@@ -63,7 +63,7 @@
 
 修订版 10 条增量出口标准 + 原方案 6 条标准**逐条勾验通过**（详见 `docs/m0_exit_report.md`）：
 
-> **M0: PASS**（唯一待回填项：CI 首次运行——仓库尚未推送 GitHub）
+> **M0: PASS_PENDING_CI**（任务书 §1.1 裁定：GitHub CI 首跑通过后改为 PASS；CI 矩阵已按任务书升级为 Windows+3.14 REQUIRED / Windows+3.12 兼容 / Linux+3.14 推荐）
 
 ## 三、轨 B：P0-M-1 Spike 完成情况（B1 阶段）
 
@@ -79,7 +79,7 @@
 
 与设计文档需求逐项对上：
 
-- `get_history_stock_status`：**字段与 `fact_security_status_daily` 一一对应**（HIGH_LIMITED/LOW_LIMITED/IS_ST_SEC/IS_SUSP_SEC/IS_WD_SEC/IS_XR_SEC...）
+- `get_history_stock_status`：单接口跨**三个 Canonical 事实域**（任务书 §1.3 裁定：DTO 保留全字段，Canonicalizer 按域路由）——`IS_ST_SEC/IS_SUSP_SEC` → Security Status 域（`fact_security_status_daily`）；`HIGH_LIMITED/LOW_LIMITED` → Limit Price 域（`fact_limit_price`）；`IS_WD_SEC/IS_XR_SEC` → Corporate Action 域（`fact_corporate_action`）
 - `get_hist_code_list`（20130101 起，退市包含性待实测）、`get_stock_basic`（IS_LISTED 退市标志）
 - `get_adj_factor` + `get_backward_factor`（复权因子）
 - **行业四件套**（`get_industry_base_info/constituent/daily/weight`，taxonomy 归属待实测——申万 or 银河自编，按 ADR-007 纪律不预设结论）

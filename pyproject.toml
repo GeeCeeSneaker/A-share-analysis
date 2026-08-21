@@ -97,10 +97,16 @@ ignore_missing_imports = true
 module = ["pyarrow", "pyarrow.parquet"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["tgw", "tgw.*", "AmazingData", "AmazingData.*"]
+# broker SDK ships without type stubs; provider layer wraps every call
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 markers = [
     "integration: tests touching real filesystem/duckdb (slower)",
     "golden: golden dataset comparisons",
+    "unit: fast offline tests",
 ]

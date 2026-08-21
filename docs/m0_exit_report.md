@@ -64,4 +64,4 @@ P0-M0 出口标准（含设计者修订版 10 条增量）**全部满足**，工
 三层身份（data_snapshot_id / feature_artifact_set_id / publish_id）在 Schema 与
 运行时（发布事务 + Published/Exact readers）两个层面均可用且被测试覆盖。
 
-**M0: PASS（待 CI 首跑回填第 4 节第 1 条后完全闭合）**
+**M0: PASS_PENDING_CI**（任务书 §1.1 裁定：CI 首跑通过——Windows+3.14 必选矩阵——后改为 PASS；CI 矩阵已升级为 Windows+3.14 REQUIRED / Windows+3.12 / Linux+3.14）

@@ -26,7 +26,7 @@
 ### 1.2 关键接口字段（手册确认）
 
 `get_history_stock_status` 返回（按日、沪深 A）：
-`MARKET_CODE / TRADE_DATE / PRECLOSE / HIGH_LIMITED / LOW_LIMITED / PRICE_HIGH_LMT_RATE / PRICE_LOW_LMT_RATE / IS_ST_SEC / IS_SUSP_SEC / IS_WD_SEC / IS_XR_SEC`——**正是设计文档 §6.11 fact_security_status_daily 所需的完整字段集**。
+`MARKET_CODE / TRADE_DATE / PRECLOSE / HIGH_LIMITED / LOW_LIMITED / PRICE_HIGH_LMT_RATE / PRICE_LOW_LMT_RATE / IS_ST_SEC / IS_SUSP_SEC / IS_WD_SEC / IS_XR_SEC`——**单接口跨三个 Canonical 事实域**（任务书 §1.3 裁定）：`IS_ST_SEC/IS_SUSP_SEC` → Security Status 域；`HIGH_LIMITED/LOW_LIMITED` → Limit Price 域；`IS_WD_SEC/IS_XR_SEC` → Corporate Action 域。Provider DTO 保留全字段，Canonicalizer 按事实域路由，禁止合并为单一事实所有者。
 
 缓存模式：`local_path` + `is_local`（True=本地优先缺则拉取并缓存；False=强制拉取并更新本地）。
 

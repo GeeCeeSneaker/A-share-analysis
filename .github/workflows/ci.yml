@@ -6,26 +6,38 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Design ruling section 10: real CI runner is an M0 exit requirement.
-# - Windows runner: mandatory (primary dev/deploy platform; path/case/tz drift checks)
-# - Linux runner: recommended (cross-platform manifest hash & file_uri semantics)
+# Task book section 1.1/1.4 (2026-08-21): reference production Python = 3.14.
+# Matrix:
+#   Windows + 3.14    REQUIRED  (reference production runtime)
+#   Windows + 3.12    COMPATIBILITY (minimum supported version)
+#   Linux   + 3.14    RECOMMENDED (cross-platform manifest/file_uri drift)
 # CI never installs the AmazingData SDK and holds no real provider credentials.
 
 jobs:
   quality:
-    name: Lint & Type Check (${{ matrix.os }})
+    name: Lint & Type Check (${{ matrix.os }} / py${{ matrix.python-version }})
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            python-version: "3.14"
+            required: true
+          - os: windows-latest
+            python-version: "3.12"
+            required: false
+          - os: ubuntu-latest
+            python-version: "3.14"
+            required: false
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ !matrix.required }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           enable-cache: true
 
       - name: Sync dependencies (no AmazingData SDK)

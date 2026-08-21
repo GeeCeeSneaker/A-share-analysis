@@ -7,7 +7,7 @@ from pathlib import Path
 
 import typer
 
-from ashare_state.config import load_config
+from ashare_state.config import Settings, load_config
 from ashare_state.identity import PROJECT_SECURITY_NAMESPACE, resolve_security_identity
 from ashare_state.logging_setup import setup_logging
 from ashare_state.storage.connection import DuckDBConnectionManager
@@ -82,6 +82,35 @@ def self_test() -> None:
     typer.echo(f"config loaded: data_root={config.paths.data_root}")
     typer.echo(f"migrations found: {n_migrations}")
     _run_security_fixture_check()
+
+
+@app.command()
+def provider_doctor(
+    offline: bool = typer.Option(False, help="Skip login/connectivity probes"),
+    output: Path = typer.Option(None, help="Also write the JSON report to this path"),
+) -> None:
+    """Runtime identity + connectivity diagnosis (task book section 2)."""
+    import json
+
+    from ashare_state.providers.amazingdata.doctor import run_doctor
+
+    settings = Settings()
+    creds = None
+    if settings.tgw_username and settings.tgw_password and not offline:
+        creds = (
+            settings.tgw_username,
+            settings.tgw_password,
+            settings.tgw_server_vip,
+            settings.tgw_server_port,
+        )
+    report = run_doctor(credentials=creds, offline=offline)
+    typer.echo(json.dumps(report, indent=2, ensure_ascii=False, default=str))
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+        )
+        typer.echo(f"report written: {output}")
 
 
 if __name__ == "__main__":

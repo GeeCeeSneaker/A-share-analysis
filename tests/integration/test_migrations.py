@@ -48,6 +48,12 @@ EXPECTED_TABLES = {
     # 004
     "meta_feature_set",
     "meta_feature_set_member",
+    # 005 canonical fact domains (task book section 8)
+    "fact_daily_bar",
+    "fact_security_status_daily",
+    "fact_limit_price",
+    "fact_adj_factor",
+    "fact_corporate_action",
     # runner bootstrap
     "meta_schema_version",
 }
@@ -64,7 +70,7 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 4
+            assert len(applied) == 5
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
         finally:
@@ -75,10 +81,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 4
+            assert len(first) == 5
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 4
+            assert len(ledger) == 5
         finally:
             conn.close()
 
@@ -114,10 +120,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 005
+            # tamper 002 and add a new 006
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "005_new_thing.sql").write_text(
+            (tampered_dir / "006_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):

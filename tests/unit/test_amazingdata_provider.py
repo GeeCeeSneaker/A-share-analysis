@@ -1,0 +1,184 @@
+"""AmazingData provider component tests (offline; no SDK required for most).
+
+The mapper/dto/capability/session-profile layers are testable without the
+broker SDK; only sdk_loader import paths need the real wheel (skipped when
+absent - CI discipline).
+"""
+
+from __future__ import annotations
+
+from datetime import date
+
+import pytest
+
+from ashare_state.providers.amazingdata.capability import (
+    CAPABILITY_REGISTRY,
+    CapabilityStatus,
+    capability_status,
+)
+from ashare_state.providers.amazingdata.errors import ProviderUnavailableError
+from ashare_state.providers.amazingdata.mapper import (
+    corporate_action_flags,
+    map_security_status_row,
+    project_limit_price,
+)
+from ashare_state.providers.amazingdata.session import AccountProfile
+from ashare_state.providers.amazingdata.timeout import RetryPolicy, TimeBudget, run_with_budget
+
+pytestmark = pytest.mark.unit
+
+
+class TestCapabilityRegistry:
+    def test_all_capabilities_start_candidate(self):
+        """Task book 21.1: nothing APPROVED before real-account Spike."""
+        for name, cap in CAPABILITY_REGISTRY.items():
+            assert cap.status is CapabilityStatus.CANDIDATE, name
+
+    def test_status_query(self):
+        assert capability_status("daily_bar") is CapabilityStatus.CANDIDATE
+
+    def test_unknown_capability_raises(self):
+        with pytest.raises(KeyError):
+            capability_status("nonexistent")
+
+    def test_status_endpoint_feeds_three_domains(self):
+        """Task book 1.3: never merged into one fact owner."""
+        domains = CAPABILITY_REGISTRY["security_status_history"].canonical_domains
+        assert set(domains) == {
+            "fact_security_status_daily",
+            "fact_limit_price",
+            "fact_corporate_action",
+        }
+
+
+class TestStatusRouting:
+    """One provider row -> three domain projections (task book 1.3)."""
+
+    ROW = {
+        "MARKET_CODE": "2",
+        "SECURITY_CODE": "000001",
+        "TRADE_DATE": "20260814",
+        "PRECLOSE": 10.0,
+        "HIGH_LIMITED": 11.0,
+        "LOW_LIMITED": 9.0,
+        "PRICE_HIGH_LMT_RATE": 0.1,
+        "PRICE_LOW_LMT_RATE": 0.1,
+        "IS_ST_SEC": 0,
+        "IS_SUSP_SEC": 0,
+        "IS_WD_SEC": 1,
+        "IS_XR_SEC": 0,
+    }
+
+    def test_status_domain_fields(self):
+        dto = map_security_status_row(self.ROW)
+        assert dto.security_code == "000001"
+        assert dto.trade_date == date(2026, 8, 14)
+        assert dto.is_st_sec == 0
+        assert dto.is_susp_sec == 0
+
+    def test_limit_price_projection(self):
+        status = map_security_status_row(self.ROW)
+        limit = project_limit_price(status)
+        assert limit.provider_symbol == "000001.SZ"
+        assert limit.up_limit == 11.0
+        assert limit.down_limit == 9.0
+        assert limit.up_limit_rate == 0.1
+
+    def test_corporate_action_projection(self):
+        status = map_security_status_row(self.ROW)
+        symbol, ex_date, ex_div, ex_rights = corporate_action_flags(status)
+        assert symbol == "000001.SZ"
+        assert ex_date == date(2026, 8, 14)
+        assert ex_div is True  # IS_WD_SEC = 1
+        assert ex_rights is False  # IS_XR_SEC = 0
+
+    def test_missing_columns_tolerated(self):
+        dto = map_security_status_row({})
+        assert dto.security_code == ""
+        assert dto.high_limited is None
+        assert dto.trade_date == date(1970, 1, 1)  # sentinel, mapper is honest
+
+
+class TestAccountProfile:
+    def test_trial_profile_shape(self):
+        profile = AccountProfile.from_scrubbed(
+            {
+                "PermissionCode": "3|4|32|33",
+                "SubscribeLimitNum": 100,
+                "TotalWeekFlow": 10,
+                "UsedWeekFlow": 0.16,
+            }
+        )
+        assert profile.login_ok
+        assert profile.account_profile_id.startswith("TRIAL_SIMULATION_")
+        assert profile.permission_codes == "3|4|32|33"
+        assert profile.subscribe_limit == 100
+        assert profile.weekly_flow_limit == 10
+
+    def test_production_like_profile_kind(self):
+        profile = AccountProfile.from_scrubbed(
+            {"PermissionCode": "1|2|3|4|32|33", "SubscribeLimitNum": 5000, "TotalWeekFlow": 500}
+        )
+        assert profile.account_profile_id.startswith("ACCOUNT_")
+
+    def test_empty_profile(self):
+        profile = AccountProfile.from_scrubbed(None)
+        assert not profile.login_ok
+        assert profile.account_profile_id == "UNKNOWN"
+
+
+class TestTimeBudget:
+    def test_budget_exhaustion_raises_typed(self):
+        def always_fail():
+            raise RuntimeError("sdk grinding")
+
+        with pytest.raises(Exception, match="budget exhausted") as excinfo:
+            run_with_budget(
+                always_fail,
+                budget=TimeBudget(query_timeout_seconds=0.0),
+                retry=RetryPolicy(max_retries=2, backoff_base_seconds=0.001),
+                endpoint="ep",
+            )
+        assert "budget exhausted" in str(excinfo.value)
+
+    def test_success_passthrough(self):
+        assert (
+            run_with_budget(
+                lambda: "ok",
+                budget=TimeBudget(),
+                retry=RetryPolicy(),
+                endpoint="ep",
+            )
+            == "ok"
+        )
+
+    def test_non_retryable_raises_immediately(self):
+        calls = []
+
+        def boom():
+            calls.append(1)
+            raise KeyboardInterrupt
+
+        with pytest.raises(KeyboardInterrupt):
+            run_with_budget(
+                boom,
+                budget=TimeBudget(),
+                retry=RetryPolicy(max_retries=5, backoff_base_seconds=0.001),
+                endpoint="ep",
+            )
+        assert len(calls) == 1
+
+
+class TestSdkLoaderAbsent:
+    def test_load_sdk_absent_raises_typed(self, monkeypatch):
+        import ashare_state.providers.amazingdata.sdk_loader as loader
+
+        monkeypatch.setattr(loader, "SDK_MODULE", "definitely_not_installed_xyz")
+        with pytest.raises(ProviderUnavailableError):
+            loader.load_sdk()
+
+    def test_probe_identity_offline_tolerates_absence(self, monkeypatch):
+        import ashare_state.providers.amazingdata.sdk_loader as loader
+
+        monkeypatch.setattr(loader, "SDK_MODULE", "definitely_not_installed_xyz")
+        assert loader.probe_identity(require_sdk=False) is None

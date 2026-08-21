@@ -120,6 +120,19 @@ class DifferenceReasonCode(StrEnum):
     DOCUMENTED_UNIT_DIFFERENCE = "DOCUMENTED_UNIT_DIFFERENCE"
 
 
+class SourcePolicyStatus(StrEnum):
+    """Task book section 10: source policy governance state machine.
+
+    CANDIDATE -> APPROVED requires the full evidence bundle (real-account
+    spike + golden + provider verification + dry-run). Unverified
+    AmazingData capabilities stay CANDIDATE - never APPROVED by default.
+    """
+
+    CANDIDATE = "CANDIDATE"
+    APPROVED = "APPROVED"
+    RETIRED = "RETIRED"
+
+
 class QualityFlag(StrEnum):
     """Quality flags used across canonical layers (extensible)."""
 
