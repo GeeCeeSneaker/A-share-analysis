@@ -66,7 +66,7 @@ def _try_lock(fh: TextIO) -> bool:
 
         fh.seek(0)
         try:
-            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)  # type: ignore[attr-defined]
             return True
         except OSError:
             return False
@@ -86,7 +86,7 @@ def _unlock(fh: TextIO) -> None:
         fh.seek(0)
         with contextlib.suppress(OSError):
             # the lock dies with the file handle anyway; ignore release errors
-            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
     else:
         import fcntl
 

@@ -102,6 +102,12 @@ module = ["tgw", "tgw.*", "AmazingData", "AmazingData.*"]
 # broker SDK ships without type stubs; provider layer wraps every call
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "ashare_state.storage.connection"
+# platform-conditional locking code: msvcrt attrs are invisible on posix
+# stubs and fcntl ignores become unused on windows - both expected.
+warn_unused_ignores = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
