@@ -67,7 +67,10 @@ def approve_candidate(
         if not value
     ]
     if missing:
-        msg = f"approval evidence incomplete; missing: {missing} (task book 10: real spike + golden + verification + dry-run required)"
+        msg = (
+            f"approval evidence incomplete; missing: {missing} "
+            "(task book 10: real spike + golden + verification + dry-run required)"
+        )
         raise PolicyTransitionError(msg)
     return SourcePolicyStatus.APPROVED
 

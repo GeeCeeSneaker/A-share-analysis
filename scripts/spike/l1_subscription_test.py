@@ -133,7 +133,6 @@ def main() -> int:
         sub = ad.SubscribeData()
         events: list[dict] = []
         received_at_ms: list[float] = []
-        t0 = time.monotonic()
 
         def on_snapshot(data):  # SDK callback signature verified on first run
             recv = time.time()
