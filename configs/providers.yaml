@@ -1,0 +1,34 @@
+# Provider enablement (Phase 0).
+# Frozen Baseline V1.3.2 remains multi-source; current single-source reality is a
+# temporary condition recorded in ADR-007, NOT a silent redesign.
+
+providers:
+  amazingdata:
+    enabled: true
+    role: candidate_primary     # becomes APPROVED source policy only after Spike GO + P0b governance
+    sdk: python_tgw_dataframe   # pending from Galaxy; C++ V1.0.8 verified installed (runtime + certs)
+    sdk_status: >
+      cpp_v1.0.8_installed_runtime_ok (2026-08-21);
+      python_tgw_dataframe_pending_user_delivery;
+      test_tool config parser has 64->32bit truncation bug (see provider_verification section 4)
+  tushare:
+    enabled: false
+    status: disabled_pending_credits
+    note: >-
+      daily_basic (free-float) requires 2000 credits. Re-enable after credits
+      are topped up; see ADR-007 for single-source risk register.
+  qmt:
+    enabled: false
+    status: phase2_reserved
+  ifind:
+    enabled: false
+    status: optional
+  choice:
+    enabled: false
+    status: optional
+  akshare:
+    enabled: false
+    status: optional
+    note: >-
+      MUST NOT be auto-promoted to production fallback (design ruling Q6);
+      requires its own Spike + source policy approval.

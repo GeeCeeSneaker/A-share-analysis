@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+
+# Virtual environments
+.venv/
+venv/
+
+# Secrets - real credentials never enter git
+.env
+*.token
+*.secret
+
+# All local data (raw/canonical/features/db/spike outputs) - not a system of record in git
+data/
+
+# DuckDB database files
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# CodeBuddy IDE-managed project data (local, not source)
+.codebuddy/
+
+# OS
+Thumbs.db
+.DS_Store

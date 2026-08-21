@@ -1,0 +1,70 @@
+{
+  "$comment": "Fixed security identity fixture for double-rebuild determinism tests (M0 exit). Covers live, delisted, ST and code-reuse cases. Dates are ISO.",
+  "securities": [
+    {
+      "exchange": "SZSE",
+      "asset_type": "STOCK",
+      "initial_symbol": "000001",
+      "first_list_date": "1991-04-03",
+      "case": "live_main_board"
+    },
+    {
+      "exchange": "SSE",
+      "asset_type": "STOCK",
+      "initial_symbol": "600000",
+      "first_list_date": "1990-12-19",
+      "case": "live_main_board"
+    },
+    {
+      "exchange": "SZSE",
+      "asset_type": "STOCK",
+      "initial_symbol": "300750",
+      "first_list_date": "2018-06-11",
+      "case": "live_chinext"
+    },
+    {
+      "exchange": "SSE",
+      "asset_type": "STOCK",
+      "initial_symbol": "688981",
+      "first_list_date": "2020-07-22",
+      "case": "live_star"
+    },
+    {
+      "exchange": "BSE",
+      "asset_type": "STOCK",
+      "initial_symbol": "830799",
+      "first_list_date": "2021-11-15",
+      "case": "live_bse"
+    },
+    {
+      "exchange": "SSE",
+      "asset_type": "STOCK",
+      "initial_symbol": "600070",
+      "first_list_date": "1997-05-01",
+      "delist_date": "2019-07-12",
+      "case": "delisted_survivorship"
+    },
+    {
+      "exchange": "SZSE",
+      "asset_type": "STOCK",
+      "initial_symbol": "000018",
+      "first_list_date": "2004-06-25",
+      "case": "st_flag"
+    },
+    {
+      "exchange": "SZSE",
+      "asset_type": "STOCK",
+      "initial_symbol": "000003",
+      "first_list_date": "1991-07-03",
+      "delist_date": "2000-10-30",
+      "case": "code_reuse_first_listing"
+    },
+    {
+      "exchange": "SZSE",
+      "asset_type": "STOCK",
+      "initial_symbol": "000003",
+      "first_list_date": "2030-01-01",
+      "case": "code_reuse_hypothetical_relisting_must_differ"
+    }
+  ]
+}

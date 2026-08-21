@@ -1,0 +1,160 @@
+"""Migration runner integration tests (design ruling 8).
+
+Covers M0 exit criteria:
+- from-zero initialization applies all migrations
+- re-run is idempotent (skips applied)
+- modifying an applied migration BLOCKs startup
+- a failing migration rolls back completely (transactional DDL)
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import duckdb
+import pytest
+
+from ashare_state.storage import (
+    MigrationError,
+    MigrationTamperedError,
+    applied_migrations,
+    apply_migrations,
+)
+
+MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
+
+EXPECTED_TABLES = {
+    # 001
+    "dim_security",
+    "bridge_security_provider_symbol",
+    "dim_trade_calendar",
+    "dim_trading_rule",
+    # 002
+    "meta_data_source",
+    "meta_provider_capability",
+    "meta_provider_field_map",
+    "meta_source_policy",
+    "meta_tolerance_rule",
+    "meta_ingest_run",
+    # 003
+    "dim_universe",
+    "meta_pipeline_run",
+    "meta_data_snapshot",
+    "meta_data_snapshot_component",
+    "meta_feature_artifact_set",
+    "meta_feature_artifact_component",
+    "meta_publish_snapshot",
+    "meta_publish_universe",
+    # 004
+    "meta_feature_set",
+    "meta_feature_set_member",
+    # runner bootstrap
+    "meta_schema_version",
+}
+
+
+@pytest.fixture
+def db_path(tmp_path: Path) -> Path:
+    return tmp_path / "atlas.duckdb"
+
+
+@pytest.mark.integration
+class TestFromZeroInit:
+    def test_all_tables_created(self, db_path: Path):
+        conn = duckdb.connect(str(db_path))
+        try:
+            applied = apply_migrations(conn, MIGRATIONS_DIR)
+            assert len(applied) == 4
+            tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
+            assert tables >= EXPECTED_TABLES
+        finally:
+            conn.close()
+
+    def test_idempotent_rerun(self, db_path: Path):
+        conn = duckdb.connect(str(db_path))
+        try:
+            first = apply_migrations(conn, MIGRATIONS_DIR)
+            second = apply_migrations(conn, MIGRATIONS_DIR)
+            assert len(first) == 4
+            assert second == []  # nothing new applied
+            ledger = applied_migrations(conn)
+            assert len(ledger) == 4
+        finally:
+            conn.close()
+
+
+@pytest.mark.integration
+class TestTamperDetection:
+    def test_modified_applied_migration_blocks(self, db_path: Path, tmp_path: Path):
+        # copy migrations to a temp dir so we can tamper safely
+        tampered_dir = tmp_path / "migrations"
+        tampered_dir.mkdir()
+        for f in MIGRATIONS_DIR.glob("*.sql"):
+            (tampered_dir / f.name).write_bytes(f.read_bytes())
+
+        conn = duckdb.connect(str(db_path))
+        try:
+            apply_migrations(conn, tampered_dir)
+            # tamper with an applied migration
+            target = tampered_dir / "001_identity_calendar.sql"
+            target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
+            with pytest.raises(MigrationTamperedError, match="BLOCKED"):
+                apply_migrations(conn, tampered_dir)
+        finally:
+            conn.close()
+
+    def test_tamper_check_runs_before_any_new_migration(self, db_path: Path, tmp_path: Path):
+        """BLOCK must happen even when a new pending migration exists."""
+        tampered_dir = tmp_path / "migrations"
+        tampered_dir.mkdir()
+        files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+        for f in files:
+            (tampered_dir / f.name).write_bytes(f.read_bytes())
+
+        conn = duckdb.connect(str(db_path))
+        try:
+            apply_migrations(conn, tampered_dir)
+            # tamper 002 and add a new 005
+            target = tampered_dir / "002_provider_governance.sql"
+            target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
+            (tampered_dir / "005_new_thing.sql").write_text(
+                "CREATE TABLE tamper_probe (id INTEGER);"
+            )
+            with pytest.raises(MigrationTamperedError):
+                apply_migrations(conn, tampered_dir)
+            # the new migration must NOT have been applied
+            tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
+            assert "tamper_probe" not in tables
+        finally:
+            conn.close()
+
+
+@pytest.mark.integration
+class TestTransactionalRollback:
+    def test_failing_migration_rolls_back_completely(self, db_path: Path, tmp_path: Path):
+        migrations_dir = tmp_path / "migrations"
+        migrations_dir.mkdir()
+        # first migration fine, second one breaks halfway
+        (migrations_dir / "001_ok.sql").write_text("CREATE TABLE ok_table (id INTEGER);")
+        (migrations_dir / "002_bad.sql").write_text(
+            "CREATE TABLE partial_table (id INTEGER);\n"
+            "CREATE TABLE will_fail (id INTEGER);\n"
+            "CREATE TABLE will_fail (id INTEGER);\n"  # duplicate -> error
+        )
+        conn = duckdb.connect(str(db_path))
+        try:
+            with pytest.raises(MigrationError, match="rolled back"):
+                apply_migrations(conn, migrations_dir)
+            tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
+            assert "ok_table" in tables
+            assert "partial_table" not in tables  # rolled back
+            ledger = applied_migrations(conn)
+            assert "001" in ledger and "002" not in ledger
+            # fixing the bad file allows progress
+            (migrations_dir / "002_bad.sql").write_text("CREATE TABLE fixed_table (id INTEGER);")
+            applied = apply_migrations(conn, migrations_dir)
+            assert [r.migration_id for r in applied] == ["002"]
+            tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
+            assert "fixed_table" in tables
+        finally:
+            conn.close()

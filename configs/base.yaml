@@ -1,0 +1,56 @@
+# Base runtime configuration (Phase 0 skeleton).
+# Secret values live in .env (gitignored), never here.
+
+# Data root (relative to repo root; logical file_uri is expressed relative to this)
+data_root: data
+
+# Physical storage of the single-writer DuckDB metadata catalog
+duckdb_path: data/db/atlas.duckdb
+
+# Staging area for atomic commits (MUST be on the same volume as data_root
+# so os.replace stays atomic; enforced in storage/atomic_files.py)
+staging_root: data/staging
+
+# Spike output isolation (gitignored, never enters canonical paths)
+spike_root: data/spike
+
+timezone:
+  display: Asia/Shanghai   # presentation timezone
+  physical: UTC            # storage timezone (TIMESTAMPTZ)
+
+# Conservative availability policy defaults (V1.3.2 section 2.3).
+# AmazingData EOD availability is PROVISIONAL until Spike B5 provides evidence;
+# Tushare defaults kept for reference only while tushare is disabled.
+availability:
+  amazingdata:
+    daily:
+      kind: CONSERVATIVE_ASSUMED
+      time: "16:30"        # PROVISIONAL - to be validated by Spike B5
+      status: PROVISIONAL
+  tushare:
+    daily:
+      kind: CONSERVATIVE_ASSUMED
+      time: "16:10"
+    daily_basic:
+      kind: CONSERVATIVE_ASSUMED
+      time: "17:10"
+    stk_limit:
+      kind: CONSERVATIVE_ASSUMED
+      time: "08:40"
+
+# EOD signal point (V1.3.2 section 2.3)
+eod_signal_time: "17:30"
+
+# Spike request throttling (design ruling: serial, bounded retry, exponential backoff)
+spike:
+  request_interval_seconds: 1.0
+  max_retries: 3
+  retry_backoff_base_seconds: 2.0
+  # 1-month whole-market sampling is read in batches to control memory
+  batch_size: 1000
+
+# Disk watermark driven staging cleanup thresholds (V1.3.2 section 5.7)
+disk_watermark:
+  warn_free_pct: 20
+  clean_free_pct: 15
+  block_free_pct: 10

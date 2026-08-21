@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Design ruling section 10: real CI runner is an M0 exit requirement.
+# - Windows runner: mandatory (primary dev/deploy platform; path/case/tz drift checks)
+# - Linux runner: recommended (cross-platform manifest hash & file_uri semantics)
+# CI never installs the AmazingData SDK and holds no real provider credentials.
+
+jobs:
+  quality:
+    name: Lint & Type Check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync dependencies (no AmazingData SDK)
+        run: uv sync --frozen
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy
+
+      - name: Pytest (unit + integration incl. migration-from-zero, identity rebuild, secret leak)
+        run: uv run pytest
+
+      - name: Verify AmazingData SDK is absent in CI env
+        shell: bash
+        run: |
+          if uv run python -c "import AmazingData" 2>/dev/null; then
+            echo "::error::AmazingData SDK must not be installed in CI"
+            exit 1
+          fi
+          echo "OK: AmazingData SDK not present in CI environment"

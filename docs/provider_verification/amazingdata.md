@@ -1,0 +1,85 @@
+# Provider Verification — AmazingData / TGW（中国银河证券 格物金融服务平台）
+
+> 状态：**Python SDK 已安装验证（2026-08-21），待仿真账号连通性测试**
+> 本文件是 Provider 事实的唯一权威记录处（V1.3.2 §7.14）。主架构文档不维护接口细节。
+
+## 1. SDK 与环境（已验证）
+
+| 项 | 值 |
+|---|---|
+| Python SDK 包 | `AmazingData==1.1.9`（cp314 wheel，匹配本机 Python 3.14.6） |
+| wheel SHA-256 | `D9A5D12F20523F865F5CF017D134862BC985E01F1DCB0333C36F1876328006FA` |
+| 底层依赖包 | `tgw==1.0.9.2`（`tgw-1.0.9.2-py3-none-any.whl`） |
+| tgw wheel SHA-256 | `CBC30194E2D3923C87E5D40CE469B79575758001F9D5F7481D46C29C9667E21D` |
+| 安装方式 | `uv pip install <wheel>`（受控安装，**不写入 uv.lock**——设计裁决 9） |
+| 登录 API | `AmazingData.login(username, password, host, port)`（.env 注入凭证） |
+| import 验证 | ✓（B1 离线冒烟：`data/spike/results/b1_sdk_env.json`） |
+| 附带依赖 | numpy 2.5.2 / pandas 3.0.5 / scipy / statsmodels（SDK 自带数据分析栈） |
+| C++ 运行库 | VC++ 14.50 已在系统（tgw 底层需要）；证书+运行库在 `C:\Users\Public\Documents\mdga_file\lib` |
+
+### 1.1 API 面清单（import 实测）
+
+- **BaseData**（10 方法）：`get_calendar`、`get_code_list`、`get_hist_code_list`、`get_code_info`、`get_adj_factor`（单次复权）、`get_backward_factor`（后复权）、`get_etf_pcf`、期货/期权代码表
+- **InfoData**（53 方法）：`get_history_stock_status`（按日 ST/停牌/涨跌停/除权除息状态）、`get_stock_basic`（含 IS_LISTED 1上市/3终止上市）、`get_bj_code_mapping`（北交所新旧代码对照）、`get_equity_structure`（股本结构）、`get_dividend`/`get_right_issue`（分红配股）、`get_index_constituent`/`get_index_weight`（指数成分/权重）、`get_industry_base_info`/`get_industry_constituent`/`get_industry_daily`/`get_industry_weight`（行业四件套）、`get_margin_detail`/`get_margin_summary`（融资融券）、财务三表（`get_balance_sheet`/`get_cash_flow`/`get_income`）、龙虎榜/大宗交易/股东数据等
+- **其他**：`MarketData`（行情查询）、`SubscribeData`（实时订阅）、`DownloadInfoData`（批量下载）+ 量化工具类（PortfolioOptimizer/RiskModel 等，项目不使用）
+
+### 1.2 关键接口字段（手册确认）
+
+`get_history_stock_status` 返回（按日、沪深 A）：
+`MARKET_CODE / TRADE_DATE / PRECLOSE / HIGH_LIMITED / LOW_LIMITED / PRICE_HIGH_LMT_RATE / PRICE_LOW_LMT_RATE / IS_ST_SEC / IS_SUSP_SEC / IS_WD_SEC / IS_XR_SEC`——**正是设计文档 §6.11 fact_security_status_daily 所需的完整字段集**。
+
+缓存模式：`local_path` + `is_local`（True=本地优先缺则拉取并缓存；False=强制拉取并更新本地）。
+
+## 2. 账号与权限（当前为仿真账号）
+
+| 项 | 值 |
+|---|---|
+| 账号类型 | **试用仿真账号**（正式账号后续开通） |
+| 登录信息 | login 成功（2026-08-21 实测）：`SubscribeLimitNum=100`、`TotalWeekFlow=10GB`、`PushBandwidth/QueryBandwidth=3000`、`PermissionCode="3|4|32|33"` |
+| 实测权限边界 | `get_code_list` **可用**（默认 5211 / EXTRA_STOCK_A 5549 只，后缀式代码 `600000.SH`）；`get_calendar` / `get_hist_code_list` / `get_adj_factor` / `query_snapshot` **全部无权限**（服务端拒绝） |
+| 凭证注入 | `.env`（TGW_USERNAME/TGW_PASSWORD/TGW_SERVER_VIP/TGW_SERVER_PORT），不入库不入日志 |
+| 证据 | `data/spike/results/connectivity.json`（P0-P4 探针全记录） |
+
+### 2.1 仿真账号下的 Spike 范围裁定（2026-08-21）
+
+| 阶段 | 仿真账号可做 | 结果 |
+|---|---|---|
+| B1 连通性 | login + 代码表 + 快照冒烟 | **完成**：网络/认证/SDK 数据面部分通（详见 §2）；快照被服务端拒绝（权限码不含） |
+| B2-B7 正式评估 | ✗ **等正式账号** | 历史 K 线/历史状态/复权因子/行业成分均超出权限 |
+| 正式 Spike 结论（GO/NO-GO） | ✗ **等正式账号** | "核心事实未验证前不得给 GO" |
+
+### 2.2 SDK 行为观察（生产 Adapter 必须处理）
+
+1. **login 会向 stdout 打印含 Token 的 logon json**——生产 Adapter 不得转发 SDK stdout 进日志（Secret 纪律）；
+2. **无权限请求的失败形态**：内部 `TypeError: 'NoneType' object is not subscriptable`（BaseData 系）或长重试后 `Exception: 查询失败`（MarketData 系）——**无类型化错误**，Adapter 必须包装所有调用并做 None/异常双防御；
+3. `query_snapshot` 失败前重试 2-4 分钟（0.2MB/s 带宽）——生产 Adapter 需显式超时；
+4. `get_code_info(["600000.SH"])` 报 `unhashable list`——签名与手册示例可能不一致，正式账号到位后核对。
+
+流量纪律执行情况：全轮探测累计消耗约 0.08GB / 10GB 周额度。
+
+## 3. 待验证事项（正式账号到位后执行完整 Spike）
+
+1. K 线历史深度实测（手册称 2013 年至今；目标 2018 分析 + 2014/2015 Warmup）
+2. 退市证券包含性（`get_hist_code_list` 20130101 起 + `get_stock_basic.IS_LISTED=3`）
+3. 历史证券状态全字段抽样（50 ST 加/脱帽 / 20 退市 / 30 涨跌停制度 / 20 除权除息连续性 Golden）
+4. 复权因子表全历史 + 与交易所公告一致性
+5. 行业 taxonomy 归属（`get_industry_base_info`：申万 or 银河自编 → GALAXY_xxx 纪律）
+6. 行业成分历史区间（INDATE/OUTDATE）与日权重
+7. Benchmark 指数日线可得性（中证全指/300/500/1000/2000）
+8. EOD 数据可得时刻连续观测（OBSERVED vs CONSERVATIVE_ASSUMED）
+9. volume/amount 单位实测（股/手、元/千元）
+10. free-float 语义评估（`get_equity_structure` 字段 → EXACT/DERIVABLE/ALTERNATIVE/MISSING 四级结论）
+11. 限流/并发实测（正式账号额度）
+12. 指数成分股（`get_index_constituent` A010200001 对应）
+
+## 4. C++ SDK 存档（2026-08-21 摸底，已被 Python 版取代为集成路径）
+
+- TGW C++ V1.0.8 已装运行库（`C:\Users\Public\Documents\mdga_file\lib`），DLL 加载链验证完整
+- test_tool JSON 配置解析存在 64→32 位截断 bug（`ColocChannelMode` 三种格式实测均非法），不阻塞 Python 路径
+- C++ 手册能力面（K线/快照/复权因子/三方资讯功能号体系）已存档于本文件历史版本与 `data/spike/manual_extract/manual_full.txt`
+
+## 5. 已知问题与修订记录
+
+- **2026-08-21（1）**：C++ SDK 摸底完成，test_tool 配置 bug 确认
+- **2026-08-21（2）**：Python SDK（AmazingData 1.1.9 + tgw 1.0.9.2）受控安装 + import/API 面验证通过；发现仿真账号权限限制（仅 Level-1 快照），B2-B7 正式 Spike 顺延至正式账号
+- **2026-08-21（3）**：**B1 连通性测试完成**（仿真账号 330800077781）：login/认证/代码表 PASS；calendar/hist_code_list/adj_factor/snapshot 服务端拒绝（PermissionCode 3|4|32|33 仅覆盖代码表）。SDK 行为观察 4 条入档 §2.2。证据：`data/spike/results/connectivity.json`
