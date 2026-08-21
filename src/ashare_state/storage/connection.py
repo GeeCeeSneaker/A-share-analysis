@@ -96,13 +96,24 @@ def _unlock(fh: TextIO) -> None:
 class DuckDBConnectionManager:
     """File-level exclusive ownership gate + DuckDB connection factory."""
 
-    def __init__(self, db_path: Path | str) -> None:
+    #: seconds to keep retrying a busy lock before declaring it held by a
+    #: live owner (crash-recovery probe; see _acquire_gate).
+    DEAD_LOCK_PROBE_SECONDS = 1.5
+
+    def __init__(
+        self, db_path: Path | str, *, dead_lock_probe_seconds: float | None = None
+    ) -> None:
         self._db_path = Path(db_path)
         self._lock_path = self._db_path.with_suffix(self._db_path.suffix + ".owner.lock")
         self._gate_lock = threading.RLock()
         self._gate_fh: TextIO | None = None
         self._gate_mode: OwnerMode | None = None
         self._gate_refcount = 0
+        self._probe_seconds = (
+            self.DEAD_LOCK_PROBE_SECONDS
+            if dead_lock_probe_seconds is None
+            else dead_lock_probe_seconds
+        )
 
     @property
     def db_path(self) -> Path:
@@ -139,6 +150,13 @@ class DuckDBConnectionManager:
 
             self._db_path.parent.mkdir(parents=True, exist_ok=True)
             deadline = time.monotonic() + max(timeout, 0.0)
+            # Windows: msvcrt byte-range lock release can lag TerminateProcess
+            # by a observable window (seen on CI runners 2026-08-21). Before
+            # declaring the DB owned by a LIVE process, probe briefly so a
+            # crashed owner's lock is always recovered (ADR-008 rule 3 makes
+            # crash recovery deterministic; live owners still fail loudly,
+            # just after the probe window).
+            probe_deadline = time.monotonic() + self._probe_seconds
             while True:
                 # SIM115/PTH123: the lock file handle is held deliberately
                 # for the lifetime of ownership - it IS the cross-process
@@ -151,9 +169,16 @@ class DuckDBConnectionManager:
                     self._write_owner_info(mode)
                     return
                 fh.close()
-                if not wait or time.monotonic() >= deadline:
+                if wait:
+                    if time.monotonic() >= deadline:
+                        raise DatabaseOwnedError(self._db_path, self._read_owner_info())
+                    time.sleep(0.1)
+                elif time.monotonic() >= probe_deadline:
+                    # probe window elapsed: the lock is genuinely held by a
+                    # live owner -> the loud, typed error.
                     raise DatabaseOwnedError(self._db_path, self._read_owner_info())
-                time.sleep(0.1)
+                else:
+                    time.sleep(0.05)
 
     def _release_gate(self) -> None:
         with self._gate_lock:

@@ -89,7 +89,7 @@ class TestSingleWriterRule:
 
     def test_two_writer_processes_second_fails(self, db_path: Path):
         # seed the database first
-        manager = DuckDBConnectionManager(db_path)
+        manager = DuckDBConnectionManager(db_path, dead_lock_probe_seconds=0.0)
         with manager.owner("read_write") as conn:
             conn.execute("CREATE TABLE t (id INTEGER)")
 
@@ -97,7 +97,8 @@ class TestSingleWriterRule:
         try:
             assert holder.stdout is not None
             assert holder.stdout.readline().strip() == "ACQUIRED"
-            # rule test 1: second writer fails explicitly
+            # rule test 1: second writer fails explicitly (probe disabled so
+            # the LIVE-owner failure is immediate and race-free)
             with pytest.raises(DatabaseOwnedError), manager.owner("read_write"):
                 pass
             # rule test 2: while a WRITER holds it, ownership is refused for
