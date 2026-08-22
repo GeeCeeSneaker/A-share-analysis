@@ -8,6 +8,38 @@
 
 ---
 
+## 2026-08-22 · 建立项目开发管理总册
+
+**Scope**
+- 初始化长期项目治理文档（Documentation Governance，P0 治理要求，不改 Frozen Baseline）
+
+**Implementation**
+- 新建 `docs/project/DEVELOPMENT_MANAGEMENT.md`（固定路径，永不改名/不建副本）
+- 按工作要求 §10 以最新 HEAD（`bb694c5`，R4-A1.1 已落地）同步初始化状态：§30/§31（Golden Truth v2 candidate + R4-A1.1 DONE/PENDING_REVIEW）、§40（状态表）、§41（最高优先 → R4-A2）、§52（RISK-001 部分缓解）、§62（检查点标注）
+- 固化 Design/Progress/Change-Control/Entry-Gate 管理规则（C0-C3 分级 + DM-CR 变更记录 + 同一逻辑提交纪律）
+- 归档工作要求至 `docs/design/开发管理总册_初始化与持续维护工作要求_20260822.md`
+- 记录首个 Change Record：DM-CR-20260822-001
+
+**Schema / Contract Changes**
+- 无运行时代码/Schema 改动
+- 新增 Documentation Governance Contract（设计/契约变化必须同 commit 更新 DEVLOG + DEVELOPMENT_MANAGEMENT）
+
+**Verification**
+- 文档路径检查（docs/project/DEVELOPMENT_MANAGEMENT.md 精确匹配）
+- 与 V1.3.2 / DEVLOG / 当前 R4-A1.1 状态核对（§10 真实状态要求）
+- Frozen Baseline 未修改；无 credential/wheel 入库
+
+**Implementation Status**
+- DONE
+
+**Review Status**
+- PENDING_REVIEW
+
+**Next**
+- R4-A2（含并入的 Golden Domain Router）+ CR-1 并行
+
+---
+
 ## 2026-08-23 05:10 · R4-A1.1 补遗：Devlog Gate 自身修复
 
 **Scope**
