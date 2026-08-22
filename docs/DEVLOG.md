@@ -8,6 +8,46 @@
 
 ---
 
+## 2026-08-22 23:50 · R3-0C + R3-1A/1B：语义 Validators + Golden Truth + 治理精确化
+
+**Scope**
+- 第三轮审查 §10-17（语义 validators）+ §37 R3-0C/0E + §21-27（治理精确化）
+
+**Implementation**
+- **Validators v2 重写**：symbol mapping 复用 `normalize_provider_symbol` 单一规则（bare code 跨市场不再是错误，全符号唯一性才是）；daily bar units 独立证据源（documented vs observed，`_observe_units` 从 live 数据推导观测单位；checked_n=0 必 FAIL）；ST/停牌无 golden facts 时 OBSERVED（全 0 样本不再 PASS）；limit 制度校验（board 分类 + pre_close×rate + tick rounding：ST 5%/主板 10%/创业板科创板 20%/北交所 30%；字段全缺失必 FAIL）；adj 连续性需要价格上下文（raw×factor 连续性，无上下文时 OBSERVED）；SDK behavior 拒绝 placeholder permission codes
+- **Golden Truth 结构**（R3-0E）：`GoldenCase`（golden_case_id/truth_source/source_ref/expected_fields/source_hash）+ 内置 7 个公开可查证案例（ST 加帽/退市/涨跌停制度/除权）；B4 重写为逐案例 provider 对比；**golden case types 进入 Core Gate**（golden_st_transition/golden_delisted/golden_limit_regime/golden_corporate_action 成为 required case types）
+- **R3-P0-18**：`allow_manual_publish` 逃生舱删除——任何 publish 必须有 run（RECOVERY 语义保留）
+- **R3-P1-01**：migration 010——`meta_artifact_validation` 改 append-only（artifact_validation_id PK）+ `meta_publish_snapshot.artifact_validation_id` 绑定（历史 publish 永远能回答"当时哪个 validation 批准了我"）
+- **R3-P1-02**：universe 激活同 hash 幂等 / 异 hash BLOCK（不再 REPLACE）
+- **R3-P1-03**：publish 时自检 feature set members hash（绕过 service 的越库修改也会被拦）
+- **R3-P1-05**：capability approval validate-before-mutate（内存不再先于 DB 提交变更）
+
+**Schema / Contract Changes**
+- migration 010（append-only validation + publish 绑定）；008 表重命名保留历史
+- publish_snapshot 签名：pipeline_run_id 必填、allow_manual_publish 移除
+- capabilities：required_case_types 增加 golden 类型
+
+**Verification**
+- pytest: **279 passed**（+26：validators v2 21 项 + recovery-run 语义适配）
+- ruff/format/mypy clean；dry-run 冒烟——**新 validators 当场抓到 Fake 数据的制度违规**（北交所股票给出主板式涨跌停 → limit FAIL），证明语义校验真实生效
+
+**Known Open Issues**
+- R3-P0-17（capability approval 从 SpikeRun 自证）→ 下一批
+- R3-P1-06/07（provider envelope 审计单元统一）→ 与 CR-1 RawWriter 一并
+- R3-P1-08（B7 全月 capacity）、P1-10（L1 小修）、P1-12（Spike Report 更新）→ 收尾批
+- DEVLOG CI gate（§4）→ 收尾批
+
+**Implementation Status**
+- DONE（R3-0C / R3-1A / R3-1B 主体）
+
+**Review Status**
+- PENDING_REVIEW
+
+**Next**
+- 收尾批：DEVLOG CI gate + L1 小修 + Spike Report 更新；然后 CR-1（RawWriter + ProviderExchange）
+
+---
+
 ## 2026-08-22 22:30 · R3-0A：Spike 生命周期 + 账号门 + Provenance + Verdict 引擎
 
 **Scope**

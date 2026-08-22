@@ -68,18 +68,18 @@ class MockE2eResult:
 
 def _register_feature_set(conn: DuckDBPyConnection) -> None:
     """Design ruling P0-3: feature_set_version must resolve BEFORE the first
-    artifact set exists."""
-    definition_hash = compute_manifest_hash(
-        [
-            ComponentIdentity(
-                dataset="feature_set_definition",
-                logical_partition_key=f"{SKELETON_FEATURE_ID}/{SKELETON_FEATURE_VERSION}/{SKELETON_PARAM_SET_ID}",
-                content_hash=_feature_definition_hash(),
-                schema_hash="v1",
-                row_count=1,
-            )
-        ]
-    )
+    artifact set exists.
+
+    R3-P1-03: the registered definition_hash uses the SAME formula as
+    storage.versioning.recompute_feature_set_hash so the publish-time
+    self-check passes for honest sets.
+    """
+    import hashlib
+
+    members = [(SKELETON_FEATURE_ID, SKELETON_FEATURE_VERSION, SKELETON_PARAM_SET_ID)]
+    definition_hash = hashlib.sha256(
+        "|".join(f"{fid}:{fv}:{psid}" for fid, fv, psid in members).encode()
+    ).hexdigest()
     existing = conn.execute(
         "SELECT 1 FROM meta_feature_set WHERE feature_set_version = ?",
         [SKELETON_FEATURE_SET_VERSION],

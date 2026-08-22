@@ -25,16 +25,35 @@ def base(tmp_path: Path):
     return run_mock_e2e(db, data_root, start=date(2026, 8, 3), end=date(2026, 8, 14))
 
 
-def _valid_kwargs(base) -> dict:
+def _valid_kwargs(conn, base) -> dict:
+    """Publish kwargs carrying a RECOVERY run (R3-P0-18: every publish
+    needs a run; lineage tests exercise the OTHER gates)."""
+    import uuid as uuid_mod
+
+    recovery_run = str(uuid_mod.uuid4())
+    conn.execute(
+        "INSERT INTO meta_pipeline_run "
+        "(pipeline_run_id, run_type, status, started_at, code_commit, "
+        "environment_lock_hash, config_hash, source_policy_version, "
+        "availability_policy_version) "
+        "VALUES (?, 'RECOVERY', 'FEATURE_VALIDATED', ?, ?, ?, ?, ?, ?)",
+        [
+            recovery_run,
+            datetime.now(UTC),
+            "skeleton-commit",
+            "skeleton-env",
+            "skeleton-config",
+            "source-policy-mock-v1",
+            "availability-mock-v1",
+        ],
+    )
     return {
         "trade_date": date(2026, 8, 18),  # a new trade date (no existing publish)
         "data_snapshot_id": base.data_snapshot_id,
         "feature_artifact_set_id": base.feature_artifact_set_id,
         "feature_set_version": SKELETON_FEATURE_SET_VERSION,
         "universes": [("ALL_A", "v1")],
-        # lineage tests probe OTHER invariants; the run-required gate is
-        # tested separately in test_publish_validation_gate.py
-        "allow_manual_publish": True,
+        "pipeline_run_id": recovery_run,
     }
 
 
@@ -43,7 +62,7 @@ class TestPublishLineageGate:
     def test_valid_publish_still_works(self, base):
         manager = DuckDBConnectionManager(base.db_path)
         with manager.owner("read_write") as conn:
-            pid = publish_snapshot(conn, **_valid_kwargs(base))
+            pid = publish_snapshot(conn, **_valid_kwargs(conn, base))
         assert pid
 
     def test_rejects_artifact_snapshot_mismatch(self, base, tmp_path: Path):
@@ -72,7 +91,7 @@ class TestPublishLineageGate:
                     None,
                 ],
             )
-            kwargs = _valid_kwargs(base)
+            kwargs = _valid_kwargs(conn, base)
             kwargs["data_snapshot_id"] = other.data_snapshot_id
             with pytest.raises(PublishStateError, match="artifact .* was computed from"):
                 publish_snapshot(conn, **kwargs)
@@ -80,7 +99,7 @@ class TestPublishLineageGate:
     def test_rejects_feature_set_mismatch(self, base):
         manager = DuckDBConnectionManager(base.db_path)
         with manager.owner("read_write") as conn:
-            kwargs = _valid_kwargs(base)
+            kwargs = _valid_kwargs(conn, base)
             kwargs["feature_set_version"] = "other-set-v9"
             with pytest.raises(PublishStateError, match="belongs to feature set"):
                 publish_snapshot(conn, **kwargs)
@@ -90,7 +109,7 @@ class TestPublishLineageGate:
         but a DIRECT unknown-set probe is covered by the artifact check."""
         manager = DuckDBConnectionManager(base.db_path)
         with manager.owner("read_write") as conn:
-            kwargs = _valid_kwargs(base)
+            kwargs = _valid_kwargs(conn, base)
             kwargs["feature_set_version"] = "never-registered-v0"
             with pytest.raises(PublishStateError):
                 publish_snapshot(conn, **kwargs)
@@ -103,12 +122,12 @@ class TestPublishLineageGate:
                 [SKELETON_FEATURE_SET_VERSION],
             )
             with pytest.raises(PublishStateError, match="expected ACTIVE"):
-                publish_snapshot(conn, **_valid_kwargs(base))
+                publish_snapshot(conn, **_valid_kwargs(conn, base))
 
     def test_rejects_unknown_pipeline_run(self, base):
         manager = DuckDBConnectionManager(base.db_path)
         with manager.owner("read_write") as conn:
-            kwargs = _valid_kwargs(base)
+            kwargs = _valid_kwargs(conn, base)
             kwargs["pipeline_run_id"] = "run-that-never-existed"
             with pytest.raises(PublishStateError, match="pipeline run .* not registered"):
                 publish_snapshot(conn, **kwargs)
@@ -121,7 +140,7 @@ class TestPublishLineageGate:
                 "VALUES (?, 'EOD', 'RUNNING', ?)",
                 ["run-still-running", datetime.now(UTC)],
             )
-            kwargs = _valid_kwargs(base)
+            kwargs = _valid_kwargs(conn, base)
             kwargs["pipeline_run_id"] = "run-still-running"
             with pytest.raises(PublishStateError, match="expected FEATURE_VALIDATED"):
                 publish_snapshot(conn, **kwargs)
@@ -129,7 +148,7 @@ class TestPublishLineageGate:
     def test_rejects_unknown_universe(self, base):
         manager = DuckDBConnectionManager(base.db_path)
         with manager.owner("read_write") as conn:
-            kwargs = _valid_kwargs(base)
+            kwargs = _valid_kwargs(conn, base)
             kwargs["universes"] = [("NOT_REGISTERED", "v1")]
             with pytest.raises(PublishStateError, match="not registered in dim_universe"):
                 publish_snapshot(conn, **kwargs)
@@ -149,4 +168,4 @@ class TestPublishLineageGate:
                 blocking_dq_count=0,
             )
             with pytest.raises(PublishStateError, match="ARTIFACT_VALIDATION_GATE"):
-                publish_snapshot(conn, **_valid_kwargs(base))
+                publish_snapshot(conn, **_valid_kwargs(conn, base))

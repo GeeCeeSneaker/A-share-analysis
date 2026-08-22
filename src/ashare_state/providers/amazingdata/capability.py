@@ -134,10 +134,11 @@ def capability_status(name: str) -> CapabilityStatus:
     return cap.status
 
 
-def approve_capability(name: str, evidence: CapabilityEvidence) -> Capability:
-    """In-memory approval with FULL evidence bundle (audit P1-03).
+def _validate_evidence(name: str, evidence: CapabilityEvidence) -> Capability:
+    """Pure validation: raise on incomplete evidence / RETIRED capability.
 
-    Persistence to the authoritative table happens via persist_approval().
+    R3-P1-05: NEVER mutates the registry - the persisted path validates
+    first, writes the DB, then rebuilds the cache from the DB.
     """
     cap = CAPABILITY_REGISTRY[name]
     missing = [
@@ -163,6 +164,18 @@ def approve_capability(name: str, evidence: CapabilityEvidence) -> Capability:
     if cap.status is CapabilityStatus.RETIRED:
         msg = f"capability {name!r} is RETIRED; approval refused"
         raise CapabilityGovernanceError(msg)
+    return cap
+
+
+def approve_capability(name: str, evidence: CapabilityEvidence) -> Capability:
+    """In-memory approval with FULL evidence bundle (audit P1-03).
+
+    NOTE (R3-P1-05): prefer approve_and_persist_capability() - it never
+    mutates memory before the DB commit. This in-memory variant remains
+    for tests and is the only mutating path.
+    """
+    _validate_evidence(name, evidence)
+    cap = CAPABILITY_REGISTRY[name]
     approved = Capability(
         name=cap.name,
         sdk_methods=cap.sdk_methods,
@@ -183,16 +196,16 @@ def approve_and_persist_capability(
     name: str,
     evidence: CapabilityEvidence,
 ) -> Capability:
-    """The ONLY public approval path (audit R2-P1-01).
+    """The ONLY public approval path (audit R2-P1-01 + R3-P1-05).
 
-    One transaction: validate evidence -> UPSERT governance fields only
-    (existing metadata columns are preserved) -> COMMIT -> reload the
-    registry from the DB, so memory and the authoritative table can never
-    disagree. Broken evidence raises BEFORE any write; a failed write
-    ROLLBACKs and restores the cache from the DB.
+    R3-P1-05 validate-before-mutate: evidence is validated WITHOUT touching
+    the in-memory registry; the DB transaction writes; only AFTER commit is
+    the cache rebuilt from the DB. A failed write leaves the cache exactly
+    as the DB says - no stale APPROVED can survive even when the DB has no
+    prior row for the capability.
     """
-    # validate FIRST (raises before any write)
-    approve_capability(name, evidence)
+    # pure validation - NO memory mutation (R3-P1-05)
+    _validate_evidence(name, evidence)
     existing = conn.execute(
         "SELECT 1 FROM meta_provider_capability WHERE provider = 'amazingdata' AND capability = ?",
         [name],

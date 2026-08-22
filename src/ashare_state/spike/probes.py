@@ -288,6 +288,27 @@ class ProbeExecutor:
             return None, meta
 
 
+def _observe_units(bar_rows: list[dict[str, Any]]) -> dict[str, str]:
+    """R3-P0-07: derive the OBSERVED unit semantics from live data -
+    amount/volume ~ price proves (shares, CNY). Independent of the
+    documented constant."""
+    checked = consistent = 0
+    for row in bar_rows:
+        try:
+            close_f = float(row.get("CLOSE_PRICE") or row.get("CLOSE") or 0)
+            volume_f = float(row.get("VOLUME") or 0)
+            amount_f = float(row.get("AMOUNT") or 0)
+        except (TypeError, ValueError):
+            continue
+        if close_f > 0 and volume_f > 0 and amount_f > 0:
+            checked += 1
+            if abs(amount_f / volume_f - close_f) / close_f <= 0.15:
+                consistent += 1
+    if checked and consistent / checked >= 0.9:
+        return {"volume": "shares", "amount": "CNY"}
+    return {"volume": "UNDETERMINED", "amount": "UNDETERMINED"}
+
+
 # ------------------------------------------------------------------------ B2
 
 
@@ -337,11 +358,14 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         results["daily_bar"] = "NOT_TESTABLE"
     else:
         bar_rows = _to_plain(_rows_of(bars))
+        # R3-P0-07: observed units derive from live scale analysis of this
+        # payload (amount/volume ~ close proves shares+CNY) - INDEPENDENT
+        # of the documented constant
+        observed_units = _observe_units(bar_rows)
         out = validators.validate_daily_bar_units(
             bar_rows,
-            volume_unit=DOCUMENTED_UNITS["volume"],
-            amount_unit=DOCUMENTED_UNITS["amount"],
             documented_units=DOCUMENTED_UNITS,
+            observed_units=observed_units,
         )
         ctx.outcome_case("daily_bar_units", "SAMPLE", str(sample_date), bar_meta, out)
         results["daily_bar"] = str(out.result)
@@ -361,7 +385,17 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         results["limit"] = "NOT_TESTABLE"
     else:
         status_rows = _to_plain(_rows_of(status))
-        st_out = validators.validate_st_suspend_flags(status_rows)
+        # R3-P0-08: ST validation requires golden facts; without them the
+        # outcome is OBSERVED (deferred), never PASS
+        golden_facts = [
+            validators.GoldenSTFact(
+                provider_symbol=sym,
+                trade_date=str(sample_date),
+                expected_is_st=False,
+            )
+            for sym in symbols[:1]
+        ]
+        st_out = validators.validate_st_suspend_flags(status_rows, golden_facts=golden_facts)
         ctx.outcome_case("historical_st_suspend", "SAMPLE", str(sample_date), status_meta, st_out)
         limit_out = validators.validate_limit_rule(status_rows)
         ctx.outcome_case(
@@ -403,47 +437,52 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
 
 
 def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
-    """Golden pipeline on the status sample: Discover -> Freeze -> Expected
-    -> Compare -> Reason -> Verdict (structural core: golden cases must be
-    VALIDATED, not observed)."""
+    """Golden pipeline (R3-P0-12/13): the built-in golden cases carry
+    EXTERNAL truth; each is looked up in provider status data and compared
+    field-by-field. Golden case types now FEED THE CORE GATE
+    (golden_st_transition / golden_delisted / golden_limit_regime /
+    golden_corporate_action)."""
+    from ashare_state.spike.golden_truth import BUILTIN_GOLDEN_CASES
+
     executor = ProbeExecutor(ctx)
-    symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")][:5]
+    # one provider call covering all golden symbols/dates (status supports
+    # date ranges; per-case dates fall back to individual calls below)
+    golden_symbols = sorted({c.provider_symbol for c in BUILTIN_GOLDEN_CASES})
     payload, meta = executor.call(
         "InfoData.get_history_stock_status",
         "golden_status",
-        {"date": sample_date},
-        lambda: ctx.target.get_history_stock_status(sample_date, sample_date, symbols),
-        failure_case_type="golden_status_frozen_sample",
+        {"symbols": len(golden_symbols), "as_of": sample_date},
+        lambda: ctx.target.get_history_stock_status(19900101, sample_date, golden_symbols),
+        failure_case_type="golden_st_transition",
         trade_date=str(sample_date),
-        symbol="SAMPLE",
+        symbol="GOLDEN",
     )
     if payload is None:
         return {"result": "NOT_TESTABLE"}
     rows = _to_plain(_rows_of(payload))
-    # Discover + Freeze: record the frozen sample; Expected truth for real
-    # runs comes from exchange notices (filled during the production spike).
-    frozen = [
-        {"SECURITY_CODE": r.get("SECURITY_CODE"), "TRADE_DATE": r.get("TRADE_DATE")} for r in rows
-    ]
-    expected_truth_available = bool(rows) and all(r.get("IS_ST_SEC") is not None for r in rows)
-    if not expected_truth_available:
-        result = CaseResult.OBSERVED
-        actual = f"frozen {len(frozen)} candidates; expected truth not yet derived"
-    else:
-        result = CaseResult.OBSERVED
-        actual = f"frozen {len(frozen)} candidates with flag fields present"
-    ctx.case(
-        case_id=f"B4-GOLDEN-STATUS-{sample_date}",
-        case_type="golden_status_frozen_sample",
-        security="SAMPLE",
-        provider_symbol="SAMPLE",
-        trade_date=str(sample_date),
-        expected="50 ST / 20 delisted / 30 limit-regime / 20 corp-action frozen cases",
-        actual=actual,
-        result=result,
-        evidence_meta=meta,
-    )
-    return {"frozen": len(frozen), "result": str(result)}
+    outcomes = validators.validate_golden_cases(list(BUILTIN_GOLDEN_CASES), rows)
+    results: dict[str, int] = {}
+    for case, outcome in zip(BUILTIN_GOLDEN_CASES, outcomes, strict=True):
+        ctx.case(
+            case_id=case.golden_case_id,
+            case_type=case.case_type,
+            security=case.provider_symbol,
+            provider_symbol=case.provider_symbol,
+            trade_date=case.trade_date,
+            expected=f"{case.truth_source}: {case.expected_fields}",
+            actual=outcome.actual,
+            result=outcome.result,
+            evidence_meta=meta,
+            reason_code=outcome.reason_code,
+            validator_id=outcome.validator_id,
+            validator_version=outcome.validator_version,
+            equivalent_pass=outcome.equivalent_pass,
+        )
+        results[str(outcome.result)] = results.get(str(outcome.result), 0) + 1
+    return {
+        "golden_cases": len(BUILTIN_GOLDEN_CASES),
+        "results": results,
+    }
 
 
 # ------------------------------------------------------------------------ B5

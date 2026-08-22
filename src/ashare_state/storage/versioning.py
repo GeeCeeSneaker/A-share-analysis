@@ -55,12 +55,8 @@ def assert_feature_set_members_mutable(conn: DuckDBPyConnection, feature_set_ver
 
 
 def activate_universe(conn: DuckDBPyConnection, universe_id: str, universe_version: str) -> None:
-    """Universe activation writes rule_hash + activated_at (immutable after).
-
-    dim_universe (003) lacks activation columns, so immutability is
-    enforced at service level: once activated (registered in the
-    activation ledger below), rule_json must not change.
-    """
+    """Universe activation (R3-P1-02): idempotent for the SAME rule hash,
+    BLOCKED for a different one - never overwritten."""
     import hashlib
     from datetime import UTC, datetime
 
@@ -72,10 +68,44 @@ def activate_universe(conn: DuckDBPyConnection, universe_id: str, universe_versi
         msg = f"universe ({universe_id}, {universe_version}) not registered"
         raise VersioningError(msg)
     rule_hash = hashlib.sha256(str(row[0]).encode()).hexdigest()
+    existing = conn.execute(
+        "SELECT rule_hash FROM universe_activation WHERE universe_id = ? AND universe_version = ?",
+        [universe_id, universe_version],
+    ).fetchone()
+    if existing is not None:
+        if existing[0] == rule_hash:
+            return  # same rule: idempotent no-op
+        msg = (
+            f"universe ({universe_id}, {universe_version}) is ACTIVATED with a "
+            f"different rule hash ({str(existing[0])[:12]}... != {rule_hash[:12]}...); "
+            "reactivation with changed rules is forbidden - create a new version"
+        )
+        raise VersioningError(msg)
     conn.execute(
-        "INSERT OR REPLACE INTO universe_activation VALUES (?, ?, ?, ?)",
+        "INSERT INTO universe_activation VALUES (?, ?, ?, ?)",
         [universe_id, universe_version, rule_hash, datetime.now(UTC)],
     )
+
+
+def recompute_feature_set_hash(conn: DuckDBPyConnection, feature_set_version: str) -> str | None:
+    """R3-P1-03: recompute the members' definition hash from CURRENT rows.
+
+    Mirrors the registration formula (sorted member tuples -> sha256) so a
+    publish-time self-check can detect out-of-band member edits. Returns
+    None when the set is not registered.
+    """
+    import hashlib
+
+    rows = conn.execute(
+        "SELECT feature_id, feature_version, param_set_id "
+        "FROM meta_feature_set_member WHERE feature_set_version = ? "
+        "ORDER BY feature_id, feature_version, param_set_id",
+        [feature_set_version],
+    ).fetchall()
+    if not rows:
+        return None
+    payload = "|".join(f"{r[0]}:{r[1]}:{r[2]}" for r in rows)
+    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 def assert_universe_rule_mutable(

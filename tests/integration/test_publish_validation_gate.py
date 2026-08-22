@@ -26,13 +26,35 @@ def base(tmp_path: Path):
     return run_mock_e2e(db, tmp_path / "data", start=date(2026, 8, 3), end=date(2026, 8, 14))
 
 
-def _kwargs(base) -> dict:
+def _kwargs(conn, base) -> dict:
+    """Publish kwargs carrying a RECOVERY run (R3-P0-18)."""
+    import uuid as uuid_mod
+    from datetime import UTC, datetime
+
+    recovery_run = str(uuid_mod.uuid4())
+    conn.execute(
+        "INSERT INTO meta_pipeline_run "
+        "(pipeline_run_id, run_type, status, started_at, code_commit, "
+        "environment_lock_hash, config_hash, source_policy_version, "
+        "availability_policy_version) "
+        "VALUES (?, 'RECOVERY', 'FEATURE_VALIDATED', ?, ?, ?, ?, ?, ?)",
+        [
+            recovery_run,
+            datetime.now(UTC),
+            "skeleton-commit",
+            "skeleton-env",
+            "skeleton-config",
+            "source-policy-mock-v1",
+            "availability-mock-v1",
+        ],
+    )
     return {
         "trade_date": date(2026, 8, 18),
         "data_snapshot_id": base.data_snapshot_id,
         "feature_artifact_set_id": base.feature_artifact_set_id,
         "feature_set_version": SKELETON_FEATURE_SET_VERSION,
         "universes": [("ALL_A", "v1")],
+        "pipeline_run_id": recovery_run,
     }
 
 
@@ -49,7 +71,7 @@ class TestArtifactValidationGate:
                 [fresh.feature_artifact_set_id],
             )
             with pytest.raises(PublishStateError, match="ARTIFACT_VALIDATION_REQUIRED"):
-                publish_snapshot(conn, **_kwargs(fresh), allow_manual_publish=True)
+                publish_snapshot(conn, **_kwargs(conn, fresh))
 
     def test_publish_blocks_fallback_count(self, base):
         with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
@@ -61,7 +83,7 @@ class TestArtifactValidationGate:
                 blocking_dq_count=0,
             )
             with pytest.raises(PublishStateError, match="identity_fallback_count=1"):
-                publish_snapshot(conn, **_kwargs(base), allow_manual_publish=True)
+                publish_snapshot(conn, **_kwargs(conn, base))
 
     def test_publish_blocks_blocking_dq(self, base):
         with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
@@ -73,21 +95,47 @@ class TestArtifactValidationGate:
                 blocking_dq_count=3,
             )
             with pytest.raises(PublishStateError, match="blocking_dq_count=3"):
-                publish_snapshot(conn, **_kwargs(base), allow_manual_publish=True)
+                publish_snapshot(conn, **_kwargs(conn, base))
 
 
 @pytest.mark.integration
 class TestProductionRunRequired:
     def test_production_publish_requires_pipeline_run(self, base):
-        with (
-            DuckDBConnectionManager(base.db_path).owner("read_write") as conn,
-            pytest.raises(PublishStateError, match="requires pipeline_run_id"),
-        ):
-            publish_snapshot(conn, **_kwargs(base))
-
-    def test_manual_publish_allowed_explicitly(self, base):
+        """R3-P0-18: no run-less publish exists AT ALL."""
         with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
-            pid = publish_snapshot(conn, **_kwargs(base), allow_manual_publish=True)
+            kwargs = _kwargs(conn, base)
+            kwargs["pipeline_run_id"] = None
+            with pytest.raises(PublishStateError, match="requires pipeline_run_id"):
+                publish_snapshot(conn, **kwargs)
+
+    def test_recovery_run_can_republish(self, base):
+        """R3-P0-18 replacement semantics: recovery goes through a RECOVERY
+        run - the old manual escape hatch is gone."""
+        import uuid as uuid_mod
+        from datetime import UTC, datetime
+
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            recovery_run = str(uuid_mod.uuid4())
+            conn.execute(
+                "INSERT INTO meta_pipeline_run "
+                "(pipeline_run_id, run_type, status, started_at, code_commit, "
+                "environment_lock_hash, config_hash, source_policy_version, "
+                "availability_policy_version) "
+                "VALUES (?, 'RECOVERY', 'FEATURE_VALIDATED', ?, ?, ?, ?, ?, ?)",
+                [
+                    recovery_run,
+                    datetime.now(UTC),
+                    "skeleton-commit",
+                    "skeleton-env",
+                    "skeleton-config",
+                    "source-policy-mock-v1",
+                    "availability-mock-v1",
+                ],
+            )
+            kwargs = _kwargs(conn, base)
+            kwargs["pipeline_run_id"] = recovery_run
+            pid = publish_snapshot(conn, **kwargs)
+            assert pid
             assert pid
 
 
@@ -119,7 +167,7 @@ class TestFullLineage:
     def test_rejects_artifact_calc_run_mismatch(self, base):
         with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
             other_run = self._new_run(conn)
-            kwargs = _kwargs(base)
+            kwargs = _kwargs(conn, base)
             kwargs["pipeline_run_id"] = other_run
             with pytest.raises(PublishStateError, match="was computed by run"):
                 publish_snapshot(conn, **kwargs)
@@ -138,7 +186,7 @@ class TestFullLineage:
                 "WHERE data_snapshot_id = ?",
                 [base.data_snapshot_id],
             )
-            kwargs = _kwargs(base)
+            kwargs = _kwargs(conn, base)
             kwargs["pipeline_run_id"] = run_id
             with pytest.raises(PublishStateError, match="source_policy_version mismatch"):
                 publish_snapshot(conn, **kwargs)
@@ -156,7 +204,7 @@ class TestFullLineage:
                 "WHERE data_snapshot_id = ?",
                 [base.data_snapshot_id],
             )
-            kwargs = _kwargs(base)
+            kwargs = _kwargs(conn, base)
             kwargs["pipeline_run_id"] = run_id
             with pytest.raises(PublishStateError, match="availability_policy_version mismatch"):
                 publish_snapshot(conn, **kwargs)
@@ -169,7 +217,7 @@ class TestFullLineage:
                 "WHERE feature_artifact_set_id = ?",
                 [run_id, base.feature_artifact_set_id],
             )
-            kwargs = _kwargs(base)
+            kwargs = _kwargs(conn, base)
             kwargs["pipeline_run_id"] = run_id
             with pytest.raises(PublishStateError, match="code_commit mismatch"):
                 publish_snapshot(conn, **kwargs)
@@ -182,7 +230,7 @@ class TestFullLineage:
                 "WHERE feature_artifact_set_id = ?",
                 [run_id, base.feature_artifact_set_id],
             )
-            kwargs = _kwargs(base)
+            kwargs = _kwargs(conn, base)
             kwargs["pipeline_run_id"] = run_id
             with pytest.raises(PublishStateError, match="config_hash mismatch"):
                 publish_snapshot(conn, **kwargs)
@@ -190,7 +238,7 @@ class TestFullLineage:
     def test_recovery_run_may_republish_foreign_artifact(self, base):
         with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
             recovery = self._new_run(conn, run_type="RECOVERY")
-            kwargs = _kwargs(base)
+            kwargs = _kwargs(conn, base)
             kwargs["pipeline_run_id"] = recovery
             pid = publish_snapshot(conn, **kwargs)
             assert pid

@@ -42,32 +42,33 @@ def record_artifact_validation(
     validator_code_commit: str | None = None,
     validation_hash: str | None = None,
     details_json: str | None = None,
-) -> None:
-    """Write the artifact validation record (R2-P0-05).
+) -> str:
+    """APPEND a validation record to the ledger (R3-P1-01).
 
-    The publish gate reads this record as a SYSTEM invariant:
-    identity_fallback_count == 0 AND blocking_dq_count == 0 are required
-    for any PUBLISHED artifact. Records are one-per-artifact-set; an
-    existing record for the same set is replaced only when re-validating
-    the SAME set (the artifact itself is immutable, so this is a
-    validation refresh, not a data mutation).
+    Every call inserts a NEW artifact_validation_id - validations are
+    immutable history. The publish gate binds the LATEST record for the
+    artifact set, and old publishes keep answering "which validation
+    approved me" via meta_publish_snapshot.artifact_validation_id.
+    Returns the new artifact_validation_id.
     """
     from datetime import UTC as _UTC
     from datetime import datetime as _datetime
 
+    validation_id = f"val-{uuid.uuid4()}"
     conn.execute(
-        "INSERT OR REPLACE INTO meta_artifact_validation VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO meta_artifact_validation VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
+            validation_id,
             feature_artifact_set_id,
             validation_version,
+            validator_code_commit,
             int(identity_fallback_count),
             int(blocking_dq_count),
             _datetime.now(_UTC),
-            validator_code_commit,
-            validation_hash,
-            details_json,
+            details_json or validation_hash,
         ],
     )
+    return validation_id
 
 
 def publish_snapshot(
@@ -78,46 +79,43 @@ def publish_snapshot(
     feature_artifact_set_id: str,
     feature_set_version: str,
     universes: list[tuple[str, str]],
-    pipeline_run_id: str | None = None,
+    pipeline_run_id: str,
     quality_grade: str | None = None,
     publish_id: str | None = None,
-    allow_manual_publish: bool = False,
 ) -> str:
     """Atomically publish one trade_date. Returns the publish_id.
 
     Steps inside ONE transaction (all-or-nothing):
       1. existing PUBLISHED for trade_date -> SUPERSEDED (previous_publish_id)
-      2. insert new row status=PUBLISHED
+      2. insert new row status=PUBLISHED (bound to the artifact_validation_id)
       3. insert meta_publish_universe rows
       4. meta_pipeline_run.status -> PUBLISHED
 
-    Full lineage gate (Round-1 P0-02 + Round-2 P0-05/P0-06) - before any
-    write, ALL system invariants hold:
+    Full lineage gate (R1 P0-02 + R2 P0-05/P0-06 + R3 P0-18/P1-01/P1-03):
       - snapshot exists, status DATA_VALIDATED
       - artifact exists, status FEATURE_VALIDATED
       - artifact.data_snapshot_id == data_snapshot_id (no cross-snapshot mix)
       - artifact.feature_set_version == feature_set_version
-      - meta_feature_set exists and is ACTIVE
-      - pipeline_run REQUIRED (manual publish needs explicit
-        allow_manual_publish=True and is for recovery only)
+      - meta_feature_set exists, is ACTIVE, and its members STILL hash to
+        the registered definition_hash (P1-03 self-check)
+      - pipeline_run REQUIRED - NO exceptions (R3-P0-18: the manual escape
+        hatch is removed; recovery/republish must create a RECOVERY run)
       - pipeline_run exists, status FEATURE_VALIDATED
-      - artifact.calc_run_id == pipeline_run_id
+      - artifact.calc_run_id == pipeline_run_id (RECOVERY runs exempt)
       - run/artifact (code_commit, environment_lock_hash, config_hash) match
       - run/snapshot (source_policy_version, availability_policy_version) match
       - every (universe_id, universe_version) exists in dim_universe
-      - meta_artifact_validation record EXISTS with
-        identity_fallback_count == 0 and blocking_dq_count == 0
-        (R2-P0-05: the fallback gate is a system invariant, no longer a
-        caller-supplied set)
+      - the LATEST append-only meta_artifact_validation record for the set
+        has identity_fallback_count == 0 and blocking_dq_count == 0
     """
     pid = publish_id or str(uuid.uuid4())
     now = datetime.now(UTC)
 
-    if pipeline_run_id is None and not allow_manual_publish:
+    if pipeline_run_id is None:
+        # R3-P0-18: no run-less publishes, ever - recovery uses RECOVERY runs
         msg = (
-            "PRODUCTION publish requires pipeline_run_id (R2-P0-06); manual "
-            "recovery/republish must pass allow_manual_publish=True explicitly "
-            "and record a RECOVERY run"
+            "publish requires pipeline_run_id (R3-P0-18: no manual escape "
+            "hatch; recovery/republish must create a RECOVERY-type run)"
         )
         raise PublishStateError(msg)
 
@@ -162,7 +160,7 @@ def publish_snapshot(
         )
         raise PublishStateError(msg)
     fset = conn.execute(
-        "SELECT status FROM meta_feature_set WHERE feature_set_version = ?",
+        "SELECT status, definition_hash FROM meta_feature_set WHERE feature_set_version = ?",
         [feature_set_version],
     ).fetchone()
     if fset is None:
@@ -175,6 +173,20 @@ def publish_snapshot(
         msg = (
             f"SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: feature set "
             f"{feature_set_version} status is {fset[0]}, expected ACTIVE"
+        )
+        raise PublishStateError(msg)
+    # R3-P1-03: self-check - members must STILL hash to the registered
+    # definition_hash (out-of-band member edits block the publish even
+    # though they bypassed the service helpers)
+    from ashare_state.storage.versioning import recompute_feature_set_hash
+
+    current_hash = recompute_feature_set_hash(conn, feature_set_version)
+    if current_hash is not None and current_hash != fset[1]:
+        msg = (
+            f"FEATURE_SET_IMMUTABLE violated: {feature_set_version} members hash to "
+            f"{current_hash[:12]}... but the registered definition_hash is "
+            f"{str(fset[1])[:12]}... - members changed after activation; create a "
+            "new version instead"
         )
         raise PublishStateError(msg)
     if pipeline_run_id is not None:
@@ -243,10 +255,12 @@ def publish_snapshot(
                 f"({universe_id}, {universe_version}) not registered in dim_universe"
             )
             raise PublishStateError(msg)
-    # R2-P0-05: validation record is a system invariant, not a caller assertion
+    # R2-P0-05 + R3-P1-01: the LATEST append-only validation record is the
+    # system invariant; the publish binds its artifact_validation_id
     validation = conn.execute(
-        "SELECT identity_fallback_count, blocking_dq_count "
-        "FROM meta_artifact_validation WHERE feature_artifact_set_id = ?",
+        "SELECT artifact_validation_id, identity_fallback_count, blocking_dq_count "
+        "FROM meta_artifact_validation WHERE feature_artifact_set_id = ? "
+        "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1",
         [feature_artifact_set_id],
     ).fetchone()
     if validation is None:
@@ -256,13 +270,14 @@ def publish_snapshot(
             "artifact validator records identity_fallback_count and blocking_dq_count"
         )
         raise PublishStateError(msg)
-    if validation[0] != 0 or validation[1] != 0:
+    if validation[1] != 0 or validation[2] != 0:
         msg = (
             "ARTIFACT_VALIDATION_GATE violated: "
-            f"identity_fallback_count={validation[0]}, blocking_dq_count={validation[1]}; "
+            f"identity_fallback_count={validation[1]}, blocking_dq_count={validation[2]}; "
             "fallback identities and blocking DQ findings may never be PUBLISHED"
         )
         raise PublishStateError(msg)
+    artifact_validation_id = validation[0]
 
     conn.execute("BEGIN TRANSACTION")
     try:
@@ -278,7 +293,8 @@ def publish_snapshot(
                 [existing[0]],
             )
         conn.execute(
-            "INSERT INTO meta_publish_snapshot VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)",
+            "INSERT INTO meta_publish_snapshot VALUES "
+            "(?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?)",
             [
                 pid,
                 trade_date,
@@ -290,6 +306,7 @@ def publish_snapshot(
                 now,
                 quality_grade,
                 previous_publish_id,
+                artifact_validation_id,  # R3-P1-01: bound validation
             ],
         )
         for universe_id, universe_version in universes:

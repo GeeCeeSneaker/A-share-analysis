@@ -150,8 +150,17 @@ class TestScenarioD_PublishTransactionFailure:
                     None,
                 ],
             )
+            import uuid as uuid_mod
+
             from ashare_state.pipeline import PublishStateError
 
+            probe_run = str(uuid_mod.uuid4())
+            conn.execute(
+                "INSERT INTO meta_pipeline_run "
+                "(pipeline_run_id, run_type, status, started_at) "
+                "VALUES (?, 'RECOVERY', 'FEATURE_VALIDATED', ?)",
+                [probe_run, datetime.now(UTC)],
+            )
             with pytest.raises(PublishStateError, match="DATA_VALIDATED"):
                 publish_snapshot(
                     conn,
@@ -160,7 +169,7 @@ class TestScenarioD_PublishTransactionFailure:
                     feature_artifact_set_id=base_run.feature_artifact_set_id,
                     feature_set_version="skeleton-v0",
                     universes=[("ALL_A", "v1")],
-                    allow_manual_publish=True,  # reach the status gate being tested
+                    pipeline_run_id=probe_run,
                 )
             latest = latest_published(conn, date(2026, 8, 14))
             assert latest["publish_id"] == base_run.publish_ids[0]

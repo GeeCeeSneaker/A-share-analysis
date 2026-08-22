@@ -26,7 +26,8 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
     SpikeCapabilityDefinition(
         capability_id="security_master_with_delisted",
         core=True,
-        required_case_types=("security_master_with_delisted",),
+        # R3-P0-13: golden delisted cases are REQUIRED for the core gate
+        required_case_types=("security_master_with_delisted", "golden_delisted"),
         min_valid_cases=20,  # 20 delisted golden cases (task book 7.1A)
         validator_id="security_master_delisted_v1",
         description="master must contain delisted securities (survivorship)",
@@ -36,31 +37,34 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         core=True,
         required_case_types=("daily_bar_units",),
         min_valid_cases=1,
-        validator_id="daily_bar_units_v1",
-        description="volume/amount units verified against documented units",
+        validator_id="daily_bar_units_v2",
+        description="volume/amount units verified between independent sources",
     ),
     SpikeCapabilityDefinition(
         capability_id="historical_st_suspend",
         core=True,
-        required_case_types=("historical_st_suspend",),
+        required_case_types=("historical_st_suspend", "golden_st_transition"),
         min_valid_cases=50,  # 50 ST cap/removal golden cases
-        validator_id="st_suspend_v1",
-        description="daily ST/suspension semantics correct",
+        validator_id="st_suspend_v2",
+        description="daily ST/suspension semantics correct vs golden facts",
     ),
     SpikeCapabilityDefinition(
         capability_id="limit_price_and_no_limit_days",
         core=True,
-        required_case_types=("limit_price_and_no_limit_days",),
+        required_case_types=("limit_price_and_no_limit_days", "golden_limit_regime"),
         min_valid_cases=30,  # 30 limit-regime golden cases
-        validator_id="limit_rule_v1",
-        description="limit prices and no-limit days correct",
+        validator_id="limit_rule_v2",
+        description="limit prices match the exchange regime (board rates)",
     ),
     SpikeCapabilityDefinition(
         capability_id="adj_factor_corporate_action_continuity",
         core=True,
-        required_case_types=("adj_factor_corporate_action_continuity",),
+        required_case_types=(
+            "adj_factor_corporate_action_continuity",
+            "golden_corporate_action",
+        ),
         min_valid_cases=20,  # 20 corporate-action golden cases
-        validator_id="adj_continuity_v1",
+        validator_id="adj_continuity_v2",
         description="adj factor + corporate action price continuity",
     ),
     SpikeCapabilityDefinition(
@@ -76,7 +80,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         core=True,
         required_case_types=("symbol_mapping_unambiguous",),
         min_valid_cases=1,
-        validator_id="symbol_mapping_v1",
+        validator_id="symbol_mapping_v2",
         description="provider symbol mapping unambiguous incl. BJ old/new codes",
     ),
     SpikeCapabilityDefinition(
@@ -84,7 +88,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         core=True,
         required_case_types=("sdk_permission_cache_freshness",),
         min_valid_cases=1,
-        validator_id="sdk_behavior_v1",
+        validator_id="sdk_behavior_v2",
         description="SDK permission/cache/freshness behavior recorded & verified",
     ),
 )
