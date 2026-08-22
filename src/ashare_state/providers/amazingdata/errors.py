@@ -1,10 +1,14 @@
-"""Unified provider error layer (task book section 3.2).
+"""AmazingData error layer: classification + retry policy (task book 3.2).
 
-SDK-internal errors (TypeError, opaque strings) must NEVER cross the
-provider boundary unclassified. Every failure is mapped to one of the
-typed errors below; when classification is impossible it becomes
-ProviderSdkInternalError with the original exception preserved as
-__cause__.
+Audit fixes (2026-08-22):
+- P1-10: taxonomy lives in ashare_state.providers.errors; this module only
+  adds SDK-error classification and re-exports.
+- P1-09: classification is CONSERVATIVE - only the two VERIFIED denial
+  shapes observed on 2026-08-21 (TypeError/NoneType from entitlement
+  denial, and unhashable-list was RECLASSIFIED to internal) map to
+  Permission; unknown shapes default to ProviderSdkInternalError.
+- P0-03: retry decisions use is_retryable() - permission/auth/schema/
+  internal errors never retry.
 """
 
 from __future__ import annotations
@@ -12,59 +16,46 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from ashare_state.providers.errors import (
+    NON_RETRYABLE_ERRORS,
+    RETRYABLE_ERRORS,
+    ProviderAuthError,
+    ProviderEmptyResultError,
+    ProviderError,
+    ProviderNetworkError,
+    ProviderPermissionError,
+    ProviderRateLimitError,
+    ProviderSchemaError,
+    ProviderSdkInternalError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+    is_retryable,
+)
 
-class ProviderError(RuntimeError):
-    """Base class for all provider-layer errors."""
-
-    def __init__(self, message: str, *, context: dict[str, Any] | None = None) -> None:
-        super().__init__(message)
-        self.context: dict[str, Any] = context or {}
-
-
-class ProviderUnavailableError(ProviderError):
-    """SDK not installed / not importable (expected outside controlled machine)."""
-
-
-class ProviderNetworkError(ProviderError):
-    """Connection cannot be established to the access server."""
-
-
-class ProviderAuthError(ProviderError):
-    """Authentication failed (bad credentials, expired account)."""
-
-
-class ProviderPermissionError(ProviderError):
-    """Server refused the dataset: entitlement missing (PermissionCode scope)."""
-
-
-class ProviderTimeoutError(ProviderError):
-    """Call exceeded its configured time budget (SDK may retry internally)."""
-
-
-class ProviderRateLimitError(ProviderError):
-    """Provider-side flow/bandwidth/rate limit hit."""
-
-
-class ProviderSchemaError(ProviderError):
-    """Response shape does not match the documented SDK contract."""
-
-
-class ProviderEmptyResultError(ProviderError):
-    """Call succeeded but returned an empty/None payload legitimately."""
-
-
-class ProviderSdkInternalError(ProviderError):
-    """SDK raised an internal/unclassifiable error; original preserved as cause."""
-
+__all__ = [
+    "NON_RETRYABLE_ERRORS",
+    "RETRYABLE_ERRORS",
+    "ProviderAuthError",
+    "ProviderEmptyResultError",
+    "ProviderError",
+    "ProviderNetworkError",
+    "ProviderPermissionError",
+    "ProviderRateLimitError",
+    "ProviderSchemaError",
+    "ProviderSdkInternalError",
+    "ProviderTimeoutError",
+    "ProviderUnavailableError",
+    "classify_sdk_error",
+    "is_retryable",
+    "wrap_sdk_call",
+]
 
 # ---------------------------------------------------------------- mapping
 
-_PERMISSION_NONE_HINTS = ("nonetype", "unhashable")
-_AUTH_HINTS = ("login fail", "logon fail", "password", "auth", "token")
 _NET_HINTS = ("connect", "connection", "refused", "timeout", "unreachable", "reset")
+_AUTH_HINTS = ("login fail", "logon fail", "password", "auth")
 _RATE_HINTS = ("flow", "bandwidth", "rate", "limit num", "limitnum", "too fast")
 _QUERY_FAIL = "查询失败"
-_EMPTY_HINTS = ("no data", "empty")
 
 
 def classify_sdk_error(
@@ -76,17 +67,16 @@ def classify_sdk_error(
 ) -> ProviderError:
     """Map an arbitrary SDK exception to a typed provider error.
 
-    The original exception is preserved as __cause__ on the returned error.
+    The original exception is preserved as __cause__.
 
-    Mapping heuristics (documented so behavior is auditable):
-    - TypeError with 'NoneType' -> the observed shape of entitlement denial
-      (server returns None; SDK then subscripts it). If account_context
-      shows limited PermissionCode, this is ProviderPermissionError.
-    - Chinese '查询失败' after long retries -> permission or timeout;
-      classified as ProviderPermissionError when the endpoint is outside
-      the account's known permission set, else ProviderTimeoutError.
-    - network-ish substrings -> ProviderNetworkError.
-    - everything else -> ProviderSdkInternalError (cause preserved).
+    Conservative mapping (audit P1-09):
+    - TypeError with 'NoneType' -> the VERIFIED entitlement-denial shape
+      (2026-08-21 evidence) -> ProviderPermissionError.
+    - '查询失败' with limited permission context -> ProviderPermissionError
+      (verified shape); without context -> ProviderTimeoutError.
+    - network-ish / auth-ish / rate-ish substrings map accordingly.
+    - everything else (including 'unhashable list', which looks like an
+      interface-signature issue) -> ProviderSdkInternalError.
     """
     mapped = _classify(exc, endpoint=endpoint, response=response, account_context=account_context)
     mapped.__cause__ = exc
@@ -110,15 +100,17 @@ def _classify(
     if isinstance(exc, TimeoutError):
         return ProviderTimeoutError(f"{endpoint}: timeout: {msg}", context=context)
 
-    if name == "TypeError" and any(h in lowered for h in _PERMISSION_NONE_HINTS):
-        # observed entitlement-denial shape (connectivity evidence 2026-08-21)
+    # VERIFIED denial shape #1: server returns None; SDK subscripts it.
+    if name == "TypeError" and "nonetype" in lowered:
         return ProviderPermissionError(
-            f"{endpoint}: server returned no data (likely entitlement "
-            f"denial); sdk raised {name}: {msg}",
+            f"{endpoint}: server returned no data (likely entitlement denial); "
+            f"sdk raised {name}: {msg}",
             context=context,
         )
 
-    if any(h in lowered for h in _AUTH_HINTS) and "token" not in lowered:
+    # NOTE (audit P1-09): 'unhashable' was previously lumped into Permission;
+    # it is NOT a verified denial shape - it stays unclassified/internal.
+    if any(h in lowered for h in _AUTH_HINTS):
         return ProviderAuthError(f"{endpoint}: auth failure: {msg}", context=context)
 
     if _QUERY_FAIL in msg:
@@ -138,7 +130,7 @@ def _classify(
     if any(h in lowered for h in _NET_HINTS):
         return ProviderNetworkError(f"{endpoint}: network error: {msg}", context=context)
 
-    if response is None and any(h in lowered for h in _EMPTY_HINTS):
+    if response is None and "no data" in lowered:
         return ProviderEmptyResultError(f"{endpoint}: empty result: {msg}", context=context)
 
     return ProviderSdkInternalError(

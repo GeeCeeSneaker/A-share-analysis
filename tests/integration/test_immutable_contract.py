@@ -73,7 +73,7 @@ class TestImmutabilityCoexist:
         """Audit P1-01: registered files must never be flagged as orphans."""
         from ashare_state.pipeline import find_orphan_files
 
-        run = run_mock_e2e(
+        run_mock_e2e(
             tmp_path / "atlas.duckdb",
             tmp_path / "data",
             start=date(2026, 8, 3),

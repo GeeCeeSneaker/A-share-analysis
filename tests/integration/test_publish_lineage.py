@@ -55,7 +55,8 @@ class TestPublishLineageGate:
         with manager.owner("read_write") as conn:
             # register other's snapshot under base's db for the mismatch probe
             conn.execute(
-                "INSERT INTO meta_data_snapshot VALUES (?, ?, ?, ?, ?, ?, ?, 'DATA_VALIDATED', ?, ?)",
+                "INSERT INTO meta_data_snapshot VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, 'DATA_VALIDATED', ?, ?)",
                 [
                     other.data_snapshot_id,
                     datetime.now(UTC),

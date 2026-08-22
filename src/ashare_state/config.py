@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     )
 
     tgw_username: str = ""
-    tgw_password: str = ""
+    # audit P1-14: SecretStr so repr(Settings)/debug dumps never leak it
+    tgw_password: SecretStr = SecretStr("")
     tgw_server_vip: str = ""
     tgw_server_port: int = 8000
     tgw_module: str = "AmazingData"

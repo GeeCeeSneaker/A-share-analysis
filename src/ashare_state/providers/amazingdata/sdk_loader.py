@@ -11,6 +11,7 @@ import importlib
 import importlib.metadata
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from ashare_state.providers.amazingdata.errors import ProviderUnavailableError
@@ -50,19 +51,46 @@ def load_sdk() -> Any:
         raise ProviderUnavailableError(msg) from exc
 
 
+def resolve_packaged_runtime_path() -> Path | None:
+    """SINGLE authoritative ABI-dir resolver (audit P1-11).
+
+    Returns the packaged tgw runtime directory for this interpreter, or
+    None when tgw is absent / no matching ABI subdir exists. The doctor
+    must call THIS - never re-derive paths locally.
+    """
+    try:
+        import pathlib
+
+        import tgw
+
+        pkg_dir = pathlib.Path(tgw.__file__).parent
+        tag = f"py{sys.version_info.major}{sys.version_info.minor}_x64_package"
+        prefix = "win_" if sys.platform == "win32" else "linux_"
+        cand = pkg_dir / f"{prefix}{tag}"
+        return cand if cand.is_dir() else None
+    except Exception:  # noqa: BLE001 - resolver is best-effort
+        return None
+
+
 def probe_identity(*, require_sdk: bool = True) -> SdkIdentity | None:
     """Collect version identity without touching the network.
 
-    Returns None when the SDK is absent and require_sdk is False
-    (doctor offline mode uses this to still report Python-side facts).
+    Audit P1-11: SDK absence ALWAYS surfaces as ProviderUnavailableError
+    when require_sdk=True (never a raw ImportError/PackageNotFoundError).
+    Returns None when the SDK is absent and require_sdk is False.
     """
     sdk: Any = None
     try:
         sdk = importlib.import_module(SDK_MODULE)
         sdk_version = importlib.metadata.version(SDK_MODULE)
-    except (ImportError, importlib.metadata.PackageNotFoundError):
+    except (ImportError, importlib.metadata.PackageNotFoundError) as exc:
         if require_sdk:
-            raise
+            msg = (
+                f"AmazingData SDK ({SDK_MODULE}) is not installed in this "
+                "environment; install the broker wheels on the controlled "
+                "machine - see docs/provider_verification/amazingdata.md"
+            )
+            raise ProviderUnavailableError(msg) from exc
         sdk_version = None
 
     tgw_pkg_version: str | None = None
@@ -77,7 +105,8 @@ def probe_identity(*, require_sdk: bool = True) -> SdkIdentity | None:
             tgw_runtime = str(tgw.GetVersion()).strip() or None
         except Exception:  # noqa: BLE001 - GetVersion is best-effort
             tgw_runtime = None
-        abi_dir = _infer_abi_dir()
+        runtime_path = resolve_packaged_runtime_path()
+        abi_dir = runtime_path.name if runtime_path else None
     except (ImportError, importlib.metadata.PackageNotFoundError):
         pass
 
@@ -92,19 +121,3 @@ def probe_identity(*, require_sdk: bool = True) -> SdkIdentity | None:
         python_version=sys.version.split()[0],
         abi_dir=abi_dir,
     )
-
-
-def _infer_abi_dir() -> str | None:
-    """Which ABI subpackage the loader would pick for this interpreter."""
-    try:
-        import pathlib
-
-        import tgw
-
-        pkg_dir = pathlib.Path(tgw.__file__).parent
-        tag = f"py{sys.version_info.major}{sys.version_info.minor}_x64_package"
-        prefix = "win_" if sys.platform == "win32" else "linux_"
-        cand = pkg_dir / f"{prefix}{tag}"
-        return cand.name if cand.is_dir() else None
-    except Exception:  # noqa: BLE001 - inference is best-effort
-        return None

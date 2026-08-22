@@ -17,9 +17,13 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Protocol, runtime_checkable
 
+from ashare_state.providers.errors import ProviderUnavailableError
 
-class ProviderUnavailableError(RuntimeError):
-    """Provider SDK/credentials not installed or not reachable."""
+__all__ = [
+    "DailyBar",
+    "ProviderUnavailableError",
+    "SecurityMasterEntry",
+]
 
 
 @dataclass(frozen=True)

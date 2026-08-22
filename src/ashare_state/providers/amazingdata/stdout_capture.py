@@ -19,6 +19,7 @@ import os
 import re
 import sys
 import tempfile
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -26,6 +27,11 @@ _SENSITIVE_KEYS = ("token", "password", "username", "session", "credential")
 _MASK = "***MASKED***"
 
 _CAPTURE_FLAG = "_sdk_capture_active"
+
+# Audit P1-12: fd-level stdout redirection is PROCESS-WIDE; concurrent
+# provider threads must be serialized or captures interleave / restore
+# in the wrong order (Token capture could leak).
+_GLOBAL_SDK_STDOUT_LOCK = threading.RLock()
 
 
 def _set_capture_flag(obj: object, value: bool) -> None:
@@ -61,33 +67,37 @@ def sdk_stdout_into(holder: CapturedStdout) -> Iterator[None]:
 
     Native printf goes to fd 1 - we dup the original, swap in a temp file,
     and restore afterwards in finally (crash-safe at the os level).
+
+    Audit P1-12: the whole capture region is serialized by a global RLock -
+    concurrent provider threads cannot interleave fd swaps.
     """
     if sys.platform not in ("win32", "linux"):
         yield
         return
-    if _has_capture_flag(sys.stdout):
-        # re-entrancy: outer capture already active; SDK text still lands
-        # in the OUTER temp file, nothing to restore here.
-        yield
-        return
-
-    with tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace") as tmp:
-        sys.stdout.flush()
-        saved_fd = os.dup(1)
-        marker = sys.stdout
-        _set_capture_flag(marker, True)
-        try:
-            os.dup2(tmp.fileno(), 1)
+    with _GLOBAL_SDK_STDOUT_LOCK:
+        if _has_capture_flag(sys.stdout):
+            # re-entrancy: outer capture already active; SDK text still lands
+            # in the OUTER temp file, nothing to restore here.
             yield
-        finally:
-            _set_capture_flag(marker, False)
-            # flush must not mask fd restore
-            with contextlib.suppress(Exception):
-                sys.stdout.flush()
-            os.dup2(saved_fd, 1)
-            os.close(saved_fd)
-            tmp.seek(0)
-            holder.text = tmp.read()
+            return
+
+        with tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace") as tmp:
+            sys.stdout.flush()
+            saved_fd = os.dup(1)
+            marker = sys.stdout
+            _set_capture_flag(marker, True)
+            try:
+                os.dup2(tmp.fileno(), 1)
+                yield
+            finally:
+                _set_capture_flag(marker, False)
+                # flush must not mask fd restore
+                with contextlib.suppress(Exception):
+                    sys.stdout.flush()
+                os.dup2(saved_fd, 1)
+                os.close(saved_fd)
+                tmp.seek(0)
+                holder.text = tmp.read()
 
 
 _LOGON_JSON_RE = re.compile(r"logon json\s*:\s*(\{.*\})", re.DOTALL)

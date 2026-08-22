@@ -28,7 +28,10 @@ from ashare_state.providers.amazingdata.errors import (
     ProviderError,
     ProviderUnavailableError,
 )
-from ashare_state.providers.amazingdata.sdk_loader import probe_identity
+from ashare_state.providers.amazingdata.sdk_loader import (
+    probe_identity,
+    resolve_packaged_runtime_path,
+)
 from ashare_state.providers.amazingdata.session import AmazingDataSession
 from ashare_state.providers.amazingdata.stdout_capture import (
     CapturedStdout,
@@ -184,22 +187,14 @@ def run_doctor(
     else:
         report["TGW_LOADED_DLL_PATH"] = None
         report["dll_note"] = "tgw DLL not loaded yet (loads on first SDK use)"
-        # locate the packaged DLL the loader would use
-        try:
-            import tgw as tgw_mod
-
-            pkg_dir = Path(tgw_mod.__file__).parent
-            tag = (
-                f"{sys.implementation.name}_py{sys.version_info.major}"
-                f"{sys.version_info.minor}_x64_package"
-            )
-            prefix = "win_" if sys.platform == "win32" else "linux_"
-            candidate = (
-                pkg_dir / f"{prefix}{tag}" / ("tgw.dll" if sys.platform == "win32" else "libtgw.so")
-            )
+        # P1-11: use the SINGLE authoritative resolver from sdk_loader
+        runtime_dir = resolve_packaged_runtime_path()
+        if runtime_dir is not None:
+            dll_name = "tgw.dll" if sys.platform == "win32" else "libtgw.so"
+            candidate = runtime_dir / dll_name
             report["expected_dll_path"] = str(candidate) if candidate.is_file() else None
-        except Exception:  # noqa: BLE001
-            pass
+        else:
+            report["expected_dll_path"] = None
 
     # ---- connectivity / auth / query --------------------------------
     report["NETWORK_REACHABLE"] = "NOT_TESTED"

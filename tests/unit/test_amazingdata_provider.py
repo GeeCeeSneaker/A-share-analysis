@@ -110,6 +110,8 @@ class TestAccountProfile:
             }
         )
         assert profile.login_ok
+        assert profile.profile_parsed
+        assert profile.entitlement_verified
         assert profile.account_profile_id.startswith("TRIAL_SIMULATION_")
         assert profile.permission_codes == "3|4|32|33"
         assert profile.subscribe_limit == 100
@@ -121,16 +123,38 @@ class TestAccountProfile:
         )
         assert profile.account_profile_id.startswith("ACCOUNT_")
 
+    def test_account_profile_id_distinct_for_same_entitlements(self):
+        """Audit P1-07: same entitlements, different accounts -> distinct ids."""
+        entitlements = {"PermissionCode": "3|4", "SubscribeLimitNum": 100, "TotalWeekFlow": 10}
+        a = AccountProfile.from_scrubbed(entitlements, host="10.0.0.1", username="userA")
+        b = AccountProfile.from_scrubbed(entitlements, host="10.0.0.1", username="userB")
+        assert a.account_profile_id != b.account_profile_id
+
+    def test_unparsed_profile_keeps_auth_ok(self):
+        """Audit P1-08: auth succeeded but logon json unparseable."""
+        profile = AccountProfile(auth_ok=True, profile_parsed=False)
+        assert profile.auth_ok
+        assert not profile.profile_parsed
+        assert not profile.entitlement_verified
+        assert profile.account_profile_id == "UNKNOWN"
+
     def test_empty_profile(self):
         profile = AccountProfile.from_scrubbed(None)
-        assert not profile.login_ok
+        assert profile.auth_ok  # from_scrubbed(None) models "login returned, no json"
+        assert not profile.profile_parsed
         assert profile.account_profile_id == "UNKNOWN"
 
 
 class TestTimeBudget:
     def test_budget_exhaustion_raises_typed(self):
+        """Only RETRYABLE classes exhaust into a timeout (audit P0-03)."""
+        from ashare_state.providers.errors import ProviderNetworkError
+
+        calls = []
+
         def always_fail():
-            raise RuntimeError("sdk grinding")
+            calls.append(1)
+            raise ProviderNetworkError("sdk grinding")
 
         with pytest.raises(Exception, match="budget exhausted") as excinfo:
             run_with_budget(
@@ -140,6 +164,115 @@ class TestTimeBudget:
                 endpoint="ep",
             )
         assert "budget exhausted" in str(excinfo.value)
+        # zero budget: first failure already exceeds the deadline -> 1 call
+        assert len(calls) == 1
+
+    def test_budget_exhaustion_after_full_retries(self):
+        from ashare_state.providers.errors import ProviderNetworkError
+
+        calls = []
+
+        def always_fail():
+            calls.append(1)
+            raise ProviderNetworkError("still down")
+
+        with pytest.raises(Exception, match="budget exhausted"):
+            run_with_budget(
+                always_fail,
+                budget=TimeBudget(query_timeout_seconds=30.0),
+                retry=RetryPolicy(max_retries=2, backoff_base_seconds=0.001),
+                endpoint="ep",
+            )
+        assert len(calls) == 3  # 1 + 2 retries, then max_retries reached
+
+    def test_raw_exception_never_retries(self):
+        """Audit P0-03: an unclassified SDK error must surface immediately
+        with its true class - never masked by budget-exhaustion timeout."""
+        calls = []
+
+        def boom():
+            calls.append(1)
+            raise TypeError("'NoneType' object is not subscriptable")
+
+        with pytest.raises(TypeError):
+            run_with_budget(
+                boom,
+                budget=TimeBudget(),
+                retry=RetryPolicy(max_retries=5, backoff_base_seconds=0.001),
+                endpoint="ep",
+            )
+        assert len(calls) == 1
+
+    def test_permission_error_not_retried(self):
+        """Audit P0-03: permission denial - 1 call, no retry, not a timeout."""
+        from ashare_state.providers.errors import ProviderPermissionError
+
+        calls = []
+
+        def denied():
+            calls.append(1)
+            raise ProviderPermissionError("entitlement missing")
+
+        with pytest.raises(ProviderPermissionError):
+            run_with_budget(
+                denied,
+                budget=TimeBudget(),
+                retry=RetryPolicy(max_retries=5, backoff_base_seconds=0.001),
+                endpoint="ep",
+            )
+        assert len(calls) == 1
+
+    def test_auth_error_not_retried(self):
+        from ashare_state.providers.errors import ProviderAuthError
+
+        calls = []
+
+        def denied():
+            calls.append(1)
+            raise ProviderAuthError("bad credentials")
+
+        with pytest.raises(ProviderAuthError):
+            run_with_budget(
+                denied,
+                budget=TimeBudget(),
+                retry=RetryPolicy(max_retries=5, backoff_base_seconds=0.001),
+                endpoint="ep",
+            )
+        assert len(calls) == 1
+
+    def test_network_error_retries_per_policy(self):
+        from ashare_state.providers.errors import ProviderNetworkError
+
+        calls = []
+
+        def flaky():
+            calls.append(1)
+            if len(calls) < 3:
+                raise ProviderNetworkError("connection reset")
+            return "ok"
+
+        assert (
+            run_with_budget(
+                flaky,
+                budget=TimeBudget(),
+                retry=RetryPolicy(max_retries=3, backoff_base_seconds=0.001),
+                endpoint="ep",
+            )
+            == "ok"
+        )
+        assert len(calls) == 3
+
+    def test_blocking_callable_exceeding_budget_is_recorded_not_cancelled(self):
+        """Audit P0-03: honest semantics - budget does NOT cancel a blocking
+        native call; the fn runs to completion and the elapsed time is
+        simply beyond the budget (documented, tested as-is)."""
+        result = run_with_budget(
+            lambda: "late-but-done",
+            budget=TimeBudget(query_timeout_seconds=0.0),
+            retry=RetryPolicy(),
+            endpoint="ep",
+        )
+        assert result == "late-but-done"
 
     def test_success_passthrough(self):
         assert (

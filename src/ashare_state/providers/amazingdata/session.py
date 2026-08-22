@@ -28,11 +28,32 @@ from ashare_state.providers.amazingdata.stdout_capture import (
 
 @dataclass
 class AccountProfile:
-    """Scrubbed logon entitlements + derived stable profile id."""
+    """Scrubbed logon entitlements + derived stable profile id.
+
+    Audit P1-08: auth success and profile parsing are SEPARATE facts:
+      auth_ok            - login call returned without error
+      profile_parsed     - the logon json was captured and parsed
+      entitlement_verified - PermissionCode was present and non-empty
+    Production source-policy approval requires all three.
+
+    Audit P1-07: account_profile_id mixes provider/env/host/username-hash
+    with the entitlement hash so two accounts with identical entitlements
+    still get distinct ids.
+    """
 
     raw_profile: dict[str, Any] = field(default_factory=dict)
-    login_ok: bool = False
+    auth_ok: bool = False
+    profile_parsed: bool = False
     account_profile_id: str = "UNKNOWN"
+
+    @property
+    def login_ok(self) -> bool:
+        """Legacy view: auth succeeded (profile may still be unparsed)."""
+        return self.auth_ok
+
+    @property
+    def entitlement_verified(self) -> bool:
+        return self.profile_parsed and bool(self.permission_codes)
 
     @property
     def permission_codes(self) -> str:
@@ -54,20 +75,35 @@ class AccountProfile:
         return float(v) if isinstance(v, (int, float)) else None
 
     @classmethod
-    def from_scrubbed(cls, profile: dict[str, Any] | None) -> AccountProfile:
+    def from_scrubbed(
+        cls,
+        profile: dict[str, Any] | None,
+        *,
+        provider: str = "amazingdata",
+        environment: str = "UNKNOWN",
+        host: str = "",
+        username: str = "",
+    ) -> AccountProfile:
+        """Build the profile; unparsable logon output keeps auth_ok=True
+        but profile_parsed=False (audit P1-08)."""
         if not profile:
-            return cls(login_ok=False)
-        digest = hashlib.sha256(
+            return cls(auth_ok=True, profile_parsed=False)
+        username_hash = hashlib.sha256(username.encode()).hexdigest()[:8] if username else "anon"
+        entitlement = (
             f"{profile.get('PermissionCode', '')}|"
             f"{profile.get('SubscribeLimitNum', '')}|"
-            f"{profile.get('TotalWeekFlow', '')}".encode()
+            f"{profile.get('TotalWeekFlow', '')}"
+        )
+        digest = hashlib.sha256(
+            f"{provider}|{environment}|{host}|{username_hash}|{entitlement}".encode()
         ).hexdigest()[:12]
         # classify trial vs production by entitlement shape; refined when a
         # real production account is observed (task book section 18).
         kind = "TRIAL_SIMULATION" if profile.get("TotalWeekFlow") == 10 else "ACCOUNT"
         return cls(
             raw_profile=profile,
-            login_ok=True,
+            auth_ok=True,
+            profile_parsed=True,
             account_profile_id=f"{kind}_{digest}",
         )
 
@@ -104,9 +140,16 @@ class AmazingDataSession:
         # login success prints "login success" + logon json into the capture
         profile = parse_logon_profile(holder.text)
         if profile is None:
-            # SDK version drift: no logon json captured - record raw shape
-            profile = {"NOTE": "logon json pattern not captured", "captured_len": len(holder.text)}
-        self.profile = AccountProfile.from_scrubbed(profile)
+            # SDK version drift: no logon json captured - keep auth_ok=True
+            # but profile_parsed=False (audit P1-08: separate the two facts)
+            self.profile = AccountProfile(auth_ok=True, profile_parsed=False)
+            return self.profile
+        self.profile = AccountProfile.from_scrubbed(
+            profile,
+            provider="amazingdata",
+            host=host,
+            username=username,
+        )
         return self.profile
 
     # ------------------------------------------------------------- logout

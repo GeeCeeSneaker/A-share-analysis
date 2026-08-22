@@ -61,15 +61,26 @@ class SecretMaskingFilter(logging.Filter):
         for attr in ("context", "extra"):
             payload = getattr(record, attr, None)
             if isinstance(payload, dict):
-                masked = {k: self._mask_value(k, v) for k, v in payload.items()}
-                setattr(record, attr, masked)
-        # mask printf-style args: logger.info("pw=%s", secret) cannot know the
-        # key name, so we only mask dict args directly
-        if record.args and isinstance(record.args, dict):
-            record.args = {k: self._mask_value(k, v) for k, v in record.args.items()}
-        # mask inline key=value in the plain message
+                masked_payload = {k: self._mask_value(k, v) for k, v in payload.items()}
+                setattr(record, attr, masked_payload)
+        # mask printf-style dict args directly
+        args: Any = record.args
+        if args and isinstance(args, dict):
+            args = {k: self._mask_value(k, v) for k, v in args.items()}
+            record.args = args
+        # mask inline key=value in the plain message; when the message was
+        # rewritten (audit P1-13) the leftover positional args can no longer
+        # be interpolated safely -> pre-format now to avoid formatter errors
         if isinstance(record.msg, str):
-            record.msg = self._mask_inline(record.msg)
+            masked_msg = self._mask_inline(record.msg)
+            if masked_msg != record.msg and args:
+                try:
+                    record.msg = masked_msg % args
+                except (TypeError, ValueError):
+                    record.msg = masked_msg
+                record.args = None
+            else:
+                record.msg = masked_msg
         return True
 
 

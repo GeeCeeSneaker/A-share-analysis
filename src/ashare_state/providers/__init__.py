@@ -1,16 +1,38 @@
-"""Provider layer: protocols, registry, adapters (Mock now; AmazingData in P0a)."""
+"""Provider layer: shared error taxonomy, protocols, registry, adapters."""
 
 from ashare_state.providers.base import (
     DailyBar,
-    ProviderUnavailableError,
     SecurityMasterEntry,
+)
+from ashare_state.providers.errors import (
+    ProviderAuthError,
+    ProviderEmptyResultError,
+    ProviderError,
+    ProviderNetworkError,
+    ProviderPermissionError,
+    ProviderRateLimitError,
+    ProviderSchemaError,
+    ProviderSdkInternalError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+    is_retryable,
 )
 from ashare_state.providers.registry import ProviderRegistry, default_registry
 
 __all__ = [
     "DailyBar",
+    "ProviderAuthError",
+    "ProviderEmptyResultError",
+    "ProviderError",
+    "ProviderNetworkError",
+    "ProviderPermissionError",
+    "ProviderRateLimitError",
     "ProviderRegistry",
+    "ProviderSchemaError",
+    "ProviderSdkInternalError",
+    "ProviderTimeoutError",
     "ProviderUnavailableError",
     "SecurityMasterEntry",
     "default_registry",
+    "is_retryable",
 ]

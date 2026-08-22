@@ -96,10 +96,10 @@ def provider_doctor(
 
     settings = Settings()
     creds = None
-    if settings.tgw_username and settings.tgw_password and not offline:
+    if settings.tgw_username and settings.tgw_password.get_secret_value() and not offline:
         creds = (
             settings.tgw_username,
-            settings.tgw_password,
+            settings.tgw_password.get_secret_value(),
             settings.tgw_server_vip,
             settings.tgw_server_port,
         )

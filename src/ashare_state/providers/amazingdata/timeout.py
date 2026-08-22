@@ -1,9 +1,17 @@
-"""Timeout and retry policy for provider calls (task book section 4).
+"""Retry budget for provider calls (task book section 4, audit P0-03).
 
-The SDK is known to retry internally for minutes before failing, and Python
-timers do NOT necessarily cancel the underlying SDK call (task book 4.2).
-This module centralizes budgets; the subprocess-isolation experiment is
-recorded separately (see docs/adr/ candidates) and NOT introduced here.
+Honest semantics (audit P0-03): this is a RETRY BUDGET, not a hard
+timeout. Python timers cannot cancel a blocking native SDK call; if the
+SDK blocks past the deadline we can only abandon waiting at the Python
+layer - the SDK thread may still be running underneath. The subprocess
+isolation experiment (task book 4.2) is tracked separately; do NOT
+represent query_timeout_seconds as a hard timeout in any doc.
+
+Retry discipline (audit P0-03): errors are CLASSIFIED FIRST, then the
+retry decision consults is_retryable() - ProviderPermissionError /
+ProviderAuthError / ProviderSchemaError / ProviderSdkInternalError are
+never retried, so a permission denial can no longer surface as a
+timeout after budget exhaustion.
 """
 
 from __future__ import annotations
@@ -13,7 +21,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from ashare_state.providers.amazingdata.errors import ProviderTimeoutError
+from ashare_state.providers.errors import ProviderError, ProviderTimeoutError, is_retryable
 
 
 @dataclass(frozen=True)
@@ -52,15 +60,14 @@ def run_with_budget(
     retryable: Callable[[Exception], bool] | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> object:
-    """Run fn under a wall-clock budget with bounded retries.
+    """Run fn under a wall-clock budget with class-aware bounded retries.
 
-    NOTE (task book 4.2): if fn internally blocks past the deadline we can
-    only abandon waiting at the Python layer - the SDK thread may still be
-    running underneath. Callers must observe and record that experiment;
-    this function never pretends the underlying call was cancelled.
+    Default retry policy (audit P0-03): only ProviderError subclasses in
+    RETRYABLE_ERRORS (network/timeout/rate-limit) retry; raw exceptions
+    and non-retryable typed errors propagate IMMEDIATELY so their true
+    class is never masked by a budget-exhaustion timeout.
     """
-    _default_retryable = lambda exc: not isinstance(exc, (KeyboardInterrupt, SystemExit))  # noqa: E731
-    is_retryable = retryable or _default_retryable
+    is_retryable_exc = retryable or _default_retryable
     deadline = budget.deadline()
     attempt = 0
     last_exc: Exception | None = None
@@ -69,7 +76,7 @@ def run_with_budget(
             return fn()
         except Exception as exc:  # noqa: BLE001 - boundary
             last_exc = exc
-            if not is_retryable(exc):
+            if not is_retryable_exc(exc):
                 raise
             attempt += 1
             if attempt > retry.max_retries or time.monotonic() >= deadline:
@@ -79,3 +86,12 @@ def run_with_budget(
         f"{endpoint}: budget exhausted after {attempt} attempt(s): {last_exc}",
         context={"attempts": attempt, "budget_seconds": budget.query_timeout_seconds},
     ) from last_exc
+
+
+def _default_retryable(exc: Exception) -> bool:
+    if isinstance(exc, ProviderError):
+        return is_retryable(exc)
+    # raw SDK exceptions: classify happens in the provider layer BEFORE
+    # reaching here; a raw exception at this level is a programming error
+    # and must not retry (audit P0-03: no silent retry of unknowns).
+    return False
