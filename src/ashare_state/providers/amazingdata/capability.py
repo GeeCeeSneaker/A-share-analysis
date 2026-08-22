@@ -1,21 +1,46 @@
-"""Provider capability registry (task book sections 3.1 / 10).
+"""Provider capability registry (task book sections 3.1 / 10, audit P1-03).
 
 Discipline: an AmazingData capability that has not passed the REAL-account
 Spike may only ever be CANDIDATE. Approval flow:
     real account -> spike -> golden -> provider verification ->
     source-policy dry-run -> APPROVED
+
+Audit P1-03: meta_provider_capability (migration 007 columns) is the
+AUTHORITATIVE state; the in-memory registry is a session cache synced
+explicitly via load_approvals()/persist_approval().
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
 
 
 class CapabilityStatus(StrEnum):
     CANDIDATE = "CANDIDATE"  # API surface exists; data NOT yet verified
     APPROVED = "APPROVED"  # real-account spike + golden passed
     RETIRED = "RETIRED"  # deprecated / replaced by another endpoint
+
+
+@dataclass(frozen=True)
+class CapabilityEvidence:
+    """Mandatory bundle for APPROVED (audit P1-03)."""
+
+    spike_report_ref: str
+    provider_verification_ref: str
+    golden_case_refs: tuple[str, ...]
+    dry_run_ref: str
+    approved_by: str
+    approved_at: str
+    account_profile_id: str
+
+
+class CapabilityGovernanceError(RuntimeError):
+    """Illegal capability governance transition / incomplete evidence."""
 
 
 @dataclass(frozen=True)
@@ -109,16 +134,103 @@ def capability_status(name: str) -> CapabilityStatus:
     return cap.status
 
 
-def approve_capability(name: str, *, verified_at: str, account_profile_id: str) -> Capability:
-    """Governance transition (only via explicit call - tests guard this)."""
+def approve_capability(name: str, evidence: CapabilityEvidence) -> Capability:
+    """In-memory approval with FULL evidence bundle (audit P1-03).
+
+    Persistence to the authoritative table happens via persist_approval().
+    """
     cap = CAPABILITY_REGISTRY[name]
+    missing = [
+        field
+        for field, value in (
+            ("spike_report_ref", evidence.spike_report_ref),
+            ("provider_verification_ref", evidence.provider_verification_ref),
+            ("golden_case_refs", evidence.golden_case_refs),
+            ("dry_run_ref", evidence.dry_run_ref),
+            ("approved_by", evidence.approved_by),
+            ("approved_at", evidence.approved_at),
+            ("account_profile_id", evidence.account_profile_id),
+        )
+        if not value
+    ]
+    if missing:
+        msg = (
+            f"capability approval evidence incomplete for {name!r}; "
+            f"missing: {missing} (audit P1-03: real spike + golden + "
+            "verification + dry-run + account profile required)"
+        )
+        raise CapabilityGovernanceError(msg)
+    if cap.status is CapabilityStatus.RETIRED:
+        msg = f"capability {name!r} is RETIRED; approval refused"
+        raise CapabilityGovernanceError(msg)
     approved = Capability(
         name=cap.name,
         sdk_methods=cap.sdk_methods,
         canonical_domains=cap.canonical_domains,
         status=CapabilityStatus.APPROVED,
-        verified_at=verified_at,
-        account_profile_id=account_profile_id,
+        verified_at=evidence.approved_at,
+        account_profile_id=evidence.account_profile_id,
     )
     CAPABILITY_REGISTRY[name] = approved
     return approved
+
+
+# ------------------------------------------------------- persistence (P1-03)
+
+
+def persist_approval(
+    conn: DuckDBPyConnection,
+    name: str,
+    evidence: CapabilityEvidence,
+) -> None:
+    """Write the approval to meta_provider_capability (authoritative)."""
+    conn.execute(
+        "INSERT OR REPLACE INTO meta_provider_capability "
+        "(provider, capability, status, spike_report_ref, "
+        "provider_verification_ref, golden_case_refs, dry_run_ref, "
+        "account_profile_id, approved_by, adapter_version, verified_at) "
+        "VALUES ('amazingdata', ?, 'APPROVED', ?, ?, ?, ?, ?, ?, NULL, ?)",
+        [
+            name,
+            evidence.spike_report_ref,
+            evidence.provider_verification_ref,
+            ",".join(evidence.golden_case_refs),
+            evidence.dry_run_ref,
+            evidence.account_profile_id,
+            evidence.approved_by,
+            evidence.approved_at,
+        ],
+    )
+
+
+def load_approvals(conn: DuckDBPyConnection) -> dict[str, CapabilityStatus]:
+    """Sync the in-memory registry from the authoritative table.
+
+    Called at session start so a fresh process sees persisted approvals
+    (audit P1-03: no reset-to-CANDIDATE on restart).
+    """
+    rows = conn.execute(
+        "SELECT capability, status FROM meta_provider_capability WHERE provider = 'amazingdata'"
+    ).fetchall()
+    loaded: dict[str, CapabilityStatus] = {}
+    for capability, status in rows:
+        key = str(capability)
+        try:
+            loaded[key] = CapabilityStatus(str(status))
+        except ValueError:
+            # unknown status literal in db: treat as CANDIDATE (fail safe)
+            loaded[key] = CapabilityStatus.CANDIDATE
+        cap = CAPABILITY_REGISTRY.get(key)
+        if cap is not None and loaded[key] in (
+            CapabilityStatus.APPROVED,
+            CapabilityStatus.RETIRED,
+        ):
+            CAPABILITY_REGISTRY[key] = Capability(
+                name=cap.name,
+                sdk_methods=cap.sdk_methods,
+                canonical_domains=cap.canonical_domains,
+                status=loaded[key],
+                verified_at=cap.verified_at,
+                account_profile_id=cap.account_profile_id,
+            )
+    return loaded

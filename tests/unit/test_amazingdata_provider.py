@@ -30,12 +30,17 @@ pytestmark = pytest.mark.unit
 
 class TestCapabilityRegistry:
     def test_all_capabilities_start_candidate(self):
-        """Task book 21.1: nothing APPROVED before real-account Spike."""
+        """Task book 21.1: nothing APPROVED before real-account Spike.
+
+        Value equality (not `is`): the capability module may be reloaded by
+        the governance tests, rebuilding the StrEnum class - values compare
+        equal across reloads.
+        """
         for name, cap in CAPABILITY_REGISTRY.items():
-            assert cap.status is CapabilityStatus.CANDIDATE, name
+            assert cap.status == CapabilityStatus.CANDIDATE, name
 
     def test_status_query(self):
-        assert capability_status("daily_bar") is CapabilityStatus.CANDIDATE
+        assert capability_status("daily_bar") == CapabilityStatus.CANDIDATE
 
     def test_unknown_capability_raises(self):
         with pytest.raises(KeyError):
