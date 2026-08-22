@@ -268,6 +268,53 @@ class AmazingDataProvider:
             require_capability="trade_calendar",
         )
 
+    def get_hist_code_list(self, security_type: str, start_date: int, end_date: int) -> Any:
+        return self._call(
+            "BaseData.get_hist_code_list",
+            "hist_code_list",
+            lambda: self._base().get_hist_code_list(
+                security_type=security_type, start_date=start_date, end_date=end_date
+            ),
+            params={
+                "security_type": security_type,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            require_capability="security_master",
+        )
+
+    def query_kline(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        kline_type: str = "DAY",
+    ) -> Any:
+        return self._call(
+            "MarketData.query_kline",
+            "daily_bar",
+            lambda: self._market(begin_date, end_date).query_kline(
+                code_list=code_list,
+                begin_date=begin_date,
+                end_date=end_date,
+                kline_type=kline_type,
+            ),
+            params={
+                "codes": len(code_list),
+                "begin_date": begin_date,
+                "end_date": end_date,
+                "kline_type": kline_type,
+            },
+            require_capability="daily_bar",
+        )
+
+    def _market(self, begin_date: int, end_date: int) -> Any:
+        # MarketData(calendar) needs the trading-day list covering the range
+        calendar = self._base().get_calendar()
+        days = [d for d in (calendar or []) if begin_date <= int(d) <= end_date]
+        return self.session.sdk.MarketData(days or [begin_date, end_date])
+
 
 def _count_rows(result: Any) -> int:
     if result is None:

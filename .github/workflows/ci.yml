@@ -55,6 +55,12 @@ jobs:
       - name: Pytest (unit + integration incl. migration-from-zero, identity rebuild, secret leak)
         run: uv run pytest
 
+      - name: Spike framework gates (audit R2 section 34)
+        shell: bash
+        run: |
+          uv run python -m compileall -q scripts
+          uv run python scripts/spike/spike_runner.py --dry-run
+
       - name: Verify AmazingData SDK is absent in CI env
         shell: bash
         run: |

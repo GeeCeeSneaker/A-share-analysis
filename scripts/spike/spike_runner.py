@@ -1,193 +1,149 @@
-"""P0-M-1 Spike orchestrator (single entry point).
+"""P0-M-1 Spike CLI (thin entry point; logic lives in ashare_state.spike).
 
-Usage (Windows/PowerShell, from repo root):
-
-    # dry-run: validate the whole framework without credentials (CI-safe)
+Usage:
     uv run python scripts/spike/spike_runner.py --dry-run
-
-    # real run on the controlled machine (requires AmazingData SDK installed)
-    uv run python scripts/spike/spike_runner.py --phase b1
-    uv run python scripts/spike/spike_runner.py --phase b3 --date 2026-08-14
-    uv run python scripts/spike/spike_runner.py --phase all --month 2026-07
-
-Phases (design ruling section 14, track B):
-    b1  SDK environment verification
-    b2  security master / historical codes (incl. delisted)
-    b3  daily / status / limit / adj sampling
-    b4  ST / delist / corp-action golden discovery
-    b5  volume/amount/unit/cache/freshness over one month
-    b6  free-float equivalence assessment (four-level verdict)
-    b7  taxonomy / benchmark index assessment
-    verdict  aggregate catalog -> GO_CORE / GO_DEGRADED / NO_GO draft
-
-Every run appends auditable cases to data/spike/results/spike_case_catalog.*
-and archives raw responses under data/spike/raw/.
+    uv run python scripts/spike/spike_runner.py --verdict --run-id <id>   # production only
+    uv run python scripts/spike/spike_runner.py --production --phase b2   # real account (B2-B7)
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from adk_client import ProviderUnavailableError  # noqa: E402
-from case_catalog import CaseCatalog, compute_overall_verdict  # noqa: E402
-from samples_b1_sdk import run_b1  # noqa: E402
-from samples_b2_b5 import (  # noqa: E402
-    ProbeContext as ProbeContextB2B5,
+from ashare_state.spike import (
+    CaseCatalog,
+    ProbeContext,
+    RunKind,
+    RunStore,
+    compute_verdict,
+    current_code_commit,
+    new_run,
+    run_dry_run,
 )
-from samples_b2_b5 import (
+from ashare_state.spike.probes import (
     probe_b2_security_master,
     probe_b3_core_facts,
     probe_b4_golden,
-    probe_b5_units_coverage,
-)
-from samples_b6_b7 import (  # noqa: E402
-    ProbeContext as ProbeContextB6B7,
-)
-from samples_b6_b7 import (
-    probe_b6_free_float,
-    probe_b7_taxonomy_index,
+    probe_b5_units_pit_freshness,
+    probe_b6_replacement,
+    probe_b7_capacity,
 )
 
-ALL_PHASES = ["b1", "b2", "b3", "b4", "b5", "b6", "b7"]
+
+def _load_env(path: Path = Path(".env")) -> dict[str, str]:
+    import os
+
+    env = {k: v for k, v in os.environ.items() if k.startswith("TGW_")}
+    if path.is_file():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                env[key.strip()] = value.strip()
+    return env
 
 
-def _ctx_b2b5(spike_root: Path, catalog: CaseCatalog, module: str, dry_run: bool):
-    return ProbeContextB2B5(
-        spike_root=spike_root, catalog=catalog, dry_run=dry_run, module_name=module
+def _make_real_target():
+    from ashare_state.providers.amazingdata.session import AmazingDataSession
+    from ashare_state.spike.target import make_real_target
+
+    env = _load_env()
+    missing = [
+        k
+        for k in ("TGW_USERNAME", "TGW_PASSWORD", "TGW_SERVER_VIP", "TGW_SERVER_PORT")
+        if not env.get(k)
+    ]
+    if missing:
+        print(f"missing env keys: {missing}; fill .env first")
+        sys.exit(2)
+    session = AmazingDataSession(
+        env["TGW_USERNAME"],
+        env["TGW_PASSWORD"],
+        env["TGW_SERVER_VIP"],
+        int(env["TGW_SERVER_PORT"]),
     )
+    session.login()
+    return make_real_target(session), session
 
 
-def _ctx_b6b7(spike_root: Path, catalog: CaseCatalog, module: str, dry_run: bool):
-    return ProbeContextB6B7(
-        spike_root=spike_root, catalog=catalog, dry_run=dry_run, module_name=module
-    )
-
-
-def run_phase(
-    phase: str,
-    *,
-    spike_root: Path,
-    module: str,
-    dry_run: bool,
-    sample_date: str,
-    sample_month: str,
-) -> dict[str, object]:
-    results_dir = spike_root / "results"
-    catalog = CaseCatalog(results_dir)
-    catalog.load_existing()
-
-    outputs: dict[str, object] = {"phase": phase}
-
-    if phase == "b1":
-        outputs["report"] = str(run_b1(module, spike_root, dry_run=dry_run))
-    elif phase == "b2":
-        outputs["b2"] = probe_b2_security_master(_ctx_b2b5(spike_root, catalog, module, dry_run))
-    elif phase == "b3":
-        outputs["b3"] = probe_b3_core_facts(
-            _ctx_b2b5(spike_root, catalog, module, dry_run), sample_date
-        )
-    elif phase == "b4":
-        outputs["b4"] = probe_b4_golden(
-            _ctx_b2b5(spike_root, catalog, module, dry_run), sample_date
-        )
-    elif phase == "b5":
-        outputs["b5"] = probe_b5_units_coverage(
-            _ctx_b2b5(spike_root, catalog, module, dry_run), sample_month
-        )
-    elif phase == "b6":
-        outputs["b6"] = probe_b6_free_float(
-            _ctx_b6b7(spike_root, catalog, module, dry_run), sample_date
-        )
-    elif phase == "b7":
-        outputs["b7"] = probe_b7_taxonomy_index(_ctx_b6b7(spike_root, catalog, module, dry_run))
-    else:
-        msg = f"unknown phase {phase!r}; valid: {ALL_PHASES + ['all', 'verdict']}"
-        raise SystemExit(msg)
-
-    catalog.flush()
-    outputs["catalog"] = str(catalog.jsonl_path)
-    return outputs
-
-
-def run_verdict(spike_root: Path) -> dict[str, object]:
-    """Aggregate the catalog into a draft three-level verdict.
-
-    NOTE: this is a DRAFT scaffold. The capability verdicts fed in here come
-    from case results; the final GO/NO-GO decision is written by the report
-    author after human review of the evidence (design review node: Spike
-    Report + M0 Exit Report submitted together).
-    """
-    catalog = CaseCatalog(spike_root / "results")
-    catalog.load_existing()
-    stats = catalog.stats()
-
-    capability_verdicts: dict[str, str] = {}
-    for case_type, counts in stats.items():
-        if counts["FAIL"] > 0:
-            capability_verdicts[case_type] = "FAIL"
-        elif counts["PASS"] + counts["DIFF_EXPLAINED"] > 0:
-            capability_verdicts[case_type] = "PASS"
-        else:
-            capability_verdicts[case_type] = "MISSING"
-
-    draft = compute_overall_verdict(capability_verdicts)
-    out = {
-        "phase": "verdict",
-        "case_stats": stats,
-        "capability_verdicts": capability_verdicts,
-        "draft_overall_verdict": draft,
-        "caveat": "DRAFT - requires human review of evidence before submission",
-    }
-    results_dir = spike_root / "results"
-    results_dir.mkdir(parents=True, exist_ok=True)
-    path = results_dir / "verdict_draft.json"
-    path.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
-    out["path"] = str(path)
-    return out
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="P0-M-1 AmazingData Spike runner")
-    parser.add_argument(
-        "--phase",
-        default="all",
-        help=f"one of {ALL_PHASES + ['all', 'verdict']} (default: all)",
-    )
-    parser.add_argument("--module", default=os.environ.get("AMAZINGDATA_MODULE", "AmazingData"))
+def main() -> int:
+    parser = argparse.ArgumentParser(description="P0-M-1 Spike runner (R2A)")
+    parser.add_argument("--dry-run", action="store_true", help="framework self-test (fake data)")
+    parser.add_argument("--production", action="store_true", help="real account run (B2-B7)")
+    parser.add_argument("--trial", action="store_true", help="trial account run")
+    parser.add_argument("--phase", default="all", help="b2|b3|b4|b5|b6|b7|all (production/trial)")
+    parser.add_argument("--date", type=int, default=20260814, help="sample trade date")
+    parser.add_argument("--verdict", action="store_true", help="aggregate verdict for --run-id")
+    parser.add_argument("--run-id", help="spike run id for --verdict")
     parser.add_argument("--spike-root", default="data/spike")
-    parser.add_argument("--date", default="2026-08-14", help="sample trade date for b3/b4/b6")
-    parser.add_argument("--month", default="2026-07", help="sample month for b5 (YYYY-MM)")
-    parser.add_argument("--dry-run", action="store_true", help="no SDK, fake client, CI-safe")
     args = parser.parse_args()
 
     spike_root = Path(args.spike_root)
-    phases = ALL_PHASES + ["verdict"] if args.phase == "all" else [args.phase]
 
-    for phase in phases:
+    if args.dry_run:
+        out = run_dry_run(spike_root, sample_date=args.date, repo_root=Path.cwd())
+        print(json.dumps(out, ensure_ascii=False, default=str)[:600])
+        return 0
+
+    if args.verdict:
+        if not args.run_id:
+            print("--verdict requires --run-id (production run)")
+            return 2
+        store = RunStore(spike_root)
+        run = store.load_run(args.run_id, RunKind.PRODUCTION)
+        verdict = compute_verdict(store, run)
+        out_path = store.run_dir(run) / "verdict.json"
+        out_path.write_text(
+            json.dumps(verdict.to_json(), indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        print(json.dumps(verdict.to_json(), ensure_ascii=False, default=str)[:600])
+        print(f"verdict written: {out_path}")
+        return 0
+
+    if args.production or args.trial:
+        run_kind = RunKind.PRODUCTION if args.production else RunKind.TRIAL
+        target, session = _make_real_target()
         try:
-            if phase == "verdict":
-                out = run_verdict(spike_root)
-            else:
-                out = run_phase(
-                    phase,
-                    spike_root=spike_root,
-                    module=args.module,
-                    dry_run=args.dry_run,
-                    sample_date=args.date,
-                    sample_month=args.month,
-                )
-        except ProviderUnavailableError as exc:
-            # expected outside the controlled machine; not a framework failure
-            print(f"[{phase}] SKIPPED (SDK unavailable): {exc}")
-            continue
-        print(f"[{phase}] done -> {json.dumps(out, ensure_ascii=False, default=str)[:400]}")
+            identity = target.identity()
+            run, store = new_run(
+                run_kind=run_kind,
+                spike_root=spike_root,
+                code_commit=current_code_commit(),
+                sdk_version=identity.get("sdk_version"),
+                runtime_version=identity.get("runtime_version"),
+                account_profile_id=identity.get("account_profile_id", "UNKNOWN"),
+            )
+            catalog = CaseCatalog(store, run.spike_run_id)
+            ctx = ProbeContext(run, store, catalog, target)
+            phases = {
+                "b2": lambda: probe_b2_security_master(ctx),
+                "b3": lambda: probe_b3_core_facts(ctx, args.date),
+                "b4": lambda: probe_b4_golden(ctx, args.date),
+                "b5": lambda: probe_b5_units_pit_freshness(ctx, args.date),
+                "b6": lambda: probe_b6_replacement(ctx, args.date),
+                "b7": lambda: probe_b7_capacity(ctx, args.date),
+            }
+            wanted = list(phases) if args.phase == "all" else [args.phase]
+            results = {}
+            for phase in wanted:
+                if phase not in phases:
+                    print(f"unknown phase {phase!r}; valid: {list(phases)}")
+                    return 2
+                results[phase] = phases[phase]()
+                print(f"[{phase}] {results[phase]}")
+            catalog.flush(store.run_dir(run))
+            print(f"spike_run_id: {run.spike_run_id}")
+            print(f"run_dir: {store.run_dir(run)}")
+            return 0
+        finally:
+            session.logout()
+
+    parser.print_help()
+    return 2
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
