@@ -136,6 +136,7 @@ class TestStatusRouting:
         full.update(
             {
                 "SECURITY_CODE": "600000",
+                "MARKET_CODE": "1",
                 "KLINE_TIME": 20260814,
                 "OPEN_PRICE": 0,
                 "HIGH_PRICE": 10.5,
@@ -155,7 +156,13 @@ class TestStatusRouting:
         from ashare_state.providers.amazingdata.mapper import map_daily_bar_row
         from ashare_state.providers.errors import MappingValidationError
 
-        row = {"SECURITY_CODE": "600000", "KLINE_TIME": 20260814, "VOLUME": 100, "AMOUNT": 1000}
+        row = {
+            "SECURITY_CODE": "600000",
+            "MARKET_CODE": "1",
+            "KLINE_TIME": 20260814,
+            "VOLUME": 100,
+            "AMOUNT": 1000,
+        }
         with pytest.raises(MappingValidationError, match="OPEN_PRICE"):
             map_daily_bar_row(row)
 

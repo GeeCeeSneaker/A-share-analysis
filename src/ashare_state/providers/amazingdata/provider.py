@@ -26,8 +26,8 @@ from typing import Any
 
 from ashare_state.providers.amazingdata.capability import CAPABILITY_REGISTRY, CapabilityStatus
 from ashare_state.providers.amazingdata.errors import (
+    ProviderCapabilityNotApprovedError,
     ProviderError,
-    ProviderPermissionError,
     classify_sdk_error,
 )
 from ashare_state.providers.amazingdata.sdk_loader import SdkIdentity, probe_identity
@@ -114,7 +114,9 @@ class AmazingDataProvider:
 
     # ------------------------------------------------------------ internals
     def _gate_capability(self, capability: str | None) -> CapabilityStatus | None:
-        """Audit P1-02: PRODUCTION refuses CANDIDATE capabilities."""
+        """Audit P1-02 / R2-P1-02: PRODUCTION refuses CANDIDATE capabilities
+        with a GOVERNANCE error (never ProviderPermissionError - that class
+        is reserved for broker-side entitlement)."""
         if capability is None:
             return None
         cap = CAPABILITY_REGISTRY[capability]
@@ -127,7 +129,7 @@ class AmazingDataProvider:
                 "PRODUCTION use mode allows APPROVED capabilities only - "
                 "spike usage must explicitly opt in with ProviderUseMode.SPIKE"
             )
-            raise ProviderPermissionError(msg, context={"capability": capability})
+            raise ProviderCapabilityNotApprovedError(msg, context={"capability": capability})
         return cap.status
 
     def _call(

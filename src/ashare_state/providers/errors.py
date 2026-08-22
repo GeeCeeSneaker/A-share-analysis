@@ -63,6 +63,20 @@ class ProviderSdkInternalError(ProviderError):
     """SDK raised an internal/unclassifiable error; original preserved as cause."""
 
 
+class ProviderGovernanceError(ProviderError):
+    """INTERNAL governance refusal (audit R2-P1-02).
+
+    Distinct from ProviderPermissionError (broker-side entitlement):
+    this class means OUR governance layer refused the call, e.g. a
+    CANDIDATE capability used in PRODUCTION mode. Provider-entitlement
+    statistics must count only ProviderPermissionError.
+    """
+
+
+class ProviderCapabilityNotApprovedError(ProviderGovernanceError):
+    """Capability is not APPROVED for the requested use mode (R2-P1-02)."""
+
+
 #: error classes that must NEVER be retried (audit P0-03)
 NON_RETRYABLE_ERRORS: tuple[type[ProviderError], ...] = (
     ProviderAuthError,

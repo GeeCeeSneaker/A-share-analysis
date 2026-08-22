@@ -8,6 +8,7 @@ from ashare_state.pipeline.publish import (
     latest_published,
     publish_snapshot,
     publish_universes,
+    record_artifact_validation,
     resolve_publish,
 )
 
@@ -19,5 +20,6 @@ __all__ = [
     "latest_published",
     "publish_snapshot",
     "publish_universes",
+    "record_artifact_validation",
     "resolve_publish",
 ]

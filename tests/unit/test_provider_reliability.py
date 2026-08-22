@@ -52,13 +52,14 @@ class TestRetryPolicy:
 
 class TestCapabilityUseMode:
     def test_production_mode_refuses_candidate(self):
-        """Audit P1-02: PRODUCTION + CANDIDATE -> BLOCK (all caps are
-        CANDIDATE until real-account spike approval)."""
+        """Audit P1-02 / R2-P1-02: PRODUCTION + CANDIDATE -> GOVERNANCE
+        error (never ProviderPermissionError - that is broker-side only)."""
         from ashare_state.providers.amazingdata.session import AccountProfile
+        from ashare_state.providers.errors import ProviderCapabilityNotApprovedError
 
         session = _FakeSession(AccountProfile())
         provider = AmazingDataProvider(session, use_mode=ProviderUseMode.PRODUCTION)
-        with pytest.raises(ProviderPermissionError, match="not APPROVED"):
+        with pytest.raises(ProviderCapabilityNotApprovedError, match="not APPROVED"):
             provider._gate_capability("daily_bar")  # noqa: SLF001
 
     def test_spike_mode_allows_candidate(self):

@@ -32,6 +32,37 @@ from ashare_state.providers.errors import MappingValidationError
 _MARKET_SUFFIX = {"1": ".SH", "2": ".SZ", "3": ".BJ"}
 
 
+def normalize_provider_symbol(code: str, market_code: str | None = None) -> str:
+    """ProviderSymbolNormalizer (audit R2-P1-05): the SINGLE rule producing
+    canonical provider symbols `600000.SH` / `000001.SZ` / `830799.BJ`.
+
+    - bare code + market code -> suffixed symbol
+    - already-suffixed symbol -> validated and returned unchanged
+    - unknown market -> MappingValidationError
+    """
+    text = str(code).strip()
+    if "." in text:
+        bare, _, suffix = text.partition(".")
+        if f".{suffix}" not in _MARKET_SUFFIX.values():
+            raise MappingValidationError(
+                f"provider symbol {text!r}: unknown suffix {suffix!r} "
+                f"(expected one of {sorted(_MARKET_SUFFIX.values())})"
+            )
+        if not bare.isdigit():
+            raise MappingValidationError(f"provider symbol {text!r}: non-numeric code")
+        return text
+    market = str(market_code or "")
+    market_suffix = _MARKET_SUFFIX.get(market)
+    if market_suffix is None:
+        raise MappingValidationError(
+            f"cannot normalize bare code {text!r}: unknown/missing market "
+            f"code {market!r} (expected one of {sorted(_MARKET_SUFFIX)})"
+        )
+    if not text.isdigit():
+        raise MappingValidationError(f"provider symbol {text!r}: non-numeric code")
+    return f"{text}{market_suffix}"
+
+
 def _col(row: Any, name: str) -> Any:
     """DataFrame row / dict access with explicit None for absence."""
     try:
@@ -118,7 +149,18 @@ def _to_int(value: Any) -> int | None:
 
 
 def map_trade_calendar(market: str, trading_days: list[Any]) -> TradeCalendarDTO:
-    days = [d for d in (_to_date(v) for v in trading_days) if d is not None]
+    """Strict calendar (R2-P1-05): ONE unparsable date quarantines the WHOLE
+    response - the calendar underpins PIT/rolling/prev-next logic and must
+    never be silently filtered."""
+    days: list[date] = []
+    for value in trading_days:
+        parsed = _to_date(value)
+        if parsed is None:
+            raise MappingValidationError(
+                f"trade_calendar({market}): unparsable trading day {value!r}; "
+                "whole payload quarantined (audit R2-P1-05)"
+            )
+        days.append(parsed)
     return TradeCalendarDTO(market=market, trading_days=days)
 
 
@@ -128,9 +170,16 @@ def map_trade_calendar(market: str, trading_days: list[Any]) -> TradeCalendarDTO
 def map_security_master_row(row: Any, *, source: str) -> SecurityMasterDTO:
     symbol = str(_required(row, "SECURITY_CODE", "code", context="security_master"))
     market = str(first_present(row, "MARKET_CODE", "market") or "")
-    suffix = _MARKET_SUFFIX.get(market, "")
+    # R2-P1-05: market is REQUIRED - identity cannot accept unknown markets
+    suffix = _MARKET_SUFFIX.get(market)
+    if suffix is None:
+        raise MappingValidationError(
+            f"security_master: unknown/missing MARKET_CODE {market!r}; "
+            "provider symbol normalization requires a known market "
+            f"(one of {sorted(_MARKET_SUFFIX)})"
+        )
     return SecurityMasterDTO(
-        provider_symbol=f"{symbol}{suffix}" if suffix else symbol,
+        provider_symbol=f"{symbol}{suffix}",
         security_code=symbol,
         market_code=market,
         security_type=str(first_present(row, "SECURITY_TYPE") or source),
@@ -147,7 +196,11 @@ def map_security_master_row(row: Any, *, source: str) -> SecurityMasterDTO:
 
 def map_daily_bar_row(row: Any, *, kline_type: str = "DAY") -> DailyBarDTO:
     ctx = "daily_bar"
-    symbol = str(_required(row, "SECURITY_CODE", "code", context=ctx))
+    bare = str(_required(row, "SECURITY_CODE", "code", context=ctx))
+    market = str(first_present(row, "MARKET_CODE", "market") or "")
+    # R2-P1-05: daily bar symbols normalize through the SAME rule as
+    # security master (600000 -> 600000.SH), never left bare
+    symbol = normalize_provider_symbol(bare, market or None)
     kline_time = _to_int(first_present(row, "KLINE_TIME", "kline_time"))
     if kline_time is None:
         raise MappingValidationError(f"{ctx}: required KLINE_TIME missing/unparsable")

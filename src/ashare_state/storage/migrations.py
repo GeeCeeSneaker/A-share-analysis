@@ -66,6 +66,14 @@ class MigrationLedgerGapError(MigrationError):
     """
 
 
+class MigrationSequenceGapError(MigrationError):
+    """The REPO migration sequence itself has a gap (audit R2-P1-09).
+
+    Repo files must be exactly 001..N consecutive; a gap like 001,003,004
+    means a migration was never committed and blocks startup.
+    """
+
+
 @dataclass(frozen=True)
 class MigrationRecord:
     migration_id: str
@@ -125,6 +133,14 @@ def discover_migrations(migrations_dir: Path) -> list[Path]:
     if len(ids) != len(set(ids)):
         msg = "duplicate migration ids"
         raise MigrationNameError(msg)
+    # audit R2-P1-09: repo ids must be exactly 001..N consecutive
+    for expected, actual in enumerate(ids, start=1):
+        if int(actual) != expected:
+            msg = (
+                f"migration sequence gap: expected {expected:03d} but found "
+                f"{actual}; repository migrations must be consecutive 001..N"
+            )
+            raise MigrationSequenceGapError(msg)
     return [path for _, path in found]
 
 

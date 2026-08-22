@@ -26,7 +26,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ashare_state.identity import resolve_security_identity
-from ashare_state.pipeline.publish import publish_snapshot
+from ashare_state.pipeline.publish import publish_snapshot, record_artifact_validation
 from ashare_state.providers.mock import FixtureProvider
 from ashare_state.storage.atomic_files import (
     ComponentIdentity,
@@ -136,8 +136,9 @@ def run_mock_e2e(
         # (audit P0-01: two runs must physically coexist, never overwrite)
         result.data_snapshot_id = str(uuid.uuid4())
         result.feature_artifact_set_id = str(uuid.uuid4())
-        snap_tag = result.data_snapshot_id.replace("-", "")[:8]
-        artifact_tag = result.feature_artifact_set_id.replace("-", "")[:8]
+        # R2-P1-08: full 32-hex tags (8-hex tags collide eventually)
+        snap_tag = result.data_snapshot_id.replace("-", "")
+        artifact_tag = result.feature_artifact_set_id.replace("-", "")
 
         # -- 1. provider-normalized canonical files (atomic commit) ---------
         canonical_dir = data_root / "canonical" / "daily_bar"
@@ -311,11 +312,25 @@ def run_mock_e2e(
                         datetime.now(UTC),
                     ],
                 )
+        # R2-P0-06: bind artifact to its producing run (lineage closes)
         pipeline_run_id = str(uuid.uuid4())
+        conn.execute(
+            "UPDATE meta_feature_artifact_set SET calc_run_id = ? "
+            "WHERE feature_artifact_set_id = ?",
+            [pipeline_run_id, result.feature_artifact_set_id],
+        )
         conn.execute(
             "INSERT INTO meta_pipeline_run (pipeline_run_id, run_type, status, started_at) "
             "VALUES (?, 'EOD', 'FEATURE_VALIDATED', ?)",
             [pipeline_run_id, datetime.now(UTC)],
+        )
+        # R2-P0-05: validation record is a system invariant for publish
+        record_artifact_validation(
+            conn,
+            feature_artifact_set_id=result.feature_artifact_set_id,
+            validation_version="mock-v1",
+            identity_fallback_count=0,
+            blocking_dq_count=0,
         )
         universes = [("ALL_A", "v1"), ("CORE_TRADABLE", "v1")]
         pid = publish_snapshot(
@@ -330,8 +345,15 @@ def run_mock_e2e(
         )
         result.publish_ids.append(pid)
 
-        # optional second publish for the same trade_date (supersede path)
+        # optional second publish for the same trade_date (supersede path);
+        # R2-P0-06: republish runs as an explicit RECOVERY run
         if republish:
+            recovery_run_id = str(uuid.uuid4())
+            conn.execute(
+                "INSERT INTO meta_pipeline_run (pipeline_run_id, run_type, status, started_at) "
+                "VALUES (?, 'RECOVERY', 'FEATURE_VALIDATED', ?)",
+                [recovery_run_id, datetime.now(UTC)],
+            )
             pid2 = publish_snapshot(
                 conn,
                 trade_date=end,
@@ -339,7 +361,7 @@ def run_mock_e2e(
                 feature_artifact_set_id=result.feature_artifact_set_id,
                 feature_set_version=SKELETON_FEATURE_SET_VERSION,
                 universes=universes,
-                pipeline_run_id=None,
+                pipeline_run_id=recovery_run_id,
                 quality_grade="MOCK-RERUN",
             )
             result.publish_ids.append(pid2)

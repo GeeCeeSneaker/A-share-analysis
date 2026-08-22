@@ -32,6 +32,44 @@ class PublishStateError(PublishError):
     """Preconditions for publishing are not met."""
 
 
+def record_artifact_validation(
+    conn: DuckDBPyConnection,
+    *,
+    feature_artifact_set_id: str,
+    validation_version: str,
+    identity_fallback_count: int,
+    blocking_dq_count: int,
+    validator_code_commit: str | None = None,
+    validation_hash: str | None = None,
+    details_json: str | None = None,
+) -> None:
+    """Write the artifact validation record (R2-P0-05).
+
+    The publish gate reads this record as a SYSTEM invariant:
+    identity_fallback_count == 0 AND blocking_dq_count == 0 are required
+    for any PUBLISHED artifact. Records are one-per-artifact-set; an
+    existing record for the same set is replaced only when re-validating
+    the SAME set (the artifact itself is immutable, so this is a
+    validation refresh, not a data mutation).
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _datetime
+
+    conn.execute(
+        "INSERT OR REPLACE INTO meta_artifact_validation VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            feature_artifact_set_id,
+            validation_version,
+            int(identity_fallback_count),
+            int(blocking_dq_count),
+            _datetime.now(_UTC),
+            validator_code_commit,
+            validation_hash,
+            details_json,
+        ],
+    )
+
+
 def publish_snapshot(
     conn: DuckDBPyConnection,
     *,
@@ -43,7 +81,7 @@ def publish_snapshot(
     pipeline_run_id: str | None = None,
     quality_grade: str | None = None,
     publish_id: str | None = None,
-    fallback_security_ids: set[str] | None = None,
+    allow_manual_publish: bool = False,
 ) -> str:
     """Atomically publish one trade_date. Returns the publish_id.
 
@@ -53,24 +91,40 @@ def publish_snapshot(
       3. insert meta_publish_universe rows
       4. meta_pipeline_run.status -> PUBLISHED
 
-    Full lineage gate (audit P0-02): before any write, ALL invariants hold:
+    Full lineage gate (Round-1 P0-02 + Round-2 P0-05/P0-06) - before any
+    write, ALL system invariants hold:
       - snapshot exists, status DATA_VALIDATED
       - artifact exists, status FEATURE_VALIDATED
       - artifact.data_snapshot_id == data_snapshot_id (no cross-snapshot mix)
       - artifact.feature_set_version == feature_set_version
       - meta_feature_set exists and is ACTIVE
-      - pipeline_run (when given) exists, status FEATURE_VALIDATED
+      - pipeline_run REQUIRED (manual publish needs explicit
+        allow_manual_publish=True and is for recovery only)
+      - pipeline_run exists, status FEATURE_VALIDATED
+      - artifact.calc_run_id == pipeline_run_id
+      - run/artifact (code_commit, environment_lock_hash, config_hash) match
+      - run/snapshot (source_policy_version, availability_policy_version) match
       - every (universe_id, universe_version) exists in dim_universe
-      - NO_IDENTITY_FALLBACK gate (audit P0-06): fallback_security_ids must
-        be empty - the upstream canonicalizer passes the set of fallback
-        identities detected in the data being published; any entry BLOCKs.
+      - meta_artifact_validation record EXISTS with
+        identity_fallback_count == 0 and blocking_dq_count == 0
+        (R2-P0-05: the fallback gate is a system invariant, no longer a
+        caller-supplied set)
     """
     pid = publish_id or str(uuid.uuid4())
     now = datetime.now(UTC)
 
+    if pipeline_run_id is None and not allow_manual_publish:
+        msg = (
+            "PRODUCTION publish requires pipeline_run_id (R2-P0-06); manual "
+            "recovery/republish must pass allow_manual_publish=True explicitly "
+            "and record a RECOVERY run"
+        )
+        raise PublishStateError(msg)
+
     # preconditions (outside txn: fail fast with clear errors)
     snap = conn.execute(
-        "SELECT status FROM meta_data_snapshot WHERE data_snapshot_id = ?",
+        "SELECT status, source_policy_version, availability_policy_version "
+        "FROM meta_data_snapshot WHERE data_snapshot_id = ?",
         [data_snapshot_id],
     ).fetchone()
     if snap is None:
@@ -80,7 +134,8 @@ def publish_snapshot(
         msg = f"data_snapshot {data_snapshot_id} status is {snap[0]}, expected DATA_VALIDATED"
         raise PublishStateError(msg)
     art = conn.execute(
-        "SELECT status, data_snapshot_id, feature_set_version "
+        "SELECT status, data_snapshot_id, feature_set_version, calc_run_id, "
+        "code_commit, environment_lock_hash, config_hash "
         "FROM meta_feature_artifact_set WHERE feature_artifact_set_id = ?",
         [feature_artifact_set_id],
     ).fetchone()
@@ -124,7 +179,9 @@ def publish_snapshot(
         raise PublishStateError(msg)
     if pipeline_run_id is not None:
         run = conn.execute(
-            "SELECT status FROM meta_pipeline_run WHERE pipeline_run_id = ?",
+            "SELECT status, code_commit, environment_lock_hash, config_hash, "
+            "source_policy_version, availability_policy_version, run_type "
+            "FROM meta_pipeline_run WHERE pipeline_run_id = ?",
             [pipeline_run_id],
         ).fetchone()
         if run is None:
@@ -139,6 +196,39 @@ def publish_snapshot(
                 f"{pipeline_run_id} status is {run[0]}, expected FEATURE_VALIDATED"
             )
             raise PublishStateError(msg)
+        is_recovery = str(run[6]) == "RECOVERY"
+        # R2-P0-06: artifact <-> run binding. A RECOVERY run may re-publish
+        # an artifact produced by another run (that is its purpose); normal
+        # runs must be the artifact's producing run.
+        if not is_recovery and art[3] is not None and art[3] != pipeline_run_id:
+            msg = (
+                "RUN_ARTIFACT_LINEAGE_VALID violated: artifact "
+                f"{feature_artifact_set_id} was computed by run {art[3]}, "
+                f"but this publish references run {pipeline_run_id}"
+            )
+            raise PublishStateError(msg)
+        for label, run_value, art_value in (
+            ("code_commit", run[1], art[4]),
+            ("environment_lock_hash", run[2], art[5]),
+            ("config_hash", run[3], art[6]),
+        ):
+            if run_value is not None and art_value is not None and run_value != art_value:
+                msg = (
+                    f"RUN_ARTIFACT_LINEAGE_VALID violated: {label} mismatch "
+                    f"(run={run_value!r}, artifact={art_value!r})"
+                )
+                raise PublishStateError(msg)
+        # R2-P0-06: run <-> snapshot policy binding (006 columns)
+        for label, run_value, snap_value in (
+            ("source_policy_version", run[4], snap[1]),
+            ("availability_policy_version", run[5], snap[2]),
+        ):
+            if run_value is not None and snap_value is not None and run_value != snap_value:
+                msg = (
+                    f"RUN_SNAPSHOT_POLICY_LINEAGE_VALID violated: {label} mismatch "
+                    f"(run={run_value!r}, snapshot={snap_value!r})"
+                )
+                raise PublishStateError(msg)
     if not universes:
         msg = "at least one (universe_id, universe_version) is required"
         raise PublishStateError(msg)
@@ -153,12 +243,24 @@ def publish_snapshot(
                 f"({universe_id}, {universe_version}) not registered in dim_universe"
             )
             raise PublishStateError(msg)
-    if fallback_security_ids:
-        sample = sorted(fallback_security_ids)[:5]
+    # R2-P0-05: validation record is a system invariant, not a caller assertion
+    validation = conn.execute(
+        "SELECT identity_fallback_count, blocking_dq_count "
+        "FROM meta_artifact_validation WHERE feature_artifact_set_id = ?",
+        [feature_artifact_set_id],
+    ).fetchone()
+    if validation is None:
         msg = (
-            "NO_IDENTITY_FALLBACK gate violated: publish contains "
-            f"{len(fallback_security_ids)} IDENTITY_FALLBACK security ids "
-            f"(sample: {sample}); fallback identities may never be PUBLISHED"
+            "ARTIFACT_VALIDATION_REQUIRED violated: no meta_artifact_validation "
+            f"record for {feature_artifact_set_id}; publish is blocked until the "
+            "artifact validator records identity_fallback_count and blocking_dq_count"
+        )
+        raise PublishStateError(msg)
+    if validation[0] != 0 or validation[1] != 0:
+        msg = (
+            "ARTIFACT_VALIDATION_GATE violated: "
+            f"identity_fallback_count={validation[0]}, blocking_dq_count={validation[1]}; "
+            "fallback identities and blocking DQ findings may never be PUBLISHED"
         )
         raise PublishStateError(msg)
 

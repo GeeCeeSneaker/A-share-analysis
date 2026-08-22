@@ -73,7 +73,7 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 7
+            assert len(applied) == 9
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
         finally:
@@ -84,10 +84,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 7
+            assert len(first) == 9
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 7
+            assert len(ledger) == 9
         finally:
             conn.close()
 
@@ -123,10 +123,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 008 (006 exists in the real repo set)
+            # tamper 002 and add a new 010 (006 exists in the real repo set)
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "008_new_thing.sql").write_text(
+            (tampered_dir / "010_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):
@@ -185,9 +185,26 @@ class TestLedgerIntegrity:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, migrations_dir)
-            # delete an already-applied migration file
+            # delete an already-applied migration file: repo sequence gap
+            # (R2-P1-09) fires first and equally BLOCKs startup
             (migrations_dir / "002_provider_governance.sql").unlink()
-            with pytest.raises(MigrationLedgerGapError, match="P1-05"):
+            from ashare_state.storage.migrations import MigrationSequenceGapError
+
+            with pytest.raises((MigrationLedgerGapError, MigrationSequenceGapError)):
+                apply_migrations(conn, migrations_dir)
+        finally:
+            conn.close()
+
+    def test_repo_sequence_gap_blocks(self, tmp_path: Path):
+        """Audit R2-P1-09: a gap in the repo sequence (001, 003, ...) blocks
+        even on a FRESH database - a migration was never committed."""
+        from ashare_state.storage.migrations import MigrationSequenceGapError
+
+        migrations_dir = self._copy_migrations(tmp_path)
+        (migrations_dir / "002_provider_governance.sql").unlink()
+        conn = duckdb.connect(":memory:")
+        try:
+            with pytest.raises(MigrationSequenceGapError, match="consecutive"):
                 apply_migrations(conn, migrations_dir)
         finally:
             conn.close()

@@ -160,6 +160,7 @@ class TestScenarioD_PublishTransactionFailure:
                     feature_artifact_set_id=base_run.feature_artifact_set_id,
                     feature_set_version="skeleton-v0",
                     universes=[("ALL_A", "v1")],
+                    allow_manual_publish=True,  # reach the status gate being tested
                 )
             latest = latest_published(conn, date(2026, 8, 14))
             assert latest["publish_id"] == base_run.publish_ids[0]

@@ -32,6 +32,9 @@ def _valid_kwargs(base) -> dict:
         "feature_artifact_set_id": base.feature_artifact_set_id,
         "feature_set_version": SKELETON_FEATURE_SET_VERSION,
         "universes": [("ALL_A", "v1")],
+        # lineage tests probe OTHER invariants; the run-required gate is
+        # tested separately in test_publish_validation_gate.py
+        "allow_manual_publish": True,
     }
 
 
@@ -131,11 +134,19 @@ class TestPublishLineageGate:
             with pytest.raises(PublishStateError, match="not registered in dim_universe"):
                 publish_snapshot(conn, **kwargs)
 
-    def test_rejects_identity_fallback(self, base):
-        """Audit P0-06: IDENTITY_FALLBACK security ids must BLOCK publish."""
+    def test_rejects_identity_fallback_via_validation_record(self, base):
+        """R2-P0-05: the fallback gate reads meta_artifact_validation (system
+        invariant), not a caller-supplied set."""
+        from ashare_state.pipeline import record_artifact_validation
+
         manager = DuckDBConnectionManager(base.db_path)
         with manager.owner("read_write") as conn:
-            kwargs = _valid_kwargs(base)
-            kwargs["fallback_security_ids"] = {"fallback-uuid-1", "fallback-uuid-2"}
-            with pytest.raises(PublishStateError, match="NO_IDENTITY_FALLBACK"):
-                publish_snapshot(conn, **kwargs)
+            record_artifact_validation(
+                conn,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+                validation_version="probe-v1",
+                identity_fallback_count=2,
+                blocking_dq_count=0,
+            )
+            with pytest.raises(PublishStateError, match="ARTIFACT_VALIDATION_GATE"):
+                publish_snapshot(conn, **_valid_kwargs(base))

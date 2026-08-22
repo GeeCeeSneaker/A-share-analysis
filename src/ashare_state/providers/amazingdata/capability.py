@@ -175,62 +175,113 @@ def approve_capability(name: str, evidence: CapabilityEvidence) -> Capability:
     return approved
 
 
-# ------------------------------------------------------- persistence (P1-03)
+# ------------------------------------------ persistence (P1-03 / R2-P1-01)
 
 
-def persist_approval(
+def approve_and_persist_capability(
     conn: DuckDBPyConnection,
     name: str,
     evidence: CapabilityEvidence,
-) -> None:
-    """Write the approval to meta_provider_capability (authoritative)."""
-    conn.execute(
-        "INSERT OR REPLACE INTO meta_provider_capability "
-        "(provider, capability, status, spike_report_ref, "
-        "provider_verification_ref, golden_case_refs, dry_run_ref, "
-        "account_profile_id, approved_by, adapter_version, verified_at) "
-        "VALUES ('amazingdata', ?, 'APPROVED', ?, ?, ?, ?, ?, ?, NULL, ?)",
-        [
-            name,
-            evidence.spike_report_ref,
-            evidence.provider_verification_ref,
-            ",".join(evidence.golden_case_refs),
-            evidence.dry_run_ref,
-            evidence.account_profile_id,
-            evidence.approved_by,
-            evidence.approved_at,
-        ],
-    )
+) -> Capability:
+    """The ONLY public approval path (audit R2-P1-01).
+
+    One transaction: validate evidence -> UPSERT governance fields only
+    (existing metadata columns are preserved) -> COMMIT -> reload the
+    registry from the DB, so memory and the authoritative table can never
+    disagree. Broken evidence raises BEFORE any write; a failed write
+    ROLLBACKs and restores the cache from the DB.
+    """
+    # validate FIRST (raises before any write)
+    approve_capability(name, evidence)
+    existing = conn.execute(
+        "SELECT 1 FROM meta_provider_capability WHERE provider = 'amazingdata' AND capability = ?",
+        [name],
+    ).fetchone()
+    conn.execute("BEGIN TRANSACTION")
+    try:
+        if existing is None:
+            conn.execute(
+                "INSERT INTO meta_provider_capability "
+                "(provider, capability, status, spike_report_ref, "
+                "provider_verification_ref, golden_case_refs, dry_run_ref, "
+                "account_profile_id, approved_by, adapter_version, verified_at) "
+                "VALUES ('amazingdata', ?, 'APPROVED', ?, ?, ?, ?, ?, ?, NULL, ?)",
+                [
+                    name,
+                    evidence.spike_report_ref,
+                    evidence.provider_verification_ref,
+                    ",".join(evidence.golden_case_refs),
+                    evidence.dry_run_ref,
+                    evidence.account_profile_id,
+                    evidence.approved_by,
+                    evidence.approved_at,
+                ],
+            )
+        else:
+            # R2-P1-01 12.3: UPDATE touches ONLY governance fields -
+            # existing metadata columns can never be erased
+            conn.execute(
+                "UPDATE meta_provider_capability SET status = 'APPROVED', "
+                "spike_report_ref = ?, provider_verification_ref = ?, "
+                "golden_case_refs = ?, dry_run_ref = ?, account_profile_id = ?, "
+                "approved_by = ?, verified_at = ? "
+                "WHERE provider = 'amazingdata' AND capability = ?",
+                [
+                    evidence.spike_report_ref,
+                    evidence.provider_verification_ref,
+                    ",".join(evidence.golden_case_refs),
+                    evidence.dry_run_ref,
+                    evidence.account_profile_id,
+                    evidence.approved_by,
+                    evidence.approved_at,
+                    name,
+                ],
+            )
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        # memory was mutated by approve_capability above -> restore from
+        # the authoritative DB so cache never says APPROVED while DB
+        # does not (R2-P1-01 12.2)
+        load_approvals(conn)
+        raise
+    # post-commit: rebuild the cache from the authoritative table
+    load_approvals(conn)
+    return CAPABILITY_REGISTRY[name]
 
 
 def load_approvals(conn: DuckDBPyConnection) -> dict[str, CapabilityStatus]:
     """Sync the in-memory registry from the authoritative table.
 
-    Called at session start so a fresh process sees persisted approvals
-    (audit P1-03: no reset-to-CANDIDATE on restart).
+    Full sync semantics (audit R2-P1-01 12.4):
+    - restores complete provenance (verified_at / account_profile_id)
+    - DB status OVERRIDES the cached state in BOTH directions: a DB
+      CANDIDATE row actively demotes a stale cached APPROVED.
     """
     rows = conn.execute(
-        "SELECT capability, status FROM meta_provider_capability WHERE provider = 'amazingdata'"
+        "SELECT capability, status, verified_at, account_profile_id "
+        "FROM meta_provider_capability WHERE provider = 'amazingdata'"
     ).fetchall()
     loaded: dict[str, CapabilityStatus] = {}
-    for capability, status in rows:
+    for capability, status, verified_at, account_profile_id in rows:
         key = str(capability)
         try:
-            loaded[key] = CapabilityStatus(str(status))
+            db_status = CapabilityStatus(str(status))
         except ValueError:
-            # unknown status literal in db: treat as CANDIDATE (fail safe)
-            loaded[key] = CapabilityStatus.CANDIDATE
+            # unknown status literal in db: fail safe to CANDIDATE
+            db_status = CapabilityStatus.CANDIDATE
+        loaded[key] = db_status
         cap = CAPABILITY_REGISTRY.get(key)
-        if cap is not None and loaded[key] in (
-            CapabilityStatus.APPROVED,
-            CapabilityStatus.RETIRED,
-        ):
+        if cap is not None:
+            # unconditional override: DB is authoritative, cache is cache
             CAPABILITY_REGISTRY[key] = Capability(
                 name=cap.name,
                 sdk_methods=cap.sdk_methods,
                 canonical_domains=cap.canonical_domains,
-                status=loaded[key],
-                verified_at=cap.verified_at,
-                account_profile_id=cap.account_profile_id,
+                status=db_status,
+                verified_at=str(verified_at) if verified_at else cap.verified_at,
+                account_profile_id=str(account_profile_id)
+                if account_profile_id
+                else cap.account_profile_id,
             )
     return loaded
