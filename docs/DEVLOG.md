@@ -1,10 +1,43 @@
 # 开发日志（DEVLOG）
 
-> **维护规则**（第三轮审查 §1-§4 固化）：
+> **维护规则**（第三轮审查 §1-§4 固化 + R4-A1.1 复核 §2.3/§2.4 更新）：
 > - 本文件是项目**唯一**滚动开发日志；每次代码推送同步在顶部追加条目（倒序），不覆盖历史。
 > - 专题报告仅限：M0 Exit / Provider Spike / P0a Exit / P0b Exit / Backfill Exit / 重大 Incident / 重大架构决策。
 > - 每个条目区分 **Implementation Status**（DONE / IN_PROGRESS / BLOCKED）与 **Review Status**（PENDING_REVIEW / VERIFIED / REOPENED）——"代码写完" ≠ "审计关闭"。
-> - CI gate：代码 commit（src/migrations/configs/scripts）必须同时修改本文件（test_code_commit_requires_devlog_change + CI diff-tree 检查）。
+> - CI DEVLOG gate 实际覆盖路径（与 `.github/workflows/ci.yml` 同步）：
+>   `src/` · `migrations/` · `configs/` · `scripts/` · `data/golden/` · `.gitattributes` · `.github/workflows/`。
+> - **Contract 路径**（C1，变更必须同时更新 `docs/project/DEVELOPMENT_MANAGEMENT.md`）：
+>   `data/golden/**` · `migrations/**` · `docs/adr/**` · `src/ashare_state/spike/capabilities.py` ·
+>   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
+> - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
+
+---
+
+## 2026-08-22 16:30 +08:00 · Management 批次修正 + R4-A2/CR-1 任务接收
+
+**Scope**
+- R4-A1.1 复核结论执行（Governance PASS_WITH_MINOR_FIXES / Truth Closure REOPENED）+ §2 四小项修正
+
+**Implementation**
+- DM-CR-20260822-001 → **VERIFIED**；新增 **DM-CR-20260822-002**（Adopt R4-A1.1 Golden Truth Integrity Contract，REOPENED——source artifact 证据未闭环）
+- §41 去重（两段 R4-A2 合一，含 Golden Review Evidence Closure 与 ST_TRANSITION 语义）
+- §33 Current Baseline Metadata（Code Baseline `8d7d4aa` + Document Revision + Last Review + 时间标准）
+- DEVLOG 顶部：CI 实际覆盖路径同步（含 data/golden 等 7 路径）+ Contract 路径 C1 规则 + Asia/Shanghai 时间标准
+- **Management CI Guard**（§34）：ci.yml 新增 contract 路径 gate（golden/migrations/adr/capabilities/golden_store/publish/security_id 变更必须同 commit 更新管理总册）+ 本地等价测试
+- 任务书归档 docs/design/
+
+**Verification**
+- devlog gate 测试（含新 contract gate）3/3 passed；ruff clean
+
+**Implementation Status**
+- DONE（Management 批次）
+
+**Review Status**
+- PENDING_REVIEW（DM-CR-002 REOPENED 按复核结论如实记录）
+
+**Next**
+- R4-A2 Track A：Golden Review Evidence Closure → Domain Router → 事件语义 → PIT Limit
+- CR-1 Track B 并行：ProviderExchange + RawWriter
 
 ---
 

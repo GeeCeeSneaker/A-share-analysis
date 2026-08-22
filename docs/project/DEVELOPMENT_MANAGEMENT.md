@@ -4,9 +4,12 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **初始化依据仓库 HEAD**：`bb694c5`（按工作要求 §10 以最新 HEAD 同步，R4-A1.1 已落地）  
-> **初始化日期**：2026-08-22  
-> **状态**：ACTIVE / LIVING DOCUMENT
+> **Current Code Baseline**：`8d7d4aa`（R4-A1.1 落地 + DM 初始化；见 §33 更新规则——每次 C1 提交刷新）  
+> **Document Revision**：本批（DM-CR-002 + §2 修正）  
+> **Last Review**：2026-08-22（R4-A1.1 复核：Governance PASS_WITH_MINOR_FIXES）  
+> **Last Reviewer**：Design / Audit Review  
+> **状态**：ACTIVE / LIVING DOCUMENT  
+> **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
 ---
 
@@ -1091,29 +1094,26 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A2（R4-A1.1 已完成后接续）
+## R4-A2（Track A，与 CR-1 并行）
 
 ```text
-Adj T-1/T/T+1 price context
-删除 B3 现场 expected_is_st=False
-History Coverage 固定样本
-PIT Limit Rule
-Decimal ROUND_HALF_UP
-BSE Security Master
-BJ effective-date mapping
-Domain-specific Golden Router（自 R4-A1.1 并入）
-```
-
-## R4-A2
-
-```text
-Adj T-1/T/T+1 price context
-删除 B3 现场 expected_is_st=False
-History Coverage 固定样本
-PIT Limit Rule
-Decimal ROUND_HALF_UP
-BSE Security Master
-BJ effective-date mapping
+Golden Review Evidence Closure（source_artifact_ref + review workflow，
+    不允许手工填 hash；formal gate resolve bytes → SHA256 verify）
+Domain-specific Golden Probe Router（ST→status / Delisted→hist_code_list+
+    stock_basic / Limit→status+PIT rule / CA→dividend+adj+kline 组合 /
+    BJ→mapping endpoint）
+ST 事件语义：ST_TRANSITION + subtype（ST_ADD/ST_REMOVE/STAR_ST_ADD/
+    STAR_ST_REMOVE）；≥50 distinct 且 ADD>0 且 REMOVE>0
+Delist Gate：distinct event_id ≥20 AND distinct provider_symbol ≥20
+Golden hash 字段更名：golden_dataset_hash（方案 A）
+Manifest diversity：distinct_events/securities_by_type +
+    exchange/board coverage（全部由 cases 复算）
+Adj T-1/T/T+1 price context（无 context 不进 Core PASS）
+删除 B3 现场 expected_is_st=False（语义 truth 只来自 Reviewed Golden）
+History Coverage 固定 fixtures（长上市 SH/SZ/BSE/历史退市 +
+    expected_list_date 对比）
+PIT Trading Rule（版本化 effective_from/to + Decimal ROUND_HALF_UP）
+BSE / BJ 独立 Core Evidence
 ```
 
 ## R4-A3 / B1 / B2
@@ -1127,9 +1127,18 @@ explicit artifact_validation_id
 Migration 011
 ```
 
-## CR-1
+## CR-1（Track B，可立即并行）
 
-可立即并行：
+```text
+ProviderExchange[T]（1 exchange = 1 request_id = 1 envelope = ≤1 payload）
+call_exchange() 显式返回；业务 API wrapper 取 .payload
+内部 SDK call（如 query_kline 内 calendar）独立 envelope
+RawWriter：success→immutable raw artifact；failure→envelope；
+    幂等（same hash no-op / different BLOCK）
+raw/provider=amazingdata/dataset=X/date=Y/<request_id>.parquet + .meta.json
+meta_ingest_run 复用检查（有则不重复造表）
+10 项 contract tests（request_id lineage / no repr / no secret 等）
+```
 
 ```text
 ProviderExchange
@@ -1608,10 +1617,27 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 > 新条目倒序追加，不删除历史。
 
+## DM-CR-20260822-002 — Adopt R4-A1.1 Golden Truth Integrity Contract
+
+**Type**：C1 Contract Clarification  
+**Status**：REOPENED（Formal Source Evidence 未闭环；source_artifact_hash 尚未绑定真实工件——R4-A2 第一任务）  
+**Trigger**：R4-A1 复核 REOPENED，四项 P0（manifest 自验证 / hash 拆分 / event 覆盖 / 版本选择）。  
+**Old Contract**：source_hash 单哈希；manifest 统计可被单点篡改；loader 按字典序猜版本。  
+**New Contract**：manifest 统计从 cases 复算（篡改即拦截）；case_semantic_hash（含 case_type）与 source_artifact_hash 分离；event_id/event_class + distinct-event gate（PRODUCTION run 创建即拒绝，fail-closed）；append-only v1/v2 + ACTIVE 指针。  
+**Reason**：Golden 从 "Versioned Claim Set" 推进到 "Versioned + Reviewed + Externally-Evidenced Truth Set" 的结构前提。  
+**Affected Modules**：spike/golden_store、spike/runner、spike/validators、scripts/golden  
+**Affected Data**：data/golden/provider/amazingdata/（v2 candidate，123 cases，全部 COMPILED）  
+**Compatibility**：GoldenCase 字段扩展（source_hash→case_semantic_hash + 新字段）；load API 不变。  
+**Migration / Backfill**：golden_cases_v2.jsonl 由 compile_v2 生成。  
+**Tests**：302 passing（含 §22 关键测试：manifest 双类篡改 / entry 改+重封 / case_type 改 / REVIEWED 无 artifact / 负样本不算事件 / 诱饵 loader / append-only）。  
+**ADR**：Not Required（契约澄清，不改架构）  
+**Implementation Commit**：`b3a3d27`  
+**Reviewer**：Design/Audit Review（2026-08-22：Structure SUBSTANTIALLY PASS；Formal Truth Closure REOPENED）
+
 ## DM-CR-20260822-001 — 建立 Development Management 总册
 
 **Type**：C1 / Governance  
-**Status**：PENDING_REVIEW  
+**Status**：VERIFIED（2026-08-22 R4-A1.1 复核：Development Management Governance PASS_WITH_MINOR_FIXES，§2 四小项已在本批修正）  
 **Trigger**：项目进入多轮审计、Formal Spike 与 Canonical Runtime 并行阶段，需要统一长期管理入口。  
 **Old Contract**：设计、进度、审计、风险、日志分散在多个文档。  
 **New Contract**：建立 `docs/project/DEVELOPMENT_MANAGEMENT.md`，统一维护当前设计摘要、状态、Gate、Roadmap、变更控制和文档索引。  
@@ -1620,10 +1646,10 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 **Affected Data**：None  
 **Compatibility**：不改变运行时代码。  
 **Migration / Backfill**：None  
-**Tests**：建议加入 management-doc governance test。  
+**Tests**：management-doc governance test（DM CI guard，本批落地）。  
 **ADR**：Not Required  
-**Commit**：`f102394`（本总册初始化提交；SHA 回填于紧邻的 docs-only commit）  
-**Reviewer**：PENDING_REVIEW
+**Commit**：`f102394`（初始化）+ `8d7d4aa`（SHA 回填）+ 本批（§2 修正）  
+**Reviewer**：Design/Audit Review（VERIFIED 2026-08-22）
 
 ---
 

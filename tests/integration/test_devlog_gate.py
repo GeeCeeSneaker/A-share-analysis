@@ -82,3 +82,40 @@ class TestDevlogGate:
         text = devlog.read_text(encoding="utf-8")
         assert "Implementation Status" in text
         assert "Review Status" in text
+
+    def test_contract_paths_require_management_doc(self):
+        """R4-A1.1 review section 34: contract-path commits must update
+        docs/project/DEVELOPMENT_MANAGEMENT.md in the same commit."""
+        contract_prefixes = (
+            "data/golden/",
+            "migrations/",
+            "docs/adr/",
+            "src/ashare_state/spike/capabilities.py",
+            "src/ashare_state/spike/golden_store.py",
+            "src/ashare_state/pipeline/publish.py",
+            "src/ashare_state/identity/security_id.py",
+        )
+        rule_since = "8d7d4aa"
+        rev_list = subprocess.run(
+            ["git", "rev-list", "main", "--max-count=200"],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=True, timeout=30,
+        )
+        offenders: list[str] = []
+        for commit in rev_list.stdout.split():
+            if commit.startswith(rule_since):
+                continue
+            is_after = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", rule_since, commit],
+                cwd=REPO_ROOT, capture_output=True, timeout=30,
+            ).returncode == 0
+            if not is_after:
+                continue
+            files = subprocess.run(
+                ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", commit],
+                cwd=REPO_ROOT, capture_output=True, text=True, check=True, timeout=30,
+            ).stdout.splitlines()
+            touches_contract = any(f.startswith(contract_prefixes) for f in files)
+            touches_dm = any(f == "docs/project/DEVELOPMENT_MANAGEMENT.md" for f in files)
+            if touches_contract and not touches_dm:
+                offenders.append(commit[:10])
+        assert not offenders, f"contract commits without management-doc update: {offenders}"

@@ -100,3 +100,37 @@ jobs:
             fi
           done
           echo "OK: every code commit updated DEVLOG"
+
+      - name: Management-doc gate (contract paths must update DEVELOPMENT_MANAGEMENT.md)
+        if: matrix.required
+        shell: bash
+        run: |
+          # R4-A1.1 review section 34: contract paths are C1 changes and
+          # must update the management doc in the SAME commit.
+          RULE_SINCE="9a12184"
+          CONTRACT_PATHS="data/golden/ migrations/ docs/adr/ src/ashare_state/spike/capabilities.py src/ashare_state/spike/golden_store.py src/ashare_state/pipeline/publish.py src/ashare_state/identity/security_id.py"
+          for commit in $(git rev-list HEAD --max-count=300); do
+            case "$commit" in "$RULE_SINCE"*) continue ;; esac
+            if ! git merge-base --is-ancestor "$RULE_SINCE" "$commit" 2>/dev/null; then
+              continue
+            fi
+            files=$(git diff-tree --no-commit-id --name-only -r "$commit")
+            [ -z "$files" ] && continue
+            touches_contract=false
+            touches_dm=false
+            while IFS= read -r f; do
+              case "$f" in
+                docs/project/DEVELOPMENT_MANAGEMENT.md) touches_dm=true ;;
+              esac
+              for cp in $CONTRACT_PATHS; do
+                case "$f" in
+                  $cp*) touches_contract=true ;;
+                esac
+              done
+            done <<< "$files"
+            if $touches_contract && ! $touches_dm; then
+              echo "::error::commit $commit changes contract paths without updating docs/project/DEVELOPMENT_MANAGEMENT.md"
+              exit 1
+            fi
+          done
+          echo "OK: every contract commit updated the management doc"
