@@ -1,0 +1,7 @@
+# Byte-exact files: hashes are sealed over these bytes (audit R3/R4).
+# git autocrlf would rewrite LF to CRLF on Windows checkout and break
+# manifest_hash verification - force LF everywhere.
+data/golden/** text eol=lf
+*.jsonl text eol=lf
+*.json text eol=lf
+uv.lock text eol=lf
