@@ -18,6 +18,10 @@ venv/
 *.token
 *.secret
 
+# Broker SDK distribution hygiene (audit P1-18): wheels never enter git
+vendor/
+*.whl
+
 # All local data (raw/canonical/features/db/spike outputs) - not a system of record in git
 data/
 

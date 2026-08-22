@@ -46,6 +46,15 @@ class ProviderSchemaError(ProviderError):
     """Response shape does not match the documented SDK contract."""
 
 
+class MappingValidationError(ProviderSchemaError):
+    """A REQUIRED source field is missing/unparsable (audit P0-04).
+
+    Critical fields (security_code, trade_date, OHLC, adj-factor keys)
+    must NEVER be silently coerced to sentinel values (1970-01-01 / 0.0):
+    the row is quarantined by raising, and the caller records evidence.
+    """
+
+
 class ProviderEmptyResultError(ProviderError):
     """Call succeeded but returned an empty/None payload legitimately."""
 

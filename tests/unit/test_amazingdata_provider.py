@@ -93,10 +93,76 @@ class TestStatusRouting:
         assert ex_rights is False  # IS_XR_SEC = 0
 
     def test_missing_columns_tolerated(self):
-        dto = map_security_status_row({})
-        assert dto.security_code == ""
+        """Audit P0-04: OPTIONAL fields stay None (no 1970/0.0 sentinels);
+        REQUIRED fields raise MappingValidationError."""
+        from ashare_state.providers.errors import MappingValidationError
+
+        # optional-only absence: limit prices may legitimately be absent
+        dto = map_security_status_row({"SECURITY_CODE": "000001", "TRADE_DATE": "20260814"})
+        assert dto.security_code == "000001"
         assert dto.high_limited is None
-        assert dto.trade_date == date(1970, 1, 1)  # sentinel, mapper is honest
+        assert dto.trade_date == date(2026, 8, 14)
+
+        # required security_code missing -> quarantine, not sentinel
+        with pytest.raises(MappingValidationError, match="SECURITY_CODE"):
+            map_security_status_row({"TRADE_DATE": "20260814"})
+
+        # required trade_date missing -> quarantine (audit: never 1970-01-01)
+        with pytest.raises(MappingValidationError, match="TRADE_DATE"):
+            map_security_status_row({"SECURITY_CODE": "000001"})
+
+        # unparsable date -> quarantine, not 1970-01-01
+        with pytest.raises(MappingValidationError, match="unparsable"):
+            map_security_status_row({"SECURITY_CODE": "000001", "TRADE_DATE": "garbage"})
+
+    def test_zero_is_not_missing(self):
+        """Audit P0-04: legal zero must not trigger field fallback."""
+        from ashare_state.providers.amazingdata.mapper import first_present
+
+        row = {"OPEN_PRICE": 0, "open": 99.5}
+        assert first_present(row, "OPEN_PRICE", "open") == 0
+        # and a zero OHLC maps to 0.0, not to the fallback column
+        from ashare_state.providers.amazingdata.mapper import map_daily_bar_row
+
+        full = dict.fromkeys(
+            ("SECURITY_CODE", "KLINE_TIME", "VOLUME", "AMOUNT"),
+            None,
+        )
+        full.update(
+            {
+                "SECURITY_CODE": "600000",
+                "KLINE_TIME": 20260814,
+                "OPEN_PRICE": 0,
+                "HIGH_PRICE": 10.5,
+                "LOW_PRICE": 0,
+                "CLOSE_PRICE": 9.9,
+                "VOLUME": 0,
+                "AMOUNT": 0,
+            }
+        )
+        bar = map_daily_bar_row(full)
+        assert bar.open == 0.0
+        assert bar.volume == 0.0
+        assert bar.amount == 0.0
+
+    def test_missing_ohlc_quarantines_not_zero(self):
+        """Audit P0-04: absent OHLC must NOT silently become 0.0."""
+        from ashare_state.providers.amazingdata.mapper import map_daily_bar_row
+        from ashare_state.providers.errors import MappingValidationError
+
+        row = {"SECURITY_CODE": "600000", "KLINE_TIME": 20260814, "VOLUME": 100, "AMOUNT": 1000}
+        with pytest.raises(MappingValidationError, match="OPEN_PRICE"):
+            map_daily_bar_row(row)
+
+    def test_missing_adj_factor_quarantines_not_zero(self):
+        """Audit P0-04: absent adj factor must NOT silently become 0.0."""
+        from ashare_state.providers.amazingdata.mapper import map_adj_factor_row
+        from ashare_state.providers.errors import MappingValidationError
+
+        with pytest.raises(MappingValidationError, match="EX_FACTOR"):
+            map_adj_factor_row(
+                {"SECURITY_CODE": "600000", "EX_DATE": "20260101"}, factor_type="SINGLE"
+            )
 
 
 class TestAccountProfile:

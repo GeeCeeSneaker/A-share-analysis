@@ -2,6 +2,12 @@
 
 > 审计报告：`docs/design/A-share-analysis_第一阶段代码审计报告_20260822.md`
 > 整改顺序按审计 §28：Patch A（M0 Integrity）→ Patch B（Provider Reliability）→ Patch C（Canonical PIT）→ Contract Tests
+> **整改完成**：三个 Patch 全部落地（commits `cf81be3` / `fee655b` / 本轮），171 tests 全绿，门禁干净。
+
+## P1-15 / P1-17 决策记录
+
+- **P1-15 STAGING 生命周期**：采用**方案 B**——STAGING 只存在于 run/filesystem 层，元数据表只在完成后 INSERT validated（hash NOT NULL 天然自洽）。详见 `docs/adr/ADR-009_canonical_sor_boundary.md` 附节。
+- **P1-17 Canonical SoR 边界**：**Parquet = System of Record；DuckDB = 元数据 + 派生读模型**（fact 表可随时重建，不参与 Exact Replay 承诺）。详见 `ADR-009_canonical_sor_boundary.md`。
 
 ## P0 关闭状态
 

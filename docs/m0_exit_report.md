@@ -18,7 +18,7 @@
 | 7 | feature_set_version 在首次 Feature Artifact 前有可解析 Registry | PASS | `migrations/004_feature_governance.sql`（meta_feature_set + member，definition_hash 由排序成员生成）；`test_mock_pipeline.py::test_feature_set_registry_resolvable`；`mock_e2e` 在创建 artifact set 前强制注册 |
 | 8 | Security ID 缺 list_date 不允许正式 PUBLISHED | PASS | `identity/security_id.py::assert_publishable()` 抛 `IdentityPublishBlockedError`；`test_security_id.py::test_fallback_identity_blocked_from_publish` |
 | 9 | 模拟"文件落盘后崩溃 / Snapshot 后崩溃 / Publish 事务失败"的恢复测试通过 | PASS | `tests/integration/test_failure_injection.py` 场景 A（orphan 不可见且可被 startup check 探测）/ B（latest 仍旧版）/ C（artifact 不可被 latest 读到）/ D（事务失败旧 PUBLISHED 保持、无残留 SUPERSEDED） |
-| 10 | 真实 CI 不安装 AmazingData SDK，Mock 全测试通过 | PASS | `.github/workflows/ci.yml`：uv sync（无 SDK）+ 显式 `import AmazingData` 缺失断言步骤；本地等效验证（当前环境无 SDK，84 tests 全过） |
+| 10 | 真实 CI 不安装 AmazingData SDK，Mock 全测试通过 | PASS | `.github/workflows/ci.yml`：uv sync（无 SDK）+ 显式 `import AmazingData` 缺失断言步骤；本地等效验证（当前环境无 SDK，全量测试通过；测试数已随审计整改增长，以 CI 最新为准） |
 
 ## 2. 原方案第 31 节 P0-M0 出口标准
 
@@ -45,7 +45,7 @@ src/ashare_state/
 ├─ storage/{connection,migrations,atomic_files,paths}.py
 ├─ pipeline/{publish,mock_e2e}.py           原子发布事务 + Published/Exact readers + Mock 闭环
 ├─ config.py / logging_setup.py / cli.py
-tests/                                      84 tests（unit 38 + integration 46）
+tests/                                      M0 时点 84 tests（审计整改后 171，持续增长以 CI 为准）
 .github/workflows/ci.yml                    真实 CI（Windows 必须 + Linux）
 ```
 

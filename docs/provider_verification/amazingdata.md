@@ -82,4 +82,4 @@
 
 - **2026-08-21（1）**：C++ SDK 摸底完成，test_tool 配置 bug 确认
 - **2026-08-21（2）**：Python SDK（AmazingData 1.1.9 + tgw 1.0.9.2）受控安装 + import/API 面验证通过；发现仿真账号权限限制（仅 Level-1 快照），B2-B7 正式 Spike 顺延至正式账号
-- **2026-08-21（3）**：**B1 连通性测试完成**（仿真账号 330800077781）：login/认证/代码表 PASS；calendar/hist_code_list/adj_factor/snapshot 服务端拒绝（PermissionCode 3|4|32|33 仅覆盖代码表）。SDK 行为观察 4 条入档 §2.2。证据：`data/spike/results/connectivity.json`
+- **2026-08-21（3）**：**B1 连通性测试完成**（仿真账号 `330800****81`，掩码处理——审计 P1-18：真实账号编号不入版本库）：login/认证/代码表 PASS；calendar/hist_code_list/adj_factor/snapshot 服务端拒绝（PermissionCode 3|4|32|33 仅覆盖代码表）。SDK 行为观察 4 条入档 §2.2。证据：`data/spike/results/connectivity.json`（本地保存，gitignored）
