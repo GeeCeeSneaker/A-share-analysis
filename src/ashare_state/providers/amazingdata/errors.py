@@ -61,6 +61,10 @@ _AUTH_HINTS = ("login fail", "logon fail", "password", "auth")
 _RATE_HINTS = ("flow", "bandwidth", "rate", "limit num", "limitnum", "too fast")
 _QUERY_FAIL = "查询失败"
 
+#: verified denial signatures (2026-08-21 connectivity evidence): only
+#: these may classify as ProviderPermissionError (audit R2-P1-03)
+_VERIFIED_DENIAL_SIGNATURES = ("nonetype",)
+
 
 def classify_sdk_error(
     exc: BaseException,
@@ -105,11 +109,16 @@ def _classify(
         return ProviderTimeoutError(f"{endpoint}: timeout: {msg}", context=context)
 
     # VERIFIED denial shape #1: server returns None; SDK subscripts it.
-    if name == "TypeError" and "nonetype" in lowered:
+    # (R2-P1-03: only VERIFIED signatures may classify as Permission)
+    if name == "TypeError" and any(s in lowered for s in _VERIFIED_DENIAL_SIGNATURES):
         return ProviderPermissionError(
-            f"{endpoint}: server returned no data (likely entitlement denial); "
-            f"sdk raised {name}: {msg}",
-            context=context,
+            f"{endpoint}: server returned no data (entitlement denial, "
+            f"verified signature); sdk raised {name}: {msg}",
+            context={
+                **context,
+                "classification_rule_id": "VERIFIED_NONE_SUBSCRIPT",
+                "classification_confidence": "HIGH",
+            },
         )
 
     # NOTE (audit P1-09): 'unhashable' was previously lumped into Permission;
@@ -118,14 +127,20 @@ def _classify(
         return ProviderAuthError(f"{endpoint}: auth failure: {msg}", context=context)
 
     if _QUERY_FAIL in msg:
-        if account_context and account_context.get("permission_codes"):
-            return ProviderPermissionError(
-                f"{endpoint}: query failed; endpoint outside PermissionCode "
-                f"{account_context.get('permission_codes')}: {msg}",
-                context=context,
-            )
-        return ProviderTimeoutError(
-            f"{endpoint}: query failed after long retries: {msg}", context=context
+        # R2-P1-03: '查询失败' is NOT a verified denial signature - a
+        # production account also has permission codes, so param errors /
+        # server faults must not masquerade as entitlement problems.
+        # Without an explicit endpoint-entitlement map the shape is
+        # UNCLASSIFIED; the long-retry timeout note stays for diagnosis.
+        return ProviderSdkInternalError(
+            f"{endpoint}: generic query failure (unclassified; could be "
+            f"params/server/entitlement): {msg}",
+            context={
+                **context,
+                "classification_rule_id": "QUERY_FAIL_UNCLASSIFIED",
+                "classification_confidence": "LOW",
+                "note": "re-classify only with an explicit endpoint entitlement map",
+            },
         )
 
     if any(h in lowered for h in _RATE_HINTS):

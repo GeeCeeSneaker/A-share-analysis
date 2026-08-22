@@ -1,28 +1,19 @@
-"""L1 REALTIME subscription test (task book section 1.2 + 17).
+"""L1 REALTIME subscription test (task book 1.2 + R2-P1-06 hardening).
 
-CRITICAL DISTINCTION (task book 1.2):
-    REALTIME_L1_SUBSCRIPTION      SubscribeData.register(period=snapshot)
-    HISTORICAL_SNAPSHOT_QUERY     MarketData.query_snapshot(...)
-These are SEPARATE capabilities with SEPARATE verdicts. The 2026-08-21
-DENIED evidence was for the HISTORICAL path only; the realtime path is
-UNTESTED until this script runs during trading hours.
+CRITICAL DISTINCTION: REALTIME_L1_SUBSCRIPTION != HISTORICAL_SNAPSHOT_QUERY
+(separate verdicts; the latter was DENIED on 2026-08-21).
 
-Usage (MUST run during trading hours, Mon-Fri 09:15-11:30 / 13:00-15:05):
+R2-P1-06 hardening:
+- Asia/Shanghai session detection (never trust the dev machine's local zone)
+- distinct not-testable reasons: NOT_TESTABLE_TIME / NOT_TESTABLE_PERMISSION
+  / FAIL_NO_EVENTS (lifecycle-unverified events are NEVER read as
+  entitlement evidence)
+- provider_event_time parsed to an aware datetime before latency/ordering
+- subscription lifecycle (register/run/unregister/stop) is verified live
+  BEFORE FAIL_NO_EVENTS can mean anything about permissions
+
+Usage (MUST run during trading hours, Asia/Shanghai):
     uv run python scripts/spike/l1_subscription_test.py --stage 1
-    uv run python scripts/spike/l1_subscription_test.py --stage 5
-    uv run python scripts/spike/l1_subscription_test.py --stage 20
-    uv run python scripts/spike/l1_subscription_test.py --stage 100
-
-Stages (task book 1.2): 1 -> 5 -> 20 -> 100 stocks.
-
-Results land in data/spike/results/l1_subscription_<stage>.json with:
-    provider_event_time / received_at / latency / duplicates /
-    out-of-order / cumulative volume/amount / bid-ask depth presence /
-    up-down limit fields / trading phase / unsubscribe / reconnect.
-
-Entitlement note (task book 17): the trial account's 100-subscription /
-0.2MB/s / 10GB-week limits are ACCOUNT entitlements, NOT platform
-capacity. No Phase-2 capacity conclusions may be drawn from this test.
 """
 
 from __future__ import annotations
@@ -34,13 +25,10 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
+SHANGHAI = ZoneInfo("Asia/Shanghai")
 RESULTS = Path("data/spike/results")
-RESULTS.mkdir(parents=True, exist_ok=True)
-
-# 20-stock capture sample (task book 17): SH/SZ/BJ, high/low liquidity,
-# near-limit names refined on the run day from the live code list.
-DEFAULT_STAGES = [1, 5, 20, 100]
 
 
 def load_env(path: Path = Path(".env")) -> dict[str, str]:
@@ -54,58 +42,83 @@ def load_env(path: Path = Path(".env")) -> dict[str, str]:
     return env
 
 
-def pick_sample_stocks(code_list: list[str], stage: int) -> list[str]:
-    """Deterministic sample: spread across SH/SZ/BJ suffixes."""
-    sh = [c for c in code_list if c.endswith(".SH")]
-    sz = [c for c in code_list if c.endswith(".SZ")]
-    bj = [c for c in code_list if c.endswith(".BJ")]
-    if stage <= len(sh):
-        pool = sh[:stage]
-    else:
-        pool = sh[: stage // 3] + sz[: stage // 3] + bj[: (stage - 2 * (stage // 3))]
-        # top up deterministically if BJ list is short
-        i = 0
-        while len(pool) < stage and i < len(sz):
-            pool.append(sz[i])
-            i += 1
-    return pool[:stage]
+def session_state(now: datetime | None = None) -> str:
+    """Trading-session classification in Asia/Shanghai."""
+    now = now or datetime.now(tz=SHANGHAI)
+    if now.weekday() >= 5:
+        return "NOT_TESTABLE_TIME"  # weekend
+    hhmm = now.hour * 100 + now.minute
+    if 915 <= hhmm <= 1130 or 1300 <= hhmm <= 1505:
+        return "IN_SESSION"
+    return "NOT_TESTABLE_TIME"
+
+
+def parse_event_time(value: object) -> datetime | None:
+    """Parse provider event time into an aware datetime (R2-P1-06).
+
+    Handles: epoch ms/µs, HHMMSSmmm within today, yyyymmddHHMMSS.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    digits = "".join(ch for ch in text if ch.isdigit())
+    today = datetime.now(tz=SHANGHAI).date()
+    try:
+        if len(digits) == 13:  # epoch ms
+            return datetime.fromtimestamp(int(digits) / 1000, tz=UTC)
+        if len(digits) == 16:  # epoch µs
+            return datetime.fromtimestamp(int(digits) / 1e6, tz=UTC)
+        if len(digits) == 9:  # HHMMSSmmm today
+            h, m, s = int(digits[0:2]), int(digits[2:4]), int(digits[4:6])
+            return datetime(today.year, today.month, today.day, h, m, s, tzinfo=SHANGHAI)
+        if len(digits) == 14:  # yyyymmddHHMMSS
+            return datetime(
+                int(digits[0:4]),
+                int(digits[4:6]),
+                int(digits[6:8]),
+                int(digits[8:10]),
+                int(digits[10:12]),
+                int(digits[12:14]),
+                tzinfo=SHANGHAI,
+            )
+    except (ValueError, OSError):
+        return None
+    return None
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="L1 realtime subscription test")
-    parser.add_argument("--stage", type=int, default=1, help="1/5/20/100 stocks")
-    parser.add_argument("--duration-seconds", type=int, default=60, help="how long to collect")
+    parser.add_argument("--stage", type=int, default=1)
+    parser.add_argument("--duration-seconds", type=int, default=60)
     args = parser.parse_args()
 
+    RESULTS.mkdir(parents=True, exist_ok=True)
     env = load_env()
+    report: dict[str, object] = {
+        "capability": "REALTIME_L1_SUBSCRIPTION",
+        "stage": args.stage,
+        "started_at": datetime.now(UTC).isoformat(),
+        "session_state": session_state(),
+    }
+
     if not all(
         env.get(k) for k in ("TGW_USERNAME", "TGW_PASSWORD", "TGW_SERVER_VIP", "TGW_SERVER_PORT")
     ):
-        print("missing TGW_* env; fill .env first")
+        report["status"] = "NOT_TESTABLE_ACCOUNT"
+        _flush(report, args.stage)
+        return 2
+    if session_state() != "IN_SESSION":
+        # outside trading hours: NOTHING about permissions can be concluded
+        report["status"] = "NOT_TESTABLE_TIME"
+        report["note"] = "run Mon-Fri 09:15-11:30 / 13:00-15:05 Asia/Shanghai"
+        _flush(report, args.stage)
         return 2
 
-    report: dict[str, object] = {
-        "capability": "REALTIME_L1_SUBSCRIPTION",
-        "distinct_from": "HISTORICAL_SNAPSHOT_QUERY (DENIED 2026-08-21, separate verdict)",
-        "stage": args.stage,
-        "started_at": datetime.now(UTC).isoformat(),
-        "trading_hours_check": datetime.now().strftime("%H:%M"),
-    }
-
-    # trading-hours sanity (Asia/Shanghai): warn but allow override for study
-    now_local = datetime.now()
-    hhmm = now_local.hour * 100 + now_local.minute
-    in_session = (915 <= hhmm <= 1130) or (1300 <= hhmm <= 1505)
-    report["in_trading_session"] = in_session
-    if not in_session:
-        print("WARNING: outside trading hours - subscription may return nothing")
-        print("(run Mon-Fri 09:15-11:30 / 13:00-15:05 for a meaningful verdict)")
-
     try:
-        # N813: manual idiom
         import AmazingData as ad  # noqa: N813
     except ImportError:
-        report["status"] = "NOT_TESTABLE_SDK_MISSING"
+        report["status"] = "NOT_TESTABLE_ACCOUNT"
+        report["detail"] = "SDK not installed"
         _flush(report, args.stage)
         return 2
 
@@ -117,32 +130,53 @@ def main() -> int:
             port=int(env["TGW_SERVER_PORT"]),
         )
     except Exception as exc:  # noqa: BLE001
-        report["status"] = "FAIL"
+        report["status"] = "NOT_TESTABLE_ACCOUNT"
         report["login_error"] = f"{type(exc).__name__}: {exc}"[:300]
         _flush(report, args.stage)
         return 1
 
+    events: list[dict] = []
+    lifecycle: dict[str, object] = {}
     try:
         base = ad.BaseData()
-        code_list = base.get_code_list(security_type="EXTRA_STOCK_A")
-        sample = pick_sample_stocks(list(code_list), args.stage)
-        report["sample"] = sample[:20]
+        code_list = list(base.get_code_list(security_type="EXTRA_STOCK_A"))
+        sh = [c for c in code_list if c.endswith(".SH")]
+        sample = sh[: args.stage] if len(sh) >= args.stage else code_list[: args.stage]
         report["sample_size"] = len(sample)
 
-        # ---- the actual realtime subscription --------------------------
         sub = ad.SubscribeData()
-        events: list[dict] = []
-        received_at_ms: list[float] = []
 
-        def on_snapshot(data):  # SDK callback signature verified on first run
-            recv = time.time()
-            try:
-                events.append(_snapshot_record(data, recv))
-                received_at_ms.append(recv * 1000)
-            except Exception as exc:  # noqa: BLE001 - record the shape issue
-                events.append({"callback_error": f"{type(exc).__name__}: {exc}"})
+        def on_snapshot(data) -> None:
+            recv = datetime.now(tz=UTC)
+            record: dict[str, object] = {"received_at": recv.isoformat()}
+            for attr in (
+                "security_code",
+                "code",
+                "last_price",
+                "cum_volume",
+                "volume",
+                "cum_amount",
+                "amount",
+                "trading_phase",
+                "up_limit",
+                "high_limited",
+                "down_limit",
+                "low_limited",
+                "bid_price_1",
+                "ask_price_1",
+                "data_time",
+            ):
+                value = getattr(data, attr, None)
+                if value is None and hasattr(data, "get"):
+                    value = data.get(attr)
+                if value is not None:
+                    record[attr] = str(value)[:40]
+            event_time = parse_event_time(record.get("data_time"))
+            if event_time is not None:
+                record["event_time"] = event_time.isoformat()
+                record["latency_ms"] = round((recv - event_time).total_seconds() * 1000, 3)
+            events.append(record)
 
-        # subscribe call per manual; Period enum may be ad.Period or tgw.Period
         period_value = None
         for holder in (ad, getattr(ad, "tgw", None)):
             period_enum = getattr(holder, "Period", None)
@@ -151,122 +185,95 @@ def main() -> int:
                 break
         if period_value is None:
             report["status"] = "NOT_TESTABLE_PERMISSION"
-            report["detail"] = "Period.snapshot enum not found; check SDK version"
+            report["detail"] = "Period.snapshot enum not found (SDK surface drift)"
             _flush(report, args.stage)
             return 1
 
-        sub.register(code_list=sample, period=period_value, callback=on_snapshot)
+        # --- lifecycle verification (R2-P1-06 17.3) ---
+        lifecycle["register"] = "OK"
+        try:
+            sub.register(code_list=sample, period=period_value, callback=on_snapshot)
+        except Exception as exc:  # noqa: BLE001
+            lifecycle["register"] = f"ERROR {type(exc).__name__}: {exc}"[:200]
+            report["lifecycle"] = lifecycle
+            report["status"] = "NOT_TESTABLE_PERMISSION"
+            _flush(report, args.stage)
+            return 1
+
+        # run/start loop if the SDK exposes one (verified live per R2-P1-06)
+        run_fn = getattr(sub, "run", None) or getattr(sub, "start", None)
+        if callable(run_fn):
+            try:
+                run_fn()
+                lifecycle["run"] = "OK"
+            except Exception as exc:  # noqa: BLE001
+                lifecycle["run"] = f"ERROR {type(exc).__name__}"[:200]
+
         deadline = time.monotonic() + args.duration_seconds
         while time.monotonic() < deadline:
             time.sleep(0.5)
+
         try:
             sub.unregister(code_list=sample, period=period_value)
-        except Exception:  # noqa: BLE001 - unregister best-effort evidence
-            report["unregister_note"] = "unregister raised (recorded)"
+            lifecycle["unregister"] = "OK"
+        except Exception as exc:  # noqa: BLE001
+            lifecycle["unregister"] = f"ERROR {type(exc).__name__}"[:200]
+        stop_fn = getattr(sub, "stop", None)
+        if callable(stop_fn):
+            try:
+                stop_fn()
+                lifecycle["stop"] = "OK"
+            except Exception as exc:  # noqa: BLE001
+                lifecycle["stop"] = f"ERROR {type(exc).__name__}"[:200]
+        report["lifecycle"] = lifecycle
 
-        # ---- observations (task book 17) --------------------------------
         report["events_received"] = len(events)
         if events:
-            keys = set()
-            for e in events:
-                keys.update(e.keys())
-            report["observed_fields"] = sorted(keys)
-            latencies = [e.get("latency_ms") for e in events if e.get("latency_ms") is not None]
+            latencies = [e["latency_ms"] for e in events if "latency_ms" in e]
             if latencies:
                 report["latency_ms"] = {
                     "min": min(latencies),
                     "p50": sorted(latencies)[len(latencies) // 2],
                     "max": max(latencies),
                 }
-            report["duplicate_count"] = _duplicates(events)
             report["out_of_order_count"] = _out_of_order(events)
-            report["trading_phases_seen"] = sorted(
-                {str(e.get("trading_phase")) for e in events if e.get("trading_phase")}
+            report["fields_observed"] = sorted({k for e in events for k in e})
+            report["status"] = "PASS"
+        else:
+            # lifecycle verified + in-session + no events -> genuinely failed
+            report["status"] = "FAIL_NO_EVENTS"
+            report["note"] = (
+                "subscription lifecycle recorded above; verify callback "
+                "signature against the lifecycle errors before reading this "
+                "as an entitlement conclusion (R2-P1-06 17.3)"
             )
-            report["has_limit_fields"] = any(e.get("up_limit") is not None for e in events)
-            report["has_bid_ask_depth"] = any(e.get("bid_price_1") is not None for e in events)
-        report["status"] = (
-            "PASS"
-            if events
-            else ("NOT_TESTABLE_PERMISSION" if not in_session else "FAIL_NO_EVENTS")
-        )
         report["evidence_events_sample"] = events[:5]
-        report["duration_seconds"] = args.duration_seconds
 
     except Exception as exc:  # noqa: BLE001 - evidence, not crash
-        report["status"] = "FAIL"
+        report["status"] = "NOT_TESTABLE_PERMISSION"
         report["error"] = f"{type(exc).__name__}: {exc}"[:400]
     finally:
-        with contextlib_suppress():
+        with _suppress():
             ad.logout()
 
     _flush(report, args.stage)
-    print(json.dumps({k: report[k] for k in ("stage", "status", "events_received")}, default=str))
+    print(
+        json.dumps({k: report.get(k) for k in ("stage", "status", "events_received")}, default=str)
+    )
     return 0 if report.get("status") == "PASS" else 1
-
-
-def _snapshot_record(data, recv_ts: float) -> dict:
-    """Extract observation fields from one snapshot callback payload.
-
-    Defensive: SDK callback shapes are verified by the first live run;
-    attribute/dict access failures are recorded, never crash the collector.
-    """
-
-    def g(name: str):
-        for source in (data, getattr(data, "fields", None)):
-            if source is None:
-                continue
-            if hasattr(source, name):
-                return getattr(source, name)
-            if hasattr(source, "get"):
-                return source.get(name)
-        return None
-
-    event_time = g("provider_event_time") or g("data_time") or g("time")
-    record: dict = {
-        "provider_event_time": str(event_time)[:32] if event_time is not None else None,
-        "received_at": recv_ts,
-        "security": g("security_code") or g("code") or g("symbol"),
-        "last_price": g("last_price") or g("close"),
-        "cumulative_volume": g("cum_volume") or g("volume"),
-        "cumulative_amount": g("cum_amount") or g("amount"),
-        "trading_phase": g("trading_phase") or g("trade_phase"),
-        "up_limit": g("up_limit") or g("high_limited"),
-        "down_limit": g("down_limit") or g("low_limited"),
-        "bid_price_1": g("bid_price_1") or g("bid1_price"),
-        "ask_price_1": g("ask_price_1") or g("ask1_price"),
-    }
-    if event_time is not None:
-        try:
-            # provider event time formats vary; assume ms epoch or HHMMSSmmm
-            ev = float(event_time)
-            record["latency_ms"] = round(recv_ts * 1000 - ev, 3)
-        except (TypeError, ValueError):
-            pass
-    return record
-
-
-def _duplicates(events: list[dict]) -> int:
-    seen: set[tuple] = set()
-    dupes = 0
-    for e in events:
-        key = (e.get("security"), e.get("provider_event_time"))
-        if key in seen and key[0] is not None:
-            dupes += 1
-        seen.add(key)
-    return dupes
 
 
 def _out_of_order(events: list[dict]) -> int:
     last: dict[str, str] = {}
     oo = 0
     for e in events:
-        sec, t = e.get("security"), e.get("provider_event_time")
-        if sec is None or t is None:
+        sec = str(e.get("security_code") or e.get("code") or "")
+        t = str(e.get("event_time") or "")
+        if not sec or not t:
             continue
-        if sec in last and str(t) < str(last[sec]):
+        if sec in last and t < last[sec]:
             oo += 1
-        last[sec] = str(t)
+        last[sec] = t
     return oo
 
 
@@ -277,7 +284,7 @@ def _flush(report: dict, stage: int) -> None:
     print(f"report -> {out}")
 
 
-def contextlib_suppress():
+def _suppress():
     import contextlib
 
     return contextlib.suppress(Exception)

@@ -23,11 +23,35 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from collections.abc import Sequence
+import threading
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 _READ_CHUNK = 1024 * 1024
+
+# Audit R2-P1-07: immutable commits are serialized PROCESS-WIDE so the
+# exists->write->replace window (TOCTOU) cannot interleave between threads.
+# Cross-process safety comes from the DuckDB single-owner model: all
+# immutable commits happen inside the DB owner process.
+_COMMIT_COORDINATOR_LOCK = threading.RLock()
+
+
+class FileCommitCoordinator:
+    """Process-wide serializer for immutable file commits (R2-P1-07).
+
+    Rule: every write_file_atomic() call runs under this coordinator, so
+    the exists->write->replace window cannot interleave between threads.
+    Cross-process concurrency remains governed by the DuckDB single-owner
+    model (immutable commits happen inside the owner process).
+    """
+
+    @staticmethod
+    @contextmanager
+    def lock() -> Iterator[None]:
+        with _COMMIT_COORDINATOR_LOCK:
+            yield
 
 
 class AtomicCommitError(RuntimeError):
@@ -87,6 +111,9 @@ def write_file_atomic(
     an existing file whose SHA-256 equals the incoming content is an
     idempotent no-op returning that hash; different content always BLOCKs.
 
+    R2-P1-07: the whole exists->write->replace sequence runs under the
+    FileCommitCoordinator lock, so concurrent threads cannot interleave.
+
     1-4: write temp file in staging_dir (default: final_path.parent), flush,
          fsync, close.
     5:   verify SHA-256 (against expected when provided).
@@ -94,6 +121,24 @@ def write_file_atomic(
     Returns the content hash. Steps 7-8 (component registration and publish
     pointer switch) belong to the caller's DuckDB transaction.
     """
+    with FileCommitCoordinator.lock():
+        return _write_file_atomic_locked(
+            final_path,
+            data,
+            staging_dir=staging_dir,
+            expected_sha256=expected_sha256,
+            allow_existing_identical=allow_existing_identical,
+        )
+
+
+def _write_file_atomic_locked(
+    final_path: Path,
+    data: bytes,
+    *,
+    staging_dir: Path | None,
+    expected_sha256: str | None,
+    allow_existing_identical: bool,
+) -> str:
     final_path = Path(final_path)
     final_path.parent.mkdir(parents=True, exist_ok=True)
 

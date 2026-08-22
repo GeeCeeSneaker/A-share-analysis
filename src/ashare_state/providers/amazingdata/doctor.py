@@ -225,40 +225,50 @@ def run_doctor(
                 report["QUERY_READY"] = "YES" if codes is not None else "NO"
             except Exception as exc:  # noqa: BLE001 - evidence, not crash
                 report["QUERY_READY"] = f"NO ({type(exc).__name__})"
+            # R2-P1-04: re-probe the loaded DLL AFTER real SDK activity -
+            # the native runtime may load lazily on first call
+            post_modules = _loaded_tgw_modules()
+            post_dlls = [m for m in post_modules if m.lower().endswith("tgw.dll")]
+            if post_dlls:
+                report["TGW_LOADED_DLL_PATH_POST_LOGIN"] = post_dlls[0]
+                report["TGW_LOADED_DLL_VERSION"] = _dll_file_version(post_dlls[0])
         except ProviderError as exc:
             report["AUTHENTICATED"] = f"NO ({type(exc).__name__})"
             report["auth_error"] = str(exc)[:300]
         finally:
             session.logout()
 
-    # ---- verdict ------------------------------------------------------
-    loaded_path = (report.get("TGW_LOADED_DLL_PATH") or "").lower()
+    # ---- verdict (R2-P1-04: package vs ACTUAL LOAD are separate facts) --
+    loaded_path = (
+        report.get("TGW_LOADED_DLL_PATH_POST_LOGIN") or report.get("TGW_LOADED_DLL_PATH") or ""
+    ).lower()
+    expected_path = (report.get("expected_dll_path") or "").lower()
     if loaded_path:
         site_packages_ok = "site-packages" in loaded_path and "tgw" in loaded_path
         public_docs = "mdga_file" in loaded_path
         if public_docs or not site_packages_ok:
             report["verdict"] = "RUNTIME_PATH_AMBIGUOUS"
             report["verdict_detail"] = (
-                "loaded tgw DLL is outside the python wheel's package dir; "
-                "verify no C++ 1.0.8 runtime is being mixed in"
+                "ACTUALLY LOADED tgw DLL is outside the python wheel's package "
+                "dir; verify no C++ 1.0.8 runtime is being mixed in"
             )
         else:
-            report["verdict"] = "RUNTIME_IDENTITY_VERIFIED"
+            report["verdict"] = "RUNTIME_ACTUAL_LOAD_VERIFIED"
             report["verdict_detail"] = (
-                "python wheel ships and loads its own runtime "
+                "python wheel ships AND loaded its own runtime "
                 f"({identity.tgw_runtime_version}); independent from the "
                 "C++ SDK install under Public Documents"
             )
-    else:
-        # DLL not loaded yet: identity verified structurally from the wheel
-        report["verdict"] = (
-            "RUNTIME_IDENTITY_VERIFIED"
-            if report.get("expected_dll_path")
-            else "RUNTIME_PATH_AMBIGUOUS"
+    elif expected_path:
+        # DLL not loaded yet (e.g. offline mode): wheel-level verification
+        # only - audit R2-P1-04: this is NOT the same as load verification
+        report["verdict"] = "RUNTIME_PACKAGE_VERIFIED"
+        report["verdict_detail"] = (
+            "packaged runtime present (wheel-level); actual DLL load "
+            "unverified - run doctor ONLINE to confirm "
+            f"(self-reported {identity.tgw_runtime_version})"
         )
-        if report["verdict"] == "RUNTIME_IDENTITY_VERIFIED":
-            report["verdict_detail"] = (
-                "packaged runtime present; loads on first SDK use "
-                f"(self-reported {identity.tgw_runtime_version})"
-            )
+    else:
+        report["verdict"] = "RUNTIME_PATH_AMBIGUOUS"
+        report["verdict_detail"] = "no packaged runtime found for this ABI"
     return report

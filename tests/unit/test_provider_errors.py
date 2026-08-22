@@ -27,17 +27,31 @@ class TestClassify:
         assert isinstance(out, ProviderPermissionError)
         assert "entitlement" in str(out).lower()
 
-    def test_query_fail_with_permission_context(self):
+    def test_query_fail_is_unclassified_internal(self):
+        """R2-P1-03: '查询失败' is NOT a verified denial signature - even
+        with permission codes in context it stays unclassified (a
+        production account has codes too; param/server errors must not
+        masquerade as entitlement problems)."""
         exc = Exception("查询失败")
         out = classify_sdk_error(
             exc, endpoint="query_snapshot", account_context={"permission_codes": "3|4"}
         )
-        assert isinstance(out, ProviderPermissionError)
+        assert isinstance(out, ProviderSdkInternalError)
+        assert out.context.get("classification_rule_id") == "QUERY_FAIL_UNCLASSIFIED"
+        assert out.context.get("classification_confidence") == "LOW"
 
-    def test_query_fail_without_context_is_timeout_class(self):
+    def test_query_fail_without_context_also_internal(self):
         exc = Exception("查询失败")
         out = classify_sdk_error(exc, endpoint="query_snapshot")
-        assert isinstance(out, ProviderTimeoutError)
+        assert isinstance(out, ProviderSdkInternalError)
+
+    def test_none_subscript_carries_classification_rule(self):
+        """R2-P1-03: the VERIFIED denial signature carries rule metadata."""
+        exc = TypeError("'NoneType' object is not subscriptable")
+        out = classify_sdk_error(exc, endpoint="get_calendar")
+        assert isinstance(out, ProviderPermissionError)
+        assert out.context.get("classification_rule_id") == "VERIFIED_NONE_SUBSCRIPT"
+        assert out.context.get("classification_confidence") == "HIGH"
 
     def test_network_keywords(self):
         for msg in ("connection refused", "connect timeout", "reset by peer"):
