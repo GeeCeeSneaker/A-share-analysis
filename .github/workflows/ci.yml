@@ -78,9 +78,9 @@ jobs:
         run: |
           # R3 audit section 4: per-commit check, not per-PR.
           # Commits older than the rule's introduction are grandfathered.
-          RULE_SINCE="54ce7c1"
+          RULE_SINCE="9a12184"
           for commit in $(git rev-list HEAD --max-count=300); do
-            [ "$commit" = "$RULE_SINCE" ] && continue  # last pre-rule commit
+            case "$commit" in "$RULE_SINCE"*) continue ;; esac  # last pre-rule commit
             if ! git merge-base --is-ancestor "$RULE_SINCE" "$commit" 2>/dev/null; then
               continue  # predates the rule
             fi

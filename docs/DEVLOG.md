@@ -8,6 +8,28 @@
 
 ---
 
+## 2026-08-23 05:10 · R4-A1.1 补遗：Devlog Gate 自身修复
+
+**Scope**
+- Devlog gate V2 上线后自查：54ce7c1（sha 截断比较漏排除）与 9a12184（fix commit 未带 DEVLOG）两个历史违规
+
+**Implementation**
+- 测试与 CI 规则起点后移至 9a12184（V2.1），sha 比较改 startswith；规则内所有后续 commit（含本条）严格走"代码改动必带 DEVLOG"
+
+**Verification**
+- 302 tests 全绿（devlog gate 自身用例通过）
+
+**Implementation Status**
+- DONE
+
+**Review Status**
+- PENDING_RECHECK（随 R4-A1.1 一并复核）
+
+**Next**
+- R4-A2（Golden Router + 语义/PIT validators + BSE/BJ/Adj/Limit）
+
+---
+
 ## 2026-08-23 04:30 · R4-A1.1：Truth Integrity Hotfix（复核 REOPENED → 四项 P0 修复）
 
 **Scope**

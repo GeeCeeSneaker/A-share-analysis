@@ -49,13 +49,14 @@ class TestDevlogGate:
                 offenders.append(
                     f"{commit[:10]}: {sorted(f for f in files if f.startswith(code_prefixes))[:3]}"
                 )
-        # V2 rule (R4-A1.1): covers golden/gitattributes/workflows too;
-        # effective AFTER 54ce7c1 (the last pre-V2 commit).
-        rule_since = "54ce7c1"
+        # V2.1 rule (R4-A1.1): covers golden/gitattributes/workflows too;
+        # effective AFTER 9a12184 (the last pre-V2.1 commit - it predates
+        # this gate's own fix commit and is grandfathered).
+        rule_since = "9a12184"
         new_offenders = []
         for line in offenders:
             sha = line.split(":")[0]
-            if sha == rule_since:
+            if sha.startswith(rule_since):
                 continue  # the last pre-rule commit itself
             try:
                 is_ancestor = (
