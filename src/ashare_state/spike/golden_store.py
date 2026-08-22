@@ -182,7 +182,10 @@ class GoldenTruthStore:
     def verify_binding(self, *, truth_version: str, manifest_hash: str) -> None:
         _, manifest = self.load()
         if truth_version != manifest.truth_version:
-            msg = f"golden truth_version drifted: run bound {truth_version!r}, dataset now {manifest.truth_version!r}"
+            msg = (
+                f"golden truth_version drifted: run bound {truth_version!r}, "
+                f"dataset now {manifest.truth_version!r}"
+            )
             raise GoldenTruthError(msg)
         if manifest_hash != manifest.dataset_hash:
             msg = "golden dataset hash drifted since the run was created"

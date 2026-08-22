@@ -55,6 +55,8 @@ class TestDevlogGate:
         new_offenders = []
         for line in offenders:
             sha = line.split(":")[0]
+            if sha == rule_since:
+                continue  # the last pre-rule commit itself
             try:
                 is_ancestor = (
                     subprocess.run(
