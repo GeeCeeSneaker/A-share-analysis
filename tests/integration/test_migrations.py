@@ -16,10 +16,13 @@ import pytest
 
 from ashare_state.storage import (
     MigrationError,
+    MigrationLedgerGapError,
+    MigrationNamingError,
     MigrationTamperedError,
     applied_migrations,
     apply_migrations,
 )
+from ashare_state.storage.migrations import discover_migrations
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 
@@ -164,3 +167,57 @@ class TestTransactionalRollback:
             assert "fixed_table" in tables
         finally:
             conn.close()
+
+
+@pytest.mark.integration
+class TestLedgerIntegrity:
+    """Audit P1-05: deleted / renamed / mis-named migrations must BLOCK."""
+
+    def _copy_migrations(self, tmp_path: Path) -> Path:
+        target = tmp_path / "migrations"
+        target.mkdir(exist_ok=True)
+        for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
+            (target / f.name).write_bytes(f.read_bytes())
+        return target
+
+    def test_deleted_applied_migration_blocks(self, db_path: Path, tmp_path: Path):
+        migrations_dir = self._copy_migrations(tmp_path)
+        conn = duckdb.connect(str(db_path))
+        try:
+            apply_migrations(conn, migrations_dir)
+            # delete an already-applied migration file
+            (migrations_dir / "002_provider_governance.sql").unlink()
+            with pytest.raises(MigrationLedgerGapError, match="P1-05"):
+                apply_migrations(conn, migrations_dir)
+        finally:
+            conn.close()
+
+    def test_renamed_applied_migration_blocks(self, db_path: Path, tmp_path: Path):
+        migrations_dir = self._copy_migrations(tmp_path)
+        conn = duckdb.connect(str(db_path))
+        try:
+            apply_migrations(conn, migrations_dir)
+            # rename an already-applied migration file (same id, new name)
+            old = migrations_dir / "003_run_snapshot_publish.sql"
+            old.rename(migrations_dir / "003_renamed_oops.sql")
+            with pytest.raises((MigrationLedgerGapError, MigrationTamperedError)):
+                apply_migrations(conn, migrations_dir)
+        finally:
+            conn.close()
+
+    def test_invalid_sql_filename_blocks(self, db_path: Path, tmp_path: Path):
+        migrations_dir = self._copy_migrations(tmp_path)
+        (migrations_dir / "bad_name.sql").write_text("CREATE TABLE nope (id INTEGER);")
+        conn = duckdb.connect(str(db_path))
+        try:
+            with pytest.raises(MigrationNamingError, match="P1-05"):
+                apply_migrations(conn, migrations_dir)
+        finally:
+            conn.close()
+
+    def test_non_sql_files_still_ignored(self, tmp_path: Path):
+        """README.md etc. must NOT trigger the naming gate."""
+        migrations_dir = self._copy_migrations(tmp_path)
+        (migrations_dir / "README.md").write_text("notes")
+        files = discover_migrations(migrations_dir)
+        assert all(f.suffix == ".sql" for f in files)

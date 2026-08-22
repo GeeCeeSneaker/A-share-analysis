@@ -51,6 +51,21 @@ class MigrationNameError(MigrationError):
     """A file in the migrations directory has an invalid name."""
 
 
+class MigrationNamingError(MigrationError):
+    """A *.sql file in the migrations directory violates the naming rule.
+
+    Audit P1-05: non-conforming .sql files must BLOCK startup, never be
+    silently ignored (a stray '  9_x.sql' would look like a no-op).
+    """
+
+
+class MigrationLedgerGapError(MigrationError):
+    """Applied ledger ids are not a complete prefix of the repo sequence.
+
+    Audit P1-05: detects deleted or renamed already-applied migrations.
+    """
+
+
 @dataclass(frozen=True)
 class MigrationRecord:
     migration_id: str
@@ -82,7 +97,11 @@ def split_statements(sql_text: str) -> list[str]:
 
 
 def discover_migrations(migrations_dir: Path) -> list[Path]:
-    """Return numbered migration files sorted by migration id."""
+    """Return numbered migration files sorted by migration id.
+
+    Audit P1-05: any .sql file violating the naming rule BLOCKs (instead of
+    being silently ignored). Non-.sql files (README etc.) remain ignored.
+    """
     if not migrations_dir.is_dir():
         msg = f"migrations directory not found: {migrations_dir}"
         raise MigrationError(msg)
@@ -90,9 +109,15 @@ def discover_migrations(migrations_dir: Path) -> list[Path]:
     for path in migrations_dir.iterdir():
         if not path.is_file():
             continue
+        if path.suffix.lower() != ".sql":
+            continue  # README etc. are not migrations
         match = _MIGRATION_NAME.match(path.name)
         if match is None:
-            continue  # ignore README etc.; only numbered files are migrations
+            msg = (
+                f"migration file {path.name} violates the NNN_name.sql naming "
+                "rule; startup BLOCKED (audit P1-05: never silently ignore)"
+            )
+            raise MigrationNamingError(msg)
         found.append((match.group(1), path))
     found.sort(key=lambda pair: pair[0])
     # duplicate ids are impossible with the 3-digit naming scheme, but assert anyway
@@ -124,6 +149,36 @@ def apply_migrations(
     ledger = applied_migrations(conn)
     files = discover_migrations(migrations_dir)
 
+    # P1-05: the applied ledger must be a COMPLETE PREFIX of the repo
+    # sequence - detects deletions and renames of already-applied files.
+    repo_ids = []
+    for path in files:
+        match = _MIGRATION_NAME.match(path.name)
+        assert match is not None
+        repo_ids.append(match.group(1))
+    applied_ids = sorted(ledger.keys())
+    prefix_len = len(applied_ids)
+    if repo_ids[:prefix_len] != applied_ids:
+        missing = [mid for mid in applied_ids if mid not in repo_ids]
+        renamed = [
+            (mid, ledger[mid].filename)
+            for mid in applied_ids
+            if mid in repo_ids
+            and any(
+                _MIGRATION_NAME.match(p.name)
+                and _MIGRATION_NAME.match(p.name).group(1) == mid  # type: ignore[union-attr]
+                and p.name != ledger[mid].filename
+                for p in files
+            )
+        ]
+        msg = (
+            f"applied migration ledger is not a complete prefix of the repo "
+            f"sequence (ledger={applied_ids}, repo={repo_ids}); "
+            f"missing/deleted={missing}, renamed={renamed}; startup BLOCKED "
+            "(audit P1-05)"
+        )
+        raise MigrationLedgerGapError(msg)
+
     # verify integrity of already-applied migrations first: BLOCK before any change
     for path in files:
         match = _MIGRATION_NAME.match(path.name)
@@ -131,13 +186,21 @@ def apply_migrations(
         migration_id = match.group(1)
         current_hash = _file_sha256(path)
         record = ledger.get(migration_id)
-        if record is not None and record.content_hash != current_hash:
-            msg = (
-                f"migration {path.name} was modified after being applied "
-                f"(recorded hash {record.content_hash}, current hash {current_hash}); "
-                "startup BLOCKED - restore the original file or add a new migration"
-            )
-            raise MigrationTamperedError(msg)
+        if record is not None:
+            if record.content_hash != current_hash:
+                msg = (
+                    f"migration {path.name} was modified after being applied "
+                    f"(recorded hash {record.content_hash}, current hash {current_hash}); "
+                    "startup BLOCKED - restore the original file or add a new migration"
+                )
+                raise MigrationTamperedError(msg)
+            if record.filename != path.name:
+                msg = (
+                    f"migration {migration_id} was renamed after being applied "
+                    f"(ledger filename {record.filename}, repo filename {path.name}); "
+                    "startup BLOCKED - restore the original filename"
+                )
+                raise MigrationLedgerGapError(msg)
 
     newly_applied: list[MigrationRecord] = []
     for path in files:

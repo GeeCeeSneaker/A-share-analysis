@@ -35,9 +35,8 @@ class TestScenarioA_OrphanFile:
         """Crash between os.replace() and component registration."""
         orphan_rel = (
             "features/security/layer=base/family=skeleton/version=0.0.1"
-            "/year=2026/month=99/part-9999.parquet"
+            "/year=2026/month=99/part-zombie-9999.parquet"
         )
-        features_root = base_run.data_root / "features"
         orphan_path = base_run.data_root / orphan_rel
         orphan_path.parent.mkdir(parents=True, exist_ok=True)
         orphan_path.write_bytes(b"orphan")
@@ -47,8 +46,8 @@ class TestScenarioA_OrphanFile:
             # invisible to the publish contract: not in any component manifest
             files = artifact_files_for_publish(conn, base_run.publish_ids[0])
             assert orphan_rel not in {f["file_uri"] for f in files}
-            # but detectable by the startup recovery check
-            orphans = find_orphan_files(conn, features_root)
+            # but detectable by the startup recovery check (P1-01: data_root)
+            orphans = find_orphan_files(conn, base_run.data_root)
         assert orphan_path in orphans
 
 

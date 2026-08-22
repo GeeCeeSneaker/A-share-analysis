@@ -132,6 +132,13 @@ def run_mock_e2e(
         provider = FixtureProvider()
         bars = provider.get_daily_bars(start, end)
 
+        # identities are generated FIRST so filenames carry output identity
+        # (audit P0-01: two runs must physically coexist, never overwrite)
+        result.data_snapshot_id = str(uuid.uuid4())
+        result.feature_artifact_set_id = str(uuid.uuid4())
+        snap_tag = result.data_snapshot_id.replace("-", "")[:8]
+        artifact_tag = result.feature_artifact_set_id.replace("-", "")[:8]
+
         # -- 1. provider-normalized canonical files (atomic commit) ---------
         canonical_dir = data_root / "canonical" / "daily_bar"
         canonical_dir.mkdir(parents=True, exist_ok=True)
@@ -140,6 +147,7 @@ def run_mock_e2e(
         for bar in bars:
             by_month.setdefault(bar.trade_date.strftime("%Y-%m"), []).append(bar)
 
+        canonical_rels: list[str] = []
         for month, month_bars in sorted(by_month.items()):
             table = pa.table(
                 {
@@ -154,12 +162,16 @@ def run_mock_e2e(
                     "amount_cny": [b.amount_cny for b in month_bars],
                 }
             )
-            rel = f"canonical/daily_bar/year={month[:4]}/month={month[5:]}/part-0001.parquet"
+            rel = (
+                f"canonical/daily_bar/year={month[:4]}/month={month[5:]}/"
+                f"part-{snap_tag}-0001.parquet"
+            )
             final = data_root / rel
             buf = pa.BufferOutputStream()
             pq.write_table(table, buf, compression="zstd")
             content_hash = write_file_atomic(final, buf.getvalue().to_pybytes())
             result.canonical_files.append(rel)
+            canonical_rels.append(rel)
             canonical_components.append(
                 ComponentIdentity(
                     dataset="daily_bar",
@@ -174,7 +186,6 @@ def run_mock_e2e(
 
         # -- 2. DATA_VALIDATED snapshot ------------------------------------
         result.data_manifest_hash = compute_manifest_hash(canonical_components)
-        result.data_snapshot_id = str(uuid.uuid4())
         conn.execute(
             "INSERT INTO meta_data_snapshot VALUES (?, ?, ?, ?, ?, ?, ?, 'DATA_VALIDATED', ?, ?)",
             [
@@ -189,12 +200,7 @@ def run_mock_e2e(
                 "mock e2e",
             ],
         )
-        for comp in canonical_components:
-            month = comp.logical_partition_key.split("/")[-1].split("=")[1]
-            rel = (
-                f"canonical/daily_bar/year={comp.logical_partition_key.split('=')[1][:4]}/"
-                f"month={month}/part-0001.parquet"
-            )
+        for rel, comp in zip(canonical_rels, canonical_components, strict=True):
             conn.execute(
                 "INSERT INTO meta_data_snapshot_component VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
@@ -228,7 +234,7 @@ def run_mock_e2e(
             partition = (
                 f"layer=base/family=skeleton/version=0.0.1/year={month[:4]}/month={month[5:]}"
             )
-            rel = f"features/security/{partition}/part-0001.parquet"
+            rel = f"features/security/{partition}/part-{artifact_tag}-0001.parquet"
             final = data_root / rel
             table = pa.table(
                 {
@@ -253,7 +259,6 @@ def run_mock_e2e(
 
         # -- 4. FEATURE_VALIDATED artifact set ------------------------------
         result.artifact_manifest_hash = compute_manifest_hash(feature_components)
-        result.feature_artifact_set_id = str(uuid.uuid4())
         conn.execute(
             "INSERT INTO meta_feature_artifact_set VALUES "
             "(?, ?, ?, ?, ?, ?, ?, ?, 'FEATURE_VALIDATED', ?, ?)",
@@ -288,10 +293,28 @@ def run_mock_e2e(
             )
 
         # -- 5. atomic publish ----------------------------------------------
+        # universes must exist in dim_universe (audit P0-02 lineage gate)
+        for universe_id, universe_version in (("ALL_A", "v1"), ("CORE_TRADABLE", "v1")):
+            existing = conn.execute(
+                "SELECT 1 FROM dim_universe WHERE universe_id = ? AND universe_version = ?",
+                [universe_id, universe_version],
+            ).fetchone()
+            if existing is None:
+                conn.execute(
+                    "INSERT INTO dim_universe VALUES (?, ?, ?, ?, ?, ?)",
+                    [
+                        universe_id,
+                        universe_version,
+                        f"mock universe {universe_id}",
+                        "mock-rule-v1",
+                        "mock e2e",
+                        datetime.now(UTC),
+                    ],
+                )
         pipeline_run_id = str(uuid.uuid4())
         conn.execute(
             "INSERT INTO meta_pipeline_run (pipeline_run_id, run_type, status, started_at) "
-            "VALUES (?, 'EOD', 'RUNNING', ?)",
+            "VALUES (?, 'EOD', 'FEATURE_VALIDATED', ?)",
             [pipeline_run_id, datetime.now(UTC)],
         )
         universes = [("ALL_A", "v1"), ("CORE_TRADABLE", "v1")]

@@ -43,6 +43,7 @@ def publish_snapshot(
     pipeline_run_id: str | None = None,
     quality_grade: str | None = None,
     publish_id: str | None = None,
+    fallback_security_ids: set[str] | None = None,
 ) -> str:
     """Atomically publish one trade_date. Returns the publish_id.
 
@@ -51,6 +52,18 @@ def publish_snapshot(
       2. insert new row status=PUBLISHED
       3. insert meta_publish_universe rows
       4. meta_pipeline_run.status -> PUBLISHED
+
+    Full lineage gate (audit P0-02): before any write, ALL invariants hold:
+      - snapshot exists, status DATA_VALIDATED
+      - artifact exists, status FEATURE_VALIDATED
+      - artifact.data_snapshot_id == data_snapshot_id (no cross-snapshot mix)
+      - artifact.feature_set_version == feature_set_version
+      - meta_feature_set exists and is ACTIVE
+      - pipeline_run (when given) exists, status FEATURE_VALIDATED
+      - every (universe_id, universe_version) exists in dim_universe
+      - NO_IDENTITY_FALLBACK gate (audit P0-06): fallback_security_ids must
+        be empty - the upstream canonicalizer passes the set of fallback
+        identities detected in the data being published; any entry BLOCKs.
     """
     pid = publish_id or str(uuid.uuid4())
     now = datetime.now(UTC)
@@ -67,7 +80,8 @@ def publish_snapshot(
         msg = f"data_snapshot {data_snapshot_id} status is {snap[0]}, expected DATA_VALIDATED"
         raise PublishStateError(msg)
     art = conn.execute(
-        "SELECT status FROM meta_feature_artifact_set WHERE feature_artifact_set_id = ?",
+        "SELECT status, data_snapshot_id, feature_set_version "
+        "FROM meta_feature_artifact_set WHERE feature_artifact_set_id = ?",
         [feature_artifact_set_id],
     ).fetchone()
     if art is None:
@@ -78,8 +92,74 @@ def publish_snapshot(
             f"artifact set {feature_artifact_set_id} status is {art[0]}, expected FEATURE_VALIDATED"
         )
         raise PublishStateError(msg)
+    if art[1] != data_snapshot_id:
+        msg = (
+            "SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: artifact "
+            f"{feature_artifact_set_id} was computed from snapshot {art[1]}, "
+            f"but this publish references snapshot {data_snapshot_id}"
+        )
+        raise PublishStateError(msg)
+    if art[2] != feature_set_version:
+        msg = (
+            "SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: artifact "
+            f"{feature_artifact_set_id} belongs to feature set {art[2]}, "
+            f"but this publish references {feature_set_version}"
+        )
+        raise PublishStateError(msg)
+    fset = conn.execute(
+        "SELECT status FROM meta_feature_set WHERE feature_set_version = ?",
+        [feature_set_version],
+    ).fetchone()
+    if fset is None:
+        msg = (
+            f"SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: feature set "
+            f"{feature_set_version} not registered"
+        )
+        raise PublishStateError(msg)
+    if fset[0] != "ACTIVE":
+        msg = (
+            f"SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: feature set "
+            f"{feature_set_version} status is {fset[0]}, expected ACTIVE"
+        )
+        raise PublishStateError(msg)
+    if pipeline_run_id is not None:
+        run = conn.execute(
+            "SELECT status FROM meta_pipeline_run WHERE pipeline_run_id = ?",
+            [pipeline_run_id],
+        ).fetchone()
+        if run is None:
+            msg = (
+                f"SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: pipeline run "
+                f"{pipeline_run_id} not registered"
+            )
+            raise PublishStateError(msg)
+        if run[0] != "FEATURE_VALIDATED":
+            msg = (
+                f"SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: pipeline run "
+                f"{pipeline_run_id} status is {run[0]}, expected FEATURE_VALIDATED"
+            )
+            raise PublishStateError(msg)
     if not universes:
         msg = "at least one (universe_id, universe_version) is required"
+        raise PublishStateError(msg)
+    for universe_id, universe_version in universes:
+        u = conn.execute(
+            "SELECT 1 FROM dim_universe WHERE universe_id = ? AND universe_version = ?",
+            [universe_id, universe_version],
+        ).fetchone()
+        if u is None:
+            msg = (
+                "SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: universe "
+                f"({universe_id}, {universe_version}) not registered in dim_universe"
+            )
+            raise PublishStateError(msg)
+    if fallback_security_ids:
+        sample = sorted(fallback_security_ids)[:5]
+        msg = (
+            "NO_IDENTITY_FALLBACK gate violated: publish contains "
+            f"{len(fallback_security_ids)} IDENTITY_FALLBACK security ids "
+            f"(sample: {sample}); fallback identities may never be PUBLISHED"
+        )
         raise PublishStateError(msg)
 
     conn.execute("BEGIN TRANSACTION")
@@ -223,8 +303,11 @@ def publish_universes(conn: DuckDBPyConnection, publish_id: str) -> list[tuple[s
 # -------------------------------------------------------- startup recovery
 
 
-def find_orphan_files(conn: DuckDBPyConnection, features_root: Path) -> list[Path]:
+def find_orphan_files(conn: DuckDBPyConnection, data_root: Path) -> list[Path]:
     """Scenario A recovery check: physical files not registered anywhere.
+
+    Audit P1-01: scans data_root (canonical + features) and compares against
+    REGISTERED file_uris which are data_root-relative - roots must match.
 
     An orphan (file moved but DB registration crashed before commit) is
     invisible to all readers and MAY be cleaned later. This function only
@@ -239,10 +322,10 @@ def find_orphan_files(conn: DuckDBPyConnection, features_root: Path) -> list[Pat
         for row in conn.execute("SELECT file_uri FROM meta_data_snapshot_component").fetchall()
     }
     orphans: list[Path] = []
-    if not features_root.is_dir():
+    if not data_root.is_dir():
         return orphans
-    for path in features_root.rglob("*.parquet"):
-        rel = path.relative_to(features_root).as_posix()
+    for path in data_root.rglob("*.parquet"):
+        rel = path.relative_to(data_root).as_posix()
         if rel not in registered:
             orphans.append(path)
     return orphans

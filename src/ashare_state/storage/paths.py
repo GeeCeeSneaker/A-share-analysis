@@ -29,6 +29,11 @@ class CaseCollisionError(LogicalUriError):
     """Two logical URIs differ only by case (design ruling P0-4 BLOCK)."""
 
 
+class NonCanonicalLogicalUriError(LogicalUriError):
+    """URI has an alias form (e.g. 'a//b', 'a/./b', 'a/b/') that normalizes
+    to a different canonical string (audit P1-06: physical-path aliasing)."""
+
+
 _FORBIDDEN_SCHEME = "://"
 
 
@@ -73,6 +78,15 @@ def validate_logical_uri(uri: str) -> str:
     if any(part == ".." for part in pure.parts):
         msg = f"logical URI must not contain '..': {uri!r}"
         raise LogicalUriError(msg)
+    # P1-06: reject alias forms that normalize to a different string
+    # ('a//b', 'a/./b', 'a/b/' map to the same physical path as 'a/b').
+    normalized = pure.as_posix()
+    if normalized != uri:
+        msg = (
+            f"logical URI {uri!r} is not in canonical form (normalizes to "
+            f"{normalized!r}); alias paths are BLOCKed"
+        )
+        raise NonCanonicalLogicalUriError(msg)
     return uri
 
 

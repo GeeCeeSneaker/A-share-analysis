@@ -42,6 +42,15 @@ class HashMismatchError(AtomicCommitError):
     """Content hash verification failed before commit."""
 
 
+class ImmutableFileExistsError(AtomicCommitError):
+    """final_path already exists: committed files must never change bytes.
+
+    Audit P0-01 (2026-08-22): once a file_uri is referenced by a snapshot
+    or artifact manifest its bytes are frozen; a rewrite requires a NEW
+    identity-carrying filename, never a replace.
+    """
+
+
 def file_sha256(path: Path) -> str:
     """Stream a file and return its hex SHA-256."""
     digest = hashlib.sha256()
@@ -69,8 +78,14 @@ def write_file_atomic(
     *,
     staging_dir: Path | None = None,
     expected_sha256: str | None = None,
+    allow_existing_identical: bool = False,
 ) -> str:
     """Write bytes to final_path atomically following the ruled 8-step order.
+
+    Immutable contract (audit P0-01): if final_path already exists the write
+    BLOCKS with ImmutableFileExistsError. With allow_existing_identical=True,
+    an existing file whose SHA-256 equals the incoming content is an
+    idempotent no-op returning that hash; different content always BLOCKs.
 
     1-4: write temp file in staging_dir (default: final_path.parent), flush,
          fsync, close.
@@ -81,6 +96,27 @@ def write_file_atomic(
     """
     final_path = Path(final_path)
     final_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # P0-01: fail fast BEFORE writing any temp file.
+    incoming_hash = hashlib.sha256(data).hexdigest()
+    if final_path.exists():
+        if allow_existing_identical and file_sha256(final_path) == incoming_hash:
+            if expected_sha256 is not None and incoming_hash != expected_sha256:
+                msg = (
+                    f"content hash mismatch for {final_path.name}: "
+                    f"expected {expected_sha256}, computed {incoming_hash}"
+                )
+                raise HashMismatchError(msg)
+            # idempotent retry: identical bytes already committed under this
+            # URI - keep them untouched and report the existing hash.
+            return incoming_hash
+        msg = (
+            f"immutable file {final_path} already exists; committed files must "
+            "never change bytes - write to a new identity-carrying filename, or "
+            "pass allow_existing_identical=True for same-hash idempotent retries"
+        )
+        raise ImmutableFileExistsError(msg)
+
     if staging_dir is None:
         staging_dir = final_path.parent
     else:

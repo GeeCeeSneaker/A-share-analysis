@@ -2,6 +2,9 @@
 
 from ashare_state.storage.migrations import (
     MigrationError,
+    MigrationLedgerGapError,
+    MigrationNameError,
+    MigrationNamingError,
     MigrationRecord,
     MigrationTamperedError,
     applied_migrations,
@@ -12,6 +15,9 @@ from ashare_state.storage.migrations import (
 
 __all__ = [
     "MigrationError",
+    "MigrationLedgerGapError",
+    "MigrationNameError",
+    "MigrationNamingError",
     "MigrationRecord",
     "MigrationTamperedError",
     "apply_migrations",
