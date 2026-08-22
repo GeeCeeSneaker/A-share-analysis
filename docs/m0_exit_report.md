@@ -12,7 +12,7 @@
 | 1 | DuckDB 不依赖"跨进程写者 + read-only 读者可同时存在"的假设 | PASS | `storage/connection.py` 实现进程级排他 Owner（外部锁文件 Gate：msvcrt/fcntl）；`tests/integration/test_db_owner.py` 覆盖裁决要求的全 4 项测试：双写进程竞争第二个明确失败、写持有期间所有权拒绝（从不断言并发读可用）、Owner 被 kill 后锁立即可恢复、残留锁文件不阻塞启动 |
 | 2 | Migration 文件有 checksum，已执行 migration 被修改时 BLOCK | PASS | `storage/migrations.py`：SHA-256 登记 + 篡改检测在任何新迁移执行**之前**完成；`test_migrations.py::test_modified_applied_migration_blocks` 与 `test_tamper_check_runs_before_any_new_migration` |
 | 3 | Snapshot Manifest Hash 与机器绝对路径、随机 run_id 无关 | PASS | `ComponentIdentity` 数据类结构上**不含** file_uri/路径/run_id/时间戳字段（`test_cross_root_manifest.py::test_run_id_in_physical_layout_does_not_pollute` 直接断言字段集）；身份 Hash 仅由 7 个逻辑字段排序生成 |
-| 4 | Windows/Linux 对同一逻辑 component 集合生成相同 Manifest Hash | PASS* | 本地 Windows：`test_cross_root_manifest.py::test_same_content_two_roots_same_hash`（两个独立根目录同 Hash）；Linux 侧由 CI ubuntu-latest runner 运行同一测试套件验证（*待 CI 首次运行确认） |
+| 4 | Windows/Linux 对同一逻辑 component 集合生成相同 Manifest Hash | PASS | 本地 Windows：`test_cross_root_manifest.py::test_same_content_two_roots_same_hash`（两个独立根目录同 Hash）；Linux 侧由 CI ubuntu-latest runner 运行同一测试套件验证（**2026-08-22 CI 全绿确认**） |
 | 5 | file_uri 精确比较，case collision 自动 BLOCK | PASS | `storage/paths.py`：逻辑 URI（相对 data_root/正斜杠/无盘符/无 `..`）；`test_file_uri.py::test_exact_collapse_blocked` |
 | 6 | meta_feature_artifact_set/component Schema 已存在 | PASS | `migrations/003_run_snapshot_publish.sql`；`test_migrations.py::EXPECTED_TABLES` 断言 21 张表全建 |
 | 7 | feature_set_version 在首次 Feature Artifact 前有可解析 Registry | PASS | `migrations/004_feature_governance.sql`（meta_feature_set + member，definition_hash 由排序成员生成）；`test_mock_pipeline.py::test_feature_set_registry_resolvable`；`mock_e2e` 在创建 artifact set 前强制注册 |
@@ -51,7 +51,7 @@ tests/                                      84 tests（unit 38 + integration 46�
 
 ## 4. 遗留事项（不阻塞 M0 出口，移交后续里程碑）
 
-1. **CI 首次运行确认**：仓库尚未推送到 GitHub，ci.yml 的 Linux runner 验证项 #4 待首次 CI 运行后回填本报告。
+1. ~~**CI 首次运行确认**~~：**已回填（2026-08-22）**——GitHub Actions 三矩阵全绿（commit `212bacf`）：Windows+3.14 REQUIRED ✅ / Windows+3.12 兼容 ✅ / Linux+3.14 推荐 ✅。首轮暴露并修复三类真实缺陷：lint 违规（`ffb948f`）、mypy 平台条件代码（`a248163`）、Windows 崩溃后 msvcrt 锁释放延迟（`212bacf`，产品级修复：`_acquire_gate` 死锁探测窗口，ADR-008 规则 3 确定性达成）。
 2. **git 初始提交**：仓库已 `git init`，待用户确认后做首次提交（含 uv.lock）。
 3. **Canonical selected 层 DDL**：按裁决第 5 节留待 P0a 前完成（fact_daily_bar/limit/status/adj 四域契约）。
 4. ~~ADR-001..006 索引 + ADR-007/008 正文~~：**已交付**（`docs/adr/ADR-000_adr_index.md`、`ADR-007_p0m0_tushare_unavailable.md`、`ADR-008_duckdb_process_model.md`），随 Spike 报告框架（`docs/spike_report_p0m1.md`）、Provider Verification 模板（`docs/provider_verification/amazingdata.md`）与风险登记册（`docs/risk_register.md`）一并提供。
@@ -64,4 +64,4 @@ P0-M0 出口标准（含设计者修订版 10 条增量）**全部满足**，工
 三层身份（data_snapshot_id / feature_artifact_set_id / publish_id）在 Schema 与
 运行时（发布事务 + Published/Exact readers）两个层面均可用且被测试覆盖。
 
-**M0: PASS_PENDING_CI**（任务书 §1.1 裁定：CI 首跑通过——Windows+3.14 必选矩阵——后改为 PASS；CI 矩阵已升级为 Windows+3.14 REQUIRED / Windows+3.12 / Linux+3.14）
+**M0: PASS**（2026-08-22 收口：GitHub CI 三矩阵全绿——Windows+3.14 REQUIRED / Windows+3.12 兼容 / Linux+3.14 推荐，commit `212bacf`）

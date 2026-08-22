@@ -63,7 +63,7 @@
 
 修订版 10 条增量出口标准 + 原方案 6 条标准**逐条勾验通过**（详见 `docs/m0_exit_report.md`）：
 
-> **M0: PASS_PENDING_CI**（任务书 §1.1 裁定：GitHub CI 首跑通过后改为 PASS；CI 矩阵已按任务书升级为 Windows+3.14 REQUIRED / Windows+3.12 兼容 / Linux+3.14 推荐）
+> **M0: PASS**（2026-08-22 收口：GitHub CI 三矩阵全绿——Windows+3.14 REQUIRED / Windows+3.12 兼容 / Linux+3.14 推荐，commit `212bacf`；首轮 CI 修复三类真实缺陷：lint 违规 / mypy 平台条件代码 / Windows msvcrt 崩溃锁释放延迟）
 
 ## 三、轨 B：P0-M-1 Spike 完成情况（B1 阶段）
 
