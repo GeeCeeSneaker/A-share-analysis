@@ -31,6 +31,23 @@ SHANGHAI = ZoneInfo("Asia/Shanghai")
 RESULTS = Path("data/spike/results")
 
 
+def _pick_sample(code_list: list[str], stage: int) -> list[str]:
+    """R3-P1-10 32.3: SH/SZ/BJ mixed sample (deterministic round-robin)."""
+    buckets = [[c for c in code_list if c.endswith(sfx)] for sfx in (".SH", ".SZ", ".BJ")]
+    pool: list[str] = []
+    while len(pool) < stage and any(buckets):
+        for bucket in buckets:
+            if bucket and len(pool) < stage:
+                pool.append(bucket.pop(0))
+    return pool[:stage]
+
+
+def _run_id() -> str:
+    import uuid
+
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:8]
+
+
 def load_env(path: Path = Path(".env")) -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if k.startswith("TGW_")}
     if path.is_file():
@@ -97,6 +114,7 @@ def main() -> int:
     report: dict[str, object] = {
         "capability": "REALTIME_L1_SUBSCRIPTION",
         "stage": args.stage,
+        "run_id": _run_id(),
         "started_at": datetime.now(UTC).isoformat(),
         "session_state": session_state(),
     }
@@ -140,9 +158,12 @@ def main() -> int:
     try:
         base = ad.BaseData()
         code_list = list(base.get_code_list(security_type="EXTRA_STOCK_A"))
-        sh = [c for c in code_list if c.endswith(".SH")]
-        sample = sh[: args.stage] if len(sh) >= args.stage else code_list[: args.stage]
+        # R3-P1-10 32.3: SH/SZ/BJ mixed sample
+        sample = _pick_sample(code_list, args.stage)
         report["sample_size"] = len(sample)
+        report["sample_markets"] = {
+            sfx: sum(1 for c in sample if c.endswith(sfx)) for sfx in (".SH", ".SZ", ".BJ")
+        }
 
         sub = ad.SubscribeData()
 
@@ -228,6 +249,8 @@ def main() -> int:
         report["lifecycle"] = lifecycle
 
         report["events_received"] = len(events)
+        # R3-P1-10 32.4: two separate verdicts - receiving events with a
+        # broken unregister/stop is NOT an overall PASS
         if events:
             latencies = [e["latency_ms"] for e in events if "latency_ms" in e]
             if latencies:
@@ -238,15 +261,21 @@ def main() -> int:
                 }
             report["out_of_order_count"] = _out_of_order(events)
             report["fields_observed"] = sorted({k for e in events for k in e})
-            report["status"] = "PASS"
+            report["event_stream_verdict"] = "PASS"
         else:
-            # lifecycle verified + in-session + no events -> genuinely failed
-            report["status"] = "FAIL_NO_EVENTS"
+            report["event_stream_verdict"] = "FAIL_NO_EVENTS"
             report["note"] = (
                 "subscription lifecycle recorded above; verify callback "
                 "signature against the lifecycle errors before reading this "
                 "as an entitlement conclusion (R2-P1-06 17.3)"
             )
+        lifecycle_ok = bool(lifecycle) and all(str(v).startswith("OK") for v in lifecycle.values())
+        report["lifecycle_verdict"] = "PASS" if lifecycle_ok else "FAIL"
+        report["status"] = (
+            "PASS"
+            if report["event_stream_verdict"] == "PASS" and report["lifecycle_verdict"] == "PASS"
+            else str(report["event_stream_verdict"])
+        )
         report["evidence_events_sample"] = events[:5]
 
     except Exception as exc:  # noqa: BLE001 - evidence, not crash
@@ -279,7 +308,10 @@ def _out_of_order(events: list[dict]) -> int:
 
 def _flush(report: dict, stage: int) -> None:
     report["finished_at"] = datetime.now(UTC).isoformat()
-    out = RESULTS / f"l1_subscription_{stage}.json"
+    # R3-P1-10 32.1: run-scoped immutable evidence (no overwrite on rerun)
+    run_dir = Path("data/spike/trial-l1") / str(report.get("run_id", "unknown"))
+    run_dir.mkdir(parents=True, exist_ok=True)
+    out = run_dir / f"l1_subscription_{stage}.json"
     out.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
     print(f"report -> {out}")
 

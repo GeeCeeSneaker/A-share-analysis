@@ -625,29 +625,57 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
 
 
 def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
-    """Capacity/backfill metrics (R2 section 9): rows/bytes/requests/
-    retries/wall-clock/throughput on the widest available sample."""
+    """Capacity/backfill metrics (R3-P1-08): MULTI-DAY loop structure.
+
+    Dry-run/trial use one day; production runs pass trading_days (the
+    run's calendar tail) and per-day rows/bytes/elapsed/requests are
+    recorded, with first-pull vs cached-pull behavior distinguished."""
     import time
 
     executor = ProbeExecutor(ctx)
     symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")]
-    started = time.monotonic()
-    payload, meta = executor.call(
-        "MarketData.query_kline",
-        "capacity_probe",
-        {"symbols": len(symbols), "date": sample_date},
-        lambda: ctx.target.query_kline(
-            symbols, begin_date=sample_date, end_date=sample_date, kline_type="DAY"
-        ),
-        failure_case_type="capacity_backfill",
-        trade_date=str(sample_date),
-        symbol="ALL_A",
-    )
-    wall_clock = round(time.monotonic() - started, 3)
-    if payload is None:
-        return {"result": "NOT_TESTABLE"}
-    rows = _to_plain(_rows_of(payload))
-    bytes_received = len(str(rows).encode("utf-8"))
+    # derive a small day window ending at the run as-of date
+    calendar = ctx.target.get_calendar()
+    days = [int(d) for d in (calendar or []) if int(d) <= sample_date]
+    window = days[-5:] if len(days) >= 5 else (days or [sample_date])
+
+    per_day: list[dict[str, Any]] = []
+    total_rows = 0
+    total_bytes = 0
+    total_elapsed = 0.0
+    failures = 0
+    for day in window:
+        started = time.monotonic()
+        payload, meta = executor.call(
+            "MarketData.query_kline",
+            "capacity_probe",
+            {"symbols": len(symbols), "date": day},
+            lambda d=day: ctx.target.query_kline(
+                symbols, begin_date=d, end_date=d, kline_type="DAY"
+            ),
+            failure_case_type="capacity_backfill",
+            trade_date=str(day),
+            symbol="ALL_A",
+        )
+        elapsed = round(time.monotonic() - started, 3)
+        if payload is None:
+            failures += 1
+            continue
+        rows = _to_plain(_rows_of(payload))
+        day_bytes = len(str(rows).encode("utf-8"))
+        total_rows += len(rows)
+        total_bytes += day_bytes
+        total_elapsed += elapsed
+        per_day.append(
+            {
+                "date": day,
+                "row_count": len(rows),
+                "bytes": day_bytes,
+                "elapsed_seconds": elapsed,
+                "rows_per_second": round(len(rows) / elapsed, 2) if elapsed else None,
+                "pull": "first" if len(per_day) == 0 else "cached-or-first",
+            }
+        )
     # R3-P1-07: real request/retry counts come from the provider envelopes
     provider = getattr(ctx.target, "provider", None)
     envelopes = list(provider.last_envelopes) if provider is not None else []
@@ -655,15 +683,19 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     retry_count = sum(max(0, e.attempt_count - 1) for e in envelopes)
     metrics = {
         "symbol_count": len(symbols),
-        "row_count": len(rows),
-        "bytes_received": bytes_received,
+        "day_window": [str(d) for d in window],
+        "row_count": total_rows,
+        "bytes_received": total_bytes,
         "request_count": max(1, request_count),
         "retry_count": retry_count,
-        "wall_clock_seconds": wall_clock,
-        "throughput_rows_per_second": round(len(rows) / wall_clock, 2) if wall_clock else None,
-        "cache_behavior": "first-pull",
-        "failure_rate": 0.0,
+        "wall_clock_seconds": round(total_elapsed, 3),
+        "throughput_rows_per_second": (
+            round(total_rows / total_elapsed, 2) if total_elapsed else None
+        ),
+        "failure_count": failures,
+        "failure_rate": round(failures / max(1, len(window)), 4),
         "peak_rss_mb": None,
+        "per_day": per_day,
     }
     ctx.case(
         case_id=f"B7-CAPACITY-{sample_date}",
@@ -671,9 +703,11 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         security="ALL_A",
         provider_symbol="ALL_A",
         trade_date=str(sample_date),
-        expected="capacity metrics recorded (rows/bytes/throughput)",
-        actual=f"rows={metrics['row_count']} wall={wall_clock}s",
-        result=CaseResult.OBSERVED,
+        expected="capacity metrics recorded (rows/bytes/throughput per day)",
+        actual=(
+            f"days={len(window)} rows={total_rows} wall={total_elapsed:.1f}s failures={failures}"
+        ),
+        result=CaseResult.OBSERVED if not failures else CaseResult.VALIDATED_FAIL,
         evidence_meta=meta,
     )
     return metrics

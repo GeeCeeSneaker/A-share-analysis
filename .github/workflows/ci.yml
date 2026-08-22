@@ -69,3 +69,31 @@ jobs:
             exit 1
           fi
           echo "OK: AmazingData SDK not present in CI environment"
+
+      - name: DEVLOG gate (every code commit must update docs/DEVLOG.md)
+        if: matrix.required
+        shell: bash
+        run: |
+          # R3 audit section 4: per-commit check, not per-PR.
+          # Commits older than the rule's introduction are grandfathered.
+          RULE_SINCE="e6a2a01"
+          for commit in $(git rev-list HEAD --max-count=300); do
+            if ! git merge-base --is-ancestor "$RULE_SINCE" "$commit" 2>/dev/null; then
+              continue  # predates the rule
+            fi
+            files=$(git diff-tree --no-commit-id --name-only -r "$commit")
+            [ -z "$files" ] && continue
+            touches_code=false
+            touches_devlog=false
+            while IFS= read -r f; do
+              case "$f" in
+                src/*|migrations/*|configs/*|scripts/*) touches_code=true ;;
+                docs/DEVLOG.md) touches_devlog=true ;;
+              esac
+            done <<< "$files"
+            if $touches_code && ! $touches_devlog; then
+              echo "::error::commit $commit changes code without updating docs/DEVLOG.md"
+              exit 1
+            fi
+          done
+          echo "OK: every code commit updated DEVLOG"

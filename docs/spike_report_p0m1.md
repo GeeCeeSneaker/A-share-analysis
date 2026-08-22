@@ -1,93 +1,101 @@
 # P0-M-1 Spike Report — AmazingData Provider 验证（GO / NO-GO）
 
-> 状态：**FRAMEWORK READY — AWAITING LIVE RUN**
-> 本报告框架已就绪；三级结论待受控机器上真实账号运行 `scripts/spike/spike_runner.py` 后填写。
-> 与 M0 Exit Report 同时提交设计者评审（设计裁决第 18 节要求的下一次 Review 节点）。
+> 状态：**FRAMEWORK READY (R3) — AWAITING PRODUCTION ACCOUNT**
+> 框架已通过第三轮审计整改（R3-0A/0B/0C/1A/1B）：Run 生命周期终态化、单 Run Verdict、账号门、完整 Provenance、语义 Validators v2、Golden Truth 进 Core Gate、Evidence Closure。
+> 与 M0 Exit Report 同时提交设计者评审。
 
 ## 1. 执行摘要
 
 | 项 | 值 |
 |---|---|
-| Spike 对象 | AmazingData（中国银河证券 星耀数智）唯一可用 Provider；Tushare 积分不足（ADR-007） |
-| 框架验证 | dry-run 全流程通过（无凭证、CI 安全）：B1-B7 案例落盘 + 证据归档 + verdict 草稿聚合 |
-| 真实运行 | 待执行（需受控机器安装 SDK + .env 凭证） |
+| Spike 对象 | AmazingData（中国银河证券 格物金融服务平台）；Tushare 不可用（ADR-007） |
+| 框架验证 | dry-run 全流程（FakeTarget）：八态 case / validators v2 / golden 逐案例对比 / 终态 run / verdict 引擎 + evidence closure 全部工作——**dry-run 中新 validators 当场抓到 fake 数据的北交所涨跌停制度违规，证明语义校验真实生效** |
+| 仿真账号 | B1 连通性 DONE（2026-08-21）；权限码 3\|4\|32\|33 实际只开代码表 |
+| 真实运行 | 待正式账号（P0-M-1B） |
 | 当前结论 | **未评定**（核心事实未验证前不得给 GO） |
 
-## 2. 三级结论定义（设计裁决第 4 节）
-
-| 结论 | 条件 | 对里程碑的影响 |
-|---|---|---|
-| **GO_CORE** | 核心事实 8 项全部通过（见 §4） | 允许进入 P0a |
-| **GO_DEGRADED** | 核心事实通过，但 free-float / SW taxonomy / 真实双源 reconciliation 缺失 | P0a GO；P0b 与部分 P0-M2 BLOCKED |
-| **NO_GO** | 任一核心事实无法满足 Frozen 要求 | P0a BLOCKED，上报设计者（不自动切 AKShare） |
-
-## 3. 能力评估矩阵（真实运行后填写）
-
-### 3.1 核心事实（全部必须 PASS）
-
-| # | 能力 | 结论 | 证据（case catalog 引用） |
-|---|---|---|---|
-| 1 | Security Master / 历史代码含退市 | 待填 | |
-| 2 | Daily OHLCV/amount 单位明确 | 待填 | |
-| 3 | ST/停牌历史样本正确（50 加/脱帽） | 待填 | |
-| 4 | up/down limit 与无涨跌幅限制日正确 | 待填 | |
-| 5 | Adj Factor / Corporate Action 连续性 | 待填 | |
-| 6 | 历史起点满足 2018 分析 + Warmup | 待填 | |
-| 7 | Symbol Mapping 无关键歧义 | 待填 | |
-| 8 | SDK/权限/缓存/freshness 行为已记录 | 待填 | |
-
-### 3.2 允许缺失项（BLOCK P0b/M2，不阻塞 P0a）
-
-| # | 能力 | 四级结论 | 证据 |
-|---|---|---|---|
-| 1 | `free_share / turnover_rate_f` 语义等价 | 待填（EXACT/DERIVABLE/ALTERNATIVE/MISSING） | |
-| 2 | SW taxonomy | 待填 | |
-| 3 | 真实双源 Reconciliation | MISSING（结构性：无第二源，ADR-007） | |
-
-### 3.3 里程碑状态汇总
-
-| 里程碑 | 状态 | 依据 |
-|---|---|---|
-| P0a（AmazingData 最小纵贯线） | 待定 | 核心事实 Spike 结论 |
-| P0b（Tushare Essential + Source Policy + Reconciliation） | 预计 BLOCKED | ADR-007：Tushare 积分不足 |
-| P0-M2（Historical Backfill） | 部分待定 | SW/自由流通相关部分受 3.2 影响 |
-
-## 4. 证据与可审计性
-
-- 案例目录：`data/spike/results/spike_case_catalog.jsonl`（+ CSV 导出），13 字段完整（case_id → checked_at）；
-- 原始响应：`data/spike/raw/`（凭证已脱敏：password/token/secret 键值一律 MASKED）；
-- 每个差异必须归因到 8 类 reason code 之一（CORPORATE_ACTION / PRICE_TICK_ROUNDING / AFTER_HOURS_INCLUDED / SESSION_BOUNDARY / SYMBOL_MAPPING / SOURCE_REVISION / PROVIDER_TIMING / DOCUMENTED_UNIT_DIFFERENCE），**无法解释即 FAIL**；
-- verdict 草稿由 `spike_runner.py --phase verdict` 生成（`verdict_draft.json`），最终结论需人工复核证据后填写本报告。
-
-## 5. No-Go 预案（ADR-007 §决策 5）
-
-若核心事实 NO_GO 且 Tushare 仍不可用：**P0a BLOCKED**。可选动作：
-1. 补足 Tushare 积分，启用 `FUSED_TS_SECURITY_CONTEXT_V1`；
-2. 新候选 Provider 单独 Spike + Source Policy 审批；
-3. 形成新 ADR 后再批准。
-
-**AKShare 不因"免费能拿到"自动升级为生产 fallback。**
-
-## 6. 运行指引（受控机器）
+## 2. 运行方式（R3 框架，与旧文档不同）
 
 ```powershell
-# 0. 安装 SDK（券商本地 wheel）并记录到 docs/provider_verification/amazingdata.md §1
-uv pip install <path-to-amazingdata-wheel>
+# 框架自检（无凭证）
+uv run python scripts/spike/spike_runner.py --dry-run
 
-# 1. 配置凭证
-Copy-Item .env.example .env   # 填入真实值
+# 仿真账号 trial run（终态必然持久化：CLOSED/FAILED/ABORTED）
+uv run python scripts/spike/spike_runner.py --trial --date <as-of>
 
-# 2. 逐阶段运行（串行限流 + 指数退避已内置）
-uv run python scripts/spike/spike_runner.py --phase b1
-uv run python scripts/spike/spike_runner.py --phase b2
-uv run python scripts/spike/spike_runner.py --phase b3 --date <近期交易日>
-uv run python scripts/spike/spike_runner.py --phase b4 --date <近期交易日>
-uv run python scripts/spike/spike_runner.py --phase b5 --month 2026-07
-uv run python scripts/spike/spike_runner.py --phase b6 --date <近期交易日>
-uv run python scripts/spike/spike_runner.py --phase b7
+# PRODUCTION：一个 run 跑全部阶段（R3-P0-02 单 Run Verdict 契约）
+uv run python scripts/spike/spike_runner.py --production --date <as-of>
 
-# 3. 汇总草稿结论（人工复核后填写本报告 §3）
-uv run python scripts/spike/spike_runner.py --phase verdict
+# 中断续跑（身份六元组必须匹配）
+uv run python scripts/spike/spike_runner.py --production --resume --run-id <id> --phase b5
+
+# verdict（仅 CLOSED 的 PRODUCTION run）
+uv run python scripts/spike/spike_runner.py --verdict --run-id <id>
 ```
 
-> 注意：SDK 方法名（`query_kline` / `get_history_stock_status` 等）为占位，B1/B3 首次真实调用时按实际 SDK surface 修正 `scripts/spike/samples_*.py` 中的调用点；本框架的目录/证据/结论结构不变。
+**证据目录（run-scoped，物理隔离）**：
+```text
+data/spike/{dry-run,trial,production}/<spike_run_id>/
+    spike_run.json          # 含完整 provenance（40位SHA/uv.lock hash/config hash/账号画像）
+    cases/                  # 逐案例目录（13字段 + equivalent_pass + evidence_hash）
+    raw/                    # 无损不可变原始证据（含失败 exchange 的 ERROR envelope）
+    verdict.json            # verdict + p0a/p0b/backfill eligibility
+```
+
+## 3. 三级结论与里程碑 Eligibility（分离输出）
+
+| 结论 | 条件 |
+|---|---|
+| GO_CORE | 核心 8 能力全 PASS（validators 语义验证 + golden 数量达标） |
+| GO_DEGRADED | 核心过 + 可选能力缺失（free-float/SW/capacity） |
+| NO_GO | 覆盖完整且核心真失败（fail dominates pass） |
+| SPIKE_INCOMPLETE | 覆盖缺失 / provenance 不完整 / evidence closure 失败 / golden 数量不足 |
+
+verdict.json 同时输出（R3 §54）：
+```json
+{"p0a_eligible": true, "p0b_eligible": false, "historical_backfill_eligible": "PARTIAL"}
+```
+
+## 4. 核心能力矩阵（含 golden 最低数量）
+
+| 能力 | min_valid_cases | golden 类型 |
+|---|---|---|
+| security_master_with_delisted | 20 | golden_delisted |
+| daily_bar_units | 1 | —（独立证据源） |
+| historical_st_suspend | 50 | golden_st_transition |
+| limit_price_and_no_limit_days | 30 | golden_limit_regime |
+| adj_factor_corporate_action_continuity | 20 | golden_corporate_action |
+| history_start_2018_plus_warmup | 1 | — |
+| symbol_mapping_unambiguous | 1 | —（单一 parser 规则） |
+| sdk_permission_cache_freshness | 1 | —（真实 permission codes） |
+
+内置 golden 种子（公开可查证事实）：`src/ashare_state/spike/golden_truth.py`（7 例）；正式 run 前由 operator 补齐至目标数量并核验 source_ref/source_hash。
+
+## 5. Early Stop（R3 §53）
+
+B2/B3/B4 任一 blocking FAIL → run 终态 FAILED → verdict NO_GO；NOT_TESTABLE / 框架不完整 → SPIKE_INCOMPLETE（**不误记为 NO_GO**）。
+
+## 6. 正式账号到位当天的流程（R3 §52）
+
+```text
+Provider Doctor（RUNTIME_ACTUAL_LOAD_VERIFIED）
+→ 验证 Production Account Profile（非 TRIAL、entitlement 完整）
+→ --production --date <as-of>（单 run 全阶段 + 逐阶段 Core Gate）
+→ Close Run（终态必然持久化）
+→ --verdict --run-id（evidence closure 自动复验 hash）
+→ 人工复核
+→ approve_from_spike_run()（R3-P0-17：审批从 run 自证，不接受口头"它过了"）
+```
+
+## 7. L1 实时订阅（独立能力，交易时段实测）
+
+```powershell
+uv run python scripts/spike/l1_subscription_test.py --stage 1   # → 5 → 20
+# stage 100 仅用于订阅上限行为；不得用试用账号推断平台容量
+```
+
+输出 run-scoped 不可变证据（`data/spike/trial-l1/<run-id>/`）+ 双 verdict（event_stream / lifecycle 分离）。
+
+## 8. No-Go 预案
+
+见 ADR-007：核心 NO_GO 且 Tushare 不可用 → P0a BLOCKED 上报设计者；AKShare 不自动升级生产 fallback。

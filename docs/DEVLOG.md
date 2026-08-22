@@ -8,6 +8,40 @@
 
 ---
 
+## 2026-08-23 00:40 · R3 收尾批：Approval 自证 + DEVLOG CI Gate + L1/Report/B7 收口
+
+**Scope**
+- 第三轮审查剩余项：R3-P0-17、§4 DEVLOG CI gate、P1-08/10/12
+
+**Implementation**
+- **R3-P0-17 capability approval 自证**：`approve_from_spike_run()`——不接受"我告诉你它过了"，函数自己查询 spike run（PRODUCTION+CLOSED+provenance 完整+evidence closure 干净+verdict 引擎判 PASS+golden case refs 存在且 VALIDATED_PASS），全部通过才构建证据包并持久化；含 registry→spike capability 映射表
+- **DEVLOG CI gate**（§4）：ci.yml 新增 per-commit diff-tree 检查（代码 commit 必须同时改 docs/DEVLOG.md；规则自 `e6a2a01` 起生效，旧 commit 豁免）+ 对应测试 `test_devlog_gate.py`
+- **L1 脚本小修**（P1-10）：run-scoped 不可变证据（`data/spike/trial-l1/<run-id>/`）；SH/SZ/BJ 轮转混合样本；event_stream_verdict 与 lifecycle_verdict 分离（unregister/stop 失败不再是整体 PASS）
+- **Spike Report 更新**（P1-12）：新框架用法（单 run 全阶段/`--resume`/verdict eligibility 输出）、run-scoped 证据目录、golden 最低数量矩阵、正式账号当天流程（含 `approve_from_spike_run`）
+- **B7 多日结构**（P1-08）：按 run 日历尾窗 5 日循环，逐日 rows/bytes/elapsed + first/cached pull 区分 + 真实 request/retry 计数（来自 provider envelopes）
+
+**Schema / Contract Changes**
+- 无新 migration
+
+**Verification**
+- pytest: **286 passed**（+7：approval 自证 5 + devlog gate 2）
+- ruff/format/mypy clean；dry-run 冒烟通过
+
+**Known Open Issues**
+- R3-P1-06/07（provider 内部 calendar 走 envelope + ProviderExchange 统一审计单元）→ 与 CR-1 RawWriter 一并（审计 §41 已列为 RawWriter 输入契约）
+- P1-04（Source Policy DB 不可变写路径）→ P0b 前完成（审计 §26 裁定）
+
+**Implementation Status**
+- DONE（R3 全部 P0 关闭；R3 状态：Formal-Spike Correctness = COMPLETE）
+
+**Review Status**
+- PENDING_REVIEW
+
+**Next**
+- CR-1：RawWriter + ProviderExchange/RawEnvelope 持久化（审计 §41；含 P1-06/07 一并解决）
+
+---
+
 ## 2026-08-22 23:50 · R3-0C + R3-1A/1B：语义 Validators + Golden Truth + 治理精确化
 
 **Scope**
