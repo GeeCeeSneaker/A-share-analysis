@@ -597,16 +597,14 @@ def validate_sdk_behavior_record(record: dict[str, Any] | None) -> ValidationOut
 class GoldenCase:
     """One golden case with EXTERNAL truth (audit R3 section 37 R3-0E).
 
-    R4-A1.1 hash model (audit sections 3-4):
-    - case_semantic_hash: SHA-256 over the claim semantics INCLUDING
-      case_type and source_artifact_hash (detects any edit, re-seal proof).
-    - source_artifact_hash: SHA-256 of a REAL external evidence artifact
-      (announcement PDF, rule book, exchange page snapshot). Empty while
-      COMPILED; REQUIRED for REVIEWED (P0-06).
-
-    R4-A1.1 event model (audit section 5):
-    - event_id/event_class identify the underlying market event; the
-      distinct-event gate counts events, never repeated dates.
+    R4-A2 evidence model (review sections 7-8):
+    - compiled_* / reviewed_* are SEPARATE provenance chains; a COMPILED
+      case never carries reviewer fields.
+    - source_artifact_ref/kind/retrieved_at: the verifiable external
+      evidence artifact; the review workflow hashes the REAL bytes.
+    - review_note: human reviewer's verification note.
+    - event_subtype: ST_ADD / ST_REMOVE / STAR_ST_ADD / STAR_ST_REMOVE
+      (the ST event gate requires both ADD>0 and REMOVE>0).
     """
 
     golden_case_id: str
@@ -618,12 +616,19 @@ class GoldenCase:
     expected_fields: dict[str, Any] = field(default_factory=dict)
     case_semantic_hash: str = ""
     source_artifact_hash: str = ""
+    source_artifact_ref: str = ""
+    source_artifact_kind: str = ""
+    source_retrieved_at: str = ""
     truth_version: str = ""
+    compiled_by: str = ""
+    compiled_at: str = ""
     reviewed_by: str = ""
     reviewed_at: str = ""
+    review_note: str = ""
     review_status: str = ""  # COMPILED | REVIEWED
     event_id: str = ""
     event_class: str = ""
+    event_subtype: str = ""
 
 
 def validate_golden_cases(

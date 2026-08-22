@@ -162,7 +162,7 @@ def resume_run(
         from ashare_state.spike.golden_store import GoldenTruthStore
 
         GoldenTruthStore().verify_binding(
-            truth_version=run.golden_truth_version, manifest_hash=run.golden_manifest_hash
+            truth_version=run.golden_truth_version, dataset_hash=run.golden_dataset_hash
         )
     return run
 
@@ -288,7 +288,7 @@ def new_run(
             raise RunLifecycleError(msg)
     # R4-P0-01/02: formal runs BIND the golden truth dataset at creation
     golden_truth_version = ""
-    golden_manifest_hash = ""
+    golden_dataset_hash = ""
     if run_kind in (RunKind.PRODUCTION, RunKind.TRIAL):
         from ashare_state.spike.golden_store import GoldenTruthStore
 
@@ -304,7 +304,7 @@ def new_run(
             )
             raise RunLifecycleError(msg)
         golden_truth_version = golden_manifest.truth_version
-        golden_manifest_hash = golden_manifest.dataset_hash
+        golden_dataset_hash = golden_manifest.dataset_hash
         _ = golden_cases
     run = SpikeRun(
         spike_run_id=str(uuid_module.uuid4()),
@@ -317,7 +317,7 @@ def new_run(
         account_profile_id=account_profile_id,
         as_of_date=as_of_date,
         golden_truth_version=golden_truth_version,
-        golden_manifest_hash=golden_manifest_hash,
+        golden_dataset_hash=golden_dataset_hash,
     )
     store = RunStore(spike_root)
     store.initialize(run)
@@ -450,7 +450,7 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
             golden_store = GoldenTruthStore()
             golden_store.verify_binding(
                 truth_version=run.golden_truth_version,
-                manifest_hash=run.golden_manifest_hash,
+                dataset_hash=run.golden_dataset_hash,
             )
             # R4-P0-01 + audit section 39: production verdicts need reviewed truth
             if run.run_kind == RunKind.PRODUCTION:

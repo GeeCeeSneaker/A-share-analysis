@@ -140,7 +140,8 @@ class TestReviewGate:
             json.dumps(active, indent=2), encoding="utf-8", newline="\n"
         )
         problems = GoldenTruthStore(golden_env).review_gate()
-        assert any("source_artifact_hash" in p for p in problems)
+        # v3 semantics: the artifact gate fires (ref/hash both mandatory)
+        assert any("source_artifact_ref" in p or "source_artifact_hash" in p for p in problems)
 
     def test_review_gate_uses_cases_not_manifest_claim(self):
         problems = GoldenTruthStore(REPO_GOLDEN).review_gate()
@@ -153,11 +154,11 @@ class TestEventCoverageGate:
         # 40 negative ROWS but only 8 distinct negative-sample events;
         # neither counts toward ST_CAP (which is honestly 2)
         assert manifest.distinct_events.get("NEGATIVE_SAMPLE", 0) == 8
-        assert manifest.distinct_events.get("ST_CAP", 0) == 2  # honest count
+        assert manifest.distinct_events.get("ST_TRANSITION", 0) == 2  # honest count
 
     def test_st_gate_requires_distinct_transition_events(self):
         problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
-        assert any("ST_CAP events 2 < 50" in p for p in problems)
+        assert any("ST_TRANSITION events 2 < 50" in p for p in problems)
 
     def test_delist_gate_requires_distinct_securities(self):
         problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
@@ -175,7 +176,7 @@ class TestEventCoverageGate:
             host="h",
             username="u",
         )
-        with pytest.raises(RunLifecycleError, match="distinct"):
+        with pytest.raises(RunLifecycleError, match="ST_TRANSITION|DELIST|distinct"):
             new_run(
                 run_kind=RunKind.PRODUCTION,
                 spike_root=tmp_path / "spike",
@@ -199,13 +200,13 @@ class TestLoaderSelection:
             json.dumps({"golden_case_id": "DECOY"}) + "\n", encoding="utf-8", newline="\n"
         )
         cases, manifest = GoldenTruthStore(golden_env).load()
-        assert manifest.dataset_file == "golden_cases_v2.jsonl"
+        assert manifest.dataset_file == "golden_cases_v3.jsonl"
         assert all(c.golden_case_id != "DECOY" for c in cases)
 
     def test_version_is_append_only(self):
         """P1-01: v1 dataset file still exists (never overwritten)."""
         assert (REPO_GOLDEN / "golden_cases_v1.jsonl").is_file()
-        assert (REPO_GOLDEN / "golden_cases_v2.jsonl").is_file()
+        assert (REPO_GOLDEN / "golden_cases_v3.jsonl").is_file()
 
 
 class TestSemanticConflictFix:

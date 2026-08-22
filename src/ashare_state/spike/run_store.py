@@ -64,6 +64,7 @@ class RunStore:
 
     def save_run(self, run: SpikeRun) -> None:
         path = self.run_dir(run) / "spike_run.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(run.to_json(), indent=2, ensure_ascii=False), encoding="utf-8")
 
     def load_run(self, spike_run_id: str, run_kind: RunKind) -> SpikeRun:
@@ -84,7 +85,9 @@ class RunStore:
             config_hash=payload.get("config_hash", ""),
             as_of_date=payload.get("as_of_date", ""),
             golden_truth_version=payload.get("golden_truth_version", ""),
-            golden_manifest_hash=payload.get("golden_manifest_hash", ""),
+            golden_dataset_hash=payload.get(
+                "golden_dataset_hash", payload.get("golden_manifest_hash", "")
+            ),
             case_catalog_hash=payload.get("case_catalog_hash", ""),
             started_at=payload.get("started_at", ""),
             ended_at=payload.get("ended_at"),

@@ -98,21 +98,34 @@ class TestDevlogGate:
         rule_since = "8d7d4aa"
         rev_list = subprocess.run(
             ["git", "rev-list", "main", "--max-count=200"],
-            cwd=REPO_ROOT, capture_output=True, text=True, check=True, timeout=30,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
         )
         offenders: list[str] = []
         for commit in rev_list.stdout.split():
             if commit.startswith(rule_since):
                 continue
-            is_after = subprocess.run(
-                ["git", "merge-base", "--is-ancestor", rule_since, commit],
-                cwd=REPO_ROOT, capture_output=True, timeout=30,
-            ).returncode == 0
+            is_after = (
+                subprocess.run(
+                    ["git", "merge-base", "--is-ancestor", rule_since, commit],
+                    cwd=REPO_ROOT,
+                    capture_output=True,
+                    timeout=30,
+                ).returncode
+                == 0
+            )
             if not is_after:
                 continue
             files = subprocess.run(
                 ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", commit],
-                cwd=REPO_ROOT, capture_output=True, text=True, check=True, timeout=30,
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30,
             ).stdout.splitlines()
             touches_contract = any(f.startswith(contract_prefixes) for f in files)
             touches_dm = any(f == "docs/project/DEVELOPMENT_MANAGEMENT.md" for f in files)

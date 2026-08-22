@@ -1617,6 +1617,29 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 > 新条目倒序追加，不删除历史。
 
+## DM-CR-20260822-003 — R4-A2 Golden Review / Domain Router / PIT Validator Contract（第一批）
+
+**Type**：C1 Contract Clarification  
+**Status**：IN_PROGRESS（第一批已落地：Evidence Closure + Review Workflow + 事件语义 + hash 更名；Router/PIT/BSE/BJ 进行中）  
+**Trigger**：R4-A1.1 复核 REOPENED Formal Truth Closure——source_artifact_hash 未真正绑定 Source Artifact。  
+**Old Contract**：REVIEWED 只检查 source_artifact_hash 非空（可手工填任意值）；event gate 只有 ST_CAP 单类；SpikeRun 字段名 golden_manifest_hash 存的是 dataset_hash。  
+**New Contract**：
+- **Review Workflow 是唯一 COMPILED→REVIEWED 路径**（`scripts/golden/review.py`）：reviewer 提供外部证据工件文件，workflow 自己读取 bytes 计算 SHA256 并复制入 evidence store（内容寻址）；**无 --hash 参数**（手工 hash 永远无法输入）
+- **Formal Review Gate**（review_gate）：每个 REVIEWED case 的 source_artifact_ref 必须 resolve 到 evidence 工件且 SHA256 与封存值一致，否则 REVIEW_INCOMPLETE
+- **Provenance 分离**：compiled_by/compiled_at 与 reviewed_by/reviewed_at 独立；COMPILED case 带 reviewer 字段即 load 失败
+- **事件语义**（§9/§10）：ST_TRANSITION + subtype（ST_ADD/ST_REMOVE/STAR_ST_ADD/STAR_ST_REMOVE），gate 要求 ≥50 distinct 且 ADD>0 且 REMOVE>0；DELIST 要求 distinct event ≥20 **AND** distinct symbol ≥20
+- **字段更名**（§11 方案 A）：SpikeRun.golden_manifest_hash → golden_dataset_hash（load 兼容旧 key）
+- 数据集 v3 candidate（compiled/reviewed 分离 + ST_TRANSITION 语义；诚实覆盖：ST_TRANSITION=2<50 无 REMOVE subtype、DELIST=10<20）  
+**Reason**：让"封存的 hash"从 Claim 变成可机器复验的 External Evidence。  
+**Affected Modules**：spike/golden_store、spike/validators、spike/model、spike/run_store、spike/runner、providers/amazingdata/capability、scripts/golden  
+**Affected Data**：data/golden/provider/amazingdata/（v3 ACTIVE；evidence/ 由 review workflow 产生）  
+**Compatibility**：GoldenCase 字段扩展；golden_dataset_hash 更名（legacy json key 兼容读取）。  
+**Migration / Backfill**：golden_cases_v3.jsonl。  
+**Tests**：313 passing（新增 test_golden_review_workflow：artifact 字节封存/无 hash 参数/重复 review 拒绝/缺失 artifact 拒绝/封存后篡改检测/ghost ref 检测/ST_REMOVE subtype gate/symbol 双门/更名兼容）。  
+**ADR**：Not Required（契约澄清）  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
 ## DM-CR-20260822-002 — Adopt R4-A1.1 Golden Truth Integrity Contract
 
 **Type**：C1 Contract Clarification  

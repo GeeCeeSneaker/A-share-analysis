@@ -81,7 +81,7 @@ class SpikeRun:
     as_of_date: str = ""  # R3-P1-09: the single run-wide as-of reference
     # R4-P0-02/12: golden binding + catalog seal (set at creation / close)
     golden_truth_version: str = ""
-    golden_manifest_hash: str = ""
+    golden_dataset_hash: str = ""
     case_catalog_hash: str = ""
     started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     ended_at: str | None = None
@@ -101,7 +101,7 @@ class SpikeRun:
             "config_hash": self.config_hash,
             "as_of_date": self.as_of_date,
             "golden_truth_version": self.golden_truth_version,
-            "golden_manifest_hash": self.golden_manifest_hash,
+            "golden_dataset_hash": self.golden_dataset_hash,
             "case_catalog_hash": self.case_catalog_hash,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
@@ -127,7 +127,7 @@ class SpikeRun:
             return False
         return not (
             self.run_kind == RunKind.PRODUCTION
-            and not (self.golden_truth_version and self.golden_manifest_hash)
+            and not (self.golden_truth_version and self.golden_dataset_hash)
         )
 
 

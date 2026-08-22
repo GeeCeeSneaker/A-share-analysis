@@ -13,6 +13,43 @@
 
 ---
 
+## 2026-08-22 18:00 +08:00 · R4-A2 第一批：Golden Review Evidence Closure
+
+**Scope**
+- R4-A2 §5-11（复核 REOPENED 的 Formal Truth Closure）+ Track B CR-1 接收
+
+**Implementation**
+- **Review Workflow**（`scripts/golden/review.py`）：唯一 COMPILED→REVIEWED 路径——reviewer 只提供外部证据工件文件，workflow 读取真实 bytes 计算 SHA256、内容寻址存入 `evidence/`、封存 ref/kind/retrieved_at 并重封 semantic hash；**CLI 无 --hash 参数**（§6"不允许手工填 hash"落地为接口事实）；支持 --manifest 批量与 --expect-fields 修正
+- **Formal Review Gate**：`review_gate()` 对每个 REVIEWED case resolve artifact → bytes → SHA256 == sealed hash，否则 REVIEW_INCOMPLETE；封存后篡改工件 / ghost ref 均被拦截（测试覆盖）
+- **Provenance 分离**（§7）：compiled_*/reviewed_* 独立字段；COMPILED case 带 reviewer 字段在 load 即失败
+- **事件语义**（§9/§10）：event_class=ST_TRANSITION + subtype（ST_ADD/ST_REMOVE/STAR_ST_ADD/STAR_ST_REMOVE）；gate = ≥50 distinct + ADD>0 + REMOVE>0；DELIST = distinct event ≥20 AND distinct symbol ≥20
+- **字段更名**（§11 方案 A）：SpikeRun.golden_dataset_hash（run_store/model 兼容 legacy key 读取）
+- Dataset v3 candidate（compiled/reviewed 分离 + 新事件语义）；诚实覆盖不变（ST_TRANSITION=2<50 无 REMOVE、DELIST=10<20）——review workflow 是补齐的唯一路径
+
+**Schema / Contract Changes**
+- GoldenCase：+source_artifact_ref/kind/retrieved_at、+compiled_by/at、+review_note、+event_subtype
+- SpikeRun：golden_manifest_hash → golden_dataset_hash（C1，DM-CR-003 记录）
+- run_store.save_run 补 mkdir（latent bug 顺带修复）
+
+**Verification**
+- pytest: **313 passed**（+11 review workflow 契约测试；Local validation）
+- ruff/format/mypy clean；review workflow 端到端 smoke 通过
+
+**Implementation Status**
+- DONE（R4-A2 第一批：Evidence Closure + 事件语义 + 更名）
+
+**Review Status**
+- PENDING_REVIEW
+
+**Known Open Issues**
+- R4-A2 剩余：Domain Router / PIT Limit Rule（Decimal ROUND_HALF_UP）/ B3 删现场假设 / History fixtures / BSE·BJ 独立证据
+- CR-1（ProviderExchange + RawWriter）未开始
+
+**Next**
+- R4-A2 第二批（Router + PIT）与 CR-1 并行
+
+---
+
 ## 2026-08-22 16:30 +08:00 · Management 批次修正 + R4-A2/CR-1 任务接收
 
 **Scope**

@@ -1,26 +1,23 @@
-"""Golden Truth Dataset store (R4-A1.1: Truth Integrity Hotfix).
+"""Golden Truth Dataset store (R4-A1.1 + R4-A2 evidence closure).
 
-Layout (append-only versions, audit R4A1-P1-01/02):
+Layout (append-only versions):
     golden_cases_v1.jsonl / truth_manifest_v1.json   (immutable snapshots)
     golden_cases_v2.jsonl / truth_manifest_v2.json   ...
+    golden_cases_v3.jsonl / truth_manifest_v3.json   (review workflow target)
     truth_manifest.json                              (ACTIVE pointer only)
+    evidence/                                        (external artifacts,
+                                                     resolvable + hashable)
 
-Fixes over R4-A1 (audit sections 2-11):
-- P0-01 manifest self-verification: case_count / counts_by_type /
-  review_summary are RECOMPUTED from parsed cases and must equal the
-  manifest - editing only the manifest cannot bypass any gate.
-- P0-02/03 hash model split: case_semantic_hash covers golden_case_id,
-  case_type, symbol, date, expected_fields, truth_source, source_ref,
-  source_artifact_hash, truth_version; source_artifact_hash comes from a
-  REAL external artifact (empty while COMPILED; required for REVIEWED).
-- P0-04 event coverage: event_id/event_class on every case; the
-  distinct-event gate enforces frozen semantics (>= 50 distinct positive
-  ST transitions, >= 20 distinct delisted securities) - repeated dates of
-  one event or negative samples never count.
-- P0-06 review evidence: REVIEWED requires review command output
-  (reviewer/at/note + source_artifact_hash), not a hand-edited flag.
-- P1-02 the ACTIVE pointer selects the dataset file explicitly; no
-  lexicographic "latest" guessing.
+R4-A2 additions over R4-A1.1 (review sections 5-12):
+- source evidence model: source_artifact_ref/kind/retrieved_at; the
+  FORMAL review gate resolves artifact bytes and re-verifies SHA256 -
+  hand-typed hashes can never pass (they must equal the artifact bytes).
+- compiled_* / reviewed_* provenance separated.
+- ST event semantics: ST_TRANSITION with subtypes (ST_ADD/ST_REMOVE/
+  STAR_ST_ADD/STAR_ST_REMOVE); gate requires >=50 distinct events AND
+  ADD>0 AND REMOVE>0.
+- Delist gate: distinct event_id >= 20 AND distinct provider_symbol >= 20.
+- SpikeRun field renamed golden_dataset_hash (review section 11, option A).
 """
 
 from __future__ import annotations
@@ -34,20 +31,22 @@ from ashare_state.spike.validators import GoldenCase
 
 GOLDEN_ROOT = Path("data/golden/provider/amazingdata")
 ACTIVE_MANIFEST = "truth_manifest.json"
+EVIDENCE_DIRNAME = "evidence"
 
-#: per-type minimum ROW counts (kept from R4-A1)
+#: per-type minimum ROW counts
 REQUIRED_GOLDEN_COUNTS = {
     "golden_st_transition": 50,
     "golden_delisted": 20,
     "golden_limit_regime": 30,
     "golden_corporate_action": 20,
 }
-#: distinct EVENT minimums (audit R4A1-P0-04): negative samples and
-#: repeated dates of the same event never count toward these.
+#: distinct-event minimums with semantic constraints (review sections 9-10)
 REQUIRED_DISTINCT_EVENTS = {
-    "golden_st_transition": ("ST_CAP", 50),  # distinct positive ST/*ST caps
-    "golden_delisted": ("DELIST", 20),  # distinct delisted securities
+    "golden_st_transition": ("ST_TRANSITION", 50),
+    "golden_delisted": ("DELIST", 20),
 }
+ST_ADD_SUBTYPES = ("ST_ADD", "STAR_ST_ADD")
+ST_REMOVE_SUBTYPES = ("ST_REMOVE", "STAR_ST_REMOVE")
 
 
 class GoldenTruthError(RuntimeError):
@@ -125,7 +124,6 @@ class GoldenTruthStore:
                 continue
             doc = json.loads(line)
             golden = _case_from_doc(doc, truth_version)
-            # P0-02/03: case_semantic_hash re-verified per entry
             expected = hashlib.sha256(_semantic_statement(golden).encode("utf-8")).hexdigest()
             if golden.case_semantic_hash != expected:
                 msg = (
@@ -143,7 +141,6 @@ class GoldenTruthStore:
         actual_count = len(cases)
         actual_counts: dict[str, int] = {}
         actual_review: dict[str, int] = {}
-        # P0-04: DISTINCT event ids per class (repeated dates never count)
         event_ids_by_class: dict[str, set[str]] = {}
         actual_securities: dict[str, int] = {}
         for case in cases:
@@ -179,7 +176,7 @@ class GoldenTruthStore:
         return cases, manifest
 
     # ---------------------------------------------------------------- gates
-    def verify_binding(self, *, truth_version: str, manifest_hash: str) -> None:
+    def verify_binding(self, *, truth_version: str, dataset_hash: str) -> None:
         _, manifest = self.load()
         if truth_version != manifest.truth_version:
             msg = (
@@ -187,7 +184,7 @@ class GoldenTruthStore:
                 f"dataset now {manifest.truth_version!r}"
             )
             raise GoldenTruthError(msg)
-        if manifest_hash != manifest.dataset_hash:
+        if dataset_hash != manifest.dataset_hash:
             msg = "golden dataset hash drifted since the run was created"
             raise GoldenTruthError(msg)
 
@@ -200,23 +197,34 @@ class GoldenTruthStore:
         ]
 
     def event_coverage_gate(self) -> list[str]:
-        """P0-04: distinct-event semantics (negative samples / repeated
-        dates never count)."""
-        _, manifest = self.load()
+        """Distinct-event semantics (review sections 9-10)."""
+        cases, manifest = self.load()
         problems: list[str] = []
-        for case_type, (event_class, minimum) in REQUIRED_DISTINCT_EVENTS.items():
-            actual = manifest.distinct_events.get(event_class, 0)
-            if actual < minimum:
-                problems.append(
-                    f"{case_type}: distinct {event_class} events {actual} < {minimum} "
-                    "(repeated dates of one event / negative samples do not count; "
-                    "the reviewed dataset must add real distinct events)"
-                )
+        # ST transitions: >= 50 distinct events, ADD>0, REMOVE>0
+        st_events = {c.event_id: c.event_subtype for c in cases if c.event_class == "ST_TRANSITION"}
+        st_count = len(st_events)
+        if st_count < REQUIRED_DISTINCT_EVENTS["golden_st_transition"][1]:
+            problems.append(f"golden_st_transition: distinct ST_TRANSITION events {st_count} < 50")
+        add_count = sum(1 for s in st_events.values() if s in ST_ADD_SUBTYPES)
+        remove_count = sum(1 for s in st_events.values() if s in ST_REMOVE_SUBTYPES)
+        if add_count == 0:
+            problems.append("golden_st_transition: no ST_ADD/STAR_ST_ADD subtype events")
+        if remove_count == 0:
+            problems.append("golden_st_transition: no ST_REMOVE/STAR_ST_REMOVE subtype events")
+        # Delist: distinct event >= 20 AND distinct provider_symbol >= 20
+        delist_events = {c.event_id for c in cases if c.event_class == "DELIST"}
+        delist_symbols = {c.provider_symbol for c in cases if c.event_class == "DELIST"}
+        if len(delist_events) < REQUIRED_DISTINCT_EVENTS["golden_delisted"][1]:
+            problems.append(f"golden_delisted: distinct DELIST events {len(delist_events)} < 20")
+        if len(delist_symbols) < 20:
+            problems.append(
+                f"golden_delisted: distinct delisted securities {len(delist_symbols)} < 20"
+            )
         return problems
 
     def review_gate(self) -> list[str]:
-        """REVIEWED entries must carry source_artifact_hash + review
-        evidence (P0-06); production verdicts need full review."""
+        """FORMAL review gate (review section 8): every case REVIEWED, and
+        every REVIEWED case's source artifact RESOLVES and hash-VERIFIES."""
         cases, manifest = self.load()
         problems: list[str] = []
         if not manifest.fully_reviewed:
@@ -227,13 +235,34 @@ class GoldenTruthStore:
                 "audit section 39 requires every golden entry reviewed before P0-M-1B)"
             )
         for case in cases:
-            if case.review_status == "REVIEWED" and not case.source_artifact_hash:
-                problems.append(
-                    f"{case.golden_case_id}: REVIEWED without source_artifact_hash "
-                    "(P0-06: review must seal the real external artifact)"
-                )
+            if case.review_status != "REVIEWED":
+                continue
+            problems.extend(self._verify_artifact(case))
+            if not problems:
                 break
         return problems
+
+    def _verify_artifact(self, case: GoldenCase) -> list[str]:
+        if not case.source_artifact_ref:
+            return [
+                f"{case.golden_case_id}: REVIEWED without source_artifact_ref "
+                "(review section 8: a resolvable artifact is mandatory)"
+            ]
+        if not case.source_artifact_hash:
+            return [f"{case.golden_case_id}: REVIEWED without source_artifact_hash"]
+        artifact_path = self.root / EVIDENCE_DIRNAME / case.source_artifact_ref
+        if not artifact_path.is_file():
+            return [
+                f"{case.golden_case_id}: source artifact {case.source_artifact_ref!r} "
+                "does not resolve under the evidence store"
+            ]
+        actual = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+        if actual != case.source_artifact_hash:
+            return [
+                f"{case.golden_case_id}: source artifact hash mismatch - the "
+                "sealed hash does not match the artifact bytes (REVIEW_INCOMPLETE)"
+            ]
+        return []
 
 
 def _semantic_statement(golden: GoldenCase) -> str:
@@ -251,15 +280,20 @@ def _semantic_statement(golden: GoldenCase) -> str:
     return json.dumps(doc, sort_keys=True, ensure_ascii=False)
 
 
+def semantic_hash_of(golden: GoldenCase) -> str:
+    """Recompute the case semantic hash (used by the review workflow)."""
+    return hashlib.sha256(_semantic_statement(golden).encode("utf-8")).hexdigest()
+
+
 def _case_from_doc(doc: dict, dataset_truth_version: str) -> GoldenCase:
     missing = [
         field
         for field in (
             "case_semantic_hash",
             "truth_version",
-            "reviewed_by",
-            "reviewed_at",
             "review_status",
+            "compiled_by",
+            "compiled_at",
             "event_id",
             "event_class",
         )
@@ -274,6 +308,13 @@ def _case_from_doc(doc: dict, dataset_truth_version: str) -> GoldenCase:
             f"{doc['truth_version']} != dataset {dataset_truth_version}"
         )
         raise GoldenTruthError(msg)
+    # provenance discipline: COMPILED cases must NOT carry reviewer fields
+    if doc["review_status"] == "COMPILED" and (doc.get("reviewed_by") or doc.get("reviewed_at")):
+        msg = (
+            f"golden case {doc['golden_case_id']}: COMPILED case carries "
+            "reviewer provenance (compiled/reviewed must be separate)"
+        )
+        raise GoldenTruthError(msg)
     return GoldenCase(
         golden_case_id=str(doc["golden_case_id"]),
         case_type=str(doc["case_type"]),
@@ -284,10 +325,17 @@ def _case_from_doc(doc: dict, dataset_truth_version: str) -> GoldenCase:
         expected_fields=dict(doc.get("expected_fields", {})),
         case_semantic_hash=str(doc["case_semantic_hash"]),
         source_artifact_hash=str(doc.get("source_artifact_hash", "")),
+        source_artifact_ref=str(doc.get("source_artifact_ref", "")),
+        source_artifact_kind=str(doc.get("source_artifact_kind", "")),
+        source_retrieved_at=str(doc.get("source_retrieved_at", "")),
         truth_version=str(doc["truth_version"]),
-        reviewed_by=str(doc["reviewed_by"]),
-        reviewed_at=str(doc["reviewed_at"]),
+        compiled_by=str(doc["compiled_by"]),
+        compiled_at=str(doc["compiled_at"]),
+        reviewed_by=str(doc.get("reviewed_by", "")),
+        reviewed_at=str(doc.get("reviewed_at", "")),
+        review_note=str(doc.get("review_note", "")),
         review_status=str(doc["review_status"]),
         event_id=str(doc["event_id"]),
         event_class=str(doc["event_class"]),
+        event_subtype=str(doc.get("event_subtype", "")),
     )

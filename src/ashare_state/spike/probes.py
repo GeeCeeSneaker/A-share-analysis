@@ -482,7 +482,7 @@ def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     return {
         "golden_cases": len(golden_cases),
         "golden_truth_version": golden_manifest.truth_version,
-        "golden_manifest_hash": golden_manifest.dataset_hash[:16],
+        "golden_dataset_hash": golden_manifest.dataset_hash[:16],
         "results": results,
     }
 
