@@ -1,0 +1,26 @@
+{
+  "truth_version": "v1-compiled-20260822",
+  "provider": "amazingdata",
+  "case_count": 123,
+  "counts_by_type": {
+    "golden_st_transition": 50,
+    "golden_delisted": 20,
+    "golden_limit_regime": 30,
+    "golden_corporate_action": 20,
+    "golden_bj_mapping": 3
+  },
+  "required_minimums": {
+    "golden_st_transition": 50,
+    "golden_delisted": 20,
+    "golden_limit_regime": 30,
+    "golden_corporate_action": 20
+  },
+  "manifest_hash": "b19b807612ca20436aeb766ba216ff47880c9ed6bd5843e446e547841612c1c8",
+  "review_summary": {
+    "COMPILED": 123,
+    "REVIEWED": 0
+  },
+  "compiled_by": "ai-compile-v1",
+  "compiled_at": "2026-08-22T00:00:00+00:00",
+  "note": "All entries COMPILED (machine-compiled from public market facts). The PRODUCTION verdict gate requires every entry human-reviewed (review_status=REVIEWED) before P0-M-1B; review corrects/removes entries and bumps the truth version."
+}

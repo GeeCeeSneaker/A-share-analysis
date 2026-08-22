@@ -69,11 +69,30 @@ def _replace(run: SpikeRun, **changes: Any) -> SpikeRun:
 
 
 def close_run(store: RunStore, run: SpikeRun) -> SpikeRun:
-    """RUNNING -> CLOSED (all requested phases executed). Terminal."""
+    """RUNNING -> CLOSED (all requested phases executed). Terminal.
+
+    R4-P0-12: sealing the case catalog - the closed catalog is an
+    IMMUTABLE artifact. case_catalog_hash is computed from the catalog
+    bytes and stored on the run; the verdict re-computes and exact-matches
+    it, so post-close edits (FAIL->PASS, expected_value, validator_id,
+    equivalent_pass) block the verdict.
+    """
     if run.status != RunStatus.RUNNING.value:
         msg = f"run {run.spike_run_id} is {run.status}; only RUNNING runs close"
         raise RunLifecycleError(msg)
-    closed = _replace(run, status=RunStatus.CLOSED.value, ended_at=_now())
+    catalog_path = store.run_dir(run) / "cases" / "spike_case_catalog.jsonl"
+    if not catalog_path.is_file():
+        # an empty run still seals an (empty) catalog: closed-run immutability
+        # holds uniformly; verdicts over empty runs are SPIKE_INCOMPLETE
+        catalog_path.parent.mkdir(parents=True, exist_ok=True)
+        catalog_path.write_bytes(b"")
+    catalog_hash = hashlib.sha256(catalog_path.read_bytes()).hexdigest()
+    closed = _replace(
+        run,
+        status=RunStatus.CLOSED.value,
+        ended_at=_now(),
+        case_catalog_hash=catalog_hash,
+    )
     store.save_run(closed)
     return closed
 
@@ -138,6 +157,13 @@ def resume_run(
             f"{mismatches} - open a NEW run instead"
         )
         raise RunLifecycleError(msg)
+    # R4-P0-02: golden binding must still hold on resume
+    if run.golden_truth_version:
+        from ashare_state.spike.golden_store import GoldenTruthStore
+
+        GoldenTruthStore().verify_binding(
+            truth_version=run.golden_truth_version, manifest_hash=run.golden_manifest_hash
+        )
     return run
 
 
@@ -260,6 +286,24 @@ def new_run(
         if not environment_lock_hash or not config_hash:
             msg = "PRODUCTION runs require environment_lock_hash and config_hash"
             raise RunLifecycleError(msg)
+    # R4-P0-01/02: formal runs BIND the golden truth dataset at creation
+    golden_truth_version = ""
+    golden_manifest_hash = ""
+    if run_kind in (RunKind.PRODUCTION, RunKind.TRIAL):
+        from ashare_state.spike.golden_store import GoldenTruthStore
+
+        golden_store = GoldenTruthStore()
+        golden_cases, golden_manifest = golden_store.load()
+        missing = golden_store.quantity_gate()
+        if run_kind is RunKind.PRODUCTION and missing:
+            msg = (
+                "PRODUCTION run refused: golden dataset quantities incomplete: "
+                f"{missing} (audit R4-P0-01)"
+            )
+            raise RunLifecycleError(msg)
+        golden_truth_version = golden_manifest.truth_version
+        golden_manifest_hash = golden_manifest.manifest_hash
+        _ = golden_cases
     run = SpikeRun(
         spike_run_id=str(uuid_module.uuid4()),
         run_kind=run_kind,
@@ -270,6 +314,8 @@ def new_run(
         runtime_version=runtime_version,
         account_profile_id=account_profile_id,
         as_of_date=as_of_date,
+        golden_truth_version=golden_truth_version,
+        golden_manifest_hash=golden_manifest_hash,
     )
     store = RunStore(spike_root)
     store.initialize(run)
@@ -380,6 +426,36 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
     closure = verify_evidence_closure(store, run, catalog)
     blocking.extend(closure)
 
+    # R4-P0-12: catalog seal - recompute the closed catalog's hash and
+    # exact-match it; post-close edits block the verdict
+    catalog_path = store.run_dir(run) / "cases" / "spike_case_catalog.jsonl"
+    if not run.case_catalog_hash:
+        blocking.append("R4-P0-12: run has no case_catalog_hash (not sealed at close)")
+    elif catalog_path.is_file():
+        import hashlib as _hashlib
+
+        actual = _hashlib.sha256(catalog_path.read_bytes()).hexdigest()
+        if actual != run.case_catalog_hash:
+            blocking.append(
+                "R4-P0-12: case catalog hash mismatch - the closed catalog "
+                "was edited (closed catalogs are immutable artifacts)"
+            )
+    # R4-P0-02: golden binding re-verification
+    if run.golden_truth_version:
+        from ashare_state.spike.golden_store import GoldenTruthStore
+
+        try:
+            golden_store = GoldenTruthStore()
+            golden_store.verify_binding(
+                truth_version=run.golden_truth_version,
+                manifest_hash=run.golden_manifest_hash,
+            )
+            # R4-P0-01 + audit section 39: production verdicts need reviewed truth
+            if run.run_kind == RunKind.PRODUCTION:
+                blocking.extend(golden_store.review_gate())
+        except Exception as exc:  # noqa: BLE001 - integrity error blocks the verdict
+            blocking.append(f"golden truth binding violated: {exc}")
+
     capability_status: dict[str, str] = {}
     missing_core: list[str] = []
     failed_core: list[str] = []
@@ -434,11 +510,12 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
 
 
 def _capability_status_from_cases(cap: SpikeCapabilityDefinition, cases: list[Any]) -> str:
-    """Per-capability verdict from RAW cases (R3-P0-04/05).
+    """Per-capability verdict from RAW cases (R3-P0-04/05 + R4-P0-04).
 
     - any VALIDATED_FAIL -> FAILED (fail dominates pass)
     - DIFF_EXPLAINED counts toward valid cases ONLY with equivalent_pass
-    - valid-case count < min_valid_cases -> SPIKE_INCOMPLETE
+    - EVERY required case type must reach its OWN minimum count
+      (required_case_counts); total volume can never substitute
     - required case type absent -> MISSING
     """
     required_types = set(cap.required_case_types)
@@ -447,11 +524,17 @@ def _capability_status_from_cases(cap: SpikeCapabilityDefinition, cases: list[An
         return "MISSING"
     if any(c.result is CaseResult.VALIDATED_FAIL for c in relevant):
         return "FAILED"
-    valid = [
-        c for c in relevant if core_gate_satisfied(c.result, equivalent_pass=c.equivalent_pass)
-    ]
-    if len(valid) < cap.min_valid_cases:
-        return "SPIKE_INCOMPLETE"
+    valid_by_type: dict[str, int] = {}
+    for case_type in cap.required_case_types:
+        valid_by_type[case_type] = sum(
+            1
+            for c in relevant
+            if c.case_type == case_type
+            and core_gate_satisfied(c.result, equivalent_pass=c.equivalent_pass)
+        )
+    for case_type, minimum in cap.required_case_counts.items():
+        if valid_by_type.get(case_type, 0) < minimum:
+            return "SPIKE_INCOMPLETE"
     return "PASS"
 
 

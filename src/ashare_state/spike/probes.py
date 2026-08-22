@@ -437,17 +437,17 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
 
 
 def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
-    """Golden pipeline (R3-P0-12/13): the built-in golden cases carry
-    EXTERNAL truth; each is looked up in provider status data and compared
-    field-by-field. Golden case types now FEED THE CORE GATE
-    (golden_st_transition / golden_delisted / golden_limit_regime /
-    golden_corporate_action)."""
-    from ashare_state.spike.golden_truth import BUILTIN_GOLDEN_CASES
+    """Golden pipeline (R3-P0-12/13 + R4-P0-01/02): the VERSIONED golden
+    dataset (data/golden/..., sealed source_hash per entry) carries the
+    EXTERNAL truth; each case is looked up in provider status data and
+    compared field-by-field. Golden case types FEED THE CORE GATE."""
+    from ashare_state.spike.golden_store import GoldenTruthStore
 
+    golden_cases, golden_manifest = GoldenTruthStore().load()
     executor = ProbeExecutor(ctx)
     # one provider call covering all golden symbols/dates (status supports
     # date ranges; per-case dates fall back to individual calls below)
-    golden_symbols = sorted({c.provider_symbol for c in BUILTIN_GOLDEN_CASES})
+    golden_symbols = sorted({c.provider_symbol for c in golden_cases})
     payload, meta = executor.call(
         "InfoData.get_history_stock_status",
         "golden_status",
@@ -460,9 +460,9 @@ def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     if payload is None:
         return {"result": "NOT_TESTABLE"}
     rows = _to_plain(_rows_of(payload))
-    outcomes = validators.validate_golden_cases(list(BUILTIN_GOLDEN_CASES), rows)
+    outcomes = validators.validate_golden_cases(list(golden_cases), rows)
     results: dict[str, int] = {}
-    for case, outcome in zip(BUILTIN_GOLDEN_CASES, outcomes, strict=True):
+    for case, outcome in zip(golden_cases, outcomes, strict=True):
         ctx.case(
             case_id=case.golden_case_id,
             case_type=case.case_type,
@@ -480,7 +480,9 @@ def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         )
         results[str(outcome.result)] = results.get(str(outcome.result), 0) + 1
     return {
-        "golden_cases": len(BUILTIN_GOLDEN_CASES),
+        "golden_cases": len(golden_cases),
+        "golden_truth_version": golden_manifest.truth_version,
+        "golden_manifest_hash": golden_manifest.manifest_hash[:16],
         "results": results,
     }
 

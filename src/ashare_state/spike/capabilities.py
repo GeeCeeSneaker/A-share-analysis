@@ -1,9 +1,8 @@
 """Spike capability definitions: Gate Contract == Probe Contract (R2 §8).
 
-Every core capability declares the case types its verdict REQUIRES; the
-verdict first checks coverage == 100%. Missing coverage is
-SPIKE_INCOMPLETE (not NO_GO); NO_GO is reserved for "adequately verified
-and genuinely failed".
+R4-P0-04: every required case type has its OWN minimum count
+(required_case_counts) - total volume can never substitute for a missing
+type. The verdict checks each type's valid count individually.
 """
 
 from __future__ import annotations
@@ -16,7 +15,8 @@ class SpikeCapabilityDefinition:
     capability_id: str
     core: bool  # core capabilities gate P0a
     required_case_types: tuple[str, ...]
-    min_valid_cases: int = 1
+    #: per-type minimum VALIDATED (or equivalent) case counts (R4-P0-04)
+    required_case_counts: dict[str, int]
     validator_id: str = ""
     blocking_rule: str = "CORE_FAIL_BLOCKS_P0A"  # informational
     description: str = ""
@@ -26,9 +26,8 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
     SpikeCapabilityDefinition(
         capability_id="security_master_with_delisted",
         core=True,
-        # R3-P0-13: golden delisted cases are REQUIRED for the core gate
         required_case_types=("security_master_with_delisted", "golden_delisted"),
-        min_valid_cases=20,  # 20 delisted golden cases (task book 7.1A)
+        required_case_counts={"security_master_with_delisted": 1, "golden_delisted": 20},
         validator_id="security_master_delisted_v1",
         description="master must contain delisted securities (survivorship)",
     ),
@@ -36,7 +35,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="daily_bar_units",
         core=True,
         required_case_types=("daily_bar_units",),
-        min_valid_cases=1,
+        required_case_counts={"daily_bar_units": 1},
         validator_id="daily_bar_units_v2",
         description="volume/amount units verified between independent sources",
     ),
@@ -44,7 +43,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="historical_st_suspend",
         core=True,
         required_case_types=("historical_st_suspend", "golden_st_transition"),
-        min_valid_cases=50,  # 50 ST cap/removal golden cases
+        required_case_counts={"historical_st_suspend": 1, "golden_st_transition": 50},
         validator_id="st_suspend_v2",
         description="daily ST/suspension semantics correct vs golden facts",
     ),
@@ -52,7 +51,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="limit_price_and_no_limit_days",
         core=True,
         required_case_types=("limit_price_and_no_limit_days", "golden_limit_regime"),
-        min_valid_cases=30,  # 30 limit-regime golden cases
+        required_case_counts={"limit_price_and_no_limit_days": 1, "golden_limit_regime": 30},
         validator_id="limit_rule_v2",
         description="limit prices match the exchange regime (board rates)",
     ),
@@ -63,7 +62,10 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
             "adj_factor_corporate_action_continuity",
             "golden_corporate_action",
         ),
-        min_valid_cases=20,  # 20 corporate-action golden cases
+        required_case_counts={
+            "adj_factor_corporate_action_continuity": 1,
+            "golden_corporate_action": 20,
+        },
         validator_id="adj_continuity_v2",
         description="adj factor + corporate action price continuity",
     ),
@@ -71,15 +73,15 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="history_start_2018_plus_warmup",
         core=True,
         required_case_types=("history_start_2018_plus_warmup",),
-        min_valid_cases=1,
+        required_case_counts={"history_start_2018_plus_warmup": 1},
         validator_id="history_coverage_v1",
         description="history depth covers 2018 + warmup to 2014/2015",
     ),
     SpikeCapabilityDefinition(
         capability_id="symbol_mapping_unambiguous",
         core=True,
-        required_case_types=("symbol_mapping_unambiguous",),
-        min_valid_cases=1,
+        required_case_types=("symbol_mapping_unambiguous", "golden_bj_mapping"),
+        required_case_counts={"symbol_mapping_unambiguous": 1, "golden_bj_mapping": 1},
         validator_id="symbol_mapping_v2",
         description="provider symbol mapping unambiguous incl. BJ old/new codes",
     ),
@@ -87,7 +89,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="sdk_permission_cache_freshness",
         core=True,
         required_case_types=("sdk_permission_cache_freshness",),
-        min_valid_cases=1,
+        required_case_counts={"sdk_permission_cache_freshness": 1},
         validator_id="sdk_behavior_v2",
         description="SDK permission/cache/freshness behavior recorded & verified",
     ),
@@ -98,6 +100,7 @@ OPTIONAL_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="free_float_equivalence",
         core=False,
         required_case_types=("free_float_equivalence",),
+        required_case_counts={"free_float_equivalence": 1},
         validator_id="free_float_equivalence_v1",
         description="four-level equivalence vs Tushare free_share semantics",
     ),
@@ -105,6 +108,7 @@ OPTIONAL_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="sw_taxonomy",
         core=False,
         required_case_types=("sw_taxonomy",),
+        required_case_counts={"sw_taxonomy": 1},
         validator_id="taxonomy_owner_v1",
         description="industry taxonomy owner identified (SW vs GALAXY)",
     ),
@@ -112,6 +116,7 @@ OPTIONAL_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="benchmark_index_availability",
         core=False,
         required_case_types=("benchmark_index_availability",),
+        required_case_counts={"benchmark_index_availability": 1},
         validator_id="benchmark_index_v1",
         description="benchmark index daily bars available",
     ),
@@ -119,6 +124,7 @@ OPTIONAL_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="capacity_backfill",
         core=False,
         required_case_types=("capacity_backfill",),
+        required_case_counts={"capacity_backfill": 1},
         validator_id="capacity_v1",
         description="ALL_A x 1 month capacity/backfill metrics (R2 section 9)",
     ),

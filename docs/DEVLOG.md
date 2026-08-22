@@ -8,6 +8,42 @@
 
 ---
 
+## 2026-08-23 02:30 · R4-A1：Golden Truth Dataset v1 + Per-Type Gate + Catalog Seal
+
+**Scope**
+- 第四轮审计 §1-5/12（R4-P0-01/02/03/04/12）+ §29.1-5
+
+**Implementation**
+- **Golden Dataset v1**（`data/golden/provider/amazingdata/`，入库）：123 条 = ST 50（2 个已验证 ST 加帽事件 × 日期状态采样 + 8 蓝筹 × 5 日期负样本）+ 退市 20（10 个已验证退市 × 2 远期状态日期）+ 涨跌停制度 30（板块×时期制度矩阵：主板 10%/ST 5%/创业板改革前后 10%→20%/科创板 20%/首 5 日无涨跌/北交所 30%/主板新股首日 44%）+ 除权除息 20（10 蓝筹 × 2 年）+ BJ 映射 3；每条全字段（source_hash/truth_version/reviewed_by/reviewed_at/review_status）
+- **GoldenTruthStore**：加载即校验（每条 source_hash 重算 + manifest hash 复验 + 数量 gate + review gate）；verify_binding 供 resume/verdict 复验
+- **R4-P0-04 per-type gate**：`required_case_counts` 替代 `min_valid_cases`（golden_st_transition≥50 等逐类型检查，总量永不能替代类型）
+- **R4-P0-12 catalog seal**：close_run 计算 `case_catalog_hash`（cases/ 子目录）；verdict 重算 exact match——closed catalog 篡改（FAIL→PASS）阻断 verdict
+- **R4-P0-02 golden 绑定**：PRODUCTION/TRIAL run 创建时绑定 truth_version + manifest_hash（数量不足拒绝开 PRODUCTION run）；resume 复验；PRODUCTION verdict 加 review gate（v1 全 COMPILED → P0-M-1B 前必须人工 review，§39 checklist 落地为代码）
+- **R4-P0-03 语义冲突清理**：seed 中 ST removal/IS_ST 矛盾与 STAR 混合表达移除；v1 数据集断言无同类矛盾（有测试）
+- B4 golden 探针改读 GoldenTruthStore（123 case 全量比对）；golden_truth.py 降级为 validator 单测 seed
+
+**Honesty Notes**
+- v1 全部标 `review_status=COMPILED`（机器编译）：高置信结构事实为主，具体除息日期等中置信条目依赖正式 run 前人工 review（review gate 强制）——不编造确定性，用版本化流程收敛
+
+**Verification**
+- pytest: **297 passed**（+11：dataset 完整性/篡改检测/review gate/run 绑定/catalog seal/语义冲突）
+- ruff/format/mypy clean；dry-run：123 golden case 全链路（truth_version + manifest hash 绑定输出）
+
+**Known Open Issues**
+- R4-A2（adj price context/B3 去现场假设/limit PIT+Decimal/history 固定样本/B2 BSE/BJ mapping 验证）
+- R4-A3（SDK 拆分/Early Stop/auth failure state）、R4-B1/B2、R4-CI
+
+**Implementation Status**
+- DONE（R4-A1）
+
+**Review Status**
+- PENDING_REVIEW
+
+**Next**
+- R4-A2：语义修复批
+
+---
+
 ## 2026-08-23 00:40 · R3 收尾批：Approval 自证 + DEVLOG CI Gate + L1/Report/B7 收口
 
 **Scope**

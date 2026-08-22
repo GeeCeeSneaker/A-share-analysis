@@ -35,6 +35,16 @@ def spike_root(tmp_path: Path) -> Path:
     return tmp_path / "spike"
 
 
+@pytest.fixture(autouse=True)
+def _golden_review_gate_relaxed(monkeypatch):
+    """Aggregation-semantics tests must not depend on the (real) golden
+    dataset's review status - the review gate has dedicated tests in
+    test_golden_truth_gates.py (audit R4-P0-01/02)."""
+    from ashare_state.spike.golden_store import GoldenTruthStore
+
+    monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self: [])
+
+
 def _prod_profile() -> AccountProfile:
     return AccountProfile.from_scrubbed(
         {
@@ -309,7 +319,7 @@ class TestVerdictEngine:
                 result = CaseResult.VALIDATED_PASS
                 if override and cap.capability_id in override:
                     result = override[cap.capability_id]
-                n = count if count is not None else cap.min_valid_cases
+                n = count if count is not None else cap.required_case_counts[case_type]
                 for k in range(n):
                     _write_case(store, run, catalog, f"C{i}{j}{k}-{case_type}", case_type, result)
 
@@ -342,7 +352,7 @@ class TestVerdictEngine:
         for i, cap in enumerate(CORE_CAPABILITIES):
             for case_type in cap.required_case_types:
                 if cap.capability_id == "daily_bar_units":
-                    for k in range(cap.min_valid_cases):
+                    for k in range(cap.required_case_counts[case_type]):
                         _write_case(
                             store,
                             run,
@@ -354,7 +364,7 @@ class TestVerdictEngine:
                             payload={"reason": "DOCUMENTED_UNIT_DIFFERENCE"},
                         )
                 else:
-                    for k in range(cap.min_valid_cases):
+                    for k in range(cap.required_case_counts[case_type]):
                         _write_case(
                             store,
                             run,
@@ -392,22 +402,26 @@ class TestVerdictEngine:
 
         run, store = _production_run(spike_root)
         catalog = CaseCatalog(store, run.spike_run_id)
-        # historical_st_suspend with min_valid_cases=2 (set below in capability def)
+        # historical_st_suspend: golden_st_transition requires 50 per-type
+        # (R4-P0-04) - one case of EACH type only -> INCOMPLETE
         target_cap = next(
             c for c in CORE_CAPABILITIES if c.capability_id == "historical_st_suspend"
         )
-        assert target_cap.min_valid_cases >= 1
+        assert target_cap.required_case_counts["golden_st_transition"] >= 2
         # build: every other capability passes; st has only 1 valid case
         for i, cap in enumerate(CORE_CAPABILITIES):
             if cap.capability_id == "historical_st_suspend":
-                _write_case(
-                    store,
-                    run,
-                    catalog,
-                    f"S{i}-only-one",
-                    cap.required_case_types[0],
-                    CaseResult.VALIDATED_PASS,
-                )
+                # ONE case per required type: enough for
+                # historical_st_suspend(1) but NOT golden_st_transition(50)
+                for case_type in cap.required_case_types:
+                    _write_case(
+                        store,
+                        run,
+                        catalog,
+                        f"S{i}-{case_type}-only-one",
+                        case_type,
+                        CaseResult.VALIDATED_PASS,
+                    )
             else:
                 for case_type in cap.required_case_types:
                     _write_case(

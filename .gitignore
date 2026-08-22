@@ -23,7 +23,9 @@ vendor/
 *.whl
 
 # All local data (raw/canonical/features/db/spike outputs) - not a system of record in git
-data/
+# EXCEPT the golden truth dataset (versioned evidence, audit R4-P0-01)
+data/*
+!data/golden/
 
 # DuckDB database files
 *.duckdb

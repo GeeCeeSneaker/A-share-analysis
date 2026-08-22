@@ -79,6 +79,10 @@ class SpikeRun:
     environment_lock_hash: str = ""
     config_hash: str = ""
     as_of_date: str = ""  # R3-P1-09: the single run-wide as-of reference
+    # R4-P0-02/12: golden binding + catalog seal (set at creation / close)
+    golden_truth_version: str = ""
+    golden_manifest_hash: str = ""
+    case_catalog_hash: str = ""
     started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     ended_at: str | None = None
     status: str = "RUNNING"
@@ -96,6 +100,9 @@ class SpikeRun:
             "environment_lock_hash": self.environment_lock_hash,
             "config_hash": self.config_hash,
             "as_of_date": self.as_of_date,
+            "golden_truth_version": self.golden_truth_version,
+            "golden_manifest_hash": self.golden_manifest_hash,
+            "case_catalog_hash": self.case_catalog_hash,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
             "status": self.status,
@@ -105,9 +112,8 @@ class SpikeRun:
     def provenance_complete(self) -> bool:
         """R3-P0-15: formal verdict requires full provenance.
 
-        Unknown/empty code_commit / environment_lock_hash / config_hash /
-        sdk_version / runtime_version / account_profile_id makes a verdict
-        SPIKE_INCOMPLETE by construction (asserted before aggregation).
+        R4-P0-02: golden binding (truth_version + manifest_hash) is part
+        of provenance for formal runs.
         """
         required = (
             self.code_commit,
@@ -117,7 +123,12 @@ class SpikeRun:
             self.runtime_version or "",
             self.account_profile_id,
         )
-        return all(value and value != "unknown" for value in required)
+        if not all(value and value != "unknown" for value in required):
+            return False
+        return not (
+            self.run_kind == RunKind.PRODUCTION
+            and not (self.golden_truth_version and self.golden_manifest_hash)
+        )
 
 
 @dataclass(frozen=True)

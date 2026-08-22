@@ -599,6 +599,10 @@ class GoldenCase:
 
     Truth sources must be independent of the provider under test
     (exchange notices, official announcements, cross-source references).
+
+    R4-P0-01/02: seal fields (source_hash/truth_version/reviewed_by/
+    reviewed_at/review_status) are REQUIRED for the formal gate - the
+    dataset store re-verifies source_hash on every load.
     """
 
     golden_case_id: str
@@ -609,6 +613,10 @@ class GoldenCase:
     source_ref: str  # URL / document id
     expected_fields: dict[str, Any] = field(default_factory=dict)
     source_hash: str = ""
+    truth_version: str = ""
+    reviewed_by: str = ""
+    reviewed_at: str = ""
+    review_status: str = ""  # COMPILED | REVIEWED
 
 
 def validate_golden_cases(
