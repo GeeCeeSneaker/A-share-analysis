@@ -2,7 +2,7 @@
 
 > 审计报告：`docs/design/A-share-analysis_第一阶段代码审计报告_20260822.md`
 > 整改顺序按审计 §28：Patch A（M0 Integrity）→ Patch B（Provider Reliability）→ Patch C（Canonical PIT）→ Contract Tests
-> **整改完成**：三个 Patch 全部落地（commits `cf81be3` / `fee655b` / 本轮），171 tests 全绿，门禁干净。
+> **整改完成（全部关闭）**：三个 Patch + 收尾批次全部落地——commits `cf81be3`（Patch A）/ `fee655b`（Patch B）/ `bfce563`（Patch C）/ `0a5c704`（收尾：P1-03 持久化 + 并行 capture 测试）；**179 tests 全绿**，ruff/format/mypy 零违规。
 
 ## P1-15 / P1-17 决策记录
 
