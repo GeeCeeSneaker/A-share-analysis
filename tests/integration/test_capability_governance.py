@@ -16,6 +16,19 @@ import pytest
 from ashare_state.providers.amazingdata import capability as capability_module
 from ashare_state.storage import apply_migrations
 
+
+@pytest.fixture(autouse=True)
+def _event_gate_relaxed(monkeypatch):
+    """R4-A1.1: PRODUCTION runs now require the reviewed golden dataset
+    (distinct-event coverage). These tests exercise OTHER gates, so the
+    event/review gates are relaxed here; dedicated tests live in
+    test_golden_truth_gates.py."""
+    from ashare_state.spike.golden_store import GoldenTruthStore
+
+    monkeypatch.setattr(GoldenTruthStore, "event_coverage_gate", lambda self: [])
+    monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self: [])
+
+
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 
 EVIDENCE_KWARGS = {

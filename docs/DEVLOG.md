@@ -8,6 +8,34 @@
 
 ---
 
+## 2026-08-23 04:30 · R4-A1.1：Truth Integrity Hotfix（复核 REOPENED → 四项 P0 修复）
+
+**Scope**
+- R4-A1 聚焦复核（REOPENED）§2-13/16/22：A/B/C 三项 + P1-01/02/03/04（D 项 Golden Router 按审计 §7 与 R4-A2 合并执行）
+
+**Implementation**
+- **A. Manifest Self-Verification（P0-01）**：`load()` 从解析后的 cases 重算 case_count/counts_by_type/review_summary 并要求与 manifest 精确相等——只改 manifest（伪造 REVIEWED 123 / counts 999）不再能绕过 review/quantity gate（两条专属篡改测试）
+- **B. Hash 模型拆分（P0-02/03）**：`source_hash` → `case_semantic_hash`（含 case_type + source_artifact_hash + truth_version；改 case_type 也被拦截）+ `source_artifact_hash`（真实外部证据工件哈希；COMPILED 为空，REVIEWED 必填——review_gate 拒绝无 artifact 的手改 REVIEWED）
+- **C. Event Coverage（P0-04）**：每条 case 带 `event_id/event_class`；`event_coverage_gate()` 按 distinct event 计数（重复日期/负样本不计）；**PRODUCTION run 创建即拒绝**（当前诚实状态：ST_CAP=2<50、DELIST=10<20——补齐真实事件属于 golden review 流程）
+- **P1-01/02**：版本 append-only（`golden_cases_v1/v2.jsonl` + 各自 manifest 快照 + `truth_manifest.json` ACTIVE 指针）；loader 只认指针指定文件（lexicographic 猜测废除，诱饵文件测试）
+- **P1-03/04**：DEVLOG gate 扩至 `data/golden/**`、`.gitattributes`、`.github/workflows/**`（V2 规则自 54ce7c1 后生效）；CI `fetch-depth: 0`
+- 数据集定位修正：v2 = **Golden CANDIDATE Dataset**（§13：全 COMPILED、事件覆盖诚实不足——不是 Verified Truth Basis）
+
+**Verification**
+- pytest: **302 passed**（+5；§22 关键测试：manifest 两类篡改/stats 相等/entry 改+重封/case_type 改/seal 缺失/REVIEWED 无 artifact/负样本不算事件/ST·DELIST distinct 门/PRODUCTION run 拒绝/诱饵 loader/append-only/语义无矛盾）
+- ruff/format/mypy clean；dataset_hash 绑定链全链路复验
+
+**Implementation Status**
+- DONE（R4-A1.1；Golden Router 留待 R4-A2 按审计 §7 合并）
+
+**Review Status**
+- PENDING_RECHECK（§14 四项中 1-3 完成，第 4 项 Router 归入 R4-A2）
+
+**Next**
+- R4-A2（语义/PIT validators + Golden Router + BSE/BJ/Adj/Limit）→ R4-A3 → R4-B1/B2 → R4-CI；CR-1 可并行
+
+---
+
 ## 2026-08-23 02:30 · R4-A1：Golden Truth Dataset v1 + Per-Type Gate + Catalog Seal
 
 **Scope**

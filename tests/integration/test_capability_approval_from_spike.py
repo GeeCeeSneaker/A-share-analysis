@@ -22,6 +22,18 @@ MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 _SHA = "a" * 40
 
 
+@pytest.fixture(autouse=True)
+def _event_gate_relaxed(monkeypatch):
+    """R4-A1.1: PRODUCTION runs now require the reviewed golden dataset
+    (distinct-event coverage). These tests exercise OTHER gates, so the
+    event/review gates are relaxed here; dedicated tests live in
+    test_golden_truth_gates.py."""
+    from ashare_state.spike.golden_store import GoldenTruthStore
+
+    monkeypatch.setattr(GoldenTruthStore, "event_coverage_gate", lambda self: [])
+    monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self: [])
+
+
 @pytest.fixture
 def conn():
     connection = duckdb.connect(":memory:")

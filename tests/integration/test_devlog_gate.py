@@ -13,7 +13,15 @@ class TestDevlogGate:
         """R3 section 4: every commit touching src/migrations/configs/scripts
         must also touch docs/DEVLOG.md. Verified over the whole main
         history: any commit in that set without a DEVLOG change fails."""
-        code_prefixes = ("src/", "migrations/", "configs/", "scripts/")
+        code_prefixes = (
+            "src/",
+            "migrations/",
+            "configs/",
+            "scripts/",
+            "data/golden/",
+            ".gitattributes",
+            ".github/workflows/",
+        )
         rev_list = subprocess.run(
             ["git", "rev-list", "main", "--max-count=200"],
             cwd=REPO_ROOT,
@@ -41,9 +49,9 @@ class TestDevlogGate:
                 offenders.append(
                     f"{commit[:10]}: {sorted(f for f in files if f.startswith(code_prefixes))[:3]}"
                 )
-        # The gate exists from commit e6a2a01 (2026-08-22 R3) onward; older
-        # commits predate the rule and are grandfathered.
-        rule_since = "e6a2a01"
+        # V2 rule (R4-A1.1): covers golden/gitattributes/workflows too;
+        # effective AFTER 54ce7c1 (the last pre-V2 commit).
+        rule_since = "54ce7c1"
         new_offenders = []
         for line in offenders:
             sha = line.split(":")[0]

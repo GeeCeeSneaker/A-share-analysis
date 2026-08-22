@@ -295,14 +295,16 @@ def new_run(
         golden_store = GoldenTruthStore()
         golden_cases, golden_manifest = golden_store.load()
         missing = golden_store.quantity_gate()
-        if run_kind is RunKind.PRODUCTION and missing:
+        missing_events = golden_store.event_coverage_gate()
+        if run_kind is RunKind.PRODUCTION and (missing or missing_events):
             msg = (
-                "PRODUCTION run refused: golden dataset quantities incomplete: "
-                f"{missing} (audit R4-P0-01)"
+                "PRODUCTION run refused: golden dataset incomplete: "
+                f"{missing + missing_events} (audit R4-P0-01/P0-04: row and "
+                "distinct-event coverage must both be complete)"
             )
             raise RunLifecycleError(msg)
         golden_truth_version = golden_manifest.truth_version
-        golden_manifest_hash = golden_manifest.manifest_hash
+        golden_manifest_hash = golden_manifest.dataset_hash
         _ = golden_cases
     run = SpikeRun(
         spike_run_id=str(uuid_module.uuid4()),

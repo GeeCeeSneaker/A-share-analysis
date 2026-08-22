@@ -30,6 +30,16 @@ from ashare_state.spike.model import RunFailureReason, SpikeCase
 _SHA = "a" * 40
 
 
+@pytest.fixture(autouse=True)
+def _event_gate_relaxed(monkeypatch):
+    """R4-A1.1: PRODUCTION runs now require the reviewed golden dataset
+    (distinct-event coverage). These tests exercise OTHER gates."""
+    from ashare_state.spike.golden_store import GoldenTruthStore
+
+    monkeypatch.setattr(GoldenTruthStore, "event_coverage_gate", lambda self: [])
+    monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self: [])
+
+
 @pytest.fixture
 def spike_root(tmp_path: Path) -> Path:
     return tmp_path / "spike"

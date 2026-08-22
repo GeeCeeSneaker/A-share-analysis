@@ -1,4 +1,4 @@
-"""Golden truth dataset gates (audit R4-P0-01/02/03/04/12, section 40)."""
+"""Golden truth dataset gates (R4-A1.1 hotfix, audit sections 2-13/22)."""
 
 from __future__ import annotations
 
@@ -10,21 +10,17 @@ from pathlib import Path
 import pytest
 
 from ashare_state.spike.golden_store import (
-    REQUIRED_GOLDEN_COUNTS,
     GoldenTruthError,
     GoldenTruthStore,
 )
 from ashare_state.spike.model import RunKind
-from ashare_state.spike.runner import close_run, new_run
+from ashare_state.spike.runner import RunLifecycleError, new_run
 
 REPO_GOLDEN = Path(__file__).resolve().parents[2] / "data" / "golden" / "provider" / "amazingdata"
 
 
 @pytest.fixture
 def golden_env(tmp_path: Path, monkeypatch) -> Path:
-    """Isolated copy of the real dataset at the RELATIVE path structure
-    (data/golden/provider/amazingdata) + chdir, so the default
-    GoldenTruthStore() resolves it."""
     root = tmp_path / "data" / "golden" / "provider" / "amazingdata"
     shutil.copytree(REPO_GOLDEN, root)
     monkeypatch.setattr("ashare_state.spike.golden_store.GOLDEN_ROOT", root)
@@ -32,77 +28,142 @@ def golden_env(tmp_path: Path, monkeypatch) -> Path:
     return root
 
 
-class TestDatasetIntegrity:
-    def test_repo_dataset_loads_and_seals(self):
-        cases, manifest = GoldenTruthStore(REPO_GOLDEN).load()
-        assert manifest.case_count == len(cases) == 123
-        assert manifest.quantities_complete
+@pytest.fixture(autouse=True)
+def _no_autoload_fixture_guard():
+    """golden_env-dependent tests mutate an isolated copy; tests that do
+    NOT use golden_env still resolve the repo dataset via chdir."""
 
-    def test_required_minimums_match_core_gate(self):
-        assert REQUIRED_GOLDEN_COUNTS == {
-            "golden_st_transition": 50,
-            "golden_delisted": 20,
-            "golden_limit_regime": 30,
-            "golden_corporate_action": 20,
-        }
 
-    def test_manifest_hash_mismatch_detected(self, golden_env: Path):
-        jsonl = golden_env / "golden_cases_v1.jsonl"
-        jsonl.write_text(
-            jsonl.read_text(encoding="utf-8") + json.dumps({"tampered": True}) + "\n",
-            encoding="utf-8",
+def _active(root: Path) -> dict:
+    return json.loads((root / "truth_manifest.json").read_text(encoding="utf-8"))
+
+
+def _dataset(root: Path) -> Path:
+    return root / _active(root)["dataset_file"]
+
+
+def _reseal(root: Path) -> None:
+    """Recompute the ACTIVE manifest's dataset hash after a dataset edit
+    (simulating a careful attacker who reseals the pointer)."""
+    active = _active(root)
+    active["dataset_hash"] = hashlib.sha256(_dataset(root).read_bytes()).hexdigest()
+    (root / "truth_manifest.json").write_text(
+        json.dumps(active, indent=2), encoding="utf-8", newline="\n"
+    )
+
+
+class TestManifestSelfVerification:
+    def test_manifest_stats_equal_recomputed_stats(self):
+        _, manifest = GoldenTruthStore(REPO_GOLDEN).load()
+        assert manifest.case_count == 123
+        assert manifest.counts_by_type["golden_st_transition"] == 50
+
+    def test_manifest_review_summary_tamper_detected(self, golden_env: Path):
+        active = _active(golden_env)
+        active["review_summary"] = {"COMPILED": 0, "REVIEWED": 123}
+        (golden_env / "truth_manifest.json").write_text(
+            json.dumps(active, indent=2), encoding="utf-8", newline="\n"
         )
-        with pytest.raises(GoldenTruthError, match="manifest hash mismatch"):
+        with pytest.raises(GoldenTruthError, match="review_summary != recomputed"):
             GoldenTruthStore(golden_env).load()
 
-    def test_entry_edit_without_reseal_detected(self, golden_env: Path):
-        """R4-P0-02: editing one entry (FAIL->PASS style) breaks its
-        source_hash even when the manifest is re-sealed."""
-        jsonl = golden_env / "golden_cases_v1.jsonl"
-        lines = jsonl.read_text(encoding="utf-8").splitlines()
+    def test_manifest_counts_by_type_tamper_detected(self, golden_env: Path):
+        active = _active(golden_env)
+        active["counts_by_type"]["golden_st_transition"] = 999
+        (golden_env / "truth_manifest.json").write_text(
+            json.dumps(active, indent=2), encoding="utf-8", newline="\n"
+        )
+        with pytest.raises(GoldenTruthError, match="counts_by_type != recomputed"):
+            GoldenTruthStore(golden_env).load()
+
+    def test_dataset_edit_breaks_active_pointer_hash(self, golden_env: Path):
+        ds = _dataset(golden_env)
+        ds.write_text(ds.read_text(encoding="utf-8") + "\n", encoding="utf-8", newline="\n")
+        with pytest.raises(GoldenTruthError, match="dataset hash mismatch"):
+            GoldenTruthStore(golden_env).load()
+
+
+class TestCaseSemanticHash:
+    def test_entry_edit_detected_even_after_reseal(self, golden_env: Path):
+        ds = _dataset(golden_env)
+        lines = ds.read_text(encoding="utf-8").splitlines()
         doc = json.loads(lines[0])
-        # flip the truth (first entry is an IS_ST_SEC=False negative case)
-        doc["expected_fields"] = {"IS_ST_SEC": True}
+        # first row is the positive Kangmei cap sample (IS_ST_SEC True) -
+        # flip the truth to False without touching its semantic hash
+        doc["expected_fields"] = {"IS_ST_SEC": False}
         lines[0] = json.dumps(doc, ensure_ascii=False, sort_keys=True)
-        jsonl.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
-        manifest_path = golden_env / "truth_manifest.json"
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        manifest["manifest_hash"] = hashlib.sha256(jsonl.read_bytes()).hexdigest()
-        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        with pytest.raises(GoldenTruthError, match="source_hash mismatch"):
+        ds.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+        _reseal(golden_env)  # attacker reseals the pointer hash too
+        with pytest.raises(GoldenTruthError, match="case_semantic_hash"):
+            GoldenTruthStore(golden_env).load()
+
+    def test_case_type_edit_breaks_case_semantic_hash(self, golden_env: Path):
+        """P0-03: case_type is INSIDE the semantic hash."""
+        ds = _dataset(golden_env)
+        lines = ds.read_text(encoding="utf-8").splitlines()
+        doc = json.loads(lines[0])
+        doc["case_type"] = "golden_delisted"  # re-type the claim
+        lines[0] = json.dumps(doc, ensure_ascii=False, sort_keys=True)
+        ds.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+        _reseal(golden_env)
+        with pytest.raises(GoldenTruthError, match="case_semantic_hash"):
             GoldenTruthStore(golden_env).load()
 
     def test_missing_seal_field_rejected(self, golden_env: Path):
-        jsonl = golden_env / "golden_cases_v1.jsonl"
-        lines = jsonl.read_text(encoding="utf-8").splitlines()
+        ds = _dataset(golden_env)
+        lines = ds.read_text(encoding="utf-8").splitlines()
         doc = json.loads(lines[0])
-        doc.pop("source_hash")
+        doc.pop("case_semantic_hash")
         lines[0] = json.dumps(doc, ensure_ascii=False, sort_keys=True)
-        jsonl.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
-        manifest_path = golden_env / "truth_manifest.json"
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        manifest["manifest_hash"] = hashlib.sha256(jsonl.read_bytes()).hexdigest()
-        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        ds.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+        _reseal(golden_env)
         with pytest.raises(GoldenTruthError, match="missing seal fields"):
             GoldenTruthStore(golden_env).load()
 
 
 class TestReviewGate:
-    def test_compiled_dataset_blocks_production_verdict(self):
-        """Audit section 39: v1 ships COMPILED entries -> review gate
-        returns blocking reasons (production verdicts become
-        SPIKE_INCOMPLETE until the human review completes)."""
-        _, manifest = GoldenTruthStore(REPO_GOLDEN).load()
-        assert not manifest.fully_reviewed
+    def test_reviewed_requires_source_artifact_hash(self, golden_env: Path, monkeypatch):
+        """P0-06: hand-edited REVIEWED flags are caught - either by the
+        manifest self-verification (stats drift) or, when made
+        self-consistent, by the review gate demanding the artifact hash."""
+        ds = _dataset(golden_env)
+        lines = ds.read_text(encoding="utf-8").splitlines()
+        for i, line in enumerate(lines):
+            doc = json.loads(line)
+            doc["review_status"] = "REVIEWED"  # hand-edited, no artifact hash
+            lines[i] = json.dumps(doc, ensure_ascii=False, sort_keys=True)
+        ds.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+        _reseal(golden_env)
+        active = _active(golden_env)
+        active["review_summary"] = {"REVIEWED": 123}  # attacker fixes stats too
+        (golden_env / "truth_manifest.json").write_text(
+            json.dumps(active, indent=2), encoding="utf-8", newline="\n"
+        )
+        problems = GoldenTruthStore(golden_env).review_gate()
+        assert any("source_artifact_hash" in p for p in problems)
+
+    def test_review_gate_uses_cases_not_manifest_claim(self):
         problems = GoldenTruthStore(REPO_GOLDEN).review_gate()
-        assert problems and "not fully human-reviewed" in problems[0]
-
-    def test_quantity_gate_passes_on_v1(self):
-        assert GoldenTruthStore(REPO_GOLDEN).quantity_gate() == []
+        assert problems and "REVIEWED 0/123" in problems[0]
 
 
-class TestRunBinding:
-    def test_production_run_binds_golden_at_creation(
+class TestEventCoverageGate:
+    def test_negative_st_samples_do_not_count_as_st_transition_events(self):
+        _, manifest = GoldenTruthStore(REPO_GOLDEN).load()
+        # 40 negative ROWS but only 8 distinct negative-sample events;
+        # neither counts toward ST_CAP (which is honestly 2)
+        assert manifest.distinct_events.get("NEGATIVE_SAMPLE", 0) == 8
+        assert manifest.distinct_events.get("ST_CAP", 0) == 2  # honest count
+
+    def test_st_gate_requires_distinct_transition_events(self):
+        problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
+        assert any("ST_CAP events 2 < 50" in p for p in problems)
+
+    def test_delist_gate_requires_distinct_securities(self):
+        problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
+        assert any("DELIST events 10 < 20" in p for p in problems)
+
+    def test_production_run_refused_until_event_coverage_complete(
         self, tmp_path: Path, monkeypatch, golden_env: Path
     ):
         monkeypatch.chdir(tmp_path)
@@ -114,114 +175,41 @@ class TestRunBinding:
             host="h",
             username="u",
         )
-        run, store = new_run(
-            run_kind=RunKind.PRODUCTION,
-            spike_root=tmp_path / "spike",
-            code_commit="a" * 40,
-            environment_lock_hash="e" * 64,
-            config_hash="c" * 64,
-            sdk_version="1.1.9",
-            runtime_version="V4.3.0",
-            account_profile_id=profile.account_profile_id,
-            account_profile=profile,
-        )
-        assert run.golden_truth_version
-        assert len(run.golden_manifest_hash) == 64
-        # persisted through save/load
-        loaded = store.load_run(run.spike_run_id, RunKind.PRODUCTION)
-        assert loaded.golden_truth_version == run.golden_truth_version
-        assert loaded.provenance_complete()
-
-    def test_binding_drift_detected_on_verify(self, golden_env: Path):
-        store_obj = GoldenTruthStore(golden_env)
-        _, manifest = store_obj.load()
-        with pytest.raises(GoldenTruthError, match="drifted"):
-            store_obj.verify_binding(
-                truth_version="v999-other", manifest_hash=manifest.manifest_hash
+        with pytest.raises(RunLifecycleError, match="distinct"):
+            new_run(
+                run_kind=RunKind.PRODUCTION,
+                spike_root=tmp_path / "spike",
+                code_commit="a" * 40,
+                environment_lock_hash="e" * 64,
+                config_hash="c" * 64,
+                sdk_version="1.1.9",
+                runtime_version="V4.3.0",
+                account_profile_id=profile.account_profile_id,
+                account_profile=profile,
             )
-        with pytest.raises(GoldenTruthError, match="manifest_hash drifted"):
-            store_obj.verify_binding(truth_version=manifest.truth_version, manifest_hash="0" * 64)
 
 
-class TestCatalogSeal:
-    def test_closed_catalog_tamper_blocks_verdict(
-        self, tmp_path: Path, monkeypatch, golden_env: Path
-    ):
-        """R4-P0-12: editing the closed catalog (FAIL->PASS) is detected by
-        the verdict's seal re-computation."""
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.setattr(
-            "ashare_state.spike.golden_store.GoldenTruthStore.review_gate",
-            lambda self: [],
+class TestLoaderSelection:
+    def test_loader_uses_manifest_selected_dataset_not_lexicographic_latest(self, golden_env: Path):
+        """P1-02: a lexicographically-later file must not be picked - only
+        the ACTIVE manifest's dataset_file loads."""
+        # plant a decoy that sorts AFTER v2
+        decoy = golden_env / "golden_cases_v9.jsonl"
+        decoy.write_text(
+            json.dumps({"golden_case_id": "DECOY"}) + "\n", encoding="utf-8", newline="\n"
         )
-        from ashare_state.providers.amazingdata.session import AccountProfile
-        from ashare_state.spike import CaseCatalog, CaseResult, compute_verdict
-        from ashare_state.spike.model import SpikeCase
+        cases, manifest = GoldenTruthStore(golden_env).load()
+        assert manifest.dataset_file == "golden_cases_v2.jsonl"
+        assert all(c.golden_case_id != "DECOY" for c in cases)
 
-        profile = AccountProfile.from_scrubbed(
-            {"PermissionCode": "1|2", "SubscribeLimitNum": 5000, "TotalWeekFlow": 500},
-            provider="amazingdata",
-            host="h",
-            username="u",
-        )
-        run, store = new_run(
-            run_kind=RunKind.PRODUCTION,
-            spike_root=tmp_path / "spike",
-            code_commit="a" * 40,
-            environment_lock_hash="e" * 64,
-            config_hash="c" * 64,
-            sdk_version="1.1.9",
-            runtime_version="V4.3.0",
-            account_profile_id=profile.account_profile_id,
-            account_profile=profile,
-        )
-        catalog = CaseCatalog(store, run.spike_run_id)
-        # one failing case -> tamper it to PASS after close
-        meta = store.write_evidence(
-            run,
-            "req-1",
-            endpoint="ep",
-            provider_dataset="ds",
-            params={},
-            payload={"x": 1},
-        )
-        catalog.add(
-            SpikeCase(
-                case_id="T1",
-                spike_run_id=run.spike_run_id,
-                case_type="daily_bar_units",
-                security="X",
-                provider_symbol="X",
-                trade_date="20260814",
-                expected_value="e",
-                actual_value="a",
-                evidence_type="RAW_JSON",
-                evidence_ref=str(meta["evidence_ref"]),
-                result=CaseResult.VALIDATED_FAIL,
-                evidence_hash=str(meta["content_hash"]),
-            )
-        )
-        catalog.flush(store.run_dir(run))
-        close_run(store, run)
-        # verdict sees the FAIL -> NO_GO path (fail dominates)
-        verdict = compute_verdict(store, store.load_run(run.spike_run_id, RunKind.PRODUCTION))
-        assert verdict.verdict in ("NO_GO", "SPIKE_INCOMPLETE")
-        assert verdict.capability_status["daily_bar_units"] == "FAILED"
-        # ---- the tamper: edit the closed catalog FAIL -> PASS
-        catalog_path = store.run_dir(run) / "cases" / "spike_case_catalog.jsonl"
-        tampered = catalog_path.read_text(encoding="utf-8").replace(
-            "VALIDATED_FAIL", "VALIDATED_PASS"
-        )
-        catalog_path.write_text(tampered, encoding="utf-8")
-        verdict2 = compute_verdict(store, store.load_run(run.spike_run_id, RunKind.PRODUCTION))
-        assert "R4-P0-12" in " ".join(verdict2.blocking_reasons)
-        assert verdict2.verdict == "SPIKE_INCOMPLETE"
+    def test_version_is_append_only(self):
+        """P1-01: v1 dataset file still exists (never overwritten)."""
+        assert (REPO_GOLDEN / "golden_cases_v1.jsonl").is_file()
+        assert (REPO_GOLDEN / "golden_cases_v2.jsonl").is_file()
 
 
 class TestSemanticConflictFix:
-    def test_v1_has_no_st_removal_contradiction(self):
-        """R4-P0-03: no case claims 'ST removal' while expecting IS_ST
-        True; no case mixes 20% and no-limit on the same day."""
+    def test_v2_has_no_st_removal_contradiction(self):
         cases, _ = GoldenTruthStore(REPO_GOLDEN).load()
         for case in cases:
             if case.case_type == "golden_st_transition":

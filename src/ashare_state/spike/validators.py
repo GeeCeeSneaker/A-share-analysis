@@ -597,26 +597,33 @@ def validate_sdk_behavior_record(record: dict[str, Any] | None) -> ValidationOut
 class GoldenCase:
     """One golden case with EXTERNAL truth (audit R3 section 37 R3-0E).
 
-    Truth sources must be independent of the provider under test
-    (exchange notices, official announcements, cross-source references).
+    R4-A1.1 hash model (audit sections 3-4):
+    - case_semantic_hash: SHA-256 over the claim semantics INCLUDING
+      case_type and source_artifact_hash (detects any edit, re-seal proof).
+    - source_artifact_hash: SHA-256 of a REAL external evidence artifact
+      (announcement PDF, rule book, exchange page snapshot). Empty while
+      COMPILED; REQUIRED for REVIEWED (P0-06).
 
-    R4-P0-01/02: seal fields (source_hash/truth_version/reviewed_by/
-    reviewed_at/review_status) are REQUIRED for the formal gate - the
-    dataset store re-verifies source_hash on every load.
+    R4-A1.1 event model (audit section 5):
+    - event_id/event_class identify the underlying market event; the
+      distinct-event gate counts events, never repeated dates.
     """
 
     golden_case_id: str
-    case_type: str  # golden_st_transition / golden_limit_regime / ...
+    case_type: str
     provider_symbol: str
     trade_date: str
-    truth_source: str  # e.g. "SSE announcement" / "SZSE disclosure"
-    source_ref: str  # URL / document id
+    truth_source: str
+    source_ref: str
     expected_fields: dict[str, Any] = field(default_factory=dict)
-    source_hash: str = ""
+    case_semantic_hash: str = ""
+    source_artifact_hash: str = ""
     truth_version: str = ""
     reviewed_by: str = ""
     reviewed_at: str = ""
     review_status: str = ""  # COMPILED | REVIEWED
+    event_id: str = ""
+    event_class: str = ""
 
 
 def validate_golden_cases(

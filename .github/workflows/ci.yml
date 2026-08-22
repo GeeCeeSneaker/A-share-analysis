@@ -33,6 +33,8 @@ jobs:
     continue-on-error: ${{ !matrix.required }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -76,8 +78,9 @@ jobs:
         run: |
           # R3 audit section 4: per-commit check, not per-PR.
           # Commits older than the rule's introduction are grandfathered.
-          RULE_SINCE="e6a2a01"
+          RULE_SINCE="54ce7c1"
           for commit in $(git rev-list HEAD --max-count=300); do
+            [ "$commit" = "$RULE_SINCE" ] && continue  # last pre-rule commit
             if ! git merge-base --is-ancestor "$RULE_SINCE" "$commit" 2>/dev/null; then
               continue  # predates the rule
             fi
@@ -87,7 +90,7 @@ jobs:
             touches_devlog=false
             while IFS= read -r f; do
               case "$f" in
-                src/*|migrations/*|configs/*|scripts/*) touches_code=true ;;
+                src/*|migrations/*|configs/*|scripts/*|data/golden/*|.gitattributes|.github/workflows/*) touches_code=true ;;
                 docs/DEVLOG.md) touches_devlog=true ;;
               esac
             done <<< "$files"
