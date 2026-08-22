@@ -1622,7 +1622,7 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 **Migration / Backfill**：None  
 **Tests**：建议加入 management-doc governance test。  
 **ADR**：Not Required  
-**Commit**：待上传仓库后填写  
+**Commit**：`f102394`（本总册初始化提交；SHA 回填于紧邻的 docs-only commit）  
 **Reviewer**：PENDING_REVIEW
 
 ---
