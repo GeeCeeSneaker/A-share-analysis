@@ -85,6 +85,7 @@ class RunStore:
             config_hash=payload.get("config_hash", ""),
             as_of_date=payload.get("as_of_date", ""),
             golden_truth_version=payload.get("golden_truth_version", ""),
+            golden_dataset_file=payload.get("golden_dataset_file", ""),
             golden_dataset_hash=payload.get(
                 "golden_dataset_hash", payload.get("golden_manifest_hash", "")
             ),

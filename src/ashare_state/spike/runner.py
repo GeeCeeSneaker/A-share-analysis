@@ -157,12 +157,14 @@ def resume_run(
             f"{mismatches} - open a NEW run instead"
         )
         raise RunLifecycleError(msg)
-    # R4-P0-02: golden binding must still hold on resume
+    # R4A2-P0-02: resume resolves the RUN-BOUND dataset (never ACTIVE)
     if run.golden_truth_version:
         from ashare_state.spike.golden_store import GoldenTruthStore
 
-        GoldenTruthStore().verify_binding(
-            truth_version=run.golden_truth_version, dataset_hash=run.golden_dataset_hash
+        GoldenTruthStore().load_bound(
+            dataset_file=run.golden_dataset_file,
+            truth_version=run.golden_truth_version,
+            dataset_hash=run.golden_dataset_hash,
         )
     return run
 
@@ -286,24 +288,31 @@ def new_run(
         if not environment_lock_hash or not config_hash:
             msg = "PRODUCTION runs require environment_lock_hash and config_hash"
             raise RunLifecycleError(msg)
-    # R4-P0-01/02: formal runs BIND the golden truth dataset at creation
+    # R4-P0-01/02 + R4A2-P0-02/04: formal runs BIND the golden dataset at
+    # creation; PRODUCTION additionally requires the FULL review gate
+    # (fail fast - never burn production-account flow on unreviewed truth)
     golden_truth_version = ""
+    golden_dataset_file = ""
     golden_dataset_hash = ""
     if run_kind in (RunKind.PRODUCTION, RunKind.TRIAL):
         from ashare_state.spike.golden_store import GoldenTruthStore
 
         golden_store = GoldenTruthStore()
         golden_cases, golden_manifest = golden_store.load()
-        missing = golden_store.quantity_gate()
-        missing_events = golden_store.event_coverage_gate()
-        if run_kind is RunKind.PRODUCTION and (missing or missing_events):
-            msg = (
-                "PRODUCTION run refused: golden dataset incomplete: "
-                f"{missing + missing_events} (audit R4-P0-01/P0-04: row and "
-                "distinct-event coverage must both be complete)"
-            )
-            raise RunLifecycleError(msg)
+        if run_kind is RunKind.PRODUCTION:
+            missing = golden_store.quantity_gate()
+            missing_events = golden_store.event_coverage_gate()
+            review_problems = golden_store.review_gate()
+            blocking = missing + missing_events + review_problems
+            if blocking:
+                msg = (
+                    "PRODUCTION run refused: golden dataset not formal-truth "
+                    f"ready: {blocking} (audit R4A2-P0-04: quantity + events "
+                    "+ review gates all pass BEFORE a production run starts)"
+                )
+                raise RunLifecycleError(msg)
         golden_truth_version = golden_manifest.truth_version
+        golden_dataset_file = golden_manifest.dataset_file
         golden_dataset_hash = golden_manifest.dataset_hash
         _ = golden_cases
     run = SpikeRun(
@@ -317,6 +326,7 @@ def new_run(
         account_profile_id=account_profile_id,
         as_of_date=as_of_date,
         golden_truth_version=golden_truth_version,
+        golden_dataset_file=golden_dataset_file,
         golden_dataset_hash=golden_dataset_hash,
     )
     store = RunStore(spike_root)
@@ -442,19 +452,23 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
                 "R4-P0-12: case catalog hash mismatch - the closed catalog "
                 "was edited (closed catalogs are immutable artifacts)"
             )
-    # R4-P0-02: golden binding re-verification
+    # R4A2-P0-02: verdict resolves the RUN-BOUND immutable dataset (never
+    # the ACTIVE pointer); historical verdicts replay against the exact
+    # dataset the run was created with, even after ACTIVE advances.
     if run.golden_truth_version:
         from ashare_state.spike.golden_store import GoldenTruthStore
 
         try:
             golden_store = GoldenTruthStore()
-            golden_store.verify_binding(
+            _, bound_manifest = golden_store.load_bound(
+                dataset_file=run.golden_dataset_file,
                 truth_version=run.golden_truth_version,
                 dataset_hash=run.golden_dataset_hash,
             )
-            # R4-P0-01 + audit section 39: production verdicts need reviewed truth
+            # R4-P0-01 + audit section 39: production verdicts need reviewed
+            # truth - evaluated over the BOUND dataset, not ACTIVE
             if run.run_kind == RunKind.PRODUCTION:
-                blocking.extend(golden_store.review_gate())
+                blocking.extend(golden_store.production_formal_gate(bound_manifest))
         except Exception as exc:  # noqa: BLE001 - integrity error blocks the verdict
             blocking.append(f"golden truth binding violated: {exc}")
 

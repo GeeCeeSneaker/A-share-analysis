@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from ashare_state.spike.validators import GoldenCase
@@ -47,6 +48,17 @@ REQUIRED_DISTINCT_EVENTS = {
 }
 ST_ADD_SUBTYPES = ("ST_ADD", "STAR_ST_ADD")
 ST_REMOVE_SUBTYPES = ("ST_REMOVE", "STAR_ST_REMOVE")
+
+
+def st_event_identity(case: GoldenCase) -> tuple[str, str, str]:
+    """Structural ST event identity (audit section 14): the free-form
+    event_id string can never inflate the count - identity is
+    (provider_symbol, event_effective_date, event_subtype)."""
+    return (case.provider_symbol, case.event_effective_date or case.trade_date, case.event_subtype)
+
+
+def delist_event_identity(case: GoldenCase) -> tuple[str, str]:
+    return (case.provider_symbol, case.event_effective_date or case.trade_date)
 
 
 class GoldenTruthError(RuntimeError):
@@ -175,6 +187,86 @@ class GoldenTruthStore:
         self._manifest, self._cases = manifest, cases
         return cases, manifest
 
+    # ------------------------------------------------------------ bound load
+    def load_bound(
+        self,
+        dataset_file: str,
+        truth_version: str,
+        dataset_hash: str,
+    ) -> tuple[list[GoldenCase], GoldenManifest]:
+        """R4A2-P0-02: load the RUN-BOUND immutable dataset directly.
+
+        Never touches the ACTIVE pointer: formal runs, resumes, verdicts
+        and replay resolve the exact dataset they were created against,
+        even after the ACTIVE pointer advances to a newer version.
+        """
+        dataset_path = self.root / dataset_file
+        if not dataset_path.is_file():
+            msg = (
+                f"bound golden dataset {dataset_file!r} does not exist under "
+                f"{self.root} (immutable version must not be deleted)"
+            )
+            raise GoldenTruthError(msg)
+        dataset_bytes = dataset_path.read_bytes()
+        actual_hash = hashlib.sha256(dataset_bytes).hexdigest()
+        if actual_hash != dataset_hash:
+            msg = (
+                f"bound golden dataset {dataset_file!r}: hash mismatch "
+                f"(bound {dataset_hash[:12]}..., actual {actual_hash[:12]}...) - "
+                "the immutable version file was modified"
+            )
+            raise GoldenTruthError(msg)
+
+        cases: list[GoldenCase] = []
+        for line in dataset_bytes.decode("utf-8").splitlines():
+            if not line.strip():
+                continue
+            doc = json.loads(line)
+            golden = _case_from_doc(doc, truth_version)
+            expected = hashlib.sha256(_semantic_statement(golden).encode("utf-8")).hexdigest()
+            if golden.case_semantic_hash != expected:
+                msg = (
+                    f"golden case {golden.golden_case_id}: case_semantic_hash "
+                    "mismatch in bound dataset"
+                )
+                raise GoldenTruthError(msg)
+            cases.append(golden)
+
+        counts: dict[str, int] = {}
+        review: dict[str, int] = {}
+        event_ids: dict[str, set[str]] = {}
+        securities: dict[str, int] = {}
+        for case in cases:
+            counts[case.case_type] = counts.get(case.case_type, 0) + 1
+            review[case.review_status] = review.get(case.review_status, 0) + 1
+            if case.event_class and case.event_id:
+                event_ids.setdefault(case.event_class, set()).add(case.event_id)
+            securities[case.provider_symbol] = securities.get(case.provider_symbol, 0) + 1
+        manifest = GoldenManifest(
+            truth_version=truth_version,
+            dataset_file=dataset_file,
+            dataset_hash=actual_hash,
+            case_count=len(cases),
+            counts_by_type=counts,
+            review_summary=review,
+            distinct_events={k: len(v) for k, v in event_ids.items()},
+            distinct_securities=securities,
+        )
+        return cases, manifest
+
+    def production_formal_gate(self, bound_manifest: GoldenManifest) -> list[str]:
+        """R4A2-P0-04 formal gate evaluated over the BOUND dataset:
+        the review gate (artifact verification) + full-review requirement
+        of the bound dataset itself."""
+        problems = self.review_gate()
+        if not bound_manifest.fully_reviewed:
+            problems = list(problems) + [
+                "bound golden dataset is not fully REVIEWED "
+                f"(REVIEWED {bound_manifest.review_summary.get('REVIEWED', 0)}/"
+                f"{bound_manifest.case_count})"
+            ]
+        return problems
+
     # ---------------------------------------------------------------- gates
     def verify_binding(self, *, truth_version: str, dataset_hash: str) -> None:
         _, manifest = self.load()
@@ -197,11 +289,17 @@ class GoldenTruthStore:
         ]
 
     def event_coverage_gate(self) -> list[str]:
-        """Distinct-event semantics (review sections 9-10)."""
+        """Distinct-event semantics (audit sections 14-16): identity is
+        STRUCTURAL - (symbol, effective_date, subtype) for ST and
+        (symbol, effective_date) for delist. Free-form event_id strings
+        can never inflate the count."""
         cases, manifest = self.load()
         problems: list[str] = []
-        # ST transitions: >= 50 distinct events, ADD>0, REMOVE>0
-        st_events = {c.event_id: c.event_subtype for c in cases if c.event_class == "ST_TRANSITION"}
+        # ST transitions: >= 50 distinct structural events, ADD>0, REMOVE>0
+        st_events: dict[tuple[str, str, str], str] = {}
+        for case in cases:
+            if case.event_class == "ST_TRANSITION":
+                st_events[st_event_identity(case)] = case.event_subtype
         st_count = len(st_events)
         if st_count < REQUIRED_DISTINCT_EVENTS["golden_st_transition"][1]:
             problems.append(f"golden_st_transition: distinct ST_TRANSITION events {st_count} < 50")
@@ -211,11 +309,13 @@ class GoldenTruthStore:
             problems.append("golden_st_transition: no ST_ADD/STAR_ST_ADD subtype events")
         if remove_count == 0:
             problems.append("golden_st_transition: no ST_REMOVE/STAR_ST_REMOVE subtype events")
-        # Delist: distinct event >= 20 AND distinct provider_symbol >= 20
-        delist_events = {c.event_id for c in cases if c.event_class == "DELIST"}
+        # Delist: distinct (symbol, effective_date) >= 20 AND symbols >= 20
+        delist_identities = {delist_event_identity(c) for c in cases if c.event_class == "DELIST"}
         delist_symbols = {c.provider_symbol for c in cases if c.event_class == "DELIST"}
-        if len(delist_events) < REQUIRED_DISTINCT_EVENTS["golden_delisted"][1]:
-            problems.append(f"golden_delisted: distinct DELIST events {len(delist_events)} < 20")
+        if len(delist_identities) < REQUIRED_DISTINCT_EVENTS["golden_delisted"][1]:
+            problems.append(
+                f"golden_delisted: distinct DELIST events {len(delist_identities)} < 20"
+            )
         if len(delist_symbols) < 20:
             problems.append(
                 f"golden_delisted: distinct delisted securities {len(delist_symbols)} < 20"
@@ -224,7 +324,11 @@ class GoldenTruthStore:
 
     def review_gate(self) -> list[str]:
         """FORMAL review gate (review section 8): every case REVIEWED, and
-        every REVIEWED case's source artifact RESOLVES and hash-VERIFIES."""
+        EVERY REVIEWED case's source artifact RESOLVES and hash-VERIFIES.
+
+        R4A2-P0-01 fix: verifies ALL reviewed cases with complete error
+        collection - never breaks on the first success.
+        """
         cases, manifest = self.load()
         problems: list[str] = []
         if not manifest.fully_reviewed:
@@ -235,11 +339,8 @@ class GoldenTruthStore:
                 "audit section 39 requires every golden entry reviewed before P0-M-1B)"
             )
         for case in cases:
-            if case.review_status != "REVIEWED":
-                continue
-            problems.extend(self._verify_artifact(case))
-            if not problems:
-                break
+            if case.review_status == "REVIEWED":
+                problems.extend(self._verify_artifact(case))
         return problems
 
     def _verify_artifact(self, case: GoldenCase) -> list[str]:
@@ -250,7 +351,17 @@ class GoldenTruthStore:
             ]
         if not case.source_artifact_hash:
             return [f"{case.golden_case_id}: REVIEWED without source_artifact_hash"]
-        artifact_path = self.root / EVIDENCE_DIRNAME / case.source_artifact_ref
+        # R4A2-P1-03: path confinement - must resolve INSIDE <root>/evidence
+        evidence_dir = (self.root / EVIDENCE_DIRNAME).resolve()
+        artifact_path = (evidence_dir / case.source_artifact_ref).resolve()
+        try:
+            artifact_path.relative_to(evidence_dir)
+        except ValueError:
+            return [
+                f"{case.golden_case_id}: source_artifact_ref "
+                f"{case.source_artifact_ref!r} escapes the evidence store "
+                "(path confinement violation)"
+            ]
         if not artifact_path.is_file():
             return [
                 f"{case.golden_case_id}: source artifact {case.source_artifact_ref!r} "
@@ -285,6 +396,55 @@ def semantic_hash_of(golden: GoldenCase) -> str:
     return hashlib.sha256(_semantic_statement(golden).encode("utf-8")).hexdigest()
 
 
+#: R4A2-P1-02: artifact kinds shared by the review CLI and the loader
+VALID_ARTIFACT_KINDS = {
+    "SSE_ANNOUNCEMENT",
+    "SZSE_ANNOUNCEMENT",
+    "BSE_ANNOUNCEMENT",
+    "CSRC_DOCUMENT",
+    "EXCHANGE_RULEBOOK",
+    "COMPANY_ANNOUNCEMENT",
+    "INDEX_METHODOLOGY",
+    "OTHER_OFFICIAL",
+}
+
+
+def _validate_review_provenance(doc: dict) -> None:
+    """REVIEWED provenance completeness (R4A2-P1-02)."""
+    case_id = str(doc.get("golden_case_id", "?"))
+    problems = []
+    if not str(doc.get("reviewed_by", "")):
+        problems.append("reviewed_by is empty")
+    reviewed_at = str(doc.get("reviewed_at", ""))
+    if not _valid_iso_timestamp(reviewed_at):
+        problems.append("reviewed_at is not a valid ISO timestamp")
+    if not str(doc.get("source_artifact_ref", "")):
+        problems.append("source_artifact_ref is empty")
+    artifact_hash = str(doc.get("source_artifact_hash", ""))
+    if len(artifact_hash) != 64 or not all(c in "0123456789abcdef" for c in artifact_hash):
+        problems.append("source_artifact_hash is not 64-hex")
+    if str(doc.get("source_artifact_kind", "")) not in VALID_ARTIFACT_KINDS:
+        problems.append(
+            f"source_artifact_kind {doc.get('source_artifact_kind')!r} not in allowlist"
+        )
+    retrieved_at = str(doc.get("source_retrieved_at", ""))
+    if not _valid_iso_timestamp(retrieved_at):
+        problems.append("source_retrieved_at is not a valid ISO timestamp")
+    if problems:
+        msg = f"golden case {case_id}: REVIEWED provenance incomplete: {'; '.join(problems)}"
+        raise GoldenTruthError(msg)
+
+
+def _valid_iso_timestamp(text: str) -> bool:
+    if not text:
+        return False
+    try:
+        datetime.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
 def _case_from_doc(doc: dict, dataset_truth_version: str) -> GoldenCase:
     missing = [
         field
@@ -315,6 +475,9 @@ def _case_from_doc(doc: dict, dataset_truth_version: str) -> GoldenCase:
             "reviewer provenance (compiled/reviewed must be separate)"
         )
         raise GoldenTruthError(msg)
+    # R4A2-P1-02: REVIEWED cases must carry COMPLETE review provenance
+    if doc["review_status"] == "REVIEWED":
+        _validate_review_provenance(doc)
     return GoldenCase(
         golden_case_id=str(doc["golden_case_id"]),
         case_type=str(doc["case_type"]),
@@ -338,4 +501,5 @@ def _case_from_doc(doc: dict, dataset_truth_version: str) -> GoldenCase:
         event_id=str(doc["event_id"]),
         event_class=str(doc["event_class"]),
         event_subtype=str(doc.get("event_subtype", "")),
+        event_effective_date=str(doc.get("event_effective_date", "")),
     )

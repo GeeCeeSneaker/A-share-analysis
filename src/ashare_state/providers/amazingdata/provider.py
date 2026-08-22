@@ -112,6 +112,11 @@ class AmazingDataProvider:
         self.use_mode = use_mode
         self.last_envelopes: list[RawEnvelope] = []
 
+    def _call_or_payload(self, *args: object, **kwargs: object) -> Any:
+        """Business convenience path (audit section 43): returns .payload."""
+        exchange = self.call_exchange(*args, **kwargs)  # type: ignore[arg-type]
+        return exchange.payload
+
     # ------------------------------------------------------------ internals
     def _gate_capability(self, capability: str | None) -> CapabilityStatus | None:
         """Audit P1-02 / R2-P1-02: PRODUCTION refuses CANDIDATE capabilities
@@ -132,7 +137,7 @@ class AmazingDataProvider:
             raise ProviderCapabilityNotApprovedError(msg, context={"capability": capability})
         return cap.status
 
-    def _call(
+    def call_exchange(
         self,
         endpoint: str,
         dataset: str,
@@ -152,25 +157,27 @@ class AmazingDataProvider:
             "permission_codes": self.session.profile.permission_codes,
         }
 
-        def envelope(status: str, error_class: str | None, attempts: int, row_count: int) -> None:
-            self.last_envelopes.append(
-                RawEnvelope(
-                    provider_dataset=dataset,
-                    endpoint=endpoint,
-                    request_params_hash=RawEnvelope.params_hash(params),
-                    requested_at=requested_at,
-                    received_at=datetime.now(UTC).isoformat(),
-                    sdk_version=self.identity.sdk_version if self.identity else None,
-                    runtime_version=self.identity.tgw_runtime_version if self.identity else None,
-                    account_profile_id=self.session.profile.account_profile_id,
-                    row_count=row_count,
-                    status=status,
-                    error_class=error_class,
-                    duration_ms=round((time.monotonic() - started) * 1000, 3),
-                    attempt_count=attempts,
-                    capability_status=str(cap_status) if cap_status else None,
-                )
+        def envelope(
+            status: str, error_class: str | None, attempts: int, row_count: int
+        ) -> RawEnvelope:
+            env = RawEnvelope(
+                provider_dataset=dataset,
+                endpoint=endpoint,
+                request_params_hash=RawEnvelope.params_hash(params),
+                requested_at=requested_at,
+                received_at=datetime.now(UTC).isoformat(),
+                sdk_version=self.identity.sdk_version if self.identity else None,
+                runtime_version=self.identity.tgw_runtime_version if self.identity else None,
+                account_profile_id=self.session.profile.account_profile_id,
+                row_count=row_count,
+                status=status,
+                error_class=error_class,
+                duration_ms=round((time.monotonic() - started) * 1000, 3),
+                attempt_count=attempts,
+                capability_status=str(cap_status) if cap_status else None,
             )
+            self.last_envelopes.append(env)
+            return env
 
         attempt_state = {"attempts": 0}
 
@@ -198,8 +205,10 @@ class AmazingDataProvider:
         except ProviderError as exc:
             envelope("ERROR", type(exc).__name__, attempt_state["attempts"], 0)
             raise
-        envelope("OK", None, attempt_state["attempts"], _count_rows(result))
-        return result
+        env = envelope("OK", None, attempt_state["attempts"], _count_rows(result))
+        from ashare_state.providers.exchange import ProviderExchange
+
+        return ProviderExchange(envelope=env, payload=result)
 
     def _base(self) -> Any:
         return self.session.sdk.BaseData()
@@ -215,7 +224,7 @@ class AmazingDataProvider:
             if params
             else (lambda: self._base().get_code_list())
         )
-        return self._call(
+        return self._call_or_payload(
             "BaseData.get_code_list",
             "code_list",
             fn,
@@ -224,7 +233,7 @@ class AmazingDataProvider:
         )
 
     def get_stock_basic(self, code_list: list[str]) -> Any:
-        return self._call(
+        return self._call_or_payload(
             "InfoData.get_stock_basic",
             "stock_basic",
             lambda: self._info().get_stock_basic(code_list=code_list),
@@ -233,7 +242,7 @@ class AmazingDataProvider:
         )
 
     def get_history_stock_status(self, start_date: int, end_date: int, code_list: list[str]) -> Any:
-        return self._call(
+        return self._call_or_payload(
             "InfoData.get_history_stock_status",
             "history_stock_status",
             lambda: self._info().get_history_stock_status(
@@ -244,7 +253,7 @@ class AmazingDataProvider:
         )
 
     def get_adj_factor(self, code_list: list[str]) -> Any:
-        return self._call(
+        return self._call_or_payload(
             "BaseData.get_adj_factor",
             "adj_factor",
             lambda: self._base().get_adj_factor(code_list=code_list),
@@ -253,7 +262,7 @@ class AmazingDataProvider:
         )
 
     def get_backward_factor(self, code_list: list[str]) -> Any:
-        return self._call(
+        return self._call_or_payload(
             "BaseData.get_backward_factor",
             "backward_factor",
             lambda: self._base().get_backward_factor(code_list=code_list),
@@ -262,7 +271,7 @@ class AmazingDataProvider:
         )
 
     def get_calendar(self, market: str = "SH") -> Any:
-        return self._call(
+        return self._call_or_payload(
             "BaseData.get_calendar",
             "trade_calendar",
             lambda: self._base().get_calendar(market=market),
@@ -271,7 +280,7 @@ class AmazingDataProvider:
         )
 
     def get_hist_code_list(self, security_type: str, start_date: int, end_date: int) -> Any:
-        return self._call(
+        return self._call_or_payload(
             "BaseData.get_hist_code_list",
             "hist_code_list",
             lambda: self._base().get_hist_code_list(
@@ -293,7 +302,7 @@ class AmazingDataProvider:
         end_date: int,
         kline_type: str = "DAY",
     ) -> Any:
-        return self._call(
+        return self._call_or_payload(
             "MarketData.query_kline",
             "daily_bar",
             lambda: self._market(begin_date, end_date).query_kline(
@@ -312,8 +321,13 @@ class AmazingDataProvider:
         )
 
     def _market(self, begin_date: int, end_date: int) -> Any:
-        # MarketData(calendar) needs the trading-day list covering the range
-        calendar = self._base().get_calendar()
+        """MarketData(calendar) needs the trading-day list covering the range.
+
+        CR-1 (audit section 44): the calendar fetch is a REAL SDK call and
+        gets its OWN exchange (endpoint BaseData.get_calendar) - it is never
+        buried inside the query_kline envelope.
+        """
+        calendar = self.get_calendar()
         days = [d for d in (calendar or []) if begin_date <= int(d) <= end_date]
         return self.session.sdk.MarketData(days or [begin_date, end_date])
 

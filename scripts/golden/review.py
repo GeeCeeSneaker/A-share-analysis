@@ -1,26 +1,23 @@
-"""Golden Review Workflow (audit R4-A2 sections 6-8).
+"""Golden Review Workflow (R4-A2.1 hardening).
 
 The ONLY path from COMPILED to REVIEWED. Reviewers provide the external
 evidence ARTIFACT; the workflow hashes the real bytes itself.
 
-    python scripts/golden/review.py \\
-        --case GT-ST-600518-20190506 \\
-        --artifact data/golden/provider/amazingdata/evidence/kangmei-st-notice.txt \\
-        --kind SSE_ANNOUNCEMENT \\
-        --reviewer alice \\
-        --note "verified against SSE disclosure page 2026-08-22"
-
-Hard rules (review section 6):
-- NO --hash parameter exists: source_artifact_hash is computed from the
-  artifact bytes by this workflow, never typed by a human.
-- The artifact is copied into the evidence store (content-addressed by
-  its own sha256) and source_artifact_ref points at the stored copy.
-- The output is a NEW dataset version (append-only); the ACTIVE pointer
-  is updated only after re-sealing every touched case's semantic hash.
+Hard rules:
+- NO --hash parameter: source_artifact_hash is computed from artifact
+  bytes by this workflow, never typed by a human.
+- Evidence is content-addressed: evidence/sha256/<full_hash>.<ext>
+  (R4A2-P1-06 option A).
+- Batch mode validates ALL entries (kind allowlist included) BEFORE
+  writing anything; a failure leaves no orphan evidence (R4A2-P1-05).
+- Versioned dataset/manifest files are create-only: same bytes are an
+  idempotent no-op, different bytes BLOCK (R4A2-P1-04).
+- The ACTIVE pointer moves via staging + atomic replace.
 - COMPILED provenance is preserved untouched.
 
-Batch mode: --manifest review_batch.json applies many entries; each
-entry must still resolve a real artifact file.
+    python scripts/golden/review.py --case GT-ST-600518-20190506 \
+        --artifact evidence-src/kangmei.txt \
+        --kind SSE_ANNOUNCEMENT --reviewer alice --note "verified"
 """
 
 from __future__ import annotations
@@ -28,28 +25,33 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from ashare_state.spike.golden_store import VALID_ARTIFACT_KINDS  # noqa: E402
+
 GOLDEN_ROOT = Path("data/golden/provider/amazingdata")
 EVIDENCE_DIR = GOLDEN_ROOT / "evidence"
-
-VALID_KINDS = {
-    "SSE_ANNOUNCEMENT",
-    "SZSE_ANNOUNCEMENT",
-    "BSE_ANNOUNCEMENT",
-    "CSRC_DOCUMENT",
-    "EXCHANGE_RULEBOOK",
-    "COMPANY_ANNOUNCEMENT",
-    "INDEX_METHODLOGY",
-    "OTHER_OFFICIAL",
-}
 
 
 class ReviewError(RuntimeError):
     """Review workflow contract violation."""
+
+
+# ------------------------------------------------------------- validation
+
+
+def _validate_artifact_kind(kind: str) -> None:
+    """R4A2-P1-01: single + batch share the allowlist check."""
+    if kind not in VALID_ARTIFACT_KINDS:
+        msg = f"artifact kind {kind!r} not in allowlist {sorted(VALID_ARTIFACT_KINDS)}"
+        raise ReviewError(msg)
+
+
+# ---------------------------------------------------------------- loading
 
 
 def _load_active() -> tuple[Path, dict, list[dict]]:
@@ -89,24 +91,24 @@ def _semantic_hash(doc: dict) -> str:
     return hashlib.sha256(statement.encode("utf-8")).hexdigest()
 
 
-def _store_artifact(artifact: Path, case_id: str, kind: str) -> tuple[str, str, str]:
-    """Copy the artifact into the evidence store (content-addressed).
+# ---------------------------------------------------------------- staging
 
-    Returns (source_artifact_ref, sha256, retrieved_at).
-    """
+
+def _stage_artifact(artifact: Path, kind: str) -> tuple[str, str, str]:
+    """Stage ONE artifact: validate kind, hash the real bytes, return
+    (content-addressed ref, sha256, retrieved_at). Nothing is written yet
+    (R4A2-P1-05: stage-all-then-commit)."""
+    _validate_artifact_kind(kind)
     if not artifact.is_file():
         msg = f"artifact file does not exist: {artifact}"
         raise ReviewError(msg)
     data = artifact.read_bytes()
     digest = hashlib.sha256(data).hexdigest()
-    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+    # R4A2-P1-06 option A: content-addressed evidence
     suffix = artifact.suffix or ".bin"
-    stored = EVIDENCE_DIR / f"{case_id}{suffix}"
-    if stored.exists() and hashlib.sha256(stored.read_bytes()).hexdigest() != digest:
-        stored = EVIDENCE_DIR / f"{case_id}-{digest[:12]}{suffix}"
-    shutil.copy2(artifact, stored)
+    ref = f"sha256/{digest}{suffix}"
     retrieved_at = datetime.now(UTC).isoformat()
-    return stored.name, digest, retrieved_at
+    return ref, digest, retrieved_at
 
 
 def _apply_review(
@@ -120,7 +122,7 @@ def _apply_review(
     reviewer: str,
     note: str,
     expect_fields: dict | None = None,
-) -> list[dict]:
+) -> None:
     """Mutate the target case into REVIEWED (in-memory)."""
     now = datetime.now(UTC).isoformat()
     for doc in lines:
@@ -134,21 +136,65 @@ def _apply_review(
         doc["source_artifact_ref"] = artifact_ref
         doc["source_artifact_kind"] = artifact_kind
         doc["source_retrieved_at"] = retrieved_at
-        doc["source_artifact_hash"] = artifact_hash  # computed from real bytes
+        doc["source_artifact_hash"] = artifact_hash
         doc["reviewed_by"] = reviewer
         doc["reviewed_at"] = now
         doc["review_note"] = note
         doc["review_status"] = "REVIEWED"
-        doc["case_semantic_hash"] = _semantic_hash(doc)  # re-seal
-        return lines
+        doc["case_semantic_hash"] = _semantic_hash(doc)
+        return
     msg = f"case {case_id} not found in the active dataset"
     raise ReviewError(msg)
 
 
+# ----------------------------------------------------------------- commit
+
+
+def _commit_evidence(staged: list[tuple[Path, str]]) -> None:
+    """Copy staged artifacts into the evidence store (create-only)."""
+    for source, ref in staged:
+        target = EVIDENCE_DIR / ref
+        target.parent.mkdir(parents=True, exist_ok=True)
+        data = source.read_bytes()
+        if target.exists():
+            if hashlib.sha256(target.read_bytes()).hexdigest() != hashlib.sha256(data).hexdigest():
+                msg = f"evidence {ref} already exists with different bytes"
+                raise ReviewError(msg)
+            continue  # idempotent
+        tmp = target.with_suffix(target.suffix + ".tmp")
+        tmp.write_bytes(data)
+        tmp.replace(target)
+
+
+def _create_only_write(path: Path, data: bytes) -> None:
+    """R4A2-P1-04: versioned files are create-only.
+
+    absent -> create; exists + same bytes -> idempotent no-op;
+    exists + different bytes -> BLOCK.
+    """
+    if path.exists():
+        if path.read_bytes() == data:
+            return
+        msg = f"versioned file {path.name} already exists with different bytes"
+        raise ReviewError(msg)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_bytes(data)
+    Path(tmp).replace(Path(path))
+
+
+def _atomic_active_pointer(manifest: dict) -> None:
+    """Move the ACTIVE pointer via staging + atomic replace."""
+    active_path = GOLDEN_ROOT / "truth_manifest.json"
+    staging = active_path.with_suffix(".json.tmp")
+    staging.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n"
+    )
+    staging.replace(active_path)
+
+
 def _write_new_version(lines: list[dict], old_active: dict) -> str:
-    """Write the next dataset version + update the ACTIVE pointer."""
+    """Write the next dataset version (create-only) + move ACTIVE."""
     old_version = str(old_active["truth_version"])
-    # bump the version suffix: vN-candidate -> v(N+1)-reviewed-partial
     num = "".join(ch for ch in old_version.split("-")[0][1:] if ch.isdigit()) or "1"
     truth_version = f"v{int(num) + 1}-reviewed-{datetime.now(UTC).strftime('%Y%m%d')}"
     for doc in lines:
@@ -156,8 +202,9 @@ def _write_new_version(lines: list[dict], old_active: dict) -> str:
         doc["case_semantic_hash"] = _semantic_hash(doc)
     dataset_file = f"golden_cases_{truth_version.split('-')[0]}.jsonl"
     payload = "".join(json.dumps(c, ensure_ascii=False, sort_keys=True) + "\n" for c in lines)
-    (GOLDEN_ROOT / dataset_file).write_text(payload, encoding="utf-8", newline="\n")
-    dataset_hash = hashlib.sha256((GOLDEN_ROOT / dataset_file).read_bytes()).hexdigest()
+    dataset_path = GOLDEN_ROOT / dataset_file
+    _create_only_write(dataset_path, payload.encode("utf-8"))
+    dataset_hash = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
 
     counts: dict[str, int] = {}
     review: dict[str, int] = {}
@@ -175,20 +222,23 @@ def _write_new_version(lines: list[dict], old_active: dict) -> str:
         "review_summary": review,
         "distinct_events": {k: len(v) for k, v in events.items()},
     }
-    (GOLDEN_ROOT / f"truth_manifest_{truth_version.split('-')[0]}.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n"
+    manifest_file = GOLDEN_ROOT / f"truth_manifest_{truth_version.split('-')[0]}.json"
+    _create_only_write(
+        manifest_file,
+        json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
     )
-    (GOLDEN_ROOT / "truth_manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n"
-    )
+    _atomic_active_pointer(manifest)
     return truth_version
+
+
+# ------------------------------------------------------------------- main
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Golden review workflow")
     parser.add_argument("--case", help="golden_case_id to review")
     parser.add_argument("--artifact", type=Path, help="path to the external evidence artifact")
-    parser.add_argument("--kind", choices=sorted(VALID_KINDS))
+    parser.add_argument("--kind", help="artifact kind (see allowlist)")
     parser.add_argument("--reviewer", required=True)
     parser.add_argument("--note", default="")
     parser.add_argument("--expect-fields", help="JSON: corrected expected_fields (optional)")
@@ -202,45 +252,65 @@ def main() -> int:
         EVIDENCE_DIR = GOLDEN_ROOT / "evidence"
 
     dataset, active, lines = _load_active()
+    _ = dataset
 
+    # -------- stage ALL entries first (P1-05: no orphan evidence) --------
+    staged_artifacts: list[tuple[Path, str]] = []
+    entries: list[dict] = []
     if args.manifest:
-        entries = json.loads(args.manifest.read_text(encoding="utf-8"))
-        for entry in entries:
-            ref, digest, retrieved = _store_artifact(
-                Path(entry["artifact"]), entry["case"], entry["kind"]
-            )
-            _apply_review(
-                lines,
-                entry["case"],
-                artifact_ref=ref,
-                artifact_hash=digest,
-                artifact_kind=entry["kind"],
-                retrieved_at=retrieved,
-                reviewer=args.reviewer,
-                note=entry.get("note", ""),
-                expect_fields=entry.get("expect_fields"),
+        raw_entries = json.loads(args.manifest.read_text(encoding="utf-8"))
+        for entry in raw_entries:
+            ref, digest, retrieved = _stage_artifact(Path(entry["artifact"]), entry["kind"])
+            staged_artifacts.append((Path(entry["artifact"]), ref))
+            entries.append(
+                {
+                    "case": entry["case"],
+                    "ref": ref,
+                    "digest": digest,
+                    "retrieved": retrieved,
+                    "kind": entry["kind"],
+                    "note": entry.get("note", ""),
+                    "expect_fields": entry.get("expect_fields"),
+                }
             )
     else:
         missing = [f for f in (args.case, args.artifact, args.kind) if not f]
         if missing:
             parser.error(f"missing arguments: {missing} (or use --manifest)")
-        expect = json.loads(args.expect_fields) if args.expect_fields else None
-        ref, digest, retrieved = _store_artifact(args.artifact, args.case, args.kind)
-        _apply_review(
-            lines,
-            args.case,
-            artifact_ref=ref,
-            artifact_hash=digest,
-            artifact_kind=args.kind,
-            retrieved_at=retrieved,
-            reviewer=args.reviewer,
-            note=args.note,
-            expect_fields=expect,
+        ref, digest, retrieved = _stage_artifact(args.artifact, args.kind)
+        staged_artifacts.append((args.artifact, ref))
+        entries.append(
+            {
+                "case": args.case,
+                "ref": ref,
+                "digest": digest,
+                "retrieved": retrieved,
+                "kind": args.kind,
+                "note": args.note,
+                "expect_fields": json.loads(args.expect_fields) if args.expect_fields else None,
+            }
         )
 
+    # -------- apply ALL reviews in memory (validates every case) ---------
+    for entry in entries:
+        _apply_review(
+            lines,
+            entry["case"],
+            artifact_ref=entry["ref"],
+            artifact_hash=entry["digest"],
+            artifact_kind=entry["kind"],
+            retrieved_at=entry["retrieved"],
+            reviewer=args.reviewer,
+            note=entry["note"],
+            expect_fields=entry["expect_fields"],
+        )
+
+    # -------- commit: evidence -> version -> ACTIVE pointer ---------------
+    _commit_evidence(staged_artifacts)
     version = _write_new_version(lines, active)
+    reviewed = sum(1 for c in lines if c["review_status"] == "REVIEWED")
     print(f"reviewed dataset version: {version}")
-    print(f"cases: {sum(1 for c in lines if c['review_status'] == 'REVIEWED')} REVIEWED")
+    print(f"cases: {reviewed} REVIEWED")
     return 0
 
 

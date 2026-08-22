@@ -629,6 +629,7 @@ class GoldenCase:
     event_id: str = ""
     event_class: str = ""
     event_subtype: str = ""
+    event_effective_date: str = ""
 
 
 def validate_golden_cases(

@@ -13,6 +13,53 @@
 
 ---
 
+## 2026-08-22 23:30 +08:00 · R4-A2.1 + R4-A2.2 + CR-1（复核四项 P0 全修 + 并行 Track B 启动）
+
+**Scope**
+- R4-A2 Batch-1 复核 REOPENED 的四项 Formal Truth P0（§2-19）+ P1-01~06（§20-29）+ R4-A2.2 Router/PIT（§34-40）+ CR-1 全部（§41-47）
+
+**Implementation**
+- **P0-01 review_gate 全量校验**：删除"第一条成功即 break"——现在遍历全部 REVIEWED cases 完整收集错误；first-valid-second-tampered / first-valid-later-missing 测试
+- **P0-02 Bound Golden Resolver**：`GoldenTruthStore.load_bound()` 直读 immutable dataset 文件（ACTIVE 指针只决定 NEW run 的默认选择）；resume / verdict / B4 probe 全部改走 `run.golden_dataset_file + golden_dataset_hash`；ACTIVE 推进（review 出 v4）后历史 run 仍精确 replay（测试验证）
+- **P0-03 Candidate Augmentation**：`scripts/golden/candidate.py`（add-case → validate → build-version 生命周期）；review workflow 只核验已有 candidate、绝不创建事件——"candidate 增事件 / review 验事件"职责分离；ST candidate 强制 subtype + event_effective_date
+- **P0-04 Production fail-fast**：`new_run(PRODUCTION)` 执行 quantity + event + review 三 gate 全通过才允许创建（不再烧完流量才在 verdict 发现 golden 未 review）
+- **P1 全修**：batch kind allowlist 统一校验；REVIEWED provenance 在 load 即完整校验（reviewer/at/ref/64-hex hash/kind/timestamp）；artifact ref path confinement（../ 与绝对路径拒绝）；版本文件 create-only（不同 bytes BLOCK）；batch stage-all-then-commit（失败零孤儿 evidence）；evidence 真正 content-addressed（`sha256/<full-hash>.<ext>`，方案 A）
+- **R4-A2.2 Domain Router**（`golden_router.py`）：ST→history_stock_status；Delisted→hist_code_list+stock_basic（幸存者偏差证明）；Limit→status+PIT TradingRule；CA→status+adj+kline T-1/T/T+1；BJ→mapping endpoint——B4 从"123 cases 一次 status 调用泛化比较"改为按域路由
+- **B3/B4 彻底分离**（§36）：B3 只做结构性校验，现场 `expected_is_st=False` 假设删除——语义 truth 只来自 B4 reviewed golden
+- **PIT TradingRule**（`trading_rule.py`）：版本化 effective_from/to（主板 10%/ST 5%/创业板改革前后/科创板首 5 日/北交所 30%/新股 44%）；limit price 用 **Decimal ROUND_HALF_UP**（禁 float round）
+- **History 固定 fixtures**（§38）：600519.SH / 000001.SZ / 835185.BJ / 300104.SZ（含历史退市）——不再 `get_code_list()[:2]`
+- **BSE 独立 core evidence**（§40）：B5 专项 835185.BJ status 调用
+- **事件 identity 结构化**（§13-16）：ST=(symbol, event_effective_date, subtype)、DELIST=(symbol, effective_date)——60 个自由字符串 event_id 合并为 1 个结构化 identity（测试证明无法凑数）
+- **CR-1a ProviderExchange**：`1 exchange = 1 request_id = 1 envelope = ≤1 payload`；`call_exchange()` 显式返回（无 last_exchange/consume 模式）；业务 wrapper 取 `.payload`；hidden `query_kline→get_calendar` 独立 exchange
+- **CR-1b RawWriter**（`storage/raw_writer.py`）：成功 → Parquet + meta.json；失败 → envelope-only 证据；same hash 幂等 / different bytes BLOCK；跨平台逻辑 URI；secret 脱敏；无 repr()
+- **CR-1c Spike 迁移**：`ProbeContext.evidence` 复用 exchange request_id（不再重新生成 uuid）
+
+**Schema / Contract Changes**
+- GoldenCase：+event_effective_date；SpikeRun：+golden_dataset_file
+- 新模块：providers/exchange.py、storage/raw_writer.py、spike/{golden_router,trading_rule}.py、scripts/golden/{candidate,review}.py
+- DM-CR-003 Part 2 + DM-CR-004 记录（C1）
+
+**Verification**
+- Local: **348 tests passed**（+35：review-gate 全量 3 + bound resolver 4 + candidate 7 + provenance/confinement/immutability 6 + CR-1 13 + router/PIT 适配）；ruff/format/mypy 全绿
+- GitHub Actions: 本批提交后触发，尚未确认（按 §49 口径区分 Local 与 CI）
+- dry-run 冒烟：B4 domain router 123 cases 全路由；B3 ST=OBSERVED（无 fabricated truth）；B5 fixtures + BSE evidence 正常
+
+**Implementation Status**
+- DONE（R4-A2.1 / R4-A2.2 / CR-1 全部）
+
+**Review Status**
+- PENDING_REVIEW（对照 §57 下次评审范围与 §58/§59 Exit Gate）
+
+**Known Open Issues**
+- Golden Review Workflow 仍待人工执行（candidate → review → 补齐 ≥50 distinct ST + ≥20 distinct DELIST + REMOTE subtype）
+- Branch Protection（§48，P1 治理）未启用——CR-A 前建议
+- B6/B7 optional gate 未在本批范围
+
+**Next**
+- Golden 人工 review 流程执行；R4-A3（SDK 行为拆分 / Early Stop / auth terminal-state）；CR-2（Canonicalizer）
+
+---
+
 ## 2026-08-22 18:00 +08:00 · R4-A2 第一批：Golden Review Evidence Closure
 
 **Scope**

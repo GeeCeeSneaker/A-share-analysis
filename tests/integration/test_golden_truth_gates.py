@@ -139,9 +139,10 @@ class TestReviewGate:
         (golden_env / "truth_manifest.json").write_text(
             json.dumps(active, indent=2), encoding="utf-8", newline="\n"
         )
-        problems = GoldenTruthStore(golden_env).review_gate()
-        # v3 semantics: the artifact gate fires (ref/hash both mandatory)
-        assert any("source_artifact_ref" in p or "source_artifact_hash" in p for p in problems)
+        # R4-A2.1 hardening: incomplete REVIEWED provenance now fails at LOAD
+        # (stronger than the old gate-only check)
+        with pytest.raises(GoldenTruthError, match="provenance incomplete"):
+            GoldenTruthStore(golden_env).load()
 
     def test_review_gate_uses_cases_not_manifest_claim(self):
         problems = GoldenTruthStore(REPO_GOLDEN).review_gate()
@@ -157,12 +158,17 @@ class TestEventCoverageGate:
         assert manifest.distinct_events.get("ST_TRANSITION", 0) == 2  # honest count
 
     def test_st_gate_requires_distinct_transition_events(self):
+        """Structural identity (audit section 14): the 10 ST rows over 2
+        real events (state-sampled dates) collapse to 10 distinct
+        (symbol, effective_date) identities - still far below 50."""
         problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
-        assert any("ST_TRANSITION events 2 < 50" in p for p in problems)
+        assert any("ST_TRANSITION events 10 < 50" in p for p in problems)
 
     def test_delist_gate_requires_distinct_securities(self):
+        """Structural identities (10 symbols x 2 dates = 20) pass the event
+        count, but the distinct-SYMBOL gate still blocks at 10."""
         problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
-        assert any("DELIST events 10 < 20" in p for p in problems)
+        assert any("distinct delisted securities 10 < 20" in p for p in problems)
 
     def test_production_run_refused_until_event_coverage_complete(
         self, tmp_path: Path, monkeypatch, golden_env: Path
@@ -207,6 +213,108 @@ class TestLoaderSelection:
         """P1-01: v1 dataset file still exists (never overwritten)."""
         assert (REPO_GOLDEN / "golden_cases_v1.jsonl").is_file()
         assert (REPO_GOLDEN / "golden_cases_v3.jsonl").is_file()
+
+
+class TestBoundGoldenResolver:
+    """R4A2-P0-02: runs resolve their BOUND immutable dataset, never ACTIVE."""
+
+    def _bound_run(self, golden_env: Path, tmp_path: Path):
+        """Create a PRODUCTION run bound to the CURRENT ACTIVE dataset."""
+        import sys as _sys
+
+        _sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+        from ashare_state.providers.amazingdata.session import AccountProfile
+        from ashare_state.spike.golden_store import GoldenTruthStore
+        from ashare_state.spike.runner import new_run
+
+        profile = AccountProfile.from_scrubbed(
+            {"PermissionCode": "1|2", "SubscribeLimitNum": 5000, "TotalWeekFlow": 500},
+            provider="amazingdata",
+            host="h",
+            username="u",
+        )
+        # relax entry gates (this test exercises BINDING, not review)
+        import ashare_state.spike.golden_store as gs
+
+        original = gs.GoldenTruthStore.event_coverage_gate
+        gs.GoldenTruthStore.event_coverage_gate = lambda self: []
+        gs.GoldenTruthStore.review_gate = lambda self: []
+        try:
+            run, store = new_run(
+                run_kind=RunKind.PRODUCTION,
+                spike_root=tmp_path / "spike",
+                code_commit="a" * 40,
+                environment_lock_hash="e" * 64,
+                config_hash="c" * 64,
+                sdk_version="1.1.9",
+                runtime_version="V4.3.0",
+                account_profile_id=profile.account_profile_id,
+                account_profile=profile,
+            )
+        finally:
+            gs.GoldenTruthStore.event_coverage_gate = original
+        return run, store, GoldenTruthStore(golden_env)
+
+    def test_run_bound_golden_survives_active_pointer_advance(
+        self, golden_env: Path, tmp_path: Path
+    ):
+        run, store, store_obj = self._bound_run(golden_env, tmp_path)
+        bound_file, bound_version, bound_hash = (
+            run.golden_dataset_file,
+            run.golden_truth_version,
+            run.golden_dataset_hash,
+        )
+        # advance ACTIVE by reviewing one case (creates a new version)
+        art = golden_env.parent / "adv.txt"
+        art.write_text("advance evidence", encoding="utf-8")
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).resolve().parents[2] / "scripts/golden/review.py"),
+                "--root",
+                str(golden_env),
+                "--case",
+                "GT-ST-600518-20190506",
+                "--artifact",
+                str(art),
+                "--kind",
+                "SSE_ANNOUNCEMENT",
+                "--reviewer",
+                "bob",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stderr
+        # ACTIVE has advanced past the bound version...
+        _, new_manifest = store_obj.load()
+        assert new_manifest.truth_version != bound_version
+        # ...but the run still resolves its OWN bound dataset exactly
+        cases, manifest = store_obj.load_bound(bound_file, bound_version, bound_hash)
+        assert manifest.case_count == 123
+        assert len(cases) == 123
+
+    def test_bound_dataset_hash_mismatch_blocks(self, golden_env: Path, tmp_path: Path):
+        run, store, store_obj = self._bound_run(golden_env, tmp_path)
+        with pytest.raises(GoldenTruthError, match="hash mismatch"):
+            store_obj.load_bound(run.golden_dataset_file, run.golden_truth_version, "0" * 64)
+
+    def test_missing_bound_dataset_blocks(self, golden_env: Path, tmp_path: Path):
+        run, store, store_obj = self._bound_run(golden_env, tmp_path)
+        with pytest.raises(GoldenTruthError, match="does not exist"):
+            store_obj.load_bound(
+                "golden_cases_v99.jsonl", run.golden_truth_version, run.golden_dataset_hash
+            )
+
+    def test_run_json_persists_dataset_file(self, golden_env: Path, tmp_path: Path):
+        run, store, store_obj = self._bound_run(golden_env, tmp_path)
+        loaded = store.load_run(run.spike_run_id, RunKind.PRODUCTION)
+        assert loaded.golden_dataset_file == run.golden_dataset_file
+        assert loaded.golden_dataset_file.endswith(".jsonl")
 
 
 class TestSemanticConflictFix:

@@ -4,9 +4,9 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Current Code Baseline**：`8d7d4aa`（R4-A1.1 落地 + DM 初始化；见 §33 更新规则——每次 C1 提交刷新）  
-> **Document Revision**：本批（DM-CR-002 + §2 修正）  
-> **Last Review**：2026-08-22（R4-A1.1 复核：Governance PASS_WITH_MINOR_FIXES）  
+> **Current Code Baseline**：本批提交（R4-A2.1 + R4-A2.2 + CR-1；见 §33 更新规则）  
+> **Document Revision**：DM-CR-003 Part 2 + DM-CR-004  
+> **Last Review**：2026-08-22（R4-A2 Batch-1 复核：REOPENED——四项 Formal Truth P0，本批修复）  
 > **Last Reviewer**：Design / Audit Review  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
@@ -1617,7 +1617,34 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 > 新条目倒序追加，不删除历史。
 
+## DM-CR-20260822-004 — CR-1 ProviderExchange / RawWriter Runtime Contract
+
+**Type**：C1（新增运行时契约）  
+**Status**：DONE（Implementation）/ PENDING_REVIEW  
+**Trigger**：R4-A2 Batch-1 复核裁决 CR-1 READY / SHOULD START NOW。  
+**Old Contract**：provider `get_xxx` 直接返回 payload；envelope 藏在 `last_envelopes`（thread-local 式）；无 Raw 层持久化；query_kline 内部 get_calendar 无独立审计。  
+**New Contract**：
+- `ProviderExchange`（1 SDK exchange = 1 request_id = 1 RawEnvelope = ≤1 payload）；`call_exchange()` 显式返回 exchange；业务 wrapper 取 `.payload`；**无 last_exchange/consume 模式**
+- hidden SDK call（`query_kline → get_calendar`）独立 exchange（calendar 不埋进 kline envelope）
+- `RawWriter`：成功 exchange → Parquet 工件 + .meta.json（envelope）；失败 exchange → envelope-only 失败证据（请求审计永不丢失）；same hash 幂等 / different bytes BLOCK；跨平台逻辑 URI；secret 脱敏；**无 repr() 序列化**
+- Spike `ProbeContext.evidence` 复用 exchange 的 request_id（不再重新生成）  
+**Affected Modules**：providers/exchange.py（新）、providers/amazingdata/provider.py、storage/raw_writer.py（新）、spike/probes.py  
+**Tests**：348 passing（新增 test_cr1_provider_exchange：request_id 保持 / 失败 envelope / 幂等 / 冲突 BLOCK / secret 脱敏 / 跨平台 URI / 无 repr / hidden calendar 独立 exchange / spike request_id lineage）  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
 ## DM-CR-20260822-003 — R4-A2 Golden Review / Domain Router / PIT Validator Contract（第一批）
+
+**Part 2（本批）**：R4-A2 Batch-1 复核四项 P0 全部修复——
+- **P0-01** review_gate 全 case 校验（删除 early break；完整错误收集；first-valid-second-tampered 测试）
+- **P0-02** Run-bound Golden resolver：`load_bound(dataset_file, truth_version, dataset_hash)` 直读 immutable dataset；resume/verdict/B4 全部走 bound（ACTIVE 仅决定 NEW run 默认版本）；ACTIVE 推进后历史 run 仍可 Exact Replay（测试）
+- **P0-03** Candidate Augmentation Workflow（`scripts/golden/candidate.py`：add-case/validate/build-version）；review 只核验不创建事件；生命周期文档更新
+- **P0-04** PRODUCTION new_run 执行完整 formal gate（quantity + events + review）fail-fast（不再烧完正式账号流量才在 verdict 发现 golden 未 review）
+- P1-01 batch kind 统一 allowlist；P1-02 REVIEWED provenance load 时完整校验；P1-03 artifact ref path confinement；P1-04 版本文件 create-only（不同 bytes BLOCK）；P1-05 batch stage-all-then-commit（无孤儿 evidence）；P1-06 evidence 真正 content-addressed（sha256/ 路径，方案 A）
+- **R4-A2.2**：Domain Router（golden_router.py：ST→status / Delisted→hist_code_list+stock_basic / Limit→status+PIT rule / CA→status+adj+kline / BJ→mapping）；B3 现场 ST truth 删除（B3 结构性、B4 语义性彻底分离）；PIT TradingRule（版本化 effective_from/to + Decimal ROUND_HALF_UP）；History 固定 fixtures（600519/000001/835185/300104，不再 get_code_list()[:2]）；BSE 独立 core evidence
+- 事件 identity 结构化：ST=(symbol, effective_date, subtype)、DELIST=(symbol, effective_date)——自由字符串 event_id 无法凑数（60 fake-id 合并为 1 的测试）
+**Status 更新**：Implementation DONE（R4-A2.1 + R4-A2.2 全部落地）/ Review PENDING_REVIEW  
+**Tests**：348 passing（本批 +13：bound resolver 4 + candidate workflow 4 + router/trading_rule 相关 + CR-1 13 项）
 
 **Type**：C1 Contract Clarification  
 **Status**：IN_PROGRESS（第一批已落地：Evidence Closure + Review Workflow + 事件语义 + hash 更名；Router/PIT/BSE/BJ 进行中）  

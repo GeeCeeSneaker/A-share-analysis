@@ -38,6 +38,7 @@ def _event_gate_relaxed(monkeypatch):
 
     monkeypatch.setattr(GoldenTruthStore, "event_coverage_gate", lambda self: [])
     monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self: [])
+    monkeypatch.setattr(GoldenTruthStore, "production_formal_gate", lambda self, m: [])
 
 
 @pytest.fixture

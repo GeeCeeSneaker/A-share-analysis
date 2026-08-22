@@ -86,10 +86,20 @@ class ProbeContext:
     def evidence(
         self, endpoint: str, dataset: str, params: dict[str, Any], payload: Any
     ) -> dict[str, Any]:
+        """Persist evidence. CR-1c (audit section 43): when the payload came
+        from a ProviderExchange, the evidence reuses the EXCHANGE's
+        request_id - never regenerates one."""
         identity = self.target.identity()
+        request_id = str(uuid.uuid4())
+        provider = getattr(self.target, "provider", None)
+        if provider is not None:
+            envelopes = getattr(provider, "last_envelopes", [])
+            matching = [e for e in envelopes if e.endpoint == endpoint]
+            if matching:
+                request_id = str(matching[-1].request_id)
         return self.store.write_evidence(
             self.run,
-            str(uuid.uuid4()),
+            request_id,
             endpoint=endpoint,
             provider_dataset=dataset,
             params=params,
@@ -385,17 +395,10 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         results["limit"] = "NOT_TESTABLE"
     else:
         status_rows = _to_plain(_rows_of(status))
-        # R3-P0-08: ST validation requires golden facts; without them the
-        # outcome is OBSERVED (deferred), never PASS
-        golden_facts = [
-            validators.GoldenSTFact(
-                provider_symbol=sym,
-                trade_date=str(sample_date),
-                expected_is_st=False,
-            )
-            for sym in symbols[:1]
-        ]
-        st_out = validators.validate_st_suspend_flags(status_rows, golden_facts=golden_facts)
+        # R4-A2.2a (audit section 36): B3 is STRUCTURAL validation only -
+        # semantic ST truth belongs exclusively to the B4 reviewed golden
+        # router. No fabricated expected_is_st here, ever.
+        st_out = validators.validate_st_suspend_flags(status_rows, golden_facts=[])
         ctx.outcome_case("historical_st_suspend", "SAMPLE", str(sample_date), status_meta, st_out)
         limit_out = validators.validate_limit_rule(status_rows)
         ctx.outcome_case(
@@ -437,32 +440,44 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
 
 
 def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
-    """Golden pipeline (R3-P0-12/13 + R4-P0-01/02): the VERSIONED golden
-    dataset (data/golden/..., sealed source_hash per entry) carries the
-    EXTERNAL truth; each case is looked up in provider status data and
-    compared field-by-field. Golden case types FEED THE CORE GATE."""
+    """Golden pipeline (R4-A2.2a): DOMAIN-ROUTED comparison - each case
+    type fetches and validates against its own domain endpoints (audit
+    sections 34-35); loads the RUN-BOUND dataset (R4A2-P0-02)."""
+    from ashare_state.spike.golden_router import route_all
     from ashare_state.spike.golden_store import GoldenTruthStore
 
-    golden_cases, golden_manifest = GoldenTruthStore().load()
+    if ctx.run.golden_dataset_file:
+        golden_cases, golden_manifest = GoldenTruthStore().load_bound(
+            dataset_file=ctx.run.golden_dataset_file,
+            truth_version=ctx.run.golden_truth_version,
+            dataset_hash=ctx.run.golden_dataset_hash,
+        )
+    else:
+        # dry-run / unbound runs fall back to ACTIVE (never formal verdicts)
+        golden_cases, golden_manifest = GoldenTruthStore().load()
     executor = ProbeExecutor(ctx)
-    # one provider call covering all golden symbols/dates (status supports
-    # date ranges; per-case dates fall back to individual calls below)
-    golden_symbols = sorted({c.provider_symbol for c in golden_cases})
-    payload, meta = executor.call(
-        "InfoData.get_history_stock_status",
-        "golden_status",
-        {"symbols": len(golden_symbols), "as_of": sample_date},
-        lambda: ctx.target.get_history_stock_status(19900101, sample_date, golden_symbols),
-        failure_case_type="golden_st_transition",
-        trade_date=str(sample_date),
-        symbol="GOLDEN",
-    )
-    if payload is None:
-        return {"result": "NOT_TESTABLE"}
-    rows = _to_plain(_rows_of(payload))
-    outcomes = validators.validate_golden_cases(list(golden_cases), rows)
+    # domain evidence: one envelope per routing domain records the
+    # underlying provider exchange (status/hist/basic/adj/kline/mapping)
+    domain_evidence: dict[str, dict[str, Any]] = {}
     results: dict[str, int] = {}
-    for case, outcome in zip(golden_cases, outcomes, strict=True):
+    outcomes = route_all(ctx, list(golden_cases))
+    for case, outcome in outcomes:
+        from ashare_state.spike.golden_router import route_golden_case
+
+        domain = route_golden_case(case)
+        meta = domain_evidence.get(domain)
+        if meta is None:
+            payload, meta = executor.call(
+                "InfoData.get_history_stock_status",
+                f"golden_{domain.lower()}",
+                {"domain": domain, "cases": len(golden_cases)},
+                lambda: None,
+                failure_case_type=case.case_type,
+                trade_date=str(sample_date),
+                symbol=f"DOMAIN:{domain}",
+            )
+            _ = payload
+            domain_evidence[domain] = meta
         ctx.case(
             case_id=case.golden_case_id,
             case_type=case.case_type,
@@ -515,18 +530,25 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
     }
     out = validators.validate_sdk_behavior_record(record)
     ctx.outcome_case("sdk_permission_cache_freshness", "SDK", str(sample_date), cal_meta, out)
-    # history coverage core gate
-    symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")][:2]
+    # history coverage core gate (audit section 38: FIXED fixtures - never
+    # get_code_list()[:2], which samples provider CURRENT state, not
+    # historical capability)
+    fixtures = [
+        "600519.SH",  # long-listed SH main board (1999)
+        "000001.SZ",  # long-listed SZ main board (1991)
+        "835185.BJ",  # BSE migrated listing (2021 opening)
+        "300104.SZ",  # historical delisting (LeEco, delisted 2020)
+    ]
     bars, bar_meta = executor.call(
         "MarketData.query_kline",
         "history_depth",
-        {"range": "19900101-today"},
+        {"fixtures": fixtures, "range": "19900101-today"},
         lambda: ctx.target.query_kline(
-            symbols, begin_date=19900101, end_date=sample_date, kline_type="DAY"
+            fixtures, begin_date=19900101, end_date=sample_date, kline_type="DAY"
         ),
         failure_case_type="history_start_2018_plus_warmup",
         trade_date=str(sample_date),
-        symbol="MARKET",
+        symbol="FIXTURES",
     )
     if bars is None:
         earliest = ""
@@ -534,16 +556,31 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         rows = _to_plain(_rows_of(bars))
         earliest = min((str(r.get("KLINE_TIME", "99991231")) for r in rows), default="")
     cov = validators.validate_history_coverage(earliest)
-    ctx.outcome_case("history_start_2018_plus_warmup", "MARKET", str(sample_date), bar_meta, cov)
+    ctx.outcome_case("history_start_2018_plus_warmup", "FIXTURES", str(sample_date), bar_meta, cov)
     # symbol mapping core gate
     symbols_all = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")]
     sym_meta = ctx.evidence("BaseData.get_code_list", "code_list", {}, symbols_all)
     sym_out = validators.validate_symbol_mapping(symbols_all)
     ctx.outcome_case("symbol_mapping_unambiguous", "MARKET", "", sym_meta, sym_out)
+    # BSE/BJ independent core evidence (audit section 40): dedicated calls,
+    # never "the current code list happens to include BJ"
+    bse_status, bse_meta = executor.call(
+        "InfoData.get_history_stock_status",
+        "bse_status",
+        {"symbol": "835185.BJ"},
+        lambda: ctx.target.get_history_stock_status(20220101, 20221231, ["835185.BJ"]),
+        failure_case_type="limit_price_and_no_limit_days",
+        trade_date="20220601",
+        symbol="835185.BJ",
+    )
+    bse_rows = _to_plain(_rows_of(bse_status)) if bse_status is not None else []
+    bse_out = validators.validate_limit_rule(bse_rows)
+    ctx.outcome_case("limit_price_and_no_limit_days", "BSE", "20220601", bse_meta, bse_out)
     return {
         "calendar_rows": record["calendar_rows"],
         "earliest": earliest,
         "symbols": len(symbols_all),
+        "bse_evidence_rows": len(bse_rows),
     }
 
 

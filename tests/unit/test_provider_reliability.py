@@ -97,7 +97,7 @@ class TestFailedCallEnvelope:
             raise TypeError("'NoneType' object is not subscriptable")
 
         with pytest.raises(ProviderPermissionError):
-            provider._call(  # noqa: SLF001
+            provider.call_exchange(
                 "FakeData.endpoint",
                 "fake_dataset",
                 denied,
@@ -121,13 +121,13 @@ class TestFailedCallEnvelope:
             identity=_FakeIdentity(),
             use_mode=ProviderUseMode.SPIKE,
         )
-        result = provider._call(  # noqa: SLF001
+        exchange = provider.call_exchange(
             "FakeData.endpoint",
             "fake_dataset",
             lambda: ["a", "b"],
             require_capability="daily_bar",
         )
-        assert result == ["a", "b"]
+        assert exchange.payload == ["a", "b"]
         env = provider.last_envelopes[-1]
         assert env.status == "OK"
         assert env.error_class is None
