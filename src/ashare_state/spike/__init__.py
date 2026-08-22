@@ -15,29 +15,59 @@ Layout:
 """
 
 from ashare_state.spike.catalog import CaseCatalog
-from ashare_state.spike.model import CaseResult, RunKind, SpikeCase, SpikeRun, core_gate_satisfied
+from ashare_state.spike.model import (
+    CaseResult,
+    RunFailureReason,
+    RunKind,
+    RunStatus,
+    SpikeCase,
+    SpikeRun,
+    core_gate_satisfied,
+)
 from ashare_state.spike.probes import ProbeContext
 from ashare_state.spike.run_store import RunStore
 from ashare_state.spike.runner import (
+    ProductionAccountGateError,
+    RunLifecycleError,
     SpikeVerdict,
+    abort_run,
+    close_run,
+    compute_config_hash,
+    compute_environment_lock_hash,
     compute_verdict,
     current_code_commit,
+    fail_run,
     new_run,
+    resume_run,
     run_dry_run,
+    verify_evidence_closure,
+    verify_production_account,
 )
 
 __all__ = [
     "CaseCatalog",
     "CaseResult",
     "ProbeContext",
+    "ProductionAccountGateError",
+    "RunFailureReason",
     "RunKind",
+    "RunLifecycleError",
+    "RunStatus",
     "RunStore",
     "SpikeCase",
     "SpikeRun",
     "SpikeVerdict",
+    "abort_run",
+    "close_run",
+    "compute_config_hash",
+    "compute_environment_lock_hash",
     "compute_verdict",
     "core_gate_satisfied",
     "current_code_commit",
+    "fail_run",
     "new_run",
+    "resume_run",
     "run_dry_run",
+    "verify_evidence_closure",
+    "verify_production_account",
 ]

@@ -27,6 +27,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="security_master_with_delisted",
         core=True,
         required_case_types=("security_master_with_delisted",),
+        min_valid_cases=20,  # 20 delisted golden cases (task book 7.1A)
         validator_id="security_master_delisted_v1",
         description="master must contain delisted securities (survivorship)",
     ),
@@ -34,6 +35,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="daily_bar_units",
         core=True,
         required_case_types=("daily_bar_units",),
+        min_valid_cases=1,
         validator_id="daily_bar_units_v1",
         description="volume/amount units verified against documented units",
     ),
@@ -41,6 +43,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="historical_st_suspend",
         core=True,
         required_case_types=("historical_st_suspend",),
+        min_valid_cases=50,  # 50 ST cap/removal golden cases
         validator_id="st_suspend_v1",
         description="daily ST/suspension semantics correct",
     ),
@@ -48,6 +51,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="limit_price_and_no_limit_days",
         core=True,
         required_case_types=("limit_price_and_no_limit_days",),
+        min_valid_cases=30,  # 30 limit-regime golden cases
         validator_id="limit_rule_v1",
         description="limit prices and no-limit days correct",
     ),
@@ -55,6 +59,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="adj_factor_corporate_action_continuity",
         core=True,
         required_case_types=("adj_factor_corporate_action_continuity",),
+        min_valid_cases=20,  # 20 corporate-action golden cases
         validator_id="adj_continuity_v1",
         description="adj factor + corporate action price continuity",
     ),
@@ -62,6 +67,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="history_start_2018_plus_warmup",
         core=True,
         required_case_types=("history_start_2018_plus_warmup",),
+        min_valid_cases=1,
         validator_id="history_coverage_v1",
         description="history depth covers 2018 + warmup to 2014/2015",
     ),
@@ -69,6 +75,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="symbol_mapping_unambiguous",
         core=True,
         required_case_types=("symbol_mapping_unambiguous",),
+        min_valid_cases=1,
         validator_id="symbol_mapping_v1",
         description="provider symbol mapping unambiguous incl. BJ old/new codes",
     ),
@@ -76,6 +83,7 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         capability_id="sdk_permission_cache_freshness",
         core=True,
         required_case_types=("sdk_permission_cache_freshness",),
+        min_valid_cases=1,
         validator_id="sdk_behavior_v1",
         description="SDK permission/cache/freshness behavior recorded & verified",
     ),

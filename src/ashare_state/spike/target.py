@@ -78,10 +78,13 @@ class RealTarget:
 
     def identity(self) -> dict[str, Any]:
         identity = self.provider.identity
+        profile = self.provider.session.profile
         return {
             "sdk_version": identity.sdk_version if identity else None,
             "runtime_version": identity.tgw_runtime_version if identity else None,
-            "account_profile_id": self.provider.session.profile.account_profile_id,
+            "account_profile_id": profile.account_profile_id,
+            # R3-P0-11: REAL permission codes from the parsed logon profile
+            "permission_codes": profile.permission_codes,
         }
 
 
@@ -104,6 +107,7 @@ class FakeTarget:
             "sdk_version": "FAKE-1.1.9",
             "runtime_version": "FAKE-V4.3.0",
             "account_profile_id": "TRIAL_SIMULATION_FAKE",
+            "permission_codes": "3|4|32|33",
         }
 
     def get_code_list(self, security_type: str | None = None) -> list[str]:

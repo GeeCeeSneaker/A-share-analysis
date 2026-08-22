@@ -22,6 +22,25 @@ class RunKind(StrEnum):
     PRODUCTION = "PRODUCTION"
 
 
+class RunStatus(StrEnum):
+    """R3-P0-01: formal runs ALWAYS reach a terminal state."""
+
+    RUNNING = "RUNNING"
+    CLOSED = "CLOSED"  # all phases executed (success or partial semantic fails)
+    FAILED = "FAILED"  # aborted by auth/account/fatal error
+    ABORTED = "ABORTED"  # operator-interrupted
+
+
+TERMINAL_RUN_STATUSES = (RunStatus.CLOSED, RunStatus.FAILED, RunStatus.ABORTED)
+
+
+class RunFailureReason(StrEnum):
+    """Why a run FAILED (terminal detail)."""
+
+    FAILED_ACCOUNT = "FAILED_ACCOUNT"  # ProviderAuthError: run cannot continue
+    FRAMEWORK_ERROR = "FRAMEWORK_ERROR"
+
+
 class CaseResult(StrEnum):
     """Audit R2 section 4: eight states, semantic verdicts only."""
 
@@ -59,9 +78,11 @@ class SpikeRun:
     code_commit: str = "unknown"
     environment_lock_hash: str = ""
     config_hash: str = ""
+    as_of_date: str = ""  # R3-P1-09: the single run-wide as-of reference
     started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     ended_at: str | None = None
     status: str = "RUNNING"
+    failure_reason: str | None = None  # RunFailureReason when FAILED
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -74,10 +95,29 @@ class SpikeRun:
             "code_commit": self.code_commit,
             "environment_lock_hash": self.environment_lock_hash,
             "config_hash": self.config_hash,
+            "as_of_date": self.as_of_date,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
             "status": self.status,
+            "failure_reason": self.failure_reason,
         }
+
+    def provenance_complete(self) -> bool:
+        """R3-P0-15: formal verdict requires full provenance.
+
+        Unknown/empty code_commit / environment_lock_hash / config_hash /
+        sdk_version / runtime_version / account_profile_id makes a verdict
+        SPIKE_INCOMPLETE by construction (asserted before aggregation).
+        """
+        required = (
+            self.code_commit,
+            self.environment_lock_hash,
+            self.config_hash,
+            self.sdk_version or "",
+            self.runtime_version or "",
+            self.account_profile_id,
+        )
+        return all(value and value != "unknown" for value in required)
 
 
 @dataclass(frozen=True)

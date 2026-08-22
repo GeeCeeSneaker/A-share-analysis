@@ -82,9 +82,11 @@ class RunStore:
             code_commit=payload.get("code_commit", "unknown"),
             environment_lock_hash=payload.get("environment_lock_hash", ""),
             config_hash=payload.get("config_hash", ""),
+            as_of_date=payload.get("as_of_date", ""),
             started_at=payload.get("started_at", ""),
             ended_at=payload.get("ended_at"),
             status=payload.get("status", "RUNNING"),
+            failure_reason=payload.get("failure_reason"),
         )
 
     def assert_verdict_eligible(self, run: SpikeRun) -> None:
@@ -130,7 +132,12 @@ class RunStore:
             "payload": lossless,
         }
         text = json.dumps(document, ensure_ascii=False, default=str, indent=1)
-        path.write_text(text, encoding="utf-8")
+        # newline="": NO platform newline translation - the recorded
+        # content_hash must match the file BYTES exactly (evidence closure
+        # re-verifies them; the default \n -> \r\n translation on Windows
+        # broke hash equality - found by the R3-P0-16 closure check).
+        with path.open("w", encoding="utf-8", newline="") as fh:
+            fh.write(text)
         import hashlib
 
         content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()

@@ -1,10 +1,52 @@
 # 开发日志（DEVLOG）
 
-> **维护规则**：每次推送 git 时在本日志顶部追加当日条目（倒序），不覆盖历史。
-> 每条包含：日期 / 关联 commit / 完成事项 / 关键决策 / 下一步。
-> 里程碑级专题报告（M0 出口、审计响应等）独立成文于 `docs/`，此处登记链接。
+> **维护规则**（第三轮审查 §1-§4 固化）：
+> - 本文件是项目**唯一**滚动开发日志；每次代码推送同步在顶部追加条目（倒序），不覆盖历史。
+> - 专题报告仅限：M0 Exit / Provider Spike / P0a Exit / P0b Exit / Backfill Exit / 重大 Incident / 重大架构决策。
+> - 每个条目区分 **Implementation Status**（DONE / IN_PROGRESS / BLOCKED）与 **Review Status**（PENDING_REVIEW / VERIFIED / REOPENED）——"代码写完" ≠ "审计关闭"。
+> - CI gate：代码 commit（src/migrations/configs/scripts）必须同时修改本文件（test_code_commit_requires_devlog_change + CI diff-tree 检查）。
 
 ---
+
+## 2026-08-22 22:30 · R3-0A：Spike 生命周期 + 账号门 + Provenance + Verdict 引擎
+
+**Scope**
+- 按第三轮审查 §37 R3-0A + R3-0B 主体：修复 Formal Spike 无法产出 verdict / 可能错误 GO 的全部 P0 逻辑漏洞。
+
+**Implementation**
+- `RunStatus`（RUNNING/CLOSED/FAILED/ABORTED）+ `close_run`/`fail_run`/`abort_run`/`resume_run`——formal run 必达终态；resume 校验身份六元组（account/code/env/config/sdk/runtime）
+- **Production Account Gate**（R3-P0-14）：`verify_production_account`——auth_ok/profile_parsed/entitlement_verified/非 TRIAL；`new_run(PRODUCTION)` 强制完整 provenance（40 字符 SHA + env/config hash）
+- **Verdict 引擎重写**（R3-P0-04/05/16）：直接遍历 SpikeCase——fail dominates pass、DIFF_EXPLAINED 仅 equivalent_pass 计入、min_valid_cases 真实生效（golden 数量：20/50/30/20）、**Evidence Closure**（case 校验 + run 绑定 + 去重 + evidence 文件存在 + hash 复验 + catalog 篡改检测）
+- **ProbeExecutor**（R3-P0-03）：Provider 五类 typed error → 结构化 case（Permission→NOT_TESTABLE_PERMISSION / RateLimit→NOT_TESTABLE_ACCOUNT / Auth→fail_run(FAILED_ACCOUNT) / Schema→VALIDATED_FAIL / 其他→MISSING→SPIKE_INCOMPLETE）；失败 envelope 也归档为 evidence
+- CLI：PRODUCTION 默认单 run 全阶段（逐阶段需 `--resume`）；终态强制持久化；`--date` 进入 run.as_of_date，B2 不再硬编码日期（R3-P1-09）
+- milestone eligibility 与 verdict 分离（R3 §54）：verdict.json 输出 p0a/p0b/backfill_eligible
+
+**Schema / Contract Changes**
+- SpikeRun 新增 `as_of_date` / `failure_reason`；status 变为 RunStatus 枚举语义
+- capabilities：min_valid_cases 从占位 1 提为 golden 数量（20/50/30/20）
+- 无 migration（本轮全部在 spike 框架内）
+
+**Verification**
+- pytest: **253 passed**（was 238；新增 lifecycle/verdict/gate 15 项）
+- ruff/format/mypy: clean；`spike_runner --dry-run` 冒烟通过
+- **R3-P0-16 闭包校验当场抓到真实 Windows bug**：`write_text` 默认换行转换导致 evidence 字节与 hash 不一致——已修（`newline=""`），这正是该审计项要防的篡改不可见问题
+
+**Known Open Issues**
+- R3-P0-06~13（validators 语义强化 + Golden Truth 绑定 Core Gate）→ R3-0C
+- R3-P0-17（capability approval 自证）→ R3-1B；R3-P0-18（删 manual publish）→ R3-1A
+- R3-P1-06（query_kline 内部 calendar 未走 envelope）/ P1-07（ProviderExchange）→ 与 CR-1 一并做
+
+**Implementation Status**
+- DONE（R3-0A + R3-0B verdict 引擎主体）
+
+**Review Status**
+- PENDING_REVIEW
+
+**Next**
+- R3-0C：语义 validators 重写（symbol 复用 normalize_provider_symbol / units 独立证据 / ST golden / limit 制度 / adj 连续性 / sdk 真实 permission codes）+ Golden 进 Core Gate
+
+---
+
 
 ## 2026-08-22（晚）· 第二轮审计整改完成
 

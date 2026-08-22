@@ -1,10 +1,15 @@
-"""B2-B7 probes (audit R2 sections 3/24.5/24.6/24.7).
+"""B2-B7 probes (audit R2 sections 3/24.5/24.6/24.7 + R3-P0-03/P1-09).
 
 Every probe:
 - calls ONLY through its SpikeTarget (real = hardened adapter),
-- archives lossless raw evidence via the RunStore,
+- goes through the ProbeExecutor so provider errors become STRUCTURED
+  cases (never an unhandled crash leaving the run RUNNING),
+- archives lossless raw evidence via the RunStore (including FAILED
+  exchanges - the provider envelope itself is evidence),
 - turns payloads into cases with SEMANTIC validators (never call-success),
-- writes cases into the run-scoped catalog.
+- writes cases into the run-scoped catalog,
+- references the SINGLE run as-of date (R3-P1-09) - no probe may hardcode
+  today's date.
 
 Golden (B4) executes the real Discover -> Freeze -> Expected -> Compare
 -> Reason -> Verdict pipeline against provider data.
@@ -13,11 +18,19 @@ Golden (B4) executes the real Discover -> Freeze -> Expected -> Compare
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 from typing import Any
 
+from ashare_state.providers.errors import (
+    ProviderAuthError,
+    ProviderError,
+    ProviderPermissionError,
+    ProviderRateLimitError,
+    ProviderSchemaError,
+)
 from ashare_state.spike import validators
 from ashare_state.spike.catalog import CaseCatalog
-from ashare_state.spike.model import CaseResult, SpikeCase, SpikeRun
+from ashare_state.spike.model import CaseResult, RunFailureReason, SpikeCase, SpikeRun
 from ashare_state.spike.run_store import RunStore
 from ashare_state.spike.target import SpikeTarget
 
@@ -63,6 +76,12 @@ class ProbeContext:
         self.store = store
         self.catalog = catalog
         self.target = target
+
+    @property
+    def as_of_date(self) -> int:
+        """R3-P1-09: the single run-wide as-of reference."""
+        digits = "".join(ch for ch in str(self.run.as_of_date) if ch.isdigit())
+        return int(digits[:8]) if len(digits) >= 8 else 20260814
 
     def evidence(
         self, endpoint: str, dataset: str, params: dict[str, Any], payload: Any
@@ -143,16 +162,153 @@ class ProbeContext:
         )
 
 
+class ProbeExecutor:
+    """R3-P0-03: provider exceptions become structured cases.
+
+    Mapping (audit R3 section 7):
+      ProviderPermissionError -> NOT_TESTABLE_PERMISSION case
+      ProviderRateLimitError  -> NOT_TESTABLE_ACCOUNT case
+      ProviderAuthError       -> run FAILED_ACCOUNT (terminal) + re-raise
+      ProviderSchemaError     -> VALIDATED_FAIL case
+      other ProviderError     -> MISSING case (SDK internal -> gate sees
+                                 SPIKE_INCOMPLETE, never a false PASS)
+
+    FAILED exchanges are archived as evidence too: the provider's own
+    ERROR RawEnvelope is persisted (request_id / attempts / error_class),
+    so denials leave an auditable trail.
+    """
+
+    def __init__(self, ctx: ProbeContext) -> None:
+        self.ctx = ctx
+
+    def _failed_envelope_evidence(
+        self, exc: ProviderError, endpoint: str, dataset: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        provider = getattr(self.ctx.target, "provider", None)
+        payload: Any = {"error": f"{type(exc).__name__}: {exc}"[:500]}
+        if provider is not None:
+            failed = [e for e in provider.last_envelopes if e.status == "ERROR"]
+            if failed:
+                payload = {"failed_envelope": asdict(failed[-1]), "error": str(exc)[:500]}
+        return self.ctx.evidence(endpoint, dataset, params, payload)
+
+    def call(
+        self,
+        endpoint: str,
+        dataset: str,
+        params: dict[str, Any],
+        fn: Any,
+        *,
+        failure_case_type: str,
+        trade_date: str = "",
+        symbol: str = "SDK",
+    ) -> tuple[Any, dict[str, Any]]:
+        """Execute one target call; returns (payload, evidence_meta).
+
+        On provider failure the case is recorded and (None, meta) is
+        returned - callers skip further validation for this capability.
+        """
+        from ashare_state.spike.runner import fail_run
+
+        try:
+            payload = fn()
+            meta = self.ctx.evidence(endpoint, dataset, params, payload)
+            return payload, meta
+        except ProviderAuthError as exc:
+            # account-level fatal: terminal state, then re-raise so the CLI stops
+            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            self.ctx.case(
+                case_id=f"SDK-AUTH-{uuid.uuid4().hex[:8]}",
+                case_type=failure_case_type,
+                security=symbol,
+                provider_symbol=symbol,
+                trade_date=trade_date,
+                expected="authenticated account",
+                actual=f"ProviderAuthError: {exc}"[:300],
+                result=CaseResult.NOT_TESTABLE_ACCOUNT,
+                evidence_meta=meta,
+            )
+            fail_run(self.ctx.store, self.ctx.run, RunFailureReason.FAILED_ACCOUNT)
+            raise
+        except ProviderPermissionError as exc:
+            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            self.ctx.case(
+                case_id=f"SDK-PERM-{uuid.uuid4().hex[:8]}",
+                case_type=failure_case_type,
+                security=symbol,
+                provider_symbol=symbol,
+                trade_date=trade_date,
+                expected="endpoint within account entitlement",
+                actual=f"ProviderPermissionError: {exc}"[:300],
+                result=CaseResult.NOT_TESTABLE_PERMISSION,
+                evidence_meta=meta,
+            )
+            return None, meta
+        except ProviderRateLimitError as exc:
+            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            self.ctx.case(
+                case_id=f"SDK-RATE-{uuid.uuid4().hex[:8]}",
+                case_type=failure_case_type,
+                security=symbol,
+                provider_symbol=symbol,
+                trade_date=trade_date,
+                expected="within flow/rate entitlement",
+                actual=f"ProviderRateLimitError: {exc}"[:300],
+                result=CaseResult.NOT_TESTABLE_ACCOUNT,
+                evidence_meta=meta,
+            )
+            return None, meta
+        except ProviderSchemaError as exc:
+            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            self.ctx.case(
+                case_id=f"SDK-SCHEMA-{uuid.uuid4().hex[:8]}",
+                case_type=failure_case_type,
+                security=symbol,
+                provider_symbol=symbol,
+                trade_date=trade_date,
+                expected="payload matches documented SDK contract",
+                actual=f"ProviderSchemaError: {exc}"[:300],
+                result=CaseResult.VALIDATED_FAIL,
+                evidence_meta=meta,
+            )
+            return None, meta
+        except ProviderError as exc:  # internal + unclassified
+            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            self.ctx.case(
+                case_id=f"SDK-INTERNAL-{uuid.uuid4().hex[:8]}",
+                case_type=failure_case_type,
+                security=symbol,
+                provider_symbol=symbol,
+                trade_date=trade_date,
+                expected="verifiable capability output",
+                actual=f"{type(exc).__name__}: {exc}"[:300],
+                result=CaseResult.MISSING,
+                evidence_meta=meta,
+            )
+            return None, meta
+
+
 # ------------------------------------------------------------------------ B2
 
 
 def probe_b2_security_master(ctx: ProbeContext) -> dict[str, Any]:
     """Security master incl. delisted (survivorship core gate)."""
-    payload = ctx.target.get_hist_code_list("EXTRA_STOCK_A_SH_SZ", 19900101, 20260822)
-    meta = ctx.evidence("BaseData.get_hist_code_list", "hist_code_list", {}, payload)
+    executor = ProbeExecutor(ctx)
+    as_of = ctx.as_of_date  # R3-P1-09: run as-of, never hardcoded
+    payload, meta = executor.call(
+        "BaseData.get_hist_code_list",
+        "hist_code_list",
+        {"as_of": as_of},
+        lambda: ctx.target.get_hist_code_list("EXTRA_STOCK_A_SH_SZ", 19900101, as_of),
+        failure_case_type="security_master_with_delisted",
+        trade_date=str(as_of),
+        symbol="MARKET",
+    )
+    if payload is None:
+        return {"result": "NOT_TESTABLE"}
     rows = _to_plain(_rows_of(payload))
     out = validators.validate_security_master_delisted(rows)
-    ctx.outcome_case("security_master_with_delisted", "MARKET", "", meta, out)
+    ctx.outcome_case("security_master_with_delisted", "MARKET", str(as_of), meta, out)
     return {"rows": len(rows), "result": str(out.result)}
 
 
@@ -161,50 +317,85 @@ def probe_b2_security_master(ctx: ProbeContext) -> dict[str, Any]:
 
 def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     """Daily bar units + ST/suspend semantics + limit rule on one date."""
+    executor = ProbeExecutor(ctx)
     symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")][:5]
     results: dict[str, Any] = {}
 
     # --- daily bar units
-    bars = ctx.target.query_kline(
-        symbols, begin_date=sample_date, end_date=sample_date, kline_type="DAY"
+    bars, bar_meta = executor.call(
+        "MarketData.query_kline",
+        "daily_bar",
+        {"date": sample_date},
+        lambda: ctx.target.query_kline(
+            symbols, begin_date=sample_date, end_date=sample_date, kline_type="DAY"
+        ),
+        failure_case_type="daily_bar_units",
+        trade_date=str(sample_date),
+        symbol="SAMPLE",
     )
-    bar_meta = ctx.evidence("MarketData.query_kline", "daily_bar", {"date": sample_date}, bars)
-    bar_rows = _to_plain(_rows_of(bars))
-    out = validators.validate_daily_bar_units(
-        bar_rows,
-        volume_unit=DOCUMENTED_UNITS["volume"],
-        amount_unit=DOCUMENTED_UNITS["amount"],
-        documented_units=DOCUMENTED_UNITS,
-    )
-    ctx.outcome_case("daily_bar_units", "SAMPLE", str(sample_date), bar_meta, out)
-    results["daily_bar"] = str(out.result)
+    if bars is None:
+        results["daily_bar"] = "NOT_TESTABLE"
+    else:
+        bar_rows = _to_plain(_rows_of(bars))
+        out = validators.validate_daily_bar_units(
+            bar_rows,
+            volume_unit=DOCUMENTED_UNITS["volume"],
+            amount_unit=DOCUMENTED_UNITS["amount"],
+            documented_units=DOCUMENTED_UNITS,
+        )
+        ctx.outcome_case("daily_bar_units", "SAMPLE", str(sample_date), bar_meta, out)
+        results["daily_bar"] = str(out.result)
 
     # --- ST/suspend + limit (semantic case ids per R2 section 7)
-    status = ctx.target.get_history_stock_status(sample_date, sample_date, symbols)
-    status_meta = ctx.evidence(
+    status, status_meta = executor.call(
         "InfoData.get_history_stock_status",
         "history_stock_status",
         {"date": sample_date},
-        status,
+        lambda: ctx.target.get_history_stock_status(sample_date, sample_date, symbols),
+        failure_case_type="historical_st_suspend",
+        trade_date=str(sample_date),
+        symbol="SAMPLE",
     )
-    status_rows = _to_plain(_rows_of(status))
-    st_out = validators.validate_st_suspend_flags(status_rows)
-    ctx.outcome_case("historical_st_suspend", "SAMPLE", str(sample_date), status_meta, st_out)
-    limit_out = validators.validate_limit_rule(status_rows)
-    ctx.outcome_case(
-        "limit_price_and_no_limit_days", "SAMPLE", str(sample_date), status_meta, limit_out
-    )
-    results["st_suspend"] = str(st_out.result)
-    results["limit"] = str(limit_out.result)
+    if status is None:
+        results["st_suspend"] = "NOT_TESTABLE"
+        results["limit"] = "NOT_TESTABLE"
+    else:
+        status_rows = _to_plain(_rows_of(status))
+        st_out = validators.validate_st_suspend_flags(status_rows)
+        ctx.outcome_case("historical_st_suspend", "SAMPLE", str(sample_date), status_meta, st_out)
+        limit_out = validators.validate_limit_rule(status_rows)
+        ctx.outcome_case(
+            "limit_price_and_no_limit_days",
+            "SAMPLE",
+            str(sample_date),
+            status_meta,
+            limit_out,
+        )
+        results["st_suspend"] = str(st_out.result)
+        results["limit"] = str(limit_out.result)
 
     # --- adj factor continuity
-    adj = ctx.target.get_adj_factor(symbols[:2])
-    adj_meta = ctx.evidence("BaseData.get_adj_factor", "adj_factor", {}, adj)
-    adj_out = validators.validate_adj_continuity(_to_plain(_rows_of(adj)))
-    ctx.outcome_case(
-        "adj_factor_corporate_action_continuity", "SAMPLE", str(sample_date), adj_meta, adj_out
+    adj, adj_meta = executor.call(
+        "BaseData.get_adj_factor",
+        "adj_factor",
+        {},
+        lambda: ctx.target.get_adj_factor(symbols[:2]),
+        failure_case_type="adj_factor_corporate_action_continuity",
+        trade_date=str(sample_date),
+        symbol="SAMPLE",
     )
-    results["adj"] = str(adj_out.result)
+    if adj is None:
+        results["adj"] = "NOT_TESTABLE"
+    else:
+        adj_out = validators.validate_adj_continuity(_to_plain(_rows_of(adj)))
+        ctx.outcome_case(
+            "adj_factor_corporate_action_continuity",
+            "SAMPLE",
+            str(sample_date),
+            adj_meta,
+            adj_out,
+        )
+        results["adj"] = str(adj_out.result)
     return results
 
 
@@ -215,14 +406,19 @@ def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     """Golden pipeline on the status sample: Discover -> Freeze -> Expected
     -> Compare -> Reason -> Verdict (structural core: golden cases must be
     VALIDATED, not observed)."""
+    executor = ProbeExecutor(ctx)
     symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")][:5]
-    payload = ctx.target.get_history_stock_status(sample_date, sample_date, symbols)
-    meta = ctx.evidence(
+    payload, meta = executor.call(
         "InfoData.get_history_stock_status",
         "golden_status",
         {"date": sample_date},
-        payload,
+        lambda: ctx.target.get_history_stock_status(sample_date, sample_date, symbols),
+        failure_case_type="golden_status_frozen_sample",
+        trade_date=str(sample_date),
+        symbol="SAMPLE",
     )
+    if payload is None:
+        return {"result": "NOT_TESTABLE"}
     rows = _to_plain(_rows_of(payload))
     # Discover + Freeze: record the frozen sample; Expected truth for real
     # runs comes from exchange notices (filled during the production spike).
@@ -255,12 +451,24 @@ def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
 
 def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     """SDK permission/cache/freshness behavior (core gate) + EOD timing."""
-    calendar = ctx.target.get_calendar()
-    cal_meta = ctx.evidence("BaseData.get_calendar", "trade_calendar", {}, calendar)
+    executor = ProbeExecutor(ctx)
+    calendar, cal_meta = executor.call(
+        "BaseData.get_calendar",
+        "trade_calendar",
+        {},
+        lambda: ctx.target.get_calendar(),
+        failure_case_type="sdk_permission_cache_freshness",
+        trade_date=str(sample_date),
+        symbol="SDK",
+    )
+    if calendar is None:
+        calendar = []
     identity = ctx.target.identity()
     record = {
         "account_profile_id": identity.get("account_profile_id", ""),
-        "permission_codes": identity.get("account_profile_id", ""),  # refined live
+        # R3-P0-11: the REAL permission codes come from the account profile,
+        # never the profile id again
+        "permission_codes": identity.get("permission_codes", ""),
         "cache_behavior": "documented_local_path_is_local",
         "calendar_rows": len(list(calendar or [])),
     }
@@ -268,14 +476,22 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
     ctx.outcome_case("sdk_permission_cache_freshness", "SDK", str(sample_date), cal_meta, out)
     # history coverage core gate
     symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")][:2]
-    bars = ctx.target.query_kline(
-        symbols, begin_date=19900101, end_date=sample_date, kline_type="DAY"
+    bars, bar_meta = executor.call(
+        "MarketData.query_kline",
+        "history_depth",
+        {"range": "19900101-today"},
+        lambda: ctx.target.query_kline(
+            symbols, begin_date=19900101, end_date=sample_date, kline_type="DAY"
+        ),
+        failure_case_type="history_start_2018_plus_warmup",
+        trade_date=str(sample_date),
+        symbol="MARKET",
     )
-    bar_meta = ctx.evidence(
-        "MarketData.query_kline", "history_depth", {"range": "19900101-today"}, bars
-    )
-    rows = _to_plain(_rows_of(bars))
-    earliest = min((str(r.get("KLINE_TIME", "99991231")) for r in rows), default="")
+    if bars is None:
+        earliest = ""
+    else:
+        rows = _to_plain(_rows_of(bars))
+        earliest = min((str(r.get("KLINE_TIME", "99991231")) for r in rows), default="")
     cov = validators.validate_history_coverage(earliest)
     ctx.outcome_case("history_start_2018_plus_warmup", "MARKET", str(sample_date), bar_meta, cov)
     # symbol mapping core gate
@@ -299,9 +515,18 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     Real-account runs assess semantics; the structural probe records the
     OBSERVED shape so the assessment has evidence attached.
     """
+    executor = ProbeExecutor(ctx)
     symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")][:3]
-    basic = ctx.target.get_stock_basic(symbols)
-    basic_meta = ctx.evidence("InfoData.get_stock_basic", "stock_basic", {}, basic)
+    basic, basic_meta = executor.call(
+        "InfoData.get_stock_basic",
+        "stock_basic",
+        {},
+        lambda: ctx.target.get_stock_basic(symbols),
+        failure_case_type="free_float_equivalence",
+        trade_date=str(sample_date),
+        symbol="SAMPLE",
+    )
+    basic_available = basic is not None
     ctx.case(
         case_id=f"B6-FREEFLOAT-SEMANTICS-{sample_date}",
         case_type="free_float_equivalence",
@@ -309,8 +534,12 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         provider_symbol="SAMPLE",
         trade_date=str(sample_date),
         expected="EXACT/DERIVABLE/ALTERNATIVE/MISSING vs free_share semantics",
-        actual="OBSERVED: equity fields recorded; equivalence assessed live",
-        result=CaseResult.OBSERVED,
+        actual=(
+            "OBSERVED: equity fields recorded; equivalence assessed live"
+            if basic_available
+            else "NOT_TESTABLE: stock_basic call failed"
+        ),
+        result=CaseResult.OBSERVED if basic_available else CaseResult.NOT_TESTABLE_PERMISSION,
         evidence_meta=basic_meta,
     )
     ctx.case(
@@ -320,14 +549,25 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         provider_symbol="TAXONOMY",
         trade_date="",
         expected="taxonomy owner identified (SW / GALAXY)",
-        actual="OBSERVED: industry endpoints recorded; owner verified live",
-        result=CaseResult.OBSERVED,
+        actual=(
+            "OBSERVED: industry endpoints recorded; owner verified live"
+            if basic_available
+            else "NOT_TESTABLE"
+        ),
+        result=CaseResult.OBSERVED if basic_available else CaseResult.NOT_TESTABLE_PERMISSION,
         evidence_meta=basic_meta,
     )
-    idx = ctx.target.query_kline(
-        ["000300.SH"], begin_date=sample_date, end_date=sample_date, kline_type="DAY"
+    idx, idx_meta = executor.call(
+        "MarketData.query_kline",
+        "index_daily",
+        {},
+        lambda: ctx.target.query_kline(
+            ["000300.SH"], begin_date=sample_date, end_date=sample_date, kline_type="DAY"
+        ),
+        failure_case_type="benchmark_index_availability",
+        trade_date=str(sample_date),
+        symbol="000300.SH",
     )
-    idx_meta = ctx.evidence("MarketData.query_kline", "index_daily", {}, idx)
     ctx.case(
         case_id=f"B6-BENCHMARK-INDEX-{sample_date}",
         case_type="benchmark_index_availability",
@@ -335,11 +575,11 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         provider_symbol="000300.SH",
         trade_date=str(sample_date),
         expected="benchmark index daily rows present",
-        actual=f"OBSERVED: {len(_rows_of(idx))} rows",
-        result=CaseResult.OBSERVED,
+        actual=(f"OBSERVED: {len(_rows_of(idx))} rows" if idx is not None else "NOT_TESTABLE"),
+        result=CaseResult.OBSERVED if idx is not None else CaseResult.NOT_TESTABLE_PERMISSION,
         evidence_meta=idx_meta,
     )
-    return {"status": "OBSERVED"}
+    return {"status": "OBSERVED" if basic_available else "NOT_TESTABLE"}
 
 
 # ------------------------------------------------------------------------ B7
@@ -350,26 +590,36 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     retries/wall-clock/throughput on the widest available sample."""
     import time
 
+    executor = ProbeExecutor(ctx)
     symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")]
     started = time.monotonic()
-    payload = ctx.target.query_kline(
-        symbols, begin_date=sample_date, end_date=sample_date, kline_type="DAY"
-    )
-    wall_clock = round(time.monotonic() - started, 3)
-    meta = ctx.evidence(
+    payload, meta = executor.call(
         "MarketData.query_kline",
         "capacity_probe",
         {"symbols": len(symbols), "date": sample_date},
-        payload,
+        lambda: ctx.target.query_kline(
+            symbols, begin_date=sample_date, end_date=sample_date, kline_type="DAY"
+        ),
+        failure_case_type="capacity_backfill",
+        trade_date=str(sample_date),
+        symbol="ALL_A",
     )
+    wall_clock = round(time.monotonic() - started, 3)
+    if payload is None:
+        return {"result": "NOT_TESTABLE"}
     rows = _to_plain(_rows_of(payload))
     bytes_received = len(str(rows).encode("utf-8"))
+    # R3-P1-07: real request/retry counts come from the provider envelopes
+    provider = getattr(ctx.target, "provider", None)
+    envelopes = list(provider.last_envelopes) if provider is not None else []
+    request_count = sum(1 for e in envelopes if e.endpoint == "MarketData.query_kline")
+    retry_count = sum(max(0, e.attempt_count - 1) for e in envelopes)
     metrics = {
         "symbol_count": len(symbols),
         "row_count": len(rows),
         "bytes_received": bytes_received,
-        "request_count": 1,
-        "retry_count": 0,
+        "request_count": max(1, request_count),
+        "retry_count": retry_count,
         "wall_clock_seconds": wall_clock,
         "throughput_rows_per_second": round(len(rows) / wall_clock, 2) if wall_clock else None,
         "cache_behavior": "first-pull",
