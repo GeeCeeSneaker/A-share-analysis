@@ -7,15 +7,34 @@ regardless of which broker SDK sits underneath.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ashare_state.providers.exchange import ProviderExchange
 
 
 class ProviderError(RuntimeError):
-    """Base class for all provider-layer errors."""
+    """Base class for all provider-layer errors.
 
-    def __init__(self, message: str, *, context: dict[str, Any] | None = None) -> None:
+    CR-1.1 (audit R4-A2.3 §3.2-D): a FAILED SDK exchange is a first-class
+    object. When the failure happened inside a real SDK exchange,
+    ``call_exchange`` attaches the failed ProviderExchange (error envelope,
+    payload=None) to the raised error, so callers obtain the exchange's
+    request_id / envelope / attempt_count / error_class / requested_at /
+    received_at WITHOUT any shared-state lookup (no last_envelopes
+    reverse-search on the correctness path).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        context: dict[str, Any] | None = None,
+        exchange: ProviderExchange | None = None,
+    ) -> None:
         super().__init__(message)
         self.context: dict[str, Any] = context or {}
+        self.exchange: ProviderExchange | None = exchange
 
 
 class ProviderUnavailableError(ProviderError):

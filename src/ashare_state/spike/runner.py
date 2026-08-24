@@ -466,9 +466,19 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
                 dataset_hash=run.golden_dataset_hash,
             )
             # R4-P0-01 + audit section 39: production verdicts need reviewed
-            # truth - evaluated over the BOUND dataset, not ACTIVE
+            # truth - evaluated over the BOUND dataset, not ACTIVE.
+            # R4-A2.3 P0-05: ALL formal gates (quantity + events + review)
+            # are bound-aware - pass the bound cases themselves so an
+            # ACTIVE advance/tamper can never leak into the verdict.
             if run.run_kind == RunKind.PRODUCTION:
-                blocking.extend(golden_store.production_formal_gate(bound_manifest))
+                bound_cases, bound_manifest = golden_store.load_bound(
+                    dataset_file=run.golden_dataset_file,
+                    truth_version=run.golden_truth_version,
+                    dataset_hash=run.golden_dataset_hash,
+                )
+                blocking.extend(
+                    golden_store.production_formal_gate(bound_cases, bound_manifest)
+                )
         except Exception as exc:  # noqa: BLE001 - integrity error blocks the verdict
             blocking.append(f"golden truth binding violated: {exc}")
 
@@ -559,9 +569,16 @@ def verify_evidence_closure(store: RunStore, run: SpikeRun, catalog: CaseCatalog
 
     Checks: case validation, run-id binding, duplicate ids, evidence file
     existence, evidence hash match.
+
+    R4-A2.3 (audit section 6.3): evidence BUNDLES (golden domain routing)
+    are additionally opened and every exchange they list is re-verified
+    (file exists + hash matches) - the multi-endpoint lineage closes.
     """
+    import hashlib
+
     problems: list[str] = []
     seen_ids: set[str] = set()
+    verified_bundles: dict[str, list[str]] = {}
     for case in catalog.cases:
         try:
             case.validate()
@@ -580,11 +597,49 @@ def verify_evidence_closure(store: RunStore, run: SpikeRun, catalog: CaseCatalog
         if not evidence_path.is_file():
             problems.append(f"evidence missing: {case.evidence_ref}")
             continue
-        import hashlib
-
         actual = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
         if actual != case.evidence_hash:
             problems.append(f"evidence hash mismatch: {case.evidence_ref}")
+            continue
+        # evidence bundle: verify every referenced raw artifact as well
+        if case.evidence_ref.endswith(".json") and "/bundles/" in case.evidence_ref:
+            bundle_problems = verified_bundles.get(case.evidence_ref)
+            if bundle_problems is None:
+                bundle_problems = _verify_evidence_bundle(
+                    store, case.evidence_ref, evidence_path
+                )
+                verified_bundles[case.evidence_ref] = bundle_problems
+            problems.extend(bundle_problems)
+    return problems
+
+
+def _verify_evidence_bundle(
+    store: RunStore, bundle_ref: str, bundle_path: Path
+) -> list[str]:
+    """Re-verify every raw exchange listed inside an evidence bundle
+    manifest (audit section 6.3): each evidence_ref must exist and its
+    content hash must match."""
+    import hashlib
+    import json
+
+    problems: list[str] = []
+    try:
+        doc = json.loads(bundle_path.read_bytes().decode("utf-8"))
+    except (OSError, ValueError) as exc:
+        return [f"evidence bundle unreadable: {bundle_ref} ({exc})"]
+    for entry in doc.get("exchanges", []):
+        ref = str(entry.get("evidence_ref", ""))
+        expected_hash = str(entry.get("content_hash", ""))
+        if not ref or not expected_hash:
+            problems.append(f"bundle {bundle_ref}: exchange entry missing ref/hash")
+            continue
+        artifact_path = store.spike_root / ref
+        if not artifact_path.is_file():
+            problems.append(f"bundle {bundle_ref}: listed evidence missing: {ref}")
+            continue
+        actual = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+        if actual != expected_hash:
+            problems.append(f"bundle {bundle_ref}: listed evidence hash mismatch: {ref}")
     return problems
 
 

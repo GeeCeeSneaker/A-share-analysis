@@ -295,36 +295,6 @@ def _suffix_for(symbol: str) -> str:
 # ------------------------------------------------------------------ limit rule
 
 #: board limit-rate rules (audit R3-P0-09)
-BOARD_LIMIT_RATES: dict[str, float] = {
-    "MAIN": 0.10,  # main board (incl. ST at 5% - refined below)
-    "ST_MAIN": 0.05,
-    "CHINEXT": 0.20,  # ChiNext after 2020-08-24 registration reform
-    "STAR": 0.20,  # STAR market
-    "BSE": 0.30,
-}
-
-
-def board_of(symbol: str, *, is_st: bool = False) -> str:
-    """Classify a provider symbol into its limit-rate board."""
-    bare = symbol.split(".")[0]
-    if symbol.endswith(".BJ") or bare.startswith(("43", "83", "87", "92")):
-        return "BSE"
-    if bare.startswith("688") or bare.startswith("689"):
-        return "STAR"
-    if bare.startswith("30") or bare.startswith("68") is False and bare.startswith("30"):
-        return "CHINEXT"
-    if bare.startswith(("60", "00")):
-        return "ST_MAIN" if is_st else "MAIN"
-    return "MAIN"
-
-
-def expected_limit_price(pre_close: float, rate: float, *, tick: float = 0.01) -> float:
-    """Exchange rule: round(pre_close * (1 +/- rate)) to the price tick."""
-    up = pre_close * (1 + rate)
-    # A-share rule: round to 2 decimals (tick), half-up
-    return round(up / tick) * tick
-
-
 def validate_limit_rule(
     rows: list[dict[str, Any]],
     *,
@@ -332,13 +302,23 @@ def validate_limit_rule(
 ) -> ValidationOutcome:
     """R3-P0-09: real regime validation.
 
+    R4-A2.3 P0-06: the limit rates come from the VERSIONED DATA LAYER
+    (configs/trading_rules/*.yaml via TradingRuleBook.resolve_limit_regime)
+    - NO hardcoded board-rate table in Python. Rows are matched by their
+    OWN trade date (PIT), and rate resolution failures are collected as
+    RULE_UNRESOLVED violations (fail closed, audit section 8.3).
+
     - all-rows-missing-limit-fields -> NOT validated (never silent PASS)
-    - rows WITH limits: expected up/down = round(pre_close x (1+/-rate))
-      per board (ST 5% / main 10% / ChiNext+STAR 20% / BSE 30%)
+    - rows WITH limits: expected up/down = Decimal ROUND_HALF_UP of
+      pre_close * (1 +/- rule rate) from the resolved PIT rule
     - rows marked no-limit (IPO first day etc.): must be an acceptable
       no-limit context or flagged
     """
-    vid = "limit_rule_v2"
+    from decimal import Decimal
+
+    from ashare_state.spike.trading_rule import RuleUnresolvedError, resolve_limit_regime
+
+    vid = "limit_rule_v3"
     if not rows:
         return _outcome(vid, CaseResult.MISSING, "status rows with limits", "no rows")
     rows_with_limits = [r for r in rows if r.get("HIGH_LIMITED") is not None]
@@ -361,20 +341,41 @@ def validate_limit_rule(
         market = str(row.get("MARKET_CODE", ""))
         symbol = code + {"1": ".SH", "2": ".SZ", "3": ".BJ"}.get(market, "")
         is_st = str(row.get("IS_ST_SEC", "0")) in ("1", "1.0")
+        trade_date = str(row.get("TRADE_DATE", "") or "")
         if pre is None or up is None or down is None:
             continue
+        if not trade_date or len(trade_date) < 8:
+            violations.append(
+                f"{symbol}: row has no TRADE_DATE - PIT rule resolution "
+                "requires the exact date (audit section 8.3)"
+            )
+            continue
+        try:
+            # a row WITH a HIGH_LIMITED price is by construction not a
+            # no-limit listing-window day -> regime resolve applies
+            rule = resolve_limit_regime(
+                exchange=symbol.rsplit(".", 1)[1] if "." in symbol else "",
+                code=symbol,
+                trade_date=trade_date,
+                is_st=is_st,
+            )
+        except RuleUnresolvedError as exc:
+            violations.append(f"{symbol}: RULE_UNRESOLVED ({exc})")
+            continue
         checked += 1
-        rate = BOARD_LIMIT_RATES[board_of(symbol, is_st=is_st)]
-        exp_up = expected_limit_price(pre, rate)
-        exp_down = expected_limit_price(pre, -rate) if rate else pre
+        exp_up_dec, exp_down_dec = rule.limit_prices(Decimal(str(pre)))
+        exp_up = float(exp_up_dec)
+        exp_down = float(exp_down_dec)
         # exchange rounds DOWN the down-limit at half tick; allow 1 tick slack
         if abs(up - exp_up) > 0.011:
             violations.append(
-                f"{symbol}: up {up} != expected {exp_up:.2f} (pre {pre}, rate {rate})"
+                f"{symbol}: up {up} != expected {exp_up:.2f} "
+                f"(pre {pre}, rule {rule.rule_id})"
             )
         if abs(down - exp_down) > 0.011:
             violations.append(
-                f"{symbol}: down {down} != expected {exp_down:.2f} (pre {pre}, rate {rate})"
+                f"{symbol}: down {down} != expected {exp_down:.2f} "
+                f"(pre {pre}, rule {rule.rule_id})"
             )
         close = _to_float(_first(row, "CLOSE_PRICE", "CLOSE"))
         if close is not None and not (down - 1e-9 <= close <= up + 1e-9):
@@ -384,7 +385,8 @@ def validate_limit_rule(
             vid,
             CaseResult.VALIDATED_FAIL,
             "limit rows with preclose",
-            "no row had PRECLOSE + limits together",
+            "no row had PRECLOSE + limits together"
+            + (f"; rule failures: {'; '.join(violations[:3])}" if violations else ""),
         )
     if violations:
         return _outcome(
@@ -393,8 +395,8 @@ def validate_limit_rule(
     return _outcome(
         vid,
         CaseResult.VALIDATED_PASS,
-        "up/down = round(pre_close x (1+/-board rate))",
-        f"{checked} rows match the board regime",
+        "up/down = Decimal ROUND_HALF_UP(pre_close x (1+/-PIT rule rate))",
+        f"{checked} rows match the data-driven regime",
     )
 
 

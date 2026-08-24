@@ -1,43 +1,92 @@
-"""RawWriter: immutable provider evidence runtime (CR-1b, audit section 45-46).
+"""RawWriter: immutable provider evidence runtime (CR-1b/CR-1.1).
 
-Contract:
+Contract (audit R4-A2.3 sections 4-5):
 - SUCCESS exchange  -> raw artifact (Parquet for tabular payloads) +
                        .meta.json (envelope), immutable
 - FAILURE exchange  -> failure evidence (envelope-only .meta.json), the
                        request audit record is NEVER dropped
+- ``write(exchange)`` consumes the ProviderExchange DIRECTLY (audit
+  section 3.2-C): request_id consistency is asserted
+  (``exchange.request_id == exchange.envelope.request_id``) and
+  provider/dataset come from the ENVELOPE first - an external value that
+  conflicts with the envelope BLOCKS instead of silently overriding.
 - Idempotent: same request + same content hash -> no-op
 - Conflict: same request + different bytes -> BLOCK
 - Lossless: structured tabular payloads go to Parquet; never repr()
 - Secret-scrubbed: params are scrubbed before persisting
 - Cross-platform logical URI: relative, forward slashes, no drive letters
 
+Payload shapes (audit section 5.2 - MANDATORY support):
+    list[dict]                     -> single table
+    pandas.DataFrame               -> single table
+    pyarrow.Table                  -> single table
+    dict[str, list[dict]]          -> one Parquet per logical table
+    dict[str, pandas.DataFrame]    -> one Parquet per logical table
+
+dict-of-tables uses scheme A (audit section 5.2): every logical table
+gets its own Parquet file; the meta records the table list with each
+table's hash/schema/row-count. "Take the first dict value" is FORBIDDEN
+- mixed/unsupported shapes raise instead of silently picking a table.
+
 Layout:
-    raw/provider=amazingdata/dataset=<D>/<request_id>.parquet
-    raw/provider=amazingdata/dataset=<D>/<request_id>.meta.json
+    raw/provider=<P>/dataset=<D>/<request_id>.parquet          (single table)
+    raw/provider=<P>/dataset=<D>/<request_id>.meta.json
+    raw/provider=<P>/dataset=<D>/<request_id>/<table>.parquet  (multi table)
 """
 
 from __future__ import annotations
 
 import hashlib
+import io
 import json
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from ashare_state.storage.atomic_files import ImmutableFileExistsError, write_file_atomic
 
+#: payload_kind values recorded in the meta document
+KIND_ROWS = "rows"
+KIND_EMPTY = "empty"
+KIND_DATAFRAME = "dataframe"
+KIND_ARROW_TABLE = "arrow_table"
+KIND_MULTI_ROWS = "multi_table_rows"
+KIND_MULTI_FRAMES = "multi_table_frames"
+
+_TABLE_NAME_SAFE = re.compile(r"[^A-Za-z0-9_\-]")
+
 
 class RawWriterError(RuntimeError):
-    """RawWriter contract violation."""
+    """RawWriter contract violation (unsupported shape / id conflict)."""
+
+
+@dataclass(frozen=True)
+class TableRecord:
+    """One logical table inside a raw artifact (audit section 5.2-A)."""
+
+    name: str | None  # None for single-table payloads
+    file: str  # file name relative to the dataset dir
+    content_hash: str  # sha256 of the table bytes
+    schema_hash: str  # sha256 of the arrow schema
+    row_count: int
 
 
 @dataclass(frozen=True)
 class RawWriteResult:
     request_id: str
-    logical_uri: str | None  # None for failure evidence (no payload file)
+    logical_uri: str | None  # payload artifact (dir form for multi-table); None for failures
     meta_uri: str
-    content_hash: str
+    content_hash: str  # combined hash over all table bytes
     idempotent: bool = False
+    payload_kind: str = ""
+    row_count: int = 0
+    tables: tuple[TableRecord, ...] = field(default_factory=tuple)
+    #: the evidence artifact a SpikeCase binds to (parquet for single-table
+    #: success, meta.json otherwise) + the SHA256 of ITS bytes - evidence
+    #: closure re-verifies exactly these.
+    evidence_uri: str = ""
+    evidence_hash: str = ""
 
 
 def _scrub(params: dict[str, Any] | None) -> dict[str, Any]:
@@ -50,6 +99,130 @@ def _scrub(params: dict[str, Any] | None) -> dict[str, Any]:
     return out
 
 
+def _is_dataframe_like(obj: Any) -> bool:
+    """polars.DataFrame (project stack) or pandas.DataFrame (duck-typed) -
+    both are supported tabular payload shapes."""
+    return _to_arrow_table(obj) is not None
+
+
+def _to_arrow_table(obj: Any) -> Any | None:
+    """Convert a DataFrame-like object to a pyarrow Table, or None."""
+    if isinstance(obj, _pa_table_type()):
+        return obj
+    if not hasattr(obj, "columns") or not hasattr(obj, "rows"):
+        # polars.DataFrame has .columns/.rows; pandas has .columns/.to_records
+        # anything else is not a supported DataFrame-like payload
+        to_records = getattr(obj, "to_records", None)
+        if not (callable(to_records) and hasattr(obj, "index")):
+            return None
+    to_arrow = getattr(obj, "to_arrow", None)  # polars.DataFrame
+    if callable(to_arrow):
+        try:
+            return to_arrow()
+        except TypeError:
+            return None
+    to_records = getattr(obj, "to_records", None)  # pandas.DataFrame
+    if callable(to_records) and hasattr(obj, "columns"):
+        import pyarrow as pa
+
+        return pa.Table.from_pandas(obj, preserve_index=False)
+    return None
+
+
+def _pa_table_type() -> type:
+    import pyarrow as pa
+
+    return pa.Table
+
+
+def _rows_to_table(rows: list[dict[str, Any]]) -> Any:
+    import pyarrow as pa
+
+    # union of keys across rows, stable order
+    columns: list[str] = []
+    for row in rows:
+        if isinstance(row, dict):
+            for key in row:
+                if key not in columns:
+                    columns.append(key)
+    data = {
+        col: [row.get(col) if isinstance(row, dict) else None for row in rows] for col in columns
+    }
+    return pa.table(data)
+
+
+def _empty_table() -> Any:
+    import pyarrow as pa
+
+    return pa.table({"_empty": pa.array([], type=pa.int8())})
+
+
+def _table_bytes(table: Any) -> bytes:
+    import pyarrow.parquet as pq
+
+    buf = io.BytesIO()
+    pq.write_table(table, buf, compression="zstd")
+    return buf.getvalue()
+
+
+def _schema_hash(table: Any) -> str:
+    return hashlib.sha256(str(table.schema).encode("utf-8")).hexdigest()
+
+
+def _safe_table_name(name: str) -> str:
+    return _TABLE_NAME_SAFE.sub("_", name) or "table"
+
+
+def normalize_payload(payload: Any) -> tuple[str, list[tuple[str | None, Any]]]:
+    """Classify + normalize a payload into (payload_kind, tables).
+
+    tables is a list of (table_name, arrow_table); table_name is None for
+    single-table payloads. Raises RawWriterError for unsupported/mixed
+    shapes - never silently picks a dict value (audit section 5.2).
+    """
+    if payload is None:
+        return KIND_EMPTY, [(None, _empty_table())]
+    if isinstance(payload, _pa_table_type()):
+        return KIND_ARROW_TABLE, [(None, payload)]
+    arrow = _to_arrow_table(payload)
+    if arrow is not None:
+        return KIND_DATAFRAME, [(None, arrow)]
+    if isinstance(payload, list):
+        if not payload:
+            return KIND_EMPTY, [(None, _empty_table())]
+        if all(isinstance(r, dict) for r in payload):
+            return KIND_ROWS, [(None, _rows_to_table(payload))]
+        if any(isinstance(r, dict) for r in payload):
+            # mixed dict/scalar rows are a malformed payload - fail loud
+            raise RawWriterError(
+                "unsupported payload shape: mixed dict/scalar rows "
+                f"(element types: {sorted({type(r).__name__ for r in payload})}) - "
+                "convert to list[dict] / DataFrame / dict-of-tables explicitly"
+            )
+        # scalar list (e.g. trade calendar days) -> single 'value' column
+        return KIND_ROWS, [(None, _rows_to_table([{"value": r} for r in payload]))]
+    if isinstance(payload, dict):
+        if not payload:
+            return KIND_EMPTY, [(None, _empty_table())]
+        values = list(payload.values())
+        if all(_is_dataframe_like(v) for v in values):
+            converted = [(str(k), _to_arrow_table(v)) for k, v in payload.items()]
+            return KIND_MULTI_FRAMES, [(k, t) for k, t in converted if t is not None]
+        if all(
+            isinstance(v, list) and all(isinstance(r, dict) for r in v) for v in values
+        ):
+            return KIND_MULTI_ROWS, [(str(k), _rows_to_table(v)) for k, v in payload.items()]
+        raise RawWriterError(
+            "unsupported payload shape: dict values must ALL be DataFrames or "
+            f"ALL be list[dict] (got value types: {sorted({type(v).__name__ for v in values})}); "
+            "silently taking one dict value is forbidden (audit R4-A2.3 section 5.2)"
+        )
+    raise RawWriterError(
+        f"unsupported payload shape {type(payload).__name__}: convert to "
+        "list[dict] / DataFrame / pyarrow.Table / dict-of-tables explicitly"
+    )
+
+
 class RawWriter:
     """Persists ProviderExchange results as immutable raw evidence."""
 
@@ -59,7 +232,53 @@ class RawWriter:
     def _dir_for(self, provider: str, dataset: str) -> Path:
         return self.root / f"provider={provider}" / f"dataset={dataset}"
 
-    # ------------------------------------------------------------- success
+    # ------------------------------------------------------- unified entry
+    def write(
+        self,
+        exchange: Any,
+        *,
+        provider: str | None = None,
+        dataset: str | None = None,
+    ) -> RawWriteResult:
+        """CR-1.1 (audit section 3.2-C): persist ONE ProviderExchange.
+
+        - asserts exchange.request_id == exchange.envelope.request_id
+        - provider/dataset default to the ENVELOPE's own values; explicit
+          arguments that CONFLICT with the envelope raise (no silent
+          override)
+        - ERROR envelope -> failure evidence (envelope-only meta)
+        """
+        envelope = getattr(exchange, "envelope", None)
+        if envelope is None:
+            raise RawWriterError("write() expects a ProviderExchange (missing .envelope)")
+        env_request_id = str(getattr(envelope, "request_id", ""))
+        if str(getattr(exchange, "request_id", "")) != env_request_id or not env_request_id:
+            raise RawWriterError(
+                "exchange request_id inconsistency: "
+                f"exchange={getattr(exchange, 'request_id', '')!r} "
+                f"envelope={env_request_id!r} (audit section 3.2-C)"
+            )
+        env_provider = str(getattr(envelope, "provider", "") or "amazingdata")
+        env_dataset = str(getattr(envelope, "provider_dataset", "") or "")
+        if provider is not None and provider != env_provider:
+            raise RawWriterError(
+                f"provider conflict for request {env_request_id}: envelope says "
+                f"{env_provider!r}, caller passed {provider!r} - the envelope is "
+                "the source of record (audit section 3.2-C)"
+            )
+        if dataset is not None and env_dataset and dataset != env_dataset:
+            raise RawWriterError(
+                f"dataset conflict for request {env_request_id}: envelope says "
+                f"{env_dataset!r}, caller passed {dataset!r} - the envelope is "
+                "the source of record (audit section 3.2-C)"
+            )
+        provider_ = env_provider
+        dataset_ = env_dataset or (dataset or "unknown")
+        if getattr(envelope, "status", "OK") == "ERROR":
+            return self._write_failure(provider_, dataset_, exchange)
+        return self._write_success(provider_, dataset_, exchange)
+
+    # keep legacy explicit names as thin aliases (backwards compatible)
     def write_success(
         self,
         *,
@@ -69,41 +288,14 @@ class RawWriter:
         payload: Any,
         envelope: Any,
     ) -> RawWriteResult:
-        """Persist a SUCCESS exchange: payload + envelope metadata."""
-        dataset_dir = self._dir_for(provider, dataset)
-        dataset_dir.mkdir(parents=True, exist_ok=True)
-        payload_path = dataset_dir / f"{request_id}.parquet"
-        meta_path = dataset_dir / f"{request_id}.meta.json"
+        """Legacy success entry (kept for compatibility): build the exchange
+        inline. New code MUST use write(exchange)."""
+        from ashare_state.providers.exchange import ProviderExchange
 
-        # lossless tabular serialization (audit section 46: never repr())
-        rows = _rows_of(payload)
-        payload_bytes = _to_parquet_bytes(rows)
-        content_hash = hashlib.sha256(payload_bytes).hexdigest()
-        meta_bytes = self._meta_bytes(envelope, content_hash, len(rows))
+        envelope = _with_request_id(envelope, request_id, provider=provider, dataset=dataset)
+        exchange = ProviderExchange(envelope=envelope, payload=payload)
+        return self._write_success(provider, dataset, exchange)
 
-        idem = False
-        if payload_path.exists() or meta_path.exists():
-            existing_hash = _existing_hash(payload_path)
-            if existing_hash == content_hash and meta_path.exists():
-                idem = True  # same content: idempotent no-op
-            else:
-                msg = (
-                    f"raw artifact conflict for request {request_id}: same "
-                    "request id with different content - immutable raw store"
-                )
-                raise RawWriterError(msg)
-        if not idem:
-            write_file_atomic(payload_path, payload_bytes)
-            write_file_atomic(meta_path, meta_bytes)
-        return RawWriteResult(
-            request_id=request_id,
-            logical_uri=self._logical_uri(provider, dataset, payload_path.name),
-            meta_uri=self._logical_uri(provider, dataset, meta_path.name),
-            content_hash=content_hash,
-            idempotent=idem,
-        )
-
-    # ------------------------------------------------------------- failure
     def write_failure(
         self,
         *,
@@ -112,15 +304,111 @@ class RawWriter:
         request_id: str,
         envelope: Any,
     ) -> RawWriteResult:
+        """Legacy failure entry (kept for compatibility)."""
+        envelope = _with_request_id(
+            envelope, request_id, provider=provider, dataset=dataset, status="ERROR"
+        )
+        exchange = None  # failure never carries a payload
+        from ashare_state.providers.exchange import ProviderExchange
+
+        exchange = ProviderExchange(envelope=envelope, payload=None)
+        return self._write_failure(provider, dataset, exchange)
+
+    # ------------------------------------------------------------- success
+    def _write_success(self, provider: str, dataset: str, exchange: Any) -> RawWriteResult:
+        envelope = exchange.envelope
+        request_id = str(envelope.request_id)
+        payload_kind, tables = normalize_payload(exchange.payload)
+
+        dataset_dir = self._dir_for(provider, dataset)
+        dataset_dir.mkdir(parents=True, exist_ok=True)
+
+        records: list[TableRecord] = []
+        multi = len(tables) > 1 or (len(tables) == 1 and tables[0][0] is not None)
+        table_files: list[tuple[str | None, Path, bytes]] = []
+        if multi:
+            table_dir = dataset_dir / request_id
+            for name, table in tables:
+                payload_bytes = _table_bytes(table)
+                fname = f"{_safe_table_name(name or 'table')}.parquet"
+                records.append(
+                    TableRecord(
+                        name=name,
+                        file=f"{request_id}/{fname}",
+                        content_hash=hashlib.sha256(payload_bytes).hexdigest(),
+                        schema_hash=_schema_hash(table),
+                        row_count=table.num_rows,
+                    )
+                )
+                table_files.append((name, table_dir / fname, payload_bytes))
+        else:
+            _, table = tables[0]
+            payload_bytes = _table_bytes(table)
+            records.append(
+                TableRecord(
+                    name=None,
+                    file=f"{request_id}.parquet",
+                    content_hash=hashlib.sha256(payload_bytes).hexdigest(),
+                    schema_hash=_schema_hash(table),
+                    row_count=table.num_rows,
+                )
+            )
+            table_files.append((None, dataset_dir / f"{request_id}.parquet", payload_bytes))
+
+        content_hash = _combined_hash(records)
+        meta_path = dataset_dir / f"{request_id}.meta.json"
+        row_count = sum(r.row_count for r in records)
+        meta_bytes = self._meta_bytes(
+            envelope,
+            content_hash=content_hash,
+            row_count=row_count,
+            payload_kind=payload_kind,
+            tables=records,
+        )
+
+        idem = self._check_idempotent(request_id, records, meta_path, meta_bytes, table_files)
+        if not idem:
+            for _, path, payload_bytes in table_files:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                write_file_atomic(path, payload_bytes)
+            write_file_atomic(meta_path, meta_bytes)
+
+        if multi:
+            logical_uri = self._logical_uri(provider, dataset, f"{request_id}/")
+            evidence_uri = self._logical_uri(provider, dataset, meta_path.name)
+            evidence_hash = hashlib.sha256(meta_bytes).hexdigest()
+        else:
+            logical_uri = self._logical_uri(provider, dataset, f"{request_id}.parquet")
+            evidence_uri = logical_uri
+            evidence_hash = records[0].content_hash
+        return RawWriteResult(
+            request_id=request_id,
+            logical_uri=logical_uri,
+            meta_uri=self._logical_uri(provider, dataset, meta_path.name),
+            content_hash=content_hash,
+            idempotent=idem,
+            payload_kind=payload_kind,
+            row_count=row_count,
+            tables=tuple(records),
+            evidence_uri=evidence_uri,
+            evidence_hash=evidence_hash,
+        )
+
+    # ------------------------------------------------------------- failure
+    def _write_failure(self, provider: str, dataset: str, exchange: Any) -> RawWriteResult:
         """Persist a FAILURE exchange: envelope-only evidence (the request
         audit record is retained even with no payload)."""
+        envelope = exchange.envelope
+        request_id = str(envelope.request_id)
         dataset_dir = self._dir_for(provider, dataset)
         dataset_dir.mkdir(parents=True, exist_ok=True)
         meta_path = dataset_dir / f"{request_id}.meta.json"
+        meta_bytes = self._meta_bytes(
+            envelope, content_hash="", row_count=0, payload_kind="failure", tables=()
+        )
         if meta_path.exists():
             # failure evidence is append-only too: same request id twice
             # with failure is suspicious - block unless byte-identical
-            meta_bytes = self._meta_bytes(envelope, "", 0)
             if meta_path.read_bytes() == meta_bytes:
                 return RawWriteResult(
                     request_id=request_id,
@@ -128,23 +416,87 @@ class RawWriter:
                     meta_uri=self._logical_uri(provider, dataset, meta_path.name),
                     content_hash=hashlib.sha256(meta_bytes).hexdigest(),
                     idempotent=True,
+                    payload_kind="failure",
+                    evidence_uri=self._logical_uri(provider, dataset, meta_path.name),
+                    evidence_hash=hashlib.sha256(meta_bytes).hexdigest(),
                 )
             msg = (
                 f"raw failure-evidence conflict for request {request_id}: "
                 "different envelope bytes for the same request"
             )
             raise RawWriterError(msg)
-        meta_bytes = self._meta_bytes(envelope, "", 0)
         write_file_atomic(meta_path, meta_bytes)
+        meta_hash = hashlib.sha256(meta_bytes).hexdigest()
         return RawWriteResult(
             request_id=request_id,
             logical_uri=None,
             meta_uri=self._logical_uri(provider, dataset, meta_path.name),
-            content_hash=hashlib.sha256(meta_bytes).hexdigest(),
+            content_hash=meta_hash,
+            payload_kind="failure",
+            evidence_uri=self._logical_uri(provider, dataset, meta_path.name),
+            evidence_hash=meta_hash,
         )
 
+    # ---------------------------------------------------------------- read
+    def read(self, *, provider: str, dataset: str, request_id: str) -> Any:
+        """Read back a persisted payload: DataFrame for single-table kinds,
+        dict[str, DataFrame] for multi-table kinds (lossless round-trip
+        support for audit section 5.3 tests). Uses polars - the project
+        data stack (pandas is NOT a project dependency)."""
+        import polars as pl
+
+        dataset_dir = self._dir_for(provider, dataset)
+        meta_path = dataset_dir / f"{request_id}.meta.json"
+        if not meta_path.is_file():
+            raise RawWriterError(f"no raw meta for request {request_id} under {dataset_dir}")
+        doc = json.loads(meta_path.read_text(encoding="utf-8"))
+        kind = str(doc.get("payload_kind", ""))
+        if kind in (KIND_MULTI_ROWS, KIND_MULTI_FRAMES):
+            frames: dict[str, Any] = {}
+            for table in doc.get("tables", []):
+                path = dataset_dir / str(table.get("file", ""))
+                frames[str(table.get("name", ""))] = pl.read_parquet(path)
+            return frames
+        if kind == KIND_EMPTY:
+            return pl.DataFrame()
+        # single table
+        return pl.read_parquet(dataset_dir / f"{request_id}.parquet")
+
     # ------------------------------------------------------------- helpers
-    def _meta_bytes(self, envelope: Any, content_hash: str, row_count: int) -> bytes:
+    def _check_idempotent(
+        self,
+        request_id: str,
+        records: list[TableRecord],
+        meta_path: Path,
+        meta_bytes: bytes,
+        table_files: list[tuple[str | None, Path, bytes]],
+    ) -> bool:
+        """Same request id: idempotent no-op iff every existing byte matches
+        the new bytes; any difference BLOCKS (immutable raw store)."""
+        existing_any = meta_path.exists() or any(p.exists() for _, p, _ in table_files)
+        if not existing_any:
+            return False
+        same_meta = meta_path.is_file() and meta_path.read_bytes() == meta_bytes
+        same_tables = all(
+            p.is_file() and p.read_bytes() == b for _, p, b in table_files
+        )
+        if same_meta and same_tables:
+            return True
+        msg = (
+            f"raw artifact conflict for request {request_id}: same request id "
+            "with different content - immutable raw store"
+        )
+        raise RawWriterError(msg)
+
+    def _meta_bytes(
+        self,
+        envelope: Any,
+        *,
+        content_hash: str,
+        row_count: int,
+        payload_kind: str,
+        tables: tuple[TableRecord, ...] | list[TableRecord],
+    ) -> bytes:
         doc = {
             "request_id": getattr(envelope, "request_id", ""),
             "provider": getattr(envelope, "provider", "amazingdata"),
@@ -163,6 +515,18 @@ class RawWriter:
             "capability_status": getattr(envelope, "capability_status", None),
             "row_count": row_count,
             "content_hash": content_hash,
+            "payload_kind": payload_kind,
+            "request_params": _scrub(getattr(envelope, "request_params", None)),
+            "tables": [
+                {
+                    "name": t.name,
+                    "file": t.file,
+                    "content_hash": t.content_hash,
+                    "schema_hash": t.schema_hash,
+                    "row_count": t.row_count,
+                }
+                for t in tables
+            ],
         }
         return json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=1).encode("utf-8")
 
@@ -171,50 +535,35 @@ class RawWriter:
         return f"provider={provider}/dataset={dataset}/{filename}"
 
 
-def _rows_of(payload: Any) -> list[dict[str, Any]]:
-    if payload is None:
-        return []
-    if isinstance(payload, dict):
-        for value in payload.values():
-            if hasattr(value, "__len__") and not isinstance(value, (str, bytes)):
-                return list(value)
-        return []
-    if isinstance(payload, list):
-        return list(payload)
-    return [payload]
+def _with_request_id(
+    envelope: Any, request_id: str, *, provider: str, dataset: str, status: str = "OK"
+) -> Any:
+    """Legacy-entry helper: rebuild the envelope with explicit request_id /
+    provider / dataset (used only by the compatibility wrappers)."""
+    from dataclasses import replace
+
+    return replace(
+        envelope,
+        request_id=request_id,
+        provider=provider,
+        provider_dataset=dataset,
+        status=status,
+    )
 
 
-def _to_parquet_bytes(rows: list[dict[str, Any]]) -> bytes:
-    import io
-
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-
-    if not rows:
-        # empty-but-typed artifact
-        table = pa.table({"_empty": pa.array([], type=pa.int8())})
-    else:
-        # union of keys across rows, stable order
-        columns: list[str] = []
-        for row in rows:
-            if isinstance(row, dict):
-                for key in row:
-                    if key not in columns:
-                        columns.append(key)
-        data = {
-            col: [row.get(col) if isinstance(row, dict) else None for row in rows]
-            for col in columns
-        }
-        table = pa.table(data)
-    buf = io.BytesIO()
-    pq.write_table(table, buf, compression="zstd")
-    return buf.getvalue()
-
-
-def _existing_hash(path: Path) -> str | None:
-    if not path.is_file():
-        return None
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _combined_hash(records: list[TableRecord]) -> str:
+    """Single-table payloads keep the classic content-hash semantics (the
+    sha256 of the payload artifact bytes); multi-table payloads hash the
+    sorted (file, table-hash) pairs of every table."""
+    if len(records) == 1 and records[0].name is None:
+        return records[0].content_hash
+    digest = hashlib.sha256()
+    for record in sorted(records, key=lambda r: r.file):
+        digest.update(record.file.encode("utf-8"))
+        digest.update(b":")
+        digest.update(record.content_hash.encode("utf-8"))
+        digest.update(b"\n")
+    return digest.hexdigest()
 
 
 __all__ = [
@@ -222,4 +571,5 @@ __all__ = [
     "RawWriteResult",
     "RawWriter",
     "RawWriterError",
+    "TableRecord",
 ]

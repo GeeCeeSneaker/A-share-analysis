@@ -4,8 +4,10 @@ Every probe:
 - calls ONLY through its SpikeTarget (real = hardened adapter),
 - goes through the ProbeExecutor so provider errors become STRUCTURED
   cases (never an unhandled crash leaving the run RUNNING),
-- archives lossless raw evidence via the RunStore (including FAILED
-  exchanges - the provider envelope itself is evidence),
+- archives lossless raw evidence via the RawWriter consuming the EXPLICIT
+  ProviderExchange (CR-1.1 / audit R4-A2.3 sections 3-4): Parquet payload
+  artifact + .meta.json envelope, including FAILED exchanges (envelope-
+  only evidence - the request audit record is never dropped),
 - turns payloads into cases with SEMANTIC validators (never call-success),
 - writes cases into the run-scoped catalog,
 - references the SINGLE run as-of date (R3-P1-09) - no probe may hardcode
@@ -13,12 +15,16 @@ Every probe:
 
 Golden (B4) executes the real Discover -> Freeze -> Expected -> Compare
 -> Reason -> Verdict pipeline against provider data.
+
+CR-1.1 audit section 3.2-B: this module NEVER reads
+``provider.last_envelopes`` - that list is diagnostic-only. All lineage
+flows through the explicit ProviderExchange returned by ``*_exchange``
+target methods (or attached to a raised ProviderError).
 """
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import asdict
 from typing import Any
 
 from ashare_state.providers.errors import (
@@ -28,6 +34,7 @@ from ashare_state.providers.errors import (
     ProviderRateLimitError,
     ProviderSchemaError,
 )
+from ashare_state.providers.exchange import ProviderExchange, synthetic_failure_exchange
 from ashare_state.spike import validators
 from ashare_state.spike.catalog import CaseCatalog
 from ashare_state.spike.model import CaseResult, RunFailureReason, SpikeCase, SpikeRun
@@ -39,7 +46,7 @@ DOCUMENTED_UNITS = {"volume": "shares", "amount": "CNY"}
 
 
 def _rows_of(payload: Any) -> list[dict[str, Any]]:
-    """Normalize SDK payload shapes into row dicts (dict-of-frames / list)."""
+    """Normalize SDK payload shapes into row dicts (frames / list / dict-of)."""
     if payload is None:
         return []
     if isinstance(payload, dict):
@@ -49,11 +56,21 @@ def _rows_of(payload: Any) -> list[dict[str, Any]]:
         return rows
     if isinstance(payload, list):
         return [r if isinstance(r, dict) else {"value": r} for r in payload]
-    if hasattr(payload, "to_dict"):  # DataFrame
+    to_dict = getattr(payload, "to_dict", None)
+    if callable(to_dict):  # DataFrame (polars/pandas)
         try:
-            return payload.reset_index().to_dict(orient="records")
+            records = to_dict(orient="records") if hasattr(payload, "index") else None
+        except TypeError:
+            records = None
+        if records is not None:
+            return records
+        try:
+            return list(to_dict())  # polars: dict of series -> fallback
         except Exception:  # noqa: BLE001
             return []
+    rows_method = getattr(payload, "rows", None)
+    if callable(rows_method):  # polars.DataFrame
+        return [dict(zip(payload.columns, row, strict=True)) for row in rows_method()]
     return [{"value": payload}]
 
 
@@ -65,6 +82,12 @@ def _to_plain(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 class ProbeContext:
+    """Run-scoped context. CR-1.1 (audit R4-A2.3 section 4): the runtime
+    evidence pipeline is ProviderExchange -> RawWriter -> Parquet + meta
+    -> RawWriteResult -> SpikeCase evidence_ref/evidence_hash. Payload ->
+    RunStore.write_evidence(JSON) is FORBIDDEN as the formal provider
+    evidence chain."""
+
     def __init__(
         self,
         run: SpikeRun,
@@ -76,6 +99,9 @@ class ProbeContext:
         self.store = store
         self.catalog = catalog
         self.target = target
+        from ashare_state.storage.raw_writer import RawWriter
+
+        self.raw_writer = RawWriter(store.raw_dir(run))
 
     @property
     def as_of_date(self) -> int:
@@ -83,32 +109,45 @@ class ProbeContext:
         digits = "".join(ch for ch in str(self.run.as_of_date) if ch.isdigit())
         return int(digits[:8]) if len(digits) >= 8 else 20260814
 
-    def evidence(
-        self, endpoint: str, dataset: str, params: dict[str, Any], payload: Any
-    ) -> dict[str, Any]:
-        """Persist evidence. CR-1c (audit section 43): when the payload came
-        from a ProviderExchange, the evidence reuses the EXCHANGE's
-        request_id - never regenerates one."""
-        identity = self.target.identity()
-        request_id = str(uuid.uuid4())
-        provider = getattr(self.target, "provider", None)
-        if provider is not None:
-            envelopes = getattr(provider, "last_envelopes", [])
-            matching = [e for e in envelopes if e.endpoint == endpoint]
-            if matching:
-                request_id = str(matching[-1].request_id)
-        return self.store.write_evidence(
-            self.run,
-            request_id,
-            endpoint=endpoint,
-            provider_dataset=dataset,
-            params=params,
-            payload=payload,
-            account_profile_id=identity.get("account_profile_id", ""),
-            sdk_version=identity.get("sdk_version"),
-            runtime_version=identity.get("runtime_version"),
+    # ------------------------------------------------------------ evidence
+    def evidence_from_exchange(self, exchange: ProviderExchange) -> dict[str, Any]:
+        """Persist ONE ProviderExchange via the RawWriter and return the
+        evidence meta for case binding. Reuses the exchange's own
+        request_id (CR-1c) - never regenerates one, never reverse-searches
+        last_envelopes."""
+        result = self.raw_writer.write(exchange)
+        envelope = exchange.envelope
+        # evidence_ref must be relative to the run store's spike_root so
+        # the evidence closure can re-verify the file bytes
+        run_prefix = (
+            f"{self.run.run_kind.value.lower()}/{self.run.spike_run_id}/raw/"
         )
+        return {
+            "request_id": result.request_id,
+            "endpoint": envelope.endpoint,
+            "provider_dataset": envelope.provider_dataset,
+            "status": envelope.status,
+            "error_class": envelope.error_class,
+            "attempt_count": envelope.attempt_count,
+            "row_count": result.row_count,
+            "payload_kind": result.payload_kind,
+            "evidence_ref": run_prefix + result.evidence_uri,
+            "content_hash": result.evidence_hash,
+        }
 
+    def failure_evidence(
+        self, exc: ProviderError, *, endpoint: str, dataset: str
+    ) -> dict[str, Any]:
+        """Persist the FAILED exchange attached to a ProviderError (first-
+        class failure object, audit section 3.2-D). If the failure never
+        reached a real SDK exchange (governance gate), an honest synthetic
+        envelope is recorded instead - still no shared-state lookup."""
+        exchange = getattr(exc, "exchange", None)
+        if exchange is None:
+            exchange = synthetic_failure_exchange(endpoint=endpoint, dataset=dataset, error=exc)
+        return self.evidence_from_exchange(exchange)
+
+    # ---------------------------------------------------------------- cases
     def case(
         self,
         *,
@@ -136,7 +175,7 @@ class ProbeContext:
                 trade_date=trade_date,
                 expected_value=expected,
                 actual_value=actual,
-                evidence_type="RAW_JSON",
+                evidence_type="RAW_PARQUET",
                 evidence_ref=str(evidence_meta.get("evidence_ref", "")),
                 result=result,
                 reason_code=reason_code,
@@ -183,50 +222,49 @@ class ProbeExecutor:
       other ProviderError     -> MISSING case (SDK internal -> gate sees
                                  SPIKE_INCOMPLETE, never a false PASS)
 
-    FAILED exchanges are archived as evidence too: the provider's own
-    ERROR RawEnvelope is persisted (request_id / attempts / error_class),
-    so denials leave an auditable trail.
+    CR-1.1 (audit section 3.2): ``fn`` must return the EXPLICIT
+    ProviderExchange (call the target's ``*_exchange`` methods). Failure
+    exchanges are first-class: the exchange attached to the raised
+    ProviderError is persisted (envelope-only evidence) - the module never
+    reverse-searches provider.last_envelopes.
     """
 
     def __init__(self, ctx: ProbeContext) -> None:
         self.ctx = ctx
 
-    def _failed_envelope_evidence(
-        self, exc: ProviderError, endpoint: str, dataset: str, params: dict[str, Any]
-    ) -> dict[str, Any]:
-        provider = getattr(self.ctx.target, "provider", None)
-        payload: Any = {"error": f"{type(exc).__name__}: {exc}"[:500]}
-        if provider is not None:
-            failed = [e for e in provider.last_envelopes if e.status == "ERROR"]
-            if failed:
-                payload = {"failed_envelope": asdict(failed[-1]), "error": str(exc)[:500]}
-        return self.ctx.evidence(endpoint, dataset, params, payload)
-
     def call(
         self,
         endpoint: str,
-        dataset: str,
-        params: dict[str, Any],
         fn: Any,
         *,
         failure_case_type: str,
+        dataset: str = "",
         trade_date: str = "",
         symbol: str = "SDK",
     ) -> tuple[Any, dict[str, Any]]:
-        """Execute one target call; returns (payload, evidence_meta).
+        """Execute one exchange-returning target call; returns
+        (payload, evidence_meta).
 
-        On provider failure the case is recorded and (None, meta) is
-        returned - callers skip further validation for this capability.
+        On provider failure the case is recorded (with the failed
+        exchange's envelope-only evidence) and (None, meta) is returned -
+        callers skip further validation for this capability.
         """
         from ashare_state.spike.runner import fail_run
 
         try:
-            payload = fn()
-            meta = self.ctx.evidence(endpoint, dataset, params, payload)
-            return payload, meta
+            exchange = fn()
+            if not isinstance(exchange, ProviderExchange):
+                msg = (
+                    f"probe contract violation: {endpoint} fn must return a "
+                    "ProviderExchange (CR-1.1 audit section 3.2-A) - use the "
+                    "target's *_exchange methods"
+                )
+                raise TypeError(msg)
+            meta = self.ctx.evidence_from_exchange(exchange)
+            return exchange.payload, meta
         except ProviderAuthError as exc:
             # account-level fatal: terminal state, then re-raise so the CLI stops
-            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            meta = self.ctx.failure_evidence(exc, endpoint=endpoint, dataset=dataset)
             self.ctx.case(
                 case_id=f"SDK-AUTH-{uuid.uuid4().hex[:8]}",
                 case_type=failure_case_type,
@@ -241,7 +279,7 @@ class ProbeExecutor:
             fail_run(self.ctx.store, self.ctx.run, RunFailureReason.FAILED_ACCOUNT)
             raise
         except ProviderPermissionError as exc:
-            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            meta = self.ctx.failure_evidence(exc, endpoint=endpoint, dataset=dataset)
             self.ctx.case(
                 case_id=f"SDK-PERM-{uuid.uuid4().hex[:8]}",
                 case_type=failure_case_type,
@@ -255,7 +293,7 @@ class ProbeExecutor:
             )
             return None, meta
         except ProviderRateLimitError as exc:
-            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            meta = self.ctx.failure_evidence(exc, endpoint=endpoint, dataset=dataset)
             self.ctx.case(
                 case_id=f"SDK-RATE-{uuid.uuid4().hex[:8]}",
                 case_type=failure_case_type,
@@ -269,7 +307,7 @@ class ProbeExecutor:
             )
             return None, meta
         except ProviderSchemaError as exc:
-            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            meta = self.ctx.failure_evidence(exc, endpoint=endpoint, dataset=dataset)
             self.ctx.case(
                 case_id=f"SDK-SCHEMA-{uuid.uuid4().hex[:8]}",
                 case_type=failure_case_type,
@@ -283,7 +321,7 @@ class ProbeExecutor:
             )
             return None, meta
         except ProviderError as exc:  # internal + unclassified
-            meta = self._failed_envelope_evidence(exc, endpoint, dataset, params)
+            meta = self.ctx.failure_evidence(exc, endpoint=endpoint, dataset=dataset)
             self.ctx.case(
                 case_id=f"SDK-INTERNAL-{uuid.uuid4().hex[:8]}",
                 case_type=failure_case_type,
@@ -328,9 +366,9 @@ def probe_b2_security_master(ctx: ProbeContext) -> dict[str, Any]:
     as_of = ctx.as_of_date  # R3-P1-09: run as-of, never hardcoded
     payload, meta = executor.call(
         "BaseData.get_hist_code_list",
-        "hist_code_list",
-        {"as_of": as_of},
-        lambda: ctx.target.get_hist_code_list("EXTRA_STOCK_A_SH_SZ", 19900101, as_of),
+        lambda: ctx.target.get_hist_code_list_exchange(
+            "EXTRA_STOCK_A_SH_SZ", 19900101, as_of
+        ),
         failure_case_type="security_master_with_delisted",
         trade_date=str(as_of),
         symbol="MARKET",
@@ -355,9 +393,7 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     # --- daily bar units
     bars, bar_meta = executor.call(
         "MarketData.query_kline",
-        "daily_bar",
-        {"date": sample_date},
-        lambda: ctx.target.query_kline(
+        lambda: ctx.target.query_kline_exchange(
             symbols, begin_date=sample_date, end_date=sample_date, kline_type="DAY"
         ),
         failure_case_type="daily_bar_units",
@@ -383,9 +419,9 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     # --- ST/suspend + limit (semantic case ids per R2 section 7)
     status, status_meta = executor.call(
         "InfoData.get_history_stock_status",
-        "history_stock_status",
-        {"date": sample_date},
-        lambda: ctx.target.get_history_stock_status(sample_date, sample_date, symbols),
+        lambda: ctx.target.get_history_stock_status_exchange(
+            sample_date, sample_date, symbols
+        ),
         failure_case_type="historical_st_suspend",
         trade_date=str(sample_date),
         symbol="SAMPLE",
@@ -414,9 +450,7 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     # --- adj factor continuity
     adj, adj_meta = executor.call(
         "BaseData.get_adj_factor",
-        "adj_factor",
-        {},
-        lambda: ctx.target.get_adj_factor(symbols[:2]),
+        lambda: ctx.target.get_adj_factor_exchange(symbols[:2]),
         failure_case_type="adj_factor_corporate_action_continuity",
         trade_date=str(sample_date),
         symbol="SAMPLE",
@@ -440,9 +474,11 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
 
 
 def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
-    """Golden pipeline (R4-A2.2a): DOMAIN-ROUTED comparison - each case
-    type fetches and validates against its own domain endpoints (audit
-    sections 34-35); loads the RUN-BOUND dataset (R4A2-P0-02)."""
+    """Golden pipeline (R4-A2.2a + R4-A2.3 section 6): DOMAIN-ROUTED
+    comparison where every domain fetch goes through EXPLICIT
+    ProviderExchanges persisted by the RawWriter; cases bind to the
+    domain's evidence bundle (multi-endpoint lineage, audit section 6.3).
+    Loads the RUN-BOUND dataset (R4A2-P0-02)."""
     from ashare_state.spike.golden_router import route_all
     from ashare_state.spike.golden_store import GoldenTruthStore
 
@@ -455,29 +491,9 @@ def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     else:
         # dry-run / unbound runs fall back to ACTIVE (never formal verdicts)
         golden_cases, golden_manifest = GoldenTruthStore().load()
-    executor = ProbeExecutor(ctx)
-    # domain evidence: one envelope per routing domain records the
-    # underlying provider exchange (status/hist/basic/adj/kline/mapping)
-    domain_evidence: dict[str, dict[str, Any]] = {}
     results: dict[str, int] = {}
     outcomes = route_all(ctx, list(golden_cases))
-    for case, outcome in outcomes:
-        from ashare_state.spike.golden_router import route_golden_case
-
-        domain = route_golden_case(case)
-        meta = domain_evidence.get(domain)
-        if meta is None:
-            payload, meta = executor.call(
-                "InfoData.get_history_stock_status",
-                f"golden_{domain.lower()}",
-                {"domain": domain, "cases": len(golden_cases)},
-                lambda: None,
-                failure_case_type=case.case_type,
-                trade_date=str(sample_date),
-                symbol=f"DOMAIN:{domain}",
-            )
-            _ = payload
-            domain_evidence[domain] = meta
+    for case, outcome, evidence_meta in outcomes:
         ctx.case(
             case_id=case.golden_case_id,
             case_type=case.case_type,
@@ -487,7 +503,7 @@ def probe_b4_golden(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
             expected=f"{case.truth_source}: {case.expected_fields}",
             actual=outcome.actual,
             result=outcome.result,
-            evidence_meta=meta,
+            evidence_meta=evidence_meta,
             reason_code=outcome.reason_code,
             validator_id=outcome.validator_id,
             validator_version=outcome.validator_version,
@@ -510,9 +526,7 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
     executor = ProbeExecutor(ctx)
     calendar, cal_meta = executor.call(
         "BaseData.get_calendar",
-        "trade_calendar",
-        {},
-        lambda: ctx.target.get_calendar(),
+        lambda: ctx.target.get_calendar_exchange(),
         failure_case_type="sdk_permission_cache_freshness",
         trade_date=str(sample_date),
         symbol="SDK",
@@ -541,9 +555,7 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
     ]
     bars, bar_meta = executor.call(
         "MarketData.query_kline",
-        "history_depth",
-        {"fixtures": fixtures, "range": "19900101-today"},
-        lambda: ctx.target.query_kline(
+        lambda: ctx.target.query_kline_exchange(
             fixtures, begin_date=19900101, end_date=sample_date, kline_type="DAY"
         ),
         failure_case_type="history_start_2018_plus_warmup",
@@ -557,18 +569,20 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         earliest = min((str(r.get("KLINE_TIME", "99991231")) for r in rows), default="")
     cov = validators.validate_history_coverage(earliest)
     ctx.outcome_case("history_start_2018_plus_warmup", "FIXTURES", str(sample_date), bar_meta, cov)
-    # symbol mapping core gate
-    symbols_all = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")]
-    sym_meta = ctx.evidence("BaseData.get_code_list", "code_list", {}, symbols_all)
+    # symbol mapping core gate - explicit exchange (CR-1.1: no JSON
+    # evidence chain, no payload-only call)
+    symbols_exchange = ctx.target.get_code_list_exchange("EXTRA_STOCK_A")
+    symbols_all = [str(s) for s in _rows_of(symbols_exchange.payload)]
+    sym_meta = ctx.evidence_from_exchange(symbols_exchange)
     sym_out = validators.validate_symbol_mapping(symbols_all)
     ctx.outcome_case("symbol_mapping_unambiguous", "MARKET", "", sym_meta, sym_out)
     # BSE/BJ independent core evidence (audit section 40): dedicated calls,
     # never "the current code list happens to include BJ"
     bse_status, bse_meta = executor.call(
         "InfoData.get_history_stock_status",
-        "bse_status",
-        {"symbol": "835185.BJ"},
-        lambda: ctx.target.get_history_stock_status(20220101, 20221231, ["835185.BJ"]),
+        lambda: ctx.target.get_history_stock_status_exchange(
+            20220101, 20221231, ["835185.BJ"]
+        ),
         failure_case_type="limit_price_and_no_limit_days",
         trade_date="20220601",
         symbol="835185.BJ",
@@ -594,12 +608,11 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     OBSERVED shape so the assessment has evidence attached.
     """
     executor = ProbeExecutor(ctx)
-    symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")][:3]
+    symbols_exchange = ctx.target.get_code_list_exchange("EXTRA_STOCK_A")
+    symbols = [str(s) for s in _rows_of(symbols_exchange.payload)][:3]
     basic, basic_meta = executor.call(
         "InfoData.get_stock_basic",
-        "stock_basic",
-        {},
-        lambda: ctx.target.get_stock_basic(symbols),
+        lambda: ctx.target.get_stock_basic_exchange(symbols),
         failure_case_type="free_float_equivalence",
         trade_date=str(sample_date),
         symbol="SAMPLE",
@@ -637,9 +650,7 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     )
     idx, idx_meta = executor.call(
         "MarketData.query_kline",
-        "index_daily",
-        {},
-        lambda: ctx.target.query_kline(
+        lambda: ctx.target.query_kline_exchange(
             ["000300.SH"], begin_date=sample_date, end_date=sample_date, kline_type="DAY"
         ),
         failure_case_type="benchmark_index_availability",
@@ -668,7 +679,12 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
 
     Dry-run/trial use one day; production runs pass trading_days (the
     run's calendar tail) and per-day rows/bytes/elapsed/requests are
-    recorded, with first-pull vs cached-pull behavior distinguished."""
+    recorded, with first-pull vs cached-pull behavior distinguished.
+
+    CR-1.1: request/retry counts are accumulated from each call's
+    evidence meta (the explicit exchanges) - never from
+    provider.last_envelopes.
+    """
     import time
 
     executor = ProbeExecutor(ctx)
@@ -683,19 +699,25 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     total_bytes = 0
     total_elapsed = 0.0
     failures = 0
+    request_count = 0
+    retry_count = 0
+    last_meta: dict[str, Any] = {}
     for day in window:
         started = time.monotonic()
         payload, meta = executor.call(
             "MarketData.query_kline",
-            "capacity_probe",
-            {"symbols": len(symbols), "date": day},
-            lambda d=day: ctx.target.query_kline(
+            lambda d=day: ctx.target.query_kline_exchange(
                 symbols, begin_date=d, end_date=d, kline_type="DAY"
             ),
             failure_case_type="capacity_backfill",
             trade_date=str(day),
             symbol="ALL_A",
         )
+        # CR-1.1: counts come from the explicit exchange evidence, not from
+        # provider.last_envelopes (diagnostic-only list)
+        request_count += 1
+        retry_count += max(0, int(meta.get("attempt_count", 1)) - 1)
+        last_meta = meta
         elapsed = round(time.monotonic() - started, 3)
         if payload is None:
             failures += 1
@@ -715,11 +737,6 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
                 "pull": "first" if len(per_day) == 0 else "cached-or-first",
             }
         )
-    # R3-P1-07: real request/retry counts come from the provider envelopes
-    provider = getattr(ctx.target, "provider", None)
-    envelopes = list(provider.last_envelopes) if provider is not None else []
-    request_count = sum(1 for e in envelopes if e.endpoint == "MarketData.query_kline")
-    retry_count = sum(max(0, e.attempt_count - 1) for e in envelopes)
     metrics = {
         "symbol_count": len(symbols),
         "day_window": [str(d) for d in window],
@@ -747,6 +764,6 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
             f"days={len(window)} rows={total_rows} wall={total_elapsed:.1f}s failures={failures}"
         ),
         result=CaseResult.OBSERVED if not failures else CaseResult.VALIDATED_FAIL,
-        evidence_meta=meta,
+        evidence_meta=last_meta,
     )
     return metrics

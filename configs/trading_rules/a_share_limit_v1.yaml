@@ -1,0 +1,152 @@
+# A-share price-limit rule facts (PIT, versioned data layer)
+#
+# R4-A2.3 P0-06 (audit section 8): institutional FACTS live HERE, not in
+# Python. The resolver (ashare_state.spike.trading_rule) only loads,
+# validates, PIT-matches, conflict-detects, resolves and computes Decimal
+# limit prices. 0 matches / >1 equally-valid matches / unknown board /
+# missing calendar rows -> RULE_UNRESOLVED (fail closed, never silent
+# fallback to MAIN 10%).
+#
+# review flow: COMPILED -> (human review) -> REVIEWED; review_status is
+# part of the dataset governance (see docs/project/DEVELOPMENT_MANAGEMENT.md).
+version: "2026-08-24.1"
+source_version: "SSE/SZSE/BSE public trading rules, consolidated 2026-08"
+source_retrieved_at: "2026-08-24"
+review_status: "COMPILED"
+reviewed_by: ""
+review_note: >
+  Consolidated from the frozen V1.3.2 design (section: trading rules) and
+  public exchange rulebooks. Pending human review via the golden review
+  workflow before any PRODUCTION formal run binds this file.
+rules:
+  # ---------------------------------------------------------------- MAIN
+  - rule_id: MAIN_BOARD_NORMAL
+    board: MAIN
+    exchanges: [SH, SZ]
+    code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
+    effective_from: "19961216"       # price limit restored on both boards
+    effective_to: "20991231"
+    st_state: false
+    listing_age_rule: NONE
+    up_rate: 0.10
+    down_rate: 0.10
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SSE/SZSE price-limit rule, effective 1996-12-16"
+
+  - rule_id: MAIN_BOARD_ST
+    board: MAIN
+    exchanges: [SH, SZ]
+    code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
+    effective_from: "19980401"       # ST special-treatment regime begins
+    effective_to: "20991231"
+    st_state: true
+    listing_age_rule: NONE
+    up_rate: 0.05
+    down_rate: 0.05
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SSE/SZSE ST special treatment, +/-5% daily limit"
+
+  - rule_id: MAIN_BOARD_IPO_DAY
+    board: MAIN
+    exchanges: [SH, SZ]
+    code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
+    effective_from: "20140101"       # IPO-day 44%/36% regime
+    effective_to: "20230131"         # replaced by registration-system rules
+    st_state: false
+    listing_age_rule: IPO_DAY_44_36  # applies ONLY on the listing day
+    up_rate: 0.44
+    down_rate: 0.36
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SSE/SZSE IPO-day limit +44%/-36%, 2014-01-01..2023-01-31"
+
+  # ------------------------------------------------------------- CHINEXT
+  - rule_id: CHINEXT_PRE_REGISTRATION
+    board: CHINEXT
+    exchanges: [SZ]
+    code_patterns: ["30xxxx"]
+    effective_from: "20091030"       # ChiNext opening
+    effective_to: "20200823"         # day before registration-system reform
+    st_state: null                   # ANY - ST shares shared the 10% regime
+    listing_age_rule: NONE
+    up_rate: 0.10
+    down_rate: 0.10
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SZSE ChiNext +/-10% daily limit, 2009-10-30..2020-08-23"
+
+  - rule_id: CHINEXT_REGISTRATION
+    board: CHINEXT
+    exchanges: [SZ]
+    code_patterns: ["30xxxx"]
+    effective_from: "20200824"       # registration-system reform
+    effective_to: "20991231"
+    st_state: null                   # ANY - +/-20% regardless of ST
+    listing_age_rule: NONE
+    up_rate: 0.20
+    down_rate: 0.20
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SZSE ChiNext registration-system reform, +/-20%, from 2020-08-24"
+
+  - rule_id: CHINEXT_REGISTRATION_FIRST5
+    board: CHINEXT
+    exchanges: [SZ]
+    code_patterns: ["30xxxx"]
+    effective_from: "20200824"
+    effective_to: "20991231"
+    st_state: null
+    listing_age_rule: FIRST_5_DAYS_NO_LIMIT  # first 5 TRADING sessions (PIT calendar)
+    up_rate: 0.0
+    down_rate: 0.0
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SZSE ChiNext: no price limit during the first 5 trading sessions after IPO"
+
+  # ---------------------------------------------------------------- STAR
+  - rule_id: STAR_MARKET
+    board: STAR
+    exchanges: [SH]
+    code_patterns: ["688xxx", "689xxx"]
+    effective_from: "20190722"       # STAR Market opening
+    effective_to: "20991231"
+    st_state: null                   # ANY - +/-20% regardless of ST
+    listing_age_rule: NONE
+    up_rate: 0.20
+    down_rate: 0.20
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SSE STAR Market +/-20% daily limit, from 2019-07-22"
+
+  - rule_id: STAR_MARKET_FIRST5
+    board: STAR
+    exchanges: [SH]
+    code_patterns: ["688xxx", "689xxx"]
+    effective_from: "20190722"
+    effective_to: "20991231"
+    st_state: null
+    listing_age_rule: FIRST_5_DAYS_NO_LIMIT
+    up_rate: 0.0
+    down_rate: 0.0
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SSE STAR Market: no price limit during the first 5 trading sessions after IPO"
+
+  # ----------------------------------------------------------------- BSE
+  # Selected layer (2020-10-30, +/-30%) carried over unchanged to the BSE
+  # opening on 2021-11-15 (audit: BJ code-continuity golden cases).
+  - rule_id: BSE_LIMIT
+    board: BSE
+    exchanges: [BJ]
+    code_patterns: ["43xxxx", "83xxxx", "87xxxx", "92xxxx"]
+    effective_from: "20201030"       # selected-layer listing on the NEEQ
+    effective_to: "20991231"
+    st_state: null                   # ANY - +/-30% regardless of ST
+    listing_age_rule: NONE
+    up_rate: 0.30
+    down_rate: 0.30
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "BSE/selected layer +/-30% daily limit, from 2020-10-30"

@@ -13,6 +13,54 @@
 
 ---
 
+## 2026-08-24 · R4-A2.3 Correctness Closure + CR-1.1 Runtime Closure（复审 9 项 P0 + P1 + 文档治理全修）
+
+**Scope**
+- R4-A2.2/CR-1 复审裁决 REOPENED（工作要求 20260824）：P0-01..P0-09 + P1（BSE/BJ 语义证明）+ §13 文档治理；按推荐顺序 Batch A→F 全部完成
+
+**Implementation**
+- **CR-1.1 显式 Exchange Runtime（P0-01/02/03，ADR-010，DM-CR-20260824-006）**：
+  - `SpikeTarget`/`RealTarget`/`FakeTarget` 全套 `*_exchange` 显式 API（provider 层每业务方法 `*_exchange` 变体；FakeTarget 产出真实 ProviderExchange——dry-run 与 formal run 同管线）
+  - 运行时证据链唯一正式路径：`exchange → RawWriter.write(exchange) → Parquet + .meta.json → RawWriteResult → SpikeCase.evidence_ref/evidence_hash`（evidence_type=RAW_PARQUET）；`payload → RunStore.write_evidence(JSON)` 退出正式证据链（保留兼容）
+  - 失败 exchange 一等对象：`ProviderError.exchange`（call_exchange 附加 error envelope）；治理拒绝 `synthetic_failure_exchange`；`last_envelopes` 降级 diagnostic-only（**AST 级静态测试**强制 probes/golden_router/runner 不得访问）
+  - `ProbeExecutor.call(fn)`：fn 必须返回 ProviderExchange（TypeError fail loud）；B7 request/retry 从 evidence meta 累计
+  - RawWriter 载荷形状全支持：`list[dict]`/`dict[str,list[dict]]`/DataFrame(polars|pandas 鸭子类型)/`dict[str,DataFrame]`/`pyarrow.Table`/标量列表；dict-of-tables **方案 A**（每逻辑表独立 Parquet + meta 记录 name/file/content_hash/schema_hash/row_count）；混合/未知形状抛 `RawWriterError`（禁止静默取 dict 首值）；`write(exchange)` request_id 一致性断言 + envelope-first provider/dataset（冲突 BLOCK）
+- **Golden Router 证据同源（P0-04）**：每 domain 全部 exchange 先持久化（`_DomainCollector.persist`）→ DomainData 从精确 payload 构建 → case 绑定 **evidence bundle**（`raw/bundles/<domain>-<id>.json` 列出全部 request_id/evidence_ref/content_hash）；LIMIT 域=status+hist+calendar 三 exchange；CA 域=calendar+status+adj+kline；`verify_evidence_closure` 对 bundle **递归复验**；domain fetch 失败→失败 exchange 入 bundle + 全部 case 按错误类结构化；`lambda:None` 伪调用删除（静态断言）
+- **Bound Formal Gates（P0-05，DM-CR-20260824-005）**：`quantity_gate/event_coverage_gate/review_gate/production_formal_gate` 全部 bound-aware（`(cases, manifest)` 显式参数优先）；`compute_verdict` 对 bound 三 gate 全复验；旧 `production_formal_gate` 内部 ACTIVE 读与 `verify_binding`（ACTIVE 对比语义）删除；ACTIVE advance/tamper 双向对抗测试（8 个）证明历史 run verdict 完全独立
+- **Trading Rule 数据层（P0-06，ADR-011，DM-CR-20260824-005）**：制度事实迁入 `configs/trading_rules/a_share_limit_v1.yaml`（9 条规则全字段，COMPILED 待人工 review）；Python 只 load/validate/PIT 匹配/冲突检测/resolve/Decimal；fail-closed 全链（0 匹配/>1 equally-valid/未知板别/缺 listing_date+calendar → `RuleUnresolvedError`，永不静默退化 MAIN 10%）；`validators.validate_limit_rule` v3 数据驱动（BOARD_LIMIT_RATES/board_of 硬编码删除；Python 源码费率字面量静态断言）
+- **首 N 日 = session 序号（P0-07）**：`first_n_sessions` 用 PIT 交易日历 index（上市日=第 1 个 session）；日历缺行 fail-closed；测试覆盖春节/国庆长假/跨周末/第 5-6 日
+- **Limit 精确匹配（P0-08）**：`(SECURITY_CODE, TRADE_DATE)` 精确匹配（0/多行 fail closed）；listing_date 必须来自同一 PIT hist master（缺失即 FAIL 不允许 None 退化）；限价 Decimal ROUND_HALF_UP 与 provider 高低限价一致（1 tick 容差）
+- **CA T-1/T/T+1 真验证（P0-09）**：exact event date（adj EX_DATE==T）/ factor transition at T / raw discontinuity（factor≠1 时 raw_ret≠adj_ret）/ adjusted continuity（|adj_ret|≤35%，项目定义见 ADR-010）/ 停牌→`NOT_TESTABLE_TIME(SUSPENSION_AT_EVENT)`（绝不静默 PASS）
+- **P1 BSE/BJ 独立语义证明**：hist master 存在性（code continuity）+ exact-date ±30% regime（数据驱动 rule + Decimal 价格校验）；不再依赖 mapping endpoint
+- **文档治理（§13，DM-CR-20260824-005/006/007）**：DEVLOG + 管理总册同批更新（Current Code Baseline / Last Review / §40/41/43/48/52/53/56/61/62）；**ADR-010 Raw Evidence Model（C2）** + **ADR-011 Trading Rule Data SoR（C2）**；Reviewer Auto-Archive 规则并入总册 §56；工作要求文档回填 §20 Implementation Mapping（含 §17 Exit Gate 16 项自检）
+
+**Schema / Contract Changes**
+- C2 ×2：evidence model（RAW_PARQUET + bundle，ADR-010）、Trading Rules SoR（configs/trading_rules，ADR-011）
+- 新增：configs/trading_rules/a_share_limit_v1.yaml、tests/{unit/test_trading_rule_data.py, unit/test_raw_writer_shapes.py, integration/test_cr11_explicit_exchange.py, integration/test_golden_router_evidence.py, integration/test_bound_formal_gates.py}
+- 变更：providers/{exchange,errors}.py、providers/amazingdata/provider.py、storage/raw_writer.py、spike/{target,probes,golden_router,trading_rule,golden_store,validators,runner}.py
+
+**Verification**
+- Local: **418 tests passed / 0 failed**（348 → 418，新增 70：trading rule 数据层 21 + raw writer 形状 22 + 显式 exchange 10 + router 证据/CA/BJ 14 + bound gates 8——对照工作要求 §16 矩阵逐项覆盖）；ruff / mypy 全绿
+- dry-run 冒烟：B2-B7 全探针走 exchange→RawWriter 管线；B4 123 cases 全路由绑定 bundle；evidence closure（含 bundle 递归复验）零问题
+- GitHub Actions: 本批提交后触发，尚未确认（按 §49 口径区分 Local 与 CI）
+
+**Implementation Status**
+- DONE（R4-A2.3 / CR-1.1 全部 P0 + P1 + 文档治理）
+
+**Review Status**
+- PENDING_REVIEW（对照工作要求 §17 Exit Gate 16 项与 §18 复检重点）
+
+**Known Open Issues**
+- Golden v3 人工 Review 未执行（distinct events：ST_TRANSITION=10<50、DELIST symbols=10<20——candidate.py add-case 补齐；RISK-001/TD-005）
+- trading rules yaml 为 COMPILED，P0-M-1B 前需人工复核置 REVIEWED（RISK-005）
+- CI 三矩阵待推送后确认
+- Branch Protection（P1 治理）未启用
+
+**Next**
+- 推送 git + CI 确认 → Reviewer 复审 R4-A2.3/CR-1.1；Golden 人工 review 执行；R4-A3 / CR-2（消费 raw evidence 的 Provider-Normalized）
+
+---
+
 ## 2026-08-22 23:30 +08:00 · R4-A2.1 + R4-A2.2 + CR-1（复核四项 P0 全修 + 并行 Track B 启动）
 
 **Scope**

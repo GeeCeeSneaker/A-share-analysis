@@ -254,50 +254,74 @@ class GoldenTruthStore:
         )
         return cases, manifest
 
-    def production_formal_gate(self, bound_manifest: GoldenManifest) -> list[str]:
-        """R4A2-P0-04 formal gate evaluated over the BOUND dataset:
-        the review gate (artifact verification) + full-review requirement
-        of the bound dataset itself."""
-        problems = self.review_gate()
-        if not bound_manifest.fully_reviewed:
-            problems = list(problems) + [
-                "bound golden dataset is not fully REVIEWED "
-                f"(REVIEWED {bound_manifest.review_summary.get('REVIEWED', 0)}/"
-                f"{bound_manifest.case_count})"
-            ]
-        return problems
+    def production_formal_gate(
+        self,
+        bound_cases: list[GoldenCase] | None = None,
+        bound_manifest: GoldenManifest | None = None,
+    ) -> list[str]:
+        """R4A2-P0-04 + R4-A2.3 P0-05: the FORMAL production gate.
+
+        Bound-aware contract (audit section 7): RUNNING/RESUME/CLOSE/
+        VERDICT/REPLAY stages MUST pass bound (cases, manifest) - then
+        quantity + event-coverage + review gates are ALL re-verified over
+        the run-bound dataset itself. The ACTIVE dataset is only consulted
+        when no bound data is supplied (new-run creation path), and an
+        ACTIVE advance/tamper can never leak into a historical run's
+        verdict.
+        """
+        cases, manifest = self._resolve_dataset(bound_cases, bound_manifest)
+        return (
+            self.quantity_gate(cases, manifest)
+            + self.event_coverage_gate(cases, manifest)
+            + self.review_gate(cases, manifest)
+        )
 
     # ---------------------------------------------------------------- gates
-    def verify_binding(self, *, truth_version: str, dataset_hash: str) -> None:
-        _, manifest = self.load()
-        if truth_version != manifest.truth_version:
-            msg = (
-                f"golden truth_version drifted: run bound {truth_version!r}, "
-                f"dataset now {manifest.truth_version!r}"
-            )
-            raise GoldenTruthError(msg)
-        if dataset_hash != manifest.dataset_hash:
-            msg = "golden dataset hash drifted since the run was created"
-            raise GoldenTruthError(msg)
+    def _resolve_dataset(
+        self,
+        cases: list[GoldenCase] | None,
+        manifest: GoldenManifest | None,
+    ) -> tuple[list[GoldenCase], GoldenManifest]:
+        """Bound-aware dataset resolution: explicit (cases, manifest) win
+        (run-bound datasets); otherwise fall back to ACTIVE (only valid
+        for new-run creation, never for verdict paths).
 
-    def quantity_gate(self) -> list[str]:
-        _, manifest = self.load()
+        R4-A2.3 P0-05: the old verify_binding() (comparing a run's binding
+        against the ACTIVE pointer) was REMOVED - it violated the
+        bound-run contract. Binding integrity is verified via load_bound()
+        hash checking instead."""
+        if cases is not None and manifest is not None:
+            return cases, manifest
+        return self.load()
+
+    def quantity_gate(
+        self,
+        cases: list[GoldenCase] | None = None,
+        manifest: GoldenManifest | None = None,
+    ) -> list[str]:
+        cases_, manifest_ = self._resolve_dataset(cases, manifest)
+        _ = cases_
         return [
-            f"{case_type}: {manifest.counts_by_type.get(case_type, 0)} rows < {minimum}"
+            f"{case_type}: {manifest_.counts_by_type.get(case_type, 0)} rows < {minimum}"
             for case_type, minimum in REQUIRED_GOLDEN_COUNTS.items()
-            if manifest.counts_by_type.get(case_type, 0) < minimum
+            if manifest_.counts_by_type.get(case_type, 0) < minimum
         ]
 
-    def event_coverage_gate(self) -> list[str]:
+    def event_coverage_gate(
+        self,
+        cases: list[GoldenCase] | None = None,
+        manifest: GoldenManifest | None = None,
+    ) -> list[str]:
         """Distinct-event semantics (audit sections 14-16): identity is
         STRUCTURAL - (symbol, effective_date, subtype) for ST and
         (symbol, effective_date) for delist. Free-form event_id strings
-        can never inflate the count."""
-        cases, manifest = self.load()
+        can never inflate the count. Bound-aware (P0-05)."""
+        cases_, manifest_ = self._resolve_dataset(cases, manifest)
+        _ = manifest_
         problems: list[str] = []
         # ST transitions: >= 50 distinct structural events, ADD>0, REMOVE>0
         st_events: dict[tuple[str, str, str], str] = {}
-        for case in cases:
+        for case in cases_:
             if case.event_class == "ST_TRANSITION":
                 st_events[st_event_identity(case)] = case.event_subtype
         st_count = len(st_events)
@@ -310,8 +334,10 @@ class GoldenTruthStore:
         if remove_count == 0:
             problems.append("golden_st_transition: no ST_REMOVE/STAR_ST_REMOVE subtype events")
         # Delist: distinct (symbol, effective_date) >= 20 AND symbols >= 20
-        delist_identities = {delist_event_identity(c) for c in cases if c.event_class == "DELIST"}
-        delist_symbols = {c.provider_symbol for c in cases if c.event_class == "DELIST"}
+        delist_identities = {
+            delist_event_identity(c) for c in cases_ if c.event_class == "DELIST"
+        }
+        delist_symbols = {c.provider_symbol for c in cases_ if c.event_class == "DELIST"}
         if len(delist_identities) < REQUIRED_DISTINCT_EVENTS["golden_delisted"][1]:
             problems.append(
                 f"golden_delisted: distinct DELIST events {len(delist_identities)} < 20"
@@ -322,23 +348,32 @@ class GoldenTruthStore:
             )
         return problems
 
-    def review_gate(self) -> list[str]:
+    def review_gate(
+        self,
+        cases: list[GoldenCase] | None = None,
+        manifest: GoldenManifest | None = None,
+    ) -> list[str]:
         """FORMAL review gate (review section 8): every case REVIEWED, and
         EVERY REVIEWED case's source artifact RESOLVES and hash-VERIFIES.
 
         R4A2-P0-01 fix: verifies ALL reviewed cases with complete error
         collection - never breaks on the first success.
+
+        R4-A2.3 P0-05: bound-aware - with explicit (cases, manifest) the
+        gate re-verifies the RUN-BOUND dataset (verdict/replay stages);
+        artifacts live in the shared immutable evidence store, so bound
+        case refs verify against the same content-addressed files.
         """
-        cases, manifest = self.load()
+        cases_, manifest_ = self._resolve_dataset(cases, manifest)
         problems: list[str] = []
-        if not manifest.fully_reviewed:
-            total = sum(manifest.review_summary.values())
+        if not manifest_.fully_reviewed:
+            total = sum(manifest_.review_summary.values())
             problems.append(
                 "golden truth not fully human-reviewed "
-                f"(REVIEWED {manifest.review_summary.get('REVIEWED', 0)}/{total}; "
+                f"(REVIEWED {manifest_.review_summary.get('REVIEWED', 0)}/{total}; "
                 "audit section 39 requires every golden entry reviewed before P0-M-1B)"
             )
-        for case in cases:
+        for case in cases_:
             if case.review_status == "REVIEWED":
                 problems.extend(self._verify_artifact(case))
         return problems

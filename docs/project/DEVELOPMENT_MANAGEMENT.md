@@ -4,9 +4,9 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Current Code Baseline**：本批提交（R4-A2.1 + R4-A2.2 + CR-1；见 §33 更新规则）  
-> **Document Revision**：DM-CR-003 Part 2 + DM-CR-004  
-> **Last Review**：2026-08-22（R4-A2 Batch-1 复核：REOPENED——四项 Formal Truth P0，本批修复）  
+> **Current Code Baseline**：本批提交（R4-A2.3 Correctness Closure + CR-1.1 Runtime Closure；见 §33 更新规则）  
+> **Document Revision**：DM-CR-20260824-005 / 006 / 007  
+> **Last Review**：2026-08-24（R4-A2.2 复审：REOPENED——9 项 P0 + 文档治理，本批 R4-A2.3/CR-1.1 修复）  
 > **Last Reviewer**：Design / Audit Review  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
@@ -1074,19 +1074,21 @@ Evidence/Log/Exception 必须 scrub secret。
 | P0-M0 Engineering Foundation | DONE | VERIFIED | PASS |
 | Round-1/2 Architecture Hardening | DONE | VERIFIED/absorbed | PASS |
 | R3 Formal Spike Structure | DONE | absorbed by R4 | STRUCTURE PASS |
-| R4-A1 Golden Dataset / Per-Type Gate / Catalog Seal | DONE | REOPENED | 由 A1.1 修复 |
-| R4-A1.1 Truth Integrity | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
-| R4-A2 Semantic/PIT Validators | PLANNED | PENDING | Next |
+| R4-A1 Golden Dataset / Per-Type Gate / Catalog Seal | DONE | absorbed | PASS（由 A1.1 闭环） |
+| R4-A1.1 Truth Integrity | DONE | absorbed | PASS（由 R4-A2 批次闭环） |
+| R4-A2.1/A2.2 Semantic/PIT Validators + Review Workflow | DONE | REOPENED | 由 R4-A2.3 修复 |
+| R4-A2.3 Correctness Closure（bound gates / rule data / CA context / router evidence） | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
+| CR-1 ProviderExchange + RawWriter | DONE | absorbed | PASS（由 CR-1.1 闭环） |
+| CR-1.1 Explicit Exchange Runtime（runtime evidence 链） | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
 | R4-A3 SDK/Lifecycle/Early Stop | PLANNED | PENDING | Next |
 | R4-B1 Capability Endpoint Proof | PLANNED | PENDING | Next |
 | R4-B2 Publish Validation Exactness | PLANNED | PENDING | Next |
 | R4-CI | PLANNED | PENDING | Next |
-| CR-1 ProviderExchange + RawWriter | READY | PENDING | 可并行 |
-| CR-2 Provider-Normalized + Quarantine | PLANNED | PENDING | CR-1 后 |
+| CR-2 Provider-Normalized + Quarantine | PLANNED | PENDING | CR-1.1 后 |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
 | CR-4 Snapshot + Read Model Rebuild | PLANNED | PENDING | CR-3 后 |
-| Mock 20×60d Vertical Slice | BLOCKED | PENDING | CR-1..4 后 |
-| Production P0-M-1B | BLOCKED | PENDING | 正式账号 + R4 |
+| Mock 20×60d Vertical Slice | BLOCKED | PENDING | CR-2..4 后 |
+| Production P0-M-1B | BLOCKED | PENDING | 正式账号 + R4 + Golden 人工 Review |
 | Real P0a | BLOCKED | PENDING | Provider + Canonical Runtime |
 | Trend BASE | BLOCKED | PENDING | Real Vertical Slice 后 |
 
@@ -1094,26 +1096,37 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A2（Track A，与 CR-1 并行）
+## R4-A2.3 + CR-1.1（本批，DONE / PENDING_REVIEW）
 
 ```text
-Golden Review Evidence Closure（source_artifact_ref + review workflow，
-    不允许手工填 hash；formal gate resolve bytes → SHA256 verify）
-Domain-specific Golden Probe Router（ST→status / Delisted→hist_code_list+
-    stock_basic / Limit→status+PIT rule / CA→dividend+adj+kline 组合 /
-    BJ→mapping endpoint）
-ST 事件语义：ST_TRANSITION + subtype（ST_ADD/ST_REMOVE/STAR_ST_ADD/
-    STAR_ST_REMOVE）；≥50 distinct 且 ADD>0 且 REMOVE>0
-Delist Gate：distinct event_id ≥20 AND distinct provider_symbol ≥20
-Golden hash 字段更名：golden_dataset_hash（方案 A）
-Manifest diversity：distinct_events/securities_by_type +
-    exchange/board coverage（全部由 cases 复算）
-Adj T-1/T/T+1 price context（无 context 不进 Core PASS）
-删除 B3 现场 expected_is_st=False（语义 truth 只来自 Reviewed Golden）
-History Coverage 固定 fixtures（长上市 SH/SZ/BSE/历史退市 +
-    expected_list_date 对比）
-PIT Trading Rule（版本化 effective_from/to + Decimal ROUND_HALF_UP）
-BSE / BJ 独立 Core Evidence
+CR-1.1（P0-01/02/03）：
+  SpikeTarget/RealTarget/FakeTarget 显式 *_exchange API；
+  运行时删除 last_envelopes 反查（AST 级静态测试强制）；
+  ProbeExecutor.call(fn) 只接受返回 ProviderExchange 的 callable；
+  失败 exchange 一等对象（ProviderError.exchange；治理拒绝用
+    synthetic_failure_exchange 诚实记录）；
+  RawWriter.write(exchange) 统一入口（request_id 一致性断言；
+    envelope-first provider/dataset，冲突 BLOCK）；
+  载荷形状：list[dict] / dict[str, list[dict]] / DataFrame(polars|pandas) /
+    dict[str, DataFrame] / pyarrow.Table / 标量列表；dict-of-tables 方案 A
+    （每逻辑表独立 Parquet）；禁止静默取 dict 首值；逐字段 round-trip 测试
+R4-A2.3（P0-04..09 + P1）：
+  Golden Router 显式 exchange 持久化 + DomainData 来自精确 payload +
+    evidence bundle（多端点 lineage：LIMIT=status+hist+calendar；
+    CA=calendar+status+adj+kline；bundle 递归 closure 复验）
+  Bound-aware formal gates：quantity/event_coverage/review/
+    production_formal_gate 全部接受 (cases, manifest)；VERDICT 只用 bound；
+    ACTIVE advance/tamper 不泄漏（对抗测试）
+  Trading Rule 数据层（configs/trading_rules/a_share_limit_v1.yaml；
+    ADR-011）：Python 无制度费率字面量；fail-closed（0 匹配/>1 匹配/
+    缺 listing_date+calendar→RULE_UNRESOLVED）
+  首 N 日 = PIT 交易日历 session 序号（春节/国庆/跨周末/第5第6日/
+    日历缺行 fail-closed，禁止日历天近似）
+  Limit 验证按 (symbol, trade_date) 精确匹配（0 行/多行 fail closed）；
+    listing_date 必须来自同一 PIT context
+  CA T-1/T/T+1 真验证（exact event date / factor transition /
+    raw discontinuity / adjusted continuity / 停牌→NOT_TESTABLE_TIME）
+  BSE/BJ 独立语义证明（hist master 存在性 + exact-date ±30% regime）
 ```
 
 ## R4-A3 / B1 / B2
@@ -1127,22 +1140,12 @@ explicit artifact_validation_id
 Migration 011
 ```
 
-## CR-1（Track B，可立即并行）
+## 后续 CR（CR-1.1 已就绪）
 
 ```text
-ProviderExchange[T]（1 exchange = 1 request_id = 1 envelope = ≤1 payload）
-call_exchange() 显式返回；业务 API wrapper 取 .payload
-内部 SDK call（如 query_kline 内 calendar）独立 envelope
-RawWriter：success→immutable raw artifact；failure→envelope；
-    幂等（same hash no-op / different BLOCK）
-raw/provider=amazingdata/dataset=X/date=Y/<request_id>.parquet + .meta.json
-meta_ingest_run 复用检查（有则不重复造表）
-10 项 contract tests（request_id lineage / no repr / no secret 等）
-```
-
-```text
-ProviderExchange
-RawWriter
+CR-2 Provider-Normalized + Quarantine（消费 raw evidence → provider-normalized）
+CR-3 AvailabilityPolicy + Canonicalizer
+CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild
 ```
 
 ---
@@ -1171,15 +1174,15 @@ Trend BASE
 
 ---
 
-# 43. CR-1 Acceptance
+# 43. CR-1 / CR-1.1 Acceptance
 
-输入：
+CR-1 输入：
 
 ```text
 ProviderExchange
 ```
 
-输出：
+CR-1 输出：
 
 ```text
 Raw immutable payload
@@ -1191,7 +1194,7 @@ row_count
 meta_ingest_run
 ```
 
-要求：
+CR-1 要求：
 
 ```text
 success exchange → payload persisted
@@ -1201,6 +1204,28 @@ secret scrub
 immutable
 same-hash retry idempotent
 different bytes same URI block
+```
+
+CR-1.1（Runtime Closure，R4-A2.3 §3-§5 补充）要求：
+
+```text
+target.*_exchange 显式 API（RealTarget + FakeTarget，dry-run 同管线）
+运行时无 last_envelopes 反查（diagnostic-only，AST 静态测试）
+ProbeExecutor.call(fn)：fn 必须返回 ProviderExchange（否则 TypeError）
+失败 exchange 一等对象：ProviderError.exchange（error envelope + payload=None）
+    ；治理拒绝 synthetic_failure_exchange（诚实记录，不冒充 SDK exchange）
+RawWriter.write(exchange) 统一入口：
+    exchange.request_id == envelope.request_id 断言
+    provider/dataset envelope-first（外部冲突 BLOCK）
+载荷形状支持：list[dict] / dict[str,list[dict]] / DataFrame(polars|pandas)
+    / dict[str,DataFrame] / pyarrow.Table / 标量列表
+dict-of-tables 方案 A：每逻辑表独立 Parquet + meta 列出全部
+    (name,file,content_hash,schema_hash,row_count)；禁止静默取首值
+Spike 证据链唯一正式路径：
+    exchange → RawWriter → Parquet+meta → RawWriteResult(evidence_uri/hash)
+    → SpikeCase.evidence_ref/evidence_hash（evidence_type=RAW_PARQUET）
+RunStore.write_evidence(JSON) 保留为兼容 API，不再是正式 provider 证据链
+逐字段 round-trip 测试（值/类型/nullable/中文/NaN-None 语义）
 ```
 
 ---
@@ -1287,7 +1312,10 @@ Fixture Provider
 [ ] External Source Artifact Hash
 [ ] Distinct-event Gate
 [ ] Golden Manifest / Catalog Seal
-[ ] Domain-specific Golden Router
+[ ] Domain-specific Golden Router（evidence bundle 同源验证）
+[ ] Bound-aware Formal Gates（verdict 只用 run-bound dataset）
+[ ] Trading Rule 数据层 REVIEWED（configs/trading_rules，ADR-011）
+[ ] Runtime Evidence 链（exchange → RawWriter → RAW_PARQUET，CR-1.1）
 [ ] Production Account Profile Freeze
 [ ] Provider Doctor actual runtime verified
 [ ] clean working tree
@@ -1379,11 +1407,13 @@ Performance
 ## RISK-001 Formal Golden Truth 未闭环
 
 ```text
-Status: OPEN
+Status: OPEN（结构已闭环：integrity gates + review workflow + evidence
+        closure + bound gates；剩余人工执行：123 cases 人工 Review +
+        补齐 distinct events（当前 ST_TRANSITION=10<50、DELIST symbols=10<20）
+        + 外部工件封存）
 Impact: False GO / False NO_GO
-Mitigation: R4-A1.1 已落地（integrity gates as code）；
-           剩余：Golden Router（R4-A2）+ 人工 Review Workflow
-           补齐 distinct events 并封存外部工件
+Mitigation: R4-A1.1/R4-A2.3 已落地（gates as code，fail-closed）；
+           人工 review 完成前 P0-M-1B Entry Gate 永远 BLOCKED
 ```
 
 ## RISK-002 正式 Provider 账号未验证
@@ -1404,8 +1434,18 @@ Deadline: 首个 APPROVED Source Policy 前
 ## RISK-004 ProviderExchange 未统一
 
 ```text
+Status: CLOSED（CR-1 + CR-1.1：运行时全链显式 exchange；last_envelopes
+        diagnostic-only；AST 级静态测试防回归）
+```
+
+## RISK-005 Trading Rule 数据层未人工 Review
+
+```text
 Status: OPEN
-Mitigation: CR-1
+Impact: 制度事实（费率/生效窗口/板别映射）当前为 COMPILED 候选
+Mitigation: P0-M-1B 前按 golden review 同标准人工复核
+        configs/trading_rules/a_share_limit_v1.yaml 并置 REVIEWED；
+        fail-closed 语义已在代码层（RULE_UNRESOLVED 永不静默退化）
 ```
 
 ---
@@ -1417,10 +1457,16 @@ TD-001 历史 audit/work_report 较多
     不影响运行；不删除 Git 历史
 
 TD-002 Spike/Canonical 尚未共享 ProviderExchange
-    CR-1
+    CR-1.1 已闭环 Spike 侧；Canonical 侧在 CR-2 消费 raw evidence
 
 TD-003 CI Governance full-history checkout 待完善
     R4-CI
+
+TD-004 RawWriter 旧入口 write_success/write_failure 保留为兼容包装
+    CR-2 接入后可移除（统一走 write(exchange)）
+
+TD-005 golden v3 候选 distinct events 不足（ST 10<50 / DELIST symbols 10<20）
+    人工 review 批次中以 candidate.py add-case 补齐
 ```
 
 ---
@@ -1496,6 +1542,8 @@ C1/C2/C3 同 Commit 更新 DEVELOPMENT_MANAGEMENT
         ↓
 ADR / Migration（如需要）
         ↓
+Developer 在工作要求文档内更新各问题的 implementation mapping
+        ↓
 Tests / CI
         ↓
 Implementation = DONE
@@ -1505,6 +1553,15 @@ Reviewer Recheck
         ↓
 VERIFIED / REOPENED
 ```
+
+## Reviewer Auto-Archive 规则（R4-A2.3 §0 并入管理总册）
+
+历史工作要求文档（`docs/design/*工作要求*` / `*审计*` / `*复审*`）不做手工归档移动；其生命周期由本总册与 DEVLOG 承载：
+
+1. 每份工作要求处理完毕（本批全部 P0 关闭或明确转 P1/DEFERRED）后，Developer 必须在该文档内追加 **implementation mapping** 章节（问题编号 → 代码/测试/ADR 定位），随后该文档即视为**已关闭归档**；
+2. 复核裁决（VERIFIED/REOPENED）直接记录于 DEVLOG 对应条目与本总册 §61 Change Log，不再为旧工作要求文档新开复审文件；
+3. 若同一主题需要新一轮整改，Reviewer 下达**新的**工作要求文档（新文件名带日期与批次号），不修改已关闭文档正文；
+4. 单一真相入口永远是本总册（当前状态）+ DEVLOG（时间线）+ ADR（长期决策），历史工作要求文档只作为输入证据保留。
 
 ---
 
@@ -1617,6 +1674,59 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 > 新条目倒序追加，不删除历史。
 
+## DM-CR-20260824-007 — Reviewer Auto-Archive 规则并入管理总册
+
+**Type**：C1（治理流程）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.3 工作要求 §0（Reviewer 闭环规则）要求并入管理总册。  
+**Old Contract**：工作要求文档生命周期未定义；历史复审文档逐份独立成文。  
+**New Contract**：§56 新增"Reviewer Auto-Archive 规则"——工作要求处理完毕后 Developer 在文档内追加 implementation mapping 即视为关闭归档；复核裁决记录于 DEVLOG 与 §61；新整改下达新工作要求文档，不修改已关闭正文。  
+**Affected Modules**：Documentation / Governance（§56）  
+**Tests**：DM CI guard（管理总册结构守卫）继续覆盖  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260824-006 — Raw Evidence Model（CR-1.1 Explicit Exchange Runtime）
+
+**Type**：C2（正式 evidence model 变更）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.2 复审裁决 REOPENED——CR-1 的 ProviderExchange/RawWriter 存在 4 项 P0（运行时链不完整 / RawWriter 未接入 / 序列化风险 / router 证据不同源）。  
+**Old Contract**：探针消费 payload 便捷方法；失败 envelope 依赖 `provider.last_envelopes` 反查（共享状态）；正式 provider 证据链 = `payload → RunStore.write_evidence(JSON)`；B4 路由 `lambda: None` 伪调用 + 单条 domain envelope；dict payload 静默取第一个 value。  
+**New Contract**（ADR-010）：
+- 运行时证据链唯一正式路径：`target.*_exchange() → RawWriter.write(exchange) → Parquet + .meta.json → RawWriteResult → SpikeCase.evidence_ref/evidence_hash`（evidence_type=RAW_PARQUET）；
+- 失败 exchange 一等对象：`ProviderError.exchange`（`call_exchange` 附加）；治理拒绝 `synthetic_failure_exchange`；`last_envelopes` 降级 diagnostic-only（AST 静态测试强制 probes/golden_router/runner 不得访问）；
+- `ProbeExecutor.call(fn)` 的 fn 必须返回 ProviderExchange（TypeError fail loud）；
+- 载荷形状全支持 + dict-of-tables 方案 A（每逻辑表独立 Parquet；meta 记录全部 hash/schema/rows）；混合/未知形状抛 RawWriterError；逐字段 round-trip 测试（含中文/NaN/None/nullable）；
+- Golden Router 证据同源：每 domain 全部 exchange 先持久化、DomainData 来自精确 payload、case 绑定 **evidence bundle**（`raw/bundles/*.json` 列出全部 request_id/ref/hash）；`verify_evidence_closure` 对 bundle 递归复验；domain fetch 失败按错误类结构化全部 case；
+- RawWriter `write(exchange)`：request_id 一致性断言 + envelope-first provider/dataset（外部冲突 BLOCK）；旧入口保留为兼容包装。  
+**Affected Modules**：providers/exchange.py、providers/errors.py、providers/amazingdata/provider.py、storage/raw_writer.py、spike/target.py、spike/probes.py、spike/golden_router.py、spike/runner.py  
+**Compatibility**：`RunStore.write_evidence`（JSON）保留（测试/旧数据兼容），不再是正式证据链；SpikeCase.evidence_type RAW_JSON→RAW_PARQUET；旧 raw 目录布局不变（同 request_id 同字节幂等）。  
+**Tests**：418 passing（新增 test_cr11_explicit_exchange 10 + test_raw_writer_shapes 22 + test_golden_router_evidence 13；CR-1/spike/golden gates 既有测试适配）  
+**ADR**：[ADR-010](../adr/ADR-010_raw_evidence_model.md)  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260824-005 — R4-A2.3 Correctness Closure（bound gates / rule data / exact-date / CA context）
+
+**Type**：C2（Trading Rules 契约变更）+ C1（gates 语义强化）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.2 复审裁决 REOPENED——5 项 P0（run-bound ACTIVE 泄漏 / 制度事实硬编码 / 首 N 日日历天近似 / limit 未精确按日匹配 / CA T-1/T/T+1 只是注释）+ P1（BJ 独立语义证明）。  
+**Old Contract**：`production_formal_gate(bound_manifest)` 内部仍调 `review_gate()`（读 ACTIVE）；`verify_binding` 用 ACTIVE 对比（违反 bound-run 契约）；`trading_rule.py`/`validators.py` 硬编码 ±10/20/30% 等制度费率；首 N 日无判定（CHINEXT first-5 规则直接 None）；`_validate_limit_pit` 取首个 symbol 匹配行（非精确日期）；`_validate_corp_action_context` 只做字段比较（无 T-1/T/T+1 价格上下文）；`_validate_bj_mapping` 依赖不存在的 mapping endpoint。  
+**New Contract**：
+- **Bound-aware gates**：`quantity_gate/event_coverage_gate/review_gate/production_formal_gate` 全部接受 `(cases, manifest)`；VERDICT 只用 run-bound 数据集；`verify_binding`（ACTIVE 对比语义）删除；ACTIVE advance/tamper 双向对抗测试证明不泄漏；
+- **Trading Rule 数据层**（ADR-011）：制度事实迁入 `configs/trading_rules/a_share_limit_v1.yaml`（version/review_status + rules[]）；Python 只 load/validate/PIT 匹配/冲突检测/resolve/Decimal 计算；fail-closed（0 匹配 / >1 equally-valid / 缺 listing_date+calendar / 未知板别 → `RuleUnresolvedError`，永不静默退化 MAIN 10%）；Python 源码出现费率字面量即测试失败；
+- **首 N 日 = session 序号**：`first_n_sessions` 用 PIT 交易日历 index（上市日=第 1 个 session）；日历缺行 fail-closed；测试覆盖春节/国庆/跨周末/第 5-6 日；
+- **Limit 精确匹配**：`(SECURITY_CODE, TRADE_DATE)` 精确匹配（0 行/多行 fail closed）；listing_date 必须来自同一 PIT hist master（缺失即 FAIL，不允许 None 退化）；限价 Decimal ROUND_HALF_UP 与 provider 高低限价一致性校验；
+- **CA T-1/T/T+1 真验证**：exact event date（adj EX_DATE==T）/ factor transition at T / raw discontinuity（factor≠1 时 raw_ret≠adj_ret）/ adjusted continuity（|adj_ret|≤35%）/ 停牌→`NOT_TESTABLE_TIME(SUSPENSION_AT_EVENT)`（绝不静默 PASS）；
+- **BJ 语义证明**：hist master 存在性（code continuity）+ exact-date status ±30% regime（数据驱动 rule），不再依赖 mapping endpoint。  
+**Affected Modules**：spike/golden_store.py、spike/golden_router.py、spike/trading_rule.py、spike/validators.py、spike/runner.py、configs/trading_rules/（新）  
+**Affected Data**：configs/trading_rules/a_share_limit_v1.yaml（COMPILED，待人工 review）  
+**Compatibility**：`resolve_trading_rule` 返回值从 `TradingRule | None` 改为 raise `RuleUnresolvedError`（fail-closed）；`validate_limit_rule` 升级 v3（数据驱动）；`BOARD_LIMIT_RATES/board_of/expected_limit_price` 删除（无外部引用）。  
+**Tests**：418 passing（新增 test_trading_rule_data 21 + test_bound_formal_gates 8 + router/CA/BJ 场景 13）  
+**ADR**：[ADR-011](../adr/ADR-011_trading_rule_data_sor.md)  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
 ## DM-CR-20260822-004 — CR-1 ProviderExchange / RawWriter Runtime Contract
 
 **Type**：C1（新增运行时契约）  
@@ -1705,23 +1815,25 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 # 62. 下一次维护检查点
 
-完成 R4-A1.1 后至少更新（**本次初始化已按最新 HEAD 同步完成**）：
+R4-A2.3 + CR-1.1 已更新（2026-08-24，见 DM-CR-20260824-005/006/007）：
 
 ```text
-§30 §31 §40 §41 §52   (done 2026-08-22, 见 DM-CR-20260822-001)
-§48                    (R4-A2 Golden Router 落地时更新)
-§61                    (Change Log 持续追加)
+§40 §41 §43 §48 §52 §53 §56 §61 §62   (done 2026-08-24)
 ```
 
-完成 CR-1 后至少更新：
+下一批（R4-A3 / CR-2）落地时至少更新：
 
 ```text
-§17
-§40
-§42
-§43
-§52
-§61
+§17                 (CR-2 Provider-Normalized 契约)
+§40 §42 §44         (roadmap / acceptance)
+§48                 (如新增 entry gate 条目)
+§52 §53 §61         (风险 / TD / Change Log)
+```
+
+Golden 人工 Review 执行时至少更新：
+
+```text
+§40 §48 §52 §61     (RISK-001 状态 + trading rules REVIEWED)
 ```
 
 ---

@@ -1117,3 +1117,145 @@ Production P0-M-1B:
 ```
 
 本文件为下一批开发的直接任务输入。开发者完成后必须更新本文件对应问题的 implementation mapping，并同步 DEVLOG / DEVELOPMENT_MANAGEMENT，然后再提交 Reviewer 复审。
+
+---
+
+# 20. Implementation Mapping（Developer 回填，2026-08-24）
+
+> 本批：R4-A2.3 Correctness Closure + CR-1.1 Runtime Closure。
+> 测试基线：**418 passing / 0 failed**（348 → 418，新增 70）；ruff / mypy 全绿；dry-run 走完整 exchange→RawWriter→bundle 管线并通过 evidence closure。
+> Change IDs：DM-CR-20260824-005 / 006 / 007；ADR-010（Raw Evidence Model）/ ADR-011（Trading Rule Data SoR）。
+
+## P0-01（CR-1.1 显式 Exchange Runtime 链）
+
+| 要求 | 实现位置 |
+|---|---|
+| A. SpikeTarget/RealTarget 显式 Exchange API | `src/ashare_state/spike/target.py`（SpikeTarget Protocol + RealTarget/FakeTarget 全套 `*_exchange` 方法）；`src/ashare_state/providers/amazingdata/provider.py`（每个业务方法 `*_exchange` 变体，payload wrapper 调 exchange 变体） |
+| B. 删除运行时 last_envelopes 反查 | `src/ashare_state/spike/probes.py`（旧 `evidence()` 反查与 `_failed_envelope_evidence` 删除；B7 request/retry 统计改从每步 evidence meta 累计）；静态证明：`tests/integration/test_cr11_explicit_exchange.py::test_no_runtime_last_envelopes_lookup`（AST 级检查 probes/golden_router/runner 无 Attribute 访问） |
+| C. RawWriter 直接消费 ProviderExchange | `src/ashare_state/storage/raw_writer.py::RawWriter.write(exchange)`（统一入口；request_id 一致性断言；envelope-first provider/dataset，外部冲突 BLOCK）；`probes.ProbeContext.raw_writer` + `evidence_from_exchange()` |
+| D. 失败 Exchange 一等对象 | `src/ashare_state/providers/errors.py`（ProviderError.exchange 字段）；`provider.call_exchange` 失败路径附加 ProviderExchange(error envelope)（§3.2-D 完整字段）；治理拒绝 `providers/exchange.py::synthetic_failure_exchange`（诚实记录，不冒充 SDK exchange） |
+
+## P0-02（RawWriter 接入 Spike Runtime）
+
+| 要求 | 实现位置 |
+|---|---|
+| 证据链切换为 exchange→RawWriter→RAW_PARQUET | `probes.ProbeContext.evidence_from_exchange`（成功=parquet 证据；失败=envelope-only meta 证据）；`SpikeCase.evidence_type` RAW_JSON→RAW_PARQUET；B5 symbols 证据不再走 JSON |
+| 禁止 payload→RunStore JSON 作为正式证据链 | probes 全部探针改 exchange 路径（B2/B3/B5/B6/B7 的每处调用）；`RunStore.write_evidence` 保留为兼容 API（测试仍用） |
+| 失败 exchange: payload artifact=none, meta artifact=mandatory | `RawWriter._write_failure`（envelope-only meta；同 request 失败复写 byte-identical 幂等 / 不同 BLOCK） |
+
+## P0-03（载荷形状）
+
+| 要求 | 实现位置 |
+|---|---|
+| list[dict] / dict[str,list[dict]] / DataFrame / dict[str,DataFrame] / pyarrow.Table | `raw_writer.normalize_payload`（polars to_arrow / pandas to_records 鸭子类型；dict-of-frames 方案 A：`<request_id>/<table>.parquet` 每逻辑表独立文件 + meta.tables 记录 name/file/content_hash/schema_hash/row_count） |
+| 禁止"取 dict 第一个 value" | 混合/未知形状抛 `RawWriterError`（含明确错误信息引用 audit §5.2） |
+| Required tests（dtype/value、multi-table、empty、nullable、中文、NaN/None） | `tests/unit/test_raw_writer_shapes.py`（22 个：DataFrame round-trip 逐字段比较、dict-of-frames/rows 多表、empty、nullable int、中文列名值、NaN≠null 语义保真、标量列表=value 列、幂等/冲突、request_id 断言、provider/dataset 冲突 BLOCK、read API） |
+
+## P0-04（Router 证据同源）
+
+| 要求 | 实现位置 |
+|---|---|
+| fetch 显式返回 DomainData + exchanges | `spike/golden_router.py::fetch_domain_data(ctx, domain, cases, collector)`——每个 domain 的全部调用走 `target.*_exchange` 并经 `collector.persist()`（RawWriter）持久化；DomainData 从 exchange.payload 精确构建 |
+| 正确流程（§6.2） | `route_all`：persist → DomainData from exact payloads → validator → case 绑定 bundle |
+| 删除 lambda:None | probe_b4_golden 重写（无伪调用；静态断言 `lambda: None,` 不在 router 源码调用位） |
+| Multi-endpoint lineage = evidence bundle | `_DomainCollector.bundle_evidence()`：`raw/bundles/<domain>-<id>.json` 列出全部 request_id/evidence_ref/content_hash；LIMIT 域=status+hist+calendar 三 exchange；CA 域=calendar+status+adj+kline 四 exchange；`runner.verify_evidence_closure` 对 bundle 递归复验（bundle hash + 每个列出工件存在且 hash 匹配） |
+| failure classification + case linkage | `route_all` 的 ProviderError 分支：失败 exchange 入 bundle + 全部 case 按错误类结构化（`_failure_outcome`：PERMISSION/RATE_LIMIT→NOT_TESTABLE_*，SCHEMA→VALIDATED_FAIL，其它→MISSING） |
+
+## P0-05（Bound Formal Gates）
+
+| 要求 | 实现位置 |
+|---|---|
+| 四 gate bound-aware | `spike/golden_store.py`：`quantity_gate(cases, manifest)` / `event_coverage_gate(cases, manifest)` / `review_gate(cases, manifest)` / `production_formal_gate(bound_cases, bound_manifest)`（`_resolve_dataset`：显式参数优先；无参=ACTIVE 仅限 new_run 创建） |
+| VERDICT 只用 bound | `spike/runner.py::compute_verdict`：load_bound 后 `production_formal_gate(bound_cases, bound_manifest)`（三 gate 全部对 bound 复验） |
+| ACTIVE 泄漏修复 | 旧 `production_formal_gate(bound_manifest)` 内部 `review_gate()`（读 ACTIVE）已消除；`verify_binding`（ACTIVE 对比语义）整体删除 |
+| §7.3 反向场景测试 | `tests/integration/test_bound_formal_gates.py`（8 个：ACTIVE advance 前后 bound 结果恒等；bound COMPILED + ACTIVE REVIEWED 仍 FAIL；bound artifact tamper BLOCK；ACTIVE tamper 不影响 healthy bound；bound dataset 文件篡改 load 即拦；event/review summary 与 ACTIVE 解耦） |
+
+## P0-06（制度事实数据化）
+
+| 要求 | 实现位置 |
+|---|---|
+| 规则迁移版本化数据层 | `configs/trading_rules/a_share_limit_v1.yaml`（version/source_version/review_status=COMPILED + 9 条规则全字段：rule_id/board/exchanges/code_patterns/effective_from/to/st_state/listing_age_rule/up_rate/down_rate/tick_size/rounding_mode/source_ref） |
+| Python 只 load/validate/PIT/conflict/resolve/Decimal | `spike/trading_rule.py`（TradingRuleBook.load/validate/resolve/resolve_limit_regime；`resolve_trading_rule` raise RuleUnresolvedError 替代返回 None） |
+| 冲突 fail closed（§8.3） | 0 匹配 / >1 equally-valid / 未知板别/交易所 / 缺 listing_date+calendar（存在 listing-age 规则时）→ RuleUnresolvedError；测试 `tests/unit/test_trading_rule_data.py::TestFailClosed`（含 duplicate-rule 拼装场景）；`_validate_limit_pit` 捕获→VALIDATED_FAIL(RULE_UNRESOLVED) |
+| Python 无费率字面量 | `test_no_hardcoded_rates_in_python` 静态断言；`validators.py` 的 BOARD_LIMIT_RATES/board_of/expected_limit_price 删除，`validate_limit_rule` v3 数据驱动（按行内 TRADE_DATE 解析） |
+
+## P0-07（首 N 日 session 序号）
+
+| 要求 | 实现位置 |
+|---|---|
+| PIT Trading Calendar 计算 session index | `trading_rule.first_n_sessions(trade_date, listing_date, calendar, n)`：sorted 日历 index 差 < n（上市日=第 1 个 session）；listing 早于日历窗口→False（老股票） |
+| Required tests（春节/国庆/周末/第5第6/missing row） | `tests/unit/test_trading_rule_data.py::TestFirstNSessions`（7 个：session≠日历天、春节 0219 间隔、国庆 1009 间隔、周末跨越、日历缺行 fail-closed×2、trade<listing fail、空日历 fail） |
+| missing calendar 不得 fallback | `first_n_sessions` 日历缺 listing/trade date → RuleUnresolvedError（无任何 calendar-day 近似路径） |
+
+## P0-08（Limit 精确日期匹配）
+
+| 要求 | 实现位置 |
+|---|---|
+| (provider_symbol, trade_date) 精确匹配 | `golden_router._status_row_exact`（0 行/多行→VALIDATED_FAIL("STATUS_EXACT_MATCH_FAILURE")）；`_validate_limit_pit` 全程使用 |
+| listing_date 来自同一 PIT context | LIMIT 域 fetch 增加 hist_code_list exchange；listing 缺失→FAIL("LISTING_MISSING"→`LISTING_DATE_MISSING`)（不允许 None 退化） |
+| limit regime 一致性 | rate 比较 + `rule.limit_prices(Decimal)` 与 provider HIGH/LOW（1 tick 容差）；no-limit 日与 provider HIGH_LIMITED 矛盾即 FAIL |
+| B3 validate_limit_rule 同步 | v3：按行 TRADE_DATE resolve_limit_regime（行带 HIGH_LIMITED ⇒ 非 no-limit 日语义）；RULE_UNRESOLVED 收集为违规 |
+
+## P0-09（CA T-1/T/T+1 真验证）
+
+| 要求 | 实现位置 |
+|---|---|
+| 最少证据组合 | CA 域 fetch：calendar + status + adj + kline（事件窗 [min-15d, max+15d]）全部 exchange 持久化入 bundle |
+| exact event date | `_validate_corp_action_context`：adj row EX_DATE==T 否则 FAIL(`ADJ_EVENT_DATE_MISSING`)；T 非 calendar 交易日→NOT_TESTABLE_TIME(`CALENDAR_MISSING_EVENT_DAY`) |
+| factor transition location | T 前后 factor 必须变化（`ADJ_NO_TRANSITION`）；非正 factor FAIL |
+| raw discontinuity + adjusted continuity（项目定义，ADR-010/DEVLOG 记录） | factor≠1 时 |raw_ret−adj_ret|>0（除权跳变被 factor 解释，`RAW_DISCONTINUITY_UNEXPLAINED`）；|adj_ret|≤35%（`ADJ_CONTINUITY_BROKEN`） |
+| missing session / suspension semantics | T-1/T/T+1 bar 缺失：停牌→NOT_TESTABLE_TIME(`SUSPENSION_AT_EVENT`)（不静默 PASS）；非停牌→VALIDATED_FAIL(`KLINE_CONTEXT_MISSING`)；测试覆盖两种路径（`test_golden_router_evidence.py::TestCorpActionContext`） |
+
+## P1（BSE/BJ 独立语义证明）
+
+| 要求 | 实现位置 |
+|---|---|
+| 四要素分别由何种 evidence 证明 | `golden_router._validate_bj_mapping`（v2）：BSE board mapping/PIT rule=数据驱动 `resolve_limit_regime`（BSE_LIMIT 30%）；historical security identity=hist master 存在性（code continuity，`BJ_MASTER_ABSENT` fail）；limit regime=exact-date status 行 ±30% Decimal 价格校验（`BJ_PRICE_MISMATCH` fail）；无 mapping endpoint 依赖。B5 的 835185.BJ 专项 status 调用保留 |
+
+## §13 Documentation/Governance
+
+| 要求 | 实现位置 |
+|---|---|
+| DEVLOG + 管理总册同 change set 更新 | 本批同一提交：`docs/DEVLOG.md`（顶部新条目）+ `docs/project/DEVELOPMENT_MANAGEMENT.md` |
+| 指定章节 | Current Code Baseline / Last Review / §40 / §41 / §43 / §48 / §52 / §53 / §56 / §61 / §62 全部更新（REOPENED 状态如实反映） |
+| Reviewer auto-archive 规则并入总册 | §56 新增"Reviewer Auto-Archive 规则"四条（DM-CR-20260824-007） |
+| Change IDs / ADR | DM-CR-20260824-005/006/007 均入 §61；evidence model 变化按 C2 处理：**ADR-010**（Raw Evidence Model）；Trading Rules 契约变化：**ADR-011**；ADR-000 索引更新 |
+
+## §16 Required Test Matrix 对照
+
+| 矩阵项 | 测试 |
+|---|---|
+| success/failure explicit exchange | cr11::TestExplicitExchangeSuccessChain / TestFailureExchangeFirstClass（失败→envelope-only meta + case 绑定 + ProviderError.exchange 断言） |
+| same endpoint two exchanges | cr11::test_same_endpoint_two_exchanges_two_artifacts |
+| hidden calendar+kline two artifacts | 既有 `test_cr1_provider_exchange.py::test_hidden_calendar_and_kline_persist_separate_raw_artifacts`（保留通过） |
+| request_id exact lineage | cr11 + router bundle 内 request_ids 断言 |
+| no last_envelopes runtime lookup | cr11::test_no_runtime_last_envelopes_lookup（AST） |
+| idempotence / different bytes block | raw_writer_shapes::TestImmutability |
+| DataFrame / dict-of-frames roundtrip | raw_writer_shapes::TestPayloadShapes（逐字段） |
+| secret scrub / cross-platform URI | 既有 `test_secret_masking.py` / `test_file_uri.py`（保留通过） |
+| Bound Golden 五项 | bound_formal_gates 全 8 个测试（advance/tamper 双向） |
+| Trading Rule 十项 | trading_rule_data.py 21 个（effective 窗口/重叠阻断/缺失阻断/五板别/春节/国庆/第5-6日/ROUND_HALF_UP 边界/精确日期） |
+| Corporate Action 五项 | golden_router_evidence::TestCorpActionContext（T-1/T/T+1 精确/factor 变化/缺上下文不 PASS/停牌语义/bundle 绑定全部 exchange） |
+
+## §17 Exit Gate 自检
+
+```text
+[x] Runtime correctness 不依赖 last_envelopes（AST 测试）
+[x] Spike provider path 显式消费 ProviderExchange（executor 契约 TypeError）
+[x] Success and failure exchanges 都进入 RawWriter（write(exchange) 统一入口）
+[x] Real SDK payload shapes lossless round-trip（形状矩阵 + 逐字段）
+[x] Golden validators 与其 evidence 来自同一批真实 exchanges（collector.persist→exact payload→bundle）
+[x] 无 lambda:None 伪 evidence（静态断言）
+[x] Production historical verdict 对 ACTIVE 完全独立（对抗测试）
+[x] Bound artifact failure 能独立阻断（tamper 测试）
+[x] Trading rules 不以 Python hard-code 作为 SoR（数据层 + 静态断言）
+[x] first-N 规则使用 trading calendar（session index 测试）
+[x] limit status exact trade_date match（0/多行 fail closed）
+[x] CA T-1/T/T+1 真正验证（5 类语义测试）
+[x] No silent fallback（全链 fail-closed：RULE_UNRESOLVED / RawWriterError / exact-match failure）
+[x] DEVLOG 与 DEVELOPMENT_MANAGEMENT 同步（同批提交）
+[x] Reviewer auto-archive rule 已写入管理总册（§56）
+[x] ruff / mypy / pytest / dry-run 全绿（418 passing；dry-run 含 bundle closure 复验）
+```
+
+已知开放项（非本批范围，如实声明）：golden v3 人工 Review 未执行（distinct events 不足，RISK-001/TD-005）；trading rules yaml 为 COMPILED 待人工复核（RISK-005）；CI 三矩阵待推送后验证。

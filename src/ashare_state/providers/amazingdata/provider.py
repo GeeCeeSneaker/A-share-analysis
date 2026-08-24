@@ -34,6 +34,7 @@ from ashare_state.providers.amazingdata.sdk_loader import SdkIdentity, probe_ide
 from ashare_state.providers.amazingdata.session import AmazingDataSession
 from ashare_state.providers.amazingdata.stdout_capture import CapturedStdout, sdk_stdout_into
 from ashare_state.providers.amazingdata.timeout import RetryPolicy, TimeBudget, run_with_budget
+from ashare_state.providers.exchange import ProviderExchange
 
 
 class ProviderUseMode(StrEnum):
@@ -110,12 +111,22 @@ class AmazingDataProvider:
         self.budget = budget or TimeBudget()
         self.retry = retry or RetryPolicy()
         self.use_mode = use_mode
+        # DIAGNOSTIC-ONLY (CR-1.1 audit §3.2-B): last_envelopes may be kept
+        # for debugging/inspection; correctness and lineage paths are
+        # FORBIDDEN from reverse-searching it - they consume the explicit
+        # ProviderExchange returned by call_exchange / attached to errors.
         self.last_envelopes: list[RawEnvelope] = []
 
     def _call_or_payload(self, *args: object, **kwargs: object) -> Any:
         """Business convenience path (audit section 43): returns .payload."""
         exchange = self.call_exchange(*args, **kwargs)  # type: ignore[arg-type]
         return exchange.payload
+
+    def _call_or_exchange(self, *args: object, **kwargs: object) -> Any:
+        """Explicit exchange path (CR-1.1 audit §3.2-A): returns the
+        ProviderExchange itself - probes / RawWriter / audit paths MUST
+        consume this, never the payload convenience wrapper."""
+        return self.call_exchange(*args, **kwargs)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------ internals
     def _gate_capability(self, capability: str | None) -> CapabilityStatus | None:
@@ -203,11 +214,13 @@ class AmazingDataProvider:
                 endpoint=endpoint,
             )
         except ProviderError as exc:
-            envelope("ERROR", type(exc).__name__, attempt_state["attempts"], 0)
+            env = envelope("ERROR", type(exc).__name__, attempt_state["attempts"], 0)
+            # CR-1.1 (audit §3.2-D): the FAILED exchange is a first-class
+            # object attached to the raised error - callers never reverse-
+            # search last_envelopes (diagnostic-only list) for it.
+            exc.exchange = ProviderExchange(envelope=env, payload=None)
             raise
         env = envelope("OK", None, attempt_state["attempts"], _count_rows(result))
-        from ashare_state.providers.exchange import ProviderExchange
-
         return ProviderExchange(envelope=env, payload=result)
 
     def _base(self) -> Any:
@@ -217,14 +230,14 @@ class AmazingDataProvider:
         return self.session.sdk.InfoData()
 
     # -------------------------------------------------------------- queries
-    def get_code_list(self, security_type: str | None = None) -> list[str]:
+    def get_code_list_exchange(self, security_type: str | None = None) -> Any:
         params = {"security_type": security_type} if security_type else {}
         fn = (
             (lambda: self._base().get_code_list(**params))
             if params
             else (lambda: self._base().get_code_list())
         )
-        return self._call_or_payload(
+        return self._call_or_exchange(
             "BaseData.get_code_list",
             "code_list",
             fn,
@@ -232,8 +245,11 @@ class AmazingDataProvider:
             require_capability="security_master",
         )
 
-    def get_stock_basic(self, code_list: list[str]) -> Any:
-        return self._call_or_payload(
+    def get_code_list(self, security_type: str | None = None) -> list[str]:
+        return self.get_code_list_exchange(security_type).payload
+
+    def get_stock_basic_exchange(self, code_list: list[str]) -> Any:
+        return self._call_or_exchange(
             "InfoData.get_stock_basic",
             "stock_basic",
             lambda: self._info().get_stock_basic(code_list=code_list),
@@ -241,8 +257,13 @@ class AmazingDataProvider:
             require_capability="security_master",
         )
 
-    def get_history_stock_status(self, start_date: int, end_date: int, code_list: list[str]) -> Any:
-        return self._call_or_payload(
+    def get_stock_basic(self, code_list: list[str]) -> Any:
+        return self.get_stock_basic_exchange(code_list).payload
+
+    def get_history_stock_status_exchange(
+        self, start_date: int, end_date: int, code_list: list[str]
+    ) -> Any:
+        return self._call_or_exchange(
             "InfoData.get_history_stock_status",
             "history_stock_status",
             lambda: self._info().get_history_stock_status(
@@ -252,8 +273,11 @@ class AmazingDataProvider:
             require_capability="security_status_history",
         )
 
-    def get_adj_factor(self, code_list: list[str]) -> Any:
-        return self._call_or_payload(
+    def get_history_stock_status(self, start_date: int, end_date: int, code_list: list[str]) -> Any:
+        return self.get_history_stock_status_exchange(start_date, end_date, code_list).payload
+
+    def get_adj_factor_exchange(self, code_list: list[str]) -> Any:
+        return self._call_or_exchange(
             "BaseData.get_adj_factor",
             "adj_factor",
             lambda: self._base().get_adj_factor(code_list=code_list),
@@ -261,8 +285,11 @@ class AmazingDataProvider:
             require_capability="adj_factor",
         )
 
-    def get_backward_factor(self, code_list: list[str]) -> Any:
-        return self._call_or_payload(
+    def get_adj_factor(self, code_list: list[str]) -> Any:
+        return self.get_adj_factor_exchange(code_list).payload
+
+    def get_backward_factor_exchange(self, code_list: list[str]) -> Any:
+        return self._call_or_exchange(
             "BaseData.get_backward_factor",
             "backward_factor",
             lambda: self._base().get_backward_factor(code_list=code_list),
@@ -270,8 +297,11 @@ class AmazingDataProvider:
             require_capability="adj_factor",
         )
 
-    def get_calendar(self, market: str = "SH") -> Any:
-        return self._call_or_payload(
+    def get_backward_factor(self, code_list: list[str]) -> Any:
+        return self.get_backward_factor_exchange(code_list).payload
+
+    def get_calendar_exchange(self, market: str = "SH") -> Any:
+        return self._call_or_exchange(
             "BaseData.get_calendar",
             "trade_calendar",
             lambda: self._base().get_calendar(market=market),
@@ -279,8 +309,13 @@ class AmazingDataProvider:
             require_capability="trade_calendar",
         )
 
-    def get_hist_code_list(self, security_type: str, start_date: int, end_date: int) -> Any:
-        return self._call_or_payload(
+    def get_calendar(self, market: str = "SH") -> Any:
+        return self.get_calendar_exchange(market).payload
+
+    def get_hist_code_list_exchange(
+        self, security_type: str, start_date: int, end_date: int
+    ) -> Any:
+        return self._call_or_exchange(
             "BaseData.get_hist_code_list",
             "hist_code_list",
             lambda: self._base().get_hist_code_list(
@@ -294,7 +329,10 @@ class AmazingDataProvider:
             require_capability="security_master",
         )
 
-    def query_kline(
+    def get_hist_code_list(self, security_type: str, start_date: int, end_date: int) -> Any:
+        return self.get_hist_code_list_exchange(security_type, start_date, end_date).payload
+
+    def query_kline_exchange(
         self,
         code_list: list[str],
         *,
@@ -302,7 +340,7 @@ class AmazingDataProvider:
         end_date: int,
         kline_type: str = "DAY",
     ) -> Any:
-        return self._call_or_payload(
+        return self._call_or_exchange(
             "MarketData.query_kline",
             "daily_bar",
             lambda: self._market(begin_date, end_date).query_kline(
@@ -319,6 +357,18 @@ class AmazingDataProvider:
             },
             require_capability="daily_bar",
         )
+
+    def query_kline(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        kline_type: str = "DAY",
+    ) -> Any:
+        return self.query_kline_exchange(
+            code_list, begin_date=begin_date, end_date=end_date, kline_type=kline_type
+        ).payload
 
     def _market(self, begin_date: int, end_date: int) -> Any:
         """MarketData(calendar) needs the trading-day list covering the range.

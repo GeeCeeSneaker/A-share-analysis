@@ -33,12 +33,19 @@ _SHA = "a" * 40
 @pytest.fixture(autouse=True)
 def _event_gate_relaxed(monkeypatch):
     """R4-A1.1: PRODUCTION runs now require the reviewed golden dataset
-    (distinct-event coverage). These tests exercise OTHER gates."""
+    (distinct-event coverage). These tests exercise OTHER gates.
+
+    R4-A2.3: gates are bound-aware - signatures accept optional
+    (cases, manifest); the relaxed stubs swallow any bound invocation."""
     from ashare_state.spike.golden_store import GoldenTruthStore
 
-    monkeypatch.setattr(GoldenTruthStore, "event_coverage_gate", lambda self: [])
-    monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self: [])
-    monkeypatch.setattr(GoldenTruthStore, "production_formal_gate", lambda self, m: [])
+    monkeypatch.setattr(
+        GoldenTruthStore, "event_coverage_gate", lambda self, *a, **k: []
+    )
+    monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self, *a, **k: [])
+    monkeypatch.setattr(
+        GoldenTruthStore, "production_formal_gate", lambda self, *a, **k: []
+    )
 
 
 @pytest.fixture
@@ -53,7 +60,7 @@ def _golden_review_gate_relaxed(monkeypatch):
     test_golden_truth_gates.py (audit R4-P0-01/02)."""
     from ashare_state.spike.golden_store import GoldenTruthStore
 
-    monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self: [])
+    monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self, *a, **k: [])
 
 
 def _prod_profile() -> AccountProfile:
@@ -159,7 +166,22 @@ class TestDryRunAllPhases:
         run_dir = Path(out["run_dir"])
         assert (run_dir / "spike_run.json").is_file()
         assert (run_dir / "cases" / "spike_case_catalog.jsonl").is_file()
-        assert any((run_dir / "raw").glob("*.json"))
+        # CR-1.1/R4-A2.3: raw evidence now flows ProviderExchange ->
+        # RawWriter -> provider=*/dataset=*/ layout (Parquet + .meta.json),
+        # plus golden domain bundles under raw/bundles/
+        assert any((run_dir / "raw").glob("provider=*/dataset=*/*.meta.json"))
+        assert any((run_dir / "raw").glob("provider=*/dataset=*/*.parquet"))
+        assert any((run_dir / "raw" / "bundles").glob("*.json"))
+        # every case's evidence_ref resolves and its hash closes
+        from ashare_state.spike.catalog import CaseCatalog
+        from ashare_state.spike.run_store import RunStore
+        from ashare_state.spike.runner import verify_evidence_closure
+
+        store = RunStore(spike_root)
+        catalog = CaseCatalog(store, out["spike_run_id"])
+        catalog.load(run_dir)
+        dry_run = store.load_run(out["spike_run_id"], RunKind.DRY_RUN)
+        assert verify_evidence_closure(store, dry_run, catalog) == []
         catalog_json = json.loads((run_dir / "spike_run.json").read_text(encoding="utf-8"))
         assert catalog_json["run_kind"] == "DRY_RUN"
         assert catalog_json["status"] == "CLOSED"
