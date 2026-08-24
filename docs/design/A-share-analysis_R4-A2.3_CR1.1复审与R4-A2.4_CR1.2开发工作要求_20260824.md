@@ -1061,3 +1061,75 @@ CI for reviewed HEAD:
 ```
 
 本文件是下一批开发的直接任务输入。开发者应按 Batch A→F 执行，并在提交复审前回填 implementation mapping。
+
+---
+
+# 18. Implementation Mapping（Developer 回填，2026-08-24）
+
+> 本批：R4-A2.4 Correctness Deepening + CR-1.2 Raw Exchange Closure。
+> 测试基线：**461 passed / 0 failed**（420 → 461，+41）；ruff / mypy 全绿；dry-run 冒烟 33 exchanges 全 meta-anchored + 5 bundles，整 run 双向闭合零问题。
+> Change IDs：DM-CR-20260824-008/009/010/011；**ADR-012**（amendment to ADR-010/011）。
+> CI：本批提交后触发 GitHub Actions（Local 与 CI 分开报告——§49 口径；CI 状态以 Actions 页面为准，不在本地宣称）。
+
+## CR-1.2（P0-01/P0-02 + P1-01/02/03，§2-§3）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 2.1-A 构造函数接收 calendar | `spike/target.py`：`SpikeTarget.query_kline_exchange(..., trading_days)`；`RealTarget.query_kline_exchange(trading_days=None)` 转发 provider | cr12::test_b7（fake 记录 kline_used_explicit_calendar 标记数 == kline exchange 数） |
+| 2.1-B 隐藏取数失败（Option C） | 不适用——**Option A 已实现**（显式前置）；日历失败：`probes.py` probe_b3 先 calendar exchange，失败 → `failure_evidence` + case + **kline 不发射** | cr12::test_calendar_failure_persists_meta_and_kline_never_fires |
+| 2.1-C 优先序列 calendar→symbols→kline | `probe_b3_core_facts` / `probe_b7_capacity` / `golden_router.fetch_domain_data`（collector.persist 序列） | cr12::test_hidden_calendar_and_kline_are_exactly_two_persisted_exchanges（恰两个 exchange：calendar meta + kline meta） |
+| 2.2-B B3/B7 前置参数落盘 | FakeTarget/RealTarget 全方法真实 params；meta 持久化 `request_params`（code_list/trading_days 完整） | cr12::test_b3_symbol_list_is_persisted_exchange + raw_closure::TestRequestParams |
+| 2.4-4 AST 静态检查 | `tests/integration/test_cr12_exchange_completeness.py::TestStaticNoPayloadOnlyCalls`（`_PAYLOAD_ONLY_METHODS` 集合 + AST Call/Attribute 匹配 `target.X(`） | 同左（参数化 probes.py / golden_router.py） |
+| 3.1 RawWriteResult 拆分 | `storage/raw_writer.py`：`ArtifactRef`（uri/content_hash/schema_hash/row_count）+ `payload_artifacts[]` + `meta_artifact` | raw_closure::test_schema_hash_at_artifact_level + cr11 更新断言 |
+| 3.2-B 证据恒绑 meta | `_write_success`：`evidence_uri=<request_id>.meta.json`、`evidence_hash=sha256(meta)`（单表不再绑裸 parquet）；bundle entry 带 payload_artifacts + meta_ref/meta_hash；`runner._close_case_evidence` 对 meta/legacy-parquet 双向闭合 | raw_closure::TestBidirectionalClosure（payload tamper/deletion/multi-table/combined-hash 4 个） |
+| 3.3-A request 可重建 | `_meta_bytes`：完整脱敏 `request_params` + `request_params_hash` | raw_closure::test_full_params_persisted_and_reconstructable + test_secrets_scrubbed |
+| 3.3-B equal-size 区分 | FakeTarget params 真实化（不同 code_list → 不同 params_hash，实测） | raw_closure::test_same_size_different_symbols_hash_differently |
+| 3.4 ingested_at + meta_ingest_run | `RawWriter(raw_root, ingest_run_id=...)`；meta 记录两字段；`ProbeContext` 注入 run.spike_run_id；幂等/失败复写比较忽略 ingested_at 墙钟 | raw_closure::test_ingested_at_and_run_binding_recorded + cr12（meta.ingest_run_id == run id 断言） |
+| 9.1 P1 staging 原子性 | `_commit_files`：staging 目录 → 全 payload 落盘 → os.replace 逐个 → **meta 最后**；finally 清 staging | raw_closure::test_no_staging_residue + test_failed_multi_write_leaves_no_meta_anchor |
+| 9.2 P1 表名冲突 BLOCK | `_write_success` 净化后文件名唯一性检查（冲突在**任何文件落盘前**抛错） | raw_closure::test_collision_blocks_before_any_file_lands |
+| 9.3 P1 read verify | `read(..., verify=True)`：`verify_meta_closure`（payload 存在 + hash + combined） | raw_closure::TestReadVerification ×2 |
+
+## R4-A2.4（P0-03/04/05/06 + P1-04，§4-§8/§11）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 4.1-A compute_config_hash 递归 | `runner.compute_config_hash`：`configs/**`（rglob，相对路径规范化，排除 .staging） | binding::test_nested_trading_rules_are_in_config_identity（编辑嵌套文件 → hash 变化） |
+| 4.1-B SpikeRun 绑定规则数据集 | `model.py` trading_rule_file/version/hash/review_status 四字段（json 持久化 + 兼容读取）；`new_run` TRIAL/PRODUCTION 绑定 | binding::test_trial_run_binds + test_run_json_persists |
+| 4.1-C verdict 用 bound book | `load_bound_rule_book`（文件存在 + bytes hash + version 三重复验）；`resume_run` / `compute_verdict` / `ProbeContext.rule_book` 全走 bound；`route_all` 把 book 传给 limit/BJ 验证器 | binding::test_binding_survives_working_tree_advance + test_binding_version_mismatch_refused + cr12::test_rule_book_binding |
+| 4.2 COMPILED 阻断 | `trading_rule_review_gate` + `new_run(PRODUCTION)` fail-fast + `compute_verdict(PRODUCTION)` 复核 | binding::test_compiled_rules_block_production_new_run（golden gates 放松隔离 rule gate）；test_reviewed_rules_pass（REVIEWED 放行） |
+| 5.1/5.3 审阅工作流与 hash 封存 | `trading_rule_review_gate`（六字段 provenance + kind allowlist + artifact bytes hash 复验）；`scripts/rules/review.py`（工具自算 SHA-256 → REVIEWED 副本自验证通过才成功；重复 review 拒绝） | binding::test_bound_artifact_tamper_blocks + test_reviewed_without_provenance_blocks + test_bad_artifact_kind + test_review_script（端到端子进程） |
+| 5.4-b broker 持有 artifact 文件 | review.py 复制 artifact 到 `configs/trading_rules/evidence/`（gate 的解析根） | binding::test_review_script（副本 gate PASS 证明可解析） |
+| 6.2/6.3 CA 事件源 | `golden_router.py`：CA fetch 增 dividend exchange；`_validate_corp_action_context`：EVENT_SOURCE_MISSING / EVENT_DATE_MISMATCH / PASS / SUSPENSION | ca_event_sor 6 个（bundle 含 InfoData.get_dividend 断言） |
+| 7 institutional rates 非 Python SoR | AST 结构化守卫：`spike/**/*.py` 禁止 `*_rate` 与数值常量直接比较（≥0.001 阈值，1e-9 容差豁免）；负向验证捕获 `!= 0.30` | trading_rule_data::test_no_hardcoded_rates_in_python（升级版） |
+| 11.4 st_state 严格解析 | `trading_rule._parse_st_state`（bool/"true"/"false"/"any"；其余 ValueError） | binding::TestStStateParsing 4 个（含 "false" 字符串不反转） |
+
+## §12 Governance（DM-CR-20260824-011）
+
+- DEVLOG 追加修正条目（历史保留——2026-08-24 两个条目并存）；上批 BJ mapping endpoint 表述归正（hist master + exact-date regime，无 mapping endpoint 依赖）
+- 管理总册：Current Code Baseline / Last Review / §40/§41/§43/§48/§52(RISK-005 更新)/§53(TD-006)/§61（四个 DM-CR）/§62 同批更新；ADR-012 + ADR-000 索引（010/011 标注 amended by 012）
+- Local：461 passed / ruff+mypy clean；CI：**GitHub Actions 已触发，结果以 Actions 页面为准**（不在本地宣称 CONFIRMED）
+
+## §13 Exit Gate 自检
+
+```text
+[x] zero unpersisted real provider exchanges on formal Spike path（AST 禁 payload-only 面 + exchange 计数断言）
+[x] no payload-only provider call in formal probes（TestStaticNoPayloadOnlyCalls 参数化 ×2）
+[x] Kline prerequisite calendar is explicit and persisted（Option A + trading_days 显式传递 + 标记计数）
+[x] success evidence closure verifies payload(s) AND meta（meta-anchored 双向闭合 + 递归复验）
+[x] full real request parameters are reconstructable / hash-verifiable（完整 params 落盘 + 等长异 symbols 区分）
+[x] request_params_hash represents full actual request（RawEnvelope.params_hash 全参数）
+[x] ingested/run lineage satisfies Raw contract（ingested_at + ingest_run_id 每 meta）
+[x] Trading Rule dataset is run-bound with file/version/hash（SpikeRun 四字段 + load_bound 三重复验）
+[x] Trading Rule formal Review Gate is enforced by code（new_run + verdict 双执行）
+[x] Trading Rule source artifacts are resolvable + hash-sealed（gate 复验 bytes hash；review.py 复制进 evidence/）
+[x] institutional rates are not Python validator SoR（AST 守卫 + 负向验证）
+[x] Corporate Action has independent event fact source（dividend exchange 入 bundle）
+[x] adj-only CA cannot Core PASS（EVENT_SOURCE_MISSING 测试）
+[x] bound Golden remains independent of ACTIVE（R4-A2.3 既有对抗测试保留通过）
+[x] no silent fallback（全链 fail-closed：RuleUnresolvedError / RawWriterError / exact-match / EVENT_SOURCE_MISSING）
+[x] management docs match runtime（本批同提交；RISK-005 结构闭环状态如实）
+[x] required regression / adversarial tests pass（461/0；staging/tamper/adversarial 全绿）
+[~] CI status is positively confirmed —— 本批提交触发 Actions；按审计要求不预先宣称，推送后以 Actions 结果为准
+```
+
+已知开放项（如实声明）：Golden / Trading Rule 人工 Review 未执行（OPEN / BLOCKING P0-M-1B）；CI 待 Actions 完成；Branch Protection 未启用。

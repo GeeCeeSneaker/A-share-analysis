@@ -118,6 +118,32 @@ def _pattern_match(pattern: str, bare_code: str) -> bool:
     return all(p == "x" or p == c for p, c in zip(pattern, bare_code, strict=True))
 
 
+def _parse_st_state(raw: Any) -> bool | None:
+    """P1-04 (audit R4-A2.4 section 11.4): STRICT st_state parsing.
+
+    bool -> bool; the strings 'true'/'false' (case-insensitive) -> bool;
+    'any'/None -> None (rule ignores ST state). ANY OTHER string is a
+    schema error - ``bool('false')`` truthiness would silently INVERT the
+    rule (a YAML author writing st_state: "false" must never get True)."""
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        return raw
+    text = str(raw).strip()
+    lowered = text.lower()
+    if lowered == "any":
+        return None
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    msg = (
+        f"invalid st_state {raw!r}: use a bool, 'true'/'false', or 'any' "
+        "(truthiness parsing is forbidden - audit R4-A2.4 section 11.4)"
+    )
+    raise ValueError(msg)
+
+
 def first_n_sessions(
     trade_date: Any,
     listing_date: Any,
@@ -167,11 +193,18 @@ class TradingRuleBook:
         version: str = "",
         source_version: str = "",
         review_status: str = "",
+        dataset_files: tuple[str, ...] = (),
+        content_hash: str = "",
+        review_provenance: dict[str, Any] | None = None,
     ) -> None:
         self.rules: tuple[TradingRuleRow, ...] = tuple(rules)
         self.version = version
         self.source_version = source_version
         self.review_status = review_status
+        # R4-A2.4 P0-03: dataset identity for run binding
+        self.dataset_files = dataset_files
+        self.content_hash = content_hash
+        self.review_provenance = dict(review_provenance or {})
         problems = self.validate()
         if problems:
             msg = "trading rule data invalid: " + "; ".join(problems)
@@ -186,6 +219,8 @@ class TradingRuleBook:
         (cwd of the test/CLI entry point) or against the package location
         when the cwd has no configs directory.
         """
+        import hashlib
+
         target = Path(path) if path is not None else cls._default_rules_dir()
         files = (
             sorted(target.glob("*.yaml")) + sorted(target.glob("*.yml"))
@@ -197,7 +232,13 @@ class TradingRuleBook:
             raise FileNotFoundError(msg)
         rules: list[TradingRuleRow] = []
         doc_meta: dict[str, str] = {}
+        provenance: dict[str, Any] = {}
+        digest = hashlib.sha256()
+        names: list[str] = []
         for file in files:
+            digest.update(file.name.encode("utf-8"))
+            digest.update(file.read_bytes())
+            names.append(file.name)
             doc = yaml.safe_load(file.read_text(encoding="utf-8"))
             if not isinstance(doc, dict):
                 msg = f"rule file {file} must be a mapping"
@@ -208,12 +249,28 @@ class TradingRuleBook:
                     msg = f"rule file {file}: {key} conflicts with a previous file"
                     raise ValueError(msg)
                 doc_meta[key] = doc_meta.get(key, value)
+            for key in (
+                "reviewed_by",
+                "reviewed_at",
+                "source_artifact_ref",
+                "source_artifact_hash",
+                "source_artifact_kind",
+                "source_retrieved_at",
+            ):
+                if key in doc:
+                    if key in provenance and provenance[key] != doc[key]:
+                        msg = f"rule file {file}: {key} conflicts with a previous file"
+                        raise ValueError(msg)
+                    provenance[key] = doc[key]
             rules.extend(cls._rows_from(doc, file))
         return cls(
             rules,
             version=doc_meta.get("version", ""),
             source_version=doc_meta.get("source_version", ""),
             review_status=doc_meta.get("review_status", ""),
+            dataset_files=tuple(names),
+            content_hash=digest.hexdigest(),
+            review_provenance=provenance,
         )
 
     @staticmethod
@@ -258,11 +315,7 @@ class TradingRuleBook:
                     code_patterns=tuple(str(p) for p in entry["code_patterns"]),
                     effective_from=_yyyymmdd(entry["effective_from"]),
                     effective_to=_yyyymmdd(entry["effective_to"]),
-                    st_state=(
-                        None
-                        if st_raw is None or str(st_raw).lower() == "any"
-                        else bool(st_raw)
-                    ),
+                    st_state=_parse_st_state(st_raw),
                     listing_age_rule=str(entry.get("listing_age_rule", "NONE") or "NONE"),
                     up_rate=_to_decimal(entry["up_rate"]),
                     down_rate=_to_decimal(entry["down_rate"]),
@@ -456,6 +509,131 @@ class TradingRuleBook:
 
 _DEFAULT_BOOK: TradingRuleBook | None = None
 
+#: allowed source artifact kinds (aligned with the golden review gate)
+_REVIEW_ARTIFACT_KINDS = (
+    "OTHER_OFFICIAL",
+    "EXCHANGE_NOTICE",
+    "REGULATOR_DOC",
+    "DATASET_DOC",
+)
+
+
+def trading_rule_review_gate(
+    book: TradingRuleBook,
+    *,
+    rules_root: Path | str | None = None,
+) -> list[str]:
+    """R4-A2.4 P0-04: Trading Rule Review Gate.
+
+    The rule dataset follows the same lifecycle as golden truth:
+    COMPILED (candidate, usable by dry-run/trial with explicit provenance)
+    -> REVIEWED (human-reviewed, required for PRODUCTION runs/verdicts).
+
+    Checks (each failure is a returned problem):
+      - review_status must be REVIEWED for formal use (COMPILED is reported
+        explicitly - the caller decides whether that blocks)
+      - REVIEWED requires complete provenance (reviewed_by/reviewed_at/
+        source_artifact_ref/source_artifact_hash/source_artifact_kind/
+        source_retrieved_at)
+      - the referenced source artifact must resolve under rules_root (or
+        the rule dataset's own directory) and hash to source_artifact_hash
+    """
+    problems: list[str] = []
+    if book.review_status != "REVIEWED":
+        problems.append(
+            f"trading rule dataset is {book.review_status or 'UNKNOWN'} - not fully "
+            "human-reviewed (COMPILED candidates are dry-run/trial only)"
+        )
+        return problems
+    prov = book.review_provenance
+    missing = [
+        key
+        for key in (
+            "reviewed_by",
+            "reviewed_at",
+            "source_artifact_ref",
+            "source_artifact_hash",
+            "source_artifact_kind",
+            "source_retrieved_at",
+        )
+        if not str(prov.get(key, "") or "").strip()
+    ]
+    if missing:
+        problems.append(f"REVIEWED dataset missing provenance fields: {missing}")
+        return problems
+    if str(prov.get("source_artifact_kind")) not in _REVIEW_ARTIFACT_KINDS:
+        problems.append(
+            f"source_artifact_kind {prov.get('source_artifact_kind')!r} not in "
+            f"{_REVIEW_ARTIFACT_KINDS}"
+        )
+    ref = str(prov.get("source_artifact_ref"))
+    expected_hash = str(prov.get("source_artifact_hash"))
+    import hashlib
+
+    # artifact resolution roots: explicit rules_root first, then the
+    # loader's default rules dir (respects tests/installed layouts)
+    roots = [Path(p) for p in (rules_root,) if p is not None]
+    roots.append(TradingRuleBook._default_rules_dir())
+    artifact_path: Path | None = None
+    for root in roots:
+        candidate = root / ref
+        if candidate.is_file():
+            artifact_path = candidate
+            break
+    if artifact_path is None:
+        problems.append(f"source artifact not found: {ref}")
+    else:
+        actual = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+        if actual != expected_hash:
+            problems.append(f"source artifact hash mismatch: {ref}")
+    return problems
+
+
+def load_bound_rule_book(
+    *,
+    rule_file: str,
+    rule_version: str,
+    rule_hash: str,
+    repo_root: Path | str | None = None,
+) -> TradingRuleBook:
+    """R4-A2.4 P0-03: load the RUN-BOUND rule dataset and verify its
+    integrity (bytes hash + version). Verdicts/replays resolve rules
+    through THIS loader, never through the working tree's current state -
+    an ACTIVE/working-tree advance can never leak into a historical run."""
+    import hashlib
+
+    candidates = []
+    if repo_root is not None:
+        candidates.append(Path(repo_root) / rule_file)
+    else:
+        candidates.append(Path.cwd() / rule_file)
+        # fallback: the package-anchored repo layout (respects a patched
+        # _default_rules_dir in tests and installed-package runs)
+        default_dir = TradingRuleBook._default_rules_dir()
+        repo_anchor = default_dir.parent.parent if default_dir.is_absolute() else None
+        if repo_anchor is not None:
+            candidates.append(repo_anchor / rule_file)
+    path = next((c for c in candidates if c.is_file()), None)
+    if path is None:
+        msg = f"bound trading rule dataset missing: {rule_file}"
+        raise RuleUnresolvedError(msg)
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    if actual != rule_hash:
+        msg = (
+            f"bound trading rule dataset hash mismatch for {rule_file}: "
+            "the file changed after the run was created (expected "
+            f"{rule_hash[:16]}..., got {actual[:16]}...)"
+        )
+        raise RuleUnresolvedError(msg)
+    book = TradingRuleBook.load(path)
+    if book.version != rule_version:
+        msg = (
+            f"bound trading rule dataset version mismatch: run bound {rule_version!r}, "
+            f"file now {book.version!r}"
+        )
+        raise RuleUnresolvedError(msg)
+    return book
+
 
 def default_rule_book() -> TradingRuleBook:
     """Process-wide cached book loaded from configs/trading_rules."""
@@ -509,6 +687,8 @@ __all__ = [
     "TradingRuleRow",
     "default_rule_book",
     "first_n_sessions",
+    "load_bound_rule_book",
     "resolve_limit_regime",
     "resolve_trading_rule",
+    "trading_rule_review_gate",
 ]

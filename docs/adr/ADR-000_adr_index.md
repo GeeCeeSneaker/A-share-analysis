@@ -13,8 +13,9 @@ ADR（Architecture Decision Record）记录对系统有长期影响的决策。�
 | ADR-007 | P0 阶段 Tushare 不可用的单源运行风险 | ACCEPTED | 2026-08-21 | [ADR-007](ADR-007_p0m0_tushare_unavailable.md) |
 | ADR-008 | DuckDB 进程级独占所有权模型 | ACCEPTED | 2026-08-21 | [ADR-008](ADR-008_duckdb_process_model.md)，设计裁决 P0-1 的落地 |
 | ADR-009 | Canonical SoR 边界 | ACCEPTED | 2026-08-22 | [ADR-009](ADR-009_canonical_sor_boundary.md) |
-| ADR-010 | Raw Evidence Model（显式 Exchange → RawWriter → Bundle） | ACCEPTED | 2026-08-24 | [ADR-010](ADR-010_raw_evidence_model.md)，R4-A2.3/CR-1.1 P0-01/02/04 落地（DM-CR-20260824-006） |
-| ADR-011 | 交易制度事实的版本化数据层 | ACCEPTED | 2026-08-24 | [ADR-011](ADR-011_trading_rule_data_sor.md)，R4-A2.3 P0-06/07 落地（DM-CR-20260824-005） |
+| ADR-010 | Raw Evidence Model（显式 Exchange → RawWriter → Bundle） | ACCEPTED | 2026-08-24 | [ADR-010](ADR-010_raw_evidence_model.md)，R4-A2.3/CR-1.1 P0-01/02/04 落地（DM-CR-20260824-006）；**amended by ADR-012**（meta-anchored 双向闭合，2026-08-24） |
+| ADR-011 | 交易制度事实的版本化数据层 | ACCEPTED | 2026-08-24 | [ADR-011](ADR-011_trading_rule_data_sor.md)，R4-A2.3 P0-06/07 落地（DM-CR-20260824-005）；**amended by ADR-012**（run 绑定 + review gate，2026-08-24） |
+| ADR-012 | Raw Exchange Closure + Trading Rule Binding（R4-A2.4/CR-1.2） | ACCEPTED | 2026-08-24 | [ADR-012](ADR-012_raw_exchange_closure.md)，amendment to 010/011；DM-CR-20260824-008/009/010/011 |
 
 ## 纪律
 

@@ -107,15 +107,16 @@ class TestProviderExchangeContract:
         assert env.error_class == "ProviderPermissionError"
 
     def test_hidden_calendar_call_has_own_exchange(self, monkeypatch):
-        """Audit section 44: query_kline -> get_calendar -> query_kline
-        produces SEPARATE exchanges for calendar and kline."""
+        """Audit section 44 + CR-1.2 (R4-A2.4 section 2.3): the CONVENIENCE
+        path (query_kline) still fetches the calendar via a real SDK call
+        that gets its OWN exchange (never buried in the kline envelope)."""
         provider = _provider()
         calendar_calls: list[str] = []
 
         class FakeBase:
             def get_calendar(self, market: str = "SH"):
                 calendar_calls.append("calendar")
-                return [20260814]
+                return [20260813, 20260814]
 
         class FakeMarket:
             def __init__(self, days: list[int]) -> None:
@@ -128,19 +129,90 @@ class TestProviderExchangeContract:
             BaseData = FakeBase
             MarketData = FakeMarket
 
-        monkeypatch.setattr(provider.session, "sdk", FakeSdk(), raising=False)
         provider.session.__dict__["sdk"] = FakeSdk()
-        provider._call_or_payload(  # noqa: SLF001
-            "MarketData.query_kline",
-            "daily_bar",
-            lambda: provider._market(20260814, 20260814).query_kline(  # noqa: SLF001
-                code_list=["600000.SH"]
-            ),
-            require_capability="daily_bar",
+        # business convenience wrapper: internally fetches the calendar
+        payload = provider.query_kline(
+            ["600000.SH"], begin_date=20260813, end_date=20260814, kline_type="DAY"
         )
-        assert calendar_calls == ["calendar"]  # the real SDK call happened
-        # calendar exchange + kline envelope recorded separately
-        assert any(e.endpoint == "BaseData.get_calendar" for e in provider.last_envelopes)
+        assert payload and calendar_calls == ["calendar"]
+        # the internal calendar fetch produced its OWN envelope (diagnostic
+        # list on the convenience path); the kline envelope is separate
+        endpoints = [e.endpoint for e in provider.last_envelopes]
+        assert endpoints.count("BaseData.get_calendar") == 1
+        assert endpoints.count("MarketData.query_kline") == 1
+
+    def test_explicit_kline_requires_no_hidden_calendar(self, monkeypatch):
+        """CR-1.2 (audit R4-A2.4 section 2.3-A): the EXPLICIT exchange path
+        (what spikes/formal evidence consume) takes trading_days as an
+        argument - no calendar SDK call happens inside it at all."""
+        provider = _provider()
+        calendar_calls: list[str] = []
+
+        class FakeBase:
+            def get_calendar(self, market: str = "SH"):
+                calendar_calls.append("calendar")
+                return [20260813, 20260814]
+
+        class FakeMarket:
+            def __init__(self, days: list[int]) -> None:
+                self.days = days
+
+            def query_kline(self, **kwargs: object):
+                return [{"KLINE_TIME": d} for d in self.days]
+
+        class FakeSdk:
+            BaseData = FakeBase
+            MarketData = FakeMarket
+
+        provider.session.__dict__["sdk"] = FakeSdk()
+        exchange = provider.query_kline_exchange(
+            ["600000.SH"],
+            begin_date=20260813,
+            end_date=20260814,
+            kline_type="DAY",
+            trading_days=[20260813, 20260814],
+        )
+        assert exchange.payload
+        assert calendar_calls == []  # no hidden calendar call
+        assert [e.endpoint for e in provider.last_envelopes] == ["MarketData.query_kline"]
+        # full request params (CR-1.2 section 3.3) are carried on the
+        # envelope: complete code list + the explicit trading days
+        params = exchange.envelope.request_params
+        assert params["code_list"] == ["600000.SH"]
+        assert params["trading_days"] == [20260813, 20260814]
+
+    def test_request_params_full_and_hashed(self):
+        """CR-1.2 (audit R4-A2.4 section 3.3): FULL params persisted + full
+        params hash; same size over DIFFERENT symbols hashes differently."""
+        provider = _provider()
+
+        class FakeInfo:
+            def get_history_stock_status(self, **kwargs: object):
+                return []
+
+        class FakeSdk:
+            InfoData = FakeInfo
+
+        provider.session.__dict__["sdk"] = FakeSdk()
+        first = provider.get_history_stock_status_exchange(
+            20220101, 20220102, ["600000.SH", "000001.SZ"]
+        )
+        second = provider.get_history_stock_status_exchange(
+            20220101, 20220102, ["600000.SH", "300750.SZ"]
+        )
+        third = provider.get_history_stock_status_exchange(
+            20220101, 20220102, ["600000.SH", "000001.SZ"]
+        )
+        assert first.envelope.request_params == {
+            "start_date": 20220101,
+            "end_date": 20220102,
+            "code_list": ["600000.SH", "000001.SZ"],
+        }
+        # equal size, different symbols -> different params AND hash
+        assert first.envelope.request_params != second.envelope.request_params
+        assert first.envelope.request_params_hash != second.envelope.request_params_hash
+        # same request -> same hash (reconstruction-stable)
+        assert third.envelope.request_params_hash == first.envelope.request_params_hash
 
 
 class TestRawWriterContract:

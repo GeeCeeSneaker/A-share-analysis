@@ -71,10 +71,18 @@ class TestWriteExchangeContract:
         result = writer.write(_exchange("req-1", "ds1", [{"a": 1}]))
         assert result.request_id == "req-1"
         assert result.payload_kind == "rows"
-        assert result.evidence_uri.endswith("req-1.parquet")
-        assert result.evidence_hash == result.content_hash
-        meta = tmp_path / "provider=amazingdata" / "dataset=ds1" / "req-1.meta.json"
-        assert meta.is_file()
+        # CR-1.2: the case evidence is the META (bidirectional anchor);
+        # payload artifacts are listed separately with their own hashes
+        assert result.evidence_uri.endswith("req-1.meta.json")
+        import hashlib
+
+        meta_path = tmp_path / "provider=amazingdata" / "dataset=ds1" / "req-1.meta.json"
+        assert result.evidence_hash == hashlib.sha256(meta_path.read_bytes()).hexdigest()
+        assert len(result.payload_artifacts) == 1
+        assert result.payload_artifacts[0].uri.endswith("req-1.parquet")
+        assert result.payload_artifacts[0].content_hash == result.content_hash
+        assert result.meta_artifact is not None
+        assert result.meta_artifact.uri == result.evidence_uri
 
     def test_request_id_consistency_assertion_blocks(self, tmp_path: Path):
         writer = RawWriter(tmp_path)

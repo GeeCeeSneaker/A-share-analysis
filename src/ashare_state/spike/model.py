@@ -84,6 +84,13 @@ class SpikeRun:
     golden_dataset_file: str = ""
     golden_dataset_hash: str = ""
     case_catalog_hash: str = ""
+    #: R4-A2.4 P0-03: the run BINDS the trading-rule dataset it was created
+    #: with; verdict/replay re-load THIS file + hash (never the working
+    #: tree's current state)
+    trading_rule_file: str = ""  # repo-relative, e.g. configs/trading_rules/a_share_limit_v1.yaml
+    trading_rule_version: str = ""
+    trading_rule_hash: str = ""  # sha256 over the bound rule file bytes
+    trading_rule_review_status: str = ""  # COMPILED | REVIEWED at binding time
     started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     ended_at: str | None = None
     status: str = "RUNNING"
@@ -105,6 +112,10 @@ class SpikeRun:
             "golden_dataset_file": self.golden_dataset_file,
             "golden_dataset_hash": self.golden_dataset_hash,
             "case_catalog_hash": self.case_catalog_hash,
+            "trading_rule_file": self.trading_rule_file,
+            "trading_rule_version": self.trading_rule_version,
+            "trading_rule_hash": self.trading_rule_hash,
+            "trading_rule_review_status": self.trading_rule_review_status,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
             "status": self.status,

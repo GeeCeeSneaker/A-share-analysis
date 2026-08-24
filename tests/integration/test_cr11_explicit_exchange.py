@@ -77,15 +77,27 @@ class TestExplicitExchangeSuccessChain:
             20220601, 20220630, ["600519.SH"]
         )
         meta = ctx.evidence_from_exchange(exchange)
-        # evidence ref is run-relative and resolvable
+        # evidence ref is run-relative and resolvable; CR-1.2: the case
+        # evidence is the exchange META (bidirectional closure anchor)
         assert meta["evidence_ref"].startswith("dry_run/")
-        assert meta["evidence_ref"].endswith(".parquet")
+        assert meta["evidence_ref"].endswith(".meta.json")
         assert meta["content_hash"]
         artifact = ctx.store.spike_root / meta["evidence_ref"]
         assert artifact.is_file()
         import hashlib
 
         assert hashlib.sha256(artifact.read_bytes()).hexdigest() == meta["content_hash"]
+        # CR-1.2: payload artifacts listed separately, each with its hash
+        assert meta["payload_artifacts"]
+        payload = meta["payload_artifacts"][0]
+        assert payload["uri"].endswith(".parquet")
+        payload_path = ctx.store.spike_root / payload["uri"]
+        assert payload_path.is_file()
+        assert (
+            hashlib.sha256(payload_path.read_bytes()).hexdigest() == payload["content_hash"]
+        )
+        assert meta["meta_ref"] == meta["evidence_ref"]
+        assert meta["meta_hash"] == meta["content_hash"]
         # request_id lineage: the case binds the EXCHANGE's request id
         assert meta["request_id"] == exchange.request_id
 

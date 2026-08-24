@@ -224,9 +224,15 @@ class TestCorpActionContext:
         ctx, _ = _ctx(tmp_path)
 
         class _KlineGapTarget(FakeTarget):
-            def query_kline_exchange(self, code_list, *, begin_date, end_date, kline_type):
+            def query_kline_exchange(
+                self, code_list, *, begin_date, end_date, kline_type, trading_days=None
+            ):
                 exchange = super().query_kline_exchange(
-                    code_list, begin_date=begin_date, end_date=end_date, kline_type=kline_type
+                    code_list,
+                    begin_date=begin_date,
+                    end_date=end_date,
+                    kline_type=kline_type,
+                    trading_days=trading_days,
                 )
                 payload = [r for r in exchange.payload if str(r["KLINE_TIME"]) != "20220629"]
                 from ashare_state.providers.exchange import ProviderExchange
@@ -249,9 +255,15 @@ class TestCorpActionContext:
         ctx, _ = _ctx(tmp_path)
 
         class _SuspendedKlineGapTarget(FakeTarget):
-            def query_kline_exchange(self, code_list, *, begin_date, end_date, kline_type):
+            def query_kline_exchange(
+                self, code_list, *, begin_date, end_date, kline_type, trading_days=None
+            ):
                 exchange = super().query_kline_exchange(
-                    code_list, begin_date=begin_date, end_date=end_date, kline_type=kline_type
+                    code_list,
+                    begin_date=begin_date,
+                    end_date=end_date,
+                    kline_type=kline_type,
+                    trading_days=trading_days,
                 )
                 payload = [r for r in exchange.payload if str(r["KLINE_TIME"]) != "20220630"]
                 from ashare_state.providers.exchange import ProviderExchange

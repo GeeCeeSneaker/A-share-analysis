@@ -79,6 +79,7 @@ class DomainData:
     hist_code_rows: list[dict[str, Any]] | None = None
     stock_basic_rows: list[dict[str, Any]] | None = None
     adj_rows: list[dict[str, Any]] | None = None
+    dividend_rows: list[dict[str, Any]] | None = None
     kline_rows: list[dict[str, Any]] | None = None
     calendar_days: list[int] | None = None
 
@@ -116,8 +117,13 @@ class _DomainCollector:
                 "provider_dataset": meta.get("provider_dataset", ""),
                 "status": meta.get("status", ""),
                 "error_class": meta.get("error_class"),
+                # CR-1.2 (audit R4-A2.4 section 3.2): every bundle exchange
+                # lists its payload artifacts AND the meta anchor/hash
                 "evidence_ref": meta.get("evidence_ref", ""),
                 "content_hash": meta.get("content_hash", ""),
+                "payload_artifacts": meta.get("payload_artifacts", []),
+                "meta_ref": meta.get("meta_ref", ""),
+                "meta_hash": meta.get("meta_hash", ""),
             }
         )
         self.request_ids.append(str(meta.get("request_id", "")))
@@ -205,25 +211,36 @@ def fetch_domain_data(
             calendar_days=_calendar_days(calendar),
         )
     if domain == "CORP_ACTION_CONTEXT":
-        # audit section 9.3: event record + adj factor around event +
-        # kline T-1/T/T+1 + PIT trading calendar
+        # audit sections 9.3 + R4-A2.4 section 6: EVENT RECORD (dividend)
+        # + adj factor around event + kline T-1/T/T+1 + PIT calendar
         calendar = collector.persist(ctx.target.get_calendar_exchange())
+        cal_days = _calendar_days(calendar)
         status = collector.persist(
             ctx.target.get_history_stock_status_exchange(19900101, 20991231, symbols)
         )
         adj = collector.persist(ctx.target.get_adj_factor_exchange(symbols))
+        # P0-05: provider corporate-action EVENT endpoint (exact ex-date +
+        # event type) - the adj stream alone is NOT a sufficient event SoR
+        dividend = collector.persist(ctx.target.get_dividend_exchange(symbols))
         begin, end = _event_window(cases)
+        # CR-1.2: the calendar prerequisite of kline is EXPLICIT (persisted
+        # above, windowed here) - no invisible internal calendar exchange
         kline = collector.persist(
             ctx.target.query_kline_exchange(
-                symbols, begin_date=begin, end_date=end, kline_type="DAY"
+                symbols,
+                begin_date=begin,
+                end_date=end,
+                kline_type="DAY",
+                trading_days=[d for d in cal_days if begin <= d <= end],
             )
         )
         return DomainData(
             domain=domain,
             status_rows=_rows(status),
             adj_rows=_rows(adj),
+            dividend_rows=_rows(dividend),
             kline_rows=_rows(kline),
-            calendar_days=_calendar_days(calendar),
+            calendar_days=cal_days,
         )
     if domain == "BJ_MAPPING":
         # audit section 10: independent semantic proof - historical master
@@ -245,19 +262,23 @@ def fetch_domain_data(
 
 
 def validate_case_in_domain(
-    case: GoldenCase, data: DomainData
+    case: GoldenCase, data: DomainData, *, rule_book: Any = None
 ) -> validators.ValidationOutcome:
-    """Domain-specific validation for ONE golden case."""
+    """Domain-specific validation for ONE golden case.
+
+    R4-A2.4 P0-03: ``rule_book`` is the RUN-BOUND trading-rule book (audit
+    section 4.1-C) - limit/BJ validators resolve rules through it, never
+    through the working tree's current state."""
     if case.case_type == "golden_st_transition":
         return validators.validate_golden_cases([case], data.status_rows or [])[0]
     if case.case_type == "golden_delisted":
         return _validate_delisted(case, data)
     if case.case_type == "golden_limit_regime":
-        return _validate_limit_pit(case, data)
+        return _validate_limit_pit(case, data, rule_book=rule_book)
     if case.case_type == "golden_corporate_action":
         return _validate_corp_action_context(case, data)
     if case.case_type == "golden_bj_mapping":
-        return _validate_bj_mapping(case, data)
+        return _validate_bj_mapping(case, data, rule_book=rule_book)
     msg = f"no validator for case type {case.case_type!r}"
     raise GoldenRoutingError(msg)
 
@@ -321,9 +342,12 @@ def _status_row_exact(
     return matches, problem
 
 
-def _validate_limit_pit(case: GoldenCase, data: DomainData) -> validators.ValidationOutcome:
+def _validate_limit_pit(
+    case: GoldenCase, data: DomainData, *, rule_book: Any = None
+) -> validators.ValidationOutcome:
     """Limit -> status EXACT trade_date + hist listing_date (same PIT
-    context) + trade calendar + data-driven rule book (sections 8-9)."""
+    context) + trade calendar + data-driven rule book (sections 8-9).
+    The rule book is the RUN-BOUND dataset (R4-A2.4 section 4.1-C)."""
     bare = case.provider_symbol.split(".")[0]
     suffix = case.provider_symbol.split(".")[1] if "." in case.provider_symbol else "SH"
     matches, problem = _status_row_exact(data.status_rows or [], bare, case.trade_date)
@@ -373,6 +397,7 @@ def _validate_limit_pit(case: GoldenCase, data: DomainData) -> validators.Valida
             is_st=is_st,
             listing_date=listing_date,
             calendar=calendar,
+            book=rule_book,
         )
     except RuleUnresolvedError as exc:
         return ValidationOutcome(
@@ -549,6 +574,38 @@ def _validate_corp_action_context(
             validator_version="2",
         )
 
+    # P0-05 (audit R4-A2.4 section 6): EVENT FACT SOURCE - the provider
+    # corporate-action event records must confirm the exact date/type.
+    # adj-factor movement alone is NOT a sufficient event SoR.
+    dividend_rows = [
+        r for r in (data.dividend_rows or []) if str(r.get("SECURITY_CODE", "")) == bare
+    ]
+    if not dividend_rows:
+        return ValidationOutcome(
+            result=CaseResult.VALIDATED_FAIL,
+            expected=f"{case.truth_source} (corporate-action event record required)",
+            actual=(
+                "no provider event record (dividend/right issue) for this symbol - "
+                "adj-factor movement alone is not a sufficient event SoR"
+            ),
+            reason_code="EVENT_SOURCE_MISSING",
+            validator_id="corp_action_context_v2",
+            validator_version="3",
+        )
+    events_at_t = [r for r in dividend_rows if str(r.get("EX_DATE", "")) == t_day]
+    if not events_at_t:
+        return ValidationOutcome(
+            result=CaseResult.VALIDATED_FAIL,
+            expected=f"{case.truth_source} (event record EX_DATE == {t_day})",
+            actual=(
+                "provider event records exist but none matches the case's exact "
+                f"event date (found EX_DATEs: "
+                f"{sorted({str(r.get('EX_DATE')) for r in dividend_rows})[:5]})"
+            ),
+            reason_code="EVENT_DATE_MISMATCH",
+            validator_id="corp_action_context_v2",
+            validator_version="3",
+        )
     # exact event date + factor transition at T
     adj_rows = sorted(
         (
@@ -648,7 +705,9 @@ def _validate_corp_action_context(
     )
 
 
-def _validate_bj_mapping(case: GoldenCase, data: DomainData) -> validators.ValidationOutcome:
+def _validate_bj_mapping(
+    case: GoldenCase, data: DomainData, *, rule_book: Any = None
+) -> validators.ValidationOutcome:
     """BJ/BSE independent semantic proof (audit section 10, P1).
 
     Two independent evidence legs (no BJ mapping endpoint assumed):
@@ -656,6 +715,7 @@ def _validate_bj_mapping(case: GoldenCase, data: DomainData) -> validators.Valid
          across the 2021-11-15 BSE opening migration)
       2. exact-date status row + data-driven rule book: the BSE +/-30%
          limit regime actually holds on the case's trade date
+    The rule book is the RUN-BOUND dataset (R4-A2.4 section 4.1-C).
     """
     bare = case.provider_symbol.split(".")[0]
     suffix = case.provider_symbol.split(".")[1] if "." in case.provider_symbol else "BJ"
@@ -699,6 +759,7 @@ def _validate_bj_mapping(case: GoldenCase, data: DomainData) -> validators.Valid
             code=case.provider_symbol,
             trade_date=case.trade_date,
             is_st=is_st,
+            book=rule_book,
         )
     except RuleUnresolvedError as exc:
         return ValidationOutcome(
@@ -709,10 +770,22 @@ def _validate_bj_mapping(case: GoldenCase, data: DomainData) -> validators.Valid
             validator_id="bj_mapping_v2",
             validator_version="2",
         )
-    if float(rule.up_rate) != 0.30 or float(rule.down_rate) != 0.30:
+    # P0-06 (audit R4-A2.4 section 7): NO rate literals in validators - the
+    # regime check is golden-expected x resolved-rule x provider-observed.
+    # The golden expected rate comes from the REVIEWED dataset; the rule from
+    # the versioned rule data layer; the prices from the provider row.
+    expected_up = case.expected_fields.get(
+        "BJ_UP_RATE", case.expected_fields.get("PRICE_HIGH_LMT_RATE")
+    )
+    expected_down = case.expected_fields.get(
+        "BJ_DOWN_RATE", case.expected_fields.get("PRICE_LOW_LMT_RATE")
+    )
+    if expected_up is not None and abs(float(rule.up_rate) - float(expected_up)) > 1e-9 or (
+        expected_down is not None and abs(float(rule.down_rate) - float(expected_down)) > 1e-9
+    ):
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
-            expected=f"{case.truth_source} (BSE +/-30%)",
+            expected=f"{case.truth_source} (golden up={expected_up} down={expected_down})",
             actual=f"PIT rule resolved to {rule.up_rate}/{rule.down_rate} ({rule.rule_id})",
             reason_code="BJ_REGIME_MISMATCH",
             validator_id="bj_mapping_v2",
@@ -741,8 +814,8 @@ def _validate_bj_mapping(case: GoldenCase, data: DomainData) -> validators.Valid
         result=CaseResult.VALIDATED_PASS,
         expected=case.truth_source,
         actual=(
-            f"code continuity + BSE 30% regime proven "
-            f"(high {provider_high} vs rule {rule.rule_id})"
+            f"code continuity + regime proven via rule {rule.rule_id} "
+            f"(up {rule.up_rate}, high {provider_high})"
         ),
         validator_id="bj_mapping_v2",
         validator_version="2",
@@ -885,6 +958,11 @@ def route_all(
                 outcomes.append((case, _failure_outcome(exc, case), evidence))
             continue
         evidence = collector.bundle_evidence()
+        # R4-A2.4 P0-03: validators resolve rules through the RUN-BOUND
+        # book (ctx.rule_book); dry-run/unbound runs use the default book
+        rule_book = getattr(ctx, "rule_book", None)
         for case in domain_cases:
-            outcomes.append((case, validate_case_in_domain(case, data), evidence))
+            outcomes.append(
+                (case, validate_case_in_domain(case, data, rule_book=rule_book), evidence)
+            )
     return outcomes

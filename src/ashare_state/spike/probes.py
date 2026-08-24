@@ -101,7 +101,9 @@ class ProbeContext:
         self.target = target
         from ashare_state.storage.raw_writer import RawWriter
 
-        self.raw_writer = RawWriter(store.raw_dir(run))
+        # CR-1.2 (audit R4-A2.4 section 3.4): every raw meta records the
+        # run it belongs to (ingest_run_id traceability)
+        self.raw_writer = RawWriter(store.raw_dir(run), ingest_run_id=run.spike_run_id)
 
     @property
     def as_of_date(self) -> int:
@@ -109,12 +111,35 @@ class ProbeContext:
         digits = "".join(ch for ch in str(self.run.as_of_date) if ch.isdigit())
         return int(digits[:8]) if len(digits) >= 8 else 20260814
 
+    @property
+    def rule_book(self):
+        """R4-A2.4 P0-03: the RUN-BOUND trading-rule book. Formal runs bind
+        the rule dataset at creation; validation resolves rules through
+        THIS book - never the working tree's current state. Dry-run /
+        unbound runs fall back to the default (working tree) book."""
+        from ashare_state.spike.trading_rule import (
+            TradingRuleBook,
+            load_bound_rule_book,
+        )
+
+        if getattr(self.run, "trading_rule_file", ""):
+            return load_bound_rule_book(
+                rule_file=self.run.trading_rule_file,
+                rule_version=self.run.trading_rule_version,
+                rule_hash=self.run.trading_rule_hash,
+            )
+        return TradingRuleBook.load()
+
     # ------------------------------------------------------------ evidence
     def evidence_from_exchange(self, exchange: ProviderExchange) -> dict[str, Any]:
         """Persist ONE ProviderExchange via the RawWriter and return the
         evidence meta for case binding. Reuses the exchange's own
         request_id (CR-1c) - never regenerates one, never reverse-searches
-        last_envelopes."""
+        last_envelopes.
+
+        CR-1.2 (audit R4-A2.4 section 3.1-3.2): the evidence is the
+        exchange META (bidirectional closure anchor); payload artifacts
+        are listed separately with their own hashes."""
         result = self.raw_writer.write(exchange)
         envelope = exchange.envelope
         # evidence_ref must be relative to the run store's spike_root so
@@ -133,6 +158,18 @@ class ProbeContext:
             "payload_kind": result.payload_kind,
             "evidence_ref": run_prefix + result.evidence_uri,
             "content_hash": result.evidence_hash,
+            # CR-1.2: explicit artifact split (payloads + meta anchor)
+            "payload_artifacts": [
+                {
+                    "uri": run_prefix + a.uri,
+                    "content_hash": a.content_hash,
+                    "schema_hash": a.schema_hash,
+                    "row_count": a.row_count,
+                }
+                for a in result.payload_artifacts
+            ],
+            "meta_ref": run_prefix + result.meta_uri,
+            "meta_hash": result.meta_artifact.content_hash if result.meta_artifact else "",
         }
 
     def failure_evidence(
@@ -357,6 +394,67 @@ def _observe_units(bar_rows: list[dict[str, Any]]) -> dict[str, str]:
     return {"volume": "UNDETERMINED", "amount": "UNDETERMINED"}
 
 
+def _flat_values(payload: Any) -> list[Any]:
+    """Flatten a scalar-list payload (e.g. code lists / calendars) that
+    _rows_of would wrap into {'value': x} dicts."""
+    rows = _rows_of(payload)
+    if rows and all(isinstance(r, dict) and set(r.keys()) <= {"value"} for r in rows):
+        return [r.get("value") for r in rows]
+    return rows
+
+
+def _calendar_ints(payload: Any) -> list[int]:
+    """Extract trading-day ints from any calendar payload shape
+    (list[int] / list[str] / list[dict] / frames) - CR-1.2 helper."""
+    if payload is None:
+        return []
+    if isinstance(payload, list):
+        out: list[int] = []
+        for item in payload:
+            if isinstance(item, dict):
+                value = None
+                for key in ("CAL_DATE", "TRADING_DATE", "TRADE_DATE", "CALENDAR_DATE", "value"):
+                    if key in item:
+                        value = item[key]
+                        break
+                item = value
+            digits = "".join(ch for ch in str(item) if ch.isdigit())
+            if len(digits) >= 8:
+                out.append(int(digits[:8]))
+        return out
+    # frame/dict-of shapes: normalize to rows first, then recurse
+    return _calendar_ints(_rows_of(payload))
+
+
+def _persisted_calendar(
+    ctx: ProbeContext,
+    executor: ProbeExecutor,
+    *,
+    failure_case_type: str,
+    trade_date: str,
+    symbol: str = "SDK",
+) -> tuple[list[int] | None, dict[str, Any]]:
+    """CR-1.2 (audit R4-A2.4 section 2.3, option A): the kline trading-
+    calendar prerequisite is EXPLICIT - fetch + persist the calendar
+    exchange FIRST, then callers pass the windowed days to
+    query_kline_exchange. A failed calendar exchange means kline MUST NOT
+    fire (no fabricated success); the failure meta is already persisted."""
+    calendar, cal_meta = executor.call(
+        "BaseData.get_calendar",
+        lambda: ctx.target.get_calendar_exchange(),
+        failure_case_type=failure_case_type,
+        trade_date=trade_date,
+        symbol=symbol,
+    )
+    if calendar is None:
+        return None, cal_meta
+    return _calendar_ints(calendar), cal_meta
+
+
+def _window_days(days: list[int], begin: int, end: int) -> list[int]:
+    return [d for d in days if begin <= d <= end]
+
+
 # ------------------------------------------------------------------------ B2
 
 
@@ -387,34 +485,73 @@ def probe_b2_security_master(ctx: ProbeContext) -> dict[str, Any]:
 def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     """Daily bar units + ST/suspend semantics + limit rule on one date."""
     executor = ProbeExecutor(ctx)
-    symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")][:5]
+    # CR-1.2 (audit R4-A2.4 section 2.2): the symbol-list prerequisite is an
+    # EXPLICIT persisted exchange - no payload-only get_code_list on the
+    # formal path.
+    symbols_payload, _sym_meta = executor.call(
+        "BaseData.get_code_list",
+        lambda: ctx.target.get_code_list_exchange("EXTRA_STOCK_A"),
+        failure_case_type="sdk_prerequisite_failure",
+        trade_date=str(sample_date),
+        symbol="MARKET",
+    )
+    symbols = (
+        [str(s) for s in _flat_values(symbols_payload)][:5]
+        if symbols_payload is not None
+        else []
+    )
     results: dict[str, Any] = {}
 
-    # --- daily bar units
-    bars, bar_meta = executor.call(
-        "MarketData.query_kline",
-        lambda: ctx.target.query_kline_exchange(
-            symbols, begin_date=sample_date, end_date=sample_date, kline_type="DAY"
-        ),
+    # --- daily bar units (kline prerequisite: explicit persisted calendar)
+    cal_days, _cal_meta = _persisted_calendar(
+        ctx,
+        executor,
         failure_case_type="daily_bar_units",
         trade_date=str(sample_date),
-        symbol="SAMPLE",
     )
-    if bars is None:
+    if cal_days is None or not symbols:
         results["daily_bar"] = "NOT_TESTABLE"
+        if cal_days is None:
+            ctx.case(
+                case_id=f"B3-DAILYBAR-CALPREREQ-{sample_date}",
+                case_type="daily_bar_units",
+                security="SAMPLE",
+                provider_symbol="SAMPLE",
+                trade_date=str(sample_date),
+                expected="calendar prerequisite exchange OK",
+                actual="NOT_TESTABLE: calendar prerequisite failed; kline not fired",
+                result=CaseResult.NOT_TESTABLE_PERMISSION,
+                evidence_meta=_cal_meta,
+            )
     else:
-        bar_rows = _to_plain(_rows_of(bars))
-        # R3-P0-07: observed units derive from live scale analysis of this
-        # payload (amount/volume ~ close proves shares+CNY) - INDEPENDENT
-        # of the documented constant
-        observed_units = _observe_units(bar_rows)
-        out = validators.validate_daily_bar_units(
-            bar_rows,
-            documented_units=DOCUMENTED_UNITS,
-            observed_units=observed_units,
+        bars, bar_meta = executor.call(
+            "MarketData.query_kline",
+            lambda: ctx.target.query_kline_exchange(
+                symbols,
+                begin_date=sample_date,
+                end_date=sample_date,
+                kline_type="DAY",
+                trading_days=_window_days(cal_days, sample_date, sample_date),
+            ),
+            failure_case_type="daily_bar_units",
+            trade_date=str(sample_date),
+            symbol="SAMPLE",
         )
-        ctx.outcome_case("daily_bar_units", "SAMPLE", str(sample_date), bar_meta, out)
-        results["daily_bar"] = str(out.result)
+        if bars is None:
+            results["daily_bar"] = "NOT_TESTABLE"
+        else:
+            bar_rows = _to_plain(_rows_of(bars))
+            # R3-P0-07: observed units derive from live scale analysis of this
+            # payload (amount/volume ~ close proves shares+CNY) - INDEPENDENT
+            # of the documented constant
+            observed_units = _observe_units(bar_rows)
+            out = validators.validate_daily_bar_units(
+                bar_rows,
+                documented_units=DOCUMENTED_UNITS,
+                observed_units=observed_units,
+            )
+            ctx.outcome_case("daily_bar_units", "SAMPLE", str(sample_date), bar_meta, out)
+            results["daily_bar"] = str(out.result)
 
     # --- ST/suspend + limit (semantic case ids per R2 section 7)
     status, status_meta = executor.call(
@@ -531,8 +668,7 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         trade_date=str(sample_date),
         symbol="SDK",
     )
-    if calendar is None:
-        calendar = []
+    cal_all_days: list[int] | None = None if calendar is None else _calendar_ints(calendar)
     identity = ctx.target.identity()
     record = {
         "account_profile_id": identity.get("account_profile_id", ""),
@@ -540,7 +676,7 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         # never the profile id again
         "permission_codes": identity.get("permission_codes", ""),
         "cache_behavior": "documented_local_path_is_local",
-        "calendar_rows": len(list(calendar or [])),
+        "calendar_rows": len(cal_all_days or []),
     }
     out = validators.validate_sdk_behavior_record(record)
     ctx.outcome_case("sdk_permission_cache_freshness", "SDK", str(sample_date), cal_meta, out)
@@ -553,22 +689,56 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         "835185.BJ",  # BSE migrated listing (2021 opening)
         "300104.SZ",  # historical delisting (LeEco, delisted 2020)
     ]
-    bars, bar_meta = executor.call(
-        "MarketData.query_kline",
-        lambda: ctx.target.query_kline_exchange(
-            fixtures, begin_date=19900101, end_date=sample_date, kline_type="DAY"
-        ),
-        failure_case_type="history_start_2018_plus_warmup",
-        trade_date=str(sample_date),
-        symbol="FIXTURES",
+    # CR-1.2: reuse the ALREADY-persisted calendar exchange above (single
+    # fetch per probe) and pass its windowed days explicitly to kline.
+    hist_days = (
+        _window_days(cal_all_days, 19900101, sample_date)
+        if cal_all_days is not None
+        else None
     )
+    if hist_days is None:
+        bars, bar_meta = None, cal_meta
+    else:
+        bars, bar_meta = executor.call(
+            "MarketData.query_kline",
+            lambda: ctx.target.query_kline_exchange(
+                fixtures,
+                begin_date=19900101,
+                end_date=sample_date,
+                kline_type="DAY",
+                trading_days=hist_days,
+            ),
+            failure_case_type="history_start_2018_plus_warmup",
+            trade_date=str(sample_date),
+            symbol="FIXTURES",
+        )
     if bars is None:
         earliest = ""
+        if hist_days is None:
+            # calendar prerequisite failed: coverage is NOT_TESTABLE (its
+            # failure case is already recorded), never a fabricated FAIL
+            ctx.case(
+                case_id=f"B5-HISTCOV-CALPREREQ-{sample_date}",
+                case_type="history_start_2018_plus_warmup",
+                security="FIXTURES",
+                provider_symbol="FIXTURES",
+                trade_date=str(sample_date),
+                expected="calendar prerequisite exchange OK",
+                actual="NOT_TESTABLE: calendar prerequisite failed; kline not fired",
+                result=CaseResult.NOT_TESTABLE_PERMISSION,
+                evidence_meta=cal_meta,
+            )
+            cov = None
+        else:
+            cov = validators.validate_history_coverage(earliest)
     else:
         rows = _to_plain(_rows_of(bars))
         earliest = min((str(r.get("KLINE_TIME", "99991231")) for r in rows), default="")
-    cov = validators.validate_history_coverage(earliest)
-    ctx.outcome_case("history_start_2018_plus_warmup", "FIXTURES", str(sample_date), bar_meta, cov)
+        cov = validators.validate_history_coverage(earliest)
+    if cov is not None:
+        ctx.outcome_case(
+            "history_start_2018_plus_warmup", "FIXTURES", str(sample_date), bar_meta, cov
+        )
     # symbol mapping core gate - explicit exchange (CR-1.1: no JSON
     # evidence chain, no payload-only call)
     symbols_exchange = ctx.target.get_code_list_exchange("EXTRA_STOCK_A")
@@ -648,15 +818,30 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         result=CaseResult.OBSERVED if basic_available else CaseResult.NOT_TESTABLE_PERMISSION,
         evidence_meta=basic_meta,
     )
-    idx, idx_meta = executor.call(
-        "MarketData.query_kline",
-        lambda: ctx.target.query_kline_exchange(
-            ["000300.SH"], begin_date=sample_date, end_date=sample_date, kline_type="DAY"
-        ),
+    # CR-1.2: explicit persisted calendar prerequisite for the index kline
+    idx_cal_days, _idx_cal_meta = _persisted_calendar(
+        ctx,
+        executor,
         failure_case_type="benchmark_index_availability",
         trade_date=str(sample_date),
         symbol="000300.SH",
     )
+    if idx_cal_days is None:
+        idx, idx_meta = None, _idx_cal_meta
+    else:
+        idx, idx_meta = executor.call(
+            "MarketData.query_kline",
+            lambda: ctx.target.query_kline_exchange(
+                ["000300.SH"],
+                begin_date=sample_date,
+                end_date=sample_date,
+                kline_type="DAY",
+                trading_days=_window_days(idx_cal_days, sample_date, sample_date),
+            ),
+            failure_case_type="benchmark_index_availability",
+            trade_date=str(sample_date),
+            symbol="000300.SH",
+        )
     ctx.case(
         case_id=f"B6-BENCHMARK-INDEX-{sample_date}",
         case_type="benchmark_index_availability",
@@ -688,10 +873,46 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     import time
 
     executor = ProbeExecutor(ctx)
-    symbols = [str(s) for s in ctx.target.get_code_list("EXTRA_STOCK_A")]
+    # CR-1.2 (audit R4-A2.4 section 2.2): symbol list AND calendar are
+    # explicit persisted exchanges on the formal path.
+    symbols_payload, _sym_meta = executor.call(
+        "BaseData.get_code_list",
+        lambda: ctx.target.get_code_list_exchange("EXTRA_STOCK_A"),
+        failure_case_type="capacity_backfill",
+        trade_date=str(sample_date),
+        symbol="MARKET",
+    )
+    symbols = (
+        [str(s) for s in _flat_values(symbols_payload)] if symbols_payload is not None else []
+    )
+    cal_days, _cal_meta = _persisted_calendar(
+        ctx,
+        executor,
+        failure_case_type="capacity_backfill",
+        trade_date=str(sample_date),
+    )
+    if cal_days is None or not symbols:
+        ctx.case(
+            case_id=f"B7-CAPACITY-PREREQ-{sample_date}",
+            case_type="capacity_backfill",
+            security="ALL_A",
+            provider_symbol="ALL_A",
+            trade_date=str(sample_date),
+            expected="symbols + calendar prerequisite exchanges OK",
+            actual="NOT_TESTABLE: prerequisite exchange failed; per-day loop not fired",
+            result=CaseResult.NOT_TESTABLE_PERMISSION,
+            evidence_meta=_cal_meta if cal_days is None else _sym_meta,
+        )
+        return {
+            "symbol_count": len(symbols),
+            "day_window": [],
+            "row_count": 0,
+            "request_count": 0,
+            "failure_count": 1,
+            "prerequisite_failed": True,
+        }
     # derive a small day window ending at the run as-of date
-    calendar = ctx.target.get_calendar()
-    days = [int(d) for d in (calendar or []) if int(d) <= sample_date]
+    days = [int(d) for d in cal_days if int(d) <= sample_date]
     window = days[-5:] if len(days) >= 5 else (days or [sample_date])
 
     per_day: list[dict[str, Any]] = []
@@ -707,7 +928,11 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         payload, meta = executor.call(
             "MarketData.query_kline",
             lambda d=day: ctx.target.query_kline_exchange(
-                symbols, begin_date=d, end_date=d, kline_type="DAY"
+                symbols,
+                begin_date=d,
+                end_date=d,
+                kline_type="DAY",
+                trading_days=[d],
             ),
             failure_case_type="capacity_backfill",
             trade_date=str(day),

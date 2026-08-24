@@ -47,12 +47,42 @@ class TestRuleDataLayer:
         assert book.review_status == "COMPILED"
 
     def test_no_hardcoded_rates_in_python(self):
-        """P0-06: the institutional rates must NOT live in trading_rule.py."""
-        source = Path("src/ashare_state/spike/trading_rule.py").read_text(encoding="utf-8")
-        # the literal rate tables of the old implementation must be gone
-        assert "BOARD_LIMIT_RATES" not in source
-        assert '"MAIN": 0.10' not in source
-        assert "0.20," not in source.replace("up_rate: 0.20", "")  # yaml-only values
+        """P0-06 + R4-A2.4 P0-06: institutional rates must NOT live in ANY
+        spike module. STRUCTURED AST rule (no brittle string matching):
+
+        1. no legacy rate-table names anywhere under src/ashare_state/spike/
+        2. no comparison of a *-rate attribute against a NUMERIC LITERAL
+           (e.g. ``float(rule.up_rate) != 0.30``) - regime checks must be
+           golden-expected x resolved-rule x provider-observed, all data
+        """
+        import ast
+
+        spike_dir = Path("src/ashare_state/spike")
+        files = sorted(spike_dir.rglob("*.py"))
+        assert files  # sanity: the package exists
+        offenders: list[str] = []
+        for file in files:
+            source = file.read_text(encoding="utf-8")
+            assert "BOARD_LIMIT_RATES" not in source, f"{file}: BOARD_LIMIT_RATES"
+            tree = ast.parse(source)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Compare):
+                    continue
+                sides = [node.left, *node.comparators]
+                for side in sides:
+                    expr_text = ast.dump(side)
+                    if "_rate" in expr_text:
+                        for other in sides:
+                            if other is side:
+                                continue
+                            if isinstance(other, ast.Constant) and isinstance(
+                                other.value, (int, float)
+                            ) and not isinstance(other.value, bool) and abs(other.value) >= 0.001:
+                                offenders.append(f"{file}:{node.lineno}")
+        assert not offenders, (
+            f"rate literals compared against numeric constants in spike code: "
+            f"{offenders} - institutional facts belong in configs/trading_rules"
+        )
 
     def test_board_regimes_resolve_from_data(self, book: TradingRuleBook):
         # MAIN normal 10% / ST 5%

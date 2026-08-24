@@ -19,6 +19,16 @@ from ashare_state.spike.runner import RunLifecycleError, new_run
 REPO_GOLDEN = Path(__file__).resolve().parents[2] / "data" / "golden" / "provider" / "amazingdata"
 
 
+@pytest.fixture(autouse=True)
+def _rule_review_gate_relaxed(monkeypatch):
+    """R4-A2.4: golden-gate tests exercise the GOLDEN review lifecycle;
+    the trading-rule review gate has dedicated tests in
+    test_trading_rule_binding.py."""
+    from ashare_state.spike import trading_rule as rule_module
+
+    monkeypatch.setattr(rule_module, "trading_rule_review_gate", lambda book, **k: [])
+
+
 @pytest.fixture
 def golden_env(tmp_path: Path, monkeypatch) -> Path:
     root = tmp_path / "data" / "golden" / "provider" / "amazingdata"

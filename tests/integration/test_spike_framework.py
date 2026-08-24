@@ -63,6 +63,16 @@ def _golden_review_gate_relaxed(monkeypatch):
     monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self, *a, **k: [])
 
 
+@pytest.fixture(autouse=True)
+def _rule_review_gate_relaxed(monkeypatch):
+    """R4-A2.4: aggregation-semantics tests must not depend on the rule
+    dataset's review status - the trading-rule review gate has dedicated
+    tests in test_trading_rule_binding.py."""
+    from ashare_state.spike import trading_rule as rule_module
+
+    monkeypatch.setattr(rule_module, "trading_rule_review_gate", lambda book, **k: [])
+
+
 def _prod_profile() -> AccountProfile:
     return AccountProfile.from_scrubbed(
         {

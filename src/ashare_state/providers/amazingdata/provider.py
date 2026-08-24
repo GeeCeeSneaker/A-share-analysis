@@ -54,6 +54,13 @@ class RawEnvelope:
 
     Audit P1-04: envelopes are produced for FAILED calls too (status/error
     fields), so a denial is auditable evidence rather than a lost event.
+
+    CR-1.2 (audit R4-A2.4 section 3.3): ``request_params`` carries the FULL
+    real request parameters (complete code lists, dates, options) - never a
+    count/first-N summary. ``request_params_hash`` is the SHA-256 of the
+    canonical JSON of those full params, so equal-size requests over
+    DIFFERENT symbols hash differently and the request is reconstructable
+    from the persisted (scrubbed) meta alone.
     """
 
     provider: str = "amazingdata"
@@ -61,6 +68,7 @@ class RawEnvelope:
     endpoint: str = ""
 
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    request_params: dict[str, Any] = field(default_factory=dict)
     request_params_hash: str = ""
 
     requested_at: str = ""
@@ -174,6 +182,7 @@ class AmazingDataProvider:
             env = RawEnvelope(
                 provider_dataset=dataset,
                 endpoint=endpoint,
+                request_params=dict(params),  # CR-1.2: FULL real params
                 request_params_hash=RawEnvelope.params_hash(params),
                 requested_at=requested_at,
                 received_at=datetime.now(UTC).isoformat(),
@@ -253,7 +262,7 @@ class AmazingDataProvider:
             "InfoData.get_stock_basic",
             "stock_basic",
             lambda: self._info().get_stock_basic(code_list=code_list),
-            params={"code_list": code_list[:3], "len": len(code_list)},
+            params={"code_list": list(code_list)},
             require_capability="security_master",
         )
 
@@ -269,7 +278,11 @@ class AmazingDataProvider:
             lambda: self._info().get_history_stock_status(
                 start_date=start_date, end_date=end_date, code_list=code_list
             ),
-            params={"start_date": start_date, "end_date": end_date, "codes": len(code_list)},
+            params={
+                "start_date": start_date,
+                "end_date": end_date,
+                "code_list": list(code_list),
+            },
             require_capability="security_status_history",
         )
 
@@ -281,7 +294,7 @@ class AmazingDataProvider:
             "BaseData.get_adj_factor",
             "adj_factor",
             lambda: self._base().get_adj_factor(code_list=code_list),
-            params={"codes": len(code_list)},
+            params={"code_list": list(code_list)},
             require_capability="adj_factor",
         )
 
@@ -293,12 +306,31 @@ class AmazingDataProvider:
             "BaseData.get_backward_factor",
             "backward_factor",
             lambda: self._base().get_backward_factor(code_list=code_list),
-            params={"codes": len(code_list)},
+            params={"code_list": list(code_list)},
             require_capability="adj_factor",
         )
 
     def get_backward_factor(self, code_list: list[str]) -> Any:
         return self.get_backward_factor_exchange(code_list).payload
+
+    def get_dividend_exchange(self, code_list: list[str]) -> Any:
+        """Corporate-action event records (dividend/right issue).
+
+        R4-A2.4 P0-05: the CA validator needs an EVENT FACT SOURCE (exact
+        ex-date + event type), not just the adj factor stream. This
+        endpoint is the provider-side event SoR (capability
+        ``corporate_action`` -> InfoData.get_dividend).
+        """
+        return self._call_or_exchange(
+            "InfoData.get_dividend",
+            "corporate_action",
+            lambda: self._info().get_dividend(code_list=code_list),
+            params={"code_list": list(code_list)},
+            require_capability="corporate_action",
+        )
+
+    def get_dividend(self, code_list: list[str]) -> Any:
+        return self.get_dividend_exchange(code_list).payload
 
     def get_calendar_exchange(self, market: str = "SH") -> Any:
         return self._call_or_exchange(
@@ -339,21 +371,38 @@ class AmazingDataProvider:
         begin_date: int,
         end_date: int,
         kline_type: str = "DAY",
+        trading_days: list[int] | None = None,
     ) -> Any:
+        """Explicit-exchange kline query.
+
+        CR-1.2 (audit R4-A2.4 section 2.3, option A): the trading-calendar
+        prerequisite is EXPLICIT - audit/formal callers must first fetch +
+        persist ``get_calendar_exchange`` and pass the windowed ``trading_days``
+        here. Passing ``trading_days=None`` is allowed ONLY on the business
+        convenience path (``query_kline``), which fetches the calendar
+        internally and is FORBIDDEN on spike/formal evidence paths (static
+        AST test). The calendar exchange of the convenience path never
+        reaches formal evidence.
+        """
+        days = trading_days
+        if days is None:
+            calendar = self.get_calendar()
+            days = [d for d in (calendar or []) if begin_date <= int(d) <= end_date]
         return self._call_or_exchange(
             "MarketData.query_kline",
             "daily_bar",
-            lambda: self._market(begin_date, end_date).query_kline(
+            lambda: self._market(days or [begin_date, end_date]).query_kline(
                 code_list=code_list,
                 begin_date=begin_date,
                 end_date=end_date,
                 kline_type=kline_type,
             ),
             params={
-                "codes": len(code_list),
+                "code_list": list(code_list),
                 "begin_date": begin_date,
                 "end_date": end_date,
                 "kline_type": kline_type,
+                "trading_days": list(days),
             },
             require_capability="daily_bar",
         )
@@ -366,20 +415,21 @@ class AmazingDataProvider:
         end_date: int,
         kline_type: str = "DAY",
     ) -> Any:
+        """Business convenience path (NOT for spike/formal evidence paths)."""
         return self.query_kline_exchange(
             code_list, begin_date=begin_date, end_date=end_date, kline_type=kline_type
         ).payload
 
-    def _market(self, begin_date: int, end_date: int) -> Any:
-        """MarketData(calendar) needs the trading-day list covering the range.
+    def _market(self, trading_days: list[int]) -> Any:
+        """MarketData(calendar) built from EXPLICIT trading days.
 
-        CR-1 (audit section 44): the calendar fetch is a REAL SDK call and
-        gets its OWN exchange (endpoint BaseData.get_calendar) - it is never
-        buried inside the query_kline envelope.
+        CR-1/CR-1.2 (audit section 44 + R4-A2.4 section 2.3): the calendar
+        fetch is a REAL SDK call and gets its OWN exchange - the formal path
+        persists it via ``get_calendar_exchange`` and passes the windowed
+        days here; nothing calendar-related is buried inside the kline
+        exchange on the explicit path.
         """
-        calendar = self.get_calendar()
-        days = [d for d in (calendar or []) if begin_date <= int(d) <= end_date]
-        return self.session.sdk.MarketData(days or [begin_date, end_date])
+        return self.session.sdk.MarketData(list(trading_days))
 
 
 def _count_rows(result: Any) -> int:

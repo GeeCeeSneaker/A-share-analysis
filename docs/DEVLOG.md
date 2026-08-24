@@ -13,6 +13,51 @@
 
 ---
 
+## 2026-08-24 · R4-A2.4 Correctness Deepening + CR-1.2 Raw Exchange Closure（复审 6 项 P0 + P1 全修）
+
+**Scope**
+- R4-A2.3/CR-1.1 复审裁决 REOPENED（工作要求 20260824 第二份）：CR-1.1 四 P0 + R4-A2.4 两 P0（trading rule binding / CA event SoR）+ P1-01..04 + 文档治理；按 Batch A→E 全部完成
+
+**Implementation**
+- **CR-1.2 Complete Exchange + Raw Closure（P0-01/02 + P1，ADR-012，DM-CR-20260824-008）**：
+  - 隐藏日历前置显式化（Option A）：calendar exchange 先持久化 → 窗口 trading_days 显式传入 kline（`RealTarget.query_kline_exchange(trading_days=...)`）；日历失败→失败 meta 落盘 + kline **不发射**（不伪造成功）；B3/B7 code_list/calendar 前置全部持久化 exchange
+  - **证据锚定升级为 meta.json**：`RawWriteResult` 拆分 `payload_artifacts[]`（uri/content_hash/schema_hash/row_count）+ `meta_artifact`；SpikeCase 证据恒绑 exchange meta——payload+meta **双向闭合**（篡改/删除任一侧都 BLOCK；`verify_evidence_closure` 对 bundle→meta→payload 递归复验）
+  - meta 持久化**完整脱敏 request_params** + params_hash（等长不同 symbols hash 不同——请求可重建）+ `ingested_at` + `ingest_run_id`（run 绑定追溯）
+  - 多文件提交 **staging 原子化**（全部 payload 先落 staging → 逐个 os.replace → meta 最后落盘）；表名净化冲突 BLOCK；`read(verify=True)` 读前复验
+  - AST 静态测试：probes.py / golden_router.py 禁止调用 payload-only target 方法（get_code_list / get_calendar / query_kline 等）；FakeTarget 产出真实 params（dry-run 覆盖 params 管线）
+- **R4-A2.4 Trading Rule Binding + Review Gate（P0-03/04 + P1-04，ADR-012，DM-CR-20260824-009）**：
+  - SpikeRun 绑定 `trading_rule_file/version/hash/review_status`（TRIAL/PRODUCTION 创建时）；`compute_config_hash` 递归 `configs/**`（嵌套规则文件进入配置指纹——审计 §4.1-A 复现验证：编辑嵌套文件改变 hash）
+  - RUNNING/RESUME/VERDICT/REPLAY 只用 `load_bound_rule_book`（bytes hash + version 复验；工作树篡改/推进 → `RuleUnresolvedError` fail-closed）；`ProbeContext.rule_book`（run-bound）经 `route_all` 传入 limit/BJ 验证器
+  - **Review Gate**：COMPILED→REVIEWED（reviewed_by/at + source_artifact_ref/hash/kind(allowlist)/retrieved_at 六字段 + artifact bytes hash 复验）；`new_run(PRODUCTION)` fail-fast + `compute_verdict(PRODUCTION)` 复核双执行；`scripts/rules/review.py`（reviewer 提供官方 artifact → 工具自算 SHA-256 写入 REVIEWED 副本 + 副本自验证 + 重复 review 拒绝）
+  - `_parse_st_state` 严格解析：bool/"true"/"false"/"any" 之外 ValueError（`bool("false")==True` 的 truthiness 反转被禁止）
+- **R4-A2.4 CA Event SoR（P0-05，DM-CR-20260824-010）**：CA 证据组合加入**事件事实源**（dividend records）：adj-only → `VALIDATED_FAIL(EVENT_SOURCE_MISSING)`（"adj-factor movement alone is not a sufficient event SoR"）；事件存在但 EX_DATE≠T → `EVENT_DATE_MISMATCH`；event+adj+kline 一致 → PASS；事件日停牌 → `NOT_TESTABLE_TIME`；FakeTarget `get_dividend_exchange`（事件端点进 dry-run 覆盖）；CA 域 bundle = calendar+status+dividend+adj+kline 五 exchange
+- **R4-A2.4 静态守卫升级（P0-06）**：费率字面量守卫从字符串匹配升级为 **AST 结构化规则**（`spike/**/*.py` 禁止 `*_rate` 与数值常量直接比较；1e-9 容差豁免；负向验证确认能捕获 `!= 0.30` 旧模式）
+- **文档治理（DM-CR-20260824-011）**：上批宣称与 runtime 的出入修正（BJ mapping endpoint 表述归正为 hist master + exact-date regime；CI 口径区分本地/Actions）；R4-A2.3/CR-1.1 条目归档 absorbed
+
+**Schema / Contract Changes**
+- C2 ×2（ADR-012 amendment to 010/011）：evidence 锚定 meta 化（双向闭合 + request 可重建 + ingest 绑定）；rule 数据集 run 绑定 + 审阅生命周期
+- SpikeRun 新增 trading_rule_* 四字段（旧 run json 兼容读取）；scripts/rules/review.py（新）；tests 新增 test_raw_closure / test_cr12_exchange_completeness / test_trading_rule_binding / test_ca_event_sor
+
+**Verification**
+- Local: **461 tests passed / 0 failed**（420 → 461，+41：raw closure 13 + exchange completeness 7 + rule binding 14 + CA event SoR 6 + 静态守卫升级适配）；ruff / mypy 全绿
+- dry-run 冒烟：B2-B7 全阶段；**33 exchanges 全部 meta-anchored + 5 bundles**；整 run `verify_evidence_closure`（bundle→meta→payload 递归双向）零问题
+- GitHub Actions: 本批提交后触发，尚未确认（按 §49 口径区分 Local 与 CI）
+
+**Implementation Status**
+- DONE（R4-A2.4 / CR-1.2 全部 P0 + P1 + 文档治理）
+
+**Review Status**
+- PENDING_REVIEW（对照工作要求 §16 Exit Gate 12 项与 §17 复检重点）
+
+**Known Open Issues**
+- Golden v3 人工 Review 未执行（RISK-001/TD-005）；Trading Rule yaml 为 COMPILED（RISK-005——结构闭环已就绪，待人工以 scripts/rules/review.py 执行）
+- CI 三矩阵待推送后确认；Branch Protection 未启用
+
+**Next**
+- 推送 git + CI 确认 → Reviewer 复审 R4-A2.4/CR-1.2；Golden + Trading Rule 人工 review 执行；R4-A3 / CR-2
+
+---
+
 ## 2026-08-24 · R4-A2.3 Correctness Closure + CR-1.1 Runtime Closure（复审 9 项 P0 + P1 + 文档治理全修）
 
 **Scope**

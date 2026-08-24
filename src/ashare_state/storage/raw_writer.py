@@ -1,6 +1,6 @@
-"""RawWriter: immutable provider evidence runtime (CR-1b/CR-1.1).
+"""RawWriter: immutable provider evidence runtime (CR-1b/CR-1.1/CR-1.2).
 
-Contract (audit R4-A2.3 sections 4-5):
+Contract (audit R4-A2.3 sections 4-5 + R4-A2.4 section 3):
 - SUCCESS exchange  -> raw artifact (Parquet for tabular payloads) +
                        .meta.json (envelope), immutable
 - FAILURE exchange  -> failure evidence (envelope-only .meta.json), the
@@ -15,6 +15,23 @@ Contract (audit R4-A2.3 sections 4-5):
 - Lossless: structured tabular payloads go to Parquet; never repr()
 - Secret-scrubbed: params are scrubbed before persisting
 - Cross-platform logical URI: relative, forward slashes, no drive letters
+
+CR-1.2 closure (audit R4-A2.4 section 3.1-3.2):
+- the EVIDENCE a SpikeCase binds to is the .meta.json of the exchange
+  (``evidence_uri``/``evidence_hash``): the meta declares every payload
+  artifact's hash, so payload+meta close BIDIRECTIONALLY - deleting or
+  tampering EITHER side breaks the evidence closure
+- ``RawWriteResult`` splits into ``payload_artifacts`` (uri/content_hash/
+  schema_hash/row_count each) + ``meta_artifact`` (uri/content_hash)
+- meta persists the FULL scrubbed ``request_params`` + their hash (the
+  request is reconstructable; equal-size requests over different symbols
+  hash differently), ``ingested_at`` and the ``ingest_run_id`` binding
+- multi-file commits are staged: all payload bytes land in a staging dir
+  first, then each file is atomically moved into place, and the meta is
+  written LAST - an interrupted commit can never produce a meta-anchored
+  partial evidence set
+- table-name collisions after sanitization BLOCK (never overwrite)
+- ``read(verify=True)`` re-verifies every declared payload hash
 
 Payload shapes (audit section 5.2 - MANDATORY support):
     list[dict]                     -> single table
@@ -39,8 +56,12 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import re
+import shutil
+import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +80,17 @@ _TABLE_NAME_SAFE = re.compile(r"[^A-Za-z0-9_\-]")
 
 class RawWriterError(RuntimeError):
     """RawWriter contract violation (unsupported shape / id conflict)."""
+
+
+@dataclass(frozen=True)
+class ArtifactRef:
+    """CR-1.2 (audit R4-A2.4 section 3.1): one artifact of an exchange,
+    separately addressed + hashed (payload artifacts AND the meta)."""
+
+    uri: str
+    content_hash: str
+    schema_hash: str = ""
+    row_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -82,11 +114,14 @@ class RawWriteResult:
     payload_kind: str = ""
     row_count: int = 0
     tables: tuple[TableRecord, ...] = field(default_factory=tuple)
-    #: the evidence artifact a SpikeCase binds to (parquet for single-table
-    #: success, meta.json otherwise) + the SHA256 of ITS bytes - evidence
-    #: closure re-verifies exactly these.
+    #: the evidence artifact a SpikeCase binds to. CR-1.2: this is ALWAYS
+    #: the exchange's .meta.json (whose bytes declare every payload hash),
+    #: so payload+meta close bidirectionally under evidence closure.
     evidence_uri: str = ""
     evidence_hash: str = ""
+    #: CR-1.2 section 3.1: explicit artifact split
+    payload_artifacts: tuple[ArtifactRef, ...] = field(default_factory=tuple)
+    meta_artifact: ArtifactRef | None = None
 
 
 def _scrub(params: dict[str, Any] | None) -> dict[str, Any]:
@@ -226,8 +261,11 @@ def normalize_payload(payload: Any) -> tuple[str, list[tuple[str | None, Any]]]:
 class RawWriter:
     """Persists ProviderExchange results as immutable raw evidence."""
 
-    def __init__(self, raw_root: Path | str) -> None:
+    def __init__(self, raw_root: Path | str, *, ingest_run_id: str = "") -> None:
         self.root = Path(raw_root)
+        # CR-1.2 section 3.4: run binding recorded on every meta (empty for
+        # non-run usage like unit tests / direct reader access)
+        self.ingest_run_id = str(ingest_run_id)
 
     def _dir_for(self, provider: str, dataset: str) -> Path:
         return self.root / f"provider={provider}" / f"dataset={dataset}"
@@ -323,14 +361,23 @@ class RawWriter:
         dataset_dir = self._dir_for(provider, dataset)
         dataset_dir.mkdir(parents=True, exist_ok=True)
 
-        records: list[TableRecord] = []
         multi = len(tables) > 1 or (len(tables) == 1 and tables[0][0] is not None)
+        records: list[TableRecord] = []
         table_files: list[tuple[str | None, Path, bytes]] = []
         if multi:
             table_dir = dataset_dir / request_id
-            for name, table in tables:
+            # P1-02 (audit R4-A2.4 section 9.2): table-name collision after
+            # sanitization BLOCKS - two logical tables must never collapse
+            # onto the same output file
+            file_names = [f"{_safe_table_name(name or 'table')}.parquet" for name, _ in tables]
+            if len(set(file_names)) != len(file_names):
+                msg = (
+                    f"table name collision for request {request_id}: sanitized file "
+                    f"names are not unique ({file_names}) - rename the logical tables"
+                )
+                raise RawWriterError(msg)
+            for (name, table), fname in zip(tables, file_names, strict=True):
                 payload_bytes = _table_bytes(table)
-                fname = f"{_safe_table_name(name or 'table')}.parquet"
                 records.append(
                     TableRecord(
                         name=name,
@@ -368,19 +415,28 @@ class RawWriter:
 
         idem = self._check_idempotent(request_id, records, meta_path, meta_bytes, table_files)
         if not idem:
-            for _, path, payload_bytes in table_files:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                write_file_atomic(path, payload_bytes)
-            write_file_atomic(meta_path, meta_bytes)
+            self._commit_files(request_id, dataset_dir, meta_path, meta_bytes, table_files)
 
         if multi:
             logical_uri = self._logical_uri(provider, dataset, f"{request_id}/")
-            evidence_uri = self._logical_uri(provider, dataset, meta_path.name)
-            evidence_hash = hashlib.sha256(meta_bytes).hexdigest()
         else:
             logical_uri = self._logical_uri(provider, dataset, f"{request_id}.parquet")
-            evidence_uri = logical_uri
-            evidence_hash = records[0].content_hash
+        # CR-1.2 (audit R4-A2.4 section 3.1): the case evidence is the META
+        # - it declares every payload hash, so payload+meta close
+        # bidirectionally. Single-table payloads no longer bind the bare
+        # parquet (meta deletion/tampering must break the closure).
+        evidence_uri = self._logical_uri(provider, dataset, meta_path.name)
+        meta_hash = hashlib.sha256(meta_bytes).hexdigest()
+        payload_artifacts = tuple(
+            ArtifactRef(
+                uri=self._logical_uri(provider, dataset, r.file),
+                content_hash=r.content_hash,
+                schema_hash=r.schema_hash,
+                row_count=r.row_count,
+            )
+            for r in records
+        )
+        meta_artifact = ArtifactRef(uri=evidence_uri, content_hash=meta_hash)
         return RawWriteResult(
             request_id=request_id,
             logical_uri=logical_uri,
@@ -391,8 +447,45 @@ class RawWriter:
             row_count=row_count,
             tables=tuple(records),
             evidence_uri=evidence_uri,
-            evidence_hash=evidence_hash,
+            evidence_hash=meta_hash,
+            payload_artifacts=payload_artifacts,
+            meta_artifact=meta_artifact,
         )
+
+    def _commit_files(
+        self,
+        request_id: str,
+        dataset_dir: Path,
+        meta_path: Path,
+        meta_bytes: bytes,
+        table_files: list[tuple[str | None, Path, bytes]],
+    ) -> None:
+        """P1-01 (audit R4-A2.4 section 9.1): multi-file atomicity - stage
+        ALL payload bytes first, then move each into place, meta LAST. An
+        interrupted commit can never leave a meta-anchored partial set (the
+        meta is the closure anchor; no meta -> evidence closure BLOCKS)."""
+        staging = dataset_dir / f".staging-{request_id[:12]}-{uuid.uuid4().hex[:6]}"
+        staged: list[tuple[Path, Path]] = []
+        try:
+            for _, final_path, payload_bytes in table_files:
+                staged_tmp = staging / final_path.name
+                write_file_atomic(staged_tmp, payload_bytes, staging_dir=staging)
+                staged.append((final_path, staged_tmp))
+            # every payload byte is safely on disk in staging -> move each
+            # into its final position (os.replace is atomic per file)
+            for final_path, staged_tmp in staged:
+                final_path.parent.mkdir(parents=True, exist_ok=True)
+                if final_path.exists():  # pragma: no cover - idempotence pre-checked
+                    msg = (
+                        f"raw artifact conflict for request {request_id}: "
+                        f"{final_path} already exists with different bytes"
+                    )
+                    raise RawWriterError(msg)
+                os.replace(staged_tmp, final_path)  # noqa: PTH105 - os.replace is the atomic primitive
+            # the meta (closure anchor) lands only after ALL payloads
+            write_file_atomic(meta_path, meta_bytes)
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
 
     # ------------------------------------------------------------- failure
     def _write_failure(self, provider: str, dataset: str, exchange: Any) -> RawWriteResult:
@@ -409,16 +502,22 @@ class RawWriter:
         if meta_path.exists():
             # failure evidence is append-only too: same request id twice
             # with failure is suspicious - block unless byte-identical
-            if meta_path.read_bytes() == meta_bytes:
+            # (ignoring the ingested_at wall-clock, CR-1.2)
+            if _same_meta_ignoring_time(meta_path.read_bytes(), meta_bytes):
+                meta_hash = hashlib.sha256(meta_path.read_bytes()).hexdigest()
                 return RawWriteResult(
                     request_id=request_id,
                     logical_uri=None,
                     meta_uri=self._logical_uri(provider, dataset, meta_path.name),
-                    content_hash=hashlib.sha256(meta_bytes).hexdigest(),
+                    content_hash=meta_hash,
                     idempotent=True,
                     payload_kind="failure",
                     evidence_uri=self._logical_uri(provider, dataset, meta_path.name),
-                    evidence_hash=hashlib.sha256(meta_bytes).hexdigest(),
+                    evidence_hash=meta_hash,
+                    meta_artifact=ArtifactRef(
+                        uri=self._logical_uri(provider, dataset, meta_path.name),
+                        content_hash=meta_hash,
+                    ),
                 )
             msg = (
                 f"raw failure-evidence conflict for request {request_id}: "
@@ -427,6 +526,9 @@ class RawWriter:
             raise RawWriterError(msg)
         write_file_atomic(meta_path, meta_bytes)
         meta_hash = hashlib.sha256(meta_bytes).hexdigest()
+        meta_ref = ArtifactRef(
+            uri=self._logical_uri(provider, dataset, meta_path.name), content_hash=meta_hash
+        )
         return RawWriteResult(
             request_id=request_id,
             logical_uri=None,
@@ -435,14 +537,20 @@ class RawWriter:
             payload_kind="failure",
             evidence_uri=self._logical_uri(provider, dataset, meta_path.name),
             evidence_hash=meta_hash,
+            meta_artifact=meta_ref,
         )
 
     # ---------------------------------------------------------------- read
-    def read(self, *, provider: str, dataset: str, request_id: str) -> Any:
+    def read(
+        self, *, provider: str, dataset: str, request_id: str, verify: bool = True
+    ) -> Any:
         """Read back a persisted payload: DataFrame for single-table kinds,
         dict[str, DataFrame] for multi-table kinds (lossless round-trip
         support for audit section 5.3 tests). Uses polars - the project
-        data stack (pandas is NOT a project dependency)."""
+        data stack (pandas is NOT a project dependency).
+
+        P1-03 (audit R4-A2.4 section 9.3): ``verify=True`` re-checks every
+        declared payload hash BEFORE returning data."""
         import polars as pl
 
         dataset_dir = self._dir_for(provider, dataset)
@@ -450,6 +558,14 @@ class RawWriter:
         if not meta_path.is_file():
             raise RawWriterError(f"no raw meta for request {request_id} under {dataset_dir}")
         doc = json.loads(meta_path.read_text(encoding="utf-8"))
+        if verify:
+            problems = verify_meta_closure(dataset_dir, doc)
+            if problems:
+                msg = (
+                    f"raw integrity verification failed for request {request_id}: "
+                    f"{'; '.join(problems)}"
+                )
+                raise RawWriterError(msg)
         kind = str(doc.get("payload_kind", ""))
         if kind in (KIND_MULTI_ROWS, KIND_MULTI_FRAMES):
             frames: dict[str, Any] = {}
@@ -472,14 +588,15 @@ class RawWriter:
         table_files: list[tuple[str | None, Path, bytes]],
     ) -> bool:
         """Same request id: idempotent no-op iff every existing byte matches
-        the new bytes; any difference BLOCKS (immutable raw store)."""
+        the new bytes; any difference BLOCKS (immutable raw store). The
+        wall-clock ``ingested_at`` is excluded from the comparison."""
         existing_any = meta_path.exists() or any(p.exists() for _, p, _ in table_files)
         if not existing_any:
             return False
-        same_meta = meta_path.is_file() and meta_path.read_bytes() == meta_bytes
-        same_tables = all(
-            p.is_file() and p.read_bytes() == b for _, p, b in table_files
+        same_meta = meta_path.is_file() and _same_meta_ignoring_time(
+            meta_path.read_bytes(), meta_bytes
         )
+        same_tables = all(p.is_file() and p.read_bytes() == b for _, p, b in table_files)
         if same_meta and same_tables:
             return True
         msg = (
@@ -517,6 +634,8 @@ class RawWriter:
             "content_hash": content_hash,
             "payload_kind": payload_kind,
             "request_params": _scrub(getattr(envelope, "request_params", None)),
+            "ingested_at": datetime.now(UTC).isoformat(),
+            "ingest_run_id": self.ingest_run_id,
             "tables": [
                 {
                     "name": t.name,
@@ -533,6 +652,55 @@ class RawWriter:
     def _logical_uri(self, provider: str, dataset: str, filename: str) -> str:
         # cross-platform logical URI: relative, forward slashes (audit 46)
         return f"provider={provider}/dataset={dataset}/{filename}"
+
+
+def _same_meta_ignoring_time(existing: bytes, incoming: bytes) -> bool:
+    """Byte-compare two meta docs ignoring the wall-clock ``ingested_at``."""
+    try:
+        a = json.loads(existing)
+        b = json.loads(incoming)
+    except json.JSONDecodeError:  # pragma: no cover - corrupted meta
+        return False
+    a.pop("ingested_at", None)
+    b.pop("ingested_at", None)
+    return a == b
+
+
+def verify_meta_closure(raw_root: Path | str, meta_doc: dict[str, Any]) -> list[str]:
+    """CR-1.2 (audit R4-A2.4 section 3.1): verify the payload+meta closure
+    of ONE exchange meta document against the bytes on disk.
+
+    Checks (each failure is a returned problem):
+      - every declared table file exists and its sha256 equals the declared
+        content_hash (payload tamper / partial set detection)
+      - the combined content_hash over the declared tables recomputes
+    Returns an empty list when the closure holds."""
+    root = Path(raw_root)
+    problems: list[str] = []
+    tables = meta_doc.get("tables") or []
+    for table in tables:
+        rel = str(table.get("file", ""))
+        path = root / rel
+        if not path.is_file():
+            problems.append(f"payload artifact missing: {rel}")
+            continue
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual != str(table.get("content_hash", "")):
+            problems.append(f"payload hash mismatch: {rel}")
+    if tables and not problems:
+        records = [
+            TableRecord(
+                name=t.get("name"),
+                file=str(t.get("file", "")),
+                content_hash=str(t.get("content_hash", "")),
+                schema_hash=str(t.get("schema_hash", "")),
+                row_count=int(t.get("row_count", 0) or 0),
+            )
+            for t in tables
+        ]
+        if _combined_hash(records) != str(meta_doc.get("content_hash", "")):
+            problems.append("combined content_hash does not recompute from tables")
+    return problems
 
 
 def _with_request_id(
@@ -567,9 +735,11 @@ def _combined_hash(records: list[TableRecord]) -> str:
 
 
 __all__ = [
+    "ArtifactRef",
     "ImmutableFileExistsError",
     "RawWriteResult",
     "RawWriter",
     "RawWriterError",
     "TableRecord",
+    "verify_meta_closure",
 ]

@@ -50,6 +50,7 @@ class SpikeTarget(Protocol):
         self, start_date: int, end_date: int, code_list: list[str]
     ) -> Any: ...
     def get_adj_factor_exchange(self, code_list: list[str]) -> Any: ...
+    def get_dividend_exchange(self, code_list: list[str]) -> Any: ...
     def get_calendar_exchange(self, market: str = "SH") -> Any: ...
     def query_kline_exchange(
         self,
@@ -58,6 +59,7 @@ class SpikeTarget(Protocol):
         begin_date: int,
         end_date: int,
         kline_type: str,
+        trading_days: list[int],
     ) -> Any: ...
 
     # payload convenience surface
@@ -68,6 +70,7 @@ class SpikeTarget(Protocol):
         self, start_date: int, end_date: int, code_list: list[str]
     ) -> Any: ...
     def get_adj_factor(self, code_list: list[str]) -> Any: ...
+    def get_dividend(self, code_list: list[str]) -> Any: ...
     def get_calendar(self, market: str = "SH") -> Any: ...
     def query_kline(
         self, code_list: list[str], *, begin_date: int, end_date: int, kline_type: str
@@ -105,6 +108,9 @@ class RealTarget:
     def get_adj_factor_exchange(self, code_list: list[str]) -> ProviderExchange:
         return self.provider.get_adj_factor_exchange(code_list)
 
+    def get_dividend_exchange(self, code_list: list[str]) -> ProviderExchange:
+        return self.provider.get_dividend_exchange(code_list)
+
     def get_calendar_exchange(self, market: str = "SH") -> ProviderExchange:
         return self.provider.get_calendar_exchange(market)
 
@@ -115,9 +121,14 @@ class RealTarget:
         begin_date: int,
         end_date: int,
         kline_type: str,
+        trading_days: list[int] | None = None,
     ) -> ProviderExchange:
         return self.provider.query_kline_exchange(
-            code_list=code_list, begin_date=begin_date, end_date=end_date, kline_type=kline_type
+            code_list=code_list,
+            begin_date=begin_date,
+            end_date=end_date,
+            kline_type=kline_type,
+            trading_days=trading_days,
         )
 
     # ---- payload convenience surface ----
@@ -136,15 +147,19 @@ class RealTarget:
     def get_adj_factor(self, code_list: list[str]) -> Any:
         return self.get_adj_factor_exchange(code_list).payload
 
+    def get_dividend(self, code_list: list[str]) -> Any:
+        return self.get_dividend_exchange(code_list).payload
+
     def get_calendar(self, market: str = "SH") -> Any:
         return self.get_calendar_exchange(market).payload
 
     def query_kline(
         self, code_list: list[str], *, begin_date: int, end_date: int, kline_type: str
     ) -> Any:
-        return self.query_kline_exchange(
+        exchange = self.query_kline_exchange(
             code_list, begin_date=begin_date, end_date=end_date, kline_type=kline_type
-        ).payload
+        )
+        return exchange.payload
 
     def identity(self) -> dict[str, Any]:
         identity = self.provider.identity
@@ -253,21 +268,26 @@ def _fake_exchange(
     payload: Any,
     *,
     row_count: int | None = None,
+    params: dict[str, Any] | None = None,
 ) -> ProviderExchange:
     """Deterministic fake exchange: every FakeTarget call produces a REAL
-    ProviderExchange (own request_id), so the dry-run exercises the SAME
-    RawWriter evidence pipeline as formal runs (CR-1.1)."""
+    ProviderExchange (own request_id + FULL request params, CR-1.2), so
+    the dry-run exercises the SAME RawWriter evidence pipeline as formal
+    runs (CR-1.1)."""
     if row_count is not None:
         count: int = row_count
     elif hasattr(payload, "__len__"):
         count = len(payload)
     else:
         count = 1
+    request_params = dict(params or {})
     env = RawEnvelope(
         provider="amazingdata",
         provider_dataset=dataset,
         endpoint=endpoint,
         request_id=str(uuid.uuid4()),
+        request_params=request_params,
+        request_params_hash=RawEnvelope.params_hash(request_params),
         requested_at="2026-08-24T00:00:00+00:00",
         received_at="2026-08-24T00:00:01+00:00",
         sdk_version="FAKE-1.1.9",
@@ -306,28 +326,43 @@ class FakeTarget:
     def get_code_list_exchange(self, security_type: str | None = None) -> ProviderExchange:
         self._mark("get_code_list")
         return _fake_exchange(
-            "BaseData.get_code_list", "code_list", ["600519.SH", "600000.SH", "000001.SZ"]
+            "BaseData.get_code_list",
+            "code_list",
+            ["600519.SH", "600000.SH", "000001.SZ"],
+            params={"security_type": security_type},
         )
 
     def get_hist_code_list_exchange(
         self, security_type: str, start_date: int, end_date: int
     ) -> ProviderExchange:
         self._mark("get_hist_code_list")
-        return _fake_exchange("BaseData.get_hist_code_list", "hist_code_list", _FAKE_HIST_ROWS)
+        return _fake_exchange(
+            "BaseData.get_hist_code_list",
+            "hist_code_list",
+            _FAKE_HIST_ROWS,
+            params={"security_type": security_type, "start_date": start_date, "end_date": end_date},
+        )
 
     def get_stock_basic_exchange(self, code_list: list[str]) -> ProviderExchange:
         self._mark("get_stock_basic")
         rows = [
             {"SECURITY_CODE": code.split(".")[0], "IS_LISTED": "1"} for code in code_list
         ]
-        return _fake_exchange("InfoData.get_stock_basic", "stock_basic", rows)
+        return _fake_exchange(
+            "InfoData.get_stock_basic", "stock_basic", rows, params={"code_list": list(code_list)}
+        )
 
     def get_history_stock_status_exchange(
         self, start_date: int, end_date: int, code_list: list[str]
     ) -> ProviderExchange:
         self._mark("get_history_stock_status")
         rows = self._status_rows(start_date, end_date, code_list)
-        return _fake_exchange("InfoData.get_history_stock_status", "history_stock_status", rows)
+        return _fake_exchange(
+            "InfoData.get_history_stock_status",
+            "history_stock_status",
+            rows,
+            params={"start_date": start_date, "end_date": end_date, "code_list": list(code_list)},
+        )
 
     def get_adj_factor_exchange(self, code_list: list[str]) -> ProviderExchange:
         self._mark("get_adj_factor")
@@ -341,11 +376,42 @@ class FakeTarget:
                         "EX_FACTOR": factor,
                     }
                 )
-        return _fake_exchange("BaseData.get_adj_factor", "adj_factor", rows)
+        return _fake_exchange(
+            "BaseData.get_adj_factor", "adj_factor", rows, params={"code_list": list(code_list)}
+        )
+
+    def get_dividend_exchange(self, code_list: list[str]) -> ProviderExchange:
+        """Fake corporate-action EVENT records (R4-A2.4 P0-05 event SoR).
+
+        Mirrors _FAKE_ADJ_EVENTS: 600519.SH has DIVIDEND events on its two
+        ex-dates; symbols without events return EMPTY (the adj-only
+        failure mode stays observable per case)."""
+        self._mark("get_dividend")
+        rows: list[dict[str, Any]] = []
+        for code in code_list:
+            events = _FAKE_ADJ_EVENTS.get(code)
+            if events:
+                for ex_date, _factor in events:
+                    rows.append(
+                        {
+                            "SECURITY_CODE": code.split(".")[0],
+                            "EX_DATE": str(ex_date),
+                            "EVENT_TYPE": "DIVIDEND",
+                            "DIVIDEND_PER_SHARE": 21.675,
+                        }
+                    )
+        return _fake_exchange(
+            "InfoData.get_dividend", "corporate_action", rows, params={"code_list": list(code_list)}
+        )
 
     def get_calendar_exchange(self, market: str = "SH") -> ProviderExchange:
         self._mark("get_calendar")
-        return _fake_exchange("BaseData.get_calendar", "trade_calendar", list(_FAKE_CALENDAR))
+        return _fake_exchange(
+            "BaseData.get_calendar",
+            "trade_calendar",
+            list(_FAKE_CALENDAR),
+            params={"market": market},
+        )
 
     def query_kline_exchange(
         self,
@@ -354,10 +420,27 @@ class FakeTarget:
         begin_date: int,
         end_date: int,
         kline_type: str,
+        trading_days: list[int] | None = None,
     ) -> ProviderExchange:
         self._mark("query_kline")
+        # CR-1.2: the calendar prerequisite is EXPLICIT on the spike path -
+        # probes must fetch + persist get_calendar_exchange first and pass
+        # the windowed days here (the fake ignores them beyond the marker).
+        if trading_days is not None:
+            self._mark("kline_used_explicit_calendar")
         rows = self._kline_rows(code_list, begin_date, end_date)
-        return _fake_exchange("MarketData.query_kline", "daily_bar", rows)
+        return _fake_exchange(
+            "MarketData.query_kline",
+            "daily_bar",
+            rows,
+            params={
+                "code_list": list(code_list),
+                "begin_date": begin_date,
+                "end_date": end_date,
+                "kline_type": kline_type,
+                "trading_days": list(trading_days or []),
+            },
+        )
 
     # ------------------------------------------------ payload surface
     def get_code_list(self, security_type: str | None = None) -> list[str]:
@@ -378,6 +461,9 @@ class FakeTarget:
 
     def get_adj_factor(self, code_list: list[str]) -> list[dict[str, Any]]:
         return self.get_adj_factor_exchange(code_list).payload
+
+    def get_dividend(self, code_list: list[str]) -> list[dict[str, Any]]:
+        return self.get_dividend_exchange(code_list).payload
 
     def get_calendar(self, market: str = "SH") -> list[int]:
         return self.get_calendar_exchange(market).payload
