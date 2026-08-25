@@ -8,7 +8,7 @@
 > **Document Revision**：DM-CR-20260825-001 / 002 / 003  
 > **Last Review**：2026-08-25（R4-A2.4/CR-1.2 复审：REOPENED——5 项 P0 + P1 + 治理修正，本批 R4-A2.5/CR-1.2.1 修复）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：b7a84563..c7aa511 共 8 个提交 CI FAILURE（ruff format --check 未过；本批修复并本地验证 format/lint/mypy/pytest 全绿，提交后以 Actions 实际结果为准）  
+> **CI Status**：**CONFIRMED GREEN**——run 35（commit 13d02a1）三矩阵全部 success（2026-08-25 API positive confirmation）。历史：b7a84563..f3694bd 共 9 个提交 FAILURE（根因 1：ruff format --check 门未过，已修复；根因 2：两个 capability-mode 测试在无 SDK 的 CI 上探测真实 SDK，已改传显式 identity 并以模拟无 SDK 环境验证）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 

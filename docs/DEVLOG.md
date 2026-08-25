@@ -34,7 +34,7 @@
 **Verification**
 - Local: **502 tests passed / 0 failed**（461 → 502，+41：rule binding 对抗 4 + 版本模型/绑定/gate 加固 24 + recovery 8 + CA event 8 + B5/B6 9 + TestLimitRule 适配）；
 - ruff check / **ruff format --check** / mypy 全绿（CI 等价四检查）；dry-run 冒烟：34 exchanges 全 meta-anchored + 5 bundles，整 run 双向闭合零问题，right-issue 端点进 bundle
-- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（8 连红根因已修，本地等价检查全绿）
+- GitHub Actions: **CONFIRMED GREEN**——run 35（13d02a1）三矩阵 success（API positive confirmation）。首推 f3694bd 曾再挂：**第二根因**=两个 capability-mode 测试无显式 identity 在无 SDK 的 CI 上触发 probe_identity 探测（本地装过 trial SDK 掩盖）；修复=显式 `_FakeIdentity` + 模拟无 SDK 环境（monkeypatch probe_identity 抛错）验证 13 passed；连同 9 连红的第一根因（format 门）一并终结
 
 **Implementation Status**
 - DONE（R4-A2.5 / CR-1.2.1 全部 P0 + P1 + 治理修正）
