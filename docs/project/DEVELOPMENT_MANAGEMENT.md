@@ -4,12 +4,12 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Current Code Baseline**：本批提交（R4-A2.8 Final Exchange-Boundary / Review-Lineage Closure + CR-1.2.4 Pre-Access Integrity）；上一批 implementation SHA `47b47437b0828262e4f9f11c57862af2558a4d34`（复审基线 HEAD，run 40 = success）  
-> **Document Revision**：DM-CR-20260825-013 / 014 / 015 / 016  
-> **Last Review**：2026-08-25 14:27 +08:00（R4-A2.7/CR-1.2.3 复审：REOPENED——3 项 P0 + P1 + 治理修正，本批 R4-A2.8/CR-1.2.4 修复）  
+> **Current Code Baseline**：本批提交（R4-A2.9 Review-Seal Exactness / Cross-Platform CI Closure + CR-1.2.5 Output Confinement）；上一批 implementation SHA `ada0eac2d973730605f7af65f57e72a22e1483c1`（复审基线 HEAD，run 42）  
+> **Document Revision**：DM-CR-20260825-017 / 018 / 019 / 020  
+> **Last Review**：2026-08-25 16:26 +08:00（R4-A2.8/CR-1.2.4 复审：REOPENED——2 项 P0 + P1 + CI 真相，本批 R4-A2.9/CR-1.2.5 修复）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：run 40 / `47b47437...` = success（Reviewer API 正向确认）；本批提交后以 Actions 实际结果为准  
-> **Reviewer Correction（2026-08-25 14:27）**：R4-A2.7 的 Raw identity / active coherence / provider-shape architecture 保留；但 CA assign-then-persist control-flow、bound lexical-first 顺序、review input integrity 尚未关闭（ADR-016 为修正记录；历史 ADR 原文保留）  
+> **CI Status（job-level truth）**：run 42 / `ada0eac2...`：required Windows 3.12/3.14 **PASS**；optional Ubuntu 3.14 **Pytest FAILED**（根因=真实跨平台 correctness bug：`.gitattributes` 漏盖 `*.yaml`，Windows autocrlf checkout 重写 LF→CRLF 使 Ubuntu 重算 dataset hash 失配——本批修复：yaml 纳入 LF 规则 + manifest hash 以 LF 字节重算 `dd2219d2...` + 跨平台回归测试）；overall SUCCESS 仅因既有 `continue-on-error: ${{ !matrix.required }}` 策略（未改动）；本批提交后以 Actions 实际结果为准  
+> **Reviewer Correction（2026-08-25 16:26）**：R4-A2.8 的三个原始 P0 主体冻结（collector.call 原子边界 / lexical-first / review preflight 保留）；但 review seal 存在 double-read TOCTOU（验证与封存字节可分离）、`--version` 输出无 confinement、CI 全矩阵非绿（ADR-017 为修正记录；历史 ADR 原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
@@ -1069,8 +1069,9 @@ Evidence/Log/Exception 必须 scrub secret。
 | CR-1.2 Complete Exchange + Raw Closure | DONE | absorbed into CR-1.2.3 | 结构保留；最终 VERIFIED 随本批门 |
 | R4-A2.5 Rule-SoR Closure + CR-1.2.1 Raw Hardening | DONE | absorbed into R4-A2.7 | 结构保留；最终 VERIFIED 随本批门 |
 | R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement | DONE | absorbed into R4-A2.8 | 结构保留；最终 VERIFIED 随本批门 |
-| R4-A2.7 Final Integrity + CR-1.2.3 Evidence Identity Closure | DONE | REOPENED | 由 R4-A2.8/CR-1.2.4 修复（本批） |
-| R4-A2.8 Final Exchange-Boundary / Review-Lineage Closure + CR-1.2.4 Pre-Access Integrity | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
+| R4-A2.7 Final Integrity + CR-1.2.3 Evidence Identity Closure | DONE | absorbed into R4-A2.9 | 结构保留；最终 VERIFIED 随本批门 |
+| R4-A2.8 Final Exchange-Boundary + CR-1.2.4 Pre-Access Integrity | DONE | REOPENED | 三个原始 P0 主体冻结；由 R4-A2.9/CR-1.2.5 修复 seal/confinement/CI（本批） |
+| R4-A2.9 Review-Seal Exactness / Cross-Platform CI Closure + CR-1.2.5 Output Confinement | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
 | R4-A3 SDK/Lifecycle/Early Stop | PLANNED | PENDING | Next |
 | R4-B1 Capability Endpoint Proof | PLANNED | PENDING | Next |
 | R4-B2 Publish Validation Exactness | PLANNED | PENDING | Next |
@@ -1087,47 +1088,46 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A2.8 + CR-1.2.4（本批，DONE / PENDING_REVIEW）
+## R4-A2.9 + CR-1.2.5（本批，DONE / PENDING_REVIEW）
 
 ```text
-P0-01 Golden Atomic Exchange Persistence（DM-CR-20260825-013，ADR-016 §1）：
-  _DomainCollector.call(fn) → PersistedExchangeView：call+persist 一个
-    边界操作（exchange 在边界返回前已持久化；lineage 从 frozen view 读）
-  全部域 fetch（ST/DELISTED/LIMIT/CA/BJ）统一走原子边界；CA 的
-    assign-then-persist 窗口消除
-  对抗测试：dividend 成功+right_issue 失败→两者都持久化（call 数 ==
-    persisted 数）；首次 persist 失败→后续 provider call 不发射；
-    dividend 失败→right_issue 不发射；full success lineage 指向精确
-    persisted exchange
-  AST 守卫升级为控制流安全：exchange 调用必须位于 collector.call(
-    lambda:...) 内；负向测试证明旧 assign-then-persist 模式被拒
-P0-02 Bound Lexical-First Pre-Access（DM-CR-20260825-014，ADR-016 §2）：
-  _lexically_confined_dataset_file（Step A：非空/相对/无盘符/无 ../
-    versions/<v>/——零 fs 访问）→ _confined_dataset_file 唯一入口
-    （Step B：resolved symlink escape）；bound loop 删除前置 _confined
-    双 helper 并列；evidence ref 的 _confined 同加 lexical 前置拒绝
-  Path.resolve spy：traversal/绝对/盘符/异版本目录的拒绝全程 candidate
-    未被 resolve；合法路径才 resolve；symlink escape 仍拦截
-P0-03 Review Input Integrity（DM-CR-20260825-015，ADR-016 §3）：
-  review.py preflight 不可绕过执行 load_active_rules（ACTIVE hash 复算 +
-    manifest↔dataset 四字段 coherence）；--from-version / 单文件 /
-    --rules==已验证 ACTIVE / COMPILED 校验；REVIEWED 副本从已验证 ACTIVE
-    bytes 产生（读取后复验 hash，无 TOCTOU）；preflight 失败→零输出
-    （无 evidence 拷贝/无 versions/<new>/无 manifest 变更）
-  §4.4：source_version/dataset_version REQUIRED 下沉 load_rule_manifest
-    schema（单一 manifest API 契约）
-P1-01/02（DM-CR-20260825-016 内）：
-  CA_STREAM_ENDPOINTS 固定映射交叉校验（跨流重标 → ShapeError）；
-    _payload_columns 空 frame schema（0 行+必需列=合法空；0 行+缺列=
-    PROVIDER_SCHEMA）
+P0-01 Review Exact-Byte Seal（DM-CR-20260825-017，ADR-017 §1）：
+  一次性 snapshot：active_bytes 单次读取；_hash_snapshot([(rel, bytes)])
+    用 manifest 同一算法对内存字节计算；_build_reviewed_text 从同一
+    snapshot 构造 REVIEWED 副本；此后无任何 ACTIVE 文件第二次读取
+  修正 ADR-016 §3 overclaim（旧实现 Read A 封存/Read B 验证可被替换分离）
+  对抗测试：preflight 后读取返回篡改字节 → snapshot hash BLOCK（零输出）；
+    工具对 ACTIVE 文件读取数 = preflight + 恰好 1；REVIEWED 内容可从
+    exact snapshot 推导（seal block 剥离后逐行相等）；输出报告
+    snapshot sha256 供 reviewer 独立复核
+P0-02 Output Version Confinement（DM-CR-20260825-018，ADR-017 §2）：
+  --version = 单一安全组件（^[A-Za-z0-9][A-Za-z0-9._-]*$，拒 . / .. /
+    分隔符/盘符/绝对路径）；lexical first → resolved confinement →
+    mutation last（全部确定性校验先于任何输出）
+  12 类非法 id → 拒绝 + before/after 文件树快照零差异（含越界逃逸）；
+    既有版本冲突 BLOCK 先于 evidence 拷贝
+P1 Staged Output / Cleanup（并入 017/018，ADR-017 §3）：
+  Phase 1 纯校验/snapshot（零 mutation）→ Phase 2 staged（evidence 内容
+    寻址 + versions/.staging-<id>/ 运行完整 gate；失败移除全部 staged
+    字节）→ Phase 3 publish（staging 原子改名为 versions/<id>/，ACTIVE
+    manifest 最后原子替换）
+  gate 失败→无 finalized version/无孤儿 evidence/ACTIVE 不推进/无 temp
+    残留；失败后重试确定性
+CI 根因修复（DM-CR-20260825-019，ADR-017 §4）：
+  .gitattributes 补 *.yaml/*.yml text eol=lf + evidence/** -text；
+    工作树 yaml 规范化 LF（git diff 与 blob 字节一致）；manifest
+    dataset_hash 以 LF 字节重算（dd2219d2... == Ubuntu 重算值）；
+    跨平台回归测试（yaml 无 CRLF / 规则存在 / 工作树==blob）
+  政策：真实 correctness bug 修复，未削弱 gate/skip 测试/删 leg；
+    continue-on-error 策略不变；CI 真相 job-level 记录于头部
 ```
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
 ```text
 scripts/golden/review.py 逐条核验 123 v3 cases + 补齐 distinct events
-scripts/rules/review.py 对已验证 ACTIVE 规则版本执行人工复核（integrity
-  preflight → REVIEWED 版本并原子切换 ACTIVE）
+scripts/rules/review.py 对已验证 ACTIVE 规则版本执行人工复核（exact-byte
+  seal workflow：snapshot → staged → ACTIVE manifest 最后切换）
 ```
 
 ## R4-A3 / B1 / B2（CR-2 前；CR-2/R4-A3/P0-M-1B 保持 BLOCKED 直到本批 VERIFIED）
@@ -1145,7 +1145,7 @@ Migration 011
 
 ```text
 CR-2 Provider-Normalized + Quarantine（消费 raw evidence → provider-normalized；
-    本批 VERIFIED 后可启动——原子边界/lexical-first/review preflight 契约已稳定）
+    本批 VERIFIED 后可启动——exact-byte seal / output confinement 契约已稳定）
 CR-3 AvailabilityPolicy + Canonicalizer
 CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild
 ```
@@ -1471,13 +1471,14 @@ Deadline: 首个 APPROVED Source Policy 前
 ## RISK-004 ProviderExchange 未统一
 
 ```text
-Status: REOPENED（R4-A2.7/CR-1.2.3 复审发现新的 blocking correctness
-        问题：CA assign-then-persist 窗口 / bound lexical-first 顺序 /
-        review 输入完整性——即 R4-A2.8/CR-1.2.4 的三项 P0）
-        → 本批 R4-A2.8/CR-1.2.4 修复后结构完整（原子 call+persist 边界
-        + 控制流安全 AST 守卫 + lexical-first + review preflight）；
-        保持 REOPENED 直到 Reviewer 验证本批（不预写关闭）
-Mitigation: PENDING_REVIEW（R4-A2.8/CR-1.2.4）
+Status: REOPENED（R4-A2.8/CR-1.2.4 复审发现新的 blocking correctness
+        问题：review seal double-read TOCTOU / --version 输出无
+        confinement / Ubuntu CI 跨平台 hash 失配——即 R4-A2.9/CR-1.2.5
+        的两项 P0 + CI 根因）
+        → 本批 R4-A2.9/CR-1.2.5 修复后结构完整（exact-byte snapshot
+        seal + 输出 lexical/resolved confinement + staged cleanup +
+        跨平台字节真相）；保持 REOPENED 直到 Reviewer 验证本批（不预写关闭）
+Mitigation: PENDING_REVIEW（R4-A2.9/CR-1.2.5）
 ```
 
 ## RISK-005 Trading Rule 数据层未人工 Review
@@ -1726,6 +1727,56 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260825-020 — R4-A2.8 Reviewer Governance Correction
+
+**Type**：C1（治理修正）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.8/CR-1.2.4 复审 §6——治理文档须记录 Reviewed baseline `ada0eac2d973730605f7af65f57e72a22e1483c1` / 三个原始 P0 主体冻结 / REOPENED / CI job-level truth / RISK-004 保持；ADR-016 §3 的"exact ACTIVE bytes"表述为 overclaim（double-read gap），需 amendment 不删历史。  
+**Correction**：总册头部更新（Reviewed baseline + Reviewer Correction 段：seal double-read TOCTOU / version 输出无 confinement / CI 全矩阵非绿）；§40 R4-A2.8/CR-1.2.4 → REOPENED（主体冻结 + 由本批修复）；RISK-004 理由更新；ADR-017 为 ADR-016 §3 的修正记录（索引标注 amended by）。  
+**Affected Modules**：Documentation / Governance（DEVLOG、总册 §40/§41/§52/§61、ADR-017/ADR-000）  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-019 — Cross-Platform CI Truth / Byte-Exact Fix
+
+**Type**：C1 correctness fix（真实跨平台 bug）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.9 §5——Reviewer 下钻 run 42 job matrix：optional Ubuntu 3.14 的 Pytest step 实际 FAILED（~20 测试同错 `ACTIVE dataset hash mismatch: declared 7dc5f627... recomputed dd2219d2...`），overall SUCCESS 仅因 `continue-on-error: ${{ !matrix.required }}`；不得表述"全矩阵绿"。  
+**Root Cause（API 日志查证）**：`.gitattributes` 覆盖 `data/golden/**`/`*.json`/`*.jsonl` 但**漏 `*.yaml`**——Windows autocrlf checkout 重写 LF→CRLF（本地 hash 与 manifest 一致故 Windows CI 过），Ubuntu checkout 保持 LF（重算 hash 失配）。golden 未挂因已有 LF 规则。属**真实跨平台 correctness bug**（非环境依赖）。  
+**Fix**：`.gitattributes` 补 `*.yaml`/`*.yml text eol=lf`（规则数据集与 golden 同等字节治理）+ `configs/trading_rules/evidence/** -text`（内容寻址 artifact 禁 eol 归一化）；工作树 yaml 规范化 LF（`git diff` 与 blob 字节零差异）；`rule_manifest.json` dataset_hash 以 LF 字节重算（`dd2219d2...` 与 Ubuntu 重算值完全一致——两平台自此同字节）；回归测试 ×3（yaml 无 CRLF / .gitattributes 规则 / 工作树 == git blob）。  
+**Policy（§5.2）**：未削弱 required gate、未 skip 测试、未删除 Ubuntu leg；`continue-on-error` 策略不变；CI 真相以 job-level 记录于总册头部；本批提交后以 Actions 实际结果为准（重点观察 Ubuntu leg 转绿）。  
+**Affected Modules**：.gitattributes、configs/trading_rules/{rule_manifest.json, versions/v20260824-compiled/rules.yaml}  
+**Tests**：test_review_failure_cleanup.py::TestCrossPlatformRuleBytes ×3  
+**ADR**：[ADR-017](../adr/ADR-017_review_seal_output_confinement.md) §4  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-018 — Trading Rule Review Output-Version Confinement
+
+**Type**：C1 correctness closure  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.9 P0-02——`--version` 未验证即拼路径：`../escape`/`foo\/bar`/绝对路径/盘符样式可在 versions root 外创建目录；且 evidence 拷贝等 mutation 先于 version 冲突检查。  
+**Old Contract**：`version_dir = rules_root / "versions" / args.version` 直接 mkdir/write。  
+**New Contract**（ADR-017 §2）：`_validate_version_id`——Step A lexical（单一组件语法 `^[A-Za-z0-9][A-Za-z0-9._-]*$`，显式拒 `.`/`..`；分隔符/盘符/绝对路径在语法层不可能）；Step B resolved confinement（`versions_root/<id>` resolve 后必须位于 versions/ 内）；Step C 顺序（version 语法+confinence+不存在性等**全部确定性校验**先于任何输出 mutation——既有版本冲突先于 evidence 拷贝）。**测试**：12 类非法 id → 拒绝 + **before/after 文件树快照零差异**（覆盖 versions/ 内创建与越界逃逸）；合法 id 输出仅在 versions/<id>/ 且恰为 rules.yaml。  
+**Affected Modules**：scripts/rules/review.py  
+**Tests**：test_review_version_confinement.py（17：参数化 12 + 合法 1 + 冲突 1 + eol 豁免 1 + blob 一致性 1 + tree snapshot 内含）  
+**ADR**：[ADR-017](../adr/ADR-017_review_seal_output_confinement.md) §2  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-017 — Trading Rule Review Exact-Byte Seal + Staged Output
+
+**Type**：C1 correctness closure（review 工作流 seal 语义变更）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.9 P0-01——旧实现两次独立读取 ACTIVE 文件（Read A 生成 REVIEWED 副本、Read B `_dataset_files_hash` 验证）：swap→capture→restore→verify→seal-tampered 的 TOCTOU 使"hash 验证的字节 ≠ 被封存的字节"。  
+**Old Contract**：capture 与 verify 分离（ADR-016 §3 的"已验证 ACTIVE bytes"表述为 overclaim）。  
+**New Contract**（ADR-017 §1/§3）：**一次性 snapshot**——`active_bytes = read_bytes()` 单次读取；`_hash_snapshot([(rel, active_bytes)])` 用 manifest 同一算法对**内存字节**计算（与 manifest hash 相等即证明 snapshot 就是 ACTIVE 字节）；`_build_reviewed_text(active_bytes, ...)` 从同一 snapshot 构造副本；此后**无任何 ACTIVE 文件第二次读取**；输出 `sealed from ACTIVE snapshot sha256=<hash>` 供复核。**Staged 输出**（P1 并入）：Phase 1 纯校验/snapshot（含 REVIEWED 副本临时沙箱解析——零 rule-store mutation）→ Phase 2 staged（evidence 内容寻址 + `versions/.staging-<id>/` 运行完整 gate；gate 失败显式移除 staging+本次 evidence——`return` 在 try 内不触发 except 的坑已修）→ Phase 3 publish（staging 原子改名 `versions/<id>/`；ACTIVE manifest 最后原子替换；publish 后 manifest 的 dataset_hash 从 published bytes 计算）。**测试**：exact-byte 7（健康流报告 snapshot sha / REVIEWED 内容从 exact snapshot 逐行推导 / preflight 后篡改读取 BLOCK 零输出 / 无第二次读取可替换 seal 身份 / 控制组 / ACTIVE 文件读取数 == preflight+1 / 篡改零输出）+ cleanup 4（gate 失败无 finalized version+无 evidence / 不推进 ACTIVE / preflight 失败无 temp / 失败后重试确定性）。  
+**Affected Modules**：scripts/rules/review.py  
+**Tests**：test_review_seal_exactness.py（7）+ test_review_failure_cleanup.py（7 中 4 项属本条）  
+**ADR**：[ADR-017](../adr/ADR-017_review_seal_output_confinement.md) §1/§3  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260825-016 — R4-A2.7 Reviewer Governance Correction + P1 Hardening
 
@@ -2119,10 +2170,10 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 # 62. 下一次维护检查点
 
-R4-A2.8 + CR-1.2.4 已更新（2026-08-25，见 DM-CR-20260825-013..016）：
+R4-A2.9 + CR-1.2.5 已更新（2026-08-25，见 DM-CR-20260825-017..020）：
 
 ```text
-§40 §41 §52 §61 §62 + 头部（Reviewed baseline 47b47437 / run 40 / Reviewer Correction）(done 2026-08-25)
+§40 §41 §52 §61 §62 + 头部（Reviewed baseline ada0eac2 / CI job-level truth / Reviewer Correction）(done 2026-08-25)
 ```
 
 下一批（R4-A3 / CR-2，须待本批 VERIFIED）落地时至少更新：

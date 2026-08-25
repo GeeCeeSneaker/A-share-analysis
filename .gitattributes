@@ -5,3 +5,13 @@ data/golden/** text eol=lf
 *.jsonl text eol=lf
 *.json text eol=lf
 uv.lock text eol=lf
+# R4-A2.9 (audit 20260825 #5 section 5): the trading-rule dataset hash is
+# sealed over the yaml bytes and re-verified on every platform - a Windows
+# autocrlf checkout rewrote LF->CRLF and made the Ubuntu CI recompute a
+# different hash. Rule datasets are byte-exact like the golden truth.
+*.yaml text eol=lf
+*.yml text eol=lf
+# Content-addressed review evidence artifacts must stay byte-exact
+# (never eol-normalized - their sha256 IS their name).
+configs/trading_rules/evidence/** -text
+

@@ -777,3 +777,81 @@ formal entry gates
 ```
 
 Trial / Fake / CI 成功仍不得作为正式 Provider business truth 的替代证据。
+
+---
+
+# 13. Implementation Mapping（Developer 回填，2026-08-25）
+
+> 本批：R4-A2.9 Review-Seal Exactness / Cross-Platform CI Closure + CR-1.2.5 Output Confinement（Batch A→F 全部完成；**未启动 CR-2 / R4-A3**——遵守 §10 禁止项）。
+> 测试基线：**637 passed / 0 failed**（608 → 637，+29）；CI 等价四检查（ruff check + format --check + mypy + pytest）本地全绿；dry-run 冒烟 35 exchanges + 5 bundles 双向闭合零问题。
+> Change IDs：DM-CR-20260825-017/018/019/020；**ADR-017**（amendment to ADR-016；含 §11 四问完整记录）。
+> CI：本批提交后以 Actions 实际结果为准（重点观察 Ubuntu 3.14 leg 转绿——根因已修，blob == 工作树 == manifest hash 三方一致）。
+> **§11 四问对照**：exact-byte seal → ADR-017 §1（单次 snapshot vs 读两次一致性比较 vs 锁文件——snapshot 使"验证的字节"与"封存的字节"在构造上为同一对象）；output confinement → §2（严格单一组件语法 vs 任意相对路径——分隔符/盘符/穿越在语法层不可能）；staging → §3（全确定性校验先行 vs 增量 mutation）；CI policy → §4（真实 correctness bug 修复 + 政策不变，非削弱 gate/删 leg 制造绿色）。
+
+## P0-01（Exact-Byte Seal，§2）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 2.2 一次性 snapshot + 从 snapshot 计算 hash | `review.py::_hash_snapshot([(rel, active_bytes)])`（manifest 同一算法对**内存字节**）+ `active_bytes = active_path.read_bytes()` 单次读取 | exactness::test_single_snapshot_read_after_preflight（ACTIVE 文件读取数 == preflight + 恰好 1） |
+| 2.2 hash checked == transformed == sealed | `_build_reviewed_text(active_bytes, ...)` 从同一 snapshot 构造；此后无第二次 ACTIVE 读取 | exactness::test_reviewed_content_derives_from_exact_snapshot（seal 块剥离后逐行相等）+ test_healthy_review_reports_snapshot_sha_and_seals（输出 snapshot sha 供复核） |
+| 2.3 snapshot hash mismatch → BLOCK before any output | Phase 1 内 snapshot hash != manifest.dataset_hash → `_fail` | exactness::test_snapshot_hash_mismatch_blocks_zero_output + test_mismatch_leaves_no_evidence_no_version_no_manifest |
+| 2.3 successive-read 对抗不能封存未验证 bytes | monkeypatch read_bytes：preflight 后返回篡改字节 | exactness::test_no_second_read_can_substitute_seal_identity（BLOCK 零输出）+ test_control_all_reads_valid_seals_verified_bytes（控制组） |
+| 2.3 validated_snapshot_sha == review_source_snapshot_sha | snapshot 是同一对象（构造性保证）+ 输出报告 | exactness::test_healthy_review_reports_snapshot_sha_and_seals |
+
+## P0-02（Output Version Confinement，§3）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 3.2 Step A lexical（单一组件语法） | `_VERSION_ID_RE = ^[A-Za-z0-9][A-Za-z0-9._-]*$` + 显式拒 `.`/`..` | confinement：参数化 12 类非法 id 全拒 |
+| 3.2 Step B resolved confinement | `_validate_version_id`：`(versions_root/<id>).resolve()` 必须位于 versions/ 内 | 同上（越界输入零逃逸） |
+| 3.2 Step C mutation last（全部确定性校验先行） | Phase 1 完成全部校验（含 version 语法+confinement+不存在性+snapshot+artifact+副本沙箱解析）后才有输出 | confinement::test_existing_version_collision_blocks_before_other_mutation（冲突先于 evidence 拷贝）+ 全部失败测试的零输出断言 |
+| 3.3 全部危险输入拒绝 + 零副作用 | — | confinement::test_unsafe_version_ids_rejected_zero_side_effects（**before/after 文件树快照零差异**——覆盖 versions/ 内创建与 ../、绝对路径越界） |
+| 3.3 valid → output ONLY under versions/<id>/ | — | confinement::test_valid_version_confined_output（目录内恰为 rules.yaml） |
+| 3.3 unsafe 不能创建 evidence / version / manifest | — | 文件树快照 + manifest 断言嵌入全部失败用例 |
+
+## P1（§4）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| Phase 1/2/3 staged flow | review.py 三阶段重构：纯校验（含系统临时沙箱解析副本）→ staged（evidence 内容寻址 + `versions/.staging-<id>/` 完整 gate）→ publish（staging 原子改名；ACTIVE manifest 最后原子替换；manifest hash 从 published bytes 计算） | cleanup::test_retry_after_failure_is_deterministic |
+| 4.x deterministic failure = zero output mutation | Phase 1 全部先行 + gate 失败显式清理（修 `return`-in-try 不触发 except 的坑） | cleanup::test_failed_gate_leaves_no_finalized_version_no_evidence + test_preflight_failure_leaves_no_temp_files |
+| failed seal never advances ACTIVE | — | cleanup::test_failed_gate_never_advances_active |
+
+## §5 CI Truth（DM-CR-20260825-019）
+
+| 要求 | 落实 |
+|---|---|
+| 5.1 job-level truth 记录 | 总册头部 CI Status：required Windows 3.12/3.14 PASS；optional Ubuntu 3.14 Pytest FAILED（根因已修）；overall SUCCESS 仅因 continue-on-error；不写"全矩阵绿" |
+| 5.2 根因调查（API job 日志下钻） | `Lint & Type Check (ubuntu-latest / py3.14)` 的 Pytest step：~20 测试同错 `ACTIVE dataset hash mismatch: declared 7dc5f627... recomputed dd2219d2...`。**分类=真实跨平台 correctness bug**：`.gitattributes` 漏盖 `*.yaml`——Windows autocrlf checkout 重写 LF→CRLF（本地 hash 与 manifest 一致故 Windows 过），Ubuntu 保持 LF 重算失配；golden 未挂因 `data/golden/**` 已有 LF 规则 |
+| 5.2 修复 + 回归 | `.gitattributes` 补 `*.yaml`/`*.yml text eol=lf` + `configs/trading_rules/evidence/** -text`；工作树 yaml 规范化 LF（git diff 与 blob 零差异）；manifest dataset_hash 以 LF 重算（**dd2219d2... == Ubuntu 重算值**）；回归 ×3：yaml 无 CRLF / .gitattributes 规则存在 / 工作树 == git blob |
+| 5.2 禁止弱化 | required gate 未动 / 无 skip / Ubuntu leg 未删 / continue-on-error 策略不变 |
+
+## §6 Governance（DM-CR-20260825-020）
+
+| 要求 | 落实 |
+|---|---|
+| baseline / REOPENED / RISK-004 | 总册头部 Reviewed baseline `ada0eac2d973730605f7af65f57e72a22e1483c1` + §40 三原始 P0 主体冻结表述 + RISK-004 理由更新（保持 REOPENED） |
+| CI job-level truth | 头部 CI Status（见上） |
+| ADR-016 overclaim 修正 | ADR-017 §1（ADR-016 §3 的"已验证 ACTIVE bytes"在 double-read 修复前为 overclaim——修正记录；原文保留为历史）；ADR-000 索引标注 amended by ADR-017 |
+| DEVLOG 顶部追加 | 2026-08-25 新条目（历史全保留） |
+
+## §9 Exit Gate 自检
+
+```text
+[x] hash-validated ACTIVE bytes == bytes transformed into REVIEWED copy（一次性 snapshot，构造性保证）
+[x] no second-read TOCTOU can substitute seal identity（对抗测试 + 读取计数 == preflight+1）
+[x] --version is one safe confined component（语法 + resolved；12 类非法输入零副作用）
+[x] invalid output version has zero side effects（before/after 文件树快照零差异）
+[x] all deterministic review validation happens before durable output mutation（Phase 1 全先行；版本冲突先于 evidence 拷贝）
+[x] ACTIVE manifest changes last and only after reviewed version passes gates（Phase 3 顺序 + staging gate）
+[x] old CA atomic exchange boundary remains closed（既有测试全保持）
+[x] old lexical-first rule confinement remains closed（既有测试全保持）
+[x] old Raw evidence identity remains closed（既有测试全保持）
+[x] required Windows CI gates green（本地等价四检查；Actions 以实际为准）
+[x] Ubuntu failure root cause / support policy recorded truthfully（job-level 真相 + 根因修复 + 政策不变记录）
+[x] DEVLOG updated / DEVELOPMENT_MANAGEMENT updated / ADR correction（ADR-017 + 索引）
+[x] important changes record why/how/alternatives/cost-benefit（ADR-017 §1-§4 四问 + DM-CR 取舍段）
+[~] Ubuntu CI leg 转绿确认 —— 根因已修（blob==工作树==manifest hash 三方一致），本批提交后以 Actions 实际结果为准（不预写）
+```
+
+已知开放项（如实声明）：Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED——Trading Rule 人工复核现可用 exact-byte seal workflow 执行）；Branch Protection 未启用；CR-2 / R4-A3 / P0-M-1B 保持 BLOCKED 直到本批 VERIFIED。
