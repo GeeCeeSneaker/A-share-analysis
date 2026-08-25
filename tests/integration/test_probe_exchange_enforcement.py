@@ -224,6 +224,27 @@ class TestStaticBoundaryGuard:
         func = parent.func
         return isinstance(func, ast.Attribute) and func.attr == "persist"
 
+    @classmethod
+    def _inside_atomic_call_boundary(cls, node: ast.AST, parents: dict[int, ast.AST]) -> bool:
+        """R4-A2.8 P0-01: the exchange call sits inside a Lambda that is an
+        argument of ``collector.call(...)`` - the ATOMIC call+persist
+        boundary (the evidence is persisted before the boundary returns)."""
+        current = node
+        while True:
+            parent = parents.get(id(current))
+            if parent is None:
+                return False
+            if isinstance(parent, ast.Lambda):
+                # the lambda must be an argument of collector.call(...)
+                grand = parents.get(id(parent))
+                return bool(
+                    grand is not None
+                    and isinstance(grand, ast.Call)
+                    and isinstance(grand.func, ast.Attribute)
+                    and grand.func.attr == "call"
+                )
+            current = parent
+
     def test_probes_direct_exchange_calls_must_be_in_lambda(self):
         """probes.py: every ctx.target.X_exchange(...) call node must be
         inside a Lambda (the executor.call boundary)."""
@@ -249,37 +270,15 @@ class TestStaticBoundaryGuard:
         )
 
     def test_golden_router_direct_exchange_calls_confined(self):
-        """golden_router.py: direct target exchange calls must live inside
-        an approved boundary: collector.persist(...) (call-and-persist),
-        assign-then-persist (``x = ctx.target.X(); ... collector.persist(x)``
-        - the R4-A2.7 provider-view lineage pattern), or a lambda."""
+        """R4-A2.8 P0-01 (audit 20260825 #4 section 2.3): golden_router.py
+        target exchange calls must sit inside the ATOMIC
+        ``collector.call(lambda: ...)`` boundary - name-presence
+        assign-then-persist patterns are NO LONGER accepted (a later
+        provider-call failure could orphan a prior success exchange)."""
         source_path = Path("src/ashare_state/spike/golden_router.py")
         source = source_path.read_text(encoding="utf-8")
         tree = ast.parse(source)
         parents = self._parent_map(tree)
-        # map assigned name -> the exchange Call it is bound to
-        assigned: dict[int, str] = {}
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and len(node.targets) == 1:
-                target_expr = node.targets[0]
-                if isinstance(target_expr, ast.Name) and isinstance(node.value, ast.Call):
-                    func = node.value.func
-                    if (
-                        isinstance(func, ast.Attribute)
-                        and func.attr.endswith("_exchange")
-                        and isinstance(func.value, ast.Attribute)
-                        and func.value.attr in ("target", "ctx_target")
-                    ):
-                        assigned[id(node.value)] = target_expr.id
-        persisted_names: set[str] = set()
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if isinstance(func, ast.Attribute) and func.attr == "persist":
-                for arg in node.args:
-                    if isinstance(arg, ast.Name):
-                        persisted_names.add(arg.id)
         offenders: list[int] = []
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
@@ -290,16 +289,41 @@ class TestStaticBoundaryGuard:
                 and func.attr.endswith("_exchange")
                 and isinstance(func.value, ast.Attribute)
                 and func.value.attr in ("target", "ctx_target")
-            ) and not (
-                self._inside_persist_call(node, parents)
-                or self._inside_lambda(node, parents)
-                or assigned.get(id(node)) in persisted_names
-            ):
+            ) and not self._inside_atomic_call_boundary(node, parents):
                 offenders.append(node.lineno)
         assert not offenders, (
-            f"golden_router.py calls target.*_exchange outside the collector "
-            f"boundary at lines {offenders} - domain exchanges must persist "
-            "through collector.persist(...) (CR-1.2.2 P0-01)"
+            f"golden_router.py calls target.*_exchange outside the atomic "
+            f"collector.call(lambda: ...) boundary at lines {offenders} - "
+            "assign-then-persist patterns are forbidden: every real provider "
+            "exchange must be persisted BEFORE the next provider call fires "
+            "(R4-A2.8 P0-01)"
         )
-        # the collector really is the persisting boundary
-        assert "collector.persist" in source or ".persist(" in source
+        # the atomic boundary really exists in the runtime
+        assert "collector.call(" in source
+
+    def test_golden_router_forbids_assign_then_persist_pattern(self):
+        """Negative check of the guard itself: the OLD assign-then-persist
+        source (the R4-A2.7 CA lineage pattern the audit rejected) MUST be
+        flagged by the boundary rule (proves the guard is control-flow
+        safe, not name-presence based)."""
+        old_pattern = """
+def fetch(ctx, collector):
+    dividend_exchange = ctx.target.get_dividend_exchange(symbols)
+    right_issue_exchange = ctx.target.get_right_issue_exchange(symbols)
+    dividend = collector.persist(dividend_exchange)
+    right_issue = collector.persist(right_issue_exchange)
+    return dividend, right_issue
+"""
+        tree = ast.parse(old_pattern)
+        parents = self._parent_map(tree)
+        flagged = [
+            node.lineno
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr.endswith("_exchange")
+            and isinstance(node.func.value, ast.Attribute)
+            and node.func.value.attr in ("target", "ctx_target")
+            and not self._inside_atomic_call_boundary(node, parents)
+        ]
+        assert flagged, "the assign-then-persist pattern must be flagged"

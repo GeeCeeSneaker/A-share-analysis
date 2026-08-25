@@ -143,8 +143,9 @@ class TestRouterEvidenceLineage:
         """P0-04: fetch_domain_data must persist every exchange through the
         collector (no silent payload-only calls)."""
         source = Path("src/ashare_state/spike/golden_router.py").read_text(encoding="utf-8")
-        # every fetch branch goes through collector.persist(...)
-        assert "collector.persist(" in source
+        # R4-A2.8 P0-01: every fetch branch goes through the ATOMIC
+        # collector.call(...) boundary (call+persist as one operation)
+        assert "collector.call(" in source
         # the old pseudo-call pattern is gone from the RUNTIME (docstring
         # prose may mention it; an actual call site would pass it as an arg)
         assert "lambda: None," not in source

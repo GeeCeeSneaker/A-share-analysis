@@ -894,3 +894,83 @@ endpoint identity/schema hardening（如实施）
 ```
 
 如果这些全部关闭，且没有新的 formal correctness regression，R4-A2.x / CR-1.x 才具备进入 VERIFIED、再启动 CR-2 / R4-A3 的条件。
+
+---
+
+# 13. Implementation Mapping（Developer 回填，2026-08-25）
+
+> 本批：R4-A2.8 Final Exchange-Boundary / Review-Lineage Closure + CR-1.2.4 Pre-Access Integrity（Batch A→D 全部完成；**未启动 CR-2 / R4-A3**——遵守 §10 禁止项）。
+> 测试基线：**608 passed / 0 failed**（580 → 608，+28）；CI 等价四检查（ruff check + format --check + mypy + pytest）本地全绿；dry-run 冒烟 35 exchanges + 5 bundles 双向闭合零问题（原子边界下 Spy 计数不变量保持）。
+> Change IDs：DM-CR-20260825-013/014/015/016；**ADR-016**（amendment to ADR-013/015；含 §11 四问完整记录）。
+> CI：本批提交后以 Actions 实际结果为准（上批 run 40 / 47b47437 = success，Reviewer API 确认口径——本批不预写结果）。
+> **§11 四问对照**：atomic boundary → ADR-016 §1（为什么：mid-sequence failure 孤儿化 success exchange；怎么改：collector.call + PersistedExchangeView；备选：assign-then-persist+注释/last_envelopes 通道均被拒；代价收益：lambda 间接 vs 永不丢真实证据）；lexical-first → §2（resolve-first 在拒绝前触发 fs resolution）；review preflight → §3（human review ≠ re-seal integrity-broken candidate；复用 load_active_rules 单一 gate vs 内联重实现）。
+
+## P0-01（Golden Atomic Exchange Persistence，§2）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 2.4 collector.call 原子边界 | `golden_router._DomainCollector.call(fn) -> PersistedExchangeView`（frozen dataclass：payload/request_id/endpoint/evidence_meta；exchange 在边界返回前已持久化；非 ProviderExchange 返回值 → GoldenRoutingError fail loud） | atomic::TestAtomicExchangeBoundary |
+| 2.4 CA 路径改写 | CA fetch：`dividend = collector.call(lambda: ctx.target.get_dividend_exchange(symbols))` 等（**全部五个域**统一走 call 边界）；lineage 从 view 读取 | 同上 + 既有 router/CA 测试适配 |
+| 2.5 场景 A：dividend 成功+right_issue 失败 | 原子边界下 dividend 先持久化；failure 走 persist_failure 入同一 bundle | atomic::test_dividend_success_right_issue_failure_both_persisted（**call 数 == persisted 数**；bundle 内 OK+ERROR 两 exchange） |
+| 2.5 场景 B：persist 失败→后续不发射 | 边界内 persistence 失败立即传播 | atomic::test_persistence_failure_prevents_later_provider_calls（right_issue 未 fired） |
+| 2.5 场景 C：dividend 失败 | 第一个 endpoint 失败即分类 | atomic::test_first_endpoint_failure_no_second_call |
+| 2.5 full success lineage | view.request_id/endpoint → bundle entry request_id/meta_hash 闭合 | atomic::test_full_success_lineage_points_at_persisted_exchange |
+| 2.5 AST 守卫控制流安全 | `_inside_atomic_call_boundary`：exchange 调用必须位于 `collector.call(lambda:...)` 内；name-presence 逻辑删除 | enforcement::test_golden_router_direct_exchange_calls_confined + **test_golden_router_forbids_assign_then_persist_pattern（负向：旧模式源码被拒）** |
+
+## P0-02（Bound Lexical-First，§3）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 3.3 Step A lexical-only | `_lexically_confined_dataset_file`（非空/相对/无盘符/无 `..`/versions/<v>/——**零 fs 访问**） | lexical::test_lexical_step_a_rejects_without_fs（spy.calls == []） |
+| 3.3 Step B resolved confinement | `_confined_dataset_file` 唯一入口（A→B）；bound loop 删除前置 `_confined` | lexical::test_symlink_escape_blocked_at_resolved_confinement |
+| 3.4 traversal 拒绝在 candidate resolve 前 | **Path.resolve spy** | lexical::test_traversal_rejected_before_candidate_resolve（外部文件真实存在） |
+| 3.4 absolute / drive-letter / foreign-version-dir | 同上 | lexical ×2 + enforcement 既有 |
+| 3.4 合法路径才 resolve | — | lexical::test_valid_lexical_path_does_resolve（resolve 有调用记录） |
+| 3.4 正常 bound replay 通过 | — | lexical::test_normal_bound_replay_still_passes |
+
+## P0-03（Review Input Integrity，§4）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 4.3 preflight = load_active_rules | review.py：`active_book, active = load_active_rules(rules_root)`（hash 复算 + 四字段 coherence；与 runtime 同一 gate）；review_status==COMPILED 校验 | integrity ×7（篡改 bytes / 篡改 manifest hash / coherence mismatch ×3 / REVIEWED 拒绝） |
+| 4.3 reviewed copy 从已验证 bytes 产生 | canonical `rules_root / active_rel` 读取 + **读取后复验 hash**（无 TOCTOU）；--rules 与 ACTIVE 路径比较保留 | integrity::test_healthy_compiled_active_reviews_normally |
+| 4.3 preflight 失败零输出 | 早退路径（无 evidence 拷贝 / 无 versions/<new>/ / 无 temp manifest） | `_assert_zero_output_mutation` 断言嵌入全部失败测试 |
+| 4.4 required 字段下沉 manifest schema | `load_rule_manifest`：source_version/dataset_version REQUIRED（非空） | integrity::test_source_version_missing_in_manifest_refused + test_dataset_version_empty_in_manifest_refused（+ coherence 测试复用） |
+
+## P1（§5）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 5.1 endpoint 身份交叉校验 | `CA_STREAM_ENDPOINTS` 固定映射；`_ca_provider_view` 校验 source_endpoint 一致（不一致 → ShapeError "never be relabelled"） | atomic::TestEndpointIdentityCrossCheck ×2 |
+| 5.2 空 frame schema | `_payload_columns(payload)`（frame.columns / row keys）；`_ca_provider_view(payload_columns=)`：0 行+必需列=合法空；0 行+缺列=PROVIDER_SCHEMA | atomic::TestEmptyFrameSchema ×3 |
+
+## §6 Governance（DM-CR-20260825-016）
+
+| 要求 | 落实 |
+|---|---|
+| Reviewed baseline / REOPENED / next | 总册头部：`47b47437b0828262e4f9f11c57862af2558a4d34` + R4-A2.7/CR-1.2.3 → REOPENED（由本批修复）+ Reviewer Correction 段 |
+| CI = run 40 SUCCESS | 头部 CI Status（Reviewer API 确认口径） |
+| RISK-004 保持 REOPENED | §52 理由更新为本批三 P0 |
+| DEVLOG 顶部追加（不重写历史） | 2026-08-25 新条目（历史全保留） |
+
+## §9 Exit Gate 自检
+
+```text
+[x] CA domain call+persist is atomic per real exchange（collector.call + PersistedExchangeView）
+[x] mid-sequence provider failure cannot orphan a prior success exchange（场景 A 测试）
+[x] mid-sequence persistence failure prevents later provider calls（场景 B 测试）
+[x] Golden static boundary guard is control-flow safe, not name-presence based（AST 收紧 + 负向测试）
+[x] bound invalid lexical refs reject before candidate resolve/filesystem access（Path.resolve spy ×4）
+[x] symlink escape still blocked after lexical pass（Step B 测试）
+[x] review.py seals only a load_active_rules-verified candidate（prefetch + COMPILED 校验）
+[x] tampered/incoherent ACTIVE cannot be converted into REVIEWED（integrity ×7）
+[x] failed review preflight leaves zero new review artifacts/version/manifest mutation（零输出断言嵌入）
+[x] RawWriter persisted identity fix remains green（test_raw_identity 全保持）
+[x] active/bound rule identity fix remains green（coherence/binding 全保持）
+[x] provider-native CA raw + ephemeral semantic view remains intact（parquet 列名断言保持）
+[x] CI green（本地四检查；Actions 以实际为准）
+[x] DEVLOG / DEVELOPMENT_MANAGEMENT synchronized（同批提交）
+[x] every important change note answers why/how/alternatives/tradeoffs（ADR-016 §1-§4 四问 + DM-CR 取舍段）
+```
+
+已知开放项（如实声明）：Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED）；Branch Protection 未启用；CR-2 / R4-A3 / P0-M-1B 保持 BLOCKED 直到本批 VERIFIED。

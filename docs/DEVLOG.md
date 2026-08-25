@@ -13,6 +13,41 @@
 
 ---
 
+## 2026-08-25 · R4-A2.8 Final Exchange-Boundary / Review-Lineage Closure + CR-1.2.4 Pre-Access Integrity（复审 3 项 P0 + P1 + 治理修正）
+
+**Scope**
+- R4-A2.7/CR-1.2.3 复审裁决 REOPENED（工作要求 20260825 第四份）：P0-01..P0-03 + P1-01/02 + §6 治理；按 Batch A→D 全部完成（未启动 CR-2/R4-A3——遵守 §10 禁止项）
+
+**Implementation**
+- **P0-01 Golden Atomic Exchange Persistence（DM-CR-20260825-013，ADR-016 §1）**：`_DomainCollector.call(fn) → PersistedExchangeView`（frozen：payload/request_id/endpoint/evidence_meta）——**call+persist 是一个边界操作**：exchange 在边界返回前已持久化（lineage 从 view 读取，不再持有裸 exchange 引用）；**全部域 fetch**（ST/DELISTED/LIMIT/CA/BJ）统一走原子边界，CA 的 assign-then-persist 窗口消除；**AST 守卫升级控制流安全**（exchange 调用必须位于 `collector.call(lambda: ...)` 内；负向测试证明旧 assign-then-persist 源码被拒）；**对抗测试**：dividend 成功+right_issue 失败→两者都持久化（call 数 == persisted 数）；首次 persist 失败→后续 provider call 不发射；dividend 失败→right_issue 不发射；full success lineage 指向精确 persisted exchange
+- **P0-02 Bound Lexical-First Pre-Access（DM-CR-20260825-014，ADR-016 §2）**：`_lexically_confined_dataset_file`（Step A：非空/相对/无盘符/无 `..`/versions/<v>/ 结构——**零 fs 访问**）；`_confined_dataset_file` 成为**唯一入口**（Step A → Step B resolved symlink escape）；bound loop 删除前置 `_confined` 双 helper 并列；evidence ref 同加 lexical 前置拒绝；**Path.resolve spy 测试**：traversal/绝对/盘符/异版本目录的拒绝全程 candidate 未被 resolve
+- **P0-03 Review Input Integrity（DM-CR-20260825-015，ADR-016 §3）**：review.py preflight **不可绕过**执行 `load_active_rules`（ACTIVE hash 复算 + 四字段 coherence——与 runtime 同一 gate）；增加 review_status==COMPILED 校验；REVIEWED 副本从**已验证 ACTIVE bytes** 产生（canonical 路径 + 读取后复验 hash，无 TOCTOU）；preflight 失败→**零输出**（无 evidence 拷贝/无 versions/<new>/无 manifest 变更）；§4.4：source_version/dataset_version REQUIRED 下沉 `load_rule_manifest` schema（单一 manifest API 契约）
+- **P1-01/02（DM-CR-20260825-016）**：`CA_STREAM_ENDPOINTS` 固定映射交叉校验（跨流重标 → `CAProviderShapeError`）；`_payload_columns` 空 frame schema 契约（0 行+必需列=合法空事件流；0 行+缺列=`PROVIDER_SCHEMA`）
+- **治理（DM-CR-20260825-016）**：总册头部 Reviewed baseline `47b47437` + run 40 SUCCESS + Reviewer Correction 段（CA control-flow / lexical-first 顺序 / review integrity 未关闭——ADR-016 为修正记录）；§40 R4-A2.7/CR-1.2.3 → REOPENED；RISK-004 理由更新保持 REOPENED
+
+**Schema / Contract Changes**
+- C1 ×4（DM-CR-013/014/015/016）；ADR-016（amendment to ADR-013/015：原子边界 / lexical-first / review preflight 三个不变量的收紧记录，含 §11 四问）
+- `load_rule_manifest` schema 收紧（source_version/dataset_version REQUIRED——破坏性：缺字段的 manifest 现在被拒）
+
+**Verification**
+- Local: **608 tests passed / 0 failed**（580 → 608，+28：CA 原子边界 7 + lexical-first 9 + review 完整性 9 + 适配/守卫）；ruff check / ruff format --check / mypy 全绿（CI 等价四检查）
+- dry-run 冒烟：35 meta-anchored exchanges + 5 bundles，整 run 双向闭合零问题（原子边界下 Spy 计数不变量保持）
+- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（上批 run 40 = success，Reviewer API 确认口径）
+
+**Implementation Status**
+- DONE（R4-A2.8 / CR-1.2.4 全部 P0 + P1 + 治理修正）
+
+**Review Status**
+- PENDING_REVIEW（对照工作要求 §9 Exit Gate 15 项与 §12 Reviewer 复检 6 项重点）
+
+**Known Open Issues**
+- Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED）；Branch Protection 未启用；CR-2 / R4-A3 / P0-M-1B 保持 BLOCKED 直到本批 VERIFIED
+
+**Next**
+- 推送 git + CI 确认 → Reviewer 复审 R4-A2.8/CR-1.2.4；VERIFIED 后可启动 CR-2 / R4-A3（原子边界/lexical-first/review preflight 契约已稳定）
+
+---
+
 ## 2026-08-25 · R4-A2.7 Final Integrity / Provider-Shape Closure + CR-1.2.3 Evidence Identity Closure（复审 4 项 P0 + 2 项 P1 + 治理修正）
 
 **Scope**

@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -104,10 +105,38 @@ CA_PROVIDER_FIELD_CONTRACT = {
     "right_issue": {"code": "MARKET_CODE", "ex_date": "EX_DIVIDEND_DATE"},
 }
 
+#: R4-A2.8 P1-01 (audit 20260825 #4 section 5.1): the fixed stream <->
+#: endpoint identity mapping. A payload fetched from one endpoint may
+#: never be labelled as the other stream.
+CA_STREAM_ENDPOINTS = {
+    "dividend": "InfoData.get_dividend",
+    "right_issue": "InfoData.get_right_issue",
+}
+
+
+def _payload_columns(payload: Any) -> set[str] | None:
+    """R4-A2.8 P1-02: the payload's column set (for empty-frame schema
+    validation). Frames expose ``columns``; row lists use the union of
+    row keys; anything else returns None (no schema claim)."""
+    columns = getattr(payload, "columns", None)
+    if columns is not None:
+        try:
+            return {str(c) for c in columns}
+        except TypeError:  # pragma: no cover - exotic columns
+            return None
+    if isinstance(payload, list):
+        keys: set[str] = set()
+        for row in payload:
+            if isinstance(row, dict):
+                keys.update(str(k) for k in row)
+        return keys if keys else None
+    return None
+
 
 class CAProviderShapeError(ValueError):
     """The provider CA payload is missing a documented contract field
-    (fail loud - never a silent empty row set)."""
+    (fail loud - never a silent empty row set), or the stream label
+    disagrees with the source endpoint identity."""
 
 
 def _ca_provider_view(
@@ -116,6 +145,7 @@ def _ca_provider_view(
     *,
     source_endpoint: str = "",
     raw_request_id: str = "",
+    payload_columns: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """R4-A2.7 P0-04: ephemeral in-memory normalization of ONE provider
     corporate-action stream into the canonical validator view.
@@ -129,11 +159,42 @@ def _ca_provider_view(
     RIGHT_ISSUE) - it is NOT a provider payload field. Each view row
     carries ``source_endpoint`` / ``raw_request_id`` lineage back to the
     exact persisted exchange. Missing documented fields raise
-    CAProviderShapeError (fail loud)."""
+    CAProviderShapeError (fail loud).
+
+    R4-A2.8 P1-01: when ``source_endpoint`` is provided it must agree
+    with the fixed stream<->endpoint mapping (a right-issue payload can
+    never be mislabelled as the dividend stream).
+
+    R4-A2.8 P1-02: ``payload_columns`` (the exchange payload's column
+    set, available even for a 0-row frame) enables empty-result schema
+    validation - zero rows + all required columns is a legitimate empty
+    event stream, zero rows + missing required columns is PROVIDER_SCHEMA."""
     contract = CA_PROVIDER_FIELD_CONTRACT.get(stream)
     if contract is None:
         msg = f"unknown corporate-action stream {stream!r}"
         raise CAProviderShapeError(msg)
+    expected_endpoint = CA_STREAM_ENDPOINTS.get(stream, "")
+    if source_endpoint and expected_endpoint and source_endpoint != expected_endpoint:
+        msg = (
+            f"corporate-action stream {stream!r} requires endpoint "
+            f"{expected_endpoint!r}, but the exchange came from "
+            f"{source_endpoint!r} - a payload can never be relabelled as the "
+            "other event stream (R4-A2.8 P1-01)"
+        )
+        raise CAProviderShapeError(msg)
+    if not rows and payload_columns is not None:
+        missing = {
+            contract["code"],
+            contract["ex_date"],
+        } - set(payload_columns)
+        if missing:
+            msg = (
+                f"provider {stream} payload has zero rows and is MISSING the "
+                f"documented contract columns {sorted(missing)} - this is a "
+                "schema violation, not a legitimate empty event result "
+                "(R4-A2.8 P1-02)"
+            )
+            raise CAProviderShapeError(msg)
     event_type = "DIVIDEND" if stream == "dividend" else "RIGHT_ISSUE"
     view: list[dict[str, Any]] = []
     for row in rows:
@@ -161,6 +222,23 @@ def _ca_provider_view(
 # ------------------------------------------------------------------ bundle
 
 
+@dataclass(frozen=True)
+class PersistedExchangeView:
+    """R4-A2.8 P0-01 (audit 20260825 #4 section 2.4): the result of ONE
+    atomic call+persist boundary operation.
+
+    The provider call happens INSIDE ``_DomainCollector.call`` and its
+    evidence is persisted BEFORE the boundary returns - a later provider
+    call failure can therefore never orphan a prior real success exchange.
+    Consumers read lineage (endpoint / request_id) from THIS view instead
+    of holding a raw exchange reference."""
+
+    payload: Any
+    request_id: str
+    endpoint: str
+    evidence_meta: dict[str, Any]
+
+
 class _DomainCollector:
     """Persists every exchange of ONE domain fetch through the run's
     RawWriter and builds the multi-endpoint evidence bundle manifest
@@ -172,8 +250,39 @@ class _DomainCollector:
         self.entries: list[dict[str, Any]] = []
         self.request_ids: list[str] = []
 
+    def call(self, fn: Callable[[], Any]) -> PersistedExchangeView:
+        """R4-A2.8 P0-01: ATOMIC call+persist boundary.
+
+        ``fn`` must return a ProviderExchange; the exchange's evidence is
+        persisted BEFORE this method returns (call + persist is ONE
+        boundary operation - no assign-then-persist-later window). The
+        returned view carries the payload plus read-only lineage. If
+        ``fn`` raises a ProviderError it propagates (the caller persists
+        the first-class failure exchange) - but any exchange that
+        SUCCEEDED before the raise is already persisted."""
+        exchange = fn()
+        if not hasattr(exchange, "envelope"):
+            msg = (
+                "collector.call() expects a callable returning a "
+                "ProviderExchange - the atomic call+persist boundary cannot "
+                "consume payload-only returns (R4-A2.8 P0-01)"
+            )
+            raise GoldenRoutingError(msg)
+        meta = self.ctx.evidence_from_exchange(exchange)
+        self._record(meta)
+        return PersistedExchangeView(
+            payload=exchange.payload,
+            request_id=str(exchange.request_id),
+            endpoint=str(exchange.envelope.endpoint),
+            evidence_meta=dict(meta),
+        )
+
     def persist(self, exchange: Any) -> Any:
-        """Persist one SUCCESS exchange; returns its exact payload."""
+        """Persist one SUCCESS exchange; returns its exact payload.
+
+        R4-A2.8 P0-01: restricted to the CA-provider-view/lineage flows
+        where the exchange is already in hand; NEW fetch code must use
+        :meth:`call` (atomic boundary) instead of assign-then-persist."""
         meta = self.ctx.evidence_from_exchange(exchange)
         self._record(meta)
         return exchange.payload
@@ -254,59 +363,64 @@ def fetch_domain_data(
     the SDK directly and never fetches without evidence."""
     symbols = sorted({c.provider_symbol for c in cases})
     if domain == "ST_STATUS":
-        status = collector.persist(
-            ctx.target.get_history_stock_status_exchange(19900101, 20991231, symbols)
+        status = collector.call(
+            lambda: ctx.target.get_history_stock_status_exchange(19900101, 20991231, symbols)
         )
-        return DomainData(domain=domain, status_rows=_rows(status))
+        return DomainData(domain=domain, status_rows=_rows(status.payload))
     if domain == "DELISTED_MASTER":
-        hist = collector.persist(
-            ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 19900101, 20991231)
+        hist = collector.call(
+            lambda: ctx.target.get_hist_code_list_exchange(
+                "EXTRA_STOCK_A_SH_SZ", 19900101, 20991231
+            )
         )
-        basic = collector.persist(ctx.target.get_stock_basic_exchange(symbols))
+        basic = collector.call(lambda: ctx.target.get_stock_basic_exchange(symbols))
         return DomainData(
             domain=domain,
-            hist_code_rows=_rows(hist),
-            stock_basic_rows=_rows(basic),
+            hist_code_rows=_rows(hist.payload),
+            stock_basic_rows=_rows(basic.payload),
         )
     if domain == "LIMIT_PIT_RULE":
         # audit section 9.2: listing_date must come from the SAME PIT
         # context (hist master), the calendar from a dedicated exchange
-        status = collector.persist(
-            ctx.target.get_history_stock_status_exchange(19900101, 20991231, symbols)
+        status = collector.call(
+            lambda: ctx.target.get_history_stock_status_exchange(19900101, 20991231, symbols)
         )
-        hist = collector.persist(
-            ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 19900101, 20991231)
+        hist = collector.call(
+            lambda: ctx.target.get_hist_code_list_exchange(
+                "EXTRA_STOCK_A_SH_SZ", 19900101, 20991231
+            )
         )
-        calendar = collector.persist(ctx.target.get_calendar_exchange())
+        calendar = collector.call(lambda: ctx.target.get_calendar_exchange())
         return DomainData(
             domain=domain,
-            status_rows=_rows(status),
-            hist_code_rows=_rows(hist),
-            calendar_days=_calendar_days(calendar),
+            status_rows=_rows(status.payload),
+            hist_code_rows=_rows(hist.payload),
+            calendar_days=_calendar_days(calendar.payload),
         )
     if domain == "CORP_ACTION_CONTEXT":
         # audit sections 9.3 + R4-A2.4 section 6: EVENT RECORD (dividend)
         # + adj factor around event + kline T-1/T/T+1 + PIT calendar
-        calendar = collector.persist(ctx.target.get_calendar_exchange())
-        cal_days = _calendar_days(calendar)
-        status = collector.persist(
-            ctx.target.get_history_stock_status_exchange(19900101, 20991231, symbols)
+        calendar = collector.call(lambda: ctx.target.get_calendar_exchange())
+        cal_days = _calendar_days(calendar.payload)
+        status = collector.call(
+            lambda: ctx.target.get_history_stock_status_exchange(19900101, 20991231, symbols)
         )
-        adj = collector.persist(ctx.target.get_adj_factor_exchange(symbols))
+        adj = collector.call(lambda: ctx.target.get_adj_factor_exchange(symbols))
         # P0-05: provider corporate-action EVENT endpoints (exact ex-date +
         # event type) - the adj stream alone is NOT a sufficient event SoR.
         # R4-A2.5 P0-04: dividend and right-issue are SEPARATE event
         # streams; a DIVIDEND record can never substitute a RIGHT_ISSUE
         # expectation (both are persisted evidence).
-        dividend_exchange = ctx.target.get_dividend_exchange(symbols)
-        right_issue_exchange = ctx.target.get_right_issue_exchange(symbols)
-        dividend = collector.persist(dividend_exchange)
-        right_issue = collector.persist(right_issue_exchange)
+        # R4-A2.8 P0-01: ATOMIC call+persist - each event exchange is
+        # persisted BEFORE the next provider call fires (a mid-sequence
+        # failure can never orphan a prior real success exchange).
+        dividend = collector.call(lambda: ctx.target.get_dividend_exchange(symbols))
+        right_issue = collector.call(lambda: ctx.target.get_right_issue_exchange(symbols))
         begin, end = _event_window(cases)
         # CR-1.2: the calendar prerequisite of kline is EXPLICIT (persisted
         # above, windowed here) - no invisible internal calendar exchange
-        kline = collector.persist(
-            ctx.target.query_kline_exchange(
+        kline = collector.call(
+            lambda: ctx.target.query_kline_exchange(
                 symbols,
                 begin_date=begin,
                 end_date=end,
@@ -316,41 +430,46 @@ def fetch_domain_data(
         )
         return DomainData(
             domain=domain,
-            status_rows=_rows(status),
-            adj_rows=_rows(adj),
+            status_rows=_rows(status.payload),
+            adj_rows=_rows(adj.payload),
             # R4-A2.7 P0-04: the validator consumes the NORMALIZED view of
             # the provider-native payload (documented field contract); the
             # persisted raw evidence keeps the provider's own field names.
-            # Lineage points at the EXACT persisted exchange.
+            # Lineage points at the EXACT persisted exchange (R4-A2.8: read
+            # from the atomic-boundary view, not a raw exchange reference).
             dividend_rows=_ca_provider_view(
                 "dividend",
-                _rows(dividend),
-                source_endpoint=str(dividend_exchange.envelope.endpoint),
-                raw_request_id=str(dividend_exchange.request_id),
+                _rows(dividend.payload),
+                source_endpoint=dividend.endpoint,
+                raw_request_id=dividend.request_id,
+                payload_columns=_payload_columns(dividend.payload),
             ),
             right_issue_rows=_ca_provider_view(
                 "right_issue",
-                _rows(right_issue),
-                source_endpoint=str(right_issue_exchange.envelope.endpoint),
-                raw_request_id=str(right_issue_exchange.request_id),
+                _rows(right_issue.payload),
+                source_endpoint=right_issue.endpoint,
+                raw_request_id=right_issue.request_id,
+                payload_columns=_payload_columns(right_issue.payload),
             ),
-            kline_rows=_rows(kline),
+            kline_rows=_rows(kline.payload),
             calendar_days=cal_days,
         )
     if domain == "BJ_MAPPING":
         # audit section 10: independent semantic proof - historical master
         # (code continuity) + exact-date status (BSE +/-30% regime)
-        hist = collector.persist(
-            ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 19900101, 20991231)
+        hist = collector.call(
+            lambda: ctx.target.get_hist_code_list_exchange(
+                "EXTRA_STOCK_A_SH_SZ", 19900101, 20991231
+            )
         )
         dates = sorted(int(c.trade_date) for c in cases)
-        status = collector.persist(
-            ctx.target.get_history_stock_status_exchange(dates[0], dates[-1], symbols)
+        status = collector.call(
+            lambda: ctx.target.get_history_stock_status_exchange(dates[0], dates[-1], symbols)
         )
         return DomainData(
             domain=domain,
-            hist_code_rows=_rows(hist),
-            status_rows=_rows(status),
+            hist_code_rows=_rows(hist.payload),
+            status_rows=_rows(status.payload),
         )
     msg = f"unknown domain {domain!r}"
     raise GoldenRoutingError(msg)

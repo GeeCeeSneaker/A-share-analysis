@@ -563,10 +563,16 @@ def _dataset_files_hash(root: Path, rel_files: Sequence[str]) -> str:
 
 def _confined(root: Path, rel: str) -> Path:
     """Resolve ``rel`` under ``root`` refusing traversal (R4-A2.5 P0-03:
-    review-gate evidence hardening - no absolute paths, no '..')."""
+    review-gate evidence hardening - no absolute paths, no '..').
+
+    R4-A2.8 P0-02: lexical '..' rejection happens BEFORE Path.resolve() -
+    an invalid ref never triggers filesystem resolution."""
     normalized = rel.replace("\\", "/")
     if not normalized or normalized.startswith(("/", "\\")) or ":" in normalized.split("/")[0]:
         msg = f"evidence ref must be relative: {rel!r}"
+        raise RuleUnresolvedError(msg)
+    if any(part == ".." for part in normalized.split("/")):
+        msg = f"evidence ref must not traverse: {rel!r}"
         raise RuleUnresolvedError(msg)
     candidate = (root / normalized).resolve()
     root_resolved = root.resolve()
@@ -608,16 +614,15 @@ def _provenance_equivalent(
     return True
 
 
-def _confined_dataset_file(root: Path, rel: str, *, rule_version: str) -> tuple[bool, str]:
-    """R4-A2.6 P0-03: confine a manifest ``dataset_files[]`` entry BEFORE
-    any fs access.
+def _lexically_confined_dataset_file(rel: str, *, rule_version: str) -> tuple[bool, str]:
+    """R4-A2.8 P0-02 (audit 20260825 #4 section 3.3) Step A: LEXICAL-ONLY
+    validation - no Path.resolve(), no stat, no filesystem access of any
+    kind.
 
-    Rules (audit section 4.2):
-      - relative path only (no absolute, no drive letters)
-      - no '..' traversal (checked lexically AND by resolved path, which
-        also covers symlink escapes)
-      - must stay under ``versions/<rule_version>/`` - the selector id and
-        the version directory must agree structurally
+      - non-empty
+      - relative path only (no leading slash / backslash, no drive letters)
+      - no '..' component
+      - must stay under ``versions/<rule_version>/``
     """
     normalized = rel.replace("\\", "/")
     if not normalized or normalized.startswith(("/", "\\")):
@@ -629,6 +634,23 @@ def _confined_dataset_file(root: Path, rel: str, *, rule_version: str) -> tuple[
         return False, "'..' traversal"
     if parts[:1] != ["versions"] or len(parts) < 3 or parts[1] != rule_version:
         return False, f"not under versions/{rule_version}/"
+    return True, ""
+
+
+def _confined_dataset_file(root: Path, rel: str, *, rule_version: str) -> tuple[bool, str]:
+    """R4-A2.6 P0-03 + R4-A2.8 P0-02: confine a manifest ``dataset_files[]``
+    entry BEFORE any fs access.
+
+    Two explicit steps (audit 20260825 #4 section 3.3):
+      Step A (lexical-only, zero fs): relative / no drive / no '..' /
+        under versions/<rule_version>/  -> rejects BEFORE candidate resolve
+      Step B (resolved confinement, symlink detection): only reached when
+        the lexical form is already valid
+    """
+    ok, reason = _lexically_confined_dataset_file(rel, rule_version=rule_version)
+    if not ok:
+        return False, reason
+    parts = [p for p in rel.replace("\\", "/").split("/") if p not in ("", ".")]
     candidate = (root / "/".join(parts)).resolve()
     try:
         candidate.relative_to(root.resolve())
@@ -656,6 +678,8 @@ def load_rule_manifest(root: Path | str) -> RuleDatasetManifest:
     status = str(doc.get("review_status", "") or "")
     files = [str(f) for f in doc.get("dataset_files", []) or []]
     dataset_hash = str(doc.get("dataset_hash", "") or "")
+    source_version = str(doc.get("source_version", "") or "")
+    dataset_version = str(doc.get("dataset_version", "") or "")
     if not version:
         problems.append("rule_version missing")
     if status not in ("COMPILED", "REVIEWED"):
@@ -664,6 +688,15 @@ def load_rule_manifest(root: Path | str) -> RuleDatasetManifest:
         problems.append("dataset_files empty")
     if not _HEX64.match(dataset_hash):
         problems.append("dataset_hash must be 64 lower-hex chars")
+    # R4-A2.8 P0-03 (audit 20260825 #4 section 4.4): source_version /
+    # dataset_version are REQUIRED manifest schema fields - the SAME
+    # manifest API must not sometimes allow missing required fields
+    # (review tools and selector tools consume load_rule_manifest
+    # directly; optional-here/required-there creates two contracts)
+    if not source_version:
+        problems.append("source_version missing (REQUIRED, non-empty)")
+    if not dataset_version:
+        problems.append("dataset_version missing (REQUIRED, non-empty)")
     if problems:
         msg = "trading rule manifest invalid: " + "; ".join(problems)
         raise RuleUnresolvedError(msg)
@@ -689,8 +722,8 @@ def load_rule_manifest(root: Path | str) -> RuleDatasetManifest:
         review_status=status,
         dataset_files=tuple(files),
         dataset_hash=dataset_hash,
-        source_version=str(doc.get("source_version", "") or ""),
-        dataset_version=str(doc.get("dataset_version", "") or ""),
+        source_version=source_version,
+        dataset_version=dataset_version,
         review_provenance=dict(doc.get("review_provenance", {}) or {}),
     )
 
@@ -888,8 +921,9 @@ def load_bound_rule_book(
     # confinement FIRST for ALL files (lexical + resolved + structural
     # versions/<rule_version>/ identity) - only then existence/read/hash
     for rel in dataset_files:
+        # R4-A2.8 P0-02: single-entry confinement - lexical-only Step A
+        # (zero filesystem access) then resolved Step B (symlink escape)
         try:
-            _confined(root, rel)
             confined, reason = _confined_dataset_file(root, rel, rule_version=rule_version)
             if not confined:
                 msg = (

@@ -428,7 +428,9 @@ class TestGateHardening:
     def test_dotdot_traversal_rejected(self, rules_env):
         book = self._reviewed_book_with_ref(rules_env, source_artifact_ref="../../secrets.txt")
         problems = trading_rule_review_gate(book, rules_root=rules_env)
-        assert any("escapes the evidence root" in p for p in problems)
+        # R4-A2.8 P0-02: lexical '..' rejection fires BEFORE any resolve -
+        # the message is the traversal rejection, not the escape detection
+        assert any("must not traverse" in p or "escapes the evidence root" in p for p in problems)
 
     def test_non_hex_hash_rejected(self, rules_env):
         book = self._reviewed_book_with_ref(rules_env, source_artifact_hash="NOT-A-SHA256")
@@ -461,6 +463,9 @@ class TestReviewScript:
             RULES_DIR / "versions" / "v20260824-compiled" / "rules.yaml",
             compiled_dir / "rules.yaml",
         )
+        # coherent governance metadata (R4-A2.7 P0-03): source_version and
+        # the non-empty provenance value mirror the dataset file
+        compiled_doc = yaml.safe_load((compiled_dir / "rules.yaml").read_text(encoding="utf-8"))
         (root / "rule_manifest.json").write_text(
             json.dumps(
                 {
@@ -468,9 +473,11 @@ class TestReviewScript:
                     "review_status": "COMPILED",
                     "dataset_files": ["versions/v1-compiled/rules.yaml"],
                     "dataset_hash": _manifest_hash(root, ["versions/v1-compiled/rules.yaml"]),
-                    "source_version": "2026-08-24.1",
-                    "dataset_version": "2026-08-24.1",
-                    "review_provenance": {},
+                    "source_version": str(compiled_doc.get("source_version", "")),
+                    "dataset_version": str(compiled_doc.get("version", "")),
+                    "review_provenance": {
+                        "source_retrieved_at": str(compiled_doc.get("source_retrieved_at", ""))
+                    },
                 }
             ),
             encoding="utf-8",

@@ -41,6 +41,7 @@ from ashare_state.spike.trading_rule import (  # noqa: E402
     RULE_EVIDENCE_SUBDIR,
     RULE_MANIFEST_FILE,
     TradingRuleBook,
+    load_active_rules,
     load_rule_manifest,
     trading_rule_review_gate,
 )
@@ -103,10 +104,20 @@ def main() -> int:
 
     # R4-A2.6 P1-02: lineage check - the input must be the CURRENT ACTIVE
     # COMPILED version (explicit --from-version, or the manifest itself)
+    #
+    # R4-A2.8 P0-03 (audit 20260825 #4 section 4.3): the preflight runs the
+    # FULL integrity gate FIRST - load_active_rules re-verifies the ACTIVE
+    # dataset hash AND manifest<->dataset coherence. A tampered/incoherent
+    # ACTIVE can NEVER be re-sealed into a fresh REVIEWED version through
+    # this tool: a human review approves a VERIFIED candidate, it does not
+    # re-seal an integrity-broken one.
     try:
-        active = load_rule_manifest(rules_root)
+        active_book, active = load_active_rules(rules_root)
     except Exception as exc:  # noqa: BLE001 - clear operator error
-        print(f"ERROR: ACTIVE manifest unreadable: {exc}", file=sys.stderr)
+        print(
+            f"ERROR: ACTIVE dataset failed the integrity preflight (load_active_rules): {exc}",
+            file=sys.stderr,
+        )
         return 2
     expected_active = args.from_version or active.rule_version
     if active.rule_version != expected_active:
@@ -141,8 +152,19 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+    if active_book.review_status != "COMPILED":
+        print(
+            "ERROR: the verified ACTIVE dataset is not a COMPILED candidate "
+            f"(review_status={active_book.review_status!r}) - only a COMPILED "
+            "candidate can be sealed into REVIEWED",
+            file=sys.stderr,
+        )
+        return 2
 
-    book = TradingRuleBook.load(rules_path)
+    # the reviewed copy is generated from the VERIFIED ACTIVE bytes (the
+    # load_active_rules preflight above already re-hashed them) - never
+    # from a second, unverified read of an arbitrary path
+    book = active_book
     if book.review_status == "REVIEWED":
         print(f"ERROR: {rules_path} is already REVIEWED - review once, seal forever")
         return 2
@@ -170,8 +192,20 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+    # R4-A2.8 P0-03: generate the reviewed copy from the VERIFIED ACTIVE
+    # BYTES - read the canonical ACTIVE path and re-verify its hash
+    # against the manifest (no TOCTOU window between preflight and read)
+    active_path = rules_root / active_rel
+    active_bytes = active_path.read_bytes()
+    if _dataset_files_hash(rules_root, [active_rel]) != active.dataset_hash:
+        print(
+            "ERROR: ACTIVE dataset bytes changed during the review "
+            "(hash re-verification failed) - aborting, no output written",
+            file=sys.stderr,
+        )
+        return 2
     version_dir.mkdir(parents=True)
-    lines = rules_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines = active_bytes.decode("utf-8").splitlines(keepends=True)
     provenance_keys = (
         "reviewed_by:",
         "reviewed_at:",
@@ -250,8 +284,8 @@ def main() -> int:
         print("ERROR: ACTIVE manifest did not flip to the reviewed version", file=sys.stderr)
         return 2
     # coherence self-check: load_active_rules must accept the flipped state
-    from ashare_state.spike.trading_rule import load_active_rules
-
+    # (module-level import - a function-local import would shadow the
+    # preflight use above)
     try:
         load_active_rules(rules_root)
     except Exception as exc:  # noqa: BLE001 - coherence failure must surface

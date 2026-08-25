@@ -4,12 +4,12 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Current Code Baseline**：本批提交（R4-A2.7 Final Integrity / Provider-Shape Closure + CR-1.2.3 Evidence Identity Closure）；上一批 implementation SHA `2e85f4477c89486a7de401d068c383378ecbc3f0`（复审基线 HEAD，run 38 = success）  
-> **Document Revision**：DM-CR-20260825-008 / 009 / 010 / 011 / 012  
-> **Last Review**：2026-08-25 13:19 +08:00（R4-A2.6/CR-1.2.2 复审：REOPENED——4 项 P0 + 2 项 P1 + 治理修正，本批 R4-A2.7/CR-1.2.3 修复）  
+> **Current Code Baseline**：本批提交（R4-A2.8 Final Exchange-Boundary / Review-Lineage Closure + CR-1.2.4 Pre-Access Integrity）；上一批 implementation SHA `47b47437b0828262e4f9f11c57862af2558a4d34`（复审基线 HEAD，run 40 = success）  
+> **Document Revision**：DM-CR-20260825-013 / 014 / 015 / 016  
+> **Last Review**：2026-08-25 14:27 +08:00（R4-A2.7/CR-1.2.3 复审：REOPENED——3 项 P0 + P1 + 治理修正，本批 R4-A2.8/CR-1.2.4 修复）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：run 38 / `2e85f447...` = success（Reviewer API 确认）；本批提交后以 Actions 实际结果为准  
-> **Reviewer Correction（ADR-014 overclaim，2026-08-25）**：ADR-014 声明"任何 fs 访问前 confinement"此前仅 ACTIVE 路径成立——bound 路径存在先探测后 confinement 的偏离，且 source/dataset_version 缺失可放行（见 ADR-015 §5 修正记录；ADR-014 原文保留为历史，以 ADR-015 §5 为准）  
+> **CI Status**：run 40 / `47b47437...` = success（Reviewer API 正向确认）；本批提交后以 Actions 实际结果为准  
+> **Reviewer Correction（2026-08-25 14:27）**：R4-A2.7 的 Raw identity / active coherence / provider-shape architecture 保留；但 CA assign-then-persist control-flow、bound lexical-first 顺序、review input integrity 尚未关闭（ADR-016 为修正记录；历史 ADR 原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
@@ -1068,8 +1068,9 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A2.4 Correctness Deepening | DONE | absorbed into R4-A2.7 | 结构保留；最终 VERIFIED 随本批门 |
 | CR-1.2 Complete Exchange + Raw Closure | DONE | absorbed into CR-1.2.3 | 结构保留；最终 VERIFIED 随本批门 |
 | R4-A2.5 Rule-SoR Closure + CR-1.2.1 Raw Hardening | DONE | absorbed into R4-A2.7 | 结构保留；最终 VERIFIED 随本批门 |
-| R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement | DONE | REOPENED | 由 R4-A2.7/CR-1.2.3 修复（本批） |
-| R4-A2.7 Final Integrity / Provider-Shape Closure + CR-1.2.3 Evidence Identity Closure | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
+| R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement | DONE | absorbed into R4-A2.8 | 结构保留；最终 VERIFIED 随本批门 |
+| R4-A2.7 Final Integrity + CR-1.2.3 Evidence Identity Closure | DONE | REOPENED | 由 R4-A2.8/CR-1.2.4 修复（本批） |
+| R4-A2.8 Final Exchange-Boundary / Review-Lineage Closure + CR-1.2.4 Pre-Access Integrity | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
 | R4-A3 SDK/Lifecycle/Early Stop | PLANNED | PENDING | Next |
 | R4-B1 Capability Endpoint Proof | PLANNED | PENDING | Next |
 | R4-B2 Publish Validation Exactness | PLANNED | PENDING | Next |
@@ -1086,45 +1087,47 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A2.7 + CR-1.2.3（本批，DONE / PENDING_REVIEW）
+## R4-A2.8 + CR-1.2.4（本批，DONE / PENDING_REVIEW）
 
 ```text
-P0-01 Bound Pre-Access Confinement（DM-CR-20260825-008，ADR-015 §5.1）：
-  load_bound_rule_book root 确定性解析（参数驱动，零 dataset_files 探测）
-  全文件 confinement（lexical + resolved + versions/<v>/ 结构）先于任何
-    存在性/读取；FsSpy 测试证明非法绑定零越界 fs 访问
-  （修正 ADR-014 overclaim：bound 路径此前存在先探测后 confinement）
-P0-02 Raw Evidence Identity（DM-CR-20260825-009，ADR-015 §5.2）：
-  完整幂等重试返回 sha256(磁盘实际 meta bytes)（非新 serialization）；
-    fresh commit 断言 persisted == intended；失败幂等/orphan 恢复同规则
-  second.evidence_hash == sha256(actual meta file) 全场景回归
-    （单表/多表/失败/恢复 + SpikeCase binding → closure PASS）
-P0-03 Required Rule Coherence（DM-CR-20260825-010，ADR-015 §5.3）：
-  manifest source_version/dataset_version 必填非空 + 无条件精确比较
-    （"填了才比较"可选语义废除）；provenance_complete 纳入
-    dataset_version + source_version；bound replay 复验 source_version/
-    review_status（runner 三处调用全传完整身份）
-P0-04 CA Provider-Shape Adapter（DM-CR-20260825-011，ADR-015 §1-4）：
-  文档契约 CA_PROVIDER_FIELD_CONTRACT（MARKET_CODE/DATE_EX；
-    MARKET_CODE/EX_DIVIDEND_DATE）；ephemeral _ca_provider_view
-    （endpoint 身份派生 event_type；payload 伪造 EVENT_TYPE 忽略；
-    lineage=source_endpoint/raw_request_id）；缺字段→CAProviderShapeError
-    →结构化 VALIDATED_FAIL(PROVIDER_SCHEMA)；FakeTarget 改 provider 原生
-    字段（dry-run 与 real 同一 adapter，无 canonical 旁路）；raw evidence
-    保持 provider 原生字段（parquet 列名断言）；validator v6；真实 v3
-    case + provider-shaped fixture 端到端 PASS
-P1-01/02 Review Tool（DM-CR-20260825-012 内）：
-  review.py 显式单文件限制（multi-file ACTIVE fail loud，Option A）；
-    durability wording 更正（atomic replacement / reader-safe，非
-    power-loss durable）
+P0-01 Golden Atomic Exchange Persistence（DM-CR-20260825-013，ADR-016 §1）：
+  _DomainCollector.call(fn) → PersistedExchangeView：call+persist 一个
+    边界操作（exchange 在边界返回前已持久化；lineage 从 frozen view 读）
+  全部域 fetch（ST/DELISTED/LIMIT/CA/BJ）统一走原子边界；CA 的
+    assign-then-persist 窗口消除
+  对抗测试：dividend 成功+right_issue 失败→两者都持久化（call 数 ==
+    persisted 数）；首次 persist 失败→后续 provider call 不发射；
+    dividend 失败→right_issue 不发射；full success lineage 指向精确
+    persisted exchange
+  AST 守卫升级为控制流安全：exchange 调用必须位于 collector.call(
+    lambda:...) 内；负向测试证明旧 assign-then-persist 模式被拒
+P0-02 Bound Lexical-First Pre-Access（DM-CR-20260825-014，ADR-016 §2）：
+  _lexically_confined_dataset_file（Step A：非空/相对/无盘符/无 ../
+    versions/<v>/——零 fs 访问）→ _confined_dataset_file 唯一入口
+    （Step B：resolved symlink escape）；bound loop 删除前置 _confined
+    双 helper 并列；evidence ref 的 _confined 同加 lexical 前置拒绝
+  Path.resolve spy：traversal/绝对/盘符/异版本目录的拒绝全程 candidate
+    未被 resolve；合法路径才 resolve；symlink escape 仍拦截
+P0-03 Review Input Integrity（DM-CR-20260825-015，ADR-016 §3）：
+  review.py preflight 不可绕过执行 load_active_rules（ACTIVE hash 复算 +
+    manifest↔dataset 四字段 coherence）；--from-version / 单文件 /
+    --rules==已验证 ACTIVE / COMPILED 校验；REVIEWED 副本从已验证 ACTIVE
+    bytes 产生（读取后复验 hash，无 TOCTOU）；preflight 失败→零输出
+    （无 evidence 拷贝/无 versions/<new>/无 manifest 变更）
+  §4.4：source_version/dataset_version REQUIRED 下沉 load_rule_manifest
+    schema（单一 manifest API 契约）
+P1-01/02（DM-CR-20260825-016 内）：
+  CA_STREAM_ENDPOINTS 固定映射交叉校验（跨流重标 → ShapeError）；
+    _payload_columns 空 frame schema（0 行+必需列=合法空；0 行+缺列=
+    PROVIDER_SCHEMA）
 ```
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
 ```text
 scripts/golden/review.py 逐条核验 123 v3 cases + 补齐 distinct events
-scripts/rules/review.py 对 ACTIVE 规则版本执行人工复核（--from-version
-  血缘检查；产出 REVIEWED 版本并原子切换 ACTIVE）
+scripts/rules/review.py 对已验证 ACTIVE 规则版本执行人工复核（integrity
+  preflight → REVIEWED 版本并原子切换 ACTIVE）
 ```
 
 ## R4-A3 / B1 / B2（CR-2 前；CR-2/R4-A3/P0-M-1B 保持 BLOCKED 直到本批 VERIFIED）
@@ -1142,7 +1145,7 @@ Migration 011
 
 ```text
 CR-2 Provider-Normalized + Quarantine（消费 raw evidence → provider-normalized；
-    本批 VERIFIED 后可启动——provider-shape/raw-evidence contract 已稳定）
+    本批 VERIFIED 后可启动——原子边界/lexical-first/review preflight 契约已稳定）
 CR-3 AvailabilityPolicy + Canonicalizer
 CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild
 ```
@@ -1468,14 +1471,13 @@ Deadline: 首个 APPROVED Source Policy 前
 ## RISK-004 ProviderExchange 未统一
 
 ```text
-Status: REOPENED（R4-A2.6/CR-1.2.2 复审发现新的 blocking correctness
-        问题：bound pre-access confinement / raw idempotent identity /
-        required coherence / CA provider-shape——即 R4-A2.7/CR-1.2.3 的
-        四项 P0；且 ADR-014 存在 overclaim）
-        → 本批 R4-A2.7/CR-1.2.3 修复后结构完整（pre-access confinement
-        + persisted-identity idempotency + required coherence + 文档
-        契约 adapter）；保持 REOPENED 直到 Reviewer 验证本批（不预写关闭）
-Mitigation: PENDING_REVIEW（R4-A2.7/CR-1.2.3）
+Status: REOPENED（R4-A2.7/CR-1.2.3 复审发现新的 blocking correctness
+        问题：CA assign-then-persist 窗口 / bound lexical-first 顺序 /
+        review 输入完整性——即 R4-A2.8/CR-1.2.4 的三项 P0）
+        → 本批 R4-A2.8/CR-1.2.4 修复后结构完整（原子 call+persist 边界
+        + 控制流安全 AST 守卫 + lexical-first + review preflight）；
+        保持 REOPENED 直到 Reviewer 验证本批（不预写关闭）
+Mitigation: PENDING_REVIEW（R4-A2.8/CR-1.2.4）
 ```
 
 ## RISK-005 Trading Rule 数据层未人工 Review
@@ -1724,6 +1726,57 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260825-016 — R4-A2.7 Reviewer Governance Correction + P1 Hardening
+
+**Type**：C1（治理修正 + P1 加固）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.7/CR-1.2.3 复审 §6——治理文档须记录 Reviewed Code Baseline `47b47437b0828262e4f9f11c57862af2558a4d34` / REOPENED / CI run 40 SUCCESS / RISK-004 保持 REOPENED；P1-01（endpoint 身份交叉校验）与 P1-02（空 frame schema）建议本批清掉。  
+**Correction & P1**：总册头部更新（Reviewed baseline + Reviewer Correction 段：CA control-flow / lexical-first 顺序 / review integrity 未关闭）；§40 R4-A2.7/CR-1.2.3 → REOPENED；`CA_STREAM_ENDPOINTS` 固定映射（dividend↔get_dividend / right_issue↔get_right_issue；跨流重标 → `CAProviderShapeError`）；`_payload_columns` + `_ca_provider_view(payload_columns=)`：0 行+必需列=合法空事件流、0 行+缺列=`PROVIDER_SCHEMA`。  
+**Affected Modules**：spike/golden_router.py、Documentation / Governance  
+**Tests**：test_ca_atomic_boundary.py::TestEmptyFrameSchema ×3 + TestEndpointIdentityCrossCheck ×2  
+**ADR**：[ADR-016](../adr/ADR-016_atomic_boundary_integrity.md) §4  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-015 — Trading Rule Review Input Integrity Gate
+
+**Type**：C1/C2（review 工作流契约变更）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.8 P0-03——review.py 只验证 selector 可解析（`load_rule_manifest`），被篡改/不一致的 COMPILED ACTIVE 可被"洗成"新的合法 REVIEWED 版本（human review ≠ re-seal an integrity-broken candidate）。  
+**Old Contract**：preflight = manifest 可读 + --from-version / 单文件 / --rules==ACTIVE 路径比较；REVIEWED 副本从 --rules 路径二次读取。  
+**New Contract**（ADR-016 §3）：preflight 不可绕过执行 `load_active_rules`（ACTIVE dataset hash 复算 + manifest↔dataset 四字段 coherence——与 runtime 同一 gate）；增加 review_status==COMPILED 校验（REVIEWED ACTIVE 拒绝再 review）；REVIEWED 副本从**已验证 ACTIVE bytes** 产生（canonical 路径读取 + 读取后复验 hash，无 TOCTOU）；preflight 失败 → **零输出**（无 evidence 拷贝、无 versions/<new>/、无 temp/final manifest 变更）；§4.4：source_version/dataset_version REQUIRED 下沉 `load_rule_manifest` schema 校验（review/selector 工具与 runtime 共享单一 manifest API 契约）。  
+**Affected Modules**：scripts/rules/review.py、spike/trading_rule.py（manifest schema）  
+**Tests**：test_review_input_integrity.py（9：篡改 bytes/篡改 manifest hash/缺 source_version/空 dataset_version/coherence mismatch ×3/健康流成功/REVIEWED 拒绝——全部含零输出断言）  
+**ADR**：[ADR-016](../adr/ADR-016_atomic_boundary_integrity.md) §3  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-014 — Bound Rule Lexical-First Pre-Access Confinement
+
+**Type**：C1 correctness closure（ADR-014/015 契约补全）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.8 P0-02——`_confined()` 先 `Path.resolve()` 再 containment 比较：非法 `../..` ref 在 lexical 拒绝前已触发 filesystem resolution（"confinement before ANY fs access" 仍为 overclaim）。  
+**Old Contract**：`_confined(root, rel)`（resolve-first）+ `_confined_dataset_file`（内含 lexical）并列调用，顺序不透明。  
+**New Contract**（ADR-016 §2）：`_lexically_confined_dataset_file`（Step A：非空/相对/无盘符/无 `..`/versions/<rule_version>/ 结构——**零 fs 访问**）；`_confined_dataset_file` 成为**唯一入口**（Step A → Step B resolved symlink escape）；bound loop 删除前置 `_confined`（双 helper 并列废除）；evidence ref 的 `_confined` 增加 lexical `..` 前置拒绝。**测试**：`Path.resolve` spy——traversal（外部文件存在）/绝对/盘符/异版本目录的拒绝全程 **candidate 未被 resolve**；合法路径才触发 resolve；symlink escape 仍在 Step B 拦截；正常 bound replay 保持通过。  
+**Affected Modules**：spike/trading_rule.py  
+**Tests**：test_lexical_first_confinement.py（9：拒绝前零 resolve ×4 / 合法 resolve / symlink / 正常通过 / helper 单元 ×2）  
+**ADR**：[ADR-016](../adr/ADR-016_atomic_boundary_integrity.md) §2  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-013 — Golden Domain Atomic Exchange Persistence
+
+**Type**：C1 correctness closure  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.8 P0-01——CA 域 assign-then-persist（`x = target.X(); ...; collector.persist(x)`）重新打开"真实 exchange 已创建但未持久化"窗口：第二个 provider call 失败时第一个 success exchange 永久丢证据（real calls=2 / persisted=1）；AST 守卫已退化为 name-presence 检查。  
+**Old Contract**：调用者取得 exchange 引用后另行 persist（"记得稍后持久化"）；AST 守卫接受 assign-then-persist（变量名某处出现 persist 即可）。  
+**New Contract**（ADR-016 §1）：`_DomainCollector.call(fn) -> PersistedExchangeView`（frozen dataclass：payload/request_id/endpoint/evidence_meta）——**call+persist 是一个边界操作**（exchange 在边界返回前已持久化；lineage 从 view 读取）；**全部域 fetch**（ST_STATUS/DELISTED_MASTER/LIMIT_PIT_RULE/CORP_ACTION_CONTEXT/BJ_MAPPING）统一走原子边界；AST 守卫升级**控制流安全**（exchange 调用必须位于 `collector.call(lambda: ...)` 的 lambda 内；负向测试证明旧 assign-then-persist 源码被拒）。  
+**Affected Modules**：spike/golden_router.py、tests/integration/test_probe_exchange_enforcement.py（守卫收紧）  
+**Tests**：test_ca_atomic_boundary.py（7：dividend 成功+right_issue 失败→两者都持久化+call 数==persisted 数 / persist 失败→后续 provider call 不发射 / dividend 失败→right_issue 不发射 / full success lineage / 空 frame ×3 / endpoint 交叉 ×2）；既有 router/CA/enforcement 测试适配  
+**ADR**：[ADR-016](../adr/ADR-016_atomic_boundary_integrity.md) §1  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260825-012 — R4-A2.6 Review Correction & Governance Sync + Review Tool Hardening
 
@@ -2066,10 +2119,10 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 # 62. 下一次维护检查点
 
-R4-A2.7 + CR-1.2.3 已更新（2026-08-25，见 DM-CR-20260825-008..012）：
+R4-A2.8 + CR-1.2.4 已更新（2026-08-25，见 DM-CR-20260825-013..016）：
 
 ```text
-§40 §41 §52 §61 §62 + 头部（exact SHA 2e85f447 / run 38 / ADR-014 overclaim correction）(done 2026-08-25)
+§40 §41 §52 §61 §62 + 头部（Reviewed baseline 47b47437 / run 40 / Reviewer Correction）(done 2026-08-25)
 ```
 
 下一批（R4-A3 / CR-2，须待本批 VERIFIED）落地时至少更新：
