@@ -822,8 +822,8 @@ Trial / Fake / CI 成功仍不得作为正式 Provider business truth 的替代�
 | 要求 | 落实 |
 |---|---|
 | 5.1 job-level truth 记录 | 总册头部 CI Status：required Windows 3.12/3.14 PASS；optional Ubuntu 3.14 Pytest FAILED（根因已修）；overall SUCCESS 仅因 continue-on-error；不写"全矩阵绿" |
-| 5.2 根因调查（API job 日志下钻） | `Lint & Type Check (ubuntu-latest / py3.14)` 的 Pytest step：~20 测试同错 `ACTIVE dataset hash mismatch: declared 7dc5f627... recomputed dd2219d2...`。**分类=真实跨平台 correctness bug**：`.gitattributes` 漏盖 `*.yaml`——Windows autocrlf checkout 重写 LF→CRLF（本地 hash 与 manifest 一致故 Windows 过），Ubuntu 保持 LF 重算失配；golden 未挂因 `data/golden/**` 已有 LF 规则 |
-| 5.2 修复 + 回归 | `.gitattributes` 补 `*.yaml`/`*.yml text eol=lf` + `configs/trading_rules/evidence/** -text`；工作树 yaml 规范化 LF（git diff 与 blob 零差异）；manifest dataset_hash 以 LF 重算（**dd2219d2... == Ubuntu 重算值**）；回归 ×3：yaml 无 CRLF / .gitattributes 规则存在 / 工作树 == git blob |
+| 5.2 根因调查（API job 日志下钻） | **根因 1**：`Lint & Type Check (ubuntu-latest / py3.14)` 的 Pytest step：~20 测试同错 `ACTIVE dataset hash mismatch: declared 7dc5f627... recomputed dd2219d2...`——`.gitattributes` 漏盖 `*.yaml`（Windows autocrlf 重写 LF→CRLF，Ubuntu 保持 LF 重算失配）。**根因 2（run 44 查证）**：golden review gate 的 artifact confinement 平台依赖——Linux 上 `evidence_dir / "C:/evil.txt"` 是相对拼接（resolved 检查不见逃逸），Windows 上为绝对路径（被检出）。均属真实跨平台 correctness bug |
+| 5.2 修复 + 回归 | 根因 1：`.gitattributes` 补 `*.yaml`/`*.yml text eol=lf` + `configs/trading_rules/evidence/** -text`；工作树 yaml 规范化 LF（git diff 与 blob 零差异）；manifest dataset_hash 以 LF 重算（**dd2219d2... == Ubuntu 重算值**）。根因 2：`_verify_artifact` 平台无关 lexical 检查（前导 `/`/盘符/`..`）先于 resolved 比较。回归 ×5：yaml 无 CRLF / .gitattributes 规则存在 / 工作树 == git blob / 盘符 ref 双平台拒 / POSIX 绝对 ref 双平台拒 |
 | 5.2 禁止弱化 | required gate 未动 / 无 skip / Ubuntu leg 未删 / continue-on-error 策略不变 |
 
 ## §6 Governance（DM-CR-20260825-020）

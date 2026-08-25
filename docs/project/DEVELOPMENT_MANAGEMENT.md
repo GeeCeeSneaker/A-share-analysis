@@ -1743,11 +1743,11 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 **Type**：C1 correctness fix（真实跨平台 bug）  
 **Status**：DONE / PENDING_REVIEW  
 **Trigger**：R4-A2.9 §5——Reviewer 下钻 run 42 job matrix：optional Ubuntu 3.14 的 Pytest step 实际 FAILED（~20 测试同错 `ACTIVE dataset hash mismatch: declared 7dc5f627... recomputed dd2219d2...`），overall SUCCESS 仅因 `continue-on-error: ${{ !matrix.required }}`；不得表述"全矩阵绿"。  
-**Root Cause（API 日志查证）**：`.gitattributes` 覆盖 `data/golden/**`/`*.json`/`*.jsonl` 但**漏 `*.yaml`**——Windows autocrlf checkout 重写 LF→CRLF（本地 hash 与 manifest 一致故 Windows CI 过），Ubuntu checkout 保持 LF（重算 hash 失配）。golden 未挂因已有 LF 规则。属**真实跨平台 correctness bug**（非环境依赖）。  
-**Fix**：`.gitattributes` 补 `*.yaml`/`*.yml text eol=lf`（规则数据集与 golden 同等字节治理）+ `configs/trading_rules/evidence/** -text`（内容寻址 artifact 禁 eol 归一化）；工作树 yaml 规范化 LF（`git diff` 与 blob 字节零差异）；`rule_manifest.json` dataset_hash 以 LF 字节重算（`dd2219d2...` 与 Ubuntu 重算值完全一致——两平台自此同字节）；回归测试 ×3（yaml 无 CRLF / .gitattributes 规则 / 工作树 == git blob）。  
+**Root Cause（API 日志查证）**：**根因 1**——`.gitattributes` 覆盖 `data/golden/**`/`*.json`/`*.jsonl` 但**漏 `*.yaml`**：Windows autocrlf checkout 重写 LF→CRLF（本地 hash 与 manifest 一致故 Windows CI 过），Ubuntu checkout 保持 LF（重算 hash 失配）；golden 未挂因已有 LF 规则。**根因 2（run 44 查证）**——golden review gate 的 artifact confinement 平台依赖：Linux 上 `evidence_dir / "C:/evil.txt"` 是**相对**拼接（resolved 检查不见逃逸，仅报"不存在"），Windows 上盘符使其绝对（被检出）；`test_absolute_artifact_ref_rejected` 因此在 Ubuntu 失败。均属**真实跨平台 correctness bug**（非环境依赖）。  
+**Fix**：根因 1——`.gitattributes` 补 `*.yaml`/`*.yml text eol=lf` + `configs/trading_rules/evidence/** -text`（内容寻址 artifact 禁 eol 归一化）；工作树 yaml 规范化 LF（`git diff` 与 blob 字节零差异）；`rule_manifest.json` dataset_hash 以 LF 字节重算（`dd2219d2...` 与 Ubuntu 重算值完全一致——两平台自此同字节）。根因 2——`golden_store._verify_artifact` 先做**平台无关 lexical 检查**（前导 `/`、盘符前缀、`..` 穿越——与其他 confinement 同一"lexical first, resolved second"设计语言）再 resolved 比较。回归测试 ×5（yaml 无 CRLF / .gitattributes 规则 / 工作树 == git blob / 盘符 ref 双平台拒 / POSIX 绝对 ref 双平台拒）。  
 **Policy（§5.2）**：未削弱 required gate、未 skip 测试、未删除 Ubuntu leg；`continue-on-error` 策略不变；CI 真相以 job-level 记录于总册头部；本批提交后以 Actions 实际结果为准（重点观察 Ubuntu leg 转绿）。  
-**Affected Modules**：.gitattributes、configs/trading_rules/{rule_manifest.json, versions/v20260824-compiled/rules.yaml}  
-**Tests**：test_review_failure_cleanup.py::TestCrossPlatformRuleBytes ×3  
+**Affected Modules**：.gitattributes、configs/trading_rules/{rule_manifest.json, versions/v20260824-compiled/rules.yaml}、spike/golden_store.py  
+**Tests**：test_review_failure_cleanup.py::TestCrossPlatformRuleBytes ×3 + test_golden_review_workflow.py 平台无关 ×2  
 **ADR**：[ADR-017](../adr/ADR-017_review_seal_output_confinement.md) §4  
 **Commit**：本批  
 **Reviewer**：PENDING_REVIEW

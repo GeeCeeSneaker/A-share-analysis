@@ -94,6 +94,15 @@ checkout 保持 LF（重算 dd2219d2，失配）。golden 未挂恰因其已有 
 3. 回归测试：规则 yaml 无 CRLF、.gitattributes 规则存在、工作树 ==
    git blob 字节。
 
+**第二个平台依赖 bug（run 44 查证）**：hash 修复后 Ubuntu 仅剩
+`test_absolute_artifact_ref_rejected` 失败——golden review gate 的
+artifact confinement 用 `evidence_dir / ref` 后做 resolved 比较：Linux 上
+`evidence_dir / "C:/evil.txt"` 是**相对**拼接（不逃逸，gate 报"不存在"
+而非"越界"），Windows 上盘符使其绝对（被检出）。修复：`_verify_artifact`
+先做**平台无关的 lexical 检查**（前导 `/`、盘符前缀、`..` 穿越——与其他
+confinement 同一"lexical first, resolved second"设计语言），回归测试 ×2
+（盘符/POSIX 绝对路径在两平台同拒）。
+
 **政策记录（§5.2）**：本失败属于第 1 类（真实跨平台 correctness bug），
 已修复并加回归；**不是**通过削弱 gate / skip 测试 / 删除 Ubuntu leg 制造
 的绿色。CI 真相（job-level）：required Windows 3.12/3.14 PASS；optional

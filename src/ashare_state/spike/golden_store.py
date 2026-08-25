@@ -384,7 +384,27 @@ class GoldenTruthStore:
             ]
         if not case.source_artifact_hash:
             return [f"{case.golden_case_id}: REVIEWED without source_artifact_hash"]
-        # R4A2-P1-03: path confinement - must resolve INSIDE <root>/evidence
+        # R4A2-P1-03 + R4-A2.9 (audit 20260825 #5 CI root cause #2): path
+        # confinement must be PLATFORM-INDEPENDENT. On Linux,
+        # ``evidence_dir / "C:/evil.txt"`` is a RELATIVE join (no escape
+        # detected by the resolved check); on Windows the drive prefix
+        # makes it absolute. Reject absolute-on-any-platform forms
+        # LEXICALLY first (leading slash/backslash, drive prefix,
+        # '..' traversal), then do the resolved confinement check.
+        ref = str(case.source_artifact_ref).replace("\\", "/")
+        lexical_violation = ""
+        if ref.startswith("/"):
+            lexical_violation = "absolute path"
+        elif ":" in ref.split("/", 1)[0]:
+            lexical_violation = "drive-letter path"
+        elif any(part == ".." for part in ref.split("/")):
+            lexical_violation = "'..' traversal"
+        if lexical_violation:
+            return [
+                f"{case.golden_case_id}: source_artifact_ref "
+                f"{case.source_artifact_ref!r} escapes the evidence store "
+                f"(path confinement violation: {lexical_violation})"
+            ]
         evidence_dir = (self.root / EVIDENCE_DIRNAME).resolve()
         artifact_path = (evidence_dir / case.source_artifact_ref).resolve()
         try:

@@ -363,6 +363,23 @@ class TestArtifactPathConfinement:
         problems = GoldenTruthStore(golden_env).review_gate()
         assert any("escapes the evidence store" in p for p in problems)
 
+    def test_drive_letter_ref_rejected_platform_independent(self, golden_env: Path):
+        """R4-A2.9 CI root cause #2: on Linux ``evidence_dir / "C:/evil"``
+        is a RELATIVE join (the resolved check saw no escape); the gate
+        must reject drive-letter refs LEXICALLY on every platform."""
+        self._traversal_seal(golden_env, "C:/evil.txt")
+        problems = GoldenTruthStore(golden_env).review_gate()
+        assert any("escapes the evidence store" in p for p in problems)
+        assert any("drive-letter" in p for p in problems)
+
+    def test_posix_absolute_ref_rejected_platform_independent(self, golden_env: Path):
+        """Leading-slash refs (absolute on POSIX, odd-but-relative via
+        pathlib on Windows) are rejected lexically everywhere."""
+        self._traversal_seal(golden_env, "/etc/passwd")
+        problems = GoldenTruthStore(golden_env).review_gate()
+        assert any("escapes the evidence store" in p for p in problems)
+        assert any("absolute path" in p for p in problems)
+
     def _traversal_seal(self, golden_env: Path, ref: str) -> None:
         active = json.loads((golden_env / "truth_manifest.json").read_text(encoding="utf-8"))
         dataset_path = golden_env / str(active["dataset_file"])
