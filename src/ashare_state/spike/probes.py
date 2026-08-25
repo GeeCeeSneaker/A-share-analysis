@@ -156,6 +156,8 @@ class ProbeContext:
                 dataset_files=self.run.trading_rule_dataset_files,
                 dataset_hash=self.run.trading_rule_dataset_hash,
                 dataset_version=getattr(self.run, "trading_rule_dataset_version", ""),
+                source_version=getattr(self.run, "trading_rule_source_version", ""),
+                review_status=getattr(self.run, "trading_rule_review_status", ""),
             )
         book, _manifest = load_active_rules()
         return book

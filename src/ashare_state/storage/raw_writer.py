@@ -420,6 +420,23 @@ class RawWriter:
         # a retry with DIFFERENT bytes QUARANTINES the orphan (moved under
         # .quarantine/, never mistaken for valid evidence).
 
+        # CR-1.2.3 / R4-A2.7 P0-02 (audit 20260825 #3 section 3): the
+        # returned evidence identity MUST describe the PERSISTED bytes, not
+        # an unpersisted candidate serialization. On an idempotent retry
+        # the disk keeps the FIRST commit's meta (with its ingested_at);
+        # hashing the in-memory meta_bytes here would bind callers to a
+        # hash that evidence closure can never reproduce. Read the actual
+        # file back and hash THOSE bytes.
+        persisted_meta_bytes = meta_path.read_bytes()
+        if not idem and persisted_meta_bytes != meta_bytes:
+            # fresh commit: the bytes on disk must be exactly what we
+            # intended to write (write_file_atomic guarantees it; assert)
+            msg = (
+                f"raw meta write verification failed for request {request_id}: "
+                "persisted bytes differ from the intended serialization"
+            )
+            raise RawWriterError(msg)
+
         if multi:
             logical_uri = self._logical_uri(provider, dataset, f"{request_id}/")
         else:
@@ -429,7 +446,7 @@ class RawWriter:
         # bidirectionally. Single-table payloads no longer bind the bare
         # parquet (meta deletion/tampering must break the closure).
         evidence_uri = self._logical_uri(provider, dataset, meta_path.name)
-        meta_hash = hashlib.sha256(meta_bytes).hexdigest()
+        meta_hash = hashlib.sha256(persisted_meta_bytes).hexdigest()
         payload_artifacts = tuple(
             ArtifactRef(
                 uri=self._logical_uri(provider, dataset, r.file),

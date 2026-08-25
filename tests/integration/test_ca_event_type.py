@@ -140,7 +140,7 @@ class TestTypedValidation:
         ctx = _ctx(tmp_path)
         outcome, _evidence = _route_one(ctx, _ca_case("GT-CA-D1", "600519.SH", "20220630"))
         assert outcome.result is CaseResult.VALIDATED_PASS
-        assert outcome.validator_version == "5"
+        assert outcome.validator_version == "6"
 
     def test_right_issue_case_passes_on_own_stream(self, tmp_path: Path):
         ctx = _ctx(tmp_path)
@@ -246,11 +246,11 @@ class TestActualGoldenV3Truth:
                 from ashare_state.spike.target import _fake_exchange
 
                 self._mark("get_right_issue")
+                # R4-A2.7 P0-04: provider-native documented field names
                 rows = [
                     {
-                        "SECURITY_CODE": code.split(".")[0],
-                        "EX_DATE": case.trade_date,
-                        "EVENT_TYPE": "RIGHT_ISSUE",
+                        "MARKET_CODE": code.split(".")[0],
+                        "EX_DIVIDEND_DATE": case.trade_date,
                     }
                     for code in code_list
                 ]
@@ -286,4 +286,4 @@ class TestActualGoldenV3Truth:
             )
             # every outcome carries the typed validator version
             if outcome.validator_id == "corp_action_context_v2":
-                assert outcome.validator_version == "5"
+                assert outcome.validator_version == "6"

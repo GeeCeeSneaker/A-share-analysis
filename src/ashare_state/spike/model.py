@@ -157,8 +157,13 @@ class SpikeRun:
         if self.run_kind != RunKind.PRODUCTION:
             return True
         golden_bound = bool(self.golden_truth_version and self.golden_dataset_hash)
+        # R4-A2.7 P0-03: the semantic SoR binding is complete only with the
+        # selector version + the dataset content version + the source
+        # lineage + the file identity + the review status
         rules_bound = bool(
             self.trading_rule_version
+            and self.trading_rule_dataset_version
+            and self.trading_rule_source_version
             and self.trading_rule_dataset_files
             and self.trading_rule_dataset_hash
             and self.trading_rule_review_status

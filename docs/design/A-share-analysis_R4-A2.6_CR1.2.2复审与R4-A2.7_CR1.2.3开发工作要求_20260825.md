@@ -920,3 +920,84 @@ Bound confinement: deterministic root vs probing candidate roots
 ```
 
 不得只写“tests pass / bug fixed”。
+
+---
+
+# 14. Implementation Mapping（Developer 回填，2026-08-25）
+
+> 本批：R4-A2.7 Final Integrity / Provider-Shape Closure + CR-1.2.3 Evidence Identity Closure（Batch A→F 全部完成；**未启动 CR-2**——遵守 §9/§12 约束）。
+> 测试基线：**580 passed / 0 failed**（544 → 580，+36）；CI 等价四检查（ruff check + format --check + mypy + pytest）本地全绿；dry-run 冒烟 35 exchanges + 5 bundles 双向闭合零问题。
+> Change IDs：DM-CR-20260825-008/009/010/011/012；**ADR-015**（amendment to ADR-013 §4 + ADR-014 契约补全；含 §13 四问完整记录）。
+> CI：本批提交后以 Actions 实际结果为准（上批 run 38 / 2e85f447 = success，Reviewer API 确认口径——本批不预写结果）。
+> **§13 四问对照**：Raw idempotency → ADR-015 §5.2（reuse persisted identity；不重写旧 meta——immutable 首次落盘保留）；CA mapping → ADR-015 §3 表（ephemeral adapter vs 改 raw vs CR-2 的取舍）；Rule source_version → ADR-015 §5.3（mandatory；optional 语义走私 lineage）；Bound confinement → ADR-015 §5.1（deterministic root；probing candidates 违反 pre-access 契约）。
+
+## P0-01（Bound Pre-Access Confinement，§2）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 2.2 root 确定性解析（不碰 dataset_files） | `trading_rule.load_bound_rule_book`：root = rules_root / repo_root+configs/trading_rules / default dir（参数驱动三选一）；**废除** `(root/dataset_files[0]).is_file()` 候选探测 | pre_access ×3 |
+| 2.2 全文件 confinement 先行 | confinement 循环（lexical `_confined` + `_confined_dataset_file` resolved+versions/<v>/ 结构）→ 存在性循环 → hash/load | 同上 |
+| 2.3 非法路径零触碰证明 | **FsSpy**（monkeypatch `Path.is_file/read_bytes/open`，记录 root 外访问） | traversal（**外部文件真实存在**）/绝对路径/异版本目录 → `outside_probes == []` |
+| 2.3 symlink / valid multi-file | resolve 覆盖 symlink（既有测试）；multi-file 合法加载（hash 覆盖全部文件） | closure::symlink + pre_access::test_valid_bound_multi_file_version_passes |
+
+## P0-02（Raw Evidence Identity，§3）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 3.2 幂等返回 persisted hash | `raw_writer._write_success`：`persisted_meta_bytes = meta_path.read_bytes()` → `meta_hash = sha256(persisted)`；幂等重试**不覆盖旧 meta** | identity::test_second_write_returns_persisted_meta_hash（含 meta_artifact.content_hash） |
+| 3.2 fresh commit 断言 persisted == intended | `if not idem and persisted != intended: raise RawWriterError` | identity::test_fresh_commit_asserts_persisted_equals_intended |
+| 3.3 全场景 returned == persisted | 单表/多表 binding→closure / 失败幂等 / orphan 恢复 | identity 6 个（second.evidence_hash == sha256(actual file) 全断言） |
+
+## P0-03（Required Coherence，§4）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 4.2 必填 + 无条件比较 | `load_active_rules`：两字段非空校验（"REQUIRED and empty"）+ exact compare（可选语义废除） | coherence::TestRequiredCoherence（missing/empty/mismatch ×6 + PASS） |
+| 4.2 provenance 含两字段 | `model.provenance_complete`：rules_bound 增 dataset_version + source_version | coherence::TestProvenanceRequirements ×3 |
+| 4.2 bound source/review 复验 | `load_bound_rule_book(source_version=, review_status=)`；runner verdict/resume + probes.rule_book 三处传完整身份 | coherence::TestBoundIdentityDisagreement ×2 + 完整一致加载 |
+
+## P0-04（CA Provider-Shape，§5）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 5.4 ephemeral adapter（raw 不动） | `golden_router.CA_PROVIDER_FIELD_CONTRACT + _ca_provider_view`（event_type=端点身份；lineage=source_endpoint/raw_request_id）；DomainData 事件行 = normalized view | shape::TestProviderView ×7（含 payload 伪造 EVENT_TYPE 被忽略） |
+| 5.5 缺字段 fail-closed | `CAProviderShapeError` → route_all 结构化 `VALIDATED_FAIL(PROVIDER_SCHEMA)` | shape::test_broken_provider_shape_structured_fail |
+| 5.6 provider-shaped fixtures | FakeTarget 改文档字段（MARKET_CODE/DATE_EX；MARKET_CODE/EX_DIVIDEND_DATE）；raw parquet 列名断言 {MARKET_CODE, DATE_EX} | shape::test_fake_target_uses_documented_provider_fields + test_raw_evidence_retains_provider_native_fields |
+| 5.6 opposite endpoint / actual v3 | 反向类型 fail；真实 v3 CA case provider-shaped 端到端 PASS（validator v6） | shape::test_opposite_endpoint_never_satisfies_case + test_actual_v3_case_with_provider_shape_passes |
+
+## P1-01/02（§6/§7）
+
+| 要求 | 实现位置 |
+|---|---|
+| Option A 单文件 fail loud | `review.py`：`len(dataset_files) != 1` → clear unsupported-multi-file ERROR（exit 2；禁止未来 silent review only first file） |
+| Option A wording | 注释/文档更正为 **atomic replacement / reader-safe**（非 power-loss durable，无 fsync）；DEVLOG/总册不再使用 crash-safe 措辞 |
+
+## §8 Governance（DM-CR-20260825-012）
+
+| 要求 | 落实 |
+|---|---|
+| exact SHA baseline | 总册头部：上批 implementation `2e85f4477c89486a7de401d068c383378ecbc3f0`（run 38 = success） |
+| CI = run 38 SUCCESS | 头部 CI Status 更新 |
+| ADR-014 overclaim 修正 | 总册头部 **Reviewer Correction 段**（如实记录两处不成立；ADR-015 §5 为准；ADR-014 原文保留为历史）+ ADR-000 索引标注 |
+| R4-A2.6/CR-1.2.2 → REOPENED | §40（"由 R4-A2.7/CR-1.2.3 修复（本批）"） |
+| RISK-004 保持 REOPENED | §52 理由更新为本批四 P0 |
+| DEVLOG 顶部追加 | 2026-08-25 新条目（历史全保留） |
+
+## §11 Exit Gate 自检
+
+```text
+[x] P0-01 bound confinement before ANY file probe/read（FsSpy 零越界证明）
+[x] P0-02 idempotent returned identity == persisted identity（6 测试全场景）
+[x] P0-03 source/content version required + exact coherent（required×4 + mismatch×2 + provenance×3 + bound×2）
+[x] P0-04 documented AmazingData CA provider shape reaches typed validator（fixtures + v6 + 真实 v3）
+[x] raw evidence remains provider-native / immutable（parquet 列名断言；adapter ephemeral）
+[x] CA type remains fail-closed（EVENT_TYPE_UNRESOLVED / EVENT_TYPE_MISMATCH / PROVIDER_SCHEMA）
+[x] rule run-bound exact replay remains intact（身份三重复验 + adversarial 保持）
+[x] all new adversarial tests pass（580/0）
+[x] local CI-equivalent checks green（四检查全绿）
+[x] GitHub Actions result recorded accurately（run 38 已录；本批以 Actions 为准）
+[x] DEVLOG updated / DEVELOPMENT_MANAGEMENT updated / ADR updated（ADR-015 + 索引）
+[x] every important change note records why / how / alternatives / costs-benefits（ADR-015 §1-§5 + DM-CR 方案取舍段）
+```
+
+已知开放项（如实声明）：Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED）；Branch Protection 未启用；CR-2 / R4-A3 / P0-M-1B 保持 BLOCKED 直到本批 VERIFIED。

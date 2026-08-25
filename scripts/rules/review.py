@@ -117,6 +117,20 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+    # R4-A2.7 P1-01 (audit 20260825 #3 section 6, Option A): this tool
+    # reviews exactly ONE dataset file. A multi-file ACTIVE version is
+    # refused EXPLICITLY (fail loud) instead of silently reviewing only
+    # the first file.
+    if len(active.dataset_files) != 1:
+        print(
+            f"ERROR: ACTIVE dataset {active.rule_version!r} declares "
+            f"{len(active.dataset_files)} files "
+            f"({list(active.dataset_files)}) - this tool reviews single-file "
+            "datasets only; a multi-file review must seal the COMPLETE file "
+            "list (never silently review just the first)",
+            file=sys.stderr,
+        )
+        return 2
     active_rel = active.dataset_files[0] if active.dataset_files else ""
     input_rel = _rel_under_root(rules_path, rules_root)
     if not input_rel or input_rel.replace("\\", "/") != active_rel.replace("\\", "/"):
@@ -202,10 +216,13 @@ def main() -> int:
         print(f"ERROR: reviewed copy fails the review gate: {problems}", file=sys.stderr)
         return 2
 
-    # flip the ACTIVE manifest to the reviewed version - CRASH-SAFE
-    # (R4-A2.6 P1-02): write a temp manifest, then atomically replace -
-    # a crash leaves either the old valid ACTIVE or the new valid ACTIVE,
-    # never a half-written manifest
+    # flip the ACTIVE manifest to the reviewed version - ATOMIC
+    # REPLACEMENT / READER-SAFE (R4-A2.6 P1-02 + R4-A2.7 P1-02): write a
+    # temp manifest, then Path.replace - concurrent readers always see
+    # either the complete old manifest or the complete new one, never a
+    # half-written file. (This is NOT a power-loss durability guarantee -
+    # no file/dir fsync is performed; a torn old-or-new state survives an
+    # OS crash only as one of the two complete files.)
     dataset_files = [f"versions/{args.version}/rules.yaml"]
     manifest = {
         "rule_version": args.version,
@@ -227,7 +244,7 @@ def main() -> int:
     manifest_bytes = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
     tmp_manifest = rules_root / f".{RULE_MANIFEST_FILE}.tmp-{args.version}"
     tmp_manifest.write_bytes(manifest_bytes + b"\n")
-    tmp_manifest.replace(manifest_path)  # atomic ACTIVE flip (crash-safe)
+    tmp_manifest.replace(manifest_path)  # atomic replacement (reader-safe)
     loaded_manifest = load_rule_manifest(rules_root)
     if loaded_manifest.rule_version != args.version:
         print("ERROR: ACTIVE manifest did not flip to the reviewed version", file=sys.stderr)

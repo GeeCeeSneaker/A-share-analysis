@@ -13,6 +13,42 @@
 
 ---
 
+## 2026-08-25 · R4-A2.7 Final Integrity / Provider-Shape Closure + CR-1.2.3 Evidence Identity Closure（复审 4 项 P0 + 2 项 P1 + 治理修正）
+
+**Scope**
+- R4-A2.6/CR-1.2.2 复审裁决 REOPENED（工作要求 20260825 第三份）：P0-01..P0-04 + P1-01/02 + §8 治理修正（exact SHA / run 38 / ADR-014 overclaim）；按 Batch A→F 全部完成（未启动 CR-2——遵守 §9/§12 约束）
+
+**Implementation**
+- **P0-01 Bound Pre-Access Confinement（DM-CR-20260825-008，ADR-015 §5.1）**：`load_bound_rule_book` 的 root 改为参数**确定性解析**（废除 `(root/dataset_files[0]).is_file()` 探测——篡改绑定 `../../outside.yaml` 曾在拒绝前发生一次越界 fs probe）；全文件 confinement（lexical + resolved + versions/<v>/ 结构）先于任何存在性/读取；**FsSpy 测试**（patch Path.is_file/read_bytes/open）证明 traversal（外部文件真实存在）/绝对路径/异版本目录的拒绝全程**零越界访问**
+- **P0-02 Raw Evidence Identity（DM-CR-20260825-009，ADR-015 §5.2）**：完整幂等成功重试的返回身份改以**磁盘实际 bytes** 计算（`meta_path.read_bytes()`——旧实现返回新 serialization 的 hash，ingested_at 差异导致 SpikeCase 绑定后 evidence closure 必败）；fresh commit 断言 persisted == intended；幂等重试返回 existing persisted hash（不覆盖旧 meta——immutable 语义保留首次落盘）；失败幂等/orphan 恢复同规则
+- **P0-03 Required Rule Coherence（DM-CR-20260825-010，ADR-015 §5.3）**：manifest source_version/dataset_version **必填非空 + 无条件精确比较**（"填了才比较"可选语义废除——空 manifest 字段曾走私真实 dataset lineage 且 new_run 绑定空 source_version）；`provenance_complete()` 纳入 dataset_version + source_version；`load_bound_rule_book` 增 source_version/review_status 复验（verdict/resume/rule_book 三处调用全传完整身份——bound 与 loaded 不一致即 BLOCK）
+- **P0-04 CA Provider-Shape Adapter（DM-CR-20260825-011，ADR-015 §1-4）**：显式文档契约 `CA_PROVIDER_FIELD_CONTRACT`（get_dividend: MARKET_CODE/DATE_EX；get_right_issue: MARKET_CODE/EX_DIVIDEND_DATE——官方 3.5.7.1/3.5.7.2）；**ephemeral** `_ca_provider_view` 归一化（event_type=**端点身份**派生——payload 伪造的 EVENT_TYPE 列被忽略；view 携带 source_endpoint/raw_request_id lineage）；缺文档字段 → `CAProviderShapeError` → 结构化 `VALIDATED_FAIL(PROVIDER_SCHEMA)`；**FakeTarget 改 provider 原生字段**（dry-run 与 real 同一 adapter，canonical 旁路消除）；raw evidence 保持 provider 原生字段（parquet 列名断言 {MARKET_CODE, DATE_EX}）；validator v6；真实 v3 case + provider-shaped fixture 端到端 PASS
+- **P1-01/02 Review Tool（DM-CR-20260825-012）**：review.py 显式单文件限制（multi-file ACTIVE → fail loud with clear message，Option A）；durability wording 更正（**atomic replacement / reader-safe**——非 power-loss durable，未做 fsync）
+- **治理修正（DM-CR-20260825-012）**：总册头部 exact SHA（上批 implementation `2e85f447` + run 38 success）+ **Reviewer Correction 段**（ADR-014 overclaim 如实记录——bound 路径 pre-access confinement 与 required coherence 此前不成立，以 ADR-015 §5 修正为准，ADR-014 原文保留为历史）；§40 R4-A2.6/CR-1.2.2 → REOPENED（由本批修复）；RISK-004 理由更新并保持 REOPENED
+
+**Schema / Contract Changes**
+- C2 ×2（DM-CR-010 manifest 必填 coherence；DM-CR-011 CA provider-shape adapter 契约）+ C1 ×3（008/009/012）
+- ADR-015（amendment to ADR-013 §4 + ADR-014 契约补全，含审计 §13 四问完整记录：为什么/怎么改/备选方案/代价收益）
+
+**Verification**
+- Local: **580 tests passed / 0 failed**（544 → 580，+36：raw identity 6 + pre-access confinement 4（含 FsSpy）+ required coherence 12 + CA provider-shape 13 + 适配）；ruff check / ruff format --check / mypy 全绿（CI 等价四检查）
+- dry-run 冒烟：35 meta-anchored exchanges + 5 bundles，整 run 双向闭合零问题
+- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（上批 run 38 = success，Reviewer API 确认口径）
+
+**Implementation Status**
+- DONE（R4-A2.7 / CR-1.2.3 全部 P0 + P1 + 治理修正）
+
+**Review Status**
+- PENDING_REVIEW（对照工作要求 §11 Exit Gate 14 项与 Reviewer 下轮 7 项复检重点）
+
+**Known Open Issues**
+- Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED）；Branch Protection 未启用；CR-2 / R4-A3 / P0-M-1B 保持 BLOCKED 直到本批 VERIFIED
+
+**Next**
+- 推送 git + CI 确认 → Reviewer 复审 R4-A2.7/CR-1.2.3；VERIFIED 后可启动 R4-A3 / CR-2（provider-shape / raw-evidence contract 已稳定）
+
+---
+
 ## 2026-08-25 · R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement（复审 4 项 P0 + 3 项 P1 + 治理修正）
 
 **Scope**

@@ -72,7 +72,14 @@ def route_golden_case(case: GoldenCase) -> str:
 @dataclass(frozen=True)
 class DomainData:
     """Provider data fetched per domain, built from the EXACT payloads of
-    the persisted exchanges (audit section 6.2)."""
+    the persisted exchanges (audit section 6.2).
+
+    R4-A2.7 P0-04: ``dividend_rows`` / ``right_issue_rows`` hold the
+    NORMALIZED SEMANTIC VIEW (see ``_ca_provider_view``) - lowercase
+    ``security_code`` / ``ex_date`` / ``event_type`` (+ ``source_endpoint``
+    / ``raw_request_id`` lineage). The RAW evidence keeps the provider's
+    native field names (MARKET_CODE / DATE_EX / EX_DIVIDEND_DATE ...);
+    the view is ephemeral and in-memory only."""
 
     domain: str
     status_rows: list[dict[str, Any]] | None = None
@@ -85,6 +92,70 @@ class DomainData:
     right_issue_rows: list[dict[str, Any]] | None = None
     kline_rows: list[dict[str, Any]] | None = None
     calendar_days: list[int] | None = None
+
+
+#: R4-A2.7 P0-04 (audit 20260825 #3 section 5): the documented AmazingData
+#: corporate-action payload contracts (3.5.7.1 get_dividend /
+#: 3.5.7.2 get_right_issue). The event TYPE is ENDPOINT IDENTITY - the
+#: provider payload does NOT carry an EVENT_TYPE field and must never be
+#: fabricated into the raw evidence.
+CA_PROVIDER_FIELD_CONTRACT = {
+    "dividend": {"code": "MARKET_CODE", "ex_date": "DATE_EX"},
+    "right_issue": {"code": "MARKET_CODE", "ex_date": "EX_DIVIDEND_DATE"},
+}
+
+
+class CAProviderShapeError(ValueError):
+    """The provider CA payload is missing a documented contract field
+    (fail loud - never a silent empty row set)."""
+
+
+def _ca_provider_view(
+    stream: str,
+    rows: list[dict[str, Any]],
+    *,
+    source_endpoint: str = "",
+    raw_request_id: str = "",
+) -> list[dict[str, Any]]:
+    """R4-A2.7 P0-04: ephemeral in-memory normalization of ONE provider
+    corporate-action stream into the canonical validator view.
+
+    ``stream`` is "dividend" or "right_issue" (endpoint identity); the
+    documented provider field names map as:
+        MARKET_CODE   -> security_code
+        DATE_EX       -> ex_date        (dividend)
+        EX_DIVIDEND_DATE -> ex_date     (right issue)
+    and ``event_type`` is DERIVED from the endpoint identity (DIVIDEND /
+    RIGHT_ISSUE) - it is NOT a provider payload field. Each view row
+    carries ``source_endpoint`` / ``raw_request_id`` lineage back to the
+    exact persisted exchange. Missing documented fields raise
+    CAProviderShapeError (fail loud)."""
+    contract = CA_PROVIDER_FIELD_CONTRACT.get(stream)
+    if contract is None:
+        msg = f"unknown corporate-action stream {stream!r}"
+        raise CAProviderShapeError(msg)
+    event_type = "DIVIDEND" if stream == "dividend" else "RIGHT_ISSUE"
+    view: list[dict[str, Any]] = []
+    for row in rows:
+        code = str(row.get(contract["code"], "") or "").strip()
+        ex_date = str(row.get(contract["ex_date"], "") or "").strip()
+        if not code or not ex_date:
+            msg = (
+                f"provider {stream} payload row missing documented contract "
+                f"fields ({contract['code']}={code!r}, "
+                f"{contract['ex_date']}={ex_date!r}) - row={row}"
+            )
+            raise CAProviderShapeError(msg)
+        view.append(
+            {
+                "security_code": code,
+                "ex_date": ex_date,
+                "event_type": event_type,
+                "source_endpoint": source_endpoint,
+                "raw_request_id": raw_request_id,
+            }
+        )
+    return view
 
 
 # ------------------------------------------------------------------ bundle
@@ -227,8 +298,10 @@ def fetch_domain_data(
         # R4-A2.5 P0-04: dividend and right-issue are SEPARATE event
         # streams; a DIVIDEND record can never substitute a RIGHT_ISSUE
         # expectation (both are persisted evidence).
-        dividend = collector.persist(ctx.target.get_dividend_exchange(symbols))
-        right_issue = collector.persist(ctx.target.get_right_issue_exchange(symbols))
+        dividend_exchange = ctx.target.get_dividend_exchange(symbols)
+        right_issue_exchange = ctx.target.get_right_issue_exchange(symbols)
+        dividend = collector.persist(dividend_exchange)
+        right_issue = collector.persist(right_issue_exchange)
         begin, end = _event_window(cases)
         # CR-1.2: the calendar prerequisite of kline is EXPLICIT (persisted
         # above, windowed here) - no invisible internal calendar exchange
@@ -245,8 +318,22 @@ def fetch_domain_data(
             domain=domain,
             status_rows=_rows(status),
             adj_rows=_rows(adj),
-            dividend_rows=_rows(dividend),
-            right_issue_rows=_rows(right_issue),
+            # R4-A2.7 P0-04: the validator consumes the NORMALIZED view of
+            # the provider-native payload (documented field contract); the
+            # persisted raw evidence keeps the provider's own field names.
+            # Lineage points at the EXACT persisted exchange.
+            dividend_rows=_ca_provider_view(
+                "dividend",
+                _rows(dividend),
+                source_endpoint=str(dividend_exchange.envelope.endpoint),
+                raw_request_id=str(dividend_exchange.request_id),
+            ),
+            right_issue_rows=_ca_provider_view(
+                "right_issue",
+                _rows(right_issue),
+                source_endpoint=str(right_issue_exchange.envelope.endpoint),
+                raw_request_id=str(right_issue_exchange.request_id),
+            ),
             kline_rows=_rows(kline),
             calendar_days=cal_days,
         )
@@ -610,13 +697,16 @@ def _validate_corp_action_context(
             actual=type_error,
             reason_code="EVENT_TYPE_UNRESOLVED",
             validator_id="corp_action_context_v2",
-            validator_version="5",
+            validator_version="6",
         )
+    # R4-A2.7 P0-04: the event rows are the NORMALIZED provider view
+    # (security_code / ex_date / event_type + endpoint/request lineage) -
+    # see _ca_provider_view. No canonical-like field access here.
     dividend_rows = [
-        r for r in (data.dividend_rows or []) if str(r.get("SECURITY_CODE", "")) == bare
+        r for r in (data.dividend_rows or []) if str(r.get("security_code", "")) == bare
     ]
     right_rows = [
-        r for r in (data.right_issue_rows or []) if str(r.get("SECURITY_CODE", "")) == bare
+        r for r in (data.right_issue_rows or []) if str(r.get("security_code", "")) == bare
     ]
     all_event_rows = [*dividend_rows, *right_rows]
     if not all_event_rows:
@@ -629,26 +719,27 @@ def _validate_corp_action_context(
             ),
             reason_code="EVENT_SOURCE_MISSING",
             validator_id="corp_action_context_v2",
-            validator_version="4",
+            validator_version="6",
         )
-    events_at_t = [r for r in all_event_rows if str(r.get("EX_DATE", "")) == t_day]
+    events_at_t = [r for r in all_event_rows if str(r.get("ex_date", "")) == t_day]
     if not events_at_t:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
-            expected=f"{case.truth_source} (event record EX_DATE == {t_day})",
+            expected=f"{case.truth_source} (event record ex_date == {t_day})",
             actual=(
                 "provider event records exist but none matches the case's exact "
-                f"event date (found EX_DATEs: "
-                f"{sorted({str(r.get('EX_DATE')) for r in all_event_rows})[:5]})"
+                f"event date (found ex_dates: "
+                f"{sorted({str(r.get('ex_date')) for r in all_event_rows})[:5]})"
             ),
             reason_code="EVENT_DATE_MISMATCH",
             validator_id="corp_action_context_v2",
-            validator_version="4",
+            validator_version="6",
         )
     # the golden truth pins the event TYPE (mandatory since R4-A2.6): the
     # exact-date record must be of that type (a DIVIDEND record can NEVER
-    # substitute a RIGHT_ISSUE expectation and vice versa)
-    types_at_t = {_normalize_event_type(r.get("EVENT_TYPE", "")) for r in events_at_t}
+    # substitute a RIGHT_ISSUE expectation and vice versa). The type is
+    # ENDPOINT IDENTITY carried by the normalized view (R4-A2.7).
+    types_at_t = {str(r.get("event_type", "")) for r in events_at_t}
     if expected_type not in types_at_t:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -659,7 +750,7 @@ def _validate_corp_action_context(
             ),
             reason_code="EVENT_TYPE_MISMATCH",
             validator_id="corp_action_context_v2",
-            validator_version="5",
+            validator_version="6",
         )
     # exact event date + factor transition at T
     adj_rows = sorted(
@@ -755,7 +846,7 @@ def _validate_corp_action_context(
             f"raw_ret={raw_ret:.4f}, adj_ret={adj_ret:.4f} (continuity held)"
         ),
         validator_id="corp_action_context_v2",
-        validator_version="5",
+        validator_version="6",
     )
 
 
@@ -1069,6 +1160,30 @@ def route_all(
             evidence = collector.bundle_evidence()
             for case in domain_cases:
                 outcomes.append((case, _failure_outcome(exc, case), evidence))
+            continue
+        except CAProviderShapeError as exc:
+            # R4-A2.7 P0-04: a documented-contract field is missing from
+            # the provider's CA payload - a STRUCTURED validation failure
+            # for every case of the domain (never silent empty rows). The
+            # fetch exchanges are already persisted (the raw evidence
+            # retains the provider-native bytes for forensics).
+            evidence = collector.bundle_evidence()
+            for case in domain_cases:
+                outcomes.append(
+                    (
+                        case,
+                        ValidationOutcome(
+                            result=CaseResult.VALIDATED_FAIL,
+                            expected=f"{case.truth_source} (documented provider CA schema)",
+                            actual=f"provider CA payload violates the documented field "
+                            f"contract: {exc}",
+                            reason_code="PROVIDER_SCHEMA",
+                            validator_id="ca_provider_view",
+                            validator_version="1",
+                        ),
+                        evidence,
+                    )
+                )
             continue
         evidence = collector.bundle_evidence()
         # R4-A2.4 P0-03: validators resolve rules through the RUN-BOUND

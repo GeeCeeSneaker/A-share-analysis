@@ -167,9 +167,9 @@ def resume_run(
             truth_version=run.golden_truth_version,
             dataset_hash=run.golden_dataset_hash,
         )
-    # R4-A2.4 P0-03 + R4-A2.5 P0-02 + R4-A2.6 P0-04: resume also re-verifies
-    # the RUN-BOUND rule dataset (full file list + combined hash + both
-    # version identities)
+    # R4-A2.4 P0-03 + R4-A2.5 P0-02 + R4-A2.6 P0-04 + R4-A2.7 P0-03: resume
+    # also re-verifies the RUN-BOUND rule dataset (full file list + combined
+    # hash + both version identities + source lineage + review status)
     if run.trading_rule_dataset_files:
         from ashare_state.spike.trading_rule import load_bound_rule_book
 
@@ -178,6 +178,8 @@ def resume_run(
             dataset_files=run.trading_rule_dataset_files,
             dataset_hash=run.trading_rule_dataset_hash,
             dataset_version=run.trading_rule_dataset_version,
+            source_version=run.trading_rule_source_version,
+            review_status=run.trading_rule_review_status,
         )
     return run
 
@@ -555,6 +557,8 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
                 dataset_files=run.trading_rule_dataset_files,
                 dataset_hash=run.trading_rule_dataset_hash,
                 dataset_version=run.trading_rule_dataset_version,
+                source_version=run.trading_rule_source_version,
+                review_status=run.trading_rule_review_status,
             )
             if run.run_kind == RunKind.PRODUCTION:
                 rule_problems = trading_rule_review_gate(bound_book)

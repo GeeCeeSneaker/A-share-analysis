@@ -112,11 +112,11 @@ class TestEventSourceRequired:
                 from ashare_state.spike.target import _fake_exchange
 
                 self._mark("get_dividend")
+                # R4-A2.7 P0-04: provider-native documented field names
                 rows = [
                     {
-                        "SECURITY_CODE": code.split(".")[0],
-                        "EX_DATE": "20230627",  # the OTHER ex-date, not T
-                        "EVENT_TYPE": "DIVIDEND",
+                        "MARKET_CODE": code.split(".")[0],
+                        "DATE_EX": "20230627",  # the OTHER ex-date, not T
                     }
                     for code in code_list
                     if code in ("600519.SH",)

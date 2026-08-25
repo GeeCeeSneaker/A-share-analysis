@@ -250,12 +250,36 @@ class TestStaticBoundaryGuard:
 
     def test_golden_router_direct_exchange_calls_confined(self):
         """golden_router.py: direct target exchange calls must live inside
-        the collector.persist(...) boundary (call-and-persist) or a
-        lambda."""
+        an approved boundary: collector.persist(...) (call-and-persist),
+        assign-then-persist (``x = ctx.target.X(); ... collector.persist(x)``
+        - the R4-A2.7 provider-view lineage pattern), or a lambda."""
         source_path = Path("src/ashare_state/spike/golden_router.py")
         source = source_path.read_text(encoding="utf-8")
         tree = ast.parse(source)
         parents = self._parent_map(tree)
+        # map assigned name -> the exchange Call it is bound to
+        assigned: dict[int, str] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                target_expr = node.targets[0]
+                if isinstance(target_expr, ast.Name) and isinstance(node.value, ast.Call):
+                    func = node.value.func
+                    if (
+                        isinstance(func, ast.Attribute)
+                        and func.attr.endswith("_exchange")
+                        and isinstance(func.value, ast.Attribute)
+                        and func.value.attr in ("target", "ctx_target")
+                    ):
+                        assigned[id(node.value)] = target_expr.id
+        persisted_names: set[str] = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if isinstance(func, ast.Attribute) and func.attr == "persist":
+                for arg in node.args:
+                    if isinstance(arg, ast.Name):
+                        persisted_names.add(arg.id)
         offenders: list[int] = []
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
@@ -267,7 +291,9 @@ class TestStaticBoundaryGuard:
                 and isinstance(func.value, ast.Attribute)
                 and func.value.attr in ("target", "ctx_target")
             ) and not (
-                self._inside_persist_call(node, parents) or self._inside_lambda(node, parents)
+                self._inside_persist_call(node, parents)
+                or self._inside_lambda(node, parents)
+                or assigned.get(id(node)) in persisted_names
             ):
                 offenders.append(node.lineno)
         assert not offenders, (

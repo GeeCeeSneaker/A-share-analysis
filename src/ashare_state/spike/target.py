@@ -393,6 +393,12 @@ class FakeTarget:
     def get_dividend_exchange(self, code_list: list[str]) -> ProviderExchange:
         """Fake corporate-action EVENT records (R4-A2.4 P0-05 event SoR).
 
+        R4-A2.7 P0-04: the fake payload uses the DOCUMENTED provider field
+        names (AmazingData 3.5.7.1 get_dividend: MARKET_CODE / DATE_EX) -
+        no SECURITY_CODE / EX_DATE / EVENT_TYPE fabrication. The dry-run
+        therefore exercises the SAME provider-shape validation adapter as
+        the real provider.
+
         Mirrors _FAKE_ADJ_EVENTS: 600519.SH has DIVIDEND events on its two
         ex-dates; symbols without events return EMPTY (the adj-only
         failure mode stays observable per case). Right-issue symbols
@@ -406,18 +412,22 @@ class FakeTarget:
                 for ex_date, _factor in events:
                     rows.append(
                         {
-                            "SECURITY_CODE": code.split(".")[0],
-                            "EX_DATE": str(ex_date),
-                            "EVENT_TYPE": "DIVIDEND",
-                            "DIVIDEND_PER_SHARE": 21.675,
+                            "MARKET_CODE": code.split(".")[0],
+                            "DATE_EX": str(ex_date),
                         }
                     )
         return _fake_exchange(
-            "InfoData.get_dividend", "corporate_action", rows, params={"code_list": list(code_list)}
+            "InfoData.get_dividend",
+            "corporate_action",
+            rows,
+            params={"code_list": list(code_list)},
         )
 
     def get_right_issue_exchange(self, code_list: list[str]) -> ProviderExchange:
         """Fake right-issue EVENT records (R4-A2.5 P0-04).
+
+        R4-A2.7 P0-04: documented provider field names (AmazingData 3.5.7.2
+        get_right_issue: MARKET_CODE / EX_DIVIDEND_DATE).
 
         600036.SH has a RIGHT_ISSUE event on 2022-06-30 - a SEPARATE
         stream from get_dividend: a case expecting RIGHT_ISSUE must find
@@ -430,10 +440,8 @@ class FakeTarget:
                 for ex_date, _factor in events:
                     rows.append(
                         {
-                            "SECURITY_CODE": code.split(".")[0],
-                            "EX_DATE": str(ex_date),
-                            "EVENT_TYPE": "RIGHT_ISSUE",
-                            "RIGHTS_PER_SHARE": 0.3,
+                            "MARKET_CODE": code.split(".")[0],
+                            "EX_DIVIDEND_DATE": str(ex_date),
                         }
                     )
         return _fake_exchange(
