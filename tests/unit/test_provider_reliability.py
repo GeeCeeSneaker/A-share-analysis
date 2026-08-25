@@ -53,20 +53,30 @@ class TestRetryPolicy:
 class TestCapabilityUseMode:
     def test_production_mode_refuses_candidate(self):
         """Audit P1-02 / R2-P1-02: PRODUCTION + CANDIDATE -> GOVERNANCE
-        error (never ProviderPermissionError - that is broker-side only)."""
+        error (never ProviderPermissionError - that is broker-side only).
+
+        CI runs WITHOUT the broker SDK installed: the constructor's
+        default ``probe_identity()`` would raise ProviderUnavailableError
+        there - pass an explicit identity (the capability gating under
+        test has nothing to do with SDK presence)."""
         from ashare_state.providers.amazingdata.session import AccountProfile
         from ashare_state.providers.errors import ProviderCapabilityNotApprovedError
 
         session = _FakeSession(AccountProfile())
-        provider = AmazingDataProvider(session, use_mode=ProviderUseMode.PRODUCTION)
+        provider = AmazingDataProvider(
+            session, use_mode=ProviderUseMode.PRODUCTION, identity=_FakeIdentity()
+        )
         with pytest.raises(ProviderCapabilityNotApprovedError, match="not APPROVED"):
             provider._gate_capability("daily_bar")  # noqa: SLF001
 
     def test_spike_mode_allows_candidate(self):
+        """Explicit identity for SDK-less CI (see the test above)."""
         from ashare_state.providers.amazingdata.session import AccountProfile
 
         session = _FakeSession(AccountProfile())
-        provider = AmazingDataProvider(session, use_mode=ProviderUseMode.SPIKE)
+        provider = AmazingDataProvider(
+            session, use_mode=ProviderUseMode.SPIKE, identity=_FakeIdentity()
+        )
         status = provider._gate_capability("daily_bar")  # noqa: SLF001
         assert status is not None
         assert "daily_bar" in CAPABILITY_REGISTRY
