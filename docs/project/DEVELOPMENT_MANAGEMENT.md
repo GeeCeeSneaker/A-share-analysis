@@ -7,11 +7,11 @@
 > **Reviewed Repository HEAD**：`8a6f4149e0f7090850b77c3b2e6a804b8ef45595`（Reviewer 复审基线，run 46 全三腿 success）  
 > **Primary Implementation（上批）**：`793dfc1220e3d1b8669483c008a8596150b0dcd6`  
 > **Cross-Platform CI Fix（上批）**：`b429220663897060b7940c727d0e09ec902192de`  
-> **Current Code Baseline**：本批 implementation commit（R4-A2.10 Review Publish Byte-Identity / CR-1.2.6 Review Publish Integrity；SHA 于提交后由同批 docs commit 记录）  
+> **Current Code Baseline**：本批 implementation commit `8d29c16d2476a48e105b091a9ec63b2b39c3d77e`（R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity；run 48 三腿 success）  
 > **Document Revision**：DM-CR-20260825-022 / 023 / 024 / 025 / 026  
 > **Last Review**：2026-08-25 18:55 +08:00（R4-A2.9/CR-1.2.5 复审：REOPENED——2 项 P0 + 2 项 P1 + 治理修正，本批 R4-A2.10/CR-1.2.6 修复）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN**——run 46（Reviewed HEAD `8a6f4149`）与 run 45（`b429220`）均 Ubuntu 3.14 + Windows 3.12 + Windows 3.14 三 job 全部 success（Reviewer 正向确认；DM-CR-20260825-019 root-cause investigation CLOSED）；本批提交后以 Actions 实际结果为准  
+> **CI Status**：**FULL MATRIX GREEN**——run 46（Reviewed HEAD `8a6f4149`）与 run 45（`b429220`）均三腿 success（Reviewer 正向确认；DM-CR-20260825-019 CLOSED）；**run 48（本批 implementation `8d29c16d`）三腿 success**（2026-08-25 API positive confirmation——新增 generated-byte 测试在 Ubuntu+Windows 两 OS 通过）  
 > **Reviewer Correction（2026-08-25 18:55）**：R4-A2.9 的输入侧 exact snapshot / version 输出 confinement / 跨平台 CI 修复保留冻结；但输出侧未闭合——REVIEWED 经 write_text 落盘（Windows 换行翻译破坏 byte identity）、publish 后 final reread 定义 manifest hash（TOCTOU：gate 验证 R / manifest 祝福 T）（ADR-018 为修正记录；历史 ADR 原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。

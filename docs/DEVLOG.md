@@ -33,7 +33,7 @@
 - Local: **650 tests passed / 0 failed**（639 → 650，+11：persisted byte identity 4 + publish tamper 2 + pre-commit cleanup 2 + single-writer 3）；ruff check / ruff format --check / mypy 全绿（CI 等价四检查）
 - dry-run 冒烟：35 meta-anchored exchanges + 5 bundles，整 run 双向闭合零问题
 - byte-level 对抗验证：生成 REVIEWED 文件 == 独立重建的 reviewed_bytes（LF-only）；manifest hash 独立重算一致；生成版本经 load_active_rules/load_bound_rule_book 重放（跨平台字节真相）；rename 后注入 tamper → fail closed + rollback + 同版本重试成功
-- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（上一批 run 45/46 已全三腿 success；本批新增 generated-byte 测试随 matrix 在两 OS 执行）
+- GitHub Actions: **FULL MATRIX GREEN——run 48（`8d29c16`）三腿 success**（API positive confirmation；新增 generated-byte 测试在 Ubuntu+Windows 两 OS 通过）
 
 **Implementation Status**
 - DONE（R4-A2.10 / CR-1.2.6 全部 P0 + P1 + 治理修正）
