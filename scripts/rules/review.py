@@ -1,34 +1,35 @@
-"""Trading-rule dataset review workflow (R4-A2.4 P0-04).
+"""Trading-rule dataset review workflow (R4-A2.4 P0-04 + R4-A2.5 P0-02/03).
 
-Mirrors the golden-truth review discipline for the rule data layer:
+Rule dataset lifecycle (mirrors golden truth):
 
-    COMPILED (candidate) -> REVIEWED (human-reviewed)
+    versions/<v-compiled>/rules.yaml   COMPILED candidate (immutable)
+    -- reviewer supplies an OFFICIAL source artifact -->
+    versions/<v-reviewed>/rules.yaml   REVIEWED copy (immutable, NEW version)
+    rule_manifest.json                 ACTIVE selector -> the reviewed version
+    evidence/<ref>                     sealed source artifact bytes
 
-The reviewer supplies an OFFICIAL source artifact (exchange notice /
-regulator doc / official dataset doc); the tool computes its SHA-256 and
-writes the review provenance INTO a new reviewed copy of the yaml. The
-original COMPILED file is never modified in place - the reviewed version
-is a new file (``--out``), which the operator then points the ACTIVE
-rules at (single-file convention: configs/trading_rules/).
-
-The provenance is verifiable forever after via
+The tool computes the artifact's SHA-256 itself, writes the reviewed copy
+under a NEW immutable version directory (the COMPILED original is never
+modified), stores the artifact under the evidence root, and flips the
+ACTIVE manifest. The provenance is verifiable forever after via
 ``ashare_state.spike.trading_rule.trading_rule_review_gate`` - the gate
-resolves ``source_artifact_ref`` under the rules root (or its evidence/
-subdir) and re-hashes the bytes.
+resolves ``source_artifact_ref`` RELATIVE TO THE EVIDENCE ROOT (path
+confined) and re-hashes the bytes.
 
 Usage:
     uv run python scripts/rules/review.py \
-        --rules configs/trading_rules/a_share_limit_v1.yaml \
-        --artifact docs/evidence/rules/a_share_limit_v1_source.pdf \
+        --rules configs/trading_rules/versions/v20260824-compiled/rules.yaml \
+        --artifact docs/evidence/a_share_limit_source.pdf \
         --kind EXCHANGE_NOTICE \
         --reviewer "human-name" \
-        --out configs/trading_rules/a_share_limit_v1_reviewed.yaml
+        --version v20260825-reviewed
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -37,11 +38,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from ashare_state.spike.trading_rule import (  # noqa: E402
+    RULE_EVIDENCE_SUBDIR,
+    RULE_MANIFEST_FILE,
     TradingRuleBook,
+    load_rule_manifest,
     trading_rule_review_gate,
 )
 
 _KINDS = ("OTHER_OFFICIAL", "EXCHANGE_NOTICE", "REGULATOR_DOC", "DATASET_DOC")
+
+
+def _dataset_files_hash(root: Path, rel_files: list[str]) -> str:
+    digest = hashlib.sha256()
+    for rel in sorted(rel_files):
+        digest.update(rel.replace("\\", "/").encode("utf-8"))
+        digest.update((root / rel).read_bytes())
+    return digest.hexdigest()
 
 
 def main() -> int:
@@ -50,12 +62,21 @@ def main() -> int:
     parser.add_argument("--artifact", required=True, help="official source artifact file")
     parser.add_argument("--kind", required=True, choices=_KINDS)
     parser.add_argument("--reviewer", required=True, help="human reviewer identity")
-    parser.add_argument("--out", required=True, help="output REVIEWED yaml path")
+    parser.add_argument(
+        "--version",
+        required=True,
+        help="new immutable version name (e.g. v20260825-reviewed)",
+    )
+    parser.add_argument(
+        "--rules-root",
+        default="configs/trading_rules",
+        help="rules root holding versions/ + evidence/ + rule_manifest.json",
+    )
     args = parser.parse_args()
 
     rules_path = Path(args.rules)
     artifact = Path(args.artifact)
-    out_path = Path(args.out)
+    rules_root = Path(args.rules_root)
     if not rules_path.is_file():
         print(f"ERROR: rules file not found: {rules_path}", file=sys.stderr)
         return 2
@@ -70,15 +91,28 @@ def main() -> int:
 
     artifact_hash = hashlib.sha256(artifact.read_bytes()).hexdigest()
     now = datetime.now(UTC).isoformat()
-    # the artifact must remain resolvable by the review gate: copy it next
-    # to the rules (evidence/ convention) unless it already lives there
-    rules_dir = rules_path.parent
-    evidence_dir = rules_dir / "evidence"
+    # seal the artifact bytes under the evidence root (the gate's confined
+    # resolution root); ref is RELATIVE to evidence/
+    evidence_dir = rules_root / RULE_EVIDENCE_SUBDIR
     evidence_dir.mkdir(parents=True, exist_ok=True)
-    artifact_copy = evidence_dir / artifact.name
-    if artifact.resolve() != artifact_copy.resolve():
+    artifact_ref = f"{artifact_hash[:16]}-{artifact.name}"
+    artifact_copy = evidence_dir / artifact_ref
+    if artifact_copy.exists() and artifact_copy.read_bytes() != artifact.read_bytes():
+        print(f"ERROR: evidence collision with different bytes: {artifact_ref}", file=sys.stderr)
+        return 2
+    if not artifact_copy.exists():
         shutil.copy2(artifact, artifact_copy)
 
+    # build the REVIEWED copy under a NEW immutable version directory
+    version_dir = rules_root / "versions" / args.version
+    if version_dir.exists():
+        print(
+            f"ERROR: version directory already exists: {version_dir} "
+            "(versions are immutable - pick a NEW version name)",
+            file=sys.stderr,
+        )
+        return 2
+    version_dir.mkdir(parents=True)
     lines = rules_path.read_text(encoding="utf-8").splitlines(keepends=True)
     provenance_keys = (
         "reviewed_by:",
@@ -88,7 +122,7 @@ def main() -> int:
         "source_artifact_kind:",
         "source_retrieved_at:",
     )
-    reviewed = []
+    reviewed: list[str] = []
     inserted = False
     for line in lines:
         if line.startswith("review_status:") and not inserted:
@@ -97,7 +131,7 @@ def main() -> int:
                 [
                     f"reviewed_by: {args.reviewer}\n",
                     f"reviewed_at: {now}\n",
-                    f"source_artifact_ref: evidence/{artifact.name}\n",
+                    f"source_artifact_ref: {artifact_ref}\n",
                     f"source_artifact_hash: {artifact_hash}\n",
                     f"source_artifact_kind: {args.kind}\n",
                     f"source_retrieved_at: {now}\n",
@@ -105,29 +139,59 @@ def main() -> int:
             )
             inserted = True
         elif line.startswith(provenance_keys):
-            # drop the COMPILED placeholder provenance (empty values) -
-            # keeping them would create DUPLICATE yaml keys whose last
-            # (empty) value silently overrides the review seal
+            # drop COMPILED placeholder provenance (empty values) - keeping
+            # them would create DUPLICATE yaml keys whose last (empty)
+            # value silently overrides the review seal
             continue
         else:
             reviewed.append(line)
     if not inserted:
         print("ERROR: review_status line not found in the rule yaml", file=sys.stderr)
         return 2
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text("".join(reviewed), encoding="utf-8")
+    reviewed_path = version_dir / "rules.yaml"
+    reviewed_path.write_text("".join(reviewed), encoding="utf-8")
 
-    # self-verify: the written file must PASS the review gate
-    reviewed_book = TradingRuleBook.load(out_path)
-    problems = trading_rule_review_gate(reviewed_book, rules_root=out_path.parent)
+    # self-verify: the reviewed copy must load and PASS the review gate
+    reviewed_book = TradingRuleBook.load(reviewed_path)
+    problems = trading_rule_review_gate(reviewed_book, rules_root=rules_root)
     if problems:
         print(f"ERROR: reviewed copy fails the review gate: {problems}", file=sys.stderr)
         return 2
+
+    # flip the ACTIVE manifest to the reviewed version
+    dataset_files = [f"versions/{args.version}/rules.yaml"]
+    manifest = {
+        "rule_version": args.version,
+        "review_status": "REVIEWED",
+        "dataset_files": dataset_files,
+        "dataset_hash": _dataset_files_hash(rules_root, dataset_files),
+        "source_version": book.source_version,
+        "dataset_version": reviewed_book.version,
+        "review_provenance": {
+            "reviewed_by": args.reviewer,
+            "reviewed_at": now,
+            "source_artifact_ref": artifact_ref,
+            "source_artifact_hash": artifact_hash,
+            "source_artifact_kind": args.kind,
+            "source_retrieved_at": now,
+        },
+    }
+    manifest_path = rules_root / RULE_MANIFEST_FILE
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n"
+    )
+    if problems:
+        print(f"ERROR: reviewed copy fails the review gate: {problems}", file=sys.stderr)
+        return 2
+    loaded_manifest = load_rule_manifest(rules_root)
+    if loaded_manifest.rule_version != args.version:
+        print("ERROR: ACTIVE manifest did not flip to the reviewed version", file=sys.stderr)
+        return 2
     print(
-        f"REVIEWED dataset written: {out_path}\n"
-        f"  version={reviewed_book.version} rules={len(reviewed_book.rules)}\n"
-        f"  source artifact evidence/{artifact.name} sha256={artifact_hash[:16]}...\n"
-        f"  review gate: PASS"
+        f"REVIEWED version written: {reviewed_path}\n"
+        f"  version={args.version} rules={len(reviewed_book.rules)}\n"
+        f"  evidence {RULE_EVIDENCE_SUBDIR}/{artifact_ref} sha256={artifact_hash[:16]}...\n"
+        f"  ACTIVE manifest -> {args.version}; review gate: PASS"
     )
     return 0
 

@@ -51,6 +51,7 @@ class SpikeTarget(Protocol):
     ) -> Any: ...
     def get_adj_factor_exchange(self, code_list: list[str]) -> Any: ...
     def get_dividend_exchange(self, code_list: list[str]) -> Any: ...
+    def get_right_issue_exchange(self, code_list: list[str]) -> Any: ...
     def get_calendar_exchange(self, market: str = "SH") -> Any: ...
     def query_kline_exchange(
         self,
@@ -110,6 +111,9 @@ class RealTarget:
 
     def get_dividend_exchange(self, code_list: list[str]) -> ProviderExchange:
         return self.provider.get_dividend_exchange(code_list)
+
+    def get_right_issue_exchange(self, code_list: list[str]) -> ProviderExchange:
+        return self.provider.get_right_issue_exchange(code_list)
 
     def get_calendar_exchange(self, market: str = "SH") -> ProviderExchange:
         return self.provider.get_calendar_exchange(market)
@@ -206,6 +210,8 @@ _FAKE_QUOTES: dict[str, tuple[float, float, int]] = {
 #: fake ex-dividend events (symbol -> [(ex_date, factor)])
 _FAKE_ADJ_EVENTS: dict[str, list[tuple[int, float]]] = {
     "600519.SH": [(20220630, 0.9737), (20230627, 0.9714)],
+    # R4-A2.5 P0-04: a RIGHT_ISSUE event (separate stream from dividend)
+    "600036.SH": [(20220630, 1.1)],
 }
 
 #: fake closes around ex dates (symbol -> {date: close})
@@ -217,6 +223,12 @@ _FAKE_CLOSES: dict[str, dict[int, float]] = {
         20230626: 1750.0,
         20230627: 1700.0,
         20230628: 1710.0,
+    },
+    # right-issue window: pre 38.0 -> ex 35.0 (factor-explained jump)
+    "600036.SH": {
+        20220629: 38.0,
+        20220630: 35.0,
+        20220701: 35.2,
     },
 }
 
@@ -345,9 +357,7 @@ class FakeTarget:
 
     def get_stock_basic_exchange(self, code_list: list[str]) -> ProviderExchange:
         self._mark("get_stock_basic")
-        rows = [
-            {"SECURITY_CODE": code.split(".")[0], "IS_LISTED": "1"} for code in code_list
-        ]
+        rows = [{"SECURITY_CODE": code.split(".")[0], "IS_LISTED": "1"} for code in code_list]
         return _fake_exchange(
             "InfoData.get_stock_basic", "stock_basic", rows, params={"code_list": list(code_list)}
         )
@@ -385,12 +395,14 @@ class FakeTarget:
 
         Mirrors _FAKE_ADJ_EVENTS: 600519.SH has DIVIDEND events on its two
         ex-dates; symbols without events return EMPTY (the adj-only
-        failure mode stays observable per case)."""
+        failure mode stays observable per case). Right-issue symbols
+        (600036.SH) return EMPTY here - the RIGHT_ISSUE stream is
+        separate (R4-A2.5 P0-04)."""
         self._mark("get_dividend")
         rows: list[dict[str, Any]] = []
         for code in code_list:
             events = _FAKE_ADJ_EVENTS.get(code)
-            if events:
+            if events and code == "600519.SH":
                 for ex_date, _factor in events:
                     rows.append(
                         {
@@ -402,6 +414,33 @@ class FakeTarget:
                     )
         return _fake_exchange(
             "InfoData.get_dividend", "corporate_action", rows, params={"code_list": list(code_list)}
+        )
+
+    def get_right_issue_exchange(self, code_list: list[str]) -> ProviderExchange:
+        """Fake right-issue EVENT records (R4-A2.5 P0-04).
+
+        600036.SH has a RIGHT_ISSUE event on 2022-06-30 - a SEPARATE
+        stream from get_dividend: a case expecting RIGHT_ISSUE must find
+        it HERE (a DIVIDEND record can never substitute)."""
+        self._mark("get_right_issue")
+        rows: list[dict[str, Any]] = []
+        for code in code_list:
+            events = _FAKE_ADJ_EVENTS.get(code)
+            if events and code == "600036.SH":
+                for ex_date, _factor in events:
+                    rows.append(
+                        {
+                            "SECURITY_CODE": code.split(".")[0],
+                            "EX_DATE": str(ex_date),
+                            "EVENT_TYPE": "RIGHT_ISSUE",
+                            "RIGHTS_PER_SHARE": 0.3,
+                        }
+                    )
+        return _fake_exchange(
+            "InfoData.get_right_issue",
+            "corporate_action",
+            rows,
+            params={"code_list": list(code_list)},
         )
 
     def get_calendar_exchange(self, market: str = "SH") -> ProviderExchange:
@@ -477,9 +516,7 @@ class FakeTarget:
 
     # ------------------------------------------------ data synthesis
     @staticmethod
-    def _status_rows(
-        start_date: int, end_date: int, code_list: list[str]
-    ) -> list[dict[str, Any]]:
+    def _status_rows(start_date: int, end_date: int, code_list: list[str]) -> list[dict[str, Any]]:
         days = [d for d in _FAKE_CALENDAR if start_date <= d <= end_date]
         if not days:
             # out-of-calendar sample dates still produce ONE end-date row so
@@ -505,13 +542,14 @@ class FakeTarget:
                 # ex-dividend marker days for CA golden fixtures
                 if code == "600519.SH" and day in (20220630, 20230627):
                     row["IS_WD_SEC"] = 1
+                # right-issue marker day (R4-A2.5 P0-04 fake fixture)
+                if code == "600036.SH" and day == 20220630:
+                    row["IS_WD_SEC"] = 1
                 rows.append(row)
         return rows
 
     @staticmethod
-    def _kline_rows(
-        code_list: list[str], begin_date: int, end_date: int
-    ) -> list[dict[str, Any]]:
+    def _kline_rows(code_list: list[str], begin_date: int, end_date: int) -> list[dict[str, Any]]:
         days = [d for d in _FAKE_CALENDAR if begin_date <= d <= end_date]
         if not days:
             days = [end_date]

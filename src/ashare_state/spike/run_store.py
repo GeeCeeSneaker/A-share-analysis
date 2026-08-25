@@ -90,9 +90,14 @@ class RunStore:
                 "golden_dataset_hash", payload.get("golden_manifest_hash", "")
             ),
             case_catalog_hash=payload.get("case_catalog_hash", ""),
-            trading_rule_file=payload.get("trading_rule_file", ""),
             trading_rule_version=payload.get("trading_rule_version", ""),
-            trading_rule_hash=payload.get("trading_rule_hash", ""),
+            trading_rule_dataset_files=list(
+                payload.get("trading_rule_dataset_files", [])
+                # legacy (R4-A2.4) single-file binding -> file-list binding
+                or ([payload["trading_rule_file"]] if payload.get("trading_rule_file") else [])
+            ),
+            trading_rule_dataset_hash=payload.get("trading_rule_dataset_hash", "")
+            or payload.get("trading_rule_hash", ""),
             trading_rule_review_status=payload.get("trading_rule_review_status", ""),
             started_at=payload.get("started_at", ""),
             ended_at=payload.get("ended_at"),

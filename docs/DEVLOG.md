@@ -13,6 +13,43 @@
 
 ---
 
+## 2026-08-25 · R4-A2.5 Formal Replay/Rule-SoR Closure + CR-1.2.1 Raw Commit Hardening（复审 5 项 P0 + P1 + CI 根因修复）
+
+**Scope**
+- R4-A2.4/CR-1.2 复审裁决 REOPENED（工作要求 20260825）：P0-01..P0-05 + P1（CR-1.2.1 raw commit recovery）+ §10 治理修正（CI 全红根因 / §30-31 状态改写 / R4-A2.3"提前 absorbed"修正）；Batch A→F 全部完成
+
+**Implementation**
+- **P0-01 全消费者 Rule Binding（DM-CR-20260825-001，ADR-013 §3）**：`validate_limit_rule(rows, *, book=...)` 的 book 改为**必填 keyword**（显式 None → 结构化 FAIL "book=None refused"）；B3/B5 传 `ctx.rule_book`；`route_all` 把 run-bound book 传入 limit/BJ 验证器；**AST 守卫**（formal 模块 validate_limit_rule 必带 book= 非 None、resolve_* 必带 book=）；**对抗测试**：ACTIVE 推进（v1 MAIN 10% → v2 20%）后同 run 重放 B5 limit cases 恒等、bound 仍解析 10%；bound 文件篡改 → `ctx.rule_book` 访问即阻断
+- **P0-02 Trading Rule 版本模型（DM-CR-20260825-002，ADR-013 §1）**：`configs/trading_rules/` 迁移为 `rule_manifest.json`（ACTIVE 选择器：rule_version/review_status/dataset_files[]/dataset_hash/dataset_version/review_provenance）+ `versions/<v>/rules.yaml`（**不可变共存**）+ `evidence/`；`load(dir)` 只加载 manifest 声明文件（**目录 glob 合并语义废除**）；`load_active_rules` 复算 dataset_hash（**ACTIVE 篡改 → new_run 阻断**）；SpikeRun 绑定升级 `trading_rule_dataset_files[] + dataset_hash`（联合 hash=manifest 算法，**篡改任一绑定文件阻断 replay**；旧 run json 兼容读取）；review.py 重写（新 immutable 版本 + ACTIVE 切换 + evidence 内容寻址 + 副本自验证 + 重复 review 拒绝）
+- **P0-03 Review Gate 加固（ADR-013 §2）**：`source_artifact_ref` 相对 **evidence root** 解析 + **path confinement**（绝对路径/`..` 穿越在任何 fs 访问前拒绝）；hash 必须 64 lower-hex；reviewed_at/source_retrieved_at 必须 ISO-8601；artifact bytes hash 复验保持
+- **P0-04 CA Event Taxonomy（DM-CR-20260825-003，ADR-013 §4）**：事件分类学 DIVIDEND/RIGHT_ISSUE **两独立事件流**（provider `get_right_issue_exchange`；capability corporate_action）；golden case 以 `expected_fields["event_type"]` 声明期望类型（载体天然进语义 hash，v3 数据无需重封）；校验 (symbol, EX_DATE, **type**) 精确三元组——**DIVIDEND 永不替代 RIGHT_ISSUE**（`EVENT_TYPE_MISMATCH`，双向测试）；provider 字面量归一化（分红/配股/cash_dividend/rights_issue 等）；CA 域 fetch = calendar+status+dividend+**right_issue**+adj+kline 六 exchange 全入 bundle；`event_type` 为验证器元键（status 字段比对前剥离）；FakeTarget 600036.SH right-issue fixture（独立流验证）
+- **P0-05 B5/B6 载荷形状（ADR-013 §5）**：`_flat_values`（标量列表/单列 frame → 纯值列表；多列 **fail loud**）——修复旧路径把 row dict 强转 `"{'value': '600519.SH'}"` 垃圾字符串后静默"通过"；`_rows_of` polars 优先级修正（polars 无参 `to_dict()` 返回 {列: Series}，`list()` 之=列名垃圾行——改为优先 `.rows()`）；B5/B6 code_list 消费全部走 `_flat_values`
+- **P1 CR-1.2.1 Raw Commit Recovery（ADR-013 §6，方案 A）**：orphan payload（字节在盘、meta 锚缺失）——**same-bytes retry → 提交恢复**（补落 meta，idempotent）；**different-bytes → `.quarantine/` 隔离 + BLOCK**（可取证、永不冒充有效证据）；partial orphan 同隔离；`list_orphan_payloads()` 巡检；fault-injection 测试（meta 写失败 → 无锚无残留 + retry 恢复；payload move 失败 → 无 meta 锚）
+- **CI 根因修复（§10 治理）**：查证 `b7a84563..c7aa511` 共 8 个提交 CI 全红，根因 = **`ruff format --check` 门未过**（本地只跑了 ruff check）；本批修复全部 format 差异并本地验证 CI 等价四检查（ruff check + format --check + mypy + pytest）全绿；根因与整改记录入管理总册头部 CI Status + TD-007
+
+**Schema / Contract Changes**
+- C2 ×1（ADR-013 amendment to ADR-012）：规则数据集版本模型（manifest + immutable versions + 文件清单绑定）+ gate schema 加固 + CA 事件分类学 + CI format 门
+- `validate_limit_rule` 签名收紧（book 必填，破坏性，调用方同批更新）；SpikeRun 绑定字段升级（旧 json 兼容）；configs/trading_rules 布局迁移（v20260824-compiled + rule_manifest.json）
+
+**Verification**
+- Local: **502 tests passed / 0 failed**（461 → 502，+41：rule binding 对抗 4 + 版本模型/绑定/gate 加固 24 + recovery 8 + CA event 8 + B5/B6 9 + TestLimitRule 适配）；
+- ruff check / **ruff format --check** / mypy 全绿（CI 等价四检查）；dry-run 冒烟：34 exchanges 全 meta-anchored + 5 bundles，整 run 双向闭合零问题，right-issue 端点进 bundle
+- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（8 连红根因已修，本地等价检查全绿）
+
+**Implementation Status**
+- DONE（R4-A2.5 / CR-1.2.1 全部 P0 + P1 + 治理修正）
+
+**Review Status**
+- PENDING_REVIEW（对照工作要求 §16 Exit Gate 与 §17 复检重点）
+
+**Known Open Issues**
+- CI 提交后待 Actions 确认（根因已修）；Golden / Trading Rule 人工 Review 未执行（RISK-001/005，结构完全就绪待人工）；Branch Protection 未启用；CR-2 被复审置 BLOCKED 直到本批关闭
+
+**Next**
+- 推送 git + CI 确认 → Reviewer 复审 R4-A2.5/CR-1.2.1；Golden + Trading Rule 人工 review；R4-A3 / CR-2
+
+---
+
 ## 2026-08-24 · R4-A2.4 Correctness Deepening + CR-1.2 Raw Exchange Closure（复审 6 项 P0 + P1 全修）
 
 **Scope**

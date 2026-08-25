@@ -56,21 +56,21 @@ def _rows_of(payload: Any) -> list[dict[str, Any]]:
         return rows
     if isinstance(payload, list):
         return [r if isinstance(r, dict) else {"value": r} for r in payload]
+    # polars.DataFrame FIRST (it also exposes to_dict, whose no-arg form
+    # returns a {column: Series} dict - list() of that is column NAMES,
+    # a silent garbage row; .rows() is the correct accessor)
+    rows_method = getattr(payload, "rows", None)
+    if callable(rows_method) and hasattr(payload, "columns"):
+        return [dict(zip(payload.columns, row, strict=True)) for row in rows_method()]
     to_dict = getattr(payload, "to_dict", None)
-    if callable(to_dict):  # DataFrame (polars/pandas)
+    if callable(to_dict):  # pandas.DataFrame
         try:
-            records = to_dict(orient="records") if hasattr(payload, "index") else None
-        except TypeError:
+            records = to_dict(orient="records")
+        except TypeError:  # pragma: no cover - non-pandas to_dict
             records = None
         if records is not None:
             return records
-        try:
-            return list(to_dict())  # polars: dict of series -> fallback
-        except Exception:  # noqa: BLE001
-            return []
-    rows_method = getattr(payload, "rows", None)
-    if callable(rows_method):  # polars.DataFrame
-        return [dict(zip(payload.columns, row, strict=True)) for row in rows_method()]
+        return []
     return [{"value": payload}]
 
 
@@ -79,6 +79,33 @@ def _to_plain(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     import json
 
     return json.loads(json.dumps(rows, default=str))
+
+
+def _flat_values(payload: Any) -> list[Any]:
+    """R4-A2.5 P0-05 (audit 20260825 section 6.2): flatten a scalar-list /
+    single-column-frame payload into plain scalar values.
+
+    Payload-only consumers that coerced row dicts to strings produced
+    GARBAGE ("{'value': '600519.SH'}") and silently "passed" - this helper
+    fails loud instead: a multi-column row that cannot be flattened
+    raises (the caller decides the real shape)."""
+    values: list[Any] = []
+    for row in _rows_of(payload):
+        if isinstance(row, dict):
+            if set(row.keys()) == {"value"}:
+                values.append(row["value"])
+            elif len(row) == 1:
+                values.append(next(iter(row.values())))
+            else:
+                msg = (
+                    "_flat_values: multi-column row cannot be flattened to a "
+                    f"scalar list (keys={sorted(row.keys())[:5]}) - the payload "
+                    "is not a scalar list; consume it as rows instead"
+                )
+                raise ValueError(msg)
+        else:
+            values.append(row)
+    return values
 
 
 class ProbeContext:
@@ -113,22 +140,24 @@ class ProbeContext:
 
     @property
     def rule_book(self):
-        """R4-A2.4 P0-03: the RUN-BOUND trading-rule book. Formal runs bind
-        the rule dataset at creation; validation resolves rules through
-        THIS book - never the working tree's current state. Dry-run /
-        unbound runs fall back to the default (working tree) book."""
+        """R4-A2.4 P0-03 + R4-A2.5 P0-01/P0-02: the RUN-BOUND trading-rule
+        book. Formal runs bind the rule dataset (version + full file list +
+        combined hash) at creation; validation resolves rules through THIS
+        book - never the working tree's ACTIVE state. Dry-run / unbound
+        runs fall back to the ACTIVE (manifest-selected) book."""
         from ashare_state.spike.trading_rule import (
-            TradingRuleBook,
+            load_active_rules,
             load_bound_rule_book,
         )
 
-        if getattr(self.run, "trading_rule_file", ""):
+        if getattr(self.run, "trading_rule_dataset_files", None):
             return load_bound_rule_book(
-                rule_file=self.run.trading_rule_file,
                 rule_version=self.run.trading_rule_version,
-                rule_hash=self.run.trading_rule_hash,
+                dataset_files=self.run.trading_rule_dataset_files,
+                dataset_hash=self.run.trading_rule_dataset_hash,
             )
-        return TradingRuleBook.load()
+        book, _manifest = load_active_rules()
+        return book
 
     # ------------------------------------------------------------ evidence
     def evidence_from_exchange(self, exchange: ProviderExchange) -> dict[str, Any]:
@@ -144,9 +173,7 @@ class ProbeContext:
         envelope = exchange.envelope
         # evidence_ref must be relative to the run store's spike_root so
         # the evidence closure can re-verify the file bytes
-        run_prefix = (
-            f"{self.run.run_kind.value.lower()}/{self.run.spike_run_id}/raw/"
-        )
+        run_prefix = f"{self.run.run_kind.value.lower()}/{self.run.spike_run_id}/raw/"
         return {
             "request_id": result.request_id,
             "endpoint": envelope.endpoint,
@@ -394,15 +421,6 @@ def _observe_units(bar_rows: list[dict[str, Any]]) -> dict[str, str]:
     return {"volume": "UNDETERMINED", "amount": "UNDETERMINED"}
 
 
-def _flat_values(payload: Any) -> list[Any]:
-    """Flatten a scalar-list payload (e.g. code lists / calendars) that
-    _rows_of would wrap into {'value': x} dicts."""
-    rows = _rows_of(payload)
-    if rows and all(isinstance(r, dict) and set(r.keys()) <= {"value"} for r in rows):
-        return [r.get("value") for r in rows]
-    return rows
-
-
 def _calendar_ints(payload: Any) -> list[int]:
     """Extract trading-day ints from any calendar payload shape
     (list[int] / list[str] / list[dict] / frames) - CR-1.2 helper."""
@@ -464,9 +482,7 @@ def probe_b2_security_master(ctx: ProbeContext) -> dict[str, Any]:
     as_of = ctx.as_of_date  # R3-P1-09: run as-of, never hardcoded
     payload, meta = executor.call(
         "BaseData.get_hist_code_list",
-        lambda: ctx.target.get_hist_code_list_exchange(
-            "EXTRA_STOCK_A_SH_SZ", 19900101, as_of
-        ),
+        lambda: ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 19900101, as_of),
         failure_case_type="security_master_with_delisted",
         trade_date=str(as_of),
         symbol="MARKET",
@@ -496,9 +512,7 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         symbol="MARKET",
     )
     symbols = (
-        [str(s) for s in _flat_values(symbols_payload)][:5]
-        if symbols_payload is not None
-        else []
+        [str(s) for s in _flat_values(symbols_payload)][:5] if symbols_payload is not None else []
     )
     results: dict[str, Any] = {}
 
@@ -556,9 +570,7 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     # --- ST/suspend + limit (semantic case ids per R2 section 7)
     status, status_meta = executor.call(
         "InfoData.get_history_stock_status",
-        lambda: ctx.target.get_history_stock_status_exchange(
-            sample_date, sample_date, symbols
-        ),
+        lambda: ctx.target.get_history_stock_status_exchange(sample_date, sample_date, symbols),
         failure_case_type="historical_st_suspend",
         trade_date=str(sample_date),
         symbol="SAMPLE",
@@ -573,7 +585,9 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         # router. No fabricated expected_is_st here, ever.
         st_out = validators.validate_st_suspend_flags(status_rows, golden_facts=[])
         ctx.outcome_case("historical_st_suspend", "SAMPLE", str(sample_date), status_meta, st_out)
-        limit_out = validators.validate_limit_rule(status_rows)
+        # R4-A2.5 P0-01: EVERY formal limit consumer resolves rules through
+        # the RUN-BOUND book (ctx.rule_book) - never the working tree
+        limit_out = validators.validate_limit_rule(status_rows, book=ctx.rule_book)
         ctx.outcome_case(
             "limit_price_and_no_limit_days",
             "SAMPLE",
@@ -692,9 +706,7 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
     # CR-1.2: reuse the ALREADY-persisted calendar exchange above (single
     # fetch per probe) and pass its windowed days explicitly to kline.
     hist_days = (
-        _window_days(cal_all_days, 19900101, sample_date)
-        if cal_all_days is not None
-        else None
+        _window_days(cal_all_days, 19900101, sample_date) if cal_all_days is not None else None
     )
     if hist_days is None:
         bars, bar_meta = None, cal_meta
@@ -740,9 +752,10 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
             "history_start_2018_plus_warmup", "FIXTURES", str(sample_date), bar_meta, cov
         )
     # symbol mapping core gate - explicit exchange (CR-1.1: no JSON
-    # evidence chain, no payload-only call)
+    # evidence chain, no payload-only call). R4-A2.5 P0-05: scalar-list
+    # payloads flatten via _flat_values (never coerce rows to strings).
     symbols_exchange = ctx.target.get_code_list_exchange("EXTRA_STOCK_A")
-    symbols_all = [str(s) for s in _rows_of(symbols_exchange.payload)]
+    symbols_all = [str(s) for s in _flat_values(symbols_exchange.payload)]
     sym_meta = ctx.evidence_from_exchange(symbols_exchange)
     sym_out = validators.validate_symbol_mapping(symbols_all)
     ctx.outcome_case("symbol_mapping_unambiguous", "MARKET", "", sym_meta, sym_out)
@@ -750,15 +763,14 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
     # never "the current code list happens to include BJ"
     bse_status, bse_meta = executor.call(
         "InfoData.get_history_stock_status",
-        lambda: ctx.target.get_history_stock_status_exchange(
-            20220101, 20221231, ["835185.BJ"]
-        ),
+        lambda: ctx.target.get_history_stock_status_exchange(20220101, 20221231, ["835185.BJ"]),
         failure_case_type="limit_price_and_no_limit_days",
         trade_date="20220601",
         symbol="835185.BJ",
     )
     bse_rows = _to_plain(_rows_of(bse_status)) if bse_status is not None else []
-    bse_out = validators.validate_limit_rule(bse_rows)
+    # R4-A2.5 P0-01: B5 BSE limit validation uses the run-bound book too
+    bse_out = validators.validate_limit_rule(bse_rows, book=ctx.rule_book)
     ctx.outcome_case("limit_price_and_no_limit_days", "BSE", "20220601", bse_meta, bse_out)
     return {
         "calendar_rows": record["calendar_rows"],
@@ -779,7 +791,8 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     """
     executor = ProbeExecutor(ctx)
     symbols_exchange = ctx.target.get_code_list_exchange("EXTRA_STOCK_A")
-    symbols = [str(s) for s in _rows_of(symbols_exchange.payload)][:3]
+    # R4-A2.5 P0-05: _flat_values (scalar lists) - no silent row->str garbage
+    symbols = [str(s) for s in _flat_values(symbols_exchange.payload)][:3]
     basic, basic_meta = executor.call(
         "InfoData.get_stock_basic",
         lambda: ctx.target.get_stock_basic_exchange(symbols),
@@ -882,9 +895,7 @@ def probe_b7_capacity(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         trade_date=str(sample_date),
         symbol="MARKET",
     )
-    symbols = (
-        [str(s) for s in _flat_values(symbols_payload)] if symbols_payload is not None else []
-    )
+    symbols = [str(s) for s in _flat_values(symbols_payload)] if symbols_payload is not None else []
     cal_days, _cal_meta = _persisted_calendar(
         ctx,
         executor,

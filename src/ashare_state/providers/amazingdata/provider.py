@@ -329,6 +329,25 @@ class AmazingDataProvider:
             require_capability="corporate_action",
         )
 
+    def get_right_issue_exchange(self, code_list: list[str]) -> Any:
+        """Right-issue event records (R4-A2.5 P0-04).
+
+        Dividend and right-issue are SEPARATE event streams in the
+        corporate_action capability (InfoData.get_right_issue): a DIVIDEND
+        record can never substitute a RIGHT_ISSUE expectation in the CA
+        golden validation.
+        """
+        return self._call_or_exchange(
+            "InfoData.get_right_issue",
+            "corporate_action",
+            lambda: self._info().get_right_issue(code_list=code_list),
+            params={"code_list": list(code_list)},
+            require_capability="corporate_action",
+        )
+
+    def get_right_issue(self, code_list: list[str]) -> Any:
+        return self.get_right_issue_exchange(code_list).payload
+
     def get_dividend(self, code_list: list[str]) -> Any:
         return self.get_dividend_exchange(code_list).payload
 

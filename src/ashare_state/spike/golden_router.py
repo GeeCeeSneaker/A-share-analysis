@@ -80,6 +80,9 @@ class DomainData:
     stock_basic_rows: list[dict[str, Any]] | None = None
     adj_rows: list[dict[str, Any]] | None = None
     dividend_rows: list[dict[str, Any]] | None = None
+    #: R4-A2.5 P0-04: right-issue event records (independent event stream -
+    #: a DIVIDEND record can NEVER substitute a RIGHT_ISSUE expectation)
+    right_issue_rows: list[dict[str, Any]] | None = None
     kline_rows: list[dict[str, Any]] | None = None
     calendar_days: list[int] | None = None
 
@@ -219,9 +222,13 @@ def fetch_domain_data(
             ctx.target.get_history_stock_status_exchange(19900101, 20991231, symbols)
         )
         adj = collector.persist(ctx.target.get_adj_factor_exchange(symbols))
-        # P0-05: provider corporate-action EVENT endpoint (exact ex-date +
-        # event type) - the adj stream alone is NOT a sufficient event SoR
+        # P0-05: provider corporate-action EVENT endpoints (exact ex-date +
+        # event type) - the adj stream alone is NOT a sufficient event SoR.
+        # R4-A2.5 P0-04: dividend and right-issue are SEPARATE event
+        # streams; a DIVIDEND record can never substitute a RIGHT_ISSUE
+        # expectation (both are persisted evidence).
         dividend = collector.persist(ctx.target.get_dividend_exchange(symbols))
+        right_issue = collector.persist(ctx.target.get_right_issue_exchange(symbols))
         begin, end = _event_window(cases)
         # CR-1.2: the calendar prerequisite of kline is EXPLICIT (persisted
         # above, windowed here) - no invisible internal calendar exchange
@@ -239,6 +246,7 @@ def fetch_domain_data(
             status_rows=_rows(status),
             adj_rows=_rows(adj),
             dividend_rows=_rows(dividend),
+            right_issue_rows=_rows(right_issue),
             kline_rows=_rows(kline),
             calendar_days=cal_days,
         )
@@ -331,8 +339,7 @@ def _status_row_exact(
     matches = [
         r
         for r in status_rows
-        if str(r.get("SECURITY_CODE", "")) == bare
-        and str(r.get("TRADE_DATE", "")) == trade_date
+        if str(r.get("SECURITY_CODE", "")) == bare and str(r.get("TRADE_DATE", "")) == trade_date
     ]
     problem = ""
     if not matches:
@@ -454,16 +461,18 @@ def _validate_limit_pit(
         try:
             exp_up, exp_down = rule.limit_prices(str(pre_close))
             tick = float(rule.tick_size)
-            if provider_high not in (None, "", 0, "0") and abs(
-                float(provider_high) - float(exp_up)
-            ) > tick + 1e-9:
+            if (
+                provider_high not in (None, "", 0, "0")
+                and abs(float(provider_high) - float(exp_up)) > tick + 1e-9
+            ):
                 price_problem = (
                     f"HIGH_LIMITED {provider_high} != rule {exp_up} "
                     f"(preclose {pre_close}, rule {rule.rule_id})"
                 )
-            elif provider_low not in (None, "", 0, "0") and abs(
-                float(provider_low) - float(exp_down)
-            ) > tick + 1e-9:
+            elif (
+                provider_low not in (None, "", 0, "0")
+                and abs(float(provider_low) - float(exp_down)) > tick + 1e-9
+            ):
                 price_problem = (
                     f"LOW_LIMITED {provider_low} != rule {exp_down} "
                     f"(preclose {pre_close}, rule {rule.rule_id})"
@@ -531,9 +540,21 @@ def _validate_corp_action_context(
     t_prev = calendar[idx - 1]
     t_next = calendar[idx + 1]
 
-    # event-day field expectation (IS_WD_SEC etc.) on the EXACT T row
+    # event-day field expectation (IS_WD_SEC etc.) on the EXACT T row.
+    # R4-A2.5 P0-04: "event_type" is VALIDATOR metadata (the expected CA
+    # event taxonomy) - it is NOT a status-row field and is stripped
+    # before the field comparison.
+    import dataclasses
+
+    status_case = case
+    if "event_type" in case.expected_fields:
+        status_case = dataclasses.replace(
+            case,
+            expected_fields={k: v for k, v in case.expected_fields.items() if k != "event_type"},
+        )
     status_out = validators.validate_golden_cases(
-        [case], [r for r in (data.status_rows or []) if str(r.get("TRADE_DATE", "")) == t_day]
+        [status_case],
+        [r for r in (data.status_rows or []) if str(r.get("TRADE_DATE", "")) == t_day],
     )[0]
     if status_out.result is CaseResult.VALIDATED_FAIL:
         return status_out
@@ -574,13 +595,19 @@ def _validate_corp_action_context(
             validator_version="2",
         )
 
-    # P0-05 (audit R4-A2.4 section 6): EVENT FACT SOURCE - the provider
-    # corporate-action event records must confirm the exact date/type.
-    # adj-factor movement alone is NOT a sufficient event SoR.
+    # P0-05 (audit R4-A2.4 section 6) + R4-A2.5 P0-04: EVENT FACT SOURCE -
+    # the provider corporate-action event records must confirm the exact
+    # date AND type. adj-factor movement alone is NOT a sufficient event
+    # SoR; dividend and right-issue are SEPARATE event streams.
+    expected_type = str(case.expected_fields.get("event_type", "") or "").strip().upper()
     dividend_rows = [
         r for r in (data.dividend_rows or []) if str(r.get("SECURITY_CODE", "")) == bare
     ]
-    if not dividend_rows:
+    right_rows = [
+        r for r in (data.right_issue_rows or []) if str(r.get("SECURITY_CODE", "")) == bare
+    ]
+    all_event_rows = [*dividend_rows, *right_rows]
+    if not all_event_rows:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
             expected=f"{case.truth_source} (corporate-action event record required)",
@@ -590,9 +617,9 @@ def _validate_corp_action_context(
             ),
             reason_code="EVENT_SOURCE_MISSING",
             validator_id="corp_action_context_v2",
-            validator_version="3",
+            validator_version="4",
         )
-    events_at_t = [r for r in dividend_rows if str(r.get("EX_DATE", "")) == t_day]
+    events_at_t = [r for r in all_event_rows if str(r.get("EX_DATE", "")) == t_day]
     if not events_at_t:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -600,19 +627,36 @@ def _validate_corp_action_context(
             actual=(
                 "provider event records exist but none matches the case's exact "
                 f"event date (found EX_DATEs: "
-                f"{sorted({str(r.get('EX_DATE')) for r in dividend_rows})[:5]})"
+                f"{sorted({str(r.get('EX_DATE')) for r in all_event_rows})[:5]})"
             ),
             reason_code="EVENT_DATE_MISMATCH",
             validator_id="corp_action_context_v2",
-            validator_version="3",
+            validator_version="4",
         )
+    if expected_type:
+        # the golden truth pins the event TYPE: the exact-date record must
+        # be of that type (a DIVIDEND record can NEVER substitute a
+        # RIGHT_ISSUE expectation and vice versa, audit 20260825 section 5)
+        types_at_t = {_normalize_event_type(r.get("EVENT_TYPE", "")) for r in events_at_t}
+        if expected_type not in types_at_t:
+            return ValidationOutcome(
+                result=CaseResult.VALIDATED_FAIL,
+                expected=f"{case.truth_source} (event record EX_DATE == {t_day}, "
+                f"type {expected_type})",
+                actual=(
+                    f"exact-date event records are of type(s) {sorted(types_at_t)} - "
+                    f"no {expected_type} record on the event date"
+                ),
+                reason_code="EVENT_TYPE_MISMATCH",
+                validator_id="corp_action_context_v2",
+                validator_version="4",
+            )
     # exact event date + factor transition at T
     adj_rows = sorted(
         (
             r
             for r in (data.adj_rows or [])
-            if str(r.get("SECURITY_CODE", "")) == bare
-            and str(r.get("EX_DATE", "")).strip() != ""
+            if str(r.get("SECURITY_CODE", "")) == bare and str(r.get("EX_DATE", "")).strip() != ""
         ),
         key=lambda r: str(r.get("EX_DATE", "")),
     )
@@ -701,7 +745,7 @@ def _validate_corp_action_context(
             f"raw_ret={raw_ret:.4f}, adj_ret={adj_ret:.4f} (continuity held)"
         ),
         validator_id="corp_action_context_v2",
-        validator_version="2",
+        validator_version="4",
     )
 
 
@@ -719,9 +763,7 @@ def _validate_bj_mapping(
     """
     bare = case.provider_symbol.split(".")[0]
     suffix = case.provider_symbol.split(".")[1] if "." in case.provider_symbol else "BJ"
-    hist_rows = [
-        r for r in (data.hist_code_rows or []) if str(r.get("SECURITY_CODE", "")) == bare
-    ]
+    hist_rows = [r for r in (data.hist_code_rows or []) if str(r.get("SECURITY_CODE", "")) == bare]
     if not hist_rows:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -780,8 +822,10 @@ def _validate_bj_mapping(
     expected_down = case.expected_fields.get(
         "BJ_DOWN_RATE", case.expected_fields.get("PRICE_LOW_LMT_RATE")
     )
-    if expected_up is not None and abs(float(rule.up_rate) - float(expected_up)) > 1e-9 or (
-        expected_down is not None and abs(float(rule.down_rate) - float(expected_down)) > 1e-9
+    if (
+        expected_up is not None
+        and abs(float(rule.up_rate) - float(expected_up)) > 1e-9
+        or (expected_down is not None and abs(float(rule.down_rate) - float(expected_down)) > 1e-9)
     ):
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -850,6 +894,32 @@ def _flat(payload: Any) -> list[Any]:
     return rows
 
 
+#: R4-A2.5 P0-04 (audit 20260825 section 5.2): CA event taxonomy. The
+#: golden truth records canonical types; provider streams map into them.
+_EVENT_TYPE_ALIASES = {
+    "DIVIDEND": "DIVIDEND",
+    "CASH_DIVIDEND": "DIVIDEND",
+    "分红": "DIVIDEND",
+    "派息": "DIVIDEND",
+    "RIGHT_ISSUE": "RIGHT_ISSUE",
+    "RIGHTS_ISSUE": "RIGHT_ISSUE",
+    "配股": "RIGHT_ISSUE",
+    "1": "DIVIDEND",
+    "2": "RIGHT_ISSUE",
+}
+
+
+def _normalize_event_type(raw: Any) -> str:
+    """Normalize a provider event-type value into the canonical taxonomy
+    (DIVIDEND / RIGHT_ISSUE / uppercased raw). Fail-open ONLY for unknown
+    strings (kept verbatim uppercase) - the comparison is exact against
+    the golden expectation, and mismatches FAIL closed."""
+    text = str(raw or "").strip().upper()
+    if not text:
+        return ""
+    return _EVENT_TYPE_ALIASES.get(text, text)
+
+
 def _calendar_days(payload: Any) -> list[int]:
     """Extract trading-day ints from any calendar payload shape
     (list[int] / list[str] / DataFrame / dict-of)."""
@@ -877,9 +947,7 @@ def _calendar_days(payload: Any) -> list[int]:
         return sorted(set(out))
     rows_method = getattr(payload, "rows", None)
     if callable(rows_method):  # polars.DataFrame
-        return _calendar_days(
-            [dict(zip(payload.columns, r, strict=True)) for r in rows_method()]
-        )
+        return _calendar_days([dict(zip(payload.columns, r, strict=True)) for r in rows_method()])
     to_dict = getattr(payload, "to_dict", None)
     if callable(to_dict):
         try:
@@ -903,9 +971,7 @@ def _event_window(cases: list[GoldenCase]) -> tuple[int, int]:
 # ------------------------------------------------------------------ router
 
 
-def _failure_outcome(
-    exc: ProviderError, case: GoldenCase
-) -> validators.ValidationOutcome:
+def _failure_outcome(exc: ProviderError, case: GoldenCase) -> validators.ValidationOutcome:
     """Domain-level failure classification (same mapping as ProbeExecutor)."""
     if isinstance(exc, ProviderPermissionError):
         result = CaseResult.NOT_TESTABLE_PERMISSION

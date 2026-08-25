@@ -18,8 +18,9 @@ Fail-closed contract (audit R4-A2.3 section 8.3):
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
@@ -213,22 +214,40 @@ class TradingRuleBook:
     # ------------------------------------------------------------- loading
     @classmethod
     def load(cls, path: Path | str | None = None) -> TradingRuleBook:
-        """Load from a YAML file or a directory of YAML files.
+        """Load the rule dataset.
 
-        Default: ``configs/trading_rules`` resolved against the repo root
-        (cwd of the test/CLI entry point) or against the package location
-        when the cwd has no configs directory.
+        R4-A2.5 P0-02 (audit 20260825 section 3.5) - explicit version model:
+
+        - ``path`` is a DIRECTORY (or None -> default rules dir):
+          read ``rule_manifest.json`` (the ACTIVE selector) and load ONLY
+          the declared ``dataset_files`` (relative to that root), verifying
+          the combined ``dataset_hash``. Historical versions under
+          ``versions/`` coexist but are NEVER auto-merged - the old
+          "glob every yaml in the directory" semantics is GONE.
+        - ``path`` is a FILE: load exactly that one yaml (standalone/test
+          or bound-version direct load).
+
+        The ACTIVE manifest is the single unambiguous selector; run
+        bindings capture (version, dataset_files, dataset_hash) and are
+        loaded via ``load_bound_rule_book`` without reading ACTIVE.
         """
+        target = Path(path) if path is not None else cls._default_rules_dir()
+        if target.is_dir():
+            book, _manifest = load_active_rules(target)
+            return book
+        if not target.is_file():
+            msg = f"trading rule data not found: {target}"
+            raise FileNotFoundError(msg)
+        return cls.load_version_files([target])
+
+    @classmethod
+    def load_version_files(cls, files: list[Path]) -> TradingRuleBook:
+        """Load an EXPLICIT list of rule yaml files as one dataset (used
+        by the ACTIVE selector and by run-bound loads)."""
         import hashlib
 
-        target = Path(path) if path is not None else cls._default_rules_dir()
-        files = (
-            sorted(target.glob("*.yaml")) + sorted(target.glob("*.yml"))
-            if target.is_dir()
-            else [target]
-        )
         if not files or not files[0].is_file():
-            msg = f"trading rule data not found: {target}"
+            msg = f"trading rule data not found: {files}"
             raise FileNotFoundError(msg)
         rules: list[TradingRuleRow] = []
         doc_meta: dict[str, str] = {}
@@ -370,9 +389,7 @@ class TradingRuleBook:
         """Full PIT resolve (needs listing_date + calendar when any
         candidate rule depends on listing age). Raises RuleUnresolvedError
         on 0 / ambiguous / missing-context matches."""
-        selected, day, exch, bare = self._select_candidates(
-            exchange, code, trade_date, is_st
-        )
+        selected, day, exch, bare = self._select_candidates(exchange, code, trade_date, is_st)
         age_rules = {r.listing_age_rule for r in selected}
         first_n = False
         if any(rule != "NONE" for rule in age_rules):
@@ -385,15 +402,11 @@ class TradingRuleBook:
                 raise RuleUnresolvedError(msg)
             ipo_day = _yyyymmdd(listing_date) == day
             if ipo_day and any(r.listing_age_rule == "IPO_DAY_44_36" for r in selected):
-                selected = [
-                    r for r in selected if r.listing_age_rule == "IPO_DAY_44_36"
-                ]
+                selected = [r for r in selected if r.listing_age_rule == "IPO_DAY_44_36"]
                 first_n = True
             else:
                 first_n = first_n_sessions(day, listing_date, calendar, n=5)
-                if first_n and any(
-                    r.listing_age_rule == "FIRST_5_DAYS_NO_LIMIT" for r in selected
-                ):
+                if first_n and any(r.listing_age_rule == "FIRST_5_DAYS_NO_LIMIT" for r in selected):
                     selected = [
                         r for r in selected if r.listing_age_rule == "FIRST_5_DAYS_NO_LIMIT"
                     ]
@@ -429,9 +442,7 @@ class TradingRuleBook:
         context) not to be a no-limit listing window day - e.g. provider
         status rows that carry an actual HIGH_LIMITED price. Selects the
         NONE listing-age rule; raises when only listing-age rules exist."""
-        selected, day, exch, bare = self._select_candidates(
-            exchange, code, trade_date, is_st
-        )
+        selected, day, exch, bare = self._select_candidates(exchange, code, trade_date, is_st)
         selected = [r for r in selected if r.listing_age_rule == "NONE"]
         if not selected:
             msg = (
@@ -441,9 +452,7 @@ class TradingRuleBook:
             raise RuleUnresolvedError(msg)
         if len(selected) > 1:
             ids = ", ".join(sorted(r.rule_id for r in selected))
-            msg = (
-                f"RULE_UNRESOLVED: >1 equally-valid rules for {exch} {bare} on {day}: {ids}"
-            )
+            msg = f"RULE_UNRESOLVED: >1 equally-valid rules for {exch} {bare} on {day}: {ids}"
             raise RuleUnresolvedError(msg)
         return self._to_rule(selected[0], exch=exch, code=bare, first_n=False)
 
@@ -479,15 +488,12 @@ class TradingRuleBook:
         selected = st_specific or st_any
         if not selected:
             msg = (
-                f"RULE_UNRESOLVED: is_st={is_st} has no applicable rule for "
-                f"{exch} {bare} on {day}"
+                f"RULE_UNRESOLVED: is_st={is_st} has no applicable rule for {exch} {bare} on {day}"
             )
             raise RuleUnresolvedError(msg)
         return selected, day, exch, bare
 
-    def _to_rule(
-        self, row: TradingRuleRow, *, exch: str, code: str, first_n: bool
-    ) -> TradingRule:
+    def _to_rule(self, row: TradingRuleRow, *, exch: str, code: str, first_n: bool) -> TradingRule:
         return TradingRule(
             rule_id=row.rule_id,
             exchange=exch,
@@ -517,27 +523,162 @@ _REVIEW_ARTIFACT_KINDS = (
     "DATASET_DOC",
 )
 
+#: R4-A2.5 P0-02: the ACTIVE selector file inside the rules root
+RULE_MANIFEST_FILE = "rule_manifest.json"
+#: R4-A2.5 P0-03: review artifacts live under this subdir of the rules root
+RULE_EVIDENCE_SUBDIR = "evidence"
+
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
+
+@dataclass(frozen=True)
+class RuleDatasetManifest:
+    """R4-A2.5 P0-02 (audit 20260825 section 3.5): the ACTIVE rule-version
+    selector. Historical versions under versions/ coexist immutably; the
+    manifest is the single unambiguous pointer."""
+
+    rule_version: str
+    review_status: str
+    dataset_files: tuple[str, ...]  # relative to the rules root
+    dataset_hash: str  # sha256 over (rel_path + bytes) of every file
+    source_version: str = ""
+    #: the yaml ``version:`` field inside the dataset files (content
+    #: version) - distinct from rule_version (the selector/directory id)
+    dataset_version: str = ""
+    review_provenance: dict[str, Any] = field(default_factory=dict)
+
+
+def _dataset_files_hash(root: Path, rel_files: Sequence[str]) -> str:
+    """Deterministic combined hash over the rule dataset: for every file
+    (sorted) the relative path + the file bytes. Used by the manifest AND
+    the run bindings - one algorithm everywhere."""
+    import hashlib
+
+    digest = hashlib.sha256()
+    for rel in sorted(rel_files):
+        digest.update(rel.replace("\\", "/").encode("utf-8"))
+        digest.update((root / rel).read_bytes())
+    return digest.hexdigest()
+
+
+def _confined(root: Path, rel: str) -> Path:
+    """Resolve ``rel`` under ``root`` refusing traversal (R4-A2.5 P0-03:
+    review-gate evidence hardening - no absolute paths, no '..')."""
+    normalized = rel.replace("\\", "/")
+    if not normalized or normalized.startswith(("/", "\\")) or ":" in normalized.split("/")[0]:
+        msg = f"evidence ref must be relative: {rel!r}"
+        raise RuleUnresolvedError(msg)
+    candidate = (root / normalized).resolve()
+    root_resolved = root.resolve()
+    try:
+        candidate.relative_to(root_resolved)
+    except ValueError as exc:
+        msg = f"evidence ref escapes the evidence root: {rel!r}"
+        raise RuleUnresolvedError(msg) from exc
+    return candidate
+
+
+def load_rule_manifest(root: Path | str) -> RuleDatasetManifest:
+    """Load + schema-validate the ACTIVE rule manifest (fail closed)."""
+    root = Path(root)
+    manifest_path = root / RULE_MANIFEST_FILE
+    if not manifest_path.is_file():
+        msg = f"trading rule manifest missing: {manifest_path}"
+        raise RuleUnresolvedError(msg)
+    import json
+
+    try:
+        doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        msg = f"trading rule manifest unreadable: {exc}"
+        raise RuleUnresolvedError(msg) from exc
+    problems: list[str] = []
+    version = str(doc.get("rule_version", "") or "")
+    status = str(doc.get("review_status", "") or "")
+    files = [str(f) for f in doc.get("dataset_files", []) or []]
+    dataset_hash = str(doc.get("dataset_hash", "") or "")
+    if not version:
+        problems.append("rule_version missing")
+    if status not in ("COMPILED", "REVIEWED"):
+        problems.append(f"review_status must be COMPILED|REVIEWED, got {status!r}")
+    if not files:
+        problems.append("dataset_files empty")
+    if not _HEX64.match(dataset_hash):
+        problems.append("dataset_hash must be 64 lower-hex chars")
+    if problems:
+        msg = "trading rule manifest invalid: " + "; ".join(problems)
+        raise RuleUnresolvedError(msg)
+    for rel in files:
+        if not (root / rel).is_file():
+            msg = f"manifest dataset file missing: {rel}"
+            raise RuleUnresolvedError(msg)
+    return RuleDatasetManifest(
+        rule_version=version,
+        review_status=status,
+        dataset_files=tuple(files),
+        dataset_hash=dataset_hash,
+        source_version=str(doc.get("source_version", "") or ""),
+        dataset_version=str(doc.get("dataset_version", "") or ""),
+        review_provenance=dict(doc.get("review_provenance", {}) or {}),
+    )
+
+
+def load_active_rules(
+    root: Path | str | None = None,
+) -> tuple[TradingRuleBook, RuleDatasetManifest]:
+    """Load the ACTIVE rule version selected by rule_manifest.json and
+    verify the dataset integrity (combined hash recomputed over the
+    declared files - tampering ANY dataset file or the manifest's hash
+    blocks here, i.e. new_run/TRIAL/PRODUCTION fail fast).
+
+    R4-A2.5 P0-02: COMPILED and REVIEWED versions coexist immutably under
+    versions/; only the manifest decides which one is ACTIVE."""
+    target = Path(root) if root is not None else TradingRuleBook._default_rules_dir()
+    manifest = load_rule_manifest(target)
+    actual = _dataset_files_hash(target, manifest.dataset_files)
+    if actual != manifest.dataset_hash:
+        msg = (
+            f"ACTIVE trading rule dataset hash mismatch for {manifest.rule_version}: "
+            f"declared {manifest.dataset_hash[:16]}..., recomputed {actual[:16]}... "
+            "- the rule data was tampered with (audit 20260825 section 3.2)"
+        )
+        raise RuleUnresolvedError(msg)
+    book = TradingRuleBook.load_version_files([target / rel for rel in manifest.dataset_files])
+    if manifest.dataset_version and book.version != manifest.dataset_version:
+        msg = (
+            f"ACTIVE trading rule dataset version mismatch: manifest says "
+            f"{manifest.dataset_version!r}, files say {book.version!r}"
+        )
+        raise RuleUnresolvedError(msg)
+    return book, manifest
+
 
 def trading_rule_review_gate(
     book: TradingRuleBook,
     *,
     rules_root: Path | str | None = None,
 ) -> list[str]:
-    """R4-A2.4 P0-04: Trading Rule Review Gate.
+    """R4-A2.4 P0-04 + R4-A2.5 P0-03: Trading Rule Review Gate.
 
     The rule dataset follows the same lifecycle as golden truth:
     COMPILED (candidate, usable by dry-run/trial with explicit provenance)
     -> REVIEWED (human-reviewed, required for PRODUCTION runs/verdicts).
 
-    Checks (each failure is a returned problem):
-      - review_status must be REVIEWED for formal use (COMPILED is reported
-        explicitly - the caller decides whether that blocks)
+    Hardened provenance verification (audit 20260825 section 4):
+      - review_status must be REVIEWED for formal use
       - REVIEWED requires complete provenance (reviewed_by/reviewed_at/
         source_artifact_ref/source_artifact_hash/source_artifact_kind/
         source_retrieved_at)
-      - the referenced source artifact must resolve under rules_root (or
-        the rule dataset's own directory) and hash to source_artifact_hash
+      - source_artifact_ref is RELATIVE to the EVIDENCE root
+        (rules_root/evidence) and is path-confined: absolute paths and
+        '..' traversal are REJECTED before any filesystem access
+      - source_artifact_hash must be 64 lower-hex chars
+      - reviewed_at / source_retrieved_at must be ISO-8601 timestamps
+      - the artifact bytes must hash to source_artifact_hash
     """
+    import hashlib
+    from datetime import datetime
+
     problems: list[str] = []
     if book.review_status != "REVIEWED":
         problems.append(
@@ -566,70 +707,85 @@ def trading_rule_review_gate(
             f"source_artifact_kind {prov.get('source_artifact_kind')!r} not in "
             f"{_REVIEW_ARTIFACT_KINDS}"
         )
+    expected_hash = str(prov.get("source_artifact_hash", ""))
+    if not _HEX64.match(expected_hash):
+        problems.append(f"source_artifact_hash must be 64 lower-hex chars, got {expected_hash!r}")
+        return problems
+    for ts_key in ("reviewed_at", "source_retrieved_at"):
+        try:
+            datetime.fromisoformat(str(prov.get(ts_key, "")))
+        except ValueError:
+            problems.append(f"{ts_key} is not an ISO-8601 timestamp: {prov.get(ts_key)!r}")
+    if problems:
+        return problems
     ref = str(prov.get("source_artifact_ref"))
-    expected_hash = str(prov.get("source_artifact_hash"))
-    import hashlib
-
-    # artifact resolution roots: explicit rules_root first, then the
-    # loader's default rules dir (respects tests/installed layouts)
-    roots = [Path(p) for p in (rules_root,) if p is not None]
-    roots.append(TradingRuleBook._default_rules_dir())
-    artifact_path: Path | None = None
-    for root in roots:
-        candidate = root / ref
-        if candidate.is_file():
-            artifact_path = candidate
-            break
-    if artifact_path is None:
-        problems.append(f"source artifact not found: {ref}")
-    else:
-        actual = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
-        if actual != expected_hash:
-            problems.append(f"source artifact hash mismatch: {ref}")
+    root = Path(rules_root) if rules_root is not None else TradingRuleBook._default_rules_dir()
+    evidence_root = root / RULE_EVIDENCE_SUBDIR
+    try:
+        artifact_path = _confined(evidence_root, ref)
+    except RuleUnresolvedError as exc:
+        problems.append(f"source_artifact_ref rejected: {exc}")
+        return problems
+    if not artifact_path.is_file():
+        problems.append(f"source artifact not found under evidence root: {ref}")
+        return problems
+    actual = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+    if actual != expected_hash:
+        problems.append(f"source artifact hash mismatch: {ref}")
     return problems
 
 
 def load_bound_rule_book(
     *,
-    rule_file: str,
     rule_version: str,
-    rule_hash: str,
+    dataset_files: Sequence[str],
+    dataset_hash: str,
     repo_root: Path | str | None = None,
+    rules_root: Path | str | None = None,
 ) -> TradingRuleBook:
-    """R4-A2.4 P0-03: load the RUN-BOUND rule dataset and verify its
-    integrity (bytes hash + version). Verdicts/replays resolve rules
-    through THIS loader, never through the working tree's current state -
-    an ACTIVE/working-tree advance can never leak into a historical run."""
-    import hashlib
-
-    candidates = []
-    if repo_root is not None:
-        candidates.append(Path(repo_root) / rule_file)
-    else:
-        candidates.append(Path.cwd() / rule_file)
-        # fallback: the package-anchored repo layout (respects a patched
-        # _default_rules_dir in tests and installed-package runs)
-        default_dir = TradingRuleBook._default_rules_dir()
-        repo_anchor = default_dir.parent.parent if default_dir.is_absolute() else None
-        if repo_anchor is not None:
-            candidates.append(repo_anchor / rule_file)
-    path = next((c for c in candidates if c.is_file()), None)
-    if path is None:
-        msg = f"bound trading rule dataset missing: {rule_file}"
+    """R4-A2.4 P0-03 + R4-A2.5 P0-02: load the RUN-BOUND rule dataset and
+    verify its integrity. The binding captures the dataset FILES LIST and
+    the combined hash over (relative path + bytes) of every file - exactly
+    the manifest's algorithm - so tampering ANY bound file (not just the
+    first) blocks the replay. Verdicts/replays resolve rules through THIS
+    loader, never through the working tree's ACTIVE state."""
+    if not dataset_files:
+        msg = "bound trading rule dataset has no files"
         raise RuleUnresolvedError(msg)
-    actual = hashlib.sha256(path.read_bytes()).hexdigest()
-    if actual != rule_hash:
+    candidates: list[Path] = []
+    if rules_root is not None:
+        candidates.append(Path(rules_root))
+    elif repo_root is not None:
+        candidates.append(Path(repo_root) / "configs" / "trading_rules")
+    else:
+        default_dir = TradingRuleBook._default_rules_dir()
+        candidates.append(default_dir)
+    root = next((c for c in candidates if (c / dataset_files[0]).is_file()), None)
+    if root is None:
+        msg = f"bound trading rule dataset missing: {list(dataset_files)}"
+        raise RuleUnresolvedError(msg)
+    for rel in dataset_files:
+        try:
+            _confined(root, rel)
+        except RuleUnresolvedError as exc:
+            msg = f"bound dataset file rejected: {rel} ({exc})"
+            raise RuleUnresolvedError(msg) from exc
+        if not (root / rel).is_file():
+            msg = f"bound trading rule dataset file missing: {rel}"
+            raise RuleUnresolvedError(msg)
+    actual = _dataset_files_hash(root, dataset_files)
+    if actual != dataset_hash:
         msg = (
-            f"bound trading rule dataset hash mismatch for {rule_file}: "
-            "the file changed after the run was created (expected "
-            f"{rule_hash[:16]}..., got {actual[:16]}...)"
+            f"bound trading rule dataset hash mismatch (expected {dataset_hash[:16]}..., "
+            f"recomputed {actual[:16]}...): the dataset changed after the run was "
+            "created (audit 20260825 section 3.4)"
         )
         raise RuleUnresolvedError(msg)
-    book = TradingRuleBook.load(path)
+    book = TradingRuleBook.load_version_files([root / rel for rel in dataset_files])
     if book.version != rule_version:
         msg = (
             f"bound trading rule dataset version mismatch: run bound {rule_version!r}, "
-            f"file now {book.version!r}"
+            f"files now {book.version!r}"
         )
         raise RuleUnresolvedError(msg)
     return book
@@ -681,13 +837,18 @@ def resolve_limit_regime(
 
 
 __all__ = [
+    "RuleDatasetManifest",
     "RuleUnresolvedError",
+    "RULE_EVIDENCE_SUBDIR",
+    "RULE_MANIFEST_FILE",
     "TradingRule",
     "TradingRuleBook",
     "TradingRuleRow",
     "default_rule_book",
     "first_n_sessions",
+    "load_active_rules",
     "load_bound_rule_book",
+    "load_rule_manifest",
     "resolve_limit_regime",
     "resolve_trading_rule",
     "trading_rule_review_gate",

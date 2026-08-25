@@ -334,9 +334,7 @@ class GoldenTruthStore:
         if remove_count == 0:
             problems.append("golden_st_transition: no ST_REMOVE/STAR_ST_REMOVE subtype events")
         # Delist: distinct (symbol, effective_date) >= 20 AND symbols >= 20
-        delist_identities = {
-            delist_event_identity(c) for c in cases_ if c.event_class == "DELIST"
-        }
+        delist_identities = {delist_event_identity(c) for c in cases_ if c.event_class == "DELIST"}
         delist_symbols = {c.provider_symbol for c in cases_ if c.event_class == "DELIST"}
         if len(delist_identities) < REQUIRED_DISTINCT_EVENTS["golden_delisted"][1]:
             problems.append(

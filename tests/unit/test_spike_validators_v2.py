@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from ashare_state.spike import validators
 from ashare_state.spike.model import CaseResult
 from ashare_state.spike.validators import GoldenSTFact
@@ -142,45 +144,54 @@ def _status_row(code: str, market: str, pre: float, up: float, down: float, st: 
 
 
 class TestLimitRule:
+    @pytest.fixture(autouse=True)
+    def _book(self):
+        """R4-A2.5 P0-01: validate_limit_rule requires an EXPLICIT book -
+        tests load the ACTIVE rule version the same way the runtime does."""
+        from ashare_state.spike.trading_rule import load_active_rules
+
+        self.book, _manifest = load_active_rules()
+        yield
+
     def test_limit_missing_all_not_pass(self):
         """R3-P0-09: all rows missing limit fields -> FAIL (never silent pass)."""
         rows = [{"SECURITY_CODE": "600000", "MARKET_CODE": "1", "TRADE_DATE": "20240102"}]
-        out = validators.validate_limit_rule(rows)
+        out = validators.validate_limit_rule(rows, book=self.book)
         assert out.result is CaseResult.VALIDATED_FAIL
 
     def test_known_mainboard_limit_case(self):
         # 600000 main board: pre 10.00 -> up 11.00 / down 9.00
         rows = [_status_row("600000", "1", 10.00, 11.00, 9.00)]
-        out = validators.validate_limit_rule(rows)
+        out = validators.validate_limit_rule(rows, book=self.book)
         assert out.result is CaseResult.VALIDATED_PASS
 
     def test_known_star_limit_case(self):
         # 688981 STAR: pre 50.00 -> 20%: up 60.00 / down 40.00
         rows = [_status_row("688981", "1", 50.00, 60.00, 40.00)]
-        out = validators.validate_limit_rule(rows)
+        out = validators.validate_limit_rule(rows, book=self.book)
         assert out.result is CaseResult.VALIDATED_PASS
 
     def test_known_st_limit_case(self):
         # ST main board: pre 10.00 -> 5%: up 10.50 / down 9.50
         rows = [_status_row("600518", "1", 10.00, 10.50, 9.50, st=1)]
-        out = validators.validate_limit_rule(rows)
+        out = validators.validate_limit_rule(rows, book=self.book)
         assert out.result is CaseResult.VALIDATED_PASS
 
     def test_st_limit_at_10pct_fails(self):
         """ST stock priced at the 10% board rate -> regime violation."""
         rows = [_status_row("600518", "1", 10.00, 11.00, 9.00, st=1)]
-        out = validators.validate_limit_rule(rows)
+        out = validators.validate_limit_rule(rows, book=self.book)
         assert out.result is CaseResult.VALIDATED_FAIL
 
     def test_wrong_mainboard_limit_fails(self):
         rows = [_status_row("600000", "1", 10.00, 11.50, 8.50)]  # not 10%
-        out = validators.validate_limit_rule(rows)
+        out = validators.validate_limit_rule(rows, book=self.book)
         assert out.result is CaseResult.VALIDATED_FAIL
 
     def test_rounding_to_tick(self):
         # pre 9.99 -> up = round(9.99 * 1.1) = round(10.989) = 10.99
         rows = [_status_row("600000", "1", 9.99, 10.99, 8.99)]
-        out = validators.validate_limit_rule(rows)
+        out = validators.validate_limit_rule(rows, book=self.book)
         assert out.result is CaseResult.VALIDATED_PASS
 
 

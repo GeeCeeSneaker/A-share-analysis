@@ -86,6 +86,7 @@ class TestWriteExchangeContract:
 
     def test_request_id_consistency_assertion_blocks(self, tmp_path: Path):
         writer = RawWriter(tmp_path)
+
         # duck-typed exchange whose request_id DISAGREES with its envelope
         # (the assertion must catch a future divergence, audit 3.2-C)
         class _Mismatched:

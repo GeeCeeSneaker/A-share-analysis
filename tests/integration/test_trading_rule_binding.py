@@ -1,15 +1,17 @@
-"""R4-A2.4 trading-rule binding + review gate tests (audit sections 4-5).
+"""R4-A2.4 + R4-A2.5 trading-rule binding / review gate / version model
+tests (audit 20260825 sections 2-4).
 
-P0-03: the run BINDS the rule dataset (file/version/hash/review_status);
-RUNNING/RESUME/VERDICT/REPLAY read ONLY the bound dataset - a working-tree
-advance/tamper can never leak into a historical run. compute_config_hash
-covers configs/** recursively.
+P0-02 version model:
+    rule_manifest.json (ACTIVE selector) + versions/<v>/rules.yaml
+    (immutable coexisting versions) + evidence/ (sealed artifacts).
+    The manifest dataset_hash is recomputed over the FULL declared file
+    list - tampering ANY file (or the manifest) blocks new_run.
 
-P0-04: COMPILED -> REVIEWED review gate (same discipline as golden
-truth); PRODUCTION new_run/verdict REQUIRE REVIEWED; the bound source
-artifact hash is re-verified.
+P0-03 gate hardening: evidence refs are path-confined (no absolute / '..'),
+hashes are 64 lower-hex, timestamps are ISO-8601.
 
-P1-04: strict st_state parsing (no truthiness inversion).
+P0-01: every formal limit consumer resolves through the run-bound book
+(validate_limit_rule requires an explicit book; probes pass ctx.rule_book).
 """
 
 from __future__ import annotations
@@ -32,7 +34,9 @@ from ashare_state.spike.runner import (
 from ashare_state.spike.trading_rule import (
     RuleUnresolvedError,
     TradingRuleBook,
+    load_active_rules,
     load_bound_rule_book,
+    load_rule_manifest,
     trading_rule_review_gate,
 )
 
@@ -41,37 +45,82 @@ RULES_DIR = REPO_ROOT / "configs" / "trading_rules"
 _SHA = "e" * 40
 
 
+def _manifest_hash(root: Path, rel_files: list[str]) -> str:
+    digest = hashlib.sha256()
+    for rel in sorted(rel_files):
+        digest.update(rel.replace("\\", "/").encode("utf-8"))
+        digest.update((root / rel).read_bytes())
+    return digest.hexdigest()
+
+
+def _write_manifest(
+    root: Path,
+    *,
+    rule_version: str,
+    review_status: str,
+    dataset_files: list[str],
+    dataset_version: str,
+    provenance: dict | None = None,
+) -> None:
+    (root / "rule_manifest.json").write_text(
+        json.dumps(
+            {
+                "rule_version": rule_version,
+                "review_status": review_status,
+                "dataset_files": dataset_files,
+                "dataset_hash": _manifest_hash(root, dataset_files),
+                "source_version": "2026-08-24.1",
+                "dataset_version": dataset_version,
+                "review_provenance": provenance or {},
+            },
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
 @pytest.fixture
 def rules_env(tmp_path: Path, monkeypatch):
-    """Tmp rules layout:
-        tmp/configs/trading_rules/            REVIEWED (loader default) + evidence/
-        tmp/configs/trading_rules_compiled/   COMPILED (for the block test)
-    """
-    rules_root = tmp_path / "configs" / "trading_rules"
-    compiled_root = tmp_path / "configs" / "trading_rules_compiled"
-    rules_root.mkdir(parents=True)
-    compiled_root.mkdir(parents=True)
-    shutil.copy(RULES_DIR / "a_share_limit_v1.yaml", compiled_root / "a_share_limit_v1.yaml")
-    evidence = rules_root / "evidence"
-    evidence.mkdir()
-    artifact = evidence / "sse_notice_2022.txt"
-    artifact.write_text("official exchange notice: price limit rules 2022", encoding="utf-8")
-    # build the REVIEWED dataset (same discipline as scripts/rules/review.py)
-    doc = yaml.safe_load((RULES_DIR / "a_share_limit_v1.yaml").read_text(encoding="utf-8"))
+    """A tmp rules root with BOTH versions coexisting (immutable versions
+    model) + a sealed evidence artifact; ACTIVE initially -> COMPILED."""
+    root = tmp_path / "configs" / "trading_rules"
+    compiled_dir = root / "versions" / "v1-compiled"
+    compiled_dir.mkdir(parents=True)
+    shutil.copy(
+        RULES_DIR / "versions" / "v20260824-compiled" / "rules.yaml", compiled_dir / "rules.yaml"
+    )
+    # build the REVIEWED version (same discipline as scripts/rules/review.py)
+    doc = yaml.safe_load((compiled_dir / "rules.yaml").read_text(encoding="utf-8"))
     doc["review_status"] = "REVIEWED"
     doc["reviewed_by"] = "human-reviewer"
-    doc["reviewed_at"] = "2026-08-24T00:00:00+00:00"
-    doc["source_artifact_ref"] = "evidence/sse_notice_2022.txt"
-    doc["source_artifact_hash"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    doc["reviewed_at"] = "2026-08-25T00:00:00+00:00"
+    doc["source_artifact_ref"] = "sse_notice_2022.txt"  # RELATIVE to evidence/
+    doc["source_artifact_hash"] = hashlib.sha256(
+        b"official exchange notice: price limit rules 2022"
+    ).hexdigest()
     doc["source_artifact_kind"] = "EXCHANGE_NOTICE"
-    doc["source_retrieved_at"] = "2026-08-24T00:00:00+00:00"
-    (rules_root / "a_share_limit_v1_reviewed.yaml").write_text(
+    doc["source_retrieved_at"] = "2026-08-25T00:00:00+00:00"
+    reviewed_dir = root / "versions" / "v2-reviewed"
+    reviewed_dir.mkdir(parents=True)
+    (reviewed_dir / "rules.yaml").write_text(
         yaml.safe_dump(doc, allow_unicode=True), encoding="utf-8"
     )
-    monkeypatch.setattr(
-        TradingRuleBook, "_default_rules_dir", classmethod(lambda cls: rules_root)
+    evidence = root / "evidence"
+    evidence.mkdir()
+    (evidence / "sse_notice_2022.txt").write_bytes(
+        b"official exchange notice: price limit rules 2022"
     )
-    return rules_root
+    _write_manifest(
+        root,
+        rule_version="v1-compiled",
+        review_status="COMPILED",
+        dataset_files=["versions/v1-compiled/rules.yaml"],
+        dataset_version=doc["version"],
+    )
+    monkeypatch.setattr(TradingRuleBook, "_default_rules_dir", classmethod(lambda cls: root))
+    return root
 
 
 def _prod_profile() -> AccountProfile:
@@ -103,98 +152,153 @@ def _trial_run(spike_root: Path, **overrides):
     return new_run(**kwargs)
 
 
+def _relax_golden_gates(mp: pytest.MonkeyPatch) -> None:
+    """Isolate the RULE gate: golden gates have dedicated tests."""
+    from ashare_state.spike.golden_store import GoldenTruthStore
+
+    mp.setattr(GoldenTruthStore, "quantity_gate", lambda self, *a, **k: [])
+    mp.setattr(GoldenTruthStore, "event_coverage_gate", lambda self, *a, **k: [])
+    mp.setattr(GoldenTruthStore, "review_gate", lambda self, *a, **k: [])
+
+
 class TestConfigHashRecursion:
     def test_nested_trading_rules_are_in_config_identity(self, tmp_path: Path):
         root = tmp_path
-        (root / "configs" / "trading_rules").mkdir(parents=True)
+        (root / "configs" / "trading_rules" / "versions" / "v1").mkdir(parents=True)
         (root / "configs" / "top.yaml").write_text("a: 1\n", encoding="utf-8")
-        (root / "configs" / "trading_rules" / "rules.yaml").write_text(
-            "version: v1\n", encoding="utf-8"
-        )
+        rule_file = root / "configs" / "trading_rules" / "versions" / "v1" / "rules.yaml"
+        rule_file.write_text("version: v1\n", encoding="utf-8")
         before = compute_config_hash(root)
-        # editing the NESTED rule file changes the config hash
-        (root / "configs" / "trading_rules" / "rules.yaml").write_text(
-            "version: v2\n", encoding="utf-8"
-        )
+        rule_file.write_text("version: v2\n", encoding="utf-8")
         after = compute_config_hash(root)
         assert before != after
 
 
-class TestRunBinding:
-    def test_trial_run_binds_rule_dataset_identity(self, tmp_path: Path, rules_env):
-        run, _store = _trial_run(tmp_path / "spike")
-        assert run.trading_rule_file
-        assert run.trading_rule_version
-        assert len(run.trading_rule_hash) == 64
-        assert run.trading_rule_review_status == "REVIEWED"
-        # the bound file resolves and its bytes hash matches the binding
-        bound_path = Path(run.trading_rule_file)
-        assert bound_path.name  # repo-relative convention
-        actual = hashlib.sha256(
-            (rules_env / bound_path.name).read_bytes()
-        ).hexdigest()
-        assert actual == run.trading_rule_hash
+class TestVersionModel:
+    def test_both_versions_coexist_and_active_selects(self, rules_env):
+        compiled = TradingRuleBook.load(rules_env / "versions" / "v1-compiled" / "rules.yaml")
+        reviewed = TradingRuleBook.load(rules_env / "versions" / "v2-reviewed" / "rules.yaml")
+        assert compiled.review_status == "COMPILED"
+        assert reviewed.review_status == "REVIEWED"
+        # ACTIVE initially -> COMPILED
+        book, manifest = load_active_rules(rules_env)
+        assert book.review_status == "COMPILED"
+        assert manifest.rule_version == "v1-compiled"
+        # ACTIVE advance -> REVIEWED; the COMPILED files are untouched
+        _write_manifest(
+            rules_env,
+            rule_version="v2-reviewed",
+            review_status="REVIEWED",
+            dataset_files=["versions/v2-reviewed/rules.yaml"],
+            dataset_version=reviewed.version,
+        )
+        book2, manifest2 = load_active_rules(rules_env)
+        assert book2.review_status == "REVIEWED"
+        assert manifest2.rule_version == "v2-reviewed"
+        assert (
+            TradingRuleBook.load(
+                rules_env / "versions" / "v1-compiled" / "rules.yaml"
+            ).review_status
+            == "COMPILED"
+        )
 
-    def test_binding_survives_working_tree_advance(self, tmp_path: Path, rules_env):
-        """Adversarial: after the run binds the rules, the bound file
-        CHANGES on disk - the bound loader must refuse (fail closed), not
-        silently use the new content."""
+    def test_active_dataset_tamper_blocks_load(self, rules_env):
+        victim = rules_env / "versions" / "v1-compiled" / "rules.yaml"
+        victim.write_bytes(victim.read_bytes() + b"\n# tampered\n")
+        with pytest.raises(RuleUnresolvedError, match="dataset hash mismatch"):
+            load_active_rules(rules_env)
+
+    def test_manifest_hash_tamper_blocks_load(self, rules_env):
+        # flip the manifest's declared hash to a different value
+        path = rules_env / "rule_manifest.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["dataset_hash"] = "0" * 64
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        with pytest.raises(RuleUnresolvedError, match="dataset hash mismatch"):
+            load_active_rules(rules_env)
+
+    def test_manifest_missing_file_blocks_load(self, rules_env):
+        path = rules_env / "rule_manifest.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["dataset_files"] = ["versions/never-existed/rules.yaml"]
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        with pytest.raises(RuleUnresolvedError, match="dataset file missing"):
+            load_active_rules(rules_env)
+
+
+class TestRunBinding:
+    def test_trial_run_binds_full_dataset_identity(self, tmp_path: Path, rules_env):
         run, _store = _trial_run(tmp_path / "spike")
-        bound_name = Path(run.trading_rule_file).name
-        bound_file = rules_env / bound_name
-        original_bytes = bound_file.read_bytes()
-        bound_file.write_bytes(original_bytes + b"\n# tampered\n")
-        with pytest.raises(RuleUnresolvedError, match="hash mismatch"):
+        assert run.trading_rule_version
+        assert run.trading_rule_dataset_files == ["versions/v1-compiled/rules.yaml"]
+        assert len(run.trading_rule_dataset_hash) == 64
+        assert run.trading_rule_review_status == "COMPILED"
+        # the binding hash equals the manifest algorithm over the files
+        assert run.trading_rule_dataset_hash == _manifest_hash(
+            rules_env, list(run.trading_rule_dataset_files)
+        )
+
+    def test_binding_survives_active_advance(self, tmp_path: Path, rules_env):
+        """Adversarial: the run binds v1-COMPILED; ACTIVE then advances to
+        the v2-REVIEWED version. The BOUND load still resolves v1 (and its
+        review status stays COMPILED at binding time)."""
+        run, _store = _trial_run(tmp_path / "spike")
+        reviewed = TradingRuleBook.load(rules_env / "versions" / "v2-reviewed" / "rules.yaml")
+        _write_manifest(
+            rules_env,
+            rule_version="v2-reviewed",
+            review_status="REVIEWED",
+            dataset_files=["versions/v2-reviewed/rules.yaml"],
+            dataset_version=reviewed.version,
+        )
+        bound = load_bound_rule_book(
+            rule_version=run.trading_rule_version,
+            dataset_files=run.trading_rule_dataset_files,
+            dataset_hash=run.trading_rule_dataset_hash,
+            rules_root=rules_env,
+        )
+        assert bound.review_status == "COMPILED"
+
+    def test_binding_blocks_on_bound_file_tamper(self, tmp_path: Path, rules_env):
+        run, _store = _trial_run(tmp_path / "spike")
+        victim = rules_env / "versions" / "v1-compiled" / "rules.yaml"
+        victim.write_bytes(victim.read_bytes() + b"\n# tampered\n")
+        with pytest.raises(RuleUnresolvedError, match="dataset hash mismatch"):
             load_bound_rule_book(
-                rule_file=run.trading_rule_file,
                 rule_version=run.trading_rule_version,
-                rule_hash=run.trading_rule_hash,
-                repo_root=rules_env.parent.parent,
+                dataset_files=run.trading_rule_dataset_files,
+                dataset_hash=run.trading_rule_dataset_hash,
+                rules_root=rules_env,
             )
 
     def test_binding_version_mismatch_refused(self, tmp_path: Path, rules_env):
         run, _store = _trial_run(tmp_path / "spike")
         with pytest.raises(RuleUnresolvedError, match="version mismatch"):
             load_bound_rule_book(
-                rule_file=run.trading_rule_file,
                 rule_version="v999-different",
-                rule_hash=run.trading_rule_hash,
-                repo_root=rules_env.parent.parent,
+                dataset_files=run.trading_rule_dataset_files,
+                dataset_hash=run.trading_rule_dataset_hash,
+                rules_root=rules_env,
             )
 
-    def test_run_json_persists_rule_binding(self, tmp_path: Path, rules_env):
+    def test_run_json_persists_dataset_binding(self, tmp_path: Path, rules_env):
         run, store = _trial_run(tmp_path / "spike")
-        doc = json.loads(
-            (store.run_dir(run) / "spike_run.json").read_text(encoding="utf-8")
-        )
-        assert doc["trading_rule_file"]
+        doc = json.loads((store.run_dir(run) / "spike_run.json").read_text(encoding="utf-8"))
         assert doc["trading_rule_version"]
-        assert doc["trading_rule_hash"]
-        assert doc["trading_rule_review_status"]
+        assert doc["trading_rule_dataset_files"] == ["versions/v1-compiled/rules.yaml"]
+        assert doc["trading_rule_dataset_hash"]
+        assert doc["trading_rule_review_status"] == "COMPILED"
 
 
 class TestReviewGate:
     def test_compiled_rules_block_production_new_run(self, tmp_path: Path, rules_env):
         """P0-04: COMPILED rule candidates may NOT enter production (the
-        golden gates are relaxed here - their blocking has dedicated
-        tests - so the RULE gate is what refuses)."""
-        from ashare_state.spike.golden_store import GoldenTruthStore
-
-        compiled_root = rules_env.parent / "trading_rules_compiled"
+        golden gates are relaxed here - the RULE gate is what refuses)."""
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(
-                TradingRuleBook,
-                "_default_rules_dir",
-                classmethod(lambda cls: compiled_root),
-            )
-            mp.setattr(GoldenTruthStore, "quantity_gate", lambda self, *a, **k: [])
-            mp.setattr(
-                GoldenTruthStore, "event_coverage_gate", lambda self, *a, **k: []
-            )
-            mp.setattr(GoldenTruthStore, "review_gate", lambda self, *a, **k: [])
-            book = TradingRuleBook.load()
+            _relax_golden_gates(mp)
+            book, _manifest = load_active_rules(rules_env)
             assert book.review_status == "COMPILED"
-            problems = trading_rule_review_gate(book)
+            problems = trading_rule_review_gate(book, rules_root=rules_env)
             assert any("not fully human-reviewed" in p for p in problems)
             with pytest.raises(RunLifecycleError, match="trading rule dataset not reviewed"):
                 new_run(
@@ -211,26 +315,16 @@ class TestReviewGate:
                 )
 
     def test_reviewed_rules_pass_gate_and_production_opens(self, tmp_path: Path, rules_env):
-        """The golden gates are monkeypatched away here (their production
-        blocking has dedicated tests) - this test isolates the RULE gate."""
-        from ashare_state.spike.golden_store import GoldenTruthStore
-
+        reviewed = TradingRuleBook.load(rules_env / "versions" / "v2-reviewed" / "rules.yaml")
+        _write_manifest(
+            rules_env,
+            rule_version="v2-reviewed",
+            review_status="REVIEWED",
+            dataset_files=["versions/v2-reviewed/rules.yaml"],
+            dataset_version=reviewed.version,
+        )
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(
-                GoldenTruthStore,
-                "quantity_gate",
-                lambda self, *a, **k: [],
-            )
-            mp.setattr(
-                GoldenTruthStore,
-                "event_coverage_gate",
-                lambda self, *a, **k: [],
-            )
-            mp.setattr(
-                GoldenTruthStore,
-                "review_gate",
-                lambda self, *a, **k: [],
-            )
+            _relax_golden_gates(mp)
             run, _store = new_run(
                 run_kind=RunKind.PRODUCTION,
                 spike_root=tmp_path / "spike",
@@ -245,62 +339,129 @@ class TestReviewGate:
             )
             assert run.trading_rule_review_status == "REVIEWED"
 
-    def test_bound_artifact_tamper_blocks_gate(self, tmp_path: Path, rules_env):
-        """REVIEWED dataset whose source artifact no longer hashes to the
-        sealed value -> review gate BLOCKS (verdict-side re-verification)."""
-        book = TradingRuleBook.load(rules_env / "a_share_limit_v1_reviewed.yaml")
+    def test_bound_artifact_tamper_blocks_gate(self, rules_env):
+        book = TradingRuleBook.load(rules_env / "versions" / "v2-reviewed" / "rules.yaml")
         assert trading_rule_review_gate(book, rules_root=rules_env) == []
         artifact = rules_env / "evidence" / "sse_notice_2022.txt"
         artifact.write_bytes(b"tampered official bytes")
         problems = trading_rule_review_gate(book, rules_root=rules_env)
         assert any("source artifact hash mismatch" in p for p in problems)
 
-    def test_reviewed_without_provenance_blocks(self, tmp_path: Path, rules_env):
-        compiled_root = rules_env.parent / "trading_rules_compiled"
+    def test_reviewed_without_provenance_blocks(self, rules_env):
         doc = yaml.safe_load(
-            (compiled_root / "a_share_limit_v1.yaml").read_text(encoding="utf-8")
+            (rules_env / "versions" / "v1-compiled" / "rules.yaml").read_text(encoding="utf-8")
         )
         doc["review_status"] = "REVIEWED"  # no provenance fields!
-        bare = rules_env / "bare_reviewed.yaml"
+        bare = rules_env / "versions" / "v2-bare" / "rules.yaml"
+        bare.parent.mkdir(parents=True)
         bare.write_text(yaml.safe_dump(doc), encoding="utf-8")
         book = TradingRuleBook.load(bare)
         problems = trading_rule_review_gate(book, rules_root=rules_env)
         assert any("missing provenance" in p for p in problems)
 
-    def test_bad_artifact_kind_rejected(self, tmp_path: Path, rules_env):
-        book = TradingRuleBook.load(rules_env / "a_share_limit_v1_reviewed.yaml")
+    def test_bad_artifact_kind_rejected(self, rules_env):
+        book = TradingRuleBook.load(rules_env / "versions" / "v2-reviewed" / "rules.yaml")
         book.review_provenance["source_artifact_kind"] = "WIKIPEDIA"
         problems = trading_rule_review_gate(book, rules_root=rules_env)
         assert any("source_artifact_kind" in p for p in problems)
 
 
+class TestGateHardening:
+    """R4-A2.5 P0-03 (audit 20260825 section 4.6): review-gate evidence
+    hardening - traversal/absolute refs rejected BEFORE fs access, hash
+    schema, timestamp schema."""
+
+    @staticmethod
+    def _reviewed_book_with_ref(rules_env, **overrides):
+        doc = yaml.safe_load(
+            (rules_env / "versions" / "v2-reviewed" / "rules.yaml").read_text(encoding="utf-8")
+        )
+        for key, value in overrides.items():
+            doc[key] = value
+        target = rules_env / "versions" / "v3-hardened" / "rules.yaml"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(yaml.safe_dump(doc, allow_unicode=True), encoding="utf-8")
+        return TradingRuleBook.load(target)
+
+    def test_absolute_path_ref_rejected(self, rules_env):
+        import platform
+
+        if platform.system() == "Windows":
+            ref = "C:/Windows/system32/config.sys"
+        else:
+            ref = "/etc/passwd"
+        book = self._reviewed_book_with_ref(rules_env, source_artifact_ref=ref)
+        problems = trading_rule_review_gate(book, rules_root=rules_env)
+        assert any("must be relative" in p or "rejected" in p for p in problems)
+
+    def test_dotdot_traversal_rejected(self, rules_env):
+        book = self._reviewed_book_with_ref(rules_env, source_artifact_ref="../../secrets.txt")
+        problems = trading_rule_review_gate(book, rules_root=rules_env)
+        assert any("escapes the evidence root" in p for p in problems)
+
+    def test_non_hex_hash_rejected(self, rules_env):
+        book = self._reviewed_book_with_ref(rules_env, source_artifact_hash="NOT-A-SHA256")
+        problems = trading_rule_review_gate(book, rules_root=rules_env)
+        assert any("64 lower-hex" in p for p in problems)
+
+    def test_bad_timestamp_rejected(self, rules_env):
+        book = self._reviewed_book_with_ref(rules_env, reviewed_at="yesterday-ish")
+        problems = trading_rule_review_gate(book, rules_root=rules_env)
+        assert any("reviewed_at" in p and "ISO-8601" in p for p in problems)
+
+    def test_missing_artifact_reported(self, rules_env):
+        book = self._reviewed_book_with_ref(rules_env, source_artifact_ref="no-such-notice.txt")
+        problems = trading_rule_review_gate(book, rules_root=rules_env)
+        assert any("not found" in p for p in problems)
+
+
 class TestReviewScript:
-    def test_review_script_creates_verified_reviewed_copy(self, tmp_path: Path):
-        """scripts/rules/review.py: COMPILED -> REVIEWED with artifact
-        hashing; the output passes the review gate (self-verified)."""
+    def test_review_script_creates_new_version_and_flips_active(self, tmp_path: Path):
+        """scripts/rules/review.py: COMPILED -> REVIEWED as a NEW immutable
+        version; the ACTIVE manifest flips; the output passes the gate
+        (self-verified)."""
         import subprocess
         import sys
 
-        work = tmp_path / "rules"
-        work.mkdir()
-        shutil.copy(RULES_DIR / "a_share_limit_v1.yaml", work / "rules.yaml")
+        root = tmp_path / "rules"
+        compiled_dir = root / "versions" / "v1-compiled"
+        compiled_dir.mkdir(parents=True)
+        shutil.copy(
+            RULES_DIR / "versions" / "v20260824-compiled" / "rules.yaml",
+            compiled_dir / "rules.yaml",
+        )
+        (root / "rule_manifest.json").write_text(
+            json.dumps(
+                {
+                    "rule_version": "v1-compiled",
+                    "review_status": "COMPILED",
+                    "dataset_files": ["versions/v1-compiled/rules.yaml"],
+                    "dataset_hash": _manifest_hash(root, ["versions/v1-compiled/rules.yaml"]),
+                    "source_version": "2026-08-24.1",
+                    "dataset_version": "2026-08-24.1",
+                    "review_provenance": {},
+                }
+            ),
+            encoding="utf-8",
+        )
         artifact = tmp_path / "official_notice.txt"
         artifact.write_text("SSE notice 2022 price limits", encoding="utf-8")
-        out = work / "rules_reviewed.yaml"
         result = subprocess.run(
             [
                 sys.executable,
                 str(REPO_ROOT / "scripts" / "rules" / "review.py"),
                 "--rules",
-                str(work / "rules.yaml"),
+                str(compiled_dir / "rules.yaml"),
                 "--artifact",
                 str(artifact),
                 "--kind",
                 "EXCHANGE_NOTICE",
                 "--reviewer",
                 "test-reviewer",
-                "--out",
-                str(out),
+                "--version",
+                "v2-reviewed",
+                "--rules-root",
+                str(root),
             ],
             capture_output=True,
             text=True,
@@ -308,24 +469,31 @@ class TestReviewScript:
             env={"PYTHONIOENCODING": "utf-8", "PATH": ""},
         )
         assert result.returncode == 0, result.stderr
-        reviewed = TradingRuleBook.load(out)
-        assert reviewed.review_status == "REVIEWED"
-        assert trading_rule_review_gate(reviewed, rules_root=out.parent) == []
-        # already-reviewed input refuses a second review
+        # ACTIVE flipped to the reviewed version; the compiled original is
+        # untouched (immutable coexistence)
+        manifest = load_rule_manifest(root)
+        assert manifest.rule_version == "v2-reviewed"
+        assert manifest.review_status == "REVIEWED"
+        assert TradingRuleBook.load(compiled_dir / "rules.yaml").review_status == "COMPILED"
+        book, _m = load_active_rules(root)
+        assert trading_rule_review_gate(book, rules_root=root) == []
+        # a second review of the already-reviewed version is refused
         result2 = subprocess.run(
             [
                 sys.executable,
                 str(REPO_ROOT / "scripts" / "rules" / "review.py"),
                 "--rules",
-                str(out),
+                str(root / "versions" / "v2-reviewed" / "rules.yaml"),
                 "--artifact",
                 str(artifact),
                 "--kind",
                 "EXCHANGE_NOTICE",
                 "--reviewer",
                 "test-reviewer",
-                "--out",
-                str(work / "again.yaml"),
+                "--version",
+                "v3-again",
+                "--rules-root",
+                str(root),
             ],
             capture_output=True,
             text=True,
@@ -333,6 +501,37 @@ class TestReviewScript:
             env={"PYTHONIOENCODING": "utf-8", "PATH": ""},
         )
         assert result2.returncode != 0
+
+
+class TestFormalBookRequired:
+    def test_validate_limit_rule_refuses_book_none(self):
+        """P0-01: explicit book=None is the old silent-fallback footgun -
+        the validator refuses it with a structured FAIL."""
+        from ashare_state.spike import validators
+        from ashare_state.spike.model import CaseResult
+
+        rows = [
+            {
+                "SECURITY_CODE": "600000",
+                "MARKET_CODE": "1",
+                "TRADE_DATE": "20240102",
+                "PRECLOSE": 10.0,
+                "HIGH_LIMITED": 11.0,
+                "LOW_LIMITED": 9.0,
+                "IS_ST_SEC": "0",
+            }
+        ]
+        out = validators.validate_limit_rule(rows, book=None)
+        assert out.result is CaseResult.VALIDATED_FAIL
+        assert "book=None refused" in out.actual
+
+    def test_validate_limit_rule_requires_book_kwarg(self):
+        """The book parameter has NO default - omitting it is a TypeError
+        (fail loud), so the formal runtime can never silently fall back."""
+        from ashare_state.spike import validators
+
+        with pytest.raises(TypeError, match="book"):
+            validators.validate_limit_rule([])  # type: ignore[call-arg]
 
 
 class TestStStateParsing:
@@ -357,7 +556,11 @@ class TestStStateParsing:
                 _parse_st_state(bad)
 
     def test_rule_file_with_ambiguous_st_state_rejected(self, tmp_path: Path):
-        doc = yaml.safe_load((RULES_DIR / "a_share_limit_v1.yaml").read_text(encoding="utf-8"))
+        doc = yaml.safe_load(
+            (RULES_DIR / "versions" / "v20260824-compiled" / "rules.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
         doc["rules"][0]["st_state"] = "maybe"
         bad = tmp_path / "bad.yaml"
         bad.write_text(yaml.safe_dump(doc), encoding="utf-8")
@@ -365,7 +568,11 @@ class TestStStateParsing:
             TradingRuleBook.load(bad)
 
     def test_string_false_parses_as_false_not_true(self, tmp_path: Path):
-        doc = yaml.safe_load((RULES_DIR / "a_share_limit_v1.yaml").read_text(encoding="utf-8"))
+        doc = yaml.safe_load(
+            (RULES_DIR / "versions" / "v20260824-compiled" / "rules.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
         doc["rules"][0]["st_state"] = "false"
         good = tmp_path / "good.yaml"
         good.write_text(yaml.safe_dump(doc), encoding="utf-8")

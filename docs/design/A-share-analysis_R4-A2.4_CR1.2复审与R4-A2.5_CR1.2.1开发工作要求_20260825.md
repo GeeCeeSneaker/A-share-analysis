@@ -1262,3 +1262,102 @@ CI:
 ```
 
 本文件是下一开发批次的直接任务输入。开发完成后，请在本文件末尾追加 Implementation Mapping，并同步 DEVLOG / DEVELOPMENT_MANAGEMENT，再提交 Reviewer 复检。
+
+---
+
+# 18. Implementation Mapping（Developer 回填，2026-08-25）
+
+> 本批：R4-A2.5 Formal Replay/Rule-SoR Closure + CR-1.2.1 Raw Commit Hardening（Batch A→F 全部完成）。
+> 测试基线：**502 passed / 0 failed**（461 → 502，+41）；CI 等价四检查（ruff check + **ruff format --check** + mypy + pytest）本地全绿；dry-run 冒烟 34 exchanges + 5 bundles 双向闭合零问题。
+> Change IDs：DM-CR-20260825-001/002/003；**ADR-013**（amendment to ADR-012；索引同步标注）。
+> CI：8 个红提交（b7a84563..c7aa511）根因查证 = `ruff format --check` 门未过（本地历来只跑 ruff check）；本批修复全部 format 差异；本批提交后以 **Actions 实际结果为准**（不预先宣称 CONFIRMED）。
+
+## P0-01（全消费者 Rule Binding）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 2.3-A/B/C validate_limit_rule 显式 book（formal 禁 fallback） | `validators.py`：`book` **必填 keyword**（无默认值；显式 None → 结构化 FAIL "book=None refused"）；`probes.py` B3/B5 传 `ctx.rule_book` | binding::TestFormalBookRequired ×2；validators_v2::TestLimitRule（显式 ACTIVE book） |
+| 2.3-D B3/B5/B4-LIMIT 消费者全走 run-bound | probes B3/B5 validate_limit_rule；`route_all` 把 `ctx.rule_book` 传给 limit/BJ 验证器 | adversarial::test_b5_limit_result_invariant_under_active_advance |
+| 2.4 静态守卫（无 book=None 调用） | AST 测试：probes/golden_router 的 validate_limit_rule 必带 book= 非 None 字面量；resolve_* 必带 book= | adversarial::TestStaticBookUsage ×2 |
+| 对抗测试：bound vN + current vN+1 | `test_rule_binding_adversarial.py`：v1 MAIN 10% → ACTIVE v2 20%（regime 断言证明语义真实变化）→ 同 run 重放 B5 limit cases **恒等**；bound tamper → `ctx.rule_book` 访问即阻断 | 同左 |
+
+## P0-02（Trading Rule 版本模型）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 3.2 ACTIVE 篡改阻断 new_run | `load_active_rules`：manifest dataset_hash **复算**（rel-path+bytes 联合算法）→ mismatch → RuleUnresolvedError → new_run fail-fast | binding::test_active_dataset_tamper_blocks_load / manifest_hash_tamper / manifest_missing_file |
+| 3.3-B load 显式文件清单（glob 合并废除） | `load_rule_manifest`（schema：rule_version/review_status/dataset_files[]/dataset_hash 64hex/dataset_version）+ `load_version_files`；`load(dir)` 只读 manifest 声明文件；`load(file)` 单文件显式 | binding::TestVersionModel（共存 + ACTIVE 选择/推进） |
+| 3.4 绑定全数据集（非第一个文件） | SpikeRun `trading_rule_dataset_files[] + trading_rule_dataset_hash`（联合 hash=manifest 算法）；`load_bound_rule_book` 逐文件 confinement + 联合 hash + version；**new_run 不再取 dataset_files[0]**（绑定 manifest 全清单） | binding::test_binding_blocks_on_bound_file_tamper + adversarial::tamper_blocks_replay |
+| 3.5 布局（manifest + versions + evidence） | 已迁移：`configs/trading_rules/{rule_manifest.json, versions/v20260824-compiled/rules.yaml, evidence/}` | binding::TestVersionModel（compiled 原件在 review 后不动） |
+| 5.2/5.3 review 工作流产新版本 | `review.py` 重写：新 immutable 版本目录 + ACTIVE manifest 切换 + evidence 内容寻址（`<hash16>-<name>`）+ 副本自验证 + 重复 review 拒绝 | binding::TestReviewScript（端到端子进程） |
+
+## P0-03（Review Gate 加固）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 4.6-A ref 相对 evidence root + confinement | `_confined()`：绝对路径 / `..` 穿越在任何 fs 访问前拒绝；gate 解析 `rules_root/evidence/<ref>` | binding::TestGateHardening（绝对路径 / 穿越 / 缺失 artifact） |
+| 4.6-B hash 64 lower-hex | `_HEX64` schema | binding::test_non_hex_hash_rejected |
+| 4.6-C 时间戳 ISO-8601 | `fromisoformat`（reviewed_at / source_retrieved_at） | binding::test_bad_timestamp_rejected |
+| artifact bytes 复验保持 | sha256(artifact) == source_artifact_hash | binding::test_bound_artifact_tamper_blocks_gate |
+
+## P0-04（CA Event Taxonomy）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 5.2 分类学 + provider 映射 | `_EVENT_TYPE_ALIASES + _normalize_event_type`（cash_dividend/分红/派息→DIVIDEND；rights_issue/配股→RIGHT_ISSUE；未知原样大写精确比较 fail-closed） | ca_event_type::TestEventTaxonomy |
+| 5.3-B expected_event_type 载体 | `expected_fields["event_type"]`（天然进 semantic hash，v3 无需重封）；验证器元键（status 字段比对前剥离） | ca_event_type::test_untyped_case_accepts_any_event_type |
+| 5.4 (symbol, EX_DATE, type) 精确匹配 | `_validate_corp_action_context` v4：类型集合 vs expected → `EVENT_TYPE_MISMATCH` | ca_event_type：date+type PASS / wrong type FAIL（双向替代测试）/ wrong date FAIL（既有 EVENT_DATE_MISMATCH 保持） |
+| 5.5-B/C right issue 独立流 | provider `get_right_issue_exchange` + Target 三实现（Protocol/Real/Fake 600036.SH fixture）+ CA fetch **六 exchange** 入 bundle | ca_event_type::test_bundle_lists_both_event_streams + TestTargetSurface |
+
+## P0-05（B5/B6 载荷形状）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 6.2-A/B 标量载荷显式展开 | `probes._flat_values`（标量列表/单列 frame → 值列表；多列 **fail loud**）；B5/B6 code_list 消费全部替换（单一来源） | b5_b6::TestFlatValues（7） |
+| 6.2-C B5 BJ 专项逐行检查 | 835185.BJ 专项 status exchange + validate_limit_rule 逐行（book=ctx.rule_book） | b5_b6::test_b5_symbols_are_clean_strings（catalog 无 "{'value'" 垃圾 + PASS） |
+| （附带根因）polars to_dict 列名垃圾 | `_rows_of` polars 优先 `.rows()` | TestFlatValues frame 系列 |
+
+## P1 CR-1.2.1（Raw Commit Recovery，方案 A）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 7.2-A same-request retry 恢复 | `_check_idempotent` orphan 分支：无 meta + payload 在 + 字节一致 → 补落 meta + idempotent=True（`_commit_files` 对已存在同字节跳过） | recovery::same_bytes_retry_recovers + multi_table_completes |
+| 7.2-B different-bytes quarantine | `_quarantine_orphans`（`.quarantine/` 可取证）+ BLOCK；partial orphan 同隔离（空 request 目录清理） | recovery::different_bytes_quarantines + partial_orphan_set_quarantined |
+| 7.2-C orphan 巡检 | `list_orphan_payloads(raw_root)` | recovery::TestHealthyStore + 场景断言 |
+| 7.2-D fault injection | monkeypatch write_file_atomic（meta 步失败）→ 无锚无残留 + retry 恢复；monkeypatch os.replace（payload move 失败）→ 无 meta 锚 | recovery::TestFaultInjection ×2 |
+
+## §10 Governance（并入 DM-CR-20260825-003）
+
+| 要求 | 落实 |
+|---|---|
+| CI positive confirmation | 根因查证（API 查询 8 run 全红、job/step 定位 format check）+ 修复 + 本地 CI 等价四检查；根因/整改入总册头部 CI Status + TD-007；本批提交后以 Actions 为准 |
+| Current Code Baseline exact SHA | 总册头部更新为本批提交（引用批次 + §33 规则；SHA 见 git log 本批 commit） |
+| §30/§31 改写 | §31 重写为 2026-08-25 当前状态（结构 8 项闭环 + 人工 4 项；过时陈述清除） |
+| §40 修复（提前 absorbed 非法） | R4-A2.4/CR-1.2 = REOPENED（本批修复）；R4-A2.3/CR-1.1 = REOPENED→absorbed（由 R4-A2.5 复审闭环） |
+| RISK-004 REOPENED | 已置 REOPENED（ADR-013 结构完整，PENDING_REVIEW 待 Reviewer 关闭） |
+| CR-2 BLOCKED | §41 明示（Exit Gate 关闭前） |
+| review_status vs 行为 | 版本模型使 ACTIVE=COMPILED + 代码阻断 PRODUCTION 成为唯一合法状态机 |
+| DEVLOG correction | 2026-08-25 新条目（历史保留）；上批"8 连红期间宣称全绿"的偏差已在本条目如实记录根因 |
+
+## §13 Exit Gate 自检
+
+```text
+[x] all formal Trading Rule consumers use run-bound book（AST + 对抗测试）
+[x] no formal semantic validator falls back to current/default rule SoR（book 必填 keyword；None→结构化 FAIL）
+[x] Trading Rule has explicit immutable version + ACTIVE selector model（manifest + versions/）
+[x] run binding covers complete rule dataset, not first file only（dataset_files[] + 联合 hash）
+[x] COMPILED / REVIEWED historical versions can coexist（TestVersionModel + review 脚本）
+[x] rule review evidence is path-confined + hash/timestamp schema validated（TestGateHardening）
+[x] CA validator verifies event date AND event type（v4 三元组精确匹配）
+[x] Right Issue cannot be proven by Dividend evidence（双向 EVENT_TYPE_MISMATCH 测试）
+[x] B5/B6 code-list scalar payloads are interpreted correctly（_flat_values + 端到端）
+[x] Raw partial-commit crash semantics are documented and tested（ADR-013 §6 + recovery 测试）
+[x] no silent fallback（全链 fail-closed）
+[x] Development Management / DEVLOG match runtime and reviewer verdict（同批更新 + 修正）
+[x] RISK-004 remains open until verified（REOPENED 状态保持）
+[x] CR-2 remains blocked until this gate closes（§41）
+[x] pytest / ruff / format / mypy / dry-run pass（本地 502 + 四检查 + 冒烟）
+[~] GitHub Actions status is positively confirmed —— 根因已修（format 差异全清），本批提交后以 Actions 实际结果为准（如实标注，不预先宣称）
+```
+
+已知开放项（如实声明）：CI 待本批提交后 Actions 确认；Golden / Trading Rule 人工 Review 未执行（结构就绪待人工——Trading Rule 人工复核现在可用 scripts/rules/review.py 直接执行）；Branch Protection 未启用。

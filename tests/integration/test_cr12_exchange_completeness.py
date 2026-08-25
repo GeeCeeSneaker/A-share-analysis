@@ -91,9 +91,7 @@ def _metas(ctx: ProbeContext) -> list[dict]:
 
 
 class TestKlineCalendarPrerequisite:
-    def test_hidden_calendar_and_kline_are_exactly_two_persisted_exchanges(
-        self, tmp_path: Path
-    ):
+    def test_hidden_calendar_and_kline_are_exactly_two_persisted_exchanges(self, tmp_path: Path):
         """Audit section 2.4-1: one kline data pull (with its calendar
         prerequisite) persists EXACTLY two exchange evidences - the
         calendar meta and the kline meta, nothing hidden."""
@@ -155,8 +153,7 @@ class TestPrerequisiteExchanges:
         probe_b3_core_facts(ctx, 20230601)
         metas = _metas(ctx)
         assert any(
-            m["endpoint"] == "BaseData.get_code_list"
-            and m["provider_dataset"] == "code_list"
+            m["endpoint"] == "BaseData.get_code_list" and m["provider_dataset"] == "code_list"
             for m in metas
         )
 
@@ -182,9 +179,7 @@ class TestStaticNoPayloadOnlyCalls:
             # match `ctx.target.X(` / `target.X(` attribute calls
             if isinstance(func, ast.Attribute) and func.attr in _PAYLOAD_ONLY_METHODS:
                 receiver = func.value
-                receiver_name = (
-                    receiver.attr if isinstance(receiver, ast.Attribute) else None
-                )
+                receiver_name = receiver.attr if isinstance(receiver, ast.Attribute) else None
                 if isinstance(receiver, ast.Name):
                     receiver_name = receiver.id
                 if receiver_name in ("target",):

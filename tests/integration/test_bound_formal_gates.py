@@ -46,9 +46,10 @@ def golden_env(tmp_path: Path, monkeypatch) -> Path:
 def _make_reviewed_version(root: Path, version: str) -> str:
     """Create a fully-REVIEWED sibling dataset version (simulating the
     completed human review workflow) and repoint ACTIVE at it."""
-    src = root / json.loads((root / "truth_manifest.json").read_text(encoding="utf-8"))[
-        "dataset_file"
-    ]
+    src = (
+        root
+        / json.loads((root / "truth_manifest.json").read_text(encoding="utf-8"))["dataset_file"]
+    )
     evidence_dir = root / "evidence" / "reviewed"
     evidence_dir.mkdir(parents=True, exist_ok=True)
     out_lines: list[str] = []
@@ -122,18 +123,14 @@ class TestBoundFormalGates:
         bound_cases, bound_manifest = store.load_bound(
             dataset_file=reviewed_file,
             truth_version="v4-reviewed",
-            dataset_hash=hashlib.sha256(
-                (golden_env / reviewed_file).read_bytes()
-            ).hexdigest(),
+            dataset_hash=hashlib.sha256((golden_env / reviewed_file).read_bytes()).hexdigest(),
         )
         bound_verdict_1 = store.production_formal_gate(bound_cases, bound_manifest)
         # the BOUND dataset is fully REVIEWED: the review complaint is gone
         # (it would be present if the gate read the ACTIVE COMPILED set)
         assert not any("not fully human-reviewed" in p for p in bound_verdict_1)
         # NOW advance ACTIVE back to the COMPILED v3 candidate
-        shutil.copy(
-            REPO_GOLDEN / "truth_manifest.json", golden_env / "truth_manifest.json"
-        )
+        shutil.copy(REPO_GOLDEN / "truth_manifest.json", golden_env / "truth_manifest.json")
         bound_verdict_2 = store.production_formal_gate(bound_cases, bound_manifest)
         # identical result: the ACTIVE advance changed nothing for the
         # bound run (no leakage in either direction)
@@ -162,9 +159,7 @@ class TestBoundFormalGates:
         bound_cases, bound_manifest = store.load_bound(
             dataset_file=reviewed_file,
             truth_version="v4-reviewed",
-            dataset_hash=hashlib.sha256(
-                (golden_env / reviewed_file).read_bytes()
-            ).hexdigest(),
+            dataset_hash=hashlib.sha256((golden_env / reviewed_file).read_bytes()).hexdigest(),
         )
         before = store.production_formal_gate(bound_cases, bound_manifest)
         assert not any("source artifact hash mismatch" in p for p in before)
@@ -183,9 +178,7 @@ class TestBoundFormalGates:
         bound_cases, bound_manifest = store.load_bound(
             dataset_file=reviewed_file,
             truth_version="v4-reviewed",
-            dataset_hash=hashlib.sha256(
-                (golden_env / reviewed_file).read_bytes()
-            ).hexdigest(),
+            dataset_hash=hashlib.sha256((golden_env / reviewed_file).read_bytes()).hexdigest(),
         )
         bound_verdict_1 = store.production_formal_gate(bound_cases, bound_manifest)
         # corrupt the ACTIVE dataset + pointer (an ACTIVE-side attack)

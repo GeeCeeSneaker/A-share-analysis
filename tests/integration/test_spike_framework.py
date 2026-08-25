@@ -39,13 +39,9 @@ def _event_gate_relaxed(monkeypatch):
     (cases, manifest); the relaxed stubs swallow any bound invocation."""
     from ashare_state.spike.golden_store import GoldenTruthStore
 
-    monkeypatch.setattr(
-        GoldenTruthStore, "event_coverage_gate", lambda self, *a, **k: []
-    )
+    monkeypatch.setattr(GoldenTruthStore, "event_coverage_gate", lambda self, *a, **k: [])
     monkeypatch.setattr(GoldenTruthStore, "review_gate", lambda self, *a, **k: [])
-    monkeypatch.setattr(
-        GoldenTruthStore, "production_formal_gate", lambda self, *a, **k: []
-    )
+    monkeypatch.setattr(GoldenTruthStore, "production_formal_gate", lambda self, *a, **k: [])
 
 
 @pytest.fixture

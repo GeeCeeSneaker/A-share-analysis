@@ -4,10 +4,11 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Current Code Baseline**：本批提交（R4-A2.4 Correctness Deepening + CR-1.2 Raw Exchange Closure；见 §33 更新规则）  
-> **Document Revision**：DM-CR-20260824-008 / 009 / 010 / 011  
-> **Last Review**：2026-08-24（R4-A2.3/CR-1.1 复审：REOPENED——6 项 P0 + P1，本批 R4-A2.4/CR-1.2 修复）  
+> **Current Code Baseline**：本批提交（R4-A2.5 Formal Replay/Rule-SoR Closure + CR-1.2.1 Raw Commit Hardening；见 §33 更新规则）  
+> **Document Revision**：DM-CR-20260825-001 / 002 / 003  
+> **Last Review**：2026-08-25（R4-A2.4/CR-1.2 复审：REOPENED——5 项 P0 + P1 + 治理修正，本批 R4-A2.5/CR-1.2.1 修复）  
 > **Last Reviewer**：Design / Audit Review  
+> **CI Status**：b7a84563..c7aa511 共 8 个提交 CI FAILURE（ruff format --check 未过；本批修复并本地验证 format/lint/mypy/pytest 全绿，提交后以 Actions 实际结果为准）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
@@ -873,7 +874,9 @@ Production Verdict 必须等 Review Gate PASS。
 
 # 31. Golden Truth 当前待修
 
-R4-A1.1 已完成（Implementation DONE / Review PENDING_REVIEW）：
+> 2026-08-25 状态（R4-A2.4/CR-1.2 复审 §10.4 改写；原文过时陈述已清除）：
+
+结构侧全部闭环（多轮审计吸收）：
 
 ```text
 [x] Manifest stats 从 cases 复算（篡改即拦截）
@@ -881,31 +884,28 @@ R4-A1.1 已完成（Implementation DONE / Review PENDING_REVIEW）：
 [x] case_type 进入 semantic hash
 [x] event_id / event_class
 [x] distinct-event coverage（PRODUCTION run 创建门拒绝）
-[x] append-only Golden Version（v1/v2 + ACTIVE 指针）
-[ ] domain-specific Golden Probe Router（并入 R4-A2，审计 §7）
+[x] append-only Golden Version（v1/v2/v3 + ACTIVE 指针）
+[x] domain-specific Golden Probe Router（R4-A2.3/CR-1.2，evidence bundle 同源）
+[x] bound formal gates（verdict 只用 run-bound dataset，ACTIVE 推进/篡改不泄漏）
 ```
 
-Golden Review Workflow（R4-A1.1 后仍开放）：
-人工 review 逐条核验 → 补齐 ≥50 distinct ST_CAP / ≥20 distinct DELIST
-真实事件 → 封存外部工件 source_artifact_hash → REVIEWED → 版本 v3。
-
-Domain Router：
+剩余为**人工执行**（结构已就绪，不可再由开发者代办）：
 
 ```text
-ST
-→ history_stock_status
+[ ] 人工 review 123 v3 cases（scripts/golden/review.py）
+[ ] 补齐 ≥50 distinct ST_TRANSITION 结构化事件（当前 10）
+[ ] 补齐 ≥20 distinct DELIST symbols（当前 10）
+[ ] 封存外部工件 source_artifact_hash → 产出 REVIEWED 版本
+```
 
-Limit
-→ status + PIT trading rule
+Domain Router（已实现，R4-A2.4/CR-1.2 证据同源 + bundle 闭合）：
 
-Delisted
-→ historical security master / stock basic
-
-Corporate Action
-→ dividend/right issue + adj factor + price context
-
-BJ Mapping
-→ BJ mapping + historical effective-date mapping
+```text
+ST          → history_stock_status
+Limit       → status + hist master(listing_date) + PIT calendar + run-bound rule book
+Delisted    → historical security master / stock basic
+Corp Action → calendar + status + dividend + right_issue + adj + kline T-1/T/T+1
+BJ Mapping  → hist master（code continuity）+ exact-date status ±30%
 ```
 
 ---
@@ -1076,12 +1076,13 @@ Evidence/Log/Exception 必须 scrub secret。
 | R3 Formal Spike Structure | DONE | absorbed by R4 | STRUCTURE PASS |
 | R4-A1 Golden Dataset / Per-Type Gate / Catalog Seal | DONE | absorbed | PASS（由 A1.1 闭环） |
 | R4-A1.1 Truth Integrity | DONE | absorbed | PASS（由 R4-A2 批次闭环） |
-| R4-A2.1/A2.2 Semantic/PIT Validators + Review Workflow | DONE | absorbed | PASS（由 R4-A2 批次闭环） |
-| R4-A2.3 Correctness Closure（bound gates / rule data / CA context / router evidence） | DONE | absorbed | PASS（由 R4-A2.4 闭环） |
+| R4-A2.1/A2.2 Semantic/PIT Validators + Review Workflow | DONE | absorbed | PASS（由 R4-A2.3 闭环） |
+| R4-A2.3 Correctness Closure | DONE | REOPENED→absorbed | PASS（由 R4-A2.5 复审闭环：rule binding 补全后） |
 | CR-1 ProviderExchange + RawWriter | DONE | absorbed | PASS（由 CR-1.1 闭环） |
-| CR-1.1 Explicit Exchange Runtime（runtime evidence 链） | DONE | absorbed | PASS（由 CR-1.2 闭环） |
-| R4-A2.4 Correctness Deepening（rule binding / event SoR / b-j semantics） | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
-| CR-1.2 Complete Exchange + Raw Meta/Request Closure | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
+| CR-1.1 Explicit Exchange Runtime | DONE | REOPENED→absorbed | PASS（由 CR-1.2/CR-1.2.1 闭环） |
+| R4-A2.4 Correctness Deepening | DONE | REOPENED | 由 R4-A2.5 修复（本批，PENDING_REVIEW） |
+| CR-1.2 Complete Exchange + Raw Closure | DONE | REOPENED | 由 CR-1.2.1 修复（本批，PENDING_REVIEW） |
+| R4-A2.5 Formal Replay/Rule-SoR Closure + CR-1.2.1 Raw Commit Hardening | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
 | R4-A3 SDK/Lifecycle/Early Stop | PLANNED | PENDING | Next |
 | R4-B1 Capability Endpoint Proof | PLANNED | PENDING | Next |
 | R4-B2 Publish Validation Exactness | PLANNED | PENDING | Next |
@@ -1098,39 +1099,51 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A2.4 + CR-1.2（本批，DONE / PENDING_REVIEW）
+## R4-A2.5 + CR-1.2.1（本批，DONE / PENDING_REVIEW）
 
 ```text
-CR-1.2 Complete Exchange + Raw Closure（P0-01/02 + P1-01/02/03，ADR-012）：
-  隐藏日历前置显式化（Option A）：calendar exchange 先持久化 → 窗口
-    trading_days 显式传入 kline；日历失败→失败 meta + kline 不发射
-  B3/B7 code_list/calendar 前置 = 持久化 exchange（AST 禁止 payload-only 调用）
-  RawWriteResult 拆分 payload_artifacts[] + meta_artifact；SpikeCase 证据
-    恒绑 exchange .meta.json（双向闭合：删/改任一侧都 BLOCK）
-  meta 持久化完整脱敏 request_params + params_hash + ingested_at +
-    ingest_run_id（请求可重建；等长不同 symbols hash 不同）
-  多文件提交 staging 原子化（meta 最后落盘）；表名冲突 BLOCK；
-    read(verify=True) 读前复验
-R4-A2.4 Trading Rule Binding + Review Gate（P0-03/04 + P1-04，ADR-012）：
-  SpikeRun 绑定 trading_rule_file/version/hash/review_status；
-    compute_config_hash 递归 configs/**（嵌套规则文件进指纹）
-  RUNNING/RESUME/VERDICT/REPLAY 只用 load_bound_rule_book（hash+version
-    复验）；ProbeContext.rule_book 传入验证器
-  Review Gate：COMPILED→REVIEWED（provenance 完整 + artifact hash 复验）；
-    new_run(PRODUCTION) 与 verdict 都执行（fail-fast + 复核）；
-    scripts/rules/review.py（工具自算 hash；重复 review 拒绝）
-  st_state 严格解析（bool/"true"/"false"/"any"，truthiness 禁止）
-R4-A2.4 CA Event SoR（P0-05）：
-  CA 证据组合加事件事实源（dividend records）：adj-only→FAIL
-    (EVENT_SOURCE_MISSING)；EX_DATE≠T→EVENT_DATE_MISMATCH；一致→PASS；
-    事件日停牌→NOT_TESTABLE_TIME；FakeTarget dividend exchange（dry-run
-    覆盖事件端点）
-R4-A2.4 静态守卫（P0-06）：
-  费率字面量守卫升级 AST 结构化规则：spike/**/*.py 禁止 *_rate 与数值
-    常量直接比较（容差 1e-9 豁免）；负向验证确认能抓 != 0.30 模式
+P0-01 全消费者 Rule Binding（ADR-013 §3）：
+  validate_limit_rule(book=) 必填 keyword（无默认；显式 None→结构化 FAIL）
+  B3/B5 传 ctx.rule_book；route_all 传 run-bound book 给 limit/BJ 验证器
+  AST 守卫：formal 模块 validate_limit_rule 必带 book= 且非 None 字面量；
+    resolve_* 必带 book=
+  对抗测试：ACTIVE 推进（v1 10%→v2 20%）后同 run 重放 B5 limit 结果恒等；
+    bound 数据篡改→replay 阻断
+P0-02 Trading Rule 版本模型（ADR-013 §1）：
+  configs/trading_rules/{rule_manifest.json, versions/<v>/rules.yaml, evidence/}
+  manifest=ACTIVE 选择器（dataset_files[]+dataset_hash+dataset_version）；
+    目录 glob 合并语义废除（COMPILED/REVIEWED 共存）
+  load_active_rules 复算 hash（ACTIVE 篡改→new_run 阻断）；
+    SpikeRun 绑定 dataset_files[]+dataset_hash（篡改任一文件→replay 阻断）
+  scripts/rules/review.py 重写：产出新 immutable 版本 + 切换 ACTIVE +
+    evidence 内容寻址 + 自验证
+P0-03 Review Gate 加固（ADR-013 §2）：
+  source_artifact_ref 相对 evidence root + path confinement（绝对路径/..
+    穿越在 fs 访问前拒绝）；hash 64 lower-hex；时间戳 ISO-8601
+P0-04 CA Event Taxonomy（ADR-013 §4）：
+  DIVIDEND/RIGHT_ISSUE 两独立事件流（get_right_issue_exchange）；
+    expected_fields["event_type"] 声明期望类型（v3 语义 hash 兼容）；
+    (symbol, EX_DATE, type) 精确匹配；DIVIDEND 永不替代 RIGHT_ISSUE
+    （EVENT_TYPE_MISMATCH）；CA 域 bundle=六 exchange
+P0-05 B5/B6 载荷形状（ADR-013 §5）：
+  _flat_values 标量列表展开（多列 fail loud）；_rows_of polars 优先级
+    修正（旧路径 list(to_dict())=列名垃圾行）
+P1 CR-1.2.1 Raw Commit Recovery（ADR-013 §6）：
+  orphan payload 检测（list_orphan_payloads）；same-bytes retry 恢复；
+    different-bytes→.quarantine/ 隔离 + BLOCK；partial orphan 同隔离；
+    fault-injection（meta 写失败/ payload move 失败）
+CI 根因修复：ruff format --check 门（b7a84563..c7aa511 8 连红的根因）；
+  本地 CI 等价四检查全绿
 ```
 
-## R4-A3 / B1 / B2
+## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
+
+```text
+scripts/golden/review.py 逐条核验 123 v3 cases + 补齐 distinct events
+scripts/rules/review.py 对 ACTIVE 规则版本执行人工复核（产出 REVIEWED 版本）
+```
+
+## R4-A3 / B1 / B2（CR-2 前）
 
 ```text
 permission/cache/freshness 分 Gate
@@ -1141,7 +1154,7 @@ explicit artifact_validation_id
 Migration 011
 ```
 
-## 后续 CR（CR-1.2 已就绪）
+## 后续 CR（CR-1.2.1 已就绪；CR-2 被 R4-A2.5 复审置 BLOCKED 直到其关闭）
 
 ```text
 CR-2 Provider-Normalized + Quarantine（消费 raw evidence → provider-normalized）
@@ -1247,6 +1260,19 @@ meta 持久化完整脱敏 request_params + params_hash（等长不同 symbols
     → meta 最后）；表名净化冲突 BLOCK；read(verify=True) 读前复验
 AST 静态测试：probes.py / golden_router.py 禁止调用 payload-only
     target 方法（get_code_list / get_calendar / query_kline 等业务面）
+```
+
+CR-1.2.1（Raw Commit Hardening，R4-A2.5 §7）要求：
+
+```text
+orphan payload（字节在盘、meta 锚缺失，中断提交残留）：
+    same-request retry 且字节一致 -> 提交恢复（补落 meta，idempotent）
+    retry 字节不同 -> orphan 移入 .quarantine/（可取证、永不冒充有效
+    证据）且写入 BLOCK；partial orphan（多表落一半）同隔离
+list_orphan_payloads(raw_root) 巡检接口（健康存储返回空）
+_commit_files payload 落位对"已存在且字节一致"跳过（恢复语义）
+fault-injection 测试：meta 写失败 -> 无锚无残留、retry 恢复；
+    payload move 失败 -> 无 meta 锚（meta 最后落盘语义保持）
 ```
 
 ---
@@ -1457,20 +1483,24 @@ Deadline: 首个 APPROVED Source Policy 前
 ## RISK-004 ProviderExchange 未统一
 
 ```text
-Status: CLOSED（CR-1 + CR-1.1：运行时全链显式 exchange；last_envelopes
-        diagnostic-only；AST 级静态测试防回归）
+Status: REOPENED（R4-A2.4/CR-1.2 复审裁定：A2.3 时代"由 A2.4 闭环"的
+        PASS 结论非法——CR-1.1 四 P0 在 A2.4 批次才修复且被再次 REOPEN）
+        → 本批 R4-A2.5/CR-1.2.1 后结构完整：版本模型 + run 绑定 + gate
+        加固 + AST 守卫全部落地（ADR-013），等待 Reviewer 复核关闭
+Mitigation: PENDING_REVIEW（R4-A2.5/CR-1.2.1）
 ```
 
 ## RISK-005 Trading Rule 数据层未人工 Review
 
 ```text
-Status: OPEN（结构已闭环：run 绑定 + review gate + 官方 artifact hash 复验 +
-        review 工具链；剩余人工执行：对 a_share_limit_v1.yaml 按
-        scripts/rules/review.py 完成人工复核并产出 REVIEWED 副本）
-Impact: 制度事实（费率/生效窗口/板别映射）当前为 COMPILED 候选；
-        COMPILED 已被代码层硬阻断（PRODUCTION new_run/verdict 拒绝）
-Mitigation: P0-M-1B 前完成人工 review；fail-closed 语义 + st_state 严格
-        解析已在代码层（RULE_UNRESOLVED 永不静默退化）
+Status: OPEN（结构完全闭环：immutable versions + ACTIVE manifest + run
+        绑定（文件清单+联合 hash）+ review gate（path confinement + schema）
+        + review 工具链；剩余人工执行：scripts/rules/review.py 对
+        v20260824-compiled 产出 REVIEWED 版本并切换 ACTIVE）
+Impact: 制度事实当前 ACTIVE=COMPILED；COMPILED 被代码层硬阻断
+        （PRODUCTION new_run/verdict 拒绝）
+Mitigation: P0-M-1B 前人工执行；fail-closed 语义 + st_state 严格解析
+        已在代码层（RULE_UNRESOLVED 永不静默退化）
 ```
 
 ---
@@ -1495,7 +1525,11 @@ TD-005 golden v3 候选 distinct events 不足（ST 10<50 / DELIST symbols 10<20
 
 TD-006 FakeTarget dividend 事件数据与 golden CA cases 的日期对齐有限
     dry-run 中部分 CA case 诚实 FAIL（事件源缺失）；正式验证以真实
-    provider dividend records 为准（P0-M-1B）
+    provider dividend/right issue records 为准（P0-M-1B）
+
+TD-007 CI ruff format 门在 b7a84563..c7aa511 期间缺本地等价检查
+    本批起本地提交前必须跑 ruff format --check（连同 lint/mypy/pytest
+    的 CI 等价四检查）
 ```
 
 ---
@@ -1703,6 +1737,47 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 > 新条目倒序追加，不删除历史。
 
+## DM-CR-20260825-003 — CA Event Taxonomy + B5/B6 Payload Shapes + CI 根因修复
+
+**Type**：C1（CA 证据组合扩展）+ C2（CI 门新增 format check 执行修正）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.4/CR-1.2 复审 P0-04/P0-05（CA 事件类型不可替代；B5/B6 标量载荷静默垃圾）+ §10 治理（CI 全红根因：ruff format --check 门自 b7a84563 起未过，开发者本地只跑 ruff check）。  
+**Old Contract**：CA 事件源仅 dividend 流（任何事件记录可证明任何类型期望）；B5/B6 的 code_list 消费把 row dict 强转为字符串（`"{'value': '600519.SH'}"` 垃圾但静默"通过"）；`_rows_of` 对 polars frame 走 `list(to_dict())` 返回列名列表（静默垃圾行）。  
+**New Contract**（ADR-013 §4-§5）：事件分类学 DIVIDEND/RIGHT_ISSUE 两独立流（provider `get_right_issue_exchange`；CA 域 fetch 六 exchange 全入 bundle）；golden case 以 `expected_fields["event_type"]` 声明期望类型（语义 hash 兼容载体）；校验 (symbol, EX_DATE, type) 精确三元组，DIVIDEND 永不替代 RIGHT_ISSUE（`EVENT_TYPE_MISMATCH`）；provider 字面量归一化（分红/配股等）；`event_type` 为验证器元键（status 字段比对前剥离）；`_flat_values` 标量列表展开 + 多列 fail loud；`_rows_of` polars 优先 `.rows()`。CI：本地等价四检查（ruff check + format --check + mypy + pytest）入提交前流程；8 个红提交的根因记录于头部 CI Status。  
+**Affected Modules**：providers/amazingdata/provider.py、spike/{target,golden_router,probes}.py、scripts/rules/review.py、configs/trading_rules/**（版本模型迁移：v20260824-compiled + manifest）  
+**Tests**：test_ca_event_type.py（8）、test_b5_b6_payload_shapes.py（9）、test_raw_commit_recovery.py（8）、test_rule_binding_adversarial.py（4）+ 适配  
+**ADR**：[ADR-013](../adr/ADR-013_rule_version_model.md) §4-§6  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-002 — Trading Rule Version Model + Review Gate Hardening
+
+**Type**：C2 amendment to ADR-012 §2  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.5 P0-02/P0-03（规则数据集缺版本模型：目录 glob 合并在 COMPILED/REVIEWED 共存时歧义；绑定只记录第一个文件；gate 的 ref 无 confinement/hash/timestamp schema）。  
+**Old Contract**：`TradingRuleBook.load(dir)` glob 合并目录全部 yaml；SpikeRun 绑定单 file+hash；gate 的 artifact ref 任意相对路径（可指向 evidence 外）、hash 无 schema、时间戳无校验；review.py原地改写。  
+**New Contract**（ADR-013 §1-§2）：`rule_manifest.json`（ACTIVE 选择器）+ `versions/<v>/rules.yaml`（不可变共存）+ `evidence/`；`load_active_rules` 复算 dataset_hash（ACTIVE 篡改→new_run 阻断）；SpikeRun 绑定 `trading_rule_dataset_files[] + dataset_hash`（联合 hash 算法=manifest；篡改任一文件阻断 replay；旧 run json 兼容读取）；`load_bound_rule_book` 逐文件 confinement+hash+version 校验；目录 glob 合并语义废除；gate：ref 相对 evidence root + path confinement（绝对/`..` 拒绝于 fs 访问前）+ hash 64 lower-hex + reviewed_at/source_retrieved_at ISO-8601 + artifact bytes 复验；review.py 重写（新 immutable 版本 + ACTIVE 切换 + evidence 内容寻址 + 副本自验证 + 重复 review 拒绝）。  
+**Affected Modules**：spike/trading_rule.py、spike/{model,run_store,runner,probes}.py、scripts/rules/review.py、configs/trading_rules/**（迁移至版本布局）  
+**Compatibility**：旧 SpikeRun json 的 trading_rule_file/hash 映射为单文件 dataset_files（兼容读取）；单文件 `TradingRuleBook.load(file)` 保留。  
+**Tests**：test_trading_rule_binding.py 重写（24：版本共存/ACTIVE 推进/篡改阻断×4/绑定持久化/gate 加固×5/review 脚本端到端/st_state×4/book 必填×2）+ test_trading_rule_data.py 适配  
+**ADR**：[ADR-013](../adr/ADR-013_rule_version_model.md) §1-§2  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-001 — Formal Rule-SoR Closure（全消费者 run-bound book）
+
+**Type**：C1（验证器契约强化）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.5 P0-01（validate_limit_rule 仍可用 module fallback：trial/prod 的 B3/B5 消费工作树当前规则，违反 Exact Replay）。  
+**Old Contract**：`validate_limit_rule(rows, book=None)`——book 可选，None 时 resolve 链 fallback `default_rule_book()`（工作树当前状态）。  
+**New Contract**（ADR-013 §3）：`book` 为**必填 keyword**（无默认值；显式 None→结构化 VALIDATED_FAIL，消息含 "book=None refused"）；B3/B5（probes）传 `ctx.rule_book`；`route_all` 把 run-bound book 传入 limit/BJ 验证器；AST 守卫测试：probes/golden_router 的 validate_limit_rule 调用必带 book= 且非 None 字面量、resolve_* 必带 book=；对抗测试：ACTIVE v1(10%)→v2(20%) 推进后同 run 重放 B5 limit cases 恒等（bound 仍 10%）；bound 文件篡改→`ctx.rule_book` 访问即阻断。  
+**Affected Modules**：spike/validators.py、spike/probes.py、spike/golden_router.py、tests/unit/test_spike_validators_v2.py（显式 book）  
+**Compatibility**：无（validate_limit_rule 签名收紧为破坏性变更——调用方全部同批更新；测试显式加载 ACTIVE book）。  
+**Tests**：test_rule_binding_adversarial.py（4）+ TestLimitRule 适配 + 502 全量回归  
+**ADR**：[ADR-013](../adr/ADR-013_rule_version_model.md) §3  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
 ## DM-CR-20260824-011 — R4-A2.3/CR-1.1 Review Correction & Governance Sync
 
 **Type**：C1（治理修正）  
@@ -1895,10 +1970,10 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 # 62. 下一次维护检查点
 
-R4-A2.4 + CR-1.2 已更新（2026-08-24，见 DM-CR-20260824-008/009/010/011）：
+R4-A2.5 + CR-1.2.1 已更新（2026-08-25，见 DM-CR-20260825-001/002/003）：
 
 ```text
-§40 §41 §43 §48 §52 §53 §61 §62   (done 2026-08-24)
+§30 §31 §40 §41 §43 §52 §53 §61 §62 + 头部 CI Status   (done 2026-08-25)
 ```
 
 下一批（R4-A3 / CR-2）落地时至少更新：
@@ -1913,7 +1988,7 @@ R4-A2.4 + CR-1.2 已更新（2026-08-24，见 DM-CR-20260824-008/009/010/011）�
 Golden / Trading Rule 人工 Review 执行时至少更新：
 
 ```text
-§40 §48 §52 §61     (RISK-001/005 状态 + REVIEWED 落位)
+§40 §48 §52 §61     (RISK-001/005 状态 + REVIEWED 版本落位)
 ```
 
 ---

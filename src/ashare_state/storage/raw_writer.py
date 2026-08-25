@@ -243,9 +243,7 @@ def normalize_payload(payload: Any) -> tuple[str, list[tuple[str | None, Any]]]:
         if all(_is_dataframe_like(v) for v in values):
             converted = [(str(k), _to_arrow_table(v)) for k, v in payload.items()]
             return KIND_MULTI_FRAMES, [(k, t) for k, t in converted if t is not None]
-        if all(
-            isinstance(v, list) and all(isinstance(r, dict) for r in v) for v in values
-        ):
+        if all(isinstance(v, list) and all(isinstance(r, dict) for r in v) for v in values):
             return KIND_MULTI_ROWS, [(str(k), _rows_to_table(v)) for k, v in payload.items()]
         raise RawWriterError(
             "unsupported payload shape: dict values must ALL be DataFrames or "
@@ -416,6 +414,11 @@ class RawWriter:
         idem = self._check_idempotent(request_id, records, meta_path, meta_bytes, table_files)
         if not idem:
             self._commit_files(request_id, dataset_dir, meta_path, meta_bytes, table_files)
+        # CR-1.2.1 (audit 20260825 section 7.2): an interrupted commit may
+        # leave ORPHAN payloads (bytes on disk, no meta anchor). A retry
+        # with the SAME bytes RECOVERS the commit (meta lands, idempotent);
+        # a retry with DIFFERENT bytes QUARANTINES the orphan (moved under
+        # .quarantine/, never mistaken for valid evidence).
 
         if multi:
             logical_uri = self._logical_uri(provider, dataset, f"{request_id}/")
@@ -472,10 +475,16 @@ class RawWriter:
                 write_file_atomic(staged_tmp, payload_bytes, staging_dir=staging)
                 staged.append((final_path, staged_tmp))
             # every payload byte is safely on disk in staging -> move each
-            # into its final position (os.replace is atomic per file)
+            # into its final position (os.replace is atomic per file).
+            # CR-1.2.1 recovery: a final path that ALREADY exists with the
+            # SAME bytes (orphan from an interrupted commit) is skipped -
+            # the retry completes the commit by landing the missing meta.
             for final_path, staged_tmp in staged:
                 final_path.parent.mkdir(parents=True, exist_ok=True)
-                if final_path.exists():  # pragma: no cover - idempotence pre-checked
+                if final_path.exists():
+                    if final_path.read_bytes() == staged_tmp.read_bytes():
+                        staged_tmp.unlink(missing_ok=True)
+                        continue
                     msg = (
                         f"raw artifact conflict for request {request_id}: "
                         f"{final_path} already exists with different bytes"
@@ -541,9 +550,7 @@ class RawWriter:
         )
 
     # ---------------------------------------------------------------- read
-    def read(
-        self, *, provider: str, dataset: str, request_id: str, verify: bool = True
-    ) -> Any:
+    def read(self, *, provider: str, dataset: str, request_id: str, verify: bool = True) -> Any:
         """Read back a persisted payload: DataFrame for single-table kinds,
         dict[str, DataFrame] for multi-table kinds (lossless round-trip
         support for audit section 5.3 tests). Uses polars - the project
@@ -589,10 +596,35 @@ class RawWriter:
     ) -> bool:
         """Same request id: idempotent no-op iff every existing byte matches
         the new bytes; any difference BLOCKS (immutable raw store). The
-        wall-clock ``ingested_at`` is excluded from the comparison."""
-        existing_any = meta_path.exists() or any(p.exists() for _, p, _ in table_files)
-        if not existing_any:
+        wall-clock ``ingested_at`` is excluded from the comparison.
+
+        CR-1.2.1 orphan recovery (audit 20260825 section 7.2):
+        - meta MISSING + payloads present (interrupted commit): same bytes
+          -> RECOVER (the caller writes the meta, idempotent=True);
+          different bytes -> QUARANTINE the orphan files and BLOCK.
+        - meta present + payload missing: tamper/partial -> BLOCK."""
+        meta_exists = meta_path.is_file()
+        payload_exists = any(p.exists() for _, p, _ in table_files)
+        if not meta_exists and not payload_exists:
             return False
+        if not meta_exists and payload_exists:
+            # orphan payload set without its meta anchor
+            same_tables = all(p.is_file() and p.read_bytes() == b for _, p, b in table_files)
+            if same_tables:
+                # same-request retry after an interrupted commit: land the
+                # meta now (recovery); _commit_files will write ONLY the
+                # missing pieces (payload moves are no-ops for existing
+                # bytes via the staging path's exists-check)
+                self._commit_files(request_id, meta_path.parent, meta_path, meta_bytes, table_files)
+                return True
+            self._quarantine_orphans(request_id, table_files)
+            msg = (
+                f"raw orphan-payload conflict for request {request_id}: an "
+                "interrupted commit left payload bytes without a meta anchor, "
+                "and the retry carries DIFFERENT bytes - the orphan set was "
+                "moved to .quarantine/ (audit 20260825 section 7.2-D)"
+            )
+            raise RawWriterError(msg)
         same_meta = meta_path.is_file() and _same_meta_ignoring_time(
             meta_path.read_bytes(), meta_bytes
         )
@@ -604,6 +636,38 @@ class RawWriter:
             "with different content - immutable raw store"
         )
         raise RawWriterError(msg)
+
+    @staticmethod
+    def _quarantine_orphans(
+        request_id: str, table_files: list[tuple[str | None, Path, bytes]]
+    ) -> None:
+        """Move conflicting orphan payloads under the dataset's .quarantine/
+        so they can never be mistaken for valid evidence (they stay
+        inspectable for incident forensics; the write itself BLOCKS with
+        RawWriterError)."""
+        from shutil import rmtree
+
+        dataset_dirs: set[Path] = set()
+        for _, path, _bytes in table_files:
+            if not path.is_file():
+                continue
+            # single-table payloads sit in the dataset dir; multi-table
+            # payloads sit in <dataset_dir>/<request_id>/
+            dataset_dir = path.parent.parent if path.parent.name == request_id else path.parent
+            dataset_dirs.add(dataset_dir)
+            quarantine_dir = dataset_dir / ".quarantine"
+            quarantine_dir.mkdir(parents=True, exist_ok=True)
+            target = quarantine_dir / f"{request_id}-{path.name}"
+            counter = 0
+            while target.exists():  # keep earlier quarantine evidence
+                counter += 1
+                target = quarantine_dir / f"{request_id}-{counter}-{path.name}"
+            path.replace(target)  # atomic move within the dataset dir
+        # a fully quarantined multi-table request leaves an empty dir
+        for dataset_dir in dataset_dirs:
+            request_dir = dataset_dir / request_id
+            if request_dir.is_dir() and not any(request_dir.iterdir()):
+                rmtree(request_dir, ignore_errors=True)
 
     def _meta_bytes(
         self,
@@ -664,6 +728,34 @@ def _same_meta_ignoring_time(existing: bytes, incoming: bytes) -> bool:
     a.pop("ingested_at", None)
     b.pop("ingested_at", None)
     return a == b
+
+
+def list_orphan_payloads(raw_root: Path | str) -> list[str]:
+    """CR-1.2.1 (audit 20260825 section 7.2-C): detect ORPHAN payloads -
+    parquet bytes on disk whose exchange meta anchor is missing (an
+    interrupted multi-file commit, or tampering). Returns logical refs
+    (provider=.../dataset=.../<file>) for incident forensics; a healthy
+    raw store yields an empty list.
+
+    Orphan shapes:
+      - <request_id>.parquet with no <request_id>.meta.json
+      - <request_id>/<table>.parquet with no <request_id>.meta.json
+    """
+    root = Path(raw_root)
+    orphans: list[str] = []
+    if not root.is_dir():
+        return orphans
+    for dataset_dir in sorted(root.glob("provider=*/dataset=*")):
+        for path in sorted(dataset_dir.rglob("*.parquet")):
+            rel = path.relative_to(root).as_posix()
+            if ".staging" in path.parts or ".quarantine" in path.parts:
+                continue
+            # meta for a nested table lives at ../<request_id>.meta.json
+            request_id = path.stem if path.parent == dataset_dir else path.parent.name
+            meta = dataset_dir / f"{request_id}.meta.json"
+            if not meta.is_file():
+                orphans.append(rel)
+    return orphans
 
 
 def verify_meta_closure(raw_root: Path | str, meta_doc: dict[str, Any]) -> list[str]:
@@ -741,5 +833,6 @@ __all__ = [
     "RawWriter",
     "RawWriterError",
     "TableRecord",
+    "list_orphan_payloads",
     "verify_meta_closure",
 ]

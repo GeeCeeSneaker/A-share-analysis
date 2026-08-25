@@ -84,12 +84,14 @@ class SpikeRun:
     golden_dataset_file: str = ""
     golden_dataset_hash: str = ""
     case_catalog_hash: str = ""
-    #: R4-A2.4 P0-03: the run BINDS the trading-rule dataset it was created
-    #: with; verdict/replay re-load THIS file + hash (never the working
-    #: tree's current state)
-    trading_rule_file: str = ""  # repo-relative, e.g. configs/trading_rules/a_share_limit_v1.yaml
+    #: R4-A2.4 P0-03 + R4-A2.5 P0-02: the run BINDS the trading-rule
+    #: dataset it was created with. The binding captures the FULL dataset
+    #: file list + the combined hash over (rel path + bytes) of every file
+    #: (the ACTIVE-manifest algorithm) - tampering ANY bound file blocks
+    #: the replay. verdict/resume never read the working tree's ACTIVE.
     trading_rule_version: str = ""
-    trading_rule_hash: str = ""  # sha256 over the bound rule file bytes
+    trading_rule_dataset_files: list[str] = field(default_factory=list)
+    trading_rule_dataset_hash: str = ""
     trading_rule_review_status: str = ""  # COMPILED | REVIEWED at binding time
     started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     ended_at: str | None = None
@@ -112,9 +114,9 @@ class SpikeRun:
             "golden_dataset_file": self.golden_dataset_file,
             "golden_dataset_hash": self.golden_dataset_hash,
             "case_catalog_hash": self.case_catalog_hash,
-            "trading_rule_file": self.trading_rule_file,
             "trading_rule_version": self.trading_rule_version,
-            "trading_rule_hash": self.trading_rule_hash,
+            "trading_rule_dataset_files": list(self.trading_rule_dataset_files),
+            "trading_rule_dataset_hash": self.trading_rule_dataset_hash,
             "trading_rule_review_status": self.trading_rule_review_status,
             "started_at": self.started_at,
             "ended_at": self.ended_at,

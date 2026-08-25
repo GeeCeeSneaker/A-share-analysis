@@ -167,14 +167,15 @@ def resume_run(
             truth_version=run.golden_truth_version,
             dataset_hash=run.golden_dataset_hash,
         )
-    # R4-A2.4 P0-03: resume also re-verifies the RUN-BOUND rule dataset
-    if run.trading_rule_file:
+    # R4-A2.4 P0-03 + R4-A2.5 P0-02: resume also re-verifies the RUN-BOUND
+    # rule dataset (full file list + combined hash)
+    if run.trading_rule_dataset_files:
         from ashare_state.spike.trading_rule import load_bound_rule_book
 
         load_bound_rule_book(
-            rule_file=run.trading_rule_file,
             rule_version=run.trading_rule_version,
-            rule_hash=run.trading_rule_hash,
+            dataset_files=run.trading_rule_dataset_files,
+            dataset_hash=run.trading_rule_dataset_hash,
         )
     return run
 
@@ -245,8 +246,7 @@ def compute_config_hash(repo_root: Path | None = None) -> str:
         msg = "configs/ not found; config provenance unavailable"
         raise RunLifecycleError(msg)
     paths = sorted(
-        p for p in config_dir.rglob("*.yaml")
-        if p.is_file() and ".staging" not in p.parts
+        p for p in config_dir.rglob("*.yaml") if p.is_file() and ".staging" not in p.parts
     )
     digest = hashlib.sha256()
     for path in paths:
@@ -311,11 +311,12 @@ def new_run(
     golden_truth_version = ""
     golden_dataset_file = ""
     golden_dataset_hash = ""
-    # R4-A2.4 P0-03/P0-04: formal runs also BIND the trading-rule dataset;
-    # PRODUCTION requires its review gate (COMPILED rules BLOCK production)
-    trading_rule_file = ""
+    # R4-A2.4 P0-03 + R4-A2.5 P0-02: formal runs also BIND the trading-rule
+    # dataset (version + FULL file list + combined hash); PRODUCTION
+    # requires its review gate (COMPILED rules BLOCK production)
     trading_rule_version = ""
-    trading_rule_hash = ""
+    trading_rule_dataset_files: list[str] = []
+    trading_rule_dataset_hash = ""
     trading_rule_review_status = ""
     if run_kind in (RunKind.PRODUCTION, RunKind.TRIAL):
         from ashare_state.spike.golden_store import GoldenTruthStore
@@ -339,14 +340,13 @@ def new_run(
         golden_dataset_hash = golden_manifest.dataset_hash
         _ = golden_cases
         from ashare_state.spike.trading_rule import (
-            TradingRuleBook,
+            load_active_rules,
             trading_rule_review_gate,
         )
 
-        rule_book = TradingRuleBook.load()
-        rule_dir = TradingRuleBook._default_rules_dir()
-        rule_name = rule_book.dataset_files[0] if rule_book.dataset_files else ""
-        rule_path = rule_dir / rule_name
+        # load the ACTIVE manifest-selected version; the manifest hash is
+        # re-verified here (ACTIVE tamper blocks new_run, audit 3.2)
+        rule_book, rule_manifest = load_active_rules()
         if run_kind is RunKind.PRODUCTION:
             rule_problems = trading_rule_review_gate(rule_book)
             if rule_problems:
@@ -356,13 +356,10 @@ def new_run(
                     "COMPILED rule candidates may not enter production)"
                 )
                 raise RunLifecycleError(msg)
-        # convention: repo-relative binding (configs/trading_rules/<file>)
-        trading_rule_file = f"configs/trading_rules/{rule_name}"
-        trading_rule_version = rule_book.version
-        trading_rule_hash = (
-            hashlib.sha256(rule_path.read_bytes()).hexdigest() if rule_path.is_file() else ""
-        )
-        trading_rule_review_status = rule_book.review_status
+        trading_rule_version = rule_book.version  # yaml content version
+        trading_rule_dataset_files = list(rule_manifest.dataset_files)
+        trading_rule_dataset_hash = rule_manifest.dataset_hash
+        trading_rule_review_status = rule_manifest.review_status
     run = SpikeRun(
         spike_run_id=str(uuid_module.uuid4()),
         run_kind=run_kind,
@@ -376,9 +373,9 @@ def new_run(
         golden_truth_version=golden_truth_version,
         golden_dataset_file=golden_dataset_file,
         golden_dataset_hash=golden_dataset_hash,
-        trading_rule_file=trading_rule_file,
         trading_rule_version=trading_rule_version,
-        trading_rule_hash=trading_rule_hash,
+        trading_rule_dataset_files=trading_rule_dataset_files,
+        trading_rule_dataset_hash=trading_rule_dataset_hash,
         trading_rule_review_status=trading_rule_review_status,
     )
     store = RunStore(spike_root)
@@ -528,16 +525,15 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
                     truth_version=run.golden_truth_version,
                     dataset_hash=run.golden_dataset_hash,
                 )
-                blocking.extend(
-                    golden_store.production_formal_gate(bound_cases, bound_manifest)
-                )
+                blocking.extend(golden_store.production_formal_gate(bound_cases, bound_manifest))
         except Exception as exc:  # noqa: BLE001 - integrity error blocks the verdict
             blocking.append(f"golden truth binding violated: {exc}")
-    # R4-A2.4 P0-03/P0-04: verdicts re-verify the RUN-BOUND trading-rule
-    # dataset (file + bytes hash + version); PRODUCTION verdicts also
-    # re-run the rule review gate over the BOUND dataset - the working
-    # tree's current rule state can never leak into a historical verdict
-    if run.trading_rule_file:
+    # R4-A2.4 P0-03 + R4-A2.5 P0-02: verdicts re-verify the RUN-BOUND
+    # trading-rule dataset (full file list + combined hash + version);
+    # PRODUCTION verdicts also re-run the rule review gate over the BOUND
+    # dataset - the working tree's current rule state can never leak into
+    # a historical verdict
+    if run.trading_rule_dataset_files:
         from ashare_state.spike.trading_rule import (
             load_bound_rule_book,
             trading_rule_review_gate,
@@ -545,9 +541,9 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
 
         try:
             bound_book = load_bound_rule_book(
-                rule_file=run.trading_rule_file,
                 rule_version=run.trading_rule_version,
-                rule_hash=run.trading_rule_hash,
+                dataset_files=run.trading_rule_dataset_files,
+                dataset_hash=run.trading_rule_dataset_hash,
             )
             if run.run_kind == RunKind.PRODUCTION:
                 rule_problems = trading_rule_review_gate(bound_book)
@@ -681,9 +677,7 @@ def verify_evidence_closure(store: RunStore, run: SpikeRun, catalog: CaseCatalog
         if case.evidence_ref.endswith(".json") and "/bundles/" in case.evidence_ref:
             bundle_problems = verified_bundles.get(case.evidence_ref)
             if bundle_problems is None:
-                bundle_problems = _verify_evidence_bundle(
-                    store, case.evidence_ref, evidence_path
-                )
+                bundle_problems = _verify_evidence_bundle(store, case.evidence_ref, evidence_path)
                 verified_bundles[case.evidence_ref] = bundle_problems
             problems.extend(bundle_problems)
             continue
@@ -691,15 +685,11 @@ def verify_evidence_closure(store: RunStore, run: SpikeRun, catalog: CaseCatalog
         # evidence (meta.json, or legacy .parquet via its meta) must also
         # close against every payload artifact it declares: deleting or
         # tampering EITHER side breaks the chain.
-        problems.extend(
-            _close_case_evidence(store, case.case_id, case.evidence_ref, evidence_path)
-        )
+        problems.extend(_close_case_evidence(store, case.case_id, case.evidence_ref, evidence_path))
     return problems
 
 
-def _close_case_evidence(
-    store: RunStore, case_id: str, ref: str, evidence_path: Path
-) -> list[str]:
+def _close_case_evidence(store: RunStore, case_id: str, ref: str, evidence_path: Path) -> list[str]:
     """Close one case's non-bundle evidence: resolve its exchange meta and
     verify the declared payload artifacts against the bytes on disk."""
     from ashare_state.storage.raw_writer import verify_meta_closure
@@ -721,9 +711,7 @@ def _close_case_evidence(
     return [f"{case_id}: {p}" for p in verify_meta_closure(dataset_dir, doc)]
 
 
-def _verify_evidence_bundle(
-    store: RunStore, bundle_ref: str, bundle_path: Path
-) -> list[str]:
+def _verify_evidence_bundle(store: RunStore, bundle_ref: str, bundle_path: Path) -> list[str]:
     """Re-verify every raw exchange listed inside an evidence bundle
     manifest (audit section 6.3 + CR-1.2 section 3.1): each evidence_ref
     must exist, its content hash must match, AND (for meta.json entries)
@@ -758,13 +746,10 @@ def _verify_evidence_bundle(
             try:
                 meta_doc = json.loads(artifact_path.read_text(encoding="utf-8"))
             except (OSError, ValueError) as exc:
-                problems.append(
-                    f"bundle {bundle_ref}: exchange meta unreadable ({exc})"
-                )
+                problems.append(f"bundle {bundle_ref}: exchange meta unreadable ({exc})")
                 continue
             problems.extend(
-                f"bundle {bundle_ref}: {p}"
-                for p in verify_meta_closure(dataset_dir, meta_doc)
+                f"bundle {bundle_ref}: {p}" for p in verify_meta_closure(dataset_dir, meta_doc)
             )
     return problems
 

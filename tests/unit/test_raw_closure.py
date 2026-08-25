@@ -71,9 +71,7 @@ class TestBidirectionalClosure:
 
     def test_multi_table_payload_tamper_breaks_closure(self, tmp_path: Path):
         writer = RawWriter(tmp_path)
-        writer.write(
-            _exchange("m1", "ds", {"t1": [{"a": 1}], "t2": [{"b": 2}]})
-        )
+        writer.write(_exchange("m1", "ds", {"t1": [{"a": 1}], "t2": [{"b": 2}]}))
         victim = tmp_path / "provider=amazingdata" / "dataset=ds" / "m1" / "t2.parquet"
         victim.write_bytes(b"nope")
         meta = json.loads(
@@ -105,21 +103,15 @@ class TestRequestParams:
             "end_date": 20221231,
         }
         writer.write(_exchange("p1", "ds", [{"a": 1}], params=params))
-        meta = json.loads(
-            (_dataset_dir(tmp_path) / "p1.meta.json").read_text(encoding="utf-8")
-        )
+        meta = json.loads((_dataset_dir(tmp_path) / "p1.meta.json").read_text(encoding="utf-8"))
         # the FULL params are on the meta: the request is reconstructable
         assert meta["request_params"] == params
         assert meta["request_params_hash"] == RawEnvelope.params_hash(params)
 
     def test_same_size_different_symbols_hash_differently(self, tmp_path: Path):
         writer = RawWriter(tmp_path)
-        first = _exchange(
-            "s1", "ds", [{"a": 1}], params={"code_list": ["600519.SH", "000001.SZ"]}
-        )
-        second = _exchange(
-            "s2", "ds", [{"a": 1}], params={"code_list": ["600519.SH", "300750.SZ"]}
-        )
+        first = _exchange("s1", "ds", [{"a": 1}], params={"code_list": ["600519.SH", "000001.SZ"]})
+        second = _exchange("s2", "ds", [{"a": 1}], params={"code_list": ["600519.SH", "300750.SZ"]})
         writer.write(first)
         writer.write(second)
         meta1 = json.loads((_dataset_dir(tmp_path) / "s1.meta.json").read_text(encoding="utf-8"))
@@ -204,11 +196,7 @@ class TestReadVerification:
     def test_read_verify_can_be_disabled_for_recovery(self, tmp_path: Path):
         writer = RawWriter(tmp_path)
         writer.write(_exchange("rv2", "ds", [{"a": 1}]))
-        (tmp_path / "provider=amazingdata" / "dataset=ds" / "rv2.parquet").write_bytes(
-            b"corrupt"
-        )
+        (tmp_path / "provider=amazingdata" / "dataset=ds" / "rv2.parquet").write_bytes(b"corrupt")
         # verify=False lets recovery tooling inspect the (corrupt) state
         with pytest.raises(Exception):
-            writer.read(
-                provider="amazingdata", dataset="ds", request_id="rv2", verify=False
-            )
+            writer.read(provider="amazingdata", dataset="ds", request_id="rv2", verify=False)

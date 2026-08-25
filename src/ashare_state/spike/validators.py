@@ -294,11 +294,13 @@ def _suffix_for(symbol: str) -> str:
 
 # ------------------------------------------------------------------ limit rule
 
+
 #: board limit-rate rules (audit R3-P0-09)
 def validate_limit_rule(
     rows: list[dict[str, Any]],
     *,
     require_any_limit: bool = True,
+    book: Any,
 ) -> ValidationOutcome:
     """R3-P0-09: real regime validation.
 
@@ -307,6 +309,12 @@ def validate_limit_rule(
     - NO hardcoded board-rate table in Python. Rows are matched by their
     OWN trade date (PIT), and rate resolution failures are collected as
     RULE_UNRESOLVED violations (fail closed, audit section 8.3).
+
+    R4-A2.5 P0-01 (audit 20260825 section 2.3): ``book`` is a REQUIRED
+    keyword - the run-bound TradingRuleBook (``ctx.rule_book`` on the
+    formal path; tests load one explicitly). There is deliberately NO
+    default: a formal validator must never silently fall back to the
+    current working-tree rule SoR (Exact Replay contract).
 
     - all-rows-missing-limit-fields -> NOT validated (never silent PASS)
     - rows WITH limits: expected up/down = Decimal ROUND_HALF_UP of
@@ -319,6 +327,15 @@ def validate_limit_rule(
     from ashare_state.spike.trading_rule import RuleUnresolvedError, resolve_limit_regime
 
     vid = "limit_rule_v3"
+    if book is None:
+        # explicit None is the old silent-fallback footgun - refuse it
+        return _outcome(
+            vid,
+            CaseResult.VALIDATED_FAIL,
+            "run-bound TradingRuleBook",
+            "book=None refused: formal limit validation must receive the "
+            "run-bound rule book (R4-A2.5 P0-01, audit 20260825 section 2.3)",
+        )
     if not rows:
         return _outcome(vid, CaseResult.MISSING, "status rows with limits", "no rows")
     rows_with_limits = [r for r in rows if r.get("HIGH_LIMITED") is not None]
@@ -358,6 +375,7 @@ def validate_limit_rule(
                 code=symbol,
                 trade_date=trade_date,
                 is_st=is_st,
+                book=book,
             )
         except RuleUnresolvedError as exc:
             violations.append(f"{symbol}: RULE_UNRESOLVED ({exc})")
@@ -369,13 +387,11 @@ def validate_limit_rule(
         # exchange rounds DOWN the down-limit at half tick; allow 1 tick slack
         if abs(up - exp_up) > 0.011:
             violations.append(
-                f"{symbol}: up {up} != expected {exp_up:.2f} "
-                f"(pre {pre}, rule {rule.rule_id})"
+                f"{symbol}: up {up} != expected {exp_up:.2f} (pre {pre}, rule {rule.rule_id})"
             )
         if abs(down - exp_down) > 0.011:
             violations.append(
-                f"{symbol}: down {down} != expected {exp_down:.2f} "
-                f"(pre {pre}, rule {rule.rule_id})"
+                f"{symbol}: down {down} != expected {exp_down:.2f} (pre {pre}, rule {rule.rule_id})"
             )
         close = _to_float(_first(row, "CLOSE_PRICE", "CLOSE"))
         if close is not None and not (down - 1e-9 <= close <= up + 1e-9):

@@ -73,9 +73,7 @@ class _BrokenTarget(FakeTarget):
 class TestExplicitExchangeSuccessChain:
     def test_exchange_persists_parquet_and_meta_with_case_lineage(self, tmp_path: Path):
         ctx = _ctx(tmp_path)
-        exchange = ctx.target.get_history_stock_status_exchange(
-            20220601, 20220630, ["600519.SH"]
-        )
+        exchange = ctx.target.get_history_stock_status_exchange(20220601, 20220630, ["600519.SH"])
         meta = ctx.evidence_from_exchange(exchange)
         # evidence ref is run-relative and resolvable; CR-1.2: the case
         # evidence is the exchange META (bidirectional closure anchor)
@@ -93,9 +91,7 @@ class TestExplicitExchangeSuccessChain:
         assert payload["uri"].endswith(".parquet")
         payload_path = ctx.store.spike_root / payload["uri"]
         assert payload_path.is_file()
-        assert (
-            hashlib.sha256(payload_path.read_bytes()).hexdigest() == payload["content_hash"]
-        )
+        assert hashlib.sha256(payload_path.read_bytes()).hexdigest() == payload["content_hash"]
         assert meta["meta_ref"] == meta["evidence_ref"]
         assert meta["meta_hash"] == meta["content_hash"]
         # request_id lineage: the case binds the EXCHANGE's request id

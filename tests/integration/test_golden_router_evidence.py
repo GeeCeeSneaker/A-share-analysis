@@ -79,8 +79,13 @@ class TestRouterEvidenceLineage:
     def test_every_case_binds_domain_evidence_bundle(self, tmp_path: Path):
         ctx, _ = _ctx(tmp_path)
         cases = [
-            _case("GT-LIMIT-1", "golden_limit_regime", "600519.SH", "20230601",
-                  {"PRICE_HIGH_LMT_RATE": 0.1, "PRICE_LOW_LMT_RATE": 0.1}),
+            _case(
+                "GT-LIMIT-1",
+                "golden_limit_regime",
+                "600519.SH",
+                "20230601",
+                {"PRICE_HIGH_LMT_RATE": 0.1, "PRICE_LOW_LMT_RATE": 0.1},
+            ),
         ]
         outcomes = route_all(ctx, cases)
         assert len(outcomes) == 1
@@ -107,10 +112,14 @@ class TestRouterEvidenceLineage:
         """Bundle + every listed raw artifact re-verify during closure."""
         ctx, store = _ctx(tmp_path)
         cases = [
-            _case("GT-L1", "golden_limit_regime", "600519.SH", "20230601",
-                  {"PRICE_HIGH_LMT_RATE": 0.1}),
-            _case("GT-ST1", "golden_st_transition", "600518.SH", "20220601",
-                  {"IS_ST_SEC": 1}),
+            _case(
+                "GT-L1",
+                "golden_limit_regime",
+                "600519.SH",
+                "20230601",
+                {"PRICE_HIGH_LMT_RATE": 0.1},
+            ),
+            _case("GT-ST1", "golden_st_transition", "600518.SH", "20220601", {"IS_ST_SEC": 1}),
         ]
         for case, outcome, evidence in route_all(ctx, cases):
             ctx.case(
@@ -141,10 +150,8 @@ class TestRouterEvidenceLineage:
     def test_domain_fetch_failure_classifies_all_cases(self, tmp_path: Path):
         ctx, _ = _ctx(tmp_path, target=_StatusDeniedTarget())
         cases = [
-            _case("GT-ST-A", "golden_st_transition", "600518.SH", "20220601",
-                  {"IS_ST_SEC": 1}),
-            _case("GT-ST-B", "golden_st_transition", "600518.SH", "20220701",
-                  {"IS_ST_SEC": 1}),
+            _case("GT-ST-A", "golden_st_transition", "600518.SH", "20220601", {"IS_ST_SEC": 1}),
+            _case("GT-ST-B", "golden_st_transition", "600518.SH", "20220701", {"IS_ST_SEC": 1}),
         ]
         outcomes = route_all(ctx, cases)
         assert len(outcomes) == 2
@@ -162,8 +169,13 @@ class TestLimitExactDateMatching:
         ctx, _ = _ctx(tmp_path)
         # 2024-01-02 is outside the fake status window -> no rows
         cases = [
-            _case("GT-L-Z", "golden_limit_regime", "600519.SH", "20240102",
-                  {"PRICE_HIGH_LMT_RATE": 0.1}),
+            _case(
+                "GT-L-Z",
+                "golden_limit_regime",
+                "600519.SH",
+                "20240102",
+                {"PRICE_HIGH_LMT_RATE": 0.1},
+            ),
         ]
         _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
         assert outcome.result is CaseResult.VALIDATED_FAIL
@@ -178,17 +190,20 @@ class TestLimitExactDateMatching:
             def get_hist_code_list_exchange(self, security_type, start_date, end_date):
                 from ashare_state.providers.exchange import ProviderExchange
 
-                exchange = super().get_hist_code_list_exchange(
-                    security_type, start_date, end_date
-                )
+                exchange = super().get_hist_code_list_exchange(security_type, start_date, end_date)
                 payload = [r for r in exchange.payload if r["SECURITY_CODE"] != "600519"]
 
                 return ProviderExchange(envelope=exchange.envelope, payload=payload)
 
         ctx.target = _NoHistTarget()
         cases = [
-            _case("GT-L-NH", "golden_limit_regime", "600519.SH", "20230601",
-                  {"PRICE_HIGH_LMT_RATE": 0.1}),
+            _case(
+                "GT-L-NH",
+                "golden_limit_regime",
+                "600519.SH",
+                "20230601",
+                {"PRICE_HIGH_LMT_RATE": 0.1},
+            ),
         ]
         _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
         assert outcome.result is CaseResult.VALIDATED_FAIL
@@ -200,8 +215,13 @@ class TestLimitExactDateMatching:
 
         # 600019 lists 20220601 (fake calendar start) - 5th session window
         cases = [
-            _case("GT-L-NL", "golden_limit_regime", "600519.SH", "20230601",
-                  {"PRICE_HIGH_LMT_RATE": 0.1}),
+            _case(
+                "GT-L-NL",
+                "golden_limit_regime",
+                "600519.SH",
+                "20230601",
+                {"PRICE_HIGH_LMT_RATE": 0.1},
+            ),
         ]
         _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
         assert outcome.result is CaseResult.VALIDATED_PASS
@@ -213,8 +233,9 @@ class TestCorpActionContext:
         transition + adjusted continuity all validate."""
         ctx, _ = _ctx(tmp_path)
         cases = [
-            _case("GT-CA-1", "golden_corporate_action", "600519.SH", "20220630",
-                  {"IS_WD_SEC": True}),
+            _case(
+                "GT-CA-1", "golden_corporate_action", "600519.SH", "20220630", {"IS_WD_SEC": True}
+            ),
         ]
         _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
         assert outcome.result is CaseResult.VALIDATED_PASS
@@ -241,8 +262,9 @@ class TestCorpActionContext:
 
         ctx.target = _KlineGapTarget()
         cases = [
-            _case("GT-CA-GAP", "golden_corporate_action", "600519.SH", "20220630",
-                  {"IS_WD_SEC": True}),
+            _case(
+                "GT-CA-GAP", "golden_corporate_action", "600519.SH", "20220630", {"IS_WD_SEC": True}
+            ),
         ]
         _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
         assert outcome.result is CaseResult.VALIDATED_FAIL
@@ -289,8 +311,13 @@ class TestCorpActionContext:
 
         ctx.target = _SuspendedKlineGapTarget()
         cases = [
-            _case("GT-CA-SUSP", "golden_corporate_action", "600519.SH", "20220630",
-                  {"IS_WD_SEC": True}),
+            _case(
+                "GT-CA-SUSP",
+                "golden_corporate_action",
+                "600519.SH",
+                "20220630",
+                {"IS_WD_SEC": True},
+            ),
         ]
         _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
         assert outcome.result is CaseResult.NOT_TESTABLE_TIME
@@ -299,8 +326,9 @@ class TestCorpActionContext:
     def test_event_day_off_calendar_is_not_testable(self, tmp_path: Path):
         ctx, _ = _ctx(tmp_path)
         cases = [
-            _case("GT-CA-NC", "golden_corporate_action", "600519.SH", "20220626",
-                  {"IS_WD_SEC": True}),  # a Sunday outside the fake calendar
+            _case(
+                "GT-CA-NC", "golden_corporate_action", "600519.SH", "20220626", {"IS_WD_SEC": True}
+            ),  # a Sunday outside the fake calendar
         ]
         _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
         assert outcome.result is CaseResult.NOT_TESTABLE_TIME
@@ -312,8 +340,9 @@ class TestBJSemanticProof:
         """P1: BJ proof = hist master presence + exact-date 30% regime."""
         ctx, _ = _ctx(tmp_path)
         cases = [
-            _case("GT-BJ-1", "golden_bj_mapping", "835185.BJ", "20220601",
-                  {"CODE_CONTINUITY": True}),
+            _case(
+                "GT-BJ-1", "golden_bj_mapping", "835185.BJ", "20220601", {"CODE_CONTINUITY": True}
+            ),
         ]
         _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
         assert outcome.result is CaseResult.VALIDATED_PASS
@@ -322,8 +351,9 @@ class TestBJSemanticProof:
     def test_bj_absent_from_master_fails(self, tmp_path: Path):
         ctx, _ = _ctx(tmp_path)
         cases = [
-            _case("GT-BJ-2", "golden_bj_mapping", "999999.BJ", "20220601",
-                  {"CODE_CONTINUITY": True}),
+            _case(
+                "GT-BJ-2", "golden_bj_mapping", "999999.BJ", "20220601", {"CODE_CONTINUITY": True}
+            ),
         ]
         _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
         assert outcome.result is CaseResult.VALIDATED_FAIL

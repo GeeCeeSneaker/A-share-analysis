@@ -26,17 +26,18 @@ from ashare_state.spike.trading_rule import (
 )
 
 RULES_DIR = Path("configs/trading_rules")
+RULES_FILE = RULES_DIR / "versions" / "v20260824-compiled" / "rules.yaml"
 
 
 @pytest.fixture(scope="module")
 def book() -> TradingRuleBook:
+    # load the ACTIVE manifest-selected version (same as the runtime)
     return TradingRuleBook.load(RULES_DIR)
 
 
 @pytest.fixture(scope="module")
 def book_docs() -> dict:
-    doc_file = RULES_DIR / "a_share_limit_v1.yaml"
-    return yaml.safe_load(doc_file.read_text(encoding="utf-8"))
+    return yaml.safe_load(RULES_FILE.read_text(encoding="utf-8"))
 
 
 class TestRuleDataLayer:
@@ -75,9 +76,12 @@ class TestRuleDataLayer:
                         for other in sides:
                             if other is side:
                                 continue
-                            if isinstance(other, ast.Constant) and isinstance(
-                                other.value, (int, float)
-                            ) and not isinstance(other.value, bool) and abs(other.value) >= 0.001:
+                            if (
+                                isinstance(other, ast.Constant)
+                                and isinstance(other.value, (int, float))
+                                and not isinstance(other.value, bool)
+                                and abs(other.value) >= 0.001
+                            ):
                                 offenders.append(f"{file}:{node.lineno}")
         assert not offenders, (
             f"rate literals compared against numeric constants in spike code: "
@@ -223,9 +227,14 @@ class TestFirstNSessions:
         # Spring Festival holiday 0205-0216 removed from the calendar:
         # a calendar-day approximation would misjudge the 5th session
         calendar = [
-            20240201, 20240202,
+            20240201,
+            20240202,
             # holiday gap (no sessions between 0202 and 0219)
-            20240219, 20240220, 20240221, 20240222, 20240223,
+            20240219,
+            20240220,
+            20240221,
+            20240222,
+            20240223,
         ]
         # listing 20240202: sessions are 0202, 0219, 0220, 0221, 0222 (5th)
         assert first_n_sessions(20240222, 20240202, calendar, n=5)
@@ -233,9 +242,14 @@ class TestFirstNSessions:
 
     def test_national_day_gap(self):
         calendar = [
-            20230928, 20230929,
+            20230928,
+            20230929,
             # National Day holiday 1001-1006
-            20231009, 20231010, 20231011, 20231012, 20231013,
+            20231009,
+            20231010,
+            20231011,
+            20231012,
+            20231013,
         ]
         # listing 20230928: sessions 0928, 0929, 1009, 1010, 1011 (5th)
         assert first_n_sessions(20231011, 20230928, calendar, n=5)
