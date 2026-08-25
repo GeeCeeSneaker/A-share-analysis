@@ -14,6 +14,7 @@ meta anchor). Recovery semantics:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -77,8 +78,10 @@ class TestOrphanRecovery:
         assert list_orphan_payloads(tmp_path) == []
 
     def test_partial_orphan_set_quarantined(self, tmp_path: Path):
-        """Multi-table commit interrupted after the first table: the
-        partial set can NEVER be completed by a different-bytes retry."""
+        """Multi-table commit interrupted after the first table: a retry
+        with DIFFERENT bytes can NEVER complete the set (quarantined).
+        (The same-bytes partial retry now RECOVERS - see
+        TestPartialOrphanSets, R4-A2.6 P1-03.)"""
         writer = RawWriter(tmp_path)
         writer.write(_exchange("p1", {"t1": [{"a": 1}], "t2": [{"b": 2}]}))
         dataset_dir = _dataset_dir(tmp_path)
@@ -87,7 +90,7 @@ class TestOrphanRecovery:
         orphans = list_orphan_payloads(tmp_path)
         assert orphans == ["provider=amazingdata/dataset=ds/p1/t1.parquet"]
         with pytest.raises(RawWriterError, match="quarantine"):
-            writer.write(_exchange("p1", {"t1": [{"a": 1}], "t2": [{"b": 2}]}))
+            writer.write(_exchange("p1", {"t1": [{"a": 999}], "t2": [{"b": 2}]}))
         assert not (dataset_dir / "p1").exists()
 
     def test_orphan_recovery_multi_table_completes(self, tmp_path: Path):
@@ -169,3 +172,73 @@ class TestHealthyStore:
 
     def test_missing_root_returns_empty(self, tmp_path: Path):
         assert list_orphan_payloads(tmp_path / "nope") == []
+
+
+class TestPartialOrphanSets:
+    """R4-A2.6 P1-03 (audit 20260825 #2 section 8): multi-table orphan
+    SET semantics."""
+
+    def test_partial_orphan_same_retry_completes_with_meta(self, tmp_path: Path):
+        """Existing t1 + missing t2 + same-bytes retry: the retry writes
+        the missing member AND the meta anchor (full recovery)."""
+        writer = RawWriter(tmp_path)
+        writer.write(_exchange("po1", {"t1": [{"a": 1}], "t2": [{"b": 2}]}))
+        dataset_dir = _dataset_dir(tmp_path)
+        (dataset_dir / "po1.meta.json").unlink()
+        (dataset_dir / "po1" / "t2.parquet").unlink()  # partial orphan set
+        assert list_orphan_payloads(tmp_path) == ["provider=amazingdata/dataset=ds/po1/t1.parquet"]
+        recovered = writer.write(_exchange("po1", {"t1": [{"a": 1}], "t2": [{"b": 2}]}))
+        assert recovered.idempotent is True
+        assert (dataset_dir / "po1" / "t1.parquet").is_file()
+        assert (dataset_dir / "po1" / "t2.parquet").is_file()
+        assert (dataset_dir / "po1.meta.json").is_file()
+        assert list_orphan_payloads(tmp_path) == []
+        # recovered exchange passes the FULL evidence closure
+        frame = writer.read(provider="amazingdata", dataset="ds", request_id="po1")
+        assert frame["t1"].get_column("a").to_list() == [1]
+        assert frame["t2"].get_column("b").to_list() == [2]
+
+    def test_orphan_with_unexpected_extra_member_quarantines(self, tmp_path: Path):
+        """An orphan request dir containing an EXTRA table the retry does
+        NOT declare: the set is not the retry's set -> quarantine + BLOCK
+        (never adopt unknown bytes as evidence)."""
+        writer = RawWriter(tmp_path)
+        writer.write(_exchange("px1", {"t1": [{"a": 1}], "t2": [{"b": 2}]}))
+        dataset_dir = _dataset_dir(tmp_path)
+        (dataset_dir / "px1.meta.json").unlink()
+        # plant an unexpected member the retry does not know about
+        (dataset_dir / "px1" / "t3.parquet").write_bytes(b"unexpected bytes")
+        with pytest.raises(RawWriterError, match="quarantine"):
+            writer.write(_exchange("px1", {"t1": [{"a": 1}], "t2": [{"b": 2}]}))
+        # the whole orphan set moved to quarantine; nothing active remains
+        assert not (dataset_dir / "px1").exists()
+        quarantine = dataset_dir / ".quarantine"
+        quarantined = sorted(p.name for p in quarantine.glob("px1-*"))
+        assert len(quarantined) == 3  # t1 + t2 + the unexpected t3
+        assert list_orphan_payloads(tmp_path) == []
+
+    def test_quarantined_bytes_are_not_active_orphans(self, tmp_path: Path):
+        """After quarantine, list_orphan_payloads() reports NOTHING (the
+        quarantined bytes live under .quarantine/, excluded from the
+        active scan)."""
+        writer = RawWriter(tmp_path)
+        writer.write(_exchange("qz1", [{"a": 1}]))
+        dataset_dir = _dataset_dir(tmp_path)
+        (dataset_dir / "qz1.meta.json").unlink()
+        with pytest.raises(RawWriterError, match="quarantine"):
+            writer.write(_exchange("qz1", [{"a": 2}]))
+        assert list_orphan_payloads(tmp_path) == []
+        quarantine_files = list((dataset_dir / ".quarantine").glob("*"))
+        assert quarantine_files  # the bytes remain inspectable for forensics
+
+    def test_recovered_exchange_passes_meta_closure(self, tmp_path: Path):
+        """After a same-bytes recovery, verify_meta_closure is clean."""
+        from ashare_state.storage.raw_writer import verify_meta_closure
+
+        writer = RawWriter(tmp_path)
+        writer.write(_exchange("rc1", {"t1": [{"a": 1}], "t2": [{"b": 2}]}))
+        dataset_dir = _dataset_dir(tmp_path)
+        (dataset_dir / "rc1.meta.json").unlink()
+        writer.write(_exchange("rc1", {"t1": [{"a": 1}], "t2": [{"b": 2}]}))
+        meta = json.loads((dataset_dir / "rc1.meta.json").read_text(encoding="utf-8"))
+        assert verify_meta_closure(dataset_dir, meta) == []

@@ -51,6 +51,8 @@ def _ca_case(case_id: str, symbol: str, trade_date: str) -> GoldenCase:
         truth_source="test-truth",
         source_ref="test-source",
         expected_fields={"IS_WD_SEC": True},
+        # R4-A2.6 P0-02: the formal CA type resolves from event_class
+        event_class="DIVIDEND_EX_DATE",
     )
 
 

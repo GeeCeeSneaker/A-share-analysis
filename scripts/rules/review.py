@@ -56,6 +56,14 @@ def _dataset_files_hash(root: Path, rel_files: list[str]) -> str:
     return digest.hexdigest()
 
 
+def _rel_under_root(path: Path, root: Path) -> str:
+    """Relative path of ``path`` under ``root`` ("" when outside)."""
+    try:
+        return str(path.resolve().relative_to(root.resolve())).replace("\\", "/")
+    except ValueError:
+        return ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rules", required=True, help="COMPILED rule yaml to review")
@@ -72,6 +80,15 @@ def main() -> int:
         default="configs/trading_rules",
         help="rules root holding versions/ + evidence/ + rule_manifest.json",
     )
+    parser.add_argument(
+        "--from-version",
+        default="",
+        help=(
+            "expected CURRENT ACTIVE version (lineage check: refuse when the "
+            "ACTIVE selector moved elsewhere - avoids reviewing an arbitrary "
+            "old/external compiled yaml and silently flipping ACTIVE)"
+        ),
+    )
     args = parser.parse_args()
 
     rules_path = Path(args.rules)
@@ -82,6 +99,33 @@ def main() -> int:
         return 2
     if not artifact.is_file():
         print(f"ERROR: source artifact not found: {artifact}", file=sys.stderr)
+        return 2
+
+    # R4-A2.6 P1-02: lineage check - the input must be the CURRENT ACTIVE
+    # COMPILED version (explicit --from-version, or the manifest itself)
+    try:
+        active = load_rule_manifest(rules_root)
+    except Exception as exc:  # noqa: BLE001 - clear operator error
+        print(f"ERROR: ACTIVE manifest unreadable: {exc}", file=sys.stderr)
+        return 2
+    expected_active = args.from_version or active.rule_version
+    if active.rule_version != expected_active:
+        print(
+            f"ERROR: ACTIVE manifest is {active.rule_version!r}, expected "
+            f"{expected_active!r} - the selector moved; re-check the lineage "
+            "before reviewing",
+            file=sys.stderr,
+        )
+        return 2
+    active_rel = active.dataset_files[0] if active.dataset_files else ""
+    input_rel = _rel_under_root(rules_path, rules_root)
+    if not input_rel or input_rel.replace("\\", "/") != active_rel.replace("\\", "/"):
+        print(
+            f"ERROR: --rules {input_rel or rules_path} is not the ACTIVE dataset "
+            f"({active_rel}) - review the current ACTIVE version or pass an "
+            "explicit lineage transition",
+            file=sys.stderr,
+        )
         return 2
 
     book = TradingRuleBook.load(rules_path)
@@ -158,14 +202,17 @@ def main() -> int:
         print(f"ERROR: reviewed copy fails the review gate: {problems}", file=sys.stderr)
         return 2
 
-    # flip the ACTIVE manifest to the reviewed version
+    # flip the ACTIVE manifest to the reviewed version - CRASH-SAFE
+    # (R4-A2.6 P1-02): write a temp manifest, then atomically replace -
+    # a crash leaves either the old valid ACTIVE or the new valid ACTIVE,
+    # never a half-written manifest
     dataset_files = [f"versions/{args.version}/rules.yaml"]
     manifest = {
         "rule_version": args.version,
         "review_status": "REVIEWED",
         "dataset_files": dataset_files,
         "dataset_hash": _dataset_files_hash(rules_root, dataset_files),
-        "source_version": book.source_version,
+        "source_version": reviewed_book.source_version,
         "dataset_version": reviewed_book.version,
         "review_provenance": {
             "reviewed_by": args.reviewer,
@@ -177,15 +224,21 @@ def main() -> int:
         },
     }
     manifest_path = rules_root / RULE_MANIFEST_FILE
-    manifest_path.write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n"
-    )
-    if problems:
-        print(f"ERROR: reviewed copy fails the review gate: {problems}", file=sys.stderr)
-        return 2
+    manifest_bytes = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
+    tmp_manifest = rules_root / f".{RULE_MANIFEST_FILE}.tmp-{args.version}"
+    tmp_manifest.write_bytes(manifest_bytes + b"\n")
+    tmp_manifest.replace(manifest_path)  # atomic ACTIVE flip (crash-safe)
     loaded_manifest = load_rule_manifest(rules_root)
     if loaded_manifest.rule_version != args.version:
         print("ERROR: ACTIVE manifest did not flip to the reviewed version", file=sys.stderr)
+        return 2
+    # coherence self-check: load_active_rules must accept the flipped state
+    from ashare_state.spike.trading_rule import load_active_rules
+
+    try:
+        load_active_rules(rules_root)
+    except Exception as exc:  # noqa: BLE001 - coherence failure must surface
+        print(f"ERROR: flipped ACTIVE fails coherence load: {exc}", file=sys.stderr)
         return 2
     print(
         f"REVIEWED version written: {reviewed_path}\n"

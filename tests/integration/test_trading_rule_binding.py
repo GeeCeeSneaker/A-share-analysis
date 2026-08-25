@@ -60,8 +60,14 @@ def _write_manifest(
     review_status: str,
     dataset_files: list[str],
     dataset_version: str,
+    source_version: str = "",
     provenance: dict | None = None,
 ) -> None:
+    if not source_version:
+        # R4-A2.6 P0-04: keep the manifest's governance metadata coherent
+        # with the dataset files it selects (read it from the first file)
+        doc = yaml.safe_load((root / dataset_files[0]).read_text(encoding="utf-8"))
+        source_version = str(doc.get("source_version", ""))
     (root / "rule_manifest.json").write_text(
         json.dumps(
             {
@@ -69,7 +75,7 @@ def _write_manifest(
                 "review_status": review_status,
                 "dataset_files": dataset_files,
                 "dataset_hash": _manifest_hash(root, dataset_files),
-                "source_version": "2026-08-24.1",
+                "source_version": source_version,
                 "dataset_version": dataset_version,
                 "review_provenance": provenance or {},
             },
@@ -118,6 +124,9 @@ def rules_env(tmp_path: Path, monkeypatch):
         review_status="COMPILED",
         dataset_files=["versions/v1-compiled/rules.yaml"],
         dataset_version=doc["version"],
+        # mirror the compiled yaml's non-empty provenance value so the
+        # manifest <-> dataset coherence check holds (R4-A2.6 P0-04)
+        provenance={"source_retrieved_at": "2026-08-24"},
     )
     monkeypatch.setattr(TradingRuleBook, "_default_rules_dir", classmethod(lambda cls: root))
     return root
@@ -161,6 +170,30 @@ def _relax_golden_gates(mp: pytest.MonkeyPatch) -> None:
     mp.setattr(GoldenTruthStore, "review_gate", lambda self, *a, **k: [])
 
 
+def _flip_active_to_reviewed(root: Path) -> None:
+    """Point the ACTIVE manifest at the REVIEWED version with COHERENT
+    governance metadata (R4-A2.6 P0-04)."""
+    reviewed = TradingRuleBook.load(root / "versions" / "v2-reviewed" / "rules.yaml")
+    _write_manifest(
+        root,
+        rule_version="v2-reviewed",
+        review_status="REVIEWED",
+        dataset_files=["versions/v2-reviewed/rules.yaml"],
+        dataset_version=reviewed.version,
+        provenance={
+            key: reviewed.review_provenance[key]
+            for key in (
+                "reviewed_by",
+                "reviewed_at",
+                "source_artifact_ref",
+                "source_artifact_hash",
+                "source_artifact_kind",
+                "source_retrieved_at",
+            )
+        },
+    )
+
+
 class TestConfigHashRecursion:
     def test_nested_trading_rules_are_in_config_identity(self, tmp_path: Path):
         root = tmp_path
@@ -185,13 +218,7 @@ class TestVersionModel:
         assert book.review_status == "COMPILED"
         assert manifest.rule_version == "v1-compiled"
         # ACTIVE advance -> REVIEWED; the COMPILED files are untouched
-        _write_manifest(
-            rules_env,
-            rule_version="v2-reviewed",
-            review_status="REVIEWED",
-            dataset_files=["versions/v2-reviewed/rules.yaml"],
-            dataset_version=reviewed.version,
-        )
+        _flip_active_to_reviewed(rules_env)
         book2, manifest2 = load_active_rules(rules_env)
         assert book2.review_status == "REVIEWED"
         assert manifest2.rule_version == "v2-reviewed"
@@ -222,7 +249,9 @@ class TestVersionModel:
         doc = json.loads(path.read_text(encoding="utf-8"))
         doc["dataset_files"] = ["versions/never-existed/rules.yaml"]
         path.write_text(json.dumps(doc), encoding="utf-8")
-        with pytest.raises(RuleUnresolvedError, match="dataset file missing"):
+        # R4-A2.6 P0-03: the version-dir mismatch is caught by the
+        # structural confinement BEFORE any fs access
+        with pytest.raises(RuleUnresolvedError, match="escapes the rule SoR boundary"):
             load_active_rules(rules_env)
 
 
@@ -243,14 +272,7 @@ class TestRunBinding:
         the v2-REVIEWED version. The BOUND load still resolves v1 (and its
         review status stays COMPILED at binding time)."""
         run, _store = _trial_run(tmp_path / "spike")
-        reviewed = TradingRuleBook.load(rules_env / "versions" / "v2-reviewed" / "rules.yaml")
-        _write_manifest(
-            rules_env,
-            rule_version="v2-reviewed",
-            review_status="REVIEWED",
-            dataset_files=["versions/v2-reviewed/rules.yaml"],
-            dataset_version=reviewed.version,
-        )
+        _flip_active_to_reviewed(rules_env)
         bound = load_bound_rule_book(
             rule_version=run.trading_rule_version,
             dataset_files=run.trading_rule_dataset_files,
@@ -272,12 +294,28 @@ class TestRunBinding:
             )
 
     def test_binding_version_mismatch_refused(self, tmp_path: Path, rules_env):
+        """R4-A2.6: rule_version is the SELECTOR id - a binding claiming a
+        different selector than the bound files' structural location
+        (versions/<id>/) is refused."""
         run, _store = _trial_run(tmp_path / "spike")
-        with pytest.raises(RuleUnresolvedError, match="version mismatch"):
+        with pytest.raises(RuleUnresolvedError, match="bound dataset file rejected"):
             load_bound_rule_book(
                 rule_version="v999-different",
                 dataset_files=run.trading_rule_dataset_files,
                 dataset_hash=run.trading_rule_dataset_hash,
+                rules_root=rules_env,
+            )
+
+    def test_binding_dataset_content_version_mismatch_refused(self, tmp_path: Path, rules_env):
+        """The dataset CONTENT version (yaml version) is bound separately
+        and re-verified on replay (R4-A2.6 P0-04)."""
+        run, _store = _trial_run(tmp_path / "spike")
+        with pytest.raises(RuleUnresolvedError, match="content version mismatch"):
+            load_bound_rule_book(
+                rule_version=run.trading_rule_version,
+                dataset_files=run.trading_rule_dataset_files,
+                dataset_hash=run.trading_rule_dataset_hash,
+                dataset_version="9999-01-01.0",
                 rules_root=rules_env,
             )
 
@@ -315,14 +353,7 @@ class TestReviewGate:
                 )
 
     def test_reviewed_rules_pass_gate_and_production_opens(self, tmp_path: Path, rules_env):
-        reviewed = TradingRuleBook.load(rules_env / "versions" / "v2-reviewed" / "rules.yaml")
-        _write_manifest(
-            rules_env,
-            rule_version="v2-reviewed",
-            review_status="REVIEWED",
-            dataset_files=["versions/v2-reviewed/rules.yaml"],
-            dataset_version=reviewed.version,
-        )
+        _flip_active_to_reviewed(rules_env)
         with pytest.MonkeyPatch.context() as mp:
             _relax_golden_gates(mp)
             run, _store = new_run(

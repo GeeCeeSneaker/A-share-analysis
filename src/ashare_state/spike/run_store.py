@@ -91,6 +91,7 @@ class RunStore:
             ),
             case_catalog_hash=payload.get("case_catalog_hash", ""),
             trading_rule_version=payload.get("trading_rule_version", ""),
+            trading_rule_dataset_version=payload.get("trading_rule_dataset_version", ""),
             trading_rule_dataset_files=list(
                 payload.get("trading_rule_dataset_files", [])
                 # legacy (R4-A2.4) single-file binding -> file-list binding
@@ -99,6 +100,7 @@ class RunStore:
             trading_rule_dataset_hash=payload.get("trading_rule_dataset_hash", "")
             or payload.get("trading_rule_hash", ""),
             trading_rule_review_status=payload.get("trading_rule_review_status", ""),
+            trading_rule_source_version=payload.get("trading_rule_source_version", ""),
             started_at=payload.get("started_at", ""),
             ended_at=payload.get("ended_at"),
             status=payload.get("status", "RUNNING"),

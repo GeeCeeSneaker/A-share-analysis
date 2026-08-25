@@ -5,7 +5,9 @@
     "versions/v20260824-compiled/rules.yaml"
   ],
   "dataset_hash": "7dc5f627476c12ab57029b334f2a5a12ee6344429528ba1c4ff69d3c83b40f38",
-  "source_version": "2026-08-24.1",
-  "review_provenance": {},
+  "source_version": "SSE/SZSE/BSE public trading rules, consolidated 2026-08",
+  "review_provenance": {
+    "source_retrieved_at": "2026-08-24"
+  },
   "dataset_version": "2026-08-24.1"
 }

@@ -999,3 +999,87 @@ Production P0-M-1B:
 ```
 
 Reviewer 结论：**本轮非常接近基础层收口，但尚未达到 VERIFIED。下一批必须保持“小范围 correctness closure”，禁止借机扩展 CR-2。**
+
+---
+
+# 17. Implementation Mapping（Developer 回填，2026-08-25）
+
+> 本批：R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement（Batch A→F 全部完成，未触碰 CR-2/CR-3/CR-4/Feature/State/P0-M-1B——遵守 §13 禁止事项）。
+> 测试基线：**544 passed / 0 failed**（523 → 544，+21）；CI 等价四检查（ruff check + format --check + mypy + pytest）本地全绿。
+> Change IDs：DM-CR-20260825-004/005/006/007；**ADR-014**（amendment to ADR-013；索引同步标注）。
+> CI：本批提交后以 Actions 实际结果为准（上批 run 35/36 已被 Reviewer VERIFIED GREEN——本批不预写结果）。
+
+## P0-01（CR-1.2.2 Probe Exchange Enforcement，§2）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 2.3 B5/B6 走 executor.call | `probes.py`：probe_b5 的 symbol-mapping 前置与 probe_b6 的 code-list 前置均改 `executor.call("BaseData.get_code_list", lambda: ...)`（成功/失败都持久化 + 结构化 case；B6 依赖失败→stock_basic 不发射） | enforcement::TestB5CodeListBoundary ×2 + TestB6CodeListBoundary ×2（B6 失败时 stock_basic 无 meta） |
+| 2.4 静态守卫（approved boundary 显式化） | AST：probes.py 的 `ctx.target.*_exchange` 调用必须在 Lambda 内；golden_router.py 的必须在 `collector.persist(...)` 参数内或 Lambda 内（`_inside_persist_call`——不误伤 `_DomainCollector` 调用即持久化边界） | enforcement::TestStaticBoundaryGuard ×2 |
+| 2.4 exchange 计数闭合 | Spy 目标包装（`_counting_target` 计数全部 `*_exchange` 调用）vs raw meta 数 | enforcement::TestExchangeCountClosure（B2/B3/B5/B6/B7 参数化 + B4 golden 各 1——全等） |
+
+## P0-02（Golden CA Typed Truth，§3）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 3.3 event_class 为类型事实源（推荐方案，v3 bytes 不动） | `golden_router._resolve_expected_event_type`（`_EVENT_CLASS_TO_TYPE`：DIVIDEND_EX_DATE→DIVIDEND / RIGHT_ISSUE_EX_DATE→RIGHT_ISSUE；declared event_type 必须一致，冲突 fail closed） | ca_event_type::TestEventTaxonomy ×6（含 untyped/unknown/conflict fail-closed） |
+| 3.3 untyped formal fail closed | validator v5：`EVENT_TYPE_UNRESOLVED`（类型解析在 EVENT_SOURCE 检查前） | ca_event_type::test_untyped_case_fails_closed_in_validator + test_conflicting_declared_type_fails_in_validator（**旧 untyped-accepts-any 测试已删除并反转**） |
+| 3.4 actual v3 参与校验 | `TestActualGoldenV3Truth`：load 真实 golden_cases_v3.jsonl 的 20 个 CA cases——每个解析为 DIVIDEND；right-issue-only 证据 → `EVENT_TYPE_MISMATCH`；20 cases 端到端跑 typed validator（validator_version=="5"） | ca_event_type::TestActualGoldenV3Truth ×3 |
+| 3.4 (symbol, EX_DATE, type) 精确匹配保持 | validator v5 类型比对为强制（原 `if expected_type:` 条件移除） | TestTypedValidation ×7（双向替代测试保持） |
+
+## P0-03（Rule Manifest Confinement，§4）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 4.2 confinement 于 fs 访问前 | `trading_rule._confined_dataset_file`：相对/无 `..`（词法）/无绝对/盘符 + resolve 后仍在 root（symlink）+ **versions/<rule_version>/ 结构一致**；`load_rule_manifest` 在 `(root/rel).is_file()` 之前调用 | closure::TestManifestConfinement（traversal（外部文件真实存在）/绝对/symlink（特权环境 skip）/version-dir mismatch） |
+| 4.2 bound 共用同一 helper | `load_bound_rule_book` 逐文件 `_confined_dataset_file`（含 selector 结构校验） | closure::test_bound_load_rejects_foreign_version_dir（文件存在仍被结构性拒绝） |
+| 4.3 valid version-local multi-file | manifest 可声明 versions/<v>/ 下多文件（hash 覆盖全部） | closure::test_valid_version_local_dataset_passes |
+
+## P0-04（Metadata Coherence，§5）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 5.4 四字段强制一致 | `load_active_rules`：review_status / source_version / review_provenance（`_provenance_equivalent`：非空键精确一致 + datetime ISO 规范化 + 空值键豁免）/ dataset_version | closure::TestMetadataCoherence ×5（双向 status / source_version / provenance / dataset_version）+ coherent PASS |
+| 5.1 真实不一致修正 | `configs/trading_rules/rule_manifest.json`：source_version 对齐 yaml；review_provenance 补 source_retrieved_at | closure::test_coherent_manifest_loads + 全量（真实 root 加载通过） |
+| 5.4 双版本绑定 | SpikeRun：`trading_rule_version`（selector）+ `trading_rule_dataset_version`（content）+ source_version；`load_bound_rule_book(dataset_version=)` 复验 | closure::TestRunBindsBothVersions + binding::test_binding_dataset_content_version_mismatch_refused |
+| 5.5 ACTIVE advance 不影响历史 replay | （R4-A2.5 已有 adversarial 测试保持通过；本批双版本复验加强） | adversarial::test_b5_limit_result_invariant_under_active_advance |
+
+## P1（§6-§8）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| P1-01 provenance_complete 含 rule binding | `model.py`：PRODUCTION 完整性 = golden_bound AND rules_bound（selector+files+hash+status） | closure::TestProvenanceComplete（unbound False / bound True / partial False） |
+| P1-02 ACTIVE 切换 crash-safe + lineage | `review.py`：tmp manifest + `os.replace`；`--from-version`（默认取 manifest）不匹配拒绝；输入非 ACTIVE dataset 拒绝；切换后 `load_active_rules` 自验证 | closure::TestReviewScriptHardening ×3（from-version 拒 / 非 ACTIVE 拒 / 成功切换无 tmp 残留且 COMPILED 原件不动） |
+| P1-03 partial-orphan 集 | `raw_writer`：present 成员字节一致的 same retry→恢复（补缺成员+meta）；`_unexpected_orphan_files` 未声明成员→整集隔离（`_quarantine_unexpected` + 空目录清理）；quarantine 排除于 active 扫描 | recovery::TestPartialOrphanSets ×4 + 旧 partial 测试改不同字节语义 |
+
+## §9 Governance（DM-CR-20260825-007）
+
+| 要求 | 落实 |
+|---|---|
+| 9.1 exact SHA baseline | 总册头部：上批 implementation `13d02a191f11c22b836da42ae9ae5707f9e355f1` / 复审 HEAD `cdd360879c3a6361f4c952bde39174d3d46dfbcb`；本批提交后以其 commit SHA 为新基线 |
+| 9.2 §30/§31 统一 | §30 重写（当前真相 = ACTIVE v3 COMPILED + 结构治理就绪 + 人工项指向 §31；历史状态清除——只保留当前真相，历史归 DEVLOG/Git） |
+| 9.3 §40 不预写 PASS | 全部 upstream 行 = "absorbed into R4-A2.6/CR-1.2.2——最终 VERIFIED 随本批门（不预写 PASS）" |
+| 9.4 DEVLOG 矛盾修正 | R4-A2.5 条目：CI 行就地标注更正（CONFIRMED GREEN 保留、"待确认" 划线更正）；"v3 无需重封" 声明就地标注复审修正（真实 v3 untyped，由 P0-02 修复） |
+| RISK-004 | 保持 REOPENED（理由更新为本批四 P0；不预写关闭） |
+| CI | 总册头部 CI Status = VERIFIED GREEN（Reviewer run 35/36 确认口径）；本批提交后以 Actions 实际结果为准 |
+
+## §12 Exit Gate 自检
+
+```text
+[x] zero unpersisted real provider exchanges on formal B2-B7 path（Spy 计数闭合 ×6）
+[x] success AND failure exchanges all close into immutable evidence（B5/B6 失败测试）
+[x] no direct formal provider-call bypass outside approved executor/collector boundary（AST ×2）
+[x] every formal Golden CA case has exact typed event truth（真实 v3 20 cases 全解析）
+[x] wrong corporate-action type cannot PASS any actual bound Golden case（actual v3 + right-issue-only → MISMATCH）
+[x] ACTIVE rule manifest file refs are path-confined（traversal/绝对/symlink/version-dir）
+[x] Rule manifest and dataset governance metadata are coherent（四字段 ×5 测试 + 真实 manifest 修正）
+[x] Run binds unambiguous selector version + dataset identity（双版本绑定 + content version 复验）
+[x] formal provenance API includes all semantic SoR bindings（provenance_complete 三态）
+[x] Raw orphan recovery remains closure-safe（partial 恢复/未声明隔离/恢复后 closure 干净）
+[x] no silent fallback（EVENT_TYPE_UNRESOLVED / confinement / coherence 全 fail-closed）
+[x] no current/ACTIVE dependency leaks into historical formal semantics（adversarial replay 保持）
+[x] management docs match runtime and reviewer verdict（DEVLOG/总册同批修正，不预写 PASS）
+[x] required regression/adversarial tests pass（544/0 + CI 等价四检查本地全绿）
+[~] GitHub Actions remains positively GREEN —— 本批提交后以 Actions 实际结果为准（如实标注，不预写）
+```
+
+已知开放项（如实声明）：Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED——结构就绪，Trading Rule 人工复核可用 `scripts/rules/review.py --from-version` 执行）；Branch Protection 未启用；CR-2 / P0-M-1B 保持 BLOCKED 直到本批 VERIFIED。

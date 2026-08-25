@@ -595,11 +595,23 @@ def _validate_corp_action_context(
             validator_version="2",
         )
 
-    # P0-05 (audit R4-A2.4 section 6) + R4-A2.5 P0-04: EVENT FACT SOURCE -
-    # the provider corporate-action event records must confirm the exact
-    # date AND type. adj-factor movement alone is NOT a sufficient event
-    # SoR; dividend and right-issue are SEPARATE event streams.
-    expected_type = str(case.expected_fields.get("event_type", "") or "").strip().upper()
+    # P0-05 (audit R4-A2.4 section 6) + R4-A2.5 P0-04 + R4-A2.6 P0-02:
+    # EVENT FACT SOURCE - the provider corporate-action event records must
+    # confirm the exact date AND type. adj-factor movement alone is NOT a
+    # sufficient event SoR; dividend and right-issue are SEPARATE event
+    # streams. The formal type resolves from the bound Golden truth
+    # (event_class first, expected_fields.event_type must agree) and is
+    # MANDATORY - an untyped formal CA case fails closed.
+    expected_type, type_error = _resolve_expected_event_type(case)
+    if type_error:
+        return ValidationOutcome(
+            result=CaseResult.VALIDATED_FAIL,
+            expected=f"{case.truth_source} (typed corporate-action event required)",
+            actual=type_error,
+            reason_code="EVENT_TYPE_UNRESOLVED",
+            validator_id="corp_action_context_v2",
+            validator_version="5",
+        )
     dividend_rows = [
         r for r in (data.dividend_rows or []) if str(r.get("SECURITY_CODE", "")) == bare
     ]
@@ -633,24 +645,22 @@ def _validate_corp_action_context(
             validator_id="corp_action_context_v2",
             validator_version="4",
         )
-    if expected_type:
-        # the golden truth pins the event TYPE: the exact-date record must
-        # be of that type (a DIVIDEND record can NEVER substitute a
-        # RIGHT_ISSUE expectation and vice versa, audit 20260825 section 5)
-        types_at_t = {_normalize_event_type(r.get("EVENT_TYPE", "")) for r in events_at_t}
-        if expected_type not in types_at_t:
-            return ValidationOutcome(
-                result=CaseResult.VALIDATED_FAIL,
-                expected=f"{case.truth_source} (event record EX_DATE == {t_day}, "
-                f"type {expected_type})",
-                actual=(
-                    f"exact-date event records are of type(s) {sorted(types_at_t)} - "
-                    f"no {expected_type} record on the event date"
-                ),
-                reason_code="EVENT_TYPE_MISMATCH",
-                validator_id="corp_action_context_v2",
-                validator_version="4",
-            )
+    # the golden truth pins the event TYPE (mandatory since R4-A2.6): the
+    # exact-date record must be of that type (a DIVIDEND record can NEVER
+    # substitute a RIGHT_ISSUE expectation and vice versa)
+    types_at_t = {_normalize_event_type(r.get("EVENT_TYPE", "")) for r in events_at_t}
+    if expected_type not in types_at_t:
+        return ValidationOutcome(
+            result=CaseResult.VALIDATED_FAIL,
+            expected=f"{case.truth_source} (event record EX_DATE == {t_day}, type {expected_type})",
+            actual=(
+                f"exact-date event records are of type(s) {sorted(types_at_t)} - "
+                f"no {expected_type} record on the event date"
+            ),
+            reason_code="EVENT_TYPE_MISMATCH",
+            validator_id="corp_action_context_v2",
+            validator_version="5",
+        )
     # exact event date + factor transition at T
     adj_rows = sorted(
         (
@@ -745,7 +755,7 @@ def _validate_corp_action_context(
             f"raw_ret={raw_ret:.4f}, adj_ret={adj_ret:.4f} (continuity held)"
         ),
         validator_id="corp_action_context_v2",
-        validator_version="4",
+        validator_version="5",
     )
 
 
@@ -896,6 +906,43 @@ def _flat(payload: Any) -> list[Any]:
 
 #: R4-A2.5 P0-04 (audit 20260825 section 5.2): CA event taxonomy. The
 #: golden truth records canonical types; provider streams map into them.
+#: R4-A2.6 P0-02: the formal CA event type resolves from the ACTUAL bound
+#: Golden semantic truth. event_class is part of the case's semantic
+#: identity (already hashed) - it is the PRIMARY type fact; the optional
+#: expected_fields["event_type"] must AGREE with it (conflict -> fail
+#: closed; untyped/unknown -> fail closed - no "untyped accepts any"
+#: bypass on the formal path).
+_EVENT_CLASS_TO_TYPE = {
+    "DIVIDEND_EX_DATE": "DIVIDEND",
+    "RIGHT_ISSUE_EX_DATE": "RIGHT_ISSUE",
+}
+
+
+def _resolve_expected_event_type(case: GoldenCase) -> tuple[str, str]:
+    """Resolve the formal CA event type EXACTLY ONCE.
+
+    Returns ``(canonical_type, "")`` on success or ``("", reason)`` when
+    the type is unresolvable (fail closed - the caller turns the reason
+    into a structured VALIDATED_FAIL)."""
+    event_class = str(getattr(case, "event_class", "") or "").strip().upper()
+    derived = _EVENT_CLASS_TO_TYPE.get(event_class, "")
+    declared_raw = str(case.expected_fields.get("event_type", "") or "").strip()
+    declared = _normalize_event_type(declared_raw) if declared_raw else ""
+    if not derived:
+        return "", (
+            f"unresolvable event type: event_class {event_class!r} has no canonical "
+            "mapping (known: DIVIDEND_EX_DATE->DIVIDEND, "
+            "RIGHT_ISSUE_EX_DATE->RIGHT_ISSUE) - formal CA truth must be "
+            "typed, an untyped case may not pass"
+        )
+    if declared and declared != derived:
+        return "", (
+            f"event type conflict: event_class {event_class!r} implies {derived} "
+            f"but expected_fields.event_type declares {declared}"
+        )
+    return derived, ""
+
+
 _EVENT_TYPE_ALIASES = {
     "DIVIDEND": "DIVIDEND",
     "CASH_DIVIDEND": "DIVIDEND",

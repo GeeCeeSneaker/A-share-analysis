@@ -4,11 +4,11 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Current Code Baseline**：本批提交（R4-A2.5 Formal Replay/Rule-SoR Closure + CR-1.2.1 Raw Commit Hardening；见 §33 更新规则）  
-> **Document Revision**：DM-CR-20260825-001 / 002 / 003  
-> **Last Review**：2026-08-25（R4-A2.4/CR-1.2 复审：REOPENED——5 项 P0 + P1 + 治理修正，本批 R4-A2.5/CR-1.2.1 修复）  
+> **Current Code Baseline**：本批提交（R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement）；上一批 implementation SHA `13d02a191f11c22b836da42ae9ae5707f9e355f1` / 复审基线 HEAD `cdd360879c3a6361f4c952bde39174d3d46dfbcb`（本批提交后以其 commit SHA 为新基线）  
+> **Document Revision**：DM-CR-20260825-004 / 005 / 006 / 007  
+> **Last Review**：2026-08-25（R4-A2.5/CR-1.2.1 复审：REOPENED——4 项 P0 + 3 项 P1 + 治理修正，本批 R4-A2.6/CR-1.2.2 修复）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**CONFIRMED GREEN**——run 35（commit 13d02a1）三矩阵全部 success（2026-08-25 API positive confirmation）。历史：b7a84563..f3694bd 共 9 个提交 FAILURE（根因 1：ruff format --check 门未过，已修复；根因 2：两个 capability-mode 测试在无 SDK 的 CI 上探测真实 SDK，已改传显式 identity 并以模拟无 SDK 环境验证）  
+> **CI Status**：**VERIFIED GREEN**（Reviewer 2026-08-25 确认 run 36/HEAD cdd3608 与 run 35/13d02a1 均 success）；后续提交以 Actions 实际结果为准  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
@@ -844,29 +844,13 @@ Hash Sealed
 Event Diverse
 ```
 
-当前状态（2026-08-22 R4-A1.1 后）：
-
-```text
-R4-A1.1 Implementation = DONE
-R4-A1.1 Review         = PENDING_REVIEW
-```
-
-当前 v2 是：
-
-```text
-COMPILED Candidate Dataset（v2-candidate-20260822）
-```
-
-不是正式 Reviewed Truth。
-
-v2 相比 v1 的落地（R4-A1.1）：
-manifest 统计从 cases 复算、case_semantic_hash/source_artifact_hash 分离、
-case_type 进入 semantic hash、event_id/event_class + distinct-event gate、
-append-only 版本（v1/v2 + ACTIVE 指针）。
-诚实覆盖状态：ST_CAP=2<50、DELIST=10<20 —— PRODUCTION run 在 golden
-review 补齐真实事件前被创建门拒绝。
-
-Domain-specific Golden Probe Router 按审计 §7 并入 R4-A2。
+> **当前状态（2026-08-25，R4-A2.6 批次统一）**：Golden Truth 结构治理
+> 全部就绪（immutable versions v1/v2/v3 + ACTIVE 指针 + semantic hash +
+> distinct-event gate + bound formal gates + domain router + typed CA
+> event truth）。**当前 ACTIVE = v3 COMPILED 候选**（123 cases；结构化事件
+> ST_TRANSITION=10<50、DELIST symbols=10<20 不足），**不是正式 Reviewed
+> Truth**——PRODUCTION run 在人工 review 补齐真实事件前被创建门拒绝。
+> 人工执行项与最新细节见 §31；历史沿革见 DEVLOG（管理总册只保留当前真相）。
 
 Production Verdict 必须等 Review Gate PASS。
 
@@ -1077,12 +1061,13 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A1 Golden Dataset / Per-Type Gate / Catalog Seal | DONE | absorbed | PASS（由 A1.1 闭环） |
 | R4-A1.1 Truth Integrity | DONE | absorbed | PASS（由 R4-A2 批次闭环） |
 | R4-A2.1/A2.2 Semantic/PIT Validators + Review Workflow | DONE | absorbed | PASS（由 R4-A2.3 闭环） |
-| R4-A2.3 Correctness Closure | DONE | REOPENED→absorbed | PASS（由 R4-A2.5 复审闭环：rule binding 补全后） |
-| CR-1 ProviderExchange + RawWriter | DONE | absorbed | PASS（由 CR-1.1 闭环） |
-| CR-1.1 Explicit Exchange Runtime | DONE | REOPENED→absorbed | PASS（由 CR-1.2/CR-1.2.1 闭环） |
-| R4-A2.4 Correctness Deepening | DONE | REOPENED | 由 R4-A2.5 修复（本批，PENDING_REVIEW） |
-| CR-1.2 Complete Exchange + Raw Closure | DONE | REOPENED | 由 CR-1.2.1 修复（本批，PENDING_REVIEW） |
-| R4-A2.5 Formal Replay/Rule-SoR Closure + CR-1.2.1 Raw Commit Hardening | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
+| R4-A2.3 Correctness Closure | DONE | absorbed into R4-A2.6 | 结构保留；最终 VERIFIED 随 R4-A2.6 门（不预写 PASS） |
+| CR-1 ProviderExchange + RawWriter | DONE | absorbed into CR-1.2.2 | 结构保留；最终 VERIFIED 随本批门 |
+| CR-1.1 Explicit Exchange Runtime | DONE | absorbed into CR-1.2.2 | 结构保留；最终 VERIFIED 随本批门 |
+| R4-A2.4 Correctness Deepening | DONE | absorbed into R4-A2.6 | 结构保留；最终 VERIFIED 随本批门 |
+| CR-1.2 Complete Exchange + Raw Closure | DONE | absorbed into CR-1.2.2 | 结构保留；最终 VERIFIED 随本批门 |
+| R4-A2.5 Rule-SoR Closure + CR-1.2.1 Raw Hardening | DONE | REOPENED | 由 R4-A2.6/CR-1.2.2 修复（本批） |
+| R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
 | R4-A3 SDK/Lifecycle/Early Stop | PLANNED | PENDING | Next |
 | R4-B1 Capability Endpoint Proof | PLANNED | PENDING | Next |
 | R4-B2 Publish Validation Exactness | PLANNED | PENDING | Next |
@@ -1099,51 +1084,51 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A2.5 + CR-1.2.1（本批，DONE / PENDING_REVIEW）
+## R4-A2.6 + CR-1.2.2（本批，DONE / PENDING_REVIEW）
 
 ```text
-P0-01 全消费者 Rule Binding（ADR-013 §3）：
-  validate_limit_rule(book=) 必填 keyword（无默认；显式 None→结构化 FAIL）
-  B3/B5 传 ctx.rule_book；route_all 传 run-bound book 给 limit/BJ 验证器
-  AST 守卫：formal 模块 validate_limit_rule 必带 book= 且非 None 字面量；
-    resolve_* 必带 book=
-  对抗测试：ACTIVE 推进（v1 10%→v2 20%）后同 run 重放 B5 limit 结果恒等；
-    bound 数据篡改→replay 阻断
-P0-02 Trading Rule 版本模型（ADR-013 §1）：
-  configs/trading_rules/{rule_manifest.json, versions/<v>/rules.yaml, evidence/}
-  manifest=ACTIVE 选择器（dataset_files[]+dataset_hash+dataset_version）；
-    目录 glob 合并语义废除（COMPILED/REVIEWED 共存）
-  load_active_rules 复算 hash（ACTIVE 篡改→new_run 阻断）；
-    SpikeRun 绑定 dataset_files[]+dataset_hash（篡改任一文件→replay 阻断）
-  scripts/rules/review.py 重写：产出新 immutable 版本 + 切换 ACTIVE +
-    evidence 内容寻址 + 自验证
-P0-03 Review Gate 加固（ADR-013 §2）：
-  source_artifact_ref 相对 evidence root + path confinement（绝对路径/..
-    穿越在 fs 访问前拒绝）；hash 64 lower-hex；时间戳 ISO-8601
-P0-04 CA Event Taxonomy（ADR-013 §4）：
-  DIVIDEND/RIGHT_ISSUE 两独立事件流（get_right_issue_exchange）；
-    expected_fields["event_type"] 声明期望类型（v3 语义 hash 兼容）；
-    (symbol, EX_DATE, type) 精确匹配；DIVIDEND 永不替代 RIGHT_ISSUE
-    （EVENT_TYPE_MISMATCH）；CA 域 bundle=六 exchange
-P0-05 B5/B6 载荷形状（ADR-013 §5）：
-  _flat_values 标量列表展开（多列 fail loud）；_rows_of polars 优先级
-    修正（旧路径 list(to_dict())=列名垃圾行）
-P1 CR-1.2.1 Raw Commit Recovery（ADR-013 §6）：
-  orphan payload 检测（list_orphan_payloads）；same-bytes retry 恢复；
-    different-bytes→.quarantine/ 隔离 + BLOCK；partial orphan 同隔离；
-    fault-injection（meta 写失败/ payload move 失败）
-CI 根因修复：ruff format --check 门（b7a84563..c7aa511 8 连红的根因）；
-  本地 CI 等价四检查全绿
+CR-1.2.2 Probe Exchange Enforcement（P0-01，DM-CR-20260825-004）：
+  B5/B6 code-list 前置改走 ProbeExecutor.call（成功/失败都持久化 +
+    失败→结构化 case；B6 前连成功都不持久化）
+  B6 依赖前置失败→stock_basic 不发射
+  AST 双守卫：probes 的 ctx.target.*_exchange 调用必须在 lambda 内
+    （executor 边界）；golden_router 的必须在 collector.persist(...) 内
+    （approved boundary 显式化，不靠开发者记忆）
+  Spy 计数闭合：B2-B7 每 probe 真实 exchange 调用数 == 持久化 meta 数
+R4-A2.6 Golden CA Typed Truth（P0-02，DM-CR-20260825-005）：
+  event_class（已入语义 hash）成为类型事实源：
+    DIVIDEND_EX_DATE→DIVIDEND / RIGHT_ISSUE_EX_DATE→RIGHT_ISSUE
+  expected_fields.event_type 与 event_class 冲突→fail closed；
+    unknown/untyped→fail closed（旧 untyped-accepts-any 测试反转）
+  validator v5；真实 v3 全部 20 个 CA cases 解析为 DIVIDEND 并参与校验
+    （actual-truth regression，非 synthetic-only）
+R4-A2.6 Rule Manifest Confinement + Coherence（P0-03/04，DM-CR-20260825-006）：
+  dataset_files[] confinement 于任何 fs 访问前（相对/无 ../无绝对/
+    symlink resolve 仍须在 root 内；且必须在 versions/<rule_version>/ 下
+    ——selector 与版本目录结构一致；ACTIVE 与 bound 共用同一 helper）
+  manifest↔dataset 治理字段强制一致（review_status/source_version/
+    review_provenance（语义等价，空值键豁免，datetime 规范化）/
+    dataset_version）；真实 manifest 的 source_version 不一致已修正
+  SpikeRun 绑定分离 selector version（manifest.rule_version）与 dataset
+    content version（yaml.version）+ source_version；load_bound 双版本复验
+P1（DM-CR-20260825-006/007 内）：
+  provenance_complete() 纳入 rule binding（selector+files+hash+status）
+  review.py：manifest 原子切换（tmp+os.replace）+ --from-version 血缘
+    检查 + 非 ACTIVE 输入拒绝 + 切换后 coherence 自验证
+  raw partial-orphan 集语义：present-成员字节一致的 same retry→恢复
+    （补缺成员+meta）；orphan 集含未声明成员→整集隔离；quarantined
+    bytes 不算 active orphan；恢复后 closure 干净
 ```
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
 ```text
 scripts/golden/review.py 逐条核验 123 v3 cases + 补齐 distinct events
-scripts/rules/review.py 对 ACTIVE 规则版本执行人工复核（产出 REVIEWED 版本）
+scripts/rules/review.py 对 ACTIVE 规则版本执行人工复核（--from-version
+  血缘检查；产出 REVIEWED 版本并原子切换 ACTIVE）
 ```
 
-## R4-A3 / B1 / B2（CR-2 前）
+## R4-A3 / B1 / B2（CR-2 前；CR-2 仍 BLOCKED 直到 R4-A2.6/CR-1.2.2 VERIFIED）
 
 ```text
 permission/cache/freshness 分 Gate
@@ -1154,7 +1139,7 @@ explicit artifact_validation_id
 Migration 011
 ```
 
-## 后续 CR（CR-1.2.1 已就绪；CR-2 被 R4-A2.5 复审置 BLOCKED 直到其关闭）
+## 后续 CR
 
 ```text
 CR-2 Provider-Normalized + Quarantine（消费 raw evidence → provider-normalized）
@@ -1483,11 +1468,13 @@ Deadline: 首个 APPROVED Source Policy 前
 ## RISK-004 ProviderExchange 未统一
 
 ```text
-Status: REOPENED（R4-A2.4/CR-1.2 复审裁定：A2.3 时代"由 A2.4 闭环"的
-        PASS 结论非法——CR-1.1 四 P0 在 A2.4 批次才修复且被再次 REOPEN）
-        → 本批 R4-A2.5/CR-1.2.1 后结构完整：版本模型 + run 绑定 + gate
-        加固 + AST 守卫全部落地（ADR-013），等待 Reviewer 复核关闭
-Mitigation: PENDING_REVIEW（R4-A2.5/CR-1.2.1）
+Status: REOPENED（R4-A2.5/CR-1.2.1 复审维持 REOPENED：B5/B6 仍有绕过
+        executor 的 exchange 路径 + CA 类型未入真实 truth + manifest
+        无 confinement/一致性——即 R4-A2.6/CR-1.2.2 的四项 P0）
+        → 本批 R4-A2.6/CR-1.2.2 修复后结构完整（executor 边界 AST 守卫
+        + Spy 计数闭合 + typed truth + manifest confinement/coherence）；
+        保持 REOPENED 直到 Reviewer 验证本批（不预写关闭）
+Mitigation: PENDING_REVIEW（R4-A2.6/CR-1.2.2）
 ```
 
 ## RISK-005 Trading Rule 数据层未人工 Review
@@ -1737,6 +1724,53 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 > 新条目倒序追加，不删除历史。
 
+## DM-CR-20260825-007 — R4-A2.5 Review Correction & Governance Sync
+
+**Type**：C1（治理修正）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.5/CR-1.2.1 复审 §9——DEVLOG 自相矛盾（CONFIRMED GREEN vs "待 Actions 确认"）；"v3 无需重封"的 CA 声明与实际数据（v3 untyped）不符；Current Code Baseline 非 exact SHA；§30 保留过时 current-state；§40 提前写 upstream PASS。  
+**Correction**：DEVLOG R4-A2.5 条目两处就地修正（保留历史，标注复审修正）；总册头部基线改为 exact SHA 引用（上批 implementation 13d02a1 + 复审 HEAD cdd3608；本批提交后以其 SHA 为新基线）；§30 重写为当前真相统一（2026-08-25）；§40 全部 upstream 行改为 "absorbed into R4-A2.6/CR-1.2.2——最终 VERIFIED 随本批门"（不预写 PASS）；RISK-004 保持 REOPENED 直到 Reviewer 验证本批；CI = VERIFIED GREEN（Reviewer 确认 run 35/36）。  
+**Affected Modules**：Documentation / Governance（DEVLOG、总册 §30/§40/§61）  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-006 — Rule Manifest Confinement & Metadata Coherence
+
+**Type**：C2 amendment to ADR-013（manifest selector 契约收紧）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.6 P0-03/P0-04——ACTIVE manifest 的 dataset_files[] 无 confinement（../ 与绝对路径可逃出 rules root）；manifest 与 dataset 治理字段（review_status/source_version/review_provenance/dataset_version）真实不一致（source_version 实锤）且不比较；run 的 trading_rule_version 语义混淆（selector id vs yaml content version）。  
+**Old Contract**：`load_rule_manifest` 仅检查 `(root/rel).is_file()`；`load_active_rules` 只校验 dataset_hash + dataset_version；SpikeRun.trading_rule_version = yaml content version。  
+**New Contract**：`_confined_dataset_file`（相对/无 `..`/无绝对/symlink resolve 后仍须在 root 内 + 必须位于 `versions/<rule_version>/` 下）在任何 fs 访问前执行——ACTIVE（load_rule_manifest）与 bound（load_bound_rule_book）共用同一 helper；`load_active_rules` 强制 manifest↔dataset 四字段一致（review_provenance 语义等价比较：空值键豁免、datetime 规范化）；真实 rule_manifest.json 的 source_version 修正为与 yaml 一致；SpikeRun 绑定 `trading_rule_version`（selector）+ `trading_rule_dataset_version`（content）+ `trading_rule_source_version`，load_bound 双版本复验（旧 run json 兼容读取）；P1：`provenance_complete()` 纳入 rule binding；review.py manifest 原子切换（tmp+os.replace）+ `--from-version` 血缘检查 + 非 ACTIVE 输入拒绝 + 切换后 coherence 自验证。  
+**Affected Modules**：spike/trading_rule.py、spike/model.py、spike/run_store.py、spike/runner.py、spike/probes.py、scripts/rules/review.py、configs/trading_rules/rule_manifest.json  
+**Tests**：tests/integration/test_rule_manifest_closure.py（16：traversal/绝对/symlink/version-dir×2/一致性×5/双版本绑定/provenance×3/review 脚本×3）+ binding 适配  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-005 — Golden CA Event-Type Truth Closure
+
+**Type**：C1/C2 implementation-semantic closure（不创建新 Golden 版本——event_class 已在语义 hash 内，无 v3 bytes 变更）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.6 P0-02——CA 事件类型校验只对 synthetic 测试生效（expected_fields.event_type）；真实 golden v3 的 20 个 CA cases 均 untyped（event_class=DIVIDEND_EX_DATE 被 validator 忽略），"untyped accepts any" 旁路在 formal path 保留。  
+**Old Contract**：`expected_type = case.expected_fields.get("event_type")`——空则跳过类型校验（任意事件类型可过精确日期后进入后续验证）。  
+**New Contract**：`_resolve_expected_event_type(case)`——event_class（语义 hash 成员）为 PRIMARY 类型事实源（DIVIDEND_EX_DATE→DIVIDEND / RIGHT_ISSUE_EX_DATE→RIGHT_ISSUE）；expected_fields.event_type 存在时必须与 event_class 派生一致（冲突→fail closed）；unknown/missing event_class→`EVENT_TYPE_UNRESOLVED` fail closed；类型比对为**强制**（validator v5）；删除并反转旧 "untyped accepts any" 测试；actual-truth regression：load 真实 golden_cases_v3.jsonl 全部 20 个 CA cases（每个解析为 DIVIDEND 并跑 typed validator 端到端；right-issue-only 证据对真实 DIVIDEND case 产生 EVENT_TYPE_MISMATCH）。  
+**Affected Modules**：spike/golden_router.py、tests/integration/test_ca_event_type.py（重写）  
+**Compatibility**：v3 bytes 与语义 hash 零变更（event_class 早已入 hash）；带 event_type 的合成 case 必须与 event_class 一致。  
+**Tests**：test_ca_event_type.py（16：解析×6 + typed 验证×7 + 真实 v3×3）  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-004 — Formal Probe Exchange Enforcement
+
+**Type**：C1 correctness closure  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：CR-1.2.2 P0-01（R4-A2.5/CR-1.2.1 复审 §2）——B5/B6 的 code-list 前置绕过 ProbeExecutor 直接调用 `ctx.target.get_code_list_exchange`：B5 失败路径的 failure exchange 不持久化（异常在手工 persist 前逃逸）；B6 连成功路径都不持久化。违反"formal path 每个 exchange 都是 immutable evidence"不变量。  
+**Old Contract**：调用者自行取得 exchange、成功后手工 `evidence_from_exchange`（"记得持久化"的 correctness contract）。  
+**New Contract**：B5/B6 code-list 前置改走 `executor.call(...)`（成功/失败都持久化 + 失败→结构化 case + ProviderError 不逃逸）；B6 依赖前置失败→stock_basic 不发射；**AST 双静态守卫**：probes.py 的 `ctx.target.*_exchange` 调用必须位于 lambda 内（executor 边界）、golden_router.py 的必须位于 `collector.persist(...)` 参数内（approved boundary 显式化——不靠开发者记忆，也不误伤 `_DomainCollector` 这类调用即持久化的专用边界）；**Spy 计数闭合测试**：B2-B7 每个 probe 的真实 exchange 调用数 == 持久化 raw meta 数（含 B4 golden 路由）。  
+**Affected Modules**：spike/probes.py（B5/B6）  
+**Tests**：tests/integration/test_probe_exchange_enforcement.py（12：B5/B6 成功恰好一个 meta ×2 + B5/B6 失败持久化+结构化 ×2 + B6 依赖不发射 + Spy 计数 ×6 + AST 守卫 ×2）  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
 ## DM-CR-20260825-003 — CA Event Taxonomy + B5/B6 Payload Shapes + CI 根因修复
 
 **Type**：C1（CA 证据组合扩展）+ C2（CI 门新增 format check 执行修正）  
@@ -1970,13 +2004,13 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 # 62. 下一次维护检查点
 
-R4-A2.5 + CR-1.2.1 已更新（2026-08-25，见 DM-CR-20260825-001/002/003）：
+R4-A2.6 + CR-1.2.2 已更新（2026-08-25，见 DM-CR-20260825-004/005/006/007）：
 
 ```text
-§30 §31 §40 §41 §43 §52 §53 §61 §62 + 头部 CI Status   (done 2026-08-25)
+§30 §40 §41 §52 §61 §62 + 头部（基线 exact SHA / CI VERIFIED GREEN）(done 2026-08-25)
 ```
 
-下一批（R4-A3 / CR-2）落地时至少更新：
+下一批（R4-A3 / CR-2，须待本批 VERIFIED）落地时至少更新：
 
 ```text
 §17                 (CR-2 Provider-Normalized 契约)

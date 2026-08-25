@@ -90,9 +90,14 @@ class SpikeRun:
     #: (the ACTIVE-manifest algorithm) - tampering ANY bound file blocks
     #: the replay. verdict/resume never read the working tree's ACTIVE.
     trading_rule_version: str = ""
+    #: R4-A2.6 P0-04: the run binds BOTH identities explicitly -
+    #: trading_rule_version = the manifest SELECTOR id (v20260824-compiled)
+    #: trading_rule_dataset_version = the dataset CONTENT version (yaml)
+    trading_rule_dataset_version: str = ""
     trading_rule_dataset_files: list[str] = field(default_factory=list)
     trading_rule_dataset_hash: str = ""
     trading_rule_review_status: str = ""  # COMPILED | REVIEWED at binding time
+    trading_rule_source_version: str = ""
     started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     ended_at: str | None = None
     status: str = "RUNNING"
@@ -115,9 +120,11 @@ class SpikeRun:
             "golden_dataset_hash": self.golden_dataset_hash,
             "case_catalog_hash": self.case_catalog_hash,
             "trading_rule_version": self.trading_rule_version,
+            "trading_rule_dataset_version": self.trading_rule_dataset_version,
             "trading_rule_dataset_files": list(self.trading_rule_dataset_files),
             "trading_rule_dataset_hash": self.trading_rule_dataset_hash,
             "trading_rule_review_status": self.trading_rule_review_status,
+            "trading_rule_source_version": self.trading_rule_source_version,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
             "status": self.status,
@@ -129,6 +136,13 @@ class SpikeRun:
 
         R4-P0-02: golden binding (truth_version + manifest_hash) is part
         of provenance for formal runs.
+
+        R4-A2.6 P1-01: the trading-rule binding (selector version +
+        dataset files/hash + review status) is part of formal provenance
+        too - ADR-013 made the rule dataset a formal semantic SoR, and
+        downstream consumers (Capability Approval, Replay, Publish) reuse
+        this API: it must never claim completeness with the semantic SoR
+        unbound.
         """
         required = (
             self.code_commit,
@@ -140,10 +154,16 @@ class SpikeRun:
         )
         if not all(value and value != "unknown" for value in required):
             return False
-        return not (
-            self.run_kind == RunKind.PRODUCTION
-            and not (self.golden_truth_version and self.golden_dataset_hash)
+        if self.run_kind != RunKind.PRODUCTION:
+            return True
+        golden_bound = bool(self.golden_truth_version and self.golden_dataset_hash)
+        rules_bound = bool(
+            self.trading_rule_version
+            and self.trading_rule_dataset_files
+            and self.trading_rule_dataset_hash
+            and self.trading_rule_review_status
         )
+        return golden_bound and rules_bound
 
 
 @dataclass(frozen=True)

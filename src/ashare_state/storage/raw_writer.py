@@ -608,16 +608,35 @@ class RawWriter:
         if not meta_exists and not payload_exists:
             return False
         if not meta_exists and payload_exists:
-            # orphan payload set without its meta anchor
-            same_tables = all(p.is_file() and p.read_bytes() == b for _, p, b in table_files)
-            if same_tables:
+            # orphan payload set without its meta anchor. A PARTIAL set
+            # (some members missing) can still recover: every PRESENT
+            # member must byte-match the retry's declaration (the missing
+            # members are simply written by _commit_files).
+            present_same = all(p.read_bytes() == b for _, p, b in table_files if p.is_file())
+            unexpected = self._unexpected_orphan_files(request_id, table_files)
+            if present_same and not unexpected:
                 # same-request retry after an interrupted commit: land the
                 # meta now (recovery); _commit_files will write ONLY the
                 # missing pieces (payload moves are no-ops for existing
                 # bytes via the staging path's exists-check)
                 self._commit_files(request_id, meta_path.parent, meta_path, meta_bytes, table_files)
                 return True
+            if unexpected:
+                # R4-A2.6 section 8: the orphan set contains bytes the retry
+                # does NOT declare - adopting them would fabricate evidence;
+                # quarantine the whole set
+                self._quarantine_orphans(request_id, table_files)
+                self._quarantine_unexpected(request_id, unexpected)
+                self._cleanup_empty_request_dirs(request_id, table_files)
+                msg = (
+                    f"raw orphan-payload conflict for request {request_id}: the "
+                    "orphan set contains files the retry does not declare "
+                    f"({sorted(p.name for p in unexpected)}) - the whole set was "
+                    "moved to .quarantine/ (audit R4-A2.6 section 8)"
+                )
+                raise RawWriterError(msg)
             self._quarantine_orphans(request_id, table_files)
+            self._cleanup_empty_request_dirs(request_id, table_files)
             msg = (
                 f"raw orphan-payload conflict for request {request_id}: an "
                 "interrupted commit left payload bytes without a meta anchor, "
@@ -638,6 +657,37 @@ class RawWriter:
         raise RawWriterError(msg)
 
     @staticmethod
+    def _unexpected_orphan_files(
+        request_id: str, table_files: list[tuple[str | None, Path, bytes]]
+    ) -> list[Path]:
+        """R4-A2.6 section 8: files inside the orphan request dir that the
+        retry's declaration does NOT cover (an interrupted multi-table
+        commit can never legitimately leave such files)."""
+        declared = {p.name for _, p, _ in table_files}
+        expected_dirs = {p.parent for _, p, _ in table_files}
+        unexpected: list[Path] = []
+        for parent in expected_dirs:
+            if parent.name == request_id and parent.is_dir():
+                for member in parent.glob("*.parquet"):
+                    if member.name not in declared:
+                        unexpected.append(member)
+        return unexpected
+
+    @staticmethod
+    def _quarantine_unexpected(request_id: str, files: list[Path]) -> None:
+        """Move undeclared orphan members under the dataset's .quarantine/
+        (inspectable, never active evidence)."""
+        for path in files:
+            quarantine_dir = path.parent.parent / ".quarantine"
+            quarantine_dir.mkdir(parents=True, exist_ok=True)
+            target = quarantine_dir / f"{request_id}-{path.name}"
+            counter = 0
+            while target.exists():
+                counter += 1
+                target = quarantine_dir / f"{request_id}-{counter}-{path.name}"
+            path.replace(target)  # atomic move within the dataset dir
+
+    @staticmethod
     def _quarantine_orphans(
         request_id: str, table_files: list[tuple[str | None, Path, bytes]]
     ) -> None:
@@ -645,16 +695,12 @@ class RawWriter:
         so they can never be mistaken for valid evidence (they stay
         inspectable for incident forensics; the write itself BLOCKS with
         RawWriterError)."""
-        from shutil import rmtree
-
-        dataset_dirs: set[Path] = set()
         for _, path, _bytes in table_files:
             if not path.is_file():
                 continue
             # single-table payloads sit in the dataset dir; multi-table
             # payloads sit in <dataset_dir>/<request_id>/
             dataset_dir = path.parent.parent if path.parent.name == request_id else path.parent
-            dataset_dirs.add(dataset_dir)
             quarantine_dir = dataset_dir / ".quarantine"
             quarantine_dir.mkdir(parents=True, exist_ok=True)
             target = quarantine_dir / f"{request_id}-{path.name}"
@@ -663,7 +709,18 @@ class RawWriter:
                 counter += 1
                 target = quarantine_dir / f"{request_id}-{counter}-{path.name}"
             path.replace(target)  # atomic move within the dataset dir
-        # a fully quarantined multi-table request leaves an empty dir
+
+    @staticmethod
+    def _cleanup_empty_request_dirs(
+        request_id: str, table_files: list[tuple[str | None, Path, bytes]]
+    ) -> None:
+        """Drop request dirs left empty by quarantine (never leave a
+        misleading empty skeleton behind)."""
+        from shutil import rmtree
+
+        dataset_dirs = {
+            p.parent.parent if p.parent.name == request_id else p.parent for _, p, _ in table_files
+        }
         for dataset_dir in dataset_dirs:
             request_dir = dataset_dir / request_id
             if request_dir.is_dir() and not any(request_dir.iterdir()):

@@ -155,6 +155,7 @@ class ProbeContext:
                 rule_version=self.run.trading_rule_version,
                 dataset_files=self.run.trading_rule_dataset_files,
                 dataset_hash=self.run.trading_rule_dataset_hash,
+                dataset_version=getattr(self.run, "trading_rule_dataset_version", ""),
             )
         book, _manifest = load_active_rules()
         return book
@@ -751,14 +752,25 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         ctx.outcome_case(
             "history_start_2018_plus_warmup", "FIXTURES", str(sample_date), bar_meta, cov
         )
-    # symbol mapping core gate - explicit exchange (CR-1.1: no JSON
-    # evidence chain, no payload-only call). R4-A2.5 P0-05: scalar-list
-    # payloads flatten via _flat_values (never coerce rows to strings).
-    symbols_exchange = ctx.target.get_code_list_exchange("EXTRA_STOCK_A")
-    symbols_all = [str(s) for s in _flat_values(symbols_exchange.payload)]
-    sym_meta = ctx.evidence_from_exchange(symbols_exchange)
-    sym_out = validators.validate_symbol_mapping(symbols_all)
-    ctx.outcome_case("symbol_mapping_unambiguous", "MARKET", "", sym_meta, sym_out)
+    # symbol mapping core gate - APPROVED exchange execution boundary
+    # (CR-1.2.2 P0-01: the code-list prerequisite goes through
+    # ProbeExecutor.call - success AND failure both persist as raw
+    # evidence, failures become structured cases, and no caller is left
+    # remembering to persist by hand). R4-A2.5 P0-05: scalar-list payloads
+    # flatten via _flat_values (never coerce rows to strings).
+    symbols_payload, sym_meta = executor.call(
+        "BaseData.get_code_list",
+        lambda: ctx.target.get_code_list_exchange("EXTRA_STOCK_A"),
+        failure_case_type="symbol_mapping_unambiguous",
+    )
+    if symbols_payload is not None:
+        symbols_all = [str(s) for s in _flat_values(symbols_payload)]
+        sym_out = validators.validate_symbol_mapping(symbols_all)
+        ctx.outcome_case("symbol_mapping_unambiguous", "MARKET", "", sym_meta, sym_out)
+    else:
+        # executor already structured the failure case + persisted the
+        # failure exchange - nothing to validate, nothing left unhandled
+        symbols_all = []
     # BSE/BJ independent core evidence (audit section 40): dedicated calls,
     # never "the current code list happens to include BJ"
     bse_status, bse_meta = executor.call(
@@ -790,16 +802,32 @@ def probe_b6_replacement(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
     OBSERVED shape so the assessment has evidence attached.
     """
     executor = ProbeExecutor(ctx)
-    symbols_exchange = ctx.target.get_code_list_exchange("EXTRA_STOCK_A")
-    # R4-A2.5 P0-05: _flat_values (scalar lists) - no silent row->str garbage
-    symbols = [str(s) for s in _flat_values(symbols_exchange.payload)][:3]
-    basic, basic_meta = executor.call(
-        "InfoData.get_stock_basic",
-        lambda: ctx.target.get_stock_basic_exchange(symbols),
+    # CR-1.2.2 P0-01: B6's code-list prerequisite goes through the SAME
+    # approved execution boundary (previously the exchange was created and
+    # consumed WITHOUT persistence on both paths). R4-A2.5 P0-05:
+    # _flat_values (scalar lists) - no silent row->str garbage.
+    symbols_payload, _symbols_meta = executor.call(
+        "BaseData.get_code_list",
+        lambda: ctx.target.get_code_list_exchange("EXTRA_STOCK_A"),
         failure_case_type="free_float_equivalence",
         trade_date=str(sample_date),
         symbol="SAMPLE",
     )
+    symbols = (
+        [str(s) for s in _flat_values(symbols_payload)][:3] if symbols_payload is not None else []
+    )
+    if symbols:
+        basic, basic_meta = executor.call(
+            "InfoData.get_stock_basic",
+            lambda: ctx.target.get_stock_basic_exchange(symbols),
+            failure_case_type="free_float_equivalence",
+            trade_date=str(sample_date),
+            symbol="SAMPLE",
+        )
+    else:
+        # code-list prerequisite failed (executor already structured that
+        # case) - the dependent stock_basic call is NOT fired
+        basic, basic_meta = None, _symbols_meta
     basic_available = basic is not None
     ctx.case(
         case_id=f"B6-FREEFLOAT-SEMANTICS-{sample_date}",

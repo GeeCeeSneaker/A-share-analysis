@@ -167,8 +167,9 @@ def resume_run(
             truth_version=run.golden_truth_version,
             dataset_hash=run.golden_dataset_hash,
         )
-    # R4-A2.4 P0-03 + R4-A2.5 P0-02: resume also re-verifies the RUN-BOUND
-    # rule dataset (full file list + combined hash)
+    # R4-A2.4 P0-03 + R4-A2.5 P0-02 + R4-A2.6 P0-04: resume also re-verifies
+    # the RUN-BOUND rule dataset (full file list + combined hash + both
+    # version identities)
     if run.trading_rule_dataset_files:
         from ashare_state.spike.trading_rule import load_bound_rule_book
 
@@ -176,6 +177,7 @@ def resume_run(
             rule_version=run.trading_rule_version,
             dataset_files=run.trading_rule_dataset_files,
             dataset_hash=run.trading_rule_dataset_hash,
+            dataset_version=run.trading_rule_dataset_version,
         )
     return run
 
@@ -315,9 +317,11 @@ def new_run(
     # dataset (version + FULL file list + combined hash); PRODUCTION
     # requires its review gate (COMPILED rules BLOCK production)
     trading_rule_version = ""
+    trading_rule_dataset_version = ""
     trading_rule_dataset_files: list[str] = []
     trading_rule_dataset_hash = ""
     trading_rule_review_status = ""
+    trading_rule_source_version = ""
     if run_kind in (RunKind.PRODUCTION, RunKind.TRIAL):
         from ashare_state.spike.golden_store import GoldenTruthStore
 
@@ -356,10 +360,14 @@ def new_run(
                     "COMPILED rule candidates may not enter production)"
                 )
                 raise RunLifecycleError(msg)
-        trading_rule_version = rule_book.version  # yaml content version
+        # R4-A2.6 P0-04: the run binds BOTH identities explicitly - the
+        # manifest SELECTOR id AND the dataset CONTENT version
+        trading_rule_version = rule_manifest.rule_version  # selector id
+        trading_rule_dataset_version = rule_book.version  # yaml content version
         trading_rule_dataset_files = list(rule_manifest.dataset_files)
         trading_rule_dataset_hash = rule_manifest.dataset_hash
         trading_rule_review_status = rule_manifest.review_status
+        trading_rule_source_version = rule_manifest.source_version
     run = SpikeRun(
         spike_run_id=str(uuid_module.uuid4()),
         run_kind=run_kind,
@@ -374,9 +382,11 @@ def new_run(
         golden_dataset_file=golden_dataset_file,
         golden_dataset_hash=golden_dataset_hash,
         trading_rule_version=trading_rule_version,
+        trading_rule_dataset_version=trading_rule_dataset_version,
         trading_rule_dataset_files=trading_rule_dataset_files,
         trading_rule_dataset_hash=trading_rule_dataset_hash,
         trading_rule_review_status=trading_rule_review_status,
+        trading_rule_source_version=trading_rule_source_version,
     )
     store = RunStore(spike_root)
     store.initialize(run)
@@ -544,6 +554,7 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
                 rule_version=run.trading_rule_version,
                 dataset_files=run.trading_rule_dataset_files,
                 dataset_hash=run.trading_rule_dataset_hash,
+                dataset_version=run.trading_rule_dataset_version,
             )
             if run.run_kind == RunKind.PRODUCTION:
                 rule_problems = trading_rule_review_gate(bound_book)

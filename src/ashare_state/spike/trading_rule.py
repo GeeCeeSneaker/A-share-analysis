@@ -578,6 +578,65 @@ def _confined(root: Path, rel: str) -> Path:
     return candidate
 
 
+def _provenance_equivalent(
+    manifest_provenance: dict[str, Any], dataset_provenance: dict[str, Any]
+) -> bool:
+    """Semantic equivalence of the two provenance SoR copies: every key
+    that is NON-EMPTY on either side must match exactly (timestamps are
+    normalized - yaml auto-deserializes ISO strings into datetime objects
+    whose str() form differs from the ISO text). Empty/absent keys (the
+    COMPILED placeholder shape) are equivalent on both sides - a REVIEWED
+    seal is never empty, so a real disagreement always bites."""
+    from datetime import datetime as _dt
+
+    def _norm(value: Any) -> str:
+        if isinstance(value, _dt):
+            return value.isoformat()
+        return str(value or "").strip()
+
+    meaningful: dict[str, str] = {}
+    for source in (manifest_provenance, dataset_provenance):
+        for key, value in source.items():
+            text = _norm(value)
+            if text:
+                meaningful[key] = text
+    for key, value in meaningful.items():
+        if _norm(manifest_provenance.get(key, "")) != value:
+            return False
+        if _norm(dataset_provenance.get(key, "")) != value:
+            return False
+    return True
+
+
+def _confined_dataset_file(root: Path, rel: str, *, rule_version: str) -> tuple[bool, str]:
+    """R4-A2.6 P0-03: confine a manifest ``dataset_files[]`` entry BEFORE
+    any fs access.
+
+    Rules (audit section 4.2):
+      - relative path only (no absolute, no drive letters)
+      - no '..' traversal (checked lexically AND by resolved path, which
+        also covers symlink escapes)
+      - must stay under ``versions/<rule_version>/`` - the selector id and
+        the version directory must agree structurally
+    """
+    normalized = rel.replace("\\", "/")
+    if not normalized or normalized.startswith(("/", "\\")):
+        return False, "absolute path"
+    if ":" in normalized.split("/")[0]:
+        return False, "drive-letter path"
+    parts = [p for p in normalized.split("/") if p not in ("", ".")]
+    if any(p == ".." for p in parts):
+        return False, "'..' traversal"
+    if parts[:1] != ["versions"] or len(parts) < 3 or parts[1] != rule_version:
+        return False, f"not under versions/{rule_version}/"
+    candidate = (root / "/".join(parts)).resolve()
+    try:
+        candidate.relative_to(root.resolve())
+    except ValueError:
+        return False, "resolved path escapes the rules root (symlink?)"
+    return True, ""
+
+
 def load_rule_manifest(root: Path | str) -> RuleDatasetManifest:
     """Load + schema-validate the ACTIVE rule manifest (fail closed)."""
     root = Path(root)
@@ -608,7 +667,20 @@ def load_rule_manifest(root: Path | str) -> RuleDatasetManifest:
     if problems:
         msg = "trading rule manifest invalid: " + "; ".join(problems)
         raise RuleUnresolvedError(msg)
+    # R4-A2.6 P0-03: confinement BEFORE any fs access - the ACTIVE
+    # selector may only reference dataset files INSIDE the rules root,
+    # structurally under versions/<rule_version>/ (relative path, no
+    # absolute, no .. traversal, no symlink escape)
     for rel in files:
+        confined, reason = _confined_dataset_file(root, rel, rule_version=version)
+        if not confined:
+            msg = (
+                f"manifest dataset file escapes the rule SoR boundary: {rel} "
+                f"({reason}) - dataset_files must stay under "
+                f"versions/{version}/ within the rules root (audit R4-A2.6 "
+                "section 4.2)"
+            )
+            raise RuleUnresolvedError(msg)
         if not (root / rel).is_file():
             msg = f"manifest dataset file missing: {rel}"
             raise RuleUnresolvedError(msg)
@@ -644,10 +716,37 @@ def load_active_rules(
         )
         raise RuleUnresolvedError(msg)
     book = TradingRuleBook.load_version_files([target / rel for rel in manifest.dataset_files])
+    # R4-A2.6 P0-04: manifest and dataset governance metadata must describe
+    # ONE coherent version identity - duplicated SoR fields are COMPARED,
+    # never trusted from just one side (audit 20260825 #2 section 5.4)
+    coherence: list[str] = []
     if manifest.dataset_version and book.version != manifest.dataset_version:
+        coherence.append(
+            f"dataset_version: manifest says {manifest.dataset_version!r}, "
+            f"files say {book.version!r}"
+        )
+    if manifest.review_status != book.review_status:
+        coherence.append(
+            f"review_status: manifest says {manifest.review_status!r}, "
+            f"files say {book.review_status!r}"
+        )
+    if manifest.source_version and manifest.source_version != book.source_version:
+        coherence.append(
+            f"source_version: manifest says {manifest.source_version!r}, "
+            f"files say {book.source_version!r}"
+        )
+    if not _provenance_equivalent(manifest.review_provenance, book.review_provenance):
+        coherence.append(
+            "review_provenance: manifest and dataset files disagree "
+            f"(manifest={sorted(manifest.review_provenance)}, "
+            f"files={sorted(book.review_provenance)})"
+        )
+    if coherence:
         msg = (
-            f"ACTIVE trading rule dataset version mismatch: manifest says "
-            f"{manifest.dataset_version!r}, files say {book.version!r}"
+            f"ACTIVE trading rule metadata incoherent for {manifest.rule_version}: "
+            + "; ".join(coherence)
+            + " - the manifest and the dataset must describe one version "
+            "identity (audit R4-A2.6 section 5.4)"
         )
         raise RuleUnresolvedError(msg)
     return book, manifest
@@ -740,15 +839,22 @@ def load_bound_rule_book(
     rule_version: str,
     dataset_files: Sequence[str],
     dataset_hash: str,
+    dataset_version: str = "",
     repo_root: Path | str | None = None,
     rules_root: Path | str | None = None,
 ) -> TradingRuleBook:
-    """R4-A2.4 P0-03 + R4-A2.5 P0-02: load the RUN-BOUND rule dataset and
-    verify its integrity. The binding captures the dataset FILES LIST and
-    the combined hash over (relative path + bytes) of every file - exactly
-    the manifest's algorithm - so tampering ANY bound file (not just the
-    first) blocks the replay. Verdicts/replays resolve rules through THIS
-    loader, never through the working tree's ACTIVE state."""
+    """R4-A2.4 P0-03 + R4-A2.5 P0-02 + R4-A2.6 P0-04: load the RUN-BOUND
+    rule dataset and verify its integrity. The binding captures the
+    dataset FILES LIST and the combined hash over (relative path + bytes)
+    of every file - exactly the manifest's algorithm - so tampering ANY
+    bound file (not just the first) blocks the replay. Verdicts/replays
+    resolve rules through THIS loader, never through the working tree's
+    ACTIVE state.
+
+    R4-A2.6: ``rule_version`` is the manifest SELECTOR id (the bound files
+    must live under versions/<rule_version>/ - structural identity);
+    ``dataset_version`` (when provided) is the dataset CONTENT version and
+    must match the loaded book."""
     if not dataset_files:
         msg = "bound trading rule dataset has no files"
         raise RuleUnresolvedError(msg)
@@ -767,6 +873,15 @@ def load_bound_rule_book(
     for rel in dataset_files:
         try:
             _confined(root, rel)
+            # R4-A2.6 P0-03: the bound files must structurally belong to the
+            # bound SELECTOR version (versions/<rule_version>/)
+            confined, reason = _confined_dataset_file(root, rel, rule_version=rule_version)
+            if not confined:
+                msg = (
+                    f"bound dataset file rejected: {rel} ({reason}) - bound files "
+                    f"must stay under versions/{rule_version}/"
+                )
+                raise RuleUnresolvedError(msg)
         except RuleUnresolvedError as exc:
             msg = f"bound dataset file rejected: {rel} ({exc})"
             raise RuleUnresolvedError(msg) from exc
@@ -782,10 +897,10 @@ def load_bound_rule_book(
         )
         raise RuleUnresolvedError(msg)
     book = TradingRuleBook.load_version_files([root / rel for rel in dataset_files])
-    if book.version != rule_version:
+    if dataset_version and book.version != dataset_version:
         msg = (
-            f"bound trading rule dataset version mismatch: run bound {rule_version!r}, "
-            f"files now {book.version!r}"
+            f"bound trading rule dataset content version mismatch: run bound "
+            f"{dataset_version!r}, files now {book.version!r}"
         )
         raise RuleUnresolvedError(msg)
     return book

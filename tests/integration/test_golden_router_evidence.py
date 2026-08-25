@@ -53,6 +53,8 @@ def _case(case_id: str, case_type: str, symbol: str, trade_date: str, expected=N
         truth_source="test-truth",
         source_ref="test-source",
         expected_fields=expected or {},
+        # R4-A2.6 P0-02: formal CA cases must carry a typed event_class
+        event_class="DIVIDEND_EX_DATE" if case_type == "golden_corporate_action" else "",
     )
 
 

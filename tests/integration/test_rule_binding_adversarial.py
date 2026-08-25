@@ -56,6 +56,8 @@ def _make_rules_root(tmp_path: Path, *, main_rate: float) -> Path:
     digest = hashlib.sha256()
     digest.update(rel.encode())
     digest.update((root / rel).read_bytes())
+    # coherent governance metadata (R4-A2.6 P0-04): source_version and the
+    # non-empty provenance value mirror the dataset file
     (root / "rule_manifest.json").write_text(
         json.dumps(
             {
@@ -63,9 +65,11 @@ def _make_rules_root(tmp_path: Path, *, main_rate: float) -> Path:
                 "review_status": "COMPILED",
                 "dataset_files": [rel],
                 "dataset_hash": digest.hexdigest(),
-                "source_version": doc.get("source_version", "test"),
+                "source_version": doc.get("source_version", ""),
                 "dataset_version": doc["version"],
-                "review_provenance": {},
+                "review_provenance": {
+                    "source_retrieved_at": str(doc.get("source_retrieved_at", ""))
+                },
             }
         ),
         encoding="utf-8",
@@ -146,9 +150,11 @@ class TestBoundVsActiveSemantics:
                     "review_status": "COMPILED",
                     "dataset_files": [rel],
                     "dataset_hash": digest.hexdigest(),
-                    "source_version": doc.get("source_version", "test"),
+                    "source_version": doc.get("source_version", ""),
                     "dataset_version": doc["version"],
-                    "review_provenance": {},
+                    "review_provenance": {
+                        "source_retrieved_at": str(doc.get("source_retrieved_at", ""))
+                    },
                 }
             ),
             encoding="utf-8",

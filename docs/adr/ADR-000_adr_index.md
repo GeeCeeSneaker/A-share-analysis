@@ -16,7 +16,8 @@ ADR（Architecture Decision Record）记录对系统有长期影响的决策。�
 | ADR-010 | Raw Evidence Model（显式 Exchange → RawWriter → Bundle） | ACCEPTED | 2026-08-24 | [ADR-010](ADR-010_raw_evidence_model.md)，R4-A2.3/CR-1.1 P0-01/02/04 落地（DM-CR-20260824-006）；**amended by ADR-012**（meta-anchored 双向闭合，2026-08-24） |
 | ADR-011 | 交易制度事实的版本化数据层 | ACCEPTED | 2026-08-24 | [ADR-011](ADR-011_trading_rule_data_sor.md)，R4-A2.3 P0-06/07 落地（DM-CR-20260824-005）；**amended by ADR-012**（run 绑定 + review gate，2026-08-24） |
 | ADR-012 | Raw Exchange Closure + Trading Rule Binding（R4-A2.4/CR-1.2） | ACCEPTED | 2026-08-24 | [ADR-012](ADR-012_raw_exchange_closure.md)，amendment to 010/011；DM-CR-20260824-008/009/010/011；**amended by ADR-013**（版本模型 + 事件分类学，2026-08-25） |
-| ADR-013 | Trading Rule Version Model + CA Event Taxonomy（R4-A2.5/CR-1.2.1） | ACCEPTED | 2026-08-25 | [ADR-013](ADR-013_rule_version_model.md)，amendment to ADR-012；DM-CR-20260825-001/002/003 |
+| ADR-013 | Trading Rule Version Model + CA Event Taxonomy（R4-A2.5/CR-1.2.1） | ACCEPTED | 2026-08-25 | [ADR-013](ADR-013_rule_version_model.md)，amendment to ADR-012；DM-CR-20260825-001/002/003；**amended by ADR-014**（selector 契约收紧，2026-08-25） |
+| ADR-014 | Rule Manifest Selector Contract（confinement + coherence） | ACCEPTED | 2026-08-25 | [ADR-014](ADR-014_rule_manifest_selector.md)，amendment to ADR-013；R4-A2.6 P0-03/04（DM-CR-20260825-006） |
 
 ## 纪律
 
