@@ -33,7 +33,7 @@
 - Local: **639 tests passed / 0 failed**（608 → 639，+31：exact-byte seal 7 + version confinement 17 + failure cleanup/cross-platform 7 + golden artifact 平台无关 2 + 适配）；ruff check / ruff format --check / mypy 全绿（CI 等价四检查）
 - dry-run 冒烟：35 meta-anchored exchanges + 5 bundles，整 run 双向闭合零问题
 - 对抗验证：preflight 后 ACTIVE 读取返回篡改字节 → snapshot hash BLOCK（零输出）；工具对 ACTIVE 文件读取数 == preflight + 恰好 1；12 类非法 version id → before/after 文件树快照零差异
-- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（重点观察 Ubuntu 3.14 leg 是否转绿——根因已修，本地 blob == 工作树 == manifest hash 三方一致）
+- GitHub Actions: **FULL MATRIX GREEN——run 45（`b429220`）Ubuntu 3.14 + Windows 3.12 + Windows 3.14 三 job 全部 success**（API positive confirmation；不再有被 continue-on-error 掩盖的失败 leg）。过程：run 44 验证根因 1 修复（20 个 hash 失配全消）但暴露根因 2（golden artifact confinement 平台依赖，仅剩 1 个 Linux 失败）→ 修复后 run 45 全绿
 
 **Implementation Status**
 - DONE（R4-A2.9 / CR-1.2.5 全部 P0 + P1 + CI 根因 + 治理修正）

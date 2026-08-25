@@ -8,7 +8,7 @@
 > **Document Revision**：DM-CR-20260825-017 / 018 / 019 / 020  
 > **Last Review**：2026-08-25 16:26 +08:00（R4-A2.8/CR-1.2.4 复审：REOPENED——2 项 P0 + P1 + CI 真相，本批 R4-A2.9/CR-1.2.5 修复）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status（job-level truth）**：run 42 / `ada0eac2...`：required Windows 3.12/3.14 **PASS**；optional Ubuntu 3.14 **Pytest FAILED**（根因=真实跨平台 correctness bug：`.gitattributes` 漏盖 `*.yaml`，Windows autocrlf checkout 重写 LF→CRLF 使 Ubuntu 重算 dataset hash 失配——本批修复：yaml 纳入 LF 规则 + manifest hash 以 LF 字节重算 `dd2219d2...` + 跨平台回归测试）；overall SUCCESS 仅因既有 `continue-on-error: ${{ !matrix.required }}` 策略（未改动）；本批提交后以 Actions 实际结果为准  
+> **CI Status（job-level truth）**：**FULL MATRIX GREEN——run 45 / `b429220...`：Ubuntu 3.14 + Windows 3.12 + Windows 3.14 三个 job 全部 success**（2026-08-25 API positive confirmation；不再有被 continue-on-error 掩盖的失败 leg）。历史：run 42/44 的 Ubuntu 3.14 Pytest 曾 FAIL——根因 1：`.gitattributes` 漏盖 `*.yaml`（Windows autocrlf 重写 LF→CRLF 使 Ubuntu 重算 dataset hash 失配；已修复：yaml 纳入 LF 规则 + manifest hash 以 LF 重算 `dd2219d2...`）；根因 2：golden artifact confinement 平台依赖（Linux 上盘符 ref 相对拼接不逃逸；已修复：lexical-first 平台无关检查）。`continue-on-error` 策略保持不变  
 > **Reviewer Correction（2026-08-25 16:26）**：R4-A2.8 的三个原始 P0 主体冻结（collector.call 原子边界 / lexical-first / review preflight 保留）；但 review seal 存在 double-read TOCTOU（验证与封存字节可分离）、`--version` 输出无 confinement、CI 全矩阵非绿（ADR-017 为修正记录；历史 ADR 原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
