@@ -13,6 +13,42 @@
 
 ---
 
+## 2026-08-25 · R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity（复审 2 项 P0 + 2 项 P1 + 治理修正）
+
+**Scope**
+- R4-A2.9/CR-1.2.5 复审裁决 REOPENED（工作要求 20260825 第六份）：输入侧 exact snapshot / version confinement / 跨平台 CI 修复**冻结保留**；输出侧两项 P0（write_text 字节身份 / publish 重读 TOCTOU）+ P1-01/02 + 治理修正；按 Batch A→F 全部完成（未启动 CR-2/R4-A3——遵守 §11 禁止项）
+
+**Implementation**
+- **P0-01 Persisted REVIEWED Exact-Byte Identity（DM-CR-20260825-022，ADR-018 §1）**：`reviewed_bytes = reviewed_text.encode("utf-8")` **单一不可变内存对象**；sandbox 解析 / staged rules.yaml / 全部正式 dataset 写入 **write_bytes ONLY**（Windows 文本模式换行翻译在构造上被排除）；**AST 静态守卫**（review.py 禁止任何 `write_text` 调用）；不变量链：validated ACTIVE snapshot → deterministic transform → reviewed_bytes → write_bytes → staged → atomic rename → final 全程字节同一
+- **P0-02 Manifest Seal Identity / Publish TOCTOU Closure（DM-CR-20260825-023，ADR-018 §2）**：manifest dataset_hash 唯一来源 = gate-validated **in-memory reviewed_bytes**；publish 后 read-back **仅 VERIFICATION**（`actual != reviewed_bytes` → BLOCK + rollback：移除已 publish 的 version_dir 与本次 evidence，ACTIVE 不推进）——旧实现 rename 后重读 final 并以其计算 manifest hash（"gate 验证 R / manifest 祝福 T"的 TOCTOU）在构造上不可能
+- **P1-01 Publish Failure Cleanup / Commit Boundary（DM-CR-20260825-024，ADR-018 §3）**：**commit boundary = ACTIVE manifest 原子替换成功**；`published_version`/`created_evidence`/`manifest_committed` 状态跟踪驱动 `_cleanup_uncommitted`——提交前任何失败（tmp manifest write/replace 注入 / read-back mismatch / gate 失败）→ 完整清理（无 finalized version / 无孤儿 evidence / 无 tmp 残留 / ACTIVE 保持旧）+ **同版本重试成功**（旧实现 rename 后失败会留下 immutable collision 永久阻断重试）；提交后验证失败 → 显式 **REVIEW_COMMIT_INCONSISTENT 硬失败（exit 3）**，绝不伪装成可重试失败
+- **P1-02 Single-Writer Lock（DM-CR-20260825-025，ADR-018 §4，Option A）**：`rules_root/.review.lock`（`O_CREAT|O_EXCL`）覆盖 preflight → snapshot → staged gate → manifest commit 全程；并发 reviewer fail fast（指明 stale lock 手动清理路径）；finally 释放；**诚实记录**：advisory + 进程级，非 OS-level CAS——`--from-version` 语义降级为 lineage 提示
+- **治理修正（DM-CR-20260825-026）**：总册头部改为 **exact SHA 三元组**（Reviewed HEAD `8a6f4149` / Primary Implementation `793dfc1` / Cross-Platform CI Fix `b429220`——Reviewer doc commit 不再误写为 implementation baseline）；§40 R4-A2.9 → REOPENED（输入侧冻结+输出侧由本批修复）；RISK-004 理由更新保持 REOPENED；ADR-018（ADR-017 §1 未完成环的修正记录；含审计四问完整记录：text-mode 为何破坏字节身份 / final reread 为何不得定义 identity / write_bytes+in-memory expected hash 的备选取舍表 / commit boundary 与 lock 的 CAS 局限诚实声明）
+
+**Schema / Contract Changes**
+- C1 ×5（DM-CR-022/023/024/025/026）；ADR-018（amendment to ADR-017）
+- review.py 重构：workflow 拆分为 lock 覆盖的 `_review_locked_workflow`（状态跟踪 + commit boundary + exit 3 语义）；manifest hash 派生源变更（published reread → reviewed_bytes）
+
+**Verification**
+- Local: **650 tests passed / 0 failed**（639 → 650，+11：persisted byte identity 4 + publish tamper 2 + pre-commit cleanup 2 + single-writer 3）；ruff check / ruff format --check / mypy 全绿（CI 等价四检查）
+- dry-run 冒烟：35 meta-anchored exchanges + 5 bundles，整 run 双向闭合零问题
+- byte-level 对抗验证：生成 REVIEWED 文件 == 独立重建的 reviewed_bytes（LF-only）；manifest hash 独立重算一致；生成版本经 load_active_rules/load_bound_rule_book 重放（跨平台字节真相）；rename 后注入 tamper → fail closed + rollback + 同版本重试成功
+- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（上一批 run 45/46 已全三腿 success；本批新增 generated-byte 测试随 matrix 在两 OS 执行）
+
+**Implementation Status**
+- DONE（R4-A2.10 / CR-1.2.6 全部 P0 + P1 + 治理修正）
+
+**Review Status**
+- PENDING_REVIEW（对照工作要求 §10 Exit Gate 15 项与 §13 Reviewer 下轮 10 项复查重点）
+
+**Known Open Issues**
+- Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED——seal workflow 已完整：输入 exact snapshot + 输出 byte identity + manifest 派生 + lock）；Branch Protection 未启用；CR-2 / R4-A3 / P0-M-1B 保持 BLOCKED 直到本批 VERIFIED
+
+**Next**
+- 推送 git + CI 确认（三腿）→ Reviewer 复审 R4-A2.10/CR-1.2.6；若 VERIFIED 则 R4-A2.x / CR-1.x closure 审计链结束，CR-2 / R4-A3 可启动
+
+---
+
 ## 2026-08-25 · R4-A2.9 Review-Seal Exactness / Cross-Platform CI Closure + CR-1.2.5 Output Confinement（复审 2 项 P0 + P1 + CI 根因修复）
 
 **Scope**

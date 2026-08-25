@@ -304,7 +304,12 @@ def main() -> int:
     if artifact_copy.exists() and artifact_copy.read_bytes() != artifact_bytes:
         return _fail(f"evidence collision with different bytes: {artifact_ref}")
 
-    # build the REVIEWED copy IN MEMORY from the exact snapshot bytes
+    # build the REVIEWED copy IN MEMORY from the exact snapshot bytes.
+    # R4-A2.10 P0-01 (audit 20260825 #6 section 2): the transformed
+    # identity is an immutable BYTES object. Path.write_text() would let
+    # the OS text-mode newline translation rewrite LF to CRLF on Windows,
+    # making persisted bytes != exact transformed bytes. Every formal
+    # dataset write below uses write_bytes(reviewed_bytes) ONLY.
     try:
         reviewed_text = _build_reviewed_text(
             active_bytes,
@@ -316,105 +321,210 @@ def main() -> int:
         )
     except ValueError as exc:
         return _fail(str(exc))
+    reviewed_bytes = reviewed_text.encode("utf-8")
 
     # structural validation of the reviewed copy BEFORE any output: the
-    # text must parse as a TradingRuleBook (system temp sandbox - zero
-    # rule-store mutation).
+    # bytes must parse as a TradingRuleBook (system temp sandbox - zero
+    # rule-store mutation, byte-identical write).
+    import os as os_mod
     import tempfile
 
     with tempfile.TemporaryDirectory(prefix="rule-review-") as sandbox:
         sandbox_yaml = Path(sandbox) / "rules.yaml"
-        sandbox_yaml.write_text(reviewed_text, encoding="utf-8")
+        sandbox_yaml.write_bytes(reviewed_bytes)
         try:
             TradingRuleBook.load(sandbox_yaml)
         except Exception as exc:  # noqa: BLE001 - parse failure blocks
             return _fail(f"reviewed copy does not parse as a rule dataset: {exc}")
 
-    # ================= Phase 2: staged output =================
-    # stage the evidence artifact (content-addressed, idempotent) and the
-    # reviewed version under versions/.staging-<id>/, then run the FULL
-    # review gate against the staged layout. Any failure here removes
-    # every staged byte (no finalized version, no orphan evidence).
-    created_evidence = False
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-    if not artifact_copy.exists():
-        artifact_copy.write_bytes(artifact_bytes)
-        created_evidence = True
-    staging_dir = rules_root / "versions" / f".staging-{args.version}-{uuid.uuid4().hex[:8]}"
+    # R4-A2.10 P1-02 (audit 20260825 #6 section 5, Option A): the review
+    # tool is a SINGLE-WRITER operation. An O_CREAT|O_EXCL lock file spans
+    # the entire workflow (preflight -> snapshot -> staged gate ->
+    # manifest commit): a concurrent reviewer fails fast instead of
+    # racing the ACTIVE flip. The lock is advisory + process-scoped (a
+    # stale lock after a crash must be removed manually) - this is NOT an
+    # OS-level CAS, and the ADR records that limitation honestly.
+    lock_path = rules_root / ".review.lock"
     try:
+        lock_fd = os_mod.open(lock_path, os_mod.O_CREAT | os_mod.O_EXCL | os_mod.O_WRONLY)
+    except FileExistsError:
+        return _fail(
+            "another review appears to be in progress (.review.lock exists) - "
+            "if no review is actually running, remove the stale lock file "
+            f"manually: {lock_path}"
+        )
+    try:
+        os_mod.write(
+            lock_fd,
+            f"pid={os_mod.getpid()} started={datetime.now(UTC).isoformat()}".encode(),
+        )
+        os_mod.close(lock_fd)
+        return _review_locked_workflow(
+            rules_root=rules_root,
+            snapshot_hash=snapshot_hash,
+            version=args.version,
+            version_dir=version_dir,
+            reviewed_bytes=reviewed_bytes,
+            artifact_bytes=artifact_bytes,
+            artifact_hash=artifact_hash,
+            artifact_ref=artifact_ref,
+            artifact_copy=artifact_copy,
+            reviewer=args.reviewer,
+            now=now,
+            kind=args.kind,
+        )
+    finally:
+        lock_path.unlink(missing_ok=True)
+
+
+def _review_locked_workflow(
+    *,
+    rules_root: Path,
+    snapshot_hash: str,
+    version: str,
+    version_dir: Path,
+    reviewed_bytes: bytes,
+    artifact_bytes: bytes,
+    artifact_hash: str,
+    artifact_ref: str,
+    artifact_copy: Path,
+    reviewer: str,
+    now: str,
+    kind: str,
+) -> int:
+    """The staged review workflow, executed under the single-writer lock.
+
+    Commit boundary (R4-A2.10 P1-01, audit 20260825 #6 section 4):
+      - BEFORE the ACTIVE manifest atomic replace succeeds, every failure
+        is UNCOMMITTED: the newly published version dir, the evidence
+        artifact created by THIS run, and the tmp manifest are removed;
+        ACTIVE stays on the old selector; a same-version retry works.
+      - AFTER the manifest replace succeeds the operation is COMMITTED:
+        a post-commit verification failure is an explicit
+        REVIEW_COMMIT_INCONSISTENT hard failure (exit code 3) - never
+        disguised as an ordinary retryable failure.
+
+    Manifest identity (R4-A2.10 P0-02, audit section 3): the dataset hash
+    is DERIVED from the gate-validated in-memory reviewed_bytes - the
+    post-rename filesystem read-back is VERIFICATION ONLY (actual bytes
+    must equal reviewed_bytes; a tampered final file can never have its
+    bytes re-hashed into the manifest)."""
+    evidence_dir = rules_root / RULE_EVIDENCE_SUBDIR
+    created_evidence = False
+    published_version = False
+    manifest_committed = False
+    staging_dir = rules_root / "versions" / f".staging-{version}-{uuid.uuid4().hex[:8]}"
+    tmp_manifest = rules_root / f".{RULE_MANIFEST_FILE}.tmp-{version}"
+
+    def _cleanup_uncommitted() -> None:
+        # remove every byte THIS run created (staged/published/evidence/tmp)
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        if published_version and version_dir.is_dir():
+            shutil.rmtree(version_dir, ignore_errors=True)
+        if created_evidence:
+            artifact_copy.unlink(missing_ok=True)
+        tmp_manifest.unlink(missing_ok=True)
+
+    try:
+        # ================= Phase 2: staged output =================
+        # stage the evidence artifact (content-addressed, idempotent) and
+        # the reviewed version under versions/.staging-<id>/, then run the
+        # FULL review gate against the staged layout.
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        if not artifact_copy.exists():
+            artifact_copy.write_bytes(artifact_bytes)
+            created_evidence = True
         staging_dir.mkdir(parents=True)
         staged_yaml = staging_dir / "rules.yaml"
-        staged_yaml.write_text(reviewed_text, encoding="utf-8")
+        staged_yaml.write_bytes(reviewed_bytes)  # byte identity preserved
         # full gate against the staged layout: the evidence artifact is in
         # place so the gate's confined artifact resolution works
         reviewed_book = TradingRuleBook.load(staged_yaml)
         problems = trading_rule_review_gate(reviewed_book, rules_root=rules_root)
         if problems:
-            # a `return` inside `try` does NOT trigger the except-cleanup -
-            # remove every staged byte explicitly (no finalized version,
-            # no orphan evidence) before failing
-            shutil.rmtree(staging_dir, ignore_errors=True)
-            if created_evidence:
-                artifact_copy.unlink(missing_ok=True)
+            _cleanup_uncommitted()
             return _fail(f"reviewed copy fails the review gate: {problems}")
-    except BaseException:
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        if created_evidence:
-            artifact_copy.unlink(missing_ok=True)
-        raise
 
-    # ================= Phase 3: publish (ACTIVE manifest LAST) ============
-    try:
+        # ================= Phase 3: publish (ACTIVE manifest LAST) ======
+        # manifest identity DERIVED FROM the gate-validated reviewed_bytes
+        final_rel = f"versions/{version}/rules.yaml"
+        expected_dataset_hash = _hash_snapshot([(final_rel, reviewed_bytes)])
         # publish the immutable version (atomic dir rename; the target's
         # non-existence was validated in Phase 1 - a concurrent creation
         # surfaces as a loud failure, never a silent overwrite)
         version_dir.parent.mkdir(parents=True, exist_ok=True)
         staging_dir.replace(version_dir)
-        # flip the ACTIVE manifest - ATOMIC REPLACEMENT / READER-SAFE: a
-        # temp manifest then Path.replace; concurrent readers always see
-        # either the complete old manifest or the complete new one. (NOT a
-        # power-loss durability guarantee - no fsync is performed.)
-        dataset_files = [f"versions/{args.version}/rules.yaml"]
-        published_bytes = (version_dir / "rules.yaml").read_bytes()
+        published_version = True
+        # READ-BACK VERIFICATION ONLY (audit 20260825 #6 section 3.2): the
+        # persisted bytes must EQUAL the reviewed_bytes identity; a tampered
+        # final file blocks + rolls back - it can never define the seal.
+        actual_final_bytes = (version_dir / "rules.yaml").read_bytes()
+        if actual_final_bytes != reviewed_bytes:
+            published_version = True  # keep cleanup semantics accurate
+            _cleanup_uncommitted()
+            return _fail(
+                "published REVIEWED bytes differ from the gate-validated "
+                "reviewed_bytes identity - rolled back; ACTIVE unchanged "
+                "(read-back is verification-only, never a hash source)"
+            )
         manifest = {
-            "rule_version": args.version,
+            "rule_version": version,
             "review_status": "REVIEWED",
-            "dataset_files": dataset_files,
-            "dataset_hash": _hash_snapshot([(dataset_files[0], published_bytes)]),
+            "dataset_files": [final_rel],
+            "dataset_hash": expected_dataset_hash,
             "source_version": reviewed_book.source_version,
             "dataset_version": reviewed_book.version,
             "review_provenance": {
-                "reviewed_by": args.reviewer,
+                "reviewed_by": reviewer,
                 "reviewed_at": now,
                 "source_artifact_ref": artifact_ref,
                 "source_artifact_hash": artifact_hash,
-                "source_artifact_kind": args.kind,
+                "source_artifact_kind": kind,
                 "source_retrieved_at": now,
             },
         }
         manifest_path = rules_root / RULE_MANIFEST_FILE
         manifest_bytes = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
-        tmp_manifest = rules_root / f".{RULE_MANIFEST_FILE}.tmp-{args.version}"
         tmp_manifest.write_bytes(manifest_bytes + b"\n")
-        tmp_manifest.replace(manifest_path)  # atomic replacement (reader-safe)
+        # ATOMIC REPLACEMENT / READER-SAFE: concurrent readers see either
+        # the complete old manifest or the complete new one. (NOT a
+        # power-loss durability guarantee - no fsync is performed.)
+        tmp_manifest.replace(manifest_path)
+        manifest_committed = True
     except BaseException:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        if not manifest_committed:
+            _cleanup_uncommitted()
         raise
 
+    # ================= post-commit verification =================
+    # the ACTIVE manifest has advanced: a failure here is a COMMITTED-state
+    # inconsistency (explicit hard failure, exit 3) - NOT a normal retry.
     loaded_manifest = load_rule_manifest(rules_root)
-    if loaded_manifest.rule_version != args.version:
-        return _fail("ACTIVE manifest did not flip to the reviewed version")
-    # coherence self-check: load_active_rules must accept the flipped state
+    if loaded_manifest.rule_version != version or (
+        loaded_manifest.dataset_hash != expected_dataset_hash
+    ):
+        print(
+            f"REVIEW_COMMIT_INCONSISTENT: ACTIVE manifest ("
+            f"{loaded_manifest.rule_version}) does not reflect the committed "
+            f"review ({version}) - manual intervention required",
+            file=sys.stderr,
+        )
+        return 3
     try:
         load_active_rules(rules_root)
     except Exception as exc:  # noqa: BLE001 - coherence failure must surface
-        return _fail(f"flipped ACTIVE fails coherence load: {exc}")
+        print(
+            f"REVIEW_COMMIT_INCONSISTENT: the committed ACTIVE state fails "
+            f"coherence load: {exc} - manual intervention required",
+            file=sys.stderr,
+        )
+        return 3
     print(
         f"REVIEWED version written: {version_dir / 'rules.yaml'}\n"
-        f"  version={args.version} rules={len(reviewed_book.rules)}\n"
+        f"  version={version} rules={len(reviewed_book.rules)}\n"
         f"  sealed from ACTIVE snapshot sha256={snapshot_hash[:16]}...\n"
         f"  evidence {RULE_EVIDENCE_SUBDIR}/{artifact_ref} sha256={artifact_hash[:16]}...\n"
-        f"  ACTIVE manifest -> {args.version}; review gate: PASS"
+        f"  ACTIVE manifest -> {version}; review gate: PASS"
     )
     return 0
 
