@@ -21,7 +21,8 @@ ADR（Architecture Decision Record）记录对系统有长期影响的决策。�
 | ADR-015 | Corporate-Action Provider-Shape Validation Adapter | ACCEPTED | 2026-08-25 | [ADR-015](ADR-015_ca_provider_shape_adapter.md)，amendment to ADR-013 §4 + ADR-014 补全；R4-A2.7/CR-1.2.3 P0-01..04（DM-CR-20260825-008/009/010/011）；**amended by ADR-016**（原子边界 / lexical-first / review preflight，2026-08-25） |
 | ADR-016 | Atomic Exchange Boundary + Lexical-First Confinement + Review Input Integrity | ACCEPTED | 2026-08-25 | [ADR-016](ADR-016_atomic_boundary_integrity.md)，amendment to ADR-013/015；R4-A2.8/CR-1.2.4 P0-01..03 + P1（DM-CR-20260825-013/014/015/016）；**amended by ADR-017**（exact-byte seal 修正其 §3 overclaim，2026-08-25） |
 | ADR-017 | Review Exact-Byte Seal + Output Confinement + Cross-Platform Byte Truth | ACCEPTED | 2026-08-25 | [ADR-017](ADR-017_review_seal_output_confinement.md)，amendment to ADR-016；R4-A2.9/CR-1.2.5 P0-01/02 + P1 + CI 根因修复（DM-CR-20260825-017/018/019/020）；**amended by ADR-018**（输出侧 byte identity 闭合其 §1 未完成环，2026-08-25） |
-| ADR-018 | Review Publish Byte-Identity + Manifest Seal from reviewed_bytes | ACCEPTED | 2026-08-25 | [ADR-018](ADR-018_review_publish_byte_identity.md)，amendment to ADR-017；R4-A2.10/CR-1.2.6 P0-01/02 + P1（DM-CR-20260825-022..026）；**§4 amended by R4-A2.11/CR-1.2.7**（lock-before-preflight 修正其覆盖范围 overclaim，DM-CR-20260825-027..029，2026-08-25） |
+| ADR-018 | Review Publish Byte-Identity + Manifest Seal from reviewed_bytes | ACCEPTED | 2026-08-25 | [ADR-018](ADR-018_review_publish_byte_identity.md)，amendment to ADR-017；R4-A2.10/CR-1.2.6 P0-01/02 + P1（DM-CR-20260825-022..026）；**§4 amended by R4-A2.11/CR-1.2.7**（lock-before-preflight 修正其覆盖范围 overclaim，DM-CR-20260825-027..029，2026-08-25）；**VERIFIED 2026-08-26**（R4-A2.x/CR-1.x 审计链 CLOSED） |
+| ADR-019 | SDK Runtime Lifecycle State Machine + Runtime Gate Separation | ACCEPTED | 2026-08-26 | [ADR-019](ADR-019_sdk_lifecycle_runtime_gates.md)，R4-A3 A3-01..04（DM-CR-20260826-030/031/032/033） |
 
 ## 纪律
 

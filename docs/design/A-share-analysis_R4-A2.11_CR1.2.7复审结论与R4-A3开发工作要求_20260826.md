@@ -602,3 +602,101 @@ Feature / State 扩展
 ```
 
 如果 R4-A3 通过，再进入 R4-B1；不要再回到 R4-A2.x 进行无止境局部审计。
+
+---
+
+# 13. Implementation Mapping（Developer 回填，2026-08-26）
+
+> 本批：R4-A3 SDK / Lifecycle / Early-Stop Closure（Batch A→F 全部完成；**未启动 CR-2 / R4-B1 / R4-B2 / Feature / State**——遵守 §11 禁止项）。
+> 测试基线：**716 passed / 0 failed**（658 → 716，+58）；CI 等价四检查（ruff check + format --check + mypy + pytest，**以退出码严格验证**）本地全绿；dry-run 冒烟 35 exchanges + 5 bundles 双向闭合零问题（lifecycle 门不影响 dry-run 正常路径）；既有 R4-A2.x/CR-1.x regression 全部保持（658 项零回归）。
+> Change IDs：DM-CR-20260826-030/031/032/033；**ADR-019**（含审计四问完整记录）。
+> CI：本批提交后以 Actions 实际结果为准（上批 run 52/53 已三腿 success）。
+
+## A3-01（SDK Lifecycle State Machine，§7.2）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 显式 lifecycle state / terminal state（9 态） | `providers/lifecycle.py::SdkLifecycleState`（INIT/SDK_UNAVAILABLE/LOAD_FAILED/LOGIN_FAILED/AUTH_REJECTED/SESSION_READY/SUBSCRIBE_STARTED/CALLBACK_ACTIVE/UNSUBSCRIBED/LOGGED_OUT + 合法迁移表） | lifecycle::TestStateMachine（15） |
+| 不允许异常字符串猜测流程状态 | session.login 按错误**类型**落显式状态（ProviderUnavailableError→SDK_UNAVAILABLE；其他 load 异常→LOAD_FAILED；ProviderAuthError→AUTH_REJECTED；其他 login ProviderError→LOGIN_FAILED）；状态迁移记录 reason/evidence | early_stop::TestSdkLoadFailure ×2 + TestLoginTerminalFailure ×2 + TestLifecycleDrivesSession ×3 |
+| terminal auth/load failure → early stop | `require_ready` → `ProviderLifecycleTerminalError`（context: state/reason/evidence/refused_action/early_stop）；`call_exchange` **第一道门** | lifecycle::TestRequireReady（7） |
+| terminal 后无 business call | lifecycle 门在 capability gate 与 fn() 之前；零 exchange/零 envelope | early_stop::TestNoBusinessCallAfterTerminal（参数化 5 terminal 态：fired==0 + last_envelopes==[]） |
+| cleanup/unsubscribe/logout 幂等 | `close()`（任意状态→LOGGED_OUT；已 closed 为 no-op）；失败态关闭=合法清理 | lifecycle::test_close_is_idempotent + test_close_from_failed_state_is_legal_cleanup + early_stop::test_real_session_logout_is_idempotent |
+
+## A3-02（Permission / Cache / Freshness 分 Gate，§7.2）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 六类 gate 独立 | `providers/runtime_gates.py::GateKind`（AUTH_ACCOUNT/PERMISSION/ENDPOINT_AVAILABLE/CACHE_METADATA/FRESHNESS_ASOF/BUSINESS_DATA）+ 各 Gate 类 | separation::TestGateResults（9） |
+| explicit status / blocking reason / traceable evidence / no silent fallback | GateResult（status: PASS/FAIL/**NOT_TESTABLE**/SKIPPED_BLOCKED + reason + evidence_ref + provider_calls_fired）；probe 走 ProviderExchange（evidence_ref=request_id） | separation::test_every_gate_result_carries_reason_and_evidence |
+| 权限失败不被缓存掩盖 | pipeline 顺序 PERMISSION → CACHE_METADATA + early stop | separation::test_cache_hit_cannot_mask_permission_failure（cache_ok=True 仍 blocked_by PERMISSION） |
+| 缓存命中不替代 endpoint proof | EndpointAvailableGate 真实 probe exchange | separation（EndpointAvailableGate 语义 + probe 计数==1） |
+| freshness 不足不降级为有数据即 PASS | FreshnessAsOfGate：stale→FAIL；unknown as-of→NOT_TESTABLE（阻断） | separation::test_freshness_stale_fails + test_freshness_unknown_as_of_not_testable + test_freshness_fail_blocks_business_pass（business probe==0） |
+
+## A3-03（Early Stop Control Flow，§7.2）
+
+| 链路 | 测试（计数证明） |
+|---|---|
+| SDK load fail → no login / endpoint call | early_stop::test_sdk_absent_no_login_no_endpoint_call（SDK_UNAVAILABLE；后续 call_exchange 拒绝）+ test_sdk_load_exception_is_load_failed |
+| login/auth terminal fail → no capability calls | early_stop::test_auth_rejected_no_capability_calls（sdk.calls==["login"]，零 BaseData/InfoData）+ test_network_login_failure_is_login_failed |
+| permission fail → no dependent business fetch | separation::test_permission_fail_blocks_dependent_business_fetch（permission.fired==1、endpoint==0、business==0、total==1） |
+| required metadata/cache invalid → no dependent probe | separation::test_cache_metadata_fail_blocks_dependent_probe（business==0） |
+| freshness gate fail → no business-truth PASS | separation::test_freshness_fail_blocks_business_pass（business probe==0） |
+| call-count / exchange-count / evidence-count 证明 | GateResult.provider_calls_fired + report.total_provider_calls_fired + probe.fired + last_envelopes==[]（非最终异常） |
+
+## A3-04（Runtime Truth / Trial Boundary，§7.2）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| Trial/Fake 不得把 capability 标为 PRODUCTION APPROVED | `capability._validate_evidence` + `approve_from_spike_run` 双入口拒绝 TRIAL_*/FAKE*/UNKNOWN/空 account_profile_id | boundary::TestApprovalRefusesTrialAccounts（参数化 5 类 + 生产账号对照） |
+| run kind PRODUCTION 本身不是 production truth | spike-run 路径独立拒绝（防御纵深：创建门被绕过时） | boundary::test_production_run_with_trial_account_refused（monkeypatch 创建门后 APPROVAL 仍拒） |
+
+## A3-05（Evidence Closure，§7.2）
+
+| 要求 | 落实 |
+|---|---|
+| gate 结果走 ProviderExchange → RawWriter | gates 的 ProbeCaller 契约 = 返回 ProviderExchange / 抛携带 .exchange 的 ProviderError（CR-1.1 一等失败）；PermissionGate/EndpointAvailableGate/BusinessDataGate 的 evidence_ref 即 exchange.request_id |
+| 不重新引入 payload-only / last_envelopes / synthetic success | lifecycle 门在 exchange 创建之前（refused call 零半截 evidence）；全量 716 含既有 AST 守卫与 Spy 计数闭合测试零回归 |
+
+## §7.3 Required Tests 对照
+
+```text
+[x] SDK absent -> terminal state + no later call（SDK_UNAVAILABLE + 后续拒绝）
+[x] SDK load exception -> terminal state + cleanup（LOAD_FAILED + close 合法）
+[x] login/auth reject -> early stop（AUTH_REJECTED；sdk.calls 只有 login）
+[x] permission denied -> explicit PERMISSION fail, no silent fallback（FAIL + failure exchange evidence）
+[x] cache hit + permission fail -> permission still FAIL（cache_ok=True 仍 blocked_by PERMISSION）
+[x] stale data -> freshness FAIL, not business PASS（business probe==0）
+[x] required endpoint failure -> dependent endpoints do not fire（business==0）
+[x] unsubscribe/close retry is safe/idempotent（close 幂等 ×3 测试）
+[x] Fake/Trial cannot produce PRODUCTION approval（双入口 ×6）
+[x] every real/fake provider call in formal path returns ProviderExchange（gates ProbeCaller 契约 + 既有 CR-1 契约测试零回归）
+[x] success/failure evidence remains RawWriter-anchored（evidence_ref=request_id + 既有 raw 链零回归）
+[x] previous R4-A2.x/CR-1.x regression suite remains green（658 项零回归 → 716 全过）
+```
+
+## §7.4 Governance（DM-CR-20260826-033）
+
+| 要求 | 落实 |
+|---|---|
+| Phase Status 同步（§4 裁决） | 总册头部 Phase Status 块 + §40（R4-A2.9/A2.10 → VERIFIED (absorbed)；R4-A2.11 → VERIFIED；R4-A2.x/CR-1.x → CLOSED；R4-A3 → PENDING_REVIEW；R4-B1/B2/CR-2 排序；P0-M-1B → BLOCKED） |
+| SHA Correction | 总册头部 SHA Correction 段（正确 SHA：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`；历史条目原文保留不改写） |
+| RISK-004 CLOSED for its current review-lineage definition | §52（含新消费面重新开项注记） |
+| DEVLOG / ADR | DEVLOG 顶部新条目（历史保留）；ADR-018 索引标注 VERIFIED；ADR-019 新增（四问完整记录） |
+| 四问记录 | ADR-019 §3（备选与拒绝理由表）+ §4（成本收益）：显式状态机 vs 异常字符串映射 / gate 分离 vs 折叠布尔 / NOT_TESTABLE 阻断 vs 放行 / 缓存 entitlement vs 真实 probe / OS 锁 vs 单进程状态机 |
+
+## §8 Exit Gate 自检
+
+```text
+[x] lifecycle states explicit and testable（状态机 + 迁移表 + 15 单元测试）
+[x] auth/load terminal failures early-stop（require_ready + call_exchange 第一道门）
+[x] permission/cache/freshness/business gates separated（六类 GateKind + 非掩盖性测试）
+[x] no dependent provider call after blocking prerequisite（pipeline early stop + 计数证明）
+[x] no silent fallback（NOT_TESTABLE 阻断；stale FAIL；权限失败显式 FAIL）
+[x] no payload-only formal provider path regression（既有 AST 守卫零回归）
+[x] ProviderExchange / Raw evidence chain remains exact（probe 走显式边界；raw 链零回归）
+[x] Fake/Trial cannot grant PRODUCTION capability truth（双入口拒绝 + 防御纵深）
+[~] CI required matrix green —— 本地四检查退出码全绿；本批提交后以 Actions 实际结果为准（不预写）
+[x] docs match runtime（ADR-019 + 总册 + DEVLOG 同批更新）
+```
+
+已知开放项（如实声明）：Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED）；Branch Protection 未启用；Production P0-M-1B 保持 BLOCKED（§10 条件）；R4-B1/B2 待 A3 VERIFIED 后细化正式开发要求。

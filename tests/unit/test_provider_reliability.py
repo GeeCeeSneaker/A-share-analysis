@@ -194,6 +194,12 @@ class TestSecretStrConfig:
 class _FakeSession:
     def __init__(self, profile) -> None:
         self.profile = profile
+        # R4-A3 A3-01: the provider's lifecycle gate reads the session's
+        # state machine; a fake "logged-in" session is SESSION_READY.
+        from ashare_state.providers.lifecycle import SdkLifecycle, SdkLifecycleState
+
+        self.lifecycle = SdkLifecycle()
+        self.lifecycle.transition(SdkLifecycleState.SESSION_READY, reason="fake session")
 
 
 class _FakeIdentity:

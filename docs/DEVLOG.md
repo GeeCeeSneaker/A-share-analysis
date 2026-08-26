@@ -13,6 +13,42 @@
 
 ---
 
+## 2026-08-26 · R4-A3 SDK / Lifecycle / Early-Stop Closure（审计链 CLOSED 后首个批次：A3-01..05 全落地）
+
+**Scope**
+- R4-A2.11/CR-1.2.7 复审 **VERIFIED——R4-A2.x / CR-1.x 审计链 CLOSED**（连续 11 批 correctness 整改全部 VERIFIED，冻结项无回归）；本批为下一活跃批次 R4-A3（audit 20260826 §7 强制工作项 A3-01..05 + §7.3 测试矩阵 + 治理闭环）；按 Batch A→F 完成（**未启动 CR-2/R4-B1/R4-B2/Feature/State**——遵守 §11 禁止项）
+
+**Implementation**
+- **A3-01 SDK Lifecycle State Machine（DM-CR-20260826-030，ADR-019 §1/§2.1/2.2）**：新增 `ashare_state.providers.lifecycle.SdkLifecycle`——显式状态机（INIT → SDK_UNAVAILABLE/LOAD_FAILED/LOGIN_FAILED/AUTH_REJECTED/SESSION_READY；SUBSCRIBE_STARTED ↔ CALLBACK_ACTIVE ↔ UNSUBSCRIBED；任意状态 → LOGGED_OUT 仅经幂等 `close()`，失败态关闭=合法清理）；非法跳转 raise；迁移历史（from/to/reason/evidence/at）可审计；`require_ready(action)` → `ProviderLifecycleTerminalError`（ProviderError 子类，context 携带 state/reason/evidence/refused_action/early_stop）。**真实控制流集成**：`AmazingDataSession.login` 全失败类落显式 terminal 态（load_sdk ProviderUnavailableError→SDK_UNAVAILABLE；其他异常→LOAD_FAILED；ProviderAuthError→AUTH_REJECTED；其他 login 失败→LOGIN_FAILED；成功→SESSION_READY，evidence=account_profile_id）；`logout()`→`lifecycle.close()`；`AmazingDataProvider.call_exchange` **第一道 lifecycle 门**——terminal 后 capability gate 与 SDK 函数均不执行、零 exchange/零 evidence
+- **A3-02 Gate Separation（DM-CR-20260826-031，ADR-019 §2.3）**：新增 `ashare_state.providers.runtime_gates`——六类 GateKind 显式分离（AUTH_ACCOUNT / PERMISSION / ENDPOINT_AVAILABLE / CACHE_METADATA / FRESHNESS_ASOF / BUSINESS_DATA）；GateResult = explicit status（PASS/FAIL/**NOT_TESTABLE**/SKIPPED_BLOCKED）+ blocking reason + traceable evidence_ref + `provider_calls_fired` 计数；`RuntimeGatePipeline` 顺序评估 + **early stop**（首个 blocking（FAIL 或 NOT_TESTABLE——不可证即阻断）后，后续 gate 的 evaluate **从不执行**）。非掩盖性由顺序+early-stop 编码：PERMISSION 先于 CACHE（缓存健康不掩盖权限失败）；ENDPOINT 真实 probe exchange（缓存不可替代 endpoint proof）；FRESHNESS FAIL 阻断 BUSINESS（陈旧不得降级为"有数据即 PASS"）
+- **A3-03 Early-Stop 证明（并入 030/031）**：fault-injection 以 **call-count / exchange-count / evidence-count** 证明——SDK absent/load 异常/auth 拒绝后 login 与 endpoint 调用计数为证；permission fail → business probe 计数 == 0、pipeline total == 1；terminal（参数化 5 态）后 endpoint 函数零调用 + `last_envelopes` 为空
+- **A3-04 Trial Boundary（DM-CR-20260826-032）**：capability approval **双入口**拒绝非生产账号——`_validate_evidence`（所有 approve 路径）与 `approve_from_spike_run`（spike 派生路径）均拒 `TRIAL_*`/`FAKE*`/`UNKNOWN`/空 account_profile_id；防御纵深：创建门 `verify_production_account` 被绕过（monkeypatch 模拟篡改）时 approval 路径仍拒
+- **A3-05 Evidence Closure**：gates 的 probe 走 ProviderExchange 显式边界（成功/失败 exchange 都携带 evidence_ref=request_id）；lifecycle 门在 exchange 创建之前（refused call 不产生半截 evidence）；既有 ProviderExchange → RawWriter 链 **零回归**（716 全量含全部前批契约测试）
+- **治理闭环（DM-CR-20260826-033）**：总册头部同步 Reviewer 裁决（Phase Status 块：R4-A2.x/CR-1.x → CLOSED / VERIFIED；RISK-004 → CLOSED for its current review-lineage definition；R4-A3 → ACTIVE NEXT；R4-B1/B2/CR-2 排序；P0-M-1B → BLOCKED）+ **SHA Correction**（上批误记的两个 SHA 以 GitHub commit object 为准修正：Primary `38da90e5b5f3d698cc909cf7c258c163081bb9af` / Lint fix `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`；历史条目原文保留）；ADR-018 索引标注 VERIFIED；ADR-019 新增（含审计四问完整记录：显式状态机 vs 异常字符串映射、gate 分离 vs 折叠布尔、NOT_TESTABLE 阻断 vs 放行、缓存 entitlement vs 真实 probe 的取舍表）
+
+**Schema / Contract Changes**
+- C1 ×4（DM-CR-030/031/032/033）；ADR-019（新 runtime 契约：lifecycle + gates）
+- 新模块：`providers/lifecycle.py`、`providers/runtime_gates.py`；session/provider 控制流变更（login/logout 驱动 lifecycle；call_exchange 首道 lifecycle 门）；capability.py 双入口 trial 拒绝；ProviderError 层新增 ProviderLifecycleTerminalError 子类
+
+**Verification**
+- Local: **716 tests passed / 0 failed**（658 → 716，+58：lifecycle 单元 15 + early-stop 集成 11 + gate separation 15 + trial boundary 7 + 适配（fake session lifecycle 携带））；ruff check / ruff format --check / mypy 全绿（CI 等价四检查，以退出码严格验证）
+- dry-run 冒烟：35 meta-anchored exchanges + 5 bundles，整 run 双向闭合零问题（lifecycle 门不影响 dry-run 正常路径）
+- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（上批 run 52/53 已三腿 success）
+
+**Implementation Status**
+- DONE（R4-A3 全部强制工作项 A3-01..05 + 治理闭环）
+
+**Review Status**
+- PENDING_REVIEW（对照工作要求 §8 Exit Gate 10 项与 §12 Reviewer 8 项复查重点；VERIFIED 后进入 R4-B1）
+
+**Known Open Issues**
+- Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED）；Branch Protection 未启用；Production P0-M-1B 保持 BLOCKED（人工 Review + 正式账号 + Provider Doctor RUNTIME_ACTUAL_LOAD_VERIFIED + formal endpoint/permission/entry gates）；R4-B1/B2 待 A3 VERIFIED 后细化正式要求
+
+**Next**
+- 推送 git + CI 确认（三腿）→ Reviewer 复审 R4-A3；VERIFIED 后进入 R4-B1 Capability Endpoint Proof
+
+---
+
 ## 2026-08-25 · R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization（复审 P0 + 治理修正）
 
 **Scope**

@@ -17,6 +17,7 @@ from ashare_state.providers.amazingdata.errors import (
     ProviderError,
     ProviderNetworkError,
     ProviderSdkInternalError,
+    ProviderUnavailableError,
     classify_sdk_error,
 )
 from ashare_state.providers.amazingdata.stdout_capture import (
@@ -24,6 +25,7 @@ from ashare_state.providers.amazingdata.stdout_capture import (
     parse_logon_profile,
     sdk_stdout_into,
 )
+from ashare_state.providers.lifecycle import SdkLifecycle, SdkLifecycleState
 
 
 @dataclass
@@ -109,40 +111,94 @@ class AccountProfile:
 
 
 class AmazingDataSession:
-    """Owns login/logout; all data classes are created after login."""
+    """Owns login/logout; all data classes are created after login.
+
+    R4-A3 A3-01: the session drives the EXPLICIT SDK lifecycle state
+    machine (``self.lifecycle``) - SDK load failure / login failure /
+    auth rejection become terminal states, and the provider refuses
+    business calls after a terminal failure (early stop)."""
 
     def __init__(self, username: str, password: str, host: str, port: int) -> None:
         self._credentials = (username, password, host, port)
         self._sdk: Any = None
         self.profile = AccountProfile()
+        self.lifecycle = SdkLifecycle()
 
     # -------------------------------------------------------------- login
     def login(self) -> AccountProfile:
-        """Login with SDK stdout captured; parse + scrub the logon json."""
+        """Login with SDK stdout captured; parse + scrub the logon json.
+
+        Every failure class lands in an EXPLICIT terminal lifecycle state
+        (R4-A3 A3-01) - the process phase is never inferred from
+        exception strings downstream."""
         if self.profile.login_ok:
             return self.profile
-        self._sdk = sdk_loader.load_sdk()
+        try:
+            self._sdk = sdk_loader.load_sdk()
+        except ProviderUnavailableError as exc:
+            self.lifecycle.transition(
+                SdkLifecycleState.SDK_UNAVAILABLE,
+                reason=str(exc),
+                evidence_ref="sdk_loader.load_sdk",
+            )
+            raise
+        except Exception as exc:  # noqa: BLE001 - classification boundary
+            self.lifecycle.transition(
+                SdkLifecycleState.LOAD_FAILED,
+                reason=f"{type(exc).__name__}: {exc}",
+                evidence_ref="sdk_loader.load_sdk",
+            )
+            raise
         username, password, host, port = self._credentials
         holder = CapturedStdout()
         try:
             with sdk_stdout_into(holder):
                 self._sdk.login(username=username, password=password, host=host, port=int(port))
-        except ProviderError:
+        except ProviderError as raised:
+            if isinstance(raised, ProviderAuthError):
+                self.lifecycle.transition(
+                    SdkLifecycleState.AUTH_REJECTED,
+                    reason=str(raised),
+                    evidence_ref="login",
+                )
+            else:
+                self.lifecycle.transition(
+                    SdkLifecycleState.LOGIN_FAILED,
+                    reason=f"{type(raised).__name__}: {raised}",
+                    evidence_ref="login",
+                )
             raise
         except Exception as exc:  # noqa: BLE001 - classification boundary
-            raised = classify_sdk_error(exc, endpoint="login")
-            if isinstance(raised, ProviderNetworkError | ProviderSdkInternalError):
+            typed = classify_sdk_error(exc, endpoint="login")
+            if isinstance(typed, ProviderNetworkError | ProviderSdkInternalError):
                 # login-specific refinement: auth vs network
                 lowered = str(exc).lower()
                 if any(h in lowered for h in ("password", "user", "auth", "logon")):
-                    raised = ProviderAuthError(f"login failed: {exc}")
-            raise raised from exc
+                    typed = ProviderAuthError(f"login failed: {exc}")
+            if isinstance(typed, ProviderAuthError):
+                self.lifecycle.transition(
+                    SdkLifecycleState.AUTH_REJECTED,
+                    reason=str(typed),
+                    evidence_ref="login",
+                )
+            else:
+                self.lifecycle.transition(
+                    SdkLifecycleState.LOGIN_FAILED,
+                    reason=f"{type(typed).__name__}: {typed}",
+                    evidence_ref="login",
+                )
+            raise typed from exc
         # login success prints "login success" + logon json into the capture
         profile = parse_logon_profile(holder.text)
         if profile is None:
             # SDK version drift: no logon json captured - keep auth_ok=True
             # but profile_parsed=False (audit P1-08: separate the two facts)
             self.profile = AccountProfile(auth_ok=True, profile_parsed=False)
+            self.lifecycle.transition(
+                SdkLifecycleState.SESSION_READY,
+                reason="login ok; logon profile not parsed (audit P1-08)",
+                evidence_ref="UNKNOWN",
+            )
             return self.profile
         self.profile = AccountProfile.from_scrubbed(
             profile,
@@ -150,11 +206,20 @@ class AmazingDataSession:
             host=host,
             username=username,
         )
+        self.lifecycle.transition(
+            SdkLifecycleState.SESSION_READY,
+            reason="login ok",
+            evidence_ref=self.profile.account_profile_id,
+        )
         return self.profile
 
     # ------------------------------------------------------------- logout
     def logout(self) -> None:
+        """Best-effort clean close - IDEMPOTENT (R4-A3 A3-01): closing a
+        closed session is a no-op; closing a FAILED session is legal
+        cleanup, not a state guess."""
         if self._sdk is None:
+            self.lifecycle.close(reason="logout (no sdk handle)")
             return
         try:
             with sdk_stdout_into(CapturedStdout()):
@@ -164,6 +229,7 @@ class AmazingDataSession:
         finally:
             self._sdk = None
             self.profile = AccountProfile()
+            self.lifecycle.close(reason="logout")
 
     # ------------------------------------------------------------ helpers
     @property

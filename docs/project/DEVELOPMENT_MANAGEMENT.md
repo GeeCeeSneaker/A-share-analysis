@@ -4,14 +4,17 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Reviewed Repository HEAD**：`846fd458cc2c740f423699dabdbe0f4d48bf9c24`（Reviewer 复审基线，run 49 全三腿 success）  
-> **Primary Implementation（上批）**：`8d29c16d2476a48e105b091a9ec63b2b39c3d77e`（run 48 三腿 success）  
-> **Current Code Baseline**：本批 implementation commit `38da90e583a83dd0e83991987df7f29ddbc7189c6` + lint fix `6eac92dc1bfb7a3aa70619dc34695930e88a51af`（R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization）  
-> **Document Revision**：DM-CR-20260825-027 / 028 / 029  
-> **Last Review**：2026-08-25 21:43 +08:00（R4-A2.10/CR-1.2.6 复审：REOPENED——single-writer lock 获取过晚，stale parent review 可覆盖新 ACTIVE，本批 R4-A2.11/CR-1.2.7 修复）  
+> **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
+> **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
+> **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
+> **Current Code Baseline**：本批 implementation commit（R4-A3 SDK / Lifecycle / Early-Stop Closure；SHA 于提交后由同批 docs commit 记录）  
+> **Document Revision**：DM-CR-20260826-030 / 031 / 032 / 033  
+> **Last Review**：2026-08-26 23:57 +08:00（R4-A2.11/CR-1.2.7 复审：**VERIFIED——R4-A2.x / CR-1.x 审计链 CLOSED**；R4-A3 为下一活跃批次）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN——run 52（`6eac92d`）Ubuntu 3.14 + Windows 3.12 + Windows 3.14 三腿 success**（2026-08-26 API positive confirmation；run 51 曾因 3 个 lint 错误挂——本地验证输出截断误判，已修并改为退出码严格验证）。历史：run 48/49 三腿 success（Reviewer 正向确认）  
-> **Reviewer Correction（2026-08-25 21:43）**：R4-A2.10 的 P0 byte-identity 主体（persisted exact bytes / manifest identity from reviewed_bytes / read-back verification-only）/ publish cleanup / CI = **PASS / FREEZE**（不得机械重开）；但 single-writer lock 获取于 Phase 1 之后——只串行化了 Phase 2/3，未串行化 parent selection（ADR-018 §4 的"锁覆盖 preflight → commit"为 overclaim；ADR-018 §4 amendment 为修正记录，历史保留）  
+> **CI Status**：**FULL MATRIX GREEN**——run 52/53（`6eac92d` / `ab0cde7`）三腿 success（Reviewer job-level 正向确认）；本批提交后以 Actions 实际结果为准  
+> **Phase Status（Reviewer 裁决同步，2026-08-26）**：  
+> R4-A2.10 / CR-1.2.6 → DONE / VERIFIED (absorbed)；R4-A2.11 / CR-1.2.7 → DONE / VERIFIED；R4-A2.x / CR-1.x → **CLOSED / VERIFIED**；RISK-004 → **CLOSED for its current review-lineage definition**；R4-A3 → READY / ACTIVE NEXT；R4-B1 → READY_AFTER_R4-A3；R4-B2 → READY_AFTER_R4-B1；CR-2 → UNBLOCKED, sequenced after R4-B2；Production P0-M-1B → BLOCKED（人工 Review + 正式账号条件未满足）  
+> **SHA Correction（Reviewer，2026-08-26）**：上批记录的 `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` 有误，以 GitHub commit object 为准：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`（本头部即为修正记录；历史条目原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
@@ -1073,9 +1076,13 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement | DONE | absorbed into R4-A2.8 | 结构保留；最终 VERIFIED 随本批门 |
 | R4-A2.7 Final Integrity + CR-1.2.3 Evidence Identity Closure | DONE | absorbed into R4-A2.9 | 结构保留；最终 VERIFIED 随本批门 |
 | R4-A2.8 Final Exchange-Boundary + CR-1.2.4 Pre-Access Integrity | DONE | absorbed into R4-A2.10 | 结构保留；最终 VERIFIED 随本批门 |
-| R4-A2.9 Review-Seal Exactness + CR-1.2.5 Output Confinement | DONE | absorbed into R4-A2.11 | 输入侧/confinement/CI 冻结保留 |
-| R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | REOPENED | P0 byte-identity 主体 / cleanup / CI = PASS / FREEZE；single-writer lock 覆盖范围由 R4-A2.11/CR-1.2.7 修复（本批） |
-| R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | PENDING_REVIEW | 最高优先（已完成，待复核；若 VERIFIED 则 R4-A2.x / CR-1.x 审计链结束） |
+| R4-A2.9 Review-Seal Exactness + CR-1.2.5 Output Confinement | DONE | VERIFIED (absorbed) | PASS |
+| R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | VERIFIED (absorbed) | PASS |
+| R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | **VERIFIED** | **R4-A2.x / CR-1.x 审计链 CLOSED（2026-08-26）** |
+| R4-A3 SDK / Lifecycle / Early-Stop Closure | DONE | PENDING_REVIEW | 最高优先（已完成，待复核；VERIFIED 后进入 R4-B1） |
+| R4-B1 Capability Endpoint Proof | PLANNED | READY_AFTER_R4-A3 | — |
+| R4-B2 Publish Validation Exactness | PLANNED | READY_AFTER_R4-B1 | — |
+| CR-2 Provider-Normalized + Quarantine | PLANNED | UNBLOCKED / after R4-B2 | — |
 | R4-A3 SDK/Lifecycle/Early Stop | PLANNED | PENDING | Next |
 | R4-B1 Capability Endpoint Proof | PLANNED | PENDING | Next |
 | R4-B2 Publish Validation Exactness | PLANNED | PENDING | Next |
@@ -1092,58 +1099,69 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A2.11 + CR-1.2.7（本批，DONE / PENDING_REVIEW）
+## R4-A3 SDK / Lifecycle / Early-Stop Closure（本批，DONE / PENDING_REVIEW）
 
 ```text
-P0-01 Review Parent-Identity Serialization（DM-CR-20260825-027/028，
-    ADR-018 §4 amendment，Option A——lock-before-preflight）：
-  .review.lock 获取前移到所有 ACTIVE-dependent / mutable-version-store
-    读取之前；锁前仅允许 CLI parse / 纯 lexical 参数检查 /
-    rules_root 基础存在性检查
-  load_active_rules（parent selection）/ lineage / COMPILED / version
-    confinement+non-existence / snapshot / transform / sandbox parse /
-    staged gate / publish / manifest commit / post-commit verification
-    全部在锁内（"Phase 2/3 串行" != "review parent lineage 串行"的语义
-    缺口闭合）
-  三重证明：
-    runtime counter——preflight 仅在持锁时执行（lock_exists_at_preflight）
-    AST 结构守卫——锁获取（O_EXCL open）行号先于首个 load_active_rules
-    stale-parent 对抗——A 提交 v2 后，B 的 v1-based 提交（--from-version
-      v1）必然 BLOCK（lineage moved）；无 --from-version 时 stale 输入被
-      input==ACTIVE 检查拒绝；零新 version/零新 evidence/零 manifest
-      推进；B 从 current ACTIVE 重启正常；同版本 race 撞 immutable
-      collision（首版字节不动）
-  lock success/failure 释放保持；并发锁 fail fast 先于任何 ACTIVE 读取
-    （load_active_rules 计数 == 0）
-既有契约全保持（658 全量）：exact-byte seal / manifest identity /
-  read-back verification-only / pre-commit cleanup / 输出 confinement /
-  CA 原子边界 / Raw closure / Bound Rule replay / dry-run closure
+A3-01 SDK Lifecycle State Machine（DM-CR-20260826-030，ADR-019 §2.1/2.2）：
+  ashare_state.providers.lifecycle.SdkLifecycle：
+    INIT -> SDK_UNAVAILABLE | LOAD_FAILED | LOGIN_FAILED | AUTH_REJECTED
+          | SESSION_READY
+    SESSION_READY/UNSUBSCRIBED -> SUBSCRIBE_STARTED -> CALLBACK_ACTIVE
+          -> UNSUBSCRIBED（可重订阅）
+    任意状态 -> LOGGED_OUT（仅经 close()，幂等；失败态关闭=合法清理）
+  非法跳转 raise；迁移历史（from/to/reason/evidence/at）可审计
+  require_ready(action)：terminal/非 session-alive -> 
+    ProviderLifecycleTerminalError（ProviderError 子类，context 携带
+    state/reason/evidence/refused_action/early_stop）——endpoint 函数
+    调用之前抛出
+  集成（真实控制流）：session.login 全失败类 -> 显式 terminal 态；
+    logout -> close() 幂等；provider.call_exchange 第一道 lifecycle 门
+    （terminal 后 capability gate 与 SDK 函数均不执行、零 exchange）
+A3-02 Permission / Cache / Freshness 分 Gate（DM-CR-20260826-031，
+    ADR-019 §2.3）：
+  runtime_gates 六类显式分离（AUTH_ACCOUNT / PERMISSION /
+    ENDPOINT_AVAILABLE / CACHE_METADATA / FRESHNESS_ASOF / BUSINESS_DATA）
+  GateResult：explicit status（PASS/FAIL/NOT_TESTABLE/SKIPPED_BLOCKED）
+    + blocking reason + traceable evidence_ref + provider_calls_fired 计数
+  非掩盖性：PERMISSION 先于 CACHE（缓存健康不掩盖权限失败）；
+    ENDPOINT 真实 probe（缓存不可替代 endpoint proof）；FRESHNESS FAIL
+    阻断 BUSINESS（陈旧不得降级为有数据即 PASS）
+A3-03 Early Stop Control Flow（并入 030/031）：
+  RuntimeGatePipeline 顺序评估；首个 blocking（FAIL 或 NOT_TESTABLE——
+    不可证即阻断）后，后续 gate SKIPPED_BLOCKED 且 evaluate 从不执行
+  fault-injection 以 call-count / exchange-count / evidence-count 证明
+    （permission fail -> business probe 计数 == 0）
+A3-04 Runtime Truth / Trial Boundary（DM-CR-20260826-032）：
+  capability approval 双入口（_validate_evidence + approve_from_spike_run）
+    拒绝 TRIAL_*/FAKE*/UNKNOWN/空 account_profile_id——run kind PRODUCTION
+    本身不构成 production truth
+A3-05 Evidence Closure：
+  gates 的 probe 走 ProviderExchange 显式边界（成功/失败 exchange 都
+    可携带 evidence）；lifecycle 门在 exchange 创建之前（refused call
+    不产生半截 evidence）；既有 ProviderExchange -> RawWriter 链零回归
 ```
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
 ```text
 scripts/golden/review.py 逐条核验 123 v3 cases + 补齐 distinct events
-scripts/rules/review.py 对已验证 ACTIVE 规则版本执行人工复核（lock 覆盖
-  全流程的 seal workflow——本批后 parent lineage 亦在串行边界内）
+scripts/rules/review.py 对已验证 ACTIVE 规则版本执行人工复核（exact-byte
+  + serialized-parent seal workflow，已 VERIFIED）
 ```
 
-## R4-A3 / B1 / B2（CR-2 前；CR-2/R4-A3/P0-M-1B 保持 BLOCKED 直到本批 VERIFIED）
+## R4-B1（R4-A3 VERIFIED 后启动；R4-B2 -> R4-B1 后；CR-2 -> R4-B2 后）
 
 ```text
-permission/cache/freshness 分 Gate
-Early Stop
-Auth terminal-state
-Approval endpoint proof
-explicit artifact_validation_id
-Migration 011
+Capability Approval 不接受 caller self-declare；绑定 provider/dataset/
+  endpoint/account profile/runtime；persisted exchange evidence；
+  permission/endpoint proof 与 business-quality proof 分离
+（R4-B1/B2 正式开发要求在 A3 VERIFIED 后细化）
 ```
 
 ## 后续 CR
 
 ```text
-CR-2 Provider-Normalized + Quarantine（本批 VERIFIED 后可启动——R4-A2.x /
-    CR-1.x 审计链结束的条件见工作要求 §7 Exit Gate）
+CR-2 Provider-Normalized + Quarantine（after R4-B2）
 CR-3 AvailabilityPolicy + Canonicalizer
 CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild
 ```
@@ -1469,13 +1487,13 @@ Deadline: 首个 APPROVED Source Policy 前
 ## RISK-004 ProviderExchange 未统一
 
 ```text
-Status: REOPENED（R4-A2.10/CR-1.2.6 复审发现 single-writer lock 获取
-        过晚——只串行化 Phase 2/3，parent selection 在锁外，stale
-        parent review 可覆盖新 ACTIVE——即 R4-A2.11/CR-1.2.7 的 P0）
-        → 本批 R4-A2.11/CR-1.2.7 修复后 lock 覆盖 parent selection
-        至 commit 全程（lock-before-preflight + 三重证明 + stale-parent
-        对抗测试）；保持 REOPENED 直到 Reviewer 验证本批（不预写关闭）
-Mitigation: PENDING_REVIEW（R4-A2.11/CR-1.2.7）
+Status: CLOSED for its current review-lineage definition（Reviewer
+        2026-08-26 VERIFIED 裁决：R4-A2.11/CR-1.2.7 lock-before-preflight
+        三重证明 + stale-parent 对抗通过；R4-A2.x / CR-1.x 审计链 CLOSED。
+        连续 11 个批次的 exchange/evidence/review-lineage correctness
+        修复全部 VERIFIED，冻结项无回归）
+Note: 未来若 CR-2+ 引入新的 provider-normalized 消费面，按新工作要求
+      重新开项（不得在旧条目上复活）
 ```
 
 ## RISK-005 Trading Rule 数据层未人工 Review
@@ -1724,6 +1742,50 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260826-033 — R4-A2.x / CR-1.x VERIFIED Governance Closure
+
+**Type**：C1（治理闭环）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.11/CR-1.2.7 复审（2026-08-26 23:57 +08:00）裁决 **VERIFIED——R4-A2.x / CR-1.x 审计链 CLOSED**；Reviewer 要求下一逻辑开发提交同步状态至总册与 DEVLOG（不得改写历史），并修正两个误记 SHA（以 GitHub commit object 为准：Primary `38da90e5b5f3d698cc909cf7c258c163081bb9af`；Lint fix `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`；Reviewed HEAD `ab0cde7db4673224518540e1974c4e918bdbbf33`）。  
+**Closure**：总册头部（Reviewed HEAD / Primary / Lint fix 正确 SHA + Phase Status 块 + SHA Correction 记录）；§40（R4-A2.9/A2.10 → VERIFIED (absorbed)；R4-A2.11 → VERIFIED；审计链 CLOSED；R4-A3 → PENDING_REVIEW；R4-B1/B2/CR-2 排序落位）；§41 重写为 R4-A3 批次；§52 RISK-004 → CLOSED for its current review-lineage definition（含"新消费面重新开项"注记）；ADR-018 索引标注 VERIFIED；DEVLOG 顶部新条目。  
+**Affected Modules**：Documentation / Governance（DEVLOG、总册、ADR-000）  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260826-032 — Runtime Trial/Production Truth Boundary
+
+**Type**：C1 correctness closure  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A3 A3-04——Trial/Fake 成功不得把 capability 标为 PRODUCTION APPROVED；run kind PRODUCTION 本身不构成 production truth。  
+**New Contract**（ADR-019 §2.4）：capability approval **双入口**拒绝非生产账号——`_validate_evidence`（所有 approve 路径共用）与 `approve_from_spike_run`（spike 派生路径）均拒绝 `TRIAL_*` / `FAKE*` / `UNKNOWN` / 空 account_profile_id；既有 `new_run(PRODUCTION)` 的 `verify_production_account` 创建门保持（防御纵深：创建门被绕过/篡改时 approval 路径仍拒）。  
+**Tests**：test_trial_production_boundary.py（7：参数化 5 类非法账号双语义拒绝 + 生产账号对照 + spike-run 路径防御纵深——monkeypatch 创建门后 APPROVAL 仍拒；模块属性访问纪律 + registry snapshot/restore 防泄漏）  
+**ADR**：[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) §2.4  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260826-031 — Permission / Cache / Freshness Gate Separation
+
+**Type**：C1 新 runtime 契约  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A3 A3-02/A3-03——不同性质失败不得折叠为单一 "provider unavailable"；权限失败不能被缓存掩盖；缓存命中不能替代 endpoint proof；freshness 不足不得降级为"有数据即 PASS"；early-stop 须以计数证明。  
+**New Contract**（ADR-019 §2.3）：`ashare_state.providers.runtime_gates`——六类 GateKind 显式分离（AUTH_ACCOUNT/PERMISSION/ENDPOINT_AVAILABLE/CACHE_METADATA/FRESHNESS_ASOF/BUSINESS_DATA）；GateResult（status: PASS/FAIL/**NOT_TESTABLE**/SKIPPED_BLOCKED + reason + evidence_ref + provider_calls_fired）；`RuntimeGatePipeline` 顺序评估 + early stop（首个 blocking=FAIL 或 NOT_TESTABLE 后，后续 gate 的 evaluate **从不执行**）。非掩盖性由顺序+early-stop 编码：PERMISSION 先于 CACHE；ENDPOINT 用真实 probe exchange；FRESHNESS FAIL 阻断 BUSINESS。gate 的 probe 走 ProviderExchange 显式边界（成功/失败 exchange 携带 evidence——A3-05）。  
+**Tests**：test_runtime_gate_separation.py（15：各 gate 语义 ×9 / pipeline 全过 / permission-fail 阻断（probe 计数==1、business==0、total==1）/ 缓存健康不掩盖权限 / freshness 阻断 business / cache-metadata 阻断 / endpoint 失败阻断 / NOT_TESTABLE auth 全阻断零调用 / 每结果可审计）  
+**ADR**：[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) §2.3  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260826-030 — SDK Lifecycle State Machine + Early-Stop Enforcement
+
+**Type**：C1 新 runtime 契约（session/provider 控制流变更）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A3 A3-01——SDK unavailable/load failed/login failed/auth rejected/session ready/subscribe/callback/unsubscribe/logout 必须是显式 lifecycle state/terminal state；不允许异常字符串猜测流程状态；terminal 后无 business call；cleanup 幂等。  
+**New Contract**（ADR-019 §1/§2.1/§2.2）：`ashare_state.providers.lifecycle.SdkLifecycle`（显式状态 + 合法迁移表 + 迁移历史 + 幂等 close（失败态关闭=合法清理）+ `require_ready` → `ProviderLifecycleTerminalError`（ProviderError 子类，context 含 state/reason/evidence/refused_action/early_stop））。集成：`AmazingDataSession.login` 全失败类落显式 terminal 态（SDK_UNAVAILABLE/LOAD_FAILED/AUTH_REJECTED/LOGIN_FAILED）、成功落 SESSION_READY（evidence=account_profile_id）；`logout` → close()；`AmazingDataProvider.call_exchange` **第一道 lifecycle 门**（terminal 后 capability gate 与 SDK 函数均不执行、零 exchange/零 evidence）。测试 fake session 同步携带 lifecycle（SESSION_READY）。  
+**Compatibility**：ProviderError 层新增一个子类；既有调用方（捕获 ProviderError）不受影响。  
+**Tests**：test_sdk_lifecycle.py（15）+ test_runtime_early_stop.py（11：SDK absent/load 异常/auth 拒绝/network 失败的 call-count 证明；terminal 后 endpoint 函数零调用+零 envelope（参数化 5 态）；INIT 拒绝；READY 对照；真实 session login/logout/close 驱动）  
+**ADR**：[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) §1-§2.2  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260825-029 — R4-A2.10 Reviewer Governance Correction
 
@@ -2257,10 +2319,18 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 # 62. 下一次维护检查点
 
-R4-A2.11 + CR-1.2.7 已更新（2026-08-25，见 DM-CR-20260825-027/028/029）：
+R4-A3 已更新（2026-08-26，见 DM-CR-20260826-030/031/032/033）：
 
 ```text
-§40 §41 §52 §61 §62 + 头部（Reviewed HEAD 846fd458 / Reviewer Correction：PASS-FREEZE 分列 + lock scope overclaim）(done 2026-08-25)
+§40 §41 §52 §61 §62 + 头部（VERIFIED closure 同步 / SHA correction / Phase Status）(done 2026-08-26)
+```
+
+R4-B1 落地时至少更新：
+
+```text
+§41 §44             (B1 契约与 acceptance)
+§48 §52 §61         (entry gate / 风险 / Change Log)
+ADR（若 capability approval 契约演进）
 ```
 
 下一批（R4-A3 / CR-2，须待本批 VERIFIED）落地时至少更新：

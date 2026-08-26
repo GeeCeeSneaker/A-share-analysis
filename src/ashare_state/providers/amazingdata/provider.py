@@ -165,7 +165,14 @@ class AmazingDataProvider:
         params: dict[str, Any] | None = None,
         require_capability: str | None = None,
     ) -> Any:
-        """One SDK exchange: gated, stdout-captured, budgeted, recorded."""
+        """One SDK exchange: gated, stdout-captured, budgeted, recorded.
+
+        R4-A3 A3-01 (audit 20260826 section 7.2): the LIFECYCLE gate fires
+        FIRST - after a terminal SDK/auth failure the endpoint function is
+        NEVER invoked (early stop: ProviderLifecycleTerminalError, a typed
+        error carrying the terminal state/reason/evidence, raised before
+        any capability check or SDK call)."""
+        self.session.lifecycle.require_ready(endpoint)
         cap_status = self._gate_capability(require_capability)
         params = params or {}
         requested_at = datetime.now(UTC).isoformat()

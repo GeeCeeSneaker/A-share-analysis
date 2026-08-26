@@ -165,6 +165,19 @@ def _validate_evidence(name: str, evidence: CapabilityEvidence) -> Capability:
     if cap.status is CapabilityStatus.RETIRED:
         msg = f"capability {name!r} is RETIRED; approval refused"
         raise CapabilityGovernanceError(msg)
+    # R4-A3 A3-04 (audit 20260826 section 7.2): Fake/Trial success can
+    # NEVER produce PRODUCTION capability truth - approval requires a
+    # production account profile identity.
+    if not evidence.account_profile_id or evidence.account_profile_id.startswith(
+        ("TRIAL_", "FAKE", "UNKNOWN")
+    ):
+        msg = (
+            f"capability approval refused for {name!r}: account_profile_id "
+            f"{evidence.account_profile_id!r} is not a production account - "
+            "Fake/Trial/unknown success never grants PRODUCTION truth "
+            "(audit R4-A3 section 7.2 A3-04)"
+        )
+        raise CapabilityGovernanceError(msg)
     return cap
 
 
@@ -239,6 +252,20 @@ def approve_from_spike_run(
         raise CapabilityGovernanceError(msg)
     if not run.provenance_complete():
         msg = f"approval refused: spike run {spike_run_id} provenance incomplete"
+        raise CapabilityGovernanceError(msg)
+    # R4-A3 A3-04: a PRODUCTION-kind run under a TRIAL/FAKE/unknown
+    # account profile can never approve a capability - run kind alone is
+    # not production truth.
+    if (
+        run.account_profile_id.startswith(("TRIAL_", "FAKE", "UNKNOWN"))
+        or not run.account_profile_id
+    ):
+        msg = (
+            f"approval refused: spike run {spike_run_id} account_profile_id "
+            f"{run.account_profile_id!r} is not a production account "
+            "(audit R4-A3 section 7.2 A3-04: Fake/Trial cannot grant "
+            "PRODUCTION capability truth)"
+        )
         raise CapabilityGovernanceError(msg)
     verdict = compute_verdict(store, run)
     spike_capability = SPIKE_CAPABILITY_BY_REGISTRY.get(name, name)
