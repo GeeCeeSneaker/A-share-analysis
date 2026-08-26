@@ -4,15 +4,14 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Reviewed Repository HEAD**：`8a6f4149e0f7090850b77c3b2e6a804b8ef45595`（Reviewer 复审基线，run 46 全三腿 success）  
-> **Primary Implementation（上批）**：`793dfc1220e3d1b8669483c008a8596150b0dcd6`  
-> **Cross-Platform CI Fix（上批）**：`b429220663897060b7940c727d0e09ec902192de`  
-> **Current Code Baseline**：本批 implementation commit `8d29c16d2476a48e105b091a9ec63b2b39c3d77e`（R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity；run 48 三腿 success）  
-> **Document Revision**：DM-CR-20260825-022 / 023 / 024 / 025 / 026  
-> **Last Review**：2026-08-25 18:55 +08:00（R4-A2.9/CR-1.2.5 复审：REOPENED——2 项 P0 + 2 项 P1 + 治理修正，本批 R4-A2.10/CR-1.2.6 修复）  
+> **Reviewed Repository HEAD**：`846fd458cc2c740f423699dabdbe0f4d48bf9c24`（Reviewer 复审基线，run 49 全三腿 success）  
+> **Primary Implementation（上批）**：`8d29c16d2476a48e105b091a9ec63b2b39c3d77e`（run 48 三腿 success）  
+> **Current Code Baseline**：本批 implementation commit（R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization；SHA 于提交后由同批 docs commit 记录）  
+> **Document Revision**：DM-CR-20260825-027 / 028 / 029  
+> **Last Review**：2026-08-25 21:43 +08:00（R4-A2.10/CR-1.2.6 复审：REOPENED——single-writer lock 获取过晚，stale parent review 可覆盖新 ACTIVE，本批 R4-A2.11/CR-1.2.7 修复）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN**——run 46（Reviewed HEAD `8a6f4149`）与 run 45（`b429220`）均三腿 success（Reviewer 正向确认；DM-CR-20260825-019 CLOSED）；**run 48（本批 implementation `8d29c16d`）三腿 success**（2026-08-25 API positive confirmation——新增 generated-byte 测试在 Ubuntu+Windows 两 OS 通过）  
-> **Reviewer Correction（2026-08-25 18:55）**：R4-A2.9 的输入侧 exact snapshot / version 输出 confinement / 跨平台 CI 修复保留冻结；但输出侧未闭合——REVIEWED 经 write_text 落盘（Windows 换行翻译破坏 byte identity）、publish 后 final reread 定义 manifest hash（TOCTOU：gate 验证 R / manifest 祝福 T）（ADR-018 为修正记录；历史 ADR 原文保留）  
+> **CI Status**：**FULL MATRIX GREEN**——run 48（`8d29c16`）/ run 49（Reviewed HEAD `846fd45`）均 Ubuntu 3.14 + Windows 3.12 + Windows 3.14 三腿 success（Reviewer 正向确认；CI 非 blocker）；本批提交后以 Actions 实际结果为准  
+> **Reviewer Correction（2026-08-25 21:43）**：R4-A2.10 的 P0 byte-identity 主体（persisted exact bytes / manifest identity from reviewed_bytes / read-back verification-only）/ publish cleanup / CI = **PASS / FREEZE**（不得机械重开）；但 single-writer lock 获取于 Phase 1 之后——只串行化了 Phase 2/3，未串行化 parent selection（ADR-018 §4 的"锁覆盖 preflight → commit"为 overclaim；ADR-018 §4 amendment 为修正记录，历史保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
@@ -1074,8 +1073,9 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement | DONE | absorbed into R4-A2.8 | 结构保留；最终 VERIFIED 随本批门 |
 | R4-A2.7 Final Integrity + CR-1.2.3 Evidence Identity Closure | DONE | absorbed into R4-A2.9 | 结构保留；最终 VERIFIED 随本批门 |
 | R4-A2.8 Final Exchange-Boundary + CR-1.2.4 Pre-Access Integrity | DONE | absorbed into R4-A2.10 | 结构保留；最终 VERIFIED 随本批门 |
-| R4-A2.9 Review-Seal Exactness + CR-1.2.5 Output Confinement | DONE | REOPENED | 输入侧/confinement/CI 冻结保留；输出侧由 R4-A2.10/CR-1.2.6 修复（本批） |
-| R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | PENDING_REVIEW | 最高优先（已完成，待复核） |
+| R4-A2.9 Review-Seal Exactness + CR-1.2.5 Output Confinement | DONE | absorbed into R4-A2.11 | 输入侧/confinement/CI 冻结保留 |
+| R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | REOPENED | P0 byte-identity 主体 / cleanup / CI = PASS / FREEZE；single-writer lock 覆盖范围由 R4-A2.11/CR-1.2.7 修复（本批） |
+| R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | PENDING_REVIEW | 最高优先（已完成，待复核；若 VERIFIED 则 R4-A2.x / CR-1.x 审计链结束） |
 | R4-A3 SDK/Lifecycle/Early Stop | PLANNED | PENDING | Next |
 | R4-B1 Capability Endpoint Proof | PLANNED | PENDING | Next |
 | R4-B2 Publish Validation Exactness | PLANNED | PENDING | Next |
@@ -1092,48 +1092,40 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A2.10 + CR-1.2.6（本批，DONE / PENDING_REVIEW）
+## R4-A2.11 + CR-1.2.7（本批，DONE / PENDING_REVIEW）
 
 ```text
-P0-01 Persisted REVIEWED Exact-Byte Identity（DM-CR-20260825-022，ADR-018 §1）：
-  reviewed_text.encode("utf-8") → reviewed_bytes（单一不可变内存对象）
-  sandbox 解析 / staged rules.yaml / 全部正式 dataset 写入 write_bytes ONLY
-    （AST 静态守卫：review.py 禁 write_text 调用——文本模式换行翻译在
-    构造上被排除，不靠纪律）
-  byte-level 测试（read_bytes 直接比较 / LF-only / manifest hash 独立重算 /
-    生成版本 load_active_rules + load_bound_rule_book 重放）——两 OS 的 CI
-    matrix 均执行（不再依赖 .gitattributes 规范化仓库内已提交 yaml）
-P0-02 Manifest Seal Identity / Publish TOCTOU Closure（DM-CR-20260825-023，
-    ADR-018 §2）：
-  manifest dataset_hash 唯一来源 = gate-validated in-memory reviewed_bytes
-    （expected_dataset_hash = _hash_snapshot([(final_rel, reviewed_bytes)])）
-  publish 后 read-back 仅 VERIFICATION：actual != reviewed_bytes →
-    BLOCK + rollback（ACTIVE 不推进；篡改字节绝不能被 re-hash 祝福）
-  对抗测试：rename 后注入 tamper → fail closed + rollback + 同版本重试
-    确定性成功
-P1-01 Publish Failure Cleanup / Commit Boundary（DM-CR-20260825-024，
-    ADR-018 §3）：
-  commit boundary = ACTIVE manifest 原子替换成功
-  提交前失败（tmp manifest write / replace 注入测试）→ published_version /
-    created_evidence / manifest_committed 状态跟踪驱动完整清理（无
-    finalized version / 无孤儿 evidence / 无 tmp 残留 / ACTIVE 保持旧）
-    + 同版本重试成功
-  提交后验证失败 → 显式 REVIEW_COMMIT_INCONSISTENT 硬失败（exit 3），
-    绝不伪装成可重试失败
-P1-02 Single-Writer Lock（DM-CR-20260825-025，ADR-018 §4，Option A）：
-  rules_root/.review.lock（O_CREAT|O_EXCL）覆盖 preflight→snapshot→
-    staged gate→manifest commit 全程；并发 reviewer fail fast；finally 释放
-  诚实记录：advisory + 进程级，非 OS-level CAS；stale lock 人工清理；
-    --from-version 明确降级为 lineage 提示（从不构成并发 CAS）
+P0-01 Review Parent-Identity Serialization（DM-CR-20260825-027/028，
+    ADR-018 §4 amendment，Option A——lock-before-preflight）：
+  .review.lock 获取前移到所有 ACTIVE-dependent / mutable-version-store
+    读取之前；锁前仅允许 CLI parse / 纯 lexical 参数检查 /
+    rules_root 基础存在性检查
+  load_active_rules（parent selection）/ lineage / COMPILED / version
+    confinement+non-existence / snapshot / transform / sandbox parse /
+    staged gate / publish / manifest commit / post-commit verification
+    全部在锁内（"Phase 2/3 串行" != "review parent lineage 串行"的语义
+    缺口闭合）
+  三重证明：
+    runtime counter——preflight 仅在持锁时执行（lock_exists_at_preflight）
+    AST 结构守卫——锁获取（O_EXCL open）行号先于首个 load_active_rules
+    stale-parent 对抗——A 提交 v2 后，B 的 v1-based 提交（--from-version
+      v1）必然 BLOCK（lineage moved）；无 --from-version 时 stale 输入被
+      input==ACTIVE 检查拒绝；零新 version/零新 evidence/零 manifest
+      推进；B 从 current ACTIVE 重启正常；同版本 race 撞 immutable
+      collision（首版字节不动）
+  lock success/failure 释放保持；并发锁 fail fast 先于任何 ACTIVE 读取
+    （load_active_rules 计数 == 0）
+既有契约全保持（658 全量）：exact-byte seal / manifest identity /
+  read-back verification-only / pre-commit cleanup / 输出 confinement /
+  CA 原子边界 / Raw closure / Bound Rule replay / dry-run closure
 ```
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
 ```text
 scripts/golden/review.py 逐条核验 123 v3 cases + 补齐 distinct events
-scripts/rules/review.py 对已验证 ACTIVE 规则版本执行人工复核（输入
-  exact snapshot + 输出 reviewed_bytes byte identity + manifest 从
-  reviewed_bytes 派生 + single-writer lock 的完整 seal workflow）
+scripts/rules/review.py 对已验证 ACTIVE 规则版本执行人工复核（lock 覆盖
+  全流程的 seal workflow——本批后 parent lineage 亦在串行边界内）
 ```
 
 ## R4-A3 / B1 / B2（CR-2 前；CR-2/R4-A3/P0-M-1B 保持 BLOCKED 直到本批 VERIFIED）
@@ -1150,8 +1142,8 @@ Migration 011
 ## 后续 CR
 
 ```text
-CR-2 Provider-Normalized + Quarantine（消费 raw evidence → provider-normalized；
-    本批 VERIFIED 后可启动——publish byte-identity 契约已稳定）
+CR-2 Provider-Normalized + Quarantine（本批 VERIFIED 后可启动——R4-A2.x /
+    CR-1.x 审计链结束的条件见工作要求 §7 Exit Gate）
 CR-3 AvailabilityPolicy + Canonicalizer
 CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild
 ```
@@ -1477,15 +1469,13 @@ Deadline: 首个 APPROVED Source Policy 前
 ## RISK-004 ProviderExchange 未统一
 
 ```text
-Status: REOPENED（R4-A2.9/CR-1.2.5 复审发现输出侧未闭合：write_text
-        字节身份破坏 + publish 后 final reread 定义 manifest hash 的
-        TOCTOU——即 R4-A2.10/CR-1.2.6 的两项 P0）
-        → 本批 R4-A2.10/CR-1.2.6 修复后 seal 链完整（输入 exact
-        snapshot → reviewed_bytes 单一内存身份 → write_bytes 持久化 →
-        manifest 从 reviewed_bytes 派生 + read-back 仅验证 + commit
-        boundary + single-writer lock）；保持 REOPENED 直到 Reviewer
-        验证本批（不预写关闭）
-Mitigation: PENDING_REVIEW（R4-A2.10/CR-1.2.6）
+Status: REOPENED（R4-A2.10/CR-1.2.6 复审发现 single-writer lock 获取
+        过晚——只串行化 Phase 2/3，parent selection 在锁外，stale
+        parent review 可覆盖新 ACTIVE——即 R4-A2.11/CR-1.2.7 的 P0）
+        → 本批 R4-A2.11/CR-1.2.7 修复后 lock 覆盖 parent selection
+        至 commit 全程（lock-before-preflight + 三重证明 + stale-parent
+        对抗测试）；保持 REOPENED 直到 Reviewer 验证本批（不预写关闭）
+Mitigation: PENDING_REVIEW（R4-A2.11/CR-1.2.7）
 ```
 
 ## RISK-005 Trading Rule 数据层未人工 Review
@@ -1734,6 +1724,40 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260825-029 — R4-A2.10 Reviewer Governance Correction
+
+**Type**：C1（治理修正）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.10/CR-1.2.6 复审 §5——治理文档须记录 Reviewed HEAD `846fd458cc2c740f423699dabdbe0f4d48bf9c24`（run 49 三腿 success）与 Primary Implementation `8d29c16d2476a48e105b091a9ec63b2b39c3d77e`；R4-A2.10 = Implementation DONE / Review REOPENED（P0 byte-identity 主体 = PASS / frozen；publish cleanup = PASS / frozen；DM-CR-20260825-025 single-writer = REOPENED，原因 = lock acquired AFTER parent-dependent Phase 1）；ADR-018 §4 overclaim 需 amendment 不删历史；RISK-004/CR-2/R4-A3/P0-M-1B 保持。  
+**Correction**：总册头部更新（Reviewed HEAD + Reviewer Correction 段：lock 覆盖范围 overclaim）；§40 R4-A2.10 → REOPENED（PASS/FREEZE 项与 REOPENED 项分列）；ADR-018 §4 amendment（修正记录 + 索引标注）。  
+**Affected Modules**：Documentation / Governance（DEVLOG、总册 §40/§41/§52/§61、ADR-018/ADR-000）  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-028 — Single-Writer Lock Scope / Stale-Parent Regression
+
+**Type**：C1 correctness closure（含测试矩阵）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.11 P0-01 测试要求——现有测试只覆盖锁文件存在性（fail fast / 成功释放 / 失败释放），存在 control-flow blind spot：未覆盖"两个 reviewer 在任一获锁前都对同一 parent 完成 Phase 1"的 stale-preflight race。  
+**New Contract**（ADR-018 §4 amendment）：三重证明矩阵——①runtime counter：`load_active_rules`（parent selection）执行时 `.review.lock` 必已存在（`lock_exists_at_preflight is True`）；②AST 结构守卫：锁获取（O_EXCL open，含 BitOr 嵌套 flag 匹配）行号先于首个 `load_active_rules`；③stale-parent 对抗：A 提交 v2 后 B 的 v1-based 提交（`--from-version v1`）BLOCK（lineage moved；零新 version/零新 evidence/零 manifest 推进/锁释放）；无 `--from-version` 时 stale `--rules` 输入被 input==ACTIVE 拒绝；B 从 current ACTIVE（新 COMPILED 候选）重启正常；同版本 race 撞 immutable collision（首版字节逐字节不动）；并发锁 fail fast 先于任何 ACTIVE 读取（`load_active_rules` 调用数 == 0）；成功/失败后锁释放保持。  
+**Affected Modules**：tests/integration/test_review_lineage_serialization.py（8 个）  
+**ADR**：[ADR-018](../adr/ADR-018_review_publish_byte_identity.md) §4 amendment  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260825-027 — Review Parent-Identity Serialization Closure
+
+**Type**：C1 correctness closure（控制流重排）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A2.11 P0-01——`.review.lock` 获取位于 Phase 1（snapshot/sandbox）之后：两个 reviewer 可基于同一旧 parent 完成 Phase 1，随后依次获锁提交，第二个用 stale parent snapshot 覆盖第一个的 ACTIVE advance。"Phase 2/3 串行" != "review parent lineage 串行"。  
+**Old Contract**：`main()` 完成全部 ACTIVE-dependent 读取（load_active_rules / lineage / COMPILED / version 检查 / snapshot / reviewed_bytes / sandbox）后才获取锁；锁只包 `_review_locked_workflow`（Phase 2/3）。  
+**New Contract**（ADR-018 §4 amendment，Option A）：**lock-before-preflight**——`main()` 仅做 CLI parse + 参数 lexical 检查 + rules_path/artifact 存在性检查后即获取锁；整个 workflow（ACTIVE integrity + parent identity → snapshot → transform → sandbox → staged gate → publish → manifest commit → post-commit verification）在 `_review_workflow_locked` 内于锁内执行；finally 释放保持。**四问**：①原 placement 只串行化提交不串行化 parent 选择（stale-preflight race 实测可复现）；②parent identity 在锁内建立（preflight 本身持锁）；③选 Option A 而非 Option B（recheck）——A 使 ADR-018 原广告语义成立且单一代码路径，B 需双份 parent 验证 + ADR 改写为 optimistic snapshot 语义；④成本 = 持锁时间稍长（preflight 纳入，竞争时快速失败），收益 = stale-parent 覆盖在构造上不可能。  
+**Affected Modules**：scripts/rules/review.py（main 拆分：Phase 0 锁获取 + `_review_workflow_locked` 全流程）  
+**Tests**：test_review_lineage_serialization.py（8）+ 全量 658 保持（既有 byte-identity/cleanup/confinement 测试零回归）  
+**ADR**：[ADR-018](../adr/ADR-018_review_publish_byte_identity.md) §4 amendment  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260825-026 — R4-A2.9 Reviewer Governance Correction
 
@@ -2233,10 +2257,10 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 # 62. 下一次维护检查点
 
-R4-A2.10 + CR-1.2.6 已更新（2026-08-25，见 DM-CR-20260825-022..026）：
+R4-A2.11 + CR-1.2.7 已更新（2026-08-25，见 DM-CR-20260825-027/028/029）：
 
 ```text
-§40 §41 §52 §61 §62 + 头部（exact SHA 三元组 / CI full-matrix / Reviewer Correction）(done 2026-08-25)
+§40 §41 §52 §61 §62 + 头部（Reviewed HEAD 846fd458 / Reviewer Correction：PASS-FREEZE 分列 + lock scope overclaim）(done 2026-08-25)
 ```
 
 下一批（R4-A3 / CR-2，须待本批 VERIFIED）落地时至少更新：

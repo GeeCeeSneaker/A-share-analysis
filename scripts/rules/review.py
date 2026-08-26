@@ -219,13 +219,77 @@ def main() -> int:
     artifact = Path(args.artifact)
     rules_root = Path(args.rules_root)
 
-    # ================= Phase 1: pure validation / snapshot =================
-    # (audit 20260825 #5 section 4 / section 3.2 Step C: EVERY
-    #  deterministic validation completes BEFORE any output mutation)
+    # ================= Phase 0: lock acquisition =================
+    # R4-A2.11 P0-01 (audit 20260825 #7 section 3.1, Option A): the
+    # single-writer lock MUST be acquired BEFORE every ACTIVE-dependent /
+    # mutable-version-store read. The previous placement (lock after the
+    # snapshot/sandbox) serialized only Phase 2/3 - two reviewers could
+    # both complete Phase 1 against the SAME parent, then commit in turn:
+    # the second would overwrite the first's ACTIVE advance with a
+    # stale-parent seal. Lock-before-preflight makes PARENT SELECTION
+    # itself serialized; "Phase 2/3 serial" != "review parent lineage
+    # serial".
+    #
+    # Allowed BEFORE the lock: CLI parse + pure lexical argument checks +
+    # basic rules_root existence - none of these read the ACTIVE selector
+    # or the mutable version store.
     if not rules_path.is_file():
         return _fail(f"rules file not found: {rules_path}")
     if not artifact.is_file():
         return _fail(f"source artifact not found: {artifact}")
+
+    import os as os_mod
+
+    lock_path = rules_root / ".review.lock"
+    try:
+        lock_fd = os_mod.open(lock_path, os_mod.O_CREAT | os_mod.O_EXCL | os_mod.O_WRONLY)
+    except FileExistsError:
+        return _fail(
+            "another review appears to be in progress (.review.lock exists) - "
+            "if no review is actually running, remove the stale lock file "
+            f"manually: {lock_path}"
+        )
+    try:
+        os_mod.write(
+            lock_fd,
+            f"pid={os_mod.getpid()} started={datetime.now(UTC).isoformat()}".encode(),
+        )
+        os_mod.close(lock_fd)
+        return _review_workflow_locked(
+            rules_root=rules_root,
+            rules_path=rules_path,
+            artifact=artifact,
+            from_version=args.from_version,
+            version=args.version,
+            reviewer=args.reviewer,
+            kind=args.kind,
+        )
+    finally:
+        lock_path.unlink(missing_ok=True)
+
+
+def _review_workflow_locked(
+    *,
+    rules_root: Path,
+    rules_path: Path,
+    artifact: Path,
+    from_version: str,
+    version: str,
+    reviewer: str,
+    kind: str,
+) -> int:
+    """The ENTIRE review workflow, executed under the single-writer lock
+    (R4-A2.11 P0-01, Option A): ACTIVE integrity + parent identity
+    (load_active_rules / lineage / COMPILED / version confinement +
+    non-existence) -> ACTIVE snapshot -> review transform -> sandbox parse
+    -> staged review gate -> publish -> ACTIVE manifest commit ->
+    post-commit verification - ALL inside the serialization boundary.
+    The lock is advisory + process-scoped (a stale lock after a crash must
+    be removed manually) - this is NOT an OS-level CAS, and the ADR
+    records that limitation honestly."""
+    # ================= Phase 1: pure validation / snapshot =================
+    # (audit 20260825 #5 section 4 / section 3.2 Step C: EVERY
+    #  deterministic validation completes BEFORE any output mutation)
 
     # R4-A2.8 P0-03: the preflight runs the FULL integrity gate -
     # load_active_rules re-verifies the ACTIVE dataset hash AND
@@ -237,7 +301,7 @@ def main() -> int:
         active_book, active = load_active_rules(rules_root)
     except Exception as exc:  # noqa: BLE001 - clear operator error
         return _fail(f"ACTIVE dataset failed the integrity preflight (load_active_rules): {exc}")
-    expected_active = args.from_version or active.rule_version
+    expected_active = from_version or active.rule_version
     if active.rule_version != expected_active:
         return _fail(
             f"ACTIVE manifest is {active.rule_version!r}, expected "
@@ -270,7 +334,7 @@ def main() -> int:
     # R4-A2.9 P0-02: version-id confinement BEFORE any mutation (lexical
     # grammar + resolved confinement + non-existence).
     try:
-        version_dir = _validate_version_id(args.version, rules_root)
+        version_dir = _validate_version_id(version, rules_root)
     except ValueError as exc:
         return _fail(str(exc))
     if version_dir.exists():
@@ -313,11 +377,11 @@ def main() -> int:
     try:
         reviewed_text = _build_reviewed_text(
             active_bytes,
-            reviewer=args.reviewer,
+            reviewer=reviewer,
             now=now,
             artifact_ref=artifact_ref,
             artifact_hash=artifact_hash,
-            kind=args.kind,
+            kind=kind,
         )
     except ValueError as exc:
         return _fail(str(exc))
@@ -326,7 +390,6 @@ def main() -> int:
     # structural validation of the reviewed copy BEFORE any output: the
     # bytes must parse as a TradingRuleBook (system temp sandbox - zero
     # rule-store mutation, byte-identical write).
-    import os as os_mod
     import tempfile
 
     with tempfile.TemporaryDirectory(prefix="rule-review-") as sandbox:
@@ -337,44 +400,24 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 - parse failure blocks
             return _fail(f"reviewed copy does not parse as a rule dataset: {exc}")
 
-    # R4-A2.10 P1-02 (audit 20260825 #6 section 5, Option A): the review
-    # tool is a SINGLE-WRITER operation. An O_CREAT|O_EXCL lock file spans
-    # the entire workflow (preflight -> snapshot -> staged gate ->
-    # manifest commit): a concurrent reviewer fails fast instead of
-    # racing the ACTIVE flip. The lock is advisory + process-scoped (a
-    # stale lock after a crash must be removed manually) - this is NOT an
-    # OS-level CAS, and the ADR records that limitation honestly.
-    lock_path = rules_root / ".review.lock"
-    try:
-        lock_fd = os_mod.open(lock_path, os_mod.O_CREAT | os_mod.O_EXCL | os_mod.O_WRONLY)
-    except FileExistsError:
-        return _fail(
-            "another review appears to be in progress (.review.lock exists) - "
-            "if no review is actually running, remove the stale lock file "
-            f"manually: {lock_path}"
-        )
-    try:
-        os_mod.write(
-            lock_fd,
-            f"pid={os_mod.getpid()} started={datetime.now(UTC).isoformat()}".encode(),
-        )
-        os_mod.close(lock_fd)
-        return _review_locked_workflow(
-            rules_root=rules_root,
-            snapshot_hash=snapshot_hash,
-            version=args.version,
-            version_dir=version_dir,
-            reviewed_bytes=reviewed_bytes,
-            artifact_bytes=artifact_bytes,
-            artifact_hash=artifact_hash,
-            artifact_ref=artifact_ref,
-            artifact_copy=artifact_copy,
-            reviewer=args.reviewer,
-            now=now,
-            kind=args.kind,
-        )
-    finally:
-        lock_path.unlink(missing_ok=True)
+    # R4-A2.11 P0-01 (Option A): the staged publish workflow runs inside
+    # the SAME lock scope - parent selection, snapshot, staged gate,
+    # publish, manifest commit and post-commit verification are ALL
+    # within the single-writer serialization boundary.
+    return _review_locked_workflow(
+        rules_root=rules_root,
+        snapshot_hash=snapshot_hash,
+        version=version,
+        version_dir=version_dir,
+        reviewed_bytes=reviewed_bytes,
+        artifact_bytes=artifact_bytes,
+        artifact_hash=artifact_hash,
+        artifact_ref=artifact_ref,
+        artifact_copy=artifact_copy,
+        reviewer=reviewer,
+        now=now,
+        kind=kind,
+    )
 
 
 def _review_locked_workflow(

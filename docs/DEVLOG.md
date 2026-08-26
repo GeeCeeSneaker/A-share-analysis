@@ -13,6 +13,39 @@
 
 ---
 
+## 2026-08-25 · R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization（复审 P0 + 治理修正）
+
+**Scope**
+- R4-A2.10/CR-1.2.6 复审裁决 REOPENED（工作要求 20260825 第七份）：P0 byte-identity 主体（persisted exact bytes / manifest identity from reviewed_bytes / read-back verification-only）/ publish cleanup / CI = **PASS / FREEZE**（不得机械重开）；single-writer lock 获取过晚（只串行化 Phase 2/3，parent selection 在锁外——stale parent review 可覆盖新 ACTIVE）；按 Batch A→E 全部完成（未启动 CR-2/R4-A3——遵守 §6 禁止项）
+
+**Implementation**
+- **P0-01 Review Parent-Identity Serialization（DM-CR-20260825-027，ADR-018 §4 amendment，Option A——lock-before-preflight）**：`.review.lock` 获取**前移到所有 ACTIVE-dependent / mutable-version-store 读取之前**——`main()` 仅做 CLI parse + 参数 lexical 检查 + rules_path/artifact 存在性检查后即获取锁；整个 workflow（ACTIVE integrity + parent identity → snapshot → transform → sandbox → staged gate → publish → manifest commit → post-commit verification）在锁内的 `_review_workflow_locked` 执行；finally 释放保持。"Phase 2/3 串行" != "review parent lineage 串行"的语义缺口闭合
+- **三重证明（DM-CR-20260825-028）**：①runtime counter——`load_active_rules`（parent selection）执行时 `.review.lock` 必已存在（monkeypatch 计数探针：`lock_exists_at_preflight is True`）；②AST 结构守卫——锁获取（O_EXCL open，BitOr 嵌套 flag 匹配）行号先于首个 `load_active_rules`；③stale-parent 对抗——A 提交 v2 后 B 的 v1-based 提交（`--from-version v1`）BLOCK（lineage moved；**零**新 version/新 evidence/manifest 推进；锁释放）；无 `--from-version` 时 stale `--rules` 输入被 input==ACTIVE 检查拒绝；B 从 current ACTIVE（新 COMPILED 候选）重启正常（lineage guard 非死锁）；同版本 race 撞 immutable collision（首版字节逐字节不动）；并发锁 fail fast 先于任何 ACTIVE 读取（`load_active_rules` 调用数 == 0）
+- **治理（DM-CR-20260825-029）**：总册头部（Reviewed HEAD `846fd458` / Reviewer Correction：PASS-FREEZE 项与 REOPENED 项分列）；§40 R4-A2.10 → REOPENED（P0 主体 PASS / frozen + lock scope 由本批修复）；RISK-004 理由更新保持 REOPENED；ADR-018 §4 **amendment**（修正记录：原文"锁覆盖 preflight → commit 全程"在 R4-A2.10 批次为 overclaim；R4-A2.11 按 Option A 修复——原文保留为历史）；含审计四问完整回答（原 placement 为何不构成 lineage serialization / parent identity 如何入边界 / Option A vs B 取舍 / 成本收益）
+
+**Schema / Contract Changes**
+- C1 ×3（DM-CR-027/028/029）；ADR-018 §4 amendment（无新 ADR——修正性重排）
+- review.py：main 拆分为 Phase 0（锁获取）+ `_review_workflow_locked`（全流程在锁内）；行为契约（锁广告范围）对齐 runtime
+
+**Verification**
+- Local: **658 tests passed / 0 failed**（650 → 658，+8：lock dominance 2 + stale-parent 3 + same-version race 1 + lifecycle 2）；ruff check / ruff format --check / mypy 全绿（CI 等价四检查）
+- dry-run 冒烟：35 meta-anchored exchanges + 5 bundles，整 run 双向闭合零问题；既有 byte-identity / manifest identity / cleanup / confinement / CA 原子边界 / Raw closure / Bound Rule replay 测试**零回归**
+- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（上批 run 48/49 已三腿 success，CI 非 blocker）
+
+**Implementation Status**
+- DONE（R4-A2.11 / CR-1.2.7 全部 P0 + 治理修正）
+
+**Review Status**
+- PENDING_REVIEW（对照工作要求 §7 Exit Gate 12 项——若全过则 R4-A2.x / CR-1.x 审计链结束：RISK-004 重评、CR-2 / R4-A3 可启动；P0-M-1B 仍 BLOCKED 至人工 Review + 正式账号）
+
+**Known Open Issues**
+- Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED）；Branch Protection 未启用；CR-2 / R4-A3 / P0-M-1B 保持 BLOCKED 直到本批 VERIFIED
+
+**Next**
+- 推送 git + CI 确认（三腿）→ Reviewer 复审 R4-A2.11/CR-1.2.7；VERIFIED 后启动 CR-2 / R4-A3
+
+---
+
 ## 2026-08-25 · R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity（复审 2 项 P0 + 2 项 P1 + 治理修正）
 
 **Scope**

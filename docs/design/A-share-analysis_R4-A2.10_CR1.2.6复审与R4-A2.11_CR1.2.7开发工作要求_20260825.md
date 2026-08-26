@@ -519,3 +519,61 @@ Trial / Fake / CI 永远不能替代正式 Provider business truth。
 ```
 
 这是本批最后需要封闭的正式语义。
+
+---
+
+# 9. Implementation Mapping（Developer 回填，2026-08-25）
+
+> 本批：R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization（Batch A→E 全部完成；**未启动 CR-2 / R4-A3 / 新 Provider/Canonical/Feature**——遵守 §6 禁止项）。
+> 测试基线：**658 passed / 0 failed**（650 → 658，+8）；CI 等价四检查（ruff check + format --check + mypy + pytest）本地全绿；dry-run 冒烟 35 exchanges + 5 bundles 双向闭合零问题；既有全部契约测试零回归。
+> Change IDs：DM-CR-20260825-027/028/029；ADR-018 **§4 amendment**（修正性重排——不新建 ADR，历史原文保留 + 修正记录）。
+> CI：本批提交后以 Actions 实际结果为准（上批 run 48/49 已三腿 success，CI 非 blocker）。
+> **§8 四问对照**：①原 placement 为何不构成 single-writer lineage serialization——锁只串行化 Phase 2/3 提交，parent selection（load_active_rules/snapshot）在锁外，stale-preflight race 实测可复现（两个 reviewer 基于同一旧 parent 完成 Phase 1 后依次提交，第二个覆盖第一个的 advance）；②parent identity 如何在 serialization boundary 内建立——lock-before-preflight：锁内执行 load_active_rules（parent selection）→ snapshot → transform → gate → commit → post-commit verification 全程；③为何选 Option A（lock-before-preflight）而非 Option B（recheck）——A 使 ADR-018 原广告语义成立且单一代码路径（B 需双份 parent 验证逻辑 + ADR 改写为 optimistic snapshot 语义，且两份验证逻辑必然漂移）；④成本 = 持锁时间稍长（preflight 纳入，竞争时快速失败），收益 = stale-parent 覆盖在构造上不可能。
+
+## §3 强制修复（P0-01）
+
+| 要求 | 实现位置 | 测试 |
+|---|---|---|
+| 3.1 Option A：lock 前移到 ACTIVE-dependent 读取之前 | `review.py`：`main()` Phase 0——CLI parse + `rules_path.is_file()`/`artifact.is_file()`（基础存在性）后即 `os.open(.review.lock, O_CREAT\|O_EXCL)`；整个 workflow 在 `_review_workflow_locked` 内（load_active_rules / lineage / COMPILED / version confinement+non-existence / snapshot / reviewed_bytes / sandbox / staged gate / publish / manifest commit / post-commit verification 全在锁内） | lineage::test_preflight_runs_only_while_lock_held + test_structural_guard_lock_before_preflight |
+| 3.1 锁前仅 CLI parse / lexical / 基础存在性 | 同上（rules_path/artifact 存在性属"必要的 rules_root 基础存在性检查"） | 并发锁测试证明 ACTIVE 读取为 0 |
+| 3.1 锁不能只包 _review_locked_workflow | `_review_locked_workflow` 改名 `_review_workflow_locked` 且包含 Phase 1（原锁外的全部校验/snapshot/sandbox 移入） | 全量 658 零回归 |
+
+## §4 Required Tests
+
+| 验收项 | 测试 |
+|---|---|
+| lock acquisition dominates load_active_rules / ACTIVE snapshot（control-flow/static guard + runtime counter） | test_preflight_runs_only_while_lock_held（runtime counter：`lock_exists_at_preflight is True`）+ test_structural_guard_lock_before_preflight（AST：O_EXCL open 行号 < 首个 load_active_rules；BitOr 嵌套 flag 匹配） |
+| B 持 stale Phase-1 capture、A 先 commit v2、B 后获锁 → BLOCK 为 stale parent；绝不能把 ACTIVE 从 v2 覆盖成基于 v1 的 v3 | test_stale_parent_blocks_and_never_overwrites_advance（`--from-version v1` → "ACTIVE manifest is v2-reviewed" BLOCK；ACTIVE 保持 v2；无 v3；无新 evidence；无 temp；锁释放）+ test_default_from_version_also_blocks_after_advance（无 --from-version 时 stale --rules 被 input==ACTIVE 拒绝） |
+| stale-parent rejection = zero new version / evidence / manifest advance | 同上（零输出断言嵌入） |
+| A commit 后 B 从 current ACTIVE 重启正常 | test_b_restarting_from_current_active_succeeds（新 COMPILED 候选 v2b → v3 正常推进） |
+| same target-version race 不 silent overwrite；immutable version 保持 | test_same_target_version_never_silently_overwrites（v2-reviewed 首版字节逐字节不动；ACTIVE 不被覆盖） |
+| lock success/failure release 保持 | test_lock_released_on_success_and_failure + test_concurrent_lock_blocks_before_any_active_read（fail fast 且 load_active_rules 计数 == 0） |
+| existing exact-byte / manifest identity / cleanup / CI matrix 全保持 | 全量 658 零回归（TestPersistedByteIdentity / TestPublishWindowTamper / TestPreCommitFailureCleanup / TestSingleWriterLock 等全部通过） |
+| 结构性 guard（os.open O_EXCL 先于首个 load_active_rules；helper 化后验证 entrypoint 调用顺序而非仅"两调用都存在"） | test_structural_guard_lock_before_preflight（单文件内行号序 = formal entrypoint 的执行序；锁在 main() 内、preflight 在被调函数内，行号序即调用序） |
+
+## §5 Governance（DM-CR-20260825-029）
+
+| 要求 | 落实 |
+|---|---|
+| DEVLOG / 总册 / ADR amendment | DEVLOG 顶部新条目（历史保留）；总册头部（Reviewed HEAD 846fd458 + Reviewer Correction：PASS-FREEZE 分列 + lock scope overclaim）+ §40/§41/§52/§61/§62；ADR-018 §4 amendment（修正记录置于节首，原文保留）+ ADR-000 索引标注 |
+| R4-A2.10 = Implementation DONE / Review REOPENED；P0 byte-identity 主体 = PASS/frozen；publish cleanup = PASS/frozen；DM-CR-025 = REOPENED；原因记录 | §40 精确分列 + 头部 Reviewer Correction + DM-CR-029 条目 |
+| RISK-004 / CR-2 / R4-A3 / P0-M-1B 保持 | §52（理由更新）/ §41（BLOCKED 保持） |
+
+## §7 Exit Gate 自检
+
+```text
+[x] single-writer lock/serialization covers parent selection through commit（lock-before-preflight + 三重证明）
+[x] stale parent cannot commit after ACTIVE advanced（--from-version BLOCK + input==ACTIVE BLOCK，双向）
+[x] ACTIVE parent identity is established while serialized（runtime counter：preflight 仅在持锁时执行）
+[x] exact ACTIVE snapshot remains intact（既有 7 项测试零回归）
+[x] reviewed_bytes exact persisted identity remains intact（TestPersistedByteIdentity 零回归）
+[x] manifest identity remains derived only from reviewed_bytes（test_manifest_hash_derives_from_reviewed_bytes 零回归）
+[x] final reread remains verification-only（TestPublishWindowTamper 零回归）
+[x] pre-commit cleanup / deterministic retry remains intact（TestPreCommitFailureCleanup 零回归）
+[x] output confinement remains intact（17 项 version-confinement 测试零回归）
+[x] CA / Raw / Bound Rule upstream closures remain intact（全量 658 零回归）
+[~] full CI matrix green —— 上批 run 48/49 已三腿 success；本批提交后以 Actions 实际结果为准（不预写）
+[x] docs match runtime (no lock-scope overclaim)（ADR-018 §4 amendment + 总册 Reviewer Correction + DEVLOG 同批更新）
+```
+
+已知开放项（如实声明）：Golden / Trading Rule 人工 Review 未执行（OPEN / HUMAN ACTION REQUIRED）；Branch Protection 未启用；CR-2 / R4-A3 / P0-M-1B 保持 BLOCKED 直到本批 VERIFIED。

@@ -1,10 +1,10 @@
 # ADR-018: Review Publish Byte-Identity + Manifest Seal from reviewed_bytes（R4-A2.10 / CR-1.2.6）
 
-- 状态：ACCEPTED
+- 状态：ACCEPTED（**§4 amended by R4-A2.11 / CR-1.2.7，2026-08-25**）
 - 日期：2026-08-25
-- 依据：审计 R4-A2.9/CR-1.2.5 复审（裁决 REOPENED）→ R4-A2.10 / CR-1.2.6 开发工作要求（P0-01/02 + P1-01/02）
+- 依据：审计 R4-A2.9/CR-1.2.5 复审（裁决 REOPENED）→ R4-A2.10 / CR-1.2.6 开发工作要求（P0-01/02 + P1-01/02）；审计 R4-A2.10/CR-1.2.6 复审（裁决 REOPENED）→ R4-A2.11 / CR-1.2.7 工作要求 P0-01（lock 覆盖范围修正）
 - 关系：**amendment to ADR-017**（输入侧 exact snapshot 已成立；本 ADR 闭合输出侧）
-- 登记变更：DM-CR-20260825-022 / 023 / 024 / 025 / 026（管理总册 §61）
+- 登记变更：DM-CR-20260825-022 / 023 / 024 / 025 / 026（R4-A2.10 批次）+ DM-CR-20260825-027 / 028 / 029（R4-A2.11 批次修正 §4）
 
 ## 0. 修正记录（ADR-017 §1 的未完成部分）
 
@@ -123,6 +123,23 @@ read-back 的角色被构造性地限定为"验证持久化字节 == 期望封�
 同版本重试成功。
 
 ## 4. Single-Writer Lock（P1-02，DM-CR-025，Option A）
+
+> **R4-A2.11 / CR-1.2.7 修正（2026-08-25，audit 20260825 #7）**：本节原文
+> 声明"锁覆盖 preflight → snapshot → staged gate → manifest commit 全程"
+> 在 R4-A2.10 批次是 **overclaim**——当时锁的获取位于 Phase 1（snapshot/
+> sandbox）**之后**，只序列化了 Phase 2/3：两个 reviewer 可基于同一旧
+> parent 完成 Phase 1，随后依次获锁提交，第二个用 stale parent snapshot
+> 覆盖第一个的 ACTIVE advance（"Phase 2/3 串行" != "review parent lineage
+> 串行"）。R4-A2.11 已按审计 §3.1 Option A 修复：**锁获取前移到所有
+> ACTIVE-dependent / mutable-version-store 读取之前**——锁前仅允许 CLI
+> parse、纯 lexical 参数检查与 rules_root 基础存在性检查；
+> `load_active_rules`（parent selection）、snapshot、staged gate、publish、
+> manifest commit 与 post-commit verification **全部在锁内**。运行时计数
+> 测试证明 preflight 仅在持锁时执行；AST 结构守卫证明锁获取先于首个
+> `load_active_rules`；stale-parent 对抗测试证明 B 的 v1-based 提交在
+> A 推进后必然 BLOCK（零输出、零 manifest 变更、同版本重试语义保持）。
+> 原文其余描述（advisory + 进程级、非 OS-level CAS、stale lock 人工清理、
+> `--from-version` 仅 lineage 提示）保持有效并继续诚实适用。
 
 `rules_root/.review.lock`（`O_CREAT|O_EXCL`）覆盖
 preflight → snapshot → staged gate → manifest commit 全程；并发 reviewer
