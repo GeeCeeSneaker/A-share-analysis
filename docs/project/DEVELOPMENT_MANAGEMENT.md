@@ -6,11 +6,11 @@
 > **Frozen Baseline**：V1.3.2  
 > **Reviewed Repository HEAD**：`846fd458cc2c740f423699dabdbe0f4d48bf9c24`（Reviewer 复审基线，run 49 全三腿 success）  
 > **Primary Implementation（上批）**：`8d29c16d2476a48e105b091a9ec63b2b39c3d77e`（run 48 三腿 success）  
-> **Current Code Baseline**：本批 implementation commit（R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization；SHA 于提交后由同批 docs commit 记录）  
+> **Current Code Baseline**：本批 implementation commit `38da90e583a83dd0e83991987df7f29ddbc7189c6` + lint fix `6eac92dc1bfb7a3aa70619dc34695930e88a51af`（R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization）  
 > **Document Revision**：DM-CR-20260825-027 / 028 / 029  
 > **Last Review**：2026-08-25 21:43 +08:00（R4-A2.10/CR-1.2.6 复审：REOPENED——single-writer lock 获取过晚，stale parent review 可覆盖新 ACTIVE，本批 R4-A2.11/CR-1.2.7 修复）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN**——run 48（`8d29c16`）/ run 49（Reviewed HEAD `846fd45`）均 Ubuntu 3.14 + Windows 3.12 + Windows 3.14 三腿 success（Reviewer 正向确认；CI 非 blocker）；本批提交后以 Actions 实际结果为准  
+> **CI Status**：**FULL MATRIX GREEN——run 52（`6eac92d`）Ubuntu 3.14 + Windows 3.12 + Windows 3.14 三腿 success**（2026-08-26 API positive confirmation；run 51 曾因 3 个 lint 错误挂——本地验证输出截断误判，已修并改为退出码严格验证）。历史：run 48/49 三腿 success（Reviewer 正向确认）  
 > **Reviewer Correction（2026-08-25 21:43）**：R4-A2.10 的 P0 byte-identity 主体（persisted exact bytes / manifest identity from reviewed_bytes / read-back verification-only）/ publish cleanup / CI = **PASS / FREEZE**（不得机械重开）；但 single-writer lock 获取于 Phase 1 之后——只串行化了 Phase 2/3，未串行化 parent selection（ADR-018 §4 的"锁覆盖 preflight → commit"为 overclaim；ADR-018 §4 amendment 为修正记录，历史保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。

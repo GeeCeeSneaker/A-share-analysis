@@ -30,7 +30,7 @@
 **Verification**
 - Local: **658 tests passed / 0 failed**（650 → 658，+8：lock dominance 2 + stale-parent 3 + same-version race 1 + lifecycle 2）；ruff check / ruff format --check / mypy 全绿（CI 等价四检查）
 - dry-run 冒烟：35 meta-anchored exchanges + 5 bundles，整 run 双向闭合零问题；既有 byte-identity / manifest identity / cleanup / confinement / CA 原子边界 / Raw closure / Bound Rule replay 测试**零回归**
-- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（上批 run 48/49 已三腿 success，CI 非 blocker）
+- GitHub Actions: **FULL MATRIX GREEN——run 52（`6eac92d`）三腿 success**（API positive confirmation）。过程：run 51 曾因新测试文件 3 个 lint 错误挂（本地验证管道 `Select-Object -Last 1` 截断输出误判通过——已修两处 SIM102 + 一处 C416，并改用退出码严格验证）
 
 **Implementation Status**
 - DONE（R4-A2.11 / CR-1.2.7 全部 P0 + 治理修正）
