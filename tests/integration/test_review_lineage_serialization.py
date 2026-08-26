@@ -194,10 +194,13 @@ class TestLockDominatesPreflight:
                         return True
                 return False
 
-            if isinstance(func, ast.Attribute) and func.attr == "open":
-                if any(_mentions_o_excl(arg) for arg in node.args):
-                    if lock_line is None:
-                        lock_line = node.lineno
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "open"
+                and any(_mentions_o_excl(arg) for arg in node.args)
+                and lock_line is None
+            ):
+                lock_line = node.lineno
             if (
                 isinstance(func, ast.Name)
                 and func.id == "load_active_rules"
@@ -246,7 +249,7 @@ class TestStaleParentCannotCommit:
         # zero stale output: no v3 anywhere, no new evidence, no temp
         assert not (root / "versions" / "v3-reviewed").exists()
         evidence = root / "evidence"
-        new_evidence = [p for p in evidence.glob("*")] if evidence.exists() else []
+        new_evidence = list(evidence.glob("*")) if evidence.exists() else []
         assert all(
             p.name.startswith(hashlib.sha256(b"official notice").hexdigest()[:16])
             for p in new_evidence
