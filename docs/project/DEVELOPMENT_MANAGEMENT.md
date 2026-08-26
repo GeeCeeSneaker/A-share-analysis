@@ -7,11 +7,11 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：本批 implementation commit（R4-A3 SDK / Lifecycle / Early-Stop Closure；SHA 于提交后由同批 docs commit 记录）  
+> **Current Code Baseline**：本批 implementation commit `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe`（R4-A3 SDK / Lifecycle / Early-Stop Closure；run 55 三腿 success）  
 > **Document Revision**：DM-CR-20260826-030 / 031 / 032 / 033  
 > **Last Review**：2026-08-26 23:57 +08:00（R4-A2.11/CR-1.2.7 复审：**VERIFIED——R4-A2.x / CR-1.x 审计链 CLOSED**；R4-A3 为下一活跃批次）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN**——run 52/53（`6eac92d` / `ab0cde7`）三腿 success（Reviewer job-level 正向确认）；本批提交后以 Actions 实际结果为准  
+> **CI Status**：**FULL MATRIX GREEN**——run 52/53（`6eac92d` / `ab0cde7`）三腿 success（Reviewer job-level 正向确认）；**run 55（本批 implementation `de9bf1ab`）三腿 success**（2026-08-27 API positive confirmation——R4-A3 新增 58 项 lifecycle/gate/boundary 测试在 Ubuntu+Windows 两 OS 通过）  
 > **Phase Status（Reviewer 裁决同步，2026-08-26）**：  
 > R4-A2.10 / CR-1.2.6 → DONE / VERIFIED (absorbed)；R4-A2.11 / CR-1.2.7 → DONE / VERIFIED；R4-A2.x / CR-1.x → **CLOSED / VERIFIED**；RISK-004 → **CLOSED for its current review-lineage definition**；R4-A3 → READY / ACTIVE NEXT；R4-B1 → READY_AFTER_R4-A3；R4-B2 → READY_AFTER_R4-B1；CR-2 → UNBLOCKED, sequenced after R4-B2；Production P0-M-1B → BLOCKED（人工 Review + 正式账号条件未满足）  
 > **SHA Correction（Reviewer，2026-08-26）**：上批记录的 `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` 有误，以 GitHub commit object 为准：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`（本头部即为修正记录；历史条目原文保留）  

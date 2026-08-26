@@ -33,7 +33,7 @@
 **Verification**
 - Local: **716 tests passed / 0 failed**（658 → 716，+58：lifecycle 单元 15 + early-stop 集成 11 + gate separation 15 + trial boundary 7 + 适配（fake session lifecycle 携带））；ruff check / ruff format --check / mypy 全绿（CI 等价四检查，以退出码严格验证）
 - dry-run 冒烟：35 meta-anchored exchanges + 5 bundles，整 run 双向闭合零问题（lifecycle 门不影响 dry-run 正常路径）
-- GitHub Actions: 本批提交后触发；**以 Actions 实际结果为准**（上批 run 52/53 已三腿 success）
+- GitHub Actions: **FULL MATRIX GREEN——run 55（`de9bf1ab`）三腿 success**（API positive confirmation；R4-A3 新增 58 项 lifecycle/gate/boundary 测试在 Ubuntu+Windows 两 OS 通过）
 
 **Implementation Status**
 - DONE（R4-A3 全部强制工作项 A3-01..05 + 治理闭环）
