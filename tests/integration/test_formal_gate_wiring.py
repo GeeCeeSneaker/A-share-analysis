@@ -194,9 +194,7 @@ class TestFormalGateWiring:
         executor = FormalRuntimeGateExecutor(ctx)
         executor.execute(GATE_PLAN_SPECS["daily_bar"](ctx))
 
-        report_path = (
-            ctx.store.run_dir(ctx.run) / "gates" / "daily_bar.json"
-        )
+        report_path = ctx.store.run_dir(ctx.run) / "gates" / "daily_bar.json"
         assert report_path.is_file()
         doc = json.loads(report_path.read_text(encoding="utf-8"))
         assert doc["capability"] == "daily_bar"
@@ -234,9 +232,7 @@ class TestGateEvidenceBindingAdversarial:
 
         assert not bound.report.all_passed
         assert bound.report.blocked_by is GateKind.PERMISSION
-        permission_result = next(
-            r for r in bound.report.results if r.kind is GateKind.PERMISSION
-        )
+        permission_result = next(r for r in bound.report.results if r.kind is GateKind.PERMISSION)
         assert permission_result.status is GateStatus.FAIL
         assert "persistence failed" in permission_result.reason
         assert not permission_result.has_persisted_evidence
@@ -253,9 +249,7 @@ class TestGateEvidenceBindingAdversarial:
         executor = FormalRuntimeGateExecutor(ctx)
         executor.execute(GATE_PLAN_SPECS["trade_calendar"](ctx))
         ctx.catalog.flush(ctx.store.run_dir(ctx.run))
-        permission_case = _case_by_id(
-            ctx, gate_case_id("trade_calendar", GateKind.PERMISSION)
-        )
+        permission_case = _case_by_id(ctx, gate_case_id("trade_calendar", GateKind.PERMISSION))
         meta_path = ctx.store.spike_root / permission_case.evidence_ref
         # tamper with the persisted bytes
         original = meta_path.read_bytes()
@@ -302,9 +296,7 @@ class TestNoBypassStaticGuards:
             if isinstance(n, ast.FunctionDef) and n.name == "approve_from_spike_run"
         )
         called = {
-            ast.unparse(node.func)
-            for node in ast.walk(approval)
-            if isinstance(node, ast.Call)
+            ast.unparse(node.func) for node in ast.walk(approval) if isinstance(node, ast.Call)
         }
         assert "_require_formal_gate_proof" in called
 
@@ -321,9 +313,7 @@ class TestNoBypassStaticGuards:
             n for n in ast.walk(executor) if isinstance(n, ast.FunctionDef) and n.name == "execute"
         )
         called = {
-            ast.unparse(node.func)
-            for node in ast.walk(execute)
-            if isinstance(node, ast.Call)
+            ast.unparse(node.func) for node in ast.walk(execute) if isinstance(node, ast.Call)
         }
         assert "RuntimeGatePipeline" in called, "the boundary must build the frozen pipeline"
 

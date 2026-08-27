@@ -295,9 +295,7 @@ def main() -> int:
         # unregister/stop complete) with no step errors.
         state = lifecycle.state
         lifecycle_ok = (
-            lifecycle_ok
-            and state is SdkLifecycleState.UNSUBSCRIBED
-            and not controller.step_errors
+            lifecycle_ok and state is SdkLifecycleState.UNSUBSCRIBED and not controller.step_errors
         )
         report["lifecycle_verdict"] = "PASS" if lifecycle_ok else "FAIL"
         report["status"] = (

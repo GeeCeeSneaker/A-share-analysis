@@ -48,9 +48,7 @@ def _freeze(monkeypatch, profile: AccountProfile) -> None:
         confirmed_at="2026-08-27T00:00:00+00:00",
         confirmed_by="r4-a3.1-test",
     )
-    monkeypatch.setattr(
-        pi, "load_frozen_production_identity", lambda *a, **k: frozen
-    )
+    monkeypatch.setattr(pi, "load_frozen_production_identity", lambda *a, **k: frozen)
 
 
 @pytest.fixture(autouse=True)
@@ -107,9 +105,7 @@ class TestApprovalRefusesTrialAccounts:
         "account_profile_id",
         ["TRIAL_abc123", "TRIAL_SIMULATION_x", "FAKE_session", "UNKNOWN", "UNKNOWN_deadbeef"],
     )
-    def test_trial_fake_unknown_account_cannot_approve(
-        self, conn, monkeypatch, account_profile_id
-    ):
+    def test_trial_fake_unknown_account_cannot_approve(self, conn, monkeypatch, account_profile_id):
         # even with a frozen identity configured, non-matching ids refuse
         _freeze(monkeypatch, _profile(host="h", username="u"))
         with pytest.raises(capability_module.CapabilityGovernanceError):
@@ -127,9 +123,7 @@ class TestApprovalRefusesTrialAccounts:
         with pytest.raises(
             capability_module.CapabilityGovernanceError, match="frozen production identity"
         ):
-            capability_module.approve_and_persist_capability(
-                conn, "daily_bar", _evidence(impostor)
-            )
+            capability_module.approve_and_persist_capability(conn, "daily_bar", _evidence(impostor))
 
     def test_no_frozen_identity_blocks_all_approval(self, conn, monkeypatch):
         """Fail closed: with nothing frozen (the repo truth today - the

@@ -80,6 +80,7 @@ FORMAL_GATE_PROBE_KINDS = (
     GateKind.BUSINESS_DATA,
 )
 
+
 #: gate proof case id helper (mirrors capability._require_formal_gate_proof)
 def gate_case_id(capability: str, kind: GateKind) -> str:
     return f"GATE-{capability}-{kind.value}"
@@ -215,9 +216,7 @@ class FormalRuntimeGateExecutor:
                 ),
                 PermissionGate(permission_probe),
                 EndpointAvailableGate(endpoint_probe),
-                CacheMetadataGate(
-                    plan.cache_validator, evidence_ref=plan.cache_evidence_ref
-                ),
+                CacheMetadataGate(plan.cache_validator, evidence_ref=plan.cache_evidence_ref),
                 FreshnessAsOfGate(
                     data_as_of=plan.data_as_of,
                     required_as_of=plan.required_as_of,
@@ -329,9 +328,7 @@ class FormalRuntimeGateExecutor:
             )
         self._emit_report_case(plan, bound, as_of)
 
-    def _emit_report_case(
-        self, plan: CapabilityProbePlan, bound: _BoundReport, as_of: str
-    ) -> None:
+    def _emit_report_case(self, plan: CapabilityProbePlan, bound: _BoundReport, as_of: str) -> None:
         """Persist the FULL six-gate report as a run artifact and bind a
         REPORT case to it - the auditable record that the formal boundary
         actually executed (and what each gate concluded) for this
@@ -365,9 +362,7 @@ class FormalRuntimeGateExecutor:
         payload = json.dumps(report_doc, indent=2, ensure_ascii=False, sort_keys=True)
         report_path.write_text(payload, encoding="utf-8")
         report_hash = hashlib.sha256(report_path.read_bytes()).hexdigest()
-        run_prefix = (
-            f"{self.ctx.run.run_kind.value.lower()}/{self.ctx.run.spike_run_id}/"
-        )
+        run_prefix = f"{self.ctx.run.run_kind.value.lower()}/{self.ctx.run.spike_run_id}/"
         meta = {
             "evidence_ref": f"{run_prefix}gates/{plan.capability}.json",
             "content_hash": report_hash,
@@ -393,9 +388,7 @@ class FormalRuntimeGateExecutor:
                 else CaseResult.NOT_TESTABLE_PERMISSION
             ),
             evidence_meta=meta,
-            reason_code=(
-                "GATE_ALL_PASS" if bound.report.all_passed else "GATE_CHAIN_BLOCKED"
-            ),
+            reason_code=("GATE_ALL_PASS" if bound.report.all_passed else "GATE_CHAIN_BLOCKED"),
             validator_id="formal_runtime_gate_v1",
             validator_version="1.0.0",
         )
@@ -467,20 +460,76 @@ def _plan(
 
 def _factory(
     capability: str,
-    endpoint_probe: Callable[[ProbeContext], Callable[[], ProviderExchange]],
-    business_fetch: Callable[[ProbeContext], Callable[[], ProviderExchange]],
+    endpoint_probe: Callable[[ProbeContext], ProviderExchange],
+    business_fetch: Callable[[ProbeContext], ProviderExchange],
     rule_bound: bool = False,
 ) -> Callable[[ProbeContext], CapabilityProbePlan]:
     def build(ctx: ProbeContext) -> CapabilityProbePlan:
         return _plan(
             capability,
             ctx,
-            endpoint_probe=endpoint_probe(ctx),
-            business_fetch=business_fetch(ctx),
+            endpoint_probe=lambda: endpoint_probe(ctx),
+            business_fetch=lambda: business_fetch(ctx),
             cache_validator=_rule_book_validator_factory(ctx) if rule_bound else None,
         )
 
     return build
+
+
+# ------------------------------------------------------- named gate probes
+# (explicit annotations: the gate plans are static declarations, and the
+# endpoint/business fetch signatures must be checkable - no anonymous
+# nested lambdas whose types mypy cannot determine)
+
+
+def _probe_calendar(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_calendar_exchange()
+
+
+def _probe_hist_code_list(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 19900101, ctx.as_of_date)
+
+
+def _probe_code_list_bj(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_code_list_exchange("EXTRA_STOCK_BJ")
+
+
+def _probe_kline_600519(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.query_kline_exchange(
+        ["600519.SH"],
+        begin_date=ctx.as_of_date,
+        end_date=ctx.as_of_date,
+        kline_type="DAY",
+        trading_days=[ctx.as_of_date],
+    )
+
+
+def _probe_kline_index(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.query_kline_exchange(
+        ["000300.SH"],
+        begin_date=ctx.as_of_date,
+        end_date=ctx.as_of_date,
+        kline_type="DAY",
+        trading_days=[ctx.as_of_date],
+    )
+
+
+def _probe_status_history(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_history_stock_status_exchange(
+        ctx.as_of_date, ctx.as_of_date, ["600519.SH"]
+    )
+
+
+def _probe_adj_factor(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_adj_factor_exchange(["600519.SH"])
+
+
+def _probe_dividend(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_dividend_exchange(["600519.SH"])
+
+
+def _probe_stock_basic(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_stock_basic_exchange(["600519.SH"])
 
 
 #: per-capability formal gate plans (R4-A3.1 P0-01). The endpoint /
@@ -491,89 +540,21 @@ def _factory(
 #: remains the job of the B2-B7 probes (this boundary proves the GATE
 #: CHAIN, not business semantics).
 GATE_PLAN_SPECS: dict[str, Callable[[ProbeContext], CapabilityProbePlan]] = {
-    "trade_calendar": _factory(
-        "trade_calendar",
-        lambda ctx: ctx.target.get_calendar_exchange,
-        lambda ctx: ctx.target.get_calendar_exchange,
-    ),
-    "security_master": _factory(
-        "security_master",
-        lambda ctx: (
-            lambda: ctx.target.get_hist_code_list_exchange(
-                "EXTRA_STOCK_A_SH_SZ", 19900101, ctx.as_of_date
-            )
-        ),
-        lambda ctx: (
-            lambda: ctx.target.get_hist_code_list_exchange(
-                "EXTRA_STOCK_A_SH_SZ", 19900101, ctx.as_of_date
-            )
-        ),
-    ),
-    "code_mapping_bj": _factory(
-        "code_mapping_bj",
-        lambda ctx: (lambda: ctx.target.get_code_list_exchange("EXTRA_STOCK_BJ")),
-        lambda ctx: (lambda: ctx.target.get_code_list_exchange("EXTRA_STOCK_BJ")),
-    ),
-    "daily_bar": _factory(
-        "daily_bar",
-        lambda ctx: ctx.target.get_calendar_exchange,
-        lambda ctx: (
-            lambda: ctx.target.query_kline_exchange(
-                ["600519.SH"],
-                begin_date=ctx.as_of_date,
-                end_date=ctx.as_of_date,
-                kline_type="DAY",
-                trading_days=[ctx.as_of_date],
-            )
-        ),
-    ),
+    "trade_calendar": _factory("trade_calendar", _probe_calendar, _probe_calendar),
+    "security_master": _factory("security_master", _probe_hist_code_list, _probe_hist_code_list),
+    "code_mapping_bj": _factory("code_mapping_bj", _probe_code_list_bj, _probe_code_list_bj),
+    "daily_bar": _factory("daily_bar", _probe_calendar, _probe_kline_600519),
     "security_status_history": _factory(
         "security_status_history",
-        lambda ctx: (
-            lambda: ctx.target.get_history_stock_status_exchange(
-                ctx.as_of_date, ctx.as_of_date, ["600519.SH"]
-            )
-        ),
-        lambda ctx: (
-            lambda: ctx.target.get_history_stock_status_exchange(
-                ctx.as_of_date, ctx.as_of_date, ["600519.SH"]
-            )
-        ),
+        _probe_status_history,
+        _probe_status_history,
         rule_bound=True,
     ),
-    "adj_factor": _factory(
-        "adj_factor",
-        lambda ctx: (lambda: ctx.target.get_adj_factor_exchange(["600519.SH"])),
-        lambda ctx: (lambda: ctx.target.get_adj_factor_exchange(["600519.SH"])),
-    ),
-    "corporate_action": _factory(
-        "corporate_action",
-        lambda ctx: (lambda: ctx.target.get_dividend_exchange(["600519.SH"])),
-        lambda ctx: (lambda: ctx.target.get_dividend_exchange(["600519.SH"])),
-    ),
-    "equity_structure": _factory(
-        "equity_structure",
-        lambda ctx: (lambda: ctx.target.get_stock_basic_exchange(["600519.SH"])),
-        lambda ctx: (lambda: ctx.target.get_stock_basic_exchange(["600519.SH"])),
-    ),
-    "industry_taxonomy": _factory(
-        "industry_taxonomy",
-        lambda ctx: (lambda: ctx.target.get_stock_basic_exchange(["600519.SH"])),
-        lambda ctx: (lambda: ctx.target.get_stock_basic_exchange(["600519.SH"])),
-    ),
-    "index_daily": _factory(
-        "index_daily",
-        lambda ctx: ctx.target.get_calendar_exchange,
-        lambda ctx: (
-            lambda: ctx.target.query_kline_exchange(
-                ["000300.SH"],
-                begin_date=ctx.as_of_date,
-                end_date=ctx.as_of_date,
-                kline_type="DAY",
-                trading_days=[ctx.as_of_date],
-            )
-        ),
-    ),
+    "adj_factor": _factory("adj_factor", _probe_adj_factor, _probe_adj_factor),
+    "corporate_action": _factory("corporate_action", _probe_dividend, _probe_dividend),
+    "equity_structure": _factory("equity_structure", _probe_stock_basic, _probe_stock_basic),
+    "industry_taxonomy": _factory("industry_taxonomy", _probe_stock_basic, _probe_stock_basic),
+    "index_daily": _factory("index_daily", _probe_calendar, _probe_kline_index),
 }
 
 

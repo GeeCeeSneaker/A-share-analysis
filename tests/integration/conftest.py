@@ -30,9 +30,7 @@ def freeze_production_identity(monkeypatch):
             confirmed_at="2026-08-27T00:00:00+00:00",
             confirmed_by="r4-a3.1-test",
         )
-        monkeypatch.setattr(
-            pi, "load_frozen_production_identity", lambda *a, **k: frozen
-        )
+        monkeypatch.setattr(pi, "load_frozen_production_identity", lambda *a, **k: frozen)
         return frozen.account_profile_id
 
     return _freeze

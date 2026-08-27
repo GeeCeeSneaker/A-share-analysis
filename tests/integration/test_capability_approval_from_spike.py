@@ -127,9 +127,7 @@ def _add_formal_gate_proof(store, run, catalog, capability: str) -> None:
     gates_dir = store.run_dir(run) / "gates"
     gates_dir.mkdir(parents=True, exist_ok=True)
     report_path = gates_dir / f"{capability}.json"
-    report_path.write_text(
-        json.dumps(report_doc, indent=2, sort_keys=True), encoding="utf-8"
-    )
+    report_path.write_text(json.dumps(report_doc, indent=2, sort_keys=True), encoding="utf-8")
     rel = f"{run.run_kind.value.lower()}/{run.spike_run_id}/gates/{capability}.json"
     catalog.add(
         SpikeCase(
