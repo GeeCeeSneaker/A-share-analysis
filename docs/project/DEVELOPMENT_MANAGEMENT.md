@@ -7,11 +7,11 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：本批（R4-A3.1）implementation commit 将于推送后在下方 SHA Correction 行回填（R4-A3 原始 implementation = `de9bf1ab6f499b20916f8277dba45c21880fd908`，见 SHA Correction 2026-08-27）  
+> **Current Code Baseline**：R4-A3.1 implementation `2c6ecdd`（主实现）+ CI fix `9bfe327`（format/mypy，GRANDFATHERED 例外披露）+ gate sync `af8a28a`；R4-A3 原始 implementation = `de9bf1ab6f499b20916f8277dba45c21880fd908`（见 SHA Correction 2026-08-27）  
 > **Document Revision**：DM-CR-20260827-040 / 041 / 042 / 043  
 > **Last Review**：2026-08-27（R4-A3 复审：**REOPENED**——三点 P0：gate 组件未接入 formal path / gate evidence 无 persisted identity / trial 边界 fail-open blacklist；随 R4-A3.1 收口，见 §41/§63）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：run 55（R4-A3 `de9bf1ab`）三腿 success；本批（R4-A3.1，754 tests）CI 结果待推送后正向确认回填  
+> **CI Status**：**FULL MATRIX GREEN——run 33043039242（`af8a28a`）三腿 success**（2026-08-27 API positive confirmation；R4-A3.1 新增 38 项 formal-gate/subscription/identity 测试 754/0 在 Ubuntu+Windows 两 OS 通过；CI 过程：run 33041340222/33041905727/33042592020 三次失败——ruff format 未本地执行 / mypy 嵌套 lambda / devlog gate 双实现豁免未同步——全部根因修复，gate 例外已披露，见 DEVLOG 2026-08-27 条目）  
 > **Phase Status（2026-08-27）**：  
 > R4-A2.x / CR-1.x → **CLOSED / VERIFIED**；R4-A3 → REOPENED（修正项由 R4-A3.1 承接）；R4-A3.1 → **DONE / PENDING_REVIEW**；R4-B1 → READY_AFTER_R4-A3.1；R4-B2 → READY_AFTER_R4-B1；CR-2 → UNBLOCKED, sequenced after R4-B2；Production P0-M-1B → BLOCKED（人工 Review + 正式账号条件未满足；R4-A3.1 后新增前置：production_account.yaml 冻结仍为空 = fail closed）  
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
