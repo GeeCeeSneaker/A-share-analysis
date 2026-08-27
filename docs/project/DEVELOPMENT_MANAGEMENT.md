@@ -7,13 +7,14 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：本批 implementation commit `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe`（R4-A3 SDK / Lifecycle / Early-Stop Closure；run 55 三腿 success）  
-> **Document Revision**：DM-CR-20260826-030 / 031 / 032 / 033  
-> **Last Review**：2026-08-26 23:57 +08:00（R4-A2.11/CR-1.2.7 复审：**VERIFIED——R4-A2.x / CR-1.x 审计链 CLOSED**；R4-A3 为下一活跃批次）  
+> **Current Code Baseline**：本批（R4-A3.1）implementation commit 将于推送后在下方 SHA Correction 行回填（R4-A3 原始 implementation = `de9bf1ab6f499b20916f8277dba45c21880fd908`，见 SHA Correction 2026-08-27）  
+> **Document Revision**：DM-CR-20260827-040 / 041 / 042 / 043  
+> **Last Review**：2026-08-27（R4-A3 复审：**REOPENED**——三点 P0：gate 组件未接入 formal path / gate evidence 无 persisted identity / trial 边界 fail-open blacklist；随 R4-A3.1 收口，见 §41/§63）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN**——run 52/53（`6eac92d` / `ab0cde7`）三腿 success（Reviewer job-level 正向确认）；**run 55（本批 implementation `de9bf1ab`）三腿 success**（2026-08-27 API positive confirmation——R4-A3 新增 58 项 lifecycle/gate/boundary 测试在 Ubuntu+Windows 两 OS 通过）  
-> **Phase Status（Reviewer 裁决同步，2026-08-26）**：  
-> R4-A2.10 / CR-1.2.6 → DONE / VERIFIED (absorbed)；R4-A2.11 / CR-1.2.7 → DONE / VERIFIED；R4-A2.x / CR-1.x → **CLOSED / VERIFIED**；RISK-004 → **CLOSED for its current review-lineage definition**；R4-A3 → READY / ACTIVE NEXT；R4-B1 → READY_AFTER_R4-A3；R4-B2 → READY_AFTER_R4-B1；CR-2 → UNBLOCKED, sequenced after R4-B2；Production P0-M-1B → BLOCKED（人工 Review + 正式账号条件未满足）  
+> **CI Status**：run 55（R4-A3 `de9bf1ab`）三腿 success；本批（R4-A3.1，754 tests）CI 结果待推送后正向确认回填  
+> **Phase Status（2026-08-27）**：  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED**；R4-A3 → REOPENED（修正项由 R4-A3.1 承接）；R4-A3.1 → **DONE / PENDING_REVIEW**；R4-B1 → READY_AFTER_R4-A3.1；R4-B2 → READY_AFTER_R4-B1；CR-2 → UNBLOCKED, sequenced after R4-B2；Production P0-M-1B → BLOCKED（人工 Review + 正式账号条件未满足；R4-A3.1 后新增前置：production_account.yaml 冻结仍为空 = fail closed）  
+> **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
 > **SHA Correction（Reviewer，2026-08-26）**：上批记录的 `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` 有误，以 GitHub commit object 为准：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`（本头部即为修正记录；历史条目原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
@@ -1079,15 +1080,12 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A2.9 Review-Seal Exactness + CR-1.2.5 Output Confinement | DONE | VERIFIED (absorbed) | PASS |
 | R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | VERIFIED (absorbed) | PASS |
 | R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | **VERIFIED** | **R4-A2.x / CR-1.x 审计链 CLOSED（2026-08-26）** |
-| R4-A3 SDK / Lifecycle / Early-Stop Closure | DONE | PENDING_REVIEW | 最高优先（已完成，待复核；VERIFIED 后进入 R4-B1） |
-| R4-B1 Capability Endpoint Proof | PLANNED | READY_AFTER_R4-A3 | — |
+| R4-A3 SDK / Lifecycle / Early-Stop Closure | DONE | REOPENED → 修正随 R4-A3.1 | 三点 P0 由 R4-A3.1 收口（见 §41/§63） |
+| R4-A3.1 Formal Runtime-Gate Wiring + Production Identity | DONE | PENDING_REVIEW | 最高优先（gate 边界接线 / persisted evidence / positive identity / subscription SoR；待复核） |
+| R4-B1 Capability Endpoint Proof | PLANNED | READY_AFTER_R4-A3.1 | — |
 | R4-B2 Publish Validation Exactness | PLANNED | READY_AFTER_R4-B1 | — |
 | CR-2 Provider-Normalized + Quarantine | PLANNED | UNBLOCKED / after R4-B2 | — |
-| R4-A3 SDK/Lifecycle/Early Stop | PLANNED | PENDING | Next |
-| R4-B1 Capability Endpoint Proof | PLANNED | PENDING | Next |
-| R4-B2 Publish Validation Exactness | PLANNED | PENDING | Next |
 | R4-CI | PLANNED | PENDING | Next |
-| CR-2 Provider-Normalized + Quarantine | PLANNED | PENDING | CR-1.1 后 |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
 | CR-4 Snapshot + Read Model Rebuild | PLANNED | PENDING | CR-3 后 |
 | Mock 20×60d Vertical Slice | BLOCKED | PENDING | CR-2..4 后 |
@@ -1099,47 +1097,57 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A3 SDK / Lifecycle / Early-Stop Closure（本批，DONE / PENDING_REVIEW）
+## R4-A3.1 Formal Runtime-Gate Wiring + Production Identity（本批，DONE / PENDING_REVIEW）
+
+R4-A3 复审（2026-08-27）REOPENED 三点 P0，本批收口（ADR-019 Amendment
+2026-08-27；工作要求 `docs/design/A-share-analysis_R4-A3复审与R4-A3.1正式
+运行时门控收口开发工作要求_20260827.md`）：
 
 ```text
-A3-01 SDK Lifecycle State Machine（DM-CR-20260826-030，ADR-019 §2.1/2.2）：
-  ashare_state.providers.lifecycle.SdkLifecycle：
-    INIT -> SDK_UNAVAILABLE | LOAD_FAILED | LOGIN_FAILED | AUTH_REJECTED
-          | SESSION_READY
-    SESSION_READY/UNSUBSCRIBED -> SUBSCRIBE_STARTED -> CALLBACK_ACTIVE
-          -> UNSUBSCRIBED（可重订阅）
-    任意状态 -> LOGGED_OUT（仅经 close()，幂等；失败态关闭=合法清理）
-  非法跳转 raise；迁移历史（from/to/reason/evidence/at）可审计
-  require_ready(action)：terminal/非 session-alive -> 
-    ProviderLifecycleTerminalError（ProviderError 子类，context 携带
-    state/reason/evidence/refused_action/early_stop）——endpoint 函数
-    调用之前抛出
-  集成（真实控制流）：session.login 全失败类 -> 显式 terminal 态；
-    logout -> close() 幂等；provider.call_exchange 第一道 lifecycle 门
-    （terminal 后 capability gate 与 SDK 函数均不执行、零 exchange）
-A3-02 Permission / Cache / Freshness 分 Gate（DM-CR-20260826-031，
-    ADR-019 §2.3）：
-  runtime_gates 六类显式分离（AUTH_ACCOUNT / PERMISSION /
-    ENDPOINT_AVAILABLE / CACHE_METADATA / FRESHNESS_ASOF / BUSINESS_DATA）
-  GateResult：explicit status（PASS/FAIL/NOT_TESTABLE/SKIPPED_BLOCKED）
-    + blocking reason + traceable evidence_ref + provider_calls_fired 计数
-  非掩盖性：PERMISSION 先于 CACHE（缓存健康不掩盖权限失败）；
-    ENDPOINT 真实 probe（缓存不可替代 endpoint proof）；FRESHNESS FAIL
-    阻断 BUSINESS（陈旧不得降级为有数据即 PASS）
-A3-03 Early Stop Control Flow（并入 030/031）：
-  RuntimeGatePipeline 顺序评估；首个 blocking（FAIL 或 NOT_TESTABLE——
-    不可证即阻断）后，后续 gate SKIPPED_BLOCKED 且 evaluate 从不执行
-  fault-injection 以 call-count / exchange-count / evidence-count 证明
-    （permission fail -> business probe 计数 == 0）
-A3-04 Runtime Truth / Trial Boundary（DM-CR-20260826-032）：
-  capability approval 双入口（_validate_evidence + approve_from_spike_run）
-    拒绝 TRIAL_*/FAKE*/UNKNOWN/空 account_profile_id——run kind PRODUCTION
-    本身不构成 production truth
-A3-05 Evidence Closure：
-  gates 的 probe 走 ProviderExchange 显式边界（成功/失败 exchange 都
-    可携带 evidence）；lifecycle 门在 exchange 创建之前（refused call
-    不产生半截 evidence）；既有 ProviderExchange -> RawWriter 链零回归
+P0-01 唯一正式 gate 执行边界（DM-CR-20260827-040）：
+  ashare_state.spike.formal_gates.FormalRuntimeGateExecutor —— 唯一
+  formal gate execution boundary；CapabilityProbePlan 六 gate 全量必填
+  （caller 无法选择性跳过）；冻结顺序 pipeline 评估；probe_b1 阶段为
+  全部 formal run（含 dry-run）的强制第一阶段；blocking gate 后
+  downstream probe fired == 0 且零新 raw evidence（计数器 + raw 目录
+  双证明）；每 capability 落 4 个 formal_runtime_gate case
+  （PERMISSION/ENDPOINT/BUSINESS 绑持久化 meta + REPORT 绑六 gate
+  报告 artifact {run}/gates/{cap}.json）
+  approve_from_spike_run -> _require_formal_gate_proof：四 case 缺一
+  或非 VALIDATED_PASS 即拒绝（early stop 天然阻断 approval）；AST
+  静态守卫 ×4 防绕过（approval 含调用 / executor 构造 pipeline /
+  probe_b1 经 executor / run_dry_run 消费 probe_b1）
+P0-02 persisted gate evidence identity（DM-CR-20260827-041）：
+  GateResult 证据语义显式拆分：request_id（请求身份）/ evidence_uri
+  （RawWriter .meta.json 锚）/ evidence_hash —— has_persisted_evidence
+  要求 URI+hash 同时存在；request_id 单独存在不构成 formal evidence
+  PASS；probe exchange（成功与失败）经 ProbeContext.evidence_from_
+  exchange 统一持久化后绑定（无 private writer）；持久化失败 -> PASS
+  降级 FAIL 并置 blocked_by（fail closed）；gate proof case 与 report
+  artifact 纳入统一 evidence closure（篡改即阻断 verdict）
+P0-03 positive production account identity（DM-CR-20260827-042）：
+  blacklist -> allowlist。configs/production_account.yaml 冻结 scrubbed
+  stable profile id（非凭证；当前为空 = 未确认 = fail closed）
+  AccountProfile.kind = 解析事实（TRIAL heuristics / UNKNOWN；非 trial
+  != production；ACCOUNT_ 前缀废除 -> UNKNOWN_<digest>）
+  四处同步 exact-match：verify_production_account / _validate_evidence /
+  approve_from_spike_run / AuthAccountGate(require_production_identity=
+  True)；无 frozen identity -> NOT_TESTABLE/BLOCKED；RunKind.PRODUCTION
+  永不替代账号身份
+P1-01 subscription lifecycle 接线（DM-CR-20260827-043）：
+  ashare_state.providers.amazingdata.subscription.SubscriptionController
+  —— L1 脚本 register/run/unregister/stop 驱动真实 SdkLifecycle 状态机
+  （诊断 dict 是 VIEW，状态机是 SoR）；register 失败不 fake
+  SUBSCRIBE_STARTED；unregister/stop retry-safe；UNSUBSCRIBED 后回调
+  = late callback 计数，永不 reactivation
 ```
+
+### R4-A3（前批，已由本批承接修正）
+
+R4-A3 原始交付（A3-01..05，implementation `de9bf1ab6f499b20916f8277dba
+45c21880fd908`）的 lifecycle 状态机 / 六类 gate 组件 / early-stop /
+trial 双入口拒绝结构**全部保留**；复审指出的"组件未接线 / evidence 无
+持久化身份 / blacklist fail-open"三点由上方 R4-A3.1 条目收口。
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
@@ -1149,13 +1157,14 @@ scripts/rules/review.py 对已验证 ACTIVE 规则版本执行人工复核（exa
   + serialized-parent seal workflow，已 VERIFIED）
 ```
 
-## R4-B1（R4-A3 VERIFIED 后启动；R4-B2 -> R4-B1 后；CR-2 -> R4-B2 后）
+## R4-B1（R4-A3.1 VERIFIED 后启动；R4-B2 -> R4-B1 后；CR-2 -> R4-B2 后）
 
 ```text
 Capability Approval 不接受 caller self-declare；绑定 provider/dataset/
   endpoint/account profile/runtime；persisted exchange evidence；
   permission/endpoint proof 与 business-quality proof 分离
-（R4-B1/B2 正式开发要求在 A3 VERIFIED 后细化）
+（R4-B1/B2 正式开发要求在 R4-A3.1 VERIFIED 后细化；gate 边界
+  FORMAL_GATE_PROBE_KINDS 已为 endpoint/permission proof 提供消费面）
 ```
 
 ## 后续 CR
@@ -1742,6 +1751,50 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260827-043 — Subscription Lifecycle SoR Integration
+
+**Type**：C1 correctness closure  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A3.1 P1-01（audit 20260827 §5.2）——subscription lifecycle states 已交付但真实 Trial L1 脚本仍用私有 dict 作为第二 lifecycle SoR。  
+**New Contract**（ADR-019 Amendment A.4）：`ashare_state.providers.amazingdata.subscription.SubscriptionController`——register/run/unregister/stop 驱动真实 `SdkLifecycle`（SESSION_READY → SUBSCRIBE_STARTED → CALLBACK_ACTIVE → UNSUBSCRIBED → LOGGED_OUT）；register 失败不 fake SUBSCRIBE_STARTED；unregister/stop retry-safe；UNSUBSCRIBED 后回调计数 late_callbacks 永不 reactivation；诊断 dict 是 VIEW，状态机是 SoR；`scripts/spike/l1_subscription_test.py` 消费 controller（report 增加 lifecycle_state_machine 视图，verdict 由状态机派生）。  
+**Tests**：test_subscription_controller.py（14）  
+**ADR**：[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment A.4  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260827-042 — Positive Production Account Identity（blacklist → allowlist）
+
+**Type**：C1 correctness closure（fail-open 修复）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A3.1 P0-03（audit 20260827 §4.3/§7）——"not Trial == Production" 为 fail-open：任意 unknown/educational/other-vendor-tier 账号被盖 `ACCOUNT_*` 即获得 approval 资格。  
+**New Contract**（ADR-019 Amendment A.3）：`configs/production_account.yaml` 冻结 scrubbed stable profile id（非凭证；空 = 未确认 = fail closed——当前仓库真值）；`AccountProfile.kind` 为解析事实（TRIAL / UNKNOWN；非 trial ≠ production；`ACCOUNT_` 前缀废除 → `UNKNOWN_<digest>`）；四处同步 exact-match 放行：`verify_production_account`（production run 创建门）、`_validate_evidence`、`approve_from_spike_run`、`AuthAccountGate(require_production_identity=True)`（formal boundary 的 production proof input）；无 frozen identity → NOT_TESTABLE / BLOCKED；RunKind.PRODUCTION 永不替代账号身份。旧 fail-open 断言（任意 `ACCOUNT_abc123` 可 approve）废除并重写为 exact-match 对抗集。  
+**Tests**：test_trial_production_boundary.py 重写（15：exact match 放行 / mismatch 拒绝 / 无 frozen fail-closed / RunKind 不替代身份 / production_account_status 三态）+ test_amazingdata_provider.py（kind 断言）+ 各 production-run 测试 fixture 化 frozen identity  
+**ADR**：[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment A.3  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260827-041 — Persisted Gate Evidence Identity
+
+**Type**：C1 evidence 契约  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A3.1 P0-02（audit 20260827 §4.2）——gate evidence 只有 request_id：一个 request id 只是请求身份，不是持久化证据身份；probe 失败无第一类失败 exchange 落盘。  
+**New Contract**（ADR-019 Amendment A.2）：`GateResult` 证据语义显式拆分 `request_id` / `evidence_uri`（RawWriter .meta.json 锚）/ `evidence_hash`，`has_persisted_evidence` 要求 URI+hash 同时存在；probe exchange（成功与失败）经 `ProbeContext.evidence_from_exchange` 统一持久化后绑定（无 private writer）；持久化失败（exchange 已 fire 但字节未落盘）→ PASS 降级 FAIL 并置 blocked_by（fail closed）；gate proof case 与 gates/{cap}.json report artifact 纳入统一 evidence closure（篡改即阻断 verdict）。  
+**Tests**：test_formal_gate_wiring.py（绑定 hash 读盘验证 / 失败 exchange 持久化绑定 / 持久化失败降级 / meta 与 report 篡改阻断 closure）  
+**ADR**：[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment A.2  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260827-040 — Formal Runtime-Gate Execution Boundary Wiring
+
+**Type**：C1 新正式路径契约  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A3.1 P0-01（audit 20260827 §4.1）——RuntimeGatePipeline 仅为可复用组件，formal Spike/Provider execution path 未消费：组件测试证明的是库，不是正式路径。  
+**New Contract**（ADR-019 Amendment A.1）：`ashare_state.spike.formal_gates.FormalRuntimeGateExecutor` 为**唯一** formal gate execution boundary；`CapabilityProbePlan` 六 gate 全量必填（caller 无法选择性跳过 permission/freshness）；冻结顺序 pipeline；`probe_b1_formal_gates` 为全部 formal run（含 dry-run）的强制第一阶段（run_dry_run + scripts/spike/spike_runner.py PHASES）；blocking gate 后 downstream probe fired == 0 且零新 raw evidence；每 capability 落 4 个 `formal_runtime_gate` case（PERMISSION/ENDPOINT/BUSINESS 绑持久化 meta + REPORT 绑六 gate 报告 artifact）；`approve_from_spike_run` → `_require_formal_gate_proof`（四 case 缺一或非 VALIDATED_PASS 即拒绝——early stop 天然阻断 approval）；AST 静态守卫 ×4 防绕过。  
+**Tests**：test_formal_gate_wiring.py（14）+ test_capability_approval_from_spike.py（bypass 拒绝）+ test_spike_framework.py（b1 phase 断言）  
+**ADR**：[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment A.1  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260826-033 — R4-A2.x / CR-1.x VERIFIED Governance Closure
 

@@ -707,3 +707,72 @@ full CI matrix
 ```
 
 如果上述全部通过且无新的 correctness regression，则给 R4-A3 **VERIFIED** 并进入 R4-B1；不要再次扩展与本批无关的新工作面。
+
+
+---
+
+# 12. Implementation Mapping（开发方填写，2026-08-27）
+
+## Batch A — Formal Runtime Gate Wiring（P0-01）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 唯一正式 gate execution boundary | `src/ashare_state/spike/formal_gates.py`：`FormalRuntimeGateExecutor`（唯一 boundary；`CapabilityProbePlan` 六 gate 全量必填——caller 无法选择性跳过 permission/freshness 直接 business fetch） | test_formal_gate_wiring.py::TestFormalGateWiring |
+| RuntimeGatePipeline 组件语义不弱化 | 冻结组件零改动（GateResult 仅**新增**可选字段；AuthAccountGate 仅**新增**默认关闭的 production identity 要求）；`PASS AS COMPONENT` 冻结测试零回归 | test_runtime_gate_separation.py（15）全过 |
+| formal probe orchestration 消费 pipeline | `probe_b1_formal_gates`（GATE_PLAN_SPECS 覆盖全部 10 注册 capability）经 executor 构造冻结顺序 pipeline；AST 守卫强制 | test_formal_gate_wiring.py::TestNoBypassStaticGuards |
+| blocking gate 后 zero provider call AND zero Raw evidence | `RuntimeGatePipeline.evaluate` SKIPPED_BLOCKED 后 probe 从不执行；`_PersistedProbe.fired` 计数 + raw 目录文件数双证明 | test_permission_failure_blocks_with_zero_downstream_calls（fired==0；raw 文件==1 即失败 exchange 本身） |
+| SpikeCase / capability proof 从 pipeline result 派生 | 每 capability 4 个 `formal_runtime_gate` case：PERMISSION/ENDPOINT/BUSINESS（从评估过的 gate result 落 case）+ REPORT（六 gate 报告 artifact）；SKIPPED_BLOCKED 不落 case（early stop → 缺 case → approval 拒绝，无 fabrication） | test_probe_b1_runs_the_boundary_for_all_capabilities |
+| caller 无法绕过 boundary | `approve_from_spike_run` → `_require_formal_gate_proof`（四 case 缺一或非 VALIDATED_PASS 即拒）；AST ×4（approval 含调用 / executor 构造 pipeline / probe_b1 经 executor / run_dry_run 消费 probe_b1） | test_approval_refuses_run_without_formal_gate_proof + TestNoBypassStaticGuards |
+| trial/production run 的 B1 执行 | `run_dry_run` + `scripts/spike/spike_runner.py` PHASES = ("b1", ...)——全部 formal run 强制第一阶段 | test_dry_run_includes_b1_phase + test_dry_run_produces_all_phase_outputs（b1..b7） |
+
+## Batch B — Persisted Gate Evidence（P0-02）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| permission PASS → exchange persisted → binds exact meta URI/hash | `_PersistedProbe`：probe exchange 经 `ctx.evidence_from_exchange`（与全部 formal evidence 同一 RawWriter 边界，无 private writer）持久化后绑定 `request_id`/`evidence_uri`/`evidence_hash` 三字段；`has_persisted_evidence` 要求 URI+hash 同时存在 | test_all_gates_pass_business_fires_and_evidence_binds（绑定 hash 读盘验证） |
+| permission FAIL 同样绑定 | 失败 exchange（`ProviderError.exchange`）同样持久化并绑定（失败证据也是证据） | test_permission_failure_blocks...（permission FAIL 且 has_persisted_evidence） |
+| persisted meta missing/tampered → formal proof BLOCK | gate proof case 与 report artifact 纳入统一 `verify_evidence_closure` | test_tampered_meta_blocks_verdict + test_gate_report_artifact_tamper_blocks_verdict |
+| request_id 存在但 Raw evidence 未落盘 → 不得视为 formal evidence PASS | 持久化异常 → PASS 降级 FAIL + 置 blocked_by（fail closed；request_id 单独存在不构成 PASS） | test_persistence_failure_downgrades_pass_to_fail |
+| 不通过 RunStore.write_evidence(JSON) 伪造 provider evidence 链 | probe gate 全走 RawWriter meta 锚；`gates/{cap}.json` 是治理 artifact（六 gate 报告），非 provider evidence 链成员 | 代码审查点：formal_gates.py `_persist` 仅调用 `ctx.evidence_from_exchange` |
+
+## Batch C — Positive Production Account Identity（P0-03）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 正式生产 identity / frozen production profile 引用 | `providers/amazingdata/production_identity.py` + `configs/production_account.yaml`（scrubbed stable profile id——非凭证；**空 = fail closed = 当前真值**） | test_production_account_status_unfrozen_fails_closed |
+| verify_production_account 不再是 blacklist | exact frozen match 才放行；无 frozen → BLOCK；非 trial 未匹配 → 拒绝 | TestVerifyProductionAccount（4） |
+| _validate_evidence 同步 | exact frozen match 才 approve；无 frozen → 拒绝（fail closed） | test_no_frozen_identity_blocks_all_approval |
+| approve_from_spike_run 同步 | run.account_profile_id 必须 == frozen id；无 frozen → 拒绝 | test_production_run_without_frozen_identity_refused + test_production_run_with_mismatched_account_refused |
+| AuthAccountGate / production proof input 同步 | `require_production_identity=True` + `frozen_production_id`：无 frozen → NOT_TESTABLE；mismatch → FAIL | formal_gates.py AUTH gate（PRODUCTION run 时启用） |
+| RunKind.PRODUCTION 不替代账号身份 | approval 检查 account id 与 run kind 独立判定 | test_production_run_with_mismatched_account_refused |
+| AccountKind 类型（非 str） | `AccountKind` StrEnum（UNKNOWN/TRIAL/PRODUCTION）；`AccountProfile.kind` = 解析事实（非 trial → UNKNOWN，`ACCOUNT_` 前缀废除 → `UNKNOWN_<digest>`） | test_unknown_non_trial_profile_is_not_production_kind + test_production_like_profile_kind |
+
+## Batch D — Subscription Lifecycle Integration（P1-01）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| register/run/unregister/stop 走真实 SDK SubscriptionController | `providers/amazingdata/subscription.py`（register 成功才 SUBSCRIBE_STARTED；首回调 → CALLBACK_ACTIVE 幂等；unregister/stop retry-safe；状态机是 SoR） | tests/unit/test_subscription_controller.py（14） |
+| l1_subscription_test.py 消费 controller | 脚本全面改造：SdkLifecycle 为 correctness SoR；report["lifecycle_state_machine"] = controller.diagnostic()；lifecycle_verdict 由状态机 UNSUBSCRIBED + 零 step 错误派生；logout 经幂等 close() | 脚本审查点（真实 SDK 环境运行时验证） |
+| unregister/stop retry safe | 已 UNSUBSCRIBED → no-op；SDK 失败记录 step_errors 不猜测 | test_unregister_is_retry_safe + test_unregister_failure_keeps_state_and_records |
+| callback after UNSUBSCRIBED 不 reactivation | late_callbacks 计数；状态永不回退 | test_callback_after_unsubscribed_never_reactivates |
+
+## Batch E — Adversarial Regression
+
+- `tests/integration/test_formal_gate_wiring.py`（14）：全过链路 + 阻断链路 + 绕过拒绝 + 篡改阻断 + 持久化失败降级 + AST ×4
+- `tests/unit/test_subscription_controller.py`（14）
+- `tests/integration/test_trial_production_boundary.py` 重写（15）：旧 fail-open 断言废除
+- `tests/integration/test_capability_approval_from_spike.py` 增 bypass 拒绝（+1）
+- Local: **754 / 0**（716 → 754）；ruff 全绿
+
+## Batch F — Governance
+
+- ADR-019 Amendment 2026-08-27（A.1–A.5：含变更记录四问的回答与备选方案拒绝理由）
+- DEVELOPMENT_MANAGEMENT.md：头部 SHA Correction 2026-08-27（`de9bf1ab6f499b20916f8277dba45c21880fd908`）+ Phase Status（R4-A3 REOPENED → R4-A3.1 DONE/PENDING_REVIEW）+ §40 重复 workstream 行清理 + §41 重写 + §61 DM-CR-20260827-040..043
+- DEVLOG.md 顶部新条目（2026-08-27 R4-A3.1）
+
+## 变更记录四问（§10 回答）
+
+1. **组件测试为何不能证明 formal path 闭合**：组件测试构造的是"库能正确工作"的证据（孤立 pipeline + fake probe）；formal 证明需要的是"正式路径必然经过边界"的证据——只有当 capability approval **拒绝**缺少 gate proof 的 run 时，边界才是不可绕过的结构性事实，而非可选 helper。
+2. **如何保证每个 formal capability proof 不可绕过**：四层——plan 六 gate 必填（构造期强制）；pipeline 冻结顺序 + early stop（执行期强制）；approval 要求四 case 全 PASS（消费期强制）；AST 静态守卫（源码期强制）。
+3. **为何必须绑定 RawWriter persisted identity 而非 request_id**：request_id 是请求身份——内存中即可伪造、崩溃即丢失、无字节对应；persisted meta URI+hash 是不可变字节锚——可复验、可闭合、篡改即阻断。fail-closed 要求证据链在字节层完整。
+4. **为何 positive frozen identity 而非 blacklist**：blacklist 的语义是"不在已知坏名单即好"——未知账号（educational/other-vendor-tier/拼写变体）自动获得生产资格（fail-open）；allowlist 的语义是"仅在人工确认名单中才好"——未知即拒绝（fail-closed）。生产 truth 的成本必须显式支付（人工冻结），不能默认豁免。

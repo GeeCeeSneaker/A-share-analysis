@@ -263,7 +263,16 @@ def compute_config_hash(repo_root: Path | None = None) -> str:
 
 
 def verify_production_account(profile: AccountProfile) -> None:
-    """R3-P0-14: PRODUCTION runs need a complete, non-trial account."""
+    """R3-P0-14 + R4-A3.1 P0-03: PRODUCTION runs need a complete account
+    that POSITIVELY matches the frozen production identity.
+
+    This is an allowlist (exact match), not a blacklist: "not a known
+    trial" never upgrades an account to production. When no frozen
+    production identity is configured (the current truth - the formal
+    account is not yet opened/confirmed), NO production run may open."""
+    from ashare_state.providers.amazingdata import production_identity
+    from ashare_state.providers.amazingdata.production_identity import AccountKind
+
     problems: list[str] = []
     if not profile.auth_ok:
         problems.append("auth_ok is False")
@@ -273,10 +282,17 @@ def verify_production_account(profile: AccountProfile) -> None:
         problems.append("entitlement not verified (PermissionCode missing)")
     if profile.account_profile_id == "UNKNOWN":
         problems.append("account_profile_id is UNKNOWN")
-    if profile.account_profile_id.startswith("TRIAL_SIMULATION"):
+    if profile.account_profile_id.startswith(("TRIAL_SIMULATION", "TRIAL_", "FAKE")):
         problems.append(
             "TRIAL_SIMULATION account may not open PRODUCTION runs (use --trial for trial evidence)"
         )
+    # R4-A3.1 P0-03: positive production identity - an EXACT match with
+    # the frozen identity is required; anything else (including unknown,
+    # educational, other-vendor-tier accounts) is refused. No frozen
+    # identity configured -> fail closed (NOT_TESTABLE, never a guess).
+    kind, detail = production_identity.production_account_status(profile)
+    if kind is not AccountKind.PRODUCTION:
+        problems.append(f"positive production identity not confirmed: {detail}")
     if problems:
         msg = "production account gate refused: " + "; ".join(problems)
         raise ProductionAccountGateError(msg)
@@ -411,6 +427,10 @@ def run_dry_run(
     catalog = CaseCatalog(store, run.spike_run_id)
     ctx = _probe_context(run, store, catalog, target)
     outputs: dict[str, Any] = {"spike_run_id": run.spike_run_id, "phases": {}}
+    # R4-A3.1 P0-01: the formal gate boundary is the MANDATORY first
+    # phase - every formal run (dry-run included) proves the runtime
+    # gate chain before any business probe fires.
+    from ashare_state.spike.formal_gates import probe_b1_formal_gates
     from ashare_state.spike.probes import (
         probe_b2_security_master,
         probe_b3_core_facts,
@@ -420,6 +440,7 @@ def run_dry_run(
         probe_b7_capacity,
     )
 
+    outputs["phases"]["b1"] = probe_b1_formal_gates(ctx)
     outputs["phases"]["b2"] = probe_b2_security_master(ctx)
     outputs["phases"]["b3"] = probe_b3_core_facts(ctx, sample_date)
     outputs["phases"]["b4"] = probe_b4_golden(ctx, sample_date)

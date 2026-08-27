@@ -31,6 +31,7 @@ from ashare_state.providers.amazingdata.provider import (
 from ashare_state.providers.amazingdata.session import AmazingDataSession
 from ashare_state.providers.errors import ProviderUnavailableError
 from ashare_state.providers.exchange import ProviderExchange
+from ashare_state.providers.lifecycle import SdkLifecycle, SdkLifecycleState
 
 
 class SpikeTarget(Protocol):
@@ -38,7 +39,14 @@ class SpikeTarget(Protocol):
 
     Each business method has an ``*_exchange`` twin returning the explicit
     ProviderExchange (CR-1.1); the payload methods remain as convenience.
+
+    R4-A3.1 P0-01: targets also expose the REAL ``lifecycle`` state
+    machine - the formal gate boundary consumes it as the AUTH gate's
+    control-flow truth (never a re-derived guess).
     """
+
+    #: the live SDK lifecycle state machine (AUTH gate input)
+    lifecycle: SdkLifecycle
 
     # explicit exchange surface (probes / RawWriter consume THIS)
     def get_code_list_exchange(self, security_type: str | None = None) -> Any: ...
@@ -84,6 +92,12 @@ class RealTarget:
 
     def __init__(self, session: AmazingDataSession) -> None:
         self.provider = AmazingDataProvider(session, use_mode=ProviderUseMode.SPIKE)
+
+    @property
+    def lifecycle(self) -> SdkLifecycle:
+        """R4-A3.1 P0-01: the REAL session lifecycle - the formal gate
+        boundary's AUTH truth (login/logout/failure states)."""
+        return self.provider.session.lifecycle
 
     # ---- explicit exchange surface (CR-1.1 audit section 3.2-A) ----
     def get_code_list_exchange(self, security_type: str | None = None) -> ProviderExchange:
@@ -174,6 +188,9 @@ class RealTarget:
             "account_profile_id": profile.account_profile_id,
             # R3-P0-11: REAL permission codes from the parsed logon profile
             "permission_codes": profile.permission_codes,
+            # R4-A3.1 P0-01: auth-gate input - profile parsing is a
+            # SEPARATE fact from login success (audit P1-08)
+            "profile_parsed": profile.profile_parsed,
         }
 
 
@@ -322,6 +339,24 @@ class FakeTarget:
 
     def __init__(self) -> None:
         self._call_log: list[str] = []
+        # R4-A3.1 P0-01: the fake target drives the SAME lifecycle state
+        # machine as the real session (SESSION_READY after its implicit
+        # "login") so the formal gate boundary exercises the real AUTH
+        # control-flow truth even in dry runs. The transition is driven
+        # through a LOCAL reference: subclasses that intercept attribute
+        # access (counting spies) must not observe a half-initialized
+        # self during __init__.
+        lifecycle = SdkLifecycle()
+        lifecycle.transition(
+            SdkLifecycleState.SESSION_READY,
+            reason="fake target session (dry-run)",
+            evidence_ref="TRIAL_SIMULATION_FAKE",
+        )
+        self._lifecycle = lifecycle
+
+    @property
+    def lifecycle(self) -> SdkLifecycle:
+        return self._lifecycle
 
     def _mark(self, method: str) -> None:
         self._call_log.append(method)
@@ -332,6 +367,7 @@ class FakeTarget:
             "runtime_version": "FAKE-V4.3.0",
             "account_profile_id": "TRIAL_SIMULATION_FAKE",
             "permission_codes": "3|4|32|33",
+            "profile_parsed": True,
         }
 
     # ------------------------------------------------ exchange surface

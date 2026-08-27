@@ -105,3 +105,82 @@ account_profile_id——run kind 为 PRODUCTION 本身不构成 production truth
 - `tests/integration/test_trial_production_boundary.py`（7）：TRIAL/FAKE/
   UNKNOWN/空账号在两个 approval 入口拒绝；生产账号对照；spike-run 路径
   防御纵深（monkeypatch 创建门后仍拒）。
+
+---
+
+## Amendment 2026-08-27（R4-A3.1，audit 20260827）
+
+R4-A3 复审 REOPEN（三点）：gate 组件未接入 formal execution path；gate
+evidence 仅 request_id，缺 RawWriter persisted identity；trial 边界为
+blacklist（fail-open）。本 amendment 记录接线后的最终契约。
+
+### A.1 唯一正式 gate 执行边界（P0-01）
+
+`ashare_state.spike.formal_gates.FormalRuntimeGateExecutor`：唯一正式
+gate 执行边界。正式 capability proof（B1 阶段，每个注册 capability 一个
+`CapabilityProbePlan`）经它组装**冻结顺序**的 RuntimeGatePipeline：
+
+```text
+AUTH_ACCOUNT -> PERMISSION -> ENDPOINT_AVAILABLE
+            -> CACHE_METADATA -> FRESHNESS_ASOF -> BUSINESS_DATA
+```
+
+- plan 必须定义全部六类 gate——caller 无法选择性跳过
+  permission/freshness 直接 business fetch；
+- blocking gate 后：downstream probe `fired == 0` 且零新 raw evidence
+  （计数器 + raw 目录双证明）；
+- gate proof 落 4 个 `formal_runtime_gate` case / capability：
+  `GATE-{cap}-PERMISSION/ENDPOINT/BUSINESS`（绑定持久化 meta）+
+  `GATE-{cap}-REPORT`（绑定六 gate 完整报告 artifact
+  `{run}/gates/{cap}.json`）；
+- `approve_from_spike_run` 调用 `_require_formal_gate_proof`：四 case
+  缺一或非 PASS → 拒绝（early stop 因此天然阻断 approval）；AST
+  静态守卫防绕过（approval 必须含该调用；executor 必须构造 pipeline；
+  probe_b1 必须经 executor）。
+
+### A.2 persisted evidence 闭合（P0-02）
+
+`GateResult` 拆分证据语义：`request_id`（请求身份）/ `evidence_uri`
+（RawWriter .meta.json 锚）/ `evidence_hash`——`has_persisted_evidence`
+要求 URI+hash 同时存在；request_id 单独存在**不构成** formal evidence
+PASS。probe exchange（成功与失败）经 `ProbeContext.evidence_from_exchange`
+持久化后绑定；持久化失败（exchange 已 fire 但字节未落盘）将 PASS 降级
+FAIL 并置 blocked_by（fail closed）。gate proof case 与 report artifact
+纳入统一 evidence closure（篡改即阻断 verdict）。
+
+### A.3 positive production identity（P0-03）
+
+`ashare_state.providers.amazingdata.production_identity`：blacklist 改
+allowlist。`configs/production_account.yaml` 冻结**scrubbed stable profile
+id**（非凭证；空 = 未确认 = fail closed——当前仓库真值）。
+`AccountProfile.kind` 为解析事实（TRIAL heuristics / UNKNOWN；非 trial
+≠ production，旧 `ACCOUNT_` 前缀废除，改为 `UNKNOWN_<digest>`）。
+`verify_production_account` / `_validate_evidence` / `approve_from_spike_run` /
+`AuthAccountGate(require_production_identity=True)` 四处同步：仅 exact
+match 放行；无 frozen identity 即 NOT_TESTABLE/BLOCKED；
+RunKind.PRODUCTION 永不替代账号身份。
+
+### A.4 subscription lifecycle 接线（P1-01）
+
+`ashare_state.providers.amazingdata.subscription.SubscriptionController`：
+L1 脚本 register/run/unregister/stop 经真实状态机驱动
+（SESSION_READY → SUBSCRIBE_STARTED → CALLBACK_ACTIVE → UNSUBSCRIBED →
+LOGGED_OUT）。register 失败不 fake SUBSCRIBE_STARTED；unregister/stop
+retry-safe；UNSUBSCRIBED 后回调计数为 late callback，永不 reactivation；
+诊断 dict 是 VIEW，状态机是 SoR。
+
+### A.5 新增测试
+
+- `tests/integration/test_formal_gate_wiring.py`（14）：executor 全过
+  （六 gate 顺序 + 绑定 hash 读盘验证）/ permission 失败零下游调用零新
+  evidence（失败 exchange 仍持久化绑定）/ probe_b1 全 capability /
+  report artifact + REPORT case hash 闭合 / dry-run b1 阶段 / 持久化失败
+  降级 FAIL / meta 与 report 篡改阻断 closure / 4 个 AST 静态防绕过守卫。
+- `tests/unit/test_subscription_controller.py`（14）：register 失败不
+  迁移 / 首回调激活（幂等）/ late callback 不 reactivation / retry-safe
+  unregister / stop 完成 / run 失败记录不崩溃 / diagnostic 视图非 SoR。
+- `test_trial_production_boundary.py` 重写（15）：旧 fail-open 断言
+  （任意 `ACCOUNT_abc123` 可 approve）废除，改为 exact frozen match +
+  mismatch 拒绝 + 无 frozen fail-closed + RunKind 不替代身份。
+
+DM 登记见管理总册 §61 Change Log（DM-CR-20260827-040..043）。

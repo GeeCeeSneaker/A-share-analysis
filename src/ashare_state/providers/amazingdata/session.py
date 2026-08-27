@@ -20,6 +20,7 @@ from ashare_state.providers.amazingdata.errors import (
     ProviderUnavailableError,
     classify_sdk_error,
 )
+from ashare_state.providers.amazingdata.production_identity import AccountKind
 from ashare_state.providers.amazingdata.stdout_capture import (
     CapturedStdout,
     parse_logon_profile,
@@ -41,12 +42,20 @@ class AccountProfile:
     Audit P1-07: account_profile_id mixes provider/env/host/username-hash
     with the entitlement hash so two accounts with identical entitlements
     still get distinct ids.
+
+    R4-A3.1 P0-03 (audit 20260827): ``kind`` is the PARSED truth only -
+    the known trial shape or UNKNOWN. A non-trial profile is NEVER
+    implicitly production: production requires a positive exact match
+    with the frozen production identity (production_identity.py). The
+    legacy ``ACCOUNT_`` prefix (which made every non-trial profile look
+    production-eligible) is gone - non-trial ids are ``UNKNOWN_<digest>``.
     """
 
     raw_profile: dict[str, Any] = field(default_factory=dict)
     auth_ok: bool = False
     profile_parsed: bool = False
     account_profile_id: str = "UNKNOWN"
+    kind: AccountKind = AccountKind.UNKNOWN
 
     @property
     def login_ok(self) -> bool:
@@ -99,14 +108,23 @@ class AccountProfile:
         digest = hashlib.sha256(
             f"{provider}|{environment}|{host}|{username_hash}|{entitlement}".encode()
         ).hexdigest()[:12]
-        # classify trial vs production by entitlement shape; refined when a
-        # real production account is observed (task book section 18).
-        kind = "TRIAL_SIMULATION" if profile.get("TotalWeekFlow") == 10 else "ACCOUNT"
+        # R4-A3.1 P0-03: classify by entitlement shape as PARSED truth only.
+        # The known trial shape -> TRIAL; everything else -> UNKNOWN (a
+        # non-trial account is NOT implicitly production - production is a
+        # positive frozen-identity match, see production_identity.py; task
+        # book section 18 refines the trial heuristic when observed).
+        if profile.get("TotalWeekFlow") == 10:
+            kind = AccountKind.TRIAL
+            prefix = "TRIAL_SIMULATION"
+        else:
+            kind = AccountKind.UNKNOWN
+            prefix = "UNKNOWN"
         return cls(
             raw_profile=profile,
             auth_ok=True,
             profile_parsed=True,
-            account_profile_id=f"{kind}_{digest}",
+            account_profile_id=f"{prefix}_{digest}",
+            kind=kind,
         )
 
 

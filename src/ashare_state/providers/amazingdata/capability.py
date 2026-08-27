@@ -15,7 +15,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from ashare_state.providers.amazingdata import production_identity as _production_identity
 
 if TYPE_CHECKING:
     from duckdb import DuckDBPyConnection
@@ -166,16 +168,32 @@ def _validate_evidence(name: str, evidence: CapabilityEvidence) -> Capability:
         msg = f"capability {name!r} is RETIRED; approval refused"
         raise CapabilityGovernanceError(msg)
     # R4-A3 A3-04 (audit 20260826 section 7.2): Fake/Trial success can
-    # NEVER produce PRODUCTION capability truth - approval requires a
-    # production account profile identity.
-    if not evidence.account_profile_id or evidence.account_profile_id.startswith(
-        ("TRIAL_", "FAKE", "UNKNOWN")
-    ):
+    # NEVER produce PRODUCTION capability truth. R4-A3.1 P0-03 (audit
+    # 20260827): the refusal is a POSITIVE allowlist, not a blacklist -
+    # approval requires an EXACT match with the frozen production
+    # identity; with no frozen identity configured the gate fails closed
+    # (an arbitrary ACCOUNT_*/UNKNOWN_* id can never approve).
+    frozen = _production_identity.load_frozen_production_identity()
+    if frozen is None:
+        msg = (
+            f"capability approval refused for {name!r}: no frozen production "
+            "account identity is configured - production truth is NOT_TESTABLE "
+            "(fail closed, audit R4-A3.1 P0-03: 'not Trial' is not 'Production')"
+        )
+        raise CapabilityGovernanceError(msg)
+    if evidence.account_profile_id != frozen.account_profile_id:
         msg = (
             f"capability approval refused for {name!r}: account_profile_id "
-            f"{evidence.account_profile_id!r} is not a production account - "
-            "Fake/Trial/unknown success never grants PRODUCTION truth "
-            "(audit R4-A3 section 7.2 A3-04)"
+            f"{evidence.account_profile_id!r} does not match the frozen "
+            "production identity - only the positive exact match grants "
+            "PRODUCTION truth (audit R4-A3.1 P0-03)"
+        )
+        raise CapabilityGovernanceError(msg)
+    if frozen.account_profile_id.startswith(("TRIAL_", "TRIAL_SIMULATION", "FAKE")):
+        msg = (
+            "capability approval refused: the frozen production identity itself "
+            f"looks non-production ({frozen.account_profile_id!r}) - fix the "
+            "configs/production_account.yaml governance configuration"
         )
         raise CapabilityGovernanceError(msg)
     return cap
@@ -219,6 +237,55 @@ SPIKE_CAPABILITY_BY_REGISTRY: dict[str, str] = {
 }
 
 
+#: case-type marker emitted by the formal runtime gate boundary
+FORMAL_GATE_CASE_TYPE = "formal_runtime_gate"
+
+#: gate proof case ids per capability (R4-A3.1 P0-01/P0-02): the three
+#: probe gates (each bound to RawWriter persisted evidence) plus the
+#: full gate-report artifact case covering all six gate kinds.
+FORMAL_GATE_PROOF_SUFFIXES = ("PERMISSION", "ENDPOINT", "BUSINESS", "REPORT")
+
+
+def _require_formal_gate_proof(catalog: Any, name: str) -> None:
+    """R4-A3.1 P0-01: approval requires the capability's formal gate proof.
+
+    The proof is emitted ONLY by ``spike.formal_gates`` (the single
+    formal gate execution boundary built on RuntimeGatePipeline): four
+    cases per capability - PERMISSION / ENDPOINT / BUSINESS (each bound
+    to the persisted RawWriter evidence identity) and REPORT (the full
+    six-gate report artifact). A run without them never executed the
+    gate boundary for this capability -> approval is refused. Early
+    stop is also caught: a blocked pipeline leaves probe-gate cases
+    missing or non-PASS."""
+    from ashare_state.spike.model import CaseResult
+
+    by_id = {c.case_id: c for c in catalog.cases}
+    for suffix in FORMAL_GATE_PROOF_SUFFIXES:
+        case_id = f"GATE-{name}-{suffix}"
+        case = by_id.get(case_id)
+        if case is None:
+            msg = (
+                f"approval refused: formal runtime gate proof missing for "
+                f"{name!r} ({case_id} not in the run's cases - the formal "
+                "gate boundary is mandatory and cannot be bypassed, audit "
+                "R4-A3.1 P0-01)"
+            )
+            raise CapabilityGovernanceError(msg)
+        if case.case_type != FORMAL_GATE_CASE_TYPE:
+            msg = (
+                f"approval refused: gate proof case {case_id} has type "
+                f"{case.case_type!r}, expected {FORMAL_GATE_CASE_TYPE!r}"
+            )
+            raise CapabilityGovernanceError(msg)
+        if case.result is not CaseResult.VALIDATED_PASS:
+            msg = (
+                f"approval refused: formal gate proof {case_id} result is "
+                f"{case.result} - the runtime gate chain did not fully pass "
+                "(audit R4-A3.1 P0-01)"
+            )
+            raise CapabilityGovernanceError(msg)
+
+
 def approve_from_spike_run(
     conn: DuckDBPyConnection,
     name: str,
@@ -253,18 +320,25 @@ def approve_from_spike_run(
     if not run.provenance_complete():
         msg = f"approval refused: spike run {spike_run_id} provenance incomplete"
         raise CapabilityGovernanceError(msg)
-    # R4-A3 A3-04: a PRODUCTION-kind run under a TRIAL/FAKE/unknown
-    # account profile can never approve a capability - run kind alone is
-    # not production truth.
-    if (
-        run.account_profile_id.startswith(("TRIAL_", "FAKE", "UNKNOWN"))
-        or not run.account_profile_id
-    ):
+    # R4-A3 A3-04 + R4-A3.1 P0-03: a PRODUCTION-kind run does not itself
+    # constitute production truth - the run's account must POSITIVELY
+    # match the frozen production identity (allowlist, not blacklist);
+    # with no frozen identity configured approval fails closed.
+    frozen = _production_identity.load_frozen_production_identity()
+    if frozen is None:
+        msg = (
+            "approval refused: no frozen production account identity is "
+            "configured - capability approval is blocked (fail closed, audit "
+            "R4-A3.1 P0-03: RunKind.PRODUCTION never substitutes for account "
+            "identity)"
+        )
+        raise CapabilityGovernanceError(msg)
+    if run.account_profile_id != frozen.account_profile_id:
         msg = (
             f"approval refused: spike run {spike_run_id} account_profile_id "
-            f"{run.account_profile_id!r} is not a production account "
-            "(audit R4-A3 section 7.2 A3-04: Fake/Trial cannot grant "
-            "PRODUCTION capability truth)"
+            f"{run.account_profile_id!r} does not match the frozen production "
+            f"identity - run kind PRODUCTION alone is not production truth "
+            "(audit R4-A3.1 P0-03)"
         )
         raise CapabilityGovernanceError(msg)
     verdict = compute_verdict(store, run)
@@ -283,6 +357,12 @@ def approve_from_spike_run(
 
     catalog = CaseCatalog(store, run.spike_run_id)
     catalog.load(store.run_dir(run))
+    # R4-A3.1 P0-01 (audit 20260827): the formal gate boundary is a
+    # MANDATORY prerequisite of capability approval - a run whose
+    # capability proof never executed the RuntimeGatePipeline cannot
+    # approve anything. This closes the bypass: gate evidence is not an
+    # optional helper, it is consumed by the approval path.
+    _require_formal_gate_proof(catalog, name)
     cases = {c.case_id: c for c in catalog.cases}
     for ref in capability_case_refs:
         case = cases.get(ref)

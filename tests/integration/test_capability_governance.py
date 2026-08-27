@@ -38,7 +38,10 @@ EVIDENCE_KWARGS = {
     "dry_run_ref": "dryrun-2026-09-01",
     "approved_by": "designer",
     "approved_at": "2026-09-01T00:00:00+00:00",
-    "account_profile_id": "ACCOUNT_abc123",
+    # R4-A3.1 P0-03: approval requires a POSITIVE frozen identity - the
+    # scrubbed profile id frozen below (an arbitrary ACCOUNT_* string is
+    # no longer enough)
+    "account_profile_id": "ACCOUNT_frozenprod01",
 }
 
 
@@ -48,6 +51,21 @@ def conn():
     apply_migrations(connection, MIGRATIONS_DIR)
     yield connection
     connection.close()
+
+
+@pytest.fixture(autouse=True)
+def _frozen_production_identity(monkeypatch):
+    """R4-A3.1 P0-03: freeze the positive production identity matching
+    EVIDENCE_KWARGS - approval tests exercise the exact-match allowlist
+    path (the repo default stays fail closed)."""
+    from ashare_state.providers.amazingdata import production_identity as pi
+
+    frozen = pi.FrozenProductionIdentity(
+        account_profile_id=EVIDENCE_KWARGS["account_profile_id"],
+        confirmed_at="2026-08-27T00:00:00+00:00",
+        confirmed_by="r4-a3.1-test",
+    )
+    monkeypatch.setattr(pi, "load_frozen_production_identity", lambda *a, **k: frozen)
 
 
 @pytest.fixture(autouse=True)

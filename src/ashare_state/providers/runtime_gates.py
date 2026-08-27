@@ -79,17 +79,37 @@ class GateResult:
 
     ``provider_calls_fired`` counts the REAL provider exchanges this gate
     executed (0 for pure-local gates, 1+ for probe/business gates) - the
-    early-stop proof uses these counters, not the final exception."""
+    early-stop proof uses these counters, not the final exception.
+
+    R4-A3.1 P0-02 (audit 20260827): persisted-evidence identity is
+    EXPLICIT and split - a request id is a request identity, never a
+    persisted-evidence identity. Probe gates that executed through the
+    formal boundary additionally carry the RawWriter persisted evidence
+    URI (the .meta.json anchor) and its content hash; a PASS without
+    them is not formal evidence PASS."""
 
     kind: GateKind
     status: GateStatus
     reason: str = ""
     evidence_ref: str = ""
     provider_calls_fired: int = 0
+    #: provider exchange request identity (request_id of the fired exchange)
+    request_id: str = ""
+    #: RawWriter persisted evidence URI (.meta.json anchor) - NOT a
+    #: request id; empty for local gates that fire no exchange
+    evidence_uri: str = ""
+    #: sha256 of the persisted evidence bytes (the meta anchor)
+    evidence_hash: str = ""
 
     @property
     def blocking(self) -> bool:
         return self.status in (GateStatus.FAIL, GateStatus.NOT_TESTABLE)
+
+    @property
+    def has_persisted_evidence(self) -> bool:
+        """True when this result is bound to immutable persisted evidence
+        (P0-02: request_id alone is NOT persisted evidence)."""
+        return bool(self.evidence_uri and self.evidence_hash)
 
 
 @dataclass(frozen=True)
@@ -181,12 +201,22 @@ def _fire_probe(kind: GateKind, probe: ProbeCaller) -> GateResult:
 @dataclass(frozen=True)
 class AuthAccountGate(GateCheck):
     """AUTH/ACCOUNT: the session is alive and the account profile is
-    usable. Pure state inspection - fires NO provider call."""
+    usable. Pure state inspection - fires NO provider call.
+
+    R4-A3.1 P0-03 (audit 20260827): when ``require_production_identity``
+    is set (production proof input), the account must POSITIVELY match
+    the frozen production identity - an allowlist, not a blacklist.
+    With no frozen identity configured the gate is NOT_TESTABLE (the
+    production truth is unprovable - fail closed); a mismatch FAILs."""
 
     lifecycle: SdkLifecycle
     account_profile_id: str = "UNKNOWN"
     profile_parsed: bool = False
     kind = GateKind.AUTH_ACCOUNT
+    #: positive production identity requirement (production proof input)
+    require_production_identity: bool = False
+    #: the frozen production profile id to exact-match against
+    frozen_production_id: str = ""
 
     def evaluate(self) -> GateResult:
         state = self.lifecycle.state
@@ -201,6 +231,30 @@ class AuthAccountGate(GateCheck):
                     ),
                     evidence_ref=self.account_profile_id,
                 )
+            if self.require_production_identity:
+                # P0-03: positive identity - "not Trial" is NOT "Production"
+                if not self.frozen_production_id:
+                    return GateResult(
+                        kind=self.kind,
+                        status=GateStatus.NOT_TESTABLE,
+                        reason=(
+                            "no frozen production identity configured - "
+                            "production account truth unprovable (fail closed, "
+                            "audit R4-A3.1 P0-03)"
+                        ),
+                        evidence_ref=self.account_profile_id,
+                    )
+                if self.account_profile_id != self.frozen_production_id:
+                    return GateResult(
+                        kind=self.kind,
+                        status=GateStatus.FAIL,
+                        reason=(
+                            f"account {self.account_profile_id!r} is not the frozen "
+                            f"production identity {self.frozen_production_id!r} - "
+                            "positive exact match required (audit R4-A3.1 P0-03)"
+                        ),
+                        evidence_ref=self.account_profile_id,
+                    )
             return GateResult(
                 kind=self.kind,
                 status=GateStatus.PASS,

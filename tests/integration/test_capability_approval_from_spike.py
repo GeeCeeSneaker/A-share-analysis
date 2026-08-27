@@ -60,9 +60,105 @@ def fresh_registry():
     importlib.reload(capability_module)
 
 
-def _make_closed_production_run(spike_root: Path, *, cases: list[tuple[str, str, CaseResult]]):
+@pytest.fixture(autouse=True)
+def _frozen_production_identity(monkeypatch):
+    """R4-A3.1 P0-03: freeze the positive production identity matching the
+    profile _make_closed_production_run builds (host=h/username=u) - the
+    real repo stays fail closed."""
+    from ashare_state.providers.amazingdata import production_identity as pi
+    from ashare_state.providers.amazingdata.session import AccountProfile
+
+    profile = AccountProfile.from_scrubbed(
+        {"PermissionCode": "1|2", "SubscribeLimitNum": 5000, "TotalWeekFlow": 500},
+        host="h",
+        username="u",
+    )
+    frozen = pi.FrozenProductionIdentity(
+        account_profile_id=profile.account_profile_id,
+        confirmed_at="2026-08-27T00:00:00+00:00",
+        confirmed_by="r4-a3.1-test",
+    )
+    monkeypatch.setattr(pi, "load_frozen_production_identity", lambda *a, **k: frozen)
+
+
+def _add_formal_gate_proof(store, run, catalog, capability: str) -> None:
+    """Attach the R4-A3.1 P0-01 formal gate proof cases a CLOSED run needs
+    for approval: PERMISSION/ENDPOINT/BUSINESS (persisted probe evidence)
+    + REPORT (the six-gate report artifact) - all PASS."""
+    import hashlib
+    import json
+
+    from ashare_state.providers.amazingdata.capability import FORMAL_GATE_CASE_TYPE
+
+    for suffix in ("PERMISSION", "ENDPOINT", "BUSINESS"):
+        case_id = f"GATE-{capability}-{suffix}"
+        meta = store.write_evidence(
+            run,
+            f"req-{case_id}",
+            endpoint="ep",
+            provider_dataset="ds",
+            params={},
+            payload={"gate": suffix},
+        )
+        catalog.add(
+            SpikeCase(
+                case_id=case_id,
+                spike_run_id=run.spike_run_id,
+                case_type=FORMAL_GATE_CASE_TYPE,
+                security="GATE",
+                provider_symbol="GATE",
+                trade_date="20260814",
+                expected_value="e",
+                actual_value="a",
+                evidence_type="RAW_JSON",
+                evidence_ref=str(meta["evidence_ref"]),
+                result=CaseResult.VALIDATED_PASS,
+                evidence_hash=str(meta["content_hash"]),
+            )
+        )
+    report_doc = {
+        "capability": capability,
+        "run_id": run.spike_run_id,
+        "all_passed": True,
+        "early_stopped": False,
+        "blocked_by": None,
+        "gates": [],
+    }
+    gates_dir = store.run_dir(run) / "gates"
+    gates_dir.mkdir(parents=True, exist_ok=True)
+    report_path = gates_dir / f"{capability}.json"
+    report_path.write_text(
+        json.dumps(report_doc, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    rel = f"{run.run_kind.value.lower()}/{run.spike_run_id}/gates/{capability}.json"
+    catalog.add(
+        SpikeCase(
+            case_id=f"GATE-{capability}-REPORT",
+            spike_run_id=run.spike_run_id,
+            case_type=FORMAL_GATE_CASE_TYPE,
+            security="GATE",
+            provider_symbol="GATE",
+            trade_date="20260814",
+            expected_value="e",
+            actual_value="a",
+            evidence_type="RAW_JSON",
+            evidence_ref=rel,
+            result=CaseResult.VALIDATED_PASS,
+            evidence_hash=hashlib.sha256(report_path.read_bytes()).hexdigest(),
+        )
+    )
+
+
+def _make_closed_production_run(
+    spike_root: Path,
+    *,
+    cases: list[tuple[str, str, CaseResult]],
+    gate_proof: bool = True,
+):
     """A CLOSED production run with the given (case_id, case_type, result)
-    cases; each case gets real evidence."""
+    cases; each case gets real evidence. With gate_proof=True the formal
+    runtime gate proof cases are attached (R4-A3.1 P0-01 - required for
+    approval); pass gate_proof=False to build bypass scenarios."""
     from ashare_state.providers.amazingdata.session import AccountProfile
 
     profile = AccountProfile.from_scrubbed(
@@ -107,6 +203,8 @@ def _make_closed_production_run(spike_root: Path, *, cases: list[tuple[str, str,
                 evidence_hash=str(meta["content_hash"]),
             )
         )
+    if gate_proof:
+        _add_formal_gate_proof(store, run, catalog, "daily_bar")
     catalog.flush(store.run_dir(run))
     close_run(store, run)
     return run
@@ -122,7 +220,9 @@ class TestApprovalFromSpikeRun:
         from ashare_state.providers.amazingdata.session import AccountProfile
 
         profile = AccountProfile.from_scrubbed(
-            {"PermissionCode": "1|2", "SubscribeLimitNum": 5000, "TotalWeekFlow": 500}
+            {"PermissionCode": "1|2", "SubscribeLimitNum": 5000, "TotalWeekFlow": 500},
+            host="h",
+            username="u",
         )
         run, store = new_run(
             run_kind=RunKind.PRODUCTION,
@@ -142,6 +242,24 @@ class TestApprovalFromSpikeRun:
                 spike_root=tmp_path / "spike",
                 spike_run_id=run.spike_run_id,
                 approved_by="designer",
+            )
+
+    def test_approval_refuses_run_without_formal_gate_proof(self, conn, tmp_path: Path):
+        """R4-A3.1 P0-01: a CLOSED, capability-PASSING production run whose
+        proof never executed the formal gate boundary cannot approve - the
+        boundary is mandatory and cannot be bypassed."""
+        cases = _daily_bar_passing_cases()
+        run = _make_closed_production_run(tmp_path / "spike", cases=cases, gate_proof=False)
+        with pytest.raises(
+            capability_module.CapabilityGovernanceError, match="formal runtime gate proof"
+        ):
+            capability_module.approve_from_spike_run(
+                conn,
+                "daily_bar",
+                spike_root=tmp_path / "spike",
+                spike_run_id=run.spike_run_id,
+                approved_by="designer",
+                capability_case_refs=("DB0",),
             )
 
     def test_approval_requires_capability_pass(self, conn, tmp_path: Path):

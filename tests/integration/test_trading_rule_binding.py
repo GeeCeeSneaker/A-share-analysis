@@ -329,6 +329,20 @@ class TestRunBinding:
 
 
 class TestReviewGate:
+    @pytest.fixture(autouse=True)
+    def _frozen_production_identity(self, monkeypatch):
+        """R4-A3.1 P0-03: freeze the positive production identity matching
+        _prod_profile() - these tests exercise the RULE gate, not the
+        account gate (fail closed in the real repo)."""
+        from ashare_state.providers.amazingdata import production_identity as pi
+
+        frozen = pi.FrozenProductionIdentity(
+            account_profile_id=_prod_profile().account_profile_id,
+            confirmed_at="2026-08-27T00:00:00+00:00",
+            confirmed_by="r4-a3.1-test",
+        )
+        monkeypatch.setattr(pi, "load_frozen_production_identity", lambda *a, **k: frozen)
+
     def test_compiled_rules_block_production_new_run(self, tmp_path: Path, rules_env):
         """P0-04: COMPILED rule candidates may NOT enter production (the
         golden gates are relaxed here - the RULE gate is what refuses)."""

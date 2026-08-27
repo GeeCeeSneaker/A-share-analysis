@@ -43,6 +43,7 @@ from ashare_state.spike import (
     run_dry_run,
     verify_production_account,
 )
+from ashare_state.spike.formal_gates import probe_b1_formal_gates
 from ashare_state.spike.probes import (
     probe_b2_security_master,
     probe_b3_core_facts,
@@ -52,7 +53,10 @@ from ashare_state.spike.probes import (
     probe_b7_capacity,
 )
 
-PHASES = ("b2", "b3", "b4", "b5", "b6", "b7")
+# R4-A3.1 P0-01: b1 (formal runtime gate boundary) is the mandatory
+# first phase of every formal run - capability approval consumes its
+# gate-proof cases and cannot approve a run without them.
+PHASES = ("b1", "b2", "b3", "b4", "b5", "b6", "b7")
 
 
 def _load_env(path: Path = Path(".env")) -> dict[str, str]:
@@ -93,6 +97,7 @@ def _make_real_target():
 
 def _run_phases(ctx: ProbeContext, wanted: list[str], sample_date: int) -> dict:
     phases = {
+        "b1": lambda: probe_b1_formal_gates(ctx),
         "b2": lambda: probe_b2_security_master(ctx),
         "b3": lambda: probe_b3_core_facts(ctx, sample_date),
         "b4": lambda: probe_b4_golden(ctx, sample_date),

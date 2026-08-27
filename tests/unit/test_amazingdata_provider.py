@@ -22,6 +22,7 @@ from ashare_state.providers.amazingdata.mapper import (
     map_security_status_row,
     project_limit_price,
 )
+from ashare_state.providers.amazingdata.production_identity import AccountKind
 from ashare_state.providers.amazingdata.session import AccountProfile
 from ashare_state.providers.amazingdata.timeout import RetryPolicy, TimeBudget, run_with_budget
 
@@ -194,12 +195,23 @@ class TestAccountProfile:
         assert profile.permission_codes == "3|4|32|33"
         assert profile.subscribe_limit == 100
         assert profile.weekly_flow_limit == 10
+        assert profile.kind is AccountKind.TRIAL
 
     def test_production_like_profile_kind(self):
+        """R4-A3.1 P0-03: a non-trial profile is parsed as UNKNOWN - never
+        implicitly production (the legacy ACCOUNT_ prefix is gone; PROD
+        requires a positive frozen-identity match)."""
         profile = AccountProfile.from_scrubbed(
             {"PermissionCode": "1|2|3|4|32|33", "SubscribeLimitNum": 5000, "TotalWeekFlow": 500}
         )
-        assert profile.account_profile_id.startswith("ACCOUNT_")
+        assert profile.account_profile_id.startswith("UNKNOWN_")
+        assert profile.kind is AccountKind.UNKNOWN
+
+    def test_trial_profile_kind(self):
+        profile = AccountProfile.from_scrubbed(
+            {"PermissionCode": "3|4|32|33", "SubscribeLimitNum": 100, "TotalWeekFlow": 10}
+        )
+        assert profile.kind is AccountKind.TRIAL
 
     def test_account_profile_id_distinct_for_same_entitlements(self):
         """Audit P1-07: same entitlements, different accounts -> distinct ids."""

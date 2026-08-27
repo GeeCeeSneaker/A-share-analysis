@@ -13,6 +13,41 @@
 
 ---
 
+## 2026-08-27 · R4-A3.1 正式运行时门控收口（R4-A3 复审 REOPENED 三点 P0 全部落地）
+
+**Scope**
+- R4-A3 复审（audit 20260827）裁决 **REOPENED**：R4-A3 交付了 gate **组件**但 formal execution path 未消费（组件测试证明的是库不是正式路径）；gate evidence 仅 request_id（请求身份 ≠ 持久化证据身份）；trial 边界为 blacklist（fail-open：任意 non-trial 账号被盖 `ACCOUNT_*` 即 approval 资格）。本批 R4-A3.1 按 Batch A→F 收口 P0-01/02/03 + P1-01 + 治理（**未启动 R4-B1/R4-B2/CR-2**——遵守 §11 禁止项）
+
+**Implementation**
+- **P0-01 唯一正式 gate 执行边界（DM-CR-20260827-040，ADR-019 Amendment A.1）**：新增 `ashare_state.spike.formal_gates`——`FormalRuntimeGateExecutor` 为唯一 formal gate execution boundary；`CapabilityProbePlan` 六 gate 全量必填（AUTH/PERMISSION/ENDPOINT/CACHE/FRESHNESS/BUSINESS，caller 无法选择性跳过）；`GATE_PLAN_SPECS` 覆盖全部 10 个注册 capability；`probe_b1_formal_gates` 成为全部 formal run（含 dry-run）的**强制第一阶段**（`run_dry_run` + `scripts/spike/spike_runner.py` PHASES）；blocking gate 后 downstream probe fired == 0 且零新 raw evidence（计数器 + raw 目录双证明）；每 capability 落 4 个 `formal_runtime_gate` case（`GATE-{cap}-PERMISSION/ENDPOINT/BUSINESS` 绑持久化 meta + `GATE-{cap}-REPORT` 绑六 gate 报告 artifact `{run}/gates/{cap}.json`）；`approve_from_spike_run` 新增 `_require_formal_gate_proof`——四 case 缺一或非 VALIDATED_PASS 即拒绝（early stop 天然阻断 approval，绕过不可能）；**AST 静态守卫 ×4**（approval 必须含该调用 / executor 必须构造 RuntimeGatePipeline / probe_b1 必须经 executor / run_dry_run 必须消费 probe_b1）
+- **P0-02 persisted gate evidence identity（DM-CR-20260827-041，ADR-019 Amendment A.2）**：`GateResult` 证据语义显式拆分为 `request_id` / `evidence_uri`（RawWriter .meta.json 锚）/ `evidence_hash` 三字段 + `has_persisted_evidence` property（URI+hash 同时存在才为真）；`_PersistedProbe` 将 probe exchange（成功与失败）经 `ProbeContext.evidence_from_exchange` 统一持久化后绑定（无 private writer）；**持久化失败（exchange 已 fire 但字节未落盘）→ PASS 降级 FAIL 并置 blocked_by（fail closed）**；gate proof case 与 report artifact 纳入统一 evidence closure（篡改即阻断 verdict）
+- **P0-03 positive production account identity（DM-CR-20260827-042，ADR-019 Amendment A.3）**：blacklist → **allowlist**。新增 `providers/amazingdata/production_identity.py`（AccountKind / FrozenProductionIdentity / load_frozen_production_identity / production_account_status）+ `configs/production_account.yaml`（冻结 scrubbed stable profile id——非凭证；**当前为空 = 未确认 = fail closed，当前仓库真值**）；`AccountProfile.kind` 为解析事实（TRIAL heuristics / UNKNOWN；**非 trial ≠ production；旧 `ACCOUNT_` 前缀废除 → `UNKNOWN_<digest>`**）；四处同步 exact-match：`verify_production_account` / `_validate_evidence` / `approve_from_spike_run` / `AuthAccountGate(require_production_identity=True)`（formal boundary 的 production proof input，frozen 缺失 → NOT_TESTABLE）；RunKind.PRODUCTION 永不替代账号身份
+- **P1-01 subscription lifecycle 接线（DM-CR-20260827-043，ADR-019 Amendment A.4）**：新增 `providers/amazingdata/subscription.py`——`SubscriptionController` 驱动真实 `SdkLifecycle`（register 失败不 fake SUBSCRIBE_STARTED；unregister/stop retry-safe；UNSUBSCRIBED 后回调 = late_callbacks 计数，永不 reactivation；诊断 dict 是 VIEW，状态机是 SoR）；`scripts/spike/l1_subscription_test.py` 全面改造（lifecycle 状态机为 correctness SoR；report 新增 lifecycle_state_machine 视图；lifecycle_verdict 由状态机 UNSUBSCRIBED 终态 + 零 step 错误派生；logout 经幂等 close()）
+- **治理（P1）**：总册头部 **SHA Correction 2026-08-27**（上批误记 R4-A3 SHA `de9bf1ab6c5a...`，以 GitHub commit object 为准修正为 `de9bf1ab6f499b20916f8277dba45c21880fd908`；同批 SHA 记录 commit `b5284bdc83631454c1d46add9e3478f86d81386e`）；§40 重复 workstream 行清理（R4-A3/R4-B1/R4-B2/CR-2 旧式 "PLANNED/PENDING/Next" 重复行删除，Phase Status 单一事实源）；§41 重写为 R4-A3.1 批次（R4-A3 原始交付结构保留说明）；ADR-019 Amendment 2026-08-27（A.1–A.5）
+
+**Schema / Contract Changes**
+- C1 ×4（DM-CR-20260827-040/041/042/043）；ADR-019 Amendment；新增配置 `configs/production_account.yaml`（fail-closed 默认空）
+- 新模块：`spike/formal_gates.py`、`providers/amazingdata/production_identity.py`、`providers/amazingdata/subscription.py`；`runtime_gates.py` 扩展（GateResult 三证据字段 + AuthAccountGate production identity 要求，冻结组件语义零变更）；`session.py`（AccountProfile.kind + UNKNOWN_ 前缀）；`target.py`（RealTarget/FakeTarget 暴露 lifecycle + identity 增加 profile_parsed）；`capability.py`（positive identity 双入口 + _require_formal_gate_proof）；`runner.py`（verify_production_account positive + dry-run b1 阶段）
+
+**Verification**
+- Local: **754 tests passed / 0 failed**（716 → 754，+38：formal gate wiring 14 + subscription controller 14 + trial boundary 重写 15（原 7）+ approval bypass 1 + kind 断言 2 等，含既有 production-run 测试 fixture 化适配）；ruff check 全绿（退出码严格验证）
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+
+**Implementation Status**
+- DONE（P0-01/02/03 + P1-01 + 治理闭环；754/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- gate proof 采用"3 probe case + 1 report case"结构：probe case 绑定 RawWriter 持久化 meta（P0-02 要求），report case 绑定六 gate 完整 JSON artifact（含全部绑定）——approval 检查四 case 全 PASS 即同时证明链路执行与证据闭合
+- frozen production identity 允许 `UNKNOWN_<digest>` 形状（真实生产账号的解析形状）但拒绝 TRIAL/FAKE 形状——生产身份是治理事实（人工确认冻结），不是解析结果
+- industry_taxonomy / equity_structure 等暂无 target 专属端点的 capability 用 entitlement surface 做 gate 探针（诚实注释：gate 边界证明门控链路，不证明业务语义——语义验证仍是 B2-B7 probes 的职责）
+- gate report artifact（gates/{cap}.json）是治理 artifact 而非 provider evidence 链成员——不违反"payload → RunStore.write_evidence JSON 禁令"（该禁令针对 provider evidence）
+
+**下一步**
+- 等 Reviewer 复审 R4-A3.1；VERIFIED 后进入 R4-B1 Capability Endpoint Proof（gate 边界 FORMAL_GATE_PROBE_KINDS 已为 endpoint/permission proof 提供消费面）
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 ## 2026-08-26 · R4-A3 SDK / Lifecycle / Early-Stop Closure（审计链 CLOSED 后首个批次：A3-01..05 全落地）
 
 **Scope**

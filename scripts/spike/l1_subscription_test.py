@@ -27,6 +27,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from ashare_state.providers.amazingdata.subscription import SubscriptionController
+from ashare_state.providers.lifecycle import SdkLifecycle, SdkLifecycleState
+
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 RESULTS = Path("data/spike/results")
 
@@ -153,6 +156,15 @@ def main() -> int:
         _flush(report, args.stage)
         return 1
 
+    # R4-A3.1 P1-01: the SDK lifecycle state machine is the correctness
+    # SoR for the whole session (login -> subscribe -> callback ->
+    # unsubscribe -> logout); the report dicts below are diagnostic
+    # VIEWS derived from it, never a second SoR.
+    lifecycle = SdkLifecycle()
+    lifecycle.transition(
+        SdkLifecycleState.SESSION_READY, reason="login ok", evidence_ref="ad.login"
+    )
+
     events: list[dict] = []
     lifecycle: dict[str, object] = {}
     try:
@@ -166,6 +178,7 @@ def main() -> int:
         }
 
         sub = ad.SubscribeData()
+        controller = SubscriptionController(lifecycle, sub)
 
         def on_snapshot(data) -> None:
             recv = datetime.now(tz=UTC)
@@ -210,10 +223,14 @@ def main() -> int:
             _flush(report, args.stage)
             return 1
 
-        # --- lifecycle verification (R2-P1-06 17.3) ---
+        # R4-A3.1 P1-01: register/run/unregister/stop go through the
+        # SubscriptionController, which DRIVES the SdkLifecycle state
+        # machine (SESSION_READY -> SUBSCRIBE_STARTED -> CALLBACK_ACTIVE
+        # -> UNSUBSCRIBED). The ``lifecycle`` dict is the diagnostic
+        # VIEW; correctness truth is the state machine.
         lifecycle["register"] = "OK"
         try:
-            sub.register(code_list=sample, period=period_value, callback=on_snapshot)
+            controller.register(code_list=sample, period=period_value, callback=on_snapshot)
         except Exception as exc:  # noqa: BLE001
             lifecycle["register"] = f"ERROR {type(exc).__name__}: {exc}"[:200]
             report["lifecycle"] = lifecycle
@@ -222,31 +239,33 @@ def main() -> int:
             return 1
 
         # run/start loop if the SDK exposes one (verified live per R2-P1-06)
-        run_fn = getattr(sub, "run", None) or getattr(sub, "start", None)
-        if callable(run_fn):
-            try:
-                run_fn()
-                lifecycle["run"] = "OK"
-            except Exception as exc:  # noqa: BLE001
-                lifecycle["run"] = f"ERROR {type(exc).__name__}"[:200]
+        controller.run()
+        if "run" in controller.step_errors:
+            lifecycle["run"] = f"ERROR {controller.step_errors['run']}"[:200]
+        else:
+            lifecycle["run"] = "OK"
 
         deadline = time.monotonic() + args.duration_seconds
         while time.monotonic() < deadline:
             time.sleep(0.5)
 
         try:
-            sub.unregister(code_list=sample, period=period_value)
-            lifecycle["unregister"] = "OK"
+            controller.unregister(code_list=sample, period=period_value)
+            lifecycle["unregister"] = (
+                f"ERROR {controller.step_errors['unregister']}"[:200]
+                if "unregister" in controller.step_errors
+                else "OK"
+            )
         except Exception as exc:  # noqa: BLE001
             lifecycle["unregister"] = f"ERROR {type(exc).__name__}"[:200]
-        stop_fn = getattr(sub, "stop", None)
-        if callable(stop_fn):
-            try:
-                stop_fn()
-                lifecycle["stop"] = "OK"
-            except Exception as exc:  # noqa: BLE001
-                lifecycle["stop"] = f"ERROR {type(exc).__name__}"[:200]
+        controller.stop()
+        lifecycle["stop"] = (
+            f"ERROR {controller.step_errors['stop']}"[:200]
+            if "stop" in controller.step_errors
+            else "OK"
+        )
         report["lifecycle"] = lifecycle
+        report["lifecycle_state_machine"] = controller.diagnostic()
 
         report["events_received"] = len(events)
         # R3-P1-10 32.4: two separate verdicts - receiving events with a
@@ -270,6 +289,16 @@ def main() -> int:
                 "as an entitlement conclusion (R2-P1-06 17.3)"
             )
         lifecycle_ok = bool(lifecycle) and all(str(v).startswith("OK") for v in lifecycle.values())
+        # R4-A3.1 P1-01: the verdict must ALSO be derived from the state
+        # machine SoR - a diagnostic dict alone is not lifecycle truth.
+        # The happy path ends UNSUBSCRIBED (register -> [callback] ->
+        # unregister/stop complete) with no step errors.
+        state = lifecycle.state
+        lifecycle_ok = (
+            lifecycle_ok
+            and state is SdkLifecycleState.UNSUBSCRIBED
+            and not controller.step_errors
+        )
         report["lifecycle_verdict"] = "PASS" if lifecycle_ok else "FAIL"
         report["status"] = (
             "PASS"
@@ -284,6 +313,10 @@ def main() -> int:
     finally:
         with _suppress():
             ad.logout()
+        with _suppress():
+            # state-machine truth: logout closes the session (close() is
+            # the idempotent terminal path for LOGGED_OUT)
+            lifecycle.close(reason="logout", evidence_ref="ad.logout")
 
     _flush(report, args.stage)
     print(

@@ -29,6 +29,28 @@ def _rule_review_gate_relaxed(monkeypatch):
     monkeypatch.setattr(rule_module, "trading_rule_review_gate", lambda book, **k: [])
 
 
+@pytest.fixture(autouse=True)
+def _frozen_production_identity(monkeypatch):
+    """R4-A3.1 P0-03: freeze the positive production identity matching the
+    production profile these tests build (provider=amazingdata/host=h/
+    username=u) - the real repo stays fail closed."""
+    from ashare_state.providers.amazingdata import production_identity as pi
+    from ashare_state.providers.amazingdata.session import AccountProfile
+
+    profile = AccountProfile.from_scrubbed(
+        {"PermissionCode": "1|2", "SubscribeLimitNum": 5000, "TotalWeekFlow": 500},
+        provider="amazingdata",
+        host="h",
+        username="u",
+    )
+    frozen = pi.FrozenProductionIdentity(
+        account_profile_id=profile.account_profile_id,
+        confirmed_at="2026-08-27T00:00:00+00:00",
+        confirmed_by="r4-a3.1-test",
+    )
+    monkeypatch.setattr(pi, "load_frozen_production_identity", lambda *a, **k: frozen)
+
+
 @pytest.fixture
 def golden_env(tmp_path: Path, monkeypatch) -> Path:
     root = tmp_path / "data" / "golden" / "provider" / "amazingdata"

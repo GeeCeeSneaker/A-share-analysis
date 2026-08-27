@@ -69,6 +69,23 @@ def _rule_review_gate_relaxed(monkeypatch):
     monkeypatch.setattr(rule_module, "trading_rule_review_gate", lambda book, **k: [])
 
 
+@pytest.fixture(autouse=True)
+def _frozen_production_identity(monkeypatch):
+    """R4-A3.1 P0-03: freeze the positive production identity matching
+    _prod_profile() so PRODUCTION runs can open in these tests. The real
+    repo stays fail closed until the formal production account is
+    human-confirmed (P0-M-1B); negative-gate tests keep their own
+    non-matching profiles."""
+    from ashare_state.providers.amazingdata import production_identity as pi
+
+    frozen = pi.FrozenProductionIdentity(
+        account_profile_id=_prod_profile().account_profile_id,
+        confirmed_at="2026-08-27T00:00:00+00:00",
+        confirmed_by="r4-a3.1-test",
+    )
+    monkeypatch.setattr(pi, "load_frozen_production_identity", lambda *a, **k: frozen)
+
+
 def _prod_profile() -> AccountProfile:
     return AccountProfile.from_scrubbed(
         {
@@ -167,7 +184,9 @@ class TestDryRunAllPhases:
     def test_dry_run_produces_all_phase_outputs(self, spike_root: Path):
         out = run_dry_run(spike_root, sample_date=20260814)
         phases = out["phases"]
-        for phase in ("b2", "b3", "b4", "b5", "b6", "b7"):
+        # R4-A3.1 P0-01: b1 (formal runtime gate boundary) is now the
+        # mandatory first phase of the dry run too
+        for phase in ("b1", "b2", "b3", "b4", "b5", "b6", "b7"):
             assert phase in phases, phase
         run_dir = Path(out["run_dir"])
         assert (run_dir / "spike_run.json").is_file()
