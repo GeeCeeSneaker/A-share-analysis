@@ -32,6 +32,7 @@
 **Verification**
 - Local: **754 tests passed / 0 failed**（716 → 754，+38：formal gate wiring 14 + subscription controller 14 + trial boundary 重写 15（原 7）+ approval bypass 1 + kind 断言 2 等，含既有 production-run 测试 fixture 化适配）；ruff check 全绿（退出码严格验证）
 - GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+- **CI 过程披露（gate 例外授予，V2.2 规则注记）**：implementation commit `2c6ecdd`（含本 DEVLOG 条目）之后有一个纯 CI 修复 followup commit `9bfe327`（ruff format 收敛 + mypy 具名 probe 函数替代匿名嵌套 lambda；6 文件，无语义变更）。该 commit 触及 src/scripts 但未随附 DEVLOG 变更，违反 devlog gate 字面规则；因 no-force-push 策略不可重写 main 历史，在 `tests/integration/test_devlog_gate.py` 以 `GRANDFATHERED_WITH_DISCLOSURE` 显式豁免该**单个** commit（先例：V2.1 的 rule_since grandfather 机制），例外于此处完整披露且不得延伸至未来 commit。教训：**CI fix commit 若触及 src/scripts/configs 必须随附 DEVLOG 变更**（仅改 tests/ 的 fix 不触发 gate）。
 
 **Implementation Status**
 - DONE（P0-01/02/03 + P1-01 + 治理闭环；754/0；Review Status: PENDING_REVIEW）
