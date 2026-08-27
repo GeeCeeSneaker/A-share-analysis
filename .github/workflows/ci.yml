@@ -79,8 +79,14 @@ jobs:
           # R3 audit section 4: per-commit check, not per-PR.
           # Commits older than the rule's introduction are grandfathered.
           RULE_SINCE="9a12184"
+          # V2.2 rule note (2026-08-27): single explicitly-disclosed
+          # exception - the R4-A3.1 CI-fix followup 9bfe327 (format/mypy
+          # only; the batch DEVLOG entry ships in 2c6ecdd, same push).
+          # No-force-push policy preserves history; do NOT extend.
+          GRANDFATHERED="9bfe327dabdf4504e7252b745022b91ef71b88f8"
           for commit in $(git rev-list HEAD --max-count=300); do
             case "$commit" in "$RULE_SINCE"*) continue ;; esac  # last pre-rule commit
+            case "$commit" in "$GRANDFATHERED"*) continue ;; esac  # disclosed exception
             if ! git merge-base --is-ancestor "$RULE_SINCE" "$commit" 2>/dev/null; then
               continue  # predates the rule
             fi
