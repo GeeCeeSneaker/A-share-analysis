@@ -13,6 +13,41 @@
 
 ---
 
+## 2026-08-28 · R4-A3.2 最终 Persistence Early-Stop + Trial-L1 接线修复（R4-A3.1 复审 REOPENED 两项收口）
+
+**Scope**
+- R4-A3.1 复审（audit 20260828，Reviewed HEAD `d8232d6edde09798fd17149a79d71c56727f2358`，run 33043352320 三腿 success）裁决 **REOPENED**：formal gate wiring / anti-bypass / positive production identity / persisted evidence 正常路径 / SubscriptionController 组件全部 **PASS / FREEZE**（不重写）；两个 runtime 缺口由本批 R4-A3.2 收口（**未启动 R4-B1/R4-B2/CR-2**——R4-B1 BLOCKED until R4-A3.2 VERIFIED，遵守 §10 Reviewer Handoff 不扩展新主题）
+
+**Implementation**
+- **P0-01 持久化失败 = gate evaluation 内的即时阻断（DM-CR-20260828-044，ADR-019 Amendment B.1）**：缺陷——`_PersistedProbe` 持久化失败时照常返回成功 exchange，pipeline 视 PERMISSION 为 PASS 继续评估下游 gate（**真实 downstream provider calls 已发生**），pipeline 跑完后 post-processing 才把 PASS 改 FAIL（假 early-stop）。修正（Reviewer 推荐 Option A）——fire + persist + verdict 合并为一次**原子 gate evaluation**：新增 `_PersistedPermissionGate` / `_PersistedEndpointGate` / `_PersistedBusinessGate`（组合冻结 gate 语义 + `_finalize_persisted`）：persist 成功 → 绑定 request_id/evidence_uri/evidence_hash；persist 失败且 exchange 成功 → **当场降级 blocking FAIL**（request_id 可携带但 URI/hash 为空——request_id 单独存在永不构成 formal evidence PASS）；已 FAIL 结果保留具体原因并附加持久化失败信息。冻结 pipeline 看到 FAIL → early stop → 下游 probe 从不 fire（`probes[kind].fired == 0` + raw 目录零新 evidence 双证明）。execute() 的 post-hoc 降级逻辑**删除**，替代为防御性 `FormalGateProofError`（PASS 无绑定抵达该处 = 原子 gate 契约失效 → fail loudly）
+- **P1-01 Trial L1 脚本 SdkLifecycle dict 遮蔽修复（DM-CR-20260828-045，ADR-019 Amendment B.2）**：缺陷——`lifecycle = SdkLifecycle()` 后紧跟 `lifecycle: dict[str, object] = {}` 同名重绑，`SubscriptionController(lifecycle, sub)` 实际收到 dict（真实运行即 AttributeError；组件测试通过但脚本 wiring 是坏的）。修正——SoR/view 分离命名（`sdk_lifecycle: SdkLifecycle` vs `lifecycle_diag: dict`）；SDK-dependent 主流程提取为 `execute_subscription_flow(sdk, stage, duration_seconds, *, sleep, monotonic)`（可注入 fake SDK 行为级测试）；main() 只保留 login/env/session-gate/flush 与 terminal close；verdict 从同一个 `sdk_lifecycle` 对象派生
+- **治理**：ADR-019 Amendment 2026-08-28（B.1/B.2，含两缺陷的完整记录与修正理由）；总册头部（完整 40-char SHA 基线 + Phase Status：R4-A3/A3.1 REOPENED 修正随 A3.2、R4-B1 BLOCKED until A3.2 VERIFIED）+ §40/§41 重写 + §61 DM-CR-20260828-044/045
+
+**Schema / Contract Changes**
+- C1 ×2（DM-CR-20260828-044/045）；ADR-019 Amendment 2026-08-28
+- `src/ashare_state/spike/formal_gates.py`：新增三个原子 persisted gate 子类 + `_finalize_persisted`；`_PersistedProbe` 记录 `last_request_id`；execute() 移除 post-hoc 降级（→ 防御性 raise）；冻结组件 `runtime_gates.py` **零改动**
+- `scripts/spike/l1_subscription_test.py`：`execute_subscription_flow` 提取 + SoR/view 命名分离 + main() 简化
+
+**Verification**
+- Local: **762 tests passed / 0 failed**（754 → 762，+8：P0-01 对抗集 3 新增（permission/endpoint/business persist 失败的即时阻断 + request_id 单独永不 PASS，断言直接落在 `probes[kind].fired`）+ P1-01 脚本行为测试 5（端到端状态机路径 / verdict 同源 / register 失败不 fake / close 幂等 / AST guard ×2））；ruff check / ruff format --check / mypy 全绿（退出码严格验证）
+- 既有回归零破坏：provider-denial early-stop、success/failure persisted binding、gate separation（15）、trial boundary（15）、subscription controller（14）、lifecycle 单元（15）全过
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+
+**Implementation Status**
+- DONE（P0-01 + P1-01 + 治理闭环；762/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- P0-01 采用 Reviewer 推荐的 Option A（persisted GateCheck 子类在 formal_gates.py 内直接返回已绑定 GateResult）而非 Option B（改 probe/gate 契约）——前者不动冻结组件 `runtime_gates.py` 的任何语义，修正完全落在 formal boundary 层
+- 降级 FAIL 的 result 仍携带 request_id（请求身份可追溯）但 URI/hash 保持为空——同时满足 P0-02"request_id 单独存在不构成 formal evidence PASS"与 P0-01"即时阻断"
+- post-processing 不保留静默改写路径：若原子 gate 契约被未来改动破坏（PASS 无绑定抵达 execute() 尾部），raise `FormalGateProofError` 而不是悄悄修报告——fail loudly 是对"禁止 post-hoc 改写"的结构性执行
+- L1 脚本行为测试直接加载真实脚本模块（importlib）并注入 fake SDK（含 run() 时触发 callback 模拟行情）——测试的是**真实脚本控制流**，不是它的复制品
+
+**下一步**
+- 等 Reviewer 复审 R4-A3.2（只复核三件事：persistence-failure structural early-stop / Trial L1 real script wiring / regression + CI + governance）；VERIFIED 后 R4-A3/A3.1/A3.2 → VERIFIED / CLOSED，R4-B1 Capability Endpoint Proof START
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 ## 2026-08-27 · R4-A3.1 正式运行时门控收口（R4-A3 复审 REOPENED 三点 P0 全部落地）
 
 **Scope**

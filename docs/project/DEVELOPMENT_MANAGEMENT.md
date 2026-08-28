@@ -7,13 +7,13 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：R4-A3.1 implementation `2c6ecdd`（主实现）+ CI fix `9bfe327`（format/mypy，GRANDFATHERED 例外披露）+ gate sync `af8a28a`；R4-A3 原始 implementation = `de9bf1ab6f499b20916f8277dba45c21880fd908`（见 SHA Correction 2026-08-27）  
-> **Document Revision**：DM-CR-20260827-040 / 041 / 042 / 043  
-> **Last Review**：2026-08-27（R4-A3 复审：**REOPENED**——三点 P0：gate 组件未接入 formal path / gate evidence 无 persisted identity / trial 边界 fail-open blacklist；随 R4-A3.1 收口，见 §41/§63）  
+> **Current Code Baseline**：R4-A3.2 implementation（本批，2026-08-28）——基于 Reviewer 复审 HEAD `d8232d6edde09798fd17149a79d71c56727f2358`（run 33043352320 三腿 success）；R4-A3.1 implementation `2c6ecdd1219b9964cc48a4145f99344894dcd1c1` + CI fix `9bfe327dabdf4504e7252b745022b91ef71b88f8`（GRANDFATHERED 单例例外，已披露）+ gate sync `af8a28a92b6a609047597ed8b403996a6e405ead`；R4-A3 原始 implementation = `de9bf1ab6f499b20916f8277dba45c21880fd908`（见 SHA Correction 2026-08-27）。本批完整 40-char SHA 于推送后回填  
+> **Document Revision**：DM-CR-20260828-044 / 045  
+> **Last Review**：2026-08-28 18:57 +08:00（R4-A3.1 复审：**REOPENED**——formal gate wiring / anti-bypass / positive production identity / persisted evidence 正常路径 / SubscriptionController 组件全部 PASS / FREEZE；两个 runtime 缺口：P0-01 持久化失败是 pipeline 跑完后的 post-hoc 降级（downstream calls 已发生）/ P1-01 Trial L1 脚本 SdkLifecycle 变量被 dict 遮蔽（controller 实际收到 dict）；随 R4-A3.2 收口，见 §41/§61/ADR-019 Amendment 2026-08-28）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN——run 33043039242（`af8a28a`）三腿 success**（2026-08-27 API positive confirmation；R4-A3.1 新增 38 项 formal-gate/subscription/identity 测试 754/0 在 Ubuntu+Windows 两 OS 通过；CI 过程：run 33041340222/33041905727/33042592020 三次失败——ruff format 未本地执行 / mypy 嵌套 lambda / devlog gate 双实现豁免未同步——全部根因修复，gate 例外已披露，见 DEVLOG 2026-08-27 条目）  
-> **Phase Status（2026-08-27）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED**；R4-A3 → REOPENED（修正项由 R4-A3.1 承接）；R4-A3.1 → **DONE / PENDING_REVIEW**；R4-B1 → READY_AFTER_R4-A3.1；R4-B2 → READY_AFTER_R4-B1；CR-2 → UNBLOCKED, sequenced after R4-B2；Production P0-M-1B → BLOCKED（人工 Review + 正式账号条件未满足；R4-A3.1 后新增前置：production_account.yaml 冻结仍为空 = fail closed）  
+> **CI Status**：run 33043352320（`d8232d6`，Reviewer 正向核验的 R4-A3.1 复审基线）三腿 success；本批（R4-A3.2，762 tests）CI 结果待推送后正向确认回填  
+> **Phase Status（2026-08-28，Reviewer 裁决同步）**：  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED（保持冻结）**；R4-A3 → DONE / REOPENED；R4-A3.1 → DONE / REOPENED（修正项由 R4-A3.2 承接）；R4-A3.2 → **DONE / PENDING_REVIEW**（本批：Final Persistence-Early-Stop + Trial-L1 Wiring Fix）；R4-B1 → **BLOCKED until R4-A3.2 VERIFIED**；R4-B2 → BLOCKED；CR-2 → sequenced after R4-B2；Production P0-M-1B → BLOCKED（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
 > **SHA Correction（Reviewer，2026-08-26）**：上批记录的 `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` 有误，以 GitHub commit object 为准：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`（本头部即为修正记录；历史条目原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
@@ -1080,11 +1080,12 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A2.9 Review-Seal Exactness + CR-1.2.5 Output Confinement | DONE | VERIFIED (absorbed) | PASS |
 | R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | VERIFIED (absorbed) | PASS |
 | R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | **VERIFIED** | **R4-A2.x / CR-1.x 审计链 CLOSED（2026-08-26）** |
-| R4-A3 SDK / Lifecycle / Early-Stop Closure | DONE | REOPENED → 修正随 R4-A3.1 | 三点 P0 由 R4-A3.1 收口（见 §41/§63） |
-| R4-A3.1 Formal Runtime-Gate Wiring + Production Identity | DONE | PENDING_REVIEW | 最高优先（gate 边界接线 / persisted evidence / positive identity / subscription SoR；待复核） |
-| R4-B1 Capability Endpoint Proof | PLANNED | READY_AFTER_R4-A3.1 | — |
-| R4-B2 Publish Validation Exactness | PLANNED | READY_AFTER_R4-B1 | — |
-| CR-2 Provider-Normalized + Quarantine | PLANNED | UNBLOCKED / after R4-B2 | — |
+| R4-A3 SDK / Lifecycle / Early-Stop Closure | DONE | REOPENED → 修正随 R4-A3.1/A3.2 | 三点 P0 由 R4-A3.1 收口；两点 runtime gap 由 R4-A3.2 收口 |
+| R4-A3.1 Formal Runtime-Gate Wiring + Production Identity | DONE | REOPENED → 修正随 R4-A3.2 | gate 边界/anti-bypass/positive identity PASS / FREEZE；persistence timing + L1 wiring 修正于 R4-A3.2 |
+| R4-A3.2 Final Persistence-Early-Stop + Trial-L1 Wiring Fix | DONE | PENDING_REVIEW | 最高优先（本批：原子 gate evaluation 即时阻断 + 脚本 SoR 接线；待复核） |
+| R4-B1 Capability Endpoint Proof | PLANNED | BLOCKED until R4-A3.2 VERIFIED | — |
+| R4-B2 Publish Validation Exactness | PLANNED | BLOCKED | — |
+| CR-2 Provider-Normalized + Quarantine | PLANNED | sequenced after R4-B2 | — |
 | R4-CI | PLANNED | PENDING | Next |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
 | CR-4 Snapshot + Read Model Rebuild | PLANNED | PENDING | CR-3 后 |
@@ -1097,57 +1098,58 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A3.1 Formal Runtime-Gate Wiring + Production Identity（本批，DONE / PENDING_REVIEW）
+## R4-A3.2 Final Persistence-Early-Stop + Trial-L1 Wiring Fix（本批，DONE / PENDING_REVIEW）
 
-R4-A3 复审（2026-08-27）REOPENED 三点 P0，本批收口（ADR-019 Amendment
-2026-08-27；工作要求 `docs/design/A-share-analysis_R4-A3复审与R4-A3.1正式
-运行时门控收口开发工作要求_20260827.md`）：
+R4-A3.1 复审（2026-08-28 18:57 +08:00）裁决 REOPENED：formal gate wiring /
+anti-bypass / positive production identity / persisted evidence 正常路径 /
+SubscriptionController 组件全部 **PASS / FREEZE**（不重写）；两个 runtime
+缺口由本批收口（ADR-019 Amendment 2026-08-28；工作要求
+`docs/design/A-share-analysis_R4-A3.1复审与R4-A3.2最终EarlyStop及Subscription接线修复要求_20260828.md`）：
 
 ```text
-P0-01 唯一正式 gate 执行边界（DM-CR-20260827-040）：
-  ashare_state.spike.formal_gates.FormalRuntimeGateExecutor —— 唯一
-  formal gate execution boundary；CapabilityProbePlan 六 gate 全量必填
-  （caller 无法选择性跳过）；冻结顺序 pipeline 评估；probe_b1 阶段为
-  全部 formal run（含 dry-run）的强制第一阶段；blocking gate 后
-  downstream probe fired == 0 且零新 raw evidence（计数器 + raw 目录
-  双证明）；每 capability 落 4 个 formal_runtime_gate case
-  （PERMISSION/ENDPOINT/BUSINESS 绑持久化 meta + REPORT 绑六 gate
-  报告 artifact {run}/gates/{cap}.json）
-  approve_from_spike_run -> _require_formal_gate_proof：四 case 缺一
-  或非 VALIDATED_PASS 即拒绝（early stop 天然阻断 approval）；AST
-  静态守卫 ×4 防绕过（approval 含调用 / executor 构造 pipeline /
-  probe_b1 经 executor / run_dry_run 消费 probe_b1）
-P0-02 persisted gate evidence identity（DM-CR-20260827-041）：
-  GateResult 证据语义显式拆分：request_id（请求身份）/ evidence_uri
-  （RawWriter .meta.json 锚）/ evidence_hash —— has_persisted_evidence
-  要求 URI+hash 同时存在；request_id 单独存在不构成 formal evidence
-  PASS；probe exchange（成功与失败）经 ProbeContext.evidence_from_
-  exchange 统一持久化后绑定（无 private writer）；持久化失败 -> PASS
-  降级 FAIL 并置 blocked_by（fail closed）；gate proof case 与 report
-  artifact 纳入统一 evidence closure（篡改即阻断 verdict）
-P0-03 positive production account identity（DM-CR-20260827-042）：
-  blacklist -> allowlist。configs/production_account.yaml 冻结 scrubbed
-  stable profile id（非凭证；当前为空 = 未确认 = fail closed）
-  AccountProfile.kind = 解析事实（TRIAL heuristics / UNKNOWN；非 trial
-  != production；ACCOUNT_ 前缀废除 -> UNKNOWN_<digest>）
-  四处同步 exact-match：verify_production_account / _validate_evidence /
-  approve_from_spike_run / AuthAccountGate(require_production_identity=
-  True)；无 frozen identity -> NOT_TESTABLE/BLOCKED；RunKind.PRODUCTION
-  永不替代账号身份
-P1-01 subscription lifecycle 接线（DM-CR-20260827-043）：
-  ashare_state.providers.amazingdata.subscription.SubscriptionController
-  —— L1 脚本 register/run/unregister/stop 驱动真实 SdkLifecycle 状态机
-  （诊断 dict 是 VIEW，状态机是 SoR）；register 失败不 fake
-  SUBSCRIBE_STARTED；unregister/stop retry-safe；UNSUBSCRIBED 后回调
-  = late callback 计数，永不 reactivation
+P0-01 持久化失败 = gate evaluation 内的即时阻断（DM-CR-20260828-044）：
+  缺陷：_PersistedProbe 持久化失败时照常返回成功 exchange ->
+    pipeline 视 PERMISSION 为 PASS -> ENDPOINT/CACHE/FRESHNESS/BUSINESS
+    继续评估（downstream provider calls 已发生）-> pipeline 跑完后
+    execute() post-processing 才把 PASS 改 FAIL —— 假 early-stop。
+  修正（Option A）：fire + persist + verdict 合并为一次原子 gate
+    evaluation——_PersistedPermissionGate / _PersistedEndpointGate /
+    _PersistedBusinessGate（spike/formal_gates.py）内 evaluate() 后经
+    _finalize_persisted：persist 成功 -> 绑定 request_id + evidence_uri
+    + evidence_hash；persist 失败且 exchange 成功 -> 当场降级 blocking
+    FAIL（request_id 可携带，URI/hash 为空——request_id 单独存在永不
+    构成 formal evidence PASS）；已 FAIL 结果保留具体原因并附加持久化
+    失败信息。
+  冻结 pipeline 看到 FAIL -> early stop -> 下游 gate SKIPPED_BLOCKED、
+    下游 probe 从不 fire（_BoundReport.probes[kind].fired == 0 + raw
+    目录零新 evidence 双证明）。
+  execute() post-hoc 降级逻辑删除；替代为防御性 FormalGateProofError
+    （PASS 无绑定抵达该处 = 原子 gate 契约失效 -> fail loudly）。
+  禁止：先完整跑完 pipeline 再把 PASS 改 FAIL。
+P1-01 Trial L1 脚本 SdkLifecycle 被 dict 遮蔽（DM-CR-20260828-045）：
+  缺陷：lifecycle = SdkLifecycle() 后紧跟 lifecycle: dict = {} 同名重绑
+    —— SubscriptionController 实际收到 dict（无 transition，真实运行即
+    AttributeError）；state = lifecycle.state / lifecycle.close() 失效；
+    controller 组件测试通过但真实脚本 wiring 是坏的。
+  修正：SoR 与 view 分离命名——sdk_lifecycle: SdkLifecycle（SoR：注入
+    controller / verdict 派生 / finally 幂等 close()）+
+    lifecycle_diag: dict（VIEW：report["lifecycle"]）。SDK-dependent
+    主流程提取为 execute_subscription_flow(sdk, stage, duration_seconds,
+    *, sleep, monotonic)——注入 fake SDK 行为级测试真实脚本控制流。
+  测试：脚本级行为测试（fake login/register/callback/unregister/stop
+    走通 SESSION_READY→SUBSCRIBE_STARTED→CALLBACK_ACTIVE→UNSUBSCRIBED；
+    verdict 与状态机同源；register 失败不 fake 状态；terminal close
+    幂等）+ AST guard ×2（lifecycle 不得 dict 注解/重绑定；
+    SubscriptionController 构造参数必须是 sdk_lifecycle 变量）。
 ```
 
-### R4-A3（前批，已由本批承接修正）
+### R4-A3 / R4-A3.1（前批）
 
-R4-A3 原始交付（A3-01..05，implementation `de9bf1ab6f499b20916f8277dba
-45c21880fd908`）的 lifecycle 状态机 / 六类 gate 组件 / early-stop /
-trial 双入口拒绝结构**全部保留**；复审指出的"组件未接线 / evidence 无
-持久化身份 / blacklist fail-open"三点由上方 R4-A3.1 条目收口。
+R4-A3 原始交付（lifecycle 状态机 / 六类 gate 组件 / early-stop / trial
+双入口拒绝）与 R4-A3.1 交付（formal gate boundary / anti-bypass /
+persisted evidence identity / positive production identity /
+SubscriptionController 组件）结构全部保留；各自复审指出的缺口由
+R4-A3.1 / R4-A3.2 逐层收口（详见各批 Change Log 与 ADR-019 amendments）。
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
@@ -1751,6 +1753,28 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260828-045 — Trial-L1 Script SdkLifecycle Wiring Fix
+
+**Type**：C1 correctness closure  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A3.2 P1-01（audit 20260828 §3）——`scripts/spike/l1_subscription_test.py` 将 `lifecycle = SdkLifecycle()` 随后同名重绑为 `lifecycle: dict[str, object] = {}`：SubscriptionController 实际收到 dict（无 `transition`，真实运行即 AttributeError）；`state = lifecycle.state` 与 `lifecycle.close()` 失效；finally 中 close 异常被 suppress 使错误更隐蔽。controller 组件测试 PASS 不能证明真实脚本 wiring PASS。  
+**New Contract**（ADR-019 Amendment B.2）：correctness SoR 与 diagnostic view 分离命名——`sdk_lifecycle: SdkLifecycle`（SoR：注入 SubscriptionController、verdict 从它派生、finally 中幂等 `close()`）+ `lifecycle_diag: dict`（VIEW：`report["lifecycle"]`）；SDK-dependent 主流程提取为 `execute_subscription_flow(sdk, stage, duration_seconds, *, sleep, monotonic)`——可注入 fake SDK **行为级**测试真实脚本控制流；main() 只保留 login/env/session-gate/flush 与 terminal close。  
+**Tests**：tests/integration/test_l1_subscription_script.py（5：端到端状态机路径 SESSION_READY→SUBSCRIBE_STARTED→CALLBACK_ACTIVE→UNSUBSCRIBED + verdict 同源 + register 失败不 fake 状态 + terminal close 幂等 + AST guard ×2 防 dict 遮蔽回归）  
+**ADR**：[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment B.2  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260828-044 — Persistence-Failure Structural Early-Stop
+
+**Type**：C1 correctness closure（假 early-stop 修复）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-A3.2 P0-01（audit 20260828 §2）——R4-A3.1 的 `_PersistedProbe` 在持久化失败时只记录 `persist_error` 并照常返回成功 exchange：pipeline 视 PERMISSION 为 PASS 并继续评估 ENDPOINT/CACHE/FRESHNESS/BUSINESS（**真实 downstream provider calls 已发生**），pipeline 跑完后 execute() post-processing 才把 PASS 改写 FAIL——报告呈现 early stopped 但结构上从未 early stop，违反 Exit Gate 的 fail-closed 结构要求。  
+**New Contract**（ADR-019 Amendment B.1，Option A）：fire + persist + verdict 合并为 pipeline 内部的一次**原子 gate evaluation**——`_PersistedPermissionGate` / `_PersistedEndpointGate` / `_PersistedBusinessGate`（`spike/formal_gates.py`）evaluate() 后经 `_finalize_persisted`：persist 成功 → 绑定三段证据身份；persist 失败且 exchange 成功 → **当场降级 blocking FAIL**（request_id 可携带但 URI/hash 为空）；已 FAIL 结果保留具体原因并附加持久化失败信息。冻结 pipeline 看到 FAIL → early stop → 下游 probe 从不 fire（`probes[kind].fired == 0` + raw 目录零新 evidence 双证明）。execute() post-hoc 降级逻辑**删除**，替代为防御性 `FormalGateProofError`（PASS 无绑定抵达该处 = 原子 gate 契约失效 → fail loudly，绝不静默改写报告）。**禁止先完整跑完 pipeline 再把 PASS 改 FAIL。**  
+**Tests**：test_formal_gate_wiring.py 对抗集（PERMISSION persist 失败 → ENDPOINT/BUSINESS fired==0 + SKIPPED_BLOCKED + 零 raw evidence；ENDPOINT persist 失败 → BUSINESS fired==0；BUSINESS persist 失败 → all_passed 拒绝；request_id 存在但 URI/hash 缺失永不 PASS——断言直接落在 `_BoundReport.probes[kind].fired`）；既有 provider-denial early-stop 与 success/failure binding 测试零回归  
+**ADR**：[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment B.1  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260827-043 — Subscription Lifecycle SoR Integration
 

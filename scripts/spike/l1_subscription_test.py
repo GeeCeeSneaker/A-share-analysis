@@ -12,6 +12,12 @@ R2-P1-06 hardening:
 - subscription lifecycle (register/run/unregister/stop) is verified live
   BEFORE FAIL_NO_EVENTS can mean anything about permissions
 
+R4-A3.2 P1-01 (audit 20260828): the SDK-dependent core flow lives in
+execute_subscription_flow() - behaviorally testable with an injected
+fake SDK. The SdkLifecycle state machine (``sdk_lifecycle``) is the
+correctness SoR wired into SubscriptionController; the diagnostic dict
+(``lifecycle_diag``) is a VIEW - never rebind one name to both types.
+
 Usage (MUST run during trading hours, Asia/Shanghai):
     uv run python scripts/spike/l1_subscription_test.py --stage 1
 """
@@ -23,6 +29,7 @@ import json
 import os
 import sys
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -106,6 +113,173 @@ def parse_event_time(value: object) -> datetime | None:
     return None
 
 
+def execute_subscription_flow(
+    sdk: object,
+    stage: int,
+    duration_seconds: int,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> tuple[dict[str, object], SdkLifecycle]:
+    """The SDK-dependent subscription core flow, extracted from main()
+    (R4-A3.2 P1-01) so the REAL script control flow - including the
+    SdkLifecycle SoR wiring into SubscriptionController - is
+    behaviorally testable with an injected fake SDK.
+
+    Naming contract (audit 20260828 P1-01): ``sdk_lifecycle`` is the
+    correctness SoR (the SdkLifecycle state machine); the diagnostic
+    dict is a separate ``lifecycle_diag`` VIEW - one variable name must
+    never carry both types (that shadowing bug shipped the controller a
+    dict instead of the state machine).
+
+    Returns (report_fragment, sdk_lifecycle): the caller owns the
+    terminal close() (logout)."""
+    report: dict[str, object] = {}
+    events: list[dict] = []
+
+    sdk_lifecycle = SdkLifecycle()
+    sdk_lifecycle.transition(
+        SdkLifecycleState.SESSION_READY, reason="login ok", evidence_ref="ad.login"
+    )
+    lifecycle_diag: dict[str, object] = {}
+
+    base = sdk.BaseData()
+    code_list = list(base.get_code_list(security_type="EXTRA_STOCK_A"))
+    # R3-P1-10 32.3: SH/SZ/BJ mixed sample
+    sample = _pick_sample(code_list, stage)
+    report["sample_size"] = len(sample)
+    report["sample_markets"] = {
+        sfx: sum(1 for c in sample if c.endswith(sfx)) for sfx in (".SH", ".SZ", ".BJ")
+    }
+
+    sub = sdk.SubscribeData()
+    controller = SubscriptionController(sdk_lifecycle, sub)
+
+    def on_snapshot(data) -> None:
+        recv = datetime.now(tz=UTC)
+        record: dict[str, object] = {"received_at": recv.isoformat()}
+        for attr in (
+            "security_code",
+            "code",
+            "last_price",
+            "cum_volume",
+            "volume",
+            "cum_amount",
+            "amount",
+            "trading_phase",
+            "up_limit",
+            "high_limited",
+            "down_limit",
+            "low_limited",
+            "bid_price_1",
+            "ask_price_1",
+            "data_time",
+        ):
+            value = getattr(data, attr, None)
+            if value is None and hasattr(data, "get"):
+                value = data.get(attr)
+            if value is not None:
+                record[attr] = str(value)[:40]
+        event_time = parse_event_time(record.get("data_time"))
+        if event_time is not None:
+            record["event_time"] = event_time.isoformat()
+            record["latency_ms"] = round((recv - event_time).total_seconds() * 1000, 3)
+        events.append(record)
+
+    period_value = None
+    for holder in (sdk, getattr(sdk, "tgw", None)):
+        period_enum = getattr(holder, "Period", None)
+        if period_enum is not None and hasattr(period_enum, "snapshot"):
+            period_value = period_enum.snapshot.value
+            break
+    if period_value is None:
+        report["status"] = "NOT_TESTABLE_PERMISSION"
+        report["detail"] = "Period.snapshot enum not found (SDK surface drift)"
+        return report, sdk_lifecycle
+
+    # R4-A3.1 P1-01: register/run/unregister/stop go through the
+    # SubscriptionController, which DRIVES the SdkLifecycle state
+    # machine (SESSION_READY -> SUBSCRIBE_STARTED -> CALLBACK_ACTIVE
+    # -> UNSUBSCRIBED). The ``lifecycle_diag`` dict is the diagnostic
+    # VIEW; correctness truth is the state machine.
+    lifecycle_diag["register"] = "OK"
+    try:
+        controller.register(code_list=sample, period=period_value, callback=on_snapshot)
+    except Exception as exc:  # noqa: BLE001
+        lifecycle_diag["register"] = f"ERROR {type(exc).__name__}: {exc}"[:200]
+        report["lifecycle"] = lifecycle_diag
+        report["status"] = "NOT_TESTABLE_PERMISSION"
+        return report, sdk_lifecycle
+
+    # run/start loop if the SDK exposes one (verified live per R2-P1-06)
+    controller.run()
+    if "run" in controller.step_errors:
+        lifecycle_diag["run"] = f"ERROR {controller.step_errors['run']}"[:200]
+    else:
+        lifecycle_diag["run"] = "OK"
+
+    deadline = monotonic() + duration_seconds
+    while monotonic() < deadline:
+        sleep(0.5)
+
+    try:
+        controller.unregister(code_list=sample, period=period_value)
+        lifecycle_diag["unregister"] = (
+            f"ERROR {controller.step_errors['unregister']}"[:200]
+            if "unregister" in controller.step_errors
+            else "OK"
+        )
+    except Exception as exc:  # noqa: BLE001
+        lifecycle_diag["unregister"] = f"ERROR {type(exc).__name__}"[:200]
+    controller.stop()
+    lifecycle_diag["stop"] = (
+        f"ERROR {controller.step_errors['stop']}"[:200]
+        if "stop" in controller.step_errors
+        else "OK"
+    )
+    report["lifecycle"] = lifecycle_diag
+    report["lifecycle_state_machine"] = controller.diagnostic()
+
+    report["events_received"] = len(events)
+    # R3-P1-10 32.4: two separate verdicts - receiving events with a
+    # broken unregister/stop is NOT an overall PASS
+    if events:
+        latencies = [e["latency_ms"] for e in events if "latency_ms" in e]
+        if latencies:
+            report["latency_ms"] = {
+                "min": min(latencies),
+                "p50": sorted(latencies)[len(latencies) // 2],
+                "max": max(latencies),
+            }
+        report["out_of_order_count"] = _out_of_order(events)
+        report["fields_observed"] = sorted({k for e in events for k in e})
+        report["event_stream_verdict"] = "PASS"
+    else:
+        report["event_stream_verdict"] = "FAIL_NO_EVENTS"
+        report["note"] = (
+            "subscription lifecycle recorded above; verify callback "
+            "signature against the lifecycle errors before reading this "
+            "as an entitlement conclusion (R2-P1-06 17.3)"
+        )
+    diag_ok = bool(lifecycle_diag) and all(str(v).startswith("OK") for v in lifecycle_diag.values())
+    # R4-A3.1 P1-01: the verdict must ALSO be derived from the state
+    # machine SoR - a diagnostic dict alone is not lifecycle truth.
+    # The happy path ends UNSUBSCRIBED (register -> [callback] ->
+    # unregister/stop complete) with no step errors.
+    state = sdk_lifecycle.state
+    lifecycle_ok = (
+        diag_ok and state is SdkLifecycleState.UNSUBSCRIBED and not controller.step_errors
+    )
+    report["lifecycle_verdict"] = "PASS" if lifecycle_ok else "FAIL"
+    report["status"] = (
+        "PASS"
+        if report["event_stream_verdict"] == "PASS" and report["lifecycle_verdict"] == "PASS"
+        else str(report["event_stream_verdict"])
+    )
+    report["evidence_events_sample"] = events[:5]
+    return report, sdk_lifecycle
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="L1 realtime subscription test")
     parser.add_argument("--stage", type=int, default=1)
@@ -156,165 +330,28 @@ def main() -> int:
         _flush(report, args.stage)
         return 1
 
-    # R4-A3.1 P1-01: the SDK lifecycle state machine is the correctness
-    # SoR for the whole session (login -> subscribe -> callback ->
-    # unsubscribe -> logout); the report dicts below are diagnostic
-    # VIEWS derived from it, never a second SoR.
-    lifecycle = SdkLifecycle()
-    lifecycle.transition(
-        SdkLifecycleState.SESSION_READY, reason="login ok", evidence_ref="ad.login"
-    )
-
-    events: list[dict] = []
-    lifecycle: dict[str, object] = {}
+    # R4-A3.2 P1-01: the SdkLifecycle state machine lives inside
+    # execute_subscription_flow (the correctness SoR for login ->
+    # subscribe -> callback -> unsubscribe); the report dicts are
+    # diagnostic VIEWS derived from it, never a second SoR. main()
+    # keeps the reference only to perform the terminal logout close().
+    sdk_lifecycle: SdkLifecycle | None = None
     try:
-        base = ad.BaseData()
-        code_list = list(base.get_code_list(security_type="EXTRA_STOCK_A"))
-        # R3-P1-10 32.3: SH/SZ/BJ mixed sample
-        sample = _pick_sample(code_list, args.stage)
-        report["sample_size"] = len(sample)
-        report["sample_markets"] = {
-            sfx: sum(1 for c in sample if c.endswith(sfx)) for sfx in (".SH", ".SZ", ".BJ")
-        }
-
-        sub = ad.SubscribeData()
-        controller = SubscriptionController(lifecycle, sub)
-
-        def on_snapshot(data) -> None:
-            recv = datetime.now(tz=UTC)
-            record: dict[str, object] = {"received_at": recv.isoformat()}
-            for attr in (
-                "security_code",
-                "code",
-                "last_price",
-                "cum_volume",
-                "volume",
-                "cum_amount",
-                "amount",
-                "trading_phase",
-                "up_limit",
-                "high_limited",
-                "down_limit",
-                "low_limited",
-                "bid_price_1",
-                "ask_price_1",
-                "data_time",
-            ):
-                value = getattr(data, attr, None)
-                if value is None and hasattr(data, "get"):
-                    value = data.get(attr)
-                if value is not None:
-                    record[attr] = str(value)[:40]
-            event_time = parse_event_time(record.get("data_time"))
-            if event_time is not None:
-                record["event_time"] = event_time.isoformat()
-                record["latency_ms"] = round((recv - event_time).total_seconds() * 1000, 3)
-            events.append(record)
-
-        period_value = None
-        for holder in (ad, getattr(ad, "tgw", None)):
-            period_enum = getattr(holder, "Period", None)
-            if period_enum is not None and hasattr(period_enum, "snapshot"):
-                period_value = period_enum.snapshot.value
-                break
-        if period_value is None:
-            report["status"] = "NOT_TESTABLE_PERMISSION"
-            report["detail"] = "Period.snapshot enum not found (SDK surface drift)"
-            _flush(report, args.stage)
-            return 1
-
-        # R4-A3.1 P1-01: register/run/unregister/stop go through the
-        # SubscriptionController, which DRIVES the SdkLifecycle state
-        # machine (SESSION_READY -> SUBSCRIBE_STARTED -> CALLBACK_ACTIVE
-        # -> UNSUBSCRIBED). The ``lifecycle`` dict is the diagnostic
-        # VIEW; correctness truth is the state machine.
-        lifecycle["register"] = "OK"
-        try:
-            controller.register(code_list=sample, period=period_value, callback=on_snapshot)
-        except Exception as exc:  # noqa: BLE001
-            lifecycle["register"] = f"ERROR {type(exc).__name__}: {exc}"[:200]
-            report["lifecycle"] = lifecycle
-            report["status"] = "NOT_TESTABLE_PERMISSION"
-            _flush(report, args.stage)
-            return 1
-
-        # run/start loop if the SDK exposes one (verified live per R2-P1-06)
-        controller.run()
-        if "run" in controller.step_errors:
-            lifecycle["run"] = f"ERROR {controller.step_errors['run']}"[:200]
-        else:
-            lifecycle["run"] = "OK"
-
-        deadline = time.monotonic() + args.duration_seconds
-        while time.monotonic() < deadline:
-            time.sleep(0.5)
-
-        try:
-            controller.unregister(code_list=sample, period=period_value)
-            lifecycle["unregister"] = (
-                f"ERROR {controller.step_errors['unregister']}"[:200]
-                if "unregister" in controller.step_errors
-                else "OK"
-            )
-        except Exception as exc:  # noqa: BLE001
-            lifecycle["unregister"] = f"ERROR {type(exc).__name__}"[:200]
-        controller.stop()
-        lifecycle["stop"] = (
-            f"ERROR {controller.step_errors['stop']}"[:200]
-            if "stop" in controller.step_errors
-            else "OK"
+        flow_report, sdk_lifecycle = execute_subscription_flow(
+            ad, args.stage, args.duration_seconds
         )
-        report["lifecycle"] = lifecycle
-        report["lifecycle_state_machine"] = controller.diagnostic()
-
-        report["events_received"] = len(events)
-        # R3-P1-10 32.4: two separate verdicts - receiving events with a
-        # broken unregister/stop is NOT an overall PASS
-        if events:
-            latencies = [e["latency_ms"] for e in events if "latency_ms" in e]
-            if latencies:
-                report["latency_ms"] = {
-                    "min": min(latencies),
-                    "p50": sorted(latencies)[len(latencies) // 2],
-                    "max": max(latencies),
-                }
-            report["out_of_order_count"] = _out_of_order(events)
-            report["fields_observed"] = sorted({k for e in events for k in e})
-            report["event_stream_verdict"] = "PASS"
-        else:
-            report["event_stream_verdict"] = "FAIL_NO_EVENTS"
-            report["note"] = (
-                "subscription lifecycle recorded above; verify callback "
-                "signature against the lifecycle errors before reading this "
-                "as an entitlement conclusion (R2-P1-06 17.3)"
-            )
-        lifecycle_ok = bool(lifecycle) and all(str(v).startswith("OK") for v in lifecycle.values())
-        # R4-A3.1 P1-01: the verdict must ALSO be derived from the state
-        # machine SoR - a diagnostic dict alone is not lifecycle truth.
-        # The happy path ends UNSUBSCRIBED (register -> [callback] ->
-        # unregister/stop complete) with no step errors.
-        state = lifecycle.state
-        lifecycle_ok = (
-            lifecycle_ok and state is SdkLifecycleState.UNSUBSCRIBED and not controller.step_errors
-        )
-        report["lifecycle_verdict"] = "PASS" if lifecycle_ok else "FAIL"
-        report["status"] = (
-            "PASS"
-            if report["event_stream_verdict"] == "PASS" and report["lifecycle_verdict"] == "PASS"
-            else str(report["event_stream_verdict"])
-        )
-        report["evidence_events_sample"] = events[:5]
-
+        report.update(flow_report)
     except Exception as exc:  # noqa: BLE001 - evidence, not crash
         report["status"] = "NOT_TESTABLE_PERMISSION"
         report["error"] = f"{type(exc).__name__}: {exc}"[:400]
     finally:
         with _suppress():
             ad.logout()
-        with _suppress():
-            # state-machine truth: logout closes the session (close() is
-            # the idempotent terminal path for LOGGED_OUT)
-            lifecycle.close(reason="logout", evidence_ref="ad.logout")
+        if sdk_lifecycle is not None:
+            with _suppress():
+                # state-machine truth: logout closes the session (close() is
+                # the idempotent terminal path for LOGGED_OUT)
+                sdk_lifecycle.close(reason="logout", evidence_ref="ad.logout")
 
     _flush(report, args.stage)
     print(

@@ -1,5 +1,5 @@
 """Formal runtime gate execution boundary (R4-A3.1 P0-01/P0-02, audit
-20260827).
+20260827; R4-A3.2 P0-01, audit 20260828).
 
 R4-A3 delivered the gate library (``providers.runtime_gates``) as a
 reusable component - but a component test proves the LIBRARY, not the
@@ -28,8 +28,12 @@ Persisted evidence closure (audit P0-02):
 - each gate result binds the persisted evidence identity EXPLICITLY:
   request_id + evidence_uri (the .meta.json anchor) + evidence_hash;
   a request id alone is never accepted as formal evidence;
-- persistence failure (exchange exists, bytes not on disk) DOWNGRADES
-  the gate to FAIL - fail closed;
+- persistence failure (exchange exists, bytes not on disk) converts
+  the gate to a blocking FAIL IMMEDIATELY, DURING gate evaluation
+  (R4-A3.2 P0-01: fire + persist + verdict is one atomic evaluation -
+  the frozen pipeline then early-stops so downstream probes fire ZERO
+  provider calls; a post-hoc rewrite after the pipeline finished is
+  FORBIDDEN - it would report an early stop that never happened);
 - after a blocking gate, downstream probes fire ZERO provider calls and
   persist ZERO raw evidence (provable by counters and by the raw dir).
 """
@@ -49,6 +53,7 @@ from ashare_state.providers.runtime_gates import (
     CacheMetadataGate,
     EndpointAvailableGate,
     FreshnessAsOfGate,
+    GateCheck,
     GateKind,
     GateReport,
     GateResult,
@@ -124,11 +129,11 @@ class CapabilityProbePlan:
 class _PersistedProbe:
     """Wraps a ProbeCaller so EVERY fired exchange - success or
     first-class failure - is persisted through the run's RawWriter
-    BEFORE the gate sees it, and the binding is recorded.
+    BEFORE the gate verdict is finalized, and the binding is recorded.
 
-    A probe PASS without a persisted binding is impossible from here:
-    persistence failure downgrades to a recorded error which the
-    executor turns into a gate FAIL (fail closed, audit P0-02)."""
+    R4-A3.2 P0-01: the recorded binding/persist outcome is consumed
+    INSIDE the gate evaluation (see :class:`_PersistedPermissionGate`
+    and siblings) - never post hoc after the pipeline finished."""
 
     def __init__(self, ctx: ProbeContext, probe: ProbeCaller, label: str) -> None:
         self.ctx = ctx
@@ -137,6 +142,10 @@ class _PersistedProbe:
         self.fired = 0
         self.binding: GateEvidenceIdentity | None = None
         self.persist_error: str = ""
+        #: request identity of the last fired exchange (a request id is
+        #: NOT persisted evidence - P0-02 - but a downgraded result may
+        #: still record it for traceability)
+        self.last_request_id: str = ""
 
     def __call__(self) -> ProviderExchange:
         self.fired += 1
@@ -145,8 +154,10 @@ class _PersistedProbe:
         except ProviderError as exc:
             failure = getattr(exc, "exchange", None)
             if failure is not None:
+                self.last_request_id = str(failure.envelope.request_id)
                 self._persist(failure)
             raise
+        self.last_request_id = str(exchange.envelope.request_id)
         self._persist(exchange)
         return exchange
 
@@ -161,6 +172,88 @@ class _PersistedProbe:
             evidence_uri=str(meta.get("evidence_ref", "")),
             evidence_hash=str(meta.get("content_hash", "")),
         )
+
+
+def _finalize_persisted(result: GateResult, probe: _PersistedProbe) -> GateResult:
+    """Fold the persistence outcome INTO the gate evaluation itself
+    (R4-A3.2 P0-01 - no post-hoc rewrite after the pipeline finished):
+
+    - exchange persisted -> the result is BOUND to the persisted
+      evidence identity (request_id + evidence_uri + evidence_hash);
+    - exchange fired but nothing persisted -> an otherwise-PASS gate is
+      IMMEDIATELY downgraded to a blocking FAIL right here, so the
+      frozen pipeline early-stops and downstream probes never fire
+      (structural fail-closed, audit 20260828 P0-01). The request id
+      may still be recorded - it is a request identity - but URI/hash
+      stay empty: a request id alone is never formal evidence PASS;
+    - an already-failing gate keeps its (more specific) reason, with
+      the persistence failure appended for auditability.
+    """
+    binding = probe.binding
+    if binding is not None:
+        return replace(
+            result,
+            request_id=binding.request_id,
+            evidence_uri=binding.evidence_uri,
+            evidence_hash=binding.evidence_hash,
+            evidence_ref=binding.evidence_uri,
+        )
+    if result.status is GateStatus.PASS:
+        return replace(
+            result,
+            status=GateStatus.FAIL,
+            reason=(
+                "probe exchange succeeded but evidence persistence failed - "
+                f"{probe.persist_error or 'no persisted evidence'}; "
+                "formal evidence PASS refused (audit R4-A3.2 P0-01)"
+            ),
+            request_id=probe.last_request_id,
+        )
+    if probe.persist_error:
+        return replace(
+            result,
+            reason=f"{result.reason} | evidence persistence failed: {probe.persist_error}",
+        )
+    return result
+
+
+@dataclass(frozen=True)
+class _PersistedPermissionGate(GateCheck):
+    """PERMISSION through the formal boundary: fire + persist + verdict
+    form ONE atomic gate evaluation (R4-A3.2 P0-01)."""
+
+    probe: _PersistedProbe
+    kind = GateKind.PERMISSION
+
+    def evaluate(self) -> GateResult:
+        inner = PermissionGate(self.probe).evaluate()
+        return _finalize_persisted(inner, self.probe)
+
+
+@dataclass(frozen=True)
+class _PersistedEndpointGate(GateCheck):
+    """ENDPOINT_AVAILABLE through the formal boundary: fire + persist +
+    verdict form ONE atomic gate evaluation (R4-A3.2 P0-01)."""
+
+    probe: _PersistedProbe
+    kind = GateKind.ENDPOINT_AVAILABLE
+
+    def evaluate(self) -> GateResult:
+        inner = EndpointAvailableGate(self.probe).evaluate()
+        return _finalize_persisted(inner, self.probe)
+
+
+@dataclass(frozen=True)
+class _PersistedBusinessGate(GateCheck):
+    """BUSINESS_DATA through the formal boundary: fire + persist +
+    verdict form ONE atomic gate evaluation (R4-A3.2 P0-01)."""
+
+    probe: _PersistedProbe
+    kind = GateKind.BUSINESS_DATA
+
+    def evaluate(self) -> GateResult:
+        inner = BusinessDataGate(self.probe).evaluate()
+        return _finalize_persisted(inner, self.probe)
 
 
 @dataclass
@@ -179,7 +272,13 @@ class FormalRuntimeGateExecutor:
     ``RuntimeGatePipeline`` component; persists every probe exchange via
     the run's RawWriter; binds persisted evidence identities onto the
     gate results; emits the gate-proof SpikeCases (PERMISSION/ENDPOINT/
-    BUSINESS + REPORT) consumed by capability approval."""
+    BUSINESS + REPORT) consumed by capability approval.
+
+    R4-A3.2 P0-01: fire + persist + verdict is ONE atomic gate
+    evaluation per probe gate - a persistence failure blocks DURING
+    evaluation, the pipeline early-stops structurally, and downstream
+    probes fire ZERO provider calls. The report is NEVER rewritten
+    after the pipeline has finished."""
 
     def __init__(self, ctx: ProbeContext) -> None:
         self.ctx = ctx
@@ -205,6 +304,12 @@ class FormalRuntimeGateExecutor:
         endpoint_probe = _PersistedProbe(self.ctx, plan.endpoint_probe, "ENDPOINT")
         business_probe = _PersistedProbe(self.ctx, plan.business_fetch, "BUSINESS")
 
+        # R4-A3.2 P0-01: the probe gates are the ATOMIC persisted gates -
+        # a persistence failure becomes a blocking FAIL DURING gate
+        # evaluation, so the frozen pipeline early-stops and downstream
+        # probes fire ZERO provider calls. There is NO post-hoc rewrite
+        # after the pipeline has finished (that would report an early
+        # stop that never structurally happened).
         pipeline = RuntimeGatePipeline(
             [
                 AuthAccountGate(
@@ -214,15 +319,15 @@ class FormalRuntimeGateExecutor:
                     require_production_identity=require_production,
                     frozen_production_id=frozen_id,
                 ),
-                PermissionGate(permission_probe),
-                EndpointAvailableGate(endpoint_probe),
+                _PersistedPermissionGate(permission_probe),
+                _PersistedEndpointGate(endpoint_probe),
                 CacheMetadataGate(plan.cache_validator, evidence_ref=plan.cache_evidence_ref),
                 FreshnessAsOfGate(
                     data_as_of=plan.data_as_of,
                     required_as_of=plan.required_as_of,
                     evidence_ref=plan.freshness_evidence_ref,
                 ),
-                BusinessDataGate(business_probe),
+                _PersistedBusinessGate(business_probe),
             ]
         )
         report = pipeline.evaluate()
@@ -233,50 +338,22 @@ class FormalRuntimeGateExecutor:
             GateKind.BUSINESS_DATA: business_probe,
         }
         bindings: dict[GateKind, GateEvidenceIdentity] = {}
-        bound_results: list[GateResult] = []
-        downgraded: GateKind | None = None
         for result in report.results:
             probe = probes.get(result.kind)
             if probe is None:
-                bound_results.append(result)
                 continue
             if probe.binding is not None:
                 bindings[result.kind] = probe.binding
-                bound = replace(
-                    result,
-                    request_id=probe.binding.request_id,
-                    evidence_uri=probe.binding.evidence_uri,
-                    evidence_hash=probe.binding.evidence_hash,
-                    evidence_ref=probe.binding.evidence_uri,
-                )
             elif result.status is GateStatus.PASS:
-                # P0-02 fail-closed: the exchange fired but the evidence
-                # bytes are NOT on disk - a request id is not formal
-                # evidence PASS.
-                bound = replace(
-                    result,
-                    status=GateStatus.FAIL,
-                    reason=(
-                        f"probe PASSED but evidence persistence failed - "
-                        f"{probe.persist_error or 'no persisted evidence'}; "
-                        "formal evidence PASS refused (audit R4-A3.1 P0-02)"
-                    ),
+                # Defensive fail-closed (should be unreachable): the
+                # persisted-gate subclass MUST have downgraded this
+                # DURING evaluation. Refuse loudly instead of rewriting
+                # the report post hoc (audit R4-A3.2 P0-01).
+                raise FormalGateProofError(
+                    f"{result.kind.value} PASSED without persisted evidence - "
+                    "the persisted-gate evaluation contract was violated"
                 )
-                if downgraded is None:
-                    downgraded = result.kind
-            else:
-                bound = result
-            bound_results.append(bound)
-        bound_report = _BoundReport(
-            report=replace(
-                report,
-                results=tuple(bound_results),
-                early_stopped=True if downgraded is not None else report.early_stopped,
-                blocked_by=downgraded or report.blocked_by,
-            ),
-            bindings=bindings,
-            probes=probes,
-        )
+        bound_report = _BoundReport(report=report, bindings=bindings, probes=probes)
         self._emit_cases(plan, bound_report)
         return bound_report
 

@@ -72,6 +72,31 @@ class _NoPersistContext(ProbeContext):
         raise RuntimeError("simulated persistence failure")
 
 
+class _SelectiveNoPersistContext(ProbeContext):
+    """Persistence fails only on the Nth (0-based) persisted exchange -
+    lets a single gate position (permission=0, endpoint=1, business=2)
+    hit the persistence failure while the upstream ones bind normally."""
+
+    def __init__(self, run, store, catalog, target, fail_on: set[int]) -> None:
+        super().__init__(run, store, catalog, target)
+        self._fail_on = fail_on
+        self._persist_calls = 0
+
+    @classmethod
+    def fail_on_factory(cls, fail_on: set[int]):
+        def make(run, store, catalog, target):
+            return cls(run, store, catalog, target, fail_on=fail_on)
+
+        return make
+
+    def evidence_from_exchange(self, exchange):
+        index = self._persist_calls
+        self._persist_calls += 1
+        if index in self._fail_on:
+            raise RuntimeError(f"simulated persistence failure #{index}")
+        return super().evidence_from_exchange(exchange)
+
+
 def _ctx(tmp_path: Path, target=None, context_cls=ProbeContext) -> ProbeContext:
     run, store = new_run(
         run_kind=RunKind.DRY_RUN,
@@ -222,22 +247,110 @@ class TestFormalGateWiring:
 
 @pytest.mark.integration
 class TestGateEvidenceBindingAdversarial:
-    def test_persistence_failure_downgrades_pass_to_fail(self, tmp_path: Path):
-        """P0-02: a request id alone is NOT persisted evidence PASS. When
-        the exchange fires but the bytes never land on disk, the gate
-        must FAIL (fail closed), not pass on the request identity."""
+    """R4-A3.2 P0-01 (audit 20260828): persistence failure is a blocking
+    FAIL DURING gate evaluation - the pipeline early-stops structurally
+    so downstream probes fire ZERO provider calls. A post-hoc rewrite
+    after the pipeline finished (the shipped bug) would report an early
+    stop that never happened; these tests pin the structural truth via
+    the per-probe ``fired`` counters, not just the final blocked_by."""
+
+    def test_permission_persistence_fail_blocks_immediately(self, tmp_path: Path):
+        """PERMISSION exchange succeeds, its persist fails -> PERMISSION
+        FAILs during evaluation; ENDPOINT/BUSINESS probes never fire;
+        zero downstream Raw evidence."""
         ctx = _ctx(tmp_path, context_cls=_NoPersistContext)
         executor = FormalRuntimeGateExecutor(ctx)
         bound = executor.execute(GATE_PLAN_SPECS["trade_calendar"](ctx))
 
         assert not bound.report.all_passed
+        assert bound.report.early_stopped
         assert bound.report.blocked_by is GateKind.PERMISSION
         permission_result = next(r for r in bound.report.results if r.kind is GateKind.PERMISSION)
         assert permission_result.status is GateStatus.FAIL
         assert "persistence failed" in permission_result.reason
+        # the request identity may be recorded, but URI/hash are absent:
+        # a request id alone is never formal evidence PASS (P0-02)
         assert not permission_result.has_persisted_evidence
-        # no raw evidence was written
+        assert not permission_result.evidence_uri
+        assert not permission_result.evidence_hash
+        # STRUCTURAL early stop: downstream probes never fired
+        assert bound.probes[GateKind.ENDPOINT_AVAILABLE].fired == 0
+        assert bound.probes[GateKind.BUSINESS_DATA].fired == 0
+        # downstream gates are SKIPPED_BLOCKED, not evaluated
+        endpoint_result = next(
+            r for r in bound.report.results if r.kind is GateKind.ENDPOINT_AVAILABLE
+        )
+        business_result = next(r for r in bound.report.results if r.kind is GateKind.BUSINESS_DATA)
+        assert endpoint_result.status is GateStatus.SKIPPED_BLOCKED
+        assert business_result.status is GateStatus.SKIPPED_BLOCKED
+        assert endpoint_result.provider_calls_fired == 0
+        assert business_result.provider_calls_fired == 0
+        # zero downstream Raw evidence (nothing landed on disk at all)
         assert _raw_files(ctx) == []
+
+    def test_endpoint_persistence_fail_blocks_business(self, tmp_path: Path):
+        """ENDPOINT exchange succeeds, its persist fails -> ENDPOINT
+        FAILs during evaluation; the BUSINESS probe never fires."""
+        ctx = _ctx(tmp_path, context_cls=_SelectiveNoPersistContext.fail_on_factory({1}))
+        executor = FormalRuntimeGateExecutor(ctx)
+        bound = executor.execute(GATE_PLAN_SPECS["trade_calendar"](ctx))
+
+        assert not bound.report.all_passed
+        assert bound.report.early_stopped
+        assert bound.report.blocked_by is GateKind.ENDPOINT_AVAILABLE
+        # permission persisted fine (binding present), endpoint did not
+        permission_result = next(r for r in bound.report.results if r.kind is GateKind.PERMISSION)
+        endpoint_result = next(
+            r for r in bound.report.results if r.kind is GateKind.ENDPOINT_AVAILABLE
+        )
+        assert permission_result.status is GateStatus.PASS
+        assert permission_result.has_persisted_evidence
+        assert endpoint_result.status is GateStatus.FAIL
+        assert "persistence failed" in endpoint_result.reason
+        assert not endpoint_result.has_persisted_evidence
+        # STRUCTURAL early stop: the business probe never fired
+        assert bound.probes[GateKind.BUSINESS_DATA].fired == 0
+        business_result = next(r for r in bound.report.results if r.kind is GateKind.BUSINESS_DATA)
+        assert business_result.status is GateStatus.SKIPPED_BLOCKED
+        assert business_result.provider_calls_fired == 0
+        # exactly one Raw evidence landed: the permission exchange
+        assert len(_raw_files(ctx)) == 1
+
+    def test_business_persistence_fail_refuses_all_passed(self, tmp_path: Path):
+        """BUSINESS exchange succeeds, its persist fails -> BUSINESS
+        FAILs during evaluation; the report can never claim all_passed."""
+        ctx = _ctx(tmp_path, context_cls=_SelectiveNoPersistContext.fail_on_factory({2}))
+        executor = FormalRuntimeGateExecutor(ctx)
+        bound = executor.execute(GATE_PLAN_SPECS["trade_calendar"](ctx))
+
+        assert not bound.report.all_passed
+        assert bound.report.blocked_by is GateKind.BUSINESS_DATA
+        business_result = next(r for r in bound.report.results if r.kind is GateKind.BUSINESS_DATA)
+        assert business_result.status is GateStatus.FAIL
+        assert "persistence failed" in business_result.reason
+        assert not business_result.has_persisted_evidence
+        # the business probe DID fire (upstream gates passed) - only its
+        # persistence failed; the two upstream exchanges persisted
+        assert bound.probes[GateKind.BUSINESS_DATA].fired == 1
+        assert len(_raw_files(ctx)) == 2
+
+    def test_request_id_alone_is_never_formal_evidence_pass(self, tmp_path: Path):
+        """P0-02 via P0-01 lens: a downgraded result may carry the
+        request identity, but with URI/hash absent it can never be read
+        as formal evidence PASS."""
+        ctx = _ctx(tmp_path, context_cls=_NoPersistContext)
+        executor = FormalRuntimeGateExecutor(ctx)
+        bound = executor.execute(GATE_PLAN_SPECS["trade_calendar"](ctx))
+
+        permission_result = next(r for r in bound.report.results if r.kind is GateKind.PERMISSION)
+        assert permission_result.status is GateStatus.FAIL
+        # request_id may exist; has_persisted_evidence must be False
+        assert not (permission_result.request_id and permission_result.has_persisted_evidence)
+        assert not permission_result.has_persisted_evidence
+        # and the proof case for a failing gate is a FAIL case, never PASS
+        permission_case = _case_by_id(ctx, gate_case_id("trade_calendar", GateKind.PERMISSION))
+        assert permission_case is not None
+        assert permission_case.result is CaseResult.VALIDATED_FAIL
 
     def test_tampered_meta_blocks_verdict(self, tmp_path: Path):
         """P0-02: gate proof cases are subject to the same evidence

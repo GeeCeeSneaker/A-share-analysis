@@ -184,3 +184,75 @@ retry-safe；UNSUBSCRIBED 后回调计数为 late callback，永不 reactivation
   mismatch 拒绝 + 无 frozen fail-closed + RunKind 不替代身份。
 
 DM 登记见管理总册 §61 Change Log（DM-CR-20260827-040..043）。
+
+---
+
+## Amendment 2026-08-28（R4-A3.2，audit 20260828）——两个 runtime correction
+
+复审（audit 20260828）对 R4-A3.1 的裁决：Formal gate wiring / anti-bypass /
+positive production identity / 正常 persisted evidence binding /
+SubscriptionController 组件全部 **PASS / FREEZE**；但有两个 runtime 缺口
+REOPENED，本 amendment 仅记录这两个 correction，不重写已冻结部分。
+
+### B.1 持久化失败 = gate evaluation 内的即时阻断（P0-01）
+
+**缺陷**：R4-A3.1 的 `_PersistedProbe` 在 exchange 持久化失败时只记录
+`persist_error` 并照常返回成功的 exchange——`RuntimeGatePipeline` 视
+PERMISSION 为 PASS，继续评估 ENDPOINT/CACHE/FRESHNESS/BUINESS，**真实的
+downstream provider call 已经发生**；只有 pipeline 跑完后
+`FormalRuntimeGateExecutor.execute()` 的 post-processing 才把 PASS 改写为
+FAIL。报告呈现"early stopped"，但结构上从未 early stop——这是假
+early-stop。
+
+**修正**（Option A）：fire + persist + verdict 合并为 pipeline 内部的
+**一次原子 gate evaluation**——
+
+- `_PersistedPermissionGate` / `_PersistedEndpointGate` /
+  `_PersistedBusinessGate`（`spike/formal_gates.py`）：evaluate() 内先走
+  原冻结 gate 语义（probe fire + persist 由 `_PersistedProbe.__call__`
+  完成），再经 `_finalize_persisted`：
+  - persist 成功 → 结果绑定 request_id + evidence_uri + evidence_hash；
+  - persist 失败且 exchange 成功 → **当场降级 blocking FAIL**（可携带
+    request 请求身份，但 URI/hash 为空——request_id 单独存在永不构成
+    formal evidence PASS）；
+  - 已 FAIL 的结果保留更具体的失败原因，附加持久化失败信息。
+- 冻结 pipeline 看到 FAIL → early stop → 下游 gate SKIPPED_BLOCKED、
+  下游 probe **从不 fire**（`_BoundReport.probes[kind].fired == 0`，
+  raw 目录零新 evidence——双证明）。
+- execute() 的 post-hoc 降级逻辑**删除**；替代为防御性
+  `FormalGateProofError`（若竟有 PASS 无绑定抵达该处，说明原子 gate 契约
+  本身失效——fail loudly，绝不静默改写报告）。
+
+**禁止**：先完整跑完 pipeline 再把 PASS 改 FAIL。
+
+**测试**（`test_formal_gate_wiring.py`）：PERMISSION persist 失败 →
+ENDPOINT/BUSINESS fired==0 + SKIPPED_BLOCKED + 零 raw evidence；ENDPOINT
+persist 失败 → BUSINESS fired==0；BUSINESS persist 失败 → all_passed 拒绝；
+request_id 存在但 URI/hash 缺失永不 PASS（downgrade case 为
+VALIDATED_FAIL）。断言直接落在 `_BoundReport.probes[kind].fired` 上。
+
+### B.2 Trial L1 脚本的 SdkLifecycle 被 dict 遮蔽（P1-01）
+
+**缺陷**：`scripts/spike/l1_subscription_test.py` 先构造
+`lifecycle = SdkLifecycle()` 并 transition 到 SESSION_READY，紧接着
+`lifecycle: dict[str, object] = {}` 把**同名变量重绑为 dict**——
+`SubscriptionController(lifecycle, sub)` 实际收到 dict（无 `transition`
+方法，真实运行即 AttributeError），`state = lifecycle.state` 与
+`lifecycle.close()` 同样失效。controller 组件测试通过，但真实脚本 wiring
+是坏的。
+
+**修正**：correctness SoR 与 diagnostic view 分离命名——
+`sdk_lifecycle: SdkLifecycle`（SoR，注入 SubscriptionController，verdict
+从它派生，finally 中幂等 close()）；`lifecycle_diag: dict`（VIEW，进
+report["lifecycle"]）。SDK-dependent 主流程提取为
+`execute_subscription_flow(sdk, stage, duration_seconds, *, sleep,
+monotonic)`——可用注入 fake SDK **行为级**测试真实脚本控制流（fake
+login/register/callback/unregister/stop 走通
+SESSION_READY→SUBSCRIBE_STARTED→CALLBACK_ACTIVE→UNSUBSCRIBED）。
+
+**测试**（`tests/integration/test_l1_subscription_script.py`，5）：脚本级
+行为测试（端到端状态机路径 + verdict 同源 + register 失败不 fake 状态 +
+terminal close 幂等）+ AST 静态 guard ×2（`lifecycle` 不得被 dict
+注解/重绑定；SubscriptionController 构造参数必须是 `sdk_lifecycle` 变量）。
+
+DM 登记见管理总册 §61 Change Log（DM-CR-20260828-044/045）。

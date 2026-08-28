@@ -470,3 +470,51 @@ Production P0-M-1B 仍独立 BLOCKED，不能因代码 VERIFIED 自动放行。
 ```
 
 Formal gate anti-bypass、positive production identity、正常 persisted evidence binding、SubscriptionController component、R4-A2.x/CR-1.x 均冻结，除非出现可复现回归。
+
+
+---
+
+# 11. Implementation Mapping（开发方填写，2026-08-28）
+
+## P0-01 — Persistence-Failure Structural Early-Stop（§2）
+
+| Requirement（§2.3/§2.4） | Implementation | Tests |
+|---|---|---|
+| 不做 pipeline 跑完后的 post-process | `execute()` 的 post-hoc 降级逻辑**删除**；替代为防御性 `FormalGateProofError`（PASS 无绑定抵达该处 = 原子 gate 契约失效 → fail loudly，绝不静默改写报告） | 代码审查点：formal_gates.py execute() 无 replace(status=FAIL) 改写路径 |
+| Option A：persisted GateCheck helper/subclass 直接返回已绑定 GateResult | `_PersistedPermissionGate` / `_PersistedEndpointGate` / `_PersistedBusinessGate` + `_finalize_persisted`（formal_gates.py）：evaluate() 内 fire + persist + verdict 原子化——persist 成功绑三段身份；persist 失败且 exchange 成功当场降级 blocking FAIL；已 FAIL 结果保留具体原因并附加持久化失败信息 | test_permission_persistence_fail_blocks_immediately |
+| PERMISSION persist fail → PERMISSION=FAIL → ENDPOINT/BUSINESS fired == 0 | 即时 FAIL → 冻结 pipeline early stop → 下游 gate SKIPPED_BLOCKED、下游 probe 从不 fire | 同上：`probes[ENDPOINT].fired == 0` + `probes[BUSINESS].fired == 0` + SKIPPED_BLOCKED 断言 + provider_calls_fired == 0 |
+| downstream Raw evidence count == 0 | raw 目录零 `.meta.json`（`_raw_files(ctx) == []`） | 同上 |
+| ENDPOINT persist fail → BUSINESS fired == 0 | `_SelectiveNoPersistContext.fail_on_factory({1})`（permission 正常持久化、endpoint 失败） | test_endpoint_persistence_fail_blocks_business |
+| BUSINESS persist fail → BUSINESS=FAIL，report 不得 all_passed | `_SelectiveNoPersistContext.fail_on_factory({2})`；business fired == 1（上游全过，它确实 fire 了，只是持久化失败）；上游两个 exchange 正常落盘 | test_business_persistence_fail_refuses_all_passed |
+| request_id may exist, but URI/hash absent → never PASS | 降级 result 携带 `last_request_id`（请求身份可追溯）但 URI/hash 为空 → `has_persisted_evidence == False`；proof case 为 VALIDATED_FAIL | test_request_id_alone_is_never_formal_evidence_pass |
+| 既有 provider-denial early-stop 测试保持绿 | 零改动，全过 | test_permission_failure_blocks_with_zero_downstream_calls |
+| 既有 success/failure persisted binding 测试保持绿 | 零改动，全过 | test_all_gates_pass_business_fires_and_evidence_binds |
+| 断言 `_BoundReport.probes[kind].fired`（非只断言 blocked_by） | 全部新对抗测试直接断言 probe counters | 见上各行 |
+
+## P1-01 — Trial L1 Script SdkLifecycle Wiring（§3）
+
+| Requirement（§3.2/§3.3） | Implementation | Tests |
+|---|---|---|
+| SoR 与 diagnostic view 不同变量 | `sdk_lifecycle: SdkLifecycle`（SoR）+ `lifecycle_diag: dict`（VIEW）；一个名字不再承载两种类型 | AST guard：`lifecycle` 不得被 dict 注解/重绑定 |
+| SubscriptionController 收到真实 SdkLifecycle | `SubscriptionController(sdk_lifecycle, sub)` | AST guard：构造首参必须是 `sdk_lifecycle` 变量 |
+| state = sdk_lifecycle.state；sdk_lifecycle.close(...) | verdict 从 `sdk_lifecycle.state` 派生；finally 中幂等 `close(reason="logout")` | 行为测试断言 transitions 全路径 + close 幂等 |
+| script-level behavioral test（推荐提取可注入 fake 的小函数） | `execute_subscription_flow(sdk, stage, duration_seconds, *, sleep, monotonic)`——SDK-dependent 主流程整体提取，main() 只留 login/env/session-gate/flush 与 terminal close | test_l1_subscription_script.py 加载真实脚本模块 + fake SDK（login 前置 / fake register / run() 触发 callback / unregister / stop） |
+| register/callback/unregister/stop 走通状态机 | fake SDK run() 模拟一帧行情 → callback fires | test_flow_drives_the_real_state_machine_end_to_end：SESSION_READY→SUBSCRIBE_STARTED→CALLBACK_ACTIVE→UNSUBSCRIBED 全路径 + events_received==1 + status PASS |
+| no AttributeError / type shadowing | SoR/view 命名分离 | 行为测试跑通即证明（dict 无 transition 会当场 AttributeError） |
+| lifecycle_verdict derives from SAME SdkLifecycle object | `report["lifecycle_state_machine"]["state"]` 与返回的 lifecycle 对象同源 | 同上：两者同为 UNSUBSCRIBED；lifecycle_verdict PASS |
+| logout/close terminal handling remains safe | `close()` 幂等（LOGGED_OUT 终态，重复 close 安全） | test_terminal_close_is_safe_after_flow |
+| register 失败不 fake 状态 | 提前 return NOT_TESTABLE_PERMISSION + diag 记录 | test_register_failure_is_reported_not_faked：state 仍 SESSION_READY |
+| Trial L1 只是 connectivity evidence | 脚本 verdict 语义未变（NOT_TESTABLE_* / FAIL_NO_EVENTS / PASS 均 connectivity 层级） | 既有脚本语义零改动 |
+
+## Governance（§8）
+
+- ADR-019 Amendment 2026-08-28（B.1/B.2：两个 runtime correction 的完整缺陷记录 + 修正理由 + Option A 选择依据；不删除历史）
+- DEVELOPMENT_MANAGEMENT.md：头部（完整 40-char SHA：Reviewer 复审 HEAD `d8232d6edde09798fd17149a79d71c56727f2358` + R4-A3.1 各 commit 完整 SHA）+ Phase Status（R4-A3/A3.1 REOPENED 修正随 A3.2；R4-B1 BLOCKED until A3.2 VERIFIED；R4-B2 BLOCKED；CR-2 sequenced after R4-B2）+ §40/§41 重写为 R4-A3.2 + §61 DM-CR-20260828-044/045
+- DEVLOG.md 顶部新条目（2026-08-28 R4-A3.2）
+- `9bfe327` grandfathered 例外保持单一精确 commit，未扩展（whitelist 冻结）
+
+## Verification Summary
+
+- Local: **762 / 0**（754 → 762，+8）；ruff check / ruff format --check / mypy 全绿（退出码严格验证）
+- 既有回归零破坏：provider-denial early-stop、success/failure persisted binding、gate separation（15）、trial boundary（15）、subscription controller（14）、lifecycle 单元（15）
+- CI：推送后 API 正向确认（三腿）
