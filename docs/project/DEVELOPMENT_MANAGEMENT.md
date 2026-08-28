@@ -7,11 +7,11 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：R4-B1 implementation（本批，2026-08-28）——基于 Reviewer 复审 HEAD `cf76469865e963dcb39980297b0248d178d0012f`（run 33167368684 三腿 success，R4-A3 全链 VERIFIED）；本批完整 40-char SHA 于推送后回填  
+> **Current Code Baseline**：R4-B1 implementation `b432159d3b7d5b8e1b693c7704202ea0c73f6d5b`（run 33179092630 三腿 success，2026-08-28 API positive confirmation）；基于 Reviewer 复审 HEAD `cf76469865e963dcb39980297b0248d178d0012f`（run 33167368684 三腿 success，R4-A3 全链 VERIFIED）  
 > **Document Revision**：DM-CR-20260828-044 / 045 / 046 / 047 / 048  
 > **Last Review**：2026-08-28（R4-A3.2 复审：**R4-A3 / A3.1 / A3.2 全链 VERIFIED / CLOSED**——persistence-failure structural early-stop 与 Trial-L1 wiring 两项修正 VERIFIED，无新缺陷；R4-B1 为下一活跃批次）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：run 33167368684（R4-A3.2 `cf76469865e...`）三腿 success（Reviewer 正向核验基线）；本批（R4-B1，779 tests）CI 结果待推送后正向确认回填  
+> **CI Status**：**FULL MATRIX GREEN——run 33179092630（R4-B1 implementation `b432159d3b7d5b8e1b693c7704202ea0c73f6d5b`）三腿 success**（2026-08-28 API positive confirmation；R4-B1 新增 17 项 endpoint-requirement/proof/adversarial 测试 779/0 在 Ubuntu+Windows 两 OS 通过，一次通过零修复轮次）；run 33167368684（R4-A3.2 `cf76469865e...`，Reviewer 正向核验基线）三腿 success  
 > **Phase Status（2026-08-28，Reviewer 裁决同步）**：  
 > R4-A2.x / CR-1.x → **CLOSED / VERIFIED（保持冻结）**；R4-A3 / R4-A3.1 / R4-A3.2 → **CLOSED / VERIFIED**（全链闭环，FREEZE）；R4-B1 → **DONE / PENDING_REVIEW**（本批：Capability Endpoint Proof——Endpoint Requirement Contract + exact probe + approval 身份消费）；R4-B2 → READY_AFTER_R4-B1；CR-2 → sequenced after R4-B2；Production P0-M-1B → BLOCKED（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
