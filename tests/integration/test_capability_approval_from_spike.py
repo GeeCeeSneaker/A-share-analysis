@@ -82,24 +82,22 @@ def _frozen_production_identity(monkeypatch):
 
 
 def _add_formal_gate_proof(store, run, catalog, capability: str) -> None:
-    """Attach the R4-A3.1 P0-01 formal gate proof cases a CLOSED run needs
-    for approval: PERMISSION/ENDPOINT/BUSINESS (persisted probe evidence)
-    + REPORT (the six-gate report artifact) - all PASS."""
+    """Attach the formal gate proof cases a CLOSED run needs for
+    approval (R4-A3.1 P0-01 + R4-B1 B1-04): PERMISSION/BUSINESS
+    (persisted probe evidence), one ENDPOINT case PER declared
+    requirement (exact endpoint identity), and REPORT (the six-gate
+    report artifact carrying the structured endpoint identities) -
+    all PASS."""
     import hashlib
     import json
 
     from ashare_state.providers.amazingdata.capability import FORMAL_GATE_CASE_TYPE
+    from ashare_state.providers.amazingdata.endpoint_requirements import (
+        endpoint_requirement_case_id,
+        endpoint_requirements_for,
+    )
 
-    for suffix in ("PERMISSION", "ENDPOINT", "BUSINESS"):
-        case_id = f"GATE-{capability}-{suffix}"
-        meta = store.write_evidence(
-            run,
-            f"req-{case_id}",
-            endpoint="ep",
-            provider_dataset="ds",
-            params={},
-            payload={"gate": suffix},
-        )
+    def _gate_case(case_id: str, meta) -> None:
         catalog.add(
             SpikeCase(
                 case_id=case_id,
@@ -116,6 +114,50 @@ def _add_formal_gate_proof(store, run, catalog, capability: str) -> None:
                 evidence_hash=str(meta["content_hash"]),
             )
         )
+
+    for suffix in ("PERMISSION", "BUSINESS"):
+        case_id = f"GATE-{capability}-{suffix}"
+        meta = store.write_evidence(
+            run,
+            f"req-{case_id}",
+            endpoint="ep",
+            provider_dataset="ds",
+            params={},
+            payload={"gate": suffix},
+        )
+        _gate_case(case_id, meta)
+
+    # R4-B1: one proof case per declared endpoint requirement
+    endpoint_entries = []
+    for req in endpoint_requirements_for(capability):
+        case_id = endpoint_requirement_case_id(req)
+        meta = store.write_evidence(
+            run,
+            f"req-{case_id}",
+            endpoint=req.endpoint,
+            provider_dataset=req.provider_dataset,
+            params={},
+            payload={"endpoint_proof": req.requirement_id},
+        )
+        _gate_case(case_id, meta)
+        endpoint_entries.append(
+            {
+                "requirement_id": req.requirement_id,
+                "capability": req.capability,
+                "expected_endpoint": req.endpoint,
+                "actual_endpoint": req.endpoint,
+                "provider_dataset": req.provider_dataset,
+                "actual_dataset": req.provider_dataset,
+                "mode": req.mode.value,
+                "group_id": req.group_id,
+                "status": "PASS",
+                "reason": "fixture proof",
+                "request_id": f"req-{case_id}",
+                "evidence_uri": str(meta["evidence_ref"]),
+                "evidence_hash": str(meta["content_hash"]),
+            }
+        )
+
     report_doc = {
         "capability": capability,
         "run_id": run.spike_run_id,
@@ -123,6 +165,7 @@ def _add_formal_gate_proof(store, run, catalog, capability: str) -> None:
         "early_stopped": False,
         "blocked_by": None,
         "gates": [],
+        "endpoint_requirements": endpoint_entries,
     }
     gates_dir = store.run_dir(run) / "gates"
     gates_dir.mkdir(parents=True, exist_ok=True)

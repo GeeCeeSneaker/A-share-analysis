@@ -60,6 +60,9 @@ class SpikeTarget(Protocol):
     def get_adj_factor_exchange(self, code_list: list[str]) -> Any: ...
     def get_dividend_exchange(self, code_list: list[str]) -> Any: ...
     def get_right_issue_exchange(self, code_list: list[str]) -> Any: ...
+    def get_bj_code_mapping_exchange(self, code_list: list[str]) -> Any: ...
+    def get_equity_structure_exchange(self, code_list: list[str]) -> Any: ...
+    def get_industry_base_info_exchange(self, code_list: list[str]) -> Any: ...
     def get_calendar_exchange(self, market: str = "SH") -> Any: ...
     def query_kline_exchange(
         self,
@@ -128,6 +131,15 @@ class RealTarget:
 
     def get_right_issue_exchange(self, code_list: list[str]) -> ProviderExchange:
         return self.provider.get_right_issue_exchange(code_list)
+
+    def get_bj_code_mapping_exchange(self, code_list: list[str]) -> ProviderExchange:
+        return self.provider.get_bj_code_mapping_exchange(code_list)
+
+    def get_equity_structure_exchange(self, code_list: list[str]) -> ProviderExchange:
+        return self.provider.get_equity_structure_exchange(code_list)
+
+    def get_industry_base_info_exchange(self, code_list: list[str]) -> ProviderExchange:
+        return self.provider.get_industry_base_info_exchange(code_list)
 
     def get_calendar_exchange(self, market: str = "SH") -> ProviderExchange:
         return self.provider.get_calendar_exchange(market)
@@ -483,6 +495,53 @@ class FakeTarget:
         return _fake_exchange(
             "InfoData.get_right_issue",
             "corporate_action",
+            rows,
+            params={"code_list": list(code_list)},
+        )
+
+    def get_bj_code_mapping_exchange(self, code_list: list[str]) -> ProviderExchange:
+        """Fake BJ code-mapping rows (R4-B1 B1-02): the dedicated
+        endpoint identity is what the formal gate checks."""
+        self._mark("get_bj_code_mapping")
+        rows = [
+            {"STOCK_CODE": code.split(".")[0], "BJ_CODE": f"92{code.split('.')[0][-5:]}"}
+            for code in code_list
+        ]
+        return _fake_exchange(
+            "InfoData.get_bj_code_mapping",
+            "code_mapping_bj",
+            rows,
+            params={"code_list": list(code_list)},
+        )
+
+    def get_equity_structure_exchange(self, code_list: list[str]) -> ProviderExchange:
+        """Fake equity-structure rows (R4-B1 B1-02)."""
+        self._mark("get_equity_structure")
+        rows = [
+            {
+                "SECURITY_CODE": code.split(".")[0],
+                "TOTAL_SHARE": "1256200000",
+                "FLOAT_SHARE": "1256200000",
+            }
+            for code in code_list
+        ]
+        return _fake_exchange(
+            "InfoData.get_equity_structure",
+            "equity_structure",
+            rows,
+            params={"code_list": list(code_list)},
+        )
+
+    def get_industry_base_info_exchange(self, code_list: list[str]) -> ProviderExchange:
+        """Fake industry-base-info rows (R4-B1 B1-02)."""
+        self._mark("get_industry_base_info")
+        rows = [
+            {"SECURITY_CODE": code.split(".")[0], "SW_INDUSTRY_CODE": "310000"}
+            for code in code_list
+        ]
+        return _fake_exchange(
+            "InfoData.get_industry_base_info",
+            "industry_taxonomy",
             rows,
             params={"code_list": list(code_list)},
         )

@@ -355,8 +355,54 @@ class AmazingDataProvider:
     def get_right_issue(self, code_list: list[str]) -> Any:
         return self.get_right_issue_exchange(code_list).payload
 
+    def get_bj_code_mapping_exchange(self, code_list: list[str]) -> Any:
+        """Dedicated Beijing Stock Exchange code-mapping endpoint
+        (R4-B1 B1-02, audit 20260828): capability ``code_mapping_bj`` ->
+        InfoData.get_bj_code_mapping. A generic stock-code list is a
+        stand-in and can NEVER prove this endpoint."""
+        return self._call_or_exchange(
+            "InfoData.get_bj_code_mapping",
+            "code_mapping_bj",
+            lambda: self._info().get_bj_code_mapping(code_list=code_list),
+            params={"code_list": list(code_list)},
+            require_capability="code_mapping_bj",
+        )
+
+    def get_bj_code_mapping(self, code_list: list[str]) -> Any:
+        return self.get_bj_code_mapping_exchange(code_list).payload
+
     def get_dividend(self, code_list: list[str]) -> Any:
         return self.get_dividend_exchange(code_list).payload
+
+    def get_equity_structure_exchange(self, code_list: list[str]) -> Any:
+        """Dedicated equity-structure endpoint (R4-B1 B1-02):
+        capability ``equity_structure`` -> InfoData.get_equity_structure.
+        ``get_stock_basic`` is a stand-in and can NEVER prove it."""
+        return self._call_or_exchange(
+            "InfoData.get_equity_structure",
+            "equity_structure",
+            lambda: self._info().get_equity_structure(code_list=code_list),
+            params={"code_list": list(code_list)},
+            require_capability="equity_structure",
+        )
+
+    def get_equity_structure(self, code_list: list[str]) -> Any:
+        return self.get_equity_structure_exchange(code_list).payload
+
+    def get_industry_base_info_exchange(self, code_list: list[str]) -> Any:
+        """Dedicated industry-taxonomy endpoint (R4-B1 B1-02):
+        capability ``industry_taxonomy`` -> InfoData.get_industry_base_info.
+        ``get_stock_basic`` is a stand-in and can NEVER prove it."""
+        return self._call_or_exchange(
+            "InfoData.get_industry_base_info",
+            "industry_taxonomy",
+            lambda: self._info().get_industry_base_info(code_list=code_list),
+            params={"code_list": list(code_list)},
+            require_capability="industry_taxonomy",
+        )
+
+    def get_industry_base_info(self, code_list: list[str]) -> Any:
+        return self.get_industry_base_info_exchange(code_list).payload
 
     def get_calendar_exchange(self, market: str = "SH") -> Any:
         return self._call_or_exchange(

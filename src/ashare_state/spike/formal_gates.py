@@ -1,5 +1,5 @@
 """Formal runtime gate execution boundary (R4-A3.1 P0-01/P0-02, audit
-20260827; R4-A3.2 P0-01, audit 20260828).
+20260827; R4-A3.2 P0-01, audit 20260828; R4-B1 B1-02, audit 20260828).
 
 R4-A3 delivered the gate library (``providers.runtime_gates``) as a
 reusable component - but a component test proves the LIBRARY, not the
@@ -8,7 +8,8 @@ FORMAL PATH. This module is the ONE formal gate execution boundary:
     FormalRuntimeGateExecutor(CapabilityProbePlan)
       -> AUTH_ACCOUNT        (session lifecycle + account profile)
       -> PERMISSION          (REAL probe exchange, persisted)
-      -> ENDPOINT_AVAILABLE  (REAL probe exchange, persisted)
+      -> ENDPOINT_AVAILABLE  (REAL probe exchange PER REQUIREMENT,
+                              persisted, exact endpoint identity)
       -> CACHE_METADATA      (local prerequisite validity, no call)
       -> FRESHNESS_ASOF      (data as-of vs required, no call)
       -> BUSINESS_DATA       (REAL business exchange, persisted)
@@ -36,6 +37,23 @@ Persisted evidence closure (audit P0-02):
   FORBIDDEN - it would report an early stop that never happened);
 - after a blocking gate, downstream probes fire ZERO provider calls and
   persist ZERO raw evidence (provable by counters and by the raw dir).
+
+Exact endpoint identity (R4-B1 B1-02, audit 20260828):
+- the ENDPOINT_AVAILABLE gate consumes the Endpoint Requirement
+  Contract (``providers.amazingdata.endpoint_requirements``): ONE
+  exact probe PER declared requirement;
+- the probe exchange's ``envelope.endpoint`` (and provider_dataset)
+  must MATCH the declared requirement - a stand-in endpoint (e.g.
+  ``get_stock_basic`` proving ``industry_taxonomy``, or a calendar
+  probe proving ``daily_bar``) is a blocking FAIL, never a PASS;
+- an endpoint that cannot be verified as the declared one is
+  FAIL-CLOSED (NOT_TESTABLE/FAIL) - no fallback to an unrelated
+  endpoint; official alternatives are declared EXPLICITLY as an
+  ALTERNATIVE_GROUP in the contract;
+- one proof case PER requirement, and the REPORT artifact carries the
+  full structured endpoint identity (requirement_id / expected /
+  actual endpoint / evidence binding) hash-anchored for approval's
+  tamper re-verification (B1-04).
 """
 
 from __future__ import annotations
@@ -45,13 +63,17 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
 from ashare_state.providers.amazingdata.capability import FORMAL_GATE_CASE_TYPE
+from ashare_state.providers.amazingdata.endpoint_requirements import (
+    EndpointRequirement,
+    endpoint_requirement_case_id,
+    endpoint_requirements_for,
+)
 from ashare_state.providers.errors import ProviderError
 from ashare_state.providers.exchange import ProviderExchange
 from ashare_state.providers.runtime_gates import (
     AuthAccountGate,
     BusinessDataGate,
     CacheMetadataGate,
-    EndpointAvailableGate,
     FreshnessAsOfGate,
     GateCheck,
     GateKind,
@@ -68,6 +90,7 @@ if TYPE_CHECKING:
     from ashare_state.spike.probes import ProbeContext
 
 __all__ = [
+    "ENDPOINT_PROBE_SPECS",
     "FORMAL_GATE_PROBE_KINDS",
     "CapabilityProbePlan",
     "FormalGateProofError",
@@ -113,11 +136,15 @@ class CapabilityProbePlan:
     """A complete formal gate plan for one capability.
 
     A caller CANNOT skip a gate: every probe/validator is mandatory and
-    the executor assembles the full pipeline in the fixed order."""
+    the executor assembles the full pipeline in the fixed order.
+
+    R4-B1: ``endpoint_requirements`` comes from the Endpoint Requirement
+    Contract - the ENDPOINT gate fires one EXACT probe per requirement
+    (no caller-chosen stand-in endpoint)."""
 
     capability: str
     permission_probe: ProbeCaller
-    endpoint_probe: ProbeCaller
+    endpoint_requirements: tuple[EndpointRequirement, ...]
     cache_validator: Callable[[], tuple[bool, str]]
     data_as_of: str
     required_as_of: str
@@ -230,17 +257,154 @@ class _PersistedPermissionGate(GateCheck):
         return _finalize_persisted(inner, self.probe)
 
 
-@dataclass(frozen=True)
-class _PersistedEndpointGate(GateCheck):
-    """ENDPOINT_AVAILABLE through the formal boundary: fire + persist +
-    verdict form ONE atomic gate evaluation (R4-A3.2 P0-01)."""
+@dataclass
+class _EndpointProbeOutcome:
+    """B1-02/B1-04: the evaluated outcome of ONE endpoint requirement -
+    the structured exact-endpoint identity the proof case and the
+    REPORT artifact carry (hash-anchored for approval re-verification)."""
 
-    probe: _PersistedProbe
+    requirement: EndpointRequirement
+    status: GateStatus = GateStatus.SKIPPED_BLOCKED
+    reason: str = ""
+    actual_endpoint: str = ""
+    actual_dataset: str = ""
+    request_id: str = ""
+    binding: GateEvidenceIdentity | None = None
+
+
+class _ExactEndpointRequirementsGate(GateCheck):
+    """ENDPOINT_AVAILABLE through the formal boundary (R4-B1 B1-02).
+
+    One EXACT probe per declared requirement. Each probe evaluation is
+    atomic (fire + persist + verdict, R4-A3.2 P0-01 semantics):
+    - the exchange's endpoint AND provider_dataset must MATCH the
+      declared requirement - a stand-in is a blocking FAIL;
+    - persistence failure downgrades to FAIL immediately;
+    - a ProviderError (first-class failure exchange) is FAIL.
+
+    Verdict: every REQUIRED requirement PASS and every ALTERNATIVE_GROUP
+    satisfied by at least one passing member -> PASS; otherwise FAIL
+    (blocking - the frozen pipeline early-stops downstream)."""
+
     kind = GateKind.ENDPOINT_AVAILABLE
 
+    def __init__(
+        self,
+        ctx: ProbeContext,
+        capability: str,
+        requirements: tuple[EndpointRequirement, ...],
+        probes: dict[str, _PersistedProbe],
+        outcomes: dict[str, _EndpointProbeOutcome],
+    ) -> None:
+        self.ctx = ctx
+        self.capability = capability
+        self.requirements = requirements
+        self.probes = probes
+        self.outcomes = outcomes
+
     def evaluate(self) -> GateResult:
-        inner = EndpointAvailableGate(self.probe).evaluate()
-        return _finalize_persisted(inner, self.probe)
+        fired = 0
+        reasons: list[str] = []
+        group_members: dict[str, list[bool]] = {}
+        first_binding: GateEvidenceIdentity | None = None
+        first_request_id = ""
+
+        for req in self.requirements:
+            probe = self.probes[req.requirement_id]
+            outcome = self._evaluate_one(req, probe)
+            self.outcomes[req.requirement_id] = outcome
+            fired += probe.fired
+            if outcome.binding is not None and first_binding is None:
+                first_binding = outcome.binding
+                first_request_id = outcome.request_id
+            if req.group_id:
+                group_members.setdefault(req.group_id, []).append(outcome.status is GateStatus.PASS)
+            elif outcome.status is not GateStatus.PASS:
+                reasons.append(f"{req.requirement_id}: {outcome.reason}")
+
+        failed_groups = [gid for gid, members in group_members.items() if not any(members)]
+        for gid in failed_groups:
+            reasons.append(f"alternative group {gid!r} unsatisfied: no member endpoint passed")
+
+        ok = not reasons
+        if ok:
+            status = GateStatus.PASS
+            reason = "; ".join(f"{r.requirement_id}: PASS" for r in self.requirements)
+        else:
+            status = GateStatus.FAIL
+            reason = "; ".join(reasons)[:600]
+        return GateResult(
+            kind=GateKind.ENDPOINT_AVAILABLE,
+            status=status,
+            reason=reason,
+            request_id=first_request_id,
+            evidence_uri=first_binding.evidence_uri if first_binding else "",
+            evidence_hash=first_binding.evidence_hash if first_binding else "",
+            evidence_ref=first_binding.evidence_uri if first_binding else "",
+            provider_calls_fired=fired,
+        )
+
+    def _evaluate_one(
+        self, req: EndpointRequirement, probe: _PersistedProbe
+    ) -> _EndpointProbeOutcome:
+        outcome = _EndpointProbeOutcome(requirement=req)
+        try:
+            exchange = probe()
+        except ProviderError as exc:
+            failure = getattr(exc, "exchange", None)
+            if failure is None:
+                outcome.status = GateStatus.FAIL
+                outcome.reason = f"probe refused without a first-class exchange: {exc}"[:300]
+                outcome.request_id = probe.last_request_id
+                outcome.binding = probe.binding
+                return outcome
+            env = failure.envelope
+            outcome.actual_endpoint = str(env.endpoint)
+            outcome.actual_dataset = str(env.provider_dataset)
+            outcome.request_id = probe.last_request_id
+            outcome.binding = probe.binding
+            if env.endpoint != req.endpoint or env.provider_dataset != req.provider_dataset:
+                outcome.status = GateStatus.FAIL
+                outcome.reason = (
+                    f"failure exchange endpoint mismatch: expected {req.endpoint} "
+                    f"(dataset {req.provider_dataset}), got {env.endpoint} "
+                    f"(dataset {env.provider_dataset}) - stand-in endpoints can "
+                    "never satisfy a requirement (audit R4-B1 B1-02)"
+                )
+                return outcome
+            outcome.status = GateStatus.FAIL
+            outcome.reason = (
+                f"{env.endpoint} failed: {env.error_class or 'ERROR'} - "
+                "endpoint requirement not proven available"
+            )
+            return outcome
+        env = exchange.envelope
+        outcome.actual_endpoint = str(env.endpoint)
+        outcome.actual_dataset = str(env.provider_dataset)
+        outcome.request_id = probe.last_request_id
+        outcome.binding = probe.binding
+        if env.endpoint != req.endpoint or env.provider_dataset != req.provider_dataset:
+            outcome.status = GateStatus.FAIL
+            outcome.reason = (
+                f"endpoint mismatch: expected {req.endpoint} "
+                f"(dataset {req.provider_dataset}), got {env.endpoint} "
+                f"(dataset {env.provider_dataset}) - stand-in endpoints can "
+                "never satisfy a requirement (audit R4-B1 B1-02)"
+            )
+            return outcome
+        if probe.binding is None:
+            # R4-A3.2 P0-01 (atomic persistence) + B1-02: a request id
+            # alone is never formal evidence PASS.
+            outcome.status = GateStatus.FAIL
+            outcome.reason = (
+                "probe exchange succeeded but evidence persistence failed - "
+                f"{probe.persist_error or 'no persisted evidence'}; "
+                "formal evidence PASS refused (audit R4-A3.2 P0-01)"
+            )
+            return outcome
+        outcome.status = GateStatus.PASS
+        outcome.reason = f"{env.endpoint} returned {env.row_count} rows"
+        return outcome
 
 
 @dataclass(frozen=True)
@@ -258,11 +422,14 @@ class _PersistedBusinessGate(GateCheck):
 
 @dataclass
 class _BoundReport:
-    """GateReport + per-gate persisted bindings + probe counters."""
+    """GateReport + per-gate persisted bindings + probe counters +
+    per-requirement endpoint outcomes (R4-B1 B1-02/B1-04)."""
 
     report: GateReport
     bindings: dict[GateKind, GateEvidenceIdentity] = field(default_factory=dict)
     probes: dict[GateKind, _PersistedProbe] = field(default_factory=dict)
+    endpoint_outcomes: dict[str, _EndpointProbeOutcome] = field(default_factory=dict)
+    endpoint_probes: dict[str, _PersistedProbe] = field(default_factory=dict)
 
 
 class FormalRuntimeGateExecutor:
@@ -301,8 +468,36 @@ class FormalRuntimeGateExecutor:
             frozen_id = frozen.account_profile_id if frozen else ""
 
         permission_probe = _PersistedProbe(self.ctx, plan.permission_probe, "PERMISSION")
-        endpoint_probe = _PersistedProbe(self.ctx, plan.endpoint_probe, "ENDPOINT")
         business_probe = _PersistedProbe(self.ctx, plan.business_fetch, "BUSINESS")
+
+        # R4-B1 B1-02: one EXACT persisted probe per declared endpoint
+        # requirement - the probe factories come from the static
+        # ENDPOINT_PROBE_SPECS table keyed by requirement_id, so the
+        # gate can never be handed a caller-chosen stand-in endpoint.
+        requirements = plan.endpoint_requirements
+        endpoint_probes: dict[str, _PersistedProbe] = {}
+        endpoint_outcomes: dict[str, _EndpointProbeOutcome] = {}
+        for req in requirements:
+            factory = ENDPOINT_PROBE_SPECS.get(req.requirement_id)
+            if factory is None:
+                msg = (
+                    f"formal gate boundary: no exact probe declared for "
+                    f"requirement {req.requirement_id!r} - every declared "
+                    "endpoint requirement MUST have a probe factory "
+                    "(audit R4-B1 B1-02/B1-05)"
+                )
+                raise FormalGateProofError(msg)
+
+            def _bound_probe(
+                f: Callable[[ProbeContext], ProviderExchange] = factory,
+            ) -> ProviderExchange:
+                return f(self.ctx)
+
+            endpoint_probes[req.requirement_id] = _PersistedProbe(
+                self.ctx,
+                _bound_probe,
+                f"ENDPOINT:{req.requirement_id}",
+            )
 
         # R4-A3.2 P0-01: the probe gates are the ATOMIC persisted gates -
         # a persistence failure becomes a blocking FAIL DURING gate
@@ -320,7 +515,13 @@ class FormalRuntimeGateExecutor:
                     frozen_production_id=frozen_id,
                 ),
                 _PersistedPermissionGate(permission_probe),
-                _PersistedEndpointGate(endpoint_probe),
+                _ExactEndpointRequirementsGate(
+                    self.ctx,
+                    plan.capability,
+                    requirements,
+                    endpoint_probes,
+                    endpoint_outcomes,
+                ),
                 CacheMetadataGate(plan.cache_validator, evidence_ref=plan.cache_evidence_ref),
                 FreshnessAsOfGate(
                     data_as_of=plan.data_as_of,
@@ -334,11 +535,12 @@ class FormalRuntimeGateExecutor:
 
         probes = {
             GateKind.PERMISSION: permission_probe,
-            GateKind.ENDPOINT_AVAILABLE: endpoint_probe,
             GateKind.BUSINESS_DATA: business_probe,
         }
         bindings: dict[GateKind, GateEvidenceIdentity] = {}
         for result in report.results:
+            if result.kind is GateKind.ENDPOINT_AVAILABLE:
+                continue
             probe = probes.get(result.kind)
             if probe is None:
                 continue
@@ -353,14 +555,41 @@ class FormalRuntimeGateExecutor:
                     f"{result.kind.value} PASSED without persisted evidence - "
                     "the persisted-gate evaluation contract was violated"
                 )
-        bound_report = _BoundReport(report=report, bindings=bindings, probes=probes)
+        endpoint_result = next(
+            (r for r in report.results if r.kind is GateKind.ENDPOINT_AVAILABLE), None
+        )
+        if endpoint_result is not None and endpoint_result.status is GateStatus.PASS:
+            # the exact-requirements gate guarantees: PASS means every
+            # REQUIRED outcome bound persisted evidence (mismatch /
+            # persistence failure are FAILs during evaluation)
+            unbound = [
+                req.requirement_id
+                for req in requirements
+                if req.mode.value == "REQUIRED"
+                and (
+                    endpoint_outcomes.get(req.requirement_id) is None
+                    or endpoint_outcomes[req.requirement_id].binding is None
+                )
+            ]
+            if unbound:
+                raise FormalGateProofError(
+                    f"ENDPOINT_AVAILABLE PASSED with unbound requirements {unbound} - "
+                    "the exact-endpoint evaluation contract was violated"
+                )
+        bound_report = _BoundReport(
+            report=report,
+            bindings=bindings,
+            probes=probes,
+            endpoint_outcomes=endpoint_outcomes,
+            endpoint_probes=endpoint_probes,
+        )
         self._emit_cases(plan, bound_report)
         return bound_report
 
     # -------------------------------------------------------------- cases
     def _emit_cases(self, plan: CapabilityProbePlan, bound: _BoundReport) -> None:
         as_of = str(self.ctx.as_of_date)
-        for kind in FORMAL_GATE_PROBE_KINDS:
+        for kind in (GateKind.PERMISSION, GateKind.BUSINESS_DATA):
             result = None
             for candidate in bound.report.results:
                 if candidate.kind is kind:
@@ -403,6 +632,52 @@ class FormalRuntimeGateExecutor:
                 validator_id="formal_runtime_gate_v1",
                 validator_version="1.0.0",
             )
+        # R4-B1: one proof case PER endpoint requirement (B1-04) - the
+        # case carries the exact endpoint identity (expected/actual
+        # endpoint + persisted evidence binding); SKIPPED requirements
+        # (pipeline early stop) emit no case, which blocks approval.
+        for req in plan.endpoint_requirements:
+            outcome = bound.endpoint_outcomes.get(req.requirement_id)
+            if outcome is None or outcome.status is GateStatus.SKIPPED_BLOCKED:
+                continue
+            binding = outcome.binding
+            meta = (
+                {
+                    "evidence_ref": binding.evidence_uri,
+                    "content_hash": binding.evidence_hash,
+                }
+                if binding is not None
+                else {}
+            )
+            self.ctx.case(
+                case_id=endpoint_requirement_case_id(req),
+                case_type=FORMAL_GATE_CASE_TYPE,
+                security="GATE",
+                provider_symbol="GATE",
+                trade_date=as_of,
+                expected=(
+                    f"endpoint {req.endpoint} (dataset {req.provider_dataset}) "
+                    f"available for {req.capability}"
+                    + (f" [group {req.group_id}]" if req.group_id else "")
+                ),
+                actual=(
+                    f"{outcome.status.value}: {outcome.reason} | "
+                    f"expected_endpoint={req.endpoint} "
+                    f"actual_endpoint={outcome.actual_endpoint} "
+                    + (
+                        f"request_id={binding.request_id} "
+                        f"evidence_uri={binding.evidence_uri} "
+                        f"evidence_hash={binding.evidence_hash[:16]}"
+                        if binding is not None
+                        else "no persisted evidence binding"
+                    )
+                )[:400],
+                result=_gate_status_to_case_result(outcome.status),
+                evidence_meta=meta,
+                reason_code=f"GATE_ENDPOINT_{outcome.status.value}",
+                validator_id="formal_endpoint_requirement_v1",
+                validator_version="1.0.0",
+            )
         self._emit_report_case(plan, bound, as_of)
 
     def _emit_report_case(self, plan: CapabilityProbePlan, bound: _BoundReport, as_of: str) -> None:
@@ -430,6 +705,30 @@ class FormalRuntimeGateExecutor:
                     "evidence_hash": r.evidence_hash,
                 }
                 for r in bound.report.results
+            ],
+            # R4-B1 B1-04: the structured exact-endpoint identity of every
+            # declared requirement - hash-anchored by the REPORT case's
+            # evidence_hash, consumed by capability approval for the
+            # mismatch/tamper re-verification (fail closed).
+            "endpoint_requirements": [
+                {
+                    "requirement_id": req.requirement_id,
+                    "capability": req.capability,
+                    "expected_endpoint": req.endpoint,
+                    "actual_endpoint": outcome.actual_endpoint,
+                    "provider_dataset": req.provider_dataset,
+                    "actual_dataset": outcome.actual_dataset,
+                    "mode": req.mode.value,
+                    "group_id": req.group_id,
+                    "status": outcome.status.value,
+                    "reason": outcome.reason,
+                    "request_id": outcome.request_id,
+                    "evidence_uri": outcome.binding.evidence_uri if outcome.binding else "",
+                    "evidence_hash": outcome.binding.evidence_hash if outcome.binding else "",
+                }
+                for req in plan.endpoint_requirements
+                for outcome in (bound.endpoint_outcomes.get(req.requirement_id),)
+                if outcome is not None
             ],
         }
         run_dir = self.ctx.store.run_dir(self.ctx.run)
@@ -516,16 +815,18 @@ def _plan(
     capability: str,
     ctx: ProbeContext,
     *,
-    endpoint_probe: Callable[[], ProviderExchange],
     business_fetch: Callable[[], ProviderExchange],
     cache_validator: Callable[[], tuple[bool, str]] | None = None,
 ) -> CapabilityProbePlan:
-    """Assemble a complete plan - every gate is mandatory (no opt-out)."""
+    """Assemble a complete plan - every gate is mandatory (no opt-out).
+
+    R4-B1: the endpoint requirements come from the CONTRACT
+    (``endpoint_requirements_for``) - never from caller choice."""
     as_of = str(ctx.as_of_date)
     return CapabilityProbePlan(
         capability=capability,
         permission_probe=lambda: ctx.target.get_code_list_exchange("EXTRA_STOCK_A"),
-        endpoint_probe=endpoint_probe,
+        endpoint_requirements=endpoint_requirements_for(capability),
         cache_validator=cache_validator or _ok_validator,
         data_as_of=as_of,
         required_as_of=as_of,
@@ -537,7 +838,6 @@ def _plan(
 
 def _factory(
     capability: str,
-    endpoint_probe: Callable[[ProbeContext], ProviderExchange],
     business_fetch: Callable[[ProbeContext], ProviderExchange],
     rule_bound: bool = False,
 ) -> Callable[[ProbeContext], CapabilityProbePlan]:
@@ -545,7 +845,6 @@ def _factory(
         return _plan(
             capability,
             ctx,
-            endpoint_probe=lambda: endpoint_probe(ctx),
             business_fetch=lambda: business_fetch(ctx),
             cache_validator=_rule_book_validator_factory(ctx) if rule_bound else None,
         )
@@ -563,12 +862,16 @@ def _probe_calendar(ctx: ProbeContext) -> ProviderExchange:
     return ctx.target.get_calendar_exchange()
 
 
+def _probe_code_list(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_code_list_exchange()
+
+
 def _probe_hist_code_list(ctx: ProbeContext) -> ProviderExchange:
     return ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 19900101, ctx.as_of_date)
 
 
-def _probe_code_list_bj(ctx: ProbeContext) -> ProviderExchange:
-    return ctx.target.get_code_list_exchange("EXTRA_STOCK_BJ")
+def _probe_bj_code_mapping(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_bj_code_mapping_exchange(["430047.BJ"])
 
 
 def _probe_kline_600519(ctx: ProbeContext) -> ProviderExchange:
@@ -605,33 +908,60 @@ def _probe_dividend(ctx: ProbeContext) -> ProviderExchange:
     return ctx.target.get_dividend_exchange(["600519.SH"])
 
 
-def _probe_stock_basic(ctx: ProbeContext) -> ProviderExchange:
-    return ctx.target.get_stock_basic_exchange(["600519.SH"])
+def _probe_right_issue(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_right_issue_exchange(["600519.SH"])
 
 
-#: per-capability formal gate plans (R4-A3.1 P0-01). The endpoint /
-#: business fetches use the SpikeTarget's explicit exchange surface; for
-#: capabilities whose dedicated endpoints are not yet on the target
-#: surface (industry_taxonomy / equity_structure), the entitlement
-#: surface stands in as the GATE probe - semantic endpoint validation
-#: remains the job of the B2-B7 probes (this boundary proves the GATE
-#: CHAIN, not business semantics).
+def _probe_equity_structure(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_equity_structure_exchange(["600519.SH"])
+
+
+def _probe_industry_base_info(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_industry_base_info_exchange(["600519.SH"])
+
+
+#: R4-B1 B1-02: the EXACT probe factory for every declared endpoint
+#: requirement (keyed by requirement_id - the same contract the
+#: ENDPOINT gate and capability approval consume). A probe whose
+#: exchange envelope does not match the declared endpoint/dataset is a
+#: blocking FAIL at evaluation time; there is deliberately NO way to
+#: hand the gate a stand-in endpoint.
+ENDPOINT_PROBE_SPECS: dict[str, Callable[[ProbeContext], ProviderExchange]] = {
+    "trade_calendar:BaseData.get_calendar": _probe_calendar,
+    "security_master:BaseData.get_code_list": _probe_code_list,
+    "security_master:BaseData.get_hist_code_list": _probe_hist_code_list,
+    "code_mapping_bj:InfoData.get_bj_code_mapping": _probe_bj_code_mapping,
+    "daily_bar:MarketData.query_kline": _probe_kline_600519,
+    "security_status_history:InfoData.get_history_stock_status": _probe_status_history,
+    "adj_factor:BaseData.get_adj_factor": _probe_adj_factor,
+    "corporate_action:InfoData.get_dividend": _probe_dividend,
+    "corporate_action:InfoData.get_right_issue": _probe_right_issue,
+    "equity_structure:InfoData.get_equity_structure": _probe_equity_structure,
+    "industry_taxonomy:InfoData.get_industry_base_info": _probe_industry_base_info,
+    "index_daily:MarketData.query_kline": _probe_kline_index,
+}
+
+
+#: per-capability formal gate plans (R4-A3.1 P0-01 + R4-B1 B1-02). The
+#: endpoint requirements are consumed from the contract - NOT chosen
+#: here; the business fetch remains the capability's own business
+#: exchange (semantic validation is the B2-B7 probes' job; this
+#: boundary proves the GATE CHAIN + exact endpoint identities).
 GATE_PLAN_SPECS: dict[str, Callable[[ProbeContext], CapabilityProbePlan]] = {
-    "trade_calendar": _factory("trade_calendar", _probe_calendar, _probe_calendar),
-    "security_master": _factory("security_master", _probe_hist_code_list, _probe_hist_code_list),
-    "code_mapping_bj": _factory("code_mapping_bj", _probe_code_list_bj, _probe_code_list_bj),
-    "daily_bar": _factory("daily_bar", _probe_calendar, _probe_kline_600519),
+    "trade_calendar": _factory("trade_calendar", _probe_calendar),
+    "security_master": _factory("security_master", _probe_hist_code_list),
+    "code_mapping_bj": _factory("code_mapping_bj", _probe_bj_code_mapping),
+    "daily_bar": _factory("daily_bar", _probe_kline_600519),
     "security_status_history": _factory(
         "security_status_history",
         _probe_status_history,
-        _probe_status_history,
         rule_bound=True,
     ),
-    "adj_factor": _factory("adj_factor", _probe_adj_factor, _probe_adj_factor),
-    "corporate_action": _factory("corporate_action", _probe_dividend, _probe_dividend),
-    "equity_structure": _factory("equity_structure", _probe_stock_basic, _probe_stock_basic),
-    "industry_taxonomy": _factory("industry_taxonomy", _probe_stock_basic, _probe_stock_basic),
-    "index_daily": _factory("index_daily", _probe_calendar, _probe_kline_index),
+    "adj_factor": _factory("adj_factor", _probe_adj_factor),
+    "corporate_action": _factory("corporate_action", _probe_dividend),
+    "equity_structure": _factory("equity_structure", _probe_equity_structure),
+    "industry_taxonomy": _factory("industry_taxonomy", _probe_industry_base_info),
+    "index_daily": _factory("index_daily", _probe_kline_index),
 }
 
 

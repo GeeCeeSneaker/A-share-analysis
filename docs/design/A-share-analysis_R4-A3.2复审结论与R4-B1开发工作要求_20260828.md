@@ -522,3 +522,75 @@ E. A3/A2/CR-1 frozen regression + full CI
 ```
 
 除发现可复现 regression，不再回头重审 R4-A3 的已冻结主题。
+
+
+---
+
+# 10. Implementation Mapping（开发方填写，2026-08-28）
+
+## B1-01 — Explicit Endpoint Requirement Contract
+
+| Requirement（§2.2/§2.3） | Implementation | Tests |
+|---|---|---|
+| typed contract（requirement_id / endpoint / provider_dataset / mode / group_id / proof_role） | `src/ashare_state/providers/amazingdata/endpoint_requirements.py`：`EndpointRequirement` frozen dataclass + `EndpointRequirementMode`（REQUIRED / ALTERNATIVE_GROUP）+ `ProofRole`（ENDPOINT_PROOF / BUSINESS_PROOF——后者为 B2-B7 语义证明预留） | TestEndpointRequirementContract（6） |
+| 覆盖全部 10 个注册 capability | `ENDPOINT_REQUIREMENTS` 表：13 条声明（security_master 双成员组；corporate_action 双 REQUIRED dividend+right_issue；其余单 REQUIRED） | test_contract_covers_every_registered_capability |
+| contract 结构自检 | `validate_endpoint_requirements()`：id 唯一 / endpoint 为 Class.method / provider_dataset 非空 / REQUIRED 无 group / ALTERNATIVE_GROUP 有 group 且组 ≥2 成员 | test_contract_is_structurally_valid + mode/group 断言 |
+| 唯一事实源（禁止散落 if/else） | gate（`GATE_PLAN_SPECS` 的 `endpoint_requirements` 从 `endpoint_requirements_for` 派生）、probe（`ENDPOINT_PROBE_SPECS` keyed by requirement_id）、approval（`_require_formal_gate_proof`）、守卫测试四处消费同一 contract | 结构守卫测试 + 代码审查点 |
+| 显式 ALTERNATIVE_GROUP | security_master `listing_surface`：`BaseData.get_code_list`（当前快照）+ `BaseData.get_hist_code_list`（历史重建）——官方替代，任一可用即满足 | test_alternative_group_* |
+
+## B1-02 — Exact Endpoint Probe
+
+| Requirement（§2.3） | Implementation | Tests |
+|---|---|---|
+| ENDPOINT gate 调用与 Requirement 匹配的真实 exchange | `_ExactEndpointRequirementsGate`：每 requirement 一个 exact probe（factory 来自 `ENDPOINT_PROBE_SPECS`，keyed by requirement_id——plan 从 contract 派生，caller 无入口塞 stand-in） | test_every_capability_proves_its_exact_endpoint（10 capability 全 PASS，case 的 expected_value 含声明的 endpoint） |
+| envelope.endpoint 与 requirement endpoint 精确匹配 | probe evaluation 原子（fire+persist+verdict）：`envelope.endpoint` **与** `envelope.provider_dataset` 精确匹配；mismatch = blocking FAIL（失败 exchange 的 endpoint 同样校验） | test_stand_in_endpoint_is_a_blocking_fail（industry 由 stock_basic 应答 → FAIL + case VALIDATED_FAIL + mismatch 记录 + business fired==0） |
+| 不允许 stand-in（stock_basic ≠ industry_taxonomy；generic code-list ≠ BJ mapping；calendar ≠ daily_bar/index_daily） | 三个新 exact exchange：`get_bj_code_mapping_exchange` / `get_equity_structure_exchange` / `get_industry_base_info_exchange`（provider + Protocol + RealTarget + FakeTarget 四处同步）；R4-A3.1 的 stand-in probe 映射全部移除；daily_bar/index_daily 的 requirement 是 `MarketData.query_kline`（endpoint gate 不再用 calendar probe） | 同上 + FakeTarget fake exchange endpoint 身份精确 |
+| 无法验证的 endpoint → NOT_TESTABLE/FAIL_CLOSED，不 fallback | denied exact endpoint（endpoint 身份正确、调用被拒）→ requirement FAIL，无 fallback 到无关 endpoint；失败 exchange 持久化绑定 | test_denied_exact_endpoint_is_fail_not_fallback |
+| REQUIRED 全 PASS + 组 ≥1 成员 → PASS；否则 FAIL | verdict 汇总逻辑（REQUIRED 逐条；组 any）；FAIL = blocking（pipeline early-stop，下游 probe fired==0） | test_alternative_group_all_members_denied_is_fail（组全 denied → FAIL + 两组员各 fired==1） |
+| registry 的 sdk_methods 不被散落解释 | registry tuple 保留为文档性事实；proof 语义全部由 typed contract 承载（一处声明三处消费） | 结构守卫 |
+
+## B1-03 — Permission/Endpoint/Business 分离保持
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| permission / endpoint / business gate 语义互不掩盖 | permission probe 保持共享 entitlement surface（get_code_list EXTRA_STOCK_A）；business fetch 语义不动；endpoint outcomes 独立于 business verdict | test_permission_denial_leaves_endpoint_probes_unfired（permission denied → endpoint probes fired==0 + 无 case fabrication）；test_alternative_group_single_member_pass_is_pass（endpoint gate PASS 的同时 business 独立 FAIL——分离证明） |
+
+## B1-04 — Approval 消费 exact endpoint identity
+
+| Requirement（§2.4） | Implementation | Tests |
+|---|---|---|
+| proof case 携带 requirement_id / capability / expected_endpoint / actual_endpoint / provider_dataset / request_id / evidence_uri / evidence_hash / status | 每 requirement 一个 proof case（`endpoint_requirement_case_id`）：expected/actual 字符串携带全部字段；evidence_ref/hash 绑 RawWriter 持久化 meta（成功与失败 exchange 都是证据） | test_every_capability_proves_its_exact_endpoint + stand-in 测试的 case 断言 |
+| artifact 携带结构化身份 | REPORT artifact（`gates/{cap}.json`）新增 `endpoint_requirements[]`：requirement_id/capability/expected_endpoint/actual_endpoint/provider_dataset/actual_dataset/mode/group_id/status/reason/request_id/evidence_uri/evidence_hash——由 REPORT case evidence_hash（sha256）锚定 | test_gate_report_artifact_persisted_with_bindings（既有）+ approval 重验测试 |
+| approval 对 mismatch fail closed | `_require_formal_gate_proof` 重写：REQUIRED 每 requirement 有 PASS case + evidence 绑定；组 ≥1 成员；**artifact 重验**（重算 sha256 == case hash；逐条与 contract 比对 expected_endpoint / actual_endpoint==endpoint / evidence 绑定非空）→ 任何 mismatch 拒绝 | test_approval_refuses_stand_in_actual_endpoint（actual_endpoint 改 calendar + re-bind hash → 拒绝） |
+| 不能只靠 case_id 名称推断 | 身份从 hash 锚定的 REPORT artifact 读，不从 case-id 推断；artifact 不存在/无 entry / hash 不符均拒绝 | test_approval_refuses_tampered_artifact（bind 后改字节 → hash 拒绝）+ artifact missing 分支 |
+| 缺 REQUIRED requirement case → 拒绝 | REQUIRED 逐条检查 case 存在 + PASS + 绑定 | test_approval_refuses_missing_required_case（jsonl 删行 → 拒绝） |
+
+## B1-05 — 对抗测试 + 结构守卫
+
+§2.5 验收矩阵逐项：
+
+1. probe 返回不同 endpoint（registry 内 stand-in）→ gate FAIL + case VALIDATED_FAIL ✓（test_stand_in_endpoint_is_a_blocking_fail）
+2. daily_bar/index_daily 用 calendar probe → FAIL ✓（requirement=MarketData.query_kline；calendar exchange 的 endpoint/dataset 不匹配 → mismatch FAIL——由 exact-match 机制结构性覆盖）
+3. industry probe 返回 stock_basic → FAIL ✓（同 1）
+4. code_mapping_bj 用 stock code list endpoint → FAIL ✓（requirement=InfoData.get_bj_code_mapping；generic code-list 的 endpoint/dataset 不匹配 → mismatch FAIL）
+5. valid probe PASS（10 capability 全部 exact probe PASS）✓（test_every_capability_proves_its_exact_endpoint）
+6. alternative group 全部成员 fail → FAIL ✓（test_alternative_group_all_members_denied_is_fail）
+7. endpoint exchange fail（ProviderError）→ FAIL + 失败 exchange 持久化绑定 ✓（test_denied_exact_endpoint_is_fail_not_fallback）
+8. permission fail → endpoint probes fired==0 ✓（既有 test_permission_failure_blocks_with_zero_downstream_calls 适配 + 新测试）
+9. actual_endpoint tamper → approval BLOCK ✓（test_approval_refuses_stand_in_actual_endpoint）
+10. 缺 REQUIRED case → 拒绝 ✓（test_approval_refuses_missing_required_case）
+11. artifact hash tamper → 拒绝 ✓（test_approval_refuses_tampered_artifact）
+12. 结构守卫：registered requirements == formal endpoint proof plan coverage ✓（TestStructuralGuard：contract 覆盖 == registry caps；probe specs == contract；GATE_PLAN_SPECS requirements == contract——新增 capability 漏纳入即测试红）
+
+## Governance（Batch F）
+
+- **ADR-020**（新 ADR——按 §8 要求独立成文，不塞 ADR-019 amendment）：Context / Decision（typed contract + exact gate + 身份消费）/ 四问（§7.4：typed contract vs 解释 registry tuple / per-requirement case vs 后缀方案 / ALTERNATIVE_GROUP vs 全 REQUIRED / mismatch 即时 FAIL vs warning）/ Consequences（含真实环境注记——SDK 手册端点的可用性由 Spike 阶段验证，本 ADR 固定身份合同）
+- DEVELOPMENT_MANAGEMENT.md：头部（R4-A3/A3.1/A3.2 CLOSED / VERIFIED；R4-B1 DONE / PENDING_REVIEW）+ §40/§41 重写 + §61 DM-CR-20260828-046/047/048
+- DEVLOG.md 顶部新条目（2026-08-28 R4-B1）
+- 本 Implementation Mapping
+
+## Verification Summary
+
+- Local: **779 / 0**（762 → 779，+17）；ruff check / ruff format --check / mypy 全绿（退出码严格验证）
+- 既有回归零破坏：persistence early-stop 对抗集（3）、L1 wiring（5）、gate separation（15）、trial boundary（15）、subscription controller（14）、approval from spike（6）、dry-run 全相位
+- B1-06 边界遵守：未启动 R4-B2 publish 链 / golden 审计 / CR-2（§9 禁止项）

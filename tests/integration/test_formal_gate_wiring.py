@@ -26,6 +26,10 @@ from pathlib import Path
 
 import pytest
 
+from ashare_state.providers.amazingdata.endpoint_requirements import (
+    endpoint_requirement_case_id,
+    endpoint_requirements_for,
+)
 from ashare_state.providers.amazingdata.provider import RawEnvelope
 from ashare_state.providers.errors import ProviderPermissionError
 from ashare_state.providers.exchange import ProviderExchange
@@ -148,8 +152,8 @@ class TestFormalGateWiring:
             GateKind.FRESHNESS_ASOF,
             GateKind.BUSINESS_DATA,
         ]
-        # every probe gate bound a persisted evidence identity
-        for kind in FORMAL_GATE_PROBE_KINDS:
+        # every single-probe gate bound a persisted evidence identity
+        for kind in (GateKind.PERMISSION, GateKind.BUSINESS_DATA):
             binding = bound.bindings[kind]
             assert binding.request_id, kind
             assert binding.evidence_uri.endswith(".meta.json"), kind
@@ -160,6 +164,19 @@ class TestFormalGateWiring:
             assert gate_result.evidence_uri == binding.evidence_uri
             assert gate_result.evidence_hash == binding.evidence_hash
             assert gate_result.has_persisted_evidence
+        # R4-B1: EVERY endpoint requirement fired its exact probe and
+        # bound persisted evidence (one outcome per requirement)
+        requirements = endpoint_requirements_for("trade_calendar")
+        assert requirements
+        for req in requirements:
+            outcome = bound.endpoint_outcomes[req.requirement_id]
+            assert outcome.status is GateStatus.PASS
+            assert outcome.actual_endpoint == req.endpoint
+            assert outcome.actual_dataset == req.provider_dataset
+            assert outcome.binding is not None
+            assert outcome.binding.evidence_uri.endswith(".meta.json")
+            assert len(outcome.binding.evidence_hash) == 64
+            assert bound.endpoint_probes[req.requirement_id].fired == 1
         # the bound URI is a REAL persisted file whose hash matches
         meta_path = ctx.store.spike_root / bound.bindings[GateKind.BUSINESS_DATA].evidence_uri
         assert meta_path.is_file()
@@ -186,12 +203,14 @@ class TestFormalGateWiring:
         # downstream gates were skipped: ZERO provider calls, ZERO raw
         # evidence beyond the permission failure exchange itself
         probes_fired = sum(p.fired for k, p in bound.probes.items() if k is not GateKind.PERMISSION)
+        probes_fired += sum(p.fired for p in bound.endpoint_probes.values())
         assert probes_fired == 0
         # exactly one persisted evidence exists: the permission failure
         assert len(_raw_files(ctx)) == 1
         # business/endpoint gate cases are absent (nothing fabricated)
         assert _case_by_id(ctx, gate_case_id("trade_calendar", GateKind.BUSINESS_DATA)) is None
-        assert _case_by_id(ctx, gate_case_id("trade_calendar", GateKind.ENDPOINT_AVAILABLE)) is None
+        for req in endpoint_requirements_for("trade_calendar"):
+            assert _case_by_id(ctx, endpoint_requirement_case_id(req)) is None
         # the REPORT case records the block
         report_case = _case_by_id(ctx, gate_report_case_id("trade_calendar"))
         assert report_case is not None
@@ -202,14 +221,22 @@ class TestFormalGateWiring:
         out = probe_b1_formal_gates(ctx)
         assert out["count"] == len(GATE_PLAN_SPECS)
         assert all(v == "PASS" for v in out["capabilities"].values())
-        # every capability left its full proof: 3 probe cases + REPORT
+        # every capability left its full proof: PERMISSION/BUSINESS cases
+        # + one case PER endpoint requirement + REPORT (R4-B1 B1-04)
         for capability in GATE_PLAN_SPECS:
-            for kind in FORMAL_GATE_PROBE_KINDS:
+            for kind in (GateKind.PERMISSION, GateKind.BUSINESS_DATA):
                 case = _case_by_id(ctx, gate_case_id(capability, kind))
                 assert case is not None, (capability, kind)
                 assert case.result is CaseResult.VALIDATED_PASS
                 assert case.evidence_ref.endswith(".meta.json")
                 assert len(case.evidence_hash) == 64
+            for req in endpoint_requirements_for(capability):
+                case = _case_by_id(ctx, endpoint_requirement_case_id(req))
+                assert case is not None, (capability, req.requirement_id)
+                assert case.result is CaseResult.VALIDATED_PASS
+                assert case.evidence_ref.endswith(".meta.json")
+                assert len(case.evidence_hash) == 64
+                assert req.endpoint in case.expected_value
             report_case = _case_by_id(ctx, gate_report_case_id(capability))
             assert report_case is not None
             assert report_case.result is CaseResult.VALIDATED_PASS
@@ -274,7 +301,7 @@ class TestGateEvidenceBindingAdversarial:
         assert not permission_result.evidence_uri
         assert not permission_result.evidence_hash
         # STRUCTURAL early stop: downstream probes never fired
-        assert bound.probes[GateKind.ENDPOINT_AVAILABLE].fired == 0
+        assert all(p.fired == 0 for p in bound.endpoint_probes.values())
         assert bound.probes[GateKind.BUSINESS_DATA].fired == 0
         # downstream gates are SKIPPED_BLOCKED, not evaluated
         endpoint_result = next(

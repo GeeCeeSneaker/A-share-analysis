@@ -13,6 +13,44 @@
 
 ---
 
+## 2026-08-28 · R4-B1 Capability Endpoint Proof（R4-A3 全链 CLOSED 后首个批次：Endpoint Requirement Contract 全落地）
+
+**Scope**
+- R4-A3.2 复审（audit 20260828）裁决 **R4-A3 / A3.1 / A3.2 全链 VERIFIED / CLOSED**（两项修正 VERIFIED，无新缺陷）；本批 R4-B1 按 Batch A→F 落地 B1-01..06（**未启动 R4-B2/CR-2/golden 审计**——遵守 §9 禁止项）
+
+**Implementation**
+- **B1-01 显式 Endpoint Requirement Contract（DM-CR-20260828-046，新 ADR-020）**：新模块 `providers/amazingdata/endpoint_requirements.py`——`EndpointRequirement` typed dataclass（requirement_id / capability / endpoint / provider_dataset / mode=REQUIRED|ALTERNATIVE_GROUP / group_id / proof_role）+ `ENDPOINT_REQUIREMENTS` 表（10 capability / 13 条声明）+ `validate_endpoint_requirements()` 结构自检（id 唯一 / Class.method / REQUIRED 无 group / 组 ≥2 成员）。**ALTERNATIVE_GROUP**：security_master 的 listing_surface（get_code_list 当前快照 + get_hist_code_list 历史重建——官方替代，任一可用即满足）；corporate_action 双 REQUIRED（dividend + right_issue 两个独立事件流，R4-A2.5 已确立）
+- **B1-02 Exact Endpoint Probe（DM-CR-20260828-046/047）**：`_ExactEndpointRequirementsGate` 替代单 probe endpoint gate——每个 requirement 一次原子 evaluation（fire + persist + verdict，沿 R4-A3.2 P0-01 语义）：envelope.endpoint **与** provider_dataset 精确匹配，mismatch = blocking FAIL（**stand-in 永不 PASS**；失败 exchange 的 endpoint 同样校验）；persist 失败 = FAIL；REQUIRED 全 PASS + 组 ≥1 成员 PASS → PASS，否则 FAIL（early-stop，下游 fired==0，**无 fallback**）。probe factory 来自静态表 `ENDPOINT_PROBE_SPECS`（keyed by requirement_id）；`CapabilityProbePlan.endpoint_requirements` 直接从 contract 派生——**caller 无入口塞 stand-in**。provider/target 新增三个 exact exchange 方法（`get_bj_code_mapping_exchange` / `get_equity_structure_exchange` / `get_industry_base_info_exchange`——Protocol/RealTarget/FakeTarget/provider 四处同步）；R4-A3.1 的 stand-in probe 注释全部移除
+- **B1-03 分离保持**：permission probe 共享 entitlement surface；business fetch 语义不动；endpoint outcomes 独立于 business verdict（组单成员 PASS 测试同时证明 business 独立 FAIL 的分离）
+- **B1-04 Approval 消费 exact endpoint identity（DM-CR-20260828-048）**：每 requirement 一个 proof case（`GATE-{capability}-{Class.method}`，expected/actual 携带 expected/actual_endpoint + request_id + evidence_uri + evidence_hash）；REPORT artifact 携带 `endpoint_requirements[]` 结构化身份（hash 锚定）；`_require_formal_gate_proof` 重写——REQUIRED 每 requirement 有 PASS case + evidence 绑定；组 ≥1 成员；**artifact 重验**（重算 sha256 == REPORT case hash；逐条与 contract 比对：expected_endpoint / actual_endpoint==endpoint / evidence 绑定非空）——**身份从 hash 锚定 artifact 读，不从 case-id 名称推断**；任何 mismatch → fail closed
+- **B1-05 对抗测试 + 结构守卫**：`tests/integration/test_endpoint_requirement_proof.py`（17 项）——stand-in target（industry 由 stock_basic 应答）→ gate FAIL + case VALIDATED_FAIL；denied exact endpoint → FAIL 无 fallback（失败 exchange 持久化绑定）；permission denied → endpoint probes fired==0；组全 denied → FAIL；artifact bind 后篡改 → approval 拒绝（hash）；actual_endpoint 篡改 + re-bind hash → 拒绝（stand-in）；缺 REQUIRED case → 拒绝；**结构守卫**：contract 覆盖 == registry caps、probe specs == contract、GATE_PLAN_SPECS requirements == contract（新 capability 漏纳入即测试红）
+- **治理（B1-06 + Batch F）**：**ADR-020**（Endpoint Requirement Contract——长期合同，按 Reviewer 要求独立成文，含四问与替代方案拒绝理由）；总册头部（R4-A3 全链 CLOSED / R4-B1 ACTIVE）+ §40/§41 重写 + §61 DM-CR-20260828-046/047/048
+
+**Schema / Contract Changes**
+- C1 ×3（DM-CR-20260828-046/047/048）；**新 ADR-020**（不是 ADR-019 amendment——Reviewer §8 明确要求独立 ADR）
+- 新模块：`providers/amazingdata/endpoint_requirements.py`；`spike/formal_gates.py` 大改（`_ExactEndpointRequirementsGate` + `ENDPOINT_PROBE_SPECS` + per-requirement case/artifact）；`provider.py` +3 exchange 方法；`target.py` 四处同步；`capability.py` `_require_formal_gate_proof` 重写（+run_dir artifact 重验）
+- 冻结组件 `runtime_gates.py` **零改动**（gate 子类组合在 formal boundary 层）
+
+**Verification**
+- Local: **779 tests passed / 0 failed**（762 → 779，+17：endpoint requirement contract 6 + exact proof 5 + approval 身份消费 3 + 结构守卫 2 + 适配既有 gate wiring 断言 1）；ruff check / ruff format --check / mypy 全绿（退出码严格验证）
+- 既有回归零破坏：persistence early-stop 对抗集（3）、L1 wiring（5）、gate separation（15）、trial boundary（15）、subscription controller（14）、approval from spike（6）、dry-run 全相位
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+
+**Implementation Status**
+- DONE（B1-01..06 全部；779/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- proof case 的结构化身份落在 **hash 锚定的 REPORT artifact** 而非 SpikeCase 新字段：SpikeCase 持久化只带 evidence_ref/hash 标量，artifact 已有 sha256 绑定机制（R4-A3.1），approval 重算 hash + 逐条 contract 比对即实现防篡改重验——零模型侵入
+- index_daily 的 requirement 声明 provider_dataset="daily_bar"（provider 事实——query_kline 的 dataset 标签），endpoint 与 daily_bar 相同但 requirement_id 不同：capability 维度的身份区分由 contract 承载，参数差异（指数代码）由 probe factory 承载
+- security_master 的组语义仅限**官方替代**（快照 vs 历史重建的业务等价性）；adj_factor 的 get_adj_factor/get_backward_factor 是不同数据流（前/后复权因子）——**不编组**，主端点单 REQUIRED（诚实优先：B1 证明 capability 声明的主端点面）
+- ENDPOINT gate 的 GateResult 单值字段（request_id/evidence_uri）填首个绑定——完整身份在 per-requirement case + artifact（GateResult 是汇总视图，case/artifact 是身份载体）
+
+**下一步**
+- 等 Reviewer 复审 R4-B1（五个验收点：B1-01 typed contract 与 registry 一致性 / B1-02 exact endpoint probe 与 stand-in 阻断 / B1-03 分离保持 / B1-04 approval 身份消费 / B1-05 对抗测试）；VERIFIED 后进入 R4-B2 Publish Validation Exactness
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 ## 2026-08-28 · R4-A3.2 最终 Persistence Early-Stop + Trial-L1 接线修复（R4-A3.1 复审 REOPENED 两项收口）
 
 **Scope**

@@ -7,13 +7,13 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：R4-A3.2 implementation `cf76469865e963dcb39980297b0248d178d0012f`（run 33167368684 三腿 success，2026-08-28 API positive confirmation）；基于 Reviewer 复审 HEAD `d8232d6edde09798fd17149a79d71c56727f2358`（run 33043352320 三腿 success）；R4-A3.1 implementation `2c6ecdd1219b9964cc48a4145f99344894dcd1c1` + CI fix `9bfe327dabdf4504e7252b745022b91ef71b88f8`（GRANDFATHERED 单例例外，已披露）+ gate sync `af8a28a92b6a609047597ed8b403996a6e405ead`；R4-A3 原始 implementation = `de9bf1ab6f499b20916f8277dba45c21880fd908`（见 SHA Correction 2026-08-27）  
-> **Document Revision**：DM-CR-20260828-044 / 045  
-> **Last Review**：2026-08-28 18:57 +08:00（R4-A3.1 复审：**REOPENED**——formal gate wiring / anti-bypass / positive production identity / persisted evidence 正常路径 / SubscriptionController 组件全部 PASS / FREEZE；两个 runtime 缺口：P0-01 持久化失败是 pipeline 跑完后的 post-hoc 降级（downstream calls 已发生）/ P1-01 Trial L1 脚本 SdkLifecycle 变量被 dict 遮蔽（controller 实际收到 dict）；随 R4-A3.2 收口，见 §41/§61/ADR-019 Amendment 2026-08-28）  
+> **Current Code Baseline**：R4-B1 implementation（本批，2026-08-28）——基于 Reviewer 复审 HEAD `cf76469865e963dcb39980297b0248d178d0012f`（run 33167368684 三腿 success，R4-A3 全链 VERIFIED）；本批完整 40-char SHA 于推送后回填  
+> **Document Revision**：DM-CR-20260828-044 / 045 / 046 / 047 / 048  
+> **Last Review**：2026-08-28（R4-A3.2 复审：**R4-A3 / A3.1 / A3.2 全链 VERIFIED / CLOSED**——persistence-failure structural early-stop 与 Trial-L1 wiring 两项修正 VERIFIED，无新缺陷；R4-B1 为下一活跃批次）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN——run 33167368684（R4-A3.2 implementation `cf76469865e963dcb39980297b0248d178d0012f`）三腿 success**（2026-08-28 API positive confirmation；R4-A3.2 新增 8 项 persistence-early-stop/L1-wiring 测试 762/0 在 Ubuntu+Windows 两 OS 通过，一次通过零修复轮次）；run 33043352320（`d8232d6`，Reviewer 正向核验的 R4-A3.1 复审基线）三腿 success  
+> **CI Status**：run 33167368684（R4-A3.2 `cf76469865e...`）三腿 success（Reviewer 正向核验基线）；本批（R4-B1，779 tests）CI 结果待推送后正向确认回填  
 > **Phase Status（2026-08-28，Reviewer 裁决同步）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED（保持冻结）**；R4-A3 → DONE / REOPENED；R4-A3.1 → DONE / REOPENED（修正项由 R4-A3.2 承接）；R4-A3.2 → **DONE / PENDING_REVIEW**（本批：Final Persistence-Early-Stop + Trial-L1 Wiring Fix）；R4-B1 → **BLOCKED until R4-A3.2 VERIFIED**；R4-B2 → BLOCKED；CR-2 → sequenced after R4-B2；Production P0-M-1B → BLOCKED（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED（保持冻结）**；R4-A3 / R4-A3.1 / R4-A3.2 → **CLOSED / VERIFIED**（全链闭环，FREEZE）；R4-B1 → **DONE / PENDING_REVIEW**（本批：Capability Endpoint Proof——Endpoint Requirement Contract + exact probe + approval 身份消费）；R4-B2 → READY_AFTER_R4-B1；CR-2 → sequenced after R4-B2；Production P0-M-1B → BLOCKED（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
 > **SHA Correction（Reviewer，2026-08-26）**：上批记录的 `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` 有误，以 GitHub commit object 为准：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`（本头部即为修正记录；历史条目原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
@@ -1080,11 +1080,9 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A2.9 Review-Seal Exactness + CR-1.2.5 Output Confinement | DONE | VERIFIED (absorbed) | PASS |
 | R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | VERIFIED (absorbed) | PASS |
 | R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | **VERIFIED** | **R4-A2.x / CR-1.x 审计链 CLOSED（2026-08-26）** |
-| R4-A3 SDK / Lifecycle / Early-Stop Closure | DONE | REOPENED → 修正随 R4-A3.1/A3.2 | 三点 P0 由 R4-A3.1 收口；两点 runtime gap 由 R4-A3.2 收口 |
-| R4-A3.1 Formal Runtime-Gate Wiring + Production Identity | DONE | REOPENED → 修正随 R4-A3.2 | gate 边界/anti-bypass/positive identity PASS / FREEZE；persistence timing + L1 wiring 修正于 R4-A3.2 |
-| R4-A3.2 Final Persistence-Early-Stop + Trial-L1 Wiring Fix | DONE | PENDING_REVIEW | 最高优先（本批：原子 gate evaluation 即时阻断 + 脚本 SoR 接线；待复核） |
-| R4-B1 Capability Endpoint Proof | PLANNED | BLOCKED until R4-A3.2 VERIFIED | — |
-| R4-B2 Publish Validation Exactness | PLANNED | BLOCKED | — |
+| R4-A3 / R4-A3.1 / R4-A3.2 SDK Lifecycle / Gates / Early-Stop 链 | DONE | **CLOSED / VERIFIED**（FREEZE） | 全链闭环（Reviewer 2026-08-28 裁决） |
+| R4-B1 Capability Endpoint Proof | DONE | PENDING_REVIEW | 最高优先（本批：Endpoint Requirement Contract + exact probe + approval 身份消费；待复核） |
+| R4-B2 Publish Validation Exactness | PLANNED | READY_AFTER_R4-B1 | — |
 | CR-2 Provider-Normalized + Quarantine | PLANNED | sequenced after R4-B2 | — |
 | R4-CI | PLANNED | PENDING | Next |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
@@ -1098,58 +1096,73 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-A3.2 Final Persistence-Early-Stop + Trial-L1 Wiring Fix（本批，DONE / PENDING_REVIEW）
+## R4-B1 Capability Endpoint Proof（本批，DONE / PENDING_REVIEW）
 
-R4-A3.1 复审（2026-08-28 18:57 +08:00）裁决 REOPENED：formal gate wiring /
-anti-bypass / positive production identity / persisted evidence 正常路径 /
-SubscriptionController 组件全部 **PASS / FREEZE**（不重写）；两个 runtime
-缺口由本批收口（ADR-019 Amendment 2026-08-28；工作要求
-`docs/design/A-share-analysis_R4-A3.1复审与R4-A3.2最终EarlyStop及Subscription接线修复要求_20260828.md`）：
+R4-A3.2 复审（2026-08-28）裁决 **R4-A3 / A3.1 / A3.2 全链 VERIFIED /
+CLOSED**；本批 R4-B1 按 Batch A→F 落地（ADR-020；工作要求
+`docs/design/A-share-analysis_R4-A3.2复审结论与R4-B1开发工作要求_20260828.md`）：
 
 ```text
-P0-01 持久化失败 = gate evaluation 内的即时阻断（DM-CR-20260828-044）：
-  缺陷：_PersistedProbe 持久化失败时照常返回成功 exchange ->
-    pipeline 视 PERMISSION 为 PASS -> ENDPOINT/CACHE/FRESHNESS/BUSINESS
-    继续评估（downstream provider calls 已发生）-> pipeline 跑完后
-    execute() post-processing 才把 PASS 改 FAIL —— 假 early-stop。
-  修正（Option A）：fire + persist + verdict 合并为一次原子 gate
-    evaluation——_PersistedPermissionGate / _PersistedEndpointGate /
-    _PersistedBusinessGate（spike/formal_gates.py）内 evaluate() 后经
-    _finalize_persisted：persist 成功 -> 绑定 request_id + evidence_uri
-    + evidence_hash；persist 失败且 exchange 成功 -> 当场降级 blocking
-    FAIL（request_id 可携带，URI/hash 为空——request_id 单独存在永不
-    构成 formal evidence PASS）；已 FAIL 结果保留具体原因并附加持久化
-    失败信息。
-  冻结 pipeline 看到 FAIL -> early stop -> 下游 gate SKIPPED_BLOCKED、
-    下游 probe 从不 fire（_BoundReport.probes[kind].fired == 0 + raw
-    目录零新 evidence 双证明）。
-  execute() post-hoc 降级逻辑删除；替代为防御性 FormalGateProofError
-    （PASS 无绑定抵达该处 = 原子 gate 契约失效 -> fail loudly）。
-  禁止：先完整跑完 pipeline 再把 PASS 改 FAIL。
-P1-01 Trial L1 脚本 SdkLifecycle 被 dict 遮蔽（DM-CR-20260828-045）：
-  缺陷：lifecycle = SdkLifecycle() 后紧跟 lifecycle: dict = {} 同名重绑
-    —— SubscriptionController 实际收到 dict（无 transition，真实运行即
-    AttributeError）；state = lifecycle.state / lifecycle.close() 失效；
-    controller 组件测试通过但真实脚本 wiring 是坏的。
-  修正：SoR 与 view 分离命名——sdk_lifecycle: SdkLifecycle（SoR：注入
-    controller / verdict 派生 / finally 幂等 close()）+
-    lifecycle_diag: dict（VIEW：report["lifecycle"]）。SDK-dependent
-    主流程提取为 execute_subscription_flow(sdk, stage, duration_seconds,
-    *, sleep, monotonic)——注入 fake SDK 行为级测试真实脚本控制流。
-  测试：脚本级行为测试（fake login/register/callback/unregister/stop
-    走通 SESSION_READY→SUBSCRIBE_STARTED→CALLBACK_ACTIVE→UNSUBSCRIBED；
-    verdict 与状态机同源；register 失败不 fake 状态；terminal close
-    幂等）+ AST guard ×2（lifecycle 不得 dict 注解/重绑定；
-    SubscriptionController 构造参数必须是 sdk_lifecycle 变量）。
+B1-01 显式 Endpoint Requirement Contract（DM-CR-20260828-046，
+    ADR-020 §2.1）：
+  ashare_state.providers.amazingdata.endpoint_requirements：
+    EndpointRequirement(requirement_id / capability / endpoint /
+    provider_dataset / mode=REQUIRED|ALTERNATIVE_GROUP / group_id /
+    proof_role=ENDPOINT_PROOF|BUSINESS_PROOF)
+  ENDPOINT_REQUIREMENTS 表覆盖全部 10 capability（13 条声明）；
+  validate_endpoint_requirements() 结构自检（id 唯一 / Class.method /
+  REQUIRED 无 group / 组 >= 2 成员）
+  ALTERNATIVE_GROUP 语义：security_master listing_surface（get_code_list
+  快照 + get_hist_code_list 历史重建，官方替代，任一可用即满足）
+  corporate_action 双 REQUIRED（dividend + right_issue——两个独立事件流）
+B1-02 Exact Endpoint Probe（DM-CR-20260828-046，ADR-020 §2.2）：
+  _ExactEndpointRequirementsGate：每 requirement 一个 exact probe；
+  probe factory 来自静态表 ENDPOINT_PROBE_SPECS（keyed by
+  requirement_id）——plan 从 contract 派生，无 caller 入口塞 stand-in
+  probe evaluation 原子（沿 R4-A3.2 P0-01）：envelope.endpoint +
+  provider_dataset 精确匹配；mismatch = blocking FAIL（stand-in 永不
+  PASS）；persist 失败 = FAIL；ProviderError = FAIL（失败 exchange 的
+  endpoint 同样校验）
+  Verdict：REQUIRED 全 PASS + 组 >= 1 成员 PASS -> PASS；否则 FAIL
+  （early-stop，下游 fired == 0）——无 fallback 到无关 endpoint
+  新 exact exchange surface：get_bj_code_mapping_exchange /
+  get_equity_structure_exchange / get_industry_base_info_exchange
+  （provider + RealTarget + FakeTarget + Protocol 四处同步）；
+  R4-A3.1 的 stand-in probe 注释全部移除
+B1-03 Permission/Endpoint/Business 分离保持：permission probe 保持共享
+  entitlement surface；business fetch 语义不动；endpoint gate 的
+  per-requirement outcomes 独立于 business verdict
+B1-04 Approval 消费 exact endpoint identity（DM-CR-20260828-048，
+    ADR-020 §2.3）：
+  每 requirement 一个 proof case（endpoint_requirement_case_id =
+  GATE-{capability}-{Class.method}）：expected/actual 携带
+  expected_endpoint/actual_endpoint/request_id/evidence_uri/evidence_hash
+  REPORT artifact（gates/{cap}.json）携带 endpoint_requirements[] 结构化
+  身份，由 REPORT case evidence_hash（sha256）锚定
+  _require_formal_gate_proof 重写：PERMISSION/BUSINESS/REPORT case 保留
+  + REQUIRED 每 requirement 有 PASS case 且 evidence 绑定 + 组 >= 1
+  成员 + artifact 重验（重算 hash == case hash；逐条与 contract 比对：
+  expected_endpoint / actual_endpoint==endpoint / evidence_uri+hash 非空）
+  ——身份从 hash 锚定 artifact 读，不从 case-id 名称推断；任何
+  mismatch -> fail closed
+B1-05 对抗测试 + 结构守卫（tests/integration/test_endpoint_requirement_
+  proof.py，17 项）：
+  stand-in target（industry 由 stock_basic 应答）-> gate FAIL + case
+  VALIDATED_FAIL + mismatch 记录；denied exact endpoint -> FAIL 无
+  fallback（失败 exchange 持久化绑定）；permission denied -> endpoint
+  probes fired==0；组全 denied -> FAIL；组单成员 PASS -> endpoint gate
+  PASS（business 独立 FAIL——分离证明）；artifact 篡改（bind 后改字节）
+  -> approval 拒绝（hash）；actual_endpoint 篡改（re-bind hash）->
+  approval 拒绝（stand-in）；缺 REQUIRED case -> 拒绝；结构守卫：
+  contract 覆盖 == registry caps；probe specs == contract；
+  GATE_PLAN_SPECS requirements == contract（新 capability 漏纳入即红）
+B1-06 边界遵守：未启动 R4-B2/CR-2/golden 审计（§9 禁止项）
 ```
 
-### R4-A3 / R4-A3.1（前批）
+### R4-A3 / R4-A3.1 / R4-A3.2（前批，CLOSED / VERIFIED）
 
-R4-A3 原始交付（lifecycle 状态机 / 六类 gate 组件 / early-stop / trial
-双入口拒绝）与 R4-A3.1 交付（formal gate boundary / anti-bypass /
-persisted evidence identity / positive production identity /
-SubscriptionController 组件）结构全部保留；各自复审指出的缺口由
-R4-A3.1 / R4-A3.2 逐层收口（详见各批 Change Log 与 ADR-019 amendments）。
+全链 VERIFIED / CLOSED（Reviewer 2026-08-28 裁决；FREEZE）。历史细节见
+各批 Change Log 与 ADR-019（含 Amendments 2026-08-27/2026-08-28）。
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
@@ -1753,6 +1766,39 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260828-048 — Approval Consumes Exact Endpoint Identity
+
+**Type**：C1 approval 契约重写  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-B1 B1-04（audit 20260828 §2.4）——approval 靠 case-id 命名推断 proof（`GATE-{cap}-ENDPOINT` 存在即认为端点已证明），不验证 actual endpoint 与声明一致；篡改/错位检测为零。  
+**New Contract**（ADR-020 §2.3）：`_require_formal_gate_proof` 重写——（1）PERMISSION/BUSINESS/REPORT case 语义保留；（2）每个 REQUIRED requirement 必须有 PASS proof case（`endpoint_requirement_case_id`）且 evidence_ref/hash 非空；每个 ALTERNATIVE_GROUP 至少一个成员 PASS；（3）**REPORT artifact 重验**：重算 `{run}/gates/{cap}.json` 的 sha256 == REPORT case evidence_hash；逐条 entry 与 contract 比对（expected_endpoint == contract endpoint；PASS 条目 actual_endpoint == contract endpoint——stand-in 即拒绝；evidence_uri/hash 非空）——任何 mismatch → CapabilityGovernanceError（fail closed）。身份从 hash 锚定 artifact 读，不从 case-id 名称推断。`approve_from_spike_run` 传入 run_dir 以执行 artifact 重验。  
+**Tests**：test_endpoint_requirement_proof.py::TestApprovalConsumesExactEndpointIdentity（3：bind 后篡改 artifact 字节 → hash mismatch 拒绝；actual_endpoint 改为 calendar + re-bind hash → stand-in 拒绝；删除 REQUIRED requirement case → 拒绝）  
+**ADR**：[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) §2.3  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260828-047 — Provider/Target Exact Exchange Surface
+
+**Type**：C1 provider surface 扩展  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-B1 B1-02（audit 20260828 §2.2）——industry_taxonomy / equity_structure / code_mapping_bj 的官方 endpoint（get_industry_base_info / get_equity_structure / get_bj_code_mapping）不在 exchange surface 上，R4-A3.1 时代用 stand-in probe（stock_basic / generic code-list）。  
+**New Contract**（ADR-020 §2.2）：`AmazingDataProvider` 新增三个 explicit-exchange 方法——`get_bj_code_mapping_exchange`（endpoint=InfoData.get_bj_code_mapping / dataset=code_mapping_bj / require_capability=code_mapping_bj）、`get_equity_structure_exchange`（InfoData.get_equity_structure / equity_structure）、`get_industry_base_info_exchange`（InfoData.get_industry_base_info / industry_taxonomy）；`SpikeTarget` Protocol / `RealTarget`（delegate）/ `FakeTarget`（fake exchange，endpoint 身份精确）四处同步；各带 payload convenience 方法。  
+**Tests**：FakeTarget exact endpoint 经 test_endpoint_requirement_proof.py::test_every_capability_proves_its_exact_endpoint 全量覆盖（10 capability 全 PASS）  
+**ADR**：[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) §2.2  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260828-046 — Endpoint Requirement Contract + Exact Gate
+
+**Type**：C1 新契约（typed contract + gate 重构）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-B1 B1-01/B1-02/B1-05（audit 20260828 §2.2/§2.3/§2.5）——capability→endpoint 映射无单一审计事实源（散落 if/else 解释 registry tuple）；ENDPOINT gate probe 是 capability-chosen 调用（stand-in 可 PASS，fail-open）。  
+**New Contract**（ADR-020 §2.1/§2.2）：新模块 `providers/amazingdata/endpoint_requirements.py`——`EndpointRequirement` typed dataclass（requirement_id/capability/endpoint/provider_dataset/mode/group_id/proof_role）+ `ENDPOINT_REQUIREMENTS` 表（10 capability / 13 条：security_master 为 ALTERNATIVE_GROUP listing_surface 双成员，corporate_action 为双 REQUIRED dividend+right_issue，其余单 REQUIRED）+ `validate_endpoint_requirements()` 结构自检。`spike/formal_gates.py`：`CapabilityProbePlan.endpoint_requirements` 从 contract 派生（caller 无入口）；`ENDPOINT_PROBE_SPECS` 静态表 keyed by requirement_id；`_ExactEndpointRequirementsGate` 替代单 probe endpoint gate——每 requirement 一次原子 evaluation（fire+persist+verdict），envelope endpoint+dataset 精确匹配（mismatch = blocking FAIL，stand-in 永不 PASS；失败 exchange 的 endpoint 同样校验），REQUIRED 全 PASS + 组 ≥1 成员 PASS → PASS，否则 FAIL（early-stop，无 fallback）；每 requirement 一个 proof case（成功/失败都落，SKIPPED 不落）；REPORT artifact 携带 `endpoint_requirements[]` 结构化身份。  
+**Tests**：test_endpoint_requirement_proof.py（17：contract 结构 6 + exact proof 5 + approval 身份 3 + 结构守卫 2 + 全 capability 精确证明 1）；test_formal_gate_wiring.py 适配（per-requirement outcomes/probes 断言）  
+**ADR**：[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md)  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260828-045 — Trial-L1 Script SdkLifecycle Wiring Fix
 

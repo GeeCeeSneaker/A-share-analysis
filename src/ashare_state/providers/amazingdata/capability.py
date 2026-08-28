@@ -240,23 +240,44 @@ SPIKE_CAPABILITY_BY_REGISTRY: dict[str, str] = {
 #: case-type marker emitted by the formal runtime gate boundary
 FORMAL_GATE_CASE_TYPE = "formal_runtime_gate"
 
-#: gate proof case ids per capability (R4-A3.1 P0-01/P0-02): the three
-#: probe gates (each bound to RawWriter persisted evidence) plus the
-#: full gate-report artifact case covering all six gate kinds.
-FORMAL_GATE_PROOF_SUFFIXES = ("PERMISSION", "ENDPOINT", "BUSINESS", "REPORT")
+#: gate proof case ids per capability (R4-A3.1 P0-01/P0-02 + R4-B1):
+#: PERMISSION / BUSINESS (each bound to RawWriter persisted evidence),
+#: REPORT (the full gate-report artifact covering all six gate kinds),
+#: and - R4-B1 B1-04 - one ENDPOINT case PER declared endpoint
+#: requirement (see ``endpoint_requirements``; case ids come from
+#: ``endpoint_requirement_case_id``).
+FORMAL_GATE_PROOF_SUFFIXES = ("PERMISSION", "BUSINESS", "REPORT")
 
 
-def _require_formal_gate_proof(catalog: Any, name: str) -> None:
-    """R4-A3.1 P0-01: approval requires the capability's formal gate proof.
+def _require_formal_gate_proof(catalog: Any, name: str, run_dir: Any = None) -> None:
+    """R4-A3.1 P0-01 + R4-B1 B1-04: approval requires the capability's
+    formal gate proof.
 
     The proof is emitted ONLY by ``spike.formal_gates`` (the single
-    formal gate execution boundary built on RuntimeGatePipeline): four
-    cases per capability - PERMISSION / ENDPOINT / BUSINESS (each bound
-    to the persisted RawWriter evidence identity) and REPORT (the full
-    six-gate report artifact). A run without them never executed the
-    gate boundary for this capability -> approval is refused. Early
-    stop is also caught: a blocked pipeline leaves probe-gate cases
-    missing or non-PASS."""
+    formal gate execution boundary built on RuntimeGatePipeline). A run
+    without them never executed the gate boundary for this capability
+    -> approval is refused. Early stop is also caught: a blocked
+    pipeline leaves probe-gate cases missing or non-PASS.
+
+    R4-B1 B1-04 (audit 20260828): endpoint proofs are consumed by
+    EXACT ENDPOINT IDENTITY, not by case-id naming alone:
+
+    - each REQUIRED endpoint requirement must have a passing proof
+      case bound to persisted RawWriter evidence;
+    - each ALTERNATIVE_GROUP must have at least one passing member;
+    - the REPORT artifact (``{run}/gates/{capability}.json``) carries
+      the structured identity of every requirement - the artifact is
+      re-hashed and compared against the REPORT case's evidence_hash,
+      then every entry is re-checked against the CONTRACT: a tampered
+      or mismatched actual_endpoint fails CLOSED (approval refused)."""
+    import hashlib
+    import json
+
+    from ashare_state.providers.amazingdata.endpoint_requirements import (
+        EndpointRequirementMode,
+        endpoint_requirement_case_id,
+        endpoint_requirements_for,
+    )
     from ashare_state.spike.model import CaseResult
 
     by_id = {c.case_id: c for c in catalog.cases}
@@ -284,6 +305,119 @@ def _require_formal_gate_proof(catalog: Any, name: str) -> None:
                 "(audit R4-A3.1 P0-01)"
             )
             raise CapabilityGovernanceError(msg)
+
+    # ------------------------------------------------ endpoint proofs (B1-04)
+    requirements = endpoint_requirements_for(name)
+    if not requirements:
+        msg = (
+            f"approval refused: no endpoint requirements declared for "
+            f"{name!r} - the Endpoint Requirement Contract is the auditable "
+            "truth and must cover every registered capability (audit R4-B1 "
+            "B1-01)"
+        )
+        raise CapabilityGovernanceError(msg)
+
+    group_satisfied: dict[str, bool] = {}
+    for req in requirements:
+        case_id = endpoint_requirement_case_id(req)
+        case = by_id.get(case_id)
+        case_ok = (
+            case is not None
+            and case.case_type == FORMAL_GATE_CASE_TYPE
+            and case.result is CaseResult.VALIDATED_PASS
+            and bool(case.evidence_ref)
+            and bool(case.evidence_hash)
+        )
+        if req.mode is EndpointRequirementMode.ALTERNATIVE_GROUP:
+            if case_ok and req.group_id:
+                group_satisfied[req.group_id] = True
+            continue
+        if not case_ok:
+            msg = (
+                f"approval refused: endpoint requirement proof {case_id} for "
+                f"{name!r} is missing or not a persisted-evidence PASS - the "
+                "exact endpoint identity is a mandatory approval input "
+                "(audit R4-B1 B1-04)"
+            )
+            raise CapabilityGovernanceError(msg)
+    for req in requirements:
+        if (
+            req.mode is EndpointRequirementMode.ALTERNATIVE_GROUP
+            and req.group_id
+            and not group_satisfied.get(req.group_id, False)
+        ):
+            msg = (
+                f"approval refused: alternative group {req.group_id!r} for "
+                f"{name!r} has no passing member endpoint - the capability's "
+                "endpoint surface is not proven (audit R4-B1 B1-04)"
+            )
+            raise CapabilityGovernanceError(msg)
+
+    # ------------------------------------------- REPORT artifact re-check
+    # B1-04: re-verify the structured endpoint identities from the
+    # hash-anchored artifact - case-id naming alone is NOT trusted.
+    report_case = by_id.get(f"GATE-{name}-REPORT")
+    if run_dir is not None and report_case is not None:
+        artifact_path = run_dir / "gates" / f"{name}.json"
+        if not artifact_path.exists():
+            msg = (
+                f"approval refused: gate report artifact missing for {name!r} "
+                f"({artifact_path} - the REPORT case binds it by hash, audit "
+                "R4-B1 B1-04)"
+            )
+            raise CapabilityGovernanceError(msg)
+        artifact_bytes = artifact_path.read_bytes()
+        if hashlib.sha256(artifact_bytes).hexdigest() != report_case.evidence_hash:
+            msg = (
+                f"approval refused: gate report artifact for {name!r} does "
+                "not match the REPORT case evidence hash - tampered or "
+                "stale endpoint identity (audit R4-B1 B1-04, fail closed)"
+            )
+            raise CapabilityGovernanceError(msg)
+        doc = json.loads(artifact_bytes.decode("utf-8"))
+        entries = {e.get("requirement_id"): e for e in doc.get("endpoint_requirements", [])}
+        for req in requirements:
+            entry = entries.get(req.requirement_id)
+            if entry is None:
+                msg = (
+                    f"approval refused: gate report artifact for {name!r} has "
+                    f"no entry for requirement {req.requirement_id!r} "
+                    "(audit R4-B1 B1-04)"
+                )
+                raise CapabilityGovernanceError(msg)
+            if entry.get("expected_endpoint") != req.endpoint:
+                msg = (
+                    f"approval refused: requirement {req.requirement_id!r} "
+                    f"expected_endpoint {entry.get('expected_endpoint')!r} "
+                    f"!= contract endpoint {req.endpoint!r} (audit R4-B1 "
+                    "B1-04, fail closed)"
+                )
+                raise CapabilityGovernanceError(msg)
+            if entry.get("status") != "PASS":
+                if req.mode is EndpointRequirementMode.REQUIRED:
+                    msg = (
+                        f"approval refused: requirement {req.requirement_id!r} "
+                        f"artifact status is {entry.get('status')!r} "
+                        "(audit R4-B1 B1-04, fail closed)"
+                    )
+                    raise CapabilityGovernanceError(msg)
+                continue
+            if entry.get("actual_endpoint") != req.endpoint:
+                msg = (
+                    f"approval refused: requirement {req.requirement_id!r} "
+                    f"actual_endpoint {entry.get('actual_endpoint')!r} does "
+                    f"not match the declared endpoint {req.endpoint!r} - "
+                    "stand-in endpoints are forbidden (audit R4-B1 B1-02, "
+                    "fail closed)"
+                )
+                raise CapabilityGovernanceError(msg)
+            if not entry.get("evidence_uri") or not entry.get("evidence_hash"):
+                msg = (
+                    f"approval refused: requirement {req.requirement_id!r} "
+                    "artifact entry has no persisted evidence binding "
+                    "(audit R4-B1 B1-04, fail closed)"
+                )
+                raise CapabilityGovernanceError(msg)
 
 
 def approve_from_spike_run(
@@ -362,7 +496,9 @@ def approve_from_spike_run(
     # capability proof never executed the RuntimeGatePipeline cannot
     # approve anything. This closes the bypass: gate evidence is not an
     # optional helper, it is consumed by the approval path.
-    _require_formal_gate_proof(catalog, name)
+    # R4-B1 B1-04: run_dir is passed so the endpoint identities are
+    # re-verified against the hash-anchored REPORT artifact.
+    _require_formal_gate_proof(catalog, name, run_dir=store.run_dir(run))
     cases = {c.case_id: c for c in catalog.cases}
     for ref in capability_case_refs:
         case = cases.get(ref)
