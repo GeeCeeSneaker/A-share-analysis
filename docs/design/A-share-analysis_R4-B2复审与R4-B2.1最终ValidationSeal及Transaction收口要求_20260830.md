@@ -596,3 +596,91 @@ DM-CR-20260830-060 Publish Validation Logical-URI Confinement
 ```
 
 若 P1 manifest check 语义调整属于 contract rename / semantic correction，一并写入 ADR-021 Amendment R4-B2.1；无需另建 ADR。
+
+---
+
+# 10. Implementation Mapping（开发方填写，2026-08-30）
+
+## P0-01 — DQ Required-Check Positive Execution Proof（§2）
+
+| Requirement（§2.2/§2.3） | Implementation | Tests |
+|---|---|---|
+| positive execution proof：governed check runner 持久化 proof | 新表 `meta_artifact_check_execution`（migration 012）+ `record_artifact_check_execution`（check_id / artifact set / scan_contract_version / producer / **scanned_component_manifest_hash** / completed_at / detail） | test_valid_exact_proof_with_zero_findings_passes |
+| absence of bad findings != proof of zero findings | validator 语义：无 proof → **NOT_TESTABLE**（"no positive execution proof... absence of bad findings is not proof of zero findings"） | test_no_execution_proof_is_not_testable_and_blocks（删 proofs → 两 check NOT_TESTABLE → publish BLOCK） |
+| proof 绑定 current feature_artifact_set_id + exact identity | proof 按 (artifact set, check_id) 查询且 `scanned_component_manifest_hash == compute_component_manifest_hash(current components)` 才有效 | test_proof_for_different_artifact_does_not_transfer / test_stale_proof_blocks_after_component_change |
+| stale scan 不得继承 | stale → NOT_TESTABLE（"stale scan... artifact changed after the scan; rescan required"） | 同上 stale 测试 |
+| 不得提供 caller-facing count=0/result=PASS persistence API | `record_artifact_check_execution` 签名无 count/result/status/pass 参数（AST 断言）；production 唯一 INSERT 边界（AST 扫描 pipeline 包）；findings 仍走 append-only 事实表 | test_execution_proof_api_carries_no_result_params |
+| production feature pipeline 无能力时 fail closed NOT_TESTABLE | validator 消费侧强制（无匹配 proof 即 NOT_TESTABLE）；mock_e2e 在 validate 前记录 proofs（mock 链示范）；tests 用 tests-side producer 建立证明 | 上述全部 |
+| counts 只是 summary | report.summary 携带派生计数；eligibility = proof + typed check 状态 | happy report 断言 |
+
+Mandatory tests §2.3 六项全对应：no proof+no findings→NOT_TESTABLE BLOCK ✓；valid exact scan proof+zero findings→PASS ✓；proof for different artifact→BLOCK ✓；proof bound old manifest→BLOCK after change ✓；missing one of two→BLOCK ✓；caller persist zero-count/PASS directly→无 production bypass 路径（签名 + 唯一 INSERT 边界）✓
+
+## P0-02 — Full Seal Consumption（§3）
+
+| Requirement（§3.2） | Implementation | Tests |
+|---|---|---|
+| ledger.validation_contract_hash == report == current | `_b2_recheck` 三方比对（CURRENT 经 `validation_contract_hash()`） | test_report_contract_hash_stale / test_ledger_report_contract_hash_mismatch / test_current_contract_change_blocks_old_validation（monkeypatch current——IDs 不变仍 BLOCK） |
+| required_checks_hash 三方 + 重算 | ledger == report == sha256(report checks 的 {check_id,status} canonical JSON) | test_report_required_checks_hash_garbage / test_ledger_checks_hash_mismatch / test_status_changed_without_rehash（status 改动未重封） |
+| validator_code_commit 一致且非空 | ledger == report 且非空 | test_validator_commit_mismatch |
+| validation_version 一致 + 当前 supported | ledger == report == VALIDATION_CONTRACT_VERSION；**`validate_artifact_for_publish` 移除 caller version 参数（system-derived）** | test_validation_version_mismatch |
+| duplicate required check id 拒绝 | report checks 数组 id 集合大小 == 数组长度（先于 dict collapse） | test_duplicate_check_id_blocks（重复条目 + 双 hash 一致 re-seal 仍 BLOCK） |
+
+Mandatory adversarial §3.3 九项全对应（全部 re-bind report hash 后仍 BLOCK）✓
+
+## P0-03 — Full Transaction-Internal Preconditions（§4）
+
+| Requirement（§4.2） | Implementation | Tests |
+|---|---|---|
+| 事务内重新读取全部 authoritative 状态 | `_resolve_publish_preconditions`（完整 lineage gate 语义零变更：snapshot DATA_VALIDATED + policies / artifact FEATURE_VALIDATED + snapshot/version/calc_run/provenance / feature-set ACTIVE + definition hash 自检 / run FEATURE_VALIDATED + recovery 语义 + provenance/policy / universes）在 BEGIN TRANSACTION 后调用；`_b2_recheck`（head + 完整 seal + 物理 bytes）同；写入只消费事务内值 | test_structural_guard_preconditions_inside_transaction（AST ordering：BEGIN < resolver < recheck < 首个 execute） |
+| state changes → BLOCK | 事务内 authoritative re-read 用当前值判定 | snapshot demoted / artifact demoted / artifact rebound / feature-set member 改动（FEATURE_SET_IMMUTABLE）/ run status 变化 / universe 删除 七场景全 BLOCK |
+| 最终失败 rollback 保留旧 PUBLISHED | 既有原子 republish 契约零改动（FREEZE） | test_failed_final_gate_preserves_old_published + test_failure_injection scenario D 零回归 |
+| 不通过 production test-hook 制造 race | 测试用 AST ordering 守卫 + 状态变化场景（无 test-hook） | 结构性证明 |
+
+## P0-04 — Logical-URI Confinement（§5）
+
+| Requirement（§5.2/§5.3） | Implementation | Tests |
+|---|---|---|
+| validation + publish 物理解析统一走 frozen helper | validator 组件重验 / publish bytes 终验 / report 读取全部经 `physical_from_logical_uri(data_root, uri)`（exact string identity，不 normalize 接受 alias） | TestR4B21LogicalURIConfinement |
+| 恶意 URI fail closed（先于 data_root 外读取） | URI 层 validate_logical_uri 抛错 → COMPONENT_EXISTENCE FAIL（confinement 词）→ publish BLOCK | ../outside / /absolute / C:/drive / backslash / a//b / a/./b 六项参数化测试 |
+| outside sentinel 即使存在且 hash 完全匹配也被拒 | 测试在 data_root 外放 **bytes 与真实组件一致的 sentinel**——仍被拒（拒绝发生在 URI 层） | 同上（每项测试均创建 perfect sentinel） |
+| valid canonical POSIX URI unchanged PASS | frozen helper 语义零变更 | test_valid_canonical_uri_still_passes |
+| report_uri 也走同一 helper | `physical_from_logical_uri(data_root, report_uri)`（系统生成 validation/<uuid>.json 天然 canonical；非 canonical report_uri → REPORT_URI_INVALID BLOCK） | 代码审查点 |
+
+## P1-01 — Manifest Check 语义诚实化（§6，Option B）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| check 名称与证据一致 | rename `ARTIFACT_MANIFEST_INTEGRITY` → `ARTIFACT_MANIFEST_PRESENT_AND_SEALED`；detail 明确"exact component integrity is proven by the component manifest seal + COMPONENT_* checks" | happy report 断言（REQUIRED_VALIDATION_CHECKS 枚举自动覆盖 rename）+ detail 语义断言 |
+
+## §7 治理一致性
+
+- **ADR-021 Amendment R4-B2.1**（E.1-E.7）：修正原文三处 overclaim（"contract hash changes invalidate prior seals" / "TOCTOU closed" / "required checks cannot be unexecuted"——原文保留，落地后成立）；P0-01..04 + P1-01 决策记录；残余边界如实记录（execution proof 证明扫描执行 + exact 输入绑定，不证明 producer 诚实上报全部 findings——CR-3 域）
+- DEVELOPMENT_MANAGEMENT.md：头部（R4-B2 REOPENED / R4-B2.1 DONE / CR-2 BLOCKED_BY_R4-B2.1）+ §40/§41 重写 + §61 DM-CR-20260830-057/058/059/060
+- DEVLOG.md 顶部新条目（2026-08-30 R4-B2.1）
+- 未自称 VERIFIED / ACCEPTED；ADR-021 保持 PROPOSED 待复审
+
+## §8.1 Exit Gate 对照
+
+```text
+[✓] DQ required checks positive execution proof；absence 不再等于 zero PASS
+[✓] no execution proof -> NOT_TESTABLE / publish BLOCK
+[✓] validation_contract_hash ledger/report/current 三方 exact match
+[✓] required_checks_hash ledger/report/recomputed exact match
+[✓] validator_code_commit / validation_version ledger-report identity complete
+[✓] stale semantic contract seal blocks old validation（IDs 不变场景测试）
+[✓] all authoritative reads transaction-internal（AST ordering 守卫 + 七状态场景）
+[✓] latest-head + report/seal + physical bytes final recheck remains transaction-internal
+[✓] frozen logical URI confinement used by validation/publish
+[✓] escaped/absolute/drive/backslash/alias file_uri fail closed（六类 + perfect sentinel）
+[✓] ARTIFACT_MANIFEST typed check 与实际可证明事实一致（Option B rename）
+[✓] latest-head / legacy / atomic republish frozen 机制零回归
+[✓] R4-B1/A3/A2/CR-1 frozen contracts 零回归（全量 848/0）
+[✓] migration-from-zero（12 链）+ upgrade path green
+[ ] full Windows 3.12 / Windows 3.14 / Ubuntu 3.14 CI green（推送后正向确认回填）
+[✓] DEVLOG / DEVELOPMENT_MANAGEMENT / ADR-021 amendment 与 runtime 真相一致
+```
+
+## Verification Summary
+
+- Local: **848 / 0**（819 → 848，+29）；ruff check / ruff format --check / mypy 全绿；CI 同款命令 `uv run pytest` 复验 848/0
+- §8 scope boundary：未启动 CR-2 主实现；按 §8.2 直接提交复审（不机械创建 R4-B2.2）

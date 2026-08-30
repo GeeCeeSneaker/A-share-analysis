@@ -1,4 +1,5 @@
-"""Formal artifact validation boundary (R4-B2, audit 20260830).
+"""Formal artifact validation boundary (R4-B2, audit 20260830;
+R4-B2.1 closure, audit 20260830 19:13).
 
 The pre-B2 world: ``record_artifact_validation()`` accepted
 caller-supplied ``identity_fallback_count`` / ``blocking_dq_count``
@@ -16,18 +17,34 @@ hash-bound report, and returns the artifact_validation_id. The ledger
 INSERT lives INSIDE this function - there is no caller-facing
 callable that can write a validation row.
 
-B2-02: the required checks are typed
-(:class:`ArtifactValidationCheckId`); a missing / failing /
-NOT_TESTABLE required check makes the record non-eligible (publish
-fail-closes on it). Aggregate counts are report SUMMARY, never the
-eligibility truth.
+R4-B2.1 closures (audit 20260830 REOPEN items):
 
-B2-03/B2-04: the validation seals
-``artifact_manifest_hash``/``component_manifest_hash`` (stable hash of
-the full component identity) / ``validation_contract_hash`` and
-persists ``validation/<artifact_validation_id>.json``; the ledger row
-binds ``report_uri`` + ``report_hash`` so publish can machine-verify
-the PASS still describes the CURRENT artifact bytes.
+- **P0-01 positive DQ execution proof**: IDENTITY_FALLBACK_ZERO /
+  BLOCKING_DQ_ZERO PASS requires a matching execution record in
+  ``meta_artifact_check_execution`` - a governed scan that RAN, bound
+  to the CURRENT component manifest hash. Absence of bad findings is
+  NEVER proof of zero findings: no matching proof -> NOT_TESTABLE
+  (blocking). ``record_artifact_check_execution`` persists execution
+  metadata only (no count, no result - findings stay append-only
+  facts and the validator derives the counts).
+- **P0-04 logical-URI confinement**: every registry file_uri /
+  report_uri physical resolution goes through the frozen
+  ``physical_from_logical_uri`` helper - escaped / absolute / drive /
+  backslash / alias URIs fail closed BEFORE any filesystem read
+  outside the data root.
+- **P1-01 honest check naming**: the manifest presence check is
+  ``ARTIFACT_MANIFEST_PRESENT_AND_SEALED`` - it proves the registered
+  upstream seal exists and is non-empty; the ACTUAL exact component
+  integrity is proven by ``component_manifest_hash`` + the
+  COMPONENT_* checks. No overclaim.
+
+B2-02/B2-03/B2-04 (unchanged semantics): typed required checks
+(completeness-enforced; NOT_TESTABLE is blocking); validation version
+is SYSTEM-DERIVED (the current supported contract version - not a
+caller input); the seal covers the contract hash / required-checks
+hash / validator code commit / both manifest hashes and is persisted
+in ``validation/<artifact_validation_id>.json`` (immutable bytes),
+which the ledger binds by ``report_uri`` + ``report_hash``.
 """
 
 from __future__ import annotations
@@ -42,6 +59,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ashare_state.storage.atomic_files import write_file_atomic
+from ashare_state.storage.paths import physical_from_logical_uri
 
 if TYPE_CHECKING:
     from duckdb import DuckDBPyConnection
@@ -50,9 +68,11 @@ __all__ = [
     "ArtifactValidationError",
     "ArtifactValidationCheckId",
     "CheckStatus",
+    "DQ_SCAN_CONTRACT_VERSION",
     "REQUIRED_VALIDATION_CHECKS",
     "VALIDATION_CONTRACT_VERSION",
     "compute_component_manifest_hash",
+    "record_artifact_check_execution",
     "record_artifact_dq_finding",
     "validation_contract_hash",
     "validate_artifact_for_publish",
@@ -64,9 +84,14 @@ class ArtifactValidationError(RuntimeError):
 
 
 class ArtifactValidationCheckId(StrEnum):
-    """B2-02: the typed required-check contract."""
+    """B2-02: the typed required-check contract.
 
-    ARTIFACT_MANIFEST_INTEGRITY = "ARTIFACT_MANIFEST_INTEGRITY"
+    R4-B2.1 P1-01: the manifest check is honestly named
+    ARTIFACT_MANIFEST_PRESENT_AND_SEALED - it proves the registered
+    upstream seal exists; exact component integrity is proven by the
+    component manifest seal + COMPONENT_* checks."""
+
+    ARTIFACT_MANIFEST_PRESENT_AND_SEALED = "ARTIFACT_MANIFEST_PRESENT_AND_SEALED"
     COMPONENT_EXISTENCE = "COMPONENT_EXISTENCE"
     COMPONENT_CONTENT_HASH = "COMPONENT_CONTENT_HASH"
     COMPONENT_SCHEMA_HASH = "COMPONENT_SCHEMA_HASH"
@@ -85,8 +110,13 @@ REQUIRED_VALIDATION_CHECKS: tuple[ArtifactValidationCheckId, ...] = tuple(
 )
 
 #: B2-02: the contract identity itself. Changing the required-check
-#: set / seal fields changes this hash and invalidates prior seals.
+#: set / seal fields changes this hash and invalidates prior seals
+#: (consumed by the publish recheck - R4-B2.1 P0-02).
 VALIDATION_CONTRACT_VERSION = "b2-exact-v1"
+
+#: R4-B2.1 P0-01: the DQ scan contract identity. The execution proof
+#: records the contract the scan ran under.
+DQ_SCAN_CONTRACT_VERSION = "dq-scan-b2.1-v1"
 
 _CONTRACT_TEXT = json.dumps(
     {
@@ -100,7 +130,10 @@ _CONTRACT_TEXT = json.dumps(
             "validator_code_commit",
             "required_checks_hash",
         ],
-        "count_source": "meta_artifact_dq_finding (append-only facts)",
+        "count_source": (
+            "meta_artifact_dq_finding (append-only facts) + "
+            "meta_artifact_check_execution (positive execution proofs)"
+        ),
     },
     sort_keys=True,
     separators=(",", ":"),
@@ -127,6 +160,12 @@ class _CheckOutcome:
 
 #: finding classes the DQ fact table accepts (validator count source)
 _DQ_FINDING_CLASSES = ("IDENTITY_FALLBACK", "BLOCKING_DQ")
+
+#: check_id -> finding class for the positive-proof DQ checks
+_DQ_CHECK_FINDING_CLASS = {
+    ArtifactValidationCheckId.IDENTITY_FALLBACK_ZERO: "IDENTITY_FALLBACK",
+    ArtifactValidationCheckId.BLOCKING_DQ_ZERO: "BLOCKING_DQ",
+}
 
 # arrow -> duckdb type-name mapping for parquet schema re-verification
 _ARROW_TO_DUCKDB_TYPE = {
@@ -215,7 +254,7 @@ def record_artifact_dq_finding(
     (more findings -> higher derived counts -> publish blocked) but can
     NEVER fabricate a PASS through this path. The completeness of the
     fact stream is the feature-pipeline's own governance chain; the
-    validator merely derives the counts from what was persisted."""
+    validator derives the counts from what was persisted."""
     if finding_class not in _DQ_FINDING_CLASSES:
         msg = (
             f"finding_class {finding_class!r} not in {_DQ_FINDING_CLASSES} - "
@@ -236,6 +275,69 @@ def record_artifact_dq_finding(
     return finding_id
 
 
+def record_artifact_check_execution(
+    conn: DuckDBPyConnection,
+    *,
+    feature_artifact_set_id: str,
+    check_id: str,
+    scan_contract_version: str,
+    producer: str,
+    scanned_component_manifest_hash: str,
+    detail: str | None = None,
+) -> str:
+    """R4-B2.1 P0-01: persist a POSITIVE execution proof for a DQ
+    required check - evidence that a governed scan RAN.
+
+    The record carries execution metadata ONLY: which check, over
+    which EXACT component identity (the component manifest hash of the
+    artifact as scanned), under which scan contract, by which
+    producer, completed when. It deliberately accepts NO count and NO
+    result - a caller cannot declare "zero findings" or PASS through
+    this API. Findings remain append-only facts
+    (``record_artifact_dq_finding``) and the formal validator derives
+    the counts; a scan that found problems records its findings as
+    facts, and a scan that found none simply has no facts to record -
+    what makes either HONEST is that the execution itself is provable
+    here and is bound to the exact scanned input.
+
+    The validator accepts a proof only when its
+    ``scanned_component_manifest_hash`` equals the CURRENT component
+    manifest (a stale scan never inherits onto changed components)."""
+    if check_id not in {c.value for c in _DQ_CHECK_FINDING_CLASS}:
+        msg = (
+            f"check_id {check_id!r} has no execution-proof semantics - "
+            f"expected one of {sorted(c.value for c in _DQ_CHECK_FINDING_CLASS)}"
+        )
+        raise ArtifactValidationError(msg)
+    if not scan_contract_version:
+        msg = "scan_contract_version is required (the proof records the scan contract)"
+        raise ArtifactValidationError(msg)
+    if not producer:
+        msg = "producer is required (the proof records who ran the scan)"
+        raise ArtifactValidationError(msg)
+    if not scanned_component_manifest_hash:
+        msg = (
+            "scanned_component_manifest_hash is required (the proof binds the "
+            "exact scanned input identity)"
+        )
+        raise ArtifactValidationError(msg)
+    execution_id = f"dqexec-{uuid.uuid4()}"
+    conn.execute(
+        "INSERT INTO meta_artifact_check_execution VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            execution_id,
+            feature_artifact_set_id,
+            check_id,
+            scan_contract_version,
+            producer,
+            scanned_component_manifest_hash,
+            datetime.now(UTC),
+            detail,
+        ],
+    )
+    return execution_id
+
+
 def _required_checks_hash(outcomes: list[_CheckOutcome]) -> str:
     payload = [{"check_id": o.check_id.value, "status": o.status.value} for o in outcomes]
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -248,17 +350,21 @@ def validate_artifact_for_publish(
     data_root: Path,
     feature_artifact_set_id: str,
     validator_code_commit: str,
-    validation_version: str = VALIDATION_CONTRACT_VERSION,
 ) -> str:
     """B2-01: the ONE formal artifact validation execution boundary.
 
     Executes the typed required-check contract against the ACTUAL
     artifact registry + physical component bytes, derives the counts
-    from the persisted DQ-finding facts, seals the exact
-    artifact/component identity, persists the hash-bound report, and
-    appends the ledger row INLINE (there is no separate
-    caller-reachable persistence helper). Returns the new
-    artifact_validation_id.
+    from the persisted DQ facts, seals the exact artifact/component
+    identity, persists the hash-bound report, and appends the ledger
+    row INLINE (there is no separate caller-reachable persistence
+    helper). Returns the new artifact_validation_id.
+
+    R4-B2.1: validation_version is SYSTEM-DERIVED (the current
+    supported contract version); the DQ zero-checks require positive
+    execution proofs bound to the current component manifest; every
+    physical resolution goes through the frozen logical-URI
+    confinement helper.
 
     The record is publish-eligible ONLY if every required check PASSed;
     a FAIL / NOT_TESTABLE record is still appended (honest history) but
@@ -286,37 +392,48 @@ def validate_artifact_for_publish(
 
     outcomes: list[_CheckOutcome] = []
 
-    # 1. ARTIFACT_MANIFEST_INTEGRITY --------------------------------
-    # the registration-time manifest identity exists and is sealed as-is;
-    # every component identity is re-verified item by item below, and the
-    # publish-time final recheck re-derives BOTH hashes from the CURRENT
-    # registry and compares them to this seal.
+    # 1. ARTIFACT_MANIFEST_PRESENT_AND_SEALED (P1-01 honest naming) ----
+    # Proves: the registered upstream seal exists and is non-empty.
+    # The ACTUAL exact component integrity is proven by the component
+    # manifest seal + the COMPONENT_* checks below; the publish recheck
+    # additionally compares the sealed upstream hash against the
+    # CURRENT registered value (a changed registration blocks publish).
     if artifact_manifest_hash and components:
         outcomes.append(
             _CheckOutcome(
-                ArtifactValidationCheckId.ARTIFACT_MANIFEST_INTEGRITY,
+                ArtifactValidationCheckId.ARTIFACT_MANIFEST_PRESENT_AND_SEALED,
                 CheckStatus.PASS,
-                f"registered manifest {str(artifact_manifest_hash)[:16]}... "
-                f"over {len(components)} components (sealed)",
+                f"registered upstream manifest seal {str(artifact_manifest_hash)[:16]}... "
+                f"present over {len(components)} components (exact component "
+                "integrity is proven by the component manifest seal + "
+                "COMPONENT_* checks)",
             )
         )
     else:
         outcomes.append(
             _CheckOutcome(
-                ArtifactValidationCheckId.ARTIFACT_MANIFEST_INTEGRITY,
+                ArtifactValidationCheckId.ARTIFACT_MANIFEST_PRESENT_AND_SEALED,
                 CheckStatus.FAIL,
                 "artifact set has no registered manifest hash or no components",
             )
         )
 
     # 2-5. COMPONENT_*: physical bytes vs registered identity -------
+    # P0-04: every file_uri resolves through the frozen logical-URI
+    # confinement helper - an escaped/absolute/drive/backslash/alias
+    # URI fails closed BEFORE any filesystem read outside data_root.
+    invalid_uris: list[str] = []
     missing: list[str] = []
     content_bad: list[str] = []
     schema_bad: list[str] = []
     rows_bad: list[str] = []
     for comp in components:
         uri = str(comp["file_uri"])
-        path = data_root / uri
+        try:
+            path = physical_from_logical_uri(data_root, uri)
+        except Exception:  # noqa: BLE001 - confinement violation = fail closed
+            invalid_uris.append(uri)
+            continue
         if not path.is_file():
             missing.append(uri)
             continue
@@ -340,26 +457,47 @@ def validate_artifact_for_publish(
         if int(num_rows) != int(comp["row_count"]):
             rows_bad.append(uri)
 
-    outcomes.append(
-        _CheckOutcome(
-            ArtifactValidationCheckId.COMPONENT_EXISTENCE,
-            CheckStatus.PASS if not missing else CheckStatus.FAIL,
-            "all component files exist"
-            if not missing
-            else f"missing component files: {missing[:5]}",
+    if invalid_uris:
+        outcomes.append(
+            _CheckOutcome(
+                ArtifactValidationCheckId.COMPONENT_EXISTENCE,
+                CheckStatus.FAIL,
+                f"non-canonical logical file_uri (confinement violation, "
+                f"frozen P0-4): {invalid_uris[:5]}",
+            )
         )
-    )
+    else:
+        outcomes.append(
+            _CheckOutcome(
+                ArtifactValidationCheckId.COMPONENT_EXISTENCE,
+                CheckStatus.PASS if not missing else CheckStatus.FAIL,
+                "all component files exist"
+                if not missing
+                else f"missing component files: {missing[:5]}",
+            )
+        )
     outcomes.append(
         _CheckOutcome(
             ArtifactValidationCheckId.COMPONENT_CONTENT_HASH,
-            CheckStatus.PASS if not content_bad else CheckStatus.FAIL,
+            CheckStatus.FAIL if (content_bad or invalid_uris) else CheckStatus.PASS,
             "every component's bytes hash to the registered content_hash"
-            if not content_bad
-            else f"content hash mismatch: {content_bad[:5]}",
+            if not (content_bad or invalid_uris)
+            else f"content hash mismatch or unresolvable uri: {(content_bad + invalid_uris)[:5]}",
         )
     )
-    if schema_bad and any(uri not in missing for uri in schema_bad):
-        # distinguish unreadable/mismatched from simply missing
+    if invalid_uris:
+        for check in (
+            ArtifactValidationCheckId.COMPONENT_SCHEMA_HASH,
+            ArtifactValidationCheckId.COMPONENT_ROW_COUNT,
+        ):
+            outcomes.append(
+                _CheckOutcome(
+                    check,
+                    CheckStatus.NOT_TESTABLE,
+                    f"non-canonical logical file_uri: {invalid_uris[:5]}",
+                )
+            )
+    elif schema_bad and any(uri not in missing for uri in schema_bad):
         outcomes.append(
             _CheckOutcome(
                 ArtifactValidationCheckId.COMPONENT_SCHEMA_HASH,
@@ -383,7 +521,9 @@ def validate_artifact_for_publish(
                 "every component's parquet schema hashes to the registered schema_hash",
             )
         )
-    if rows_bad and any(uri not in missing for uri in rows_bad):
+    if invalid_uris:
+        pass  # NOT_TESTABLE rows appended above
+    elif rows_bad and any(uri not in missing for uri in rows_bad):
         outcomes.append(
             _CheckOutcome(
                 ArtifactValidationCheckId.COMPONENT_ROW_COUNT,
@@ -473,7 +613,59 @@ def validate_artifact_for_publish(
         )
 
     # 9-10. IDENTITY_FALLBACK_ZERO / BLOCKING_DQ_ZERO --------------
-    # B2-01: counts are DERIVED from the persisted DQ facts, never inputs.
+    # R4-B2.1 P0-01: positive execution proof REQUIRED. Absence of bad
+    # findings is NEVER proof of zero findings - without a matching
+    # execution record bound to the CURRENT component manifest the
+    # check is NOT_TESTABLE (blocking).
+    component_manifest_hash_now = compute_component_manifest_hash(components)
+    for check_id, finding_class in _DQ_CHECK_FINDING_CLASS.items():
+        proof = conn.execute(
+            "SELECT scan_contract_version, producer, scanned_component_manifest_hash, "
+            "completed_at FROM meta_artifact_check_execution "
+            "WHERE feature_artifact_set_id = ? AND check_id = ? "
+            "ORDER BY completed_at DESC, execution_id DESC LIMIT 1",
+            [feature_artifact_set_id, check_id.value],
+        ).fetchone()
+        if proof is None:
+            outcomes.append(
+                _CheckOutcome(
+                    check_id,
+                    CheckStatus.NOT_TESTABLE,
+                    "no positive execution proof for this DQ required check - "
+                    "absence of bad findings is not proof of zero findings "
+                    "(audit R4-B2.1 P0-01)",
+                )
+            )
+            continue
+        if str(proof[2]) != component_manifest_hash_now:
+            outcomes.append(
+                _CheckOutcome(
+                    check_id,
+                    CheckStatus.NOT_TESTABLE,
+                    "stale scan: the recorded execution bound component manifest "
+                    f"{str(proof[2])[:16]}... != current manifest "
+                    f"{component_manifest_hash_now[:16]}... - the artifact "
+                    "changed after the scan; rescan required (audit "
+                    "R4-B2.1 P0-01)",
+                )
+            )
+            continue
+        count_row = conn.execute(
+            "SELECT count(*) FROM meta_artifact_dq_finding "
+            "WHERE feature_artifact_set_id = ? AND finding_class = ?",
+            [feature_artifact_set_id, finding_class],
+        ).fetchone()
+        count = int(count_row[0]) if count_row else 0
+        outcomes.append(
+            _CheckOutcome(
+                check_id,
+                CheckStatus.PASS if count == 0 else CheckStatus.FAIL,
+                f"scan executed ({str(proof[1])}, contract {str(proof[0])}); "
+                f"derived {finding_class} findings: {count}",
+            )
+        )
+
+    # counts (report summary - derived, never inputs)
     fallback_row = conn.execute(
         "SELECT count(*) FROM meta_artifact_dq_finding "
         "WHERE feature_artifact_set_id = ? AND finding_class = 'IDENTITY_FALLBACK'",
@@ -486,27 +678,14 @@ def validate_artifact_for_publish(
         [feature_artifact_set_id],
     ).fetchone()
     blocking_dq_count = int(dq_row[0]) if dq_row else 0
-    outcomes.append(
-        _CheckOutcome(
-            ArtifactValidationCheckId.IDENTITY_FALLBACK_ZERO,
-            CheckStatus.PASS if fallback_count == 0 else CheckStatus.FAIL,
-            f"identity fallback findings: {fallback_count}",
-        )
-    )
-    outcomes.append(
-        _CheckOutcome(
-            ArtifactValidationCheckId.BLOCKING_DQ_ZERO,
-            CheckStatus.PASS if blocking_dq_count == 0 else CheckStatus.FAIL,
-            f"blocking DQ findings: {blocking_dq_count}",
-        )
-    )
 
     # ------------------------------------------------- seal + report
-    component_manifest_hash = compute_component_manifest_hash(components)
+    component_manifest_hash = component_manifest_hash_now
     checks_hash = _required_checks_hash(outcomes)
     validation_id = f"val-{uuid.uuid4()}"
     now = datetime.now(UTC)
     contract_hash = validation_contract_hash()
+    validation_version = VALIDATION_CONTRACT_VERSION  # SYSTEM-DERIVED (P0-02)
 
     report_doc = {
         "artifact_validation_id": validation_id,
@@ -532,7 +711,10 @@ def validate_artifact_for_publish(
     }
     report_bytes = json.dumps(report_doc, sort_keys=True, indent=2).encode("utf-8")
     report_uri = f"validation/{validation_id}.json"
-    report_hash = write_file_atomic(data_root / report_uri, report_bytes)
+    # P0-04: the report URI is system-generated (validation/<uuid>.json)
+    # and still resolved through the frozen confinement helper.
+    report_path = physical_from_logical_uri(data_root, report_uri)
+    report_hash = write_file_atomic(report_path, report_bytes)
 
     # --------------------------------------- inline ledger persistence
     # B2-01: the INSERT lives HERE - no separate callable can receive

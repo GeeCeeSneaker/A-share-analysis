@@ -211,3 +211,50 @@ artifact_validation_id 仍可 resolve）。
 管理总册 §61：DM-CR-20260830-054（formal boundary + typed checks +
 DQ fact 表）/ DM-CR-20260830-055（exact seal + persisted report）/
 DM-CR-20260830-056（transaction 内 final recheck + latest-head policy）。
+
+---
+
+## Amendment 2026-08-30（R4-B2.1，audit 20260830 19:13）——Final Validation Truth / Seal Consumption / Transaction Closure
+
+> **Reviewer Verdict**：R4-B2 复审 **REOPENED**（4 P0 + 1 P1；机制性建设 16 项 PASS / FREEZE）。本 amendment 修正原文与运行时真相不一致的三处 overclaim，并记录四个 P0 + 一个 P1 的收口。原文保留供审计追溯。
+
+### E.1 Overclaim 修正（原文 §2 的三处）
+
+- **"contract hash changes invalidate prior seals"** —— 原实现 `_b2_recheck` 不比较 current contract hash，该声称不成立。R4-B2.1 P0-02 落地后成立（ledger ↔ report ↔ current 三方 exact match）。
+- **"TOCTOU closed"** —— 原实现只把 validation/component recheck 放进事务，完整 lineage reads 仍在事务外，两句不能同时成立。R4-B2.1 P0-03 落地后成立（全部 authoritative reads 事务内）。
+- **"required checks cannot be unexecuted"** —— DQ zero checks 原以 bad-fact absence 直接 PASS，"没跑过扫描"与"跑过且为零"不可区分。R4-B2.1 P0-01 落地后成立（positive execution proof）。
+
+### E.2 P0-01：DQ Required Checks 的 Positive Execution Proof
+
+新表 `meta_artifact_check_execution`（migration 012）：记录某 governed scan **确实执行过**——check_id / feature_artifact_set_id / scan_contract_version / producer / **scanned_component_manifest_hash**（exact 扫描输入身份）/ completed_at。**不含 count、不含 result**（`record_artifact_check_execution` 签名无 result 参数——AST 守卫 + 唯一 INSERT 边界）。
+
+validator 语义：IDENTITY_FALLBACK_ZERO / BLOCKING_DQ_ZERO 要求存在 execution proof 且其 `scanned_component_manifest_hash == current` —— 无 proof → **NOT_TESTABLE**（absence of bad findings != proof of zero findings）；stale proof（组件已变）→ NOT_TESTABLE（rescan required）；匹配 proof + 派生 count==0 → PASS。findings 仍走 append-only 事实表；counts 仍是派生值。残余边界如实记录：execution proof 证明"扫描执行过且绑定 exact 输入"，不证明"扫描者诚实上报了全部 findings"——后者仍是 feature pipeline DQ 治理链（CR-3 域）的责任。
+
+### E.3 P0-02：Full Seal Consumption（ledger ↔ report ↔ current contract）
+
+`_b2_recheck` 扩展为完整 seal 交叉验证：
+
+- `validation_contract_hash`：ledger == report == `validation_contract_hash()` **CURRENT**（语义性 contract 演进使旧 seal 失效——即使 check IDs 不变）；
+- `required_checks_hash`：ledger == report == 对 report checks 数组重算的 hash（status 改动未重封即暴露）+ **duplicate check_id 拒绝**（防 dict collapse）；
+- `validator_code_commit`：ledger == report 且非空；
+- `validation_version`：ledger == report == 当前 supported 版本（**system-derived**——`validate_artifact_for_publish` 移除 caller version 参数，不再允许自报 provenance；无 silent grandfather）。
+
+9 项对抗测试全部在 re-bind report hash（及 required_checks_hash）后仍 BLOCK。
+
+### E.4 P0-03：Full Transaction-Internal Preconditions（Option A 完成）
+
+原文 §2.4 的"precondition read 仍在事务外"描述废除。`publish_snapshot` 重构：**全部** authoritative reads（snapshot / artifact / feature set / pipeline run / universes / validation head / 完整 seal / 物理字节）在 `BEGIN TRANSACTION` 之后执行（`_resolve_publish_preconditions` helper 事务内调用；`_b2_recheck` 同）；写入只消费事务内值。AST ordering 守卫（测试）证明 BEGIN 先于 resolver/recheck/首个 execute。状态变化场景测试（snapshot demoted / artifact demoted/rebound / feature-set member 改动 / run 状态变化 / universe 删除）全部 BLOCK；失败 rollback 保留旧 PUBLISHED（FREEZE 契约零回归）。
+
+### E.5 P0-04：Logical-URI Confinement（frozen P0-4 回归修复）
+
+R4-B2 新增的物理文件读取（validator 组件重验 + publish bytes 终验 + report 读取）原先直接 `data_root / uri`——绕过 frozen helper。修正：全部经 `physical_from_logical_uri(data_root, uri)`（escaped / absolute / drive / backslash / alias URI 在 URI 层 fail closed，先于任何 data_root 外读取）。对抗测试：六类恶意 URI + **data_root 外 perfect sentinel**（bytes 与真实组件完全一致）仍被拒（COMPONENT_EXISTENCE FAIL，confinement 词记录在案）。
+
+### E.6 P1-01：ARTIFACT_MANIFEST check 语义诚实化（Option B）
+
+`ARTIFACT_MANIFEST_INTEGRITY` → **`ARTIFACT_MANIFEST_PRESENT_AND_SEALED`**：该 check 证明注册上游 seal 存在且非空；exact component integrity 由 component_manifest_hash seal + COMPONENT_* checks 证明（publish 侧另有 current registered artifact_manifest_hash == seal 比对）。当前 schema 无法无损重建 registration-time manifest formula（dataset 字段不持久化于 component 行），故不 overclaim 重算；ADR/report detail/tests 与运行时真相一致。
+
+### E.7 治理状态
+
+- R4-B2 机制性建设（16 项）FREEZE 保留；本 amendment 只记录四个 P0 + 一个 P1 的收口；
+- DM 登记：§61 DM-CR-20260830-057（positive execution proof）/ 058（full seal consumption）/ 059（transaction-internal preconditions）/ 060（logical-URI confinement；含 P1 rename）；
+- migration 012：`meta_artifact_check_execution`（from-zero 12 链 + idempotent + tamper 守卫全过；未改旧文件）。

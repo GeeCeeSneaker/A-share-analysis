@@ -19,12 +19,35 @@ R4-B2 (audit 20260830) Publish Validation Exactness:
   caller-facing count-writer ``record_artifact_validation`` is GONE);
 - the publish-critical validation recheck (report bytes hash, ledger
   identity, exact artifact/component seal, required-check completeness)
-  runs INSIDE the publish transaction (B2-05 Option A) - the precheck
-  TOCTOU window is closed;
-- the latest-head policy (B2-06) is deterministic (validated_at DESC,
+  runs INSIDE the publish transaction - the precheck TOCTOU window is
+  closed;
+- the latest-head policy is deterministic (validated_at DESC,
   artifact_validation_id DESC): a newer FAIL record makes an older PASS
   non-publishable, and legacy rows without the B2 seal require
   revalidation.
+
+R4-B2.1 closures (audit 20260830 19:13):
+
+- **P0-02 full seal consumption**: the recheck reads the COMPLETE seal
+  from the ledger row and cross-verifies it against the persisted
+  report AND the CURRENT contract - validation_contract_hash (ledger
+  == report == current), required_checks_hash (ledger == report ==
+  recomputed over the report's check set, duplicates rejected),
+  validator_code_commit (ledger == report, non-empty),
+  validation_version (ledger == report == the current supported
+  version). "Wrote the seal" is now "the seal is a correctness input".
+- **P0-03 full transaction-internal preconditions**: ALL authoritative
+  publish-precondition reads (snapshot / artifact / feature set /
+  pipeline run / universes / validation head / seal / physical bytes)
+  happen INSIDE the transaction via
+  ``_resolve_publish_preconditions`` (Option A authoritative re-read);
+  the writes consume only those in-transaction values. Nothing outside
+  the transaction is a correctness input.
+- **P0-04 logical-URI confinement**: every registry file_uri and the
+  validation report_uri resolve through the frozen
+  ``physical_from_logical_uri`` helper - escaped/absolute/drive/
+  backslash/alias URIs fail closed before any filesystem read outside
+  the data root.
 """
 
 from __future__ import annotations
@@ -35,6 +58,8 @@ import uuid
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from ashare_state.storage.paths import physical_from_logical_uri
 
 if TYPE_CHECKING:
     from duckdb import DuckDBPyConnection
@@ -54,29 +79,49 @@ def _b2_recheck(
     data_root: Path,
     feature_artifact_set_id: str,
 ) -> str:
-    """B2-05 Option A: the publish-critical validation recheck, executed
-    INSIDE the publish transaction. Returns the artifact_validation_id
-    the publish will bind. Raises PublishStateError (fail closed) on:
+    """B2-05 Option A + R4-B2.1 P0-02/P0-04: the publish-critical
+    validation recheck, executed INSIDE the publish transaction.
+
+    Reads the COMPLETE seal from the ledger row and cross-verifies it
+    against the persisted report AND the CURRENT contract. Returns the
+    artifact_validation_id the publish will bind. Raises
+    PublishStateError (fail closed) on:
 
     - no validation record at all;
-    - legacy record without the B2 exact seal (report_uri/report_hash) -
-      requires revalidation;
+    - legacy record without the B2 exact seal - requires revalidation;
     - report file missing / bytes tampered (sha256 != ledger report_hash);
     - report/ledger identity mismatch (id or artifact set);
+    - validation_contract_hash: ledger != report, or != CURRENT contract
+      hash (a semantic contract change invalidates old seals even when
+      the check IDs are unchanged);
+    - required_checks_hash: ledger != report, or != recomputed hash of
+      the report's check set (a status change without re-sealing is
+      caught), or the report contains duplicate check ids;
+    - validator_code_commit: ledger != report or empty;
+    - validation_version: ledger != report, or != the current supported
+      validation contract version (no silent grandfather);
     - sealed artifact manifest != CURRENT registered manifest;
     - sealed component manifest != manifest re-derived from the CURRENT
       component registry (component added/removed/changed);
-    - required-check set incomplete or any check not PASS;
-    - derived counts non-zero (validator-derived fallback/DQ findings).
+    - required-check set incomplete or any check not PASS (a DQ check
+      with no positive execution proof is NOT_TESTABLE here);
+    - derived counts non-zero;
+    - any component file_uri / the report_uri violating the frozen
+      logical-URI confinement, or a component file missing / its bytes
+      no longer hashing to the registered content_hash.
     """
     from ashare_state.pipeline.artifact_validation import (
         REQUIRED_VALIDATION_CHECKS,
+        VALIDATION_CONTRACT_VERSION,
         compute_component_manifest_hash,
+        validation_contract_hash,
     )
 
     validation = conn.execute(
         "SELECT artifact_validation_id, identity_fallback_count, blocking_dq_count, "
-        "report_uri, report_hash, artifact_manifest_hash, component_manifest_hash "
+        "report_uri, report_hash, artifact_manifest_hash, component_manifest_hash, "
+        "validation_contract_hash, required_checks_hash, validator_code_commit, "
+        "validation_version "
         "FROM meta_artifact_validation WHERE feature_artifact_set_id = ? "
         "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1",
         [feature_artifact_set_id],
@@ -97,6 +142,10 @@ def _b2_recheck(
         report_hash,
         seal_artifact_hash,
         seal_component_hash,
+        ledger_contract_hash,
+        ledger_checks_hash,
+        ledger_validator_commit,
+        ledger_validation_version,
     ) = validation
     # B2-03: legacy pre-B2 rows carry no exact seal - they can never be
     # publish-eligible without revalidation through the formal boundary.
@@ -108,8 +157,16 @@ def _b2_recheck(
             "validate_artifact_for_publish before publishing"
         )
         raise PublishStateError(msg)
-    # B2-04: report bytes must still hash to the ledger-bound value
-    report_path = Path(data_root) / str(report_uri)
+    # B2-04 + P0-04: report bytes must still hash to the ledger-bound
+    # value; the URI resolves through the frozen confinement helper.
+    try:
+        report_path = physical_from_logical_uri(Path(data_root), str(report_uri))
+    except Exception as exc:  # noqa: BLE001 - confinement violation
+        msg = (
+            "ARTIFACT_VALIDATION_REPORT_URI_INVALID violated: report uri "
+            f"{report_uri!r} is not a canonical logical uri ({exc})"
+        )
+        raise PublishStateError(msg) from exc
     if not report_path.is_file():
         msg = (
             "ARTIFACT_VALIDATION_REPORT_MISSING violated: validation report "
@@ -141,7 +198,72 @@ def _b2_recheck(
             f"{feature_artifact_set_id!r}"
         )
         raise PublishStateError(msg)
-    # B2-03: sealed identity == CURRENT registry identity
+
+    # ------------------------- P0-02: FULL seal cross-verification
+    current_contract_hash = validation_contract_hash()
+    if (
+        str(ledger_contract_hash) != current_contract_hash
+        or report.get("validation_contract_hash") != current_contract_hash
+    ):
+        msg = (
+            "ARTIFACT_VALIDATION_CONTRACT_STALE violated: the validation seal's "
+            f"contract hash (ledger={str(ledger_contract_hash)[:16]}..., "
+            f"report={str(report.get('validation_contract_hash'))[:16]}...) does "
+            f"not match the CURRENT validation contract {current_contract_hash[:16]}... "
+            "- the validation contract changed after this validation; "
+            "revalidation required (audit R4-B2.1 P0-02)"
+        )
+        raise PublishStateError(msg)
+    report_checks = report.get("checks", [])
+    report_check_ids = [c.get("check_id") for c in report_checks]
+    if len(report_check_ids) != len(set(report_check_ids)):
+        msg = (
+            "ARTIFACT_VALIDATION_DUPLICATE_CHECKS violated: the report contains "
+            "duplicate check ids - the typed check set must be exact "
+            "(audit R4-B2.1 P0-02)"
+        )
+        raise PublishStateError(msg)
+    recomputed_checks_hash = hashlib.sha256(
+        json.dumps(
+            [{"check_id": c.get("check_id"), "status": c.get("status")} for c in report_checks],
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if str(ledger_checks_hash) != str(recomputed_checks_hash) or report.get(
+        "required_checks_hash"
+    ) != str(recomputed_checks_hash):
+        msg = (
+            "ARTIFACT_VALIDATION_CHECKS_HASH violated: the required-checks hash "
+            f"(ledger={str(ledger_checks_hash)[:16]}..., report="
+            f"{str(report.get('required_checks_hash'))[:16]}...) != hash recomputed "
+            f"over the report's check set {recomputed_checks_hash[:16]}... - the "
+            "checks were altered after sealing (audit R4-B2.1 P0-02)"
+        )
+        raise PublishStateError(msg)
+    if not str(ledger_validator_commit or "") or report.get("validator_code_commit") != str(
+        ledger_validator_commit
+    ):
+        msg = (
+            "ARTIFACT_VALIDATION_PROVENANCE violated: validator_code_commit "
+            f"ledger={ledger_validator_commit!r} vs report="
+            f"{report.get('validator_code_commit')!r} (audit R4-B2.1 P0-02)"
+        )
+        raise PublishStateError(msg)
+    if (
+        str(ledger_validation_version) != VALIDATION_CONTRACT_VERSION
+        or report.get("validation_version") != VALIDATION_CONTRACT_VERSION
+    ):
+        msg = (
+            "ARTIFACT_VALIDATION_VERSION_STALE violated: validation_version "
+            f"(ledger={ledger_validation_version!r}, report="
+            f"{report.get('validation_version')!r}) != the current supported "
+            f"contract version {VALIDATION_CONTRACT_VERSION!r} (audit "
+            "R4-B2.1 P0-02, no silent grandfather)"
+        )
+        raise PublishStateError(msg)
+
+    # --------------------------------- B2-03: identity vs registry
     current_row = conn.execute(
         "SELECT artifact_manifest_hash FROM meta_feature_artifact_set "
         "WHERE feature_artifact_set_id = ?",
@@ -188,35 +310,14 @@ def _b2_recheck(
             "revalidation required"
         )
         raise PublishStateError(msg)
-    # B2-05: the physical bytes must STILL hash to the registered
-    # content_hash - a component replaced on disk after validation (with
-    # the registry row untouched) fails closed here (missing file /
-    # tampered bytes: any content/schema/row change alters the bytes).
-    from ashare_state.storage.atomic_files import file_sha256
-
-    for component in component_rows:
-        comp_path = Path(data_root) / str(component["file_uri"])
-        if not comp_path.is_file():
-            msg = (
-                "ARTIFACT_COMPONENT_MISSING violated: component file "
-                f"{comp_path} of {feature_artifact_set_id} is missing at "
-                "publish time"
-            )
-            raise PublishStateError(msg)
-        if file_sha256(comp_path) != str(component["content_hash"]):
-            msg = (
-                "ARTIFACT_COMPONENT_TAMPERED violated: component file "
-                f"{comp_path} bytes do not hash to the registered "
-                "content_hash - the file changed after validation; "
-                "revalidation required"
-            )
-            raise PublishStateError(msg)
     # B2-02: required-check completeness + all PASS
-    report_checks = {c.get("check_id"): c.get("status") for c in report.get("checks", [])}
+    report_checks_by_id = {c.get("check_id"): c.get("status") for c in report_checks}
     required_ids = {c.value for c in REQUIRED_VALIDATION_CHECKS}
-    missing = required_ids - set(report_checks)
+    missing = required_ids - set(report_checks_by_id)
     not_pass = sorted(
-        cid for cid, status in report_checks.items() if cid in required_ids and status != "PASS"
+        cid
+        for cid, status in report_checks_by_id.items()
+        if cid in required_ids and status != "PASS"
     )
     if missing or not_pass:
         msg = (
@@ -233,10 +334,42 @@ def _b2_recheck(
             "fallback identities and blocking DQ findings may never be PUBLISHED"
         )
         raise PublishStateError(msg)
+    # B2-05 + P0-04: the physical bytes must STILL hash to the registered
+    # content_hash - a component replaced on disk after validation (with
+    # the registry row untouched) fails closed here; every file_uri
+    # resolves through the frozen logical-URI confinement helper.
+    from ashare_state.storage.atomic_files import file_sha256
+
+    for component in component_rows:
+        uri = str(component["file_uri"])
+        try:
+            comp_path = physical_from_logical_uri(Path(data_root), uri)
+        except Exception as exc:  # noqa: BLE001 - confinement violation
+            msg = (
+                "ARTIFACT_COMPONENT_URI_INVALID violated: component file_uri "
+                f"{uri!r} is not a canonical logical uri ({exc}) - frozen P0-4 "
+                "confinement (audit R4-B2.1 P0-04)"
+            )
+            raise PublishStateError(msg) from exc
+        if not comp_path.is_file():
+            msg = (
+                "ARTIFACT_COMPONENT_MISSING violated: component file "
+                f"{comp_path} of {feature_artifact_set_id} is missing at "
+                "publish time"
+            )
+            raise PublishStateError(msg)
+        if file_sha256(comp_path) != str(component["content_hash"]):
+            msg = (
+                "ARTIFACT_COMPONENT_TAMPERED violated: component file "
+                f"{comp_path} bytes do not hash to the registered "
+                "content_hash - the file changed after validation; "
+                "revalidation required"
+            )
+            raise PublishStateError(msg)
     return str(validation_id)
 
 
-def publish_snapshot(
+def _resolve_publish_preconditions(
     conn: DuckDBPyConnection,
     *,
     trade_date: date,
@@ -245,17 +378,12 @@ def publish_snapshot(
     feature_set_version: str,
     universes: list[tuple[str, str]],
     pipeline_run_id: str,
-    data_root: Path,
-    quality_grade: str | None = None,
-    publish_id: str | None = None,
-) -> str:
-    """Atomically publish one trade_date. Returns the publish_id.
-
-    Steps inside ONE transaction (all-or-nothing):
-      1. existing PUBLISHED for trade_date -> SUPERSEDED (previous_publish_id)
-      2. insert new row status=PUBLISHED (bound to the artifact_validation_id)
-      3. insert meta_publish_universe rows
-      4. meta_pipeline_run.status -> PUBLISHED
+) -> None:
+    """R4-B2.1 P0-03 (Option A authoritative re-read): ALL publish
+    preconditions, resolved from the CURRENT database state. MUST be
+    called INSIDE the publish transaction - the values it reads are
+    the authoritative facts the writes consume; nothing read before
+    ``BEGIN TRANSACTION`` is a correctness input.
 
     Full lineage gate (R1 P0-02 + R2 P0-05/P0-06 + R3 P0-18/P1-01/P1-03):
       - snapshot exists, status DATA_VALIDATED
@@ -264,30 +392,13 @@ def publish_snapshot(
       - artifact.feature_set_version == feature_set_version
       - meta_feature_set exists, is ACTIVE, and its members STILL hash to
         the registered definition_hash (P1-03 self-check)
-      - pipeline_run REQUIRED - NO exceptions (R3-P0-18: the manual escape
-        hatch is removed; recovery/republish must create a RECOVERY run)
+      - pipeline_run REQUIRED - NO exceptions (R3-P0-18)
       - pipeline_run exists, status FEATURE_VALIDATED
       - artifact.calc_run_id == pipeline_run_id (RECOVERY runs exempt)
       - run/artifact (code_commit, environment_lock_hash, config_hash) match
       - run/snapshot (source_policy_version, availability_policy_version) match
       - every (universe_id, universe_version) exists in dim_universe
-      - R4-B2: INSIDE the transaction, the LATEST append-only validation
-        record is re-verified against the CURRENT artifact identity
-        (exact seal + persisted report + complete required-check set) -
-        see _b2_recheck.
     """
-    pid = publish_id or str(uuid.uuid4())
-    now = datetime.now(UTC)
-
-    if pipeline_run_id is None:
-        # R3-P0-18: no run-less publishes, ever - recovery uses RECOVERY runs
-        msg = (
-            "publish requires pipeline_run_id (R3-P0-18: no manual escape "
-            "hatch; recovery/republish must create a RECOVERY-type run)"
-        )
-        raise PublishStateError(msg)
-
-    # preconditions (outside txn: fail fast with clear errors)
     snap = conn.execute(
         "SELECT status, source_policy_version, availability_policy_version "
         "FROM meta_data_snapshot WHERE data_snapshot_id = ?",
@@ -423,11 +534,55 @@ def publish_snapshot(
             )
             raise PublishStateError(msg)
 
+
+def publish_snapshot(
+    conn: DuckDBPyConnection,
+    *,
+    trade_date: date,
+    data_snapshot_id: str,
+    feature_artifact_set_id: str,
+    feature_set_version: str,
+    universes: list[tuple[str, str]],
+    pipeline_run_id: str,
+    data_root: Path,
+    quality_grade: str | None = None,
+    publish_id: str | None = None,
+) -> str:
+    """Atomically publish one trade_date. Returns the publish_id.
+
+    R4-B2.1 P0-03 (Option A): EVERY authoritative read happens inside
+    the single transaction - preconditions (snapshot / artifact /
+    feature set / run / universes), the validation head with its full
+    seal, and the physical component bytes. The writes consume only
+    in-transaction values; nothing read outside the transaction is a
+    correctness input. Any failure rolls everything back and the
+    previous PUBLISHED publish stays visible.
+    """
+    pid = publish_id or str(uuid.uuid4())
+    now = datetime.now(UTC)
+
+    if pipeline_run_id is None:
+        # R3-P0-18: no run-less publishes, ever - recovery uses RECOVERY runs
+        msg = (
+            "publish requires pipeline_run_id (R3-P0-18: no manual escape "
+            "hatch; recovery/republish must create a RECOVERY-type run)"
+        )
+        raise PublishStateError(msg)
+
     conn.execute("BEGIN TRANSACTION")
     try:
-        # B2-05 Option A: the publish-critical validation recheck runs
-        # INSIDE the transaction - no TOCTOU window between precheck and
-        # the publish write.
+        # P0-03: authoritative preconditions - INSIDE the transaction.
+        _resolve_publish_preconditions(
+            conn,
+            trade_date=trade_date,
+            data_snapshot_id=data_snapshot_id,
+            feature_artifact_set_id=feature_artifact_set_id,
+            feature_set_version=feature_set_version,
+            universes=universes,
+            pipeline_run_id=pipeline_run_id,
+        )
+        # B2-05 + P0-02/P0-04: the full-seal validation recheck - also
+        # INSIDE the transaction (no TOCTOU window).
         artifact_validation_id = _b2_recheck(
             conn,
             data_root=data_root,

@@ -26,7 +26,12 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ashare_state.identity import resolve_security_identity
-from ashare_state.pipeline.artifact_validation import validate_artifact_for_publish
+from ashare_state.pipeline.artifact_validation import (
+    DQ_SCAN_CONTRACT_VERSION,
+    compute_component_manifest_hash,
+    record_artifact_check_execution,
+    validate_artifact_for_publish,
+)
 from ashare_state.pipeline.publish import publish_snapshot
 from ashare_state.providers.mock import FixtureProvider
 from ashare_state.storage.atomic_files import (
@@ -331,6 +336,38 @@ def run_mock_e2e(
         # R4-B2: validation records come ONLY from the formal boundary -
         # the validator re-verifies the physical component bytes and
         # derives the counts from the persisted DQ facts.
+        # R4-B2.1 P0-01: the mock feature pipeline first records the
+        # POSITIVE DQ scan execution proofs, bound to the exact component
+        # manifest it scanned (no counts, no results - execution facts).
+        _comp_rows = conn.execute(
+            "SELECT layer, feature_family, feature_family_version, partition_key, "
+            "file_uri, content_hash, schema_hash, row_count "
+            "FROM meta_feature_artifact_component WHERE feature_artifact_set_id = ? "
+            "ORDER BY file_uri",
+            [result.feature_artifact_set_id],
+        ).fetchall()
+        _comp_keys = (
+            "layer",
+            "feature_family",
+            "feature_family_version",
+            "partition_key",
+            "file_uri",
+            "content_hash",
+            "schema_hash",
+            "row_count",
+        )
+        _scanned_manifest = compute_component_manifest_hash(
+            [dict(zip(_comp_keys, r, strict=True)) for r in _comp_rows]
+        )
+        for _check_id in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO"):
+            record_artifact_check_execution(
+                conn,
+                feature_artifact_set_id=result.feature_artifact_set_id,
+                check_id=_check_id,
+                scan_contract_version=DQ_SCAN_CONTRACT_VERSION,
+                producer="skeleton-mock-e2e",
+                scanned_component_manifest_hash=_scanned_manifest,
+            )
         validate_artifact_for_publish(
             conn,
             data_root=data_root,

@@ -13,6 +13,44 @@
 
 ---
 
+## 2026-08-30 · R4-B2.1 最终 Validation Truth + Seal Consumption + Transaction Closure（R4-B2 复审四 P0 + P1 一次性收口）
+
+**Scope**
+- R4-B2 复审（audit 20260830 19:13 +08:00，Reviewed HEAD `892f465272622395eba030cc9847d68c5b07e539`）裁决 **REOPENED**：机制性建设 16 项 PASS / FREEZE；4 P0 + 1 P1 由本批 R4-B2.1 一次性收口（**未启动 CR-2**——BLOCKED_BY_R4-B2.1，遵守 §8 scope boundary；若完整收口直接提交复审，不机械创建 R4-B2.2）
+
+**Implementation**
+- **P0-01 DQ Required Checks Positive Execution Proof（DM-CR-20260830-057，ADR-021 Amendment E.2）**：缺陷——IDENTITY_FALLBACK_ZERO / BLOCKING_DQ_ZERO 仅凭 finding 表 count==0 即 PASS（"检查过且为零"与"根本没检查"不可区分）。修正——新表 `meta_artifact_check_execution`（migration 012）：governed scan 正向执行证明（check_id / artifact set / scan_contract_version / producer / **scanned_component_manifest_hash** / completed_at；**不含 count 不含 result**——API 签名无 result 参数 + production 唯一 INSERT 边界 AST 守卫）。validator 语义：无 proof → NOT_TESTABLE；stale proof（组件已变）→ NOT_TESTABLE（rescan required）；匹配 proof + 派生 count==0 → PASS。mock_e2e 在 validate 前记录 proofs
+- **P0-02 Full Validation Seal Consumption（DM-CR-20260830-058，Amendment E.3）**：缺陷——seal 字段写了但 publish 未消费（contract hash / checks hash / provenance / version 三方比对缺失）。修正——`_b2_recheck` 完整三方交叉验证：contract hash（ledger==report==**current**——语义性演进使旧 seal 失效）；required_checks_hash（==report checks 数组重算 + **duplicate check_id 拒绝**）；validator_code_commit（非空+相等）；validation_version（==当前 supported——`validate_artifact_for_publish` 移除 caller version 参数，system-derived）
+- **P0-03 Full Transaction-Internal Preconditions（DM-CR-20260830-059，Amendment E.4，Option A 完成）**：缺陷——只把 `_b2_recheck` 放进事务，完整 lineage reads 仍在事务外。修正——`publish_snapshot` 全部 authoritative reads（snapshot/artifact/feature-set/run/universes/validation head/完整 seal/物理字节）在 BEGIN TRANSACTION 之后执行（新 helper `_resolve_publish_preconditions` 事务内调用，lineage gate 语义零变更）；AST ordering 守卫证明 BEGIN 先于 resolver/recheck/首个 execute
+- **P0-04 Logical-URI Confinement（DM-CR-20260830-060，Amendment E.5）**：缺陷——validator/publish 新物理读取直接 `data_root / uri` 绕过 frozen helper。修正——全部经 `physical_from_logical_uri`（URI 层 fail closed 先于任何 data_root 外读取）；对抗测试六类恶意 URI + **data_root 外 perfect sentinel（bytes 与真实组件一致）仍被拒**
+- **P1-01 Manifest check 语义诚实化（Option B，Amendment E.6）**：`ARTIFACT_MANIFEST_INTEGRITY` → `ARTIFACT_MANIFEST_PRESENT_AND_SEALED`（证明注册上游 seal 存在；exact integrity 由 component seal + COMPONENT_* checks 证明；不 overclaim 重算 registration formula）
+- **ADR-021 Amendment R4-B2.1**：修正原文三处 overclaim（"contract hash invalidation"/"TOCTOU closed"/"cannot be unexecuted"——落地后成立）；原文保留
+
+**Schema / Contract Changes**
+- C1 ×4（DM-CR-20260830-057/058/059/060）；**migration 012**（meta_artifact_check_execution；from-zero 12 链 + idempotent + tamper 守卫全过，未改旧文件）
+- `artifact_validation.py`：execution proof API + validator DQ 语义重写 + confinement helper + check rename + system-derived version；`publish.py`：完整 seal 三方验证 + `_resolve_publish_preconditions` 事务内重构 + confinement；`mock_e2e.py`：validate 前记录 proofs
+
+**Verification**
+- Local: **848 tests passed / 0 failed**（819 → 848，+29：P0-01 六项 / P0-02 九项 / P0-03 八项 / P0-04 七项（含 canonical PASS）/ 既有 18 项适配）；ruff check / ruff format --check / mypy 全绿；**CI 同款命令 `uv run pytest` 复验 848/0**
+- 既有回归零破坏：B2 机制 16 项 FREEZE（latest-head / legacy / rollback / component seal / persisted report）；publish lineage（12）/ validation gate / failure injection scenario D / migrations 12 链 / B1+A3+A2+CR-1 冻结契约
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+
+**Implementation Status**
+- DONE（P0-01..04 + P1-01 + ADR amendment；848/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- execution proof 只记录元数据（无 count/result）：caller 无法 declare PASS；扫描发现的问题走 append-only findings（API 层面"隐瞒 findings"仍可能——但那是 producer 诚实性，属 feature pipeline DQ 治理链（CR-3），残余边界已在 ADR 如实记录
+- stale proof 判定绑定 scanned_component_manifest_hash == current：proof 与 exact 输入身份绑定，组件任何变化使 proof 失效（不可继承）
+- validation_version 改 system-derived：Reviewer 指出 caller 自报版本即自报 provenance——移除参数是唯一无 silent grandfather 的选择
+- P0-03 采用结构重构而非 test-hook：Reviewer 明确禁止 production test-hook 制造 race；AST ordering 守卫证明结构（BEGIN 先于一切 correctness read），状态变化场景测试证明 reads 是当前的
+- 恶意 URI 测试在 data_root 外放 perfect sentinel（bytes 与真实组件一致）：证明拒绝发生在 URI 层（confinement）而非 bytes 不匹配——"非法路径被拒绝"而非"非法路径被一致地验证"
+
+**下一步**
+- 等 Reviewer 复审 R4-B2.1（§8.1 Exit Gate 16 项：DQ positive proof / NOT_TESTABLE / seal 三方 / stale contract / transaction 内 preconditions / confinement / manifest 语义 / 冻结机制零回归 / migrations / CI / 治理一致性）；VERIFIED 后 R4-B2/B2.1 → CLOSED，CR-2 Provider-Normalized + Quarantine START（不机械创建 R4-B2.2）
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 ## 2026-08-30 · R4-B2 Publish Validation Exactness（R4-B1 全链 CLOSED 后首个批次：formal validation boundary 全落地）
 
 **Scope**

@@ -1,4 +1,5 @@
-"""Publish Validation Exactness tests (R4-B2, audit 20260830).
+"""Publish Validation Exactness tests (R4-B2 audit 20260830 +
+R4-B2.1 closure audit 20260830 19:13).
 
 The pre-B2 world: ``record_artifact_validation()`` accepted
 caller-supplied counts and appended a PASS-shaped ledger row without
@@ -18,6 +19,23 @@ B2 closes this with:
   closed, incl. physical bytes re-verification);
 - B2-06 deterministic latest-head policy (newer FAIL beats older PASS;
   legacy rows without the seal require revalidation).
+
+R4-B2.1 closures (audit 20260830 19:13):
+
+- **P0-01 positive DQ execution proof** - IDENTITY_FALLBACK_ZERO /
+  BLOCKING_DQ_ZERO require a matching execution record in
+  ``meta_artifact_check_execution`` bound to the CURRENT component
+  manifest; absence of bad findings is never proof of zero findings;
+- **P0-02 full seal consumption** - the publish recheck cross-verifies
+  validation_contract_hash / required_checks_hash /
+  validator_code_commit / validation_version across ledger, report and
+  the CURRENT contract; duplicates rejected;
+- **P0-03 full transaction-internal preconditions** - ALL
+  authoritative reads (snapshot/artifact/feature-set/run/universes/
+  validation head/seal/bytes) happen inside the transaction;
+- **P0-04 logical-URI confinement** - every registry file_uri and the
+  report_uri resolve through the frozen
+  ``physical_from_logical_uri`` helper.
 """
 
 from __future__ import annotations
@@ -34,10 +52,12 @@ import pytest
 from ashare_state.pipeline import (
     PublishStateError,
     publish_snapshot,
+    record_artifact_check_execution,
     record_artifact_dq_finding,
     validate_artifact_for_publish,
 )
 from ashare_state.pipeline import artifact_validation as av_module
+from ashare_state.pipeline import publish as publish_module
 from ashare_state.pipeline.mock_e2e import (
     SKELETON_FEATURE_SET_VERSION,
     run_mock_e2e,
@@ -122,7 +142,6 @@ class TestNoCallerDeclaredPass:
 
     def test_count_writer_is_gone_from_production(self):
         """record_artifact_validation no longer exists anywhere."""
-        from ashare_state.pipeline import publish as publish_module
 
         assert not hasattr(publish_module, "record_artifact_validation")
 
@@ -221,7 +240,7 @@ class TestTypedRequiredChecks:
                     base.feature_artifact_set_id,
                 ],
             )
-            with pytest.raises(PublishStateError, match="CHECKS violated.*BLOCKING_DQ_ZERO"):
+            with pytest.raises(PublishStateError, match="CHECKS_HASH violated"):
                 publish_snapshot(conn, **_kwargs(conn, base))
 
     def test_not_testable_required_check_blocks_publish(self, base):
@@ -260,7 +279,7 @@ class TestTypedRequiredChecks:
                     base.feature_artifact_set_id,
                 ],
             )
-            with pytest.raises(PublishStateError, match="CHECKS violated"):
+            with pytest.raises(PublishStateError, match="CHECKS_HASH violated"):
                 publish_snapshot(conn, **_kwargs(conn, base))
 
 
@@ -451,3 +470,623 @@ class TestPublishBindingAndRollback:
                 [date(2026, 8, 14)],
             ).fetchone()
             assert str(row[0]) == old_pid
+
+
+# =========================================================================
+# R4-B2.1 closures (audit 20260830 19:13)
+# =========================================================================
+
+
+def _current_component_manifest(conn, artifact_set_id: str) -> str:
+    rows = conn.execute(
+        "SELECT layer, feature_family, feature_family_version, partition_key, "
+        "file_uri, content_hash, schema_hash, row_count "
+        "FROM meta_feature_artifact_component WHERE feature_artifact_set_id = ? "
+        "ORDER BY file_uri",
+        [artifact_set_id],
+    ).fetchall()
+    keys = (
+        "layer",
+        "feature_family",
+        "feature_family_version",
+        "partition_key",
+        "file_uri",
+        "content_hash",
+        "schema_hash",
+        "row_count",
+    )
+    return av_module.compute_component_manifest_hash(
+        [dict(zip(keys, r, strict=True)) for r in rows]
+    )
+
+
+def _record_dq_proofs(conn, artifact_set_id: str, *, manifest: str | None = None) -> None:
+    """Tests-side controlled producer: record BOTH positive DQ scan
+    execution proofs bound to the given (current) component manifest."""
+    if manifest is None:
+        manifest = _current_component_manifest(conn, artifact_set_id)
+    for check_id in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO"):
+        record_artifact_check_execution(
+            conn,
+            feature_artifact_set_id=artifact_set_id,
+            check_id=check_id,
+            scan_contract_version=av_module.DQ_SCAN_CONTRACT_VERSION,
+            producer="tests-producer",
+            scanned_component_manifest_hash=manifest,
+        )
+
+
+def _rebind_report_hash(conn, base, artifact_set_id: str | None = None) -> None:
+    """Re-bind the ledger's report_hash AND required_checks_hash to the
+    CURRENT report bytes / recomputed checks hash (the attacker re-seals
+    consistently after tampering)."""
+    artifact_set_id = artifact_set_id or base.feature_artifact_set_id
+    _, report_uri, _ = _latest_validation(conn, artifact_set_id)
+    report_path = base.data_root / str(report_uri)
+    doc = json.loads(report_path.read_text(encoding="utf-8"))
+    recomputed = hashlib.sha256(
+        json.dumps(
+            [{"check_id": c["check_id"], "status": c["status"]} for c in doc["checks"]],
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    doc["required_checks_hash"] = recomputed
+    report_path.write_text(json.dumps(doc, indent=2, sort_keys=True), encoding="utf-8")
+    conn.execute(
+        "UPDATE meta_artifact_validation SET report_hash = ?, required_checks_hash = ? "
+        "WHERE feature_artifact_set_id = ? AND artifact_validation_id = "
+        "(SELECT artifact_validation_id FROM meta_artifact_validation "
+        "WHERE feature_artifact_set_id = ? "
+        "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+        [
+            hashlib.sha256(report_path.read_bytes()).hexdigest(),
+            recomputed,
+            artifact_set_id,
+            artifact_set_id,
+        ],
+    )
+
+
+@pytest.mark.integration
+class TestR4B21DQExecutionProof:
+    """P0-01: absence of bad findings is NEVER proof of zero findings -
+    the DQ required checks demand positive execution proofs bound to
+    the CURRENT component manifest."""
+
+    def test_no_execution_proof_is_not_testable_and_blocks(self, base):
+        """Delete the execution proofs (feature pipeline never ran the
+        scans) - no bad findings exist, yet the checks are NOT_TESTABLE
+        and publish BLOCKs."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "DELETE FROM meta_artifact_check_execution WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            dq = {
+                c["check_id"]: c["status"]
+                for c in report["checks"]
+                if c["check_id"] in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO")
+            }
+            assert dq == {
+                "IDENTITY_FALLBACK_ZERO": "NOT_TESTABLE",
+                "BLOCKING_DQ_ZERO": "NOT_TESTABLE",
+            }
+            with pytest.raises(PublishStateError, match="not_pass=.*IDENTITY_FALLBACK_ZERO"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_valid_exact_proof_with_zero_findings_passes(self, base):
+        """The mock chain recorded matching proofs: the DQ checks PASS
+        with the scan-executed evidence recorded in the detail."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            pid = publish_snapshot(conn, **_kwargs(conn, base))
+            assert pid
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC LIMIT 1",
+                [base.feature_artifact_set_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            for check in report["checks"]:
+                if check["check_id"] in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO"):
+                    assert check["status"] == "PASS"
+                    assert "scan executed" in check["detail"]
+
+    def test_proof_for_different_artifact_does_not_transfer(self, base):
+        """A proof recorded for ANOTHER artifact set never satisfies
+        this artifact's checks."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "DELETE FROM meta_artifact_check_execution WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            # proofs exist - but bound to a foreign artifact set
+            _record_dq_proofs(conn, "some-other-artifact-set-xyz")
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            dq = {
+                c["status"] for c in report["checks"] if c["check_id"] == "IDENTITY_FALLBACK_ZERO"
+            }
+            assert dq == {"NOT_TESTABLE"}
+            with pytest.raises(PublishStateError):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_stale_proof_blocks_after_component_change(self, base):
+        """A proof bound to the OLD component manifest is stale once a
+        component changes - rescan required (NOT_TESTABLE)."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "UPDATE meta_feature_artifact_component SET row_count = row_count + 1 "
+                "WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            stale = {
+                c["status"]
+                for c in report["checks"]
+                if c["check_id"] in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO")
+            }
+            assert stale == {"NOT_TESTABLE"}
+            assert any(
+                "stale scan" in c["detail"].lower() for c in report["checks"] if "detail" in c
+            )
+
+    def test_missing_one_of_two_proofs_blocks(self, base):
+        """Only the identity scan ran (proof deleted for the other) -
+        BLOCKING_DQ_ZERO is NOT_TESTABLE -> BLOCK."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "DELETE FROM meta_artifact_check_execution "
+                "WHERE feature_artifact_set_id = ? AND check_id = 'BLOCKING_DQ_ZERO'",
+                [base.feature_artifact_set_id],
+            )
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            dq = {
+                c["check_id"]: c["status"]
+                for c in report["checks"]
+                if c["check_id"] in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO")
+            }
+            assert dq["IDENTITY_FALLBACK_ZERO"] == "PASS"
+            assert dq["BLOCKING_DQ_ZERO"] == "NOT_TESTABLE"
+            with pytest.raises(PublishStateError, match="not_pass=.*BLOCKING_DQ_ZERO"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_execution_proof_api_carries_no_result_params(self):
+        """Structural guard: record_artifact_check_execution accepts
+        execution METADATA only - no count, no result, no status/pass
+        parameter. And it is the only production writer of the
+        execution table (AST scan)."""
+        tree = ast.parse(VALIDATION_SOURCE.read_text(encoding="utf-8"))
+        fn = next(
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == "record_artifact_check_execution"
+        )
+        arg_names = {a.arg for a in fn.args.args} | {a.arg for a in fn.args.kwonlyargs}
+        forbidden = {"count", "finding_count", "result", "status", "pass_", "passed"}
+        assert not (arg_names & forbidden), arg_names
+        inserters: set[tuple[str, str]] = set()
+        pipeline_root = REPO_ROOT / "src" / "ashare_state" / "pipeline"
+        for path in sorted(pipeline_root.glob("*.py")):
+            mod_tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(mod_tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                for sub in ast.walk(node):
+                    if (
+                        isinstance(sub, ast.Constant)
+                        and isinstance(sub.value, str)
+                        and "INSERT INTO meta_artifact_check_execution" in sub.value
+                    ):
+                        inserters.add((path.name, node.name))
+        assert inserters == {("artifact_validation.py", "record_artifact_check_execution")}
+
+
+@pytest.mark.integration
+class TestR4B21FullSealConsumption:
+    """P0-02: the publish recheck cross-verifies the COMPLETE seal -
+    ledger <-> report <-> CURRENT contract. All tamper tests re-bind the
+    report hash (and required_checks_hash where relevant) and STILL
+    block."""
+
+    def _prepare(self, conn, base):
+        _revalidate(conn, base)
+
+    def _mutate_report(self, conn, base, mutate_doc) -> None:
+        """Apply a mutation to the report document, re-bind the ledger
+        report_hash to the tampered bytes (required_checks_hash is
+        re-sealed consistently by default - the caller can override)."""
+        _, report_uri, _ = _latest_validation(conn, base.feature_artifact_set_id)
+        report_path = base.data_root / str(report_uri)
+        doc = json.loads(report_path.read_text(encoding="utf-8"))
+        mutate_doc(doc)
+        report_path.write_text(json.dumps(doc, indent=2, sort_keys=True), encoding="utf-8")
+        recomputed = hashlib.sha256(
+            json.dumps(
+                [{"check_id": c["check_id"], "status": c["status"]} for c in doc["checks"]],
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        doc["required_checks_hash"] = recomputed
+        report_path.write_text(json.dumps(doc, indent=2, sort_keys=True), encoding="utf-8")
+        conn.execute(
+            "UPDATE meta_artifact_validation SET report_hash = ?, required_checks_hash = ? "
+            "WHERE feature_artifact_set_id = ? AND artifact_validation_id = "
+            "(SELECT artifact_validation_id FROM meta_artifact_validation "
+            "WHERE feature_artifact_set_id = ? "
+            "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+            [
+                hashlib.sha256(report_path.read_bytes()).hexdigest(),
+                recomputed,
+                base.feature_artifact_set_id,
+                base.feature_artifact_set_id,
+            ],
+        )
+
+    def test_report_contract_hash_stale_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            self._prepare(conn, base)
+            self._mutate_report(conn, base, lambda d: d.update(validation_contract_hash="f" * 64))
+            with pytest.raises(PublishStateError, match="CONTRACT_STALE"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_ledger_report_contract_hash_mismatch_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            self._prepare(conn, base)
+            # tamper ONLY the ledger's contract hash (report intact)
+            conn.execute(
+                "UPDATE meta_artifact_validation SET validation_contract_hash = ? "
+                "WHERE feature_artifact_set_id = ? AND artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                ["e" * 64, base.feature_artifact_set_id, base.feature_artifact_set_id],
+            )
+            with pytest.raises(PublishStateError, match="CONTRACT_STALE"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_current_contract_change_blocks_old_validation(self, base, monkeypatch):
+        """The validation contract evolves (hash changes) while the
+        required check IDs stay unchanged - the old seal is stale and
+        BLOCKs even though every ID still passes."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            self._prepare(conn, base)
+            # _b2_recheck imports validation_contract_hash lazily from
+            # the artifact_validation module at each call - patch there
+            monkeypatch.setattr(av_module, "validation_contract_hash", lambda: "a" * 64)
+            with pytest.raises(PublishStateError, match="CONTRACT_STALE"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_report_required_checks_hash_garbage_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            self._prepare(conn, base)
+            _, report_uri, _ = _latest_validation(conn, base.feature_artifact_set_id)
+            report_path = base.data_root / str(report_uri)
+            doc = json.loads(report_path.read_text(encoding="utf-8"))
+            doc["required_checks_hash"] = "0" * 64
+            report_path.write_text(json.dumps(doc, indent=2, sort_keys=True), encoding="utf-8")
+            conn.execute(
+                "UPDATE meta_artifact_validation SET report_hash = ? "
+                "WHERE feature_artifact_set_id = ? AND artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                [
+                    hashlib.sha256(report_path.read_bytes()).hexdigest(),
+                    base.feature_artifact_set_id,
+                    base.feature_artifact_set_id,
+                ],
+            )
+            with pytest.raises(PublishStateError, match="CHECKS_HASH"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_ledger_checks_hash_mismatch_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            self._prepare(conn, base)
+            conn.execute(
+                "UPDATE meta_artifact_validation SET required_checks_hash = ? "
+                "WHERE feature_artifact_set_id = ? AND artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                ["b" * 64, base.feature_artifact_set_id, base.feature_artifact_set_id],
+            )
+            with pytest.raises(PublishStateError, match="CHECKS_HASH"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_status_changed_without_rehash_blocks(self, base):
+        """Flip one check status in the report and re-bind ONLY the
+        report bytes hash (required_checks_hash field left stale) -
+        the recomputed hash exposes the alteration."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            self._prepare(conn, base)
+            _, report_uri, _ = _latest_validation(conn, base.feature_artifact_set_id)
+            report_path = base.data_root / str(report_uri)
+            doc = json.loads(report_path.read_text(encoding="utf-8"))
+            for check in doc["checks"]:
+                if check["check_id"] == "COMPONENT_ROW_COUNT":
+                    check["status"] = "FAIL"
+            report_path.write_text(json.dumps(doc, indent=2, sort_keys=True), encoding="utf-8")
+            conn.execute(
+                "UPDATE meta_artifact_validation SET report_hash = ? "
+                "WHERE feature_artifact_set_id = ? AND artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                [
+                    hashlib.sha256(report_path.read_bytes()).hexdigest(),
+                    base.feature_artifact_set_id,
+                    base.feature_artifact_set_id,
+                ],
+            )
+            with pytest.raises(PublishStateError, match="CHECKS_HASH"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_validator_commit_mismatch_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            self._prepare(conn, base)
+            conn.execute(
+                "UPDATE meta_artifact_validation SET validator_code_commit = ? "
+                "WHERE feature_artifact_set_id = ? AND artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                ["someone-else", base.feature_artifact_set_id, base.feature_artifact_set_id],
+            )
+            with pytest.raises(PublishStateError, match="PROVENANCE"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_validation_version_mismatch_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            self._prepare(conn, base)
+            conn.execute(
+                "UPDATE meta_artifact_validation SET validation_version = ? "
+                "WHERE feature_artifact_set_id = ? AND artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                ["legacy-v0", base.feature_artifact_set_id, base.feature_artifact_set_id],
+            )
+            with pytest.raises(PublishStateError, match="VERSION_STALE"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_duplicate_check_id_blocks(self, base):
+        """Duplicate the COMPONENT_EXISTENCE entry (both PASS) and
+        re-seal BOTH hashes consistently - duplicates still BLOCK."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            self._prepare(conn, base)
+            _, report_uri, _ = _latest_validation(conn, base.feature_artifact_set_id)
+            report_path = base.data_root / str(report_uri)
+            doc = json.loads(report_path.read_text(encoding="utf-8"))
+            dup = next(c for c in doc["checks"] if c["check_id"] == "COMPONENT_EXISTENCE")
+            doc["checks"].append(dict(dup))
+            report_path.write_text(json.dumps(doc, indent=2, sort_keys=True), encoding="utf-8")
+            recomputed = hashlib.sha256(
+                json.dumps(
+                    [{"check_id": c["check_id"], "status": c["status"]} for c in doc["checks"]],
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+            doc["required_checks_hash"] = recomputed
+            report_path.write_text(json.dumps(doc, indent=2, sort_keys=True), encoding="utf-8")
+            conn.execute(
+                "UPDATE meta_artifact_validation SET report_hash = ?, required_checks_hash = ? "
+                "WHERE feature_artifact_set_id = ? AND artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                [
+                    hashlib.sha256(report_path.read_bytes()).hexdigest(),
+                    recomputed,
+                    base.feature_artifact_set_id,
+                    base.feature_artifact_set_id,
+                ],
+            )
+            with pytest.raises(PublishStateError, match="DUPLICATE_CHECKS"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+
+@pytest.mark.integration
+class TestR4B21TransactionInternalPreconditions:
+    """P0-03: ALL authoritative publish-precondition reads happen
+    INSIDE the transaction; state that changes before the authoritative
+    read blocks the publish; a final failure still rolls back and
+    preserves the old PUBLISHED."""
+
+    def test_structural_guard_preconditions_inside_transaction(self):
+        """AST ordering guard: within publish_snapshot, BEGIN TRANSACTION
+        precedes the precondition resolver, the seal recheck and every
+        write; nothing database-read happens before BEGIN in the
+        function body."""
+        src = PUBLISH_SOURCE.read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        fn = next(
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == "publish_snapshot"
+        )
+        positions: dict[str, int] = {}
+        for node in ast.walk(fn):
+            begins_transaction = (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and "BEGIN TRANSACTION" in node.value
+            )
+            if begins_transaction:
+                positions["begin"] = min(positions.get("begin", node.lineno), node.lineno)
+            if isinstance(node, ast.Call):
+                name = None
+                if isinstance(node.func, ast.Name):
+                    name = node.func.id
+                elif isinstance(node.func, ast.Attribute):
+                    name = node.func.attr
+                if name in (
+                    "_resolve_publish_preconditions",
+                    "_b2_recheck",
+                    "execute",
+                ):
+                    key = f"call:{name}"
+                    positions.setdefault(key, node.lineno)
+        assert "begin" in positions
+        assert "call:_resolve_publish_preconditions" in positions
+        assert "call:_b2_recheck" in positions
+        assert positions["begin"] < positions["call:_resolve_publish_preconditions"], (
+            "preconditions must be resolved AFTER BEGIN TRANSACTION"
+        )
+        assert positions["begin"] < positions["call:_b2_recheck"], (
+            "the seal recheck must run AFTER BEGIN TRANSACTION"
+        )
+        # and the FIRST conn.execute in the function is the BEGIN itself
+        first_execute = positions.get("call:execute")
+        assert first_execute is not None and positions["begin"] <= first_execute
+
+    def test_snapshot_demoted_before_publish_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "UPDATE meta_data_snapshot SET status = 'DATA_STALE' WHERE data_snapshot_id = ?",
+                [base.data_snapshot_id],
+            )
+            with pytest.raises(PublishStateError, match="DATA_VALIDATED"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_artifact_demoted_before_publish_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "UPDATE meta_feature_artifact_set SET status = 'FEATURE_STALE' "
+                "WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            with pytest.raises(PublishStateError, match="FEATURE_VALIDATED"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_artifact_rebound_to_other_snapshot_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "UPDATE meta_feature_artifact_set SET data_snapshot_id = 'snap-other' "
+                "WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            with pytest.raises(PublishStateError, match="SNAPSHOT_ARTIFACT_LINEAGE_VALID"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_feature_set_definition_changed_before_publish_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "INSERT INTO meta_feature_set_member VALUES (?, ?, ?, ?)",
+                [SKELETON_FEATURE_SET_VERSION, "rogue_feature", "9.9.9", "rogue-param"],
+            )
+            with pytest.raises(PublishStateError, match="FEATURE_SET_IMMUTABLE"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_run_status_changed_before_publish_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            kwargs = _kwargs(conn, base)
+            conn.execute(
+                "UPDATE meta_pipeline_run SET status = 'FAILED' WHERE pipeline_run_id = ?",
+                [kwargs["pipeline_run_id"]],
+            )
+            with pytest.raises(PublishStateError, match="FEATURE_VALIDATED"):
+                publish_snapshot(conn, **kwargs)
+
+    def test_universe_removed_before_publish_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            kwargs = _kwargs(conn, base)
+            conn.execute(
+                "DELETE FROM dim_universe WHERE universe_id = 'ALL_A' AND universe_version = 'v1'"
+            )
+            with pytest.raises(PublishStateError, match="not registered in dim_universe"):
+                publish_snapshot(conn, **kwargs)
+
+
+@pytest.mark.integration
+class TestR4B21LogicalURIConfinement:
+    """P0-04: registry file_uris resolve ONLY through the frozen
+    logical-URI confinement helper - escaped/absolute/drive/backslash/
+    alias URIs fail closed even when the outside file exists and its
+    hash matches."""
+
+    @pytest.mark.parametrize(
+        "evil_uri",
+        [
+            "../outside-sentinel.parquet",
+            "/outside-sentinel.parquet",
+            "C:/outside-sentinel.parquet",
+            "features\\\\evil.parquet",
+            "features//evil.parquet",
+            "features/./evil.parquet",
+        ],
+    )
+    def test_evil_component_uri_fails_closed(self, base, evil_uri):
+        """Point one component at an escaped/absolute/alias URI, place a
+        PERFECT sentinel file outside the data root (bytes identical to
+        the real component) - validation FAILs on confinement, never
+        reads outside the root, and publish BLOCKs."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            comp_uri = conn.execute(
+                "SELECT file_uri FROM meta_feature_artifact_component "
+                "WHERE feature_artifact_set_id = ? ORDER BY file_uri LIMIT 1",
+                [base.feature_artifact_set_id],
+            ).fetchone()[0]
+            real = base.data_root / str(comp_uri)
+            # sentinel OUTSIDE the data root with IDENTICAL bytes
+            outside = base.data_root.parent / "outside-sentinel.parquet"
+            outside.parent.mkdir(parents=True, exist_ok=True)
+            outside.write_bytes(real.read_bytes())
+            conn.execute(
+                "UPDATE meta_feature_artifact_component SET file_uri = ? "
+                "WHERE feature_artifact_set_id = ? AND file_uri = ?",
+                [evil_uri, base.feature_artifact_set_id, comp_uri],
+            )
+            # rescan proofs under the tampered registry (else NOT_TESTABLE
+            # from staleness would mask the confinement failure)
+            conn.execute(
+                "DELETE FROM meta_artifact_check_execution WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            _record_dq_proofs(conn, base.feature_artifact_set_id)
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            existence = next(c for c in report["checks"] if c["check_id"] == "COMPONENT_EXISTENCE")
+            assert existence["status"] == "FAIL"
+            assert "confinement" in existence["detail"].lower() or "canonical" in (
+                existence["detail"].lower()
+            )
+            # publish blocks on the failed validation
+            with pytest.raises(PublishStateError):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_valid_canonical_uri_still_passes(self, base):
+        """The untouched mock chain (canonical POSIX relative URIs)
+        validates and publishes - confinement does not over-block."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            pid = publish_snapshot(conn, **_kwargs(conn, base))
+            assert pid

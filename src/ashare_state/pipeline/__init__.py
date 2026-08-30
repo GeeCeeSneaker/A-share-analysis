@@ -2,6 +2,7 @@
 
 from ashare_state.pipeline.artifact_validation import (
     ArtifactValidationError,
+    record_artifact_check_execution,
     record_artifact_dq_finding,
     validate_artifact_for_publish,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "latest_published",
     "publish_snapshot",
     "publish_universes",
+    "record_artifact_check_execution",
     "record_artifact_dq_finding",
     "resolve_publish",
     "validate_artifact_for_publish",
