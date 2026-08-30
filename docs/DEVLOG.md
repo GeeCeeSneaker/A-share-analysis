@@ -33,9 +33,9 @@
 - 新增 `tests/integration/_capability_test_persistence.py`（tests 内的 approval mechanics）
 
 **Verification**
-- Local: **801 tests passed / 0 failed**（797 → 801，+4：anti-bypass 重写后 7 项（原 6）+ constituent 3 项（新增类）+ 既有守卫合并）；ruff check / ruff format --check / mypy 全绿（退出码严格验证）
+- Local: **801 tests passed / 0 failed**（797 → 801，+4：anti-bypass 重写后 7 项（原 6）+ constituent 3 项（新增类）+ 既有守卫合并）；ruff check / ruff format --check / mypy 全绿（退出码严格验证）；本地以 **CI 同款命令 `uv run pytest`** 复验（801/0）
 - 既有回归零破坏：四层 cross-binding tamper（9）、exact-match engine、persistence early-stop、trial boundary、governance（迁移 helper 后全过）、dry-run 全相位
-- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+- GitHub Actions: **run 33302154703 三腿 success**（2026-08-30 API positive confirmation）。CI 过程披露：run 33301357374 失败——tests helper 以 `tests.` 包路径导入，而 `uv run pytest`（CI 调用方式）不把 cwd 加入 sys.path（本地 `python -m pytest` 会加，故本地首跑未暴露）→ collection `ModuleNotFoundError: No module named 'tests'` 三腿全挂。根因修复：同目录顶层导入 `from _capability_test_persistence import ...`（pytest 的 rootdir insertion 机制对非包测试目录保证可用）；`261f596`（主实现，含本 DEVLOG 条目）+ `135298f`（仅 tests/ 导入修复，不触发 devlog gate——与 V2.1 以来"仅改 tests/ 的 fix 不触发 gate"先例一致）。教训：**本地验证必须用与 CI 完全一致的调用方式（`uv run pytest` 而非 `python -m pytest`）**
 
 **Implementation Status**
 - DONE（P0-01 + P0-02 + P1 计数更正 + Batch D；801/0；Review Status: PENDING_REVIEW）
