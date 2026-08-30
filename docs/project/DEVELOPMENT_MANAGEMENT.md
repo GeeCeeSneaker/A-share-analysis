@@ -7,11 +7,11 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：R4-B2 implementation（本批，2026-08-30）——基于 Reviewer 复审 HEAD `1f5eb3a`（closure / next-work 文档 commit）；R4-B1.2 implementation `261f5967cbd639ce9dd6fe3c8fa2c1abe5f649b4` + CI fix `135298fd670e85a4e0b8b53e10c9117981220137`（run 33302154703 三腿 success）；本批完整 40-char SHA 于推送后回填  
+> **Current Code Baseline**：R4-B2 implementation `11b1b5bedce7ecc07ba865227c9d3ea820818f66`（run 33307917769 三腿 success，2026-08-30 API positive confirmation）——基于 Reviewer 复审 HEAD `1f5eb3a`（closure / next-work 文档 commit）；R4-B1.2 implementation `261f5967cbd639ce9dd6fe3c8fa2c1abe5f649b4` + CI fix `135298fd670e85a4e0b8b53e10c9117981220137`（run 33302154703 三腿 success）  
 > **Document Revision**：DM-CR-20260830-054 / 055 / 056  
 > **Last Review**：2026-08-30 18:01 +08:00（R4-B1.2 复审：**VERIFIED——R4-B1 / B1.1 / B1.2 全链 CLOSED / FREEZE**（9 项 VERIFIED：anti-bypass 结构性关闭 / APPROVED inline / tests mechanics 迁出 src / constituent REQUIRED / base_info PASS + constituent DENIED → FAIL / canonical-deliverable guard / B1.1 cross-binding 无回归 / security_master 无回归 / CI green）；R4-B2 为下一活跃批次）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：run 33302154703（R4-B1.2 `261f596`+`135298f`）三腿 success（Reviewer 正向核验基线）；本批（R4-B2，819 tests）CI 结果待推送后正向确认回填  
+> **CI Status**：**FULL MATRIX GREEN——run 33307917769（R4-B2 implementation `11b1b5bedce7ecc07ba865227c9d3ea820818f66`）三腿 success**（2026-08-30 API positive confirmation；R4-B2 新增 18 项 validation-exactness 测试 819/0 在 Ubuntu+Windows 两 OS 通过，一次通过零修复轮次）；run 33302154703（R4-B1.2 `261f596`+`135298f`，Reviewer 正向核验基线）三腿 success  
 > **Phase Status（2026-08-30，Reviewer 裁决同步）**：  
 > R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（除真实可复现 regression 不再重审）**；R4-B2 → **DONE / PENDING_REVIEW**（本批：Publish Validation Exactness——formal validation boundary + typed checks + exact seal + transaction 内 recheck）；CR-2 → **BLOCKED_BY_R4-B2 / sequenced after R4-B2**；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。
