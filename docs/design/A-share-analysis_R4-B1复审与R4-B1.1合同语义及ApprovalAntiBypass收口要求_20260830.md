@@ -684,3 +684,59 @@ E. A3/A2/CR-1 regression + full CI
 ```
 
 不要启动 R4-B2，不要扩展 CR-2 / canonical / feature / state。
+
+---
+
+# 11. Implementation Mapping（开发方填写，2026-08-30）
+
+## P0-01 — Endpoint Requirement Contract 语义修正（§2）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| security_master 历史端点必须 REQUIRED（survivorship core） | `ENDPOINT_REQUIREMENTS`：`security_master:BaseData.get_hist_code_list` = REQUIRED（唯一 requirement）；`get_code_list` 移出 requirements（分类 OPTIONAL_NON_APPROVAL_SURFACE）；`ENDPOINT_PROBE_SPECS` 同步移除 get_code_list 条目 | test_security_master_hist_endpoint_is_required |
+| get_code_list 不得单独使 endpoint gate PASS | 快照不再有 requirement probe——snapshot PASS + hist DENIED → ENDPOINT FAIL → early-stop → BUSINESS fired==0 → approval impossible | test_hist_denied_snapshot_available_is_endpoint_fail + test_snapshot_alone_can_never_satisfy_the_proof（含 REPORT 记录诚实 FAIL） |
+| adj_factor 双真相二选一 | **Option B**：撤回 ADR-020 "各自 REQUIRED"；`get_backward_factor` 分类 OPTIONAL_NON_APPROVAL_SURFACE（reason 记录"当前管线不消费的后复权数据流，R4-B1.1 Option B 解决 ADR overclaim"）；approval 只要求 get_adj_factor | test_adj_factor_backward_factor_is_option_b（分类 + runtime contract 一致） |
+| 全部 registry sdk_methods 显式 reconcile | `SDK_METHOD_CLASSIFICATIONS` 表（19 条，`SdkMethodClassification`：capability / endpoint / classification / reason）：security_master 三方法、adj_factor 两方法、industry_taxonomy 四方法、index_daily 两方法全部显式分类（五分类 enum：REQUIRED_ENDPOINT_PROOF / ALTERNATIVE_GROUP_MEMBER / OPTIONAL_NON_APPROVAL_SURFACE / BUSINESS_SEMANTIC_ONLY / DEPRECATED_NOT_USED） | test_every_registry_sdk_method_is_explicitly_classified（`set(registry.sdk_methods) == set(classified)`，漏项即红） |
+| 分类与 requirements 双向一致 | `validate_endpoint_requirements()` 扩展：分类表内部一致（无重复、reason 非空）+ REQUIRED 分类 ↔ REQUIRED requirements 集合相等 + ALTERNATIVE_GROUP 分类 ↔ 组成员集合相等 | test_contract_is_structurally_valid（含新检查） |
+| 修正后改写错误语义测试 | `test_alternative_group_single_member_pass_is_pass`（Reviewer §6 点名）改写为两个 hist-denied 语义测试 | 同上两测试 |
+
+## P0-02 — Approval Anti-Bypass（§3）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 唯一生产 APPROVED transition | `approve_from_spike_run`（closed run → provenance → verdict → formal gate proof → endpoint cross-binding）→ `VerifiedCapabilityApproval`（内部 sealed proof object：name / evidence / verified_from_run / endpoint_requirements_proven；`__post_init__` 拒绝空证明）→ `_persist_verified_capability`（private 持久化边界，只接受 verified object；保留 R3-P1-05 validate-before-mutate / 单事务 / cache-rebuild / R2-P1-01 UPDATE-only-governance-fields） | test_only_the_verified_path_persists_approved |
+| caller CapabilityEvidence 不能 self-declare | 旧 public 函数**移除**：`approve_and_persist_capability` / `approve_capability` 从模块命名空间消失；测试改用显式 test-only helper（`_approve_and_persist_capability_testonly` / `_approve_capability_in_memory_testonly`，docstring 声明非生产路径） | test_old_public_approval_paths_no_longer_exist + test_fabricated_evidence_cannot_self_declare_production_approval |
+| test-only helper 不得被生产代码引用 | AST 守卫：src/ 全模块扫描，任何对两个 test-only helper 名字的引用即 AssertionError | test_production_code_never_calls_the_testonly_helpers |
+| APPROVED 写入只在 governed 边界 | AST 守卫：capability.py 中 "APPROVED" 字面量 / CapabilityStatus.APPROVED 构造只允许出现在 `_persist_verified_capability` / `_approve_capability_in_memory_testonly`（+load_approvals 的 DB→cache 重建） | test_approved_writes_only_in_governed_boundaries |
+| failed endpoint requirement 无旁路 + DB/cache 一致 | 篡改为 FAIL 的 run → approve_from_spike_run 拒绝 → load_approvals 后仍 CANDIDATE，DB 无 APPROVED 行 | test_failed_endpoint_requirement_has_no_bypass |
+| positive production identity 不削弱 | test-only helper 保留 `_validate_evidence` 全部拒绝路径（frozen identity exact-match 等）；生产链在 approve_from_spike_run 内独立验证 | 既有 test_trial_production_boundary.py 全过（迁移至 helper） |
+
+## P0-03 — Persisted Identity Cross-Binding（§4）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| contract ↔ REPORT entry（含 dataset） | `_require_formal_gate_proof` 重写：entry.expected_endpoint / **provider_dataset** / capability == contract 三字段 | test_provider_dataset_tamper_blocks |
+| entry.actual_dataset == contract dataset | 显式检查 | test_actual_dataset_tamper_blocks |
+| proof case ↔ REPORT entry identity equality | case.evidence_ref == entry.evidence_uri 且 case.evidence_hash == entry.evidence_hash（case 与 artifact 对"什么证据证明了该端点"必须一致） | test_report_evidence_uri_swapped_to_permission_evidence_blocks（entry 指向 permission 证据）+ test_report_evidence_hash_swapped_to_other_legitimate_hash_blocks + test_case_evidence_ref_disagreeing_with_report_blocks（反向：改 case）+ test_case_evidence_hash_disagreeing_with_report_blocks |
+| REPORT entry ↔ Raw meta（hash 重验） | sha256(meta bytes) == entry.evidence_hash（entry.evidence_uri 相对 spike_root 解析；approval 新增 spike_root 参数，缺失即拒绝） | 全部 9 项的基础层 |
+| Raw meta ↔ contract/entry（endpoint/dataset/request_id） | meta_doc.endpoint == req.endpoint；meta_doc.provider_dataset == req.provider_dataset；meta_doc.request_id == entry.request_id | test_raw_meta_endpoint_tamper_blocks + test_raw_meta_provider_dataset_mismatch_blocks + test_raw_meta_request_id_mismatch_blocks |
+| 全部对抗在 REPORT hash re-bind 后仍拒绝 | dataset 两项 tamper 测试均调用 `_rebind_report_case_hash`（攻击者重锚 REPORT case hash）；evidence 置换测试同步改 entry 的 uri/hash/request_id 后 re-bind | 见上各行（re-bind 内建于 helper） |
+| 复用既有 parser | meta 读取直接 json.load .meta.json（RawWriter 写盘格式；无第二套 lineage 解析） | 代码审查点 |
+
+## P1-01 — ADR-020 Governance Correction（§5）
+
+- **Amendment 2026-08-30**（追加，原文保留）：Status 修正说明（原 ACCEPTED/Deciders 是 Reviewer 复审前开发方预写的 overclaim，如实记录）；C.1 security_master 编组撤回（含与 core capability 冲突的三点论证）；C.2 adj_factor Option B；C.3 classification 表；C.4 anti-bypass；C.5 cross-binding；C.6 治理状态同步（R4-B1 机制性工作 FREEZE 保留）
+
+## Batch D — Adversarial Regression（§7）
+
+- security-master hist denied：ENDPOINT FAIL + BUSINESS fired==0 + approval impossible（2 项新测试）
+- direct approval bypass：6 项（TestApprovalAntiBypass）
+- dataset/evidence/raw-meta tamper：9 项（TestCrossBindingTamper）
+- A3/A2/CR-1 regression：全量 797/0（persistence early-stop / L1 wiring / gate separation / trial boundary / frozen contracts 零回归）
+- 固化错误语义的测试按 §6 改写（不为维持 779/0 保留错误语义）
+
+## Verification Summary
+
+- Local: **797 / 0**（779 → 797，+18：anti-bypass 6 + cross-binding 9 + contract 语义 3；改写 2）；ruff check / ruff format --check / mypy 全绿（退出码严格验证）
+- 既有回归零破坏（A3/A2/CR-1 冻结契约）
+- 边界遵守：未启动 R4-B2 / CR-2（§10）

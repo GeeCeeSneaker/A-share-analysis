@@ -166,3 +166,111 @@ fail closed 是 Runtime Gates 契约（ADR-019）的一贯原则：不可证即�
 管理总册 §61 Change Log：DM-CR-20260828-046（contract + gate）/
 DM-CR-20260828-047（provider/target exact surface）/
 DM-CR-20260828-048（approval 消费 + 对抗测试）。
+
+---
+
+## Amendment 2026-08-30（R4-B1.1，audit 20260830）——correction：合同语义 / Approval Anti-Bypass / Cross-Binding
+
+> **Status 修正说明**：本 ADR 原文写作时（2026-08-28）Status 被记为
+> ACCEPTED 且 Deciders 列入 Design / Audit Review——那是开发方在 Reviewer
+> 正式复审**之前**预写的状态，属 overclaim。Reviewer 于 2026-08-30 复审
+> 裁决 R4-B1 **REOPENED**（3 P0 + 1 P1）。本 amendment 保留原文历史、
+> 记录 REOPEN 事实并修正与运行时真相不一致的结论；修正后的契约以本节
+> 与代码（endpoint_requirements.py）为准。
+
+### C.1 P0-01 修正：security_master 的"官方替代"编组是错的（撤回）
+
+原文 §2.1/§3 声称 `get_code_list`（当前快照）与 `get_hist_code_list`
+（历史重建）是 security_master 的 official alternatives（任一可用即满足
+endpoint proof）。**该结论与项目自己的 core capability 冲突**：
+
+- 正式 spike capability 是 `security_master_with_delisted`——master 必须
+  含 delisted securities（survivorship）；
+- B2 正式语义 probe 调用 `get_hist_code_list` 并用它验证 delisted；
+- R4-B1 的测试甚至固化了"snapshot PASS + hist DENIED → ENDPOINT PASS"
+  的错误预期（靠 BUSINESS gate 兜底——违反 B1-03 分离）。
+
+**修正**：`BaseData.get_hist_code_list` = REQUIRED（survivorship 的必要
+条件）；`get_code_list` 从 requirements 中移除，分类
+OPTIONAL_NON_APPROVAL_SURFACE（快照便利面/permission surface）。快照单独
+可用**永不**满足 endpoint proof。测试改写：hist denied → ENDPOINT FAIL
+→ BUSINESS fired==0 → approval impossible。
+
+### C.2 P0-01 修正：adj_factor 双真相（Option B 撤回"各自 REQUIRED"）
+
+原文 §3 Q3 声称 get_adj_factor 与 get_backward_factor "不同数据流、
+不得编组、各自 REQUIRED"，但运行时 contract 只声明了 get_adj_factor——
+ADR 与代码矛盾。**修正（Option B）**：backward-adjustment factor 是当前
+管线不消费的数据流；capability approval 只要求 forward-adjustment
+endpoint（REQUIRED）；`get_backward_factor` 显式分类
+OPTIONAL_NON_APPROVAL_SURFACE 并记录理由。不再存在双重真相。
+
+### C.3 P0-01 新增：SDK_METHOD_CLASSIFICATIONS（全量 method reconcile）
+
+原文只覆盖"contract 的 capability 集合 == registry 的 capability 集合"，
+registry 中每个 sdk_method 的语义仍靠注释解释。**新增**
+`SdkMethodProofClass` 五分类（REQUIRED_ENDPOINT_PROOF /
+ALTERNATIVE_GROUP_MEMBER / OPTIONAL_NON_APPROVAL_SURFACE /
+BUSINESS_SEMANTIC_ONLY / DEPRECATED_NOT_USED）+
+`SDK_METHOD_CLASSIFICATIONS` 表（19 条，含 reason 字段）：**每个 registry
+sdk_method 恰有一条分类**，结构守卫验证
+`set(registry.sdk_methods) == set(classified)` 且 REQUIRED 分类与
+requirements 双向一致——新增/删除 SDK method 必须同步 contract decision。
+
+多方法 capability 的最终分类（可审计理由见代码表）：security_master 三
+方法（hist REQUIRED；code_list/stock_basic 非 approval surface）；
+adj_factor（forward REQUIRED；backward Option B）；industry_taxonomy
+（base_info REQUIRED；constituent/weight/daily 非 approval surface）；
+index_daily（query_kline REQUIRED；get_index_daily 非 approval surface）。
+
+### C.4 P0-02 新增：Approval Anti-Bypass（唯一生产 APPROVED transition）
+
+R4-B1 把 exact endpoint 重验放进 `approve_from_spike_run`，但
+`approve_and_persist_capability()` / `approve_capability()` 仍是 public——
+caller self-declare CapabilityEvidence 即可 APPROVED（绕过全部 formal
+endpoint proof）。**修正**：
+
+- 新增内部 sealed proof object `VerifiedCapabilityApproval`（name /
+  evidence / verified_from_run / endpoint_requirements_proven；
+  空证明禁止构造）——只在 `approve_from_spike_run` 全验证链通过后构造；
+- DB 写 APPROVED 的唯一边界 = private `_persist_verified_capability
+  (conn, verified)`（只接受 verified object，保留 R3-P1-05
+  validate-before-mutate / 单事务 / cache-rebuild 语义）；
+- 旧 public 函数移除：`approve_and_persist_capability` / `approve_capability`
+  消失；测试改用显式命名的 test-only helper
+  （`_approve_and_persist_capability_testonly` /
+  `_approve_capability_in_memory_testonly`，docstring 声明边界）；
+- AST 守卫 ×2：src/ 全模块禁止引用 test-only helper；capability.py 中
+  APPROVED 字面量只允许出现在 governed 边界（_persist_verified_capability
+  / testonly helper / load_approvals）。
+
+### C.5 P0-03 新增：Persisted Identity Cross-Binding（四层精确绑定）
+
+R4-B1 的 REPORT re-check 未核验 provider_dataset/actual_dataset、未要求
+proof case 与 REPORT entry 的 evidence URI/hash 相等、未从 Raw meta 反向
+重验。**修正**（`_require_formal_gate_proof` 重写，返回 proven requirement
+ids 供 verified object 消费）——对每个满足 requirement 的 PASS 证明：
+
+```text
+contract        <-> REPORT entry（endpoint + provider_dataset + capability）
+proof case      <-> REPORT entry（evidence_ref == evidence_uri；
+                    evidence_hash == evidence_hash）
+REPORT entry    <-> persisted Raw meta（sha256(bytes) == entry.evidence_hash）
+Raw meta        <-> contract（endpoint + provider_dataset）与 entry
+                    （request_id）精确相等
+```
+
+任何单点篡改（actual_dataset / provider_dataset / evidence_uri 换成
+permission 证据 / evidence_hash 换另一份合法 hash / case 与 entry 不一致 /
+raw meta endpoint/dataset/request_id tamper）→ fail closed。9 项对抗测试
+全部在"REPORT hash 重新绑定后仍拒绝"的条件下验证。
+
+### C.6 治理状态同步
+
+- R4-B1 原始实现（`b432159`）的机制性工作（exact-match engine /
+  persisted proof / hash-anchored artifact）保留 FREEZE；本 amendment 只
+  修正 contract 语义与 approval 边界；
+- DM 登记：管理总册 §61 DM-CR-20260830-049（语义修正 + classification）/
+  050（anti-bypass）/ 051（cross-binding + 对抗测试）；
+- 原 §2.1 的 listing_surface 编组、§3 Q3 的"各自 REQUIRED"表述按上文
+  C.1/C.2 修正，原文保留供审计追溯。

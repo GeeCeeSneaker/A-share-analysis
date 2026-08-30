@@ -109,7 +109,7 @@ class TestApprovalRefusesTrialAccounts:
         # even with a frozen identity configured, non-matching ids refuse
         _freeze(monkeypatch, _profile(host="h", username="u"))
         with pytest.raises(capability_module.CapabilityGovernanceError):
-            capability_module.approve_and_persist_capability(
+            capability_module._approve_and_persist_capability_testonly(
                 conn, "daily_bar", _evidence(account_profile_id)
             )
 
@@ -123,7 +123,9 @@ class TestApprovalRefusesTrialAccounts:
         with pytest.raises(
             capability_module.CapabilityGovernanceError, match="frozen production identity"
         ):
-            capability_module.approve_and_persist_capability(conn, "daily_bar", _evidence(impostor))
+            capability_module._approve_and_persist_capability_testonly(
+                conn, "daily_bar", _evidence(impostor)
+            )
 
     def test_no_frozen_identity_blocks_all_approval(self, conn, monkeypatch):
         """Fail closed: with nothing frozen (the repo truth today - the
@@ -133,7 +135,7 @@ class TestApprovalRefusesTrialAccounts:
         with pytest.raises(
             capability_module.CapabilityGovernanceError, match="no frozen production"
         ):
-            capability_module.approve_and_persist_capability(
+            capability_module._approve_and_persist_capability_testonly(
                 conn, "daily_bar", _evidence("ACCOUNT_whatever123")
             )
 
@@ -142,7 +144,7 @@ class TestApprovalRefusesTrialAccounts:
         identity (complete, entitlement-verified profile) approves."""
         production = _profile(host="h", username="u")
         _freeze(monkeypatch, production)
-        approved = capability_module.approve_and_persist_capability(
+        approved = capability_module._approve_and_persist_capability_testonly(
             conn, "daily_bar", _evidence(production.account_profile_id)
         )
         assert approved.status == capability_module.CapabilityStatus.APPROVED

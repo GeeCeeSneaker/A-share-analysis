@@ -199,12 +199,20 @@ def _validate_evidence(name: str, evidence: CapabilityEvidence) -> Capability:
     return cap
 
 
-def approve_capability(name: str, evidence: CapabilityEvidence) -> Capability:
-    """In-memory approval with FULL evidence bundle (audit P1-03).
+def _approve_capability_in_memory_testonly(name: str, evidence: CapabilityEvidence) -> Capability:
+    """TEST-ONLY in-memory approval with FULL evidence bundle.
 
-    NOTE (R3-P1-05): prefer approve_and_persist_capability() - it never
-    mutates memory before the DB commit. This in-memory variant remains
-    for tests and is the only mutating path.
+    R4-B1.1 (audit 20260830 P0-02): this is NOT a production approval
+    path. The ONLY production-reachable APPROVED transition is
+    ``approve_from_spike_run`` -> ``_persist_verified_capability``
+    (verified internal proof object). This helper exists solely so
+    tests can exercise evidence validation / registry mechanics
+    without fabricating an entire spike run; it performs the same
+    evidence validation but CANNOT substitute for the formal-run
+    proof chain (endpoint requirements, gate REPORT, Raw identity
+    cross-binding are NOT checked here - by design, the production
+    gate consumes the DB/registry state that only the verified path
+    writes).
     """
     _validate_evidence(name, evidence)
     cap = CAPABILITY_REGISTRY[name]
@@ -218,6 +226,136 @@ def approve_capability(name: str, evidence: CapabilityEvidence) -> Capability:
     )
     CAPABILITY_REGISTRY[name] = approved
     return approved
+
+
+@dataclass(frozen=True)
+class VerifiedCapabilityApproval:
+    """R4-B1.1 (audit 20260830 P0-02): the internal sealed approval
+    proof object.
+
+    Constructed ONLY inside ``approve_from_spike_run`` AFTER the full
+    verification chain (closed production run / provenance / verdict /
+    formal gate proof / exact endpoint identity cross-binding). The
+    private persistence boundary ``_persist_verified_capability``
+    accepts THIS object - never a caller-constructed
+    ``CapabilityEvidence`` - so a production APPROVED transition cannot
+    be self-declared."""
+
+    name: str
+    evidence: CapabilityEvidence
+    verified_from_run: str
+    endpoint_requirements_proven: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not self.verified_from_run:
+            msg = "VerifiedCapabilityApproval requires the source spike run id"
+            raise CapabilityGovernanceError(msg)
+        if not self.endpoint_requirements_proven:
+            msg = (
+                "VerifiedCapabilityApproval requires the proven endpoint "
+                "requirement ids - fabricating an empty proof is forbidden"
+            )
+            raise CapabilityGovernanceError(msg)
+
+
+def _persist_verified_capability(
+    conn: DuckDBPyConnection, verified: VerifiedCapabilityApproval
+) -> Capability:
+    """R4-B1.1 (audit 20260830 P0-02): the PRIVATE persistence boundary
+    for production APPROVED transitions.
+
+    Only accepts the internal ``VerifiedCapabilityApproval`` constructed
+    by ``approve_from_spike_run`` after its full verification chain. A
+    caller-constructed ``CapabilityEvidence`` can never reach the DB
+    write through this boundary.
+
+    R3-P1-05 validate-before-mutate semantics are preserved: evidence is
+    validated WITHOUT touching the in-memory registry; the DB
+    transaction writes; only AFTER commit is the cache rebuilt from the
+    DB. A failed write leaves the cache exactly as the DB says."""
+    name = verified.name
+    evidence = verified.evidence
+    # pure validation - NO memory mutation (R3-P1-05)
+    _validate_evidence(name, evidence)
+    existing = conn.execute(
+        "SELECT 1 FROM meta_provider_capability WHERE provider = 'amazingdata' AND capability = ?",
+        [name],
+    ).fetchone()
+    conn.execute("BEGIN TRANSACTION")
+    try:
+        if existing is None:
+            conn.execute(
+                "INSERT INTO meta_provider_capability "
+                "(provider, capability, status, spike_report_ref, "
+                "provider_verification_ref, golden_case_refs, dry_run_ref, "
+                "account_profile_id, approved_by, adapter_version, verified_at) "
+                "VALUES ('amazingdata', ?, 'APPROVED', ?, ?, ?, ?, ?, ?, NULL, ?)",
+                [
+                    name,
+                    evidence.spike_report_ref,
+                    evidence.provider_verification_ref,
+                    ",".join(evidence.golden_case_refs),
+                    evidence.dry_run_ref,
+                    evidence.account_profile_id,
+                    evidence.approved_by,
+                    evidence.approved_at,
+                ],
+            )
+        else:
+            # R2-P1-01 12.3: UPDATE touches ONLY governance fields -
+            # existing metadata columns can never be erased
+            conn.execute(
+                "UPDATE meta_provider_capability SET status = 'APPROVED', "
+                "spike_report_ref = ?, provider_verification_ref = ?, "
+                "golden_case_refs = ?, dry_run_ref = ?, account_profile_id = ?, "
+                "approved_by = ?, verified_at = ? "
+                "WHERE provider = 'amazingdata' AND capability = ?",
+                [
+                    evidence.spike_report_ref,
+                    evidence.provider_verification_ref,
+                    ",".join(evidence.golden_case_refs),
+                    evidence.dry_run_ref,
+                    evidence.account_profile_id,
+                    evidence.approved_by,
+                    evidence.approved_at,
+                    name,
+                ],
+            )
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        # restore the cache from the authoritative DB so it never says
+        # APPROVED while the DB does not (R2-P1-01 12.2)
+        load_approvals(conn)
+        raise
+    # post-commit: rebuild the cache from the authoritative table
+    load_approvals(conn)
+    return CAPABILITY_REGISTRY[name]
+
+
+def _approve_and_persist_capability_testonly(
+    conn: DuckDBPyConnection,
+    name: str,
+    evidence: CapabilityEvidence,
+) -> Capability:
+    """TEST-ONLY persisted approval from a caller-built evidence bundle.
+
+    R4-B1.1 (audit 20260830 P0-02): production code MUST use
+    ``approve_from_spike_run`` (verified proof object -> private
+    persistence boundary). This helper exists so tests can exercise
+    the evidence-validation / DB-transaction / cache-rebuild mechanics
+    WITHOUT the formal-run chain. It performs the SAME validation as
+    the old public path (including the positive frozen production
+    identity), so it can never be used to smuggle a fake account - but
+    it deliberately does NOT verify endpoint requirements, because it
+    is not the production gate."""
+    verified = VerifiedCapabilityApproval(
+        name=name,
+        evidence=evidence,
+        verified_from_run=f"testonly:{evidence.spike_report_ref}",
+        endpoint_requirements_proven=("TESTONLY",),
+    )
+    return _persist_verified_capability(conn, verified)
 
 
 # ------------------------------------------ persistence (P1-03 / R2-P1-01)
@@ -249,9 +387,14 @@ FORMAL_GATE_CASE_TYPE = "formal_runtime_gate"
 FORMAL_GATE_PROOF_SUFFIXES = ("PERMISSION", "BUSINESS", "REPORT")
 
 
-def _require_formal_gate_proof(catalog: Any, name: str, run_dir: Any = None) -> None:
-    """R4-A3.1 P0-01 + R4-B1 B1-04: approval requires the capability's
-    formal gate proof.
+def _require_formal_gate_proof(
+    catalog: Any,
+    name: str,
+    run_dir: Any = None,
+    spike_root: Any = None,
+) -> list[str]:
+    """R4-A3.1 P0-01 + R4-B1 B1-04 + R4-B1.1 P0-03: approval requires the
+    capability's formal gate proof.
 
     The proof is emitted ONLY by ``spike.formal_gates`` (the single
     formal gate execution boundary built on RuntimeGatePipeline). A run
@@ -259,8 +402,8 @@ def _require_formal_gate_proof(catalog: Any, name: str, run_dir: Any = None) -> 
     -> approval is refused. Early stop is also caught: a blocked
     pipeline leaves probe-gate cases missing or non-PASS.
 
-    R4-B1 B1-04 (audit 20260828): endpoint proofs are consumed by
-    EXACT ENDPOINT IDENTITY, not by case-id naming alone:
+    Endpoint proofs are consumed by EXACT ENDPOINT IDENTITY, not by
+    case-id naming alone:
 
     - each REQUIRED endpoint requirement must have a passing proof
       case bound to persisted RawWriter evidence;
@@ -268,10 +411,32 @@ def _require_formal_gate_proof(catalog: Any, name: str, run_dir: Any = None) -> 
     - the REPORT artifact (``{run}/gates/{capability}.json``) carries
       the structured identity of every requirement - the artifact is
       re-hashed and compared against the REPORT case's evidence_hash,
-      then every entry is re-checked against the CONTRACT: a tampered
-      or mismatched actual_endpoint fails CLOSED (approval refused)."""
+      then every entry is re-checked against the CONTRACT.
+
+    R4-B1.1 (audit 20260830 P0-03) - FULL cross-binding. For every
+    requirement used to satisfy the proof, ALL four layers must agree
+    EXACTLY:
+
+    .. code-block:: text
+
+        contract        <-> REPORT entry
+        proof case      <-> REPORT entry (evidence URI/hash equality)
+        REPORT entry    <-> persisted Raw meta (re-hashed on disk)
+        Raw meta        <-> contract (endpoint + provider_dataset)
+
+    Specifically re-verified: entry provider_dataset/actual_dataset
+    against the contract; the proof case's evidence_ref/evidence_hash
+    against the REPORT entry; the persisted .meta.json bytes against
+    the entry hash; and the meta's request_id / endpoint /
+    provider_dataset against the entry and the contract. Any single
+    tamper fails CLOSED.
+
+    Returns the list of requirement ids PROVEN (REQUIRED members plus
+    the group members that actually satisfied their group) - consumed
+    by the verified-approval proof object (R4-B1.1 P0-02)."""
     import hashlib
     import json
+    from typing import NoReturn
 
     from ashare_state.providers.amazingdata.endpoint_requirements import (
         EndpointRequirementMode,
@@ -280,44 +445,40 @@ def _require_formal_gate_proof(catalog: Any, name: str, run_dir: Any = None) -> 
     )
     from ashare_state.spike.model import CaseResult
 
+    def _refuse(detail: str) -> NoReturn:
+        raise CapabilityGovernanceError(f"approval refused: {detail}")
+
     by_id = {c.case_id: c for c in catalog.cases}
     for suffix in FORMAL_GATE_PROOF_SUFFIXES:
         case_id = f"GATE-{name}-{suffix}"
         case = by_id.get(case_id)
         if case is None:
-            msg = (
-                f"approval refused: formal runtime gate proof missing for "
-                f"{name!r} ({case_id} not in the run's cases - the formal "
-                "gate boundary is mandatory and cannot be bypassed, audit "
-                "R4-A3.1 P0-01)"
+            _refuse(
+                f"formal runtime gate proof missing for {name!r} ({case_id} "
+                "not in the run's cases - the formal gate boundary is "
+                "mandatory and cannot be bypassed, audit R4-A3.1 P0-01)"
             )
-            raise CapabilityGovernanceError(msg)
         if case.case_type != FORMAL_GATE_CASE_TYPE:
-            msg = (
-                f"approval refused: gate proof case {case_id} has type "
-                f"{case.case_type!r}, expected {FORMAL_GATE_CASE_TYPE!r}"
+            _refuse(
+                f"gate proof case {case_id} has type {case.case_type!r}, "
+                f"expected {FORMAL_GATE_CASE_TYPE!r}"
             )
-            raise CapabilityGovernanceError(msg)
         if case.result is not CaseResult.VALIDATED_PASS:
-            msg = (
-                f"approval refused: formal gate proof {case_id} result is "
-                f"{case.result} - the runtime gate chain did not fully pass "
-                "(audit R4-A3.1 P0-01)"
+            _refuse(
+                f"formal gate proof {case_id} result is {case.result} - the "
+                "runtime gate chain did not fully pass (audit R4-A3.1 P0-01)"
             )
-            raise CapabilityGovernanceError(msg)
 
     # ------------------------------------------------ endpoint proofs (B1-04)
     requirements = endpoint_requirements_for(name)
     if not requirements:
-        msg = (
-            f"approval refused: no endpoint requirements declared for "
-            f"{name!r} - the Endpoint Requirement Contract is the auditable "
-            "truth and must cover every registered capability (audit R4-B1 "
-            "B1-01)"
+        _refuse(
+            f"no endpoint requirements declared for {name!r} - the Endpoint "
+            "Requirement Contract is the auditable truth and must cover "
+            "every registered capability (audit R4-B1 B1-01)"
         )
-        raise CapabilityGovernanceError(msg)
 
-    group_satisfied: dict[str, bool] = {}
+    group_satisfied: dict[str, str | None] = {}
     for req in requirements:
         case_id = endpoint_requirement_case_id(req)
         case = by_id.get(case_id)
@@ -328,96 +489,183 @@ def _require_formal_gate_proof(catalog: Any, name: str, run_dir: Any = None) -> 
             and bool(case.evidence_ref)
             and bool(case.evidence_hash)
         )
-        if req.mode is EndpointRequirementMode.ALTERNATIVE_GROUP:
-            if case_ok and req.group_id:
-                group_satisfied[req.group_id] = True
+        if req.mode is not EndpointRequirementMode.ALTERNATIVE_GROUP:
+            if not case_ok:
+                _refuse(
+                    f"endpoint requirement proof {case_id} for {name!r} is "
+                    "missing or not a persisted-evidence PASS - the exact "
+                    "endpoint identity is a mandatory approval input "
+                    "(audit R4-B1 B1-04)"
+                )
             continue
-        if not case_ok:
-            msg = (
-                f"approval refused: endpoint requirement proof {case_id} for "
-                f"{name!r} is missing or not a persisted-evidence PASS - the "
-                "exact endpoint identity is a mandatory approval input "
-                "(audit R4-B1 B1-04)"
-            )
-            raise CapabilityGovernanceError(msg)
+        group_id = req.group_id or ""
+        if case_ok and group_id and group_id not in group_satisfied:
+            group_satisfied[group_id] = req.requirement_id
     for req in requirements:
+        group_id = req.group_id or ""
         if (
             req.mode is EndpointRequirementMode.ALTERNATIVE_GROUP
-            and req.group_id
-            and not group_satisfied.get(req.group_id, False)
+            and group_id
+            and group_id not in group_satisfied
         ):
-            msg = (
-                f"approval refused: alternative group {req.group_id!r} for "
-                f"{name!r} has no passing member endpoint - the capability's "
-                "endpoint surface is not proven (audit R4-B1 B1-04)"
+            _refuse(
+                f"alternative group {group_id!r} for {name!r} has no "
+                "passing member endpoint - the capability's endpoint "
+                "surface is not proven (audit R4-B1 B1-04)"
             )
-            raise CapabilityGovernanceError(msg)
 
     # ------------------------------------------- REPORT artifact re-check
     # B1-04: re-verify the structured endpoint identities from the
     # hash-anchored artifact - case-id naming alone is NOT trusted.
     report_case = by_id.get(f"GATE-{name}-REPORT")
-    if run_dir is not None and report_case is not None:
-        artifact_path = run_dir / "gates" / f"{name}.json"
-        if not artifact_path.exists():
-            msg = (
-                f"approval refused: gate report artifact missing for {name!r} "
-                f"({artifact_path} - the REPORT case binds it by hash, audit "
-                "R4-B1 B1-04)"
+    if run_dir is None or report_case is None or spike_root is None:
+        # defensive: the formal-run path always supplies both; refuse
+        # rather than skip the cross-binding (fail closed)
+        _refuse(
+            f"gate proof cross-binding for {name!r} requires the run "
+            "directory and spike root - incomplete verification inputs "
+            "(audit R4-B1.1 P0-03)"
+        )
+    artifact_path = Path(run_dir) / "gates" / f"{name}.json"
+    if not artifact_path.exists():
+        _refuse(
+            f"gate report artifact missing for {name!r} ({artifact_path} - "
+            "the REPORT case binds it by hash, audit R4-B1 B1-04)"
+        )
+    artifact_bytes = artifact_path.read_bytes()
+    if hashlib.sha256(artifact_bytes).hexdigest() != report_case.evidence_hash:
+        _refuse(
+            f"gate report artifact for {name!r} does not match the REPORT "
+            "case evidence hash - tampered or stale endpoint identity "
+            "(audit R4-B1 B1-04, fail closed)"
+        )
+    doc = json.loads(artifact_bytes.decode("utf-8"))
+    entries = {e.get("requirement_id"): e for e in doc.get("endpoint_requirements", [])}
+
+    proven: list[str] = []
+    for req in requirements:
+        entry = entries.get(req.requirement_id)
+        if entry is None:
+            _refuse(
+                f"gate report artifact for {name!r} has no entry for "
+                f"requirement {req.requirement_id!r} (audit R4-B1 B1-04)"
             )
-            raise CapabilityGovernanceError(msg)
-        artifact_bytes = artifact_path.read_bytes()
-        if hashlib.sha256(artifact_bytes).hexdigest() != report_case.evidence_hash:
-            msg = (
-                f"approval refused: gate report artifact for {name!r} does "
-                "not match the REPORT case evidence hash - tampered or "
-                "stale endpoint identity (audit R4-B1 B1-04, fail closed)"
+        # ---- contract <-> REPORT entry (B1-04 + B1.1 P0-03: datasets too)
+        if entry.get("expected_endpoint") != req.endpoint:
+            _refuse(
+                f"requirement {req.requirement_id!r} expected_endpoint "
+                f"{entry.get('expected_endpoint')!r} != contract endpoint "
+                f"{req.endpoint!r} (audit R4-B1 B1-04, fail closed)"
             )
-            raise CapabilityGovernanceError(msg)
-        doc = json.loads(artifact_bytes.decode("utf-8"))
-        entries = {e.get("requirement_id"): e for e in doc.get("endpoint_requirements", [])}
-        for req in requirements:
-            entry = entries.get(req.requirement_id)
-            if entry is None:
-                msg = (
-                    f"approval refused: gate report artifact for {name!r} has "
-                    f"no entry for requirement {req.requirement_id!r} "
-                    "(audit R4-B1 B1-04)"
-                )
-                raise CapabilityGovernanceError(msg)
-            if entry.get("expected_endpoint") != req.endpoint:
-                msg = (
-                    f"approval refused: requirement {req.requirement_id!r} "
-                    f"expected_endpoint {entry.get('expected_endpoint')!r} "
-                    f"!= contract endpoint {req.endpoint!r} (audit R4-B1 "
-                    "B1-04, fail closed)"
-                )
-                raise CapabilityGovernanceError(msg)
-            if entry.get("status") != "PASS":
-                if req.mode is EndpointRequirementMode.REQUIRED:
-                    msg = (
-                        f"approval refused: requirement {req.requirement_id!r} "
-                        f"artifact status is {entry.get('status')!r} "
-                        "(audit R4-B1 B1-04, fail closed)"
-                    )
-                    raise CapabilityGovernanceError(msg)
-                continue
-            if entry.get("actual_endpoint") != req.endpoint:
-                msg = (
-                    f"approval refused: requirement {req.requirement_id!r} "
-                    f"actual_endpoint {entry.get('actual_endpoint')!r} does "
-                    f"not match the declared endpoint {req.endpoint!r} - "
-                    "stand-in endpoints are forbidden (audit R4-B1 B1-02, "
-                    "fail closed)"
-                )
-                raise CapabilityGovernanceError(msg)
-            if not entry.get("evidence_uri") or not entry.get("evidence_hash"):
-                msg = (
-                    f"approval refused: requirement {req.requirement_id!r} "
-                    "artifact entry has no persisted evidence binding "
-                    "(audit R4-B1 B1-04, fail closed)"
-                )
-                raise CapabilityGovernanceError(msg)
+        if entry.get("provider_dataset") != req.provider_dataset:
+            _refuse(
+                f"requirement {req.requirement_id!r} provider_dataset "
+                f"{entry.get('provider_dataset')!r} != contract dataset "
+                f"{req.provider_dataset!r} (audit R4-B1.1 P0-03, fail closed)"
+            )
+        if entry.get("capability") != req.capability:
+            _refuse(
+                f"requirement {req.requirement_id!r} artifact capability "
+                f"{entry.get('capability')!r} != contract capability "
+                f"{req.capability!r} (audit R4-B1.1 P0-03, fail closed)"
+            )
+        # ---- is this requirement the one satisfying the proof?
+        group_member_not_satisfying = (
+            req.mode is EndpointRequirementMode.ALTERNATIVE_GROUP
+            and group_satisfied.get(req.group_id or "") != req.requirement_id
+        )
+        if group_member_not_satisfying:
+            # a failing member: tolerated only if another member
+            # satisfies the group - never recorded as proven
+            continue
+        if entry.get("status") != "PASS":
+            _refuse(
+                f"requirement {req.requirement_id!r} artifact status is "
+                f"{entry.get('status')!r} (audit R4-B1 B1-04, fail closed)"
+            )
+        if entry.get("actual_endpoint") != req.endpoint:
+            _refuse(
+                f"requirement {req.requirement_id!r} actual_endpoint "
+                f"{entry.get('actual_endpoint')!r} does not match the "
+                f"declared endpoint {req.endpoint!r} - stand-in endpoints "
+                "are forbidden (audit R4-B1 B1-02, fail closed)"
+            )
+        if entry.get("actual_dataset") != req.provider_dataset:
+            _refuse(
+                f"requirement {req.requirement_id!r} actual_dataset "
+                f"{entry.get('actual_dataset')!r} != contract dataset "
+                f"{req.provider_dataset!r} (audit R4-B1.1 P0-03, fail closed)"
+            )
+        if not entry.get("evidence_uri") or not entry.get("evidence_hash"):
+            _refuse(
+                f"requirement {req.requirement_id!r} artifact entry has no "
+                "persisted evidence binding (audit R4-B1 B1-04, fail closed)"
+            )
+        if not entry.get("request_id"):
+            _refuse(
+                f"requirement {req.requirement_id!r} artifact entry has no "
+                "request id (audit R4-B1.1 P0-03, fail closed)"
+            )
+        # ---- proof case <-> REPORT entry identity equality (B1.1 P0-03)
+        case = by_id.get(endpoint_requirement_case_id(req))
+        if case is None:
+            _refuse(
+                f"endpoint proof case for {req.requirement_id!r} vanished "
+                "between the case scan and the artifact re-check"
+            )
+        if case.evidence_ref != entry.get("evidence_uri"):
+            _refuse(
+                f"requirement {req.requirement_id!r} proof case "
+                f"evidence_ref {case.evidence_ref!r} != REPORT entry "
+                f"evidence_uri {entry.get('evidence_uri')!r} - the case and "
+                "the report disagree about which evidence proves the "
+                "endpoint (audit R4-B1.1 P0-03, fail closed)"
+            )
+        if case.evidence_hash != entry.get("evidence_hash"):
+            _refuse(
+                f"requirement {req.requirement_id!r} proof case "
+                f"evidence_hash != REPORT entry evidence_hash - the case "
+                "and the report disagree about the evidence bytes (audit "
+                "R4-B1.1 P0-03, fail closed)"
+            )
+        # ---- REPORT entry <-> persisted Raw meta reverse verification
+        meta_path = Path(spike_root) / str(entry.get("evidence_uri"))
+        if not meta_path.exists():
+            _refuse(
+                f"requirement {req.requirement_id!r} persisted evidence "
+                f"{meta_path} does not exist (audit R4-B1.1 P0-03)"
+            )
+        meta_bytes = meta_path.read_bytes()
+        if hashlib.sha256(meta_bytes).hexdigest() != entry.get("evidence_hash"):
+            _refuse(
+                f"requirement {req.requirement_id!r} persisted evidence "
+                "bytes do not match the REPORT entry hash - tampered raw "
+                "meta (audit R4-B1.1 P0-03, fail closed)"
+            )
+        meta_doc = json.loads(meta_bytes.decode("utf-8"))
+        if meta_doc.get("request_id") != entry.get("request_id"):
+            _refuse(
+                f"requirement {req.requirement_id!r} raw meta request_id "
+                f"{meta_doc.get('request_id')!r} != REPORT entry "
+                f"{entry.get('request_id')!r} (audit R4-B1.1 P0-03, fail closed)"
+            )
+        if meta_doc.get("endpoint") != req.endpoint:
+            _refuse(
+                f"requirement {req.requirement_id!r} raw meta endpoint "
+                f"{meta_doc.get('endpoint')!r} != contract endpoint "
+                f"{req.endpoint!r} (audit R4-B1.1 P0-03, fail closed)"
+            )
+        if meta_doc.get("provider_dataset") != req.provider_dataset:
+            _refuse(
+                f"requirement {req.requirement_id!r} raw meta "
+                f"provider_dataset {meta_doc.get('provider_dataset')!r} != "
+                f"contract dataset {req.provider_dataset!r} (audit "
+                "R4-B1.1 P0-03, fail closed)"
+            )
+        proven.append(req.requirement_id)
+    if not proven:
+        _refuse(f"no endpoint requirement was actually proven for {name!r} (audit R4-B1.1 P0-03)")
+    return proven
 
 
 def approve_from_spike_run(
@@ -496,9 +744,13 @@ def approve_from_spike_run(
     # capability proof never executed the RuntimeGatePipeline cannot
     # approve anything. This closes the bypass: gate evidence is not an
     # optional helper, it is consumed by the approval path.
-    # R4-B1 B1-04: run_dir is passed so the endpoint identities are
-    # re-verified against the hash-anchored REPORT artifact.
-    _require_formal_gate_proof(catalog, name, run_dir=store.run_dir(run))
+    # R4-B1 B1-04 + R4-B1.1 P0-03: run_dir AND spike_root are passed so
+    # the endpoint identities are cross-bound against the hash-anchored
+    # REPORT artifact AND the persisted Raw meta (contract <-> case <->
+    # REPORT <-> raw meta, all four layers exact).
+    proven_requirements = _require_formal_gate_proof(
+        catalog, name, run_dir=store.run_dir(run), spike_root=store.spike_root
+    )
     cases = {c.case_id: c for c in catalog.cases}
     for ref in capability_case_refs:
         case = cases.get(ref)
@@ -517,79 +769,17 @@ def approve_from_spike_run(
         approved_at=run.ended_at or "",
         account_profile_id=run.account_profile_id,
     )
-    return approve_and_persist_capability(conn, name, evidence)
-
-
-def approve_and_persist_capability(
-    conn: DuckDBPyConnection,
-    name: str,
-    evidence: CapabilityEvidence,
-) -> Capability:
-    """The ONLY public approval path (audit R2-P1-01 + R3-P1-05).
-
-    R3-P1-05 validate-before-mutate: evidence is validated WITHOUT touching
-    the in-memory registry; the DB transaction writes; only AFTER commit is
-    the cache rebuilt from the DB. A failed write leaves the cache exactly
-    as the DB says - no stale APPROVED can survive even when the DB has no
-    prior row for the capability.
-    """
-    # pure validation - NO memory mutation (R3-P1-05)
-    _validate_evidence(name, evidence)
-    existing = conn.execute(
-        "SELECT 1 FROM meta_provider_capability WHERE provider = 'amazingdata' AND capability = ?",
-        [name],
-    ).fetchone()
-    conn.execute("BEGIN TRANSACTION")
-    try:
-        if existing is None:
-            conn.execute(
-                "INSERT INTO meta_provider_capability "
-                "(provider, capability, status, spike_report_ref, "
-                "provider_verification_ref, golden_case_refs, dry_run_ref, "
-                "account_profile_id, approved_by, adapter_version, verified_at) "
-                "VALUES ('amazingdata', ?, 'APPROVED', ?, ?, ?, ?, ?, ?, NULL, ?)",
-                [
-                    name,
-                    evidence.spike_report_ref,
-                    evidence.provider_verification_ref,
-                    ",".join(evidence.golden_case_refs),
-                    evidence.dry_run_ref,
-                    evidence.account_profile_id,
-                    evidence.approved_by,
-                    evidence.approved_at,
-                ],
-            )
-        else:
-            # R2-P1-01 12.3: UPDATE touches ONLY governance fields -
-            # existing metadata columns can never be erased
-            conn.execute(
-                "UPDATE meta_provider_capability SET status = 'APPROVED', "
-                "spike_report_ref = ?, provider_verification_ref = ?, "
-                "golden_case_refs = ?, dry_run_ref = ?, account_profile_id = ?, "
-                "approved_by = ?, verified_at = ? "
-                "WHERE provider = 'amazingdata' AND capability = ?",
-                [
-                    evidence.spike_report_ref,
-                    evidence.provider_verification_ref,
-                    ",".join(evidence.golden_case_refs),
-                    evidence.dry_run_ref,
-                    evidence.account_profile_id,
-                    evidence.approved_by,
-                    evidence.approved_at,
-                    name,
-                ],
-            )
-        conn.execute("COMMIT")
-    except Exception:
-        conn.execute("ROLLBACK")
-        # memory was mutated by approve_capability above -> restore from
-        # the authoritative DB so cache never says APPROVED while DB
-        # does not (R2-P1-01 12.2)
-        load_approvals(conn)
-        raise
-    # post-commit: rebuild the cache from the authoritative table
-    load_approvals(conn)
-    return CAPABILITY_REGISTRY[name]
+    # R4-B1.1 (audit 20260830 P0-02): the ONLY production-reachable
+    # APPROVED transition - build the internal verified proof object
+    # (only constructible here, after the full verification chain) and
+    # hand it to the private persistence boundary.
+    verified = VerifiedCapabilityApproval(
+        name=name,
+        evidence=evidence,
+        verified_from_run=spike_run_id,
+        endpoint_requirements_proven=tuple(proven_requirements),
+    )
+    return _persist_verified_capability(conn, verified)
 
 
 def load_approvals(conn: DuckDBPyConnection) -> dict[str, CapabilityStatus]:

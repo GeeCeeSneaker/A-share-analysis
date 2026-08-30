@@ -862,10 +862,6 @@ def _probe_calendar(ctx: ProbeContext) -> ProviderExchange:
     return ctx.target.get_calendar_exchange()
 
 
-def _probe_code_list(ctx: ProbeContext) -> ProviderExchange:
-    return ctx.target.get_code_list_exchange()
-
-
 def _probe_hist_code_list(ctx: ProbeContext) -> ProviderExchange:
     return ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 19900101, ctx.as_of_date)
 
@@ -926,9 +922,11 @@ def _probe_industry_base_info(ctx: ProbeContext) -> ProviderExchange:
 #: exchange envelope does not match the declared endpoint/dataset is a
 #: blocking FAIL at evaluation time; there is deliberately NO way to
 #: hand the gate a stand-in endpoint.
+#: R4-B1.1: security_master:BaseData.get_code_list removed - the
+#: current-snapshot listing is a NON-APPROVAL surface (survivorship is
+#: proven by the HISTORICAL endpoint, audit 20260830 P0-01).
 ENDPOINT_PROBE_SPECS: dict[str, Callable[[ProbeContext], ProviderExchange]] = {
     "trade_calendar:BaseData.get_calendar": _probe_calendar,
-    "security_master:BaseData.get_code_list": _probe_code_list,
     "security_master:BaseData.get_hist_code_list": _probe_hist_code_list,
     "code_mapping_bj:InfoData.get_bj_code_mapping": _probe_bj_code_mapping,
     "daily_bar:MarketData.query_kline": _probe_kline_600519,

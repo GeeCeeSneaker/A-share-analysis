@@ -33,9 +33,12 @@ import pytest
 from ashare_state.providers.amazingdata.capability import CAPABILITY_REGISTRY
 from ashare_state.providers.amazingdata.endpoint_requirements import (
     ENDPOINT_REQUIREMENTS,
+    SDK_METHOD_CLASSIFICATIONS,
     EndpointRequirementMode,
+    SdkMethodProofClass,
     endpoint_requirement_case_id,
     endpoint_requirements_for,
+    sdk_method_classifications_for,
     validate_endpoint_requirements,
 )
 from ashare_state.providers.amazingdata.provider import RawEnvelope
@@ -153,27 +156,15 @@ class _DeniedCodeListTarget(FakeTarget):
         raise error
 
 
-class _SecurityMasterAllDeniedTarget(FakeTarget):
-    """BOTH members of the listing_surface ALTERNATIVE_GROUP are denied
-    - the group can never be satisfied. The PERMISSION probe (the shared
-    entitlement surface, EXTRA_STOCK_A) still succeeds so the block is
-    attributable to the ENDPOINT gate."""
-
-    def get_code_list_exchange(self, security_type=None):
-        if security_type == "EXTRA_STOCK_A":
-            # the shared permission-probe surface stays available
-            return super().get_code_list_exchange(security_type)
-        # the listing requirement probe (full-market, no args) is denied
-        env = RawEnvelope(
-            provider="amazingdata",
-            provider_dataset="code_list",
-            endpoint="BaseData.get_code_list",
-            status="ERROR",
-            error_class="ProviderPermissionError",
-        )
-        error = ProviderPermissionError("entitlement denied")
-        error.exchange = ProviderExchange(envelope=env, payload=None)
-        raise error
+class _SecurityMasterHistDeniedTarget(FakeTarget):
+    """R4-B1.1 (audit 20260830 P0-01): the current-snapshot listing
+    (get_code_list) is available but the HISTORICAL rebuild
+    (get_hist_code_list) is DENIED. security_master is
+    security_master_with_delisted - the survivorship requirement makes
+    the historical endpoint REQUIRED, so the snapshot alone must NOT
+    satisfy the endpoint proof. The shared permission-probe surface
+    (EXTRA_STOCK_A) stays available so the block is attributable to
+    the ENDPOINT gate."""
 
     def get_hist_code_list_exchange(self, security_type, start_date, end_date):
         env = RawEnvelope(
@@ -224,9 +215,51 @@ class TestEndpointRequirementContract:
         groups: dict[str, list[str]] = {}
         for req in ENDPOINT_REQUIREMENTS:
             if req.mode is EndpointRequirementMode.ALTERNATIVE_GROUP:
-                groups.setdefault(req.group_id, []).append(req.requirement_id)
+                groups.setdefault(req.group_id or "", []).append(req.requirement_id)
         for group_id, members in groups.items():
             assert len(members) >= 2, group_id
+
+    def test_security_master_hist_endpoint_is_required(self):
+        """R4-B1.1 (audit 20260830 P0-01): the survivorship requirement
+        of security_master_with_delisted makes the HISTORICAL listing
+        endpoint REQUIRED - the current-snapshot get_code_list is NOT
+        an endpoint requirement (withdrawn 'official alternatives')."""
+        reqs = endpoint_requirements_for("security_master")
+        assert [r.endpoint for r in reqs] == ["BaseData.get_hist_code_list"]
+        assert all(r.mode is EndpointRequirementMode.REQUIRED for r in reqs)
+
+    def test_every_registry_sdk_method_is_explicitly_classified(self):
+        """R4-B1.1 (audit 20260830 section 2.3): every registry
+        sdk_method has an explicit classification entry - no method may
+        be silently present or absent from the proof contract."""
+        classified = {(e.capability, e.endpoint) for e in SDK_METHOD_CLASSIFICATIONS}
+        registry_pairs = {
+            (name, method)
+            for name, cap in CAPABILITY_REGISTRY.items()
+            for method in cap.sdk_methods
+        }
+        assert classified == registry_pairs, (
+            f"unclassified={sorted(registry_pairs - classified)}, "
+            f"stale={sorted(classified - registry_pairs)}"
+        )
+
+    def test_adj_factor_backward_factor_is_option_b(self):
+        """R4-B1.1 (audit 20260830 section 2.2): the ADR-020 'each
+        REQUIRED' overclaim is resolved per Option B - only the
+        forward-adjustment endpoint is a requirement; backward factor
+        is explicitly OPTIONAL_NON_APPROVAL_SURFACE with a reason."""
+        classifications = {e.endpoint: e for e in sdk_method_classifications_for("adj_factor")}
+        assert classifications["BaseData.get_adj_factor"].classification is (
+            SdkMethodProofClass.REQUIRED_ENDPOINT_PROOF
+        )
+        assert classifications["BaseData.get_backward_factor"].classification is (
+            SdkMethodProofClass.OPTIONAL_NON_APPROVAL_SURFACE
+        )
+        assert classifications["BaseData.get_backward_factor"].reason
+        # the runtime contract agrees with Option B
+        assert [r.endpoint for r in endpoint_requirements_for("adj_factor")] == [
+            "BaseData.get_adj_factor"
+        ]
 
 
 @pytest.mark.integration
@@ -311,67 +344,60 @@ class TestExactEndpointProof:
         for req in endpoint_requirements_for("daily_bar"):
             assert _case_by_id(ctx, endpoint_requirement_case_id(req)) is None
 
-    def test_alternative_group_all_members_denied_is_fail(self, tmp_path: Path):
-        """security_master: BOTH listing_surface members denied - the
-        group is unsatisfied and the gate FAILs."""
-        ctx = _ctx(tmp_path, target=_SecurityMasterAllDeniedTarget())
+    def test_hist_denied_snapshot_available_is_endpoint_fail(self, tmp_path: Path):
+        """R4-B1.1 (audit 20260830 P0-01): security_master is
+        security_master_with_delisted - with get_code_list PASS but
+        get_hist_code_list DENIED, the ENDPOINT gate FAILS (the
+        snapshot is a non-approval surface), the pipeline early-stops,
+        and the business probe never fires."""
+        ctx = _ctx(tmp_path, target=_SecurityMasterHistDeniedTarget())
         executor = FormalRuntimeGateExecutor(ctx)
         bound = executor.execute(GATE_PLAN_SPECS["security_master"](ctx))
 
         assert not bound.report.all_passed
+        assert bound.report.early_stopped
         assert bound.report.blocked_by is GateKind.ENDPOINT_AVAILABLE
         endpoint_result = next(
             r for r in bound.report.results if r.kind is GateKind.ENDPOINT_AVAILABLE
         )
-        assert "listing_surface" in endpoint_result.reason
-        # both member probes fired (each denial is its own evidence)
-        assert all(p.fired == 1 for p in bound.endpoint_probes.values())
-        assert len(bound.endpoint_probes) == 2
+        assert endpoint_result.status is GateStatus.FAIL
+        assert "get_hist_code_list" in endpoint_result.reason
+        # the failure exchange is persisted and the proof case is FAIL
+        req = endpoint_requirements_for("security_master")[0]
+        assert req.endpoint == "BaseData.get_hist_code_list"
+        outcome = bound.endpoint_outcomes[req.requirement_id]
+        assert outcome.status is GateStatus.FAIL
+        assert outcome.actual_endpoint == req.endpoint
+        assert outcome.binding is not None
+        case = _case_by_id(ctx, endpoint_requirement_case_id(req))
+        assert case is not None
+        assert case.result is CaseResult.VALIDATED_FAIL
+        # early stop: the business probe (the hist business fetch)
+        # never fired - the endpoint gate blocked it first
+        assert bound.probes[GateKind.BUSINESS_DATA].fired == 0
 
-    def test_alternative_group_single_member_pass_is_pass(self, tmp_path: Path):
-        """security_master with the historical member denied: the group
-        is still satisfied by get_code_list - the ENDPOINT gate PASSes
-        (the BUSINESS gate independently FAILs on its own hist fetch -
-        separation of concerns, B1-03)."""
+    def test_snapshot_alone_can_never_satisfy_the_proof(self, tmp_path: Path):
+        """The R4-B1 'official alternatives' grouping, withdrawn
+        (audit 20260830 P0-01): a snapshot-only world (hist endpoint
+        denied) can NEVER approve security_master - the endpoint proof
+        case is VALIDATED_FAIL and the REPORT artifact records the
+        honest failure (which the approval cross-binding refuses)."""
+        import json
 
-        class _HistDeniedTarget(FakeTarget):
-            def get_hist_code_list_exchange(self, security_type, start_date, end_date):
-                env = RawEnvelope(
-                    provider="amazingdata",
-                    provider_dataset="hist_code_list",
-                    endpoint="BaseData.get_hist_code_list",
-                    status="ERROR",
-                    error_class="ProviderPermissionError",
-                )
-                error = ProviderPermissionError("denied")
-                error.exchange = ProviderExchange(envelope=env, payload=None)
-                raise error
-
-        ctx = _ctx(tmp_path, target=_HistDeniedTarget())
-        executor = FormalRuntimeGateExecutor(ctx)
-        bound = executor.execute(GATE_PLAN_SPECS["security_master"](ctx))
-
-        # the ENDPOINT gate itself passed: the group is satisfied by the
-        # surviving member even though the other member failed
-        endpoint_result = next(
-            r for r in bound.report.results if r.kind is GateKind.ENDPOINT_AVAILABLE
+        ctx = _ctx(tmp_path, target=_SecurityMasterHistDeniedTarget())
+        out = probe_b1_formal_gates(ctx)
+        assert out["capabilities"]["security_master"] == "BLOCKED_BY_ENDPOINT_AVAILABLE"
+        req = endpoint_requirements_for("security_master")[0]
+        case = _case_by_id(ctx, endpoint_requirement_case_id(req))
+        assert case is not None
+        assert case.result is CaseResult.VALIDATED_FAIL
+        artifact = ctx.store.run_dir(ctx.run) / "gates" / "security_master.json"
+        doc = json.loads(artifact.read_text(encoding="utf-8"))
+        entry = next(
+            e for e in doc["endpoint_requirements"] if e["requirement_id"] == req.requirement_id
         )
-        assert endpoint_result.status is GateStatus.PASS
-        assert (
-            not bound.report.early_stopped
-            or bound.report.blocked_by is not GateKind.ENDPOINT_AVAILABLE
-        )
-        # the failing member still emitted its (failure) proof case with
-        # the CORRECT endpoint identity recorded
-        failing = endpoint_requirements_for("security_master")[1]
-        failing_case = _case_by_id(ctx, endpoint_requirement_case_id(failing))
-        assert failing_case is not None
-        assert failing_case.result is CaseResult.VALIDATED_FAIL
-        # the surviving member's case is PASS
-        surviving = endpoint_requirements_for("security_master")[0]
-        surviving_case = _case_by_id(ctx, endpoint_requirement_case_id(surviving))
-        assert surviving_case is not None
-        assert surviving_case.result is CaseResult.VALIDATED_PASS
+        assert entry["status"] == "FAIL"
+        assert entry["actual_endpoint"] == req.endpoint
 
 
 @pytest.mark.integration
