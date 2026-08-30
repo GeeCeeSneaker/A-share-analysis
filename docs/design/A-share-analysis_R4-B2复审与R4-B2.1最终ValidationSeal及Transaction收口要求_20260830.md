@@ -676,7 +676,7 @@ Mandatory adversarial §3.3 九项全对应（全部 re-bind report hash 后仍 
 [✓] latest-head / legacy / atomic republish frozen 机制零回归
 [✓] R4-B1/A3/A2/CR-1 frozen contracts 零回归（全量 848/0）
 [✓] migration-from-zero（12 链）+ upgrade path green
-[ ] full Windows 3.12 / Windows 3.14 / Ubuntu 3.14 CI green（推送后正向确认回填）
+[✓] full Windows 3.12 / Windows 3.14 / Ubuntu 3.14 CI green（run 33310045925 三腿 success，implementation `317ac488c00c6b406311a29f25ff062e312df3a3`，2026-08-30 API positive confirmation，一次通过零修复轮次）
 [✓] DEVLOG / DEVELOPMENT_MANAGEMENT / ADR-021 amendment 与 runtime 真相一致
 ```
 
