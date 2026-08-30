@@ -916,6 +916,10 @@ def _probe_industry_base_info(ctx: ProbeContext) -> ProviderExchange:
     return ctx.target.get_industry_base_info_exchange(["600519.SH"])
 
 
+def _probe_industry_constituent(ctx: ProbeContext) -> ProviderExchange:
+    return ctx.target.get_industry_constituent_exchange(["600519.SH"])
+
+
 #: R4-B1 B1-02: the EXACT probe factory for every declared endpoint
 #: requirement (keyed by requirement_id - the same contract the
 #: ENDPOINT gate and capability approval consume). A probe whose
@@ -936,6 +940,7 @@ ENDPOINT_PROBE_SPECS: dict[str, Callable[[ProbeContext], ProviderExchange]] = {
     "corporate_action:InfoData.get_right_issue": _probe_right_issue,
     "equity_structure:InfoData.get_equity_structure": _probe_equity_structure,
     "industry_taxonomy:InfoData.get_industry_base_info": _probe_industry_base_info,
+    "industry_taxonomy:InfoData.get_industry_constituent": _probe_industry_constituent,
     "index_daily:MarketData.query_kline": _probe_kline_index,
 }
 

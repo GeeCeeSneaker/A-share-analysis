@@ -390,3 +390,44 @@ B. caller-self-declare APPROVED 是否从生产 src 中真正结构性消失
 ```
 
 Cross-binding engine、security_master historical requirement、A3/A2/CR-1 frozen contracts除非出现可复现 regression，不再重审。
+
+---
+
+# 7. Implementation Mapping（开发方填写，2026-08-30）
+
+## P0-01 — Approval Anti-Bypass 结构性关闭（§2，Preferred Option A）
+
+| Requirement（§2.3/§2.4） | Implementation | Tests |
+|---|---|---|
+| Option A：生产模块彻底不存在"无需 formal run 即可写 APPROVED"的 callable | `_approve_capability_in_memory_testonly` / `_approve_and_persist_capability_testonly` / `VerifiedCapabilityApproval` / `_persist_verified_capability` **全部从 capability.py 删除**；持久化事务（validate-before-mutate / 单事务 / cache-rebuild / UPDATE-only-governance-fields）**inline 进 `approve_from_spike_run` 尾部**——caller 到达写入点必已通过完整验证链（closed PRODUCTION / frozen identity / verdict / formal gate proof / 四层 cross-binding / golden refs） | test_src_approval_bypass_callables_are_gone + test_only_the_formal_run_path_persists_approved |
+| 测试 mechanics 放 tests/ fixture/helper | 新增 `tests/integration/_capability_test_persistence.py`（approve_in_memory_testonly / approve_and_persist_testonly——复刻 evidence 验证 / DB 事务 / cache rebuild mechanics；docstring 声明非生产路径）；test_capability_governance / test_trial_production_boundary 迁移至此 | 两个迁移测试文件全过（88/0 局部） |
+| import capability._approve_and_persist_capability_testonly → 应不存在 | hasattr 断言 ×6（含 VerifiedCapabilityApproval / _persist_verified_capability / 两个旧 public 名） | test_src_approval_bypass_callables_are_gone |
+| construct VerifiedCapabilityApproval with fake nonempty fields → 不能写 APPROVED | 类不存在——`capability_module.VerifiedCapabilityApproval(...)` raises AttributeError；DB 无行 | test_fabricated_verified_object_cannot_be_constructed |
+| direct-call any src persistence helper without a real formal run → 不能写 APPROVED | 无任何该类 helper 存在（AST 守卫：capability.py 中唯一引用 APPROVED 状态（literal / SQL 字符串内含 / CapabilityStatus 属性，排除 docstring）的函数是 `approve_from_spike_run`，且其签名无 evidence/verified 参数） | test_only_approve_from_spike_run_writes_approved |
+| caller-built CapabilityEvidence + frozen production id → 仍不能写 APPROVED | patch 合法 frozen identity 后构造最强伪造 evidence——六个 approval-shaped callable 全部不存在（hasattr 断言）；DB status 为 None | test_caller_built_evidence_with_frozen_id_still_cannot_approve |
+| only approve_from_spike_run with real closed proof chain can transition DB to APPROVED | happy 链（closed PRODUCTION run + 完整 proof fixture）→ approve_from_spike_run → APPROVED 行 + spike_report_ref 记录来源 | test_only_the_formal_run_path_persists_approved + test_failed_endpoint_requirement_has_no_bypass（失败链拒绝后 DB/cache 一致） |
+| 结构守卫：无函数仅靠 CapabilityEvidence/"verified object" 即可到达 APPROVED 写入 | AST 守卫（见上）；另有 src/ 全模块不 import tests.* 的 AST 扫描（tests helper 不可被生产代码引用） | test_only_approve_from_spike_run_writes_approved + test_production_src_never_imports_test_modules |
+
+## P0-02 — industry_taxonomy Constituent REQUIRED（§3）
+
+| Requirement（§3.2/§3.3） | Implementation | Tests |
+|---|---|---|
+| get_industry_base_info = REQUIRED（保持） | requirements 表既有条目不变 | test_every_capability_proves_its_exact_endpoint |
+| get_industry_constituent = REQUIRED | `industry_taxonomy:InfoData.get_industry_constituent` 加入 ENDPOINT_REQUIREMENTS；classification 改 REQUIRED_ENDPOINT_PROOF（reason 绑定 bridge_industry_member 交付语义）；provider/target 新增 exact exchange `get_industry_constituent_exchange`（provider + Protocol + RealTarget + FakeTarget 四处同步）+ probe factory | test_canonical_deliverable_required_surfaces_match_requirements |
+| weight/daily 依据当前消费边界决定（可保持 OPTIONAL 但理由明确） | 维持 OPTIONAL_NON_APPROVAL_SURFACE，reason 显式："NOT consumed by the current bridge_industry_member construction (membership is built from base_info + constituent); revisit if a canonical/feature consumer starts requiring weights/daily" | 同上（canonical_required 集合不含 weight/daily） |
+| base_info PASS + constituent DENIED → ENDPOINT_FAIL + business zero call + 失败 exchange 持久化 + proof case VALIDATED_FAIL + approval impossible | `_ConstituentDeniedTarget`（base_info 正常，constituent 一等失败 exchange）：ENDPOINT FAIL（reason 含 get_industry_constituent）→ early-stopped → blocked_by=ENDPOINT_AVAILABLE → BUSINESS fired==0 → constituent outcome 绑定持久化 meta（identity 正确）→ proof case VALIDATED_FAIL → b1 阶段 BLOCKED_BY_* → REPORT entry status=FAIL | test_base_info_pass_constituent_denied_is_endpoint_fail + test_constituent_denied_run_cannot_be_approved |
+| 结构守卫：canonical deliverable required surfaces ↔ REQUIRED endpoint requirements | 显式测试 pin 每个多端点 capability 的必要端点集合：security_master={hist_code_list}；adj_factor={get_adj_factor}；corporate_action={get_dividend,get_right_issue}；industry_taxonomy={get_industry_base_info,get_industry_constituent}；index_daily={query_kline}——与 endpoint_requirements_for() 集合相等 | test_canonical_deliverable_required_surfaces_match_requirements |
+
+## 治理（§4）
+
+- ADR-020 Amendment R4-B1.2（D.1 Option A closure / D.2 industry constituent / D.3 计数更正 19→18 / D.4 状态同步——Amendment C.4 的"verified object"设计被证明依赖命名约定，按 D.1 修正，原文保留供审计追溯）
+- DEVELOPMENT_MANAGEMENT.md：头部（R4-B1.1 REOPENED 大部分 FREEZE + R4-B1.2 ACTIVE + Governance Count Correction 行）+ §40/§41 重写 + §61 DM-CR-20260830-052/053
+- DEVLOG.md 顶部新条目（2026-08-30 R4-B1.2）
+- 本 Implementation Mapping
+
+## Verification Summary
+
+- Local: **801 / 0**（797 → 801）；ruff check / ruff format --check / mypy 全绿（退出码严格验证）
+- contract 结构：requirements 12 条 / classifications 18 条（Reviewer 更正后的正确计数——constituent 是修改既有条目 classification，非新增）；`set(registry.sdk_methods) == set(classified)` 通过；validate 零违规
+- 既有回归零破坏：四层 cross-binding tamper（9）/ exact-match engine / persistence early-stop / trial boundary / governance（迁移 helper）/ dry-run 全相位
+- 边界遵守：未启动 R4-B2（BLOCKED until R4-B1.2 VERIFIED）

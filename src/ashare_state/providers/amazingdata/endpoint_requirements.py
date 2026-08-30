@@ -223,6 +223,19 @@ ENDPOINT_REQUIREMENTS: tuple[EndpointRequirement, ...] = (
         endpoint="InfoData.get_industry_base_info",
         provider_dataset="industry_taxonomy",
     ),
+    # R4-B1.2 (audit 20260830 P0-02): the canonical deliverable of
+    # industry_taxonomy is bridge_industry_member - security <->
+    # industry MEMBERSHIP. base_info alone proves the taxonomy
+    # definition/identity surface; the constituent membership surface
+    # is REQUIRED: with base_info PASS and constituent DENIED the
+    # capability cannot reliably build bridge_industry_member, so the
+    # endpoint proof must FAIL.
+    EndpointRequirement(
+        requirement_id="industry_taxonomy:InfoData.get_industry_constituent",
+        capability="industry_taxonomy",
+        endpoint="InfoData.get_industry_constituent",
+        provider_dataset="industry_taxonomy",
+    ),
     # index_daily: official endpoint is the kline surface with an
     # index code list (dataset label is the provider fact "daily_bar").
     EndpointRequirement(
@@ -332,25 +345,39 @@ SDK_METHOD_CLASSIFICATIONS: tuple[SdkMethodClassification, ...] = (
         capability="industry_taxonomy",
         endpoint="InfoData.get_industry_base_info",
         classification=SdkMethodProofClass.REQUIRED_ENDPOINT_PROOF,
-        reason="the taxonomy base-info endpoint (classification identity source)",
+        reason="taxonomy definition/identity surface of bridge_industry_member",
     ),
     SdkMethodClassification(
         capability="industry_taxonomy",
         endpoint="InfoData.get_industry_constituent",
-        classification=SdkMethodProofClass.OPTIONAL_NON_APPROVAL_SURFACE,
-        reason="industry constituents detail - semantic-probe material, not approval surface",
+        classification=SdkMethodProofClass.REQUIRED_ENDPOINT_PROOF,
+        reason=(
+            "security <-> industry MEMBERSHIP surface - the core "
+            "deliverable of bridge_industry_member (R4-B1.2 audit "
+            "20260830 P0-02: proving a representative endpoint != "
+            "proving the capability's necessary delivery surface)"
+        ),
     ),
     SdkMethodClassification(
         capability="industry_taxonomy",
         endpoint="InfoData.get_industry_weight",
         classification=SdkMethodProofClass.OPTIONAL_NON_APPROVAL_SURFACE,
-        reason="index-weight detail - semantic-probe material, not approval surface",
+        reason=(
+            "index-weight detail is NOT consumed by the current "
+            "bridge_industry_member construction (membership is built "
+            "from base_info + constituent); revisit if a canonical/feature "
+            "consumer starts requiring weights"
+        ),
     ),
     SdkMethodClassification(
         capability="industry_taxonomy",
         endpoint="InfoData.get_industry_daily",
         classification=SdkMethodProofClass.OPTIONAL_NON_APPROVAL_SURFACE,
-        reason="industry daily series - semantic-probe material, not approval surface",
+        reason=(
+            "industry daily series is NOT consumed by the current "
+            "bridge_industry_member construction; revisit if a "
+            "canonical/feature consumer starts requiring it"
+        ),
     ),
     SdkMethodClassification(
         capability="index_daily",

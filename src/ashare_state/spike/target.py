@@ -63,6 +63,7 @@ class SpikeTarget(Protocol):
     def get_bj_code_mapping_exchange(self, code_list: list[str]) -> Any: ...
     def get_equity_structure_exchange(self, code_list: list[str]) -> Any: ...
     def get_industry_base_info_exchange(self, code_list: list[str]) -> Any: ...
+    def get_industry_constituent_exchange(self, code_list: list[str]) -> Any: ...
     def get_calendar_exchange(self, market: str = "SH") -> Any: ...
     def query_kline_exchange(
         self,
@@ -140,6 +141,9 @@ class RealTarget:
 
     def get_industry_base_info_exchange(self, code_list: list[str]) -> ProviderExchange:
         return self.provider.get_industry_base_info_exchange(code_list)
+
+    def get_industry_constituent_exchange(self, code_list: list[str]) -> ProviderExchange:
+        return self.provider.get_industry_constituent_exchange(code_list)
 
     def get_calendar_exchange(self, market: str = "SH") -> ProviderExchange:
         return self.provider.get_calendar_exchange(market)
@@ -541,6 +545,21 @@ class FakeTarget:
         ]
         return _fake_exchange(
             "InfoData.get_industry_base_info",
+            "industry_taxonomy",
+            rows,
+            params={"code_list": list(code_list)},
+        )
+
+    def get_industry_constituent_exchange(self, code_list: list[str]) -> ProviderExchange:
+        """Fake industry-constituent membership rows (R4-B1.2 P0-02):
+        the bridge_industry_member deliverable surface."""
+        self._mark("get_industry_constituent")
+        rows = [
+            {"SECURITY_CODE": code.split(".")[0], "SW_INDUSTRY_CODE": "310000"}
+            for code in code_list
+        ]
+        return _fake_exchange(
+            "InfoData.get_industry_constituent",
             "industry_taxonomy",
             rows,
             params={"code_list": list(code_list)},

@@ -140,6 +140,26 @@ class _DeniedIndustryTarget(FakeTarget):
         raise error
 
 
+class _ConstituentDeniedTarget(FakeTarget):
+    """R4-B1.2 (audit 20260830 P0-02): base_info PASSES but the
+    CONSTITUENT membership endpoint is DENIED - the
+    bridge_industry_member deliverable cannot be built, so the
+    endpoint proof must FAIL (proving a representative endpoint !=
+    proving the capability's necessary delivery surface)."""
+
+    def get_industry_constituent_exchange(self, code_list: list[str]):
+        env = RawEnvelope(
+            provider="amazingdata",
+            provider_dataset="industry_taxonomy",
+            endpoint="InfoData.get_industry_constituent",
+            status="ERROR",
+            error_class="ProviderPermissionError",
+        )
+        error = ProviderPermissionError("entitlement denied")
+        error.exchange = ProviderExchange(envelope=env, payload=None)
+        raise error
+
+
 class _DeniedCodeListTarget(FakeTarget):
     """The PERMISSION probe is refused (entitlement denied)."""
 
@@ -398,6 +418,110 @@ class TestExactEndpointProof:
         )
         assert entry["status"] == "FAIL"
         assert entry["actual_endpoint"] == req.endpoint
+
+
+@pytest.mark.integration
+class TestIndustryConstituentRequiredSurface:
+    """R4-B1.2 P0-02 (audit 20260830): the canonical deliverable of
+    industry_taxonomy is bridge_industry_member - security <->
+    industry MEMBERSHIP. base_info alone proves the taxonomy
+    definition surface; constituent is REQUIRED, so base_info PASS +
+    constituent DENIED must FAIL the endpoint proof."""
+
+    def test_base_info_pass_constituent_denied_is_endpoint_fail(self, tmp_path: Path):
+        """base_info PASS + constituent DENIED -> ENDPOINT FAIL ->
+        early stop -> BUSINESS probe fired == 0; the constituent
+        failure exchange is persisted and its proof case is
+        VALIDATED_FAIL -> approval impossible."""
+        ctx = _ctx(tmp_path, target=_ConstituentDeniedTarget())
+        executor = FormalRuntimeGateExecutor(ctx)
+        bound = executor.execute(GATE_PLAN_SPECS["industry_taxonomy"](ctx))
+
+        assert not bound.report.all_passed
+        assert bound.report.early_stopped
+        assert bound.report.blocked_by is GateKind.ENDPOINT_AVAILABLE
+        endpoint_result = next(
+            r for r in bound.report.results if r.kind is GateKind.ENDPOINT_AVAILABLE
+        )
+        assert endpoint_result.status is GateStatus.FAIL
+        assert "get_industry_constituent" in endpoint_result.reason
+        # base_info PASSED, constituent FAILED
+        outcomes = {
+            req.requirement_id: bound.endpoint_outcomes[req.requirement_id]
+            for req in endpoint_requirements_for("industry_taxonomy")
+        }
+        base_req = next(
+            r
+            for r in endpoint_requirements_for("industry_taxonomy")
+            if r.endpoint.endswith("get_industry_base_info")
+        )
+        const_req = next(
+            r
+            for r in endpoint_requirements_for("industry_taxonomy")
+            if r.endpoint.endswith("get_industry_constituent")
+        )
+        assert outcomes[base_req.requirement_id].status is GateStatus.PASS
+        assert outcomes[const_req.requirement_id].status is GateStatus.FAIL
+        # the failure exchange is persisted and bound (correct identity)
+        const_outcome = outcomes[const_req.requirement_id]
+        assert const_outcome.actual_endpoint == const_req.endpoint
+        assert const_outcome.binding is not None
+        assert const_outcome.binding.evidence_uri.endswith(".meta.json")
+        # the proof cases record the split verdict
+        assert (
+            _case_by_id(ctx, endpoint_requirement_case_id(base_req)).result
+            is CaseResult.VALIDATED_PASS
+        )
+        const_case = _case_by_id(ctx, endpoint_requirement_case_id(const_req))
+        assert const_case is not None
+        assert const_case.result is CaseResult.VALIDATED_FAIL
+        # early stop: the business probe never fired
+        assert bound.probes[GateKind.BUSINESS_DATA].fired == 0
+
+    def test_constituent_denied_run_cannot_be_approved(self, tmp_path: Path):
+        """Full B1 chain: with constituent denied, b1 marks the
+        capability BLOCKED - approval cannot happen (the failing proof
+        case + honest REPORT entry refuse it downstream)."""
+        import json
+
+        ctx = _ctx(tmp_path, target=_ConstituentDeniedTarget())
+        out = probe_b1_formal_gates(ctx)
+        assert out["capabilities"]["industry_taxonomy"].startswith("BLOCKED_BY")
+        artifact = ctx.store.run_dir(ctx.run) / "gates" / "industry_taxonomy.json"
+        doc = json.loads(artifact.read_text(encoding="utf-8"))
+        statuses = {e["requirement_id"]: e["status"] for e in doc["endpoint_requirements"]}
+        const_req = next(
+            r
+            for r in endpoint_requirements_for("industry_taxonomy")
+            if r.endpoint.endswith("get_industry_constituent")
+        )
+        assert statuses[const_req.requirement_id] == "FAIL"
+
+    def test_canonical_deliverable_required_surfaces_match_requirements(self):
+        """Structural guard (audit 20260830 section 3.3): for every
+        multi-endpoint capability, the REQUIRED endpoint requirements
+        must match the canonical deliverable's necessary surfaces - a
+        declared sdk_method being classified OPTIONAL while the
+        deliverable needs it is exactly the R4-B1.1 form-compliant /
+        semantically-distorted failure this guard prevents."""
+        # the canonical-deliverable necessary surfaces, pinned per
+        # multi-endpoint capability (design decision, explicit)
+        canonical_required = {
+            "security_master": {"BaseData.get_hist_code_list"},
+            "adj_factor": {"BaseData.get_adj_factor"},
+            "corporate_action": {"InfoData.get_dividend", "InfoData.get_right_issue"},
+            "industry_taxonomy": {
+                "InfoData.get_industry_base_info",
+                "InfoData.get_industry_constituent",
+            },
+            "index_daily": {"MarketData.query_kline"},
+        }
+        for capability, expected in canonical_required.items():
+            actual = {r.endpoint for r in endpoint_requirements_for(capability)}
+            assert actual == expected, (
+                f"{capability}: REQUIRED surfaces {sorted(actual)} != canonical "
+                f"deliverable surfaces {sorted(expected)}"
+            )
 
 
 @pytest.mark.integration

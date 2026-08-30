@@ -21,6 +21,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.integration._capability_test_persistence import (
+    approve_and_persist_testonly,
+)
 
 from ashare_state.providers.amazingdata import capability as capability_module
 from ashare_state.providers.amazingdata import production_identity as pi
@@ -109,9 +112,7 @@ class TestApprovalRefusesTrialAccounts:
         # even with a frozen identity configured, non-matching ids refuse
         _freeze(monkeypatch, _profile(host="h", username="u"))
         with pytest.raises(capability_module.CapabilityGovernanceError):
-            capability_module._approve_and_persist_capability_testonly(
-                conn, "daily_bar", _evidence(account_profile_id)
-            )
+            approve_and_persist_testonly(conn, "daily_bar", _evidence(account_profile_id))
 
     def test_arbitrary_account_id_cannot_approve_without_positive_match(self, conn, monkeypatch):
         """R4-A3.1 P0-03 core fix: the fail-open hole - an arbitrary
@@ -123,9 +124,7 @@ class TestApprovalRefusesTrialAccounts:
         with pytest.raises(
             capability_module.CapabilityGovernanceError, match="frozen production identity"
         ):
-            capability_module._approve_and_persist_capability_testonly(
-                conn, "daily_bar", _evidence(impostor)
-            )
+            approve_and_persist_testonly(conn, "daily_bar", _evidence(impostor))
 
     def test_no_frozen_identity_blocks_all_approval(self, conn, monkeypatch):
         """Fail closed: with nothing frozen (the repo truth today - the
@@ -135,16 +134,14 @@ class TestApprovalRefusesTrialAccounts:
         with pytest.raises(
             capability_module.CapabilityGovernanceError, match="no frozen production"
         ):
-            capability_module._approve_and_persist_capability_testonly(
-                conn, "daily_bar", _evidence("ACCOUNT_whatever123")
-            )
+            approve_and_persist_testonly(conn, "daily_bar", _evidence("ACCOUNT_whatever123"))
 
     def test_exact_frozen_identity_can_approve(self, conn, monkeypatch):
         """The positive allowlist path: an EXACT match with the frozen
         identity (complete, entitlement-verified profile) approves."""
         production = _profile(host="h", username="u")
         _freeze(monkeypatch, production)
-        approved = capability_module._approve_and_persist_capability_testonly(
+        approved = approve_and_persist_testonly(
             conn, "daily_bar", _evidence(production.account_profile_id)
         )
         assert approved.status == capability_module.CapabilityStatus.APPROVED

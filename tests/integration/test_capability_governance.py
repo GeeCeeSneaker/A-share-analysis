@@ -12,6 +12,10 @@ from pathlib import Path
 
 import duckdb
 import pytest
+from tests.integration._capability_test_persistence import (
+    approve_and_persist_testonly,
+    approve_in_memory_testonly,
+)
 
 from ashare_state.providers.amazingdata import capability as capability_module
 from ashare_state.storage import apply_migrations
@@ -87,9 +91,7 @@ class TestCapabilityGovernance:
         with pytest.raises(
             capability_module.CapabilityGovernanceError, match="evidence incomplete"
         ):
-            capability_module._approve_and_persist_capability_testonly(
-                duckdb.connect(":memory:"), "daily_bar", broken
-            )
+            approve_and_persist_testonly(duckdb.connect(":memory:"), "daily_bar", broken)
 
     def test_retired_refuses_approval(self):
         evidence = capability_module.CapabilityEvidence(**EVIDENCE_KWARGS)
@@ -101,14 +103,14 @@ class TestCapabilityGovernance:
             status=capability_module.CapabilityStatus.RETIRED,
         )
         with pytest.raises(capability_module.CapabilityGovernanceError, match="RETIRED"):
-            capability_module._approve_capability_in_memory_testonly("daily_bar", evidence)
+            approve_in_memory_testonly("daily_bar", evidence)
 
     def test_persist_cannot_bypass_evidence(self, conn):
         """R2-P1-01 12.1: the only public path validates evidence first -
         broken evidence never reaches the DB."""
         broken = capability_module.CapabilityEvidence("spike", "pv", ("c",), "dr", "by", "at", "")
         with pytest.raises(capability_module.CapabilityGovernanceError):
-            capability_module._approve_and_persist_capability_testonly(conn, "daily_bar", broken)
+            approve_and_persist_testonly(conn, "daily_bar", broken)
         row = conn.execute(
             "SELECT count(*) FROM meta_provider_capability WHERE capability='daily_bar'"
         ).fetchone()
@@ -117,7 +119,7 @@ class TestCapabilityGovernance:
     def test_approval_survives_process_restart(self, conn):
         """The core P1-03 scenario: DB authoritative across restarts."""
         evidence = capability_module.CapabilityEvidence(**EVIDENCE_KWARGS)
-        capability_module._approve_and_persist_capability_testonly(conn, "daily_bar", evidence)
+        approve_and_persist_testonly(conn, "daily_bar", evidence)
         # simulate restart: fresh module state
         importlib.reload(capability_module)
         assert (
@@ -140,7 +142,7 @@ class TestCapabilityGovernance:
             "'EQUITY', 'DAILY', 'SDK', 'galaxy trial')"
         )
         evidence = capability_module.CapabilityEvidence(**EVIDENCE_KWARGS)
-        capability_module._approve_and_persist_capability_testonly(conn, "daily_bar", evidence)
+        approve_and_persist_testonly(conn, "daily_bar", evidence)
         row = conn.execute(
             "SELECT asset_class, frequency, transport, permission_note, status "
             "FROM meta_provider_capability WHERE capability='daily_bar'"
@@ -154,7 +156,7 @@ class TestCapabilityGovernance:
     def test_db_candidate_demotes_cached_approved(self, conn):
         """R2-P1-01 12.4: DB CANDIDATE actively overrides a stale cache."""
         evidence = capability_module.CapabilityEvidence(**EVIDENCE_KWARGS)
-        capability_module._approve_and_persist_capability_testonly(conn, "daily_bar", evidence)
+        approve_and_persist_testonly(conn, "daily_bar", evidence)
         assert (
             capability_module.capability_status("daily_bar")
             == capability_module.CapabilityStatus.APPROVED
@@ -171,7 +173,7 @@ class TestCapabilityGovernance:
 
     def test_load_restores_account_profile_and_verified_at(self, conn):
         evidence = capability_module.CapabilityEvidence(**EVIDENCE_KWARGS)
-        capability_module._approve_and_persist_capability_testonly(conn, "daily_bar", evidence)
+        approve_and_persist_testonly(conn, "daily_bar", evidence)
         importlib.reload(capability_module)
         capability_module.load_approvals(conn)
         cap = capability_module.CAPABILITY_REGISTRY["daily_bar"]

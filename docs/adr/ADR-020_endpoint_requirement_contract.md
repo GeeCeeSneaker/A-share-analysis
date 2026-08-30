@@ -274,3 +274,43 @@ raw meta endpoint/dataset/request_id tamper）→ fail closed。9 项对抗测�
   050（anti-bypass）/ 051（cross-binding + 对抗测试）；
 - 原 §2.1 的 listing_surface 编组、§3 Q3 的"各自 REQUIRED"表述按上文
   C.1/C.2 修正，原文保留供审计追溯。
+
+---
+
+## Amendment 2026-08-30（R4-B1.2，audit 20260830 15:42）——Final Approval Boundary / Industry Endpoint Closure
+
+> **关联 Reviewer Verdict**：`docs/design/A-share-analysis_R4-B1.1复审与R4-B1.2最终ApprovalBoundary及IndustryEndpoint收口要求_20260830.md`（REVIEWED HEAD `c2e572d1073c48ae93a4bc57373830ba92306054`）。
+> 复审裁决：R4-B1.1 大部分 PASS / FREEZE（四层 cross-binding VERIFIED 冻结、security_master 撤回编组正确、classification 守卫正确）；**2 个 P0 blocker** 由本 amendment 修正。
+
+### D.1 P0-01 修正：Approval Anti-Bypass 结构性关闭（Option A）
+
+Amendment C.4 的"verified object + private boundary"仍是 Python 命名约定而非访问控制：`_approve_and_persist_capability_testonly()` 可被显式 import；`VerifiedCapabilityApproval` 是普通可实例化 dataclass（`__post_init__` 只查非空），caller 可伪造后直调 `_persist_verified_capability()`——后者只重做 `_validate_evidence`，不重验 formal run。
+
+**修正（Reviewer Preferred Option A）**：生产模块**彻底不存在**"无需 formal run 即可写 APPROVED"的 callable——
+
+- `_approve_capability_in_memory_testonly` / `_approve_and_persist_capability_testonly` / `VerifiedCapabilityApproval` / `_persist_verified_capability` 全部从 `capability.py` 删除；
+- 持久化事务（validate-before-mutate / 单事务 / cache-rebuild / UPDATE-only-governance-fields）**inline 进 `approve_from_spike_run` 尾部**——caller 到达写入点必已通过完整验证链（closed PRODUCTION run / frozen identity / verdict / formal gate proof / 四层 cross-binding / golden refs）；
+- 测试所需的 transaction/cache mechanics 移入 `tests/integration/_capability_test_persistence.py`（tests/ 内，生产 src 不 import test 模块——AST 守卫）；
+- 对抗测试改为**真实绕过尝试**（伪造 verified object → 类不存在；caller-built evidence + frozen id → 无 importable 路由；AST 守卫：capability.py 中唯一引用 APPROVED 状态的函数是 `approve_from_spike_run` 且其签名无 evidence/verified 参数；src 不 import tests.*）。
+
+### D.2 P0-02 修正：industry_taxonomy constituent 端点 REQUIRED
+
+Amendment C.3 把 `get_industry_constituent` 分类为 OPTIONAL_NON_APPROVAL_SURFACE——**过弱**：capability 名为 `industry_taxonomy`、canonical domain 为 `bridge_industry_member`，其核心交付物是 security ↔ industry **membership**；仅 `get_industry_base_info` 只证明 taxonomy definition/identity surface。base_info PASS + constituent DENIED 时 ENDPOINT gate 仍 PASS 并允许 APPROVED，但系统无法可靠构建 `bridge_industry_member`——与 security_master 问题同构（证明代表性 endpoint ≠ 证明必要交付面）。
+
+**修正**：
+
+- `industry_taxonomy:InfoData.get_industry_constituent` = **REQUIRED_ENDPOINT_PROOF**（requirements 表 + classification 同步；reason 绑定 bridge_industry_member 交付语义）；
+- `get_industry_weight` / `get_industry_daily` 维持 OPTIONAL_NON_APPROVAL_SURFACE，但 reason 显式指向**当前消费边界**（"bridge_industry_member 的 membership 构建不消费 weights/daily；若未来 canonical/feature consumer 需要，重新评估"）；
+- provider/target 新增 exact exchange surface `get_industry_constituent_exchange`（provider + Protocol + RealTarget + FakeTarget 四处同步）；
+- 新增对抗测试：base_info PASS + constituent DENIED → ENDPOINT FAIL → early-stop → BUSINESS fired==0 → 失败 exchange 持久化绑定 → proof case VALIDATED_FAIL → approval impossible；
+- **canonical-deliverable 结构守卫**（新测试）：multi-endpoint capability 的 REQUIRED requirements 集合 == canonical 交付面必要端点集合（security_master={hist}；adj_factor={forward}；corporate_action={dividend,right_issue}；industry_taxonomy={base_info,constituent}；index_daily={query_kline}）——防止"全部 sdk_methods 已分类但必要 method 被分 optional"的形式合规、语义失真再次发生。
+
+### D.3 P1 更正：分类表计数（治理文档数字错误）
+
+Amendment C.3 写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"——Reviewer 逐项计数实际为 **18 条**（trade_calendar 1 + security_master 3 + code_mapping_bj 1 + daily_bar 1 + security_status_history 1 + adj_factor 2 + corporate_action 2 + equity_structure 1 + industry_taxonomy 4 + index_daily 2）。结构守卫 `set(registry.sdk_methods) == set(classified)` 本身通过，故为**治理文档数字错误，非 runtime 缺项**。本 amendment 更正为 18 条；R4-B1.2 将 constituent 从 OPTIONAL 改为 REQUIRED **不改变条目数**（修改既有条目的 classification，非新增），当前表仍为 18 条。
+
+### D.4 治理状态同步
+
+- R4-B1.1 的四层 cross-binding / security_master 撤回编组 / classification 结构守卫等 PASS 项 FREEZE（除非可复现 regression 不再重审）；
+- DM 登记：管理总册 §61 DM-CR-20260830-052（Option A anti-bypass）/ DM-CR-20260830-053（industry constituent REQUIRED）；
+- ADR-020 Amendment C.4 的"verified object"设计按 D.1 修正（原文保留供审计追溯——该设计被证明依赖命名约定而非结构边界）。

@@ -7,13 +7,14 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：R4-B1.1 implementation `6f323f38d72c3a8d7ed83430904d19316bcf93a3`（run 33295780707 三腿 success，2026-08-30 API positive confirmation）；基于 Reviewer 复审 HEAD `5d63295c5f9702ee3b7af927289643a653787361`（run 33179456562 三腿 success，Reviewer job-level 正向核验）；R4-B1 implementation `b432159d3b7d5b8e1b693c7704202ea0c73f6d5b`（run 33179092630 三腿 success）  
-> **Document Revision**：DM-CR-20260830-049 / 050 / 051  
-> **Last Review**：2026-08-30 13:02 +08:00（R4-B1 复审：**REOPENED**——机制性建设 PASS / FREEZE（typed primitive / exact-match engine / persisted proof / hash-anchored artifact 等 13 项）；3 P0 + 1 P1：P0-01 contract 语义错误（security_master 假"官方替代"编组 / adj_factor ADR 与代码双真相 / sdk_methods 未全量 reconcile）、P0-02 approval 仍可 caller-self-declare 绕过（approve_and_persist_capability / approve_capability public）、P0-03 cross-binding 不完整（dataset 未验 / case↔entry 无 identity equality / Raw meta 无反向重验）、P1-01 ADR-020 overclaim；随 R4-B1.1 收口，见 §41/§61/ADR-020 Amendment 2026-08-30）  
+> **Current Code Baseline**：R4-B1.2 implementation（本批，2026-08-30）——基于 Reviewer 复审 HEAD `c2e572d1073c48ae93a4bc57373830ba92306054`（run 33295951987 三腿 success，Reviewer step-level 正向核验）；R4-B1.1 implementation `6f323f38d72c3a8d7ed83430904d19316bcf93a3`（run 33295780707 三腿 success）；本批完整 40-char SHA 于推送后回填  
+> **Document Revision**：DM-CR-20260830-049 / 050 / 051 / 052 / 053  
+> **Last Review**：2026-08-30 15:42 +08:00（R4-B1.1 复审：**REOPENED**——大部分 PASS / FREEZE（四层 cross-binding VERIFIED 冻结 / security_master 撤回编组正确 / classification exact-set 守卫正确 / CI green 等 15 项）；2 个 P0 blocker：P0-01 Approval Anti-Bypass 仍是 Python 命名约定非结构性边界（testonly helper 可显式 import / VerifiedCapabilityApproval 可伪造后直调 _persist_verified_capability）、P0-02 industry_taxonomy 只 REQUIRED base_info 却把 constituent 标 optional（与 canonical deliverable bridge_industry_member 不一致）；随 R4-B1.2 收口，见 §41/§61/ADR-020 Amendment R4-B1.2）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN——run 33295780707（R4-B1.1 implementation `6f323f38d72c3a8d7ed83430904d19316bcf93a3`）三腿 success**（2026-08-30 API positive confirmation；R4-B1.1 新增 18 项 anti-bypass/cross-binding/semantic 测试 797/0 在 Ubuntu+Windows 两 OS 通过，一次通过零修复轮次）；run 33179456562（`5d63295`，Reviewer job-level 正向核验的 R4-B1 复审基线）三腿 success；run 33179092630（R4-B1 `b432159`）三腿 success  
+> **CI Status**：run 33295951987（`c2e572d`，Reviewer step-level 正向核验的 R4-B1.1 复审基线）三腿 success；run 33295780707（R4-B1.1 `6f323f3`）三腿 success；本批（R4-B1.2，801 tests）CI 结果待推送后正向确认回填  
 > **Phase Status（2026-08-30，Reviewer 裁决同步）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 → **DONE / REOPENED**（修正项由 R4-B1.1 承接）；R4-B1.1 → **DONE / PENDING_REVIEW**（本批：Endpoint Contract Semantics + Approval Anti-Bypass + Persisted Identity Cross-Binding）；R4-B2 → **BLOCKED until R4-B1.1 VERIFIED**；CR-2 → sequenced after R4-B2；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 → **DONE / REOPENED**；R4-B1.1 → **DONE / REOPENED（cross-binding + security_master reconciliation PASS/FREEZE）**；R4-B1.2 → **DONE / PENDING_REVIEW**（本批：Final Approval Boundary Option A + Industry Constituent REQUIRED）；R4-B2 → **BLOCKED until R4-B1.2 VERIFIED**；CR-2 → sequenced after R4-B2；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
 > **SHA Correction（Reviewer，2026-08-26）**：上批记录的 `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` 有误，以 GitHub commit object 为准：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`（本头部即为修正记录；历史条目原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
@@ -1081,9 +1082,10 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | VERIFIED (absorbed) | PASS |
 | R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | **VERIFIED** | **R4-A2.x / CR-1.x 审计链 CLOSED（2026-08-26）** |
 | R4-A3 / R4-A3.1 / R4-A3.2 SDK Lifecycle / Gates / Early-Stop 链 | DONE | **CLOSED / VERIFIED / FREEZE** | 全链闭环（Reviewer 2026-08-28 裁决，不重开） |
-| R4-B1 Capability Endpoint Proof | DONE | REOPENED → 修正随 R4-B1.1 | 机制性建设 PASS / FREEZE；contract 语义 / anti-bypass / cross-binding 修正于 R4-B1.1 |
-| R4-B1.1 Endpoint Contract Semantics + Approval Anti-Bypass + Cross-Binding | DONE | PENDING_REVIEW | 最高优先（本批：语义 reconcile + 唯一 APPROVED transition + 四层精确绑定；待复核） |
-| R4-B2 Publish Validation Exactness | PLANNED | **BLOCKED until R4-B1.1 VERIFIED** | — |
+| R4-B1 Capability Endpoint Proof | DONE | REOPENED | 机制性建设 PASS / FREEZE；修正项由 R4-B1.1/B1.2 逐层收口 |
+| R4-B1.1 Endpoint Contract Semantics + Cross-Binding | DONE | REOPENED（大部分 PASS / FREEZE） | cross-binding + security_master reconciliation VERIFIED 冻结；anti-bypass 与 industry 语义修正于 R4-B1.2 |
+| R4-B1.2 Final Approval Boundary + Industry Endpoint Closure | DONE | PENDING_REVIEW | 最高优先（本批：Option A 结构性 anti-bypass + constituent REQUIRED；待复核） |
+| R4-B2 Publish Validation Exactness | PLANNED | **BLOCKED until R4-B1.2 VERIFIED** | — |
 | CR-2 Provider-Normalized + Quarantine | PLANNED | sequenced after R4-B2 | — |
 | R4-CI | PLANNED | PENDING | Next |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
@@ -1097,77 +1099,80 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-B1.1 Endpoint Contract Semantics + Approval Anti-Bypass + Persisted Identity Cross-Binding（本批，DONE / PENDING_REVIEW）
+## R4-B1.2 Final Approval Boundary + Industry Endpoint Closure（本批，DONE / PENDING_REVIEW）
 
-R4-B1 复审（2026-08-30 13:02 +08:00）裁决 **REOPENED**：机制性建设
-（typed primitive / exact-match engine / persisted proof / hash-anchored
-artifact 等 13 项）PASS / FREEZE；3 P0 + 1 P1 由本批收口（ADR-020
-Amendment 2026-08-30；工作要求
-`docs/design/A-share-analysis_R4-B1复审与R4-B1.1合同语义及ApprovalAntiBypass收口要求_20260830.md`）：
+R4-B1.1 复审（2026-08-30 15:42 +08:00）裁决 **REOPENED**：大部分 PASS /
+FREEZE（四层 cross-binding VERIFIED 冻结 / security_master 撤回编组
+正确 / classification exact-set 守卫正确 / CI green 等 15 项）；2 个 P0
+blocker 由本批收口（ADR-020 Amendment R4-B1.2；工作要求
+`docs/design/A-share-analysis_R4-B1.1复审与R4-B1.2最终ApprovalBoundary及IndustryEndpoint收口要求_20260830.md`）：
 
 ```text
-P0-01 Endpoint Requirement Contract 语义修正（DM-CR-20260830-049）：
-  security_master：撤回"官方替代"编组——spike capability 是
-    security_master_with_delisted（survivorship core），
-    BaseData.get_hist_code_list = REQUIRED；get_code_list 移出
-    requirements（OPTIONAL_NON_APPROVAL_SURFACE，快照便利面）——
-    快照单独可用永不满足 endpoint proof
-  adj_factor：ADR-020 "各自 REQUIRED" 与代码双真相 -> Option B 撤回：
-    approval 只要求 forward-adjustment endpoint（REQUIRED）；
-    get_backward_factor 显式分类 OPTIONAL_NON_APPROVAL_SURFACE
-  全量 method reconcile：SDK_METHOD_CLASSIFICATIONS 表（19 条，含
-    reason）——SdkMethodProofClass 五分类
-    （REQUIRED_ENDPOINT_PROOF / ALTERNATIVE_GROUP_MEMBER /
-    OPTIONAL_NON_APPROVAL_SURFACE / BUSINESS_SEMANTIC_ONLY /
-    DEPRECATED_NOT_USED）；结构守卫：set(registry.sdk_methods) ==
-    set(classified) 且 REQUIRED 分类 <-> requirements 双向一致
-    （新增/删除 SDK method 必须同步 contract decision）
-P0-02 Approval Anti-Bypass（DM-CR-20260830-050）：
-  唯一生产 APPROVED transition：approve_from_spike_run（closed run /
-    provenance / verdict / formal gate proof / endpoint cross-binding）
-    -> VerifiedCapabilityApproval（内部 sealed proof object：name /
-    evidence / verified_from_run / endpoint_requirements_proven；空证明
-    禁止构造）-> _persist_verified_capability（private 持久化边界，
-    只接受 verified object；保留 R3-P1-05 validate-before-mutate /
-    单事务 / cache-rebuild）
-  旧 public 绕过路径移除：approve_and_persist_capability /
-    approve_capability 消失（模块命名空间 + AST 守卫）；测试改用显式
-    test-only helper（_approve_and_persist_capability_testonly /
-    _approve_capability_in_memory_testonly，docstring 声明边界）
-  AST 守卫 ×2：src/ 全模块禁止引用 test-only helper；capability.py 中
-    APPROVED 字面量只允许出现在 governed 边界
-P0-03 Persisted Identity Cross-Binding（DM-CR-20260830-051）：
-  _require_formal_gate_proof 重写（返回 proven requirement ids 供
-    verified object 消费）——对每个满足 requirement 的 PASS 证明四层
-    精确绑定：
-    contract <-> REPORT entry（endpoint + provider_dataset + capability）
-    proof case <-> REPORT entry（evidence_ref == evidence_uri；
-      evidence_hash == evidence_hash——case 与 artifact 对"什么证据
-      证明了该端点"必须一致）
-    REPORT entry <-> persisted Raw meta（sha256(bytes) == entry hash）
-    Raw meta <-> contract（endpoint + provider_dataset）与 entry
-      （request_id）
-  9 项对抗测试全部在"REPORT hash 重新绑定后仍拒绝"条件下验证：
-    actual_dataset / provider_dataset tamper；evidence_uri 换成
-    permission 证据；evidence_hash 换另一份合法 hash；case 与 entry
-    evidence_ref / evidence_hash 不一致（双向）；raw meta endpoint /
-    provider_dataset / request_id tamper
-P1-01 ADR-020 governance correction（Amendment 2026-08-30）：
-  记录 REOPEN 事实 + Status overclaim 修正（ACCEPTED 是 Reviewer 复审
-  前开发方预写）；semantic table 修正（C.1/C.2）；classification 表
-  （C.3）；anti-bypass / cross-binding 决策（C.4/C.5）；原文保留供审计
-Batch D 对抗回归：
-  test_alternative_group_single_member_pass_is_pass（固化错误语义的
-    测试）按 Reviewer §6 要求改写为 hist-denied 语义两测试；全量
-    A3/A2/CR-1 冻结回归零破坏
+P0-01 Approval Anti-Bypass 结构性关闭（DM-CR-20260830-052，
+    Reviewer Preferred Option A）：
+  缺陷：R4-B1.1 的"verified object + private boundary"仍是 Python 命名
+    约定非访问控制——_approve_and_persist_capability_testonly() 可被
+    显式 import；VerifiedCapabilityApproval 是普通可实例化 dataclass，
+    caller 伪造后直调 _persist_verified_capability()（只重做
+    _validate_evidence，不重验 formal run）即可 APPROVED。
+  修正（Option A）：生产模块彻底不存在"无需 formal run 即可写
+    APPROVED"的 callable——
+    - 四个 bypass 入口全部删除（_approve_capability_in_memory_testonly
+      / _approve_and_persist_capability_testonly /
+      VerifiedCapabilityApproval / _persist_verified_capability）
+    - 持久化事务（validate-before-mutate / 单事务 / cache-rebuild /
+      UPDATE-only-governance-fields）inline 进 approve_from_spike_run
+      尾部——caller 到达写入点必已通过完整验证链
+    - 测试所需 transaction/cache mechanics 移入
+      tests/integration/_capability_test_persistence.py（tests/ 内）
+    - 对抗测试改为真实绕过尝试：伪造 verified object -> 类不存在；
+      caller-built evidence + frozen id -> 无 importable 路由；
+      AST 守卫：capability.py 中唯一引用 APPROVED 状态（literal / SQL
+      字符串 / CapabilityStatus 属性，排除 docstring）的函数是
+      approve_from_spike_run 且签名无 evidence/verified 参数；
+      src/ 全模块不 import tests.*（AST 扫描）
+P0-02 industry_taxonomy constituent 端点 REQUIRED（DM-CR-20260830-053）：
+  缺陷：capability 名为 industry_taxonomy、canonical domain 为
+    bridge_industry_member（核心交付物 = security <-> industry
+    MEMBERSHIP），但只 REQUIRED base_info（taxonomy definition surface）
+    而 constituent 被标 optional——base_info PASS + constituent DENIED
+    时 ENDPOINT gate 仍 PASS 并可 APPROVED，但 bridge_industry_member
+    无法可靠构建（与 security_master 问题同构：证明代表性 endpoint
+    != 证明必要交付面）。
+  修正：
+    - industry_taxonomy:InfoData.get_industry_constituent =
+      REQUIRED_ENDPOINT_PROOF（requirements + classification 同步，reason
+      绑定 bridge_industry_member 交付语义）
+    - get_industry_weight / get_industry_daily 维持 OPTIONAL，reason
+      显式指向当前消费边界（membership 构建不消费；consumer 变化时
+      重新评估）
+    - provider/target 新增 exact exchange surface
+      get_industry_constituent_exchange（四处同步）
+    - 对抗测试：base_info PASS + constituent DENIED -> ENDPOINT FAIL ->
+      early-stop -> BUSINESS fired==0 -> 失败 exchange 持久化绑定 ->
+      proof case VALIDATED_FAIL -> approval impossible
+    - canonical-deliverable 结构守卫（新测试）：multi-endpoint
+      capability 的 REQUIRED requirements 集合 == canonical 交付面必要
+      端点集合（security_master={hist}；adj_factor={forward}；
+      corporate_action={dividend,right_issue}；industry_taxonomy=
+      {base_info,constituent}；index_daily={query_kline}）——防止
+      "全部 sdk_methods 已分类但必要 method 被分 optional"的形式合规
+      语义失真再次发生
+P1 治理计数更正（Reviewer 补充裁决）：ADR-020 Amendment C.3 的
+    "19 条"经 Reviewer 逐项计数实为 18 条（治理文档数字错误非 runtime
+    缺项）；R4-B1.2 amendment D.3 更正（constituent 是修改既有条目
+    classification 非新增，当前表仍为 18 条）
+Batch D：R4-B1.1 的 anti-bypass 测试集按 Option A 现实重写（7 项真实
+    绕过尝试）；A3/A2/CR-1/B1 冻结契约零回归
 ```
 
-### R4-B1（前批，REOPENED → 修正随 R4-B1.1）
+### R4-B1 / R4-B1.1（前批）
 
-机制性建设（exact-match engine / per-requirement proof case /
-hash-anchored REPORT artifact / 三个新 exact exchange surface）保留
-FREEZE；contract 语义 / anti-bypass / cross-binding 由 R4-B1.1 收口
-（详见 ADR-020 Amendment 2026-08-30）。
+R4-B1 机制性建设（exact-match engine / per-requirement proof case /
+hash-anchored REPORT artifact）与 R4-B1.1 的四层 cross-binding /
+security_master 撤回编组 / classification 守卫全部 FREEZE 保留
+（Reviewer 2026-08-30 裁决：除非可复现 regression 不再重审）；各自复审
+指出的缺口由 R4-B1.1 / R4-B1.2 逐层收口（详见 ADR-020 各 amendment）。
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
@@ -1771,6 +1776,28 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260830-053 — Industry Constituent REQUIRED Endpoint Proof
+
+**Type**：C1 contract 语义修正（必要交付面）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-B1.2 P0-02（audit 20260830 §3）——industry_taxonomy 的 canonical deliverable 是 bridge_industry_member（security ↔ industry MEMBERSHIP），但 R4-B1.1 把 constituent 标为 OPTIONAL_NON_APPROVAL_SURFACE：base_info PASS + constituent DENIED 时 ENDPOINT gate 仍 PASS 并可 APPROVED，而 bridge_industry_member 无法可靠构建（证明代表性 endpoint ≠ 证明必要交付面，与 security_master 问题同构）。  
+**New Contract**（ADR-020 Amendment D.2）：`industry_taxonomy:InfoData.get_industry_constituent` = REQUIRED_ENDPOINT_PROOF（requirements 表 + classification 同步，reason 绑定 bridge_industry_member 交付语义）；`get_industry_weight` / `get_industry_daily` 维持 OPTIONAL 但 reason 显式指向当前消费边界（membership 构建不消费；consumer 变化时重新评估）；provider/target 新增 exact exchange surface `get_industry_constituent_exchange`（provider + Protocol + RealTarget + FakeTarget 四处同步）+ probe factory。**canonical-deliverable 结构守卫**（新测试）：multi-endpoint capability 的 REQUIRED requirements 集合 == canonical 交付面必要端点集合（security_master={hist}；adj_factor={forward}；corporate_action={dividend,right_issue}；industry_taxonomy={base_info,constituent}；index_daily={query_kline}）。  
+**Tests**：test_endpoint_requirement_proof.py::TestIndustryConstituentRequiredSurface（3：base_info PASS + constituent DENIED → ENDPOINT FAIL + BUSINESS fired==0 + 失败 exchange 持久化 + VALIDATED_FAIL case；b1 BLOCKED + REPORT 诚实失败；canonical-deliverable surfaces == REQUIRED requirements）  
+**ADR**：[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) Amendment D.2  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260830-052 — Structural Approval Anti-Bypass（Option A）
+
+**Type**：C1 approval 边界结构性重构  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-B1.2 P0-01（audit 20260830 §2）——R4-B1.1 的 anti-bypass 是 Python 命名约定非访问控制：`_approve_and_persist_capability_testonly()` 可被显式 import；`VerifiedCapabilityApproval` 是普通可实例化 dataclass（`__post_init__` 只查非空），caller 伪造后直调 `_persist_verified_capability()`——后者只重做 `_validate_evidence`，不重验 closed production run / verdict / formal gate REPORT / endpoint proof / Raw meta cross-binding。  
+**New Contract**（ADR-020 Amendment D.1，Reviewer Preferred Option A）：生产模块彻底不存在"无需 formal run 即可写 APPROVED"的 callable——（1）`_approve_capability_in_memory_testonly` / `_approve_and_persist_capability_testonly` / `VerifiedCapabilityApproval` / `_persist_verified_capability` 全部从 capability.py 删除；（2）持久化事务（R3-P1-05 validate-before-mutate / 单事务 / cache-rebuild / R2-P1-01 UPDATE-only-governance-fields）inline 进 `approve_from_spike_run` 尾部——caller 到达写入点必已通过完整验证链；（3）测试所需 transaction/cache mechanics 移入 `tests/integration/_capability_test_persistence.py`（tests/ 内；生产 src 不 import test 模块）；（4）对抗测试改为真实绕过尝试（7 项）：伪造 verified object → 类不存在；caller-built evidence + frozen id → 无 importable 路由；AST 守卫（capability.py 中唯一引用 APPROVED 状态的函数是 approve_from_spike_run 且签名无 evidence/verified 参数；src/ 全模块不 import tests.*）。  
+**Tests**：test_approval_anti_bypass.py::TestApprovalAntiBypass 重写（7）；test_capability_governance.py / test_trial_production_boundary.py 迁移至 tests/ helper（approve_and_persist_testonly / approve_in_memory_testonly）  
+**ADR**：[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) Amendment D.1  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260830-051 — Persisted Identity Cross-Binding
 

@@ -199,165 +199,6 @@ def _validate_evidence(name: str, evidence: CapabilityEvidence) -> Capability:
     return cap
 
 
-def _approve_capability_in_memory_testonly(name: str, evidence: CapabilityEvidence) -> Capability:
-    """TEST-ONLY in-memory approval with FULL evidence bundle.
-
-    R4-B1.1 (audit 20260830 P0-02): this is NOT a production approval
-    path. The ONLY production-reachable APPROVED transition is
-    ``approve_from_spike_run`` -> ``_persist_verified_capability``
-    (verified internal proof object). This helper exists solely so
-    tests can exercise evidence validation / registry mechanics
-    without fabricating an entire spike run; it performs the same
-    evidence validation but CANNOT substitute for the formal-run
-    proof chain (endpoint requirements, gate REPORT, Raw identity
-    cross-binding are NOT checked here - by design, the production
-    gate consumes the DB/registry state that only the verified path
-    writes).
-    """
-    _validate_evidence(name, evidence)
-    cap = CAPABILITY_REGISTRY[name]
-    approved = Capability(
-        name=cap.name,
-        sdk_methods=cap.sdk_methods,
-        canonical_domains=cap.canonical_domains,
-        status=CapabilityStatus.APPROVED,
-        verified_at=evidence.approved_at,
-        account_profile_id=evidence.account_profile_id,
-    )
-    CAPABILITY_REGISTRY[name] = approved
-    return approved
-
-
-@dataclass(frozen=True)
-class VerifiedCapabilityApproval:
-    """R4-B1.1 (audit 20260830 P0-02): the internal sealed approval
-    proof object.
-
-    Constructed ONLY inside ``approve_from_spike_run`` AFTER the full
-    verification chain (closed production run / provenance / verdict /
-    formal gate proof / exact endpoint identity cross-binding). The
-    private persistence boundary ``_persist_verified_capability``
-    accepts THIS object - never a caller-constructed
-    ``CapabilityEvidence`` - so a production APPROVED transition cannot
-    be self-declared."""
-
-    name: str
-    evidence: CapabilityEvidence
-    verified_from_run: str
-    endpoint_requirements_proven: tuple[str, ...]
-
-    def __post_init__(self) -> None:
-        if not self.verified_from_run:
-            msg = "VerifiedCapabilityApproval requires the source spike run id"
-            raise CapabilityGovernanceError(msg)
-        if not self.endpoint_requirements_proven:
-            msg = (
-                "VerifiedCapabilityApproval requires the proven endpoint "
-                "requirement ids - fabricating an empty proof is forbidden"
-            )
-            raise CapabilityGovernanceError(msg)
-
-
-def _persist_verified_capability(
-    conn: DuckDBPyConnection, verified: VerifiedCapabilityApproval
-) -> Capability:
-    """R4-B1.1 (audit 20260830 P0-02): the PRIVATE persistence boundary
-    for production APPROVED transitions.
-
-    Only accepts the internal ``VerifiedCapabilityApproval`` constructed
-    by ``approve_from_spike_run`` after its full verification chain. A
-    caller-constructed ``CapabilityEvidence`` can never reach the DB
-    write through this boundary.
-
-    R3-P1-05 validate-before-mutate semantics are preserved: evidence is
-    validated WITHOUT touching the in-memory registry; the DB
-    transaction writes; only AFTER commit is the cache rebuilt from the
-    DB. A failed write leaves the cache exactly as the DB says."""
-    name = verified.name
-    evidence = verified.evidence
-    # pure validation - NO memory mutation (R3-P1-05)
-    _validate_evidence(name, evidence)
-    existing = conn.execute(
-        "SELECT 1 FROM meta_provider_capability WHERE provider = 'amazingdata' AND capability = ?",
-        [name],
-    ).fetchone()
-    conn.execute("BEGIN TRANSACTION")
-    try:
-        if existing is None:
-            conn.execute(
-                "INSERT INTO meta_provider_capability "
-                "(provider, capability, status, spike_report_ref, "
-                "provider_verification_ref, golden_case_refs, dry_run_ref, "
-                "account_profile_id, approved_by, adapter_version, verified_at) "
-                "VALUES ('amazingdata', ?, 'APPROVED', ?, ?, ?, ?, ?, ?, NULL, ?)",
-                [
-                    name,
-                    evidence.spike_report_ref,
-                    evidence.provider_verification_ref,
-                    ",".join(evidence.golden_case_refs),
-                    evidence.dry_run_ref,
-                    evidence.account_profile_id,
-                    evidence.approved_by,
-                    evidence.approved_at,
-                ],
-            )
-        else:
-            # R2-P1-01 12.3: UPDATE touches ONLY governance fields -
-            # existing metadata columns can never be erased
-            conn.execute(
-                "UPDATE meta_provider_capability SET status = 'APPROVED', "
-                "spike_report_ref = ?, provider_verification_ref = ?, "
-                "golden_case_refs = ?, dry_run_ref = ?, account_profile_id = ?, "
-                "approved_by = ?, verified_at = ? "
-                "WHERE provider = 'amazingdata' AND capability = ?",
-                [
-                    evidence.spike_report_ref,
-                    evidence.provider_verification_ref,
-                    ",".join(evidence.golden_case_refs),
-                    evidence.dry_run_ref,
-                    evidence.account_profile_id,
-                    evidence.approved_by,
-                    evidence.approved_at,
-                    name,
-                ],
-            )
-        conn.execute("COMMIT")
-    except Exception:
-        conn.execute("ROLLBACK")
-        # restore the cache from the authoritative DB so it never says
-        # APPROVED while the DB does not (R2-P1-01 12.2)
-        load_approvals(conn)
-        raise
-    # post-commit: rebuild the cache from the authoritative table
-    load_approvals(conn)
-    return CAPABILITY_REGISTRY[name]
-
-
-def _approve_and_persist_capability_testonly(
-    conn: DuckDBPyConnection,
-    name: str,
-    evidence: CapabilityEvidence,
-) -> Capability:
-    """TEST-ONLY persisted approval from a caller-built evidence bundle.
-
-    R4-B1.1 (audit 20260830 P0-02): production code MUST use
-    ``approve_from_spike_run`` (verified proof object -> private
-    persistence boundary). This helper exists so tests can exercise
-    the evidence-validation / DB-transaction / cache-rebuild mechanics
-    WITHOUT the formal-run chain. It performs the SAME validation as
-    the old public path (including the positive frozen production
-    identity), so it can never be used to smuggle a fake account - but
-    it deliberately does NOT verify endpoint requirements, because it
-    is not the production gate."""
-    verified = VerifiedCapabilityApproval(
-        name=name,
-        evidence=evidence,
-        verified_from_run=f"testonly:{evidence.spike_report_ref}",
-        endpoint_requirements_proven=("TESTONLY",),
-    )
-    return _persist_verified_capability(conn, verified)
-
-
 # ------------------------------------------ persistence (P1-03 / R2-P1-01)
 
 #: registry capability name -> spike capability_id (R3-P0-17 mapping)
@@ -683,12 +524,21 @@ def approve_from_spike_run(
     spike run itself and requires:
       - run kind PRODUCTION, status CLOSED
       - run provenance complete
-      - evidence closure clean (hashes re-verified)
+      - positive frozen production account identity (exact match)
       - the capability PASSes the verdict engine over that run's cases
+      - the formal runtime gate proof with four-layer exact endpoint
+        cross-binding (contract <-> REPORT <-> proof case <-> Raw meta)
       - each listed golden case ref EXISTS in the catalog and is a
         VALIDATED_PASS / equivalent DIFF_EXPLAINED
     Only then is the evidence bundle built from the RUN's facts and
     persisted (single transaction, cache rebuilt after commit).
+
+    R4-B1.2 P0-01 (audit 20260830, Option A): this function is the ONLY
+    production-reachable APPROVED transition - the persistence
+    transaction lives INSIDE it. There is no separate persistence
+    helper and no caller-constructible "verified" proof object in the
+    production module; any APPROVED write must come through this full
+    verification chain.
     """
     from ashare_state.spike.model import RunKind, RunStatus
     from ashare_state.spike.run_store import RunStore
@@ -748,7 +598,7 @@ def approve_from_spike_run(
     # the endpoint identities are cross-bound against the hash-anchored
     # REPORT artifact AND the persisted Raw meta (contract <-> case <->
     # REPORT <-> raw meta, all four layers exact).
-    proven_requirements = _require_formal_gate_proof(
+    _require_formal_gate_proof(
         catalog, name, run_dir=store.run_dir(run), spike_root=store.spike_root
     )
     cases = {c.case_id: c for c in catalog.cases}
@@ -769,17 +619,71 @@ def approve_from_spike_run(
         approved_at=run.ended_at or "",
         account_profile_id=run.account_profile_id,
     )
-    # R4-B1.1 (audit 20260830 P0-02): the ONLY production-reachable
-    # APPROVED transition - build the internal verified proof object
-    # (only constructible here, after the full verification chain) and
-    # hand it to the private persistence boundary.
-    verified = VerifiedCapabilityApproval(
-        name=name,
-        evidence=evidence,
-        verified_from_run=spike_run_id,
-        endpoint_requirements_proven=tuple(proven_requirements),
-    )
-    return _persist_verified_capability(conn, verified)
+    # R4-B1.1 P0-02 + R4-B1.2 P0-01 (audit 20260830, Option A): the
+    # persistence transaction lives INSIDE this function - the ONLY
+    # production-reachable APPROVED transition. There is no separate
+    # persistence helper and no caller-constructible "verified" proof
+    # object: a caller who reaches this point has passed the FULL
+    # verification chain above (closed production run / frozen identity
+    # / verdict / formal gate proof / four-layer endpoint cross-binding
+    # / golden case refs). R3-P1-05 validate-before-mutate semantics
+    # preserved: evidence validated WITHOUT touching the registry; the
+    # single transaction writes; only AFTER commit is the cache rebuilt
+    # from the DB; a failed write leaves the cache exactly as the DB
+    # says. R2-P1-01 12.3: UPDATE touches ONLY governance fields.
+    _validate_evidence(name, evidence)
+    existing = conn.execute(
+        "SELECT 1 FROM meta_provider_capability WHERE provider = 'amazingdata' AND capability = ?",
+        [name],
+    ).fetchone()
+    conn.execute("BEGIN TRANSACTION")
+    try:
+        if existing is None:
+            conn.execute(
+                "INSERT INTO meta_provider_capability "
+                "(provider, capability, status, spike_report_ref, "
+                "provider_verification_ref, golden_case_refs, dry_run_ref, "
+                "account_profile_id, approved_by, adapter_version, verified_at) "
+                "VALUES ('amazingdata', ?, 'APPROVED', ?, ?, ?, ?, ?, ?, NULL, ?)",
+                [
+                    name,
+                    evidence.spike_report_ref,
+                    evidence.provider_verification_ref,
+                    ",".join(evidence.golden_case_refs),
+                    evidence.dry_run_ref,
+                    evidence.account_profile_id,
+                    evidence.approved_by,
+                    evidence.approved_at,
+                ],
+            )
+        else:
+            conn.execute(
+                "UPDATE meta_provider_capability SET status = 'APPROVED', "
+                "spike_report_ref = ?, provider_verification_ref = ?, "
+                "golden_case_refs = ?, dry_run_ref = ?, account_profile_id = ?, "
+                "approved_by = ?, verified_at = ? "
+                "WHERE provider = 'amazingdata' AND capability = ?",
+                [
+                    evidence.spike_report_ref,
+                    evidence.provider_verification_ref,
+                    ",".join(evidence.golden_case_refs),
+                    evidence.dry_run_ref,
+                    evidence.account_profile_id,
+                    evidence.approved_by,
+                    evidence.approved_at,
+                    name,
+                ],
+            )
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        # restore the cache from the authoritative DB so it never says
+        # APPROVED while the DB does not (R2-P1-01 12.2)
+        load_approvals(conn)
+        raise
+    # post-commit: rebuild the cache from the authoritative table
+    load_approvals(conn)
+    return CAPABILITY_REGISTRY[name]
 
 
 def load_approvals(conn: DuckDBPyConnection) -> dict[str, CapabilityStatus]:

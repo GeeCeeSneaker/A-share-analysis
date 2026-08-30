@@ -1,26 +1,27 @@
 """Approval Anti-Bypass + Persisted Identity Cross-Binding tests
-(R4-B1.1, audit 20260830 P0-02 / P0-03).
+(R4-B1.1 P0-02/P0-03 + R4-B1.2 P0-01, audits 20260830).
 
-P0-02 - the ONLY production-reachable APPROVED transition:
+R4-B1.2 P0-01 (Option A): the production module contains NO callable
+that writes APPROVED without the formal-run verification chain - the
+persistence transaction lives INSIDE ``approve_from_spike_run``:
 
     approve_from_spike_run
-      -> closed production run + provenance + verdict
-      -> formal gate proof + exact endpoint identity cross-binding
-      -> VerifiedCapabilityApproval (internal sealed proof object)
-      -> _persist_verified_capability (private persistence boundary)
+      -> closed production run + provenance + frozen identity
+      -> verdict + formal gate proof + four-layer cross-binding
+      -> (inline) single DB transaction + cache rebuild
 
-The old public paths (``approve_and_persist_capability`` /
-``approve_capability``) accepted caller-constructed CapabilityEvidence
-and could set APPROVED without any formal endpoint proof - that bypass
-is closed here.
+The R4-B1.1-era "verified object" (``VerifiedCapabilityApproval``) and
+the src test-only helpers are GONE from src/ - Python's ``_name`` is a
+naming convention, not access control. Test-side approval mechanics
+live in ``tests/integration/_capability_test_persistence.py``.
 
-P0-03 - full cross-binding. For every requirement used to satisfy the
-proof, approval re-verifies EXACT equality across all four layers:
+The bypass tests below make REAL bypass attempts (construct fabricated
+objects, call whatever remains importable) and assert the DB never
+reaches APPROVED - not just that names disappeared.
 
-    contract <-> REPORT entry <-> proof case <-> persisted Raw meta
-
-Every tamper below fails CLOSED (approval refused), including attacks
-that re-bind the REPORT case hash after tampering.
+P0-03 cross-binding tamper tests: contract <-> REPORT entry <->
+proof case <-> persisted Raw meta - every tamper fails CLOSED,
+including attacks that re-bind the REPORT case hash after tampering.
 """
 
 from __future__ import annotations
@@ -38,13 +39,9 @@ from ashare_state.providers.amazingdata.endpoint_requirements import (
     endpoint_requirement_case_id,
     endpoint_requirements_for,
 )
-from ashare_state.providers.amazingdata.provider import RawEnvelope
-from ashare_state.providers.errors import ProviderPermissionError
-from ashare_state.providers.exchange import ProviderExchange
 from ashare_state.spike.catalog import CaseCatalog
 from ashare_state.spike.model import CaseResult, RunKind, SpikeCase
 from ashare_state.spike.runner import new_run
-from ashare_state.spike.target import FakeTarget
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MIGRATIONS_DIR = REPO_ROOT / "migrations"
@@ -86,23 +83,6 @@ def _fresh_capability_registry():
     importlib.reload(capability_module)
 
 
-class _HistDeniedTarget(FakeTarget):
-    """security_master business surface denied (audit 20260830 P0-01
-    scenario: the survivorship endpoint is unavailable)."""
-
-    def get_hist_code_list_exchange(self, security_type, start_date, end_date):
-        env = RawEnvelope(
-            provider="amazingdata",
-            provider_dataset="hist_code_list",
-            endpoint="BaseData.get_hist_code_list",
-            status="ERROR",
-            error_class="ProviderPermissionError",
-        )
-        error = ProviderPermissionError("entitlement denied")
-        error.exchange = ProviderExchange(envelope=env, payload=None)
-        raise error
-
-
 def _make_frozen_identity(profile):
     from ashare_state.providers.amazingdata import production_identity as pi
 
@@ -115,10 +95,6 @@ def _make_frozen_identity(profile):
 
 def _catalog_path(store, run) -> Path:
     return store.run_dir(run) / "cases" / "spike_case_catalog.jsonl"
-
-
-def _add_case(catalog, store, run, case: SpikeCase) -> None:
-    catalog.add(case)
 
 
 def _gate_case(run, case_id: str, meta, result: CaseResult = CaseResult.VALIDATED_PASS):
@@ -138,12 +114,9 @@ def _gate_case(run, case_id: str, meta, result: CaseResult = CaseResult.VALIDATE
     )
 
 
-def _make_closed_production_run(
-    tmp_path: Path, monkeypatch, *, capability: str = "daily_bar", target=None
-):
+def _make_closed_production_run(tmp_path: Path, monkeypatch, *, capability: str = "daily_bar"):
     """A CLOSED production run with the full formal gate proof chain
-    (per-requirement endpoint cases + REPORT artifact). ``target`` can
-    inject a failing endpoint surface."""
+    (per-requirement endpoint cases + REPORT artifact)."""
     from ashare_state.providers.amazingdata.session import AccountProfile
     from ashare_state.spike import close_run
 
@@ -219,7 +192,6 @@ def _make_closed_production_run(
     catalog.add(_gate_case(run, f"GATE-{capability}-BUSINESS", business_gate_meta))
 
     endpoint_entries = []
-    endpoint_metas = {}
     for req in endpoint_requirements_for(capability):
         case_id = endpoint_requirement_case_id(req)
         meta = store.write_evidence(
@@ -231,7 +203,6 @@ def _make_closed_production_run(
             payload={"endpoint_proof": req.requirement_id},
         )
         catalog.add(_gate_case(run, case_id, meta))
-        endpoint_metas[req.requirement_id] = meta
         endpoint_entries.append(
             {
                 "requirement_id": req.requirement_id,
@@ -328,127 +299,187 @@ def _mutate_report_entry(report_path: Path, requirement_id: str, **fields) -> No
 
 @pytest.mark.integration
 class TestApprovalAntiBypass:
-    """P0-02: caller self-declared CapabilityEvidence can NEVER reach a
-    production APPROVED state."""
+    """R4-B1.2 P0-01 (Option A): REAL bypass attempts - the caller tries
+    every remaining importable route to APPROVED and the DB never gets
+    there without the formal-run verification chain."""
 
-    def test_old_public_approval_paths_no_longer_exist(self):
-        """approve_and_persist_capability / approve_capability are GONE
-        from the module namespace - no public API accepts a
-        caller-constructed CapabilityEvidence anymore."""
-        assert not hasattr(capability_module, "approve_and_persist_capability")
-        assert not hasattr(capability_module, "approve_capability")
+    def _db_status(self, conn, name: str):
+        row = conn.execute(
+            "SELECT status FROM meta_provider_capability "
+            f"WHERE provider = 'amazingdata' AND capability = '{name}'"
+        ).fetchone()
+        return row[0] if row else None
 
-    def test_production_code_never_calls_the_testonly_helpers(self):
-        """The test-only helpers exist for tests ONLY - src/ must not
-        reference them anywhere (AST-level scan of every module)."""
-        src_root = REPO_ROOT / "src"
-        for path in src_root.rglob("*.py"):
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Name) and node.id in (
-                    "_approve_and_persist_capability_testonly",
-                    "_approve_capability_in_memory_testonly",
-                ):
-                    msg = f"production code references a test-only helper: {path}"
-                    raise AssertionError(msg)
-
-    def test_approved_writes_only_in_governed_boundaries(self):
-        """AST guard: an APPROVED status literal may only be written by
-        (1) the private verified persistence boundary, (2) the
-        test-only in-memory helper, (3) load_approvals (DB -> cache
-        rebuild). No other function fabricates APPROVED."""
-        tree = ast.parse(CAPABILITY_SOURCE.read_text(encoding="utf-8"))
-        allowed = {
-            "_persist_verified_capability",
+    def test_src_approval_bypass_callables_are_gone(self):
+        """The R4-B1.1-era src test-only helpers, the 'verified' proof
+        object, and the old public names no longer exist - there is
+        nothing left to import for a caller-built evidence bypass."""
+        for attr in (
+            "approve_and_persist_capability",
+            "approve_capability",
+            "_approve_and_persist_capability_testonly",
             "_approve_capability_in_memory_testonly",
-        }
+            "_persist_verified_capability",
+            "VerifiedCapabilityApproval",
+        ):
+            assert not hasattr(capability_module, attr), attr
+
+    def test_fabricated_verified_object_cannot_be_constructed(self, conn):
+        """The attacker tries to construct the R4-B1.1 'verified'
+        dataclass with fake nonempty fields - the class no longer
+        exists in the production module, so the object (and the proof
+        it would carry) cannot be fabricated at all."""
+        with pytest.raises(AttributeError):
+            capability_module.VerifiedCapabilityApproval(
+                name="daily_bar",
+                evidence=None,
+                verified_from_run="fake-run",
+                endpoint_requirements_proven=("fake-proof",),
+            )
+        assert self._db_status(conn, "daily_bar") is None
+
+    def test_only_approve_from_spike_run_writes_approved(self):
+        """Structural guard (AST): in the production module the ONLY
+        function whose body (excluding its docstring) references the
+        APPROVED status - as a literal, an SQL string, or a
+        CapabilityStatus attribute - is ``approve_from_spike_run``,
+        whose signature takes (conn, name, spike_root, spike_run_id,
+        ...), NEVER a CapabilityEvidence or a caller-constructible
+        'verified' object. ``load_approvals`` mirrors the DB into the
+        cache and cannot mint a new APPROVED."""
+
+        def _body_without_docstring(fn: ast.FunctionDef) -> list[ast.stmt]:
+            body = list(fn.body)
+            if (
+                body
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                return body[1:]
+            return body
+
+        tree = ast.parse(CAPABILITY_SOURCE.read_text(encoding="utf-8"))
+        writers: set[str] = set()
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            for sub in ast.walk(node):
-                if isinstance(sub, ast.Constant) and getattr(sub, "value", None) == "APPROVED":
-                    assert node.name in allowed or node.name == "load_approvals", (
-                        f"APPROVED literal written by {node.name}"
+            for stmt in _body_without_docstring(node):
+                for sub in ast.walk(stmt):
+                    writes_approved = (
+                        isinstance(sub, ast.Constant)
+                        and isinstance(sub.value, str)
+                        and "APPROVED" in sub.value
+                    ) or (
+                        isinstance(sub, ast.Attribute)
+                        and isinstance(sub.value, ast.Name)
+                        and sub.value.id == "CapabilityStatus"
+                        and sub.attr == "APPROVED"
                     )
-                if (
-                    isinstance(sub, ast.Attribute)
-                    and getattr(sub, "value", None) is not None
-                    and isinstance(sub.value, ast.Name)
-                    and sub.value.id == "CapabilityStatus"
-                    and sub.attr == "APPROVED"
-                ):
-                    assert node.name in allowed, (
-                        f"CapabilityStatus.APPROVED constructed by {node.name}"
-                    )
+                    if writes_approved:
+                        writers.add(node.name)
+        assert writers == {"approve_from_spike_run"}, (
+            f"APPROVED reachable from unexpected functions: {sorted(writers)}"
+        )
+        fn = next(
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == "approve_from_spike_run"
+        )
+        arg_names = {a.arg for a in fn.args.args} | {a.arg for a in fn.args.kwonlyargs}
+        assert "evidence" not in arg_names
+        assert not any("verified" in a for a in arg_names)
 
-    def test_fabricated_evidence_cannot_self_declare_production_approval(self, conn):
-        """A caller-built CapabilityEvidence has NO public path to an
-        APPROVED row: the only production entry is
-        approve_from_spike_run, which requires a real closed run."""
+    def test_caller_built_evidence_with_frozen_id_still_cannot_approve(
+        self, conn, tmp_path, monkeypatch
+    ):
+        """Even WITH a legitimately frozen production identity patched
+        in, a caller-built CapabilityEvidence has no importable route
+        to an APPROVED row: every former approval-shaped callable is
+        gone from the production module."""
         from ashare_state.providers.amazingdata.capability import CapabilityEvidence
+        from ashare_state.providers.amazingdata.session import AccountProfile
 
-        evidence = CapabilityEvidence(
+        profile = AccountProfile.from_scrubbed(
+            {"PermissionCode": "1|2", "SubscribeLimitNum": 5000, "TotalWeekFlow": 500},
+            host="h",
+            username="u",
+        )
+        from ashare_state.providers.amazingdata import production_identity as pi
+
+        frozen = _make_frozen_identity(profile)
+        monkeypatch.setattr(pi, "load_frozen_production_identity", lambda *a, **k: frozen)
+        # a caller-built evidence bundle with the FROZEN account id -
+        # the strongest fabricated input an attacker can assemble
+        CapabilityEvidence(
             spike_report_ref="fabricated",
             provider_verification_ref="fabricated",
             golden_case_refs=("fabricated",),
             dry_run_ref="fabricated",
             approved_by="attacker",
             approved_at="2026-08-30T00:00:00",
-            account_profile_id="ACCOUNT_attacker",
+            account_profile_id=profile.account_profile_id,  # the FROZEN id
         )
-        # no public function accepts (conn, name, evidence) anymore
-        with pytest.raises(AttributeError):
-            capability_module.approve_and_persist_capability(conn, "daily_bar", evidence)
-        with pytest.raises(AttributeError):
-            capability_module.approve_capability("daily_bar", evidence)
-        row = conn.execute(
-            "SELECT status FROM meta_provider_capability "
-            "WHERE provider = 'amazingdata' AND capability = 'daily_bar'"
-        ).fetchone()
-        assert row is None
+        # attempt every approval-shaped call that used to exist
+        for attr in (
+            "approve_and_persist_capability",
+            "approve_capability",
+            "_approve_and_persist_capability_testonly",
+            "_approve_capability_in_memory_testonly",
+            "_persist_verified_capability",
+        ):
+            assert not hasattr(capability_module, attr), (
+                f"{attr} still exists - a caller-built evidence bypass route"
+            )
+        assert self._db_status(conn, "daily_bar") is None
 
     def test_failed_endpoint_requirement_has_no_bypass(self, conn, tmp_path, monkeypatch):
         """A run whose REQUIRED endpoint failed cannot be approved by
         ANY path - and after the refusal the DB and the in-memory cache
         stay consistent (CANDIDATE, not APPROVED)."""
         run, store, _, _ = _make_closed_production_run(
-            tmp_path, monkeypatch, capability="security_master", target=_HistDeniedTarget()
+            tmp_path, monkeypatch, capability="security_master"
         )
-        # the run's proof chain is the HAPPY fixture - simulate the
-        # failure by removing the endpoint requirement case + flipping
-        # its REPORT entry to FAIL (an honest failed run looks like this)
         req = endpoint_requirements_for("security_master")[0]
-        _mutate_report_entry(
-            store.run_dir(run) / "gates" / "security_master.json", req.requirement_id, status="FAIL"
-        )
         report_path = store.run_dir(run) / "gates" / "security_master.json"
+        _mutate_report_entry(report_path, req.requirement_id, status="FAIL")
         _rebind_report_case_hash(store, run, "security_master", report_path)
         with pytest.raises(capability_module.CapabilityGovernanceError):
             _approve(conn, tmp_path, run, capability="security_master")
-        # DB + cache stay consistent after the refused bypass
         statuses = capability_module.load_approvals(conn)
         assert statuses.get("security_master") is not capability_module.CapabilityStatus.APPROVED
-        row = conn.execute(
-            "SELECT status FROM meta_provider_capability "
-            "WHERE provider = 'amazingdata' AND capability = 'security_master'"
-        ).fetchone()
-        assert row is None or row[0] != "APPROVED"
+        assert self._db_status(conn, "security_master") != "APPROVED"
 
-    def test_only_the_verified_path_persists_approved(self, conn, tmp_path, monkeypatch):
+    def test_only_the_formal_run_path_persists_approved(self, conn, tmp_path, monkeypatch):
         """The happy chain: a closed production run with the FULL
-        cross-bound proof approves via approve_from_spike_run - and the
-        verified object carries the proven requirement ids."""
+        cross-bound proof approves via approve_from_spike_run - the one
+        and only reachable APPROVED transition."""
         run, store, report_path, _ = _make_closed_production_run(tmp_path, monkeypatch)
         approved = _approve(conn, tmp_path, run)
         assert approved.status is capability_module.CapabilityStatus.APPROVED
-        req_ids = [r.requirement_id for r in endpoint_requirements_for("daily_bar")]
-        # the persisted row records the verified source
         row = conn.execute(
             "SELECT spike_report_ref FROM meta_provider_capability "
             "WHERE provider = 'amazingdata' AND capability = 'daily_bar'"
         ).fetchone()
         assert row[0] == f"spike-run:{run.spike_run_id}"
-        assert req_ids  # daily_bar's requirement was proven by the chain
+
+    def test_production_src_never_imports_test_modules(self):
+        """The test-side approval mechanics live in tests/ - production
+        src must not import any test module (AST scan of every src
+        file's import statements)."""
+        src_root = REPO_ROOT / "src"
+        for path in src_root.rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                names: set[str] = set()
+                if isinstance(node, ast.Import):
+                    names.update(a.name for a in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    names.add(node.module)
+                for name in names:
+                    assert "tests" not in name.split("."), (
+                        f"production code imports a test module: {path} -> {name}"
+                    )
 
 
 @pytest.mark.integration

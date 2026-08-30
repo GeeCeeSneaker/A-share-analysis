@@ -13,6 +13,45 @@
 
 ---
 
+## 2026-08-30 · R4-B1.2 最终 Approval Boundary + Industry Endpoint 收口（R4-B1.1 复审两 P0 blocker 全部收口）
+
+**Scope**
+- R4-B1.1 复审（audit 20260830 15:42 +08:00，Reviewed HEAD `c2e572d1073c48ae93a4bc57373830ba92306054`）裁决 **REOPENED**：大部分 PASS / FREEZE（四层 cross-binding VERIFIED 冻结 / security_master 撤回编组正确 / classification exact-set 守卫正确 / CI green 等 15 项）；2 个 P0 blocker 由本批 R4-B1.2 收口（**未启动 R4-B2**——BLOCKED until R4-B1.2 VERIFIED，遵守 §6 不扩展新主题）
+- 另有 Reviewer 补充治理更正：ADR-020 Amendment C.3 的"19 条"经逐项计数实为 18 条（治理文档数字错误，非 runtime 缺项）
+
+**Implementation**
+- **P0-01 Approval Anti-Bypass 结构性关闭（DM-CR-20260830-052，ADR-020 Amendment D.1，Reviewer Preferred Option A）**：R4-B1.1 的"verified object + private boundary"仍是 Python 命名约定非访问控制（testonly helper 可显式 import；VerifiedCapabilityApproval 可伪造后直调 _persist_verified_capability——只重做 _validate_evidence 不重验 formal run）。修正——生产模块**彻底不存在**"无需 formal run 即可写 APPROVED"的 callable：（1）四个 bypass 入口全部删除（`_approve_capability_in_memory_testonly` / `_approve_and_persist_capability_testonly` / `VerifiedCapabilityApproval` / `_persist_verified_capability`）；（2）持久化事务（validate-before-mutate / 单事务 / cache-rebuild / UPDATE-only-governance-fields）**inline 进 `approve_from_spike_run` 尾部**——caller 到达写入点必已通过完整验证链；（3）测试所需 transaction/cache mechanics 移入 `tests/integration/_capability_test_persistence.py`（tests/ 内）；（4）对抗测试改为**真实绕过尝试**（伪造 verified object → 类不存在；caller-built evidence + frozen id → 无 importable 路由；AST 守卫：capability.py 中唯一引用 APPROVED 状态的函数是 approve_from_spike_run 且签名无 evidence/verified 参数；src/ 全模块不 import tests.*）
+- **P0-02 industry_taxonomy constituent REQUIRED（DM-CR-20260830-053，ADR-020 Amendment D.2）**：canonical deliverable 是 bridge_industry_member（security ↔ industry MEMBERSHIP），仅 base_info 只证明 taxonomy definition surface。修正——`get_industry_constituent` = REQUIRED_ENDPOINT_PROOF（requirements + classification 同步）；weight/daily 维持 OPTIONAL 但 reason 显式指向当前消费边界；provider/target 新增 exact exchange surface `get_industry_constituent_exchange`（四处同步）；对抗测试：base_info PASS + constituent DENIED → ENDPOINT FAIL → early-stop → BUSINESS fired==0 → 失败 exchange 持久化 → VALIDATED_FAIL case → approval impossible；**canonical-deliverable 结构守卫**：multi-endpoint capability 的 REQUIRED requirements 集合 == canonical 交付面必要端点集合（防"形式合规、语义失真"再次发生）
+- **P1 治理计数更正（Reviewer 补充裁决）**：ADR-020 Amendment C.3"19 条"→ 18 条（D.3 更正，历史保留）；constituent 是修改既有条目 classification 非新增，当前表仍为 18 条
+- **Batch D**：R4-B1.1 的 anti-bypass 测试集按 Option A 现实重写（7 项真实绕过尝试）；test_capability_governance / test_trial_production_boundary 迁移至 tests/ helper；A3/A2/CR-1/B1 冻结契约零回归
+
+**Schema / Contract Changes**
+- C1 ×2（DM-CR-20260830-052/053）；ADR-020 Amendment R4-B1.2（D.1-D.4）
+- `capability.py`：删除四个 bypass 入口；approve_from_spike_run 自含完整验证链 + inline 持久化事务；`_require_formal_gate_proof` 返回值改为内部消费
+- `endpoint_requirements.py`：constituent REQUIRED（requirements 12 条 / classifications 18 条不变——修改既有条目）；weight/daily reason 指向消费边界
+- `provider.py` + `target.py`：get_industry_constituent_exchange 四处同步；`formal_gates.py` probe factory
+- 新增 `tests/integration/_capability_test_persistence.py`（tests 内的 approval mechanics）
+
+**Verification**
+- Local: **801 tests passed / 0 failed**（797 → 801，+4：anti-bypass 重写后 7 项（原 6）+ constituent 3 项（新增类）+ 既有守卫合并）；ruff check / ruff format --check / mypy 全绿（退出码严格验证）
+- 既有回归零破坏：四层 cross-binding tamper（9）、exact-match engine、persistence early-stop、trial boundary、governance（迁移 helper 后全过）、dry-run 全相位
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+
+**Implementation Status**
+- DONE（P0-01 + P0-02 + P1 计数更正 + Batch D；801/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- Option A（Reviewer preferred）而非 Option B：Option B 的"helper 重验 formal-run verification"仍是一个可被调用的持久化入口（只是更难绕过）；Option A 让"到达写入点 = 通过全链验证"成为**同一函数内的控制流事实**，不依赖任何可构造对象或可导入 helper
+- AST 守卫检测 APPROVED 引用时排除 docstring 并匹配 SQL 字符串内含 'APPROVED'——纯 literal 等值匹配会漏检 inline SQL 写入（本次实现中实际踩到）
+- canonical-deliverable 结构守卫在测试中显式 pin 每个多端点 capability 的必要端点集合——设计决定成为可审计的测试事实，而非散落在 classification reason 里
+- tests/ helper 与 src 彻底分离的代价是测试文件多一个 import 路径；换来的是生产模块的攻击面归零（无 importable bypass），且 src → tests 方向被 AST 守卫阻断
+
+**下一步**
+- 等 Reviewer 复审 R4-B1.2（两项检查：A. industry_taxonomy 必要 endpoint 语义是否与 bridge_industry_member 交付一致 / B. caller-self-declare APPROVED 是否从生产 src 中真正结构性消失）；VERIFIED 后 R4-B1 / B1.1 / B1.2 → CLOSED，R4-B2 Publish Validation Exactness START
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 ## 2026-08-30 · R4-B1.1 合同语义 + Approval Anti-Bypass + Cross-Binding（R4-B1 复审 REOPEN 三 P0 + P1 全部收口）
 
 **Scope**

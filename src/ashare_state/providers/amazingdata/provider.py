@@ -404,6 +404,24 @@ class AmazingDataProvider:
     def get_industry_base_info(self, code_list: list[str]) -> Any:
         return self.get_industry_base_info_exchange(code_list).payload
 
+    def get_industry_constituent_exchange(self, code_list: list[str]) -> Any:
+        """Industry constituent membership endpoint (R4-B1.2 P0-02,
+        audit 20260830): the canonical deliverable of
+        ``industry_taxonomy`` is ``bridge_industry_member`` -
+        security <-> industry MEMBERSHIP. ``get_industry_base_info``
+        alone only proves the taxonomy definition/identity surface;
+        the constituent surface is a REQUIRED endpoint proof."""
+        return self._call_or_exchange(
+            "InfoData.get_industry_constituent",
+            "industry_taxonomy",
+            lambda: self._info().get_industry_constituent(code_list=code_list),
+            params={"code_list": list(code_list)},
+            require_capability="industry_taxonomy",
+        )
+
+    def get_industry_constituent(self, code_list: list[str]) -> Any:
+        return self.get_industry_constituent_exchange(code_list).payload
+
     def get_calendar_exchange(self, market: str = "SH") -> Any:
         return self._call_or_exchange(
             "BaseData.get_calendar",
