@@ -21,7 +21,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from tests.integration._capability_test_persistence import (
+from _capability_test_persistence import (
     approve_and_persist_testonly,
 )
 

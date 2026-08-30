@@ -12,7 +12,7 @@ from pathlib import Path
 
 import duckdb
 import pytest
-from tests.integration._capability_test_persistence import (
+from _capability_test_persistence import (
     approve_and_persist_testonly,
     approve_in_memory_testonly,
 )
