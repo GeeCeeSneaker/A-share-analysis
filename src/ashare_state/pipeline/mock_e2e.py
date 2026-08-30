@@ -26,7 +26,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ashare_state.identity import resolve_security_identity
-from ashare_state.pipeline.publish import publish_snapshot, record_artifact_validation
+from ashare_state.pipeline.artifact_validation import validate_artifact_for_publish
+from ashare_state.pipeline.publish import publish_snapshot
 from ashare_state.providers.mock import FixtureProvider
 from ashare_state.storage.atomic_files import (
     ComponentIdentity,
@@ -282,8 +283,11 @@ def run_mock_e2e(
                 [
                     result.feature_artifact_set_id,
                     "BASE",
-                    "skeleton",
-                    "0.0.1",
+                    # R4-B2 B2-02: feature_family carries the feature-set
+                    # member identity so FEATURE_FAMILY_COVERAGE is machine-
+                    # verifiable (components <-> meta_feature_set_member).
+                    SKELETON_FEATURE_ID,
+                    SKELETON_FEATURE_VERSION,
                     comp.logical_partition_key,
                     rel,
                     comp.content_hash,
@@ -324,13 +328,14 @@ def run_mock_e2e(
             "VALUES (?, 'EOD', 'FEATURE_VALIDATED', ?)",
             [pipeline_run_id, datetime.now(UTC)],
         )
-        # R2-P0-05: validation record is a system invariant for publish
-        record_artifact_validation(
+        # R4-B2: validation records come ONLY from the formal boundary -
+        # the validator re-verifies the physical component bytes and
+        # derives the counts from the persisted DQ facts.
+        validate_artifact_for_publish(
             conn,
+            data_root=data_root,
             feature_artifact_set_id=result.feature_artifact_set_id,
-            validation_version="mock-v1",
-            identity_fallback_count=0,
-            blocking_dq_count=0,
+            validator_code_commit="skeleton-commit",
         )
         universes = [("ALL_A", "v1"), ("CORE_TRADABLE", "v1")]
         pid = publish_snapshot(
@@ -341,6 +346,7 @@ def run_mock_e2e(
             feature_set_version=SKELETON_FEATURE_SET_VERSION,
             universes=universes,
             pipeline_run_id=pipeline_run_id,
+            data_root=data_root,
             quality_grade="MOCK",
         )
         result.publish_ids.append(pid)
@@ -362,6 +368,7 @@ def run_mock_e2e(
                 feature_set_version=SKELETON_FEATURE_SET_VERSION,
                 universes=universes,
                 pipeline_run_id=recovery_run_id,
+                data_root=data_root,
                 quality_grade="MOCK-RERUN",
             )
             result.publish_ids.append(pid2)

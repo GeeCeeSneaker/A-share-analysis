@@ -629,3 +629,100 @@ F. frozen regressions + full CI
 ```
 
 除发现真实 regression，不再重开 R4-B1.x 已 VERIFIED 项。
+
+---
+
+# 15. Implementation Mapping（开发方填写，2026-08-30）
+
+## B2-01 — Formal Artifact Validation Execution Boundary（§3）
+
+| Requirement（§3.1-3.5） | Implementation | Tests |
+|---|---|---|
+| 唯一正式 validation 执行边界 | `pipeline/artifact_validation.py::validate_artifact_for_publish(conn, *, data_root, feature_artifact_set_id, validator_code_commit)`——resolve registry → 物理字节重验 → typed checks → 派生 counts → seal → 持久化 report → **inline INSERT**（ledger 写入与验证链同一控制流） | test_happy_validation_report_has_all_required_checks_pass + test_publish_binds_exact_validation_id |
+| counts 必须是派生值 | `meta_artifact_dq_finding`（migration 011，append-only 坏事实）+ `SELECT count(*)` 派生 IDENTITY_FALLBACK/BLOCKING_DQ 两计数；`record_artifact_dq_finding(finding_class=...)` 白名单（只能追加坏事实——使 publish 更难，结构上不可能制造 PASS） | test_newer_fail_beats_older_pass + 迁移后的 fallback/dq gate 测试 |
+| 不允许 caller 构造 PASS result 绕过 validator | **`record_artifact_validation` 从生产命名空间删除**；无 "ValidatedArtifact"/persistence helper 中间层（沿 B1.2 Option A 教训） | test_count_writer_is_gone_from_production |
+| production src 无"无需真实 validation 即可记录 PASS"的 callable | **AST 守卫**：全 pipeline 包扫描，`INSERT INTO meta_artifact_validation` 唯一出现在 `validate_artifact_for_publish`；其签名无 identity_fallback_count/blocking_dq_count/result/checks/report 参数 | test_structural_guard_no_validation_row_writer_takes_counts |
+| record_artifact_validation 变内部 primitive 或消失 | 消失（更强形式）；测试 fixture 经 DQ facts + formal validator 重建 | 迁移后 test_publish_validation_gate / test_publish_lineage 25/0 |
+
+## B2-02 — Typed Publish Validation Contract（§4）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 十类 required check（§4 全集） | `ArtifactValidationCheckId`：ARTIFACT_MANIFEST_INTEGRITY / COMPONENT_EXISTENCE / COMPONENT_CONTENT_HASH / COMPONENT_SCHEMA_HASH / COMPONENT_ROW_COUNT / FEATURE_FAMILY_COVERAGE / FEATURE_SET_VERSION_MATCH / DATA_SNAPSHOT_BINDING / IDENTITY_FALLBACK_ZERO / BLOCKING_DQ_ZERO | test_happy（十项全 PASS 且顺序即合同序） |
+| status PASS/FAIL/NOT_TESTABLE；不可证明 = blocking | `CheckStatus` StrEnum；删除组件文件 → EXISTENCE FAIL + SCHEMA/ROW NOT_TESTABLE → publish BLOCK | test_not_testable_required_check_blocks_publish |
+| missing required check = FAIL_CLOSED | report 删一个 check（re-bind hash 后）→ BLOCK | test_missing_required_check_blocks_publish |
+| unknown check 不能替代 required check | check 改名为 unknown id → required 集合不完整 → BLOCK | test_unknown_check_cannot_substitute_required |
+| counts 只是摘要 | report.summary 携带派生计数；eligibility = required set 完整 + 全 PASS（_b2_recheck 逻辑） | test_missing/unknown/not_testable 三测 |
+| schema/validation contract 变化缺 coverage 必须测试失败 | contract hash 覆盖版本+check 集+seal 字段+count 源；REQUIRED_VALIDATION_CHECKS = tuple(enum)——新增 check id 即改变合同与 happy 断言 | test_happy 的 check 列表断言 |
+
+## B2-03 — Exact Artifact Identity Seal（§5）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| seal：feature_artifact_set_id + artifact_manifest_hash + component_manifest_hash + validation_contract_hash + validator_code_commit + required_checks_hash | migration 011 ledger 6 新列 + report 同字段；component_manifest_hash 为 B2 全字段公式（file_uri/content/schema hash/row_count/family/version/layer/partition 排序 canonical JSON hash） | happy report 断言 + 各 seal 比对 |
+| component manifest 覆盖 §5 八字段 | 公式输入即八字段 | test_component_registry_change_after_validation_blocks（row_count+1 → BLOCK） |
+| publish 机器重验 sealed identity == current registry | _b2_recheck：current registered artifact_manifest_hash == seal AND registry 重算 component_manifest_hash == seal | test_artifact_manifest_hash_change / test_component_registry_change |
+| 任何 identity 变化 BLOCK | artifact 行改 / component 行改 / 文件 bytes 换 / 文件删除 → 四个独立错误路径（IDENTITY_CHANGED / COMPONENTS_CHANGED / COMPONENT_TAMPERED / COMPONENT_MISSING） | 对应 4 测试 |
+| legacy 无 seal 行不自动 grandfather | report_uri/report_hash NULL → ARTIFACT_VALIDATION_SEAL_REQUIRED BLOCK（需 revalidation）；raw SQL 伪造 0/0 行同样被拒 | test_raw_sql_insert_without_seal_cannot_publish |
+
+## B2-04 — Persisted Validation Evidence / Tamper Closure（§6）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| validation/<id>.json report（§6 字段全集） | `data_root/validation/<artifact_validation_id>.json`（write_file_atomic immutable bytes）：artifact_validation_id / feature_artifact_set_id / validation_version / contract_hash / validator_code_commit / 双 manifest hash / required_checks_hash / checks[]（status+detail）/ summary counts / validated_at | test_happy 解析断言 |
+| ledger 绑定 report_uri + report_hash | migration 011 列；publish 重读 report bytes 重验 | test_report_bytes_tamper_blocks（+hash mismatch） |
+| report missing/tampered/wrong id/wrong artifact/check incomplete → FAIL_CLOSED | REPORT_MISSING / REPORT_TAMPERED / IDENTITY violated / CHECKS violated 四路径 | 对应 4 测试 |
+| details_json 不承担 correctness identity | ledger.detail 只是 checks_hash 前缀摘要；identity 全在 report + seal 列 | 代码审查点 |
+
+## B2-05 — Publish Final Recheck / TOCTOU Closure（§7，Option A）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| transaction 内完成 publish-critical read + final recheck | `_b2_recheck` 在 BEGIN TRANSACTION 之后、supersede/insert 之前执行全部验证重验；precondition（快失败）保留事务外 | 代码结构 + 全部 BLOCK 测试（异常 → ROLLBACK） |
+| 失败 rollback 旧 PUBLISHED 可见 | 既有原子 republish 契约零改动（FREEZE）；PK violation 注入在 recheck 之后 | test_failed_final_gate_preserves_old_published + test_failure_injection scenario D |
+| 组件身份变化的 final recheck | registry 双 hash + **物理 bytes sha256 终验**（超出字面要求：registry 未变但磁盘文件被替换也 BLOCK） | test_component_file_bytes_tamper / test_component_file_missing |
+
+## B2-06 — Latest Validation Policy（§8）
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| old PASS + newer FAIL → 不得选旧 PASS | deterministic 排序（validated_at DESC, artifact_validation_id DESC）取 head；validated_at 由 validator 系统时钟写入 | test_newer_fail_beats_older_pass |
+| newer PASS（同 exact identity + 当前 contract）可用 | append-only 语义 + head 选择 | test_recovery_after_revalidation_pass |
+| caller 不能传历史 PASS id 规避 | publish_snapshot 无 validation id 参数（只消费 head） | 签名审查点 |
+
+## §9 Adversarial Tests 15 项映射
+
+1. caller 提交 fallback=0,dq=0 → 无 production PASS 路径 ✓（count-writer 消失 + AST 守卫 + raw SQL 伪造 BLOCK）
+2. required check 未执行 → NOT eligible ✓（missing check BLOCK）
+3. NOT_TESTABLE → BLOCK ✓（删文件场景）
+4. component missing after validation → BLOCK ✓（COMPONENT_MISSING）
+5. content_hash tamper → BLOCK ✓（COMPONENT_TAMPERED——bytes 终验）
+6. schema_hash tamper → BLOCK ✓（bytes 变化被 sha256 终验覆盖；registry 改法走 COMPONENTS_CHANGED）
+7. row_count tamper → BLOCK ✓（同上两路径）
+8. artifact_manifest_hash mismatch → BLOCK ✓（IDENTITY_CHANGED）
+9. report bytes tamper → BLOCK ✓（REPORT_TAMPERED）
+10. report 换绑其它 artifact set → BLOCK ✓（IDENTITY violated）
+11. old PASS + newer FAIL → BLOCK ✓（latest-head）
+12. legacy 无 B2 seal → BLOCK / 需 revalidation ✓（SEAL_REQUIRED）
+13. validation 后 registry 变化 → final recheck BLOCK ✓（COMPONENTS_CHANGED）
+14. final gate 失败 → 旧 PUBLISHED 保留 ✓（rollback）
+15. 有效 report + 未变 artifact → PASS 且绑定 exact id ✓
+
+AST/structural guard ✓（INSERT 唯一性 + 签名禁参）。
+
+## §10 Frozen Contracts 零回归
+
+append-only ledger / publish 绑定 validation_id / at-most-one-PUBLISHED / 原子 rollback（scenario D）/ lineage gates（12 测试）/ feature-set immutable / universe checks / exact replay readers / B1+A3+A2+CR-1 冻结契约（全量 819/0）。migration 011 从零 + idempotent + tamper/sequence 守卫全过（11 链）；未改旧 migration 文件。
+
+## §12 Governance
+
+- **ADR-021 Publish Validation Exactness**（新 ADR；含五问完整回答、被拒替代方案（内部 primitive / Option B seal 对象 / counts 作参数）、成本与残余风险如实记录——DQ 事实流完备性属 feature pipeline 治理链，非 B2 范围）
+- DEVELOPMENT_MANAGEMENT.md：头部（R4-B1 全链 CLOSED/FREEZE + R4-B2 DONE/PENDING_REVIEW + CR-2 BLOCKED_BY_R4-B2）+ §40/§41 重写 + §61 DM-CR-20260830-054/055/056
+- DEVLOG.md 顶部新条目（2026-08-30 R4-B2）
+- 本 Implementation Mapping；exact SHA 与 job-level CI truth 推送后回填
+
+## Verification Summary
+
+- Local: **819 / 0**（801 → 819，+18）；ruff check / ruff format --check / mypy 全绿；CI 同款命令 `uv run pytest` 复验 819/0
+- 既有回归零破坏（§10 全列表）
+- §11 scope boundary 遵守：未启动 CR-2/CR-3/CR-4/Feature/State；仅新增 validation contract/report/ledger 扩展/artifact integrity reader/publish final-recheck executor/migration+tests

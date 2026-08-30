@@ -121,6 +121,7 @@ class TestScenarioD_PublishTransactionFailure:
                     feature_set_version="skeleton-v0",
                     universes=[("ALL_A", "v1"), ("ALL_A", "v1")],  # PK violation
                     quality_grade="SHOULD-NOT-APPEAR",
+                    data_root=base_run.data_root,
                 )
             # old PUBLISHED preserved untouched
             latest = latest_published(conn, date(2026, 8, 14))
@@ -170,6 +171,7 @@ class TestScenarioD_PublishTransactionFailure:
                     feature_set_version="skeleton-v0",
                     universes=[("ALL_A", "v1")],
                     pipeline_run_id=probe_run,
+                    data_root=base_run.data_root,
                 )
             latest = latest_published(conn, date(2026, 8, 14))
             assert latest["publish_id"] == base_run.publish_ids[0]

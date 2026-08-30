@@ -13,6 +13,45 @@
 
 ---
 
+## 2026-08-30 · R4-B2 Publish Validation Exactness（R4-B1 全链 CLOSED 后首个批次：formal validation boundary 全落地）
+
+**Scope**
+- R4-B1.2 复审（audit 20260830 18:01 +08:00）裁决 **R4-B1 / B1.1 / B1.2 全链 VERIFIED / CLOSED / FREEZE**（除真实可复现 regression 不再重审）；本批 R4-B2 落地 B2-01..06（**未启动 CR-2/CR-3/CR-4/Feature/State**——遵守 §11 scope boundary，R4-B2 只做 Publish Validation Exactness）
+
+**Implementation**
+- **B2-01 Formal Artifact Validation Execution Boundary（DM-CR-20260830-054，新 ADR-021）**：新模块 `pipeline/artifact_validation.py`——`validate_artifact_for_publish` 为唯一正式 validation 执行边界（resolve registry → 物理字节重验 → typed checks → 派生 counts → seal → 持久化 report → inline INSERT；沿 B1.2 Option A 模式）。旧 `record_artifact_validation` **从生产命名空间删除**（caller-facing count-writer 消灭）；`meta_artifact_validation` 的 INSERT 全仓库唯一出现在边界函数内（AST 守卫 + 签名禁参检查）。**counts 是派生值**：新表 `meta_artifact_dq_finding`（migration 011，append-only 坏事实，finding_class 白名单 IDENTITY_FALLBACK/BLOCKING_DQ）；`record_artifact_dq_finding` 只能追加坏事实（使 publish 更难），结构上不可能制造 PASS
+- **B2-02 Typed Publish Validation Contract（DM-CR-20260830-054）**：`ArtifactValidationCheckId` 十类 required check（工作要求 §4 全集）；status PASS/FAIL/NOT_TESTABLE（NOT_TESTABLE = blocking）；物理字节级重验（content sha256 / parquet schema canonical text / parquet row_count 逐组件）；FEATURE_FAMILY_COVERAGE：components (family,version) distinct == feature_set_member (id,version) 集合（mock_e2e component feature_family 对齐 member id——registry 行为适配，物理 bytes 不变）；`validation_contract_hash()`：contract 身份（版本 + check 集 + seal 字段 + count 源）
+- **B2-03/B2-04 Exact Seal + Persisted Report（DM-CR-20260830-055）**：migration 011 ledger 新增 6 列（artifact_manifest_hash / component_manifest_hash（B2 全字段公式）/ validation_contract_hash / report_uri / report_hash / required_checks_hash）；report 物理落盘 `data_root/validation/<validation_id>.json`（write_file_atomic，immutable bytes，含全部 seal + checks[] + derived summary counts）；ledger.detail 只是摘要，correctness identity 全在 report
+- **B2-05 Publish Final Recheck / TOCTOU Closure（DM-CR-20260830-056，Reviewer 推荐 Option A）**：publish_snapshot 新增 required `data_root`；publish-critical 重验移入事务内（`_b2_recheck`）：deterministic latest-head → legacy 无 seal BLOCK → report bytes hash + 身份比对 → current registry 双 hash == seal → required checks 完整且全 PASS → counts==0 → **物理字节终验**（每组件文件存在 + sha256 == 注册 content_hash——validate 后文件被替换即使 registry 未变也 BLOCK）。失败 → ROLLBACK → 旧 PUBLISHED 保留
+- **B2-06 Latest-Head Policy**：排序键 deterministic（validated_at DESC, id DESC）；newer FAIL 压过 old PASS；legacy 不可选；revalidation 后 newer PASS 可选；caller 无 API 传历史 validation id
+- **既有测试迁移**：record_artifact_validation 三处调用改 DQ facts + formal validator；publish_snapshot 调用加 data_root（3 个测试文件 + mock_e2e）；断言更新为 check-level 错误（更强阻断路径——fallback/dq 场景现在被 IDENTITY_FALLBACK_ZERO/BLOCKING_DQ_ZERO check 阻断而非 counts gate）；migrations 测试 10→11 + 011 硬编码冲突修复
+
+**Schema / Contract Changes**
+- C1 ×3（DM-CR-20260830-054/055/056）；**新 ADR-021**（按工作要求 §12：不扩充 ADR-020；含五问与替代方案拒绝理由、残余风险如实记录）
+- **migration 011**：meta_artifact_dq_finding 新表 + ledger 6 新列（from-zero + idempotent + tamper 守卫测试全过；未修改任何旧 migration 文件）
+- 新模块 `pipeline/artifact_validation.py`；`publish.py` 重构（record_artifact_validation 删除 + _b2_recheck 事务内重验 + data_root 参数）；`mock_e2e.py` 迁移 formal validator
+
+**Verification**
+- Local: **819 tests passed / 0 failed**（801 → 819，+18：anti-declare 3 + typed checks 4 + seal/tamper 7 + latest-head 2 + binding/rollback 2）；ruff check / ruff format --check / mypy 全绿；**CI 同款命令 `uv run pytest` 复验 819/0**
+- 既有回归零破坏：publish lineage gate（12）/ validation gate 迁移后 25/0 / failure injection scenario D（rollback 语义 FREEZE）/ migrations 11 链 / mock e2e
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+
+**Implementation Status**
+- DONE（B2-01..06 全部 + 迁移；819/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- counts 派生源选持久化 DQ 事实表而非 validation 参数：caller 只能**追加坏事实**（finding 白名单 + append-only），无法注入 PASS——这是"计数可信"的最小结构；事实流完备性属 feature pipeline DQ 治理链（CR-3 域），残余风险已在 ADR-021 §4 如实记录
+- B2 component manifest hash 采用**新全字段公式**（含 file_uri）而非复用注册时 compute_manifest_hash：注册公式的 dataset 字段不持久化于 component 行（mock 的 "security_feature_skeleton" 无从重算）；B2 seal 快照注册值 + 自算全字段值，publish 重验两者，语义完备
+- publish 重验加**物理字节终验**（超出工作要求字面）：registry 未变但磁盘文件被替换的场景（adversarial #5-#7）只有 bytes 级重算能抓住——schema/row 任何改动都改变 bytes，故 sha256 一层覆盖三个 tamper 场景
+- schema_hash 复算用 arrow→duckdb 类型映射生成 canonical "name TYPE" 文本（与注册时 schema_hash_of(文本) 同公式）；未映射类型抛错使该 check 走 FAIL/NOT_TESTABLE——fail closed
+- mock_e2e 的 feature_family 列值从 "skeleton" 对齐为 member id "SKELETON_CLOSE"：FEATURE_FAMILY_COVERAGE 的可机器验证要求 registry 行为一致；物理文件/partition_key/manifest hash 均不变
+
+**下一步**
+- 等 Reviewer 复审 R4-B2（§13 Exit Gate 17 项：anti-declare / 唯一边界 / counts 派生 / typed checks / exact seal / report hash-bound / publish 重验 / changed/missing/tampered invalidation / legacy / latest-head / transaction 内 recheck / rollback / exact binding / frozen regressions / full CI / governance truth）；VERIFIED 后 CR-2 Provider-Normalized + Quarantine START
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 ## 2026-08-30 · R4-B1.2 最终 Approval Boundary + Industry Endpoint 收口（R4-B1.1 复审两 P0 blocker 全部收口）
 
 **Scope**

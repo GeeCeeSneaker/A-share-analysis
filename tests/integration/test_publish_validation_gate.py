@@ -11,7 +11,8 @@ import pytest
 from ashare_state.pipeline import (
     PublishStateError,
     publish_snapshot,
-    record_artifact_validation,
+    record_artifact_dq_finding,
+    validate_artifact_for_publish,
 )
 from ashare_state.pipeline.mock_e2e import (
     SKELETON_FEATURE_SET_VERSION,
@@ -55,6 +56,7 @@ def _kwargs(conn, base) -> dict:
         "feature_set_version": SKELETON_FEATURE_SET_VERSION,
         "universes": [("ALL_A", "v1")],
         "pipeline_run_id": recovery_run,
+        "data_root": base.data_root,
     }
 
 
@@ -75,26 +77,44 @@ class TestArtifactValidationGate:
 
     def test_publish_blocks_fallback_count(self, base):
         with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
-            record_artifact_validation(
+            record_artifact_dq_finding(
                 conn,
                 feature_artifact_set_id=base.feature_artifact_set_id,
-                validation_version="v",
-                identity_fallback_count=1,
-                blocking_dq_count=0,
+                finding_class="IDENTITY_FALLBACK",
             )
-            with pytest.raises(PublishStateError, match="identity_fallback_count=1"):
+            validate_artifact_for_publish(
+                conn,
+                data_root=base.data_root,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+                validator_code_commit="test-commit",
+            )
+            with pytest.raises(PublishStateError, match="IDENTITY_FALLBACK_ZERO"):
                 publish_snapshot(conn, **_kwargs(conn, base))
 
     def test_publish_blocks_blocking_dq(self, base):
         with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
-            record_artifact_validation(
+            record_artifact_dq_finding(
                 conn,
                 feature_artifact_set_id=base.feature_artifact_set_id,
-                validation_version="v",
-                identity_fallback_count=0,
-                blocking_dq_count=3,
+                finding_class="BLOCKING_DQ",
             )
-            with pytest.raises(PublishStateError, match="blocking_dq_count=3"):
+            record_artifact_dq_finding(
+                conn,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+                finding_class="BLOCKING_DQ",
+            )
+            record_artifact_dq_finding(
+                conn,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+                finding_class="BLOCKING_DQ",
+            )
+            validate_artifact_for_publish(
+                conn,
+                data_root=base.data_root,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+                validator_code_commit="test-commit",
+            )
+            with pytest.raises(PublishStateError, match="BLOCKING_DQ_ZERO"):
                 publish_snapshot(conn, **_kwargs(conn, base))
 
 

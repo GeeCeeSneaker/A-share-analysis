@@ -11,10 +11,26 @@ ruling on atomic republish):
   (DuckDB has no partial unique index).
 - Readers NEVER glob directories; artifact files resolve exclusively via
   meta_feature_artifact_component of the publish's artifact set.
+
+R4-B2 (audit 20260830) Publish Validation Exactness:
+
+- validation records are written ONLY by the formal boundary
+  ``pipeline.artifact_validation.validate_artifact_for_publish`` (the old
+  caller-facing count-writer ``record_artifact_validation`` is GONE);
+- the publish-critical validation recheck (report bytes hash, ledger
+  identity, exact artifact/component seal, required-check completeness)
+  runs INSIDE the publish transaction (B2-05 Option A) - the precheck
+  TOCTOU window is closed;
+- the latest-head policy (B2-06) is deterministic (validated_at DESC,
+  artifact_validation_id DESC): a newer FAIL record makes an older PASS
+  non-publishable, and legacy rows without the B2 seal require
+  revalidation.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -32,43 +48,192 @@ class PublishStateError(PublishError):
     """Preconditions for publishing are not met."""
 
 
-def record_artifact_validation(
+def _b2_recheck(
     conn: DuckDBPyConnection,
     *,
+    data_root: Path,
     feature_artifact_set_id: str,
-    validation_version: str,
-    identity_fallback_count: int,
-    blocking_dq_count: int,
-    validator_code_commit: str | None = None,
-    validation_hash: str | None = None,
-    details_json: str | None = None,
 ) -> str:
-    """APPEND a validation record to the ledger (R3-P1-01).
+    """B2-05 Option A: the publish-critical validation recheck, executed
+    INSIDE the publish transaction. Returns the artifact_validation_id
+    the publish will bind. Raises PublishStateError (fail closed) on:
 
-    Every call inserts a NEW artifact_validation_id - validations are
-    immutable history. The publish gate binds the LATEST record for the
-    artifact set, and old publishes keep answering "which validation
-    approved me" via meta_publish_snapshot.artifact_validation_id.
-    Returns the new artifact_validation_id.
+    - no validation record at all;
+    - legacy record without the B2 exact seal (report_uri/report_hash) -
+      requires revalidation;
+    - report file missing / bytes tampered (sha256 != ledger report_hash);
+    - report/ledger identity mismatch (id or artifact set);
+    - sealed artifact manifest != CURRENT registered manifest;
+    - sealed component manifest != manifest re-derived from the CURRENT
+      component registry (component added/removed/changed);
+    - required-check set incomplete or any check not PASS;
+    - derived counts non-zero (validator-derived fallback/DQ findings).
     """
-    from datetime import UTC as _UTC
-    from datetime import datetime as _datetime
-
-    validation_id = f"val-{uuid.uuid4()}"
-    conn.execute(
-        "INSERT INTO meta_artifact_validation VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-            validation_id,
-            feature_artifact_set_id,
-            validation_version,
-            validator_code_commit,
-            int(identity_fallback_count),
-            int(blocking_dq_count),
-            _datetime.now(_UTC),
-            details_json or validation_hash,
-        ],
+    from ashare_state.pipeline.artifact_validation import (
+        REQUIRED_VALIDATION_CHECKS,
+        compute_component_manifest_hash,
     )
-    return validation_id
+
+    validation = conn.execute(
+        "SELECT artifact_validation_id, identity_fallback_count, blocking_dq_count, "
+        "report_uri, report_hash, artifact_manifest_hash, component_manifest_hash "
+        "FROM meta_artifact_validation WHERE feature_artifact_set_id = ? "
+        "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1",
+        [feature_artifact_set_id],
+    ).fetchone()
+    if validation is None:
+        msg = (
+            "ARTIFACT_VALIDATION_REQUIRED violated: no meta_artifact_validation "
+            f"record for {feature_artifact_set_id}; publish is blocked until the "
+            "formal artifact validator (validate_artifact_for_publish) records "
+            "a validation for this artifact set"
+        )
+        raise PublishStateError(msg)
+    (
+        validation_id,
+        fallback_count,
+        dq_count,
+        report_uri,
+        report_hash,
+        seal_artifact_hash,
+        seal_component_hash,
+    ) = validation
+    # B2-03: legacy pre-B2 rows carry no exact seal - they can never be
+    # publish-eligible without revalidation through the formal boundary.
+    if not report_uri or not report_hash:
+        msg = (
+            "ARTIFACT_VALIDATION_SEAL_REQUIRED violated: the latest validation "
+            f"record {validation_id} for {feature_artifact_set_id} has no B2 "
+            "exact seal (legacy pre-B2 row) - revalidate the artifact through "
+            "validate_artifact_for_publish before publishing"
+        )
+        raise PublishStateError(msg)
+    # B2-04: report bytes must still hash to the ledger-bound value
+    report_path = Path(data_root) / str(report_uri)
+    if not report_path.is_file():
+        msg = (
+            "ARTIFACT_VALIDATION_REPORT_MISSING violated: validation report "
+            f"{report_path} not found (bound to {validation_id})"
+        )
+        raise PublishStateError(msg)
+    report_bytes = report_path.read_bytes()
+    if hashlib.sha256(report_bytes).hexdigest() != str(report_hash):
+        msg = (
+            "ARTIFACT_VALIDATION_REPORT_TAMPERED violated: report bytes for "
+            f"{validation_id} do not match the ledger report_hash"
+        )
+        raise PublishStateError(msg)
+    try:
+        report = json.loads(report_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        msg = f"ARTIFACT_VALIDATION_REPORT_TAMPERED violated: unreadable report ({exc})"
+        raise PublishStateError(msg) from exc
+    if report.get("artifact_validation_id") != str(validation_id):
+        msg = (
+            "ARTIFACT_VALIDATION_IDENTITY violated: report artifact_validation_id "
+            f"{report.get('artifact_validation_id')!r} != ledger {validation_id!r}"
+        )
+        raise PublishStateError(msg)
+    if report.get("feature_artifact_set_id") != feature_artifact_set_id:
+        msg = (
+            "ARTIFACT_VALIDATION_IDENTITY violated: report belongs to artifact "
+            f"set {report.get('feature_artifact_set_id')!r}, not "
+            f"{feature_artifact_set_id!r}"
+        )
+        raise PublishStateError(msg)
+    # B2-03: sealed identity == CURRENT registry identity
+    current_row = conn.execute(
+        "SELECT artifact_manifest_hash FROM meta_feature_artifact_set "
+        "WHERE feature_artifact_set_id = ?",
+        [feature_artifact_set_id],
+    ).fetchone()
+    current_artifact_hash = str(current_row[0]) if current_row else ""
+    if current_artifact_hash != str(seal_artifact_hash) or report.get(
+        "artifact_manifest_hash"
+    ) != str(seal_artifact_hash):
+        msg = (
+            "ARTIFACT_IDENTITY_CHANGED violated: sealed artifact manifest "
+            f"{str(seal_artifact_hash)[:16]}... != current registered manifest "
+            f"{current_artifact_hash[:16]}... - the artifact changed after "
+            "validation; revalidation required"
+        )
+        raise PublishStateError(msg)
+    components = conn.execute(
+        "SELECT layer, feature_family, feature_family_version, partition_key, "
+        "file_uri, content_hash, schema_hash, row_count "
+        "FROM meta_feature_artifact_component WHERE feature_artifact_set_id = ? "
+        "ORDER BY file_uri",
+        [feature_artifact_set_id],
+    ).fetchall()
+    keys = (
+        "layer",
+        "feature_family",
+        "feature_family_version",
+        "partition_key",
+        "file_uri",
+        "content_hash",
+        "schema_hash",
+        "row_count",
+    )
+    component_rows = [dict(zip(keys, r, strict=True)) for r in components]
+    current_component_hash = compute_component_manifest_hash(component_rows)
+    if current_component_hash != str(seal_component_hash) or report.get(
+        "component_manifest_hash"
+    ) != str(seal_component_hash):
+        msg = (
+            "ARTIFACT_COMPONENTS_CHANGED violated: sealed component manifest "
+            f"{str(seal_component_hash)[:16]}... != manifest re-derived from "
+            f"the CURRENT registry {current_component_hash[:16]}... - a "
+            "component was added/removed/changed after validation; "
+            "revalidation required"
+        )
+        raise PublishStateError(msg)
+    # B2-05: the physical bytes must STILL hash to the registered
+    # content_hash - a component replaced on disk after validation (with
+    # the registry row untouched) fails closed here (missing file /
+    # tampered bytes: any content/schema/row change alters the bytes).
+    from ashare_state.storage.atomic_files import file_sha256
+
+    for component in component_rows:
+        comp_path = Path(data_root) / str(component["file_uri"])
+        if not comp_path.is_file():
+            msg = (
+                "ARTIFACT_COMPONENT_MISSING violated: component file "
+                f"{comp_path} of {feature_artifact_set_id} is missing at "
+                "publish time"
+            )
+            raise PublishStateError(msg)
+        if file_sha256(comp_path) != str(component["content_hash"]):
+            msg = (
+                "ARTIFACT_COMPONENT_TAMPERED violated: component file "
+                f"{comp_path} bytes do not hash to the registered "
+                "content_hash - the file changed after validation; "
+                "revalidation required"
+            )
+            raise PublishStateError(msg)
+    # B2-02: required-check completeness + all PASS
+    report_checks = {c.get("check_id"): c.get("status") for c in report.get("checks", [])}
+    required_ids = {c.value for c in REQUIRED_VALIDATION_CHECKS}
+    missing = required_ids - set(report_checks)
+    not_pass = sorted(
+        cid for cid, status in report_checks.items() if cid in required_ids and status != "PASS"
+    )
+    if missing or not_pass:
+        msg = (
+            "ARTIFACT_VALIDATION_CHECKS violated: required check set incomplete "
+            f"or not PASS (missing={sorted(missing)}, not_pass={not_pass}) for "
+            f"{validation_id}"
+        )
+        raise PublishStateError(msg)
+    # counts remain the system invariant gate (validator-derived values)
+    if int(fallback_count) != 0 or int(dq_count) != 0:
+        msg = (
+            "ARTIFACT_VALIDATION_GATE violated: "
+            f"identity_fallback_count={fallback_count}, blocking_dq_count={dq_count}; "
+            "fallback identities and blocking DQ findings may never be PUBLISHED"
+        )
+        raise PublishStateError(msg)
+    return str(validation_id)
 
 
 def publish_snapshot(
@@ -80,6 +245,7 @@ def publish_snapshot(
     feature_set_version: str,
     universes: list[tuple[str, str]],
     pipeline_run_id: str,
+    data_root: Path,
     quality_grade: str | None = None,
     publish_id: str | None = None,
 ) -> str:
@@ -105,8 +271,10 @@ def publish_snapshot(
       - run/artifact (code_commit, environment_lock_hash, config_hash) match
       - run/snapshot (source_policy_version, availability_policy_version) match
       - every (universe_id, universe_version) exists in dim_universe
-      - the LATEST append-only meta_artifact_validation record for the set
-        has identity_fallback_count == 0 and blocking_dq_count == 0
+      - R4-B2: INSIDE the transaction, the LATEST append-only validation
+        record is re-verified against the CURRENT artifact identity
+        (exact seal + persisted report + complete required-check set) -
+        see _b2_recheck.
     """
     pid = publish_id or str(uuid.uuid4())
     now = datetime.now(UTC)
@@ -189,58 +357,57 @@ def publish_snapshot(
             "new version instead"
         )
         raise PublishStateError(msg)
-    if pipeline_run_id is not None:
-        run = conn.execute(
-            "SELECT status, code_commit, environment_lock_hash, config_hash, "
-            "source_policy_version, availability_policy_version, run_type "
-            "FROM meta_pipeline_run WHERE pipeline_run_id = ?",
-            [pipeline_run_id],
-        ).fetchone()
-        if run is None:
+    run = conn.execute(
+        "SELECT status, code_commit, environment_lock_hash, config_hash, "
+        "source_policy_version, availability_policy_version, run_type "
+        "FROM meta_pipeline_run WHERE pipeline_run_id = ?",
+        [pipeline_run_id],
+    ).fetchone()
+    if run is None:
+        msg = (
+            f"SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: pipeline run "
+            f"{pipeline_run_id} not registered"
+        )
+        raise PublishStateError(msg)
+    if run[0] != "FEATURE_VALIDATED":
+        msg = (
+            f"SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: pipeline run "
+            f"{pipeline_run_id} status is {run[0]}, expected FEATURE_VALIDATED"
+        )
+        raise PublishStateError(msg)
+    is_recovery = str(run[6]) == "RECOVERY"
+    # R2-P0-06: artifact <-> run binding. A RECOVERY run may re-publish
+    # an artifact produced by another run (that is its purpose); normal
+    # runs must be the artifact's producing run.
+    if not is_recovery and art[3] is not None and art[3] != pipeline_run_id:
+        msg = (
+            "RUN_ARTIFACT_LINEAGE_VALID violated: artifact "
+            f"{feature_artifact_set_id} was computed by run {art[3]}, "
+            f"but this publish references run {pipeline_run_id}"
+        )
+        raise PublishStateError(msg)
+    for label, run_value, art_value in (
+        ("code_commit", run[1], art[4]),
+        ("environment_lock_hash", run[2], art[5]),
+        ("config_hash", run[3], art[6]),
+    ):
+        if run_value is not None and art_value is not None and run_value != art_value:
             msg = (
-                f"SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: pipeline run "
-                f"{pipeline_run_id} not registered"
+                f"RUN_ARTIFACT_LINEAGE_VALID violated: {label} mismatch "
+                f"(run={run_value!r}, artifact={art_value!r})"
             )
             raise PublishStateError(msg)
-        if run[0] != "FEATURE_VALIDATED":
+    # R2-P0-06: run <-> snapshot policy binding (006 columns)
+    for label, run_value, snap_value in (
+        ("source_policy_version", run[4], snap[1]),
+        ("availability_policy_version", run[5], snap[2]),
+    ):
+        if run_value is not None and snap_value is not None and run_value != snap_value:
             msg = (
-                f"SNAPSHOT_ARTIFACT_LINEAGE_VALID violated: pipeline run "
-                f"{pipeline_run_id} status is {run[0]}, expected FEATURE_VALIDATED"
+                f"RUN_SNAPSHOT_POLICY_LINEAGE_VALID violated: {label} mismatch "
+                f"(run={run_value!r}, snapshot={snap_value!r})"
             )
             raise PublishStateError(msg)
-        is_recovery = str(run[6]) == "RECOVERY"
-        # R2-P0-06: artifact <-> run binding. A RECOVERY run may re-publish
-        # an artifact produced by another run (that is its purpose); normal
-        # runs must be the artifact's producing run.
-        if not is_recovery and art[3] is not None and art[3] != pipeline_run_id:
-            msg = (
-                "RUN_ARTIFACT_LINEAGE_VALID violated: artifact "
-                f"{feature_artifact_set_id} was computed by run {art[3]}, "
-                f"but this publish references run {pipeline_run_id}"
-            )
-            raise PublishStateError(msg)
-        for label, run_value, art_value in (
-            ("code_commit", run[1], art[4]),
-            ("environment_lock_hash", run[2], art[5]),
-            ("config_hash", run[3], art[6]),
-        ):
-            if run_value is not None and art_value is not None and run_value != art_value:
-                msg = (
-                    f"RUN_ARTIFACT_LINEAGE_VALID violated: {label} mismatch "
-                    f"(run={run_value!r}, artifact={art_value!r})"
-                )
-                raise PublishStateError(msg)
-        # R2-P0-06: run <-> snapshot policy binding (006 columns)
-        for label, run_value, snap_value in (
-            ("source_policy_version", run[4], snap[1]),
-            ("availability_policy_version", run[5], snap[2]),
-        ):
-            if run_value is not None and snap_value is not None and run_value != snap_value:
-                msg = (
-                    f"RUN_SNAPSHOT_POLICY_LINEAGE_VALID violated: {label} mismatch "
-                    f"(run={run_value!r}, snapshot={snap_value!r})"
-                )
-                raise PublishStateError(msg)
     if not universes:
         msg = "at least one (universe_id, universe_version) is required"
         raise PublishStateError(msg)
@@ -255,32 +422,17 @@ def publish_snapshot(
                 f"({universe_id}, {universe_version}) not registered in dim_universe"
             )
             raise PublishStateError(msg)
-    # R2-P0-05 + R3-P1-01: the LATEST append-only validation record is the
-    # system invariant; the publish binds its artifact_validation_id
-    validation = conn.execute(
-        "SELECT artifact_validation_id, identity_fallback_count, blocking_dq_count "
-        "FROM meta_artifact_validation WHERE feature_artifact_set_id = ? "
-        "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1",
-        [feature_artifact_set_id],
-    ).fetchone()
-    if validation is None:
-        msg = (
-            "ARTIFACT_VALIDATION_REQUIRED violated: no meta_artifact_validation "
-            f"record for {feature_artifact_set_id}; publish is blocked until the "
-            "artifact validator records identity_fallback_count and blocking_dq_count"
-        )
-        raise PublishStateError(msg)
-    if validation[1] != 0 or validation[2] != 0:
-        msg = (
-            "ARTIFACT_VALIDATION_GATE violated: "
-            f"identity_fallback_count={validation[1]}, blocking_dq_count={validation[2]}; "
-            "fallback identities and blocking DQ findings may never be PUBLISHED"
-        )
-        raise PublishStateError(msg)
-    artifact_validation_id = validation[0]
 
     conn.execute("BEGIN TRANSACTION")
     try:
+        # B2-05 Option A: the publish-critical validation recheck runs
+        # INSIDE the transaction - no TOCTOU window between precheck and
+        # the publish write.
+        artifact_validation_id = _b2_recheck(
+            conn,
+            data_root=data_root,
+            feature_artifact_set_id=feature_artifact_set_id,
+        )
         existing = conn.execute(
             "SELECT publish_id FROM meta_publish_snapshot "
             "WHERE trade_date = ? AND status = 'PUBLISHED'",
@@ -314,12 +466,11 @@ def publish_snapshot(
                 "INSERT INTO meta_publish_universe VALUES (?, ?, ?)",
                 [pid, universe_id, universe_version],
             )
-        if pipeline_run_id is not None:
-            conn.execute(
-                "UPDATE meta_pipeline_run SET status = 'PUBLISHED', ended_at = ? "
-                "WHERE pipeline_run_id = ?",
-                [now, pipeline_run_id],
-            )
+        conn.execute(
+            "UPDATE meta_pipeline_run SET status = 'PUBLISHED', ended_at = ? "
+            "WHERE pipeline_run_id = ?",
+            [now, pipeline_run_id],
+        )
         # in-transaction uniqueness guard: at most one PUBLISHED per trade_date
         count_row = conn.execute(
             "SELECT count(*) FROM meta_publish_snapshot "

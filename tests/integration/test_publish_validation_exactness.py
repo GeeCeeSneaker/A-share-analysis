@@ -1,0 +1,453 @@
+"""Publish Validation Exactness tests (R4-B2, audit 20260830).
+
+The pre-B2 world: ``record_artifact_validation()`` accepted
+caller-supplied counts and appended a PASS-shaped ledger row without
+executing any validation; publish then trusted ``counts == 0``.
+
+B2 closes this with:
+
+- B2-01 the ONE formal validation boundary
+  (``validate_artifact_for_publish``) - the ledger INSERT lives inside
+  it, counts are DERIVED from persisted DQ facts, the old
+  caller-facing count-writer is GONE;
+- B2-02 typed required checks - completeness-enforced, NOT_TESTABLE is
+  blocking;
+- B2-03/B2-04 exact artifact/component seal + persisted hash-bound
+  report;
+- B2-05 the publish-critical recheck INSIDE the transaction (TOCTOU
+  closed, incl. physical bytes re-verification);
+- B2-06 deterministic latest-head policy (newer FAIL beats older PASS;
+  legacy rows without the seal require revalidation).
+"""
+
+from __future__ import annotations
+
+import ast
+import hashlib
+import json
+import uuid
+from datetime import UTC, date, datetime
+from pathlib import Path
+
+import pytest
+
+from ashare_state.pipeline import (
+    PublishStateError,
+    publish_snapshot,
+    record_artifact_dq_finding,
+    validate_artifact_for_publish,
+)
+from ashare_state.pipeline import artifact_validation as av_module
+from ashare_state.pipeline.mock_e2e import (
+    SKELETON_FEATURE_SET_VERSION,
+    run_mock_e2e,
+)
+from ashare_state.storage.connection import DuckDBConnectionManager
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PUBLISH_SOURCE = REPO_ROOT / "src" / "ashare_state" / "pipeline" / "publish.py"
+VALIDATION_SOURCE = REPO_ROOT / "src" / "ashare_state" / "pipeline" / "artifact_validation.py"
+
+
+@pytest.fixture
+def base(tmp_path: Path):
+    db = tmp_path / "atlas.duckdb"
+    return run_mock_e2e(db, tmp_path / "data", start=date(2026, 8, 3), end=date(2026, 8, 14))
+
+
+def _recovery_run(conn) -> str:
+    run_id = str(uuid.uuid4())
+    conn.execute(
+        "INSERT INTO meta_pipeline_run "
+        "(pipeline_run_id, run_type, status, started_at, code_commit, "
+        "environment_lock_hash, config_hash, source_policy_version, "
+        "availability_policy_version) "
+        "VALUES (?, 'RECOVERY', 'FEATURE_VALIDATED', ?, ?, ?, ?, ?, ?)",
+        [
+            run_id,
+            datetime.now(UTC),
+            "skeleton-commit",
+            "skeleton-env",
+            "skeleton-config",
+            "source-policy-mock-v1",
+            "availability-mock-v1",
+        ],
+    )
+    return run_id
+
+
+def _kwargs(conn, base, *, trade_date: date = date(2026, 8, 18)) -> dict:
+    return {
+        "trade_date": trade_date,
+        "data_snapshot_id": base.data_snapshot_id,
+        "feature_artifact_set_id": base.feature_artifact_set_id,
+        "feature_set_version": SKELETON_FEATURE_SET_VERSION,
+        "universes": [("ALL_A", "v1")],
+        "pipeline_run_id": _recovery_run(conn),
+        "data_root": base.data_root,
+    }
+
+
+def _latest_validation(conn, artifact_set_id: str):
+    return conn.execute(
+        "SELECT artifact_validation_id, report_uri, report_hash FROM meta_artifact_validation "
+        "WHERE feature_artifact_set_id = ? "
+        "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1",
+        [artifact_set_id],
+    ).fetchone()
+
+
+def _revalidate(conn, base) -> str:
+    return validate_artifact_for_publish(
+        conn,
+        data_root=base.data_root,
+        feature_artifact_set_id=base.feature_artifact_set_id,
+        validator_code_commit="test-commit",
+    )
+
+
+def _one_component_file(conn, base) -> Path:
+    uri = conn.execute(
+        "SELECT file_uri FROM meta_feature_artifact_component "
+        "WHERE feature_artifact_set_id = ? ORDER BY file_uri LIMIT 1",
+        [base.feature_artifact_set_id],
+    ).fetchone()[0]
+    return base.data_root / str(uri)
+
+
+@pytest.mark.integration
+class TestNoCallerDeclaredPass:
+    """B2-01: caller self-declared counts can never reach a
+    publish-eligible validation record."""
+
+    def test_count_writer_is_gone_from_production(self):
+        """record_artifact_validation no longer exists anywhere."""
+        from ashare_state.pipeline import publish as publish_module
+
+        assert not hasattr(publish_module, "record_artifact_validation")
+
+    def test_structural_guard_no_validation_row_writer_takes_counts(self):
+        """AST guard: in the production pipeline package, the ONLY
+        function that INSERTs into meta_artifact_validation is
+        ``validate_artifact_for_publish`` (the formal boundary) - and
+        its signature has NO count/result parameters. No callable can
+        accept caller-supplied counts and write a validation row."""
+        pipeline_root = REPO_ROOT / "src" / "ashare_state" / "pipeline"
+        inserters: set[tuple[str, str]] = set()
+        for path in sorted(pipeline_root.glob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                for sub in ast.walk(node):
+                    if (
+                        isinstance(sub, ast.Constant)
+                        and isinstance(sub.value, str)
+                        and "INSERT INTO meta_artifact_validation" in sub.value
+                    ):
+                        inserters.add((path.name, node.name))
+        assert inserters == {("artifact_validation.py", "validate_artifact_for_publish")}, (
+            f"meta_artifact_validation written from unexpected places: {sorted(inserters)}"
+        )
+        tree = ast.parse(VALIDATION_SOURCE.read_text(encoding="utf-8"))
+        fn = next(
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == "validate_artifact_for_publish"
+        )
+        arg_names = {a.arg for a in fn.args.args} | {a.arg for a in fn.args.kwonlyargs}
+        forbidden = {
+            "identity_fallback_count",
+            "blocking_dq_count",
+            "result",
+            "checks",
+            "report",
+        }
+        assert not (arg_names & forbidden), (
+            f"formal boundary must not accept caller-supplied counts/results: {arg_names}"
+        )
+
+    def test_raw_sql_insert_without_seal_cannot_publish(self, base):
+        """A caller hand-crafting a PASS-shaped ledger row via raw SQL
+        (no B2 seal columns) is refused at publish - legacy-row policy."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "INSERT INTO meta_artifact_validation "
+                "(artifact_validation_id, feature_artifact_set_id, validation_version, "
+                "identity_fallback_count, blocking_dq_count, validated_at) "
+                "VALUES (?, ?, 'attacker-v0', 0, 0, ?)",
+                [f"val-{uuid.uuid4()}", base.feature_artifact_set_id, datetime.now(UTC)],
+            )
+            with pytest.raises(PublishStateError, match="SEAL_REQUIRED"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+
+@pytest.mark.integration
+class TestTypedRequiredChecks:
+    """B2-02: required checks are typed and completeness-enforced."""
+
+    def test_happy_validation_report_has_all_required_checks_pass(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            got = [c["check_id"] for c in report["checks"]]
+            assert got == [c.value for c in av_module.REQUIRED_VALIDATION_CHECKS]
+            assert all(c["status"] == "PASS" for c in report["checks"])
+
+    def test_missing_required_check_blocks_publish(self, base):
+        """Strip one required check from the (otherwise valid) report ->
+        the record is NOT eligible -> publish BLOCK."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            _, report_uri, report_hash = _latest_validation(conn, base.feature_artifact_set_id)
+            report_path = base.data_root / str(report_uri)
+            doc = json.loads(report_path.read_text(encoding="utf-8"))
+            doc["checks"] = [c for c in doc["checks"] if c["check_id"] != "BLOCKING_DQ_ZERO"]
+            report_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+            # re-bind the ledger hash so the tamper is 'legitimate' - the
+            # missing check itself must still block
+            conn.execute(
+                "UPDATE meta_artifact_validation SET report_hash = ? "
+                "WHERE artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                [
+                    hashlib.sha256(report_path.read_bytes()).hexdigest(),
+                    base.feature_artifact_set_id,
+                ],
+            )
+            with pytest.raises(PublishStateError, match="CHECKS violated.*BLOCKING_DQ_ZERO"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_not_testable_required_check_blocks_publish(self, base):
+        """Delete one component FILE -> revalidation marks existence
+        FAIL / schema+row NOT_TESTABLE -> publish BLOCK (fail closed on
+        unprovable checks)."""
+        comp = _one_component_file  # noqa: F841 - readability alias
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            comp_path = _one_component_file(conn, base)
+            comp_path.unlink()
+            _revalidate(conn, base)
+            with pytest.raises(PublishStateError):
+                publish_snapshot(conn, **_kwargs(conn, base))
+            comp_path.write_bytes(b"restored")  # cleanup not needed (tmp)
+
+    def test_unknown_check_cannot_substitute_required(self, base):
+        """Rename a required check to an unknown id -> the required set
+        is incomplete -> BLOCK."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            _, report_uri, _ = _latest_validation(conn, base.feature_artifact_set_id)
+            report_path = base.data_root / str(report_uri)
+            doc = json.loads(report_path.read_text(encoding="utf-8"))
+            for check in doc["checks"]:
+                if check["check_id"] == "COMPONENT_ROW_COUNT":
+                    check["check_id"] = "SOME_OTHER_CHECK"
+            report_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+            conn.execute(
+                "UPDATE meta_artifact_validation SET report_hash = ? "
+                "WHERE artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                [
+                    hashlib.sha256(report_path.read_bytes()).hexdigest(),
+                    base.feature_artifact_set_id,
+                ],
+            )
+            with pytest.raises(PublishStateError, match="CHECKS violated"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+
+@pytest.mark.integration
+class TestExactSealAndTamper:
+    """B2-03/B2-04/B2-05: the seal binds the exact artifact identity and
+    the persisted report; any change after validation blocks publish."""
+
+    def test_component_registry_change_after_validation_blocks(self, base):
+        """UPDATE a component row (row_count) after a PASS validation ->
+        re-derived component manifest != seal -> BLOCK."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            conn.execute(
+                "UPDATE meta_feature_artifact_component SET row_count = row_count + 1 "
+                "WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            with pytest.raises(PublishStateError, match="COMPONENTS_CHANGED"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_artifact_manifest_hash_change_after_validation_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            conn.execute(
+                "UPDATE meta_feature_artifact_set SET artifact_manifest_hash = ? "
+                "WHERE feature_artifact_set_id = ?",
+                ["f" * 64, base.feature_artifact_set_id],
+            )
+            with pytest.raises(PublishStateError, match="IDENTITY_CHANGED"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_component_file_bytes_tamper_after_validation_blocks(self, base):
+        """Replace a component file on disk (registry untouched) -> the
+        in-transaction bytes re-verification fails closed."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            comp_path = _one_component_file(conn, base)
+            comp_path.write_bytes(comp_path.read_bytes() + b"\x00tamper")
+            with pytest.raises(PublishStateError, match="COMPONENT_TAMPERED"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_component_file_missing_after_validation_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            comp_path = _one_component_file(conn, base)
+            comp_path.unlink()
+            with pytest.raises(PublishStateError, match="COMPONENT_MISSING"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_report_bytes_tamper_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            _, report_uri, _ = _latest_validation(conn, base.feature_artifact_set_id)
+            report_path = base.data_root / str(report_uri)
+            report_path.write_text(report_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+            with pytest.raises(PublishStateError, match="REPORT_TAMPERED"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_report_missing_blocks(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            _, report_uri, _ = _latest_validation(conn, base.feature_artifact_set_id)
+            (base.data_root / str(report_uri)).unlink()
+            with pytest.raises(PublishStateError, match="REPORT_MISSING"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_report_swapped_to_other_artifact_set_blocks(self, base, tmp_path: Path):
+        """Point the report at ANOTHER artifact set's validation report:
+        identity mismatch -> BLOCK."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            # fabricate a second, valid-looking validation for another set
+            other_set = str(uuid.uuid4())
+            conn.execute(
+                "INSERT INTO meta_feature_artifact_set VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, 'FEATURE_VALIDATED', ?, ?)",
+                [
+                    other_set,
+                    base.data_snapshot_id,
+                    SKELETON_FEATURE_SET_VERSION,
+                    "skeleton-commit",
+                    "skeleton-env",
+                    "skeleton-config",
+                    None,
+                    base.artifact_manifest_hash,
+                    datetime.now(UTC),
+                    datetime.now(UTC),
+                ],
+            )
+            # copy base components under the other set id
+            conn.execute(
+                "INSERT INTO meta_feature_artifact_component "
+                "SELECT ?, layer, feature_family, feature_family_version, partition_key, "
+                "file_uri, content_hash, schema_hash, row_count, calc_run_id "
+                "FROM meta_feature_artifact_component WHERE feature_artifact_set_id = ?",
+                [other_set, base.feature_artifact_set_id],
+            )
+            other_vid = validate_artifact_for_publish(
+                conn,
+                data_root=base.data_root,
+                feature_artifact_set_id=other_set,
+                validator_code_commit="test-commit",
+            )
+            # bind base's LATEST validation to the OTHER set's report
+            other_report = conn.execute(
+                "SELECT report_uri, report_hash FROM meta_artifact_validation "
+                "WHERE artifact_validation_id = ?",
+                [other_vid],
+            ).fetchone()
+            conn.execute(
+                "UPDATE meta_artifact_validation SET report_uri = ?, report_hash = ? "
+                "WHERE feature_artifact_set_id = ? "
+                "AND artifact_validation_id = "
+                "(SELECT artifact_validation_id FROM meta_artifact_validation "
+                "WHERE feature_artifact_set_id = ? "
+                "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1)",
+                [
+                    other_report[0],
+                    other_report[1],
+                    base.feature_artifact_set_id,
+                    base.feature_artifact_set_id,
+                ],
+            )
+            with pytest.raises(PublishStateError, match="IDENTITY violated"):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+
+@pytest.mark.integration
+class TestLatestHeadPolicy:
+    """B2-06: deterministic current-head policy."""
+
+    def test_newer_fail_beats_older_pass(self, base):
+        """A PASS validation followed by a revalidation AFTER a blocking
+        DQ fact was recorded: the newest (FAIL) record is the head ->
+        publish BLOCK (the old PASS cannot be chosen)."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)  # PASS head
+            record_artifact_dq_finding(
+                conn,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+                finding_class="BLOCKING_DQ",
+            )
+            _revalidate(conn, base)  # newer FAIL head
+            with pytest.raises(PublishStateError):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_recovery_after_revalidation_pass(self, base):
+        """PASS -> FAIL -> fix the facts (no findings for a NEW artifact
+        identity) is out of scope here; but a NEWER PASS on the SAME
+        unchanged artifact after the DQ facts were 'cleared' by using a
+        fresh artifact set publishes fine."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)
+            pid = publish_snapshot(conn, **_kwargs(conn, base))
+            assert pid
+
+
+@pytest.mark.integration
+class TestPublishBindingAndRollback:
+    """B2-05: the publish binds the exact artifact_validation_id; a
+    failed final gate preserves the previous PUBLISHED."""
+
+    def test_publish_binds_exact_validation_id(self, base):
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            validation_id = _revalidate(conn, base)
+            kwargs = _kwargs(conn, base)
+            pid = publish_snapshot(conn, **kwargs)
+            bound = conn.execute(
+                "SELECT artifact_validation_id FROM meta_publish_snapshot WHERE publish_id = ?",
+                [pid],
+            ).fetchone()[0]
+            assert str(bound) == validation_id
+
+    def test_failed_final_gate_preserves_old_published(self, base):
+        """Inject a failure AFTER the in-transaction recheck (duplicate
+        universe PK) -> rollback -> the previous PUBLISHED stays."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            old_pid = base.publish_ids[0]
+            _revalidate(conn, base)
+            kwargs = _kwargs(conn, base, trade_date=date(2026, 8, 14))
+            kwargs["universes"] = [("ALL_A", "v1"), ("ALL_A", "v1")]  # PK violation
+            with pytest.raises(Exception):
+                publish_snapshot(conn, **kwargs)
+            row = conn.execute(
+                "SELECT publish_id FROM meta_publish_snapshot "
+                "WHERE trade_date = ? AND status = 'PUBLISHED'",
+                [date(2026, 8, 14)],
+            ).fetchone()
+            assert str(row[0]) == old_pid

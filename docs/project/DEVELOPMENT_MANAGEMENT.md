@@ -7,13 +7,13 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：R4-B1.2 implementation `261f5967cbd639ce9dd6fe3c8fa2c1abe5f649b4` + CI fix `135298fd670e85a4e0b8b53e10c9117981220137`（tests-only 导入修复；run 33302154703 三腿 success，2026-08-30 API positive confirmation）——基于 Reviewer 复审 HEAD `c2e572d1073c48ae93a4bc57373830ba92306054`（run 33295951987 三腿 success，Reviewer step-level 正向核验）；R4-B1.1 implementation `6f323f38d72c3a8d7ed83430904d19316bcf93a3`（run 33295780707 三腿 success）  
-> **Document Revision**：DM-CR-20260830-049 / 050 / 051 / 052 / 053  
-> **Last Review**：2026-08-30 15:42 +08:00（R4-B1.1 复审：**REOPENED**——大部分 PASS / FREEZE（四层 cross-binding VERIFIED 冻结 / security_master 撤回编组正确 / classification exact-set 守卫正确 / CI green 等 15 项）；2 个 P0 blocker：P0-01 Approval Anti-Bypass 仍是 Python 命名约定非结构性边界（testonly helper 可显式 import / VerifiedCapabilityApproval 可伪造后直调 _persist_verified_capability）、P0-02 industry_taxonomy 只 REQUIRED base_info 却把 constituent 标 optional（与 canonical deliverable bridge_industry_member 不一致）；随 R4-B1.2 收口，见 §41/§61/ADR-020 Amendment R4-B1.2）  
+> **Current Code Baseline**：R4-B2 implementation（本批，2026-08-30）——基于 Reviewer 复审 HEAD `1f5eb3a`（closure / next-work 文档 commit）；R4-B1.2 implementation `261f5967cbd639ce9dd6fe3c8fa2c1abe5f649b4` + CI fix `135298fd670e85a4e0b8b53e10c9117981220137`（run 33302154703 三腿 success）；本批完整 40-char SHA 于推送后回填  
+> **Document Revision**：DM-CR-20260830-054 / 055 / 056  
+> **Last Review**：2026-08-30 18:01 +08:00（R4-B1.2 复审：**VERIFIED——R4-B1 / B1.1 / B1.2 全链 CLOSED / FREEZE**（9 项 VERIFIED：anti-bypass 结构性关闭 / APPROVED inline / tests mechanics 迁出 src / constituent REQUIRED / base_info PASS + constituent DENIED → FAIL / canonical-deliverable guard / B1.1 cross-binding 无回归 / security_master 无回归 / CI green）；R4-B2 为下一活跃批次）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN——run 33302154703（R4-B1.2 主实现 `261f596` + CI fix `135298f`）三腿 success**（2026-08-30 API positive confirmation；R4-B1.2 新增/重写 anti-bypass 真实绕过尝试 7 项 + industry constituent 3 项，801/0 在 Ubuntu+Windows 两 OS 通过；CI 过程：run 33301357374 失败——tests helper 以 `tests.` 包路径导入，`uv run pytest` 不把 cwd 加入 sys.path 导致 collection ImportError——根因修复为同目录顶层导入（`261f596` 含同批 DEVLOG，`135298f` 仅 tests/ 不触发 devlog gate））；run 33295951987（`c2e572d`，Reviewer step-level 正向核验的 R4-B1.1 复审基线）三腿 success；run 33295780707（R4-B1.1 `6f323f3`）三腿 success  
+> **CI Status**：run 33302154703（R4-B1.2 `261f596`+`135298f`）三腿 success（Reviewer 正向核验基线）；本批（R4-B2，819 tests）CI 结果待推送后正向确认回填  
 > **Phase Status（2026-08-30，Reviewer 裁决同步）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 → **DONE / REOPENED**；R4-B1.1 → **DONE / REOPENED（cross-binding + security_master reconciliation PASS/FREEZE）**；R4-B1.2 → **DONE / PENDING_REVIEW**（本批：Final Approval Boundary Option A + Industry Constituent REQUIRED）；R4-B2 → **BLOCKED until R4-B1.2 VERIFIED**；CR-2 → sequenced after R4-B2；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（除真实可复现 regression 不再重审）**；R4-B2 → **DONE / PENDING_REVIEW**（本批：Publish Validation Exactness——formal validation boundary + typed checks + exact seal + transaction 内 recheck）；CR-2 → **BLOCKED_BY_R4-B2 / sequenced after R4-B2**；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
 > **SHA Correction（Reviewer，2026-08-26）**：上批记录的 `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` 有误，以 GitHub commit object 为准：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`（本头部即为修正记录；历史条目原文保留）  
@@ -1082,11 +1082,9 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | VERIFIED (absorbed) | PASS |
 | R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | **VERIFIED** | **R4-A2.x / CR-1.x 审计链 CLOSED（2026-08-26）** |
 | R4-A3 / R4-A3.1 / R4-A3.2 SDK Lifecycle / Gates / Early-Stop 链 | DONE | **CLOSED / VERIFIED / FREEZE** | 全链闭环（Reviewer 2026-08-28 裁决，不重开） |
-| R4-B1 Capability Endpoint Proof | DONE | REOPENED | 机制性建设 PASS / FREEZE；修正项由 R4-B1.1/B1.2 逐层收口 |
-| R4-B1.1 Endpoint Contract Semantics + Cross-Binding | DONE | REOPENED（大部分 PASS / FREEZE） | cross-binding + security_master reconciliation VERIFIED 冻结；anti-bypass 与 industry 语义修正于 R4-B1.2 |
-| R4-B1.2 Final Approval Boundary + Industry Endpoint Closure | DONE | PENDING_REVIEW | 最高优先（本批：Option A 结构性 anti-bypass + constituent REQUIRED；待复核） |
-| R4-B2 Publish Validation Exactness | PLANNED | **BLOCKED until R4-B1.2 VERIFIED** | — |
-| CR-2 Provider-Normalized + Quarantine | PLANNED | sequenced after R4-B2 | — |
+| R4-B1 / B1.1 / B1.2 Capability Endpoint Proof 链 | DONE | **CLOSED / VERIFIED / FREEZE** | 全链闭环（Reviewer 2026-08-30 裁决，除真实 regression 不再重审） |
+| R4-B2 Publish Validation Exactness | DONE | PENDING_REVIEW | 最高优先（本批：formal validation boundary + typed checks + exact seal + transaction 内 recheck；待复核） |
+| CR-2 Provider-Normalized + Quarantine | PLANNED | **BLOCKED_BY_R4-B2** | sequenced after R4-B2 |
 | R4-CI | PLANNED | PENDING | Next |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
 | CR-4 Snapshot + Read Model Rebuild | PLANNED | PENDING | CR-3 后 |
@@ -1099,80 +1097,77 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-B1.2 Final Approval Boundary + Industry Endpoint Closure（本批，DONE / PENDING_REVIEW）
+## R4-B2 Publish Validation Exactness（本批，DONE / PENDING_REVIEW）
 
-R4-B1.1 复审（2026-08-30 15:42 +08:00）裁决 **REOPENED**：大部分 PASS /
-FREEZE（四层 cross-binding VERIFIED 冻结 / security_master 撤回编组
-正确 / classification exact-set 守卫正确 / CI green 等 15 项）；2 个 P0
-blocker 由本批收口（ADR-020 Amendment R4-B1.2；工作要求
-`docs/design/A-share-analysis_R4-B1.1复审与R4-B1.2最终ApprovalBoundary及IndustryEndpoint收口要求_20260830.md`）：
+R4-B1.2 复审（2026-08-30 18:01 +08:00）裁决 **R4-B1 / B1.1 / B1.2 全链
+VERIFIED / CLOSED / FREEZE**；本批 R4-B2 落地（新 ADR-021；工作要求
+`docs/design/A-share-analysis_R4-B1.2复审结论与R4-B2_PublishValidationExactness开发工作要求_20260830.md`）：
 
 ```text
-P0-01 Approval Anti-Bypass 结构性关闭（DM-CR-20260830-052，
-    Reviewer Preferred Option A）：
-  缺陷：R4-B1.1 的"verified object + private boundary"仍是 Python 命名
-    约定非访问控制——_approve_and_persist_capability_testonly() 可被
-    显式 import；VerifiedCapabilityApproval 是普通可实例化 dataclass，
-    caller 伪造后直调 _persist_verified_capability()（只重做
-    _validate_evidence，不重验 formal run）即可 APPROVED。
-  修正（Option A）：生产模块彻底不存在"无需 formal run 即可写
-    APPROVED"的 callable——
-    - 四个 bypass 入口全部删除（_approve_capability_in_memory_testonly
-      / _approve_and_persist_capability_testonly /
-      VerifiedCapabilityApproval / _persist_verified_capability）
-    - 持久化事务（validate-before-mutate / 单事务 / cache-rebuild /
-      UPDATE-only-governance-fields）inline 进 approve_from_spike_run
-      尾部——caller 到达写入点必已通过完整验证链
-    - 测试所需 transaction/cache mechanics 移入
-      tests/integration/_capability_test_persistence.py（tests/ 内）
-    - 对抗测试改为真实绕过尝试：伪造 verified object -> 类不存在；
-      caller-built evidence + frozen id -> 无 importable 路由；
-      AST 守卫：capability.py 中唯一引用 APPROVED 状态（literal / SQL
-      字符串 / CapabilityStatus 属性，排除 docstring）的函数是
-      approve_from_spike_run 且签名无 evidence/verified 参数；
-      src/ 全模块不 import tests.*（AST 扫描）
-P0-02 industry_taxonomy constituent 端点 REQUIRED（DM-CR-20260830-053）：
-  缺陷：capability 名为 industry_taxonomy、canonical domain 为
-    bridge_industry_member（核心交付物 = security <-> industry
-    MEMBERSHIP），但只 REQUIRED base_info（taxonomy definition surface）
-    而 constituent 被标 optional——base_info PASS + constituent DENIED
-    时 ENDPOINT gate 仍 PASS 并可 APPROVED，但 bridge_industry_member
-    无法可靠构建（与 security_master 问题同构：证明代表性 endpoint
-    != 证明必要交付面）。
-  修正：
-    - industry_taxonomy:InfoData.get_industry_constituent =
-      REQUIRED_ENDPOINT_PROOF（requirements + classification 同步，reason
-      绑定 bridge_industry_member 交付语义）
-    - get_industry_weight / get_industry_daily 维持 OPTIONAL，reason
-      显式指向当前消费边界（membership 构建不消费；consumer 变化时
-      重新评估）
-    - provider/target 新增 exact exchange surface
-      get_industry_constituent_exchange（四处同步）
-    - 对抗测试：base_info PASS + constituent DENIED -> ENDPOINT FAIL ->
-      early-stop -> BUSINESS fired==0 -> 失败 exchange 持久化绑定 ->
-      proof case VALIDATED_FAIL -> approval impossible
-    - canonical-deliverable 结构守卫（新测试）：multi-endpoint
-      capability 的 REQUIRED requirements 集合 == canonical 交付面必要
-      端点集合（security_master={hist}；adj_factor={forward}；
-      corporate_action={dividend,right_issue}；industry_taxonomy=
-      {base_info,constituent}；index_daily={query_kline}）——防止
-      "全部 sdk_methods 已分类但必要 method 被分 optional"的形式合规
-      语义失真再次发生
-P1 治理计数更正（Reviewer 补充裁决）：ADR-020 Amendment C.3 的
-    "19 条"经 Reviewer 逐项计数实为 18 条（治理文档数字错误非 runtime
-    缺项）；R4-B1.2 amendment D.3 更正（constituent 是修改既有条目
-    classification 非新增，当前表仍为 18 条）
-Batch D：R4-B1.1 的 anti-bypass 测试集按 Option A 现实重写（7 项真实
-    绕过尝试）；A3/A2/CR-1/B1 冻结契约零回归
+B2-01 Formal Artifact Validation Execution Boundary（DM-CR-20260830-054）：
+  新模块 pipeline/artifact_validation.py：
+    validate_artifact_for_publish(conn, *, data_root,
+      feature_artifact_set_id, validator_code_commit) -> validation_id
+  唯一正式 validation 执行边界：resolve registry -> 物理字节重验 ->
+  typed checks -> 派生 counts -> seal -> 持久化 report -> inline INSERT
+  旧 record_artifact_validation 从生产命名空间删除（caller-facing
+    count-writer 消灭；meta_artifact_validation 的 INSERT 全仓库唯一
+    出现在该边界函数内——AST 守卫强制，签名无 count/result/checks/
+    report 参数）
+  counts 为派生值：新表 meta_artifact_dq_finding（migration 011，
+    append-only 坏事实，finding_class 白名单 IDENTITY_FALLBACK/
+    BLOCKING_DQ）；record_artifact_dq_finding 只能追加坏事实（使
+    publish 更难），结构上不可能制造 PASS
+B2-02 Typed Publish Validation Contract（DM-CR-20260830-054）：
+  ArtifactValidationCheckId 十类 required check（工作要求 §4 全集）；
+  status PASS/FAIL/NOT_TESTABLE（NOT_TESTABLE = blocking）；
+  物理字节级：content sha256 / parquet schema canonical text /
+    parquet row_count 逐组件重验；FEATURE_FAMILY_COVERAGE：components
+    (family,version) distinct == feature_set_member (id,version) 集合
+    （mock_e2e component feature_family 对齐 member id——registry 行为
+    适配，物理 bytes 不变）；validation_contract_hash()：contract 身份
+    （版本 + check 集 + seal 字段 + count 源）——改 check 集即改 hash
+B2-03/B2-04 Exact Seal + Persisted Report（DM-CR-20260830-055）：
+  migration 011 ledger 新增 6 列：artifact_manifest_hash /
+    component_manifest_hash（B2 全字段公式）/ validation_contract_hash /
+    report_uri / report_hash / required_checks_hash
+  report 物理落盘 data_root/validation/<validation_id>.json
+    （write_file_atomic）：全部 seal 字段 + checks[]（status+detail）+
+    derived summary counts；ledger.detail 只是摘要，correctness identity
+    全在 report
+B2-05 Publish Final Recheck / TOCTOU Closure（DM-CR-20260830-056，
+    Reviewer 推荐 Option A）：
+  publish_snapshot 新增 required 参数 data_root；precondition read 保留
+    事务外（快速失败），publish-critical 重验移入事务内（_b2_recheck）：
+    deterministic latest-head（validated_at DESC, id DESC——B2-06：
+    newer FAIL 压过 old PASS；validated_at 系统时钟）-> legacy 无 seal
+    行 BLOCK（需 revalidation）-> report bytes sha256 == ledger hash +
+    id/artifact-set 身份比对 -> current registered artifact manifest ==
+    seal + registry 重算 component manifest == seal（增删改即 BLOCK）->
+    required check 集完整且全 PASS -> counts==0 -> 物理字节终验
+    （每组件文件存在 + sha256 == 注册 content_hash——validate 后文件
+    被替换即使 registry 未变也 BLOCK）
+  失败 -> ROLLBACK -> 旧 PUBLISHED 保留（原子 republish 契约 FREEZE）
+B2-06 Latest Validation Policy：排序键 deterministic；legacy 行不可选；
+  revalidation 后 newer PASS 可选；caller 无 API 传历史 validation id
+Adversarial Tests（test_publish_validation_exactness.py，18 项）：
+  count-writer 消失 + AST 守卫（INSERT 唯一性 + 签名禁参）；raw SQL
+  伪造无 seal 行 -> BLOCK；missing check / unknown check 替代 ->
+  BLOCK；NOT_TESTABLE（删文件）-> BLOCK；component registry 改动 /
+  artifact manifest 改动 / 文件 bytes tamper / 文件删除 -> BLOCK；
+  report bytes tamper / report missing / report 换绑其它 artifact set ->
+  BLOCK；newer FAIL 压过 old PASS；legacy row -> BLOCK；PK violation
+  注入 -> 旧 PUBLISHED 保留；happy publish 绑定 exact validation_id
+既有测试迁移：record_artifact_validation 三处调用改 DQ facts +
+  formal validator；publish_snapshot 调用加 data_root；断言更新为
+  check-level 错误（更强阻断路径）；migrations 测试 10->11 + 011 硬编码
+  冲突修复
 ```
 
-### R4-B1 / R4-B1.1（前批）
+### R4-B1 / B1.1 / B1.2（前批，CLOSED / VERIFIED / FREEZE）
 
-R4-B1 机制性建设（exact-match engine / per-requirement proof case /
-hash-anchored REPORT artifact）与 R4-B1.1 的四层 cross-binding /
-security_master 撤回编组 / classification 守卫全部 FREEZE 保留
-（Reviewer 2026-08-30 裁决：除非可复现 regression 不再重审）；各自复审
-指出的缺口由 R4-B1.1 / R4-B1.2 逐层收口（详见 ADR-020 各 amendment）。
+全链闭环（Reviewer 2026-08-30 裁决：除真实可复现 regression 不再重审）。
+历史细节见各批 Change Log 与 ADR-020（含 Amendments 20260830 C/D）。
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
@@ -1776,6 +1771,39 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260830-056 — Publish Final Recheck / TOCTOU Closure + Latest-Head Policy
+
+**Type**：C1 publish 契约收口  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-B2 B2-05/B2-06（audit 20260830 §7/§8）——publish_snapshot 的 precondition read 与 latest validation selection 在 BEGIN TRANSACTION 之前完成，之后才开写事务（TOCTOU：precheck 与 commit 之间状态变化不被发现，publish 可能 commit 基于旧读数的结论）；latest-head 选择规则未机器明确（old PASS + newer FAIL 时不得选旧 PASS）。  
+**New Contract**（ADR-021 §2.4/2.5）：publish_snapshot 新增 required 参数 `data_root`；publish-critical 重验移入事务内（`_b2_recheck`，Reviewer 推荐 Option A）：（1）deterministic latest-head（validated_at DESC, artifact_validation_id DESC；validated_at 由 validator 系统时钟写入）；（2）legacy 无 seal 行 BLOCK；（3）report bytes sha256 == ledger report_hash + id/artifact-set 身份比对；（4）current registered artifact_manifest_hash == seal 且 registry 重算 component_manifest_hash == seal；（5）required check 集完整且全 PASS；（6）counts==0；（7）物理字节终验（每组件文件存在 + sha256 == 注册 content_hash——validate 后文件被替换即使 registry 未变也 BLOCK）。任何失败 → ROLLBACK → 旧 PUBLISHED 保留（原子 republish 契约 FREEZE）；supersede/insert/universe/run/uniqueness 逻辑零改动。caller 无 API 传历史 validation id。  
+**Tests**：test_publish_validation_exactness.py（newer FAIL 压 old PASS / legacy row BLOCK / registry+bytes tamper ×4 / report tamper/missing/换绑 / PK 注入 rollback / happy 绑定 exact id）；test_failure_injection.py（scenario D rollback 迁移 data_root 后零回归）  
+**ADR**：[ADR-021](../adr/ADR-021_publish_validation_exactness.md) §2.4/2.5  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260830-055 — Exact Artifact Validation Seal / Persisted Report
+
+**Type**：C1 validation 契约扩展  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-B2 B2-03/B2-04（audit 20260830 §5/§6）——ledger 只绑 feature_artifact_set_id 字符串，不绑 artifact/component 的 exact identity（bytes/schema/row/manifest）；validation 无 persisted evidence identity；publish 无法机器重验"这次 PASS 验证的就是现在要发布的字节"。  
+**New Contract**（ADR-021 §2.3）：migration 011 ledger 新增 6 列（artifact_manifest_hash / component_manifest_hash / validation_contract_hash / report_uri / report_hash / required_checks_hash）；component_manifest_hash 采用 B2 全字段公式（file_uri/content/schema hash/row_count/family/version/layer/partition 排序 canonical JSON hash——component 任何增删改都改变它）；validation_contract_hash() 是 check contract 身份（版本 + required check 集 + seal 字段 + count 源）；report 物理落盘 `data_root/validation/<artifact_validation_id>.json`（write_file_atomic，immutable bytes，含全部 seal + checks[] + derived summary counts）；ledger.detail 只是摘要，correctness identity 全在 report。publish 重验 = report bytes hash + ledger 身份 + current registry 双 hash + required checks（见 DM-CR-20260830-056）。  
+**Tests**：happy report 全 check PASS 断言；report tamper/missing/换绑三场景 BLOCK  
+**ADR**：[ADR-021](../adr/ADR-021_publish_validation_exactness.md) §2.3  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
+
+## DM-CR-20260830-054 — Formal Artifact Validation Execution Boundary + Typed Checks
+
+**Type**：C1 新正式路径契约（结构性 anti-bypass）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-B2 B2-01/B2-02（audit 20260830 §2/§3/§4）——record_artifact_validation 直接把 caller 提交的两个计数写进 append-only ledger 而不执行任何 artifact validation（caller self-declare "0/0" → PASS-shaped record → publish eligible，与 B1 早期 approval bypass 同构）；publish gate 只有 aggregate counts，无法证明 required checks 全部执行。  
+**New Contract**（ADR-021 §2.1/2.2）：（1）新模块 `pipeline/artifact_validation.py`——`validate_artifact_for_publish(conn, *, data_root, feature_artifact_set_id, validator_code_commit)` 为唯一正式 validation 执行边界（resolve registry → 物理字节重验 → typed checks → 派生 counts → seal → 持久化 report → inline INSERT；沿 B1.2 Option A 模式，无独立 persistence callable）；（2）旧 `record_artifact_validation` 从生产命名空间删除，meta_artifact_validation 的 INSERT 全仓库唯一出现在边界函数内（AST 守卫；签名无 count/result/checks/report 参数）；（3）新表 `meta_artifact_dq_finding`（migration 011，append-only 坏事实，finding_class 白名单）——counts 由 `SELECT count(*)` 派生，`record_artifact_dq_finding` 只能追加坏事实（结构上不可能制造 PASS）；（4）`ArtifactValidationCheckId` 十类 required check（PASS/FAIL/NOT_TESTABLE，NOT_TESTABLE=blocking；物理字节级 content/schema/row 重验；FEATURE_FAMILY_COVERAGE= components distinct (family,version) == member (id,version) 集合——mock_e2e component feature_family 对齐 member id，物理 bytes 不变）。既有测试迁移：record_artifact_validation 三处调用改 DQ facts + formal validator；断言更新为 check-level 阻断。  
+**Tests**：test_publish_validation_exactness.py::TestNoCallerDeclaredPass（3：count-writer 消失 / AST 守卫 / raw SQL 伪造无 seal 行 BLOCK）+ TestTypedRequiredChecks（4：happy 全 PASS / missing check / NOT_TESTABLE / unknown check 替代）；test_publish_validation_gate.py + test_publish_lineage.py 迁移后全过（25/0）；test_migrations.py 11-migration 适配  
+**ADR**：[ADR-021](../adr/ADR-021_publish_validation_exactness.md) §2.1/2.2  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260830-053 — Industry Constituent REQUIRED Endpoint Proof
 

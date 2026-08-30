@@ -10,7 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from ashare_state.pipeline import PublishStateError, publish_snapshot
+from ashare_state.pipeline import (
+    PublishStateError,
+    publish_snapshot,
+    record_artifact_dq_finding,
+    validate_artifact_for_publish,
+)
 from ashare_state.pipeline.mock_e2e import (
     SKELETON_FEATURE_SET_VERSION,
     run_mock_e2e,
@@ -54,6 +59,7 @@ def _valid_kwargs(conn, base) -> dict:
         "feature_set_version": SKELETON_FEATURE_SET_VERSION,
         "universes": [("ALL_A", "v1")],
         "pipeline_run_id": recovery_run,
+        "data_root": base.data_root,
     }
 
 
@@ -154,18 +160,27 @@ class TestPublishLineageGate:
                 publish_snapshot(conn, **kwargs)
 
     def test_rejects_identity_fallback_via_validation_record(self, base):
-        """R2-P0-05: the fallback gate reads meta_artifact_validation (system
-        invariant), not a caller-supplied set."""
-        from ashare_state.pipeline import record_artifact_validation
-
+        """R2-P0-05 + R4-B2: the fallback gate reads the validator-derived
+        counts from meta_artifact_validation (system invariant), not a
+        caller-supplied set - the counts now come from persisted DQ facts
+        through the formal validation boundary."""
         manager = DuckDBConnectionManager(base.db_path)
         with manager.owner("read_write") as conn:
-            record_artifact_validation(
+            record_artifact_dq_finding(
                 conn,
                 feature_artifact_set_id=base.feature_artifact_set_id,
-                validation_version="probe-v1",
-                identity_fallback_count=2,
-                blocking_dq_count=0,
+                finding_class="IDENTITY_FALLBACK",
             )
-            with pytest.raises(PublishStateError, match="ARTIFACT_VALIDATION_GATE"):
+            record_artifact_dq_finding(
+                conn,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+                finding_class="IDENTITY_FALLBACK",
+            )
+            validate_artifact_for_publish(
+                conn,
+                data_root=base.data_root,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+                validator_code_commit="test-commit",
+            )
+            with pytest.raises(PublishStateError, match="IDENTITY_FALLBACK_ZERO"):
                 publish_snapshot(conn, **_valid_kwargs(conn, base))
