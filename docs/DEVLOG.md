@@ -36,10 +36,10 @@
 **Verification**
 - Local: **938 tests passed / 0 failed**（907 → 938，+31：normalization 37 → 67（+30，CR-2 对抗矩阵回归 + CR-2.1 全部新增）；migrations 10 → 11（+1 upgrade 路径））；ruff check / ruff format / mypy 全绿；CI 同款命令 `uv run pytest` 复验 938/0
 - 既有回归零破坏：R4-B2.x / B1.x / A3.x / A2.x / CR-1.x 全部冻结契约（复审 §7 item 19）；CR-3 语义零泄漏（复审 §8）
-- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）；implementation SHA 待回填
+- GitHub Actions: **run `33398654940`（implementation `2bd0c31fa47c18b520c192265ce306f44a217fc3`）三腿 success**——Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success（Windows 3.14 腿 DEVLOG gate + Management-doc gate success）；2026-08-31 API positive confirmation，一次通过零修复轮次
 
 **Implementation Status**
-- DONE（4 P0 全收口 + migration 015 + ADR-022 Amendment A + P1-01/P1-02 治理更正；938/0；Review Status: PENDING_REVIEW）
+- DONE（4 P0 全收口 + migration 015 + ADR-022 Amendment A + P1-01/P1-02 治理更正；938/0；implementation `2bd0c31fa47c18b520c192265ce306f44a217fc3`；Review Status: PENDING_REVIEW）
 
 **关键决策**
 - surface identity 落 RawEnvelope/meta 而非独立 sidecar：与 evidence 同生命周期同 closure 校验，legacy 无字段不破坏（歧义 pair 才 fail closed）

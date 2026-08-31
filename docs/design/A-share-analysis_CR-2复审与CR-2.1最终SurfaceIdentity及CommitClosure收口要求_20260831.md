@@ -780,7 +780,7 @@ Snapshot / ReadModel            ░░░░░░░░░░  尚未开始
 [✓] 15 双干净环境不同墙钟 -> 同 manifest identity
 [✓] 16 happy path 回归全保持（no-sentinel / locator / calendar whole quarantine / provider-faithful / no-silent-drop / URI confinement）
 [✓] 17 migration from-zero + upgrade green（15 链；001..014 先应用再补 015 仅应用尾部）
-[✓] 18 CI 三腿——本批推送后 API 正向确认（SHA 回填）
+[✓] 18 CI 三腿——run `33398654940`（implementation `2bd0c31fa47c18b520c192265ce306f44a217fc3`）三腿 success，2026-08-31 API positive confirmation
 [✓] 19 R4-B2/B1/A3/A2/CR-1 冻结回归零破坏（937/0 全绿）
 ```
 
@@ -804,7 +804,7 @@ Snapshot / ReadModel            ░░░░░░░░░░  尚未开始
 [✓] existing no-sentinel / no-silent-drop / locator / provider-faithful semantics preserved
 [✓] no CR-3 semantics leaked in（AvailabilityPolicy/SourcePolicy/Canonical 零引入）
 [✓] migration from-zero/upgrade green（migration 015，未改 014）
-[✓] full CI matrix green（推送后 API 正向确认，SHA 回填）
+[✓] full CI matrix green（run `33398654940` 三腿 success，API positive confirmation）
 [✓] governance SHA/count/status truth corrected（P1-01 SHA correction + P1-02 count correction + 总册/DEVLOG/ADR-022 Amendment A）
 ```
 
@@ -812,4 +812,5 @@ Snapshot / ReadModel            ░░░░░░░░░░  尚未开始
 
 - Local: **938 / 0**（907 → 938，+31：normalization 37 → 67（+30，CR-2 对抗矩阵回归 + CR-2.1 全部新增）；migrations 10 → 11（+1 upgrade））；ruff check / ruff format / mypy 全绿；CI 同款命令 `uv run pytest` 复验 938/0
 - ADR-022 Amendment A（status 仍 PROPOSED，待 Reviewer closure 后 ACCEPTED）；migration 015（未改 014）；contract bump `cr2.1-v1`
-- Implementation SHA + CI run：推送后回填（本节 Verification 与 DEVLOG/总册头部同步更新）
+- **Implementation SHA：`2bd0c31fa47c18b520c192265ce306f44a217fc3`；CI run `33398654940` 三腿 success**（Ubuntu 3.14 + Windows 3.12/3.14；各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success，Windows 3.14 腿 DEVLOG gate + Management-doc gate success；2026-08-31 API positive confirmation，一次通过零修复轮次）
+- §7 item 18 / §9 对应项（full CI matrix green）据此关闭；SHA 由 docs 回填 commit 补记（历史不改写原则——本 Mapping 一次写成后仅补记本行）
