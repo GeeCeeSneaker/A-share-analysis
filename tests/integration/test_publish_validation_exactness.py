@@ -52,12 +52,13 @@ import pytest
 from ashare_state.pipeline import (
     PublishStateError,
     publish_snapshot,
-    record_artifact_check_execution,
     record_artifact_dq_finding,
+    run_required_artifact_dq_scan,
     validate_artifact_for_publish,
 )
 from ashare_state.pipeline import artifact_validation as av_module
 from ashare_state.pipeline import publish as publish_module
+from ashare_state.pipeline.artifact_dq_scan import DQ_SCAN_CONTRACT_VERSION
 from ashare_state.pipeline.mock_e2e import (
     SKELETON_FEATURE_SET_VERSION,
     run_mock_e2e,
@@ -500,20 +501,15 @@ def _current_component_manifest(conn, artifact_set_id: str) -> str:
     )
 
 
-def _record_dq_proofs(conn, artifact_set_id: str, *, manifest: str | None = None) -> None:
-    """Tests-side controlled producer: record BOTH positive DQ scan
-    execution proofs bound to the given (current) component manifest."""
-    if manifest is None:
-        manifest = _current_component_manifest(conn, artifact_set_id)
-    for check_id in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO"):
-        record_artifact_check_execution(
-            conn,
-            feature_artifact_set_id=artifact_set_id,
-            check_id=check_id,
-            scan_contract_version=av_module.DQ_SCAN_CONTRACT_VERSION,
-            producer="tests-producer",
-            scanned_component_manifest_hash=manifest,
-        )
+def _record_dq_proofs(conn, artifact_set_id: str, *, data_root: Path | None = None) -> None:
+    """Tests-side: run the GOVERNED scanner (the only legal completion
+    writer). ``data_root`` defaults to the base fixture's root - tests
+    that scan a foreign artifact pass its root explicitly."""
+    if data_root is None:
+        raise AssertionError("data_root is required for the governed scanner")
+    run_required_artifact_dq_scan(
+        conn, data_root=data_root, feature_artifact_set_id=artifact_set_id
+    )
 
 
 def _rebind_report_hash(conn, base, artifact_set_id: str | None = None) -> None:
@@ -601,15 +597,35 @@ class TestR4B21DQExecutionProof:
                     assert "scan executed" in check["detail"]
 
     def test_proof_for_different_artifact_does_not_transfer(self, base):
-        """A proof recorded for ANOTHER artifact set never satisfies
-        this artifact's checks."""
+        """A completion proof recorded for ANOTHER artifact set never
+        satisfies this artifact's checks (raw-INSERT the strongest
+        attacker-shaped foreign proof: current contract, correct
+        producer, current manifest - but a foreign artifact set id)."""
         with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
             conn.execute(
                 "DELETE FROM meta_artifact_check_execution WHERE feature_artifact_set_id = ?",
                 [base.feature_artifact_set_id],
             )
-            # proofs exist - but bound to a foreign artifact set
-            _record_dq_proofs(conn, "some-other-artifact-set-xyz")
+            manifest = _current_component_manifest(conn, base.feature_artifact_set_id)
+            for check_id in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO"):
+                from ashare_state.pipeline.artifact_dq_scan import ARTIFACT_DQ_CHECKERS
+
+                producer = next(
+                    s.producer for s in ARTIFACT_DQ_CHECKERS if s.check_id.value == check_id
+                )
+                conn.execute(
+                    "INSERT INTO meta_artifact_check_execution VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        f"dqexec-{uuid.uuid4()}",
+                        "some-other-artifact-set-xyz",
+                        check_id,
+                        DQ_SCAN_CONTRACT_VERSION,
+                        producer,
+                        manifest,
+                        datetime.now(UTC),
+                        "foreign proof",
+                    ],
+                )
             validation_id = _revalidate(conn, base)
             row = conn.execute(
                 "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
@@ -674,19 +690,18 @@ class TestR4B21DQExecutionProof:
                 publish_snapshot(conn, **_kwargs(conn, base))
 
     def test_execution_proof_api_carries_no_result_params(self):
-        """Structural guard: record_artifact_check_execution accepts
-        execution METADATA only - no count, no result, no status/pass
-        parameter. And it is the only production writer of the
-        execution table (AST scan)."""
-        tree = ast.parse(VALIDATION_SOURCE.read_text(encoding="utf-8"))
-        fn = next(
-            n
-            for n in ast.walk(tree)
-            if isinstance(n, ast.FunctionDef) and n.name == "record_artifact_check_execution"
-        )
-        arg_names = {a.arg for a in fn.args.args} | {a.arg for a in fn.args.kwonlyargs}
-        forbidden = {"count", "finding_count", "result", "status", "pass_", "passed"}
-        assert not (arg_names & forbidden), arg_names
+        """R4-B2.2 structural guard: NO caller-facing completion writer
+        exists in production. The ONLY production writer of
+        meta_artifact_check_execution is the governed scan boundary
+        ``run_required_artifact_dq_scan`` (AST scan), whose signature
+        accepts no identity/result/count/completion inputs."""
+        # 1. the R4-B2.1 caller-facing API is GONE from production
+        import ashare_state.pipeline.artifact_dq_scan as scan_module
+        import ashare_state.pipeline.artifact_validation as av
+
+        for module in (av, scan_module):
+            assert not hasattr(module, "record_artifact_check_execution")
+        # 2. the only INSERT lives in the governed scan boundary
         inserters: set[tuple[str, str]] = set()
         pipeline_root = REPO_ROOT / "src" / "ashare_state" / "pipeline"
         for path in sorted(pipeline_root.glob("*.py")):
@@ -701,7 +716,22 @@ class TestR4B21DQExecutionProof:
                         and "INSERT INTO meta_artifact_check_execution" in sub.value
                     ):
                         inserters.add((path.name, node.name))
-        assert inserters == {("artifact_validation.py", "record_artifact_check_execution")}
+        assert inserters == {("artifact_dq_scan.py", "run_required_artifact_dq_scan")}, inserters
+        # 3. the boundary signature accepts identity/results only via
+        #    (conn, data_root, feature_artifact_set_id) - no scanned
+        #    hash, no contract, no producer, no result/count/completed_at
+        tree = ast.parse(
+            (REPO_ROOT / "src/ashare_state/pipeline/artifact_dq_scan.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        fn = next(
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == "run_required_artifact_dq_scan"
+        )
+        arg_names = {a.arg for a in fn.args.args} | {a.arg for a in fn.args.kwonlyargs}
+        assert arg_names == {"conn", "data_root", "feature_artifact_set_id"}, arg_names
 
 
 @pytest.mark.integration
@@ -1061,13 +1091,33 @@ class TestR4B21LogicalURIConfinement:
                 "WHERE feature_artifact_set_id = ? AND file_uri = ?",
                 [evil_uri, base.feature_artifact_set_id, comp_uri],
             )
-            # rescan proofs under the tampered registry (else NOT_TESTABLE
-            # from staleness would mask the confinement failure)
+            # R4-B2.2: the governed scanner itself refuses to open the
+            # evil URI, so the attacker re-seals completion proofs for
+            # the CURRENT (tampered) registry identity via raw SQL - the
+            # confinement failure must still be caught by the
+            # validation/publish path (else NOT_TESTABLE from staleness
+            # would mask the confinement failure).
             conn.execute(
                 "DELETE FROM meta_artifact_check_execution WHERE feature_artifact_set_id = ?",
                 [base.feature_artifact_set_id],
             )
-            _record_dq_proofs(conn, base.feature_artifact_set_id)
+            from ashare_state.pipeline.artifact_dq_scan import ARTIFACT_DQ_CHECKERS
+
+            manifest = _current_component_manifest(conn, base.feature_artifact_set_id)
+            for spec in ARTIFACT_DQ_CHECKERS:
+                conn.execute(
+                    "INSERT INTO meta_artifact_check_execution VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        f"dqexec-{uuid.uuid4()}",
+                        base.feature_artifact_set_id,
+                        spec.check_id.value,
+                        DQ_SCAN_CONTRACT_VERSION,
+                        spec.producer,
+                        manifest,
+                        datetime.now(UTC),
+                        "attacker re-seal",
+                    ],
+                )
             validation_id = _revalidate(conn, base)
             row = conn.execute(
                 "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
@@ -1090,3 +1140,371 @@ class TestR4B21LogicalURIConfinement:
             _revalidate(conn, base)
             pid = publish_snapshot(conn, **_kwargs(conn, base))
             assert pid
+
+
+# =========================================================================
+# R4-B2.2 (audit 20260831): governed DQ scan execution boundary
+# =========================================================================
+
+
+@pytest.mark.integration
+class TestR4B22GovernedScanBoundary:
+    """The completion proof is a SCANNER-internal product: the governed
+    boundary executes the required checks over authoritative input,
+    persists findings, and writes the completion proof LAST."""
+
+    def test_no_caller_facing_completion_writer_in_production(self):
+        """No production callable writes a completion row except the
+        governed scan boundary (which executes the checks)."""
+        import ashare_state.pipeline.artifact_dq_scan as scan_module
+        import ashare_state.pipeline.artifact_validation as av
+        from ashare_state.pipeline import artifact_validation
+        from ashare_state.pipeline import publish as publish_mod
+
+        for module in (av, scan_module, artifact_validation, publish_mod):
+            assert not hasattr(module, "record_artifact_check_execution")
+
+    def test_caller_computed_manifest_cannot_declare_completion(self, base):
+        """The exact R4-B2.1 attack from the review: the caller reads the
+        components, computes the current manifest hash, and tries to
+        write completion rows - there is NO API to do it (the only
+        INSERT lives inside the scan boundary whose signature accepts
+        (conn, data_root, feature_artifact_set_id) only)."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "DELETE FROM meta_artifact_check_execution WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            _manifest = _current_component_manifest(conn, base.feature_artifact_set_id)  # noqa: F841
+            # the strongest legitimate API shape is the scanner itself -
+            # it takes no manifest, no contract, no producer
+            run_required_artifact_dq_scan(
+                conn,
+                data_root=base.data_root,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+            )
+            rows = conn.execute(
+                "SELECT count(*) FROM meta_artifact_check_execution "
+                "WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            ).fetchone()
+            assert int(rows[0]) == 2  # both checks completed via the REAL scan
+
+    def test_scanner_failure_writes_no_completion(self, base, monkeypatch):
+        """A checker evaluator that cannot run leaves NO completion
+        proof for its check (the whole scan transaction rolls back)."""
+        from ashare_state.pipeline import artifact_dq_scan as scan_module
+
+        def _boom(conn, data_root, artifact_set_id, snapshot_id):
+            raise RuntimeError("checker unavailable")
+
+        # ARTIFACT_DQ_CHECKERS is a tuple of frozen dataclasses - patch
+        # the module-level tuple (the scan boundary reads the module
+        # global at execution time)
+        monkeypatch.setattr(
+            scan_module,
+            "ARTIFACT_DQ_CHECKERS",
+            (
+                scan_module.ArtifactDQCheckerSpec(
+                    check_id=scan_module.ARTIFACT_DQ_CHECKERS[0].check_id,
+                    finding_class=scan_module.ARTIFACT_DQ_CHECKERS[0].finding_class,
+                    checker_version=scan_module.ARTIFACT_DQ_CHECKERS[0].checker_version,
+                    evaluator=_boom,
+                ),
+                scan_module.ARTIFACT_DQ_CHECKERS[1],
+            ),
+        )
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "DELETE FROM meta_artifact_check_execution WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            with pytest.raises(RuntimeError, match="checker unavailable"):
+                run_required_artifact_dq_scan(
+                    conn,
+                    data_root=base.data_root,
+                    feature_artifact_set_id=base.feature_artifact_set_id,
+                )
+            rows = conn.execute(
+                "SELECT count(*) FROM meta_artifact_check_execution "
+                "WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            ).fetchone()
+            assert int(rows[0]) == 0
+            # validation then sees NOT_TESTABLE -> publish BLOCK
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            dq = {
+                c["check_id"]: c["status"]
+                for c in report["checks"]
+                if c["check_id"] in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO")
+            }
+            assert dq["IDENTITY_FALLBACK_ZERO"] == "NOT_TESTABLE"
+            with pytest.raises(PublishStateError):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_scanner_detects_identity_fallback_finding(self, base):
+        """REAL detection: register one of the artifact's securities
+        with the FALLBACK identity key version - the governed scanner
+        detects it, persists the finding, and validation FAILs."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            # flip one registered identity to the fallback variant
+            target = conn.execute("SELECT security_id FROM dim_security LIMIT 1").fetchone()[0]
+            conn.execute(
+                "UPDATE dim_security SET identity_key_version = ? WHERE security_id = ?",
+                ["SECURITY_IDENTITY_V1_FALLBACK", target],
+            )
+            conn.execute(
+                "DELETE FROM meta_artifact_dq_finding WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            run_required_artifact_dq_scan(
+                conn,
+                data_root=base.data_root,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+            )
+            findings = conn.execute(
+                "SELECT count(*) FROM meta_artifact_dq_finding "
+                "WHERE feature_artifact_set_id = ? AND finding_class = 'IDENTITY_FALLBACK'",
+                [base.feature_artifact_set_id],
+            ).fetchone()
+            assert int(findings[0]) >= 1  # the scanner persisted the finding
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            fallback = next(
+                c for c in report["checks"] if c["check_id"] == "IDENTITY_FALLBACK_ZERO"
+            )
+            assert fallback["status"] == "FAIL"
+            with pytest.raises(PublishStateError):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_scanner_detects_blocking_dq_finding(self, base):
+        """REAL detection: a canonical fact row carrying a blocking DQ
+        quality flag for the artifact's snapshot - the scanner detects
+        it, persists the finding, and validation FAILs."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "INSERT INTO fact_daily_bar "
+                "(data_snapshot_id, security_id, trade_date, open, high, low, close, "
+                "pre_close, volume_shares, amount_cny, selected_provider, "
+                "source_policy_version, reconciliation_status, quality_flags, ingested_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    base.data_snapshot_id,
+                    "00000000-0000-0000-0000-000000000001",
+                    date(2026, 8, 14),
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    100,
+                    10000.0,
+                    "amazingdata",
+                    "source-policy-mock-v1",
+                    "NOT_RUN_NO_SECONDARY",
+                    "STALE_WINDOW",  # blocking DQ flag
+                    datetime.now(UTC),
+                ],
+            )
+            conn.execute(
+                "DELETE FROM meta_artifact_dq_finding WHERE feature_artifact_set_id = ? "
+                "AND finding_class = 'BLOCKING_DQ'",
+                [base.feature_artifact_set_id],
+            )
+            run_required_artifact_dq_scan(
+                conn,
+                data_root=base.data_root,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+            )
+            findings = conn.execute(
+                "SELECT count(*) FROM meta_artifact_dq_finding "
+                "WHERE feature_artifact_set_id = ? AND finding_class = 'BLOCKING_DQ'",
+                [base.feature_artifact_set_id],
+            ).fetchone()
+            assert int(findings[0]) >= 1
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            blocking = next(c for c in report["checks"] if c["check_id"] == "BLOCKING_DQ_ZERO")
+            assert blocking["status"] == "FAIL"
+            with pytest.raises(PublishStateError):
+                publish_snapshot(conn, **_kwargs(conn, base))
+
+    def test_unregistered_identity_is_a_finding(self, base):
+        """Fail-closed scan: a security_id in the artifact that is NOT
+        registered in dim_security cannot be proven non-fallback - the
+        scanner records it as a finding (never silently PASSes)."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            conn.execute(
+                "DELETE FROM dim_security WHERE security_id IN "
+                "(SELECT DISTINCT security_id FROM ("
+                "  SELECT unnest([?]) AS security_id))",
+                [conn.execute("SELECT security_id FROM dim_security LIMIT 1").fetchone()[0]],
+            )
+            conn.execute(
+                "DELETE FROM meta_artifact_dq_finding WHERE feature_artifact_set_id = ? "
+                "AND finding_class = 'IDENTITY_FALLBACK'",
+                [base.feature_artifact_set_id],
+            )
+            run_required_artifact_dq_scan(
+                conn,
+                data_root=base.data_root,
+                feature_artifact_set_id=base.feature_artifact_set_id,
+            )
+            findings = conn.execute(
+                "SELECT count(*) FROM meta_artifact_dq_finding "
+                "WHERE feature_artifact_set_id = ? AND finding_class = 'IDENTITY_FALLBACK'",
+                [base.feature_artifact_set_id],
+            ).fetchone()
+            assert int(findings[0]) >= 1
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            fallback = next(
+                c for c in report["checks"] if c["check_id"] == "IDENTITY_FALLBACK_ZERO"
+            )
+            assert fallback["status"] == "FAIL"
+
+    def test_scan_contract_version_evolution_requires_rescan(self, base, monkeypatch):
+        """The scan contract evolves (version string changes) - old
+        completion proofs no longer satisfy the CURRENT validator:
+        NOT_TESTABLE / rescan required, even for a proof whose
+        manifest still matches."""
+        from ashare_state.pipeline import artifact_dq_scan as scan_module
+
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            _revalidate(conn, base)  # proofs from the b2.2-v1 contract
+            monkeypatch.setattr(scan_module, "DQ_SCAN_CONTRACT_VERSION", "dq-scan-future-v9")
+            # artifact_validation imported the constant at module load:
+            # patch its view too
+            monkeypatch.setattr(av_module, "DQ_SCAN_CONTRACT_VERSION", "dq-scan-future-v9")
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            contracts = {
+                c["status"]
+                for c in report["checks"]
+                if c["check_id"] in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO")
+            }
+            assert contracts == {"NOT_TESTABLE"}
+            assert any(
+                "scan contract mismatch" in c["detail"] for c in report["checks"] if "detail" in c
+            )
+
+    def test_fake_producer_or_contract_cannot_satisfy_validator(self, base):
+        """Raw-INSERTed attacker-shaped completion rows (fake contract
+        version / fake producer, manifest and check_id correct) do NOT
+        satisfy the validator - only the system-derived checker
+        identity + CURRENT contract counts."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            manifest = _current_component_manifest(conn, base.feature_artifact_set_id)
+            conn.execute(
+                "DELETE FROM meta_artifact_check_execution WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            for check_id, contract, producer in (
+                (
+                    "IDENTITY_FALLBACK_ZERO",
+                    "fake-v0",
+                    "artifact-dq-scanner/IDENTITY_FALLBACK_ZERO@identity-fallback-checker-v1",
+                ),
+                ("BLOCKING_DQ_ZERO", DQ_SCAN_CONTRACT_VERSION, "attacker"),
+            ):
+                conn.execute(
+                    "INSERT INTO meta_artifact_check_execution VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        f"dqexec-{uuid.uuid4()}",
+                        base.feature_artifact_set_id,
+                        check_id,
+                        contract,
+                        producer,
+                        manifest,
+                        datetime.now(UTC),
+                        "attacker-shaped proof",
+                    ],
+                )
+            validation_id = _revalidate(conn, base)
+            row = conn.execute(
+                "SELECT report_uri FROM meta_artifact_validation WHERE artifact_validation_id = ?",
+                [validation_id],
+            ).fetchone()
+            report = json.loads((base.data_root / str(row[0])).read_text(encoding="utf-8"))
+            dq = {
+                c["check_id"]: c["status"]
+                for c in report["checks"]
+                if c["check_id"] in ("IDENTITY_FALLBACK_ZERO", "BLOCKING_DQ_ZERO")
+            }
+            assert dq == {
+                "IDENTITY_FALLBACK_ZERO": "NOT_TESTABLE",
+                "BLOCKING_DQ_ZERO": "NOT_TESTABLE",
+            }
+            details = [c.get("detail", "") for c in report["checks"]]
+            assert any("scan contract mismatch" in d for d in details)
+            assert any("checker identity mismatch" in d for d in details)
+
+    def test_genuine_zero_scan_passes_and_publishes(self, base):
+        """The mock chain's governed scan genuinely executed (identity
+        registry cross-check + fact-table flags over authoritative
+        input) and found zero - the DQ checks PASS and publish
+        succeeds."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            proofs = conn.execute(
+                "SELECT check_id, scan_contract_version, producer "
+                "FROM meta_artifact_check_execution "
+                "WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            ).fetchall()
+            assert {str(p[0]) for p in proofs} == {
+                "IDENTITY_FALLBACK_ZERO",
+                "BLOCKING_DQ_ZERO",
+            }
+            for _check, contract, producer in proofs:
+                assert str(contract) == DQ_SCAN_CONTRACT_VERSION
+                assert str(producer).startswith("artifact-dq-scanner/")
+            pid = publish_snapshot(conn, **_kwargs(conn, base))
+            assert pid
+
+    def test_findings_deduplicated_across_rescans(self, base):
+        """Rescanning the same fallback condition does not inflate the
+        derived counts (append-only facts are deduplicated by
+        (artifact, class, detail))."""
+        with DuckDBConnectionManager(base.db_path).owner("read_write") as conn:
+            target = conn.execute("SELECT security_id FROM dim_security LIMIT 1").fetchone()[0]
+            conn.execute(
+                "UPDATE dim_security SET identity_key_version = ? WHERE security_id = ?",
+                ["SECURITY_IDENTITY_V1_FALLBACK", target],
+            )
+            conn.execute(
+                "DELETE FROM meta_artifact_dq_finding WHERE feature_artifact_set_id = ?",
+                [base.feature_artifact_set_id],
+            )
+            for _ in range(3):
+                run_required_artifact_dq_scan(
+                    conn,
+                    data_root=base.data_root,
+                    feature_artifact_set_id=base.feature_artifact_set_id,
+                )
+            findings = conn.execute(
+                "SELECT count(*) FROM meta_artifact_dq_finding "
+                "WHERE feature_artifact_set_id = ? AND finding_class = 'IDENTITY_FALLBACK'",
+                [base.feature_artifact_set_id],
+            ).fetchone()
+            assert int(findings[0]) == 1  # deduplicated

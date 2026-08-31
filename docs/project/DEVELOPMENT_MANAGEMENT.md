@@ -7,13 +7,13 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：R4-B2.1 implementation `317ac488c00c6b406311a29f25ff062e312df3a3`（run 33310045925 三腿 success，2026-08-30 API positive confirmation）——基于 Reviewer 复审 HEAD `3061247`（reopen / next-work 文档 commit）；R4-B2 implementation `11b1b5bedce7ecc07ba865227c9d3ea820818f66`（run 33307917769 三腿 success）  
-> **Document Revision**：DM-CR-20260830-054 / 055 / 056 / 057 / 058 / 059 / 060  
-> **Last Review**：2026-08-30 19:13 +08:00（R4-B2 复审：**REOPENED**——机制性建设 16 项 PASS / FREEZE（formal boundary / typed checks / physical verification / component seal / persisted report / latest-head / legacy fail-closed / rollback / migration 011 / CI green 等）；4 P0 + 1 P1：P0-01 DQ zero checks 仍可"未执行即 PASS"（bad-fact absence ≠ zero proof）、P0-02 publish 未完整消费 validation seal（contract hash / checks hash / provenance / version 三方比对缺失）、P0-03 Option A TOCTOU 只局部完成（完整 lineage reads 仍在事务外）、P0-04 新物理文件读取绕过 frozen logical-URI confinement、P1 ARTIFACT_MANIFEST_INTEGRITY 名称与证据不一致；随 R4-B2.1 收口，见 §41/§61/ADR-021 Amendment R4-B2.1）  
+> **Current Code Baseline**：R4-B2.2 implementation（本批，2026-08-31）——基于 Reviewer 复审 HEAD `625f4a2`（reopen / next-work 文档 commit）；R4-B2.1 implementation `317ac488c00c6b406311a29f25ff062e312df3a3`（run 33310045925 三腿 success）；R4-B2 implementation `11b1b5bedce7ecc07ba865227c9d3ea820818f66`（run 33307917769 三腿 success）；本批完整 40-char SHA 于推送后回填  
+> **Document Revision**：DM-CR-20260830-054..060 / DM-CR-20260831-061  
+> **Last Review**：2026-08-31 08:03 +08:00（R4-B2.1 复审：**REOPENED（仅剩 1 个 P0）**——P0-02 full seal consumption / P0-03 transaction-internal preconditions / P0-04 logical-URI confinement / P1-01 manifest check rename / full CI matrix 全部 **VERIFIED / FREEZE**（不得继续重构）；剩余 P0：meta_artifact_check_execution 的"positive execution proof"本身仍可由 caller 直接声明（record_artifact_check_execution 不执行任何 scan；scan_contract_version/producer 无 current-contract/checker-identity 校验；mock happy path 正在使用声明路径）；随 R4-B2.2 收口，见 §41/§61/ADR-021 Amendment R4-B2.2）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN——run 33310045925（R4-B2.1 implementation `317ac488c00c6b406311a29f25ff062e312df3a3`）三腿 success**（2026-08-30 API positive confirmation；R4-B2.1 新增 29 项 closure 测试 848/0 在 Ubuntu+Windows 两 OS 通过，一次通过零修复轮次）；run 33308120230（`892f465`，Reviewer job-level 正向核验的 R4-B2 复审基线）三腿 success；run 33307917769（R4-B2 `11b1b5b`）三腿 success  
-> **Phase Status（2026-08-30，Reviewer 裁决同步）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 → **DONE / REOPENED**（机制性建设 FREEZE；修正项由 R4-B2.1 承接）；R4-B2.1 → **DONE / PENDING_REVIEW**（本批：Final Validation Truth + Seal Consumption + Transaction Closure）；CR-2 → **BLOCKED_BY_R4-B2.1**；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> **CI Status**：run 33310045925（R4-B2.1 `317ac48`，Reviewer 正向核验基线）三腿 success；run 33307917769（R4-B2 `11b1b5b`）三腿 success；本批（R4-B2.2，858 tests）CI 结果待推送后正向确认回填  
+> **Phase Status（2026-08-31，Reviewer 裁决同步）**：  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 → DONE / REOPENED；R4-B2.1 → **DONE / REOPENED（P0-02/03/04 + P1 PASS/FREEZE；execution truth 未闭合）**；R4-B2.2 → **DONE / PENDING_REVIEW**（本批：Final Governed DQ Scan Execution Boundary）；CR-2 → **BLOCKED_BY_R4-B2.2**；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
 > **SHA Correction（Reviewer，2026-08-26）**：上批记录的 `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` 有误，以 GitHub commit object 为准：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`（本头部即为修正记录；历史条目原文保留）  
@@ -1083,9 +1083,10 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | **VERIFIED** | **R4-A2.x / CR-1.x 审计链 CLOSED（2026-08-26）** |
 | R4-A3 / R4-A3.1 / R4-A3.2 SDK Lifecycle / Gates / Early-Stop 链 | DONE | **CLOSED / VERIFIED / FREEZE** | 全链闭环（Reviewer 2026-08-28 裁决，不重开） |
 | R4-B1 / B1.1 / B1.2 Capability Endpoint Proof 链 | DONE | **CLOSED / VERIFIED / FREEZE** | 全链闭环（Reviewer 2026-08-30 裁决，不重开） |
-| R4-B2 Publish Validation Exactness | DONE | REOPENED | 机制性建设 16 项 PASS / FREEZE；四 P0 + P1 由 R4-B2.1 收口 |
-| R4-B2.1 Final Validation Truth + Seal Consumption + Transaction Closure | DONE | PENDING_REVIEW | 最高优先（本批：positive DQ execution proof + full seal 消费 + 事务内全量 precondition + logical-URI confinement；待复核） |
-| CR-2 Provider-Normalized + Quarantine | PLANNED | **BLOCKED_BY_R4-B2.1** | sequenced after R4-B2.1 |
+| R4-B2 Publish Validation Exactness | DONE | REOPENED | 机制性建设 FREEZE；修正项由 R4-B2.1/B2.2 逐层收口 |
+| R4-B2.1 Final Validation Truth + Seal Consumption + Transaction Closure | DONE | REOPENED（大部分 PASS / FREEZE） | P0-02/03/04 + P1 VERIFIED / FREEZE；execution truth 修正于 R4-B2.2 |
+| R4-B2.2 Final Governed DQ Scan Execution Boundary | DONE | PENDING_REVIEW | 最高优先（本批：scanner 内产 completion proof + system-derived contract/producer + authoritative inputs；待复核） |
+| CR-2 Provider-Normalized + Quarantine | PLANNED | **BLOCKED_BY_R4-B2.2** | sequenced after R4-B2.2 |
 | R4-CI | PLANNED | PENDING | Next |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
 | CR-4 Snapshot + Read Model Rebuild | PLANNED | PENDING | CR-3 后 |
@@ -1098,78 +1099,75 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## R4-B2.1 Final Validation Truth + Seal Consumption + Transaction Closure（本批，DONE / PENDING_REVIEW）
+## R4-B2.2 Final Governed DQ Scan Execution Boundary（本批，DONE / PENDING_REVIEW）
 
-R4-B2 复审（2026-08-30 19:13 +08:00）裁决 **REOPENED**：机制性建设 16 项
-PASS / FREEZE；4 P0 + 1 P1 由本批一次性收口（ADR-021 Amendment
-R4-B2.1；工作要求
-`docs/design/A-share-analysis_R4-B2复审与R4-B2.1最终ValidationSeal及Transaction收口要求_20260830.md`）：
+R4-B2.1 复审（2026-08-31 08:03 +08:00）裁决 **REOPENED（仅剩 1 个 P0）**：
+P0-02 / P0-03 / P0-04 / P1-01 / full CI 全部 VERIFIED / FREEZE；唯一
+blocker（execution proof 仍可 caller 直接声明）由本批收口（ADR-021
+Amendment R4-B2.2；工作要求
+`docs/design/A-share-analysis_R4-B2.1复审与R4-B2.2最终DQScanExecutionBoundary收口要求_20260831.md`）：
 
 ```text
-P0-01 DQ Required Checks Positive Execution Proof（DM-CR-20260830-057）：
-  缺陷：IDENTITY_FALLBACK_ZERO / BLOCKING_DQ_ZERO 仅凭 finding 表
-    count==0 即 PASS——feature pipeline 根本没跑扫描时表自然为空，
-    "检查过且为零"与"根本没检查"不可区分。
-  修正：新表 meta_artifact_check_execution（migration 012）——
-    check_id / artifact set / scan_contract_version / producer /
-    scanned_component_manifest_hash（exact 扫描输入身份）/ completed_at；
-    不含 count 不含 result（record_artifact_check_execution 签名无
-    result 参数 + 唯一 INSERT 边界 AST 守卫）。
-    validator 语义：无 proof -> NOT_TESTABLE（absence of bad findings
-    != proof of zero findings）；stale proof（组件已变）-> NOT_TESTABLE
-    （rescan required）；匹配 proof + 派生 count==0 -> PASS。
-    findings 仍走 append-only 事实表；counts 仍是派生值。
-P0-02 Full Validation Seal Consumption（DM-CR-20260830-058）：
-  缺陷：_b2_recheck 未消费 validation_contract_hash /
-    required_checks_hash / validator_code_commit / validation_version——
-    "写了 seal 字段"而非"seal 成为 correctness input"。
-  修正：ledger <-> report <-> current contract 三方 exact match：
-    contract hash（语义性 contract 演进使旧 seal 失效——即使 check
-    IDs 不变）；required_checks_hash（report checks 数组重算 hash +
-    duplicate check_id 拒绝）；validator_code_commit（非空 + 相等）；
-    validation_version（== 当前 supported 版本；validate 函数移除
-    caller version 参数——system-derived，无 silent grandfather）。
-P0-03 Full Transaction-Internal Preconditions（DM-CR-20260830-059，
-    Option A 完成）：
-  缺陷：只把 _b2_recheck 放进事务，完整 lineage reads 仍在事务外——
-    ADR "TOCTOU closed" 与 "precondition read 仍在事务外" 不能同时成立。
-  修正：publish_snapshot 全部 authoritative reads（snapshot / artifact /
-    feature set / run / universes / validation head / 完整 seal / 物理
-    字节）在 BEGIN TRANSACTION 之后执行（_resolve_publish_preconditions
-    helper 事务内调用）；写入只消费事务内值；AST ordering 守卫证明
-    BEGIN 先于 resolver/reck/首个 execute。
-P0-04 Logical-URI Confinement（DM-CR-20260830-060）：
-  缺陷：validator 组件重验 + publish bytes 终验 + report 读取直接
-    data_root / uri——绕过 frozen P0-4 helper（escaped/absolute/drive/
-    backslash/alias URI 可读 data_root 外文件，且被"一致地验证"）。
-  修正：全部经 physical_from_logical_uri(data_root, uri)——URI 层
-    fail closed 先于任何 data_root 外读取；对抗测试六类恶意 URI +
-    data_root 外 perfect sentinel（bytes 与真实组件一致）仍被拒。
-P1-01 ARTIFACT_MANIFEST check 语义诚实化（Option B，并入 060）：
-  ARTIFACT_MANIFEST_INTEGRITY -> ARTIFACT_MANIFEST_PRESENT_AND_SEALED：
-    证明注册上游 seal 存在；exact component integrity 由 component
-    manifest seal + COMPONENT_* checks 证明。不 overclaim 重算
-    registration-time formula。
-ADR-021 Amendment R4-B2.1：修正原文三处 overclaim（contract hash
-  invalidation / TOCTOU closed / cannot be unexecuted——落地后成立）；
-  历史原文保留。
-Adversarial Tests（+29，总 848/0）：P0-01 六项（no proof NOT_TESTABLE /
-  valid proof PASS / foreign artifact proof 不转移 / stale proof BLOCK /
-  缺一项 proof BLOCK / API 无 result 参数 + 唯一 INSERT 边界）；
-  P0-02 九项（全部 re-bind 后仍 BLOCK：contract stale/mismatch/
-  current changed；checks hash tamper/mismatch/status 改动未重封；
-  provenance mismatch；version mismatch；duplicate check id）；
-  P0-03 八项（AST ordering 守卫 + snapshot/artifact demoted/rebound/
-  feature-set 改动/run 变化/universe 删除 全 BLOCK）；P0-04 七项
-  （六类恶意 URI + canonical 仍 PASS）；既有 18 项 B2 测试适配零回归。
+P0（唯一 blocker）Execution Proof -> Scanner 内部产物
+  （DM-CR-20260831-061，Reviewer §5 推荐结构）：
+  缺陷：record_artifact_check_execution 不执行任何 scan（字符串非空
+    校验后直接 INSERT）——caller 读 registry + 公开 manifest hash 计算
+    即可伪造 completion（contract/producer 任意非空串）；mock happy
+    path 正在使用该声明路径；validator 无 current-contract /
+    checker-identity 校验。
+  修正（新模块 pipeline/artifact_dq_scan.py）：
+    run_required_artifact_dq_scan(conn, *, data_root,
+      feature_artifact_set_id)——签名只有三项（AST 守卫断言，无
+      scanned hash / contract / producer / result / count /
+      completed_at 参数）：
+      - STATIC production registry（ARTIFACT_DQ_CHECKERS：check_id /
+        finding_class / checker_version / evaluator——production-owned，
+        不可注入）
+      - resolve CURRENT components + compute manifest INTERNALLY
+      - 逐 check 执行 evaluator（authoritative input）
+      - persist findings（append-only，按 detail 去重——rescan 不膨胀）
+      - INSERT completion proof LAST（scan_contract_version =
+        CURRENT DQ_SCAN_CONTRACT_VERSION "dq-scan-b2.2-v1"；producer =
+        "artifact-dq-scanner/{check_id}@{checker_version}"——全部
+        system-derived）
+      - 单事务：evaluator raise -> ROLLBACK -> 零 completion row ->
+        NOT_TESTABLE -> publish BLOCK（严禁 no-op scanner 写 completed）
+  旧 record_artifact_check_execution 从生产命名空间删除；production
+    中 INSERT INTO meta_artifact_check_execution 唯一出现在
+    run_required_artifact_dq_scan（AST 守卫）
+  validator 三重校验：proof 缺失 / contract != CURRENT / producer !=
+    system-derived checker identity / manifest != current -> 全部
+    NOT_TESTABLE（rescan required）
+Authoritative Inputs（audit §4.5——每个 check 实际读什么）：
+  IDENTITY_FALLBACK evaluator：feature component parquet security_id
+    列（distinct）× dim_security.identity_key_version——FALLBACK 版本
+    是 finding；未注册也是 finding（不可证即 fail closed）；mock_e2e
+    补 dim_security 注册（master 带 list_date -> 全部正式版身份）
+  BLOCKING_DQ evaluator：snapshot 绑定的五个 canonical fact 表的
+    quality_flags 列；blocking 集合 = QualityFlag 集 减
+    IDENTITY_FALLBACK（STALE_WINDOW / BENCHMARK_UNAVAILABLE /
+    INVALID_LIMIT_RANGE / NO_LIMIT_RULE / LOW_SAMPLE）
+真实检测测试（无 monkeypatch 伪造语义）：UPDATE dim_security 一个身份
+  为 FALLBACK -> scanner 真实发现 -> validate FAIL；INSERT fact_daily_bar
+  带 STALE_WINDOW -> scanner 发现 -> FAIL；未注册身份 -> finding
+validation contract version -> b2-exact-v2（count_source 语义更新）：
+  旧 seal 由 P0-02 current-contract recheck 自然失效
+Adversarial Tests（+10，总 858/0）：no caller-facing writer（多模块
+  hasattr + 唯一 INSERT 边界 + 签名 == {conn,data_root,artifact_set}）；
+  caller computed manifest 无 API 声明 completion；scanner raise ->
+  零 row + NOT_TESTABLE；真实 fallback / blocking DQ 检测 -> FAIL；
+  未注册身份 -> finding；contract 演进 -> rescan；fake producer /
+  contract raw row -> NOT_TESTABLE；genuine zero -> PASS + publish；
+  rescan 去重；既有 B2/B2.1 全部测试适配零回归
 ```
 
-### R4-B2（前批，REOPENED → 修正随 R4-B2.1）
+### R4-B2 / R4-B2.1（前批）
 
-机制性建设（formal boundary / typed checks / physical verification /
-component seal / persisted report / latest-head / legacy fail-closed /
-rollback / migration 011）FREEZE 保留；四个 P0 + 一个 P1 由 R4-B2.1
-收口（详见 ADR-021 Amendment R4-B2.1）。
+R4-B2 机制性建设与 R4-B2.1 的 P0-02/03/04 + P1（seal consumption /
+transaction-internal preconditions / logical-URI confinement /
+manifest check rename）全部 FREEZE 保留（Reviewer 2026-08-31 裁决：
+除真实可复现 regression 不再重审）；各自复审指出的剩余缺口由
+R4-B2.1 / R4-B2.2 逐层收口（详见 ADR-021 各 amendment）。
 
 ## Golden / Trading Rule 人工 Review（结构就绪，等人工执行）
 
@@ -1773,6 +1771,17 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260831-061 — Final Governed DQ Scan Execution Boundary
+
+**Type**：C1 validation 契约结构性收口（execution truth）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：R4-B2.2 P0（audit 20260831 §2）——R4-B2.1 的 `record_artifact_check_execution` 不执行任何 scan：caller 读 registry + 公开 `compute_component_manifest_hash` 即可对两个 check 各伪造一行 completion（contract/producer 任意非空串），不写 finding，validate 即 PASS——"caller self-declare scan executed"，与 B1（self-declare APPROVED）/ B2（self-declare 0 counts）同构；mock happy path 正在使用声明路径；proof 的 scan_contract_version / producer 无 current-contract / checker-identity 校验（"fake-v0" + "attacker" 也能成为 PASS 前置）。  
+**New Contract**（ADR-021 Amendment F）：新模块 `pipeline/artifact_dq_scan.py`——`run_required_artifact_dq_scan(conn, *, data_root, feature_artifact_set_id)` 为唯一 governed DQ scan execution boundary（签名只有三项，AST 守卫断言无 identity/result/count/completion 参数）：STATIC production registry（ARTIFACT_DQ_CHECKERS：check_id / finding_class / checker_version / evaluator，不可注入）→ 内部 resolve CURRENT components + compute manifest → 逐 check 执行 evaluator（authoritative input）→ persist findings（append-only，按 detail 去重）→ INSERT completion proof LAST（contract = CURRENT "dq-scan-b2.2-v1"；producer = registry 派生 checker 身份——全部 system-derived）→ 单事务 COMMIT（evaluator raise → ROLLBACK → 零 completion row → NOT_TESTABLE）。旧 `record_artifact_check_execution` 从生产命名空间删除（production INSERT 唯一出现在 scan boundary，AST 守卫）。validator 三重校验：proof 缺失 / contract != CURRENT / producer != system-derived checker identity / manifest != current → NOT_TESTABLE。**Authoritative inputs**（§4.5）：IDENTITY_FALLBACK = feature parquet security_id（distinct）× dim_security.identity_key_version（FALLBACK 版本或未注册均 finding——fail closed；mock_e2e 补 dim_security 注册）；BLOCKING_DQ = snapshot 五个 fact 表 quality_flags（blocking 集 = QualityFlag 减 IDENTITY_FALLBACK）。validation contract version → b2-exact-v2（count_source 语义更新，旧 seal 由 current-contract recheck 失效）。真实检测测试（无伪造语义）：fallback 身份 UPDATE → 真实发现 → FAIL；STALE_WINDOW fact 行 → 真实发现 → FAIL。  
+**Tests**：test_publish_validation_exactness.py::TestR4B22GovernedScanBoundary（10）+ TestR4B21DQExecutionProof 适配（6 项 B2.1 语义在新结构下零回归）+ confinement 测试适配（attacker re-seal 场景——scanner 自身拒开恶意 URI，validation 层仍 fail closed）  
+**ADR**：[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Amendment F  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260830-060 — Publish Validation Logical-URI Confinement + Manifest Check Rename
 

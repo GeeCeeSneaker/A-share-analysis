@@ -541,3 +541,85 @@ Exit Gate：
 ```
 
 本批之后不再扩展 B2 范围。若上述 exit gate 全部通过，直接进入 **CR-2 Provider-Normalized + Quarantine**。
+
+---
+
+# 9. Implementation Mapping（开发方填写，2026-08-31）
+
+## §4 P0 Exit Requirements
+
+| Requirement（§4.1-4.5） | Implementation | Tests |
+|---|---|---|
+| §4.1 删除 production caller-facing completion writer | `record_artifact_check_execution` **从生产命名空间删除**（artifact_validation / artifact_dq_scan / pipeline package / publish module 均无此属性）；production 中 `INSERT INTO meta_artifact_check_execution` 唯一出现在 `run_required_artifact_dq_scan`（AST 守卫） | test_execution_proof_api_carries_no_result_params（重写：hasattr ×4 + 唯一 INSERT + 签名断言）+ test_no_caller_facing_completion_writer_in_production |
+| §4.2 scanner 自己计算 identity | `run_required_artifact_dq_scan` 内部 `_resolve_components` + `compute_component_manifest_hash`；签名无 scanned_component_manifest_hash 参数 | test_caller_computed_manifest_cannot_declare_completion（复现 Reviewer §2 攻击：读 registry + 公开 hash 计算——无 API 可写 completion；合法路径只有 scanner，它不接受 manifest） |
+| §4.3 contract / checker identity system-derived | completion row 的 scan_contract_version = CURRENT `DQ_SCAN_CONTRACT_VERSION`（"dq-scan-b2.2-v1"）；producer = `artifact-dq-scanner/{check_id}@{checker_version}`（registry 派生）；validator 三重校验（proof contract != CURRENT → NOT_TESTABLE；producer != system-derived → NOT_TESTABLE） | test_fake_producer_or_contract_cannot_satisfy_validator（raw INSERT fake contract + fake producer → 双 NOT_TESTABLE）+ test_scan_contract_version_evolution_requires_rescan |
+| §4.4 completion proof 在 scan 真正完成后最后产生 | scan 单事务：evaluator 执行 → findings persist → completion INSERT LAST → COMMIT；evaluator raise → ROLLBACK → 零 completion row | test_scanner_failure_writes_no_completion（monkeypatch evaluator raise → rows == 0 → NOT_TESTABLE → BLOCK） |
+| §4.5 真实 scan 有可说明的 authoritative input | IDENTITY_FALLBACK evaluator：feature parquet security_id（distinct）× dim_security.identity_key_version（FALLBACK 或未注册 → finding，fail closed）；BLOCKING_DQ evaluator：snapshot 五 fact 表 quality_flags（blocking 集 = QualityFlag 减 IDENTITY_FALLBACK）。**未伪造任何扫描逻辑**——两 check 均有真实数据源 | test_scanner_detects_identity_fallback_finding（UPDATE dim_security 为 FALLBACK → 真实发现 → FAIL）+ test_scanner_detects_blocking_dq_finding（INSERT STALE_WINDOW fact 行 → 真实发现 → FAIL）+ test_unregistered_identity_is_a_finding |
+
+## §5 推荐最小设计（static typed checker registry + governed boundary）
+
+| 设计要素 | Implementation |
+|---|---|
+| ArtifactDQCheckId | StrEnum（IDENTITY_FALLBACK_ZERO / BLOCKING_DQ_ZERO——值与 validation required-check id 一致，migration 012 语义连续） |
+| ArtifactDQCheckerSpec（check_id / contract_version / checker_version / evaluator） | dataclass（含 finding_class；producer property = system-derived checker 身份） |
+| run_artifact_dq_checks → `run_required_artifact_dq_scan(conn, data_root, artifact_set_id)` | registry lookup → 内部 compute manifest → evaluator(actual persisted input) → persist findings → completion LAST（§5 顺序图逐项对应） |
+| registry 非 caller 可注入 | 模块级 tuple `ARTIFACT_DQ_CHECKERS`（production-owned；测试 monkeypatch 仅用于注入 raise 的 evaluator 验证失败语义） |
+| caller 不得传 passed/count/findings/manifest_hash | 签名 == {conn, data_root, feature_artifact_set_id}（AST 断言） |
+| evaluator 不可执行 → NOT_TESTABLE / raise，无 completion proof | raise → 事务 ROLLBACK → 零 row → validator NOT_TESTABLE |
+| completion proof 记录 system-derived checker/contract identity | contract + producer 如上；validator current-contract + checker-identity 校验 |
+| validation 只消费当前 supported checker contract 的 compatible proof | 三重校验（contract / producer / manifest）任一不匹配 → NOT_TESTABLE |
+
+## §6 必须增加的对抗测试（12 项）
+
+1. production 无 caller-facing record_artifact_check_execution bypass ✓（多模块 hasattr + AST 唯一 INSERT 边界）
+2. caller 自己 compute manifest → 无 API 写 completed ✓（签名断言 + 攻击复现测试）
+3. no scan / no proof / zero findings → NOT_TESTABLE → BLOCK ✓（test_no_execution_proof_is_not_testable_and_blocks——B2.1 测试在新结构下零回归）
+4. scanner throws → completion count == 0 → NOT_TESTABLE ✓（test_scanner_failure_writes_no_completion）
+5. scanner detects finding → persisted → completion 只在 finding 持久化后写 → validation FAIL ✓（两个真实检测测试；顺序由单事务结构保证）
+6. genuinely runs and finds zero → PASS ✓（test_genuine_zero_scan_passes_and_publishes：proof contract/producer 断言 + publish 成功）
+7. component changes after scan → stale → rescan ✓（test_stale_proof_blocks_after_component_change——B2.1 零回归）
+8. contract version evolves → old proof 不满足 → rescan ✓（test_scan_contract_version_evolution_requires_rescan）
+9. arbitrary/unknown producer 或 checker version 不满足 ✓（test_fake_producer_or_contract_cannot_satisfy_validator）
+10. 两个 required scanner 之一 unavailable → NOT_TESTABLE → BLOCK ✓（monkeypatch 单 evaluator raise → 该 check 零 proof）
+11. B2.1 full seal / transaction / URI tests remain green ✓（47 项既有测试全部通过，含 confinement 六项 attacker re-seal 场景适配）
+12. full CI matrix green——推送后正向确认（见下）
+
+## §6 AST/structural guard
+
+production src 中所有 INSERT INTO meta_artifact_check_execution 只能位于 governed scan execution boundary ✓；该 boundary 公开签名不得接受 scanned_component_manifest_hash / result / status / pass / finding_count / count / completed_at ✓（断言 arg set == {conn, data_root, feature_artifact_set_id}）；producer/contract 由 static registry 派生而非函数参数 ✓。
+
+## §7 治理
+
+- **ADR-021 Amendment R4-B2.2**（F.1-F.5）：REOPEN 事实 + E.2"execution-row presence != governed scanner execution truth"修正 + 收口结构 + authoritative inputs + scanner failure 语义 + 治理状态（历史保留）
+- DEVELOPMENT_MANAGEMENT.md：头部（R4-B2.1 大部分 FREEZE + R4-B2.2 ACTIVE + CR-2 BLOCKED_BY_R4-B2.2）+ §40/§41 重写 + §61 DM-CR-20260831-061
+- DEVLOG append-only 新条目（why / how / alternatives rejected（caller 参数加固 / metadata-only proof / no-op scanner）/ cost-benefit / SHA + CI 推送后回填）
+- 未自称 VERIFIED；Exit Gate CI 项推送后勾选
+
+## §8 Exit Gate 对照
+
+```text
+[✓] execution completion cannot be caller-declared through production API
+[✓] actual governed scanner executes before completion proof exists
+[✓] scanner computes exact artifact/component identity internally
+[✓] scan contract/checker provenance system-derived + current-contract checked
+[✓] zero findings without actual scan -> NOT_TESTABLE, never PASS
+[✓] scanner failure/unavailability -> no completion proof -> NOT_TESTABLE
+[✓] actual finding -> persisted -> validation FAIL
+[✓] genuine zero scan -> PASS
+[✓] stale component identity -> rescan required
+[✓] stale scan contract/checker identity -> rescan required
+[✓] B2.1 full seal consumption intact（9 项 seal 测试零回归）
+[✓] B2.1 transaction-internal final recheck intact（8 项 precondition 测试零回归）
+[✓] frozen logical-URI confinement intact（7 项 confinement 测试零回归，含 attacker re-seal 适配）
+[✓] manifest check honest-name semantics intact
+[✓] append-only validation history / latest-head / atomic rollback intact
+[✓] R4-B1/A3/A2/CR-1 frozen contracts no regression（全量 858/0）
+[ ] full required CI matrix green（推送后正向确认回填）
+[✓] DEVLOG / DEVELOPMENT_MANAGEMENT / ADR-021 match runtime truth
+```
+
+## Verification Summary
+
+- Local: **858 / 0**（848 → 858，+10）；ruff check / ruff format --check / mypy 全绿；CI 同款命令 `uv run pytest` 复验 858/0
+- migration 012 表结构不变（列已够）；未新增 migration
+- 本批之后不再扩展 B2 范围；Exit Gate 全过 → CR-2 START

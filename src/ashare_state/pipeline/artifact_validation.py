@@ -58,6 +58,10 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ashare_state.pipeline.artifact_dq_scan import (
+    ARTIFACT_DQ_CHECKERS,
+    DQ_SCAN_CONTRACT_VERSION,
+)
 from ashare_state.storage.atomic_files import write_file_atomic
 from ashare_state.storage.paths import physical_from_logical_uri
 
@@ -68,11 +72,9 @@ __all__ = [
     "ArtifactValidationError",
     "ArtifactValidationCheckId",
     "CheckStatus",
-    "DQ_SCAN_CONTRACT_VERSION",
     "REQUIRED_VALIDATION_CHECKS",
     "VALIDATION_CONTRACT_VERSION",
     "compute_component_manifest_hash",
-    "record_artifact_check_execution",
     "record_artifact_dq_finding",
     "validation_contract_hash",
     "validate_artifact_for_publish",
@@ -112,11 +114,7 @@ REQUIRED_VALIDATION_CHECKS: tuple[ArtifactValidationCheckId, ...] = tuple(
 #: B2-02: the contract identity itself. Changing the required-check
 #: set / seal fields changes this hash and invalidates prior seals
 #: (consumed by the publish recheck - R4-B2.1 P0-02).
-VALIDATION_CONTRACT_VERSION = "b2-exact-v1"
-
-#: R4-B2.1 P0-01: the DQ scan contract identity. The execution proof
-#: records the contract the scan ran under.
-DQ_SCAN_CONTRACT_VERSION = "dq-scan-b2.1-v1"
+VALIDATION_CONTRACT_VERSION = "b2-exact-v2"
 
 _CONTRACT_TEXT = json.dumps(
     {
@@ -132,7 +130,8 @@ _CONTRACT_TEXT = json.dumps(
         ],
         "count_source": (
             "meta_artifact_dq_finding (append-only facts) + "
-            "meta_artifact_check_execution (positive execution proofs)"
+            "meta_artifact_check_execution (governed scanner completion "
+            "proofs, system-derived contract/producer identity)"
         ),
     },
     sort_keys=True,
@@ -273,69 +272,6 @@ def record_artifact_dq_finding(
         ],
     )
     return finding_id
-
-
-def record_artifact_check_execution(
-    conn: DuckDBPyConnection,
-    *,
-    feature_artifact_set_id: str,
-    check_id: str,
-    scan_contract_version: str,
-    producer: str,
-    scanned_component_manifest_hash: str,
-    detail: str | None = None,
-) -> str:
-    """R4-B2.1 P0-01: persist a POSITIVE execution proof for a DQ
-    required check - evidence that a governed scan RAN.
-
-    The record carries execution metadata ONLY: which check, over
-    which EXACT component identity (the component manifest hash of the
-    artifact as scanned), under which scan contract, by which
-    producer, completed when. It deliberately accepts NO count and NO
-    result - a caller cannot declare "zero findings" or PASS through
-    this API. Findings remain append-only facts
-    (``record_artifact_dq_finding``) and the formal validator derives
-    the counts; a scan that found problems records its findings as
-    facts, and a scan that found none simply has no facts to record -
-    what makes either HONEST is that the execution itself is provable
-    here and is bound to the exact scanned input.
-
-    The validator accepts a proof only when its
-    ``scanned_component_manifest_hash`` equals the CURRENT component
-    manifest (a stale scan never inherits onto changed components)."""
-    if check_id not in {c.value for c in _DQ_CHECK_FINDING_CLASS}:
-        msg = (
-            f"check_id {check_id!r} has no execution-proof semantics - "
-            f"expected one of {sorted(c.value for c in _DQ_CHECK_FINDING_CLASS)}"
-        )
-        raise ArtifactValidationError(msg)
-    if not scan_contract_version:
-        msg = "scan_contract_version is required (the proof records the scan contract)"
-        raise ArtifactValidationError(msg)
-    if not producer:
-        msg = "producer is required (the proof records who ran the scan)"
-        raise ArtifactValidationError(msg)
-    if not scanned_component_manifest_hash:
-        msg = (
-            "scanned_component_manifest_hash is required (the proof binds the "
-            "exact scanned input identity)"
-        )
-        raise ArtifactValidationError(msg)
-    execution_id = f"dqexec-{uuid.uuid4()}"
-    conn.execute(
-        "INSERT INTO meta_artifact_check_execution VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-            execution_id,
-            feature_artifact_set_id,
-            check_id,
-            scan_contract_version,
-            producer,
-            scanned_component_manifest_hash,
-            datetime.now(UTC),
-            detail,
-        ],
-    )
-    return execution_id
 
 
 def _required_checks_hash(outcomes: list[_CheckOutcome]) -> str:
@@ -613,11 +549,16 @@ def validate_artifact_for_publish(
         )
 
     # 9-10. IDENTITY_FALLBACK_ZERO / BLOCKING_DQ_ZERO --------------
-    # R4-B2.1 P0-01: positive execution proof REQUIRED. Absence of bad
-    # findings is NEVER proof of zero findings - without a matching
-    # execution record bound to the CURRENT component manifest the
-    # check is NOT_TESTABLE (blocking).
+    # R4-B2.1 P0-01 + R4-B2.2: positive execution proof REQUIRED, and
+    # the proof must be a COMPLETION produced by the governed scanner:
+    # check_id matches the static scanner registry, the scan contract
+    # is the CURRENT DQ_SCAN_CONTRACT_VERSION, the producer is the
+    # system-derived checker identity, and the scanned component
+    # manifest equals the CURRENT manifest. Absence of bad findings is
+    # NEVER proof of zero findings; a caller-asserted or stale proof is
+    # NOT_TESTABLE (blocking).
     component_manifest_hash_now = compute_component_manifest_hash(components)
+    registry_by_check = {spec.check_id.value: spec for spec in ARTIFACT_DQ_CHECKERS}
     for check_id, finding_class in _DQ_CHECK_FINDING_CLASS.items():
         proof = conn.execute(
             "SELECT scan_contract_version, producer, scanned_component_manifest_hash, "
@@ -631,9 +572,34 @@ def validate_artifact_for_publish(
                 _CheckOutcome(
                     check_id,
                     CheckStatus.NOT_TESTABLE,
-                    "no positive execution proof for this DQ required check - "
-                    "absence of bad findings is not proof of zero findings "
-                    "(audit R4-B2.1 P0-01)",
+                    "no governed-scan completion proof for this DQ required "
+                    "check - absence of bad findings is not proof of zero "
+                    "findings (audit R4-B2.1 P0-01 / R4-B2.2)",
+                )
+            )
+            continue
+        proof_contract = str(proof[0])
+        proof_producer = str(proof[1])
+        expected_producer = registry_by_check[check_id.value].producer
+        if proof_contract != DQ_SCAN_CONTRACT_VERSION:
+            outcomes.append(
+                _CheckOutcome(
+                    check_id,
+                    CheckStatus.NOT_TESTABLE,
+                    f"scan contract mismatch: proof contract {proof_contract!r} != "
+                    f"current supported contract {DQ_SCAN_CONTRACT_VERSION!r} - "
+                    "rescan required (audit R4-B2.2 section 4.3)",
+                )
+            )
+            continue
+        if proof_producer != expected_producer:
+            outcomes.append(
+                _CheckOutcome(
+                    check_id,
+                    CheckStatus.NOT_TESTABLE,
+                    f"checker identity mismatch: proof producer {proof_producer!r} "
+                    f"!= system-derived checker identity {expected_producer!r} - "
+                    "rescan required (audit R4-B2.2 section 4.3)",
                 )
             )
             continue
@@ -660,8 +626,8 @@ def validate_artifact_for_publish(
             _CheckOutcome(
                 check_id,
                 CheckStatus.PASS if count == 0 else CheckStatus.FAIL,
-                f"scan executed ({str(proof[1])}, contract {str(proof[0])}); "
-                f"derived {finding_class} findings: {count}",
+                f"governed scan executed ({proof_producer}, contract "
+                f"{proof_contract}); derived {finding_class} findings: {count}",
             )
         )
 

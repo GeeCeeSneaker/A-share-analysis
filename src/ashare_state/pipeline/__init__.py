@@ -1,8 +1,11 @@
 """Pipeline layer: publish transaction service and contract-test pipelines."""
 
+from ashare_state.pipeline.artifact_dq_scan import (
+    ArtifactDQScanError,
+    run_required_artifact_dq_scan,
+)
 from ashare_state.pipeline.artifact_validation import (
     ArtifactValidationError,
-    record_artifact_check_execution,
     record_artifact_dq_finding,
     validate_artifact_for_publish,
 )
@@ -18,6 +21,7 @@ from ashare_state.pipeline.publish import (
 )
 
 __all__ = [
+    "ArtifactDQScanError",
     "ArtifactValidationError",
     "PublishError",
     "PublishStateError",
@@ -26,8 +30,8 @@ __all__ = [
     "latest_published",
     "publish_snapshot",
     "publish_universes",
-    "record_artifact_check_execution",
     "record_artifact_dq_finding",
     "resolve_publish",
+    "run_required_artifact_dq_scan",
     "validate_artifact_for_publish",
 ]

@@ -13,6 +13,50 @@
 
 ---
 
+## 2026-08-31 · R4-B2.2 最终 Governed DQ Scan Execution Boundary（R4-B2.1 复审唯一剩余 P0 收口）
+
+**Scope**
+- R4-B2.1 复审（audit 20260831 08:03 +08:00，Reviewed HEAD `b00e40da78f84897ecb2f8d569178e99bcf829ce`）裁决 **REOPENED（仅剩 1 个 P0）**：P0-02 full seal consumption / P0-03 transaction-internal preconditions / P0-04 logical-URI confinement / P1-01 manifest check rename / full CI matrix 全部 **VERIFIED / FREEZE**（不得继续重构）；唯一 blocker——execution proof 仍可 caller 直接声明——由本批 R4-B2.2 收口（**未启动 CR-2**——BLOCKED_BY_R4-B2.2；本批之后不再扩展 B2 范围，Exit Gate 全过即 CR-2 START）
+
+**Implementation**
+- **P0 Execution Proof -> Scanner 内部产物（DM-CR-20260831-061，ADR-021 Amendment F，Reviewer §5 推荐结构）**：缺陷——`record_artifact_check_execution` 不执行任何 scan（字符串非空校验后直接 INSERT）：caller 读 registry + 公开 manifest hash 计算即可伪造 completion（contract/producer 任意非空串）→ 不写 finding → validate PASS；mock happy path 正在使用声明路径。修正——新模块 `pipeline/artifact_dq_scan.py`：
+  - `run_required_artifact_dq_scan(conn, *, data_root, feature_artifact_set_id)`——**签名只有三项**（AST 守卫断言，无 scanned hash / contract / producer / result / count / completed_at 参数）
+  - STATIC production registry（`ARTIFACT_DQ_CHECKERS`：check_id / finding_class / checker_version / evaluator——production-owned 不可注入）
+  - 内部 resolve CURRENT components + compute manifest（caller 不得提交 scanned hash）
+  - 逐 check 执行 evaluator（authoritative input）；persist findings（append-only，按 detail 去重——rescan 不膨胀 counts）
+  - **INSERT completion proof LAST**（scan_contract_version = CURRENT `dq-scan-b2.2-v1`；producer = `artifact-dq-scanner/{check_id}@{checker_version}`——全部 system-derived）
+  - 单事务：evaluator raise → ROLLBACK → **零 completion row** → NOT_TESTABLE → publish BLOCK（严禁 no-op scanner 写 completed）
+  - 旧 `record_artifact_check_execution` **从生产命名空间删除**；production 中 `INSERT INTO meta_artifact_check_execution` 唯一出现在 scan boundary（AST 守卫）
+  - validator 三重校验：proof 缺失 / contract != CURRENT / producer != system-derived checker identity / manifest != current → 全部 NOT_TESTABLE（rescan required）
+- **Authoritative Inputs（audit §4.5）**：IDENTITY_FALLBACK evaluator = feature component parquet `security_id` 列（distinct）× `dim_security.identity_key_version`（FALLBACK 版本或**未注册**均 finding——不可证即 fail closed；mock_e2e 补 dim_security 注册：master 带 list_date → 全部正式版身份）；BLOCKING_DQ evaluator = snapshot 五个 canonical fact 表 `quality_flags` 列（blocking 集 = QualityFlag 减 IDENTITY_FALLBACK：STALE_WINDOW / BENCHMARK_UNAVAILABLE / INVALID_LIMIT_RANGE / NO_LIMIT_RULE / LOW_SAMPLE）
+- validation contract version → **b2-exact-v2**（count_source 语义更新：completion proofs 为 governed scanner 产物，system-derived contract/producer identity）——旧 seal 由 P0-02 current-contract recheck 自然失效
+- **真实检测测试（无 monkeypatch 伪造语义）**：UPDATE dim_security 一个身份为 FALLBACK → scanner 真实发现 → persist finding → validate FAIL；INSERT fact_daily_bar 带 STALE_WINDOW → scanner 发现 → FAIL；未注册身份 → finding
+
+**Schema / Contract Changes**
+- C1 ×1（DM-CR-20260831-061）；ADR-021 Amendment R4-B2.2（F.1-F.5）
+- 新模块 `pipeline/artifact_dq_scan.py`；`artifact_validation.py`（删除 caller-facing writer + validator 三重校验 + contract v2）；`mock_e2e.py`（dim_security 注册 + scanner 替代声明式 proof）；migration 012 表结构不变（列已够）
+
+**Verification**
+- Local: **858 tests passed / 0 failed**（848 → 858，+10：no caller-facing writer（多模块 + 唯一 INSERT 边界 + 签名断言）/ caller computed manifest 无 API / scanner raise 零 row / 真实 fallback 检测 / 真实 blocking DQ 检测 / 未注册身份 finding / contract 演进 rescan / fake producer+contract raw row / genuine zero PASS / rescan 去重）；ruff check / ruff format --check / mypy 全绿；**CI 同款命令 `uv run pytest` 复验 858/0**
+- 既有回归零破坏：B2.1 全部 FREEZE 项（seal consumption / transaction preconditions / URI confinement / manifest rename）+ B2 机制 + B1+A3+A2+CR-1 冻结契约
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+
+**Implementation Status**
+- DONE（唯一 P0 收口；858/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- evaluator 的 authoritative input 选**已持久化的系统事实**（dim_security 身份注册 / fact 表 quality_flags）而非新增输入面——scanner 的判定完全可从当前 DB 状态重放，无新增 caller 可控输入
+- 未注册 security_id 判为 finding 而非跳过：身份无法证明非 fallback 时 fail closed（与 B2.2 §4.5"不能错误 PASS"一致）
+- findings 按 (artifact, class, detail) 去重：append-only 语义保留（历史 finding 永不删除），重复扫描不膨胀派生 counts（幂等重扫）
+- validation contract 升 v2 而非保留 v1：count_source 的语义从"metadata 记录"变为"governed scanner 产物"是契约变化——旧 seal 必须失效（current-contract recheck 是既有 P0-02 机制，零新增代码路径）
+- mock_e2e 补 dim_security 注册是"mock 链示范真实数据链"的必要适配：identity scanner 需要权威注册表；feature parquet bytes / manifest / component registry 零变化
+
+**下一步**
+- 等 Reviewer 复审 R4-B2.2（§8 Exit Gate 18 项：completion 不可 caller-declared / scanner 先执行 / identity 内部计算 / system-derived contract+producer / 零 finding 无 scan 不 PASS / scanner 失败无 proof / 真实 finding FAIL / genuine zero PASS / stale identity+contract rescan / B2.1 FREEZE 项无回归 / CI / 治理一致）；Exit Gate 全过 → **R4-B2 / B2.1 / B2.2 → VERIFIED / CLOSED / FREEZE，CR-2 START**（本批之后不再扩展 B2 范围）
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 ## 2026-08-30 · R4-B2.1 最终 Validation Truth + Seal Consumption + Transaction Closure（R4-B2 复审四 P0 + P1 一次性收口）
 
 **Scope**

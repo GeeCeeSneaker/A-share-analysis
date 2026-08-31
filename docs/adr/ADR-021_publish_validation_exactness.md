@@ -258,3 +258,51 @@ R4-B2 新增的物理文件读取（validator 组件重验 + publish bytes 终�
 - R4-B2 机制性建设（16 项）FREEZE 保留；本 amendment 只记录四个 P0 + 一个 P1 的收口；
 - DM 登记：§61 DM-CR-20260830-057（positive execution proof）/ 058（full seal consumption）/ 059（transaction-internal preconditions）/ 060（logical-URI confinement；含 P1 rename）；
 - migration 012：`meta_artifact_check_execution`（from-zero 12 链 + idempotent + tamper 守卫全过；未改旧文件）。
+
+---
+
+## Amendment 2026-08-31（R4-B2.2，audit 20260831 08:03）——Final Governed DQ Scan Execution Boundary
+
+> **Reviewer Verdict**：R4-B2.1 复审 **REOPENED（仅剩 1 个 P0）**——P0-02 full seal consumption / P0-03 transaction-internal preconditions / P0-04 logical-URI confinement / P1-01 manifest check rename / full CI matrix 全部 **VERIFIED / FREEZE**（不得继续重构）。本 amendment 收口唯一剩余 blocker：execution proof 本身仍可由 caller 直接声明。
+
+### F.1 剩余 P0：Execution Proof 仍是 Caller Assertion
+
+Amendment E.2 的 `record_artifact_check_execution` 不执行任何 scan——只校验字符串非空/check_id 合法后直接 INSERT。攻击路径（Reviewer §2）：caller 读 registry → 调公开 `compute_component_manifest_hash` 得 current hash → 对两个 check 各写一行（contract/producer 任意非空串）→ 不写任何 finding → validate → 两项 DQ check PASS。这不是 positive execution proof，是 **caller self-declare "I executed the scan"**——与 B1（self-declare APPROVED）/ B2（self-declare 0 counts）同构。mock_e2e 的 happy path 恰好正在使用该声明路径。且 proof 的 scan_contract_version / producer 无 current-contract / checker-identity 校验（"fake-v0" + "attacker" 也能通过）。
+
+### F.2 收口：Governed Scan Execution Boundary（Reviewer §5 推荐结构）
+
+新模块 `pipeline/artifact_dq_scan.py`：
+
+```text
+run_required_artifact_dq_scan(conn, *, data_root, feature_artifact_set_id)
+  -> static registry lookup（ARTIFACT_DQ_CHECKERS，production-owned）
+  -> resolve CURRENT components + compute manifest INTERNALLY
+  -> for each check: execute the production-owned evaluator
+       over authoritative input
+  -> persist every detected finding（append-only，dedup by detail）
+  -> INSERT execution-completion proof LAST
+  -> 单事务 COMMIT（evaluator raise -> ROLLBACK -> 零 completion row）
+```
+
+- **签名只有 (conn, data_root, feature_artifact_set_id)**——无 scanned hash / contract / producer / result / count / completed_at 参数（AST 守卫断言）。
+- **唯一 INSERT 边界**：production 中 `INSERT INTO meta_artifact_check_execution` 只出现在该函数（AST 守卫）；旧 `record_artifact_check_execution` 从生产命名空间删除。
+- **system-derived identity**：completion row 的 scan_contract_version = CURRENT `DQ_SCAN_CONTRACT_VERSION`（"dq-scan-b2.2-v1"）；producer = `artifact-dq-scanner/{check_id}@{checker_version}`（registry 派生的 checker 身份）。
+- **validator 三重校验**（artifact_validation.py）：proof 缺失 → NOT_TESTABLE；contract != CURRENT → NOT_TESTABLE（rescan required）；producer != system-derived checker identity → NOT_TESTABLE；manifest != current → NOT_TESTABLE（沿 E.2）。
+
+### F.3 Authoritative Inputs（audit §4.5——每个 check 实际读什么）
+
+- **IDENTITY_FALLBACK evaluator**：artifact set 的 feature component parquet `security_id` 列（distinct）× `dim_security.identity_key_version`。注册为 `SECURITY_IDENTITY_V1_FALLBACK` 的身份是 finding；**未注册的身份也是 finding**（不可证即 fail closed）。mock_e2e 补充 dim_security 注册（master 带 list_date → 全部正式版身份）。
+- **BLOCKING_DQ evaluator**：snapshot 绑定的五个 canonical fact 表（fact_daily_bar / fact_security_status_daily / fact_limit_price / fact_adj_factor / fact_corporate_action）的 `quality_flags` 列；blocking flag 集合 = V1.3.2 QualityFlag 集减 IDENTITY_FALLBACK（STALE_WINDOW / BENCHMARK_UNAVAILABLE / INVALID_LIMIT_RANGE / NO_LIMIT_RULE / LOW_SAMPLE）。零 fact 行的 snapshot 上该扫描真实执行且客观发现零。
+
+真实检测测试：UPDATE dim_security 一个身份为 FALLBACK → scanner 真实发现并 persist finding → validate FAIL；INSERT fact_daily_bar 带 STALE_WINDOW flag → scanner 发现 → FAIL。**无 monkeypatch 伪造的检测语义**。
+
+### F.4 scanner failure 语义
+
+evaluator raise（checker unavailable / 无法读取 input）→ 整个 scan 事务 ROLLBACK → **零 completion row** → validator NOT_TESTABLE → publish BLOCK。严禁 no-op scanner 写"completed"（测试覆盖：monkeypatch evaluator raise → rows == 0）。
+
+### F.5 治理状态
+
+- R4-B2.1 已 VERIFIED 的 seal consumption / transaction preconditions / URI confinement / manifest rename / CI 全部 FREEZE（除真实 regression 不重开）；本 amendment 只动 execution truth；
+- validation contract version 升为 `b2-exact-v2`（count_source 语义更新：completion proofs 为 governed scanner 产物，system-derived contract/producer identity）——旧 seal 由 P0-02 的 current-contract recheck 自然失效；
+- DM 登记：§61 DM-CR-20260831-061；
+- mock_e2e 变更：dim_security 注册（registry 行为，feature parquet bytes 不变）+ scanner 替代声明式 proof。
