@@ -13,6 +13,45 @@
 
 ---
 
+---
+
+## 2026-08-31 · R4-B2.3 最终 DQ Authoritative Input Seal + Scan Transaction Closure（R4-B2.2 复审唯一剩余 P0 收口）
+
+**Scope**
+- R4-B2.2 复审（audit 20260831 13:37 +08:00，Reviewed HEAD `1fc6d2329a6f185c320e0805068586d394cba20e`）裁决 **REOPENED（仅剩 1 个 P0）**：scanner ownership / execution boundary / static registry / 真实 evaluator / failure 回滚 / validator current-contract+producer 校验 / CI 等共 16 项 VERIFIED / FREEZE；唯一 blocker——completion proof 未绑定 checker 实际读取的完整 authoritative input——由本批 R4-B2.3 收口（**未启动 CR-2**——BLOCKED_BY_R4-B2.3；Exit Gate 全过即 B2 链 CLOSED、CR-2 START）
+
+**Implementation**
+- **P0 Checker-Specific Authoritative Input Seal（DM-CR-20260831-062，ADR-021 Amendment G）**：缺陷——completion proof 只 seal `scanned_component_manifest_hash`：IDENTITY_FALLBACK 还读 `dim_security.identity_key_version`、BLOCKING_DQ 还读 `artifact.data_snapshot_id` + 五 fact 表 `quality_flags`；三条可复现 stale-proof false-PASS 路径（scan 后 identity 改 FALLBACK / scan 后 fact 加 blocking flag / artifact 重绑 snapshot 而 components 不变）；且 scanner 的 authoritative reads 在 BEGIN TRANSACTION 之前。修正——
+  - **单一 production-owned spec 封装（audit §4.3 防漂移）**：`ArtifactDQCheckerSpec` 增加 `resolve_input`（解析 authoritative input state）+ `evaluate`（对**同一** state 判定）；`fingerprint(input_state)` = canonical JSON（check_id + checker_version + state）→ SHA-256——fingerprint 与 evaluation **天然同源**（evaluator 不再自行读输入，两套逻辑不可能漂移）
+  - **input state 定义（§4.1/4.2）**：IDENTITY_FALLBACK = components distinct security_id 集 + 每个的当前 identity_key_version（未注册 → 显式 `__MISSING__` 标记——identity version 变化/注册增删/security 集变化都改 fingerprint）；BLOCKING_DQ = 当前 data_snapshot_id + 每 fact 表 `(table_name, quality_flags, row_count)` 稳定聚合（NULL/empty 按 evaluator 规则规范化——只 seal 影响 evaluator 结果的输入，不做无关列全表 hash）
+  - **migration 013**：`meta_artifact_check_execution` 增加 `authoritative_input_hash` + `scanned_data_snapshot_id`；`DQ_SCAN_CONTRACT_VERSION` → `dq-scan-b2.3-v1`；validation contract → `b2-exact-v3`
+  - **三层 seal 消费链（audit §3——不能只在 validator 比一次）**：scanner proof input seal → validation report seal（`dq_execution_seals`：execution_id / contract / producer / authoritative_input_hash / component manifest / scanned snapshot）→ **publish transaction current-input recheck**（`_b2_recheck` 重算 CURRENT fingerprints 与 report seals 比对——validation 后 input 变化 → `ARTIFACT_DQ_INPUT_STALE` BLOCK；不可解析 → `ARTIFACT_DQ_INPUT_UNRESOLVABLE` BLOCK）；物理 bytes 终验先行（missing/tampered 组件报具体错误）
+  - **validator**：proof 缺失 / contract != CURRENT / producer != system-derived / manifest != current / **input seal 缺失（legacy）或 != current** → 全部 NOT_TESTABLE（rescan required）
+- **Scan Transaction Closure（audit §5）**：`run_required_artifact_dq_scan` 重排——**BEGIN TRANSACTION FIRST**；artifact snapshot / components 的 authoritative reads 全部移入事务内（`_resolve_scan_context` helper）；fingerprint 在事务内对 CURRENT 输入计算；AST ordering 守卫（测试）：函数体内首个 conn.execute 即 BEGIN 且先于 `_resolve_scan_context` 调用
+
+**Schema / Contract Changes**
+- C1 ×1（DM-CR-20260831-062）；**migration 013**（两列 ALTER；from-zero 13 链 + idempotent + tamper 守卫全过；未改旧文件）；ADR-021 Amendment R4-B2.3（G.1-G.5）
+- `artifact_dq_scan.py`：spec 重构（resolve_input/evaluate/fingerprint 共享封装）+ 事务先行 + completion proof 双新列 + `current_authoritative_input_fingerprints` 公开重算入口；`artifact_validation.py`：input seal 校验 + report 绑定 dq_execution_seals + contract v3；`publish.py`：DQ_INPUT_STALE / DQ_INPUT_UNRESOLVABLE 终验（bytes 终验之后）
+
+**Verification**
+- Local: **870 tests passed / 0 failed**（858 → 870，+12：AST ordering / 四类 scan 后 input 变化 stale-proof BLOCK / validation 后 input 变化 ×2 → publish recheck BLOCK / seal tamper+NULL → fail closed / rescan 后真实 finding FAIL / genuine zero unchanged PASS+publish / report seal 与 ledger 一致 / 缺 seals 的 report 拒绝）；ruff check / ruff format --check / mypy 全绿；**CI 同款命令 `uv run pytest` 复验 870/0**
+- 既有回归零破坏：B2.2 全部 16 项 FREEZE（scanner API shape / static registry / 真实检测 / failure 回滚）+ B2.1（seal consumption / transaction preconditions / URI confinement）+ B1/A3/A2/CR-1 冻结契约；既有 57 项 publish 测试适配后零回归
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+
+**Implementation Status**
+- DONE（唯一 P0 收口；870/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- fingerprint 与 evaluator 共享同一 `resolve_input` 产物（而非各自读输入再 hash）：audit §4.3 的核心要求——"fingerprint 看 A / checker 实际看 B"的漂移在结构上不可能发生
+- BLOCKING_DQ 的 fingerprint 用 `(table, quality_flags, row_count)` 聚合而非全表 hash：只 seal 影响 evaluator 结果的输入（audit §4.2 明确"不要对无关列做昂贵全表 hash"）
+- publish recheck 中 DQ seal 检查放在物理 bytes 终验**之后**：组件 missing/tampered 先报具体错误（COMPONENT_MISSING/TAMPERED），DQ input 变化报 STALE——错误路径更精确，测试断言不被 UNRESOLVABLE 掩盖
+- validation 侧 fingerprint 重算失败（如组件文件被删）→ `current_input_seals = {}` → 全部 DQ check NOT_TESTABLE（fail closed）；publish 侧则显式 DQ_INPUT_UNRESOLVABLE——两侧都 fail closed 但错误信息分层
+- checker_version 升 v2（identity-fallback-checker-v2 / blocking-dq-checker-v2）：input resolution 共享封装是 evaluator 语义的必要重构（audit §8 允许"fingerprint 共用解析所必需"）——旧 proof 由 contract version 演进自然失效
+
+**下一步**
+- 等 Reviewer 复审 R4-B2.3（§10 Exit Gate 21 项）；Exit Gate 全过 → **R4-B2 / B2.1 / B2.2 / B2.3 → VERIFIED / CLOSED / FREEZE，ADR-021 → ACCEPTED，CR-2 START**（本批不得提前启动 CR-2）
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
 ## 2026-08-31 · R4-B2.2 最终 Governed DQ Scan Execution Boundary（R4-B2.1 复审唯一剩余 P0 收口）
 
 **Scope**

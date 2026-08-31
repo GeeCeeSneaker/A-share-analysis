@@ -652,3 +652,93 @@ Production P0-M-1B -> remains BLOCKED independently
 ```
 
 本批不得提前启动 CR-2 主实现。
+
+---
+
+# 11. Implementation Mapping（开发方填写，2026-08-31）
+
+## §3 Checker-Specific Authoritative Input Fingerprint
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| ArtifactDQCheckerSpec 增加 input_fingerprint（production-owned / checker-specific） | spec 重构：`resolve_input`（解析 authoritative input state）+ `evaluate`（对同一 state 判定）+ `fingerprint(input_state)`（canonical JSON 含 check_id + checker_version + state → SHA-256）——**fingerprint 与 evaluation 共享同一 resolve_input 产物**（§4.3 防漂移：evaluator 不再自行读输入） | test_validation_report_binds_dq_execution_seal（seal 与 ledger 一致）+ 既有 evaluator 语义测试零回归 |
+| 事务结构（§3 推荐顺序） | `run_required_artifact_dq_scan`：**BEGIN TRANSACTION FIRST** → `_resolve_scan_context`（CURRENT artifact snapshot + components 事务内读取）→ 逐 checker：resolve_input → fingerprint → evaluate → persist findings → INSERT completion proof LAST（component_manifest_hash + scanned_data_snapshot_id + authoritative_input_hash + system-derived contract/producer）→ COMMIT | test_scanner_begin_precedes_authoritative_reads（AST ordering：首个 execute 即 BEGIN 且先于 _resolve_scan_context） |
+| validate_artifact_for_publish 重算 CURRENT fingerprint | `current_authoritative_input_fingerprints(conn, data_root, artifact_set_id)`（公开重算入口，scanner/validator/publish 共用）；proof 的 authoritative_input_hash != current → NOT_TESTABLE（rescan required） | test_identity_fallback_after_scan_makes_proof_stale / test_blocking_dq_fact_after_scan_makes_proof_stale |
+| publish final recheck 拒绝 validation 后 DQ input 变化 | `_b2_recheck`：report.dq_execution_seals 集合完整非空（缺 → DQ_SEAL_INCOMPLETE BLOCK）→ 重算 CURRENT fingerprints 逐一比对（stale → **ARTIFACT_DQ_INPUT_STALE** BLOCK；不可解析 → **ARTIFACT_DQ_INPUT_UNRESOLVABLE** BLOCK）；物理 bytes 终验先行 | test_identity_change_after_validation_blocks_publish / test_blocking_dq_change_after_validation_blocks_publish / test_publish_rejects_validation_without_dq_seals |
+
+## §4 Authoritative Input Fingerprint 最低要求
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| §4.1 IDENTITY_FALLBACK 覆盖 security_id 集 + 每 security 的 identity_key_version（或 MISSING） | `_resolve_identity_input`：components distinct security_id（sorted）+ 每个的当前 dim_security.identity_key_version（未注册 → 显式 `__MISSING__`） | test_identity_fallback_after_scan_makes_proof_stale（version 变化 stale）/ test_identity_unregistered_after_scan_makes_proof_stale（删除注册 stale）/ test_snapshot_rebind…（security 集变化经 manifest+seal 双覆盖） |
+| §4.2 BLOCKING_DQ 覆盖 data_snapshot_id + quality_flags input state（不做无关列全表 hash） | `_resolve_blocking_dq_input`：当前 data_snapshot_id + 每 fact 表 `(table_name, quality_flags, row_count)` 稳定聚合（GROUP BY quality_flags ORDER BY；NULL/empty 按 evaluator 规则规范化） | test_blocking_dq_fact_after_scan_makes_proof_stale（flag 新增 stale）/ test_snapshot_rebind_cannot_transfer_dq_proof（snapshot 重绑 stale——input state 含 snapshot id） |
+| §4.3 fingerprint 与 evaluator 同一语义 | 单一 resolve_input 产物同时喂 fingerprint 与 evaluate——结构上不可能 "fingerprint 看 A / checker 看 B" | 代码结构（spec 封装）+ 全部 stale 测试证明 seal 变化 == evaluator 输入变化 |
+| 稳定 / provider/machine independent / 不可 caller 提交 | canonical JSON（sort_keys）→ SHA-256；fingerprint 仅由 scanner 内部计算写入；boundary 签名仍只有 (conn, data_root, artifact_set_id)（AST 守卫保留） | test_execution_proof_api_carries_no_result_params（B2.2 测试零回归） |
+
+## §5 Scan Transaction 顺序闭合
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| BEGIN precedes authoritative artifact/snapshot/component reads | 全部 correctness reads 移入事务内（`_resolve_scan_context` 事务内调用）；事务外仅参数 fail-fast | test_scanner_begin_precedes_authoritative_reads（AST ordering 守卫） |
+| proof identity 不信任事务前读取 | scanned manifest / snapshot / input seal 全部在事务内对 CURRENT 输入计算 | 同上 + stale 场景测试 |
+
+## §6 Persisted Schema / Contract
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| migration 013：authoritative_input_hash + scanned_data_snapshot_id | `013_dq_authoritative_input_seal.sql`（两列 ALTER；未改旧 migration） | test_migrations（13 链 from-zero + idempotent + tamper 守卫） |
+| validation report 纳入 DQ execution seal（check_id / execution_id / contract / producer / input hash / manifest / snapshot） | report.dq_execution_seals（逐 check 全字段）；contract → b2-exact-v3 | test_validation_report_binds_dq_execution_seal（report seal 与 ledger head 逐字段一致） |
+| contract hash 正式演进 + legacy fail closed | DQ_SCAN_CONTRACT_VERSION → dq-scan-b2.3-v1；VALIDATION_CONTRACT_VERSION → b2-exact-v3；无 input seal 的 legacy proof → NOT_TESTABLE（no grandfather） | test_input_seal_tamper_missing_stale_fail_closed（NULL → legacy 消息） |
+
+## §7 必须增加的对抗测试（14 项映射）
+
+1. scanner BEGIN precedes authoritative reads ✓（AST ordering）
+2. scan 后 identity 改 FALLBACK → stale → BLOCK ✓
+3. scan 后删除 dim_security row → stale → BLOCK ✓
+4. scan 后同 snapshot 插 STALE_WINDOW → stale → BLOCK ✓
+5. snapshot 重绑（components 不变）→ BLOCKING_DQ proof 不可转移 ✓
+6. validation 后 identity input 变化 → publish recheck BLOCK ✓
+7. validation 后 quality_flags 变化 → publish recheck BLOCK ✓
+8. input seal tamper / missing / stale → fail closed ✓
+9. 旧 execution row 无 input seal → NOT_TESTABLE / rescan ✓
+10. rescan after input change → 新 fingerprint → 真实 finding FAIL ✓
+11. genuine zero inputs unchanged → validation + publish PASS ✓
+12. 既有 B2.2 scanner ownership / actual-finding / failure tests green ✓（57 项局部全过）
+13. 既有 B2.1 full-seal / transaction / URI tests green ✓
+14. full CI matrix green——推送后正向确认（见下）
+
+## §8 冻结合同零重写
+
+B2.2 scanner API shape / static registry / evaluator 语义（除 input 共享解析所必需的 spec 重构——checker_version v1→v2）/ B2.1 full seal / publish transaction / URI confinement / manifest 语义 / B2 formal boundary / append-only / latest-head / rollback / B1 / A3 / A2 / CR-1 全部保留（全量 870/0 零回归）。
+
+## §10 Exit Gate 对照
+
+```text
+[✓] R4-B2.2 caller-facing completion writer remains absent
+[✓] governed static scanner remains the only production completion writer
+[✓] scanner BEGIN precedes authoritative correctness reads
+[✓] checker input identity/fingerprint is computed internally, never caller-supplied
+[✓] IDENTITY_FALLBACK proof seals current identity-registry state relevant to scanned securities
+[✓] BLOCKING_DQ proof seals current snapshot + quality_flags state actually used by evaluator
+[✓] completion proof carries machine-verifiable authoritative-input seal
+[✓] validator recomputes current input seal and rejects stale/missing/legacy proof
+[✓] validation report binds exact DQ execution/input seal
+[✓] publish transaction final recheck rejects DQ input changes after validation
+[✓] identity change after scan cannot inherit old zero PASS
+[✓] blocking quality-flag change after scan cannot inherit old zero PASS
+[✓] snapshot rebind with unchanged feature components cannot inherit old DQ proof
+[✓] genuine unchanged zero scan still PASSes
+[✓] actual finding still FAILs and is persisted before completion
+[✓] scanner failure still writes no completion
+[✓] B2.1 full seal / transaction / URI / atomic rollback remain intact
+[✓] R4-B1/A3/A2/CR-1 frozen contracts show no regression
+[✓] migration-from-zero / upgrade path green（13 链）
+[ ] full required CI matrix green（推送后正向确认回填）
+[✓] DEVLOG / DEVELOPMENT_MANAGEMENT / ADR-021 match runtime truth
+```
+
+## Verification Summary
+
+- Local: **870 / 0**（858 → 870，+12）；ruff check / ruff format --check / mypy 全绿；CI 同款命令 `uv run pytest` 复验 870/0
+- migration 013 两列 ALTER（表结构无破坏性变更）；未改旧 migration
+- 本批之后 B2 范围不再扩展；Exit Gate 全过 → B2 链 CLOSED / FREEZE，CR-2 START

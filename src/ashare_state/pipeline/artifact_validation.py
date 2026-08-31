@@ -114,7 +114,9 @@ REQUIRED_VALIDATION_CHECKS: tuple[ArtifactValidationCheckId, ...] = tuple(
 #: B2-02: the contract identity itself. Changing the required-check
 #: set / seal fields changes this hash and invalidates prior seals
 #: (consumed by the publish recheck - R4-B2.1 P0-02).
-VALIDATION_CONTRACT_VERSION = "b2-exact-v2"
+#: R4-B2.3: v3 - the report now binds the DQ execution seals
+#: (authoritative input hash / snapshot / contract / producer).
+VALIDATION_CONTRACT_VERSION = "b2-exact-v3"
 
 _CONTRACT_TEXT = json.dumps(
     {
@@ -127,11 +129,13 @@ _CONTRACT_TEXT = json.dumps(
             "validation_contract_hash",
             "validator_code_commit",
             "required_checks_hash",
+            "dq_execution_seals",
         ],
         "count_source": (
             "meta_artifact_dq_finding (append-only facts) + "
             "meta_artifact_check_execution (governed scanner completion "
-            "proofs, system-derived contract/producer identity)"
+            "proofs, system-derived contract/producer identity + "
+            "checker-specific authoritative-input seal)"
         ),
     },
     sort_keys=True,
@@ -549,20 +553,39 @@ def validate_artifact_for_publish(
         )
 
     # 9-10. IDENTITY_FALLBACK_ZERO / BLOCKING_DQ_ZERO --------------
-    # R4-B2.1 P0-01 + R4-B2.2: positive execution proof REQUIRED, and
-    # the proof must be a COMPLETION produced by the governed scanner:
-    # check_id matches the static scanner registry, the scan contract
-    # is the CURRENT DQ_SCAN_CONTRACT_VERSION, the producer is the
-    # system-derived checker identity, and the scanned component
-    # manifest equals the CURRENT manifest. Absence of bad findings is
-    # NEVER proof of zero findings; a caller-asserted or stale proof is
+    # R4-B2.1 P0-01 + R4-B2.2 + R4-B2.3: positive execution proof
+    # REQUIRED, and the proof must be a COMPLETION produced by the
+    # governed scanner: check_id matches the static scanner registry,
+    # the scan contract is the CURRENT DQ_SCAN_CONTRACT_VERSION, the
+    # producer is the system-derived checker identity, the scanned
+    # component manifest equals the CURRENT manifest, AND the
+    # checker-specific AUTHORITATIVE INPUT SEAL matches the CURRENT
+    # input fingerprint (identity registry / snapshot DQ facts can
+    # change while components stay identical - audit R4-B2.3 §2).
+    # Absence of bad findings is NEVER proof of zero findings; a
+    # caller-asserted, stale, or legacy (unsealed) proof is
     # NOT_TESTABLE (blocking).
     component_manifest_hash_now = compute_component_manifest_hash(components)
     registry_by_check = {spec.check_id.value: spec for spec in ARTIFACT_DQ_CHECKERS}
+    from ashare_state.pipeline.artifact_dq_scan import (
+        current_authoritative_input_fingerprints,
+    )
+
+    try:
+        current_input_seals = current_authoritative_input_fingerprints(
+            conn, data_root=data_root, feature_artifact_set_id=feature_artifact_set_id
+        )
+    except Exception:  # noqa: BLE001 - unresolvable input = unprovable
+        # (e.g. a component file missing/unreadable - the COMPONENT_*
+        # checks already record that failure; the DQ checks simply
+        # cannot be proven against the current input -> NOT_TESTABLE)
+        current_input_seals = {}
+    dq_execution_seals: list[dict[str, str]] = []
     for check_id, finding_class in _DQ_CHECK_FINDING_CLASS.items():
         proof = conn.execute(
             "SELECT scan_contract_version, producer, scanned_component_manifest_hash, "
-            "completed_at FROM meta_artifact_check_execution "
+            "completed_at, authoritative_input_hash, scanned_data_snapshot_id, execution_id "
+            "FROM meta_artifact_check_execution "
             "WHERE feature_artifact_set_id = ? AND check_id = ? "
             "ORDER BY completed_at DESC, execution_id DESC LIMIT 1",
             [feature_artifact_set_id, check_id.value],
@@ -616,6 +639,33 @@ def validate_artifact_for_publish(
                 )
             )
             continue
+        # R4-B2.3: legacy rows carry no input seal - fail closed
+        proof_input_seal = str(proof[4]) if proof[4] is not None else ""
+        if not proof_input_seal:
+            outcomes.append(
+                _CheckOutcome(
+                    check_id,
+                    CheckStatus.NOT_TESTABLE,
+                    "legacy completion proof carries no authoritative-input "
+                    "seal - rescan through the governed scanner required "
+                    "(audit R4-B2.3 section 6, no grandfather)",
+                )
+            )
+            continue
+        current_input_seal = current_input_seals.get(check_id.value, "")
+        if proof_input_seal != current_input_seal:
+            outcomes.append(
+                _CheckOutcome(
+                    check_id,
+                    CheckStatus.NOT_TESTABLE,
+                    "stale authoritative input: the proof's checker input seal "
+                    f"{proof_input_seal[:16]}... != current input fingerprint "
+                    f"{current_input_seal[:16]}... - the checker's authoritative "
+                    "input (identity registry / snapshot DQ facts) changed after "
+                    "the scan; rescan required (audit R4-B2.3 section 3)",
+                )
+            )
+            continue
         count_row = conn.execute(
             "SELECT count(*) FROM meta_artifact_dq_finding "
             "WHERE feature_artifact_set_id = ? AND finding_class = ?",
@@ -627,8 +677,20 @@ def validate_artifact_for_publish(
                 check_id,
                 CheckStatus.PASS if count == 0 else CheckStatus.FAIL,
                 f"governed scan executed ({proof_producer}, contract "
-                f"{proof_contract}); derived {finding_class} findings: {count}",
+                f"{proof_contract}); input seal {proof_input_seal[:16]}... "
+                f"matches current; derived {finding_class} findings: {count}",
             )
+        )
+        dq_execution_seals.append(
+            {
+                "check_id": check_id.value,
+                "execution_id": str(proof[6]),
+                "scan_contract_version": proof_contract,
+                "producer": proof_producer,
+                "authoritative_input_hash": proof_input_seal,
+                "scanned_component_manifest_hash": str(proof[2]),
+                "scanned_data_snapshot_id": str(proof[5]) if proof[5] is not None else "",
+            }
         )
 
     # counts (report summary - derived, never inputs)
@@ -666,6 +728,12 @@ def validate_artifact_for_publish(
             {"check_id": o.check_id.value, "status": o.status.value, "detail": o.detail}
             for o in outcomes
         ],
+        # R4-B2.3 (audit section 6): the report binds the EXACT DQ
+        # execution seals it consumed - execution id, scan contract,
+        # checker producer, checker-specific authoritative-input seal,
+        # scanned component manifest, and (where applicable) the
+        # scanned data snapshot id.
+        "dq_execution_seals": dq_execution_seals,
         "summary": {
             "identity_fallback_count": fallback_count,
             "blocking_dq_count": blocking_dq_count,

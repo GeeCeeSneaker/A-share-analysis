@@ -326,6 +326,27 @@ def _b2_recheck(
             f"{validation_id}"
         )
         raise PublishStateError(msg)
+    # R4-B2.3 (audit section 3): the DQ authoritative-input seal must
+    # still describe the CURRENT inputs - the validation report binds
+    # the execution seals it consumed; a checker input (identity
+    # registry / snapshot DQ facts) that changed AFTER validation makes
+    # the whole report stale (fail closed inside the publish
+    # transaction). This runs AFTER the physical bytes verification so
+    # a missing/tampered component reports its specific failure first.
+    report_seals = {
+        str(seal.get("check_id")): str(seal.get("authoritative_input_hash") or "")
+        for seal in report.get("dq_execution_seals", [])
+    }
+    required_dq_check_ids = {
+        c.value for c in REQUIRED_VALIDATION_CHECKS if c.value.endswith("_ZERO")
+    }
+    if set(report_seals) != required_dq_check_ids or any(not v for v in report_seals.values()):
+        msg = (
+            "ARTIFACT_VALIDATION_DQ_SEAL_INCOMPLETE violated: the validation "
+            f"report for {validation_id} does not bind a complete set of DQ "
+            "execution input seals (audit R4-B2.3 section 3)"
+        )
+        raise PublishStateError(msg)
     # counts remain the system invariant gate (validator-derived values)
     if int(fallback_count) != 0 or int(dq_count) != 0:
         msg = (
@@ -366,6 +387,35 @@ def _b2_recheck(
                 "revalidation required"
             )
             raise PublishStateError(msg)
+    from ashare_state.pipeline.artifact_dq_scan import (
+        current_authoritative_input_fingerprints,
+    )
+
+    try:
+        current_input_seals = current_authoritative_input_fingerprints(
+            conn, data_root=Path(data_root), feature_artifact_set_id=feature_artifact_set_id
+        )
+    except Exception as exc:  # noqa: BLE001 - unresolvable = stale/unprovable
+        msg = (
+            "ARTIFACT_DQ_INPUT_UNRESOLVABLE violated: the current checker "
+            f"authoritative input cannot be resolved for {feature_artifact_set_id} "
+            f"({exc}) - the DQ input seal cannot be verified; rescan and "
+            "revalidation required (audit R4-B2.3 section 3)"
+        )
+        raise PublishStateError(msg) from exc
+    stale_inputs = sorted(
+        check_id
+        for check_id, seal in report_seals.items()
+        if current_input_seals.get(check_id, "") != seal
+    )
+    if stale_inputs:
+        msg = (
+            "ARTIFACT_DQ_INPUT_STALE violated: the checker authoritative "
+            f"inputs changed after validation (stale checks: {stale_inputs}) - "
+            "rescan and revalidation required before publish (audit "
+            "R4-B2.3 section 3)"
+        )
+        raise PublishStateError(msg)
     return str(validation_id)
 
 

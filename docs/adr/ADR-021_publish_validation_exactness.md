@@ -306,3 +306,54 @@ evaluator raise（checker unavailable / 无法读取 input）→ 整个 scan 事
 - validation contract version 升为 `b2-exact-v2`（count_source 语义更新：completion proofs 为 governed scanner 产物，system-derived contract/producer identity）——旧 seal 由 P0-02 的 current-contract recheck 自然失效；
 - DM 登记：§61 DM-CR-20260831-061；
 - mock_e2e 变更：dim_security 注册（registry 行为，feature parquet bytes 不变）+ scanner 替代声明式 proof。
+
+---
+
+## Amendment 2026-08-31（R4-B2.3，audit 20260831 13:37）——Final DQ Authoritative Input Seal + Scan Transaction Closure
+
+> **Reviewer Verdict**：R4-B2.2 复审 **REOPENED（仅剩 1 个 P0）**——scanner ownership / execution boundary 等 16 项 VERIFIED / FREEZE。本 amendment 收口唯一剩余 blocker：completion proof 未绑定 checker 实际读取的完整 authoritative input。
+
+### G.1 剩余 P0：Component Manifest 不是 Checker 的完整输入
+
+Amendment F 的 completion proof 只 seal `scanned_component_manifest_hash`，但两个真实 checker 的 authoritative input 不只 components：
+
+```text
+IDENTITY_FALLBACK：components security_id 集 + dim_security.identity_key_version
+BLOCKING_DQ：artifact.data_snapshot_id + 五个 fact 表 quality_flags
+```
+
+三条可复现错误路径（audit §2）：(A) scan 后 dim_security 某 security 改为 FALLBACK——components 未变、manifest 匹配、findings 仍 0 → **false PASS**；(B) scan 后同 snapshot fact 表新增 STALE_WINDOW——同上；(C) scan 在 S1 下完成，artifact 重绑 S2 且 components 不变——proof 无字段证明当时扫的是哪个 snapshot。根因：`component manifest unchanged` ≠ `checker authoritative input unchanged`。且 scanner 的 artifact/components 读取发生在 `BEGIN TRANSACTION` **之前**（顺序缺陷，audit §5）。
+
+### G.2 收口：Checker-Specific Authoritative Input Seal
+
+**单一 production-owned spec 封装 input resolution / fingerprint / evaluation（audit §4.3——防两套逻辑漂移）**：`ArtifactDQCheckerSpec` 增加 `resolve_input`（解析该 checker 的 authoritative input state）与 `evaluate`（对同一 state 判定）；`fingerprint(input_state)` = canonical JSON（含 check_id + checker_version + state）→ SHA-256。evaluator 不再自行读输入——它消费 resolve_input 的产物，fingerprint 与 evaluation **天然同源**。
+
+- **IDENTITY_FALLBACK input state（§4.1）**：components 的 distinct security_id 集 + 每个 security 的当前 `dim_security.identity_key_version`（未注册 → 显式 `__MISSING__` 标记）。identity version 变化 / 注册增删 / artifact security 集变化都改变 fingerprint。
+- **BLOCKING_DQ input state（§4.2）**：当前 `artifact.data_snapshot_id` + 每个 fact 表按 `(table_name, quality_flags, row_count)` 的稳定聚合（NULL/empty 按 evaluator 规则规范化）——只 seal 影响 evaluator 结果的输入，不做无关列全表 hash。
+
+**completion proof 新增两列（migration 013）**：`authoritative_input_hash`（checker-specific input seal）+ `scanned_data_snapshot_id`（显式审计字段）。`DQ_SCAN_CONTRACT_VERSION` → `dq-scan-b2.3-v1`；`VALIDATION_CONTRACT_VERSION` → `b2-exact-v3`（report 新增 `dq_execution_seals` 绑定）。
+
+### G.3 三层 seal 消费链（audit §3——不能只在 validator 比一次）
+
+```text
+scanner proof input seal
+  -> validation report seal（report.dq_execution_seals：execution_id /
+     contract / producer / authoritative_input_hash / component
+     manifest / scanned snapshot）
+  -> publish transaction current-input recheck（_b2_recheck 重算 CURRENT
+     fingerprints 并与 report seals 比对——validation 后 input 变化 ->
+     ARTIFACT_DQ_INPUT_STALE BLOCK）
+```
+
+validator（artifact_validation）：proof 缺失 / contract != CURRENT / producer != system-derived / manifest != current / **input seal 缺失（legacy）或 != current** → NOT_TESTABLE。publish recheck（publish.py）：report 的 dq_execution_seals 集合必须完整非空；`current_authoritative_input_fingerprints` 重算当前值（不可解析 → DQ_INPUT_UNRESOLVABLE BLOCK）逐一比对。物理 bytes 终验先行（missing/tampered 组件报具体错误），DQ seal 检查在其后。
+
+### G.4 Scan Transaction Closure（audit §5）
+
+`run_required_artifact_dq_scan` 重排：**BEGIN TRANSACTION FIRST**——artifact snapshot / components 的 authoritative reads 全部移入事务内（`_resolve_scan_context` helper）；fingerprint 在事务内对 CURRENT 输入计算；evaluator → findings persist → completion proof LAST → COMMIT。AST ordering 守卫（测试）：函数体内首个 conn.execute 即 BEGIN，且 BEGIN 先于 `_resolve_scan_context` 调用。
+
+### G.5 治理状态
+
+- R4-B2.2 的 16 项 VERIFIED / FREEZE（scanner API shape / static registry / evaluator semantics / 真实检测 / failure 回滚等）全部保留；本 amendment 只增加 input seal 与事务闭合；
+- checker_version 升 v2（input resolution 共享封装是 evaluator 语义必要的重构——audit §8 允许"fingerprint 共用解析所必需"）；
+- migration 013：两列 ALTER（from-zero 13 链 + idempotent + tamper 守卫全过；未改旧文件）；
+- DM 登记：§61 DM-CR-20260831-062。
