@@ -15,6 +15,49 @@
 
 ---
 
+---
+
+## 2026-08-31 · CR-2 Provider-Normalized + Quarantine（R4-B2 全链 CLOSED 后首个数据层批次：归一化 runtime 全落地）
+
+**Scope**
+- R4-B2.3 复审（audit 20260831 16:22 +08:00，Reviewed HEAD `6c5088bde046719c0b6df2b18d807079e62ee780`）裁决 **R4-B2 / B2.1 / B2.2 / B2.3 全链 VERIFIED / CLOSED / FREEZE**（无新 blocker；ADR-021 → ACCEPTED）；本批 CR-2 落地 CR2-P0-01..10（**未启动 CR-3/CR-4/Feature/State**——遵守工作要求 §4 边界；CR-3 BLOCKED_BY_CR-2）
+
+**Implementation**
+- **CR2-P0-01 Raw Evidence 唯一正式输入（新包 `ashare_state.normalization`）**：`NormalizationRunner.run(provider, provider_dataset, request_id)` 只消费已持久化 raw evidence——定位 `.meta.json` → `verify_meta_closure`（复用）→ `RawWriter.read(verify=True)`（复用 verified reader）→ mapper；全程无 provider/SDK 访问（结构性测试断言无 provider-module import）。失败 exchange（ERROR meta）不是 mapping failure：`SOURCE_EXCHANGE_FAILED` BLOCKED run + 保留原 failure evidence + 零 quarantine 行
+- **CR2-P0-02 Typed Dataset Normalization Registry**：`registry.py` STATIC production-owned，keyed by (provider_dataset, endpoint) exact routing；14 个 provider surface 全显式分类——9 SUPPORTED（trade_calendar=WHOLE_PAYLOAD；code_list / hist_code_list / stock_basic / daily_bar / history_stock_status（三输出：全字段镜像 + limit-price projection + CA-flag projection）/ adj_factor / backward_factor / equity_structure / industry_constituent=ROW）；5 BLOCKED_PENDING_MAPPER（dividend / right_issue / bj_code_mapping / industry_base_info——mapper 未具备足够已验证字段语义，fail closed 不 silent skip）。**结构守卫**：测试 AST 抽取 provider 全部 (dataset, endpoint) 对并要求注册表 exact 覆盖——新 surface 无分类决策即测试红
+- **CR2-P0-03 First-Class Immutable 持久化输出**：`normalized/provider=<P>/dataset=<D>/raw_request=<rid>/contract=cr2-v1/` 下每输出表一个 parquet（canonical 全列排序——消除输入行序影响）+ `manifest.json`（绑定 raw evidence uri/hash/request/table、contract 版本、mapper identity、输出表 uri/content_hash/schema_hash/row_count、semantic_hash、counts、status）+ ledger 表 `meta_provider_normalization_run`（migration 014）；URI 构造经 frozen logical-URI confinement（组件校验 + physical_from_logical_uri）；artifact 不可变（同 bytes 幂等 no-op，异 bytes conflict BLOCK）
+- **CR2-P0-04 No-Silent-Drop Accounting（runtime 机器强制）**：ROW scope `input == mapped + quarantined`——违反即 NORMALIZATION_INTERNAL_ERROR BLOCKED；mapper 非 MappingValidationError 异常**不被吞掉**（记为 internal-error quarantine 带 locator 并 BLOCKED）；WHOLE_PAYLOAD scope：任一非法元素 → 零 normalized + 一条 whole-payload quarantine + BLOCKED
+- **CR2-P0-05/06 First-Class Quarantine + Deterministic Locator**：`meta_provider_quarantine`（append-only）：raw request/table/**row ordinal** 精确定位 + source_key（best-effort，不替代 locator）+ scrubbed structured context（credential-shaped key 递归 REDACT——测试注入 password/token 验证不泄漏）+ scope/error_class/mapper identity/contract。multi-table payload 严格按 meta 声明的 table identity 路由（无路由声明 → PAYLOAD_SHAPE_UNSUPPORTED BLOCK，不取第一个 table）
+- **CR2-P0-07 Determinism / Idempotency**：run_id = uuid5(namespace, sha256(evidence hash + contract + mapper identity))——同输入重放同 run id；idempotent replay 直接返回既有 run（零重复 ledger/quarantine 行）；semantic_hash = 全输出表 sorted canonical JSON hash（**行序无关**——reversed 输入测试覆盖）；同 request id 不同 evidence bytes → RAW_EVIDENCE_INVALID BLOCK
+- **CR2-P0-08 错误分类**：RAW_EVIDENCE_INVALID / SOURCE_EXCHANGE_FAILED / PAYLOAD_SHAPE_UNSUPPORTED / MAPPING_VALIDATION_FAILED / NORMALIZATION_INTERNAL_ERROR——provider error 与 mapping error 分离
+- **CR2-P0-09 Provider-Faithful**：注册 mapper 即既有 provider-faithful mappers——provider literals / units / 未验证标记（GALAXY_UNVERIFIED）原样通过（测试断言）；不预支 canonical 语义（CR-3 的事）
+- **CR2-P0-10 状态机**：SUCCESS / PARTIAL / BLOCKED；PARTIAL 是否允许由 registry 逐 surface 声明（caller 不能临时决定）
+
+**Schema / Contract Changes**
+- C2 ×1（DM-CR-20260831-063）；**新 ADR-022**（Provider Normalization and Quarantine；PROPOSED 待复审）；**ADR-021 → ACCEPTED**（B2 链 CLOSED 同步）；ADR-000 索引更新
+- **migration 014**：meta_provider_normalization_run（22 列）+ meta_provider_quarantine（17 列）；from-zero 14 链 + idempotent + tamper 守卫全过（未改旧文件）
+- 新包 `src/ashare_state/normalization/`（registry.py + runner.py + __init__.py）
+
+**Verification**
+- Local: **907 tests passed / 0 failed**（870 → 907，+37：CR-2 对抗测试全套——工作要求 §7 清单 18 项全对应 + 结构守卫 ×3 + 状态机 + 三输出 + 排序确定性）；ruff check / ruff format --check / mypy 全绿；**CI 同款命令 `uv run pytest` 复验 907/0**
+- 既有回归零破坏：R4-B2.x / B1.x / A3.x / A2.x / CR-1.x 全部冻结契约；migrations 14 链
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿：Ubuntu 3.14 + Windows 3.12/3.14）
+
+**Implementation Status**
+- DONE（CR2-P0-01..10 全部 + migration 014 + ADR-022 + 治理同步；907/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- run_id 用确定性 uuid5 而非随机：同输入重放天然命中既有 run 行（幂等 no-op），无先查后插竞态窗口
+- semantic_hash 用 sorted canonical JSON 而非 parquet bytes hash：parquet 编码可能含环境级元数据（writer 版本）跨机器不稳定；语义等价（行集 + 值）才需要确定性比较；artifact content hash 仍记录用于完整性
+- corporate_action / bj_mapping / industry_base_info 显式 BLOCKED_PENDING_MAPPER 而非"尽力解析"：半验证字段的尽力解析正是 sentinel 风险来源；fail closed + 显式分类让缺口可审计可排期（工作要求 §5 明确允许）
+- quarantine 落 DB 表而非 JSONL/parquet：需按 run/request/locator 可查询（CR-3 消费检查 + 人工审计）；ledger + manifest 双锚定；normalized 行数据仍走 parquet
+- runner 复用 RawWriter.read(verify=True) 而非自写读取：工作要求 §5 P0-01 明确"不得另写一套弱化 hash 规则"
+- 组件校验（provider/dataset/request_id 无 / \ .. :）：artifact 路径构造的 confinement 防御——evil request id 在任何文件系统访问前被拒
+
+**下一步**
+- 等 Reviewer 复审 CR-2（§8 Exit Gate 20 项）；Exit Gate 全过 → CR-2 → VERIFIED / CLOSED，**CR-3 AvailabilityPolicy + Canonicalizer START**
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
 ## 2026-08-31 · R4-B2.3 最终 DQ Authoritative Input Seal + Scan Transaction Closure（R4-B2.2 复审唯一剩余 P0 收口）
 
 **Scope**

@@ -1,6 +1,6 @@
 # ADR-021: Publish Validation Exactness（发布验证精确性）
 
-- **Status**: PROPOSED（2026-08-30，R4-B2 批次交付；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
+- **Status**: ACCEPTED（2026-08-31，Reviewer closure 裁决同步——R4-B2 / B2.1 / B2.2 / B2.3 全链 VERIFIED / CLOSED / FREEZE；Amendments 20260830（E）/ 20260831（F/G）随链冻结）
 - **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
 - **Date**: 2026-08-30
 - **Work Requirement**: `docs/design/A-share-analysis_R4-B1.2复审结论与R4-B2_PublishValidationExactness开发工作要求_20260830.md`

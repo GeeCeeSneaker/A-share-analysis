@@ -62,6 +62,9 @@ EXPECTED_TABLES = {
     # 012 (R4-B2.1 validation closure)
     "meta_artifact_check_execution",
     # 013 (R4-B2.3 authoritative-input seal) adds columns only
+    # 014 (CR-2 provider normalization + quarantine)
+    "meta_provider_normalization_run",
+    "meta_provider_quarantine",
     # runner bootstrap
     "meta_schema_version",
 }
@@ -78,7 +81,7 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 13
+            assert len(applied) == 14
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
         finally:
@@ -89,10 +92,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 13
+            assert len(first) == 14
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 13
+            assert len(ledger) == 14
         finally:
             conn.close()
 
@@ -128,10 +131,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 014 (013 exists in the real repo set)
+            # tamper 002 and add a new 015 (014 exists in the real repo set)
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "014_new_thing.sql").write_text(
+            (tampered_dir / "015_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):

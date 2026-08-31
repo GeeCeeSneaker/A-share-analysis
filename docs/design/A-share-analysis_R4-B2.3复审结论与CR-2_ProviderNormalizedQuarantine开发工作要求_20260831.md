@@ -702,3 +702,89 @@ A股数据基座
 ```
 
 **当前最关键含义**：系统已经能可靠回答“这批 feature artifact 是否真的经过当前数据输入的检查、是否仍可发布”；下一步开始补齐此前缺失的中间数据层——把已经保存好的 provider Raw 证据稳定转换为 Provider-Normalized 数据，并把任何无法可靠解释的坏记录隔离出来，而不是让它们悄悄进入 Canonical 主数据。
+
+---
+
+# 11. Implementation Mapping（开发方填写，2026-08-31）
+
+## §5 P0 Runtime Contract
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| **P0-01** Raw evidence 唯一正式输入；复用 verified reader；失败 exchange ≠ mapping failure | `NormalizationRunner.run(provider, provider_dataset, request_id)`：定位 `.meta.json` → `verify_meta_closure`（复用）→ `RawWriter.read(verify=True)`（复用）→ mapper；全程无 provider/SDK 访问；ERROR meta → `SOURCE_EXCHANGE_FAILED` BLOCKED run（保留 failure evidence、零 quarantine 行） | test_normalizes_persisted_raw_evidence / test_missing_raw_meta_is_caller_misuse / test_source_exchange_failure_is_not_a_mapping_quarantine / test_runner_has_no_provider_calls |
+| **P0-02** Typed dataset registry；caller 不可注入；全 surface 显式分类；unsupported fail closed | `registry.py`：STATIC `DATASET_NORMALIZATION_REGISTRY` keyed by (dataset, endpoint)；14 surface 全分类（9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER：dividend / right_issue / bj_code_mapping / industry_base_info）；结构守卫 AST 抽取 provider surface exact 覆盖 | test_every_provider_surface_is_explicitly_classified / test_supported_specs_have_mappers / test_unsupported_surface_blocks_no_silent_skip / test_unknown_surface_blocks |
+| **P0-03** First-class immutable 持久化输出 + manifest 绑定 raw request/evidence/table + 逻辑 URI confinement | `normalized/provider=<P>/dataset=<D>/raw_request=<rid>/contract=cr2-v1/`：parquet per output（canonical 全列排序）+ manifest.json（全绑定）+ ledger `meta_provider_normalization_run`（migration 014，22 列）；组件校验 + `physical_from_logical_uri`；artifact 不可变（同 bytes no-op / 异 bytes conflict） | test_normalizes_persisted_raw_evidence（manifest 断言）/ test_normalized_artifact_uris_are_canonical / test_evil_request_id_fails_closed ×6 |
+| **P0-04** No silent drop（ROW 记账 + WHOLE_PAYLOAD 语义） | runtime 机器强制 `input == mapped + quarantined`（违反 → NORMALIZATION_INTERNAL_ERROR BLOCKED）；mapper 非 MappingValidationError 异常记为 internal-error quarantine + BLOCKED（不吞掉）；calendar 一个非法日期 → 零 normalized + 一条 whole-payload quarantine + BLOCKED | test_row_accounting_invariant_machine_enforced / test_mapper_internal_exception_is_recorded_not_swallowed / test_one_invalid_calendar_date_quarantines_whole_payload / test_valid_calendar_normalizes |
+| **P0-05** Quarantine first-class evidence（全字段 + scrub + immutable） | `meta_provider_quarantine`（migration 014，17 列，append-only）：quarantine_id / run 绑定 / provider+dataset / raw request / evidence uri+hash / table / ordinal / source_key / scope / error_class / message / scrubbed context（credential 递归 REDACT）/ mapper identity / contract | test_quarantine_locates_exact_raw_row / test_quarantine_never_leaks_secrets（注入 password/token → REDACTED） |
+| **P0-06** Deterministic source-row locator；multi-table 严格路由 | quarantine 记录 `raw_request_id + raw_table_name + raw_row_ordinal`（source_key 为 best-effort 自然键不替代 locator）；multi-table payload 无 spec.source_table 路由 → PAYLOAD_SHAPE_UNSUPPORTED BLOCK（不取第一个 table） | test_quarantine_locates_exact_raw_row / test_multi_table_payload_requires_exact_table_routing |
+| **P0-07** Deterministic replay / idempotency；同 request 冲突 bytes BLOCK | run_id = uuid5(sha256(evidence hash + contract + mapper identity))；idempotent replay 返回既有 run（零重复行）；semantic_hash 行序无关；同 request 不同 evidence bytes → RAW_EVIDENCE_INVALID BLOCK | test_rerun_is_idempotent / test_deterministic_semantic_output（reversed 输入）/ test_conflicting_raw_evidence_bytes_block |
+| **P0-08** 错误分类分离 | `NormalizationErrorClass` 五类（RAW_EVIDENCE_INVALID / SOURCE_EXCHANGE_FAILED / PAYLOAD_SHAPE_UNSUPPORTED / MAPPING_VALIDATION_FAILED / NORMALIZATION_INTERNAL_ERROR） | 各 BLOCK 测试的 error_class 断言 |
+| **P0-09** 不提前 canonicalize | 注册 mapper 即既有 provider-faithful mappers：provider literals / units / GALAXY_UNVERIFIED 原样通过；status 三输出 event_type=STATUS_FLAG_PROJECTION 诚实标注 | test_daily_bar_preserves_provider_units_and_literals / test_industry_member_keeps_unverified_marker |
+| **P0-10** SUCCESS/PARTIAL/BLOCKED 机器定义；PARTIAL 由 registry 声明 | 状态机如 §5；PARTIAL 逐 spec.allow_partial；internal error → BLOCKED | TestStatusMachine 三态 + test_row_quarantine_partial_when_allowed |
+
+## §7 必须增加的对抗测试（20 项映射）
+
+1. normalization 只消费 persisted Raw evidence；禁止 SDK call ✓（test_runner_has_no_provider_calls + test_missing_raw_meta）
+2. raw meta hash tamper → BLOCK ✓
+3. raw payload bytes tamper → BLOCK ✓
+4. required field missing → quarantine 绝不 sentinel ✓（+ normalized artifact 断言无坏行）
+5. unparsable required date → quarantine 无 1970-01-01 ✓
+6. unparsable required numeric → quarantine 无 0.0 ✓
+7. legal zero/0.0 不当 missing ✓（first_present 语义）
+8. row-wise input == normalized + quarantine ✓（4 行混合场景）
+9. trade_calendar 一个非法日期 → whole payload quarantine 零输出 ✓
+10. multi-table exact routing 不 take-first ✓
+11. unsupported required dataset → BLOCKED_PENDING_MAPPER run BLOCK ✓
+12. mapper exception 可追溯 locator ✓（ordinal 0/1 断言）
+13. quarantine 不泄露 password/token/secret ✓（注入验证）
+14. rerun same raw+contract → deterministic/idempotent ✓（零重复 ledger 行）
+15. same request conflicting raw bytes → BLOCK ✓
+16. normalized URI logical-URI confinement ✓（canonical 断言 + evil request id ×6）
+17. source exchange failure ≠ mapping quarantine ✓（零 quarantine 行断言）
+18. provider-normalized DTO 保留 provider units/literals ✓
+19. Windows 3.12 / Windows 3.14 / Ubuntu 3.14 all green——推送后正向确认（见下）
+20. R4-B2/B1/A3/A2/CR-1 frozen regression green ✓（全量 907/0）
+
+## §6 Schema / Artifact 设计
+
+- migration 014：`meta_provider_normalization_run`（22 列）+ `meta_provider_quarantine`（17 列）；from-zero 14 链 + idempotent + tamper 守卫测试同步；未改 001..013
+- normalized 主记录 = immutable Parquet artifact + manifest（metadata table 仅 lineage/summary——工作要求 §6 原样采纳）
+- C2 处理 + 新 ADR：**ADR-022**（含五问 + 被拒替代方案 + 残余边界如实记录）
+
+## §8 Exit Gate 对照
+
+```text
+[✓] Raw evidence is the sole normalization input
+[✓] exact Raw evidence closure verified before mapping
+[✓] static typed dataset normalization registry exists
+[✓] all current capability/mapper surfaces explicitly classified（14 surface AST 守卫）
+[✓] Provider-Normalized output is immutable persisted artifact, not memory-only
+[✓] normalized output binds exact raw evidence uri/hash/request/table
+[✓] row-level no-silent-drop accounting invariant enforced
+[✓] whole-payload quarantine semantics enforced where required
+[✓] MappingValidationError produces first-class quarantine evidence
+[✓] quarantine has exact raw row locator + structured scrubbed error context
+[✓] no sentinel substitution for required invalid fields
+[✓] failed provider exchange separated from mapping quarantine
+[✓] unsupported required payload/dataset fail closed
+[✓] deterministic replay + idempotency proven
+[✓] provider-specific semantics/units remain provider-faithful
+[✓] no CR-3 Availability/SourcePolicy/Canonical selection leaked into CR-2
+[✓] logical-URI / immutable artifact contracts preserved
+[✓] migrations from-zero / upgrade / idempotency green（14 链）
+[ ] full CI matrix green（推送后正向确认回填）
+[✓] DEVLOG / DEVELOPMENT_MANAGEMENT / ADR current truth synced
+[✓] ADR-021 status synced ACCEPTED after B2 closure
+```
+
+## §9 治理同步
+
+- DEVLOG append-only 新条目（2026-08-31 CR-2：why / how / 关键决策 / SHA+CI 推送后回填）
+- DEVELOPMENT_MANAGEMENT：头部（B2 链 CLOSED + CR-2 ACTIVE + CR-3 BLOCKED_BY_CR-2）+ §40/§41/§44/§61（DM-CR-20260831-063）
+- ADR-021 status → **ACCEPTED**（B2 closure 同步）；ADR-000 索引更新（ADR-021 ACCEPTED + ADR-022 PROPOSED）
+- 新 **ADR-022**（Provider Normalization and Quarantine）
+
+## Verification Summary
+
+- Local: **907 / 0**（870 → 907，+37）；ruff check / ruff format --check / mypy 全绿；CI 同款命令 `uv run pytest` 复验 907/0
+- 未启动 CR-3 / CR-4 / Feature / State（§4 边界遵守）；Exit Gate 全过 → CR-3 START

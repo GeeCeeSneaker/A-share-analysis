@@ -24,7 +24,8 @@ ADR（Architecture Decision Record）记录对系统有长期影响的决策。�
 | ADR-018 | Review Publish Byte-Identity + Manifest Seal from reviewed_bytes | ACCEPTED | 2026-08-25 | [ADR-018](ADR-018_review_publish_byte_identity.md)，amendment to ADR-017；R4-A2.10/CR-1.2.6 P0-01/02 + P1（DM-CR-20260825-022..026）；**§4 amended by R4-A2.11/CR-1.2.7**（lock-before-preflight 修正其覆盖范围 overclaim，DM-CR-20260825-027..029，2026-08-25）；**VERIFIED 2026-08-26**（R4-A2.x/CR-1.x 审计链 CLOSED） |
 | ADR-019 | SDK Runtime Lifecycle State Machine + Runtime Gate Separation | ACCEPTED | 2026-08-26 | [ADR-019](ADR-019_sdk_lifecycle_runtime_gates.md)，R4-A3 A3-01..04（DM-CR-20260826-030/031/032/033）；amendments 2026-08-27/28（A/B）；**VERIFIED 2026-08-28**（R4-A3.x 链 CLOSED） |
 | ADR-020 | Endpoint Requirement Contract（显式端点身份合同） | ACCEPTED | 2026-08-28 | [ADR-020](ADR-020_endpoint_requirement_contract.md)，R4-B1（DM-CR-20260828-046/047/048）；amendments 20260830 C/D（语义修正 / anti-bypass / cross-binding）；**VERIFIED 2026-08-30**（R4-B1.x 链 CLOSED） |
-| ADR-021 | Publish Validation Exactness（发布验证精确性） | PROPOSED | 2026-08-30 | [ADR-021](ADR-021_publish_validation_exactness.md)，R4-B2 B2-01..06（DM-CR-20260830-054/055/056）；复审裁决 pending |
+| ADR-021 | Publish Validation Exactness（发布验证精确性） | ACCEPTED | 2026-08-30 | [ADR-021](ADR-021_publish_validation_exactness.md)，R4-B2 B2-01..06（DM-CR-20260830-054/055/056）；amendments B2.1/B2.2/B2.3（DM-CR-20260830-057..060 / DM-CR-20260831-061/062）；**VERIFIED 2026-08-31**（R4-B2.x 链 CLOSED） |
+| ADR-022 | Provider Normalization and Quarantine（提供方归一化与隔离） | PROPOSED | 2026-08-31 | [ADR-022](ADR-022_provider_normalization_quarantine.md)，CR-2（DM-CR-20260831-063）；复审裁决 pending |
 
 ## 纪律
 
