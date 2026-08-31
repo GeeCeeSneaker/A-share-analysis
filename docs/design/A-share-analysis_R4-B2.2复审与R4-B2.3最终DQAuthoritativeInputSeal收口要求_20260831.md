@@ -733,7 +733,7 @@ B2.2 scanner API shape / static registry / evaluator 语义（除 input 共享�
 [✓] B2.1 full seal / transaction / URI / atomic rollback remain intact
 [✓] R4-B1/A3/A2/CR-1 frozen contracts show no regression
 [✓] migration-from-zero / upgrade path green（13 链）
-[ ] full required CI matrix green（推送后正向确认回填）
+[✓] full required CI matrix green（run 33365674254 三腿 success，implementation `7362dfc93ab5ea6eb7ebc63c8fddb4508d7942aa` + CI fix `85a9260eb0cc07ea81c7844f661388e113575aa6`，2026-08-31 API positive confirmation）
 [✓] DEVLOG / DEVELOPMENT_MANAGEMENT / ADR-021 match runtime truth
 ```
 
