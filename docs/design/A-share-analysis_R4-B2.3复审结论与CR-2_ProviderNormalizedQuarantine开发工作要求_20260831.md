@@ -772,7 +772,7 @@ A股数据基座
 [✓] no CR-3 Availability/SourcePolicy/Canonical selection leaked into CR-2
 [✓] logical-URI / immutable artifact contracts preserved
 [✓] migrations from-zero / upgrade / idempotency green（14 链）
-[ ] full CI matrix green（推送后正向确认回填）
+[✓] full CI matrix green（run 33378006770 三腿 success，implementation `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`，2026-08-31 API positive confirmation，一次通过零修复轮次）
 [✓] DEVLOG / DEVELOPMENT_MANAGEMENT / ADR current truth synced
 [✓] ADR-021 status synced ACCEPTED after B2 closure
 ```

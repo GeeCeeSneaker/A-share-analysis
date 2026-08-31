@@ -7,11 +7,11 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：CR-2 implementation（本批，2026-08-31）——基于 Reviewer closure HEAD `a41c9f2`（R4-B2.x 链 VERIFIED / CLOSED / FREEZE + CR-2 工作要求 commit）；R4-B2.3 implementation `7362dfc93ab5ea6eb7ebc63c8fddb4508d7942aa` + CI fix `85a9260eb0cc07ea81c7844f661388e113575aa6`（run 33365674254 三腿 success）；本批完整 40-char SHA 于推送后回填  
+> **Current Code Baseline**：CR-2 implementation `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`（run 33378006770 三腿 success，2026-08-31 API positive confirmation）——基于 Reviewer closure HEAD `a41c9f2`（R4-B2.x 链 VERIFIED / CLOSED / FREEZE + CR-2 工作要求 commit）；R4-B2.3 implementation `7362dfc93ab5ea6eb7ebc63c8fddb4508d7942aa` + CI fix `85a9260eb0cc07ea81c7844f661388e113575aa6`（run 33365674254 三腿 success）  
 > **Document Revision**：DM-CR-20260830-054..060 / DM-CR-20260831-061 / 062 / 063  
 > **Last Review**：2026-08-31 16:22 +08:00（R4-B2.3 复审：**VERIFIED——R4-B2 / B2.1 / B2.2 / B2.3 全链 CLOSED / VERIFIED / FREEZE**（无新 blocker）；ADR-021 → ACCEPTED；CR-2 为下一活跃批次）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：run 33365674254（R4-B2.3 `7362dfc`+`85a9260`，Reviewer closure 基线）三腿 success；run 33366574574（reviewed HEAD `6c5088b`）三腿 success；本批（CR-2，907 tests）CI 结果待推送后正向确认回填  
+> **CI Status**：**FULL MATRIX GREEN——run 33378006770（CR-2 implementation `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`）三腿 success**（2026-08-31 API positive confirmation；CR-2 新增 37 项 normalization/quarantine 测试 907/0 在 Ubuntu+Windows 两 OS 通过，一次通过零修复轮次）；run 33365674254（R4-B2.3 `7362dfc`+`85a9260`，Reviewer closure 基线）三腿 success  
 > **Phase Status（2026-08-31，Reviewer 裁决同步）**：  
 > R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 → **DONE / PENDING_REVIEW**（本批：Provider-Normalized + Quarantine runtime）；CR-3 → **BLOCKED_BY_CR-2**；CR-4 → sequenced after CR-3；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。
