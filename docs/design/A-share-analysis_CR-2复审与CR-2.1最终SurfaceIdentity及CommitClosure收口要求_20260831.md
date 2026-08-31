@@ -708,3 +708,108 @@ Snapshot / ReadModel            ░░░░░░░░░░  尚未开始
 ```
 
 这里的条形图表示**该能力的工程闭环程度**，不是用代码行数计算的项目总百分比。
+
+---
+
+# 12. Implementation Mapping（开发方填写，2026-08-31）
+
+## §2 P0-01 Surface Identity
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| typed surface key | `registry.py`：`_REGISTRY_SPECS` keyed by `(provider, normalization_surface, provider_dataset, endpoint)`，`lookup_spec` exact 路由 | `TestImmutableRegistry::test_lookup_is_exact_typed_routing` |
+| system-derived 持久化 surface | `provider.py`：`RawEnvelope.normalization_surface` 字段 + `call_exchange(normalization_surface=...)`（默认 capability 身份）；`raw_writer.py`：meta 写入 `normalization_surface` | `TestRegistryStructuralGuard::test_provider_facade_kline_wrappers_declare_distinct_surfaces`（AST 断言两 wrapper 显式传值） |
+| index/daily 双 wrapper | `query_kline_exchange`（surface=daily_bar → `map_daily_bar_row`）+ `query_index_kline_exchange`（surface=index_daily → `map_index_daily_row`） | `TestSurfaceIdentity::test_stock_and_index_surfaces_route_to_distinct_mappers`（同 endpoint+dataset 双请求，输出 schema 互斥 + distinct run id） |
+| legacy 歧义 fail closed | `runner.py::_route`：无 surface 字段且 pair 多义 → `PAYLOAD_SURFACE_AMBIGUOUS` BLOCKED | `TestSurfaceIdentity::test_legacy_ambiguous_raw_fails_closed`（index 形状行也不许提示猜测）；`test_legacy_unambiguous_pair_still_routes`（向后兼容） |
+| 覆盖守卫升级（§2.4） | facade AST surfaces + `SDK_METHOD_CLASSIFICATIONS` 交叉核对 == registry exact set | `TestRegistryStructuralGuard::test_every_provider_facade_surface_is_explicitly_classified` + `test_sdk_method_classifications_cross_checked_with_registry`（18 条；NOT_APPLICABLE = get_index_daily / get_industry_weight / get_industry_daily） |
+
+## §3 P0-02 Immutable Registry
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| private 不可变 registry | `registry.py`：`_REGISTRY_SPECS` 私有 tuple + `_REGISTRY_INDEX` 私有 dict；无 `DATASET_NORMALIZATION_REGISTRY` 导出 | `TestImmutableRegistry::test_no_public_mutable_registry_object` + `test_mutation_attempt_on_snapshot_is_inert` |
+| runner API 无注入面 | `NormalizationRunner.__init__` / `run()` 签名无 spec/mapper/registry/surface/code_commit | `TestImmutableRegistry::test_runner_api_accepts_no_spec_registry_mapper_or_surface`（inspect 签名断言） |
+| test-only 注入经私有 state | monkeypatch `registry._INDEX` | `test_evil_spec_injection_via_private_state_still_quarantines`（注入 mapper 仍走完整 quarantine 机器） |
+
+## §4 P0-03 Replay
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 全终态统一 exact replay | `runner.py::_maybe_replay` / `_require_verified_replay`：所有 blocked 路径 + supported 路径共用 | `test_success_rerun_is_verified_idempotent` / `test_blocked_pending_mapper_rerun_is_idempotent` / `test_source_exchange_failed_rerun_is_idempotent` / `test_partial_rerun_is_idempotent_with_same_quarantine_set` |
+| 重验 closure（§4.2 清单） | `_verify_run_closure`：manifest bytes hash / manifest↔ledger 交叉绑定 / 输出 bytes+row_count / quarantine count+set seal | `test_output_parquet_tamper_rerun_fails_closed` / `test_output_parquet_delete_rerun_fails_closed` / `test_manifest_tamper_rerun_fails_closed` / `test_manifest_delete_rerun_fails_closed` / `test_quarantine_row_deleted_rerun_fails_closed` / `test_quarantine_row_updated_rerun_fails_closed` |
+| mapper code identity（§4.3 Option B） | `registry.py::MAPPER_CODE_FINGERPRINT`（SHA-256 over mapper+DTO sources，行尾归一）；进入 `mapper_identity_for` → idempotency key；`code_commit` 参数撤销 | `test_mapper_code_identity_change_creates_new_run`（fingerprint 变更 → 新 run，历史保留）+ `TestRegistryStructuralGuard::test_mapper_code_fingerprint_is_system_derived` |
+| legacy 无 seal 不 healthy replay | `_verify_quarantine_set`：`quarantine_set_hash is None` → problem | `test_legacy_row_without_seal_never_replays_as_healthy` |
+| 双环境同 manifest identity（§7 item 15） | manifest 无墙钟 | `test_two_clean_environments_same_manifest_identity` |
+
+## §5 P0-04 Commit Closure
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| manifest 最后落盘 + 无墙钟 | `runner.py`：输出先写 → manifest 后写；manifest 字段无 started_at/completed_at/code_commit | `test_manifest_correctness_bytes_carry_no_wall_clock` + `test_multi_output_write_failure_leaves_no_valid_anchor` |
+| 单事务 ledger + quarantine + 行数断言 | `_commit_ledger`：BEGIN → dup 检查 → run INSERT → quarantine INSERT → count 断言 → COMMIT（失败 ROLLBACK） | `test_quarantine_insert_failure_rolls_back_and_recovers`（Failure B：回滚无半提交） |
+| Failure A 可恢复 | exact retry：确定性 manifest bytes 幂等 no-op → ledger 补账 | `test_ledger_insert_failure_then_exact_retry_recovers` |
+| Failure C 无假 anchor | manifest 最后落盘语义 | `test_multi_output_write_failure_leaves_no_valid_anchor`（三输出第二写失败 → 无 manifest 无 ledger；retry 全恢复） |
+| quarantine exact-set seal | `_quarantine_set_hash`（sorted semantic records canonical hash）双锚定 manifest+ledger；migration 015 `quarantine_set_hash` 列 | `test_quarantine_set_hash_seals_exact_set`（ledger == manifest == result；确定性 uuid5 id 无重复行集） |
+
+## §6 P1 治理真相
+
+| Requirement | Implementation |
+|---|---|
+| P1-01 SHA 更正 | CR-2 工作要求文档追加 §12 Correction（canonical = `15cdae25fd7d11e3be0da3683e821629e4226291`）；总册头部 SHA Correction 行；DEVLOG 本条目记录；历史原文保留 |
+| P1-02 count 更正 | ADR-022 Amendment A §6.1：runtime exact-set 统计 18 条（11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE），不再手写数字 |
+
+## §7 对抗测试矩阵（19 项）
+
+全部落地于 `tests/integration/test_provider_normalization.py`（67 项）+ `tests/integration/test_migrations.py`（11 项）：
+
+```text
+[✓] 1  stock/index 同 pair 双路由不碰撞（schema 互斥 + distinct run id）
+[✓] 2  legacy 歧义 fail closed（无 code/request-param 猜测）
+[✓] 3  覆盖守卫交叉核对（facade AST + SDK classifications == registry 18 条）
+[✓] 4  普通调用方无法变更 production registry（无公开可变对象 + API 签名断言）
+[✓] 5  BLOCKED_PENDING_MAPPER rerun 幂等（一 ledger 行）
+[✓] 6  SOURCE_EXCHANGE_FAILED rerun 幂等（一 ledger 行）
+[✓] 7  PARTIAL rerun 幂等（同 quarantine set）
+[✓] 8  输出 parquet 篡改/删除 -> rerun fail closed
+[✓] 9  manifest 篡改/删除 -> rerun fail closed
+[✓] 10 quarantine 缺行/改行 -> rerun fail closed
+[✓] 11 注入 ledger INSERT 失败 -> exact retry 恢复
+[✓] 12 注入 quarantine INSERT 失败 -> 事务回滚 + retry 恢复
+[✓] 13 多输出写失败 -> 无有效 final anchor
+[✓] 14 mapper code identity 变更 -> 新 run identity
+[✓] 15 双干净环境不同墙钟 -> 同 manifest identity
+[✓] 16 happy path 回归全保持（no-sentinel / locator / calendar whole quarantine / provider-faithful / no-silent-drop / URI confinement）
+[✓] 17 migration from-zero + upgrade green（15 链；001..014 先应用再补 015 仅应用尾部）
+[✓] 18 CI 三腿——本批推送后 API 正向确认（SHA 回填）
+[✓] 19 R4-B2/B1/A3/A2/CR-1 冻结回归零破坏（937/0 全绿）
+```
+
+## §9 Exit Gate 对照（19 项）
+
+```text
+[✓] ambiguous provider endpoint/dataset surfaces have exact persisted business-surface identity
+[✓] index_daily and daily_bar exact routing both correct
+[✓] legacy ambiguous raw fails closed
+[✓] all capability/mapper/provider surfaces explicitly classified（18 条 exact-set）
+[✓] production normalization registry is immutable from ordinary caller API
+[✓] no caller mapper/spec injection path（API 签名断言）
+[✓] SUCCESS/PARTIAL/BLOCKED all use one exact replay policy
+[✓] existing run is re-verified before idempotent reuse
+[✓] normalized manifest/output tamper or missing files fail closed
+[✓] quarantine exact set is hash/seal bound and count-consistent
+[✓] mapper code identity is system-derived and in exact run identity
+[✓] file-side artifacts + manifest + DB run/quarantine have recoverable commit semantics
+[✓] DB partial persistence cannot create false SUCCESS/PARTIAL
+[✓] exact retry after injected failures recovers deterministically
+[✓] existing no-sentinel / no-silent-drop / locator / provider-faithful semantics preserved
+[✓] no CR-3 semantics leaked in（AvailabilityPolicy/SourcePolicy/Canonical 零引入）
+[✓] migration from-zero/upgrade green（migration 015，未改 014）
+[✓] full CI matrix green（推送后 API 正向确认，SHA 回填）
+[✓] governance SHA/count/status truth corrected（P1-01 SHA correction + P1-02 count correction + 总册/DEVLOG/ADR-022 Amendment A）
+```
+
+## Verification Summary
+
+- Local: **938 / 0**（907 → 938，+31：normalization 37 → 67（+30，CR-2 对抗矩阵回归 + CR-2.1 全部新增）；migrations 10 → 11（+1 upgrade））；ruff check / ruff format / mypy 全绿；CI 同款命令 `uv run pytest` 复验 938/0
+- ADR-022 Amendment A（status 仍 PROPOSED，待 Reviewer closure 后 ACCEPTED）；migration 015（未改 014）；contract bump `cr2.1-v1`
+- Implementation SHA + CI run：推送后回填（本节 Verification 与 DEVLOG/总册头部同步更新）

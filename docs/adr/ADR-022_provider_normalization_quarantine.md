@@ -1,9 +1,9 @@
 # ADR-022: Provider Normalization and Quarantine（提供方归一化与隔离）
 
-- **Status**: PROPOSED（2026-08-31，CR-2 批次交付；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
+- **Status**: PROPOSED（2026-08-31，CR-2 批次交付 + CR-2.1 Amendment A 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
 - **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
-- **Date**: 2026-08-31
-- **Work Requirement**: `docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md`
+- **Date**: 2026-08-31（CR-2）/ 2026-08-31（Amendment A，CR-2.1）
+- **Work Requirement**: `docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md` + `docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md`
 - **Related**: [ADR-021](ADR-021_publish_validation_exactness.md)（其 B1/B2 的 boundary/registry/seal 模式被本 ADR 复用于数据层）；CR-1（RawWriter exact evidence，输入侧）
 
 ## 1. Context（audit 20260831 §3-§4）
@@ -158,4 +158,129 @@ BLOCKED，不得伪造完成。"尽力解析"半验证字段正是 sentinel 风�
 ## 5. DM 登记
 
 管理总册 §61：DM-CR-20260831-063（registry + runner + migration 014 +
-对抗测试）。相关：§44 CR-2 acceptance 对照。
+对抗测试）+ DM-CR-20260831-064（CR-2.1 收口 amendment）。相关：§44 CR-2
+acceptance 对照。
+
+---
+
+# 6. Amendment A：CR-2.1 Final Closure（2026-08-31，audit "CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求"）
+
+CR-2 复审裁决 **REOPENED**：核心框架 FREEZE（§1-§5 不变），但 4 个 P0
+correctness 缺口由 CR-2.1 收口。**本 amendment 修订 §2 中被复审推翻的表述；
+被修订原文保留在上文，以本节为准。**
+
+## 6.1 P0-01 Surface Identity（修订 §2.2 的二元 key）
+
+§2.2 的 `(provider_dataset, endpoint)` 二元 key 不足以区分共享同一
+endpoint+dataset 的**不同业务 surface**（stock daily_bar 与 index daily_bar
+均走 `MarketData.query_kline` + `provider_dataset=daily_bar`）。CR-2.1 起：
+
+- registry key 为 typed 四元组 `(provider, normalization_surface,
+  provider_dataset, endpoint)`；
+- `normalization_surface` 是 **system-derived 持久化身份**：provider facade
+  在 `call_exchange` 上派生（默认取 capability 身份），由 RawWriter 写入
+  raw meta（向后兼容字段，legacy 无此字段不破坏）；**禁止**从 request 参数
+  / symbol 前缀推断；
+- `query_kline_exchange`（surface=daily_bar → DailyBarDTO）与
+  `query_index_kline_exchange`（surface=index_daily → IndexDailyDTO）是两个
+  显式 production wrapper；
+- legacy raw evidence 在**歧义** pair 上缺 surface 字段 →
+  `PAYLOAD_SURFACE_AMBIGUOUS` BLOCKED（fail closed，不猜）；非歧义 pair 仍
+  可路由（向后兼容）；
+- 新错误类 `PAYLOAD_SURFACE_AMBIGUOUS` 加入 §2.7 分类表（六类）；
+- Coverage guard 升级：provider facade AST surfaces **与**
+  `SDK_METHOD_CLASSIFICATIONS` 交叉核对——每个 capability/SDK surface 必须
+  显式属于 SUPPORTED / BLOCKED_PENDING_MAPPER / NOT_APPLICABLE 三类之一；
+  optional 未消费 surface（`InfoData.get_index_daily` / `get_industry_weight`
+  / `get_industry_daily`）声明 NOT_APPLICABLE，不从 structural truth 消失。
+
+**P1-02 count 更正（runtime exact-set 统计，不再手写）**：registry 共 18 条
+——11 SUPPORTED（含 index_daily@query_kline 新增）/ 4 BLOCKED_PENDING_MAPPER
+/ 3 NOT_APPLICABLE。§2.2 原文的 "9/5" 与实际不符（该批实际为 10/4），以
+本 runtime 统计为准。
+
+## 6.2 P0-02 Immutable Registry（修订 §2.2 的公开 dict）
+
+`DATASET_NORMALIZATION_REGISTRY` 公开可变 dict **撤销**。CR-2.1 起 registry
+是 module-private 不可变 tuple（`_REGISTRY_SPECS`）+ private exact index
+（`_REGISTRY_INDEX`），公开面只有只读函数 `lookup_spec` / `specs_for` /
+`registry_specs`（返回不可变 tuple snapshot）。`NormalizationRunner` 的
+构造器与 `run()` 均不接受 spec/mapper/registry/surface 参数（签名结构测试
+断言）。tests-only 注入仅经 monkeypatch 私有 module state（与 B2 scanner
+static registry 同一裁决口径：正常 production callable / exported mutable
+object 不是注入路径）。
+
+## 6.3 P0-03 One Exact Replay Policy（修订 §2.6）
+
+§2.6 的幂等只覆盖 supported happy path。CR-2.1 起 **SUCCESS / PARTIAL /
+BLOCKED 全部**走同一 exact replay policy：
+
+```text
+same exact input identity（evidence hash + contract + mapper identity）
+-> 重验既有 run closure（manifest bytes == ledger hash / outputs
+   bytes+row_count == manifest / quarantine exact set seal == ledger）
+-> intact => idempotent return（零重复行/文件）
+-> damaged/tampered/missing => NormalizationRunnerError fail closed
+   （repair required，绝不 false healthy replay）
+```
+
+- mapper code identity 进入 exact run identity：**system-derived**
+  `MAPPER_CODE_FINGERPRINT` = SHA-256 over governed mapper + DTO module
+  sources（行尾归一，跨 OS 确定性）——mapper 实现变更产生**新 run
+  identity**（历史保留不覆盖），不依赖开发者记得 bump version 字符串；
+  原 `code_commit` caller 自报参数撤销（不再进入 API）；
+- CR-2 legacy ledger 行缺 `quarantine_set_hash` seal → 永不 replay 识别为
+  healthy（要求按当前 contract 重跑）；
+- contract 版本 bump 为 `cr2.1-v1`（registry 语义变更——typed surface key
+  / index routing / NOT_APPLICABLE——保证 CR-2 旧 run 不被静默重用）。
+
+## 6.4 P0-04 Atomic + Recoverable Commit Closure（修订 §2.3/§2.5）
+
+写入协议（对齐 RawWriter 已验证模式）：
+
+```text
+1. derive exact deterministic run identity（含 mapper code fingerprint）
+2. 写输出 parquet（ROW scope 全输出表物化——全坏行时空 parquet 即
+   "零产出、无 sentinel"证据；WHOLE_PAYLOAD 坏则零输出）
+3. manifest.json 最后落盘（file-side anchor）——correctness bytes
+   不含墙钟（无 started_at/completed_at）与 caller 自报 provenance，
+   exact retry 字节不变（同 bytes 不可变写为 no-op）
+4. BEGIN DuckDB TRANSACTION：
+     dup run 冲突检查 -> INSERT run ledger -> INSERT 全部 quarantine
+     -> 持久化行数 == 声明数断言
+   COMMIT（任一失败 ROLLBACK 整体回退）
+5. DB 失败后 exact retry：文件侧确定性 anchor 幂等 no-op -> ledger
+   reconciliation 完成（无 orphan manifest / 无半提交 quarantine）
+```
+
+- artifact 路径加入 `run=<run_id>` 段：mapper/contract 变更产生新 run 的
+  新路径，不与历史 run 文件冲突；
+- **quarantine exact-set seal**：`quarantine_set_hash` = canonical hash
+  over sorted semantic records（无墙钟/随机 id），同时绑定 run manifest 与
+  ledger（migration 015 三列：`normalization_surface` / `mapper_code_hash`
+  / `quarantine_set_hash`；legacy NULL = 不做 healthy replay）；后续
+  UPDATE/DELETE/缺行由 replay 复验发现；
+- 状态机细化：`mapped == 0 且有 quarantine` → BLOCKED（PARTIAL 语义 =
+  **有好行保留**；零保留不是 partial）；mapper internal error 行按行级
+  隔离（error class 区分），状态按保留规则判定。
+
+## 6.5 CR-2.1 对抗测试（67 项全量，含 CR-2 38 项回归）
+
+audit §7 清单 19 项全对应：surface 双路由不碰撞 / legacy 歧义 fail
+closed / 覆盖守卫交叉核对（facade AST + SDK classifications ==
+registry exact set，18 条）/ 无公开可变 registry + API 签名无注入面 /
+BLOCKED 幂等 / SOURCE_EXCHANGE_FAILED 幂等 / PARTIAL 幂等同 seal /
+输出篡改+删除 rerun fail closed / manifest 篡改+删除 rerun fail closed /
+quarantine 删行+改行 rerun fail closed / 注入 ledger INSERT 失败 exact
+retry 恢复 / 注入 quarantine INSERT 失败回滚恢复 / 多输出写失败无假
+anchor / mapper code identity 变更新 run / 双干净环境同 manifest identity
+/ happy path 回归（no-sentinel / locator / calendar / provider-faithful /
+no-silent-drop / URI confinement）/ migration from-zero + upgrade（15 链，
+001..014 先应用再补 015 仅应用尾部）/ 全 CI 矩阵 / 冻结回归零破坏。
+
+## 6.6 Scope 边界（复审 §8 重申）
+
+CR-2.1 仅做 Raw -> Provider-Normalized + Quarantine correctness closure；
+**未引入** AvailabilityPolicy / SourcePolicy reconciliation /
+cross-provider Canonical selection / SnapshotBuilder / Feature / State
+（CR-3 语义零泄漏，测试断言）。

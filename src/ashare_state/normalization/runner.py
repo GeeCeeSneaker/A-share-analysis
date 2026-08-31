@@ -1,41 +1,58 @@
-"""Provider-Normalization execution runner (CR-2, audit 20260831).
+"""Provider-Normalization execution runner (CR-2 / CR-2.1, audit 20260831).
 
 The ONE formal normalization boundary::
 
     persisted Raw evidence (.meta.json + payload bytes)
       -> closure verification (verified reader, no re-call of the SDK)
-      -> static registry lookup (exact dataset+endpoint routing)
+      -> system-derived surface routing (typed registry key, the
+         persisted normalization_surface of the envelope - legacy raw
+         evidence on an AMBIGUOUS endpoint fails closed, never guessed)
       -> provider-faithful row / whole-payload mapping
-      -> immutable normalized parquet artifacts + manifest
-      -> first-class quarantine records (append-only)
-      -> meta_provider_normalization_run ledger row
+      -> immutable normalized parquet artifacts + deterministic
+         manifest (correctness bytes carry NO wall-clock)
+      -> first-class quarantine records (append-only, exact-set sealed)
+      -> meta_provider_normalization_run ledger row - committed in ONE
+         DuckDB transaction together with the full quarantine set
 
-Machine-enforced invariants (audit sections 5-6):
+Machine-enforced invariants (audit sections 2-5):
 
 - P0-01 the runner NEVER calls the provider/SDK - its only input is
   the persisted raw evidence, read through the verified RawWriter
   reader (``read(verify=True)``);
-- P0-03 normalized output is a FIRST-CLASS immutable persisted
-  artifact (parquet per output table + manifest), never memory-only;
+- CR-2.1 P0-01 surface identity is the PERSISTED envelope field, not a
+  request parameter: stock daily_bar and index daily_bar share the
+  same (provider_dataset, endpoint) and route to different mappers
+  ONLY through the system-derived ``normalization_surface``;
+- CR-2.1 P0-03 ONE exact replay policy for SUCCESS / PARTIAL / BLOCKED:
+  the same exact input identity re-verifies the existing run closure
+  (manifest bytes, outputs, quarantine exact set) BEFORE an
+  idempotent return; a damaged/tampered existing run fails closed
+  (repair required) instead of returning a false healthy replay;
+- CR-2.1 P0-03 the run identity includes the SYSTEM-DERIVED mapper
+  code fingerprint - a mapper implementation change yields a NEW run
+  identity (history preserved, never overwritten);
+- CR-2.1 P0-04 commit closure: outputs land first, the manifest anchor
+  lands LAST (file side); the run ledger + the full quarantine set +
+  the count assertion commit in ONE DuckDB transaction - a DB failure
+  rolls the ledger back while the deterministic file-side anchor lets
+  the exact retry recover (identical bytes are a no-op);
+- CR-2.1 P0-04 the quarantine evidence is sealed as an exact set
+  (``quarantine_set_hash`` over the sorted semantic records) bound to
+  both the run manifest and the ledger row - UPDATE/DELETE/missing
+  quarantine rows break replay verification;
 - P0-04 row-scope accounting ``input == normalized + quarantined`` is
   checked by the runtime itself - a silent drop fails the run;
-- P0-05 quarantine records are first-class persisted evidence with
-  scrubbed structured error context;
 - P0-06 every quarantine carries the deterministic raw locator
   (request id / table / row ordinal);
-- P0-07 the run id and artifact URIs are derived deterministically
-  from (raw evidence hash + contract version + mapper identity): a
-  replay of the same inputs is an idempotent no-op returning the
-  existing run; conflicting raw evidence bytes for the same request
-  BLOCK;
-- P0-08 error classes separate provider failures from mapping
-  failures;
+- P0-08 error classes separate provider failures, mapping failures
+  and surface ambiguity;
 - P0-10 the run status machine is SUCCESS / PARTIAL / BLOCKED with
   PARTIAL permitted only where the static registry allows it.
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import uuid
@@ -44,6 +61,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ashare_state.normalization import registry as _registry
 from ashare_state.normalization.registry import (
     NORMALIZATION_CONTRACT_VERSION,
     DatasetNormalizationSpec,
@@ -53,6 +71,7 @@ from ashare_state.normalization.registry import (
     SurfaceSupport,
     lookup_spec,
     mapper_identity_for,
+    specs_for,
 )
 from ashare_state.providers.errors import MappingValidationError
 from ashare_state.storage.paths import physical_from_logical_uri, validate_logical_uri
@@ -74,16 +93,84 @@ __all__ = [
     "NormalizationRunResult",
 ]
 
-#: uuid namespace for deterministic run ids (same inputs -> same id)
+#: uuid namespaces for deterministic identities (same inputs -> same id)
 _RUN_NAMESPACE = uuid.UUID("6f1c2b9a-4d3e-5f8a-9b7c-1e2d3c4b5a60")
+_QTZ_NAMESPACE = uuid.UUID("8d2e3f0b-5c4a-6e9d-af8d-2f3e4d5c6b71")
 
 _SECRET_MARKERS = ("password", "token", "secret", "credential")
 
+#: semantic fields of a quarantine record entering the exact-set seal
+_QTZ_SEMANTIC_FIELDS = (
+    "provider",
+    "provider_dataset",
+    "raw_request_id",
+    "raw_evidence_uri",
+    "raw_evidence_hash",
+    "raw_table_name",
+    "raw_row_ordinal",
+    "source_key",
+    "quarantine_scope",
+    "error_class",
+    "error_message",
+    "error_context_json",
+    "mapper_identity",
+)
+
+#: ledger columns (migration 014 + 015) in canonical order
+_LEDGER_COLUMNS = (
+    "normalization_run_id",
+    "provider",
+    "provider_dataset",
+    "endpoint",
+    "raw_request_id",
+    "raw_evidence_uri",
+    "raw_evidence_hash",
+    "raw_payload_kind",
+    "normalization_contract_version",
+    "mapper_identity",
+    "normalized_manifest_uri",
+    "normalized_manifest_hash",
+    "input_count",
+    "normalized_count",
+    "quarantined_count",
+    "status",
+    "error_class",
+    "error_message",
+    "idempotency_key",
+    "idempotent_replay",
+    "started_at",
+    "completed_at",
+    "normalization_surface",
+    "mapper_code_hash",
+    "quarantine_set_hash",
+)
+
+_QTZ_COLUMNS = (
+    "quarantine_id",
+    "normalization_run_id",
+    "provider",
+    "provider_dataset",
+    "raw_request_id",
+    "raw_evidence_uri",
+    "raw_evidence_hash",
+    "raw_table_name",
+    "raw_row_ordinal",
+    "source_key",
+    "quarantine_scope",
+    "error_class",
+    "error_message",
+    "error_context_json",
+    "mapper_identity",
+    "normalization_contract_version",
+    "created_at",
+)
+
 
 class NormalizationRunnerError(RuntimeError):
-    """The normalization boundary contract was violated (caller misuse
-    or unrecoverable input state - e.g. the raw meta does not exist at
-    all, so no evidence-bound run can even be recorded)."""
+    """The normalization boundary contract was violated (caller misuse,
+    a damaged existing run requiring repair, or unrecoverable input
+    state - e.g. the raw meta does not exist at all, so no
+    evidence-bound run can even be recorded)."""
 
 
 @dataclass(frozen=True)
@@ -101,6 +188,8 @@ class NormalizationRunResult:
     manifest_uri: str | None
     manifest_hash: str | None
     idempotent_replay: bool
+    normalization_surface: str | None = None
+    quarantine_set_hash: str | None = None
 
 
 def _scrub_context(value: Any) -> Any:
@@ -152,6 +241,28 @@ def _canonical_semantic_hash(rows_by_output: dict[str, list[dict[str, Any]]]) ->
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _quarantine_set_hash(records: list[dict[str, Any]]) -> str:
+    """CR-2.1 P0-04: the exact-set seal of a run's quarantine evidence
+    - canonical JSON over the SEMANTIC fields (no wall-clock, no random
+    ids), ordered by the canonical semantic form of each record so the
+    seal recomputes identically from persisted DB rows."""
+    ordered = sorted(records, key=_quarantine_semantic_key)
+    semantic = [{field: record.get(field) for field in _QTZ_SEMANTIC_FIELDS} for record in ordered]
+    canonical = json.dumps(
+        semantic, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _quarantine_semantic_key(record: dict[str, Any]) -> str:
+    return json.dumps(
+        {field: record.get(field) for field in _QTZ_SEMANTIC_FIELDS},
+        sort_keys=True,
+        ensure_ascii=False,
+        default=str,
+    )
+
+
 def _validate_component(value: str, label: str) -> None:
     """A path component of the normalized artifact URI must be a safe
     single segment - '/', '\\', '..', ':' or empty values can only come
@@ -173,9 +284,10 @@ def _validate_component(value: str, label: str) -> None:
 
 
 class NormalizationRunner:
-    """CR-2 P0-01: the formal normalization runtime. Inputs are the
-    persisted raw evidence + the static registry ONLY - there is no
-    provider/SDK access anywhere in this class."""
+    """CR-2 P0-01 / CR-2.1: the formal normalization runtime. Inputs
+    are the persisted raw evidence + the immutable static registry
+    ONLY - there is no provider/SDK access anywhere in this class, and
+    no caller-supplied spec/mapper/registry anywhere in the API."""
 
     def __init__(
         self,
@@ -183,12 +295,10 @@ class NormalizationRunner:
         *,
         raw_root: Path | str,
         normalized_root: Path | str,
-        code_commit: str = "",
     ) -> None:
         self.conn = conn
         self.raw_root = Path(raw_root)
         self.normalized_root = Path(normalized_root)
-        self.code_commit = code_commit
         # the verified reader is the EXISTING RawWriter read path
         self._reader = RawWriter(self.raw_root)
 
@@ -218,32 +328,7 @@ class NormalizationRunner:
         raw_evidence_uri = f"provider={provider}/dataset={provider_dataset}/{request_id}.meta.json"
         validate_logical_uri(raw_evidence_uri)  # defense in depth
 
-        try:
-            meta_doc = json.loads(raw_evidence_bytes.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            return self._blocked_run(
-                provider=provider,
-                provider_dataset=provider_dataset,
-                request_id=request_id,
-                raw_evidence_uri=raw_evidence_uri,
-                raw_evidence_hash=raw_evidence_hash,
-                raw_payload_kind=None,
-                endpoint=None,
-                error_class=NormalizationErrorClass.RAW_EVIDENCE_INVALID,
-                error_message=f"raw meta unreadable: {exc}",
-                started=started,
-                input_count=0,
-                normalized_count=0,
-                quarantined_count=0,
-                manifest_uri=None,
-                manifest_hash=None,
-                quarantines=[],
-            )
-
-        endpoint = str(meta_doc.get("endpoint") or "")
-        payload_kind = str(meta_doc.get("payload_kind") or "")
-
-        # ---------------------------------------------------- idempotency
+        # --------------------------- prior-run lookup (BEFORE all paths)
         prior = self.conn.execute(
             "SELECT normalization_run_id, raw_evidence_hash, idempotency_key "
             "FROM meta_provider_normalization_run "
@@ -254,14 +339,17 @@ class NormalizationRunner:
         if prior is not None and str(prior[1]) != raw_evidence_hash:
             # same request id, DIFFERENT raw evidence bytes: the immutable
             # raw store itself should have prevented this - fail closed
+            # (a NEW blocked run: the key derives from the new hash, so it
+            # can never collide with the prior run's identity)
             return self._blocked_run(
                 provider=provider,
                 provider_dataset=provider_dataset,
                 request_id=request_id,
                 raw_evidence_uri=raw_evidence_uri,
                 raw_evidence_hash=raw_evidence_hash,
-                raw_payload_kind=payload_kind,
-                endpoint=endpoint,
+                raw_payload_kind=None,
+                endpoint=None,
+                surface=None,
                 error_class=NormalizationErrorClass.RAW_EVIDENCE_INVALID,
                 error_message=(
                     "conflicting raw evidence bytes for the same request id "
@@ -278,9 +366,51 @@ class NormalizationRunner:
                 quarantines=[],
             )
 
+        try:
+            meta_doc = json.loads(raw_evidence_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            replay = self._maybe_replay(
+                prior,
+                self._blocked_key(raw_evidence_hash, None, provider_dataset, None, None),
+            )
+            if replay is not None:
+                return replay
+            return self._blocked_run(
+                provider=provider,
+                provider_dataset=provider_dataset,
+                request_id=request_id,
+                raw_evidence_uri=raw_evidence_uri,
+                raw_evidence_hash=raw_evidence_hash,
+                raw_payload_kind=None,
+                endpoint=None,
+                surface=None,
+                error_class=NormalizationErrorClass.RAW_EVIDENCE_INVALID,
+                error_message=f"raw meta unreadable: {exc}",
+                started=started,
+                input_count=0,
+                normalized_count=0,
+                quarantined_count=0,
+                manifest_uri=None,
+                manifest_hash=None,
+                quarantines=[],
+            )
+
+        endpoint = str(meta_doc.get("endpoint") or "")
+        payload_kind = str(meta_doc.get("payload_kind") or "")
+        # CR-2.1 P0-01: the business surface is the SYSTEM-DERIVED value
+        # the provider facade persisted on the envelope - never a caller
+        # argument, never a request-parameter guess.
+        surface = str(meta_doc.get("normalization_surface") or "")
+
         # -------------------------------------------- closure verification
         problems = verify_meta_closure(dataset_dir, meta_doc)
         if problems:
+            replay = self._maybe_replay(
+                prior,
+                self._blocked_key(raw_evidence_hash, surface, provider_dataset, endpoint, None),
+            )
+            if replay is not None:
+                return replay
             return self._blocked_run(
                 provider=provider,
                 provider_dataset=provider_dataset,
@@ -289,6 +419,7 @@ class NormalizationRunner:
                 raw_evidence_hash=raw_evidence_hash,
                 raw_payload_kind=payload_kind,
                 endpoint=endpoint,
+                surface=surface or None,
                 error_class=NormalizationErrorClass.RAW_EVIDENCE_INVALID,
                 error_message=f"raw evidence closure failed: {'; '.join(problems)}",
                 started=started,
@@ -302,6 +433,12 @@ class NormalizationRunner:
 
         # ------------------------------------ source exchange failed check
         if str(meta_doc.get("status") or "OK") == "ERROR":
+            replay = self._maybe_replay(
+                prior,
+                self._blocked_key(raw_evidence_hash, surface, provider_dataset, endpoint, None),
+            )
+            if replay is not None:
+                return replay
             # a FAILED provider exchange is NOT a mapping failure: record
             # SOURCE_EXCHANGE_FAILED and keep the raw failure evidence -
             # it never enters the normalized main output
@@ -313,6 +450,7 @@ class NormalizationRunner:
                 raw_evidence_hash=raw_evidence_hash,
                 raw_payload_kind=payload_kind,
                 endpoint=endpoint,
+                surface=surface or None,
                 error_class=NormalizationErrorClass.SOURCE_EXCHANGE_FAILED,
                 error_message=(
                     f"source exchange failed ({meta_doc.get('error_class')}) - "
@@ -329,25 +467,15 @@ class NormalizationRunner:
             )
 
         # ------------------------------------------------ registry routing
-        spec = lookup_spec(provider_dataset, endpoint)
-        if spec is None or spec.support is not SurfaceSupport.SUPPORTED_NORMALIZATION:
-            if spec is not None and spec.support is SurfaceSupport.BLOCKED_PENDING_MAPPER:
-                detail = (
-                    f"surface {provider_dataset}/{endpoint} is BLOCKED_PENDING_MAPPER "
-                    f"(mapper {spec.mapper_version!r}) - no verified mapper exists yet; "
-                    "normalization fails closed, it never silently skips"
-                )
-            elif spec is not None:
-                detail = (
-                    f"surface {provider_dataset}/{endpoint} is classified "
-                    f"{spec.support.value} - not a normalization input"
-                )
-            else:
-                detail = (
-                    f"no registry entry for surface {provider_dataset}/{endpoint} - "
-                    "unknown surfaces fail closed (never take-first-table or "
-                    "fuzzy routing)"
-                )
+        spec, blocked_error = self._route(provider, provider_dataset, endpoint, surface)
+        if blocked_error is not None:
+            blocked_class, detail = blocked_error
+            replay = self._maybe_replay(
+                prior,
+                self._blocked_key(raw_evidence_hash, surface, provider_dataset, endpoint, spec),
+            )
+            if replay is not None:
+                return replay
             return self._blocked_run(
                 provider=provider,
                 provider_dataset=provider_dataset,
@@ -356,7 +484,8 @@ class NormalizationRunner:
                 raw_evidence_hash=raw_evidence_hash,
                 raw_payload_kind=payload_kind,
                 endpoint=endpoint,
-                error_class=NormalizationErrorClass.PAYLOAD_SHAPE_UNSUPPORTED,
+                surface=surface or None,
+                error_class=blocked_class,
                 error_message=detail,
                 started=started,
                 input_count=0,
@@ -365,45 +494,22 @@ class NormalizationRunner:
                 manifest_uri=None,
                 manifest_hash=None,
                 quarantines=[],
+                spec=spec,
             )
 
+        # routing returned a SUPPORTED spec (blocked_error is None only
+        # for supported surfaces) - narrow for the rest of the flow
+        assert spec is not None
         mapper_identity = mapper_identity_for(spec)
-        idempotency_key = hashlib.sha256(
-            "|".join(
-                (
-                    raw_evidence_hash,
-                    NORMALIZATION_CONTRACT_VERSION,
-                    mapper_identity,
-                )
-            ).encode("utf-8")
-        ).hexdigest()
+        idempotency_key = self._supported_key(raw_evidence_hash, mapper_identity)
 
         # ---------------------------------------- idempotent replay return
+        # CR-2.1 P0-03: the prior run is RE-VERIFIED (manifest bytes,
+        # outputs, quarantine exact set) BEFORE an idempotent return -
+        # a damaged existing run fails closed instead of replaying as
+        # healthy.
         if prior is not None and str(prior[2]) == idempotency_key:
-            existing = self.conn.execute(
-                "SELECT normalization_run_id, status, error_class, error_message, "
-                "input_count, normalized_count, quarantined_count, "
-                "normalized_manifest_uri, normalized_manifest_hash "
-                "FROM meta_provider_normalization_run "
-                "WHERE normalization_run_id = ?",
-                [str(prior[0])],
-            ).fetchone()
-            if existing is not None:
-                return NormalizationRunResult(
-                    normalization_run_id=str(existing[0]),
-                    provider=provider,
-                    provider_dataset=provider_dataset,
-                    raw_request_id=request_id,
-                    status=str(existing[1]),
-                    error_class=str(existing[2]) if existing[2] is not None else None,
-                    error_message=str(existing[3]) if existing[3] is not None else None,
-                    input_count=int(existing[4]),
-                    normalized_count=int(existing[5]),
-                    quarantined_count=int(existing[6]),
-                    manifest_uri=str(existing[7]) if existing[7] is not None else None,
-                    manifest_hash=str(existing[8]) if existing[8] is not None else None,
-                    idempotent_replay=True,
-                )
+            return self._require_verified_replay(str(prior[0]), idempotency_key)
 
         # ------------------------------------- verified payload read (P0-01)
         try:
@@ -411,6 +517,12 @@ class NormalizationRunner:
                 provider=provider, dataset=provider_dataset, request_id=request_id, verify=True
             )
         except RawWriterError as exc:
+            replay = self._maybe_replay(
+                prior,
+                self._blocked_key(raw_evidence_hash, surface, provider_dataset, endpoint, spec),
+            )
+            if replay is not None:
+                return replay
             return self._blocked_run(
                 provider=provider,
                 provider_dataset=provider_dataset,
@@ -419,6 +531,7 @@ class NormalizationRunner:
                 raw_evidence_hash=raw_evidence_hash,
                 raw_payload_kind=payload_kind,
                 endpoint=endpoint,
+                surface=surface or None,
                 error_class=NormalizationErrorClass.RAW_EVIDENCE_INVALID,
                 error_message=f"verified raw read failed: {exc}",
                 started=started,
@@ -450,6 +563,7 @@ class NormalizationRunner:
                     raw_evidence_hash=raw_evidence_hash,
                     raw_payload_kind=payload_kind,
                     endpoint=endpoint,
+                    surface=surface or None,
                     error_class=NormalizationErrorClass.PAYLOAD_SHAPE_UNSUPPORTED,
                     error_message=detail,
                     started=started,
@@ -460,6 +574,7 @@ class NormalizationRunner:
                     manifest_hash=None,
                     quarantines=[],
                     spec=spec,
+                    idempotency_key=idempotency_key,
                 )
             raw_table_name = spec.source_table
             frame = payload[spec.source_table]
@@ -488,7 +603,6 @@ class NormalizationRunner:
             except MappingValidationError as exc:
                 quarantines.append(
                     self._quarantine_record(
-                        run_id_placeholder=None,
                         provider=provider,
                         provider_dataset=provider_dataset,
                         request_id=request_id,
@@ -515,7 +629,6 @@ class NormalizationRunner:
                 except MappingValidationError as exc:
                     quarantines.append(
                         self._quarantine_record(
-                            run_id_placeholder=None,
                             provider=provider,
                             provider_dataset=provider_dataset,
                             request_id=request_id,
@@ -527,14 +640,13 @@ class NormalizationRunner:
                             scope=QuarantineScope.ROW,
                             error_class=NormalizationErrorClass.MAPPING_VALIDATION_FAILED,
                             message=str(exc),
-                            context=getattr(exc, "context", None),
+                            context=self._row_error_context(exc, row),
                             mapper_identity=mapper_identity,
                         )
                     )
                 except Exception as exc:  # noqa: BLE001 - recorded, never swallowed
                     quarantines.append(
                         self._quarantine_record(
-                            run_id_placeholder=None,
                             provider=provider,
                             provider_dataset=provider_dataset,
                             request_id=request_id,
@@ -546,7 +658,7 @@ class NormalizationRunner:
                             scope=QuarantineScope.ROW,
                             error_class=NormalizationErrorClass.NORMALIZATION_INTERNAL_ERROR,
                             message=f"{type(exc).__name__}: {exc}"[:500],
-                            context=None,
+                            context=self._row_error_context(exc, row),
                             mapper_identity=mapper_identity,
                         )
                     )
@@ -566,6 +678,7 @@ class NormalizationRunner:
                     raw_evidence_hash=raw_evidence_hash,
                     raw_payload_kind=payload_kind,
                     endpoint=endpoint,
+                    surface=surface or None,
                     error_class=NormalizationErrorClass.NORMALIZATION_INTERNAL_ERROR,
                     error_message=(
                         f"no-silent-drop accounting violated: input {input_count} != "
@@ -584,13 +697,12 @@ class NormalizationRunner:
                 )
 
         # ------------------------------------------------------- status
-        if internal_errors:
+        # internal-error rows are quarantined like any other bad row
+        # (P0-08 separation lives in the ERROR CLASS of the record) -
+        # the status machine itself follows the retention rules only.
+        if quarantines and spec.quarantine_scope is QuarantineScope.WHOLE_PAYLOAD:
             status = NormalizationRunStatus.BLOCKED
-            error_class: str | None = NormalizationErrorClass.NORMALIZATION_INTERNAL_ERROR
-            error_message = f"{internal_errors} mapper internal error(s) quarantined"
-        elif quarantines and spec.quarantine_scope is QuarantineScope.WHOLE_PAYLOAD:
-            status = NormalizationRunStatus.BLOCKED
-            error_class = NormalizationErrorClass.MAPPING_VALIDATION_FAILED
+            error_class: str | None = NormalizationErrorClass.MAPPING_VALIDATION_FAILED
             error_message = "whole payload quarantined - zero normalized output"
         elif quarantines and not spec.allow_partial:
             status = NormalizationRunStatus.BLOCKED
@@ -599,29 +711,67 @@ class NormalizationRunner:
                 f"{len(quarantines)} row(s) quarantined and PARTIAL is not "
                 f"allowed for {provider_dataset}/{endpoint}"
             )
+        elif quarantines and mapped_rows == 0:
+            # nothing survived: PARTIAL means good rows RETAINED - with
+            # zero retained rows the run is BLOCKED, never a healthy
+            # "partial" truth
+            status = NormalizationRunStatus.BLOCKED
+            error_class = (
+                NormalizationErrorClass.NORMALIZATION_INTERNAL_ERROR
+                if internal_errors
+                else NormalizationErrorClass.MAPPING_VALIDATION_FAILED
+            )
+            error_message = (
+                f"{len(quarantines)} row(s) quarantined and ZERO rows normalized - "
+                "nothing was retained"
+            )
         elif quarantines:
             status = NormalizationRunStatus.PARTIAL
-            error_class = NormalizationErrorClass.MAPPING_VALIDATION_FAILED
-            error_message = f"{len(quarantines)} row(s) quarantined; good rows retained"
+            error_class = (
+                NormalizationErrorClass.NORMALIZATION_INTERNAL_ERROR
+                if internal_errors
+                else NormalizationErrorClass.MAPPING_VALIDATION_FAILED
+            )
+            error_message = f"{len(quarantines)} row(s) quarantined; good rows retained" + (
+                f" ({internal_errors} mapper internal error(s))" if internal_errors else ""
+            )
         else:
             status = NormalizationRunStatus.SUCCESS
             error_class = None
             error_message = None
 
-        # -------------------------------------- persist artifacts (P0-03)
+        # ------------------------- deterministic run + artifact identity
+        # CR-2.1 P0-03: the run id is derived from the exact input
+        # identity (raw evidence hash + contract + SYSTEM-DERIVED mapper
+        # identity incl. the code fingerprint) - a mapper implementation
+        # change therefore yields a NEW run and NEW artifact paths
+        # (history preserved, never overwritten).
+        run_id = str(uuid.uuid5(_RUN_NAMESPACE, idempotency_key))
+        base_uri = (
+            f"provider={provider}/dataset={provider_dataset}/"
+            f"raw_request={request_id}/"
+            f"contract={NORMALIZATION_CONTRACT_VERSION}/run={run_id}"
+        )
+        qtz_set_hash = _quarantine_set_hash(self._bind_quarantine_ids(run_id, quarantines))
+
         manifest_uri: str | None = None
         manifest_hash: str | None = None
-        if status is not NormalizationRunStatus.BLOCKED and (mapped_rows > 0 or input_count == 0):
-            run_id = str(uuid.uuid5(_RUN_NAMESPACE, idempotency_key))
-            base_uri = (
-                f"provider={provider}/dataset={provider_dataset}/"
-                f"raw_request={request_id}/contract={NORMALIZATION_CONTRACT_VERSION}"
-            )
+        # ROW-scope runs materialize their output tables (possibly
+        # EMPTY ones when every row quarantined - the empty parquet IS
+        # the "nothing normalized, no sentinel row" evidence); a
+        # WHOLE_PAYLOAD quarantine produces zero output by contract.
+        should_write_artifacts = (
+            spec.quarantine_scope is QuarantineScope.ROW or mapped_rows > 0 or input_count == 0
+        )
+        if should_write_artifacts:
+            import io
+
             import polars as pl
 
             output_records: list[dict[str, Any]] = []
-            for output_name, out_rows in normalized.items():
-                if not out_rows and input_count > 0:
+            for output_name in spec.output_names:
+                out_rows = normalized.get(output_name, [])
+                if spec.quarantine_scope is QuarantineScope.WHOLE_PAYLOAD and not out_rows:
                     continue
                 frame_out = pl.DataFrame(out_rows)
                 # deterministic ordering: sort by ALL columns (schema order)
@@ -630,8 +780,6 @@ class NormalizationRunner:
                 artifact_uri = f"{base_uri}/{output_name}.parquet"
                 artifact_path = physical_from_logical_uri(self.normalized_root, artifact_uri)
                 artifact_path.parent.mkdir(parents=True, exist_ok=True)
-                import io
-
                 buf = io.BytesIO()
                 frame_out.write_parquet(buf)
                 payload_bytes = buf.getvalue()
@@ -648,11 +796,21 @@ class NormalizationRunner:
                     }
                 )
             semantic_hash = _canonical_semantic_hash(
-                {name: rows for name, rows in normalized.items() if rows or input_count == 0}
+                {
+                    name: rows
+                    for name, rows in normalized.items()
+                    if rows or spec.quarantine_scope is QuarantineScope.ROW or input_count == 0
+                }
             )
+            # CR-2.1 P0-04: correctness bytes carry NO wall-clock and NO
+            # caller-declared provenance - an exact retry regenerates
+            # byte-identical manifest bytes (the immutable write is a
+            # no-op), so a transient DB failure can never strand the
+            # run behind a conflicting manifest.
             manifest = {
                 "normalization_run_id": run_id,
                 "provider": provider,
+                "normalization_surface": surface,
                 "provider_dataset": provider_dataset,
                 "endpoint": endpoint,
                 "raw_request_id": request_id,
@@ -661,79 +819,52 @@ class NormalizationRunner:
                 "raw_table_name": raw_table_name,
                 "normalization_contract_version": NORMALIZATION_CONTRACT_VERSION,
                 "mapper_identity": mapper_identity,
-                "code_commit": self.code_commit,
+                "mapper_code_hash": _registry.MAPPER_CODE_FINGERPRINT,
                 "outputs": output_records,
                 "semantic_hash": semantic_hash,
+                "quarantine_set_hash": qtz_set_hash,
                 "input_count": input_count,
                 "normalized_count": mapped_rows,
                 "quarantined_count": len(quarantines),
                 "status": status.value,
-                "completed_at": datetime.now(UTC).isoformat(),
             }
             manifest_uri = f"{base_uri}/manifest.json"
             manifest_path = physical_from_logical_uri(self.normalized_root, manifest_uri)
             manifest_bytes = json.dumps(
                 manifest, sort_keys=True, indent=1, ensure_ascii=False
             ).encode("utf-8")
+            # the manifest is the FILE-SIDE anchor: it lands LAST, only
+            # after every output artifact is in place
             self._write_immutable(manifest_path, manifest_bytes, run_id)
             manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
-        else:
-            run_id = str(uuid.uuid5(_RUN_NAMESPACE, idempotency_key))
 
-        # ------------------------------------------- ledger + quarantine
+        # --------------------------- ledger + quarantine atomic commit
         completed = datetime.now(UTC)
-        self.conn.execute(
-            "INSERT INTO meta_provider_normalization_run VALUES "
-            "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [
-                run_id,
-                provider,
-                provider_dataset,
-                endpoint,
-                request_id,
-                raw_evidence_uri,
-                raw_evidence_hash,
-                payload_kind,
-                NORMALIZATION_CONTRACT_VERSION,
-                mapper_identity,
-                manifest_uri,
-                manifest_hash,
-                input_count,
-                mapped_rows,
-                len(quarantines),
-                status.value,
-                error_class,
-                error_message,
-                idempotency_key,
-                False,
-                started,
-                completed,
-            ],
+        self._commit_ledger(
+            run_id=run_id,
+            provider=provider,
+            provider_dataset=provider_dataset,
+            endpoint=endpoint,
+            request_id=request_id,
+            raw_evidence_uri=raw_evidence_uri,
+            raw_evidence_hash=raw_evidence_hash,
+            raw_payload_kind=payload_kind,
+            mapper_identity=mapper_identity,
+            manifest_uri=manifest_uri,
+            manifest_hash=manifest_hash,
+            input_count=input_count,
+            normalized_count=mapped_rows,
+            quarantined_count=len(quarantines),
+            status=status.value,
+            error_class=error_class,
+            error_message=error_message,
+            idempotency_key=idempotency_key,
+            started=started,
+            completed=completed,
+            surface=surface or None,
+            quarantines=quarantines,
+            qtz_set_hash=qtz_set_hash,
         )
-        for record in quarantines:
-            self.conn.execute(
-                "INSERT INTO meta_provider_quarantine VALUES "
-                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                    f"qtz-{uuid.uuid4()}",
-                    run_id,
-                    record["provider"],
-                    record["provider_dataset"],
-                    record["raw_request_id"],
-                    record["raw_evidence_uri"],
-                    record["raw_evidence_hash"],
-                    record["raw_table_name"],
-                    record["raw_row_ordinal"],
-                    record["source_key"],
-                    record["quarantine_scope"],
-                    record["error_class"],
-                    record["error_message"],
-                    record["error_context_json"],
-                    record["mapper_identity"],
-                    NORMALIZATION_CONTRACT_VERSION,
-                    record["created_at"],
-                ],
-            )
         return NormalizationRunResult(
             normalization_run_id=run_id,
             provider=provider,
@@ -748,9 +879,412 @@ class NormalizationRunner:
             manifest_uri=manifest_uri,
             manifest_hash=manifest_hash,
             idempotent_replay=False,
+            normalization_surface=surface or None,
+            quarantine_set_hash=qtz_set_hash,
         )
 
+    # ------------------------------------------------------------ routing
+    def _route(
+        self, provider: str, provider_dataset: str, endpoint: str, surface: str
+    ) -> tuple[DatasetNormalizationSpec | None, tuple[NormalizationErrorClass, str] | None]:
+        """Typed surface routing (CR-2.1 P0-01).
+
+        Returns (spec, blocked) - exactly one is None. When the meta
+        carries the persisted ``normalization_surface`` the lookup is
+        the exact typed key. Legacy evidence WITHOUT the surface field
+        routes through the (dataset, endpoint) pair ONLY when it is
+        unambiguous; an ambiguous pair (stock vs index daily bar on
+        MarketData.query_kline) fails closed with
+        PAYLOAD_SURFACE_AMBIGUOUS - never a symbol-prefix or
+        request-parameter guess."""
+        if surface:
+            spec = lookup_spec(provider, surface, provider_dataset, endpoint)
+            if spec is None:
+                return None, (
+                    NormalizationErrorClass.PAYLOAD_SHAPE_UNSUPPORTED,
+                    (
+                        f"no registry entry for surface {surface}/{provider_dataset}/{endpoint} "
+                        "- unknown surfaces fail closed (never take-first-table or "
+                        "fuzzy routing)"
+                    ),
+                )
+            return self._check_support(spec, provider_dataset, endpoint)
+        entries = specs_for(provider, provider_dataset, endpoint)
+        if not entries:
+            return None, (
+                NormalizationErrorClass.PAYLOAD_SHAPE_UNSUPPORTED,
+                (
+                    f"no registry entry for surface {provider_dataset}/{endpoint} - "
+                    "unknown surfaces fail closed (never take-first-table or "
+                    "fuzzy routing)"
+                ),
+            )
+        if len(entries) > 1:
+            surfaces = sorted({entry.normalization_surface for entry in entries})
+            return None, (
+                NormalizationErrorClass.PAYLOAD_SURFACE_AMBIGUOUS,
+                (
+                    f"legacy raw evidence for {provider_dataset}/{endpoint} carries no "
+                    f"normalization_surface and the pair is ambiguous (business "
+                    f"surfaces: {surfaces}) - re-ingest through the provider facade "
+                    "so the system-derived surface identity is persisted; guessing "
+                    "from symbol prefixes or request params is forbidden "
+                    "(CR-2.1 P0-01)"
+                ),
+            )
+        return self._check_support(entries[0], provider_dataset, endpoint)
+
+    @staticmethod
+    def _check_support(
+        spec: DatasetNormalizationSpec, provider_dataset: str, endpoint: str
+    ) -> tuple[DatasetNormalizationSpec | None, tuple[NormalizationErrorClass, str] | None]:
+        if spec.support is SurfaceSupport.SUPPORTED_NORMALIZATION:
+            return spec, None
+        if spec.support is SurfaceSupport.BLOCKED_PENDING_MAPPER:
+            return spec, (
+                NormalizationErrorClass.PAYLOAD_SHAPE_UNSUPPORTED,
+                (
+                    f"surface {spec.normalization_surface}/{provider_dataset}/{endpoint} is "
+                    f"BLOCKED_PENDING_MAPPER (mapper {spec.mapper_version!r}) - no verified "
+                    "mapper exists yet; normalization fails closed, it never silently skips"
+                ),
+            )
+        return spec, (
+            NormalizationErrorClass.PAYLOAD_SHAPE_UNSUPPORTED,
+            (
+                f"surface {spec.normalization_surface}/{provider_dataset}/{endpoint} is "
+                f"classified {spec.support.value} - not a normalization input"
+            ),
+        )
+
+    # ----------------------------------------------------------- identity
+    @staticmethod
+    def _supported_key(raw_evidence_hash: str, mapper_identity: str) -> str:
+        return hashlib.sha256(
+            "|".join((raw_evidence_hash, NORMALIZATION_CONTRACT_VERSION, mapper_identity)).encode(
+                "utf-8"
+            )
+        ).hexdigest()
+
+    @staticmethod
+    def _blocked_key(
+        raw_evidence_hash: str,
+        surface: str | None,
+        provider_dataset: str,
+        endpoint: str | None,
+        spec: DatasetNormalizationSpec | None,
+    ) -> str:
+        identity = (
+            mapper_identity_for(spec)
+            if spec is not None
+            else f"{surface or '-'}/{provider_dataset}/{endpoint or 'none'}@blocked"
+        )
+        return hashlib.sha256(
+            "|".join((raw_evidence_hash, NORMALIZATION_CONTRACT_VERSION, identity)).encode("utf-8")
+        ).hexdigest()
+
+    # -------------------------------------------------------------- replay
+    def _maybe_replay(self, prior: Any, idempotency_key: str) -> NormalizationRunResult | None:
+        """CR-2.1 P0-03: the ONE replay policy - SUCCESS, PARTIAL and
+        BLOCKED alike. A prior run with the SAME exact input identity is
+        re-verified (closure intact) and returned as an idempotent
+        replay; a damaged prior run fails closed."""
+        if prior is None or str(prior[2]) != idempotency_key:
+            return None
+        return self._require_verified_replay(str(prior[0]), idempotency_key)
+
+    def _require_verified_replay(self, run_id: str, idempotency_key: str) -> NormalizationRunResult:
+        row = self._ledger_row(run_id)
+        if row is None:
+            msg = (
+                f"prior run {run_id} referenced by idempotency key "
+                f"{idempotency_key[:16]}... is missing from the ledger - "
+                "inconsistent state, repair required"
+            )
+            raise NormalizationRunnerError(msg)
+        if str(row["idempotency_key"]) != idempotency_key:
+            msg = f"prior run {run_id} identity mismatch - repair required"
+            raise NormalizationRunnerError(msg)
+        problems = self._verify_run_closure(row)
+        if problems:
+            msg = (
+                f"existing run {run_id} is DAMAGED - idempotent replay refused, "
+                f"repair required: {'; '.join(problems)}"
+            )
+            raise NormalizationRunnerError(msg)
+        return NormalizationRunResult(
+            normalization_run_id=str(row["normalization_run_id"]),
+            provider=str(row["provider"]),
+            provider_dataset=str(row["provider_dataset"]),
+            raw_request_id=str(row["raw_request_id"]),
+            status=str(row["status"]),
+            error_class=str(row["error_class"]) if row["error_class"] is not None else None,
+            error_message=str(row["error_message"]) if row["error_message"] is not None else None,
+            input_count=int(row["input_count"]),
+            normalized_count=int(row["normalized_count"]),
+            quarantined_count=int(row["quarantined_count"]),
+            manifest_uri=str(row["normalized_manifest_uri"])
+            if row["normalized_manifest_uri"] is not None
+            else None,
+            manifest_hash=str(row["normalized_manifest_hash"])
+            if row["normalized_manifest_hash"] is not None
+            else None,
+            idempotent_replay=True,
+            normalization_surface=str(row["normalization_surface"])
+            if row["normalization_surface"] is not None
+            else None,
+            quarantine_set_hash=str(row["quarantine_set_hash"])
+            if row["quarantine_set_hash"] is not None
+            else None,
+        )
+
+    def _ledger_row(self, run_id: str) -> dict[str, Any] | None:
+        result = self.conn.execute(
+            f"SELECT {', '.join(_LEDGER_COLUMNS)} "
+            "FROM meta_provider_normalization_run "
+            "WHERE normalization_run_id = ?",
+            [run_id],
+        ).fetchone()
+        if result is None:
+            return None
+        return dict(zip(_LEDGER_COLUMNS, result, strict=True))
+
+    def _verify_run_closure(self, row: dict[str, Any]) -> list[str]:
+        """CR-2.1 P0-03/P0-04: re-verify an existing run BEFORE an
+        idempotent reuse - manifest bytes, output artifacts and the
+        quarantine exact set must all be intact."""
+        problems: list[str] = []
+        # quarantine exact-set verification (every status)
+        problems.extend(self._verify_quarantine_set(row))
+        # manifest/output verification whenever the run bound a manifest
+        # (row-scope BLOCKED runs materialize empty outputs too)
+        if row["normalized_manifest_uri"] is not None:
+            problems.extend(self._verify_manifest_outputs(row))
+        return problems
+
+    def _verify_quarantine_set(self, row: dict[str, Any]) -> list[str]:
+        run_id = str(row["normalization_run_id"])
+        expected_count = int(row["quarantined_count"])
+        sealed_hash = row["quarantine_set_hash"]
+        problems: list[str] = []
+        if sealed_hash is None:
+            # CR-2 legacy row without the exact-set seal: never replay-
+            # verified as healthy
+            return [
+                f"run {run_id} carries no quarantine_set_hash seal "
+                "(CR-2 legacy row) - re-run under the current contract"
+            ]
+        rows = self.conn.execute(
+            f"SELECT {', '.join(_QTZ_SEMANTIC_FIELDS)} "
+            "FROM meta_provider_quarantine "
+            "WHERE normalization_run_id = ? ORDER BY quarantine_id",
+            [run_id],
+        ).fetchall()
+        if len(rows) != expected_count:
+            problems.append(
+                f"quarantine count mismatch: ledger declares {expected_count} "
+                f"but {len(rows)} rows persist"
+            )
+        records = [dict(zip(_QTZ_SEMANTIC_FIELDS, record, strict=True)) for record in rows]
+        if _quarantine_set_hash(records) != str(sealed_hash):
+            problems.append(
+                "quarantine exact-set seal mismatch: persisted rows no longer "
+                "match the sealed quarantine_set_hash (tamper or missing rows)"
+            )
+        return problems
+
+    def _verify_manifest_outputs(self, row: dict[str, Any]) -> list[str]:
+        run_id = str(row["normalization_run_id"])
+        manifest_uri = row["normalized_manifest_uri"]
+        manifest_hash = row["normalized_manifest_hash"]
+        problems: list[str] = []
+        if manifest_uri is None or manifest_hash is None:
+            return [
+                f"run {run_id} is SUCCESS/PARTIAL but has no manifest binding - repair required"
+            ]
+        manifest_path = physical_from_logical_uri(self.normalized_root, str(manifest_uri))
+        if not manifest_path.is_file():
+            return [f"normalized manifest missing: {manifest_uri}"]
+        actual_manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        if actual_manifest_hash != str(manifest_hash):
+            return [f"normalized manifest bytes do not match the ledger hash: {manifest_uri}"]
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return [f"normalized manifest unreadable: {manifest_uri}"]
+        # cross-binding: manifest identity == ledger identity
+        bindings = (
+            ("normalization_run_id", str(row["normalization_run_id"])),
+            ("raw_request_id", str(row["raw_request_id"])),
+            ("raw_evidence_hash", str(row["raw_evidence_hash"])),
+            ("normalization_contract_version", str(row["normalization_contract_version"])),
+            ("mapper_identity", str(row["mapper_identity"])),
+        )
+        for field, expected in bindings:
+            if str(manifest.get(field)) != expected:
+                problems.append(f"manifest field {field} does not match the ledger binding")
+        if int(manifest.get("quarantined_count", -1)) != int(row["quarantined_count"]):
+            problems.append("manifest quarantined_count does not match the ledger")
+        import polars as pl
+
+        for output in manifest.get("outputs", []):
+            output_uri = str(output.get("uri", ""))
+            output_path = physical_from_logical_uri(self.normalized_root, output_uri)
+            if not output_path.is_file():
+                problems.append(f"normalized output missing: {output_uri}")
+                continue
+            output_bytes = output_path.read_bytes()
+            if hashlib.sha256(output_bytes).hexdigest() != str(output.get("content_hash")):
+                problems.append(f"normalized output bytes tampered: {output_uri}")
+                continue
+            frame = pl.read_parquet(output_path)
+            if frame.height != int(output.get("row_count", -1)):
+                problems.append(f"normalized output row count mismatch: {output_uri}")
+        return problems
+
+    # ------------------------------------------------------------- commit
+    def _commit_ledger(
+        self,
+        *,
+        run_id: str,
+        provider: str,
+        provider_dataset: str,
+        endpoint: str,
+        request_id: str,
+        raw_evidence_uri: str,
+        raw_evidence_hash: str,
+        raw_payload_kind: str,
+        mapper_identity: str,
+        manifest_uri: str | None,
+        manifest_hash: str | None,
+        input_count: int,
+        normalized_count: int,
+        quarantined_count: int,
+        status: str,
+        error_class: str | None,
+        error_message: str | None,
+        idempotency_key: str,
+        started: datetime,
+        completed: datetime,
+        surface: str | None,
+        quarantines: list[dict[str, Any]],
+        qtz_set_hash: str,
+    ) -> None:
+        """CR-2.1 P0-04: the run ledger + the FULL quarantine set commit
+        in ONE DuckDB transaction with a post-insert count assertion -
+        a failure anywhere rolls the whole ledger back (the file-side
+        deterministic anchor lets the exact retry recover)."""
+        self.conn.execute("BEGIN TRANSACTION")
+        try:
+            dup = self.conn.execute(
+                "SELECT 1 FROM meta_provider_normalization_run WHERE normalization_run_id = ?",
+                [run_id],
+            ).fetchone()
+            if dup is not None:
+                msg = (
+                    f"normalization run {run_id} already exists in the ledger - "
+                    "conflicting duplicate execution (repair required)"
+                )
+                raise NormalizationRunnerError(msg)
+            self.conn.execute(
+                f"INSERT INTO meta_provider_normalization_run "
+                f"({', '.join(_LEDGER_COLUMNS)}) VALUES "
+                f"({', '.join(['?'] * len(_LEDGER_COLUMNS))})",
+                [
+                    run_id,
+                    provider,
+                    provider_dataset,
+                    endpoint,
+                    request_id,
+                    raw_evidence_uri,
+                    raw_evidence_hash,
+                    raw_payload_kind,
+                    NORMALIZATION_CONTRACT_VERSION,
+                    mapper_identity,
+                    manifest_uri,
+                    manifest_hash,
+                    input_count,
+                    normalized_count,
+                    quarantined_count,
+                    status,
+                    error_class,
+                    error_message,
+                    idempotency_key,
+                    False,
+                    started,
+                    completed,
+                    surface,
+                    _registry.MAPPER_CODE_FINGERPRINT,
+                    qtz_set_hash,
+                ],
+            )
+            for record in quarantines:
+                self.conn.execute(
+                    f"INSERT INTO meta_provider_quarantine "
+                    f"({', '.join(_QTZ_COLUMNS)}) VALUES "
+                    f"({', '.join(['?'] * len(_QTZ_COLUMNS))})",
+                    [
+                        record["_qtz_id"],
+                        run_id,
+                        record["provider"],
+                        record["provider_dataset"],
+                        record["raw_request_id"],
+                        record["raw_evidence_uri"],
+                        record["raw_evidence_hash"],
+                        record["raw_table_name"],
+                        record["raw_row_ordinal"],
+                        record["source_key"],
+                        record["quarantine_scope"],
+                        record["error_class"],
+                        record["error_message"],
+                        record["error_context_json"],
+                        record["mapper_identity"],
+                        NORMALIZATION_CONTRACT_VERSION,
+                        record["created_at"],
+                    ],
+                )
+            persisted = self.conn.execute(
+                "SELECT count(*) FROM meta_provider_quarantine WHERE normalization_run_id = ?",
+                [run_id],
+            ).fetchone()
+            persisted_count = int(persisted[0]) if persisted is not None else -1
+            if persisted_count != len(quarantines):
+                msg = (
+                    f"quarantine set persistence mismatch for run {run_id}: "
+                    f"expected {len(quarantines)} rows, persisted {persisted_count}"
+                )
+                raise NormalizationRunnerError(msg)
+            self.conn.execute("COMMIT")
+        except Exception as exc:
+            with contextlib.suppress(Exception):
+                self.conn.execute("ROLLBACK")
+            if isinstance(exc, NormalizationRunnerError):
+                raise
+            msg = f"normalization ledger commit failed for run {run_id}: {exc}"
+            raise NormalizationRunnerError(msg) from exc
+
     # ------------------------------------------------------------- helpers
+    @staticmethod
+    def _row_error_context(exc: Exception, row: dict[str, Any]) -> dict[str, Any]:
+        """Evidence context of a row-level failure: the error's own
+        context (when present) plus the OFFENDING ROW itself, scrubbed
+        of secret-bearing keys (CR2-P0-05: quarantine must never leak
+        credentials, but must carry enough evidence to diagnose)."""
+        context: dict[str, Any] = {}
+        exc_context = getattr(exc, "context", None)
+        if isinstance(exc_context, dict):
+            context.update(exc_context)
+        context["row"] = _scrub_context(dict(row))
+        return context
+
+    @staticmethod
+    def _bind_quarantine_ids(run_id: str, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Deterministic quarantine ids: the same exact run replays to
+        the same ids (never a second row set)."""
+        for position, record in enumerate(records):
+            record["_qtz_id"] = f"qtz-{uuid.uuid5(_QTZ_NAMESPACE, f'{run_id}:{position}')}"
+        return records
+
     @staticmethod
     def _source_key_of(row: dict[str, Any]) -> str | None:
         """Best-effort natural key for the quarantine record (never a
@@ -764,7 +1298,6 @@ class NormalizationRunner:
     @staticmethod
     def _quarantine_record(
         *,
-        run_id_placeholder: None,
         provider: str,
         provider_dataset: str,
         request_id: str,
@@ -779,7 +1312,6 @@ class NormalizationRunner:
         context: Any,
         mapper_identity: str,
     ) -> dict[str, Any]:
-        del run_id_placeholder  # bound later, when the run id exists
         context_json: str | None = None
         if context is not None:
             scrubbed = _scrub_context(context)
@@ -811,6 +1343,7 @@ class NormalizationRunner:
         raw_evidence_hash: str,
         raw_payload_kind: str | None,
         endpoint: str | None,
+        surface: str | None,
         error_class: NormalizationErrorClass,
         error_message: str,
         started: datetime,
@@ -824,75 +1357,45 @@ class NormalizationRunner:
         idempotency_key: str | None = None,
     ) -> NormalizationRunResult:
         """Record an honest BLOCKED run (and its quarantine evidence,
-        when any) - blocked runs are still first-class ledger rows."""
+        when any) - blocked runs are still first-class ledger rows,
+        committed atomically with their quarantine set."""
         if idempotency_key is None:
-            mapper_identity = (
-                mapper_identity_for(spec) if spec is not None else f"{provider_dataset}/none"
+            idempotency_key = self._blocked_key(
+                raw_evidence_hash, surface, provider_dataset, endpoint, spec
             )
-            idempotency_key = hashlib.sha256(
-                "|".join(
-                    (raw_evidence_hash, NORMALIZATION_CONTRACT_VERSION, mapper_identity)
-                ).encode("utf-8")
-            ).hexdigest()
         run_id = str(uuid.uuid5(_RUN_NAMESPACE, idempotency_key))
         mapper_identity = (
             mapper_identity_for(spec)
             if spec is not None
-            else f"{provider_dataset}/{endpoint or 'none'}@blocked"
+            else f"{surface or '-'}/{provider_dataset}/{endpoint or 'none'}@blocked"
         )
         completed = datetime.now(UTC)
-        self.conn.execute(
-            "INSERT INTO meta_provider_normalization_run VALUES "
-            "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [
-                run_id,
-                provider,
-                provider_dataset,
-                endpoint,
-                request_id,
-                raw_evidence_uri,
-                raw_evidence_hash,
-                raw_payload_kind,
-                NORMALIZATION_CONTRACT_VERSION,
-                mapper_identity,
-                manifest_uri,
-                manifest_hash,
-                input_count,
-                normalized_count,
-                quarantined_count,
-                NormalizationRunStatus.BLOCKED.value,
-                error_class.value,
-                error_message,
-                idempotency_key,
-                False,
-                started,
-                completed,
-            ],
+        qtz_set_hash = _quarantine_set_hash(self._bind_quarantine_ids(run_id, quarantines))
+        self._commit_ledger(
+            run_id=run_id,
+            provider=provider,
+            provider_dataset=provider_dataset,
+            endpoint=endpoint or "",
+            request_id=request_id,
+            raw_evidence_uri=raw_evidence_uri,
+            raw_evidence_hash=raw_evidence_hash,
+            raw_payload_kind=raw_payload_kind or "",
+            mapper_identity=mapper_identity,
+            manifest_uri=manifest_uri,
+            manifest_hash=manifest_hash,
+            input_count=input_count,
+            normalized_count=normalized_count,
+            quarantined_count=len(quarantines),
+            status=NormalizationRunStatus.BLOCKED.value,
+            error_class=error_class.value,
+            error_message=error_message,
+            idempotency_key=idempotency_key,
+            started=started,
+            completed=completed,
+            surface=surface,
+            quarantines=quarantines,
+            qtz_set_hash=qtz_set_hash,
         )
-        for record in quarantines:
-            self.conn.execute(
-                "INSERT INTO meta_provider_quarantine VALUES "
-                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                    f"qtz-{uuid.uuid4()}",
-                    run_id,
-                    record["provider"],
-                    record["provider_dataset"],
-                    record["raw_request_id"],
-                    record["raw_evidence_uri"],
-                    record["raw_evidence_hash"],
-                    record["raw_table_name"],
-                    record["raw_row_ordinal"],
-                    record["source_key"],
-                    record["quarantine_scope"],
-                    record["error_class"],
-                    record["error_message"],
-                    record["error_context_json"],
-                    record["mapper_identity"],
-                    NORMALIZATION_CONTRACT_VERSION,
-                    record["created_at"],
-                ],
-            )
         return NormalizationRunResult(
             normalization_run_id=run_id,
             provider=provider,
@@ -903,10 +1406,12 @@ class NormalizationRunner:
             error_message=error_message,
             input_count=input_count,
             normalized_count=normalized_count,
-            quarantined_count=quarantined_count,
+            quarantined_count=len(quarantines),
             manifest_uri=manifest_uri,
             manifest_hash=manifest_hash,
             idempotent_replay=False,
+            normalization_surface=surface,
+            quarantine_set_hash=qtz_set_hash,
         )
 
     @staticmethod

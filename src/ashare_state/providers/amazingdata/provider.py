@@ -92,6 +92,14 @@ class RawEnvelope:
     duration_ms: float = 0.0
     attempt_count: int = 1
     capability_status: str | None = None
+    # CR-2.1 (audit 20260831 §2): the SYSTEM-DERIVED business surface
+    # identity of the exchange - persisted on the envelope by the
+    # facade wrapper (defaults to the capability identity). It is the
+    # ONLY router input distinguishing business surfaces that share one
+    # (provider_dataset, endpoint) pair (stock daily_bar vs index
+    # daily_bar both ride MarketData.query_kline) - never derived from
+    # request params or symbol prefixes.
+    normalization_surface: str = ""
 
     @staticmethod
     def params_hash(params: dict[str, Any]) -> str:
@@ -164,6 +172,7 @@ class AmazingDataProvider:
         *,
         params: dict[str, Any] | None = None,
         require_capability: str | None = None,
+        normalization_surface: str | None = None,
     ) -> Any:
         """One SDK exchange: gated, stdout-captured, budgeted, recorded.
 
@@ -171,9 +180,17 @@ class AmazingDataProvider:
         FIRST - after a terminal SDK/auth failure the endpoint function is
         NEVER invoked (early stop: ProviderLifecycleTerminalError, a typed
         error carrying the terminal state/reason/evidence, raised before
-        any capability check or SDK call)."""
+        any capability check or SDK call).
+
+        CR-2.1 (audit 20260831 §2): ``normalization_surface`` defaults to
+        the capability identity of this exchange - the SYSTEM-DERIVED
+        business surface persisted on the raw envelope. Wrappers whose
+        dataset+endpoint pair serves MULTIPLE business surfaces pass it
+        explicitly (see query_kline_exchange vs
+        query_index_kline_exchange); it is never caller-request data."""
         self.session.lifecycle.require_ready(endpoint)
         cap_status = self._gate_capability(require_capability)
+        surface_identity = str(normalization_surface or require_capability or "")
         params = params or {}
         requested_at = datetime.now(UTC).isoformat()
         started = time.monotonic()
@@ -202,6 +219,7 @@ class AmazingDataProvider:
                 duration_ms=round((time.monotonic() - started) * 1000, 3),
                 attempt_count=attempts,
                 capability_status=str(cap_status) if cap_status else None,
+                normalization_surface=surface_identity,
             )
             self.last_envelopes.append(env)
             return env
@@ -495,6 +513,7 @@ class AmazingDataProvider:
                 "trading_days": list(days),
             },
             require_capability="daily_bar",
+            normalization_surface="daily_bar",
         )
 
     def query_kline(
@@ -507,6 +526,63 @@ class AmazingDataProvider:
     ) -> Any:
         """Business convenience path (NOT for spike/formal evidence paths)."""
         return self.query_kline_exchange(
+            code_list, begin_date=begin_date, end_date=end_date, kline_type=kline_type
+        ).payload
+
+    def query_index_kline_exchange(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        kline_type: str = "DAY",
+        trading_days: list[int] | None = None,
+    ) -> Any:
+        """Explicit-exchange INDEX kline query (CR-2.1 audit 20260831 §2).
+
+        The index daily surface rides the SAME MarketData.query_kline
+        endpoint and provider_dataset=daily_bar pair as the stock
+        surface - ONLY the system-derived ``normalization_surface``
+        ("index_daily") persisted on the raw envelope distinguishes
+        them. Guessing the surface from symbol prefixes or request
+        params is forbidden; consumers MUST call this wrapper (not
+        ``query_kline_exchange``) for index klines.
+        """
+        days = trading_days
+        if days is None:
+            calendar = self.get_calendar()
+            days = [d for d in (calendar or []) if begin_date <= int(d) <= end_date]
+        return self._call_or_exchange(
+            "MarketData.query_kline",
+            "daily_bar",
+            lambda: self._market(days or [begin_date, end_date]).query_kline(
+                code_list=code_list,
+                begin_date=begin_date,
+                end_date=end_date,
+                kline_type=kline_type,
+            ),
+            params={
+                "code_list": list(code_list),
+                "begin_date": begin_date,
+                "end_date": end_date,
+                "kline_type": kline_type,
+                "trading_days": list(days),
+            },
+            require_capability="index_daily",
+            normalization_surface="index_daily",
+        )
+
+    def query_index_kline(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        kline_type: str = "DAY",
+    ) -> Any:
+        """Business convenience path for index klines (NOT for
+        spike/formal evidence paths)."""
+        return self.query_index_kline_exchange(
             code_list, begin_date=begin_date, end_date=end_date, kline_type=kline_type
         ).payload
 

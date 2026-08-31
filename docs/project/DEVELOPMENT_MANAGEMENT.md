@@ -7,14 +7,15 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：CR-2 implementation `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`（run 33378006770 三腿 success，2026-08-31 API positive confirmation）——基于 Reviewer closure HEAD `a41c9f2`（R4-B2.x 链 VERIFIED / CLOSED / FREEZE + CR-2 工作要求 commit）；R4-B2.3 implementation `7362dfc93ab5ea6eb7ebc63c8fddb4508d7942aa` + CI fix `85a9260eb0cc07ea81c7844f661388e113575aa6`（run 33365674254 三腿 success）  
-> **Document Revision**：DM-CR-20260830-054..060 / DM-CR-20260831-061 / 062 / 063  
-> **Last Review**：2026-08-31 16:22 +08:00（R4-B2.3 复审：**VERIFIED——R4-B2 / B2.1 / B2.2 / B2.3 全链 CLOSED / VERIFIED / FREEZE**（无新 blocker）；ADR-021 → ACCEPTED；CR-2 为下一活跃批次）  
+> **Current Code Baseline**：CR-2.1 implementation `<本批提交后回填>`（CI 推送后 API 回填）——基于 CR-2 复审 HEAD `ab20871e9eb207563d0fdeb6228a08416153e2c9`（CR-2 裁决 REOPENED + CR-2.1 工作要求 commit）；CR-2 implementation canonical SHA `15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 三腿 success；**SHA Correction 见下方 2026-08-31 P1-01 更正行**）——基于 Reviewer closure HEAD `a41c9f2`（R4-B2.x 链 VERIFIED / CLOSED / FREEZE + CR-2 工作要求 commit）；R4-B2.3 implementation `7362dfc93ab5ea6eb7ebc63c8fddb4508d7942aa` + CI fix `85a9260eb0cc07ea81c7844f661388e113575aa6`（run 33365674254 三腿 success）  
+> **Document Revision**：DM-CR-20260830-054..060 / DM-CR-20260831-061 / 062 / 063 / 064  
+> **Last Review**：2026-08-31 17:42 +08:00（CR-2 复审：**REOPENED——CR-2.0 core framework 大部分 PASS / FREEZE，4 个 P0 correctness blockers 由 CR-2.1 收口**（surface identity / immutable registry / full-state replay / atomic commit closure）；CR-3 BLOCKED_BY_CR-2.1）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN——run 33378006770（CR-2 implementation `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`）三腿 success**（2026-08-31 API positive confirmation；CR-2 新增 37 项 normalization/quarantine 测试 907/0 在 Ubuntu+Windows 两 OS 通过，一次通过零修复轮次）；run 33365674254（R4-B2.3 `7362dfc`+`85a9260`，Reviewer closure 基线）三腿 success  
-> **Phase Status（2026-08-31，Reviewer 裁决同步）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 → **DONE / PENDING_REVIEW**（本批：Provider-Normalized + Quarantine runtime）；CR-3 → **BLOCKED_BY_CR-2**；CR-4 → sequenced after CR-3；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
-> **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。
+> **CI Status**：CR-2.1 implementation `<本批提交后回填>`（推送后 API 正向确认）；CR-2 implementation run `33378006770`（canonical SHA `15cdae25fd7d11e3be0da3683e821629e4226291`）三腿 success（2026-08-31 API positive confirmation；907/0）；R4-B2.3 run `33365674254`（`7362dfc`+`85a9260`，Reviewer closure 基线）三腿 success  
+> **Phase Status（2026-08-31 17:42，Reviewer 裁决同步）**：  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 → **DONE / REOPENED**（core framework FREEZE；4 P0 由 CR-2.1 收口）；CR-2.1 → **DONE / PENDING_REVIEW**（本批：Surface Identity + Immutable Registry + Full-State Replay + Atomic Commit Closure；ADR-022 Amendment A）；CR-3 → **BLOCKED_BY_CR-2.1**；CR-4 → sequenced after CR-3；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> **SHA Correction（2026-08-31 17:42，Reviewer CR-2 复审 P1-01）**：CR-2 批次头部与 Implementation Mapping 曾记录 implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`——该 SHA 非真实 implementation commit；以 GitHub commit object 为准：`15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 关联 commit）。历史条目原文保留，CR-2 工作要求文档已追加 §12 更正。  
+> **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。**Count Correction（2026-08-31，CR-2 复审 P1-02）**：ADR-022 §2.2 曾写"9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER"——该批实际 10/4，且 14 条未覆盖 index_daily 等 capability surface；CR-2.1 后 registry 为 **18 条（11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE，runtime exact-set 统计）**，已随 ADR-022 Amendment A §6.1 更正，历史保留。  
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
 > **SHA Correction（Reviewer，2026-08-26）**：上批记录的 `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` 有误，以 GitHub commit object 为准：`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`（本头部即为修正记录；历史条目原文保留）  
 > **状态**：ACTIVE / LIVING DOCUMENT  
@@ -1084,8 +1085,9 @@ Evidence/Log/Exception 必须 scrub secret。
 | R4-A3 / R4-A3.1 / R4-A3.2 SDK Lifecycle / Gates / Early-Stop 链 | DONE | **CLOSED / VERIFIED / FREEZE** | 全链闭环（Reviewer 2026-08-28 裁决，不重开） |
 | R4-B1 / B1.1 / B1.2 Capability Endpoint Proof 链 | DONE | **CLOSED / VERIFIED / FREEZE** | 全链闭环（Reviewer 2026-08-30 裁决，不重开） |
 | R4-B2 / B2.1 / B2.2 / B2.3 Publish Validation Exactness 链 | DONE | **CLOSED / VERIFIED / FREEZE** | 全链闭环（Reviewer 2026-08-31 裁决；ADR-021 ACCEPTED） |
-| CR-2 Provider-Normalized + Quarantine | DONE | PENDING_REVIEW | 最高优先（本批：typed registry + NormalizationRunner + immutable artifacts + first-class quarantine；待复核） |
-| CR-3 AvailabilityPolicy + Canonicalizer | PLANNED | **BLOCKED_BY_CR-2** | sequenced after CR-2 |
+| CR-2 Provider-Normalized + Quarantine | DONE | **REOPENED** | core framework FREEZE（2026-08-31 17:42 复审）；4 P0 由 CR-2.1 收口 |
+| CR-2.1 Surface Identity + Registry Boundary + Replay + Commit Closure | DONE | PENDING_REVIEW | 最高优先（本批：typed surface key + immutable registry + one exact replay policy + atomic/recoverable commit；ADR-022 Amendment A） |
+| CR-3 AvailabilityPolicy + Canonicalizer | PLANNED | **BLOCKED_BY_CR-2.1** | sequenced after CR-2.1 |
 | R4-CI | PLANNED | PENDING | Next |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
 | CR-4 Snapshot + Read Model Rebuild | PLANNED | PENDING | CR-3 后 |
@@ -1098,80 +1100,80 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## CR-2 Provider-Normalized + Quarantine（本批，DONE / PENDING_REVIEW）
+## CR-2.1 Surface Identity + Registry Boundary + Replay + Commit Closure（本批，DONE / PENDING_REVIEW）
 
-R4-B2.3 复审（2026-08-31 16:22 +08:00）裁决 **R4-B2 / B2.1 / B2.2 / B2.3
-全链 VERIFIED / CLOSED / FREEZE**（ADR-021 → ACCEPTED）；本批 CR-2 落地
-（新 ADR-022；工作要求
-`docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md`）：
+CR-2 复审（2026-08-31 17:42 +08:00）裁决 **CR-2 REOPENED**（core framework
+大部分 PASS / FREEZE；4 个 P0 correctness blockers）——本批 CR-2.1 收口
+（ADR-022 Amendment A；工作要求
+`docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md`）：
 
 ```text
-CR2-P0-01 Raw Evidence 唯一正式输入：
-  新包 ashare_state.normalization.runner.NormalizationRunner：
-    run(provider, provider_dataset, request_id)——只消费已持久化 raw
-    evidence（定位 .meta.json -> verify_meta_closure 复用 -> 
-    RawWriter.read(verify=True) 复用 verified reader -> mapper）；
-    全程无 provider/SDK 访问（结构性测试断言无 provider-module import）
-  失败 exchange（ERROR meta）不是 mapping failure：SOURCE_EXCHANGE_FAILED
-    BLOCKED run + 保留原 failure evidence + 零 quarantine 行
-CR2-P0-02 Typed Dataset Normalization Registry：
-  ashare_state.normalization.registry：STATIC production-owned，keyed by
-  (provider_dataset, endpoint)——exact routing 无模糊匹配；14 个 surface
-  全显式分类（9 SUPPORTED：trade_calendar=WHOLE_PAYLOAD；code_list /
-  hist_code_list / stock_basic / daily_bar / history_stock_status(三输出：
-  全字段镜像 + limit-price projection + CA-flag projection) / adj_factor /
-  backward_factor / equity_structure / industry_constituent=ROW；5 
-  BLOCKED_PENDING_MAPPER：dividend / right_issue / bj_code_mapping /
-  industry_base_info——mapper 未具备足够已验证字段语义，fail closed）
-  结构守卫测试：AST 抽取 provider 全部 (dataset, endpoint) 对并要求
-  注册表 exact 覆盖——新 surface 无分类决策即测试红
-CR2-P0-03 First-Class Immutable 持久化输出：
-  normalized/provider=<P>/dataset=<D>/raw_request=<rid>/contract=cr2-v1/
-  下：每输出表一个 parquet（canonical 排序——按全部列排序，消除输入
-  行序影响）+ manifest.json（绑定 raw evidence uri/hash/request/table、
-  contract 版本、mapper identity、输出表 uri/content_hash/schema_hash/
-  row_count、semantic_hash、counts、status）；ledger 表 
-  meta_provider_normalization_run（migration 014）；URI 构造经 frozen
-  logical-URI confinement（组件校验 + physical_from_logical_uri）；
-  artifact 不可变（同 bytes 幂等 no-op，异 bytes conflict BLOCK）
-CR2-P0-04 No-Silent-Drop Accounting（runtime 机器强制）：
-  ROW scope：input_row_count == mapped + quarantined——违反即 BLOCKED
-  run（NORMALIZATION_INTERNAL_ERROR）；mapper 非 MappingValidationError
-  异常不被吞掉：记为 internal-error quarantine（带 locator）并 BLOCKED
-  WHOLE_PAYLOAD scope：任一非法元素 -> 零 normalized + 一条
-  whole-payload quarantine + BLOCKED（trade_calendar 测试覆盖）
-CR2-P0-05/06 First-Class Quarantine + Deterministic Locator：
-  meta_provider_quarantine（migration 014，append-only）：quarantine_id /
-  run 绑定 / provider+dataset / raw request_id / evidence uri+hash /
-  raw table name / raw_row_ordinal（ROW）/ source_key（best-effort
-  自然键，不替代 locator）/ scope / error_class / error_message /
-  scrubbed structured context（credential-shaped key 递归 REDACT）/
-  mapper identity / contract 版本
-  multi-table payload 严格按 meta 声明的 table identity 路由（spec.
-  source_table；无路由声明 -> PAYLOAD_SHAPE_UNSUPPORTED BLOCK）
-CR2-P0-07 Determinism / Idempotency：
-  run_id = uuid5(namespace, sha256(raw evidence hash + contract version +
-  mapper identity))——同输入重放得同 run id；idempotent replay 直接返回
-  既有 run（零重复 ledger/quarantine 行）；semantic_hash = 全输出表
-  sorted canonical JSON hash（行序无关——reversed 输入测试覆盖）；
-  同 request id 不同 evidence bytes -> RAW_EVIDENCE_INVALID BLOCK
-CR2-P0-08 错误分类：RAW_EVIDENCE_INVALID / SOURCE_EXCHANGE_FAILED /
-  PAYLOAD_SHAPE_UNSUPPORTED / MAPPING_VALIDATION_FAILED /
-  NORMALIZATION_INTERNAL_ERROR（provider error 与 mapping error 分离）
-CR2-P0-09 Provider-Faithful：注册 mapper 即既有 provider-faithful
-  mappers——provider literals/units/未验证标记（GALAXY_UNVERIFIED）原样
-  通过（测试断言）；status -> 三输出（event_type=
-  STATUS_FLAG_PROJECTION 诚实标注投影来源）
-CR2-P0-10 状态机：SUCCESS（全过零 quarantine）/ PARTIAL（row quarantine
-  且 registry 允许）/ BLOCKED（whole-payload / unsupported / raw
-  invalid / exchange failed / internal error / partial 不允许）；
-  PARTIAL 是否允许由 registry 逐 surface 声明
-Adversarial Tests（37 项）：工作要求 §7 清单 18 项全对应 + 结构守卫
-  （registry 覆盖 == provider surface / SUPPORTED spec 有 mapper /
-  runner 无 provider import）+ 状态机三态 + 三输出路由 + 排序确定性
-Migration 014：meta_provider_normalization_run + meta_provider_quarantine
-  （from-zero 14 链 + idempotent + tamper 守卫全过；未改旧文件）
+P0-01 Surface Identity（audit §2）：
+  registry key 升级为 typed 四元组 (provider, normalization_surface,
+    provider_dataset, endpoint)；
+  normalization_surface = SYSTEM-DERIVED 持久化身份：provider facade
+    call_exchange 派生（默认 capability 身份）-> RawWriter 写入 raw meta
+    （向后兼容字段）；禁止 request 参数 / symbol 前缀猜测
+  query_kline_exchange (surface=daily_bar -> DailyBarDTO) 与
+    query_index_kline_exchange (surface=index_daily -> IndexDailyDTO)
+    两个显式 production wrapper——同 endpoint+dataset 的两个业务 surface
+    永不误路由（测试断言 schema 互斥）
+  legacy 歧义 raw（缺 surface 字段且 pair 多义）-> PAYLOAD_SURFACE_AMBIGUOUS
+    BLOCKED（不猜）；非歧义 pair 仍可路由（向后兼容）
+  新错误类 PAYLOAD_SURFACE_AMBIGUOUS（分类表六类）
+  Coverage guard 升级：provider facade AST surfaces 与
+    SDK_METHOD_CLASSIFICATIONS 交叉核对 == registry exact set（18 条）；
+    optional 未消费 surface（get_index_daily / get_industry_weight /
+    get_industry_daily）显式 NOT_APPLICABLE，不从 structural truth 消失
+P0-02 Immutable Registry（audit §3）：
+  撤销公开可变 DATASET_NORMALIZATION_REGISTRY；module-private 不可变
+    tuple + private exact index；公开面只有只读 lookup_spec / specs_for /
+    registry_specs（不可变 snapshot）
+  NormalizationRunner 构造器与 run() 签名无 spec/mapper/registry/surface
+    参数（结构测试断言）；tests-only 注入仅经 monkeypatch 私有 state
+    （B2 scanner static registry 同一裁决口径）
+P0-03 One Exact Replay Policy（audit §4）：
+  SUCCESS / PARTIAL / BLOCKED 全终态统一：same exact input identity ->
+    重验既有 run closure（manifest bytes / outputs / quarantine exact
+    set）-> intact = idempotent return；damaged/tampered = fail closed
+    （repair required，绝不 false healthy replay）
+  mapper code identity 进入 run identity：MAPPER_CODE_FINGERPRINT =
+    SHA-256 over governed mapper + DTO module sources（行尾归一跨 OS
+    确定性，import 时 system-derived）——mapper 实现变更 -> 新 run
+    identity（历史保留）；撤销 caller 自报 code_commit 参数
+  CR-2 legacy ledger 行缺 quarantine_set_hash seal -> 永不 healthy replay
+  contract 版本 bump cr2.1-v1
+P0-04 Atomic + Recoverable Commit Closure（audit §5）：
+  写入协议：输出 parquet 先落（ROW scope 全输出物化——空 parquet 即零产出
+    证据；WHOLE_PAYLOAD 坏则零输出）-> manifest 最后落盘（correctness
+    bytes 无墙钟无 caller provenance，exact retry 字节不变）-> BEGIN
+    TRANSACTION（dup 检查 + run INSERT + 全部 quarantine INSERT + 行数
+    断言）COMMIT（失败整体 ROLLBACK）
+  DB 失败后 exact retry：确定性文件 anchor 幂等 no-op -> ledger
+    reconciliation（无 orphan manifest / 半提交 quarantine）
+  artifact 路径加 run=<run_id> 段（新 run 新路径，不覆盖历史）
+  quarantine exact-set seal：quarantine_set_hash = canonical hash over
+    sorted semantic records，同时绑定 manifest 与 ledger；UPDATE/DELETE/
+    缺行由 replay 复验发现
+  状态机细化：mapped==0 且有 quarantine -> BLOCKED（PARTIAL = 有好行保留）
+Migration 015：meta_provider_normalization_run + normalization_surface /
+  mapper_code_hash / quarantine_set_hash 三列（ADD COLUMN IF NOT EXISTS；
+  未改 014；from-zero 15 链 + upgrade（001..014 先应用再补 015 仅应用尾部）
+  + idempotent 测试）
+Adversarial Tests（67 项全量 = CR-2 37 项回归 + CR-2.1 新增 30 项）：
+  audit §7 清单 19 项全对应（surface 双路由 / legacy 歧义 fail closed /
+  覆盖守卫交叉核对 / 无公开可变 registry / 三终态幂等 / 输出-manifest-
+  quarantine 篡改删除 fail closed / 注入 DB 失败恢复 / 多输出写失败 /
+  mapper code identity 变更 / 双环境同 manifest identity / happy path
+  回归 / migration from-zero+upgrade / CI 矩阵 / 冻结回归）
 ```
+
+### CR-2 Provider-Normalized + Quarantine（前批，DONE / REOPENED）
+
+R4-B2.3 复审（2026-08-31 16:22 +08:00）裁决 **R4-B2 / B2.1 / B2.2 / B2.3
+全链 VERIFIED / CLOSED / FREEZE**（ADR-021 → ACCEPTED）；CR-2 批次落地
+CR2-P0-01..10（新 ADR-022；工作要求
+`docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md`）。2026-08-31 17:42 CR-2 复审：core framework FREEZE，4 P0 由 CR-2.1 收口（见上）。历史细节见 §61 DM-CR-20260831-063 与 ADR-022 §1-§5（其中二元 key / 9-5 分类等表述已被 ADR-022 Amendment A §6.1-§6.4 修订）。
 
 ### R4-B2 / B2.1 / B2.2 / B2.3（前批，CLOSED / VERIFIED / FREEZE）
 
@@ -1330,7 +1332,7 @@ Raw
 
 Mapping Validation 失败进入 Quarantine，不得 silent drop / 1970 / 0.0 sentinel。
 
-**CR-2 交付状态（2026-08-31，DM-CR-20260831-063 / ADR-022）**：typed dataset normalization registry（14 surface 全显式分类）+ NormalizationRunner（raw evidence 唯一输入 / verified reader / closure 校验 / SOURCE_EXCHANGE_FAILED 分离）+ first-class immutable 持久化输出（parquet + manifest + ledger）+ no-silent-drop 记账不变式（runtime 机器强制）+ first-class quarantine（append-only / row locator / scrubbed context）+ deterministic replay（uuid5 run id / semantic hash / idempotent no-op / conflicting-evidence BLOCK）+ provider-faithful DTO （不预支 canonical 语义）+ SUCCESS/PARTIAL/BLOCKED 状态机。37 项对抗测试（含结构守卫）；详见 §41 / ADR-022。
+**CR-2 交付状态（2026-08-31，DM-CR-20260831-063 / ADR-022；2026-08-31 17:42 复审 REOPENED，CR-2.1 收口 DM-CR-20260831-064）**：typed dataset normalization registry + NormalizationRunner（raw evidence 唯一输入 / verified reader / closure 校验 / SOURCE_EXCHANGE_FAILED 分离）+ first-class immutable 持久化输出（parquet + manifest + ledger）+ no-silent-drop 记账不变式（runtime 机器强制）+ first-class quarantine（append-only / row locator / scrubbed context）+ deterministic replay + provider-faithful DTO（不预支 canonical 语义）+ SUCCESS/PARTIAL/BLOCKED 状态机。CR-2.1 收口后：typed surface 四元 key（system-derived normalization_surface 持久化身份 + index/daily 双 wrapper + legacy 歧义 fail closed）/ private 不可变 registry（无公开可变对象，runner API 无注入面）/ 全终态统一 exact replay（重验 closure 后幂等；篡改即 fail closed；system-derived mapper code fingerprint 进入 run identity）/ atomic + recoverable commit closure（manifest 无墙钟最后落盘 + 单事务 ledger/quarantine + quarantine exact-set seal + 注入失败恢复测试）。67 项对抗测试（含结构守卫 + 覆盖交叉核对）；migration 014 + 015；详见 §41 / ADR-022（含 Amendment A）。
 
 ---
 
@@ -1783,6 +1785,20 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-CR-20260831-064 — CR-2.1 Surface Identity + Registry Boundary + Full-State Replay + Atomic Commit Closure
+
+**Type**：C2 correctness closure（ADR-022 Amendment A；CR-2 复审 4 P0 全收口）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：CR-2 复审（2026-08-31 17:42 +08:00，Reviewed HEAD `ab20871e9eb207563d0fdeb6228a08416153e2c9`，裁决 **REOPENED**——core framework FREEZE，4 P0：surface identity 冲突 / 公开可变 registry / happy-path-only 幂等 / 无原子提交协议；工作要求 `docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md`）。  
+**New Contract**（ADR-022 Amendment A）：（1）**P0-01 Surface Identity**：registry key 升级 typed 四元组 `(provider, normalization_surface, provider_dataset, endpoint)`；`normalization_surface` 为 system-derived 持久化身份（provider facade `call_exchange` 派生默认 capability 身份 → RawWriter 写入 raw meta 向后兼容字段；禁止 request 参数/symbol 前缀猜测）；`query_kline_exchange`（daily_bar → DailyBarDTO）与 `query_index_kline_exchange`（index_daily → IndexDailyDTO）双显式 wrapper；legacy 歧义 raw → `PAYLOAD_SURFACE_AMBIGUOUS` BLOCKED（新错误类，分类表六类）；coverage guard 升级为 facade AST + `SDK_METHOD_CLASSIFICATIONS` 交叉核对 == registry exact set（18 条：11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE——optional 未消费 surface 显式 NOT_APPLICABLE 不消失）。（2）**P0-02 Immutable Registry**：撤销公开可变 `DATASET_NORMALIZATION_REGISTRY`；module-private 不可变 tuple + private exact index；公开面仅只读 `lookup_spec` / `specs_for` / `registry_specs`；runner 构造器与 `run()` 签名无 spec/mapper/registry/surface 参数（结构测试断言）；tests-only 注入仅经 monkeypatch 私有 state。（3）**P0-03 One Exact Replay Policy**：SUCCESS/PARTIAL/BLOCKED 全终态统一——same exact input identity（evidence hash + contract `cr2.1-v1` + system-derived mapper identity）→ 重验既有 run closure（manifest bytes == ledger hash / outputs bytes+row_count == manifest / quarantine exact set seal == ledger）→ intact = idempotent return，damaged/tampered = fail closed（repair required）；`MAPPER_CODE_FINGERPRINT` = SHA-256 over governed mapper + DTO module sources（行尾归一）进入 run identity——mapper 实现变更产生新 run（历史保留）；撤销 caller 自报 `code_commit`；CR-2 legacy 行缺 seal 永不 healthy replay。（4）**P0-04 Atomic + Recoverable Commit Closure**：输出 parquet 先落（ROW scope 全输出物化，空 parquet = 零产出证据）→ manifest 最后落盘（correctness bytes 无墙钟无 caller provenance，exact retry 字节不变）→ 单 DuckDB 事务（dup 检查 + run INSERT + 全部 quarantine INSERT + 行数断言）COMMIT/ROLLBACK；DB 失败 exact retry 确定性恢复；artifact 路径加 `run=<run_id>` 段；`quarantine_set_hash`（canonical hash over sorted semantic records）双锚定 manifest+ledger；状态机细化（mapped==0 有 quarantine → BLOCKED）。  
+**Schema**：migration 015（meta_provider_normalization_run + `normalization_surface` / `mapper_code_hash` / `quarantine_set_hash` 三列，ADD COLUMN IF NOT EXISTS；未改 014；from-zero 15 链 + upgrade（001..014 → 015 仅尾部）+ idempotent 测试）  
+**Affected Modules**：`src/ashare_state/normalization/`（registry.py 重构 typed key + 私有化；runner.py 重写 replay/commit 协议）、`src/ashare_state/providers/amazingdata/provider.py`（RawEnvelope.normalization_surface 字段 + call_exchange 派生 + query_index_kline_exchange）、`src/ashare_state/storage/raw_writer.py`（meta 持久化 surface 字段）、`migrations/015_normalization_surface_closure.sql`、`tests/integration/test_provider_normalization.py`（67 项）、`tests/integration/test_migrations.py`（15 链 + upgrade）、`docs/adr/ADR-022`（Amendment A + P1-02 count 更正）、CR-2 工作要求文档（§12 SHA correction P1-01）  
+**Tests**：67 项 normalization 对抗测试（CR-2 37 项回归 + CR-2.1 新增 30 项，audit §7 清单 19 项全对应）+ migrations 11 项（15 链 from-zero/upgrade/idempotent/tamper）  
+**Governance**：P1-01 SHA 更正（CR-2 implementation canonical = `15cdae25fd7d11e3be0da3683e821629e4226291`，原记录 `15cdae2e4f1...` 为笔误——历史原文保留，工作要求文档追加 §12 更正）；P1-02 count 更正（ADR-022 §2.2 "9/5" → runtime exact-set 18 条 11/4/3，经 Amendment A §6.1）  
+**Verification**：Local 938/0（907 → 938，+31：normalization 37 → 67（+30）+ migrations 10 → 11（+1 upgrade））；ruff check / ruff format / mypy 全绿；CI 同款 `uv run pytest` 复验；GitHub Actions 三腿结果推送后 API 正向确认  
+**Commit**：本批  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-CR-20260831-063 — Provider-Normalized + Quarantine Runtime (CR-2)
 

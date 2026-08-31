@@ -788,3 +788,17 @@ A股数据基座
 
 - Local: **907 / 0**（870 → 907，+37）；ruff check / ruff format --check / mypy 全绿；CI 同款命令 `uv run pytest` 复验 907/0
 - 未启动 CR-3 / CR-4 / Feature / State（§4 边界遵守）；Exit Gate 全过 → CR-3 START
+
+---
+
+# 12. Correction（CR-2 复审 P1-01，2026-08-31 追加——历史不改写，只追加更正）
+
+CR-2 复审（`docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md` §6 P1-01）指出：上文 §8 Exit Gate 与 Verification Summary 中记录的 implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464` **不是真实的 CR-2 implementation commit**。GitHub canonical CR-2 implementation commit 为：
+
+```text
+15cdae25fd7d11e3be0da3683e821629e4226291
+```
+
+（CI run `33378006770` 三腿 success 关联的即此 SHA；上文原记录为笔误 SHA，以本更正为准。）
+
+同复审将本工作要求的 CR-2 裁决改为 **DONE / REOPENED**，后续收口由 **CR-2.1** 工作要求承载（Surface Identity / Immutable Registry / Full-State Replay / Atomic Commit Closure）。本文件按 §56 Auto-Archive 规则保持关闭归档，CR-2.1 的实现映射记录于 CR-2.1 工作要求文档内。

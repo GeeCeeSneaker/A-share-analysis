@@ -757,6 +757,12 @@ class RawWriter:
             "provider": getattr(envelope, "provider", "amazingdata"),
             "provider_dataset": getattr(envelope, "provider_dataset", ""),
             "endpoint": getattr(envelope, "endpoint", ""),
+            # CR-2.1 (audit 20260831 §2): the SYSTEM-DERIVED business
+            # surface identity of the exchange - persisted by the
+            # provider facade, consumed by the normalization typed
+            # routing. Legacy evidence without the field fails closed
+            # on ambiguous (dataset, endpoint) pairs.
+            "normalization_surface": getattr(envelope, "normalization_surface", "") or "",
             "request_params_hash": getattr(envelope, "request_params_hash", ""),
             "requested_at": getattr(envelope, "requested_at", ""),
             "received_at": getattr(envelope, "received_at", ""),
