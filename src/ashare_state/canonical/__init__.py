@@ -24,10 +24,14 @@ from ashare_state.canonical.availability import (
     derive_available_at,
 )
 from ashare_state.canonical.canonicalizer import (
+    CanonicalFinding,
     CanonicalInputSnapshot,
     CanonicalRunner,
     CanonicalRunnerError,
     CanonicalRunResult,
+    InputRunSeal,
+    MaterializedOutput,
+    SnapshotRun,
     canonical_code_fingerprint,
 )
 from ashare_state.canonical.eligibility import (
@@ -62,6 +66,7 @@ __all__ = [
     "AvailabilityPolicyEntry",
     "CANONICAL_CONTRACT_VERSION",
     "CanonicalDomainSpec",
+    "CanonicalFinding",
     "CanonicalInputSnapshot",
     "CanonicalRunner",
     "CanonicalRunnerError",
@@ -71,7 +76,10 @@ __all__ = [
     "IDENTITY_BRIDGE_POLICY_VERSION",
     "IdentityBridge",
     "IdentityResolutionError",
+    "InputRunSeal",
+    "MaterializedOutput",
     "SOURCE_POLICY_VERSION",
+    "SnapshotRun",
     "availability_policy_entries",
     "availability_policy_hash",
     "availability_policy_version",

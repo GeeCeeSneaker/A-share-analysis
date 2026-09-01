@@ -1,9 +1,9 @@
 # ADR-023: AvailabilityPolicy + Canonical Source Selection
 
-- **Status**: PROPOSED（2026-09-01，CR-3 批次交付 + CR-3.1 Amendment A 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
+- **Status**: PROPOSED（2026-09-01，CR-3 批次交付 + CR-3.1 Amendment A 收口 + 2026-09-01 CR-3.2 Amendment B 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
 - **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
-- **Date**: 2026-09-01（CR-3）/ 2026-09-01（Amendment A，CR-3.1）
-- **Work Requirement**: `docs/design/A-share-analysis_CR-2.4最终复审结论与CR-3_AvailabilityPolicy_Canonicalizer开发工作要求_20260901.md` + `docs/design/A-share-analysis_CR-3复审与CR-3.1最终CanonicalInputSnapshot及ReplaySeal收口要求_20260901.md`
+- **Date**: 2026-09-01（CR-3）/ 2026-09-01（Amendment A，CR-3.1）/ 2026-09-01（Amendment B，CR-3.2）
+- **Work Requirement**: `docs/design/A-share-analysis_CR-2.4最终复审结论与CR-3_AvailabilityPolicy_Canonicalizer开发工作要求_20260901.md` + `docs/design/A-share-analysis_CR-3复审与CR-3.1最终CanonicalInputSnapshot及ReplaySeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.1复审与CR-3.2最终TransactionalSnapshot及PolicyExecution收口要求_20260901.md`
 - **Related**: [ADR-022](ADR-022_provider_normalization_quarantine.md)（ACCEPTED——CR-2 全链 VERIFIED/CLOSED/FREEZE，本 ADR 的上游输入契约）；[ADR-002]（确定性 security identity，identity bridge 的解析内核）
 
 ## 1. Context
@@ -168,8 +168,11 @@ reader-module 白名单 / production 全树零违规）；总体 1025/0。
 管理总册 §61：DM-20260901-068（CR-3 AvailabilityPolicy + Canonicalizer
 runtime + migration 018 + ADR-022 ACCEPTED 同步 + CR-2.4 P1 guard 加固）+
 DM-20260901-069（CR-3.1 Amendment A：Canonical Input Snapshot / Anchored
-Availability Evidence / Full Replay Seal / Recoverable Commit）。相关：§42
-Canonical Runtime Roadmap、§44 CR-2 acceptance（上游冻结）。
+Availability Evidence / Full Replay Seal / Recoverable Commit）+
+DM-20260901-070（CR-3.2 Amendment B：Transactional Materialized Snapshot /
+Identity Master PIT / Honest Policy Execution / Full Seal /
+Verification-State Transition）。相关：§42 Canonical Runtime Roadmap、
+§44 CR-2 acceptance（上游冻结）。
 
 ---
 
@@ -277,3 +280,120 @@ CR-3.1 不新增业务 domain、不做 CR-4（SnapshotBuilder / DuckDB ReadModel
 不扩功能面——只封死四个正确性身份（requested set / input snapshot /
 PIT evidence / replay seal）。migration 019（未改 018）；CR-2.x 冻结语义
 零触碰。
+
+---
+
+# 7. Amendment B：CR-3.2 Transactional Snapshot + Identity Master PIT + Honest Policy Execution + Full Seal + Verification-State Transition（2026-09-01，audit "CR-3.1复审与CR-3.2最终TransactionalSnapshot及PolicyExecution收口要求"）
+
+CR-3.1 复审（2026-09-01 21:08 +08:00，Reviewed HEAD `bd3bcad6aa3e55580cfd03943c4c52f3a31efd0a`，Primary implementation `75744aaa89487aae09474b3569519a73f0efba24`）裁决
+**REOPENED**：19 项机制 PASS / FREEZE（requested-domain identity /
+future-only completeness / anchored availability / identity binding /
+全字段 policy hash / 三 semantic seal / recoverable commit / P1 三项），
+5 个 P0 集中在 "同一次 canonical run 是否真的只代表一个唯一 as-of
+世界"。**本 amendment 修订 §2/§6 中被复审推翻的表述；原文保留在上文，
+以本节为准。**
+
+## 7.1 P0-01 Transactional Materialized Snapshot（修订 §6.3）
+
+§6.3 的 snapshot 只解决了 "构造完成后不再 broad re-query"。CR-3.2 起：
+
+```text
+BEGIN TRANSACTION（MVCC snapshot boundary——在第一个 authoritative
+  broad SELECT 之前）
+  -> surface 去重发现（P1-02：同一 surface 只查询一次，union datasets）
+  -> 逐 run：closure verify + anchored availability verify
+  -> 物化 exact sealed bytes：读 bytes -> hash == manifest content_hash
+     -> parse 同一份 bytes -> 深冻结行（tuple of sorted item-tuples）
+COMMIT
+```
+
+- candidate builder 只消费 materialized rows（**绝不重新查询当前
+  normalization ledger path / 重读当前文件**）——snapshot 后的 ledger
+  UPDATE 或文件替换只影响下一次 invocation / replay verify；
+- 深不可变（P1-01）：typed frozen records（`InputRunSeal` /
+  `SnapshotRun` / `MaterializedOutput` / `CanonicalFinding` frozen
+  dataclasses；行 tuple-frozen；无 shallow-copy 后被 writer 修改）；
+- race 测试用第二 connection 在 broad reads 之间真实 commit（file-backed
+  DuckDB MVCC）——非 "snapshot 返回后再插入"。
+
+## 7.2 P0-02 Identity Master PIT（修订 §2.4/§6.4）
+
+security_master 与 market source 同规则：anchor-verified
+`received_at <= as_of` 才可进 IdentityBridge；future master 是
+discovery evidence（sealed in input set，`pit_available=false`）但绝不
+解析历史 rows。typed findings：`IDENTITY_DATASET_MISSING` /
+`IDENTITY_DATASET_UNAVAILABLE_AT_ASOF` / `IDENTITY_EVIDENCE_INVALID`。
+first-run 与 replay 对称（都验 master anchor）。relist 用例保持 early
+truth。
+
+## 7.3 P0-03 Honest Policy Execution（修订 §6.6）
+
+§6.6 只显式拒绝 fallback/partial。CR-3.2 起 **explicit supported-value
+guard**：`required_evidence_class == PROVIDER_NORMALIZED_VERIFIED` /
+`reconciliation == SINGLE_SOURCE_EXACT` / `tolerance_rule_id ==
+exact-v1` / `tolerance_rule_version == 1` / `conflict_action == BLOCK` /
+fallback 空 / partial False——任何声明超出 v1 runtime 能力 fail closed
+（在 canonical run 之前）。未来新增行为必须字段值 + runtime 实现 +
+decision/finding 语义 + 测试 + policy 版本同一批进入。
+
+## 7.4 P0-04 Full Seal 全消费（修订 §6.7）
+
+- input entry 升级为 **typed full CR-2 seal**（`InputRunSeal`：
+  contract_version / mapper_identity / mapper_code_hash /
+  manifest_uri+hash / output_set_hash / semantic_hash / status / raw
+  identity / verification / received_at / pit_available）——
+  `input_seal_hash` 三方（snapshot == manifest == ledger）；
+- manifest 显式 provenance 字段全部被 replay 消费：
+  `identity_master_input_set_hash` / `identity_bridge_policy_version` /
+  `identity_bridge_policy_hash` / `required_evidence_classes`（== current
+  policy）；
+- **manifest_uri 本身 deterministic verify**（expected base +
+  `/manifest.json`）；
+- replay 的 sealed-input 验证改为 seal-based（直接用 seal 字段验证
+  files：manifest bytes / outputs content+schema+row_count / CR-2 manifest
+  自身 seal 字段 == typed seal / raw meta + anchor）——不依赖 current
+  DB row。
+
+## 7.5 P0-05 Verification-State Transition（新增）
+
+run identity = **base identity**（input world：requested set + identity
+seal entries + identity hash + as_of + contract + policies +
+fingerprint）+ **verification_state_hash**（每 discovered run 的
+verification outcome canonical hash）。migration 020 四列
+（base_identity_hash / verification_state_hash / input_seal_hash /
+identity_master_input_set_hash）：
+
+```text
+state 相同             -> exact replay（含 BLOCKED 的同状态重放）
+BLOCKED(可恢复) + 修复  -> 新 deterministic run id（recovery run）——
+                          绝不 replay stale BLOCKED；历史证据保留
+SUCCESS + 退化          -> DAMAGED 拒绝（不 mint 任何 replacement）；
+                          exact repair 后恢复历史 replay
+```
+
+`input_set_hash` 只含 identity 字段（verification/received_at/
+pit_available 是 runtime state，进 state hash / manifest evidence，
+绝不进 base identity）。
+
+## 7.6 P1
+
+- P1-01 深不可变 snapshot（7.1）；
+- P1-02 shared surface discovery 去重（7.1）；
+- P1-03 `domains=[]` 显式 reject（None = all supported）。
+
+## 7.7 CR-3.2 对抗测试（+30 项）
+
+`tests/integration/test_canonical.py`（111 项 = CR-3/3.1 81 项回归 +
+30 新增：TransactionalSnapshot 6（含真实 MVCC race×2 + ledger URI
+update + file replace + deep immutability + next-invocation）/
+IdentityMasterPIT 6 / HonestPolicyExecution 8（5 unsupported-value
+parametrize + supported 回归 + empty domains）/ FullSealConsumption 7 /
+VerificationStateTransition 3（repair recovery ×2 + degradation
+refusal + evidence preservation））。总体 1096/0。
+
+## 7.8 Scope 边界
+
+CR-3.2 仍是 Canonical Runtime correctness closure：不建
+SnapshotBuilder / DuckDB ReadModel（CR-4）、不新增 canonical domain、
+不绕过 CR-2 frozen verifier。migration 020（未改 018/019）；CR-3.1
+FREEZE 的 19 项机制零重写（81 项回归全保持）。

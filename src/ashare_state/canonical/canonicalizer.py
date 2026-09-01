@@ -1,60 +1,65 @@
-"""Provider-Normalized -> Canonical runtime (CR-3 / CR-3.1, audit 20260901).
+"""Provider-Normalized -> Canonical runtime (CR-3 / CR-3.1 / CR-3.2, audit 20260901).
 
 The ONE formal canonical boundary::
 
-    ONE authoritative CanonicalInputSnapshot (resolved ONCE per run:
-      requested domain exact set + verified CR-2 source runs + verified
-      identity master runs + policy identities + code fingerprint)
-        -> read-only closure verification (verify_normalized_run)
-        -> anchored availability evidence verification (raw meta bytes
-           == sealed raw_evidence_hash == meta_raw_evidence_anchor)
-        -> governed identity bridge (security_master -> security_id)
+    ONE TRANSACTIONAL Materialized Canonical Input Snapshot:
+      BEGIN (MVCC snapshot boundary BEFORE the first authoritative
+      broad read) -> discover source + identity-master runs (each
+      underlying SURFACE queried exactly once) -> closure verification
+      (verify_normalized_run) + anchored availability evidence (raw
+      meta bytes == sealed hash == anchor) -> materialize the EXACT
+      SEALED output bytes (read -> hash-verify -> parse the SAME
+      bytes) -> COMMIT
+        -> governed identity bridge (PIT-available security_master ->
+           security_id; future masters are discovery evidence but never
+           resolve historical identities)
         -> typed availability derivation + as_of filter (BEFORE
            selection) + per-domain availability completeness
         -> source selection / EXACT reconciliation per static versioned
-           SourcePolicy (no caller injection)
+           SourcePolicy (honestly executed: unsupported declared values
+           fail closed before any run)
         -> immutable canonical artifacts (selected/decisions/findings
            parquet - deterministic bytes, NO wall-clock - + manifest
            LAST) + canonicalization ledger row committed in ONE DuckDB
            transaction with count assertions
 
-CR-3.1 closures (audit 20260901 "CR-3复审与CR-3.1...收口要求"):
+CR-3.2 closures (audit 20260901 "CR-3.1复审与CR-3.2最终TransactionalSnapshot
+及PolicyExecution收口要求"):
 
-- P0-01 the REQUESTED DOMAIN SET (deduped, sorted) enters the canonical
-  run identity; the ledger and manifest seal it explicitly. Requesting
-  daily_bar can never replay a trade_calendar run's artifacts;
-- P0-02 availability completeness is machine-judged per domain: zero
-  PIT-available candidates while eligible verified runs exist is
-  REQUIRED_DOMAIN_UNAVAILABLE_AT_ASOF (blocking) - future-only data can
-  never make a historical canonical world look "successfully empty";
-- P0-03 the run identity, the consumed candidates, the manifest AND
-  the ledger all derive from ONE immutable snapshot resolved before any
-  authoritative broad read is repeated - a mid-run normalization-run
-  insertion cannot leak into the current run (only the NEXT invocation
-  sees it, producing a new run identity);
-- P0-04 the availability moment is only read from raw meta bytes whose
-  exact SHA-256 equals BOTH the normalization run's sealed
-  raw_evidence_hash AND the authoritative meta_raw_evidence_anchor
-  entry (identity cross-bound) - a post-normalization received_at edit
-  can never move future data into historical availability;
-- P0-05 exactly ONE identity binding semantics
-  (identity_dataset_hash = hash(master input set + bridge policy
-  version + bridge policy hash)) feeds the run identity, the manifest
-  and the ledger;
-- P0-06 the source policy hash covers EVERY semantic field of every
-  policy entry (asdict + canonical JSON) - no forgotten field can keep
-  a stale hash;
-- P0-07 the replay consumes the FULL seal: CURRENT snapshot identities
-  == ledger == manifest == replay-time physical recompute (selected /
-  decisions / findings semantics, artifact exact set, deterministic
-  URIs, schemas, row counts) AND re-verifies every sealed CR-2 source
-  run closure + its anchored availability evidence;
-- P0-08 the deterministic correctness artifacts carry NO wall-clock
-  (findings.parquet has no created_at) so a DB-commit failure recovers
-  on the exact retry with byte-identical files;
-- P1 identity findings report their TRUE domain; naive datetimes are
-  rejected (naive strings are parsed under the documented fixed-UTC
-  rule); the domain matrix counts 13 domains (5/2/6).
+- P0-01 the snapshot carries a REAL DB snapshot boundary (BEGIN before
+  the first broad SELECT; surfaces queried once and deduplicated), the
+  consumed rows are MATERIALIZED from the exact verified bytes inside
+  that boundary, and no post-snapshot current-ledger/current-path
+  reread can change the consumed truth; snapshot records are DEEPLY
+  immutable typed dataclasses (frozen findings, tuple-frozen rows);
+- P0-02 the identity master obeys the SAME PIT/anchored-evidence rules
+  as market sources (anchor-verified received_at <= as_of before a
+  master may enter the bridge; future masters stay discovery
+  evidence; first-run and replay verification are symmetric) with
+  typed findings IDENTITY_DATASET_MISSING /
+  IDENTITY_DATASET_UNAVAILABLE_AT_ASOF / IDENTITY_EVIDENCE_INVALID;
+- P0-03 the runtime HONESTLY executes the declared policy: every
+  semantic field is guarded against unsupported values (evidence class,
+  reconciliation, tolerance id/version, conflict action, fallback,
+  partial) - declaring an unimplemented value fails closed before any
+  canonical run instead of silently keeping old behavior under a new
+  hash;
+- P0-04 the full seal is typed and consumed: the manifest input
+  entries carry the COMPLETE CR-2 seal per run (contract version,
+  mapper identity + code hash, manifest + output-set + semantic seals,
+  status, raw identity), the manifest URI itself is deterministically
+  verified, and every explicit manifest provenance field
+  (identity_master_input_set_hash / bridge policy version+hash /
+  required_evidence_classes) is compared three-way against ledger and
+  CURRENT values on replay;
+- P0-05 the run identity is base identity (the input world) + a
+  verification-state hash: an exact upstream repair yields a NEW
+  deterministic run (never replaying a stale BLOCKED run), while a
+  prior SUCCESS degraded by damage is refused (DAMAGED) and never
+  silently replaced; repairs never overwrite historical BLOCKED
+  evidence;
+- P1 the snapshot is deeply immutable; ``domains=[]`` is rejected
+  explicitly (None = all supported domains).
 """
 
 from __future__ import annotations
@@ -62,6 +67,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -83,10 +89,14 @@ from ashare_state.canonical.identity import IdentityBridge
 from ashare_state.normalization.runner import verify_normalized_run
 
 __all__ = [
+    "CanonicalFinding",
     "CanonicalInputSnapshot",
     "CanonicalRunner",
     "CanonicalRunnerError",
     "CanonicalRunResult",
+    "InputRunSeal",
+    "MaterializedOutput",
+    "SnapshotRun",
     "canonical_code_fingerprint",
 ]
 
@@ -94,7 +104,8 @@ __all__ = [
 class CanonicalRunnerError(RuntimeError):
     """The canonical boundary contract was violated (damaged prior run,
     identity dataset corruption, unreadable verified artifacts, naive
-    as_of, unknown domain)."""
+    as_of, unknown domain, unsupported declared policy, empty domain
+    request, degraded inputs behind a prior SUCCESS)."""
 
 
 _RUN_NAMESPACE = uuid.UUID("b7a3c1d5-9e2f-4a6b-8c4d-7f5e3a2b1c90")
@@ -134,6 +145,11 @@ _LEDGER_COLUMNS = (
     "requested_domains_hash",
     "selected_semantic_hash",
     "decision_set_hash",
+    # migration 020 (CR-3.2)
+    "base_identity_hash",
+    "verification_state_hash",
+    "input_seal_hash",
+    "identity_master_input_set_hash",
 )
 
 _FINDING_COLUMNS = (
@@ -165,20 +181,20 @@ _FINDING_SEMANTIC_FIELDS = (
 #: the exact artifact set of every canonical run
 _ARTIFACT_NAMES = ("selected", "decisions", "findings")
 
-#: identity fields of a manifest input entry (CR-3.1 P0-07: the replay
-#: re-verifies every sealed CR-2 source run + its anchored evidence)
-_INPUT_ENTRY_FIELDS = (
-    "run_id",
-    "role",
-    "provider",
-    "normalization_surface",
-    "provider_dataset",
-    "endpoint",
-    "raw_request_id",
-    "raw_evidence_uri",
-    "raw_evidence_hash",
-    "normalized_manifest_hash",
-)
+#: verification outcomes of a discovered input run
+V_HEALTHY = "HEALTHY"
+V_CLOSURE_FAILED = "CLOSURE_FAILED"
+V_AVAILABILITY_EVIDENCE_INVALID = "AVAILABILITY_EVIDENCE_INVALID"
+V_IDENTITY_EVIDENCE_INVALID = "IDENTITY_EVIDENCE_INVALID"
+
+#: CR-3.2 P0-03: the ONLY policy values the v1 runtime honestly executes
+_SUPPORTED_POLICY_VALUES = {
+    "required_evidence_class": "PROVIDER_NORMALIZED_VERIFIED",
+    "reconciliation": "SINGLE_SOURCE_EXACT",
+    "tolerance_rule_id": "exact-v1",
+    "tolerance_rule_version": "1",
+    "conflict_action": "BLOCK",
+}
 
 
 @dataclass(frozen=True)
@@ -195,6 +211,267 @@ class CanonicalRunResult:
     domains: tuple[str, ...] = ()
     finding_set_hash: str | None = None
     error_message: str | None = None
+
+
+@dataclass(frozen=True)
+class CanonicalFinding:
+    """A DEEPLY immutable reconciliation finding (CR-3.2 P1-01)."""
+
+    canonical_domain: str
+    canonical_key: str
+    finding_class: str
+    provider: str | None
+    source_normalization_run_id: str | None
+    detail_json: str
+    blocking: bool
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "canonical_domain": self.canonical_domain,
+            "canonical_key": self.canonical_key,
+            "finding_class": self.finding_class,
+            "provider": self.provider,
+            "source_normalization_run_id": self.source_normalization_run_id,
+            "detail_json": self.detail_json,
+            "blocking": self.blocking,
+        }
+
+
+@dataclass(frozen=True)
+class InputRunSeal:
+    """CR-3.2 P0-04: the TYPED FULL CR-2 seal of one discovered input
+    run - every frozen CR-2 identity/seal field is snapshotted here,
+    enters the canonical manifest and the input_seal_hash, and is
+    consumed three-way (snapshot == manifest == ledger) on replay."""
+
+    run_id: str
+    role: str  # source | identity_master
+    provider: str
+    normalization_surface: str
+    provider_dataset: str
+    endpoint: str
+    raw_request_id: str
+    raw_evidence_uri: str
+    raw_evidence_hash: str
+    normalization_contract_version: str
+    mapper_identity: str
+    mapper_code_hash: str
+    normalized_manifest_uri: str
+    normalized_manifest_hash: str
+    normalized_output_set_hash: str
+    normalized_semantic_hash: str
+    status: str
+    verification: str  # HEALTHY | CLOSURE_FAILED | *_INVALID
+    received_at: str  # ISO (empty when the evidence is invalid)
+    pit_available: bool  # anchored received_at <= as_of at snapshot time
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "run_id": self.run_id,
+            "role": self.role,
+            "provider": self.provider,
+            "normalization_surface": self.normalization_surface,
+            "provider_dataset": self.provider_dataset,
+            "endpoint": self.endpoint,
+            "raw_request_id": self.raw_request_id,
+            "raw_evidence_uri": self.raw_evidence_uri,
+            "raw_evidence_hash": self.raw_evidence_hash,
+            "normalization_contract_version": self.normalization_contract_version,
+            "mapper_identity": self.mapper_identity,
+            "mapper_code_hash": self.mapper_code_hash,
+            "normalized_manifest_uri": self.normalized_manifest_uri,
+            "normalized_manifest_hash": self.normalized_manifest_hash,
+            "normalized_output_set_hash": self.normalized_output_set_hash,
+            "normalized_semantic_hash": self.normalized_semantic_hash,
+            "status": self.status,
+            "verification": self.verification,
+            "received_at": self.received_at,
+            "pit_available": self.pit_available,
+        }
+
+    def identity_dict(self) -> dict[str, Any]:
+        """The IDENTITY fields only - verification/received_at/
+        pit_available are RUNTIME STATE (they enter the verification
+        state hash / manifest evidence, never the base input identity:
+        CR-3.2 P0-05 requires the base identity to stay stable across
+        verification-state changes)."""
+        return {
+            "run_id": self.run_id,
+            "role": self.role,
+            "provider": self.provider,
+            "normalization_surface": self.normalization_surface,
+            "provider_dataset": self.provider_dataset,
+            "endpoint": self.endpoint,
+            "raw_request_id": self.raw_request_id,
+            "raw_evidence_uri": self.raw_evidence_uri,
+            "raw_evidence_hash": self.raw_evidence_hash,
+            "normalization_contract_version": self.normalization_contract_version,
+            "mapper_identity": self.mapper_identity,
+            "mapper_code_hash": self.mapper_code_hash,
+            "normalized_manifest_uri": self.normalized_manifest_uri,
+            "normalized_manifest_hash": self.normalized_manifest_hash,
+            "normalized_output_set_hash": self.normalized_output_set_hash,
+            "normalized_semantic_hash": self.normalized_semantic_hash,
+            "status": self.status,
+        }
+
+    def availability_row(self) -> dict[str, str]:
+        """The identity subset consumed by the anchored-evidence
+        verifier (raw meta bytes == sealed hash == anchor)."""
+        return {
+            "normalization_run_id": self.run_id,
+            "provider": self.provider,
+            "normalization_surface": self.normalization_surface,
+            "provider_dataset": self.provider_dataset,
+            "endpoint": self.endpoint,
+            "raw_request_id": self.raw_request_id,
+            "raw_evidence_uri": self.raw_evidence_uri,
+            "raw_evidence_hash": self.raw_evidence_hash,
+        }
+
+
+@dataclass(frozen=True)
+class MaterializedOutput:
+    """One materialized CR-2 output table: rows frozen as tuples of
+    sorted item-tuples (deeply immutable), parsed from the EXACT bytes
+    that were hash-verified inside the snapshot transaction."""
+
+    output_name: str
+    rows: tuple[tuple[tuple[str, Any], ...], ...]
+    content_hash: str
+    schema_hash: str
+
+    def row_dicts(self) -> list[dict[str, Any]]:
+        return [dict(items) for items in self.rows]
+
+
+@dataclass(frozen=True)
+class SnapshotRun:
+    """One discovered input run inside the snapshot: its typed full
+    seal plus its materialized (exact verified bytes) outputs."""
+
+    seal: InputRunSeal
+    outputs: tuple[MaterializedOutput, ...]
+
+    def output(self, name: str) -> MaterializedOutput | None:
+        for materialized in self.outputs:
+            if materialized.output_name == name:
+                return materialized
+        return None
+
+
+@dataclass(frozen=True)
+class CanonicalInputSnapshot:
+    """CR-3.2 P0-01: the ONE transactional, materialized, deeply
+    immutable authoritative input world of a canonical run.
+
+    Resolved inside a single DB snapshot boundary (BEGIN before the
+    first authoritative broad SELECT, COMMIT after materialization).
+    The run identity (base + verification state), the consumed
+    candidates, the manifest and the ledger ALL derive from this object
+    - never from a re-executed broad query or a current-path reread."""
+
+    as_of: datetime
+    requested_domains: tuple[str, ...]
+    runs: tuple[SnapshotRun, ...]
+    available_master_rows: tuple[tuple[tuple[str, Any], ...], ...]
+    prefindings: tuple[CanonicalFinding, ...]
+    master_input_set_hash: str
+    identity_dataset_hash: str
+    availability_policy_version: str
+    availability_policy_hash: str
+    source_policy_version: str
+    source_policy_hash: str
+    tolerance_policy_version: str
+    tolerance_policy_hash: str
+    code_fingerprint: str
+
+    # ------------------------------------------------------------ derived
+    @property
+    def requested_domains_json(self) -> str:
+        return json.dumps(list(self.requested_domains), separators=(",", ":"))
+
+    @property
+    def requested_domains_hash(self) -> str:
+        return hashlib.sha256(self.requested_domains_json.encode("utf-8")).hexdigest()
+
+    @property
+    def seals(self) -> tuple[InputRunSeal, ...]:
+        return tuple(run.seal for run in self.runs)
+
+    @property
+    def input_entries(self) -> tuple[dict[str, Any], ...]:
+        return tuple(seal.as_dict() for seal in self.seals)
+
+    @property
+    def input_seal_hash(self) -> str:
+        """Canonical hash over the TYPED full input seal (every seal
+        field of every discovered run, order-stable)."""
+        return hashlib.sha256(
+            _canonical_json([seal.as_dict() for seal in self.seals]).encode("utf-8")
+        ).hexdigest()
+
+    @property
+    def input_set_hash(self) -> str:
+        """Identity-only input set hash (stable across verification-
+        state changes - the state enters verification_state_hash)."""
+        return hashlib.sha256(
+            _canonical_json([seal.identity_dict() for seal in self.seals]).encode("utf-8")
+        ).hexdigest()
+
+    @property
+    def verification_state_hash(self) -> str:
+        """CR-3.2 P0-05: canonical hash over the per-input verification
+        outcomes (health only - PIT availability is not damage)."""
+        state = [{"run_id": seal.run_id, "verification": seal.verification} for seal in self.seals]
+        return hashlib.sha256(_canonical_json(state).encode("utf-8")).hexdigest()
+
+    @property
+    def base_identity_hash(self) -> str:
+        """The input-world identity WITHOUT the verification state."""
+        return hashlib.sha256(
+            "|".join(
+                (
+                    self.requested_domains_hash,
+                    self.input_set_hash,
+                    self.identity_dataset_hash,
+                    self.as_of.isoformat(),
+                    CANONICAL_CONTRACT_VERSION,
+                    self.availability_policy_version,
+                    self.availability_policy_hash,
+                    self.source_policy_version,
+                    self.source_policy_hash,
+                    self.tolerance_policy_version,
+                    self.tolerance_policy_hash,
+                    self.code_fingerprint,
+                )
+            ).encode("utf-8")
+        ).hexdigest()
+
+    @property
+    def idempotency_key(self) -> str:
+        """run id key = base identity + verification state (P0-05)."""
+        return hashlib.sha256(
+            f"{self.base_identity_hash}|{self.verification_state_hash}".encode()
+        ).hexdigest()
+
+    @property
+    def has_verification_failures(self) -> bool:
+        return any(seal.verification != V_HEALTHY for seal in self.seals)
+
+    def source_runs_for(self, domain: str) -> tuple[SnapshotRun, ...]:
+        """HEALTHY runs of the domain's surface/datasets (PIT
+        availability is NOT filtered here - future candidates are built
+        and excluded with EXCLUDED_FUTURE decisions by the run loop)."""
+        spec = domain_spec(domain)
+        return tuple(
+            run
+            for run in self.runs
+            if run.seal.role == "source"
+            and run.seal.normalization_surface == spec.normalization_surface
+            and run.seal.provider_dataset in spec.provider_datasets
+            and run.seal.verification == V_HEALTHY
+        )
 
 
 def canonical_code_fingerprint() -> str:
@@ -229,15 +506,23 @@ def _canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
 
 
+def _freeze(value: Any) -> Any:
+    """Deeply freeze a parsed row value: lists -> tuples, dicts ->
+    sorted item-tuples (deeply immutable snapshot representation)."""
+    if isinstance(value, dict):
+        return tuple(sorted((str(k), _freeze(v)) for k, v in value.items()))
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(v) for v in value)
+    return value
+
+
 def _rows_semantic_hash(rows: list[dict[str, Any]]) -> str:
-    """Deterministic semantic identity of artifact rows (sorted canonical
-    JSON) - the replay-time physical recompute seal basis."""
     return hashlib.sha256(
         _canonical_json(sorted(_canonical_json(r) for r in rows)).encode("utf-8")
     ).hexdigest()
 
 
-def _finding_set_hash(findings: list[dict[str, Any]]) -> str:
+def _finding_set_hash(findings: Sequence[Mapping[str, Any]]) -> str:
     ordered = sorted(
         findings, key=lambda f: _canonical_json({k: f.get(k) for k in _FINDING_SEMANTIC_FIELDS})
     )
@@ -258,10 +543,9 @@ def _as_date(value: Any) -> date:
 
 
 def _parse_as_of(as_of: datetime | str) -> datetime:
-    """CR-3.1 P1 (audit section 9.3): as_of parsing is deterministic
-    across platforms. Naive datetimes are REJECTED (their local-time
-    interpretation depends on the host); naive strings are parsed under
-    the documented FIXED-UTC rule."""
+    """CR-3.1 P1: as_of parsing is deterministic across platforms. Naive
+    datetimes are REJECTED; naive strings are parsed under the
+    documented FIXED-UTC rule."""
     if isinstance(as_of, datetime):
         if as_of.tzinfo is None:
             msg = (
@@ -303,87 +587,25 @@ def _align_schema(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{key: row.get(key) for key in keys} for row in rows]
 
 
-def _input_entry(run_row: dict[str, Any], role: str) -> dict[str, str]:
-    return {
-        "run_id": str(run_row["normalization_run_id"]),
-        "role": role,
-        "provider": str(run_row["provider"]),
-        "normalization_surface": str(run_row["normalization_surface"]),
-        "provider_dataset": str(run_row["provider_dataset"]),
-        "endpoint": str(run_row["endpoint"]),
-        "raw_request_id": str(run_row["raw_request_id"]),
-        "raw_evidence_uri": str(run_row["raw_evidence_uri"]),
-        "raw_evidence_hash": str(run_row["raw_evidence_hash"]),
-        "normalized_manifest_hash": str(run_row["normalized_manifest_hash"]),
-    }
-
-
-@dataclass(frozen=True)
-class CanonicalInputSnapshot:
-    """CR-3.1 P0-03 (audit section 3): the ONE immutable authoritative
-    input world of a canonical run, resolved ONCE before anything else.
-    The run identity, the consumed candidates, the manifest and the
-    ledger ALL derive from this object - never from a re-executed broad
-    query against the moving current DB.
-
-    ``entries`` is the DISCOVERED input set (every SUCCESS CR-2 run on
-    the relevant surfaces - including any run found DAMAGED during
-    verification, which yields a blocking prefinding). Keeping damaged
-    runs inside the input identity is what makes a post-success tamper
-    surface as a DAMAGED replay instead of silently minting a new run
-    identity."""
-
-    as_of: datetime
-    requested_domains: tuple[str, ...]
-    source_runs: dict[str, tuple[dict[str, Any], ...]]
-    master_rows: tuple[dict[str, Any], ...]
-    prefindings: tuple[dict[str, Any], ...]
-    entries: tuple[dict[str, str], ...]
-    input_set_hash: str
-    master_input_set_hash: str
-    identity_dataset_hash: str
-    availability_policy_version: str
-    availability_policy_hash: str
-    source_policy_version: str
-    source_policy_hash: str
-    tolerance_policy_version: str
-    tolerance_policy_hash: str
-    code_fingerprint: str
-
-    @property
-    def requested_domains_json(self) -> str:
-        return json.dumps(list(self.requested_domains), separators=(",", ":"))
-
-    @property
-    def requested_domains_hash(self) -> str:
-        return hashlib.sha256(self.requested_domains_json.encode("utf-8")).hexdigest()
-
-    def run_identity(self) -> str:
-        """The deterministic idempotency key: exact input set + requested
-        domain set + as_of + contract + identity/policy identities +
-        code fingerprint. Any change yields a NEW run (history
-        preserved)."""
-        return hashlib.sha256(
-            "|".join(
-                (
-                    self.requested_domains_hash,
-                    self.input_set_hash,
-                    self.identity_dataset_hash,
-                    self.as_of.isoformat(),
-                    CANONICAL_CONTRACT_VERSION,
-                    self.availability_policy_version,
-                    self.availability_policy_hash,
-                    self.source_policy_version,
-                    self.source_policy_hash,
-                    self.tolerance_policy_version,
-                    self.tolerance_policy_hash,
-                    self.code_fingerprint,
-                )
-            ).encode("utf-8")
-        ).hexdigest()
-
-    def input_entries(self) -> list[dict[str, str]]:
-        return list(self.entries)
+def _finding(
+    domain: str,
+    key_json: str,
+    finding_class: str,
+    provider: str | None,
+    source_run_id: str | None,
+    detail: dict[str, Any],
+    *,
+    blocking: bool,
+) -> CanonicalFinding:
+    return CanonicalFinding(
+        canonical_domain=domain,
+        canonical_key=key_json,
+        finding_class=finding_class,
+        provider=provider,
+        source_normalization_run_id=source_run_id,
+        detail_json=_canonical_json(detail),
+        blocking=blocking,
+    )
 
 
 class CanonicalRunner:
@@ -414,7 +636,19 @@ class CanonicalRunner:
     ) -> CanonicalRunResult:
         started = datetime.now(UTC)
         as_of_dt = _parse_as_of(as_of)
-        requested = tuple(sorted(set(domains))) if domains else supported_domains()
+        # CR-3.2 P1-03: explicit empty semantics - None = all supported
+        # domains; an EMPTY collection is rejected (never a truthiness
+        # accident that silently builds everything).
+        if domains is None:
+            requested = supported_domains()
+        else:
+            if len(domains) == 0:
+                msg = (
+                    "domains=[] is not a valid canonical request - pass None "
+                    "to build all supported domains, or a non-empty collection"
+                )
+                raise CanonicalRunnerError(msg)
+            requested = tuple(sorted(set(domains)))
         for domain in requested:
             spec = domain_spec(domain)
             if spec.eligibility is not DomainEligibility.CANONICAL_SUPPORTED:
@@ -423,13 +657,33 @@ class CanonicalRunner:
                     "it can never produce canonical rows (no silent skip)"
                 )
                 raise CanonicalRunnerError(msg)
-        self._assert_policy_honestly_consumed()
+        self._assert_policy_honestly_executed()
 
-        # ------------------------ ONE authoritative snapshot (P0-03)
+        # ------------------------ ONE transactional materialized snapshot
         snapshot = self._build_snapshot(as_of_dt, requested)
 
+        # ------------------------ degraded-SUCCESS guard (P0-05)
+        prior_runs = self.conn.execute(
+            "SELECT canonical_run_id, status FROM meta_canonicalization_run "
+            "WHERE base_identity_hash = ?",
+            [snapshot.base_identity_hash],
+        ).fetchall()
+        has_prior_success = any(str(r[1]) != "BLOCKED" for r in prior_runs)
+        if snapshot.has_verification_failures and has_prior_success:
+            failed = sorted(
+                seal.run_id for seal in snapshot.seals if seal.verification != V_HEALTHY
+            )
+            msg = (
+                f"prior SUCCESS(eful) canonical runs exist for this input world, "
+                f"but the current inputs are DEGRADED (failed: {failed}) - the "
+                "prior run is DAMAGED and no replacement may be minted; repair "
+                "the exact upstream evidence to replay the historical run "
+                "(CR-3.2 audit 20260901 section 5)"
+            )
+            raise CanonicalRunnerError(msg)
+
         # ------------------------ exact replay lookup (history-wide)
-        idempotency_key = snapshot.run_identity()
+        idempotency_key = snapshot.idempotency_key
         run_id = str(uuid.uuid5(_RUN_NAMESPACE, idempotency_key))
         prior = self.conn.execute(
             "SELECT canonical_run_id FROM meta_canonicalization_run WHERE canonical_run_id = ?",
@@ -438,10 +692,67 @@ class CanonicalRunner:
         if prior is not None:
             return self._require_verified_replay(run_id, idempotency_key, snapshot)
 
-        findings: list[dict[str, Any]] = list(snapshot.prefindings)
+        findings: list[CanonicalFinding] = list(snapshot.prefindings)
         bridge = IdentityBridge(
-            list(snapshot.master_rows), master_input_set_hash=snapshot.master_input_set_hash
+            [dict(items) for items in snapshot.available_master_rows],
+            master_input_set_hash=snapshot.master_input_set_hash,
         )
+
+        # ------------------------------------------ identity dataset state
+        identity_required = [d for d in requested if domain_spec(d).requires_security_identity]
+        available_masters = [
+            s for s in snapshot.runs if s.seal.role == "identity_master" and s.seal.pit_available
+        ]
+        discovered_masters = [s for s in snapshot.runs if s.seal.role == "identity_master"]
+        if identity_required:
+            invalid_masters = [
+                s
+                for s in discovered_masters
+                if s.seal.verification in (V_CLOSURE_FAILED, V_IDENTITY_EVIDENCE_INVALID)
+            ]
+            if invalid_masters:
+                for run_snapshot in invalid_masters:
+                    findings.append(
+                        _finding(
+                            "security_master",
+                            "",
+                            "IDENTITY_EVIDENCE_INVALID",
+                            run_snapshot.seal.provider,
+                            run_snapshot.seal.run_id,
+                            {"verification": run_snapshot.seal.verification},
+                            blocking=True,
+                        )
+                    )
+            elif discovered_masters and not available_masters:
+                findings.append(
+                    _finding(
+                        "security_master",
+                        "",
+                        "IDENTITY_DATASET_UNAVAILABLE_AT_ASOF",
+                        None,
+                        None,
+                        {
+                            "reason": (
+                                "identity master runs exist but none is "
+                                "PIT-available at this as_of - future identity "
+                                "knowledge must not resolve historical rows"
+                            )
+                        },
+                        blocking=True,
+                    )
+                )
+            elif not discovered_masters:
+                findings.append(
+                    _finding(
+                        "security_master",
+                        "",
+                        "IDENTITY_DATASET_MISSING",
+                        None,
+                        None,
+                        {"reason": "no verified security_master run discovered"},
+                        blocking=True,
+                    )
+                )
 
         # ------------------------------------------ candidates per domain
         selected_rows: list[dict[str, Any]] = []
@@ -451,9 +762,8 @@ class CanonicalRunner:
         for domain in requested:
             policy = _source_policy.source_policy_for(domain)
             candidates: list[dict[str, Any]] = []
-            for run_row in snapshot.source_runs.get(domain, ()):
-                candidates.extend(self._build_candidates(domain, run_row, bridge))
-            # ---- availability filter BEFORE selection (CR3-P0-03)
+            for run_snapshot in snapshot.source_runs_for(domain):
+                candidates.extend(self._build_candidates(domain, run_snapshot, bridge))
             available: list[dict[str, Any]] = []
             for candidate in candidates:
                 if candidate["available_at"] <= as_of_dt:
@@ -462,13 +772,16 @@ class CanonicalRunner:
                     decisions.append(
                         self._decision(domain, candidate, "EXCLUDED_FUTURE", "available_at > as_of")
                     )
-            # ---- availability completeness (CR-3.1 P0-02): eligible
-            # verified runs existing while ZERO candidates are
-            # PIT-available is a blocking failure - future-only data
-            # must never make a historical world "successfully empty"
-            if not snapshot.source_runs.get(domain):
+            eligible_verified = [
+                s
+                for s in snapshot.runs
+                if s.seal.role == "source"
+                and s.seal.normalization_surface == domain_spec(domain).normalization_surface
+                and s.seal.provider_dataset in domain_spec(domain).provider_datasets
+            ]
+            if not eligible_verified:
                 findings.append(
-                    self._finding(
+                    _finding(
                         domain,
                         "",
                         "REQUIRED_DOMAIN_MISSING",
@@ -480,7 +793,7 @@ class CanonicalRunner:
                 )
             elif not available:
                 findings.append(
-                    self._finding(
+                    _finding(
                         domain,
                         "",
                         "REQUIRED_DOMAIN_UNAVAILABLE_AT_ASOF",
@@ -503,13 +816,12 @@ class CanonicalRunner:
             decisions.extend(domain_decisions)
             findings.extend(domain_findings)
 
-        # ---- truthful per-domain identity findings (CR-3.1 P1-9.1)
         for domain, missing in identity_missing_by_domain.items():
             if missing <= 0:
                 continue
             policy = _source_policy.source_policy_for(domain)
             findings.append(
-                self._finding(
+                _finding(
                     domain,
                     "",
                     "IDENTITY_MISSING",
@@ -528,11 +840,11 @@ class CanonicalRunner:
                 )
             )
 
-        blocking = [f for f in findings if f["blocking"]]
+        blocking = [f for f in findings if f.blocking]
         if blocking:
             status = "BLOCKED"
             error = f"{len(blocking)} blocking finding(s): " + "; ".join(
-                sorted({str(f["finding_class"]) for f in blocking})
+                sorted({f.finding_class for f in blocking})
             )
         else:
             status = "SUCCESS"
@@ -587,102 +899,61 @@ class CanonicalRunner:
     def _build_snapshot(
         self, as_of_dt: datetime, requested: tuple[str, ...]
     ) -> CanonicalInputSnapshot:
-        """Resolve the ONE authoritative input world (every broad query
-        happens exactly HERE). Tests may wrap this method to simulate a
-        mid-run insertion race - production never exposes such a hook."""
-        source_runs: dict[str, list[dict[str, Any]]] = {}
-        prefindings: list[dict[str, Any]] = []
-        discovered: list[dict[str, str]] = []
-        for domain in requested:
-            spec = domain_spec(domain)
-            for run_row in self._surface_runs(spec.normalization_surface, spec.provider_datasets):
-                # the DISCOVERED input set includes every SUCCESS run -
-                # even one found DAMAGED below (its blocking prefinding
-                # is the honest record). Keeping damaged runs inside the
-                # input identity makes a post-success tamper surface as
-                # a DAMAGED replay instead of minting a new run identity.
-                discovered.append(_input_entry(run_row, "source"))
-                closure_problems = verify_normalized_run(
-                    self.conn,
-                    run_row["normalization_run_id"],
-                    raw_root=self.raw_root,
-                    normalized_root=self.normalized_root,
+        """CR-3.2 P0-01: resolve the ONE authoritative input world inside
+        a REAL DB snapshot boundary - BEGIN before the first broad
+        SELECT, every underlying surface queried exactly once, every
+        consumed output MATERIALIZED from exact hash-verified bytes,
+        COMMIT. Tests may monkeypatch internal query hooks to inject
+        concurrent writes BETWEEN the broad reads - production never
+        exposes such a hook."""
+        self.conn.execute("BEGIN TRANSACTION")
+        try:
+            surfaces = self._surface_plan(requested)
+            discovered: dict[str, list[dict[str, Any]]] = {}
+            for surface, datasets in surfaces:
+                discovered[f"{surface}|{','.join(datasets)}"] = self._surface_runs(
+                    surface, datasets
                 )
-                anchor_problems, received_at = self._verify_anchored_availability(run_row)
-                if closure_problems:
-                    prefindings.append(
-                        self._finding(
-                            domain,
-                            "",
-                            "CLOSURE_VERIFICATION_FAILED",
-                            run_row["provider"],
-                            run_row["normalization_run_id"],
-                            {"problems": closure_problems},
-                            blocking=True,
-                        )
-                    )
-                if anchor_problems:
-                    prefindings.append(
-                        self._finding(
-                            domain,
-                            "",
-                            "AVAILABILITY_EVIDENCE_INVALID",
-                            run_row["provider"],
-                            run_row["normalization_run_id"],
-                            {"problems": anchor_problems},
-                            blocking=True,
-                        )
-                    )
-                if closure_problems or anchor_problems:
-                    continue
-                run_row["received_at"] = received_at
-                source_runs.setdefault(domain, []).append(run_row)
-        # identity master dataset (auxiliary; always resolved)
-        verified_master_rows: list[dict[str, Any]] = []
-        for run_row in self._surface_runs(
-            "security_master", ("code_list", "hist_code_list", "stock_basic")
-        ):
-            discovered.append(_input_entry(run_row, "identity_master"))
-            problems = verify_normalized_run(
-                self.conn,
-                run_row["normalization_run_id"],
-                raw_root=self.raw_root,
-                normalized_root=self.normalized_root,
-            )
-            if problems:
-                prefindings.append(
-                    self._finding(
-                        "security_master",
-                        "",
-                        "CLOSURE_VERIFICATION_FAILED",
-                        run_row["provider"],
-                        run_row["normalization_run_id"],
-                        {"problems": problems},
-                        blocking=True,
-                    )
-                )
-                continue
-            verified_master_rows.extend(
-                self._read_output_rows(run_row["normalization_run_id"], "main")
-            )
-        frozen_source_runs = {domain: tuple(runs) for domain, runs in sorted(source_runs.items())}
-        master_entries = [e for e in discovered if e["role"] == "identity_master"]
-        master_input_set_hash = hashlib.sha256(
-            "|".join(
-                sorted(f"{e['run_id']}:{e['normalized_manifest_hash']}" for e in master_entries)
-            ).encode("utf-8")
-        ).hexdigest()
-        entries = tuple(sorted(discovered, key=_canonical_json))
-        input_set_hash = hashlib.sha256(_canonical_json(list(entries)).encode("utf-8")).hexdigest()
+            runs: list[SnapshotRun] = []
+            prefindings: list[CanonicalFinding] = []
+            available_master_rows: list[tuple[tuple[str, Any], ...]] = []
+            for key, run_rows in sorted(discovered.items()):
+                surface = key.split("|")[0]
+                role = "identity_master" if surface == "security_master" else "source"
+                for run_row in run_rows:
+                    snapshot_run, findings = self._snapshot_run(run_row, role, as_of_dt)
+                    runs.append(snapshot_run)
+                    prefindings.extend(findings)
+                    if (
+                        role == "identity_master"
+                        and snapshot_run.seal.verification == V_HEALTHY
+                        and snapshot_run.seal.pit_available
+                    ):
+                        master_output = snapshot_run.output("main")
+                        if master_output is not None:
+                            available_master_rows.extend(master_output.rows)
+            self.conn.execute("COMMIT")
+        except Exception:
+            import contextlib
+
+            with contextlib.suppress(Exception):
+                self.conn.execute("ROLLBACK")
+            raise
+
+        seals = tuple(run.seal for run in runs)
+        master_hashes = sorted(
+            f"{s.run_id}:{s.normalized_manifest_hash}"
+            for s in seals
+            if s.role == "identity_master" and s.verification == V_HEALTHY and s.pit_available
+        )
+        master_input_set_hash = hashlib.sha256("|".join(master_hashes).encode("utf-8")).hexdigest()
         tolerance_version, tolerance_hash = _source_policy.tolerance_policy_identity()
         return CanonicalInputSnapshot(
             as_of=as_of_dt,
             requested_domains=requested,
-            source_runs=frozen_source_runs,
-            master_rows=tuple(verified_master_rows),
+            runs=tuple(runs),
+            available_master_rows=tuple(available_master_rows),
             prefindings=tuple(prefindings),
-            entries=entries,
-            input_set_hash=input_set_hash,
             master_input_set_hash=master_input_set_hash,
             identity_dataset_hash=_identity.identity_dataset_hash(master_input_set_hash),
             availability_policy_version=_availability.availability_policy_version(),
@@ -694,26 +965,178 @@ class CanonicalRunner:
             code_fingerprint=canonical_code_fingerprint(),
         )
 
-    def _verify_run_intact(self, run_row: dict[str, Any]) -> list[str]:
-        """CR-2 closure verification + CR-3.1 P0-04 anchored
-        availability evidence (replay-side reuse)."""
-        problems = verify_normalized_run(
+    @staticmethod
+    def _surface_plan(requested: tuple[str, ...]) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """CR-3.2 P1-02: one broad query per underlying SURFACE (union of
+        the datasets of every domain that consumes it) - a surface
+        shared by several requested domains is discovered exactly once."""
+        surfaces: dict[str, set[str]] = {}
+        for domain in requested:
+            spec = domain_spec(domain)
+            surfaces.setdefault(spec.normalization_surface, set()).update(spec.provider_datasets)
+        surfaces.setdefault("security_master", set()).update(
+            ("code_list", "hist_code_list", "stock_basic")
+        )
+        return tuple(
+            (surface, tuple(sorted(datasets))) for surface, datasets in sorted(surfaces.items())
+        )
+
+    def _snapshot_run(
+        self, run_row: dict[str, Any], role: str, as_of_dt: datetime
+    ) -> tuple[SnapshotRun, list[CanonicalFinding]]:
+        """Verify one discovered run (CR-2 closure + anchored
+        availability) and MATERIALIZE its outputs from the exact
+        hash-verified bytes inside the snapshot boundary."""
+        findings: list[CanonicalFinding] = []
+        domain_label = "security_master" if role == "identity_master" else role
+        closure_problems = verify_normalized_run(
             self.conn,
             run_row["normalization_run_id"],
             raw_root=self.raw_root,
             normalized_root=self.normalized_root,
         )
-        anchor_problems, _ = self._verify_anchored_availability(run_row)
-        return problems + anchor_problems
+        anchor_problems, received_at = self._verify_anchored_availability(run_row)
+        if closure_problems:
+            findings.append(
+                _finding(
+                    domain_label,
+                    "",
+                    "CLOSURE_VERIFICATION_FAILED",
+                    run_row["provider"],
+                    run_row["normalization_run_id"],
+                    {"problems": closure_problems},
+                    blocking=True,
+                )
+            )
+        if anchor_problems:
+            findings.append(
+                _finding(
+                    domain_label,
+                    "",
+                    "AVAILABILITY_EVIDENCE_INVALID",
+                    run_row["provider"],
+                    run_row["normalization_run_id"],
+                    {"problems": anchor_problems},
+                    blocking=True,
+                )
+            )
+        verification = V_HEALTHY
+        if closure_problems:
+            verification = V_CLOSURE_FAILED
+        elif anchor_problems:
+            verification = (
+                V_IDENTITY_EVIDENCE_INVALID
+                if role == "identity_master"
+                else V_AVAILABILITY_EVIDENCE_INVALID
+            )
+        pit_available = bool(
+            verification == V_HEALTHY and received_at is not None and received_at <= as_of_dt
+        )
+
+        outputs: list[MaterializedOutput] = []
+        if verification == V_HEALTHY:
+            outputs, materialize_problems = self._materialize_outputs(run_row)
+            if materialize_problems:
+                verification = V_CLOSURE_FAILED
+                pit_available = False
+                findings.append(
+                    _finding(
+                        domain_label,
+                        "",
+                        "CLOSURE_VERIFICATION_FAILED",
+                        run_row["provider"],
+                        run_row["normalization_run_id"],
+                        {"problems": materialize_problems},
+                        blocking=True,
+                    )
+                )
+                outputs = []
+        seal = InputRunSeal(
+            run_id=str(run_row["normalization_run_id"]),
+            role=role,
+            provider=str(run_row["provider"]),
+            normalization_surface=str(run_row["normalization_surface"]),
+            provider_dataset=str(run_row["provider_dataset"]),
+            endpoint=str(run_row["endpoint"]),
+            raw_request_id=str(run_row["raw_request_id"]),
+            raw_evidence_uri=str(run_row["raw_evidence_uri"]),
+            raw_evidence_hash=str(run_row["raw_evidence_hash"]),
+            normalization_contract_version=str(run_row["normalization_contract_version"]),
+            mapper_identity=str(run_row["mapper_identity"]),
+            mapper_code_hash=str(run_row["mapper_code_hash"]),
+            normalized_manifest_uri=str(run_row["normalized_manifest_uri"]),
+            normalized_manifest_hash=str(run_row["normalized_manifest_hash"]),
+            normalized_output_set_hash=str(run_row["normalized_output_set_hash"]),
+            normalized_semantic_hash=str(run_row["normalized_semantic_hash"]),
+            status=str(run_row["status"]),
+            verification=verification,
+            received_at=received_at.isoformat() if received_at else "",
+            pit_available=pit_available,
+        )
+        return SnapshotRun(seal=seal, outputs=tuple(outputs)), findings
+
+    def _materialize_outputs(
+        self, run_row: dict[str, Any]
+    ) -> tuple[list[MaterializedOutput], list[str]]:
+        """Read the EXACT sealed output bytes (hash-verify each read
+        against the manifest entry) and parse the SAME bytes into frozen
+        rows - the candidate builder never rereads a current path."""
+        import io
+
+        problems: list[str] = []
+        manifest_path = self.normalized_root / str(run_row["normalized_manifest_uri"])
+        if not manifest_path.is_file():
+            return [], [f"normalized manifest missing: {run_row['normalized_manifest_uri']}"]
+        manifest_bytes = manifest_path.read_bytes()
+        if hashlib.sha256(manifest_bytes).hexdigest() != str(run_row["normalized_manifest_hash"]):
+            return [], ["normalized manifest bytes do not match the ledger hash"]
+        try:
+            manifest = json.loads(manifest_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return [], [f"normalized manifest unreadable: {exc}"]
+        outputs: list[MaterializedOutput] = []
+        for entry in manifest.get("outputs", []):
+            output_name = str(entry.get("output_name"))
+            uri = str(entry.get("uri"))
+            path = self.normalized_root / uri
+            if not path.is_file():
+                problems.append(f"output artifact missing: {uri}")
+                continue
+            data = path.read_bytes()
+            if hashlib.sha256(data).hexdigest() != str(entry.get("content_hash")):
+                problems.append(f"output artifact bytes do not match the sealed hash: {uri}")
+                continue
+            try:
+                frame = pl.read_parquet(io.BytesIO(data))
+            except Exception as exc:  # noqa: BLE001 - reported as problems
+                problems.append(f"output artifact unreadable: {uri}: {exc}")
+                continue
+            if frame.height != int(entry.get("row_count", -1)):
+                problems.append(f"output artifact row count mismatch: {uri}")
+                continue
+            rows = tuple(
+                tuple(sorted((str(k), _freeze(v)) for k, v in row.items()))
+                for row in frame.to_dicts()
+            )
+            outputs.append(
+                MaterializedOutput(
+                    output_name=output_name,
+                    rows=rows,
+                    content_hash=str(entry.get("content_hash")),
+                    schema_hash=str(entry.get("schema_hash")),
+                )
+            )
+        return outputs, problems
 
     def _verify_anchored_availability(
         self, run_row: dict[str, Any]
     ) -> tuple[list[str], datetime | None]:
-        """CR-3.1 P0-04: the availability moment may ONLY be read from
-        raw meta bytes whose exact SHA-256 equals BOTH the
+        """CR-3.1 P0-04 / CR-3.2 P0-02: the availability moment may ONLY
+        be read from raw meta bytes whose exact SHA-256 equals BOTH the
         normalization run's sealed raw_evidence_hash AND the
         authoritative meta_raw_evidence_anchor entry (identity
-        cross-bound). Returns (problems, received_at|None)."""
+        cross-bound). Applies to market sources AND identity masters
+        symmetrically."""
         from ashare_state.storage.raw_anchor import lookup_raw_evidence_anchor
 
         problems: list[str] = []
@@ -744,7 +1167,6 @@ class CanonicalRunner:
             doc = json.loads(meta_bytes.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             return [f"raw meta unreadable: {exc}"], None
-        # identity cross-binding: anchor == run == meta
         for field, expected in (
             ("evidence_uri", str(run_row["raw_evidence_uri"])),
             ("provider", str(run_row["provider"])),
@@ -769,24 +1191,37 @@ class CanonicalRunner:
             return problems, None
         return [], _parse_ts(doc["received_at"])
 
-    def _assert_policy_honestly_consumed(self) -> None:
-        """CR-3.1 P0-06: the runtime must HONESTLY consume the declared
-        policy fields - v1 supports no fallback providers and no
-        partial-run consumption; declaring either without runtime
-        support fails loudly instead of silently ignoring the field."""
+    def _assert_policy_honestly_executed(self) -> None:
+        """CR-3.2 P0-03: the runtime HONESTLY executes the declared
+        policy - every semantic field is guarded against values the v1
+        runtime does not implement. Declaring an unsupported value
+        fails closed BEFORE any canonical run instead of silently
+        keeping the old behavior under a new hash."""
         for policy in _source_policy.source_policies():
+            for field, supported in _SUPPORTED_POLICY_VALUES.items():
+                declared = getattr(policy, field)
+                if declared != supported:
+                    msg = (
+                        f"source policy for {policy.domain} declares "
+                        f"{field}={declared!r} but the v1 runtime only executes "
+                        f"{field}={supported!r} - declaring an unimplemented "
+                        "value fails closed; ship the field value, runtime "
+                        "implementation, decision/finding semantics and tests "
+                        "TOGETHER (CR-3.2 audit 20260901 section 3)"
+                    )
+                    raise CanonicalRunnerError(msg)
             if policy.allowed_fallback_providers:
                 msg = (
                     f"source policy for {policy.domain} declares fallback providers "
                     "but the runtime implements no fallback selection path - "
-                    "bump the policy with runtime support, never silently ignore it"
+                    "declaring an unimplemented value fails closed"
                 )
                 raise CanonicalRunnerError(msg)
             if policy.partial_run_allowed:
                 msg = (
                     f"source policy for {policy.domain} allows PARTIAL CR-2 runs "
-                    "but the runtime consumes SUCCESS runs only - bump the "
-                    "policy with runtime support, never silently ignore it"
+                    "but the runtime consumes SUCCESS runs only - declaring an "
+                    "unimplemented value fails closed"
                 )
                 raise CanonicalRunnerError(msg)
 
@@ -798,77 +1233,67 @@ class CanonicalRunner:
             "SELECT normalization_run_id, provider, normalization_surface, "
             "provider_dataset, endpoint, raw_request_id, raw_evidence_uri, "
             "raw_evidence_hash, normalization_contract_version, mapper_identity, "
-            "normalized_manifest_uri, normalized_manifest_hash, status "
+            "mapper_code_hash, normalized_manifest_uri, normalized_manifest_hash, "
+            "normalized_output_set_hash, normalized_semantic_hash, status "
             "FROM meta_provider_normalization_run "
             "WHERE provider = 'amazingdata' AND normalization_surface = ? "
             "AND provider_dataset IN (" + ",".join("?" * len(provider_datasets)) + ") "
             "AND status = 'SUCCESS' ORDER BY normalization_run_id",
             [normalization_surface, *provider_datasets],
         ).fetchall()
-        result: list[dict[str, Any]] = []
-        for r in rows:
-            result.append(
-                {
-                    "normalization_run_id": str(r[0]),
-                    "provider": str(r[1]),
-                    "normalization_surface": str(r[2]),
-                    "provider_dataset": str(r[3]),
-                    "endpoint": str(r[4]),
-                    "raw_request_id": str(r[5]),
-                    "raw_evidence_uri": str(r[6]),
-                    "raw_evidence_hash": str(r[7]),
-                    "normalization_contract_version": str(r[8]),
-                    "mapper_identity": str(r[9]),
-                    "normalized_manifest_uri": str(r[10]),
-                    "normalized_manifest_hash": str(r[11]),
-                    "status": str(r[12]),
-                }
-            )
-        return result
-
-    def _read_output_rows(self, run_id: str, output_name: str) -> list[dict[str, Any]]:
-        row = self.conn.execute(
-            "SELECT normalized_manifest_uri FROM meta_provider_normalization_run "
-            "WHERE normalization_run_id = ?",
-            [run_id],
-        ).fetchone()
-        if row is None or row[0] is None:
-            msg = f"normalization run {run_id} carries no manifest uri"
-            raise CanonicalRunnerError(msg)
-        manifest = json.loads((self.normalized_root / str(row[0])).read_text(encoding="utf-8"))
-        for output in manifest.get("outputs", []):
-            if str(output.get("output_name")) == output_name:
-                frame = pl.read_parquet(self.normalized_root / str(output.get("uri")))
-                return frame.to_dicts()
-        return []
+        columns = (
+            "normalization_run_id",
+            "provider",
+            "normalization_surface",
+            "provider_dataset",
+            "endpoint",
+            "raw_request_id",
+            "raw_evidence_uri",
+            "raw_evidence_hash",
+            "normalization_contract_version",
+            "mapper_identity",
+            "mapper_code_hash",
+            "normalized_manifest_uri",
+            "normalized_manifest_hash",
+            "normalized_output_set_hash",
+            "normalized_semantic_hash",
+            "status",
+        )
+        return [dict(zip(columns, row, strict=True)) for row in rows]
 
     # --------------------------------------------------------- candidates
     def _build_candidates(
-        self, domain: str, run_row: dict[str, Any], bridge: IdentityBridge
+        self, domain: str, run_snapshot: SnapshotRun, bridge: IdentityBridge
     ) -> list[dict[str, Any]]:
-        """Deterministic candidates from ONE verified snapshot run row:
-        each row of the domain's output table with its availability
-        (the anchored received_at resolved during the snapshot), identity
-        and lineage. Availability is attached but NOT filtered here -
-        the filter runs before selection."""
+        """Deterministic candidates from ONE materialized snapshot run:
+        each row of the domain's output with its availability (the
+        anchored received_at sealed on the snapshot), identity and
+        lineage. Rows come from the EXACT verified bytes materialized
+        inside the snapshot - never from a current-path reread."""
         spec = domain_spec(domain)
-        received_at = run_row["received_at"]
+        seal = run_snapshot.seal
+        received_at = _parse_ts(seal.received_at)
         available_at = derive_available_at(domain, received_at)
-        rows = self._read_output_rows(run_row["normalization_run_id"], spec.output_name)
+        output = run_snapshot.output(spec.output_name)
+        if output is None:
+            return []
         candidates: list[dict[str, Any]] = []
-        for ordinal, row in enumerate(rows):
+        for ordinal, row_items in enumerate(output.rows):
+            row = dict(row_items)
             row_identity = hashlib.sha256(_canonical_json(row).encode("utf-8")).hexdigest()
             if domain == "trade_calendar":
                 # one CR-2 calendar row carries the whole market's days;
                 # expand to one candidate per (market, trade_date)
-                for day in row.get("trading_days") or []:
+                trading_days = row.get("trading_days") or ()
+                for day in trading_days:
                     trade_date = _as_date(day)
                     key = (str(row.get("market")), trade_date.isoformat())
                     candidates.append(
                         self._candidate(
                             domain,
                             spec,
-                            run_row,
+                            seal,
+                            output,
                             ordinal,
                             row_identity,
                             key,
@@ -897,7 +1322,8 @@ class CanonicalRunner:
                 self._candidate(
                     domain,
                     spec,
-                    run_row,
+                    seal,
+                    output,
                     ordinal,
                     row_identity,
                     key,
@@ -915,7 +1341,8 @@ class CanonicalRunner:
         self,
         domain: str,
         spec: Any,
-        run_row: dict[str, Any],
+        seal: InputRunSeal,
+        output: MaterializedOutput,
         ordinal: int,
         row_identity: str,
         key: tuple[Any, ...],
@@ -934,19 +1361,20 @@ class CanonicalRunner:
             "security_id": security_id,
             "trade_date": trade_date.isoformat(),
             "payload": payload,
-            "provider": run_row["provider"],
-            "run_row": run_row,
+            "provider": seal.provider,
+            "seal": seal,
             "output_name": spec.output_name,
+            "output": output,
             "ordinal": ordinal,
             "row_identity": row_identity,
             "available_at": available_at,
             "received_at": received_at,
-            "run_manifest_hash": str(run_row["normalized_manifest_hash"]),
+            "run_manifest_hash": seal.normalized_manifest_hash,
         }
 
     def _select(
         self, domain: str, policy: Any, candidates: list[dict[str, Any]]
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[CanonicalFinding]]:
         """Deterministic source selection + EXACT reconciliation over
         the PIT-available candidates of ONE domain.
 
@@ -964,7 +1392,7 @@ class CanonicalRunner:
 
         selected: list[dict[str, Any]] = []
         decisions: list[dict[str, Any]] = []
-        findings: list[dict[str, Any]] = []
+        findings: list[CanonicalFinding] = []
         priority = {p: i for i, p in enumerate(policy.priority_providers)}
 
         for key in sorted(by_key, key=_canonical_json):
@@ -985,21 +1413,21 @@ class CanonicalRunner:
                             other,
                             "EQUIVALENT_MERGED",
                             "equal values (EXACT tolerance); deterministic winner "
-                            f"{winner['run_row']['normalization_run_id'][:12]}",
+                            f"{winner['seal'].run_id[:12]}",
                         )
                     )
                 else:
                     findings.append(
-                        self._finding(
+                        _finding(
                             domain,
                             winner["key_json"],
                             "SOURCE_CONFLICT",
                             other["provider"],
-                            other["run_row"]["normalization_run_id"],
+                            other["seal"].run_id,
                             {
-                                "winner_run": winner["run_row"]["normalization_run_id"],
+                                "winner_run": winner["seal"].run_id,
                                 "winner_values": winner["payload"],
-                                "conflicting_run": other["run_row"]["normalization_run_id"],
+                                "conflicting_run": other["seal"].run_id,
                                 "conflicting_values": other["payload"],
                                 "tolerance": policy.tolerance_rule_id,
                             },
@@ -1013,15 +1441,15 @@ class CanonicalRunner:
 
         seen: set[tuple[str, str]] = set()
         for candidate in usable:
-            marker = (candidate["run_row"]["normalization_run_id"], candidate["key_json"])
+            marker = (candidate["seal"].run_id, candidate["key_json"])
             if marker in seen:
                 findings.append(
-                    self._finding(
+                    _finding(
                         domain,
                         candidate["key_json"],
                         "DUPLICATE_CANONICAL_KEY",
                         candidate["provider"],
-                        candidate["run_row"]["normalization_run_id"],
+                        candidate["seal"].run_id,
                         {"output_name": candidate["output_name"]},
                         blocking=True,
                     )
@@ -1031,10 +1459,6 @@ class CanonicalRunner:
         return selected, decisions, findings
 
     # ------------------------------------------------------------ helpers
-    def _read_manifest(self, run_row: dict[str, Any]) -> dict[str, Any]:
-        path = self.normalized_root / str(run_row["normalized_manifest_uri"])
-        return json.loads(path.read_text(encoding="utf-8"))
-
     @staticmethod
     def _trade_date_of(domain: str, row: dict[str, Any]) -> date:
         if domain == "daily_bar":
@@ -1072,7 +1496,7 @@ class CanonicalRunner:
 
     def _canonical_row(self, domain: str, candidate: dict[str, Any]) -> dict[str, Any]:
         spec = domain_spec(domain)
-        run_row = candidate["run_row"]
+        seal: InputRunSeal = candidate["seal"]
         row: dict[str, Any] = {
             "canonical_domain": domain,
             "canonical_key": candidate["key_json"],
@@ -1088,13 +1512,13 @@ class CanonicalRunner:
                 "availability_basis": "OBSERVED_AT_INGEST",
                 "availability_policy_version": _availability.availability_policy_version(),
                 "selected_provider": candidate["provider"],
-                "source_normalization_run_id": run_row["normalization_run_id"],
+                "source_normalization_run_id": seal.run_id,
                 "source_output_name": candidate["output_name"],
                 "source_row_ordinal": candidate["ordinal"],
                 "source_row_identity_hash": candidate["row_identity"],
-                "source_raw_request_id": run_row["raw_request_id"],
-                "source_raw_evidence_hash": run_row["raw_evidence_hash"],
-                "source_mapper_identity": run_row["mapper_identity"],
+                "source_raw_request_id": seal.raw_request_id,
+                "source_raw_evidence_hash": seal.raw_evidence_hash,
+                "source_mapper_identity": seal.mapper_identity,
                 "source_policy_version": _source_policy.source_policy_version(),
                 "canonical_contract_version": CANONICAL_CONTRACT_VERSION,
             }
@@ -1105,36 +1529,16 @@ class CanonicalRunner:
     def _decision(
         domain: str, candidate: dict[str, Any], decision_class: str, reason: str
     ) -> dict[str, Any]:
+        seal: InputRunSeal = candidate["seal"]
         return {
             "canonical_domain": domain,
             "canonical_key": candidate["key_json"],
             "decision_class": decision_class,
             "provider": candidate["provider"],
-            "source_normalization_run_id": candidate["run_row"]["normalization_run_id"],
+            "source_normalization_run_id": seal.run_id,
             "source_row_ordinal": candidate["ordinal"],
             "available_at": candidate["available_at"].isoformat(),
             "reason": reason,
-        }
-
-    @staticmethod
-    def _finding(
-        domain: str,
-        key_json: str,
-        finding_class: str,
-        provider: str | None,
-        source_run_id: str | None,
-        detail: dict[str, Any],
-        *,
-        blocking: bool,
-    ) -> dict[str, Any]:
-        return {
-            "canonical_domain": domain,
-            "canonical_key": key_json,
-            "finding_class": finding_class,
-            "provider": provider,
-            "source_normalization_run_id": source_run_id,
-            "detail_json": _canonical_json(detail),
-            "blocking": blocking,
         }
 
     # ------------------------------------------------------------ replay
@@ -1181,15 +1585,26 @@ class CanonicalRunner:
     def _verify_closure(
         self, record: dict[str, Any], snapshot: CanonicalInputSnapshot
     ) -> list[str]:
-        """CR-3.1 P0-07: the FULL seal is consumed on every replay -
-        CURRENT snapshot identities == ledger == manifest == replay-time
-        physical recompute, plus re-verification of every sealed CR-2
-        source run closure and its anchored availability evidence."""
+        """CR-3.2 P0-04: the FULL typed seal is consumed on every replay
+        - CURRENT snapshot identities == ledger == manifest ==
+        replay-time physical recompute, with every explicit manifest
+        provenance field compared (not display-only), the deterministic
+        manifest URI verified, the typed full CR-2 input seal verified
+        field-by-field against the physical artifacts, and every sealed
+        input run's closure + anchored availability evidence
+        re-verified."""
         problems: list[str] = []
         manifest_uri = record["manifest_uri"]
         manifest_hash = record["manifest_hash"]
         if not manifest_uri or not manifest_hash:
             return ["ledger row carries no manifest binding"]
+        # deterministic manifest anchor URI (P0-04 section 4.3)
+        expected_manifest_uri = f"{self._expected_base_uri(record)}/manifest.json"
+        if str(manifest_uri) != expected_manifest_uri:
+            return [
+                f"ledger manifest_uri {manifest_uri!r} is not the deterministic "
+                f"anchor {expected_manifest_uri!r}"
+            ]
         manifest_path = self.normalized_root / str(manifest_uri)
         if not manifest_path.is_file():
             return [f"canonical manifest missing: {manifest_uri}"]
@@ -1197,13 +1612,16 @@ class CanonicalRunner:
             return [f"canonical manifest bytes do not match the ledger hash: {manifest_uri}"]
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-        # ---- CURRENT provenance == ledger (defense in depth on top of
-        # the exact idempotency key - catches ledger tampering)
+        # ---- CURRENT provenance == ledger (defense in depth)
         expected_provenance = (
             ("requested_domains_json", snapshot.requested_domains_json),
             ("requested_domains_hash", snapshot.requested_domains_hash),
             ("input_set_hash", snapshot.input_set_hash),
             ("identity_dataset_hash", snapshot.identity_dataset_hash),
+            ("identity_master_input_set_hash", snapshot.master_input_set_hash),
+            ("base_identity_hash", snapshot.base_identity_hash),
+            ("verification_state_hash", snapshot.verification_state_hash),
+            ("input_seal_hash", snapshot.input_seal_hash),
             ("availability_policy_version", snapshot.availability_policy_version),
             ("availability_policy_hash", snapshot.availability_policy_hash),
             ("source_policy_version", snapshot.source_policy_version),
@@ -1224,7 +1642,11 @@ class CanonicalRunner:
             ("idempotency_key", str(record["idempotency_key"])),
             ("status", str(record["status"])),
             ("input_set_hash", str(record["input_set_hash"])),
+            ("input_seal_hash", str(record["input_seal_hash"])),
             ("identity_dataset_hash", str(record["identity_dataset_hash"])),
+            ("identity_master_input_set_hash", str(record["identity_master_input_set_hash"])),
+            ("identity_bridge_policy_version", _identity.identity_bridge_policy_version()),
+            ("identity_bridge_policy_hash", _identity.identity_bridge_policy_hash()),
             ("availability_policy_version", str(record["availability_policy_version"])),
             ("availability_policy_hash", str(record["availability_policy_hash"])),
             ("source_policy_version", str(record["source_policy_version"])),
@@ -1243,12 +1665,25 @@ class CanonicalRunner:
         manifest_domains = manifest.get("requested_domains")
         if list(manifest_domains or []) != json.loads(str(record["requested_domains_json"])):
             problems.append("manifest requested_domains does not match the ledger seal")
+        # CR-3.2 P0-04: the EXPLICIT provenance maps are consumed, not
+        # display-only - required_evidence_classes must equal the
+        # CURRENT declared policy exactly
+        if manifest.get("required_evidence_classes") != {
+            p.domain: p.required_evidence_class for p in _source_policy.source_policies()
+        }:
+            problems.append("manifest required_evidence_classes diverge from the current policy")
         if int(manifest.get("selected_count", -1)) != int(record["selected_count"]):
             problems.append("manifest selected_count does not match the ledger")
         if int(manifest.get("decision_count", -1)) != int(record["decision_count"]):
             problems.append("manifest decision_count does not match the ledger")
         if int(manifest.get("finding_count", -1)) != int(record["finding_count"]):
             problems.append("manifest finding_count does not match the ledger")
+
+        # ---- typed full input seal: manifest entries == CURRENT snapshot
+        sealed_entries = manifest.get("input_normalized_runs", [])
+        current_entries = [seal.as_dict() for seal in snapshot.seals]
+        if _canonical_json(sealed_entries) != _canonical_json(current_entries):
+            problems.append("manifest typed input seal does not match the current snapshot")
 
         # ---- artifact exact set + deterministic URI + physical recompute
         artifacts = manifest.get("artifacts", {})
@@ -1284,7 +1719,6 @@ class CanonicalRunner:
                 problems.append(f"canonical {name} artifact schema mismatch (rebind)")
             artifact_rows[name] = frame.to_dicts()
 
-        # ---- semantic seals: physical recompute == manifest == ledger
         if "selected" in artifact_rows:
             recomputed = _rows_semantic_hash(artifact_rows["selected"])
             if recomputed != str(record["selected_semantic_hash"]) or recomputed != str(
@@ -1325,36 +1759,84 @@ class CanonicalRunner:
             if _finding_set_hash(parquet_semantic) != str(record["finding_set_hash"]):
                 problems.append("findings parquet semantic set diverges from the seal")
 
-        # ---- re-verify every sealed CR-2 source run + anchored evidence
-        for entry in manifest.get("input_normalized_runs", []):
-            run_row = {
-                "normalization_run_id": str(entry.get("run_id")),
-                "provider": str(entry.get("provider")),
-                "normalization_surface": str(entry.get("normalization_surface")),
-                "provider_dataset": str(entry.get("provider_dataset")),
-                "endpoint": str(entry.get("endpoint")),
-                "raw_request_id": str(entry.get("raw_request_id")),
-                "raw_evidence_uri": str(entry.get("raw_evidence_uri")),
-                "raw_evidence_hash": str(entry.get("raw_evidence_hash")),
-                "normalized_manifest_hash": str(entry.get("normalized_manifest_hash")),
-            }
-            entry_problems = self._verify_run_intact(run_row)
+        # ---- re-verify every sealed input run: typed seal vs physical
+        # artifacts + anchored evidence (symmetric with first consume)
+        for entry in sealed_entries:
+            entry_problems = self._verify_sealed_input(entry)
             if entry_problems:
                 problems.append(
-                    f"sealed CR-2 source run {run_row['normalization_run_id']} is no "
-                    f"longer intact: {'; '.join(entry_problems)}"
+                    f"sealed CR-2 input run {entry.get('run_id')} is no longer "
+                    f"intact: {'; '.join(entry_problems)}"
                 )
-        # ---- the sealed input set == the manifest input set
-        sealed_entries = manifest.get("input_normalized_runs", [])
-        if _canonical_json(sorted(sealed_entries, key=_canonical_json)) != _canonical_json(
-            sorted(snapshot.input_entries(), key=_canonical_json)
+        return problems
+
+    def _verify_sealed_input(self, entry: dict[str, Any]) -> list[str]:
+        """Seal-based verification of ONE input run (CR-3.2 P0-04): the
+        TYPED full CR-2 seal is checked against the physical artifacts -
+        manifest bytes, output content/schema/row-count, the manifest's
+        own CR-2 seal fields (output-set/semantic/mapper/contract), the
+        raw meta bytes, and the authoritative anchor. First-run and
+        replay verification are symmetric."""
+        problems: list[str] = []
+        run_row = {
+            "normalization_run_id": str(entry.get("run_id")),
+            "provider": str(entry.get("provider")),
+            "normalization_surface": str(entry.get("normalization_surface")),
+            "provider_dataset": str(entry.get("provider_dataset")),
+            "endpoint": str(entry.get("endpoint")),
+            "raw_request_id": str(entry.get("raw_request_id")),
+            "raw_evidence_uri": str(entry.get("raw_evidence_uri")),
+            "raw_evidence_hash": str(entry.get("raw_evidence_hash")),
+        }
+        anchor_problems, _ = self._verify_anchored_availability(run_row)
+        problems.extend(anchor_problems)
+
+        manifest_uri = str(entry.get("normalized_manifest_uri"))
+        manifest_path = self.normalized_root / manifest_uri
+        if not manifest_path.is_file():
+            problems.append(f"normalized manifest missing: {manifest_uri}")
+            return problems
+        manifest_bytes = manifest_path.read_bytes()
+        if hashlib.sha256(manifest_bytes).hexdigest() != str(entry.get("normalized_manifest_hash")):
+            problems.append("normalized manifest bytes do not match the sealed hash")
+            return problems
+        try:
+            manifest = json.loads(manifest_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            problems.append(f"normalized manifest unreadable: {exc}")
+            return problems
+        # the manifest's own CR-2 seal fields == the typed input seal
+        for manifest_field, seal_field in (
+            ("normalization_contract_version", "normalization_contract_version"),
+            ("mapper_identity", "mapper_identity"),
+            ("mapper_code_hash", "mapper_code_hash"),
+            ("output_set_hash", "normalized_output_set_hash"),
+            ("semantic_hash", "normalized_semantic_hash"),
         ):
-            problems.append("manifest input set does not match the current snapshot")
+            if str(manifest.get(manifest_field)) != str(entry.get(seal_field)):
+                problems.append(
+                    f"CR-2 manifest {manifest_field} diverges from the typed input seal"
+                )
+        for output in manifest.get("outputs", []):
+            uri = str(output.get("uri"))
+            path = self.normalized_root / uri
+            if not path.is_file():
+                problems.append(f"output artifact missing: {uri}")
+                continue
+            data = path.read_bytes()
+            if hashlib.sha256(data).hexdigest() != str(output.get("content_hash")):
+                problems.append(f"output artifact bytes tampered: {uri}")
+                continue
+            frame = pl.read_parquet(path)
+            if frame.height != int(output.get("row_count", -1)):
+                problems.append(f"output artifact row count mismatch: {uri}")
+            schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
+            if schema_hash != str(output.get("schema_hash")):
+                problems.append(f"output artifact schema mismatch: {uri}")
         return problems
 
     def _expected_artifact_uri(self, record: dict[str, Any], name: str) -> str:
-        base = self._expected_base_uri(record)
-        return f"{base}/{name}.parquet"
+        return f"{self._expected_base_uri(record)}/{name}.parquet"
 
     def _expected_base_uri(self, record: dict[str, Any]) -> str:
         as_of_dt = _ledger_as_of(record)
@@ -1373,14 +1855,14 @@ class CanonicalRunner:
         idempotency_key: str,
         selected_rows: list[dict[str, Any]],
         decisions: list[dict[str, Any]],
-        findings: list[dict[str, Any]],
+        findings: list[CanonicalFinding],
         status: str,
     ) -> tuple[str | None, str | None, str, str, str]:
         """Deterministic correctness artifacts. NO wall-clock anywhere
-        (CR-3.1 P0-08): findings carry NO created_at in the parquet -
-        the DB-side created_at is transaction-time audit metadata bound
-        only at commit - so a DB failure after the file writes recovers
-        on the exact retry with byte-identical files."""
+        (findings carry no created_at in the parquet - the DB-side
+        created_at is transaction-time audit metadata bound only at
+        commit), so a DB failure after the file writes recovers on the
+        exact retry with byte-identical files."""
         base_uri = (
             f"canonical/contract={CANONICAL_CONTRACT_VERSION}/"
             f"as_of={snapshot.as_of.strftime('%Y%m%dT%H%M%SZ')}/run={run_id}"
@@ -1388,11 +1870,13 @@ class CanonicalRunner:
         base_path = self.normalized_root / base_uri
         base_path.mkdir(parents=True, exist_ok=True)
 
-        # bind deterministic finding ids before sealing (uuid5 - no clock)
-        for position, finding in enumerate(findings):
-            finding["finding_id"] = f"cf-{uuid.uuid5(_FINDING_NAMESPACE, f'{run_id}:{position}')}"
-            finding["canonical_run_id"] = run_id
-        finding_seal = _finding_set_hash(findings)
+        finding_dicts = [f.as_dict() for f in findings]
+        for position, finding_dict in enumerate(finding_dicts):
+            finding_dict["finding_id"] = (
+                f"cf-{uuid.uuid5(_FINDING_NAMESPACE, f'{run_id}:{position}')}"
+            )
+            finding_dict["canonical_run_id"] = run_id
+        finding_seal = _finding_set_hash(finding_dicts)
         selected_semantic = _rows_semantic_hash(selected_rows)
         decision_set = _rows_semantic_hash(decisions)
 
@@ -1406,11 +1890,11 @@ class CanonicalRunner:
             "findings": _align_schema(
                 [
                     {
-                        "finding_id": f["finding_id"],
-                        "canonical_run_id": f["canonical_run_id"],
-                        **{field: f.get(field) for field in _FINDING_SEMANTIC_FIELDS},
+                        "finding_id": f_dict["finding_id"],
+                        "canonical_run_id": f_dict["canonical_run_id"],
+                        **{field: f_dict.get(field) for field in _FINDING_SEMANTIC_FIELDS},
                     }
-                    for f in findings
+                    for f_dict in finding_dicts
                 ]
             ),
         }
@@ -1439,8 +1923,11 @@ class CanonicalRunner:
             "idempotency_key": idempotency_key,
             "requested_domains": list(snapshot.requested_domains),
             "requested_domains_hash": snapshot.requested_domains_hash,
-            "input_normalized_runs": snapshot.input_entries(),
+            "input_normalized_runs": [seal.as_dict() for seal in snapshot.seals],
             "input_set_hash": snapshot.input_set_hash,
+            "input_seal_hash": snapshot.input_seal_hash,
+            "base_identity_hash": snapshot.base_identity_hash,
+            "verification_state_hash": snapshot.verification_state_hash,
             "identity_master_input_set_hash": snapshot.master_input_set_hash,
             "identity_bridge_policy_version": _identity.identity_bridge_policy_version(),
             "identity_bridge_policy_hash": _identity.identity_bridge_policy_hash(),
@@ -1489,7 +1976,7 @@ class CanonicalRunner:
         decision_count: int,
         selected_semantic: str,
         decision_set: str,
-        findings: list[dict[str, Any]],
+        findings: list[CanonicalFinding],
         finding_seal: str,
         status: str,
         error: str | None,
@@ -1498,8 +1985,7 @@ class CanonicalRunner:
     ) -> None:
         """One DuckDB transaction: dup check + run INSERT + full finding
         set + count assertion. A failure rolls everything back; the
-        deterministic file-side anchor lets the exact retry recover
-        (byte-identical no-op writes, then the ledger commit)."""
+        deterministic file-side anchor lets the exact retry recover."""
         self.conn.execute("BEGIN TRANSACTION")
         try:
             dup = self.conn.execute(
@@ -1544,26 +2030,32 @@ class CanonicalRunner:
                     snapshot.requested_domains_hash,
                     selected_semantic,
                     decision_set,
+                    snapshot.base_identity_hash,
+                    snapshot.verification_state_hash,
+                    snapshot.input_seal_hash,
+                    snapshot.master_input_set_hash,
                 ],
             )
             # transaction-time audit metadata ONLY (never part of the
-            # deterministic correctness bytes - CR-3.1 P0-08)
+            # deterministic correctness bytes)
             now = datetime.now(UTC)
-            for finding in findings:
+            for position, finding in enumerate(findings):
+                f_dict = finding.as_dict()
+                finding_id = f"cf-{uuid.uuid5(_FINDING_NAMESPACE, f'{run_id}:{position}')}"
                 self.conn.execute(
                     f"INSERT INTO meta_canonical_reconciliation_finding "
                     f"({', '.join(_FINDING_COLUMNS)}) VALUES "
                     f"({', '.join(['?'] * len(_FINDING_COLUMNS))})",
                     [
-                        finding["finding_id"],
+                        finding_id,
                         run_id,
-                        finding["canonical_domain"],
-                        finding["canonical_key"],
-                        finding["finding_class"],
-                        finding["provider"],
-                        finding["source_normalization_run_id"],
-                        finding["detail_json"],
-                        bool(finding["blocking"]),
+                        f_dict["canonical_domain"],
+                        f_dict["canonical_key"],
+                        f_dict["finding_class"],
+                        f_dict["provider"],
+                        f_dict["source_normalization_run_id"],
+                        f_dict["detail_json"],
+                        bool(f_dict["blocking"]),
                         now,
                     ],
                 )

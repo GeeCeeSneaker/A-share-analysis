@@ -708,3 +708,124 @@ Snapshot / ReadModel                   ░░░░░░░░░░  尚未开
 ```
 
 **老板视角**：CR-3.1 已经非常接近完成，当前不是“大功能没做”，而是还差几条会决定历史回测是否真的没有未来函数、同一次运行是否真的代表一个输入世界的底层正确性边界。把 CR-3.2 这批收口后，才适合把 Canonical 层冻结并进入 CR-4 Snapshot/ReadModel。
+
+---
+
+# 12. Implementation Mapping（开发方填写，2026-09-01）
+
+> 本 Mapping 以本文件（21:08 完整版，含 P0-05 状态转换与 §7 32 项矩阵）为权威依据——其覆盖同日 21:01 版《SnapshotTransaction及VerifiedReadBoundary收口要求》的全部内容。
+
+## §1 P0-01 Transactional Materialized Snapshot
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| BEGIN 在第一个 broad SELECT 前 | `_build_snapshot`：`BEGIN TRANSACTION` 包裹全部 surface 发现与物化，`COMMIT` 收尾 | `TestTransactionalSnapshot::test_concurrent_insert_between_broad_reads_invisible`（第二 connection 在 domain 查询后、master 查询前真实 commit——file-backed DuckDB MVCC——current run 严格 S1） |
+| same surface 不重复发现 | `_surface_plan`：per-surface union datasets 一次查询 | `test_concurrent_master_insert_between_broad_reads_invisible`（daily_bar 查询返回后注入 master run——snapshot 不可见） |
+| mid-run 插入只影响下次 invocation | — | `test_next_invocation_sees_committed_insert`（新 identity 诚实发现） |
+| 验证后不重读当前 DB path | `_materialize_outputs`：读 bytes → hash==manifest → parse 同一份；candidate builder 消费 `SnapshotRun.outputs` | `test_post_snapshot_ledger_uri_update_not_consumed`（snapshot 后 UPDATE manifest_uri=evil——current run 仍消费 M1 物化行） |
+| verify 后文件替换不被消费 | — | `test_post_verify_file_replacement_not_consumed`（verify P1 后换 P2——close 值仍是物化 P1 的 10.5/20.5 非 777.0） |
+| 深层 immutable | typed frozen dataclasses + tuple-frozen rows | `test_snapshot_deep_immutability`（frozen 赋值 raise；run() 结果不受 mutation attempt 影响） |
+
+## §2 P0-02 Identity Master PIT
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| master anchored evidence + received_at <= as_of | `_snapshot_run` 对 identity_master 同样执行 `_verify_anchored_availability` + `pit_available` 判定；`available_master_rows` 才进 bridge | `TestIdentityMasterPIT::test_future_master_never_resolves_historical_rows` |
+| future master 不改历史 identity truth | future master 留 discovery evidence（`pit_available=false`） | `test_early_master_plus_future_relist_keeps_early_truth`（early master 唯一 available；relist 是 sealed evidence） |
+| all-future master -> BLOCKED | `IDENTITY_DATASET_UNAVAILABLE_AT_ASOF` blocking | `test_all_masters_future_only_blocks` |
+| master anchor missing/mismatch before FIRST -> BLOCK | `IDENTITY_EVIDENCE_INVALID` blocking | `test_master_anchor_missing_first_run_blocks` / `test_master_meta_mismatch_first_run_blocks` |
+| first/replay verifier parity | replay 对全部 sealed input（含 master）执行 `_verify_sealed_input`（含 anchor） | `test_first_run_replay_parity`（成功后立即 replay 通过同一 verifier） |
+
+## §3 P0-03 Honest Policy Execution
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| required_evidence_class unsupported -> fail closed | `_assert_policy_honestly_executed` supported-value guard（run 之前） | `TestHonestPolicyExecution`（5 项 parametrize：evidence_class/reconciliation/tolerance_id/tolerance_version/conflict_action） |
+| fallback/partial unsupported -> fail closed | 同上（继承 CR-3.1 行为） | `TestPolicyHashCompleteness::test_fallback_providers_change_new_run`（raise）+ CR-3.1 回归 |
+| supported v1 values 行为不变 | — | `test_supported_v1_values_behavior_unchanged` |
+| domains=[] 显式语义 | `run()`：None=all；empty reject | `test_empty_domains_rejected` |
+
+## §4 P0-04 Full Seal
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| input entry 封完整 CR-2 seal | `InputRunSeal` 19 字段（contract version / mapper identity+code hash / manifest uri+hash / output_set+semantic hash / status / raw identity / verification / received_at / pit_available） | `TestFullSealConsumption::test_typed_input_seal_three_way_equality`（snapshot == manifest == ledger + 全字段存在断言） |
+| manifest 显式 provenance 全消费 | `_verify_closure`：identity_master_input_set_hash / bridge policy version+hash / required_evidence_classes（==current policy）逐项比对 | `test_identity_master_input_set_hash_rebind_blocks` / `test_bridge_policy_version_rebind_blocks` / `test_bridge_policy_hash_rebind_blocks` / `test_required_evidence_classes_rebind_blocks` |
+| manifest_uri deterministic verify | expected base + `/manifest.json` 比对 | `test_manifest_uri_rebind_blocks` |
+| input entry seal 字段 rebind -> DAMAGED | typed seal vs current snapshot 比对 | `test_input_entry_seal_field_rebind_blocks`（mapper_code_hash rebind + 外层 rehash） |
+| CR-2 exact seal snapshot 化 | `input_seal_hash` 三方 + `_verify_sealed_input`（CR-2 manifest 自身 seal 字段 == typed seal） | 同上 + replay 回归 |
+
+## §5 P0-05 Verification-State Transition
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| state 相同 -> exact replay | run id = uuid5(base + state hash) | 既有 replay 回归全保持 |
+| 历史 BLOCKED(可恢复) + repair -> 新 recovery run | state hash 变 -> 新 run id；历史证据保留 | `TestVerificationStateTransition::test_anchor_missing_then_repair_mints_recovery_run`（BLOCKED → repair → 新 SUCCESS run + BLOCKED 行/finding 保留）/ `test_closure_damage_then_repair_mints_recovery_run` |
+| 历史 SUCCESS + 退化 -> DAMAGED 拒绝 | degraded-SUCCESS guard（同 base 非 BLOCKED 历史 + 当前 damaged → raise） | `test_prior_success_degradation_refused`（DAMAGED；无新 run minted；exact repair 后恢复历史 replay） |
+| repair 不覆盖历史 BLOCKED evidence | append-only（无 UPDATE/DELETE 路径） | `test_repair_preserves_block_evidence`（2 ledger 行 + BLOCKED finding 保留） |
+| state 不污染 base identity | `InputRunSeal.identity_dict()`（state 字段排除出 input_set_hash/base） | `test_prior_success_degradation_refused`（退化后 base 仍同 -> guard 命中） |
+
+## §7 测试矩阵对照（32 项）
+
+```text
+[✓] 01 broad reads 之间第二 connection INSERT S2 -> current run 严格 S1（真实 MVCC）
+[✓] 02 master query 前插入 master run -> snapshot 不可见
+[✓] 03 next invocation 看到 S2 -> new identity
+[✓] 04 snapshot verify M1 后 UPDATE ledger manifest_uri=M2 -> 不消费 M2
+[✓] 05 verify P1 后 replace file P2 -> 只消费已物化 P1
+[✓] 06 snapshot nested record mutation 不可改变 authoritative truth
+[✓] 07 future-only master received_at > as_of -> 不进 IdentityBridge
+[✓] 08 early master + future relist -> historical security_id 保持 early truth
+[✓] 09 all identity master future-only -> identity-required domain BLOCKED
+[✓] 10 master anchor missing before FIRST -> BLOCK（IDENTITY_EVIDENCE_INVALID）
+[✓] 11 master raw meta/anchor mismatch before FIRST -> BLOCK
+[✓] 12 first run 后立即 replay 无外部变化 -> 通过同一 verifier（parity）
+[✓] 13 required_evidence_class unsupported -> run 前 fail closed
+[✓] 14 reconciliation unsupported -> fail closed
+[✓] 15 tolerance_rule_id/version unsupported -> fail closed
+[✓] 16 conflict_action unsupported -> fail closed
+[✓] 17 supported v1 policy values -> 行为不变
+[✓] 18 manifest identity_master_input_set_hash rebind -> DAMAGED
+[✓] 19 manifest bridge policy version/hash rebind -> DAMAGED
+[✓] 20 manifest required_evidence_classes rebind -> DAMAGED
+[✓] 21 canonical manifest_uri rebind -> DAMAGED
+[✓] 22 upstream input entry full CR-2 seal field rebind -> DAMAGED
+[✓] 23 full typed input seal 三方 exact equality
+[✓] 24 source anchor missing -> BLOCKED；governed repair -> next invocation 不 replay stale BLOCKED（新 recovery run + 证据保留）
+[✓] 25 source closure temporarily damaged -> BLOCKED；exact repair -> recovery run
+[✓] 26 prior SUCCESS -> damage -> DAMAGED（无 replacement；repair 后恢复历史 replay）
+[✓] 27 repair 保留历史 BLOCKED evidence（append-only）
+[✓] 28 migration 020 from-zero（20 链）
+[✓] 29 migration 019->020 upgrade（含 020 四列断言）
+[ ]  30 Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full CI green（推送后 API 正向确认，SHA 回填）
+[✓] 31 Ruff / format / Mypy / Spike / governance gates green（本地；CI 待确认）
+[✓] 32 all CR-3.1 / CR-3 / CR-2.x / R4 frozen regressions green（81 + 985 全保持；总体 1096/0）
+```
+
+## §9 Exit Gate 对照（17 项）
+
+```text
+[✓] real DB snapshot boundary before first authoritative broad read（BEGIN TRANSACTION + MVCC race 测试）
+[✓] actual consumed normalized rows materialized from exact verified bytes
+[✓] no post-snapshot current-ledger/current-path reread changes consumed truth
+[✓] snapshot deeply immutable（typed frozen records + tuple-frozen rows）
+[✓] identity master anchored evidence verified on first consume and replay（对称）
+[✓] identity master obeys PIT as_of availability policy
+[✓] future master cannot change historical identity truth
+[✓] policy declaration and runtime behavior exact match / unsupported fail closed
+[✓] full manifest provenance fields consumed（rebind 矩阵全拦截）
+[✓] upstream CR-2 full seal snapshotted/bound（InputRunSeal + input_seal_hash 三方）
+[✓] deterministic manifest URI verified
+[✓] repair 后不 replay stale BLOCKED（base + state identity）
+[✓] prior SUCCESS degradation DAMAGED fail closed
+[✓] recoverable repair preserves immutable history
+[✓] CR-3.1 passed mechanisms frozen（81 项回归全保持）
+[✓] no CR-4 logic leak
+[ ]  migration / CI / governance green（migration 20 链本地全绿；CI 待 API 确认，SHA 回填；governance 本批已同步）
+```
+
+## Verification Summary
+
+- Local: **1096 / 0**（1066 → 1096，+30：TransactionalSnapshot 6 / IdentityMasterPIT 6 / HonestPolicyExecution 8 / FullSealConsumption 7 / VerificationStateTransition 3）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1096/0
+- ADR-023 Amendment B（status 仍 PROPOSED）；migration 020（未改 018/019）；CR-3.1 FREEZE 的 19 项机制零重写（81 项回归全保持）
+- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）
