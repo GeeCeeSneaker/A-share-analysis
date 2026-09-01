@@ -425,7 +425,19 @@ def run_dry_run(
     target = make_dry_run_target()
     run, store = new_run(run_kind=RunKind.DRY_RUN, spike_root=spike_root)
     catalog = CaseCatalog(store, run.spike_run_id)
-    ctx = _probe_context(run, store, catalog, target)
+    # CR-2.4 (audit 20260901 section 3.2): the evidence path is the
+    # ANCHORED boundary - every exchange (SUCCESS and ERROR alike)
+    # enrolls an immutable meta_raw_evidence_anchor. The dry-run keeps
+    # its anchors in an in-memory migrated DB: the framework self-test
+    # exercises the exact production write path, and its FakeTarget
+    # evidence still never enters a production verdict.
+    import duckdb
+
+    from ashare_state.storage import apply_migrations
+
+    conn = duckdb.connect(":memory:")
+    apply_migrations(conn, (repo_root or Path.cwd()) / "migrations")
+    ctx = _probe_context(run, store, catalog, target, conn)
     outputs: dict[str, Any] = {"spike_run_id": run.spike_run_id, "phases": {}}
     # R4-A3.1 P0-01: the formal gate boundary is the MANDATORY first
     # phase - every formal run (dry-run included) proves the runtime
@@ -450,15 +462,16 @@ def run_dry_run(
     run_dir = store.run_dir(run)
     catalog.flush(run_dir)
     closed = close_run(store, run)
+    conn.close()
     outputs["run_dir"] = str(run_dir)
     outputs["status"] = closed.status
     return outputs
 
 
-def _probe_context(run, store, catalog, target):
+def _probe_context(run, store, catalog, target, conn):
     from ashare_state.spike.probes import ProbeContext
 
-    return ProbeContext(run, store, catalog, target)
+    return ProbeContext(run, store, catalog, target, conn)
 
 
 # ------------------------------------------------------------- verdict engine

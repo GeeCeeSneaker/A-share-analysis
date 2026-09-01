@@ -1,9 +1,9 @@
 # ADR-022: Provider Normalization and Quarantine（提供方归一化与隔离）
 
-- **Status**: PROPOSED（2026-08-31，CR-2 批次交付 + CR-2.1 Amendment A 收口 + 2026-09-01 CR-2.2 Amendment B 收口 + 2026-09-01 CR-2.3 Amendment C 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
+- **Status**: PROPOSED（2026-08-31，CR-2 批次交付 + CR-2.1 Amendment A 收口 + 2026-09-01 CR-2.2 Amendment B 收口 + 2026-09-01 CR-2.3 Amendment C 收口 + 2026-09-01 CR-2.4 Amendment D wiring 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
 - **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
-- **Date**: 2026-08-31（CR-2）/ 2026-08-31（Amendment A，CR-2.1）/ 2026-09-01（Amendment B，CR-2.2）/ 2026-09-01（Amendment C，CR-2.3）
-- **Work Requirement**: `docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md` + `docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md` + `docs/design/A-share-analysis_CR-2.1复审与CR-2.2最终ReplayProvenanceSeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-2.2复审与CR-2.3最终RawTrustAnchor及OutputSeal收口要求_20260901.md`
+- **Date**: 2026-08-31（CR-2）/ 2026-08-31（Amendment A，CR-2.1）/ 2026-09-01（Amendment B，CR-2.2）/ 2026-09-01（Amendment C，CR-2.3）/ 2026-09-01（Amendment D，CR-2.4）
+- **Work Requirement**: `docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md` + `docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md` + `docs/design/A-share-analysis_CR-2.1复审与CR-2.2最终ReplayProvenanceSeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-2.2复审与CR-2.3最终RawTrustAnchor及OutputSeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-2.3复审与CR-2.4最终AnchoredIngestionBoundary收口要求_20260901.md`
 - **Related**: [ADR-021](ADR-021_publish_validation_exactness.md)（其 B1/B2 的 boundary/registry/seal 模式被本 ADR 复用于数据层）；CR-1（RawWriter exact evidence，输入侧）
 
 ## 1. Context（audit 20260831 §3-§4）
@@ -161,6 +161,7 @@ BLOCKED，不得伪造完成。"尽力解析"半验证字段正是 sentinel 风�
 对抗测试）+ DM-CR-20260831-064（CR-2.1 收口 amendment）+
 DM-20260901-065（CR-2.2 Replay Provenance Seal amendment）+
 DM-20260901-066（CR-2.3 Raw Trust Anchor + Operation Spec + Output Seal
+amendment）+ DM-20260901-067（CR-2.4 Anchored Ingestion Boundary wiring
 amendment）。相关：§44 CR-2 acceptance 对照。
 
 ---
@@ -504,3 +505,86 @@ idempotent + tamper probe 018）；audit §6 A/B/C/D 矩阵全对应。总体 97
 CR-2.3 仍不引入 CR-3 语义；schema 变更仅 migration 017（anchor 表 + 两
 seal 列，未改 014/015/016）。通过后 CR-2.x 全链 CLOSED / FREEZE，ADR-022
 ACCEPTED，CR-3 START——**不再扩张 CR-2 scope**。
+
+---
+
+# 9. Amendment D：CR-2.4 Anchored Raw Ingestion Boundary（2026-09-01，audit "CR-2.3复审与CR-2.4最终AnchoredIngestionBoundary收口要求"）
+
+CR-2.3 复审（2026-09-01 14:26 +08:00，Reviewed HEAD `81d6b8d`）裁决
+**REOPENED**：operation spec / anchor schema+runner verification /
+output-set+semantic seal 三块 **PASS / FREEZE**，但 anchor enrollment
+未形成 production-owned boundary（enrollment 机制存在，正式写入链未接线；
+测试靠 helper 手工模拟 governed flow；recorder 只 hash "调用时看到的
+meta"，write→enroll 之间存在 TOCTOU / late-enrollment blessing 窗口）。
+**本 amendment 只补 wiring；上文已冻结语义不变。**
+
+## 9.1 AnchoredRawEvidenceWriter（audit §3.1）
+
+```text
+AnchoredRawEvidenceWriter(conn, raw_root, *, ingest_run_id)
+  write_exchange(exchange) -> RawWriteResult      # the ONE boundary
+    1. RawWriter.write(exchange)                  # file commit (meta LAST)
+    2. reread persisted meta bytes - VERIFY-ONLY
+       require sha256(reread) == RawWriteResult.evidence_hash
+       (write -> enroll 之间的 TOCTOU 换字节 -> 整体 HARD FAIL，H2 永不 enroll)
+    3. identity cross-binding: meta 的 request_id/provider/provider_dataset/
+       endpoint/normalization_surface/operation_id == exchange envelope
+       （伪造 meta 身份字段 -> BLOCK）；uri cross-binding（evidence_uri ==
+       meta_uri == canonical request-addressed uri）
+    4. enroll immutable anchor（keyed to the COMMIT identity）
+    5. return RawWriteResult                      # ingest 至此才算完成
+```
+
+关键：anchor expected hash 的来源是**本次 RawWriter commit 的 output
+identity**；最终 reread 是 verify-only，不能在没有 cross-binding 的情况
+下自行定义首次真值。
+
+## 9.2 全部 production evidence 写入切到 anchored boundary（audit §3.2）
+
+- `ProbeContext.__init__` 新增必需 `conn` 参数；`raw_writer` 变为
+  `AnchoredRawEvidenceWriter`（`evidence_from_exchange` /
+  `failure_evidence` → 同一 `write_exchange`——SUCCESS 与 ERROR exchange
+  均自动 anchor）；
+- `run_dry_run` 打开 in-memory migrated DB（repo migrations 全链）供
+  ProbeContext——框架自检走与 production 完全相同的 anchored 写路径；
+- 结构守卫（AST）：`src/ashare_state` 中 RawWriter 的
+  write/write_success/write_failure 调用点只允许出现在 raw_writer.py
+  （定义本身）与 raw_anchor.py（anchored boundary 内部）；reader
+  （`RawWriter.read`）不受限（normalization runner 只读消费）。
+
+## 9.3 Enrollment 可恢复但不可 rebaseline（audit §3.3）
+
+- anchor INSERT 注入失败 → write_exchange 抛出 → **本次 governed ingest
+  失败**（evidence 不 ready）；Raw bytes（H1）在盘、无 anchor →
+  Normalization RAW_ANCHOR_MISSING fail closed；
+- exact retry 同一 exchange：RawWriter idempotent（same bytes ignoring
+  ingested_at → no-op → evidence_hash 从磁盘首 commit bytes 计算 = H1）→
+  enrollment 成功 → **一个 immutable anchor、单一 evidence identity**；
+- 已有 anchor H1：same H1 idempotent / H2 hard conflict（RawWriter 不可变
+  写先行拦截 + anchor CONFLICT 双保险）；anchor 永不 rebaseline。
+
+## 9.4 Enrollment API 收口（audit §3.4）
+
+- 公开 `record_raw_evidence_anchor`（"看现场 bytes 建首次 anchor"）**撤销**；
+  enrollment primitive 私有化为 `_enroll_anchor(conn, raw_root, *,
+  provider, provider_dataset, request_id, evidence_hash, ...)`——
+  `evidence_hash` 是必填的**调用方声明 commit identity**，函数内部
+  verify-only 比对磁盘（不再自行 hash 现场 bytes 定义真值）；
+- 模块公开面：`AnchoredRawEvidenceWriter` /
+  `persist_exchange_with_anchor`（便捷一次性）/ `lookup_raw_evidence_anchor`
+  （只读）/ `RawEvidenceAnchor` / `RawAnchorError`；
+- tests 制造 legacy/unanchored 或 governed-reingest 夹具时直接使用私有
+  primitive（tests-only，B2 scanner static registry 同一裁决口径）。
+
+## 9.5 CR-2.4 对抗测试（+10 项）
+
+`tests/integration/test_provider_normalization.py`（114 项 = CR-2/2.1/2.2/
+2.3 104 项回归 + 10 新增：ProbeContext SUCCESS/ERROR anchor 2 / 结构守卫
+1 / TOCTOU 1 / enrollment 失败恢复 1 / same-H1 idempotent 1 / H2 hard
+conflict 1 / anchored→runner SUCCESS 1 / identity cross-binding 1 / API
+收口 1）；audit §4 17 项矩阵全对应。总体 985/0。
+
+## 9.6 Scope 边界
+
+无 schema 变更（复用 migration 017 anchor 表）；不重写 operation spec /
+runner anchor lookup / output-set semantic seal；CR-3 语义零引入。

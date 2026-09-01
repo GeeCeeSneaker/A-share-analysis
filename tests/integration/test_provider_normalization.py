@@ -170,14 +170,20 @@ def _persist_raw(
             envelope=env,
         )
     if anchor and conn is not None:
-        from ashare_state.storage.raw_anchor import record_raw_evidence_anchor
+        # tests-only governed-reingest emulation: the PRIVATE enrollment
+        # primitive (production reaches it only through the anchored
+        # writer; the declared hash must equal the on-disk bytes)
+        from ashare_state.storage.raw_anchor import _enroll_anchor
 
-        record_raw_evidence_anchor(
+        _enroll_anchor(
             conn,
             roots["raw"],
             provider="amazingdata",
             provider_dataset=dataset,
             request_id=request_id,
+            evidence_hash=hashlib.sha256(
+                _meta_path(roots, dataset, request_id).read_bytes()
+            ).hexdigest(),
         )
 
 
@@ -2579,14 +2585,17 @@ class TestRawTrustAnchor:
         assert blocked.error_class == "RAW_ANCHOR_MISSING"
         # governed re-ingest: the ingestion flow records the anchor for
         # the exact persisted bytes
-        from ashare_state.storage.raw_anchor import record_raw_evidence_anchor
+        from ashare_state.storage.raw_anchor import _enroll_anchor
 
-        record_raw_evidence_anchor(
+        _enroll_anchor(
             conn,
             env_root["raw"],
             provider="amazingdata",
             provider_dataset="daily_bar",
             request_id="req-no-anchor",
+            evidence_hash=hashlib.sha256(
+                _meta_path(env_root, "daily_bar", "req-no-anchor").read_bytes()
+            ).hexdigest(),
         )
         result = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-no-anchor"
@@ -2597,7 +2606,7 @@ class TestRawTrustAnchor:
         """Recording the SAME bytes twice is idempotent (one row);
         recording DIFFERENT bytes for the same request is a hard anchor
         conflict - the anchor is never re-baselined."""
-        from ashare_state.storage.raw_anchor import RawAnchorError, record_raw_evidence_anchor
+        from ashare_state.storage.raw_anchor import RawAnchorError, _enroll_anchor
 
         _persist_raw(
             env_root,
@@ -2608,19 +2617,24 @@ class TestRawTrustAnchor:
             surface="daily_bar",
             anchor=False,
         )
-        first = record_raw_evidence_anchor(
+        h1 = hashlib.sha256(
+            _meta_path(env_root, "daily_bar", "req-anchor-rec").read_bytes()
+        ).hexdigest()
+        first = _enroll_anchor(
             conn,
             env_root["raw"],
             provider="amazingdata",
             provider_dataset="daily_bar",
             request_id="req-anchor-rec",
+            evidence_hash=h1,
         )
-        second = record_raw_evidence_anchor(
+        second = _enroll_anchor(
             conn,
             env_root["raw"],
             provider="amazingdata",
             provider_dataset="daily_bar",
             request_id="req-anchor-rec",
+            evidence_hash=h1,
         )
         assert first.evidence_hash == second.evidence_hash
         count = conn.execute(
@@ -2633,13 +2647,29 @@ class TestRawTrustAnchor:
         doc = json.loads(meta.read_bytes())
         doc["account_profile_id"] = "EVIL"
         meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        h2 = hashlib.sha256(meta.read_bytes()).hexdigest()
+        # the tampered bytes no longer match ANY trusted identity:
+        # - enrolling them via the (private) primitive with their own
+        #   hash hits the existing H1 anchor -> hard CONFLICT
         with pytest.raises(RawAnchorError, match="CONFLICT"):
-            record_raw_evidence_anchor(
+            _enroll_anchor(
                 conn,
                 env_root["raw"],
                 provider="amazingdata",
                 provider_dataset="daily_bar",
                 request_id="req-anchor-rec",
+                evidence_hash=h2,
+            )
+        # - claiming the ORIGINAL H1 identity fails the verify-only
+        #   cross-bind (on-disk bytes are H2)
+        with pytest.raises(RawAnchorError, match="does not match"):
+            _enroll_anchor(
+                conn,
+                env_root["raw"],
+                provider="amazingdata",
+                provider_dataset="daily_bar",
+                request_id="req-anchor-rec",
+                evidence_hash=h1,
             )
 
     def test_anchor_cross_binds_operation_identity(self, conn, env_root):
@@ -2937,3 +2967,284 @@ class TestSemanticValueSeal:
             provider_dataset="daily_bar", request_id="req-empty-payload"
         )
         assert replay.idempotent_replay is True
+
+
+# --------------------------------------------- CR-2.4: anchored ingestion boundary
+
+
+def _live_exchange(
+    request_id: str,
+    payload: Any = None,
+    *,
+    status: str = "OK",
+    surface: str = "daily_bar",
+    dataset: str = "daily_bar",
+    endpoint: str = "MarketData.query_kline",
+    operation_id: str = "MarketData.query_kline#daily_bar",
+) -> Any:
+    """A real RawEnvelope-backed ProviderExchange for the anchored
+    boundary tests (full provider-owned identity on the envelope)."""
+    from ashare_state.providers.amazingdata.provider import RawEnvelope
+    from ashare_state.providers.exchange import ProviderExchange
+
+    params = {"code_list": ["600000"]}
+    env = RawEnvelope(
+        provider="amazingdata",
+        provider_dataset=dataset,
+        endpoint=endpoint,
+        request_id=request_id,
+        request_params=params,
+        request_params_hash=RawEnvelope.params_hash(params),
+        requested_at="2026-09-01T00:00:00+00:00",
+        received_at="2026-09-01T00:00:01+00:00",
+        sdk_version="FAKE-1.1.9",
+        runtime_version="FAKE-V4.3.0",
+        account_profile_id="TRIAL_SIMULATION_FAKE",
+        row_count=len(payload) if hasattr(payload, "__len__") else 0,
+        status=status,
+        error_class="ProviderPermissionError" if status == "ERROR" else None,
+        operation_id=operation_id,
+        normalization_surface=surface,
+    )
+    return ProviderExchange(envelope=env, payload=None if status == "ERROR" else payload)
+
+
+def _anchored_writer(conn, env_root):
+    from ashare_state.storage.raw_anchor import AnchoredRawEvidenceWriter
+
+    return AnchoredRawEvidenceWriter(conn, env_root["raw"], ingest_run_id="ingest-run-test")
+
+
+def _anchor_count(conn, request_id: str) -> int:
+    return int(
+        conn.execute(
+            "SELECT count(*) FROM meta_raw_evidence_anchor WHERE request_id = ?",
+            [request_id],
+        ).fetchone()[0]
+    )
+
+
+def _probe_ctx(conn, tmp_root, target=None):
+    """A REAL ProbeContext over the anchored evidence path (CR-2.4:
+    the evidence pipeline enrolls anchors exactly like production)."""
+    from ashare_state.spike.catalog import CaseCatalog
+    from ashare_state.spike.model import RunKind
+    from ashare_state.spike.probes import ProbeContext
+    from ashare_state.spike.runner import new_run
+    from ashare_state.spike.target import FakeTarget
+
+    run, store = new_run(
+        run_kind=RunKind.DRY_RUN,
+        spike_root=tmp_root / "spike",
+        code_commit="a" * 40,
+        environment_lock_hash="b" * 64,
+        config_hash="c" * 64,
+        sdk_version="FAKE-1.1.9",
+        runtime_version="FAKE-V4.3.0",
+        account_profile_id="TRIAL_SIMULATION_FAKE",
+        as_of_date="20260814",
+    )
+    catalog = CaseCatalog(store, run.spike_run_id)
+    return ProbeContext(run, store, catalog, target or FakeTarget(), conn)
+
+
+@pytest.mark.integration
+class TestAnchoredIngestionBoundary:
+    """CR-2.4 (audit 20260901 section 3): RawWriter file commit + trust
+    anchor enrollment are ONE production-owned indivisible boundary
+    whose enrolled hash is always the COMMIT identity."""
+
+    def test_probe_context_success_enrolls_anchor(self, conn, env_root, tmp_path):
+        """Audit §4-1: after ProbeContext.evidence_from_exchange succeeds,
+        the anchor row necessarily exists and binds the evidence hash."""
+        ctx = _probe_ctx(conn, tmp_path)
+        meta = ctx.evidence_from_exchange(_live_exchange("req-pc-ok", _DAILY_BAR_ROWS))
+        row = conn.execute(
+            "SELECT evidence_hash, normalization_surface, ingest_run_id "
+            "FROM meta_raw_evidence_anchor WHERE request_id = ?",
+            ["req-pc-ok"],
+        ).fetchone()
+        assert row is not None
+        assert str(row[0]) == meta["content_hash"]
+        assert str(row[1]) == "daily_bar"
+        assert str(row[2]) == ctx.run.spike_run_id
+
+    def test_probe_context_failure_evidence_enrolls_anchor(self, conn, env_root, tmp_path):
+        """Audit §4-2: ERROR/failure evidence also lands with an anchor
+        row (failure evidence is first-class raw evidence)."""
+        ctx = _probe_ctx(conn, tmp_path)
+        meta = ctx.evidence_from_exchange(_live_exchange("req-pc-err", status="ERROR"))
+        assert meta["status"] == "ERROR"
+        row = conn.execute(
+            "SELECT evidence_hash, payload_kind FROM meta_raw_evidence_anchor WHERE request_id = ?",
+            ["req-pc-err"],
+        ).fetchone()
+        assert row is not None
+        assert str(row[0]) == meta["content_hash"]
+        assert str(row[1]) == "failure"
+
+    def test_no_unanchored_raw_writer_write_in_production_src(self):
+        """Audit §4-3 structural guard: RawWriter write/write_success/
+        write_failure production call sites exist ONLY inside the
+        anchored boundary module (raw_anchor.py) and the RawWriter
+        definition itself; readers are unrestricted."""
+        src_root = REPO_ROOT / "src" / "ashare_state"
+        allowed_files = {"raw_writer.py", "raw_anchor.py"}
+        violations: list[str] = []
+        for py in sorted(src_root.rglob("*.py")):
+            if py.name in allowed_files:
+                continue
+            tree = ast.parse(py.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+                    continue
+                if node.func.attr not in ("write", "write_success", "write_failure"):
+                    continue
+                receiver = node.func.value
+                receiver_name = (
+                    receiver.attr if isinstance(receiver, ast.Attribute) else None
+                ) or (receiver.id if isinstance(receiver, ast.Name) else "")
+                if "writer" in str(receiver_name).lower():
+                    violations.append(
+                        f"{py.relative_to(REPO_ROOT)}:{node.lineno} .{node.func.attr}()"
+                    )
+        assert violations == [], (
+            f"production raw-evidence writes bypass the anchored boundary: {violations}"
+        )
+
+    def test_toctou_tamper_between_commit_and_enrollment_fails(self, conn, env_root, monkeypatch):
+        """Audit §4-4: RawWriter commits H1 -> the meta bytes are swapped
+        to H2 before enrollment -> the anchored boundary HARD FAILS and
+        never enrolls H2 as the first truth."""
+        from ashare_state.storage.raw_anchor import RawAnchorError
+        from ashare_state.storage.raw_writer import RawWriter
+
+        original = RawWriter.write
+
+        def write_then_swap(self, exchange, **kwargs):
+            result = original(self, exchange, **kwargs)
+            # swap the meta bytes AFTER the commit, BEFORE enrollment
+            meta_path = (
+                self.root
+                / "provider=amazingdata"
+                / "dataset=daily_bar"
+                / f"{result.request_id}.meta.json"
+            )
+            doc = json.loads(meta_path.read_bytes())
+            doc["account_profile_id"] = "TOCTOU_ATTACKER"
+            meta_path.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+            return result
+
+        monkeypatch.setattr(RawWriter, "write", write_then_swap)
+        with pytest.raises(RawAnchorError, match="TOCTOU"):
+            _anchored_writer(conn, env_root).write_exchange(
+                _live_exchange("req-toctou", _DAILY_BAR_ROWS)
+            )
+        monkeypatch.undo()
+        # nothing was enrolled (H2 is NOT the first truth; H1 bytes are gone)
+        assert _anchor_count(conn, "req-toctou") == 0
+
+    def test_anchor_insert_failure_fails_ingest_then_exact_retry_recovers(self, conn, env_root):
+        """Audit §4-5/§4-6: an anchor INSERT failure fails the whole
+        ingest (evidence NOT ready); normalization stays RAW_ANCHOR_MISSING;
+        the exact retry completes the enrollment with ONE immutable
+        anchor and a single evidence identity."""
+        exchange = _live_exchange("req-enroll-fail", _DAILY_BAR_ROWS)
+        failing = _FailingConn(conn, "INSERT INTO meta_raw_evidence_anchor")
+        with pytest.raises(RuntimeError, match="injected DB failure"):
+            _anchored_writer(failing, env_root).write_exchange(exchange)
+        # raw bytes committed (H1) but NO anchor -> evidence not ready
+        assert _meta_path(env_root, "daily_bar", "req-enroll-fail").is_file()
+        assert _anchor_count(conn, "req-enroll-fail") == 0
+        blocked = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-enroll-fail"
+        )
+        assert blocked.status == "BLOCKED"
+        assert blocked.error_class == "RAW_ANCHOR_MISSING"
+        # exact retry over a healthy connection completes the enrollment
+        recovered = _anchored_writer(conn, env_root).write_exchange(exchange)
+        assert recovered.idempotent is True
+        assert _anchor_count(conn, "req-enroll-fail") == 1
+        # the evidence identity is the SAME commit (no second identity)
+        anchor_hash = str(
+            conn.execute(
+                "SELECT evidence_hash FROM meta_raw_evidence_anchor WHERE request_id = ?",
+                ["req-enroll-fail"],
+            ).fetchone()[0]
+        )
+        assert anchor_hash == recovered.evidence_hash
+        # normalization now works end to end
+        result = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-enroll-fail"
+        )
+        assert result.status == "SUCCESS"
+
+    def test_repeat_same_evidence_is_idempotent_one_anchor(self, conn, env_root):
+        """Audit §4-7: an existing H1 anchor + the same H1 bytes ->
+        idempotent anchored write, exactly one anchor row."""
+        exchange = _live_exchange("req-same-h1", _DAILY_BAR_ROWS)
+        first = _anchored_writer(conn, env_root).write_exchange(exchange)
+        second = _anchored_writer(conn, env_root).write_exchange(exchange)
+        assert second.idempotent is True
+        assert second.evidence_hash == first.evidence_hash
+        assert _anchor_count(conn, "req-same-h1") == 1
+
+    def test_different_bytes_same_request_hard_conflicts(self, conn, env_root):
+        """Audit §4-8: an existing H1 anchor + H2 bytes for the same
+        request -> hard conflict (the immutable raw store blocks the
+        write itself; the anchor can never be re-baselined)."""
+        from ashare_state.storage.raw_writer import RawWriterError
+
+        _anchored_writer(conn, env_root).write_exchange(_live_exchange("req-h2", _DAILY_BAR_ROWS))
+        with pytest.raises(RawWriterError):
+            _anchored_writer(conn, env_root).write_exchange(
+                _live_exchange("req-h2", _INDEX_BAR_ROWS)
+            )
+        assert _anchor_count(conn, "req-h2") == 1  # H1 still the only truth
+
+    def test_anchored_healthy_raw_normalizes_successfully(self, conn, env_root):
+        """Audit §4-9: raw evidence written through the anchored boundary
+        flows through NormalizationRunner to SUCCESS."""
+        _anchored_writer(conn, env_root).write_exchange(
+            _live_exchange("req-anchored-ok", _DAILY_BAR_ROWS)
+        )
+        result = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-anchored-ok"
+        )
+        assert result.status == "SUCCESS"
+        assert result.normalized_count == 2
+        assert result.normalization_surface == "daily_bar"
+
+    def test_meta_identity_tamper_blocks_enrollment(self, conn, env_root, monkeypatch):
+        """Audit §4-12: a persisted meta whose endpoint/operation_id/
+        surface disagree with the exchange envelope BLOCKS the anchored
+        enrollment (identity cross-binding)."""
+        from ashare_state.storage.raw_anchor import RawAnchorError
+        from ashare_state.storage.raw_writer import RawWriter
+
+        original = RawWriter._meta_bytes
+
+        def tampered_meta(self, envelope, **kwargs):
+            data = original(self, envelope, **kwargs)
+            doc = json.loads(data)
+            doc["endpoint"] = "InfoData.get_index_daily"  # forge the endpoint
+            return json.dumps(doc, sort_keys=True).encode("utf-8")
+
+        monkeypatch.setattr(RawWriter, "_meta_bytes", tampered_meta)
+        with pytest.raises(RawAnchorError, match="cross-binding"):
+            _anchored_writer(conn, env_root).write_exchange(
+                _live_exchange("req-ident", _DAILY_BAR_ROWS)
+            )
+        monkeypatch.undo()
+        assert _anchor_count(conn, "req-ident") == 0
+
+    def test_public_recorder_api_is_closed(self):
+        """Audit §3.4: the enrollment primitive is PRIVATE - the public
+        module surface exposes only the anchored writer + the read-only
+        lookup (no 'enroll any existing request by looking at it' API)."""
+        import ashare_state.storage.raw_anchor as anchor_module
+
+        assert "record_raw_evidence_anchor" not in anchor_module.__all__
+        assert not hasattr(anchor_module, "record_raw_evidence_anchor")
+        for exported in anchor_module.__all__:
+            assert not exported.startswith("_")

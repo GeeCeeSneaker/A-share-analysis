@@ -113,7 +113,15 @@ class ProbeContext:
     evidence pipeline is ProviderExchange -> RawWriter -> Parquet + meta
     -> RawWriteResult -> SpikeCase evidence_ref/evidence_hash. Payload ->
     RunStore.write_evidence(JSON) is FORBIDDEN as the formal provider
-    evidence chain."""
+    evidence chain.
+
+    CR-2.4 (audit 20260901 section 3.2): the evidence pipeline is the
+    ANCHORED boundary - ProviderExchange -> AnchoredRawEvidenceWriter
+    (RawWriter file commit + immutable trust-anchor enrollment, one
+    indivisible governed step) -> RawWriteResult. Every formal/spike
+    evidence write (SUCCESS and ERROR alike) therefore always leaves a
+    ``meta_raw_evidence_anchor`` row; there is no unanchored
+    production write path."""
 
     def __init__(
         self,
@@ -121,16 +129,21 @@ class ProbeContext:
         store: RunStore,
         catalog: CaseCatalog,
         target: SpikeTarget,
+        conn: Any,
     ) -> None:
         self.run = run
         self.store = store
         self.catalog = catalog
         self.target = target
-        from ashare_state.storage.raw_writer import RawWriter
+        from ashare_state.storage.raw_anchor import AnchoredRawEvidenceWriter
 
         # CR-1.2 (audit R4-A2.4 section 3.4): every raw meta records the
-        # run it belongs to (ingest_run_id traceability)
-        self.raw_writer = RawWriter(store.raw_dir(run), ingest_run_id=run.spike_run_id)
+        # run it belongs to (ingest_run_id traceability). CR-2.4: the
+        # writer is the anchored boundary (write + anchor enrollment are
+        # indivisible; the enrolled hash is the RawWriter COMMIT identity).
+        self.raw_writer = AnchoredRawEvidenceWriter(
+            conn, store.raw_dir(run), ingest_run_id=run.spike_run_id
+        )
 
     @property
     def as_of_date(self) -> int:
@@ -172,7 +185,7 @@ class ProbeContext:
         CR-1.2 (audit R4-A2.4 section 3.1-3.2): the evidence is the
         exchange META (bidirectional closure anchor); payload artifacts
         are listed separately with their own hashes."""
-        result = self.raw_writer.write(exchange)
+        result = self.raw_writer.write_exchange(exchange)
         envelope = exchange.envelope
         # evidence_ref must be relative to the run store's spike_root so
         # the evidence closure can re-verify the file bytes

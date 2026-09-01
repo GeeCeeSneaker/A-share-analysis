@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from _anchored_ctx import anchored_conn
 
 from ashare_state.providers.amazingdata.provider import RawEnvelope
 from ashare_state.providers.errors import ProviderPermissionError
@@ -24,7 +25,6 @@ from ashare_state.spike.model import RunKind
 from ashare_state.spike.probes import ProbeContext, ProbeExecutor
 from ashare_state.spike.runner import new_run
 from ashare_state.spike.target import FakeTarget
-from ashare_state.storage.raw_writer import RawWriter
 
 _SHA = "b" * 40
 
@@ -42,7 +42,7 @@ def _ctx(tmp_path: Path, target=None) -> ProbeContext:
         as_of_date="20260814",
     )
     catalog = CaseCatalog(store, run.spike_run_id)
-    return ProbeContext(run, store, catalog, target or FakeTarget())
+    return ProbeContext(run, store, catalog, target or FakeTarget(), anchored_conn())
 
 
 class _BrokenTarget(FakeTarget):
@@ -206,10 +206,14 @@ class TestProbeContract:
             )
 
     def test_raw_writer_write_is_the_unified_entry(self, tmp_path: Path):
-        """The runtime evidence pipeline writes via write(exchange)."""
+        """The runtime evidence pipeline writes via the ANCHORED unified
+        entry: write_exchange(exchange) persists AND enrolls the trust
+        anchor in one governed step (CR-2.4)."""
+        from ashare_state.storage.raw_anchor import AnchoredRawEvidenceWriter
+
         ctx = _ctx(tmp_path)
-        assert isinstance(ctx.raw_writer, RawWriter)
+        assert isinstance(ctx.raw_writer, AnchoredRawEvidenceWriter)
         exchange = ctx.target.get_calendar_exchange()
-        result = ctx.raw_writer.write(exchange)
+        result = ctx.raw_writer.write_exchange(exchange)
         assert result.request_id == exchange.request_id
         assert result.evidence_hash

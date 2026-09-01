@@ -20,6 +20,7 @@ import json
 from pathlib import Path
 
 import pytest
+from _anchored_ctx import anchored_conn
 
 from ashare_state.spike.catalog import CaseCatalog
 from ashare_state.spike.golden_router import (
@@ -50,7 +51,7 @@ def _ctx(tmp_path: Path) -> ProbeContext:
         as_of_date="20260814",
     )
     catalog = CaseCatalog(store, run.spike_run_id)
-    return ProbeContext(run, store, catalog, FakeTarget())
+    return ProbeContext(run, store, catalog, FakeTarget(), anchored_conn())
 
 
 def _ca_case(

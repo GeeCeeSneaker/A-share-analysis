@@ -17,6 +17,47 @@
 
 ---
 
+## 2026-09-01 · CR-2.4 Anchored Raw Ingestion Boundary（CR-2.3 复审 REOPENED 后的 wiring 收口批次）
+
+**Scope**
+- CR-2.3 复审（audit 20260901 14:26 +08:00，Reviewed HEAD `81d6b8d53a97cdcc7ee1cdfbd627d4dac2913e4d`，reopen commit `3348200`）裁决 **CR-2.3 REOPENED（仅剩 Anchored Ingestion Boundary wiring / enrollment correctness）**：operation spec / anchor schema+runner verification / output-set+semantic seal **PASS / FREEZE**；enrollment 机制存在但正式写入链未接线（测试靠 helper 手工模拟 governed flow）/ recorder 只 hash "调用时看到的 meta"（write→enroll TOCTOU / late-enrollment blessing 窗口）/ 普通 callable 未收口。本批 CR-2.4 收口（**未启动 CR-3**——复审 §5 边界；CR-3 BLOCKED_BY_CR-2.4）；复审 §4 测试矩阵 17 项全对应
+
+**Implementation**
+- **AnchoredRawEvidenceWriter**（`raw_anchor.py`，audit §3.1）：唯一 production-owned 写入边界。`write_exchange(exchange)` 内部五步：（1）`RawWriter.write`（文件 commit，meta LAST）；（2）reread persisted meta bytes——**VERIFY-ONLY**：require sha256(reread) == `RawWriteResult.evidence_hash`（write→enroll 之间换字节（TOCTOU）→ 整体 HARD FAIL，H2 永不 enroll 为首次真值）；（3）identity cross-binding（meta 的 request_id/provider/provider_dataset/endpoint/normalization_surface/operation_id == exchange envelope + uri cross-binding：evidence_uri == meta_uri == canonical request-addressed uri）；（4）enroll immutable anchor（keyed to **COMMIT identity**）；（5）return——ingest 至此才算完成（任何失败 = evidence 不 ready）。anchor expected hash 的来源是本次 RawWriter commit 的 output identity；最终 reread 不能自行定义首次真值
+- **全部 production evidence 写入接线**（audit §3.2）：`ProbeContext.__init__` 新增必需 `conn` 参数，`raw_writer` → `AnchoredRawEvidenceWriter`（`evidence_from_exchange` / `failure_evidence` → 同一 `write_exchange`——**SUCCESS 与 ERROR exchange 均自动 anchor**）；`run_dry_run` 打开 in-memory migrated DB（repo migrations 全链）——框架自检走与 production 完全相同的 anchored 写路径；**结构守卫**（AST）：`src/ashare_state` 中 RawWriter 的 write/write_success/write_failure 调用点只允许出现在 raw_writer.py（定义本身）与 raw_anchor.py（boundary 内部）；reader（`RawWriter.read`）不受限（normalization runner 只读消费）
+- **Enrollment 可恢复但不可 rebaseline**（audit §3.3）：anchor INSERT 注入失败 → write_exchange 抛出 → 本次 governed ingest 失败；raw bytes（H1）在盘、无 anchor → Normalization RAW_ANCHOR_MISSING fail closed；exact retry 同一 exchange → RawWriter idempotent（same bytes ignoring ingested_at → no-op → evidence_hash 从磁盘首 commit bytes 计算 = H1）→ enrollment 成功 → **一个 immutable anchor、单一 evidence identity**；已有 anchor H1：same H1 idempotent / H2 hard conflict（RawWriter 不可变写先行拦截 + anchor CONFLICT 双保险）
+- **Enrollment API 收口**（audit §3.4）：公开 `record_raw_evidence_anchor`（"看现场 bytes 建首次 anchor"）**撤销**；私有化 `_enroll_anchor(conn, raw_root, *, provider, provider_dataset, request_id, evidence_hash, ingest_run_id)`——`evidence_hash` 是必填的调用方声明 commit identity，函数内部 verify-only 比对磁盘（不自行 hash 现场 bytes 定义真值）；模块公开面：`AnchoredRawEvidenceWriter` / `persist_exchange_with_anchor`（便捷）/ `lookup_raw_evidence_anchor`（只读）/ `RawEvidenceAnchor` / `RawAnchorError`；tests 制造 legacy/unanchored 或 governed-reingest 夹具直接用私有 primitive（tests-only，B2 scanner static registry 同一裁决口径）
+- 测试接线：新共享 helper `tests/integration/_anchored_ctx.py::anchored_conn()`（in-memory + migrations 全链）；13 个 spike/formal-gate 测试文件的 ProbeContext 构造接线；`_persist_raw` 的 anchor 路径迁移到私有 `_enroll_anchor`
+
+**Schema / Contract Changes**
+- 无 schema 变更（复用 migration 017 anchor 表）；**ADR-022 Amendment D**（§9.1-§9.4 wiring 收口；已冻结语义零重写；status 仍 PROPOSED 待 Reviewer closure）；DM-20260901-067
+
+**Verification**
+- Local: **985 tests passed / 0 failed**（975 → 985，+10：TestAnchoredIngestionBoundary 10 项 = ProbeContext SUCCESS/ERROR anchor 2 / 结构守卫 1 / TOCTOU 1 / enrollment 失败恢复 1 / same-H1 idempotent 1 / H2 hard conflict 1 / anchored→runner SUCCESS 1 / identity cross-binding 1 / API 收口 1；normalization 114 = 104 回归 + 10 新增）；ruff check / ruff format / mypy 全绿（63 文件零错）；CI 同款命令 `uv run pytest` 复验 985/0
+- 既有回归零破坏：CR-2/2.1/2.2/2.3 对抗矩阵 104 项全保持（audit §4 items 10-16）；R4-B2.x / B1.x / A3.x / A2.x / CR-1.x 冻结契约零破坏；CR-3 语义零泄漏
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+
+**Implementation Status**
+- DONE（wiring P0 全收口 + ADR-022 Amendment D + DM-20260901-067；985/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- enrollment 的 hash 声明与磁盘 verify 分离：`_enroll_anchor` 要求调用方传入 commit identity 并 verify-only 比对——AnchoredRawEvidenceWriter 传 RawWriteResult.evidence_hash（TOCTOU 检查在 writer 层先行），测试传现场 hash（同一 verify 语义）；两种路径都不存在"函数自己 hash 现场 bytes 定义真值"的窗口
+- TOCTOU 检查放 writer 层（reread == commit hash）而 enrollment 内再 verify 一次：writer 层检查在 identity cross-binding 之前，保证后续字段比对针对的是"确认未被调包"的 bytes；enrollment 内 verify 是 defense in depth（私有 primitive 被直接调用时仍安全）
+- run_dry_run 用 in-memory DB 而非跳过 anchor：dry-run 的意义就是走与 production 完全相同的代码路径（FakeTarget 换真实 target 即 formal run）；跳过会让 dry-run 失去对 anchored 路径的自检能力
+- ProbeContext.conn 设计为必需位置参数而非可选：audit 明确"不允许某条正常正式入口继续直接 RawWriter.write 后绕过 anchor"——可选参数（None 时退化为裸 writer）会重新引入绕过路径
+- 结构守卫按"receiver 名含 writer + write/write_success/write_failure"启发式 + 白名单文件（raw_writer.py/raw_anchor.py）：与既有 B1/B2 AST 守卫同一精确度口径；normalization runner 的只读 RawWriter 消费不受影响
+- 13 个既有测试的 ProbeContext 接线通过共享 anchored_conn() helper：单一改动点，未来 anchor DB 构造变化只改 helper
+
+**下一步**
+- 等 Reviewer 复审 CR-2.4（复审 §6 Exit Gate 11 项）；全部通过 → Reviewer 推送 CR-2 closure doc + **CR-3 详细开发工作要求**，CR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 → VERIFIED / CLOSED / FREEZE，ADR-022 → ACCEPTED，CR-3 AvailabilityPolicy + Canonicalizer → START（复审明确：不再扩张 CR-2 scope）
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
+---
+
+---
+
 ## 2026-09-01 · CR-2.3 Raw Trust Anchor + Provider-Owned Operation Spec + Output Seal（CR-2.2 复审 REOPENED 后的收口批次）
 
 **Scope**

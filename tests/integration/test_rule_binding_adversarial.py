@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from _anchored_ctx import anchored_conn
 
 from ashare_state.spike.catalog import CaseCatalog
 from ashare_state.spike.model import RunKind
@@ -107,7 +108,7 @@ def _ctx_with_rules(tmp_path: Path, rules_root: Path, monkeypatch) -> ProbeConte
         as_of_date="20260814",
     )
     catalog = CaseCatalog(store, run.spike_run_id)
-    return ProbeContext(run, store, catalog, FakeTarget())
+    return ProbeContext(run, store, catalog, FakeTarget(), anchored_conn())
 
 
 class TestBoundVsActiveSemantics:
@@ -177,7 +178,7 @@ class TestBoundVsActiveSemantics:
         # re-running the probe on the SAME run reproduces the SAME limit
         # cases (they evaluate against the BOUND dataset, not ACTIVE v2)
         catalog2 = CaseCatalog(ctx.store, ctx.run.spike_run_id)
-        ctx2 = ProbeContext(ctx.run, ctx.store, catalog2, FakeTarget())
+        ctx2 = ProbeContext(ctx.run, ctx.store, catalog2, FakeTarget(), anchored_conn())
         probe_b5_units_pit_freshness(ctx2, 20220601)
         limit_cases_after = [
             (c.case_id, str(c.result)) for c in ctx2.catalog.cases if "limit" in c.case_type

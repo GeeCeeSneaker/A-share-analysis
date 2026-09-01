@@ -397,3 +397,88 @@ RawWriter 写完以后，
 ```
 
 也就是“保险柜和验钞机都装好了，现在只差把正式收款窗口强制接到验钞机上，不能让业务人员自己先收钱、以后再决定什么时候补登记”。
+
+---
+
+# 9. Implementation Mapping（开发方填写，2026-09-01）
+
+## §3.1 AnchoredRawEvidenceWriter
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| production-owned anchored writer | `raw_anchor.py::AnchoredRawEvidenceWriter.write_exchange(exchange)`（五步：RawWriter.write → verify-only reread → identity cross-binding → enroll → return） | `test_probe_context_success_enrolls_anchor` / `test_anchored_healthy_raw_normalizes_successfully` |
+| reread == RawWriteResult.evidence_hash | TOCTOU verify-only 比对（hash 不等 → RawAnchorError HARD FAIL） | `test_toctou_tamper_between_commit_and_enrollment_fails`（commit 后 enrollment 前换 meta bytes → FAIL；零 anchor 行） |
+| meta uri == commit uri | evidence_uri == meta_uri == canonical request-addressed uri 断言 | 同上路径（uri cross-binding 在 identity 检查内） |
+| meta request/provider/dataset/operation_id/surface == envelope | `_ENVELOPE_IDENTITY_FIELDS` 六字段全比对（不一致 → BLOCK） | `test_meta_identity_tamper_blocks_enrollment`（monkeypatch `_meta_bytes` 伪造 endpoint → cross-binding FAIL；零 anchor） |
+| insert immutable anchor keyed to commit identity | `_enroll_anchor(..., evidence_hash=result.evidence_hash)` | `test_probe_context_success_enrolls_anchor`（anchor.evidence_hash == meta["content_hash"]） |
+
+## §3.2 Production 写入全部接线
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| ProbeContext.evidence_from_exchange 生成 anchor | `ProbeContext.__init__(..., conn)`（必需参数）；`raw_writer` = AnchoredRawEvidenceWriter | `test_probe_context_success_enrolls_anchor` |
+| failure_evidence 也 anchor | `failure_evidence` → 同一 `write_exchange` | `test_probe_context_failure_evidence_enrolls_anchor`（ERROR exchange → anchor + payload_kind=failure） |
+| run_dry_run 走 production 写路径 | in-memory migrated DB（repo migrations 全链）供 ProbeContext | 既有 `test_dry_run_produces_all_phase_outputs` / `test_dry_run_includes_b1_phase` 回归（全 phase 绿） |
+| 结构守卫：无 unanchored RawWriter write bypass | AST 扫描 src/：write/write_success/write_failure 调用点仅 raw_writer.py + raw_anchor.py 白名单 | `test_no_unanchored_raw_writer_write_in_production_src` |
+| src/ 其他写入点 | 逐一核对：src/ 中 RawWriter 实例化仅 probes.py（已接线）+ normalization/runner.py（只读 reader） | 同上结构守卫 |
+
+## §3.3 可恢复不可 rebaseline
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| anchor INSERT 失败 → ingest 失败 + evidence 不 ready | write_exchange 直接传播异常 | `test_anchor_insert_failure_fails_ingest_then_exact_retry_recovers`（注入失败 → 无 anchor → Normalization RAW_ANCHOR_MISSING） |
+| exact retry 恢复 + 单一 identity | RawWriter idempotent（same bytes ignoring ingested_at → evidence_hash = 首 commit H1）→ enrollment 成功 | 同上（retry → idempotent=True → 一行 anchor → anchor_hash == result.evidence_hash → Normalization SUCCESS） |
+| 已有 H1 + same H1 → idempotent | `_enroll_anchor` lookup-first | `test_repeat_same_evidence_is_idempotent_one_anchor`（两次写 → 一行 anchor） |
+| 已有 H1 + H2 → hard conflict | RawWriter 不可变写先行 + anchor CONFLICT | `test_different_bytes_same_request_hard_conflicts`（不同 payload → RawWriterError；anchor 仍仅 H1） |
+
+## §3.4 API 收口
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| INSERT primitive private | `_enroll_anchor`（evidence_hash 必填声明 commit identity；verify-only） | `test_public_recorder_api_is_closed`（`record_raw_evidence_anchor` 不在 `__all__`/无属性；公开面全非下划线） |
+| public = anchored boundary + 只读 lookup | `__all__`：AnchoredRawEvidenceWriter / persist_exchange_with_anchor / lookup_raw_evidence_anchor / RawEvidenceAnchor / RawAnchorError | 同上 |
+| tests legacy 夹具走私有 primitive | `_persist_raw` anchor 路径 + governed-reingest 测试改用 `_enroll_anchor` | 既有 anchor 测试矩阵回归全绿 |
+
+## §4 对抗测试矩阵对照（17 项）
+
+```text
+[✓] 1  ProbeContext.evidence_from_exchange 成功后 anchor row 必然存在
+[✓] 2  ERROR/failure evidence 落盘后 anchor row 必然存在
+[✓] 3  结构守卫：无绕开 anchored boundary 的 RawWriter.write* 写入
+[✓] 4  RawWriter commit H1 -> enrollment 前篡改 H2 -> HARD FAIL，不 anchor H2
+[✓] 5  anchor INSERT 注入失败 -> ingest 不宣称成功；Normalization RAW_ANCHOR_MISSING
+[✓] 6  同一 evidence exact retry -> anchor 补齐；仅一个 immutable anchor
+[✓] 7  已有 H1，重复 same H1 -> idempotent
+[✓] 8  已有 H1，尝试 H2 -> hard conflict / no rebaseline
+[✓] 9  anchored healthy raw -> NormalizationRunner SUCCESS
+[✓] 10 legacy direct RawWriter without anchor -> RAW_ANCHOR_MISSING（CR-2.3 回归保持）
+[✓] 11 first-consume meta-only tamper -> anchor mismatch before route/map（CR-2.3 回归保持）
+[✓] 12 operation_id/endpoint/surface 与 envelope 不一致 -> enrollment BLOCK
+[✓] 13 CR-2.3 output exact-set / semantic tamper 矩阵保持 green
+[✓] 14 CR-2.2 historical exact replay / full fingerprint / schema recheck 保持 green
+[✓] 15 CR-2.1 atomic commit / quarantine seal / no-silent-drop 保持 green
+[✓] 16 migration 017 from-zero + upgrade 保持 green
+[ ]  17 Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full CI green（本批推送后 API 正向确认，SHA 回填）
+```
+
+## §6 Exit Gate 对照（11 项）
+
+```text
+[✓] anchored raw persistence 是正式 production 写入边界（AnchoredRawEvidenceWriter + 结构守卫）
+[✓] formal/spike evidence 成功与失败路径均自动生成 anchor（ProbeContext 接线；run_dry_run 同路径）
+[✓] RawWriter commit result evidence hash 与 anchor exact cross-binding（verify-only reread + enroll keyed to commit identity）
+[✓] write→anchor 间 meta tamper 不可能被首次 enroll 为新真值（TOCTOU HARD FAIL 测试）
+[✓] anchor enrollment failure fail closed 且 exact retry 可恢复（注入失败 + retry 测试）
+[✓] production normal callable 不存在 unanchored RawWriter write bypass（AST 结构守卫 + ProbeContext conn 必需）
+[✓] anchor 永不 rebaseline（same-H1 idempotent / H2 hard conflict 测试）
+[✓] existing CR-2.3 operation spec / output-set / semantic seal 无 regression（104 项回归全绿）
+[✓] existing CR-2.2 / 2.1 frozen contracts 无 regression（回归全绿）
+[✓] migration 017 chain green（17 链 from-zero/upgrade/idempotent/tamper 回归）
+[ ]  full CI green（本批推送后 API 正向确认，SHA 回填）
+```
+
+## Verification Summary
+
+- Local: **985 / 0**（975 → 985，+10：TestAnchoredIngestionBoundary 10 项；normalization 114 = 104 回归 + 10 新增；13 个 spike/formal-gate 测试文件 ProbeContext 接线后全绿）；ruff check / ruff format / mypy 全绿（63 文件零错）；CI 同款命令 `uv run pytest` 复验 985/0
+- ADR-022 Amendment D（status 仍 PROPOSED）；无 schema 变更（复用 migration 017 anchor 表）；已冻结语义零重写（operation spec / runner anchor lookup / output-set semantic seal 均未改动）
+- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）

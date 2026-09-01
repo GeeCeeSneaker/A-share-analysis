@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from _anchored_ctx import anchored_conn
+
 from ashare_state.providers.errors import ProviderPermissionError
 from ashare_state.spike.catalog import CaseCatalog
 from ashare_state.spike.golden_router import route_all
@@ -41,7 +43,7 @@ def _ctx(tmp_path: Path, target=None) -> tuple[ProbeContext, RunStore]:
         as_of_date="20260814",
     )
     catalog = CaseCatalog(store, run.spike_run_id)
-    return ProbeContext(run, store, catalog, target or FakeTarget()), store
+    return ProbeContext(run, store, catalog, target or FakeTarget(), anchored_conn()), store
 
 
 def _case(case_id: str, case_type: str, symbol: str, trade_date: str, expected=None):

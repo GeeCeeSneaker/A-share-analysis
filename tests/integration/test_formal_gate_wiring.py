@@ -25,6 +25,7 @@ import json
 from pathlib import Path
 
 import pytest
+from _anchored_ctx import anchored_conn
 
 from ashare_state.providers.amazingdata.endpoint_requirements import (
     endpoint_requirement_case_id,
@@ -81,15 +82,15 @@ class _SelectiveNoPersistContext(ProbeContext):
     lets a single gate position (permission=0, endpoint=1, business=2)
     hit the persistence failure while the upstream ones bind normally."""
 
-    def __init__(self, run, store, catalog, target, fail_on: set[int]) -> None:
-        super().__init__(run, store, catalog, target)
+    def __init__(self, run, store, catalog, target, conn, fail_on: set[int]) -> None:
+        super().__init__(run, store, catalog, target, conn)
         self._fail_on = fail_on
         self._persist_calls = 0
 
     @classmethod
     def fail_on_factory(cls, fail_on: set[int]):
-        def make(run, store, catalog, target):
-            return cls(run, store, catalog, target, fail_on=fail_on)
+        def make(run, store, catalog, target, conn):
+            return cls(run, store, catalog, target, conn, fail_on=fail_on)
 
         return make
 
@@ -114,7 +115,7 @@ def _ctx(tmp_path: Path, target=None, context_cls=ProbeContext) -> ProbeContext:
         as_of_date="20260814",
     )
     catalog = CaseCatalog(store, run.spike_run_id)
-    return context_cls(run, store, catalog, target or FakeTarget())
+    return context_cls(run, store, catalog, target or FakeTarget(), anchored_conn())
 
 
 def _raw_files(ctx: ProbeContext) -> list[Path]:
