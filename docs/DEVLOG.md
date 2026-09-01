@@ -45,10 +45,10 @@
 **Verification**
 - Local: **1025 tests passed / 0 failed**（985 → 1025，+40：TestBoundaryStructure 4 / TestClosureVerification 2 / TestAvailability 4 / TestIdentityResolution 3 / TestSelection 7 / TestRunIdentity 5 / TestDomainMatrix 6 / TestLedgerAndArtifacts 3 / TestRawWriterGuardHardening 4 + guard 重构）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1025/0
 - audit §8 矩阵 30 类全对应（无 SDK import / 无 caller policy 参数 / BLOCKED·PARTIAL eligibility / closure·semantic tamper / as_of 先行 / 无伪造 available_at / policy version 新 run / identity missing·ambiguous·无前缀 fallback / 重复 key / deterministic winner / EQUIVALENT_MERGED / SOURCE_CONFLICT / 顺序无关 / 行序无关 semantic hash / 三 identity 变化新 run / CA tier / AST 无制度事实）；CR-2.x 冻结回归零破坏（985 项全保持）
-- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+- GitHub Actions: **run `33498314119`（implementation `ae5b76c998196f936ae6430408d2a016a35aec0d`）三腿 success**——Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success（Windows 3.14 腿 DEVLOG gate + Management-doc gate success）；2026-09-01 API positive confirmation，一次通过零修复轮次
 
 **Implementation Status**
-- DONE（15 P0 全交付 + P1 guard 闭环 + migration 018 + ADR-023 + ADR-022 ACCEPTED 同步；1025/0；Review Status: PENDING_REVIEW）
+- DONE（15 P0 全交付 + P1 guard 闭环 + migration 018 + ADR-023 + ADR-022 ACCEPTED 同步；1025/0；implementation `ae5b76c998196f936ae6430408d2a016a35aec0d`；Review Status: PENDING_REVIEW）
 
 **关键决策**
 - available_at 选 raw envelope received_at 而非 normalization run 时间：received_at 是 provider 应答时刻（数据存在的最早系统证据），比 run/anchor 时间更早更保守；且它是 CR-2 bound evidence 的一部分（不引入新信任源）

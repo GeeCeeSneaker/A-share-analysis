@@ -775,7 +775,7 @@ migration 018：`meta_canonicalization_run`（24 列：run identity + as_of + co
 [✓] 27 code fingerprint change -> new run/history exact replay（含 rollback replay）
 [✓] 28 CA STATUS_FLAG_PROJECTION 不能替代 DIRECT_EVENT
 [✓] 29 AST guard 无 institutional limit-price facts hardcoded
-[ ]  30 Windows 3.12 / 3.14 / Ubuntu 3.14 full CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] 30 Windows 3.12 / 3.14 / Ubuntu 3.14 full CI green（run `33498314119`，implementation `ae5b76c998196f936ae6430408d2a016a35aec0d`，三腿 success + Windows 3.14 腿 DEVLOG/Management-doc gate success，2026-09-01 API positive confirmation）
 ```
 
 另：CR-2.4 P1 guard 加固已纳入本批（§2 建议）：
@@ -810,7 +810,7 @@ migration 018：`meta_canonicalization_run`（24 列：run identity + as_of + co
 [✓] deterministic run identity / historical exact replay（三方 seal 复验 + tamper fail closed）
 [✓] additive migration from-zero + upgrade green（18 链 + probe 019）
 [✓] all CR-2/B2/B1/A3/A2/CR-1 frozen regressions green（985 项全保持）
-[ ]  full 3-leg CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] full 3-leg CI green（run `33498314119` 三腿 success，API positive confirmation）
 [✓] ADR-023 created（PROPOSED）
 [✓] ADR-022 + ADR index synchronized to ACCEPTED（本批完成）
 [✓] DEVLOG / DEVELOPMENT_MANAGEMENT synchronized（本批完成）
@@ -820,4 +820,5 @@ migration 018：`meta_canonicalization_run`（24 列：run identity + as_of + co
 
 - Local: **1025 / 0**（985 → 1025，+40：canonical 36 项 + guard 加固 4 项）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1025/0
 - ADR-023 PROPOSED（新建）；ADR-022 → **ACCEPTED**（正文 + 索引同步）；migration 018（未改旧文件）；CR-2.x 冻结契约零改动（runner.py 仅新增只读 verifier）
-- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）
+- **Implementation SHA：`ae5b76c998196f936ae6430408d2a016a35aec0d`；CI run `33498314119` 三腿 success**（Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success，Windows 3.14 腿 DEVLOG gate + Management-doc gate success；2026-09-01 API positive confirmation，一次通过零修复轮次）
+- §8 矩阵 30 类 / §9 Exit Gate 24 项全过（CI 项据 API positive confirmation 关闭）；SHA 由 docs 回填 commit 补记（历史不改写——本 Mapping 一次写成后仅补记本节）
