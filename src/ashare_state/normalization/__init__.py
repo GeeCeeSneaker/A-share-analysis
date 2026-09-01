@@ -25,6 +25,7 @@ from ashare_state.normalization.runner import (
     NormalizationRunner,
     NormalizationRunnerError,
     NormalizationRunResult,
+    NormalizationRunSeal,
 )
 
 __all__ = [
@@ -36,6 +37,7 @@ __all__ = [
     "NormalizationRunner",
     "NormalizationRunnerError",
     "NormalizationRunResult",
+    "NormalizationRunSeal",
     "QuarantineScope",
     "SurfaceSupport",
     "lookup_spec",

@@ -172,7 +172,6 @@ class AmazingDataProvider:
         *,
         params: dict[str, Any] | None = None,
         require_capability: str | None = None,
-        normalization_surface: str | None = None,
     ) -> Any:
         """One SDK exchange: gated, stdout-captured, budgeted, recorded.
 
@@ -182,15 +181,19 @@ class AmazingDataProvider:
         error carrying the terminal state/reason/evidence, raised before
         any capability check or SDK call).
 
-        CR-2.1 (audit 20260831 §2): ``normalization_surface`` defaults to
-        the capability identity of this exchange - the SYSTEM-DERIVED
-        business surface persisted on the raw envelope. Wrappers whose
-        dataset+endpoint pair serves MULTIPLE business surfaces pass it
-        explicitly (see query_kline_exchange vs
-        query_index_kline_exchange); it is never caller-request data."""
+        CR-2.2 (audit 20260901 §2): the normalization surface identity is
+        STRICTLY derived from the provider-owned capability contract
+        (``surface_identity = require_capability``) - there is NO caller
+        override parameter. Wrappers whose dataset+endpoint pair serves
+        MULTIPLE business surfaces distinguish themselves ONLY through
+        their require_capability (query_kline_exchange ->
+        capability=daily_bar vs query_index_kline_exchange ->
+        capability=index_daily); an ordinary caller can never declare a
+        correctness identity (same ruling as B1/B2: caller-declared
+        identity is not system-derived)."""
         self.session.lifecycle.require_ready(endpoint)
         cap_status = self._gate_capability(require_capability)
-        surface_identity = str(normalization_surface or require_capability or "")
+        surface_identity = str(require_capability or "")
         params = params or {}
         requested_at = datetime.now(UTC).isoformat()
         started = time.monotonic()
@@ -513,7 +516,6 @@ class AmazingDataProvider:
                 "trading_days": list(days),
             },
             require_capability="daily_bar",
-            normalization_surface="daily_bar",
         )
 
     def query_kline(
@@ -538,14 +540,16 @@ class AmazingDataProvider:
         kline_type: str = "DAY",
         trading_days: list[int] | None = None,
     ) -> Any:
-        """Explicit-exchange INDEX kline query (CR-2.1 audit 20260831 §2).
+        """Explicit-exchange INDEX kline query (CR-2.1 audit 20260831 §2
+        / CR-2.2 audit 20260901 §2).
 
         The index daily surface rides the SAME MarketData.query_kline
         endpoint and provider_dataset=daily_bar pair as the stock
-        surface - ONLY the system-derived ``normalization_surface``
-        ("index_daily") persisted on the raw envelope distinguishes
-        them. Guessing the surface from symbol prefixes or request
-        params is forbidden; consumers MUST call this wrapper (not
+        surface - ONLY the system-derived surface identity (derived
+        from this wrapper's require_capability="index_daily" and
+        persisted on the raw envelope) distinguishes them. Guessing
+        the surface from symbol prefixes or request params is
+        forbidden; consumers MUST call this wrapper (not
         ``query_kline_exchange``) for index klines.
         """
         days = trading_days
@@ -569,7 +573,6 @@ class AmazingDataProvider:
                 "trading_days": list(days),
             },
             require_capability="index_daily",
-            normalization_surface="index_daily",
         )
 
     def query_index_kline(

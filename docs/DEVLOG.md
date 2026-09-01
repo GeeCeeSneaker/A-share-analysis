@@ -17,6 +17,47 @@
 
 ---
 
+## 2026-09-01 · CR-2.2 Replay Provenance Seal（CR-2.1 复审 REOPENED 后的收口批次）
+
+**Scope**
+- CR-2.1 复审（audit 20260901 10:15 +08:00，Reviewed HEAD `70bb1018e8445a3b9d2b5897f3f0b4a4260cb0a`）裁决 **CR-2.1 REOPENED**：收口方向保留，3 个 P0 correctness identity 缺口由本批 CR-2.2 收口（**未启动 CR-3**——复审 §6 边界；CR-3 BLOCKED_BY_CR-2.2）；复审 §2.4/§3.5/§4.6 测试清单全对应
+
+**Implementation**
+- **P0-01 Surface 真正 system-derived**：撤销 `call_exchange` 的 `normalization_surface` caller-override 可选参数（与 B1/B2 "caller-declared identity is not system-derived" 同裁——具备该参数意味着 low-level call path 可自由声明 correctness 身份，例如带 daily_bar capability 却传出 index_daily surface 的 envelope）；`surface_identity = str(require_capability or "")` capability 契约派生；`query_kline_exchange`（capability=daily_bar）与 `query_index_kline_exchange`（capability=index_daily）仅靠 capability 区分；registry 18 条映射不变（surface 值本就等于 capability 名，零数据迁移）；结构测试断言签名无该参数 + provider.py 全部 `_call_or_exchange` 调用点无该 kwarg + 派生表达式
+- **P0-02 Raw Evidence Binding 冲突不可洗白 + 全历史 exact replay**：baseline = 该 request 全部**非 conflict** run 的 DISTINCT `raw_evidence_hash`（`evidence_conflict=TRUE` 排除，migration 016 新列）；current hash 不在 baseline（且非空）→ **INCIDENT HARD BLOCK**（conflict run 记录但不改变 baseline——观察篡改的 BLOCK run 不洗白篡改）；第二/三次运行同样 BLOCK；conflict run 自身按 exact key 幂等 replay（一 ledger 行）；surface 篡改（meta surface 字段改 index_daily）→ bytes 变 → conflict BLOCK 永续、永不产出 index_daily SUCCESS；修复回原始 bytes → 原 run 照常 exact replay；exact replay lookup 重写为 `run_id = uuid5(namespace, idempotency_key)` 直接查询 ledger（**不再 latest-run ORDER BY 比较**）——mapper A→B→A / contract A→B→A rollback replay 历史 A run（无 duplicate-PK 错误、无 B 阴影）；全部 blocked 分支（含 multi-table / accounting violation）统一 exact lookup
+- **P0-03 Full Seal 消费**：`_supported_key`/`_blocked_key` 混入**完整** `MAPPER_CODE_FINGERPRINT`（64 hex；显示串仍 16 hex——correctness hash input 不得缩短，前 16 位相同的两个 fingerprint 产生不同 run identity）；typed **`NormalizationRunSeal`** dataclass：`from_ledger()` 构造 + `current_provenance_problems()`（ledger == 当前 contract + 当前 full fingerprint，defense in depth，捕获 ledger 篡改）+ `manifest_binding_problems()`（manifest 全语义字段 == ledger seal：run_id/provider/surface/dataset/endpoint/request/evidence_hash/contract/mapper_identity/mapper_code_hash/status/input_count/normalized_count/quarantined_count + quarantine 三方绑定 manifest == ledger == DB recompute）；manifest policy typed 化（**SUCCESS/PARTIAL manifest REQUIRED**——ledger status 翻转伪造不出 manifest-free healthy replay；BLOCKED 携带即验证）；**schema_hash 重算**（replay 从物理 parquet 重算 `sha256(str(frame.schema))` 与 manifest 比对——rebind 换 parquet + 更新 content_hash 仍被拦截）
+- **Migration 016**：`meta_provider_normalization_run` + `evidence_conflict BOOLEAN DEFAULT FALSE`（未改 014/015）；16 链 from-zero + upgrade（001..015 先应用再补 016 仅应用尾部）+ idempotent + tamper 测试（probe 迁移顺延 017）
+
+**Schema / Contract Changes**
+- C2 ×1（DM-20260901-065）；**ADR-022 Amendment B**（§7.1-§7.3 修订 Amendment A 中被复审推翻的三处表述；status 仍 PROPOSED 待 Reviewer closure）；migration 016；contract 版本未 bump（`cr2.1-v1` 语义不变——CR-2.2 是 identity/seal 收口，不是 registry 语义变更，且 full fingerprint 混入已使 key 空间天然区分新旧实现）
+- surface identity 语义源变更（capability 派生）不产生数据迁移：registry surface 值本就等于 capability 名
+
+**Verification**
+- Local: **955 tests passed / 0 failed**（938 → 955，+17：TestRawEvidenceBindingPermanence 5 / TestFullMapperIdentity 1 / TestFullSealConsumption 10 / 结构签名 1；normalization 84 = 67 回归 + 17 新增；migrations 11 含 16 链 upgrade）；ruff check / ruff format / mypy 全绿（61 文件零错）；CI 同款命令 `uv run pytest` 复验 955/0
+- 既有回归零破坏：CR-2/CR-2.1 对抗矩阵 67 项全保持；R4-B2.x / B1.x / A3.x / A2.x / CR-1.x 冻结契约零破坏；CR-3 语义零泄漏
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+
+**Implementation Status**
+- DONE（3 P0 全收口 + migration 016 + ADR-022 Amendment B + DM-20260901-065；955/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- conflict 排除用显式结构化列 `evidence_conflict`（migration 016）而非 error_message 前缀匹配——audit 历来反对 message-driven truth；列默认 FALSE 使 legacy 行语义正确（每个既有 run 绑定其读取时的真实 hash）
+- exact replay lookup 直接按确定性 run_id 查询（uuid5 over key）：O(1) PK 查询替代 latest-run 比较，天然支持全历史回溯（A→B→A rollback）；dup-guard（_commit_ledger 内 INSERT 前 exists 检查）保留为最后防线
+- typed seal 的 current_provenance_problems 在 key 匹配之外显式比对 ledger.mapper_code_hash == 当前 full fingerprint：idempotency key 是 sha256 单向混合，无法逆推——显式比对提供 defense in depth（ledger 篡改场景）
+- manifest["normalization_surface"]（str，可能 ""）与 ledger（NULL 或 str）比对时统一 normalize（None → ""）——legacy meta 无 surface 字段的 SUCCESS run 仍能 replay
+- rebind tamper 测试 helper 同时重写 manifest 文件 + UPDATE ledger hash——证明 seal 消费比对的是语义字段而非外层文件哈希
+- contract 版本不 bump：CR-2.2 未改 registry 语义（surface 值映射不变），full fingerprint 混入已使 key 空间区分新旧实现；bump 反而会使全部 CR-2.1 旧 run 变成"可重跑"而非"可 replay"，无益且引入 churn
+
+**下一步**
+- 等 Reviewer 复审 CR-2.2（复审 §7 Exit Gate 15 项）；Exit Gate 全过 → CR-2 / CR-2.1 / CR-2.2 → VERIFIED / CLOSED / FREEZE，ADR-022 → ACCEPTED，**CR-3 AvailabilityPolicy + Canonicalizer START**
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
+---
+
+---
+
 ## 2026-08-31 · CR-2.1 Surface Identity + Registry Boundary + Full-State Replay + Atomic Commit Closure（CR-2 复审 REOPENED 后的收口批次）
 
 **Scope**

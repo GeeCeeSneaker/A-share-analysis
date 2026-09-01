@@ -772,3 +772,86 @@ Snapshot / ReadModel                ░░░░░░░░░░ 0%（尚未�
 ```
 
 条形图表示能力的工程闭环程度，不等同精确工时/代码量百分比。
+
+---
+
+# 9. Implementation Mapping（开发方填写，2026-09-01）
+
+## §2 P0-01 Surface Provenance
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 撤销 caller override 参数 | `provider.py::call_exchange` 签名删除 `normalization_surface` 参数 | `TestRegistryStructuralGuard::test_call_exchange_has_no_surface_override_parameter`（inspect 签名 + 派生表达式断言） |
+| surface = capability 契约派生 | `surface_identity = str(require_capability or "")` | 同上（源断言）；`test_provider_facade_kline_wrappers_declare_distinct_surfaces`（全部 `_call_or_exchange` 调用点无该 kwarg；双 wrapper capability 分别为 daily_bar / index_daily） |
+| 低层 caller 无法伪造 | 签名层面不存在该参数；`query_kline_exchange`（capability=daily_bar）与 `query_index_kline_exchange`（capability=index_daily）仅靠 capability 区分；registry 18 条 surface 值 == capability 名（零数据迁移） | 既有 `test_stock_and_index_surfaces_route_to_distinct_mappers`（schema 互斥）回归保持 |
+
+## §3 P0-02 Evidence Binding + Exact Replay
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 3.4-A baseline 不可被 BLOCK 洗白（Option A） | `runner.py::run` 头部：baseline = 非 conflict run 的 DISTINCT `raw_evidence_hash`（`NOT COALESCE(evidence_conflict, FALSE)`）；不在 baseline → INCIDENT HARD BLOCK（conflict run `evidence_conflict=TRUE`） | `TestRawEvidenceBindingPermanence::test_hash_conflict_blocks_repeatedly`（三次运行全 BLOCK；无 H2 健康行；conflict 标记计数） |
+| 3.5-1 H1→H2 三次 BLOCK | 同上 | 同上（含 conflict run 幂等 replay 断言：`test_blocked_conflict_run_replays_idempotently`——一 ledger 行） |
+| 3.5-2 surface 篡改永不 SUCCESS | meta surface 改 index_daily → bytes 变 → conflict BLOCK 永续 | `test_surface_swap_tamper_never_succeeds`（两次运行 BLOCK；无 index_daily 非 BLOCKED 行） |
+| 3.5-3 修复回 H1 replay 原 run | baseline 未被污染 → 原 key → exact lookup → 原 run | `test_repaired_hash_replays_original_run`（replay=True；run_id==原 run；ledger 恰 2 行） |
+| 3.4-B exact replay lookup（全历史） | `_maybe_replay(key)`：`run_id = uuid5(namespace, key)` 直接查询 ledger（删除 latest-run 比较） | 既有 5 项幂等回归 + 以下 rollback 项 |
+| 3.5-4 mapper A→B→A rollback | full-history lookup | `test_mapper_rollback_replays_historical_run`（replay 历史 A；无 duplicate-PK；ledger 恰 2 行） |
+| 3.5-5 contract A→B→A rollback | contract 引用改为 `_registry.NORMALIZATION_CONTRACT_VERSION` 动态取值 | `test_contract_rollback_replays_historical_run`（monkeypatch contract；rollback replay） |
+
+## §4 P0-03 Full Seal
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 4.1 full mapper hash 进入 identity | `_supported_key`/`_blocked_key` 混入完整 `MAPPER_CODE_FINGERPRINT`（64 hex；显示串仍 16 hex） | `TestFullMapperIdentity::test_first16_collision_yields_distinct_run`（前 16 相同 → 不同 run identity） |
+| 4.2 全量 cross-binding | typed `NormalizationRunSeal`（`runner.py`）：`from_ledger()` / `manifest_binding_problems()` 比对 §4.2 全部字段（provider/surface/dataset/endpoint/request/evidence_hash/contract/mapper_identity/full mapper_code_hash/status/input_count/normalized_count/quarantined_count） | rebind 矩阵（下） |
+| 4.2 quarantine 三方绑定 | manifest.quarantine_set_hash == ledger（`manifest_binding_problems`）+ DB recompute == ledger（既有 `_verify_quarantine_set`） | `test_manifest_quarantine_set_hash_tamper_rebind_blocks`（item 10）/ `test_ledger_quarantine_seal_tamper_blocks`（item 11） |
+| 4.3 SUCCESS/PARTIAL manifest REQUIRED | `_verify_run_closure`：status ∈ {SUCCESS, PARTIAL} 且 manifest_uri None → problem；BLOCKED 携带即验证 | `test_ledger_status_flip_without_manifest_blocks`（item 8：ledger status 翻 SUCCESS 无 manifest → DAMAGED） |
+| 4.4 schema_hash 重算 | `_verify_manifest_outputs`：`sha256(str(frame.schema))` recompute 与 manifest outputs[].schema_hash 比对 | `test_output_schema_hash_recompute_blocks`（item 14：换 schema parquet + content_hash rebind → DAMAGED） |
+| 4.5 typed seal + current 比对 | `current_provenance_problems()`：ledger contract == 当前 contract；ledger mapper_code_hash == 当前 full fingerprint（defense in depth） | `test_ledger_mapper_code_hash_tamper_blocks`（item 12） |
+| 4.6 rebind tamper 矩阵 | `_rebind_manifest` helper：改 manifest JSON + 重写文件 + UPDATE ledger hash | items 6/7/9/10/13：surface/status/counts/quarantine_set_hash/mapper_code_hash 各一项 rebind → DAMAGED；item 15 同 §4.1 |
+
+### §4.6 清单对照（编号 6-15）
+
+```text
+[✓] 6  manifest normalization_surface 改错 + rebind -> BLOCK
+[✓] 7  manifest status 改 SUCCESS + rebind -> BLOCK
+[✓] 8  ledger status BLOCKED->SUCCESS 无 manifest -> BLOCK
+[✓] 9  manifest input_count 改错 + rebind -> BLOCK
+[✓] 10 manifest quarantine_set_hash 改错 + rebind -> BLOCK
+[✓] 11 ledger quarantine_set_hash 与 manifest 不一致 -> BLOCK
+[✓] 12 ledger full mapper_code_hash 与 current 不一致 -> BLOCK
+[✓] 13 manifest full mapper_code_hash 与 current 不一致 + rebind -> BLOCK
+[✓] 14 physical parquet schema / manifest schema_hash 不一致（content_hash 已 rebind）-> BLOCK
+[✓] 15 same first16 mapper hash, different remaining bits -> new run identity
+```
+
+## §6 Exit Gate 对照
+
+```text
+[✓] normalization_surface cannot be overridden by ordinary production caller（签名无参数 + AST 无 kwarg）
+[✓] surface derived from provider-owned capability contract（surface_identity = require_capability）
+[✓] stock/index exact routing remains green（既有双路由测试回归）
+[✓] legacy ambiguous raw remains fail closed（既有 PAYLOAD_SURFACE_AMBIGUOUS 测试回归）
+[✓] raw evidence hash conflict can never become the next accepted baseline（evidence_conflict 排除查询）
+[✓] repeated runs over conflicting/tampered raw remain blocked（三次 BLOCK 测试）
+[✓] repaired original raw can replay the original exact historical run（修复回 H1 replay 测试）
+[✓] exact replay lookup searches by exact idempotency identity, not latest-run equality（uuid5 run_id 直接查询）
+[✓] mapper A -> B -> A rollback replays historical A（rollback 测试）
+[✓] full mapper SHA-256 enters correctness/idempotency identity（key 混入 full fp）
+[✓] ledger / manifest / current surface+contract+mapper full seal cross-bound（NormalizationRunSeal）
+[✓] quarantine_set_hash recomputes DB exact set and matches BOTH ledger and manifest（三方绑定测试 items 10/11）
+[✓] SUCCESS/PARTIAL manifest-required invariant enforced（item 8）
+[✓] output content/schema/row-count all physically reverified（item 14 + 既有 content/row_count 测试）
+[✓] rebind-style adversarial tamper tests block（§4.6 矩阵 10 项）
+[✓] CR-2.1 atomic/recovery + immutable registry tests remain green（67 项回归全过）
+[✓] existing no-sentinel/no-silent-drop/locator/provider-faithful tests remain green
+[✓] migrations from-zero/upgrade green（migration 016：16 链 from-zero + 001..015→016 upgrade + idempotent + tamper probe 017）
+[ ]  Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] ADR-022 remains PROPOSED until Reviewer closure（Amendment B 已追加；status 未改）
+[✓] DEVLOG / DEVELOPMENT_MANAGEMENT current truth synced（本批同步更新）
+```
+
+## Verification Summary
+
+- Local: **955 / 0**（938 → 955，+17；normalization 84 = 67 回归 + 17 新增；migrations 11 含 16 链）；ruff check / ruff format / mypy 全绿（61 文件零错）；CI 同款命令 `uv run pytest` 复验 955/0
+- ADR-022 Amendment B（status 仍 PROPOSED）；migration 016（未改 014/015）；contract 版本未 bump（`cr2.1-v1`——CR-2.2 是 identity/seal 收口而非 registry 语义变更，full fingerprint 混入已使 key 空间天然区分新旧实现）
+- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）

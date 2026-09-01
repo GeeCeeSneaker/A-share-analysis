@@ -1,9 +1,9 @@
 # ADR-022: Provider Normalization and Quarantine（提供方归一化与隔离）
 
-- **Status**: PROPOSED（2026-08-31，CR-2 批次交付 + CR-2.1 Amendment A 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
+- **Status**: PROPOSED（2026-08-31，CR-2 批次交付 + CR-2.1 Amendment A 收口 + 2026-09-01 CR-2.2 Amendment B 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
 - **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
-- **Date**: 2026-08-31（CR-2）/ 2026-08-31（Amendment A，CR-2.1）
-- **Work Requirement**: `docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md` + `docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md`
+- **Date**: 2026-08-31（CR-2）/ 2026-08-31（Amendment A，CR-2.1）/ 2026-09-01（Amendment B，CR-2.2）
+- **Work Requirement**: `docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md` + `docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md` + `docs/design/A-share-analysis_CR-2.1复审与CR-2.2最终ReplayProvenanceSeal收口要求_20260901.md`
 - **Related**: [ADR-021](ADR-021_publish_validation_exactness.md)（其 B1/B2 的 boundary/registry/seal 模式被本 ADR 复用于数据层）；CR-1（RawWriter exact evidence，输入侧）
 
 ## 1. Context（audit 20260831 §3-§4）
@@ -158,8 +158,9 @@ BLOCKED，不得伪造完成。"尽力解析"半验证字段正是 sentinel 风�
 ## 5. DM 登记
 
 管理总册 §61：DM-CR-20260831-063（registry + runner + migration 014 +
-对抗测试）+ DM-CR-20260831-064（CR-2.1 收口 amendment）。相关：§44 CR-2
-acceptance 对照。
+对抗测试）+ DM-CR-20260831-064（CR-2.1 收口 amendment）+
+DM-20260901-065（CR-2.2 Replay Provenance Seal amendment）。相关：§44
+CR-2 acceptance 对照。
 
 ---
 
@@ -284,3 +285,106 @@ CR-2.1 仅做 Raw -> Provider-Normalized + Quarantine correctness closure；
 **未引入** AvailabilityPolicy / SourcePolicy reconciliation /
 cross-provider Canonical selection / SnapshotBuilder / Feature / State
 （CR-3 语义零泄漏，测试断言）。
+
+---
+
+# 7. Amendment B：CR-2.2 Replay Provenance Seal（2026-09-01，audit "CR-2.1复审与CR-2.2最终ReplayProvenanceSeal收口要求"）
+
+CR-2.1 复审（2026-09-01 10:15 +08:00，Reviewed HEAD `70bb101`）裁决
+**REOPENED**：CR-2.1 的收口方向保留，但 surface provenance、conflict
+permanence、seal 消费三处 correctness identity 缺口由 CR-2.2 收口。
+**本 amendment 修订 Amendment A 中被复审推翻的表述；原文保留在上文，
+以本节为准。**
+
+## 7.1 P0-01 Surface 真正 system-derived（修订 §6.1 的可选参数）
+
+§6.1 中 `call_exchange(normalization_surface=...)` 的可选 caller 参数
+**撤销**（audit §2：具备该参数意味着 call path 在 low level 可自由
+声明 correctness 身份——例如带 daily_bar capability 却传出 index_daily
+surface 的 envelope；与 B1/B2 "caller-declared identity is not
+system-derived" 的裁决冲突）。CR-2.2 起：
+
+```text
+surface_identity = str(require_capability or "")   # capability 契约派生
+```
+
+- `call_exchange` 签名不再含 normalization_surface 参数（结构测试断言）；
+  provider.py 中任何 `_call_or_exchange` 调用点不再携带该 kwarg；
+- `query_kline_exchange`（require_capability=daily_bar）与
+  `query_index_kline_exchange`（require_capability=index_daily）仅通过
+  capability 区分——registry 的 normalization_surface 值本就等于
+  capability 名（§6.1 的 18 条映射不变，无需数据迁移）；
+- 由此同时修复"签名可选参数使 surface 归属从定义性降级为约定性"的问题。
+
+## 7.2 P0-02 Raw Evidence Binding 冲突不可洗白 + 全历史 exact replay（修订 §6.3）
+
+§6.3 的 latest-run hash equality 检查有两个缺陷（audit §3）：
+conflict BLOCK 记录会把新 hash 写成下一次可接受 baseline（第二次运行
+H2 就不再触发 hash conflict，closure 通过后可产出 SUCCESS）；
+latest-run 比较会掩盖历史 exact match。CR-2.2 起：
+
+**Binding（audit §3.4 Option A）**：
+
+```text
+baseline = DISTINCT raw_evidence_hash of the request's runs
+           WHERE NOT evidence_conflict
+current hash NOT IN baseline (and baseline non-empty)
+  -> INCIDENT HARD BLOCK：conflict run 记录（evidence_conflict = TRUE，
+     migration 016 新列），不改变 baseline；第二次/第三次运行同样 BLOCK
+     （conflict run 自身按 exact key 幂等 replay，一 ledger 行）
+修复回原始 bytes -> 原 run 照常 exact replay（baseline 未被污染）
+```
+
+**Exact replay lookup（audit §3.3）**：
+
+```text
+run_id = uuid5(namespace, idempotency_key)   # deterministic
+存在 ledger -> _require_verified_replay（closure 复验后幂等返回）
+不存在      -> 新 run
+```
+
+不再依赖 latest-run（ORDER BY started_at DESC LIMIT 1）比较：mapper
+A -> B -> A rollback 后 replay 的是历史 A run（非 B 的重复、无
+duplicate-PK 错误）；contract A -> B -> A 同理。全部 blocked 分支
+（含 multi-table / accounting violation）统一走 exact lookup。
+
+## 7.3 P0-03 Full Seal 消费（修订 §6.4 的 seal 边界）
+
+- **Full mapper hash 进入 identity**（audit §4.1）：`_supported_key` /
+  `_blocked_key` 混入 **完整** `MAPPER_CODE_FINGERPRINT`（64 hex）——
+  显示串（`mapper_identity` 尾部 `#fp[:16]`）可缩短，correctness hash
+  input 不得缩短；前 16 位相同的两个 fingerprint 产生不同 run identity
+  （测试覆盖）。
+- **Typed `NormalizationRunSeal`**（audit §4.5）：dataclass 承载 ledger
+  侧 seal（run_id / provider / normalization_surface / provider_dataset /
+  endpoint / raw_request_id / raw_evidence_hash / contract_version /
+  mapper_identity / **mapper_code_hash(full)** / status / input_count /
+  normalized_count / quarantined_count / quarantine_set_hash），
+  `from_ledger()` 构造、`current_provenance_problems()`（ledger ==
+  当前 contract + 当前 full fingerprint，defense in depth）、
+  `manifest_binding_problems(manifest)`（manifest 全语义字段 == ledger
+  seal + quarantine 三方绑定 manifest == ledger）。
+- **Manifest policy typed 化**（audit §4.3）：SUCCESS/PARTIAL run 的
+  manifest 为 REQUIRED（ledger status 翻转伪造不出 manifest-free 的
+  healthy replay）；BLOCKED run 仅在物化了 empty-output evidence
+  （row scope）时携带 manifest——携带即验证。
+- **schema_hash 重算**（audit §4.4）：replay 时从物理 parquet 重算
+  `sha256(str(frame.schema))` 与 manifest 比对——rebind 攻击（换
+  parquet + 更新 content_hash）仍被 schema seal 拦截。
+- **Rebind tamper 矩阵**（audit §4.6，10 项）：manifest
+  surface/status/counts/quarantine_set_hash/mapper_code_hash 篡改 +
+  重算外层 hash + UPDATE ledger hash -> DAMAGED；ledger
+  status/quarantine seal/mapper_code_hash 篡改 -> DAMAGED；
+  output schema 换绑 -> DAMAGED。
+
+## 7.4 CR-2.2 对抗测试（17 项新增）
+
+`tests/integration/test_provider_normalization.py`（84 项 = CR-2/2.1
+67 项回归 + 17 新增）+ migration 16 链 from-zero/upgrade/tamper；
+audit §2.4/§3.5/§4.6 清单全对应。总体 955/0。
+
+## 7.5 Scope 边界
+
+CR-2.2 仍不引入 CR-3 语义（AvailabilityPolicy / SourcePolicy /
+Canonicalizer / SnapshotBuilder）；schema 变更仅 migration 016
+（`evidence_conflict BOOLEAN DEFAULT FALSE`，未改 014/015）。

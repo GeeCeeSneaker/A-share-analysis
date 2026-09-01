@@ -458,7 +458,7 @@ class TestImmutableRegistry:
         for forbidden in ("spec", "registry", "mapper", "mappers", "code_commit"):
             assert forbidden not in init_params, forbidden
         run_params = inspect.signature(NormalizationRunner.run).parameters
-        for forbidden in ("spec", "registry", "mapper", "mappers", "surface"):
+        for forbidden in ("spec", "registry", "mapper", "mappers", "surface", "code_commit"):
             assert forbidden not in run_params, forbidden
 
     def test_lookup_is_exact_typed_routing(self):
@@ -1787,11 +1787,16 @@ class TestRegistryStructuralGuard:
             assert identity_suffix  # identities carry the typed surface
 
     def test_provider_facade_kline_wrappers_declare_distinct_surfaces(self):
-        """AST: query_kline_exchange and query_index_kline_exchange
-        pass explicit distinct normalization_surface values while
-        riding the same endpoint + dataset."""
+        """CR-2.2 P0-01 (audit 20260901 section 2): the surface identity
+        is STRICTLY derived from the provider-owned capability contract
+        - query_kline_exchange and query_index_kline_exchange
+        distinguish themselves ONLY via require_capability, and NO
+        _call_or_exchange call site carries a normalization_surface
+        override (an ordinary caller can never declare a correctness
+        identity)."""
         tree = ast.parse(PROVIDER_SOURCE.read_text(encoding="utf-8"))
-        surfaces_by_wrapper: dict[str, list[str]] = {}
+        capability_by_wrapper: dict[str, list[str]] = {}
+        surface_overrides: list[str] = []
         for class_node in (n for n in tree.body if isinstance(n, ast.ClassDef)):
             # scope attribution to METHOD-level function defs only -
             # nested closures (e.g. invoke) never own an exchange call
@@ -1803,11 +1808,457 @@ class TestRegistryStructuralGuard:
                         and node.func.attr == "_call_or_exchange"
                     ):
                         for kw in node.keywords:
-                            if kw.arg == "normalization_surface" and isinstance(
+                            if kw.arg == "require_capability" and isinstance(
                                 kw.value, ast.Constant
                             ):
-                                surfaces_by_wrapper.setdefault(method.name, []).append(
+                                capability_by_wrapper.setdefault(method.name, []).append(
                                     str(kw.value.value)
                                 )
-        assert surfaces_by_wrapper.get("query_kline_exchange") == ["daily_bar"]
-        assert surfaces_by_wrapper.get("query_index_kline_exchange") == ["index_daily"]
+                            if kw.arg == "normalization_surface":
+                                surface_overrides.append(method.name)
+        assert surface_overrides == [], (
+            f"call sites still declare a caller-side surface override: {surface_overrides}"
+        )
+        assert capability_by_wrapper.get("query_kline_exchange") == ["daily_bar"]
+        assert capability_by_wrapper.get("query_index_kline_exchange") == ["index_daily"]
+
+    def test_call_exchange_has_no_surface_override_parameter(self):
+        """CR-2.2 P0-01: the low-level ``call_exchange`` signature
+        exposes NO normalization_surface parameter - a caller passing
+        capability='daily_bar' can never produce an index_daily surface
+        envelope, and the surface derivation is capability-only."""
+        from ashare_state.providers.amazingdata.provider import AmazingDataProvider
+
+        params = inspect.signature(AmazingDataProvider.call_exchange).parameters
+        assert "normalization_surface" not in params
+        source = PROVIDER_SOURCE.read_text(encoding="utf-8")
+        assert 'surface_identity = str(require_capability or "")' in source
+
+
+# ------------------------------------------------- CR-2.2 P0-02: provenance
+
+
+def _meta_path(roots: dict[str, Path], dataset: str, request_id: str) -> Path:
+    return roots["raw"] / "provider=amazingdata" / f"dataset={dataset}" / f"{request_id}.meta.json"
+
+
+@pytest.mark.integration
+class TestRawEvidenceBindingPermanence:
+    """CR-2.2 P0-02A (audit 20260901 section 3): a request's raw
+    evidence hash is a PERMANENT binding - a conflicting hash is an
+    INCIDENT HARD BLOCK that can never be legitimized by the BLOCK run
+    that observed it."""
+
+    def test_hash_conflict_blocks_repeatedly(self, conn, env_root):
+        """H1 SUCCESS -> tamper to H2 -> BLOCKED; the SECOND and THIRD
+        runs of the same tampered evidence are STILL BLOCKED (the
+        conflict BLOCK run does not become the new baseline), and the
+        conflict replays idempotently."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-perm",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+        )
+        first = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-perm")
+        assert first.status == "SUCCESS"
+        meta = _meta_path(env_root, "daily_bar", "req-perm")
+        original = meta.read_bytes()
+        doc = json.loads(original)
+        doc["request_params_hash"] = "f" * 64
+        meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        blocked_ids = []
+        for _ in range(3):
+            result = _runner(conn, env_root).run(
+                provider_dataset="daily_bar", request_id="req-perm"
+            )
+            assert result.status == "BLOCKED"
+            assert result.error_class == "RAW_EVIDENCE_INVALID"
+            assert "conflicting raw evidence" in (result.error_message or "")
+            blocked_ids.append(result.normalization_run_id)
+        # the three conflict observations replay the SAME conflict run
+        assert blocked_ids[1] == blocked_ids[0] and blocked_ids[2] == blocked_ids[0]
+        # no SUCCESS/PARTIAL run is ever bound to the tampered hash
+        tampered_hash = hashlib.sha256(meta.read_bytes()).hexdigest()
+        healthy = conn.execute(
+            "SELECT count(*) FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = ? AND raw_evidence_hash = ? "
+            "AND status != 'BLOCKED'",
+            ["req-perm", tampered_hash],
+        ).fetchone()[0]
+        assert int(healthy) == 0
+        # the conflict run is explicitly marked (excluded from baseline)
+        marked = conn.execute(
+            "SELECT count(*) FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = ? AND evidence_conflict = TRUE",
+            ["req-perm"],
+        ).fetchone()[0]
+        assert int(marked) >= 1
+        # exactly one SUCCESS run (the original H1 lineage) + conflict runs
+        successes = conn.execute(
+            "SELECT count(*) FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = ? AND status = 'SUCCESS'",
+            ["req-perm"],
+        ).fetchone()[0]
+        assert int(successes) == 1
+
+    def test_surface_swap_tamper_never_succeeds(self, conn, env_root):
+        """A tampered meta whose surface field is flipped to index_daily
+        changes the meta BYTES (hash conflict) and can NEVER produce an
+        index_daily SUCCESS run - the conflict blocks before routing."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-swap",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+        )
+        assert (
+            _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-swap").status
+            == "SUCCESS"
+        )
+        meta = _meta_path(env_root, "daily_bar", "req-swap")
+        doc = json.loads(meta.read_bytes())
+        doc["normalization_surface"] = "index_daily"  # forge the surface
+        meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        for _ in range(2):
+            result = _runner(conn, env_root).run(
+                provider_dataset="daily_bar", request_id="req-swap"
+            )
+            assert result.status == "BLOCKED"
+            assert result.error_class == "RAW_EVIDENCE_INVALID"
+        index_success = conn.execute(
+            "SELECT count(*) FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = ? AND normalization_surface = 'index_daily' "
+            "AND status != 'BLOCKED'",
+            ["req-swap"],
+        ).fetchone()[0]
+        assert int(index_success) == 0
+
+    def test_repaired_hash_replays_original_run(self, conn, env_root):
+        """H1 SUCCESS -> H2 conflict BLOCK -> the raw evidence is
+        REPAIRED back to the exact original bytes -> the ORIGINAL H1 run
+        is replayed idempotently (no new run, no duplicate)."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-repair",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+        )
+        first = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-repair")
+        assert first.status == "SUCCESS"
+        meta = _meta_path(env_root, "daily_bar", "req-repair")
+        original = meta.read_bytes()
+        doc = json.loads(original)
+        doc["request_params_hash"] = "f" * 64
+        meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        conflict = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-repair"
+        )
+        assert conflict.status == "BLOCKED"
+        # repair: restore the exact original bytes
+        meta.write_bytes(original)
+        repaired = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-repair"
+        )
+        assert repaired.status == "SUCCESS"
+        assert repaired.idempotent_replay is True
+        assert repaired.normalization_run_id == first.normalization_run_id
+        # lineage: one SUCCESS run + one conflict run, nothing else
+        assert _ledger_count(conn) == 2
+
+    def test_mapper_rollback_replays_historical_run(self, conn, env_root, monkeypatch):
+        """mapper identity A -> B -> back to A: the rollback EXACTLY
+        replays the historical A run (full-history exact lookup - no
+        duplicate-PK error, no B-shadowed latest-run comparison)."""
+        import ashare_state.normalization.registry as registry_module
+
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-roll",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+        )
+        run_a = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-roll")
+        assert run_a.status == "SUCCESS" and run_a.idempotent_replay is False
+        monkeypatch.setattr(registry_module, "MAPPER_CODE_FINGERPRINT", "b" * 64)
+        run_b = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-roll")
+        assert run_b.status == "SUCCESS"
+        assert run_b.normalization_run_id != run_a.normalization_run_id
+        monkeypatch.undo()
+        replay_a = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-roll")
+        assert replay_a.idempotent_replay is True
+        assert replay_a.normalization_run_id == run_a.normalization_run_id
+        assert replay_a.manifest_hash == run_a.manifest_hash
+        assert _ledger_count(conn) == 2  # exactly A + B, no duplicates
+
+    def test_contract_rollback_replays_historical_run(self, conn, env_root, monkeypatch):
+        """contract version A -> B -> back to A: same exact-replay
+        semantics across contract identity changes."""
+        import ashare_state.normalization.registry as registry_module
+
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-croll",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+        )
+        run_a = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-croll")
+        monkeypatch.setattr(registry_module, "NORMALIZATION_CONTRACT_VERSION", "cr2.2-test-v9")
+        run_b = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-croll")
+        assert run_b.normalization_run_id != run_a.normalization_run_id
+        monkeypatch.undo()
+        replay_a = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-croll")
+        assert replay_a.idempotent_replay is True
+        assert replay_a.normalization_run_id == run_a.normalization_run_id
+        assert _ledger_count(conn) == 2
+
+
+@pytest.mark.integration
+class TestFullMapperIdentity:
+    def test_first16_collision_yields_distinct_run(self, conn, env_root, monkeypatch):
+        """CR-2.2 P0-03 (audit 4.1): two mapper fingerprints sharing the
+        first 16 hex chars (identical DISPLAY identity) yield DISTINCT
+        run identities - the full SHA-256 enters the idempotency key."""
+        import ashare_state.normalization.registry as registry_module
+
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-fp16",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+        )
+        run_a = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-fp16")
+        real_fp = registry_module.MAPPER_CODE_FINGERPRINT
+        colliding_fp = real_fp[:16] + "e" * 48  # same display prefix
+        monkeypatch.setattr(registry_module, "MAPPER_CODE_FINGERPRINT", colliding_fp)
+        run_b = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-fp16")
+        assert run_b.normalization_run_id != run_a.normalization_run_id
+        assert run_b.idempotent_replay is False
+        assert _ledger_count(conn) == 2
+
+
+def _rebind_manifest(env_root: dict[str, Path], conn, result, dataset: str, mutate) -> None:
+    """Rebind-style tamper: edit the manifest JSON, rewrite the file AND
+    update the ledger's normalized_manifest_hash to match - proving the
+    seal consumption compares semantic fields, not just file bytes."""
+    path = _manifest_path(
+        env_root, dataset, result.raw_request_id, run_id=result.normalization_run_id
+    )
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    mutate(doc)
+    data = json.dumps(doc, sort_keys=True, indent=1, ensure_ascii=False).encode("utf-8")
+    path.write_bytes(data)
+    conn.execute(
+        "UPDATE meta_provider_normalization_run SET normalized_manifest_hash = ? "
+        "WHERE normalization_run_id = ?",
+        [hashlib.sha256(data).hexdigest(), result.normalization_run_id],
+    )
+
+
+@pytest.mark.integration
+class TestFullSealConsumption:
+    """CR-2.2 P0-03 (audit 20260901 section 4): the full provenance seal
+    is CONSUMED on every replay - manifest == ledger == current contract
+    + FULL mapper fingerprint, with schema/counts/quarantine seals all
+    recomputed. Rebind tampering fails closed."""
+
+    def _partial_run(self, conn, env_root, request_id: str):
+        rows = [dict(_DAILY_BAR_ROWS[0]), dict(_DAILY_BAR_ROWS[1])]
+        rows[1].pop("VOLUME")
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id=request_id,
+            payload=rows,
+            surface="daily_bar",
+        )
+        result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id=request_id)
+        assert result.status == "PARTIAL"
+        return result
+
+    def test_manifest_surface_field_tamper_rebind_blocks(self, conn, env_root):
+        result = self._partial_run(conn, env_root, "req-seal-surface")
+        _rebind_manifest(
+            env_root,
+            conn,
+            result,
+            "daily_bar",
+            lambda doc: doc.__setitem__("normalization_surface", "index_daily"),
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-seal-surface")
+
+    def test_manifest_status_tamper_rebind_blocks(self, conn, env_root):
+        result = self._partial_run(conn, env_root, "req-seal-status")
+        _rebind_manifest(
+            env_root,
+            conn,
+            result,
+            "daily_bar",
+            lambda doc: doc.__setitem__("status", "SUCCESS"),
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-seal-status")
+
+    def test_ledger_status_flip_without_manifest_blocks(self, conn, env_root):
+        """A BLOCKED run whose ledger status is flipped to SUCCESS has
+        no manifest - SUCCESS without a manifest binding is not
+        replayable as healthy (typed manifest policy)."""
+        _persist_raw(
+            env_root,
+            dataset="trade_calendar",
+            endpoint="BaseData.get_calendar",
+            request_id="req-seal-flip",
+            payload=["20260810", "bad"],
+            params={"market": "SH"},
+        )
+        result = _runner(conn, env_root).run(
+            provider_dataset="trade_calendar", request_id="req-seal-flip"
+        )
+        assert result.status == "BLOCKED"
+        assert result.manifest_uri is None
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET status = 'SUCCESS' "
+            "WHERE normalization_run_id = ?",
+            [result.normalization_run_id],
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(
+                provider_dataset="trade_calendar", request_id="req-seal-flip"
+            )
+
+    def test_manifest_counts_tamper_rebind_blocks(self, conn, env_root):
+        result = self._partial_run(conn, env_root, "req-seal-counts")
+        _rebind_manifest(
+            env_root,
+            conn,
+            result,
+            "daily_bar",
+            lambda doc: doc.__setitem__("input_count", 999),
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-seal-counts")
+
+    def test_manifest_quarantine_set_hash_tamper_rebind_blocks(self, conn, env_root):
+        result = self._partial_run(conn, env_root, "req-seal-qtz")
+        _rebind_manifest(
+            env_root,
+            conn,
+            result,
+            "daily_bar",
+            lambda doc: doc.__setitem__("quarantine_set_hash", "0" * 64),
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-seal-qtz")
+
+    def test_ledger_quarantine_seal_tamper_blocks(self, conn, env_root):
+        """The ledger's quarantine_set_hash is edited (manifest
+        untouched): the three-way binding (DB recompute == ledger ==
+        manifest) breaks on both sides."""
+        result = self._partial_run(conn, env_root, "req-seal-lqtz")
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET quarantine_set_hash = ? "
+            "WHERE normalization_run_id = ?",
+            ["0" * 64, result.normalization_run_id],
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-seal-lqtz")
+
+    def test_ledger_mapper_code_hash_tamper_blocks(self, conn, env_root):
+        """The ledger's mapper_code_hash no longer matches the CURRENT
+        system-derived fingerprint (defense in depth on top of the exact
+        key - catches ledger tampering explicitly)."""
+        result = self._partial_run(conn, env_root, "req-seal-lmch")
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET mapper_code_hash = ? "
+            "WHERE normalization_run_id = ?",
+            ["0" * 64, result.normalization_run_id],
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-seal-lmch")
+
+    def test_manifest_mapper_code_hash_tamper_rebind_blocks(self, conn, env_root):
+        result = self._partial_run(conn, env_root, "req-seal-mch")
+        _rebind_manifest(
+            env_root,
+            conn,
+            result,
+            "daily_bar",
+            lambda doc: doc.__setitem__("mapper_code_hash", "0" * 64),
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-seal-mch")
+
+    def test_output_schema_hash_recompute_blocks(self, conn, env_root):
+        """The physical parquet is swapped for a different-schema frame
+        AND the manifest content_hash is rebound to match - the
+        RECOMPUTED schema seal still fails closed."""
+        import io
+
+        import polars as pl
+
+        result = self._partial_run(conn, env_root, "req-seal-schema")
+        output_path = _output_path(
+            env_root, "daily_bar", "req-seal-schema", run_id=result.normalization_run_id
+        )
+        frame = pl.read_parquet(output_path)
+        swapped = frame.with_columns(pl.lit(1).alias("injected_col"))
+        buf = io.BytesIO()
+        swapped.write_parquet(buf)
+        new_bytes = buf.getvalue()
+        output_path.write_bytes(new_bytes)
+
+        def mutate(doc: dict) -> None:
+            for output in doc.get("outputs", []):
+                if output.get("uri", "").endswith("main.parquet"):
+                    output["content_hash"] = hashlib.sha256(new_bytes).hexdigest()
+
+        _rebind_manifest(env_root, conn, result, "daily_bar", mutate)
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-seal-schema")
+
+    def test_blocked_conflict_run_replays_idempotently(self, conn, env_root):
+        """The conflict INCIDENT run itself replays idempotently (one
+        ledger row per distinct conflict identity) while remaining
+        excluded from the baseline."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-conflict-replay",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+        )
+        _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-conflict-replay")
+        meta = _meta_path(env_root, "daily_bar", "req-conflict-replay")
+        doc = json.loads(meta.read_bytes())
+        doc["request_params_hash"] = "f" * 64
+        meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        first = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-conflict-replay"
+        )
+        assert first.status == "BLOCKED" and first.idempotent_replay is False
+        second = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-conflict-replay"
+        )
+        assert second.status == "BLOCKED" and second.idempotent_replay is True
+        assert second.normalization_run_id == first.normalization_run_id
+        conflict_rows = conn.execute(
+            "SELECT count(*) FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = ? AND evidence_conflict = TRUE",
+            ["req-conflict-replay"],
+        ).fetchone()[0]
+        assert int(conflict_rows) == 1
