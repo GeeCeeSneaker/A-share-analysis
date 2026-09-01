@@ -755,7 +755,7 @@ RawWriter exact-byte/payload closure / DTO provider-faithful / no-sentinel / row
 [✓] D21 DB 失败恢复回归全绿
 [✓] D22 no-sentinel / no-silent-drop / locator / calendar / provider-faithful 回归全绿
 [✓] D23 migration from-zero + 016->017 upgrade + idempotency/tamper 全绿
-[ ]  D24 Ubuntu 3.14 / Windows 3.12 / 3.14 full CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] D24 Ubuntu 3.14 / Windows 3.12 / 3.14 full CI green（run `33472357951`，implementation `480dc7549bb512e9c187213e5010fab424248774`，三腿 success + Windows 3.14 腿 DEVLOG/Management-doc gate success，2026-09-01 API positive confirmation）
 ```
 
 ## §7 Exit Gate 对照（20 项）
@@ -779,7 +779,7 @@ RawWriter exact-byte/payload closure / DTO provider-faithful / no-sentinel / row
 [✓] recoverable file + DB commit semantics remain intact
 [✓] no CR-3 Availability/SourcePolicy/Canonical semantics leak in
 [✓] migrations from-zero/upgrade/idempotency/tamper green（17 链）
-[ ]  full CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] full CI green（run `33472357951` 三腿 success，API positive confirmation）
 [✓] ADR-022 / DEVLOG / DEVELOPMENT_MANAGEMENT synced current truth（Amendment C + DM-20260901-066 + DEVLOG 条目）
 ```
 
@@ -787,4 +787,5 @@ RawWriter exact-byte/payload closure / DTO provider-faithful / no-sentinel / row
 
 - Local: **975 / 0**（955 → 975，+20；normalization 104 = 84 回归 + 20 新增；migrations 11 含 17 链）；ruff check / ruff format / mypy 全绿（63 文件零错）；CI 同款命令 `uv run pytest` 复验 975/0
 - ADR-022 Amendment C（status 仍 PROPOSED）；migration 017（未改 014/015/016）；contract 版本未 bump（`cr2.1-v1`——trust-root/seal 收口而非 registry 语义变更，full fingerprint 混入已使 key 空间区分新旧实现）
-- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）
+- **Implementation SHA：`480dc7549bb512e9c187213e5010fab424248774`；CI run `33472357951` 三腿 success**（Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success，Windows 3.14 腿 DEVLOG gate + Management-doc gate success；2026-09-01 API positive confirmation，一次通过零修复轮次）
+- §6 矩阵 24 项 / §7 Exit Gate 20 项全过（CI 项据 API positive confirmation 关闭）；SHA 由 docs 回填 commit 补记（历史不改写——本 Mapping 一次写成后仅补记本节）

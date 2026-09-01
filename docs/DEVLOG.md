@@ -35,10 +35,10 @@
 **Verification**
 - Local: **975 tests passed / 0 failed**（955 → 975，+20：TestOperationSpecProvenance 3 / TestRawTrustAnchor 6 / TestOutputExactSetSeal 6 / TestSemanticValueSeal 4 / 公开签名守卫 1；normalization 104 = 84 回归 + 20 新增；migrations 11 含 17 链 upgrade）；ruff check / ruff format / mypy 全绿（63 文件零错）；CI 同款命令 `uv run pytest` 复验 975/0
 - 既有回归零破坏：CR-2/2.1/2.2 对抗矩阵 84 项全保持；R4-B2.x / B1.x / A3.x / A2.x / CR-1.x 冻结契约零破坏；CR-3 语义零泄漏
-- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+- GitHub Actions: **run `33472357951`（implementation `480dc7549bb512e9c187213e5010fab424248774`）三腿 success**——Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success（Windows 3.14 腿 DEVLOG gate + Management-doc gate success）；2026-09-01 API positive confirmation，一次通过零修复轮次
 
 **Implementation Status**
-- DONE（3 P0 全收口 + migration 017 + ADR-022 Amendment C + DM-20260901-066；975/0；Review Status: PENDING_REVIEW）
+- DONE（3 P0 全收口 + migration 017 + ADR-022 Amendment C + DM-20260901-066；975/0；implementation `480dc7549bb512e9c187213e5010fab424248774`；Review Status: PENDING_REVIEW）
 
 **关键决策**
 - anchor 独立成表而非依赖 run history：run history 是 normalization 视角（第一次看到才算），anchor 是 ingestion 视角（落盘即登记）——信任根必须在消费方之外
