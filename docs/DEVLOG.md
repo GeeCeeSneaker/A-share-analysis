@@ -37,10 +37,10 @@
 **Verification**
 - Local: **1096 tests passed / 0 failed**（1066 → 1096，+30：TestTransactionalSnapshot 6（MVCC race×2 真实第二连接 + ledger URI update + file replace TOCTOU + deep immutability + next-invocation）/ TestIdentityMasterPIT 6 / TestHonestPolicyExecution 8（5 unsupported-value parametrize + supported 回归 + empty domains）/ TestFullSealConsumption 7（manifest provenance rebind 矩阵 + manifest_uri + input seal 三方）/ TestVerificationStateTransition 3（anchor repair recovery + closure repair recovery + SUCCESS degradation refusal + evidence preservation））；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1096/0
 - 既有回归零破坏：CR-3/CR-3.1 对抗矩阵 81 项全保持（复审 §7 item 32）；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
-- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+- GitHub Actions: **run `33521594830`（implementation `df409ede0ddb25ce5cee12a46fa66fe7a3ea093f`）三腿 success**——Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success（Windows 3.14 腿 DEVLOG gate + Management-doc gate success）；2026-09-01 API positive confirmation，一次通过零修复轮次
 
 **Implementation Status**
-- DONE（5 P0 + 3 P1 全收口 + migration 020 + ADR-023 Amendment B + DM-20260901-070；1096/0；Review Status: PENDING_REVIEW）
+- DONE（5 P0 + 3 P1 全收口 + migration 020 + ADR-023 Amendment B + DM-20260901-070；1096/0；implementation `df409ede0ddb25ce5cee12a46fa66fe7a3ea093f`；Review Status: PENDING_REVIEW）
 
 **关键决策**
 - 物化优先于重验证：与其在 candidate builder 里"再次验证当前文件"，不如在 snapshot 事务内读 bytes→hash 验证→parse 同一份 bytes 存入 immutable records——一次读取同时是验证与消费，TOCTOU 在结构上不存在

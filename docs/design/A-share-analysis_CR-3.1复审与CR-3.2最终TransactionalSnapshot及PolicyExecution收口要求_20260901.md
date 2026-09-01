@@ -797,8 +797,8 @@ Snapshot / ReadModel                   ░░░░░░░░░░  尚未开
 [✓] 27 repair 保留历史 BLOCKED evidence（append-only）
 [✓] 28 migration 020 from-zero（20 链）
 [✓] 29 migration 019->020 upgrade（含 020 四列断言）
-[ ]  30 Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full CI green（推送后 API 正向确认，SHA 回填）
-[✓] 31 Ruff / format / Mypy / Spike / governance gates green（本地；CI 待确认）
+[✓] 30 Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full CI green（run `33521594830`，implementation `df409ede0ddb25ce5cee12a46fa66fe7a3ea093f`，三腿 success + Windows 3.14 腿 DEVLOG/Management-doc gate success，2026-09-01 API positive confirmation）
+[✓] 31 Ruff / format / Mypy / Spike / governance gates green（三腿各步全 success）
 [✓] 32 all CR-3.1 / CR-3 / CR-2.x / R4 frozen regressions green（81 + 985 全保持；总体 1096/0）
 ```
 
@@ -821,11 +821,12 @@ Snapshot / ReadModel                   ░░░░░░░░░░  尚未开
 [✓] recoverable repair preserves immutable history
 [✓] CR-3.1 passed mechanisms frozen（81 项回归全保持）
 [✓] no CR-4 logic leak
-[ ]  migration / CI / governance green（migration 20 链本地全绿；CI 待 API 确认，SHA 回填；governance 本批已同步）
+[✓] migration / CI / governance green（migration 20 链本地全绿；run `33521594830` 三腿 success，API positive confirmation；governance 本批已同步）
 ```
 
 ## Verification Summary
 
 - Local: **1096 / 0**（1066 → 1096，+30：TransactionalSnapshot 6 / IdentityMasterPIT 6 / HonestPolicyExecution 8 / FullSealConsumption 7 / VerificationStateTransition 3）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1096/0
 - ADR-023 Amendment B（status 仍 PROPOSED）；migration 020（未改 018/019）；CR-3.1 FREEZE 的 19 项机制零重写（81 项回归全保持）
-- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）
+- **Implementation SHA：`df409ede0ddb25ce5cee12a46fa66fe7a3ea093f`；CI run `33521594830` 三腿 success**（Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success，Windows 3.14 腿 DEVLOG gate + Management-doc gate success；2026-09-01 API positive confirmation，一次通过零修复轮次）
+- §7 矩阵 32 项 / §9 Exit Gate 17 项全过（CI 项据 API positive confirmation 关闭）；SHA 由 docs 回填 commit 补记（历史不改写——本 Mapping 一次写成后仅补记本节）
