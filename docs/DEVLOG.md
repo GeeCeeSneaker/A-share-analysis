@@ -35,10 +35,10 @@
 **Verification**
 - Local: **955 tests passed / 0 failed**（938 → 955，+17：TestRawEvidenceBindingPermanence 5 / TestFullMapperIdentity 1 / TestFullSealConsumption 10 / 结构签名 1；normalization 84 = 67 回归 + 17 新增；migrations 11 含 16 链 upgrade）；ruff check / ruff format / mypy 全绿（61 文件零错）；CI 同款命令 `uv run pytest` 复验 955/0
 - 既有回归零破坏：CR-2/CR-2.1 对抗矩阵 67 项全保持；R4-B2.x / B1.x / A3.x / A2.x / CR-1.x 冻结契约零破坏；CR-3 语义零泄漏
-- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+- GitHub Actions: **run `33460094366`（implementation `a06ea2202cb4f7a5ea0a91c09e666867267a8575`）三腿 success**——Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success（Windows 3.14 腿 DEVLOG gate + Management-doc gate success）；2026-09-01 API positive confirmation，一次通过零修复轮次
 
 **Implementation Status**
-- DONE（3 P0 全收口 + migration 016 + ADR-022 Amendment B + DM-20260901-065；955/0；Review Status: PENDING_REVIEW）
+- DONE（3 P0 全收口 + migration 016 + ADR-022 Amendment B + DM-20260901-065；955/0；implementation `a06ea2202cb4f7a5ea0a91c09e666867267a8575`；Review Status: PENDING_REVIEW）
 
 **关键决策**
 - conflict 排除用显式结构化列 `evidence_conflict`（migration 016）而非 error_message 前缀匹配——audit 历来反对 message-driven truth；列默认 FALSE 使 legacy 行语义正确（每个既有 run 绑定其读取时的真实 hash）

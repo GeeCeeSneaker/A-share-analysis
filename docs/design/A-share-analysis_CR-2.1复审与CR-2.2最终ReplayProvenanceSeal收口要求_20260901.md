@@ -845,7 +845,7 @@ Snapshot / ReadModel                ░░░░░░░░░░ 0%（尚未�
 [✓] CR-2.1 atomic/recovery + immutable registry tests remain green（67 项回归全过）
 [✓] existing no-sentinel/no-silent-drop/locator/provider-faithful tests remain green
 [✓] migrations from-zero/upgrade green（migration 016：16 链 from-zero + 001..015→016 upgrade + idempotent + tamper probe 017）
-[ ]  Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full CI green（run `33460094366`，implementation `a06ea2202cb4f7a5ea0a91c09e666867267a8575`，三腿 success + Windows 3.14 腿 DEVLOG/Management-doc gate success，2026-09-01 API positive confirmation）
 [✓] ADR-022 remains PROPOSED until Reviewer closure（Amendment B 已追加；status 未改）
 [✓] DEVLOG / DEVELOPMENT_MANAGEMENT current truth synced（本批同步更新）
 ```
@@ -854,4 +854,5 @@ Snapshot / ReadModel                ░░░░░░░░░░ 0%（尚未�
 
 - Local: **955 / 0**（938 → 955，+17；normalization 84 = 67 回归 + 17 新增；migrations 11 含 16 链）；ruff check / ruff format / mypy 全绿（61 文件零错）；CI 同款命令 `uv run pytest` 复验 955/0
 - ADR-022 Amendment B（status 仍 PROPOSED）；migration 016（未改 014/015）；contract 版本未 bump（`cr2.1-v1`——CR-2.2 是 identity/seal 收口而非 registry 语义变更，full fingerprint 混入已使 key 空间天然区分新旧实现）
-- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）
+- **Implementation SHA：`a06ea2202cb4f7a5ea0a91c09e666867267a8575`；CI run `33460094366` 三腿 success**（Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success，Windows 3.14 腿 DEVLOG gate + Management-doc gate success；2026-09-01 API positive confirmation，一次通过零修复轮次）
+- §6 Exit Gate 20 项全过（CI 项据 API positive confirmation 关闭）；SHA 由 docs 回填 commit 补记（历史不改写——本 Mapping 一次写成后仅补记本节）
