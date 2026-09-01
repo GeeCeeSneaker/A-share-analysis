@@ -33,12 +33,12 @@
 - 无 schema 变更（复用 migration 017 anchor 表）；**ADR-022 Amendment D**（§9.1-§9.4 wiring 收口；已冻结语义零重写；status 仍 PROPOSED 待 Reviewer closure）；DM-20260901-067
 
 **Verification**
-- Local: **985 tests passed / 0 failed**（975 → 985，+10：TestAnchoredIngestionBoundary 10 项 = ProbeContext SUCCESS/ERROR anchor 2 / 结构守卫 1 / TOCTOU 1 / enrollment 失败恢复 1 / same-H1 idempotent 1 / H2 hard conflict 1 / anchored→runner SUCCESS 1 / identity cross-binding 1 / API 收口 1；normalization 114 = 104 回归 + 10 新增）；ruff check / ruff format / mypy 全绿（63 文件零错）；CI 同款命令 `uv run pytest` 复验 985/0
+- Local: **985 tests passed / 0 failed**（975 → 985，+10：TestAnchoredIngestionBoundary 10 项 = ProbeContext SUCCESS/ERROR anchor 2 / 结构守卫 1 / TOCTOU 1 / enrollment 失败恢复 1 / same-H1 idempotent 1 / H2 hard conflict 1 / anchored→runner SUCCESS 1 / identity cross-binding 1 / API 收口 1；normalization 114 = 104 回归 + 10 新增；13 个 spike/formal-gate 测试文件 ProbeContext 接线后全绿）；ruff check / ruff format / mypy 全绿（63 文件零错）；CI 同款命令 `uv run pytest` 复验 985/0
 - 既有回归零破坏：CR-2/2.1/2.2/2.3 对抗矩阵 104 项全保持（audit §4 items 10-16）；R4-B2.x / B1.x / A3.x / A2.x / CR-1.x 冻结契约零破坏；CR-3 语义零泄漏
-- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+- GitHub Actions: **run `33482144065`（implementation `3bc5c53d2217f2b01d26766eabe470b7bcc4d5bc`）三腿 success**——Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success（Windows 3.14 腿 DEVLOG gate + Management-doc gate success）；2026-09-01 API positive confirmation，一次通过零修复轮次
 
 **Implementation Status**
-- DONE（wiring P0 全收口 + ADR-022 Amendment D + DM-20260901-067；985/0；Review Status: PENDING_REVIEW）
+- DONE（wiring P0 全收口 + ADR-022 Amendment D + DM-20260901-067；985/0；implementation `3bc5c53d2217f2b01d26766eabe470b7bcc4d5bc`；Review Status: PENDING_REVIEW）
 
 **关键决策**
 - enrollment 的 hash 声明与磁盘 verify 分离：`_enroll_anchor` 要求调用方传入 commit identity 并 verify-only 比对——AnchoredRawEvidenceWriter 传 RawWriteResult.evidence_hash（TOCTOU 检查在 writer 层先行），测试传现场 hash（同一 verify 语义）；两种路径都不存在"函数自己 hash 现场 bytes 定义真值"的窗口

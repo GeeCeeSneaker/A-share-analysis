@@ -458,7 +458,7 @@ RawWriter 写完以后，
 [✓] 14 CR-2.2 historical exact replay / full fingerprint / schema recheck 保持 green
 [✓] 15 CR-2.1 atomic commit / quarantine seal / no-silent-drop 保持 green
 [✓] 16 migration 017 from-zero + upgrade 保持 green
-[ ]  17 Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] 17 Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full CI green（run `33482144065`，implementation `3bc5c53d2217f2b01d26766eabe470b7bcc4d5bc`，三腿 success + Windows 3.14 腿 DEVLOG/Management-doc gate success，2026-09-01 API positive confirmation）
 ```
 
 ## §6 Exit Gate 对照（11 项）
@@ -474,11 +474,12 @@ RawWriter 写完以后，
 [✓] existing CR-2.3 operation spec / output-set / semantic seal 无 regression（104 项回归全绿）
 [✓] existing CR-2.2 / 2.1 frozen contracts 无 regression（回归全绿）
 [✓] migration 017 chain green（17 链 from-zero/upgrade/idempotent/tamper 回归）
-[ ]  full CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] full CI green（run `33482144065` 三腿 success，API positive confirmation）
 ```
 
 ## Verification Summary
 
 - Local: **985 / 0**（975 → 985，+10：TestAnchoredIngestionBoundary 10 项；normalization 114 = 104 回归 + 10 新增；13 个 spike/formal-gate 测试文件 ProbeContext 接线后全绿）；ruff check / ruff format / mypy 全绿（63 文件零错）；CI 同款命令 `uv run pytest` 复验 985/0
 - ADR-022 Amendment D（status 仍 PROPOSED）；无 schema 变更（复用 migration 017 anchor 表）；已冻结语义零重写（operation spec / runner anchor lookup / output-set semantic seal 均未改动）
-- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）
+- **Implementation SHA：`3bc5c53d2217f2b01d26766eabe470b7bcc4d5bc`；CI run `33482144065` 三腿 success**（Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success，Windows 3.14 腿 DEVLOG gate + Management-doc gate success；2026-09-01 API positive confirmation，一次通过零修复轮次）
+- §4 矩阵 17 项 / §6 Exit Gate 11 项全过（CI 项据 API positive confirmation 关闭）；SHA 由 docs 回填 commit 补记（历史不改写——本 Mapping 一次写成后仅补记本节）
