@@ -40,10 +40,10 @@
 **Verification**
 - Local: **1066 tests passed / 0 failed**（1025 → 1066，+41：TestRequestedDomainIdentity 6 / TestAvailabilityCompleteness 3 / TestInputSnapshot 3 / TestAnchoredAvailabilityEvidence 6 / TestIdentityPolicyBinding 4 / TestPolicyHashCompleteness 6 / TestFullReplaySeal 7 / TestRecoverableCommit 2 / TestP1Corrections 4）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1066/0
 - 既有回归零破坏：CR-3 40 项对抗矩阵全保持（复审 §10 item 30）；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
-- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+- GitHub Actions: **run `33508307611`（implementation `75744aaa89487aae09474b3569519a73f0efba24`）三腿 success**——Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success（Windows 3.14 腿 DEVLOG gate + Management-doc gate success）；2026-09-01 API positive confirmation，一次通过零修复轮次
 
 **Implementation Status**
-- DONE（8 P0 + 3 P1 全收口 + migration 019 + ADR-023 Amendment A + DM-20260901-069；1066/0；Review Status: PENDING_REVIEW）
+- DONE（8 P0 + 3 P1 全收口 + migration 019 + ADR-023 Amendment A + DM-20260901-069；1066/0；implementation `75744aaa89487aae09474b3569519a73f0efba24`；Review Status: PENDING_REVIEW）
 
 **关键决策**
 - discovered input set 含验证失败 run：若把损坏 run 从 input set 排除，post-success tamper 会改变 identity → mint 新 run 而非拒绝 replay；保留在 identity 中使 replay 命中后被 seal 拒绝（DAMAGED），这正是复审 §7 "CR-2 source artifact tamper after canonical -> replay BLOCK" 的语义

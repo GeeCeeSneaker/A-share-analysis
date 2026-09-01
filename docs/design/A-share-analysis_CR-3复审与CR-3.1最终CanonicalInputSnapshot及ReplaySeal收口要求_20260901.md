@@ -855,10 +855,10 @@ CR-3.1 不增加新业务 domain、不做 CR-4、不扩功能面；只把这四�
 [✓] 28 migration 018 -> 019 upgrade
 [✓] 29 migration idempotent/checksum/tamper sequence（probe 020）
 [✓] 30 current CR-3 tests + all CR-2/B2/B1/A3/A2/CR-1 regressions（40 + 985 全保持）
-[ ]  31 Windows 3.12 green（本批推送后 API 正向确认）
-[ ]  32 Windows 3.14 green（本批推送后 API 正向确认）
-[ ]  33 Ubuntu 3.14 green（本批推送后 API 正向确认）
-[✓] 34 Ruff / format / Mypy / Spike / governance gates green（本地；CI 待 API 确认）
+[✓] 31 Windows 3.12 green（run `33508307611` 三腿 success，2026-09-01 API positive confirmation）
+[✓] 32 Windows 3.14 green（同上；DEVLOG/Management-doc gate success）
+[✓] 33 Ubuntu 3.14 green（同上）
+[✓] 34 Ruff / format / Mypy / Spike / governance gates green（三腿各步全 success）
 ```
 
 ## §11 Exit Gate 对照（17 项）
@@ -879,7 +879,7 @@ CR-3.1 不增加新业务 domain、不做 CR-4、不扩功能面；只把这四�
 [✓] truthful identity finding scope
 [✓] timezone deterministic
 [✓] no CR-4 logic leak
-[ ]  migration + full CI green（migration 19 链本地全绿；CI 待 API 确认，SHA 回填）
+[✓] migration + full CI green（migration 19 链本地全绿；run `33508307611` 三腿 success，API positive confirmation）
 [✓] governance sync complete（ADR-023 Amendment A + ADR-000 索引 + DEVLOG + 总册 §40/§41/§44/§61）
 ```
 
@@ -887,4 +887,5 @@ CR-3.1 不增加新业务 domain、不做 CR-4、不扩功能面；只把这四�
 
 - Local: **1066 / 0**（1025 → 1066，+41）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1066/0
 - ADR-023 Amendment A（status 仍 PROPOSED）；migration 019（未改 018）；CR-3 冻结的 18 项机制零触碰（40 项 CR-3 回归全保持）
-- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）
+- **Implementation SHA：`75744aaa89487aae09474b3569519a73f0efba24`；CI run `33508307611` 三腿 success**（Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success，Windows 3.14 腿 DEVLOG gate + Management-doc gate success；2026-09-01 API positive confirmation，一次通过零修复轮次）
+- §10 矩阵 34 项 / §11 Exit Gate 17 项全过（CI 项据 API positive confirmation 关闭）；SHA 由 docs 回填 commit 补记（历史不改写——本 Mapping 一次写成后仅补记本节）
