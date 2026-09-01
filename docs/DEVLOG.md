@@ -17,6 +17,47 @@
 
 ---
 
+## 2026-09-01 · CR-2.3 Raw Trust Anchor + Provider-Owned Operation Spec + Output Seal（CR-2.2 复审 REOPENED 后的收口批次）
+
+**Scope**
+- CR-2.2 复审（audit 20260901 10:45 +08:00，Reviewed HEAD `a4a23cd3f758a6cdc450b4256f1d66172ba3524c`，reopen commit `323bbb5`）裁决 **CR-2.2 REOPENED**：exact replay / full fingerprint / schema verify 等 FREEZE，3 个 P0 trust-root blockers 由本批 CR-2.3 收口（**未启动 CR-3**——复审 §7 边界；CR-3 BLOCKED_BY_CR-2.3）；复审 §6 A/B/C/D 测试矩阵全对应
+
+**Implementation**
+- **P0-01 Provider-Owned Operation Spec**：公开 `call_exchange(..., require_capability=...)` 允许普通 caller 自由选择 capability——等于把自报入口从 surface 字段换到 capability 字段（daily fn + index capability 组合未封死）。新 `operations.py`：`ProviderOperationSpec`（operation_id/capability/endpoint/provider_dataset/normalization_surface）**私有静态常量 15 个**（每 facade wrapper 一个）；`call_exchange`/`_call_or_exchange` 撤销，generic executor 私有化为 `_execute_exchange(spec, fn, params)`——endpoint/dataset/capability/surface/operation_id **全部由 spec 派生**；`query_kline_exchange`→`DAILY_BAR_KLINE`、`query_index_kline_exchange`→`INDEX_DAILY_KLINE`（AST 绑定断言）；RawEnvelope/raw meta 新增 `operation_id`；结构守卫：15 spec 与 `SDK_METHOD_CLASSIFICATIONS` + normalization registry **双向 exact 核对**（3 NOT_APPLICABLE 无 spec）；公开方法签名检查——任何 public 方法不含 endpoint/dataset/require_capability/capability/normalization_surface/spec 参数
+- **P0-02 Raw Evidence Trust Anchor**：CR-2 首次消费某 raw 时只是现场 hash 当前 meta 作为初始 baseline——`verify_meta_closure()` 只证明 payload 与 meta 声明一致，不证明 meta 自身是 RawWriter 落盘原字节（首消费前单独改 surface/endpoint/params/account 可成"初始真相"）。migration 017 `meta_raw_evidence_anchor`（**Raw 文件系统之外**的权威 anchor ledger）；`raw_anchor.py::record_raw_evidence_anchor`（governed ingestion flow：RawWriter commit meta LAST → reread bytes → sha256 → anchor；同 bytes 幂等 / 异 bytes `RawAnchorError` hard fail）；Runner 在任何 meta 解析/路由/**映射之前**查 anchor——缺失（legacy pre-017）→ `RAW_ANCHOR_MISSING` BLOCKED（fail closed；governed repair = re-ingest；**绝不 auto-grandfather**——015-era H1+H2 laundering history 升级后 H2 永不被信任且失败运行不自动建 anchor）/ current hash ≠ anchor → `RAW_ANCHOR_MISMATCH` INCIDENT HARD BLOCK（`evidence_conflict` 降级诊断属性；信任根是 anchor——重复运行永续 BLOCK、修复回原 bytes → 原 run exact replay）；旧 baseline DISTINCT-hash 查询删除
+- **P0-03 Expected Output Exact Set + Semantic Value Seal**：原 seal 未封住 expected output set 与 normalized values（删 manifest 一个 output 再重绑双 hash 可过；parquet 换同 schema/row_count 的另一份值并重绑 content/manifest hash 可过）。migration 017 ledger 两列 `normalized_output_set_hash` / `normalized_semantic_hash`；**三方消费**（ledger == manifest == replay-time 物理重算）；expected exact set（manifest output_name set == **CURRENT** registry spec.output_names——no missing/extra/duplicate）；URI deterministic binding（每 output uri == ledger 身份重算 base_path + output_name）；物化语义升级（materialized set 恰好等于 spec.output_names——空表物化为空 parquet 零产出证据；empty-payload SUCCESS 测试覆盖）；`NormalizationRunSeal` 扩展 raw_evidence_uri/raw_payload_kind/normalized_output_set_hash/normalized_semantic_hash；manifest 新增 raw_payload_kind/output_set_hash；pre-CR-2.3 行缺 seal 不作 healthy replay
+- **Migration 017**：anchor 表 + 两 seal 列（未改 014/015/016）；17 链 from-zero + 001..016→017 upgrade + idempotent + tamper probe 018
+
+**Schema / Contract Changes**
+- C2 ×1（DM-20260901-066）；**ADR-022 Amendment C**（§8.1-§8.3 修订 Amendment B 中被复审推翻的三处表述；status 仍 PROPOSED 待 Reviewer closure）；migration 017；contract 版本未 bump（`cr2.1-v1`——CR-2.3 是 trust-root/seal 收口而非 registry 语义变更，full fingerprint 混入已使 key 空间区分新旧实现）
+- 既有 mechanics 测试更新：`call_exchange` 调用点迁移至私有 `_execute_exchange` + 测试 spec（test_cr1 / test_runtime_early_stop / test_provider_reliability）
+
+**Verification**
+- Local: **975 tests passed / 0 failed**（955 → 975，+20：TestOperationSpecProvenance 3 / TestRawTrustAnchor 6 / TestOutputExactSetSeal 6 / TestSemanticValueSeal 4 / 公开签名守卫 1；normalization 104 = 84 回归 + 20 新增；migrations 11 含 17 链 upgrade）；ruff check / ruff format / mypy 全绿（63 文件零错）；CI 同款命令 `uv run pytest` 复验 975/0
+- 既有回归零破坏：CR-2/2.1/2.2 对抗矩阵 84 项全保持；R4-B2.x / B1.x / A3.x / A2.x / CR-1.x 冻结契约零破坏；CR-3 语义零泄漏
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+
+**Implementation Status**
+- DONE（3 P0 全收口 + migration 017 + ADR-022 Amendment C + DM-20260901-066；975/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- anchor 独立成表而非依赖 run history：run history 是 normalization 视角（第一次看到才算），anchor 是 ingestion 视角（落盘即登记）——信任根必须在消费方之外
+- anchor 记录为独立 governed 函数（governed ingestion control flow 组件）而非嵌入 RawWriter：RawWriter 是 filesystem-only 冻结机制；anchor 需要 DuckDB 连接，属摄取控制流的职责
+- `_execute_exchange` 私有 + spec 参数：与 B2 scanner static registry 同一裁决口径——普通调用方不可达即足够，不防解释器级 monkeypatch；测试可用私有 API + 构造 spec（mechanics 测试本就测机制而非身份）
+- expected set 对 CURRENT registry spec：registry 漂移（如删输出）会使旧 run 不再 healthy replay——按 audit §4.3 要求执行（"manifest output_name set == current typed registry spec.output_names"）
+- 空表物化为空 parquet：空表是"零产出、无 sentinel"的结构性证据，且使 exact-set 恒成立；polars 空帧 parquet 往返 schema 一致已验证
+- anchor mismatch 与 legacy missing 分设两个错误类：修复语义不同（mismatch = 篡改调查 / missing = re-ingest 治理路径），且测试矩阵分别断言
+
+**下一步**
+- 等 Reviewer 复审 CR-2.3（复审 §7 Exit Gate 20 项）；Exit Gate 全过 → CR-2 / CR-2.1 / CR-2.2 / CR-2.3 → VERIFIED / CLOSED / FREEZE，ADR-022 → ACCEPTED，**CR-3 AvailabilityPolicy + Canonicalizer START**（复审明确：通过后不再扩张 CR-2 scope）
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
+---
+
+---
+
 ## 2026-09-01 · CR-2.2 Replay Provenance Seal（CR-2.1 复审 REOPENED 后的收口批次）
 
 **Scope**

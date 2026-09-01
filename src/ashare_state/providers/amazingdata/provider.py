@@ -30,6 +30,24 @@ from ashare_state.providers.amazingdata.errors import (
     ProviderError,
     classify_sdk_error,
 )
+from ashare_state.providers.amazingdata.operations import (
+    ADJ_FACTOR,
+    BACKWARD_FACTOR,
+    BJ_CODE_MAPPING,
+    CODE_LIST,
+    DAILY_BAR_KLINE,
+    DIVIDEND,
+    EQUITY_STRUCTURE,
+    HIST_CODE_LIST,
+    HISTORY_STOCK_STATUS,
+    INDEX_DAILY_KLINE,
+    INDUSTRY_BASE_INFO,
+    INDUSTRY_CONSTITUENT,
+    RIGHT_ISSUE,
+    STOCK_BASIC,
+    TRADE_CALENDAR,
+    ProviderOperationSpec,
+)
 from ashare_state.providers.amazingdata.sdk_loader import SdkIdentity, probe_identity
 from ashare_state.providers.amazingdata.session import AmazingDataSession
 from ashare_state.providers.amazingdata.stdout_capture import CapturedStdout, sdk_stdout_into
@@ -92,6 +110,12 @@ class RawEnvelope:
     duration_ms: float = 0.0
     attempt_count: int = 1
     capability_status: str | None = None
+    # CR-2.3 (audit 20260901 §2): the SYSTEM-DERIVED operation identity
+    # of the exchange - the static ProviderOperationSpec constant the
+    # facade wrapper is bound to (endpoint / dataset / capability /
+    # normalization_surface ALL derive from that spec). Persisted on the
+    # envelope + raw meta and cross-bound on the raw evidence anchor.
+    operation_id: str = ""
     # CR-2.1 (audit 20260831 §2): the SYSTEM-DERIVED business surface
     # identity of the exchange - persisted on the envelope by the
     # facade wrapper (defaults to the capability identity). It is the
@@ -133,16 +157,12 @@ class AmazingDataProvider:
         # ProviderExchange returned by call_exchange / attached to errors.
         self.last_envelopes: list[RawEnvelope] = []
 
-    def _call_or_payload(self, *args: object, **kwargs: object) -> Any:
+    def _call_or_payload(
+        self, spec: ProviderOperationSpec, fn: Callable[[], Any], **kwargs: Any
+    ) -> Any:
         """Business convenience path (audit section 43): returns .payload."""
-        exchange = self.call_exchange(*args, **kwargs)  # type: ignore[arg-type]
+        exchange = self._execute_exchange(spec, fn, **kwargs)
         return exchange.payload
-
-    def _call_or_exchange(self, *args: object, **kwargs: object) -> Any:
-        """Explicit exchange path (CR-1.1 audit §3.2-A): returns the
-        ProviderExchange itself - probes / RawWriter / audit paths MUST
-        consume this, never the payload convenience wrapper."""
-        return self.call_exchange(*args, **kwargs)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------ internals
     def _gate_capability(self, capability: str | None) -> CapabilityStatus | None:
@@ -164,16 +184,15 @@ class AmazingDataProvider:
             raise ProviderCapabilityNotApprovedError(msg, context={"capability": capability})
         return cap.status
 
-    def call_exchange(
+    def _execute_exchange(
         self,
-        endpoint: str,
-        dataset: str,
+        spec: ProviderOperationSpec,
         fn: Callable[[], Any],
         *,
         params: dict[str, Any] | None = None,
-        require_capability: str | None = None,
     ) -> Any:
-        """One SDK exchange: gated, stdout-captured, budgeted, recorded.
+        """PRIVATE generic exchange executor (CR-2.3, audit 20260901
+        section 2.2): gated, stdout-captured, budgeted, recorded.
 
         R4-A3 A3-01 (audit 20260826 section 7.2): the LIFECYCLE gate fires
         FIRST - after a terminal SDK/auth failure the endpoint function is
@@ -181,19 +200,21 @@ class AmazingDataProvider:
         error carrying the terminal state/reason/evidence, raised before
         any capability check or SDK call).
 
-        CR-2.2 (audit 20260901 §2): the normalization surface identity is
-        STRICTLY derived from the provider-owned capability contract
-        (``surface_identity = require_capability``) - there is NO caller
-        override parameter. Wrappers whose dataset+endpoint pair serves
-        MULTIPLE business surfaces distinguish themselves ONLY through
-        their require_capability (query_kline_exchange ->
-        capability=daily_bar vs query_index_kline_exchange ->
-        capability=index_daily); an ordinary caller can never declare a
-        correctness identity (same ruling as B1/B2: caller-declared
-        identity is not system-derived)."""
+        CR-2.3 P0-01: EVERY correctness identity field - endpoint,
+        provider_dataset, capability, normalization_surface and the
+        persisted operation_id - is derived from the caller-INVISIBLE
+        static ``ProviderOperationSpec`` the public wrapper is bound to.
+        This executor is PRIVATE: an ordinary production caller cannot
+        freely combine a stock kline callable with an index capability
+        (or any other endpoint/dataset/capability/surface mix); the only
+        public way to run an exchange is a typed wrapper. Same ruling as
+        B1/B2: caller-declared correctness identity is not
+        system-derived."""
+        endpoint = spec.endpoint
+        dataset = spec.provider_dataset
         self.session.lifecycle.require_ready(endpoint)
-        cap_status = self._gate_capability(require_capability)
-        surface_identity = str(require_capability or "")
+        cap_status = self._gate_capability(spec.capability)
+        surface_identity = spec.normalization_surface
         params = params or {}
         requested_at = datetime.now(UTC).isoformat()
         started = time.monotonic()
@@ -222,6 +243,7 @@ class AmazingDataProvider:
                 duration_ms=round((time.monotonic() - started) * 1000, 3),
                 attempt_count=attempts,
                 capability_status=str(cap_status) if cap_status else None,
+                operation_id=spec.operation_id,
                 normalization_surface=surface_identity,
             )
             self.last_envelopes.append(env)
@@ -274,24 +296,20 @@ class AmazingDataProvider:
             if params
             else (lambda: self._base().get_code_list())
         )
-        return self._call_or_exchange(
-            "BaseData.get_code_list",
-            "code_list",
+        return self._execute_exchange(
+            CODE_LIST,
             fn,
             params=params,
-            require_capability="security_master",
         )
 
     def get_code_list(self, security_type: str | None = None) -> list[str]:
         return self.get_code_list_exchange(security_type).payload
 
     def get_stock_basic_exchange(self, code_list: list[str]) -> Any:
-        return self._call_or_exchange(
-            "InfoData.get_stock_basic",
-            "stock_basic",
+        return self._execute_exchange(
+            STOCK_BASIC,
             lambda: self._info().get_stock_basic(code_list=code_list),
             params={"code_list": list(code_list)},
-            require_capability="security_master",
         )
 
     def get_stock_basic(self, code_list: list[str]) -> Any:
@@ -300,9 +318,8 @@ class AmazingDataProvider:
     def get_history_stock_status_exchange(
         self, start_date: int, end_date: int, code_list: list[str]
     ) -> Any:
-        return self._call_or_exchange(
-            "InfoData.get_history_stock_status",
-            "history_stock_status",
+        return self._execute_exchange(
+            HISTORY_STOCK_STATUS,
             lambda: self._info().get_history_stock_status(
                 start_date=start_date, end_date=end_date, code_list=code_list
             ),
@@ -311,31 +328,26 @@ class AmazingDataProvider:
                 "end_date": end_date,
                 "code_list": list(code_list),
             },
-            require_capability="security_status_history",
         )
 
     def get_history_stock_status(self, start_date: int, end_date: int, code_list: list[str]) -> Any:
         return self.get_history_stock_status_exchange(start_date, end_date, code_list).payload
 
     def get_adj_factor_exchange(self, code_list: list[str]) -> Any:
-        return self._call_or_exchange(
-            "BaseData.get_adj_factor",
-            "adj_factor",
+        return self._execute_exchange(
+            ADJ_FACTOR,
             lambda: self._base().get_adj_factor(code_list=code_list),
             params={"code_list": list(code_list)},
-            require_capability="adj_factor",
         )
 
     def get_adj_factor(self, code_list: list[str]) -> Any:
         return self.get_adj_factor_exchange(code_list).payload
 
     def get_backward_factor_exchange(self, code_list: list[str]) -> Any:
-        return self._call_or_exchange(
-            "BaseData.get_backward_factor",
-            "backward_factor",
+        return self._execute_exchange(
+            BACKWARD_FACTOR,
             lambda: self._base().get_backward_factor(code_list=code_list),
             params={"code_list": list(code_list)},
-            require_capability="adj_factor",
         )
 
     def get_backward_factor(self, code_list: list[str]) -> Any:
@@ -349,12 +361,10 @@ class AmazingDataProvider:
         endpoint is the provider-side event SoR (capability
         ``corporate_action`` -> InfoData.get_dividend).
         """
-        return self._call_or_exchange(
-            "InfoData.get_dividend",
-            "corporate_action",
+        return self._execute_exchange(
+            DIVIDEND,
             lambda: self._info().get_dividend(code_list=code_list),
             params={"code_list": list(code_list)},
-            require_capability="corporate_action",
         )
 
     def get_right_issue_exchange(self, code_list: list[str]) -> Any:
@@ -365,12 +375,10 @@ class AmazingDataProvider:
         record can never substitute a RIGHT_ISSUE expectation in the CA
         golden validation.
         """
-        return self._call_or_exchange(
-            "InfoData.get_right_issue",
-            "corporate_action",
+        return self._execute_exchange(
+            RIGHT_ISSUE,
             lambda: self._info().get_right_issue(code_list=code_list),
             params={"code_list": list(code_list)},
-            require_capability="corporate_action",
         )
 
     def get_right_issue(self, code_list: list[str]) -> Any:
@@ -381,12 +389,10 @@ class AmazingDataProvider:
         (R4-B1 B1-02, audit 20260828): capability ``code_mapping_bj`` ->
         InfoData.get_bj_code_mapping. A generic stock-code list is a
         stand-in and can NEVER prove this endpoint."""
-        return self._call_or_exchange(
-            "InfoData.get_bj_code_mapping",
-            "code_mapping_bj",
+        return self._execute_exchange(
+            BJ_CODE_MAPPING,
             lambda: self._info().get_bj_code_mapping(code_list=code_list),
             params={"code_list": list(code_list)},
-            require_capability="code_mapping_bj",
         )
 
     def get_bj_code_mapping(self, code_list: list[str]) -> Any:
@@ -399,12 +405,10 @@ class AmazingDataProvider:
         """Dedicated equity-structure endpoint (R4-B1 B1-02):
         capability ``equity_structure`` -> InfoData.get_equity_structure.
         ``get_stock_basic`` is a stand-in and can NEVER prove it."""
-        return self._call_or_exchange(
-            "InfoData.get_equity_structure",
-            "equity_structure",
+        return self._execute_exchange(
+            EQUITY_STRUCTURE,
             lambda: self._info().get_equity_structure(code_list=code_list),
             params={"code_list": list(code_list)},
-            require_capability="equity_structure",
         )
 
     def get_equity_structure(self, code_list: list[str]) -> Any:
@@ -414,12 +418,10 @@ class AmazingDataProvider:
         """Dedicated industry-taxonomy endpoint (R4-B1 B1-02):
         capability ``industry_taxonomy`` -> InfoData.get_industry_base_info.
         ``get_stock_basic`` is a stand-in and can NEVER prove it."""
-        return self._call_or_exchange(
-            "InfoData.get_industry_base_info",
-            "industry_taxonomy",
+        return self._execute_exchange(
+            INDUSTRY_BASE_INFO,
             lambda: self._info().get_industry_base_info(code_list=code_list),
             params={"code_list": list(code_list)},
-            require_capability="industry_taxonomy",
         )
 
     def get_industry_base_info(self, code_list: list[str]) -> Any:
@@ -432,24 +434,20 @@ class AmazingDataProvider:
         security <-> industry MEMBERSHIP. ``get_industry_base_info``
         alone only proves the taxonomy definition/identity surface;
         the constituent surface is a REQUIRED endpoint proof."""
-        return self._call_or_exchange(
-            "InfoData.get_industry_constituent",
-            "industry_taxonomy",
+        return self._execute_exchange(
+            INDUSTRY_CONSTITUENT,
             lambda: self._info().get_industry_constituent(code_list=code_list),
             params={"code_list": list(code_list)},
-            require_capability="industry_taxonomy",
         )
 
     def get_industry_constituent(self, code_list: list[str]) -> Any:
         return self.get_industry_constituent_exchange(code_list).payload
 
     def get_calendar_exchange(self, market: str = "SH") -> Any:
-        return self._call_or_exchange(
-            "BaseData.get_calendar",
-            "trade_calendar",
+        return self._execute_exchange(
+            TRADE_CALENDAR,
             lambda: self._base().get_calendar(market=market),
             params={"market": market},
-            require_capability="trade_calendar",
         )
 
     def get_calendar(self, market: str = "SH") -> Any:
@@ -458,9 +456,8 @@ class AmazingDataProvider:
     def get_hist_code_list_exchange(
         self, security_type: str, start_date: int, end_date: int
     ) -> Any:
-        return self._call_or_exchange(
-            "BaseData.get_hist_code_list",
-            "hist_code_list",
+        return self._execute_exchange(
+            HIST_CODE_LIST,
             lambda: self._base().get_hist_code_list(
                 security_type=security_type, start_date=start_date, end_date=end_date
             ),
@@ -469,7 +466,6 @@ class AmazingDataProvider:
                 "start_date": start_date,
                 "end_date": end_date,
             },
-            require_capability="security_master",
         )
 
     def get_hist_code_list(self, security_type: str, start_date: int, end_date: int) -> Any:
@@ -499,9 +495,8 @@ class AmazingDataProvider:
         if days is None:
             calendar = self.get_calendar()
             days = [d for d in (calendar or []) if begin_date <= int(d) <= end_date]
-        return self._call_or_exchange(
-            "MarketData.query_kline",
-            "daily_bar",
+        return self._execute_exchange(
+            DAILY_BAR_KLINE,
             lambda: self._market(days or [begin_date, end_date]).query_kline(
                 code_list=code_list,
                 begin_date=begin_date,
@@ -515,7 +510,6 @@ class AmazingDataProvider:
                 "kline_type": kline_type,
                 "trading_days": list(days),
             },
-            require_capability="daily_bar",
         )
 
     def query_kline(
@@ -556,9 +550,8 @@ class AmazingDataProvider:
         if days is None:
             calendar = self.get_calendar()
             days = [d for d in (calendar or []) if begin_date <= int(d) <= end_date]
-        return self._call_or_exchange(
-            "MarketData.query_kline",
-            "daily_bar",
+        return self._execute_exchange(
+            INDEX_DAILY_KLINE,
             lambda: self._market(days or [begin_date, end_date]).query_kline(
                 code_list=code_list,
                 begin_date=begin_date,
@@ -572,7 +565,6 @@ class AmazingDataProvider:
                 "kline_type": kline_type,
                 "trading_days": list(days),
             },
-            require_capability="index_daily",
         )
 
     def query_index_kline(

@@ -74,6 +74,7 @@ from ashare_state.normalization.registry import (
 )
 from ashare_state.providers.errors import MappingValidationError
 from ashare_state.storage.paths import physical_from_logical_uri, validate_logical_uri
+from ashare_state.storage.raw_anchor import lookup_raw_evidence_anchor
 from ashare_state.storage.raw_writer import (
     KIND_EMPTY,
     KIND_MULTI_FRAMES,
@@ -115,7 +116,7 @@ _QTZ_SEMANTIC_FIELDS = (
     "mapper_identity",
 )
 
-#: ledger columns (migration 014 + 015 + 016) in canonical order
+#: ledger columns (migration 014 + 015 + 016 + 017) in canonical order
 _LEDGER_COLUMNS = (
     "normalization_run_id",
     "provider",
@@ -143,6 +144,8 @@ _LEDGER_COLUMNS = (
     "mapper_code_hash",
     "quarantine_set_hash",
     "evidence_conflict",
+    "normalized_output_set_hash",
+    "normalized_semantic_hash",
 )
 
 _QTZ_COLUMNS = (
@@ -263,6 +266,32 @@ def _quarantine_semantic_key(record: dict[str, Any]) -> str:
     )
 
 
+def _output_set_hash(records: list[dict[str, Any]]) -> str:
+    """CR-2.3 P0-03 (audit 20260901 section 4.3): the exact-set seal of
+    a run's materialized outputs - canonical JSON over the sorted
+    (output_name, canonical logical uri, content_hash, schema_hash,
+    row_count) tuples. Three-way bound: ledger == manifest ==
+    replay-time physical recompute; removing a required output and
+    rebinding both hashes breaks the exact-set comparison."""
+    ordered = sorted(records, key=lambda r: str(r.get("output_name") or ""))
+    canonical = json.dumps(
+        [
+            {
+                "output_name": str(r.get("output_name") or ""),
+                "uri": str(r.get("uri") or ""),
+                "content_hash": str(r.get("content_hash") or ""),
+                "schema_hash": str(r.get("schema_hash") or ""),
+                "row_count": int(r.get("row_count") or 0),
+            }
+            for r in ordered
+        ],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _validate_component(value: str, label: str) -> None:
     """A path component of the normalized artifact URI must be a safe
     single segment - '/', '\\', '..', ':' or empty values can only come
@@ -285,13 +314,15 @@ def _validate_component(value: str, label: str) -> None:
 
 @dataclass(frozen=True)
 class NormalizationRunSeal:
-    """CR-2.2 P0-03 (audit 20260901 section 4.5): the typed full-seal
-    binding of one normalization run. A replay is healthy only when the
-    ledger row, the manifest bytes AND the CURRENT system-derived
-    provenance (contract + FULL mapper code fingerprint) all agree with
-    this seal - a rebind-style tamper (edit manifest, rehash the file,
-    update the ledger hash) still breaks it because every semantic
-    field is compared, not just the outer file hash."""
+    """CR-2.2 P0-03 (audit 20260901 section 4.5) + CR-2.3 P0-03 (audit
+    section 4.3): the typed full-seal binding of one normalization run.
+    A replay is healthy only when the ledger row, the manifest bytes,
+    the replay-time PHYSICAL recompute (output exact set + semantic
+    values) AND the CURRENT system-derived provenance (contract + FULL
+    mapper code fingerprint) all agree with this seal - a rebind-style
+    tamper (edit manifest, rehash the file, update the ledger hash)
+    still breaks it because every semantic field is compared, not just
+    the outer file hash."""
 
     normalization_run_id: str
     provider: str
@@ -299,7 +330,9 @@ class NormalizationRunSeal:
     provider_dataset: str
     endpoint: str
     raw_request_id: str
+    raw_evidence_uri: str
     raw_evidence_hash: str
+    raw_payload_kind: str
     normalization_contract_version: str
     mapper_identity: str
     mapper_code_hash: str
@@ -308,6 +341,8 @@ class NormalizationRunSeal:
     normalized_count: int
     quarantined_count: int
     quarantine_set_hash: str | None
+    normalized_output_set_hash: str | None
+    normalized_semantic_hash: str | None
 
     @classmethod
     def from_ledger(cls, row: dict[str, Any]) -> NormalizationRunSeal:
@@ -318,7 +353,9 @@ class NormalizationRunSeal:
             provider_dataset=str(row["provider_dataset"]),
             endpoint=str(row["endpoint"]),
             raw_request_id=str(row["raw_request_id"]),
+            raw_evidence_uri=str(row["raw_evidence_uri"]),
             raw_evidence_hash=str(row["raw_evidence_hash"]),
+            raw_payload_kind=str(row["raw_payload_kind"] or ""),
             normalization_contract_version=str(row["normalization_contract_version"]),
             mapper_identity=str(row["mapper_identity"]),
             mapper_code_hash=str(row["mapper_code_hash"] or ""),
@@ -328,6 +365,16 @@ class NormalizationRunSeal:
             quarantined_count=int(row["quarantined_count"]),
             quarantine_set_hash=(
                 str(row["quarantine_set_hash"]) if row["quarantine_set_hash"] is not None else None
+            ),
+            normalized_output_set_hash=(
+                str(row["normalized_output_set_hash"])
+                if row.get("normalized_output_set_hash") is not None
+                else None
+            ),
+            normalized_semantic_hash=(
+                str(row["normalized_semantic_hash"])
+                if row.get("normalized_semantic_hash") is not None
+                else None
             ),
         )
 
@@ -352,8 +399,9 @@ class NormalizationRunSeal:
 
     def manifest_binding_problems(self, manifest: dict[str, Any]) -> list[str]:
         """Every semantic field of the manifest must equal the ledger
-        seal (audit 20260901 section 4.2 list) - a rebind that edits any
-        of these fields and rehashes the file still fails here."""
+        seal (audit 20260901 section 4.2 + CR-2.3 section 4.3 list) - a
+        rebind that edits any of these fields and rehashes the file
+        still fails here."""
         problems: list[str] = []
         expected = {
             "normalization_run_id": self.normalization_run_id,
@@ -362,7 +410,9 @@ class NormalizationRunSeal:
             "provider_dataset": self.provider_dataset,
             "endpoint": self.endpoint,
             "raw_request_id": self.raw_request_id,
+            "raw_evidence_uri": self.raw_evidence_uri,
             "raw_evidence_hash": self.raw_evidence_hash,
+            "raw_payload_kind": self.raw_payload_kind,
             "normalization_contract_version": self.normalization_contract_version,
             "mapper_identity": self.mapper_identity,
             "mapper_code_hash": self.mapper_code_hash,
@@ -386,6 +436,18 @@ class NormalizationRunSeal:
                 "manifest quarantine_set_hash does not match the ledger seal "
                 "(three-way quarantine binding broken)"
             )
+        # CR-2.3 P0-03: three-way output-set + semantic seals (manifest
+        # == ledger; the PHYSICAL recompute lives in
+        # _verify_manifest_outputs)
+        for field, sealed_value in (
+            ("output_set_hash", self.normalized_output_set_hash),
+            ("semantic_hash", self.normalized_semantic_hash),
+        ):
+            if sealed_value is None or str(manifest.get(field)) != sealed_value:
+                problems.append(
+                    f"manifest {field} does not match the ledger seal "
+                    "(three-way output/semantic binding broken)"
+                )
         return problems
 
 
@@ -434,27 +496,29 @@ class NormalizationRunner:
         raw_evidence_uri = f"provider={provider}/dataset={provider_dataset}/{request_id}.meta.json"
         validate_logical_uri(raw_evidence_uri)  # defense in depth
 
-        # ---------------- CR-2.2 P0-02A: raw-evidence binding conflict
-        # (audit 20260901 section 3.4, Option A): the trusted baseline of
-        # this request's raw evidence = the DISTINCT hashes bound by every
-        # NON-conflict run. The current hash not being among them while a
-        # baseline exists is an INCIDENT HARD BLOCK (the raw store is
-        # immutable - a different hash means tampering); the conflict run
-        # is recorded with evidence_conflict=TRUE so it can NEVER become
-        # the new baseline (the BLOCK that observed the tampering does
-        # not legitimize it).
-        baseline_hashes = {
-            str(row[0])
-            for row in self.conn.execute(
-                "SELECT DISTINCT raw_evidence_hash FROM meta_provider_normalization_run "
-                "WHERE provider = ? AND provider_dataset = ? AND raw_request_id = ? "
-                "AND NOT COALESCE(evidence_conflict, FALSE)",
-                [provider, provider_dataset, request_id],
-            ).fetchall()
-        }
-        if baseline_hashes and raw_evidence_hash not in baseline_hashes:
-            conflict_key = self._blocked_key(raw_evidence_hash, None, provider_dataset, None, None)
-            replay = self._maybe_replay(conflict_key)
+        # ---------------- CR-2.3 P0-02: RAW EVIDENCE TRUST ANCHOR
+        # (audit 20260901 section 3.3): the authoritative expected hash
+        # of this request's meta is the INGESTION-TIME anchor persisted
+        # OUTSIDE the raw filesystem (meta_raw_evidence_anchor, recorded
+        # by the governed ingestion flow the moment RawWriter committed
+        # the meta). The runner NEVER treats its first-seen meta hash as
+        # a trust root:
+        #   - no anchor (legacy pre-017 raw) -> fail closed; the
+        #     governed repair is re-ingestion, never auto-grandfathering
+        #     (a 015-era laundering history cannot be blessed silently);
+        #   - current bytes != anchor hash -> INCIDENT HARD BLOCK before
+        #     ANY routing/mapping (diagnostic evidence_conflict=TRUE -
+        #     the trust root stays the anchor, so repeated tampered runs
+        #     stay blocked forever and repairing the exact original
+        #     bytes replays the original run).
+        anchor = lookup_raw_evidence_anchor(
+            self.conn, provider=provider, provider_dataset=provider_dataset, request_id=request_id
+        )
+        if anchor is None:
+            anchor_missing_key = self._blocked_key(
+                raw_evidence_hash, None, provider_dataset, None, None
+            )
+            replay = self._maybe_replay(anchor_missing_key)
             if replay is not None:
                 return replay
             return self._blocked_run(
@@ -466,12 +530,45 @@ class NormalizationRunner:
                 raw_payload_kind=None,
                 endpoint=None,
                 surface=None,
-                error_class=NormalizationErrorClass.RAW_EVIDENCE_INVALID,
+                error_class=NormalizationErrorClass.RAW_ANCHOR_MISSING,
                 error_message=(
-                    "conflicting raw evidence bytes for the same request id "
-                    f"(trusted baseline {[h[:16] for h in sorted(baseline_hashes)]} does not "
-                    f"contain current {raw_evidence_hash[:16]}...) - the raw store is "
-                    "immutable; investigate before normalizing"
+                    "no authoritative raw evidence anchor for request "
+                    f"{request_id!r} - legacy raw without an ingestion-time "
+                    "anchor fails closed (CR-2.3 audit 20260901 section 3.3); "
+                    "the governed repair path is re-ingestion, never "
+                    "auto-grandfathering"
+                ),
+                started=started,
+                input_count=0,
+                normalized_count=0,
+                quarantined_count=0,
+                manifest_uri=None,
+                manifest_hash=None,
+                quarantines=[],
+            )
+        if anchor.evidence_hash != raw_evidence_hash:
+            anchor_mismatch_key = self._blocked_key(
+                raw_evidence_hash, None, provider_dataset, None, None
+            )
+            replay = self._maybe_replay(anchor_mismatch_key)
+            if replay is not None:
+                return replay
+            return self._blocked_run(
+                provider=provider,
+                provider_dataset=provider_dataset,
+                request_id=request_id,
+                raw_evidence_uri=raw_evidence_uri,
+                raw_evidence_hash=raw_evidence_hash,
+                raw_payload_kind=None,
+                endpoint=None,
+                surface=None,
+                error_class=NormalizationErrorClass.RAW_ANCHOR_MISMATCH,
+                error_message=(
+                    "raw evidence ANCHOR MISMATCH: the ingestion-time anchor binds "
+                    f"{anchor.evidence_hash[:16]}... but the current persisted meta "
+                    f"bytes hash to {raw_evidence_hash[:16]}... - tampering detected "
+                    "BEFORE routing/mapping; the raw store is immutable, repair the "
+                    "exact original bytes or re-ingest"
                 ),
                 started=started,
                 input_count=0,
@@ -877,6 +974,8 @@ class NormalizationRunner:
 
         manifest_uri: str | None = None
         manifest_hash: str | None = None
+        output_set_hash: str | None = None
+        semantic_hash: str | None = None
         # ROW-scope runs materialize their output tables (possibly
         # EMPTY ones when every row quarantined - the empty parquet IS
         # the "nothing normalized, no sentinel row" evidence); a
@@ -889,11 +988,17 @@ class NormalizationRunner:
 
             import polars as pl
 
+            # CR-2.3 P0-03 (audit 20260901 section 4.3): the
+            # materialized output set is EXACTLY spec.output_names -
+            # every declared output is materialized (an empty parquet
+            # for an empty table), never a subset. The exact set is
+            # sealed (output_set_hash) into BOTH the manifest and the
+            # ledger, and replay re-verifies it against the CURRENT
+            # registry spec - removing a required output (or adding an
+            # undeclared one) and rebinding both hashes breaks the seal.
             output_records: list[dict[str, Any]] = []
             for output_name in spec.output_names:
                 out_rows = normalized.get(output_name, [])
-                if spec.quarantine_scope is QuarantineScope.WHOLE_PAYLOAD and not out_rows:
-                    continue
                 frame_out = pl.DataFrame(out_rows)
                 # deterministic ordering: sort by ALL columns (schema order)
                 if frame_out.height > 0:
@@ -916,12 +1021,15 @@ class NormalizationRunner:
                         "row_count": frame_out.height,
                     }
                 )
+            output_set_hash = _output_set_hash(output_records)
+            # CR-2.3 P0-03: the semantic identity of the normalized
+            # VALUES is sealed into BOTH the ledger and the manifest;
+            # replay recomputes it from the physical parquet records -
+            # swapping the parquet for same-schema/same-row-count
+            # different values and rebinding content/manifest hashes
+            # still breaks it.
             semantic_hash = _canonical_semantic_hash(
-                {
-                    name: rows
-                    for name, rows in normalized.items()
-                    if rows or spec.quarantine_scope is QuarantineScope.ROW or input_count == 0
-                }
+                {name: normalized.get(name, []) for name in spec.output_names}
             )
             # CR-2.1 P0-04: correctness bytes carry NO wall-clock and NO
             # caller-declared provenance - an exact retry regenerates
@@ -937,11 +1045,13 @@ class NormalizationRunner:
                 "raw_request_id": request_id,
                 "raw_evidence_uri": raw_evidence_uri,
                 "raw_evidence_hash": raw_evidence_hash,
+                "raw_payload_kind": payload_kind,
                 "raw_table_name": raw_table_name,
                 "normalization_contract_version": _registry.NORMALIZATION_CONTRACT_VERSION,
                 "mapper_identity": mapper_identity,
                 "mapper_code_hash": _registry.MAPPER_CODE_FINGERPRINT,
                 "outputs": output_records,
+                "output_set_hash": output_set_hash,
                 "semantic_hash": semantic_hash,
                 "quarantine_set_hash": qtz_set_hash,
                 "input_count": input_count,
@@ -985,6 +1095,8 @@ class NormalizationRunner:
             surface=surface or None,
             quarantines=quarantines,
             qtz_set_hash=qtz_set_hash,
+            output_set_hash=output_set_hash,
+            semantic_hash=semantic_hash,
         )
         return NormalizationRunResult(
             normalization_run_id=run_id,
@@ -1286,8 +1398,66 @@ class NormalizationRunner:
         problems.extend(seal.manifest_binding_problems(manifest))
         import polars as pl
 
-        for output in manifest.get("outputs", []):
+        # --------------------------- CR-2.3 P0-03: EXPECTED OUTPUT EXACT
+        # SET == CURRENT typed registry spec.output_names - no missing
+        # required output, no undeclared extra, no duplicates.
+        registry_spec = lookup_spec(
+            seal.provider,
+            seal.normalization_surface,
+            seal.provider_dataset,
+            seal.endpoint,
+        )
+        if registry_spec is None:
+            problems.append(
+                "no CURRENT registry spec for "
+                f"{seal.normalization_surface}/{seal.provider_dataset}/{seal.endpoint} - "
+                "the run's surface is no longer a known normalization surface "
+                "(registry drift); replay fails closed"
+            )
+            return problems
+        manifest_outputs = list(manifest.get("outputs", []))
+        manifest_names = [str(o.get("output_name") or "") for o in manifest_outputs]
+        if len(manifest_names) != len(set(manifest_names)):
+            problems.append("manifest carries DUPLICATE output_name entries")
+        expected_names = set(registry_spec.output_names)
+        actual_names = set(manifest_names)
+        missing = sorted(expected_names - actual_names)
+        extra = sorted(actual_names - expected_names)
+        if missing:
+            problems.append(
+                f"manifest output set MISSING required output(s): {missing} "
+                "(exact-set seal: every declared output must be present)"
+            )
+        if extra:
+            problems.append(
+                f"manifest output set carries UNDECLARED output(s): {extra} "
+                "(exact-set seal: no output outside spec.output_names)"
+            )
+        # --------------------------- CR-2.3 P0-03: deterministic URI
+        # binding - every manifest output uri must equal the expected
+        # base path + output_name, recomputed from the LEDGER identity
+        # (a rebind onto another valid logical path fails here).
+        expected_base = (
+            f"provider={seal.provider}/dataset={seal.provider_dataset}/"
+            f"raw_request={seal.raw_request_id}/"
+            f"contract={seal.normalization_contract_version}/run={run_id}"
+        )
+        for output in manifest_outputs:
             output_uri = str(output.get("uri", ""))
+            expected_uri = f"{expected_base}/{output.get('output_name')}.parquet"
+            if output_uri != expected_uri:
+                problems.append(
+                    f"output uri {output_uri!r} is not the deterministic expected "
+                    f"path {expected_uri!r} (URI rebind detected)"
+                )
+        # --------------------------- CR-2.3 P0-03: three-way OUTPUT SET
+        # seal - recompute from the PHYSICAL files and compare with the
+        # manifest and the ledger.
+        physical_records: list[dict[str, Any]] = []
+        rows_by_output: dict[str, list[dict[str, Any]]] = {}
+        for output in manifest_outputs:
+            output_uri = str(output.get("uri", ""))
+            output_name = str(output.get("output_name") or "")
             output_path = physical_from_logical_uri(self.normalized_root, output_uri)
             if not output_path.is_file():
                 problems.append(f"normalized output missing: {output_uri}")
@@ -1305,6 +1475,44 @@ class NormalizationRunner:
             actual_schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
             if actual_schema_hash != str(output.get("schema_hash")):
                 problems.append(f"normalized output schema mismatch: {output_uri}")
+            physical_records.append(
+                {
+                    "output_name": output_name,
+                    "uri": output_uri,
+                    "content_hash": hashlib.sha256(output_bytes).hexdigest(),
+                    "schema_hash": actual_schema_hash,
+                    "row_count": frame.height,
+                }
+            )
+            rows_by_output[output_name] = frame.to_dicts()
+        if seal.normalized_output_set_hash is not None:
+            if _output_set_hash(physical_records) != str(seal.normalized_output_set_hash):
+                problems.append(
+                    "output exact-set seal mismatch: the physical output recompute "
+                    "does not match the ledger normalized_output_set_hash"
+                )
+        else:
+            problems.append(
+                "run carries no normalized_output_set_hash seal (pre-CR-2.3 row) - "
+                "re-run under the current contract"
+            )
+        # --------------------------- CR-2.3 P0-03: three-way SEMANTIC
+        # seal - recompute the normalized VALUES identity from the
+        # physical parquet records.
+        if seal.normalized_semantic_hash is not None:
+            recomputed_semantic = _canonical_semantic_hash(
+                {name: rows_by_output.get(name, []) for name in registry_spec.output_names}
+            )
+            if recomputed_semantic != str(seal.normalized_semantic_hash):
+                problems.append(
+                    "semantic seal mismatch: the physical parquet VALUES recompute "
+                    "does not match the ledger normalized_semantic_hash"
+                )
+        else:
+            problems.append(
+                "run carries no normalized_semantic_hash seal (pre-CR-2.3 row) - "
+                "re-run under the current contract"
+            )
         return problems
 
     # ------------------------------------------------------------- commit
@@ -1335,6 +1543,8 @@ class NormalizationRunner:
         quarantines: list[dict[str, Any]],
         qtz_set_hash: str,
         evidence_conflict: bool = False,
+        output_set_hash: str | None = None,
+        semantic_hash: str | None = None,
     ) -> None:
         """CR-2.1 P0-04: the run ledger + the FULL quarantine set commit
         in ONE DuckDB transaction with a post-insert count assertion -
@@ -1342,8 +1552,13 @@ class NormalizationRunner:
         deterministic anchor lets the exact retry recover).
 
         CR-2.2 P0-02A: ``evidence_conflict`` marks the INCIDENT HARD
-        BLOCK runs - recorded for audit but excluded from the request's
-        trusted raw-evidence baseline."""
+        BLOCK runs (diagnostic/audit only since CR-2.3 - the trust
+        root is the raw evidence anchor ledger).
+
+        CR-2.3 P0-03: ``output_set_hash`` / ``semantic_hash`` are the
+        ledger-side seals of the exact output set and the normalized
+        values (three-way bound with the manifest and the replay-time
+        physical recompute)."""
         self.conn.execute("BEGIN TRANSACTION")
         try:
             dup = self.conn.execute(
@@ -1387,6 +1602,8 @@ class NormalizationRunner:
                     _registry.MAPPER_CODE_FINGERPRINT,
                     qtz_set_hash,
                     evidence_conflict,
+                    output_set_hash,
+                    semantic_hash,
                 ],
             )
             for record in quarantines:

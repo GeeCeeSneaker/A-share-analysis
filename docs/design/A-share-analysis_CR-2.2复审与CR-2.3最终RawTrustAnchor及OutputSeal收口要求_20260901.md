@@ -680,3 +680,111 @@ Snapshot / ReadModel                 ░░░░░░░░░░ 0%
 ```
 
 当前最重要的工程判断：**CR-2 已经不再缺“数据怎么转换”的主体能力，缺的是“第一次输入和最终输出究竟能不能被当成不可替换的可信事实”。CR-2.3 只解决这个 trust-root / exact-output 闭环，通过后就应停止继续扩张 CR-2，正式转入 CR-3。**
+
+---
+
+# 10. Implementation Mapping（开发方填写，2026-09-01）
+
+## §2 P0-01 Provider-Owned Operation Spec
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 撤销 caller 自由组合入口 | `call_exchange` / `_call_or_exchange` 删除；generic executor 私有化为 `_execute_exchange(spec, fn, params)` | `TestRegistryStructuralGuard::test_no_public_generic_exchange_boundary`（公开方法签名无 endpoint/dataset/require_capability/capability/normalization_surface/spec；`hasattr(call_exchange)` 为 False） |
+| private typed ProviderOperationSpec | `operations.py`：frozen dataclass + 15 私有静态常量 + 私有 `_OPERATION_SPECS` dict + 只读 `lookup_operation_spec` | `TestOperationSpecProvenance::test_specs_are_immutable_and_private_registry` |
+| wrapper -> 私有 spec 常量 -> 私有 executor | 15 个 wrapper 全部改为 `self._execute_exchange(<CONST>, fn, params=...)`；kline 双 wrapper 绑定 `DAILY_BAR_KLINE` / `INDEX_DAILY_KLINE` | `test_provider_facade_kline_wrappers_declare_distinct_surfaces`（AST 断言绑定 + 双 spec capability/surface 互斥且共享 endpoint/dataset）+ `test_executor_signature_is_spec_typed_private`（签名仅 `(self, spec, fn, params)`） |
+| operation registry ↔ 双契约结构守卫 | spec (capability, endpoint) ∈ SDK_METHOD_CLASSIFICATIONS；spec (surface, dataset, endpoint) ∈ registry 且非 NOT_APPLICABLE；双向 exact | `test_operation_specs_cross_checked_with_both_contracts`（15 spec；seen == non-NA registry keys） |
+| meta 持久化 operation 身份 | RawEnvelope.operation_id + raw meta `operation_id` 字段（RawWriter） | `TestRawTrustAnchor::test_anchor_cross_binds_operation_identity`（anchor 行交叉绑定 endpoint/surface） |
+
+## §3 P0-02 Raw Evidence Trust Anchor
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| anchor ledger（017+） | migration 017 `meta_raw_evidence_anchor`（PK + evidence_uri/hash + endpoint/operation_id/surface/payload_kind/ingest_run_id/created_at） | `test_migrations.py` 17 链 + anchor 列断言 |
+| RawWriter 落盘后 reread + 登记 | `raw_anchor.py::record_raw_evidence_anchor`（governed ingestion flow 组件：reread persisted meta bytes → sha256 → insert） | `test_anchor_recording_is_idempotent_and_conflict_hard_fails`（同 bytes 幂等一行；异 bytes `RawAnchorError`——永不 re-baseline） |
+| runner 查 expected hash 于路由前 | `runner.py::run()` 头部 `lookup_raw_evidence_anchor`——任何 meta 解析/路由/映射之前 | `test_first_consume_surface_tamper_blocks_before_routing`（无 prior run；仅改 surface 字段 → BLOCK；无输出；ledger 仅 1 行 incident） |
+| 首消费 meta-only 篡改 fail closed | anchor mismatch（surface/endpoint/params/account 任一改动都改变 meta bytes） | `test_first_consume_endpoint_params_account_tamper_blocks`（endpoint/account 逐项篡改 → MISMATCH；恢复原 bytes → SUCCESS） |
+| current hash != anchor -> BLOCK before mapper | `RAW_ANCHOR_MISMATCH` blocked run（evidence_conflict=TRUE 诊断） | `test_raw_meta_hash_tamper_blocks`（CR-2 回归更新）+ 上述两项 |
+| 015-era H1+H2 冲突史升级不洗白 | 无 anchor → `RAW_ANCHOR_MISSING` 永续 fail closed；migration 不 auto-anchor；失败运行不建 anchor | `test_legacy_history_upgrade_never_trusts_conflict_hash`（fabricated legacy H1/H2 runs → BLOCKED；无 anchor 自动创建；H2 无 SUCCESS 行） |
+| 多 hash legacy 不 auto-grandfather | 同上（任何无 anchor 情况 fail closed） | 同上（>1 distinct hash 场景含于 fabricated history） |
+| legacy 无 anchor fail closed / re-ingest | `RAW_ANCHOR_MISSING` + governed re-ingest 路径（record anchor 后解锁） | `test_missing_anchor_fails_closed_then_governed_reingest_succeeds` |
+| healthy anchor exact match success | 全部既有 happy-path 测试经 `_persist_raw(conn=conn)` 记录 anchor | `test_anchor_cross_binds_operation_identity` + 84 项回归 |
+| anchor duplicate/conflict -> hard fail | `RawAnchorError` | `test_anchor_recording_is_idempotent_and_conflict_hard_fails` |
+| 016 evidence_conflict 降级 | mismatch 运行仍标记 TRUE 但仅诊断；信任根 = anchor；旧 baseline 查询删除 | `test_blocked_conflict_run_replays_idempotently`（CR-2.2 回归：conflict run 幂等 + 标记计数） |
+
+## §4 P0-03 Output-Set / Semantic Seal
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| normalized_output_set_hash / normalized_semantic_hash（017+） | migration 017 两列 + `_output_set_hash()` canonical hash | `test_happy_path_exact_set_and_seals`（ledger == manifest 双 seal；replay healthy） |
+| 三方 output-set 消费 | replay 物理重算（content/schema/row_count from files + expected URI）== ledger == manifest | `test_ledger_output_set_seal_tamper_blocks` / `test_manifest_output_set_hash_rebind_blocks` |
+| 三方 semantic 消费 | replay 从物理 parquet records 重算 `_canonical_semantic_hash` == ledger == manifest | `test_values_swapped_same_schema_rowcount_rebind_blocks`（§4.6-15：同 schema/row_count 换值 + rebind content/manifest hash → DAMAGED） |
+| manifest expected set == 当前 spec.output_names | `_verify_manifest_outputs` registry lookup + missing/extra/duplicate 检查 | `test_required_output_removed_rebind_blocks`（§4.6-11）/ `test_undeclared_output_added_blocks`（§4.6-12）/ `test_duplicate_output_name_blocks`（§4.6-13） |
+| output URI deterministic 重算 | expected_base 由 ledger 身份重算；uri ≠ base+name → rebind 检测 | `test_output_uri_rebind_blocks`（§4.6-14：移到另一合法 logical path） |
+| semantic ledger seal 篡改 | ledger.normalized_semantic_hash 编辑 → 三方断裂 | `test_ledger_semantic_seal_tamper_blocks` / `test_manifest_semantic_hash_rebind_blocks`（§4.6-16） |
+| manifest 携带 raw_payload_kind | manifest 新增字段 + seal 比对 | `manifest_binding_problems`（raw_evidence_uri/raw_payload_kind 全语义比对——rebind 矩阵回归） |
+| 正常 exact replay PASS | — | `test_happy_path_exact_set_and_seals`（replay=True）+ 84 项回归 |
+| 空表物化（零产出证据） | materialized set 恒等于 spec.output_names（空表 = 空 parquet） | `test_empty_payload_success_materializes_all_declared_outputs`（SUCCESS + 0 行 + 全输出物化 + replay healthy） |
+
+## §5 冻结机制不重开
+
+RawWriter exact-byte/payload closure / DTO provider-faithful / no-sentinel / row locator / no-silent-drop / calendar whole quarantine / private immutable registry / typed routing / full-history replay / full fingerprint key / quarantine exact-set / schema recompute / file-DB commit / logical URI confinement / R4 冻结契约——全部经 84 项回归保持（§6-D 矩阵 18-23）。
+
+## §6 对抗测试矩阵对照（24 项）
+
+```text
+[✓] A1 public API 无法自由选择 require_capability/surface（签名守卫 + executor 私有）
+[✓] A2 stock/index wrapper 绑定不同私有静态 spec（AST 断言）
+[✓] A3 operation spec 与 endpoint requirement / normalization registry 双向 exact 核对
+[✓] B4 首次消费前 meta surface 篡改 -> BLOCK（路由前）
+[✓] B5 首次消费前 endpoint/params/account 篡改 -> BLOCK
+[✓] B6 current meta hash != anchor -> BLOCK before mapper
+[✓] B7 015 legacy H1+H2 冲突史升级 -> H2 不被信任
+[✓] B8 多 hash legacy 不 auto-grandfather（失败运行不建 anchor）
+[✓] B9 无 anchor fail closed / re-ingest 解锁
+[✓] B10 healthy anchor exact match success
+[✓] C11 required output 删除 + manifest rehash + ledger hash 更新 -> DAMAGED
+[✓] C12 未声明 output 加入 -> DAMAGED
+[✓] C13 duplicate output_name -> DAMAGED
+[✓] C14 output URI 重绑 -> DAMAGED
+[✓] C15 同 schema/row_count 换值 + rebind content/manifest hash -> DAMAGED
+[✓] C16 semantic ledger seal 篡改 -> DAMAGED
+[✓] C17 正常 exact replay PASS
+[✓] D18 SUCCESS/PARTIAL/BLOCKED 历史 exact replay 回归全绿
+[✓] D19 conflict H2 重复运行保持 BLOCKED（anchor 语义）
+[✓] D20 mapper A->B->A replay 回归全绿
+[✓] D21 DB 失败恢复回归全绿
+[✓] D22 no-sentinel / no-silent-drop / locator / calendar / provider-faithful 回归全绿
+[✓] D23 migration from-zero + 016->017 upgrade + idempotency/tamper 全绿
+[ ]  D24 Ubuntu 3.14 / Windows 3.12 / 3.14 full CI green（本批推送后 API 正向确认，SHA 回填）
+```
+
+## §7 Exit Gate 对照（20 项）
+
+```text
+[✓] generic production exchange boundary no caller-selectable capability/surface correctness identity
+[✓] provider operation identity private/static and wrapper-owned
+[✓] stock/index operation identity exact and structurally guarded
+[✓] ingestion-time Raw meta exact-byte hash has external authoritative anchor
+[✓] normalization verifies expected Raw evidence hash before routing/mapping
+[✓] first-consume meta-only tamper fail closed
+[✓] legacy 015 conflict history cannot be grandfathered as trusted anchor
+[✓] full-history exact replay remains intact
+[✓] full mapper fingerprint correctness key remains intact
+[✓] manifest expected output names exact-set == registry spec
+[✓] output logical URI deterministic exact binding
+[✓] ledger/manifest/physical output-set hash three-way bound
+[✓] ledger/manifest/physical normalized semantic hash three-way bound
+[✓] quarantine exact-set seal remains intact
+[✓] physical content/schema/row-count recheck remains intact
+[✓] recoverable file + DB commit semantics remain intact
+[✓] no CR-3 Availability/SourcePolicy/Canonical semantics leak in
+[✓] migrations from-zero/upgrade/idempotency/tamper green（17 链）
+[ ]  full CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] ADR-022 / DEVLOG / DEVELOPMENT_MANAGEMENT synced current truth（Amendment C + DM-20260901-066 + DEVLOG 条目）
+```
+
+## Verification Summary
+
+- Local: **975 / 0**（955 → 975，+20；normalization 104 = 84 回归 + 20 新增；migrations 11 含 17 链）；ruff check / ruff format / mypy 全绿（63 文件零错）；CI 同款命令 `uv run pytest` 复验 975/0
+- ADR-022 Amendment C（status 仍 PROPOSED）；migration 017（未改 014/015/016）；contract 版本未 bump（`cr2.1-v1`——trust-root/seal 收口而非 registry 语义变更，full fingerprint 混入已使 key 空间区分新旧实现）
+- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）

@@ -19,6 +19,7 @@ from typing import Any
 
 import pytest
 
+from ashare_state.providers.amazingdata.operations import CODE_LIST
 from ashare_state.providers.amazingdata.provider import (
     AmazingDataProvider,
     ProviderUseMode,
@@ -117,7 +118,7 @@ class TestSdkLoadFailure:
         provider.identity = FakeIdentity()
         provider.use_mode = ProviderUseMode.SPIKE
         with pytest.raises(ProviderLifecycleTerminalError, match="TERMINAL"):
-            provider.call_exchange("BaseData.get_code_list", "code_list", lambda: None)
+            provider._execute_exchange(CODE_LIST, lambda: None)
 
     def test_sdk_load_exception_is_load_failed(self, monkeypatch):
         """A non-ImportError load failure (corrupted wheel) lands in
@@ -206,7 +207,7 @@ class TestNoBusinessCallAfterTerminal:
         session = ReadySession(lifecycle=lc)
         provider = _provider(session)
         with pytest.raises(ProviderLifecycleTerminalError):
-            provider.call_exchange("BaseData.get_code_list", "code_list", endpoint_fn)
+            provider._execute_exchange(CODE_LIST, endpoint_fn)
         assert fired["count"] == 0  # endpoint function NEVER fired
         assert provider.last_envelopes == []  # no evidence created
 
@@ -224,7 +225,7 @@ class TestNoBusinessCallAfterTerminal:
         session.lifecycle = SdkLifecycle()
         provider = _provider(session)
         with pytest.raises(ProviderLifecycleTerminalError, match="not session-ready"):
-            provider.call_exchange("BaseData.get_code_list", "code_list", endpoint_fn)
+            provider._execute_exchange(CODE_LIST, endpoint_fn)
         assert fired["count"] == 0
 
     def test_ready_session_proceeds_normally(self):
@@ -237,7 +238,7 @@ class TestNoBusinessCallAfterTerminal:
             return ["600519.SH"]
 
         provider = _provider(ReadySession())
-        exchange = provider.call_exchange("BaseData.get_code_list", "code_list", endpoint_fn)
+        exchange = provider._execute_exchange(CODE_LIST, endpoint_fn)
         assert fired["count"] == 1
         assert exchange.payload == ["600519.SH"]
         assert exchange.envelope.status == "OK"

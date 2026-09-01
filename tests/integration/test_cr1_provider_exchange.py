@@ -9,12 +9,23 @@ from typing import Any
 
 import pytest
 
+from ashare_state.providers.amazingdata.operations import ProviderOperationSpec
 from ashare_state.providers.amazingdata.provider import (
     AmazingDataProvider,
     ProviderUseMode,
 )
 from ashare_state.providers.exchange import ProviderExchange
 from ashare_state.storage.raw_writer import RawWriter, RawWriterError
+
+#: mechanics-only fabricated operation spec (CR-2.3: the generic
+#: executor is private; tests exercise it through the private API)
+_FAKE_SPEC = ProviderOperationSpec(
+    operation_id="FakeData.endpoint#fake_surface",
+    capability="daily_bar",
+    endpoint="FakeData.endpoint",
+    provider_dataset="fake_dataset",
+    normalization_surface="fake_surface",
+)
 
 
 @dataclass
@@ -76,11 +87,9 @@ class TestProviderExchangeContract:
 
     def test_call_exchange_returns_exchange(self):
         provider = _provider()
-        exchange = provider.call_exchange(
-            "FakeData.endpoint",
-            "fake_dataset",
+        exchange = provider._execute_exchange(  # noqa: SLF001
+            _FAKE_SPEC,
             lambda: ["a", "b"],
-            require_capability="daily_bar",
         )
         assert isinstance(exchange, ProviderExchange)
         assert exchange.payload == ["a", "b"]
@@ -90,10 +99,8 @@ class TestProviderExchangeContract:
     def test_business_wrapper_returns_payload(self):
         provider = _provider()
         result = provider._call_or_payload(  # noqa: SLF001
-            "FakeData.endpoint",
-            "fake_dataset",
+            _FAKE_SPEC,
             lambda: ["x"],
-            require_capability="daily_bar",
         )
         assert result == ["x"]
 
@@ -105,11 +112,9 @@ class TestProviderExchangeContract:
             raise ProviderPermissionError("entitlement denied")
 
         with pytest.raises(ProviderPermissionError):
-            provider.call_exchange(
-                "FakeData.endpoint",
-                "fake_dataset",
+            provider._execute_exchange(  # noqa: SLF001
+                _FAKE_SPEC,
                 denied,
-                require_capability="daily_bar",
             )
         env = provider.last_envelopes[-1]
         assert env.status == "ERROR"
@@ -350,11 +355,9 @@ class TestRawWriterContract:
         """Spike writes raw evidence with the EXCHANGE's request id - never
         a regenerated one."""
         provider = _provider()
-        exchange = provider.call_exchange(
-            "FakeData.endpoint",
-            "daily_bar",
+        exchange = provider._execute_exchange(  # noqa: SLF001
+            _FAKE_SPEC,
             lambda: [{"SECURITY_CODE": "600000"}],
-            require_capability="daily_bar",
         )
         result = writer.write_success(
             provider="amazingdata",

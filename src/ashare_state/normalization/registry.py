@@ -114,10 +114,19 @@ class NormalizationRunStatus(StrEnum):
 
 
 class NormalizationErrorClass(StrEnum):
-    """CR2-P0-08 + CR-2.1 §2.3: mapping errors, provider errors and
-    surface-identity ambiguity are separated."""
+    """CR2-P0-08 + CR-2.1 §2.3 + CR-2.3 §3: mapping errors, provider
+    errors, surface-identity ambiguity and raw-trust-anchor failures
+    are separated."""
 
     RAW_EVIDENCE_INVALID = "RAW_EVIDENCE_INVALID"
+    #: CR-2.3 P0-02: no authoritative ingestion-time anchor exists for
+    #: the request's raw meta (legacy pre-017 raw) - fail closed, the
+    #: governed repair path is re-ingestion, never auto-grandfathering.
+    RAW_ANCHOR_MISSING = "RAW_ANCHOR_MISSING"
+    #: CR-2.3 P0-02: the current meta bytes do not match the
+    #: authoritative ingestion-time anchor hash - tampering detected
+    #: BEFORE any routing/mapping.
+    RAW_ANCHOR_MISMATCH = "RAW_ANCHOR_MISMATCH"
     SOURCE_EXCHANGE_FAILED = "SOURCE_EXCHANGE_FAILED"
     PAYLOAD_SURFACE_AMBIGUOUS = "PAYLOAD_SURFACE_AMBIGUOUS"
     PAYLOAD_SHAPE_UNSUPPORTED = "PAYLOAD_SHAPE_UNSUPPORTED"

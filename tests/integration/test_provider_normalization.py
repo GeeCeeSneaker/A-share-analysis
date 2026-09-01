@@ -133,10 +133,16 @@ def _persist_raw(
     params: dict[str, Any] | None = None,
     status: str = "OK",
     surface: str = "",
+    conn=None,
+    anchor: bool = True,
 ) -> None:
     """Persist raw evidence exactly the way the production pipeline
-    does (RawWriter.write_success / write_failure). ``surface=""``
-    emulates legacy evidence without the surface identity field."""
+    does (RawWriter.write_success / write_failure) and - since CR-2.3 -
+    record the INGESTION-TIME raw evidence anchor the governed
+    ingestion flow records the moment the meta lands (audit 20260901
+    section 3.3). ``surface=""`` emulates legacy evidence without the
+    surface identity field; ``anchor=False`` emulates LEGACY raw
+    predating the anchor ledger (fail-closed path)."""
     writer = RawWriter(roots["raw"])
     env = _FakeEnvelope(
         provider_dataset=dataset,
@@ -162,6 +168,16 @@ def _persist_raw(
             request_id=request_id,
             payload=payload,
             envelope=env,
+        )
+    if anchor and conn is not None:
+        from ashare_state.storage.raw_anchor import record_raw_evidence_anchor
+
+        record_raw_evidence_anchor(
+            conn,
+            roots["raw"],
+            provider="amazingdata",
+            provider_dataset=dataset,
+            request_id=request_id,
         )
 
 
@@ -313,6 +329,7 @@ class TestSurfaceIdentity:
             request_id="req-stock",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         _persist_raw(
             env_root,
@@ -321,6 +338,7 @@ class TestSurfaceIdentity:
             request_id="req-index",
             payload=_INDEX_BAR_ROWS,
             surface="index_daily",
+            conn=conn,
         )
         results = {
             "req-stock": _runner(conn, env_root).run(
@@ -361,6 +379,7 @@ class TestSurfaceIdentity:
             request_id="req-legacy",
             payload=_INDEX_BAR_ROWS,  # index-shaped rows must NOT tip the guess
             surface="",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-legacy")
         assert result.status == "BLOCKED"
@@ -383,6 +402,7 @@ class TestSurfaceIdentity:
             payload=["20260810", "20260811"],
             params={"market": "SH"},
             surface="",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="trade_calendar", request_id="req-legacy-cal"
@@ -400,6 +420,7 @@ class TestSurfaceIdentity:
             request_id="req-wrong-surface",
             payload=_DAILY_BAR_ROWS,
             surface="not_a_surface",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-wrong-surface"
@@ -419,6 +440,7 @@ class TestSurfaceIdentity:
             request_id="req-na-surface",
             payload=[{"INDEX_CODE": "000300", "TRADE_DATE": "20260814"}],
             surface="index_daily",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="index_daily", request_id="req-na-surface"
@@ -512,6 +534,7 @@ class TestImmutableRegistry:
             request_id="req-evil",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-evil")
         # zero rows survived the evil mapper: BLOCKED (never a healthy
@@ -547,6 +570,7 @@ class TestReplayVerification:
             request_id="req-replay",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-replay")
         assert first.idempotent_replay is False
@@ -566,6 +590,7 @@ class TestReplayVerification:
             request_id="req-div-replay",
             payload=[{"SECURITY_CODE": "600000", "EX_DIVIDEND_DATE": "20260810"}],
             surface="corporate_action",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(
             provider_dataset="corporate_action", request_id="req-div-replay"
@@ -588,6 +613,7 @@ class TestReplayVerification:
             payload=[],
             status="ERROR",
             surface="daily_bar",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-err-replay"
@@ -610,6 +636,7 @@ class TestReplayVerification:
             request_id="req-partial-replay",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-partial-replay"
@@ -638,6 +665,7 @@ class TestReplayVerification:
             request_id="req-tamper-out",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-tamper-out"
@@ -656,6 +684,7 @@ class TestReplayVerification:
             request_id="req-del-out",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-del-out")
         _output_path(env_root, "daily_bar", "req-del-out").unlink()
@@ -670,6 +699,7 @@ class TestReplayVerification:
             request_id="req-tamper-man",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-tamper-man")
         manifest = _manifest_path(env_root, "daily_bar", "req-tamper-man")
@@ -687,6 +717,7 @@ class TestReplayVerification:
             request_id="req-del-man",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-del-man")
         _manifest_path(env_root, "daily_bar", "req-del-man").unlink()
@@ -703,6 +734,7 @@ class TestReplayVerification:
             request_id="req-qtz-del",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-qtz-del")
         assert first.status == "PARTIAL"
@@ -722,6 +754,7 @@ class TestReplayVerification:
             request_id="req-qtz-upd",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-qtz-upd")
         conn.execute(
@@ -743,6 +776,7 @@ class TestReplayVerification:
             payload=["20260810"],
             params={"market": "SH"},
             surface="",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(
             provider_dataset="trade_calendar", request_id="req-legacy-seal"
@@ -776,6 +810,7 @@ class TestReplayVerification:
             request_id="req-code-change",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-code-change"
@@ -796,6 +831,8 @@ class TestReplayVerification:
         from ashare_state.storage import apply_migrations
 
         roots1 = {"raw": tmp_path / "e1" / "raw", "normalized": tmp_path / "e1" / "normalized"}
+        conn1 = duckdb.connect(":memory:")
+        apply_migrations(conn1, MIGRATIONS_DIR)
         _persist_raw(
             roots1,
             dataset="daily_bar",
@@ -803,19 +840,26 @@ class TestReplayVerification:
             request_id="req-cross-env",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn1,
         )
-        conn1 = duckdb.connect(":memory:")
-        apply_migrations(conn1, MIGRATIONS_DIR)
         result1 = NormalizationRunner(
             conn1, raw_root=roots1["raw"], normalized_root=roots1["normalized"]
         ).run(provider_dataset="daily_bar", request_id="req-cross-env")
-        conn1.close()
 
         # environment 2: the SAME raw bytes (byte-for-byte copy)
         roots2 = {"raw": tmp_path / "e2" / "raw", "normalized": tmp_path / "e2" / "normalized"}
         shutil.copytree(roots1["raw"], roots2["raw"])
         conn2 = duckdb.connect(":memory:")
         apply_migrations(conn2, MIGRATIONS_DIR)
+        _persist_raw(
+            roots2,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-cross-env",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+            conn=conn2,
+        )
         result2 = NormalizationRunner(
             conn2, raw_root=roots2["raw"], normalized_root=roots2["normalized"]
         ).run(provider_dataset="daily_bar", request_id="req-cross-env")
@@ -865,6 +909,7 @@ class TestAtomicCommitClosure:
             request_id="req-db-fail",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         failing = _FailingConn(conn, "INSERT INTO meta_provider_normalization_run")
         with pytest.raises(NormalizationRunnerError, match="commit failed"):
@@ -895,6 +940,7 @@ class TestAtomicCommitClosure:
             request_id="req-qtz-fail",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         failing = _FailingConn(conn, "INSERT INTO meta_provider_quarantine")
         with pytest.raises(NormalizationRunnerError, match="commit failed"):
@@ -942,6 +988,7 @@ class TestAtomicCommitClosure:
             request_id="req-multi-out",
             payload=status_rows,
             surface="security_status_history",
+            conn=conn,
         )
         calls = {"n": 0}
         original = NormalizationRunner._write_immutable
@@ -980,6 +1027,7 @@ class TestAtomicCommitClosure:
             request_id="req-no-clock",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-no-clock"
@@ -1011,6 +1059,7 @@ class TestAtomicCommitClosure:
             request_id="req-seal",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-seal")
         assert result.status == "PARTIAL"
@@ -1049,6 +1098,7 @@ class TestRawEvidenceSoleInput:
             request_id="req-1",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-1")
         assert result.status == "SUCCESS"
@@ -1065,8 +1115,9 @@ class TestRawEvidenceSoleInput:
             _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-none")
 
     def test_raw_meta_hash_tamper_blocks(self, conn, env_root):
-        """The persisted meta hash no longer matches the payload's
-        content hash -> the verified reader rejects the evidence."""
+        """The persisted meta BYTES change (content_hash field edited)
+        -> the ingestion-time anchor no longer matches -> BLOCKED
+        BEFORE any closure verification or routing (CR-2.3 P0-02)."""
         _persist_raw(
             env_root,
             dataset="daily_bar",
@@ -1074,6 +1125,7 @@ class TestRawEvidenceSoleInput:
             request_id="req-tamper",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         meta_path = (
             env_root["raw"] / "provider=amazingdata" / "dataset=daily_bar" / "req-tamper.meta.json"
@@ -1083,7 +1135,7 @@ class TestRawEvidenceSoleInput:
         meta_path.write_text(json.dumps(doc, sort_keys=True), encoding="utf-8")
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-tamper")
         assert result.status == "BLOCKED"
-        assert result.error_class == "RAW_EVIDENCE_INVALID"
+        assert result.error_class == "RAW_ANCHOR_MISMATCH"
 
     def test_raw_payload_bytes_tamper_blocks(self, conn, env_root):
         _persist_raw(
@@ -1093,6 +1145,7 @@ class TestRawEvidenceSoleInput:
             request_id="req-payload-tamper",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         import polars as pl
 
@@ -1121,6 +1174,7 @@ class TestRawEvidenceSoleInput:
             payload=[],
             status="ERROR",
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-err")
         assert result.status == "BLOCKED"
@@ -1140,6 +1194,7 @@ class TestNoSentinelNoSilentDrop:
             request_id="req-missing",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-missing")
         assert result.status == "BLOCKED"  # allow_partial=True but 100% bad rows
@@ -1164,6 +1219,7 @@ class TestNoSentinelNoSilentDrop:
             request_id="req-bad-date",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-bad-date"
@@ -1187,6 +1243,7 @@ class TestNoSentinelNoSilentDrop:
             request_id="req-bad-num",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-bad-num")
         assert result.quarantined_count == 1
@@ -1204,6 +1261,7 @@ class TestNoSentinelNoSilentDrop:
             request_id="req-zero",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-zero")
         assert result.status == "SUCCESS"
@@ -1229,6 +1287,7 @@ class TestNoSentinelNoSilentDrop:
             request_id="req-accounting",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-accounting"
@@ -1250,6 +1309,7 @@ class TestWholePayloadQuarantine:
             request_id="req-cal-bad",
             payload=["20260810", "20260811", "not-a-date", "20260812"],
             params={"market": "SH"},
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="trade_calendar", request_id="req-cal-bad"
@@ -1281,6 +1341,7 @@ class TestWholePayloadQuarantine:
             request_id="req-cal-ok",
             payload=["20260810", "20260811"],
             params={"market": "SH"},
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="trade_calendar", request_id="req-cal-ok"
@@ -1304,6 +1365,7 @@ class TestRoutingAndUnsupported:
             request_id="req-div",
             payload=[{"SECURITY_CODE": "600000", "EX_DIVIDEND_DATE": "20260810"}],
             surface="corporate_action",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="corporate_action", request_id="req-div"
@@ -1320,6 +1382,7 @@ class TestRoutingAndUnsupported:
             request_id="req-base-info",
             payload=[{"SECURITY_CODE": "600000", "SW_INDUSTRY_CODE": "310000"}],
             surface="industry_taxonomy",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="industry_taxonomy", request_id="req-base-info"
@@ -1337,6 +1400,7 @@ class TestRoutingAndUnsupported:
             request_id="req-multi-table",
             payload={"table_a": _DAILY_BAR_ROWS, "table_b": _DAILY_BAR_ROWS},
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="daily_bar", request_id="req-multi-table"
@@ -1358,6 +1422,7 @@ class TestQuarantineEvidenceQuality:
             request_id="req-locate",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-locate")
         assert result.quarantined_count == 1
@@ -1388,6 +1453,7 @@ class TestQuarantineEvidenceQuality:
             request_id="req-secrets",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-secrets")
         assert result.quarantined_count == 1
@@ -1443,6 +1509,7 @@ class TestQuarantineEvidenceQuality:
                 request_id="req-crash",
                 payload=_DAILY_BAR_ROWS,
                 surface="daily_bar",
+                conn=conn,
             )
             result = _runner(conn, env_root).run(
                 provider_dataset="daily_bar", request_id="req-crash"
@@ -1474,6 +1541,7 @@ class TestDeterministicReplay:
             request_id="req-det",
             payload=list(reversed(_DAILY_BAR_ROWS)),  # input order flipped
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-det")
         assert result.status == "SUCCESS"
@@ -1489,6 +1557,7 @@ class TestDeterministicReplay:
             request_id="req-conflict",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-conflict")
         assert first.status == "SUCCESS"
@@ -1506,8 +1575,8 @@ class TestDeterministicReplay:
             provider_dataset="daily_bar", request_id="req-conflict"
         )
         assert second.status == "BLOCKED"
-        assert second.error_class == "RAW_EVIDENCE_INVALID"
-        assert "conflicting raw evidence" in (second.error_message or "")
+        assert second.error_class == "RAW_ANCHOR_MISMATCH"
+        assert "ANCHOR MISMATCH" in (second.error_message or "")
         assert _ledger_count(conn) == 2  # history preserved, never overwritten
 
 
@@ -1521,6 +1590,7 @@ class TestLogicalURIConfinement:
             request_id="req-uri",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-uri")
         assert result.manifest_uri == (
@@ -1548,6 +1618,7 @@ class TestProviderFaithfulOutput:
             request_id="req-faithful",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-faithful")
         frame = _read_output(env_root, "daily_bar", "req-faithful")
@@ -1581,6 +1652,7 @@ class TestProviderFaithfulOutput:
             request_id="req-industry",
             payload=rows,
             surface="industry_taxonomy",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="industry_taxonomy", request_id="req-industry"
@@ -1610,6 +1682,7 @@ class TestProviderFaithfulOutput:
             request_id="req-status",
             payload=status_rows,
             surface="security_status_history",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="history_stock_status", request_id="req-status"
@@ -1635,6 +1708,7 @@ class TestStatusMachine:
             request_id="req-good",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-good")
         assert result.status == "SUCCESS"
@@ -1650,6 +1724,7 @@ class TestStatusMachine:
             request_id="req-partial",
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-partial")
         assert result.status == "PARTIAL"
@@ -1662,6 +1737,7 @@ class TestStatusMachine:
             request_id="req-cal-block",
             payload=["20260810", "bad"],
             params={"market": "SH"},
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="trade_calendar", request_id="req-cal-block"
@@ -1673,31 +1749,34 @@ class TestStatusMachine:
 
 
 def _facade_surfaces() -> set[tuple[str, str, str]]:
-    """AST-extract every (require_capability, dataset, endpoint)
-    triple the provider facade declares via _call_or_exchange."""
+    """AST-extract every (normalization_surface, dataset, endpoint)
+    triple the provider facade declares via its STATIC operation-spec
+    constants bound to ``_execute_exchange`` call sites (CR-2.3)."""
+    from ashare_state.providers.amazingdata import operations as operations_module
+
+    spec_constants = {
+        name: value
+        for name, value in vars(operations_module).items()
+        if isinstance(value, operations_module.ProviderOperationSpec)
+    }
     tree = ast.parse(PROVIDER_SOURCE.read_text(encoding="utf-8"))
     surfaces: set[tuple[str, str, str]] = set()
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
             continue
-        if node.func.attr != "_call_or_exchange":
+        if node.func.attr != "_execute_exchange":
             continue
-        endpoint = (
-            node.args[0].value
-            if len(node.args) > 0 and isinstance(node.args[0], ast.Constant)
-            else None
-        )
-        dataset = (
-            node.args[1].value
-            if len(node.args) > 1 and isinstance(node.args[1], ast.Constant)
-            else None
-        )
-        capability = None
-        for kw in node.keywords:
-            if kw.arg == "require_capability" and isinstance(kw.value, ast.Constant):
-                capability = kw.value.value
-        if endpoint and dataset and capability:
-            surfaces.add((str(capability), str(dataset), str(endpoint)))
+        if not node.args or not isinstance(node.args[0], ast.Name):
+            continue
+        spec = spec_constants.get(node.args[0].id)
+        if spec is not None:
+            surfaces.add(
+                (
+                    spec.normalization_surface,
+                    spec.provider_dataset,
+                    spec.endpoint,
+                )
+            )
     return surfaces
 
 
@@ -1787,16 +1866,19 @@ class TestRegistryStructuralGuard:
             assert identity_suffix  # identities carry the typed surface
 
     def test_provider_facade_kline_wrappers_declare_distinct_surfaces(self):
-        """CR-2.2 P0-01 (audit 20260901 section 2): the surface identity
-        is STRICTLY derived from the provider-owned capability contract
-        - query_kline_exchange and query_index_kline_exchange
-        distinguish themselves ONLY via require_capability, and NO
-        _call_or_exchange call site carries a normalization_surface
-        override (an ordinary caller can never declare a correctness
-        identity)."""
+        """CR-2.3 P0-01 (audit 20260901 section 2.2): query_kline_exchange
+        and query_index_kline_exchange each bind their OWN static
+        operation-spec constant (DAILY_BAR_KLINE vs INDEX_DAILY_KLINE) -
+        the ONLY way the two surfaces sharing MarketData.query_kline +
+        daily_bar are distinguished. No call site passes free-form
+        endpoint/dataset/capability/surface values."""
+        from ashare_state.providers.amazingdata.operations import (
+            DAILY_BAR_KLINE,
+            INDEX_DAILY_KLINE,
+        )
+
         tree = ast.parse(PROVIDER_SOURCE.read_text(encoding="utf-8"))
-        capability_by_wrapper: dict[str, list[str]] = {}
-        surface_overrides: list[str] = []
+        spec_by_wrapper: dict[str, list[str]] = {}
         for class_node in (n for n in tree.body if isinstance(n, ast.ClassDef)):
             # scope attribution to METHOD-level function defs only -
             # nested closures (e.g. invoke) never own an exchange call
@@ -1805,34 +1887,52 @@ class TestRegistryStructuralGuard:
                     if (
                         isinstance(node, ast.Call)
                         and isinstance(node.func, ast.Attribute)
-                        and node.func.attr == "_call_or_exchange"
+                        and node.func.attr == "_execute_exchange"
+                        and node.args
+                        and isinstance(node.args[0], ast.Name)
                     ):
-                        for kw in node.keywords:
-                            if kw.arg == "require_capability" and isinstance(
-                                kw.value, ast.Constant
-                            ):
-                                capability_by_wrapper.setdefault(method.name, []).append(
-                                    str(kw.value.value)
-                                )
-                            if kw.arg == "normalization_surface":
-                                surface_overrides.append(method.name)
-        assert surface_overrides == [], (
-            f"call sites still declare a caller-side surface override: {surface_overrides}"
-        )
-        assert capability_by_wrapper.get("query_kline_exchange") == ["daily_bar"]
-        assert capability_by_wrapper.get("query_index_kline_exchange") == ["index_daily"]
+                        spec_by_wrapper.setdefault(method.name, []).append(node.args[0].id)
+        assert spec_by_wrapper.get("query_kline_exchange") == ["DAILY_BAR_KLINE"]
+        assert spec_by_wrapper.get("query_index_kline_exchange") == ["INDEX_DAILY_KLINE"]
+        # the two specs differ in capability + surface, share the endpoint
+        assert DAILY_BAR_KLINE.capability == "daily_bar"
+        assert DAILY_BAR_KLINE.normalization_surface == "daily_bar"
+        assert INDEX_DAILY_KLINE.capability == "index_daily"
+        assert INDEX_DAILY_KLINE.normalization_surface == "index_daily"
+        assert DAILY_BAR_KLINE.endpoint == INDEX_DAILY_KLINE.endpoint
+        assert DAILY_BAR_KLINE.provider_dataset == INDEX_DAILY_KLINE.provider_dataset
 
-    def test_call_exchange_has_no_surface_override_parameter(self):
-        """CR-2.2 P0-01: the low-level ``call_exchange`` signature
-        exposes NO normalization_surface parameter - a caller passing
-        capability='daily_bar' can never produce an index_daily surface
-        envelope, and the surface derivation is capability-only."""
+    def test_no_public_generic_exchange_boundary(self):
+        """CR-2.3 P0-01 (audit 20260901 section 2.2): there is NO public
+        generic exchange callable - the executor is private and consumes
+        a static ProviderOperationSpec; every PUBLIC method of the
+        provider exposes no free-form endpoint/dataset/capability/surface
+        correctness selector. An ordinary production caller cannot mix a
+        stock kline callable with an index capability."""
         from ashare_state.providers.amazingdata.provider import AmazingDataProvider
 
-        params = inspect.signature(AmazingDataProvider.call_exchange).parameters
-        assert "normalization_surface" not in params
-        source = PROVIDER_SOURCE.read_text(encoding="utf-8")
-        assert 'surface_identity = str(require_capability or "")' in source
+        for name, member in vars(AmazingDataProvider).items():
+            if name.startswith("_") or not callable(member):
+                continue
+            params = inspect.signature(member).parameters
+            for forbidden in (
+                "endpoint",
+                "dataset",
+                "require_capability",
+                "capability",
+                "normalization_surface",
+                "operation_spec",
+                "spec",
+            ):
+                assert forbidden not in params, (
+                    f"public method {name} exposes free-form correctness selector {forbidden!r}"
+                )
+        # the generic executor itself is PRIVATE and spec-typed
+        executor = inspect.signature(AmazingDataProvider._execute_exchange).parameters
+        assert "spec" in executor
+        assert "endpoint" not in executor
+        assert "dataset" not in executor
+        assert "require_capability" not in executor
 
 
 # ------------------------------------------------- CR-2.2 P0-02: provenance
@@ -1861,6 +1961,7 @@ class TestRawEvidenceBindingPermanence:
             request_id="req-perm",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-perm")
         assert first.status == "SUCCESS"
@@ -1875,8 +1976,8 @@ class TestRawEvidenceBindingPermanence:
                 provider_dataset="daily_bar", request_id="req-perm"
             )
             assert result.status == "BLOCKED"
-            assert result.error_class == "RAW_EVIDENCE_INVALID"
-            assert "conflicting raw evidence" in (result.error_message or "")
+            assert result.error_class == "RAW_ANCHOR_MISMATCH"
+            assert "ANCHOR MISMATCH" in (result.error_message or "")
             blocked_ids.append(result.normalization_run_id)
         # the three conflict observations replay the SAME conflict run
         assert blocked_ids[1] == blocked_ids[0] and blocked_ids[2] == blocked_ids[0]
@@ -1915,6 +2016,7 @@ class TestRawEvidenceBindingPermanence:
             request_id="req-swap",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         assert (
             _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-swap").status
@@ -1929,7 +2031,7 @@ class TestRawEvidenceBindingPermanence:
                 provider_dataset="daily_bar", request_id="req-swap"
             )
             assert result.status == "BLOCKED"
-            assert result.error_class == "RAW_EVIDENCE_INVALID"
+            assert result.error_class == "RAW_ANCHOR_MISMATCH"
         index_success = conn.execute(
             "SELECT count(*) FROM meta_provider_normalization_run "
             "WHERE raw_request_id = ? AND normalization_surface = 'index_daily' "
@@ -1949,6 +2051,7 @@ class TestRawEvidenceBindingPermanence:
             request_id="req-repair",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         first = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-repair")
         assert first.status == "SUCCESS"
@@ -1985,6 +2088,7 @@ class TestRawEvidenceBindingPermanence:
             request_id="req-roll",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         run_a = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-roll")
         assert run_a.status == "SUCCESS" and run_a.idempotent_replay is False
@@ -2011,6 +2115,7 @@ class TestRawEvidenceBindingPermanence:
             request_id="req-croll",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         run_a = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-croll")
         monkeypatch.setattr(registry_module, "NORMALIZATION_CONTRACT_VERSION", "cr2.2-test-v9")
@@ -2038,6 +2143,7 @@ class TestFullMapperIdentity:
             request_id="req-fp16",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         run_a = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-fp16")
         real_fp = registry_module.MAPPER_CODE_FINGERPRINT
@@ -2084,6 +2190,7 @@ class TestFullSealConsumption:
             request_id=request_id,
             payload=rows,
             surface="daily_bar",
+            conn=conn,
         )
         result = _runner(conn, env_root).run(provider_dataset="daily_bar", request_id=request_id)
         assert result.status == "PARTIAL"
@@ -2124,6 +2231,7 @@ class TestFullSealConsumption:
             request_id="req-seal-flip",
             payload=["20260810", "bad"],
             params={"market": "SH"},
+            conn=conn,
         )
         result = _runner(conn, env_root).run(
             provider_dataset="trade_calendar", request_id="req-seal-flip"
@@ -2241,6 +2349,7 @@ class TestFullSealConsumption:
             request_id="req-conflict-replay",
             payload=_DAILY_BAR_ROWS,
             surface="daily_bar",
+            conn=conn,
         )
         _runner(conn, env_root).run(provider_dataset="daily_bar", request_id="req-conflict-replay")
         meta = _meta_path(env_root, "daily_bar", "req-conflict-replay")
@@ -2262,3 +2371,569 @@ class TestFullSealConsumption:
             ["req-conflict-replay"],
         ).fetchone()[0]
         assert int(conflict_rows) == 1
+
+
+# ------------------------------------------------- CR-2.3 P0-01: operation specs
+
+
+@pytest.mark.integration
+class TestOperationSpecProvenance:
+    """CR-2.3 P0-01 (audit 20260901 section 2): the operation identity
+    is provider-owned - private static specs, wrapper-bound, structurally
+    cross-checked against BOTH governed contracts."""
+
+    def test_operation_specs_cross_checked_with_both_contracts(self):
+        """Every operation spec's (capability, endpoint) exists in
+        SDK_METHOD_CLASSIFICATIONS and its (normalization_surface,
+        provider_dataset, endpoint) exists in the normalization
+        registry; every registry entry that is NOT NOT_APPLICABLE has
+        exactly one operation spec (the NOT_APPLICABLE optional surfaces
+        deliberately have none)."""
+        from ashare_state.providers.amazingdata.operations import operation_specs
+
+        sdk = {(c.capability, c.endpoint) for c in SDK_METHOD_CLASSIFICATIONS}
+        registry = {
+            (spec.normalization_surface, spec.provider_dataset, spec.endpoint): spec
+            for spec in registry_specs()
+        }
+        ops = operation_specs()
+        assert len(ops) == 15
+        seen_registry_keys = set()
+        for op in ops:
+            assert (op.capability, op.endpoint) in sdk, (
+                f"operation {op.operation_id} capability/endpoint not in the SDK contract"
+            )
+            key = (op.normalization_surface, op.provider_dataset, op.endpoint)
+            assert key in registry, f"operation {op.operation_id} not in the normalization registry"
+            assert registry[key].support is not SurfaceSupport.NOT_APPLICABLE
+            seen_registry_keys.add(key)
+        not_na = {
+            key
+            for key, spec in registry.items()
+            if spec.support is not SurfaceSupport.NOT_APPLICABLE
+        }
+        assert seen_registry_keys == not_na
+
+    def test_specs_are_immutable_and_private_registry(self):
+        """The spec constants are frozen; the registry dict is private
+        and only read-only lookups are exported."""
+        import ashare_state.providers.amazingdata.operations as operations_module
+
+        assert not hasattr(operations_module, "OPERATION_SPECS")
+        spec = operations_module.lookup_operation_spec("MarketData.query_kline#daily_bar")
+        assert spec is not None
+        with pytest.raises(Exception):  # noqa: B017 - frozen dataclass mutation
+            spec.capability = "index_daily"  # type: ignore[misc]
+
+    def test_executor_signature_is_spec_typed_private(self):
+        import inspect as _inspect
+
+        from ashare_state.providers.amazingdata.provider import AmazingDataProvider
+
+        params = _inspect.signature(AmazingDataProvider._execute_exchange).parameters
+        assert list(params) == ["self", "spec", "fn", "params"]
+        assert not hasattr(AmazingDataProvider, "call_exchange")
+        assert not hasattr(AmazingDataProvider, "_call_or_exchange")
+
+
+# ------------------------------------------------- CR-2.3 P0-02: raw trust anchor
+
+
+@pytest.mark.integration
+class TestRawTrustAnchor:
+    """CR-2.3 P0-02 (audit 20260901 section 3): the authoritative
+    expected hash of a request's raw meta is the INGESTION-TIME anchor
+    persisted outside the raw filesystem - first-consume meta-only
+    tampers fail closed, legacy raw without an anchor fails closed."""
+
+    def test_first_consume_surface_tamper_blocks_before_routing(self, conn, env_root):
+        """NO prior run exists; only the meta's normalization_surface
+        field is edited (payload hashes stay consistent). The anchor
+        mismatch fires BEFORE any routing/mapping - the tampered
+        surface can never become the first accepted truth."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-anchor-surface",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+            conn=conn,
+        )
+        meta = _meta_path(env_root, "daily_bar", "req-anchor-surface")
+        doc = json.loads(meta.read_bytes())
+        doc["normalization_surface"] = "index_daily"
+        meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        result = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-anchor-surface"
+        )
+        assert result.status == "BLOCKED"
+        assert result.error_class == "RAW_ANCHOR_MISMATCH"
+        assert result.manifest_uri is None
+        # no outputs and no surface routing ever happened
+        assert list((env_root["normalized"] / "provider=amazingdata").rglob("*.parquet")) == []
+        assert _ledger_count(conn) == 1  # only the incident blocked run
+
+    def test_first_consume_endpoint_params_account_tamper_blocks(self, conn, env_root):
+        """Editing NON-payload-hash meta fields (endpoint / request
+        params / account profile) all change the meta bytes - each one
+        fails closed against the anchor before routing."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-anchor-meta",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+            conn=conn,
+        )
+        meta = _meta_path(env_root, "daily_bar", "req-anchor-meta")
+        original = meta.read_bytes()
+        for field, value in (
+            ("endpoint", "InfoData.get_index_daily"),
+            ("account_profile_id", "EVIL_ACCOUNT"),
+        ):
+            doc = json.loads(original)
+            doc[field] = value
+            meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+            result = _runner(conn, env_root).run(
+                provider_dataset="daily_bar", request_id="req-anchor-meta"
+            )
+            assert result.status == "BLOCKED"
+            assert result.error_class == "RAW_ANCHOR_MISMATCH"
+        # restore the exact original bytes -> normalization proceeds
+        meta.write_bytes(original)
+        restored = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-anchor-meta"
+        )
+        assert restored.status == "SUCCESS"
+
+    def test_legacy_history_upgrade_never_trusts_conflict_hash(self, conn, env_root):
+        """015-era simulation: a legacy DB carries an H1 SUCCESS run and
+        an H2 conflict BLOCKED run for the same request, both WITHOUT an
+        anchor (pre-017). After the 017 upgrade the current meta (H1)
+        still fails closed - no auto-anchor, no grandfathering of H2."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-legacy-hist",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+            anchor=False,
+        )
+        # fabricate the 015-era history directly in the ledger (no
+        # anchors existed then)
+        for hash_value, status in (
+            ("a" * 64, "SUCCESS"),
+            ("b" * 64, "BLOCKED"),
+        ):
+            conn.execute(
+                "INSERT INTO meta_provider_normalization_run "
+                "(normalization_run_id, provider, provider_dataset, endpoint, "
+                "raw_request_id, raw_evidence_uri, raw_evidence_hash, "
+                "raw_payload_kind, normalization_contract_version, mapper_identity, "
+                "input_count, normalized_count, quarantined_count, status, "
+                "idempotency_key, idempotent_replay, started_at, completed_at, "
+                "evidence_conflict) VALUES (?, 'amazingdata', 'daily_bar', "
+                "'MarketData.query_kline', 'req-legacy-hist', 'legacy', ?, 'rows', "
+                "'cr2.1-v1', 'legacy', 0, 0, 0, ?, ?, FALSE, now(), now(), FALSE)",
+                [f"legacy-{hash_value[:6]}", hash_value, status, f"key-{hash_value[:6]}"],
+            )
+        result = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-legacy-hist"
+        )
+        assert result.status == "BLOCKED"
+        assert result.error_class == "RAW_ANCHOR_MISSING"
+        # NO anchor was auto-created by the failed run
+        anchors = conn.execute(
+            "SELECT count(*) FROM meta_raw_evidence_anchor WHERE request_id = ?",
+            ["req-legacy-hist"],
+        ).fetchone()[0]
+        assert int(anchors) == 0
+        # H2 was never blessed: no SUCCESS row is bound to a non-anchor hash
+        healthy = conn.execute(
+            "SELECT count(*) FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = ? AND status = 'SUCCESS' AND raw_evidence_hash = ?",
+            ["req-legacy-hist", "b" * 64],
+        ).fetchone()[0]
+        assert int(healthy) == 0
+
+    def test_missing_anchor_fails_closed_then_governed_reingest_succeeds(self, conn, env_root):
+        """Legacy raw WITHOUT an anchor fails closed; recording the
+        anchor through the GOVERNED ingestion flow (re-ingest of the
+        same bytes) unblocks normalization."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-no-anchor",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+            anchor=False,
+        )
+        blocked = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-no-anchor"
+        )
+        assert blocked.status == "BLOCKED"
+        assert blocked.error_class == "RAW_ANCHOR_MISSING"
+        # governed re-ingest: the ingestion flow records the anchor for
+        # the exact persisted bytes
+        from ashare_state.storage.raw_anchor import record_raw_evidence_anchor
+
+        record_raw_evidence_anchor(
+            conn,
+            env_root["raw"],
+            provider="amazingdata",
+            provider_dataset="daily_bar",
+            request_id="req-no-anchor",
+        )
+        result = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-no-anchor"
+        )
+        assert result.status == "SUCCESS"
+
+    def test_anchor_recording_is_idempotent_and_conflict_hard_fails(self, conn, env_root):
+        """Recording the SAME bytes twice is idempotent (one row);
+        recording DIFFERENT bytes for the same request is a hard anchor
+        conflict - the anchor is never re-baselined."""
+        from ashare_state.storage.raw_anchor import RawAnchorError, record_raw_evidence_anchor
+
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-anchor-rec",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+            anchor=False,
+        )
+        first = record_raw_evidence_anchor(
+            conn,
+            env_root["raw"],
+            provider="amazingdata",
+            provider_dataset="daily_bar",
+            request_id="req-anchor-rec",
+        )
+        second = record_raw_evidence_anchor(
+            conn,
+            env_root["raw"],
+            provider="amazingdata",
+            provider_dataset="daily_bar",
+            request_id="req-anchor-rec",
+        )
+        assert first.evidence_hash == second.evidence_hash
+        count = conn.execute(
+            "SELECT count(*) FROM meta_raw_evidence_anchor WHERE request_id = ?",
+            ["req-anchor-rec"],
+        ).fetchone()[0]
+        assert int(count) == 1
+        # tamper the meta, then try to re-record the anchor
+        meta = _meta_path(env_root, "daily_bar", "req-anchor-rec")
+        doc = json.loads(meta.read_bytes())
+        doc["account_profile_id"] = "EVIL"
+        meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        with pytest.raises(RawAnchorError, match="CONFLICT"):
+            record_raw_evidence_anchor(
+                conn,
+                env_root["raw"],
+                provider="amazingdata",
+                provider_dataset="daily_bar",
+                request_id="req-anchor-rec",
+            )
+
+    def test_anchor_cross_binds_operation_identity(self, conn, env_root):
+        """The anchor row persists the meta's endpoint / operation_id /
+        normalization_surface for cross-binding (they match the meta)."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-anchor-xbind",
+            payload=_DAILY_BAR_ROWS,
+            surface="daily_bar",
+            conn=conn,
+        )
+        row = conn.execute(
+            "SELECT endpoint, normalization_surface FROM meta_raw_evidence_anchor "
+            "WHERE request_id = ?",
+            ["req-anchor-xbind"],
+        ).fetchone()
+        assert str(row[0]) == "MarketData.query_kline"
+        assert str(row[1]) == "daily_bar"
+
+
+# --------------------------------------------- CR-2.3 P0-03: output + semantic seal
+
+
+_STATUS_ROWS = [
+    {
+        "SECURITY_CODE": "600000",
+        "MARKET_CODE": "1",
+        "TRADE_DATE": "20260814",
+        "IS_ST": "0",
+        "IS_XR_SEC": "1",
+        "IS_WD_SEC": "0",
+        "UP_LIMIT_PRICE": "11.0",
+        "DOWN_LIMIT_PRICE": "9.0",
+    },
+]
+
+
+def _status_run(conn, env_root, request_id: str):
+    """A SUCCESS multi-output run (security_status + limit_price +
+    corporate_action) - the exact-set seal surface."""
+    _persist_raw(
+        env_root,
+        dataset="history_stock_status",
+        endpoint="InfoData.get_history_stock_status",
+        request_id=request_id,
+        payload=_STATUS_ROWS,
+        surface="security_status_history",
+        conn=conn,
+    )
+    result = _runner(conn, env_root).run(
+        provider_dataset="history_stock_status", request_id=request_id
+    )
+    assert result.status == "SUCCESS"
+    return result
+
+
+@pytest.mark.integration
+class TestOutputExactSetSeal:
+    """CR-2.3 P0-03 (audit 20260901 section 4.1/4.3): the manifest
+    output set is EXACTLY the current registry spec.output_names, with
+    deterministic URIs, and the exact set + semantic values are sealed
+    three-way (ledger == manifest == physical recompute)."""
+
+    def test_happy_path_exact_set_and_seals(self, conn, env_root):
+        result = _status_run(conn, env_root, "req-set-happy")
+        manifest = json.loads(
+            _manifest_path(
+                env_root,
+                "history_stock_status",
+                "req-set-happy",
+                run_id=result.normalization_run_id,
+            ).read_text(encoding="utf-8")
+        )
+        names = [o["output_name"] for o in manifest["outputs"]]
+        assert set(names) == {"security_status", "limit_price", "corporate_action"}
+        row = conn.execute(
+            "SELECT normalized_output_set_hash, normalized_semantic_hash "
+            "FROM meta_provider_normalization_run WHERE normalization_run_id = ?",
+            [result.normalization_run_id],
+        ).fetchone()
+        assert str(row[0]) == manifest["output_set_hash"]
+        assert str(row[1]) == manifest["semantic_hash"]
+        # replay is healthy (three-way seals all agree)
+        replay = _runner(conn, env_root).run(
+            provider_dataset="history_stock_status", request_id="req-set-happy"
+        )
+        assert replay.idempotent_replay is True
+
+    def test_required_output_removed_rebind_blocks(self, conn, env_root):
+        """Removing corporate_action from the manifest AND rebinding the
+        manifest hash + the ledger manifest hash still fails: the
+        expected-set check (missing required output) and the ledger
+        output_set seal both break."""
+        result = _status_run(conn, env_root, "req-set-removed")
+
+        def mutate(doc: dict) -> None:
+            doc["outputs"] = [o for o in doc["outputs"] if o["output_name"] != "corporate_action"]
+
+        _rebind_manifest(env_root, conn, result, "history_stock_status", mutate)
+        # also rebind the ledger's own output-set seal to the reduced set
+        # (the full rebind attack) - the MISSING-OUTPUT check still fires
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(
+                provider_dataset="history_stock_status", request_id="req-set-removed"
+            )
+
+    def test_undeclared_output_added_blocks(self, conn, env_root):
+        result = _status_run(conn, env_root, "req-set-extra")
+
+        def mutate(doc: dict) -> None:
+            doc["outputs"].append(
+                {
+                    "output_name": "evil_output",
+                    "uri": f"provider=amazingdata/dataset=history_stock_status/"
+                    f"raw_request=req-set-extra/contract={NORMALIZATION_CONTRACT_VERSION}/"
+                    f"run={result.normalization_run_id}/evil_output.parquet",
+                    "content_hash": "0" * 64,
+                    "schema_hash": "0" * 64,
+                    "row_count": 0,
+                }
+            )
+
+        _rebind_manifest(env_root, conn, result, "history_stock_status", mutate)
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(
+                provider_dataset="history_stock_status", request_id="req-set-extra"
+            )
+
+    def test_duplicate_output_name_blocks(self, conn, env_root):
+        result = _status_run(conn, env_root, "req-set-dup")
+
+        def mutate(doc: dict) -> None:
+            doc["outputs"].append(dict(doc["outputs"][0]))
+
+        _rebind_manifest(env_root, conn, result, "history_stock_status", mutate)
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(
+                provider_dataset="history_stock_status", request_id="req-set-dup"
+            )
+
+    def test_output_uri_rebind_blocks(self, conn, env_root):
+        """An output entry's uri is moved to ANOTHER valid logical path
+        (another run id) with everything else intact - the deterministic
+        URI recompute fails."""
+        result = _status_run(conn, env_root, "req-set-uri")
+
+        def mutate(doc: dict) -> None:
+            for output in doc["outputs"]:
+                if output["output_name"] == "limit_price":
+                    output["uri"] = output["uri"].replace(
+                        f"run={result.normalization_run_id}", "run=0000dead0000"
+                    )
+
+        _rebind_manifest(env_root, conn, result, "history_stock_status", mutate)
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED|URI rebind"):
+            _runner(conn, env_root).run(
+                provider_dataset="history_stock_status", request_id="req-set-uri"
+            )
+
+    def test_ledger_output_set_seal_tamper_blocks(self, conn, env_root):
+        result = _status_run(conn, env_root, "req-set-lseal")
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET normalized_output_set_hash = ? "
+            "WHERE normalization_run_id = ?",
+            ["0" * 64, result.normalization_run_id],
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(
+                provider_dataset="history_stock_status", request_id="req-set-lseal"
+            )
+
+    def test_manifest_output_set_hash_rebind_blocks(self, conn, env_root):
+        result = _status_run(conn, env_root, "req-set-mseal")
+        _rebind_manifest(
+            env_root,
+            conn,
+            result,
+            "history_stock_status",
+            lambda doc: doc.__setitem__("output_set_hash", "0" * 64),
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED"):
+            _runner(conn, env_root).run(
+                provider_dataset="history_stock_status", request_id="req-set-mseal"
+            )
+
+
+@pytest.mark.integration
+class TestSemanticValueSeal:
+    """CR-2.3 P0-03 (audit 20260901 section 4.2/4.3): the normalized
+    VALUES identity is sealed three-way - swapping the parquet for
+    same-schema/same-row-count different values and rebinding the
+    content/manifest hashes still breaks the semantic seal."""
+
+    def test_values_swapped_same_schema_rowcount_rebind_blocks(self, conn, env_root):
+        """The physical parquet VALUES are changed (same schema, same
+        row count), the manifest content_hash is rebound, the manifest
+        hash + ledger manifest hash are rebound - the PHYSICAL semantic
+        recompute still fails."""
+        import io
+
+        import polars as pl
+
+        result = _status_run(conn, env_root, "req-sem-swap")
+        output_path = _output_path(
+            env_root,
+            "history_stock_status",
+            "req-sem-swap",
+            "security_status",
+            run_id=result.normalization_run_id,
+        )
+        frame = pl.read_parquet(output_path)
+        # same schema, same row count, DIFFERENT VALUES
+        swapped = frame.with_columns(
+            pl.when(pl.col("security_code") == "600000")
+            .then(pl.lit("999999"))
+            .otherwise(pl.col("security_code"))
+            .alias("security_code")
+        )
+        assert swapped.schema == frame.schema
+        assert swapped.height == frame.height
+        buf = io.BytesIO()
+        swapped.write_parquet(buf)
+        new_bytes = buf.getvalue()
+        output_path.write_bytes(new_bytes)
+
+        def mutate(doc: dict) -> None:
+            for output in doc.get("outputs", []):
+                if output.get("output_name") == "security_status":
+                    output["content_hash"] = hashlib.sha256(new_bytes).hexdigest()
+
+        _rebind_manifest(env_root, conn, result, "history_stock_status", mutate)
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED|semantic"):
+            _runner(conn, env_root).run(
+                provider_dataset="history_stock_status", request_id="req-sem-swap"
+            )
+
+    def test_manifest_semantic_hash_rebind_blocks(self, conn, env_root):
+        """The manifest's semantic_hash is rebound to the swapped
+        values' hash while the LEDGER seal keeps the original - the
+        three-way binding (manifest == ledger == physical) breaks."""
+        result = _status_run(conn, env_root, "req-sem-mrebind")
+        _rebind_manifest(
+            env_root,
+            conn,
+            result,
+            "history_stock_status",
+            lambda doc: doc.__setitem__("semantic_hash", "e" * 64),
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED|semantic"):
+            _runner(conn, env_root).run(
+                provider_dataset="history_stock_status", request_id="req-sem-mrebind"
+            )
+
+    def test_ledger_semantic_seal_tamper_blocks(self, conn, env_root):
+        result = _status_run(conn, env_root, "req-sem-lseal")
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET normalized_semantic_hash = ? "
+            "WHERE normalization_run_id = ?",
+            ["0" * 64, result.normalization_run_id],
+        )
+        with pytest.raises(NormalizationRunnerError, match="DAMAGED|semantic"):
+            _runner(conn, env_root).run(
+                provider_dataset="history_stock_status", request_id="req-sem-lseal"
+            )
+
+    def test_empty_payload_success_materializes_all_declared_outputs(self, conn, env_root):
+        """An EMPTY raw payload normalizes to SUCCESS with ALL declared
+        outputs materialized as EMPTY parquet (the exact set holds even
+        with zero rows - and no sentinel row exists)."""
+        _persist_raw(
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            request_id="req-empty-payload",
+            payload=[],
+            surface="daily_bar",
+            conn=conn,
+        )
+        result = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-empty-payload"
+        )
+        assert result.status == "SUCCESS"
+        assert result.input_count == 0
+        assert result.normalized_count == 0
+
+        frame = _read_output(
+            env_root, "daily_bar", "req-empty-payload", run_id=result.normalization_run_id
+        )
+        assert frame.height == 0
+        # replay healthy with the empty-output exact set + semantic seals
+        replay = _runner(conn, env_root).run(
+            provider_dataset="daily_bar", request_id="req-empty-payload"
+        )
+        assert replay.idempotent_replay is True

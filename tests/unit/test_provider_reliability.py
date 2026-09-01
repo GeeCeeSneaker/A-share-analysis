@@ -12,6 +12,7 @@ from ashare_state.providers.amazingdata.errors import (
     ProviderSdkInternalError,
     classify_sdk_error,
 )
+from ashare_state.providers.amazingdata.operations import ProviderOperationSpec
 from ashare_state.providers.amazingdata.provider import (
     AmazingDataProvider,
     ProviderUseMode,
@@ -19,6 +20,16 @@ from ashare_state.providers.amazingdata.provider import (
 from ashare_state.providers.errors import (
     ProviderNetworkError,
     is_retryable,
+)
+
+#: mechanics-only fabricated operation spec (CR-2.3: the generic
+#: executor is private; tests exercise it through the private API)
+_FAKE_SPEC = ProviderOperationSpec(
+    operation_id="FakeData.endpoint#fake_surface",
+    capability="daily_bar",
+    endpoint="FakeData.endpoint",
+    provider_dataset="fake_dataset",
+    normalization_surface="fake_surface",
 )
 
 
@@ -107,12 +118,10 @@ class TestFailedCallEnvelope:
             raise TypeError("'NoneType' object is not subscriptable")
 
         with pytest.raises(ProviderPermissionError):
-            provider.call_exchange(
-                "FakeData.endpoint",
-                "fake_dataset",
+            provider._execute_exchange(  # noqa: SLF001
+                _FAKE_SPEC,
                 denied,
                 params={"x": 1},
-                require_capability="daily_bar",
             )
         assert len(provider.last_envelopes) == 1
         env = provider.last_envelopes[0]
@@ -131,11 +140,9 @@ class TestFailedCallEnvelope:
             identity=_FakeIdentity(),
             use_mode=ProviderUseMode.SPIKE,
         )
-        exchange = provider.call_exchange(
-            "FakeData.endpoint",
-            "fake_dataset",
+        exchange = provider._execute_exchange(  # noqa: SLF001
+            _FAKE_SPEC,
             lambda: ["a", "b"],
-            require_capability="daily_bar",
         )
         assert exchange.payload == ["a", "b"]
         env = provider.last_envelopes[-1]

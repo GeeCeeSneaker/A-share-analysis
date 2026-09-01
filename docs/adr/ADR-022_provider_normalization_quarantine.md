@@ -1,9 +1,9 @@
 # ADR-022: Provider Normalization and Quarantine（提供方归一化与隔离）
 
-- **Status**: PROPOSED（2026-08-31，CR-2 批次交付 + CR-2.1 Amendment A 收口 + 2026-09-01 CR-2.2 Amendment B 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
+- **Status**: PROPOSED（2026-08-31，CR-2 批次交付 + CR-2.1 Amendment A 收口 + 2026-09-01 CR-2.2 Amendment B 收口 + 2026-09-01 CR-2.3 Amendment C 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
 - **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
-- **Date**: 2026-08-31（CR-2）/ 2026-08-31（Amendment A，CR-2.1）/ 2026-09-01（Amendment B，CR-2.2）
-- **Work Requirement**: `docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md` + `docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md` + `docs/design/A-share-analysis_CR-2.1复审与CR-2.2最终ReplayProvenanceSeal收口要求_20260901.md`
+- **Date**: 2026-08-31（CR-2）/ 2026-08-31（Amendment A，CR-2.1）/ 2026-09-01（Amendment B，CR-2.2）/ 2026-09-01（Amendment C，CR-2.3）
+- **Work Requirement**: `docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md` + `docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md` + `docs/design/A-share-analysis_CR-2.1复审与CR-2.2最终ReplayProvenanceSeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-2.2复审与CR-2.3最终RawTrustAnchor及OutputSeal收口要求_20260901.md`
 - **Related**: [ADR-021](ADR-021_publish_validation_exactness.md)（其 B1/B2 的 boundary/registry/seal 模式被本 ADR 复用于数据层）；CR-1（RawWriter exact evidence，输入侧）
 
 ## 1. Context（audit 20260831 §3-§4）
@@ -159,8 +159,9 @@ BLOCKED，不得伪造完成。"尽力解析"半验证字段正是 sentinel 风�
 
 管理总册 §61：DM-CR-20260831-063（registry + runner + migration 014 +
 对抗测试）+ DM-CR-20260831-064（CR-2.1 收口 amendment）+
-DM-20260901-065（CR-2.2 Replay Provenance Seal amendment）。相关：§44
-CR-2 acceptance 对照。
+DM-20260901-065（CR-2.2 Replay Provenance Seal amendment）+
+DM-20260901-066（CR-2.3 Raw Trust Anchor + Operation Spec + Output Seal
+amendment）。相关：§44 CR-2 acceptance 对照。
 
 ---
 
@@ -388,3 +389,118 @@ audit §2.4/§3.5/§4.6 清单全对应。总体 955/0。
 CR-2.2 仍不引入 CR-3 语义（AvailabilityPolicy / SourcePolicy /
 Canonicalizer / SnapshotBuilder）；schema 变更仅 migration 016
 （`evidence_conflict BOOLEAN DEFAULT FALSE`，未改 014/015）。
+
+---
+
+# 8. Amendment C：CR-2.3 Raw Trust Anchor + Operation Spec + Output Seal（2026-09-01，audit "CR-2.2复审与CR-2.3最终RawTrustAnchor及OutputSeal收口要求"）
+
+CR-2.2 复审（2026-09-01 10:45 +08:00，Reviewed HEAD `a4a23cd`）裁决
+**REOPENED**：exact replay / full fingerprint / schema verify 等 FREEZE，
+但从"谁是 trust root"审查仍发现 3 个 P0。**本 amendment 修订
+Amendment B 中被复审推翻的表述；原文保留在上文，以本节为准。**
+
+## 8.1 P0-01 Provider-Owned Operation Spec（修订 §7.1 的 capability 派生）
+
+§7.1 中 `surface_identity = str(require_capability or "")` 仍是
+caller-declared——公开 `call_exchange(..., require_capability=...)` 允许普通
+caller 自由选择 capability，等于把自报入口从 surface 字段换成了
+capability 字段（audit §2.1：endpoint/dataset/fn 与 capability 可以不一致，
+如 daily_bar capability + index surface 的组合语义未封死）。CR-2.3 起：
+
+```text
+ProviderOperationSpec(operation_id, capability, endpoint,
+                      provider_dataset, normalization_surface)
+  private STATIC 常量（operations.py，15 个 - 每个 facade wrapper 一个）
+public typed wrapper -> 静态 spec 常量 -> private _execute_exchange(spec, fn,
+  params)（endpoint/dataset/capability/surface/operation_id 全部由 spec 派生）
+```
+
+- `call_exchange` / `_call_or_exchange` **撤销**（公开面不再存在 generic
+  exchange callable）；executor 私有且签名仅 `(spec, fn, params)`；
+- `query_kline_exchange` -> `DAILY_BAR_KLINE` spec，
+  `query_index_kline_exchange` -> `INDEX_DAILY_KLINE` spec（AST 测试断言
+  绑定）；
+- RawEnvelope / raw meta 新增 `operation_id`（spec 派生，持久化并进入
+  anchor 交叉绑定）；
+- 结构守卫：15 个 operation spec 与 `SDK_METHOD_CLASSIFICATIONS`
+  （capability, endpoint）及 normalization registry（surface, dataset,
+  endpoint）**双向 exact 核对**；3 个 NOT_APPLICABLE optional surface 无
+  spec（pipeline 从不 exchange）；
+- 公开方法签名检查：任何 public 方法不含 endpoint / dataset /
+  require_capability / capability / normalization_surface / spec 参数。
+
+## 8.2 P0-02 Raw Evidence Trust Anchor（修订 §7.2 的 baseline 信任根）
+
+§7.2 的 baseline（normalization run history）不是 ingestion-time
+trust root：CR-2 第一次消费某 raw 时只是现场 hash 当前 meta 作为初始
+baseline——`verify_meta_closure()` 只证明 payload 与 meta 声明一致，不证明
+meta 自身仍是 RawWriter 落盘原字节（audit §3.1：首消费前单独改 meta 的
+surface/endpoint/params/account 等非 payload-hash 字段可逃过 closure 成为
+"初始真相"；§3.2：016 legacy 行默认 evidence_conflict=FALSE 也无法安全
+识别 015-era 的 laundering history）。CR-2.3 起（audit §3.3 Option：anchor
+ledger）：
+
+```text
+migration 017: meta_raw_evidence_anchor
+  (provider, provider_dataset, request_id) PK / evidence_uri / evidence_hash
+  / endpoint / operation_id / normalization_surface / payload_kind /
+  ingest_run_id / created_at
+governed ingestion flow: RawWriter commit meta LAST -> reread persisted
+  bytes -> sha256 -> record anchor（record_raw_evidence_anchor：同 bytes
+  幂等；异 bytes hard fail RawAnchorError - anchor 永不 re-baseline）
+NormalizationRunner（在任何 meta 解析/路由/映射之前）:
+  anchor 缺失（legacy pre-017 raw）-> RAW_ANCHOR_MISSING BLOCKED
+    （fail closed；governed repair = re-ingest；绝不 auto-grandfather）
+  current hash != anchor.evidence_hash -> RAW_ANCHOR_MISMATCH
+    INCIDENT HARD BLOCK（evidence_conflict=TRUE 仅诊断；anchor 即信任根 -
+    重复运行永续 BLOCK；修复回原 bytes -> 原 run exact replay）
+```
+
+- `evidence_conflict`（016）**降级为诊断/audit 属性**：correctness trust
+  root 是 anchor ledger，不是 normalization run history；旧 baseline
+  DISTINCT-hash 查询删除；
+- 015-era legacy history（H1 SUCCESS + H2 conflict，均无 anchor）升级后
+  **H2 绝不被信任**：无 anchor -> 永续 fail closed；migration 不做任何
+  auto-anchor（多 hash / conflict history 只能人工或重新取数）；
+- anchor 记录本身：同 request 异 bytes -> `RawAnchorError`（hard fail，
+  anchor 不可 re-baseline）。
+
+## 8.3 P0-03 Expected Output Exact Set + Semantic Value Seal（修订 §7.3 的 seal 边界）
+
+§7.3 的 seal 未封住 expected output set 与 normalized values（audit
+§4.1/§4.2）：从 manifest 删除一个 output 再重绑双 hash，verifier 只遍历
+"剩下的 outputs"；parquet 值整体换成同 schema/row_count 的另一份并重绑
+content/manifest hash，没有 ledger-bound semantic hash 证明值未替换。
+CR-2.3 起（migration 017 两列）：
+
+```text
+normalized_output_set_hash = hash(sorted(output_name, canonical uri,
+  content_hash, schema_hash, row_count))
+  三方消费: ledger == manifest.output_set_hash == replay-time 物理重算
+normalized_semantic_hash = 全输出表 sorted canonical JSON hash
+  三方消费: ledger == manifest.semantic_hash == replay-time 物理重算
+expected exact set: manifest output_name set == CURRENT registry
+  spec.output_names（no missing / no extra / no duplicate）
+URI deterministic binding: 每 output uri == ledger 身份重算的
+  base_path + output_name（不接受 manifest 任意 logical URI）
+```
+
+- 物化语义升级：materialized output set **恰好等于** spec.output_names
+  （空表也物化为空 parquet——空表本身是"零产出、无 sentinel"证据）；
+- `NormalizationRunSeal` 扩展 `raw_evidence_uri / raw_payload_kind /
+  normalized_output_set_hash / normalized_semantic_hash`；manifest 新增
+  `raw_payload_kind / output_set_hash` 字段；
+- pre-CR-2.3 ledger 行缺两 seal -> replay 不作 healthy（要求重跑当前
+  contract）。
+
+## 8.4 CR-2.3 对抗测试（+20 项）
+
+`tests/integration/test_provider_normalization.py`（104 项 = CR-2/2.1/2.2
+84 项回归 + 20 新增）+ migration 17 链（from-zero + 001..016->017 upgrade +
+idempotent + tamper probe 018）；audit §6 A/B/C/D 矩阵全对应。总体 975/0。
+
+## 8.5 Scope 边界
+
+CR-2.3 仍不引入 CR-3 语义；schema 变更仅 migration 017（anchor 表 + 两
+seal 列，未改 014/015/016）。通过后 CR-2.x 全链 CLOSED / FREEZE，ADR-022
+ACCEPTED，CR-3 START——**不再扩张 CR-2 scope**。

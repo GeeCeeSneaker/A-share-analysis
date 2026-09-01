@@ -65,6 +65,8 @@ EXPECTED_TABLES = {
     # 014 (CR-2 provider normalization + quarantine)
     "meta_provider_normalization_run",
     "meta_provider_quarantine",
+    # 017 (CR-2.3 raw evidence trust anchor)
+    "meta_raw_evidence_anchor",
     # runner bootstrap
     "meta_schema_version",
 }
@@ -81,7 +83,7 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 16
+            assert len(applied) == 17
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
         finally:
@@ -92,10 +94,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 16
+            assert len(first) == 17
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 16
+            assert len(ledger) == 17
         finally:
             conn.close()
 
@@ -131,10 +133,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 017 (015/016 exist in the real repo set)
+            # tamper 002 and add a new 018 (015/016/017 exist in the real repo set)
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "017_new_thing.sql").write_text(
+            (tampered_dir / "018_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):
@@ -247,20 +249,20 @@ class TestLedgerIntegrity:
         upgrade_dir = tmp_path / "migrations"
         upgrade_dir.mkdir()
         for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
-            if int(f.name[:3]) <= 15:
+            if int(f.name[:3]) <= 16:
                 (upgrade_dir / f.name).write_bytes(f.read_bytes())
         conn = duckdb.connect(str(db_path))
         try:
             first = apply_migrations(conn, upgrade_dir)
-            assert [r.migration_id for r in first] == [f"{i:03d}" for i in range(1, 16)]
-            # ship 016 into the same directory set
+            assert [r.migration_id for r in first] == [f"{i:03d}" for i in range(1, 17)]
+            # ship 017 into the same directory set
             for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
-                if int(f.name[:3]) == 16:
+                if int(f.name[:3]) == 17:
                     (upgrade_dir / f.name).write_bytes(f.read_bytes())
             second = apply_migrations(conn, upgrade_dir)
-            assert [r.migration_id for r in second] == ["016"]
+            assert [r.migration_id for r in second] == ["017"]
             ledger = applied_migrations(conn)
-            assert len(ledger) == 16
+            assert len(ledger) == 17
             # the CR-2.1 seal columns exist on the upgraded database
             columns = {
                 row[0]
@@ -274,7 +276,30 @@ class TestLedgerIntegrity:
                 "mapper_code_hash",
                 "quarantine_set_hash",
                 "evidence_conflict",
+                "normalized_output_set_hash",
+                "normalized_semantic_hash",
             } <= columns
+            # the CR-2.3 anchor ledger exists on the upgraded database
+            anchor_cols = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'meta_raw_evidence_anchor'"
+                ).fetchall()
+            }
+            assert {
+                "provider",
+                "provider_dataset",
+                "request_id",
+                "evidence_uri",
+                "evidence_hash",
+                "endpoint",
+                "operation_id",
+                "normalization_surface",
+                "payload_kind",
+                "ingest_run_id",
+                "created_at",
+            } <= anchor_cols
         finally:
             conn.close()
 

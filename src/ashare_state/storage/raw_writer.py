@@ -763,6 +763,11 @@ class RawWriter:
             # routing. Legacy evidence without the field fails closed
             # on ambiguous (dataset, endpoint) pairs.
             "normalization_surface": getattr(envelope, "normalization_surface", "") or "",
+            # CR-2.3 (audit 20260901 §2): the SYSTEM-DERIVED operation
+            # identity - the static ProviderOperationSpec the facade
+            # wrapper is bound to. Cross-bound on the raw evidence
+            # anchor (see ashare_state.storage.raw_anchor).
+            "operation_id": getattr(envelope, "operation_id", "") or "",
             "request_params_hash": getattr(envelope, "request_params_hash", ""),
             "requested_at": getattr(envelope, "requested_at", ""),
             "received_at": getattr(envelope, "received_at", ""),
