@@ -710,3 +710,114 @@ CR-2 关闭后，项目已经不只是“能从供应商拿数据”，而是形
 > **同一条市场事实，如果来自不同供应商、不同时间、不同质量，系统在“当时那个时间点”到底应该信哪一条。**
 
 因此 CR-3 的核心不是继续写 mapper，而是正式建立 **时间可用性 + 多源选择 + 冲突解释 + Canonical lineage**。这是进入 Snapshot/ReadModel 前最后一个数据语义层。
+
+---
+
+# 12. Implementation Mapping（开发方填写，2026-09-01）
+
+## §5 P0 Runtime Contract
+
+| P0 | Implementation | Tests |
+|---|---|---|
+| P0-01 唯一输入 CR-2 verified | `CanonicalRunner` 只读 CR-2 ledger + artifacts（+raw meta received_at）；`verify_normalized_run`（normalization/runner.py 公开只读 verifier）消费前全量复验 | `TestClosureVerification`（manifest hash tamper / physical values swap → CLOSURE_VERIFICATION_FAILED → BLOCKED） |
+| P0-02 eligibility 机器定义 | SUCCESS only（`_surface_runs` 查询 status='SUCCESS'）；PARTIAL 默认排除（v1 全 domain partial_run_allowed=False） | `TestBoundaryStructure::test_blocked_cr2_run_not_eligible` / `test_partial_cr2_run_not_eligible_by_default` |
+| P0-03 availability 先于 selection | candidates 构建后先 `available_at <= as_of` 过滤（EXCLUDED_FUTURE decision），后 `_select` | `TestAvailability::test_as_of_filter_runs_before_selection` / `test_future_data_never_wins_historical_selection` |
+| P0-04 available_at 不伪造 | `derive_available_at`（availability.py）唯一 basis OBSERVED_AT_INGEST = raw received_at；无 00:00/1970/固定收盘 | `test_available_at_is_real_ingest_time_never_fabricated`（== received_at；非 1970；非 T00:00；trade_date != available_at） |
+| P0-05 identity fail closed | `IdentityBridge`（security_master 三 dataset → ADR-002）；裸码唯一市场匹配；PIT relist；missing/ambiguous → IDENTITY_MISSING blocking + 行排除 | `TestIdentityResolution` 3 项（missing finding+排除 / PIT relist / unknown market MISSING 非前缀猜） |
+| P0-06 natural keys 静态 typed | eligibility.py：calendar market+trade_date；bars/status/limit security_id+trade_date；adj_factor security_id+ex_date+factor_type；不足 domain BLOCKED_PENDING_SEMANTICS | `TestDomainMatrix::test_matrix_classifies_every_surface`（12 项显式） |
+| P0-07 SourcePolicy 版本化静态不可注入 | `CanonicalSourcePolicy` registry（source-policy-v1）；run() 签名零 correctness 参数 | `TestBoundaryStructure::test_no_caller_correctness_parameters`（run + __init__ 签名断言） |
+| P0-08 No Silent Fallback | 不可用 → REQUIRED_DOMAIN_MISSING blocking；EXCLUDED_FUTURE 显式 decision | `TestSelection::test_required_domain_missing_blocks` + availability EXCLUDED_FUTURE 断言 |
+| P0-09 Reconciliation 显式冲突 | EXACT 比较：等值 → EQUIVALENT_MERGED decision + deterministic winner；不等值 → SOURCE_CONFLICT blocking；重复 key → DUPLICATE_CANONICAL_KEY blocking | `TestSelection::test_equivalent_values_merge_with_decision` / `test_conflicting_values_block` / `test_duplicate_canonical_key_blocks` / `test_run_order_does_not_change_winner` |
+| P0-10 精确 lineage | canonical row 14 字段（source run/output/ordinal+row identity hash/raw request/evidence hash/mapper identity/policy versions/availability basis） | `TestLedgerAndArtifacts::test_manifest_seals_everything`（逐字段断言） |
+| P0-11 CA evidence tier | matrix：corporate_action BLOCKED_PENDING_SEMANTICS + ca_projection AUXILIARY_ONLY；API raise | `TestDomainMatrix::test_ca_projection_never_direct_event_truth` |
+| P0-12 无硬编码制度事实 | AST guard 扫 canonical 包（limit/ST/board + 5/10/20/30% 模式） | `TestDomainMatrix::test_no_hardcoded_institutional_facts` |
+| P0-13 immutable artifact + manifest | canonical/contract/as_of/run 布局；manifest LAST 无墙钟；同 bytes no-op 异 bytes conflict | `TestLedgerAndArtifacts`（manifest 全 seal 断言）+ `TestRunIdentity::test_damaged_prior_run_fails_closed` |
+| P0-14 确定性 run identity + exact replay | uuid5(sha256(input_set+identity_hash+as_of+contract+三 policy+fingerprint))；prior 同 identity 三方 seal 复验后 idempotent | `TestRunIdentity` 5 项（policy/tolerance/fingerprint 变化新 run + rollback replay + tampered/replay fail closed + finding 删除 fail closed） |
+| P0-15 状态机 | SUCCESS/BLOCKED（blocking findings 聚合）；PARTIAL 仅 policy | `TestSelection`（BLOCKED 场景）+ manifest status 断言 |
+
+## §6 数据模型 / migration
+
+migration 018：`meta_canonicalization_run`（24 列：run identity + as_of + contract + input_set/identity/policy 三组 version+hash + code fingerprint + manifest uri/hash + counts + status + idempotency key/replay + 时间戳 + finding_set_hash）+ `meta_canonical_reconciliation_finding`（10 列：deterministic finding_id + run 绑定 + domain/key/class + detail + blocking）。逐行 decisions 存 decisions.parquet（DB 只存 run-level seal/summary）。18 链 from-zero + 001..017→018 upgrade + idempotent + tamper probe 019（test_migrations.py）。
+
+## §7 Domain Eligibility Matrix
+
+12 项全显式分类（eligibility.py `_DOMAIN_SPECS`）：5 CANONICAL_SUPPORTED / 2 AUXILIARY_ONLY / 5 BLOCKED_PENDING_SEMANTICS——`TestDomainMatrix::test_matrix_classifies_every_surface` 结构断言；非 SUPPORTED domain 调用即 raise（`test_auxiliary_and_blocked_domains_rejected`）。
+
+## §8 对抗测试矩阵（30 类）
+
+```text
+[✓] 1  canonicalizer 不 import/call Provider SDK（AST 扫 canonical 包）
+[✓] 2  caller 不能注入 provider priority/tolerance/allow_fallback（签名断言）
+[✓] 3  CR-2 BLOCKED run 不 eligible
+[✓] 4  CR-2 PARTIAL 默认不 eligible（+ 全 policy partial_run_allowed=False 断言）
+[✓] 5  （policy 允许 PARTIAL 的场景 v1 不存在——策略槽位 + 静态断言）
+[✓] 6  normalized manifest/hash tamper -> BLOCK
+[✓] 7  normalized physical semantic seal mismatch -> BLOCK
+[✓] 8  available_at > as_of 候选在 selection 前排除（EXCLUDED_FUTURE）
+[✓] 9  future preferred 不影响历史 as_of winner
+[✓] 10 无 publish timestamp 不伪造 00:00/1970（== received_at 断言）
+[✓] 11 OBSERVED_AT_INGEST 保守 availability 正确
+[✓] 12 availability policy version change -> new run
+[✓] 13 identity missing -> finding/excluded
+[✓] 14 identity ambiguous/无法归市 -> finding/excluded（裸码多市场 + unknown market）
+[✓] 15 provider symbol prefix 不得作为 identity fallback（missing 行无 bare-symbol key）
+[✓] 16 同 output 重复 canonical key -> BLOCK（DUPLICATE_CANONICAL_KEY）
+[✓] 17 单 provider healthy candidate -> deterministic selected
+[✓] 18 preferred provider available -> selected（priority[0]=amazingdata）
+[✓] 19 preferred unavailable + fallback forbidden -> BLOCK（REQUIRED_DOMAIN_MISSING）
+[✓] 20 （同 19——v1 无 fallback provider 槽位）
+[✓] 21 两 run within tolerance -> deterministic policy winner（EQUIVALENT_MERGED）
+[✓] 22 两 run above tolerance -> SOURCE_CONFLICT blocking
+[✓] 23 provider/run iteration order reversed -> same canonical result（deterministic tiebreak）
+[✓] 24 row order reversed -> same semantic hash（selected 按 key 排序 + semantic hash）
+[✓] 25 source policy version change -> new run/history preserved
+[✓] 26 tolerance version change -> new run/history preserved
+[✓] 27 code fingerprint change -> new run/history exact replay（含 rollback replay）
+[✓] 28 CA STATUS_FLAG_PROJECTION 不能替代 DIRECT_EVENT
+[✓] 29 AST guard 无 institutional limit-price facts hardcoded
+[ ]  30 Windows 3.12 / 3.14 / Ubuntu 3.14 full CI green（本批推送后 API 正向确认，SHA 回填）
+```
+
+另：CR-2.4 P1 guard 加固已纳入本批（§2 建议）：
+
+```text
+[✓] rw = RawWriter(...); rw.write(...) -> guard FAIL（alias 形态 + 构造点双重违规）
+[✓] RawWriter(...).write(...) -> guard FAIL（直接构造调用形态）
+[✓] normalization/runner.py 构造白名单（read-only reader）但 write 零豁免
+[✓] production 全树零违规
+```
+
+## §9 Exit Gate 对照（24 项）
+
+```text
+[✓] CR-2 verified normalized output is sole formal input（verify_normalized_run 全量复验）
+[✓] normalized run closure/semantic seal consumed（tamper -> CLOSURE_VERIFICATION_FAILED）
+[✓] typed domain eligibility matrix complete（12 项显式）
+[✓] AvailabilityPolicy versioned and machine-owned（availability-v1 + hash 进 identity）
+[✓] as_of filter happens BEFORE source selection
+[✓] no fabricated available_at（OBSERVED_AT_INGEST == received_at）
+[✓] identity mapping fail closed（missing/ambiguous blocking + 行排除）
+[✓] canonical natural keys typed/static
+[✓] SourcePolicy versioned and caller cannot override correctness
+[✓] no silent fallback（REQUIRED_DOMAIN_MISSING / EXCLUDED_FUTURE 显式）
+[✓] reconciliation/tolerance explicit（EXACT + finding）
+[✓] no last-write-wins / keep-first dedupe（deterministic winner + blocking findings）
+[✓] per-row canonical lineage complete（14 字段）
+[✓] CA evidence tier preserved（AUXILIARY_ONLY + API raise）
+[✓] no hard-coded institutional price-limit facts（AST guard）
+[✓] immutable canonical artifact + manifest（manifest LAST 无墙钟）
+[✓] decision/finding exact-set seal（finding_set_hash 三方：ledger == manifest == DB recompute）
+[✓] deterministic run identity / historical exact replay（三方 seal 复验 + tamper fail closed）
+[✓] additive migration from-zero + upgrade green（18 链 + probe 019）
+[✓] all CR-2/B2/B1/A3/A2/CR-1 frozen regressions green（985 项全保持）
+[ ]  full 3-leg CI green（本批推送后 API 正向确认，SHA 回填）
+[✓] ADR-023 created（PROPOSED）
+[✓] ADR-022 + ADR index synchronized to ACCEPTED（本批完成）
+[✓] DEVLOG / DEVELOPMENT_MANAGEMENT synchronized（本批完成）
+```
+
+## Verification Summary
+
+- Local: **1025 / 0**（985 → 1025，+40：canonical 36 项 + guard 加固 4 项）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1025/0
+- ADR-023 PROPOSED（新建）；ADR-022 → **ACCEPTED**（正文 + 索引同步）；migration 018（未改旧文件）；CR-2.x 冻结契约零改动（runner.py 仅新增只读 verifier）
+- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）

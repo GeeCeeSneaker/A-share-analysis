@@ -17,6 +17,57 @@
 
 ---
 
+## 2026-09-01 · CR-3 AvailabilityPolicy + Canonicalizer（CR-2 全链 CLOSED 后首个 Canonical 批次）
+
+**Reviewer Closure（2026-09-01 17:06 +08:00，"CR-2.4最终复审结论与CR-3开发工作要求"）**
+- **CR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 全链 VERIFIED / CLOSED / FREEZE**（Reviewed HEAD `0b4ef7a1c91c896054501853adf40324ba3687fc`；Primary CR-2.4 implementation `3bc5c53d2217f2b01d26766eabe470b7bcc4d5bc`，run 33482144065 三腿 success）
+- **ADR-022 REVIEWER ACCEPTED**（本批同步正文 + 索引）
+- **CR-3 START / ACTIVE NEXT；CR-4 BLOCKED_BY_CR-3**；P1 非阻塞：RawWriter AST guard alias-tracking 加固（CR-3 首批完成——本批闭环）
+- 除非可复现 regression，不得以 CR-3 开发为由重开 R4-B2/B1/A3/A2/CR-1 或 CR-2.x 已冻结机制
+
+**Scope**
+- 本批 CR-3 交付（ADR-023 PROPOSED；工作要求 `docs/design/A-share-analysis_CR-2.4最终复审结论与CR-3_AvailabilityPolicy_Canonicalizer开发工作要求_20260901.md` §5 全部 15 个 P0）：Provider-Normalized -> Canonical——时间可用性 + 多源选择 + 冲突解释 + Canonical lineage；复审 §8 矩阵 30 类 + P1 guard 全对应
+
+**Implementation**
+- **`src/ashare_state/canonical/`（新包 5 模块）**：
+  - `canonicalizer.py::CanonicalRunner.run(as_of, domains=...)`——唯一正式 canonical 边界。输入仅 CR-2 verified Provider-Normalized（SUCCESS only；PARTIAL 默认 NOT eligible——v1 全部 domain partial_run_allowed=False；BLOCKED NEVER）；消费前逐 run `verify_normalized_run`（normalization/runner.py 新公开**只读** closure verifier，复用 CR-2 三方 seal 全量复验）——problem → CLOSURE_VERIFICATION_FAILED blocking finding；available_at 过滤在 source selection **之前**（EXCLUDED_FUTURE decision 留证）；同 key EXACT reconciliation（等值 → EQUIVALENT_MERGED decision + deterministic winner（(priority, manifest hash, ordinal)——iteration order 永不影响）；不等值 → SOURCE_CONFLICT blocking；同 output 重复 key → DUPLICATE_CANONICAL_KEY blocking）；REQUIRED_DOMAIN_MISSING / IDENTITY_MISSING blocking 状态机（SUCCESS/BLOCKED；PARTIAL 仅 policy 允许——v1 无）
+  - `eligibility.py`——Domain eligibility matrix 12 项全显式（5 CANONICAL_SUPPORTED：trade_calendar / daily_bar / security_status / limit_price / adj_factor；2 AUXILIARY_ONLY：security_master=identity dataset、ca_projection=STATUS_FLAG_PROJECTION evidence tier（P0-11：direct CA mapper 仍 BLOCKED 期间绝不伪造 direct corporate_action truth）；5 BLOCKED_PENDING_SEMANTICS：corporate_action direct / index_daily（INDEX_CODE 无已验证市场归属）/ industry_member / equity_structure / bj_code_mapping + industry_taxonomy_definition）；typed natural keys 静态定义；非 SUPPORTED domain 调用即 raise（无 silent skip）
+  - `availability.py`——typed basis 四分类，唯一注册 production basis = **OBSERVED_AT_INGEST**（raw envelope received_at——PIT 保守：晚于真实 publish 时刻）；SOURCE_PUBLISHED_AT / DOMAIN_RULE_DERIVED 未注册（无已验证 publish ts / 无版本化 Trading Rule 事实——不硬编码收盘时间）；NOT_VERIFIABLE 永不进入 PIT truth；policy 版本 availability-v1 + hash 进 run identity
+  - `source_policy.py`——CanonicalSourcePolicy 静态版本化 registry（source-policy-v1：priority / fallback 空 / partial False / SINGLE_SOURCE_EXACT / exact-v1 / conflict BLOCK / identity_missing_max 0）；caller 零注入面（签名结构测试）
+  - `identity.py::IdentityBridge`——CR-2 verified security_master（三 dataset 全集）→ ADR-002 resolve_security_identity；exchange 归属仅来自 provider market 后缀；**裸码唯一市场匹配**（三后缀变体恰一存在；两存在 = ambiguous fail closed——绝不前缀猜交易所）；PIT relist（list_date <= trade_date 最新）；missing/ambiguous → IDENTITY_MISSING blocking + 行排除（裸 symbol 绝不作为 canonical key fallback）
+- **Immutable artifacts + deterministic run identity**：`canonical/contract=<V>/as_of=<T>/run=<id>/` 下 selected/decisions/findings parquet + manifest.json LAST（无墙钟；immutable 同 bytes no-op）；manifest 封 input run exact set + 三 policy version/hash + canonicalizer code fingerprint（五模块源码 SHA-256 行尾归一）+ artifact seals + selected_semantic_hash + finding_set_hash；run identity = uuid5(sha256(input_set + identity_hash + as_of + contract + 三 policy identity + fingerprint))——policy/代码/输入任一变化 → 新 run（历史保留）；prior 同 identity 先三方 seal closure 复验再 idempotent replay（篡改 → fail closed）
+- **Migration 018**：meta_canonicalization_run（24 列）+ meta_canonical_reconciliation_finding（10 列）；单事务提交（dup 检查 + finding 行数断言）；18 链 from-zero + upgrade + idempotent + tamper probe 019
+- **P1 guard 加固（CR-2.4 复审 §2，本批闭环）**：`_scan_unanchored_writes` 升级——RawWriter write 调用点经 alias 赋值（`rw = RawWriter(...); rw.write(...)`）与直接构造调用（`RawWriter(...).write(...)`）双形态跟踪；构造白名单 = raw_writer.py / raw_anchor.py + normalization/runner.py（read-only verified reader，无 write 豁免）；negative fixtures + production 全树零违规
+
+**Schema / Contract Changes**
+- C3 ×1（DM-20260901-068）；**ADR-023 PROPOSED**（新建）；**ADR-022 → ACCEPTED**（Reviewer 裁决同步：正文头部 + ADR-000 索引 + DEVLOG closure 记录 + 总册 §40/§41/§44/§61）；migration 018；CR-2.x 全链 FREEZE 零改动（runner.py 仅新增只读 verifier 函数，冻结语义零触碰）
+
+**Verification**
+- Local: **1025 tests passed / 0 failed**（985 → 1025，+40：TestBoundaryStructure 4 / TestClosureVerification 2 / TestAvailability 4 / TestIdentityResolution 3 / TestSelection 7 / TestRunIdentity 5 / TestDomainMatrix 6 / TestLedgerAndArtifacts 3 / TestRawWriterGuardHardening 4 + guard 重构）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1025/0
+- audit §8 矩阵 30 类全对应（无 SDK import / 无 caller policy 参数 / BLOCKED·PARTIAL eligibility / closure·semantic tamper / as_of 先行 / 无伪造 available_at / policy version 新 run / identity missing·ambiguous·无前缀 fallback / 重复 key / deterministic winner / EQUIVALENT_MERGED / SOURCE_CONFLICT / 顺序无关 / 行序无关 semantic hash / 三 identity 变化新 run / CA tier / AST 无制度事实）；CR-2.x 冻结回归零破坏（985 项全保持）
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+
+**Implementation Status**
+- DONE（15 P0 全交付 + P1 guard 闭环 + migration 018 + ADR-023 + ADR-022 ACCEPTED 同步；1025/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- available_at 选 raw envelope received_at 而非 normalization run 时间：received_at 是 provider 应答时刻（数据存在的最早系统证据），比 run/anchor 时间更早更保守；且它是 CR-2 bound evidence 的一部分（不引入新信任源）
+- 裸码唯一市场匹配作为 identity 规则：adj_factor surface 的 provider_symbol 无市场后缀（CR-2 已验证语义即裸码）；唯一匹配确定性无猜测，歧义 fail closed——比 BLOCKED 整个 domain 更可用，比前缀猜测严格
+- identity_missing_max = 0：任何 identity missing 都 BLOCK 整个 run——audit P0-05 允许阈值，但 0 阈值最保守且当前 fixture 数据完全可解析；阈值放宽是未来 policy 版本变更
+- 只读 verifier 公开为 normalization/runner.py 模块函数而非独立模块：复用 NormalizationRunner 的全部冻结验证逻辑（_ledger_row/_verify_run_closure），零复制零漂移；同模块私有方法复用合规
+- selected/decisions/findings 三 artifact 而非 DB 行：audit §6 明确"不要把大批 Canonical rows 塞进 metadata DB"；findings 同时进 DB（blocking 判定 + count 断言）与 parquet（exact-set seal）
+- run() 的 domains 参数允许显式指定而非全局固定：它是"构建哪些受治理 domain"的选择（如同 as_of 是 PIT 查询点），不是 correctness truth——每个 domain 的 policy/identity 仍全部静态
+
+**下一步**
+- 等 Reviewer 复审 CR-3（工作要求 §9 Exit Gate 24 项）；全部通过 → CR-3 VERIFIED / CLOSED / FREEZE，ADR-023 → ACCEPTED，**CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild START**
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
+---
+
+---
+
 ## 2026-09-01 · CR-2.4 Anchored Raw Ingestion Boundary（CR-2.3 复审 REOPENED 后的 wiring 收口批次）
 
 **Scope**

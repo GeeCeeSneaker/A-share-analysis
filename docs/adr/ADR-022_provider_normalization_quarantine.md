@@ -1,8 +1,8 @@
 # ADR-022: Provider Normalization and Quarantine（提供方归一化与隔离）
 
-- **Status**: PROPOSED（2026-08-31，CR-2 批次交付 + CR-2.1 Amendment A 收口 + 2026-09-01 CR-2.2 Amendment B 收口 + 2026-09-01 CR-2.3 Amendment C 收口 + 2026-09-01 CR-2.4 Amendment D wiring 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
-- **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
-- **Date**: 2026-08-31（CR-2）/ 2026-08-31（Amendment A，CR-2.1）/ 2026-09-01（Amendment B，CR-2.2）/ 2026-09-01（Amendment C，CR-2.3）/ 2026-09-01（Amendment D，CR-2.4）
+- **Status**: **ACCEPTED**（2026-09-01，Reviewer 最终复审裁决：CR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 全链 VERIFIED / CLOSED / FREEZE，ADR-022 REVIEWER ACCEPTED——"CR-2.4最终复审结论与CR-3开发工作要求_20260901"，Reviewed HEAD `0b4ef7a1c91c896054501853adf40324ba3687fc`）
+- **Deciders**: 开发方（设计实现）；Design / Audit Review（**ACCEPTED 2026-09-01**）
+- **Date**: 2026-08-31（CR-2）/ 2026-08-31（Amendment A，CR-2.1）/ 2026-09-01（Amendment B，CR-2.2）/ 2026-09-01（Amendment C，CR-2.3）/ 2026-09-01（Amendment D，CR-2.4）/ 2026-09-01（Reviewer ACCEPTED）
 - **Work Requirement**: `docs/design/A-share-analysis_R4-B2.3复审结论与CR-2_ProviderNormalizedQuarantine开发工作要求_20260831.md` + `docs/design/A-share-analysis_CR-2复审与CR-2.1最终SurfaceIdentity及CommitClosure收口要求_20260831.md` + `docs/design/A-share-analysis_CR-2.1复审与CR-2.2最终ReplayProvenanceSeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-2.2复审与CR-2.3最终RawTrustAnchor及OutputSeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-2.3复审与CR-2.4最终AnchoredIngestionBoundary收口要求_20260901.md`
 - **Related**: [ADR-021](ADR-021_publish_validation_exactness.md)（其 B1/B2 的 boundary/registry/seal 模式被本 ADR 复用于数据层）；CR-1（RawWriter exact evidence，输入侧）
 

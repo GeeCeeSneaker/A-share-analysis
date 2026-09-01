@@ -1825,3 +1825,27 @@ class NormalizationRunner:
 
 
 _ = (KIND_EMPTY, KIND_MULTI_ROWS, KIND_MULTI_FRAMES)  # documented kinds
+
+
+def verify_normalized_run(
+    conn: DuckDBPyConnection,
+    run_id: str,
+    *,
+    raw_root: Path | str,
+    normalized_root: Path | str,
+) -> list[str]:
+    """CR-3 (audit 20260901 CR3-P0-01): read-only closure verification of
+    one CR-2 normalization run - the ONLY sanctioned way for downstream
+    consumers to establish that a Provider-Normalized artifact is still
+    the exact verified truth (manifest bytes, output content/schema/
+    row-count, quarantine exact set, typed seal vs current provenance).
+
+    Returns the (possibly empty) problem list. An empty list means the
+    run is verified intact; consumers must treat any problem as
+    fail-closed. This verifier writes NOTHING and re-maps NOTHING.
+    """
+    runner = NormalizationRunner(conn, raw_root=raw_root, normalized_root=normalized_root)
+    row = runner._ledger_row(run_id)  # noqa: SLF001 - same-module read-only reuse
+    if row is None:
+        return [f"normalization run {run_id!r} not found in the ledger"]
+    return runner._verify_run_closure(row)  # noqa: SLF001 - read-only closure reuse

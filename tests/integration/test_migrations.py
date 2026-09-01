@@ -67,6 +67,9 @@ EXPECTED_TABLES = {
     "meta_provider_quarantine",
     # 017 (CR-2.3 raw evidence trust anchor)
     "meta_raw_evidence_anchor",
+    # 018 (CR-3 canonicalization)
+    "meta_canonicalization_run",
+    "meta_canonical_reconciliation_finding",
     # runner bootstrap
     "meta_schema_version",
 }
@@ -83,7 +86,7 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 17
+            assert len(applied) == 18
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
         finally:
@@ -94,10 +97,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 17
+            assert len(first) == 18
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 17
+            assert len(ledger) == 18
         finally:
             conn.close()
 
@@ -133,10 +136,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 018 (015/016/017 exist in the real repo set)
+            # tamper 002 and add a new 019 (015/016/017/018 exist in the real repo set)
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "018_new_thing.sql").write_text(
+            (tampered_dir / "019_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):
@@ -249,20 +252,20 @@ class TestLedgerIntegrity:
         upgrade_dir = tmp_path / "migrations"
         upgrade_dir.mkdir()
         for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
-            if int(f.name[:3]) <= 16:
+            if int(f.name[:3]) <= 17:
                 (upgrade_dir / f.name).write_bytes(f.read_bytes())
         conn = duckdb.connect(str(db_path))
         try:
             first = apply_migrations(conn, upgrade_dir)
-            assert [r.migration_id for r in first] == [f"{i:03d}" for i in range(1, 17)]
-            # ship 017 into the same directory set
+            assert [r.migration_id for r in first] == [f"{i:03d}" for i in range(1, 18)]
+            # ship 018 into the same directory set
             for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
-                if int(f.name[:3]) == 17:
+                if int(f.name[:3]) == 18:
                     (upgrade_dir / f.name).write_bytes(f.read_bytes())
             second = apply_migrations(conn, upgrade_dir)
-            assert [r.migration_id for r in second] == ["017"]
+            assert [r.migration_id for r in second] == ["018"]
             ledger = applied_migrations(conn)
-            assert len(ledger) == 17
+            assert len(ledger) == 18
             # the CR-2.1 seal columns exist on the upgraded database
             columns = {
                 row[0]
