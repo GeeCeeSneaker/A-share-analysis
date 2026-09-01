@@ -25,6 +25,7 @@ Fail-closed rulings:
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -36,11 +37,58 @@ __all__ = [
     "IdentityBridge",
     "IdentityResolutionError",
     "ResolvedIdentityOutcome",
+    "identity_bridge_policy_hash",
+    "identity_bridge_policy_version",
+    "identity_dataset_hash",
 ]
 
 
 #: versioned identity of the bridge policy (PIT selection rule)
 IDENTITY_BRIDGE_POLICY_VERSION = "identity-bridge-v1"
+
+#: canonical description of the governed resolution RULES (CR-3.1 P0-05:
+#: the bridge policy identity - not just the version string - enters the
+#: canonical run identity, so a rule change without a version bump still
+#: yields a new run)
+_BRIDGE_RULES: dict[str, str] = {
+    "exchange_attribution": "provider_market_suffix_only",
+    "bare_code": "unique_market_match_else_missing",
+    "relist": "latest_list_date_le_trade_date",
+    "conflict": "fail_closed_never_guess",
+}
+
+
+def identity_bridge_policy_version() -> str:
+    """Current bridge policy identity (module indirection for tests)."""
+    return IDENTITY_BRIDGE_POLICY_VERSION
+
+
+def identity_bridge_policy_hash() -> str:
+    """SHA-256 over the versioned canonical rule description."""
+    canonical = json.dumps(
+        {"version": identity_bridge_policy_version(), "rules": _BRIDGE_RULES},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def identity_dataset_hash(master_input_set_hash: str) -> str:
+    """CR-3.1 P0-05: the ONE identity binding entering the canonical run
+    identity, the manifest AND the ledger - a canonical hash over the
+    master input set hash + the bridge policy version + the bridge
+    policy hash. There is exactly one semantic for this value in the
+    whole runtime (no second code path computing a divergent variant)."""
+    canonical = json.dumps(
+        [
+            str(master_input_set_hash),
+            identity_bridge_policy_version(),
+            identity_bridge_policy_hash(),
+        ],
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
 
 #: provider market suffix -> exchange literal (verified provider
 #: semantics shared with the CR-2 mapper; NOT code-prefix guessing)
@@ -71,8 +119,8 @@ class IdentityBridge:
     """The immutable provider-symbol -> security_id mapping for one
     canonical run, built from the CR-2 verified security_master rows."""
 
-    def __init__(self, master_rows: list[dict[str, Any]], *, dataset_hash: str) -> None:
-        self._dataset_hash = str(dataset_hash)
+    def __init__(self, master_rows: list[dict[str, Any]], *, master_input_set_hash: str) -> None:
+        self._master_input_set_hash = str(master_input_set_hash)
         self._by_symbol: dict[str, list[_IdentityEntry]] = {}
         for row in master_rows:
             symbol = str(row.get("provider_symbol") or "")
@@ -99,11 +147,10 @@ class IdentityBridge:
 
     @property
     def dataset_hash(self) -> str:
-        """Identity of the underlying dataset + bridge policy (enters
-        the canonical run identity)."""
-        return hashlib.sha256(
-            f"{IDENTITY_BRIDGE_POLICY_VERSION}|{self._dataset_hash}".encode()
-        ).hexdigest()
+        """The ONE identity binding (CR-3.1 P0-05): canonical hash of the
+        master input set + the bridge policy identity - the same value
+        the canonical run identity, the manifest and the ledger carry."""
+        return identity_dataset_hash(self._master_input_set_hash)
 
     def resolve(self, provider_symbol: str, trade_date: date) -> str | None:
         """PIT resolution: the latest identity whose list_date <=

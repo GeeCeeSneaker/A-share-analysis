@@ -15,7 +15,8 @@ identity -> history preserved), never as a caller argument.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 
 __all__ = [
     "SOURCE_POLICY_VERSION",
@@ -24,6 +25,7 @@ __all__ = [
     "source_policy_hash",
     "source_policy_version",
     "source_policies",
+    "tolerance_policy_identity",
 ]
 
 
@@ -84,12 +86,19 @@ def source_policy_version() -> str:
 
 
 def source_policy_hash() -> str:
+    """CR-3.1 P0-06 (audit 20260901 section 6): the policy hash covers
+    EVERY semantic field of EVERY policy entry via exact canonical
+    serialization (``dataclasses.asdict`` + sorted canonical JSON) - a
+    change to allowed_fallback_providers / identity_missing_max /
+    required_evidence_class / tolerance_rule_version can never silently
+    keep the old hash because someone forgot to bump the version string."""
     import hashlib
 
-    canonical = "|".join(
-        f"{p.domain}:{'>'.join(p.priority_providers)}:{p.reconciliation}:"
-        f"{p.tolerance_rule_id}:{int(p.partial_run_allowed)}:{p.conflict_action}"
-        for p in _POLICY
+    canonical = json.dumps(
+        [asdict(p) for p in _POLICY],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
     )
     return hashlib.sha256(f"{source_policy_version()}|{canonical}".encode()).hexdigest()
 
@@ -99,6 +108,6 @@ def tolerance_policy_identity() -> tuple[str, str]:
     import hashlib
 
     rules = {p.domain: (p.tolerance_rule_id, p.tolerance_rule_version) for p in _POLICY}
-    canonical = "|".join(f"{d}:{r[0]}@{r[1]}" for d, r in sorted(rules.items()))
+    canonical = json.dumps(rules, sort_keys=True, separators=(",", ":"))
     version = "tolerance-v1"
     return version, hashlib.sha256(canonical.encode("utf-8")).hexdigest()

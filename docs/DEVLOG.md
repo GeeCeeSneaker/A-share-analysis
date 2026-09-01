@@ -17,6 +17,52 @@
 
 ---
 
+## 2026-09-01 · CR-3.1 Canonical Input Snapshot + Anchored Availability Evidence + Full Replay Seal + Recoverable Commit（CR-3 复审 REOPENED 后的收口批次）
+
+**Scope**
+- CR-3 复审（audit 20260901 19:06 +08:00，Reviewed HEAD `e1c6bb2236a1b0eac06ee214b7cf64cf4fe13f79`，reopen commit `f720447`）裁决 **CR-3 REOPENED**：主体架构 PASS / FREEZE（18 项冻结清单：CanonicalRunner 唯一边界 / 无 SDK / closure-verified 唯一输入 / availability 先行 / static SourcePolicy / exact conflict / IdentityBridge 无前缀猜测 / PIT relist / 5 domain 映射 / auxiliary 边界 / CA tier / 无制度百分比 / migration 018 / P1 guard / CI green）；8 个 P0 correctness blockers 由本批 CR-3.1 收口（**未启动 CR-4**——复审 §11 边界；CR-4 BLOCKED_BY_CR-3.1）；复审 §10 测试矩阵 34 项全对应
+
+**Implementation**
+- **P0-01 RequestedDomainSet 进 run identity**：请求域去重排序 exact set，canonical JSON hash 进入 run identity——原先同一 as_of 请求 daily_bar 会直接 replay trade_calendar 历史运行的 artifacts（直接 correctness blocker）；migration 019 ledger 列 `requested_domains_json/hash` + manifest 显式绑定；replay 返回的 domains 来自 ledger seal；不同 set 必不同 run / 同 set 不同顺序同 run / 重复域去重
+- **P0-02 Availability completeness**：原先 REQUIRED_DOMAIN_MISSING 只判"有无 eligible CR-2 run"——future-only 候选全被 as_of 排除时 run 可能 false SUCCESS（"成功但空"的历史世界）。CR-3.1 机器区分：无 eligible verified run → `REQUIRED_DOMAIN_MISSING`；有 eligible run 但零 PIT-available 候选 → `REQUIRED_DOMAIN_UNAVAILABLE_AT_ASOF`（均 blocking；"合法空集合"只能由 domain policy 显式版本化声明，v1 无此例）；EXCLUDED_FUTURE decisions 留证；新增 future-only run 不改早期 selected 真值（仅 input identity 变化）
+- **P0-03 CanonicalInputSnapshot（一次 authoritative 解析）**：原先同一次 run 内 broad input discovery 被重复执行（identity / candidates / manifest / ledger 各自查当前 DB 全集）——read-race 下四者可能代表不同世界。新 `CanonicalInputSnapshot`（typed immutable dataclass）在一切之前一次性解析：requested set + **discovered** CR-2 source/master run exact set + closure/anchor 验证结果 + policy identities + code fingerprint；run identity、candidates、manifest、ledger 全部从 snapshot 派生。**Discovered set 含验证失败的 run**（blocking prefinding 是诚实记录）——这使 post-success tamper 表现为 DAMAGED replay 而非悄悄 mint 新 identity；mid-run 插入的新 run 只能被下一次 invocation 看到（新 identity）；snapshot race 测试经 `_build_snapshot` monkeypatch 注入（production 无 hook）
+- **P0-04 AnchoredAvailabilityEvidence**：原先 `_received_at()` 直接读 raw meta——normalize 后仅改 received_at 可把未来数据提前变历史可用（PIT trust-root blocker；CR-2 closure 不覆盖 raw meta bytes）。CR-3.1：读 received_at 前必须证明 current raw meta exact-byte SHA-256 == normalization run sealed `raw_evidence_hash` == `meta_raw_evidence_anchor.evidence_hash`，并 cross-bind provider/dataset/request/uri/endpoint/surface/operation_id（anchor == run == meta 三方）；失败 → `AVAILABILITY_EVIDENCE_INVALID` blocking finding；replay 对每个 sealed source run 重新执行
+- **P0-05 Identity binding 统一**：原先 run identity/ledger 用裸 master set hash、manifest 用另一公式（且都不含 bridge policy identity）——两口径不一致且被 replay 隐藏。CR-3.1 唯一口径：`identity_dataset_hash = hash(master_input_set_hash, identity_bridge_policy_version, identity_bridge_policy_hash)` 进入 run identity / manifest / ledger 三处同值；bridge policy 变更 → 新 run；replay 比对 ledger == manifest == current
+- **P0-06 Policy hash 全字段**：`source_policy_hash()` 原先手写字段串（漏 allowed_fallback_providers / identity_missing_max / required_evidence_class / tolerance_rule_version——忘 bump version 时 hash 不变）。CR-3.1：`dataclasses.asdict` + sorted canonical JSON 全语义字段覆盖；runtime 诚实消费——声明 fallback/partial 而 runtime 无支持时**显式 raise**（绝不静默忽略字段）；`identity_missing_max` 按 per-domain 计数 vs 阈值判定 blocking（非硬编码 >0）；`required_evidence_classes` map 进 manifest binding
+- **P0-07 Full replay seal**：原先 verifier 只验 manifest bytes/counts/DB findings——manifest 已写入的 correctness 字段未被三方消费，selected/decisions/findings 可 rebind（换 parquet + 更新双 hash 可过）。CR-3.1 replay 必须：CURRENT snapshot identities == ledger == manifest == **replay-time physical recompute**（selected_semantic_hash / decision_set_hash / finding_set_hash / artifact exact set == {selected,decisions,findings} / deterministic URI recompute / schema recompute / row_count / findings parquet ↔ DB exact-set cross-bind），并 re-verify 每个 sealed CR-2 source run closure + anchored availability evidence；migration 019 两 semantic seal 列；rebind 矩阵 10 项全拦截
+- **P0-08 Recoverable commit**：原先 findings.parquet 含 `created_at = now()`——DB 失败后 exact retry 因 bytes 不同与 immutable path conflict 不可恢复（所有 BLOCKED-with-findings run 易中招）。CR-3.1：deterministic correctness artifact 不含任何 wall-clock（finding id = uuid5(run_id:position)；created_at 仅作为 transaction-time audit metadata 存 DB 且排除出 semantic hash）；DB 注入失败 → exact retry 文件 byte-identical no-op → ledger 补提交（单 ledger 行 + exact finding set + 二次 replay 幂等）
+- **P1 三项**：identity finding 按真实 domain 记录（per-domain 计数——security_status 缺 identity 不再错标 daily_bar）；**domain matrix 计数更正 12 → 13**（5 CANONICAL_SUPPORTED / 2 AUXILIARY_ONLY / 6 BLOCKED_PENDING_SEMANTICS，runtime exact-set 统计 + 测试断言 13；ADR-023 §2.4 原文"12/5"按历史不改写原则在 Amendment A §6.9 追加更正）；timezone deterministic——naive datetime **拒绝**（其解释依赖 host 本地时区），naive string 按文档化固定 UTC 规则解析（跨平台测试覆盖）
+- **Migration 019**：`meta_canonicalization_run` + requested_domains_json / requested_domains_hash / selected_semantic_hash / decision_set_hash 四列（未改 018）；19 链 from-zero + 018→019 upgrade + idempotent + tamper probe 020
+
+**Schema / Contract Changes**
+- C3 ×1（DM-20260901-069）；**ADR-023 Amendment A**（§6.1-§6.8 修订 §2 被复审推翻的七处表述 + §6.9 P1 计数更正；status 仍 PROPOSED 待 Reviewer closure）；migration 019；CR-2.x 与 CR-3 冻结语义零触碰（canonicalizer 重构不改变 18 项冻结清单行为——40 项 CR-3 回归测试全保持）
+
+**Verification**
+- Local: **1066 tests passed / 0 failed**（1025 → 1066，+41：TestRequestedDomainIdentity 6 / TestAvailabilityCompleteness 3 / TestInputSnapshot 3 / TestAnchoredAvailabilityEvidence 6 / TestIdentityPolicyBinding 4 / TestPolicyHashCompleteness 6 / TestFullReplaySeal 7 / TestRecoverableCommit 2 / TestP1Corrections 4）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1066/0
+- 既有回归零破坏：CR-3 40 项对抗矩阵全保持（复审 §10 item 30）；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+
+**Implementation Status**
+- DONE（8 P0 + 3 P1 全收口 + migration 019 + ADR-023 Amendment A + DM-20260901-069；1066/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- discovered input set 含验证失败 run：若把损坏 run 从 input set 排除，post-success tamper 会改变 identity → mint 新 run 而非拒绝 replay；保留在 identity 中使 replay 命中后被 seal 拒绝（DAMAGED），这正是复审 §7 "CR-2 source artifact tamper after canonical -> replay BLOCK" 的语义
+- snapshot race 测试经 `_build_snapshot` 方法 monkeypatch 而非 production hook：复审建议"显式 injection hook 仅测试用"——方法级 monkeypatch 已满足（无 production API 暴露），且避免永久测试代码进 production 路径
+- findings 的 created_at 完全移出 parquet：CR-2 的 quarantine exact-set seal 同样排除 created_at——同一 determinism 裁决口径；DB 侧保留 created_at 作 audit metadata（transaction-time 语义）
+- `_assert_policy_honestly_consumed` 用 raise 而非忽略：v1 runtime 不支持 fallback/partial 消费——若 policy 声明了它们而 runtime 静默忽略，等于 policy 字段是"装饰"；未来支持它们时是 policy 版本 + runtime 同步变更
+- naive string 采用固定 UTC 规则而非拒绝：isoformat string 无 offset 的场景（配置文件/简单调用）常见；固定规则跨平台 deterministic 且文档化；aware datetime 是推荐形式（naive datetime 直接拒绝因其解释依赖 host）
+- identity_missing_max 阈值化判定：count > max → blocking；count <= max → 非 blocking informational finding（行仍排除）——诚实消费声明字段而非硬编码
+
+**下一步**
+- 等 Reviewer 复审 CR-3.1（复审 §11 Exit Gate 17 项）；全部通过 → CR-3 / CR-3.1 → VERIFIED / CLOSED / FREEZE，ADR-023 → ACCEPTED，**CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild START**
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
+---
+
+---
+
 ## 2026-09-01 · CR-3 AvailabilityPolicy + Canonicalizer（CR-2 全链 CLOSED 后首个 Canonical 批次）
 
 **Reviewer Closure（2026-09-01 17:06 +08:00，"CR-2.4最终复审结论与CR-3开发工作要求"）**

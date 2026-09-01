@@ -736,3 +736,155 @@ received_at 是否仍是 ingestion-time 原始真值
 ```
 
 CR-3.1 不增加新业务 domain、不做 CR-4、不扩功能面；只把这四个“正确性身份”一次封死。
+
+---
+
+# 14. Implementation Mapping（开发方填写，2026-09-01）
+
+## §1 P0-01 RequestedDomainSet identity
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| domain set canonical hash 进 identity | `CanonicalInputSnapshot.requested_domains_json/hash` → `run_identity()` | `TestRequestedDomainIdentity::test_daily_bar_vs_trade_calendar_distinct_runs` |
+| 同 set 不同顺序同 run | 去重 + 排序 | `test_domain_order_irrelevant_same_run` / `test_duplicate_domains_deduped` |
+| replay domains 来自 seal | ledger `requested_domains_json` | `test_replay_returns_exact_requested_domains` |
+| manifest/ledger 显式绑定 | manifest `requested_domains`/`_hash` + migration 019 两列 | `test_manifest_requested_domains_rebind_blocks` / `test_ledger_requested_domains_tamper_blocks` |
+
+## §2 P0-02 availability completeness
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| future-only -> BLOCKED | eligible run 存在 + 零 PIT-available → `REQUIRED_DOMAIN_UNAVAILABLE_AT_ASOF` blocking | `TestAvailabilityCompleteness::test_future_only_blocks_never_success`（BLOCKED / 零 selected / EXCLUDED_FUTURE×2 留证） |
+| early + future -> early only | — | `test_early_plus_future_success_early_only` |
+| future run 不改早期真相 | input identity 变 + selected 值不变 | `test_future_run_added_keeps_earlier_truth` |
+
+## §3 P0-03 CanonicalInputSnapshot
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 一次性 authoritative 解析 | `_build_snapshot`（唯一 broad query 入口；typed immutable dataclass） | `TestInputSnapshot::test_mid_run_source_insertion_current_run_exact`（monkeypatch `_build_snapshot` 注入 race——manifest/ledger/selected 全 == S1） |
+| 下一次 invocation 新 identity | — | `test_next_invocation_sees_new_identity` |
+| master 插入不改 bridge | — | `test_mid_run_master_insertion_bridge_unchanged` |
+| closure problem 保留为 blocking evidence | discovered set 含损坏 run（prefinding 诚实记录） | CR-3 回归 `TestClosureVerification` 2 项保持 |
+
+## §4 P0-04 AnchoredAvailabilityEvidence
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| hash 三方 + identity cross-bind | `_verify_anchored_availability`（bytes == sealed == anchor + 六字段三方） | `TestAnchoredAvailabilityEvidence` 6 项 |
+| 首次 canonical 前改 received_at -> BLOCK | — | `test_received_at_tamper_before_first_canonical_blocks`（AVAILABILITY_EVIDENCE_INVALID） |
+| 改 endpoint/account/params -> BLOCK | 任何 meta bytes 变化 → hash mismatch | `test_endpoint_tamper_blocks` |
+| anchor missing/mismatch -> BLOCK | — | `test_anchor_missing_blocks` / `test_anchor_hash_mismatch_blocks` |
+| 成功后改 received_at -> replay refused | snapshot identity 含损坏 run → replay 命中 → seal re-verify 拒绝 | `test_received_at_tamper_after_success_replay_refused` |
+| intact -> available_at == 原始 | — | `test_intact_anchored_raw_available_at_exact` |
+
+## §5 P0-05 identity binding
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 唯一口径进 identity/manifest/ledger | `identity.identity_dataset_hash(master_input_set_hash)`（含 bridge policy version+hash） | `TestIdentityPolicyBinding::test_ledger_identity_hash_matches_manifest_and_runtime` |
+| policy change -> new run | — | `test_bridge_policy_version_change_new_run` |
+| manifest/ledger tamper -> DAMAGED | replay provenance + seal 比对 | `test_manifest_identity_hash_rebind_blocks` / `test_ledger_identity_hash_tamper_blocks` |
+
+## §6 P0-06 policy hash 全字段
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 全语义字段 canonical hash | `asdict` + sorted canonical JSON | `TestPolicyHashCompleteness` |
+| fallback 变更 -> hash/run 变化 | runtime 诚实消费：声明无支持字段 → raise | `test_fallback_providers_change_new_run`（raise）+ `test_identity_missing_max_change_new_run` / `test_required_evidence_class_change_new_run` / `test_tolerance_rule_version_change_new_run`（新 run） |
+| required_evidence_class 进 binding | manifest `required_evidence_classes` map | `test_required_evidence_class_in_manifest` |
+| manifest policy rebind -> DAMAGED | seal 比对 | `test_manifest_policy_hash_rebind_blocks` |
+
+## §7 P0-07 full replay seal
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| 三方 + physical recompute | `_verify_closure`（provenance/manifest seal/artifact exact set + deterministic URI + schema recompute + selected/decisions/findings semantic recompute + parquet↔DB cross-bind + CR-2 source + anchor re-verify） | `TestFullReplaySeal` 7 项 |
+| selected values/schema rebind -> BLOCK | — | `test_selected_values_rebind_blocks` / `test_selected_schema_rebind_blocks` |
+| decisions rebind -> BLOCK | decision_set_hash 三方 | `test_decisions_rebind_blocks` |
+| findings parquet vs DB 分歧 -> BLOCK | — | `test_findings_parquet_vs_db_divergence_blocks` |
+| manifest input/policy rebind -> BLOCK | — | `test_manifest_input_set_rebind_blocks` / `test_manifest_policy_hash_rebind_blocks` |
+| CR-2 source tamper after canonical -> replay refused | seal 内 source re-verify | `test_cr2_artifact_bytes_tamper_replay_refused` |
+| artifact URI rebind -> BLOCK | deterministic URI recompute | `test_artifact_uri_rebind_blocks` |
+
+## §8 P0-08 recoverable commit
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| findings 无 wall-clock | parquet 排除 created_at（uuid5 id；DB created_at 为 transaction-time audit） | `TestRecoverableCommit::test_findings_parquet_has_no_wall_clock` |
+| DB fail -> exact retry 恢复 | 文件 byte-identical no-op → ledger 补提交 | `test_blocked_run_db_failure_exact_retry_recovers`（注入失败 → 0 行 → retry → 1 行 + exact finding set + 二次 replay 幂等） |
+
+## §9 P1
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| identity finding 真实 domain | per-domain 计数 | `TestP1Corrections::test_identity_finding_domain_truthful` |
+| domain 计数 12 -> 13 更正 | ADR-023 Amendment A §6.9 追加更正 + runtime 断言 | `test_domain_matrix_counts_13` |
+| naive datetime 拒绝 / naive string 固定 UTC | `_parse_as_of` | `test_naive_datetime_rejected` / `test_naive_string_fixed_utc_rule` |
+
+## §10 测试矩阵对照（34 项）
+
+```text
+[✓] 01 requested daily_bar vs trade_calendar same as_of -> distinct run
+[✓] 02 requested same domain set different order -> same run
+[✓] 03 replay returns exact requested domain set
+[✓] 04 future-only eligible runs -> BLOCKED, never SUCCESS
+[✓] 05 early + future -> early selected / future excluded
+[✓] 06 snapshot mid-run source insertion -> current S1 unchanged
+[✓] 07 next invocation after insertion -> new identity S2
+[✓] 08 mid-run identity-master insertion -> current bridge unchanged
+[✓] 09 first canonical before: raw received_at meta-only tamper -> BLOCK
+[✓] 10 raw anchor missing/mismatch -> BLOCK
+[✓] 11 canonical after success: raw received_at tamper -> replay refused
+[✓] 12 identity bridge policy version change -> new run
+[✓] 13 ledger/manifest identity dataset hash exact same
+[✓] 14 source policy allowed_fallback change -> hash/new run（v1 runtime 无 fallback 支持 -> 显式 raise）
+[✓] 15 identity_missing_max change -> hash/new run
+[✓] 16 selected values rebind -> replay refused
+[✓] 17 selected schema rebind -> replay refused
+[✓] 18 decisions rebind -> replay refused
+[✓] 19 findings parquet vs DB divergence -> replay refused
+[✓] 20 manifest input/policy/code rebind -> replay refused
+[✓] 21 ledger input/policy/code tamper -> replay refused（provenance 比对：identity/policy tamper 测试）
+[✓] 22 CR-2 normalized source tamper after canonical -> replay refused
+[✓] 23 artifact exact-set / URI rebind -> replay refused
+[✓] 24 BLOCKED file-write success + DB fail -> exact retry recovers
+[✓] 25 identity finding domain truthful (status/limit/factor cannot report daily_bar)
+[✓] 26 naive datetime deterministic fail/reject
+[✓] 27 migration 019 from-zero
+[✓] 28 migration 018 -> 019 upgrade
+[✓] 29 migration idempotent/checksum/tamper sequence（probe 020）
+[✓] 30 current CR-3 tests + all CR-2/B2/B1/A3/A2/CR-1 regressions（40 + 985 全保持）
+[ ]  31 Windows 3.12 green（本批推送后 API 正向确认）
+[ ]  32 Windows 3.14 green（本批推送后 API 正向确认）
+[ ]  33 Ubuntu 3.14 green（本批推送后 API 正向确认）
+[✓] 34 Ruff / format / Mypy / Spike / governance gates green（本地；CI 待 API 确认）
+```
+
+## §11 Exit Gate 对照（17 项）
+
+```text
+[✓] RequestedDomainSet exact bind
+[✓] future-only required domain fail closed
+[✓] one authoritative CanonicalInputSnapshot
+[✓] run identity / consumed candidates / manifest / ledger exact same snapshot
+[✓] availability received_at anchored evidence exact verify
+[✓] identity bridge policy enters correctness identity
+[✓] policy hash covers all semantic fields
+[✓] canonical full seal consumed on replay
+[✓] replay re-verifies source CR-2 closure + raw PIT evidence
+[✓] selected/decisions/findings semantic seals
+[✓] artifact schema/exact-set/URI verify
+[✓] DB failure exact retry recoverable
+[✓] truthful identity finding scope
+[✓] timezone deterministic
+[✓] no CR-4 logic leak
+[ ]  migration + full CI green（migration 19 链本地全绿；CI 待 API 确认，SHA 回填）
+[✓] governance sync complete（ADR-023 Amendment A + ADR-000 索引 + DEVLOG + 总册 §40/§41/§44/§61）
+```
+
+## Verification Summary
+
+- Local: **1066 / 0**（1025 → 1066，+41）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1066/0
+- ADR-023 Amendment A（status 仍 PROPOSED）；migration 019（未改 018）；CR-3 冻结的 18 项机制零触碰（40 项 CR-3 回归全保持）
+- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）

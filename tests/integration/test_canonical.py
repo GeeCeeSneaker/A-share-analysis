@@ -1117,3 +1117,769 @@ class TestRawWriterGuardHardening:
             relpath = str(py.relative_to(src_root)).replace("\\", "/")
             violations.extend(_scan_unanchored_writes(tree, relpath))
         assert violations == [], f"unanchored RawWriter usage: {violations}"
+
+
+# --------------------------------------------- CR-3.1: requested domain identity
+
+
+@pytest.mark.integration
+class TestRequestedDomainIdentity:
+    """CR-3.1 P0-01 (audit section 1): the requested domain set is part
+    of the canonical run identity."""
+
+    def test_daily_bar_vs_trade_calendar_distinct_runs(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="trade_calendar",
+            endpoint="BaseData.get_calendar",
+            surface="trade_calendar",
+            request_id="req-cal",
+            payload=["20260810"],
+            params={"market": "SH"},
+        )
+        bars = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        calendar = _canonical(conn, env_root, AS_OF_LATE, domains=("trade_calendar",))
+        assert bars.canonical_run_id != calendar.canonical_run_id
+        # the calendar replay can never return the bars artifact set
+        assert calendar.domains == ("trade_calendar",)
+        assert bars.domains == ("daily_bar",)
+
+    def test_domain_order_irrelevant_same_run(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        a = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar", "limit_price"))
+        b = _canonical(conn, env_root, AS_OF_LATE, domains=("limit_price", "daily_bar"))
+        assert a.canonical_run_id == b.canonical_run_id
+        assert b.idempotent_replay is True
+        assert b.domains == ("daily_bar", "limit_price")
+
+    def test_duplicate_domains_deduped(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        a = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        b = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar", "daily_bar"))
+        assert a.canonical_run_id == b.canonical_run_id
+
+    def test_replay_returns_exact_requested_domains(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar", "limit_price"))
+        replay = _canonical(conn, env_root, AS_OF_LATE, domains=("limit_price", "daily_bar"))
+        assert replay.idempotent_replay is True
+        assert replay.domains == ("daily_bar", "limit_price")  # from the ledger seal
+
+    def test_manifest_requested_domains_rebind_blocks(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        path = env_root["normalized"] / str(result.manifest_uri)
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["requested_domains"] = ["trade_calendar"]
+        data = json.dumps(doc, sort_keys=True, indent=1).encode("utf-8")
+        path.write_bytes(data)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET manifest_hash = ? WHERE canonical_run_id = ?",
+            [hashlib.sha256(data).hexdigest(), result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_ledger_requested_domains_tamper_blocks(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET requested_domains_json = ? "
+            "WHERE canonical_run_id = ?",
+            ['["trade_calendar"]', result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+
+# --------------------------------------------- CR-3.1: availability completeness
+
+
+@pytest.mark.integration
+class TestAvailabilityCompleteness:
+    """CR-3.1 P0-02 (audit section 2): future-only data can never make a
+    historical canonical world look "successfully empty"."""
+
+    def test_future_only_blocks_never_success(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-future", received_at=T1)
+        result = _canonical(conn, env_root, AS_OF_EARLY, domains=("daily_bar",))
+        assert result.status == "BLOCKED"
+        assert result.selected_count == 0
+        classes = {c for c, _ in _findings(conn, result.canonical_run_id)}
+        assert "REQUIRED_DOMAIN_UNAVAILABLE_AT_ASOF" in classes
+        decisions = _read_decisions(env_root, result)
+        assert all(d["decision_class"] == "EXCLUDED_FUTURE" for d in decisions)
+        assert len(decisions) == 2  # both rows retained as exclusion evidence
+
+    def test_early_plus_future_success_early_only(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-early", received_at=T0)
+        _seed_bars(conn, env_root, "req-future", received_at=T1)
+        result = _canonical(conn, env_root, AS_OF_EARLY, domains=("daily_bar",))
+        assert result.status == "SUCCESS"
+        assert result.selected_count == 2
+
+    def test_future_run_added_keeps_earlier_truth(self, conn, env_root):
+        """Adding a future-only run does not change the earlier selected
+        truth (only the input identity per frozen snapshot semantics)."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-early", received_at=T0)
+        first = _canonical(conn, env_root, AS_OF_EARLY, domains=("daily_bar",))
+        assert first.status == "SUCCESS"
+        first_rows = _read_selected(env_root, first)
+        _seed_bars(conn, env_root, "req-future", received_at=T1)
+        second = _canonical(conn, env_root, AS_OF_EARLY, domains=("daily_bar",))
+        assert second.canonical_run_id != first.canonical_run_id  # new input identity
+        assert second.status == "SUCCESS"
+        assert _read_selected(env_root, second) == first_rows  # same truth values
+
+
+# --------------------------------------------- CR-3.1: input snapshot
+
+
+@pytest.mark.integration
+class TestInputSnapshot:
+    """CR-3.1 P0-03 (audit section 3): the run identity, the consumed
+    candidates, the manifest and the ledger all derive from ONE
+    authoritative snapshot resolved once - mid-run insertions cannot
+    leak into the current run."""
+
+    def test_mid_run_source_insertion_current_run_exact(self, conn, env_root, monkeypatch):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-s1", received_at=T0)
+        original = CanonicalRunner._build_snapshot
+
+        def racing(self, as_of_dt, requested):
+            snapshot = original(self, as_of_dt, requested)
+            # a new SUCCESS normalization run lands mid-run
+            _seed_bars(conn, env_root, "req-s2", received_at=T0)
+            return snapshot
+
+        monkeypatch.setattr(CanonicalRunner, "_build_snapshot", racing)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        monkeypatch.undo()
+        assert result.status == "SUCCESS"
+        manifest = json.loads(
+            (env_root["normalized"] / str(result.manifest_uri)).read_text(encoding="utf-8")
+        )
+        run_ids = [e["run_id"] for e in manifest["input_normalized_runs"] if e["role"] == "source"]
+        s1 = str(
+            conn.execute(
+                "SELECT normalization_run_id FROM meta_provider_normalization_run "
+                "WHERE raw_request_id = 'req-s1'"
+            ).fetchone()[0]
+        )
+        assert run_ids == [s1]  # exact snapshot S1 - S2 never leaked in
+        selected = _read_selected(env_root, result)
+        assert all(r["source_raw_request_id"] == "req-s1" for r in selected)
+        ledger = conn.execute(
+            "SELECT input_set_hash FROM meta_canonicalization_run WHERE canonical_run_id = ?",
+            [result.canonical_run_id],
+        ).fetchone()[0]
+        assert str(ledger) == manifest["input_set_hash"]
+
+    def test_next_invocation_sees_new_identity(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-s1", received_at=T0)
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        _seed_bars(conn, env_root, "req-s2", received_at=T0)
+        second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert second.canonical_run_id != first.canonical_run_id
+        assert second.idempotent_replay is False
+
+    def test_mid_run_master_insertion_bridge_unchanged(self, conn, env_root, monkeypatch):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars", received_at=T0)
+        original = CanonicalRunner._build_snapshot
+
+        def racing(self, as_of_dt, requested):
+            snapshot = original(self, as_of_dt, requested)
+            _persist_raw(
+                conn,
+                env_root,
+                dataset="code_list",
+                endpoint="BaseData.get_code_list",
+                surface="security_master",
+                request_id="req-master-2",
+                payload=[
+                    {
+                        "SECURITY_CODE": "300750",
+                        "MARKET_CODE": "1",
+                        "LISTING_DATE": "20180611",
+                        "IS_LISTED": "1",
+                    }
+                ],
+            )
+            return snapshot
+
+        monkeypatch.setattr(CanonicalRunner, "_build_snapshot", racing)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        monkeypatch.undo()
+        assert result.status == "SUCCESS"
+        selected = _read_selected(env_root, result)
+        # only the snapshot master identities resolved - 600000/000001
+        assert len(selected) == 2
+
+
+# --------------------------------------- CR-3.1: anchored availability evidence
+
+
+def _raw_meta_path(env_root: dict[str, Path], dataset: str, request_id: str) -> Path:
+    return (
+        env_root["raw"] / "provider=amazingdata" / f"dataset={dataset}" / f"{request_id}.meta.json"
+    )
+
+
+@pytest.mark.integration
+class TestAnchoredAvailabilityEvidence:
+    """CR-3.1 P0-04 (audit section 4): the availability moment is only
+    read from raw meta bytes still equal to the sealed hash AND the
+    authoritative anchor."""
+
+    def test_received_at_tamper_before_first_canonical_blocks(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars", received_at=T1)
+        meta = _raw_meta_path(env_root, "daily_bar", "req-bars")
+        doc = json.loads(meta.read_bytes())
+        doc["received_at"] = T0.isoformat()  # pull the future into the past
+        meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        result = _canonical(conn, env_root, AS_OF_EARLY, domains=("daily_bar",))
+        assert result.status == "BLOCKED"
+        classes = {c for c, _ in _findings(conn, result.canonical_run_id)}
+        assert "AVAILABILITY_EVIDENCE_INVALID" in classes
+        assert result.selected_count == 0
+
+    def test_endpoint_tamper_blocks(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars", received_at=T0)
+        meta = _raw_meta_path(env_root, "daily_bar", "req-bars")
+        doc = json.loads(meta.read_bytes())
+        doc["account_profile_id"] = "EVIL"  # any meta-only edit changes the bytes
+        meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "BLOCKED"
+        classes = {c for c, _ in _findings(conn, result.canonical_run_id)}
+        assert "AVAILABILITY_EVIDENCE_INVALID" in classes
+
+    def test_anchor_missing_blocks(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars", received_at=T0)
+        conn.execute("DELETE FROM meta_raw_evidence_anchor WHERE request_id = ?", ["req-bars"])
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "BLOCKED"
+        classes = {c for c, _ in _findings(conn, result.canonical_run_id)}
+        assert "AVAILABILITY_EVIDENCE_INVALID" in classes
+
+    def test_anchor_hash_mismatch_blocks(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars", received_at=T0)
+        conn.execute(
+            "UPDATE meta_raw_evidence_anchor SET evidence_hash = ? WHERE request_id = ?",
+            ["0" * 64, "req-bars"],
+        )
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "BLOCKED"
+        classes = {c for c, _ in _findings(conn, result.canonical_run_id)}
+        assert "AVAILABILITY_EVIDENCE_INVALID" in classes
+
+    def test_received_at_tamper_after_success_replay_refused(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars", received_at=T1)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "SUCCESS"
+        meta = _raw_meta_path(env_root, "daily_bar", "req-bars")
+        doc = json.loads(meta.read_bytes())
+        doc["received_at"] = T0.isoformat()
+        meta.write_bytes(json.dumps(doc, sort_keys=True).encode("utf-8"))
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_intact_anchored_raw_available_at_exact(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars", received_at=T1)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        selected = _read_selected(env_root, result)
+        for row in selected:
+            assert row["available_at"] == T1.isoformat()
+
+
+# --------------------------------------------- CR-3.1: identity policy binding
+
+
+@pytest.mark.integration
+class TestIdentityPolicyBinding:
+    """CR-3.1 P0-05 (audit section 5): the identity bridge policy
+    identity enters the run identity; ledger/manifest/runtime carry the
+    SAME identity_dataset_hash."""
+
+    def test_bridge_policy_version_change_new_run(self, conn, env_root, monkeypatch):
+        import ashare_state.canonical.identity as identity_module
+
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        monkeypatch.setattr(identity_module, "IDENTITY_BRIDGE_POLICY_VERSION", "identity-bridge-v2")
+        second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert second.canonical_run_id != first.canonical_run_id
+
+    def test_ledger_identity_hash_matches_manifest_and_runtime(self, conn, env_root):
+        from ashare_state.canonical import identity_dataset_hash
+
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        manifest = json.loads(
+            (env_root["normalized"] / str(result.manifest_uri)).read_text(encoding="utf-8")
+        )
+        ledger_hash = str(
+            conn.execute(
+                "SELECT identity_dataset_hash FROM meta_canonicalization_run "
+                "WHERE canonical_run_id = ?",
+                [result.canonical_run_id],
+            ).fetchone()[0]
+        )
+        master_parts = conn.execute(
+            "SELECT normalization_run_id, normalized_manifest_hash FROM "
+            "meta_provider_normalization_run WHERE normalization_surface = "
+            "'security_master' AND status = 'SUCCESS' ORDER BY normalization_run_id"
+        ).fetchall()
+        master_hash = hashlib.sha256(
+            "|".join(f"{r[0]}:{r[1]}" for r in master_parts).encode("utf-8")
+        ).hexdigest()
+        assert (
+            ledger_hash == manifest["identity_dataset_hash"] == identity_dataset_hash(master_hash)
+        )
+
+    def test_manifest_identity_hash_rebind_blocks(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        path = env_root["normalized"] / str(result.manifest_uri)
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["identity_dataset_hash"] = "0" * 64
+        data = json.dumps(doc, sort_keys=True, indent=1).encode("utf-8")
+        path.write_bytes(data)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET manifest_hash = ? WHERE canonical_run_id = ?",
+            [hashlib.sha256(data).hexdigest(), result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_ledger_identity_hash_tamper_blocks(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET identity_dataset_hash = ? "
+            "WHERE canonical_run_id = ?",
+            ["0" * 64, result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+
+# ------------------------------------------- CR-3.1: policy hash completeness
+
+
+def _patched_policy(conn, env_root, monkeypatch, **overrides):
+    """Run once, then patch the policy tuple with one field overridden
+    and run again - returns (first, second)."""
+    import ashare_state.canonical.source_policy as source_policy_module
+    from ashare_state.canonical.source_policy import CanonicalSourcePolicy
+
+    _seed_base(conn, env_root)
+    _seed_bars(conn, env_root)
+    first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+    patched = tuple(
+        CanonicalSourcePolicy(**{**{"domain": p.domain}, **overrides}) for p in source_policies()
+    )
+    monkeypatch.setattr(source_policy_module, "_POLICY", patched)
+    monkeypatch.setattr(source_policy_module, "_INDEX", {p.domain: p for p in patched})
+    second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+    return first, second
+
+
+@pytest.mark.integration
+class TestPolicyHashCompleteness:
+    """CR-3.1 P0-06 (audit section 6): the policy hash covers EVERY
+    semantic field - a single-field change without a version bump
+    yields a new hash and a new run."""
+
+    def test_fallback_providers_change_new_run(self, conn, env_root, monkeypatch):
+        with pytest.raises(CanonicalRunnerError, match="fallback"):
+            _patched_policy(conn, env_root, monkeypatch, allowed_fallback_providers=("other",))
+
+    def test_identity_missing_max_change_new_run(self, conn, env_root, monkeypatch):
+        first, second = _patched_policy(conn, env_root, monkeypatch, identity_missing_max=5)
+        assert second.canonical_run_id != first.canonical_run_id
+
+    def test_required_evidence_class_change_new_run(self, conn, env_root, monkeypatch):
+        first, second = _patched_policy(
+            conn, env_root, monkeypatch, required_evidence_class="OTHER_CLASS"
+        )
+        assert second.canonical_run_id != first.canonical_run_id
+
+    def test_tolerance_rule_version_change_new_run(self, conn, env_root, monkeypatch):
+        first, second = _patched_policy(conn, env_root, monkeypatch, tolerance_rule_version="2")
+        assert second.canonical_run_id != first.canonical_run_id
+
+    def test_manifest_policy_hash_rebind_blocks(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        path = env_root["normalized"] / str(result.manifest_uri)
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["source_policy_hash"] = "0" * 64
+        data = json.dumps(doc, sort_keys=True, indent=1).encode("utf-8")
+        path.write_bytes(data)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET manifest_hash = ? WHERE canonical_run_id = ?",
+            [hashlib.sha256(data).hexdigest(), result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_required_evidence_class_in_manifest(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        manifest = json.loads(
+            (env_root["normalized"] / str(result.manifest_uri)).read_text(encoding="utf-8")
+        )
+        assert manifest["required_evidence_classes"] == {
+            "trade_calendar": "PROVIDER_NORMALIZED_VERIFIED",
+            "daily_bar": "PROVIDER_NORMALIZED_VERIFIED",
+            "security_status": "PROVIDER_NORMALIZED_VERIFIED",
+            "limit_price": "PROVIDER_NORMALIZED_VERIFIED",
+            "adj_factor": "PROVIDER_NORMALIZED_VERIFIED",
+        }
+
+
+# --------------------------------------------- CR-3.1: full replay seal
+
+
+class _FailingConn:
+    """Connection wrapper injecting a failure when a SQL fragment is
+    seen (test-only)."""
+
+    def __init__(self, conn, fragment: str, times: int = 1) -> None:
+        self._conn = conn
+        self._fragment = fragment
+        self._remaining = times
+
+    def execute(self, sql: str, params: Any = None):
+        if self._fragment in sql and self._remaining > 0:
+            self._remaining -= 1
+            raise RuntimeError("injected DB failure")
+        return self._conn.execute(sql, params)
+
+
+def _rebind_artifact(env_root: dict[str, Path], conn, result, name: str, mutate) -> None:
+    """Rebind-style tamper: edit an artifact parquet, update the
+    manifest content_hash AND the ledger manifest hash - proving the
+    seal consumption compares semantic values, not just file bytes."""
+    import io
+
+    import polars as pl
+
+    manifest = json.loads(
+        (env_root["normalized"] / str(result.manifest_uri)).read_text(encoding="utf-8")
+    )
+    entry = manifest["artifacts"][name]
+    path = env_root["normalized"] / entry["uri"]
+    frame = pl.read_parquet(path)
+    frame = mutate(frame)
+    buf = io.BytesIO()
+    frame.write_parquet(buf)
+    data = buf.getvalue()
+    path.write_bytes(data)
+    entry["content_hash"] = hashlib.sha256(data).hexdigest()
+    entry["row_count"] = frame.height
+    entry["schema_hash"] = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
+    mpath = env_root["normalized"] / str(result.manifest_uri)
+    mdata = json.dumps(manifest, sort_keys=True, indent=1, ensure_ascii=False).encode("utf-8")
+    mpath.write_bytes(mdata)
+    conn.execute(
+        "UPDATE meta_canonicalization_run SET manifest_hash = ? WHERE canonical_run_id = ?",
+        [hashlib.sha256(mdata).hexdigest(), result.canonical_run_id],
+    )
+
+
+@pytest.mark.integration
+class TestFullReplaySeal:
+    """CR-3.1 P0-07 (audit section 7): the replay consumes the FULL
+    seal - rebind-style tampering fails closed everywhere."""
+
+    def _setup(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root)
+        return _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_selected_values_rebind_blocks(self, conn, env_root):
+        import polars as pl
+
+        result = self._setup(conn, env_root)
+        _rebind_artifact(
+            env_root,
+            conn,
+            result,
+            "selected",
+            lambda f: f.with_columns(pl.lit(999.0).alias("close")),
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_selected_schema_rebind_blocks(self, conn, env_root):
+        import polars as pl
+
+        result = self._setup(conn, env_root)
+        _rebind_artifact(
+            env_root,
+            conn,
+            result,
+            "selected",
+            lambda f: f.with_columns(pl.lit(1).alias("injected_col")),
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_decisions_rebind_blocks(self, conn, env_root):
+        import polars as pl
+
+        result = self._setup(conn, env_root)
+        _rebind_artifact(
+            env_root,
+            conn,
+            result,
+            "decisions",
+            lambda f: f.with_columns(pl.lit("FORGED").alias("reason")),
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_findings_parquet_vs_db_divergence_blocks(self, conn, env_root):
+        result = self._setup(conn, env_root)
+        # no findings on a healthy run -> fabricate one in the parquet
+        import polars as pl
+
+        manifest = json.loads(
+            (env_root["normalized"] / str(result.manifest_uri)).read_text(encoding="utf-8")
+        )
+        entry = manifest["artifacts"]["findings"]
+        path = env_root["normalized"] / entry["uri"]
+        frame = pl.read_parquet(path)
+        forged = pl.DataFrame(
+            [
+                {
+                    "finding_id": "cf-forged",
+                    "canonical_run_id": result.canonical_run_id,
+                    "canonical_domain": "daily_bar",
+                    "canonical_key": '["forged"]',
+                    "finding_class": "SOURCE_CONFLICT",
+                    "provider": "amazingdata",
+                    "source_normalization_run_id": None,
+                    "detail_json": "{}",
+                    "blocking": True,
+                }
+            ]
+        )
+        if frame.height == 0:
+            frame = forged
+        else:
+            frame = pl.concat([frame, forged])
+        import io
+
+        buf = io.BytesIO()
+        frame.write_parquet(buf)
+        data = buf.getvalue()
+        path.write_bytes(data)
+        entry["content_hash"] = hashlib.sha256(data).hexdigest()
+        entry["row_count"] = frame.height
+        entry["schema_hash"] = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
+        mpath = env_root["normalized"] / str(result.manifest_uri)
+        mdata = json.dumps(manifest, sort_keys=True, indent=1).encode("utf-8")
+        mpath.write_bytes(mdata)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET manifest_hash = ? WHERE canonical_run_id = ?",
+            [hashlib.sha256(mdata).hexdigest(), result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_manifest_input_set_rebind_blocks(self, conn, env_root):
+        result = self._setup(conn, env_root)
+        path = env_root["normalized"] / str(result.manifest_uri)
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["input_set_hash"] = "0" * 64
+        data = json.dumps(doc, sort_keys=True, indent=1).encode("utf-8")
+        path.write_bytes(data)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET manifest_hash = ? WHERE canonical_run_id = ?",
+            [hashlib.sha256(data).hexdigest(), result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_cr2_artifact_bytes_tamper_replay_refused(self, conn, env_root):
+        self._setup(conn, env_root)
+        run_row = conn.execute(
+            "SELECT normalized_manifest_uri FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = 'req-bars'"
+        ).fetchone()
+        manifest = json.loads(
+            (env_root["normalized"] / str(run_row[0])).read_text(encoding="utf-8")
+        )
+        output_uri = manifest["outputs"][0]["uri"]
+        (env_root["normalized"] / output_uri).write_bytes(b"tampered-parquet")
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_artifact_uri_rebind_blocks(self, conn, env_root):
+        result = self._setup(conn, env_root)
+        path = env_root["normalized"] / str(result.manifest_uri)
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["artifacts"]["selected"]["uri"] = doc["artifacts"]["selected"]["uri"].replace(
+            f"run={result.canonical_run_id}", "run=0000dead0000"
+        )
+        data = json.dumps(doc, sort_keys=True, indent=1).encode("utf-8")
+        path.write_bytes(data)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET manifest_hash = ? WHERE canonical_run_id = ?",
+            [hashlib.sha256(data).hexdigest(), result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+
+# --------------------------------------------- CR-3.1: recoverable commit
+
+
+@pytest.mark.integration
+class TestRecoverableCommit:
+    """CR-3.1 P0-08 (audit section 8): deterministic artifact bytes (no
+    wall-clock in findings) -> a DB failure after the file writes
+    recovers on the exact retry."""
+
+    def test_blocked_run_db_failure_exact_retry_recovers(self, conn, env_root):
+        _seed_base(conn, env_root)
+        # future-only -> BLOCKED with findings (the P0-08 hot path)
+        _seed_bars(conn, env_root, "req-future", received_at=T1)
+        from ashare_state.canonical.canonicalizer import CanonicalRunner as Runner
+
+        failing = _FailingConn(conn, "INSERT INTO meta_canonicalization_run")
+        with pytest.raises(CanonicalRunnerError, match="commit failed"):
+            Runner(failing, raw_root=env_root["raw"], normalized_root=env_root["normalized"]).run(
+                AS_OF_EARLY, domains=("daily_bar",)
+            )
+        assert conn.execute("SELECT count(*) FROM meta_canonicalization_run").fetchone()[0] == 0
+        # exact retry over the healthy connection: byte-identical files
+        # (no wall-clock in the artifacts) -> no-op writes -> commit
+        recovered = _canonical(conn, env_root, AS_OF_EARLY, domains=("daily_bar",))
+        assert recovered.status == "BLOCKED"
+        assert recovered.finding_count >= 1
+        assert conn.execute("SELECT count(*) FROM meta_canonicalization_run").fetchone()[0] == 1
+        count = conn.execute(
+            "SELECT count(*) FROM meta_canonical_reconciliation_finding WHERE canonical_run_id = ?",
+            [recovered.canonical_run_id],
+        ).fetchone()[0]
+        assert count == recovered.finding_count
+        # a second replay is idempotent
+        replay = _canonical(conn, env_root, AS_OF_EARLY, domains=("daily_bar",))
+        assert replay.idempotent_replay is True
+
+    def test_findings_parquet_has_no_wall_clock(self, conn, env_root):
+        _seed_base(conn, env_root)
+        orphan = [dict(_BAR_ROWS[0])]
+        orphan[0]["SECURITY_CODE"] = "999999"
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            surface="daily_bar",
+            request_id="req-orphan",
+            payload=orphan,
+            received_at=T0,
+        )
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "BLOCKED"
+        import polars as pl
+
+        manifest = json.loads(
+            (env_root["normalized"] / str(result.manifest_uri)).read_text(encoding="utf-8")
+        )
+        frame = pl.read_parquet(env_root["normalized"] / manifest["artifacts"]["findings"]["uri"])
+        assert frame.height >= 1
+        assert "created_at" not in frame.columns
+
+
+# --------------------------------------------- CR-3.1: P1 corrections
+
+
+@pytest.mark.integration
+class TestP1Corrections:
+    def test_identity_finding_domain_truthful(self, conn, env_root):
+        """CR-3.1 P1-9.1: identity findings report their TRUE domain -
+        security_status rows without identity never get reported as
+        daily_bar."""
+        _seed_base(conn, env_root)
+        status_row = dict(_STATUS_ROWS[0])
+        status_row["SECURITY_CODE"] = "999999"  # no identity entry
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="history_stock_status",
+            endpoint="InfoData.get_history_stock_status",
+            surface="security_status_history",
+            request_id="req-status-orphan",
+            payload=[status_row],
+            received_at=T0,
+        )
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("security_status",))
+        assert result.status == "BLOCKED"
+        domains = {
+            str(r[0])
+            for r in conn.execute(
+                "SELECT DISTINCT canonical_domain FROM "
+                "meta_canonical_reconciliation_finding WHERE finding_class = 'IDENTITY_MISSING'"
+            ).fetchall()
+        }
+        assert domains == {"security_status"}
+
+    def test_naive_datetime_rejected(self, conn, env_root):
+        from datetime import datetime as dt
+
+        with pytest.raises(CanonicalRunnerError, match="timezone-aware"):
+            _canonical(conn, env_root, dt(2026, 9, 1, 12, 0, 0), domains=("daily_bar",))
+
+    def test_naive_string_fixed_utc_rule(self, conn, env_root):
+        """Naive strings parse under the documented FIXED-UTC rule -
+        deterministic across Windows/Linux hosts."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, received_at=T0)
+        naive = _canonical(conn, env_root, "2026-09-01T12:00:00", domains=("daily_bar",))
+        aware = _canonical(conn, env_root, "2026-09-01T12:00:00+00:00", domains=("daily_bar",))
+        assert naive.canonical_run_id == aware.canonical_run_id
+        assert aware.idempotent_replay is True
+
+    def test_domain_matrix_counts_13(self):
+        specs = domain_specs()
+        assert len(specs) == 13
+        by_class: dict[str, int] = {}
+        for spec in specs:
+            by_class[spec.eligibility.value] = by_class.get(spec.eligibility.value, 0) + 1
+        assert by_class == {
+            "CANONICAL_SUPPORTED": 5,
+            "AUXILIARY_ONLY": 2,
+            "BLOCKED_PENDING_SEMANTICS": 6,
+        }

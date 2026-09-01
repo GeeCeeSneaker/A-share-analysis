@@ -1,11 +1,13 @@
-"""Canonical runtime (CR-3, audit 20260901): Provider-Normalized ->
-Canonical with typed availability policy, governed identity bridge,
-versioned static source policy and exact-replay canonical runs.
+"""Canonical runtime (CR-3 / CR-3.1, audit 20260901): Provider-Normalized
+-> Canonical with typed availability policy, governed identity bridge,
+versioned static source policy and exact-replay canonical runs over ONE
+authoritative input snapshot.
 
 Boundary summary::
 
-    CR-2 verified Provider-Normalized runs (SUCCESS only)
-      -> read-only closure verification
+    ONE CanonicalInputSnapshot (requested domain set + verified CR-2
+      source runs + verified identity master runs + policy identities)
+      -> read-only closure verification + anchored availability evidence
       -> identity bridge (security_master -> security_id, fail closed)
       -> availability derivation + as_of filter (BEFORE selection)
       -> source selection / EXACT reconciliation (static policy)
@@ -22,6 +24,7 @@ from ashare_state.canonical.availability import (
     derive_available_at,
 )
 from ashare_state.canonical.canonicalizer import (
+    CanonicalInputSnapshot,
     CanonicalRunner,
     CanonicalRunnerError,
     CanonicalRunResult,
@@ -39,6 +42,9 @@ from ashare_state.canonical.identity import (
     IDENTITY_BRIDGE_POLICY_VERSION,
     IdentityBridge,
     IdentityResolutionError,
+    identity_bridge_policy_hash,
+    identity_bridge_policy_version,
+    identity_dataset_hash,
 )
 from ashare_state.canonical.source_policy import (
     SOURCE_POLICY_VERSION,
@@ -56,6 +62,7 @@ __all__ = [
     "AvailabilityPolicyEntry",
     "CANONICAL_CONTRACT_VERSION",
     "CanonicalDomainSpec",
+    "CanonicalInputSnapshot",
     "CanonicalRunner",
     "CanonicalRunnerError",
     "CanonicalRunResult",
@@ -72,6 +79,9 @@ __all__ = [
     "derive_available_at",
     "domain_spec",
     "domain_specs",
+    "identity_bridge_policy_hash",
+    "identity_bridge_policy_version",
+    "identity_dataset_hash",
     "source_policy_for",
     "source_policy_hash",
     "source_policies",
