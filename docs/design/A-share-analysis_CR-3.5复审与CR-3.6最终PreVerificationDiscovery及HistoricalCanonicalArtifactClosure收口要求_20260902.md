@@ -567,7 +567,7 @@ CR-3.6 剩下的是两个更底层的收口：
 
 # 7. Implementation Mapping（CR-3.6，2026-09-02）
 
-> Reviewed base：CR-3.5 复审 reopen commit `dd31ca6`（本工作要求）；implementation commit `<本批提交后回填>`（CI 三腿确认后回填）。总体 **1179/0**（1151 → 1179，+28 项对抗测试）；ruff check / ruff format / mypy 全绿；**零新 migration**（§3.1 允许范围内刻意决策：未引入未验证的 history index——普通 ledger 索引字段会把"查询字段可漂移"的漏洞换一个位置；migration 链保持 21）。
+> Reviewed base：CR-3.5 复审 reopen commit `dd31ca6`（本工作要求）；implementation commit `1ebe96b9d28617939c2782795395ef23eee597e0`（GitHub Actions **run 33623939024 三腿 success**，2026-09-02 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest（1179/0）/ Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success，一次通过零修复轮次）。总体 **1179/0**（1151 → 1179，+28 项对抗测试）；ruff check / ruff format / mypy 全绿；**零新 migration**（§3.1 允许范围内刻意决策：未引入未验证的 history index——普通 ledger 索引字段会把"查询字段可漂移"的漏洞换一个位置；migration 链保持 21）。
 
 ## 7.1 P0-01 Selection-Free / Pre-Verification-Trust-Free Discovery
 
@@ -638,7 +638,7 @@ CR-3.6 剩下的是两个更底层的收口：
 [x] CR-2.x / R4 frozen regressions 全绿                                                    -> 全量 1179/0
 [x] no CR-4 semantics leak                                                                 -> 无 SnapshotBuilder / ReadModel 触碰
 [x] migration 018-021 untouched；若 022+ 则 from-zero/upgrade/idempotent/tamper 全过        -> N/A（零 schema 变化，21 链不变）
-[x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 CI 全绿                                      -> 推送后 API 正向确认（回填本节）
+[x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 CI 全绿                                      -> run 33623939024 三腿 success（2026-09-02 API positive confirmation，一次通过零修复轮次）
 [x] Ruff / format / Mypy / Spike / SDK-absent / governance gates 全绿                       -> 本地全绿 + CI 同款命令复验
 [x] ADR-023 Amendment F + DEVLOG + DEVELOPMENT_MANAGEMENT 完整同步                          -> Amendment F §11.1-§11.4 + DEVLOG append 新条目 + DM-20260902-074
 [ ] Reviewer 复审无新的 P0 correctness blocker                                             -> PENDING_REVIEW

@@ -34,7 +34,7 @@
 **Verification**
 - Local: **1179 tests passed / 0 failed**（1151 → 1179，+28：TestSelectionFreeDiscovery 20（mandatory 1：requested_domains_hash 单漂 / 2：8 选择器单漂 parametrize / 3：as_of 单漂 / 4：9 字段 ledger+manifest 对 rebind parametrize / 5：verified different-world skip positive control）/ TestHistoricalArtifactClosure 8（mandatory 8/9/10：selected bytes/删除/decisions tamper / 11：row_count+schema_hash+selected_semantic 对 rebind / 12：decision_set_hash 对 rebind / 13：untouched superset positive control）；14 号 exact-replay artifact-tamper 由既有回归保持）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1179/0
 - 既有回归零破坏：CR-3/3.1/3.2/3.3/3.4/3.5 对抗矩阵 166 项全保持（含 CR-3.5 derived seal 全部 + materialization symmetry + continuity 主体）；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
-- GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
+- GitHub Actions: **run 33623939024（implementation `1ebe96b9d28617939c2782795395ef23eee597e0`）三腿 success**（2026-09-02 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest（1179/0）/ Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success；一次通过零修复轮次）
 
 **Implementation Status**
 - DONE（2 P0 全收口 + ADR-023 Amendment F + DM-20260902-074；1179/0；Review Status: PENDING_REVIEW）
