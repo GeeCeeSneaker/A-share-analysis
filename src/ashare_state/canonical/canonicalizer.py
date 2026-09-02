@@ -60,6 +60,30 @@ CR-3.2 closures (audit 20260901 "CR-3.1复审与CR-3.2最终TransactionalSnapsho
   evidence;
 - P1 the snapshot is deeply immutable; ``domains=[]`` is rejected
   explicitly (None = all supported domains).
+
+CR-3.4 closures (audit 20260902 "CR-3.3复审与CR-3.4最终ContinuitySeal
+及VerificationReplay收口要求"):
+
+- P0-01 the historical continuity guard verifies a typed HISTORICAL
+  CANONICAL RUN SEAL (ledger == manifest explicit correctness fields ==
+  physical recompute of input_seal_hash / input_set_hash /
+  verification_state_hash over the manifest input entries) BEFORE
+  trusting a prior manifest's input list - a canonical manifest +
+  ledger outer-hash rebind can never launder a consumed input out of
+  continuity evidence, and a prior manifest/ledger that fails the seal
+  is itself HARD DAMAGED (no replacement of any kind may be minted);
+- P0-02 first consume and replay share ONE verification evidence
+  collector (``_collect_input_verification_evidence``): closure
+  problems, anchored-evidence problems, exact-byte materialization
+  problems, the derived verification enum and the canonical
+  problem-evidence hash are ALWAYS collected by the same sequence with
+  the same semantics - a materialization-only failure is replayed with
+  the exact evidence it was first sealed with (never a contradictory
+  empty problem set);
+- P0-03 the manifest correctness identity fields
+  (canonical_context_hash / base_identity_hash /
+  verification_state_hash) are consumed on replay: manifest == ledger
+  == current recompute (no display-only seal).
 """
 
 from __future__ import annotations
@@ -91,10 +115,12 @@ from ashare_state.normalization.runner import verify_normalized_run
 __all__ = [
     "CanonicalFinding",
     "CanonicalInputSnapshot",
+    "CanonicalRunResult",
+    "CanonicalRunSeal",
     "CanonicalRunner",
     "CanonicalRunnerError",
-    "CanonicalRunResult",
     "InputRunSeal",
+    "InputVerificationEvidence",
     "MaterializedOutput",
     "SnapshotRun",
     "canonical_code_fingerprint",
@@ -239,6 +265,31 @@ class CanonicalFinding:
         }
 
 
+#: CR-3.4 P0-01: the IDENTITY field subset of an input seal - the
+#: single source of truth for ``InputRunSeal.identity_dict`` AND for
+#: the historical recompute over manifest entries: both must derive
+#: the exact same input_set_hash from the exact same field set.
+_INPUT_IDENTITY_FIELDS = (
+    "run_id",
+    "role",
+    "provider",
+    "normalization_surface",
+    "provider_dataset",
+    "endpoint",
+    "raw_request_id",
+    "raw_evidence_uri",
+    "raw_evidence_hash",
+    "normalization_contract_version",
+    "mapper_identity",
+    "mapper_code_hash",
+    "normalized_manifest_uri",
+    "normalized_manifest_hash",
+    "normalized_output_set_hash",
+    "normalized_semantic_hash",
+    "status",
+)
+
+
 @dataclass(frozen=True)
 class InputRunSeal:
     """CR-3.2 P0-04: the TYPED FULL CR-2 seal of one discovered input
@@ -306,26 +357,12 @@ class InputRunSeal:
         pit_available are RUNTIME STATE (they enter the verification
         state hash / manifest evidence, never the base input identity:
         CR-3.2 P0-05 requires the base identity to stay stable across
-        verification-state changes)."""
-        return {
-            "run_id": self.run_id,
-            "role": self.role,
-            "provider": self.provider,
-            "normalization_surface": self.normalization_surface,
-            "provider_dataset": self.provider_dataset,
-            "endpoint": self.endpoint,
-            "raw_request_id": self.raw_request_id,
-            "raw_evidence_uri": self.raw_evidence_uri,
-            "raw_evidence_hash": self.raw_evidence_hash,
-            "normalization_contract_version": self.normalization_contract_version,
-            "mapper_identity": self.mapper_identity,
-            "mapper_code_hash": self.mapper_code_hash,
-            "normalized_manifest_uri": self.normalized_manifest_uri,
-            "normalized_manifest_hash": self.normalized_manifest_hash,
-            "normalized_output_set_hash": self.normalized_output_set_hash,
-            "normalized_semantic_hash": self.normalized_semantic_hash,
-            "status": self.status,
-        }
+        verification-state changes). CR-3.4 P0-01: the field set comes
+        from the module-level ``_INPUT_IDENTITY_FIELDS`` single source
+        of truth - the historical continuity guard recomputes the
+        sealed input_set_hash from manifest entries with the SAME
+        tuple."""
+        return {field: getattr(self, field) for field in _INPUT_IDENTITY_FIELDS}
 
     def availability_row(self) -> dict[str, str]:
         """The identity subset consumed by the anchored-evidence
@@ -343,6 +380,70 @@ class InputRunSeal:
 
 
 @dataclass(frozen=True)
+class CanonicalRunSeal:
+    """CR-3.4 P0-01: the typed full seal of ONE canonical run as
+    persisted in the ledger - the trust anchor the historical
+    continuity guard verifies (ledger == manifest explicit
+    correctness fields == physical recompute over the manifest input
+    entries) BEFORE a prior manifest's input list may be trusted. A
+    prior canonical manifest / ledger that fails this seal is itself
+    DAMAGED (HARD DAMAGED): its input list is not consulted and no
+    replacement of any kind may be minted."""
+
+    canonical_run_id: str
+    canonical_contract_version: str
+    as_of: str
+    idempotency_key: str
+    status: str
+    requested_domains_json: str
+    requested_domains_hash: str
+    input_set_hash: str
+    input_seal_hash: str
+    identity_dataset_hash: str
+    identity_master_input_set_hash: str
+    canonical_context_hash: str
+    base_identity_hash: str
+    verification_state_hash: str
+    availability_policy_version: str
+    availability_policy_hash: str
+    source_policy_version: str
+    source_policy_hash: str
+    tolerance_policy_version: str
+    tolerance_policy_hash: str
+    code_fingerprint: str
+    manifest_uri: str
+    manifest_hash: str
+
+    @classmethod
+    def from_ledger(cls, record: Mapping[str, Any]) -> CanonicalRunSeal:
+        return cls(
+            canonical_run_id=str(record["canonical_run_id"]),
+            canonical_contract_version=str(record["canonical_contract_version"]),
+            as_of=_ledger_as_of(dict(record)).isoformat(),
+            idempotency_key=str(record["idempotency_key"]),
+            status=str(record["status"]),
+            requested_domains_json=str(record["requested_domains_json"]),
+            requested_domains_hash=str(record["requested_domains_hash"]),
+            input_set_hash=str(record["input_set_hash"]),
+            input_seal_hash=str(record["input_seal_hash"]),
+            identity_dataset_hash=str(record["identity_dataset_hash"]),
+            identity_master_input_set_hash=str(record["identity_master_input_set_hash"]),
+            canonical_context_hash=str(record["canonical_context_hash"]),
+            base_identity_hash=str(record["base_identity_hash"]),
+            verification_state_hash=str(record["verification_state_hash"]),
+            availability_policy_version=str(record["availability_policy_version"]),
+            availability_policy_hash=str(record["availability_policy_hash"]),
+            source_policy_version=str(record["source_policy_version"]),
+            source_policy_hash=str(record["source_policy_hash"]),
+            tolerance_policy_version=str(record["tolerance_policy_version"]),
+            tolerance_policy_hash=str(record["tolerance_policy_hash"]),
+            code_fingerprint=str(record["code_fingerprint"]),
+            manifest_uri=str(record["manifest_uri"]) if record["manifest_uri"] else "",
+            manifest_hash=str(record["manifest_hash"]) if record["manifest_hash"] else "",
+        )
+
+
+@dataclass(frozen=True)
 class MaterializedOutput:
     """One materialized CR-2 output table: rows frozen as tuples of
     sorted item-tuples (deeply immutable), parsed from the EXACT bytes
@@ -355,6 +456,27 @@ class MaterializedOutput:
 
     def row_dicts(self) -> list[dict[str, Any]]:
         return [dict(items) for items in self.rows]
+
+
+@dataclass(frozen=True)
+class InputVerificationEvidence:
+    """CR-3.4 P0-02: the ONE verification evidence state machine shared
+    by first consume and replay - closure problems, anchored-evidence
+    problems, exact-byte materialization problems, the derived
+    verification enum and the canonical problem-evidence hash are
+    ALWAYS produced by the same collection sequence with the same
+    semantics (a materialization-only failure replays exactly)."""
+
+    closure_problems: tuple[str, ...]
+    anchored_evidence_problems: tuple[str, ...]
+    materialization_problems: tuple[str, ...]
+    verification: str
+    received_at: datetime | None
+    pit_available: bool
+    verification_problem_hash: str
+    #: materialized rows are retained only in first-consume mode; the
+    #: replay mode discards them but runs the identical verification
+    outputs: tuple[MaterializedOutput, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -554,6 +676,34 @@ def canonical_code_fingerprint() -> str:
 
 def _canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+
+
+def _input_hashes_from_entries(
+    entries: Sequence[Mapping[str, Any]],
+) -> tuple[str, str, str]:
+    """CR-3.4 P0-01: physically recompute the historical
+    (input_seal_hash, input_set_hash, verification_state_hash) from a
+    manifest's typed input entries - the SAME formulas
+    ``CanonicalInputSnapshot`` derives from live seals, so a rebound
+    input list (entries removed / altered / reordered) can never
+    re-derive the sealed ledger hashes."""
+    seal_list = [dict(entry) for entry in entries]
+    identity_list = [
+        {field: entry.get(field) for field in _INPUT_IDENTITY_FIELDS} for entry in entries
+    ]
+    state_list = [
+        {
+            "run_id": entry.get("run_id"),
+            "verification": entry.get("verification"),
+            "verification_problem_hash": entry.get("verification_problem_hash"),
+        }
+        for entry in entries
+    ]
+    return (
+        hashlib.sha256(_canonical_json(seal_list).encode("utf-8")).hexdigest(),
+        hashlib.sha256(_canonical_json(identity_list).encode("utf-8")).hexdigest(),
+        hashlib.sha256(_canonical_json(state_list).encode("utf-8")).hexdigest(),
+    )
 
 
 def _freeze(value: Any) -> Any:
@@ -937,69 +1087,157 @@ class CanonicalRunner:
 
     # -------------------------------------------------------- snapshot
     def _check_historical_continuity(self, snapshot: CanonicalInputSnapshot) -> None:
-        """CR-3.3 P0-01 (audit 20260902 section 1): historical input
-        continuity guard - a prior SUCCESS(eful) canonical run of the
-        SAME request world must never be silently forgotten when its
-        consumed CR-2 inputs disappear / drift in the ledger (which
-        changes the base identity but never the canonical CONTEXT).
+        """CR-3.3 P0-01 + CR-3.4 P0-01 (audits 20260902 section 1):
+        historical input continuity guard - a prior SUCCESS(eful)
+        canonical run of the SAME request world must never be silently
+        forgotten when its consumed CR-2 inputs disappear / drift in
+        the ledger (which changes the base identity but never the
+        canonical CONTEXT).
 
         For every prior non-BLOCKED run under the same
-        ``canonical_context_hash``: each sealed input run must still
+        ``canonical_context_hash``: the prior canonical run's OWN seal
+        is first verified typed and in full (ledger == manifest
+        explicit correctness fields == physical recompute over the
+        manifest input entries - a canonical manifest + ledger
+        outer-hash rebind can never launder a consumed input out of
+        continuity evidence); THEN each sealed input run must still
         exist in the current authoritative CR-2 ledger with an
         identical identity (status + seal fields), and its physical /
-        anchored verification must still be healthy. Disappearance,
-        status/seal drift or damaged evidence -> DAMAGED (no
-        replacement of any kind may be minted). A current input set
-        that is a SUPERSET of every prior sealed set (all prior inputs
-        intact + healthy) is a legitimate new world and flows on
-        normally."""
+        anchored verification must still be healthy. Prior
+        manifest/ledger seal damage, input disappearance, status/seal
+        drift or damaged evidence -> DAMAGED (no replacement of any
+        kind may be minted). A current input set that is a SUPERSET of
+        every prior sealed set (all prior inputs intact + healthy) is
+        a legitimate new world and flows on normally."""
         prior_rows = self.conn.execute(
-            "SELECT canonical_run_id, status, manifest_uri, manifest_hash "
-            "FROM meta_canonicalization_run WHERE canonical_context_hash = ? "
-            "AND status != 'BLOCKED' ORDER BY canonical_run_id",
+            f"SELECT {', '.join(_LEDGER_COLUMNS)} FROM meta_canonicalization_run "
+            "WHERE canonical_context_hash = ? AND status != 'BLOCKED' "
+            "ORDER BY canonical_run_id",
             [snapshot.canonical_context_hash],
         ).fetchall()
         if not prior_rows:
             return
         current_seal_by_run = {seal.run_id: seal for seal in snapshot.seals}
-        for run_id, _status, manifest_uri, manifest_hash in prior_rows:
-            problems = self._continuity_problems_for(
-                str(run_id), str(manifest_uri), str(manifest_hash), current_seal_by_run
-            )
+        for row in prior_rows:
+            record = dict(zip(_LEDGER_COLUMNS, row, strict=True))
+            seal = CanonicalRunSeal.from_ledger(record)
+            manifest, seal_problems = self._verify_historical_canonical_seal(seal)
+            problems = list(seal_problems)
+            if manifest is not None:
+                for entry in manifest.get("input_normalized_runs", []):
+                    run_id = str(entry.get("run_id"))
+                    problems.extend(
+                        self._continuity_problems_for_input(entry, run_id, current_seal_by_run)
+                    )
             if problems:
                 msg = (
-                    f"prior canonical run {run_id} consumed inputs that are no "
-                    f"longer intact: {'; '.join(problems)} - the prior run is "
-                    "DAMAGED and no replacement may be minted; restore the exact "
-                    "upstream evidence to replay the historical run "
-                    "(CR-3.3 audit 20260902 section 1)"
+                    f"prior canonical run {seal.canonical_run_id} is DAMAGED: "
+                    f"{'; '.join(problems)} - the prior run and its sealed "
+                    "evidence can no longer be trusted and no replacement may "
+                    "be minted; restore the exact upstream evidence to replay "
+                    "the historical run (CR-3.3 audit 20260902 section 1 + "
+                    "CR-3.4 audit 20260902 section 1)"
                 )
                 raise CanonicalRunnerError(msg)
 
-    def _continuity_problems_for(
-        self,
-        canonical_run_id: str,
-        manifest_uri: str,
-        manifest_hash: str,
-        current_seal_by_run: dict[str, InputRunSeal],
-    ) -> list[str]:
-        """Continuity problems of ONE prior canonical run against the
-        CURRENT authoritative ledger + physical evidence."""
-        problems: list[str] = []
-        manifest_path = self.normalized_root / manifest_uri
+    def _verify_historical_canonical_seal(
+        self, seal: CanonicalRunSeal
+    ) -> tuple[dict[str, Any] | None, list[str]]:
+        """CR-3.4 P0-01: typed full-seal verification of ONE historical
+        canonical run BEFORE its manifest input list may be trusted for
+        continuity - the deterministic manifest URI, the manifest bytes
+        against the ledger hash, EVERY explicit manifest correctness
+        field against the ledger seal, and the physical recompute of
+        input_seal_hash / input_set_hash / verification_state_hash from
+        the manifest input entries. Any problem -> the prior canonical
+        run is itself HARD DAMAGED: its input list is NOT consulted and
+        no replacement may be minted."""
+        if not seal.manifest_uri or not seal.manifest_hash:
+            return None, ["prior canonical ledger row carries no manifest binding"]
+        record = {
+            "canonical_contract_version": seal.canonical_contract_version,
+            "as_of": seal.as_of,
+            "canonical_run_id": seal.canonical_run_id,
+        }
+        expected_manifest_uri = f"{self._expected_base_uri(record)}/manifest.json"
+        if seal.manifest_uri != expected_manifest_uri:
+            return None, [
+                f"prior canonical manifest_uri {seal.manifest_uri!r} is not the "
+                f"deterministic anchor {expected_manifest_uri!r} (rebind)"
+            ]
+        manifest_path = self.normalized_root / seal.manifest_uri
         if not manifest_path.is_file():
-            return [f"prior canonical manifest missing: {manifest_uri}"]
-        if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != manifest_hash:
-            return ["prior canonical manifest bytes do not match the ledger hash"]
+            return None, [f"prior canonical manifest missing: {seal.manifest_uri}"]
+        if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != seal.manifest_hash:
+            return None, ["prior canonical manifest bytes do not match the ledger hash (rebind)"]
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            return [f"prior canonical manifest unreadable: {exc}"]
-        for entry in manifest.get("input_normalized_runs", []):
-            run_id = str(entry.get("run_id"))
-            problems.extend(self._continuity_problems_for_input(entry, run_id, current_seal_by_run))
-        _ = canonical_run_id
-        return problems
+            return None, [f"prior canonical manifest unreadable: {exc}"]
+        problems: list[str] = []
+        expected_fields = (
+            ("canonical_run_id", seal.canonical_run_id),
+            ("canonical_contract_version", seal.canonical_contract_version),
+            ("as_of", seal.as_of),
+            ("idempotency_key", seal.idempotency_key),
+            ("status", seal.status),
+            ("requested_domains_hash", seal.requested_domains_hash),
+            ("input_set_hash", seal.input_set_hash),
+            ("input_seal_hash", seal.input_seal_hash),
+            ("identity_dataset_hash", seal.identity_dataset_hash),
+            ("identity_master_input_set_hash", seal.identity_master_input_set_hash),
+            ("canonical_context_hash", seal.canonical_context_hash),
+            ("base_identity_hash", seal.base_identity_hash),
+            ("verification_state_hash", seal.verification_state_hash),
+            ("availability_policy_version", seal.availability_policy_version),
+            ("availability_policy_hash", seal.availability_policy_hash),
+            ("source_policy_version", seal.source_policy_version),
+            ("source_policy_hash", seal.source_policy_hash),
+            ("tolerance_policy_version", seal.tolerance_policy_version),
+            ("tolerance_policy_hash", seal.tolerance_policy_hash),
+            ("code_fingerprint", seal.code_fingerprint),
+        )
+        for field, expected in expected_fields:
+            if str(manifest.get(field)) != expected:
+                problems.append(
+                    f"prior canonical manifest field {field} does not match the "
+                    "ledger seal (manifest rebind)"
+                )
+        try:
+            ledger_domains = json.loads(seal.requested_domains_json)
+        except json.JSONDecodeError:
+            problems.append("prior canonical ledger requested_domains_json is unreadable")
+            ledger_domains = None
+        if (
+            ledger_domains is not None
+            and list(manifest.get("requested_domains") or []) != ledger_domains
+        ):
+            problems.append(
+                "prior canonical manifest requested_domains does not match the ledger seal (rebind)"
+            )
+        entries = manifest.get("input_normalized_runs")
+        if not isinstance(entries, list):
+            problems.append("prior canonical manifest carries no typed input list")
+            return None, problems
+        seal_recompute, set_recompute, state_recompute = _input_hashes_from_entries(entries)
+        if seal_recompute != seal.input_seal_hash:
+            problems.append(
+                "prior canonical input_seal_hash does not match the manifest "
+                "input entries (input list rebind)"
+            )
+        if set_recompute != seal.input_set_hash:
+            problems.append(
+                "prior canonical input_set_hash does not match the manifest "
+                "input entries (input list rebind)"
+            )
+        if state_recompute != seal.verification_state_hash:
+            problems.append(
+                "prior canonical verification_state_hash does not match the "
+                "manifest input entries (input list rebind)"
+            )
+        if problems:
+            return None, problems
+        return manifest, []
 
     def _continuity_problems_for_input(
         self,
@@ -1176,8 +1414,10 @@ class CanonicalRunner:
         self, run_row: dict[str, Any], role: str, as_of_dt: datetime, requested: tuple[str, ...]
     ) -> tuple[SnapshotRun, list[CanonicalFinding]]:
         """Verify one discovered run (CR-2 closure + anchored
-        availability) and MATERIALIZE its outputs from the exact
-        hash-verified bytes inside the snapshot boundary.
+        availability + exact-byte materialization - all through the
+        ONE shared evidence collector, CR-3.4 P0-02) and MATERIALIZE
+        its outputs from the exact hash-verified bytes inside the
+        snapshot boundary.
 
         CR-3.3 P1-01: source-scope findings carry the reserved input
         scope ``input:<normalization_surface>`` (never the meaningless
@@ -1197,14 +1437,10 @@ class CanonicalRunner:
                 for domain in requested
                 if domain_spec(domain).normalization_surface == surface
             )
-        closure_problems = verify_normalized_run(
-            self.conn,
-            run_row["normalization_run_id"],
-            raw_root=self.raw_root,
-            normalized_root=self.normalized_root,
+        evidence = self._collect_input_verification_evidence(
+            run_row, role, as_of_dt, keep_rows=True
         )
-        anchor_problems, received_at = self._verify_anchored_availability(run_row)
-        if closure_problems:
+        if evidence.closure_problems:
             findings.append(
                 _finding(
                     scope,
@@ -1212,11 +1448,11 @@ class CanonicalRunner:
                     "CLOSURE_VERIFICATION_FAILED",
                     run_row["provider"],
                     run_row["normalization_run_id"],
-                    {"problems": closure_problems, "affected_domains": affected},
+                    {"problems": list(evidence.closure_problems), "affected_domains": affected},
                     blocking=True,
                 )
             )
-        if anchor_problems:
+        if evidence.anchored_evidence_problems:
             finding_class = (
                 "IDENTITY_EVIDENCE_INVALID"
                 if role == "identity_master"
@@ -1229,50 +1465,28 @@ class CanonicalRunner:
                     finding_class,
                     run_row["provider"],
                     run_row["normalization_run_id"],
-                    {"problems": anchor_problems, "affected_domains": affected},
+                    {
+                        "problems": list(evidence.anchored_evidence_problems),
+                        "affected_domains": affected,
+                    },
                     blocking=True,
                 )
             )
-        verification = V_HEALTHY
-        if closure_problems:
-            verification = V_CLOSURE_FAILED
-        elif anchor_problems:
-            verification = (
-                V_IDENTITY_EVIDENCE_INVALID
-                if role == "identity_master"
-                else V_AVAILABILITY_EVIDENCE_INVALID
-            )
-        pit_available = bool(
-            verification == V_HEALTHY and received_at is not None and received_at <= as_of_dt
-        )
-
-        outputs: list[MaterializedOutput] = []
-        materialize_problems: list[str] = []
-        if verification == V_HEALTHY:
-            outputs, materialize_problems = self._materialize_outputs(run_row)
-            if materialize_problems:
-                verification = V_CLOSURE_FAILED
-                pit_available = False
-                findings.append(
-                    _finding(
-                        scope,
-                        "",
-                        "CLOSURE_VERIFICATION_FAILED",
-                        run_row["provider"],
-                        run_row["normalization_run_id"],
-                        {"problems": materialize_problems, "affected_domains": affected},
-                        blocking=True,
-                    )
+        if evidence.materialization_problems:
+            findings.append(
+                _finding(
+                    scope,
+                    "",
+                    "CLOSURE_VERIFICATION_FAILED",
+                    run_row["provider"],
+                    run_row["normalization_run_id"],
+                    {
+                        "problems": list(evidence.materialization_problems),
+                        "affected_domains": affected,
+                    },
+                    blocking=True,
                 )
-                outputs = []
-        problem_evidence = {
-            "run_id": str(run_row["normalization_run_id"]),
-            "verification": verification,
-            "closure_problems": sorted(closure_problems),
-            "anchored_evidence_problems": sorted(anchor_problems),
-            "materialization_problems": sorted(materialize_problems),
-        }
-        problem_hash = hashlib.sha256(_canonical_json(problem_evidence).encode("utf-8")).hexdigest()
+            )
         seal = InputRunSeal(
             run_id=str(run_row["normalization_run_id"]),
             role=role,
@@ -1291,12 +1505,78 @@ class CanonicalRunner:
             normalized_output_set_hash=str(run_row["normalized_output_set_hash"]),
             normalized_semantic_hash=str(run_row["normalized_semantic_hash"]),
             status=str(run_row["status"]),
+            verification=evidence.verification,
+            received_at=evidence.received_at.isoformat() if evidence.received_at else "",
+            pit_available=evidence.pit_available,
+            verification_problem_hash=evidence.verification_problem_hash,
+        )
+        return SnapshotRun(seal=seal, outputs=evidence.outputs), findings
+
+    def _collect_input_verification_evidence(
+        self,
+        run_row: dict[str, Any],
+        role: str,
+        as_of_dt: datetime,
+        *,
+        keep_rows: bool,
+    ) -> InputVerificationEvidence:
+        """CR-3.4 P0-02: the ONE verification evidence collector -
+        first consume (``_snapshot_run``) and replay
+        (``_verify_sealed_input``) run the SAME sequence with the SAME
+        semantics: CR-2 closure verification -> anchored availability
+        evidence -> (only when closure + anchor are healthy) exact-byte
+        materialization verification -> derived verification enum ->
+        canonical problem-evidence hash. ``keep_rows`` only controls
+        whether the materialized rows are returned; the verification
+        sequence itself is identical, so a materialization-only
+        failure is replayed with the exact evidence hash it was first
+        sealed with (never a contradictory empty problem set)."""
+        closure_problems = verify_normalized_run(
+            self.conn,
+            str(run_row["normalization_run_id"]),
+            raw_root=self.raw_root,
+            normalized_root=self.normalized_root,
+        )
+        anchor_problems, received_at = self._verify_anchored_availability(run_row)
+        verification = V_HEALTHY
+        if closure_problems:
+            verification = V_CLOSURE_FAILED
+        elif anchor_problems:
+            verification = (
+                V_IDENTITY_EVIDENCE_INVALID
+                if role == "identity_master"
+                else V_AVAILABILITY_EVIDENCE_INVALID
+            )
+        pit_available = bool(
+            verification == V_HEALTHY and received_at is not None and received_at <= as_of_dt
+        )
+        outputs: list[MaterializedOutput] = []
+        materialization_problems: list[str] = []
+        if verification == V_HEALTHY:
+            materialized, materialization_problems = self._materialize_outputs(run_row)
+            if materialization_problems:
+                verification = V_CLOSURE_FAILED
+                pit_available = False
+            elif keep_rows:
+                outputs = materialized
+        problem_evidence = {
+            "run_id": str(run_row["normalization_run_id"]),
+            "verification": verification,
+            "closure_problems": sorted(closure_problems),
+            "anchored_evidence_problems": sorted(anchor_problems),
+            "materialization_problems": sorted(materialization_problems),
+        }
+        problem_hash = hashlib.sha256(_canonical_json(problem_evidence).encode("utf-8")).hexdigest()
+        return InputVerificationEvidence(
+            closure_problems=tuple(closure_problems),
+            anchored_evidence_problems=tuple(anchor_problems),
+            materialization_problems=tuple(materialization_problems),
             verification=verification,
-            received_at=received_at.isoformat() if received_at else "",
+            received_at=received_at,
             pit_available=pit_available,
             verification_problem_hash=problem_hash,
+            outputs=tuple(outputs),
         )
-        return SnapshotRun(seal=seal, outputs=tuple(outputs)), findings
 
     def _materialize_outputs(
         self, run_row: dict[str, Any]
@@ -1867,6 +2147,13 @@ class CanonicalRunner:
             ("status", str(record["status"])),
             ("input_set_hash", str(record["input_set_hash"])),
             ("input_seal_hash", str(record["input_seal_hash"])),
+            # CR-3.4 P0-03: the manifest correctness identity fields are
+            # CONSUMED on replay (manifest == ledger == current
+            # recompute via expected_provenance above) - no
+            # display-only seal
+            ("canonical_context_hash", str(record["canonical_context_hash"])),
+            ("base_identity_hash", str(record["base_identity_hash"])),
+            ("verification_state_hash", str(record["verification_state_hash"])),
             ("identity_dataset_hash", str(record["identity_dataset_hash"])),
             ("identity_master_input_set_hash", str(record["identity_master_input_set_hash"])),
             ("identity_bridge_policy_version", _identity.identity_bridge_policy_version()),
@@ -1986,7 +2273,7 @@ class CanonicalRunner:
         # ---- re-verify every sealed input run: typed seal vs physical
         # artifacts + anchored evidence (symmetric with first consume)
         for entry in sealed_entries:
-            entry_problems = self._verify_sealed_input(entry)
+            entry_problems = self._verify_sealed_input(entry, snapshot.as_of)
             if entry_problems:
                 problems.append(
                     f"sealed CR-2 input run {entry.get('run_id')} is no longer "
@@ -1994,17 +2281,21 @@ class CanonicalRunner:
                 )
         return problems
 
-    def _verify_sealed_input(self, entry: dict[str, Any]) -> list[str]:
+    def _verify_sealed_input(self, entry: dict[str, Any], as_of_dt: datetime) -> list[str]:
         """Seal-based verification of ONE sealed input run (CR-3.2 P0-04
-        + CR-3.3 P0-02). For a HEALTHY sealed input the physical
-        artifacts are checked against the typed seal (manifest bytes /
-        output content+schema+row-count / the CR-2 manifest's own seal
-        fields / raw meta + anchor) and the input must STILL be healthy.
-        For an INVALID sealed input (a BLOCKED run's recorded failure)
-        the CURRENT problem evidence must equal the sealed
-        verification_problem_hash - the exact same failure replays, a
-        changed cause does not (it produced a different run identity
-        upstream and never reaches this branch)."""
+        + CR-3.3 P0-02 + CR-3.4 P0-02). For a HEALTHY sealed input the
+        physical artifacts are checked against the typed seal (manifest
+        bytes / output content+schema+row-count / the CR-2 manifest's own
+        seal fields / raw meta + anchor) and the input must STILL be
+        healthy. For an INVALID sealed input (a BLOCKED run's recorded
+        failure) the replay runs the SAME shared verification evidence
+        collector as the first consume - including the exact-byte
+        materialization verification whenever closure + anchor are
+        currently healthy - and the collected problem-evidence hash
+        must equal the sealed verification_problem_hash: the exact same
+        failure replays, a changed cause does not (it produced a
+        different run identity upstream and never reaches this
+        branch)."""
         problems: list[str] = []
         run_row = {
             "normalization_run_id": str(entry.get("run_id")),
@@ -2015,33 +2306,35 @@ class CanonicalRunner:
             "raw_request_id": str(entry.get("raw_request_id")),
             "raw_evidence_uri": str(entry.get("raw_evidence_uri")),
             "raw_evidence_hash": str(entry.get("raw_evidence_hash")),
+            "normalization_contract_version": str(entry.get("normalization_contract_version")),
+            "mapper_identity": str(entry.get("mapper_identity")),
+            "mapper_code_hash": str(entry.get("mapper_code_hash")),
+            "normalized_manifest_uri": str(entry.get("normalized_manifest_uri")),
+            "normalized_manifest_hash": str(entry.get("normalized_manifest_hash")),
+            "normalized_output_set_hash": str(entry.get("normalized_output_set_hash")),
+            "normalized_semantic_hash": str(entry.get("normalized_semantic_hash")),
+            "status": str(entry.get("status")),
         }
-        anchor_problems, _ = self._verify_anchored_availability(run_row)
         sealed_verification = str(entry.get("verification", "HEALTHY"))
         if sealed_verification != "HEALTHY":
-            # the sealed failure must still be the EXACT same failure
-            closure_problems = verify_normalized_run(
-                self.conn,
-                str(entry.get("run_id")),
-                raw_root=self.raw_root,
-                normalized_root=self.normalized_root,
+            # CR-3.4 P0-02: the replay runs the SAME evidence collector
+            # as the first consume - a materialization-only failure
+            # (closure + anchor healthy, exact-byte materialization
+            # damaged) is rebuilt exactly instead of being
+            # short-circuited to a contradictory empty problem set.
+            evidence = self._collect_input_verification_evidence(
+                run_row,
+                str(entry.get("role", "source")),
+                as_of_dt,
+                keep_rows=False,
             )
-            current_evidence = {
-                "run_id": str(entry.get("run_id")),
-                "verification": sealed_verification,
-                "closure_problems": sorted(closure_problems),
-                "anchored_evidence_problems": sorted(anchor_problems),
-                "materialization_problems": [],
-            }
-            current_hash = hashlib.sha256(
-                _canonical_json(current_evidence).encode("utf-8")
-            ).hexdigest()
-            if current_hash != str(entry.get("verification_problem_hash")):
+            if evidence.verification_problem_hash != str(entry.get("verification_problem_hash")):
                 problems.append(
                     "sealed failure evidence no longer matches the current "
                     "problem set (verification evidence drift)"
                 )
             return problems
+        anchor_problems, _ = self._verify_anchored_availability(run_row)
         problems.extend(anchor_problems)
 
         manifest_uri = str(entry.get("normalized_manifest_uri"))

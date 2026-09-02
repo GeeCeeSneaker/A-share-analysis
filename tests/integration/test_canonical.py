@@ -3148,3 +3148,387 @@ class TestSealFieldCountCorrection:
         assert "received_at" not in identity
         assert "pit_available" not in identity
         assert len(identity) == 17
+
+
+# ------------------------------- CR-3.4: historical canonical seal trust (P0-01)
+
+
+def _cr2_run_id(conn, request_id: str) -> str:
+    return str(
+        conn.execute(
+            "SELECT normalization_run_id FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = ?",
+            [request_id],
+        ).fetchone()[0]
+    )
+
+
+def _cr2_output_uri(env_root, conn, request_id: str) -> tuple[str, bytes]:
+    """(uri, exact good bytes) of one CR-2 run's first output artifact."""
+    run_uri = str(
+        conn.execute(
+            "SELECT normalized_manifest_uri FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = ?",
+            [request_id],
+        ).fetchone()[0]
+    )
+    manifest = json.loads((env_root["normalized"] / run_uri).read_text(encoding="utf-8"))
+    uri = str(manifest["outputs"][0]["uri"])
+    return uri, (env_root["normalized"] / uri).read_bytes()
+
+
+def _canonical_manifest(env_root, result) -> dict[str, Any]:
+    return json.loads(
+        (env_root["normalized"] / str(result.manifest_uri)).read_text(encoding="utf-8")
+    )
+
+
+def _rebind_canonical_manifest(env_root, conn, result, mutate) -> None:
+    """Rewrite a prior canonical manifest in place (mutate + rehash +
+    update ONLY the ledger outer manifest_hash - the canonical rebind
+    attack shape of CR-3.4 P0-01/P0-03)."""
+    path = env_root["normalized"] / str(result.manifest_uri)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    mutate(doc)
+    data = json.dumps(doc, sort_keys=True, indent=1, ensure_ascii=False).encode("utf-8")
+    path.write_bytes(data)
+    conn.execute(
+        "UPDATE meta_canonicalization_run SET manifest_hash = ? WHERE canonical_run_id = ?",
+        [hashlib.sha256(data).hexdigest(), result.canonical_run_id],
+    )
+
+
+@pytest.mark.integration
+class TestHistoricalCanonicalSealTrust:
+    """CR-3.4 P0-01 (audit 20260902 section 1): the historical
+    continuity guard verifies a typed Historical Canonical Run Seal
+    BEFORE trusting a prior manifest's input list - the consumed input
+    list cannot be laundered out of continuity evidence by a canonical
+    manifest + ledger outer-hash rebind."""
+
+    def _prior_success(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "SUCCESS"
+        return result
+
+    def test_input_list_rebind_then_cr2_delete_damaged(self, conn, env_root):
+        """Mandatory adversarial test 1: remove a consumed input from
+        the historical manifest + rebind the outer manifest_hash +
+        DELETE the CR-2 row -> DAMAGED BEFORE the input list is
+        trusted, zero new canonical runs."""
+        result = self._prior_success(conn, env_root)
+        bars_run_id = _cr2_run_id(conn, "req-bars")
+
+        def mutate(doc: dict) -> None:
+            doc["input_normalized_runs"] = [
+                e for e in doc["input_normalized_runs"] if str(e.get("run_id")) != bars_run_id
+            ]
+
+        _rebind_canonical_manifest(env_root, conn, result, mutate)
+        conn.execute(
+            "DELETE FROM meta_provider_normalization_run WHERE normalization_run_id = ?",
+            [bars_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1  # only the historical SUCCESS
+
+    def test_input_entry_seal_field_rebind_damaged(self, conn, env_root):
+        """Mandatory adversarial test 2: alter one prior input seal
+        field inside the manifest + rebind the outer hash -> the
+        physically recomputed input hashes no longer match the ledger
+        -> DAMAGED BEFORE the input list is trusted."""
+        result = self._prior_success(conn, env_root)
+
+        def mutate(doc: dict) -> None:
+            for entry in doc["input_normalized_runs"]:
+                if entry.get("role") == "source":
+                    entry["mapper_code_hash"] = "f" * 64
+
+        _rebind_canonical_manifest(env_root, conn, result, mutate)
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_manifest_input_seal_hash_field_rebind_damaged(self, conn, env_root):
+        """Mandatory adversarial test 3: rebind the manifest's own
+        input_seal_hash FIELD + outer hash only -> DAMAGED."""
+        result = self._prior_success(conn, env_root)
+        _rebind_canonical_manifest(
+            env_root, conn, result, lambda d: d.__setitem__("input_seal_hash", "0" * 64)
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "input_set_hash",
+            "verification_state_hash",
+            "base_identity_hash",
+            "canonical_context_hash",
+        ],
+    )
+    def test_manifest_identity_field_rebind_damaged(self, conn, env_root, field):
+        """Mandatory adversarial test 4: rebinding any of
+        input_set_hash / verification_state_hash / base_identity_hash /
+        canonical_context_hash + outer hash -> DAMAGED."""
+        result = self._prior_success(conn, env_root)
+        _rebind_canonical_manifest(env_root, conn, result, lambda d: d.__setitem__(field, "0" * 64))
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_prior_manifest_missing_hard_damaged(self, conn, env_root):
+        """The prior canonical manifest file itself missing -> HARD
+        DAMAGED via the historical seal (zero replacement minted)."""
+        result = self._prior_success(conn, env_root)
+        (env_root["normalized"] / str(result.manifest_uri)).unlink()
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_historical_manifest_seal_positive_superset(self, conn, env_root):
+        """Mandatory adversarial test 5 (positive control): an
+        UNTOUCHED healthy historical manifest + a legitimate new CR-2
+        input superset still produces a NEW canonical run."""
+        result = self._prior_success(conn, env_root)
+        _seed_bars(conn, env_root, "req-new", received_at=T0)
+        second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert second.status == "SUCCESS"
+        assert second.canonical_run_id != result.canonical_run_id
+        assert second.idempotent_replay is False
+        assert _canonical_count(conn) == 2
+
+
+# --------------------------- CR-3.4: materialization evidence symmetry (P0-02)
+
+
+@pytest.mark.integration
+class TestMaterializationEvidenceSymmetry:
+    """CR-3.4 P0-02 (audit 20260902 section 2): first consume and
+    replay share ONE verification evidence collector - a
+    materialization-only failure (closure + anchor healthy, exact-byte
+    materialization damaged between the two steps) is sealed AND
+    replayed with the exact same problem evidence."""
+
+    def _setup(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        return _cr2_run_id(conn, "req-bars"), _cr2_output_uri(env_root, conn, "req-bars")
+
+    @staticmethod
+    def _install_racy_closure(
+        monkeypatch, env_root, run_id: str, output_uri: str, good_bytes: bytes, mode: str
+    ) -> None:
+        """Simulate the adversarial second actor: restore the exact
+        good bytes before closure verification, then damage the output
+        again right after it passes - the physical failure persists
+        across invocations while closure verification keeps passing
+        (the true TOCTOU shape of a materialization-only failure)."""
+        import ashare_state.canonical.canonicalizer as canonicalizer_module
+
+        real = canonicalizer_module.verify_normalized_run
+
+        def wrapper(c, verified_run_id, *, raw_root, normalized_root):
+            if str(verified_run_id) == run_id:
+                target = env_root["normalized"] / output_uri
+                target.write_bytes(good_bytes)
+                problems = real(
+                    c, verified_run_id, raw_root=raw_root, normalized_root=normalized_root
+                )
+                if mode == "bytes":
+                    target.write_bytes(b"racy-damaged-output")
+                else:
+                    target.unlink()
+                return problems
+            return real(c, verified_run_id, raw_root=raw_root, normalized_root=normalized_root)
+
+        monkeypatch.setattr(canonicalizer_module, "verify_normalized_run", wrapper)
+
+    def _sealed_entry(self, env_root, result, run_id: str) -> dict[str, Any]:
+        for entry in _canonical_manifest(env_root, result)["input_normalized_runs"]:
+            if str(entry.get("run_id")) == run_id:
+                return entry
+        raise AssertionError(f"sealed input entry {run_id} not found")
+
+    def test_materialization_only_failure_first_run_blocked(self, conn, env_root, monkeypatch):
+        """Mandatory test 1: closure verify passes, the output bytes
+        are replaced before materialization -> the first canonical run
+        is BLOCKED with a NON-EMPTY materialization problem set sealed
+        into the verification evidence hash."""
+        run_id, (output_uri, good_bytes) = self._setup(conn, env_root)
+        self._install_racy_closure(monkeypatch, env_root, run_id, output_uri, good_bytes, "bytes")
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        monkeypatch.undo()
+        assert result.status == "BLOCKED"
+        detail = str(
+            conn.execute(
+                "SELECT detail_json FROM meta_canonical_reconciliation_finding "
+                "WHERE canonical_run_id = ? AND finding_class = "
+                "'CLOSURE_VERIFICATION_FAILED'",
+                [result.canonical_run_id],
+            ).fetchone()[0]
+        )
+        assert "output artifact bytes do not match the sealed hash" in detail
+        entry = self._sealed_entry(env_root, result, run_id)
+        assert str(entry["verification"]) == "CLOSURE_FAILED"
+        expected_evidence = {
+            "run_id": run_id,
+            "verification": "CLOSURE_FAILED",
+            "closure_problems": [],
+            "anchored_evidence_problems": [],
+            "materialization_problems": [
+                f"output artifact bytes do not match the sealed hash: {output_uri}"
+            ],
+        }
+        expected_hash = hashlib.sha256(
+            json.dumps(
+                expected_evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode("utf-8")
+        ).hexdigest()
+        assert str(entry["verification_problem_hash"]) == expected_hash
+
+    def test_exact_materialization_failure_idempotent_replay(self, conn, env_root, monkeypatch):
+        """Mandatory test 2: keeping the exact physical failure (the
+        adversarial actor keeps swapping after every verification) ->
+        the next invocation replays the SAME BLOCKED run idempotently -
+        the replay evidence collector rebuilds the materialization
+        problem exactly instead of contradicting the sealed hash."""
+        run_id, (output_uri, good_bytes) = self._setup(conn, env_root)
+        self._install_racy_closure(monkeypatch, env_root, run_id, output_uri, good_bytes, "bytes")
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert first.status == "BLOCKED"
+        replay = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        monkeypatch.undo()
+        assert replay.status == "BLOCKED"
+        assert replay.idempotent_replay is True
+        assert replay.canonical_run_id == first.canonical_run_id
+        assert _canonical_count(conn) == 1
+
+    def test_exact_repair_recovery_preserves_blocked_history(self, conn, env_root, monkeypatch):
+        """Mandatory test 3: restoring the exact bytes permanently ->
+        the recovery run SUCCEEDS as a NEW run; the historical BLOCKED
+        run and its materialization finding remain append-only."""
+        run_id, (output_uri, good_bytes) = self._setup(conn, env_root)
+        self._install_racy_closure(monkeypatch, env_root, run_id, output_uri, good_bytes, "bytes")
+        blocked = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        monkeypatch.undo()
+        assert blocked.status == "BLOCKED"
+        (env_root["normalized"] / output_uri).write_bytes(good_bytes)  # exact repair
+        recovered = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert recovered.status == "SUCCESS"
+        assert recovered.canonical_run_id != blocked.canonical_run_id
+        row = conn.execute(
+            "SELECT status, finding_count FROM meta_canonicalization_run "
+            "WHERE canonical_run_id = ?",
+            [blocked.canonical_run_id],
+        ).fetchone()
+        assert str(row[0]) == "BLOCKED" and int(row[1]) >= 1
+
+    def test_materialization_cause_change_new_evidence_run(self, conn, env_root, monkeypatch):
+        """Mandatory test 4: materialization failure cause A (bytes
+        mismatch) -> cause B (artifact missing) -> the exact problem
+        evidence changes -> a NEW BLOCKED run identity per cause."""
+        run_id, (output_uri, good_bytes) = self._setup(conn, env_root)
+        self._install_racy_closure(monkeypatch, env_root, run_id, output_uri, good_bytes, "bytes")
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert first.status == "BLOCKED"
+        monkeypatch.undo()
+        self._install_racy_closure(monkeypatch, env_root, run_id, output_uri, good_bytes, "missing")
+        second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        monkeypatch.undo()
+        assert second.status == "BLOCKED"
+        assert second.canonical_run_id != first.canonical_run_id
+        assert _canonical_count(conn) == 2
+        details = " | ".join(
+            str(r[0])
+            for r in conn.execute(
+                "SELECT detail_json FROM meta_canonical_reconciliation_finding "
+                "WHERE finding_class = 'CLOSURE_VERIFICATION_FAILED' "
+                "AND canonical_run_id IN (?, ?)",
+                [first.canonical_run_id, second.canonical_run_id],
+            ).fetchall()
+        )
+        assert "bytes do not match the sealed hash" in details
+        assert "output artifact missing" in details
+
+
+# ------------------------ CR-3.4: manifest correctness identity binding (P0-03)
+
+
+@pytest.mark.integration
+class TestManifestCorrectnessIdentityBinding:
+    """CR-3.4 P0-03 (audit 20260902 section 3): the manifest's
+    correctness identity fields (canonical_context_hash /
+    base_identity_hash / verification_state_hash) are CONSUMED on
+    replay - manifest == ledger == current recompute, no display-only
+    seal."""
+
+    def test_identity_fields_three_way_binding(self, conn, env_root):
+        """Positive control: the three correctness identity fields
+        match exactly across manifest / ledger / current snapshot
+        recompute."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        manifest = _canonical_manifest(env_root, result)
+        ledger = conn.execute(
+            "SELECT canonical_context_hash, base_identity_hash, verification_state_hash "
+            "FROM meta_canonicalization_run WHERE canonical_run_id = ?",
+            [result.canonical_run_id],
+        ).fetchone()
+        runner = CanonicalRunner(
+            conn, raw_root=env_root["raw"], normalized_root=env_root["normalized"]
+        )
+        snapshot = runner._build_snapshot(  # noqa: SLF001 - structural test
+            AS_OF_LATE, ("daily_bar",)
+        )
+        assert (
+            str(ledger[0]) == manifest["canonical_context_hash"] == snapshot.canonical_context_hash
+        )
+        assert str(ledger[1]) == manifest["base_identity_hash"] == snapshot.base_identity_hash
+        assert (
+            str(ledger[2])
+            == manifest["verification_state_hash"]
+            == snapshot.verification_state_hash
+        )
+
+    @pytest.mark.parametrize(
+        "field",
+        ["canonical_context_hash", "base_identity_hash", "verification_state_hash"],
+    )
+    def test_identity_field_rebind_replay_damaged(self, conn, env_root, field):
+        """Rebinding one manifest correctness identity field + outer
+        manifest_hash -> replay MUST be DAMAGED (the continuity
+        historical seal consumes the field for SUCCESS runs)."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        _rebind_canonical_manifest(env_root, conn, result, lambda d: d.__setitem__(field, "0" * 64))
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    @pytest.mark.parametrize(
+        "field",
+        ["canonical_context_hash", "base_identity_hash", "verification_state_hash"],
+    )
+    def test_identity_field_rebind_blocked_replay_damaged(self, conn, env_root, field):
+        """The same rebind on a BLOCKED run's manifest (continuity
+        skips BLOCKED runs) is caught by the replay closure verifier:
+        manifest == ledger for every correctness identity field."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        conn.execute("DELETE FROM meta_raw_evidence_anchor WHERE request_id = 'req-bars'")
+        blocked = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert blocked.status == "BLOCKED"
+        _rebind_canonical_manifest(
+            env_root, conn, blocked, lambda d: d.__setitem__(field, "0" * 64)
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1

@@ -17,7 +17,44 @@
 
 ---
 
-## 2026-09-02 · CR-3.3 Historical Input Continuity + Verification Evidence Exactness + Finding Truthfulness（CR-3.2 复审 REOPENED 后的收口批次）
+## 2026-09-02 · CR-3.4 Historical Canonical Seal Trust + Verification Replay Symmetry + Manifest Correctness Identity Binding（CR-3.3 复审 REOPENED 后的收口批次）
+
+**Scope**
+- CR-3.3 复审（audit 20260902 10:22 +08:00，Reviewed HEAD `b5fdc27b9f2fd9c262c7dc6dae9aa665b9494bc1`，Primary CR-3.3 implementation `f8b80b3212ff299f52ee3fb0308c248fd16c17df`，reopen commit `33d0901`）裁决 **CR-3.3 REOPENED**：18 项机制 PASS / FREEZE（canonical_context_hash 方向 / continuity guard 按 context 查历史 / 全部 CR-2 ledger drift 检测 / superset 合法 / exact restore replay / verification_problem_hash 进 seal+state / finding truthfulness / 治理计数）；3 个 P0 由本批 CR-3.4 收口（**未启动 CR-4**——复审 §4 边界；CR-4 BLOCKED_BY_CR-3.4）；复审 §1.3/§2.3/§3 mandatory 测试 13 项全对应
+- 复审 §6 Owner View：CR-3 关闭前最后一层"历史审计证据本身也不能被重新绑定"的收口
+
+**Implementation**
+- **P0-01 Historical Canonical Run Seal Trust**：CR-3.3 continuity guard 在信任 prior `manifest.input_normalized_runs` 前只验 manifest 存在 + 外层 hash == ledger.manifest_hash——rebind 路径：改历史 manifest input list（去 A）+ rehash + 只更新 ledger.manifest_hash + DELETE CR-2 A → A 被"洗出"continuity evidence。CR-3.4 引入 **typed `CanonicalRunSeal`**（`from_ledger`）+ `_verify_historical_canonical_seal()`：使用历史 manifest 前先完整验证（1）deterministic manifest URI + bytes == ledger.manifest_hash；（2）manifest 显式 correctness 字段（canonical_run_id / contract / as_of / idempotency_key / status / requested domains json+hash / input_set_hash / input_seal_hash / identity_dataset_hash / identity_master_input_set_hash / canonical_context_hash / base_identity_hash / verification_state_hash / 三 policy version+hash / code_fingerprint）== ledger seal；（3）**物理重算** `_input_hashes_from_entries()`：historical input_seal_hash（全 seal entries canonical JSON）/ input_set_hash（identity subset——`_INPUT_IDENTITY_FIELDS` 模块级单一事实源，`InputRunSeal.identity_dict` 同源）/ verification_state_hash（run_id + verification + verification_problem_hash per entry）必须 == ledger（列表删除/改写/重排/改 seal 字段均无法重算出 sealed hashes）。prior manifest/ledger 自身 DAMAGED → **HARD DAMAGED**：不用该 input list 做 continuity 判断，零 replacement
+- **P0-02 Verification Evidence Replay Symmetry**：CR-3.3 replay 分支对 INVALID sealed input 硬编码 `materialization_problems=[]`，但 first consume 允许 closure+anchor 健康后在 `_materialize_outputs` 才失败（TOCTOU protection path）——first-run seal 可含非空 materialization evidence，replay 永远构造空列表 → exact evidence hash 无法对称重建（上一批 DEVLOG "INVALID 短路物化故恒空" 的 rationale **错误**——INVALID 是 first-run 物化失败的结果而非前提，本条更正）。CR-3.4 起 first consume 与 replay **共用同一 collector** `_collect_input_verification_evidence(run identity, role, as_of, keep_rows)`：closure problems → anchored-evidence problems →（closure+anchor 健康时）exact-byte materialization verify → derived verification enum → canonical problem evidence → problem hash；first-run（keep_rows=True）额外保留物化行，replay（keep_rows=False）丢弃行但运行**同一验证序列/语义**。materialization-only failure 被 replay 精确重建：exact repeat → idempotent replay 同一 BLOCKED run；cause 变化 → 新 exact evidence identity；exact repair → recovery run（历史 BLOCKED 保留）
+- **P0-03 Manifest Correctness Identity 全消费**：manifest 显式写入 canonical_context_hash / base_identity_hash / verification_state_hash 但 `_verify_closure` 的 manifest<->ledger 比较未含三者——edit manifest 三字段 + rehash + update ledger.manifest_hash 可造自相矛盾 manifest。三字段进入 typed manifest binding（manifest == ledger == current recompute 三方闭环）；continuity 历史 seal 同样消费（§9.1 expected_fields）
+- **无新 migration**（复审 §4 优先不新增 schema——三收口全部为 canonicalizer runtime 侧；migration 链保持 21）
+- 新公开类型：`CanonicalRunSeal` / `InputVerificationEvidence`（canonicalizer + canonical `__init__` 导出）
+
+**Schema / Contract Changes**
+- C3 ×1（DM-20260902-072）；**ADR-023 Amendment D**（§9.1-§9.3 修订 §7.4/§8.1/§8.2 被复审推翻的三处表述；status 仍 PROPOSED 待 Reviewer closure）；零 migration（未改 018-021）；CR-3.3 FREEZE 的 18 项机制零重写（131 项回归全保持）
+
+**Verification**
+- Local: **1136 tests passed / 0 failed**（1116 → 1136，+20：TestHistoricalCanonicalSealTrust 9（input list rebind + CR-2 DELETE → DAMAGED 零新 run / entry seal 字段 rebind 在信任 input list 前 DAMAGED / manifest input_seal_hash 字段 rebind / input_set+verification_state+base+context 四字段 parametrize rebind / prior manifest 缺失 HARD DAMAGED / 健康历史 manifest + 新 CR-2 superset positive control）/ TestMaterializationEvidenceSymmetry 4（racy closure 第二演员：closure verify 通过后换 output bytes → first-run BLOCKED + evidence hash 精确重算断言 / exact physical failure 保持 → idempotent replay 同一 BLOCKED run / exact bytes 恢复 → recovery SUCCESS 新 run + 历史 BLOCKED 保留 / cause A（bytes mismatch）→ cause B（artifact missing）→ 新 evidence run identity）/ TestManifestCorrectnessIdentityBinding 7（三 identity 字段 manifest==ledger==snapshot 三方绑定 positive control + SUCCESS replay rebind ×3 + BLOCKED replay rebind ×3 parametrize））；ruff check / ruff format / mypy 全绿；CI 同款命令 `uv run pytest` 复验 1136/0
+- 既有回归零破坏：CR-3/3.1/3.2/3.3 对抗矩阵 131 项全保持（含 CR-3.3 historical continuity 11 项 + verification/finding/count 全部）；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
+- GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
+
+**Implementation Status**
+- DONE（3 P0 全收口 + ADR-023 Amendment D + DM-20260902-072；1136/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- 历史 input list 的信任根是"重算"而非"外层 hash"：外层 manifest_hash 与 ledger 同步被改时（rebind 攻击形态）只有从 entries 物理重算的三个 hash 仍然锚定 ledger seal——这正是 A 被洗出时必然暴露的那一层
+- `_INPUT_IDENTITY_FIELDS` 提升为模块级单一事实源：identity_dict 与历史重算共用同一 tuple，杜绝"两套字段集各自演化后 hash 永不匹配"的伪 DAMAGED
+- INVALID sealed input 的 replay 走共享 collector 而非专用弱验证器：分支只比 sealed problem hash 与 collector 重算 hash——TOCTOU 下物理状态若在 snapshot 与 replay verify 之间再变，hash 即漂移（fail-closed）
+- keep_rows 是唯一模式差异：验证序列与语义完全相同，物化行只在 first consume 保留——满足"不能存在两份看起来类似但 problem evidence 字段不同的逻辑"的字面与实质
+- manifest 三 correctness identity 字段以 manifest==ledger==current 三方闭环消费：expected_provenance（ledger==current）+ typed manifest binding（manifest==ledger）+ 历史 seal（manifest==ledger）三处同源比较
+- 无新 migration 是本批刻意决策：三收口全部是 trust/verification 逻辑，schema 已有全部所需列（020/021 的四+一列）
+
+**下一步**
+- 等 Reviewer 复审 CR-3.4（复审 §5 Exit Gate 20 项）；全部通过 → CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 → VERIFIED / CLOSED / FREEZE，ADR-023 → ACCEPTED，**CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild START**
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 
 **Scope**
 - CR-3.2 复审（audit 20260902 06:56 +08:00，Reviewed HEAD `9ffdf35f577e48ec4de1432057d954da07f78db0`，reopen commit `9ec2fca`）裁决 **CR-3.2 REOPENED**：16 项机制 PASS / FREEZE（transactional snapshot / master PIT / honest policy / full seal 主体 / state transition 主体）；2 个 P0 + 3 个 P1 由本批 CR-3.3 收口（**未启动 CR-4**——复审 §6 边界；CR-4 BLOCKED_BY_CR-3.3）；复审 §1.4/§2.3 mandatory 测试 15 项 + P1 全对应
