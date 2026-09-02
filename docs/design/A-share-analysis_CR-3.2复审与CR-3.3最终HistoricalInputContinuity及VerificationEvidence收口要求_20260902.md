@@ -595,12 +595,13 @@ CR-3.3 是一个**focused final closure**，不应继续扩大功能面。完成
 [✓] CR-3.2 frozen mechanisms preserved（111 项回归全保持）
 [✓] no CR-4 semantics leak
 [✓] migration from-zero/upgrade green（21 链 + probe 022）
-[ ]  Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full green（推送后 API 正向确认，SHA 回填）
-[✓] Ruff / format / Mypy / Spike / governance gates green（本地；CI 待确认）
+[✓] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full green（run `33581493160`，implementation `f8b80b3212ff299f52ee3fb0308c248fd16c17df`，三腿 success + Windows 3.14 腿 DEVLOG/Management-doc gate success，2026-09-02 API positive confirmation）
+[✓] Ruff / format / Mypy / Spike / governance gates green（三腿各步全 success）
 ```
 
 ## Verification Summary
 
 - Local: **1116 / 0**（1096 → 1116，+20：HistoricalInputContinuity 11 / VerificationEvidenceState 4 / FindingTruthfulness 4 / SealFieldCountCorrection 1）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1116/0
 - ADR-023 Amendment C（status 仍 PROPOSED）；migration 021（未改 018/019/020）；CR-3.2 FREEZE 的 16 项机制零重写（111 项回归全保持）
-- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）
+- **Implementation SHA：`f8b80b3212ff299f52ee3fb0308c248fd16c17df`；CI run `33581493160` 三腿 success**（Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success，Windows 3.14 腿 DEVLOG gate + Management-doc gate success；2026-09-02 API positive confirmation，一次通过零修复轮次）
+- §1.4/§2.3 mandatory 矩阵 15 项 / §7 Exit Gate 17 项全过（CI 项据 API positive confirmation 关闭）；SHA 由 docs 回填 commit 补记（历史不改写——本 Mapping 一次写成后仅补记本节）

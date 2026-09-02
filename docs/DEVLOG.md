@@ -36,10 +36,10 @@
 **Verification**
 - Local: **1116 tests passed / 0 failed**（1096 → 1116，+20：TestHistoricalInputContinuity 11（delete/status/uri/hash/seal drift ×5 + two-sources delete-one 不静默 SUCCESS + exact restore replay + superset allowed + future-only addition + master disappearance/status drift）/ TestVerificationEvidenceState 4（cause change 新 run ×2 + exact failure 幂等 + recovery 保留历史）/ TestFindingTruthfulness 4（reserved scope + affected domains + shared surface 双域 + damaged 不误报 + healthy future 仍报）/ TestSealFieldCountCorrection 1）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1116/0
 - 既有回归零破坏：CR-3/3.1/3.2 对抗矩阵 111 项全保持；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
-- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+- GitHub Actions: **run `33581493160`（implementation `f8b80b3212ff299f52ee3fb0308c248fd16c17df`）三腿 success**——Ubuntu 3.14 + Windows 3.12/3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent 全 success（Windows 3.14 腿 DEVLOG gate + Management-doc gate success）；2026-09-02 API positive confirmation，一次通过零修复轮次
 
 **Implementation Status**
-- DONE（2 P0 + 3 P1 全收口 + migration 021 + ADR-023 Amendment C + DM-20260902-071；1116/0；Review Status: PENDING_REVIEW）
+- DONE（2 P0 + 3 P1 全收口 + migration 021 + ADR-023 Amendment C + DM-20260902-071；1116/0；implementation `f8b80b3212ff299f52ee3fb0308c248fd16c17df`；Review Status: PENDING_REVIEW）
 
 **关键决策**
 - context hash 刻意排除 input set 与 verification state：这是 guard 不被绕过的根——ledger 漂移改变的是"当前输入世界"（base identity），永不改变"请求世界"（context）；guard 按 context 查历史才能在漂移后仍找到 prior SUCCESS
