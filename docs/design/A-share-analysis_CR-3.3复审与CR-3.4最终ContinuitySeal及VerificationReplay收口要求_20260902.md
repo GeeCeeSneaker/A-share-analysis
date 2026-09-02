@@ -396,7 +396,7 @@ CR-3.4 final:
 
 # 7. Implementation Mapping（CR-3.4，2026-09-02）
 
-> Reviewed base：CR-3.3 复审 reopen commit `33d0901`（本工作要求）；implementation commit `<本批提交后回填>`（CI 三腿确认后回填）。总体 **1136/0**（1116 → 1136，+20 项对抗测试）；ruff check / ruff format / mypy 全绿；**零新 migration**（§4 允许范围内刻意决策：三收口全部为 canonicalizer runtime 侧，020/021 已有全部所需列，migration 链保持 21）。
+> Reviewed base：CR-3.3 复审 reopen commit `33d0901`（本工作要求）；implementation commit `fce2ca43a35b95d61dc390647fdc46d844d9b1a5`（GitHub Actions **run 33591527697 三腿 success**，2026-09-02 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest / Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success，一次通过零修复轮次）。总体 **1136/0**（1116 → 1136，+20 项对抗测试）；ruff check / ruff format / mypy 全绿；**零新 migration**（§4 允许范围内刻意决策：三收口全部为 canonicalizer runtime 侧，020/021 已有全部所需列，migration 链保持 21）。
 
 ## 7.1 P0-01 Historical Canonical Run Seal Trust
 
@@ -472,7 +472,7 @@ CR-3.4 final:
 [x] CR-3.2 transaction/PIT/policy/full seal frozen regression remain green           -> 同上
 [x] CR-2.x / R4 frozen chain remain green                                            -> 全量 1136/0
 [x] migration from-zero / upgrade / idempotent green if schema changes               -> N/A（零 schema 变化，21 链不变）
-[x] Windows 3.12 + Windows 3.14 + Ubuntu 3.14 full CI green                          -> 推送后 API 正向确认（回填本节）
+[x] Windows 3.12 + Windows 3.14 + Ubuntu 3.14 full CI green                          -> run 33591527697 三腿 success（2026-09-02 API positive confirmation，一次通过零修复轮次）
 [x] ADR-023 remains PROPOSED until Reviewer closure                                  -> status 行保持 PROPOSED（Amendment D 追加）
 [x] DEVLOG / DEVELOPMENT_MANAGEMENT synchronized                                    -> DEVLOG 新条目 + DM-20260902-072 + 头部/§40/§41/§44/§61
 ```

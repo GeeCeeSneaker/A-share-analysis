@@ -36,7 +36,7 @@
 **Verification**
 - Local: **1136 tests passed / 0 failed**（1116 → 1136，+20：TestHistoricalCanonicalSealTrust 9（input list rebind + CR-2 DELETE → DAMAGED 零新 run / entry seal 字段 rebind 在信任 input list 前 DAMAGED / manifest input_seal_hash 字段 rebind / input_set+verification_state+base+context 四字段 parametrize rebind / prior manifest 缺失 HARD DAMAGED / 健康历史 manifest + 新 CR-2 superset positive control）/ TestMaterializationEvidenceSymmetry 4（racy closure 第二演员：closure verify 通过后换 output bytes → first-run BLOCKED + evidence hash 精确重算断言 / exact physical failure 保持 → idempotent replay 同一 BLOCKED run / exact bytes 恢复 → recovery SUCCESS 新 run + 历史 BLOCKED 保留 / cause A（bytes mismatch）→ cause B（artifact missing）→ 新 evidence run identity）/ TestManifestCorrectnessIdentityBinding 7（三 identity 字段 manifest==ledger==snapshot 三方绑定 positive control + SUCCESS replay rebind ×3 + BLOCKED replay rebind ×3 parametrize））；ruff check / ruff format / mypy 全绿；CI 同款命令 `uv run pytest` 复验 1136/0
 - 既有回归零破坏：CR-3/3.1/3.2/3.3 对抗矩阵 131 项全保持（含 CR-3.3 historical continuity 11 项 + verification/finding/count 全部）；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
-- GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
+- GitHub Actions: **run 33591527697（implementation `fce2ca43a35b95d61dc390647fdc46d844d9b1a5`）三腿 success**（2026-09-02 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest（1136/0）/ Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success；一次通过零修复轮次）
 
 **Implementation Status**
 - DONE（3 P0 全收口 + ADR-023 Amendment D + DM-20260902-072；1136/0；Review Status: PENDING_REVIEW）
