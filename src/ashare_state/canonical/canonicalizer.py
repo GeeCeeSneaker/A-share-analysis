@@ -540,34 +540,25 @@ class CanonicalInputSnapshot:
     @property
     def input_seal_hash(self) -> str:
         """Canonical hash over the TYPED full input seal (every seal
-        field of every discovered run, order-stable)."""
-        return hashlib.sha256(
-            _canonical_json([seal.as_dict() for seal in self.seals]).encode("utf-8")
-        ).hexdigest()
+        field of every discovered run, order-stable). CR-3.5: derived
+        through the shared entries-based formula (single source)."""
+        return _input_hashes_from_entries(self.input_entries)[0]
 
     @property
     def input_set_hash(self) -> str:
         """Identity-only input set hash (stable across verification-
-        state changes - the state enters verification_state_hash)."""
-        return hashlib.sha256(
-            _canonical_json([seal.identity_dict() for seal in self.seals]).encode("utf-8")
-        ).hexdigest()
+        state changes - the state enters verification_state_hash).
+        CR-3.5: derived through the shared entries-based formula."""
+        return _input_hashes_from_entries(self.input_entries)[1]
 
     @property
     def verification_state_hash(self) -> str:
         """CR-3.2 P0-05 + CR-3.3 P0-02: canonical hash over the
         per-input verification outcomes INCLUDING the exact problem
         evidence hash - the same error class with a different cause
-        yields a NEW state (never a stale BLOCKED finding replay)."""
-        state = [
-            {
-                "run_id": seal.run_id,
-                "verification": seal.verification,
-                "verification_problem_hash": seal.verification_problem_hash,
-            }
-            for seal in self.seals
-        ]
-        return hashlib.sha256(_canonical_json(state).encode("utf-8")).hexdigest()
+        yields a NEW state (never a stale BLOCKED finding replay).
+        CR-3.5: derived through the shared entries-based formula."""
+        return _input_hashes_from_entries(self.input_entries)[2]
 
     @property
     def canonical_context_hash(self) -> str:
@@ -578,54 +569,49 @@ class CanonicalInputSnapshot:
         and the verification state: the historical SUCCESS continuity
         guard must still find a prior SUCCESS after its consumed CR-2
         inputs disappear / drift in the ledger (which changes the base
-        identity but never the request world)."""
-        return hashlib.sha256(
-            "|".join(
-                (
-                    self.requested_domains_hash,
-                    self.as_of.isoformat(),
-                    CANONICAL_CONTRACT_VERSION,
-                    self.availability_policy_version,
-                    self.availability_policy_hash,
-                    self.source_policy_version,
-                    self.source_policy_hash,
-                    self.tolerance_policy_version,
-                    self.tolerance_policy_hash,
-                    _identity.identity_bridge_policy_version(),
-                    _identity.identity_bridge_policy_hash(),
-                    self.code_fingerprint,
-                )
-            ).encode("utf-8")
-        ).hexdigest()
+        identity but never the request world). CR-3.5 P0-02: derived
+        through the shared primitive-based formula (single source)."""
+        return _canonical_context_hash_from_primitives(
+            requested_domains_hash=self.requested_domains_hash,
+            as_of=self.as_of.isoformat(),
+            canonical_contract_version=CANONICAL_CONTRACT_VERSION,
+            availability_policy_version=self.availability_policy_version,
+            availability_policy_hash=self.availability_policy_hash,
+            source_policy_version=self.source_policy_version,
+            source_policy_hash=self.source_policy_hash,
+            tolerance_policy_version=self.tolerance_policy_version,
+            tolerance_policy_hash=self.tolerance_policy_hash,
+            identity_bridge_policy_version=_identity.identity_bridge_policy_version(),
+            identity_bridge_policy_hash=_identity.identity_bridge_policy_hash(),
+            code_fingerprint=self.code_fingerprint,
+        )
 
     @property
     def base_identity_hash(self) -> str:
-        """The input-world identity WITHOUT the verification state."""
-        return hashlib.sha256(
-            "|".join(
-                (
-                    self.requested_domains_hash,
-                    self.input_set_hash,
-                    self.identity_dataset_hash,
-                    self.as_of.isoformat(),
-                    CANONICAL_CONTRACT_VERSION,
-                    self.availability_policy_version,
-                    self.availability_policy_hash,
-                    self.source_policy_version,
-                    self.source_policy_hash,
-                    self.tolerance_policy_version,
-                    self.tolerance_policy_hash,
-                    self.code_fingerprint,
-                )
-            ).encode("utf-8")
-        ).hexdigest()
+        """The input-world identity WITHOUT the verification state.
+        CR-3.5 P0-02: derived through the shared primitive-based
+        formula (single source)."""
+        return _base_identity_hash_from_primitives(
+            requested_domains_hash=self.requested_domains_hash,
+            input_set_hash=self.input_set_hash,
+            identity_dataset_hash=self.identity_dataset_hash,
+            as_of=self.as_of.isoformat(),
+            canonical_contract_version=CANONICAL_CONTRACT_VERSION,
+            availability_policy_version=self.availability_policy_version,
+            availability_policy_hash=self.availability_policy_hash,
+            source_policy_version=self.source_policy_version,
+            source_policy_hash=self.source_policy_hash,
+            tolerance_policy_version=self.tolerance_policy_version,
+            tolerance_policy_hash=self.tolerance_policy_hash,
+            code_fingerprint=self.code_fingerprint,
+        )
 
     @property
     def idempotency_key(self) -> str:
-        """run id key = base identity + verification state (P0-05)."""
-        return hashlib.sha256(
-            f"{self.base_identity_hash}|{self.verification_state_hash}".encode()
-        ).hexdigest()
+        """run id key = base identity + verification state (P0-05).
+        CR-3.5 P0-02: derived through the shared formula (single
+        source, cross-bound to canonical_run_id on every verify)."""
+        return _idempotency_key_from_hashes(self.base_identity_hash, self.verification_state_hash)
 
     @property
     def has_verification_failures(self) -> bool:
@@ -704,6 +690,239 @@ def _input_hashes_from_entries(
         hashlib.sha256(_canonical_json(identity_list).encode("utf-8")).hexdigest(),
         hashlib.sha256(_canonical_json(state_list).encode("utf-8")).hexdigest(),
     )
+
+
+def _requested_domains_hash_from_list(domains: Sequence[str]) -> str:
+    """CR-3.5 P0-02: sha256 over the compact canonical JSON of the
+    requested domain list - the PRIMITIVE behind the ledger/manifest
+    ``requested_domains_hash`` (recomputed, never trusted)."""
+    return hashlib.sha256(
+        json.dumps(list(domains), separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _master_input_set_hash_from_entries(entries: Sequence[Mapping[str, Any]]) -> str:
+    """CR-3.5 P0-02: the identity-master input set hash derived from
+    the PIT-available HEALTHY master entries - the SAME formula the
+    live snapshot uses over seals, so the historical verifier
+    physically recomputes it from the manifest input entries instead
+    of trusting a ledger == manifest equality."""
+    master_hashes = sorted(
+        f"{entry.get('run_id')}:{entry.get('normalized_manifest_hash')}"
+        for entry in entries
+        if entry.get("role") == "identity_master"
+        and entry.get("verification") == V_HEALTHY
+        and bool(entry.get("pit_available"))
+    )
+    return hashlib.sha256("|".join(master_hashes).encode("utf-8")).hexdigest()
+
+
+def _canonical_context_hash_from_primitives(
+    *,
+    requested_domains_hash: str,
+    as_of: str,
+    canonical_contract_version: str,
+    availability_policy_version: str,
+    availability_policy_hash: str,
+    source_policy_version: str,
+    source_policy_hash: str,
+    tolerance_policy_version: str,
+    tolerance_policy_hash: str,
+    identity_bridge_policy_version: str,
+    identity_bridge_policy_hash: str,
+    code_fingerprint: str,
+) -> str:
+    """CR-3.5 P0-02: the canonical context hash derived from the
+    PRIMITIVE request-world fields (+ the identity bridge policy
+    identity) - the one derivation shared by the live snapshot, the
+    replay verifier and the historical continuity verifier."""
+    return hashlib.sha256(
+        "|".join(
+            (
+                requested_domains_hash,
+                as_of,
+                canonical_contract_version,
+                availability_policy_version,
+                availability_policy_hash,
+                source_policy_version,
+                source_policy_hash,
+                tolerance_policy_version,
+                tolerance_policy_hash,
+                identity_bridge_policy_version,
+                identity_bridge_policy_hash,
+                code_fingerprint,
+            )
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _base_identity_hash_from_primitives(
+    *,
+    requested_domains_hash: str,
+    input_set_hash: str,
+    identity_dataset_hash: str,
+    as_of: str,
+    canonical_contract_version: str,
+    availability_policy_version: str,
+    availability_policy_hash: str,
+    source_policy_version: str,
+    source_policy_hash: str,
+    tolerance_policy_version: str,
+    tolerance_policy_hash: str,
+    code_fingerprint: str,
+) -> str:
+    """CR-3.5 P0-02: the base identity hash derived from the primitive
+    request-world fields + the identity-only input set + the identity
+    dataset hash (no verification state, no bridge identity)."""
+    return hashlib.sha256(
+        "|".join(
+            (
+                requested_domains_hash,
+                input_set_hash,
+                identity_dataset_hash,
+                as_of,
+                canonical_contract_version,
+                availability_policy_version,
+                availability_policy_hash,
+                source_policy_version,
+                source_policy_hash,
+                tolerance_policy_version,
+                tolerance_policy_hash,
+                code_fingerprint,
+            )
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _idempotency_key_from_hashes(base_identity_hash: str, verification_state_hash: str) -> str:
+    """CR-3.5 P0-02: idempotency key = base identity + verification
+    state (the one derivation behind both the live run id and the
+    historical run-id cross-bind)."""
+    return hashlib.sha256(f"{base_identity_hash}|{verification_state_hash}".encode()).hexdigest()
+
+
+def _canonical_run_id_from_idempotency(idempotency_key: str) -> str:
+    """CR-3.5 P0-02: canonical_run_id = UUID5(run namespace,
+    idempotency key) - the cross-bind recomputed on replay and
+    historical continuity."""
+    return str(uuid.uuid5(_RUN_NAMESPACE, idempotency_key))
+
+
+def _status_error_from_findings(findings: Sequence[Mapping[str, Any]]) -> tuple[str, str | None]:
+    """CR-3.5 P0-02: the canonical run status (and its derived error
+    text) is a FUNCTION of the exact sealed findings truth - any
+    blocking finding -> BLOCKED, otherwise SUCCESS. Live build, replay
+    and historical continuity all derive it through this ONE helper;
+    the ledger/manifest status fields are consumed AGAINST this
+    recompute, never trusted as free strings."""
+    blocking = [f for f in findings if bool(f.get("blocking"))]
+    if blocking:
+        classes = sorted({str(f.get("finding_class")) for f in blocking})
+        return "BLOCKED", f"{len(blocking)} blocking finding(s): " + "; ".join(classes)
+    return "SUCCESS", None
+
+
+def _derived_run_identity_problems(
+    *,
+    entries: Sequence[Mapping[str, Any]],
+    requested_domains: Sequence[str],
+    as_of: str,
+    ledger: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+) -> list[str]:
+    """CR-3.5 P0-02: physically recompute the FULL derived canonical
+    run identity from the primitive request-world fields + the
+    manifest input entries, and compare EVERY recomputation against
+    the ledger typed seal:
+
+        requested_domains_hash        <- compact JSON of the domain list
+        input_seal_hash               <- manifest entries (full seal)
+        input_set_hash                <- manifest entries (identity subset)
+        verification_state_hash       <- manifest entries (state subset)
+        identity_master_input_set_hash<- PIT-healthy master entries
+        identity_dataset_hash         <- recompute(master set + bridge policy)
+        canonical_context_hash        <- primitives + bridge policy identity
+        base_identity_hash            <- primitives + input set + dataset hash
+        idempotency_key               <- base + verification state
+        canonical_run_id              <- UUID5(namespace, idempotency key)
+
+    A ledger+manifest rebind of any derived field that does not
+    replay this physical derivation is DAMAGED. Shared by the replay
+    closure verifier AND the historical continuity seal verifier (the
+    live build derives through the same module-level helpers)."""
+    problems: list[str] = []
+    bridge_version = str(manifest.get("identity_bridge_policy_version") or "")
+    bridge_hash = str(manifest.get("identity_bridge_policy_hash") or "")
+    if not bridge_version or not bridge_hash:
+        problems.append("manifest carries no identity bridge policy identity")
+    contract = str(ledger["canonical_contract_version"])
+    availability_version = str(ledger["availability_policy_version"])
+    availability_hash = str(ledger["availability_policy_hash"])
+    source_version = str(ledger["source_policy_version"])
+    source_hash = str(ledger["source_policy_hash"])
+    tolerance_version = str(ledger["tolerance_policy_version"])
+    tolerance_hash = str(ledger["tolerance_policy_hash"])
+    fingerprint = str(ledger["code_fingerprint"])
+    domains_hash_recompute = _requested_domains_hash_from_list(requested_domains)
+    if domains_hash_recompute != str(ledger["requested_domains_hash"]):
+        problems.append("requested_domains_hash does not match the requested domain list")
+    seal_recompute, set_recompute, state_recompute = _input_hashes_from_entries(entries)
+    master_recompute = _master_input_set_hash_from_entries(entries)
+    # the dataset hash is recomputed with the run's OWN sealed bridge
+    # policy identity (the manifest is the only persistence of that
+    # world's bridge identity) - never the current code's, so a prior
+    # run of an older bridge-policy world verifies against ITS world.
+    dataset_recompute = _identity.identity_dataset_hash_with_bridge(
+        master_recompute, bridge_version, bridge_hash
+    )
+    context_recompute = _canonical_context_hash_from_primitives(
+        requested_domains_hash=domains_hash_recompute,
+        as_of=as_of,
+        canonical_contract_version=contract,
+        availability_policy_version=availability_version,
+        availability_policy_hash=availability_hash,
+        source_policy_version=source_version,
+        source_policy_hash=source_hash,
+        tolerance_policy_version=tolerance_version,
+        tolerance_policy_hash=tolerance_hash,
+        identity_bridge_policy_version=bridge_version,
+        identity_bridge_policy_hash=bridge_hash,
+        code_fingerprint=fingerprint,
+    )
+    base_recompute = _base_identity_hash_from_primitives(
+        requested_domains_hash=domains_hash_recompute,
+        input_set_hash=set_recompute,
+        identity_dataset_hash=dataset_recompute,
+        as_of=as_of,
+        canonical_contract_version=contract,
+        availability_policy_version=availability_version,
+        availability_policy_hash=availability_hash,
+        source_policy_version=source_version,
+        source_policy_hash=source_hash,
+        tolerance_policy_version=tolerance_version,
+        tolerance_policy_hash=tolerance_hash,
+        code_fingerprint=fingerprint,
+    )
+    idempotency_recompute = _idempotency_key_from_hashes(base_recompute, state_recompute)
+    run_id_recompute = _canonical_run_id_from_idempotency(idempotency_recompute)
+    for field, recomputed in (
+        ("input_seal_hash", seal_recompute),
+        ("input_set_hash", set_recompute),
+        ("verification_state_hash", state_recompute),
+        ("identity_master_input_set_hash", master_recompute),
+        ("identity_dataset_hash", dataset_recompute),
+        ("canonical_context_hash", context_recompute),
+        ("base_identity_hash", base_recompute),
+        ("idempotency_key", idempotency_recompute),
+    ):
+        if recomputed != str(ledger[field]):
+            problems.append(
+                f"ledger {field} does not match the physical recompute from "
+                "the manifest entries/primitives (derived seal rebind)"
+            )
+    if run_id_recompute != str(ledger["canonical_run_id"]):
+        problems.append("canonical_run_id does not match UUID5 of the recomputed idempotency key")
+    return problems
 
 
 def _freeze(value: Any) -> Any:
@@ -867,7 +1086,7 @@ class CanonicalRunner:
 
         # ------------------------ exact replay lookup (history-wide)
         idempotency_key = snapshot.idempotency_key
-        run_id = str(uuid.uuid5(_RUN_NAMESPACE, idempotency_key))
+        run_id = _canonical_run_id_from_idempotency(idempotency_key)
         prior = self.conn.execute(
             "SELECT canonical_run_id FROM meta_canonicalization_run WHERE canonical_run_id = ?",
             [run_id],
@@ -1030,15 +1249,11 @@ class CanonicalRunner:
                 )
             )
 
-        blocking = [f for f in findings if f.blocking]
-        if blocking:
-            status = "BLOCKED"
-            error = f"{len(blocking)} blocking finding(s): " + "; ".join(
-                sorted({f.finding_class for f in blocking})
-            )
-        else:
-            status = "SUCCESS"
-            error = None
+        # CR-3.5 P0-02: status + derived error text are FUNCTIONS of
+        # the exact findings truth - live build, replay and historical
+        # continuity share this one derivation, so a status rebind that
+        # does not replay the sealed findings truth is DAMAGED.
+        status, error = _status_error_from_findings([f.as_dict() for f in findings])
 
         # ------------------------------------------ deterministic artifacts
         manifest_uri, manifest_hash, finding_seal, selected_semantic, decision_set = (
@@ -1087,93 +1302,153 @@ class CanonicalRunner:
 
     # -------------------------------------------------------- snapshot
     def _check_historical_continuity(self, snapshot: CanonicalInputSnapshot) -> None:
-        """CR-3.3 P0-01 + CR-3.4 P0-01 (audits 20260902 section 1):
-        historical input continuity guard - a prior SUCCESS(eful)
-        canonical run of the SAME request world must never be silently
-        forgotten when its consumed CR-2 inputs disappear / drift in
-        the ledger (which changes the base identity but never the
-        canonical CONTEXT).
+        """CR-3.3 P0-01 + CR-3.4 P0-01 + CR-3.5 P0-01 (audits
+        20260902 section 1): historical input continuity guard with
+        TAMPER-RESISTANT candidate discovery.
 
-        For every prior non-BLOCKED run under the same
-        ``canonical_context_hash``: the prior canonical run's OWN seal
-        is first verified typed and in full (ledger == manifest
-        explicit correctness fields == physical recompute over the
-        manifest input entries - a canonical manifest + ledger
-        outer-hash rebind can never launder a consumed input out of
-        continuity evidence); THEN each sealed input run must still
-        exist in the current authoritative CR-2 ledger with an
-        identical identity (status + seal fields), and its physical /
-        anchored verification must still be healthy. Prior
-        manifest/ledger seal damage, input disappearance, status/seal
-        drift or damaged evidence -> DAMAGED (no replacement of any
-        kind may be minted). A current input set that is a SUPERSET of
-        every prior sealed set (all prior inputs intact + healthy) is
-        a legitimate new world and flows on normally."""
-        prior_rows = self.conn.execute(
+        Candidates are selected by the PRIMITIVE request-world fields
+        (requested domains hash, as_of, contract, the three policy
+        identities and the code fingerprint) - NEVER by the derived
+        ``canonical_context_hash`` and NEVER pre-filtered by
+        ``status`` - so drifting either derived field cannot hide a
+        prior run from the verifier before it is even selected.
+
+        Every candidate is then full-seal verified (ledger == manifest
+        == physical recompute of the ENTIRE derived identity:
+        input hashes, master set, dataset hash, context, base,
+        idempotency, run id - plus the findings truth -> status
+        semantic recompute). Only THEN are the VERIFIED, PHYSICALLY
+        DERIVED context and status interpreted:
+
+        - verified status SUCCESS of the SAME request world: every
+          sealed input run must still exist in the current
+          authoritative CR-2 ledger with an identical identity and
+          healthy physical/anchored evidence (a SUPERSET current input
+          set is a legitimate new world and flows on normally);
+        - verified GENUINE historical BLOCKED: not a SUCCESS
+          continuity dependency (its exact repair / recovery is
+          allowed to proceed);
+        - verified candidate of a different request world (e.g. an
+          older identity bridge policy): not a dependency.
+
+        Any seal problem, prior input disappearance, identity drift or
+        degraded evidence -> DAMAGED (no replacement of any kind may
+        be minted)."""
+        candidate_rows = self.conn.execute(
             f"SELECT {', '.join(_LEDGER_COLUMNS)} FROM meta_canonicalization_run "
-            "WHERE canonical_context_hash = ? AND status != 'BLOCKED' "
+            "WHERE requested_domains_hash = ? AND canonical_contract_version = ? "
+            "AND availability_policy_version = ? AND availability_policy_hash = ? "
+            "AND source_policy_version = ? AND source_policy_hash = ? "
+            "AND tolerance_policy_version = ? AND tolerance_policy_hash = ? "
+            "AND code_fingerprint = ? "
             "ORDER BY canonical_run_id",
-            [snapshot.canonical_context_hash],
+            [
+                snapshot.requested_domains_hash,
+                CANONICAL_CONTRACT_VERSION,
+                snapshot.availability_policy_version,
+                snapshot.availability_policy_hash,
+                snapshot.source_policy_version,
+                snapshot.source_policy_hash,
+                snapshot.tolerance_policy_version,
+                snapshot.tolerance_policy_hash,
+                snapshot.code_fingerprint,
+            ],
         ).fetchall()
-        if not prior_rows:
+        candidates: list[dict[str, Any]] = []
+        for row in candidate_rows:
+            record = dict(zip(_LEDGER_COLUMNS, row, strict=True))
+            if _ledger_as_of(record) != snapshot.as_of:
+                continue  # a different as_of is a different request world
+            candidates.append(record)
+        if not candidates:
             return
         current_seal_by_run = {seal.run_id: seal for seal in snapshot.seals}
-        for row in prior_rows:
-            record = dict(zip(_LEDGER_COLUMNS, row, strict=True))
+        for record in candidates:
             seal = CanonicalRunSeal.from_ledger(record)
-            manifest, seal_problems = self._verify_historical_canonical_seal(seal)
-            problems = list(seal_problems)
-            if manifest is not None:
-                for entry in manifest.get("input_normalized_runs", []):
-                    run_id = str(entry.get("run_id"))
-                    problems.extend(
-                        self._continuity_problems_for_input(entry, run_id, current_seal_by_run)
-                    )
-            if problems:
+            manifest, verified_status, problems = self._verify_historical_canonical_seal(
+                seal, record
+            )
+            if problems or manifest is None or verified_status is None:
+                detail = "; ".join(problems) if problems else "no verifiable seal"
                 msg = (
                     f"prior canonical run {seal.canonical_run_id} is DAMAGED: "
-                    f"{'; '.join(problems)} - the prior run and its sealed "
+                    f"{detail} - the prior run and its sealed "
                     "evidence can no longer be trusted and no replacement may "
                     "be minted; restore the exact upstream evidence to replay "
                     "the historical run (CR-3.3 audit 20260902 section 1 + "
-                    "CR-3.4 audit 20260902 section 1)"
+                    "CR-3.4 audit 20260902 section 1 + CR-3.5 audit "
+                    "20260902 sections 1-2)"
+                )
+                raise CanonicalRunnerError(msg)
+            # verified, physically derived world membership
+            if seal.canonical_context_hash != snapshot.canonical_context_hash:
+                continue  # same primitives, different bridge-policy world
+            # verified, physically derived historical status
+            if verified_status == "BLOCKED":
+                continue  # genuine historical BLOCKED: not a SUCCESS dependency
+            for entry in manifest.get("input_normalized_runs", []):
+                run_id = str(entry.get("run_id"))
+                problems.extend(
+                    self._continuity_problems_for_input(entry, run_id, current_seal_by_run)
+                )
+            if problems:
+                msg = (
+                    f"prior canonical run {seal.canonical_run_id} consumed inputs "
+                    f"that are no longer intact: {'; '.join(problems)} - the "
+                    "prior run is DAMAGED and no replacement may be minted; "
+                    "restore the exact upstream evidence to replay the "
+                    "historical run (CR-3.3 audit 20260902 section 1 + "
+                    "CR-3.5 audit 20260902 section 1)"
                 )
                 raise CanonicalRunnerError(msg)
 
     def _verify_historical_canonical_seal(
-        self, seal: CanonicalRunSeal
-    ) -> tuple[dict[str, Any] | None, list[str]]:
-        """CR-3.4 P0-01: typed full-seal verification of ONE historical
-        canonical run BEFORE its manifest input list may be trusted for
-        continuity - the deterministic manifest URI, the manifest bytes
-        against the ledger hash, EVERY explicit manifest correctness
-        field against the ledger seal, and the physical recompute of
-        input_seal_hash / input_set_hash / verification_state_hash from
-        the manifest input entries. Any problem -> the prior canonical
-        run is itself HARD DAMAGED: its input list is NOT consulted and
-        no replacement may be minted."""
+        self, seal: CanonicalRunSeal, record: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, str | None, list[str]]:
+        """CR-3.4 P0-01 + CR-3.5 P0-02: typed full-seal verification of
+        ONE historical canonical run BEFORE its manifest input list or
+        its claimed status may be trusted - the deterministic manifest
+        URI, the manifest bytes against the ledger hash, EVERY explicit
+        manifest correctness field against the ledger seal, the
+        physical recompute of the ENTIRE derived run identity
+        (input hashes + master set + dataset hash + canonical context
+        + base identity + idempotency key + run id) from the manifest
+        input entries and the primitive request-world fields, and the
+        findings truth -> status semantic recompute. Any problem ->
+        the prior canonical run is itself HARD DAMAGED: its input list
+        and its claimed status are NOT consulted and no replacement of
+        any kind may be minted. Returns (manifest, verified_status,
+        problems)."""
         if not seal.manifest_uri or not seal.manifest_hash:
-            return None, ["prior canonical ledger row carries no manifest binding"]
-        record = {
+            return None, None, ["prior canonical ledger row carries no manifest binding"]
+        record_for_uri = {
             "canonical_contract_version": seal.canonical_contract_version,
             "as_of": seal.as_of,
             "canonical_run_id": seal.canonical_run_id,
         }
-        expected_manifest_uri = f"{self._expected_base_uri(record)}/manifest.json"
+        expected_manifest_uri = f"{self._expected_base_uri(record_for_uri)}/manifest.json"
         if seal.manifest_uri != expected_manifest_uri:
-            return None, [
-                f"prior canonical manifest_uri {seal.manifest_uri!r} is not the "
-                f"deterministic anchor {expected_manifest_uri!r} (rebind)"
-            ]
+            return (
+                None,
+                None,
+                [
+                    f"prior canonical manifest_uri {seal.manifest_uri!r} is not the "
+                    f"deterministic anchor {expected_manifest_uri!r} (rebind)"
+                ],
+            )
         manifest_path = self.normalized_root / seal.manifest_uri
         if not manifest_path.is_file():
-            return None, [f"prior canonical manifest missing: {seal.manifest_uri}"]
+            return None, None, [f"prior canonical manifest missing: {seal.manifest_uri}"]
         if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != seal.manifest_hash:
-            return None, ["prior canonical manifest bytes do not match the ledger hash (rebind)"]
+            return (
+                None,
+                None,
+                ["prior canonical manifest bytes do not match the ledger hash (rebind)"],
+            )
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            return None, [f"prior canonical manifest unreadable: {exc}"]
+            return None, None, [f"prior canonical manifest unreadable: {exc}"]
         problems: list[str] = []
         expected_fields = (
             ("canonical_run_id", seal.canonical_run_id),
@@ -1218,7 +1493,7 @@ class CanonicalRunner:
         entries = manifest.get("input_normalized_runs")
         if not isinstance(entries, list):
             problems.append("prior canonical manifest carries no typed input list")
-            return None, problems
+            return None, None, problems
         seal_recompute, set_recompute, state_recompute = _input_hashes_from_entries(entries)
         if seal_recompute != seal.input_seal_hash:
             problems.append(
@@ -1235,9 +1510,29 @@ class CanonicalRunner:
                 "prior canonical verification_state_hash does not match the "
                 "manifest input entries (input list rebind)"
             )
+        # CR-3.5 P0-02: the ENTIRE derived run identity is physically
+        # recomputed from the manifest input entries + the primitive
+        # request-world fields (ledger) + the manifest bridge policy
+        # identity, and compared against the ledger seal.
+        problems.extend(
+            _derived_run_identity_problems(
+                entries=entries,
+                requested_domains=list(manifest.get("requested_domains") or []),
+                as_of=seal.as_of,
+                ledger=record,
+                manifest=manifest,
+            )
+        )
         if problems:
-            return None, problems
-        return manifest, []
+            return None, None, problems
+        # CR-3.5 P0-02: the status is a function of the exact sealed
+        # findings truth (DB == parquet == finding_set_hash seal) - a
+        # status rebind that does not replay the findings truth is
+        # DAMAGED.
+        verified_status, finding_problems = self._verify_findings_truth(record, manifest)
+        if finding_problems:
+            return None, None, finding_problems
+        return manifest, verified_status, []
 
     def _continuity_problems_for_input(
         self,
@@ -1370,12 +1665,12 @@ class CanonicalRunner:
             raise
 
         seals = tuple(run.seal for run in runs)
-        master_hashes = sorted(
-            f"{s.run_id}:{s.normalized_manifest_hash}"
-            for s in seals
-            if s.role == "identity_master" and s.verification == V_HEALTHY and s.pit_available
+        # CR-3.5 P0-02: master set hash derived through the shared
+        # entries-based formula (the historical verifier recomputes the
+        # SAME value from the manifest input entries).
+        master_input_set_hash = _master_input_set_hash_from_entries(
+            [seal.as_dict() for seal in seals]
         )
-        master_input_set_hash = hashlib.sha256("|".join(master_hashes).encode("utf-8")).hexdigest()
         tolerance_version, tolerance_hash = _source_policy.tolerance_policy_identity()
         return CanonicalInputSnapshot(
             as_of=as_of_dt,
@@ -2085,6 +2380,80 @@ class CanonicalRunner:
             error_message=str(record["error_message"]) if record["error_message"] else None,
         )
 
+    def _verify_findings_truth(
+        self, record: dict[str, Any], manifest: dict[str, Any]
+    ) -> tuple[str, list[str]]:
+        """CR-3.5 P0-02: the exact sealed findings truth is the ONLY
+        basis of the canonical run status - ``any blocking finding ->
+        BLOCKED, otherwise SUCCESS`` - and of the derived error text.
+        The findings are verified three-way (DB rows == findings
+        parquet == finding_set_hash seal) and the status/error are
+        then RECOMPUTED from that truth and consumed AGAINST the
+        ledger/manifest status/error fields. Shared by the replay
+        closure verifier AND the historical continuity seal verifier
+        (the live build derives through the same
+        ``_status_error_from_findings`` helper) - a status rebind that
+        does not replay the sealed findings truth is DAMAGED."""
+        problems: list[str] = []
+        run_id = str(record["canonical_run_id"])
+        db_rows = self.conn.execute(
+            "SELECT finding_id, canonical_domain, canonical_key, finding_class, "
+            "provider, source_normalization_run_id, detail_json, blocking "
+            "FROM meta_canonical_reconciliation_finding WHERE canonical_run_id = ? "
+            "ORDER BY finding_id",
+            [run_id],
+        ).fetchall()
+        if len(db_rows) != int(record["finding_count"]):
+            problems.append(
+                f"finding count mismatch: ledger {int(record['finding_count'])} vs {len(db_rows)}"
+            )
+        db_findings = [dict(zip(_FINDING_SEMANTIC_FIELDS, r[1:], strict=True)) for r in db_rows]
+        db_finding_ids = [str(r[0]) for r in db_rows]
+        if _finding_set_hash(db_findings) != str(record["finding_set_hash"]):
+            problems.append("DB finding exact-set seal mismatch (tampered or missing rows)")
+        if str(manifest.get("finding_set_hash")) != str(record["finding_set_hash"]):
+            problems.append("manifest finding_set_hash does not match the ledger seal")
+        if int(manifest.get("finding_count", -1)) != int(record["finding_count"]):
+            problems.append("manifest finding_count does not match the ledger")
+        artifacts = manifest.get("artifacts")
+        entry = artifacts.get("findings") if isinstance(artifacts, dict) else None
+        if not isinstance(entry, dict):
+            problems.append("manifest carries no findings artifact seal")
+        else:
+            expected_uri = self._expected_artifact_uri(record, "findings")
+            if str(entry.get("uri")) != expected_uri:
+                problems.append("findings artifact uri is not the deterministic recompute")
+            path = self.normalized_root / str(entry.get("uri"))
+            if not path.is_file():
+                problems.append(f"findings artifact missing: {entry.get('uri')}")
+            elif hashlib.sha256(path.read_bytes()).hexdigest() != str(entry.get("content_hash")):
+                problems.append("findings artifact bytes tampered")
+            else:
+                frame = pl.read_parquet(path)
+                if frame.height != int(entry.get("row_count", -1)):
+                    problems.append("findings artifact row count mismatch")
+                parquet_rows = frame.to_dicts()
+                parquet_ids = sorted(str(r.get("finding_id")) for r in parquet_rows)
+                if parquet_ids != sorted(db_finding_ids):
+                    problems.append("findings parquet ids diverge from the DB finding set")
+                parquet_semantic = [
+                    {field: r.get(field) for field in _FINDING_SEMANTIC_FIELDS}
+                    for r in parquet_rows
+                ]
+                if _finding_set_hash(parquet_semantic) != str(record["finding_set_hash"]):
+                    problems.append("findings parquet semantic set diverges from the seal")
+        status_recompute, error_recompute = _status_error_from_findings(db_findings)
+        if status_recompute != str(record["status"]):
+            problems.append(
+                f"status does not match the sealed findings truth: ledger "
+                f"{record['status']!r} vs recomputed {status_recompute!r}"
+            )
+        ledger_error = record["error_message"]
+        ledger_error = str(ledger_error) if ledger_error not in (None, "") else None
+        if error_recompute != ledger_error:
+            problems.append("error_message does not match the sealed findings truth")
+        return status_recompute, problems
+
     def _verify_closure(
         self, record: dict[str, Any], snapshot: CanonicalInputSnapshot
     ) -> list[str]:
@@ -2196,6 +2565,21 @@ class CanonicalRunner:
         if _canonical_json(sealed_entries) != _canonical_json(current_entries):
             problems.append("manifest typed input seal does not match the current snapshot")
 
+        # ---- CR-3.5 P0-02: derived run identity physical closure -
+        # ledger == physical recompute from the manifest entries +
+        # primitive request-world fields (current == ledger via
+        # expected_provenance above; manifest == ledger via the typed
+        # seal above; the recompute closes the third side).
+        problems.extend(
+            _derived_run_identity_problems(
+                entries=sealed_entries,
+                requested_domains=json.loads(str(record["requested_domains_json"])),
+                as_of=_ledger_as_of(record).isoformat(),
+                ledger=record,
+                manifest=manifest,
+            )
+        )
+
         # ---- artifact exact set + deterministic URI + physical recompute
         artifacts = manifest.get("artifacts", {})
         if set(artifacts) != set(_ARTIFACT_NAMES):
@@ -2243,32 +2627,13 @@ class CanonicalRunner:
             ):
                 problems.append("decision semantic seal mismatch (values changed)")
 
-        # ---- findings three-way: parquet == DB == seal
-        db_rows = self.conn.execute(
-            "SELECT finding_id, canonical_domain, canonical_key, finding_class, "
-            "provider, source_normalization_run_id, detail_json, blocking "
-            "FROM meta_canonical_reconciliation_finding WHERE canonical_run_id = ? "
-            "ORDER BY finding_id",
-            [str(record["canonical_run_id"])],
-        ).fetchall()
-        if len(db_rows) != int(record["finding_count"]):
-            problems.append(
-                f"finding count mismatch: ledger {int(record['finding_count'])} vs {len(db_rows)}"
-            )
-        db_findings = [dict(zip(_FINDING_SEMANTIC_FIELDS, r[1:], strict=True)) for r in db_rows]
-        db_finding_ids = [str(r[0]) for r in db_rows]
-        if _finding_set_hash(db_findings) != str(record["finding_set_hash"]):
-            problems.append("DB finding exact-set seal mismatch (tampered or missing rows)")
-        if "findings" in artifact_rows:
-            parquet_rows = artifact_rows["findings"]
-            parquet_ids = sorted(str(r.get("finding_id")) for r in parquet_rows)
-            if parquet_ids != sorted(db_finding_ids):
-                problems.append("findings parquet ids diverge from the DB finding set")
-            parquet_semantic = [
-                {field: r.get(field) for field in _FINDING_SEMANTIC_FIELDS} for r in parquet_rows
-            ]
-            if _finding_set_hash(parquet_semantic) != str(record["finding_set_hash"]):
-                problems.append("findings parquet semantic set diverges from the seal")
+        # ---- findings truth + status semantic recompute (CR-3.5 P0-02):
+        # DB == findings parquet == finding_set_hash seal, and the
+        # status/error recomputed from that exact truth against the
+        # ledger fields (a status rebind that does not replay the
+        # sealed findings truth is DAMAGED).
+        _, finding_problems = self._verify_findings_truth(record, manifest)
+        problems.extend(finding_problems)
 
         # ---- re-verify every sealed input run: typed seal vs physical
         # artifacts + anchored evidence (symmetric with first consume)

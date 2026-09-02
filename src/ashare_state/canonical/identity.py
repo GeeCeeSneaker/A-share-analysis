@@ -78,12 +78,30 @@ def identity_dataset_hash(master_input_set_hash: str) -> str:
     identity, the manifest AND the ledger - a canonical hash over the
     master input set hash + the bridge policy version + the bridge
     policy hash. There is exactly one semantic for this value in the
-    whole runtime (no second code path computing a divergent variant)."""
+    whole runtime (no second code path computing a divergent variant):
+    the current-world entry point delegates to the parameterized
+    ``identity_dataset_hash_with_bridge`` (CR-3.5 P0-02)."""
+    return identity_dataset_hash_with_bridge(
+        master_input_set_hash,
+        identity_bridge_policy_version(),
+        identity_bridge_policy_hash(),
+    )
+
+
+def identity_dataset_hash_with_bridge(
+    master_input_set_hash: str, bridge_policy_version: str, bridge_policy_hash: str
+) -> str:
+    """CR-3.5 P0-02: the parameterized derivation of the identity
+    dataset hash - the historical derived-seal verifier recomputes a
+    PRIOR run's own request-world value from its SEALED bridge policy
+    identity (the manifest is the only persistence of that world's
+    bridge identity) with the exact same formula the live build uses
+    for the current world."""
     canonical = json.dumps(
         [
             str(master_input_set_hash),
-            identity_bridge_policy_version(),
-            identity_bridge_policy_hash(),
+            str(bridge_policy_version),
+            str(bridge_policy_hash),
         ],
         separators=(",", ":"),
     )

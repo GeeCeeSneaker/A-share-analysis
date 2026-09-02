@@ -1,9 +1,9 @@
 # ADR-023: AvailabilityPolicy + Canonical Source Selection
 
-- **Status**: PROPOSED（2026-09-01，CR-3 批次交付 + CR-3.1 Amendment A 收口 + 2026-09-01 CR-3.2 Amendment B 收口 + 2026-09-02 CR-3.3 Amendment C 收口 + 2026-09-02 CR-3.4 Amendment D 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
+- **Status**: PROPOSED（2026-09-01，CR-3 批次交付 + CR-3.1 Amendment A 收口 + 2026-09-01 CR-3.2 Amendment B 收口 + 2026-09-02 CR-3.3 Amendment C 收口 + 2026-09-02 CR-3.4 Amendment D 收口 + 2026-09-02 CR-3.5 Amendment E 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
 - **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
-- **Date**: 2026-09-01（CR-3）/ 2026-09-01（Amendment A，CR-3.1）/ 2026-09-01（Amendment B，CR-3.2）/ 2026-09-02（Amendment C，CR-3.3）/ 2026-09-02（Amendment D，CR-3.4）
-- **Work Requirement**: `docs/design/A-share-analysis_CR-2.4最终复审结论与CR-3_AvailabilityPolicy_Canonicalizer开发工作要求_20260901.md` + `docs/design/A-share-analysis_CR-3复审与CR-3.1最终CanonicalInputSnapshot及ReplaySeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.1复审与CR-3.2最终TransactionalSnapshot及PolicyExecution收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.2复审与CR-3.3最终HistoricalInputContinuity及VerificationEvidence收口要求_20260902.md` + `docs/design/A-share-analysis_CR-3.3复审与CR-3.4最终ContinuitySeal及VerificationReplay收口要求_20260902.md`
+- **Date**: 2026-09-01（CR-3）/ 2026-09-01（Amendment A，CR-3.1）/ 2026-09-01（Amendment B，CR-3.2）/ 2026-09-02（Amendment C，CR-3.3）/ 2026-09-02（Amendment D，CR-3.4）/ 2026-09-02（Amendment E，CR-3.5）
+- **Work Requirement**: `docs/design/A-share-analysis_CR-2.4最终复审结论与CR-3_AvailabilityPolicy_Canonicalizer开发工作要求_20260901.md` + `docs/design/A-share-analysis_CR-3复审与CR-3.1最终CanonicalInputSnapshot及ReplaySeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.1复审与CR-3.2最终TransactionalSnapshot及PolicyExecution收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.2复审与CR-3.3最终HistoricalInputContinuity及VerificationEvidence收口要求_20260902.md` + `docs/design/A-share-analysis_CR-3.3复审与CR-3.4最终ContinuitySeal及VerificationReplay收口要求_20260902.md` + `docs/design/A-share-analysis_CR-3.4复审与CR-3.5最终HistoricalCandidateDiscovery及DerivedRunSeal收口要求_20260902.md`
 - **Related**: [ADR-022](ADR-022_provider_normalization_quarantine.md)（ACCEPTED——CR-2 全链 VERIFIED/CLOSED/FREEZE，本 ADR 的上游输入契约）；[ADR-002]（确定性 security identity，identity bridge 的解析内核）
 
 ## 1. Context
@@ -600,3 +600,63 @@ CR-3.4 是 CR-3 关闭前最后一层"历史审计证据本身也不能被重新
 CR-2 frozen contract、**无新 migration**（优先不新增 schema——三收口
 全部为 canonicalizer runtime 侧）。CR-3.3 FREEZE 的 18 项机制零重写
 （131 项回归全保持）。
+
+---
+
+# 10. Amendment E：CR-3.5 Historical Candidate Discovery + Derived Canonical Run/Status Seal（2026-09-02，audit "CR-3.4复审与CR-3.5最终HistoricalCandidateDiscovery及DerivedRunSeal收口要求"）
+
+CR-3.4 复审（2026-09-02 13:17 +08:00，Reviewed HEAD `8585b08dc079207e8306bf3be38cf3de3de2f7a4`，Primary implementation `fce2ca43a35b95d61dc390647fdc46d844d9b1a5`，reopen commit `275fc93`）裁决 **REOPENED**：CR-3.4 原定 3 个 P0 **PASS / FREEZE**（14 项机制，含 CanonicalRunSeal typed historical seal / continuity 先验历史 manifest URI+hash / 三 input hash 物理重算 / `_INPUT_IDENTITY_FIELDS` 单一字段真相 / first consume + replay 共用 `_collect_input_verification_evidence` / materialization symmetry 全链 / manifest 三 correctness identity replay full-consume / no new migration），但发现 2 个新 P0。**本 amendment 修订 §8/§9 中被复审推翻或延伸的表述；原文保留在上文，以本节为准。**无新 migration（同复审 §3"仅在确需持久化额外 primitive request-world field 时"——bridge policy identity 已由 manifest 持久化且参与物理重算，ledger 侧新增列不改变 primitive 漂移这一已接受残余边界的本质，故不引入 022）。
+
+## 10.1 P0-01 Tamper-Resistant Historical Candidate Discovery（修订 §8.1/§9.1 的候选选择）
+
+§9.1 的 continuity 候选 SQL 仍是 `WHERE canonical_context_hash = ? AND status != 'BLOCKED'`——**derived 字段预过滤**：把 ledger `status` 改为 `'BLOCKED'`（路径 A）或把 `canonical_context_hash` 漂移为假值（路径 B），prior SUCCESS 在进入 seal verifier 之前就被从候选集隐藏，随后 DELETE 其消费的 CR-2 输入即可 mint 新 truth。CR-3.5 起候选发现按 **primitive request-world fields**：
+
+```text
+requested_domains_hash + as_of（Python 侧精确比较）+ canonical_contract_version
++ availability/source/tolerance policy version+hash + canonical code_fingerprint
+```
+
+不用 `status` 预过滤、不把 stored `canonical_context_hash` 当 selection key。每个候选先过 **full historical seal**（§9.1 全部检查 + §10.2 derived identity 物理重算 + findings truth→status 语义重算），**之后**才解释其已验证、已物理推导的 world/status：
+
+```text
+recompute(ledger primitives + manifest bridge identity) == ledger context
+verified status SUCCESS 且 ledger context == current context -> continuity 依赖
+verified genuine BLOCKED -> 非 SUCCESS 依赖（不阻塞 exact repair/recovery）
+verified 但 context != current（旧 bridge policy 世界）-> 跳过
+```
+
+路径 A 被 findings→status 语义重算拦截（声称 BLOCKED 但 sealed findings 无 blocking → DAMAGED）；路径 B/ledger+manifest 同步 rebind 被 primitive 物理重算拦截（伪造 context 无法从 primitives 重新 derive）。
+
+## 10.2 P0-02 Derived Canonical Run Seal 物理闭环（修订 §9.2/§9.3 的"完整"表述）
+
+CR-3.4 的 seal 验证对 derived 字段仍是"ledger == manifest + 三 input hash 重算"——ledger+manifest 同步 rebind 无法被检测。CR-3.5 起建立**模块级单一派生公式集**（live build / replay closure / historical continuity 三方共用，`canonicalizer.py`）：
+
+```text
+_requested_domains_hash_from_list        sha256(compact JSON of domain list)
+_input_hashes_from_entries               seal / set / state 三 hash（CR-3.4 既有）
+_master_input_set_hash_from_entries      PIT-healthy master entries（live 同公式）
+identity_dataset_hash_with_bridge        master set + SEALED bridge policy identity
+_canonical_context_hash_from_primitives  primitives + bridge identity
+_base_identity_hash_from_primitives      primitives + input set + dataset hash
+_idempotency_key_from_hashes             base + state
+_canonical_run_id_from_idempotency       UUID5(namespace, key)
+_status_error_from_findings              findings blocking truth -> (status, error)
+```
+
+`_derived_run_identity_problems()` 把上述全部重算与 ledger 逐字段比对（`identity_dataset_hash` 用该 run 自己的 manifest bridge identity 重算——`identity.py` 抽取 `identity_dataset_hash_with_bridge` 参数化变体，当前世界入口委托之，公式唯一）。消费点：
+
+1. **historical seal verifier**（`_verify_historical_canonical_seal`，含 findings truth）；
+2. **replay closure verifier**（`_verify_closure`，与 expected_provenance/current + typed manifest binding 构成三方闭环）；
+3. **live build**（snapshot 属性 + `_build_snapshot` + `run()` 状态派生全部委托同一 helpers）。
+
+### status semantic seal
+
+`_verify_findings_truth(record, manifest)`（replay + historical 共用）：findings 三方（DB rows == findings parquet == finding_set_hash seal，parquet 按 deterministic URI + content hash + row count 验证）后从 blocking truth 重算 status 与 error text，**消费** ledger/manifest 的 status/error_message 字段——SUCCESS→BLOCKED 或 BLOCKED→SUCCESS 的 ledger+manifest 同步 rebind 只要不同时重放 findings truth 即 DAMAGED。error_message 因此升级为 derived audit text（P1 收口，不再是"看似 correctness 实则不校验"的中间态）。未来新增 status 必须由明确 typed transition 规则扩展，不允许自由字符串。
+
+## 10.3 CR-3.5 对抗测试（+15 项）
+
+`tests/integration/test_canonical.py`（166 项 = CR-3.x 既有 151 项回归 + 15 新增：HistoricalCandidateDiscovery 6（mandatory 1/2/3+12/4/5+15——status drift 无法隐藏 prior SUCCESS / context drift 无法隐藏 / ledger+manifest context 同步 rebind 被 primitive 重算拦截 / genuine BLOCKED 不阻塞 exact repair recovery / superset positive control）/ DerivedRunSeal 9（mandatory 6/7/8/9/10/11 + P1 error_message + 13/14——status 双向 rebind / master set / dataset hash / base identity / idempotency key rebind 全部物理重算拦截 / error_message rebind / untouched SUCCESS 与 BLOCKED 幂等 replay / run-id cross-bind positive control））。总体 1151/0。
+
+## 10.4 Scope 边界
+
+CR-3.5 是 CR-3 关闭前对"谁有资格进入 verifier"与"derived truth 必须物理可重算"的收口：不建 SnapshotBuilder / ReadModel（CR-4）、不新增 domain、不改 CR-2 frozen contract、**无新 migration**（migration 链保持 21）。CR-3.4 FREEZE 的 14 项机制零重写（除复用 derived-seal helper 的最小必要抽取：snapshot 属性/`_build_snapshot`/`run()` 委托共享公式，公式本身逐字节不变——151 项回归全保持即为证明）。

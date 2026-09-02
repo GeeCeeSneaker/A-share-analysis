@@ -17,7 +17,43 @@
 
 ---
 
-## 2026-09-02 · CR-3.4 Historical Canonical Seal Trust + Verification Replay Symmetry + Manifest Correctness Identity Binding（CR-3.3 复审 REOPENED 后的收口批次）
+## 2026-09-02 · CR-3.5 Historical Candidate Discovery + Derived Canonical Run/Status Seal（CR-3.4 复审 REOPENED 后的收口批次）
+
+**Scope**
+- CR-3.4 复审（audit 20260902 13:17 +08:00，Reviewed HEAD `8585b08dc079207e8306bf3be38cf3de3de2f7a4`，Primary CR-3.4 implementation `fce2ca43a35b95d61dc390647fdc46d844d9b1a5`，reopen commit `275fc93`）裁决 **CR-3.4 REOPENED**：原定 3 个 P0 **PASS / FREEZE**（14 项机制）；2 个新 P0 由本批 CR-3.5 收口（**未启动 CR-4**——复审 §4 边界；CR-4 BLOCKED_BY_CR-3.5）；复审 §1.4/§2.3 mandatory 测试 15 项全对应（1-5 候选发现 + 6-15 derived seal/positive）
+- 复审 §6 Owner View：CR-3 关闭前对"谁有资格进入 verifier"与"derived truth 必须物理可重算"的收口
+
+**Implementation**
+- **P0-01 Tamper-Resistant Historical Candidate Discovery**：CR-3.4 的 continuity 候选 SQL 仍是 `WHERE canonical_context_hash = ? AND status != 'BLOCKED'`——derived 字段预过滤，两条绕过路径（ledger status 改 'BLOCKED' / canonical_context_hash 漂移假值）都让 prior SUCCESS 在进入 seal verifier 前被隐藏。CR-3.5 起候选发现按 **primitive request-world fields**（requested_domains_hash + as_of（Python 侧精确比较）+ contract + 三 policy version/hash + code_fingerprint），不用 status 预过滤、不把 stored context 当 selection key；每个候选先过 full historical seal（§9.1 全部 + derived identity 物理重算 + findings truth→status 语义重算），**之后**才解释已验证的 world/status（verified SUCCESS 同世界 → continuity 依赖；verified genuine BLOCKED → 非依赖，不阻塞 exact repair/recovery；verified 但 context != current（旧 bridge policy 世界）→ 跳过）
+- **P0-02 Derived Canonical Run Seal 物理闭环**：CR-3.4 对 derived 字段仍只验"ledger == manifest + 三 input hash 重算"——ledger+manifest 同步 rebind 无法检测（尤其 status 可被洗成 genuine BLOCKED 或反向洗成 SUCCESS）。CR-3.5 建立模块级单一派生公式集（live build / replay / historical continuity 三方共用）：`_requested_domains_hash_from_list` / `_input_hashes_from_entries`（既有）/ `_master_input_set_hash_from_entries` / `identity_dataset_hash_with_bridge`（`identity.py` 参数化抽取——用该 run 自己的 manifest bridge identity 重算，公式唯一）/ `_canonical_context_hash_from_primitives` / `_base_identity_hash_from_primitives` / `_idempotency_key_from_hashes` / `_canonical_run_id_from_idempotency`（UUID5 cross-bind）/ `_status_error_from_findings`；`_derived_run_identity_problems()` 将全部重算与 ledger 逐字段比对，消费于 `_verify_historical_canonical_seal` + `_verify_closure`（三方闭环）；snapshot 属性 / `_build_snapshot` / `run()` 状态派生全部委托同一 helpers（最小必要抽取，公式逐字节不变——151 项回归全保持即证明）
+- **status semantic seal**：`_verify_findings_truth(record, manifest)`（replay + historical 共用）——findings 三方（DB == findings parquet == finding_set_hash seal，parquet 按 deterministic URI + content hash + row count 验证）后从 blocking truth 重算 status 与 error text 并**消费** ledger/manifest 字段；error_message 升级为 derived audit text（P1 收口）
+- **无新 migration**（复审 §3 允许"仅确需时"——bridge policy identity 已由 manifest 持久化且参与物理重算，ledger 新增列不改变 primitive 漂移这一已接受残余边界的本质；migration 链保持 21）
+
+**Schema / Contract Changes**
+- C3 ×1（DM-20260902-073）；**ADR-023 Amendment E**（§10.1-§10.4 修订 §8.1/§9.1/§9.2/§9.3 被复审推翻/延伸的表述；status 仍 PROPOSED 待 Reviewer closure）；零 migration（未改 018-021）；CR-3.4 FREEZE 的 14 项机制零重写
+
+**Verification**
+- Local: **1151 tests passed / 0 failed**（1136 → 1151，+15：TestHistoricalCandidateDiscovery 6（mandatory 1/2/3+12/4/5+15）/ TestDerivedRunSeal 9（mandatory 6/7/8/9/10/11 + P1 error_message + 13/14 + run-id cross-bind positive control））；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1151/0
+- 既有回归零破坏：CR-3/3.1/3.2/3.3/3.4 对抗矩阵 151 项全保持（含 CR-3.4 materialization symmetry 与 historical canonical seal trust 全部）；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
+- 实现中发现并修复：`identity_dataset_hash` 原内嵌读取**当前** bridge identity，历史重算必须用该 run 自己的（manifest 封存）bridge identity——`identity.py` 抽取 `identity_dataset_hash_with_bridge` 参数化变体（当前世界入口委托之）；此修复正是 `test_bridge_policy_version_change_new_run`（旧 bridge 世界的 run 须被验证后跳过、而非误报 DAMAGED）所驱动的
+- GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
+
+**Implementation Status**
+- DONE（2 P0 + P1 全收口 + ADR-023 Amendment E + DM-20260902-073；1151/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- 候选发现的信任根从 derived 字段回到 primitive 字段：derived 字段（context/status）的漂移不再能"过滤掉"需要验证的历史行——先全量验证、后解释，是本批与 CR-3.4 的分界线
+- derived identity 的物理重算以 manifest bridge identity 为该 run 自己世界的锚：`identity_dataset_hash` 的参数化抽取保持"整个 runtime 只有一个语义"（CR-3.1 P0-05 原则），旧 bridge 世界的 prior run 因此可被完整验证后正确跳过
+- status 是 findings 的函数而非自由字符串：ledger/manifest 的 status/error_message 字段全部变为"被消费的声明"，findings truth（DB == parquet == seal 三方）是唯一事实源；这同时消解了 status drift 与 findings 漂移两类攻击
+- genuine BLOCKED 的语义边界：验证通过的 BLOCKED 是"已记录的失败证据"（append-only，不构成 SUCCESS continuity 依赖，不阻塞 recovery），而非"可跳过的二等行"——它同样要过 full seal，只是通过后的解释不同
+- 无新 migration 是刻意决策：bridge identity 在 manifest 中已有持久化锚，ledger 加列只是把同一残余边界（primitive 全字段伪造）从一处挪到另一处，不收敛攻击面
+
+**下一步**
+- 等 Reviewer 复审 CR-3.5（复审 §4 Exit Gate 20 项）；全部通过 → CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 → VERIFIED / CLOSED / FREEZE，ADR-023 → ACCEPTED，**CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild START**
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 
 **Scope**
 - CR-3.3 复审（audit 20260902 10:22 +08:00，Reviewed HEAD `b5fdc27b9f2fd9c262c7dc6dae9aa665b9494bc1`，Primary CR-3.3 implementation `f8b80b3212ff299f52ee3fb0308c248fd16c17df`，reopen commit `33d0901`）裁决 **CR-3.3 REOPENED**：18 项机制 PASS / FREEZE（canonical_context_hash 方向 / continuity guard 按 context 查历史 / 全部 CR-2 ledger drift 检测 / superset 合法 / exact restore replay / verification_problem_hash 进 seal+state / finding truthfulness / 治理计数）；3 个 P0 由本批 CR-3.4 收口（**未启动 CR-4**——复审 §4 边界；CR-4 BLOCKED_BY_CR-3.4）；复审 §1.3/§2.3/§3 mandatory 测试 13 项全对应

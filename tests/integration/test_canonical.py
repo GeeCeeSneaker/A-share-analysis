@@ -31,6 +31,7 @@ import ast
 import hashlib
 import inspect
 import json
+import uuid
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -3519,8 +3520,11 @@ class TestManifestCorrectnessIdentityBinding:
     )
     def test_identity_field_rebind_blocked_replay_damaged(self, conn, env_root, field):
         """The same rebind on a BLOCKED run's manifest (continuity
-        skips BLOCKED runs) is caught by the replay closure verifier:
-        manifest == ledger for every correctness identity field."""
+        treats a verified genuine BLOCKED run as a non-dependency) is
+        caught before that interpretation: the historical seal
+        verifier (and, on the replay path, the closure verifier)
+        demands manifest == ledger for every correctness identity
+        field."""
         _seed_base(conn, env_root)
         _seed_bars(conn, env_root, "req-bars")
         conn.execute("DELETE FROM meta_raw_evidence_anchor WHERE request_id = 'req-bars'")
@@ -3532,3 +3536,334 @@ class TestManifestCorrectnessIdentityBinding:
         with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
             _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
         assert _canonical_count(conn) == 1
+
+
+# ------------------- CR-3.5: historical candidate discovery (P0-01)
+
+
+def _damage_cr2_output_bytes(env_root, conn, request_id: str) -> tuple[str, bytes]:
+    """Overwrite one CR-2 run's first output artifact with damaged
+    bytes (a deterministic physical failure). Returns (uri, exact
+    good bytes) for the exact repair."""
+    run_uri = str(
+        conn.execute(
+            "SELECT normalized_manifest_uri FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = ?",
+            [request_id],
+        ).fetchone()[0]
+    )
+    manifest = json.loads((env_root["normalized"] / run_uri).read_text(encoding="utf-8"))
+    uri = str(manifest["outputs"][0]["uri"])
+    path = env_root["normalized"] / uri
+    good = path.read_bytes()
+    path.write_bytes(b"cr3-5-damaged-output")
+    return uri, good
+
+
+@pytest.mark.integration
+class TestHistoricalCandidateDiscovery:
+    """CR-3.5 P0-01 (audit 20260902 section 1): the continuity
+    candidate discovery selects by the PRIMITIVE request-world fields
+    (requested domains hash, as_of, contract, policy identities, code
+    fingerprint) and never pre-filters by the derived
+    canonical_context_hash or status - a drifted derived field cannot
+    hide a prior SUCCESS from the verifier."""
+
+    def _prior_success(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "SUCCESS"
+        return result
+
+    def _delete_bars_input(self, conn) -> None:
+        conn.execute(
+            "DELETE FROM meta_provider_normalization_run WHERE raw_request_id = ?",
+            ["req-bars"],
+        )
+
+    def test_status_drift_cannot_hide_prior_success(self, conn, env_root):
+        """Mandatory test 1: prior SUCCESS -> ledger status = BLOCKED
+        ONLY -> delete the consumed CR-2 input -> DAMAGED, zero new
+        canonical runs (the candidate is still discovered by
+        primitives and its claimed status is recomputed from the
+        sealed findings truth)."""
+        self._prior_success(conn, env_root)
+        conn.execute("UPDATE meta_canonicalization_run SET status = 'BLOCKED'")
+        self._delete_bars_input(conn)
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_context_hash_drift_cannot_hide_prior_success(self, conn, env_root):
+        """Mandatory test 2: prior SUCCESS -> ledger
+        canonical_context_hash drift ONLY -> delete the consumed
+        input -> DAMAGED (primitive discovery still selects the row;
+        the context recompute from the primitives exposes the drift)."""
+        result = self._prior_success(conn, env_root)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET canonical_context_hash = ? "
+            "WHERE canonical_run_id = ?",
+            ["f" * 64, result.canonical_run_id],
+        )
+        self._delete_bars_input(conn)
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_context_rebind_ledger_and_manifest_damaged(self, conn, env_root):
+        """Mandatory tests 3 + 12: prior SUCCESS -> ledger AND manifest
+        canonical_context_hash rebound together (+ outer manifest
+        hash) -> delete the consumed input -> DAMAGED by the primitive
+        recompute (a fully consistent forged context still cannot
+        re-derive from the primitive request-world fields)."""
+        result = self._prior_success(conn, env_root)
+
+        def mutate(doc: dict) -> None:
+            doc["canonical_context_hash"] = "e" * 64
+
+        _rebind_canonical_manifest(env_root, conn, result, mutate)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET canonical_context_hash = ? "
+            "WHERE canonical_run_id = ?",
+            ["e" * 64, result.canonical_run_id],
+        )
+        self._delete_bars_input(conn)
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_genuine_blocked_not_blocking_exact_recovery(self, conn, env_root):
+        """Mandatory test 4: a genuine historical BLOCKED run (valid
+        seal + valid status semantics) must NOT block the exact repair
+        / recovery that follows."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        _uri, good_bytes = _damage_cr2_output_bytes(env_root, conn, "req-bars")
+        blocked = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert blocked.status == "BLOCKED"
+        # exact repair -> recovery run succeeds; the genuine BLOCKED
+        # candidate is verified, classified non-dependency, skipped
+        (env_root["normalized"] / _uri).write_bytes(good_bytes)
+        recovered = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert recovered.status == "SUCCESS"
+        assert recovered.canonical_run_id != blocked.canonical_run_id
+        assert _canonical_count(conn) == 2
+
+    def test_superset_with_intact_success_still_allowed(self, conn, env_root):
+        """Mandatory tests 5 + 15: a legitimate new CR-2 input superset
+        with the historical SUCCESS fully intact -> a NEW canonical
+        run is allowed (positive control under primitive discovery)."""
+        result = self._prior_success(conn, env_root)
+        _seed_bars(conn, env_root, "req-new", received_at=T0)
+        second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert second.status == "SUCCESS"
+        assert second.canonical_run_id != result.canonical_run_id
+        assert second.idempotent_replay is False
+        assert _canonical_count(conn) == 2
+
+
+# --------------------------- CR-3.5: derived run seal (P0-02)
+
+
+@pytest.mark.integration
+class TestDerivedRunSeal:
+    """CR-3.5 P0-02 (audit 20260902 section 2): the derived canonical
+    run identity (context / master set / dataset hash / base identity
+    / idempotency key / run id) and the status are PHYSICALLY
+    RECOMPUTED from the primitive seal + the exact findings truth on
+    replay AND historical continuity - a ledger+manifest rebind of a
+    derived field that does not replay the physical derivation is
+    DAMAGED."""
+
+    def _prior_success(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "SUCCESS"
+        return result
+
+    @staticmethod
+    def _rebind_ledger_and_manifest(env_root, conn, result, mutate, ledger_updates: dict):
+        """The CR-3.5 rebind attack shape: mutate the manifest (mutate)
+        + rehash + update the ledger outer manifest_hash AND the same
+        ledger field(s) - a fully consistent forged pair."""
+        path = env_root["normalized"] / str(result.manifest_uri)
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        mutate(doc)
+        data = json.dumps(doc, sort_keys=True, indent=1, ensure_ascii=False).encode("utf-8")
+        path.write_bytes(data)
+        sets = ", ".join(["manifest_hash = ?", *[f"{k} = ?" for k in ledger_updates]])
+        conn.execute(
+            f"UPDATE meta_canonicalization_run SET {sets} WHERE canonical_run_id = ?",
+            [
+                hashlib.sha256(data).hexdigest(),
+                *ledger_updates.values(),
+                result.canonical_run_id,
+            ],
+        )
+
+    def _invoke_with_superset(self, conn, env_root):
+        """Add a legitimate new CR-2 input (superset world) so the
+        invocation is NOT an exact replay - the HISTORICAL continuity
+        verifier is the catcher."""
+        _seed_bars(conn, env_root, "req-new", received_at=T0)
+        return _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_status_success_to_blocked_rebind_damaged(self, conn, env_root):
+        """Mandatory test 6: rebind ledger+manifest status
+        SUCCESS -> BLOCKED + outer hash while the findings carry NO
+        blocking finding -> DAMAGED (status is recomputed from the
+        sealed findings truth)."""
+        result = self._prior_success(conn, env_root)
+        self._rebind_ledger_and_manifest(
+            env_root,
+            conn,
+            result,
+            lambda d: d.__setitem__("status", "BLOCKED"),
+            {"status": "BLOCKED"},
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_status_blocked_to_success_rebind_damaged(self, conn, env_root):
+        """Mandatory test 7: rebind ledger+manifest status
+        BLOCKED -> SUCCESS + outer hash while the findings DO carry a
+        blocking finding -> DAMAGED (a forged SUCCESS cannot replay
+        the sealed blocking truth)."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        conn.execute("DELETE FROM meta_raw_evidence_anchor WHERE request_id = 'req-bars'")
+        blocked = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert blocked.status == "BLOCKED"
+        assert _findings(conn, blocked.canonical_run_id)
+        self._rebind_ledger_and_manifest(
+            env_root,
+            conn,
+            blocked,
+            lambda d: d.__setitem__("status", "SUCCESS"),
+            {"status": "SUCCESS"},
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_master_input_set_hash_rebind_damaged(self, conn, env_root):
+        """Mandatory test 8: rebind ledger+manifest
+        identity_master_input_set_hash together while the input
+        entries are unchanged -> DAMAGED by the physical recompute."""
+        result = self._prior_success(conn, env_root)
+        self._rebind_ledger_and_manifest(
+            env_root,
+            conn,
+            result,
+            lambda d: d.__setitem__("identity_master_input_set_hash", "0" * 64),
+            {"identity_master_input_set_hash": "0" * 64},
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    def test_identity_dataset_hash_rebind_damaged(self, conn, env_root):
+        """Mandatory test 9: rebind ledger+manifest
+        identity_dataset_hash together -> DAMAGED by the physical
+        recompute (master set + sealed bridge policy identity)."""
+        result = self._prior_success(conn, env_root)
+        self._rebind_ledger_and_manifest(
+            env_root,
+            conn,
+            result,
+            lambda d: d.__setitem__("identity_dataset_hash", "0" * 64),
+            {"identity_dataset_hash": "0" * 64},
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    def test_base_identity_hash_rebind_damaged(self, conn, env_root):
+        """Mandatory test 10: rebind ledger+manifest base_identity_hash
+        together -> DAMAGED by the physical recompute."""
+        result = self._prior_success(conn, env_root)
+        self._rebind_ledger_and_manifest(
+            env_root,
+            conn,
+            result,
+            lambda d: d.__setitem__("base_identity_hash", "0" * 64),
+            {"base_identity_hash": "0" * 64},
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    def test_idempotency_key_rebind_damaged(self, conn, env_root):
+        """Mandatory test 11: rebind ledger+manifest idempotency_key
+        together -> DAMAGED; the recomputed run id (UUID5 of the
+        physically derived key) does not match the stored pair."""
+        result = self._prior_success(conn, env_root)
+        self._rebind_ledger_and_manifest(
+            env_root,
+            conn,
+            result,
+            lambda d: d.__setitem__("idempotency_key", "0" * 64),
+            {"idempotency_key": "0" * 64},
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    def test_error_message_rebind_damaged(self, conn, env_root):
+        """P1 (audit section 2.3): error_message is a DERIVED audit
+        text over the exact findings truth - a rebind that does not
+        replay it is DAMAGED."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        conn.execute("DELETE FROM meta_raw_evidence_anchor WHERE request_id = 'req-bars'")
+        blocked = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert blocked.status == "BLOCKED"
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET error_message = ? WHERE canonical_run_id = ?",
+            ["forged error text", blocked.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_untouched_success_exact_replay_idempotent(self, conn, env_root):
+        """Mandatory test 13: an untouched historical SUCCESS replays
+        idempotently through the full derived-seal verification."""
+        result = self._prior_success(conn, env_root)
+        replay = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert replay.idempotent_replay is True
+        assert replay.canonical_run_id == result.canonical_run_id
+        assert replay.status == "SUCCESS"
+        assert _canonical_count(conn) == 1
+
+    def test_untouched_blocked_exact_replay_idempotent(self, conn, env_root):
+        """Mandatory test 14: an untouched historical BLOCKED (exact
+        failure) replays idempotently through the full derived-seal
+        verification."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        conn.execute("DELETE FROM meta_raw_evidence_anchor WHERE request_id = 'req-bars'")
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert first.status == "BLOCKED"
+        replay = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert replay.idempotent_replay is True
+        assert replay.canonical_run_id == first.canonical_run_id
+        assert replay.status == "BLOCKED"
+        assert _canonical_count(conn) == 1
+
+    def test_run_id_cross_bind_positive(self, conn, env_root):
+        """Positive control for the run-id cross-bind: the live run id
+        equals UUID5(namespace, physically derived idempotency key)."""
+        result = self._prior_success(conn, env_root)
+        ledger_key = str(
+            conn.execute(
+                "SELECT idempotency_key FROM meta_canonicalization_run WHERE canonical_run_id = ?",
+                [result.canonical_run_id],
+            ).fetchone()[0]
+        )
+        assert result.canonical_run_id == str(
+            uuid.uuid5(uuid.UUID("b7a3c1d5-9e2f-4a6b-8c4d-7f5e3a2b1c90"), ledger_key)
+        )
