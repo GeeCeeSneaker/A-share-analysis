@@ -1,9 +1,9 @@
 # ADR-023: AvailabilityPolicy + Canonical Source Selection
 
-- **Status**: PROPOSED（2026-09-01，CR-3 批次交付 + CR-3.1 Amendment A 收口 + 2026-09-01 CR-3.2 Amendment B 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
+- **Status**: PROPOSED（2026-09-01，CR-3 批次交付 + CR-3.1 Amendment A 收口 + 2026-09-01 CR-3.2 Amendment B 收口 + 2026-09-02 CR-3.3 Amendment C 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
 - **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
-- **Date**: 2026-09-01（CR-3）/ 2026-09-01（Amendment A，CR-3.1）/ 2026-09-01（Amendment B，CR-3.2）
-- **Work Requirement**: `docs/design/A-share-analysis_CR-2.4最终复审结论与CR-3_AvailabilityPolicy_Canonicalizer开发工作要求_20260901.md` + `docs/design/A-share-analysis_CR-3复审与CR-3.1最终CanonicalInputSnapshot及ReplaySeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.1复审与CR-3.2最终TransactionalSnapshot及PolicyExecution收口要求_20260901.md`
+- **Date**: 2026-09-01（CR-3）/ 2026-09-01（Amendment A，CR-3.1）/ 2026-09-01（Amendment B，CR-3.2）/ 2026-09-02（Amendment C，CR-3.3）
+- **Work Requirement**: `docs/design/A-share-analysis_CR-2.4最终复审结论与CR-3_AvailabilityPolicy_Canonicalizer开发工作要求_20260901.md` + `docs/design/A-share-analysis_CR-3复审与CR-3.1最终CanonicalInputSnapshot及ReplaySeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.1复审与CR-3.2最终TransactionalSnapshot及PolicyExecution收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.2复审与CR-3.3最终HistoricalInputContinuity及VerificationEvidence收口要求_20260902.md`
 - **Related**: [ADR-022](ADR-022_provider_normalization_quarantine.md)（ACCEPTED——CR-2 全链 VERIFIED/CLOSED/FREEZE，本 ADR 的上游输入契约）；[ADR-002]（确定性 security identity，identity bridge 的解析内核）
 
 ## 1. Context
@@ -171,8 +171,10 @@ DM-20260901-069（CR-3.1 Amendment A：Canonical Input Snapshot / Anchored
 Availability Evidence / Full Replay Seal / Recoverable Commit）+
 DM-20260901-070（CR-3.2 Amendment B：Transactional Materialized Snapshot /
 Identity Master PIT / Honest Policy Execution / Full Seal /
-Verification-State Transition）。相关：§42 Canonical Runtime Roadmap、
-§44 CR-2 acceptance（上游冻结）。
+Verification-State Transition）+ DM-20260902-071（CR-3.3 Amendment C：
+Historical Input Continuity / Verification Evidence Exactness / finding
+truthfulness / seal count correction）。相关：§42 Canonical Runtime
+Roadmap、§44 CR-2 acceptance（上游冻结）。
 
 ---
 
@@ -397,3 +399,99 @@ CR-3.2 仍是 Canonical Runtime correctness closure：不建
 SnapshotBuilder / DuckDB ReadModel（CR-4）、不新增 canonical domain、
 不绕过 CR-2 frozen verifier。migration 020（未改 018/019）；CR-3.1
 FREEZE 的 19 项机制零重写（81 项回归全保持）。
+
+---
+
+# 8. Amendment C：CR-3.3 Historical Input Continuity + Verification Evidence Exactness（2026-09-02，audit "CR-3.2复审与CR-3.3最终HistoricalInputContinuity及VerificationEvidence收口要求"）
+
+CR-3.2 复审（2026-09-02 06:56 +08:00，Reviewed HEAD `9ffdf35f577e48ec4de1432057d954da07f78db0`，Primary implementation `df409ede0ddb25ce5cee12a46fa66fe7a3ea093f`）裁决
+**REOPENED**：16 项机制 PASS / FREEZE（transactional snapshot / master
+PIT / honest policy / full seal 主体 / state transition 主体），但 2 个
+P0 + 3 个 P1。**本 amendment 修订 §7 中被复审推翻的表述；原文保留在
+上文，以本节为准。**
+
+## 8.1 P0-01 Historical Input Continuity Guard（修订 §7.5）
+
+§7.5 的 degraded-SUCCESS guard 以 `base_identity_hash` 查历史——但
+consumed CR-2 run 的 ledger 行 DELETE / status drift / seal 字段 drift
+都会改变 current base identity，使 guard 查不到历史 SUCCESS，可能 mint
+新的 BLOCKED 甚至新 SUCCESS truth。CR-3.3 起（migration 021
+`canonical_context_hash`）：
+
+```text
+canonical_context_hash = requested domain set + as_of + contract +
+  availability/source/tolerance policy identities + identity bridge
+  policy identity + canonical code fingerprint
+（刻意不含 current CR-2 input set / verification state）
+
+guard：查同 context 的全部历史非 BLOCKED run，对每个 prior 的
+  sealed input set 逐 run 检查：
+    1. run_id 仍在当前 authoritative CR-2 ledger 中存在（disappearance
+       -> DAMAGED）
+    2. ledger identity（status + 全部 seal 字段）== prior sealed
+       identity（drift -> DAMAGED）
+    3. physical + anchored verification 仍健康（degradation -> DAMAGED）
+    4. 健康的 prior input 必然出现在 current snapshot discovery 中
+       （同 context => 同 surface plan；缺失即不可解释 drift）
+合法新增：全部 prior inputs 完整保留 + current set 是 superset
+  -> 正常新 run（新 identity）
+exact restoration -> 历史 SUCCESS exact replay
+```
+
+## 8.2 P0-02 Verification Evidence Exactness（修订 §7.5）
+
+`verification_state_hash` 只封枚举——同错误大类内 cause 变化（anchor
+missing → anchor hash mismatch）会 replay stale BLOCKED finding。CR-3.3
+起 `InputRunSeal` 新增 `verification_problem_hash`（canonical sorted
+problem evidence：run_id + verification class + closure problems +
+anchored-evidence problems + materialization problems）：
+
+```text
+base identity        不含 problem hash（identity_dict 排除）
+verification state   含 problem hash（run_id + class + problem hash）
+manifest input seal  持久化 problem hash（as_dict 含）
+input_seal_hash      含 problem hash
+同一 INVALID class + 不同 cause -> 新 state -> 新 BLOCKED evidence run
+  （prior BLOCKED 保留 append-only；finding detail 反映真实当前 cause）
+exact same failure   -> idempotent replay 同一 BLOCKED run
+INVALID -> HEALTHY   -> recovery run
+prior SUCCESS + 任何退化 -> P0-01 continuity guard HARD DAMAGED
+```
+
+replay 的 sealed-input 验证分流：HEALTHY sealed input 要求仍健康
+（物理 + anchor）；INVALID sealed input（BLOCKED run 记录的失败）要求
+**当前 problem evidence == sealed problem hash**（exact failure 才
+replay）。
+
+## 8.3 P1（audit §3-§5）
+
+- **P1-01 finding scope 真实**：source-scope findings 用 reserved scope
+  `input:<normalization_surface>`（绝不用无业务语义的 "source"），detail
+  seal `affected_domains` exact set（受该 surface 影响的全部 requested
+  domains——shared surface 如 security_status_history 同时封
+  security_status 与 limit_price）；
+- **P1-02 finding precedence**：no discovered → REQUIRED_DOMAIN_MISSING；
+  discovered but damaged → 仅 closure/evidence finding（**不再误报
+  UNAVAILABLE_AT_ASOF**——损坏不是不可用）；healthy but all future →
+  UNAVAILABLE（真语义保留）；
+- **P1-03 治理计数更正**：CR-3.2 说明称 InputRunSeal "19 fields"——实际
+  为 **20**；CR-3.3 后为 **21**（+verification_problem_hash）；
+  identity_dict 为 17 字段。治理文档按代码 exact set 记录（测试机械
+  断言），不再手写数字。
+
+## 8.4 CR-3.3 对抗测试（+20 项）
+
+`tests/integration/test_canonical.py`（131 项 = CR-3/3.1/3.2 111 项回归
++ 20 新增：HistoricalInputContinuity 11（delete/status/uri/hash/seal
+drift ×5 + two-sources delete-one + exact restore replay + superset
+allowed + future-only addition + master disappearance/status drift）/
+VerificationEvidenceState 4（cause change 新 run ×2 + exact failure
+idempotent + recovery 保留历史）/ FindingTruthfulness 4（reserved scope +
+affected domains + shared surface 双域 + damaged 不误报 + healthy future
+仍报）/ SealFieldCountCorrection 1）。总体 1116/0。
+
+## 8.5 Scope 边界
+
+CR-3.3 仍是 CR-3 correctness closure：不建 SnapshotBuilder / ReadModel
+（CR-4）、不新增 domain、不改 CR-2 frozen contract。migration 021（未改
+018/019/020）；CR-3.2 FREEZE 的 16 项机制零重写（111 项回归全保持）。

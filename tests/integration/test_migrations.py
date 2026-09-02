@@ -86,7 +86,7 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 20
+            assert len(applied) == 21
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
         finally:
@@ -97,10 +97,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 20
+            assert len(first) == 21
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 20
+            assert len(ledger) == 21
         finally:
             conn.close()
 
@@ -136,10 +136,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 021 (015..020 exist in the real repo set)
+            # tamper 002 and add a new 022 (015..021 exist in the real repo set)
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "021_new_thing.sql").write_text(
+            (tampered_dir / "022_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):
@@ -252,20 +252,20 @@ class TestLedgerIntegrity:
         upgrade_dir = tmp_path / "migrations"
         upgrade_dir.mkdir()
         for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
-            if int(f.name[:3]) <= 19:
+            if int(f.name[:3]) <= 20:
                 (upgrade_dir / f.name).write_bytes(f.read_bytes())
         conn = duckdb.connect(str(db_path))
         try:
             first = apply_migrations(conn, upgrade_dir)
-            assert [r.migration_id for r in first] == [f"{i:03d}" for i in range(1, 20)]
-            # ship 020 into the same directory set
+            assert [r.migration_id for r in first] == [f"{i:03d}" for i in range(1, 21)]
+            # ship 021 into the same directory set
             for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
-                if int(f.name[:3]) == 20:
+                if int(f.name[:3]) == 21:
                     (upgrade_dir / f.name).write_bytes(f.read_bytes())
             second = apply_migrations(conn, upgrade_dir)
-            assert [r.migration_id for r in second] == ["020"]
+            assert [r.migration_id for r in second] == ["021"]
             ledger = applied_migrations(conn)
-            assert len(ledger) == 20
+            assert len(ledger) == 21
             # the CR-2.1 seal columns exist on the upgraded database
             columns = {
                 row[0]
@@ -299,6 +299,7 @@ class TestLedgerIntegrity:
                 "verification_state_hash",
                 "input_seal_hash",
                 "identity_master_input_set_hash",
+                "canonical_context_hash",
             } <= canonical_columns
             # the CR-2.3 anchor ledger exists on the upgraded database
             anchor_cols = {

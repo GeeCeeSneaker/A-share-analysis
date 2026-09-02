@@ -2086,8 +2086,8 @@ class TestTransactionalSnapshot:
         original = CanonicalRunner._snapshot_run
         captured = {}
 
-        def racing(self, run_row, role, as_of_dt):
-            result = original(self, run_row, role, as_of_dt)
+        def racing(self, run_row, role, as_of_dt, requested):
+            result = original(self, run_row, role, as_of_dt, requested)
             if run_row["normalization_surface"] == "daily_bar" and "uri" not in captured:
                 captured["uri"] = run_row["normalized_manifest_uri"]
                 # a concurrent ledger UPDATE to a different manifest path
@@ -2123,8 +2123,8 @@ class TestTransactionalSnapshot:
         _seed_bars(conn, env_root, "req-bars")
         original = CanonicalRunner._snapshot_run
 
-        def racing_swap(self, run_row, role, as_of_dt):
-            result = original(self, run_row, role, as_of_dt)
+        def racing_swap(self, run_row, role, as_of_dt, requested):
+            result = original(self, run_row, role, as_of_dt, requested)
             if run_row["normalization_surface"] == "daily_bar":
                 manifest = json.loads(
                     (self.normalized_root / str(run_row["normalized_manifest_uri"])).read_text(
@@ -2643,3 +2643,508 @@ class TestVerificationStateTransition:
         ).fetchone()
         assert str(row[0]) == "BLOCKED"
         assert int(row[1]) >= 1
+
+
+# ----------------------------------- CR-3.3: historical input continuity
+
+
+def _canonical_count(conn) -> int:
+    return int(conn.execute("SELECT count(*) FROM meta_canonicalization_run").fetchone()[0])
+
+
+@pytest.mark.integration
+class TestHistoricalInputContinuity:
+    """CR-3.3 P0-01 (audit 20260902 section 1): prior SUCCESS consumed
+    CR-2 inputs disappearing / drifting in the ledger can never escape
+    the degradation guard (the context identity excludes the input
+    set, so the guard still finds the prior SUCCESS)."""
+
+    def _prior_success(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "SUCCESS"
+        return result
+
+    def test_consumed_cr2_row_delete_damaged(self, conn, env_root):
+        """Audit item 01: DELETE one consumed CR-2 ledger row -> DAMAGED,
+        zero new canonical runs."""
+        result = self._prior_success(conn, env_root)
+        conn.execute(
+            "DELETE FROM meta_provider_normalization_run WHERE raw_request_id = ?",
+            ["req-bars"],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1  # only the historical SUCCESS
+        assert result.status == "SUCCESS"
+
+    def test_consumed_cr2_status_drift_damaged(self, conn, env_root):
+        """Audit item 02: status SUCCESS -> BLOCKED drift -> DAMAGED."""
+        self._prior_success(conn, env_root)
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET status = 'BLOCKED' "
+            "WHERE raw_request_id = ?",
+            ["req-bars"],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_consumed_cr2_manifest_uri_drift_damaged(self, conn, env_root):
+        """Audit item 03: manifest_uri drift -> DAMAGED."""
+        self._prior_success(conn, env_root)
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET normalized_manifest_uri = ? "
+            "WHERE raw_request_id = ?",
+            ["evil/manifest.json", "req-bars"],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_consumed_cr2_manifest_hash_drift_damaged(self, conn, env_root):
+        """Audit item 04: manifest_hash drift -> DAMAGED."""
+        self._prior_success(conn, env_root)
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET normalized_manifest_hash = ? "
+            "WHERE raw_request_id = ?",
+            ["0" * 64, "req-bars"],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_consumed_cr2_seal_field_drift_damaged(self, conn, env_root):
+        """Audit item 05: mapper_code_hash / semantic seal drift ->
+        DAMAGED."""
+        self._prior_success(conn, env_root)
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET mapper_code_hash = ?, "
+            "normalized_semantic_hash = ? WHERE raw_request_id = ?",
+            ["0" * 64, "1" * 64, "req-bars"],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_two_sources_delete_one_not_silent_success(self, conn, env_root):
+        """Audit item 06: two healthy source runs -> delete one -> MUST
+        NOT silently produce SUCCESS from the remainder."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-a", received_at=T0)
+        _seed_bars(conn, env_root, "req-b", received_at=T0)
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert first.status == "SUCCESS"
+        conn.execute(
+            "DELETE FROM meta_provider_normalization_run WHERE raw_request_id = ?",
+            ["req-a"],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1  # no new SUCCESS from remainder
+
+    def test_exact_restore_returns_historical_replay(self, conn, env_root):
+        """Audit item 07: exact restoration of the drifted CR-2 identity
+        -> historical SUCCESS exact replay."""
+        result = self._prior_success(conn, env_root)
+        original = str(
+            conn.execute(
+                "SELECT mapper_code_hash FROM meta_provider_normalization_run "
+                "WHERE raw_request_id = ?",
+                ["req-bars"],
+            ).fetchone()[0]
+        )
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET mapper_code_hash = ? "
+            "WHERE raw_request_id = ?",
+            ["0" * 64, "req-bars"],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        # exact restore
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET mapper_code_hash = ? "
+            "WHERE raw_request_id = ?",
+            [original, "req-bars"],
+        )
+        replay = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert replay.idempotent_replay is True
+        assert replay.canonical_run_id == result.canonical_run_id
+        assert _canonical_count(conn) == 1
+
+    def test_legitimate_new_input_superset_allowed(self, conn, env_root):
+        """Audit item 08: all prior inputs intact + a new healthy CR-2
+        run -> a NEW canonical run is allowed (superset world)."""
+        result = self._prior_success(conn, env_root)
+        _seed_bars(conn, env_root, "req-new", received_at=T0)
+        second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert second.status == "SUCCESS"
+        assert second.canonical_run_id != result.canonical_run_id
+        assert second.idempotent_replay is False
+        assert _canonical_count(conn) == 2
+
+    def test_future_only_addition_permitted_earlier_truth(self, conn, env_root):
+        """Audit item 09: future-only added run with prior inputs intact
+        -> new input identity permitted, earlier selected BUSINESS truth
+        unchanged (lineage fields may legitimately differ when the
+        deterministic winner shifts between equivalent sources)."""
+        result = self._prior_success(conn, env_root)
+
+        def truth(rows):
+            return [
+                {
+                    k: r[k]
+                    for k in (
+                        "canonical_key",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "amount",
+                        "trade_date",
+                    )
+                }
+                for r in rows
+            ]
+
+        first_truth = truth(_read_selected(env_root, result))
+        _seed_bars(conn, env_root, "req-future", received_at=T1)
+        second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert second.status == "SUCCESS"
+        assert second.canonical_run_id != result.canonical_run_id
+        assert truth(_read_selected(env_root, second)) == first_truth
+
+    def test_identity_master_disappearance_damaged(self, conn, env_root):
+        """Audit item 10: identity-master consumed run disappearance ->
+        DAMAGED under the same continuity rule."""
+        result = self._prior_success(conn, env_root)
+        conn.execute(
+            "DELETE FROM meta_provider_normalization_run WHERE raw_request_id = ?",
+            ["req-master"],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+        assert result.status == "SUCCESS"
+
+    def test_identity_master_status_drift_damaged(self, conn, env_root):
+        self._prior_success(conn, env_root)
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET status = 'BLOCKED' "
+            "WHERE raw_request_id = ?",
+            ["req-master"],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+
+# --------------------------------- CR-3.3: verification evidence state
+
+
+@pytest.mark.integration
+class TestVerificationEvidenceState:
+    """CR-3.3 P0-02 (audit 20260902 section 2): the verification state
+    seals the EXACT problem evidence - the same error class with a
+    different cause yields a NEW BLOCKED run, never a stale finding
+    replay."""
+
+    def test_anchor_missing_then_wrong_hash_new_blocked_run(self, conn, env_root):
+        """Audit item 11: anchor missing -> BLOCKED; then anchor exists
+        with a WRONG hash (different cause) -> NEW BLOCKED run with the
+        truthful finding detail."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        conn.execute("DELETE FROM meta_raw_evidence_anchor WHERE request_id = 'req-bars'")
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert first.status == "BLOCKED"
+        first_detail = str(
+            conn.execute(
+                "SELECT detail_json FROM meta_canonical_reconciliation_finding "
+                "WHERE canonical_run_id = ? AND finding_class = "
+                "'AVAILABILITY_EVIDENCE_INVALID'",
+                [first.canonical_run_id],
+            ).fetchone()[0]
+        )
+        assert "no meta_raw_evidence_anchor" in first_detail
+        # different cause: anchor row EXISTS but the hash mismatches
+        conn.execute(
+            "INSERT INTO meta_raw_evidence_anchor (provider, provider_dataset, "
+            "request_id, evidence_uri, evidence_hash, endpoint, operation_id, "
+            "normalization_surface, payload_kind, ingest_run_id, created_at) VALUES ("
+            "'amazingdata', 'daily_bar', 'req-bars', 'x', ?, 'MarketData.query_kline', "
+            "'op', 'daily_bar', 'rows', 'ing', now())",
+            ["0" * 64],
+        )
+        second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert second.status == "BLOCKED"
+        assert second.canonical_run_id != first.canonical_run_id
+        assert second.idempotent_replay is False
+        second_detail = str(
+            conn.execute(
+                "SELECT detail_json FROM meta_canonical_reconciliation_finding "
+                "WHERE canonical_run_id = ? AND finding_class = "
+                "'AVAILABILITY_EVIDENCE_INVALID'",
+                [second.canonical_run_id],
+            ).fetchone()[0]
+        )
+        assert "anchor hash mismatch" in second_detail  # truthful current cause
+        assert "no meta_raw_evidence_anchor" not in second_detail
+        # both BLOCKED runs are preserved append-only
+        blocked_count = int(
+            conn.execute(
+                "SELECT count(*) FROM meta_canonicalization_run WHERE status = 'BLOCKED'"
+            ).fetchone()[0]
+        )
+        assert blocked_count == 2
+
+    def test_closure_manifest_missing_then_output_damage_new_run(self, conn, env_root):
+        """Audit item 12: manifest missing -> BLOCKED; manifest restored
+        but output damaged (different cause) -> NEW BLOCKED run."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        run_uri = conn.execute(
+            "SELECT normalized_manifest_uri FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = 'req-bars'"
+        ).fetchone()[0]
+        manifest_bytes = (env_root["normalized"] / str(run_uri)).read_bytes()
+        (env_root["normalized"] / str(run_uri)).unlink()
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert first.status == "BLOCKED"
+        # restore manifest, damage an output parquet instead (different cause)
+        (env_root["normalized"] / str(run_uri)).write_bytes(manifest_bytes)
+        manifest = json.loads(manifest_bytes)
+        output_uri = manifest["outputs"][0]["uri"]
+        (env_root["normalized"] / output_uri).write_bytes(b"damaged-output")
+        second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert second.status == "BLOCKED"
+        assert second.canonical_run_id != first.canonical_run_id
+        first_problems = str(
+            conn.execute(
+                "SELECT detail_json FROM meta_canonical_reconciliation_finding "
+                "WHERE canonical_run_id = ? AND finding_class = "
+                "'CLOSURE_VERIFICATION_FAILED'",
+                [first.canonical_run_id],
+            ).fetchone()[0]
+        )
+        second_problems = str(
+            conn.execute(
+                "SELECT detail_json FROM meta_canonical_reconciliation_finding "
+                "WHERE canonical_run_id = ? AND finding_class = "
+                "'CLOSURE_VERIFICATION_FAILED'",
+                [second.canonical_run_id],
+            ).fetchone()[0]
+        )
+        assert "missing" in first_problems.lower()
+        assert "tampered" in second_problems.lower() or "bytes" in second_problems.lower()
+
+    def test_same_exact_failure_idempotent_replay(self, conn, env_root):
+        """Audit item 13: the same exact failure repeated -> idempotent
+        replay of the SAME BLOCKED run."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        conn.execute("DELETE FROM meta_raw_evidence_anchor WHERE request_id = 'req-bars'")
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        replay = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert replay.status == "BLOCKED"
+        assert replay.idempotent_replay is True
+        assert replay.canonical_run_id == first.canonical_run_id
+        assert _canonical_count(conn) == 1
+
+    def test_invalid_to_healthy_recovery_preserves_history(self, conn, env_root):
+        """Audit items 14-15: invalid -> exact healthy repair -> recovery
+        SUCCESS new run; all historical BLOCKED findings remain
+        append-only."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        conn.execute("DELETE FROM meta_raw_evidence_anchor WHERE request_id = 'req-bars'")
+        blocked = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert blocked.status == "BLOCKED"
+        from ashare_state.storage.raw_anchor import _enroll_anchor
+
+        _enroll_anchor(
+            conn,
+            env_root["raw"],
+            provider="amazingdata",
+            provider_dataset="daily_bar",
+            request_id="req-bars",
+            evidence_hash=hashlib.sha256(
+                _raw_meta_path(env_root, "daily_bar", "req-bars").read_bytes()
+            ).hexdigest(),
+        )
+        recovered = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert recovered.status == "SUCCESS"
+        assert recovered.canonical_run_id != blocked.canonical_run_id
+        # historical BLOCKED evidence remains
+        row = conn.execute(
+            "SELECT status, finding_count FROM meta_canonicalization_run "
+            "WHERE canonical_run_id = ?",
+            [blocked.canonical_run_id],
+        ).fetchone()
+        assert str(row[0]) == "BLOCKED" and int(row[1]) >= 1
+
+
+# ------------------------------------- CR-3.3: P1 finding truthfulness
+
+
+@pytest.mark.integration
+class TestFindingTruthfulness:
+    """CR-3.3 P1-01/P1-02 (audit 20260902 sections 3-4): source-scope
+    findings carry a real reserved scope + affected domains; damaged
+    sources never masquerade as UNAVAILABLE_AT_ASOF."""
+
+    def test_source_finding_scope_reserved_with_affected_domains(self, conn, env_root):
+        """P1-01: a damaged surface produces findings scoped to
+        'input:<surface>' with the affected requested domains sealed in
+        detail - never the meaningless 'source'."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET normalized_manifest_hash = ? "
+            "WHERE raw_request_id = ?",
+            ["0" * 64, "req-bars"],
+        )
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "BLOCKED"
+        rows = conn.execute(
+            "SELECT canonical_domain, detail_json FROM "
+            "meta_canonical_reconciliation_finding WHERE canonical_run_id = ? "
+            "AND finding_class = 'CLOSURE_VERIFICATION_FAILED'",
+            [result.canonical_run_id],
+        ).fetchall()
+        assert rows
+        for domain_label, detail_json in rows:
+            assert str(domain_label) == "input:daily_bar"  # reserved scope
+            detail = json.loads(str(detail_json))
+            assert detail.get("affected_domains") == ["daily_bar"]
+        # no finding carries the meaningless "source" scope
+        bogus = int(
+            conn.execute(
+                "SELECT count(*) FROM meta_canonical_reconciliation_finding "
+                "WHERE canonical_run_id = ? AND canonical_domain = 'source'",
+                [result.canonical_run_id],
+            ).fetchone()[0]
+        )
+        assert bogus == 0
+
+    def test_status_surface_finding_affects_both_domains(self, conn, env_root):
+        """P1-01: a damaged security_status_history surface seals BOTH
+        consuming domains in affected_domains."""
+        _seed_base(conn, env_root)
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="history_stock_status",
+            endpoint="InfoData.get_history_stock_status",
+            surface="security_status_history",
+            request_id="req-status",
+            payload=_STATUS_ROWS,
+        )
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET normalized_manifest_hash = ? "
+            "WHERE raw_request_id = ?",
+            ["0" * 64, "req-status"],
+        )
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("security_status", "limit_price"))
+        assert result.status == "BLOCKED"
+        detail = str(
+            conn.execute(
+                "SELECT detail_json FROM meta_canonical_reconciliation_finding "
+                "WHERE canonical_run_id = ? AND finding_class = "
+                "'CLOSURE_VERIFICATION_FAILED'",
+                [result.canonical_run_id],
+            ).fetchone()[0]
+        )
+        doc = json.loads(detail)
+        assert doc["affected_domains"] == ["limit_price", "security_status"]
+
+    def test_damaged_source_not_masquerading_as_unavailable(self, conn, env_root):
+        """P1-02: a damaged source (closure failed) produces the closure
+        finding ONLY - no misleading UNAVAILABLE_AT_ASOF."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        conn.execute(
+            "UPDATE meta_provider_normalization_run SET normalized_manifest_hash = ? "
+            "WHERE raw_request_id = ?",
+            ["0" * 64, "req-bars"],
+        )
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "BLOCKED"
+        unavailable = int(
+            conn.execute(
+                "SELECT count(*) FROM meta_canonical_reconciliation_finding "
+                "WHERE canonical_run_id = ? AND finding_class = "
+                "'REQUIRED_DOMAIN_UNAVAILABLE_AT_ASOF'",
+                [result.canonical_run_id],
+            ).fetchone()[0]
+        )
+        assert unavailable == 0  # damage is not unavailability
+        closure = int(
+            conn.execute(
+                "SELECT count(*) FROM meta_canonical_reconciliation_finding "
+                "WHERE canonical_run_id = ? AND finding_class = "
+                "'CLOSURE_VERIFICATION_FAILED'",
+                [result.canonical_run_id],
+            ).fetchone()[0]
+        )
+        assert closure >= 1
+
+    def test_healthy_future_only_still_reports_unavailable(self, conn, env_root):
+        """P1-02 positive control: HEALTHY future-only runs still report
+        UNAVAILABLE_AT_ASOF (precedence preserved for the truthful
+        case)."""
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-future", received_at=T1)
+        result = _canonical(conn, env_root, AS_OF_EARLY, domains=("daily_bar",))
+        assert result.status == "BLOCKED"
+        classes = {c for c, _ in _findings(conn, result.canonical_run_id)}
+        assert "REQUIRED_DOMAIN_UNAVAILABLE_AT_ASOF" in classes
+
+
+# -------------------------------------- CR-3.3: P1-03 governance count
+
+
+@pytest.mark.integration
+class TestSealFieldCountCorrection:
+    def test_input_run_seal_field_count_21(self):
+        """P1-03: InputRunSeal carries 21 fields (20 after CR-3.2 + the
+        CR-3.3 verification_problem_hash); identity_dict carries the 17
+        identity fields (state fields excluded)."""
+        import inspect
+
+        from ashare_state.canonical.canonicalizer import InputRunSeal
+
+        fields = [f for f in inspect.signature(InputRunSeal).parameters if f != "self"]
+        assert len(fields) == 21
+        sample = InputRunSeal(
+            run_id="r",
+            role="source",
+            provider="amazingdata",
+            normalization_surface="daily_bar",
+            provider_dataset="daily_bar",
+            endpoint="e",
+            raw_request_id="q",
+            raw_evidence_uri="u",
+            raw_evidence_hash="h",
+            normalization_contract_version="v",
+            mapper_identity="m",
+            mapper_code_hash="c",
+            normalized_manifest_uri="mu",
+            normalized_manifest_hash="mh",
+            normalized_output_set_hash="osh",
+            normalized_semantic_hash="sh",
+            status="SUCCESS",
+            verification="HEALTHY",
+            received_at="",
+            pit_available=True,
+            verification_problem_hash="ph",
+        )
+        assert len(sample.as_dict()) == 21
+        identity = sample.identity_dict()
+        assert "verification_problem_hash" not in identity
+        assert "verification" not in identity
+        assert "received_at" not in identity
+        assert "pit_available" not in identity
+        assert len(identity) == 17

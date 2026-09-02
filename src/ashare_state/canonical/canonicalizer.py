@@ -150,6 +150,8 @@ _LEDGER_COLUMNS = (
     "verification_state_hash",
     "input_seal_hash",
     "identity_master_input_set_hash",
+    # migration 021 (CR-3.3)
+    "canonical_context_hash",
 )
 
 _FINDING_COLUMNS = (
@@ -264,6 +266,15 @@ class InputRunSeal:
     verification: str  # HEALTHY | CLOSURE_FAILED | *_INVALID
     received_at: str  # ISO (empty when the evidence is invalid)
     pit_available: bool  # anchored received_at <= as_of at snapshot time
+    # CR-3.3 P0-02: canonical hash over the EXACT verification problem
+    # evidence (run id + verification class + canonicalized closure /
+    # anchored-evidence / materialization problem sets). HEALTHY seals
+    # the empty problem set. The hash enters the verification STATE and
+    # the manifest input seal (as_dict) but NEVER the base identity
+    # (identity_dict) - so the same error class with a different cause
+    # yields a NEW BLOCKED evidence run instead of replaying a stale
+    # finding.
+    verification_problem_hash: str
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -287,6 +298,7 @@ class InputRunSeal:
             "verification": self.verification,
             "received_at": self.received_at,
             "pit_available": self.pit_available,
+            "verification_problem_hash": self.verification_problem_hash,
         }
 
     def identity_dict(self) -> dict[str, Any]:
@@ -421,10 +433,48 @@ class CanonicalInputSnapshot:
 
     @property
     def verification_state_hash(self) -> str:
-        """CR-3.2 P0-05: canonical hash over the per-input verification
-        outcomes (health only - PIT availability is not damage)."""
-        state = [{"run_id": seal.run_id, "verification": seal.verification} for seal in self.seals]
+        """CR-3.2 P0-05 + CR-3.3 P0-02: canonical hash over the
+        per-input verification outcomes INCLUDING the exact problem
+        evidence hash - the same error class with a different cause
+        yields a NEW state (never a stale BLOCKED finding replay)."""
+        state = [
+            {
+                "run_id": seal.run_id,
+                "verification": seal.verification,
+                "verification_problem_hash": seal.verification_problem_hash,
+            }
+            for seal in self.seals
+        ]
         return hashlib.sha256(_canonical_json(state).encode("utf-8")).hexdigest()
+
+    @property
+    def canonical_context_hash(self) -> str:
+        """CR-3.3 P0-01: the REQUEST-WORLD identity - requested domain
+        set + as_of + contract + availability/source/tolerance policy
+        identities + identity bridge policy identity + canonical code
+        fingerprint. Deliberately EXCLUDES the current CR-2 input set
+        and the verification state: the historical SUCCESS continuity
+        guard must still find a prior SUCCESS after its consumed CR-2
+        inputs disappear / drift in the ledger (which changes the base
+        identity but never the request world)."""
+        return hashlib.sha256(
+            "|".join(
+                (
+                    self.requested_domains_hash,
+                    self.as_of.isoformat(),
+                    CANONICAL_CONTRACT_VERSION,
+                    self.availability_policy_version,
+                    self.availability_policy_hash,
+                    self.source_policy_version,
+                    self.source_policy_hash,
+                    self.tolerance_policy_version,
+                    self.tolerance_policy_hash,
+                    _identity.identity_bridge_policy_version(),
+                    _identity.identity_bridge_policy_hash(),
+                    self.code_fingerprint,
+                )
+            ).encode("utf-8")
+        ).hexdigest()
 
     @property
     def base_identity_hash(self) -> str:
@@ -662,25 +712,8 @@ class CanonicalRunner:
         # ------------------------ ONE transactional materialized snapshot
         snapshot = self._build_snapshot(as_of_dt, requested)
 
-        # ------------------------ degraded-SUCCESS guard (P0-05)
-        prior_runs = self.conn.execute(
-            "SELECT canonical_run_id, status FROM meta_canonicalization_run "
-            "WHERE base_identity_hash = ?",
-            [snapshot.base_identity_hash],
-        ).fetchall()
-        has_prior_success = any(str(r[1]) != "BLOCKED" for r in prior_runs)
-        if snapshot.has_verification_failures and has_prior_success:
-            failed = sorted(
-                seal.run_id for seal in snapshot.seals if seal.verification != V_HEALTHY
-            )
-            msg = (
-                f"prior SUCCESS(eful) canonical runs exist for this input world, "
-                f"but the current inputs are DEGRADED (failed: {failed}) - the "
-                "prior run is DAMAGED and no replacement may be minted; repair "
-                "the exact upstream evidence to replay the historical run "
-                "(CR-3.2 audit 20260901 section 5)"
-            )
-            raise CanonicalRunnerError(msg)
+        # ------------- CR-3.3 P0-01 historical input continuity guard
+        self._check_historical_continuity(snapshot)
 
         # ------------------------ exact replay lookup (history-wide)
         idempotency_key = snapshot.idempotency_key
@@ -779,6 +812,11 @@ class CanonicalRunner:
                 and s.seal.normalization_surface == domain_spec(domain).normalization_surface
                 and s.seal.provider_dataset in domain_spec(domain).provider_datasets
             ]
+            healthy_verified = [s for s in eligible_verified if s.seal.verification == V_HEALTHY]
+            # CR-3.3 P1-02 finding precedence (audit 20260902 section 4):
+            # no discovered run -> MISSING; discovered but damaged ->
+            # closure/evidence findings only (damage is NOT unavailability);
+            # healthy runs but all received_at > as_of -> UNAVAILABLE.
             if not eligible_verified:
                 findings.append(
                     _finding(
@@ -791,6 +829,8 @@ class CanonicalRunner:
                         blocking=True,
                     )
                 )
+            elif not healthy_verified:
+                pass  # damaged inputs already carry closure/evidence findings
             elif not available:
                 findings.append(
                     _finding(
@@ -896,6 +936,157 @@ class CanonicalRunner:
         )
 
     # -------------------------------------------------------- snapshot
+    def _check_historical_continuity(self, snapshot: CanonicalInputSnapshot) -> None:
+        """CR-3.3 P0-01 (audit 20260902 section 1): historical input
+        continuity guard - a prior SUCCESS(eful) canonical run of the
+        SAME request world must never be silently forgotten when its
+        consumed CR-2 inputs disappear / drift in the ledger (which
+        changes the base identity but never the canonical CONTEXT).
+
+        For every prior non-BLOCKED run under the same
+        ``canonical_context_hash``: each sealed input run must still
+        exist in the current authoritative CR-2 ledger with an
+        identical identity (status + seal fields), and its physical /
+        anchored verification must still be healthy. Disappearance,
+        status/seal drift or damaged evidence -> DAMAGED (no
+        replacement of any kind may be minted). A current input set
+        that is a SUPERSET of every prior sealed set (all prior inputs
+        intact + healthy) is a legitimate new world and flows on
+        normally."""
+        prior_rows = self.conn.execute(
+            "SELECT canonical_run_id, status, manifest_uri, manifest_hash "
+            "FROM meta_canonicalization_run WHERE canonical_context_hash = ? "
+            "AND status != 'BLOCKED' ORDER BY canonical_run_id",
+            [snapshot.canonical_context_hash],
+        ).fetchall()
+        if not prior_rows:
+            return
+        current_seal_by_run = {seal.run_id: seal for seal in snapshot.seals}
+        for run_id, _status, manifest_uri, manifest_hash in prior_rows:
+            problems = self._continuity_problems_for(
+                str(run_id), str(manifest_uri), str(manifest_hash), current_seal_by_run
+            )
+            if problems:
+                msg = (
+                    f"prior canonical run {run_id} consumed inputs that are no "
+                    f"longer intact: {'; '.join(problems)} - the prior run is "
+                    "DAMAGED and no replacement may be minted; restore the exact "
+                    "upstream evidence to replay the historical run "
+                    "(CR-3.3 audit 20260902 section 1)"
+                )
+                raise CanonicalRunnerError(msg)
+
+    def _continuity_problems_for(
+        self,
+        canonical_run_id: str,
+        manifest_uri: str,
+        manifest_hash: str,
+        current_seal_by_run: dict[str, InputRunSeal],
+    ) -> list[str]:
+        """Continuity problems of ONE prior canonical run against the
+        CURRENT authoritative ledger + physical evidence."""
+        problems: list[str] = []
+        manifest_path = self.normalized_root / manifest_uri
+        if not manifest_path.is_file():
+            return [f"prior canonical manifest missing: {manifest_uri}"]
+        if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != manifest_hash:
+            return ["prior canonical manifest bytes do not match the ledger hash"]
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return [f"prior canonical manifest unreadable: {exc}"]
+        for entry in manifest.get("input_normalized_runs", []):
+            run_id = str(entry.get("run_id"))
+            problems.extend(self._continuity_problems_for_input(entry, run_id, current_seal_by_run))
+        _ = canonical_run_id
+        return problems
+
+    def _continuity_problems_for_input(
+        self,
+        entry: dict[str, Any],
+        run_id: str,
+        current_seal_by_run: dict[str, InputRunSeal],
+    ) -> list[str]:
+        """Continuity problems of ONE sealed input run of a prior
+        canonical run: ledger existence, identity equality, physical /
+        anchored health (symmetric with first consume)."""
+        problems: list[str] = []
+        row = self.conn.execute(
+            "SELECT provider, normalization_surface, provider_dataset, endpoint, "
+            "raw_request_id, raw_evidence_uri, raw_evidence_hash, "
+            "normalization_contract_version, mapper_identity, mapper_code_hash, "
+            "normalized_manifest_uri, normalized_manifest_hash, "
+            "normalized_output_set_hash, normalized_semantic_hash, status "
+            "FROM meta_provider_normalization_run WHERE normalization_run_id = ?",
+            [run_id],
+        ).fetchone()
+        if row is None:
+            return [
+                f"sealed input run {run_id} no longer exists in the CR-2 ledger (disappearance)"
+            ]
+        current = dict(
+            zip(
+                (
+                    "provider",
+                    "normalization_surface",
+                    "provider_dataset",
+                    "endpoint",
+                    "raw_request_id",
+                    "raw_evidence_uri",
+                    "raw_evidence_hash",
+                    "normalization_contract_version",
+                    "mapper_identity",
+                    "mapper_code_hash",
+                    "normalized_manifest_uri",
+                    "normalized_manifest_hash",
+                    "normalized_output_set_hash",
+                    "normalized_semantic_hash",
+                    "status",
+                ),
+                row,
+                strict=True,
+            )
+        )
+        for field, expected in current.items():
+            if str(entry.get(field, "")) != str(expected):
+                problems.append(
+                    f"sealed input run {run_id} ledger field {field} drifted: "
+                    f"sealed {entry.get(field)!r} != current {expected!r}"
+                )
+        if problems:
+            return problems
+        # identity intact: physical + anchored verification must still be healthy
+        run_row = {
+            "normalization_run_id": run_id,
+            **current,
+        }
+        anchor_problems, _ = self._verify_anchored_availability(run_row)
+        if anchor_problems:
+            problems.extend(
+                f"sealed input run {run_id} anchored evidence degraded: {p}"
+                for p in anchor_problems
+            )
+        closure_problems = verify_normalized_run(
+            self.conn,
+            run_id,
+            raw_root=self.raw_root,
+            normalized_root=self.normalized_root,
+        )
+        problems.extend(
+            f"sealed input run {run_id} closure degraded: {p}" for p in closure_problems
+        )
+        if problems:
+            return problems
+        # healthy + identity intact: the prior input must also be present in
+        # the CURRENT snapshot discovery (same context => same surface plan;
+        # absence would be unexplainable discovery drift)
+        if run_id not in current_seal_by_run:
+            problems.append(
+                f"sealed input run {run_id} is healthy but absent from the "
+                "current snapshot discovery (unexplainable drift)"
+            )
+        return problems
+
     def _build_snapshot(
         self, as_of_dt: datetime, requested: tuple[str, ...]
     ) -> CanonicalInputSnapshot:
@@ -921,7 +1112,7 @@ class CanonicalRunner:
                 surface = key.split("|")[0]
                 role = "identity_master" if surface == "security_master" else "source"
                 for run_row in run_rows:
-                    snapshot_run, findings = self._snapshot_run(run_row, role, as_of_dt)
+                    snapshot_run, findings = self._snapshot_run(run_row, role, as_of_dt, requested)
                     runs.append(snapshot_run)
                     prefindings.extend(findings)
                     if (
@@ -982,13 +1173,30 @@ class CanonicalRunner:
         )
 
     def _snapshot_run(
-        self, run_row: dict[str, Any], role: str, as_of_dt: datetime
+        self, run_row: dict[str, Any], role: str, as_of_dt: datetime, requested: tuple[str, ...]
     ) -> tuple[SnapshotRun, list[CanonicalFinding]]:
         """Verify one discovered run (CR-2 closure + anchored
         availability) and MATERIALIZE its outputs from the exact
-        hash-verified bytes inside the snapshot boundary."""
+        hash-verified bytes inside the snapshot boundary.
+
+        CR-3.3 P1-01: source-scope findings carry the reserved input
+        scope ``input:<normalization_surface>`` (never the meaningless
+        "source") and seal the affected requested domains in detail.
+        CR-3.3 P0-02: the seal carries the verification_problem_hash
+        over the exact canonicalized problem evidence."""
         findings: list[CanonicalFinding] = []
-        domain_label = "security_master" if role == "identity_master" else role
+        surface = str(run_row["normalization_surface"])
+        if role == "identity_master":
+            scope = "security_master"
+            affected: list[str] = []
+        else:
+            # reserved input-scope schema + affected requested domains
+            scope = f"input:{surface}"
+            affected = sorted(
+                domain
+                for domain in requested
+                if domain_spec(domain).normalization_surface == surface
+            )
         closure_problems = verify_normalized_run(
             self.conn,
             run_row["normalization_run_id"],
@@ -999,24 +1207,29 @@ class CanonicalRunner:
         if closure_problems:
             findings.append(
                 _finding(
-                    domain_label,
+                    scope,
                     "",
                     "CLOSURE_VERIFICATION_FAILED",
                     run_row["provider"],
                     run_row["normalization_run_id"],
-                    {"problems": closure_problems},
+                    {"problems": closure_problems, "affected_domains": affected},
                     blocking=True,
                 )
             )
         if anchor_problems:
+            finding_class = (
+                "IDENTITY_EVIDENCE_INVALID"
+                if role == "identity_master"
+                else "AVAILABILITY_EVIDENCE_INVALID"
+            )
             findings.append(
                 _finding(
-                    domain_label,
+                    scope,
                     "",
-                    "AVAILABILITY_EVIDENCE_INVALID",
+                    finding_class,
                     run_row["provider"],
                     run_row["normalization_run_id"],
-                    {"problems": anchor_problems},
+                    {"problems": anchor_problems, "affected_domains": affected},
                     blocking=True,
                 )
             )
@@ -1034,6 +1247,7 @@ class CanonicalRunner:
         )
 
         outputs: list[MaterializedOutput] = []
+        materialize_problems: list[str] = []
         if verification == V_HEALTHY:
             outputs, materialize_problems = self._materialize_outputs(run_row)
             if materialize_problems:
@@ -1041,16 +1255,24 @@ class CanonicalRunner:
                 pit_available = False
                 findings.append(
                     _finding(
-                        domain_label,
+                        scope,
                         "",
                         "CLOSURE_VERIFICATION_FAILED",
                         run_row["provider"],
                         run_row["normalization_run_id"],
-                        {"problems": materialize_problems},
+                        {"problems": materialize_problems, "affected_domains": affected},
                         blocking=True,
                     )
                 )
                 outputs = []
+        problem_evidence = {
+            "run_id": str(run_row["normalization_run_id"]),
+            "verification": verification,
+            "closure_problems": sorted(closure_problems),
+            "anchored_evidence_problems": sorted(anchor_problems),
+            "materialization_problems": sorted(materialize_problems),
+        }
+        problem_hash = hashlib.sha256(_canonical_json(problem_evidence).encode("utf-8")).hexdigest()
         seal = InputRunSeal(
             run_id=str(run_row["normalization_run_id"]),
             role=role,
@@ -1072,6 +1294,7 @@ class CanonicalRunner:
             verification=verification,
             received_at=received_at.isoformat() if received_at else "",
             pit_available=pit_available,
+            verification_problem_hash=problem_hash,
         )
         return SnapshotRun(seal=seal, outputs=tuple(outputs)), findings
 
@@ -1622,6 +1845,7 @@ class CanonicalRunner:
             ("base_identity_hash", snapshot.base_identity_hash),
             ("verification_state_hash", snapshot.verification_state_hash),
             ("input_seal_hash", snapshot.input_seal_hash),
+            ("canonical_context_hash", snapshot.canonical_context_hash),
             ("availability_policy_version", snapshot.availability_policy_version),
             ("availability_policy_hash", snapshot.availability_policy_hash),
             ("source_policy_version", snapshot.source_policy_version),
@@ -1771,12 +1995,16 @@ class CanonicalRunner:
         return problems
 
     def _verify_sealed_input(self, entry: dict[str, Any]) -> list[str]:
-        """Seal-based verification of ONE input run (CR-3.2 P0-04): the
-        TYPED full CR-2 seal is checked against the physical artifacts -
-        manifest bytes, output content/schema/row-count, the manifest's
-        own CR-2 seal fields (output-set/semantic/mapper/contract), the
-        raw meta bytes, and the authoritative anchor. First-run and
-        replay verification are symmetric."""
+        """Seal-based verification of ONE sealed input run (CR-3.2 P0-04
+        + CR-3.3 P0-02). For a HEALTHY sealed input the physical
+        artifacts are checked against the typed seal (manifest bytes /
+        output content+schema+row-count / the CR-2 manifest's own seal
+        fields / raw meta + anchor) and the input must STILL be healthy.
+        For an INVALID sealed input (a BLOCKED run's recorded failure)
+        the CURRENT problem evidence must equal the sealed
+        verification_problem_hash - the exact same failure replays, a
+        changed cause does not (it produced a different run identity
+        upstream and never reaches this branch)."""
         problems: list[str] = []
         run_row = {
             "normalization_run_id": str(entry.get("run_id")),
@@ -1789,6 +2017,31 @@ class CanonicalRunner:
             "raw_evidence_hash": str(entry.get("raw_evidence_hash")),
         }
         anchor_problems, _ = self._verify_anchored_availability(run_row)
+        sealed_verification = str(entry.get("verification", "HEALTHY"))
+        if sealed_verification != "HEALTHY":
+            # the sealed failure must still be the EXACT same failure
+            closure_problems = verify_normalized_run(
+                self.conn,
+                str(entry.get("run_id")),
+                raw_root=self.raw_root,
+                normalized_root=self.normalized_root,
+            )
+            current_evidence = {
+                "run_id": str(entry.get("run_id")),
+                "verification": sealed_verification,
+                "closure_problems": sorted(closure_problems),
+                "anchored_evidence_problems": sorted(anchor_problems),
+                "materialization_problems": [],
+            }
+            current_hash = hashlib.sha256(
+                _canonical_json(current_evidence).encode("utf-8")
+            ).hexdigest()
+            if current_hash != str(entry.get("verification_problem_hash")):
+                problems.append(
+                    "sealed failure evidence no longer matches the current "
+                    "problem set (verification evidence drift)"
+                )
+            return problems
         problems.extend(anchor_problems)
 
         manifest_uri = str(entry.get("normalized_manifest_uri"))
@@ -1926,6 +2179,7 @@ class CanonicalRunner:
             "input_normalized_runs": [seal.as_dict() for seal in snapshot.seals],
             "input_set_hash": snapshot.input_set_hash,
             "input_seal_hash": snapshot.input_seal_hash,
+            "canonical_context_hash": snapshot.canonical_context_hash,
             "base_identity_hash": snapshot.base_identity_hash,
             "verification_state_hash": snapshot.verification_state_hash,
             "identity_master_input_set_hash": snapshot.master_input_set_hash,
@@ -2034,6 +2288,7 @@ class CanonicalRunner:
                     snapshot.verification_state_hash,
                     snapshot.input_seal_hash,
                     snapshot.master_input_set_hash,
+                    snapshot.canonical_context_hash,
                 ],
             )
             # transaction-time audit metadata ONLY (never part of the

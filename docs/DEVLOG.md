@@ -17,6 +17,48 @@
 
 ---
 
+## 2026-09-02 · CR-3.3 Historical Input Continuity + Verification Evidence Exactness + Finding Truthfulness（CR-3.2 复审 REOPENED 后的收口批次）
+
+**Scope**
+- CR-3.2 复审（audit 20260902 06:56 +08:00，Reviewed HEAD `9ffdf35f577e48ec4de1432057d954da07f78db0`，reopen commit `9ec2fca`）裁决 **CR-3.2 REOPENED**：16 项机制 PASS / FREEZE（transactional snapshot / master PIT / honest policy / full seal 主体 / state transition 主体）；2 个 P0 + 3 个 P1 由本批 CR-3.3 收口（**未启动 CR-4**——复审 §6 边界；CR-4 BLOCKED_BY_CR-3.3）；复审 §1.4/§2.3 mandatory 测试 15 项 + P1 全对应
+
+**Implementation**
+- **P0-01 Historical Input Continuity Guard**：CR-3.2 的 degraded-SUCCESS guard 以 `base_identity_hash` 查历史——但 consumed CR-2 run 的 ledger 行 DELETE / status drift / seal 字段 drift 都会改变 current base identity，使 guard 查不到历史 SUCCESS（可能 mint 新 BLOCKED 甚至从残余健康 run 生成新 SUCCESS truth）。CR-3.3 引入 **`canonical_context_hash`**（migration 021：requested domain set + as_of + contract + 三 policy identities + identity bridge policy identity + canonical code fingerprint——**刻意不含 current CR-2 input set / verification state**，ledger 漂移改变 base 但永不改变 request world）；`_check_historical_continuity` 对同 context 的每个历史非 BLOCKED run 的 sealed input set 逐 run 四重检查：（1）run_id 仍在当前 authoritative ledger（disappearance → DAMAGED）；（2）ledger identity（status + 全部 seal 字段）== prior sealed identity（drift → DAMAGED）；（3）physical + anchored verification 仍健康（degradation → DAMAGED）；（4）健康的 prior input 必在 current snapshot discovery（同 context ⇒ 同 surface plan，缺失即不可解释 drift）。**合法新增**（prior inputs 全部完整 + current superset）→ 正常新 run；**exact restoration** → 历史 SUCCESS exact replay；identity master 同规则
+- **P0-02 Verification Evidence Exactness**：`verification_state_hash` 只封枚举——同错误大类内 cause 变化（anchor missing → anchor hash mismatch；manifest missing → output tamper）会 replay stale BLOCKED finding（audit 结论过时）。`InputRunSeal` 新增 **`verification_problem_hash`**（canonical sorted problem evidence：run_id + verification class + closure problems + anchored-evidence problems + materialization problems）：base identity **不含**（identity_dict 排除）；verification state / manifest input seal / input_seal_hash **均含**。同 INVALID class + 不同 cause → 新 state → **新 BLOCKED evidence run**（prior BLOCKED 保留 append-only；finding detail 反映真实当前 cause）；exact same failure → idempotent replay；INVALID → HEALTHY → recovery run。replay 的 sealed-input 验证**分流**：HEALTHY sealed input 要求仍健康（物理 + anchor）；INVALID sealed input（BLOCKED run 记录的失败）要求**当前 problem evidence == sealed problem hash**（exact failure 才 replay）
+- **P1-01 finding scope 真实**：source-scope findings 用 reserved scope `input:<normalization_surface>`（如 `input:daily_bar`——绝不用无业务语义的 "source"），detail seal `affected_domains` exact set（shared surface 如 security_status_history 同时封 security_status + limit_price）
+- **P1-02 finding precedence**：no discovered → `REQUIRED_DOMAIN_MISSING`；discovered but damaged → **仅** closure/evidence finding（**不误报 UNAVAILABLE_AT_ASOF**——损坏不是不可用）；healthy but all future → `UNAVAILABLE`（真语义保留，positive control 测试）
+- **P1-03 治理计数更正**：CR-3.2 说明称 InputRunSeal "19 fields"——实际 **20**；CR-3.3 后 **21**（+verification_problem_hash；identity_dict 17 字段）。治理按代码 exact set 记录，测试机械断言（`TestSealFieldCountCorrection`），不再手写
+- **Migration 021**：`meta_canonicalization_run` + canonical_context_hash 列（未改 018/019/020）；21 链 from-zero + 020→021 upgrade + idempotent + tamper probe 022
+
+**Schema / Contract Changes**
+- C3 ×1（DM-20260902-071）；**ADR-023 Amendment C**（§8.1-§8.3 修订被复审推翻的两处表述 + P1 计数更正；status 仍 PROPOSED 待 Reviewer closure）；migration 021；CR-3.2 FREEZE 的 16 项机制零重写（111 项回归全保持）
+
+**Verification**
+- Local: **1116 tests passed / 0 failed**（1096 → 1116，+20：TestHistoricalInputContinuity 11（delete/status/uri/hash/seal drift ×5 + two-sources delete-one 不静默 SUCCESS + exact restore replay + superset allowed + future-only addition + master disappearance/status drift）/ TestVerificationEvidenceState 4（cause change 新 run ×2 + exact failure 幂等 + recovery 保留历史）/ TestFindingTruthfulness 4（reserved scope + affected domains + shared surface 双域 + damaged 不误报 + healthy future 仍报）/ TestSealFieldCountCorrection 1）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1116/0
+- 既有回归零破坏：CR-3/3.1/3.2 对抗矩阵 111 项全保持；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
+- GitHub Actions: 本批 CI 结果推送后以 API 正向确认（三腿）；implementation SHA 待回填
+
+**Implementation Status**
+- DONE（2 P0 + 3 P1 全收口 + migration 021 + ADR-023 Amendment C + DM-20260902-071；1116/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- context hash 刻意排除 input set 与 verification state：这是 guard 不被绕过的根——ledger 漂移改变的是"当前输入世界"（base identity），永不改变"请求世界"（context）；guard 按 context 查历史才能在漂移后仍找到 prior SUCCESS
+- 健康的 prior input 必在 current discovery 中的第四重检查：同 context ⇒ 同 surface plan ⇒ discovery 是输入世界的确定性函数；若健康的 prior input 缺席即不可解释——这把 guard 从"数据都在"升级为"数据都在且解释得通"
+- INVALID sealed input 的 replay 语义是 evidence 相等而非健康：BLOCKED run 记录的失败是其审计真相的一部分——replay 要求"现在仍是同一个失败"；不同 cause 因 state hash 不同根本不会命中 replay 分支（新 run），所以分支内只需防 evidence drift
+- problem hash 的 materialization_problems 在 replay 重算时恒 []：materialization 只发生在 snapshot 事务内；seal 为 INVALID 的 run 物化必然为空（INVALID 短路物化），因此 hash 输入一致
+- finding scope 用 `input:<surface>` 前缀而非新 finding_class：保留既有 finding_class 语义（CLOSURE_VERIFICATION_FAILED 等），scope 只修正 domain 字段的真实性；affected_domains 让 shared surface 的影响范围可审计
+- superset 判定隐式而非显式集合比较：continuity guard 只要求 prior inputs 全部健康存在；current 是 superset 时新 base identity 自然产生新 run id——无需额外比较（若 current == prior 则 replay 命中，也正确）
+
+**下一步**
+- 等 Reviewer 复审 CR-3.3（复审 §7 Exit Gate 17 项）；全部通过 → CR-3 / CR-3.1 / CR-3.2 / CR-3.3 → VERIFIED / CLOSED / FREEZE，ADR-023 → ACCEPTED，**CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild START**
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
+---
+
+---
+
 ## 2026-09-01 · CR-3.2 Transactional Snapshot + Identity Master PIT + Honest Policy Execution + Full Seal + Verification-State Transition（CR-3.1 复审 REOPENED 后的收口批次）
 
 **Scope**

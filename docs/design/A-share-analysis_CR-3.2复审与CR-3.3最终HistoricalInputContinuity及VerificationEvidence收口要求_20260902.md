@@ -512,3 +512,95 @@ CR-3.2 已经把“同一次 Canonical 构建只看一个数据库世界”“�
 另外，失败状态不仅要记“是哪一类失败”，还要封住“具体为什么失败”，否则同一大类错误内部变化时会 replay 过时的审计原因。
 
 CR-3.3 是一个**focused final closure**，不应继续扩大功能面。完成后再进入 CR-4 Snapshot / ReadModel。
+
+---
+
+# 10. Implementation Mapping（开发方填写，2026-09-02）
+
+## §1 P0-01 Historical Input Continuity Guard
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| canonical_context_hash（不含 input set / state） | `CanonicalInputSnapshot.canonical_context_hash`（requested set + as_of + contract + 三 policy + bridge policy + fingerprint）；migration 021 持久化 | `TestHistoricalInputContinuity`（全部 11 项——guard 在 ledger 漂移后仍命中） |
+| prior sealed run_id 必须仍在 ledger | `_continuity_problems_for_input` 第一重检查 | item 01 `test_consumed_cr2_row_delete_damaged`（DELETE → DAMAGED；零新 run） |
+| status drift -> DAMAGED | identity 比对含 status | item 02 `test_consumed_cr2_status_drift_damaged` |
+| manifest_uri / hash drift -> DAMAGED | identity 比对含 seal 字段 | items 03-04 |
+| seal 字段（mapper_code_hash / semantic）drift -> DAMAGED | 同上 | item 05 |
+| 双 source 删一不得静默 SUCCESS | guard 在任何 prior input 退化时 raise | item 06 `test_two_sources_delete_one_not_silent_success` |
+| exact restore -> 历史 replay | guard 通过 → base/state 相同 → replay 命中 | item 07 `test_exact_restore_returns_historical_replay` |
+| 合法新增 superset 允许 | prior inputs 全部健康 → 正常新 run | item 08 `test_legitimate_new_input_superset_allowed` |
+| future-only 新增 + earlier truth 不变 | 同上（EXCLUDED_FUTURE；业务真值比较） | item 09 `test_future_only_addition_permitted_earlier_truth` |
+| identity-master 同规则 | guard 不区分 role（sealed inputs 含 identity_master） | items 10-11 `test_identity_master_disappearance/status_drift_damaged` |
+
+## §2 P0-02 Verification Evidence Exactness
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| verification_problem_hash（canonical sorted problem evidence） | `_snapshot_run` 计算（run_id + class + closure/anchor/materialization problems）；HEALTHY = 空 problems hash | `TestSealFieldCountCorrection`（21 字段 + identity_dict 17/排除 state） |
+| base identity 不含 problem hash | `identity_dict()` 排除 verification_problem_hash（及全部 state 字段） | 同上 |
+| state / manifest seal / input_seal_hash 含 problem hash | `verification_state_hash`（run_id+class+problem hash）；`as_dict` 含；`input_seal_hash` 基于 as_dict | item 11（cause 变化 → state 变 → 新 run id） |
+| 同 class 不同 cause -> 新 BLOCKED evidence run | — | item 11 `test_anchor_missing_then_wrong_hash_new_blocked_run`（finding detail 真实更新：no anchor → anchor hash mismatch；两 BLOCKED 保留）/ item 12 `test_closure_manifest_missing_then_output_damage_new_run`（missing → tampered） |
+| exact same failure idempotent | — | item 13 `test_same_exact_failure_idempotent_replay` |
+| INVALID -> HEALTHY recovery + 历史保留 | — | items 14-15 `test_invalid_to_healthy_recovery_preserves_history` |
+| INVALID sealed input replay 分流（evidence 相等） | `_verify_sealed_input`：INVALID → 当前 problem evidence hash == sealed hash | item 13（replay 通过——同一失败） |
+
+## §3/§4 P1-01 / P1-02
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| finding scope 真实（reserved scope + affected domains） | `_snapshot_run`：scope = `input:<surface>`；detail seal `affected_domains` | `TestFindingTruthfulness::test_source_finding_scope_reserved_with_affected_domains`（input:daily_bar + affected ["daily_bar"] + 无 "source" scope）/ `test_status_surface_finding_affects_both_domains`（shared surface 双域） |
+| damaged 不误报 UNAVAILABLE | 三分支 precedence（no discovered → MISSING；damaged → 仅 evidence；healthy future → UNAVAILABLE） | `test_damaged_source_not_masquerading_as_unavailable` / `test_healthy_future_only_still_reports_unavailable`（positive control） |
+
+## §5 P1-03
+
+| Requirement | Implementation | Tests |
+|---|---|---|
+| seal 计数更正 19→20→21 | ADR-023 Amendment C §8.3 追加更正（历史保留）；测试机械断言 | `TestSealFieldCountCorrection::test_input_run_seal_field_count_21`（dataclass 21 / as_dict 21 / identity_dict 17） |
+
+## Mandatory 测试矩阵对照（15 项）
+
+```text
+[✓] 01 prior SUCCESS -> DELETE consumed CR-2 row -> DAMAGED, zero new run
+[✓] 02 prior SUCCESS -> status SUCCESS->BLOCKED -> DAMAGED, zero replacement
+[✓] 03 prior SUCCESS -> manifest_uri drift -> DAMAGED
+[✓] 04 prior SUCCESS -> manifest_hash drift -> DAMAGED
+[✓] 05 prior SUCCESS -> mapper_code_hash / semantic seal drift -> DAMAGED
+[✓] 06 two sources delete one -> MUST NOT silently produce SUCCESS
+[✓] 07 exact restore -> historical SUCCESS exact replay
+[✓] 08 legitimate ADD healthy run, prior intact -> new run allowed
+[✓] 09 future-only addition -> new identity permitted, earlier truth unchanged
+[✓] 10 identity-master disappearance/status drift -> DAMAGED
+[✓] 11 anchor missing BLOCKED -> wrong anchor hash -> NEW BLOCKED run, truthful detail
+[✓] 12 manifest missing BLOCKED -> restored but output damaged -> NEW BLOCKED run
+[✓] 13 same exact failure -> idempotent replay same BLOCKED run
+[✓] 14 invalid -> exact healthy repair -> recovery SUCCESS new run
+[✓] 15 all historical BLOCKED findings remain append-only
+```
+
+## §7 Exit Gate 对照（17 项）
+
+```text
+[✓] prior SUCCESS consumed CR-2 run disappearance cannot escape degradation guard
+[✓] prior SUCCESS input status/seal identity drift -> DAMAGED, no replacement
+[✓] legitimate new input superset remains allowed
+[✓] exact restoration returns historical SUCCESS replay
+[✓] identity-master input obeys same historical continuity guard
+[✓] verification problem exact evidence enters verification state identity
+[✓] same error class / changed cause cannot replay stale BLOCKED finding
+[✓] exact same failure remains idempotent
+[✓] invalid -> healthy recovery preserves prior BLOCKED history
+[✓] source failure finding scope truthful
+[✓] damaged source does not masquerade as UNAVAILABLE_AT_ASOF
+[✓] InputRunSeal governance count corrected（21/17，测试机械断言）
+[✓] CR-3.2 frozen mechanisms preserved（111 项回归全保持）
+[✓] no CR-4 semantics leak
+[✓] migration from-zero/upgrade green（21 链 + probe 022）
+[ ]  Windows 3.12 / Windows 3.14 / Ubuntu 3.14 full green（推送后 API 正向确认，SHA 回填）
+[✓] Ruff / format / Mypy / Spike / governance gates green（本地；CI 待确认）
+```
+
+## Verification Summary
+
+- Local: **1116 / 0**（1096 → 1116，+20：HistoricalInputContinuity 11 / VerificationEvidenceState 4 / FindingTruthfulness 4 / SealFieldCountCorrection 1）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1116/0
+- ADR-023 Amendment C（status 仍 PROPOSED）；migration 021（未改 018/019/020）；CR-3.2 FREEZE 的 16 项机制零重写（111 项回归全保持）
+- Implementation SHA + CI run：推送后回填（本节与 DEVLOG/总册头部同步更新）
