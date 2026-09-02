@@ -1,9 +1,9 @@
 # ADR-023: AvailabilityPolicy + Canonical Source Selection
 
-- **Status**: PROPOSED（2026-09-01，CR-3 批次交付 + CR-3.1 Amendment A 收口 + 2026-09-01 CR-3.2 Amendment B 收口 + 2026-09-02 CR-3.3 Amendment C 收口 + 2026-09-02 CR-3.4 Amendment D 收口 + 2026-09-02 CR-3.5 Amendment E 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
+- **Status**: PROPOSED（2026-09-01，CR-3 批次交付 + CR-3.1 Amendment A 收口 + 2026-09-01 CR-3.2 Amendment B 收口 + 2026-09-02 CR-3.3 Amendment C 收口 + 2026-09-02 CR-3.4 Amendment D 收口 + 2026-09-02 CR-3.5 Amendment E 收口 + 2026-09-02 CR-3.6 Amendment F 收口；Reviewer 复审裁决待定——本 ADR 在复审前不自称 ACCEPTED）
 - **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
-- **Date**: 2026-09-01（CR-3）/ 2026-09-01（Amendment A，CR-3.1）/ 2026-09-01（Amendment B，CR-3.2）/ 2026-09-02（Amendment C，CR-3.3）/ 2026-09-02（Amendment D，CR-3.4）/ 2026-09-02（Amendment E，CR-3.5）
-- **Work Requirement**: `docs/design/A-share-analysis_CR-2.4最终复审结论与CR-3_AvailabilityPolicy_Canonicalizer开发工作要求_20260901.md` + `docs/design/A-share-analysis_CR-3复审与CR-3.1最终CanonicalInputSnapshot及ReplaySeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.1复审与CR-3.2最终TransactionalSnapshot及PolicyExecution收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.2复审与CR-3.3最终HistoricalInputContinuity及VerificationEvidence收口要求_20260902.md` + `docs/design/A-share-analysis_CR-3.3复审与CR-3.4最终ContinuitySeal及VerificationReplay收口要求_20260902.md` + `docs/design/A-share-analysis_CR-3.4复审与CR-3.5最终HistoricalCandidateDiscovery及DerivedRunSeal收口要求_20260902.md`
+- **Date**: 2026-09-01（CR-3）/ 2026-09-01（Amendment A，CR-3.1）/ 2026-09-01（Amendment B，CR-3.2）/ 2026-09-02（Amendment C，CR-3.3）/ 2026-09-02（Amendment D，CR-3.4）/ 2026-09-02（Amendment E，CR-3.5）/ 2026-09-02（Amendment F，CR-3.6）
+- **Work Requirement**: `docs/design/A-share-analysis_CR-2.4最终复审结论与CR-3_AvailabilityPolicy_Canonicalizer开发工作要求_20260901.md` + `docs/design/A-share-analysis_CR-3复审与CR-3.1最终CanonicalInputSnapshot及ReplaySeal收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.1复审与CR-3.2最终TransactionalSnapshot及PolicyExecution收口要求_20260901.md` + `docs/design/A-share-analysis_CR-3.2复审与CR-3.3最终HistoricalInputContinuity及VerificationEvidence收口要求_20260902.md` + `docs/design/A-share-analysis_CR-3.3复审与CR-3.4最终ContinuitySeal及VerificationReplay收口要求_20260902.md` + `docs/design/A-share-analysis_CR-3.4复审与CR-3.5最终HistoricalCandidateDiscovery及DerivedRunSeal收口要求_20260902.md` + `docs/design/A-share-analysis_CR-3.5复审与CR-3.6最终PreVerificationDiscovery及HistoricalCanonicalArtifactClosure收口要求_20260902.md`
 - **Related**: [ADR-022](ADR-022_provider_normalization_quarantine.md)（ACCEPTED——CR-2 全链 VERIFIED/CLOSED/FREEZE，本 ADR 的上游输入契约）；[ADR-002]（确定性 security identity，identity bridge 的解析内核）
 
 ## 1. Context
@@ -660,3 +660,58 @@ _status_error_from_findings              findings blocking truth -> (status, err
 ## 10.4 Scope 边界
 
 CR-3.5 是 CR-3 关闭前对"谁有资格进入 verifier"与"derived truth 必须物理可重算"的收口：不建 SnapshotBuilder / ReadModel（CR-4）、不新增 domain、不改 CR-2 frozen contract、**无新 migration**（migration 链保持 21）。CR-3.4 FREEZE 的 14 项机制零重写（除复用 derived-seal helper 的最小必要抽取：snapshot 属性/`_build_snapshot`/`run()` 委托共享公式，公式本身逐字节不变——151 项回归全保持即为证明）。
+
+---
+
+# 11. Amendment F：CR-3.6 Selection-Free Historical Discovery + Historical Canonical Artifact Closure（2026-09-02，audit "CR-3.5复审与CR-3.6最终PreVerificationDiscovery及HistoricalCanonicalArtifactClosure收口要求"）
+
+CR-3.5 复审（2026-09-02 17:36 +08:00，Reviewed HEAD `3c6087e13de4af26143aa72a2a8bbeade052ecdb`，Primary implementation `48982290056cf88e6daafbecb7d8b8a766da6e28`，reopen commit `dd31ca6`）裁决 **REOPENED**：**CR-3.5 Derived Run / Status Seal 全部 PASS / FREEZE**（21 项机制，含 status 不再作 SQL pre-filter / stored context 不再作 selection key / live build 共享 derived formulas / requested_domains_hash·三 input hash·master set·dataset hash（run 自己的 bridge identity）·context·base·idempotency·run-id UUID5 cross-bind·status·error_message 全物理重算 / findings DB==parquet==seal / CR-3.4 materialization symmetry / genuine BLOCKED recovery / old bridge world skip / no new migration），但发现 2 个新 P0。**本 amendment 修订 §10.1 中被复审推翻的表述；原文保留在上文，以本节为准。**无新 migration（未引入 history index——复审 §3.1 允许"仅当引入真正有独立完整性锚的 history index"；未验证的普通 ledger 索引字段会换回旧漏洞，不引入）。
+
+## 11.1 P0-01 Selection-Free / Pre-Verification-Trust-Free Discovery（修订 §10.1 的候选选择）
+
+§10.1 的候选发现虽已删除 status/context 预过滤，但仍按 primitive request-world fields 做 SQL WHERE + Python as_of 过滤——这些字段的 integrity 只在 full seal verifier **内部**才被确认，因此它们不能在 verifier **之前**拥有"把某条历史记录排除在候选集之外"的权力：单漂 `requested_domains_hash` / 任一 policy version/hash / `code_fingerprint` / `canonical_contract_version` / `as_of` 即可把 prior SUCCESS 从 verifier 前隐藏（pre-verification trust 只是从 status/context 移到了 primitives，invariant 未变）。CR-3.6 起确立原则：
+
+> **No correctness-bearing field may exclude a historical canonical row before its identity seal is verified.**
+
+实现（Phase A/B/C）：
+
+```text
+Phase A  broad discovery:
+  SELECT 全部 ledger row ORDER BY canonical_run_id（无 WHERE、无 Python 预过滤）
+Phase B  historical identity seal first（每行）:
+  deterministic manifest URI / bytes hash / manifest 显式 correctness 字段
+  == ledger / requested domains hash + 三 input hash + master set +
+  dataset hash（run 自己的 bridge identity）+ context + base +
+  idempotency + run-id 全物理重算
+Phase C  world/status interpretation after verification:
+  verified different request world -> safely skip
+  verified same world -> shared canonical artifact verifier ->
+    findings/status semantic truth -> （SUCCESS）CR-2 dependency continuity
+  verified genuine BLOCKED -> 非依赖，recovery allowed
+```
+
+无法建立可信 request-world 的历史行（identity seal 任何 problem）→ **GLOBAL / HISTORICAL CANONICAL LEDGER DAMAGED**：系统不能安全证明"这条损坏记录与当前 world 无关"，fail closed，零 mint。findings truth 刻意移出 identity seal——只在 same-world 分类之后运行（不同 world 行的 findings 状态与本 world 无关）。ledger+manifest 单字段对 rebind（伪造"different world"）由 derived identity / run-id cross-bind 在 world 分类**之前**拦截，不可能借 forged world 提前 skip。性能：canonical ledger 远小于业务表，CR-3 correctness 优先；如后续需要优化，须 CR-4+ 另做**有独立完整性锚的 history index**。
+
+## 11.2 P0-02 Shared Historical Canonical Artifact Verifier（修订 §9.2/§10.2 的"完整"表述）
+
+`_verify_historical_canonical_seal` 验证 identity/status truth，但 continuity/superset 路径在 prior SUCCESS 被当作可信依赖前**未验证其自身 selected / decisions artifact closure**——旧 Canonical 产物损坏后仍可放行新 superset run（违反已冻结的 CR-3.2/3.x invariant：prior SUCCESS 被 physical correctness damage 降级后不得通过新 input world 绕过）。CR-3.5 起 `_verify_closure` 的 artifact 段抽取为共享只读 helper：
+
+```text
+_verify_canonical_artifacts(record, manifest)
+  -> manifest selected_count / decision_count == ledger
+  -> artifact exact set = selected / decisions / findings
+  -> deterministic artifact URIs（_expected_artifact_uri）
+  -> physical content_hash / row_count / schema_hash（逐 artifact）
+  -> selected semantic seal（recompute == ledger == manifest）
+  -> decision semantic seal（recompute == ledger == manifest）
+```
+
+消费点：exact replay（`_verify_closure`）与 historical continuity（same-world 每行，BLOCKED 亦然——genuine BLOCKED 的 recorded evidence 必须内部完好才可被分类为 genuine）。findings artifact 的 DB/parquet/seal 三方 truth 与 status recompute 保留在共享 `_verify_findings_truth`。规则：same-world SUCCESS 任一 canonical artifact damage → DAMAGED 零 replacement；same-world genuine BLOCKED 证据内部完好 → 非依赖；different-world verified run → identity world 安全建立后可 skip。
+
+## 11.3 CR-3.6 对抗测试（+28 项）
+
+`tests/integration/test_canonical.py`（194 项 = CR-3.x 既有 166 项回归 + 28 新增：TestSelectionFreeDiscovery 20（mandatory 1：requested_domains_hash 单漂 / 2：8 个 contract·policy·fingerprint 选择器单漂 parametrize / 3：as_of 单漂（deterministic URI anchor 拦截）/ 4：9 个 primitive 字段 ledger+manifest 对 rebind parametrize（derived identity/run-id cross-bind 拦截，无法借 forged different-world 提前 skip）/ 5：verified different-world run 安全跳过 positive control）/ TestHistoricalArtifactClosure 8（mandatory 8：selected bytes tamper / 9：selected 删除 / 10：decisions tamper / 11：row_count+schema_hash parametrize + selected_semantic_hash 对 rebind / 12：decision_set_hash 对 rebind / 13：untouched superset positive control；14 exact-replay artifact-tamper 由既有 TestFullSealConsumption 回归保持））。总体 1179/0。
+
+## 11.4 Scope 边界
+
+CR-3.6 是 CR-3 关闭前最后两块底层收口："不能让一条需要检查的历史记录通过修改任何一个查询字段在进入检查前消失"与"不能只证明历史 SUCCESS 的 metadata/findings/upstream 没问题却允许它自己的 selected/decisions 产物已损坏"。不建 SnapshotBuilder / ReadModel（CR-4）、不新增 domain、不改 CR-2 frozen contract、**无新 migration**（migration 链保持 21；未引入未验证的 history index）。CR-3.5 FREEZE 的 21 项机制零重写（唯一改动：`_verify_historical_canonical_seal` 拆出 `_verify_historical_identity_seal`——identity 部分与 findings/status truth 分离，findings truth 只在 same-world 分类后运行，公式逐字节不变；166 项回归全保持即为证明）。

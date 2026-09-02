@@ -1302,87 +1302,85 @@ class CanonicalRunner:
 
     # -------------------------------------------------------- snapshot
     def _check_historical_continuity(self, snapshot: CanonicalInputSnapshot) -> None:
-        """CR-3.3 P0-01 + CR-3.4 P0-01 + CR-3.5 P0-01 (audits
-        20260902 section 1): historical input continuity guard with
-        TAMPER-RESISTANT candidate discovery.
+        """CR-3.3 P0-01 + CR-3.4 P0-01 + CR-3.5 P0-01 + CR-3.6 P0-01
+        (audits 20260902 section 1): historical input continuity guard
+        with SELECTION-FREE, pre-verification-trust-free discovery.
 
-        Candidates are selected by the PRIMITIVE request-world fields
-        (requested domains hash, as_of, contract, the three policy
-        identities and the code fingerprint) - NEVER by the derived
-        ``canonical_context_hash`` and NEVER pre-filtered by
-        ``status`` - so drifting either derived field cannot hide a
-        prior run from the verifier before it is even selected.
+        CR-3.6 closes the last discovery hole: NO correctness-bearing
+        field may exclude a historical canonical row before its
+        identity seal is verified. The discovery is a broad full-table
+        scan (ORDER BY canonical_run_id) with no WHERE clause and no
+        Python-side pre-filter - not status, not the derived context
+        hash, and not the primitive request-world fields either (a
+        single-field drift of requested_domains_hash / as_of /
+        contract / a policy identity / the code fingerprint previously
+        removed the row from the candidate set before the verifier
+        ever saw it).
 
-        Every candidate is then full-seal verified (ledger == manifest
-        == physical recompute of the ENTIRE derived identity:
-        input hashes, master set, dataset hash, context, base,
-        idempotency, run id - plus the findings truth -> status
-        semantic recompute). Only THEN are the VERIFIED, PHYSICALLY
-        DERIVED context and status interpreted:
+        Every historical row then passes the typed identity seal
+        (deterministic manifest URI + bytes hash + manifest == ledger
+        correctness fields + the full derived-identity physical
+        recompute). A row whose identity seal cannot be established is
+        GLOBAL / HISTORICAL CANONICAL LEDGER DAMAGED: the system
+        cannot safely prove the damaged record is unrelated to the
+        current request world, so it fails closed and mints nothing.
 
-        - verified status SUCCESS of the SAME request world: every
-          sealed input run must still exist in the current
-          authoritative CR-2 ledger with an identical identity and
-          healthy physical/anchored evidence (a SUPERSET current input
-          set is a legitimate new world and flows on normally);
-        - verified GENUINE historical BLOCKED: not a SUCCESS
+        Only after the identity seal verifies is the (now physically
+        derived) request world interpreted:
+
+        - a verified different request world -> safely skipped;
+        - a verified same-world row: the canonical artifact closure
+          (selected / decisions / findings - exact set, deterministic
+          URIs, physical hashes, semantic seals) and the findings ->
+          status semantic truth are verified before anything else;
+        - a verified genuine historical BLOCKED -> not a SUCCESS
           continuity dependency (its exact repair / recovery is
           allowed to proceed);
-        - verified candidate of a different request world (e.g. an
-          older identity bridge policy): not a dependency.
+        - a verified same-world SUCCESS -> every sealed input run must
+          still exist in the current authoritative CR-2 ledger with an
+          identical identity and healthy physical / anchored evidence
+          (a SUPERSET current input set is a legitimate new world and
+          flows on normally).
 
-        Any seal problem, prior input disappearance, identity drift or
-        degraded evidence -> DAMAGED (no replacement of any kind may
-        be minted)."""
+        Any problem -> DAMAGED (no replacement of any kind may be
+        minted)."""
         candidate_rows = self.conn.execute(
             f"SELECT {', '.join(_LEDGER_COLUMNS)} FROM meta_canonicalization_run "
-            "WHERE requested_domains_hash = ? AND canonical_contract_version = ? "
-            "AND availability_policy_version = ? AND availability_policy_hash = ? "
-            "AND source_policy_version = ? AND source_policy_hash = ? "
-            "AND tolerance_policy_version = ? AND tolerance_policy_hash = ? "
-            "AND code_fingerprint = ? "
-            "ORDER BY canonical_run_id",
-            [
-                snapshot.requested_domains_hash,
-                CANONICAL_CONTRACT_VERSION,
-                snapshot.availability_policy_version,
-                snapshot.availability_policy_hash,
-                snapshot.source_policy_version,
-                snapshot.source_policy_hash,
-                snapshot.tolerance_policy_version,
-                snapshot.tolerance_policy_hash,
-                snapshot.code_fingerprint,
-            ],
+            "ORDER BY canonical_run_id"
         ).fetchall()
-        candidates: list[dict[str, Any]] = []
+        current_seal_by_run = {seal.run_id: seal for seal in snapshot.seals}
         for row in candidate_rows:
             record = dict(zip(_LEDGER_COLUMNS, row, strict=True))
-            if _ledger_as_of(record) != snapshot.as_of:
-                continue  # a different as_of is a different request world
-            candidates.append(record)
-        if not candidates:
-            return
-        current_seal_by_run = {seal.run_id: seal for seal in snapshot.seals}
-        for record in candidates:
             seal = CanonicalRunSeal.from_ledger(record)
-            manifest, verified_status, problems = self._verify_historical_canonical_seal(
-                seal, record
-            )
-            if problems or manifest is None or verified_status is None:
-                detail = "; ".join(problems) if problems else "no verifiable seal"
+            manifest, identity_problems = self._verify_historical_identity_seal(seal, record)
+            if identity_problems or manifest is None:
+                detail = "; ".join(identity_problems) if identity_problems else "no verifiable seal"
                 msg = (
-                    f"prior canonical run {seal.canonical_run_id} is DAMAGED: "
-                    f"{detail} - the prior run and its sealed "
-                    "evidence can no longer be trusted and no replacement may "
-                    "be minted; restore the exact upstream evidence to replay "
-                    "the historical run (CR-3.3 audit 20260902 section 1 + "
-                    "CR-3.4 audit 20260902 section 1 + CR-3.5 audit "
-                    "20260902 sections 1-2)"
+                    f"historical canonical ledger row {seal.canonical_run_id} is DAMAGED "
+                    f"(GLOBAL): {detail} - the row's request-world identity can no "
+                    "longer be safely established, so it cannot be proven unrelated "
+                    "to the current request world; no new canonical run may be "
+                    "minted until the historical evidence is restored "
+                    "(CR-3.6 audit 20260902 section 1)"
                 )
                 raise CanonicalRunnerError(msg)
             # verified, physically derived world membership
             if seal.canonical_context_hash != snapshot.canonical_context_hash:
-                continue  # same primitives, different bridge-policy world
+                continue  # a verified different request world is safely skipped
+            # same verified world: CR-3.6 P0-02 canonical artifact closure
+            problems = self._verify_canonical_artifacts(record, manifest)
+            # CR-3.5 P0-02 findings truth -> status semantic recompute
+            verified_status, finding_problems = self._verify_findings_truth(record, manifest)
+            problems.extend(finding_problems)
+            if problems:
+                msg = (
+                    f"prior canonical run {seal.canonical_run_id} is DAMAGED: "
+                    f"{'; '.join(problems)} - the prior run and its sealed "
+                    "evidence can no longer be trusted and no replacement may "
+                    "be minted; restore the exact upstream evidence to replay "
+                    "the historical run (CR-3.6 audit 20260902 sections 1-2)"
+                )
+                raise CanonicalRunnerError(msg)
             # verified, physically derived historical status
             if verified_status == "BLOCKED":
                 continue  # genuine historical BLOCKED: not a SUCCESS dependency
@@ -1398,29 +1396,33 @@ class CanonicalRunner:
                     "prior run is DAMAGED and no replacement may be minted; "
                     "restore the exact upstream evidence to replay the "
                     "historical run (CR-3.3 audit 20260902 section 1 + "
-                    "CR-3.5 audit 20260902 section 1)"
+                    "CR-3.6 audit 20260902 section 1)"
                 )
                 raise CanonicalRunnerError(msg)
 
-    def _verify_historical_canonical_seal(
+    def _verify_historical_identity_seal(
         self, seal: CanonicalRunSeal, record: dict[str, Any]
-    ) -> tuple[dict[str, Any] | None, str | None, list[str]]:
-        """CR-3.4 P0-01 + CR-3.5 P0-02: typed full-seal verification of
-        ONE historical canonical run BEFORE its manifest input list or
-        its claimed status may be trusted - the deterministic manifest
-        URI, the manifest bytes against the ledger hash, EVERY explicit
-        manifest correctness field against the ledger seal, the
-        physical recompute of the ENTIRE derived run identity
-        (input hashes + master set + dataset hash + canonical context
-        + base identity + idempotency key + run id) from the manifest
-        input entries and the primitive request-world fields, and the
-        findings truth -> status semantic recompute. Any problem ->
-        the prior canonical run is itself HARD DAMAGED: its input list
-        and its claimed status are NOT consulted and no replacement of
-        any kind may be minted. Returns (manifest, verified_status,
-        problems)."""
+    ) -> tuple[dict[str, Any] | None, list[str]]:
+        """CR-3.4 P0-01 + CR-3.5 P0-02 + CR-3.6 P0-01: typed
+        IDENTITY-seal verification of ONE historical canonical run
+        BEFORE its request-world membership, its manifest input list
+        or its claimed status may be interpreted - the deterministic
+        manifest URI, the manifest bytes against the ledger hash,
+        EVERY explicit manifest correctness field against the ledger
+        seal, and the physical recompute of the ENTIRE derived run
+        identity (input hashes + master set + dataset hash + canonical
+        context + base identity + idempotency key + run id) from the
+        manifest input entries and the primitive request-world fields.
+        Any problem -> the historical row is GLOBAL / HISTORICAL
+        CANONICAL LEDGER DAMAGED: its world membership cannot be
+        safely established, it cannot be proven unrelated to the
+        current request world, and no replacement of any kind may be
+        minted. Returns (manifest, problems). The findings -> status
+        semantic truth (``_verify_findings_truth``) is deliberately
+        NOT part of the identity seal: it runs only for SAME-world
+        rows after world membership is verified."""
         if not seal.manifest_uri or not seal.manifest_hash:
-            return None, None, ["prior canonical ledger row carries no manifest binding"]
+            return None, ["prior canonical ledger row carries no manifest binding"]
         record_for_uri = {
             "canonical_contract_version": seal.canonical_contract_version,
             "as_of": seal.as_of,
@@ -1430,7 +1432,6 @@ class CanonicalRunner:
         if seal.manifest_uri != expected_manifest_uri:
             return (
                 None,
-                None,
                 [
                     f"prior canonical manifest_uri {seal.manifest_uri!r} is not the "
                     f"deterministic anchor {expected_manifest_uri!r} (rebind)"
@@ -1438,17 +1439,13 @@ class CanonicalRunner:
             )
         manifest_path = self.normalized_root / seal.manifest_uri
         if not manifest_path.is_file():
-            return None, None, [f"prior canonical manifest missing: {seal.manifest_uri}"]
+            return None, [f"prior canonical manifest missing: {seal.manifest_uri}"]
         if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != seal.manifest_hash:
-            return (
-                None,
-                None,
-                ["prior canonical manifest bytes do not match the ledger hash (rebind)"],
-            )
+            return None, ["prior canonical manifest bytes do not match the ledger hash (rebind)"]
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            return None, None, [f"prior canonical manifest unreadable: {exc}"]
+            return None, [f"prior canonical manifest unreadable: {exc}"]
         problems: list[str] = []
         expected_fields = (
             ("canonical_run_id", seal.canonical_run_id),
@@ -1493,7 +1490,7 @@ class CanonicalRunner:
         entries = manifest.get("input_normalized_runs")
         if not isinstance(entries, list):
             problems.append("prior canonical manifest carries no typed input list")
-            return None, None, problems
+            return None, problems
         seal_recompute, set_recompute, state_recompute = _input_hashes_from_entries(entries)
         if seal_recompute != seal.input_seal_hash:
             problems.append(
@@ -1524,15 +1521,8 @@ class CanonicalRunner:
             )
         )
         if problems:
-            return None, None, problems
-        # CR-3.5 P0-02: the status is a function of the exact sealed
-        # findings truth (DB == parquet == finding_set_hash seal) - a
-        # status rebind that does not replay the findings truth is
-        # DAMAGED.
-        verified_status, finding_problems = self._verify_findings_truth(record, manifest)
-        if finding_problems:
-            return None, None, finding_problems
-        return manifest, verified_status, []
+            return None, problems
+        return manifest, []
 
     def _continuity_problems_for_input(
         self,
@@ -2552,12 +2542,6 @@ class CanonicalRunner:
             p.domain: p.required_evidence_class for p in _source_policy.source_policies()
         }:
             problems.append("manifest required_evidence_classes diverge from the current policy")
-        if int(manifest.get("selected_count", -1)) != int(record["selected_count"]):
-            problems.append("manifest selected_count does not match the ledger")
-        if int(manifest.get("decision_count", -1)) != int(record["decision_count"]):
-            problems.append("manifest decision_count does not match the ledger")
-        if int(manifest.get("finding_count", -1)) != int(record["finding_count"]):
-            problems.append("manifest finding_count does not match the ledger")
 
         # ---- typed full input seal: manifest entries == CURRENT snapshot
         sealed_entries = manifest.get("input_normalized_runs", [])
@@ -2580,7 +2564,52 @@ class CanonicalRunner:
             )
         )
 
-        # ---- artifact exact set + deterministic URI + physical recompute
+        # ---- CR-3.6 P0-02: shared canonical artifact closure verifier
+        # (the SAME read-only verifier the historical continuity path
+        # consumes for same-world rows - no second weaker copy).
+        problems.extend(self._verify_canonical_artifacts(record, manifest))
+
+        # ---- findings truth + status semantic recompute (CR-3.5 P0-02):
+        # DB == findings parquet == finding_set_hash seal, and the
+        # status/error recomputed from that exact truth against the
+        # ledger fields (a status rebind that does not replay the
+        # sealed findings truth is DAMAGED).
+        _, finding_problems = self._verify_findings_truth(record, manifest)
+        problems.extend(finding_problems)
+
+        # ---- re-verify every sealed input run: typed seal vs physical
+        # artifacts + anchored evidence (symmetric with first consume)
+        for entry in sealed_entries:
+            entry_problems = self._verify_sealed_input(entry, snapshot.as_of)
+            if entry_problems:
+                problems.append(
+                    f"sealed CR-2 input run {entry.get('run_id')} is no longer "
+                    f"intact: {'; '.join(entry_problems)}"
+                )
+        return problems
+
+    def _verify_canonical_artifacts(
+        self, record: dict[str, Any], manifest: dict[str, Any]
+    ) -> list[str]:
+        """CR-3.6 P0-02: the ONE shared read-only canonical ARTIFACT
+        closure verifier - the artifact exact set (selected /
+        decisions / findings), the deterministic artifact URIs, the
+        physical content hashes / row counts / schema hashes, and the
+        selected / decision semantic seals. Consumed by BOTH the exact
+        replay closure verifier (``_verify_closure``) and the
+        historical continuity path for every same-world row - a
+        same-world prior SUCCESS whose OWN selected / decisions
+        artifacts are damaged can never be laundered into a new
+        superset run, and a genuine historical BLOCKED must keep its
+        recorded evidence internally intact before it may be
+        classified as genuine. The findings artifact's DB / parquet /
+        seal three-way truth and the status recompute live in the
+        shared ``_verify_findings_truth``."""
+        problems: list[str] = []
+        if int(manifest.get("selected_count", -1)) != int(record["selected_count"]):
+            problems.append("manifest selected_count does not match the ledger")
+        if int(manifest.get("decision_count", -1)) != int(record["decision_count"]):
+            problems.append("manifest decision_count does not match the ledger")
         artifacts = manifest.get("artifacts", {})
         if set(artifacts) != set(_ARTIFACT_NAMES):
             problems.append(
@@ -2626,24 +2655,6 @@ class CanonicalRunner:
                 manifest.get("decision_set_hash")
             ):
                 problems.append("decision semantic seal mismatch (values changed)")
-
-        # ---- findings truth + status semantic recompute (CR-3.5 P0-02):
-        # DB == findings parquet == finding_set_hash seal, and the
-        # status/error recomputed from that exact truth against the
-        # ledger fields (a status rebind that does not replay the
-        # sealed findings truth is DAMAGED).
-        _, finding_problems = self._verify_findings_truth(record, manifest)
-        problems.extend(finding_problems)
-
-        # ---- re-verify every sealed input run: typed seal vs physical
-        # artifacts + anchored evidence (symmetric with first consume)
-        for entry in sealed_entries:
-            entry_problems = self._verify_sealed_input(entry, snapshot.as_of)
-            if entry_problems:
-                problems.append(
-                    f"sealed CR-2 input run {entry.get('run_id')} is no longer "
-                    f"intact: {'; '.join(entry_problems)}"
-                )
         return problems
 
     def _verify_sealed_input(self, entry: dict[str, Any], as_of_dt: datetime) -> list[str]:

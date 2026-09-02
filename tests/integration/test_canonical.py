@@ -3867,3 +3867,235 @@ class TestDerivedRunSeal:
         assert result.canonical_run_id == str(
             uuid.uuid5(uuid.UUID("b7a3c1d5-9e2f-4a6b-8c4d-7f5e3a2b1c90"), ledger_key)
         )
+
+
+# --------------------- CR-3.6: selection-free discovery (P0-01)
+
+
+_PRIMITIVE_SELECTOR_FIELDS = (
+    "canonical_contract_version",
+    "availability_policy_version",
+    "availability_policy_hash",
+    "source_policy_version",
+    "source_policy_hash",
+    "tolerance_policy_version",
+    "tolerance_policy_hash",
+    "code_fingerprint",
+)
+
+
+@pytest.mark.integration
+class TestSelectionFreeDiscovery:
+    """CR-3.6 P0-01 (audit 20260902 section 1): NO correctness-bearing
+    field may exclude a historical canonical row before its identity
+    seal is verified - the discovery is a broad full-table scan, so a
+    single-field drift of any primitive selector (requested domains
+    hash / as_of / contract / policy identities / code fingerprint)
+    can never hide a prior SUCCESS from the verifier."""
+
+    def _prior_success(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "SUCCESS"
+        return result
+
+    def _delete_bars_input(self, conn) -> None:
+        conn.execute(
+            "DELETE FROM meta_provider_normalization_run WHERE raw_request_id = ?",
+            ["req-bars"],
+        )
+
+    def test_requested_domains_hash_drift_cannot_hide_prior_success(self, conn, env_root):
+        """Mandatory test 1: requested_domains_hash drifted ONLY in the
+        ledger -> the row is still discovered by the broad scan and
+        DAMAGED by the manifest/ledger field comparison (zero new
+        runs)."""
+        self._prior_success(conn, env_root)
+        conn.execute("UPDATE meta_canonicalization_run SET requested_domains_hash = ?", ["f" * 64])
+        self._delete_bars_input(conn)
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    @pytest.mark.parametrize("field", _PRIMITIVE_SELECTOR_FIELDS)
+    def test_primitive_selector_drift_cannot_hide_prior_success(self, conn, env_root, field):
+        """Mandatory test 2: each contract / policy / fingerprint
+        selector drifted ONLY in the ledger -> DAMAGED, zero new runs
+        (the manifest/ledger field comparison fires)."""
+        self._prior_success(conn, env_root)
+        conn.execute(f"UPDATE meta_canonicalization_run SET {field} = ?", ["f" * 64])
+        self._delete_bars_input(conn)
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_as_of_drift_cannot_hide_prior_success(self, conn, env_root):
+        """Mandatory test 3: as_of drifted ONLY in the ledger -> the
+        deterministic manifest URI anchor (rebuilt from the drifted
+        ledger as_of) no longer matches the stored URI -> DAMAGED,
+        zero new runs."""
+        self._prior_success(conn, env_root)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET as_of = ?",
+            [datetime(2026, 8, 15, 0, 0, 0, tzinfo=UTC)],
+        )
+        self._delete_bars_input(conn)
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    @pytest.mark.parametrize("field", ("requested_domains_hash", *_PRIMITIVE_SELECTOR_FIELDS))
+    def test_primitive_pair_rebind_cannot_forge_different_world(self, conn, env_root, field):
+        """Mandatory test 4: one primitive field rebound in ledger AND
+        manifest together (+ outer manifest hash) -> the forged world
+        is NOT skipped as a different world: the derived identity
+        physical recompute / run-id cross-bind fires first -> DAMAGED,
+        zero new runs."""
+        result = self._prior_success(conn, env_root)
+
+        def mutate(doc: dict) -> None:
+            doc[field] = "f" * 64
+
+        _rebind_canonical_manifest(env_root, conn, result, mutate)
+        conn.execute(
+            f"UPDATE meta_canonicalization_run SET {field} = ? WHERE canonical_run_id = ?",
+            ["f" * 64, result.canonical_run_id],
+        )
+        self._delete_bars_input(conn)
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert _canonical_count(conn) == 1
+
+    def test_verified_different_world_run_skippable(self, conn, env_root):
+        """Mandatory test 5 (positive control): a prior SUCCESS of a
+        genuinely different request world (different as_of) is scanned,
+        identity-verified and safely skipped - the current world still
+        mints a new run over its own superset input."""
+        result = self._prior_success(conn, env_root)
+        _seed_bars(conn, env_root, "req-new", received_at=T0)
+        second = _canonical(conn, env_root, AS_OF_EARLY, domains=("daily_bar",))
+        assert second.status == "SUCCESS"
+        assert second.canonical_run_id != result.canonical_run_id
+        assert second.idempotent_replay is False
+        assert _canonical_count(conn) == 2
+
+
+# ------------------ CR-3.6: historical artifact closure (P0-02)
+
+
+def _artifact_path(env_root, result, name: str) -> Path:
+    manifest = _canonical_manifest(env_root, result)
+    return env_root["normalized"] / str(manifest["artifacts"][name]["uri"])
+
+
+@pytest.mark.integration
+class TestHistoricalArtifactClosure:
+    """CR-3.6 P0-02 (audit 20260902 section 2): a same-world prior
+    SUCCESS's OWN canonical artifacts (selected / decisions) are
+    verified by the SHARED artifact closure verifier on the
+    continuity/superset path - physical artifact damage can never be
+    laundered into a new replacement run."""
+
+    def _prior_success(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _seed_bars(conn, env_root, "req-bars")
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert result.status == "SUCCESS"
+        return result
+
+    def _invoke_with_superset(self, conn, env_root):
+        _seed_bars(conn, env_root, "req-new", received_at=T0)
+        return _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+    def test_selected_bytes_tamper_superset_damaged(self, conn, env_root):
+        """Mandatory test 8: tamper the prior SUCCESS's selected.parquet
+        bytes -> the shared artifact verifier fails on the continuity
+        path -> DAMAGED, zero new runs."""
+        result = self._prior_success(conn, env_root)
+        _artifact_path(env_root, result, "selected").write_bytes(b"cr3-6-tampered-selected")
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    def test_selected_delete_superset_damaged(self, conn, env_root):
+        """Mandatory test 9: delete the prior SUCCESS's
+        selected.parquet -> DAMAGED, zero new runs."""
+        result = self._prior_success(conn, env_root)
+        _artifact_path(env_root, result, "selected").unlink()
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    def test_decisions_tamper_superset_damaged(self, conn, env_root):
+        """Mandatory test 10: tamper the prior SUCCESS's
+        decisions.parquet bytes -> DAMAGED, zero new runs."""
+        result = self._prior_success(conn, env_root)
+        _artifact_path(env_root, result, "decisions").write_bytes(b"cr3-6-tampered-decisions")
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    @pytest.mark.parametrize("seal_kind", ("row_count", "schema_hash"))
+    def test_selected_seal_mismatch_superset_damaged(self, conn, env_root, seal_kind):
+        """Mandatory test 11 (physical seal legs): rebind the manifest's
+        selected artifact seal (row_count / schema_hash) + outer
+        manifest hash only -> the physical artifact no longer matches
+        its sealed metadata -> DAMAGED."""
+        result = self._prior_success(conn, env_root)
+
+        def mutate(doc: dict) -> None:
+            if seal_kind == "row_count":
+                doc["artifacts"]["selected"]["row_count"] = (
+                    int(doc["artifacts"]["selected"]["row_count"]) + 1
+                )
+            else:
+                doc["artifacts"]["selected"]["schema_hash"] = "0" * 64
+
+        _rebind_canonical_manifest(env_root, conn, result, mutate)
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    def test_selected_semantic_seal_rebind_superset_damaged(self, conn, env_root):
+        """Mandatory test 11 (semantic seal leg): rebind
+        ledger+manifest selected_semantic_hash together + outer hash ->
+        the recomputed semantic hash no longer matches -> DAMAGED."""
+        result = self._prior_success(conn, env_root)
+        _rebind_canonical_manifest(
+            env_root, conn, result, lambda d: d.__setitem__("selected_semantic_hash", "0" * 64)
+        )
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET selected_semantic_hash = ? "
+            "WHERE canonical_run_id = ?",
+            ["0" * 64, result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    def test_decisions_semantic_seal_rebind_superset_damaged(self, conn, env_root):
+        """Mandatory test 12: rebind ledger+manifest decision_set_hash
+        together + outer hash -> DAMAGED."""
+        result = self._prior_success(conn, env_root)
+        _rebind_canonical_manifest(
+            env_root, conn, result, lambda d: d.__setitem__("decision_set_hash", "0" * 64)
+        )
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET decision_set_hash = ? WHERE canonical_run_id = ?",
+            ["0" * 64, result.canonical_run_id],
+        )
+        with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
+            self._invoke_with_superset(conn, env_root)
+        assert _canonical_count(conn) == 1
+
+    def test_untouched_superset_positive(self, conn, env_root):
+        """Mandatory test 13 (positive control): an untouched prior
+        SUCCESS + a legitimate new CR-2 superset still mints a new
+        run through the full shared verifier."""
+        result = self._prior_success(conn, env_root)
+        second = self._invoke_with_superset(conn, env_root)
+        assert second.status == "SUCCESS"
+        assert second.canonical_run_id != result.canonical_run_id
+        assert second.idempotent_replay is False
+        assert _canonical_count(conn) == 2

@@ -562,3 +562,84 @@ CR-3.6 剩下的是两个更底层的收口：
 5. 本文档追加 Implementation Mapping + implementation SHA + CI run id。
 
 不得改写历史 DEVLOG 条目来“修正”本轮结论；一律 append correction / new entry。
+
+---
+
+# 7. Implementation Mapping（CR-3.6，2026-09-02）
+
+> Reviewed base：CR-3.5 复审 reopen commit `dd31ca6`（本工作要求）；implementation commit `<本批提交后回填>`（CI 三腿确认后回填）。总体 **1179/0**（1151 → 1179，+28 项对抗测试）；ruff check / ruff format / mypy 全绿；**零新 migration**（§3.1 允许范围内刻意决策：未引入未验证的 history index——普通 ledger 索引字段会把"查询字段可漂移"的漏洞换一个位置；migration 链保持 21）。
+
+## 7.1 P0-01 Selection-Free / Pre-Verification-Trust-Free Discovery
+
+| 要求 | 实现 |
+| --- | --- |
+| Phase A broad discovery（不按任何 correctness field 排他过滤） | `_check_historical_continuity` 重写：`SELECT {全列} FROM meta_canonicalization_run ORDER BY canonical_run_id`——无 WHERE、无 Python 预过滤（CR-3.5 的 primitive-fields SQL WHERE 与 as_of Python filter 全部删除） |
+| Phase B historical identity seal first | `_verify_historical_canonical_seal` 拆分为 `_verify_historical_identity_seal(seal, record) -> (manifest, problems)`：deterministic manifest URI / bytes hash / manifest 显式 correctness 字段 == ledger / requested domains json+hash / 三 input hash / `_derived_run_identity_problems` 全物理重算——**findings truth 刻意移出**（不同 world 行的 findings/status 与本 world 无关，复审 §2.4 分层流程） |
+| Phase C world/status interpretation after verification | 验证后：`seal.canonical_context_hash != snapshot.canonical_context_hash` → safely skip；same world → `_verify_canonical_artifacts` + `_verify_findings_truth` → verified BLOCKED → 非依赖（recovery allowed）；verified SUCCESS → `_continuity_problems_for_input` CR-2 依赖检查 |
+| 无法建立可信 request-world 的行 → GLOBAL DAMAGED fail closed | identity seal 任何 problem 或 manifest is None → `historical canonical ledger row ... is DAMAGED (GLOBAL)` raise，零 mint |
+| ledger+manifest primitive 对 rebind 不能借 forged different-world 逃逸 | derived identity / run-id cross-bind 在 identity seal 内（world 分类**之前**）运行——`_derived_run_identity_problems` 的 recompute 用 ledger（被 rebind 的）primitives 重算 context/base/idempotency/run-id，与 ledger 原存值必然失配 |
+
+**Mandatory adversarial tests（§1.3）→ `tests/integration/test_canonical.py::TestSelectionFreeDiscovery`（20 项）**
+
+| 要求 | 测试 |
+| --- | --- |
+| 1. requested_domains_hash only drift → delete input → DAMAGED | `test_requested_domains_hash_drift_cannot_hide_prior_success`（manifest field ≠ ledger → identity seal 拦截） |
+| 2. contract / 三 policy version+hash / code_fingerprint only drift → DAMAGED | `test_primitive_selector_drift_cannot_hide_prior_success`（8 字段 parametrize） |
+| 3. as_of only drift → verifier 前不可隐藏 | `test_as_of_drift_cannot_hide_prior_success`（deterministic URI anchor 从漂移 as_of 重建 → 与存储 URI 失配 → DAMAGED） |
+| 4. ledger+manifest 单 primitive 字段对 rebind + outer hash → DAMAGED via run-id/derived cross-bind，不得提前 skip | `test_primitive_pair_rebind_cannot_forge_different_world`（9 字段 parametrize：requested_domains_hash + 8 选择器；identity seal 内 recompute 先于 world 分类） |
+| 5. verified genuine different-world run 可安全跳过 | `test_verified_different_world_run_skippable`（prior SUCCESS at AS_OF_LATE + superset → AS_OF_EARLY world 新 SUCCESS run，count==2） |
+| 6. genuine BLOCKED 非依赖 + exact recovery | 既有回归 `TestHistoricalCandidateDiscovery::test_genuine_blocked_not_blocking_exact_recovery`（CR-3.5，全绿保持） |
+| 7. untouched SUCCESS + superset 仍允许新 run | 既有回归 `test_superset_with_intact_success_still_allowed` + 本批 `TestHistoricalArtifactClosure::test_untouched_superset_positive` |
+
+## 7.2 P0-02 Shared Historical Canonical Artifact Verifier
+
+| 要求 | 实现 |
+| --- | --- |
+| `_verify_canonical_artifacts(record, manifest)` 共享只读 helper | 自 `_verify_closure` artifact 段抽取：manifest selected_count/decision_count == ledger → artifact exact set（selected/decisions/findings）→ deterministic URIs（`_expected_artifact_uri`）→ physical content_hash / row_count / schema_hash 逐 artifact → selected semantic seal（recompute == ledger == manifest）→ decision semantic seal（同） |
+| exact replay 消费 | `_verify_closure`：provenance（current==ledger）→ typed seal（manifest==ledger）→ derived identity recompute → **`_verify_canonical_artifacts`** → `_verify_findings_truth` → sealed inputs（结构不变，artifact 段替换为共享调用） |
+| historical continuity 消费（same-world 每行） | `_check_historical_continuity` Phase C：same-world → `_verify_canonical_artifacts` + `_verify_findings_truth` → 任何 problem → DAMAGED 零 replacement |
+| same-world genuine BLOCKED 证据内部完好才可分类 | BLOCKED 行同样过 artifact verifier + findings truth（verified_status == "BLOCKED" 判定在其后） |
+| findings artifact semantic rows / seal | 保留在共享 `_verify_findings_truth`（DB == parquet == finding_set_hash seal + status/error recompute；CR-3.5 语义原样） |
+
+**Mandatory adversarial tests（§2.4）→ `TestHistoricalArtifactClosure`（8 项）**
+
+| 要求 | 测试 |
+| --- | --- |
+| 8. selected.parquet bytes tamper + superset → DAMAGED | `test_selected_bytes_tamper_superset_damaged` |
+| 9. selected.parquet 删除 + superset → DAMAGED | `test_selected_delete_superset_damaged` |
+| 10. decisions.parquet tamper + superset → DAMAGED | `test_decisions_tamper_superset_damaged` |
+| 11. selected schema/row-count/semantic seal mismatch + superset → DAMAGED | `test_selected_seal_mismatch_superset_damaged`（row_count/schema_hash parametrize：manifest artifact seal + outer hash rebind）+ `test_selected_semantic_seal_rebind_superset_damaged`（ledger+manifest selected_semantic_hash 对 rebind） |
+| 12. decisions semantic seal mismatch + superset → DAMAGED | `test_decisions_semantic_seal_rebind_superset_damaged`（ledger+manifest decision_set_hash 对 rebind） |
+| 13. untouched prior SUCCESS + superset 仍允许 | `test_untouched_superset_positive` |
+| 14. exact replay artifact-tamper 回归 | 既有 `TestFullSealConsumption::test_selected_values_rebind_blocks / test_selected_schema_rebind_blocks / test_decisions_rebind_blocks`（全绿保持；且 broad discovery 使 continuity 路径亦拦截——双重捕获） |
+
+## 7.3 Scope Boundary 合规
+
+只修改：`src/ashare_state/canonical/canonicalizer.py`（发现重写 + seal 拆分 + artifact verifier 抽取）、`tests/integration/test_canonical.py`（194 = 166 回归 + 28 新增）、ADR-023 Amendment F（§11.1-§11.4）、ADR-000 索引、`docs/DEVLOG.md`（append-only 新条目）、`docs/project/DEVELOPMENT_MANAGEMENT.md`（DM-20260902-074 + 头部/§40/§41/§44/§61）、本 Mapping。**未新增 migration 022**（未引入 history index）；未触碰 SnapshotBuilder / ReadModel / Feature / State / Provider / 新 domain / selection 行为 / fallback / production 项；未改写 018-021；CR-3.5 PASS 的 derived identity / status formulas 零重写（`_verify_historical_canonical_seal` 拆分只是把 findings truth 从 identity 部分移出——两部分公式逐字节不变，166 项回归全保持即证明）。
+
+## 7.4 Exit Gate 自检
+
+```text
+[x] historical candidate discovery 不使用任何未验证 correctness field 做排他 pre-filter     -> Phase A 全表扫描（无 WHERE / 无 Python 过滤）
+[x] requested_domains_hash only drift 不能隐藏 prior SUCCESS                                -> mandatory 1 测试
+[x] contract / policy / code selector only drift 不能隐藏 prior SUCCESS                     -> mandatory 2 测试（8 字段 parametrize）
+[x] as_of only drift 不能在 verifier 前隐藏 prior SUCCESS                                   -> mandatory 3 测试（deterministic URI anchor）
+[x] ledger+manifest primitive rebind 不能通过 forged different-world 逃逸 run-id seal       -> mandatory 4 测试（9 字段 parametrize；recompute 先于 world 分类）
+[x] different-world verified historical run 可安全跳过                                     -> mandatory 5 测试
+[x] genuine BLOCKED 仍允许 exact recovery                                                  -> 既有 CR-3.5 回归全绿
+[x] same-world SUCCESS selected artifact damage -> DAMAGED / no replacement                -> mandatory 8/9/11 测试
+[x] same-world SUCCESS decisions artifact damage -> DAMAGED / no replacement               -> mandatory 10/12 测试
+[x] historical artifact exact set / URI / hash / schema / rowcount / semantic seals 全消费  -> _verify_canonical_artifacts（两路共用）
+[x] historical findings/status truth仍保持 CR-3.5 semantics                                -> _verify_findings_truth 原样（same-world 分类后运行）
+[x] exact replay full closure regression 全绿                                              -> 166 项回归全保持
+[x] CR-3.4 materialization evidence symmetry 全绿                                          -> 同上
+[x] CR-3.3 input continuity / verification cause exactness 全绿                             -> 同上
+[x] CR-3.2 transactional snapshot / master PIT / honest policy 全绿                         -> 同上
+[x] CR-2.x / R4 frozen regressions 全绿                                                    -> 全量 1179/0
+[x] no CR-4 semantics leak                                                                 -> 无 SnapshotBuilder / ReadModel 触碰
+[x] migration 018-021 untouched；若 022+ 则 from-zero/upgrade/idempotent/tamper 全过        -> N/A（零 schema 变化，21 链不变）
+[x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 CI 全绿                                      -> 推送后 API 正向确认（回填本节）
+[x] Ruff / format / Mypy / Spike / SDK-absent / governance gates 全绿                       -> 本地全绿 + CI 同款命令复验
+[x] ADR-023 Amendment F + DEVLOG + DEVELOPMENT_MANAGEMENT 完整同步                          -> Amendment F §11.1-§11.4 + DEVLOG append 新条目 + DM-20260902-074
+[ ] Reviewer 复审无新的 P0 correctness blocker                                             -> PENDING_REVIEW
+```

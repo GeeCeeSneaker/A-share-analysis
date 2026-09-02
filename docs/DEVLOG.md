@@ -17,7 +17,41 @@
 
 ---
 
-## 2026-09-02 · CR-3.5 Historical Candidate Discovery + Derived Canonical Run/Status Seal（CR-3.4 复审 REOPENED 后的收口批次）
+## 2026-09-02 · CR-3.6 Selection-Free Historical Discovery + Historical Canonical Artifact Closure（CR-3.5 复审 REOPENED 后的收口批次）
+
+**Scope**
+- CR-3.5 复审（audit 20260902 17:36 +08:00，Reviewed HEAD `3c6087e13de4af26143aa72a2a8bbeade052ecdb`，Primary CR-3.5 implementation `48982290056cf88e6daafbecb7d8b8a766da6e28`，reopen commit `dd31ca6`）裁决 **CR-3.5 REOPENED**：**Derived Run / Status Seal 全部 PASS / FREEZE**（21 项机制）；2 个新 P0 由本批 CR-3.6 收口（**未启动 CR-4**——复审 §3 边界；CR-4 BLOCKED_BY_CR-3.6）；复审 §1.3/§2.4 mandatory 测试 14 项全对应（1-7 Discovery + 8-14 Artifact Closure）
+- 复审 §5 Owner View：两条底层收口——"不能让一条需要检查的历史记录通过修改任何一个查询字段在进入检查前消失"与"不能只证明历史 SUCCESS 的 metadata/findings/upstream 没问题却允许它自己的 selected/decisions 产物已损坏"
+
+**Implementation**
+- **P0-01 Selection-Free / Pre-Verification-Trust-Free Discovery**：CR-3.5 的候选发现仍按 primitive request-world fields 做 SQL WHERE + Python as_of 过滤——这些字段的 integrity 只在 full seal verifier 内部才被确认，单漂任一字段（requested_domains_hash / contract / 三 policy version/hash / code_fingerprint / as_of）即可把 prior SUCCESS 从 verifier 前隐藏。CR-3.6 确立原则 **"No correctness-bearing field may exclude a historical canonical row before its identity seal is verified"**：Phase A broad discovery（`SELECT 全部 row ORDER BY canonical_run_id`，无 WHERE、无 Python 预过滤）；Phase B 每行先过 historical identity seal（`_verify_historical_identity_seal`——原 `_verify_historical_canonical_seal` 拆分：URI/hash/manifest==ledger/derived identity 全重算，findings truth 刻意移出）；Phase C 验证后才解释 world/status（different world 安全 skip / same world → artifact closure + findings truth →（SUCCESS）CR-2 dependency continuity / genuine BLOCKED 非依赖）。identity seal 任何 problem → **GLOBAL / HISTORICAL CANONICAL LEDGER DAMAGED**（不能安全证明与当前 world 无关，fail closed 零 mint）。ledger+manifest 单字段对 rebind（伪造 different world）由 derived identity / run-id cross-bind 在 world 分类之前拦截。性能取舍：ledger 远小于业务表，correctness 优先；后续优化须 CR-4+ 做有独立完整性锚的 history index
+- **P0-02 Shared Historical Canonical Artifact Verifier**：continuity/superset 路径此前未验证 prior SUCCESS 自身 selected/decisions artifact closure（旧产物损坏后仍可放行新 superset run）。`_verify_closure` 的 artifact 段抽取为共享只读 `_verify_canonical_artifacts(record, manifest)`：manifest selected_count/decision_count == ledger + artifact exact set（selected/decisions/findings）+ deterministic URIs + physical content_hash/row_count/schema_hash 逐 artifact + selected/decision semantic seals（recompute == ledger == manifest）。消费点：exact replay（`_verify_closure`）与 historical continuity（same-world 每行，genuine BLOCKED 亦须证据内部完好）；findings 三方 truth 与 status recompute 保留在共享 `_verify_findings_truth`
+- **无新 migration**（复审 §3.1 允许"仅当引入真正有独立完整性锚的 history index"；未验证的普通 ledger 索引字段会换回旧漏洞；migration 链保持 21）
+
+**Schema / Contract Changes**
+- C3 ×1（DM-20260902-074）；**ADR-023 Amendment F**（§11.1-§11.4 修订 §10.1 候选选择与 §9.2/§10.2 "完整验证"表述；status 仍 PROPOSED 待 Reviewer closure）；零 migration（未改 018-021）；CR-3.5 FREEZE 的 21 项机制零重写
+
+**Verification**
+- Local: **1179 tests passed / 0 failed**（1151 → 1179，+28：TestSelectionFreeDiscovery 20（mandatory 1：requested_domains_hash 单漂 / 2：8 选择器单漂 parametrize / 3：as_of 单漂 / 4：9 字段 ledger+manifest 对 rebind parametrize / 5：verified different-world skip positive control）/ TestHistoricalArtifactClosure 8（mandatory 8/9/10：selected bytes/删除/decisions tamper / 11：row_count+schema_hash+selected_semantic 对 rebind / 12：decision_set_hash 对 rebind / 13：untouched superset positive control）；14 号 exact-replay artifact-tamper 由既有回归保持）；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1179/0
+- 既有回归零破坏：CR-3/3.1/3.2/3.3/3.4/3.5 对抗矩阵 166 项全保持（含 CR-3.5 derived seal 全部 + materialization symmetry + continuity 主体）；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
+- GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
+
+**Implementation Status**
+- DONE（2 P0 全收口 + ADR-023 Amendment F + DM-20260902-074；1179/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- pre-verification trust 的彻底移除：任何只有在 verifier 内才被证明可信的 correctness field 都不得作为"是否进入 verifier"的排他条件——broad scan + 先验身份 + 后解释世界，是 CR-3.6 与 CR-3.5 的分界线
+- GLOBAL DAMAGED 语义：无法建立可信 request-world 的历史行不靠猜测跳过——fail closed 优先于可用性；不同 world 的行只要 identity seal 完好即可安全 skip，损坏的行则一视同仁地阻塞
+- findings truth 移出 identity seal：不同 world 行的 findings/status 与本 world 无关——验证分层（身份 → 世界 → 产物/状态 → 上游）与复审 §2.4 流程逐层对齐
+- artifact verifier 单一实现：exact replay 与 historical continuity 消费同一只读 helper（selected/decisions/findings exact set + URI + 物理三 seal + 语义双 seal），不维护第二套较弱副本——genuine BLOCKED 也须证据内部完好才可被分类为 genuine
+- 无新 migration：未验证的 history index 只会把"查询字段可漂移"的漏洞换一个位置，不引入
+
+**下一步**
+- 等 Reviewer 复审 CR-3.6（复审 §4 Exit Gate 21 项）；全部通过 → CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 → VERIFIED / CLOSED / FREEZE，ADR-023 → ACCEPTED，**CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild START**
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
 
 **Scope**
 - CR-3.4 复审（audit 20260902 13:17 +08:00，Reviewed HEAD `8585b08dc079207e8306bf3be38cf3de3de2f7a4`，Primary CR-3.4 implementation `fce2ca43a35b95d61dc390647fdc46d844d9b1a5`，reopen commit `275fc93`）裁决 **CR-3.4 REOPENED**：原定 3 个 P0 **PASS / FREEZE**（14 项机制）；2 个新 P0 由本批 CR-3.5 收口（**未启动 CR-4**——复审 §4 边界；CR-4 BLOCKED_BY_CR-3.5）；复审 §1.4/§2.3 mandatory 测试 15 项全对应（1-5 候选发现 + 6-15 derived seal/positive）
