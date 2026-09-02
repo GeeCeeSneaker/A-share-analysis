@@ -415,7 +415,7 @@ Exit Gate：
 
 # 7. Implementation Mapping（CR-3.5，2026-09-02）
 
-> Reviewed base：CR-3.4 复审 reopen commit `275fc93`（本工作要求）；implementation commit `<本批提交后回填>`（CI 三腿确认后回填）。总体 **1151/0**（1136 → 1151，+15 项对抗测试）；ruff check / ruff format / mypy 全绿；**零新 migration**（§3 允许范围内刻意决策：bridge policy identity 已由 manifest 持久化且参与物理重算，ledger 侧新增列不改变 primitive 全字段伪造这一已接受残余边界的本质，不收敛攻击面——migration 链保持 21）。
+> Reviewed base：CR-3.4 复审 reopen commit `275fc93`（本工作要求）；implementation commit `48982290056cf88e6daafbecb7d8b8a766da6e28`（GitHub Actions **run 33601822767 三腿 success**，2026-09-02 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest（1151/0）/ Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success，一次通过零修复轮次）。总体 **1151/0**（1136 → 1151，+15 项对抗测试）；ruff check / ruff format / mypy 全绿；**零新 migration**（§3 允许范围内刻意决策：bridge policy identity 已由 manifest 持久化且参与物理重算，ledger 侧新增列不改变 primitive 全字段伪造这一已接受残余边界的本质，不收敛攻击面——migration 链保持 21）。
 
 ## 7.1 P0-01 Tamper-Resistant Historical Candidate Discovery
 
@@ -492,7 +492,7 @@ Exit Gate：
 [x] CR-3.4 materialization symmetry tests 全绿                                 -> 151 项回归全保持
 [x] CR-3.3 continuity/finding tests 全绿                                       -> 同上
 [x] CR-3/3.1/3.2/CR-2/R4 frozen regressions 全绿                               -> 全量 1151/0
-[x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 + Ruff/format/Mypy/Spike/governance gates 全绿 -> 推送后 API 正向确认（回填本节）
+[x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 + Ruff/format/Mypy/Spike/governance gates 全绿 -> run 33601822767 三腿 success（2026-09-02 API positive confirmation，一次通过零修复轮次）
 [x] ADR-023 Amendment E + DEVLOG + DEVELOPMENT_MANAGEMENT 完整同步             -> Amendment E §10.1-§10.4 + DEVLOG 条目 + DM-20260902-073
 [x] 若 migration 022+：from-zero / upgrade / idempotent / tamper probe 全过    -> N/A（零 schema 变化，21 链不变）
 [ ] Reviewer 复审无新的 P0 correctness blocker                                 -> PENDING_REVIEW

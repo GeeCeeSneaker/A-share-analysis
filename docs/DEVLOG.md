@@ -36,7 +36,7 @@
 - Local: **1151 tests passed / 0 failed**（1136 → 1151，+15：TestHistoricalCandidateDiscovery 6（mandatory 1/2/3+12/4/5+15）/ TestDerivedRunSeal 9（mandatory 6/7/8/9/10/11 + P1 error_message + 13/14 + run-id cross-bind positive control））；ruff check / ruff format / mypy 全绿（69 源文件零错）；CI 同款命令 `uv run pytest` 复验 1151/0
 - 既有回归零破坏：CR-3/3.1/3.2/3.3/3.4 对抗矩阵 151 项全保持（含 CR-3.4 materialization symmetry 与 historical canonical seal trust 全部）；CR-2.x / R4 全链冻结契约零破坏；CR-4 语义零泄漏
 - 实现中发现并修复：`identity_dataset_hash` 原内嵌读取**当前** bridge identity，历史重算必须用该 run 自己的（manifest 封存）bridge identity——`identity.py` 抽取 `identity_dataset_hash_with_bridge` 参数化变体（当前世界入口委托之）；此修复正是 `test_bridge_policy_version_change_new_run`（旧 bridge 世界的 run 须被验证后跳过、而非误报 DAMAGED）所驱动的
-- GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
+- GitHub Actions: **run 33601822767（implementation `48982290056cf88e6daafbecb7d8b8a766da6e28`）三腿 success**（2026-09-02 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest（1151/0）/ Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success；一次通过零修复轮次）
 
 **Implementation Status**
 - DONE（2 P0 + P1 全收口 + ADR-023 Amendment E + DM-20260902-073；1151/0；Review Status: PENDING_REVIEW）
