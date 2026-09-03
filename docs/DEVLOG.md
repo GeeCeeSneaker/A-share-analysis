@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 formatter blank-line closure
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 163 的唯一失败是参数化 decorator 与测试函数之间多余的两个空行；Ruff lint 已通过。
+- 已删除该纯格式空行，路径表达式的局部 E501 处理保持 formatter-compatible；等待完整三矩阵门禁。
+
+**Next**
+- 继续跟踪 mypy、pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 formatter comment placement
 
 **Implementation Status / Review Status**

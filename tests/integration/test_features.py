@@ -585,8 +585,6 @@ class TestFeatureSealCrossBinding:
         "field",
         ["security_row_count", "market_row_count", "finding_count"],
     )
-
-
     def test_verifier_rejects_lineage_rebind_even_when_all_seals_rebound(self, conn, env_root):
         _, built = _build_feature(conn, env_root)
         manifest_path = env_root["normalized"] / built.manifest_uri
