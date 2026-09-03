@@ -11,6 +11,19 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 Deterministic Feature Layer + PIT Feature Snapshot
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：PR #1 已按 CR-4.4 最终复审裁决合并，main 基线为 `a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`；CR-4 / ADR-024 进入 VERIFIED / CLOSED / FREEZE，CR-5 按要求启动。
+- 新增静态版本化 Feature Registry `market-state-base-v1`，只允许显式 `snapshot_id + feature_set_id`；FeatureBuilder 只通过 `DuckDBReadModel.open_read_only(snapshot_id)` 获取 `rm_daily_bar`，不直接读取 Provider、Raw、Canonical 或 Snapshot Parquet。
+- 新增确定性 Python 公式引擎：UNADJUSTED_CANONICAL raw-price features、OBSERVED_SECURITY_BARS 5/20/60 rolling、observed-universe breadth；所有缺失、危险分母、非 finite 结果以 null + typed finding 记录，不做填充、哨兵或缩短窗口。
+- 新增 PIT provenance（`feature_available_at` / ordered `input_lineage_hash`）、UUID5 feature identity、不可变可恢复的 exact artifact set（security / market / findings / manifest）和公共 `verify_feature_run_for_consumption`；verifier 使用同一 `compute_feature_set` 从 verified ReadModel 重放并校验物理/语义 seals。
+- 新增 migration 023 `meta_feature_build` 及 CR-5 integration/unit contract tests；ADR-025 记录窗口、分母、缺失值、复权阻塞和替代方案。CR-5 不包含 State、score、signal、strategy、backtest、portfolio 或 trading。
+- 本次实现提交的 GitHub Actions 三矩阵、Ruff、Mypy、全量 pytest、Spike、SDK-absent 与治理 gates **待 CI 返回**；此处不预先宣称通过。生产 P0-M-1B 仍独立 BLOCKED。
+
+**Next**
+- 以 CI 实际结果修复本阶段实现；随后提交 Reviewer closure，未闭环前不启动 CR-6 State。
+
 ---
 
 ---

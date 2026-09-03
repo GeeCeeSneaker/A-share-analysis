@@ -4,16 +4,16 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
+> **Reviewed Repository HEAD**：`a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`（CR-4.4 final review 后 PR #1 merge；CR-4 全链 **VERIFIED / CLOSED / FREEZE**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：CR-4.4 correctness-closure final head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`（首个实现 `cad56f39fc4f8d50b2eefdae45045dd5a86237a5`；CI 修复链见 DEVLOG 与 DM-20260903-076/077）；CR-4 首批 implementation `2db6d8d6cc1fef047175b1f23c80016f003eee63` 及 CR-3 reviewer closure 基线沿用历史记录。
-> **Document Revision**：DM-CR-20260830-054..060 / DM-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075 / 076 / 077
-> **Last Review**：2026-09-02 21:24 +08:00（CR-3.6 最终复审：VERIFIED / CLOSED / FREEZE——CR-3 全链关闭；Reviewer closure commit `ff3808b7a5036246ea11e37173aa31d863beb2d9`）；CR-4.4 final CI evidence recorded 2026-09-03，Reviewer closure pending
+> **Current Code Baseline**：CR-4.4 correctness-closure 已随 PR #1 合并至 `a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`；CR-5 implementation 当前提交于独立分支，CR-5 CI / Reviewer closure pending。
+> **Document Revision**：DM-CR-20260830-054..060 / DM-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075 / 076 / 077 / 078
+> **Last Review**：2026-09-03（CR-4.4 最终复审：CR-4 全链 VERIFIED / CLOSED / FREEZE；PR #1 APPROVED_TO_MERGE 后已合并；CR-5 implementation pending CI / Reviewer closure）
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN——run 33732904158（CR-4.4 final head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`）三腿 success**（2026-09-03 API positive confirmation：Windows 3.12 / Windows 3.14 / Ubuntu 3.14 各通过 Ruff lint、Ruff format、Mypy、Pytest（1256/0）、Spike gates 与 SDK-absent；Windows 3.14 的 DEVLOG gate 与 Management-doc gate success，其他两腿按 workflow 条件 skipped）。
+> **CI Status**：CR-4.4 source branch run 33738799060 为三矩阵 success；CR-5 独立实现分支 CI 尚待返回，不预先宣称通过。
 > **Phase Status（2026-09-03，CR-4 首批交付同步）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-022 ACCEPTED）**；CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-023 ACCEPTED——2026-09-02 21:24 复审裁决）**；CR-4 → **IN_PROGRESS（CR-4.4 scoped implementation DONE / PENDING_REVIEW；final CI run 33732904158 三腿 success；ADR-024 PROPOSED）**；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-022 ACCEPTED）**；CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-023 ACCEPTED——2026-09-02 21:24 复审裁决）**；CR-4 → **CLOSED / VERIFIED / FREEZE（CR-4.4 final review accepted；ADR-024 ACCEPTED）**；CR-5 → **IN_PROGRESS（implementation DONE / PENDING_REVIEW；CI pending；production blocked）**；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-31 17:42，Reviewer CR-2 复审 P1-01）**：CR-2 批次头部与 Implementation Mapping 曾记录 implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`——该 SHA 非真实 implementation commit；以 GitHub commit object 为准：`15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 关联 commit）。历史条目原文保留，CR-2 工作要求文档已追加 §12 更正。  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。**Count Correction（2026-08-31，CR-2 复审 P1-02）**：ADR-022 §2.2 曾写"9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER"——该批实际 10/4，且 14 条未覆盖 index_daily 等 capability surface；CR-2.1 后 registry 为 **18 条（11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE，runtime exact-set 统计）**，已随 ADR-022 Amendment A §6.1 更正，历史保留。  
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
@@ -3428,6 +3428,29 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 **Reviewer**：Design/Audit Review（VERIFIED 2026-08-22）
 
 ---
+
+
+## DM-CR-20260903-078 — CR-5 Deterministic Feature Layer + PIT Feature Snapshot
+
+**Type**：C2（Feature / PIT / lineage / artifact contract）  
+**Status**：DONE（Implementation）/ PENDING_REVIEW  
+**Trigger**：CR-4.4 final review accepted CR-4 full-chain closure and issued the CR-5 work requirement after PR #1 merge.  
+**Old Contract**：CR-4 produced verified Snapshot and ReadModel, but no governed feature input boundary, feature registry, PIT feature lineage, deterministic feature identity, feature findings artifact, or feature ledger.  
+**New Contract**：
+- `FeatureBuilder.build(snapshot_id, feature_set_id)` accepts only an explicit verified ReadModel world and a static registry set; no latest/best, fallback, direct Snapshot/Canonical/Raw/Provider access, or hidden rebuild;
+- V1 emits only `UNADJUSTED_CANONICAL` raw-price features, `OBSERVED_SECURITY_BARS` windows, and `OBSERVED_DAILY_BAR_UNIVERSE` breadth; adjusted/total returns, session semantics, full-universe claims, State/strategy semantics remain blocked;
+- null, unsafe denominator, insufficient history, optional omission, and non-finite outcomes are deterministic typed findings; no fill, sentinel, copied suspension value, shortened window, or silent drop;
+- every row carries knowledge-time `feature_available_at` and ordered source lineage; one feature run binds one Snapshot world + one Registry/contract/code identity;
+- exact feature artifacts are immutable and recoverable, manifest-last / ledger-last, and the public verifier replays `compute_feature_set` from the verified ReadModel and consumes all physical/semantic seals.
+**Reason**：为未来 CR-6 State 提供可确定性重建、PIT 可追溯且缺失原因可审计的特征事实层，不提前引入策略判断。  
+**Affected Modules**：`src/ashare_state/features/`、`migrations/023_feature_build.sql`、`tests/integration/test_features.py`  
+**Affected Data**：`meta_feature_build`；`feature/contract=feature-v1/.../manifest.json` 及三类 Parquet correctness artifacts  
+**Compatibility**：CR-2/CR-3/CR-4 frozen inputs unchanged；新增 023 migration tail；Feature artifacts require current Registry / builder fingerprint for consumption。  
+**Migration / Backfill**：from-zero 与 022→023 upgrade tests；无历史 Feature backfill。  
+**Tests**：CR-5 contract matrix added; GitHub Actions validation pending.  
+**ADR**：[ADR-025](../adr/ADR-025_feature_layer_pit_missingness.md)；ADR-024 merged/accepted.  
+**Commit**：this CR-5 implementation commit  
+**Reviewer**：PENDING_REVIEW
 
 # 62. 下一次维护检查点
 

@@ -1,0 +1,116 @@
+"""CR-5 deterministic Feature Layer public boundary.
+
+FeatureBuilder consumes one explicit, verified ReadModel snapshot and
+publishes immutable PIT feature artifacts. Future State/Research code should
+consume the VerifiedFeatureRun by feature_run_id, not providers or raw files.
+"""
+
+from ashare_state.features.builder import (
+    FEATURE_LEDGER_COLUMNS,
+    FeatureBuilder,
+    feature_base_dir,
+    feature_builder_code_fingerprint,
+    feature_manifest_uri,
+)
+from ashare_state.features.engine import (
+    FEATURE_ARTIFACT_NAMES,
+    FINDING_COLUMNS,
+    MARKET_FEATURE_COLUMNS,
+    SECURITY_FEATURE_COLUMNS,
+    ComputedFeatureSet,
+    FeatureEngineError,
+    compute_feature_set,
+    feature_artifact_columns,
+    feature_artifact_schema,
+    frame_for_artifact,
+)
+from ashare_state.features.formulas import (
+    amplitude_preclose_raw,
+    amount_to_mean,
+    close_to_mean,
+    gap_open_raw,
+    intraday_return_raw,
+    lag_return,
+    ordered_mean,
+    ordered_median,
+    ordered_population_std,
+    raw_return_1,
+    safe_ratio,
+)
+from ashare_state.features.models import (
+    FEATURE_CONTRACT_VERSION,
+    FEATURE_NAMESPACE,
+    FeatureBuildResult,
+    FeatureBuilderError,
+    FeatureFinding,
+    FeatureVerifierError,
+    VerifiedFeatureRun,
+    canonical_json,
+    feature_base_hash_from_primitives,
+    feature_id_from_base_hash,
+    lineage_hash,
+    semantic_hash,
+)
+from ashare_state.features.registry import (
+    BLOCKED_FEATURE_SEMANTICS,
+    FEATURE_REGISTRY_VERSION,
+    FEATURE_SET_ID,
+    FeatureRegistryError,
+    FeatureSet,
+    FeatureSpec,
+    get_feature_set,
+)
+from ashare_state.features.verifier import (
+    FeatureVerifier,
+    verify_feature_run_for_consumption,
+)
+
+__all__ = [
+    "BLOCKED_FEATURE_SEMANTICS",
+    "FEATURE_ARTIFACT_NAMES",
+    "FEATURE_CONTRACT_VERSION",
+    "FEATURE_LEDGER_COLUMNS",
+    "FEATURE_NAMESPACE",
+    "FEATURE_REGISTRY_VERSION",
+    "FEATURE_SET_ID",
+    "FINDING_COLUMNS",
+    "MARKET_FEATURE_COLUMNS",
+    "SECURITY_FEATURE_COLUMNS",
+    "ComputedFeatureSet",
+    "FeatureBuildResult",
+    "FeatureBuilder",
+    "FeatureBuilderError",
+    "FeatureEngineError",
+    "FeatureFinding",
+    "FeatureRegistryError",
+    "FeatureSet",
+    "FeatureSpec",
+    "FeatureVerifier",
+    "FeatureVerifierError",
+    "VerifiedFeatureRun",
+    "amplitude_preclose_raw",
+    "amount_to_mean",
+    "canonical_json",
+    "close_to_mean",
+    "compute_feature_set",
+    "feature_artifact_columns",
+    "feature_artifact_schema",
+    "feature_base_dir",
+    "feature_base_hash_from_primitives",
+    "feature_builder_code_fingerprint",
+    "feature_id_from_base_hash",
+    "feature_manifest_uri",
+    "frame_for_artifact",
+    "gap_open_raw",
+    "get_feature_set",
+    "intraday_return_raw",
+    "lag_return",
+    "lineage_hash",
+    "ordered_mean",
+    "ordered_median",
+    "ordered_population_std",
+    "raw_return_1",
+    "safe_ratio",
+    "semantic_hash",
+    "verify_feature_run_for_consumption",
+]

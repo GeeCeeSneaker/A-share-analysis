@@ -72,6 +72,8 @@ EXPECTED_TABLES = {
     "meta_canonical_reconciliation_finding",
     # 022 (CR-4.2 snapshot build ledger)
     "meta_snapshot_build",
+    # 023 (CR-5 feature build ledger)
+    "meta_feature_build",
     # runner bootstrap
     "meta_schema_version",
 }
@@ -88,7 +90,7 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 22
+            assert len(applied) == 23
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
         finally:
@@ -99,10 +101,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 22
+            assert len(first) == 23
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 22
+            assert len(ledger) == 23
         finally:
             conn.close()
 
@@ -138,10 +140,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 023 (015..022 exist in the real repo set)
+            # tamper 002 and add a new 024 (001..023 exist in the real repo set)
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "023_new_thing.sql").write_text(
+            (tampered_dir / "024_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):
@@ -267,8 +269,13 @@ class TestLedgerIntegrity:
                     (upgrade_dir / f.name).write_bytes(f.read_bytes())
             second = apply_migrations(conn, upgrade_dir)
             assert [r.migration_id for r in second] == ["022"]
+            for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
+                if int(f.name[:3]) == 23:
+                    (upgrade_dir / f.name).write_bytes(f.read_bytes())
+            third = apply_migrations(conn, upgrade_dir)
+            assert [r.migration_id for r in third] == ["023"]
             ledger = applied_migrations(conn)
-            assert len(ledger) == 22
+            assert len(ledger) == 23
             # the CR-4.2 snapshot build ledger exists on the upgraded database
             snapshot_columns = {
                 row[0]
@@ -297,6 +304,24 @@ class TestLedgerIntegrity:
                 "started_at",
                 "completed_at",
             } <= snapshot_columns
+            feature_columns = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'meta_feature_build'"
+                ).fetchall()
+            }
+            assert {
+                "feature_run_id",
+                "snapshot_id",
+                "feature_registry_hash",
+                "feature_contract_version",
+                "manifest_hash",
+                "feature_semantic_hash",
+                "finding_set_hash",
+                "started_at",
+                "completed_at",
+            } <= feature_columns
         finally:
             conn.close()
 
