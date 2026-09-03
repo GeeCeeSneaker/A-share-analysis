@@ -217,7 +217,7 @@ class SnapshotBuilder:
                 "content_hash": hashlib.sha256(data).hexdigest(),
                 "schema_hash": schema_hash,
                 "row_count": len(rows),
-                "semantic_hash": _rows_semantic_hash(rows),
+                "semantic_hash": _rows_semantic_hash(list(rows)),
             }
             row_count_total += len(rows)
 

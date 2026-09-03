@@ -24,6 +24,13 @@
 - mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
 
 ---
+## 2026-09-03 · CR-4.4 CI mypy 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：format 通过后，三矩阵 mypy 报告 3 个类型错误；已对共享回放 tuple 做显式 list 适配，并对 canonical domain 做显式字符串收窄。
+- pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
 ## 2026-09-03 · CR-4.4 CI EOF 换行修复
 
 **Implementation Status / Review Status**

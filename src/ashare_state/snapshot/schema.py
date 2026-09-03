@@ -453,12 +453,12 @@ def project_verified_canonical_snapshot(
     for row in verified_canonical.selected_rows:
         if not isinstance(row, dict):
             raise SnapshotSchemaError(f"verified canonical selected row is not a mapping: {row!r}")
-        domain = row.get("canonical_domain")
-        if domain not in grouped:
+        row_domain = row.get("canonical_domain")
+        if not isinstance(row_domain, str) or row_domain not in grouped:
             raise SnapshotSchemaError(
-                f"canonical run emitted domain {domain!r} outside the requested domain set"
+                f"canonical run emitted domain {row_domain!r} outside the requested domain set"
             )
-        grouped[domain].append(row)
+        grouped[row_domain].append(row)
 
     projected_by_domain: dict[str, tuple[dict[str, Any], ...]] = {}
     for domain in requested_domains:

@@ -285,7 +285,7 @@ def verify_snapshot(
                 "canonical projection"
             )
             raise SnapshotVerifierError(msg)
-        if semantic != _rows_semantic_hash(expected_rows):
+        if semantic != _rows_semantic_hash(list(expected_rows)):
             msg = f"snapshot {domain} artifact semantic seal diverges from the canonical projection"
             raise SnapshotVerifierError(msg)
         # PIT + key sanity re-check on the materialized rows
