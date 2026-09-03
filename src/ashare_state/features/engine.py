@@ -252,7 +252,7 @@ def _amplitude_feature(row: Mapping[str, Any]) -> tuple[float | None, Reason]:
         denominator=denominator,
         denominator_name="pre_close",
         feature_name="amplitude_preclose_raw",
-        formula=formulas.amplitude_preclose_raw,
+        formula=formulas.safe_ratio,
     )
 
 
@@ -557,13 +557,13 @@ def _security_features(
                         f"{spec.feature_name} has no positive observed window length"
                     )
                 name = spec.feature_name
-                ma_value, ma_reason, window = _fixed_close_window(
+                ma_value, ma_reason, mean_window = _fixed_close_window(
                     security_rows,
                     index=index,
                     length=length,
                 )
-                ma_inputs[name] = window
-                for input_row in window:
+                ma_inputs[name] = mean_window
+                for input_row in mean_window:
                     input_rows[str(input_row["canonical_key"])] = input_row
                 ma_reasons[name] = ma_reason
                 store(name, ma_value, ma_reason)
@@ -577,12 +577,12 @@ def _security_features(
                         f"{spec.feature_name} has an invalid dependency declaration"
                     )
                 dependency = spec.required_inputs[1]
-                window = ma_inputs.get(dependency)
-                if window is None:
+                dependency_window = ma_inputs.get(dependency)
+                if dependency_window is None:
                     raise FeatureEngineError(
                         f"{spec.feature_name} depends on an uncomputed mean {dependency}"
                     )
-                for input_row in window:
+                for input_row in dependency_window:
                     input_rows[str(input_row["canonical_key"])] = input_row
                 close_state, close = _numeric(row, spec.required_inputs[0])
                 dependency_value = feature_values.get(dependency)
@@ -813,7 +813,7 @@ def _market_features(
         by_date.setdefault(record["trade_date"], []).append(record)
 
     market_entries = execution_plan.market
-    specs = {entry.handler: entry.spec for entry in market_entries}
+    specs = {str(entry.handler): entry.spec for entry in market_entries}
 
     def spec_for(handler: str) -> Any:
         try:

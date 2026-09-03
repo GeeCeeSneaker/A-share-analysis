@@ -11,6 +11,24 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 mypy follow-up
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：上一轮 mypy 修复脚本中发现并纠正了局部变量重命名的中间文本拼接问题；本次以完整 engine.py 基线重建，避免引入非预期文本变更。
+- 当前修复只包含 safe_ratio 公式绑定、mean_window/dependency_window 类型区分和 market handler key 字符串化，等待 CI 重新确认。
+
+**Next**
+- 继续跟踪三矩阵的 mypy、pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 mypy type closure
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 164 已通过 Ruff lint/formatter，mypy 报告 engine.py 三处局部类型不一致：振幅 helper 的公式签名、window 变量复用、market handler 字典键推断。
+- 已将振幅的已验证 high-low/pre_close 路径绑定到二元 safe_ratio，区分 mean_window 与 dependency_window，并显式字符串化 market handler key；功能语义不变，等待 pytest 与后续 gates。
+
+**Next**
+- 继续跟踪三矩阵的 pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 formatter blank-line closure
 
 **Implementation Status / Review Status**
