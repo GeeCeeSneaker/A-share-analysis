@@ -21,6 +21,7 @@ from ashare_state.features import (
     FEATURE_SET_ID,
     FeatureBuilder,
     FeatureBuilderError,
+    FeatureEngineError,
     FeatureVerifierError,
     compile_feature_execution_plan,
     compute_feature_set,

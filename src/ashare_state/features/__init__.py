@@ -53,9 +53,9 @@ from ashare_state.features.models import (
 )
 from ashare_state.features.registry import (
     BLOCKED_FEATURE_SEMANTICS,
-    BlockedFeatureSemantic,
     FEATURE_REGISTRY_VERSION,
     FEATURE_SET_ID,
+    BlockedFeatureSemantic,
     FeatureExecutionPlan,
     FeatureExecutionSpec,
     FeatureRegistryError,

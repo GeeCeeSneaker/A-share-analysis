@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 CI lint correction
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：新 head 9f7cc9aee3f3f3021af603aefdebf19258558847 的 Ubuntu 3.14 CI 已先暴露两类工程问题：features 公共导出顺序未满足 Ruff，以及新增 focused tests 漏导入 FeatureEngineError；均不改变运行时契约。
+- 已按 CI 原始日志修正 src/ashare_state/features/__init__.py 的 import order，并补齐测试显式异常类型导入；等待三矩阵重新验证。
+
+**Next**
+- 复跑完整 CI；仅在三平台与 governance evidence 均实际通过、且 Reviewer closure 完成后考虑结束 CR-5.1。未闭环前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 Registry Honest Execution / Feature Seal Closure
 
 **Implementation Status / Review Status**
