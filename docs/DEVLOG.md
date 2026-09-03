@@ -11,6 +11,12 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 Ruff 导入块收口
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33743476996`（PR #2 head `52a0ed9`）已显示三条矩阵腿均只在 builder.py 的 Ruff 导入块失败；根因是移除未使用导入后遗留的重复空行。
+- 已移除该重复空行，未改变任何运行时代码或 Feature Layer 语义，等待新 head 的完整 CI。
+
 ## 2026-09-03 · CR-5 Ruff CI 修复
 
 **Implementation Status / Review Status**
