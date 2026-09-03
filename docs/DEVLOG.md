@@ -11,6 +11,12 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 market replay 差异诊断
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33744333659`（PR #2 head `1155a27`）静态检查全部通过；Ubuntu pytest 为 `1267 passed, 3 failed`，失败集中在 market artifact 与 Verified ReadModel replay 的第 0 行。
+- verifier 现在在不改变拒绝条件的前提下报告具体差异字段，以便下一轮按实际字段修复；Windows 两腿的同一 pytest 结果仍以各自 CI 完成为准。
+
 ## 2026-09-03 · CR-5 mypy 变量复用修复
 
 **Implementation Status / Review Status**

@@ -133,8 +133,14 @@ def _compare_rows(
         )
     for position, (actual_row, expected_row) in enumerate(zip(actual, expected_list, strict=True)):
         if canonical_json(actual_row) != canonical_json(expected_row):
+            differing_fields = [
+                field
+                for field in sorted(set(actual_row) | set(expected_row))
+                if canonical_json(actual_row.get(field)) != canonical_json(expected_row.get(field))
+            ]
             raise FeatureVerifierError(
-                f"feature {name} row {position} differs from Verified ReadModel replay"
+                f"feature {name} row {position} differs from Verified ReadModel replay "
+                f"at fields: {', '.join(differing_fields)}"
             )
 
 
