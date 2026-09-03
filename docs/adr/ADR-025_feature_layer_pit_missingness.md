@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Status**: PROPOSED（2026-09-03，CR-5 implementation；Reviewer closure pending）
+- **Status**: PROPOSED（2026-09-03，CR-5.1 implementation；CI run 33758109611 green；Reviewer closure pending）
 - **Deciders**: Project Owner / Development Executor；Design / Audit Review（裁决 pending）
 - **Date**: 2026-09-03
 - **Work Requirement**: \`docs/design/A-share-analysis_CR-5_DeterministicFeatureLayer及PITFeatureSnapshot开发工作要求_20260903.md\`
@@ -254,8 +254,9 @@ until this amendment and Reviewer closure are accepted.
 
 ## Review and exit
 
-Implementation status is DONE only for the submitted CR-5 scope; review status
-is PENDING_REVIEW until the three-platform CI matrix and reviewer closure
-succeed. CR-5 must not emit State, score, signal, strategy, backtest,
+Implementation status is DONE for the submitted CR-5.1 scope. GitHub Actions run
+33758109611 (run 167) verified the Windows 3.12, Windows 3.14, and Ubuntu
+3.14 matrix legs with 1312 passed on each leg and all configured code/test
+checks green. Review status remains PENDING_REVIEW until Reviewer closure. CR-5 must not emit State, score, signal, strategy, backtest,
 portfolio, or trading outputs. On closure, this ADR may be marked ACCEPTED;
 until then it remains PROPOSED.

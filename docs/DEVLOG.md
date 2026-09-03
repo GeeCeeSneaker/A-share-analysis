@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 CI verification complete
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：CR-5.1 code/test implementation head `06106c27652e14f13d360fd3e153ececb39a4434` 已由 GitHub Actions run `33758109611`（run 167）验证；Windows 3.12、Windows 3.14、Ubuntu 3.14 三条矩阵腿全部 success，且每腿均为 `1312 passed`。
+- 三平台的 Ruff lint、Ruff formatter、mypy、full pytest、Spike framework gate 与 AmazingData SDK-absent 检查均通过；Windows 3.14 的 DEVLOG gate 与 Management-doc gate 通过，其他两腿的治理步骤按 workflow 条件跳过。ADR-025 仍为 PROPOSED，等待 Reviewer closure。
+
+**Next**
+- 将本次真实 CI 证据同步到 Development Management、CR-5 工作要求 mapping 与 ADR-025；在 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 pytest helper correction
 
 **Implementation Status / Review Status**

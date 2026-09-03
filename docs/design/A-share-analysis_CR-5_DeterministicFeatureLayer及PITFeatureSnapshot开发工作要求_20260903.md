@@ -1103,10 +1103,10 @@ is not a substitute for this mapping.
 | 60 | tests/integration/test_migrations.py::TestLedgerIntegrity::test_upgrade_from_prior_chain_applies_only_new_tail |
 | 61 | tests/integration/test_migrations.py::TestFromZeroInit::test_idempotent_rerun |
 | 62 | tests/integration/test_migrations.py::TestTamperDetection::test_modified_applied_migration_blocks |
-| 63 | GitHub Actions Windows py3.12 matrix leg |
-| 64 | GitHub Actions Windows py3.14 matrix leg |
-| 65 | GitHub Actions Ubuntu py3.14 matrix leg |
-| 66 | GitHub Actions full gate chain: Ruff, formatter, mypy, full pytest, Spike, SDK-absent, DEVLOG, Management-doc |
+| 63 | GitHub Actions Windows py3.12 matrix leg — run `33758109611`（run 167）success；`1312 passed` |
+| 64 | GitHub Actions Windows py3.14 matrix leg — run `33758109611`（run 167）success；`1312 passed`；DEVLOG/Management-doc gates success |
+| 65 | GitHub Actions Ubuntu py3.14 matrix leg — run `33758109611`（run 167）success；`1312 passed` |
+| 66 | GitHub Actions full gate chain：run `33758109611`（run 167；code head `06106c27652e14f13d360fd3e153ececb39a4434`）三腿 success；各腿 `1312 passed`；Ruff/formatter/mypy/pytest/Spike/SDK-absent success，Windows 3.14 DEVLOG/Management-doc success，其他两腿治理步骤按 workflow 条件跳过 |
 
 ---
 
