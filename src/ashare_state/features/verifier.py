@@ -331,8 +331,8 @@ class FeatureVerifier:
             ("finding_count", int(record["finding_count"])),
             ("status", "SUCCESS"),
         )
-        for field, expected in manifest_fields:
-            if str(manifest.get(field)) != str(expected):
+        for field, expected_manifest_value in manifest_fields:
+            if str(manifest.get(field)) != str(expected_manifest_value):
                 raise FeatureVerifierError(
                     f"feature manifest field {field} does not match the ledger"
                 )

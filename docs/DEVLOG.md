@@ -11,6 +11,12 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 mypy 变量复用修复
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33744175985`（PR #2 head `8d0e3e0`）中 Ruff lint、formatter 均通过；mypy 因 verifier.py 复用前序字符串循环的 `expected` 变量而报联合类型赋值错误。
+- 已将 manifest 比较循环变量改为独立名称，未改变比较条件或 verifier 行为，等待 CI 继续执行。
+
 ## 2026-09-03 · CR-5 mypy manifest 类型收口
 
 **Implementation Status / Review Status**
