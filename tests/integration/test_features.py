@@ -317,8 +317,7 @@ def _rebind_manifest(
         values.append(value)
     values.append(built.feature_run_id)
     conn.execute(
-        f"UPDATE meta_feature_build SET {', '.join(assignments)} "
-        "WHERE feature_run_id = ?",
+        f"UPDATE meta_feature_build SET {', '.join(assignments)} WHERE feature_run_id ?",
         values,
     )
 
@@ -496,9 +495,7 @@ class TestFeatureRegistryHonestExecution:
             ("ma_close_obs_20", "window_basis", "MARKET_SESSIONS"),
         ],
     )
-    def test_registry_semantic_drift_fails_closed(
-        self, feature_name, field, value
-    ):
+    def test_registry_semantic_drift_fails_closed(self, feature_name, field, value):
         feature_set = _mutate_feature_spec(
             get_feature_set(FEATURE_SET_ID),
             feature_name,
@@ -537,9 +534,7 @@ class TestFeatureRegistryHonestExecution:
         with pytest.raises(ValueError, match="typed classifications"):
             compile_feature_execution_plan(untyped)
 
-    def test_registry_window_drift_writes_no_artifact_or_ledger(
-        self, conn, env_root, monkeypatch
-    ):
+    def test_registry_window_drift_writes_no_artifact_or_ledger(self, conn, env_root, monkeypatch):
         snapshot = _build_readmodel(conn, env_root)
         mutated = _mutate_feature_spec(
             get_feature_set(FEATURE_SET_ID),
@@ -592,16 +587,11 @@ class TestFeatureSealCrossBinding:
     )
 
 
-    def test_verifier_rejects_lineage_rebind_even_when_all_seals_rebound(
-        self, conn, env_root
-    ):
+    def test_verifier_rejects_lineage_rebind_even_when_all_seals_rebound(self, conn, env_root):
         _, built = _build_feature(conn, env_root)
         manifest_path = env_root["normalized"] / built.manifest_uri
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        artifact_path = (
-            env_root["normalized"]
-            / manifest["artifacts"]["security_daily_features"]["uri"]
-        )
+        artifact_path = env_root["normalized"] / manifest["artifacts"]["security_daily_features"]["uri"]
         rows = pl.read_parquet(artifact_path).to_dicts()
         rows[0]["input_lineage_hash"] = "0" * 64
         frame = pl.DataFrame(
@@ -629,8 +619,7 @@ class TestFeatureSealCrossBinding:
             [
                 *frame.to_dicts(),
                 *pl.read_parquet(
-                    env_root["normalized"]
-                    / manifest["artifacts"]["market_daily_features"]["uri"]
+                    env_root["normalized"] / manifest["artifacts"]["market_daily_features"]["uri"]
                 ).to_dicts(),
             ]
         )
@@ -659,9 +648,7 @@ class TestFeatureSealCrossBinding:
                 normalized_root=env_root["normalized"],
             )
 
-    def test_manifest_and_ledger_counts_are_physically_recomputed(
-        self, conn, env_root, field
-    ):
+    def test_manifest_and_ledger_counts_are_physically_recomputed(self, conn, env_root, field):
         _, built = _build_feature(conn, env_root)
         _rebind_manifest(
             conn,
@@ -879,9 +866,10 @@ class TestFeaturePITAndMarketDeterminism:
         changed = [dict(row) for row in rows]
         changed[0]["source_row_identity_hash"] = "f" * 64
         second = _compute_rows(changed)
-        assert first.security_rows[0]["input_lineage_hash"] != second.security_rows[0][
-            "input_lineage_hash"
-        ]
+        assert (
+            first.security_rows[0]["input_lineage_hash"]
+            != second.security_rows[0]["input_lineage_hash"]
+        )
 
     def test_market_mean_median_are_order_deterministic(self):
         first = _fixture_rows(21)
@@ -898,12 +886,14 @@ class TestFeaturePITAndMarketDeterminism:
             row["close"] += 10.0
         forward = _compute_rows([*first, *second])
         reverse = _compute_rows([*second, *first])
-        assert forward.market_rows[-1]["mean_raw_return_observed"] == reverse.market_rows[-1][
-            "mean_raw_return_observed"
-        ]
-        assert forward.market_rows[-1]["median_raw_return_observed"] == reverse.market_rows[-1][
-            "median_raw_return_observed"
-        ]
+        assert (
+            forward.market_rows[-1]["mean_raw_return_observed"]
+            == reverse.market_rows[-1]["mean_raw_return_observed"]
+        )
+        assert (
+            forward.market_rows[-1]["median_raw_return_observed"]
+            == reverse.market_rows[-1]["median_raw_return_observed"]
+        )
 
 
 @pytest.mark.integration
@@ -945,10 +935,7 @@ class TestFeatureRecoverablePublication:
             builder.build(snapshot.snapshot_id, FEATURE_SET_ID)
         manifest_path = next((env_root["normalized"] / "feature").rglob("manifest.json"))
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        missing_path = (
-            env_root["normalized"]
-            / manifest["artifacts"]["feature_findings"]["uri"]
-        )
+        missing_path = env_root["normalized"] / manifest["artifacts"]["feature_findings"]["uri"]
         missing_path.unlink()
         retry = self._builder(conn, env_root).build(snapshot.snapshot_id, FEATURE_SET_ID)
         assert retry.status == "SUCCESS"
@@ -966,10 +953,7 @@ class TestFeatureRecoverablePublication:
             builder.build(snapshot.snapshot_id, FEATURE_SET_ID)
         manifest_path = next((env_root["normalized"] / "feature").rglob("manifest.json"))
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        conflict_path = (
-            env_root["normalized"]
-            / manifest["artifacts"]["security_daily_features"]["uri"]
-        )
+        conflict_path = env_root["normalized"] / manifest["artifacts"]["security_daily_features"]["uri"]
         conflict_path.write_bytes(b"conflicting feature bytes")
         with pytest.raises(FeatureBuilderError, match="conflict|different bytes"):
             self._builder(conn, env_root).build(snapshot.snapshot_id, FEATURE_SET_ID)
@@ -1010,13 +994,9 @@ class TestFeatureIdentityAndBoundary:
             "feature_contract_version": "feature-v1",
             "feature_builder_code_fingerprint": "e" * 64,
         }
-        first = feature_id_from_base_hash(
-            feature_base_hash_from_primitives(**values)
-        )
+        first = feature_id_from_base_hash(feature_base_hash_from_primitives(**values))
         changed = dict(values, feature_registry_hash="f" * 64)
-        second = feature_id_from_base_hash(
-            feature_base_hash_from_primitives(**changed)
-        )
+        second = feature_id_from_base_hash(feature_base_hash_from_primitives(**changed))
         assert first != second
 
     def test_feature_builder_requires_explicit_world_arguments(self):

@@ -627,19 +627,13 @@ def _security_features(
                 raise FeatureEngineError(
                     f"{amount_spec.feature_name} has no positive amount window length"
                 )
-            amount_state, current_amount = _numeric(
-                row, amount_spec.required_inputs[0]
-            )
+            amount_state, current_amount = _numeric(row, amount_spec.required_inputs[0])
             if amount_state == "ok":
                 assert current_amount is not None
                 valid_amount_rows.append((index, row, current_amount))
-            amount_invalid_prefix.append(
-                amount_invalid_prefix[-1] + int(amount_state != "ok")
-            )
+            amount_invalid_prefix.append(amount_invalid_prefix[-1] + int(amount_state != "ok"))
             if amount_state != "ok":
-                amount_reason = _reason_for_input(
-                    amount_state, amount_spec.required_inputs[0]
-                )
+                amount_reason = _reason_for_input(amount_state, amount_spec.required_inputs[0])
                 if amount_reason is None:
                     amount_reason = (
                         "INPUT_NULL",
@@ -659,9 +653,7 @@ def _security_features(
                     amount_value = None
                 else:
                     amount_window = valid_amount_rows[-amount_length:]
-                    mean_amount = formulas.ordered_mean(
-                        [value for _, _, value in amount_window]
-                    )
+                    mean_amount = formulas.ordered_mean([value for _, _, value in amount_window])
                     if mean_amount is None:
                         amount_reason = (
                             "NON_FINITE_RESULT",
@@ -689,9 +681,9 @@ def _security_features(
                 end=index,
             )
             if len(valid_amount_rows) >= amount_length:
-                skipped_amounts = amount_invalid_prefix[index + 1] - amount_invalid_prefix[
-                    amount_start
-                ]
+                skipped_amounts = (
+                    amount_invalid_prefix[index + 1] - amount_invalid_prefix[amount_start]
+                )
                 if skipped_amounts:
                     findings.append(
                         FeatureFinding(
@@ -746,9 +738,9 @@ def _security_features(
                 start=volatility_start,
                 end=index,
             )
-            skipped_raw_returns = raw_invalid_prefix[index + 1] - raw_invalid_prefix[
-                volatility_start
-            ]
+            skipped_raw_returns = (
+                raw_invalid_prefix[index + 1] - raw_invalid_prefix[volatility_start]
+            )
             if skipped_raw_returns:
                 findings.append(
                     FeatureFinding(
@@ -911,9 +903,7 @@ def _market_features(
 
         ma_input = valid_ma_spec.required_inputs[0]
         ma_records = [
-            record
-            for record in day_records
-            if record["features"].get(ma_input) is not None
+            record for record in day_records if record["features"].get(ma_input) is not None
         ]
         valid_ma_count = len(ma_records)
         if valid_ma_count:
@@ -932,9 +922,7 @@ def _market_features(
 
         mom_input = valid_mom_spec.required_inputs[0]
         mom_records = [
-            record
-            for record in day_records
-            if record["features"].get(mom_input) is not None
+            record for record in day_records if record["features"].get(mom_input) is not None
         ]
         valid_mom_count = len(mom_records)
         if valid_mom_count:
@@ -962,11 +950,7 @@ def _market_features(
                 amount_values.append(value)
         total_amount = math.fsum(amount_values) if amount_values else None
         if total_amount is None or not math.isfinite(total_amount):
-            finding_class = (
-                "NON_FINITE_RESULT"
-                if "nonfinite" in amount_states
-                else "INPUT_NULL"
-            )
+            finding_class = "NON_FINITE_RESULT" if "nonfinite" in amount_states else "INPUT_NULL"
             append_missing(
                 trade_date,
                 total_amount_spec.feature_name,

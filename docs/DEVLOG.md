@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 formatter follow-up
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 160 仍只在 formatter gate 失败；原始差异集中于 amount/market 表达式折叠、测试长签名/路径/断言的确定性换行。
+- 已按完整 formatter diff 收口 engine.py 与 test_features.py 的剩余格式项，保持计算、验证和恢复行为不变；等待 lint 之后的 mypy、pytest、framework 与 governance gates。
+
+**Next**
+- 继续复跑完整 CI；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 CI formatter correction
 
 **Implementation Status / Review Status**
