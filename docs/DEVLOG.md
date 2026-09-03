@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 pytest helper correction
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 166 的 Ubuntu pytest 为 1304 passed、8 failed；失败均定位到新增测试 helper：目标 feature 参数与变更字段同名导致 TypeError，以及 ledger UPDATE 缺少 `=`。
+- 已将 helper 的定位参数改名为 `target_feature_name`，并修正 `WHERE feature_run_id = ?`；产品代码未改，等待三平台重新执行真实断言。
+
+**Next**
+- 继续跟踪 pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 pytest collection fix
 
 **Implementation Status / Review Status**

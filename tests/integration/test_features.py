@@ -282,11 +282,11 @@ def _build_readmodel(conn, env_root, *, domains=("daily_bar",)):
     return snapshot
 
 
-def _mutate_feature_spec(feature_set, feature_name: str, **changes):
+def _mutate_feature_spec(feature_set, target_feature_name: str, **changes):
     return replace(
         feature_set,
         features=tuple(
-            replace(spec, **changes) if spec.feature_name == feature_name else spec
+            replace(spec, **changes) if spec.feature_name == target_feature_name else spec
             for spec in feature_set.features
         ),
     )
@@ -317,7 +317,7 @@ def _rebind_manifest(
         values.append(value)
     values.append(built.feature_run_id)
     conn.execute(
-        f"UPDATE meta_feature_build SET {', '.join(assignments)} WHERE feature_run_id ?",
+        f"UPDATE meta_feature_build SET {', '.join(assignments)} WHERE feature_run_id = ?",
         values,
     )
 
