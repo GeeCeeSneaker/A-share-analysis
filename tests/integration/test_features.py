@@ -15,10 +15,10 @@ from typing import Any
 
 import polars as pl
 import pytest
-import ashare_state.features.engine as feature_engine
-import ashare_state.features.verifier as feature_verifier
 from test_snapshot import _canonical_success
 
+import ashare_state.features.engine as feature_engine
+import ashare_state.features.verifier as feature_verifier
 from ashare_state.features import (
     FEATURE_SET_ID,
     FeatureBuilder,
