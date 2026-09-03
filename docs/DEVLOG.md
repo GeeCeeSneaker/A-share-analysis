@@ -11,6 +11,13 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 CI 完整验证
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：最终实现 head `eaebce48ad373d7302f208f2f7fe7ddd53bf6cfb` 的 GitHub Actions CI run `33745226956`（run 155）三条矩阵腿全部 success；Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿均为 `1270 passed`。
+- Ruff lint、Ruff formatter、mypy、pytest、Spike framework gates、AmazingData SDK-absent 均通过；Windows 3.14 的 DEVLOG gate 与 Management-doc gate 也通过，其他两腿按 workflow 条件跳过治理 gates。
+- CR-5 实现保持 PENDING_REVIEW，下一步是 Reviewer closure；未闭环前不启动 CR-6 State，生产 P0-M-1B 仍独立 BLOCKED，PR #2 不在本次自动合并。
+
 ## 2026-09-03 · CR-5 market schema 类型修复
 
 **Implementation Status / Review Status**
