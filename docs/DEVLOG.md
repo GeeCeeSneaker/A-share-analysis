@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 formatter comment placement
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 162 显示 Ruff lint 已通过，但 formatter 要求将两条路径表达式的 `# noqa: E501` 注释放到括号闭合行。
+- 已按 formatter 的实际规范调整为括号布局并保留局部 E501 抑制；未改变测试逻辑或全局 lint 配置，等待完整门禁。
+
+**Next**
+- 继续跟踪三矩阵的 mypy、pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 lint/formatter compatibility
 
 **Implementation Status / Review Status**
