@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 lint/formatter compatibility
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 161 的 formatter 已通过候选代码，但 Ruff lint 发现两个被 formatter 固定折叠的 security artifact 路径表达式为 104 字符，超过仓库 E501 上限。
+- 已仅对这两个确定性 formatter 输出行添加局部 # noqa: E501；没有修改全局 lint 规则或功能代码，等待完整 CI 验证。
+
+**Next**
+- 继续跟踪三矩阵的 mypy、pytest、framework 和 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 formatter follow-up
 
 **Implementation Status / Review Status**

@@ -591,7 +591,7 @@ class TestFeatureSealCrossBinding:
         _, built = _build_feature(conn, env_root)
         manifest_path = env_root["normalized"] / built.manifest_uri
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        artifact_path = env_root["normalized"] / manifest["artifacts"]["security_daily_features"]["uri"]
+        artifact_path = env_root["normalized"] / manifest["artifacts"]["security_daily_features"]["uri"]  # noqa: E501
         rows = pl.read_parquet(artifact_path).to_dicts()
         rows[0]["input_lineage_hash"] = "0" * 64
         frame = pl.DataFrame(
@@ -953,7 +953,7 @@ class TestFeatureRecoverablePublication:
             builder.build(snapshot.snapshot_id, FEATURE_SET_ID)
         manifest_path = next((env_root["normalized"] / "feature").rglob("manifest.json"))
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        conflict_path = env_root["normalized"] / manifest["artifacts"]["security_daily_features"]["uri"]
+        conflict_path = env_root["normalized"] / manifest["artifacts"]["security_daily_features"]["uri"]  # noqa: E501
         conflict_path.write_bytes(b"conflicting feature bytes")
         with pytest.raises(FeatureBuilderError, match="conflict|different bytes"):
             self._builder(conn, env_root).build(snapshot.snapshot_id, FEATURE_SET_ID)
