@@ -488,6 +488,40 @@ class FeatureExecutionPlan:
             )
         return next(iter(bases))
 
+    @property
+    def max_security_lineage_members(self) -> int:
+        """Return the Registry-derived V1 upper bound for one security row.
+
+        The bound is deliberately conservative: one current observation,
+        the largest fixed observed-bar/lag dependency, and all selected
+        valid members declared by the amount/volatility windows. It is
+        derived from the compiled plan instead of being a magic constant.
+        """
+
+        fixed_dependencies: list[int] = [1]
+        selected_valid_members = 0
+        for entry in self.security:
+            spec = entry.spec
+            if entry.handler in {"observed_close_mean", "close_to_mean"}:
+                if spec.window_length is None:
+                    raise FeatureRegistryError(
+                        f"{spec.feature_name} has no fixed observed dependency length"
+                    )
+                fixed_dependencies.append(spec.window_length)
+            elif entry.handler == "lag_return":
+                if spec.lag is None:
+                    raise FeatureRegistryError(
+                        f"{spec.feature_name} has no fixed lag dependency length"
+                    )
+                fixed_dependencies.append(spec.lag)
+            elif entry.handler in {"amount_to_mean", "volatility"}:
+                if spec.window_length is None:
+                    raise FeatureRegistryError(
+                        f"{spec.feature_name} has no selected valid member bound"
+                    )
+                selected_valid_members += spec.window_length
+        return 1 + max(fixed_dependencies) + selected_valid_members
+
     def by_name(self, feature_name: str) -> FeatureExecutionSpec:
         for entry in (*self.security, *self.market):
             if entry.spec.feature_name == feature_name:

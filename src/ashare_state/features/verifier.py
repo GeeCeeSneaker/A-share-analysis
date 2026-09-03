@@ -201,7 +201,8 @@ def _validate_rows(
                     f"feature security {column} contains a non-finite or invalid value"
                 )
 
-    market_dates: list[Any] = []
+    seen_market_dates: set[Any] = set()
+    previous_market_date: Any | None = None
     for row in market_rows:
         if row["source_snapshot_id"] != snapshot_id:
             raise FeatureVerifierError("feature market row carries a foreign source_snapshot_id")
@@ -216,11 +217,12 @@ def _validate_rows(
             raise FeatureVerifierError("feature market row is available after snapshot_as_of")
         _check_sha256(row["input_lineage_hash"], "input_lineage_hash")
         trade_date = row["trade_date"]
-        if market_dates and trade_date < market_dates[-1]:
+        if previous_market_date is not None and trade_date < previous_market_date:
             raise FeatureVerifierError("feature market rows are not deterministically sorted")
-        if trade_date in market_dates:
+        if trade_date in seen_market_dates:
             raise FeatureVerifierError("feature market rows have duplicate trade_date keys")
-        market_dates.append(trade_date)
+        seen_market_dates.add(trade_date)
+        previous_market_date = trade_date
         for column in (
             "advancer_ratio_observed",
             "mean_raw_return_observed",

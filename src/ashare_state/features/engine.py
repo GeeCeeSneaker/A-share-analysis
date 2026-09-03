@@ -296,16 +296,20 @@ def _lag_close_feature(
     index: int,
     lag: int,
 ) -> tuple[float | None, Reason, tuple[Mapping[str, Any], ...]]:
+    window_start = max(0, index - lag)
+    inputs = tuple(rows[window_start : index + 1])
     if index < lag:
         return (
             None,
             (
                 "INSUFFICIENT_HISTORY",
-                {"window_basis": "OBSERVED_SECURITY_BARS", "required_prior_bars": lag},
+                {
+                    "window_basis": "OBSERVED_SECURITY_BARS",
+                    "required_prior_bars": lag,
+                },
             ),
-            tuple(rows[: index + 1]),
+            inputs,
         )
-    inputs = tuple(rows[index - lag : index + 1])
     current_state, current = _numeric(rows[index], "close")
     prior_state, prior = _numeric(rows[index - lag], "close")
     value, reason = _ratio_from_states(
@@ -424,14 +428,11 @@ def _prepare_rows(
     return prepared
 
 
-def _add_input_span(
+def _add_selected_inputs(
     input_rows: dict[str, Mapping[str, Any]],
-    rows: Sequence[dict[str, Any]],
-    *,
-    start: int,
-    end: int,
+    rows: Sequence[Mapping[str, Any]],
 ) -> None:
-    for input_row in rows[start : end + 1]:
+    for input_row in rows:
         input_rows[str(input_row["canonical_key"])] = input_row
 
 
@@ -476,6 +477,7 @@ def _security_features(
     raw_entry = entries_by_handler["raw_return_1"][0]
     amount_entry = entries_by_handler["amount_to_mean"][0]
     volatility_entry = entries_by_handler["volatility"][0]
+    security_lineage_bound = execution_plan.max_security_lineage_members
 
     grouped: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
@@ -674,11 +676,10 @@ def _security_features(
                 amount_start = 0
             else:
                 amount_start = valid_amount_rows[-amount_length][0]
-            _add_input_span(
+            amount_selected_rows = valid_amount_rows[-amount_length:]
+            _add_selected_inputs(
                 input_rows,
-                security_rows,
-                start=amount_start,
-                end=index,
+                [input_row for _, input_row, _ in amount_selected_rows],
             )
             if len(valid_amount_rows) >= amount_length:
                 skipped_amounts = (
@@ -732,11 +733,10 @@ def _security_features(
                         {"formula": volatility_spec.feature_name},
                     )
                 )
-            _add_input_span(
+            volatility_selected_rows = valid_raw_rows[-volatility_length:]
+            _add_selected_inputs(
                 input_rows,
-                security_rows,
-                start=volatility_start,
-                end=index,
+                [input_row for _, input_row, _ in volatility_selected_rows],
             )
             skipped_raw_returns = (
                 raw_invalid_prefix[index + 1] - raw_invalid_prefix[volatility_start]
@@ -764,6 +764,11 @@ def _security_features(
                     "compiled feature execution plan did not produce the exact security feature set"
                 )
             ordered_inputs = _ordered_unique_inputs(input_rows)
+            if len(ordered_inputs) > security_lineage_bound:
+                raise FeatureEngineError(
+                    f"security feature row lineage has {len(ordered_inputs)} members; "
+                    f"compiled V1 bound is {security_lineage_bound}"
+                )
             available_at = max(item["available_at"] for item in ordered_inputs)
             if available_at > snapshot_as_of.astimezone(UTC):
                 raise FeatureEngineError(

@@ -15,6 +15,8 @@ from typing import Any
 
 import polars as pl
 import pytest
+import ashare_state.features.engine as feature_engine
+import ashare_state.features.verifier as feature_verifier
 from test_snapshot import _canonical_success
 
 from ashare_state.features import (
@@ -359,6 +361,42 @@ def _source_row(index: int, *, snapshot_id: str = "snapshot-1") -> dict[str, Any
 
 def _fixture_rows(count: int = 65) -> list[dict[str, Any]]:
     return [_source_row(index) for index in range(count)]
+
+
+def _capture_lineage_sizes(monkeypatch) -> list[int]:
+    sizes: list[int] = []
+    original = feature_engine._ordered_unique_inputs
+
+    def capture(input_rows):
+        ordered = original(input_rows)
+        sizes.append(len(ordered))
+        return ordered
+
+    monkeypatch.setattr(feature_engine, "_ordered_unique_inputs", capture)
+    return sizes
+
+
+def _sparse_amount_history() -> list[dict[str, Any]]:
+    rows = _fixture_rows(10_000)
+    for row in rows:
+        row["amount"] = None
+    for index in (0, 5_000, 9_999):
+        rows[index]["amount"] = 1_000.0 + index
+    return rows
+
+
+def _sparse_raw_return_history() -> list[dict[str, Any]]:
+    rows = _fixture_rows(10_000)
+    for index in range(20, len(rows)):
+        rows[index]["pre_close"] = 0.0
+    return rows
+
+
+def _long_active_amount_history() -> list[dict[str, Any]]:
+    rows = _fixture_rows(183)
+    for index in range(21, 181):
+        rows[index]["amount"] = None
+    return rows
 
 
 @pytest.mark.unit
@@ -839,6 +877,10 @@ class TestFeatureFormulaAndMissingnessClosure:
     def test_incremental_windows_do_not_rescan_history_prefix(self):
         engine_source = (SRC_ROOT / "engine.py").read_text(encoding="utf-8")
         assert "security_rows[: index + 1]" not in engine_source
+        assert "_add_input_span" not in engine_source
+        assert "start=amount_start" not in engine_source
+        assert "start=volatility_start" not in engine_source
+        assert "max_security_lineage_members" in engine_source
         verifier_source = (
             Path(__file__).resolve().parents[2]
             / "src"
@@ -847,6 +889,7 @@ class TestFeatureFormulaAndMissingnessClosure:
             / "verifier.py"
         ).read_text(encoding="utf-8")
         assert "security_keys: set" in verifier_source
+        assert "seen_market_dates: set" in verifier_source
 
 
 @pytest.mark.unit
@@ -859,6 +902,111 @@ class TestFeaturePITAndMarketDeterminism:
         computed = _compute_rows(rows)
         target = computed.security_rows[-1]
         assert target["feature_available_at"] == datetime(2026, 3, 11, tzinfo=UTC)
+
+    def test_sparse_amount_history_has_registry_derived_lineage_bound(
+        self, monkeypatch
+    ):
+        rows = _sparse_amount_history()
+        lineage_sizes = _capture_lineage_sizes(monkeypatch)
+        computed = _compute_rows(rows)
+        plan = compile_feature_execution_plan(get_feature_set(FEATURE_SET_ID))
+        assert len(lineage_sizes) == len(rows)
+        assert max(lineage_sizes) <= plan.max_security_lineage_members
+        assert computed.security_rows[-1]["amount_to_mean_obs_20"] is None
+
+    def test_sparse_raw_return_history_has_registry_derived_lineage_bound(
+        self, monkeypatch
+    ):
+        rows = _sparse_raw_return_history()
+        lineage_sizes = _capture_lineage_sizes(monkeypatch)
+        computed = _compute_rows(rows)
+        plan = compile_feature_execution_plan(get_feature_set(FEATURE_SET_ID))
+        assert len(lineage_sizes) == len(rows)
+        assert max(lineage_sizes) <= plan.max_security_lineage_members
+        assert computed.security_rows[-1]["vol_raw_return_obs_20"] is not None
+
+    def test_invalid_active_gap_identity_does_not_change_selected_lineage(self):
+        rows = _long_active_amount_history()
+        baseline = _compute_rows(rows)
+        changed = [dict(row) for row in rows]
+        changed[90]["source_row_identity_hash"] = "f" * 64
+        replay = _compute_rows(changed)
+        assert replay.security_rows[181] == baseline.security_rows[181]
+
+    def test_invalid_active_gap_becoming_valid_changes_selection_and_truth(self):
+        rows = _long_active_amount_history()
+        baseline = _compute_rows(rows)
+        changed = [dict(row) for row in rows]
+        changed[90]["amount"] = 1_090.0
+        replay = _compute_rows(changed)
+        assert (
+            replay.security_rows[181]["input_lineage_hash"]
+            != baseline.security_rows[181]["input_lineage_hash"]
+        )
+        assert (
+            replay.security_rows[181]["amount_to_mean_obs_20"]
+            != baseline.security_rows[181]["amount_to_mean_obs_20"]
+        )
+
+    def test_invalid_active_gap_available_at_does_not_lift_feature_availability(self):
+        rows = _long_active_amount_history()
+        baseline = _compute_rows(rows)
+        changed = [dict(row) for row in rows]
+        changed[90]["available_at"] = datetime(2026, 3, 11, tzinfo=UTC)
+        replay = _compute_rows(changed)
+        assert replay.security_rows[181]["feature_available_at"] == baseline.security_rows[181][
+            "feature_available_at"
+        ]
+
+    def test_selected_valid_identity_changes_lineage(self):
+        rows = _long_active_amount_history()
+        baseline = _compute_rows(rows)
+        changed = [dict(row) for row in rows]
+        changed[20]["source_row_identity_hash"] = "e" * 64
+        replay = _compute_rows(changed)
+        assert (
+            replay.security_rows[181]["input_lineage_hash"]
+            != baseline.security_rows[181]["input_lineage_hash"]
+        )
+
+    def test_selected_valid_available_at_controls_feature_availability(self):
+        rows = _long_active_amount_history()
+        changed = [dict(row) for row in rows]
+        changed[20]["available_at"] = datetime(2026, 3, 11, tzinfo=UTC)
+        replay = _compute_rows(changed)
+        assert replay.security_rows[181]["feature_available_at"] == datetime(
+            2026, 3, 11, tzinfo=UTC
+        )
+
+    def test_market_date_duplicate_and_order_guards_fail_closed(self):
+        computed = _compute_rows(_fixture_rows(1))
+        market_row = dict(computed.market_rows[0])
+        with pytest.raises(FeatureVerifierError, match="duplicate trade_date"):
+            feature_verifier._validate_rows(
+                security_rows=[],
+                market_rows=[market_row, dict(market_row)],
+                finding_rows=[],
+                snapshot_id="snapshot-1",
+                feature_run_id="feature-1",
+                feature_set_id=FEATURE_SET_ID,
+                snapshot_as_of=datetime(2026, 3, 12, tzinfo=UTC),
+                expected_security_columns=feature_engine.SECURITY_FEATURE_COLUMNS,
+                universe_rule_id="OBSERVED_DAILY_BAR_UNIVERSE",
+            )
+        out_of_order = dict(market_row)
+        out_of_order["trade_date"] = market_row["trade_date"] - timedelta(days=1)
+        with pytest.raises(FeatureVerifierError, match="not deterministically sorted"):
+            feature_verifier._validate_rows(
+                security_rows=[],
+                market_rows=[market_row, out_of_order],
+                finding_rows=[],
+                snapshot_id="snapshot-1",
+                feature_run_id="feature-1",
+                feature_set_id=FEATURE_SET_ID,
+                snapshot_as_of=datetime(2026, 3, 12, tzinfo=UTC),
+                expected_security_columns=feature_engine.SECURITY_FEATURE_COLUMNS,
+                universe_rule_id="OBSERVED_DAILY_BAR_UNIVERSE",
+            )
 
     def test_security_lineage_changes_when_source_identity_changes(self):
         rows = _fixture_rows(2)
