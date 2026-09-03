@@ -25,9 +25,9 @@ from ashare_state.features.models import (
     semantic_hash,
 )
 from ashare_state.features.registry import (
-    FeatureSet,
     FEATURE_SET_ID,
     UNIVERSE_RULE_ID,
+    FeatureSet,
 )
 
 __all__ = [
@@ -445,7 +445,16 @@ def _security_features(
             feature_values: dict[str, float | None] = {}
             reasons: dict[str, Reason] = {}
 
-            def store(name: str, value: float | None, reason: Reason) -> None:
+            def store(
+                name: str,
+                value: float | None,
+                reason: Reason,
+                *,
+                feature_values: dict[str, float | None] = feature_values,
+                reasons: dict[str, Reason] = reasons,
+                security_id: str = security_id,
+                trade_date: date = trade_date,
+            ) -> None:
                 feature_values[name] = value
                 reasons[name] = reason
                 _add_finding(

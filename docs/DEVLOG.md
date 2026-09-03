@@ -11,6 +11,12 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 Ruff CI 修复
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：PR #2 首轮 CI run `33742421507` 的三条矩阵腿均在 Ruff 阶段失败；问题限定为导入排序、未使用导入、B023 闭包捕获和 4 处 E501，未进入 mypy、pytest 或后续治理 gates。
+- 已按实际日志修复这些静态检查问题；Feature Registry、公式、窗口、缺失值、PIT lineage、artifact seal 与 verifier 语义未改变，等待新提交 CI 结果。
+
 ## 2026-09-03 · CR-5 Deterministic Feature Layer + PIT Feature Snapshot
 
 **Implementation Status / Review Status**

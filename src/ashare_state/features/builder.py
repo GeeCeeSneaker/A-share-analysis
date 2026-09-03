@@ -9,7 +9,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import duckdb
 
 from ashare_state.features.engine import (
     FEATURE_ARTIFACT_NAMES,
@@ -19,8 +18,8 @@ from ashare_state.features.engine import (
 )
 from ashare_state.features.models import (
     FEATURE_CONTRACT_VERSION,
-    FeatureBuildResult,
     FeatureBuilderError,
+    FeatureBuildResult,
     feature_base_hash_from_primitives,
     feature_id_from_base_hash,
     semantic_hash,
@@ -31,7 +30,6 @@ from ashare_state.readmodel import (
     DuckDBReadModel,
     ReadModelError,
     duckdb_domain_columns,
-    readmodel_builder_code_fingerprint,
 )
 from ashare_state.snapshot import verify_snapshot
 from ashare_state.storage.atomic_files import write_file_atomic

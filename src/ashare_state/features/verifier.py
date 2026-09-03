@@ -319,7 +319,10 @@ class FeatureVerifier:
             ("snapshot_manifest_uri", str(record["snapshot_manifest_uri"])),
             ("snapshot_manifest_hash", str(record["snapshot_manifest_hash"])),
             ("snapshot_semantic_hash", str(record["snapshot_semantic_hash"])),
-            ("snapshot_as_of", _utc_datetime(record["snapshot_as_of"], "snapshot_as_of").isoformat()),
+            (
+                "snapshot_as_of",
+                _utc_datetime(record["snapshot_as_of"], "snapshot_as_of").isoformat(),
+            ),
             ("readmodel_contract_version", str(record["readmodel_contract_version"])),
             (
                 "readmodel_builder_code_fingerprint",
@@ -362,7 +365,9 @@ class FeatureVerifier:
             feature_builder_code_fingerprint=current_feature_fingerprint,
         )
         if str(manifest.get("feature_base_hash")) != base_hash:
-            raise FeatureVerifierError("feature_base_hash does not match feature identity primitives")
+            raise FeatureVerifierError(
+                "feature_base_hash does not match feature identity primitives"
+            )
         if feature_id_from_base_hash(base_hash) != feature_run_id:
             raise FeatureVerifierError("feature_run_id does not match UUID5 identity recompute")
 
@@ -448,10 +453,10 @@ class FeatureVerifier:
             entry = artifacts.get(name)
             if not isinstance(entry, dict):
                 raise FeatureVerifierError(f"feature artifact {name} has no seal entry")
-            expected_artifact_uri = (
-                f"{feature_manifest_uri(str(manifest['snapshot_id']), feature_run_id).rsplit('/', 1)[0]}"
-                f"/{name}.parquet"
-            )
+            artifact_base_uri = feature_manifest_uri(
+                str(manifest["snapshot_id"]), feature_run_id
+            ).rsplit("/", 1)[0]
+            expected_artifact_uri = f"{artifact_base_uri}/{name}.parquet"
             if str(entry.get("uri")) != expected_artifact_uri:
                 raise FeatureVerifierError(f"feature artifact {name} URI is not deterministic")
             path = self.feature_root / str(entry["uri"])
@@ -484,7 +489,9 @@ class FeatureVerifier:
             }
 
         if _artifact_set_hash(physical_seals) != str(manifest["artifact_set_hash"]):
-            raise FeatureVerifierError("feature artifact_set_hash does not match physical artifacts")
+            raise FeatureVerifierError(
+                "feature artifact_set_hash does not match physical artifacts"
+            )
         if _artifact_set_hash(physical_seals) != str(record["artifact_set_hash"]):
             raise FeatureVerifierError("feature artifact_set_hash does not match the ledger")
         actual_feature_semantic = _feature_semantic_hash(

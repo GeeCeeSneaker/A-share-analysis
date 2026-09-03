@@ -25,8 +25,8 @@ from ashare_state.features.engine import (
     frame_for_artifact,
 )
 from ashare_state.features.formulas import (
-    amplitude_preclose_raw,
     amount_to_mean,
+    amplitude_preclose_raw,
     close_to_mean,
     gap_open_raw,
     intraday_return_raw,
@@ -40,8 +40,8 @@ from ashare_state.features.formulas import (
 from ashare_state.features.models import (
     FEATURE_CONTRACT_VERSION,
     FEATURE_NAMESPACE,
-    FeatureBuildResult,
     FeatureBuilderError,
+    FeatureBuildResult,
     FeatureFinding,
     FeatureVerifierError,
     VerifiedFeatureRun,

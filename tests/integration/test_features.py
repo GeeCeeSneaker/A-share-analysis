@@ -13,7 +13,6 @@ from typing import Any
 
 import polars as pl
 import pytest
-
 from test_snapshot import _canonical_success
 
 from ashare_state.features import (
