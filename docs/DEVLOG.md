@@ -17,6 +17,13 @@
 
 ---
 
+## 2026-09-03 · CR-4.4 CI EOF format 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：CI format check 仅剩 6 个文件末尾多出的空行；已移除多余 EOF 空行，代码语义不变。
+- mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
 ## 2026-09-03 · CR-4.4 CI format 修复
 
 **Implementation Status / Review Status**
