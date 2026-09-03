@@ -903,9 +903,7 @@ class TestFeaturePITAndMarketDeterminism:
         target = computed.security_rows[-1]
         assert target["feature_available_at"] == datetime(2026, 3, 11, tzinfo=UTC)
 
-    def test_sparse_amount_history_has_registry_derived_lineage_bound(
-        self, monkeypatch
-    ):
+    def test_sparse_amount_history_has_registry_derived_lineage_bound(self, monkeypatch):
         rows = _sparse_amount_history()
         lineage_sizes = _capture_lineage_sizes(monkeypatch)
         computed = _compute_rows(rows)
@@ -914,9 +912,7 @@ class TestFeaturePITAndMarketDeterminism:
         assert max(lineage_sizes) <= plan.max_security_lineage_members
         assert computed.security_rows[-1]["amount_to_mean_obs_20"] is None
 
-    def test_sparse_raw_return_history_has_registry_derived_lineage_bound(
-        self, monkeypatch
-    ):
+    def test_sparse_raw_return_history_has_registry_derived_lineage_bound(self, monkeypatch):
         rows = _sparse_raw_return_history()
         lineage_sizes = _capture_lineage_sizes(monkeypatch)
         computed = _compute_rows(rows)
@@ -954,9 +950,10 @@ class TestFeaturePITAndMarketDeterminism:
         changed = [dict(row) for row in rows]
         changed[90]["available_at"] = datetime(2026, 3, 11, tzinfo=UTC)
         replay = _compute_rows(changed)
-        assert replay.security_rows[181]["feature_available_at"] == baseline.security_rows[181][
-            "feature_available_at"
-        ]
+        assert (
+            replay.security_rows[181]["feature_available_at"]
+            == baseline.security_rows[181]["feature_available_at"]
+        )
 
     def test_selected_valid_identity_changes_lineage(self):
         rows = _long_active_amount_history()

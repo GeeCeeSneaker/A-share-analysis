@@ -11,6 +11,13 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.2 formatter correction
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 VERIFIED / CLOSED / FREEZE；CR-5.2 START / ACTIVE**：run `33767497724`（run 174）已通过 Ruff lint，但 formatter 指出 test_features.py 三处确定性换行差异；已按实际 formatter 输出修正，未改变测试或运行时语义。
+
+**Next**
+- 重新执行完整三平台 CI；以实际 pytest、Spike、SDK 与 governance gate 结果更新 CR-5.2 evidence。
 ## 2026-09-03 · CR-5.2 bounded selected-input lineage implementation
 
 **Implementation Status / Review Status**
