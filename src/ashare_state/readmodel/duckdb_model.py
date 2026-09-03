@@ -46,7 +46,6 @@ __all__ = [
 ]
 
 
-
 def readmodel_builder_code_fingerprint() -> str:
     """Hash the exact source set that governs ReadModel construction."""
     import ashare_state.readmodel.duckdb_model as _model
@@ -338,8 +337,7 @@ class DuckDBReadModel:
                 problems.append("rm_snapshot_meta readmodel_builder_code_fingerprint mismatch")
 
         domain_meta_rows = db.execute(
-            "SELECT snapshot_id, domain, artifact_uri, row_count, semantic_hash "
-            "FROM rm_domain_meta"
+            "SELECT snapshot_id, domain, artifact_uri, row_count, semantic_hash FROM rm_domain_meta"
         ).fetchall()
         expected_domains = set(verified.requested_domains)
         seen_domains: dict[str, tuple[Any, int, Any]] = {}
@@ -374,9 +372,7 @@ class DuckDBReadModel:
             raise ReadModelError(msg)
 
     # --------------------------------------------------------------- open
-    def _open_verified_read_only(
-        self, snapshot_id: str
-    ) -> tuple[duckdb.DuckDBPyConnection, Any]:
+    def _open_verified_read_only(self, snapshot_id: str) -> tuple[duckdb.DuckDBPyConnection, Any]:
         target = self.readmodel_root / readmodel_db_uri(snapshot_id)
         if not target.is_file():
             msg = f"readmodel for snapshot {snapshot_id} has not been built: {target}"

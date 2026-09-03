@@ -422,7 +422,6 @@ def project_selected_row(
     return projected
 
 
-
 def project_verified_canonical_snapshot(
     verified_canonical: Any, *, snapshot_id: str
 ) -> dict[str, tuple[dict[str, Any], ...]]:
@@ -434,9 +433,7 @@ def project_verified_canonical_snapshot(
     natural keys, and returns rows in the registry's stable order.
     """
     try:
-        requested_domains = tuple(
-            str(domain) for domain in verified_canonical.requested_domains
-        )
+        requested_domains = tuple(str(domain) for domain in verified_canonical.requested_domains)
     except (AttributeError, TypeError) as exc:
         raise SnapshotSchemaError("verified canonical run has no requested domain set") from exc
     if not requested_domains or len(set(requested_domains)) != len(requested_domains):
@@ -455,9 +452,7 @@ def project_verified_canonical_snapshot(
     grouped: dict[str, list[dict[str, Any]]] = {domain: [] for domain in requested_domains}
     for row in verified_canonical.selected_rows:
         if not isinstance(row, dict):
-            raise SnapshotSchemaError(
-                f"verified canonical selected row is not a mapping: {row!r}"
-            )
+            raise SnapshotSchemaError(f"verified canonical selected row is not a mapping: {row!r}")
         domain = row.get("canonical_domain")
         if domain not in grouped:
             raise SnapshotSchemaError(
@@ -484,3 +479,4 @@ def project_verified_canonical_snapshot(
         projected.sort(key=lambda row: tuple(row[name] for name in schema.stable_sort_key))
         projected_by_domain[domain] = tuple(projected)
     return projected_by_domain
+

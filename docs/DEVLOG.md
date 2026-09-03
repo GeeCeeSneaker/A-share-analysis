@@ -17,6 +17,13 @@
 
 ---
 
+## 2026-09-03 · CR-4.4 CI format 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：第三轮 GitHub Actions 的 Ruff format check 指出 6 个文件未格式化；已按 Ruff 0.16.4 / line-length 100 结果同步，未改变 CR-4.4 契约语义。
+- mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
 ## 2026-09-03 · CR-4.4 CI lint 修复（SIM101）
 
 **Implementation Status / Review Status**

@@ -337,9 +337,9 @@ def _rebind_snapshot_artifact(env_root, conn, result, domain: str, mutate) -> No
             "utf-8"
         )
     ).hexdigest()
-    manifest_bytes = json.dumps(
-        manifest, sort_keys=True, indent=1, ensure_ascii=False
-    ).encode("utf-8")
+    manifest_bytes = json.dumps(manifest, sort_keys=True, indent=1, ensure_ascii=False).encode(
+        "utf-8"
+    )
     manifest_path.write_bytes(manifest_bytes)
     conn.execute(
         "UPDATE meta_snapshot_build SET manifest_hash = ?, artifact_set_hash = ?, "
@@ -596,20 +596,25 @@ class TestSnapshotBuilder:
         assert len(manifests) == 1
         manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
         snapshot_id = str(manifest["snapshot_id"])
-        assert conn.execute(
-            "SELECT COUNT(*) FROM meta_snapshot_build WHERE snapshot_id = ?", [snapshot_id]
-        ).fetchone()[0] == 0
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) FROM meta_snapshot_build WHERE snapshot_id = ?", [snapshot_id]
+            ).fetchone()[0]
+            == 0
+        )
 
         retry = _build(conn, env_root, result.canonical_run_id)
         assert retry.snapshot_id == snapshot_id
         assert retry.idempotent_replay is False
-        assert verify_snapshot(
-            conn,
-            snapshot_id,
-            raw_root=env_root["raw"],
-            normalized_root=env_root["normalized"],
-        ).snapshot_id == snapshot_id
-
+        assert (
+            verify_snapshot(
+                conn,
+                snapshot_id,
+                raw_root=env_root["raw"],
+                normalized_root=env_root["normalized"],
+            ).snapshot_id
+            == snapshot_id
+        )
 
     def test_partial_residue_recovers(self, conn, env_root, monkeypatch):
         """A missing deterministic artifact is written on exact retry."""
@@ -619,9 +624,9 @@ class TestSnapshotBuilder:
         )
 
         monkeypatch.setattr(
-            builder, "_commit_ledger", lambda **kwargs: (_ for _ in ()).throw(
-                RuntimeError("injected ledger commit failure")
-            )
+            builder,
+            "_commit_ledger",
+            lambda **kwargs: (_ for _ in ()).throw(RuntimeError("injected ledger commit failure")),
         )
         with pytest.raises(RuntimeError):
             builder.build(result.canonical_run_id)
@@ -633,7 +638,6 @@ class TestSnapshotBuilder:
         assert retry.status == "SUCCESS"
         assert artifact_path.is_file()
 
-
     def test_conflicting_residue_refuses(self, conn, env_root, monkeypatch):
         """A deterministic path with different bytes is a hard conflict."""
         result = _canonical_success(conn, env_root, domains=("daily_bar",))
@@ -641,9 +645,9 @@ class TestSnapshotBuilder:
             conn, raw_root=env_root["raw"], normalized_root=env_root["normalized"]
         )
         monkeypatch.setattr(
-            builder, "_commit_ledger", lambda **kwargs: (_ for _ in ()).throw(
-                RuntimeError("injected ledger commit failure")
-            )
+            builder,
+            "_commit_ledger",
+            lambda **kwargs: (_ for _ in ()).throw(RuntimeError("injected ledger commit failure")),
         )
         with pytest.raises(RuntimeError):
             builder.build(result.canonical_run_id)
@@ -653,9 +657,7 @@ class TestSnapshotBuilder:
         artifact_path.write_bytes(b"conflicting bytes")
         with pytest.raises(SnapshotBuilderError, match="conflict|different bytes"):
             _build(conn, env_root, result.canonical_run_id)
-        assert conn.execute(
-            "SELECT COUNT(*) FROM meta_snapshot_build"
-        ).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM meta_snapshot_build").fetchone()[0] == 0
 
     def test_snapshot_id_deterministic_across_environments(self, conn, env_root, tmp_path_factory):
         """Mandatory 14 (same-environment semantics): the snapshot
@@ -907,7 +909,6 @@ class TestSnapshotBuilder:
                 normalized_root=env_root["normalized"],
             )
 
-
     def test_verify_snapshot_business_tamper_with_rebound_seals(self, conn, env_root):
         """Business bytes plus every snapshot seal rebound still fail
         against the verified canonical projection."""
@@ -923,7 +924,6 @@ class TestSnapshotBuilder:
                 raw_root=env_root["raw"],
                 normalized_root=env_root["normalized"],
             )
-
 
     def test_verify_snapshot_lineage_tamper_with_rebound_seals(self, conn, env_root):
         """Lineage bytes plus every snapshot seal rebound still fail
@@ -963,7 +963,6 @@ class TestSnapshotBuilder:
                 raw_root=env_root["raw"],
                 normalized_root=env_root["normalized"],
             )
-
 
     def test_verify_snapshot_identity_rebind(self, conn, env_root):
         """Mandatory 26: the ledger snapshot_semantic_hash is rebound
@@ -1308,3 +1307,4 @@ class TestBoundaryStructure:
             assert forbidden not in params, forbidden
         build_params = inspect.signature(SnapshotBuilder.build).parameters
         assert list(build_params) == ["self", "canonical_run_id"]
+

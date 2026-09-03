@@ -286,7 +286,6 @@ class TestDuckDBReadModel:
         with pytest.raises(ReadModelError, match="has not been built"):
             _model(conn, env_root).open_read_only(str(uuid.uuid4()))
 
-
     def test_verified_open_rejects_canonical_as_of_drift(self, conn, env_root):
         """A foreign canonical_as_of in an otherwise readable DB is refused."""
         built = _built_snapshot(conn, env_root)
@@ -296,14 +295,12 @@ class TestDuckDBReadModel:
         db = duckdb.connect(str(target))
         try:
             db.execute(
-                "UPDATE rm_snapshot_meta SET canonical_as_of = "
-                "TIMESTAMPTZ '2020-01-01 00:00:00+00'"
+                "UPDATE rm_snapshot_meta SET canonical_as_of = TIMESTAMPTZ '2020-01-01 00:00:00+00'"
             )
         finally:
             db.close()
         with pytest.raises(ReadModelError, match="canonical_as_of"):
             model.open_read_only(built.snapshot_id)
-
 
     def test_verified_open_rejects_foreign_domain_meta(self, conn, env_root):
         """Every domain metadata row must bind to this snapshot id."""
@@ -313,14 +310,11 @@ class TestDuckDBReadModel:
         target = env_root["normalized"] / readmodel_db_uri(built.snapshot_id)
         db = duckdb.connect(str(target))
         try:
-            db.execute(
-                "UPDATE rm_domain_meta SET snapshot_id = 'foreign-snapshot'"
-            )
+            db.execute("UPDATE rm_domain_meta SET snapshot_id = 'foreign-snapshot'")
         finally:
             db.close()
         with pytest.raises(ReadModelError, match="foreign snapshot_id"):
             model.open_read_only(built.snapshot_id)
-
 
     def test_verified_open_rejects_logical_row_tamper(self, conn, env_root):
         """A changed table value is rejected before a read-only handle escapes."""
@@ -335,7 +329,6 @@ class TestDuckDBReadModel:
             db.close()
         with pytest.raises(ReadModelError, match="logical semantic hash"):
             model.open_read_only(built.snapshot_id)
-
 
     def test_verified_open_rejects_foreign_snapshot_file(self, conn, env_root):
         """A database copied from another snapshot cannot be opened under A."""
@@ -358,7 +351,6 @@ class TestDuckDBReadModel:
         target_a.write_bytes(target_b.read_bytes())
         with pytest.raises(ReadModelError, match="snapshot_id|semantic"):
             model.open_read_only(first.snapshot_id)
-
 
     def test_verify_readmodel_green(self, conn, env_root):
         built = _built_snapshot(conn, env_root)
@@ -405,3 +397,4 @@ class TestDuckDBReadModel:
         finally:
             db1.close()
             db2.close()
+

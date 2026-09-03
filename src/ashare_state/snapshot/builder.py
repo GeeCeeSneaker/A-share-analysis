@@ -119,9 +119,7 @@ def _assert_immutable_compatible(path: Path, data: bytes) -> None:
         return
     if path.is_file() and path.read_bytes() == data:
         return
-    raise SnapshotBuilderError(
-        f"immutable artifact conflict: {path} exists with different bytes"
-    )
+    raise SnapshotBuilderError(f"immutable artifact conflict: {path} exists with different bytes")
 
 
 def _write_immutable(path: Path, data: bytes) -> None:
@@ -367,3 +365,4 @@ class SnapshotBuilder:
             with contextlib.suppress(Exception):
                 self.conn.execute("ROLLBACK")
             raise
+

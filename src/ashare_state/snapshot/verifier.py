@@ -286,10 +286,7 @@ def verify_snapshot(
             )
             raise SnapshotVerifierError(msg)
         if semantic != _rows_semantic_hash(expected_rows):
-            msg = (
-                f"snapshot {domain} artifact semantic seal diverges from the "
-                "canonical projection"
-            )
+            msg = f"snapshot {domain} artifact semantic seal diverges from the canonical projection"
             raise SnapshotVerifierError(msg)
         # PIT + key sanity re-check on the materialized rows
         for r in rows:
@@ -343,3 +340,4 @@ def verify_snapshot(
         manifest=manifest,
         domain_rows=domain_rows,
     )
+
