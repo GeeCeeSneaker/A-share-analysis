@@ -17,6 +17,13 @@
 
 ---
 
+## 2026-09-03 · CR-4.4 CI lint 修复（SIM101）
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：第二轮 GitHub Actions 仍在 Ruff lint 阶段报告 `SIM101`；已合并日期类型判断，未改变 CR-4.4 契约语义。
+- 后续 format、mypy、pytest 及治理 gates 继续以新的 CI 结果为准。
+
+---
 ## 2026-09-03 · CR-4.4 CI lint 修复
 
 **Implementation Status / Review Status**

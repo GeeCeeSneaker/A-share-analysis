@@ -402,7 +402,7 @@ def project_selected_row(
     # canonical_key components must agree with the typed row identity.
     for binding in schema.key_bindings:
         value = projected[binding.column_name]
-        if isinstance(value, datetime) or isinstance(value, date):
+        if isinstance(value, (datetime, date)):
             typed_key_value = value.isoformat()
         else:
             typed_key_value = value
