@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Status**: PROPOSED（2026-09-03，CR-5.1 implementation；CI run 33758109611 green；Reviewer closure pending）
+- **Status**: PROPOSED（2026-09-03，CR-5.1 correctness VERIFIED / CLOSED / FREEZE；CR-5.2 bounded lineage START / ACTIVE；Reviewer final closure pending）
 - **Deciders**: Project Owner / Development Executor；Design / Audit Review（裁决 pending）
 - **Date**: 2026-09-03
 - **Work Requirement**: \`docs/design/A-share-analysis_CR-5_DeterministicFeatureLayer及PITFeatureSnapshot开发工作要求_20260903.md\`
@@ -260,3 +260,70 @@ Implementation status is DONE for the submitted CR-5.1 scope. GitHub Actions run
 checks green. Review status remains PENDING_REVIEW until Reviewer closure. CR-5 must not emit State, score, signal, strategy, backtest,
 portfolio, or trading outputs. On closure, this ADR may be marked ACCEPTED;
 until then it remains PROPOSED.
+
+## Amendment B — CR-5.2 Bounded Selected-Input Lineage
+
+### Status
+
+This amendment is PROPOSED / PENDING_REVIEW. It closes the only remaining
+CR-5 item identified by the Reviewer: bounded row-lineage complexity. It does
+not change V1 feature names, formulas, price basis, window basis, market
+breadth semantics, artifact schema, or migration 023.
+
+### Decisions
+
+1. **Selected-input lineage is the V1 row contract.** A security row's
+`input_lineage_hash` binds the current observation, the fixed observed-bar
+   windows and fixed lag dependencies actually used by the plan, and the
+   selected valid members consumed by the amount and volatility formulas.
+   Invalid observations that are only skipped between selected valid members
+   remain represented by deterministic `OPTIONAL_INPUT_MISSING` findings, not
+   by repeated row-level lineage members.
+
+2. **The member bound is derived, not magic.** The compiled
+`FeatureExecutionPlan.max_security_lineage_members` returns the conservative
+   V1 bound:
+   `1 + max(fixed observed dependency lengths) +
+   sum(selected valid amount/volatility window lengths)`.
+   The first term is the current observation; fixed dependency lengths are
+   derived from Registry-declared observed windows and lag counts. For the
+   current Registry this bound is 101. The engine enforces the bound before
+   hashing each security row.
+
+3. **Finding truth remains independent.** Incremental valid-history and invalid
+   prefix state continues to count only the active span needed to obtain the
+   selected valid members. Removing invalid identities from row lineage does
+   not remove their typed finding, and the finding artifact continues to be
+   replayed and sealed by the public verifier.
+
+4. **Availability follows actual selected inputs.** `feature_available_at` is
+   the maximum `available_at` of the actual row-lineage members. An unrelated
+   invalid gap row therefore cannot lift a target's knowledge time. Changing
+   a selected valid identity or availability changes the target lineage or
+   availability; changing an unselected invalid identity does not.
+
+5. **Fixed dependency and verifier complexity.** Lag insufficiency uses a
+   bounded `max(0, index - lag)..index` dependency window. Security lineage
+   materialization no longer scans `active_start..index`. Market-date
+   uniqueness uses a set plus a previous-date order guard, preserving
+   fail-closed duplicate and stable-order behavior.
+
+### Consequences
+
+Numeric feature values, active missingness finding values, PIT no-lookahead
+semantics, artifact rows, and migration 023 remain unchanged by this
+complexity closure. Sparse histories now have a history-independent explicit
+row-lineage member bound. The selected-input semantics is intentionally
+narrower than the Amendment A active-span materialization and supersedes that
+lineage detail while retaining its finding semantics.
+
+### Implementation and evidence
+
+Implementation is on PR #2 branch at code/test head
+`1bbfb2b9485fb62f8713e13584879fe33cb656fe`; the first CI run for this head is
+run `33766197492` (run 171), still pending at this document revision. Focused
+tests are in `tests/integration/test_features.py`, including the 10k sparse
+histories, selected/unselected mutation cases, market duplicate/order guard,
+and structural no-history-scan guard. Review status remains PENDING_REVIEW.
+Until Reviewer closure, CR-5 remains REOPENED with only CR-5.2 active, PR #2
+must not be merged, and CR-6 remains blocked.

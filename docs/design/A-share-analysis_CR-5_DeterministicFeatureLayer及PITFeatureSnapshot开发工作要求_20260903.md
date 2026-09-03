@@ -1110,6 +1110,33 @@ is not a substitute for this mapping.
 
 ---
 
+## 16.11 CR-5.2 Bounded Lineage Complexity Mapping
+
+CR-5.2 requires explicit evidence for bounded selected-input lineage. The
+mapping below separates algorithm/member-count proof from numeric/finding
+regression and the platform matrix. Wall-clock thresholds are not used as the
+sole performance evidence.
+
+| # | Focused test / parameter / evidence |
+|---:|---|
+| 1 | tests/integration/test_features.py::TestFeaturePITAndMarketDeterminism::test_sparse_amount_history_has_registry_derived_lineage_bound — 10k sparse amount history |
+| 2 | tests/integration/test_features.py::TestFeaturePITAndMarketDeterminism::test_sparse_raw_return_history_has_registry_derived_lineage_bound — 10k long invalid raw-return streak |
+| 3 | The two sparse tests capture `_ordered_unique_inputs` member counts and compare them with `compile_feature_execution_plan(...).max_security_lineage_members`; no wall-clock-only threshold |
+| 4 | TestFeatureFormulas::test_ordered_formula_fixture — amount numeric truth frozen |
+| 5 | TestFeatureFormulas::test_ordered_formula_fixture — volatility numeric truth frozen |
+| 6 | TestFeatureFormulaAndMissingnessClosure::test_active_amount_missingness_counts_only_active_span + test_active_volatility_missingness_counts_only_active_span |
+| 7 | TestFeatureFormulaAndMissingnessClosure::test_active_amount_missingness_ignores_old_history_gap |
+| 8 | TestFeaturePITAndMarketDeterminism::test_invalid_active_gap_identity_does_not_change_selected_lineage |
+| 9 | TestFeaturePITAndMarketDeterminism::test_invalid_active_gap_becoming_valid_changes_selection_and_truth |
+| 10 | TestFeaturePITAndMarketDeterminism::test_invalid_active_gap_available_at_does_not_lift_feature_availability |
+| 11 | TestFeaturePITAndMarketDeterminism::test_selected_valid_identity_changes_lineage |
+| 12 | TestFeaturePITAndMarketDeterminism::test_selected_valid_available_at_controls_feature_availability |
+| 13 | TestFeaturePITAndMarketDeterminism::test_market_date_duplicate_and_order_guards_fail_closed |
+| 14 | TestFeatureFormulaAndMissingnessClosure::test_incremental_windows_do_not_rescan_history_prefix — `_add_input_span` and history-sized lineage guards |
+| 15 | GitHub Actions full pytest + frozen CR-5.1 regression matrix — run 171 pending at this document revision |
+| 16 | Windows py3.12 / Windows py3.14 / Ubuntu py3.14 + Ruff / format / mypy / full pytest / Spike / SDK / governance gates — run 171 pending at this document revision |
+
+---
 # 17. CR-5 Exit Gate
 
 Reviewer closure 前必须全部成立：
