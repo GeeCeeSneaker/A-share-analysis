@@ -8,7 +8,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-
 def _main_history_ref() -> str:
     """Resolve mainline history in local and detached CI checkouts."""
     for candidate in ("main", "origin/main"):
@@ -23,6 +22,7 @@ def _main_history_ref() -> str:
         if probe.returncode == 0:
             return candidate
     raise AssertionError("neither main nor origin/main is available for the DEVLOG gate")
+
 
 #: Explicitly grandfathered commits (full disclosure, V2.2 rule note):
 #: `9bfe327...` (2026-08-27) is the R4-A3.1 CI-fix followup (ruff

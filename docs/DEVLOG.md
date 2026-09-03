@@ -24,6 +24,13 @@
 - mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
 
 ---
+## 2026-09-03 · CR-4.4 DEVLOG gate format 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：DEVLOG gate ref 解析修复后仅剩其新增 helper 的 Ruff 格式差异；已按格式器结果收口，逻辑不变。
+- pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
 ## 2026-09-03 · CI DEVLOG gate checkout ref 修复
 
 **Implementation Status / Review Status**
