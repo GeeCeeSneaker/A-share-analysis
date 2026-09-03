@@ -24,6 +24,13 @@
 - mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
 
 ---
+## 2026-09-03 · CI DEVLOG gate checkout ref 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：CR-4.4 首轮 pytest 为 `1254 passed, 2 failed`；两项失败来自 DEVLOG gate 在 PR detached checkout 中硬编码本地 `main`。
+- `test_devlog_gate.py` 现在优先使用 `main`，否则使用 checkout 已存在的 `origin/main`；这只修复测试的 ref 解析，不放宽治理判定。
+
+---
 ## 2026-09-03 · CR-4.4 CI mypy 修复
 
 **Implementation Status / Review Status**
