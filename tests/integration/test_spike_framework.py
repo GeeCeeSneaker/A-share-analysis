@@ -501,8 +501,18 @@ class TestVerdictEngine:
         catalog = CaseCatalog(store, run.spike_run_id)
         self._full_core_catalog(store, run, catalog)
         catalog.flush(store.run_dir(run))
-        # tamper with one evidence file after flush
-        tampered = next((store.run_dir(run) / "raw").glob("*.json"))
+        # tamper with one EVIDENCE file after flush - the glob target must be
+        # the payload json (the case's evidence_ref), never a sibling
+        # "<request_id>.meta.json" (which matches "*.json" too but is not a
+        # case evidence_ref): an unsorted glob picks whichever entry the
+        # filesystem yields first, which is platform dependent (NTFS returns
+        # lexical order, ext4 returns directory order) - the resulting
+        # verdict differed between Windows and the Ubuntu CI leg.
+        tampered = next(
+            p
+            for p in sorted((store.run_dir(run) / "raw").glob("*.json"))
+            if not p.name.endswith(".meta.json")
+        )
         tampered.write_text('{"tampered": true}', encoding="utf-8")
         close_run(store, run)
         verdict = compute_verdict(store, store.load_run(run.spike_run_id, RunKind.PRODUCTION))

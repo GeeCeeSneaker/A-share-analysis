@@ -43,7 +43,8 @@
 **Verification**
 - Local: **1235 tests passed / 0 failed**（1179 → 1235，+56：`test_snapshot.py` 44（consumption verifier 10——mandatory 1-10 / builder 21——mandatory 11-30 / schema projection unit 3 / boundary AST guard 10）/ `test_readmodel.py` 11（mandatory 31-42 + 双模型并存）/ `test_canonical.py` +1 multi-domain replay 回归；migration 测试更新 22 链 + 021→022 升级 + tamper probe 023）；ruff check / ruff format / mypy 全绿（78 源文件零错）
 - 既有回归零破坏：CR-3.x 全链 195 项（含 6 轮 REOPEN 收口全部对抗矩阵）；CR-2.x / R4 冻结契约零破坏
-- 实现中修复的工程问题（均以测试钉死）：DuckDB TIMESTAMPTZ fetch 本地时区（GMT+8）→ verify/rebuild 归一化 UTC；read_parquet hive partitioning 误读路径段；polars dict-rows + schema 的 extra-key 行为规避（投影先行过滤）；adj_factor factor_type 为 key projection 非 payload；**CI 首跑暴露一处跨环境不稳定断言**（superset 测试断言第二 world 的 EQUIVALENT winner 具体为 req-new-bars——但 winner 排序键含 run_manifest_hash，其相对顺序依赖 raw evidence hash 的 ingest wall-clock，跨独立 ingest 环境合法漂移；修正断言为 winner ∈ {两 run} 并注释 CR-3 determinism 语义边界——1 次修复轮次）
+- 实现中修复的工程问题（均以测试钉死）：DuckDB TIMESTAMPTZ fetch 本地时区（GMT+8）→ verify/rebuild 归一化 UTC；read_parquet hive partitioning 误读路径段；polars dict-rows + schema 的 extra-key 行为规避（投影先行过滤）；adj_factor factor_type 为 key projection 非 payload
+- **CI 两个修复轮次（均只影响测试断言，零产品代码改动）**：①superset 共存测试断言第二 world 的 EQUIVALENT winner 具体为 `req-new-bars`——但 winner 排序键含 `run_manifest_hash`，其相对顺序依赖 raw evidence hash 的 ingest wall-clock，跨独立 ingest 环境合法漂移（本地 GMT+8 选 B、UTC runner 选 A）；修正断言为 winner ∈ {两 run} 并注释 CR-3 determinism 语义边界。②Ubuntu 腿 `test_evidence_hash_mismatch_blocks_verdict` 失败（Windows 两腿绿）——根因为**测试自身的平台脆弱性**：`next(raw.glob("*.json"))` 未排序，而 raw 顶层同时存在 `<request_id>.json`（case evidence_ref）与 `<request_id>.meta.json`（非 evidence_ref，但同样匹配 `*.json`）；NTFS 返回字典序（命中 payload → SPIKE_INCOMPLETE ✓），ext4 返回目录项顺序（命中 meta → 无 case hash mismatch → GO_DEGRADED ✗）。修正为显式选择非 `.meta.json` 的 payload evidence 文件（确定性）——与 CR-4 产品代码无关（CR-4 未触碰 spike 框架），已在提交信息与本条目显式申报
 - GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
 
 **Implementation Status**
