@@ -4099,3 +4099,55 @@ class TestHistoricalArtifactClosure:
         assert second.canonical_run_id != result.canonical_run_id
         assert second.idempotent_replay is False
         assert _canonical_count(conn) == 2
+
+
+# -------- CR-4 implementation finding: multi-domain replay regression
+# (CR-3 latent defect declared in the CR-4 batch: the selected/decision
+# semantic seals are computed over the SCHEMA-ALIGNED rows - the exact
+# rows written to the parquet - so a multi-domain exact replay can
+# never diverge on the aligned-vs-unaligned key-set difference.)
+
+
+@pytest.mark.integration
+class TestMultiDomainReplayRegression:
+    """A multi-domain canonical SUCCESS replays idempotently through
+    the full artifact closure verification (the seal now matches the
+    schema-aligned parquet truth byte-for-byte)."""
+
+    def test_multi_domain_exact_replay_idempotent(self, conn, env_root):
+        _seed_base(conn, env_root)
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="trade_calendar",
+            endpoint="BaseData.get_calendar",
+            surface="trade_calendar",
+            request_id="req-cal",
+            payload=["20260810", "20260811"],
+            params={"market": "SH"},
+        )
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="history_stock_status",
+            endpoint="InfoData.get_history_stock_status",
+            surface="security_status_history",
+            request_id="req-status",
+            payload=_STATUS_ROWS,
+        )
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="adj_factor",
+            endpoint="BaseData.get_adj_factor",
+            surface="adj_factor",
+            request_id="req-adj",
+            payload=_ADJ_ROWS,
+        )
+        domains = ("trade_calendar", "security_status", "limit_price", "adj_factor")
+        first = _canonical(conn, env_root, AS_OF_LATE, domains=domains)
+        assert first.status == "SUCCESS"
+        replay = _canonical(conn, env_root, AS_OF_LATE, domains=domains)
+        assert replay.idempotent_replay is True
+        assert replay.canonical_run_id == first.canonical_run_id
+        assert _canonical_count(conn) == 1

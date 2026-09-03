@@ -70,6 +70,8 @@ EXPECTED_TABLES = {
     # 018 (CR-3 canonicalization)
     "meta_canonicalization_run",
     "meta_canonical_reconciliation_finding",
+    # 022 (CR-4.2 snapshot build ledger)
+    "meta_snapshot_build",
     # runner bootstrap
     "meta_schema_version",
 }
@@ -86,7 +88,7 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 21
+            assert len(applied) == 22
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
         finally:
@@ -97,10 +99,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 21
+            assert len(first) == 22
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 21
+            assert len(ledger) == 22
         finally:
             conn.close()
 
@@ -136,10 +138,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 022 (015..021 exist in the real repo set)
+            # tamper 002 and add a new 023 (015..022 exist in the real repo set)
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "022_new_thing.sql").write_text(
+            (tampered_dir / "023_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):
@@ -246,82 +248,55 @@ class TestLedgerIntegrity:
             conn.close()
 
     def test_upgrade_from_prior_chain_applies_only_new_tail(self, db_path: Path, tmp_path: Path):
-        """CR-2.1 audit §7 item 17: a database initialized on the
-        PRIOR migration chain (001..014) upgrades cleanly when 015
-        ships - only the new tail applies, prior files untouched."""
+        """CR-2.1 audit §7 item 17 (maintained per shipped tail): a
+        database initialized on the PRIOR migration chain (001..021)
+        upgrades cleanly when 022 ships - only the new tail applies,
+        prior files untouched."""
         upgrade_dir = tmp_path / "migrations"
         upgrade_dir.mkdir()
         for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
-            if int(f.name[:3]) <= 20:
+            if int(f.name[:3]) <= 21:
                 (upgrade_dir / f.name).write_bytes(f.read_bytes())
         conn = duckdb.connect(str(db_path))
         try:
             first = apply_migrations(conn, upgrade_dir)
-            assert [r.migration_id for r in first] == [f"{i:03d}" for i in range(1, 21)]
-            # ship 021 into the same directory set
+            assert [r.migration_id for r in first] == [f"{i:03d}" for i in range(1, 22)]
+            # ship 022 into the same directory set
             for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
-                if int(f.name[:3]) == 21:
+                if int(f.name[:3]) == 22:
                     (upgrade_dir / f.name).write_bytes(f.read_bytes())
             second = apply_migrations(conn, upgrade_dir)
-            assert [r.migration_id for r in second] == ["021"]
+            assert [r.migration_id for r in second] == ["022"]
             ledger = applied_migrations(conn)
-            assert len(ledger) == 21
-            # the CR-2.1 seal columns exist on the upgraded database
-            columns = {
+            assert len(ledger) == 22
+            # the CR-4.2 snapshot build ledger exists on the upgraded database
+            snapshot_columns = {
                 row[0]
                 for row in conn.execute(
                     "SELECT column_name FROM information_schema.columns "
-                    "WHERE table_name = 'meta_provider_normalization_run'"
+                    "WHERE table_name = 'meta_snapshot_build'"
                 ).fetchall()
             }
             assert {
-                "normalization_surface",
-                "mapper_code_hash",
-                "quarantine_set_hash",
-                "evidence_conflict",
-                "normalized_output_set_hash",
-                "normalized_semantic_hash",
-            } <= columns
-            # the CR-3.1 replay-seal columns exist on the upgraded database
-            canonical_columns = {
-                row[0]
-                for row in conn.execute(
-                    "SELECT column_name FROM information_schema.columns "
-                    "WHERE table_name = 'meta_canonicalization_run'"
-                ).fetchall()
-            }
-            assert {
+                "snapshot_id",
+                "canonical_run_id",
+                "canonical_manifest_uri",
+                "canonical_manifest_hash",
+                "canonical_as_of",
                 "requested_domains_json",
                 "requested_domains_hash",
-                "selected_semantic_hash",
-                "decision_set_hash",
-                "base_identity_hash",
-                "verification_state_hash",
-                "input_seal_hash",
-                "identity_master_input_set_hash",
-                "canonical_context_hash",
-            } <= canonical_columns
-            # the CR-2.3 anchor ledger exists on the upgraded database
-            anchor_cols = {
-                row[0]
-                for row in conn.execute(
-                    "SELECT column_name FROM information_schema.columns "
-                    "WHERE table_name = 'meta_raw_evidence_anchor'"
-                ).fetchall()
-            }
-            assert {
-                "provider",
-                "provider_dataset",
-                "request_id",
-                "evidence_uri",
-                "evidence_hash",
-                "endpoint",
-                "operation_id",
-                "normalization_surface",
-                "payload_kind",
-                "ingest_run_id",
-                "created_at",
-            } <= anchor_cols
+                "snapshot_contract_version",
+                "builder_code_fingerprint",
+                "manifest_uri",
+                "manifest_hash",
+                "artifact_set_hash",
+                "snapshot_semantic_hash",
+                "row_count_total",
+                "status",
+                "error_message",
+                "started_at",
+                "completed_at",
+            } <= snapshot_columns
         finally:
             conn.close()
 

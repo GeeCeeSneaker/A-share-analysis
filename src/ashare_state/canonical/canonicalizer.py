@@ -1524,15 +1524,16 @@ class CanonicalRunner:
             return None, problems
         return manifest, []
 
-    def _continuity_problems_for_input(
-        self,
-        entry: dict[str, Any],
-        run_id: str,
-        current_seal_by_run: dict[str, InputRunSeal],
-    ) -> list[str]:
-        """Continuity problems of ONE sealed input run of a prior
-        canonical run: ledger existence, identity equality, physical /
-        anchored health (symmetric with first consume)."""
+    def _sealed_input_authority_problems(self, entry: dict[str, Any], run_id: str) -> list[str]:
+        """CR-4.1: authority + physical health of ONE sealed CR-2 input
+        of a historical canonical run - ledger existence, identity
+        equality and anchored/physical health, WITHOUT the
+        current-discovery-presence requirement. Shared by the
+        historical continuity guard (which additionally demands
+        presence in the current discovery) and the CR-4 public
+        consumption verifier (a later legitimate superset world must
+        not retroactively break consumption of an already-minted
+        SUCCESS run)."""
         problems: list[str] = []
         row = self.conn.execute(
             "SELECT provider, normalization_surface, provider_dataset, endpoint, "
@@ -1598,6 +1599,20 @@ class CanonicalRunner:
         problems.extend(
             f"sealed input run {run_id} closure degraded: {p}" for p in closure_problems
         )
+        return problems
+
+    def _continuity_problems_for_input(
+        self,
+        entry: dict[str, Any],
+        run_id: str,
+        current_seal_by_run: dict[str, InputRunSeal],
+    ) -> list[str]:
+        """Continuity problems of ONE sealed input run of a prior
+        canonical run: ledger existence, identity equality, physical /
+        anchored health (symmetric with first consume) AND presence in
+        the current snapshot discovery (same context => same surface
+        plan; absence would be unexplainable discovery drift)."""
+        problems = self._sealed_input_authority_problems(entry, run_id)
         if problems:
             return problems
         # healthy + identity intact: the prior input must also be present in
@@ -2799,15 +2814,24 @@ class CanonicalRunner:
             )
             finding_dict["canonical_run_id"] = run_id
         finding_seal = _finding_set_hash(finding_dicts)
-        selected_semantic = _rows_semantic_hash(selected_rows)
-        decision_set = _rows_semantic_hash(decisions)
+        # CR-4 implementation finding (CR-3 latent defect, declared for
+        # Reviewer adjudication in the CR-4 batch): the semantic seals
+        # are computed over the SCHEMA-ALIGNED rows - the exact rows
+        # written to the parquet artifacts - so the replay verifier's
+        # recompute from the parquet can never diverge on multi-domain
+        # runs (single-domain behavior is byte-identical: aligning rows
+        # whose key sets already agree is a no-op).
+        aligned_selected = _align_schema(selected_rows)
+        aligned_decisions = _align_schema(decisions)
+        selected_semantic = _rows_semantic_hash(aligned_selected)
+        decision_set = _rows_semantic_hash(aligned_decisions)
 
         import io
 
         artifacts: dict[str, dict[str, Any]] = {}
         parquet_rows = {
-            "selected": _align_schema(selected_rows),
-            "decisions": _align_schema(decisions),
+            "selected": aligned_selected,
+            "decisions": aligned_decisions,
             # findings parquet: deterministic fields ONLY (no created_at)
             "findings": _align_schema(
                 [

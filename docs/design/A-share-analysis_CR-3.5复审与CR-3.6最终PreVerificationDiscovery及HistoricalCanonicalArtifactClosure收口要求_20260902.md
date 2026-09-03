@@ -643,3 +643,15 @@ CR-3.6 剩下的是两个更底层的收口：
 [x] ADR-023 Amendment F + DEVLOG + DEVELOPMENT_MANAGEMENT 完整同步                          -> Amendment F §11.1-§11.4 + DEVLOG append 新条目 + DM-20260902-074
 [ ] Reviewer 复审无新的 P0 correctness blocker                                             -> PENDING_REVIEW
 ```
+
+---
+
+# 8. Reviewer Closure 裁决同步（2026-09-02 21:24 +08:00）
+
+CR-3.6 复审最终结论（`docs/design/A-share-analysis_CR-3.6最终复审结论与CR-4启动裁决_20260902.md`，Reviewer closure commit `ff3808b7a5036246ea11e37173aa31d863beb2d9`）：
+
+- **CR-3.6 → VERIFIED / CLOSED / FREEZE（不重开）**——28 项 mandatory 全 PASS；Exit Gate 21 项全过
+- **CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 全链 → VERIFIED / CLOSED / FREEZE**
+- **ADR-023 → ACCEPTED**（六轮 REOPEN 收口后的最终裁决；Amendment A-F 全部并入正文裁决）
+- **CR-4 SnapshotBuilder + DuckDB ReadModel 正式 START**（首个开发批 DM-20260903-075 已按裁决先同步治理基线后实现）
+- 同一裁决要求 CR-4 首批交付附带：CR-3 latent 缺陷若在 CR-4 实现中被发现必须显式申报（本批发现 multi-domain semantic seal 对齐缺陷一处，已在 ADR-024 Consequences 与 DM-20260903-075 申报，提请 CR-4 复审一并裁决——未走"悄悄修复"路径）

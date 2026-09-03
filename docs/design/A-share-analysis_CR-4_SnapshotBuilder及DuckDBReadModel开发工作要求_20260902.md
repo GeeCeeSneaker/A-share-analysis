@@ -1182,3 +1182,66 @@ Future Feature / State
 ```
 
 **本阶段判断标准：CR-4 做完以后，下游研究代码应该能够稳定地“按 snapshot_id 打开一个完整 A 股市场事实世界”，而不需要知道 Provider、CR-2、Canonical source selection、manifest 内部细节，也不会无意中读取到另一个时间世界的数据。**
+
+---
+
+# 13. Implementation Mapping（CR-4 首批，2026-09-03）
+
+> Reviewed base：CR-3 全链 closure reviewer 基线 `ff3808b7a5036246ea11e37173aa31d863beb2d9`（CR-4 启动裁决）；implementation commit `<本批提交后回填>`（CI 三腿确认后回填）。总体 **1235/0**（1179 → 1235，+56 项对抗测试）；ruff check / ruff format / mypy 全绿（78 源文件）；migration **022**（链 21 → 22）。治理同步（§12 裁决要求的第一动作，同 commit 完成）：ADR-023 → ACCEPTED、ADR-000 索引、CR-3.6 工作要求 Reviewer Closure 章节、DM 基线 `ff3808b`、CR-3 全链 VERIFIED/CLOSED/FREEZE。
+
+## 13.1 §5 十问实现对照（ADR-024 PROPOSED 全文见 `docs/adr/ADR-024_snapshot_builder_readmodel.md`）
+
+| # | 问题 | 实现 |
+| --- | --- | --- |
+| 1 | Snapshot 输入 | CR-4.1 公共消费验证器 `verify_canonical_run_for_consumption`（`canonical/verifier.py`）——Builder 绝不直接读 canonical parquet、绝不重实现 canonical 校验；内部复用 CR-3 唯一实现（identity seal / artifact closure / findings truth / sealed-input 权威+物理验证） |
+| 2 | identity 计算 | `snapshot_base_hash` = canonical run-level seals（run_id/manifest_hash/requested_domains_hash/selected_semantic_hash/as_of）+ snapshot contract + builder code fingerprint 的 canonical JSON SHA-256；`snapshot_id = UUID5(SNAPSHOT_NAMESPACE, ...)` |
+| 3 | 磁盘布局 | `snapshot/contract=snapshot-v1/as_of=<YYYYMMDDTHHMMSSZ>/snapshot=<id>/<domain>.parquet + manifest.json(LAST)`；artifact 集 == 请求 domain 集 |
+| 4 | fingerprint | `snapshot_builder_code_fingerprint()`（snapshot/schema.py + canonical/verifier.py + snapshot/builder.py 源码 SHA-256 行尾归一）进 identity；verify 拒绝不同 builder 版本构建的 snapshot |
+| 5 | schema 单一事实源 | `snapshot/schema.py` 版本化 registry（列集/DType/nullability/key_arity/key projection）——builder 投影 / snapshot verifier / readmodel 建表三方共用 |
+| 6 | typed key projection | canonical_key JSON 数组严格 round-trip；**market = canonical payload 字段**（trade_calendar 行自带）；**factor_type = key projection**（key 第 3 段 decode，ColumnSpec.key_index=2） |
+| 7 | lineage | 全部 canonical selected-row lineage 字段逐字保留 + 仅新增 canonical_run_id / snapshot_id 两个投影；PIT 断言 available_at <= as_of fail closed |
+| 8 | migration 022 | `meta_snapshot_build`（18 列 + idx canonical_run_id）；canonical_as_of 与 canonical ledger 同名同型（TIMESTAMPTZ UTC instant）；重复 snapshot_id fail、exact retry 幂等 replay、crash 残留 fail closed |
+| 9 | ReadModel 原子发布 | temp 库构建 → temp 上 logical seal → `Path.replace` 原子替换确定性目标；失败 temp 删除旧目标字节不变 |
+| 10 | 表结构固定 | 每次 rebuild 全新 temp 库（无 stale 表结构可能）+ 表集精确比对 + information_schema 列类型精确比对（TIMESTAMP WITH TIME ZONE）+ 表内容重算 semantic hash == 域 seal |
+
+## 13.2 Mandatory 测试映射（1-50）
+
+**Mandatory 1-10（消费验证器）→ `tests/integration/test_snapshot.py::TestCanonicalConsumptionVerifier`**：1 `test_consume_verified_success_green` / 2 `test_consume_unknown_run_rejected` / 3 `test_consume_blocked_run_rejected` / 4 `test_consume_after_superset_growth_green`（C1 consumed A + 新增 B 后 C1 仍可消费）/ 5 `test_consume_rejects_input_ledger_drift` + `test_consume_rejects_input_disappearance` / 6 `test_consume_rejects_status_rebind`（typed seal 先拦截，语义重算同判） / 7 `test_consume_rejects_canonical_manifest_rebind` / 8+9 `test_consume_rejects_selected_artifact_tamper` + `test_consume_rejects_input_physical_damage` / 10 `test_builder_rejects_unverifiable_canonical_input`（零文件零 ledger 行）。
+
+**Mandatory 11-30（SnapshotBuilder）→ `TestSnapshotBuilder` + `TestSnapshotSchemaProjection`**：11 `test_build_success_writes_artifacts_and_ledger` / 12 `test_exact_retry_idempotent_replay` + `test_crash_residue_directory_fails_closed` / 13 `test_conflicting_duplicate_ledger_row_fails` / 14 `test_snapshot_id_deterministic_across_environments` + `test_artifacts_deterministic_bytes`（**同环境语义**：抹掉 snapshot 层重建 → 同 id 同 bytes；跨环境 byte 相等被刻意不主张——raw evidence meta 含 ingest wall-clock，跨独立 ingest 的 canonical run id 必不同，identity determinism 的主张对象是同一 verified canonical truth）/ 15 `test_different_canonical_run_different_snapshot` / 16 `test_identity_from_canonical_seals_not_rows`（manifest 的 canonical 字段 == canonical ledger + fingerprint == 当前代码）/ 17 `test_artifact_set_equals_requested_domains` / 18 `test_domain_partitioned_rows`（schema == registry）/ 19 `test_rows_sorted_by_canonical_key` / 20 schema registry unit（`test_key_roundtrip_validation` / `test_pit_contract_enforced` / `test_typed_projection_fail_closed`——wrong type / None non-nullable / nullable None 合法）/ 21 `test_lineage_preserved_verbatim`（含 typed 时间投影的 instant 精确比较）/ 22 `test_verify_snapshot_green` / 23 `test_verify_snapshot_unknown_id_rejected` / 24 `test_verify_snapshot_manifest_bytes_tamper` + `test_verify_snapshot_manifest_field_rebind` / 25 `test_verify_snapshot_domain_artifact_tamper` + `test_verify_snapshot_domain_artifact_missing` / 26 `test_verify_snapshot_identity_rebind` + `test_verify_snapshot_uri_rebind` / 27 `test_verify_snapshot_builder_fingerprint_mismatch` / 28 `test_verify_snapshot_canonical_drift_fails` + `test_verify_snapshot_canonical_input_disappearance`（build 后 canonical 损坏 → cross-bind fail closed）/ 29 `test_verify_snapshot_requested_domain_drift` / 30 `test_builder_immutable_no_overwrite`。
+
+**Mandatory 31-42（ReadModel）→ `tests/integration/test_readmodel.py::TestDuckDBReadModel`**：31 `test_rebuild_success` / 32+33 `test_logical_seal_row_counts_and_semantics`（表内容重算 semantic == 域 seal）/ 34 `test_no_stale_table_between_snapshots` / 35+36 `test_schema_exactness_with_explicit_timezone`（TIMESTAMP WITH TIME ZONE + UTC instant 精确 round-trip）/ 37 `test_key_uniqueness` / 38 `test_meta_tables_content` / 39 `test_rebuild_unknown_snapshot_fails_clean`（零 temp 残留）/ 40 `test_exact_second_rebuild_idempotent` / 41 `test_rebuild_atomic_failure_leaves_target_intact`（注入 logical seal 失败 → 旧目标字节不变 + temp 清理 + 模型仍可用）/ 42 `test_open_read_only_unknown_snapshot`。
+
+**Mandatory 43-46（migration/CI）**：43 from-zero 22 链 + `meta_snapshot_build` ∈ EXPECTED_TABLES（`test_all_tables_created` / `test_idempotent_rerun` 更新至 22）/ 44 upgrade 021→022 只应用新尾 + 18 列全验证（`test_upgrade_from_prior_chain_applies_only_new_tail`）/ 45 idempotent rerun / 46 tamper probe 023（`test_tamper_check_runs_before_any_new_migration`）。47-50 CI 三腿 + Ruff/format/Mypy/governance gates——推送后 API 正向确认（回填）。
+
+**边界（§8）→ `TestBoundaryStructure`**：snapshot/ 与 readmodel/ AST guard（禁 providers/normalization/raw_writer；禁 pandas/talib/numpy/scipy/sklearn）；`SnapshotBuilder.build` 签名只接受 canonical_run_id。
+
+## 13.3 实现中发现并修复的工程问题（均以测试钉死）
+
+- DuckDB TIMESTAMPTZ fetch 返回本地时区（Windows GMT+8 session timezone）——`verify_snapshot` 的 as_of 与 readmodel logical seal 的行值统一 `astimezone(UTC)` 归一化（UTC instant 才是 deterministic anchor / semantic truth）
+- `read_parquet` 自动 hive_partitioning 把 artifact 路径的 `contract=/as_of=/snapshot=` 段误读为分区列（+3 列 Binder 错误）——`read_parquet(..., hive_partitioning=false)`
+- adj_factor 的 factor_type 不在 canonical payload_fields（只进 canonical key）——schema registry 以 key projection 列（key_index=2）携带
+- polars dict-rows + 显式 schema 会把 extra keys 也带为列——snapshot 投影先经 registry 严格过滤再构造 frame（列集 == registry 精确）
+
+## 13.4 CR-3 Latent 缺陷显式申报（§12 流式红线合规）
+
+**发现**：CR-3 `_write_artifacts` 的 selected/decision semantic seal 曾对**未对齐 rows**计算，而 parquet 写入 `_align_schema` 对齐后的 rows——多 domain 混合时（不同 domain 行的 key 集合不同）exact replay 从 parquet 重算的 semantic hash 必然与 ledger seal 失配 → 误报 DAMAGED（fail-closed 方向 false positive）。单 domain 时 key 集合一致故对齐是无操作——1179 项既有回归全绿、六轮复审均未暴露；CR-4 多 domain 消费首次触发。
+
+**处理路径（未悄悄修复）**：最小修复（seal 改为对 aligned rows 计算——单 domain 行为逐字节不变，194 项既有 canonical 回归全保持即证明）+ `TestMultiDomainReplayRegression::test_multi_domain_exact_replay_idempotent`（4 domain SUCCESS 幂等 replay）回归钉 + ADR-024 Consequences / DM-20260903-075 / DEVLOG 申报 + **提请 Reviewer 在 CR-4 复审中一并裁决该 CR-3 frozen 机制的修正**。
+
+## 13.5 Exit Gate 自检（§12）
+
+```text
+[x] consumption verifier 是唯一 canonical 读取入口（BLOCKED 拒绝 + superset 语义正确）  -> canonical/verifier.py + mandatory 1-10
+[x] snapshot identity 确定性 + run-level seals 派生 + fingerprint 参与                     -> mandatory 14-16
+[x] artifact 集精确 == 请求域；domain 分区；schema registry 强制                            -> mandatory 17-20
+[x] lineage 全保留 + 仅两个 snapshot 投影 + PIT 断言                                       -> mandatory 21
+[x] immutable artifacts + manifest LAST + exact retry 幂等 + crash 残留 fail closed        -> mandatory 11-13/30
+[x] verify_snapshot 全物理重算 + canonical provenance cross-bind（build 后损坏也拦截）      -> mandatory 22-29
+[x] readmodel temp→logical seal→原子替换；失败零残留；表集/schema/时区/唯一性/semantic 全验   -> mandatory 31-42
+[x] migration 022 from-zero/upgrade/idempotent/tamper probe                                -> mandatory 43-46
+[x] 边界 AST guard（providers/normalization/raw/特征库全禁）                                -> TestBoundaryStructure
+[x] CR-3 冻结机制零"悄悄修改"——唯一触碰为显式申报的 latent 缺陷修复（回归钉 + 提请裁决）     -> §13.4
+[x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 + Ruff/format/Mypy/governance gates          -> 推送后 API 正向确认（回填本节）
+[ ] Reviewer 复审裁决（含 CR-3 latent 缺陷修复的追认）                                      -> PENDING_REVIEW
+```

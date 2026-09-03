@@ -17,6 +17,53 @@
 
 ---
 
+## 2026-09-03 · CR-4 首批：Canonical 公共消费验证器 + SnapshotBuilder + DuckDB ReadModel（CR-3 全链 VERIFIED 后的启动批次）
+
+**CR-3 全链 Closure 同步（Reviewer 裁决先行）**
+- CR-3.6 复审最终结论（2026-09-02 21:24 +08:00，Reviewer closure commit `ff3808b7a5036246ea11e37173aa31d863beb2d9`，文档 `A-share-analysis_CR-3.6最终复审结论与CR-4启动裁决_20260902.md`）：**CR-3.6 → VERIFIED / CLOSED / FREEZE；CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 全链 CLOSED / FREEZE；ADR-023 → ACCEPTED；CR-4 正式 START**
+- 本批第一动作即同步治理基线：ADR-023 status → ACCEPTED（含六轮 Amendment 裁决并入）；ADR-000 索引同步；CR-3.6 工作要求追加 Reviewer Closure 裁决章节；DM 头部基线切换至 reviewer closure commit `ff3808b`；CR-3 全链 → VERIFIED / CLOSED / FREEZE
+
+**Scope（CR-4 工作要求 `A-share-analysis_CR-4_SnapshotBuilder及DuckDBReadModel开发工作要求_20260902.md`，1184 行）**
+- CR-4.1 Canonical 公共消费验证器（P0-A01/A02/A03）+ CR-4.2 SnapshotBuilder（P0-A04-A12）+ CR-4.3 DuckDB ReadModel（P0-B01-B09）一个 implementation commit 交付（Reviewer §11 建议分层 CR-4.0-4.4 的连续实现）；ADR-024（PROPOSED）回答 §5 十问
+
+**Implementation**
+- **CR-4.1 `canonical/verifier.py`**：`verify_canonical_run_for_consumption` 是下游读取 canonical truth 的**唯一支持入口**——内部复用 CR-3 唯一实现（`_verify_historical_identity_seal` / `_verify_canonical_artifacts` / `_verify_findings_truth` / `_sealed_input_authority_problems` + `_verify_sealed_input`；为复用把 `_continuity_problems_for_input` 的前半提取为共享 `_sealed_input_authority_problems`，纯重构零行为变化）；BLOCKED 显式拒绝；与 exact replay 的刻意区别：不要求 current discovery presence（合法 superset 增长不追溯破坏已 mint SUCCESS 的消费），但要求 ledger 存在 + identity 相等 + 物理/anchor 健康
+- **CR-4.2 snapshot 包**：版本化 schema registry（`DomainSnapshotSchema`/`ColumnSpec`/`DType`——列集/类型/nullability/key arity/key projection 单一事实源；market 是 payload 字段、factor_type 是 key projection（key 第 3 段 decode））；确定性 identity（`snapshot_base_hash` = canonical run-level seals + snapshot contract + builder code fingerprint 的 canonical JSON SHA-256 → `UUID5(SNAPSHOT_NAMESPACE, ...)`；从 run-level seals 而非投影行派生——可先算后写、manifest 原语可重算）；artifact 布局 `snapshot/contract=snapshot-v1/as_of=<fmt>/snapshot=<id>/<domain>.parquet + manifest.json(LAST)`（artifact 集 == 请求 domain 集）；严格投影（key round-trip + PIT 断言 + typed 转换 fail closed + canonical_key 排序稳定序）；`_write_immutable` 拒绝覆盖；migration 022 `meta_snapshot_build`（一事务 dup-check + INSERT；exact retry → verify_snapshot 幂等 replay；目录存在 ledger 无行 → 显式 fail closed crash 残留）；`verify_snapshot`（deterministic URI + bytes hash + manifest==ledger + identity UUID5 cross-bind + **canonical provenance cross-bind**（重新跑消费验证器 + manifest canonical 字段 == VERIFIED ledger truth——canonical 在 snapshot 之后被篡改同样 fail closed）+ artifact 物理/语义 seal 重算 + row PIT/投影 sanity）
+- **CR-4.3 readmodel 包**：`DuckDBReadModel.rebuild` = verify_snapshot → temp 库（`.readmodel.building.duckdb`）→ 建表（registry 精确 DuckDB 类型 + `PRIMARY KEY (canonical_key)` + NOT NULL identity 列）→ INSERT（**`read_parquet(hive_partitioning=false)`**——修复路径 `contract=/as_of=/snapshot=` 段被 DuckDB 误读为分区列的 +3 列 Binder 错误）→ **temp 库上 logical seal**（表集精确 == `{rm_<domain>} ∪ {rm_snapshot_meta, rm_domain_meta}` / 行数 / key 唯一 / **从表内容重算 semantic hash == snapshot 域 seal**（TIMESTAMPTZ fetch 归一化回 UTC 再序列化）/ `information_schema` 列类型精确比对（TIMESTAMP WITH TIME ZONE 显式时区）/ meta 表内容）→ `Path.replace` 原子替换确定性目标；失败 temp 删除旧目标字节不变；`open_read_only` 消费入口
+- **边界（AST guard 测试）**：snapshot/ 与 readmodel/ 禁止 import providers/normalization/raw_writer；禁止 pandas/talib/numpy/scipy/sklearn；`SnapshotBuilder.build` 签名只接受 canonical_run_id
+
+**CR-3 latent 缺陷显式申报（提请 Reviewer 在 CR-4 复审中一并裁决，未走"悄悄修复"路径——工作要求 §12）**
+- 发现：CR-3 `_write_artifacts` 的 selected/decision semantic seal 曾对**未对齐 rows**计算，而 parquet 写 `_align_schema` 对齐后的 rows——**多 domain 混合时 exact replay 的 recompute 必然误报 DAMAGED**（fail-closed 方向 false positive；单 domain key 集合一致故 1179 项既有回归全绿、六轮复审未暴露；CR-4 多 domain 消费首次触发）
+- 最小修复：seal 改为对 aligned rows 计算（单 domain 行为逐字节不变——194 项既有 canonical 回归全保持即证明）；新增 `TestMultiDomainReplayRegression::test_multi_domain_exact_replay_idempotent`（4 domain SUCCESS 幂等 replay）作为回归钉
+- 申报位置：ADR-024 Consequences / DM-20260903-075 / 本条目 / CR-4 工作要求 Implementation Mapping §7.5
+
+**Schema / Contract Changes**
+- C4 ×1（DM-20260903-075）；**ADR-024（PROPOSED）**；migration **022** `meta_snapshot_build`（链 21 → 22）；CR-3 冻结机制仅上述显式申报的一处 seal 计算修复（零行为破坏证明：194 项 canonical 回归 + 1179→1235 全量绿）
+
+**Verification**
+- Local: **1235 tests passed / 0 failed**（1179 → 1235，+56：`test_snapshot.py` 44（consumption verifier 10——mandatory 1-10 / builder 21——mandatory 11-30 / schema projection unit 3 / boundary AST guard 10）/ `test_readmodel.py` 11（mandatory 31-42 + 双模型并存）/ `test_canonical.py` +1 multi-domain replay 回归；migration 测试更新 22 链 + 021→022 升级 + tamper probe 023）；ruff check / ruff format / mypy 全绿（78 源文件零错）
+- 既有回归零破坏：CR-3.x 全链 195 项（含 6 轮 REOPEN 收口全部对抗矩阵）；CR-2.x / R4 冻结契约零破坏
+- 实现中修复的工程问题（均以测试钉死）：DuckDB TIMESTAMPTZ fetch 本地时区（GMT+8）→ verify/rebuild 归一化 UTC；read_parquet hive partitioning 误读路径段；polars dict-rows + schema 的 extra-key 行为规避（投影先行过滤）；adj_factor factor_type 为 key projection 非 payload
+- GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
+
+**Implementation Status**
+- DONE（CR-4.0-4.3 全交付 + ADR-024 + DM-20260903-075 + CR-3 closure 治理同步；1235/0；Review Status: PENDING_REVIEW）
+
+**关键决策**
+- 消费边界唯一性：SnapshotBuilder 不读 canonical 文件——它读"已验证的 canonical truth"（VerifiedCanonicalRun）；所有 canonical 正确性规则仍只在 canonicalizer.py 一处
+- identity 从 run-level seals 派生而非投影行：先算后写（构建失败不留半成品 identity）、manifest 原语可物理重算（verifier 的 UUID5 cross-bind）
+- superset 语义精确化：snapshot 的 canonical provenance cross-bind 在每次 verify/rebuild 时**重跑**消费验证器——canonical 在 snapshot 之后损坏同样 fail closed（不是构建时一次性的信任）
+- ReadModel 的 logical seal 从**表内容**重算而非 parquet——证明"DuckDB 表逻辑 == snapshot seal"（含时区归一化后的 instant 精确性），杜绝"load 成功但 cast 悄悄改值"
+- 每 snapshot 独立 DB（确定性路径）+ 每次 rebuild 全新 temp 库——stale table 结构性不可能；原子替换保证失败不留半模型
+- CR-3 latent 缺陷的处理路径：显式申报 + 最小修复 + 回归钉 + 提请裁决（而非悄悄改或停下空等）
+
+**下一步**
+- 等 Reviewer 复审 CR-4 首批（工作要求 §12 Exit Gate 50 项 + §5 十问裁决 + CR-3 latent 缺陷申报裁决）；通过 → CR-4 后续（如有）或 CR-5（Feature 层）规划
+- 持续开放：Golden/Trading Rule 人工 Review（HUMAN ACTION REQUIRED）；production_account.yaml 冻结待 P0-M-1B 正式账号人工确认；Branch Protection 未启用
+
+---
+
+
 ## 2026-09-02 · CR-3.6 Selection-Free Historical Discovery + Historical Canonical Artifact Closure（CR-3.5 复审 REOPENED 后的收口批次）
 
 **Scope**
@@ -52,6 +99,8 @@
 
 ---
 
+
+## 2026-09-02 · CR-3.5 Historical Candidate Discovery + Derived Canonical Run/Status Seal（CR-3.4 复审 REOPENED 后的收口批次）
 
 **Scope**
 - CR-3.4 复审（audit 20260902 13:17 +08:00，Reviewed HEAD `8585b08dc079207e8306bf3be38cf3de3de2f7a4`，Primary CR-3.4 implementation `fce2ca43a35b95d61dc390647fdc46d844d9b1a5`，reopen commit `275fc93`）裁决 **CR-3.4 REOPENED**：原定 3 个 P0 **PASS / FREEZE**（14 项机制）；2 个新 P0 由本批 CR-3.5 收口（**未启动 CR-4**——复审 §4 边界；CR-4 BLOCKED_BY_CR-3.5）；复审 §1.4/§2.3 mandatory 测试 15 项全对应（1-5 候选发现 + 6-15 derived seal/positive）
@@ -89,6 +138,8 @@
 ---
 
 
+## 2026-09-02 · CR-3.4 Historical Canonical Seal Trust + Verification Replay Symmetry + Manifest Correctness Identity Binding（CR-3.3 复审 REOPENED 后的收口批次）
+
 **Scope**
 - CR-3.3 复审（audit 20260902 10:22 +08:00，Reviewed HEAD `b5fdc27b9f2fd9c262c7dc6dae9aa665b9494bc1`，Primary CR-3.3 implementation `f8b80b3212ff299f52ee3fb0308c248fd16c17df`，reopen commit `33d0901`）裁决 **CR-3.3 REOPENED**：18 项机制 PASS / FREEZE（canonical_context_hash 方向 / continuity guard 按 context 查历史 / 全部 CR-2 ledger drift 检测 / superset 合法 / exact restore replay / verification_problem_hash 进 seal+state / finding truthfulness / 治理计数）；3 个 P0 由本批 CR-3.4 收口（**未启动 CR-4**——复审 §4 边界；CR-4 BLOCKED_BY_CR-3.4）；复审 §1.3/§2.3/§3 mandatory 测试 13 项全对应
 - 复审 §6 Owner View：CR-3 关闭前最后一层"历史审计证据本身也不能被重新绑定"的收口
@@ -125,6 +176,8 @@
 
 ---
 
+
+## 2026-09-02 · CR-3.3 Historical Input Continuity + Verification Evidence Exactness + Finding Truthfulness（CR-3.2 复审 REOPENED 后的收口批次）
 
 **Scope**
 - CR-3.2 复审（audit 20260902 06:56 +08:00，Reviewed HEAD `9ffdf35f577e48ec4de1432057d954da07f78db0`，reopen commit `9ec2fca`）裁决 **CR-3.2 REOPENED**：16 项机制 PASS / FREEZE（transactional snapshot / master PIT / honest policy / full seal 主体 / state transition 主体）；2 个 P0 + 3 个 P1 由本批 CR-3.3 收口（**未启动 CR-4**——复审 §6 边界；CR-4 BLOCKED_BY_CR-3.3）；复审 §1.4/§2.3 mandatory 测试 15 项 + P1 全对应

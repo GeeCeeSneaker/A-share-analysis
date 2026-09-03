@@ -7,11 +7,34 @@ is frozen). Tests that legitimately open PRODUCTION runs / approve
 capabilities freeze an identity matching THEIR production profile via
 ``freeze_production_identity`` - the real repo stays fail-closed until
 the formal production account is human-confirmed (P0-M-1B).
+
+CR-4: the migrated-DB ``conn`` and ``env_root`` fixtures shared by the
+canonical / snapshot / readmodel integration tests.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import duckdb
 import pytest
+
+MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
+
+
+@pytest.fixture
+def conn():
+    connection = duckdb.connect(":memory:")
+    from ashare_state.storage import apply_migrations
+
+    apply_migrations(connection, MIGRATIONS_DIR)
+    yield connection
+    connection.close()
+
+
+@pytest.fixture
+def env_root(tmp_path: Path) -> dict[str, Path]:
+    return {"raw": tmp_path / "raw", "normalized": tmp_path / "normalized"}
 
 
 @pytest.fixture
