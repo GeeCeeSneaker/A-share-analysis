@@ -4,16 +4,16 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Reviewed Repository HEAD**：`a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`（CR-4.4 final review 后 PR #1 merge；CR-4 全链 **VERIFIED / CLOSED / FREEZE**）  
+> **Reviewed Repository HEAD**：`aa24751b18437e24b48aaf5bfc3b9ae3382e90fd`（CR-5 首批复审与 CR-5.1 启动要求；PR #2 OPEN / NOT MERGED）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：CR-4.4 correctness-closure 已随 PR #1 合并至 `a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`；CR-5 implementation head 为 `eaebce48ad373d7302f208f2f7fe7ddd53bf6cfb`，CI run `33745226956` 已三矩阵 success，Reviewer closure pending。
-> **Document Revision**：DM-CR-20260830-054..060 / DM-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075 / 076 / 077 / 078 / 079
-> **Last Review**：2026-09-03（CR-4.4 最终复审后，CR-5 implementation head `eaebce48` 的 CI run `33745226956` 三矩阵 success；Reviewer closure pending）
+> **Current Code Baseline**：CR-4.4 correctness-closure 已随 PR #1 合并至 `a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`；CR-5.1 implementation 从 `aa24751b18437e24b48aaf5bfc3b9ae3382e90fd` 开始，代码提交与 CI 待本批完成。  
+> **Document Revision**：DM-CR-20260830-054..060 / DM-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075 / 076 / 077 / 078 / 079 / 080
+> **Last Review**：2026-09-03 19:22 +08:00（CR-5 首批复审：主体 PASS，但 Registry honesty / Feature seal / numeric-finding / mandatory matrix 重新打开；CR-5.1 START / ACTIVE；CR-6 BLOCKED_BY_CR-5.1）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：CR-4.4 source branch run 33738799060 为三矩阵 success；CR-5 implementation head `eaebce48` 的 run 33745226956 三矩阵 success，每腿 1270 passed；Windows 3.14 的 DEVLOG / Management-doc gates success。
+> **CI Status**：前一 CR-5 head `eaebce48` 的 run `33745226956` 三矩阵 success；CR-5.1 新 head 尚未产生 CI 证据，本批不预先宣称通过。  
 > **Phase Status（2026-09-03，CR-4 首批交付同步）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-022 ACCEPTED）**；CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-023 ACCEPTED——2026-09-02 21:24 复审裁决）**；CR-4 → **CLOSED / VERIFIED / FREEZE（CR-4.4 final review accepted；ADR-024 ACCEPTED）**；CR-5 → **IN_PROGRESS（implementation DONE / PENDING_REVIEW；CI VERIFIED；production blocked）**；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 → **DONE / REOPENED**（主体 PASS；CR-5.1 correctness closure ACTIVE）；CR-5.1 → **IN_PROGRESS / START / ACTIVE**；CR-6 State → **BLOCKED_BY_CR-5.1**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-31 17:42，Reviewer CR-2 复审 P1-01）**：CR-2 批次头部与 Implementation Mapping 曾记录 implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`——该 SHA 非真实 implementation commit；以 GitHub commit object 为准：`15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 关联 commit）。历史条目原文保留，CR-2 工作要求文档已追加 §12 更正。  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。**Count Correction（2026-08-31，CR-2 复审 P1-02）**：ADR-022 §2.2 曾写"9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER"——该批实际 10/4，且 14 条未覆盖 index_daily 等 capability surface；CR-2.1 后 registry 为 **18 条（11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE，runtime exact-set 统计）**，已随 ADR-022 Amendment A §6.1 更正，历史保留。  
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
@@ -1097,7 +1097,7 @@ Evidence/Log/Exception 必须 scrub secret。
 | CR-3.4 Historical Canonical Seal Trust + Verification Replay Symmetry + Manifest Identity Binding | DONE | **REOPENED（已吸收，原定 3 P0 PASS/FREEZE）** | 14 项机制 PASS / FREEZE（2026-09-02 13:17 复审）；2 新 P0 由 CR-3.5 收口 |
 | CR-3.5 Historical Candidate Discovery + Derived Run/Status Seal | DONE | **REOPENED** | derived run/status seal PASS / FREEZE——21 项机制（2026-09-02 17:36 复审）；2 新 P0 由 CR-3.6 收口 |
 | CR-3.6 Selection-Free Historical Discovery + Historical Artifact Closure | DONE | **VERIFIED / CLOSED / FREEZE** | 2026-09-02 21:24 复审最终裁决（28 mandatory 全 PASS）；CR-3 全链关闭 |
-| CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild | IN_PROGRESS | **CR-4.4 ACTIVE / PENDING_REVIEW** | **当前最高优先级**（CR-4.1/4.2/4.3 首批已实现；CR-4.4 收口确定性回放、可恢复 immutable、key binding、physical schema hash、ReadModel verified-open；ADR-024 Amendment A PROPOSED） |
+| CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild | DONE | **VERIFIED / CLOSED / FREEZE** | CR-4 全链已完成，ADR-024 ACCEPTED，PR #1 已合并 || CR-5 Deterministic Feature Layer | DONE | **REOPENED** | 主体机制 PASS；P0/P1 correctness closure 转入 CR-5.1 || CR-5.1 Registry Honest Execution + Feature Seal Closure | IN_PROGRESS | **START / ACTIVE** | Reviewer 要求：Registry 诚实执行、manifest/ledger physical recompute、分母与 active finding、1..66 mapping、三平台 CI || CR-6 Market State Layer | BLOCKED | **BLOCKED_BY_CR-5.1** | CR-5.1 与 Reviewer closure 完成后才可启动 |
 | R4-CI | PLANNED | PENDING | Next |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
 | CR-4 Snapshot + Read Model Rebuild | PLANNED | PENDING | CR-3 后 |
@@ -1110,7 +1110,22 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## CR-4 SnapshotBuilder + DuckDB ReadModel（IN_PROGRESS——CR-4.4 ACTIVE / PENDING_REVIEW）
+## CR-5.1 Registry Honest Execution + Feature Seal Closure（IN_PROGRESS——START / ACTIVE）
+
+CR-5 首批复审文档 `docs/design/A-share-analysis_CR-5首批复审与CR-5.1_RegistryHonestExecution及FeatureSeal收口要求_20260903.md` 明确：CR-5 主体机制 PASS，但 Registry declaration/runtime drift、manifest/ledger correctness-field rebinding、physical row-count recompute、rolling denominator finding、active missingness span 与原始 66 项 mandatory mapping 尚未闭环。当前只允许 focused closure；CR-6 State、生产和上游 CR-2/3/4 变更均不在范围内。
+
+本批执行：
+
+```text
+compile_feature_execution_plan()  ->  typed exact-set Registry execution
+manifest semantic fields           ->  Registry / plan cross-bind
+row counts / snapshot_as_of         ->  physical / Verified Snapshot recompute
+lag / MA / amount denominator       ->  NULL + typed UNSAFE_DENOMINATOR
+amount / volatility missingness     ->  active-span incremental tracking
+mandatory 1..66                    ->  §16.10 explicit mapping
+```
+
+## CR-4 SnapshotBuilder + DuckDB ReadModel（前批，VERIFIED / CLOSED / FREEZE）
 
 CR-3 全链 VERIFIED / CLOSED / FREEZE（2026-09-02 21:24 复审裁决，ADR-023 ACCEPTED）后正式启动。
 首批（DM-20260903-075；CR-4.4 closure DM-20260903-076/077；工作要求
@@ -2399,6 +2414,30 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-20260903-080 — CR-5.1 Registry Honest Execution / Feature Seal Closure
+
+**Type**：C4 correctness closure（CR-5 首批复审 reopen；ADR-025 Amendment A PROPOSED）  
+**Status**：IN_PROGRESS / START / ACTIVE  
+**Trigger**：CR-5 首批复审（2026-09-03 19:22 +08:00）裁决 CR-5 主体机制 PASS 但 CR-5 DONE / REOPENED；CR-5.1 START / ACTIVE；PR #2 暂不合并；CR-6 BLOCKED_BY_CR-5.1。  
+**Scope**：仅 Registry honest execution、Feature seal cross-binding、rolling denominator/missingness、active-span complexity、mandatory 1..66 mapping；不改 migration 023，不启动 CR-6，不重开 CR-2/3/4，不触碰 production。  
+**Implementation**：
+- compile_feature_execution_plan() 以 typed blocked semantics、V1 exact feature set 和 formula-rule dispatch 为唯一执行计划；声明字段变化、额外 feature 或 blocked rename 均 fail closed。
+- FeatureBuilder / verifier 消费 Registry/plan 的 price_basis、window_basis、universe_rule_id；verifier 对 manifest/ledger snapshot_as_of、SUCCESS error_message、物理 security/market/finding counts 做交叉绑定与重算。
+- lag、close-to-MA、amount 共用危险分母分类；valid_ma20_count 按实际可比较的 close-to-MA 行计数；amount/volatility 使用 active-span incremental history；duplicate key 校验使用 set。
+- tests/integration/test_features.py 增加 Registry drift、seal rebound、numeric/PIT/lineage、active missingness、recovery 和 mandatory focused cases；CR-5 work requirement §16.10 增加 1..66 mapping；ADR-025 Amendment A 与 DEVLOG 同步。
+**Verification**：本批新 head 的 GitHub Actions 三矩阵、Ruff、formatter、mypy、full pytest、Spike、SDK-absent 与 governance gates 待实际证据；不得以旧 run 33745226956 代替。  
+**Migration**：023 保持不变；001..022 保持不变。  
+**Reviewer**：PENDING_REVIEW
+
+## DM-20260903-079 — CR-5 首批复审与 CR-5.1 启动
+
+**Type**：C4 review verdict / next-stage work requirement  
+**Status**：CR-5 DONE / REOPENED；CR-5.1 START / ACTIVE  
+**Trigger**：2026-09-03 19:22 +08:00 reviewer 文档；主体架构与 run 33746604036 三平台 CI PASS，但 P0-01 Registry honesty、P0-02 Feature seal closure、P0-03 denominator/finding closure、P1 active missingness/complexity、mandatory 66 mapping 未闭环。  
+**Decision**：ADR-025 保持 PROPOSED；PR #2 OPEN / MERGEABLE / NOT MERGED；CR-6 BLOCKED_BY_CR-5.1；CR-2/3/4 保持 CLOSED / FREEZE。  
+**Required**：按 reviewer work requirement 实施 focused closure 后，重新取得三平台 CI 证据并等待 Reviewer closure。  
+**Reviewer**：Design / Audit Review
 
 ## DM-20260903-077 — CR-4.4 CI 验证与治理同步
 

@@ -11,6 +11,18 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 Registry Honest Execution / Feature Seal Closure
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：Reviewer 复审确认 CR-5 主体机制 PASS，但发现 Registry 声明与 runtime 执行、Feature manifest/ledger physical recompute、分母与 active missingness span、原始 66 项 mandatory matrix 仍有收口缺口；PR #2 保持 OPEN / MERGEABLE / NOT MERGED，CR-6 继续 BLOCKED_BY_CR-5.1。
+- 新增 typed blocked-semantic classification 与 V1 exact-set compile_feature_execution_plan()；engine 改为从编译计划读取 window/lag，并对 formula、denominator、missingness、availability、eligibility、input/output contract 漂移 fail closed；Registry 额外或重命名的 feature 不会进入执行路径。
+- verifier 新增 price_basis / window_basis / universe_rule_id 交叉绑定，physical security/market/finding row-count 重算，manifest/ledger snapshot_as_of 对 Verified Snapshot 绑定，以及 SUCCESS error_message 约束；valid_ma20_count 明确按可比较的 close_to_ma_obs_20 计数。
+- 统一 lag / close-to-MA / amount 的危险分母 finding；market breadth 对不可比较 MA 值 null-safe；amount/volatility 使用 incremental valid history 与 active-span missingness，避免旧历史缺失持续污染并消除 prefix rescan；新增 registry drift、seal rebound、numeric、PIT、lineage、recovery focused tests。
+- 同步 ADR-025 Amendment A、CR-5 原工作要求 §16.10 的 1..66 mapping、DEVELOPMENT_MANAGEMENT；migration 023 及 CR-2/3/4 冻结链不改。新 head 的 GitHub Actions 三矩阵与 governance evidence 待实际返回，此处不预先宣称通过。
+
+**Next**
+- 以新 head 的 CI 实际结果收口剩余工程问题；CI 通过后仍需 Reviewer closure，未闭环前不合并 PR #2、不启动 CR-6、不触碰生产 P0-M-1B。
+
 ## 2026-09-03 · CR-5 CI 完整验证
 
 **Implementation Status / Review Status**

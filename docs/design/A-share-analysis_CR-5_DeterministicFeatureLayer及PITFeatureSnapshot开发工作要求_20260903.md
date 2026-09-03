@@ -1032,6 +1032,84 @@ ADR-025 至少回答：
 
 ---
 
+## 16.10 CR-5.1 Mandatory Test Mapping
+
+CR-5.1 requires an explicit mapping for the original 1..66 matrix. A matrix
+item may map to a parametrized case, a focused structural guard, an existing
+frozen upstream regression, or the required CI leg. The aggregate pytest count
+is not a substitute for this mapping.
+
+| # | Focused test / parameter / evidence |
+|---:|---|
+| 1 | tests/integration/test_features.py::TestFeatureBoundary::test_verified_readmodel_build_and_public_verify |
+| 2 | tests/integration/test_features.py::TestFeatureBoundary::test_unknown_snapshot_fails_closed |
+| 3 | tests/integration/test_snapshot.py::TestSnapshotBuilder::test_verify_snapshot_manifest_bytes_tamper + feature input boundary |
+| 4 | tests/integration/test_readmodel.py::TestDuckDBReadModel::test_verified_open_rejects_foreign_snapshot_file and test_verified_open_rejects_logical_row_tamper |
+| 5 | tests/integration/test_features.py::TestFeatureBoundary::test_missing_readmodel_is_not_rebuilt |
+| 6 | tests/integration/test_features.py::TestFeatureIdentityAndBoundary::test_feature_builder_requires_explicit_world_arguments |
+| 7 | tests/integration/test_features.py::TestFeatureBoundary::test_feature_package_has_no_forbidden_imports |
+| 8 | tests/integration/test_snapshot.py::TestSnapshotBuilder::test_different_canonical_run_different_snapshot + feature identity primitive test |
+| 9 | tests/integration/test_features.py::TestFeatureBoundary::test_unknown_feature_set_fails_closed |
+| 10 | tests/integration/test_features.py::TestFeatureIdentityAndBoundary::test_registry_and_builder_fingerprints_enter_feature_identity |
+| 11 | TestFeatureRegistryHonestExecution::test_registry_semantic_drift_fails_closed[ma_close_obs_20/window_length=17] |
+| 12 | TestFeatureRegistryHonestExecution::test_registry_semantic_drift_fails_closed[return_lag_obs_20/lag=17] |
+| 13 | TestFeatureRegistryHonestExecution::test_registry_semantic_drift_fails_closed[raw_return_1/formula_rule_id=UNIMPLEMENTED_RULE] |
+| 14 | TestFeatureRegistryHonestExecution::test_registry_semantic_drift_fails_closed[raw_return_1/denominator_policy=UNIMPLEMENTED_POLICY] |
+| 15 | TestFeatureRegistryHonestExecution::test_registry_semantic_drift_fails_closed[raw_return_1/missingness_policy=UNIMPLEMENTED_POLICY] |
+| 16 | TestFeatureRegistryHonestExecution::test_registry_semantic_drift_fails_closed[raw_return_1/availability_rule=UNIMPLEMENTED_RULE] |
+| 17 | TestFeatureRegistryHonestExecution::test_registry_semantic_drift_fails_closed[ma_close_obs_20/window_basis=MARKET_SESSIONS] |
+| 18 | TestFeatureRegistryHonestExecution::test_supported_feature_without_execution_handler_fails_closed |
+| 19 | TestFeatureFormulaAndMissingnessClosure::test_all_same_row_formulas_have_exact_fixture_values |
+| 20 | TestFeatureFormulaAndMissingnessClosure::test_all_observed_windows_and_lags_use_declared_boundaries[5,20,60] |
+| 21 | TestFeatureFormulaAndMissingnessClosure::test_all_observed_windows_and_lags_use_declared_boundaries[lag 5,20,60] |
+| 22 | tests/integration/test_features.py::TestFeatureFormulas::test_ordered_formula_fixture |
+| 23 | TestFeatureFormulas::test_future_observation_does_not_change_target |
+| 24 | TestFeatureBoundary::test_verified_readmodel_build_and_public_verify + verifier key/order guard |
+| 25 | TestFeatureFormulas::test_observation_gap_is_not_filled |
+| 26 | TestFeatureFormulaAndMissingnessClosure::test_all_observed_windows_and_lags_use_declared_boundaries |
+| 27 | TestFeatureFormulas::test_missing_denominator_is_null_with_finding |
+| 28 | TestFeatureFormulaAndMissingnessClosure::test_lag_non_positive_prior_close_is_unsafe_denominator and test_close_to_ma_non_positive_mean_is_unsafe_denominator |
+| 29 | TestFeatureFormulaAndMissingnessClosure::test_nonfinite_input_becomes_null_and_never_enters_artifact |
+| 30 | TestFeatureBoundary::test_feature_package_has_no_forbidden_imports + null-only artifact assertions |
+| 31 | TestFeatureBoundary::test_feature_package_has_no_forbidden_imports + engine source guard |
+| 32 | TestFeatureFormulas::test_input_order_does_not_change_truth, including finding hash |
+| 33 | TestFeaturePITAndMarketDeterminism::test_active_span_available_at_is_pit_max |
+| 34 | _prepare_rows available_at <= snapshot_as_of assertion + public verifier CI |
+| 35 | TestFeaturePITAndMarketDeterminism::test_security_lineage_changes_when_source_identity_changes |
+| 36 | TestFeaturePITAndMarketDeterminism::test_security_lineage_changes_when_source_identity_changes + current-row seed |
+| 37 | TestFeatureFormulas::test_future_observation_does_not_change_target |
+| 38 | TestFeaturePITAndMarketDeterminism::test_market_mean_median_are_order_deterministic |
+| 39 | TestFeatureFormulaAndMissingnessClosure::test_market_breadth_ignores_uncomparable_ma_values_without_crashing |
+| 40 | TestFeatureFormulaAndMissingnessClosure::test_market_breadth_ignores_uncomparable_ma_values_without_crashing |
+| 41 | TestFeatureFormulas::test_missing_denominator_is_null_with_finding, market ratio assertion |
+| 42 | TestFeatureFormulaAndMissingnessClosure::test_market_breadth_ignores_uncomparable_ma_values_without_crashing |
+| 43 | TestFeaturePITAndMarketDeterminism::test_market_mean_median_are_order_deterministic |
+| 44 | TestFeatureBoundary::test_registry_is_static_and_versioned |
+| 45 | TestFeatureRegistryHonestExecution::test_blocked_semantics_are_typed_and_cannot_be_renamed_into_supported |
+| 46 | TestFeatureRegistryHonestExecution::test_registry_semantic_drift_fails_closed[window_basis=MARKET_SESSIONS] |
+| 47 | TestFeatureRegistryHonestExecution::test_blocked_semantics_are_typed_and_cannot_be_renamed_into_supported |
+| 48 | TestFeatureBoundary::test_feature_package_has_no_forbidden_imports |
+| 49 | TestFeatureRecoverablePublication::test_ledger_failure_exact_retry_recovers + manifest-last implementation guard |
+| 50 | TestFeatureBoundary::test_verifier_rejects_tampered_feature_bytes |
+| 51 | TestFeatureSealCrossBinding::test_manifest_and_ledger_counts_are_physically_recomputed[security/market/finding] |
+| 52 | TestFeatureBoundary::test_verifier_rejects_business_rebind_even_when_all_feature_seals_rebound |
+| 53 | TestFeatureSealCrossBinding::test_verifier_rejects_lineage_rebind_even_when_all_seals_rebound |
+| 54 | TestFeatureRecoverablePublication::test_ledger_failure_exact_retry_recovers |
+| 55 | TestFeatureRecoverablePublication::test_partial_identical_residue_recovers |
+| 56 | TestFeatureRecoverablePublication::test_conflicting_residue_refuses |
+| 57 | TestFeatureBoundary::test_verifier_rejects_tampered_feature_bytes |
+| 58 | TestFeatureRecoverablePublication::test_feature_artifact_bytes_are_deterministic |
+| 59 | tests/integration/test_migrations.py::TestFromZeroInit::test_all_tables_created |
+| 60 | tests/integration/test_migrations.py::TestLedgerIntegrity::test_upgrade_from_prior_chain_applies_only_new_tail |
+| 61 | tests/integration/test_migrations.py::TestFromZeroInit::test_idempotent_rerun |
+| 62 | tests/integration/test_migrations.py::TestTamperDetection::test_modified_applied_migration_blocks |
+| 63 | GitHub Actions Windows py3.12 matrix leg |
+| 64 | GitHub Actions Windows py3.14 matrix leg |
+| 65 | GitHub Actions Ubuntu py3.14 matrix leg |
+| 66 | GitHub Actions full gate chain: Ruff, formatter, mypy, full pytest, Spike, SDK-absent, DEVLOG, Management-doc |
+
+---
+
 # 17. CR-5 Exit Gate
 
 Reviewer closure 前必须全部成立：

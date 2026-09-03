@@ -25,9 +25,11 @@ from ashare_state.features.models import (
     semantic_hash,
 )
 from ashare_state.features.registry import (
-    FEATURE_SET_ID,
-    UNIVERSE_RULE_ID,
+    FeatureExecutionPlan,
+    FeatureExecutionSpec,
+    FeatureRegistryError,
     FeatureSet,
+    compile_feature_execution_plan,
 )
 
 __all__ = [
@@ -158,16 +160,17 @@ def _reason_for_input(state: str, name: str) -> Reason:
     return None
 
 
-def _binary_feature(
-    row: Mapping[str, Any],
+def _ratio_from_states(
     *,
-    feature_name: str,
+    numerator_state: str,
+    numerator: float | None,
     numerator_name: str,
+    denominator_state: str,
+    denominator: float | None,
     denominator_name: str,
+    feature_name: str,
     formula: Callable[[float, float], float | None],
 ) -> tuple[float | None, Reason]:
-    numerator_state, numerator = _numeric(row, numerator_name)
-    denominator_state, denominator = _numeric(row, denominator_name)
     if denominator_state != "ok":
         if denominator_state == "nonfinite":
             return None, (
@@ -197,38 +200,60 @@ def _binary_feature(
     return value, None
 
 
+def _binary_feature(
+    row: Mapping[str, Any],
+    *,
+    feature_name: str,
+    numerator_name: str,
+    denominator_name: str,
+    formula: Callable[[float, float], float | None],
+) -> tuple[float | None, Reason]:
+    numerator_state, numerator = _numeric(row, numerator_name)
+    denominator_state, denominator = _numeric(row, denominator_name)
+    return _ratio_from_states(
+        numerator_state=numerator_state,
+        numerator=numerator,
+        numerator_name=numerator_name,
+        denominator_state=denominator_state,
+        denominator=denominator,
+        denominator_name=denominator_name,
+        feature_name=feature_name,
+        formula=formula,
+    )
+
+
 def _amplitude_feature(row: Mapping[str, Any]) -> tuple[float | None, Reason]:
     high_state, high = _numeric(row, "high")
     low_state, low = _numeric(row, "low")
     denominator_state, denominator = _numeric(row, "pre_close")
     if denominator_state != "ok":
-        if denominator_state == "nonfinite":
-            return None, (
-                "NON_FINITE_RESULT",
-                {"input": "pre_close", "reason": "non-finite denominator"},
-            )
-        return None, (
-            "UNSAFE_DENOMINATOR",
-            {"denominator": "pre_close", "reason": "null denominator"},
-        )
-    assert denominator is not None
-    if denominator <= 0:
-        return None, (
-            "UNSAFE_DENOMINATOR",
-            {"denominator": "pre_close", "reason": "must be greater than zero"},
+        return _ratio_from_states(
+            numerator_state="ok",
+            numerator=0.0,
+            numerator_name="high-low",
+            denominator_state=denominator_state,
+            denominator=denominator,
+            denominator_name="pre_close",
+            feature_name="amplitude_preclose_raw",
+            formula=lambda _numerator, _denominator: None,
         )
     for state, name in ((high_state, "high"), (low_state, "low")):
         reason = _reason_for_input(state, name)
         if reason is not None:
             return None, reason
-    assert high is not None and low is not None
-    value = formulas.amplitude_preclose_raw(high, low, denominator)
-    if value is None or not math.isfinite(value):
-        return None, (
-            "NON_FINITE_RESULT",
-            {"formula": "amplitude_preclose_raw", "reason": "formula returned non-finite"},
-        )
-    return value, None
+    assert high is not None and low is not None and denominator is not None
+    numerator = high - low
+    numerator_state = "ok" if math.isfinite(numerator) else "nonfinite"
+    return _ratio_from_states(
+        numerator_state=numerator_state,
+        numerator=numerator,
+        numerator_name="high-low",
+        denominator_state="ok",
+        denominator=denominator,
+        denominator_name="pre_close",
+        feature_name="amplitude_preclose_raw",
+        formula=formulas.amplitude_preclose_raw,
+    )
 
 
 def _fixed_close_window(
@@ -283,15 +308,17 @@ def _lag_close_feature(
     inputs = tuple(rows[index - lag : index + 1])
     current_state, current = _numeric(rows[index], "close")
     prior_state, prior = _numeric(rows[index - lag], "close")
-    for state, name in ((current_state, "close"), (prior_state, "close")):
-        reason = _reason_for_input(state, name)
-        if reason is not None:
-            return None, reason, inputs
-    assert current is not None and prior is not None
-    value = formulas.lag_return(current, prior)
-    if value is None:
-        return None, ("NON_FINITE_RESULT", {"formula": f"return_lag_obs_{lag}"}), inputs
-    return value, None, inputs
+    value, reason = _ratio_from_states(
+        numerator_state=current_state,
+        numerator=current,
+        numerator_name="close",
+        denominator_state=prior_state,
+        denominator=prior,
+        denominator_name="prior_close",
+        feature_name=f"return_lag_obs_{lag}",
+        formula=formulas.lag_return,
+    )
+    return value, reason, inputs
 
 
 def _add_finding(
@@ -397,6 +424,17 @@ def _prepare_rows(
     return prepared
 
 
+def _add_input_span(
+    input_rows: dict[str, Mapping[str, Any]],
+    rows: Sequence[dict[str, Any]],
+    *,
+    start: int,
+    end: int,
+) -> None:
+    for input_row in rows[start : end + 1]:
+        input_rows[str(input_row["canonical_key"])] = input_row
+
+
 def _ordered_unique_inputs(
     input_rows: Mapping[str, Mapping[str, Any]],
 ) -> tuple[dict[str, Any], ...]:
@@ -424,19 +462,38 @@ def _security_features(
     canonical_run_id: str,
     feature_run_id: str,
     feature_set: FeatureSet,
+    execution_plan: FeatureExecutionPlan,
     snapshot_as_of: datetime,
 ) -> tuple[list[dict[str, Any]], list[FeatureFinding], list[dict[str, Any]]]:
     findings: list[FeatureFinding] = []
     result_rows: list[dict[str, Any]] = []
     records: list[dict[str, Any]] = []
+    security_entries = execution_plan.security
+    expected_feature_names = {entry.spec.feature_name for entry in security_entries}
+    entries_by_handler: dict[str, list[FeatureExecutionSpec]] = {}
+    for entry in security_entries:
+        entries_by_handler.setdefault(entry.handler, []).append(entry)
+    raw_entry = entries_by_handler["raw_return_1"][0]
+    amount_entry = entries_by_handler["amount_to_mean"][0]
+    volatility_entry = entries_by_handler["volatility"][0]
 
     grouped: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         grouped.setdefault(str(row["security_id"]), []).append(row)
 
+    binary_formulas: dict[str, Callable[[float, float], float | None]] = {
+        "raw_return_1": formulas.raw_return_1,
+        "gap_open_raw": formulas.gap_open_raw,
+        "intraday_return_raw": formulas.intraday_return_raw,
+    }
+
     for security_id in sorted(grouped):
         security_rows = grouped[security_id]
-        valid_raw_rows: list[tuple[dict[str, Any], float]] = []
+        valid_raw_rows: list[tuple[int, dict[str, Any], float]] = []
+        raw_invalid_prefix = [0]
+        valid_amount_rows: list[tuple[int, dict[str, Any], float]] = []
+        amount_invalid_prefix = [0]
+
         for index, row in enumerate(security_rows):
             trade_date = row["trade_date"]
             input_rows: dict[str, Mapping[str, Any]] = {str(row["canonical_key"]): row}
@@ -464,192 +521,258 @@ def _security_features(
                     reason=reason,
                 )
 
-            raw_value, raw_reason = _binary_feature(
-                row,
-                feature_name="raw_return_1",
-                numerator_name="close",
-                denominator_name="pre_close",
-                formula=formulas.raw_return_1,
-            )
-            store("raw_return_1", raw_value, raw_reason)
+            for entry in security_entries:
+                if entry.handler in binary_formulas:
+                    spec = entry.spec
+                    if len(spec.required_inputs) != 2:
+                        raise FeatureEngineError(
+                            f"{spec.feature_name} has an invalid binary input declaration"
+                        )
+                    value, reason = _binary_feature(
+                        row,
+                        feature_name=spec.feature_name,
+                        numerator_name=spec.required_inputs[0],
+                        denominator_name=spec.required_inputs[1],
+                        formula=binary_formulas[entry.handler],
+                    )
+                    store(spec.feature_name, value, reason)
+                elif entry.handler == "amplitude_preclose_raw":
+                    value, reason = _amplitude_feature(row)
+                    store(entry.spec.feature_name, value, reason)
+
+            raw_value = feature_values[raw_entry.spec.feature_name]
             if raw_value is not None:
-                valid_raw_rows.append((row, raw_value))
+                valid_raw_rows.append((index, row, raw_value))
+            raw_invalid_prefix.append(raw_invalid_prefix[-1] + int(raw_value is None))
 
-            gap_value, gap_reason = _binary_feature(
-                row,
-                feature_name="gap_open_raw",
-                numerator_name="open",
-                denominator_name="pre_close",
-                formula=formulas.gap_open_raw,
-            )
-            store("gap_open_raw", gap_value, gap_reason)
-
-            intraday_value, intraday_reason = _binary_feature(
-                row,
-                feature_name="intraday_return_raw",
-                numerator_name="close",
-                denominator_name="open",
-                formula=formulas.intraday_return_raw,
-            )
-            store("intraday_return_raw", intraday_value, intraday_reason)
-
-            amplitude_value, amplitude_reason = _amplitude_feature(row)
-            store("amplitude_preclose_raw", amplitude_value, amplitude_reason)
-
-            ma_reasons: dict[int, Reason] = {}
-            ma_inputs: dict[int, tuple[Mapping[str, Any], ...]] = {}
-            for length in (5, 20, 60):
-                name = f"ma_close_obs_{length}"
+            ma_inputs: dict[str, tuple[Mapping[str, Any], ...]] = {}
+            ma_reasons: dict[str, Reason] = {}
+            for entry in security_entries:
+                if entry.handler != "observed_close_mean":
+                    continue
+                spec = entry.spec
+                length = spec.window_length
+                if not isinstance(length, int) or length <= 0:
+                    raise FeatureEngineError(
+                        f"{spec.feature_name} has no positive observed window length"
+                    )
+                name = spec.feature_name
                 ma_value, ma_reason, window = _fixed_close_window(
                     security_rows,
                     index=index,
                     length=length,
                 )
-                ma_inputs[length] = window
+                ma_inputs[name] = window
                 for input_row in window:
                     input_rows[str(input_row["canonical_key"])] = input_row
-                ma_reasons[length] = ma_reason
+                ma_reasons[name] = ma_reason
                 store(name, ma_value, ma_reason)
 
-            for length in (5, 20, 60):
-                name = f"close_to_ma_obs_{length}"
-                window = ma_inputs[length]
+            for entry in security_entries:
+                if entry.handler != "close_to_mean":
+                    continue
+                spec = entry.spec
+                if len(spec.required_inputs) != 2:
+                    raise FeatureEngineError(
+                        f"{spec.feature_name} has an invalid dependency declaration"
+                    )
+                dependency = spec.required_inputs[1]
+                window = ma_inputs.get(dependency)
+                if window is None:
+                    raise FeatureEngineError(
+                        f"{spec.feature_name} depends on an uncomputed mean {dependency}"
+                    )
                 for input_row in window:
                     input_rows[str(input_row["canonical_key"])] = input_row
-                close_state, close = _numeric(row, "close")
-                reason = _reason_for_input(close_state, "close")
-                if reason is None and feature_values[f"ma_close_obs_{length}"] is None:
-                    reason = ma_reasons[length] or (
+                close_state, close = _numeric(row, spec.required_inputs[0])
+                dependency_value = feature_values.get(dependency)
+                if dependency_value is None:
+                    reason = ma_reasons.get(dependency) or (
                         "INPUT_NULL",
-                        {"dependency": f"ma_close_obs_{length}"},
+                        {"dependency": dependency},
                     )
-                if reason is not None:
-                    close_to_ma_value = None
+                    close_to_mean_value = None
                 else:
-                    assert close is not None
-                    mean_value = feature_values[f"ma_close_obs_{length}"]
-                    assert mean_value is not None
-                    close_to_ma_value = formulas.close_to_mean(close, mean_value)
-                    if close_to_ma_value is None:
-                        reason = (
-                            "NON_FINITE_RESULT",
-                            {"formula": f"close_to_ma_obs_{length}"},
-                        )
-                store(name, close_to_ma_value, reason)
+                    close_to_mean_value, reason = _ratio_from_states(
+                        numerator_state=close_state,
+                        numerator=close,
+                        numerator_name=spec.required_inputs[0],
+                        denominator_state="ok",
+                        denominator=dependency_value,
+                        denominator_name=dependency,
+                        feature_name=spec.feature_name,
+                        formula=formulas.close_to_mean,
+                    )
+                store(spec.feature_name, close_to_mean_value, reason)
 
-            for lag in (5, 20, 60):
-                name = f"return_lag_obs_{lag}"
-                lag_value, lag_reason, inputs = _lag_close_feature(
+            for entry in security_entries:
+                if entry.handler != "lag_return":
+                    continue
+                spec = entry.spec
+                lag = spec.lag
+                if not isinstance(lag, int) or lag <= 0:
+                    raise FeatureEngineError(
+                        f"{spec.feature_name} has no positive observed lag"
+                    )
+                value, reason, inputs = _lag_close_feature(
                     security_rows,
                     index=index,
                     lag=lag,
                 )
                 for input_row in inputs:
                     input_rows[str(input_row["canonical_key"])] = input_row
-                store(name, lag_value, lag_reason)
+                store(spec.feature_name, value, reason)
 
-            amount_state, current_amount = _numeric(row, "amount")
+            amount_spec = amount_entry.spec
+            amount_length = amount_spec.window_length
+            if not isinstance(amount_length, int) or amount_length <= 0:
+                raise FeatureEngineError(
+                    f"{amount_spec.feature_name} has no positive amount window length"
+                )
+            amount_state, current_amount = _numeric(
+                row, amount_spec.required_inputs[0]
+            )
+            if amount_state == "ok":
+                assert current_amount is not None
+                valid_amount_rows.append((index, row, current_amount))
+            amount_invalid_prefix.append(
+                amount_invalid_prefix[-1] + int(amount_state != "ok")
+            )
             if amount_state != "ok":
-                amount_reason = _reason_for_input(amount_state, "amount")
+                amount_reason = _reason_for_input(
+                    amount_state, amount_spec.required_inputs[0]
+                )
                 if amount_reason is None:
                     amount_reason = (
                         "INPUT_NULL",
-                        {"input": "amount"},
+                        {"input": amount_spec.required_inputs[0]},
                     )
                 amount_value = None
             else:
                 assert current_amount is not None
-                valid_amount_rows: list[tuple[dict[str, Any], float]] = []
-                for candidate in security_rows[: index + 1]:
-                    candidate_state, candidate_amount = _numeric(candidate, "amount")
-                    if candidate_state == "ok":
-                        assert candidate_amount is not None
-                        valid_amount_rows.append((candidate, candidate_amount))
-                if len(valid_amount_rows) < 20:
+                if len(valid_amount_rows) < amount_length:
                     amount_reason = (
                         "INSUFFICIENT_HISTORY",
                         {
                             "window_basis": "OBSERVED_SECURITY_BARS",
-                            "required_valid_amounts": 20,
+                            "required_valid_amounts": amount_length,
                         },
                     )
                     amount_value = None
-                    for input_row, _ in valid_amount_rows:
-                        input_rows[str(input_row["canonical_key"])] = input_row
                 else:
-                    amount_window = valid_amount_rows[-20:]
-                    for input_row, _ in amount_window:
-                        input_rows[str(input_row["canonical_key"])] = input_row
-                    mean_amount = formulas.ordered_mean([value for _, value in amount_window])
-                    amount_value = (
-                        formulas.amount_to_mean(current_amount, mean_amount)
-                        if mean_amount is not None
-                        else None
+                    amount_window = valid_amount_rows[-amount_length:]
+                    mean_amount = formulas.ordered_mean(
+                        [value for _, _, value in amount_window]
                     )
-                    amount_reason = (
-                        None
-                        if amount_value is not None
-                        else (
-                            "UNSAFE_DENOMINATOR",
-                            {"denominator": "mean(last_20_valid_amounts)"},
+                    if mean_amount is None:
+                        amount_reason = (
+                            "NON_FINITE_RESULT",
+                            {"formula": amount_spec.feature_name},
                         )
-                    )
-                    missing_amounts = (index + 1) - len(valid_amount_rows)
-                    if missing_amounts:
-                        findings.append(
-                            FeatureFinding(
-                                scope="security_daily",
-                                security_id=security_id,
-                                trade_date=trade_date,
-                                feature_name="amount_to_mean_obs_20",
-                                finding_class="OPTIONAL_INPUT_MISSING",
-                                detail_json=canonical_json(
-                                    {"skipped_invalid_or_null_amount_rows": missing_amounts}
-                                ),
+                        amount_value = None
+                    else:
+                        amount_value = formulas.amount_to_mean(current_amount, mean_amount)
+                        amount_reason = (
+                            None
+                            if amount_value is not None
+                            else (
+                                "UNSAFE_DENOMINATOR",
+                                {"denominator": "mean(last_valid_amounts)"},
                             )
                         )
-            store("amount_to_mean_obs_20", amount_value, amount_reason)
+            if len(valid_amount_rows) < amount_length:
+                amount_start = 0
+            else:
+                amount_start = valid_amount_rows[-amount_length][0]
+            _add_input_span(
+                input_rows,
+                security_rows,
+                start=amount_start,
+                end=index,
+            )
+            if len(valid_amount_rows) >= amount_length:
+                skipped_amounts = amount_invalid_prefix[index + 1] - amount_invalid_prefix[
+                    amount_start
+                ]
+                if skipped_amounts:
+                    findings.append(
+                        FeatureFinding(
+                            scope="security_daily",
+                            security_id=security_id,
+                            trade_date=trade_date,
+                            feature_name=amount_spec.feature_name,
+                            finding_class="OPTIONAL_INPUT_MISSING",
+                            detail_json=canonical_json(
+                                {
+                                    "active_input_row_count": index - amount_start + 1,
+                                    "skipped_invalid_or_null_amount_rows": skipped_amounts,
+                                }
+                            ),
+                        )
+                    )
+            store(amount_spec.feature_name, amount_value, amount_reason)
 
-            if len(valid_raw_rows) < 20:
+            volatility_spec = volatility_entry.spec
+            volatility_length = volatility_spec.window_length
+            if not isinstance(volatility_length, int) or volatility_length <= 0:
+                raise FeatureEngineError(
+                    f"{volatility_spec.feature_name} has no positive volatility window length"
+                )
+            if len(valid_raw_rows) < volatility_length:
                 volatility_reason: Reason = (
                     "INSUFFICIENT_HISTORY",
                     {
                         "window_basis": "OBSERVED_SECURITY_BARS",
-                        "required_valid_raw_returns": 20,
+                        "required_valid_raw_returns": volatility_length,
                     },
                 )
                 volatility_value = None
-                volatility_inputs = valid_raw_rows
+                volatility_start = 0
             else:
-                volatility_inputs = valid_raw_rows[-20:]
+                volatility_inputs = valid_raw_rows[-volatility_length:]
+                volatility_start = volatility_inputs[0][0]
                 volatility_value = formulas.ordered_population_std(
-                    [value for _, value in volatility_inputs]
+                    [value for _, _, value in volatility_inputs]
                 )
                 volatility_reason = (
                     None
                     if volatility_value is not None
                     else (
                         "NON_FINITE_RESULT",
-                        {"formula": "vol_raw_return_obs_20"},
+                        {"formula": volatility_spec.feature_name},
                     )
                 )
-            for input_row, _ in volatility_inputs:
-                input_rows[str(input_row["canonical_key"])] = input_row
-            if len(valid_raw_rows) != index + 1:
+            _add_input_span(
+                input_rows,
+                security_rows,
+                start=volatility_start,
+                end=index,
+            )
+            skipped_raw_returns = raw_invalid_prefix[index + 1] - raw_invalid_prefix[
+                volatility_start
+            ]
+            if skipped_raw_returns:
                 findings.append(
                     FeatureFinding(
                         scope="security_daily",
                         security_id=security_id,
                         trade_date=trade_date,
-                        feature_name="vol_raw_return_obs_20",
+                        feature_name=volatility_spec.feature_name,
                         finding_class="OPTIONAL_INPUT_MISSING",
                         detail_json=canonical_json(
-                            {"skipped_invalid_raw_return_rows": (index + 1) - len(valid_raw_rows)}
+                            {
+                                "active_input_row_count": index - volatility_start + 1,
+                                "skipped_invalid_raw_return_rows": skipped_raw_returns,
+                            }
                         ),
                     )
                 )
-            store("vol_raw_return_obs_20", volatility_value, volatility_reason)
+            store(volatility_spec.feature_name, volatility_value, volatility_reason)
 
+            if set(feature_values) != expected_feature_names:
+                raise FeatureEngineError(
+                    "compiled feature execution plan did not produce the exact security feature set"
+                )
             ordered_inputs = _ordered_unique_inputs(input_rows)
             available_at = max(item["available_at"] for item in ordered_inputs)
             if available_at > snapshot_as_of.astimezone(UTC):
@@ -693,10 +816,34 @@ def _market_features(
     snapshot_id: str,
     feature_run_id: str,
     feature_set: FeatureSet,
+    execution_plan: FeatureExecutionPlan,
 ) -> tuple[list[dict[str, Any]], list[FeatureFinding]]:
     by_date: dict[date, list[Mapping[str, Any]]] = {}
     for record in records:
         by_date.setdefault(record["trade_date"], []).append(record)
+
+    market_entries = execution_plan.market
+    specs = {entry.handler: entry.spec for entry in market_entries}
+
+    def spec_for(handler: str) -> Any:
+        try:
+            return specs[handler]
+        except KeyError as exc:  # pragma: no cover - compile plan guards this
+            raise FeatureEngineError(f"market handler {handler!r} is not planned") from exc
+
+    observed_spec = spec_for("observed_security_count")
+    valid_raw_spec = spec_for("valid_raw_return_count")
+    advancer_spec = spec_for("advancer_count")
+    decliner_spec = spec_for("decliner_count")
+    unchanged_spec = spec_for("unchanged_count")
+    advancer_ratio_spec = spec_for("advancer_ratio_observed")
+    mean_raw_spec = spec_for("mean_raw_return_observed")
+    median_raw_spec = spec_for("median_raw_return_observed")
+    valid_ma_spec = spec_for("valid_ma20_count")
+    pct_above_spec = spec_for("pct_above_ma20_observed")
+    valid_mom_spec = spec_for("valid_mom20_count")
+    pct_positive_mom_spec = spec_for("pct_positive_mom20_observed")
+    total_amount_spec = spec_for("total_amount_observed")
 
     market_rows: list[dict[str, Any]] = []
     findings: list[FeatureFinding] = []
@@ -723,11 +870,12 @@ def _market_features(
             by_date[trade_date],
             key=lambda record: str(record["security_id"]),
         )
+        raw_input = valid_raw_spec.required_inputs[0]
         raw_values = [
-            record["features"]["raw_return_1"]
+            record["features"].get(raw_input)
             for record in day_records
-            if record["features"]["raw_return_1"] is not None
-            and math.isfinite(float(record["features"]["raw_return_1"]))
+            if record["features"].get(raw_input) is not None
+            and math.isfinite(float(record["features"][raw_input]))
         ]
         observed_count = len(day_records)
         valid_raw_count = len(raw_values)
@@ -743,80 +891,94 @@ def _market_features(
             advancer_ratio = None
             mean_raw = None
             median_raw = None
-            detail = {"denominator": "valid_raw_return_count", "value": 0}
+            detail = {"denominator": valid_raw_spec.feature_name, "value": 0}
             append_missing(
                 trade_date,
-                "advancer_ratio_observed",
+                advancer_ratio_spec.feature_name,
                 "UNSAFE_DENOMINATOR",
                 detail,
             )
             append_missing(
                 trade_date,
-                "mean_raw_return_observed",
+                mean_raw_spec.feature_name,
                 "UNSAFE_DENOMINATOR",
                 detail,
             )
             append_missing(
                 trade_date,
-                "median_raw_return_observed",
+                median_raw_spec.feature_name,
                 "UNSAFE_DENOMINATOR",
                 detail,
             )
 
+        ma_input = valid_ma_spec.required_inputs[0]
         ma_records = [
-            record for record in day_records if record["features"]["ma_close_obs_20"] is not None
+            record
+            for record in day_records
+            if record["features"].get(ma_input) is not None
         ]
         valid_ma_count = len(ma_records)
         if valid_ma_count:
             pct_above_ma = formulas.safe_ratio(
-                sum(record["features"]["close_to_ma_obs_20"] > 0 for record in ma_records),
+                sum(record["features"][ma_input] > 0 for record in ma_records),
                 valid_ma_count,
             )
         else:
             pct_above_ma = None
             append_missing(
                 trade_date,
-                "pct_above_ma20_observed",
+                pct_above_spec.feature_name,
                 "UNSAFE_DENOMINATOR",
-                {"denominator": "valid_ma20_count", "value": 0},
+                {"denominator": valid_ma_spec.feature_name, "value": 0},
             )
 
+        mom_input = valid_mom_spec.required_inputs[0]
         mom_records = [
-            record for record in day_records if record["features"]["return_lag_obs_20"] is not None
+            record
+            for record in day_records
+            if record["features"].get(mom_input) is not None
         ]
         valid_mom_count = len(mom_records)
         if valid_mom_count:
             pct_positive_mom = formulas.safe_ratio(
-                sum(record["features"]["return_lag_obs_20"] > 0 for record in mom_records),
+                sum(record["features"][mom_input] > 0 for record in mom_records),
                 valid_mom_count,
             )
         else:
             pct_positive_mom = None
             append_missing(
                 trade_date,
-                "pct_positive_mom20_observed",
+                pct_positive_mom_spec.feature_name,
                 "UNSAFE_DENOMINATOR",
-                {"denominator": "valid_mom20_count", "value": 0},
+                {"denominator": valid_mom_spec.feature_name, "value": 0},
             )
 
+        amount_input = total_amount_spec.required_inputs[0]
         amount_values: list[float] = []
+        amount_states: list[str] = []
         for record in day_records:
-            state, value = _numeric(record["source_row"], "amount")
+            state, value = _numeric(record["source_row"], amount_input)
+            amount_states.append(state)
             if state == "ok":
                 assert value is not None
                 amount_values.append(value)
         total_amount = math.fsum(amount_values) if amount_values else None
         if total_amount is None or not math.isfinite(total_amount):
+            finding_class = (
+                "NON_FINITE_RESULT"
+                if "nonfinite" in amount_states
+                else "INPUT_NULL"
+            )
             append_missing(
                 trade_date,
-                "total_amount_observed",
-                "INPUT_NULL",
-                {"input": "amount", "valid_observed_amounts": 0},
+                total_amount_spec.feature_name,
+                finding_class,
+                {"input": amount_input, "valid_observed_amounts": 0},
             )
         if len(amount_values) < observed_count:
             append_missing(
                 trade_date,
-                "total_amount_observed",
+                total_amount_spec.feature_name,
                 "OPTIONAL_INPUT_MISSING",
                 {"missing_observed_amounts": observed_count - len(amount_values)},
             )
@@ -830,6 +992,21 @@ def _market_features(
             for record in day_records
         ]
         available_at = max(record["feature_available_at"] for record in day_records)
+        market_values = {
+            observed_spec.feature_name: observed_count,
+            valid_raw_spec.feature_name: valid_raw_count,
+            advancer_spec.feature_name: advancers,
+            decliner_spec.feature_name: decliners,
+            unchanged_spec.feature_name: unchanged,
+            advancer_ratio_spec.feature_name: advancer_ratio,
+            mean_raw_spec.feature_name: mean_raw,
+            median_raw_spec.feature_name: median_raw,
+            valid_ma_spec.feature_name: valid_ma_count,
+            pct_above_spec.feature_name: pct_above_ma,
+            valid_mom_spec.feature_name: valid_mom_count,
+            pct_positive_mom_spec.feature_name: pct_positive_mom,
+            total_amount_spec.feature_name: total_amount,
+        }
         market_rows.append(
             {
                 "trade_date": trade_date,
@@ -838,20 +1015,8 @@ def _market_features(
                 "feature_set_id": feature_set.feature_set_id,
                 "feature_available_at": available_at,
                 "input_lineage_hash": lineage_hash(lineage_members),
-                "universe_rule_id": UNIVERSE_RULE_ID,
-                "observed_security_count": observed_count,
-                "valid_raw_return_count": valid_raw_count,
-                "advancer_count": advancers,
-                "decliner_count": decliners,
-                "unchanged_count": unchanged,
-                "advancer_ratio_observed": advancer_ratio,
-                "mean_raw_return_observed": mean_raw,
-                "median_raw_return_observed": median_raw,
-                "valid_ma20_count": valid_ma_count,
-                "pct_above_ma20_observed": pct_above_ma,
-                "valid_mom20_count": valid_mom_count,
-                "pct_positive_mom20_observed": pct_positive_mom,
-                "total_amount_observed": total_amount,
+                "universe_rule_id": feature_set.universe_rule_id,
+                **market_values,
             }
         )
     return market_rows, findings
@@ -867,10 +1032,12 @@ def compute_feature_set(
     snapshot_as_of: datetime,
 ) -> ComputedFeatureSet:
     """Compute V1 features from one explicitly verified ReadModel world."""
-    if feature_set.feature_set_id != FEATURE_SET_ID:
+    try:
+        execution_plan = compile_feature_execution_plan(feature_set)
+    except FeatureRegistryError as exc:
         raise FeatureEngineError(
-            f"feature set {feature_set.feature_set_id!r} is not supported by the V1 engine"
-        )
+            f"feature Registry cannot be honestly executed: {exc}"
+        ) from exc
     prepared = _prepare_rows(
         readmodel_rows,
         snapshot_id=snapshot_id,
@@ -883,6 +1050,7 @@ def compute_feature_set(
         canonical_run_id=canonical_run_id,
         feature_run_id=feature_run_id,
         feature_set=feature_set,
+        execution_plan=execution_plan,
         snapshot_as_of=snapshot_as_of,
     )
     market_rows, market_findings = _market_features(
@@ -890,6 +1058,7 @@ def compute_feature_set(
         snapshot_id=snapshot_id,
         feature_run_id=feature_run_id,
         feature_set=feature_set,
+        execution_plan=execution_plan,
     )
     findings = [
         finding.as_dict()

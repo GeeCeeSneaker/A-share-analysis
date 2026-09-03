@@ -53,11 +53,15 @@ from ashare_state.features.models import (
 )
 from ashare_state.features.registry import (
     BLOCKED_FEATURE_SEMANTICS,
+    BlockedFeatureSemantic,
     FEATURE_REGISTRY_VERSION,
     FEATURE_SET_ID,
+    FeatureExecutionPlan,
+    FeatureExecutionSpec,
     FeatureRegistryError,
     FeatureSet,
     FeatureSpec,
+    compile_feature_execution_plan,
     get_feature_set,
 )
 from ashare_state.features.verifier import (
@@ -67,6 +71,7 @@ from ashare_state.features.verifier import (
 
 __all__ = [
     "BLOCKED_FEATURE_SEMANTICS",
+    "BlockedFeatureSemantic",
     "FEATURE_ARTIFACT_NAMES",
     "FEATURE_CONTRACT_VERSION",
     "FEATURE_LEDGER_COLUMNS",
@@ -78,6 +83,8 @@ __all__ = [
     "SECURITY_FEATURE_COLUMNS",
     "ComputedFeatureSet",
     "FeatureBuildResult",
+    "FeatureExecutionPlan",
+    "FeatureExecutionSpec",
     "FeatureBuilder",
     "FeatureBuilderError",
     "FeatureEngineError",
@@ -86,6 +93,7 @@ __all__ = [
     "FeatureSet",
     "FeatureSpec",
     "FeatureVerifier",
+    "compile_feature_execution_plan",
     "FeatureVerifierError",
     "VerifiedFeatureRun",
     "amplitude_preclose_raw",

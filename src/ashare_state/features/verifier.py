@@ -36,7 +36,11 @@ from ashare_state.features.models import (
     feature_id_from_base_hash,
     semantic_hash,
 )
-from ashare_state.features.registry import FeatureRegistryError, get_feature_set
+from ashare_state.features.registry import (
+    FeatureRegistryError,
+    compile_feature_execution_plan,
+    get_feature_set,
+)
 from ashare_state.readmodel import (
     READMODEL_CONTRACT_VERSION,
     DuckDBReadModel,
@@ -161,9 +165,10 @@ def _validate_rows(
     feature_set_id: str,
     snapshot_as_of: datetime,
     expected_security_columns: tuple[str, ...],
+    universe_rule_id: str,
 ) -> None:
     business_columns = expected_security_columns[9:]
-    security_keys: list[tuple[str, Any]] = []
+    security_keys: set[tuple[str, Any]] = set()
     previous_key: tuple[str, Any] | None = None
     for row in security_rows:
         if row["source_snapshot_id"] != snapshot_id:
@@ -183,7 +188,7 @@ def _validate_rows(
             raise FeatureVerifierError("feature security rows are not deterministically sorted")
         if key in security_keys:
             raise FeatureVerifierError("feature security rows have duplicate security/date keys")
-        security_keys.append(key)
+        security_keys.add(key)
         previous_key = key
         for column in business_columns:
             value = row[column]
@@ -204,7 +209,7 @@ def _validate_rows(
             raise FeatureVerifierError("feature market row carries a foreign feature_run_id")
         if row["feature_set_id"] != feature_set_id:
             raise FeatureVerifierError("feature market row carries a foreign feature_set_id")
-        if row["universe_rule_id"] != "OBSERVED_DAILY_BAR_UNIVERSE":
+        if row["universe_rule_id"] != universe_rule_id:
             raise FeatureVerifierError("feature market row carries a foreign universe rule")
         available_at = _utc_datetime(row["feature_available_at"], "feature_available_at")
         if available_at > snapshot_as_of:
@@ -272,8 +277,13 @@ class FeatureVerifier:
             )
         try:
             feature_set = get_feature_set(str(record["feature_set_id"]))
+            execution_plan = compile_feature_execution_plan(feature_set)
         except FeatureRegistryError as exc:
-            raise FeatureVerifierError(str(exc)) from exc
+            raise FeatureVerifierError(
+                f"feature Registry cannot be honestly executed: {exc}"
+            ) from exc
+        if record["error_message"] is not None:
+            raise FeatureVerifierError("SUCCESS feature ledger row carries an error_message")
 
         required_record_fields = (
             ("feature_run_id", feature_run_id),
@@ -308,7 +318,7 @@ class FeatureVerifier:
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise FeatureVerifierError(f"feature manifest is unreadable: {exc}") from exc
 
-        manifest_fields: tuple[tuple[str, str | int], ...] = (
+        manifest_fields: tuple[tuple[str, str | int | None], ...] = (
             ("feature_run_id", feature_run_id),
             ("feature_contract_version", str(record["feature_contract_version"])),
             ("feature_set_id", str(record["feature_set_id"])),
@@ -328,6 +338,9 @@ class FeatureVerifier:
                 "readmodel_builder_code_fingerprint",
                 str(record["readmodel_builder_code_fingerprint"]),
             ),
+            ("price_basis", feature_set.price_basis),
+            ("window_basis", execution_plan.manifest_window_basis),
+            ("universe_rule_id", feature_set.universe_rule_id),
             ("feature_builder_code_fingerprint", str(record["feature_builder_code_fingerprint"])),
             ("artifact_set_hash", str(record["artifact_set_hash"])),
             ("feature_semantic_hash", str(record["feature_semantic_hash"])),
@@ -336,9 +349,17 @@ class FeatureVerifier:
             ("market_row_count", int(record["market_row_count"])),
             ("finding_count", int(record["finding_count"])),
             ("status", "SUCCESS"),
+            ("error_message", None),
         )
         for field, expected_manifest_value in manifest_fields:
-            if str(manifest.get(field)) != str(expected_manifest_value):
+            if field not in manifest:
+                raise FeatureVerifierError(f"feature manifest field {field} is missing")
+            actual_manifest_value = manifest[field]
+            if expected_manifest_value is None:
+                matches = actual_manifest_value is None
+            else:
+                matches = str(actual_manifest_value) == str(expected_manifest_value)
+            if not matches:
                 raise FeatureVerifierError(
                     f"feature manifest field {field} does not match the ledger"
                 )
@@ -378,6 +399,14 @@ class FeatureVerifier:
             )
         except SnapshotVerifierError as exc:
             raise FeatureVerifierError(f"upstream snapshot cannot be verified: {exc}") from exc
+        if _utc_datetime(record["snapshot_as_of"], "snapshot_as_of") != verified_snapshot.as_of:
+            raise FeatureVerifierError(
+                "feature ledger snapshot_as_of diverges from Verified Snapshot"
+            )
+        if str(manifest["snapshot_as_of"]) != verified_snapshot.as_of.isoformat():
+            raise FeatureVerifierError(
+                "feature manifest snapshot_as_of diverges from Verified Snapshot"
+            )
         if str(verified_snapshot.ledger_record["manifest_uri"]) != str(
             manifest["snapshot_manifest_uri"]
         ):
@@ -504,6 +533,27 @@ class FeatureVerifier:
         if actual_finding_hash != str(record["finding_set_hash"]):
             raise FeatureVerifierError("feature finding set does not match the ledger")
 
+        physical_counts = {
+            "security_row_count": len(actual_rows["security_daily_features"]),
+            "market_row_count": len(actual_rows["market_daily_features"]),
+            "finding_count": len(actual_rows["feature_findings"]),
+        }
+        for field, actual_count in physical_counts.items():
+            manifest_count = manifest.get(field)
+            try:
+                if isinstance(manifest_count, bool) or int(manifest_count) != actual_count:
+                    raise FeatureVerifierError(
+                        f"feature manifest {field} does not match physical artifact rows"
+                    )
+                if isinstance(record[field], bool) or int(record[field]) != actual_count:
+                    raise FeatureVerifierError(
+                        f"feature ledger {field} does not match physical artifact rows"
+                    )
+            except (TypeError, ValueError) as exc:
+                raise FeatureVerifierError(
+                    f"feature row count field {field} is not an integer"
+                ) from exc
+
         _validate_rows(
             security_rows=actual_rows["security_daily_features"],
             market_rows=actual_rows["market_daily_features"],
@@ -538,6 +588,7 @@ class FeatureVerifier:
                 "amount_to_mean_obs_20",
                 "vol_raw_return_obs_20",
             ),
+            universe_rule_id=feature_set.universe_rule_id,
         )
         return VerifiedFeatureRun(
             feature_run_id=feature_run_id,

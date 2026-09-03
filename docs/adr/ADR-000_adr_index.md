@@ -29,7 +29,7 @@ ADR（Architecture Decision Record）记录对系统有长期影响的决策。�
 | ADR-023 | AvailabilityPolicy + Canonical Source Selection（时间可用性策略与 Canonical 源选择） | **ACCEPTED / VERIFIED** | 2026-09-02 | [ADR-023](ADR-023_availability_policy_canonical_selection.md)，CR-3（DM-20260901-068）+ CR-3.1 Amendment A（DM-20260901-069）+ CR-3.2 Amendment B（DM-20260901-070）+ CR-3.3 Amendment C（DM-20260902-071）+ CR-3.4 Amendment D（DM-20260902-072）+ CR-3.5 Amendment E（DM-20260902-073）+ CR-3.6 Amendment F（DM-20260902-074）；2026-09-02 21:24 复审裁决 VERIFIED / CLOSED / FREEZE——CR-3 全链关闭 |
 | ADR-024 | SnapshotBuilder + DuckDB ReadModel（CR-4 快照与读模型层） | ACCEPTED / VERIFIED | 2026-09-03 | [ADR-024](ADR-024_snapshot_builder_readmodel.md)，CR-4（DM-20260903-075/076/077）：CR-4 全链 VERIFIED / CLOSED / FREEZE；PR #1 已于 `a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a` 合并，CR-4.4 final review accepted |
 
-| ADR-025 | Deterministic Feature Layer / PIT / Window / Missingness Contract（CR-5） | PROPOSED | 2026-09-03 | [ADR-025](ADR-025_feature_layer_pit_missingness.md)，CR-5；静态 Feature Registry、Verified ReadModel-only input、observed-bar windows、PIT lineage、immutable feature artifacts；Reviewer closure pending |
+| ADR-025 | Deterministic Feature Layer / PIT / Window / Missingness Contract（CR-5） | PROPOSED | 2026-09-03 | [ADR-025](ADR-025_feature_layer_pit_missingness.md)，CR-5 / CR-5.1；Amendment A：Registry honest execution、Feature seal cross-binding、active missingness 与 1..66 mapping；Reviewer closure pending |
 
 ## 纪律
 

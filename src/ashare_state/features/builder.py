@@ -23,7 +23,11 @@ from ashare_state.features.models import (
     feature_id_from_base_hash,
     semantic_hash,
 )
-from ashare_state.features.registry import FeatureRegistryError, get_feature_set
+from ashare_state.features.registry import (
+    FeatureRegistryError,
+    compile_feature_execution_plan,
+    get_feature_set,
+)
 from ashare_state.readmodel import (
     READMODEL_CONTRACT_VERSION,
     DuckDBReadModel,
@@ -247,8 +251,11 @@ class FeatureBuilder:
         started = datetime.now(UTC)
         try:
             feature_set = get_feature_set(feature_set_id)
+            execution_plan = compile_feature_execution_plan(feature_set)
         except FeatureRegistryError as exc:
-            raise FeatureBuilderError(str(exc)) from exc
+            raise FeatureBuilderError(
+                f"feature Registry cannot be honestly executed: {exc}"
+            ) from exc
 
         metadata, readmodel_rows, verified_snapshot = self._load_verified_readmodel(snapshot_id)
         snapshot_record = verified_snapshot.ledger_record
@@ -365,7 +372,7 @@ class FeatureBuilder:
             "readmodel_contract_version": readmodel_contract,
             "readmodel_builder_code_fingerprint": readmodel_fingerprint,
             "price_basis": feature_set.price_basis,
-            "window_basis": "OBSERVED_SECURITY_BARS",
+            "window_basis": execution_plan.manifest_window_basis,
             "universe_rule_id": feature_set.universe_rule_id,
             "artifacts": artifacts,
             "artifact_set_hash": artifact_set_hash,
@@ -375,6 +382,7 @@ class FeatureBuilder:
             "market_row_count": len(computed.market_rows),
             "finding_count": len(computed.finding_rows),
             "status": "SUCCESS",
+            "error_message": None,
         }
         manifest_uri = feature_manifest_uri(snapshot_id, feature_run_id)
         manifest_bytes = json.dumps(

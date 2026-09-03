@@ -187,13 +187,70 @@ and exact replayed rows.
 
 ## Implementation mapping
 
-- Registry: \`src/ashare_state/features/registry.py\`
+- Registry and compiled execution plan: \`src/ashare_state/features/registry.py\`
 - Formula truth: \`features/formulas.py\` and \`features/engine.py\`
 - Builder/publicization: \`features/builder.py\`
 - Public replay verifier: \`features/verifier.py\`
 - Identity/findings: \`features/models.py\`
 - Ledger: \`migrations/023_feature_build.sql\`
-- Contract tests: \`tests/integration/test_features.py\`
+- Contract tests and CR-5.1 mandatory mapping: \`tests/integration/test_features.py\` plus the CR-5 work requirement §16.10
+
+## Amendment A — CR-5.1 Registry Honest Execution / Feature Seal Closure
+
+### Status
+
+This amendment is PROPOSED / PENDING_REVIEW. It is the focused closure
+required by the CR-5 first review. It does not change the V1 feature names or
+introduce a new migration.
+
+### Decisions
+
+1. **Registry-driven execution plan.** compile_feature_execution_plan() is
+   the only V1 execution-plan compiler. It validates the exact typed
+   blocked-semantic classification, feature-set metadata and order, every
+   FeatureSpec field, and a static exact-set formula_rule_id dispatch.
+   Every SUPPORTED declaration maps to one typed handler. A changed
+   formula, required input, window, lag, denominator, missingness,
+   availability, eligibility, output type, or unsupported extra feature is a
+   new governed contract and fails closed before feature computation or
+   artifact publication. V1 does not silently reuse the engine for a changed
+   declaration.
+
+2. **Semantic fields and counts are consumed.** The manifest fields
+   price_basis, window_basis, and universe_rule_id are cross-bound to the
+   current Registry/compiled plan. The verifier cross-binds both manifest and
+   ledger snapshot_as_of to the Verified Snapshot, requires a null
+   error_message for SUCCESS, and recomputes security, market, and finding
+   top-level counts from the physical artifact rows. Artifact entry counts
+   remain independently checked.
+
+3. **Denominator and breadth truth.** Same-row, lag, close-to-MA, and amount
+   ratios share one denominator reason path: a null or non-positive denominator
+   produces NULL + UNSAFE_DENOMINATOR; a non-finite input produces
+   NON_FINITE_RESULT. valid_ma20_count means the number of securities with
+   a non-null close_to_ma_obs_20, so pct_above_ma20_observed is null-safe
+   and its denominator is exactly the comparable set. Non-finite all-invalid
+   market amount aggregates retain a NON_FINITE_RESULT finding.
+
+4. **Active selection span.** Amount and volatility windows maintain
+   incremental valid-history and invalid-prefix state. Their
+   OPTIONAL_INPUT_MISSING findings count only invalid rows between the oldest
+   selected valid member and the target row; old gaps outside that active span
+   are excluded. The same active span is included in row lineage when it was
+   examined. Duplicate-key validation uses a set plus ordered previous-key
+   tracking.
+
+5. **Mandatory matrix evidence.** The CR-5 work requirement now carries a
+   §16.10 mapping for all original cases 1..66 to focused tests, parameter
+   cases, static guards, or the required CI matrix. A green aggregate test
+   count alone is not treated as proof of the matrix.
+
+### Consequences
+
+The FeatureBuilder and public verifier compile the same closed plan through the
+shared engine. Existing V1 artifact schema and migration 023 remain unchanged.
+CR-2, CR-3, and CR-4 remain frozen. CR-6 State and production remain blocked
+until this amendment and Reviewer closure are accepted.
 
 ## Review and exit
 
