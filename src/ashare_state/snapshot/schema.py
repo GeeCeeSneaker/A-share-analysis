@@ -479,4 +479,3 @@ def project_verified_canonical_snapshot(
         projected.sort(key=lambda row: tuple(row[name] for name in schema.stable_sort_key))
         projected_by_domain[domain] = tuple(projected)
     return projected_by_domain
-

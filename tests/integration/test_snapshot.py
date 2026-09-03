@@ -1307,4 +1307,3 @@ class TestBoundaryStructure:
             assert forbidden not in params, forbidden
         build_params = inspect.signature(SnapshotBuilder.build).parameters
         assert list(build_params) == ["self", "canonical_run_id"]
-

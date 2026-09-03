@@ -365,4 +365,3 @@ class SnapshotBuilder:
             with contextlib.suppress(Exception):
                 self.conn.execute("ROLLBACK")
             raise
-

@@ -416,4 +416,3 @@ class DuckDBReadModel:
         """Open only a ReadModel whose snapshot and logical seal verify."""
         db, _ = self._open_verified_read_only(snapshot_id)
         return db
-

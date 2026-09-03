@@ -24,6 +24,13 @@
 - mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
 
 ---
+## 2026-09-03 · CR-4.4 CI EOF 换行修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：format gate 发现前一轮临时读取过程引入了额外 EOF 换行；已按实际 GitHub blob 结尾移除该单个空白行，文件主体未改动。
+- mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
 ## 2026-09-03 · CR-4.4 CI format 修复
 
 **Implementation Status / Review Status**
