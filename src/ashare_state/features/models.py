@@ -69,9 +69,7 @@ def canonical_json(value: Any) -> str:
 
 def semantic_hash(rows: Sequence[Mapping[str, Any]]) -> str:
     """Hash rows in their already-governed deterministic physical order."""
-    return hashlib.sha256(
-        canonical_json([dict(row) for row in rows]).encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha256(canonical_json([dict(row) for row in rows]).encode("utf-8")).hexdigest()
 
 
 def lineage_hash(members: Sequence[Mapping[str, Any]]) -> str:

@@ -143,9 +143,7 @@ def _numeric(row: Mapping[str, Any], name: str) -> NumericState:
     if value is None:
         return "null", None
     if isinstance(value, bool) or not isinstance(value, int | float):
-        raise FeatureEngineError(
-            f"daily_bar input {name} has an invalid typed value: {value!r}"
-        )
+        raise FeatureEngineError(f"daily_bar input {name} has an invalid typed value: {value!r}")
     converted = float(value)
     if not math.isfinite(converted):
         return "nonfinite", None
@@ -646,10 +644,7 @@ def _security_features(
                         feature_name="vol_raw_return_obs_20",
                         finding_class="OPTIONAL_INPUT_MISSING",
                         detail_json=canonical_json(
-                            {
-                                "skipped_invalid_raw_return_rows": (index + 1)
-                                - len(valid_raw_rows)
-                            }
+                            {"skipped_invalid_raw_return_rows": (index + 1) - len(valid_raw_rows)}
                         ),
                     )
                 )
@@ -769,9 +764,7 @@ def _market_features(
             )
 
         ma_records = [
-            record
-            for record in day_records
-            if record["features"]["ma_close_obs_20"] is not None
+            record for record in day_records if record["features"]["ma_close_obs_20"] is not None
         ]
         valid_ma_count = len(ma_records)
         if valid_ma_count:
@@ -789,9 +782,7 @@ def _market_features(
             )
 
         mom_records = [
-            record
-            for record in day_records
-            if record["features"]["return_lag_obs_20"] is not None
+            record for record in day_records if record["features"]["return_lag_obs_20"] is not None
         ]
         valid_mom_count = len(mom_records)
         if valid_mom_count:
@@ -937,10 +928,7 @@ def _feature_schemas() -> dict[str, pl.Schema]:
                 ("feature_contract_version", pl.String()),
                 ("feature_available_at", pl.Datetime(time_unit="us", time_zone="UTC")),
                 ("input_lineage_hash", pl.String()),
-                *[
-                    (name, pl.Float64())
-                    for name in SECURITY_FEATURE_COLUMNS[9:]
-                ],
+                *[(name, pl.Float64()) for name in SECURITY_FEATURE_COLUMNS[9:]],
             ]
         ),
         "market_daily_features": pl.Schema(
@@ -957,10 +945,7 @@ def _feature_schemas() -> dict[str, pl.Schema]:
                 ("advancer_count", pl.Int64()),
                 ("decliner_count", pl.Int64()),
                 ("unchanged_count", pl.Int64()),
-                *[
-                    (name, pl.Float64())
-                    for name in MARKET_FEATURE_COLUMNS[13:]
-                ],
+                *[(name, pl.Float64()) for name in MARKET_FEATURE_COLUMNS[13:]],
             ]
         ),
         "feature_findings": pl.Schema(

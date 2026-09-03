@@ -85,9 +85,7 @@ class TestFeatureBoundary:
 
     def test_unknown_feature_set_fails_closed(self, conn, env_root):
         snapshot, _ = _build_feature(conn, env_root)
-        before = int(
-            conn.execute("SELECT COUNT(*) FROM meta_feature_build").fetchone()[0]
-        )
+        before = int(conn.execute("SELECT COUNT(*) FROM meta_feature_build").fetchone()[0])
         builder = FeatureBuilder(
             conn,
             raw_root=env_root["raw"],
@@ -152,9 +150,9 @@ class TestFeatureBoundary:
         _, built = _build_feature(conn, env_root)
         manifest_path = env_root["normalized"] / built.manifest_uri
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        artifact_path = env_root["normalized"] / manifest["artifacts"][
-            "security_daily_features"
-        ]["uri"]
+        artifact_path = (
+            env_root["normalized"] / manifest["artifacts"]["security_daily_features"]["uri"]
+        )
         rows = pl.read_parquet(artifact_path).to_dicts()
         rows[0]["raw_return_1"] = 123.0
         frame = pl.DataFrame(rows, schema=feature_artifact_schema("security_daily_features"))
@@ -179,14 +177,13 @@ class TestFeatureBoundary:
             [
                 *frame.to_dicts(),
                 *pl.read_parquet(
-                    env_root["normalized"]
-                    / manifest["artifacts"]["market_daily_features"]["uri"]
+                    env_root["normalized"] / manifest["artifacts"]["market_daily_features"]["uri"]
                 ).to_dicts(),
             ]
         )
-        manifest_bytes = json.dumps(
-            manifest, sort_keys=True, indent=1, ensure_ascii=False
-        ).encode("utf-8")
+        manifest_bytes = json.dumps(manifest, sort_keys=True, indent=1, ensure_ascii=False).encode(
+            "utf-8"
+        )
         manifest_path.write_bytes(manifest_bytes)
         conn.execute(
             "UPDATE meta_feature_build SET manifest_hash = ?, artifact_set_hash = ?, "
@@ -288,18 +285,10 @@ class TestFeatureFormulas:
         target = computed.security_rows[60]
         expected_ma5 = sum(row["close"] for row in rows[56:61]) / 5
         expected_lag5 = rows[60]["close"] / rows[55]["close"] - 1.0
-        expected_amount = rows[60]["amount"] / (
-            sum(row["amount"] for row in rows[41:61]) / 20
-        )
-        raw_returns = [
-            row["close"] / row["pre_close"] - 1.0 for row in rows[41:61]
-        ]
+        expected_amount = rows[60]["amount"] / (sum(row["amount"] for row in rows[41:61]) / 20)
+        raw_returns = [row["close"] / row["pre_close"] - 1.0 for row in rows[41:61]]
         expected_vol = math.sqrt(
-            sum(
-                (value - (sum(raw_returns) / 20)) ** 2
-                for value in raw_returns
-            )
-            / 20
+            sum((value - (sum(raw_returns) / 20)) ** 2 for value in raw_returns) / 20
         )
         assert target["ma_close_obs_5"] == pytest.approx(expected_ma5)
         assert target["return_lag_obs_5"] == pytest.approx(expected_lag5)

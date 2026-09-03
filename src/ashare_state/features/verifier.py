@@ -99,22 +99,16 @@ def _readmodel_rows(
     table_names = {
         str(row[0])
         for row in db.execute(
-            "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = 'main'"
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
         ).fetchall()
     }
     if "rm_daily_bar" not in table_names:
         raise FeatureVerifierError(f"snapshot {snapshot_id} has no rm_daily_bar input table")
     query = (
-        "SELECT "
-        + ", ".join(columns)
-        + " FROM rm_daily_bar "
+        "SELECT " + ", ".join(columns) + " FROM rm_daily_bar "
         "ORDER BY security_id, trade_date, canonical_key"
     )
-    rows = [
-        dict(zip(columns, row, strict=True))
-        for row in db.execute(query).fetchall()
-    ]
+    rows = [dict(zip(columns, row, strict=True)) for row in db.execute(query).fetchall()]
     metadata = {
         "snapshot_id": str(meta_row[0]),
         "canonical_run_id": str(meta_row[1]),
@@ -354,9 +348,7 @@ class FeatureVerifier:
             snapshot_semantic_hash=str(manifest["snapshot_semantic_hash"]),
             snapshot_as_of=str(manifest["snapshot_as_of"]),
             readmodel_contract_version=str(manifest["readmodel_contract_version"]),
-            readmodel_builder_code_fingerprint=str(
-                manifest["readmodel_builder_code_fingerprint"]
-            ),
+            readmodel_builder_code_fingerprint=str(manifest["readmodel_builder_code_fingerprint"]),
             feature_set_id=str(manifest["feature_set_id"]),
             feature_set_version=str(manifest["feature_set_version"]),
             feature_registry_version=str(manifest["feature_registry_version"]),
@@ -379,9 +371,7 @@ class FeatureVerifier:
                 normalized_root=self.normalized_root,
             )
         except SnapshotVerifierError as exc:
-            raise FeatureVerifierError(
-                f"upstream snapshot cannot be verified: {exc}"
-            ) from exc
+            raise FeatureVerifierError(f"upstream snapshot cannot be verified: {exc}") from exc
         if str(verified_snapshot.ledger_record["manifest_uri"]) != str(
             manifest["snapshot_manifest_uri"]
         ):

@@ -11,6 +11,12 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 Formatter CI 收口
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33743610144`（PR #2 head `85ad800`）已通过 Ruff lint 与 mypy；失败仅来自 Formatter 对 5 个 Python 文件的确定性重排。
+- 已按 Formatter 输出同步纯格式变更，未改变 Feature Layer 运行时语义；等待新 head 继续执行 pytest、Spike 与治理 gates。
+
 ## 2026-09-03 · CR-5 Ruff 导入块收口
 
 **Implementation Status / Review Status**

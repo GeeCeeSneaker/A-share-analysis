@@ -102,10 +102,7 @@ def feature_builder_code_fingerprint() -> str:
 
 
 def feature_base_dir(snapshot_id: str, feature_run_id: str) -> str:
-    return (
-        f"feature/contract={FEATURE_CONTRACT_VERSION}/"
-        f"snapshot={snapshot_id}/run={feature_run_id}"
-    )
+    return f"feature/contract={FEATURE_CONTRACT_VERSION}/snapshot={snapshot_id}/run={feature_run_id}"
 
 
 def feature_manifest_uri(snapshot_id: str, feature_run_id: str) -> str:
@@ -188,25 +185,17 @@ class FeatureBuilder:
             table_names = {
                 str(row[0])
                 for row in db.execute(
-                    "SELECT table_name FROM information_schema.tables "
-                    "WHERE table_schema = 'main'"
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
                 ).fetchall()
             }
             if "rm_daily_bar" not in table_names:
-                raise FeatureBuilderError(
-                    f"snapshot {snapshot_id} has no rm_daily_bar input table"
-                )
+                raise FeatureBuilderError(f"snapshot {snapshot_id} has no rm_daily_bar input table")
             query = (
-                "SELECT "
-                + ", ".join(columns)
-                + " FROM rm_daily_bar "
+                "SELECT " + ", ".join(columns) + " FROM rm_daily_bar "
                 "ORDER BY security_id, trade_date, canonical_key"
             )
             fetched_rows = db.execute(query).fetchall()
-            readmodel_rows = [
-                dict(zip(columns, row, strict=True))
-                for row in fetched_rows
-            ]
+            readmodel_rows = [dict(zip(columns, row, strict=True)) for row in fetched_rows]
             metadata = {
                 "snapshot_id": str(meta[0]),
                 "canonical_run_id": str(meta[1]),
@@ -463,10 +452,21 @@ class FeatureBuilder:
             row = [
                 values[column]
                 for column in FEATURE_LEDGER_COLUMNS
-                if column not in {"manifest_uri", "manifest_hash", "artifact_set_hash",
-                                  "feature_semantic_hash", "finding_set_hash",
-                                  "security_row_count", "market_row_count", "finding_count",
-                                  "status", "error_message", "started_at", "completed_at"}
+                if column
+                not in {
+                    "manifest_uri",
+                    "manifest_hash",
+                    "artifact_set_hash",
+                    "feature_semantic_hash",
+                    "finding_set_hash",
+                    "security_row_count",
+                    "market_row_count",
+                    "finding_count",
+                    "status",
+                    "error_message",
+                    "started_at",
+                    "completed_at",
+                }
             ]
             row.extend(
                 [
