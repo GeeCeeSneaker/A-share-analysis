@@ -1254,7 +1254,7 @@ Future Feature / State
 ---
 ## 13.7 CR-4.4 Correctness Closure Implementation Mapping（2026-09-03）
 
-> Implementation commit：`__INITIAL_COMMIT_SHA__`（GitHub PR head，commit object 创建后回填）；Review
+> Implementation commits：首个 CR-4.4 implementation `cad56f39fc4f8d50b2eefdae45045dd5a86237a5`；最终 CI-green head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`；Review
 > requirement：`docs/design/A-share-analysis_CR-4首批复审与CR-4.4_SnapshotDerivationReplay及ReadModelProvenance收口要求_20260903.md`。
 
 本节 supersede §13.2 中首批对 CR-4.4 之前状态的描述；不改写历史记录。
@@ -1274,5 +1274,5 @@ Future Feature / State
 - ADR-024 remains PROPOSED until Reviewer closure; CR-5 and production remain blocked/out of scope.
 
 **Verification state**
-- Implementation is complete for the scoped CR-4.4 changes; PR CI, lint, type-check, full pytest,
-  DEVLOG gate and Management-doc gate are pending and will be recorded only after GitHub Actions returns.
+- Implementation is complete for the scoped CR-4.4 changes; GitHub Actions run `33732904158` on final head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9` is green for Windows 3.12 / Windows 3.14 / Ubuntu 3.14, with **1256 passed / 0 failed per matrix**; Ruff lint, Ruff format and mypy passed.
+- Spike gates and SDK-absent passed on all three legs; Windows 3.14 also passed DEVLOG and Management-doc gates, while those two steps are workflow-skipped on the other matrix legs. Reviewer closure remains PENDING_REVIEW.

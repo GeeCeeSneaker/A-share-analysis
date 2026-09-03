@@ -176,6 +176,10 @@ target.
    ReadModel database is rebuilt from a verified Snapshot and its derived schema is not the
    project ledger schema.
 
+### Verification evidence
+
+GitHub Actions run `33732904158` on final head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9` passed on Windows 3.12, Windows 3.14 and Ubuntu 3.14. Each matrix leg reported **1256 passed / 0 failed**; Ruff lint, Ruff format, mypy, Spike gates and SDK-absent passed. The Windows 3.14 leg also passed DEVLOG and Management-doc gates; those two steps are workflow-skipped on the other legs.
+
 ### Status
 
 This amendment remains **PROPOSED** pending reviewer acceptance. CR-4.4 implementation status is

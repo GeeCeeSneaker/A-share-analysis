@@ -17,6 +17,14 @@
 
 ---
 
+## 2026-09-03 · CR-4.4 CI 完整验证与治理同步
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：最终 CR-4.4 代码 head 为 `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`；首个实现提交为 `cad56f39fc4f8d50b2eefdae45045dd5a86237a5`，中间 CI 修复均保留在 DEVLOG 历史中。
+- GitHub Actions run `33732904158` 三矩阵腿（Windows 3.12、Windows 3.14、Ubuntu 3.14）全部 success；每腿 pytest 为 **1256 passed**，Ruff lint、Ruff format、mypy、Spike gates、SDK-absent 均通过；Windows 3.14 的 DEVLOG gate 与 Management-doc gate 也通过，其他矩阵腿按 workflow 条件跳过这两项。
+- 本条同步 DEVELOPMENT_MANAGEMENT、CR-4 工作要求 §13.7 与 ADR-024 Amendment A；Reviewer closure 仍待裁决，ADR-024 保持 PROPOSED，CR-5 与生产保持 blocked/out of scope。
+
+---
 ## 2026-09-03 · CR-4.4 CI EOF format 修复
 
 **Implementation Status / Review Status**

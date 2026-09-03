@@ -7,13 +7,13 @@
 > **Reviewed Repository HEAD**：`ab0cde7db4673224518540e1974c4e918bdbbf33`（R4-A2.11/CR-1.2.7 复审基线，run 53 全三腿 success；**VERIFIED**）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：CR-4 首批 implementation `2db6d8d6cc1fef047175b1f23c80016f003eee63` + 两个 assertion-only CI fix `397ea7c`（superset winner 断言）/ `0c328c3de95c636df053a52bb5b4814fde2d14cb`（spike evidence glob 平台序）——基于 CR-3 全链 closure reviewer 基线 `ff3808b7a5036246ea11e37173aa31d863beb2d9`（CR-3.6 最终复审 VERIFIED/CLOSED/FREEZE + CR-4 启动裁决 commit，2026-09-02 21:24 +08:00；CR-3.6 implementation `1ebe96b9d28617939c2782795395ef23eee597e0` run 33623939024 三腿 success）；CR-3.5 implementation `48982290056cf88e6daafbecb7d8b8a766da6e28`（run 33601822767 三腿 success）；CR-3.4 implementation `fce2ca43a35b95d61dc390647fdc46d844d9b1a5`（run 33591527697 三腿 success）；CR-3.3 implementation `f8b80b3212ff299f52ee3fb0308c248fd16c17df`（run 33581493160 三腿 success）；CR-3.2 implementation `df409ede0ddb25ce5cee12a46fa66fe7a3ea093f`（run 33521594830 三腿 success）；CR-3.1 implementation `75744aaa89487aae09474b3569519a73f0efba24`（run 33508307611 三腿 success）；CR-3 implementation `ae5b76c998196f936ae6430408d2a016a35aec0d`（run 33498314119 三腿 success）；CR-2.4 implementation `3bc5c53d2217f2b01d26766eabe470b7bcc4d5bc`（run 33482144065 三腿 success）；CR-2.3 implementation `480dc7549bb512e9c187213e5010fab424248774`（run 33472357951 三腿 success）；CR-2.2 implementation `a06ea2202cb4f7a5ea0a91c09e666867267a8575`（run 33460094366 三腿 success）；CR-2.1 implementation `2bd0c31fa47c18b520c192265ce306f44a217fc3`（run 33398654940 三腿 success）；CR-2 implementation canonical SHA `15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 三腿 success；**SHA Correction 见下方 2026-08-31 P1-01 更正行**）；R4-B2.3 implementation `7362dfc93ab5ea6eb7ebc63c8fddb4508d7942aa` + CI fix `85a9260eb0cc07ea81c7844f661388e113575aa6`（run 33365674254 三腿 success）  
-> **Document Revision**：DM-CR-20260830-054..060 / DM-CR-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075  
-> **Last Review**：2026-09-02 21:24 +08:00（CR-3.6 最终复审：**VERIFIED / CLOSED / FREEZE——CR-3 全链关闭**（CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 全部 VERIFIED / CLOSED / FREEZE，28 项 mandatory 全 PASS，Exit Gate 21 项全过；ADR-023 → ACCEPTED；CR-4 SnapshotBuilder + DuckDB ReadModel 正式 START）；Reviewer closure commit `ff3808b7a5036246ea11e37173aa31d863beb2d9`；CR-4 首批 PENDING_REVIEW）  
+> **Current Code Baseline**：CR-4.4 correctness-closure final head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`（首个实现 `cad56f39fc4f8d50b2eefdae45045dd5a86237a5`；CI 修复链见 DEVLOG 与 DM-20260903-076/077）；CR-4 首批 implementation `2db6d8d6cc1fef047175b1f23c80016f003eee63` 及 CR-3 reviewer closure 基线沿用历史记录。
+> **Document Revision**：DM-CR-20260830-054..060 / DM-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075 / 076 / 077
+> **Last Review**：2026-09-02 21:24 +08:00（CR-3.6 最终复审：VERIFIED / CLOSED / FREEZE——CR-3 全链关闭；Reviewer closure commit `ff3808b7a5036246ea11e37173aa31d863beb2d9`）；CR-4.4 final CI evidence recorded 2026-09-03，Reviewer closure pending
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：**FULL MATRIX GREEN——run 33715493176（CR-4 首批 final `0c328c3`）三腿 success**（2026-09-03 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest（1235/0）/ Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success）；CR-4 首批 implementation `2db6d8d` 首跑 run `33707982975` 暴露 2 处**仅测试断言**的跨环境脆弱性（superset winner 跨 ingest 环境合法漂移 / spike evidence 未排序 glob 的平台序差异——NTFS 字典序 vs ext4 目录序命中 `.meta.json`），两个 assertion-only fix（`397ea7c`、`0c328c3`）后三腿全绿——**2 次修复轮次，零产品代码改动**；CR-3.6 implementation run `33623939024`（`1ebe96b`）三腿 success（2026-09-02 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest（1179/0）/ Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success；一次通过零修复轮次）；CR-3.5 implementation run `33601822767`（`4898229`）三腿 success（2026-09-02 API positive confirmation；1151/0；一次通过零修复轮次）；CR-3.4 implementation run `33591527697`（`fce2ca4`）三腿 success（2026-09-02 API positive confirmation；1136/0；一次通过零修复轮次）；CR-3.3 implementation run `33581493160`（`f8b80b3`）三腿 success（2026-09-02 API positive confirmation；1116/0；一次通过零修复轮次）；CR-3.2 implementation run `33521594830`（`df409ed`）三腿 success（2026-09-01 API positive confirmation；1096/0；一次通过零修复轮次）；CR-3.1 implementation run `33508307611`（`75744aa`）三腿 success（1066/0）；CR-3 implementation run `33498314119`（`ae5b76c`）三腿 success（1025/0）；CR-2.4 implementation run `33482144065`（`3bc5c53`）三腿 success（985/0）；CR-2.3 implementation run `33472357951`（`480dc75`）三腿 success（975/0）；CR-2.2 implementation run `33460094366`（`a06ea22`）三腿 success（955/0）；CR-2.1 implementation run `33398654940`（`2bd0c31`）三腿 success（938/0）；CR-2 implementation run `33378006770`（canonical SHA `15cdae25fd7d11e3be0da3683e821629e4226291`）三腿 success（907/0）；R4-B2.3 run `33365674254`（`7362dfc`+`85a9260`，Reviewer closure 基线）三腿 success  
+> **CI Status**：**FULL MATRIX GREEN——run 33732904158（CR-4.4 final head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`）三腿 success**（2026-09-03 API positive confirmation：Windows 3.12 / Windows 3.14 / Ubuntu 3.14 各通过 Ruff lint、Ruff format、Mypy、Pytest（1256/0）、Spike gates 与 SDK-absent；Windows 3.14 的 DEVLOG gate 与 Management-doc gate success，其他两腿按 workflow 条件 skipped）。
 > **Phase Status（2026-09-03，CR-4 首批交付同步）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-022 ACCEPTED）**；CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-023 ACCEPTED——2026-09-02 21:24 复审裁决）**；CR-4 → **IN_PROGRESS（首批 DONE / PENDING_REVIEW：CR-4.1 canonical 公共消费验证器 + CR-4.2 SnapshotBuilder（migration 022）+ CR-4.3 DuckDB ReadModel；ADR-024 PROPOSED；含 CR-3 latent 缺陷（multi-domain semantic seal）显式申报修复——提请复审一并裁决）**；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-022 ACCEPTED）**；CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 → **VERIFIED / CLOSED / FREEZE（不重开；ADR-023 ACCEPTED——2026-09-02 21:24 复审裁决）**；CR-4 → **IN_PROGRESS（CR-4.4 scoped implementation DONE / PENDING_REVIEW；final CI run 33732904158 三腿 success；ADR-024 PROPOSED）**；Production P0-M-1B → BLOCKED independently（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-31 17:42，Reviewer CR-2 复审 P1-01）**：CR-2 批次头部与 Implementation Mapping 曾记录 implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`——该 SHA 非真实 implementation commit；以 GitHub commit object 为准：`15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 关联 commit）。历史条目原文保留，CR-2 工作要求文档已追加 §12 更正。  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。**Count Correction（2026-08-31，CR-2 复审 P1-02）**：ADR-022 §2.2 曾写"9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER"——该批实际 10/4，且 14 条未覆盖 index_daily 等 capability surface；CR-2.1 后 registry 为 **18 条（11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE，runtime exact-set 统计）**，已随 ADR-022 Amendment A §6.1 更正，历史保留。  
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
@@ -1113,7 +1113,7 @@ Evidence/Log/Exception 必须 scrub secret。
 ## CR-4 SnapshotBuilder + DuckDB ReadModel（IN_PROGRESS——CR-4.4 ACTIVE / PENDING_REVIEW）
 
 CR-3 全链 VERIFIED / CLOSED / FREEZE（2026-09-02 21:24 复审裁决，ADR-023 ACCEPTED）后正式启动。
-首批（DM-20260903-075，工作要求
+首批（DM-20260903-075；CR-4.4 closure DM-20260903-076/077；工作要求
 `docs/design/A-share-analysis_CR-4_SnapshotBuilder及DuckDBReadModel开发工作要求_20260902.md`
 + `A-share-analysis_CR-3.6最终复审结论与CR-4启动裁决_20260902.md`）：
 
@@ -2400,6 +2400,15 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 > 新条目倒序追加，不删除历史。
 
+## DM-20260903-077 — CR-4.4 CI 验证与治理同步
+
+**Type**：C4 correctness closure verification / governance synchronization
+**Status**：DONE / PENDING_REVIEW
+**Evidence**：GitHub Actions run `33732904158` 对 CR-4.4 final head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9` 三腿 success；每腿 pytest 1256 passed。
+**Governance Sync**：同步 DEVLOG、CR-4 工作要求 §13.7、ADR-024 Amendment A 与本总册；不改变 ADR-024 PROPOSED、CR-5 blocked、production independently blocked 的状态。
+**Commit**：本次治理同步提交；代码证据锚定 `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`。
+**Reviewer**：PENDING_REVIEW
+
 ## DM-20260903-076 — CR-4.4 Snapshot 回放、不可变写入与 ReadModel provenance 收口
 
 **Type**：C4 correctness closure（CR-4 首批复审 reopen；ADR-024 Amendment A PROPOSED）  
@@ -2416,9 +2425,9 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 
 **Schema / Contract**：migration 022 unchanged；derived ReadModel schema change is per-build and does not add project migration 023。  
 **Affected Modules**：`src/ashare_state/snapshot/schema.py`、`snapshot/builder.py`、`snapshot/verifier.py`、`snapshot/__init__.py`、`src/ashare_state/canonical/canonicalizer.py`、`canonical/verifier.py`、`src/ashare_state/readmodel/duckdb_model.py`、`readmodel/__init__.py`、focused integration tests、ADR-024、DEVLOG、CR-4 work requirement §13.7。  
-**Tests**：在既有 CR-4 首批回归基础上增加 CR-4.4 对抗测试；具体数量以 PR CI 正向结果为准。  
-**Verification**：PR CI pending；不把实现完成误报为审计 VERIFIED。  
-**Commit**：`__INITIAL_COMMIT_SHA__`（待 GitHub commit object 创建后回填）  
+**Tests**：GitHub Actions run 33732904158 三腿 pytest 均为 **1256 passed / 0 failed**；新增 CR-4.4 focused adversarial tests 已纳入该总数。
+**Verification**：GitHub Actions **run 33732904158（final head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`）三腿 success**；Windows 3.12 / Windows 3.14 / Ubuntu 3.14 的 Ruff lint、Ruff format、mypy、pytest、Spike gates、SDK-absent 均通过；Windows 3.14 的 DEVLOG gate 与 Management-doc gate 通过。
+**Commit**：CR-4.4 final code head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`（首个实现 `cad56f39fc4f8d50b2eefdae45045dd5a86237a5`；CI 修复链见 DEVLOG）。
 **Reviewer**：PENDING_REVIEW
 
 ## DM-20260903-075 — CR-4 首批：Canonical 公共消费验证器 + SnapshotBuilder + DuckDB ReadModel
