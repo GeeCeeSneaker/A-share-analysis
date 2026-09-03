@@ -945,7 +945,14 @@ def _feature_schemas() -> dict[str, pl.Schema]:
                 ("advancer_count", pl.Int64()),
                 ("decliner_count", pl.Int64()),
                 ("unchanged_count", pl.Int64()),
-                *[(name, pl.Float64()) for name in MARKET_FEATURE_COLUMNS[13:]],
+                ("advancer_ratio_observed", pl.Float64()),
+                ("mean_raw_return_observed", pl.Float64()),
+                ("median_raw_return_observed", pl.Float64()),
+                ("valid_ma20_count", pl.Int64()),
+                ("pct_above_ma20_observed", pl.Float64()),
+                ("valid_mom20_count", pl.Int64()),
+                ("pct_positive_mom20_observed", pl.Float64()),
+                ("total_amount_observed", pl.Float64()),
             ]
         ),
         "feature_findings": pl.Schema(

@@ -11,6 +11,12 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 market schema 类型修复
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33744781189` 已定位失败字段为 `valid_ma20_count` 与 `valid_mom20_count`；其余 replay 与全量测试保持通过。
+- market artifact schema 已改为逐列声明：breadth ratio/均值/中位数/百分比/金额为 Float64，`valid_ma20_count` 与 `valid_mom20_count` 为 Int64，并加入回归断言；等待完整 CI 重跑。
+
 ## 2026-09-03 · CR-5 market replay 差异诊断
 
 **Implementation Status / Review Status**

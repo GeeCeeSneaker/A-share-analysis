@@ -61,6 +61,16 @@ class TestFeatureBoundary:
         assert built.market_row_count == 1
         assert built.finding_count > 0
 
+        manifest = json.loads(
+            (env_root["normalized"] / built.manifest_uri).read_text(encoding="utf-8")
+        )
+        market_frame = pl.read_parquet(
+            env_root["normalized"] / manifest["artifacts"]["market_daily_features"]["uri"]
+        )
+        assert market_frame.schema["advancer_ratio_observed"] == pl.Float64
+        assert market_frame.schema["valid_ma20_count"] == pl.Int64
+        assert market_frame.schema["valid_mom20_count"] == pl.Int64
+
         verified = verify_feature_run_for_consumption(
             conn,
             built.feature_run_id,
