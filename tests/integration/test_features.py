@@ -921,9 +921,7 @@ class TestFeatureRecoverablePublication:
         monkeypatch.setattr(
             builder,
             "_commit_ledger",
-            lambda **kwargs: (_ for _ in ()).throw(
-                RuntimeError("injected ledger commit failure")
-            ),
+            lambda **kwargs: (_ for _ in ()).throw(RuntimeError("injected ledger commit failure")),
         )
         with pytest.raises(RuntimeError, match="ledger commit failure"):
             builder.build(snapshot.snapshot_id, FEATURE_SET_ID)
@@ -941,9 +939,7 @@ class TestFeatureRecoverablePublication:
         monkeypatch.setattr(
             builder,
             "_commit_ledger",
-            lambda **kwargs: (_ for _ in ()).throw(
-                RuntimeError("injected ledger commit failure")
-            ),
+            lambda **kwargs: (_ for _ in ()).throw(RuntimeError("injected ledger commit failure")),
         )
         with pytest.raises(RuntimeError):
             builder.build(snapshot.snapshot_id, FEATURE_SET_ID)
@@ -964,9 +960,7 @@ class TestFeatureRecoverablePublication:
         monkeypatch.setattr(
             builder,
             "_commit_ledger",
-            lambda **kwargs: (_ for _ in ()).throw(
-                RuntimeError("injected ledger commit failure")
-            ),
+            lambda **kwargs: (_ for _ in ()).throw(RuntimeError("injected ledger commit failure")),
         )
         with pytest.raises(RuntimeError):
             builder.build(snapshot.snapshot_id, FEATURE_SET_ID)

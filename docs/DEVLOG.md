@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 CI formatter correction
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 159 的三条矩阵腿均通过 Ruff lint，但 formatter 发现 engine.py 两处可压缩异常抛出和 test_features.py 三处可压缩 lambda。
+- 已按 formatter 的确定性输出完成最小格式修正；不改变 feature registry、计算、验证或恢复语义，等待后续 lint/type/pytest/governance gates。
+
+**Next**
+- 复跑完整 CI；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 CI lint correction
 
 **Implementation Status / Review Status**

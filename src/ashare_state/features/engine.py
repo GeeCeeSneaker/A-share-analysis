@@ -611,9 +611,7 @@ def _security_features(
                 spec = entry.spec
                 lag = spec.lag
                 if not isinstance(lag, int) or lag <= 0:
-                    raise FeatureEngineError(
-                        f"{spec.feature_name} has no positive observed lag"
-                    )
+                    raise FeatureEngineError(f"{spec.feature_name} has no positive observed lag")
                 value, reason, inputs = _lag_close_feature(
                     security_rows,
                     index=index,
@@ -1035,9 +1033,7 @@ def compute_feature_set(
     try:
         execution_plan = compile_feature_execution_plan(feature_set)
     except FeatureRegistryError as exc:
-        raise FeatureEngineError(
-            f"feature Registry cannot be honestly executed: {exc}"
-        ) from exc
+        raise FeatureEngineError(f"feature Registry cannot be honestly executed: {exc}") from exc
     prepared = _prepare_rows(
         readmodel_rows,
         snapshot_id=snapshot_id,
