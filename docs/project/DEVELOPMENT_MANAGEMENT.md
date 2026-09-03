@@ -1097,7 +1097,7 @@ Evidence/Log/Exception 必须 scrub secret。
 | CR-3.4 Historical Canonical Seal Trust + Verification Replay Symmetry + Manifest Identity Binding | DONE | **REOPENED（已吸收，原定 3 P0 PASS/FREEZE）** | 14 项机制 PASS / FREEZE（2026-09-02 13:17 复审）；2 新 P0 由 CR-3.5 收口 |
 | CR-3.5 Historical Candidate Discovery + Derived Run/Status Seal | DONE | **REOPENED** | derived run/status seal PASS / FREEZE——21 项机制（2026-09-02 17:36 复审）；2 新 P0 由 CR-3.6 收口 |
 | CR-3.6 Selection-Free Historical Discovery + Historical Artifact Closure | DONE | **VERIFIED / CLOSED / FREEZE** | 2026-09-02 21:24 复审最终裁决（28 mandatory 全 PASS）；CR-3 全链关闭 |
-| CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild | IN_PROGRESS | 首批 PENDING_REVIEW | **当前批次**（CR-4.1 消费验证器 + CR-4.2 SnapshotBuilder（migration 022）+ CR-4.3 ReadModel；ADR-024 PROPOSED；含 CR-3 latent 缺陷显式申报修复） |
+| CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild | IN_PROGRESS | **CR-4.4 ACTIVE / PENDING_REVIEW** | **当前最高优先级**（CR-4.1/4.2/4.3 首批已实现；CR-4.4 收口确定性回放、可恢复 immutable、key binding、physical schema hash、ReadModel verified-open；ADR-024 Amendment A PROPOSED） |
 | R4-CI | PLANNED | PENDING | Next |
 | CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 后 |
 | CR-4 Snapshot + Read Model Rebuild | PLANNED | PENDING | CR-3 后 |
@@ -1110,12 +1110,20 @@ Evidence/Log/Exception 必须 scrub secret。
 
 # 41. 当前最高优先级
 
-## CR-4 SnapshotBuilder + DuckDB ReadModel（IN_PROGRESS——首批 DONE / PENDING_REVIEW）
+## CR-4 SnapshotBuilder + DuckDB ReadModel（IN_PROGRESS——CR-4.4 ACTIVE / PENDING_REVIEW）
 
 CR-3 全链 VERIFIED / CLOSED / FREEZE（2026-09-02 21:24 复审裁决，ADR-023 ACCEPTED）后正式启动。
 首批（DM-20260903-075，工作要求
 `docs/design/A-share-analysis_CR-4_SnapshotBuilder及DuckDBReadModel开发工作要求_20260902.md`
 + `A-share-analysis_CR-3.6最终复审结论与CR-4启动裁决_20260902.md`）：
+
+CR-4.4（2026-09-03 复审 reopen）当前只处理以下 correctness closure：SnapshotBuilder 与
+`verify_snapshot` 共用确定性 canonical projection replay；immutable artifact 采用 identical
+no-op / missing-write / different-byte conflict 并在写入前整体 preflight；registry 加入显式
+KeyBinding 与 stable sort；Canonical/Snapshot verifier 使用已校验的同一 Parquet bytes，Snapshot
+schema_hash 从 physical schema 重算；ReadModel 增加双 fingerprint、canonical_as_of/full
+domain_meta seal，并在 `open_read_only` 返回句柄前完成 verified-open。migration 022 不改；
+CR-5、Feature/State、provider/fallback/production 仍不在范围内。
 
 ```text
 CR-4.1 Canonical 公共消费验证器（canonical/verifier.py）：
@@ -1965,6 +1973,15 @@ Acceptance：
 → key / row / aggregate 一致
 ```
 
+CR-4.4 additional closure：
+
+```text
+canonical selected rows → shared registry projection replay
+→ exact expected artifact rows (including zero-row domains)
+→ physical bytes/schema/semantic/aggregate verification
+→ verified Snapshot → verified-open ReadModel
+```
+
 ---
 
 # 47. Mock Vertical Slice
@@ -2382,6 +2399,27 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-20260903-076 — CR-4.4 Snapshot 回放、不可变写入与 ReadModel provenance 收口
+
+**Type**：C4 correctness closure（CR-4 首批复审 reopen；ADR-024 Amendment A PROPOSED）  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：2026-09-03 CR-4 首批复审要求收口 P0-01 deterministic canonical projection、P0-02 recoverable immutable write、P0-03 explicit key binding、P0-04 physical schema hash / same-byte materialization、P0-05 ReadModel provenance + verified-open。  
+**Scope**：仅上述五项与 focused tests、ADR-024 Amendment A、DEVLOG、工作要求 §13.7；migration 022 不改；CR-5、Feature/State、provider/fallback/production 不在范围内。
+
+**Implementation**
+- Snapshot schema registry 新增 `KeyBinding` 与 `stable_sort_key`；新增共享 `project_verified_canonical_snapshot`，Builder/verifier 完全共用。
+- Snapshot verifier 对每个物理 artifact 的 expected canonical projection 做 exact row/semantic 比对；业务值或 lineage 连同 manifest/ledger seals rebound 仍 DAMAGED。
+- immutable writer 支持 identical no-op、missing write、different-byte conflict；全计划 preflight，manifest LAST；ledger commit crash 与 partial residue 可 exact retry。
+- Canonical/Snapshot verifier 从已 hash-verify 的同一 bytes 解析 Parquet；Snapshot schema_hash physical recompute；公共 canonical verifier 复用已物化 selected rows。
+- ReadModel meta 增加 snapshot/readmodel builder fingerprints；logical seal 检查 canonical_as_of、完整 domain_meta snapshot binding；`open_read_only` / `verify_readmodel` 执行 verified-open。
+
+**Schema / Contract**：migration 022 unchanged；derived ReadModel schema change is per-build and does not add project migration 023。  
+**Affected Modules**：`src/ashare_state/snapshot/schema.py`、`snapshot/builder.py`、`snapshot/verifier.py`、`snapshot/__init__.py`、`src/ashare_state/canonical/canonicalizer.py`、`canonical/verifier.py`、`src/ashare_state/readmodel/duckdb_model.py`、`readmodel/__init__.py`、focused integration tests、ADR-024、DEVLOG、CR-4 work requirement §13.7。  
+**Tests**：在既有 CR-4 首批回归基础上增加 CR-4.4 对抗测试；具体数量以 PR CI 正向结果为准。  
+**Verification**：PR CI pending；不把实现完成误报为审计 VERIFIED。  
+**Commit**：`__INITIAL_COMMIT_SHA__`（待 GitHub commit object 创建后回填）  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-20260903-075 — CR-4 首批：Canonical 公共消费验证器 + SnapshotBuilder + DuckDB ReadModel
 

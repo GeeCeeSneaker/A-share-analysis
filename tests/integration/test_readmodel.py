@@ -1,5 +1,5 @@
 """CR-4.3 DuckDB ReadModel integration tests (work requirement audit
-20260902 section 6, mandatory 31-42).
+20260902 section 6, CR-4.4 verified-open closure).
 
 Reuses the CR-4.2 test harness (seeding helpers + snapshot build) from
 ``test_snapshot``.
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import duckdb
 import pytest
 from test_snapshot import (
     ALL_DOMAINS,
@@ -24,6 +25,7 @@ from ashare_state.readmodel import (
     READMODEL_CONTRACT_VERSION,
     DuckDBReadModel,
     ReadModelError,
+    readmodel_builder_code_fingerprint,
     readmodel_db_uri,
 )
 from ashare_state.readmodel.duckdb_model import _normalize_seal_row
@@ -189,15 +191,20 @@ class TestDuckDBReadModel:
         try:
             meta = db.execute(
                 "SELECT snapshot_id, snapshot_contract_version, canonical_run_id, "
-                "requested_domains, readmodel_contract_version FROM rm_snapshot_meta"
+                "canonical_as_of, requested_domains, readmodel_contract_version, "
+                "snapshot_builder_code_fingerprint, readmodel_builder_code_fingerprint "
+                "FROM rm_snapshot_meta"
             ).fetchone()
             assert meta[0] == built.snapshot_id
             assert str(meta[1]) == str(manifest["snapshot_contract_version"])
             assert str(meta[2]) == built.canonical_run_id
+            assert meta[3].astimezone(UTC) == AS_OF_LATE
             import json
 
-            assert list(json.loads(str(meta[3]))) == ["daily_bar"]
-            assert str(meta[4]) == READMODEL_CONTRACT_VERSION
+            assert list(json.loads(str(meta[4]))) == ["daily_bar"]
+            assert str(meta[5]) == READMODEL_CONTRACT_VERSION
+            assert str(meta[6]) == str(manifest["snapshot_builder_code_fingerprint"])
+            assert str(meta[7]) == readmodel_builder_code_fingerprint()
             dmeta = db.execute(
                 "SELECT domain, artifact_uri, row_count, semantic_hash FROM rm_domain_meta"
             ).fetchone()
@@ -278,6 +285,86 @@ class TestDuckDBReadModel:
 
         with pytest.raises(ReadModelError, match="has not been built"):
             _model(conn, env_root).open_read_only(str(uuid.uuid4()))
+
+
+    def test_verified_open_rejects_canonical_as_of_drift(self, conn, env_root):
+        """A foreign canonical_as_of in an otherwise readable DB is refused."""
+        built = _built_snapshot(conn, env_root)
+        model = _model(conn, env_root)
+        model.rebuild(built.snapshot_id)
+        target = env_root["normalized"] / readmodel_db_uri(built.snapshot_id)
+        db = duckdb.connect(str(target))
+        try:
+            db.execute(
+                "UPDATE rm_snapshot_meta SET canonical_as_of = "
+                "TIMESTAMPTZ '2020-01-01 00:00:00+00'"
+            )
+        finally:
+            db.close()
+        with pytest.raises(ReadModelError, match="canonical_as_of"):
+            model.open_read_only(built.snapshot_id)
+
+
+    def test_verified_open_rejects_foreign_domain_meta(self, conn, env_root):
+        """Every domain metadata row must bind to this snapshot id."""
+        built = _built_snapshot(conn, env_root)
+        model = _model(conn, env_root)
+        model.rebuild(built.snapshot_id)
+        target = env_root["normalized"] / readmodel_db_uri(built.snapshot_id)
+        db = duckdb.connect(str(target))
+        try:
+            db.execute(
+                "UPDATE rm_domain_meta SET snapshot_id = 'foreign-snapshot'"
+            )
+        finally:
+            db.close()
+        with pytest.raises(ReadModelError, match="foreign snapshot_id"):
+            model.open_read_only(built.snapshot_id)
+
+
+    def test_verified_open_rejects_logical_row_tamper(self, conn, env_root):
+        """A changed table value is rejected before a read-only handle escapes."""
+        built = _built_snapshot(conn, env_root)
+        model = _model(conn, env_root)
+        model.rebuild(built.snapshot_id)
+        target = env_root["normalized"] / readmodel_db_uri(built.snapshot_id)
+        db = duckdb.connect(str(target))
+        try:
+            db.execute("UPDATE rm_daily_bar SET close = 999.0")
+        finally:
+            db.close()
+        with pytest.raises(ReadModelError, match="logical semantic hash"):
+            model.open_read_only(built.snapshot_id)
+
+
+    def test_verified_open_rejects_foreign_snapshot_file(self, conn, env_root):
+        """A database copied from another snapshot cannot be opened under A."""
+        first_run = _canonical_success(conn, env_root, domains=("daily_bar",))
+        first = _builder(conn, env_root).build(first_run.canonical_run_id)
+        _seed_bars(
+            conn,
+            env_root,
+            "req-new-bars",
+            received_at=datetime(2026, 8, 31, 0, 0, 1, tzinfo=UTC),
+        )
+        second_run = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+        assert second_run.status == "SUCCESS"
+        second = _builder(conn, env_root).build(second_run.canonical_run_id)
+        model = _model(conn, env_root)
+        model.rebuild(first.snapshot_id)
+        model.rebuild(second.snapshot_id)
+        target_a = env_root["normalized"] / readmodel_db_uri(first.snapshot_id)
+        target_b = env_root["normalized"] / readmodel_db_uri(second.snapshot_id)
+        target_a.write_bytes(target_b.read_bytes())
+        with pytest.raises(ReadModelError, match="snapshot_id|semantic"):
+            model.open_read_only(first.snapshot_id)
+
+
+    def test_verify_readmodel_green(self, conn, env_root):
+        built = _built_snapshot(conn, env_root)
+        model = _model(conn, env_root)
+        model.rebuild(built.snapshot_id)
+        assert model.verify_readmodel(built.snapshot_id).snapshot_id == built.snapshot_id
 
     def test_superset_snapshot_both_models_coexist(self, conn, env_root):
         """Additional: two snapshots' read models coexist

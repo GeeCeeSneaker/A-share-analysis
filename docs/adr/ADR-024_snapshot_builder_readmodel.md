@@ -77,3 +77,107 @@ migrations/022_snapshot_build.sql         meta_snapshot_build
 ## Testing
 
 1235/0（1179 → 1235，+56：`test_snapshot.py` 44（consumption verifier 10 / builder 21 / schema projection 3 / boundary 10（含 parametrize））/ `test_readmodel.py` 11 / `test_canonical.py` 多 domain replay 回归 1；migration 测试更新至 22 链）。mandatory 1-50 全对应（见 CR-4 工作要求 Implementation Mapping）。
+
+---
+## Amendment A — CR-4.4 Correctness Closure（2026-09-03，PROPOSED）
+
+### Trigger and scope
+
+The CR-4 first-batch review reopened CR-4.4 because the initial implementation did not yet
+prove deterministic projection lineage, recoverable immutable publication, explicit natural-key
+bindings, physical schema-hash recomputation, or verified ReadModel opening. This amendment is
+limited to those closure points. It does not introduce Feature / State / return / indicator
+semantics, multi-run snapshots, provider expansion, fallback behavior, or production enablement.
+Migration 022 remains unchanged; the ReadModel schema is a derived per-snapshot artifact and
+does not require a project migration.
+
+### A.1 One deterministic Snapshot projection
+
+`project_verified_canonical_snapshot(verified_canonical, snapshot_id=...)` in
+`src/ashare_state/snapshot/schema.py` is the single projection/replay helper. It:
+
+1. groups only the rows delivered by the verified public canonical consumption boundary;
+2. checks requested-domain membership and exact supported schema;
+3. projects every row through the registry with strict types and the PIT rule;
+4. validates explicit key bindings and key uniqueness; and
+5. emits each domain in the registry's stable sort order.
+
+SnapshotBuilder and `verify_snapshot` both call this helper. Verification compares the
+materialized artifact rows, including zero-row domains, with the replayed expected rows using
+canonical row serialization and the expected semantic seal. Therefore rebinding an artifact's
+business values or lineage fields together with its content, semantic, aggregate, manifest, and
+ledger seals still produces DAMAGED.
+
+### A.2 Recoverable immutable publication
+
+The file contract is now:
+
+- missing deterministic path: write the expected bytes;
+- existing path with identical bytes: no-op;
+- existing path with different bytes, or a directory at the file path: conflict;
+- preflight every artifact and the manifest before writing any path;
+- write the manifest last; then commit the ledger.
+
+There is no delete, overwrite, random suffix, or latest-pointer fallback. A ledger-commit
+failure or partial identical residue can be retried exactly; a conflicting residue remains a
+hard error.
+
+### A.3 Explicit natural-key bindings
+
+The registry now records `KeyBinding` values and a `stable_sort_key`:
+
+- `trade_calendar`: key[0] = `market`, key[1] = `trade_date`;
+- `daily_bar`, `security_status`, `limit_price`: key[0] = `security_id`, key[1] =
+  `trade_date`;
+- `adj_factor`: key[0] = `security_id`, key[1] = `trade_date`; key[2] remains the typed
+  `factor_type` key projection.
+
+The builder and verifier reject a row whose typed identity fields disagree with its
+`canonical_key`, even when JSON shape and arity are valid.
+
+### A.4 Same-byte verification
+
+The canonical shared artifact verifier and the Snapshot verifier parse Parquet from the exact
+bytes whose hashes they verified, and the public canonical consumption boundary reuses those
+materialized rows instead of rereading the mutable path. Snapshot schema hashes are recomputed
+from the physical frame and compared with the manifest before aggregate recomputation. This is
+a correctness hotfix to the CR-3 shared verifier path; no new semantic rule is introduced.
+
+### A.5 ReadModel provenance and verified-open
+
+`rm_snapshot_meta` now carries both
+`snapshot_builder_code_fingerprint` and `readmodel_builder_code_fingerprint`. The ReadModel
+fingerprint is SHA-256 over the line-ending-normalized UTF-8 source of exactly these modules, in
+this order:
+
+1. `ashare_state.snapshot.schema`;
+2. `ashare_state.readmodel.schema`;
+3. `ashare_state.readmodel.duckdb_model`.
+
+`_validate_logical_seal` now checks canonical_as_of, both fingerprints, the full snapshot
+metadata row, and every `rm_domain_meta.snapshot_id` / domain binding. `open_read_only`
+performs Snapshot verification and logical-seal validation on the same opened DuckDB file
+before returning a handle; `verify_readmodel` provides the explicit verification-only path.
+A foreign, copied, or table-tampered database is therefore refused. Rebuild still follows
+temp database → logical seal → atomic replace, so a failed rebuild preserves the previous
+target.
+
+### Alternatives considered
+
+1. Rebind only the manifest and outer ledger hashes: rejected because it proves bookkeeping
+   consistency, not that the Snapshot is a projection of canonical truth.
+2. Keep the directory-residue fail-closed rule: rejected because it makes a recoverable
+   ledger-commit crash permanently manual-repair-only and violates exact retry semantics.
+3. Validate only key JSON shape: rejected because arity/string checks do not bind key components
+   to their typed row identity.
+4. Trust `open_read_only` after checking file existence: rejected because a readable DuckDB
+   file can be foreign or logically tampered.
+5. Add a new persistent migration for derived ReadModel metadata: rejected for CR-4.4; the
+   ReadModel database is rebuilt from a verified Snapshot and its derived schema is not the
+   project ledger schema.
+
+### Status
+
+This amendment remains **PROPOSED** pending reviewer acceptance. CR-4.4 implementation status is
+DONE only for the scoped correctness closure; CR-5 and production remain out of scope and
+blocked as specified by the review requirements.

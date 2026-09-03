@@ -1250,3 +1250,29 @@ Future Feature / State
 [x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 + Ruff/format/Mypy/governance gates          -> run 33715493176 三腿 success（2026-09-03 API positive confirmation；2 次 assertion-only 修复轮次，零产品代码改动——见 §13.6）
 [ ] Reviewer 复审裁决（含 CR-3 latent 缺陷修复的追认）                                      -> PENDING_REVIEW
 ```
+
+---
+## 13.7 CR-4.4 Correctness Closure Implementation Mapping（2026-09-03）
+
+> Implementation commit：`__INITIAL_COMMIT_SHA__`（GitHub PR head，commit object 创建后回填）；Review
+> requirement：`docs/design/A-share-analysis_CR-4首批复审与CR-4.4_SnapshotDerivationReplay及ReadModelProvenance收口要求_20260903.md`。
+
+本节 supersede §13.2 中首批对 CR-4.4 之前状态的描述；不改写历史记录。
+
+| 复审 blocker | 实现映射 | focused regression |
+|---|---|---|
+| P0-01 deterministic projection / lineage | `snapshot/schema.py::project_verified_canonical_snapshot`；Builder 与 `verify_snapshot` 共用；expected rows exact compare，支持 zero-row domain | `test_verify_snapshot_business_tamper_with_rebound_seals`；`test_verify_snapshot_lineage_tamper_with_rebound_seals` |
+| P0-02 recoverable immutable write | `snapshot/builder.py` preflight + identical no-op / missing write / conflict；manifest LAST；ledger commit 后置 | `test_crash_residue_directory_recovers`；`test_partial_residue_recovers`；`test_conflicting_residue_refuses` |
+| P0-03 explicit key bindings | registry `KeyBinding` + trade_calendar/security domains/adj_factor bindings + registry stable sort | `test_explicit_key_bindings_fail_closed`；`test_adj_factor_projection_is_typed_key_component` |
+| P0-04 same-byte / physical schema | canonical shared verifier + public consumer reuse exact bytes；Snapshot physical `schema_hash` recompute | `test_verify_snapshot_schema_hash_is_physical` |
+| P0-05 ReadModel provenance / verified-open | `rm_snapshot_meta` dual fingerprints；logical seal validates as_of/full domain binding；`open_read_only` and `verify_readmodel` verify before handle/return | `test_verified_open_rejects_canonical_as_of_drift`；`test_verified_open_rejects_foreign_domain_meta`；`test_verified_open_rejects_logical_row_tamper`；`test_verified_open_rejects_foreign_snapshot_file` |
+
+**Contract decisions**
+- Migration 022 remains untouched; no migration 023 is introduced for derived ReadModel metadata.
+- Existing identical Snapshot bytes are accepted as immutable replay no-ops; different bytes are
+  conflicts. A ledger-commit failure leaves deterministic residue that an exact retry can complete.
+- ADR-024 remains PROPOSED until Reviewer closure; CR-5 and production remain blocked/out of scope.
+
+**Verification state**
+- Implementation is complete for the scoped CR-4.4 changes; PR CI, lint, type-check, full pytest,
+  DEVLOG gate and Management-doc gate are pending and will be recorded only after GitHub Actions returns.

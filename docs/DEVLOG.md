@@ -17,6 +17,46 @@
 
 ---
 
+## 2026-09-03 · CR-4.4 Snapshot 回放、不可变写入与 ReadModel provenance 收口
+
+**Trigger**
+- CR-4 首批复审将 CR-4.4 重新打开：首版只能证明“自有 seals 一致”，尚未证明 Snapshot 行是
+  `VerifiedCanonicalRun.selected_rows` 的确定性投影；写入残留不可恢复；key 只有 JSON
+  形状校验；schema_hash 未从物理 frame 重算；ReadModel 缺少完整 provenance 与 verified-open。
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：实现仅覆盖复审要求的 CR-4.4 五个 correctness blocker；CR-5、
+  Feature / State、multi-run snapshot、provider/fallback/production 均未扩展。
+
+**Implementation**
+- **确定性回放**：新增 `project_verified_canonical_snapshot`，Builder 与 `verify_snapshot`
+  共享同一分组、严格投影、PIT、key uniqueness、stable sort 和 zero-row 语义；验证阶段把
+  每个 artifact 的物理行与 canonical replay expected rows 做 exact semantic 比对。
+- **可恢复 immutable 写入**：相同 bytes no-op、缺失 bytes 写入、不同 bytes conflict；整批
+  preflight 后按 artifact → manifest LAST → ledger commit；移除“目录存在即永久失败”的错误前提。
+- **显式 key binding**：registry 绑定 trade_calendar 的 market/date、证券域的 security_id/date、
+  adj_factor 的 security_id/date，并保留 factor_type 的 key projection。
+- **同一字节与物理 schema**：Canonical/Snapshot verifier 从已 hash-verify 的 bytes 解析 Parquet；
+  Snapshot verifier 重新计算 physical schema_hash；公共 Canonical verifier 不再 post-verify 重读
+  selected path。
+- **ReadModel provenance**：rm_snapshot_meta 增加 snapshot/readmodel builder fingerprints；
+  logical seal 检查 canonical_as_of、完整 domain_meta snapshot binding；`open_read_only`
+  与 `verify_readmodel` 在返回/结束前执行 snapshot + logical-seal 验真。
+- **回归测试**：增加业务/lineage 全 seals rebound 仍拒绝、物理 schema hash rebind 拒绝、ledger
+  commit crash/partial residue/conflicting residue、全域 key binding 和 ReadModel foreign/tampered
+  verified-open 测试。
+
+**Governance / Contract**
+- ADR-024 Amendment A（仍 PROPOSED）、本文件、`DEVELOPMENT_MANAGEMENT.md` 与 CR-4 工作要求
+  Implementation Mapping §13.7 同步；migration 022 未改。
+- GitHub Actions verification：**待 PR CI 返回**；此处不预先宣称测试或 lint 已通过。
+
+**Next**
+- 等待 PR 的 Windows 3.12 / Windows 3.14 / Ubuntu 3.14、Ruff、format、Mypy、pytest 和治理 gates；
+  若失败，只按 CI 证据修复并追加日志，不把 CR-4.4 误标为审计关闭。
+
+---
+
 ## 2026-09-03 · CR-4 首批：Canonical 公共消费验证器 + SnapshotBuilder + DuckDB ReadModel（CR-3 全链 VERIFIED 后的启动批次）
 
 **CR-3 全链 Closure 同步（Reviewer 裁决先行）**

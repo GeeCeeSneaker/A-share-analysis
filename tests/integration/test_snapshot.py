@@ -1,10 +1,10 @@
 """CR-4 SnapshotBuilder + canonical consumption verifier integration
-tests (work requirement audits 20260902 sections 3-5, mandatory 1-30).
+tests (work requirement audits 20260902 sections 3-5, CR-4.4 closure).
 
 Coverage map (work requirement §10):
 - TestCanonicalConsumptionVerifier: mandatory 1-10
 - TestSnapshotBuilder: mandatory 11-30
-- TestSnapshotSchemaProjection: unit-level strictness (P0-A09/PIT)
+- TestSnapshotSchemaProjection: unit-level strictness (P0-A09/PIT/key bindings)
 - TestBoundaryStructure: CR-4 boundary AST guards
 """
 
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import io
 import json
 import uuid
 from dataclasses import dataclass
@@ -23,6 +24,10 @@ import polars as pl
 import pytest
 
 from ashare_state.canonical import CanonicalRunner
+from ashare_state.canonical.canonicalizer import (
+    _canonical_json,
+    _rows_semantic_hash,
+)
 from ashare_state.canonical.verifier import (
     CanonicalConsumptionError,
     verify_canonical_run_for_consumption,
@@ -307,6 +312,47 @@ def _rebind_snapshot_manifest(env_root, conn, result, mutate) -> None:
     )
 
 
+def _rebind_snapshot_artifact(env_root, conn, result, domain: str, mutate) -> None:
+    """Rebind one artifact's physical and aggregate seals after a row edit."""
+    manifest_path = env_root["normalized"] / str(result.manifest_uri)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    artifact_path = env_root["normalized"] / str(manifest["artifacts"][domain]["uri"])
+    rows = pl.read_parquet(artifact_path).to_dicts()
+    mutate(rows[0])
+    frame = pl.DataFrame(rows, schema=polars_domain_schema(domain))
+    buffer = io.BytesIO()
+    frame.write_parquet(buffer)
+    artifact_bytes = buffer.getvalue()
+    artifact_path.write_bytes(artifact_bytes)
+    entry = manifest["artifacts"][domain]
+    entry["content_hash"] = hashlib.sha256(artifact_bytes).hexdigest()
+    entry["schema_hash"] = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
+    entry["row_count"] = frame.height
+    entry["semantic_hash"] = _rows_semantic_hash(rows)
+    manifest["artifact_set_hash"] = hashlib.sha256(
+        _canonical_json(manifest["artifacts"]).encode("utf-8")
+    ).hexdigest()
+    manifest["snapshot_semantic_hash"] = hashlib.sha256(
+        _canonical_json({d: a["semantic_hash"] for d, a in manifest["artifacts"].items()}).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    manifest_bytes = json.dumps(
+        manifest, sort_keys=True, indent=1, ensure_ascii=False
+    ).encode("utf-8")
+    manifest_path.write_bytes(manifest_bytes)
+    conn.execute(
+        "UPDATE meta_snapshot_build SET manifest_hash = ?, artifact_set_hash = ?, "
+        "snapshot_semantic_hash = ? WHERE snapshot_id = ?",
+        [
+            hashlib.sha256(manifest_bytes).hexdigest(),
+            manifest["artifact_set_hash"],
+            manifest["snapshot_semantic_hash"],
+            result.snapshot_id,
+        ],
+    )
+
+
 def _canonical_manifest(env_root, canonical_result) -> dict[str, Any]:
     return json.loads(
         (env_root["normalized"] / str(canonical_result.manifest_uri)).read_text(encoding="utf-8")
@@ -532,15 +578,84 @@ class TestSnapshotBuilder:
         with pytest.raises((SnapshotVerifierError, SnapshotBuilderError)):
             _build(conn, env_root, result.canonical_run_id)
 
-    def test_crash_residue_directory_fails_closed(self, conn, env_root):
-        """Mandatory 12/13 (crash leg): artifacts exist but the ledger
-        has no row -> an explicit fail-closed error, never a silent
-        rewrite or a duplicate."""
+    def test_crash_residue_directory_recovers(self, conn, env_root, monkeypatch):
+        """Mandatory 12/13 (crash leg): a ledger commit failure leaves
+        deterministic residue that an exact retry can recover."""
         result = _canonical_success(conn, env_root, domains=("daily_bar",))
-        built = _build(conn, env_root, result.canonical_run_id)
-        conn.execute("DELETE FROM meta_snapshot_build WHERE snapshot_id = ?", [built.snapshot_id])
-        with pytest.raises(SnapshotBuilderError, match="unexplainable residue"):
+        builder = SnapshotBuilder(
+            conn, raw_root=env_root["raw"], normalized_root=env_root["normalized"]
+        )
+
+        def _fail_commit(**kwargs):
+            raise RuntimeError("injected ledger commit failure")
+
+        monkeypatch.setattr(builder, "_commit_ledger", _fail_commit)
+        with pytest.raises(RuntimeError, match="ledger commit failure"):
+            builder.build(result.canonical_run_id)
+        manifests = list((env_root["normalized"] / "snapshot").rglob("manifest.json"))
+        assert len(manifests) == 1
+        manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
+        snapshot_id = str(manifest["snapshot_id"])
+        assert conn.execute(
+            "SELECT COUNT(*) FROM meta_snapshot_build WHERE snapshot_id = ?", [snapshot_id]
+        ).fetchone()[0] == 0
+
+        retry = _build(conn, env_root, result.canonical_run_id)
+        assert retry.snapshot_id == snapshot_id
+        assert retry.idempotent_replay is False
+        assert verify_snapshot(
+            conn,
+            snapshot_id,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+        ).snapshot_id == snapshot_id
+
+
+    def test_partial_residue_recovers(self, conn, env_root, monkeypatch):
+        """A missing deterministic artifact is written on exact retry."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        builder = SnapshotBuilder(
+            conn, raw_root=env_root["raw"], normalized_root=env_root["normalized"]
+        )
+
+        monkeypatch.setattr(
+            builder, "_commit_ledger", lambda **kwargs: (_ for _ in ()).throw(
+                RuntimeError("injected ledger commit failure")
+            )
+        )
+        with pytest.raises(RuntimeError):
+            builder.build(result.canonical_run_id)
+        manifest_path = next((env_root["normalized"] / "snapshot").rglob("manifest.json"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        artifact_path = env_root["normalized"] / str(manifest["artifacts"]["daily_bar"]["uri"])
+        artifact_path.unlink()
+        retry = _build(conn, env_root, result.canonical_run_id)
+        assert retry.status == "SUCCESS"
+        assert artifact_path.is_file()
+
+
+    def test_conflicting_residue_refuses(self, conn, env_root, monkeypatch):
+        """A deterministic path with different bytes is a hard conflict."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        builder = SnapshotBuilder(
+            conn, raw_root=env_root["raw"], normalized_root=env_root["normalized"]
+        )
+        monkeypatch.setattr(
+            builder, "_commit_ledger", lambda **kwargs: (_ for _ in ()).throw(
+                RuntimeError("injected ledger commit failure")
+            )
+        )
+        with pytest.raises(RuntimeError):
+            builder.build(result.canonical_run_id)
+        manifest_path = next((env_root["normalized"] / "snapshot").rglob("manifest.json"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        artifact_path = env_root["normalized"] / str(manifest["artifacts"]["daily_bar"]["uri"])
+        artifact_path.write_bytes(b"conflicting bytes")
+        with pytest.raises(SnapshotBuilderError, match="conflict|different bytes"):
             _build(conn, env_root, result.canonical_run_id)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM meta_snapshot_build"
+        ).fetchone()[0] == 0
 
     def test_snapshot_id_deterministic_across_environments(self, conn, env_root, tmp_path_factory):
         """Mandatory 14 (same-environment semantics): the snapshot
@@ -792,6 +907,64 @@ class TestSnapshotBuilder:
                 normalized_root=env_root["normalized"],
             )
 
+
+    def test_verify_snapshot_business_tamper_with_rebound_seals(self, conn, env_root):
+        """Business bytes plus every snapshot seal rebound still fail
+        against the verified canonical projection."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        built = _build(conn, env_root, result.canonical_run_id)
+        _rebind_snapshot_artifact(
+            env_root, conn, built, "daily_bar", lambda row: row.__setitem__("close", 999.0)
+        )
+        with pytest.raises(SnapshotVerifierError, match="canonical projection"):
+            verify_snapshot(
+                conn,
+                built.snapshot_id,
+                raw_root=env_root["raw"],
+                normalized_root=env_root["normalized"],
+            )
+
+
+    def test_verify_snapshot_lineage_tamper_with_rebound_seals(self, conn, env_root):
+        """Lineage bytes plus every snapshot seal rebound still fail
+        against the verified canonical projection."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        built = _build(conn, env_root, result.canonical_run_id)
+        _rebind_snapshot_artifact(
+            env_root,
+            conn,
+            built,
+            "daily_bar",
+            lambda row: row.__setitem__("source_raw_request_id", "forged-request"),
+        )
+        with pytest.raises(SnapshotVerifierError, match="canonical projection"):
+            verify_snapshot(
+                conn,
+                built.snapshot_id,
+                raw_root=env_root["raw"],
+                normalized_root=env_root["normalized"],
+            )
+
+    def test_verify_snapshot_schema_hash_is_physical(self, conn, env_root):
+        """The manifest schema_hash cannot be rebound away from the
+        physical schema while the outer manifest hash is rebound."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        built = _build(conn, env_root, result.canonical_run_id)
+        _rebind_snapshot_manifest(
+            env_root,
+            conn,
+            built,
+            lambda doc: doc["artifacts"]["daily_bar"].__setitem__("schema_hash", "0" * 64),
+        )
+        with pytest.raises(SnapshotVerifierError, match="schema hash"):
+            verify_snapshot(
+                conn,
+                built.snapshot_id,
+                raw_root=env_root["raw"],
+                normalized_root=env_root["normalized"],
+            )
+
+
     def test_verify_snapshot_identity_rebind(self, conn, env_root):
         """Mandatory 26: the ledger snapshot_semantic_hash is rebound
         -> the physical recompute fails closed."""
@@ -899,9 +1072,8 @@ class TestSnapshotBuilder:
             )
 
     def test_builder_immutable_no_overwrite(self, conn, env_root):
-        """Mandatory 30: the artifacts are immutable - an existing
-        artifact path is NEVER overwritten (the crash-residue guard
-        holds for individual files too)."""
+        """Mandatory 30: identical immutable bytes are a no-op and
+        different bytes are rejected without overwrite."""
         result = _canonical_success(conn, env_root, domains=("daily_bar",))
         built = _build(conn, env_root, result.canonical_run_id)
         manifest = _snapshot_manifest(env_root, built)
@@ -909,9 +1081,46 @@ class TestSnapshotBuilder:
         before = uri.read_bytes()
         from ashare_state.snapshot.builder import _write_immutable
 
-        with pytest.raises(SnapshotBuilderError, match="immutable"):
+        _write_immutable(uri, before)
+        assert uri.read_bytes() == before
+        with pytest.raises(SnapshotBuilderError, match="immutable|conflict"):
             _write_immutable(uri, b"x")
         assert uri.read_bytes() == before
+
+
+def _schema_projection_row(domain: str) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "canonical_domain": domain,
+        "available_at": "2026-08-14T00:00:01+00:00",
+        "ingested_at": "2026-08-14T00:00:01+00:00",
+        "availability_basis": "OBSERVED_AT_INGEST",
+        "availability_policy_version": "v",
+        "selected_provider": "amazingdata",
+        "source_normalization_run_id": "r",
+        "source_output_name": "main",
+        "source_row_ordinal": 1,
+        "source_row_identity_hash": "h",
+        "source_raw_request_id": "q",
+        "source_raw_evidence_hash": "e",
+        "source_mapper_identity": "m",
+        "source_policy_version": "p",
+        "canonical_contract_version": "cr3-v1",
+    }
+    if domain == "trade_calendar":
+        row.update(
+            canonical_key='["SH","2026-08-14"]',
+            market="SH",
+            trade_date="2026-08-14",
+        )
+    else:
+        row.update(
+            canonical_key='["sec-1","2026-08-14"]',
+            security_id="sec-1",
+            trade_date="2026-08-14",
+        )
+        if domain == "adj_factor":
+            row["canonical_key"] = '["sec-1","2026-08-14","adj_factor"]'
+    return row
 
 
 # --------------------- CR-4.2: strict schema projection (P0-A07/A09)
@@ -961,6 +1170,43 @@ class TestSnapshotSchemaProjection:
             project_selected_row(
                 "daily_bar", row, canonical_run_id="c", snapshot_id="s", as_of=as_of
             )
+
+    @pytest.mark.parametrize(
+        ("domain", "field", "value"),
+        [
+            ("trade_calendar", "market", "SZ"),
+            ("trade_calendar", "trade_date", "2026-08-15"),
+            ("daily_bar", "security_id", "sec-2"),
+            ("daily_bar", "trade_date", "2026-08-15"),
+            ("security_status", "security_id", "sec-2"),
+            ("security_status", "trade_date", "2026-08-15"),
+            ("limit_price", "security_id", "sec-2"),
+            ("limit_price", "trade_date", "2026-08-15"),
+            ("adj_factor", "security_id", "sec-2"),
+            ("adj_factor", "trade_date", "2026-08-15"),
+        ],
+    )
+    def test_explicit_key_bindings_fail_closed(self, domain, field, value):
+        row = _schema_projection_row(domain)
+        row[field] = value
+        with pytest.raises(SnapshotSchemaError, match="does not match"):
+            project_selected_row(
+                domain,
+                row,
+                canonical_run_id="c",
+                snapshot_id="s",
+                as_of=AS_OF_LATE,
+            )
+
+    def test_adj_factor_projection_is_typed_key_component(self):
+        projected = project_selected_row(
+            "adj_factor",
+            _schema_projection_row("adj_factor"),
+            canonical_run_id="c",
+            snapshot_id="s",
+            as_of=AS_OF_LATE,
+        )
+        assert projected["factor_type"] == "adj_factor"
 
     def test_typed_projection_fail_closed(self):
         base = {

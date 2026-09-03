@@ -11,6 +11,7 @@ from ashare_state.readmodel.duckdb_model import (
     DuckDBReadModel,
     ReadModelBuildResult,
     ReadModelError,
+    readmodel_builder_code_fingerprint,
     readmodel_db_uri,
 )
 from ashare_state.readmodel.schema import (
@@ -28,5 +29,6 @@ __all__ = [
     "duckdb_domain_columns",
     "duckdb_domain_table_name",
     "duckdb_type_of",
+    "readmodel_builder_code_fingerprint",
     "readmodel_db_uri",
 ]
