@@ -11,6 +11,16 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-5.2 atomic-history CI verification
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：PR #2 的 run `33767742448`（run 175）中，CR-5.2 功能检查已通过（Ruff、formatter、mypy、pytest、Spike、SDK-absent）；唯一失败是 Windows 3.14 的 DEVLOG 历史门禁，指出 `0fe989767d40bc31d0c538c0e07d509f9d1983ff` 代码提交没有在同一 commit 更新 `docs/DEVLOG.md`。
+- 为遵守 workflow 的 no-force-push 规则并保留历史，基于 `main` 创建 clean branch `codex/cr-5-feature-layer-20260904`，将已验证的最终树 `8281e258a7595f8e5fbbd8d0f7e023a494f0b821` 作为原子提交 `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e`，代码、测试、DEVLOG、DEVELOPMENT_MANAGEMENT 和 ADR 同批进入 PR #3。
+- GitHub Actions run `33814571568`（run 176）在 `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e` 上三平台全绿：Ubuntu 3.14、Windows 3.14、Windows 3.12 每腿 `1320 passed`；Ruff lint/formatter、mypy、Spike、AmazingData SDK-absent 均通过；Windows 3.14 的 DEVLOG 与 Management-doc gates 通过。migration 023 未改，CR-6/State/score/strategy/backtest/production 未扩展。
+
+**Next**
+- CR-5.2 的实现与 CI 证据已完成，等待 Reviewer closure；ADR-025 仍保持 PROPOSED，PR #3 不自动合并，PR #2 保留以供历史追踪，CR-6 继续 BLOCKED_BY_CR-5.2。
+
 ## 2026-09-03 · CR-5.2 formatter correction
 
 **Implementation Status / Review Status**

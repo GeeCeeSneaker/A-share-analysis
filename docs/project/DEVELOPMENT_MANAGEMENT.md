@@ -4,16 +4,16 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Reviewed Repository HEAD**：`af9e27aa9771a4be23f00c51dda09b603ce1aff0`（CR-5.2 bounded lineage implementation and governance sync；PR #2 OPEN / NOT MERGED）  
+> **Reviewed Repository HEAD**：`3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e`（CR-5.2 atomic governed replacement；PR #3 OPEN / NOT MERGED）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：CR-4.4 correctness-closure 已随 PR #1 合并至 `a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`；CR-5.1 correctness closure 已由 Reviewer commit `67d37f8e51b086e0585ba12b53e529e49d70a427` 验证关闭；CR-5.2 code/test head 为 `1bbfb2b9485fb62f8713e13584879fe33cb656fe`，CI run `33766197492`（run 171）在本文修订时仍 queued / in progress；PR #2 OPEN / NOT MERGED。  
-> **Document Revision**：DM-CR-20260830-054..060 / DM-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075 / 076 / 077 / 078 / 079 / 080 / 081 / 082
+> **Current Code Baseline**：CR-4.4 correctness-closure 已随 PR #1 合并至 `a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`；CR-5.1 correctness closure 已由 Reviewer commit `67d37f8e51b086e0585ba12b53e529e49d70a427` 验证关闭；CR-5.2 clean atomic implementation head 为 `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e`，GitHub Actions run `33814571568`（run 176）三平台全绿；PR #3 OPEN / NOT MERGED，PR #2 保留为历史追踪。  
+> **Document Revision**：DM-CR-20260830-054..060 / DM-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075 / 076 / 077 / 078 / 079 / 080 / 081 / 082 / DM-20260904-083  
 > **Last Review**：2026-09-03 21:42 +08:00（Reviewer 验证 CR-5.1 correctness VERIFIED / CLOSED / FREEZE；CR-5.2 Bounded Lineage Complexity START / ACTIVE；CR-5 仅剩 P1 bounded lineage；CR-6 BLOCKED_BY_CR-5.2）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：CR-5.2 code/test head `1bbfb2b9485fb62f8713e13584879fe33cb656fe` 的 run `33766197492`（run 171）在本文修订时仍 queued / in progress；上一轮 CR-5.1 green evidence 仍为 run `33759993886`（run 168），三矩阵全绿。当前不预先宣称 CR-5.2 CI 通过。  
+> **CI Status**：CR-5.2 clean atomic head `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e` 的 GitHub Actions run `33814571568`（run 176）三矩阵全绿；Ubuntu 3.14、Windows 3.14、Windows 3.12 每腿 `1320 passed`，Ruff lint/formatter、mypy、Spike、SDK-absent 全部 success，Windows 3.14 的 DEVLOG/Management-doc gates success。此前 PR #2 run `33767742448`（run 175）唯一失败为历史 DEVLOG gate，未发现运行时或测试失败。  
 > **Phase Status（2026-09-03，CR-5.2 收口中）**：  
-> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 → **DONE / REOPENED**（主体 PASS；仅剩 P1 bounded lineage）；CR-5.1 → **VERIFIED / CLOSED / FREEZE**（correctness closure）；CR-5.2 → **START / ACTIVE**（bounded selected-input lineage）；CR-6 State → **BLOCKED_BY_CR-5.2**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 → **DONE / REOPENED**（主体 PASS；仅剩 P1 bounded lineage）；CR-5.1 → **VERIFIED / CLOSED / FREEZE**（correctness closure）；CR-5.2 → **DONE / PENDING_REVIEW**（bounded selected-input lineage；run 176 三平台全绿，Reviewer closure pending）；CR-6 State → **BLOCKED_BY_CR-5.2**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-31 17:42，Reviewer CR-2 复审 P1-01）**：CR-2 批次头部与 Implementation Mapping 曾记录 implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`——该 SHA 非真实 implementation commit；以 GitHub commit object 为准：`15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 关联 commit）。历史条目原文保留，CR-2 工作要求文档已追加 §12 更正。  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。**Count Correction（2026-08-31，CR-2 复审 P1-02）**：ADR-022 §2.2 曾写"9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER"——该批实际 10/4，且 14 条未覆盖 index_daily 等 capability surface；CR-2.1 后 registry 为 **18 条（11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE，runtime exact-set 统计）**，已随 ADR-022 Amendment A §6.1 更正，历史保留。  
 > **SHA Correction（2026-08-27，P1 治理）**：上批头部记录的 R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` 有误，以 GitHub commit object 为准：`de9bf1ab6f499b20916f8277dba45c21880fd908`（与 run 55 关联 commit）；同批 SHA 记录 commit = `b5284bdc83631454c1d46add9e3478f86d81386e`。历史条目原文保留。  
@@ -1127,19 +1127,13 @@ Previous green evidence remains run `33759993886` (run 168), with Windows
 head is `1bbfb2b9485fb62f8713e13584879fe33cb656fe`; its run `33766197492`
 (run 171) is still queued / in progress at this document revision.
 
-## CR-5.2 Bounded Selected-Input Lineage（IMPLEMENTATION IN_PROGRESS）
+## CR-5.2 Bounded Selected-Input Lineage（CI VERIFIED / REVIEW PENDING）
 
-The current scope is limited to:
-- selected valid amount/volatility members instead of history-sized active-span row lineage;
-- a Registry/Execution Plan-derived per-row member bound with runtime enforcement;
-- bounded lag insufficiency dependencies;
-- market verifier set/order uniqueness;
-- focused 10k sparse and mutation/availability tests;
-- ADR-025 Amendment B, CR-5.2 mapping, DEVLOG and this management record.
+CR-5.2 implementation and CI verification are complete on clean atomic history head `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e` (PR #3). The final tree originated from `8281e258a7595f8e5fbbd8d0f7e023a494f0b821`; PR #2's history remains unchanged because its run 175 failure was corrected by a new branch rather than force-push or an expanded workflow exception.
 
-Numeric formulas, active finding truth, artifact schema, migration 023 and all
-State/score/signal/strategy/backtest/production work remain out of scope.
+Run `33814571568` (run 176) is green on Ubuntu 3.14, Windows 3.14, and Windows 3.12, with `1320 passed` on each leg. Ruff lint/format, mypy, Spike, SDK-absent, and the required Windows 3.14 DEVLOG/Management-doc gates all pass. The bounded selected-input lineage, Registry-derived member bound, bounded lag dependency, market set/order guard, and focused mutation/availability tests are covered by this matrix.
 
+Numeric formulas, active finding truth, artifact schema, migration 023 and all State/score/signal/strategy/backtest/production work remain out of scope. CR-5.2 is DONE / PENDING_REVIEW pending Reviewer closure; PR #3 is not auto-merged, PR #2 is retained for historical traceability, and CR-6 remains BLOCKED_BY_CR-5.2.
 ## CR-4 SnapshotBuilder + DuckDB ReadModel（前批，VERIFIED / CLOSED / FREEZE）
 
 CR-3 全链 VERIFIED / CLOSED / FREEZE（2026-09-02 21:24 复审裁决，ADR-023 ACCEPTED）后正式启动。
@@ -2429,6 +2423,16 @@ docs/project/DEVELOPMENT_MANAGEMENT.md
 # 61. Change Log
 
 > 新条目倒序追加，不删除历史。
+
+## DM-20260904-083 — CR-5.2 atomic-history CI verification
+
+**Type**：C4 bounded-lineage complexity closure / governance synchronization  
+**Status**：DONE / PENDING_REVIEW  
+**Trigger**：PR #2 run `33767742448`（run 175）正确暴露历史 `0fe9897` 代码提交未在同一 commit 更新 DEVLOG 的门禁问题；仓库 workflow 明确禁止扩展例外和 force-push 重写。  
+**Resolution**：从 `main` 以 CR-5.2 最终树创建 clean branch `codex/cr-5-feature-layer-20260904`，原子提交 `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e`，保持 PR #2 历史可追踪并以 PR #3 接受同一完整审计。  
+**Evidence**：GitHub Actions run `33814571568`（run 176）三矩阵 success；Ubuntu 3.14、Windows 3.14、Windows 3.12 每腿 `1320 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 全部通过；Windows 3.14 DEVLOG/Management-doc gates success。  
+**Current State**：CR-5.2 implementation + CI complete；Reviewer closure pending；ADR-025 仍 PROPOSED；PR #3 OPEN / NOT MERGED，PR #2 保留但不作为合并目标；CR-6 继续 BLOCKED_BY_CR-5.2。  
+**Reviewer**：PENDING_REVIEW
 
 ## DM-20260903-082 — CR-5.2 bounded selected-input lineage implementation
 

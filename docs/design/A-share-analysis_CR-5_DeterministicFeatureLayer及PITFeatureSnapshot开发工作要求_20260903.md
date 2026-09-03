@@ -1133,8 +1133,14 @@ sole performance evidence.
 | 12 | TestFeaturePITAndMarketDeterminism::test_selected_valid_available_at_controls_feature_availability |
 | 13 | TestFeaturePITAndMarketDeterminism::test_market_date_duplicate_and_order_guards_fail_closed |
 | 14 | TestFeatureFormulaAndMissingnessClosure::test_incremental_windows_do_not_rescan_history_prefix — `_add_input_span` and history-sized lineage guards |
-| 15 | GitHub Actions full pytest + frozen CR-5.1 regression matrix — run 171 pending at this document revision |
-| 16 | Windows py3.12 / Windows py3.14 / Ubuntu py3.14 + Ruff / format / mypy / full pytest / Spike / SDK / governance gates — run 171 pending at this document revision |
+| 15 | GitHub Actions full pytest + frozen CR-5.1 regression matrix — run 33814571568 (run 176), all three legs success, each 1320 passed |
+| 16 | Windows py3.12 / Windows py3.14 / Ubuntu py3.14 + Ruff / format / mypy / full pytest / Spike / SDK / governance gates — run 33814571568 (run 176) all green; Windows 3.14 DEVLOG/Management-doc gates success |
+
+### 16.11.1 CR-5.2 CI evidence update (2026-09-04)
+
+The CR-5.2 implementation was republished as clean atomic history head `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e` on PR #3 after PR #2 run 175 exposed the historical per-commit DEVLOG gate failure on `0fe989767d40bc31d0c538c0e07d509f9d1983ff`. No force-push or workflow exception expansion was used.
+
+GitHub Actions run `33814571568` (run 176) is SUCCESS across Ubuntu 3.14, Windows 3.14, and Windows 3.12. Each matrix leg reports `1320 passed`; Ruff lint, Ruff format, mypy, full pytest, Spike, and AmazingData SDK-absent checks pass. Windows 3.14 also passes the DEVLOG and Management-doc gates; the other two governance steps are skipped by the workflow matrix condition. CR-5.2's focused sparse/member-bound, selected-input PIT, mutation, market-order, and structural tests are therefore backed by the full regression matrix.
 
 ---
 # 17. CR-5 Exit Gate

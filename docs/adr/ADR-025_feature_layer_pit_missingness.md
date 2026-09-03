@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Status**: PROPOSED（2026-09-03，CR-5.1 correctness VERIFIED / CLOSED / FREEZE；CR-5.2 bounded lineage START / ACTIVE；Reviewer final closure pending）
+- **Status**: PROPOSED（2026-09-04，CR-5.1 correctness VERIFIED / CLOSED / FREEZE；CR-5.2 bounded lineage CI VERIFIED；Reviewer final closure pending）
 - **Deciders**: Project Owner / Development Executor；Design / Audit Review（裁决 pending）
 - **Date**: 2026-09-03
 - **Work Requirement**: \`docs/design/A-share-analysis_CR-5_DeterministicFeatureLayer及PITFeatureSnapshot开发工作要求_20260903.md\`
@@ -319,11 +319,8 @@ lineage detail while retaining its finding semantics.
 
 ### Implementation and evidence
 
-Implementation is on PR #2 branch at code/test head
-`1bbfb2b9485fb62f8713e13584879fe33cb656fe`; the first CI run for this head is
-run `33766197492` (run 171), still pending at this document revision. Focused
-tests are in `tests/integration/test_features.py`, including the 10k sparse
-histories, selected/unselected mutation cases, market duplicate/order guard,
-and structural no-history-scan guard. Review status remains PENDING_REVIEW.
-Until Reviewer closure, CR-5 remains REOPENED with only CR-5.2 active, PR #2
-must not be merged, and CR-6 remains blocked.
+The implementation tree originated at `8281e258a7595f8e5fbbd8d0f7e023a494f0b821`. To preserve the repository's no-force-push policy after the original PR #2 history exposed a per-commit DEVLOG violation, the same final tree was published from `main` as the clean atomic history head `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e` on PR #3. This does not rewrite PR #2 history and does not extend the workflow's grandfathered exception list.
+
+The original PR #2 run `33767742448` (run 175) had all runtime and test gates green; its only failure was the Windows 3.14 DEVLOG gate reporting the historical `0fe989767d40bc31d0c538c0e07d509f9d1983ff` code commit. The clean atomic head `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e` was then verified by GitHub Actions run `33814571568` (run 176): Ubuntu 3.14, Windows 3.14, and Windows 3.12 all succeeded, each with `1320 passed`; Ruff lint/format, mypy, Spike, and AmazingData SDK-absent checks passed, and Windows 3.14 DEVLOG/Management-doc gates passed.
+
+The CR-5.2 focused tests remain in `tests/integration/test_features.py`: 10k sparse amount/raw-return member bounds, selected/unselected identity and availability mutations, market duplicate/order failure, and the structural no-history-scan guard. Numeric formulas, active finding truth, artifact schema, and migration 023 remain unchanged. Review status remains PENDING_REVIEW; ADR-025 remains PROPOSED until Reviewer closure, PR #3 must not be auto-merged, PR #2 is retained for historical traceability, and CR-6 remains blocked.
