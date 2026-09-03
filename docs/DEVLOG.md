@@ -43,7 +43,7 @@
 **Verification**
 - Local: **1235 tests passed / 0 failed**（1179 → 1235，+56：`test_snapshot.py` 44（consumption verifier 10——mandatory 1-10 / builder 21——mandatory 11-30 / schema projection unit 3 / boundary AST guard 10）/ `test_readmodel.py` 11（mandatory 31-42 + 双模型并存）/ `test_canonical.py` +1 multi-domain replay 回归；migration 测试更新 22 链 + 021→022 升级 + tamper probe 023）；ruff check / ruff format / mypy 全绿（78 源文件零错）
 - 既有回归零破坏：CR-3.x 全链 195 项（含 6 轮 REOPEN 收口全部对抗矩阵）；CR-2.x / R4 冻结契约零破坏
-- 实现中修复的工程问题（均以测试钉死）：DuckDB TIMESTAMPTZ fetch 本地时区（GMT+8）→ verify/rebuild 归一化 UTC；read_parquet hive partitioning 误读路径段；polars dict-rows + schema 的 extra-key 行为规避（投影先行过滤）；adj_factor factor_type 为 key projection 非 payload
+- 实现中修复的工程问题（均以测试钉死）：DuckDB TIMESTAMPTZ fetch 本地时区（GMT+8）→ verify/rebuild 归一化 UTC；read_parquet hive partitioning 误读路径段；polars dict-rows + schema 的 extra-key 行为规避（投影先行过滤）；adj_factor factor_type 为 key projection 非 payload；**CI 首跑暴露一处跨环境不稳定断言**（superset 测试断言第二 world 的 EQUIVALENT winner 具体为 req-new-bars——但 winner 排序键含 run_manifest_hash，其相对顺序依赖 raw evidence hash 的 ingest wall-clock，跨独立 ingest 环境合法漂移；修正断言为 winner ∈ {两 run} 并注释 CR-3 determinism 语义边界——1 次修复轮次）
 - GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
 
 **Implementation Status**
