@@ -11,6 +11,12 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 mypy manifest 类型收口
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33744006854`（PR #2 head `20fa8c4`）的三条矩阵腿均通过 Ruff lint 与 formatter，mypy 仅报告 verifier.py 中混合字符串/整数 manifest 字段的局部类型推断错误。
+- 已为该字段集合显式声明 `tuple[tuple[str, str | int], ...]`；比较逻辑和 feature 验证语义不变，等待 CI 继续执行。
+
 ## 2026-09-03 · CR-5 lint/formatter 长度冲突修复
 
 **Implementation Status / Review Status**

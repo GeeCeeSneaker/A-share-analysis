@@ -302,7 +302,7 @@ class FeatureVerifier:
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise FeatureVerifierError(f"feature manifest is unreadable: {exc}") from exc
 
-        manifest_fields = (
+        manifest_fields: tuple[tuple[str, str | int], ...] = (
             ("feature_run_id", feature_run_id),
             ("feature_contract_version", str(record["feature_contract_version"])),
             ("feature_set_id", str(record["feature_set_id"])),
