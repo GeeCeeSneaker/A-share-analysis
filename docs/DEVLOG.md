@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.1 pytest collection fix
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 165 的三平台静态门禁均通过；pytest 在 collection 阶段发现 physical-count 参数化 decorator 错装到 lineage 测试。
+- 已将 `field` 参数化 decorator 移到对应的 manifest/ledger physical-count 测试，lineage 测试恢复为无参数；这是测试结构修复，不改变产品代码。
+
+**Next**
+- 重新跑三平台 pytest 及其后的 framework/governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
 ## 2026-09-03 · CR-5.1 mypy follow-up
 
 **Implementation Status / Review Status**
