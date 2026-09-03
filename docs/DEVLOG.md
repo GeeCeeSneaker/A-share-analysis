@@ -11,6 +11,12 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5 lint/formatter 长度冲突修复
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33743885535`（PR #2 head `16c4204`）已完成 formatter，但 lint 在同一处报告 101 字符的 E501；该处源于 formatter 推荐的合并行与项目 100 字符上限冲突。
+- 已将 feature artifact 路径前缀拆为局部变量，保持输出完全相同并同时满足 lint/formatter，等待完整 CI 重跑。
+
 ## 2026-09-03 · CR-5 Formatter CI 收口
 
 **Implementation Status / Review Status**

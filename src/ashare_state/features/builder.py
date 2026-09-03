@@ -102,7 +102,8 @@ def feature_builder_code_fingerprint() -> str:
 
 
 def feature_base_dir(snapshot_id: str, feature_run_id: str) -> str:
-    return f"feature/contract={FEATURE_CONTRACT_VERSION}/snapshot={snapshot_id}/run={feature_run_id}"
+    prefix = f"feature/contract={FEATURE_CONTRACT_VERSION}"
+    return f"{prefix}/snapshot={snapshot_id}/run={feature_run_id}"
 
 
 def feature_manifest_uri(snapshot_id: str, feature_run_id: str) -> str:
