@@ -11,6 +11,15 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-03 · CR-5.2 bounded selected-input lineage implementation
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 VERIFIED / CLOSED / FREEZE；CR-5.2 START / ACTIVE**：Reviewer 新增 bounded-lineage 要求后，已将 security row lineage 从 active span 改为 current observation、固定 observed/lag 依赖与 selected valid amount/volatility members；新增由 Execution Plan 派生的 lineage 成员上界及运行时 enforcement；Feature verifier 的 market-date membership 改为 set + previous-order guard。
+- 新增 10k sparse amount/raw-return operation-bound tests，以及 invalid identity/availability/valid-transition、selected identity/availability、duplicate/order guard 和 structural guard。numeric feature values、active missingness finding 规则及 artifact contract 未扩展；migration 023 保持不变；CR-6 继续 blocked。
+- Implementation commits：`0fe989767d40bc31d0c538c0e07d509f9d1983ff`（CR-5.2 代码与 focused tests）及 `1bbfb2b9485fb62f8713e13584879fe33cb656fe`（Ruff import correction）。CI run `33766197492`（run 171）在本条同步时仍为 queued / in progress，不预先宣称通过。
+
+**Next**
+- 等待 run 171 的三平台结果；如有后续 CI 修复继续以实际日志为准。Reviewer 完成 CR-5.2 closure 前不合并 PR #2、不启动 CR-6。
 ## 2026-09-03 · CR-5.1 CI verification complete
 
 **Implementation Status / Review Status**
