@@ -25,6 +25,7 @@ section 5, P0-B03/P0-B04).
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -51,7 +52,11 @@ from ashare_state.snapshot.models import (
     snapshot_base_hash_from_primitives,
     snapshot_id_from_base_hash,
 )
-from ashare_state.snapshot.schema import polars_domain_schema
+from ashare_state.snapshot.schema import (
+    SnapshotSchemaError,
+    polars_domain_schema,
+    project_verified_canonical_snapshot,
+)
 
 __all__ = ["verify_snapshot"]
 
@@ -206,6 +211,14 @@ def verify_snapshot(
     if cross_problems:
         msg = f"snapshot {snapshot_id} canonical provenance is DAMAGED: {'; '.join(cross_problems)}"
         raise SnapshotVerifierError(msg)
+    try:
+        expected_rows_by_domain = project_verified_canonical_snapshot(
+            verified_canonical, snapshot_id=snapshot_id
+        )
+    except SnapshotSchemaError as exc:
+        raise SnapshotVerifierError(
+            f"snapshot {snapshot_id} canonical projection is DAMAGED: {exc}"
+        ) from exc
 
     # 5. artifact exact set == the requested domain set
     artifacts = manifest.get("artifacts")
@@ -242,7 +255,16 @@ def verify_snapshot(
         if hashlib.sha256(data).hexdigest() != str(entry.get("content_hash")):
             msg = f"snapshot {domain} artifact bytes tampered"
             raise SnapshotVerifierError(msg)
-        frame = pl.read_parquet(path)
+        # Parse exactly the bytes whose hash was verified above; do not
+        # reread a mutable path after verification.
+        frame = pl.read_parquet(io.BytesIO(data))
+        actual_schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
+        if actual_schema_hash != str(entry.get("schema_hash")):
+            msg = (
+                f"snapshot {domain} artifact schema hash does not match the physical "
+                "schema (schema rebind)"
+            )
+            raise SnapshotVerifierError(msg)
         if str(frame.schema) != str(polars_domain_schema(domain)):
             msg = f"snapshot {domain} artifact schema is not the registry schema (schema rebind)"
             raise SnapshotVerifierError(msg)
@@ -253,6 +275,18 @@ def verify_snapshot(
         semantic = _rows_semantic_hash(rows)
         if semantic != str(entry.get("semantic_hash")):
             msg = f"snapshot {domain} artifact semantic seal mismatch (values changed)"
+            raise SnapshotVerifierError(msg)
+        expected_rows = expected_rows_by_domain[domain]
+        if sorted(_canonical_json(row) for row in rows) != sorted(
+            _canonical_json(row) for row in expected_rows
+        ):
+            msg = (
+                f"snapshot {domain} artifact rows diverge from the deterministic "
+                "canonical projection"
+            )
+            raise SnapshotVerifierError(msg)
+        if semantic != _rows_semantic_hash(list(expected_rows)):
+            msg = f"snapshot {domain} artifact semantic seal diverges from the canonical projection"
             raise SnapshotVerifierError(msg)
         # PIT + key sanity re-check on the materialized rows
         for r in rows:
@@ -272,9 +306,9 @@ def verify_snapshot(
         domain_rows[domain] = tuple(rows)
         recomputed_seals[domain] = {
             "uri": str(entry.get("uri")),
-            "content_hash": str(entry.get("content_hash")),
-            "schema_hash": str(entry.get("schema_hash")),
-            "row_count": int(entry.get("row_count", -1)),
+            "content_hash": hashlib.sha256(data).hexdigest(),
+            "schema_hash": actual_schema_hash,
+            "row_count": frame.height,
             "semantic_hash": semantic,
         }
         row_count_total += len(rows)

@@ -17,6 +17,112 @@
 
 ---
 
+## 2026-09-03 · CR-4.4 CI 完整验证与治理同步
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：最终 CR-4.4 代码 head 为 `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`；首个实现提交为 `cad56f39fc4f8d50b2eefdae45045dd5a86237a5`，中间 CI 修复均保留在 DEVLOG 历史中。
+- GitHub Actions run `33732904158` 三矩阵腿（Windows 3.12、Windows 3.14、Ubuntu 3.14）全部 success；每腿 pytest 为 **1256 passed**，Ruff lint、Ruff format、mypy、Spike gates、SDK-absent 均通过；Windows 3.14 的 DEVLOG gate 与 Management-doc gate 也通过，其他矩阵腿按 workflow 条件跳过这两项。
+- 本条同步 DEVELOPMENT_MANAGEMENT、CR-4 工作要求 §13.7 与 ADR-024 Amendment A；Reviewer closure 仍待裁决，ADR-024 保持 PROPOSED，CR-5 与生产保持 blocked/out of scope。
+
+---
+## 2026-09-03 · CR-4.4 CI EOF format 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：CI format check 仅剩 6 个文件末尾多出的空行；已移除多余 EOF 空行，代码语义不变。
+- mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
+## 2026-09-03 · CR-4.4 DEVLOG gate format 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：DEVLOG gate ref 解析修复后仅剩其新增 helper 的 Ruff 格式差异；已按格式器结果收口，逻辑不变。
+- pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
+## 2026-09-03 · CI DEVLOG gate checkout ref 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：CR-4.4 首轮 pytest 为 `1254 passed, 2 failed`；两项失败来自 DEVLOG gate 在 PR detached checkout 中硬编码本地 `main`。
+- `test_devlog_gate.py` 现在优先使用 `main`，否则使用 checkout 已存在的 `origin/main`；这只修复测试的 ref 解析，不放宽治理判定。
+
+---
+## 2026-09-03 · CR-4.4 CI mypy 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：format 通过后，三矩阵 mypy 报告 3 个类型错误；已对共享回放 tuple 做显式 list 适配，并对 canonical domain 做显式字符串收窄。
+- pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
+## 2026-09-03 · CR-4.4 CI EOF 换行修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：format gate 发现前一轮临时读取过程引入了额外 EOF 换行；已按实际 GitHub blob 结尾移除该单个空白行，文件主体未改动。
+- mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
+## 2026-09-03 · CR-4.4 CI format 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：第三轮 GitHub Actions 的 Ruff format check 指出 6 个文件未格式化；已按 Ruff 0.16.4 / line-length 100 结果同步，未改变 CR-4.4 契约语义。
+- mypy、pytest 及后续治理 gates 继续以新的 CI 结果为准。
+
+---
+## 2026-09-03 · CR-4.4 CI lint 修复（SIM101）
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：第二轮 GitHub Actions 仍在 Ruff lint 阶段报告 `SIM101`；已合并日期类型判断，未改变 CR-4.4 契约语义。
+- 后续 format、mypy、pytest 及治理 gates 继续以新的 CI 结果为准。
+
+---
+## 2026-09-03 · CR-4.4 CI lint 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：PR 首轮 GitHub Actions 在 Ruff lint 阶段报告 4 个静态问题（两处
+  E501、一个 SIM114、一个长错误消息）；已按报告修复，未改变 CR-4.4 契约语义。
+- pytest、format、mypy 及后续治理 gates 尚未因首轮 lint 失败而运行，继续以新的 CI 结果为准。
+
+---
+
+## 2026-09-03 · CR-4.4 Snapshot 回放、不可变写入与 ReadModel provenance 收口
+
+**Trigger**
+- CR-4 首批复审将 CR-4.4 重新打开：首版只能证明“自有 seals 一致”，尚未证明 Snapshot 行是
+  `VerifiedCanonicalRun.selected_rows` 的确定性投影；写入残留不可恢复；key 只有 JSON
+  形状校验；schema_hash 未从物理 frame 重算；ReadModel 缺少完整 provenance 与 verified-open。
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：实现仅覆盖复审要求的 CR-4.4 五个 correctness blocker；CR-5、
+  Feature / State、multi-run snapshot、provider/fallback/production 均未扩展。
+
+**Implementation**
+- **确定性回放**：新增 `project_verified_canonical_snapshot`，Builder 与 `verify_snapshot`
+  共享同一分组、严格投影、PIT、key uniqueness、stable sort 和 zero-row 语义；验证阶段把
+  每个 artifact 的物理行与 canonical replay expected rows 做 exact semantic 比对。
+- **可恢复 immutable 写入**：相同 bytes no-op、缺失 bytes 写入、不同 bytes conflict；整批
+  preflight 后按 artifact → manifest LAST → ledger commit；移除“目录存在即永久失败”的错误前提。
+- **显式 key binding**：registry 绑定 trade_calendar 的 market/date、证券域的 security_id/date、
+  adj_factor 的 security_id/date，并保留 factor_type 的 key projection。
+- **同一字节与物理 schema**：Canonical/Snapshot verifier 从已 hash-verify 的 bytes 解析 Parquet；
+  Snapshot verifier 重新计算 physical schema_hash；公共 Canonical verifier 不再 post-verify 重读
+  selected path。
+- **ReadModel provenance**：rm_snapshot_meta 增加 snapshot/readmodel builder fingerprints；
+  logical seal 检查 canonical_as_of、完整 domain_meta snapshot binding；`open_read_only`
+  与 `verify_readmodel` 在返回/结束前执行 snapshot + logical-seal 验真。
+- **回归测试**：增加业务/lineage 全 seals rebound 仍拒绝、物理 schema hash rebind 拒绝、ledger
+  commit crash/partial residue/conflicting residue、全域 key binding 和 ReadModel foreign/tampered
+  verified-open 测试。
+
+**Governance / Contract**
+- ADR-024 Amendment A（仍 PROPOSED）、本文件、`DEVELOPMENT_MANAGEMENT.md` 与 CR-4 工作要求
+  Implementation Mapping §13.7 同步；migration 022 未改。
+- GitHub Actions verification：**待 PR CI 返回**；此处不预先宣称测试或 lint 已通过。
+
+**Next**
+- 等待 PR 的 Windows 3.12 / Windows 3.14 / Ubuntu 3.14、Ruff、format、Mypy、pytest 和治理 gates；
+  若失败，只按 CI 证据修复并追加日志，不把 CR-4.4 误标为审计关闭。
+
+---
+
 ## 2026-09-03 · CR-4 首批：Canonical 公共消费验证器 + SnapshotBuilder + DuckDB ReadModel（CR-3 全链 VERIFIED 后的启动批次）
 
 **CR-3 全链 Closure 同步（Reviewer 裁决先行）**

@@ -15,9 +15,10 @@ canonical SUCCESS run:
 
 No wall-clock enters any artifact (started_at/completed_at are
 ledger-side transaction audit metadata only), so an exact retry after
-a crash between file writes and the ledger commit is either an
-idempotent replay (ledger row exists) or an explicit fail-closed
-error (directory exists without a ledger row).
+a crash between file writes and the ledger commit is recoverable:
+identical existing bytes are no-ops, missing bytes are written,
+conflicting bytes fail closed, and the ledger is committed only after
+the complete deterministic file plan is compatible.
 """
 
 from __future__ import annotations
@@ -41,9 +42,9 @@ from ashare_state.snapshot.models import (
 )
 from ashare_state.snapshot.schema import (
     SNAPSHOT_CONTRACT_VERSION,
+    SnapshotSchemaError,
     polars_domain_schema,
-    project_selected_row,
-    snapshot_domains,
+    project_verified_canonical_snapshot,
 )
 
 __all__ = [
@@ -112,12 +113,20 @@ def snapshot_manifest_uri(snapshot_id: str, as_of: datetime) -> str:
     return f"{snapshot_base_dir(snapshot_id, as_of)}/manifest.json"
 
 
+def _assert_immutable_compatible(path: Path, data: bytes) -> None:
+    """Check an immutable path before any file in the build is written."""
+    if not path.exists():
+        return
+    if path.is_file() and path.read_bytes() == data:
+        return
+    raise SnapshotBuilderError(f"immutable artifact conflict: {path} exists with different bytes")
+
+
 def _write_immutable(path: Path, data: bytes) -> None:
-    """P0-A11: artifacts are immutable - an existing path is a fail
-    closed correctness problem (never overwrite)."""
+    """Write deterministic bytes exactly once; identical retries are no-ops."""
+    _assert_immutable_compatible(path, data)
     if path.exists():
-        msg = f"immutable artifact already exists: {path}"
-        raise SnapshotBuilderError(msg)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
 
@@ -179,50 +188,20 @@ class SnapshotBuilder:
             )
 
         base_dir = snapshot_base_dir(snapshot_id, verified.as_of)
-        target_dir = self.normalized_root / base_dir
-        if target_dir.exists():
-            msg = (
-                f"snapshot artifact directory {base_dir} already exists but the "
-                "ledger carries no row - unexplainable residue from a crashed "
-                "build; manual inspection required before any retry"
+
+        # ---- one shared deterministic projection for build + verify
+        try:
+            projected_by_domain = project_verified_canonical_snapshot(
+                verified, snapshot_id=snapshot_id
             )
-            raise SnapshotBuilderError(msg)
+        except SnapshotSchemaError as exc:
+            raise SnapshotBuilderError(
+                f"canonical run {canonical_run_id} cannot be projected into a snapshot: {exc}"
+            ) from exc
 
-        # ---- group + project the canonical selected rows per domain
-        grouped: dict[str, list[dict[str, Any]]] = {d: [] for d in verified.requested_domains}
-        for row in verified.selected_rows:
-            domain = str(row.get("canonical_domain"))
-            if domain not in grouped:
-                msg = (
-                    f"canonical run {canonical_run_id} emitted domain {domain!r} "
-                    "which is not part of the requested domain set"
-                )
-                raise SnapshotBuilderError(msg)
-            if domain not in snapshot_domains():
-                msg = f"domain {domain!r} has no snapshot schema (not supported)"
-                raise SnapshotBuilderError(msg)
-            grouped[domain].append(row)
-        projected_by_domain: dict[str, list[dict[str, Any]]] = {}
-        for domain, rows in grouped.items():
-            projected = [
-                project_selected_row(
-                    domain,
-                    row,
-                    canonical_run_id=canonical_run_id,
-                    snapshot_id=snapshot_id,
-                    as_of=verified.as_of,
-                )
-                for row in rows
-            ]
-            keys = [p["canonical_key"] for p in projected]
-            if len(set(keys)) != len(keys):
-                msg = f"domain {domain} carries duplicate canonical keys"
-                raise SnapshotBuilderError(msg)
-            projected.sort(key=lambda p: p["canonical_key"])
-            projected_by_domain[domain] = projected
-
-        # ---- immutable per-domain parquet artifacts + seals
+        # ---- deterministic per-domain parquet artifacts + seals
         artifacts: dict[str, dict[str, Any]] = {}
+        artifact_payloads: dict[str, bytes] = {}
         row_count_total = 0
         for domain in verified.requested_domains:
             rows = projected_by_domain[domain]
@@ -231,14 +210,14 @@ class SnapshotBuilder:
             frame.write_parquet(buffer)
             data = buffer.getvalue()
             uri = f"{base_dir}/{domain}.parquet"
-            _write_immutable(self.normalized_root / uri, data)
+            artifact_payloads[domain] = data
             schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
             artifacts[domain] = {
                 "uri": uri,
                 "content_hash": hashlib.sha256(data).hexdigest(),
                 "schema_hash": schema_hash,
                 "row_count": len(rows),
-                "semantic_hash": _rows_semantic_hash(rows),
+                "semantic_hash": _rows_semantic_hash(list(rows)),
             }
             row_count_total += len(rows)
 
@@ -270,7 +249,23 @@ class SnapshotBuilder:
         manifest_bytes = json.dumps(manifest, sort_keys=True, indent=1, ensure_ascii=False).encode(
             "utf-8"
         )
-        _write_immutable(self.normalized_root / manifest_uri, manifest_bytes)
+        # Preflight every deterministic path before writing any one of them:
+        # a partial residue is recoverable only when every existing byte is
+        # identical to the current deterministic build.
+        write_plan = [
+            (
+                self.normalized_root / str(artifacts[domain]["uri"]),
+                artifact_payloads[domain],
+            )
+            for domain in verified.requested_domains
+        ]
+        write_plan.append((self.normalized_root / manifest_uri, manifest_bytes))
+        for path, data in write_plan:
+            _assert_immutable_compatible(path, data)
+        # Manifest remains the final publication marker.
+        for path, data in write_plan[:-1]:
+            _write_immutable(path, data)
+        _write_immutable(write_plan[-1][0], write_plan[-1][1])
         manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
 
         # ---- one ledger transaction (duplicate check included)

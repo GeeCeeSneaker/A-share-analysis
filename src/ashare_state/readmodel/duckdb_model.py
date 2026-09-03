@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +33,7 @@ from ashare_state.readmodel.schema import (
     duckdb_domain_columns,
     duckdb_domain_table_name,
 )
+from ashare_state.snapshot.models import SnapshotVerifierError
 from ashare_state.snapshot.schema import domain_snapshot_schema
 from ashare_state.snapshot.verifier import verify_snapshot
 
@@ -39,8 +41,29 @@ __all__ = [
     "DuckDBReadModel",
     "ReadModelBuildResult",
     "ReadModelError",
+    "readmodel_builder_code_fingerprint",
     "readmodel_db_uri",
 ]
+
+
+def readmodel_builder_code_fingerprint() -> str:
+    """Hash the exact source set that governs ReadModel construction."""
+    import ashare_state.readmodel.duckdb_model as _model
+    import ashare_state.readmodel.schema as _schema
+    import ashare_state.snapshot.schema as _snapshot_schema
+
+    digest = hashlib.sha256()
+    for module in (_snapshot_schema, _schema, _model):
+        module_file = getattr(module, "__file__", None)
+        if module_file is None:  # pragma: no cover
+            raise ReadModelError(f"module {module!r} has no source file")
+        source = Path(module_file).read_bytes().decode("utf-8")
+        normalized = source.replace("\r\n", "\n").replace("\r", "\n")
+        digest.update(module.__name__.encode("utf-8"))
+        digest.update(b"\x00")
+        digest.update(normalized.encode("utf-8"))
+        digest.update(b"\x00")
+    return digest.hexdigest()
 
 
 def _normalize_seal_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -156,7 +179,9 @@ class DuckDBReadModel:
                 canonical_run_id VARCHAR NOT NULL,
                 canonical_as_of TIMESTAMP WITH TIME ZONE NOT NULL,
                 requested_domains VARCHAR NOT NULL,
-                readmodel_contract_version VARCHAR NOT NULL
+                readmodel_contract_version VARCHAR NOT NULL,
+                snapshot_builder_code_fingerprint VARCHAR NOT NULL,
+                readmodel_builder_code_fingerprint VARCHAR NOT NULL
             )
             """
         )
@@ -195,7 +220,7 @@ class DuckDBReadModel:
 
     def _insert_meta(self, db: duckdb.DuckDBPyConnection, verified: Any) -> None:
         db.execute(
-            "INSERT INTO rm_snapshot_meta VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO rm_snapshot_meta VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 verified.snapshot_id,
                 str(verified.manifest["snapshot_contract_version"]),
@@ -203,6 +228,8 @@ class DuckDBReadModel:
                 verified.as_of,
                 _canonical_json(list(verified.requested_domains)),
                 READMODEL_CONTRACT_VERSION,
+                str(verified.manifest["snapshot_builder_code_fingerprint"]),
+                readmodel_builder_code_fingerprint(),
             ],
         )
         for domain in verified.requested_domains:
@@ -276,42 +303,67 @@ class DuckDBReadModel:
             semantic = _rows_semantic_hash(dicts)
             if semantic != str(entry["semantic_hash"]):
                 problems.append(f"{table} logical semantic hash diverges from the snapshot seal")
-        # meta tables
+        # meta tables: every provenance field is part of the logical seal.
         meta = db.execute(
             "SELECT snapshot_id, snapshot_contract_version, canonical_run_id, "
-            "requested_domains, readmodel_contract_version FROM rm_snapshot_meta"
+            "canonical_as_of, requested_domains, readmodel_contract_version, "
+            "snapshot_builder_code_fingerprint, readmodel_builder_code_fingerprint "
+            "FROM rm_snapshot_meta"
         ).fetchall()
         if len(meta) != 1:
             problems.append("rm_snapshot_meta must carry exactly one row")
         else:
             row = meta[0]
-            if row[0] != verified.snapshot_id:
+            if str(row[0]) != verified.snapshot_id:
                 problems.append("rm_snapshot_meta snapshot_id mismatch")
             if str(row[1]) != str(verified.manifest["snapshot_contract_version"]):
                 problems.append("rm_snapshot_meta snapshot_contract_version mismatch")
             if str(row[2]) != verified.canonical_run_id:
                 problems.append("rm_snapshot_meta canonical_run_id mismatch")
-            if str(row[3]) != _canonical_json(list(verified.requested_domains)):
+            db_as_of = row[3]
+            if (
+                not isinstance(db_as_of, datetime)
+                or db_as_of.tzinfo is None
+                or db_as_of.astimezone(UTC) != verified.as_of.astimezone(UTC)
+            ):
+                problems.append("rm_snapshot_meta canonical_as_of mismatch")
+            if str(row[4]) != _canonical_json(list(verified.requested_domains)):
                 problems.append("rm_snapshot_meta requested_domains mismatch")
-            if str(row[4]) != READMODEL_CONTRACT_VERSION:
+            if str(row[5]) != READMODEL_CONTRACT_VERSION:
                 problems.append("rm_snapshot_meta readmodel_contract_version mismatch")
-        domain_meta = {
-            r[1]: (r[2], int(r[3]), r[4])
-            for r in db.execute(
-                "SELECT snapshot_id, domain, artifact_uri, row_count, semantic_hash "
-                "FROM rm_domain_meta"
-            ).fetchall()
-        }
-        if set(domain_meta) != set(verified.requested_domains):
+            if str(row[6]) != str(verified.manifest["snapshot_builder_code_fingerprint"]):
+                problems.append("rm_snapshot_meta snapshot_builder_code_fingerprint mismatch")
+            if str(row[7]) != readmodel_builder_code_fingerprint():
+                problems.append("rm_snapshot_meta readmodel_builder_code_fingerprint mismatch")
+
+        domain_meta_rows = db.execute(
+            "SELECT snapshot_id, domain, artifact_uri, row_count, semantic_hash FROM rm_domain_meta"
+        ).fetchall()
+        expected_domains = set(verified.requested_domains)
+        seen_domains: dict[str, tuple[Any, int, Any]] = {}
+        for row in domain_meta_rows:
+            row_snapshot_id = str(row[0])
+            domain = str(row[1])
+            if row_snapshot_id != verified.snapshot_id:
+                problems.append(f"rm_domain_meta {domain} carries a foreign snapshot_id")
+            if domain not in expected_domains:
+                problems.append(f"rm_domain_meta carries an unexpected domain {domain}")
+                continue
+            if domain in seen_domains:
+                problems.append(f"rm_domain_meta carries duplicate domain {domain}")
+                continue
+            seen_domains[domain] = (row[2], int(row[3]), row[4])
+        if set(seen_domains) != expected_domains:
             problems.append("rm_domain_meta domain set mismatch")
-        else:
-            for domain in verified.requested_domains:
-                entry = verified.manifest["artifacts"][domain]
-                uri, count, semantic = domain_meta[domain]
-                if uri != str(entry["uri"]) or count != int(entry["row_count"]):
-                    problems.append(f"rm_domain_meta {domain} row mismatch")
-                if str(semantic) != str(entry["semantic_hash"]):
-                    problems.append(f"rm_domain_meta {domain} semantic hash mismatch")
+        for domain in expected_domains:
+            if domain not in seen_domains:
+                continue
+            entry = verified.manifest["artifacts"][domain]
+            uri, count, semantic = seen_domains[domain]
+            if uri != str(entry["uri"]) or count != int(entry["row_count"]):
+                problems.append(f"rm_domain_meta {domain} row mismatch")
+            if str(semantic) != str(entry["semantic_hash"]):
+                problems.append(f"rm_domain_meta {domain} semantic hash mismatch")
         if problems:
             msg = (
                 f"readmodel rebuild for snapshot {verified.snapshot_id} failed the "
@@ -320,10 +372,47 @@ class DuckDBReadModel:
             raise ReadModelError(msg)
 
     # --------------------------------------------------------------- open
-    def open_read_only(self, snapshot_id: str) -> duckdb.DuckDBPyConnection:
-        """Open the rebuilt readmodel for read-only consumption."""
+    def _open_verified_read_only(self, snapshot_id: str) -> tuple[duckdb.DuckDBPyConnection, Any]:
         target = self.readmodel_root / readmodel_db_uri(snapshot_id)
         if not target.is_file():
             msg = f"readmodel for snapshot {snapshot_id} has not been built: {target}"
             raise ReadModelError(msg)
-        return duckdb.connect(str(target), read_only=True)
+        try:
+            verified = verify_snapshot(
+                self.conn,
+                snapshot_id,
+                raw_root=self.raw_root,
+                normalized_root=self.normalized_root,
+            )
+        except SnapshotVerifierError as exc:
+            # A readmodel handle must never expose an unverified snapshot.
+            raise ReadModelError(
+                f"readmodel for snapshot {snapshot_id} cannot verify its snapshot provenance: {exc}"
+            ) from exc
+        db: duckdb.DuckDBPyConnection | None = None
+        try:
+            db = duckdb.connect(str(target), read_only=True)
+            self._validate_logical_seal(db, verified)
+        except ReadModelError:
+            if db is not None:
+                db.close()
+            raise
+        except Exception as exc:
+            if db is not None:
+                db.close()
+            raise ReadModelError(
+                f"readmodel for snapshot {snapshot_id} failed verified-open: {exc}"
+            ) from exc
+        assert db is not None
+        return db, verified
+
+    def verify_readmodel(self, snapshot_id: str) -> Any:
+        """Verify the snapshot and logical ReadModel seal, then close it."""
+        db, verified = self._open_verified_read_only(snapshot_id)
+        db.close()
+        return verified
+
+    def open_read_only(self, snapshot_id: str) -> duckdb.DuckDBPyConnection:
+        """Open only a ReadModel whose snapshot and logical seal verify."""
+        db, _ = self._open_verified_read_only(snapshot_id)
+        return db

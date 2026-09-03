@@ -89,6 +89,7 @@ CR-3.4 closures (audit 20260902 "CR-3.3复审与CR-3.4最终ContinuitySeal
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import uuid
 from collections.abc import Mapping, Sequence
@@ -2431,22 +2432,24 @@ class CanonicalRunner:
             path = self.normalized_root / str(entry.get("uri"))
             if not path.is_file():
                 problems.append(f"findings artifact missing: {entry.get('uri')}")
-            elif hashlib.sha256(path.read_bytes()).hexdigest() != str(entry.get("content_hash")):
-                problems.append("findings artifact bytes tampered")
             else:
-                frame = pl.read_parquet(path)
-                if frame.height != int(entry.get("row_count", -1)):
-                    problems.append("findings artifact row count mismatch")
-                parquet_rows = frame.to_dicts()
-                parquet_ids = sorted(str(r.get("finding_id")) for r in parquet_rows)
-                if parquet_ids != sorted(db_finding_ids):
-                    problems.append("findings parquet ids diverge from the DB finding set")
-                parquet_semantic = [
-                    {field: r.get(field) for field in _FINDING_SEMANTIC_FIELDS}
-                    for r in parquet_rows
-                ]
-                if _finding_set_hash(parquet_semantic) != str(record["finding_set_hash"]):
-                    problems.append("findings parquet semantic set diverges from the seal")
+                data = path.read_bytes()
+                if hashlib.sha256(data).hexdigest() != str(entry.get("content_hash")):
+                    problems.append("findings artifact bytes tampered")
+                else:
+                    frame = pl.read_parquet(io.BytesIO(data))
+                    if frame.height != int(entry.get("row_count", -1)):
+                        problems.append("findings artifact row count mismatch")
+                    parquet_rows = frame.to_dicts()
+                    parquet_ids = sorted(str(r.get("finding_id")) for r in parquet_rows)
+                    if parquet_ids != sorted(db_finding_ids):
+                        problems.append("findings parquet ids diverge from the DB finding set")
+                    parquet_semantic = [
+                        {field: r.get(field) for field in _FINDING_SEMANTIC_FIELDS}
+                        for r in parquet_rows
+                    ]
+                    if _finding_set_hash(parquet_semantic) != str(record["finding_set_hash"]):
+                        problems.append("findings parquet semantic set diverges from the seal")
         status_recompute, error_recompute = _status_error_from_findings(db_findings)
         if status_recompute != str(record["status"]):
             problems.append(
@@ -2606,20 +2609,15 @@ class CanonicalRunner:
     def _verify_canonical_artifacts(
         self, record: dict[str, Any], manifest: dict[str, Any]
     ) -> list[str]:
-        """CR-3.6 P0-02: the ONE shared read-only canonical ARTIFACT
-        closure verifier - the artifact exact set (selected /
-        decisions / findings), the deterministic artifact URIs, the
-        physical content hashes / row counts / schema hashes, and the
-        selected / decision semantic seals. Consumed by BOTH the exact
-        replay closure verifier (``_verify_closure``) and the
-        historical continuity path for every same-world row - a
-        same-world prior SUCCESS whose OWN selected / decisions
-        artifacts are damaged can never be laundered into a new
-        superset run, and a genuine historical BLOCKED must keep its
-        recorded evidence internally intact before it may be
-        classified as genuine. The findings artifact's DB / parquet /
-        seal three-way truth and the status recompute live in the
-        shared ``_verify_findings_truth``."""
+        """Compatibility wrapper for the frozen list-returning verifier."""
+        problems, _ = self._verify_canonical_artifacts_with_rows(record, manifest)
+        return problems
+
+    def _verify_canonical_artifacts_with_rows(
+        self, record: dict[str, Any], manifest: dict[str, Any]
+    ) -> tuple[list[str], dict[str, list[dict[str, Any]]]]:
+        """Verify canonical artifact closure and return rows parsed from the
+        exact bytes whose content hashes were verified."""
         problems: list[str] = []
         if int(manifest.get("selected_count", -1)) != int(record["selected_count"]):
             problems.append("manifest selected_count does not match the ledger")
@@ -2650,7 +2648,7 @@ class CanonicalRunner:
             if hashlib.sha256(data).hexdigest() != str(entry.get("content_hash")):
                 problems.append(f"canonical {name} artifact bytes tampered")
                 continue
-            frame = pl.read_parquet(path)
+            frame = pl.read_parquet(io.BytesIO(data))
             if frame.height != int(entry.get("row_count", -1)):
                 problems.append(f"canonical {name} artifact row count mismatch")
             actual_schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
@@ -2670,7 +2668,7 @@ class CanonicalRunner:
                 manifest.get("decision_set_hash")
             ):
                 problems.append("decision semantic seal mismatch (values changed)")
-        return problems
+        return problems, artifact_rows
 
     def _verify_sealed_input(self, entry: dict[str, Any], as_of_dt: datetime) -> list[str]:
         """Seal-based verification of ONE sealed input run (CR-3.2 P0-04
@@ -2764,7 +2762,7 @@ class CanonicalRunner:
             if hashlib.sha256(data).hexdigest() != str(output.get("content_hash")):
                 problems.append(f"output artifact bytes tampered: {uri}")
                 continue
-            frame = pl.read_parquet(path)
+            frame = pl.read_parquet(io.BytesIO(data))
             if frame.height != int(output.get("row_count", -1)):
                 problems.append(f"output artifact row count mismatch: {uri}")
             schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()

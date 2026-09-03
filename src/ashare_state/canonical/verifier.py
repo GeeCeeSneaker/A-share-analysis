@@ -26,8 +26,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import polars as pl
-
 from ashare_state.canonical.canonicalizer import (
     _LEDGER_COLUMNS,
     CanonicalRunner,
@@ -118,7 +116,9 @@ def verify_canonical_run_for_consumption(
         raise CanonicalConsumptionError(msg)
 
     # 3. shared canonical artifact closure verifier
-    artifact_problems = runner._verify_canonical_artifacts(record, manifest)  # noqa: SLF001 - the ONE shared implementation
+    artifact_problems, artifact_rows = runner._verify_canonical_artifacts_with_rows(  # noqa: SLF001
+        record, manifest
+    )
     if artifact_problems:
         msg = (
             f"canonical run {canonical_run_id} artifacts are DAMAGED and "
@@ -164,10 +164,9 @@ def verify_canonical_run_for_consumption(
             )
             raise CanonicalConsumptionError(msg)
 
-    # materialize the selected rows from the hash-verified selected.parquet
-    selected_entry = manifest["artifacts"]["selected"]
-    selected_path = normalized_root / str(selected_entry["uri"])
-    rows = pl.read_parquet(selected_path).to_dicts()
+    # Reuse the rows materialized from the exact bytes inside the shared
+    # artifact verifier; never reread a mutable path after verification.
+    rows = artifact_rows["selected"]
     try:
         requested_domains = tuple(
             str(d) for d in json_loads_domains(str(record["requested_domains_json"]))

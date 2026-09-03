@@ -29,11 +29,13 @@ __all__ = [
     "SNAPSHOT_CONTRACT_VERSION",
     "ColumnSpec",
     "DomainSnapshotSchema",
+    "KeyBinding",
     "DType",
     "SnapshotSchemaError",
     "domain_snapshot_schema",
     "polars_domain_schema",
     "project_selected_row",
+    "project_verified_canonical_snapshot",
     "snapshot_domains",
     "validate_canonical_key",
 ]
@@ -67,6 +69,14 @@ class ColumnSpec:
     #: from the canonical_key JSON array at this index (P0-A08 - a
     #: decoded key component, never mistaken for canonical payload)
     key_index: int | None = None
+
+
+@dataclass(frozen=True)
+class KeyBinding:
+    """Binds a canonical key component to its typed snapshot column."""
+
+    key_index: int
+    column_name: str
 
 
 def _lineage_columns(requires_security_identity: bool) -> tuple[ColumnSpec, ...]:
@@ -110,6 +120,8 @@ def _domain_schema(
     requires_security_identity: bool,
     key_arity: int,
     key_projections: dict[str, int] | None = None,
+    key_bindings: tuple[tuple[int, str], ...] = (),
+    stable_sort_key: tuple[str, ...] = ("canonical_key",),
 ) -> DomainSnapshotSchema:
     cols = list(_lineage_columns(requires_security_identity))
     payload_start = 2 + (1 if requires_security_identity else 0)
@@ -127,6 +139,8 @@ def _domain_schema(
         domain=domain,
         columns=tuple(cols),
         key_arity=key_arity,
+        key_bindings=tuple(KeyBinding(index, name) for index, name in key_bindings),
+        stable_sort_key=stable_sort_key,
     )
 
 
@@ -136,6 +150,10 @@ class DomainSnapshotSchema:
     columns: tuple[ColumnSpec, ...]
     #: expected canonical_key JSON-array arity for this domain
     key_arity: int
+    #: explicit bindings from canonical key components to snapshot columns
+    key_bindings: tuple[KeyBinding, ...] = ()
+    #: deterministic physical row ordering for this domain
+    stable_sort_key: tuple[str, ...] = ("canonical_key",)
 
 
 _F = DType.FLOAT64
@@ -148,6 +166,7 @@ _DOMAIN_SCHEMAS: tuple[DomainSnapshotSchema, ...] = (
         (("market", _S, False),),
         requires_security_identity=False,
         key_arity=2,
+        key_bindings=((0, "market"), (1, "trade_date")),
     ),
     _domain_schema(
         "daily_bar",
@@ -162,6 +181,7 @@ _DOMAIN_SCHEMAS: tuple[DomainSnapshotSchema, ...] = (
         ),
         requires_security_identity=True,
         key_arity=2,
+        key_bindings=((0, "security_id"), (1, "trade_date")),
     ),
     _domain_schema(
         "security_status",
@@ -178,6 +198,7 @@ _DOMAIN_SCHEMAS: tuple[DomainSnapshotSchema, ...] = (
         ),
         requires_security_identity=True,
         key_arity=2,
+        key_bindings=((0, "security_id"), (1, "trade_date")),
     ),
     _domain_schema(
         "limit_price",
@@ -190,6 +211,7 @@ _DOMAIN_SCHEMAS: tuple[DomainSnapshotSchema, ...] = (
         ),
         requires_security_identity=True,
         key_arity=2,
+        key_bindings=((0, "security_id"), (1, "trade_date")),
     ),
     _domain_schema(
         "adj_factor",
@@ -200,6 +222,7 @@ _DOMAIN_SCHEMAS: tuple[DomainSnapshotSchema, ...] = (
         requires_security_identity=True,
         key_arity=3,
         key_projections={"factor_type": 2},
+        key_bindings=((0, "security_id"), (1, "trade_date")),
     ),
 )
 
@@ -351,6 +374,11 @@ def project_selected_row(
     closed). Lineage fields are preserved verbatim; only
     ``canonical_run_id`` / ``snapshot_id`` are added as projections."""
     schema = domain_snapshot_schema(domain)
+    if selected_row.get("canonical_domain") != domain:
+        raise SnapshotSchemaError(
+            f"domain {domain} selected row carries a foreign canonical_domain: "
+            f"{selected_row.get('canonical_domain')!r}"
+        )
     canonical_key = selected_row.get("canonical_key")
     if not isinstance(canonical_key, str) or not canonical_key:
         raise SnapshotSchemaError(
@@ -370,6 +398,20 @@ def project_selected_row(
         else:
             value = selected_row.get(spec.name)
         projected[spec.name] = _convert(value, spec, domain)
+    # Explicit natural-key bindings are part of the schema contract:
+    # canonical_key components must agree with the typed row identity.
+    for binding in schema.key_bindings:
+        value = projected[binding.column_name]
+        if isinstance(value, (datetime, date)):
+            typed_key_value = value.isoformat()
+        else:
+            typed_key_value = value
+        if typed_key_value != key_parts[binding.key_index]:
+            raise SnapshotSchemaError(
+                f"domain {domain} canonical_key component {binding.key_index} "
+                f"does not match {binding.column_name}: "
+                f"{key_parts[binding.key_index]!r} != {typed_key_value!r}"
+            )
     # PIT contract (P0-A08): every consumed row was available at as_of
     available_at = projected["available_at"]
     if available_at > as_of:
@@ -378,3 +420,62 @@ def project_selected_row(
             f"available_at {available_at.isoformat()} > as_of {as_of.isoformat()}"
         )
     return projected
+
+
+def project_verified_canonical_snapshot(
+    verified_canonical: Any, *, snapshot_id: str
+) -> dict[str, tuple[dict[str, Any], ...]]:
+    """Replay one verified canonical run through the snapshot registry.
+
+    This is the single deterministic projection used by both the builder
+    and the snapshot verifier. It groups only the already verified selected
+    rows, validates their domain/key/typed/PIT contracts, rejects duplicate
+    natural keys, and returns rows in the registry's stable order.
+    """
+    try:
+        requested_domains = tuple(str(domain) for domain in verified_canonical.requested_domains)
+    except (AttributeError, TypeError) as exc:
+        raise SnapshotSchemaError("verified canonical run has no requested domain set") from exc
+    if not requested_domains or len(set(requested_domains)) != len(requested_domains):
+        raise SnapshotSchemaError("verified canonical run carries an empty or duplicate domain set")
+    for domain in requested_domains:
+        domain_snapshot_schema(domain)
+
+    canonical_run_id = getattr(verified_canonical, "canonical_run_id", None)
+    if not isinstance(canonical_run_id, str) or not canonical_run_id:
+        raise SnapshotSchemaError("verified canonical run carries no canonical_run_id")
+    as_of = getattr(verified_canonical, "as_of", None)
+    if not isinstance(as_of, datetime) or as_of.tzinfo is None:
+        raise SnapshotSchemaError("verified canonical run carries no timezone-aware as_of")
+    as_of = as_of.astimezone(UTC)
+
+    grouped: dict[str, list[dict[str, Any]]] = {domain: [] for domain in requested_domains}
+    for row in verified_canonical.selected_rows:
+        if not isinstance(row, dict):
+            raise SnapshotSchemaError(f"verified canonical selected row is not a mapping: {row!r}")
+        row_domain = row.get("canonical_domain")
+        if not isinstance(row_domain, str) or row_domain not in grouped:
+            raise SnapshotSchemaError(
+                f"canonical run emitted domain {row_domain!r} outside the requested domain set"
+            )
+        grouped[row_domain].append(row)
+
+    projected_by_domain: dict[str, tuple[dict[str, Any], ...]] = {}
+    for domain in requested_domains:
+        projected = [
+            project_selected_row(
+                domain,
+                row,
+                canonical_run_id=canonical_run_id,
+                snapshot_id=snapshot_id,
+                as_of=as_of,
+            )
+            for row in grouped[domain]
+        ]
+        keys = [row["canonical_key"] for row in projected]
+        if len(set(keys)) != len(keys):
+            raise SnapshotSchemaError(f"domain {domain} carries duplicate canonical keys")
+        schema = domain_snapshot_schema(domain)
+        projected.sort(key=lambda row: tuple(row[name] for name in schema.stable_sort_key))
+        projected_by_domain[domain] = tuple(projected)
+    return projected_by_domain

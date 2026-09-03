@@ -7,6 +7,23 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+
+def _main_history_ref() -> str:
+    """Resolve mainline history in local and detached CI checkouts."""
+    for candidate in ("main", "origin/main"):
+        probe = subprocess.run(
+            ["git", "rev-parse", "--verify", candidate],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        if probe.returncode == 0:
+            return candidate
+    raise AssertionError("neither main nor origin/main is available for the DEVLOG gate")
+
+
 #: Explicitly grandfathered commits (full disclosure, V2.2 rule note):
 #: `9bfe327...` (2026-08-27) is the R4-A3.1 CI-fix followup (ruff
 #: format + mypy named probes) to the batch implementation commit
@@ -37,7 +54,7 @@ class TestDevlogGate:
             ".github/workflows/",
         )
         rev_list = subprocess.run(
-            ["git", "rev-list", "main", "--max-count=200"],
+            ["git", "rev-list", _main_history_ref(), "--max-count=200"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -113,7 +130,7 @@ class TestDevlogGate:
         )
         rule_since = "8d7d4aa"
         rev_list = subprocess.run(
-            ["git", "rev-list", "main", "--max-count=200"],
+            ["git", "rev-list", _main_history_ref(), "--max-count=200"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
