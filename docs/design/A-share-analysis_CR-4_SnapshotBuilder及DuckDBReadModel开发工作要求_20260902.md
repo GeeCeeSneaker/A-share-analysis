@@ -1187,7 +1187,7 @@ Future Feature / State
 
 # 13. Implementation Mapping（CR-4 首批，2026-09-03）
 
-> Reviewed base：CR-3 全链 closure reviewer 基线 `ff3808b7a5036246ea11e37173aa31d863beb2d9`（CR-4 启动裁决）；implementation commit `<本批提交后回填>`（CI 三腿确认后回填）。总体 **1235/0**（1179 → 1235，+56 项对抗测试）；ruff check / ruff format / mypy 全绿（78 源文件）；migration **022**（链 21 → 22）。治理同步（§12 裁决要求的第一动作，同 commit 完成）：ADR-023 → ACCEPTED、ADR-000 索引、CR-3.6 工作要求 Reviewer Closure 章节、DM 基线 `ff3808b`、CR-3 全链 VERIFIED/CLOSED/FREEZE。
+> Reviewed base：CR-3 全链 closure reviewer 基线 `ff3808b7a5036246ea11e37173aa31d863beb2d9`（CR-4 启动裁决）；implementation commit `2db6d8d6cc1fef047175b1f23c80016f003eee63` + 两个 assertion-only CI fix（`397ea7c` / `0c328c3de95c636df053a52bb5b4814fde2d14cb`）；CI **run 33715493176 三腿 success**（2026-09-03 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest（1235/0）/ Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success；implementation 首跑 run 33707982975 暴露 2 处仅测试断言的跨环境脆弱性——见 §13.6）。总体 **1235/0**（1179 → 1235，+56 项对抗测试）；ruff check / ruff format / mypy 全绿（78 源文件）；migration **022**（链 21 → 22）。治理同步（§12 裁决要求的第一动作，同 commit 完成）：ADR-023 → ACCEPTED、ADR-000 索引、CR-3.6 工作要求 Reviewer Closure 章节、DM 基线 `ff3808b`、CR-3 全链 VERIFIED/CLOSED/FREEZE。
 
 ## 13.1 §5 十问实现对照（ADR-024 PROPOSED 全文见 `docs/adr/ADR-024_snapshot_builder_readmodel.md`）
 
@@ -1229,6 +1229,11 @@ Future Feature / State
 
 **处理路径（未悄悄修复）**：最小修复（seal 改为对 aligned rows 计算——单 domain 行为逐字节不变，194 项既有 canonical 回归全保持即证明）+ `TestMultiDomainReplayRegression::test_multi_domain_exact_replay_idempotent`（4 domain SUCCESS 幂等 replay）回归钉 + ADR-024 Consequences / DM-20260903-075 / DEVLOG 申报 + **提请 Reviewer 在 CR-4 复审中一并裁决该 CR-3 frozen 机制的修正**。
 
+## 13.6 CI 首跑暴露的 2 处跨环境测试脆弱性（assertion-only 修复，零产品代码改动）
+
+1. **superset 共存测试的 winner 断言跨 ingest 环境漂移**：第二 world 有两条 **EQUIVALENT** 候选 run，CR-3 winner 排序键含 `run_manifest_hash`，其相对顺序依赖 raw evidence hash（内含 ingest wall-clock）——跨独立 ingest 环境合法漂移（本地 GMT+8 选 B、UTC runner 选 A）。断言改为 winner ∈ {两条 run} 并注释 CR-3 determinism 语义边界（determinism 的主张对象是"同一 verified canonical truth 复现同一 snapshot"，不是跨独立 ingest 的字节相等）。
+2. **`test_evidence_hash_mismatch_blocks_verdict` 的未排序 glob 平台脆弱性**（Ubuntu 腿失败、Windows 两腿绿）：spike `raw/` 顶层同时存在 `<request_id>.json`（case evidence_ref）与 `<request_id>.meta.json`（非 evidence_ref，但同样匹配 `*.json`）；原测试用 `next(raw.glob("*.json"))` 选篡改目标——NTFS 返回字典序（命中 payload → hash mismatch → SPIKE_INCOMPLETE ✓），ext4 返回目录项顺序（命中 `.meta.json` → 无 case hash mismatch → GO_DEGRADED ✗）。改为显式选择非 `.meta.json` 的 payload evidence 文件（确定性）。**与 CR-4 产品代码无关**（CR-4 未触碰 spike 框架）；因修改的是 R3/R4 冻结测试，在此显式申报并说明原委。
+
 ## 13.5 Exit Gate 自检（§12）
 
 ```text
@@ -1242,6 +1247,6 @@ Future Feature / State
 [x] migration 022 from-zero/upgrade/idempotent/tamper probe                                -> mandatory 43-46
 [x] 边界 AST guard（providers/normalization/raw/特征库全禁）                                -> TestBoundaryStructure
 [x] CR-3 冻结机制零"悄悄修改"——唯一触碰为显式申报的 latent 缺陷修复（回归钉 + 提请裁决）     -> §13.4
-[x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 + Ruff/format/Mypy/governance gates          -> 推送后 API 正向确认（回填本节）
+[x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 + Ruff/format/Mypy/governance gates          -> run 33715493176 三腿 success（2026-09-03 API positive confirmation；2 次 assertion-only 修复轮次，零产品代码改动——见 §13.6）
 [ ] Reviewer 复审裁决（含 CR-3 latent 缺陷修复的追认）                                      -> PENDING_REVIEW
 ```

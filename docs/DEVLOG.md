@@ -45,10 +45,10 @@
 - 既有回归零破坏：CR-3.x 全链 195 项（含 6 轮 REOPEN 收口全部对抗矩阵）；CR-2.x / R4 冻结契约零破坏
 - 实现中修复的工程问题（均以测试钉死）：DuckDB TIMESTAMPTZ fetch 本地时区（GMT+8）→ verify/rebuild 归一化 UTC；read_parquet hive partitioning 误读路径段；polars dict-rows + schema 的 extra-key 行为规避（投影先行过滤）；adj_factor factor_type 为 key projection 非 payload
 - **CI 两个修复轮次（均只影响测试断言，零产品代码改动）**：①superset 共存测试断言第二 world 的 EQUIVALENT winner 具体为 `req-new-bars`——但 winner 排序键含 `run_manifest_hash`，其相对顺序依赖 raw evidence hash 的 ingest wall-clock，跨独立 ingest 环境合法漂移（本地 GMT+8 选 B、UTC runner 选 A）；修正断言为 winner ∈ {两 run} 并注释 CR-3 determinism 语义边界。②Ubuntu 腿 `test_evidence_hash_mismatch_blocks_verdict` 失败（Windows 两腿绿）——根因为**测试自身的平台脆弱性**：`next(raw.glob("*.json"))` 未排序，而 raw 顶层同时存在 `<request_id>.json`（case evidence_ref）与 `<request_id>.meta.json`（非 evidence_ref，但同样匹配 `*.json`）；NTFS 返回字典序（命中 payload → SPIKE_INCOMPLETE ✓），ext4 返回目录项顺序（命中 meta → 无 case hash mismatch → GO_DEGRADED ✗）。修正为显式选择非 `.meta.json` 的 payload evidence 文件（确定性）——与 CR-4 产品代码无关（CR-4 未触碰 spike 框架），已在提交信息与本条目显式申报
-- GitHub Actions: 三腿 CI 确认见 backfill（implementation SHA + run id 待推送后回填本条目下方）
+- GitHub Actions: **run 33715493176（final `0c328c3de95c636df053a52bb5b4814fde2d14cb`）三腿 success**（2026-09-03 API positive confirmation：Windows 3.14 + Windows 3.12 + Ubuntu 3.14 各腿 Ruff lint / Ruff format / Mypy / Pytest（1235/0）/ Spike gates / SDK-absent / DEVLOG gate / Management-doc gate 全 success）。implementation commit `2db6d8d6cc1fef047175b1f23c80016f003eee63` 首跑 run 33707982975 暴露 2 处**仅测试断言**的跨环境脆弱性（superset winner 断言 / spike evidence glob 平台序），两个 assertion-only fix 提交（`397ea7c`、`0c328c3`）后三腿全绿——**2 次修复轮次，零产品代码改动**
 
 **Implementation Status**
-- DONE（CR-4.0-4.3 全交付 + ADR-024 + DM-20260903-075 + CR-3 closure 治理同步；1235/0；Review Status: PENDING_REVIEW）
+- DONE（CR-4.0-4.3 全交付 + ADR-024 + DM-20260903-075 + CR-3 closure 治理同步；1235/0；CI 三腿全绿；Review Status: PENDING_REVIEW）
 
 **关键决策**
 - 消费边界唯一性：SnapshotBuilder 不读 canonical 文件——它读"已验证的 canonical truth"（VerifiedCanonicalRun）；所有 canonical 正确性规则仍只在 canonicalizer.py 一处
