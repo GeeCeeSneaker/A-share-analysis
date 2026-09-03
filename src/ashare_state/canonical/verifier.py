@@ -116,7 +116,9 @@ def verify_canonical_run_for_consumption(
         raise CanonicalConsumptionError(msg)
 
     # 3. shared canonical artifact closure verifier
-    artifact_problems, artifact_rows = runner._verify_canonical_artifacts_with_rows(record, manifest)  # noqa: SLF001 - the ONE shared implementation
+    artifact_problems, artifact_rows = runner._verify_canonical_artifacts_with_rows(  # noqa: SLF001
+        record, manifest
+    )
     if artifact_problems:
         msg = (
             f"canonical run {canonical_run_id} artifacts are DAMAGED and "

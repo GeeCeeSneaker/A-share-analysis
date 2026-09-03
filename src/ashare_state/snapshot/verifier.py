@@ -260,7 +260,10 @@ def verify_snapshot(
         frame = pl.read_parquet(io.BytesIO(data))
         actual_schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
         if actual_schema_hash != str(entry.get("schema_hash")):
-            msg = f"snapshot {domain} artifact schema hash does not match the physical schema (schema rebind)"
+            msg = (
+                f"snapshot {domain} artifact schema hash does not match the physical "
+                "schema (schema rebind)"
+            )
             raise SnapshotVerifierError(msg)
         if str(frame.schema) != str(polars_domain_schema(domain)):
             msg = f"snapshot {domain} artifact schema is not the registry schema (schema rebind)"

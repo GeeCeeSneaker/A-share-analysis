@@ -17,6 +17,15 @@
 
 ---
 
+## 2026-09-03 · CR-4.4 CI lint 修复
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：PR 首轮 GitHub Actions 在 Ruff lint 阶段报告 4 个静态问题（两处
+  E501、一个 SIM114、一个长错误消息）；已按报告修复，未改变 CR-4.4 契约语义。
+- pytest、format、mypy 及后续治理 gates 尚未因首轮 lint 失败而运行，继续以新的 CI 结果为准。
+
+---
+
 ## 2026-09-03 · CR-4.4 Snapshot 回放、不可变写入与 ReadModel provenance 收口
 
 **Trigger**

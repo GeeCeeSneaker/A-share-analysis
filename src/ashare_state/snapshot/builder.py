@@ -14,10 +14,11 @@ canonical SUCCESS run:
 - one ledger transaction (migration 022) with a duplicate check.
 
 No wall-clock enters any artifact (started_at/completed_at are
-ledger-side transaction audit metadata only), so an exact retry after a crash between file writes and the ledger commit
-is recoverable: identical existing bytes are no-ops, missing bytes are
-written, conflicting bytes fail closed, and the ledger is committed only
-after the complete deterministic file plan is compatible.
+ledger-side transaction audit metadata only), so an exact retry after
+a crash between file writes and the ledger commit is recoverable:
+identical existing bytes are no-ops, missing bytes are written,
+conflicting bytes fail closed, and the ledger is committed only after
+the complete deterministic file plan is compatible.
 """
 
 from __future__ import annotations
