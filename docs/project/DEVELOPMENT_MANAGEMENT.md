@@ -8,8 +8,8 @@
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d`；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`  
 > **Latest CI baseline**：GitHub Actions run `33842361483`（run 232）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1407 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均成功。  
 > **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 保持待审；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105   / DM-20260904-106
-> **Last Review**：2026-09-04（正式账号 SDK 已在受控本地环境安装并通过脱敏直连冒烟；仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105   / DM-20260904-106 / DM-20260904-107
+> **Last Review**：2026-09-04（正式账号 SDK 已在受控本地环境安装并通过脱敏直连冒烟；2020+ 历史边界守卫修正等待 CI；仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：CR-5 final docs-inclusive run `33818320010`（run 179）三矩阵全绿；CR-6.1 clean snapshot run `33827791369`（run 192）三矩阵全绿；Ubuntu 3.14、Windows 3.12、Windows 3.14 的 Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 均 success，Windows 3.14 DEVLOG/Management-doc gates success。main merge commit 为 `075ad80e5254998a0662a0f9c1cadc107a217fdb`，activation commit 为 `4ac274747e86d5f386560ceabbffa3273ca9d14b`。  
 > **Phase Status（2026-09-04，CR-6.4 + 2020+ history contract）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-020 ACCEPTED）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 → **VERIFIED / CLOSED / FREEZE（ADR-025 ACCEPTED；PR #3 merged）**；CR-6 State → **DONE / REOPENED（CR-6.4 implementation complete；ADR-026 PROPOSED / PENDING_REVIEW）**；2020+ history contract → **IMPLEMENTED / PENDING_REVIEW**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
@@ -32,6 +32,14 @@
 - 小窗口接口返回规模已记录：calendar 8,719、沪深代码 5,215、历史代码列表 5,215、北交所映射 248、stock basic 1、history status 1、adj factor 8,719、dividend 54、right issue 0、equity structure 68、industry base 511；行业/日线接口返回结构化结果。
 - 该证据是 native SDK smoke，不满足 formal facade/provider-doctor、run-scoped Production B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval。全历史覆盖仅在正式单 Run 中按 2020+ 合同执行。
 - 依赖 wheel 只保存在本地被忽略的 `vendor/amazingdata/`；`configs/production_account.yaml` 仍为空。因当前本地 SDK 环境未装入仓库源码，formal runner 尚未执行。
+
+## DM-20260904-107 · 2020+ 历史边界静态守卫有效性修正
+
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW
+
+- 修正集成测试对旧 1990 边界的自匹配问题；测试现在在运行时拼接旧边界字符串，再断言正式 gate 与 B2 probe 源码不含该边界。
+- 正式 gate、B2 probe 仍调用 2020-01-01；这是测试有效性修正，不是新增 State/Provider 语义。
+- 等待本提交的三矩阵 CI；Production formal run 仍未执行。
 
 # 0. 文档定位
 

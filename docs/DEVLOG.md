@@ -1,5 +1,13 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · Corrected the effective 2020 history-boundary guard
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：收紧正式 gate 与 B2 probe 的静态测试守卫；旧边界在断言运行时构造，避免测试源码中的字面量让“旧边界不存在”检查自匹配。运行时调用仍固定为 2020-01-01。
+- 本修正不改变 Provider 数据语义，只提高 2020+ 历史合同的可验证性；上一提交的 SDK 直连冒烟结果、依赖 wheel 本地归档与凭证不入库边界保持不变。
+- 当前提交等待 GitHub Actions 三矩阵验证；正式 repo Production B1-B7、Golden/Data Sufficiency Matrix、verdict 与 Provider approval 仍未完成。
+
 ## 2026-09-04 · Formal provider SDK smoke validation completed
 
 **Implementation Status / Review Status**

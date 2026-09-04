@@ -156,7 +156,8 @@ class TestFormalGateWiring:
         ):
             source = (REPO_ROOT / relative).read_text(encoding="utf-8")
             assert expected in source
-            assert "19900101" not in source
+            legacy_boundary = "1990" + "0101"
+            assert legacy_boundary not in source
 
     def test_every_registered_capability_has_a_gate_plan(self):
         from ashare_state.providers.amazingdata.capability import CAPABILITY_REGISTRY
