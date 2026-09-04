@@ -11,6 +11,30 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.1 Registry and deterministic State engine
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：在 CR-6.0 governance bootstrap 后，完成静态 State Registry、严格 execution-plan compiler、共享 deterministic State engine 和四个 V1 描述性维度：return center、daily participation、trend participation、market structure。
+- State engine 只接收一个 VerifiedFeatureRun 的 market rows，不读取 Provider、Raw、Canonical、Snapshot、ReadModel，不重算 Feature；阈值仅使用 sign、0.5 majority 和 exact count dominance。
+- 正常混合结构输出 MIXED；缺失证据保留日期并输出 UNKNOWN 与 typed finding；daily count invariant 违反时 fail closed。新增 CR-6.1 focused tests 覆盖 Registry drift、exact rule semantics、evidence projection、PIT/lineage 和输入顺序确定性。StateBuilder、artifact、ledger、migration 024、public verifier 和 scope guard 尚未实现。
+
+**Next**
+
+- 进入 CR-6.2：显式 feature_run_id 的 StateBuilder、确定性 identity、immutable artifacts、migration 024、recoverable publication、ledger 与 public replay verifier；保持 ADR-026 PROPOSED / PENDING_REVIEW。
+
+## 2026-09-04 · CR-6.0 governance bootstrap
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：PR #3 已合入 main，merge commit 为 075ad80e5254998a0662a0f9c1cadc107a217fdb；随后 activation commit 4ac274747e86d5f386560ceabbffa3273ca9d14b 已确认 CR-6 START / ACTIVE。
+- CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 已 VERIFIED / CLOSED / FREEZE；ADR-025 已由 Reviewer 接受。最终 docs-inclusive CI run 33818320010（run 179）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部 SUCCESS，并通过 Ruff、format、mypy、full pytest、Spike、SDK-absent 和 Windows 3.14 governance gates。
+- 本批为 CR-6.0 governance bootstrap：新增 ADR-026（PROPOSED / PENDING_REVIEW）以及 State registry/models/schema 类型骨架；尚未加入 State 计算、artifact、ledger、migration、verifier、预测或策略语义。
+
+**Next**
+
+- 在 Reviewer 复核 ADR-026 与治理同步后，进入 CR-6.1 Registry + Engine；继续保持 State 只消费 Verified Feature Run，Production P0-M-1B 独立 BLOCKED。
+
 ## 2026-09-04 · CR-5.2 atomic-history CI verification
 
 **Implementation Status / Review Status**
