@@ -205,9 +205,7 @@ def main() -> int:
     env = load_env(args.env_file)
     credentials = None if args.offline else _credentials_from_env(env)
     if not args.offline and credentials is None:
-        safe = _safe_report(
-            _not_tested_report(), offline=False, credentials_available=False
-        )
+        safe = _safe_report(_not_tested_report(), offline=False, credentials_available=False)
         exit_code = 2
     else:
         try:

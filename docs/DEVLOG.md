@@ -1,3 +1,10 @@
+## 2026-09-04 · P0-AD-01 formatter follow-up
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (P0-M-1B.0) / CI_PENDING / PENDING_REVIEW**：run 257 的 Ruff lint 已通过，format check 仅要求缺少凭证分支的调用恢复单行；本提交只做格式修正。
+- 不改变缺失输入优先级、doctor 不调用、脱敏输出或正式账号验证边界；凭证、Token、host/port/raw profile 不进入仓库。
+
 ## 2026-09-04 · P0-AD-01 missing-input classification correction
 
 **Implementation Status / Review Status**
