@@ -3759,3 +3759,19 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.3 scope-guard lint correction batch.
 - **Reviewer**：Design / Audit Review pending.
 
+---
+
+## Change Record: DM-CR-20260904-094
+
+- **Type**：C0 — CR-6.3 scope guard formatter correction
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Trigger**：CI run 33830803320（run 204）Ruff formatter output.
+- **Old Contract**：Two scope guard expressions used valid but non-canonical multi-line formatting.
+- **New Contract**：The guard remains semantically identical and matches the repository formatter.
+- **Affected Modules**：tests/integration/test_state_scope.py.
+- **Tests**：Ruff lint/format and subsequent full CI pending.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
+- **Commit**：Current CR-6.3 scope-guard formatter correction batch.
+- **Reviewer**：Design / Audit Review pending.
+

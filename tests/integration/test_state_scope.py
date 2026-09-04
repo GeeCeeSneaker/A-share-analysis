@@ -17,9 +17,7 @@ _ALLOWED_FEATURE_IMPORTS = {
     "ashare_state.features.models": frozenset(
         {"VerifiedFeatureRun", "canonical_json", "semantic_hash"}
     ),
-    "ashare_state.features.verifier": frozenset(
-        {"verify_feature_run_for_consumption"}
-    ),
+    "ashare_state.features.verifier": frozenset({"verify_feature_run_for_consumption"}),
 }
 _FORBIDDEN_LAYER_MODULES = (
     "ashare_state.providers",
@@ -169,9 +167,7 @@ def _import_scope_violations(path: Path, tree: ast.Module) -> list[str]:
                 or node.args[0].value.startswith("ashare_state.features")
             )
         ):
-            violations.append(
-                f"{path.name}: dynamic forbidden import {node.args[0].value}"
-            )
+            violations.append(f"{path.name}: dynamic forbidden import {node.args[0].value}")
     return violations
 
 

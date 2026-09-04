@@ -11,6 +11,17 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.3 scope guard formatter correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：PR #6 run `33830803320`（run 204）Ruff lint 已通过，formatter 发现 scope guard 两处非规范换行；未进入 mypy/pytest。
+- 已按实际 formatter 输出收敛允许的 Feature verifier 集合和动态 import 诊断为单行；scope guard 语义不变。
+
+**Next**
+
+- 重新执行 CR-6.3 三矩阵 CI；以实际 scope guard、全量 pytest、Spike、SDK-absent 与治理 gate 结果更新状态。
+
 ## 2026-09-04 · CR-6.3 scope guard lint correction
 
 **Implementation Status / Review Status**
