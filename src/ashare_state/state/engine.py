@@ -260,6 +260,13 @@ def _market_structure(
     return "MIXED"
 
 
+def _trade_date_key(row: Mapping[str, Any]) -> date:
+    trade_date = row.get("trade_date")
+    if not isinstance(trade_date, date):
+        raise StateEngineError("Feature market row trade_date must be a date")
+    return trade_date
+
+
 def _validate_row_identity(
     row: Mapping[str, Any],
     feature_run: VerifiedFeatureRun,
@@ -309,7 +316,7 @@ def compute_state_set(
 
     ordered_rows = sorted(
         (dict(row) for row in feature_run.market_rows),
-        key=lambda row: row.get("trade_date"),
+        key=_trade_date_key,
     )
     seen_dates: set[date] = set()
     state_rows: list[dict[str, Any]] = []
