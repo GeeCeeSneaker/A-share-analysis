@@ -6,10 +6,10 @@
 > **Frozen Baseline**：V1.3.2  
 > **Reviewed Repository HEAD**：`0a79be1cb8de7349c40668da059bf8b7480bd304`（2020+ history contract、治理例外与当前文档同步基线；分支历史保持 append-only）  
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d`；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`  
-> **Latest CI baseline**：GitHub Actions run `33842361483`（run 232）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1407 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均成功。  
+> **Latest CI baseline**：GitHub Actions run `33853588983`（run 238）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1408 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均成功。
 > **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 保持待审；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105   / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109
-> **Last Review**：2026-09-04（正式账号 SDK 已在受控本地环境安装并通过脱敏直连冒烟；2020+ 历史边界守卫修正等待 CI；仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105   / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110
+> **Last Review**：2026-09-04（正式账号 SDK 已在受控本地环境安装并通过脱敏直连冒烟；2020+ 历史边界守卫已由 CI 验证；仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：CR-5 final docs-inclusive run `33818320010`（run 179）三矩阵全绿；CR-6.1 clean snapshot run `33827791369`（run 192）三矩阵全绿；Ubuntu 3.14、Windows 3.12、Windows 3.14 的 Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 均 success，Windows 3.14 DEVLOG/Management-doc gates success。main merge commit 为 `075ad80e5254998a0662a0f9c1cadc107a217fdb`，activation commit 为 `4ac274747e86d5f386560ceabbffa3273ca9d14b`。  
 > **Phase Status（2026-09-04，CR-6.4 + 2020+ history contract）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-020 ACCEPTED）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 → **VERIFIED / CLOSED / FREEZE（ADR-025 ACCEPTED；PR #3 merged）**；CR-6 State → **DONE / REOPENED（CR-6.4 implementation complete；ADR-026 PROPOSED / PENDING_REVIEW）**；2020+ history contract → **IMPLEMENTED / PENDING_REVIEW**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
@@ -54,6 +54,14 @@
 
 - 按 Ubuntu Ruff format 实际诊断，将新增测试中的多行路径拼接收敛为等价单行表达式；2020+ 历史合同与运行时行为不变。
 - 当前 head 等待三矩阵 CI；Production formal run 仍未执行。
+
+## DM-20260904-110 · 2020+ 历史边界守卫 CI 验证完成
+
+**Status**：DONE / VERIFIED / PENDING_REVIEW
+
+- 当前 head `13235cf596867fbd798f050f1027a7349bd3daa5` 的 run `33853588983`（run 238）三矩阵全部成功，每腿 `1408 passed`。
+- Ruff、mypy、Spike、SDK-absent、DEVLOG 与 Management-doc gates 均通过；正式 gate/B2 probe 的 2020-01-01 参数守卫已获得真实 CI 证据。
+- 正式账号的 native SDK smoke 不等同于 formal Production run；B1-B7、Golden/Data Sufficiency Matrix、verdict 与 Provider approval 仍未完成。
 
 # 0. 文档定位
 

@@ -1,5 +1,13 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · 2020+ 历史边界守卫 CI verified
+
+**Implementation Status / Review Status**
+
+- **DONE (code/test/documentation) / VERIFIED (CI) / PENDING_REVIEW**：当前 head `13235cf596867fbd798f050f1027a7349bd3daa5` 的 GitHub Actions run `33853588983`（run 238）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1408 passed`。
+- Ruff lint/format、mypy、Spike framework、SDK-absent、DEVLOG 与 Management-doc gates 均成功；2020-01-01 历史边界守卫已由真实 CI 验证。
+- 本次 CI 只证明仓库代码/契约门通过，不改变本地 native SDK smoke 与正式 Production B1-B7 的边界：正式 run、Golden/Data Sufficiency Matrix、verdict、Provider approval 和 Reviewer closure 仍待完成。
+
 ## 2026-09-04 · Ruff path-expression format correction
 
 **Implementation Status / Review Status**
