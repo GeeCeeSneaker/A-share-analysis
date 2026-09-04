@@ -3,7 +3,7 @@
 > **Date**：2026-09-04  
 > **Reviewer Baseline**：`4ac274747e86d5f386560ceabbffa3273ca9d14b`  
 > **Parallel Track**：CR-6 State 开发可并行；本批次不得修改 CR-5 冻结语义，也不得越权批准未验证 Provider capability  
-> **Status**：**P0-M-1B ACCOUNT AVAILABLE / VALIDATION START**  
+> **Status**：**P0-M-1B ACCOUNT NOT AVAILABLE / VALIDATION BLOCKED**  
 > **Production Truth**：正式账号“已存在”≠正式数据源“已验证”；只有 frozen account identity + production Spike + golden + evidence closure + Reviewer approval 才能授予 APPROVED  
 > **Credentials**：用户名、密码、Token、真实 host 明文等一律只进 `.env`/运行环境，不得写入 Git、日志、issue、PR body 或本文件
 
@@ -53,7 +53,7 @@ b7 capacity / backfill
 3. `historical_st_suspend`
 4. `limit_price_and_no_limit_days`
 5. `adj_factor_corporate_action_continuity`
-6. `history_start_2018_plus_warmup`
+6. `history_start_2020`
 7. `symbol_mapping_unambiguous`
 8. `sdk_permission_cache_freshness`
 
@@ -242,7 +242,7 @@ open/high/low/close/pre_close/volume/amount
 
 必须验证：
 
-- 2013/2014 起历史深度是否真实可取；
+- 2020-01-01 起历史深度是否真实可取；
 - 2020+ 全 A 研究覆盖；
 - volume 是股还是手；
 - amount 是元还是其他单位；
@@ -495,7 +495,7 @@ NOT_NEEDED_CURRENTLY
 
 # 9. 运行顺序与流量纪律
 
-正式账号虽可能额度更高，也不得一开始就全量 2013+ 全市场猛拉。
+正式账号虽可能额度更高，也不得一开始就全量 2020+ 全市场猛拉；2020 年以前不是当前回填目标。
 
 建议顺序：
 
@@ -562,7 +562,7 @@ Provider validation track
 5. verdict + evidence closure；
 6. Core 8 全部有明确结论；
 7. Existing Optional 4 全部有明确结论；
-8. 历史深度至少证明满足 2020+ 研究，目标验证 2013/2014 warmup；
+8. 历史深度必须证明满足 2020+ 研究；2020 年以前不再作为 GO 条件或回填目标；
 9. daily bar volume/amount unit 有独立证据；
 10. EOD available_at/freshness 有实测；
 11. historical status/limit golden 达标；
@@ -577,6 +577,20 @@ Provider validation track
 20. DEVLOG + DEVELOPMENT_MANAGEMENT 同步；
 21. 未经 Reviewer 审批不得把 CANDIDATE capability 改为 APPROVED；
 22. 未经 PIT/semantic proof 不得新增 Feature/State 公式消费扩展数据。
+
+---
+
+## 11.1 当前阻塞记录（2026-09-04）
+
+本批文档要求可以继续推进的代码、合同和测试已进入仓库；但以下生产事实不能由开发人员伪造，因此仍保持阻塞：
+
+1. `configs/production_account.yaml` 的 `production_account_profile_id`、`confirmed_at`、`confirmed_by` 仍为空；
+2. 当前仅有试用仿真账号的 B1 连通性证据，B2-B7 正式生产验证尚未执行；
+3. `docs/provider_verification/amazingdata.md` 仍记录正式账号和正式 entitlement 待确认；
+4. `docs/spike_report_p0m1.md` 当前结论仍为 `未评定`，没有生产 `GO_CORE` / `GO_DEGRADED` / `NO_GO` verdict；
+5. 因此不得勾选正式账号、CLOSED PRODUCTION B1-B7、Golden/Data Sufficiency Matrix、Reviewer approval 或 capability APPROVED 等退出项。
+
+解除阻塞所需的最小外部输入是：由 Owner/Reviewer 人工确认的脱敏稳定账号画像和实际 entitlement；凭证只能通过运行环境注入。账号到位后仍必须按本文件的单一 production run、evidence closure、2020+ 历史合同和 Reviewer 复核流程执行。
 
 ---
 
