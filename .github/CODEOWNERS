@@ -1,0 +1,13 @@
+# A-share-analysis CODEOWNERS
+#
+# Normal source changes still require the repository's protected-main PR review.
+# The entries below add an OWNER review requirement for governance/security-critical paths.
+# Keep this file itself owner-protected via the /.github/ rule.
+
+/.github/ @GeeCeeSneaker
+/configs/production_account.yaml @GeeCeeSneaker
+/configs/trading_rules/ @GeeCeeSneaker
+/data/golden/ @GeeCeeSneaker
+/migrations/ @GeeCeeSneaker
+/docs/adr/ @GeeCeeSneaker
+/docs/project/DEVELOPMENT_MANAGEMENT.md @GeeCeeSneaker
