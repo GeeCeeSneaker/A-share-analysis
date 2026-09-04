@@ -33,8 +33,8 @@ uv run ashare provider-doctor --output data/spike/results/provider_doctor.json
 
 | verdict | 含义 | 动作 |
 |---|---|---|
-| RUNTIME_IDENTITY_VERIFIED | Python wheel 自带运行时且加载路径一致 | 可继续 |
-| RUNTIME_VERSION_MISMATCH | 版本线索冲突 | 停止；对照 provider_verification §1 排查后再测 |
+| RUNTIME_ACTUAL_LOAD_VERIFIED | Python wheel 自带运行时已实际加载且路径一致 | 可继续正式 Spike 前置 |
+| RUNTIME_PACKAGE_VERIFIED | 仅确认 wheel 层打包运行时存在，实际 DLL 尚未确认 | 先在线运行 doctor |\n| RUNTIME_VERSION_MISMATCH | 版本线索冲突 | 停止；对照 provider_verification §1 排查后再测 |
 | RUNTIME_PATH_AMBIGUOUS | 加载了 wheel 外的 tgw DLL（如公共路径 C++ 库） | 停止；排查 PATH/DLL 搜索顺序 |
 
 ## 4. 账号画像纪律（任务书 §6/§18）
@@ -42,4 +42,4 @@ uv run ashare provider-doctor --output data/spike/results/provider_doctor.json
 - `account_profile_id` 区分 TRIAL_SIMULATION 与正式账号
 - **仿真账号与正式账号的验证结果不得混记**：provider_verification 与
   Spike 案例目录都按 profile 分节
-- 正式账号到位后：先重跑 doctor → 重新记录全部画像字段 → 才能开始 B2-B7
+- 正式账号当前已完成本地 native SDK smoke；正式 Production run 前仍必须在线重跑 doctor，确认实际加载路径、脱敏 profile 和 entitlement，再按单一 B1-B7 run 执行
