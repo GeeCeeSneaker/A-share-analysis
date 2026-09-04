@@ -1,5 +1,21 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · CR-6.4 final CI verification and mandatory mapping sync
+
+**Implementation Status / Review Status**
+
+- **DONE (CR-6.4 implementation + CI) / REOPENED (CR-6) / PENDING_REVIEW**：Implementation head `e47514a8afc864c9f197e18f95ea56fe81424a2d` includes the normal current-main merge `bdb112213dc64325ccc3931a1c0617ae448ef93d` and preserves public-repository governance plus AmazingData 2020+ contracts.
+- GitHub Actions run `33836243605` (run 213) passed on Ubuntu 3.14, Windows 3.12, and Windows 3.14; each leg reported `1401 passed`. Ruff lint/format, mypy, Spike, and SDK-absent checks passed; applicable Windows 3.14 DEVLOG/Management gates passed.
+- ADR-026 now states the Amendment A contract honestly: only `STATE_INPUT_NULL` and `STATE_INPUT_EMPTY_DENOMINATOR` are persisted findings; `STATE_INPUT_INVARIANT_VIOLATION` and `STATE_RULE_UNAVAILABLE` are typed fatal codes that publish neither artifacts nor a SUCCESS ledger row. The verifier rejects an injected fatal finding class.
+- The CR-6 work requirement now contains a concrete test/parameter/case mapping for all mandatory items 1–64, including the reviewer-highlighted recovery, PIT, identity, rebind, and contract-honesty cases.
+- CR-6.4 remains START / ACTIVE pending reviewer closure; PR #6 remains OPEN / NOT MERGED. No CR-6 CLOSED/FREEZE claim is made.
+
+**Next**
+
+- Run the documentation-inclusive CI for this synchronization commit, then request final human review. Keep migration 024 and the State dimension set frozen.
+
+
+
 > **维护规则**（第三轮审查 §1-§4 固化 + R4-A1.1 复核 §2.3/§2.4 更新）：
 > - 本文件是项目**唯一**滚动开发日志；每次代码推送同步在顶部追加条目（倒序），不覆盖历史。
 > - 专题报告仅限：M0 Exit / Provider Spike / P0a Exit / P0b Exit / Backfill Exit / 重大 Incident / 重大架构决策。

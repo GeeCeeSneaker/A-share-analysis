@@ -3858,3 +3858,19 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.4 Builder-order correction batch.
 - **Reviewer**：Final Design / Audit Review pending; PR #6 remains open and not merged.
 
+
+---
+
+## Change Record: DM-CR-20260904-100
+
+- **Type**：C2 — CR-6.4 final adversarial implementation CI and contract-honesty evidence
+- **Date**：2026-09-04
+- **Status**：DONE (implementation) / REOPENED (CR-6) / PENDING_REVIEW
+- **Trigger**：CR-6.4 reviewer requirements P0-01/P0-02/P0-03 and stale-contract correction.
+- **Evidence**：Implementation head `e47514a8afc864c9f197e18f95ea56fe81424a2d` was verified by GitHub Actions run 33836243605 (run 213). Ubuntu 3.14, Windows 3.12, and Windows 3.14 each reported 1401 passed; Ruff lint/format, mypy, Spike, and SDK-absent checks passed; applicable Windows 3.14 DEVLOG/Management gates passed.
+- **New Contract**：Persisted State findings are limited to STATE_INPUT_NULL and STATE_INPUT_EMPTY_DENOMINATOR. STATE_INPUT_INVARIANT_VIOLATION and STATE_RULE_UNAVAILABLE are typed fatal error codes raised before publication; fatal errors create no State artifacts and no SUCCESS ledger row. The concrete 1–64 mapping and recovery/rebind evidence are recorded in the CR-6 work requirement addendum.
+- **Affected Modules**：src/ashare_state/state/{models,schema,engine,builder,verifier}.py; tests/integration/test_state.py; tests/integration/test_state_persistence.py; docs/adr/ADR-026_deterministic_market_state_interpretation.md; docs/design/A-share-analysis_CR-6_DeterministicMarketStateLayer开发工作要求_20260904.md.
+- **Compatibility**：No new State dimensions; migration 024 unchanged; CR-5 Feature semantics, public-repository governance, CODEOWNERS/SECURITY/CONTRIBUTING, and AmazingData 2020+ contracts preserved. Current main was merged normally into the branch without history rewrite.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE; PR #6 remains open and not merged.
+- **Commit**：`e47514a8afc864c9f197e18f95ea56fe81424a2d` implementation head; this record is synchronized with the contract-evidence documentation batch.
+- **Reviewer**：Final Design / Audit Review pending.

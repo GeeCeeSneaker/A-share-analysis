@@ -125,9 +125,11 @@ Each State row carries the source Feature input lineage hash. It also carries a 
 
 For every Feature market row, State emits exactly one State row. Missing or insufficient evidence yields UNKNOWN rather than dropping the date, filling from another date, or silently substituting another input.
 
-The permitted finding classes are STATE_INPUT_NULL, STATE_INPUT_EMPTY_DENOMINATOR, STATE_INPUT_INVARIANT_VIOLATION, and STATE_RULE_UNAVAILABLE. A normal mixed result is a valid MIXED state, not a finding. Finding detail_json contains deterministic canonical JSON only; no wall-clock field is part of correctness.
+The permitted persisted finding classes are STATE_INPUT_NULL and STATE_INPUT_EMPTY_DENOMINATOR. A normal mixed result is a valid MIXED state, not a finding. Finding detail_json contains deterministic canonical JSON only; no wall-clock field is part of correctness.
 
-For the daily participation dimension, the counts must satisfy advancer_count + decliner_count + unchanged_count == valid_raw_return_count. A mismatch fails closed with STATE_INPUT_INVARIANT_VIOLATION and produces no successful State publication; it is not silently repaired.
+STATE_INPUT_INVARIANT_VIOLATION and STATE_RULE_UNAVAILABLE are fatal State error codes, not persisted finding classes. A fatal error is raised before any State artifact is written, no SUCCESS State ledger row is committed, and the exact code is exposed on the typed exception as `error_code`. The public verifier rejects a fatal code injected into `state_findings`.
+
+For the daily participation dimension, the counts must satisfy advancer_count + decliner_count + unchanged_count == valid_raw_return_count. A mismatch raises `StateEngineError(error_code=STATE_INPUT_INVARIANT_VIOLATION)` and produces no successful State publication; it is not silently repaired. A registered State rule that cannot be compiled or has no typed handler fails before Feature consumption/publication with `StateFatalError(error_code=STATE_RULE_UNAVAILABLE)`.
 
 ### 10. Identity, artifact, manifest, and ledger are deterministic and recoverable
 
@@ -224,6 +226,10 @@ CR-6.1 implemented the State Registry, exact execution compiler, shared determin
 CR-6.2 implemented deterministic identity, immutable artifacts, migration 024, recoverable publication, the ledger, the public verifier, and tests 1–10 plus 45–60. GitHub Actions run `33829733713` (run 202) verified the clean PR #6 head with Ubuntu 3.14, Windows 3.12, and Windows 3.14; each leg passed 1368 tests plus Ruff, formatter, mypy, Spike, SDK-absent, and applicable governance gates.
 
 CR-6.3 implemented the AST-based static scope guards for groups 61–63 and completed the frozen regression evidence for group 64. GitHub Actions run `33831161954` (run 206) passed on Ubuntu 3.14, Windows 3.12, and Windows 3.14; each leg passed 1372 tests, Ruff lint/formatter, mypy, Spike, and SDK-absent, with the applicable Windows governance gates also successful. The 1–64 implementation mapping is now recorded across the CR-6.1, CR-6.2, and CR-6.3 entries above; final Reviewer closure remains pending.
+
+CR-6.4 (Amendment A — Contract Honesty / Final Adversarial Closure) implemented the fatal-vs-persisted-finding split, zero-publication fatal boundaries, deterministic retry/residue handling, independent Feature replay against evidence/business/finding rebinds, future-row and timezone identity checks, and the explicit current-main synchronization. The branch contains normal two-parent merge commit `bdb112213dc64325ccc3931a1c0617ae448ef93d` with current main `2dc63e803af908baa3424d576b17d8b07751e05f`; no history rewrite was used. Implementation head `e47514a8afc864c9f197e18f95ea56fe81424a2d` was verified by GitHub Actions run `33836243605` (run 213): Ubuntu 3.14, Windows 3.12, and Windows 3.14 each passed 1401 tests; Ruff lint/format, mypy, Spike, and SDK-absent checks passed, and the applicable Windows 3.14 DEVLOG/Management gates passed. CR-6.4 remains START / ACTIVE pending human review; PR #6 remains open and not merged.
+
+The CR-6.4 work-requirement addendum records the concrete 1–64 mapping. Items 2–7 are the State builder's propagation matrix for the named upstream failure classes; the full frozen Feature adversarial suite remains part of the 1401-test regression. The mapping distinguishes persisted findings (only `STATE_INPUT_NULL` and `STATE_INPUT_EMPTY_DENOMINATOR`) from fatal error codes (`STATE_INPUT_INVARIANT_VIOLATION` and `STATE_RULE_UNAVAILABLE`).
 
 The first implementation batch must update DEVLOG and DEVELOPMENT_MANAGEMENT in the same logical governance batch. Historical DEVLOG entries remain append-only.
 
