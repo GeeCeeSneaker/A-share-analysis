@@ -11,6 +11,17 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.2 formatter follow-up
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33829344918`（run 199）在 Ruff formatter 阶段发现 1 处未规范化换行；未进入 mypy/pytest。
+- 已按 CI 实际 formatter 输出收敛 State verifier 的 semantic seal 异常格式；不改变 State identity、artifact、ledger、replay 或 migration 语义。
+
+**Next**
+
+- 重新执行 CR-6.2 三矩阵 CI；以实际结果更新状态。
+
 ## 2026-09-04 · CR-6.2 formatter correction
 
 **Implementation Status / Review Status**

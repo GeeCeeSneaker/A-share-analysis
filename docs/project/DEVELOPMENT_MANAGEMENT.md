@@ -3679,3 +3679,20 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.2 formatter correction batch.
 - **Reviewer**：Design / Audit Review pending.
 
+---
+
+## Change Record: DM-CR-20260904-089
+
+- **Type**：C0 — CR-6.2 formatter follow-up
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Trigger**：CI run 33829344918（run 199）Ruff formatter output.
+- **Old Contract**：One State verifier semantic-seal exception retained a non-canonical multi-line form.
+- **New Contract**：The State verifier satisfies the repository formatter without changing replay, artifact, or ledger semantics.
+- **Reason**：Clear the last observed formatter-only gate before runtime validation.
+- **Affected Modules**：src/ashare_state/state/verifier.py.
+- **Tests**：Ruff formatter and subsequent full CI pending.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
+- **Commit**：Current CR-6.2 formatter follow-up batch.
+- **Reviewer**：Design / Audit Review pending.
+

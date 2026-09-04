@@ -388,9 +388,7 @@ class StateVerifier:
             rows = frame.to_dicts()
             semantic = semantic_hash(rows)
             if semantic != str(entry.get("semantic_hash")):
-                raise StateVerifierError(
-                    f"State artifact {name} semantic seal is rebound"
-                )
+                raise StateVerifierError(f"State artifact {name} semantic seal is rebound")
             _compare_rows(name, rows, expected_rows[name])
             actual_rows[name] = rows
             physical_seals[name] = {
