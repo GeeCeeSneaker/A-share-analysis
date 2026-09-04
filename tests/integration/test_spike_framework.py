@@ -741,6 +741,7 @@ class TestB7Capacity:
         ):
             assert key in metrics, key
 
+
 class TestHistoryCoverageWiring:
     def test_dry_run_uses_2020_history_contract(self, spike_root: Path):
         out = run_dry_run(spike_root, sample_date=20260814)
