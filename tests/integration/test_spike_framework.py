@@ -447,8 +447,11 @@ class TestVerdictEngine:
             store, run, catalog, "F1-daily_bar_units", "daily_bar_units", CaseResult.VALIDATED_FAIL
         )
         catalog.flush(store.run_dir(run))
-        close_run(store, run)
-        verdict = compute_verdict(store, store.load_run(run.spike_run_id, RunKind.PRODUCTION))
+        closed = close_run(store, run)
+        assert closed.status == RunStatus.CLOSED.value
+        persisted = store.load_run(run.spike_run_id, RunKind.PRODUCTION)
+        assert persisted.status == RunStatus.CLOSED.value
+        verdict = compute_verdict(store, persisted)
         assert verdict.capability_status["daily_bar_units"] == "FAILED"
         assert verdict.verdict == "NO_GO"
         assert "daily_bar_units" in verdict.failed_core

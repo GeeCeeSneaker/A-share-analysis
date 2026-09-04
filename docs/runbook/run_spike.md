@@ -34,13 +34,14 @@ uv run python scripts/spike/spike_runner.py --production --date <latest-complete
 
 # 只有硬进程中断导致原 run 仍为 RUNNING 时才使用 --resume；普通 Python failure 会落为 FAILED，operator interrupt 会落为 ABORTED
 # 省略 --date 时复用原 run 持久化的 as_of_date；若显式传入，必须与原值精确一致
-uv run python scripts/spike/spike_runner.py --production --resume --run-id <id> --phase b5
+# Production resume 采用 replay-all：重新执行完整 B1-B7；不接受 --phase bN
+uv run python scripts/spike/spike_runner.py --production --resume --run-id <id>
 
 # run CLOSED 后，单独计算正式 verdict
 uv run python scripts/spike/spike_runner.py --verdict --run-id <id>
 ```
 
-正常 Production 命令默认执行 `b1,b2,b3,b4,b5,b6,b7`；`--phase` 不是 verdict 命令。正式 runner 会在同一进程所有权下打开已迁移的持久 DuckDB，并让 `ProbeContext` 使用该连接写入 `meta_raw_evidence_anchor`；B2/B3/B4 的 blocking FAIL 必须使 run 进入终态 FAILED，不能改写成 PASS。
+正常 Production 命令默认执行 `b1,b2,b3,b4,b5,b6,b7`；Production resume 也只采用 replay-all，不接受 caller 选择单一 phase。CLI 的 `--dry-run` / `--production` / `--trial` / `--verdict` 模式互斥，歧义组合会在登录、DB open、run mint 和 evidence write 之前拒绝。正式 runner 会在同一进程所有权下打开已迁移的持久 DuckDB，并让 `ProbeContext` 使用该连接写入 `meta_raw_evidence_anchor`。B2/B3/B4 的 blocking semantic FAIL 保持 `VALIDATED_FAIL`；只要执行完整，run 可以正确进入 `CLOSED`，正式 verdict 再给出 `NO_GO`/阻塞结果；auth/account/framework fatal 才进入 `FAILED`。
 
 ### 2.3 Trial / dry-run boundary
 

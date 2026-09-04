@@ -18,11 +18,13 @@ from ashare_state import config as config_module
 from ashare_state.config import AppConfig, Paths
 from ashare_state.spike import (
     CaseCatalog,
+    CaseResult,
     RunFailureReason,
     RunKind,
     RunLifecycleError,
     RunStatus,
     RunStore,
+    SpikeCase,
     SpikeRun,
 )
 from ashare_state.spike.target import FakeTarget
@@ -41,10 +43,12 @@ def cli_module():
     return module
 
 
-def _test_run(tmp_path: Path) -> tuple[SpikeRun, RunStore, CaseCatalog]:
+def _test_run(
+    tmp_path: Path, *, run_kind: RunKind = RunKind.TRIAL
+) -> tuple[SpikeRun, RunStore, CaseCatalog]:
     run = SpikeRun(
         spike_run_id=str(uuid.uuid4()),
-        run_kind=RunKind.TRIAL,
+        run_kind=run_kind,
         account_profile_id="TEST_PROFILE",
         as_of_date="20260903",
     )
@@ -60,6 +64,71 @@ def _patch_config(monkeypatch, db_path: Path) -> None:
         "load_config",
         lambda _path=None: AppConfig(paths=Paths(duckdb_path=db_path)),
     )
+
+
+def _catalog_case(run: SpikeRun, case_id: str, case_type: str) -> SpikeCase:
+    return SpikeCase(
+        case_id=case_id,
+        spike_run_id=run.spike_run_id,
+        case_type=case_type,
+        security="TEST",
+        provider_symbol="TEST",
+        trade_date=run.as_of_date,
+        expected_value="expected",
+        actual_value="actual",
+        evidence_type="RAW_JSON",
+        evidence_ref=f"raw/{case_id}.meta.json",
+        result=CaseResult.VALIDATED_PASS,
+    )
+
+@pytest.mark.integration
+class TestCliModeContract:
+    @pytest.mark.parametrize(
+        ("left", "right"),
+        [
+            ("--dry-run", "--production"),
+            ("--dry-run", "--trial"),
+            ("--dry-run", "--verdict"),
+            ("--production", "--trial"),
+            ("--production", "--verdict"),
+            ("--trial", "--verdict"),
+        ],
+    )
+    def test_mode_conflict_refused_before_side_effects(
+        self, cli_module, monkeypatch, capsys, left, right
+    ):
+        def fail_side_effect(*_args, **_kwargs):
+            pytest.fail("mode conflict must be rejected before side effects")
+
+        for name in ("_make_real_target", "run_dry_run", "RunStore"):
+            monkeypatch.setattr(cli_module, name, fail_side_effect)
+        monkeypatch.setattr(sys, "argv", ["spike_runner.py", left, right])
+
+        assert cli_module.main() == 2
+        captured = capsys.readouterr()
+        assert "mode conflict" in captured.out + captured.err
+
+    def test_production_resume_rejects_partial_phase_before_login(
+        self, cli_module, monkeypatch, capsys
+    ):
+        def fail_login(*_args, **_kwargs):
+            pytest.fail("partial production resume must fail before login")
+
+        monkeypatch.setattr(cli_module, "_make_real_target", fail_login)
+        monkeypatch.setattr(sys, "argv", [
+            "spike_runner.py",
+            "--production",
+            "--resume",
+            "--run-id",
+            "RUNNING",
+            "--phase",
+            "b5",
+        ])
+
+        assert cli_module.main() == 2
+        captured = capsys.readouterr()
+        assert "replay-all" in captured.out + captured.err
+        assert "--phase" in captured.out + captured.err
 
 
 @pytest.mark.integration
@@ -146,6 +215,45 @@ class TestFormalDateAndLifecycle:
         assert rc == 0
         assert seen["date"] == 20260903
         assert store.load_run(run.spike_run_id, RunKind.TRIAL).status == RunStatus.CLOSED.value
+
+    def test_production_resume_rebuilds_fresh_catalog_and_replays_all(
+        self, cli_module, monkeypatch, tmp_path: Path
+    ):
+        run, store, partial = _test_run(tmp_path, run_kind=RunKind.PRODUCTION)
+        partial.add(_catalog_case(run, "stale-partial-case", "b1"))
+        partial.flush(store.run_dir(run))
+
+        fresh = cli_module._build_resume_catalog(store, run)
+        assert fresh.cases == []
+        seen: list[str] = []
+
+        def replay_phases(ctx, wanted, sample_date):
+            assert sample_date == 20260903
+            assert wanted == list(cli_module.PHASES)
+            for phase in wanted:
+                seen.append(phase)
+                ctx.add(_catalog_case(run, f"replay-{phase}", phase))
+
+        monkeypatch.setattr(cli_module, "_run_phases", replay_phases)
+        rc = cli_module._execute_run(
+            run,
+            store,
+            fresh,
+            FakeTarget(),
+            conn=None,
+            wanted=list(cli_module.PHASES),
+            sample_date=20260903,
+            context_factory=lambda *_args: fresh,
+        )
+
+        assert rc == 0
+        assert seen == list(cli_module.PHASES)
+        loaded = CaseCatalog(store, run.spike_run_id)
+        loaded.load(store.run_dir(run))
+        assert [case.case_id for case in loaded.cases] == [
+            f"replay-{phase}" for phase in cli_module.PHASES
+        ]
+        assert store.load_run(run.spike_run_id, RunKind.PRODUCTION).status == RunStatus.CLOSED
 
     def test_context_construction_failure_terminalizes_run(self, cli_module, tmp_path: Path):
         run, store, catalog = _test_run(tmp_path)

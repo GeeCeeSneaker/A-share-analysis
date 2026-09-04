@@ -8,10 +8,11 @@ Usage:
     uv run python scripts/spike/spike_runner.py --trial --date 20260824
 
     # PRODUCTION: ONE run, ALL phases (R3-P0-02 - verdict needs a single
-    # closed production run; per-phase execution requires --resume)
+    # closed production run)
     uv run python scripts/spike/spike_runner.py --production --date <as-of>
 
-    # resume an interrupted RUNNING production run (identity must match)
+    # replay-all recovery for an interrupted RUNNING production run
+    # (identity and persisted as-of must match; no --phase selector)
     uv run python scripts/spike/spike_runner.py --production --resume --run-id <id>
 
     # verdict (closed production runs only)
@@ -153,15 +154,45 @@ def _resolve_resume_as_of_date(run, requested_date) -> int:
     return frozen
 
 
+def _resolve_wanted_phases(
+    *, run_kind: RunKind, resume: bool, phase: str
+) -> list[str]:
+    """Resolve phase selection before any formal side effect.
+
+    Production recovery deliberately uses replay-all because the current
+    catalog has no durable phase checkpoint. Trial keeps its existing
+    phase-selection behavior.
+    """
+    if phase == "all":
+        return list(PHASES)
+    if phase not in PHASES:
+        raise ValueError(f"unknown phase {phase!r}; valid: {list(PHASES)}")
+    if run_kind is RunKind.PRODUCTION:
+        if resume:
+            raise RunLifecycleError(
+                "Production --resume uses replay-all recovery; --phase bN is not accepted"
+            )
+        raise RunLifecycleError(
+            "R3-P0-02: PRODUCTION runs execute ALL phases in one run; "
+            "use --phase only with --trial"
+        )
+    return [phase]
+
+
 def _build_probe_context(run, store, catalog, target, conn):
     """The single Production/Trial ProbeContext construction boundary."""
     return ProbeContext(run, store, catalog, target, conn)
 
 
-def _build_resume_probe_context(run, store, catalog, target, conn):
-    """Load the run-scoped catalog inside the terminalization boundary."""
-    catalog.load(store.run_dir(run))
-    return _build_probe_context(run, store, catalog, target, conn)
+def _build_resume_catalog(store, run):
+    """Start replay-all recovery with a fresh, unsealed catalog.
+
+    The previous catalog may contain a partial checkpoint from a hard crash.
+    It is intentionally not loaded: successful replay flushes this fresh
+    catalog over the RUNNING run's unsealed catalog, while raw evidence and
+    anchor rows remain append-only audit history.
+    """
+    return CaseCatalog(store, run.spike_run_id)
 
 
 def _current_persisted_run(store, run):
@@ -252,6 +283,27 @@ def main() -> int:
     parser.add_argument("--spike-root", default="data/spike")
     args = parser.parse_args()
 
+    selected_modes = [
+        flag
+        for flag, enabled in (
+            ("--dry-run", args.dry_run),
+            ("--production", args.production),
+            ("--trial", args.trial),
+            ("--verdict", args.verdict),
+        )
+        if enabled
+    ]
+    if len(selected_modes) > 1:
+        print(
+            "mode conflict: choose exactly one of --dry-run, --production, "
+            "--trial, or --verdict",
+            file=sys.stderr,
+        )
+        return 2
+    if args.verdict and args.resume:
+        print("argument conflict: --verdict cannot be combined with --resume")
+        return 2
+
     spike_root = Path(args.spike_root)
 
     if args.dry_run:
@@ -280,6 +332,21 @@ def main() -> int:
         return 0
 
     if args.production or args.trial:
+        if args.resume and not args.production:
+            print(
+                "argument conflict: --resume is supported only for "
+                "--production replay-all recovery"
+            )
+            return 2
+        try:
+            wanted = _resolve_wanted_phases(
+                run_kind=RunKind.PRODUCTION if args.production else RunKind.TRIAL,
+                resume=args.resume,
+                phase=args.phase,
+            )
+        except (RunLifecycleError, ValueError) as exc:
+            print(f"formal run refused: {exc}")
+            return 2
         if args.resume and not args.run_id:
             print("--resume requires --run-id")
             return 2
@@ -302,21 +369,11 @@ def main() -> int:
             identity = target.identity()
             profile = session.profile
 
-            # R3-P0-02: production defaults to ALL phases in ONE run
-            wanted = list(PHASES) if args.phase == "all" else [args.phase]
-            if args.production and args.phase != "all" and not args.resume:
-                print(
-                    "R3-P0-02: PRODUCTION runs execute ALL phases in one run; "
-                    "per-phase continuation requires --resume --run-id <id>"
-                )
-                return 2
-
             if args.production and not args.resume:
                 # R3-P0-14: verify the account before opening the run
                 verify_production_account(profile)
 
             with _formal_anchor_connection(Path.cwd()) as conn:
-                context_factory = _build_probe_context
                 if args.resume:
                     store = RunStore(spike_root)
                     run = store.load_run(args.run_id, run_kind)
@@ -331,10 +388,10 @@ def main() -> int:
                         sdk_version=identity.get("sdk_version"),
                         runtime_version=identity.get("runtime_version"),
                     )
-                    catalog = CaseCatalog(store, run.spike_run_id)
-                    context_factory = _build_resume_probe_context
+                    catalog = _build_resume_catalog(store, run)
                     print(
-                        f"resuming run {run.spike_run_id}; continuing with {wanted}; "
+                        f"resuming run {run.spike_run_id}; replaying all phases {wanted}; "
+                        "rebuilding a fresh unsealed catalog; "
                         f"as_of_date={effective_date}"
                     )
                 else:
@@ -366,7 +423,6 @@ def main() -> int:
                     conn,
                     wanted,
                     effective_date,
-                    context_factory=context_factory,
                 )
         except (RunLifecycleError, ValueError) as exc:
             # Explicit operator/configuration refusal leaves an existing

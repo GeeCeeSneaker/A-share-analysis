@@ -8,6 +8,18 @@
 
 ---
 
+## Current implementation update (2026-09-04)
+
+> **Status**：START / ACTIVE / CI_PENDING  
+> **Chosen recovery model**：方案 A — replay-all recovery；本轮不新增 migration，不扩展 phase state machine。
+
+当前实现已开始收口本文件提出的 P1：
+
+- CLI 四种运行模式通过显式 mode-conflict 校验互斥；歧义命令在 SDK login、DB open、run mint 和 evidence write 之前 fail closed。
+- Production `--resume` 只接受 replay-all；`--phase bN` 在任何副作用前拒绝。恢复创建 fresh unsealed `CaseCatalog`，不加载旧 partial catalog；成功的完整 B1-B7 replay 通过同一 run 目录覆盖 unsealed catalog，旧 raw/anchor 审计证据保留。
+- `CLOSED` 表示 required phases 已执行完毕，semantic `VALIDATED_FAIL` 仍由 verdict 判为 `NO_GO`/blocking；只有 auth/account/framework fatal 进入 `FAILED`。
+- focused tests 已覆盖 mode conflicts、partial catalog rebuild/replay-all、semantic CLOSED + verdict NO_GO，以及现有三平台回归；等待 CI 验证后再转为 VERIFIED。
+
 ## 0. Reviewer 结论
 
 PR #8 初审提出的三个核心实现缺口现已关闭：
@@ -47,7 +59,7 @@ PR #8                                  DO NOT MERGE YET
 
 ---
 
-## 1. P1-01 — CLI 运行模式当前不是互斥合同
+## 1. P1-01 — 初审发现：CLI 运行模式不是互斥合同
 
 当前 `scripts/spike/spike_runner.py` 分别声明：
 
@@ -105,7 +117,7 @@ VERDICT
 
 ---
 
-## 2. P1-02 — Production `--resume` 当前存在两套互相冲突的恢复语义
+## 2. P1-02 — 初审发现：Production `--resume` 存在两套冲突语义
 
 当前代码与文档存在以下冲突：
 

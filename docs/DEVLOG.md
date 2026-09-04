@@ -1,5 +1,13 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · PR8.1 CLI mode and replay-all recovery implementation
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (PR8.1) / CI_PENDING / PENDING_REVIEW**：按新增复审要求选择方案 A（replay-all），补齐 CLI mode-conflict fail-closed、Production resume 禁止 `--phase bN`、fresh unsealed catalog rebuild 和 CLOSED/semantic FAIL 语义校正。
+- 新增 focused tests 覆盖六组双模式冲突、冲突前零 SDK/DB/run/evidence 副作用、partial catalog 重建、完整 B1-B7 replay-all 和 semantic `VALIDATED_FAIL` → CLOSED + verdict NO_GO；runbook 与 PR8.1 requirement 已同步。
+- 本批不新增 migration，不修改 CR-5/CR-6/2020+ history/Provider capability；凭证、Token、host/port、raw profile 不进入仓库。
+
 ## 2026-09-04 · Formal runner wiring CI verification
 
 **Implementation Status / Review Status**
