@@ -58,7 +58,7 @@ uv run ashare provider-doctor --offline
 uv run ashare provider-doctor --output data/spike/results/provider_doctor.json
 ```
 
-预期 verdict：`RUNTIME_IDENTITY_VERIFIED`。
+离线预期 verdict：`RUNTIME_PACKAGE_VERIFIED`；在线且完成首次 SDK 调用后预期 verdict：`RUNTIME_ACTUAL_LOAD_VERIFIED`。
 任何 `RUNTIME_PATH_AMBIGUOUS` / `RUNTIME_VERSION_MISMATCH` 都必须先排查
 （对照 provider_verification §1-2）再继续。
 

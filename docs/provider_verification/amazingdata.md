@@ -38,17 +38,17 @@
 - **边界**：这是原生 SDK 直连 smoke，不等同于 Provider facade、provider-doctor、run-scoped Production B1-B7、Golden/Data Sufficiency Matrix 或 capability approval。历史代码列表仅验证单日窗口，未宣称 2020+ 全历史覆盖。
 - `configs/production_account.yaml` 仍为空，未冻结 production identity；正式结论保持未评定，待仓库源码环境执行单一 Production run 并完成人工 profile/Golden/Rule review。
 
-## 2. 账号与权限（当前为仿真账号）
+## 2. 历史试用账号与当前正式账号状态
 
 | 项 | 值 |
 |---|---|
-| 账号类型 | **试用仿真账号**（正式账号后续开通） |
-| 登录信息 | login 成功（2026-08-21 实测）：`SubscribeLimitNum=100`、`TotalWeekFlow=10GB`、`PushBandwidth/QueryBandwidth=3000`、`PermissionCode="3|4|32|33"` |
+| 账号类型 | **历史试用/仿真账号（仅历史证据）**；正式账号当前事实见 §1.3 |
+| 历史登录信息 | login 成功（2026-08-21 实测）：`SubscribeLimitNum=100`、`TotalWeekFlow=10GB`、`PushBandwidth/QueryBandwidth=3000`、`PermissionCode="3|4|32|33"` |
 | 实测权限边界 | `get_code_list` **可用**（默认 5211 / EXTRA_STOCK_A 5549 只，后缀式代码 `600000.SH`）；`get_calendar` / `get_hist_code_list` / `get_adj_factor` / `query_snapshot` **全部无权限**（服务端拒绝） |
 | 凭证注入 | `.env`（TGW_USERNAME/TGW_PASSWORD/TGW_SERVER_VIP/TGW_SERVER_PORT），不入库不入日志 |
 | 证据 | `data/spike/results/connectivity.json`（P0-P4 探针全记录） |
 
-### 2.1 仿真账号下的 Spike 范围裁定（2026-08-21）
+### 2.1 历史仿真账号下的 Spike 范围裁定（2026-08-21）
 
 | 阶段 | 仿真账号可做 | 结果 |
 |---|---|---|
@@ -56,16 +56,18 @@
 | B2-B7 正式评估 | ✗ **等正式账号** | 历史 K 线/历史状态/复权因子/行业成分均超出权限 |
 | 正式 Spike 结论（GO/NO-GO） | ✗ **等正式账号** | "核心事实未验证前不得给 GO" |
 
-### 2.2 SDK 行为观察（生产 Adapter 必须处理）
+> 本节仅记录 2026-08-21 仿真账号历史状态；2026-09-04 正式账号的当前事实见 §1.3。
+
+### 2.2 SDK 行为观察（历史试用探测；生产 Adapter 必须处理）
 
 1. **login 会向 stdout 打印含 Token 的 logon json**——生产 Adapter 不得转发 SDK stdout 进日志（Secret 纪律）；
 2. **无权限请求的失败形态**：内部 `TypeError: 'NoneType' object is not subscriptable`（BaseData 系）或长重试后 `Exception: 查询失败`（MarketData 系）——**无类型化错误**，Adapter 必须包装所有调用并做 None/异常双防御；
 3. `query_snapshot` 失败前重试 2-4 分钟（0.2MB/s 带宽）——生产 Adapter 需显式超时；
 4. `get_code_info(["600000.SH"])` 报 `unhashable list`——签名与手册示例可能不一致，正式账号到位后核对。
 
-流量纪律执行情况：全轮探测累计消耗约 0.08GB / 10GB 周额度。
+历史试用轮次流量纪律执行情况：全轮探测累计消耗约 0.08GB / 10GB 周额度。
 
-## 3. 待验证事项（正式账号到位后执行完整 Spike）
+## 3. 正式账号 Production Spike 待验证事项
 
 1. K 线历史深度实测（当前合同：2020-01-01 至最新完整交易日；不要求或回填 2020 年以前历史）
 2. 退市证券包含性（当前合同：2020-01-01 起不产生 survivorship omission + `get_stock_basic.IS_LISTED=3`）
@@ -84,7 +86,7 @@
 
 - 默认历史边界已由 Owner 决策统一为 `2020-01-01 -> latest complete trading day`。
 - `history_start_2020` / `history_coverage_2020_v1` 是当前 Spike Core Gate 的实现合同；旧的 `history_start_2018_plus_warmup` 只保留在历史文档中，不再作为当前 GO 条件。
-- 当前账号仍是试用仿真账号，正式账号画像尚未人工确认；因此 B2-B7、正式 verdict、Golden/Data Sufficiency Matrix 和 capability approval 均保持未验证。
+- 正式账号已完成本地 native SDK 登录/API smoke，但正式 production profile identity 与 entitlement allowlist 尚未人工冻结；因此 B2-B7、正式 verdict、Golden/Data Sufficiency Matrix 和 capability approval 均保持未验证。
 - 解除条件：Owner/Reviewer 提供脱敏稳定账号画像和实际 entitlement 后，按生产 Spike 单 Run 流程补齐证据；不得用试用账号结果替代正式生产证据。
 
 ## 3.2 2026-09-04 正式账号验证尝试（SDK 安装前历史记录）
@@ -101,6 +103,22 @@
 | 配置纪律 | `configs/production_account.yaml` 继续为空；不以连接可达性替代 frozen identity |
 
 当前结论：网络路径可达，但缺少银河官方 wheel，无法安全执行 provider doctor、正式登录或单一 Production Spike。安装官方 wheel 后，必须先完成 runtime actual-load doctor，再按单一 B1-B7 run、evidence closure、2020+ 历史合同和人工 Reviewer 流程继续。
+
+### 3.3 P0-AD-01 脱敏身份 bootstrap 工具（2026-09-04）
+
+- `scripts/spike/production_account_bootstrap.py` 是正式账号身份检查的受控入口：凭证只从 `TGW_*` 环境变量或本地 `.env` 读取，不接受 CLI 凭证参数，不打印或写出凭证。
+- 输出只包含 scrubbed `account_profile_id`、权限/额度摘要、运行时版本、网络/认证/查询状态和 `production_identity_status`；原始 SDK error、stdout、Token、host、port 不进入输出。
+- 默认只打印 JSON；`--output` 可写入操作者指定的本地证据文件。工具不会自动写入 `configs/production_account.yaml`，必须由 Owner/Reviewer 人工确认后再做独立治理提交。
+- `--offline` 只验证 SDK/runtime，不读取或使用账号凭证，且完全绕过 `.env`/`--env-file` 读取。退出码只表达环境缺失、账号未就绪或候选 identity，不表达 capability approval。
+- run `33889959971`（run `266`）已在三平台完成 bootstrap focused tests 与全量回归，每腿 `1427 passed`；这验证的是 P0-AD-01.1 工具边界，不是 live identity 冻结、Production B1-B7、Data Sufficiency Matrix、verdict 或 Provider approval。
+
+示例：
+
+```powershell
+uv run python scripts/spike/production_account_bootstrap.py
+uv run python scripts/spike/production_account_bootstrap.py --offline
+uv run python scripts/spike/production_account_bootstrap.py --output data/spike/results/production_account_bootstrap.json
+```
 
 ## 4. C++ SDK 存档（2026-08-21 摸底，已被 Python 版取代为集成路径）
 

@@ -28,6 +28,17 @@ B. Platform Data Sufficiency Audit
 
 ---
 
+## 0.1 Repository implementation update (2026-09-04)
+
+- Added `scripts/spike/production_account_bootstrap.py` as the P0-AD-01 controlled entry point. It reads credentials only from environment/.env, emits an allowlisted scrubbed profile, and never writes `configs/production_account.yaml`.
+- Added offline/injected-doctor tests proving missing credentials fail closed, `--offline` passes no credentials, raw error fields are not emitted, and human confirmation remains required.
+- GitHub Actions run `33889959971`（run `266`）verified Ubuntu 3.14、Windows 3.12 和 Windows 3.14；每个矩阵报告 `1427 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用 DEVLOG/Management gates 均通过。P0-AD-01.1 I/O safety closure 已具备 CI 证据，但 formal identity freeze 与 B1-B7 仍 pending。
+- This advances the executable boundary only; the production identity is not frozen, B1-B7 and Data Sufficiency Matrix remain pending, and no capability approval is claimed.
+
+---
+
+---
+
 # 1. 当前事实基线
 
 ## 1.1 当前本地 SDK 冒烟事实（2026-09-04）
@@ -594,7 +605,7 @@ Provider validation track
 
 1. `configs/production_account.yaml` 的 `production_account_profile_id`、`confirmed_at`、`confirmed_by` 仍为空；
 2. 当前仅有试用仿真账号的 B1 连通性证据，B2-B7 正式生产验证尚未执行；
-3. `docs/provider_verification/amazingdata.md` 仍记录正式账号和正式 entitlement 待确认；
+3. `docs/provider_verification/amazingdata.md` 已记录正式账号 native SDK smoke 通过；但 scrubbed production profile identity 与 entitlement allowlist 仍待人工确认；
 4. `docs/spike_report_p0m1.md` 当前结论仍为 `未评定`，没有生产 `GO_CORE` / `GO_DEGRADED` / `NO_GO` verdict；
 5. 因此不得勾选正式账号、CLOSED PRODUCTION B1-B7、Golden/Data Sufficiency Matrix、Reviewer approval 或 capability APPROVED 等退出项。
 

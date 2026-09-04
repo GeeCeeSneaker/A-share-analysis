@@ -1,11 +1,11 @@
 # A-share-analysis：CR-6 Deterministic Market State Layer 开发工作要求
 
 > **Date**：2026-09-04  
-> **Reviewer Decision**：CR-5 已获最终关闭批准；本合同随 clean replacement PR #3 合入 `main` 后正式 START  
+> **Reviewer Decision**：CR-5 已获最终关闭批准；CR-6.4 final Reviewer closure 已于 2026-09-04 接受，PR #6 已合入 main `dda8c000d8585a95a66a91fbaa5072427053abb8`  
 > **Upstream**：CR-4 VERIFIED/CLOSED/FREEZE；CR-5 VERIFIED/CLOSED/FREEZE；ADR-024 / ADR-025 ACCEPTED  
-> **CR-6 Status**：**DONE / REOPENED；CR-6.4 START / ACTIVE（implementation complete, pending human review）**  
+> **CR-6 Status**：**VERIFIED / CLOSED / FREEZE（CR-6.0–6.4 final Reviewer closure accepted 2026-09-04）**  
 > **Production P0-M-1B**：继续独立 BLOCKED  
-> **New ADR Required**：ADR-026 — Deterministic Market State Interpretation Contract（初始 PROPOSED）
+> **ADR-026**：Deterministic Market State Interpretation Contract（**ACCEPTED / VERIFIED**）  
 
 ---
 
@@ -1186,7 +1186,7 @@ State:
 
 # 22. CR-6.4 Final Adversarial / Contract-Honesty Addendum
 
-> **Reviewer state**：CR-6.0–6.3 PASS / KEEP；CR-6 remains **DONE / REOPENED**；CR-6.4 remains **START / ACTIVE** pending human review. PR #6 must remain open and must not be merged automatically.
+> **Historical pre-merge reviewer state**：CR-6.0–6.3 PASS / KEEP；CR-6 remains **DONE / REOPENED**；CR-6.4 remains **START / ACTIVE** pending human review. This pre-merge snapshot is retained for audit history; final closure is recorded below.
 >
 > **Implementation head**：`e47514a8afc864c9f197e18f95ea56fe81424a2d`; current main `2dc63e803af908baa3424d576b17d8b07751e05f` was merged normally into the branch by two-parent merge commit `bdb112213dc64325ccc3931a1c0617ae448ef93d`. No history rewrite was used.
 >
@@ -1294,3 +1294,11 @@ The mapping is concrete at the test and parameter/case level. Parameterized rows
 
 > **Verification**：GitHub Actions run `33842361483`（run 232）已验证当前 2020+ contract synchronization head：Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿 `1407 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 全部成功。  
 > **Interpretation**：这只关闭仓库内可验证的代码、测试和文档同步项；Data Sufficiency Matrix、正式账号/entitlement、Production B1-B7、正式 verdict、Reviewer acceptance 和 PR merge 仍按第 23 节记录为阻塞或待审。
+
+
+# 25. Final Reviewer Closure and post-merge synchronization
+
+> **Date**：2026-09-04  
+> **Reviewed merge**：PR #6 merged to main at `dda8c000d8585a95a66a91fbaa5072427053abb8` after final merge-gate run `33854677630` (run 239) passed on Ubuntu 3.14, Windows 3.12 and Windows 3.14; each leg reported `1408 passed`.  
+> **Current decision**：CR-6.0–6.4 and ADR-026 are **VERIFIED / CLOSED / FREEZE**. The State contract is unchanged by this status addendum.  
+> **Independent Provider track**：formal AmazingData production identity, formal B1-B7, Golden/Data Sufficiency Matrix, verdict and capability approval remain pending; native SDK smoke is connectivity evidence only.  

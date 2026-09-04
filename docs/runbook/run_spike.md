@@ -1,39 +1,59 @@
 # Runbook — P0-M-1 Spike 运行
 
 > 前提：完成 SDK 安装验证（install_amazingdata.md）+ provider doctor 绿灯。
-> 正式账号到位当天只做：配置凭证 → 运行脚本 → 分析结果（任务书 §11）。
+> 当前正式账号 native SDK smoke 已完成，但只属于连通性证据；正式验证仍必须先跑 doctor，再执行单一 CLOSED PRODUCTION B1-B7 run。
 
 ## 1. 凭证配置
 
 ```powershell
 Copy-Item .env.example .env
-# 编辑 .env：TGW_USERNAME / TGW_PASSWORD / TGW_SERVER_VIP / TGG_SERVER_PORT
+# 编辑 .env：TGW_USERNAME / TGW_PASSWORD / TGW_SERVER_VIP / TGW_SERVER_PORT
 ```
 
-## 2. 顺序（任务书 §12：从核心到外围，依赖排序）
+## 2. 执行顺序（正式账号：单一 Production run）
+
+### 2.1 Runtime / account preflight
 
 ```powershell
+# 离线：确认 wheel 版本与打包运行时；不需要凭证
+uv run ashare provider-doctor --offline
+
+# 在线：注入 .env 后确认实际加载、网络、认证、查询和脱敏账号画像
 uv run ashare provider-doctor --output data/spike/results/provider_doctor.json
-
-# B2 Identity / Security Master（Gate：历史 SM 不满足 = P0a NO_GO）
-uv run python scripts/spike/spike_runner.py --phase b2
-
-# B3 Core Market Facts（Gate：任一核心事实不满足 = P0a NO_GO）
-uv run python scripts/spike/spike_runner.py --phase b3 --date <近期交易日>
-
-# B4 Corporate Action / Adjustment
-uv run python scripts/spike/spike_runner.py --phase b4 --date <近期交易日>
-
-# B5 Data Semantics / Unit / Cache / Freshness（输出 Endpoint-Level Unit Map）
-uv run python scripts/spike/spike_runner.py --phase b5 --month 2026-07
-
-# B6 Replacement Assessment（free-float 四级结论 + 行业 + Benchmark）
-uv run python scripts/spike/spike_runner.py --phase b6 --date <近期交易日>
-uv run python scripts/spike/spike_runner.py --phase b7
-
-# 汇总草稿（人工复核后填 docs/spike_report_p0m1.md）
-uv run python scripts/spike/spike_runner.py --phase verdict
 ```
+
+在线 doctor 必须得到实际加载路径与账号画像；`RUNTIME_PACKAGE_VERIFIED` 只表示 wheel 层验证，不能替代在线实际加载确认。若出现 `RUNTIME_PATH_AMBIGUOUS` 或 `RUNTIME_VERSION_MISMATCH`，先停止排查。
+
+### 2.2 Formal B1-B7
+
+Production 必须由一个 `RunKind.PRODUCTION` run 执行全部 B1-B7，不能把多个独立 run 拼成 verdict：
+
+```powershell
+# <latest-complete-trading-day> 必须是已完成交易日，不能是未来日期
+uv run python scripts/spike/spike_runner.py --production --date <latest-complete-trading-day>
+
+# 只有硬进程中断导致原 run 仍为 RUNNING 时才使用 --resume；普通 Python failure 会落为 FAILED，operator interrupt 会落为 ABORTED
+# 省略 --date 时复用原 run 持久化的 as_of_date；若显式传入，必须与原值精确一致
+# Production resume 采用 replay-all：重新执行完整 B1-B7；不接受 --phase bN
+uv run python scripts/spike/spike_runner.py --production --resume --run-id <id>
+
+# run CLOSED 后，单独计算正式 verdict
+uv run python scripts/spike/spike_runner.py --verdict --run-id <id>
+```
+
+正常 Production 命令默认执行 `b1,b2,b3,b4,b5,b6,b7`；Production resume 也只采用 replay-all，不接受 caller 选择单一 phase。CLI 的 `--dry-run` / `--production` / `--trial` / `--verdict` 模式互斥，歧义组合会在登录、DB open、run mint 和 evidence write 之前拒绝。正式 runner 会在同一进程所有权下打开已迁移的持久 DuckDB，并让 `ProbeContext` 使用该连接写入 `meta_raw_evidence_anchor`。B2/B3/B4 的 blocking semantic FAIL 保持 `VALIDATED_FAIL`；只要执行完整，run 可以正确进入 `CLOSED`，正式 verdict 再给出 `NO_GO`/阻塞结果；auth/account/framework fatal 才进入 `FAILED`。
+
+### 2.3 Trial / dry-run boundary
+
+```powershell
+# 无凭证框架自检
+uv run python scripts/spike/spike_runner.py --dry-run
+
+# 仿真账号证据（不能进入 Production verdict）
+uv run python scripts/spike/spike_runner.py --trial --date <as-of>
+```
+
+Trial 与 dry-run 的目录、身份和证据必须与 Production 物理隔离。
 
 ## 3. L1 实时订阅（任务书 §1.2，必须交易时段）
 
@@ -50,16 +70,19 @@ uv run python scripts/spike/l1_subscription_test.py --stage 100
 
 ## 4. Gate 矩阵（任务书 §13）
 
-| 核心能力 | Gate |
+| 能力 | Gate |
 |---|---|
-| Security Master / Daily Bar / Historical Status / Limit Price / Adj Factor+CA / Trade Calendar | 任一 FAIL → **P0a NO_GO** |
-| free_share / SW taxonomy / 真实双源 Reconciliation | 缺失 → GO_DEGRADED（P0a 仍可进，P0b/M2 部分阻塞） |
-| Historical Status = DEGRADED/FAIL | **P0a BLOCKED** |
+| `security_master_with_delisted` / `daily_bar_units` / `historical_st_suspend` / `limit_price_and_no_limit_days` / `adj_factor_corporate_action_continuity` / `history_start_2020` / `symbol_mapping_unambiguous` / `sdk_permission_cache_freshness` | 任一核心 FAIL → **P0a NO_GO** |
+| `free_float_equivalence` / `sw_taxonomy` / `benchmark_index_availability` / `capacity_backfill` | Optional 逐项出结论；缺失时按 formal verdict 规则进入 GO_DEGRADED 或阻塞对应外围能力 |
+| 历史状态 / 限价 / 复权 / 退市连续性 | Golden 或关键连续性缺口 → **fail closed** |
 
 ## 5. 产物与归档
 
-- `data/spike/results/spike_case_catalog.jsonl/.csv`：逐案证据（13 字段）
-- `data/spike/raw/`：原始响应（凭证已脱敏）
-- `data/spike/results/verdict_draft.json`：三级结论草稿（需人工复核）
-- 差异必须归因 8 类 reason code 之一，无法解释 = FAIL
-- 结论填入 `docs/spike_report_p0m1.md` + `docs/provider_verification/amazingdata.md`
+Production run 的 run-scoped 产物位于：
+
+- `data/spike/production/<run-id>/spike_run.json`
+- `data/spike/production/<run-id>/cases/spike_case_catalog.jsonl/.csv`
+- `data/spike/production/<run-id>/raw/`
+- `data/spike/production/<run-id>/verdict.json`（执行 `--verdict` 后生成）
+
+Preflight doctor 输出可写入 `data/spike/results/provider_doctor.json`；它不能代替 run-scoped B1-B7 evidence。原始响应必须经过现有 adapter/session 的 stdout 捕获和脱敏边界；凭证、Token、host/port 明文不得写入仓库、日志或提交。
