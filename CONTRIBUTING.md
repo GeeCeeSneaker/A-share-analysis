@@ -1,48 +1,45 @@
 # Contributing to A-share-analysis
 
-This repository is public for transparency and collaboration, but `main` is a governed branch.
+This repository is public, but project write/merge authority is intentionally centralized.
 
-## Contribution model
+## Authorized project identity
 
-### Authorized project developers
+The current and only authorized project developer / maintainer identity is:
 
-- May create and push project branches in this repository when they have GitHub Write permission.
-- Must not push directly to `main`.
-- Merge to `main` only through a pull request that satisfies protected-branch/ruleset requirements and CI.
-- Changes to CODEOWNERS-controlled paths also require the designated Code Owner approval.
+```text
+@GeeCeeSneaker
+```
 
-### External contributors
+That account continues to use the repository in the same way as before for normal project development, review commits, branches, pull requests, and merges.
 
-- Do not receive direct repository Write permission by virtue of the repository being public.
-- Contribute by forking the repository and opening a pull request.
-- External pull requests must be reviewed and approved by at least one authorized repository member with Write permission before merge.
-- Changes to CODEOWNERS-controlled paths additionally require Code Owner approval.
-- Maintainers may request design discussion before accepting changes that alter architecture, data semantics, migration contracts, governance, or provider truth.
+No other GitHub user should be granted Write / Maintain / Admin permission unless the project owner explicitly changes this policy in the future.
 
-## Pull request requirements
+## External contributors
 
-A mergeable pull request must:
+Public users may:
 
-1. target `main` from a non-`main` branch;
-2. pass the repository's required CI status checks;
-3. receive the required internal approval(s);
-4. have all review conversations resolved;
-5. receive fresh approval after review-invalidating changes when the repository rules require it;
-6. satisfy project-specific DEVLOG / DEVELOPMENT_MANAGEMENT / ADR rules where applicable;
-7. contain no credentials, tokens, account identifiers, private provider material, or other secrets.
+- read and clone the repository;
+- fork it;
+- open issues and discussions where enabled;
+- submit pull requests from forks;
+- comment on public pull requests.
 
-## Security and credentials
+Public users may **not**:
 
-Never commit or paste into public issues/PRs:
+- push directly to this repository;
+- modify `main` or project branches;
+- merge pull requests;
+- change repository settings, Actions, rules, secrets, or collaborators;
+- treat an external review/approval as project authorization.
 
-- passwords or access tokens;
-- `.env` contents;
-- real provider credentials or full account numbers;
-- private SDK entitlement material that is not licensed for redistribution;
-- private keys or signing material.
+Every external pull request is untrusted until reviewed by `@GeeCeeSneaker`. The owner may merge, request changes, or close it.
 
-Provider identities committed for governance must be scrubbed stable identities only, as defined by the project contracts.
+## CI and security
 
-## Review authority
+External pull requests must never receive production credentials, provider secrets, tokens, private keys, `.env` content, or proprietary SDK material. Public CI must remain credential-free and must not install or use the production AmazingData account.
 
-A public GitHub review from an unaffiliated user is useful feedback but does not constitute project approval. Required merge approval must come from an authorized repository member with the permissions required by the protected-branch/ruleset configuration.
+Changes to `.github/workflows/`, production-account governance, migrations, trading rules, golden data, ADRs, or other correctness contracts require explicit owner review.
+
+## Future change in developer model
+
+If additional developer GitHub identities are introduced later, this document and repository protection rules must be updated deliberately before granting them write access. Until then, `@GeeCeeSneaker` is the complete authorized-writer allowlist.
