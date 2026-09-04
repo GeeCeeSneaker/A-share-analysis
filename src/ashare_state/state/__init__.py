@@ -1,5 +1,12 @@
 """CR-6 deterministic market State layer public boundary."""
 
+from ashare_state.state.builder import (
+    STATE_LEDGER_COLUMNS,
+    StateBuilder,
+    state_base_dir,
+    state_builder_code_fingerprint,
+    state_manifest_uri,
+)
 from ashare_state.state.engine import (
     STATE_EVIDENCE_FEATURES,
     ComputedStateSet,
@@ -34,6 +41,10 @@ from ashare_state.state.registry import (
     compile_state_execution_plan,
     get_state_set,
 )
+from ashare_state.state.verifier import (
+    StateVerifier,
+    verify_state_run_for_consumption,
+)
 from ashare_state.state.schema import (
     FINDING_CLASSES,
     MARKET_STATE_COLUMNS,
@@ -47,6 +58,9 @@ from ashare_state.state.schema import (
 )
 
 __all__ = [
+    "STATE_LEDGER_COLUMNS",
+    "StateBuilder",
+    "StateVerifier",
     "ComputedStateSet",
     "FINDING_CLASSES",
     "MARKET_STATE_COLUMNS",
@@ -84,4 +98,8 @@ __all__ = [
     "state_base_hash_from_primitives",
     "state_id_from_base_hash",
     "state_input_lineage_hash",
+    "state_base_dir",
+    "state_builder_code_fingerprint",
+    "state_manifest_uri",
+    "verify_state_run_for_consumption",
 ]

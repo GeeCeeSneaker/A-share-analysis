@@ -74,6 +74,8 @@ EXPECTED_TABLES = {
     "meta_snapshot_build",
     # 023 (CR-5 feature build ledger)
     "meta_feature_build",
+     # 024 (CR-6.2 State build ledger)
+    "meta_state_build",
     # runner bootstrap
     "meta_schema_version",
 }
@@ -90,7 +92,7 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 23
+            assert len(applied) == 24
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
         finally:
@@ -101,10 +103,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 23
+            assert len(first) == 24
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 23
+            assert len(ledger) == 24
         finally:
             conn.close()
 
@@ -140,10 +142,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 024 (001..023 exist in the real repo set)
+            # tamper 002 and add a new 025 (001..024 exist in the real repo set)
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "024_new_thing.sql").write_text(
+            (tampered_dir / "025_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):
@@ -322,6 +324,39 @@ class TestLedgerIntegrity:
                 "started_at",
                 "completed_at",
             } <= feature_columns
+            state_columns = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'meta_state_build'"
+                ).fetchall()
+            }
+            assert {
+                "state_run_id",
+                "feature_run_id",
+                "feature_manifest_uri",
+                "feature_manifest_hash",
+                "feature_semantic_hash",
+                "feature_set_id",
+                "feature_registry_hash",
+                "state_set_id",
+                "state_set_version",
+                "state_registry_version",
+                "state_registry_hash",
+                "state_contract_version",
+                "state_builder_code_fingerprint",
+                "manifest_uri",
+                "manifest_hash",
+                "artifact_set_hash",
+                "state_semantic_hash",
+                "finding_set_hash",
+                "state_row_count",
+                "finding_count",
+                "status",
+                "error_message",
+                "started_at",
+                "completed_at",
+            } <= state_columns
         finally:
             conn.close()
 

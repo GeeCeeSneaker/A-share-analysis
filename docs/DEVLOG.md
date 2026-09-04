@@ -11,6 +11,18 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.2 identity, artifact, ledger and replay implementation
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：CR-6.1 clean snapshot PR #6 的 CI run 33827791369（run 192）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部通过 Ruff、format、mypy、full pytest、Spike 和 SDK-absent gates；本批继续实现 CR-6.2。
+- 新增 deterministic StateBuilder / StateVerifier、state-v1 immutable artifact publication、full physical seals、State identity recompute、migration 024 和 focused persistence/replay tests。Builder 只调用 public Feature verifier；Feature verification 失败时不发布 State。
+- 本批尚未宣称 CR-6.2 closure；保持 ADR-026 PROPOSED / PENDING_REVIEW，并继续禁止预测、策略和生产语义。
+
+**Next**
+
+- 复核 migration 024 from-zero / 023→024、完整 State artifact/replay 对抗测试和 scope guard；随后进入 CR-6.3 closure。
+
 ## 2026-09-04 · CR-6.1 Registry and deterministic State engine
 
 **Implementation Status / Review Status**
