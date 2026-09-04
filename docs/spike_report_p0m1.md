@@ -65,11 +65,15 @@ verdict.json 同时输出（R3 §54）：
 | historical_st_suspend | 50 | golden_st_transition |
 | limit_price_and_no_limit_days | 30 | golden_limit_regime |
 | adj_factor_corporate_action_continuity | 20 | golden_corporate_action |
-| history_start_2018_plus_warmup | 1 | — |
+| history_start_2020 | 1 | — |
 | symbol_mapping_unambiguous | 1 | —（单一 parser 规则） |
 | sdk_permission_cache_freshness | 1 | —（真实 permission codes） |
 
 内置 golden 种子（公开可查证事实）：`src/ashare_state/spike/golden_truth.py`（7 例）；正式 run 前由 operator 补齐至目标数量并核验 source_ref/source_hash。
+
+## 4.1 当前历史边界合同（2026-09-04）
+
+`history_start_2020` 只验证 `2020-01-01 -> latest complete trading day` 的必要覆盖；2020 年以前的缺失不会导致 `GO_CORE` 失败，也不触发常规回填。2020-01-01 之后的关键连续性缺口仍必须 fail closed。正式生产 verdict 仍为未评定，原因是正式账号画像和 B1-B7 生产证据尚未提供。
 
 ## 5. Early Stop（R3 §53）
 
