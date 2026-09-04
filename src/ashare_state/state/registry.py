@@ -184,10 +184,10 @@ _TREND_PARTICIPATION = StateSpec(
     missingness_policy="NULL_OR_EMPTY_TO_UNKNOWN",
     availability_rule="SOURCE_FEATURE_ROW_AVAILABLE_AT",
     interpretation=(
-        "Observed securities with comparable 20-observation trend evidence are " + "mostly positive, negative, or mixed."
+        "Observed securities with comparable 20-observation " + "trend evidence are mostly positive, negative, or mixed."
     ),
     non_predictive_statement=(
-        "This describes current observed trend participation and is not a " + "future-regime prediction."
+        "This describes current observed trend participation " + "and is not a future-regime prediction."
     ),
     eligibility="SUPPORTED",
 )
