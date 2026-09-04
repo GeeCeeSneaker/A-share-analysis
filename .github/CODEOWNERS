@@ -1,0 +1,8 @@
+# A-share-analysis CODEOWNERS
+#
+# Single-authorized-writer model for the current public repository.
+# The only project developer / maintainer identity is @GeeCeeSneaker.
+# External users may fork and submit pull requests, but they do not gain
+# repository write or merge authority.
+
+* @GeeCeeSneaker
