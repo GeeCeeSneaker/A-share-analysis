@@ -1,3 +1,11 @@
+## 2026-09-04 · PR8.1 three-platform CI verification
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / PENDING_REVIEW**：GitHub Actions run `33877350670`（run `253`）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1422 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均通过。
+- PR8.1 的 CLI mode-conflict fail-closed、Production replay-all/fresh catalog、CLOSED 与 semantic FAIL 语义已获得仓库级 CI 证据；任务书 Exit gate 已完成，等待人工 Reviewer 复审，PR #8 不自动合并。
+- 该验证不覆盖正式账号 identity/entitlement、真实 Production B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval；`configs/production_account.yaml` 保持空 profile，凭证、Token、host/port、raw profile 不进入仓库。
+
 ## 2026-09-04 · PR8.1 format correction
 
 **Implementation Status / Review Status**

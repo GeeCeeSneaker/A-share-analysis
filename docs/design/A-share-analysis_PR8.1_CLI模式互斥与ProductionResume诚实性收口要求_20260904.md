@@ -2,15 +2,15 @@
 
 > Date: 2026-09-04  
 > Upstream Reviewer baseline: `0774803829987207f6ad37d0b324136fb6f98a51`（PR #8 初审要求）  
-> Reviewed developer HEAD: `0eb91d2bfdf358ee8b6453751c5b15908d659f88`  
-> Reviewed CI: GitHub Actions run `33872143907` / run 250 — Ubuntu 3.14、Windows 3.12、Windows 3.14 all SUCCESS；Windows 3.14 `1414 passed`；Ruff / format / mypy / Spike / SDK-absent / DEVLOG / Management gates green。  
+> Reviewed developer HEAD: `3f25c093a74c4d3635a6609eec734282f225f10b`  
+> Reviewed CI: GitHub Actions run `33877350670` / run 253 — Ubuntu 3.14、Windows 3.12、Windows 3.14 all SUCCESS；each leg `1422 passed`；Ruff / format / mypy / Spike / SDK-absent / DEVLOG / Management gates green。  
 > Scope: **仅收口 formal CLI contract honesty / resume recovery；不重开 CR-6，不改变 Provider/Canonical/Feature/State 数据语义。**
 
 ---
 
 ## Current implementation update (2026-09-04)
 
-> **Status**：START / ACTIVE / CI_PENDING  
+> **Status**：VERIFIED (CI) / PENDING_REVIEW  
 > **Chosen recovery model**：方案 A — replay-all recovery；本轮不新增 migration，不扩展 phase state machine。
 
 当前实现已开始收口本文件提出的 P1：
@@ -18,7 +18,13 @@
 - CLI 四种运行模式通过显式 mode-conflict 校验互斥；歧义命令在 SDK login、DB open、run mint 和 evidence write 之前 fail closed。
 - Production `--resume` 只接受 replay-all；`--phase bN` 在任何副作用前拒绝。恢复创建 fresh unsealed `CaseCatalog`，不加载旧 partial catalog；成功的完整 B1-B7 replay 通过同一 run 目录覆盖 unsealed catalog，旧 raw/anchor 审计证据保留。
 - `CLOSED` 表示 required phases 已执行完毕，semantic `VALIDATED_FAIL` 仍由 verdict 判为 `NO_GO`/blocking；只有 auth/account/framework fatal 进入 `FAILED`。
-- focused tests 已覆盖 mode conflicts、partial catalog rebuild/replay-all、semantic CLOSED + verdict NO_GO，以及现有三平台回归；等待 CI 验证后再转为 VERIFIED。
+- focused tests 已覆盖 mode conflicts、partial catalog rebuild/replay-all、semantic CLOSED + verdict NO_GO，以及现有三平台回归；run 253 三平台 CI 已验证，当前实现状态转为 VERIFIED (CI)，等待人工 Reviewer 复审。
+
+**CI verification record (2026-09-04)**
+
+- GitHub Actions run `33877350670` / run `253` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1422 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均通过。
+- 该结果验证仓库内 CLI mode conflict、Production replay-all/fresh catalog、CLOSED 与 semantic FAIL 语义及现有回归；不等同于正式账号 identity/entitlement、真实 Production B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval。
+- `configs/production_account.yaml` 仍为空 profile，凭证、Token、host/port/raw profile 未写入仓库；PR #8 继续保持 DO NOT MERGE，等待人工复审。
 
 ## 0. Reviewer 结论
 
@@ -51,7 +57,7 @@ CR-5 / ADR-025                         VERIFIED / CLOSED / FREEZE
 CR-6 / ADR-026                         VERIFIED / CLOSED / FREEZE（不重开）
 2020+ history contract                 VERIFIED / KEEP（不重开）
 PR #8 original anchored-wiring P0s     VERIFIED / CLOSED
-PR #8.1 CLI / resume honesty           START / ACTIVE
+PR #8.1 CLI / resume honesty           VERIFIED (CI) / PENDING_REVIEW
 Production P0-M-1B                     BLOCKED independently
 AmazingData capability approval        BLOCKED independently
 PR #8                                  DO NOT MERGE YET
@@ -299,17 +305,17 @@ credentials / Token / host / port / raw profile
 [x] original persistent anchor wiring remains correct
 [x] original formal as-of freeze remains correct
 [x] original terminalization boundary remains correct
-[ ] CLI modes are mutually exclusive / ambiguous commands fail before side effects
-[ ] Production resume has exactly one documented and implemented recovery model
-[ ] no caller-selected partial resume can accidentally mint an incomplete CLOSED production run
-[ ] partial/unsealed RUNNING catalog handling is deterministic and explicit
-[ ] CLOSED vs FAILED semantic wording corrected to frozen model truth
-[ ] blocking VALIDATED_FAIL cannot become GO
-[ ] focused tests above green without native SDK/network
-[ ] production_account.yaml remains empty until human profile freeze
-[ ] no capability approval / no fabricated Golden or Data Sufficiency PASS
-[ ] full three-platform CI + governance gates green
-[ ] no CR-5 / CR-6 semantic change
+[x] CLI modes are mutually exclusive / ambiguous commands fail before side effects
+[x] Production resume has exactly one documented and implemented recovery model
+[x] no caller-selected partial resume can accidentally mint an incomplete CLOSED production run
+[x] partial/unsealed RUNNING catalog handling is deterministic and explicit
+[x] CLOSED vs FAILED semantic wording corrected to frozen model truth
+[x] blocking VALIDATED_FAIL cannot become GO
+[x] focused tests above green without native SDK/network
+[x] production_account.yaml remains empty until human profile freeze
+[x] no capability approval / no fabricated Golden or Data Sufficiency PASS
+[x] full three-platform CI + governance gates green
+[x] no CR-5 / CR-6 semantic change
 ```
 
 通过后 Reviewer 才可裁决：

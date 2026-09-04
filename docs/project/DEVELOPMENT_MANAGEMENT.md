@@ -6,14 +6,14 @@
 > **Frozen Baseline**：V1.3.2  
 > **Reviewed Repository HEAD**：`dda8c000d8585a95a66a91fbaa5072427053abb8`（CR-6 Reviewer closure后的 main 合并基线；分支历史保持 append-only）  
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d` 已随 PR #6 合入 main；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`；State/Provider 语义边界保持冻结。  
-> **Latest CI baseline**：GitHub Actions run `33872143907`（run 250）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1414 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均成功。  
-> **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 IN_PROGRESS / CI_PENDING；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119
+> **Latest CI baseline**：GitHub Actions run `33877350670`（run 253）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1422 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均成功。  
+> **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 VERIFIED (CI) / PENDING_REVIEW；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED。  
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120
 > **Last Review**：2026-09-04（CR-6.4 final Reviewer closure 已接受；PR #6 已合入 main；正式账号 native SDK 冒烟通过，但仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）  
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：最新 merge-gate run `33854677630`（run 239）三矩阵全绿，每腿 `1408 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates 均 success。main merge commit 为 `dda8c000d8585a95a66a91fbaa5072427053abb8`。  
 > **Phase Status（2026-09-04，CR-6 closure + 2020+ history contract）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-020 ACCEPTED）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 → **VERIFIED / CLOSED / FREEZE（ADR-025 ACCEPTED；PR #3 merged）**；CR-6 State → **VERIFIED / CLOSED / FREEZE（CR-6.4 final Reviewer closure accepted；ADR-026 ACCEPTED）**；2020+ history contract → **VERIFIED / KEEP（Owner-approved 2020+ contract implementation；Provider capability remains pending）**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 正式 identity/entitlement、formal B1-B7、Golden/Data Sufficiency Matrix 与人工 Reviewer review 尚未完成）  
-> **Production Runner Anchored Wiring（PR #8 review）**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW；formal persistent anchor、frozen as-of、terminalization 和 focused tests 已提交，等待三矩阵 CI；PR #8 暂不合并。  
+> **Production Runner Anchored Wiring（PR #8 review）**：original anchored-wiring P0 已 VERIFIED (CI) / PENDING_REVIEW；PR #8.1 CLI / resume honesty 已 VERIFIED (CI) / PENDING_REVIEW；正式账号验证、PR #8 人工复审和合并仍未完成，PR #8 暂不合并。  
 > **Historical snapshot（已被上方当前状态取代）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 → **DONE / REOPENED**（主体 PASS；仅剩 P1 bounded lineage）；CR-5.1 → **VERIFIED / CLOSED / FREEZE**（correctness closure）；CR-5.2 → **DONE / PENDING_REVIEW**（bounded selected-input lineage；run 176 三平台全绿，Reviewer closure pending）；CR-6 State → **BLOCKED_BY_CR-5.2**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-31 17:42，Reviewer CR-2 复审 P1-01）**：CR-2 批次头部与 Implementation Mapping 曾记录 implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`——该 SHA 非真实 implementation commit；以 GitHub commit object 为准：`15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 关联 commit）。历史条目原文保留，CR-2 工作要求文档已追加 §12 更正。  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。**Count Correction（2026-08-31，CR-2 复审 P1-02）**：ADR-022 §2.2 曾写"9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER"——该批实际 10/4，且 14 条未覆盖 index_daily 等 capability surface；CR-2.1 后 registry 为 **18 条（11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE，runtime exact-set 统计）**，已随 ADR-022 Amendment A §6.1 更正，历史保留。  
@@ -23,6 +23,18 @@
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
 ---
+
+## DM-20260904-120 · PR8.1 three-platform CI verification
+
+**Type**：C1 — formal CLI contract and recovery verification  
+**Date**：2026-09-04  
+**Status**：VERIFIED (CI) / PENDING_REVIEW  
+**Trigger**：PR8.1 format correction 后的 run 253 完成三平台全量 CI 与治理门禁。
+
+- Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功；每腿 `1422 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均通过。
+- CLI mode conflict、Production replay-all/fresh catalog、CLOSED 与 semantic FAIL 的 focused evidence 已通过 CI；任务书 Exit gate 已勾选，等待人工 Reviewer 复审。
+- 该证据不覆盖正式账号 identity/entitlement、真实 Production B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval；production profile 仍为空，PR #8 不自动合并。
+- 本次不涉及账号、凭证、Token、host/port/raw profile、migration、CR-5/CR-6 或 2020+ history contract。
 
 ## DM-20260904-119 · PR8.1 format correction
 
