@@ -222,10 +222,15 @@ def main() -> int:
             if args.offline:
                 exit_code = 0 if safe["bootstrap_status"] == "OFFLINE_RUNTIME_VERIFIED" else 2
             else:
-                exit_code = 0 if safe["bootstrap_status"] in {
-                    "IDENTITY_CANDIDATE",
-                    "FROZEN_IDENTITY_MATCH_REQUIRES_REVIEW",
-                } else 1
+                exit_code = (
+                    0
+                    if safe["bootstrap_status"]
+                    in {
+                        "IDENTITY_CANDIDATE",
+                        "FROZEN_IDENTITY_MATCH_REQUIRES_REVIEW",
+                    }
+                    else 1
+                )
 
     if args.output:
         try:

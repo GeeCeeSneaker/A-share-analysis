@@ -1,3 +1,10 @@
+## 2026-09-04 · P0-AD-01 formatter correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (P0-M-1B.0) / CI_PENDING / PENDING_REVIEW**：run 255 的 Ruff lint 已通过，format check 仅要求规范化 bootstrap 退出码条件表达式；本提交只做格式修正。
+- 不改变脱敏输出、环境注入、人工确认、production allowlist 或正式验证边界；凭证、Token、host/port/raw profile 不进入仓库。
+
 ## 2026-09-04 · P0-AD-01 scrubbed production-account bootstrap
 
 **Implementation Status / Review Status**
