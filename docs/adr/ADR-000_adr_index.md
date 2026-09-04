@@ -31,7 +31,7 @@ ADR（Architecture Decision Record）记录对系统有长期影响的决策。�
 
 | ADR-025 | Deterministic Feature Layer / PIT / Window / Missingness Contract（CR-5） | ACCEPTED / VERIFIED | 2026-09-03 | [ADR-025](ADR-025_feature_layer_pit_missingness.md)，CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 VERIFIED / CLOSED / FREEZE；PR #3 merged at 075ad80e5254998a0662a0f9c1cadc107a217fdb |
 
-| ADR-026 | Deterministic Market State Interpretation Contract（CR-6） | PROPOSED | 2026-09-04 | [ADR-026](ADR-026_deterministic_market_state_interpretation.md)，CR-6.0 governance bootstrap；Reviewer pending | 
+| ADR-026 | Deterministic Market State Interpretation Contract（CR-6） | PROPOSED / PENDING_REVIEW | 2026-09-04 | [ADR-026](ADR-026_deterministic_market_state_interpretation.md)，CR-6.0–6.4 evidence synchronized；Reviewer pending；PR #6 remains open | 
 
 ## 纪律
 
