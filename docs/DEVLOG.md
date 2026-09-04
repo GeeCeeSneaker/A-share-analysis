@@ -1,3 +1,15 @@
+## 2026-09-05 · P0-M-1B.0.1 positive identity contract honesty closure
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：根据新增 reviewer requirement，收紧 generated scrubbed profile id 合同，并在 bootstrap candidate 判定前加入 Trial non-freezable gate。
+- `UNKNOWN_<12hex>` 是当前唯一可冻结的 non-trial candidate；`TRIAL_SIMULATION_<12hex>` 只可用于明确的 Trial 诊断，不得进入 `IDENTITY_CANDIDATE`。
+- 已补充 generated/freezable predicate、legacy/arbitrary/wrong-length/uppercase/whitespace config 拒绝测试，以及 Trial、exact candidate、exact frozen review path 的 bootstrap 回归测试。
+- 本次仍只使用 test-only host/sentinel；`configs/production_account.yaml` 保持为空，不执行 online bootstrap、Production B1-B7、Data Sufficiency、verdict 或 Provider approval。
+
+**Next**
+
+- 等待三平台 CI 与 DEVLOG/Management gates 全绿；PR #9 在该阻塞项关闭并合并前保持 DO NOT MERGE。
 ## 2026-09-05 · P0-M-1B.0 local offline bootstrap preflight
 
 **Implementation Status / Review Status**

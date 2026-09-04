@@ -11,6 +11,8 @@ from types import ModuleType
 
 import pytest
 
+from ashare_state.providers.amazingdata.production_identity import FrozenProductionIdentity
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "spike" / "production_account_bootstrap.py"
 
@@ -64,7 +66,7 @@ class TestProductionAccountBootstrap:
                     "AUTHENTICATED": "YES",
                     "QUERY_READY": "YES",
                     "ACCOUNT_PROFILE": {
-                        "account_profile_id": "UNKNOWN_abc123",
+                        "account_profile_id": "UNKNOWN_abc123def456",
                         "permission_codes": "3|4|32|33",
                         "subscribe_limit": 100,
                         "weekly_flow_limit": 1024,
@@ -96,7 +98,7 @@ class TestProductionAccountBootstrap:
         assert secret not in persisted
         report = json.loads(persisted)
         assert report["bootstrap_status"] == "IDENTITY_CANDIDATE"
-        assert report["ACCOUNT_PROFILE"]["account_profile_id"] == "UNKNOWN_abc123"
+        assert report["ACCOUNT_PROFILE"]["account_profile_id"] == "UNKNOWN_abc123def456"
         assert report["config_written"] is False
         assert report["human_confirmation_required"] is True
 
@@ -205,7 +207,7 @@ class TestProductionAccountBootstrap:
                 "AUTHENTICATED": "YES",
                 "QUERY_READY": "YES",
                 "ACCOUNT_PROFILE": {
-                    "account_profile_id": "UNKNOWN_abc123",
+                    "account_profile_id": "UNKNOWN_abc123def456",
                     "permission_codes": "3|4",
                 },
             }
@@ -305,3 +307,187 @@ class TestProductionAccountBootstrap:
         assert report["bootstrap_status"] == "NOT_TESTABLE_PROFILE"
         assert report["ACCOUNT_PROFILE"]["account_profile_id"] == "UNAVAILABLE"
         assert report["ACCOUNT_PROFILE"]["subscribe_limit"] is None
+
+
+    def test_online_trial_profile_never_becomes_identity_candidate(
+        self, monkeypatch, capsys
+    ):
+        module = _load_script()
+        trial_id = "TRIAL_SIMULATION_abc123def456"
+
+        monkeypatch.setattr(
+            module,
+            "load_env",
+            lambda _path: {
+                "TGW_USERNAME": "user",
+                "TGW_PASSWORD": "runtime-only",
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": str(0),
+            },
+        )
+        monkeypatch.setattr(
+            module,
+            "run_doctor",
+            lambda **_kwargs: {
+                "sdk_state": "SDK_INSTALLED",
+                "verdict": "RUNTIME_ACTUAL_LOAD_VERIFIED",
+                "AUTHENTICATED": "YES",
+                "QUERY_READY": "YES",
+                "ACCOUNT_PROFILE": {
+                    "account_profile_id": trial_id,
+                    "permission_codes": "3|4|32|33",
+                    "subscribe_limit": 100,
+                    "weekly_flow_limit": 10,
+                },
+            },
+        )
+        monkeypatch.setattr(module, "load_frozen_production_identity", lambda: None)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["production_account_bootstrap.py"],
+        )
+
+        assert module.main() == 1
+        report = json.loads(capsys.readouterr().out)
+        assert report["bootstrap_status"] == "TRIAL_ACCOUNT_NOT_FREEZABLE"
+        assert report["ACCOUNT_PROFILE"]["profile_kind"] == "TRIAL"
+        assert report["ACCOUNT_PROFILE"]["account_profile_id"] == trial_id
+
+    @pytest.mark.parametrize(
+        "profile_id",
+        [
+            "ACCOUNT_abcdef123456",
+            "PRODUCTION_abcdef123456",
+            "OTHER_abcdef123456",
+            "FAKE_abcdef123456",
+            "UNKNOWN_abcdef",
+        ],
+    )
+    def test_online_non_generated_profile_never_becomes_identity_candidate(
+        self, monkeypatch, capsys, profile_id
+    ):
+        module = _load_script()
+
+        monkeypatch.setattr(
+            module,
+            "load_env",
+            lambda _path: {
+                "TGW_USERNAME": "user",
+                "TGW_PASSWORD": "runtime-only",
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": str(0),
+            },
+        )
+        monkeypatch.setattr(
+            module,
+            "run_doctor",
+            lambda **_kwargs: {
+                "sdk_state": "SDK_INSTALLED",
+                "verdict": "RUNTIME_ACTUAL_LOAD_VERIFIED",
+                "AUTHENTICATED": "YES",
+                "QUERY_READY": "YES",
+                "ACCOUNT_PROFILE": {
+                    "account_profile_id": profile_id,
+                    "permission_codes": "1|2",
+                    "subscribe_limit": 5000,
+                    "weekly_flow_limit": 500,
+                },
+            },
+        )
+        monkeypatch.setattr(module, "load_frozen_production_identity", lambda: None)
+        monkeypatch.setattr(sys, "argv", ["production_account_bootstrap.py"])
+
+        assert module.main() == 1
+        report = json.loads(capsys.readouterr().out)
+        assert report["bootstrap_status"] == "NOT_TESTABLE_PROFILE"
+        assert report["ACCOUNT_PROFILE"]["account_profile_id"] == "UNAVAILABLE"
+        assert report["bootstrap_status"] != "IDENTITY_CANDIDATE"
+
+    def test_online_exact_generated_non_trial_profile_is_identity_candidate(
+        self, monkeypatch, capsys
+    ):
+        module = _load_script()
+        profile_id = "UNKNOWN_abc123def456"
+
+        monkeypatch.setattr(
+            module,
+            "load_env",
+            lambda _path: {
+                "TGW_USERNAME": "user",
+                "TGW_PASSWORD": "runtime-only",
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": str(0),
+            },
+        )
+        monkeypatch.setattr(
+            module,
+            "run_doctor",
+            lambda **_kwargs: {
+                "sdk_state": "SDK_INSTALLED",
+                "verdict": "RUNTIME_ACTUAL_LOAD_VERIFIED",
+                "AUTHENTICATED": "YES",
+                "QUERY_READY": "YES",
+                "ACCOUNT_PROFILE": {
+                    "account_profile_id": profile_id,
+                    "permission_codes": "1|2",
+                    "subscribe_limit": 5000,
+                    "weekly_flow_limit": 500,
+                },
+            },
+        )
+        monkeypatch.setattr(module, "load_frozen_production_identity", lambda: None)
+        monkeypatch.setattr(sys, "argv", ["production_account_bootstrap.py"])
+
+        assert module.main() == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["bootstrap_status"] == "IDENTITY_CANDIDATE"
+        assert report["ACCOUNT_PROFILE"]["profile_kind"] == "UNKNOWN"
+
+    def test_online_exact_frozen_identity_keeps_review_status(
+        self, monkeypatch, capsys
+    ):
+        module = _load_script()
+        profile_id = "UNKNOWN_abc123def456"
+
+        monkeypatch.setattr(
+            module,
+            "load_env",
+            lambda _path: {
+                "TGW_USERNAME": "user",
+                "TGW_PASSWORD": "runtime-only",
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": str(0),
+            },
+        )
+        monkeypatch.setattr(
+            module,
+            "run_doctor",
+            lambda **_kwargs: {
+                "sdk_state": "SDK_INSTALLED",
+                "verdict": "RUNTIME_ACTUAL_LOAD_VERIFIED",
+                "AUTHENTICATED": "YES",
+                "QUERY_READY": "YES",
+                "ACCOUNT_PROFILE": {
+                    "account_profile_id": profile_id,
+                    "permission_codes": "1|2",
+                    "subscribe_limit": 5000,
+                    "weekly_flow_limit": 500,
+                },
+            },
+        )
+        monkeypatch.setattr(
+            module,
+            "load_frozen_production_identity",
+            lambda: FrozenProductionIdentity(
+                account_profile_id=profile_id,
+                confirmed_at="2026-09-05T10:00:00+08:00",
+                confirmed_by="Owner",
+            ),
+        )
+        monkeypatch.setattr(sys, "argv", ["production_account_bootstrap.py"])
+
+        assert module.main() == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["production_identity_status"] == "PRODUCTION"
+        assert report["bootstrap_status"] == "FROZEN_IDENTITY_MATCH_REQUIRES_REVIEW"

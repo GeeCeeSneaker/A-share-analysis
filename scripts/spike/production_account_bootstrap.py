@@ -29,7 +29,8 @@ from typing import Any
 
 from ashare_state.providers.amazingdata.doctor import run_doctor
 from ashare_state.providers.amazingdata.production_identity import (
-    is_scrubbed_profile_id,
+    is_freezable_production_candidate_id,
+    is_generated_scrubbed_profile_id,
     load_frozen_production_identity,
 )
 from ashare_state.providers.amazingdata.stdout_capture import (
@@ -147,9 +148,11 @@ def _safe_report(
     profile = raw.get("ACCOUNT_PROFILE")
     profile = profile if isinstance(profile, dict) else {}
     profile_id_candidate = str(profile.get("account_profile_id") or "").strip()
-    profile_id = profile_id_candidate if is_scrubbed_profile_id(profile_id_candidate) else ""
+    profile_id = profile_id_candidate if is_generated_scrubbed_profile_id(profile_id_candidate) else ""
     permission_codes = _safe_permission_codes(profile.get("permission_codes"))
     profile_parsed = bool(profile_id)
+    profile_kind = _profile_kind(profile_id)
+    profile_is_freezable = is_freezable_production_candidate_id(profile_id)
     entitlement_verified = profile_parsed and bool(permission_codes)
     authenticated = raw.get("AUTHENTICATED") == "YES"
     query_ready = raw.get("QUERY_READY") == "YES"
@@ -161,6 +164,7 @@ def _safe_report(
         authenticated
         and profile_parsed
         and entitlement_verified
+        and profile_is_freezable
         and profile_id == frozen.account_profile_id
     ):
         production_status = "PRODUCTION"
@@ -182,6 +186,10 @@ def _safe_report(
         bootstrap_status = "NOT_TESTABLE_ENTITLEMENT"
     elif not query_ready:
         bootstrap_status = "NOT_QUERY_READY"
+    elif profile_kind == "TRIAL":
+        bootstrap_status = "TRIAL_ACCOUNT_NOT_FREEZABLE"
+    elif not profile_is_freezable:
+        bootstrap_status = "NOT_TESTABLE_PROFILE"
     elif production_status == "PRODUCTION":
         bootstrap_status = "FROZEN_IDENTITY_MATCH_REQUIRES_REVIEW"
     else:
@@ -189,7 +197,7 @@ def _safe_report(
 
     safe_profile: dict[str, Any] = {
         "account_profile_id": profile_id if profile_id else "UNAVAILABLE",
-        "profile_kind": _profile_kind(profile_id),
+        "profile_kind": profile_kind,
         "profile_parsed": profile_parsed,
         "entitlement_verified": entitlement_verified,
         "permission_codes": permission_codes,

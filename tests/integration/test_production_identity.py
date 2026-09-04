@@ -176,11 +176,62 @@ class TestProductionIdentityConfiguration:
         assert not (tmp_path / "spike").exists()
 
     @pytest.mark.parametrize(
-        "profile_id",
-        ["raw-user", "UNKNOWN", "UNKNOWN_has-space", "UNKNOWN_uppercaseABC123"],
+        ("profile_id", "expected"),
+        [
+            ("UNKNOWN_abcdef123456", True),
+            ("TRIAL_SIMULATION_abcdef123456", True),
+            ("ACCOUNT_abcdef123456", False),
+            ("PRODUCTION_abcdef123456", False),
+            ("OTHER_abcdef123456", False),
+            ("FAKE_abcdef123456", False),
+            ("UNKNOWN", False),
+            ("UNKNOWN_abcdef", False),
+            ("UNKNOWN_abcdef12345", False),
+            ("UNKNOWN_abcdef1234567", False),
+            ("UNKNOWN_" + "a" * 64, False),
+            ("UNKNOWN_ABCDEF123456", False),
+            (" UNKNOWN_abcdef123456", False),
+            ("UNKNOWN_abcdef123456 ", False),
+            ("UNKNOWN_has-space", False),
+            ("raw-user", False),
+        ],
     )
-    def test_profile_id_shape_is_scrubbed_only(self, profile_id):
-        assert not pi.is_scrubbed_profile_id(profile_id)
+    def test_profile_id_shape_matches_current_generator_contract(self, profile_id, expected):
+        assert pi.is_generated_scrubbed_profile_id(profile_id) is expected
+        assert pi.is_scrubbed_profile_id(profile_id) is expected
+
+    @pytest.mark.parametrize(
+        ("profile_id", "expected"),
+        [
+            ("UNKNOWN_abcdef123456", True),
+            ("TRIAL_SIMULATION_abcdef123456", False),
+        ],
+    )
+    def test_only_non_trial_generated_id_is_freezable(self, profile_id, expected):
+        assert pi.is_freezable_production_candidate_id(profile_id) is expected
+
+    @pytest.mark.parametrize(
+        "profile_id",
+        [
+            "ACCOUNT_abcdef123456",
+            "PRODUCTION_abcdef123456",
+            "OTHER_abcdef123456",
+            "FAKE_abcdef123456",
+            "TRIAL_SIMULATION_abcdef123456",
+            "UNKNOWN_abcdef",
+            "UNKNOWN_abcdef12345",
+            "UNKNOWN_abcdef1234567",
+            "UNKNOWN_" + "a" * 64,
+            "UNKNOWN_ABCDEF123456",
+            " UNKNOWN_abcdef123456",
+            "UNKNOWN_abcdef123456 ",
+        ],
+    )
+    def test_config_rejects_non_freezable_or_wrong_profile_ids(self, tmp_path, profile_id):
+        config = tmp_path / "production_account.yaml"
+        _write_config(config, profile_id)
+
+        assert pi.load_frozen_production_identity(config) is None
 
     def test_missing_config_is_fail_closed(self, tmp_path):
         assert pi.load_frozen_production_identity(tmp_path / "does-not-exist.yaml") is None
