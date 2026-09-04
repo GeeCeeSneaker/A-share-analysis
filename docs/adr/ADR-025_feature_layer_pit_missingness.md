@@ -2,8 +2,8 @@
 
 ## Status
 
-- **Status**: PROPOSED（2026-09-04，CR-5.1 correctness VERIFIED / CLOSED / FREEZE；CR-5.2 bounded lineage CI VERIFIED；Reviewer final closure pending）
-- **Deciders**: Project Owner / Development Executor；Design / Audit Review（裁决 pending）
+- **Status**: ACCEPTED / VERIFIED（2026-09-04；CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 VERIFIED / CLOSED / FREEZE；final Reviewer closure effective at merge commit 075ad80e5254998a0662a0f9c1cadc107a217fdb）
+- **Deciders**: Project Owner / Development Executor；Design / Audit Review（final closure accepted 2026-09-04）
 - **Date**: 2026-09-03
 - **Work Requirement**: \`docs/design/A-share-analysis_CR-5_DeterministicFeatureLayer及PITFeatureSnapshot开发工作要求_20260903.md\`
 - **Upstream**: ADR-024 ACCEPTED / CR-4 VERIFIED-CLOSED-FREEZE after PR #1 merge
@@ -265,7 +265,7 @@ until then it remains PROPOSED.
 
 ### Status
 
-This amendment is PROPOSED / PENDING_REVIEW. It closes the only remaining
+Historical pre-closure status: this amendment was PROPOSED / PENDING_REVIEW. It closes the only remaining
 CR-5 item identified by the Reviewer: bounded row-lineage complexity. It does
 not change V1 feature names, formulas, price basis, window basis, market
 breadth semantics, artifact schema, or migration 023.
@@ -323,4 +323,12 @@ The implementation tree originated at `8281e258a7595f8e5fbbd8d0f7e023a494f0b821`
 
 The original PR #2 run `33767742448` (run 175) had all runtime and test gates green; its only failure was the Windows 3.14 DEVLOG gate reporting the historical `0fe989767d40bc31d0c538c0e07d509f9d1983ff` code commit. The clean atomic head `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e` was then verified by GitHub Actions run `33814571568` (run 176): Ubuntu 3.14, Windows 3.14, and Windows 3.12 all succeeded, each with `1320 passed`; Ruff lint/format, mypy, Spike, and AmazingData SDK-absent checks passed, and Windows 3.14 DEVLOG/Management-doc gates passed.
 
-The CR-5.2 focused tests remain in `tests/integration/test_features.py`: 10k sparse amount/raw-return member bounds, selected/unselected identity and availability mutations, market duplicate/order failure, and the structural no-history-scan guard. Numeric formulas, active finding truth, artifact schema, and migration 023 remain unchanged. Review status remains PENDING_REVIEW; ADR-025 remains PROPOSED until Reviewer closure, PR #3 must not be auto-merged, PR #2 is retained for historical traceability, and CR-6 remains blocked.
+The CR-5.2 focused tests remain in `tests/integration/test_features.py`: 10k sparse amount/raw-return member bounds, selected/unselected identity and availability mutations, market duplicate/order failure, and the structural no-history-scan guard. Numeric formulas, active finding truth, artifact schema, and migration 023 remain unchanged. The preceding sentence records the pre-closure review state and is retained for audit history. The final closure supersedes it: ADR-025 is ACCEPTED / VERIFIED, PR #3 is merged, and CR-6 is allowed to start under the separate CR-6 contract.
+
+## Final closure addendum — 2026-09-04
+
+The earlier PROPOSED / PENDING_REVIEW wording in the Review and exit and Amendment B evidence sections is retained as historical pre-merge evidence. It is not the current status.
+
+The final Reviewer decision recorded CR-5, CR-5.1, CR-5.2, and CR-5.2.1 as VERIFIED / CLOSED / FREEZE and accepted ADR-025. PR #3 then merged to main at 075ad80e5254998a0662a0f9c1cadc107a217fdb after the docs-inclusive run 33818320010 (run 179) passed on Ubuntu 3.14, Windows 3.12, and Windows 3.14. No CR-5 formula, window, universe, missingness, lineage, migration, or artifact semantics are changed by this status synchronization.
+
+CR-6 State is a new downstream contract. It must consume the public Verified Feature boundary and must not reopen or silently extend the frozen CR-5 V1 semantics.
