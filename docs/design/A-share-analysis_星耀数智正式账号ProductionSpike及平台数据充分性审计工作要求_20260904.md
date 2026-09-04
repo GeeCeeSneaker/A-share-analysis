@@ -28,6 +28,16 @@ B. Platform Data Sufficiency Audit
 
 ---
 
+## 0.1 Repository implementation update (2026-09-04)
+
+- Added `scripts/spike/production_account_bootstrap.py` as the P0-AD-01 controlled entry point. It reads credentials only from environment/.env, emits an allowlisted scrubbed profile, and never writes `configs/production_account.yaml`.
+- Added offline/injected-doctor tests proving missing credentials fail closed, `--offline` passes no credentials, raw error fields are not emitted, and human confirmation remains required.
+- This advances the executable boundary only; the production identity is not frozen, B1-B7 and Data Sufficiency Matrix remain pending, and no capability approval is claimed.
+
+---
+
+---
+
 # 1. 当前事实基线
 
 ## 1.1 当前本地 SDK 冒烟事实（2026-09-04）

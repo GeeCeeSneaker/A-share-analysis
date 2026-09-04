@@ -1,6 +1,6 @@
 # P0-M-1 Spike Report — AmazingData Provider 验证（GO / NO-GO）
 
-> 状态：**FRAMEWORK READY (R3) — FORMAL SDK SMOKE PASS / FORMAL PRODUCTION RUN PENDING**
+> 状态：**FRAMEWORK READY (R3) — PR8.1 CLI/Resume VERIFIED (CI) / FORMAL PRODUCTION RUN PENDING**
 > 框架已通过第三轮审计整改（R3-0A/0B/0C/1A/1B）：Run 生命周期终态化、单 Run Verdict、账号门、完整 Provenance、语义 Validators v2、Golden Truth 进 Core Gate、Evidence Closure。
 > 与 M0 Exit Report 同时提交设计者评审。
 
@@ -26,8 +26,8 @@ uv run python scripts/spike/spike_runner.py --trial --date <as-of>
 # PRODUCTION：一个 run 跑全部阶段（R3-P0-02 单 Run Verdict 契约）
 uv run python scripts/spike/spike_runner.py --production --date <as-of>
 
-# 中断续跑（身份六元组必须匹配）
-uv run python scripts/spike/spike_runner.py --production --resume --run-id <id> --phase b5
+# Production replay-all recovery（身份六元组必须匹配；不接受 --phase bN）
+uv run python scripts/spike/spike_runner.py --production --resume --run-id <id>
 
 # verdict（仅 CLOSED 的 PRODUCTION run）
 uv run python scripts/spike/spike_runner.py --verdict --run-id <id>
@@ -89,9 +89,14 @@ verdict.json 同时输出（R3 §54）：
 - 这只证明 SDK 原生调用链在本地可用；它不产生 run-scoped raw evidence，不满足正式 B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval。完整历史覆盖只在形式化 Production run 中按 2020+ 合同执行。
 - 依赖 wheel 已留在本地被忽略的 `vendor/amazingdata/`；`configs/production_account.yaml` 继续为空。由于当前本地环境未装入仓库源码，形式化 runner 尚未执行。
 
+
+## 4.4 P0-AD-01 脱敏身份 bootstrap 工具
+
+`scripts/spike/production_account_bootstrap.py` 已作为正式账号身份检查的受控入口加入仓库。它只从环境/.env 读取凭证，输出 allowlisted scrubbed profile，支持 `--offline` runtime 检查，不会写入 `configs/production_account.yaml`；真实账号 identity 仍需 Owner/Reviewer 人工确认，B1-B7、verdict 和 Data Sufficiency Matrix 继续待执行。
+
 ## 5. Early Stop（R3 §53）
 
-B2/B3/B4 任一 blocking FAIL → run 终态 FAILED → verdict NO_GO；NOT_TESTABLE / 框架不完整 → SPIKE_INCOMPLETE（**不误记为 NO_GO**）。
+B2/B3/B4 任一 blocking semantic FAIL → case 保持 VALIDATED_FAIL；若执行本身完成，run 正确进入 CLOSED，正式 verdict 输出 NO_GO。只有 auth/account/framework fatal execution failure 才进入 FAILED；NOT_TESTABLE / 框架不完整 → SPIKE_INCOMPLETE（**不误记为 NO_GO**）。
 
 ## 6. 正式账号到位当天的流程（R3 §52）
 

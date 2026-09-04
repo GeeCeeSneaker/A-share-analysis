@@ -1,3 +1,11 @@
+## 2026-09-04 · P0-AD-01 scrubbed production-account bootstrap
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (P0-M-1B.0) / CI_PENDING / PENDING_REVIEW**：新增正式账号 bootstrap 入口与 focused tests；工具只输出 scrubbed identity candidate，不自动写入 production allowlist。
+- 修正 Spike report 中过时的 Production `--resume --phase b5` 与 semantic FAIL/FAILED 表述；不改变 CR-5/CR-6/2020+ history/Provider capability 语义。
+- 这只推进了可执行边界；正式 identity 人工冻结、Production B1-B7、Golden/Data Sufficiency Matrix、verdict 与 Provider approval 仍未完成。凭证、Token、host/port/raw profile 不进入仓库。
+
 ## 2026-09-04 · PR8.1 three-platform CI verification
 
 **Implementation Status / Review Status**

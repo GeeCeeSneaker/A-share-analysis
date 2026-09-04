@@ -104,6 +104,21 @@
 
 当前结论：网络路径可达，但缺少银河官方 wheel，无法安全执行 provider doctor、正式登录或单一 Production Spike。安装官方 wheel 后，必须先完成 runtime actual-load doctor，再按单一 B1-B7 run、evidence closure、2020+ 历史合同和人工 Reviewer 流程继续。
 
+### 3.3 P0-AD-01 脱敏身份 bootstrap 工具（2026-09-04）
+
+- `scripts/spike/production_account_bootstrap.py` 是正式账号身份检查的受控入口：凭证只从 `TGW_*` 环境变量或本地 `.env` 读取，不接受 CLI 凭证参数，不打印或写出凭证。
+- 输出只包含 scrubbed `account_profile_id`、权限/额度摘要、运行时版本、网络/认证/查询状态和 `production_identity_status`；原始 SDK error、stdout、Token、host、port 不进入输出。
+- 默认只打印 JSON；`--output` 可写入操作者指定的本地证据文件。工具不会自动写入 `configs/production_account.yaml`，必须由 Owner/Reviewer 人工确认后再做独立治理提交。
+- `--offline` 只验证 SDK/runtime，不读取或使用账号凭证。退出码只表达环境缺失、账号未就绪或候选 identity，不表达 capability approval。
+
+示例：
+
+```powershell
+uv run python scripts/spike/production_account_bootstrap.py
+uv run python scripts/spike/production_account_bootstrap.py --offline
+uv run python scripts/spike/production_account_bootstrap.py --output data/spike/results/production_account_bootstrap.json
+```
+
 ## 4. C++ SDK 存档（2026-08-21 摸底，已被 Python 版取代为集成路径）
 
 - TGW C++ V1.0.8 已装运行库（`C:\Users\Public\Documents\mdga_file\lib`），DLL 加载链验证完整
