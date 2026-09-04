@@ -139,8 +139,12 @@ _RETURN_CENTER = StateSpec(
     threshold_policy="SIGN_WITH_ZERO_AS_MIXED",
     missingness_policy="NULL_TO_UNKNOWN_WITH_STATE_INPUT_NULL",
     availability_rule="SOURCE_FEATURE_ROW_AVAILABLE_AT",
-    interpretation=("Observed cross-sectional return center has a positive, negative, or mixed sign."),
-    non_predictive_statement=("This describes the observed Feature row and does not forecast a future return."),
+    interpretation=(
+        "Observed cross-sectional return center has a positive, negative, or " + "mixed sign."
+    ),
+    non_predictive_statement=(
+        "This describes the observed Feature row and does not forecast a future " + "return."
+    ),
     eligibility="SUPPORTED",
 )
 
@@ -157,8 +161,12 @@ _DAILY_PARTICIPATION = StateSpec(
     threshold_policy="EXACT_COUNT_DOMINANCE",
     missingness_policy="NULL_TO_UNKNOWN_WITH_STATE_INPUT_NULL",
     availability_rule="SOURCE_FEATURE_ROW_AVAILABLE_AT",
-    interpretation=("Observed valid daily returns are dominated by advancing, declining, or equal counts."),
-    non_predictive_statement=("This describes participation in the observed universe and is not a trading signal."),
+    interpretation=(
+        "Observed valid daily returns are dominated by advancing, declining, or " + "equal counts."
+    ),
+    non_predictive_statement=(
+        "This describes participation in the observed universe and is not a " + "trading signal."
+    ),
     eligibility="SUPPORTED",
 )
 
@@ -175,8 +183,12 @@ _TREND_PARTICIPATION = StateSpec(
     threshold_policy="MAJORITY_AT_HALF_BOUNDARY",
     missingness_policy="NULL_OR_EMPTY_TO_UNKNOWN",
     availability_rule="SOURCE_FEATURE_ROW_AVAILABLE_AT",
-    interpretation=("Observed securities with comparable 20-observation trend evidence are mostly positive, negative, or mixed."),
-    non_predictive_statement=("This describes current observed trend participation and is not a future-regime prediction."),
+    interpretation=(
+        "Observed securities with comparable 20-observation trend evidence are " + "mostly positive, negative, or mixed."
+    ),
+    non_predictive_statement=(
+        "This describes current observed trend participation and is not a " + "future-regime prediction."
+    ),
     eligibility="SUPPORTED",
 )
 
@@ -193,7 +205,9 @@ _MARKET_STRUCTURE = StateSpec(
     missingness_policy="UNKNOWN_DIMENSION_TO_UNKNOWN",
     availability_rule="MAX_CONSUMED_STATE_INPUT_AVAILABILITY",
     interpretation="The first three descriptive State dimensions are jointly aligned or mixed.",
-    non_predictive_statement=("This is an exact descriptive composition and does not predict price direction."),
+    non_predictive_statement=(
+        "This is an exact descriptive composition and does not predict price " + "direction."
+    ),
     eligibility="SUPPORTED",
 )
 
