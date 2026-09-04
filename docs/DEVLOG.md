@@ -12,7 +12,7 @@
 
 **Next**
 
-- Run the documentation-inclusive CI for this synchronization commit, then request final human review. Keep migration 024 and the State dimension set frozen.
+- Documentation-inclusive CI for synchronization commit `f293e696e3fe8b751a56b51a2d4b4b8b3892c318` passed as run `33837386772` (run 214) on all three matrix legs; request final human review. Keep migration 024 and the State dimension set frozen.
 
 
 

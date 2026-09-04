@@ -3874,3 +3874,19 @@ Git 历史负责保存过去版本。
 - **ADR**：ADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE; PR #6 remains open and not merged.
 - **Commit**：`e47514a8afc864c9f197e18f95ea56fe81424a2d` implementation head; this record is synchronized with the contract-evidence documentation batch.
 - **Reviewer**：Final Design / Audit Review pending.
+
+---
+
+## Change Record: DM-CR-20260904-101
+
+- **Type**：C1 — CR-6.4 contract-evidence documentation synchronization verification
+- **Date**：2026-09-04
+- **Status**：DONE / PENDING_REVIEW
+- **Trigger**：Final audit-only documentation synchronization after the implementation-head CI passed.
+- **Evidence**：Documentation synchronization commit `f293e696e3fe8b751a56b51a2d4b4b8b3892c318` passed GitHub Actions run 33837386772 (run 214) on Ubuntu 3.14, Windows 3.12, and Windows 3.14; every leg reported 1401 passed, with Ruff lint/format, mypy, Spike, SDK-absent, and applicable Windows 3.14 DEVLOG/Management gates successful.
+- **New Contract**：ADR-026 and the CR-6 work requirement now retain the honest fatal-vs-persisted-finding contract and concrete 1–64 mapping as review evidence; no runtime semantics or State scope changed.
+- **Affected Modules**：docs/adr/ADR-026_deterministic_market_state_interpretation.md; docs/design/A-share-analysis_CR-6_DeterministicMarketStateLayer开发工作要求_20260904.md; docs/DEVLOG.md.
+- **Compatibility**：No new State dimensions; migration 024, CR-5 Feature contracts, public-repository governance, and AmazingData 2020+ contracts remain unchanged. PR #6 remains open and not merged.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE.
+- **Commit**：`f293e696e3fe8b751a56b51a2d4b4b8b3892c318` documentation synchronization head; final verification run 33837386772.
+- **Reviewer**：Final Design / Audit Review pending.
