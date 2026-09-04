@@ -1,6 +1,6 @@
 # Provider Verification — AmazingData / TGW（中国银河证券 格物金融服务平台）
 
-> 状态：**Python SDK 已安装验证（2026-08-21），待仿真账号连通性测试**
+> 状态：**Python SDK 已安装验证；试用账号 B1 连通性已完成；正式账号 / B2-B7 生产验证阻塞**
 > 本文件是 Provider 事实的唯一权威记录处（V1.3.2 §7.14）。主架构文档不维护接口细节。
 
 ## 1. SDK 与环境（已验证）
@@ -59,8 +59,8 @@
 
 ## 3. 待验证事项（正式账号到位后执行完整 Spike）
 
-1. K 线历史深度实测（手册称 2013 年至今；目标 2018 分析 + 2014/2015 Warmup）
-2. 退市证券包含性（`get_hist_code_list` 20130101 起 + `get_stock_basic.IS_LISTED=3`）
+1. K 线历史深度实测（当前合同：2020-01-01 至最新完整交易日；不要求或回填 2020 年以前历史）
+2. 退市证券包含性（当前合同：2020-01-01 起不产生 survivorship omission + `get_stock_basic.IS_LISTED=3`）
 3. 历史证券状态全字段抽样（50 ST 加/脱帽 / 20 退市 / 30 涨跌停制度 / 20 除权除息连续性 Golden）
 4. 复权因子表全历史 + 与交易所公告一致性
 5. 行业 taxonomy 归属（`get_industry_base_info`：申万 or 银河自编 → GALAXY_xxx 纪律）
@@ -71,6 +71,13 @@
 10. free-float 语义评估（`get_equity_structure` 字段 → EXACT/DERIVABLE/ALTERNATIVE/MISSING 四级结论）
 11. 限流/并发实测（正式账号额度）
 12. 指数成分股（`get_index_constituent` A010200001 对应）
+
+## 3.1 当前 2020+ 合同与生产阻塞
+
+- 默认历史边界已由 Owner 决策统一为 `2020-01-01 -> latest complete trading day`。
+- `history_start_2020` / `history_coverage_2020_v1` 是当前 Spike Core Gate 的实现合同；旧的 `history_start_2018_plus_warmup` 只保留在历史文档中，不再作为当前 GO 条件。
+- 当前账号仍是试用仿真账号，正式账号画像尚未人工确认；因此 B2-B7、正式 verdict、Golden/Data Sufficiency Matrix 和 capability approval 均保持未验证。
+- 解除条件：Owner/Reviewer 提供脱敏稳定账号画像和实际 entitlement 后，按生产 Spike 单 Run 流程补齐证据；不得用试用账号结果替代正式生产证据。
 
 ## 4. C++ SDK 存档（2026-08-21 摸底，已被 Python 版取代为集成路径）
 
