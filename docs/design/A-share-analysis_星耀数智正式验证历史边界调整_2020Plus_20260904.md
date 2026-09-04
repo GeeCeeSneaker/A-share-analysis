@@ -172,7 +172,7 @@ CR-6: remains START / ACTIVE
 - [x] 不为 Feature warmup 拉 2019 数据；
 - [ ] Data Sufficiency Matrix 统一使用 2020+；
 - [x] Backfill plan 明确禁止 pre-2020；
-- [ ] DEVLOG / DEVELOPMENT_MANAGEMENT 同步；
+- [x] DEVLOG / DEVELOPMENT_MANAGEMENT 同步；
 - [ ] 三平台 CI 全绿。
 
 ---

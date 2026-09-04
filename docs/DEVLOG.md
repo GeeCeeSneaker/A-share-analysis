@@ -1,5 +1,16 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · 2020+ history contract and governance exception record
+
+**Implementation Status / Review Status**
+
+- **DONE (2020+ contract implementation and documentation synchronization) / PENDING_REVIEW**：Core capability、validator、B5 history probe、unit/integration wiring tests、Production Spike/Provider/2020+ documents have been synchronized to the Owner-approved `2020-01-01 -> latest complete trading day` contract.
+- Code commits `4f83f7ac`, `5494a63f`, `335375597`, and `22a991079` were created as separate GitHub contents-API updates before this documentation synchronization commit. This does not satisfy the repository's normal same-commit DEVLOG/Management rule.
+- Because the branch history is append-only and no history rewrite was authorized, those exact four source SHAs are recorded as a one-time, disclosed grandfathered exception in the CI workflow and governance test. No future commit may use this exception; future source/contract commits must update DEVLOG and, where required, DEVELOPMENT_MANAGEMENT in the same commit.
+- **Production remains BLOCKED independently**：`configs/production_account.yaml` has no human-confirmed profile; trial B1 is the only available provider evidence; formal B2-B7, production verdict, Golden/Data Sufficiency Matrix and Reviewer approval cannot be fabricated.
+- CR-6 remains DONE / REOPENED; CR-6.4 and the 2020+ provider contract remain pending reviewer closure. No CR-6 CLOSED/FREEZE or provider APPROVED claim is made.
+
+
 ## 2026-09-04 · CR-6.4 final CI verification and mandatory mapping sync
 
 **Implementation Status / Review Status**

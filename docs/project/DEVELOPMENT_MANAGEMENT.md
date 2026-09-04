@@ -3890,3 +3890,17 @@ Git 历史负责保存过去版本。
 - **ADR**：ADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE.
 - **Commit**：`f293e696e3fe8b751a56b51a2d4b4b8b3892c318` documentation synchronization head; final verification run 33837386772.
 - **Reviewer**：Final Design / Audit Review pending.
+
+---
+
+## Change Record: DM-CR-20260904-102
+
+- **Type**：C2 — 2020+ Provider History Contract implementation/documentation synchronization and disclosed governance exception
+- **Date**：2026-09-04
+- **Status**：DONE (implementation and docs) / PENDING_REVIEW
+- **Trigger**：Owner decision replacing the obsolete pre-2020 warmup gate and the need to synchronize code, tests, Provider documents, Spike report, DEVLOG and governance records.
+- **Evidence**：`history_start_2020` / `history_coverage_2020_v1` are implemented; B5 starts at `20200101`; unit and integration wiring tests are present. Production account and formal Spike facts remain unavailable.
+- **Governance exception**：The source SHAs `4f83f7ac3a19327e9f724c9730cbfbfef03de38b`, `5494a63f83a57e4b5034bc62073fb7d2057db63b`, `335375597421dcc91c48602f5112e817adfc7044`, and `22a991079ddebe90bef3cac45eed258dc4e56269` were split by the one-path-per-commit GitHub contents API. The branch is not rewritten; the CI workflow and governance test contain a one-time exact-SHA exception, disclosed here and in DEVLOG. This exception must not be extended.
+- **Current contract**：2020-01-01 is the required history boundary; pre-2020 routine backfill and Feature warmup are forbidden/not required. 2020+ gaps remain fail closed.
+- **Remaining blockers**：formal production account identity/entitlement, closed production B1-B7 evidence, Data Sufficiency Matrix, Reviewer approval, ADR-026 acceptance and PR #6 merge. These require external facts or human decisions and are not claimed complete.
+
