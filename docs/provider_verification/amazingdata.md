@@ -1,6 +1,6 @@
 # Provider Verification — AmazingData / TGW（中国银河证券 格物金融服务平台）
 
-> 状态：**Python SDK 已安装验证；试用账号 B1 连通性已完成；正式账号 / B2-B7 生产验证阻塞**
+> 状态：**历史试用账号 B1 证据保留；本次正式账号连接信息已收到，但官方 SDK 缺失，正式登录 / B2-B7 生产验证阻塞**
 > 本文件是 Provider 事实的唯一权威记录处（V1.3.2 §7.14）。主架构文档不维护接口细节。
 
 ## 1. SDK 与环境（已验证）
@@ -78,6 +78,21 @@
 - `history_start_2020` / `history_coverage_2020_v1` 是当前 Spike Core Gate 的实现合同；旧的 `history_start_2018_plus_warmup` 只保留在历史文档中，不再作为当前 GO 条件。
 - 当前账号仍是试用仿真账号，正式账号画像尚未人工确认；因此 B2-B7、正式 verdict、Golden/Data Sufficiency Matrix 和 capability approval 均保持未验证。
 - 解除条件：Owner/Reviewer 提供脱敏稳定账号画像和实际 entitlement 后，按生产 Spike 单 Run 流程补齐证据；不得用试用账号结果替代正式生产证据。
+
+## 3.2 2026-09-04 正式账号验证尝试
+
+| 项 | 当前事实 |
+|---|---|
+| 连接信息 | 已收到；原始凭据只保留在本次运行环境，不入库 |
+| 独立网络探测 | Owner 提供的两个候选服务端点端口均 TCP `REACHABLE`；未在本文件记录 host |
+| 官方 SDK | 当前受控 Python 3.14.6 环境未发现 `AmazingData` / `tgw` |
+| AUTHENTICATED | `NOT_TESTED`（未发送登录请求） |
+| ACCOUNT_PROFILE | `NOT_TESTED`（未产生 profile） |
+| QUERY_READY | `NOT_TESTED` |
+| B1-B7 / verdict | 未执行 / 未评定 |
+| 配置纪律 | `configs/production_account.yaml` 继续为空；不以连接可达性替代 frozen identity |
+
+当前结论：网络路径可达，但缺少银河官方 wheel，无法安全执行 provider doctor、正式登录或单一 Production Spike。安装官方 wheel 后，必须先完成 runtime actual-load doctor，再按单一 B1-B7 run、evidence closure、2020+ 历史合同和人工 Reviewer 流程继续。
 
 ## 4. C++ SDK 存档（2026-08-21 摸底，已被 Python 版取代为集成路径）
 

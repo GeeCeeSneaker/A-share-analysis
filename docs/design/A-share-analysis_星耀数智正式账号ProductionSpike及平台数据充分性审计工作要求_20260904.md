@@ -3,7 +3,7 @@
 > **Date**：2026-09-04  
 > **Reviewer Baseline**：`4ac274747e86d5f386560ceabbffa3273ca9d14b`  
 > **Parallel Track**：CR-6 State 开发可并行；本批次不得修改 CR-5 冻结语义，也不得越权批准未验证 Provider capability  
-> **Status**：**P0-M-1B ACCOUNT NOT AVAILABLE / VALIDATION BLOCKED**  
+> **Status**：**P0-M-1B ACCOUNT DETAILS RECEIVED / VALIDATION BLOCKED BY OFFICIAL SDK**  
 > **Production Truth**：正式账号“已存在”≠正式数据源“已验证”；只有 frozen account identity + production Spike + golden + evidence closure + Reviewer approval 才能授予 APPROVED  
 > **Credentials**：用户名、密码、Token、真实 host 明文等一律只进 `.env`/运行环境，不得写入 Git、日志、issue、PR body 或本文件
 
@@ -617,3 +617,12 @@ Provider validation track
 ```
 
 最终只能以正式账号 evidence 为准。
+
+
+## 11.2 正式账号验证尝试记录（2026-09-04）
+
+- Owner 已通过当前协作会话提供正式账号连接信息；用户名、密码、Token、真实 host 和端口值均未写入 GitHub、日志、Issue、PR 或本文件。
+- 对 Owner 提供的两个候选服务端点执行了独立 TCP 可达性探测：端口可达。该结果只证明网络路径，不证明登录、账号身份、权限或数据正确性。
+- 当前受控 Python 3.14.6 环境未安装官方 `AmazingData` 与 `tgw` wheel；未发送登录请求，因此 `AUTHENTICATED`、`ACCOUNT_PROFILE`、`QUERY_READY` 均为 `NOT_TESTED`，B1-B7 尚未执行。
+- `configs/production_account.yaml` 继续保持空白；未生成 frozen production identity、正式 verdict、Golden 或 Data Sufficiency Matrix 结论。
+- 解除当前阻塞的最小输入：在受控环境安装并记录银河提供的官方 wheel 指纹，然后依次运行 provider doctor、单一 CLOSED PRODUCTION B1-B7 run、verdict 和人工复核；安装包不是公共同名包的替代品。

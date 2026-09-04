@@ -1,5 +1,15 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · Formal provider validation attempt blocked by official SDK
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / BLOCKED_BY_OFFICIAL_SDK / PENDING_REVIEW**：Owner supplied formal-account connection information for the pending Production Spike. The values were used only as runtime input planning; no username, password, Token, host or port literal was written to GitHub or any repository artifact.
+- An independent TCP probe confirmed the two Owner-provided candidate service endpoints are reachable on the configured port. This is network evidence only, not authentication or entitlement evidence.
+- The controlled Python 3.14.6 environment does not contain the official `AmazingData` / `tgw` wheel, so no login request was sent. Account profile, provider doctor online result, B1-B7, formal verdict and Data Sufficiency Matrix remain unassessed.
+- `configs/production_account.yaml` remains empty by design. The next required input is the Galaxy-provided official wheel package and its fingerprint; after controlled installation, rerun doctor, then one CLOSED PRODUCTION B1-B7 run and human review.
+
+
 ## 2026-09-04 · 2020+ history contract final CI verification
 
 **Implementation Status / Review Status**

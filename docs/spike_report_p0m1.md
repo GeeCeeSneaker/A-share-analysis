@@ -1,6 +1,6 @@
 # P0-M-1 Spike Report — AmazingData Provider 验证（GO / NO-GO）
 
-> 状态：**FRAMEWORK READY (R3) — AWAITING PRODUCTION ACCOUNT**
+> 状态：**FRAMEWORK READY (R3) — FORMAL ACCOUNT DETAILS RECEIVED / OFFICIAL SDK BLOCKED**
 > 框架已通过第三轮审计整改（R3-0A/0B/0C/1A/1B）：Run 生命周期终态化、单 Run Verdict、账号门、完整 Provenance、语义 Validators v2、Golden Truth 进 Core Gate、Evidence Closure。
 > 与 M0 Exit Report 同时提交设计者评审。
 
@@ -11,8 +11,8 @@
 | Spike 对象 | AmazingData（中国银河证券 格物金融服务平台）；Tushare 不可用（ADR-007） |
 | 框架验证 | dry-run 全流程（FakeTarget）：八态 case / validators v2 / golden 逐案例对比 / 终态 run / verdict 引擎 + evidence closure 全部工作——**dry-run 中新 validators 当场抓到 fake 数据的北交所涨跌停制度违规，证明语义校验真实生效** |
 | 仿真账号 | B1 连通性 DONE（2026-08-21）；权限码 3\|4\|32\|33 实际只开代码表 |
-| 真实运行 | 待正式账号（P0-M-1B） |
-| 当前结论 | **未评定**（核心事实未验证前不得给 GO） |
+| 真实运行 | 已收到连接信息；官方 SDK 未安装，尚未启动 Production run |
+| 当前结论 | **未评定 / 当前阻塞**（网络可达但 SDK 缺失，登录画像与 B1-B7 未执行） |
 
 ## 2. 运行方式（R3 框架，与旧文档不同）
 
@@ -74,6 +74,12 @@ verdict.json 同时输出（R3 §54）：
 ## 4.1 当前历史边界合同（2026-09-04）
 
 `history_start_2020` 只验证 `2020-01-01 -> latest complete trading day` 的必要覆盖；2020 年以前的缺失不会导致 `GO_CORE` 失败，也不触发常规回填。2020-01-01 之后的关键连续性缺口仍必须 fail closed。正式生产 verdict 仍为未评定，原因是正式账号画像和 B1-B7 生产证据尚未提供。
+
+## 4.2 当前正式账号验证尝试（2026-09-04）
+
+- 两个 Owner 提供的候选服务端口均通过独立 TCP 可达性探测；这不是认证或数据权限证据。
+- 当前受控 Python 3.14.6 环境未安装官方 `AmazingData` / `tgw` wheel，因此未发送登录请求，`ACCOUNT_PROFILE`、正式 B1-B7、verdict 和 Data Sufficiency Matrix 均未生成。
+- 凭据未写入仓库；`production_account.yaml` 继续为空。下一步是安装并记录官方 wheel 指纹，再重跑 doctor 和单一 Production run。
 
 ## 5. Early Stop（R3 §53）
 
