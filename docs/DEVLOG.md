@@ -1,3 +1,14 @@
+## 2026-09-05 · P0-M-1B.0 test fixture de-identification
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (fixture hardening) / CI_PENDING / PENDING_REVIEW**：将 bootstrap 对抗测试中的 endpoint-like 夹具替换为明确的 `test-only-host` / `test-only-port` 占位符，避免把任何真实连接信息带入 Git。
+- 只改变测试输入的脱敏属性，不改变 stderr containment、safe projection、identity allowlist 或正式账号验证边界；真实用户名、密码、Token、host、port 和 raw profile 不进入仓库。
+
+**Next**
+
+- 等待本提交对应的三平台 CI；配置仍保持空白，正式 identity freeze、Production B1-B7、Data Sufficiency Matrix、verdict 和 Provider approval 不执行。
+
 ## 2026-09-05 · P0-M-1B.0 three-platform CI verification
 
 **Implementation Status / Review Status**

@@ -8,7 +8,7 @@
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d` 已随 PR #6 合入 main；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`；State/Provider 语义边界保持冻结。  
 > **Latest full code CI baseline（PR #9 candidate）**：GitHub Actions run `33896142967`（run 273）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1449 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均成功。  
 > **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 VERIFIED (CI) / PENDING_REVIEW；P0-M-1B.0 scrubbed bootstrap 与 positive identity gates 当前 VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129 / DM-20260905-130 / DM-20260905-131 / DM-20260905-132 / DM-20260905-133 / DM-20260905-134
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129 / DM-20260905-130 / DM-20260905-131 / DM-20260905-132 / DM-20260905-133 / DM-20260905-134 / DM-20260905-135
 > **Last Review**：2026-09-05（P0-M-1B.0 positive identity gates 已通过三平台 CI；PR #9 保持 open / PENDING_REVIEW；正式 identity、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍未执行）  
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：PR #9 candidate 的最新验证 run `33896142967`（run 273）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全绿，每腿 `1449 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 和适用的 DEVLOG/Management gates 均 success。main 的 merge-gate 历史基线不因本 PR 自动改变。  
@@ -23,6 +23,20 @@
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
 ---
+
+## DM-20260905-135 · P0-M-1B.0 test fixture de-identification
+
+**Type**：C0 — test-only endpoint placeholder correction  
+**Date**：2026-09-05  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：最终 GitHub 侧差异扫描发现 bootstrap 对抗测试夹具含 endpoint-like literal；按最新“host/port 不入 Git”纪律改为明确测试占位符。
+
+- 将测试夹具的 VIP/port 替换为 `test-only-host` / `test-only-port`；不改变任何运行语义、秘密 containment、safe projection 或 identity gate 断言。
+- 该变更不引入真实凭证、Token、host、port、raw profile 或 live evidence。
+
+**Evidence / Next**
+
+- 等待本提交三平台 CI；`configs/production_account.yaml` 仍为空，正式 identity freeze、B1-B7、verdict、Data Sufficiency Matrix 和 Provider approval 继续未执行。
 
 ## DM-20260905-134 · P0-M-1B.0 three-platform CI verification
 

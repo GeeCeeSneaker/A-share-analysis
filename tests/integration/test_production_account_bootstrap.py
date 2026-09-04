@@ -41,8 +41,8 @@ class TestProductionAccountBootstrap:
             lambda _path: {
                 "TGW_USERNAME": "user",
                 "TGW_PASSWORD": secret,
-                "TGW_SERVER_VIP": "127.0.0.1",
-                "TGW_SERVER_PORT": "8600",
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": "test-only-port",
             },
         )
         monkeypatch.setattr(
@@ -191,8 +191,8 @@ class TestProductionAccountBootstrap:
             lambda _path: {
                 "TGW_USERNAME": "user",
                 "TGW_PASSWORD": secret,
-                "TGW_SERVER_VIP": "127.0.0.1",
-                "TGW_SERVER_PORT": "8600",
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": "test-only-port",
             },
         )
 
@@ -240,8 +240,8 @@ class TestProductionAccountBootstrap:
             lambda _path: {
                 "TGW_USERNAME": "user",
                 "TGW_PASSWORD": secret,
-                "TGW_SERVER_VIP": "127.0.0.1",
-                "TGW_SERVER_PORT": "8600",
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": "test-only-port",
             },
         )
 
@@ -276,8 +276,8 @@ class TestProductionAccountBootstrap:
             lambda _path: {
                 "TGW_USERNAME": "user",
                 "TGW_PASSWORD": "runtime-only",
-                "TGW_SERVER_VIP": "127.0.0.1",
-                "TGW_SERVER_PORT": "8600",
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": "test-only-port",
             },
         )
         monkeypatch.setattr(
