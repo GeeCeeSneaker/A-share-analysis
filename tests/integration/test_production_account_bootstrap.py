@@ -42,7 +42,7 @@ class TestProductionAccountBootstrap:
                 "TGW_USERNAME": "user",
                 "TGW_PASSWORD": secret,
                 "TGW_SERVER_VIP": "test-only-host",
-                "TGW_SERVER_PORT": "test-only-port",
+                "TGW_SERVER_PORT": str(0),
             },
         )
         monkeypatch.setattr(
@@ -192,7 +192,7 @@ class TestProductionAccountBootstrap:
                 "TGW_USERNAME": "user",
                 "TGW_PASSWORD": secret,
                 "TGW_SERVER_VIP": "test-only-host",
-                "TGW_SERVER_PORT": "test-only-port",
+                "TGW_SERVER_PORT": str(0),
             },
         )
 
@@ -241,7 +241,7 @@ class TestProductionAccountBootstrap:
                 "TGW_USERNAME": "user",
                 "TGW_PASSWORD": secret,
                 "TGW_SERVER_VIP": "test-only-host",
-                "TGW_SERVER_PORT": "test-only-port",
+                "TGW_SERVER_PORT": str(0),
             },
         )
 
@@ -277,7 +277,7 @@ class TestProductionAccountBootstrap:
                 "TGW_USERNAME": "user",
                 "TGW_PASSWORD": "runtime-only",
                 "TGW_SERVER_VIP": "test-only-host",
-                "TGW_SERVER_PORT": "test-only-port",
+                "TGW_SERVER_PORT": str(0),
             },
         )
         monkeypatch.setattr(

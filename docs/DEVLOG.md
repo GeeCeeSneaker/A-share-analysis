@@ -1,3 +1,14 @@
+## 2026-09-05 · P0-M-1B.0 fixture sentinel correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (fixture hardening) / CI_PENDING / PENDING_REVIEW**：run 275 的 Ubuntu pytest 证明前一版 `test-only-port` 占位符会被输入校验正确地归类为缺少可用账号参数；本提交改用数值哨兵 `str(0)`，继续不指向任何真实服务端点。
+- 只修正测试夹具的类型有效性，不改变 stderr containment、safe projection、identity allowlist 或正式账号验证边界；真实用户名、密码、Token、host、port 和 raw profile 不进入仓库。
+
+**Next**
+
+- 等待本提交对应的三平台 CI；配置仍保持空白，正式 identity freeze、Production B1-B7、Data Sufficiency Matrix、verdict 和 Provider approval 不执行。
+
 ## 2026-09-05 · P0-M-1B.0 test fixture de-identification
 
 **Implementation Status / Review Status**
