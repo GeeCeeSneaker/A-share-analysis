@@ -1,3 +1,15 @@
+## 2026-09-05 · P0-M-1B.0 three-platform CI verification
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW**：GitHub Actions run `33896142967`（run `273`）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1449 passed`，Ruff lint/format、mypy、Spike dry-run、SDK-absent 均通过，Windows 3.14 的 DEVLOG/Management 门禁也通过。
+- 本轮 CI 验证的是 positive identity allowlist、bootstrap safe projection 和 focused tests 的仓库闭环；不代表实际 live bootstrap 成功，也不产生 frozen production identity。
+- `configs/production_account.yaml` 仍为空；正式 identity freeze、B1-B7、Data Sufficiency Matrix、verdict、Provider approval 继续未执行。凭证、Token、host、port、原始 profile 和原始 SDK 日志不进入仓库。
+
+**Next**
+
+- 在受控 Windows + 官方 SDK 环境执行 online bootstrap，先审查脱敏候选，再由 Owner/Reviewer 人工确认；确认前保持空配置。确认后才可用独立治理提交写入 allowlist。
+
 ## 2026-09-05 · P0-M-1B.0 Ruff format follow-up
 
 **Implementation Status / Review Status**

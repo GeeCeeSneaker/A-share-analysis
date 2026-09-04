@@ -125,6 +125,7 @@ uv run python scripts/spike/production_account_bootstrap.py --output data/spike/
 - 仓库实现已把 frozen identity 收敛为 positive exact-match allowlist：profile id 必须是 digest-shaped scrubbed 值，且必须同时具备带时区的人工确认时间和 approved human/operator marker。
 - 空配置、未确认配置、试用形态、畸形 YAML、额外字段、敏感 marker、未解析 profile、缺 PermissionCode 和未知/非 exact-match profile 均保持 NOT_TESTABLE / UNKNOWN；RunKind.PRODUCTION 不会单独升级账号身份。
 - bootstrap projection 对 provider 返回的 profile id、权限码和额度执行安全类型投影；这批 focused tests 只证明仓库 fail-closed 边界，不产生 live identity candidate。
+- 仓库 CI 证据：run `33896142967`（run 273）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功，每腿 `1449 passed`；Ruff、mypy、Spike dry-run、SDK-absent 及适用治理门禁均通过。该结果只验证仓库 guard，不是 live bootstrap 或正式 profile 证据。
 - 当前状态：configs/production_account.yaml 仍为空；未通过 GitHub-only 仓库工作流发布人工确认记录，因此正式 identity freeze、B1-B7、Data Sufficiency Matrix、verdict 和 capability approval 继续未评定。
 
 

@@ -100,6 +100,8 @@ verdict.json 同时输出（R3 §54）：
 - 受控 online bootstrap 仍需在官方 SDK 环境中由 operator 执行，再由 Owner/Reviewer 确认候选；本轮没有把凭证、Token、host、port 或 raw profile 放入仓库，也没有把 CI 的 SDK-absent 结果当作 live evidence。
 - 在身份冻结及其三平台 CI 之前，正式 Production B1-B7、verdict、Data Sufficiency Matrix 和 Provider approval 均保持 blocked / not executed。
 
+- 仓库 CI 证据：run `33896142967`（run 273）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功，每腿 `1449 passed`；这证明 guard 与回归测试闭环，不产生 live identity candidate。
+
 ## 5. Early Stop（R3 §53）
 
 B2/B3/B4 任一 blocking semantic FAIL → case 保持 VALIDATED_FAIL；若执行本身完成，run 正确进入 CLOSED，正式 verdict 输出 NO_GO。只有 auth/account/framework fatal execution failure 才进入 FAILED；NOT_TESTABLE / 框架不完整 → SPIKE_INCOMPLETE（**不误记为 NO_GO**）。
