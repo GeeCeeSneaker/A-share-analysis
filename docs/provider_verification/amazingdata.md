@@ -110,6 +110,7 @@
 - 输出只包含 scrubbed `account_profile_id`、权限/额度摘要、运行时版本、网络/认证/查询状态和 `production_identity_status`；原始 SDK error、stdout、Token、host、port 不进入输出。
 - 默认只打印 JSON；`--output` 可写入操作者指定的本地证据文件。工具不会自动写入 `configs/production_account.yaml`，必须由 Owner/Reviewer 人工确认后再做独立治理提交。
 - `--offline` 只验证 SDK/runtime，不读取或使用账号凭证。退出码只表达环境缺失、账号未就绪或候选 identity，不表达 capability approval。
+- run `33881832744`（run `258`）已在三平台完成 bootstrap focused tests 与全量回归，每腿 `1425 passed`；这验证的是工具边界，不是 live identity 冻结、Production B1-B7、Data Sufficiency Matrix、verdict 或 Provider approval。
 
 示例：
 
