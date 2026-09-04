@@ -135,9 +135,7 @@ class TestFormalGateWiring:
         expected_formal = (
             'get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 20200101, ctx.as_of_date)'
         )
-        expected_b2 = (
-            'get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 20200101, as_of)'
-        )
+        expected_b2 = 'get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 20200101, as_of)'
         for relative, expected in (
             (
                 Path("src")

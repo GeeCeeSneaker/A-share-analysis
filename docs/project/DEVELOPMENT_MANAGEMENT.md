@@ -8,7 +8,7 @@
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d`；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`  
 > **Latest CI baseline**：GitHub Actions run `33842361483`（run 232）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1407 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均成功。  
 > **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 保持待审；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105   / DM-20260904-106 / DM-20260904-107
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105   / DM-20260904-106 / DM-20260904-107 / DM-20260904-108
 > **Last Review**：2026-09-04（正式账号 SDK 已在受控本地环境安装并通过脱敏直连冒烟；2020+ 历史边界守卫修正等待 CI；仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：CR-5 final docs-inclusive run `33818320010`（run 179）三矩阵全绿；CR-6.1 clean snapshot run `33827791369`（run 192）三矩阵全绿；Ubuntu 3.14、Windows 3.12、Windows 3.14 的 Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 均 success，Windows 3.14 DEVLOG/Management-doc gates success。main merge commit 为 `075ad80e5254998a0662a0f9c1cadc107a217fdb`，activation commit 为 `4ac274747e86d5f386560ceabbffa3273ca9d14b`。  
@@ -40,6 +40,13 @@
 - 修正集成测试对旧 1990 边界的自匹配问题；测试现在在运行时拼接旧边界字符串，再断言正式 gate 与 B2 probe 源码不含该边界。
 - 正式 gate、B2 probe 仍调用 2020-01-01；这是测试有效性修正，不是新增 State/Provider 语义。
 - 等待本提交的三矩阵 CI；Production formal run 仍未执行。
+
+## DM-20260904-108 · 2020+ 历史边界测试 Ruff 格式修正
+
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW
+
+- 按 Ubuntu Ruff format 实际诊断将新增测试的历史边界字符串收敛为单行；断言范围与 2020+ 合同不变。
+- 当前提交等待三矩阵 CI；正式 Production B1-B7 仍未执行。
 
 # 0. 文档定位
 

@@ -1,5 +1,13 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · Ruff format correction for the 2020 history guard
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：Ubuntu CI 在 Ruff format 阶段指出新增历史边界测试的字符串应收敛为单行；已按 formatter 实际 diff 修正，测试语义不变。
+- formal gate 与 B2 probe 仍固定使用 2020-01-01；本次只修格式，不改变 Provider/State 语义或本地 SDK 冒烟结论。
+- 等待当前 head 的三矩阵 CI；Production formal run、Golden/Data Sufficiency Matrix、verdict 与 Provider approval 仍未完成。
+
 ## 2026-09-04 · Corrected the effective 2020 history-boundary guard
 
 **Implementation Status / Review Status**
