@@ -30,6 +30,7 @@ from ashare_state.spike import (
     ProbeContext,
     RunFailureReason,
     RunKind,
+    RunLifecycleError,
     RunStatus,
     RunStore,
     abort_run,

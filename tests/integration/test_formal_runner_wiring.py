@@ -25,8 +25,8 @@ from ashare_state.spike import (
     RunStore,
     SpikeRun,
 )
-from ashare_state.storage.raw_anchor import RawAnchorError, lookup_raw_evidence_anchor
 from ashare_state.spike.target import FakeTarget
+from ashare_state.storage.raw_anchor import RawAnchorError, lookup_raw_evidence_anchor
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI_PATH = REPO_ROOT / "scripts" / "spike" / "spike_runner.py"
@@ -99,9 +99,10 @@ class TestFormalAnchorBoundary:
         self, cli_module, monkeypatch, tmp_path: Path
     ):
         _patch_config(monkeypatch, Path(":memory:"))
-        with pytest.raises(RunLifecycleError, match=":memory:"):
-            with cli_module._formal_anchor_connection(REPO_ROOT):
-                pass
+        with pytest.raises(
+            RunLifecycleError, match=":memory:"
+        ), cli_module._formal_anchor_connection(REPO_ROOT):
+            pass
 
 
 @pytest.mark.integration

@@ -1,5 +1,13 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · Formal runner wiring lint correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (runner wiring) / CI_PENDING / PENDING_REVIEW**：第 246 次 CI 在 lint 阶段发现 formal runner 缺少 `RunLifecycleError` 导入，以及 focused test 的 import 排序和 SIM117；本提交已修正。
+- 本次只修正静态检查阻断，不改变持久 anchor、日期冻结、终态边界或 dry-run 隔离语义；修正后重新等待完整 CI 矩阵与治理 gates。
+- 不涉及凭证、Token、host/port、raw profile、migration、CR-5/CR-6、production identity 或 Provider approval。
+
 ## 2026-09-04 · Production Runner anchored wiring implementation
 
 **Implementation Status / Review Status**

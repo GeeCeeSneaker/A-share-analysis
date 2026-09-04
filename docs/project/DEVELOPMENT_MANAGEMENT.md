@@ -24,6 +24,20 @@
 
 ---
 
+## DM-20260904-115 · Formal Runner lint correction
+
+**Type**：C0 — CI lint blocker correction  
+**Date**：2026-09-04  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：run 246 在 Ruff 阶段发现 `RunLifecycleError` 缺少导入、focused test import 排序错误和 SIM117；测试阶段尚未开始。
+
+- 补齐 CLI 对 `RunLifecycleError` 的显式导入，修正 focused test 的导入顺序，并合并嵌套 context manager；不改变 runner 的持久 anchor、日期冻结或终态语义。
+- 本次不涉及账号、凭证、Token、host/port/raw profile、migration、CR-5/CR-6、production identity 或 Provider approval。
+
+**Evidence / Next**
+
+- run 246 的失败是静态检查失败，三矩阵均未进入功能测试；本提交等待新的完整 CI 与治理 gates 结果。
+
 ## DM-20260904-114 · Production Runner Anchored Wiring
 
 **Type**：C1 — formal Spike runner execution-boundary closure
