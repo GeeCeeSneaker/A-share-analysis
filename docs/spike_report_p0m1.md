@@ -94,6 +94,8 @@ verdict.json 同时输出（R3 §54）：
 
 `scripts/spike/production_account_bootstrap.py` 已作为正式账号身份检查的受控入口加入仓库。它只从环境/.env 读取凭证，输出 allowlisted scrubbed profile，支持 `--offline` runtime 检查，不会写入 `configs/production_account.yaml`；真实账号 identity 仍需 Owner/Reviewer 人工确认，B1-B7、verdict 和 Data Sufficiency Matrix 继续待执行。
 
+- run `33881832744`（run `258`）三平台均通过，每腿 `1425 passed`；bootstrap 代码边界已获得 CI 证据，但正式 production identity、B1-B7、Data Sufficiency Matrix 和 verdict 仍未执行。
+
 ## 5. Early Stop（R3 §53）
 
 B2/B3/B4 任一 blocking semantic FAIL → case 保持 VALIDATED_FAIL；若执行本身完成，run 正确进入 CLOSED，正式 verdict 输出 NO_GO。只有 auth/account/framework fatal execution failure 才进入 FAILED；NOT_TESTABLE / 框架不完整 → SPIKE_INCOMPLETE（**不误记为 NO_GO**）。
