@@ -2,8 +2,9 @@
 
 ## Status
 
-- **Status**: PROPOSED / PENDING_REVIEW（2026-09-04；CR-6.4 implementation and evidence synchronization complete；Design / Audit Review pending）
-- **Deciders**: Project Owner / Development Executor；Design / Audit Review（pending）
+- **Status**: ACCEPTED / VERIFIED（2026-09-04；CR-6.0–6.4 VERIFIED / CLOSED / FREEZE；final Reviewer closure effective at merge commit `dda8c000d8585a95a66a91fbaa5072427053abb8`）
+- **Deciders**: Project Owner / Development Executor；Design / Audit Review（final closure accepted 2026-09-04）
+- **Date**: 2026-09-04
 - **Work Requirement**: docs/design/A-share-analysis_CR-6_DeterministicMarketStateLayer开发工作要求_20260904.md
 - **Upstream**: ADR-025 ACCEPTED / VERIFIED；CR-5 VERIFIED / CLOSED / FREEZE after PR #3 merge
 - **Scope**: descriptive, deterministic market State V1 only；Research / Strategy / Production remain out of scope
@@ -227,7 +228,7 @@ CR-6.2 implemented deterministic identity, immutable artifacts, migration 024, r
 
 CR-6.3 implemented the AST-based static scope guards for groups 61–63 and completed the frozen regression evidence for group 64. GitHub Actions run `33831161954` (run 206) passed on Ubuntu 3.14, Windows 3.12, and Windows 3.14; each leg passed 1372 tests, Ruff lint/formatter, mypy, Spike, and SDK-absent, with the applicable Windows governance gates also successful. The 1–64 implementation mapping is now recorded across the CR-6.1, CR-6.2, and CR-6.3 entries above; final Reviewer closure remains pending.
 
-CR-6.4 (Amendment A — Contract Honesty / Final Adversarial Closure) implemented the fatal-vs-persisted-finding split, zero-publication fatal boundaries, deterministic retry/residue handling, independent Feature replay against evidence/business/finding rebinds, future-row and timezone identity checks, and the explicit current-main synchronization. The branch contains normal two-parent merge commit `bdb112213dc64325ccc3931a1c0617ae448ef93d` with current main `2dc63e803af908baa3424d576b17d8b07751e05f`; no history rewrite was used. Implementation head `e47514a8afc864c9f197e18f95ea56fe81424a2d` was verified by GitHub Actions run `33836243605` (run 213): Ubuntu 3.14, Windows 3.12, and Windows 3.14 each passed 1401 tests; Ruff lint/format, mypy, Spike, and SDK-absent checks passed, and the applicable Windows 3.14 DEVLOG/Management gates passed. CR-6.4 remains START / ACTIVE pending human review; PR #6 remains open and not merged.
+CR-6.4 (Amendment A — Contract Honesty / Final Adversarial Closure) implemented the fatal-vs-persisted-finding split, zero-publication fatal boundaries, deterministic retry/residue handling, independent Feature replay against evidence/business/finding rebinds, future-row and timezone identity checks, and the explicit current-main synchronization. The branch contains normal two-parent merge commit `bdb112213dc64325ccc3931a1c0617ae448ef93d` with current main `2dc63e803af908baa3424d576b17d8b07751e05f`; no history rewrite was used. Implementation head `e47514a8afc864c9f197e18f95ea56fe81424a2d` was verified by GitHub Actions run `33836243605` (run 213): Ubuntu 3.14, Windows 3.12, and Windows 3.14 each passed 1401 tests; Ruff lint/format, mypy, Spike, and SDK-absent checks passed, and the applicable Windows 3.14 DEVLOG/Management gates passed. The pre-merge status in this historical evidence paragraph is superseded by the final Reviewer closure: CR-6.4 is VERIFIED / CLOSED / FREEZE and PR #6 merged at `dda8c000d8585a95a66a91fbaa5072427053abb8`.
 
 The CR-6.4 work-requirement addendum records the concrete 1–64 mapping. Items 2–7 are the State builder's propagation matrix for the named upstream failure classes; the full frozen Feature adversarial suite remains part of the 1401-test regression. The mapping distinguishes persisted findings (only `STATE_INPUT_NULL` and `STATE_INPUT_EMPTY_DENOMINATOR`) from fatal error codes (`STATE_INPUT_INVARIANT_VIOLATION` and `STATE_RULE_UNAVAILABLE`).
 
@@ -237,4 +238,6 @@ The documentation synchronization commit `f293e696e3fe8b751a56b51a2d4b4b8b3892c3
 
 ## Review and exit
 
-This ADR is PROPOSED / PENDING_REVIEW until the Reviewer verifies that the decisions above match the CR-6 work requirement and the implementation passes the corresponding replay and scope gates. Acceptance of this ADR does not authorize prediction, strategy, or production trading.
+The preceding review text records the pre-acceptance state and is retained for audit history. The final Reviewer decision in `docs/design/A-share-analysis_CR-6.4最终复审与CR-6全链关闭_20260904.md` accepted ADR-026 and CR-6 as VERIFIED / CLOSED / FREEZE after the merge-gate CI passed. This post-merge governance synchronization records the current status and introduces no State semantic change.
+
+Acceptance of this ADR does not authorize prediction, strategy, or production trading. The AmazingData production account track remains independently blocked pending frozen identity, formal B1-B7, Golden/Data Sufficiency Matrix, verdict and Provider approval.

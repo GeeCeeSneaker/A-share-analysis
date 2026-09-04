@@ -1,5 +1,15 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · CR-6 closure and Provider truth reconciliation
+
+**Implementation Status / Review Status**
+
+- **DONE (governance synchronization) / VERIFIED (Reviewer closure)**：PR #6 已在 main 合并提交 `dda8c000d8585a95a66a91fbaa5072427053abb8` 合入；CR-6.0–6.4 与 ADR-026 已记录为 **VERIFIED / CLOSED / FREEZE**。
+- Final merge-gate run `33854677630`（run 239）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功，每腿 `1408 passed`；Ruff、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均通过。
+- ADR-026/索引、CR-6 工作要求、DEVELOPMENT_MANAGEMENT 和 Provider Verification 已同步当前真相：历史试用账号仅保留历史证据；正式账号 native SDK smoke 已通过；正式 production profile identity、正式 B1-B7、Golden/Data Sufficiency Matrix、verdict 和 Provider approval 仍未完成。
+- `configs/production_account.yaml` 继续为空；本次没有把用户名、密码、Token、host、port、原始 payload 或临时 profile 写入 GitHub、日志或结果文件。依赖 wheel 仍只保存在本地被忽略目录。
+- 本治理同步不修改 CR-6 冻结语义，也不把 native SDK smoke 解释为 formal facade/provider-doctor 或 Production run 证据。
+
 ## 2026-09-04 · 2020+ 历史边界守卫 CI verified
 
 **Implementation Status / Review Status**

@@ -79,7 +79,7 @@ jobs:
           # R3 audit section 4: per-commit check, not per-PR.
           # Commits older than the rule's introduction are grandfathered.
           RULE_SINCE="9a12184"
-          # V2.3 rule note (2026-09-04): the following four source
+          # V2.3 rule note (2026-09-04): the following five source
           # commits were created before the documentation commit because the
           # GitHub contents API updates one path per commit. History rewrite
           # is not authorized, so the exception is explicit, SHA-scoped, and

@@ -594,7 +594,7 @@ Provider validation track
 
 1. `configs/production_account.yaml` 的 `production_account_profile_id`、`confirmed_at`、`confirmed_by` 仍为空；
 2. 当前仅有试用仿真账号的 B1 连通性证据，B2-B7 正式生产验证尚未执行；
-3. `docs/provider_verification/amazingdata.md` 仍记录正式账号和正式 entitlement 待确认；
+3. `docs/provider_verification/amazingdata.md` 已记录正式账号 native SDK smoke 通过；但 scrubbed production profile identity 与 entitlement allowlist 仍待人工确认；
 4. `docs/spike_report_p0m1.md` 当前结论仍为 `未评定`，没有生产 `GO_CORE` / `GO_DEGRADED` / `NO_GO` verdict；
 5. 因此不得勾选正式账号、CLOSED PRODUCTION B1-B7、Golden/Data Sufficiency Matrix、Reviewer approval 或 capability APPROVED 等退出项。
 
