@@ -11,6 +11,18 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.3 scope guard CI verification
+
+**Implementation Status / Review Status**
+
+- **DONE (CR-6.3 implementation + CI) / PENDING_REVIEW**：PR #6 head `331d98a245d508348864e43feb2ccc51557b1224` 的 GitHub Actions run `33831161954`（run 206）三矩阵全部 SUCCESS；Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿均为 1372 passed，并通过 Ruff lint/formatter、mypy、Spike 与 SDK-absent；Windows 3.14 的 DEVLOG 与 Management-doc gates 也通过。
+- Group F 的 61–63 static scope guards 已通过真实 CI：State 只能通过允许的 public Feature verifier 边界取上游，禁止跨层事实 import、Feature implementation symbol、研究/预测标识符和 future/predictive/strategy 字段。
+- CR-6.0–6.3 的实现映射与 CI 证据已回填 ADR-026；Reviewer closure 仍未发生，因此不宣称 CR-6 CLOSED/FREEZE，也未合入 main。
+
+**Next**
+
+- 请求 Reviewer 按 1–64 mapping、ADR-026、State replay/artifact/migration 和 scope guard 做 final closure；在 closure 前保持 PR #6 OPEN / NOT MERGED。
+
 ## 2026-09-04 · CR-6.3 scope guard false-positive correction
 
 **Implementation Status / Review Status**

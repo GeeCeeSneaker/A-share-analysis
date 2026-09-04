@@ -3791,3 +3791,18 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.3 scope-guard false-positive correction batch.
 - **Reviewer**：Design / Audit Review pending.
 
+---
+
+## Change Record: DM-CR-20260904-096
+
+- **Type**：C2 — CR-6.3 scope guard and frozen-regression CI verification
+- **Date**：2026-09-04
+- **Status**：DONE / PENDING_REVIEW
+- **Trigger**：CR-6 full-closure Groups F-61–64.
+- **Evidence**：GitHub Actions run 33831161954（run 206）三矩阵 SUCCESS；Ubuntu 3.14、Windows 3.12、Windows 3.14 each reported 1372 passed, with Ruff lint/formatter, mypy, Spike, SDK-absent and applicable Windows governance gates successful.
+- **New Contract**：AST scope guards enforce the State boundary and frozen non-future columns; the full 1–64 implementation evidence is recorded across CR-6.1, CR-6.2 and CR-6.3.
+- **Compatibility**：CR-5 and CR-6.1/6.2 semantics remain frozen; no prediction, strategy, portfolio, backtest, or production behavior is introduced.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW with completed implementation mapping.
+- **Commit**：331d98a245d508348864e43feb2ccc51557b1224.
+- **Reviewer**：Final Design / Audit Review pending; PR #6 remains open and not merged.
+

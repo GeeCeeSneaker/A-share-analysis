@@ -223,7 +223,7 @@ CR-6.1 implemented the State Registry, exact execution compiler, shared determin
 
 CR-6.2 implemented deterministic identity, immutable artifacts, migration 024, recoverable publication, the ledger, the public verifier, and tests 1–10 plus 45–60. GitHub Actions run `33829733713` (run 202) verified the clean PR #6 head with Ubuntu 3.14, Windows 3.12, and Windows 3.14; each leg passed 1368 tests plus Ruff, formatter, mypy, Spike, SDK-absent, and applicable governance gates.
 
-CR-6.3 now adds the AST-based static scope guards for groups 61–63 and records the full-closure evidence path. Its new CI validation is pending; Reviewer closure remains pending until the complete 1–64 mapping and three-leg evidence are reviewed.
+CR-6.3 implemented the AST-based static scope guards for groups 61–63 and completed the frozen regression evidence for group 64. GitHub Actions run `33831161954` (run 206) passed on Ubuntu 3.14, Windows 3.12, and Windows 3.14; each leg passed 1372 tests, Ruff lint/formatter, mypy, Spike, and SDK-absent, with the applicable Windows governance gates also successful. The 1–64 implementation mapping is now recorded across the CR-6.1, CR-6.2, and CR-6.3 entries above; final Reviewer closure remains pending.
 
 The first implementation batch must update DEVLOG and DEVELOPMENT_MANAGEMENT in the same logical governance batch. Historical DEVLOG entries remain append-only.
 
