@@ -308,7 +308,6 @@ class TestProductionAccountBootstrap:
         assert report["ACCOUNT_PROFILE"]["account_profile_id"] == "UNAVAILABLE"
         assert report["ACCOUNT_PROFILE"]["subscribe_limit"] is None
 
-
     def test_online_trial_profile_never_becomes_identity_candidate(self, monkeypatch, capsys):
         module = _load_script()
         trial_id = "TRIAL_SIMULATION_abc123def456"

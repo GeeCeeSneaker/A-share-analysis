@@ -1,3 +1,14 @@
+## 2026-09-05 · P0-M-1B.0.1 format gate closure follow-up
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：run `33930352036` 已通过 Ruff lint，但 format check 仅剩新增测试方法前的多余空行。
+- 已删除该多余空行；此前 bootstrap 表达式和测试签名的格式修正已被 CI 接受。
+- 三平台后续 mypy、pytest、Spike、SDK-absent 和文档 gates 尚未形成有效通过证据；online bootstrap 仍按要求暂停。
+
+**Next**
+
+- 等待本次格式修正后的完整三平台 CI。
 ## 2026-09-05 · P0-M-1B.0.1 formatter follow-up
 
 **Implementation Status / Review Status**
