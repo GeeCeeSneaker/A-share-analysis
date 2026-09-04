@@ -11,6 +11,7 @@ __all__ = [
     "MARKET_STATE_COLUMNS",
     "STATE_ARTIFACT_NAMES",
     "STATE_ENUM_VALUES",
+    "STATE_EVIDENCE_FEATURES",
     "STATE_FINDING_COLUMNS",
     "StateSchemaError",
     "frame_for_artifact",
@@ -20,6 +21,21 @@ __all__ = [
 
 
 STATE_ARTIFACT_NAMES = ("market_daily_state", "state_findings")
+
+STATE_EVIDENCE_FEATURES = (
+    "observed_security_count",
+    "valid_raw_return_count",
+    "advancer_count",
+    "decliner_count",
+    "unchanged_count",
+    "advancer_ratio_observed",
+    "mean_raw_return_observed",
+    "median_raw_return_observed",
+    "valid_ma20_count",
+    "pct_above_ma20_observed",
+    "valid_mom20_count",
+    "pct_positive_mom20_observed",
+)
 
 MARKET_STATE_COLUMNS = (
     "trade_date",

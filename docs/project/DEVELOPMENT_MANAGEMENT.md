@@ -4,15 +4,15 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Reviewed Repository HEAD**：`4ac274747e86d5f386560ceabbffa3273ca9d14b`（PR #3 已合入；CR-6.0 governance bootstrap 基于该主线开始）  
+> **Reviewed Repository HEAD**：`565f0dffd7c602337f959225b13d3b3eb5ef7697`（CR-6.0 bootstrap；CR-6.1 Registry/Engine 开发提交在该主线上继续）  
 > **Primary Implementation（R4-A2.11）**：`38da90e5b5f3d698cc909cf7c258c163081bb9af`  
 > **CI/Lint Fix（R4-A2.11）**：`6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`  
-> **Current Code Baseline**：CR-5 clean replacement 已随 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 合并至 main；activation commit `4ac274747e86d5f386560ceabbffa3273ca9d14b` 将 CR-6 置为 START / ACTIVE；本批 CR-6.0 将新增 ADR-026 与 State 类型/schema 骨架，runtime 尚未开始。  
-> **Document Revision**：DM-CR-20260830-054..060 / DM-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075 / 076 / 077 / 078 / 079 / 080 / 081 / 082 / DM-20260904-083 / DM-20260904-084  
-> **Last Review**：2026-09-04 08:44 +08:00（PR #3 已合并；Reviewer 裁决 CR-5 VERIFIED / CLOSED / FREEZE、ADR-025 ACCEPTED；CR-6 START / ACTIVE；CR-6.0 governance bootstrap PENDING_REVIEW）  
+> **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6 activation commit `4ac274747e86d5f386560ceabbffa3273ca9d14b` 后，CR-6.0 已加入 ADR-026 与 State 类型/schema skeleton；本批 CR-6.1 加入静态 Registry 与共享 deterministic engine，StateBuilder/artifact/ledger/verifier 仍未开始。  
+> **Document Revision**：DM-CR-20260830-054..060 / DM-20260831-061 / 062 / 063 / 064 / DM-20260901-065 / 066 / 067 / 068 / 069 / 070 / DM-20260902-071 / 072 / 073 / 074 / DM-20260903-075 / 076 / 077 / 078 / 079 / 080 / 081 / 082 / DM-20260904-083 / DM-20260904-084 / DM-20260904-085  
+> **Last Review**：2026-09-04 08:44 +08:00（CR-5 已合并并冻结；CR-6.0 bootstrap 后，CR-6.1 Registry/Engine 为 IN_PROGRESS / PENDING_REVIEW）  
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：CR-5 final docs-inclusive run `33818320010`（run 179）三矩阵全绿；Ubuntu 3.14、Windows 3.12、Windows 3.14 的 Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 均 success，Windows 3.14 DEVLOG/Management-doc gates success。main merge commit 为 `075ad80e5254998a0662a0f9c1cadc107a217fdb`，activation commit 为 `4ac274747e86d5f386560ceabbffa3273ca9d14b`。  
-> **Phase Status（2026-09-04，CR-6.0 启动）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-020 ACCEPTED）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 → **VERIFIED / CLOSED / FREEZE（ADR-025 ACCEPTED；PR #3 merged）**；CR-6 State → **START / ACTIVE（CR-6.0 governance bootstrap；ADR-026 PROPOSED / PENDING_REVIEW；State runtime 尚未开始）**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
+> **Phase Status（2026-09-04，CR-6.1 Registry + Engine）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-020 ACCEPTED）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 → **VERIFIED / CLOSED / FREEZE（ADR-025 ACCEPTED；PR #3 merged）**；CR-6 State → **IN_PROGRESS / PENDING_REVIEW（CR-6.1 Registry + deterministic engine；ADR-026 PROPOSED / PENDING_REVIEW；Builder/artifact/ledger/verifier 尚未开始）**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 → **DONE / REOPENED**（主体 PASS；仅剩 P1 bounded lineage）；CR-5.1 → **VERIFIED / CLOSED / FREEZE**（correctness closure）；CR-5.2 → **DONE / PENDING_REVIEW**（bounded selected-input lineage；run 176 三平台全绿，Reviewer closure pending）；CR-6 State → **BLOCKED_BY_CR-5.2**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-31 17:42，Reviewer CR-2 复审 P1-01）**：CR-2 批次头部与 Implementation Mapping 曾记录 implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`——该 SHA 非真实 implementation commit；以 GitHub commit object 为准：`15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 关联 commit）。历史条目原文保留，CR-2 工作要求文档已追加 §12 更正。  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。**Count Correction（2026-08-31，CR-2 复审 P1-02）**：ADR-022 §2.2 曾写"9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER"——该批实际 10/4，且 14 条未覆盖 index_daily 等 capability surface；CR-2.1 后 registry 为 **18 条（11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE，runtime exact-set 统计）**，已随 ADR-022 Amendment A §6.1 更正，历史保留。  
@@ -3603,4 +3603,22 @@ Git 历史负责保存过去版本。
 **Tests / Evidence**：upstream run 33818320010 (run 179) SUCCESS; CR-6.0 is a documentation/type/schema bootstrap and will be covered by the existing static CI plus later State contract tests.  
 **ADR**：[ADR-026](../adr/ADR-026_deterministic_market_state_interpretation.md)  
 **Commit**：CR-6.0 bootstrap commit  
+**Reviewer**：PENDING_REVIEW
+
+
+---
+
+## DM-CR-20260904-085 — CR-6.1 Registry and Deterministic State Engine
+
+**Type**：C2（State interpretation contract implementation）  
+**Status**：IN_PROGRESS / PENDING_REVIEW  
+**Trigger**：CR-6.0 governance bootstrap completed on the merged CR-5 mainline.  
+**Old Contract**：CR-6 had only typed identity/schema skeletons and no executable State declarations.  
+**New Contract**：A single static State Registry declares exactly four V1 descriptive dimensions and compiles them into a typed plan with exact dependencies, enums, rule IDs, threshold policies, missingness, availability, eligibility, and one handler per supported declaration. The shared engine computes deterministic State rows and typed findings from one VerifiedFeatureRun market projection.  
+**Reason**：Make Registry declarations the sole rule truth before adding publication or replay infrastructure.  
+**Affected Modules**：src/ashare_state/state/registry.py、src/ashare_state/state/engine.py、src/ashare_state/state/schema.py、src/ashare_state/state/__init__.py、tests/integration/test_state.py、docs/DEVLOG.md  
+**Compatibility**：CR-5 formulas, artifacts, migration 023, and public Feature verifier remain unchanged. CR-6.1 adds no StateBuilder, artifact, ledger, migration, prediction, or strategy behavior.  
+**Tests / Evidence**：CR-6.1 focused tests map the Registry and rule semantics groups 11–44; full three-platform CI remains the acceptance evidence.  
+**ADR**：[ADR-026](../adr/ADR-026_deterministic_market_state_interpretation.md)  
+**Commit**：CR-6.1 implementation commit  
 **Reviewer**：PENDING_REVIEW

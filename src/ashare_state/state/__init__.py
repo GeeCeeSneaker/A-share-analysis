@@ -1,10 +1,11 @@
-"""CR-6 deterministic market State layer public contract.
+"""CR-6 deterministic market State layer public boundary."""
 
-CR-6.0 exposes typed identity, schema, and registry declarations only.
-Runtime building, publication, and consumption verification are added in
-later CR-6 batches under ADR-026.
-"""
-
+from ashare_state.state.engine import (
+    ComputedStateSet,
+    STATE_EVIDENCE_FEATURES,
+    StateEngineError,
+    compute_state_set,
+)
 from ashare_state.state.models import (
     STATE_CONTRACT_VERSION,
     STATE_NAMESPACE,
@@ -25,6 +26,8 @@ from ashare_state.state.registry import (
     STATE_SET_VERSION,
     SUPPORTED_STATE_NAMES,
     StateExecutionPlan,
+    StateExecutionSpec,
+    StateHandler,
     StateRegistryError,
     StateSet,
     StateSpec,
@@ -44,11 +47,13 @@ from ashare_state.state.schema import (
 )
 
 __all__ = [
+    "ComputedStateSet",
     "FINDING_CLASSES",
     "MARKET_STATE_COLUMNS",
     "STATE_ARTIFACT_NAMES",
     "STATE_CONTRACT_VERSION",
     "STATE_ENUM_VALUES",
+    "STATE_EVIDENCE_FEATURES",
     "STATE_FINDING_COLUMNS",
     "STATE_NAMESPACE",
     "STATE_REGISTRY_VERSION",
@@ -57,8 +62,11 @@ __all__ = [
     "SUPPORTED_STATE_NAMES",
     "StateBuildResult",
     "StateBuilderError",
+    "StateEngineError",
     "StateExecutionPlan",
+    "StateExecutionSpec",
     "StateFinding",
+    "StateHandler",
     "StateRegistryError",
     "StateSchemaError",
     "StateSet",
@@ -67,6 +75,7 @@ __all__ = [
     "VerifiedStateRun",
     "canonical_json",
     "compile_state_execution_plan",
+    "compute_state_set",
     "frame_for_artifact",
     "get_state_set",
     "semantic_hash",
