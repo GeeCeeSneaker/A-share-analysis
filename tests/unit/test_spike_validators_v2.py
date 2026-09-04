@@ -311,6 +311,7 @@ class TestGoldenCases:
         outcomes = validators.validate_golden_cases(cases, [])
         assert outcomes[0].result is CaseResult.VALIDATED_FAIL
 
+
 class TestHistoryCoverage2020:
     @pytest.mark.parametrize(
         ("earliest", "expected"),
