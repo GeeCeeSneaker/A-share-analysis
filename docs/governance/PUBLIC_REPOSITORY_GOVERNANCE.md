@@ -1,246 +1,211 @@
-# Public Repository Governance and Merge Protection
+# Public Repository Governance — Single Authorized Writer
 
-> Effective target: `GeeCeeSneaker/A-share-analysis`
-> Repository visibility: PUBLIC
-> Governance objective: public read/fork/PR participation without granting unaffiliated users authority to modify governed repository state.
+> Repository: `GeeCeeSneaker/A-share-analysis`  
+> Visibility: PUBLIC  
+> Authorized project developer / maintainer: **`@GeeCeeSneaker` only**
 
-## 1. Threat / permission model
+## 1. Operating principle
 
-Making the repository public grants read/fork access; it does **not** grant Write permission to outside users.
+The repository is public for reading, cloning, forking, and receiving external pull requests. Public visibility does **not** grant write authority.
 
-The required operating model is:
-
-```text
-Public user
-  -> read / fork / open PR / comment
-  -> NO direct repository push authority
-
-Authorized project developer (GitHub Write)
-  -> push feature/review branches
-  -> NO direct push to main
-  -> merge through protected PR flow
-
-Repository Owner/Admin
-  -> manages collaborators, rulesets, security settings
-  -> should not bypass main protection during normal work
-```
-
-`main` is the authoritative integration branch and must be protected at the GitHub platform level. Repository documentation and CI are additional defenses; they are not substitutes for a ruleset/branch protection rule.
-
-## 2. Required GitHub platform configuration — P0
-
-At the time this document was created, `main` was reported by GitHub as `protected=false`, and the repository had no repository rulesets. This is an unsafe public-repository state and must be corrected in GitHub Settings.
-
-### 2.1 Main branch ruleset
-
-Preferred configuration: **Settings -> Rules -> Rulesets -> New branch ruleset**.
-
-Create an ACTIVE ruleset named:
+The current project model is intentionally simple:
 
 ```text
-protect-main
+@GeeCeeSneaker
+  = project owner
+  = only authorized developer
+  = only authorized repository writer / merger
+  = keeps the existing development workflow
+
+Everyone else
+  = external contributor
+  = read / fork / issue / PR only
+  = no direct push
+  = no merge authority
+  = no repository-setting authority
 ```
 
-Target:
+Do not introduce developer teams, additional maintainers, or multi-reviewer workflow while the project still uses one authorized GitHub identity.
+
+## 2. Repository permission policy — P0
+
+The collaborator allowlist for Write / Maintain / Admin must contain no project-development identity other than `@GeeCeeSneaker`.
+
+Rules:
+
+1. Do not grant Write / Maintain / Admin to outside contributors merely to accept a contribution.
+2. External contributors work through forks and pull requests.
+3. External approvals/reviews are feedback only; they never constitute project approval.
+4. Only `@GeeCeeSneaker` may merge an external PR.
+5. If another developer identity is needed in the future, update this governance contract first and then grant permission deliberately.
+
+This is the primary protection boundary. A random public GitHub user cannot push to this repository without being explicitly added as a collaborator.
+
+## 3. `main` protection — simple owner-bypass model
+
+At the time this policy was introduced, GitHub reported:
+
+```text
+main.protected = false
+repository rulesets = []
+```
+
+Because `@GeeCeeSneaker` is also the active developer and the project has historically used that account for direct reviewer/governance commits, protection must **not** break the existing owner workflow.
+
+Preferred GitHub configuration:
+
+### Ruleset
+
+Create an ACTIVE branch ruleset targeting:
 
 ```text
 refs/heads/main
 ```
 
-Required rules:
-
-1. Require a pull request before merging.
-2. Required approvals: **1 minimum**.
-   - A required approval must come from a user whose repository permission satisfies GitHub's protected-branch review rule (project collaborator / authorized reviewer).
-3. Require review from Code Owners.
-4. Dismiss stale approvals when new reviewable commits are pushed.
-5. Require approval of the most recent reviewable push by someone other than the pusher when available in the repository UI.
-6. Require all review conversations to be resolved.
-7. Require status checks before merging.
-8. Require the branch to be up to date before merging unless an explicit project exception is documented.
-9. Block force pushes.
-10. Block branch deletion.
-11. Do not grant broad bypass permission to Write/Maintain users.
-12. Normal repository administrators must follow the PR flow; any emergency bypass must be rare, documented in DEVLOG, and followed by retrospective review.
-
-Required status check for the current workflow:
+Suggested name:
 
 ```text
-Lint & Type Check (windows-latest / py3.14)
+protect-main-external
 ```
 
-This is the project's reference production-runtime matrix leg. Other matrix legs continue to provide compatibility/cross-platform evidence and should remain green under project review policy even if they are not the platform-required check.
+Configure the ruleset so that:
 
-### 2.2 Classic branch protection fallback
+- force pushes are blocked;
+- deletion of `main` is blocked;
+- non-authorized actors cannot update `main`;
+- normal external contribution reaches `main` only through a PR reviewed/merged by `@GeeCeeSneaker`;
+- required CI remains enforced for PR merges where applicable;
+- **repository Owner/Admin (`@GeeCeeSneaker`) is the explicit bypass actor**, so the existing project development/reviewer workflow can continue without mandatory self-approval or a second account.
 
-If a ruleset is not used, create a classic protection rule for `main` with equivalent settings:
+Do **not** configure a rule that requires a second-person approval for every owner-authored PR: the project currently has no second authorized developer, so such a rule would only create fake process or deadlock normal development.
 
-- Require a pull request before merging;
-- require 1 approval;
-- dismiss stale approvals;
-- require Code Owner review;
-- require the latest push to be reviewed by another person where supported;
-- require status checks and up-to-date branch;
-- require conversation resolution;
-- do not allow force pushes;
-- do not allow deletion;
-- enable the option that prevents administrators from bypassing the protections during normal operation.
+If GitHub UI makes a PR-review rule awkward for a single-owner personal repository, it is acceptable to rely on the stronger simple boundary:
 
-Use **one authoritative protection mechanism** with clearly understood behavior; do not create conflicting overlapping rules accidentally.
+```text
+only @GeeCeeSneaker has repository write/admin permission
++ main force-push/delete blocked
++ external contributors have fork/PR only
++ owner alone decides merge
+```
 
-## 3. Collaborator permissions
+The objective is security, not ceremony.
 
-### 3.1 Authorized developers
+## 4. CODEOWNERS
 
-Normal project developers should receive **Write** permission, not Admin.
+The repository uses a deliberately simple global ownership rule:
 
-Write permission is sufficient to:
+```text
+* @GeeCeeSneaker
+```
 
-- create project branches;
-- push commits to project branches;
-- open and review pull requests;
-- merge pull requests when all protected-main requirements are satisfied.
+Meaning:
 
-Admin access should be limited to the repository owner and explicitly designated maintainers who need to manage repository settings/rules.
+- every external pull request has a single authoritative owner;
+- external users cannot establish approval authority by reviewing one another;
+- there is no need to maintain a complex path-by-path ownership matrix while the project has only one developer identity.
 
-### 3.2 External users
-
-Do not add outside contributors as Write collaborators merely to accept a contribution.
+## 5. External pull requests
 
 External contribution path:
 
 ```text
-fork -> branch -> pull request -> internal review -> CI -> merge/reject
+fork
+  -> branch
+  -> PR
+  -> inspect diff / CI / security impact
+  -> @GeeCeeSneaker decides
+       -> merge
+       -> request changes
+       -> close
 ```
 
-A public review/approval from an unaffiliated user is feedback only. The protected-main required approval must be satisfied by an authorized reviewer under GitHub's permission rules.
-
-### 3.3 If repository ownership later moves to an Organization
-
-Use organization teams such as:
+External PRs are untrusted input. In particular, changes to the following require careful owner review before any workflow execution or merge:
 
 ```text
-@org/a-share-developers   -> Write
-@org/a-share-maintainers  -> Maintain/Admin as needed
-```
-
-Then additionally enable branch push restrictions / ruleset bypass lists so only the developer/maintainer team and required GitHub Apps can update governed branches. Do not use an 'all members' team as a bypass actor.
-
-## 4. CODEOWNERS policy
-
-`.github/CODEOWNERS` protects security/governance-critical paths with explicit Owner review.
-
-Current owner-controlled paths include:
-
-```text
-.github/
-configs/production_account.yaml
-configs/trading_rules/
-data/golden/
+.github/workflows/
+configs/
+scripts/
 migrations/
+data/golden/
 docs/adr/
-docs/project/DEVELOPMENT_MANAGEMENT.md
+provider / raw / canonical / feature / state correctness code
 ```
 
-Purpose:
+No external contributor should ever be added as a collaborator simply to make their PR easier to merge.
 
-- external contributors cannot change CI/governance contracts without Owner review;
-- ordinary internal code changes can still be reviewed by authorized developers;
-- CODEOWNERS itself is protected by ownership of `/.github/`.
+## 6. GitHub Actions for public forks
 
-Do not add `* @GeeCeeSneaker` unless the intended policy becomes 'Owner must personally approve every PR'. The current policy is deliberately less centralized: every PR needs internal approval, while sensitive paths additionally need Owner approval.
+Configure **Settings -> Actions -> General** so external fork PR workflows require owner approval before execution when GitHub exposes that option.
 
-## 5. GitHub Actions protection — P0
-
-Public repositories must treat fork PR workflow execution as untrusted input.
-
-Configure **Settings -> Actions -> General** so that fork PR workflows from outside contributors require maintainer approval. Preferred policy:
+Preferred setting:
 
 ```text
 Require approval for all external contributors
 ```
 
-Operational rules:
+Public/fork CI rules:
 
-1. Never send repository secrets to fork pull-request workflows.
-2. Keep `GITHUB_TOKEN` read-only unless a specific job proves write access is necessary.
-3. Do not introduce `pull_request_target` for arbitrary external code execution without a separate security review.
-4. Changes under `.github/workflows/` require CODEOWNER approval.
-5. Review workflow changes before approving an external contributor's workflow run.
-6. Do not install the proprietary AmazingData SDK or production credentials in public CI.
+- no production credentials;
+- no `.env` secrets;
+- no AmazingData production account;
+- no proprietary SDK binaries unless redistribution is explicitly allowed;
+- avoid `pull_request_target` executing untrusted fork code;
+- changes to workflow files are manually reviewed by `@GeeCeeSneaker` before approval.
 
-The current CI already intentionally runs without AmazingData SDK and without production credentials; preserve that boundary.
+The existing CI design — no AmazingData SDK and no production credentials — must remain frozen unless separately reviewed.
 
-## 6. Public review moderation
+## 7. Secret protection — P0
 
-Recommended repository setting:
+Because the repository is public:
 
-```text
-Settings -> Moderation options -> Code review limits
--> Limit to users explicitly granted read or higher access
-```
+- enable GitHub Secret Scanning / Push Protection when available;
+- never commit passwords, tokens, `.env`, private keys, full provider account data, or production credentials;
+- only scrubbed production-account identity may enter Git;
+- if a real secret is ever committed, rotate it immediately; deleting a later file does not remove exposure from public Git history.
 
-This keeps public comments open while preventing arbitrary accounts from presenting an `Approve` / `Request changes` review as if it were project authority.
+## 8. Account security
 
-This setting is supplemental: required protected-branch approvals still need to be configured independently.
+Because one GitHub identity now carries all project write authority, protection of `@GeeCeeSneaker` is more important than adding procedural reviewers.
 
-## 7. Secret / proprietary material protection — P0
+Strongly recommended:
 
-Because the repository is public, enforce the following immediately:
+- GitHub 2FA enabled;
+- preferably passkey / hardware security key;
+- review active sessions and authorized OAuth/GitHub Apps periodically;
+- do not share the GitHub account password;
+- use scoped tokens and revoke unused tokens;
+- do not place personal access tokens in repository files or CI logs.
 
-- `.env` and real credentials remain gitignored;
-- no passwords, Tokens, full provider account numbers, private keys, or production hosts in commits/issues/PR bodies;
-- only scrubbed production account profile identity may be committed;
-- enable GitHub Secret Scanning / Push Protection when available for the repository;
-- if a real secret is ever committed, rotation is mandatory — deleting the later file does not make the public Git history safe;
-- proprietary provider SDK binaries/manuals must only be committed if redistribution rights explicitly allow it.
+## 9. Effective authority matrix
 
-## 8. Merge authority matrix
+| Actor | Read/fork | Submit PR | Push repository | Merge | Change settings |
+|---|---:|---:|---:|---:|---:|
+| `@GeeCeeSneaker` | Yes | Yes | Yes | Yes | Yes |
+| Any other GitHub user | Yes | Yes | **No** | **No** | **No** |
+| External GitHub App | As granted | As granted | **No unless owner explicitly grants it** | No by default | No by default |
 
-| Change source | Can push project branch? | Can push `main` directly? | Internal approval required? | CODEOWNER required? |
-|---|---:|---:|---:|---:|
-| Repository Owner/Admin | Yes | No during normal work | Yes under main rules | Yes for owned paths |
-| Authorized developer (Write) | Yes | No | Yes | Yes for owned paths |
-| External contributor | No (fork only) | No | Yes | Yes for owned paths |
-| GitHub App / automation | Only as explicitly granted | No unless explicitly governed | Governed by ruleset/check design | As configured |
+## 10. Verification checklist
 
-## 9. Merge checklist
-
-Before merging any PR to `main`:
+After GitHub Settings are applied, verify:
 
 ```text
-[ ] PR is based on current main or satisfies up-to-date requirement
-[ ] required Windows Python 3.14 CI check passed
-[ ] project-required broader CI evidence is green
-[ ] at least one authorized internal approval exists
-[ ] CODEOWNER approval exists when applicable
-[ ] stale approval was invalidated/reapproved after new commits
-[ ] all conversations resolved
-[ ] no secret/proprietary material exposure
-[ ] DEVLOG / DEVELOPMENT_MANAGEMENT / ADR requirements satisfied
-[ ] no force-push/history rewrite used
+[ ] repository remains public
+[ ] @GeeCeeSneaker is the only intended write/admin developer identity
+[ ] no unknown collaborator has Write/Maintain/Admin
+[ ] main cannot be force-pushed
+[ ] main cannot be deleted
+[ ] external user cannot directly push repository branches
+[ ] external PR cannot merge without @GeeCeeSneaker action
+[ ] external fork Actions require owner approval when configured
+[ ] public CI has no production credentials / AmazingData SDK
+[ ] CODEOWNERS is `* @GeeCeeSneaker`
+[ ] secret scanning / push protection enabled when available
 ```
 
-## 10. Configuration verification
+## 11. Future expansion rule
 
-After the GitHub UI settings are applied, Reviewer must re-check:
+If development later moves to multiple GitHub accounts, do **not** gradually add collaborators ad hoc. First revise this policy to define the new authorized-developer allowlist, branch protection, review requirements, and CODEOWNERS model; then grant permissions.
 
-```text
-GET /branches/main
-  protected == true
+Until that explicit change, the authoritative rule is:
 
-GET /rulesets
-  contains active protect-main ruleset
-```
-
-and inspect a test PR to confirm:
-
-1. direct push to `main` is rejected;
-2. PR without approval cannot merge;
-3. PR with failing required CI cannot merge;
-4. stale approval is invalidated after new commit;
-5. CODEOWNERS path change requests Owner review;
-6. external fork PR cannot merge without internal approval;
-7. external workflow run follows the configured approval policy.
-
-Only after these checks should the public-repository protection milestone be marked VERIFIED / CLOSED.
+> **Only `@GeeCeeSneaker` may modify or merge the project repository. Everyone else is external and requires owner review.**
