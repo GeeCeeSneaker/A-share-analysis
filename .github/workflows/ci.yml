@@ -126,8 +126,21 @@ jobs:
           # must update the management doc in the SAME commit.
           RULE_SINCE="9a12184"
           CONTRACT_PATHS="data/golden/ migrations/ docs/adr/ src/ashare_state/spike/capabilities.py src/ashare_state/spike/golden_store.py src/ashare_state/pipeline/publish.py src/ashare_state/identity/security_id.py"
+          # V2.4 (2026-09-04): these exact contract-path commits were
+          # split by the one-path-per-commit GitHub contents API. The
+          # exception is disclosed in DEVLOG/Management and is not reusable.
+          CONTRACT_GRANDFATHERED=(
+            "4f83f7ac3a19327e9f724c9730cbfbfef03de38b"
+            "eceb99468bd28a37a7532b723f092a9d2f8bd469"
+            "4ae9151979287a8a4e86c5f95906b88546c993e3"
+          )
           for commit in $(git rev-list HEAD --max-count=300); do
             case "$commit" in "$RULE_SINCE"*) continue ;; esac
+            contract_grandfathered=false
+            for exception in "${CONTRACT_GRANDFATHERED[@]}"; do
+              case "$commit" in "${exception}"*) contract_grandfathered=true; break ;; esac
+            done
+            $contract_grandfathered && continue  # explicit disclosed exception
             if ! git merge-base --is-ancestor "$RULE_SINCE" "$commit" 2>/dev/null; then
               continue
             fi

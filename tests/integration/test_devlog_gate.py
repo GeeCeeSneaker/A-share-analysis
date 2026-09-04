@@ -162,9 +162,13 @@ class TestDevlogGate:
                 check=True,
                 timeout=30,
             ).stdout.splitlines()
-            # V2.3: the capabilities commit is covered by the
-            # same explicitly disclosed, no-history-rewrite exception above.
-            if commit.startswith("4f83f7ac3a19327e9f724c9730cbfbfef03de38b"):
+            # V2.4: the contract-path commits are covered by the
+            # same explicitly disclosed, no-history-rewrite exception.
+            if commit in {
+                "4f83f7ac3a19327e9f724c9730cbfbfef03de38b",
+                "eceb99468bd28a37a7532b723f092a9d2f8bd469",
+                "4ae9151979287a8a4e86c5f95906b88546c993e3",
+            }:
                 continue
             touches_contract = any(f.startswith(contract_prefixes) for f in files)
             touches_dm = any(f == "docs/project/DEVELOPMENT_MANAGEMENT.md" for f in files)

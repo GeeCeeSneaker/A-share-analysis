@@ -2206,3 +2206,11 @@
 - 通读冻结基线 V1.3.2（5235 行）并完成评审（11 项缺口提交设计者裁决）
 - 设计者裁决 GO WITH CHANGES 全量吸收，形成 Phase 0 启动计划
 - workspace 确立：Windows + uv + Python 3.14 参考运行时
+
+## 2026-09-04 · Contract-document exception completion record
+
+- The previous 2020+ synchronization disclosed four source commits that could not be amended because the branch history is append-only.
+- Two later ADR-only commits, `eceb99468bd28a37a7532b723f092a9d2f8bd469` (ADR-026) and `4ae9151979287a8a4e86c5f95906b88546c993e3` (ADR index), also predated this management synchronization. They are now explicitly included in the same one-time contract-path grandfathered set, together with capabilities commit `4f83f7ac3a19327e9f724c9730cbfbfef03de38b`.
+- This is a disclosed historical exception, not a relaxation of the rule: future `docs/adr/` or contract-path commits must update `docs/project/DEVELOPMENT_MANAGEMENT.md` in the same commit. No history was rewritten.
+- Production account / formal AmazingData Spike / Data Sufficiency Matrix remain BLOCKED or NOT_TESTABLE and are not marked complete.
+

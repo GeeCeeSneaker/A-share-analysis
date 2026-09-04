@@ -3904,3 +3904,15 @@ Git 历史负责保存过去版本。
 - **Current contract**：2020-01-01 is the required history boundary; pre-2020 routine backfill and Feature warmup are forbidden/not required. 2020+ gaps remain fail closed.
 - **Remaining blockers**：formal production account identity/entitlement, closed production B1-B7 evidence, Data Sufficiency Matrix, Reviewer approval, ADR-026 acceptance and PR #6 merge. These require external facts or human decisions and are not claimed complete.
 
+---
+
+## Change Record: DM-CR-20260904-103
+
+- **Type**：C1 — contract-document gate exception completion record
+- **Date**：2026-09-04
+- **Status**：DONE (exception disclosure) / PENDING_REVIEW
+- **Trigger**：CI run 33841714828 (run 231) reached the management-doc gate after all code, test and Spike checks passed, and identified the two ADR-only commits that predated management synchronization.
+- **Exact exception set**：`4f83f7ac3a19327e9f724c9730cbfbfef03de38b` (capabilities), `eceb99468bd28a37a7532b723f092a9d2f8bd469` (ADR-026), `4ae9151979287a8a4e86c5f95906b88546c993e3` (ADR index).
+- **Reason / boundary**：The GitHub contents API updated those paths as separate commits and the append-only branch is not rewritten. The workflow and governance test now contain an exact-SHA, one-time, disclosed exception; it must not be extended to future commits.
+- **Remaining blockers**：ADR-026/CR-6 formal Reviewer closure, PR #6 merge, AmazingData production account/entitlement, CLOSED PRODUCTION B1-B7, Golden and Data Sufficiency Matrix remain pending or blocked.
+
