@@ -237,8 +237,7 @@ def test_daily_participation_zero_valid_is_unknown_with_finding():
     )
     assert result.state_rows[0]["daily_participation_state"] == "UNKNOWN"
     assert any(
-        row["finding_class"] == "STATE_INPUT_EMPTY_DENOMINATOR"
-        for row in result.finding_rows
+        row["finding_class"] == "STATE_INPUT_EMPTY_DENOMINATOR" for row in result.finding_rows
     )
 
 
@@ -251,9 +250,7 @@ def test_daily_participation_zero_valid_is_unknown_with_finding():
         (0.7, 0.3, "MIXED"),
     ),
 )
-def test_trend_participation_majority_semantics(
-    ma_ratio: float, mom_ratio: float, expected: str
-):
+def test_trend_participation_majority_semantics(ma_ratio: float, mom_ratio: float, expected: str):
     result = _compute(
         _market_row(
             pct_above_ma20_observed=ma_ratio,
@@ -359,15 +356,18 @@ def test_source_lineage_and_evidence_lineage_are_separate():
     first = _compute(_market_row())
     changed_feature_lineage = _compute(_market_row(input_lineage_hash="b" * 64))
     changed_evidence = _compute(_market_row(mean_raw_return_observed=0.02))
-    assert first.state_rows[0]["source_feature_input_lineage_hash"] != (
-        changed_feature_lineage.state_rows[0]["source_feature_input_lineage_hash"]
+    assert (
+        first.state_rows[0]["source_feature_input_lineage_hash"]
+        != (changed_feature_lineage.state_rows[0]["source_feature_input_lineage_hash"])
     )
-    assert first.state_rows[0]["input_lineage_hash"] != changed_feature_lineage.state_rows[0][
-        "input_lineage_hash"
-    ]
-    assert first.state_rows[0]["input_lineage_hash"] != changed_evidence.state_rows[0][
-        "input_lineage_hash"
-    ]
+    assert (
+        first.state_rows[0]["input_lineage_hash"]
+        != changed_feature_lineage.state_rows[0]["input_lineage_hash"]
+    )
+    assert (
+        first.state_rows[0]["input_lineage_hash"]
+        != changed_evidence.state_rows[0]["input_lineage_hash"]
+    )
 
 
 def test_state_available_at_is_feature_available_at():

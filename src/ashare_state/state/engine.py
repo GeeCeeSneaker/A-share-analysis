@@ -249,17 +249,9 @@ def _market_structure(
     center = dimensions["return_center_state"]
     daily = dimensions["daily_participation_state"]
     trend = dimensions["trend_participation_state"]
-    if (
-        center == "POSITIVE_CENTER"
-        and daily == "ADVANCE_DOMINANT"
-        and trend == "BROAD_POSITIVE"
-    ):
+    if center == "POSITIVE_CENTER" and daily == "ADVANCE_DOMINANT" and trend == "BROAD_POSITIVE":
         return "BROAD_ADVANCE"
-    if (
-        center == "NEGATIVE_CENTER"
-        and daily == "DECLINE_DOMINANT"
-        and trend == "BROAD_NEGATIVE"
-    ):
+    if center == "NEGATIVE_CENTER" and daily == "DECLINE_DOMINANT" and trend == "BROAD_NEGATIVE":
         return "BROAD_DECLINE"
     if center == "POSITIVE_CENTER":
         return "POSITIVE_MIXED_PARTICIPATION"
