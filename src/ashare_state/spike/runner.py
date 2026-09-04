@@ -261,7 +261,6 @@ def compute_config_hash(repo_root: Path | None = None) -> str:
     return digest.hexdigest()
 
 
-
 @contextmanager
 def formal_anchor_connection(repo_root: Path | None = None) -> Iterator[Any]:
     """Open the persistent, migrated DuckDB ledger used by formal runs.

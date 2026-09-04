@@ -1,5 +1,13 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · Formal runner formatting correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (runner wiring) / CI_PENDING / PENDING_REVIEW**：第 247 次 CI 的 Ruff check 已通过，但 format check 要求规范化三个文件；本提交按 CI 输出完成格式修正。
+- 本次仅消除确定的格式检查阻断，不改变持久 anchor、日期冻结、终态边界、异常分类或 dry-run 隔离语义；等待新的完整 CI 矩阵与治理 gates。
+- 不涉及凭证、Token、host/port、raw profile、migration、CR-5/CR-6、production identity 或 Provider approval。
+
 ## 2026-09-04 · Formal runner wiring lint correction
 
 **Implementation Status / Review Status**

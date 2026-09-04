@@ -99,17 +99,16 @@ class TestFormalAnchorBoundary:
         self, cli_module, monkeypatch, tmp_path: Path
     ):
         _patch_config(monkeypatch, Path(":memory:"))
-        with pytest.raises(
-            RunLifecycleError, match=":memory:"
-        ), cli_module._formal_anchor_connection(REPO_ROOT):
+        with (
+            pytest.raises(RunLifecycleError, match=":memory:"),
+            cli_module._formal_anchor_connection(REPO_ROOT),
+        ):
             pass
 
 
 @pytest.mark.integration
 class TestFormalDateAndLifecycle:
-    def test_missing_production_date_is_refused_before_target_login(
-        self, cli_module, monkeypatch
-    ):
+    def test_missing_production_date_is_refused_before_target_login(self, cli_module, monkeypatch):
         monkeypatch.setattr(
             cli_module,
             "_make_real_target",

@@ -24,6 +24,20 @@
 
 ---
 
+## DM-20260904-116 · Formal Runner formatting correction
+
+**Type**：C0 — CI format blocker correction  
+**Date**：2026-09-04  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：run 247 的 Ruff check 已通过，但 format check 报告 `spike_runner.py`、`spike/runner.py` 与 focused test 需要规范化。
+
+- 按 CI 给出的确定格式修正多余空行、多上下文 `with` 和测试函数签名；运行语义保持不变。
+- 本次不涉及账号、凭证、Token、host/port/raw profile、migration、CR-5/CR-6、production identity 或 Provider approval。
+
+**Evidence / Next**
+
+- run 247 三矩阵均在 format check 阶段停止，尚未进入功能测试；本提交等待新的完整 CI 与治理 gates 结果。
+
 ## DM-20260904-115 · Formal Runner lint correction
 
 **Type**：C0 — CI lint blocker correction  
