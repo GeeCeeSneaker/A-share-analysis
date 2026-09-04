@@ -1,5 +1,13 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · Ruff path-expression format correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：Ubuntu Ruff format 对历史边界测试中的多行 `Path` 拼接给出 formatter diff；已改为等价的单行路径表达式。
+- 本次仅收敛格式，2020-01-01 边界断言、正式 gate/B2 probe 代码和本地 SDK 冒烟结论均不变。
+- 等待当前 head 的三矩阵 CI；Production formal run、Golden/Data Sufficiency Matrix、verdict 与 Provider approval 仍未完成。
+
 ## 2026-09-04 · Ruff format correction for the 2020 history guard
 
 **Implementation Status / Review Status**
