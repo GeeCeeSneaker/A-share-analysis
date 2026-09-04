@@ -1,3 +1,14 @@
+## 2026-09-05 · P0-M-1B.0.1 formatter correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：新 identity-contract 提交的逻辑检查尚未执行到测试阶段，三平台 CI 在 Ruff 阶段因 `production_account_bootstrap.py` 一处 E501 超过 100 列而停止。
+- 已按 CI 指定位置拆分 profile-id projection 表达式；不改变 generated/freezable predicate、Trial gate、safe projection 或配置边界。
+- 失败 run `33928676300` 只报告格式门禁失败；其余 job steps 被 Ruff 失败跳过，不能计作回归通过。
+
+**Next**
+
+- 重新等待三平台 Ruff、format、mypy、pytest、Spike、SDK-absent 和文档门禁；online bootstrap 仍按 P0-M-1B.0.1 要求暂停。
 ## 2026-09-05 · P0-M-1B.0.1 positive identity contract honesty closure
 
 **Implementation Status / Review Status**
