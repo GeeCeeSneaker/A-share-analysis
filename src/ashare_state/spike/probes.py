@@ -722,7 +722,7 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
     # CR-1.2: reuse the ALREADY-persisted calendar exchange above (single
     # fetch per probe) and pass its windowed days explicitly to kline.
     hist_days = (
-        _window_days(cal_all_days, 19900101, sample_date) if cal_all_days is not None else None
+        _window_days(cal_all_days, 20200101, sample_date) if cal_all_days is not None else None
     )
     if hist_days is None:
         bars, bar_meta = None, cal_meta
@@ -731,12 +731,12 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
             "MarketData.query_kline",
             lambda: ctx.target.query_kline_exchange(
                 fixtures,
-                begin_date=19900101,
+                begin_date=20200101,
                 end_date=sample_date,
                 kline_type="DAY",
                 trading_days=hist_days,
             ),
-            failure_case_type="history_start_2018_plus_warmup",
+            failure_case_type="history_start_2020",
             trade_date=str(sample_date),
             symbol="FIXTURES",
         )
@@ -747,7 +747,7 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
             # failure case is already recorded), never a fabricated FAIL
             ctx.case(
                 case_id=f"B5-HISTCOV-CALPREREQ-{sample_date}",
-                case_type="history_start_2018_plus_warmup",
+                case_type="history_start_2020",
                 security="FIXTURES",
                 provider_symbol="FIXTURES",
                 trade_date=str(sample_date),
@@ -765,7 +765,7 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         cov = validators.validate_history_coverage(earliest)
     if cov is not None:
         ctx.outcome_case(
-            "history_start_2018_plus_warmup", "FIXTURES", str(sample_date), bar_meta, cov
+            "history_start_2020", "FIXTURES", str(sample_date), bar_meta, cov
         )
     # symbol mapping core gate - APPROVED exchange execution boundary
     # (CR-1.2.2 P0-01: the code-list prerequisite goes through
