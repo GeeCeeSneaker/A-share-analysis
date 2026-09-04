@@ -11,6 +11,18 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.2 CI verification and CR-6.3 scope guard
+
+**Implementation Status / Review Status**
+
+- **DONE (CR-6.2 baseline) / IN_PROGRESS (CR-6.3) / PENDING_REVIEW**：PR #6 clean head `2c70d0ccc1e5b9389fad62fcbba98e019316eff8` 的 GitHub Actions run `33829733713`（run 202）三矩阵全部 SUCCESS；Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿均为 1368 passed，并通过 Ruff lint/formatter、mypy、Spike、SDK-absent；Windows 3.14 的 DEVLOG 与 Management-doc gates 也通过。
+- 本批新增 `tests/integration/test_state_scope.py` 的 AST scope guards，覆盖 Group F 的 61–63：跨层 Provider/Raw/Canonical/Snapshot/ReadModel import、非公开 Feature import、Feature implementation symbol、Strategy/Experiment/ForwardLabel/Backtest 等研究标识符，以及 future/predictive/strategy 等字段。
+- ADR-026 implementation mapping 已从计划描述更新为 CR-6.0/6.1/6.2 已实现证据与 CR-6.3 当前验证范围；未宣称 CR-6 CLOSED/FREEZE，也未合入 main。
+
+**Next**
+
+- 等待本批 CR-6.3 scope guard 的三矩阵 CI；随后补齐最终 1–64 mapping evidence，交 Reviewer 做 final closure。
+
 ## 2026-09-04 · CR-6.2 migration test correction
 
 **Implementation Status / Review Status**

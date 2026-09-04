@@ -3713,3 +3713,33 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.2 migration test correction batch.
 - **Reviewer**：Design / Audit Review pending.
 
+---
+
+## Change Record: DM-CR-20260904-091
+
+- **Type**：C2 — CR-6.2 CI verification
+- **Date**：2026-09-04
+- **Status**：DONE / PENDING_REVIEW
+- **Trigger**：PR #6 clean head completed the CR-6.2 migration upgrade correction.
+- **Evidence**：GitHub Actions run 33829733713（run 202）三矩阵 SUCCESS；Ubuntu 3.14、Windows 3.12、Windows 3.14 each reported 1368 passed, with Ruff lint/formatter, mypy, Spike, SDK-absent and applicable governance gates successful.
+- **Affected Modules**：CR-6.2 State builder/verifier, migration 024, persistence/replay tests.
+- **Compatibility**：CR-5 frozen; CR-6.1 State rules unchanged; no predictive, strategy, or production semantics.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
+- **Commit**：2c70d0ccc1e5b9389fad62fcbba98e019316eff8.
+- **Reviewer**：Design / Audit Review pending.
+
+---
+
+## Change Record: DM-CR-20260904-092
+
+- **Type**：C2 — CR-6.3 static scope guard
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Trigger**：CR-6 full-closure Group F requirements 61–63.
+- **New Contract**：AST guards enforce the State import boundary, reject duplicated Feature implementation symbols, reject research/predictive identifiers, and freeze the non-future State artifact columns.
+- **Affected Modules**：tests/integration/test_state_scope.py; docs/adr/ADR-026_deterministic_market_state_interpretation.md.
+- **Tests**：Three-leg CI pending for this batch.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
+- **Commit**：Current CR-6.3 scope-guard batch.
+- **Reviewer**：Design / Audit Review pending.
+

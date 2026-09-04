@@ -217,13 +217,13 @@ No rule may rename these states into a forecast, and no caller may alter the thr
 
 ## Implementation mapping
 
-CR-6.0 creates this ADR and typed skeletons without runtime rule logic.
+CR-6.0 created this ADR and typed skeletons without runtime rule logic.
 
-CR-6.1 will implement the State Registry, the exact execution compiler, the shared deterministic engine, four dimensions, and tests 11–44.
+CR-6.1 implemented the State Registry, exact execution compiler, shared deterministic engine, four dimensions, and tests 11–44.
 
-CR-6.2 will implement deterministic identity, immutable artifacts, migration 024, recoverable publication, the ledger, the public verifier, and tests 1–10 plus 45–60.
+CR-6.2 implemented deterministic identity, immutable artifacts, migration 024, recoverable publication, the ledger, the public verifier, and tests 1–10 plus 45–60. GitHub Actions run `33829733713` (run 202) verified the clean PR #6 head with Ubuntu 3.14, Windows 3.12, and Windows 3.14; each leg passed 1368 tests plus Ruff, formatter, mypy, Spike, SDK-absent, and applicable governance gates.
 
-CR-6.3 will add static import/scope guards, complete the frozen upstream regression and three-platform CI evidence, finish the 1–64 mapping, and request final Reviewer closure.
+CR-6.3 now adds the AST-based static scope guards for groups 61–63 and records the full-closure evidence path. Its new CI validation is pending; Reviewer closure remains pending until the complete 1–64 mapping and three-leg evidence are reviewed.
 
 The first implementation batch must update DEVLOG and DEVELOPMENT_MANAGEMENT in the same logical governance batch. Historical DEVLOG entries remain append-only.
 
