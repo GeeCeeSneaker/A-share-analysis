@@ -4,7 +4,8 @@
 
 **Implementation Status / Review Status**
 
-- **DONE (runbook correction) / CI_PENDING / PENDING_REVIEW**：修正正式验证手册中的 `TGW_SERVER_PORT` 拼写、Production 单一 B1-B7 run、`--verdict --run-id` 用法、run-scoped 产物路径和当前 capability 名称。
+- **DONE (runbook correction) / VERIFIED (CI) / PENDING_REVIEW**：修正正式验证手册中的 `TGW_SERVER_PORT` 拼写、Production 单一 B1-B7 run、`--verdict --run-id` 用法、run-scoped 产物路径和当前 capability 名称。
+- GitHub Actions run `33861376660`（run 243）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功，每腿 `1408 passed`；Ruff、mypy、Spike、SDK-absent 和适用的 DEVLOG/Management gates 均通过。
 - 同步 provider doctor 与 SDK 安装手册的 verdict 口径：离线为 `RUNTIME_PACKAGE_VERIFIED`，在线实际加载后为 `RUNTIME_ACTUAL_LOAD_VERIFIED`；本次不修改 Provider/State 运行时代码。
 - 正式账号 native SDK smoke 仍不是 formal facade/provider-doctor、run-scoped B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval；凭证和依赖 wheel 继续只在本地运行环境/被忽略目录。
 

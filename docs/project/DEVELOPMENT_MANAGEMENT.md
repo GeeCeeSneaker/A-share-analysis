@@ -6,9 +6,9 @@
 > **Frozen Baseline**：V1.3.2  
 > **Reviewed Repository HEAD**：`dda8c000d8585a95a66a91fbaa5072427053abb8`（CR-6 Reviewer closure后的 main 合并基线；分支历史保持 append-only）  
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d` 已随 PR #6 合入 main；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`；State/Provider 语义边界保持冻结。  
-> **Latest CI baseline**：GitHub Actions run `33854677630`（run 239）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1408 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均成功。  
+> **Latest CI baseline**：GitHub Actions run `33861376660`（run 243）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1408 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均成功。  
 > **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 保持待审；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-112 / DM-20260904-111  
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-112 / DM-20260904-113 / DM-20260904-111  
 > **Last Review**：2026-09-04（CR-6.4 final Reviewer closure 已接受；PR #6 已合入 main；正式账号 native SDK 冒烟通过，但仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）  
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：最新 merge-gate run `33854677630`（run 239）三矩阵全绿，每腿 `1408 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates 均 success。main merge commit 为 `dda8c000d8585a95a66a91fbaa5072427053abb8`。  
@@ -23,9 +23,16 @@
 
 ---
 
+## DM-20260904-113 · Formal 验证运行手册 CI 验证完成
+
+**Status**：DONE / VERIFIED (CI) / PENDING_REVIEW
+
+- run `33861376660`（run 243）三矩阵全部成功，每腿 `1408 passed`；Ruff、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均通过。
+- 该证据覆盖运行手册的单一 Production B1-B7 命令、doctor verdict 口径和 run-scoped 产物说明；没有改变正式账号 frozen identity、Production B1-B7、verdict 或 Provider approval 状态。
+
 ## DM-20260904-112 · Formal 验证运行手册与 doctor verdict 口径校正
 
-**Status**：DONE / CI_PENDING / PENDING_REVIEW
+**Status**：DONE / VERIFIED (CI) / PENDING_REVIEW
 
 - 修正 `run_spike.md` 的凭证键名错误，并将正式 B1-B7 明确为一个 `RunKind.PRODUCTION` 单 run；中断时才允许 `--resume`，run CLOSED 后使用 `--verdict --run-id`。
 - 补齐当前 run-scoped 产物路径、2020+ capability 名称和 trial/dry-run 与 Production 的物理隔离说明。
