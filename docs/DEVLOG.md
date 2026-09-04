@@ -11,6 +11,18 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.4 Ruff Builder-order correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (CR-6.4) / REOPENED (CR-6)**：CI run 33836130295（run 212）确认 State public export 排序已通过，但 Builder import block 仍需按 Ruff 的实际 fix diff 调整。
+- 已恢复仓库 formatter 要求的 StateBuilderError / StateBuildResult 顺序；运行时语义与 CR-6.4 测试不变。
+- 当前 head 的最终三矩阵 CI 仍待验证；PR #6 保持 OPEN / NOT MERGED。
+
+**Next**
+
+- 重新执行完整 Ruff、mypy、pytest、Spike、SDK-absent 与治理 gates。
+
 ## 2026-09-04 · CR-6.4 Ruff import-order correction
 
 **Implementation Status / Review Status**

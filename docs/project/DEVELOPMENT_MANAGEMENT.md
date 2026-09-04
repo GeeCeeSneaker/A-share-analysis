@@ -3841,3 +3841,20 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.4 import-order correction batch.
 - **Reviewer**：Final Design / Audit Review pending; PR #6 remains open and not merged.
 
+
+
+---
+
+## Change Record: DM-CR-20260904-099
+
+- **Type**：C0 — CR-6.4 Builder import-order correction
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / REOPENED
+- **Trigger**：CI run 33836130295（run 212）Ruff fix diff required StateBuilderError before StateBuildResult.
+- **New Contract**：Builder import order matches the repository's Ruff/isort output; no runtime or State contract semantics changed.
+- **Affected Modules**：src/ashare_state/state/builder.py.
+- **Tests**：Full post-correction CI pending.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE.
+- **Commit**：Current CR-6.4 Builder-order correction batch.
+- **Reviewer**：Final Design / Audit Review pending; PR #6 remains open and not merged.
+

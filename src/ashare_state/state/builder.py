@@ -17,8 +17,8 @@ from ashare_state.state.engine import ComputedStateSet, compute_state_set
 from ashare_state.state.models import (
     STATE_CONTRACT_VERSION,
     STATE_RULE_UNAVAILABLE,
-    StateBuildResult,
     StateBuilderError,
+    StateBuildResult,
     StateFatalError,
     state_base_hash_from_primitives,
     state_id_from_base_hash,
