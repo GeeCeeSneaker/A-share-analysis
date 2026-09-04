@@ -52,8 +52,7 @@ def _feature_row(trade_date: date = date(2026, 3, 12)) -> dict[str, Any]:
 
 def _feature_run() -> VerifiedFeatureRun:
     feature_manifest_uri = (
-        "feature/contract=feature-v1/snapshot=snapshot-1/"
-        "run=feature-run-1/manifest.json"
+        "feature/contract=feature-v1/snapshot=snapshot-1/run=feature-run-1/manifest.json"
     )
     record = {
         "feature_run_id": "feature-run-1",
@@ -166,8 +165,7 @@ def test_tampered_state_artifact_is_rejected(
         builder = StateBuilder(conn, raw_root=tmp_path / "raw", normalized_root=root)
         result = builder.build("feature-run-1", STATE_SET_ID)
         artifact_uri = (
-            state_manifest_uri("feature-run-1", result.state_run_id)
-            .rsplit("/", 1)[0]
+            state_manifest_uri("feature-run-1", result.state_run_id).rsplit("/", 1)[0]
             + "/market_daily_state.parquet"
         )
         (root / artifact_uri).write_bytes(b"tampered")

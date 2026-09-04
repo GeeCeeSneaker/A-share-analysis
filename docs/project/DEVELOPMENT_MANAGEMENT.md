@@ -3661,3 +3661,21 @@ Git 历史负责保存过去版本。
 - **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
 - **Commit**：Current CR-6.2 lint correction batch.
 - **Reviewer**：Design / Audit Review pending.
+
+---
+
+## Change Record: DM-CR-20260904-088
+
+- **Type**：C0 — CR-6.2 formatter correction
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Trigger**：CI run 33828840805（run 198）Ruff formatter output.
+- **Old Contract**：CR-6.2 implementation had passed Ruff diagnostics but still differed from the repository formatter's canonical line wrapping.
+- **New Contract**：CR-6.2 State builder, verifier, migration test, and persistence test are aligned with the repository formatter without changing runtime semantics.
+- **Reason**：Restore the mandatory formatter gate before mypy and runtime validation.
+- **Affected Modules**：src/ashare_state/state/{builder,verifier}.py; tests/integration/{test_migrations,test_state_persistence}.py.
+- **Tests**：Ruff formatter and subsequent full CI pending.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
+- **Commit**：Current CR-6.2 formatter correction batch.
+- **Reviewer**：Design / Audit Review pending.
+

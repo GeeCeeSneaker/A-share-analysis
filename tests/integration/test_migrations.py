@@ -74,7 +74,7 @@ EXPECTED_TABLES = {
     "meta_snapshot_build",
     # 023 (CR-5 feature build ledger)
     "meta_feature_build",
-     # 024 (CR-6.2 State build ledger)
+    # 024 (CR-6.2 State build ledger)
     "meta_state_build",
     # runner bootstrap
     "meta_schema_version",

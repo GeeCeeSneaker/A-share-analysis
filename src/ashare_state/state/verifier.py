@@ -56,14 +56,11 @@ def _required_text(values: Mapping[str, Any], field: str) -> str:
 
 def _ledger_record(conn: Any, state_run_id: str) -> dict[str, Any]:
     row = conn.execute(
-        f"SELECT {', '.join(STATE_LEDGER_COLUMNS)} FROM meta_state_build "
-        "WHERE state_run_id = ?",
+        f"SELECT {', '.join(STATE_LEDGER_COLUMNS)} FROM meta_state_build WHERE state_run_id = ?",
         [state_run_id],
     ).fetchone()
     if row is None:
-        raise StateVerifierError(
-            f"state run {state_run_id} does not exist in the State ledger"
-        )
+        raise StateVerifierError(f"state run {state_run_id} does not exist in the State ledger")
     return dict(zip(STATE_LEDGER_COLUMNS, row, strict=True))
 
 
@@ -95,15 +92,12 @@ def _compare_rows(
             f"State {name} row count differs from deterministic replay: "
             f"{len(actual)} != {len(expected)}"
         )
-    for position, (actual_row, expected_row) in enumerate(
-        zip(actual, expected, strict=True)
-    ):
+    for position, (actual_row, expected_row) in enumerate(zip(actual, expected, strict=True)):
         if canonical_json(actual_row) != canonical_json(expected_row):
             differing_fields = [
                 field
                 for field in sorted(set(actual_row) | set(expected_row))
-                if canonical_json(actual_row.get(field))
-                != canonical_json(expected_row.get(field))
+                if canonical_json(actual_row.get(field)) != canonical_json(expected_row.get(field))
             ]
             raise StateVerifierError(
                 f"State {name} row {position} differs from deterministic replay "
@@ -156,15 +150,11 @@ def _validate_state_rows(
         for feature_name in STATE_EVIDENCE_FEATURES:
             evidence_name = f"evidence_{feature_name}"
             if row.get(evidence_name) != source.get(feature_name):
-                raise StateVerifierError(
-                    f"State evidence {evidence_name} diverges from Feature"
-                )
+                raise StateVerifierError(f"State evidence {evidence_name} diverges from Feature")
         for state_name, allowed in STATE_ENUM_VALUES.items():
             value = row.get(state_name)
             if not isinstance(value, str) or value not in allowed:
-                raise StateVerifierError(
-                    f"State {state_name} carries an unknown enum value"
-                )
+                raise StateVerifierError(f"State {state_name} carries an unknown enum value")
 
 
 def _validate_finding_rows(
@@ -226,9 +216,7 @@ class StateVerifier:
             state_set = get_state_set(state_set_id)
             compile_state_execution_plan(state_set)
         except StateRegistryError as exc:
-            raise StateVerifierError(
-                f"State Registry cannot be honestly executed: {exc}"
-            ) from exc
+            raise StateVerifierError(f"State Registry cannot be honestly executed: {exc}") from exc
 
         record_fields: tuple[tuple[str, Any], ...] = (
             ("state_run_id", state_run_id),
@@ -240,9 +228,7 @@ class StateVerifier:
         )
         for field, expected in record_fields:
             if str(record.get(field)) != str(expected):
-                raise StateVerifierError(
-                    f"State ledger field {field} is not the current contract"
-                )
+                raise StateVerifierError(f"State ledger field {field} is not the current contract")
 
         manifest_uri = _required_text(record, "manifest_uri")
         expected_uri = state_manifest_uri(feature_run_id, state_run_id)
@@ -252,9 +238,7 @@ class StateVerifier:
         if not manifest_path.is_file():
             raise StateVerifierError(f"State manifest is missing: {manifest_uri}")
         manifest_bytes = manifest_path.read_bytes()
-        if hashlib.sha256(manifest_bytes).hexdigest() != _required_text(
-            record, "manifest_hash"
-        ):
+        if hashlib.sha256(manifest_bytes).hexdigest() != _required_text(record, "manifest_hash"):
             raise StateVerifierError("State manifest bytes do not match the ledger hash")
         try:
             manifest = json.loads(manifest_bytes.decode("utf-8"))
@@ -297,9 +281,7 @@ class StateVerifier:
             else:
                 matches = str(actual) == str(expected)
             if not matches:
-                raise StateVerifierError(
-                    f"State manifest field {field} does not match the ledger"
-                )
+                raise StateVerifierError(f"State manifest field {field} does not match the ledger")
 
         current_fingerprint = state_builder_code_fingerprint()
         if manifest["state_builder_code_fingerprint"] != current_fingerprint:
@@ -320,9 +302,7 @@ class StateVerifier:
             state_builder_code_fingerprint=current_fingerprint,
         )
         if manifest.get("state_base_hash") != base_hash:
-            raise StateVerifierError(
-                "state_base_hash does not match State identity primitives"
-            )
+            raise StateVerifierError("state_base_hash does not match State identity primitives")
         if state_id_from_base_hash(base_hash) != state_run_id:
             raise StateVerifierError("state_run_id does not match UUID5 identity recompute")
 
@@ -350,9 +330,7 @@ class StateVerifier:
         )
         for field, expected in provenance:
             if str(feature_record.get(field)) != str(expected):
-                raise StateVerifierError(
-                    f"State upstream Feature {field} provenance diverges"
-                )
+                raise StateVerifierError(f"State upstream Feature {field} provenance diverges")
         if feature_run.feature_set_id != manifest["feature_set_id"]:
             raise StateVerifierError("State upstream Feature set diverges")
 
@@ -380,9 +358,7 @@ class StateVerifier:
                 raise StateVerifierError(f"State artifact {name} has no seal entry")
             expected_artifact_uri = f"{artifact_base_uri}/{name}.parquet"
             if str(entry.get("uri")) != expected_artifact_uri:
-                raise StateVerifierError(
-                    f"State artifact {name} URI is not deterministic"
-                )
+                raise StateVerifierError(f"State artifact {name} URI is not deterministic")
             path = self.state_root / str(entry["uri"])
             if not path.is_file():
                 raise StateVerifierError(f"State artifact {name} is missing")
@@ -393,9 +369,7 @@ class StateVerifier:
             try:
                 frame = pl.read_parquet(io.BytesIO(data))
             except Exception as exc:
-                raise StateVerifierError(
-                    f"State artifact {name} is not readable parquet"
-                ) from exc
+                raise StateVerifierError(f"State artifact {name} is not readable parquet") from exc
             schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
             if schema_hash != str(entry.get("schema_hash")):
                 raise StateVerifierError(f"State artifact {name} schema hash is rebound")
@@ -410,9 +384,7 @@ class StateVerifier:
                     f"State artifact {name} row_count is not an integer"
                 ) from exc
             if isinstance(entry.get("row_count"), bool) or frame.height != sealed_row_count:
-                raise StateVerifierError(
-                    f"State artifact {name} row count differs from its seal"
-                )
+                raise StateVerifierError(f"State artifact {name} row count differs from its seal")
             rows = frame.to_dicts()
             semantic = semantic_hash(rows)
             if semantic != str(entry.get("semantic_hash")):
@@ -440,9 +412,7 @@ class StateVerifier:
             state_set=state_set,
         )
         if _artifact_set_hash(physical_seals) != str(manifest["artifact_set_hash"]):
-            raise StateVerifierError(
-                "State artifact_set_hash does not match physical artifacts"
-            )
+            raise StateVerifierError("State artifact_set_hash does not match physical artifacts")
         if _artifact_set_hash(physical_seals) != str(record["artifact_set_hash"]):
             raise StateVerifierError("State artifact_set_hash does not match the ledger")
 
@@ -466,17 +436,11 @@ class StateVerifier:
                 manifest_count = manifest[field]
                 record_count = record[field]
                 if isinstance(manifest_count, bool) or int(manifest_count) != actual_count:
-                    raise StateVerifierError(
-                        f"State manifest {field} does not match physical rows"
-                    )
+                    raise StateVerifierError(f"State manifest {field} does not match physical rows")
                 if isinstance(record_count, bool) or int(record_count) != actual_count:
-                    raise StateVerifierError(
-                        f"State ledger {field} does not match physical rows"
-                    )
+                    raise StateVerifierError(f"State ledger {field} does not match physical rows")
             except (KeyError, TypeError, ValueError) as exc:
-                raise StateVerifierError(
-                    f"State count field {field} is not an integer"
-                ) from exc
+                raise StateVerifierError(f"State count field {field} is not an integer") from exc
 
         return VerifiedStateRun(
             state_run_id=state_run_id,

@@ -131,9 +131,7 @@ def _write_immutable(path: Path, data: bytes) -> None:
     try:
         write_file_atomic(path, data, allow_existing_identical=True)
     except Exception as exc:
-        raise StateBuilderError(
-            f"State immutable publication failed at {path}: {exc}"
-        ) from exc
+        raise StateBuilderError(f"State immutable publication failed at {path}: {exc}") from exc
 
 
 def _result_from_record(
@@ -188,9 +186,7 @@ class StateBuilder:
             state_set = get_state_set(state_set_id)
             compile_state_execution_plan(state_set)
         except StateRegistryError as exc:
-            raise StateBuilderError(
-                f"State Registry cannot be honestly executed: {exc}"
-            ) from exc
+            raise StateBuilderError(f"State Registry cannot be honestly executed: {exc}") from exc
 
         try:
             feature_run = verify_feature_run_for_consumption(
