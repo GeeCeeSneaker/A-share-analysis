@@ -3824,3 +3824,20 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.4 closure implementation batch.
 - **Reviewer**：Final Design / Audit Review pending; PR #6 remains open and not merged.
 
+
+
+---
+
+## Change Record: DM-CR-20260904-098
+
+- **Type**：C0 — CR-6.4 import-order correction
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / REOPENED
+- **Trigger**：CI run 33836030319（run 211）Ruff lint detected two import-order diagnostics before runtime tests.
+- **New Contract**：State public exports and Builder model imports follow the repository's deterministic Ruff/isort ordering; no runtime or contract semantics changed.
+- **Affected Modules**：src/ashare_state/state/__init__.py; src/ashare_state/state/builder.py.
+- **Tests**：Ruff lint passed for this correction; full post-correction CI pending.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE.
+- **Commit**：Current CR-6.4 import-order correction batch.
+- **Reviewer**：Final Design / Audit Review pending; PR #6 remains open and not merged.
+

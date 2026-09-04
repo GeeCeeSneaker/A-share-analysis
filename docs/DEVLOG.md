@@ -11,6 +11,18 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.4 Ruff import-order correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (CR-6.4) / REOPENED (CR-6)**：CI run 33836030319（run 211）在 Ubuntu 3.14 与 Windows 3.12 的 Ruff lint 阶段发现 State public export 与 Builder import block 的排序问题；未进入运行时测试。
+- 已按 Ruff 实际诊断修正 import order；State fatal-vs-persisted finding 语义、零发布边界和对抗性测试内容不变。
+- 当前 head 的最终三矩阵 CI 仍待重新验证；PR #6 保持 OPEN / NOT MERGED，ADR-026 保持 PROPOSED / PENDING_REVIEW。
+
+**Next**
+
+- 重新执行 Ruff、mypy、全量 pytest、Spike、SDK-absent 与适用治理 gates；以真实最终 run 回填 CR-6.4 mapping evidence。
+
 ## 2026-09-04 · CR-6.4 adversarial closure implementation
 
 **Implementation Status / Review Status**
