@@ -498,7 +498,7 @@ def probe_b2_security_master(ctx: ProbeContext) -> dict[str, Any]:
     as_of = ctx.as_of_date  # R3-P1-09: run as-of, never hardcoded
     payload, meta = executor.call(
         "BaseData.get_hist_code_list",
-        lambda: ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 19900101, as_of),
+        lambda: ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 20200101, as_of),
         failure_case_type="security_master_with_delisted",
         trade_date=str(as_of),
         symbol="MARKET",

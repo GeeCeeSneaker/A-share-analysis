@@ -20,6 +20,17 @@ uv pip install .\Downloads\AmazingData\tgw-1.0.9.2-py3-none-any.whl `
 > cp 标签必须与本机 Python 一致（本机 3.14 → cp314）。
 > 版本升级时：先记录新 wheel hash → 卸载旧版 → 安装新版 → 重跑 provider doctor。
 
+## 2.1 运行时资料接口依赖（2026-09-04）
+
+`AmazingData` 的 wheel 元数据不声明 PyTables，但历史状态、复权、北交所映射、公司行动、股权结构和行业资料接口会使用 `tables`。受控离线安装时，需把 `tables` 及其二进制/传递依赖 wheel 放在本地被忽略目录（例如 `vendor/amazingdata/dependencies/`），再执行：
+
+```powershell
+uv pip install --python <受控Python路径> --no-index --find-links <工作区>\\vendor\\amazingdata\\dependencies tables
+uv pip check --python <受控Python路径>
+```
+
+缺少 `tables` 时，登录、日历、代码表和部分行情接口可能仍可用，但资料接口会返回 `ImportError`；这不能判定为账号无权限。
+
 ## 3. 版本兼容性事实（2026-08-21 验证）
 
 - `tgw` wheel **自带全套原生运行时**（`site-packages/tgw/win_py314_x64_package/`

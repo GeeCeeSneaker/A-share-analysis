@@ -1,6 +1,17 @@
 # 开发日志（DEVLOG）
 
-## 2026-09-04 · Formal provider validation attempt blocked by official SDK
+## 2026-09-04 · Formal provider SDK smoke validation completed
+
+**Implementation Status / Review Status**
+
+- **LOCAL_SMOKE_PASS / FORMAL_RUN_PENDING / PENDING_REVIEW**：受控本地 Python 3.14.6 环境已安装官方 `AmazingData==1.1.9` cp314 wheel、`tgw==1.0.9.2` 及运行所需 `tables` 依赖；TGW runtime `V4.3.0.260626-rc2.0-YHZQ`，`uv pip check` 通过。
+- 正式账号登录在本地成功，logon profile 已解析，权限/功能权限字段均存在。SDK stdout/stderr 已在测试边界内捕获；未把用户名、密码、Token、host、port、原始返回或临时账号画像写入 GitHub、日志或结果文件。
+- 核心直连冒烟返回：calendar 8,719；当前沪深代码 5,215；单日历史代码列表（2026-09-03）5,215；北交所映射 248；stock_basic 1；history status 1 个结果；adj_factor 8,719；dividend 54；right_issue 0；equity structure 68；industry base 511；industry constituent、股票日线与指数日线均返回结构化结果；所有测试均正常 logout。
+- 上述是原生 SDK 直连冒烟证据，不是仓库 facade/provider-doctor 或 run-scoped Production B1-B7 证据；未生成正式 run、Golden/Data Sufficiency Matrix、verdict 或 Provider APPROVED。
+- 历史代码列表只做单日窗口，以验证调用链和返回形态；没有把 2020+ 全历史逐日下载作为冒烟步骤。`configs/production_account.yaml` 继续为空，未冻结 production identity。
+- 本地工作区已保存依赖 wheel 于被忽略的 `vendor/amazingdata/`，不上传 GitHub。当前本地 SDK 测试环境未装入仓库源码，因此形式化 runner 尚未执行；下一步是将该依赖环境与仓库源代码结合，运行一次完整、单 Run、可审计的 Production B1-B7，并在人工确认 profile 后再判定 verdict。
+
+## 2026-09-04 · Formal provider validation attempt before official SDK installation
 
 **Implementation Status / Review Status**
 

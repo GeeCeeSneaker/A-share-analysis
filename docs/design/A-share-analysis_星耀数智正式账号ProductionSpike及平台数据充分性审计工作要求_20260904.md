@@ -3,7 +3,7 @@
 > **Date**：2026-09-04  
 > **Reviewer Baseline**：`4ac274747e86d5f386560ceabbffa3273ca9d14b`  
 > **Parallel Track**：CR-6 State 开发可并行；本批次不得修改 CR-5 冻结语义，也不得越权批准未验证 Provider capability  
-> **Status**：**P0-M-1B ACCOUNT DETAILS RECEIVED / VALIDATION BLOCKED BY OFFICIAL SDK**  
+> **Status**：**P0-M-1B ACCOUNT DETAILS RECEIVED / SDK SMOKE PASS / FORMAL VALIDATION PENDING**  
 > **Production Truth**：正式账号“已存在”≠正式数据源“已验证”；只有 frozen account identity + production Spike + golden + evidence closure + Reviewer approval 才能授予 APPROVED  
 > **Credentials**：用户名、密码、Token、真实 host 明文等一律只进 `.env`/运行环境，不得写入 Git、日志、issue、PR body 或本文件
 
@@ -29,6 +29,14 @@ B. Platform Data Sufficiency Audit
 ---
 
 # 1. 当前事实基线
+
+## 1.1 当前本地 SDK 冒烟事实（2026-09-04）
+
+- 受控 Python 3.14.6 已安装官方 `AmazingData==1.1.9` cp314 wheel、`tgw==1.0.9.2` 和 `tables` 运行依赖；TGW runtime 为 `V4.3.0.260626-rc2.0-YHZQ`，`uv pip check` 通过。
+- 正式账号登录成功，profile 已解析，权限/功能权限字段存在。SDK 原始 stdout/stderr 在调用边界被捕获；用户名、密码、Token、host、port、原始 payload 和临时 profile 均未写入 GitHub、日志或结果文件。
+- 直连小窗口结果：calendar 8,719；当前沪深代码 5,215；2026-09-03 单日历史代码列表 5,215；北交所映射 248；stock basic 1；history status 1；adj factor 8,719；dividend 54；right issue 0；equity structure 68；industry base 511；industry constituent、股票日线、指数日线均返回结构化结果；logout 正常。
+- 这不是正式 Production Spike：未执行仓库 facade/provider-doctor、run-scoped B1-B7、Golden/Data Sufficiency Matrix 或 verdict；历史代码列表仅做单日窗口，不能替代 2020+ 全历史覆盖。
+- 用户提供的 wheel 和所需依赖已保存在本地被忽略目录 `vendor/amazingdata/`，不上传 GitHub。当前 SDK 测试环境没有仓库源码，所以形式化 runner 尚未执行；`configs/production_account.yaml` 继续为空，正式 approval 不得提前授予。
 
 仓库已有正式 Spike 框架：
 
@@ -619,7 +627,7 @@ Provider validation track
 最终只能以正式账号 evidence 为准。
 
 
-## 11.2 正式账号验证尝试记录（2026-09-04）
+## 11.2 SDK 安装前正式账号验证尝试记录（2026-09-04，历史记录）
 
 - Owner 已通过当前协作会话提供正式账号连接信息；用户名、密码、Token、真实 host 和端口值均未写入 GitHub、日志、Issue、PR 或本文件。
 - 对 Owner 提供的两个候选服务端点执行了独立 TCP 可达性探测：端口可达。该结果只证明网络路径，不证明登录、账号身份、权限或数据正确性。

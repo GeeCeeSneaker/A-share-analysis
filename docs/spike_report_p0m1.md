@@ -1,6 +1,6 @@
 # P0-M-1 Spike Report — AmazingData Provider 验证（GO / NO-GO）
 
-> 状态：**FRAMEWORK READY (R3) — FORMAL ACCOUNT DETAILS RECEIVED / OFFICIAL SDK BLOCKED**
+> 状态：**FRAMEWORK READY (R3) — FORMAL SDK SMOKE PASS / FORMAL PRODUCTION RUN PENDING**
 > 框架已通过第三轮审计整改（R3-0A/0B/0C/1A/1B）：Run 生命周期终态化、单 Run Verdict、账号门、完整 Provenance、语义 Validators v2、Golden Truth 进 Core Gate、Evidence Closure。
 > 与 M0 Exit Report 同时提交设计者评审。
 
@@ -11,8 +11,8 @@
 | Spike 对象 | AmazingData（中国银河证券 格物金融服务平台）；Tushare 不可用（ADR-007） |
 | 框架验证 | dry-run 全流程（FakeTarget）：八态 case / validators v2 / golden 逐案例对比 / 终态 run / verdict 引擎 + evidence closure 全部工作——**dry-run 中新 validators 当场抓到 fake 数据的北交所涨跌停制度违规，证明语义校验真实生效** |
 | 仿真账号 | B1 连通性 DONE（2026-08-21）；权限码 3\|4\|32\|33 实际只开代码表 |
-| 真实运行 | 已收到连接信息；官方 SDK 未安装，尚未启动 Production run |
-| 当前结论 | **未评定 / 当前阻塞**（网络可达但 SDK 缺失，登录画像与 B1-B7 未执行） |
+| 真实运行 | 官方 SDK 已在本地受控环境安装并通过脱敏直连冒烟；尚未启动 Production run |
+| 当前结论 | **未评定 / Formal run pending**（SDK 冒烟通过，但仓库 runner、Production B1-B7、verdict 与矩阵证据尚未执行） |
 
 ## 2. 运行方式（R3 框架，与旧文档不同）
 
@@ -75,11 +75,19 @@ verdict.json 同时输出（R3 §54）：
 
 `history_start_2020` 只验证 `2020-01-01 -> latest complete trading day` 的必要覆盖；2020 年以前的缺失不会导致 `GO_CORE` 失败，也不触发常规回填。2020-01-01 之后的关键连续性缺口仍必须 fail closed。正式生产 verdict 仍为未评定，原因是正式账号画像和 B1-B7 生产证据尚未提供。
 
-## 4.2 当前正式账号验证尝试（2026-09-04）
+## 4.2 SDK 安装前正式账号验证尝试（2026-09-04，历史记录）
 
 - 两个 Owner 提供的候选服务端口均通过独立 TCP 可达性探测；这不是认证或数据权限证据。
 - 当前受控 Python 3.14.6 环境未安装官方 `AmazingData` / `tgw` wheel，因此未发送登录请求，`ACCOUNT_PROFILE`、正式 B1-B7、verdict 和 Data Sufficiency Matrix 均未生成。
 - 凭据未写入仓库；`production_account.yaml` 继续为空。下一步是安装并记录官方 wheel 指纹，再重跑 doctor 和单一 Production run。
+
+## 4.3 2026-09-04 本地 SDK 冒烟结果（非 Production run）
+
+- Python 3.14.6 中导入官方 `AmazingData==1.1.9`、`tgw==1.0.9.2` 与 `tables` 成功；TGW 自报 runtime `V4.3.0.260626-rc2.0-YHZQ`，`uv pip check` 通过。
+- 正式账号登录成功，profile 可解析且权限/功能权限字段存在；stdout/stderr 均在测试边界内捕获，未落盘账号、Token 或原始日志。
+- 单日/小样本直连接口均完成：calendar 8,719；沪深代码 5,215；历史代码列表（2026-09-03）5,215；北交所映射 248；stock basic 1；history status 1；adj factor 8,719；dividend 54；right issue 0；equity structure 68；industry base 511；industry constituent、股票日线、指数日线均返回结构化结果；logout 正常。
+- 这只证明 SDK 原生调用链在本地可用；它不产生 run-scoped raw evidence，不满足正式 B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval。完整历史覆盖只在形式化 Production run 中按 2020+ 合同执行。
+- 依赖 wheel 已留在本地被忽略的 `vendor/amazingdata/`；`configs/production_account.yaml` 继续为空。由于当前本地环境未装入仓库源码，形式化 runner 尚未执行。
 
 ## 5. Early Stop（R3 §53）
 

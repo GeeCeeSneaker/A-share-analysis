@@ -863,7 +863,7 @@ def _probe_calendar(ctx: ProbeContext) -> ProviderExchange:
 
 
 def _probe_hist_code_list(ctx: ProbeContext) -> ProviderExchange:
-    return ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 19900101, ctx.as_of_date)
+    return ctx.target.get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 20200101, ctx.as_of_date)
 
 
 def _probe_bj_code_mapping(ctx: ProbeContext) -> ProviderExchange:
