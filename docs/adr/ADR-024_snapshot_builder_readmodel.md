@@ -2,8 +2,8 @@
 
 ## Status
 
-- **Status**: PROPOSED（2026-09-03，CR-4 首批交付；Reviewer 复审裁决待定——本 ADR 在复审通过前不自称 ACCEPTED）
-- **Deciders**: 开发方（设计实现）；Design / Audit Review（裁决 pending）
+- **Status**: ACCEPTED / VERIFIED（2026-09-03，CR-4.4 final review；PR #1 merged at `a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`）
+- **Deciders**: 开发方（设计实现）；Design / Audit Review（final review accepted）
 - **Date**: 2026-09-03
 - **Work Requirement**: `docs/design/A-share-analysis_CR-4_SnapshotBuilder及DuckDBReadModel开发工作要求_20260902.md`（audit 20260902，含 CR-3 全链 closure 裁决 ff3808b7a5036246ea11e37173aa31d863beb2d9 与 CR-4 启动裁决）
 
@@ -182,6 +182,6 @@ GitHub Actions run `33732904158` on final head `3e19aa5690ebd1f90818a0ee7b52de44
 
 ### Status
 
-This amendment remains **PROPOSED** pending reviewer acceptance. CR-4.4 implementation status is
-DONE only for the scoped correctness closure; CR-5 and production remain out of scope and
-blocked as specified by the review requirements.
+This amendment is **ACCEPTED / VERIFIED** after the final review and PR #1 merge. CR-4.4
+implementation is CLOSED / FREEZE for the scoped correctness closure; CR-5 is now the active
+next-stage implementation and production remains independently blocked.

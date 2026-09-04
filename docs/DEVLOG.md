@@ -11,6 +11,211 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-5.2 atomic-history CI verification
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：PR #2 的 run `33767742448`（run 175）中，CR-5.2 功能检查已通过（Ruff、formatter、mypy、pytest、Spike、SDK-absent）；唯一失败是 Windows 3.14 的 DEVLOG 历史门禁，指出 `0fe989767d40bc31d0c538c0e07d509f9d1983ff` 代码提交没有在同一 commit 更新 `docs/DEVLOG.md`。
+- 为遵守 workflow 的 no-force-push 规则并保留历史，基于 `main` 创建 clean branch `codex/cr-5-feature-layer-20260904`，将已验证的最终树 `8281e258a7595f8e5fbbd8d0f7e023a494f0b821` 作为原子提交 `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e`，代码、测试、DEVLOG、DEVELOPMENT_MANAGEMENT 和 ADR 同批进入 PR #3。
+- GitHub Actions run `33814571568`（run 176）在 `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e` 上三平台全绿：Ubuntu 3.14、Windows 3.14、Windows 3.12 每腿 `1320 passed`；Ruff lint/formatter、mypy、Spike、AmazingData SDK-absent 均通过；Windows 3.14 的 DEVLOG 与 Management-doc gates 通过。migration 023 未改，CR-6/State/score/strategy/backtest/production 未扩展。
+
+**Next**
+- CR-5.2 的实现与 CI 证据已完成，等待 Reviewer closure；ADR-025 仍保持 PROPOSED，PR #3 不自动合并，PR #2 保留以供历史追踪，CR-6 继续 BLOCKED_BY_CR-5.2。
+
+## 2026-09-03 · CR-5.2 formatter correction
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 VERIFIED / CLOSED / FREEZE；CR-5.2 START / ACTIVE**：run `33767497724`（run 174）已通过 Ruff lint，但 formatter 指出 test_features.py 三处确定性换行差异；已按实际 formatter 输出修正，未改变测试或运行时语义。
+
+**Next**
+- 重新执行完整三平台 CI；以实际 pytest、Spike、SDK 与 governance gate 结果更新 CR-5.2 evidence。
+## 2026-09-03 · CR-5.2 bounded selected-input lineage implementation
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 VERIFIED / CLOSED / FREEZE；CR-5.2 START / ACTIVE**：Reviewer 新增 bounded-lineage 要求后，已将 security row lineage 从 active span 改为 current observation、固定 observed/lag 依赖与 selected valid amount/volatility members；新增由 Execution Plan 派生的 lineage 成员上界及运行时 enforcement；Feature verifier 的 market-date membership 改为 set + previous-order guard。
+- 新增 10k sparse amount/raw-return operation-bound tests，以及 invalid identity/availability/valid-transition、selected identity/availability、duplicate/order guard 和 structural guard。numeric feature values、active missingness finding 规则及 artifact contract 未扩展；migration 023 保持不变；CR-6 继续 blocked。
+- Implementation commits：`0fe989767d40bc31d0c538c0e07d509f9d1983ff`（CR-5.2 代码与 focused tests）及 `1bbfb2b9485fb62f8713e13584879fe33cb656fe`（Ruff import correction）。CI run `33766197492`（run 171）在本条同步时仍为 queued / in progress，不预先宣称通过。
+
+**Next**
+- 等待 run 171 的三平台结果；如有后续 CI 修复继续以实际日志为准。Reviewer 完成 CR-5.2 closure 前不合并 PR #2、不启动 CR-6。
+## 2026-09-03 · CR-5.1 CI verification complete
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：CR-5.1 code/test implementation head `06106c27652e14f13d360fd3e153ececb39a4434` 已由 GitHub Actions run `33758109611`（run 167）验证；Windows 3.12、Windows 3.14、Ubuntu 3.14 三条矩阵腿全部 success，且每腿均为 `1312 passed`。
+- 三平台的 Ruff lint、Ruff formatter、mypy、full pytest、Spike framework gate 与 AmazingData SDK-absent 检查均通过；Windows 3.14 的 DEVLOG gate 与 Management-doc gate 通过，其他两腿的治理步骤按 workflow 条件跳过。ADR-025 仍为 PROPOSED，等待 Reviewer closure。
+
+**Next**
+- 将本次真实 CI 证据同步到 Development Management、CR-5 工作要求 mapping 与 ADR-025；在 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 pytest helper correction
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 166 的 Ubuntu pytest 为 1304 passed、8 failed；失败均定位到新增测试 helper：目标 feature 参数与变更字段同名导致 TypeError，以及 ledger UPDATE 缺少 `=`。
+- 已将 helper 的定位参数改名为 `target_feature_name`，并修正 `WHERE feature_run_id = ?`；产品代码未改，等待三平台重新执行真实断言。
+
+**Next**
+- 继续跟踪 pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 pytest collection fix
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 165 的三平台静态门禁均通过；pytest 在 collection 阶段发现 physical-count 参数化 decorator 错装到 lineage 测试。
+- 已将 `field` 参数化 decorator 移到对应的 manifest/ledger physical-count 测试，lineage 测试恢复为无参数；这是测试结构修复，不改变产品代码。
+
+**Next**
+- 重新跑三平台 pytest 及其后的 framework/governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 mypy follow-up
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：上一轮 mypy 修复脚本中发现并纠正了局部变量重命名的中间文本拼接问题；本次以完整 engine.py 基线重建，避免引入非预期文本变更。
+- 当前修复只包含 safe_ratio 公式绑定、mean_window/dependency_window 类型区分和 market handler key 字符串化，等待 CI 重新确认。
+
+**Next**
+- 继续跟踪三矩阵的 mypy、pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 mypy type closure
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 164 已通过 Ruff lint/formatter，mypy 报告 engine.py 三处局部类型不一致：振幅 helper 的公式签名、window 变量复用、market handler 字典键推断。
+- 已将振幅的已验证 high-low/pre_close 路径绑定到二元 safe_ratio，区分 mean_window 与 dependency_window，并显式字符串化 market handler key；功能语义不变，等待 pytest 与后续 gates。
+
+**Next**
+- 继续跟踪三矩阵的 pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 formatter blank-line closure
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 163 的唯一失败是参数化 decorator 与测试函数之间多余的两个空行；Ruff lint 已通过。
+- 已删除该纯格式空行，路径表达式的局部 E501 处理保持 formatter-compatible；等待完整三矩阵门禁。
+
+**Next**
+- 继续跟踪 mypy、pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 formatter comment placement
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 162 显示 Ruff lint 已通过，但 formatter 要求将两条路径表达式的 `# noqa: E501` 注释放到括号闭合行。
+- 已按 formatter 的实际规范调整为括号布局并保留局部 E501 抑制；未改变测试逻辑或全局 lint 配置，等待完整门禁。
+
+**Next**
+- 继续跟踪三矩阵的 mypy、pytest、framework 与 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 lint/formatter compatibility
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 161 的 formatter 已通过候选代码，但 Ruff lint 发现两个被 formatter 固定折叠的 security artifact 路径表达式为 104 字符，超过仓库 E501 上限。
+- 已仅对这两个确定性 formatter 输出行添加局部 # noqa: E501；没有修改全局 lint 规则或功能代码，等待完整 CI 验证。
+
+**Next**
+- 继续跟踪三矩阵的 mypy、pytest、framework 和 governance gates；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 formatter follow-up
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 160 仍只在 formatter gate 失败；原始差异集中于 amount/market 表达式折叠、测试长签名/路径/断言的确定性换行。
+- 已按完整 formatter diff 收口 engine.py 与 test_features.py 的剩余格式项，保持计算、验证和恢复行为不变；等待 lint 之后的 mypy、pytest、framework 与 governance gates。
+
+**Next**
+- 继续复跑完整 CI；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 CI formatter correction
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：CI run 159 的三条矩阵腿均通过 Ruff lint，但 formatter 发现 engine.py 两处可压缩异常抛出和 test_features.py 三处可压缩 lambda。
+- 已按 formatter 的确定性输出完成最小格式修正；不改变 feature registry、计算、验证或恢复语义，等待后续 lint/type/pytest/governance gates。
+
+**Next**
+- 复跑完整 CI；未取得三矩阵和 Reviewer closure 前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 CI lint correction
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：新 head 9f7cc9aee3f3f3021af603aefdebf19258558847 的 Ubuntu 3.14 CI 已先暴露两类工程问题：features 公共导出顺序未满足 Ruff，以及新增 focused tests 漏导入 FeatureEngineError；均不改变运行时契约。
+- 已按 CI 原始日志修正 src/ashare_state/features/__init__.py 的 import order，并补齐测试显式异常类型导入；等待三矩阵重新验证。
+
+**Next**
+- 复跑完整 CI；仅在三平台与 governance evidence 均实际通过、且 Reviewer closure 完成后考虑结束 CR-5.1。未闭环前不合并 PR #2、不启动 CR-6。
+
+## 2026-09-03 · CR-5.1 Registry Honest Execution / Feature Seal Closure
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / CR-5 REOPENED；CR-5.1 START / ACTIVE**：Reviewer 复审确认 CR-5 主体机制 PASS，但发现 Registry 声明与 runtime 执行、Feature manifest/ledger physical recompute、分母与 active missingness span、原始 66 项 mandatory matrix 仍有收口缺口；PR #2 保持 OPEN / MERGEABLE / NOT MERGED，CR-6 继续 BLOCKED_BY_CR-5.1。
+- 新增 typed blocked-semantic classification 与 V1 exact-set compile_feature_execution_plan()；engine 改为从编译计划读取 window/lag，并对 formula、denominator、missingness、availability、eligibility、input/output contract 漂移 fail closed；Registry 额外或重命名的 feature 不会进入执行路径。
+- verifier 新增 price_basis / window_basis / universe_rule_id 交叉绑定，physical security/market/finding row-count 重算，manifest/ledger snapshot_as_of 对 Verified Snapshot 绑定，以及 SUCCESS error_message 约束；valid_ma20_count 明确按可比较的 close_to_ma_obs_20 计数。
+- 统一 lag / close-to-MA / amount 的危险分母 finding；market breadth 对不可比较 MA 值 null-safe；amount/volatility 使用 incremental valid history 与 active-span missingness，避免旧历史缺失持续污染并消除 prefix rescan；新增 registry drift、seal rebound、numeric、PIT、lineage、recovery focused tests。
+- 同步 ADR-025 Amendment A、CR-5 原工作要求 §16.10 的 1..66 mapping、DEVELOPMENT_MANAGEMENT；migration 023 及 CR-2/3/4 冻结链不改。新 head 的 GitHub Actions 三矩阵与 governance evidence 待实际返回，此处不预先宣称通过。
+
+**Next**
+- 以新 head 的 CI 实际结果收口剩余工程问题；CI 通过后仍需 Reviewer closure，未闭环前不合并 PR #2、不启动 CR-6、不触碰生产 P0-M-1B。
+
+## 2026-09-03 · CR-5 CI 完整验证
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：最终实现 head `eaebce48ad373d7302f208f2f7fe7ddd53bf6cfb` 的 GitHub Actions CI run `33745226956`（run 155）三条矩阵腿全部 success；Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿均为 `1270 passed`。
+- Ruff lint、Ruff formatter、mypy、pytest、Spike framework gates、AmazingData SDK-absent 均通过；Windows 3.14 的 DEVLOG gate 与 Management-doc gate 也通过，其他两腿按 workflow 条件跳过治理 gates。
+- CR-5 实现保持 PENDING_REVIEW，下一步是 Reviewer closure；未闭环前不启动 CR-6 State，生产 P0-M-1B 仍独立 BLOCKED，PR #2 不在本次自动合并。
+
+## 2026-09-03 · CR-5 market schema 类型修复
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33744781189` 已定位失败字段为 `valid_ma20_count` 与 `valid_mom20_count`；其余 replay 与全量测试保持通过。
+- market artifact schema 已改为逐列声明：breadth ratio/均值/中位数/百分比/金额为 Float64，`valid_ma20_count` 与 `valid_mom20_count` 为 Int64，并加入回归断言；等待完整 CI 重跑。
+
+## 2026-09-03 · CR-5 market replay 差异诊断
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33744333659`（PR #2 head `1155a27`）静态检查全部通过；Ubuntu pytest 为 `1267 passed, 3 failed`，失败集中在 market artifact 与 Verified ReadModel replay 的第 0 行。
+- verifier 现在在不改变拒绝条件的前提下报告具体差异字段，以便下一轮按实际字段修复；Windows 两腿的同一 pytest 结果仍以各自 CI 完成为准。
+
+## 2026-09-03 · CR-5 mypy 变量复用修复
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33744175985`（PR #2 head `8d0e3e0`）中 Ruff lint、formatter 均通过；mypy 因 verifier.py 复用前序字符串循环的 `expected` 变量而报联合类型赋值错误。
+- 已将 manifest 比较循环变量改为独立名称，未改变比较条件或 verifier 行为，等待 CI 继续执行。
+
+## 2026-09-03 · CR-5 mypy manifest 类型收口
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33744006854`（PR #2 head `20fa8c4`）的三条矩阵腿均通过 Ruff lint 与 formatter，mypy 仅报告 verifier.py 中混合字符串/整数 manifest 字段的局部类型推断错误。
+- 已为该字段集合显式声明 `tuple[tuple[str, str | int], ...]`；比较逻辑和 feature 验证语义不变，等待 CI 继续执行。
+
+## 2026-09-03 · CR-5 lint/formatter 长度冲突修复
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33743885535`（PR #2 head `16c4204`）已完成 formatter，但 lint 在同一处报告 101 字符的 E501；该处源于 formatter 推荐的合并行与项目 100 字符上限冲突。
+- 已将 feature artifact 路径前缀拆为局部变量，保持输出完全相同并同时满足 lint/formatter，等待完整 CI 重跑。
+
+## 2026-09-03 · CR-5 Formatter CI 收口
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33743610144`（PR #2 head `85ad800`）已通过 Ruff lint 与 mypy；失败仅来自 Formatter 对 5 个 Python 文件的确定性重排。
+- 已按 Formatter 输出同步纯格式变更，未改变 Feature Layer 运行时语义；等待新 head 继续执行 pytest、Spike 与治理 gates。
+
+## 2026-09-03 · CR-5 Ruff 导入块收口
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33743476996`（PR #2 head `52a0ed9`）已显示三条矩阵腿均只在 builder.py 的 Ruff 导入块失败；根因是移除未使用导入后遗留的重复空行。
+- 已移除该重复空行，未改变任何运行时代码或 Feature Layer 语义，等待新 head 的完整 CI。
+
+## 2026-09-03 · CR-5 Ruff CI 修复
+
+**Implementation Status / Review Status**
+- **IN_PROGRESS / PENDING_REVIEW**：PR #2 首轮 CI run `33742421507` 的三条矩阵腿均在 Ruff 阶段失败；问题限定为导入排序、未使用导入、B023 闭包捕获和 4 处 E501，未进入 mypy、pytest 或后续治理 gates。
+- 已按实际日志修复这些静态检查问题；Feature Registry、公式、窗口、缺失值、PIT lineage、artifact seal 与 verifier 语义未改变，等待新提交 CI 结果。
+
+## 2026-09-03 · CR-5 Deterministic Feature Layer + PIT Feature Snapshot
+
+**Implementation Status / Review Status**
+- **DONE / PENDING_REVIEW**：PR #1 已按 CR-4.4 最终复审裁决合并，main 基线为 `a9c5cee8e3daa6f76dfde961bffc61c139dd6d3a`；CR-4 / ADR-024 进入 VERIFIED / CLOSED / FREEZE，CR-5 按要求启动。
+- 新增静态版本化 Feature Registry `market-state-base-v1`，只允许显式 `snapshot_id + feature_set_id`；FeatureBuilder 只通过 `DuckDBReadModel.open_read_only(snapshot_id)` 获取 `rm_daily_bar`，不直接读取 Provider、Raw、Canonical 或 Snapshot Parquet。
+- 新增确定性 Python 公式引擎：UNADJUSTED_CANONICAL raw-price features、OBSERVED_SECURITY_BARS 5/20/60 rolling、observed-universe breadth；所有缺失、危险分母、非 finite 结果以 null + typed finding 记录，不做填充、哨兵或缩短窗口。
+- 新增 PIT provenance（`feature_available_at` / ordered `input_lineage_hash`）、UUID5 feature identity、不可变可恢复的 exact artifact set（security / market / findings / manifest）和公共 `verify_feature_run_for_consumption`；verifier 使用同一 `compute_feature_set` 从 verified ReadModel 重放并校验物理/语义 seals。
+- 新增 migration 023 `meta_feature_build` 及 CR-5 integration/unit contract tests；ADR-025 记录窗口、分母、缺失值、复权阻塞和替代方案。CR-5 不包含 State、score、signal、strategy、backtest、portfolio 或 trading。
+- 本次实现提交的 GitHub Actions 三矩阵、Ruff、Mypy、全量 pytest、Spike、SDK-absent 与治理 gates **待 CI 返回**；此处不预先宣称通过。生产 P0-M-1B 仍独立 BLOCKED。
+
+**Next**
+- 以 CI 实际结果修复本阶段实现；随后提交 Reviewer closure，未闭环前不启动 CR-6 State。
+
 ---
 
 ---
