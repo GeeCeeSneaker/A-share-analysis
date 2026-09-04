@@ -173,7 +173,8 @@ CR-6: remains START / ACTIVE
 - [ ] Data Sufficiency Matrix 统一使用 2020+；
 - [x] Backfill plan 明确禁止 pre-2020；
 - [x] DEVLOG / DEVELOPMENT_MANAGEMENT 同步；
-- [ ] 三平台 CI 全绿。
+- [x] 三平台 CI 全绿。
+- Final evidence：GitHub Actions run `33842361483`（run 232）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵均成功，每腿 `1407 passed`；静态、Spike、SDK-absent、DEVLOG/Management gates 均成功。
 
 ---
 

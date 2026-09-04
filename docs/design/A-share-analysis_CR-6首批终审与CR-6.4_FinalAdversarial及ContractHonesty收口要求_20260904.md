@@ -211,5 +211,6 @@ CR-6.4 and AmazingData validation may proceed in parallel.
 
 1. ADR-026 的 Reviewer acceptance、CR-6.4/CR-6 的 VERIFIED/CLOSED/FREEZE 以及 PR #6 的 APPROVED_TO_MERGE；
 2. AmazingData 正式账号 identity/entitlement、CLOSED PRODUCTION B1-B7、Golden、Data Sufficiency Matrix 和 Provider approval；
+补充验证证据：run `33842361483`（run 232）三矩阵每腿 `1407 passed`，并通过 Spike、SDK-absent、DEVLOG/Management gates；该 CI 证据不替代正式账号事实或 Reviewer acceptance。
 3. 以上外部事实或人工决策不能由开发提交伪造。PR #6 继续 OPEN / NOT MERGED，Strategy/Experiment 继续 BLOCKED_BY_CR-6.4，Production 继续 independently BLOCKED。
 
