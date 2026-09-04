@@ -3696,3 +3696,20 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.2 formatter follow-up batch.
 - **Reviewer**：Design / Audit Review pending.
 
+---
+
+## Change Record: DM-CR-20260904-090
+
+- **Type**：C0 — CR-6.2 migration upgrade test correction
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Trigger**：CI run 33829428832（run 200）failed the State ledger schema assertion because the test stopped at migration 023.
+- **Old Contract**：The 023→024 upgrade test asserted the migration-024 table without copying or applying migration 024.
+- **New Contract**：The upgrade test explicitly copies migration 024, applies it as the fourth tail migration, and asserts the 24-entry ledger before checking State schema columns.
+- **Reason**：Make the migration test exercise the documented 023→024 path rather than assert an unapplied table.
+- **Affected Modules**：tests/integration/test_migrations.py.
+- **Tests**：Full CI pending after this correction.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
+- **Commit**：Current CR-6.2 migration test correction batch.
+- **Reviewer**：Design / Audit Review pending.
+

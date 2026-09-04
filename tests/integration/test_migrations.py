@@ -276,8 +276,14 @@ class TestLedgerIntegrity:
                     (upgrade_dir / f.name).write_bytes(f.read_bytes())
             third = apply_migrations(conn, upgrade_dir)
             assert [r.migration_id for r in third] == ["023"]
+            # ship 024 into the same directory set
+            for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
+                if int(f.name[:3]) == 24:
+                    (upgrade_dir / f.name).write_bytes(f.read_bytes())
+            fourth = apply_migrations(conn, upgrade_dir)
+            assert [r.migration_id for r in fourth] == ["024"]
             ledger = applied_migrations(conn)
-            assert len(ledger) == 23
+            assert len(ledger) == 24
             # the CR-4.2 snapshot build ledger exists on the upgraded database
             snapshot_columns = {
                 row[0]
