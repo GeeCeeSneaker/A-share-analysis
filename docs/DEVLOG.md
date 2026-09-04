@@ -1,5 +1,14 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · Formal runner wiring CI verification
+
+**Implementation Status / Review Status**
+
+- **DONE (runner wiring) / VERIFIED (CI) / PENDING_REVIEW**：Production/Trial formal runner 的持久 anchor connection、migration/readiness gate、as-of 日期冻结和异常终态边界已通过 CI 矩阵验证。
+- GitHub Actions run `33869349852`（run 248）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1414 passed`，Ruff lint/format、mypy、Spike gates、SDK-absent、DEVLOG 和 Management gates 均通过。
+- 该结果验证的是仓库代码、focused wiring tests 和 CI 治理门禁；不等同于正式账号 identity/entitlement、真实 Production B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval。
+- 凭证、Token、host/port、raw profile 和本地依赖仍不进入仓库；CR-5/CR-6、migration、2020+ history contract 和 dry-run 语义保持不变。
+
 ## 2026-09-04 · Formal runner formatting correction
 
 **Implementation Status / Review Status**
