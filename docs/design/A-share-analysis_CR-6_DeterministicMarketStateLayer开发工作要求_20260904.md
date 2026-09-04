@@ -3,7 +3,7 @@
 > **Date**：2026-09-04  
 > **Reviewer Decision**：CR-5 已获最终关闭批准；本合同随 clean replacement PR #3 合入 `main` 后正式 START  
 > **Upstream**：CR-4 VERIFIED/CLOSED/FREEZE；CR-5 VERIFIED/CLOSED/FREEZE；ADR-024 / ADR-025 ACCEPTED  
-> **CR-6 Status**：**START AFTER PR #3 MERGE**  
+> **CR-6 Status**：**DONE / REOPENED；CR-6.4 START / ACTIVE（implementation complete, pending human review）**  
 > **Production P0-M-1B**：继续独立 BLOCKED  
 > **New ADR Required**：ADR-026 — Deterministic Market State Interpretation Contract（初始 PROPOSED）
 
@@ -1267,3 +1267,24 @@ The mapping is concrete at the test and parameter/case level. Parameterized rows
 
 
 > **Documentation synchronization evidence**：The documentation synchronization commit `f293e696e3fe8b751a56b51a2d4b4b8b3892c318` was independently verified by GitHub Actions run `33837386772` (run 214): Ubuntu 3.14, Windows 3.12, and Windows 3.14 each completed successfully with 1401 tests passed; Ruff lint/format, mypy, Spike, SDK-absent, and the applicable Windows 3.14 DEVLOG/Management gates passed. This is audit evidence for the synchronized documentation head; it does not change the pending human-review status. The State contract remains pending human review; this evidence does not authorize PR merge or CR-6 CLOSED/FREEZE.
+
+# 23. 2020+ Provider History Contract Synchronization Addendum
+
+> **Date**：2026-09-04  
+> **Owner Decision**：默认历史边界为 `2020-01-01 -> latest complete trading day`；不要求、不拉取、不回填 2020 年以前的常规平台历史。  
+> **Implementation Status**：DONE（代码与单元/集成测试已提交）；**Review Status**：PENDING_REVIEW。  
+> **Production Status**：BLOCKED independently；正式账号画像为空，Production Spike 当前未评定。
+
+本次同步已完成：
+
+1. Core capability 从 `history_start_2018_plus_warmup` 替换为 `history_start_2020`；
+2. history validator 从 `history_coverage_v1` 替换为 `history_coverage_2020_v1`，阈值固定为 `20200101`；
+3. B5 历史覆盖 Probe 起点改为 `20200101`；证券主数据退市覆盖 Probe 的独立历史样本范围保持不变；
+4. 新增 2020+ validator 单元测试和 dry-run 集成 wiring 测试；
+5. Production Spike、Provider Verification、2020+ boundary、DEVLOG/Management 文档已同步当前合同或明确剩余阻塞。
+
+不能在本批次完成的事项及原因：
+
+- 正式账号人工确认、entitlement、单一 CLOSED PRODUCTION B1-B7 run、Golden/Data Sufficiency Matrix 和 Reviewer approval 依赖仓库外部事实；当前 `configs/production_account.yaml` 三个确认字段仍为空，不能伪造通过。
+- ADR-026/CR-6 正式关闭和 PR #6 合并属于 Reviewer/Owner 决策；本批次只保留 `PROPOSED / PENDING_REVIEW`、`START / ACTIVE` 和 OPEN/NOT MERGED 状态。
+
