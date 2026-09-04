@@ -1,3 +1,17 @@
+## 2026-09-05 · P0-M-1B.0 local offline bootstrap preflight
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (LOCAL OFFLINE) / READY_FOR_CONTROLLED_ONLINE_RUN / PENDING_REVIEW**：使用当前 PR #9 最终代码 head `e8acd855` 的隔离执行副本，在 Windows Python 3.14.6 下完成 offline bootstrap。
+- 本地 SDK 事实：`AmazingData==1.1.9`、`tgw==1.0.9.2` 均可导入；SDK 状态为 `SDK_INSTALLED`，运行时实际加载 verdict 为 `RUNTIME_ACTUAL_LOAD_VERIFIED`，离线 bootstrap 状态为 `OFFLINE_RUNTIME_VERIFIED`。
+- 本次运行显式使用 `--offline`，未读取 `.env`，未发起认证或业务数据查询；只验证 SDK/runtime 加载和安全输出链路。
+- `configs/production_account.yaml` 仍为空；本次结果不构成正式账号 identity candidate、人工 identity freeze、Production B1-B7、Data Sufficiency Matrix、verdict 或 Provider approval 证据。
+- 凭证、Token、host、port、原始 profile、原始 SDK 日志、本地依赖包和临时执行副本均未写入 GitHub。
+
+**Next**
+
+- 待受控本地进程安全注入 `TGW_*` 变量后执行 online bootstrap；先审查脱敏 profile，再由 Owner/Reviewer 确认，确认前保持空配置。
+  
 ## 2026-09-05 · P0-M-1B.0 final candidate CI verification
 
 **Implementation Status / Review Status**
