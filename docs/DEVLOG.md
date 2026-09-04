@@ -1,3 +1,10 @@
+## 2026-09-05 · P0-M-1B.0 Ruff format follow-up
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (guard implementation) / CI_PENDING / PENDING_REVIEW**：run 272 只剩 bootstrap 顶层函数和新增 focused test 方法之间各少一个空行；本批按 Ruff canonical 输出补齐。
+- identity/config fixture 的格式、Ruff lint 和功能逻辑未再发现问题；等待三平台完整 CI。
+
 ## 2026-09-05 · P0-M-1B.0 Ruff format correction
 
 **Implementation Status / Review Status**

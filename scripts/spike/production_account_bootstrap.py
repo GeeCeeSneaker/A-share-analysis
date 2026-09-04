@@ -83,6 +83,7 @@ def _credentials_from_env(env: dict[str, str]) -> tuple[str, str, str, int] | No
         port,
     )
 
+
 def _safe_permission_codes(value: Any) -> str:
     """Keep only numeric entitlement codes and their public separators."""
 
