@@ -86,7 +86,9 @@ def _profile_kind(profile_id: str) -> str:
     return "UNAVAILABLE" if not profile_id or profile_id == "UNKNOWN" else "UNKNOWN"
 
 
-def _safe_report(raw: dict[str, Any], *, offline: bool) -> dict[str, Any]:
+def _safe_report(
+    raw: dict[str, Any], *, offline: bool, credentials_available: bool = True
+) -> dict[str, Any]:
     """Project the doctor report onto fields safe for stdout/evidence."""
 
     profile = raw.get("ACCOUNT_PROFILE")
@@ -116,7 +118,9 @@ def _safe_report(raw: dict[str, Any], *, offline: bool) -> dict[str, Any]:
     if runtime_verdict not in _RUNTIME_VERDICTS:
         runtime_verdict = "NOT_VERIFIED"
 
-    if offline:
+    if not offline and not credentials_available:
+        bootstrap_status = "NOT_TESTABLE_ACCOUNT"
+    elif offline:
         bootstrap_status = (
             "OFFLINE_RUNTIME_VERIFIED" if sdk_state == "SDK_INSTALLED" else "NOT_TESTABLE_SDK"
         )
@@ -201,7 +205,9 @@ def main() -> int:
     env = load_env(args.env_file)
     credentials = None if args.offline else _credentials_from_env(env)
     if not args.offline and credentials is None:
-        safe = _safe_report(_not_tested_report(), offline=False)
+        safe = _safe_report(
+            _not_tested_report(), offline=False, credentials_available=False
+        )
         exit_code = 2
     else:
         try:

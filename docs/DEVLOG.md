@@ -1,3 +1,10 @@
+## 2026-09-04 · P0-AD-01 missing-input classification correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (P0-M-1B.0) / CI_PENDING / PENDING_REVIEW**：run 256 暴露缺少凭证时安全报告的状态优先级错误；本提交让输入缺失优先报告 `NOT_TESTABLE_ACCOUNT`，并保持 doctor 不被调用。
+- 不改变脱敏字段、offline 模式、production allowlist 或正式验证边界；凭证、Token、host/port/raw profile 不进入仓库。
+
 ## 2026-09-04 · P0-AD-01 formatter correction
 
 **Implementation Status / Review Status**
