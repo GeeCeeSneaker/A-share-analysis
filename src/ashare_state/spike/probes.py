@@ -764,9 +764,7 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         earliest = min((str(r.get("KLINE_TIME", "99991231")) for r in rows), default="")
         cov = validators.validate_history_coverage(earliest)
     if cov is not None:
-        ctx.outcome_case(
-            "history_start_2020", "FIXTURES", str(sample_date), bar_meta, cov
-        )
+        ctx.outcome_case("history_start_2020", "FIXTURES", str(sample_date), bar_meta, cov)
     # symbol mapping core gate - APPROVED exchange execution boundary
     # (CR-1.2.2 P0-01: the code-list prerequisite goes through
     # ProbeExecutor.call - success AND failure both persist as raw
