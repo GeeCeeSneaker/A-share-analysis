@@ -6,9 +6,9 @@
 > **Frozen Baseline**：V1.3.2  
 > **Reviewed Repository HEAD**：`dda8c000d8585a95a66a91fbaa5072427053abb8`（CR-6 Reviewer closure后的 main 合并基线；分支历史保持 append-only）  
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d` 已随 PR #6 合入 main；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`；State/Provider 语义边界保持冻结。  
-> **Latest full code CI baseline**：GitHub Actions run `33881832744`（run 258）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1425 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均成功。  
-> **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 VERIFIED (CI) / PENDING_REVIEW；P0-M-1B.0 scrubbed bootstrap 当前 P0-AD-01.1 I/O safety IN_PROGRESS / CI_PENDING / PENDING_REVIEW；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128
+> **Latest full code CI baseline**：GitHub Actions run `33889959971`（run 266）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1427 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均成功。  
+> **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 VERIFIED (CI) / PENDING_REVIEW；P0-M-1B.0 scrubbed bootstrap 当前 P0-AD-01.1 I/O safety VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED。  
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129
 > **Last Review**：2026-09-04（CR-6.4 final Reviewer closure 已接受；PR #6 已合入 main；正式账号 native SDK 冒烟通过，但仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）  
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：最新 merge-gate run `33854677630`（run 239）三矩阵全绿，每腿 `1408 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates 均 success。main merge commit 为 `dda8c000d8585a95a66a91fbaa5072427053abb8`。  
@@ -24,49 +24,64 @@
 
 ---
 
+## DM-20260904-129 · P0-AD-01.1 bootstrap I/O safety CI verification
+
+**Type**：C1 — credential-bearing bootstrap I/O safety verification  
+**Date**：2026-09-04  
+**Status**：VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW  
+**Trigger**：run `33889959971`（run `266`）完成三平台全量 CI。
+
+- Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功；每腿 `1427 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用治理门禁均通过。
+- offline 零 `load_env` 读取、runtime-only report、OS fd2/Python stderr containment、native-style fd2、异常路径、脱敏和 fd2 restore 均有 focused evidence；fd1 capture、并发锁和既有回归保持绿色。
+- 本次只关闭 P0-AD-01.1 仓库 I/O 安全边界；production identity freeze、真实 B1-B7、Golden/Data Sufficiency Matrix、verdict 和 Provider approval 仍 pending。`configs/production_account.yaml` 保持空 profile；无 credentials、Token、host/port/raw profile、migration 或 CR-5/CR-6 语义变更。
+
+**Evidence / Next**
+
+- P0-AD-01.1 已具备受控运行前的代码/CI证据；PR #8 仍保持 open，等待显式人工复审。合并后才进入 runtime 注入凭证的 controlled online bootstrap 与人工脱敏 identity 确认。
+
 ## DM-20260904-128 · P0-AD-01.1 Ruff format correction
 
 **Type**：C0 — bootstrap I/O safety formatter correction  
 **Date**：2026-09-04  
 **Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**：run \`33889716446\`（run \`265\`）在 Ruff format check 报告 bootstrap 调用与测试调用的机械换行差异。
+**Trigger**：run `33889716446`（run `265`）在 Ruff format check 报告 bootstrap 调用与测试调用的机械换行差异。
 
-- 按 Ruff 0.16.4 输出合并 1 处 \`_run_doctor_with_stderr_containment\` 调用、1 处 \`write_text\` 调用和 1 处测试声明。
+- 按 Ruff 0.16.4 输出合并 1 处 `_run_doctor_with_stderr_containment` 调用、1 处 `write_text` 调用和 1 处测试声明。
 - 本提交与 DEVLOG/Management 同步；不涉及运行语义、I/O containment、凭证边界、Provider data contract、migration、CR-5 或 CR-6。
 
 **Evidence / Next**
 
-- run \`265\` 尚未进入功能测试；等待修正后的三平台完整 CI。
+- run `265` 尚未进入功能测试；等待修正后的三平台完整 CI。
 
 ## DM-20260904-127 · P0-AD-01.1 Ruff lint correction
 
 **Type**：C0 — bootstrap I/O safety formatter/lint correction  
 **Date**：2026-09-04  
 **Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**：run \`33889354399\`（run \`264\`）在三平台的 Ruff lint 阶段报告 \`stdout_capture.py:10 E501\`。
+**Trigger**：run `33889354399`（run `264`）在三平台的 Ruff lint 阶段报告 `stdout_capture.py:10 E501`。
 
 - 拆分模块说明中的超长 stderr containment 行，保持文档含义和代码行为不变。
 - 本提交与 DEVLOG/Management 同步；不涉及 credentials、Token、host/port、raw profile、fd2/Python stderr containment 语义、Provider data contract、migration、CR-5 或 CR-6。
 
 **Evidence / Next**
 
-- run \`264\` 尚未进入功能测试；等待修正后的三平台完整 CI。
+- run `264` 尚未进入功能测试；等待修正后的三平台完整 CI。
 
 ## DM-20260904-126 · P0-AD-01.1 bootstrap I/O safety closure implementation
 
 **Type**：C1 — credential-bearing bootstrap I/O safety closure  
 **Date**：2026-09-04  
 **Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**：Reviewer requirement \`A-share-analysis_PR8.1复审与P0-AD-01.1_ProductionBootstrapIO安全收口要求_20260904.md\` identifies two fail-closed blockers.
+**Trigger**：Reviewer requirement `A-share-analysis_PR8.1复审与P0-AD-01.1_ProductionBootstrapIO安全收口要求_20260904.md` identifies two fail-closed blockers.
 
-- \`--offline\` now bypasses \`load_env\` entirely, including a supplied \`--env-file\`; its report is runtime/package-only and does not inspect frozen production identity.
-- Online \`run_doctor\` now runs inside OS fd2 plus Python \`sys.stderr\` containment; only scrubbed \`sdk_stderr_observed\` is retained, and exception/error paths do not expose raw stderr or exception detail.
+- `--offline` now bypasses `load_env` entirely, including a supplied `--env-file`; its report is runtime/package-only and does not inspect frozen production identity.
+- Online `run_doctor` now runs inside OS fd2 plus Python `sys.stderr` containment; only scrubbed `sdk_stderr_observed` is retained, and exception/error paths do not expose raw stderr or exception detail.
 - Added adversarial tests for env-file bypass, native-style fd2 writes, Python stderr, exception path, output scrubbing and fd2 restoration.
 - No Provider/Canonical/Feature/State semantic change, migration, allowlist write, or formal Production B1-B7 claim; credentials, Token, host/port and raw profile remain outside the repository.
 
 **Evidence / Next**
 
-- Await the final three-platform CI. If green, update the reviewer requirement and governance status to \`VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW\`; PR #8 remains open pending explicit human review.
+- Await the final three-platform CI. If green, update the reviewer requirement and governance status to `VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW`; PR #8 remains open pending explicit human review.
 
 ## DM-20260904-125 · P0-AD-01 bootstrap CI verification
 

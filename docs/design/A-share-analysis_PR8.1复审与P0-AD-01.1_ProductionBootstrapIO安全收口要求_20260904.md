@@ -270,19 +270,19 @@ no migration change
 [x] semantic VALIDATED_FAIL may coexist with CLOSED and verdict blocks it
 [x] persistent anchor / frozen as-of / terminalization regressions remain green
 
-[ ] --offline performs zero env/.env credential read
-[ ] offline fail-on-load_env test green
-[ ] online bootstrap contains fd2 / stderr during credential-bearing doctor call
-[ ] injected native-style os.write(2, secret) cannot escape
-[ ] Python stderr secret cannot escape
-[ ] exception/error path cannot emit raw credential-bearing detail
-[ ] fd2 capture restore proven
-[ ] stdout Token capture / parallel capture regressions remain green
-[ ] configs/production_account.yaml remains empty
-[ ] no Provider approval / no fabricated Golden/Data Sufficiency truth
-[ ] no CR-5 / CR-6 / migration semantic change
-[ ] full 3-platform CI + governance gates green
-[ ] DEVLOG append-only + DEVELOPMENT_MANAGEMENT sync
+[x] --offline performs zero env/.env credential read
+[x] offline fail-on-load_env test green
+[x] online bootstrap contains fd2 / stderr during credential-bearing doctor call
+[x] injected native-style os.write(2, secret) cannot escape
+[x] Python stderr secret cannot escape
+[x] exception/error path cannot emit raw credential-bearing detail
+[x] fd2 capture restore proven
+[x] stdout Token capture / parallel capture regressions remain green
+[x] configs/production_account.yaml remains empty
+[x] no Provider approval / no fabricated Golden/Data Sufficiency truth
+[x] no CR-5 / CR-6 / migration semantic change
+[x] full 3-platform CI + governance gates green
+[x] DEVLOG append-only + DEVELOPMENT_MANAGEMENT sync
 ```
 
 ---
@@ -311,12 +311,12 @@ P0-AD-01.1 VERIFIED / CLOSED
 
 ## 7.1 Developer implementation status (2026-09-04)
 
-当前开发提交仅收口 P0-AD-01.1 的两个 I/O blocker，最终状态等待三平台 CI：
+P0-AD-01.1 的两个 I/O blocker 已由代码、对抗测试和三平台 CI 收口：
 
-- `--offline` 分支应完全绕过 `load_env` 和 production identity 读取，并把输出限制为 runtime/package facts。
-- online `run_doctor` 调用应在 OS fd2 与 Python `sys.stderr` 两层 containment 内执行；只保留 scrubbed `sdk_stderr_observed`，不保留 stderr 原文。
-- 对抗测试覆盖 env-file 绕过、native-style fd2、Python stderr、异常路径和 fd2 restore；不改变 Provider 数据语义、migration、CR-5 或 CR-6。
-- 在 CI 终态前，P0-AD-01.1 状态保持 `IN_PROGRESS / CI_PENDING / PENDING_REVIEW`，不得据此放行合并或正式 Production B1-B7。
+- GitHub Actions run `33889959971`（run `266`）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功；每腿 `1427 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用治理门禁均通过。
+- `--offline` 完全绕过 `load_env` 与 production identity 读取，输出只含 runtime/package facts；online `run_doctor` 同时受 OS fd2 与 Python `sys.stderr` containment 保护，原始 stderr 不进入 console、report 或异常文本。
+- 对抗测试覆盖 env-file 绕过、native-style fd2、Python stderr、异常路径、输出脱敏和 fd2 restore；fd1 Token capture、并发锁及既有 Provider/CR-5/CR-6 回归保持绿色。
+- 当前状态：`VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW`。这不等同于 production identity 人工冻结、正式 B1-B7、Data Sufficiency Matrix、verdict 或 Provider approval。
 
 # 8. Developer handoff
 
@@ -331,4 +331,4 @@ P0-AD-01.1 VERIFIED / CLOSED
 - PR #8 body；
 - final 3-platform GitHub Actions run id / pass counts。
 
-若 P0-AD-01.1 全部通过，下一次 Reviewer 目标是**直接关闭 PR #8 并批准合并**，不再新开 PR #8.2，除非发现新的真实 P0/P1 correctness/security blocker。
+P0-AD-01.1 已达到 `VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW`；下一次 Reviewer 目标是**直接关闭 PR #8 并批准合并**，不再新开 PR #8.2，除非发现新的真实 P0/P1 correctness/security blocker。

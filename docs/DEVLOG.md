@@ -1,23 +1,31 @@
+## 2026-09-04 · P0-AD-01.1 bootstrap I/O safety CI verification
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW**：GitHub Actions run `33889959971`（run `266`）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1427 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均通过。
+- CI 证据覆盖 offline 零 `load_env` 读取、runtime-only report、OS fd2/Python stderr containment、native-style fd2、异常路径、输出脱敏和 fd2 restore；fd1 capture、并发锁及既有回归保持绿色。
+- 该证据只关闭 P0-AD-01.1 的仓库 I/O 安全边界，不等同于正式 identity 人工冻结、Production B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval；`configs/production_account.yaml` 继续为空。
+
 ## 2026-09-04 · P0-AD-01.1 Ruff format correction
 
 **Implementation Status / Review Status**
 
-- **IN_PROGRESS (P0-AD-01.1) / CI_PENDING / PENDING_REVIEW**：run \`33889716446\`（run \`265\`）的 Ruff lint 已通过，format check 要求合并 bootstrap 调用和两个测试声明/写入调用的机械换行；本提交仅按 Ruff 输出调整格式。
+- **IN_PROGRESS (P0-AD-01.1) / CI_PENDING / PENDING_REVIEW**：run `33889716446`（run `265`）的 Ruff lint 已通过，format check 要求合并 bootstrap 调用和两个测试声明/写入调用的机械换行；本提交仅按 Ruff 输出调整格式。
 - 不改变 fd2/Python stderr containment、offline 零 env 读取、异常路径脱敏、fd1 capture、并发锁或任何 Provider/CR-5/CR-6 语义；等待新的三平台 CI。
 
 ## 2026-09-04 · P0-AD-01.1 Ruff lint correction
 
 **Implementation Status / Review Status**
 
-- **IN_PROGRESS (P0-AD-01.1) / CI_PENDING / PENDING_REVIEW**：run \`33889354399\`（run \`264\`）三平台均在 Ruff lint 阶段报告 \`E501\`；本提交仅拆分 \`stdout_capture.py\` 模块说明中的超长行。
+- **IN_PROGRESS (P0-AD-01.1) / CI_PENDING / PENDING_REVIEW**：run `33889354399`（run `264`）三平台均在 Ruff lint 阶段报告 `E501`；本提交仅拆分 `stdout_capture.py` 模块说明中的超长行。
 - 不改变 fd2/Python stderr containment、offline 零 env 读取、异常路径脱敏、fd1 capture、并发锁或任何 Provider/CR-5/CR-6 语义；等待新的三平台 CI。
 
 ## 2026-09-04 · P0-AD-01.1 bootstrap I/O safety closure implementation
 
 **Implementation Status / Review Status**
 
-- **IN_PROGRESS (P0-AD-01.1) / CI_PENDING / PENDING_REVIEW**：根据 Reviewer 新增要求，\`--offline\` 已完全绕过 \`load_env\`；online doctor 调用加入 OS fd2 与 Python \`sys.stderr\` containment，并清空原始 stderr。
-- 新增对抗测试覆盖秘密 env-file 不读取、native-style \`os.write(2,...)\`、Python stderr、异常路径和 fd2 restore；offline 输出不再包含 account/profile truth。
+- **IN_PROGRESS (P0-AD-01.1) / CI_PENDING / PENDING_REVIEW**：根据 Reviewer 新增要求，`--offline` 已完全绕过 `load_env`；online doctor 调用加入 OS fd2 与 Python `sys.stderr` containment，并清空原始 stderr。
+- 新增对抗测试覆盖秘密 env-file 不读取、native-style `os.write(2,...)`、Python stderr、异常路径和 fd2 restore；offline 输出不再包含 account/profile truth。
 - 不改变 Provider 数据语义、migration、CR-5/CR-6 或 production allowlist；凭证、Token、host/port/raw profile 不进入仓库；等待三平台 CI 终态。
 
 ## 2026-09-04 · P0-AD-01 bootstrap CI verification

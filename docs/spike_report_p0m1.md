@@ -92,9 +92,7 @@ verdict.json 同时输出（R3 §54）：
 
 ## 4.4 P0-AD-01 脱敏身份 bootstrap 工具
 
-`scripts/spike/production_account_bootstrap.py` 已作为正式账号身份检查的受控入口加入仓库。它只从环境/.env 读取凭证，输出 allowlisted scrubbed profile，支持 `--offline` runtime 检查且完全绕过凭证加载，不会写入 `configs/production_account.yaml`；online doctor 调用由 fd2/Python stderr containment 包裹。真实账号 identity 仍需 Owner/Reviewer 人工确认，B1-B7、verdict 和 Data Sufficiency Matrix 继续待执行，P0-AD-01.1 最终状态等待 CI。
-
-- run `33881832744`（run `258`）三平台均通过，每腿 `1425 passed`；bootstrap 代码边界已获得 CI 证据，但正式 production identity、B1-B7、Data Sufficiency Matrix 和 verdict 仍未执行。
+`scripts/spike/production_account_bootstrap.py` 已作为正式账号身份检查的受控入口加入仓库。它只从环境/.env 读取凭证，输出 allowlisted scrubbed profile，支持 `--offline` runtime 检查且完全绕过凭证加载，不会写入 `configs/production_account.yaml`；online doctor 调用由 fd2/Python stderr containment 包裹。真实账号 identity 仍需 Owner/Reviewer 人工确认，B1-B7、verdict 和 Data Sufficiency Matrix 继续待执行，P0-AD-01.1 已由 run `33889959971`（run `266`）三平台验证通过，每腿 `1427 passed`，当前为 `VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW`；正式 identity、B1-B7、Data Sufficiency Matrix 和 verdict 仍待执行。
 
 ## 5. Early Stop（R3 §53）
 
