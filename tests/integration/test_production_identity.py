@@ -115,19 +115,16 @@ class TestProductionIdentityConfiguration:
     @pytest.mark.parametrize(
         "config_text",
         [
-            "production_account_profile_id: \"\"\nconfirmed_at: \"\"\nconfirmed_by: \"\"\n",
-            "production_account_profile_id: \"UNKNOWN_abcdef123456\"\n"
-            "confirmed_at: \"\"\n"
-            "confirmed_by: \"Owner\"\n"
-            "",
-            "production_account_profile_id: \"UNKNOWN_abcdef123456\"\n"
-            "confirmed_at: \"2026-09-05\"\n"
-            "confirmed_by: \"Owner\"\n"
-            "",
-            "production_account_profile_id: \"TRIAL_SIMULATION_abcdef123456\"\n"
-            "confirmed_at: \"2026-09-05T10:00:00+08:00\"\n"
-            "confirmed_by: \"Owner\"\n"
-            "",
+            'production_account_profile_id: ""\nconfirmed_at: ""\nconfirmed_by: ""\n',
+            'production_account_profile_id: "UNKNOWN_abcdef123456"\n'
+            'confirmed_at: ""\n'
+            'confirmed_by: "Owner"\n',
+            'production_account_profile_id: "UNKNOWN_abcdef123456"\n'
+            'confirmed_at: "2026-09-05"\n'
+            'confirmed_by: "Owner"\n',
+            'production_account_profile_id: "TRIAL_SIMULATION_abcdef123456"\n'
+            'confirmed_at: "2026-09-05T10:00:00+08:00"\n'
+            'confirmed_by: "Owner"\n',
         ],
     )
     def test_empty_or_unconfirmed_config_has_no_identity(self, tmp_path, config_text):
@@ -142,22 +139,18 @@ class TestProductionIdentityConfiguration:
             "production_account_profile_id: [unterminated",
             "- not a mapping\n",
             "production_account_profile_id: raw-username\n"
-            "confirmed_at: \"2026-09-05T10:00:00+08:00\"\n"
-            "confirmed_by: \"Owner\"\n"
-            "",
-            "production_account_profile_id: \"UNKNOWN_abcdef123456\"\n"
-            "confirmed_at: \"2026-09-05T10:00:00+08:00\"\n"
-            "confirmed_by: 123\n"
-            "",
-            "production_account_profile_id: \"UNKNOWN_abcdef123456\"\n"
-            "confirmed_at: \"2026-09-05T10:00:00+08:00\"\n"
-            "confirmed_by: \"password\"\n"
-            "",
-            "production_account_profile_id: \"UNKNOWN_abcdef123456\"\n"
-            "confirmed_at: \"2026-09-05T10:00:00+08:00\"\n"
-            "confirmed_by: \"Owner\"\n"
-            "extra_field: \"sentinel\"\n"
-            "",
+            'confirmed_at: "2026-09-05T10:00:00+08:00"\n'
+            'confirmed_by: "Owner"\n',
+            'production_account_profile_id: "UNKNOWN_abcdef123456"\n'
+            'confirmed_at: "2026-09-05T10:00:00+08:00"\n'
+            "confirmed_by: 123\n",
+            'production_account_profile_id: "UNKNOWN_abcdef123456"\n'
+            'confirmed_at: "2026-09-05T10:00:00+08:00"\n'
+            'confirmed_by: "password"\n',
+            'production_account_profile_id: "UNKNOWN_abcdef123456"\n'
+            'confirmed_at: "2026-09-05T10:00:00+08:00"\n'
+            'confirmed_by: "Owner"\n'
+            'extra_field: "sentinel"\n',
         ],
     )
     def test_malformed_or_secret_bearing_config_fails_closed(self, tmp_path, config_text):

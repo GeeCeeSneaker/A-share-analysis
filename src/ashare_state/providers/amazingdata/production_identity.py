@@ -55,9 +55,7 @@ PRODUCTION_ACCOUNT_CONFIG = _REPO_ROOT / "configs" / "production_account.yaml"
 # Keeping this shape strict prevents raw usernames, hosts, tokens, or other
 # provider output from becoming a governance identity by accident.
 _PROFILE_ID_RE = re.compile(r"^[A-Z][A-Z0-9_-]{0,31}_[0-9a-f]{6,64}$")
-_ALLOWED_CONFIG_KEYS = frozenset(
-    {"production_account_profile_id", "confirmed_at", "confirmed_by"}
-)
+_ALLOWED_CONFIG_KEYS = frozenset({"production_account_profile_id", "confirmed_at", "confirmed_by"})
 _FORBIDDEN_CONFIRMATION_MARKER_RE = re.compile(
     r"(?i)\b(?:password|passwd|token|secret|credential|username|host|port)\b"
 )

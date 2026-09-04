@@ -265,8 +265,6 @@ class TestProductionAccountBootstrap:
         assert secret not in captured.err
         assert secret not in persisted
         assert json.loads(persisted)["bootstrap_status"] == "ERROR"
-
-
     def test_online_unexpected_profile_id_is_not_projected(self, monkeypatch, capsys):
         module = _load_script()
         secret_marker = "UNSAFE_PROFILE_VALUE"

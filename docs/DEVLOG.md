@@ -1,3 +1,10 @@
+## 2026-09-05 · P0-M-1B.0 Ruff format correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (guard implementation) / CI_PENDING / PENDING_REVIEW**：run 271 的 Ruff format 仅报告 4 个文件的 canonical 换行/空行差异；本批按 formatter 输出机械修正。
+- 不改变 positive identity allowlist、bootstrap safe projection、任何账号/权限判断或正式 B1-B7 边界；等待修正后的三平台 CI。
+
 ## 2026-09-05 · P0-M-1B.0 Ruff lint correction
 
 **Implementation Status / Review Status**
