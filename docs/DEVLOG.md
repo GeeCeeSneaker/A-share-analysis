@@ -11,6 +11,17 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.3 scope guard lint correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：PR #6 run `33830718832`（run 203）在 Ruff lint 阶段发现 scope guard 测试的 SIM102；未进入 format、mypy 或 pytest。
+- 已将动态 import 检查的嵌套条件合并为单一判断；scope guard 检查范围与 State 运行时语义不变。
+
+**Next**
+
+- 重新执行 CR-6.3 三矩阵 CI；以实际 scope guard、全量 pytest、Spike、SDK-absent 与治理 gate 结果更新状态。
+
 ## 2026-09-04 · CR-6.2 CI verification and CR-6.3 scope guard
 
 **Implementation Status / Review Status**

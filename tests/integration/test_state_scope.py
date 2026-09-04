@@ -158,21 +158,20 @@ def _import_scope_violations(path: Path, tree: ast.Module) -> list[str]:
                             violations.append(
                                 f"{path.name}: non-public Feature symbol {alias.name}"
                             )
-        elif isinstance(node, ast.Call):
-            if (
-                isinstance(node.func, ast.Attribute)
-                and node.func.attr == "import_module"
-                and node.args
-                and isinstance(node.args[0], ast.Constant)
-                and isinstance(node.args[0].value, str)
-                and (
-                    _module_is_forbidden(node.args[0].value)
-                    or node.args[0].value.startswith("ashare_state.features")
-                )
-            ):
-                violations.append(
-                    f"{path.name}: dynamic forbidden import {node.args[0].value}"
-                )
+        elif isinstance(node, ast.Call) and (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "import_module"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+            and (
+                _module_is_forbidden(node.args[0].value)
+                or node.args[0].value.startswith("ashare_state.features")
+            )
+        ):
+            violations.append(
+                f"{path.name}: dynamic forbidden import {node.args[0].value}"
+            )
     return violations
 
 

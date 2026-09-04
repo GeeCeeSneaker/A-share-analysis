@@ -3743,3 +3743,19 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.3 scope-guard batch.
 - **Reviewer**：Design / Audit Review pending.
 
+---
+
+## Change Record: DM-CR-20260904-093
+
+- **Type**：C0 — CR-6.3 scope guard lint correction
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Trigger**：CI run 33830718832（run 203）Ruff SIM102 in the new static scope guard test.
+- **Old Contract**：The dynamic-import branch used a nested condition that violated the repository's Ruff rule.
+- **New Contract**：The scope guard uses one explicit compound condition; its import-boundary assertions are unchanged.
+- **Affected Modules**：tests/integration/test_state_scope.py.
+- **Tests**：Ruff lint and subsequent full CI pending.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
+- **Commit**：Current CR-6.3 scope-guard lint correction batch.
+- **Reviewer**：Design / Audit Review pending.
+
