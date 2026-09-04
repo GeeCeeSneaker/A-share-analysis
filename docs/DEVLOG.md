@@ -1,3 +1,10 @@
+## 2026-09-04 · P0-AD-01.1 Ruff lint correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (P0-AD-01.1) / CI_PENDING / PENDING_REVIEW**：run \`33889354399\`（run \`264\`）三平台均在 Ruff lint 阶段报告 \`E501\`；本提交仅拆分 \`stdout_capture.py\` 模块说明中的超长行。
+- 不改变 fd2/Python stderr containment、offline 零 env 读取、异常路径脱敏、fd1 capture、并发锁或任何 Provider/CR-5/CR-6 语义；等待新的三平台 CI。
+
 ## 2026-09-04 · P0-AD-01.1 bootstrap I/O safety closure implementation
 
 **Implementation Status / Review Status**

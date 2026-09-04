@@ -8,7 +8,7 @@
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d` 已随 PR #6 合入 main；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`；State/Provider 语义边界保持冻结。  
 > **Latest full code CI baseline**：GitHub Actions run `33881832744`（run 258）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1425 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均成功。  
 > **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 VERIFIED (CI) / PENDING_REVIEW；P0-M-1B.0 scrubbed bootstrap 当前 P0-AD-01.1 I/O safety IN_PROGRESS / CI_PENDING / PENDING_REVIEW；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127
 > **Last Review**：2026-09-04（CR-6.4 final Reviewer closure 已接受；PR #6 已合入 main；正式账号 native SDK 冒烟通过，但仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）  
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：最新 merge-gate run `33854677630`（run 239）三矩阵全绿，每腿 `1408 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates 均 success。main merge commit 为 `dda8c000d8585a95a66a91fbaa5072427053abb8`。  
@@ -23,6 +23,20 @@
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
 ---
+
+## DM-20260904-127 · P0-AD-01.1 Ruff lint correction
+
+**Type**：C0 — bootstrap I/O safety formatter/lint correction  
+**Date**：2026-09-04  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：run \`33889354399\`（run \`264\`）在三平台的 Ruff lint 阶段报告 \`stdout_capture.py:10 E501\`。
+
+- 拆分模块说明中的超长 stderr containment 行，保持文档含义和代码行为不变。
+- 本提交与 DEVLOG/Management 同步；不涉及 credentials、Token、host/port、raw profile、fd2/Python stderr containment 语义、Provider data contract、migration、CR-5 或 CR-6。
+
+**Evidence / Next**
+
+- run \`264\` 尚未进入功能测试；等待修正后的三平台完整 CI。
 
 ## DM-20260904-126 · P0-AD-01.1 bootstrap I/O safety closure implementation
 

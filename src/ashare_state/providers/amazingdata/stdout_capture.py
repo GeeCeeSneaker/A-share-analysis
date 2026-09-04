@@ -7,7 +7,8 @@ captured text with mandatory secret scrubbing before anything is stored.
 
 Rules:
 - Token values NEVER leave this module; the parsed profile is scrubbed.
-- stderr (SDK logs, MinLogLevel>=1) is contained by sdk_stderr_into during credential-bearing bootstrap; raw text is never persisted or emitted by that entry point.
+- stderr (SDK logs, MinLogLevel>=1) is contained by sdk_stderr_into during
+  credential-bearing bootstrap; raw text is never persisted or emitted by that entry point.
 - Capture is re-entrant safe (nested uses reuse the outer redirect).
 """
 
