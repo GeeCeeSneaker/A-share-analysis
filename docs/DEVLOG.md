@@ -1,3 +1,15 @@
+## 2026-09-05 · P0-M-1B.0 final candidate CI verification
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW**：当前分支最终代码 head `66ab5ec7` 对应 GitHub Actions run `33899576457`（run `277`）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1449 passed`，Ruff lint/format、mypy、Spike dry-run、SDK-absent 均通过，Windows 3.14 的 DEVLOG/Management 门禁也通过。
+- run 275/276 暴露的 endpoint-like 测试夹具问题已分别修正并保留失败原因；run 277 验证的是最终 test-only host 与数值哨兵夹具，不连接任何真实服务端点。
+- 这只证明仓库 guard、safe projection、focused tests 和现有回归闭环；`configs/production_account.yaml` 仍为空，不代表 live bootstrap、人工 identity freeze、正式 B1-B7、Data Sufficiency Matrix、verdict 或 Provider approval 完成。
+
+**Next**
+
+- 在受控 Windows + 官方 SDK 环境执行 online bootstrap，先审查脱敏候选，再由 Owner/Reviewer 人工确认；确认前保持空配置，确认后才可用独立治理提交冻结 allowlist。
+
 ## 2026-09-05 · P0-M-1B.0 fixture assertion correction
 
 **Implementation Status / Review Status**
