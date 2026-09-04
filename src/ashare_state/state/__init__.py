@@ -1,16 +1,16 @@
 """CR-6 deterministic market State layer public boundary."""
 
 from ashare_state.state.engine import (
-    ComputedStateSet,
     STATE_EVIDENCE_FEATURES,
+    ComputedStateSet,
     StateEngineError,
     compute_state_set,
 )
 from ashare_state.state.models import (
     STATE_CONTRACT_VERSION,
     STATE_NAMESPACE,
-    StateBuildResult,
     StateBuilderError,
+    StateBuildResult,
     StateFinding,
     StateVerifierError,
     VerifiedStateRun,

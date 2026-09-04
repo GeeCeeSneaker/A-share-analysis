@@ -14,7 +14,6 @@ from ashare_state.state import (
     STATE_SET_ID,
     STATE_SET_VERSION,
     StateRegistryError,
-    StateSet,
     StateSpec,
     compile_state_execution_plan,
     compute_state_set,
