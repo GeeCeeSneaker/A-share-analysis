@@ -6,6 +6,18 @@
 > Reviewed developer HEAD: `55ec75e856bef41a61fb5c407b4e6a683e88555e`  
 > Reviewed CI: GitHub Actions run `33862579248` / run 244 — Ubuntu 3.14、Windows 3.12、Windows 3.14 all SUCCESS；Ruff / format / mypy / full pytest / Spike / SDK-absent green；Windows 3.14 DEVLOG / Management gates green。
 
+## 0. Current closure status (2026-09-04)
+
+> **Current implementation HEAD**：`4e1230a1223011dad0638a360ed9347f5ed576bc`  
+> **Current CI**：GitHub Actions run `33871149265`（run 249）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功；每腿 `1414 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 全部通过。  
+> **Current status**：Production Runner Anchored Wiring **VERIFIED (CI) / PENDING_REVIEW**；PR #8 保持 open/unmerged，未经用户明确授权不自动合并。
+
+初审发现的 formal runner wiring 缺口已完成收口：正式路径持有已迁移的持久 DuckDB anchor connection，`ProbeContext` 全路径接收同一连接，formal 不接受 `:memory:`；新 run 日期显式校验，resume 使用持久化 `as_of_date` 并拒绝不匹配；context/catalog/phase/flush/setup 异常进入明确终态边界；focused tests 覆盖 anchor 重开、日期冻结、context failure、anchor failure 和 SDK/network 隔离。
+
+以下勾选只表示仓库内实现、测试和治理文档已完成并通过 CI，不表示已获得正式账号 identity/entitlement、真实 Production B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider capability approval。后述外部证据链仍按本文件要求保持 BLOCKED / PENDING。
+
+---
+
 ## 1. Reviewer verdict
 
 PR #8 的治理同步方向 **PASS / KEEP**：
@@ -22,7 +34,7 @@ PR #8 的治理同步方向 **PASS / KEEP**：
 CR-6 / ADR-026                         VERIFIED / CLOSED / FREEZE（不重开）
 2020+ history contract                 VERIFIED / KEEP（不重开）
 PR #8 governance truth sync            PASS / KEEP
-Production Runner Anchored Wiring      REOPENED / ACTIVE
+Production Runner Anchored Wiring      VERIFIED (CI) / PENDING_REVIEW
 Production P0-M-1B                     BLOCKED
 AmazingData capability approval        BLOCKED
 PR #8                                  DO NOT MERGE YET
@@ -238,29 +250,29 @@ credentials / Token / host / port / raw local profile
 全部成立才允许 PR #8 merge：
 
 ```text
-[ ] formal Production/Trial path uses a migrated persistent DuckDB connection
-[ ] ProbeContext receives conn on every formal path
-[ ] formal evidence leaves durable meta_raw_evidence_anchor rows
-[ ] no formal :memory: anchor ledger
-[ ] production new run has explicit/frozen as-of
-[ ] resume uses original run.as_of_date
-[ ] resume date mismatch fails closed
-[ ] post-new_run constructor/setup exception cannot leave ordinary RUNNING residue
-[ ] focused formal CLI wiring tests green without real SDK/network
-[ ] provider_doctor literal \n fixed
-[ ] doctor verdict docstring matches runtime
-[ ] runbook resume wording matches lifecycle
-[ ] production_account.yaml remains empty until human profile freeze
-[ ] no capability approval / no fabricated Golden or Data Sufficiency PASS
-[ ] full three-platform CI + governance gates green
-[ ] no CR-5/CR-6 semantic change
+[x] formal Production/Trial path uses a migrated persistent DuckDB connection
+[x] ProbeContext receives conn on every formal path
+[x] formal evidence leaves durable meta_raw_evidence_anchor rows
+[x] no formal :memory: anchor ledger
+[x] production new run has explicit/frozen as-of
+[x] resume uses original run.as_of_date
+[x] resume date mismatch fails closed
+[x] post-new_run constructor/setup exception cannot leave ordinary RUNNING residue
+[x] focused formal CLI wiring tests green without real SDK/network
+[x] provider_doctor literal \n fixed
+[x] doctor verdict docstring matches runtime
+[x] runbook resume wording matches lifecycle
+[x] production_account.yaml remains empty until human profile freeze
+[x] no capability approval / no fabricated Golden or Data Sufficiency PASS
+[x] full three-platform CI + governance gates green
+[x] no CR-5/CR-6 semantic change
 ```
 
-Then Reviewer may set:
+The implementation evidence now supports the following pending-review state:
 
 ```text
-Production Runner Anchored Wiring  VERIFIED / CLOSED / FREEZE
-PR #8                              APPROVED_TO_MERGE
+Production Runner Anchored Wiring  VERIFIED (CI) / PENDING_REVIEW
+PR #8                              DO NOT MERGE AUTOMATICALLY; human review required
 ```
 
 After merge, the next external-evidence step is still:
