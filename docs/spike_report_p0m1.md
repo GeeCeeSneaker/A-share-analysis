@@ -94,6 +94,12 @@ verdict.json 同时输出（R3 §54）：
 
 `scripts/spike/production_account_bootstrap.py` 已作为正式账号身份检查的受控入口加入仓库。它只从环境/.env 读取凭证，输出 allowlisted scrubbed profile，支持 `--offline` runtime 检查且完全绕过凭证加载，不会写入 `configs/production_account.yaml`；online doctor 调用由 fd2/Python stderr containment 包裹。真实账号 identity 仍需 Owner/Reviewer 人工确认，B1-B7、verdict 和 Data Sufficiency Matrix 继续待执行，P0-AD-01.1 已由 run `33889959971`（run `266`）三平台验证通过，每腿 `1427 passed`，当前为 `VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW`；正式 identity、B1-B7、Data Sufficiency Matrix 和 verdict 仍待执行。
 
+## 4.5 P0-M-1B.0 identity gate hardening（2026-09-05）
+
+- production_account.yaml 仍为空；本批只加强 scrubbed profile/config 的正向 allowlist 与 bootstrap safe projection，并补齐 Reviewer 要求的 1–9 项 focused tests。
+- 受控 online bootstrap 仍需在官方 SDK 环境中由 operator 执行，再由 Owner/Reviewer 确认候选；本轮没有把凭证、Token、host、port 或 raw profile 放入仓库，也没有把 CI 的 SDK-absent 结果当作 live evidence。
+- 在身份冻结及其三平台 CI 之前，正式 Production B1-B7、verdict、Data Sufficiency Matrix 和 Provider approval 均保持 blocked / not executed。
+
 ## 5. Early Stop（R3 §53）
 
 B2/B3/B4 任一 blocking semantic FAIL → case 保持 VALIDATED_FAIL；若执行本身完成，run 正确进入 CLOSED，正式 verdict 输出 NO_GO。只有 auth/account/framework fatal execution failure 才进入 FAILED；NOT_TESTABLE / 框架不完整 → SPIKE_INCOMPLETE（**不误记为 NO_GO**）。

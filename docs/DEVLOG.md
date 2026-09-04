@@ -1,3 +1,16 @@
+## 2026-09-05 · P0-M-1B.0 positive identity gate hardening
+
+**Implementation Status / Review Status**
+
+- **DONE (guard implementation) / CI_PENDING / PENDING_REVIEW**：根据最新受控身份冻结要求，严格校验 scrubbed account_profile_id、有时区的 confirmed_at、非空且不含敏感字段的 confirmed_by；缺失、试用、畸形或未确认配置统一 fail closed。
+- bootstrap 的 allowlist projection 现在拒绝非 digest 形态的 profile id，并将非数字权限码和非数值额度降为不可用，不会把原始 profile 值投影到 stdout/证据文件。
+- 新增 focused identity tests 覆盖 exact match、unknown mismatch、trial、unparsed、missing PermissionCode、empty/unconfirmed、malformed/secret-bearing config、RunKind.PRODUCTION 不得升级和 profile shape；未改变 migration、历史 2020+ 合同或 CR-5/CR-6 语义。
+- **当前阻塞**：configs/production_account.yaml 仍为空；本轮没有把本地凭证注入仓库或 CI，也没有可通过 GitHub-only 仓库工作流发布的人工确认候选，因此不宣称 live bootstrap、identity freeze、B1-B7、Data Sufficiency Matrix、verdict 或 Provider approval 已完成。
+
+**Next**
+
+- 在受控 Windows + 官方 SDK 环境中运行 online bootstrap，只提交脱敏摘要和人工确认记录；确认前保持空配置，确认后再单独提交 allowlist governance commit。
+
 ## 2026-09-04 · P0-AD-01.1 bootstrap I/O safety CI verification
 
 **Implementation Status / Review Status**

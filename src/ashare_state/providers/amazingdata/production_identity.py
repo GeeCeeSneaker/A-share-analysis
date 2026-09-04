@@ -27,7 +27,9 @@ Governance rules encoded here:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -40,6 +42,7 @@ __all__ = [
     "FrozenProductionIdentity",
     "load_frozen_production_identity",
     "production_account_status",
+    "is_scrubbed_profile_id",
 ]
 
 #: repo root (src/ashare_state/providers/amazingdata/production_identity.py)
@@ -47,6 +50,17 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 
 #: the frozen identity config (scrubbed identity - no credentials)
 PRODUCTION_ACCOUNT_CONFIG = _REPO_ROOT / "configs" / "production_account.yaml"
+
+# A generated AccountProfile id is a kind label plus a hexadecimal digest.
+# Keeping this shape strict prevents raw usernames, hosts, tokens, or other
+# provider output from becoming a governance identity by accident.
+_PROFILE_ID_RE = re.compile(r"^[A-Z][A-Z0-9_-]{0,31}_[0-9a-f]{6,64}$")
+_ALLOWED_CONFIG_KEYS = frozenset(
+    {"production_account_profile_id", "confirmed_at", "confirmed_by"}
+)
+_FORBIDDEN_CONFIRMATION_MARKER_RE = re.compile(
+    r"(?i)\b(?:password|passwd|token|secret|credential|username|host|port)\b"
+)
 
 
 class AccountKind(StrEnum):
@@ -76,14 +90,54 @@ class FrozenProductionIdentity:
     confirmed_by: str = ""
 
 
+def is_scrubbed_profile_id(value: object) -> bool:
+    """Return True only for the public, digest-shaped profile identity."""
+
+    if not isinstance(value, str) or value != value.strip():
+        return False
+    return bool(_PROFILE_ID_RE.fullmatch(value))
+
+
+def _valid_confirmation_timestamp(value: object) -> bool:
+    if not isinstance(value, str) or not value or len(value) > 64:
+        return False
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+
+
+def _valid_confirmed_by(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    candidate = value.strip()
+    if not candidate or len(candidate) > 128:
+        return False
+    if any(ord(char) < 32 or ord(char) == 127 for char in candidate):
+        return False
+    return _FORBIDDEN_CONFIRMATION_MARKER_RE.search(candidate) is None
+
+
+def _valid_frozen_identity(identity: FrozenProductionIdentity) -> bool:
+    profile_id = identity.account_profile_id
+    if not is_scrubbed_profile_id(profile_id):
+        return False
+    if profile_id.startswith(("TRIAL_", "TRIAL_SIMULATION_", "FAKE_")):
+        return False
+    return _valid_confirmation_timestamp(identity.confirmed_at) and _valid_confirmed_by(
+        identity.confirmed_by
+    )
+
+
 def load_frozen_production_identity(
     config_path: Path | None = None,
 ) -> FrozenProductionIdentity | None:
-    """Load the frozen production identity, or None (fail closed).
+    """Load a fully confirmed, scrubbed production identity or return None.
 
-    None is returned when the config is missing, unreadable, or the
-    identity has not been confirmed yet (empty value) - in that state NO
-    production truth may be granted anywhere in the system.
+    Missing, empty, malformed, trial-shaped, or unconfirmed config is
+    deliberately indistinguishable from no identity. This keeps every
+    production gate fail closed.
     """
     path = config_path or PRODUCTION_ACCOUNT_CONFIG
     if not path.is_file():
@@ -92,41 +146,49 @@ def load_frozen_production_identity(
 
     try:
         doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except (OSError, yaml.YAMLError):
+    except (OSError, UnicodeError, yaml.YAMLError):
         return None
-    if not isinstance(doc, dict):
+    if not isinstance(doc, dict) or set(doc) - _ALLOWED_CONFIG_KEYS:
         return None
-    profile_id = str(doc.get("production_account_profile_id", "") or "").strip()
-    if not profile_id:
-        # not yet confirmed - the correct production state today
+
+    profile_id = doc.get("production_account_profile_id")
+    confirmed_at = doc.get("confirmed_at")
+    confirmed_by = doc.get("confirmed_by")
+    if not isinstance(profile_id, str) or not profile_id.strip():
         return None
-    return FrozenProductionIdentity(
-        account_profile_id=profile_id,
-        confirmed_at=str(doc.get("confirmed_at", "") or ""),
-        confirmed_by=str(doc.get("confirmed_by", "") or ""),
+    identity = FrozenProductionIdentity(
+        account_profile_id=profile_id.strip(),
+        confirmed_at=confirmed_at.strip() if isinstance(confirmed_at, str) else "",
+        confirmed_by=confirmed_by.strip() if isinstance(confirmed_by, str) else "",
     )
+    return identity if _valid_frozen_identity(identity) else None
 
 
 def production_account_status(profile: AccountProfile) -> tuple[AccountKind, str]:
-    """Positive classification of a parsed profile against the frozen
-    production identity.
+    """Classify a parsed profile against the confirmed positive allowlist."""
 
-    Returns ``(kind, reason)``; PRODUCTION requires an EXACT match with
-    the frozen identity plus a fully parsed, entitlement-verified
-    profile. Everything else - including "not a known trial" - is
-    UNKNOWN (never an implicit production upgrade).
-    """
     frozen = load_frozen_production_identity()
     if frozen is None:
         return (
             AccountKind.UNKNOWN,
-            "no frozen production identity configured - production truth "
+            "no frozen production identity configured or confirmed - production truth "
             "unprovable (fail closed, audit R4-A3.1 P0-03)",
         )
+    if not _valid_frozen_identity(frozen):
+        return (AccountKind.UNKNOWN, "frozen production identity is invalid or unconfirmed")
+    if not profile.auth_ok:
+        return (AccountKind.UNKNOWN, "authentication not confirmed")
     if not profile.profile_parsed:
         return (AccountKind.UNKNOWN, "logon profile not parsed")
+    if profile.kind is AccountKind.TRIAL:
+        return (
+            AccountKind.UNKNOWN,
+            "trial profile is never production (use --trial for trial evidence)",
+        )
     if not profile.entitlement_verified:
         return (AccountKind.UNKNOWN, "entitlement not verified (PermissionCode missing)")
+    if not is_scrubbed_profile_id(profile.account_profile_id):
+        return (AccountKind.UNKNOWN, "account profile identity is not scrubbed")
     if profile.account_profile_id == frozen.account_profile_id:
         return (
             AccountKind.PRODUCTION,
@@ -135,6 +197,6 @@ def production_account_status(profile: AccountProfile) -> tuple[AccountKind, str
         )
     return (
         AccountKind.UNKNOWN,
-        "not the frozen production identity - a non-trial account is NOT "
-        "automatically production (audit R4-A3.1 P0-03)",
+        "not the frozen production identity - a non-trial account is NOT automatically production "
+        "(audit R4-A3.1 P0-03)",
     )

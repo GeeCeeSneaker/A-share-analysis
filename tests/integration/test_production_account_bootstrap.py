@@ -265,3 +265,44 @@ class TestProductionAccountBootstrap:
         assert secret not in captured.err
         assert secret not in persisted
         assert json.loads(persisted)["bootstrap_status"] == "ERROR"
+
+
+    def test_online_unexpected_profile_id_is_not_projected(self, monkeypatch, capsys):
+        module = _load_script()
+        secret_marker = "UNSAFE_PROFILE_VALUE"
+
+        monkeypatch.setattr(
+            module,
+            "load_env",
+            lambda _path: {
+                "TGW_USERNAME": "user",
+                "TGW_PASSWORD": "runtime-only",
+                "TGW_SERVER_VIP": "127.0.0.1",
+                "TGW_SERVER_PORT": "8600",
+            },
+        )
+        monkeypatch.setattr(
+            module,
+            "run_doctor",
+            lambda **_kwargs: {
+                "sdk_state": "SDK_INSTALLED",
+                "verdict": "RUNTIME_ACTUAL_LOAD_VERIFIED",
+                "AUTHENTICATED": "YES",
+                "QUERY_READY": "YES",
+                "ACCOUNT_PROFILE": {
+                    "account_profile_id": secret_marker,
+                    "permission_codes": "1|2",
+                    "subscribe_limit": secret_marker,
+                },
+            },
+        )
+        monkeypatch.setattr(module, "load_frozen_production_identity", lambda: None)
+        monkeypatch.setattr(sys, "argv", ["production_account_bootstrap.py"])
+
+        assert module.main() == 1
+        stdout = capsys.readouterr().out
+        assert secret_marker not in stdout
+        report = json.loads(stdout)
+        assert report["bootstrap_status"] == "NOT_TESTABLE_PROFILE"
+        assert report["ACCOUNT_PROFILE"]["account_profile_id"] == "UNAVAILABLE"
+        assert report["ACCOUNT_PROFILE"]["subscribe_limit"] is None
