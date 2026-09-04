@@ -197,3 +197,19 @@ Next provider evidence still required:
 - Data Sufficiency Matrix, including index constituent/weight, industry daily/weight/taxonomy, equity/free-float, margin, and financial PIT/revision semantics.
 
 CR-6.4 and AmazingData validation may proceed in parallel.
+
+## 9. Current Implementation Evidence（2026-09-04）
+
+本文件保留为 Reviewer 的收口要求和退出门，不把要求文档改写成自批准结论。当前实现侧已经补齐：
+
+- CR-6.4 的 fatal-vs-persisted finding runtime contract、zero-publication boundary、recovery/rebind adversarial tests；
+- CR-6 mandatory 1–64 concrete mapping；
+- 2020+ provider history contract：`history_start_2020` / `history_coverage_2020_v1`，B5 起点 `20200101`，对应单元/集成 wiring tests；
+- PR #6 body、ADR-026、CR-6 work requirement、Provider/Spike/2020+ documents 和治理记录的同步。
+
+当前仍不能关闭的项目：
+
+1. ADR-026 的 Reviewer acceptance、CR-6.4/CR-6 的 VERIFIED/CLOSED/FREEZE 以及 PR #6 的 APPROVED_TO_MERGE；
+2. AmazingData 正式账号 identity/entitlement、CLOSED PRODUCTION B1-B7、Golden、Data Sufficiency Matrix 和 Provider approval；
+3. 以上外部事实或人工决策不能由开发提交伪造。PR #6 继续 OPEN / NOT MERGED，Strategy/Experiment 继续 BLOCKED_BY_CR-6.4，Production 继续 independently BLOCKED。
+
