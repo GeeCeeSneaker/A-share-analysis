@@ -1,5 +1,94 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · 2020+ 历史边界守卫 CI verified
+
+**Implementation Status / Review Status**
+
+- **DONE (code/test/documentation) / VERIFIED (CI) / PENDING_REVIEW**：当前 head `13235cf596867fbd798f050f1027a7349bd3daa5` 的 GitHub Actions run `33853588983`（run 238）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1408 passed`。
+- Ruff lint/format、mypy、Spike framework、SDK-absent、DEVLOG 与 Management-doc gates 均成功；2020-01-01 历史边界守卫已由真实 CI 验证。
+- 本次 CI 只证明仓库代码/契约门通过，不改变本地 native SDK smoke 与正式 Production B1-B7 的边界：正式 run、Golden/Data Sufficiency Matrix、verdict、Provider approval 和 Reviewer closure 仍待完成。
+
+## 2026-09-04 · Ruff path-expression format correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：Ubuntu Ruff format 对历史边界测试中的多行 `Path` 拼接给出 formatter diff；已改为等价的单行路径表达式。
+- 本次仅收敛格式，2020-01-01 边界断言、正式 gate/B2 probe 代码和本地 SDK 冒烟结论均不变。
+- 等待当前 head 的三矩阵 CI；Production formal run、Golden/Data Sufficiency Matrix、verdict 与 Provider approval 仍未完成。
+
+## 2026-09-04 · Ruff format correction for the 2020 history guard
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：Ubuntu CI 在 Ruff format 阶段指出新增历史边界测试的字符串应收敛为单行；已按 formatter 实际 diff 修正，测试语义不变。
+- formal gate 与 B2 probe 仍固定使用 2020-01-01；本次只修格式，不改变 Provider/State 语义或本地 SDK 冒烟结论。
+- 等待当前 head 的三矩阵 CI；Production formal run、Golden/Data Sufficiency Matrix、verdict 与 Provider approval 仍未完成。
+
+## 2026-09-04 · Corrected the effective 2020 history-boundary guard
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：收紧正式 gate 与 B2 probe 的静态测试守卫；旧边界在断言运行时构造，避免测试源码中的字面量让“旧边界不存在”检查自匹配。运行时调用仍固定为 2020-01-01。
+- 本修正不改变 Provider 数据语义，只提高 2020+ 历史合同的可验证性；上一提交的 SDK 直连冒烟结果、依赖 wheel 本地归档与凭证不入库边界保持不变。
+- 当前提交等待 GitHub Actions 三矩阵验证；正式 repo Production B1-B7、Golden/Data Sufficiency Matrix、verdict 与 Provider approval 仍未完成。
+
+## 2026-09-04 · Formal provider SDK smoke validation completed
+
+**Implementation Status / Review Status**
+
+- **LOCAL_SMOKE_PASS / FORMAL_RUN_PENDING / PENDING_REVIEW**：受控本地 Python 3.14.6 环境已安装官方 `AmazingData==1.1.9` cp314 wheel、`tgw==1.0.9.2` 及运行所需 `tables` 依赖；TGW runtime `V4.3.0.260626-rc2.0-YHZQ`，`uv pip check` 通过。
+- 正式账号登录在本地成功，logon profile 已解析，权限/功能权限字段均存在。SDK stdout/stderr 已在测试边界内捕获；未把用户名、密码、Token、host、port、原始返回或临时账号画像写入 GitHub、日志或结果文件。
+- 核心直连冒烟返回：calendar 8,719；当前沪深代码 5,215；单日历史代码列表（2026-09-03）5,215；北交所映射 248；stock_basic 1；history status 1 个结果；adj_factor 8,719；dividend 54；right_issue 0；equity structure 68；industry base 511；industry constituent、股票日线与指数日线均返回结构化结果；所有测试均正常 logout。
+- 上述是原生 SDK 直连冒烟证据，不是仓库 facade/provider-doctor 或 run-scoped Production B1-B7 证据；未生成正式 run、Golden/Data Sufficiency Matrix、verdict 或 Provider APPROVED。
+- 历史代码列表只做单日窗口，以验证调用链和返回形态；没有把 2020+ 全历史逐日下载作为冒烟步骤。`configs/production_account.yaml` 继续为空，未冻结 production identity。
+- 本地工作区已保存依赖 wheel 于被忽略的 `vendor/amazingdata/`，不上传 GitHub。当前本地 SDK 测试环境未装入仓库源码，因此形式化 runner 尚未执行；下一步是将该依赖环境与仓库源代码结合，运行一次完整、单 Run、可审计的 Production B1-B7，并在人工确认 profile 后再判定 verdict。
+
+## 2026-09-04 · Formal provider validation attempt before official SDK installation
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / BLOCKED_BY_OFFICIAL_SDK / PENDING_REVIEW**：Owner supplied formal-account connection information for the pending Production Spike. The values were used only as runtime input planning; no username, password, Token, host or port literal was written to GitHub or any repository artifact.
+- An independent TCP probe confirmed the two Owner-provided candidate service endpoints are reachable on the configured port. This is network evidence only, not authentication or entitlement evidence.
+- The controlled Python 3.14.6 environment does not contain the official `AmazingData` / `tgw` wheel, so no login request was sent. Account profile, provider doctor online result, B1-B7, formal verdict and Data Sufficiency Matrix remain unassessed.
+- `configs/production_account.yaml` remains empty by design. The next required input is the Galaxy-provided official wheel package and its fingerprint; after controlled installation, rerun doctor, then one CLOSED PRODUCTION B1-B7 run and human review.
+
+
+## 2026-09-04 · 2020+ history contract final CI verification
+
+**Implementation Status / Review Status**
+
+- **DONE (implementation and documentation verification) / PENDING_REVIEW**：After the governance exception synchronization, GitHub Actions run `33842361483` (run 232) passed on Ubuntu 3.14, Windows 3.12, and Windows 3.14; every leg reported `1407 passed`.
+- Ruff lint/format, mypy, Spike framework, SDK-absent, DEVLOG and Management-doc gates all succeeded. This closes the repository-verifiable 2020+ code/document synchronization items.
+- Data Sufficiency Matrix, formal AmazingData account/entitlement, production B1-B7, formal verdict, capability approval and Reviewer closure remain pending or blocked; no external production fact is inferred from CI.
+
+
+## 2026-09-04 · 2020+ history contract and governance exception record
+
+**Implementation Status / Review Status**
+
+- **DONE (2020+ contract implementation and documentation synchronization) / PENDING_REVIEW**：Core capability、validator、B5 history probe、unit/integration wiring tests、Production Spike/Provider/2020+ documents have been synchronized to the Owner-approved `2020-01-01 -> latest complete trading day` contract.
+- Code commits `4f83f7ac`, `5494a63f`, `335375597`, and `22a991079` were created as separate GitHub contents-API updates before this documentation synchronization commit. This does not satisfy the repository's normal same-commit DEVLOG/Management rule.
+- Because the branch history is append-only and no history rewrite was authorized, those exact four source SHAs are recorded as a one-time, disclosed grandfathered exception in the CI workflow and governance test. No future commit may use this exception; future source/contract commits must update DEVLOG and, where required, DEVELOPMENT_MANAGEMENT in the same commit.
+- **Production remains BLOCKED independently**：`configs/production_account.yaml` has no human-confirmed profile; trial B1 is the only available provider evidence; formal B2-B7, production verdict, Golden/Data Sufficiency Matrix and Reviewer approval cannot be fabricated.
+- CR-6 remains DONE / REOPENED; CR-6.4 and the 2020+ provider contract remain pending reviewer closure. No CR-6 CLOSED/FREEZE or provider APPROVED claim is made.
+
+
+## 2026-09-04 · CR-6.4 final CI verification and mandatory mapping sync
+
+**Implementation Status / Review Status**
+
+- **DONE (CR-6.4 implementation + CI) / REOPENED (CR-6) / PENDING_REVIEW**：Implementation head `e47514a8afc864c9f197e18f95ea56fe81424a2d` includes the normal current-main merge `bdb112213dc64325ccc3931a1c0617ae448ef93d` and preserves public-repository governance plus AmazingData 2020+ contracts.
+- GitHub Actions run `33836243605` (run 213) passed on Ubuntu 3.14, Windows 3.12, and Windows 3.14; each leg reported `1401 passed`. Ruff lint/format, mypy, Spike, and SDK-absent checks passed; applicable Windows 3.14 DEVLOG/Management gates passed.
+- ADR-026 now states the Amendment A contract honestly: only `STATE_INPUT_NULL` and `STATE_INPUT_EMPTY_DENOMINATOR` are persisted findings; `STATE_INPUT_INVARIANT_VIOLATION` and `STATE_RULE_UNAVAILABLE` are typed fatal codes that publish neither artifacts nor a SUCCESS ledger row. The verifier rejects an injected fatal finding class.
+- The CR-6 work requirement now contains a concrete test/parameter/case mapping for all mandatory items 1–64, including the reviewer-highlighted recovery, PIT, identity, rebind, and contract-honesty cases.
+- CR-6.4 remains START / ACTIVE pending reviewer closure; PR #6 remains OPEN / NOT MERGED. No CR-6 CLOSED/FREEZE claim is made.
+
+**Next**
+
+- Documentation-inclusive CI for synchronization commit `f293e696e3fe8b751a56b51a2d4b4b8b3892c318` passed as run `33837386772` (run 214) on all three matrix legs; request final human review. Keep migration 024 and the State dimension set frozen.
+
+
+
 > **维护规则**（第三轮审查 §1-§4 固化 + R4-A1.1 复核 §2.3/§2.4 更新）：
 > - 本文件是项目**唯一**滚动开发日志；每次代码推送同步在顶部追加条目（倒序），不覆盖历史。
 > - 专题报告仅限：M0 Exit / Provider Spike / P0a Exit / P0b Exit / Backfill Exit / 重大 Incident / 重大架构决策。
@@ -10,6 +99,181 @@
 >   `data/golden/**` · `migrations/**` · `docs/adr/**` · `src/ashare_state/spike/capabilities.py` ·
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
+
+## 2026-09-04 · CR-6.4 Ruff Builder-order correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (CR-6.4) / REOPENED (CR-6)**：CI run 33836130295（run 212）确认 State public export 排序已通过，但 Builder import block 仍需按 Ruff 的实际 fix diff 调整。
+- 已恢复仓库 formatter 要求的 StateBuilderError / StateBuildResult 顺序；运行时语义与 CR-6.4 测试不变。
+- 当前 head 的最终三矩阵 CI 仍待验证；PR #6 保持 OPEN / NOT MERGED。
+
+**Next**
+
+- 重新执行完整 Ruff、mypy、pytest、Spike、SDK-absent 与治理 gates。
+
+## 2026-09-04 · CR-6.4 Ruff import-order correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (CR-6.4) / REOPENED (CR-6)**：CI run 33836030319（run 211）在 Ubuntu 3.14 与 Windows 3.12 的 Ruff lint 阶段发现 State public export 与 Builder import block 的排序问题；未进入运行时测试。
+- 已按 Ruff 实际诊断修正 import order；State fatal-vs-persisted finding 语义、零发布边界和对抗性测试内容不变。
+- 当前 head 的最终三矩阵 CI 仍待重新验证；PR #6 保持 OPEN / NOT MERGED，ADR-026 保持 PROPOSED / PENDING_REVIEW。
+
+**Next**
+
+- 重新执行 Ruff、mypy、全量 pytest、Spike、SDK-absent 与适用治理 gates；以真实最终 run 回填 CR-6.4 mapping evidence。
+
+## 2026-09-04 · CR-6.4 adversarial closure implementation
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (CR-6.4) / REOPENED (CR-6)**：已将 current main 2dc63e803af908baa3424d576b17d8b07751e05f 正常合入 PR #6 分支，使用双父 merge commit，未改写历史。
+- 新增 typed fatal State error codes：STATE_INPUT_INVARIANT_VIOLATION 与 STATE_RULE_UNAVAILABLE；将可持久化 findings 限定为 STATE_INPUT_NULL / STATE_INPUT_EMPTY_DENOMINATOR，并让 fatal contradiction 在任何 artifact 写入前 fail closed。
+- 新增 StateBuilder 失败传播、identity、manifest-last、ledger retry、partial/conflicting residue、all-seal rebind、future-row 和 timezone focused tests；ADR-026 的 1..64 concrete mapping 将在下一文档同步提交补齐。
+- 本批提交后的最终三矩阵 CI 尚未完成；PR #6 保持 OPEN / NOT MERGED，ADR-026 保持 PROPOSED / PENDING_REVIEW，不宣称 CR-6 CLOSED/FREEZE。
+
+**Next**
+
+- 在当前合并后的 head 上完成三矩阵 CI；随后用真实 run 回填 1..64 mapping、ADR-026、DEVLOG 与 DEVELOPMENT_MANAGEMENT，并交 Reviewer 做 CR-6.4 final closure。
+- 不新增 State 维度，不修改 migration 024，不引入预测、策略、回测或生产交易语义。
+
+## 2026-09-04 · CR-6.3 scope guard CI verification
+
+**Implementation Status / Review Status**
+
+- **DONE (CR-6.3 implementation + CI) / PENDING_REVIEW**：PR #6 head `331d98a245d508348864e43feb2ccc51557b1224` 的 GitHub Actions run `33831161954`（run 206）三矩阵全部 SUCCESS；Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿均为 1372 passed，并通过 Ruff lint/formatter、mypy、Spike 与 SDK-absent；Windows 3.14 的 DEVLOG 与 Management-doc gates 也通过。
+- Group F 的 61–63 static scope guards 已通过真实 CI：State 只能通过允许的 public Feature verifier 边界取上游，禁止跨层事实 import、Feature implementation symbol、研究/预测标识符和 future/predictive/strategy 字段。
+- CR-6.0–6.3 的实现映射与 CI 证据已回填 ADR-026；Reviewer closure 仍未发生，因此不宣称 CR-6 CLOSED/FREEZE，也未合入 main。
+
+**Next**
+
+- 请求 Reviewer 按 1–64 mapping、ADR-026、State replay/artifact/migration 和 scope guard 做 final closure；在 closure 前保持 PR #6 OPEN / NOT MERGED。
+
+## 2026-09-04 · CR-6.3 scope guard false-positive correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：PR #6 run `33830878360`（run 205）Ubuntu pytest 为 1371 passed、1 failed；scope guard 将 verifier 的通用循环变量 `position` 误判为研究标识符。
+- 已移除该通用标识符的误报规则；仍保留 Strategy/Experiment/ForwardLabel/Backtest 等研究标识符和 future/predictive 字段检查。
+
+**Next**
+
+- 重新执行 CR-6.3 三矩阵 CI；以 scope guard、全量 pytest、Spike、SDK-absent 与治理 gate 结果更新状态。
+
+## 2026-09-04 · CR-6.3 scope guard formatter correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：PR #6 run `33830803320`（run 204）Ruff lint 已通过，formatter 发现 scope guard 两处非规范换行；未进入 mypy/pytest。
+- 已按实际 formatter 输出收敛允许的 Feature verifier 集合和动态 import 诊断为单行；scope guard 语义不变。
+
+**Next**
+
+- 重新执行 CR-6.3 三矩阵 CI；以实际 scope guard、全量 pytest、Spike、SDK-absent 与治理 gate 结果更新状态。
+
+## 2026-09-04 · CR-6.3 scope guard lint correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：PR #6 run `33830718832`（run 203）在 Ruff lint 阶段发现 scope guard 测试的 SIM102；未进入 format、mypy 或 pytest。
+- 已将动态 import 检查的嵌套条件合并为单一判断；scope guard 检查范围与 State 运行时语义不变。
+
+**Next**
+
+- 重新执行 CR-6.3 三矩阵 CI；以实际 scope guard、全量 pytest、Spike、SDK-absent 与治理 gate 结果更新状态。
+
+## 2026-09-04 · CR-6.2 CI verification and CR-6.3 scope guard
+
+**Implementation Status / Review Status**
+
+- **DONE (CR-6.2 baseline) / IN_PROGRESS (CR-6.3) / PENDING_REVIEW**：PR #6 clean head `2c70d0ccc1e5b9389fad62fcbba98e019316eff8` 的 GitHub Actions run `33829733713`（run 202）三矩阵全部 SUCCESS；Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿均为 1368 passed，并通过 Ruff lint/formatter、mypy、Spike、SDK-absent；Windows 3.14 的 DEVLOG 与 Management-doc gates 也通过。
+- 本批新增 `tests/integration/test_state_scope.py` 的 AST scope guards，覆盖 Group F 的 61–63：跨层 Provider/Raw/Canonical/Snapshot/ReadModel import、非公开 Feature import、Feature implementation symbol、Strategy/Experiment/ForwardLabel/Backtest 等研究标识符，以及 future/predictive/strategy 等字段。
+- ADR-026 implementation mapping 已从计划描述更新为 CR-6.0/6.1/6.2 已实现证据与 CR-6.3 当前验证范围；未宣称 CR-6 CLOSED/FREEZE，也未合入 main。
+
+**Next**
+
+- 等待本批 CR-6.3 scope guard 的三矩阵 CI；随后补齐最终 1–64 mapping evidence，交 Reviewer 做 final closure。
+
+## 2026-09-04 · CR-6.2 migration test correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33829428832`（run 200）在 migration upgrade test 中发现测试夹具未实际应用 024；Ubuntu 3.14 为 1367 passed、1 failed，Windows 结果尚待完成。
+- 已补齐 023→024 的临时迁移目录推进与第四次 apply 断言；迁移 DDL 和 State 运行时语义未改变。
+
+**Next**
+
+- 重新执行 CR-6.2 三矩阵 CI；以实际 pytest、Spike、SDK-absent 与治理 gate 结果更新状态。
+
+## 2026-09-04 · CR-6.2 formatter follow-up
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33829344918`（run 199）在 Ruff formatter 阶段发现 1 处未规范化换行；未进入 mypy/pytest。
+- 已按 CI 实际 formatter 输出收敛 State verifier 的 semantic seal 异常格式；不改变 State identity、artifact、ledger、replay 或 migration 语义。
+
+**Next**
+
+- 重新执行 CR-6.2 三矩阵 CI；以实际结果更新状态。
+
+## 2026-09-04 · CR-6.2 formatter correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：CI run `33828840805`（run 198）在 Ruff formatter 阶段停止；未进入 mypy/pytest。
+- 已按 Ruff 实际 formatter 输出统一 CR-6.2 builder/verifier/migration test/persistence test 的换行；不改变 State identity、artifact、ledger、replay 或 migration 语义。
+
+**Next**
+
+- 重新执行 CR-6.2 三矩阵 CI；以实际结果更新状态。
+
+## 2026-09-04 · CR-6.2 lint correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：CR-6.2 首轮 CI run 33828734327（run 197）在 Ruff import/unused-import 检查阶段停止；未进入运行时测试。
+- 已按实际 Ruff 诊断修正 State public import 顺序、删除未使用类型/函数 import，并收窄测试 helper 行宽；不改变 State identity、artifact、ledger、replay 或 migration 语义。
+
+**Next**
+
+- 重新执行 CR-6.2 三矩阵 CI；以实际 lint、mypy、pytest、Spike 与治理 gate 结果更新状态。
+
+## 2026-09-04 · CR-6.2 identity, artifact, ledger and replay implementation
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：CR-6.1 clean snapshot PR #6 的 CI run 33827791369（run 192）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部通过 Ruff、format、mypy、full pytest、Spike 和 SDK-absent gates；本批继续实现 CR-6.2。
+- 新增 deterministic StateBuilder / StateVerifier、state-v1 immutable artifact publication、full physical seals、State identity recompute、migration 024 和 focused persistence/replay tests。Builder 只调用 public Feature verifier；Feature verification 失败时不发布 State。
+- 本批尚未宣称 CR-6.2 closure；保持 ADR-026 PROPOSED / PENDING_REVIEW，并继续禁止预测、策略和生产语义。
+
+**Next**
+
+- 复核 migration 024 from-zero / 023→024、完整 State artifact/replay 对抗测试和 scope guard；随后进入 CR-6.3 closure。
+
+## 2026-09-04 · CR-6.1 Registry and deterministic State engine
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：在 CR-6.0 governance bootstrap 后，完成静态 State Registry、严格 execution-plan compiler、共享 deterministic State engine 和四个 V1 描述性维度：return center、daily participation、trend participation、market structure。
+- State engine 只接收一个 VerifiedFeatureRun 的 market rows，不读取 Provider、Raw、Canonical、Snapshot、ReadModel，不重算 Feature；阈值仅使用 sign、0.5 majority 和 exact count dominance。
+- 正常混合结构输出 MIXED；缺失证据保留日期并输出 UNKNOWN 与 typed finding；daily count invariant 违反时 fail closed。新增 CR-6.1 focused tests 覆盖 Registry drift、exact rule semantics、evidence projection、PIT/lineage 和输入顺序确定性。StateBuilder、artifact、ledger、migration 024、public verifier 和 scope guard 尚未实现。
+
+**Next**
+
+- 进入 CR-6.2：显式 feature_run_id 的 StateBuilder、确定性 identity、immutable artifacts、migration 024、recoverable publication、ledger 与 public replay verifier；保持 ADR-026 PROPOSED / PENDING_REVIEW。
+
+## 2026-09-04 · CR-6.0 governance bootstrap
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：PR #3 已合入 main，merge commit 为 075ad80e5254998a0662a0f9c1cadc107a217fdb；随后 activation commit 4ac274747e86d5f386560ceabbffa3273ca9d14b 已确认 CR-6 START / ACTIVE。
+- CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 已 VERIFIED / CLOSED / FREEZE；ADR-025 已由 Reviewer 接受。最终 docs-inclusive CI run 33818320010（run 179）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部 SUCCESS，并通过 Ruff、format、mypy、full pytest、Spike、SDK-absent 和 Windows 3.14 governance gates。
+- 本批为 CR-6.0 governance bootstrap：新增 ADR-026（PROPOSED / PENDING_REVIEW）以及 State registry/models/schema 类型骨架；尚未加入 State 计算、artifact、ledger、migration、verifier、预测或策略语义。
+
+**Next**
+
+- 在 Reviewer 复核 ADR-026 与治理同步后，进入 CR-6.1 Registry + Engine；继续保持 State 只消费 Verified Feature Run，Production P0-M-1B 独立 BLOCKED。
 
 ## 2026-09-04 · CR-5.2 atomic-history CI verification
 
@@ -2004,3 +2268,11 @@
 - 通读冻结基线 V1.3.2（5235 行）并完成评审（11 项缺口提交设计者裁决）
 - 设计者裁决 GO WITH CHANGES 全量吸收，形成 Phase 0 启动计划
 - workspace 确立：Windows + uv + Python 3.14 参考运行时
+
+## 2026-09-04 · Contract-document exception completion record
+
+- The previous 2020+ synchronization disclosed four source commits that could not be amended because the branch history is append-only.
+- Two later ADR-only commits, `eceb99468bd28a37a7532b723f092a9d2f8bd469` (ADR-026) and `4ae9151979287a8a4e86c5f95906b88546c993e3` (ADR index), also predated this management synchronization. They are now explicitly included in the same one-time contract-path grandfathered set, together with capabilities commit `4f83f7ac3a19327e9f724c9730cbfbfef03de38b`.
+- This is a disclosed historical exception, not a relaxation of the rule: future `docs/adr/` or contract-path commits must update `docs/project/DEVELOPMENT_MANAGEMENT.md` in the same commit. No history was rewritten.
+- Production account / formal AmazingData Spike / Data Sufficiency Matrix remain BLOCKED or NOT_TESTABLE and are not marked complete.
+

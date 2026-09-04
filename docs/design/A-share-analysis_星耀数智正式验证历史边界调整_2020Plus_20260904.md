@@ -165,17 +165,26 @@ CR-6: remains START / ACTIVE
 
 正式 Production Spike 启动前必须满足：
 
-- [ ] 旧 `history_start_2018_plus_warmup` core gate 已移除/替换；
-- [ ] 新 2020+ history validator 有单元/集成测试；
-- [ ] 2019 及更早缺失不会导致 GO_CORE 失败；
-- [ ] 2020-01-01 后任一关键连续性缺口仍 fail closed；
-- [ ] 不为 Feature warmup 拉 2019 数据；
+- [x] 旧 `history_start_2018_plus_warmup` core gate 已移除/替换；
+- [x] 新 2020+ history validator 有单元/集成测试；
+- [x] 2019 及更早缺失不会导致 GO_CORE 失败；
+- [x] 2020-01-01 后任一关键连续性缺口仍 fail closed；
+- [x] 不为 Feature warmup 拉 2019 数据；
 - [ ] Data Sufficiency Matrix 统一使用 2020+；
-- [ ] Backfill plan 明确禁止 pre-2020；
-- [ ] DEVLOG / DEVELOPMENT_MANAGEMENT 同步；
-- [ ] 三平台 CI 全绿。
+- [x] Backfill plan 明确禁止 pre-2020；
+- [x] DEVLOG / DEVELOPMENT_MANAGEMENT 同步；
+- [x] 三平台 CI 全绿。
+- Final evidence：GitHub Actions run `33842361483`（run 232）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵均成功，每腿 `1407 passed`；静态、Spike、SDK-absent、DEVLOG/Management gates 均成功。
 
 ---
+
+## 7.1 已完成的代码/测试同步（2026-09-04）
+
+- Core capability 已改为 `history_start_2020`，validator 已改为 `history_coverage_2020_v1`，默认阈值为 `20200101`。
+- Probe 的历史覆盖请求起点已改为 `20200101`；证券主数据退市覆盖探测仍保留其独立的历史样本范围，不与本合同混淆。
+- 单元测试：`tests/unit/test_spike_validators_v2.py::TestHistoryCoverage2020::test_2020_plus_contract`。
+- 集成测试：`tests/integration/test_spike_framework.py::TestHistoryCoverageWiring::test_dry_run_uses_2020_history_contract`。
+- Data Sufficiency Matrix、正式账号、生产 B1-B7 和正式 verdict 仍未完成；原因不是代码缺失，而是仓库中没有可用于生产验证的人工确认账号画像和 entitlement 证据。
 
 ## 8. 当前正式裁决
 

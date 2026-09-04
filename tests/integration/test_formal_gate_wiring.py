@@ -131,6 +131,20 @@ def _case_by_id(ctx: ProbeContext, case_id: str):
 
 @pytest.mark.integration
 class TestFormalGateWiring:
+    def test_history_code_list_probes_follow_2020_history_contract(self):
+        expected_formal = (
+            'get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 20200101, ctx.as_of_date)'
+        )
+        expected_b2 = 'get_hist_code_list_exchange("EXTRA_STOCK_A_SH_SZ", 20200101, as_of)'
+        for relative, expected in (
+            (Path("src/ashare_state/spike/formal_gates.py"), expected_formal),
+            (Path("src/ashare_state/spike/probes.py"), expected_b2),
+        ):
+            source = (REPO_ROOT / relative).read_text(encoding="utf-8")
+            assert expected in source
+            legacy_boundary = "1990" + "0101"
+            assert legacy_boundary not in source
+
     def test_every_registered_capability_has_a_gate_plan(self):
         from ashare_state.providers.amazingdata.capability import CAPABILITY_REGISTRY
 

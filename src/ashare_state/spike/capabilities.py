@@ -70,12 +70,12 @@ CORE_CAPABILITIES: tuple[SpikeCapabilityDefinition, ...] = (
         description="adj factor + corporate action price continuity",
     ),
     SpikeCapabilityDefinition(
-        capability_id="history_start_2018_plus_warmup",
+        capability_id="history_start_2020",
         core=True,
-        required_case_types=("history_start_2018_plus_warmup",),
-        required_case_counts={"history_start_2018_plus_warmup": 1},
-        validator_id="history_coverage_v1",
-        description="history depth covers 2018 + warmup to 2014/2015",
+        required_case_types=("history_start_2020",),
+        required_case_counts={"history_start_2020": 1},
+        validator_id="history_coverage_2020_v1",
+        description="history coverage supports required A-share facts from 2020-01-01 onward",
     ),
     SpikeCapabilityDefinition(
         capability_id="symbol_mapping_unambiguous",

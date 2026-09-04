@@ -1,6 +1,6 @@
 # Provider Verification — AmazingData / TGW（中国银河证券 格物金融服务平台）
 
-> 状态：**Python SDK 已安装验证（2026-08-21），待仿真账号连通性测试**
+> 状态：**历史试用账号 B1 证据保留；正式账号本地 SDK 冒烟通过；正式 repo B1-B7 / verdict / approval 仍待执行与复核**
 > 本文件是 Provider 事实的唯一权威记录处（V1.3.2 §7.14）。主架构文档不维护接口细节。
 
 ## 1. SDK 与环境（已验证）
@@ -29,6 +29,14 @@
 `MARKET_CODE / TRADE_DATE / PRECLOSE / HIGH_LIMITED / LOW_LIMITED / PRICE_HIGH_LMT_RATE / PRICE_LOW_LMT_RATE / IS_ST_SEC / IS_SUSP_SEC / IS_WD_SEC / IS_XR_SEC`——**单接口跨三个 Canonical 事实域**（任务书 §1.3 裁定）：`IS_ST_SEC/IS_SUSP_SEC` → Security Status 域；`HIGH_LIMITED/LOW_LIMITED` → Limit Price 域；`IS_WD_SEC/IS_XR_SEC` → Corporate Action 域。Provider DTO 保留全字段，Canonicalizer 按事实域路由，禁止合并为单一事实所有者。
 
 缓存模式：`local_path` + `is_local`（True=本地优先缺则拉取并缓存；False=强制拉取并更新本地）。
+
+## 1.3 2026-09-04 正式账号本地 SDK 冒烟验证
+
+- **环境事实**：官方 `AmazingData==1.1.9` cp314 wheel、`tgw==1.0.9.2` 与 `tables` 运行依赖在受控 Python 3.14.6 环境导入成功；`uv pip check` 通过。依赖 wheel 只保存在本地被忽略目录 `vendor/amazingdata/`，未提交 GitHub。
+- **认证事实**：正式账号登录成功，logon profile 可解析，权限码/功能权限字段存在；测试边界捕获了 SDK stdout/stderr，未持久化用户名、密码、Token、host、port 或原始 profile。
+- **小窗口数据事实**：calendar 8,719；沪深当前代码 5,215；2026-09-03 单日历史代码列表 5,215；北交所映射 248；stock basic 1 行；历史状态 1 个结果；复权因子 8,719 行；分红 54 行；配股样本 0 行；股权结构 68 行；行业基础 511 行；行业成分 1 个结构化结果；股票/指数日线各 1 个结构化结果键；logout 正常。
+- **边界**：这是原生 SDK 直连 smoke，不等同于 Provider facade、provider-doctor、run-scoped Production B1-B7、Golden/Data Sufficiency Matrix 或 capability approval。历史代码列表仅验证单日窗口，未宣称 2020+ 全历史覆盖。
+- `configs/production_account.yaml` 仍为空，未冻结 production identity；正式结论保持未评定，待仓库源码环境执行单一 Production run 并完成人工 profile/Golden/Rule review。
 
 ## 2. 账号与权限（当前为仿真账号）
 
@@ -59,8 +67,8 @@
 
 ## 3. 待验证事项（正式账号到位后执行完整 Spike）
 
-1. K 线历史深度实测（手册称 2013 年至今；目标 2018 分析 + 2014/2015 Warmup）
-2. 退市证券包含性（`get_hist_code_list` 20130101 起 + `get_stock_basic.IS_LISTED=3`）
+1. K 线历史深度实测（当前合同：2020-01-01 至最新完整交易日；不要求或回填 2020 年以前历史）
+2. 退市证券包含性（当前合同：2020-01-01 起不产生 survivorship omission + `get_stock_basic.IS_LISTED=3`）
 3. 历史证券状态全字段抽样（50 ST 加/脱帽 / 20 退市 / 30 涨跌停制度 / 20 除权除息连续性 Golden）
 4. 复权因子表全历史 + 与交易所公告一致性
 5. 行业 taxonomy 归属（`get_industry_base_info`：申万 or 银河自编 → GALAXY_xxx 纪律）
@@ -71,6 +79,28 @@
 10. free-float 语义评估（`get_equity_structure` 字段 → EXACT/DERIVABLE/ALTERNATIVE/MISSING 四级结论）
 11. 限流/并发实测（正式账号额度）
 12. 指数成分股（`get_index_constituent` A010200001 对应）
+
+## 3.1 当前 2020+ 合同与生产阻塞
+
+- 默认历史边界已由 Owner 决策统一为 `2020-01-01 -> latest complete trading day`。
+- `history_start_2020` / `history_coverage_2020_v1` 是当前 Spike Core Gate 的实现合同；旧的 `history_start_2018_plus_warmup` 只保留在历史文档中，不再作为当前 GO 条件。
+- 当前账号仍是试用仿真账号，正式账号画像尚未人工确认；因此 B2-B7、正式 verdict、Golden/Data Sufficiency Matrix 和 capability approval 均保持未验证。
+- 解除条件：Owner/Reviewer 提供脱敏稳定账号画像和实际 entitlement 后，按生产 Spike 单 Run 流程补齐证据；不得用试用账号结果替代正式生产证据。
+
+## 3.2 2026-09-04 正式账号验证尝试（SDK 安装前历史记录）
+
+| 项 | 当前事实 |
+|---|---|
+| 连接信息 | 已收到；原始凭据只保留在本次运行环境，不入库 |
+| 独立网络探测 | Owner 提供的两个候选服务端点端口均 TCP `REACHABLE`；未在本文件记录 host |
+| 官方 SDK | 当前受控 Python 3.14.6 环境未发现 `AmazingData` / `tgw` |
+| AUTHENTICATED | `NOT_TESTED`（未发送登录请求） |
+| ACCOUNT_PROFILE | `NOT_TESTED`（未产生 profile） |
+| QUERY_READY | `NOT_TESTED` |
+| B1-B7 / verdict | 未执行 / 未评定 |
+| 配置纪律 | `configs/production_account.yaml` 继续为空；不以连接可达性替代 frozen identity |
+
+当前结论：网络路径可达，但缺少银河官方 wheel，无法安全执行 provider doctor、正式登录或单一 Production Spike。安装官方 wheel 后，必须先完成 runtime actual-load doctor，再按单一 B1-B7 run、evidence closure、2020+ 历史合同和人工 Reviewer 流程继续。
 
 ## 4. C++ SDK 存档（2026-08-21 摸底，已被 Python 版取代为集成路径）
 

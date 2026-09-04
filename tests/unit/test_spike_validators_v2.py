@@ -310,3 +310,21 @@ class TestGoldenCases:
         ]
         outcomes = validators.validate_golden_cases(cases, [])
         assert outcomes[0].result is CaseResult.VALIDATED_FAIL
+
+
+class TestHistoryCoverage2020:
+    @pytest.mark.parametrize(
+        ("earliest", "expected"),
+        [
+            ("20200101", CaseResult.VALIDATED_PASS),
+            ("20191231", CaseResult.VALIDATED_PASS),  # pre-2020 data is optional
+            ("20200102", CaseResult.VALIDATED_FAIL),
+            (None, CaseResult.MISSING),
+            ("not-a-date", CaseResult.VALIDATED_FAIL),
+        ],
+    )
+    def test_2020_plus_contract(self, earliest, expected):
+        out = validators.validate_history_coverage(earliest)
+
+        assert out.validator_id == "history_coverage_2020_v1"
+        assert out.result is expected

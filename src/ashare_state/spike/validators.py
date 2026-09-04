@@ -509,10 +509,10 @@ def validate_adj_continuity(
 
 
 def validate_history_coverage(
-    earliest: str | None, required_earliest: str = "20150101"
+    earliest: str | None, required_earliest: str = "20200101"
 ) -> ValidationOutcome:
-    """History depth must cover analysis start 2018 + warmup (>= 2015)."""
-    vid = "history_coverage_v1"
+    """History coverage must support 2020-01-01 onward; earlier data is optional."""
+    vid = "history_coverage_2020_v1"
     if not earliest:
         return _outcome(vid, CaseResult.MISSING, f"earliest <= {required_earliest}", "no data")
     digits = "".join(ch for ch in str(earliest) if ch.isdigit())[:8]
@@ -524,7 +524,7 @@ def validate_history_coverage(
         return _outcome(
             vid,
             CaseResult.VALIDATED_FAIL,
-            f"earliest <= {required_earliest} (2018 analysis + warmup)",
+            f"earliest <= {required_earliest} (2020+ required)",
             f"earliest {digits}",
         )
     return _outcome(

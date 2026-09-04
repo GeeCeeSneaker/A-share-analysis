@@ -3,7 +3,7 @@
 > **Date**：2026-09-04  
 > **Reviewer Decision**：CR-5 已获最终关闭批准；本合同随 clean replacement PR #3 合入 `main` 后正式 START  
 > **Upstream**：CR-4 VERIFIED/CLOSED/FREEZE；CR-5 VERIFIED/CLOSED/FREEZE；ADR-024 / ADR-025 ACCEPTED  
-> **CR-6 Status**：**START AFTER PR #3 MERGE**  
+> **CR-6 Status**：**DONE / REOPENED；CR-6.4 START / ACTIVE（implementation complete, pending human review）**  
 > **Production P0-M-1B**：继续独立 BLOCKED  
 > **New ADR Required**：ADR-026 — Deterministic Market State Interpretation Contract（初始 PROPOSED）
 
@@ -1180,3 +1180,117 @@ State:
 > “这是牛市。”
 
 这种分层是后续策略研究能够长期可信的前提。
+
+
+---
+
+# 22. CR-6.4 Final Adversarial / Contract-Honesty Addendum
+
+> **Reviewer state**：CR-6.0–6.3 PASS / KEEP；CR-6 remains **DONE / REOPENED**；CR-6.4 remains **START / ACTIVE** pending human review. PR #6 must remain open and must not be merged automatically.
+>
+> **Implementation head**：`e47514a8afc864c9f197e18f95ea56fe81424a2d`; current main `2dc63e803af908baa3424d576b17d8b07751e05f` was merged normally into the branch by two-parent merge commit `bdb112213dc64325ccc3931a1c0617ae448ef93d`. No history rewrite was used.
+>
+> **CI evidence**：GitHub Actions run `33836243605` (run 213) passed on Ubuntu 3.14, Windows 3.12, and Windows 3.14. Each leg reported `1401 passed`; Ruff lint/format, mypy, Spike, and SDK-absent checks passed. The applicable Windows 3.14 DEVLOG and Management gates passed.
+
+This addendum is an evidence mapping for the frozen Group A–F matrix above. It does not add State dimensions or predictive/strategy scope. Items 2–7 are the State builder's zero-publication propagation matrix for the named upstream failure classes; the full upstream Feature adversarial suite remains covered by the complete CI regression.
+
+The persisted finding contract is deliberately narrower than the fatal error contract: only `STATE_INPUT_NULL` and `STATE_INPUT_EMPTY_DENOMINATOR` may be written to `state_findings`. `STATE_INPUT_INVARIANT_VIOLATION` and `STATE_RULE_UNAVAILABLE` are typed fatal error codes; they are raised before State artifact publication, cannot be published as findings, and an injected fatal finding class is rejected by the public verifier.
+
+| ID | Frozen requirement | Concrete implementation evidence |
+|---:|---|---|
+| 1 | intact Feature SUCCESS | `tests/integration/test_state_persistence.py::test_builder_publishes_and_public_verifier_replays` |
+| 2 | unknown feature_run_id | `tests/integration/test_state_persistence.py::test_feature_verifier_failure_matrix_publishes_nothing` — parameter `unknown feature_run_id` |
+| 3 | non-SUCCESS Feature | `tests/integration/test_state_persistence.py::test_feature_verifier_failure_matrix_publishes_nothing` — parameter `non-SUCCESS Feature` |
+| 4 | damaged Feature manifest | `tests/integration/test_state_persistence.py::test_feature_verifier_failure_matrix_publishes_nothing` — parameter `damaged Feature manifest` |
+| 5 | damaged Feature artifact | `tests/integration/test_state_persistence.py::test_feature_verifier_failure_matrix_publishes_nothing` — parameter `damaged Feature artifact` |
+| 6 | damaged Feature finding | `tests/integration/test_state_persistence.py::test_feature_verifier_failure_matrix_publishes_nothing` — parameter `damaged Feature finding` |
+| 7 | foreign/tampered upstream ReadModel | `tests/integration/test_state_persistence.py::test_feature_verifier_failure_matrix_publishes_nothing` — parameter `foreign ReadModel` |
+| 8 | explicit feature_run_id API | `tests/integration/test_state.py::test_state_builder_requires_explicit_world_arguments` |
+| 9 | no latest/best/current helper | `tests/integration/test_state.py::test_state_builder_has_no_implicit_world_helpers` |
+| 10 | distinct feature worlds mint distinct State identity/path | `tests/integration/test_state_persistence.py::test_two_feature_runs_have_distinct_state_identity_and_path` |
+| 11 | unknown state_set_id | `tests/integration/test_state.py::test_unknown_state_set_refused` |
+| 12 | rule_id drift | `tests/integration/test_state.py::test_registry_field_drift_refused` — mutation `rule_id=FOREIGN_RULE` |
+| 13 | required feature list drift | `tests/integration/test_state.py::test_registry_field_drift_refused` — mutation `required_feature_inputs=(foreign_feature,)` |
+| 14 | threshold policy drift | `tests/integration/test_state.py::test_registry_field_drift_refused` — mutation `threshold_policy=BACKTEST_OPTIMIZED` |
+| 15 | missingness policy drift | `tests/integration/test_state.py::test_registry_field_drift_refused` — mutation `missingness_policy=SILENT_DROP` |
+| 16 | availability rule drift | `tests/integration/test_state.py::test_registry_field_drift_refused` — mutation `availability_rule=TRADE_DATE` |
+| 17 | output enum drift | `tests/integration/test_state.py::test_registry_field_drift_refused` — mutation `output_enum=(BULL, BEAR)` |
+| 18 | extra state declaration | `tests/integration/test_state.py::test_extra_state_declaration_refused` |
+| 19 | SUPPORTED declaration without handler | `tests/integration/test_state.py::test_supported_declaration_without_handler_refused` |
+| 20 | caller cannot inject threshold/weight | `tests/integration/test_state.py::test_caller_cannot_inject_thresholds_or_weights` |
+| 21 | positive center sign rule | `tests/integration/test_state.py::test_return_center_exact_sign_semantics` — parameter `(0.01, 0.001, POSITIVE_CENTER)` |
+| 22 | negative center sign rule | `tests/integration/test_state.py::test_return_center_exact_sign_semantics` — parameter `(-0.01, -0.001, NEGATIVE_CENTER)` |
+| 23 | opposite signs and zero boundary | `tests/integration/test_state.py::test_return_center_exact_sign_semantics` — parameters `(0.01,-0.001)`, `(0,0.001)`, `(0,0)` -> `MIXED_CENTER` |
+| 24 | null return-center evidence | `tests/integration/test_state.py::test_return_center_null_is_unknown_with_finding` |
+| 25 | advancers dominate | `tests/integration/test_state.py::test_daily_participation_exact_dominance` — parameter `(6,3,ADVANCE_DOMINANT)` |
+| 26 | decliners dominate | `tests/integration/test_state.py::test_daily_participation_exact_dominance` — parameter `(3,6,DECLINE_DOMINANT)` |
+| 27 | equal participation | `tests/integration/test_state.py::test_daily_participation_exact_dominance` — parameter `(4,4,BALANCED)` |
+| 28 | count invariant fatal and zero publication | `tests/integration/test_state.py::test_daily_participation_count_invariant_fails_closed` plus `tests/integration/test_state_persistence.py::test_state_invariant_failure_is_typed_and_publishes_nothing` — exact `STATE_INPUT_INVARIANT_VIOLATION`, zero artifacts and zero ledger rows |
+| 29 | both trend ratios above majority | `tests/integration/test_state.py::test_trend_participation_majority_semantics` — parameter `(0.7,0.8,BROAD_POSITIVE)` |
+| 30 | both trend ratios below majority | `tests/integration/test_state.py::test_trend_participation_majority_semantics` — parameter `(0.3,0.2,BROAD_NEGATIVE)` |
+| 31 | trend equality/split | `tests/integration/test_state.py::test_trend_participation_majority_semantics` — parameters `(0.5,0.5)` and `(0.7,0.3)` -> `MIXED` |
+| 32 | trend null/zero denominator | `tests/integration/test_state.py::test_trend_null_and_empty_denominator_are_unknown` |
+| 33 | all-positive/all-negative composition | `tests/integration/test_state.py::test_market_structure_exact_composition` — parameter cases `{}` -> `BROAD_ADVANCE` and negative inputs -> `BROAD_DECLINE` |
+| 34 | mixed participation/center composition | `tests/integration/test_state.py::test_market_structure_exact_composition` — positive/negative mixed participation and mixed center cases; `test_market_structure_unknown_when_dimension_unknown` |
+| 35 | one State row per Feature market date | `tests/integration/test_state.py::test_every_feature_market_date_produces_one_state_row` |
+| 36 | no date drop for unavailable evidence | `tests/integration/test_state.py::test_return_center_null_is_unknown_with_finding` and `test_daily_participation_zero_valid_is_unknown_with_finding` — row retained as `UNKNOWN` |
+| 37 | exact evidence projection | `tests/integration/test_state.py::test_evidence_projection_is_exact` |
+| 38 | evidence rebind plus outer-seal rebind rejected | `tests/integration/test_state_persistence.py::test_evidence_rebind_is_rejected_by_independent_feature_replay` |
+| 39 | source lineage mutation changes State lineage | `tests/integration/test_state.py::test_source_lineage_and_evidence_lineage_are_separate` — changed `input_lineage_hash` case |
+| 40 | evidence value mutation changes State lineage | `tests/integration/test_state.py::test_source_lineage_and_evidence_lineage_are_separate` — changed `mean_raw_return_observed` case |
+| 41 | PIT available_at | `tests/integration/test_state.py::test_state_available_at_is_feature_available_at` |
+| 42 | future row cannot change prior State row | `tests/integration/test_state.py::test_future_feature_row_does_not_change_prior_state_row` |
+| 43 | input-order determinism | `tests/integration/test_state.py::test_input_order_does_not_change_semantic_hash` |
+| 44 | host-timezone determinism | `tests/integration/test_state_persistence.py::test_wall_clock_timezone_does_not_change_identity_or_bytes` |
+| 45 | same world/code deterministic state_run_id | `tests/integration/test_state.py::test_state_identity_is_deterministic_for_same_world` |
+| 46 | State Registry hash mints new identity | `tests/integration/test_state.py::test_registry_and_builder_identity_fingerprints_mint_new_state_run` — parameter `state_registry_hash` |
+| 47 | Builder fingerprint mints new identity | `tests/integration/test_state.py::test_registry_and_builder_identity_fingerprints_mint_new_state_run` — parameter `state_builder_code_fingerprint` |
+| 48 | exact retry artifact bytes | `tests/integration/test_state_persistence.py::test_artifact_bytes_are_deterministic_on_exact_retry` |
+| 49 | manifest last and failure has no SUCCESS ledger | `tests/integration/test_state_persistence.py::test_manifest_is_last_and_failure_has_no_success_ledger` |
+| 50 | ledger failure exact retry recovery | `tests/integration/test_state_persistence.py::test_ledger_commit_failure_exact_retry_recovers` |
+| 51 | partial identical residue recovery | `tests/integration/test_state_persistence.py::test_partial_identical_residue_recovers` |
+| 52 | conflicting residue refusal | `tests/integration/test_state_persistence.py::test_conflicting_residue_refuses_without_new_identity` |
+| 53 | tampered State artifact refusal | `tests/integration/test_state_persistence.py::test_tampered_state_artifact_is_rejected` |
+| 54 | schema/row-count/semantic physical recompute | `tests/integration/test_state_persistence.py::test_physical_recompute_rejects_state_pair_rebind` — parameters `schema`, `row_count`, `semantic` |
+| 55 | business State rebind plus all seals | `tests/integration/test_state_persistence.py::test_business_state_rebind_is_rejected_by_independent_replay` |
+| 56 | finding rebind plus all seals | `tests/integration/test_state_persistence.py::test_finding_rebind_is_rejected_by_deterministic_replay` |
+| 57 | migration from zero | `tests/integration/test_migrations.py::TestFromZeroInit::test_all_tables_created` |
+| 58 | 023 -> 024 upgrade | `tests/integration/test_migrations.py::TestLedgerIntegrity::test_upgrade_from_prior_chain_applies_only_new_tail` |
+| 59 | migration idempotency | `tests/integration/test_migrations.py::TestFromZeroInit::test_idempotent_rerun` |
+| 60 | migration checksum/tamper gate | `tests/integration/test_migrations.py::TestTamperDetection::test_modified_applied_migration_blocks` |
+| 61 | State import boundary | `tests/integration/test_state_scope.py::test_state_import_boundary_is_explicit` |
+| 62 | no duplicated Feature implementation | `tests/integration/test_state_scope.py::test_state_does_not_duplicate_feature_implementation` |
+| 63 | no research/predictive identifiers and no future columns | `tests/integration/test_state_scope.py::test_state_contains_no_research_or_predictive_identifiers` plus `test_state_columns_are_the_frozen_non_future_contract` |
+| 64 | three-platform full CI and gates | GitHub Actions run `33836243605` (run 213), implementation head `e47514a8afc864c9f197e18f95ea56fe81424a2d`: Ubuntu 3.14, Windows 3.12, Windows 3.14 each `1401 passed`; Ruff lint/format, mypy, Spike, SDK-absent passed; Windows 3.14 DEVLOG/Management gates passed |
+
+The mapping is concrete at the test and parameter/case level. Parameterized rows are not counted as undocumented test functions: every listed case is executed by the repository's pytest matrix. Group F-64 records the post-merge implementation-head verification; docs synchronization must retain the same three-platform gate and remain green before reviewer closure.
+
+
+> **Documentation synchronization evidence**：The documentation synchronization commit `f293e696e3fe8b751a56b51a2d4b4b8b3892c318` was independently verified by GitHub Actions run `33837386772` (run 214): Ubuntu 3.14, Windows 3.12, and Windows 3.14 each completed successfully with 1401 tests passed; Ruff lint/format, mypy, Spike, SDK-absent, and the applicable Windows 3.14 DEVLOG/Management gates passed. This is audit evidence for the synchronized documentation head; it does not change the pending human-review status. The State contract remains pending human review; this evidence does not authorize PR merge or CR-6 CLOSED/FREEZE.
+
+# 23. 2020+ Provider History Contract Synchronization Addendum
+
+> **Date**：2026-09-04  
+> **Owner Decision**：默认历史边界为 `2020-01-01 -> latest complete trading day`；不要求、不拉取、不回填 2020 年以前的常规平台历史。  
+> **Implementation Status**：DONE（代码与单元/集成测试已提交）；**Review Status**：PENDING_REVIEW。  
+> **Production Status**：BLOCKED independently；正式账号画像为空，Production Spike 当前未评定。
+
+本次同步已完成：
+
+1. Core capability 从 `history_start_2018_plus_warmup` 替换为 `history_start_2020`；
+2. history validator 从 `history_coverage_v1` 替换为 `history_coverage_2020_v1`，阈值固定为 `20200101`；
+3. B5 历史覆盖 Probe 起点改为 `20200101`；证券主数据退市覆盖 Probe 的独立历史样本范围保持不变；
+4. 新增 2020+ validator 单元测试和 dry-run 集成 wiring 测试；
+5. Production Spike、Provider Verification、2020+ boundary、DEVLOG/Management 文档已同步当前合同或明确剩余阻塞。
+
+不能在本批次完成的事项及原因：
+
+- 正式账号人工确认、entitlement、单一 CLOSED PRODUCTION B1-B7 run、Golden/Data Sufficiency Matrix 和 Reviewer approval 依赖仓库外部事实；当前 `configs/production_account.yaml` 三个确认字段仍为空，不能伪造通过。
+- ADR-026/CR-6 正式关闭和 PR #6 合并属于 Reviewer/Owner 决策；本批次只保留 `PROPOSED / PENDING_REVIEW`、`START / ACTIVE` 和 OPEN/NOT MERGED 状态。
+
+
+
+# 24. 2020+ Contract Final CI Evidence Addendum
+
+> **Verification**：GitHub Actions run `33842361483`（run 232）已验证当前 2020+ contract synchronization head：Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿 `1407 passed`，Ruff lint/format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 全部成功。  
+> **Interpretation**：这只关闭仓库内可验证的代码、测试和文档同步项；Data Sufficiency Matrix、正式账号/entitlement、Production B1-B7、正式 verdict、Reviewer acceptance 和 PR merge 仍按第 23 节记录为阻塞或待审。
