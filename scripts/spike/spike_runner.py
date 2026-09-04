@@ -154,9 +154,7 @@ def _resolve_resume_as_of_date(run, requested_date) -> int:
     return frozen
 
 
-def _resolve_wanted_phases(
-    *, run_kind: RunKind, resume: bool, phase: str
-) -> list[str]:
+def _resolve_wanted_phases(*, run_kind: RunKind, resume: bool, phase: str) -> list[str]:
     """Resolve phase selection before any formal side effect.
 
     Production recovery deliberately uses replay-all because the current
@@ -173,8 +171,7 @@ def _resolve_wanted_phases(
                 "Production --resume uses replay-all recovery; --phase bN is not accepted"
             )
         raise RunLifecycleError(
-            "R3-P0-02: PRODUCTION runs execute ALL phases in one run; "
-            "use --phase only with --trial"
+            "R3-P0-02: PRODUCTION runs execute ALL phases in one run; use --phase only with --trial"
         )
     return [phase]
 
@@ -295,8 +292,7 @@ def main() -> int:
     ]
     if len(selected_modes) > 1:
         print(
-            "mode conflict: choose exactly one of --dry-run, --production, "
-            "--trial, or --verdict",
+            "mode conflict: choose exactly one of --dry-run, --production, --trial, or --verdict",
             file=sys.stderr,
         )
         return 2
@@ -334,8 +330,7 @@ def main() -> int:
     if args.production or args.trial:
         if args.resume and not args.production:
             print(
-                "argument conflict: --resume is supported only for "
-                "--production replay-all recovery"
+                "argument conflict: --resume is supported only for --production replay-all recovery"
             )
             return 2
         try:

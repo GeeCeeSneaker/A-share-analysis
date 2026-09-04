@@ -1,3 +1,11 @@
+## 2026-09-04 · PR8.1 format correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (PR8.1) / CI_PENDING / PENDING_REVIEW**：run 252 的 Ruff check 已通过，但 format check 仅要求规范化 `spike_runner.py` 与 focused test；本提交按 CI 输出修正。
+- 本次只消除格式阻断，不改变 CLI mode conflict、Production replay-all、fresh catalog rebuild、语义 FAIL 或 verdict 行为；等待新的三平台完整 CI。
+- 不涉及凭证、Token、host/port、raw profile、migration、CR-5/CR-6、2020+ history 或 Provider approval。
+
 # 开发日志（DEVLOG）
 
 ## 2026-09-04 · PR8.1 CLI mode and replay-all recovery implementation

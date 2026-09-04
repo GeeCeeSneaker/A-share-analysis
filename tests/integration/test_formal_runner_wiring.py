@@ -81,6 +81,7 @@ def _catalog_case(run: SpikeRun, case_id: str, case_type: str) -> SpikeCase:
         result=CaseResult.VALIDATED_PASS,
     )
 
+
 @pytest.mark.integration
 class TestCliModeContract:
     @pytest.mark.parametrize(
@@ -115,15 +116,19 @@ class TestCliModeContract:
             pytest.fail("partial production resume must fail before login")
 
         monkeypatch.setattr(cli_module, "_make_real_target", fail_login)
-        monkeypatch.setattr(sys, "argv", [
-            "spike_runner.py",
-            "--production",
-            "--resume",
-            "--run-id",
-            "RUNNING",
-            "--phase",
-            "b5",
-        ])
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "spike_runner.py",
+                "--production",
+                "--resume",
+                "--run-id",
+                "RUNNING",
+                "--phase",
+                "b5",
+            ],
+        )
 
         assert cli_module.main() == 2
         captured = capsys.readouterr()
