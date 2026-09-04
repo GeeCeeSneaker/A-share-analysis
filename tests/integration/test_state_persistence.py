@@ -108,7 +108,9 @@ def _create_ledger(conn: Any) -> None:
     )
 
 
-def _patch_feature_verifier(monkeypatch: pytest.MonkeyPatch, feature_run: VerifiedFeatureRun) -> None:
+def _patch_feature_verifier(
+    monkeypatch: pytest.MonkeyPatch, feature_run: VerifiedFeatureRun
+) -> None:
     monkeypatch.setattr(
         "ashare_state.state.builder.verify_feature_run_for_consumption",
         lambda *args, **kwargs: feature_run,

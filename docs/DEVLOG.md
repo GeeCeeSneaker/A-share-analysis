@@ -11,6 +11,17 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.2 lint correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：CR-6.2 首轮 CI run 33828734327（run 197）在 Ruff import/unused-import 检查阶段停止；未进入运行时测试。
+- 已按实际 Ruff 诊断修正 State public import 顺序、删除未使用类型/函数 import，并收窄测试 helper 行宽；不改变 State identity、artifact、ledger、replay 或 migration 语义。
+
+**Next**
+
+- 重新执行 CR-6.2 三矩阵 CI；以实际 lint、mypy、pytest、Spike 与治理 gate 结果更新状态。
+
 ## 2026-09-04 · CR-6.2 identity, artifact, ledger and replay implementation
 
 **Implementation Status / Review Status**

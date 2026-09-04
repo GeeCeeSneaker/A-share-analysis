@@ -38,7 +38,6 @@ from ashare_state.state.schema import (
     STATE_ARTIFACT_NAMES,
     STATE_ENUM_VALUES,
     STATE_EVIDENCE_FEATURES,
-    frame_for_artifact,
     state_artifact_schema,
 )
 

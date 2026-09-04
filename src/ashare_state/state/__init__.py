@@ -41,10 +41,6 @@ from ashare_state.state.registry import (
     compile_state_execution_plan,
     get_state_set,
 )
-from ashare_state.state.verifier import (
-    StateVerifier,
-    verify_state_run_for_consumption,
-)
 from ashare_state.state.schema import (
     FINDING_CLASSES,
     MARKET_STATE_COLUMNS,
@@ -55,6 +51,10 @@ from ashare_state.state.schema import (
     frame_for_artifact,
     state_artifact_columns,
     state_artifact_schema,
+)
+from ashare_state.state.verifier import (
+    StateVerifier,
+    verify_state_run_for_consumption,
 )
 
 __all__ = [

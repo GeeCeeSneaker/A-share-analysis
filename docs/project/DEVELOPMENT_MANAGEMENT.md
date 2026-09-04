@@ -3643,3 +3643,21 @@ Git 历史负责保存过去版本。
 - **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
 - **Commit**：Current CR-6.2 implementation batch.
 - **Reviewer**：Design / Audit Review pending.
+
+
+---
+
+## Change Record: DM-CR-20260904-087
+
+- **Type**：C0 — CR-6.2 lint correction
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Trigger**：CI run 33828734327（run 197）Ruff diagnostics.
+- **Old Contract**：CR-6.2 implementation batch had unchanged runtime intent but did not satisfy the repository's import and line-length gates.
+- **New Contract**：State package imports are Ruff-clean and CR-6.2 focused tests satisfy the repository line-length rule.
+- **Reason**：Restore the mandatory static gates without modifying State computation or persistence semantics.
+- **Affected Modules**：src/ashare_state/state/{__init__,builder,verifier}.py; tests/integration/test_state_persistence.py.
+- **Tests**：Ruff lint/format and subsequent full CI pending.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
+- **Commit**：Current CR-6.2 lint correction batch.
+- **Reviewer**：Design / Audit Review pending.
