@@ -11,6 +11,17 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.3 scope guard false-positive correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / PENDING_REVIEW**：PR #6 run `33830878360`（run 205）Ubuntu pytest 为 1371 passed、1 failed；scope guard 将 verifier 的通用循环变量 `position` 误判为研究标识符。
+- 已移除该通用标识符的误报规则；仍保留 Strategy/Experiment/ForwardLabel/Backtest 等研究标识符和 future/predictive 字段检查。
+
+**Next**
+
+- 重新执行 CR-6.3 三矩阵 CI；以 scope guard、全量 pytest、Spike、SDK-absent 与治理 gate 结果更新状态。
+
 ## 2026-09-04 · CR-6.3 scope guard formatter correction
 
 **Implementation Status / Review Status**

@@ -3775,3 +3775,19 @@ Git 历史负责保存过去版本。
 - **Commit**：Current CR-6.3 scope-guard formatter correction batch.
 - **Reviewer**：Design / Audit Review pending.
 
+---
+
+## Change Record: DM-CR-20260904-095
+
+- **Type**：C0 — CR-6.3 scope guard false-positive correction
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Trigger**：CI run 33830878360（run 205）scope guard rejected the neutral verifier loop variable position.
+- **Old Contract**：The identifier blacklist treated a generic loop-position variable as a prohibited research term.
+- **New Contract**：The guard removes that false positive while retaining the explicit research/predictive identifier checks required by Group F-63.
+- **Affected Modules**：tests/integration/test_state_scope.py.
+- **Tests**：Full CI pending after this correction.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW.
+- **Commit**：Current CR-6.3 scope-guard false-positive correction batch.
+- **Reviewer**：Design / Audit Review pending.
+

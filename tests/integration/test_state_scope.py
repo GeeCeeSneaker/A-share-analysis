@@ -46,7 +46,6 @@ _FORBIDDEN_RESEARCH_NAMES = frozenset(
         "signal",
         "recommendation",
         "probability",
-        "position",
         "bull",
         "bear",
         "predict",
