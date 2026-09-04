@@ -1,3 +1,14 @@
+## 2026-09-05 · P0-M-1B.0.1 formatter follow-up
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：run `33928995279` 已通过 Ruff lint，但 format check 发现 bootstrap 条件表达式和两个新增测试定义未按 formatter 的规范折叠。
+- 已按 formatter 输出修正三处格式；不改变 identity contract、Trial non-freezable gate、safe projection、测试语义或空配置策略。
+- Windows 3.14 同一 run 的 uv 安装失败属于该腿基础设施阶段失败；修正提交等待重新验证，不将该 run 计作回归通过。
+
+**Next**
+
+- 等待修正提交的三平台完整 CI；online bootstrap 继续按 P0-M-1B.0.1 要求暂停。
 ## 2026-09-05 · P0-M-1B.0.1 formatter correction
 
 **Implementation Status / Review Status**

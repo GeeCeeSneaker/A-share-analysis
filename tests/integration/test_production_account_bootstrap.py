@@ -309,9 +309,7 @@ class TestProductionAccountBootstrap:
         assert report["ACCOUNT_PROFILE"]["subscribe_limit"] is None
 
 
-    def test_online_trial_profile_never_becomes_identity_candidate(
-        self, monkeypatch, capsys
-    ):
+    def test_online_trial_profile_never_becomes_identity_candidate(self, monkeypatch, capsys):
         module = _load_script()
         trial_id = "TRIAL_SIMULATION_abc123def456"
 
@@ -444,9 +442,7 @@ class TestProductionAccountBootstrap:
         assert report["bootstrap_status"] == "IDENTITY_CANDIDATE"
         assert report["ACCOUNT_PROFILE"]["profile_kind"] == "UNKNOWN"
 
-    def test_online_exact_frozen_identity_keeps_review_status(
-        self, monkeypatch, capsys
-    ):
+    def test_online_exact_frozen_identity_keeps_review_status(self, monkeypatch, capsys):
         module = _load_script()
         profile_id = "UNKNOWN_abc123def456"
 

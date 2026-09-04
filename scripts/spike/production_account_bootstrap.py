@@ -149,9 +149,7 @@ def _safe_report(
     profile = profile if isinstance(profile, dict) else {}
     profile_id_candidate = str(profile.get("account_profile_id") or "").strip()
     profile_id = (
-        profile_id_candidate
-        if is_generated_scrubbed_profile_id(profile_id_candidate)
-        else ""
+        profile_id_candidate if is_generated_scrubbed_profile_id(profile_id_candidate) else ""
     )
     permission_codes = _safe_permission_codes(profile.get("permission_codes"))
     profile_parsed = bool(profile_id)
