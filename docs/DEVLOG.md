@@ -11,6 +11,20 @@
 >   `src/ashare_state/spike/golden_store.py` · `src/ashare_state/pipeline/publish.py` · `src/ashare_state/identity/security_id.py`。
 > - **时间标准**：条目时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；不记录无时区的未来时间。
 
+## 2026-09-04 · CR-6.4 adversarial closure implementation
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (CR-6.4) / REOPENED (CR-6)**：已将 current main 2dc63e803af908baa3424d576b17d8b07751e05f 正常合入 PR #6 分支，使用双父 merge commit，未改写历史。
+- 新增 typed fatal State error codes：STATE_INPUT_INVARIANT_VIOLATION 与 STATE_RULE_UNAVAILABLE；将可持久化 findings 限定为 STATE_INPUT_NULL / STATE_INPUT_EMPTY_DENOMINATOR，并让 fatal contradiction 在任何 artifact 写入前 fail closed。
+- 新增 StateBuilder 失败传播、identity、manifest-last、ledger retry、partial/conflicting residue、all-seal rebind、future-row 和 timezone focused tests；ADR-026 的 1..64 concrete mapping 将在下一文档同步提交补齐。
+- 本批提交后的最终三矩阵 CI 尚未完成；PR #6 保持 OPEN / NOT MERGED，ADR-026 保持 PROPOSED / PENDING_REVIEW，不宣称 CR-6 CLOSED/FREEZE。
+
+**Next**
+
+- 在当前合并后的 head 上完成三矩阵 CI；随后用真实 run 回填 1..64 mapping、ADR-026、DEVLOG 与 DEVELOPMENT_MANAGEMENT，并交 Reviewer 做 CR-6.4 final closure。
+- 不新增 State 维度，不修改 migration 024，不引入预测、策略、回测或生产交易语义。
+
 ## 2026-09-04 · CR-6.3 scope guard CI verification
 
 **Implementation Status / Review Status**

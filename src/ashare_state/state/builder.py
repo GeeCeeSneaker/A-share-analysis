@@ -16,7 +16,9 @@ from ashare_state.features.verifier import verify_feature_run_for_consumption
 from ashare_state.state.engine import ComputedStateSet, compute_state_set
 from ashare_state.state.models import (
     STATE_CONTRACT_VERSION,
+    STATE_RULE_UNAVAILABLE,
     StateBuilderError,
+    StateFatalError,
     StateBuildResult,
     state_base_hash_from_primitives,
     state_id_from_base_hash,
@@ -186,7 +188,10 @@ class StateBuilder:
             state_set = get_state_set(state_set_id)
             compile_state_execution_plan(state_set)
         except StateRegistryError as exc:
-            raise StateBuilderError(f"State Registry cannot be honestly executed: {exc}") from exc
+            raise StateFatalError(
+                f"State Registry cannot be honestly executed: {exc}",
+                error_code=STATE_RULE_UNAVAILABLE,
+            ) from exc
 
         try:
             feature_run = verify_feature_run_for_consumption(

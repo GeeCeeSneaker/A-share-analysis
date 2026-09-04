@@ -10,14 +10,20 @@ import pytest
 
 from ashare_state.features.models import VerifiedFeatureRun
 from ashare_state.state import (
+    STATE_INPUT_INVARIANT_VIOLATION,
     STATE_REGISTRY_VERSION,
+    STATE_RULE_UNAVAILABLE,
     STATE_SET_ID,
     STATE_SET_VERSION,
+    StateBuilder,
+    StateEngineError,
     StateRegistryError,
     StateSpec,
     compile_state_execution_plan,
     compute_state_set,
     get_state_set,
+    state_base_hash_from_primitives,
+    state_id_from_base_hash,
 )
 
 pytestmark = pytest.mark.unit
@@ -70,6 +76,28 @@ def _compute(*rows: dict[str, object]):
         state_run_id="state-run-1",
         state_set=get_state_set(STATE_SET_ID),
     )
+
+
+def _state_identity_primitives(**changes: str) -> dict[str, str]:
+    values = {
+        "feature_run_id": "feature-run-1",
+        "feature_manifest_hash": "a" * 64,
+        "feature_semantic_hash": "b" * 64,
+        "feature_set_id": "market-state-base-v1",
+        "feature_registry_hash": "c" * 64,
+        "state_set_id": STATE_SET_ID,
+        "state_set_version": STATE_SET_VERSION,
+        "state_registry_version": STATE_REGISTRY_VERSION,
+        "state_registry_hash": "d" * 64,
+        "state_contract_version": "state-v1",
+        "state_builder_code_fingerprint": "e" * 64,
+    }
+    values.update(changes)
+    return values
+
+
+def _state_id(values: dict[str, str]) -> str:
+    return state_id_from_base_hash(state_base_hash_from_primitives(**values))
 
 
 def test_registry_declares_exact_v1_order_and_fields():
@@ -221,8 +249,9 @@ def test_daily_participation_exact_dominance(advancers: int, decliners: int, exp
 
 
 def test_daily_participation_count_invariant_fails_closed():
-    with pytest.raises(Exception, match="invariant"):
+    with pytest.raises(StateEngineError) as exc_info:
         _compute(_market_row(unchanged_count=2))
+    assert exc_info.value.error_code == STATE_INPUT_INVARIANT_VIOLATION
 
 
 def test_daily_participation_zero_valid_is_unknown_with_finding():
@@ -396,3 +425,53 @@ def test_state_run_identity_primitives_are_explicit():
 def test_constants_are_immutable_contract_values():
     assert STATE_SET_VERSION == "1"
     assert STATE_REGISTRY_VERSION == "state-registry-v1"
+
+
+def test_registry_unavailable_is_typed_fatal():
+    state_set = get_state_set(STATE_SET_ID)
+    changed_states = list(state_set.states)
+    changed_states[0] = replace(changed_states[0], rule_id="UNAVAILABLE_RULE")
+    with pytest.raises(StateEngineError) as exc_info:
+        compute_state_set(
+            _feature_run(_market_row()),
+            state_run_id="state-run-1",
+            state_set=replace(state_set, states=tuple(changed_states)),
+        )
+    assert exc_info.value.error_code == STATE_RULE_UNAVAILABLE
+
+
+def test_state_builder_requires_explicit_world_arguments():
+    assert tuple(inspect.signature(StateBuilder.build).parameters) == (
+        "self",
+        "feature_run_id",
+        "state_set_id",
+    )
+
+
+def test_state_builder_has_no_implicit_world_helpers():
+    forbidden = {"build_latest", "build_best", "build_current"}
+    assert forbidden.isdisjoint(vars(StateBuilder))
+
+
+def test_state_identity_is_deterministic_for_same_world():
+    values = _state_identity_primitives()
+    assert _state_id(values) == _state_id(dict(values))
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("state_registry_hash", "state_builder_code_fingerprint"),
+)
+def test_registry_and_builder_identity_fingerprints_mint_new_state_run(field: str):
+    values = _state_identity_primitives()
+    changed = dict(values)
+    changed[field] = "f" * 64
+    assert _state_id(values) != _state_id(changed)
+
+
+def test_future_feature_row_does_not_change_prior_state_row():
+    earlier = _market_row(date(2026, 3, 12))
+    later = _market_row(date(2026, 3, 13), input_lineage_hash="b" * 64)
+    single = _compute(earlier)
+    combined = _compute(earlier, later)
+    assert combined.state_rows[0] == single.state_rows[0]

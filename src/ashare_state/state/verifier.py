@@ -34,7 +34,7 @@ from ashare_state.state.registry import (
     get_state_set,
 )
 from ashare_state.state.schema import (
-    FINDING_CLASSES,
+    PERSISTED_FINDING_CLASSES,
     STATE_ARTIFACT_NAMES,
     STATE_ENUM_VALUES,
     STATE_EVIDENCE_FEATURES,
@@ -172,7 +172,7 @@ def _validate_finding_rows(
             raise StateVerifierError("State finding trade_date is not a date")
         if not isinstance(state_name, str) or state_name not in state_set.state_names:
             raise StateVerifierError("State finding has an unknown state_name")
-        if not isinstance(finding_class, str) or finding_class not in FINDING_CLASSES:
+        if not isinstance(finding_class, str) or finding_class not in PERSISTED_FINDING_CLASSES:
             raise StateVerifierError("State finding has an unknown finding_class")
         if not isinstance(detail_json, str):
             raise StateVerifierError("State finding detail_json is not text")
@@ -386,6 +386,8 @@ class StateVerifier:
             if isinstance(entry.get("row_count"), bool) or frame.height != sealed_row_count:
                 raise StateVerifierError(f"State artifact {name} row count differs from its seal")
             rows = frame.to_dicts()
+            if name == "state_findings":
+                _validate_finding_rows(rows, state_set=state_set)
             semantic = semantic_hash(rows)
             if semantic != str(entry.get("semantic_hash")):
                 raise StateVerifierError(f"State artifact {name} semantic seal is rebound")
@@ -404,10 +406,6 @@ class StateVerifier:
             state_run_id=state_run_id,
             state_set=state_set,
             feature_run=feature_run,
-        )
-        _validate_finding_rows(
-            actual_rows["state_findings"],
-            state_set=state_set,
         )
         if _artifact_set_hash(physical_seals) != str(manifest["artifact_set_hash"]):
             raise StateVerifierError("State artifact_set_hash does not match physical artifacts")

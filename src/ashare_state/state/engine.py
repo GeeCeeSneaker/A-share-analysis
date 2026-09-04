@@ -14,7 +14,13 @@ from datetime import date, datetime
 from typing import Any
 
 from ashare_state.features.models import VerifiedFeatureRun, canonical_json, semantic_hash
-from ashare_state.state.models import StateBuilderError, StateFinding, state_input_lineage_hash
+from ashare_state.state.models import (
+    STATE_INPUT_INVARIANT_VIOLATION,
+    STATE_RULE_UNAVAILABLE,
+    StateFatalError,
+    StateFinding,
+    state_input_lineage_hash,
+)
 from ashare_state.state.registry import StateExecutionPlan, StateSet, compile_state_execution_plan
 from ashare_state.state.schema import STATE_EVIDENCE_FEATURES
 
@@ -26,8 +32,16 @@ __all__ = [
 ]
 
 
-class StateEngineError(StateBuilderError):
+class StateEngineError(StateFatalError):
     """The verified Feature projection violates the State input contract."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = STATE_INPUT_INVARIANT_VIOLATION,
+    ) -> None:
+        super().__init__(message, error_code=error_code)
 
 
 @dataclass(frozen=True)
@@ -312,7 +326,10 @@ def compute_state_set(
     try:
         plan = compile_state_execution_plan(state_set)
     except Exception as exc:
-        raise StateEngineError(f"State Registry cannot be honestly executed: {exc}") from exc
+        raise StateEngineError(
+            f"State Registry cannot be honestly executed: {exc}",
+            error_code=STATE_RULE_UNAVAILABLE,
+        ) from exc
 
     ordered_rows = sorted(
         (dict(row) for row in feature_run.market_rows),

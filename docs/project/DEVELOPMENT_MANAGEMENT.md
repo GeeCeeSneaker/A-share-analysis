@@ -3806,3 +3806,21 @@ Git 历史负责保存过去版本。
 - **Commit**：331d98a245d508348864e43feb2ccc51557b1224.
 - **Reviewer**：Final Design / Audit Review pending; PR #6 remains open and not merged.
 
+
+
+---
+
+## Change Record: DM-CR-20260904-097
+
+- **Type**：C2 — CR-6.4 final adversarial / contract-honesty implementation
+- **Date**：2026-09-04
+- **Status**：IN_PROGRESS / REOPENED
+- **Trigger**：Reviewer reopened CR-6 after identifying that fatal finding semantics, recovery/rebind evidence, 1..64 mapping, and current-main synchronization were not mechanically closed.
+- **New Contract**：State fatal contradictions use typed error codes and publish no SUCCESS artifact/ledger; only null and empty-denominator findings are persisted. Focused State tests cover the mandatory recovery matrix and the public Feature failure propagation boundary.
+- **Affected Modules**：src/ashare_state/state/models.py; schema.py; engine.py; builder.py; verifier.py; tests/integration/test_state.py; tests/integration/test_state_persistence.py.
+- **Compatibility**：No new State dimensions; migration 024 remains unchanged; CR-5 Feature semantics, public-repository governance, and AmazingData 2020+ validation contracts are preserved.
+- **Tests**：Final post-merge three-leg CI pending at implementation commit.
+- **ADR**：ADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE.
+- **Commit**：Current CR-6.4 closure implementation batch.
+- **Reviewer**：Final Design / Audit Review pending; PR #6 remains open and not merged.
+

@@ -13,9 +13,13 @@ from ashare_state.features.models import canonical_json, semantic_hash
 
 __all__ = [
     "STATE_CONTRACT_VERSION",
+    "STATE_FATAL_CODES",
+    "STATE_INPUT_INVARIANT_VIOLATION",
+    "STATE_RULE_UNAVAILABLE",
     "STATE_NAMESPACE",
     "StateBuildResult",
     "StateBuilderError",
+    "StateFatalError",
     "StateFinding",
     "StateVerifierError",
     "VerifiedStateRun",
@@ -30,9 +34,28 @@ __all__ = [
 STATE_CONTRACT_VERSION = "state-v1"
 STATE_NAMESPACE = uuid.UUID("7e1bd3a4-6d5f-4f81-9be3-1c42f5a7d9e8")
 
+STATE_INPUT_INVARIANT_VIOLATION = "STATE_INPUT_INVARIANT_VIOLATION"
+STATE_RULE_UNAVAILABLE = "STATE_RULE_UNAVAILABLE"
+STATE_FATAL_CODES = (
+    STATE_INPUT_INVARIANT_VIOLATION,
+    STATE_RULE_UNAVAILABLE,
+)
+
 
 class StateBuilderError(RuntimeError):
     """A State run cannot be built from an unverified Feature world."""
+
+
+class StateFatalError(StateBuilderError):
+    """A fatal State contract contradiction with no successful publication."""
+
+    def __init__(self, message: str, *, error_code: str) -> None:
+        if error_code not in STATE_FATAL_CODES:
+            raise ValueError(f"unknown State fatal error code: {error_code!r}")
+        self.error_code = error_code
+        self.fatal_code = error_code
+        self.code = error_code
+        super().__init__(f"{error_code}: {message}")
 
 
 class StateVerifierError(RuntimeError):

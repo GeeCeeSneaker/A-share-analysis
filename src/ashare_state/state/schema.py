@@ -6,8 +6,12 @@ from collections.abc import Mapping, Sequence
 
 import polars as pl
 
+from ashare_state.state.models import STATE_FATAL_CODES
+
 __all__ = [
+    "FATAL_ERROR_CODES",
     "FINDING_CLASSES",
+    "PERSISTED_FINDING_CLASSES",
     "MARKET_STATE_COLUMNS",
     "STATE_ARTIFACT_NAMES",
     "STATE_ENUM_VALUES",
@@ -103,12 +107,12 @@ STATE_ENUM_VALUES = {
     ),
 }
 
-FINDING_CLASSES = (
+PERSISTED_FINDING_CLASSES = (
     "STATE_INPUT_NULL",
     "STATE_INPUT_EMPTY_DENOMINATOR",
-    "STATE_INPUT_INVARIANT_VIOLATION",
-    "STATE_RULE_UNAVAILABLE",
 )
+FATAL_ERROR_CODES = STATE_FATAL_CODES
+FINDING_CLASSES = PERSISTED_FINDING_CLASSES
 
 
 class StateSchemaError(ValueError):
