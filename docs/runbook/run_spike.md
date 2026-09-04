@@ -32,14 +32,15 @@ Production 必须由一个 `RunKind.PRODUCTION` run 执行全部 B1-B7，不能�
 # <latest-complete-trading-day> 必须是已完成交易日，不能是未来日期
 uv run python scripts/spike/spike_runner.py --production --date <latest-complete-trading-day>
 
-# 只有发生中断或需要按阶段续跑时才使用 --resume；身份必须与原 run 完全一致
+# 只有硬进程中断导致原 run 仍为 RUNNING 时才使用 --resume；普通 Python failure 会落为 FAILED，operator interrupt 会落为 ABORTED
+# 省略 --date 时复用原 run 持久化的 as_of_date；若显式传入，必须与原值精确一致
 uv run python scripts/spike/spike_runner.py --production --resume --run-id <id> --phase b5
 
 # run CLOSED 后，单独计算正式 verdict
 uv run python scripts/spike/spike_runner.py --verdict --run-id <id>
 ```
 
-正常 Production 命令默认执行 `b1,b2,b3,b4,b5,b6,b7`；`--phase` 不是 verdict 命令。B2/B3/B4 的 blocking FAIL 必须使 run 进入终态 FAILED，不能改写成 PASS。
+正常 Production 命令默认执行 `b1,b2,b3,b4,b5,b6,b7`；`--phase` 不是 verdict 命令。正式 runner 会在同一进程所有权下打开已迁移的持久 DuckDB，并让 `ProbeContext` 使用该连接写入 `meta_raw_evidence_anchor`；B2/B3/B4 的 blocking FAIL 必须使 run 进入终态 FAILED，不能改写成 PASS。
 
 ### 2.3 Trial / dry-run boundary
 

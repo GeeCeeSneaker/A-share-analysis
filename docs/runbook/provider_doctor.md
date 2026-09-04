@@ -34,7 +34,8 @@ uv run ashare provider-doctor --output data/spike/results/provider_doctor.json
 | verdict | 含义 | 动作 |
 |---|---|---|
 | RUNTIME_ACTUAL_LOAD_VERIFIED | Python wheel 自带运行时已实际加载且路径一致 | 可继续正式 Spike 前置 |
-| RUNTIME_PACKAGE_VERIFIED | 仅确认 wheel 层打包运行时存在，实际 DLL 尚未确认 | 先在线运行 doctor |\n| RUNTIME_VERSION_MISMATCH | 版本线索冲突 | 停止；对照 provider_verification §1 排查后再测 |
+| RUNTIME_PACKAGE_VERIFIED | 仅确认 wheel 层打包运行时存在，实际 DLL 尚未确认 | 先在线运行 doctor |
+| RUNTIME_VERSION_MISMATCH | 版本线索冲突 | 停止；对照 provider_verification §1 排查后再测 |
 | RUNTIME_PATH_AMBIGUOUS | 加载了 wheel 外的 tgw DLL（如公共路径 C++ 库） | 停止；排查 PATH/DLL 搜索顺序 |
 
 ## 4. 账号画像纪律（任务书 §6/§18）

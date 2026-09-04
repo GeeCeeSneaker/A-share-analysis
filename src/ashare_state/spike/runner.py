@@ -22,6 +22,8 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -257,6 +259,41 @@ def compute_config_hash(repo_root: Path | None = None) -> str:
         digest.update(str(path.relative_to(config_dir)).replace("\\", "/").encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()
+
+
+
+@contextmanager
+def formal_anchor_connection(repo_root: Path | None = None) -> Iterator[Any]:
+    """Open the persistent, migrated DuckDB ledger used by formal runs.
+
+    Formal Production/Trial evidence must keep one process-owned writable
+    connection alive for the complete run. Dry-run intentionally keeps its
+    separate in-memory connection in the run_dry_run self-test; this helper
+    is never used by that self-test.
+    """
+    root = (repo_root or Path.cwd()).resolve()
+    from ashare_state.config import load_config
+    from ashare_state.storage import apply_migrations
+    from ashare_state.storage.connection import DuckDBConnectionManager
+
+    config = load_config(root / "configs" / "base.yaml")
+    configured_db = str(config.paths.duckdb_path).strip()
+    if configured_db == ":memory:":
+        msg = (
+            "formal Production/Trial runs must not use :memory: for the "
+            "anchor ledger; configure a persistent duckdb_path"
+        )
+        raise RunLifecycleError(msg)
+    db_path = Path(configured_db)
+    if not db_path.is_absolute():
+        db_path = root / db_path
+    migrations_dir = root / "migrations"
+    manager = DuckDBConnectionManager(db_path)
+    with manager.owner("read_write") as conn:
+        apply_migrations(conn, migrations_dir)
+        # Fail before any SpikeRun is minted if the anchor schema is absent.
+        conn.execute("SELECT 1 FROM meta_raw_evidence_anchor LIMIT 0")
+        yield conn
 
 
 # ------------------------------------------------------------------- new runs
@@ -831,6 +868,7 @@ __all__ = [
     "core_gate_satisfied",
     "current_code_commit",
     "fail_run",
+    "formal_anchor_connection",
     "new_run",
     "resume_run",
     "run_dry_run",

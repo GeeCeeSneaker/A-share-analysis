@@ -1,5 +1,15 @@
 # 开发日志（DEVLOG）
 
+## 2026-09-04 · Production Runner anchored wiring implementation
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (runner wiring) / CI_PENDING / PENDING_REVIEW**：按 PR #8 复审要求补齐 formal Production/Trial 的持久 DuckDB anchor connection、迁移前置和全 run 生命周期持有；所有正式 evidence 继续经过 `ProbeContext -> AnchoredRawEvidenceWriter`。
+- `--date` 现为显式 YYYYMMDD；新 formal run 必须提供日期，resume 从已持久化的 `SpikeRun.as_of_date` 解析，显式不匹配会 fail closed；`_run_phases()` 只接收 resolved/frozen 日期。
+- context construction、resume catalog setup、phase execution、catalog flush 和 close/fail/abort 均纳入终态边界；普通异常不会留下 `RUNNING`，硬进程中断遗留的 `RUNNING` 才保留给 `--resume`。
+- 新增 FakeTarget + migrated temporary DuckDB focused tests，覆盖持久 anchor 重开、禁止 `:memory:`、日期漂移/缺失、context failure terminalization 和 anchor enrollment failure；未加载 native SDK、未访问凭证、未进行网络请求。
+- 本批不改 CR-5/CR-6、migration 文件、Provider capability approval 或 production identity；正式账号 B1-B7、Golden/Data Sufficiency Matrix、verdict 与 Provider approval 仍 pending。
+
 ## 2026-09-04 · Formal runbook command and doctor-verdict correction
 
 **Implementation Status / Review Status**
