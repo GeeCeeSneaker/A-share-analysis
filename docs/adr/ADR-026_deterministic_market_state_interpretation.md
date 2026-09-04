@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Status**: PROPOSED / PENDING_REVIEW（2026-09-04，CR-6.0 governance bootstrap）
+- **Status**: PROPOSED / PENDING_REVIEW（2026-09-04；CR-6.4 implementation and evidence synchronization complete；Design / Audit Review pending）
 - **Deciders**: Project Owner / Development Executor；Design / Audit Review（pending）
 - **Work Requirement**: docs/design/A-share-analysis_CR-6_DeterministicMarketStateLayer开发工作要求_20260904.md
 - **Upstream**: ADR-025 ACCEPTED / VERIFIED；CR-5 VERIFIED / CLOSED / FREEZE after PR #3 merge
