@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -121,33 +122,150 @@ class TestProductionAccountBootstrap:
         assert report["bootstrap_status"] == "NOT_TESTABLE_ACCOUNT"
         assert report["AUTHENTICATED"] == "NOT_TESTED"
 
-    def test_offline_mode_never_passes_credentials(self, monkeypatch, capsys):
+    def test_offline_mode_bypasses_env_file_and_never_passes_credentials(
+        self, monkeypatch, capsys, tmp_path: Path
+    ):
         module = _load_script()
         calls: list[dict[str, object]] = []
+        secret_file = tmp_path / "credentials.env"
+        secret_file.write_text(
+            "TGW_PASSWORD=MUST_NOT_APPEAR_ANYWHERE\n", encoding="utf-8"
+        )
+
+        def fail_load_env(_path):
+            pytest.fail("offline must not load .env or --env-file")
+
+        monkeypatch.setattr(module, "load_env", fail_load_env)
+        monkeypatch.setattr(
+            module,
+            "run_doctor",
+            lambda **kwargs: (
+                calls.append(kwargs)
+                or {
+                    "sdk_state": "SDK_INSTALLED",
+                    "verdict": "RUNTIME_PACKAGE_VERIFIED",
+                    "AUTHENTICATED": "YES",
+                    "ACCOUNT_PROFILE": {
+                        "account_profile_id": "SHOULD_NOT_BE_PROJECTED",
+                    },
+                }
+            ),
+        )
+        monkeypatch.setattr(
+            module,
+            "load_frozen_production_identity",
+            lambda: pytest.fail("offline must not inspect production identity"),
+        )
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "production_account_bootstrap.py",
+                "--offline",
+                "--env-file",
+                str(secret_file),
+            ],
+        )
+
+        assert module.main() == 0
+        assert calls == [{"credentials": None, "offline": True}]
+        report = json.loads(capsys.readouterr().out)
+        assert report["bootstrap_status"] == "OFFLINE_RUNTIME_VERIFIED"
+        assert report["offline"] is True
+        for key in (
+            "ACCOUNT_PROFILE",
+            "production_identity_status",
+            "AUTHENTICATED",
+            "QUERY_READY",
+        ):
+            assert key not in report
+
+    def test_online_stderr_is_contained_and_fd2_is_restored(
+        self, monkeypatch, tmp_path: Path, capfd
+    ):
+        module = _load_script()
+        secret = "MUST_NOT_APPEAR_ANYWHERE"
+        output = tmp_path / "bootstrap.json"
 
         monkeypatch.setattr(
             module,
             "load_env",
             lambda _path: {
                 "TGW_USERNAME": "user",
-                "TGW_PASSWORD": "secret",
-                "TGW_SERVER_VIP": "host",
+                "TGW_PASSWORD": secret,
+                "TGW_SERVER_VIP": "127.0.0.1",
                 "TGW_SERVER_PORT": "8600",
             },
         )
-        monkeypatch.setattr(
-            module,
-            "run_doctor",
-            lambda **kwargs: (
-                calls.append(kwargs)
-                or {"sdk_state": "SDK_INSTALLED", "verdict": "RUNTIME_PACKAGE_VERIFIED"}
-            ),
-        )
+
+        def noisy_doctor(**_kwargs):
+            os.write(2, f"{secret}\n".encode())
+            print(secret, file=sys.stderr)
+            return {
+                "sdk_state": "SDK_INSTALLED",
+                "verdict": "RUNTIME_PACKAGE_VERIFIED",
+                "AUTHENTICATED": "YES",
+                "QUERY_READY": "YES",
+                "ACCOUNT_PROFILE": {
+                    "account_profile_id": "UNKNOWN_abc123",
+                    "permission_codes": "3|4",
+                },
+            }
+
+        monkeypatch.setattr(module, "run_doctor", noisy_doctor)
         monkeypatch.setattr(module, "load_frozen_production_identity", lambda: None)
-        monkeypatch.setattr(sys, "argv", ["production_account_bootstrap.py", "--offline"])
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["production_account_bootstrap.py", "--output", str(output)],
+        )
 
         assert module.main() == 0
-        assert calls == [{"credentials": None, "offline": True}]
-        report = json.loads(capsys.readouterr().out)
-        assert report["bootstrap_status"] == "OFFLINE_RUNTIME_VERIFIED"
-        assert report["AUTHENTICATED"] == "NOT_TESTED"
+        captured = capfd.readouterr()
+        persisted = output.read_text(encoding="utf-8")
+        assert secret not in captured.out
+        assert secret not in captured.err
+        assert secret not in persisted
+
+        os.write(2, b"AFTER_BOOTSTRAP_RESTORE\n")
+        restored = capfd.readouterr()
+        assert "AFTER_BOOTSTRAP_RESTORE" in restored.err
+
+    def test_online_stderr_is_contained_on_exception_path(
+        self, monkeypatch, tmp_path: Path, capfd
+    ):
+        module = _load_script()
+        secret = "MUST_NOT_APPEAR_ANYWHERE"
+        output = tmp_path / "bootstrap.json"
+
+        monkeypatch.setattr(
+            module,
+            "load_env",
+            lambda _path: {
+                "TGW_USERNAME": "user",
+                "TGW_PASSWORD": secret,
+                "TGW_SERVER_VIP": "127.0.0.1",
+                "TGW_SERVER_PORT": "8600",
+            },
+        )
+
+        def failing_doctor(**_kwargs):
+            os.write(2, f"{secret}\n".encode())
+            print(secret, file=sys.stderr)
+            raise RuntimeError(secret)
+
+        monkeypatch.setattr(module, "run_doctor", failing_doctor)
+        monkeypatch.setattr(module, "load_frozen_production_identity", lambda: None)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["production_account_bootstrap.py", "--output", str(output)],
+        )
+
+        assert module.main() == 3
+        captured = capfd.readouterr()
+        persisted = output.read_text(encoding="utf-8")
+        assert secret not in captured.out
+        assert secret not in captured.err
+        assert secret not in persisted
+        assert json.loads(persisted)["bootstrap_status"] == "ERROR"

@@ -30,6 +30,10 @@ from ashare_state.providers.amazingdata.doctor import run_doctor
 from ashare_state.providers.amazingdata.production_identity import (
     load_frozen_production_identity,
 )
+from ashare_state.providers.amazingdata.stdout_capture import (
+    CapturedStderr,
+    sdk_stderr_into,
+)
 
 _ENV_KEYS = (
     "TGW_USERNAME",
@@ -86,10 +90,40 @@ def _profile_kind(profile_id: str) -> str:
     return "UNAVAILABLE" if not profile_id or profile_id == "UNKNOWN" else "UNKNOWN"
 
 
+def _normalized_runtime_verdict(raw: dict[str, Any]) -> str:
+    verdict = str(raw.get("verdict") or "NOT_VERIFIED")
+    return verdict if verdict in _RUNTIME_VERDICTS else "NOT_VERIFIED"
+
+
+def _offline_safe_report(raw: dict[str, Any]) -> dict[str, Any]:
+    """Return runtime-only facts; never inspect account/profile state."""
+
+    sdk_state = str(raw.get("sdk_state") or "NOT_TESTED")
+    return {
+        "schema": "production_account_bootstrap.v1",
+        "checked_at": raw.get("checked_at") or datetime.now(UTC).isoformat(),
+        "platform": raw.get("platform") or sys.platform,
+        "PYTHON_VERSION": raw.get("PYTHON_VERSION"),
+        "SDK_ABI": raw.get("SDK_ABI"),
+        "sdk_state": sdk_state,
+        "AMAZINGDATA_PACKAGE_VERSION": raw.get("AMAZINGDATA_PACKAGE_VERSION"),
+        "PYTHON_TGW_PACKAGE_VERSION": raw.get("PYTHON_TGW_PACKAGE_VERSION"),
+        "TGW_RUNTIME_REPORTED_VERSION": raw.get("TGW_RUNTIME_REPORTED_VERSION"),
+        "runtime_verdict": _normalized_runtime_verdict(raw),
+        "offline": True,
+        "bootstrap_status": (
+            "OFFLINE_RUNTIME_VERIFIED" if sdk_state == "SDK_INSTALLED" else "NOT_TESTABLE_SDK"
+        ),
+    }
+
+
 def _safe_report(
     raw: dict[str, Any], *, offline: bool, credentials_available: bool = True
 ) -> dict[str, Any]:
     """Project the doctor report onto fields safe for stdout/evidence."""
+
+    if offline:
+        return _offline_safe_report(raw)
 
     profile = raw.get("ACCOUNT_PROFILE")
     profile = profile if isinstance(profile, dict) else {}
@@ -114,16 +148,10 @@ def _safe_report(
         production_status = "UNKNOWN"
 
     sdk_state = str(raw.get("sdk_state") or "NOT_TESTED")
-    runtime_verdict = str(raw.get("verdict") or "NOT_VERIFIED")
-    if runtime_verdict not in _RUNTIME_VERDICTS:
-        runtime_verdict = "NOT_VERIFIED"
+    runtime_verdict = _normalized_runtime_verdict(raw)
 
-    if not offline and not credentials_available:
+    if not credentials_available:
         bootstrap_status = "NOT_TESTABLE_ACCOUNT"
-    elif offline:
-        bootstrap_status = (
-            "OFFLINE_RUNTIME_VERIFIED" if sdk_state == "SDK_INSTALLED" else "NOT_TESTABLE_SDK"
-        )
     elif sdk_state != "SDK_INSTALLED":
         bootstrap_status = "NOT_TESTABLE_SDK"
     elif not authenticated:
@@ -181,6 +209,35 @@ def _not_tested_report() -> dict[str, Any]:
     }
 
 
+def _error_report() -> dict[str, Any]:
+    return {
+        "checked_at": datetime.now(UTC).isoformat(),
+        "platform": sys.platform,
+        "sdk_state": "ERROR",
+        "AUTHENTICATED": "NOT_TESTED",
+        "QUERY_READY": "NOT_TESTED",
+    }
+
+
+def _run_doctor_with_stderr_containment(
+    *,
+    credentials: tuple[str, str, str, int] | None,
+    offline: bool,
+) -> tuple[dict[str, Any] | None, bool]:
+    """Run doctor without allowing raw stderr to escape the process."""
+
+    holder = CapturedStderr()
+    raw: dict[str, Any] | None = None
+    try:
+        with sdk_stderr_into(holder):
+            raw = run_doctor(credentials=credentials, offline=offline)
+    except Exception:  # noqa: BLE001 - raw error text must not escape
+        pass
+    stderr_observed = bool(holder.text)
+    holder.text = ""
+    return raw, stderr_observed
+
+
 def _write_report(report: dict[str, Any], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
@@ -202,29 +259,33 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    env = load_env(args.env_file)
-    credentials = None if args.offline else _credentials_from_env(env)
-    if not args.offline and credentials is None:
-        safe = _safe_report(_not_tested_report(), offline=False, credentials_available=False)
-        exit_code = 2
-    else:
-        try:
-            raw = run_doctor(credentials=credentials, offline=args.offline)
-        except Exception:  # noqa: BLE001 - no exception text may reach the report
-            raw = {
-                "checked_at": datetime.now(UTC).isoformat(),
-                "platform": sys.platform,
-                "sdk_state": "ERROR",
-                "AUTHENTICATED": "NOT_TESTED",
-                "QUERY_READY": "NOT_TESTED",
-            }
-            safe = _safe_report(raw, offline=args.offline)
+    if args.offline:
+        raw, stderr_observed = _run_doctor_with_stderr_containment(
+            credentials=None, offline=True
+        )
+        safe = _safe_report(_error_report() if raw is None else raw, offline=True)
+        safe["sdk_stderr_observed"] = stderr_observed
+        if raw is None:
             safe["bootstrap_status"] = "ERROR"
             exit_code = 3
         else:
-            safe = _safe_report(raw, offline=args.offline)
-            if args.offline:
-                exit_code = 0 if safe["bootstrap_status"] == "OFFLINE_RUNTIME_VERIFIED" else 2
+            exit_code = 0 if safe["bootstrap_status"] == "OFFLINE_RUNTIME_VERIFIED" else 2
+    else:
+        env = load_env(args.env_file)
+        credentials = _credentials_from_env(env)
+        if credentials is None:
+            safe = _safe_report(_not_tested_report(), offline=False, credentials_available=False)
+            safe["sdk_stderr_observed"] = False
+            exit_code = 2
+        else:
+            raw, stderr_observed = _run_doctor_with_stderr_containment(
+                credentials=credentials, offline=False
+            )
+            safe = _safe_report(_error_report() if raw is None else raw, offline=False)
+            safe["sdk_stderr_observed"] = stderr_observed
+            if raw is None:
+                safe["bootstrap_status"] = "ERROR"
+                exit_code = 3
             else:
                 exit_code = (
                     0

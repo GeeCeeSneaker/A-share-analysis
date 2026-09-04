@@ -309,6 +309,15 @@ P0-AD-01.1 VERIFIED / CLOSED
 
 ---
 
+## 7.1 Developer implementation status (2026-09-04)
+
+当前开发提交仅收口 P0-AD-01.1 的两个 I/O blocker，最终状态等待三平台 CI：
+
+- `--offline` 分支应完全绕过 `load_env` 和 production identity 读取，并把输出限制为 runtime/package facts。
+- online `run_doctor` 调用应在 OS fd2 与 Python `sys.stderr` 两层 containment 内执行；只保留 scrubbed `sdk_stderr_observed`，不保留 stderr 原文。
+- 对抗测试覆盖 env-file 绕过、native-style fd2、Python stderr、异常路径和 fd2 restore；不改变 Provider 数据语义、migration、CR-5 或 CR-6。
+- 在 CI 终态前，P0-AD-01.1 状态保持 `IN_PROGRESS / CI_PENDING / PENDING_REVIEW`，不得据此放行合并或正式 Production B1-B7。
+
 # 8. Developer handoff
 
 下一批只做 **P0-AD-01.1**。不要继续扩展新的 Provider 接口、Data Sufficiency、CR-7、策略层或 State 语义。

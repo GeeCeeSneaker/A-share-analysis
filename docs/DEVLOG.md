@@ -1,3 +1,11 @@
+## 2026-09-04 · P0-AD-01.1 bootstrap I/O safety closure implementation
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (P0-AD-01.1) / CI_PENDING / PENDING_REVIEW**：根据 Reviewer 新增要求，\`--offline\` 已完全绕过 \`load_env\`；online doctor 调用加入 OS fd2 与 Python \`sys.stderr\` containment，并清空原始 stderr。
+- 新增对抗测试覆盖秘密 env-file 不读取、native-style \`os.write(2,...)\`、Python stderr、异常路径和 fd2 restore；offline 输出不再包含 account/profile truth。
+- 不改变 Provider 数据语义、migration、CR-5/CR-6 或 production allowlist；凭证、Token、host/port/raw profile 不进入仓库；等待三平台 CI 终态。
+
 ## 2026-09-04 · P0-AD-01 bootstrap CI verification
 
 **Implementation Status / Review Status**
