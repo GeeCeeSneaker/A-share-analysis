@@ -1,3 +1,14 @@
+## 2026-09-05 · P0-M-1B.0 fixture assertion correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (fixture hardening) / CI_PENDING / PENDING_REVIEW**：run 276 的 Ubuntu pytest 发现一处 expected credentials tuple 仍引用旧 endpoint 值；本提交将断言同步到 test-only host 与数值哨兵 `0`。
+- 只修正测试断言与前一提交的输入夹具一致，不改变 bootstrap、stderr containment、safe projection、identity allowlist 或正式账号验证边界；真实连接信息不进入仓库。
+
+**Next**
+
+- 等待本提交对应的三平台 CI；配置仍保持空白，正式 identity freeze、Production B1-B7、Data Sufficiency Matrix、verdict 和 Provider approval 不执行。
+
 ## 2026-09-05 · P0-M-1B.0 fixture sentinel correction
 
 **Implementation Status / Review Status**

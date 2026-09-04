@@ -86,7 +86,7 @@ class TestProductionAccountBootstrap:
         assert module.main() == 0
         assert calls == [
             {
-                "credentials": ("user", secret, "127.0.0.1", 8600),
+                "credentials": ("user", secret, "test-only-host", 0),
                 "offline": False,
             }
         ]
