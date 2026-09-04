@@ -740,3 +740,13 @@ class TestB7Capacity:
             "wall_clock_seconds",
         ):
             assert key in metrics, key
+
+class TestHistoryCoverageWiring:
+    def test_dry_run_uses_2020_history_contract(self, spike_root: Path):
+        out = run_dry_run(spike_root, sample_date=20260814)
+        catalog_text = (
+            Path(out["run_dir"]) / "cases" / "spike_case_catalog.jsonl"
+        ).read_text(encoding="utf-8")
+
+        assert "history_start_2020" in catalog_text
+        assert "history_start_2018_plus_warmup" not in catalog_text
