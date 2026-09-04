@@ -128,9 +128,7 @@ class TestProductionAccountBootstrap:
         module = _load_script()
         calls: list[dict[str, object]] = []
         secret_file = tmp_path / "credentials.env"
-        secret_file.write_text(
-            "TGW_PASSWORD=MUST_NOT_APPEAR_ANYWHERE\n", encoding="utf-8"
-        )
+        secret_file.write_text("TGW_PASSWORD=MUST_NOT_APPEAR_ANYWHERE\n", encoding="utf-8")
 
         def fail_load_env(_path):
             pytest.fail("offline must not load .env or --env-file")
@@ -231,9 +229,7 @@ class TestProductionAccountBootstrap:
         restored = capfd.readouterr()
         assert "AFTER_BOOTSTRAP_RESTORE" in restored.err
 
-    def test_online_stderr_is_contained_on_exception_path(
-        self, monkeypatch, tmp_path: Path, capfd
-    ):
+    def test_online_stderr_is_contained_on_exception_path(self, monkeypatch, tmp_path: Path, capfd):
         module = _load_script()
         secret = "MUST_NOT_APPEAR_ANYWHERE"
         output = tmp_path / "bootstrap.json"

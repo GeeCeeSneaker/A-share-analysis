@@ -260,9 +260,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.offline:
-        raw, stderr_observed = _run_doctor_with_stderr_containment(
-            credentials=None, offline=True
-        )
+        raw, stderr_observed = _run_doctor_with_stderr_containment(credentials=None, offline=True)
         safe = _safe_report(_error_report() if raw is None else raw, offline=True)
         safe["sdk_stderr_observed"] = stderr_observed
         if raw is None:

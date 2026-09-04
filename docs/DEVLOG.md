@@ -1,3 +1,10 @@
+## 2026-09-04 · P0-AD-01.1 Ruff format correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (P0-AD-01.1) / CI_PENDING / PENDING_REVIEW**：run \`33889716446\`（run \`265\`）的 Ruff lint 已通过，format check 要求合并 bootstrap 调用和两个测试声明/写入调用的机械换行；本提交仅按 Ruff 输出调整格式。
+- 不改变 fd2/Python stderr containment、offline 零 env 读取、异常路径脱敏、fd1 capture、并发锁或任何 Provider/CR-5/CR-6 语义；等待新的三平台 CI。
+
 ## 2026-09-04 · P0-AD-01.1 Ruff lint correction
 
 **Implementation Status / Review Status**
