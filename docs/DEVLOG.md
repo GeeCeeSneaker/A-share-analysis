@@ -1,3 +1,11 @@
+## 2026-09-04 · P0-AD-01 bootstrap CI verification
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW**：GitHub Actions run `33881832744`（run `258`）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1425 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均通过。
+- 本证据只验证脱敏 bootstrap 的可执行边界；不等同于正式 identity 人工冻结、Production B1-B7、Golden/Data Sufficiency Matrix、verdict 或 Provider approval。
+- `configs/production_account.yaml` 保持空 profile；凭证、Token、host/port/raw profile 不进入仓库。
+
 ## 2026-09-04 · P0-AD-01 formatter follow-up
 
 **Implementation Status / Review Status**
