@@ -1,3 +1,33 @@
+## 2026-09-05 · T3 CI corrective follow-up
+
+**Implementation Status / Review Status**
+
+- **CORRECTIVE / LOCAL_TARGETED_VERIFIED / CI_PENDING / PENDING_REVIEW**：T3 首次 CI run 306 的 Ubuntu Python 3.14 pytest 暴露旧 AUDIT-H1 回归测试仍断言生产配置必须为空；这是阶段合同未更新，不是 T3 配置值或身份格式失败。
+- 已将该测试改为校验三平台 required CI 与 T3 三字段 exact allowlist：`UNKNOWN_24e2ff401792`、`2026-09-05T22:19:58+08:00`、`project-owner`；不改变运行时逻辑或生产执行边界。
+- 本地 Windows Python 3.14.6 targeted H1 / production-identity 回归 **101 passed**；重新验证以 GitHub Actions 新 head 的三平台全量 CI 为准。
+- T3 仍不启动 Production B1-B7、Data Sufficiency、verdict、Provider capability approval 或 backfill；身份冻结以独立 Reviewer 审阅、全绿 CI 和合并为准。
+
+**Next**
+
+- 等待 PR #14 新提交的三平台 required CI；通过后提交独立 Reviewer 关闭 T3。
+## 2026-09-05 · T2 confirmed — separate T3 identity-freeze proposal
+
+**Implementation Status / Review Status**
+
+- **T2_CONFIRMED / T3_PR_OPEN / PENDING_REVIEW / FORMAL_B1-B7_BLOCKED**：项目 Owner 已确认 exact scrubbed candidate `UNKNOWN_24e2ff401792` 对应计划使用的正式账号；确认时间 `2026-09-05T22:19:58+08:00`，安全标记 `project-owner`。
+- T1 证据 PR #13 已合并到 main；三平台 required CI run 304（`33969635047`）全绿。T1 记录仍保持为脱敏事实，不把原始账号资料带入仓库。
+- 本次 T3 只提出以下三个配置字段：`production_account_profile_id=${candidate}`、带时区 `confirmed_at`、安全 `confirmed_by`；不修改其它配置键，不执行任何 provider 或生产数据动作。
+- 在 T3 PR 独立审阅、三平台 CI 通过并合并前，生产身份不视为已冻结；未执行 Production B1-B7、Data Sufficiency、verdict、Provider approval 或 backfill。
+
+**Evidence**
+
+- T1 脱敏投影：[t1_bootstrap_20260905.md](provider_verification/t1_bootstrap_20260905.md)。
+- T3 配置候选与本次治理变更由本 PR 单独审阅；用户名、密码、Token、真实 endpoint、raw profile、raw SDK 输出和本地原始文件均不进入 GitHub。
+
+**Next**
+
+- 等待独立 Reviewer 审阅 T3 exact config；合并前保持 Formal Production B1-B7 blocked。T3 合并后再按文档单独启动一个受治理 Production run。
+
 ## 2026-09-05 · T1 controlled online bootstrap — identity candidate
 
 **Implementation Status / Review Status**

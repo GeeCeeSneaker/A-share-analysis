@@ -1,3 +1,47 @@
+## DM-20260905-151 · T3 CI corrective follow-up（当前修正）
+
+**Type**：C0 — T3 phase-contract regression correction  
+**Date**：2026-09-05  
+**Status**：**IMPLEMENTED / LOCAL_TARGETED_VERIFIED / CI_PENDING / PENDING_REVIEW**  
+**Trigger**：PR #14 Actions run 306 Ubuntu Python 3.14 pytest failed because the pre-T3 H1 test still required an empty production identity.  
+**Correction**：测试现校验 Windows 3.14、Windows 3.12、Ubuntu 3.14 三腿 required 及 T3 exact config allowlist（`UNKNOWN_24e2ff401792` / `2026-09-05T22:19:58+08:00` / `project-owner`）。  
+**Scope**：不改变 Provider、identity parser、生产 runner 或 B1-B7 语义；不引入凭证、endpoint、Token、raw profile 或 raw SDK output。  
+**Evidence**：本地 focused H1 / production-identity tests 101 passed；PR #14 新 head 的完整三平台 CI 待验证。
+
+**Gate**
+
+T3 仍需独立 Reviewer 审阅、三平台 required CI 全绿并合并；在此之前不得启动 Formal Production B1-B7、Data Sufficiency、verdict、Provider capability approval 或 backfill。
+
+---
+
+## DM-20260905-150 · T2 confirmed / T3 identity-freeze proposal（当前权威，覆盖下方历史状态）
+
+**Type**：C2 — human-confirmed production identity governance  
+**Date**：2026-09-05  
+**Status**：**T2_CONFIRMED / T3_PR_OPEN / PENDING_REVIEW / FORMAL_B1-B7_BLOCKED**  
+**Authority**：[T1/T2/T3 执行要求](../design/A-share-analysis_AUDIT-H1关闭与T1正式线上身份候选执行要求_20260905.md)  
+**T1 evidence**：[T1 脱敏证据](../provider_verification/t1_bootstrap_20260905.md)（PR #13 已合并）  
+**Current main**：`df78ad984de3817bb55b480372eef0a8f786dc99`
+
+### Confirmed facts
+
+- 项目 Owner 已确认 exact scrubbed identity `UNKNOWN_24e2ff401792` 对应计划使用的正式账号；confirmed_at 为 `2026-09-05T22:19:58+08:00`，confirmed_by 为 `project-owner`。
+- T1 的 `IDENTITY_CANDIDATE`、`RUNTIME_ACTUAL_LOAD_VERIFIED`、`AUTHENTICATED=YES`、`QUERY_READY=YES` 与 numeric entitlement evidence 已在前一治理批次记录。
+- T1 证据 PR #13 的三平台 required CI run 304（`33969635047`）全部成功；本 T3 仍需独立验证。
+
+### T3 change set
+
+- `configs/production_account.yaml` 仅包含 `production_account_profile_id`、`confirmed_at`、`confirmed_by` 三个字段；profile ID 与 T1 候选字节级一致。
+- 本 PR 不 trim、不做大小写归一化、不引入 alias，不增加其它 config keys。
+- 同批同步 Provider verification、DEVLOG 与本总册；不写入凭证、Token、真实 endpoint、raw profile、raw SDK 输出或本地 bootstrap 文件。
+
+### Gate / next
+
+T3 在独立 Reviewer 审阅、Windows 3.14 / Windows 3.12 / Ubuntu 3.14 required CI 全绿并合并前，不构成 production identity freeze。Formal Production B1-B7、Data Sufficiency、verdict、Provider capability approval 和 backfill 继续 blocked。T3 合并后才按文档启动单一受治理 Production run。
+
+
+---
+
 ## DM-20260905-149 · T1 controlled online bootstrap candidate（当前权威，覆盖下方历史状态）
 
 **Type**：C2 — controlled production identity qualification  

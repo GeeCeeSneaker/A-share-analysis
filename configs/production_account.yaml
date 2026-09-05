@@ -1,21 +1,3 @@
-# R4-A3.1 P0-03: frozen POSITIVE production account identity (audit 20260827).
-#
-# The value is the SCRUBBED stable profile identity ("<kind>_<digest>",
-# derived from provider/env/host/username-hash/entitlement digest) -
-# NEVER username / password / token. Writing real credentials here would
-# be a governance violation, not a configuration.
-#
-# Fail-closed semantics: while `production_account_profile_id` is empty
-# (the current truth - the formal production account is not yet opened /
-# human-confirmed), NO production truth can be granted anywhere:
-#   - PRODUCTION runs cannot be opened (verify_production_account)
-#   - capability approval is blocked at BOTH entry points
-#   - formal runtime AUTH gates report production identity NOT_TESTABLE
-#
-# It becomes non-empty ONLY after the real production account's logon
-# profile is human-confirmed (milestone P0-M-1B prerequisite), together
-# with confirmed_at / confirmed_by. A mismatching account NEVER matches
-# and never upgrades to production implicitly.
-production_account_profile_id: ""
-confirmed_at: ""
-confirmed_by: ""
+production_account_profile_id: "UNKNOWN_24e2ff401792"
+confirmed_at: "2026-09-05T22:19:58+08:00"
+confirmed_by: "project-owner"
