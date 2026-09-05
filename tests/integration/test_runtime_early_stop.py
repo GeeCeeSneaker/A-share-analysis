@@ -27,6 +27,8 @@ from ashare_state.providers.amazingdata.provider import (
 from ashare_state.providers.amazingdata.session import AmazingDataSession
 from ashare_state.providers.errors import (
     ProviderAuthError,
+    ProviderNetworkError,
+    ProviderSdkInternalError,
     ProviderUnavailableError,
 )
 from ashare_state.providers.lifecycle import (
@@ -130,7 +132,7 @@ class TestSdkLoadFailure:
 
         monkeypatch.setattr(loader, "load_sdk", _raise)
         session = AmazingDataSession("u", "p", "h", 1)
-        with pytest.raises(OSError, match="dll load failed"):
+        with pytest.raises(ProviderSdkInternalError, match="UNEXPECTED_ERROR"):
             session.login()
         assert session.lifecycle.state is SdkLifecycleState.LOAD_FAILED
         assert session.lifecycle.is_terminal
@@ -168,7 +170,7 @@ class TestLoginTerminalFailure:
         original = loader.load_sdk
         loader.load_sdk = lambda: sdk
         try:
-            with pytest.raises(Exception, match="connection refused"):
+            with pytest.raises(ProviderNetworkError, match="ProviderNetworkError"):
                 session.login()
         finally:
             loader.load_sdk = original

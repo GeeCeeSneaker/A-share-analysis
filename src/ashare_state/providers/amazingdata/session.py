@@ -21,9 +21,16 @@ from ashare_state.providers.amazingdata.errors import (
     classify_sdk_error,
 )
 from ashare_state.providers.amazingdata.production_identity import AccountKind
+from ashare_state.providers.amazingdata.safe_diagnostics import (
+    parse_permission_codes,
+    safe_error_code,
+    safe_session_error,
+)
 from ashare_state.providers.amazingdata.stdout_capture import (
+    CapturedStderr,
     CapturedStdout,
     parse_logon_profile,
+    sdk_stderr_into,
     sdk_stdout_into,
 )
 from ashare_state.providers.lifecycle import SdkLifecycle, SdkLifecycleState
@@ -36,7 +43,7 @@ class AccountProfile:
     Audit P1-08: auth success and profile parsing are SEPARATE facts:
       auth_ok            - login call returned without error
       profile_parsed     - the logon json was captured and parsed
-      entitlement_verified - PermissionCode was present and non-empty
+      entitlement_verified - PermissionCode parsed to at least one numeric code
     Production source-policy approval requires all three.
 
     Audit P1-07: account_profile_id mixes provider/env/host/username-hash
@@ -64,11 +71,12 @@ class AccountProfile:
 
     @property
     def entitlement_verified(self) -> bool:
-        return self.profile_parsed and bool(self.permission_codes)
+        return self.profile_parsed and len(parse_permission_codes(self.permission_codes)) > 0
 
     @property
     def permission_codes(self) -> str:
-        return str(self.raw_profile.get("PermissionCode", ""))
+        value = self.raw_profile.get("PermissionCode", "")
+        return value if isinstance(value, str) else ""
 
     @property
     def subscribe_limit(self) -> int | None:
@@ -152,62 +160,67 @@ class AmazingDataSession:
         if self.profile.login_ok:
             return self.profile
         try:
-            self._sdk = sdk_loader.load_sdk()
+            with (
+                sdk_stdout_into(CapturedStdout(), independent=True),
+                sdk_stderr_into(CapturedStderr()),
+            ):
+                self._sdk = sdk_loader.load_sdk()
         except ProviderUnavailableError as exc:
             self.lifecycle.transition(
                 SdkLifecycleState.SDK_UNAVAILABLE,
-                reason=str(exc),
+                reason=safe_error_code(exc),
                 evidence_ref="sdk_loader.load_sdk",
             )
-            raise
+            raise safe_session_error(exc) from None
         except Exception as exc:  # noqa: BLE001 - classification boundary
             self.lifecycle.transition(
                 SdkLifecycleState.LOAD_FAILED,
-                reason=f"{type(exc).__name__}: {exc}",
+                reason=safe_error_code(exc),
                 evidence_ref="sdk_loader.load_sdk",
             )
-            raise
+            raise safe_session_error(exc) from None
         username, password, host, port = self._credentials
         holder = CapturedStdout()
         try:
-            with sdk_stdout_into(holder):
+            with sdk_stdout_into(holder, independent=True), sdk_stderr_into(CapturedStderr()):
                 self._sdk.login(username=username, password=password, host=host, port=int(port))
         except ProviderError as raised:
             if isinstance(raised, ProviderAuthError):
                 self.lifecycle.transition(
                     SdkLifecycleState.AUTH_REJECTED,
-                    reason=str(raised),
+                    reason=safe_error_code(raised),
                     evidence_ref="login",
                 )
             else:
                 self.lifecycle.transition(
                     SdkLifecycleState.LOGIN_FAILED,
-                    reason=f"{type(raised).__name__}: {raised}",
+                    reason=safe_error_code(raised),
                     evidence_ref="login",
                 )
-            raise
+            raise safe_session_error(raised) from None
         except Exception as exc:  # noqa: BLE001 - classification boundary
             typed = classify_sdk_error(exc, endpoint="login")
             if isinstance(typed, ProviderNetworkError | ProviderSdkInternalError):
                 # login-specific refinement: auth vs network
                 lowered = str(exc).lower()
                 if any(h in lowered for h in ("password", "user", "auth", "logon")):
-                    typed = ProviderAuthError(f"login failed: {exc}")
+                    typed = ProviderAuthError("ProviderAuthError")
             if isinstance(typed, ProviderAuthError):
                 self.lifecycle.transition(
                     SdkLifecycleState.AUTH_REJECTED,
-                    reason=str(typed),
+                    reason=safe_error_code(typed),
                     evidence_ref="login",
                 )
             else:
                 self.lifecycle.transition(
                     SdkLifecycleState.LOGIN_FAILED,
-                    reason=f"{type(typed).__name__}: {typed}",
+                    reason=safe_error_code(typed),
                     evidence_ref="login",
                 )
-            raise typed from exc
+            raise safe_session_error(typed) from None
         # login success prints "login success" + logon json into the capture
         profile = parse_logon_profile(holder.text)
+        holder.text = ""
         if profile is None:
             # SDK version drift: no logon json captured - keep auth_ok=True
             # but profile_parsed=False (audit P1-08: separate the two facts)
@@ -240,7 +253,10 @@ class AmazingDataSession:
             self.lifecycle.close(reason="logout (no sdk handle)")
             return
         try:
-            with sdk_stdout_into(CapturedStdout()):
+            with (
+                sdk_stdout_into(CapturedStdout(), independent=True),
+                sdk_stderr_into(CapturedStderr()),
+            ):
                 self._sdk.logout()
         except Exception:  # noqa: BLE001, S110 - logout is best-effort
             pass

@@ -50,12 +50,15 @@ Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
 
 ## 5. 验证
 
+AUDIT-H1 整改合并且最终三平台 required CI 成功前，暂停真实账号在线命令。
+完整状态/临时捕获边界见 [provider_doctor.md](provider_doctor.md)。
+
 ```powershell
-# 5.1 离线验证（不联网）：import + 版本 + DLL 路径
+# 5.1 离线验证（不联网）：import + 安全版本/加载判定（不公开 DLL 路径）
 uv run ashare provider-doctor --offline
 
-# 5.2 在线验证（需 .env 凭证）：网络/认证/查询
-uv run ashare provider-doctor --output data/spike/results/provider_doctor.json
+# 5.2 T1 唯一入口（仅整改合并后；需本地安全注入凭证）
+uv run python scripts/spike/production_account_bootstrap.py --output data/spike/results/production_account_bootstrap.json
 ```
 
 离线预期 verdict：`RUNTIME_PACKAGE_VERIFIED`；在线且完成首次 SDK 调用后预期 verdict：`RUNTIME_ACTUAL_LOAD_VERIFIED`。

@@ -170,7 +170,7 @@ class TestProductionAccountBootstrap:
         assert module.main() == 0
         assert calls == [{"credentials": None, "offline": True}]
         report = json.loads(capsys.readouterr().out)
-        assert report["bootstrap_status"] == "OFFLINE_RUNTIME_VERIFIED"
+        assert report["bootstrap_status"] == "OFFLINE_PACKAGE_VERIFIED"
         assert report["offline"] is True
         for key in (
             "ACCOUNT_PROFILE",
@@ -203,7 +203,7 @@ class TestProductionAccountBootstrap:
             print(secret, file=sys.stderr)
             return {
                 "sdk_state": "SDK_INSTALLED",
-                "verdict": "RUNTIME_PACKAGE_VERIFIED",
+                "verdict": "RUNTIME_ACTUAL_LOAD_VERIFIED",
                 "AUTHENTICATED": "YES",
                 "QUERY_READY": "YES",
                 "ACCOUNT_PROFILE": {

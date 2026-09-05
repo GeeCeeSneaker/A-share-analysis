@@ -93,24 +93,45 @@ def provider_doctor(
     import json
 
     from ashare_state.providers.amazingdata.doctor import run_doctor
+    from ashare_state.providers.amazingdata.safe_diagnostics import (
+        safe_diagnostic_projection,
+        safe_error_code,
+    )
+    from ashare_state.providers.amazingdata.stdout_capture import (
+        CapturedStderr,
+        CapturedStdout,
+        sdk_stderr_into,
+        sdk_stdout_into,
+    )
 
-    settings = Settings()
     creds = None
-    if settings.tgw_username and settings.tgw_password.get_secret_value() and not offline:
-        creds = (
-            settings.tgw_username,
-            settings.tgw_password.get_secret_value(),
-            settings.tgw_server_vip,
-            settings.tgw_server_port,
-        )
-    report = run_doctor(credentials=creds, offline=offline)
+    if not offline:
+        settings = Settings()
+        if settings.tgw_username and settings.tgw_password.get_secret_value():
+            creds = (
+                settings.tgw_username,
+                settings.tgw_password.get_secret_value(),
+                settings.tgw_server_vip,
+                settings.tgw_server_port,
+            )
+    stdout, stderr = CapturedStdout(), CapturedStderr()
+    try:
+        with sdk_stdout_into(stdout), sdk_stderr_into(stderr):
+            try:
+                raw = run_doctor(credentials=creds, offline=offline)
+            except Exception as exc:  # noqa: BLE001 - no raw diagnostic traceback
+                raw = {"sdk_state": "ERROR", "error_code": safe_error_code(exc)}
+        report = safe_diagnostic_projection(raw, offline=offline)
+    finally:
+        stdout.text = ""
+        stderr.text = ""
     typer.echo(json.dumps(report, indent=2, ensure_ascii=False, default=str))
     if output:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(
             json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
         )
-        typer.echo(f"report written: {output}")
+        typer.echo("report written")
 
 
 if __name__ == "__main__":

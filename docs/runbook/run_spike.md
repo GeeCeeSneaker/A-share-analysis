@@ -22,7 +22,11 @@ uv run ashare provider-doctor --offline
 uv run ashare provider-doctor --output data/spike/results/provider_doctor.json
 ```
 
-在线 doctor 必须得到实际加载路径与账号画像；`RUNTIME_PACKAGE_VERIFIED` 只表示 wheel 层验证，不能替代在线实际加载确认。若出现 `RUNTIME_PATH_AMBIGUOUS` 或 `RUNTIME_VERSION_MISMATCH`，先停止排查。
+AUDIT-H1 整改合并且最终三平台 required CI 成功前，暂停真实账号在线命令。
+T1 必须使用 `scripts/spike/production_account_bootstrap.py` 唯一入口；上述 doctor 只是诊断，不是身份准入。
+在线诊断内部核对实际加载路径，公共报告不输出本地 DLL 路径；`RUNTIME_PACKAGE_VERIFIED` 只表示包级证据，不能产生在线候选。
+具体状态与临时介质边界见 [provider_doctor.md](provider_doctor.md)。
+T1 候选之后必须先完成 T2 人工确认和 T3 独立身份冻结，再执行下一节正式 B1-B7。
 
 ### 2.2 Formal B1-B7
 

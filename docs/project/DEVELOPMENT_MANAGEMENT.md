@@ -1,5 +1,36 @@
 # A-share-analysis 开发管理总册（Development Management）
 
+## DM-20260905-148 · AUDIT-H1 当前整改状态（覆盖下方历史头部）
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_FINAL_CI  
+**Review Status**：PENDING_REVIEW；本批不自行 CLOSE / MERGE。  
+**Base SHA**：`c939b747a46d4fc2ef62b8a427b431751346449a`  
+**Type / Authority**：C1；[外部审计 REV-01—08 管理裁决](../design/A-share-analysis_外部审计REV01-08管理裁决与整改路线_20260905.md) §3 / §9。  
+**Current Gate**：AUDIT-H1 未完成最终三平台 required CI、Reviewer 审阅及合并前，暂停真实 T1；旧头部“仅等待本地配置”的描述为历史状态，不是当前执行许可。
+
+| 管理要求 | 本批实现 / 验证位置 | 状态 |
+|---|---|---|
+| REV-01 online actual-load + offline evidence strength | production_account_bootstrap.py；test_audit_h1_trust_boundary.py | IMPLEMENTED / focused PASS |
+| REV-01 确定性数字权限 | safe_diagnostics.parse_permission_codes；AccountProfile 与 bootstrap 共用 | IMPLEMENTED / focused PASS |
+| REV-02A safe diagnostic projection | safe_diagnostics.py；doctor / cli / bootstrap | IMPLEMENTED / focused PASS |
+| REV-02A nested scrub / error / fd capture | stdout_capture.py / session.py；H1 sentinel tests | IMPLEMENTED / focused PASS |
+| REV-02B 临时介质真实说明 | provider_doctor.md；capture/bootstrap docstrings | DOCUMENTED；介质重构留待 REV-06 |
+| REV-04 three required CI legs | ci.yml；H1 workflow structure regression | IMPLEMENTED / final CI pending |
+
+**Evidence separation**
+
+- Repository-verifiable：本地 Python 3.14.6，70 项 H1/bootstrap focused 与此前 87 项 session/capture/provider focused 回归通过；Ruff check/format、mypy（93 source files）、compileall、Spike dry-run、SDK-absent 通过。
+- 完整 pytest 与 Git 历史治理门禁：最终 PR head 的三平台 CI 结果为权威；本提交时不预先宣称通过。非 Git checkout 的本地隔离副本只作源码运行验证。
+- Controlled SDK/runtime：本批未测试真实 SDK。
+- Formal account / Production：本批未执行；空 identity config 不变。
+
+**Scope preservation / Next**
+
+原 profile digest、CR-5/CR-6 frozen semantics、migrations 023/024、2020 历史边界和 capability 状态不变。按 GitHub 连接器以单提交同步代码、tests、DEVLOG 与本总册，不扩展历史例外。
+最终 head 全量三平台 CI 通过后交 Reviewer；合并前不恢复 T1，不通过整改 PR 冻结身份。其他 REV 按对应 recovery/history/unattended/scale/replay gate 另行推进。
+
+---
+
 > **仓库固定路径（MUST NOT RENAME）**：`docs/project/DEVELOPMENT_MANAGEMENT.md`  
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
