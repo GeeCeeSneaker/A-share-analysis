@@ -1,3 +1,34 @@
+## 2026-09-05 · AUDIT-H1 CI corrective follow-up
+
+**Implementation Status / Review Status**
+
+- **CORRECTIVE / LOCAL_TARGETED_VERIFIED / PENDING_FINAL_CI / PENDING_REVIEW**：首次 PR #12 head 的三平台 run 300 在 Ruff import-sort 阶段停止；未进入 pytest 或治理门禁。已按 Ruff 提示整理 bootstrap import，并将旧 early-stop 测试中要求原始 SDK 异常文本的断言改为 AUDIT-H1 规定的稳定 typed error contract。
+- 新的交付树将 AUDIT-H1 代码、测试与 DEVLOG 作为基于 main 的单一提交，避免 per-commit DEVLOG gate 被增量修正提交阻断。
+- 针对性回归：AUDIT-H1/bootstrap/early-stop **84 passed**；Ruff check/format、mypy **93 source files** 通过。此前非 Git-history 全量回归为 1531 passed / 2 skipped；唯一未能在隔离副本执行的失败项依赖 Git blob（隔离副本无 .git），其余两项旧异常文本断言已修正并针对性通过。
+- 本地不具备 Git 历史，完整 pytest 与 DEVLOG/Management 历史门禁继续以新 PR head 的三平台 Actions 为权威。未执行真实 T1/T2/T3、B1-B7、Data Sufficiency、身份冻结或回填，production_account.yaml 继续为空。
+
+**Next**
+
+- 等待新 PR head 的 Windows 3.14、Windows 3.12、Ubuntu 3.14 required CI 和治理门禁全绿，再交 Reviewer 审阅；在合并前保持真实 T1 暂停。
+- 旧 run 300 的失败只作为过程记录，不作为新 head 的测试结论。
+## 2026-09-05 · AUDIT-H1 T1 trust-boundary remediation
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_FINAL_CI / PENDING_REVIEW**：按 [外部审计管理裁决](design/A-share-analysis_外部审计REV01-08管理裁决与整改路线_20260905.md) 实施 REV-01、REV-02A、REV-04；基线为 main `c939b747a46d4fc2ef62b8a427b431751346449a`。
+- Online candidate 现在要求 actual-load runtime、有效数字权限和 NOT_FROZEN；package-only offline 使用独立 OFFLINE_PACKAGE_VERIFIED；已有不同冻结身份不会产生新候选。Session 与 bootstrap 共用权限解析器，原身份 digest 不变。
+- 新增 Safe Diagnostic Projection；doctor、CLI stdout/文件和 bootstrap 统一验证公开字段。嵌套 dict/list/tuple 敏感键递归脱敏；session load/login 错误只保留固定类型，不公开原始消息、上下文或异常链。原生 fd1/fd2、Python stdout/stderr 受控捕获；内层独立 login capture 保留画像解析。
+- 三平台 matrix 全部 required，continue-on-error=false。公共 CI 继续无生产凭证、无 AmazingData SDK。
+- 本地 Windows Python 3.14.6、通过 GitHub 连接器获取的隔离副本：AUDIT-H1 + bootstrap focused **70 passed**；Ruff check/format、mypy（93 source files）、scripts compileall、Spike dry-run、SDK-absent 检查通过。此前相关 session/capture/provider 回归 **87 passed**。
+- 本地全量非 Git-history suite 另行运行；源码副本不是 git checkout，不能在本地证明 DEVLOG 历史门禁。完整 pytest 与真实 Git 历史门禁必须由最终 PR head 的三平台 CI 提供；本提交不预填 CI 成功或沿用旧 head 结果。
+- DEVLOG / DEVELOPMENT_MANAGEMENT / runbook 同批更新。运行时私有输出仅限本机自动关闭清理的临时介质，不声称从不落盘或强制终止后安全擦除。
+- production_account.yaml 保持原始空配置；未执行真实 T1、T2、T3、B1-B7、Data Sufficiency、审批或回填；未上传秘密、端点、原始 SDK 输出或专有依赖。
+
+**Next**
+
+- 收齐最终 head 三平台 required CI 和治理门禁证据，提交 Reviewer 审阅；本次不自行合并。通过并合并后才恢复真实 T1。
+- REV-02B 介质架构、REV-03 recovery、REV-05 history、REV-06 hard deadline、REV-07 performance、REV-08 replay 按管理裁决的对应阶段关闭，本轮不混入整改。
+
 ## 2026-09-05 · Comprehensive project review handoff (documentation only)
 
 **Implementation Status / Review Status**

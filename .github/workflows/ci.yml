@@ -9,8 +9,8 @@ on:
 # Task book section 1.1/1.4 (2026-08-21): reference production Python = 3.14.
 # Matrix:
 #   Windows + 3.14    REQUIRED  (reference production runtime)
-#   Windows + 3.12    COMPATIBILITY (minimum supported version)
-#   Linux   + 3.14    RECOMMENDED (cross-platform manifest/file_uri drift)
+#   Windows + 3.12    REQUIRED (minimum supported version)
+#   Linux   + 3.14    REQUIRED (cross-platform manifest/file_uri drift)
 # CI never installs the AmazingData SDK and holds no real provider credentials.
 
 jobs:
@@ -25,12 +25,12 @@ jobs:
             required: true
           - os: windows-latest
             python-version: "3.12"
-            required: false
+            required: true
           - os: ubuntu-latest
             python-version: "3.14"
-            required: false
+            required: true
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ !matrix.required }}
+    continue-on-error: false
     steps:
       - uses: actions/checkout@v4
         with:

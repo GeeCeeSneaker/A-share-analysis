@@ -2,8 +2,10 @@
 
 This command is the controlled entry point for a real-account identity
 check. Credentials are read only from TGW_* environment variables or the
-local .env file; they are never printed, persisted, or passed as CLI
-arguments. The command emits only a scrubbed profile and runtime facts.
+local .env file; they are never printed, saved as project evidence, or passed
+as CLI arguments. SDK fd output may use auto-cleaned local temporary capture
+files.
+The command emits only a scrubbed profile and runtime facts.
 
 It deliberately does not write configs/production_account.yaml. A human
 must confirm that the returned scrubbed identity belongs to this project
@@ -20,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import sys
 from datetime import UTC, datetime
@@ -33,9 +34,16 @@ from ashare_state.providers.amazingdata.production_identity import (
     is_generated_scrubbed_profile_id,
     load_frozen_production_identity,
 )
+from ashare_state.providers.amazingdata.safe_diagnostics import (
+    parse_permission_codes,
+    safe_diagnostic_projection,
+)
+from ashare_state.providers.amazingdata.safe_diagnostics import safe_number as _safe_number
 from ashare_state.providers.amazingdata.stdout_capture import (
     CapturedStderr,
+    CapturedStdout,
     sdk_stderr_into,
+    sdk_stdout_into,
 )
 
 _ENV_KEYS = (
@@ -86,20 +94,8 @@ def _credentials_from_env(env: dict[str, str]) -> tuple[str, str, str, int] | No
 
 
 def _safe_permission_codes(value: Any) -> str:
-    """Keep only numeric entitlement codes and their public separators."""
-
-    if not isinstance(value, str):
-        return ""
-    candidate = value.strip()
-    if not candidate or len(candidate) > 200:
-        return ""
-    return candidate if all(char.isdigit() or char in "|,; " for char in candidate) else ""
-
-
-def _safe_number(value: Any) -> int | float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return value if math.isfinite(float(value)) else None
+    """Return a deterministic expression of parsed numeric permission codes."""
+    return "|".join(parse_permission_codes(value))
 
 
 def _profile_kind(profile_id: str) -> str:
@@ -118,7 +114,16 @@ def _normalized_runtime_verdict(raw: dict[str, Any]) -> str:
 def _offline_safe_report(raw: dict[str, Any]) -> dict[str, Any]:
     """Return runtime-only facts; never inspect account/profile state."""
 
+    raw = safe_diagnostic_projection(raw, offline=True)
     sdk_state = str(raw.get("sdk_state") or "NOT_TESTED")
+    verdict = _normalized_runtime_verdict(raw)
+    status = "NOT_TESTABLE_RUNTIME"
+    if sdk_state != "SDK_INSTALLED":
+        status = "NOT_TESTABLE_SDK"
+    elif verdict == "RUNTIME_ACTUAL_LOAD_VERIFIED":
+        status = "OFFLINE_RUNTIME_VERIFIED"
+    elif verdict == "RUNTIME_PACKAGE_VERIFIED":
+        status = "OFFLINE_PACKAGE_VERIFIED"
     return {
         "schema": "production_account_bootstrap.v1",
         "checked_at": raw.get("checked_at") or datetime.now(UTC).isoformat(),
@@ -131,9 +136,7 @@ def _offline_safe_report(raw: dict[str, Any]) -> dict[str, Any]:
         "TGW_RUNTIME_REPORTED_VERSION": raw.get("TGW_RUNTIME_REPORTED_VERSION"),
         "runtime_verdict": _normalized_runtime_verdict(raw),
         "offline": True,
-        "bootstrap_status": (
-            "OFFLINE_RUNTIME_VERIFIED" if sdk_state == "SDK_INSTALLED" else "NOT_TESTABLE_SDK"
-        ),
+        "bootstrap_status": status,
     }
 
 
@@ -145,6 +148,7 @@ def _safe_report(
     if offline:
         return _offline_safe_report(raw)
 
+    raw = safe_diagnostic_projection(raw)
     profile = raw.get("ACCOUNT_PROFILE")
     profile = profile if isinstance(profile, dict) else {}
     profile_id_candidate = str(profile.get("account_profile_id") or "")
@@ -155,7 +159,7 @@ def _safe_report(
     profile_parsed = bool(profile_id)
     profile_kind = _profile_kind(profile_id)
     profile_is_freezable = is_freezable_production_candidate_id(profile_id)
-    entitlement_verified = profile_parsed and bool(permission_codes)
+    entitlement_verified = profile_parsed and len(parse_permission_codes(permission_codes)) > 0
     authenticated = raw.get("AUTHENTICATED") == "YES"
     query_ready = raw.get("QUERY_READY") == "YES"
 
@@ -180,6 +184,8 @@ def _safe_report(
         bootstrap_status = "NOT_TESTABLE_ACCOUNT"
     elif sdk_state != "SDK_INSTALLED":
         bootstrap_status = "NOT_TESTABLE_SDK"
+    elif runtime_verdict != "RUNTIME_ACTUAL_LOAD_VERIFIED":
+        bootstrap_status = "NOT_TESTABLE_RUNTIME"
     elif not authenticated:
         bootstrap_status = "NOT_TESTABLE_ACCOUNT"
     elif not profile_parsed:
@@ -194,6 +200,8 @@ def _safe_report(
         bootstrap_status = "NOT_TESTABLE_PROFILE"
     elif production_status == "PRODUCTION":
         bootstrap_status = "FROZEN_IDENTITY_MATCH_REQUIRES_REVIEW"
+    elif production_status != "NOT_FROZEN":
+        bootstrap_status = "FROZEN_IDENTITY_MISMATCH"
     else:
         bootstrap_status = "IDENTITY_CANDIDATE"
 
@@ -257,14 +265,16 @@ def _run_doctor_with_stderr_containment(
     """Run doctor without allowing raw stderr to escape the process."""
 
     holder = CapturedStderr()
+    stdout = CapturedStdout()
     raw: dict[str, Any] | None = None
     try:
-        with sdk_stderr_into(holder):
+        with sdk_stdout_into(stdout), sdk_stderr_into(holder):
             raw = run_doctor(credentials=credentials, offline=offline)
     except Exception:  # noqa: BLE001 - raw error text must not escape
         pass
     stderr_observed = bool(holder.text)
     holder.text = ""
+    stdout.text = ""
     return raw, stderr_observed
 
 
@@ -297,7 +307,12 @@ def main() -> int:
             safe["bootstrap_status"] = "ERROR"
             exit_code = 3
         else:
-            exit_code = 0 if safe["bootstrap_status"] == "OFFLINE_RUNTIME_VERIFIED" else 2
+            exit_code = (
+                0
+                if safe["bootstrap_status"]
+                in {"OFFLINE_RUNTIME_VERIFIED", "OFFLINE_PACKAGE_VERIFIED"}
+                else 2
+            )
     else:
         env = load_env(args.env_file)
         credentials = _credentials_from_env(env)

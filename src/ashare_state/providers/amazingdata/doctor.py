@@ -28,13 +28,19 @@ from ashare_state.providers.amazingdata.errors import (
     ProviderError,
     ProviderUnavailableError,
 )
+from ashare_state.providers.amazingdata.safe_diagnostics import (
+    safe_diagnostic_projection,
+    safe_error_code,
+)
 from ashare_state.providers.amazingdata.sdk_loader import (
     probe_identity,
     resolve_packaged_runtime_path,
 )
 from ashare_state.providers.amazingdata.session import AmazingDataSession
 from ashare_state.providers.amazingdata.stdout_capture import (
+    CapturedStderr,
     CapturedStdout,
+    sdk_stderr_into,
     sdk_stdout_into,
 )
 
@@ -131,7 +137,7 @@ def _network_probe(host: str, port: int, timeout_seconds: float = 5.0) -> str:
         return f"UNREACHABLE ({type(exc).__name__})"
 
 
-def run_doctor(
+def _collect_doctor(
     *,
     credentials: tuple[str, str, str, int] | None,
     offline: bool = False,
@@ -152,7 +158,7 @@ def run_doctor(
         identity = probe_identity(require_sdk=not offline)
     except ProviderUnavailableError as exc:
         report["sdk_state"] = "SDK_NOT_INSTALLED"
-        report["detail"] = str(exc)
+        report["error_code"] = safe_error_code(exc)
         report["verdict"] = "RUNTIME_PATH_AMBIGUOUS"  # nothing to verify
         return report
 
@@ -234,7 +240,7 @@ def run_doctor(
                 report["TGW_LOADED_DLL_VERSION"] = _dll_file_version(post_dlls[0])
         except ProviderError as exc:
             report["AUTHENTICATED"] = f"NO ({type(exc).__name__})"
-            report["auth_error"] = str(exc)[:300]
+            report["auth_error"] = safe_error_code(exc)
         finally:
             session.logout()
 
@@ -272,3 +278,26 @@ def run_doctor(
         report["verdict"] = "RUNTIME_PATH_AMBIGUOUS"
         report["verdict_detail"] = "no packaged runtime found for this ABI"
     return report
+
+
+def run_doctor(
+    *,
+    credentials: tuple[str, str, str, int] | None,
+    offline: bool = False,
+) -> dict[str, Any]:
+    """Collect under output containment and return only public safe diagnostics."""
+    stdout, stderr = CapturedStdout(), CapturedStderr()
+    try:
+        with sdk_stdout_into(stdout), sdk_stderr_into(stderr):
+            try:
+                raw = _collect_doctor(credentials=credentials, offline=offline)
+            except Exception as exc:  # noqa: BLE001 - do not emit SDK exception text
+                raw = {
+                    "sdk_state": "ERROR",
+                    "verdict": "NOT_VERIFIED",
+                    "error_code": safe_error_code(exc),
+                }
+        return safe_diagnostic_projection(raw, offline=offline)
+    finally:
+        stdout.text = ""
+        stderr.text = ""
