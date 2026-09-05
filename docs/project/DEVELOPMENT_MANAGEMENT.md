@@ -1,3 +1,30 @@
+## DM-20260905-149 · T1 controlled online bootstrap candidate（当前权威，覆盖下方历史状态）
+
+**Type**：C2 — controlled production identity qualification  
+**Date**：2026-09-05  
+**Status**：**IDENTITY_CANDIDATE / PENDING_T2 / CONFIG_EMPTY / FORMAL_B1-B7_BLOCKED**  
+**Authority**：[AUDIT-H1 关闭与 T1 执行要求](../design/A-share-analysis_AUDIT-H1关闭与T1正式线上身份候选执行要求_20260905.md)  
+**Source binding**：源码树 `6671c6e388163b9cb15137f716247b36d0290cc4` 已随 merge commit `c9787d243be5ca02a46496e38d5401fbf38a255b` 进入当前 main；当前 main `9b08d40b4318dbd6a7784a14a9e86a743374713f`。  
+**Evidence**：[T1 脱敏证据](../provider_verification/t1_bootstrap_20260905.md)
+
+### Current verified facts
+
+- Controlled Windows Python 3.14.6 successfully loaded AmazingData 1.1.9 / tgw 1.0.9.2; runtime verdict is `RUNTIME_ACTUAL_LOAD_VERIFIED`.
+- The single controlled T1 bootstrap returned `NETWORK_REACHABLE=REACHABLE`, `AUTHENTICATED=YES`, `QUERY_READY=YES`, parsed profile and verified numeric entitlement evidence.
+- The only candidate is the scrubbed generated ID `UNKNOWN_24e2ff401792`; `production_identity_status=NOT_FROZEN`, `config_written=false`, and `human_confirmation_required=true`.
+- `configs/production_account.yaml` remains empty. No raw credentials, endpoint, Token, profile, SDK output or local bootstrap file is repository evidence.
+
+### Gate
+
+T1 is complete and stopped at its truthful terminal result. T2 is now the blocking human decision: Owner/Reviewer must confirm the exact scrubbed ID outside SDK inference. Until then, T3 identity freeze, formal Production B1-B7, Data Sufficiency, verdict, Provider capability approval and backfill remain blocked.
+
+### Next
+
+Review this focused T1 evidence PR; after explicit T2 confirmation, create a separate T3 identity-freeze PR containing only the exact confirmed ID and required timezone-aware human confirmation fields.
+
+
+---
+
 # A-share-analysis 开发管理总册（Development Management）
 
 ## DM-20260905-148 · AUDIT-H1 当前整改状态（覆盖下方历史头部）
