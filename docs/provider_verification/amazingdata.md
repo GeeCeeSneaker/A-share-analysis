@@ -1,4 +1,4 @@
-## 1.4 2026-09-05 合并后 T1 受控 online bootstrap 前置检查
+## 1.4 2026-09-05 合并后 T1 受控 online bootstrap 前置检查（历史记录）
 
 - main 当前已包含 PR #9 merge commit `f38e77ff2cbcf040837bc1c15504f847e1cfb1d8`；本次只验证受控入口的环境门禁，不重述或扩大历史 smoke 事实。
 - Windows Python 3.14.6 离线 preflight 实际加载 `AmazingData==1.1.9` 与 `tgw==1.0.9.2`，runtime verdict 为 `RUNTIME_ACTUAL_LOAD_VERIFIED`，offline 状态为 `OFFLINE_RUNTIME_VERIFIED`。
@@ -8,8 +8,18 @@
 
 # Provider Verification — AmazingData / TGW（中国银河证券 格物金融服务平台）
 
-> 状态：**历史试用账号 B1 证据保留；正式账号本地 SDK 冒烟通过；正式 repo B1-B7 / verdict / approval 仍待执行与复核**
+> 状态：**T1 脱敏身份候选已产生；T2 人工确认待处理；正式身份未冻结；Production B1-B7 / verdict / approval 仍待执行与复核**
 > 本文件是 Provider 事实的唯一权威记录处（V1.3.2 §7.14）。主架构文档不维护接口细节。
+
+
+## 1.5 2026-09-05 T1 受控线上身份候选（当前权威）
+
+- **源码绑定**：本次使用的 H1 源码树为 `6671c6e388163b9cb15137f716247b36d0290cc4`，已随 merge commit `c9787d243be5ca02a46496e38d5401fbf38a255b` 进入 main；当前复核 main 为 `9b08d40b4318dbd6a7784a14a9e86a743374713f`。
+- **受控环境**：Windows Python 3.14.6；AmazingData 1.1.9；tgw 1.0.9.2；runtime reported version `V4.3.0.260626-rc2.0-YHZQ`；checked_at `2026-09-05T13:36:45.179509+00:00`。
+- **安全投影**：`SDK_INSTALLED`、`RUNTIME_ACTUAL_LOAD_VERIFIED`、`NETWORK_REACHABLE=REACHABLE`、`AUTHENTICATED=YES`、`QUERY_READY=YES`；profile 解析/数字权限校验通过；脱敏候选为 `UNKNOWN_24e2ff401792`。
+- **当前门禁**：`production_identity_status=NOT_FROZEN`、`bootstrap_status=IDENTITY_CANDIDATE`、`config_written=false`、`human_confirmation_required=true`。`configs/production_account.yaml` 保持为空。
+- **边界**：这只是允许 T2 人工确认的脱敏候选，不是正式身份冻结、Provider capability approval、Production B1-B7、Data Sufficiency、verdict 或 backfill。原始凭证、endpoint、Token、profile、SDK stdout/stderr 和本地原始文件不进入 GitHub。
+- **证据**：完整 allowlisted projection 见 [T1 bootstrap evidence](t1_bootstrap_20260905.md)；下一步只等待 T2，不重复无凭证预检或直接启动 B1-B7。
 
 ## 1. SDK 与环境（已验证）
 
@@ -134,7 +144,7 @@ uv run python scripts/spike/production_account_bootstrap.py --output data/spike/
 - 空配置、未确认配置、试用形态、畸形 YAML、额外字段、敏感 marker、未解析 profile、缺 PermissionCode 和未知/非 exact-match profile 均保持 NOT_TESTABLE / UNKNOWN；RunKind.PRODUCTION 不会单独升级账号身份。
 - bootstrap projection 对 provider 返回的 profile id、权限码和额度执行安全类型投影；这批 focused tests 只证明仓库 fail-closed 边界，不产生 live identity candidate。
 - 仓库 CI 证据：最终代码 head `66ab5ec7` 对应 run `33899576457`（run 277）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功，每腿 `1449 passed`；Ruff、mypy、Spike dry-run、SDK-absent 及适用治理门禁均通过。该结果只验证仓库 guard，不是 live bootstrap 或正式 profile 证据。
-- 当前状态：configs/production_account.yaml 仍为空；未通过 GitHub-only 仓库工作流发布人工确认记录，因此正式 identity freeze、B1-B7、Data Sufficiency Matrix、verdict 和 capability approval 继续未评定。
+- 当前状态：T1 已产生脱敏 identity candidate `UNKNOWN_24e2ff401792`；`configs/production_account.yaml` 仍为空，T2 人工确认待处理，因此正式 identity freeze、B1-B7、Data Sufficiency Matrix、verdict 和 capability approval 继续未评定。
 
 
 ## 4. C++ SDK 存档（2026-08-21 摸底，已被 Python 版取代为集成路径）

@@ -1,3 +1,22 @@
+## 2026-09-05 · T1 controlled online bootstrap — identity candidate
+
+**Implementation Status / Review Status**
+
+- **T1_CANDIDATE / PENDING_T2 / CONFIG_EMPTY / FORMAL_B1-B7_BLOCKED**：按 [T1 受控线上身份候选执行要求](design/A-share-analysis_AUDIT-H1关闭与T1正式线上身份候选执行要求_20260905.md) 使用唯一 bootstrap 入口完成一次受控 Windows online 执行。结果为 `IDENTITY_CANDIDATE`，不是 Provider 能力批准或 Production verdict。
+- 源码树 `6671c6e388163b9cb15137f716247b36d0290cc4` 已随 H1 merge commit `c9787d243be5ca02a46496e38d5401fbf38a255b` 进入 main；本次执行后复核当前 main 为 `9b08d40b4318dbd6a7784a14a9e86a743374713f`。
+- 安全投影：`SDK_INSTALLED`、`RUNTIME_ACTUAL_LOAD_VERIFIED`、`AUTHENTICATED=YES`、`QUERY_READY=YES`、`profile_parsed=true`、`entitlement_verified=true`；脱敏候选为 `UNKNOWN_24e2ff401792`，解析出数字权限码，`production_identity_status=NOT_FROZEN`。
+- 本次 checked_at 为 `2026-09-05T13:36:45.179509+00:00`；Windows Python 3.14.6，AmazingData 1.1.9，tgw 1.0.9.2；仅记录安全字段，未记录用户名、密码、Token、真实 endpoint、raw profile 或 raw SDK 输出。
+- `configs/production_account.yaml` 保持为空；执行在候选投影后停止，未进入 T3、Production B1-B7、Data Sufficiency、verdict、Provider approval 或 backfill。
+
+**Evidence**
+
+- 脱敏字段与完整 allowlist 见 [T1 evidence](provider_verification/t1_bootstrap_20260905.md)。
+- 本地原始 bootstrap 文件不进入仓库；仓库只保存上述最小安全投影。
+
+**Next**
+
+- 等待 Owner/Reviewer 对 exact `UNKNOWN_24e2ff401792` 做 T2 人工确认；确认前保持 production identity 未冻结，不创建 T3 配置提交，不启动 B1-B7。
+
 ## 2026-09-05 · AUDIT-H1 CI corrective follow-up
 
 **Implementation Status / Review Status**
