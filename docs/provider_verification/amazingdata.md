@@ -8,7 +8,7 @@
 
 # Provider Verification — AmazingData / TGW（中国银河证券 格物金融服务平台）
 
-> 状态：**T1 脱敏身份候选已产生；T2 人工确认待处理；正式身份未冻结；Production B1-B7 / verdict / approval 仍待执行与复核**
+> 状态：**T2 已确认；T3 身份冻结 PR 待独立审阅与合并；正式身份在合并前仍未冻结；Production B1-B7 / verdict / approval 继续 blocked**
 > 本文件是 Provider 事实的唯一权威记录处（V1.3.2 §7.14）。主架构文档不维护接口细节。
 
 
@@ -20,6 +20,15 @@
 - **当前门禁**：`production_identity_status=NOT_FROZEN`、`bootstrap_status=IDENTITY_CANDIDATE`、`config_written=false`、`human_confirmation_required=true`。`configs/production_account.yaml` 保持为空。
 - **边界**：这只是允许 T2 人工确认的脱敏候选，不是正式身份冻结、Provider capability approval、Production B1-B7、Data Sufficiency、verdict 或 backfill。原始凭证、endpoint、Token、profile、SDK stdout/stderr 和本地原始文件不进入 GitHub。
 - **证据**：完整 allowlisted projection 见 [T1 bootstrap evidence](t1_bootstrap_20260905.md)；下一步只等待 T2，不重复无凭证预检或直接启动 B1-B7。
+
+
+
+## 1.6 2026-09-05 T2 人工确认与 T3 身份冻结提案（当前权威）
+
+- **T2 状态**：项目 Owner 已确认 exact scrubbed candidate `UNKNOWN_24e2ff401792` 对应计划使用的正式账号；确认时间为 `2026-09-05T22:19:58+08:00`，安全确认标记为 `project-owner`。
+- **T3 提案**：本 PR 仅设置 `production_account_profile_id`、`confirmed_at`、`confirmed_by` 三个允许字段，候选值不做 trim、大小写归一化、alias 或手工改写。
+- **当前门禁**：在 T3 PR 完成独立审阅、三平台 required CI 通过并合并前，生产身份仍不得视为冻结；不得运行 Production B1-B7、Data Sufficiency、verdict、Provider capability approval 或 backfill。
+- **秘密边界**：账号、密码、Token、真实 endpoint、原始 profile、原始 SDK stdout/stderr 和本地 bootstrap 文件不进入 GitHub。
 
 ## 1. SDK 与环境（已验证）
 
@@ -144,7 +153,7 @@ uv run python scripts/spike/production_account_bootstrap.py --output data/spike/
 - 空配置、未确认配置、试用形态、畸形 YAML、额外字段、敏感 marker、未解析 profile、缺 PermissionCode 和未知/非 exact-match profile 均保持 NOT_TESTABLE / UNKNOWN；RunKind.PRODUCTION 不会单独升级账号身份。
 - bootstrap projection 对 provider 返回的 profile id、权限码和额度执行安全类型投影；这批 focused tests 只证明仓库 fail-closed 边界，不产生 live identity candidate。
 - 仓库 CI 证据：最终代码 head `66ab5ec7` 对应 run `33899576457`（run 277）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功，每腿 `1449 passed`；Ruff、mypy、Spike dry-run、SDK-absent 及适用治理门禁均通过。该结果只验证仓库 guard，不是 live bootstrap 或正式 profile 证据。
-- 当前状态：T1 已产生脱敏 identity candidate `UNKNOWN_24e2ff401792`；`configs/production_account.yaml` 仍为空，T2 人工确认待处理，因此正式 identity freeze、B1-B7、Data Sufficiency Matrix、verdict 和 capability approval 继续未评定。
+- 当前状态：T1 脱敏 identity candidate `UNKNOWN_24e2ff401792` 已获项目 Owner T2 确认；T3 仅待独立审阅、CI 和合并，正式 identity freeze 在合并前仍未生效，B1-B7、Data Sufficiency Matrix、verdict 和 capability approval 继续 blocked。
 
 
 ## 4. C++ SDK 存档（2026-08-21 摸底，已被 Python 版取代为集成路径）

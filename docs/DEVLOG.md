@@ -1,3 +1,21 @@
+## 2026-09-05 · T2 confirmed — separate T3 identity-freeze proposal
+
+**Implementation Status / Review Status**
+
+- **T2_CONFIRMED / T3_PR_OPEN / PENDING_REVIEW / FORMAL_B1-B7_BLOCKED**：项目 Owner 已确认 exact scrubbed candidate `UNKNOWN_24e2ff401792` 对应计划使用的正式账号；确认时间 `2026-09-05T22:19:58+08:00`，安全标记 `project-owner`。
+- T1 证据 PR #13 已合并到 main；三平台 required CI run 304（`33969635047`）全绿。T1 记录仍保持为脱敏事实，不把原始账号资料带入仓库。
+- 本次 T3 只提出以下三个配置字段：`production_account_profile_id=${candidate}`、带时区 `confirmed_at`、安全 `confirmed_by`；不修改其它配置键，不执行任何 provider 或生产数据动作。
+- 在 T3 PR 独立审阅、三平台 CI 通过并合并前，生产身份不视为已冻结；未执行 Production B1-B7、Data Sufficiency、verdict、Provider approval 或 backfill。
+
+**Evidence**
+
+- T1 脱敏投影：[t1_bootstrap_20260905.md](provider_verification/t1_bootstrap_20260905.md)。
+- T3 配置候选与本次治理变更由本 PR 单独审阅；用户名、密码、Token、真实 endpoint、raw profile、raw SDK 输出和本地原始文件均不进入 GitHub。
+
+**Next**
+
+- 等待独立 Reviewer 审阅 T3 exact config；合并前保持 Formal Production B1-B7 blocked。T3 合并后再按文档单独启动一个受治理 Production run。
+
 ## 2026-09-05 · T1 controlled online bootstrap — identity candidate
 
 **Implementation Status / Review Status**
