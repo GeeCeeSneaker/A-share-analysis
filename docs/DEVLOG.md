@@ -1,3 +1,16 @@
+## 2026-09-05 · P0-M-1B.0.1 bootstrap whitespace regression closure
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE**：审阅者要求的 bootstrap doctor-profile 前后空白回归覆盖已补齐；`" UNKNOWN_abc123def456"` 与 `"UNKNOWN_abc123def456 "` 均断言为非零退出、`NOT_TESTABLE_PROFILE`、`UNAVAILABLE`，且不会成为 `IDENTITY_CANDIDATE`。
+- 测试/代码 head `75b998a79931b8c7d0c9ebf67bcd7a1a4549c0df` 对应 GitHub Actions run `33937401530`；Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵均成功，每腿 `1485 passed`。
+- Ruff lint、Ruff format、mypy、完整 pytest、Spike framework gates、SDK-absent 检查及适用 Windows 3.14 DEVLOG/Management gates 均通过。
+- `configs/production_account.yaml` 保持为空；未执行 online bootstrap、identity freeze、Production B1-B7、Data Sufficiency、verdict 或 Provider approval。
+
+**Next**
+
+- 请求 Owner/Reviewer 对 PR #9 当前实现进行最终审阅；PR 合并前继续保持正式线上验证和配置冻结不执行。
+
 ## 2026-09-05 · P0-M-1B.0.1 full matrix closure
 
 **Implementation Status / Review Status**
