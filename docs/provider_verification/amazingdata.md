@@ -1,3 +1,11 @@
+## 1.4 2026-09-05 合并后 T1 受控 online bootstrap 前置检查
+
+- main 当前已包含 PR #9 merge commit `f38e77ff2cbcf040837bc1c15504f847e1cfb1d8`；本次只验证受控入口的环境门禁，不重述或扩大历史 smoke 事实。
+- Windows Python 3.14.6 离线 preflight 实际加载 `AmazingData==1.1.9` 与 `tgw==1.0.9.2`，runtime verdict 为 `RUNTIME_ACTUAL_LOAD_VERIFIED`，offline 状态为 `OFFLINE_RUNTIME_VERIFIED`。
+- online bootstrap 在登录前因本地工作区没有 `.env` 且进程环境没有 `TGW_*` 变量而停止；安全无凭证检查为 `NOT_TESTABLE_ACCOUNT` / exit 2。未发起登录请求，不产生正式账号 profile、live identity candidate 或 entitlement 事实。
+- `configs/production_account.yaml` 仍为空；凭证、Token、真实 host/port、raw SDK stdout/stderr、raw profile 不进入 GitHub。
+- 下一步：只在受控 Windows 进程环境或未跟踪本地 `.env` 安全注入凭证后重跑 `production_account_bootstrap.py`；得到 scrubbed `IDENTITY_CANDIDATE` 后停止等待 T2 人工确认。T3、B1-B7、Data Sufficiency、verdict 和 Provider approval 继续 blocked。
+
 # Provider Verification — AmazingData / TGW（中国银河证券 格物金融服务平台）
 
 > 状态：**历史试用账号 B1 证据保留；正式账号本地 SDK 冒烟通过；正式 repo B1-B7 / verdict / approval 仍待执行与复核**
