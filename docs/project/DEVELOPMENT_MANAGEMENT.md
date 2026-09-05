@@ -6,12 +6,12 @@
 > **Frozen Baseline**：V1.3.2  
 > **Reviewed Repository HEAD**：`4a5aedafbec2b128b1656d1e152a6938ae0c88c9`（PR #8 合并及身份冻结工作要求后的 main 基线；分支历史保持 append-only）  
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d` 已随 PR #6 合入 main；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`；State/Provider 语义边界保持冻结。  
-> **Latest full code CI baseline（PR #9 candidate）**：GitHub Actions run `33899576457`（run 277）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1449 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均成功。  
+> **Latest full code CI baseline（PR #9 candidate）**：测试/代码 head `75b998a79931b8c7d0c9ebf67bcd7a1a4549c0df` 对应 GitHub Actions run `33937401530`，已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1485 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均成功。  
 > **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 VERIFIED (CI) / PENDING_REVIEW；P0-M-1B.0 scrubbed bootstrap 与 positive identity gates 当前 VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW；P0-M-1B.0.1 positive identity contract honesty 当前 VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129 / DM-20260905-130 / DM-20260905-131 / DM-20260905-132 / DM-20260905-133 / DM-20260905-134 / DM-20260905-135 / DM-20260905-136 / DM-20260905-137 / DM-20260905-138 / DM-20260905-139 / DM-20260905-140 / DM-20260905-141 / DM-20260905-142 / DM-20260905-143 / DM-20260905-144 / DM-20260905-145
-> **Last Review**：2026-09-05（P0-M-1B.0.1 已通过三平台 CI run 33935433194，状态 VERIFIED / CLOSED / READY_FOR_REVIEWED_MERGE；PR #9 保持 open，未执行合并；正式 online identity、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待 PR 合并后执行）  
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129 / DM-20260905-130 / DM-20260905-131 / DM-20260905-132 / DM-20260905-133 / DM-20260905-134 / DM-20260905-135 / DM-20260905-136 / DM-20260905-137 / DM-20260905-138 / DM-20260905-139 / DM-20260905-140 / DM-20260905-141 / DM-20260905-142 / DM-20260905-143 / DM-20260905-144 / DM-20260905-145 / DM-20260905-146
+> **Last Review**：2026-09-05（P0-M-1B.0.1 已通过三平台 CI run `33937401530`，状态 VERIFIED / CLOSED / READY_FOR_REVIEWED_MERGE；PR #9 保持 open、非草稿、未执行合并；正式 online identity、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待 PR 合并后执行）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：PR #9 candidate 的 P0-M-1B.0.1 closure run `33935433194` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全绿，每腿 `1483 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 和适用的 DEVLOG/Management gates 均 success。main 的 merge-gate 历史基线不因本 PR 自动改变。  
+> **CI Status**：PR #9 candidate 的 P0-M-1B.0.1 final code/test run `33937401530` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全绿，每腿 `1485 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 和适用的 DEVLOG/Management gates 均 success。main 的 merge-gate 历史基线不因本 PR 自动改变。  
 > **Phase Status（2026-09-05，P0-M-1B.0 identity guard CI verification + local offline bootstrap preflight）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-020 ACCEPTED）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 → **VERIFIED / CLOSED / FREEZE（ADR-025 ACCEPTED；PR #3 merged）**；CR-6 State → **VERIFIED / CLOSED / FREEZE（CR-6.4 final Reviewer closure accepted；ADR-026 ACCEPTED）**；2020+ history contract → **VERIFIED / KEEP（Owner-approved 2020+ contract implementation；Provider capability remains pending）**；P0-M-1B.0 / P0-M-1B.0.1 identity contract → **VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 正式 identity/entitlement、formal B1-B7、Golden/Data Sufficiency Matrix 与人工 Reviewer review 尚未完成）  
 > **Production Runner Anchored Wiring（PR #8 review）**：original anchored-wiring P0 已 VERIFIED (CI) / PENDING_REVIEW；PR #8.1 CLI / resume honesty 已 VERIFIED (CI) / PENDING_REVIEW；PR #8 已于 `74ae84e0e6950f7f7dc926d225be105fdb99279a` 合入 main；当前进入 P0-M-1B.0 受控 identity candidate / human confirmation 阶段。  
 > **Historical snapshot（已被上方当前状态取代）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 → **DONE / REOPENED**（主体 PASS；仅剩 P1 bounded lineage）；CR-5.1 → **VERIFIED / CLOSED / FREEZE**（correctness closure）；CR-5.2 → **DONE / PENDING_REVIEW**（bounded selected-input lineage；run 176 三平台全绿，Reviewer closure pending）；CR-6 State → **BLOCKED_BY_CR-5.2**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
@@ -23,6 +23,22 @@
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
 ---
+
+## DM-20260905-146 · P0-M-1B.0.1 bootstrap whitespace regression closure
+
+**Type**：C1 — reviewer-required regression coverage  
+**Date**：2026-09-05  
+**Status**：VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE  
+**Evidence**：测试/代码 head `75b998a79931b8c7d0c9ebf67bcd7a1a4549c0df`；GitHub Actions run `33937401530`；Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿 `1485 passed`。
+
+- 已补充 doctor `account_profile_id` 前后空白的参数化 bootstrap integration coverage；两种输入均必须 fail closed，不能进入 `IDENTITY_CANDIDATE`。
+- Ruff lint/format、mypy、完整 pytest、Spike、SDK-absent 和适用治理门禁均通过；`configs/production_account.yaml` 继续为空。
+- PR #9 的技术闭环已重新提交最终审阅；本项不执行 online bootstrap、identity freeze、Production B1-B7、Data Sufficiency、verdict 或 Provider approval。
+
+**Next**
+
+- 等待 Owner/Reviewer 对 PR #9 最终审阅并合并；合并后再按文档启动受控 online bootstrap。
+
 
 ## DM-20260905-145 · P0-M-1B.0.1 full matrix closure
 
