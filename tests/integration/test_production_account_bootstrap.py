@@ -401,6 +401,53 @@ class TestProductionAccountBootstrap:
         assert report["ACCOUNT_PROFILE"]["account_profile_id"] == "UNAVAILABLE"
         assert report["bootstrap_status"] != "IDENTITY_CANDIDATE"
 
+    @pytest.mark.parametrize(
+        "profile_id",
+        [
+            " UNKNOWN_abc123def456",
+            "UNKNOWN_abc123def456 ",
+        ],
+    )
+    def test_online_whitespace_profile_never_becomes_identity_candidate(
+        self, monkeypatch, capsys, profile_id
+    ):
+        module = _load_script()
+
+        monkeypatch.setattr(
+            module,
+            "load_env",
+            lambda _path: {
+                "TGW_USERNAME": "user",
+                "TGW_PASSWORD": "runtime-only",
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": str(0),
+            },
+        )
+        monkeypatch.setattr(
+            module,
+            "run_doctor",
+            lambda **_kwargs: {
+                "sdk_state": "SDK_INSTALLED",
+                "verdict": "RUNTIME_ACTUAL_LOAD_VERIFIED",
+                "AUTHENTICATED": "YES",
+                "QUERY_READY": "YES",
+                "ACCOUNT_PROFILE": {
+                    "account_profile_id": profile_id,
+                    "permission_codes": "1|2",
+                    "subscribe_limit": 5000,
+                    "weekly_flow_limit": 500,
+                },
+            },
+        )
+        monkeypatch.setattr(module, "load_frozen_production_identity", lambda: None)
+        monkeypatch.setattr(sys, "argv", ["production_account_bootstrap.py"])
+
+        assert module.main() == 1
+        report = json.loads(capsys.readouterr().out)
+        assert report["bootstrap_status"] == "NOT_TESTABLE_PROFILE"
+        assert report["ACCOUNT_PROFILE"]["account_profile_id"] == "UNAVAILABLE"
+        assert report["bootstrap_status"] != "IDENTITY_CANDIDATE"
+
     def test_online_exact_generated_non_trial_profile_is_identity_candidate(
         self, monkeypatch, capsys
     ):
