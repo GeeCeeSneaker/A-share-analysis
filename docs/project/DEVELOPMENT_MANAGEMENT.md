@@ -1,3 +1,19 @@
+## DM-20260905-151 · T3 CI corrective follow-up（当前修正）
+
+**Type**：C0 — T3 phase-contract regression correction  
+**Date**：2026-09-05  
+**Status**：**IMPLEMENTED / LOCAL_TARGETED_VERIFIED / CI_PENDING / PENDING_REVIEW**  
+**Trigger**：PR #14 Actions run 306 Ubuntu Python 3.14 pytest failed because the pre-T3 H1 test still required an empty production identity.  
+**Correction**：测试现校验 Windows 3.14、Windows 3.12、Ubuntu 3.14 三腿 required 及 T3 exact config allowlist（`UNKNOWN_24e2ff401792` / `2026-09-05T22:19:58+08:00` / `project-owner`）。  
+**Scope**：不改变 Provider、identity parser、生产 runner 或 B1-B7 语义；不引入凭证、endpoint、Token、raw profile 或 raw SDK output。  
+**Evidence**：本地 focused H1 / production-identity tests 101 passed；PR #14 新 head 的完整三平台 CI 待验证。
+
+**Gate**
+
+T3 仍需独立 Reviewer 审阅、三平台 required CI 全绿并合并；在此之前不得启动 Formal Production B1-B7、Data Sufficiency、verdict、Provider capability approval 或 backfill。
+
+---
+
 ## DM-20260905-150 · T2 confirmed / T3 identity-freeze proposal（当前权威，覆盖下方历史状态）
 
 **Type**：C2 — human-confirmed production identity governance  

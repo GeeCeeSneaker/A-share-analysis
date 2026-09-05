@@ -377,7 +377,7 @@ def test_unsupported_capture_platform_refuses_before_sdk_call(monkeypatch):
         pytest.fail("must not enter an uncontained SDK call")
 
 
-def test_three_ci_legs_are_required_and_production_identity_is_empty():
+def test_three_ci_legs_are_required_and_production_identity_matches_t3_allowlist():
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     job = workflow["jobs"]["quality"]
     assert job.get("continue-on-error", False) is False
@@ -389,11 +389,8 @@ def test_three_ci_legs_are_required_and_production_identity_is_empty():
     }
     assert all(row["required"] is True for row in matrix)
     identity = yaml.safe_load((ROOT / "configs/production_account.yaml").read_text())
-    assert all(
-        not identity.get(key)
-        for key in (
-            "production_account_profile_id",
-            "confirmed_at",
-            "confirmed_by",
-        )
-    )
+    assert identity == {
+        "production_account_profile_id": "UNKNOWN_24e2ff401792",
+        "confirmed_at": "2026-09-05T22:19:58+08:00",
+        "confirmed_by": "project-owner",
+    }

@@ -1,3 +1,15 @@
+## 2026-09-05 · T3 CI corrective follow-up
+
+**Implementation Status / Review Status**
+
+- **CORRECTIVE / LOCAL_TARGETED_VERIFIED / CI_PENDING / PENDING_REVIEW**：T3 首次 CI run 306 的 Ubuntu Python 3.14 pytest 暴露旧 AUDIT-H1 回归测试仍断言生产配置必须为空；这是阶段合同未更新，不是 T3 配置值或身份格式失败。
+- 已将该测试改为校验三平台 required CI 与 T3 三字段 exact allowlist：`UNKNOWN_24e2ff401792`、`2026-09-05T22:19:58+08:00`、`project-owner`；不改变运行时逻辑或生产执行边界。
+- 本地 Windows Python 3.14.6 targeted H1 / production-identity 回归 **101 passed**；重新验证以 GitHub Actions 新 head 的三平台全量 CI 为准。
+- T3 仍不启动 Production B1-B7、Data Sufficiency、verdict、Provider capability approval 或 backfill；身份冻结以独立 Reviewer 审阅、全绿 CI 和合并为准。
+
+**Next**
+
+- 等待 PR #14 新提交的三平台 required CI；通过后提交独立 Reviewer 关闭 T3。
 ## 2026-09-05 · T2 confirmed — separate T3 identity-freeze proposal
 
 **Implementation Status / Review Status**
