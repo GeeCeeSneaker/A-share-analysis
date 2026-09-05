@@ -1,3 +1,15 @@
+## 2026-09-05 · P0-M-1B.0.1 full matrix closure
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE**：run `33935433194` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1483 passed`。
+- Ruff lint、Ruff format、mypy、完整 pytest、Spike framework gates、SDK-absent 检查及适用的 Windows 3.14 DEVLOG/Management gates 均通过。
+- 本次关闭的是 generated identity contract honesty：`UNKNOWN_<12hex>` 是唯一可冻结的 non-trial candidate，Trial profile 明确不可冻结；配置仍为空。
+- PR #9 已达到审阅合并条件，但本次不执行合并；online bootstrap 只能在 PR #9 合并到 clean main 后按文档执行。
+
+**Next**
+
+- 等待 Owner/Reviewer 审阅并合并 PR #9；合并后再执行受控 online bootstrap，先人工确认脱敏 identity，再单独治理提交冻结配置。
 ## 2026-09-05 · P0-M-1B.0.1 whitespace validation correction
 
 **Implementation Status / Review Status**

@@ -3,9 +3,9 @@
 > Date: 2026-09-05  
 > Upstream Reviewer baseline: `4a5aedafbec2b128b1656d1e152a6938ae0c88c9`  
 > Reviewed PR: #9 `P0-M-1B.0 harden positive production identity gates`  
-> Reviewed developer HEAD: `cfc9243581fdc6f855b5a7e5972879e3d039247c`  
-> Verified code CI: `66ab5ec7429b95d81142a4acf18ecf89f7daf8fd` -> GitHub Actions run `33899576457` / run 277, Ubuntu 3.14 + Windows 3.12 + Windows 3.14 SUCCESS, each leg `1449 passed`; Ruff / format / mypy / Spike / SDK-absent and applicable DEVLOG / Management gates green.  
-> Current branch docs-only HEAD run 279 was still executing at review time.  
+> Reviewed implementation HEAD: `3f7ae4b4652856ab2424af7431950a390faebfd9` (closure docs commit may advance the branch head without changing code)  
+> Verified code CI: `3f7ae4b4652856ab2424af7431950a390faebfd9` -> GitHub Actions run `33935433194`, Ubuntu 3.14 + Windows 3.12 + Windows 3.14 SUCCESS, each leg `1483 passed`; Ruff / format / mypy / Spike / SDK-absent and applicable DEVLOG / Management gates green.  
+> Closure CI: GitHub Actions run `33935433194` completed successfully on Ubuntu 3.14, Windows 3.12 and Windows 3.14; each leg `1483 passed` and all listed exit gates are green.  
 > Scope: only positive production identity / bootstrap candidate honesty. Do not start formal Production B1-B7 and do not approve Provider capability.
 
 ---
@@ -30,14 +30,20 @@ PR #9 的总体方向 **PASS / KEEP**：
 PR #8 / PR #8.1 / P0-AD-01(.1)     VERIFIED / CLOSED / MERGED
 P0-M-1B.0 identity-gate architecture PASS / KEEP
 P0-M-1B.0 local offline preflight     VERIFIED / KEEP
-P0-M-1B.0.1 identity contract honesty START / ACTIVE
-PR #9                                  DO NOT MERGE YET
+P0-M-1B.0.1 identity contract honesty VERIFIED / CLOSED
+PR #9                                  READY_FOR_REVIEWED_MERGE (not merged by agent)
 production_account.yaml                EMPTY / KEEP
 Formal Production B1-B7                BLOCKED
 AmazingData Provider approval          BLOCKED
 ```
 
 ---
+
+## 0.1 Closure evidence
+
+P0-M-1B.0.1 的技术 exit gate 已由 run `33935433194` 完成：三平台每腿 `1483 passed`，Ruff、format、mypy、Spike、SDK-absent 及适用 DEVLOG/Management gates 全部成功。generated identity predicate、freezable candidate gate、Trial non-freezable bootstrap gate、config fail-closed 和 bootstrap review paths 均有回归覆盖。
+
+本闭环不产生 production identity，不写入 `configs/production_account.yaml`，也不授权在 PR #9 合并前执行 online bootstrap。
 
 ## 1. P0-01 — freezable identity shape must equal the current real generator contract
 
@@ -211,20 +217,20 @@ The current local offline bootstrap evidence remains valid as SDK/runtime prefli
 P0-M-1B.0.1 is closed only when:
 
 ```text
-[ ] generated scrubbed id shape exactly matches current AccountProfile generator
-[ ] freezable identity is current non-trial generated id only
-[ ] legacy ACCOUNT_* rejected
-[ ] fake PRODUCTION_* / arbitrary kind rejected
-[ ] wrong digest lengths rejected
-[ ] known Trial online bootstrap can never IDENTITY_CANDIDATE
-[ ] exact non-trial generated identity can candidate
-[ ] exact frozen identity can match Production
-[ ] config remains empty in repository
-[ ] no live B1-B7 / approval scope
-[ ] all existing identity/bootstrap regressions green
-[ ] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 all green
-[ ] Ruff / format / mypy / Spike / SDK-absent green
-[ ] Windows 3.14 DEVLOG + Management gates green
+[x] generated scrubbed id shape exactly matches current AccountProfile generator
+[x] freezable identity is current non-trial generated id only
+[x] legacy ACCOUNT_* rejected
+[x] fake PRODUCTION_* / arbitrary kind rejected
+[x] wrong digest lengths rejected
+[x] known Trial online bootstrap can never IDENTITY_CANDIDATE
+[x] exact non-trial generated identity can candidate
+[x] exact frozen identity can match Production
+[x] config remains empty in repository
+[x] no live B1-B7 / approval scope
+[x] all existing identity/bootstrap regressions green
+[x] Windows 3.12 / Windows 3.14 / Ubuntu 3.14 all green
+[x] Ruff / format / mypy / Spike / SDK-absent green
+[x] Windows 3.14 DEVLOG + Management gates green
 ```
 
 When all pass, Reviewer may:
