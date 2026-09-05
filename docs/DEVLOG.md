@@ -1,3 +1,18 @@
+## 2026-09-05 · Comprehensive project review handoff (documentation only)
+
+**Implementation Status / Review Status**
+
+- **REVIEW_DOCUMENTED / REMEDIATION_NOT_IMPLEMENTED / PENDING_OWNER_REVIEW**：按用户要求，将基于 main `73e337b350708e47873ffb54a1086aa48ad076e7` 的全面审阅意见整理为 [PROJECT_REVIEW_HANDOFF_20260905.md](design/PROJECT_REVIEW_HANDOFF_20260905.md)。
+- 文档列出 REV-01 至 REV-08：身份预检判定、安全输出、孤儿文件识别、CI 验收语义、历史可用性、SDK 硬截止、规模性能和版本重放；逐项区分已确认事实、合成输入复现、条件性风险与待验证内容，并给出验收清单。
+- 证据范围为核心链路静态检查及此前同轮的无账号合成输入探测；未重跑完整回归、真实 SDK 链路、全量压测或恢复演练，不把既有测试记录当成本次新证据。
+- 本次仅提交审阅交接文档与本 DEVLOG 入口；不修改代码、生产配置和现行治理，不执行账号验证或身份冻结。所有整改项仍为 OPEN / UNASSIGNED，优先级待 Owner 确认。
+- 未向 GitHub 上传任何真实账号、密码、Token、连接端点、原始 SDK 输出或专有依赖文件。
+
+**Next**
+
+- 由项目 Owner 审阅、分派 REV 事项，按交接文档逐项提供实施与验证证据后关闭；真实 T1/T2/T3 的既有要求不因本文提交而改变。
+- 本文是新增审阅发现的交接，不是重复 blocked-preflight 或 T1 完成声明。
+
 ## 2026-09-05 · Post-merge T1 controlled online bootstrap preflight
 
 **Implementation Status / Review Status**
