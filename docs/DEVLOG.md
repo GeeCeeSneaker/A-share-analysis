@@ -1,3 +1,17 @@
+## 2026-09-05 · Post-merge T1 controlled online bootstrap preflight
+
+**Implementation Status / Review Status**
+
+- **STOPPED BEFORE LOGIN / NOT_TESTABLE_ACCOUNT / PENDING_LOCAL_SECRET_INJECTION**：合并后的 clean main 已确认包含 PR #9 merge commit `f38e77ff2cbcf040837bc1c15504f847e1cfb1d8`；主分支当前 head 为 `c22a7111cda3ba9c86ca17aec4cfd85a2ee1955a`。
+- 合并后离线 preflight 已在 Windows Python 3.14.6 完成：`AmazingData==1.1.9`、`tgw==1.0.9.2` 可实际加载，runtime verdict 为 `RUNTIME_ACTUAL_LOAD_VERIFIED`，offline 状态为 `OFFLINE_RUNTIME_VERIFIED`。
+- 受控 online 入口在凭证门禁处停止：当前工作区没有本地 `.env`，进程环境没有 `TGW_*` 变量；无登录请求、无账号 profile、无 live identity candidate。无凭证运行结果为 `NOT_TESTABLE_ACCOUNT`、退出码 `2`，不构成 T1 online evidence。
+- `configs/production_account.yaml` 三个字段实际值仍为空；没有把任何凭证、Token、真实 endpoint、raw profile 或 raw SDK 输出写入 GitHub。
+
+**Next**
+
+- 需要在受控 Windows 进程环境或未被 Git 跟踪的本地 `.env` 中安全注入 `TGW_USERNAME`、`TGW_PASSWORD`、`TGW_SERVER_VIP`、`TGW_SERVER_PORT` 后，重新执行唯一入口；在得到并人工审查 scrubbed `IDENTITY_CANDIDATE` 前保持 config 为空。
+- 当前不进入 T2 human confirmation、T3 identity-freeze、Production B1-B7、Data Sufficiency、verdict 或 Provider approval。
+
 ## 2026-09-05 · P0-M-1B.0.1 bootstrap whitespace regression closure
 
 **Implementation Status / Review Status**
