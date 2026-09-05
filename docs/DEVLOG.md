@@ -1,3 +1,14 @@
+## 2026-09-05 · P0-M-1B.0.1 whitespace validation correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：run `33930460380` 的全矩阵质量门禁已通过 Ruff、format 和 mypy，但 pytest 暴露 2 个 identity config 测试失败；原因是 loader/projection 在 predicate 前剥离 profile-id 前后空格。
+- 已改为保留 profile-id 原值进行 generated/freezable predicate 校验；带前后空格的 identity 不再被规范化后接受，其他 contract 语义不变。
+- 该 run 的统计为 1481 passed / 2 failed（Ubuntu 3.14 证据）；失败只涉及本轮新增 whitespace closure，不能计作 P0-M-1B.0.1 通过。
+
+**Next**
+
+- 等待修正提交的三平台完整 CI；online bootstrap、Production B1-B7 与 Provider approval 继续暂停。
 ## 2026-09-05 · P0-M-1B.0.1 format gate closure follow-up
 
 **Implementation Status / Review Status**

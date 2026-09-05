@@ -167,10 +167,10 @@ def load_frozen_production_identity(
     profile_id = doc.get("production_account_profile_id")
     confirmed_at = doc.get("confirmed_at")
     confirmed_by = doc.get("confirmed_by")
-    if not isinstance(profile_id, str) or not profile_id.strip():
+    if not isinstance(profile_id, str) or not profile_id:
         return None
     identity = FrozenProductionIdentity(
-        account_profile_id=profile_id.strip(),
+        account_profile_id=profile_id,
         confirmed_at=confirmed_at.strip() if isinstance(confirmed_at, str) else "",
         confirmed_by=confirmed_by.strip() if isinstance(confirmed_by, str) else "",
     )

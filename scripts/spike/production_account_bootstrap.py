@@ -147,7 +147,7 @@ def _safe_report(
 
     profile = raw.get("ACCOUNT_PROFILE")
     profile = profile if isinstance(profile, dict) else {}
-    profile_id_candidate = str(profile.get("account_profile_id") or "").strip()
+    profile_id_candidate = str(profile.get("account_profile_id") or "")
     profile_id = (
         profile_id_candidate if is_generated_scrubbed_profile_id(profile_id_candidate) else ""
     )
