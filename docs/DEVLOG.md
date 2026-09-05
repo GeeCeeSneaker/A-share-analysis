@@ -1,3 +1,189 @@
+## 2026-09-05 · P0-M-1B.0.1 bootstrap whitespace regression closure
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE**：审阅者要求的 bootstrap doctor-profile 前后空白回归覆盖已补齐；`" UNKNOWN_abc123def456"` 与 `"UNKNOWN_abc123def456 "` 均断言为非零退出、`NOT_TESTABLE_PROFILE`、`UNAVAILABLE`，且不会成为 `IDENTITY_CANDIDATE`。
+- 测试/代码 head `75b998a79931b8c7d0c9ebf67bcd7a1a4549c0df` 对应 GitHub Actions run `33937401530`；Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵均成功，每腿 `1485 passed`。
+- Ruff lint、Ruff format、mypy、完整 pytest、Spike framework gates、SDK-absent 检查及适用 Windows 3.14 DEVLOG/Management gates 均通过。
+- `configs/production_account.yaml` 保持为空；未执行 online bootstrap、identity freeze、Production B1-B7、Data Sufficiency、verdict 或 Provider approval。
+
+**Next**
+
+- 请求 Owner/Reviewer 对 PR #9 当前实现进行最终审阅；PR 合并前继续保持正式线上验证和配置冻结不执行。
+
+## 2026-09-05 · P0-M-1B.0.1 full matrix closure
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE**：run `33935433194` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1483 passed`。
+- Ruff lint、Ruff format、mypy、完整 pytest、Spike framework gates、SDK-absent 检查及适用的 Windows 3.14 DEVLOG/Management gates 均通过。
+- 本次关闭的是 generated identity contract honesty：`UNKNOWN_<12hex>` 是唯一可冻结的 non-trial candidate，Trial profile 明确不可冻结；配置仍为空。
+- PR #9 已达到审阅合并条件，但本次不执行合并；online bootstrap 只能在 PR #9 合并到 clean main 后按文档执行。
+
+**Next**
+
+- 等待 Owner/Reviewer 审阅并合并 PR #9；合并后再执行受控 online bootstrap，先人工确认脱敏 identity，再单独治理提交冻结配置。
+## 2026-09-05 · P0-M-1B.0.1 whitespace validation correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：run `33930460380` 的全矩阵质量门禁已通过 Ruff、format 和 mypy，但 pytest 暴露 2 个 identity config 测试失败；原因是 loader/projection 在 predicate 前剥离 profile-id 前后空格。
+- 已改为保留 profile-id 原值进行 generated/freezable predicate 校验；带前后空格的 identity 不再被规范化后接受，其他 contract 语义不变。
+- 该 run 的统计为 1481 passed / 2 failed（Ubuntu 3.14 证据）；失败只涉及本轮新增 whitespace closure，不能计作 P0-M-1B.0.1 通过。
+
+**Next**
+
+- 等待修正提交的三平台完整 CI；online bootstrap、Production B1-B7 与 Provider approval 继续暂停。
+## 2026-09-05 · P0-M-1B.0.1 format gate closure follow-up
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：run `33930352036` 已通过 Ruff lint，但 format check 仅剩新增测试方法前的多余空行。
+- 已删除该多余空行；此前 bootstrap 表达式和测试签名的格式修正已被 CI 接受。
+- 三平台后续 mypy、pytest、Spike、SDK-absent 和文档 gates 尚未形成有效通过证据；online bootstrap 仍按要求暂停。
+
+**Next**
+
+- 等待本次格式修正后的完整三平台 CI。
+## 2026-09-05 · P0-M-1B.0.1 formatter follow-up
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：run `33928995279` 已通过 Ruff lint，但 format check 发现 bootstrap 条件表达式和两个新增测试定义未按 formatter 的规范折叠。
+- 已按 formatter 输出修正三处格式；不改变 identity contract、Trial non-freezable gate、safe projection、测试语义或空配置策略。
+- Windows 3.14 同一 run 的 uv 安装失败属于该腿基础设施阶段失败；修正提交等待重新验证，不将该 run 计作回归通过。
+
+**Next**
+
+- 等待修正提交的三平台完整 CI；online bootstrap 继续按 P0-M-1B.0.1 要求暂停。
+## 2026-09-05 · P0-M-1B.0.1 formatter correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：新 identity-contract 提交的逻辑检查尚未执行到测试阶段，三平台 CI 在 Ruff 阶段因 `production_account_bootstrap.py` 一处 E501 超过 100 列而停止。
+- 已按 CI 指定位置拆分 profile-id projection 表达式；不改变 generated/freezable predicate、Trial gate、safe projection 或配置边界。
+- 失败 run `33928676300` 只报告格式门禁失败；其余 job steps 被 Ruff 失败跳过，不能计作回归通过。
+
+**Next**
+
+- 重新等待三平台 Ruff、format、mypy、pytest、Spike、SDK-absent 和文档门禁；online bootstrap 仍按 P0-M-1B.0.1 要求暂停。
+## 2026-09-05 · P0-M-1B.0.1 positive identity contract honesty closure
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS / CI_PENDING / PENDING_REVIEW**：根据新增 reviewer requirement，收紧 generated scrubbed profile id 合同，并在 bootstrap candidate 判定前加入 Trial non-freezable gate。
+- `UNKNOWN_<12hex>` 是当前唯一可冻结的 non-trial candidate；`TRIAL_SIMULATION_<12hex>` 只可用于明确的 Trial 诊断，不得进入 `IDENTITY_CANDIDATE`。
+- 已补充 generated/freezable predicate、legacy/arbitrary/wrong-length/uppercase/whitespace config 拒绝测试，以及 Trial、exact candidate、exact frozen review path 的 bootstrap 回归测试。
+- 本次仍只使用 test-only host/sentinel；`configs/production_account.yaml` 保持为空，不执行 online bootstrap、Production B1-B7、Data Sufficiency、verdict 或 Provider approval。
+
+**Next**
+
+- 等待三平台 CI 与 DEVLOG/Management gates 全绿；PR #9 在该阻塞项关闭并合并前保持 DO NOT MERGE。
+## 2026-09-05 · P0-M-1B.0 local offline bootstrap preflight
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (LOCAL OFFLINE) / READY_FOR_CONTROLLED_ONLINE_RUN / PENDING_REVIEW**：使用当前 PR #9 最终代码 head `e8acd855` 的隔离执行副本，在 Windows Python 3.14.6 下完成 offline bootstrap。
+- 本地 SDK 事实：`AmazingData==1.1.9`、`tgw==1.0.9.2` 均可导入；SDK 状态为 `SDK_INSTALLED`，运行时实际加载 verdict 为 `RUNTIME_ACTUAL_LOAD_VERIFIED`，离线 bootstrap 状态为 `OFFLINE_RUNTIME_VERIFIED`。
+- 本次运行显式使用 `--offline`，未读取 `.env`，未发起认证或业务数据查询；只验证 SDK/runtime 加载和安全输出链路。
+- `configs/production_account.yaml` 仍为空；本次结果不构成正式账号 identity candidate、人工 identity freeze、Production B1-B7、Data Sufficiency Matrix、verdict 或 Provider approval 证据。
+- 凭证、Token、host、port、原始 profile、原始 SDK 日志、本地依赖包和临时执行副本均未写入 GitHub。
+
+**Next**
+
+- 待受控本地进程安全注入 `TGW_*` 变量后执行 online bootstrap；先审查脱敏 profile，再由 Owner/Reviewer 确认，确认前保持空配置。
+  
+## 2026-09-05 · P0-M-1B.0 final candidate CI verification
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW**：当前分支最终代码 head `66ab5ec7` 对应 GitHub Actions run `33899576457`（run `277`）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1449 passed`，Ruff lint/format、mypy、Spike dry-run、SDK-absent 均通过，Windows 3.14 的 DEVLOG/Management 门禁也通过。
+- run 275/276 暴露的 endpoint-like 测试夹具问题已分别修正并保留失败原因；run 277 验证的是最终 test-only host 与数值哨兵夹具，不连接任何真实服务端点。
+- 这只证明仓库 guard、safe projection、focused tests 和现有回归闭环；`configs/production_account.yaml` 仍为空，不代表 live bootstrap、人工 identity freeze、正式 B1-B7、Data Sufficiency Matrix、verdict 或 Provider approval 完成。
+
+**Next**
+
+- 在受控 Windows + 官方 SDK 环境执行 online bootstrap，先审查脱敏候选，再由 Owner/Reviewer 人工确认；确认前保持空配置，确认后才可用独立治理提交冻结 allowlist。
+
+## 2026-09-05 · P0-M-1B.0 fixture assertion correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (fixture hardening) / CI_PENDING / PENDING_REVIEW**：run 276 的 Ubuntu pytest 发现一处 expected credentials tuple 仍引用旧 endpoint 值；本提交将断言同步到 test-only host 与数值哨兵 `0`。
+- 只修正测试断言与前一提交的输入夹具一致，不改变 bootstrap、stderr containment、safe projection、identity allowlist 或正式账号验证边界；真实连接信息不进入仓库。
+
+**Next**
+
+- 等待本提交对应的三平台 CI；配置仍保持空白，正式 identity freeze、Production B1-B7、Data Sufficiency Matrix、verdict 和 Provider approval 不执行。
+
+## 2026-09-05 · P0-M-1B.0 fixture sentinel correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (fixture hardening) / CI_PENDING / PENDING_REVIEW**：run 275 的 Ubuntu pytest 证明前一版 `test-only-port` 占位符会被输入校验正确地归类为缺少可用账号参数；本提交改用数值哨兵 `str(0)`，继续不指向任何真实服务端点。
+- 只修正测试夹具的类型有效性，不改变 stderr containment、safe projection、identity allowlist 或正式账号验证边界；真实用户名、密码、Token、host、port 和 raw profile 不进入仓库。
+
+**Next**
+
+- 等待本提交对应的三平台 CI；配置仍保持空白，正式 identity freeze、Production B1-B7、Data Sufficiency Matrix、verdict 和 Provider approval 不执行。
+
+## 2026-09-05 · P0-M-1B.0 test fixture de-identification
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (fixture hardening) / CI_PENDING / PENDING_REVIEW**：将 bootstrap 对抗测试中的 endpoint-like 夹具替换为明确的 `test-only-host` / `test-only-port` 占位符，避免把任何真实连接信息带入 Git。
+- 只改变测试输入的脱敏属性，不改变 stderr containment、safe projection、identity allowlist 或正式账号验证边界；真实用户名、密码、Token、host、port 和 raw profile 不进入仓库。
+
+**Next**
+
+- 等待本提交对应的三平台 CI；配置仍保持空白，正式 identity freeze、Production B1-B7、Data Sufficiency Matrix、verdict 和 Provider approval 不执行。
+
+## 2026-09-05 · P0-M-1B.0 three-platform CI verification
+
+**Implementation Status / Review Status**
+
+- **VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW**：GitHub Actions run `33896142967`（run `273`）在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全部成功；每腿 `1449 passed`，Ruff lint/format、mypy、Spike dry-run、SDK-absent 均通过，Windows 3.14 的 DEVLOG/Management 门禁也通过。
+- 本轮 CI 验证的是 positive identity allowlist、bootstrap safe projection 和 focused tests 的仓库闭环；不代表实际 live bootstrap 成功，也不产生 frozen production identity。
+- `configs/production_account.yaml` 仍为空；正式 identity freeze、B1-B7、Data Sufficiency Matrix、verdict、Provider approval 继续未执行。凭证、Token、host、port、原始 profile 和原始 SDK 日志不进入仓库。
+
+**Next**
+
+- 在受控 Windows + 官方 SDK 环境执行 online bootstrap，先审查脱敏候选，再由 Owner/Reviewer 人工确认；确认前保持空配置。确认后才可用独立治理提交写入 allowlist。
+
+## 2026-09-05 · P0-M-1B.0 Ruff format follow-up
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (guard implementation) / CI_PENDING / PENDING_REVIEW**：run 272 只剩 bootstrap 顶层函数和新增 focused test 方法之间各少一个空行；本批按 Ruff canonical 输出补齐。
+- identity/config fixture 的格式、Ruff lint 和功能逻辑未再发现问题；等待三平台完整 CI。
+
+## 2026-09-05 · P0-M-1B.0 Ruff format correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (guard implementation) / CI_PENDING / PENDING_REVIEW**：run 271 的 Ruff format 仅报告 4 个文件的 canonical 换行/空行差异；本批按 formatter 输出机械修正。
+- 不改变 positive identity allowlist、bootstrap safe projection、任何账号/权限判断或正式 B1-B7 边界；等待修正后的三平台 CI。
+
+## 2026-09-05 · P0-M-1B.0 Ruff lint correction
+
+**Implementation Status / Review Status**
+
+- **IN_PROGRESS (guard implementation) / CI_PENDING / PENDING_REVIEW**：run 270 在 Ruff lint 阶段只发现 identity focused test 的 YAML fixture 超过 100 列；本批按 Ruff 输出拆分相邻字符串，并清理 bootstrap 的机械多空行。
+- 不改变 positive identity allowlist、bootstrap safe projection、任何账号/权限判断或正式 B1-B7 边界；等待修正后的三平台 CI。
+
+## 2026-09-05 · P0-M-1B.0 positive identity gate hardening
+
+**Implementation Status / Review Status**
+
+- **DONE (guard implementation) / CI_PENDING / PENDING_REVIEW**：根据最新受控身份冻结要求，严格校验 scrubbed account_profile_id、有时区的 confirmed_at、非空且不含敏感字段的 confirmed_by；缺失、试用、畸形或未确认配置统一 fail closed。
+- bootstrap 的 allowlist projection 现在拒绝非 digest 形态的 profile id，并将非数字权限码和非数值额度降为不可用，不会把原始 profile 值投影到 stdout/证据文件。
+- 新增 focused identity tests 覆盖 exact match、unknown mismatch、trial、unparsed、missing PermissionCode、empty/unconfirmed、malformed/secret-bearing config、RunKind.PRODUCTION 不得升级和 profile shape；未改变 migration、历史 2020+ 合同或 CR-5/CR-6 语义。
+- **当前阻塞**：configs/production_account.yaml 仍为空；本轮没有把本地凭证注入仓库或 CI，也没有可通过 GitHub-only 仓库工作流发布的人工确认候选，因此不宣称 live bootstrap、identity freeze、B1-B7、Data Sufficiency Matrix、verdict 或 Provider approval 已完成。
+
+**Next**
+
+- 在受控 Windows + 官方 SDK 环境中运行 online bootstrap，只提交脱敏摘要和人工确认记录；确认前保持空配置，确认后再单独提交 allowlist governance commit。
+
 ## 2026-09-04 · P0-AD-01.1 bootstrap I/O safety CI verification
 
 **Implementation Status / Review Status**

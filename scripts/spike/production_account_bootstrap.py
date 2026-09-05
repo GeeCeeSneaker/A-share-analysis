@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from datetime import UTC, datetime
@@ -28,6 +29,8 @@ from typing import Any
 
 from ashare_state.providers.amazingdata.doctor import run_doctor
 from ashare_state.providers.amazingdata.production_identity import (
+    is_freezable_production_candidate_id,
+    is_generated_scrubbed_profile_id,
     load_frozen_production_identity,
 )
 from ashare_state.providers.amazingdata.stdout_capture import (
@@ -82,6 +85,23 @@ def _credentials_from_env(env: dict[str, str]) -> tuple[str, str, str, int] | No
     )
 
 
+def _safe_permission_codes(value: Any) -> str:
+    """Keep only numeric entitlement codes and their public separators."""
+
+    if not isinstance(value, str):
+        return ""
+    candidate = value.strip()
+    if not candidate or len(candidate) > 200:
+        return ""
+    return candidate if all(char.isdigit() or char in "|,; " for char in candidate) else ""
+
+
+def _safe_number(value: Any) -> int | float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value if math.isfinite(float(value)) else None
+
+
 def _profile_kind(profile_id: str) -> str:
     if profile_id.startswith("TRIAL_SIMULATION_"):
         return "TRIAL"
@@ -127,9 +147,14 @@ def _safe_report(
 
     profile = raw.get("ACCOUNT_PROFILE")
     profile = profile if isinstance(profile, dict) else {}
-    profile_id = str(profile.get("account_profile_id") or "").strip()
-    permission_codes = str(profile.get("permission_codes") or "").strip()
-    profile_parsed = bool(profile_id and profile_id != "UNKNOWN")
+    profile_id_candidate = str(profile.get("account_profile_id") or "")
+    profile_id = (
+        profile_id_candidate if is_generated_scrubbed_profile_id(profile_id_candidate) else ""
+    )
+    permission_codes = _safe_permission_codes(profile.get("permission_codes"))
+    profile_parsed = bool(profile_id)
+    profile_kind = _profile_kind(profile_id)
+    profile_is_freezable = is_freezable_production_candidate_id(profile_id)
     entitlement_verified = profile_parsed and bool(permission_codes)
     authenticated = raw.get("AUTHENTICATED") == "YES"
     query_ready = raw.get("QUERY_READY") == "YES"
@@ -141,6 +166,7 @@ def _safe_report(
         authenticated
         and profile_parsed
         and entitlement_verified
+        and profile_is_freezable
         and profile_id == frozen.account_profile_id
     ):
         production_status = "PRODUCTION"
@@ -162,20 +188,24 @@ def _safe_report(
         bootstrap_status = "NOT_TESTABLE_ENTITLEMENT"
     elif not query_ready:
         bootstrap_status = "NOT_QUERY_READY"
+    elif profile_kind == "TRIAL":
+        bootstrap_status = "TRIAL_ACCOUNT_NOT_FREEZABLE"
+    elif not profile_is_freezable:
+        bootstrap_status = "NOT_TESTABLE_PROFILE"
     elif production_status == "PRODUCTION":
         bootstrap_status = "FROZEN_IDENTITY_MATCH_REQUIRES_REVIEW"
     else:
         bootstrap_status = "IDENTITY_CANDIDATE"
 
     safe_profile: dict[str, Any] = {
-        "account_profile_id": profile_id[:64] if profile_id else "UNAVAILABLE",
-        "profile_kind": _profile_kind(profile_id),
+        "account_profile_id": profile_id if profile_id else "UNAVAILABLE",
+        "profile_kind": profile_kind,
         "profile_parsed": profile_parsed,
         "entitlement_verified": entitlement_verified,
-        "permission_codes": permission_codes[:200] if permission_codes else "",
-        "subscribe_limit": profile.get("subscribe_limit"),
-        "weekly_flow_limit": profile.get("weekly_flow_limit"),
-        "used_week_flow": profile.get("used_week_flow"),
+        "permission_codes": permission_codes,
+        "subscribe_limit": _safe_number(profile.get("subscribe_limit")),
+        "weekly_flow_limit": _safe_number(profile.get("weekly_flow_limit")),
+        "used_week_flow": _safe_number(profile.get("used_week_flow")),
     }
     return {
         "schema": "production_account_bootstrap.v1",

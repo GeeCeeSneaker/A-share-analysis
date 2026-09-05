@@ -4,16 +4,16 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Reviewed Repository HEAD**：`dda8c000d8585a95a66a91fbaa5072427053abb8`（CR-6 Reviewer closure后的 main 合并基线；分支历史保持 append-only）  
+> **Reviewed Repository HEAD**：`4a5aedafbec2b128b1656d1e152a6938ae0c88c9`（PR #8 合并及身份冻结工作要求后的 main 基线；分支历史保持 append-only）  
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d` 已随 PR #6 合入 main；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`；State/Provider 语义边界保持冻结。  
-> **Latest full code CI baseline**：GitHub Actions run `33889959971`（run 266）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1427 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均成功。  
-> **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 VERIFIED (CI) / PENDING_REVIEW；P0-M-1B.0 scrubbed bootstrap 当前 P0-AD-01.1 I/O safety VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129
-> **Last Review**：2026-09-04（CR-6.4 final Reviewer closure 已接受；PR #6 已合入 main；正式账号 native SDK 冒烟通过，但仓库形式化 runner、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待执行/复核）  
+> **Latest full code CI baseline（PR #9 candidate）**：测试/代码 head `75b998a79931b8c7d0c9ebf67bcd7a1a4549c0df` 对应 GitHub Actions run `33937401530`，已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1485 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均成功。  
+> **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 VERIFIED (CI) / PENDING_REVIEW；P0-M-1B.0 scrubbed bootstrap 与 positive identity gates 当前 VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW；P0-M-1B.0.1 positive identity contract honesty 当前 VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED。  
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129 / DM-20260905-130 / DM-20260905-131 / DM-20260905-132 / DM-20260905-133 / DM-20260905-134 / DM-20260905-135 / DM-20260905-136 / DM-20260905-137 / DM-20260905-138 / DM-20260905-139 / DM-20260905-140 / DM-20260905-141 / DM-20260905-142 / DM-20260905-143 / DM-20260905-144 / DM-20260905-145 / DM-20260905-146
+> **Last Review**：2026-09-05（P0-M-1B.0.1 已通过三平台 CI run `33937401530`，状态 VERIFIED / CLOSED / READY_FOR_REVIEWED_MERGE；PR #9 保持 open、非草稿、未执行合并；正式 online identity、B1-B7、Data Sufficiency Matrix、verdict 与 Provider approval 仍待 PR 合并后执行）  
 > **Last Reviewer**：Design / Audit Review  
-> **CI Status**：最新 merge-gate run `33854677630`（run 239）三矩阵全绿，每腿 `1408 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates 均 success。main merge commit 为 `dda8c000d8585a95a66a91fbaa5072427053abb8`。  
-> **Phase Status（2026-09-04，CR-6 closure + 2020+ history contract）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-020 ACCEPTED）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 → **VERIFIED / CLOSED / FREEZE（ADR-025 ACCEPTED；PR #3 merged）**；CR-6 State → **VERIFIED / CLOSED / FREEZE（CR-6.4 final Reviewer closure accepted；ADR-026 ACCEPTED）**；2020+ history contract → **VERIFIED / KEEP（Owner-approved 2020+ contract implementation；Provider capability remains pending）**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 正式 identity/entitlement、formal B1-B7、Golden/Data Sufficiency Matrix 与人工 Reviewer review 尚未完成）  
-> **Production Runner Anchored Wiring（PR #8 review）**：original anchored-wiring P0 已 VERIFIED (CI) / PENDING_REVIEW；PR #8.1 CLI / resume honesty 已 VERIFIED (CI) / PENDING_REVIEW；正式账号验证、PR #8 人工复审和合并仍未完成，PR #8 暂不合并。  
+> **CI Status**：PR #9 candidate 的 P0-M-1B.0.1 final code/test run `33937401530` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全绿，每腿 `1485 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 和适用的 DEVLOG/Management gates 均 success。main 的 merge-gate 历史基线不因本 PR 自动改变。  
+> **Phase Status（2026-09-05，P0-M-1B.0 identity guard CI verification + local offline bootstrap preflight）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-020 ACCEPTED）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 → **VERIFIED / CLOSED / FREEZE（ADR-025 ACCEPTED；PR #3 merged）**；CR-6 State → **VERIFIED / CLOSED / FREEZE（CR-6.4 final Reviewer closure accepted；ADR-026 ACCEPTED）**；2020+ history contract → **VERIFIED / KEEP（Owner-approved 2020+ contract implementation；Provider capability remains pending）**；P0-M-1B.0 / P0-M-1B.0.1 identity contract → **VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 正式 identity/entitlement、formal B1-B7、Golden/Data Sufficiency Matrix 与人工 Reviewer review 尚未完成）  
+> **Production Runner Anchored Wiring（PR #8 review）**：original anchored-wiring P0 已 VERIFIED (CI) / PENDING_REVIEW；PR #8.1 CLI / resume honesty 已 VERIFIED (CI) / PENDING_REVIEW；PR #8 已于 `74ae84e0e6950f7f7dc926d225be105fdb99279a` 合入 main；当前进入 P0-M-1B.0 受控 identity candidate / human confirmation 阶段。  
 > **Historical snapshot（已被上方当前状态取代）**：R4-A2.x / CR-1.x → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-A3 / A3.1 / A3.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B1 / B1.1 / B1.2 → **CLOSED / VERIFIED / FREEZE（不重开）**；R4-B2 / B2.1 / B2.2 / B2.3 → **CLOSED / VERIFIED / FREEZE（不重开；ADR-021 ACCEPTED）**；CR-2 全链 → **VERIFIED / CLOSED / FREEZE（ADR-022 ACCEPTED）**；CR-3 全链 → **VERIFIED / CLOSED / FREEZE（ADR-023 ACCEPTED）**；CR-4 全链 → **VERIFIED / CLOSED / FREEZE（ADR-024 ACCEPTED）**；CR-5 → **DONE / REOPENED**（主体 PASS；仅剩 P1 bounded lineage）；CR-5.1 → **VERIFIED / CLOSED / FREEZE**（correctness closure）；CR-5.2 → **DONE / PENDING_REVIEW**（bounded selected-input lineage；run 176 三平台全绿，Reviewer closure pending）；CR-6 State → **BLOCKED_BY_CR-5.2**；Production P0-M-1B → **BLOCKED independently**（production_account.yaml 仍为空 + 人工 Golden/Rule Review + 正式账号条件）  
 > **SHA Correction（2026-08-31 17:42，Reviewer CR-2 复审 P1-01）**：CR-2 批次头部与 Implementation Mapping 曾记录 implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`——该 SHA 非真实 implementation commit；以 GitHub commit object 为准：`15cdae25fd7d11e3be0da3683e821629e4226291`（run 33378006770 关联 commit）。历史条目原文保留，CR-2 工作要求文档已追加 §12 更正。  
 > **Governance Count Correction（Reviewer，2026-08-30）**：ADR-020 Amendment C.3 所写"SDK_METHOD_CLASSIFICATIONS 表（19 条）"经 Reviewer 逐项计数实为 **18 条**（治理文档数字错误，非 runtime 缺项——结构守卫 exact-set 本身通过）；已随 R4-B1.2 amendment D.3 更正，历史保留。**Count Correction（2026-08-31，CR-2 复审 P1-02）**：ADR-022 §2.2 曾写"9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER"——该批实际 10/4，且 14 条未覆盖 index_daily 等 capability surface；CR-2.1 后 registry 为 **18 条（11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLE，runtime exact-set 统计）**，已随 ADR-022 Amendment A §6.1 更正，历史保留。  
@@ -23,6 +23,254 @@
 > **时间标准**：本文档所有人读时间使用 `YYYY-MM-DD HH:mm +08:00`（Asia/Shanghai）或仅日期；trade_date / market session / human timestamp 必须明确区分。
 
 ---
+
+## DM-20260905-146 · P0-M-1B.0.1 bootstrap whitespace regression closure
+
+**Type**：C1 — reviewer-required regression coverage  
+**Date**：2026-09-05  
+**Status**：VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE  
+**Evidence**：测试/代码 head `75b998a79931b8c7d0c9ebf67bcd7a1a4549c0df`；GitHub Actions run `33937401530`；Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿 `1485 passed`。
+
+- 已补充 doctor `account_profile_id` 前后空白的参数化 bootstrap integration coverage；两种输入均必须 fail closed，不能进入 `IDENTITY_CANDIDATE`。
+- Ruff lint/format、mypy、完整 pytest、Spike、SDK-absent 和适用治理门禁均通过；`configs/production_account.yaml` 继续为空。
+- PR #9 的技术闭环已重新提交最终审阅；本项不执行 online bootstrap、identity freeze、Production B1-B7、Data Sufficiency、verdict 或 Provider approval。
+
+**Next**
+
+- 等待 Owner/Reviewer 对 PR #9 最终审阅并合并；合并后再按文档启动受控 online bootstrap。
+
+
+## DM-20260905-145 · P0-M-1B.0.1 full matrix closure
+
+**Type**：C1 — reviewer requirement exit-gate closure
+**Date**：2026-09-05
+**Status**：VERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE
+**Evidence**：GitHub Actions run `33935433194`；Ubuntu 3.14、Windows 3.12、Windows 3.14 每腿 `1483 passed`，Ruff lint/format、mypy、Spike、SDK-absent 与适用治理门禁全绿。
+
+- generated scrubbed id shape 已与 `AccountProfile` 当前生成合同对齐；只有 `UNKNOWN_<12hex>` 可作为 freezable production candidate。
+- Trial profile、legacy/arbitrary kind、错误 digest 长度、大小写异常和前后空格均不会进入 production identity candidate。
+- `configs/production_account.yaml` 保持空白；本项不执行 online bootstrap、Production B1-B7、Data Sufficiency、verdict 或 Provider approval。
+- PR #9 现在具备技术上的 reviewed-merge 条件，但不由本次任务自动合并；合并后才允许从 clean main 启动受控 online bootstrap。
+## DM-20260905-144 · P0-M-1B.0.1 whitespace validation correction
+
+**Type**：C1 — identity whitespace fail-closed correction
+**Date**：2026-09-05
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW
+**Trigger**：run `33930460380` 在 identity config focused tests 中发现 loader 对 profile-id 先 strip，导致带空格的值通过 strict predicate。
+
+- loader 与 bootstrap projection 现在均保留 profile-id 原值，再执行 generated/freezable predicate；前后空格不会被静默规范化。
+- 运行时 contract、Trial non-freezable gate、空配置策略和 test-only fixture 边界不变。
+- 该 run 的 Ruff、format、mypy 已通过，但 pytest 为 1481 passed / 2 failed，后续 Spike、SDK-absent 和文档 gates未形成有效全绿证据。
+- Online bootstrap、Production B1-B7、Data Sufficiency、verdict 和 Provider approval 继续禁止执行。
+
+**Next**
+
+- 以修正提交的新三平台 CI 为准，确认 whitespace/config closure 及完整回归后再关闭该项。
+## DM-20260905-143 · P0-M-1B.0.1 format gate closure follow-up
+
+**Type**：C0 — final formatter correction
+**Date**：2026-09-05
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW
+**Trigger**：run `33930352036` 的三平台 format check 仅报告测试文件新增方法前存在多余空行。
+
+- 已删除多余空行；业务逻辑、predicate、Trial gate、测试语义和配置边界不变。
+- 该 run 的后续质量与治理 gates 未执行完成，因此不能计作 P0-M-1B.0.1 通过。
+- Online bootstrap、Production B1-B7、Data Sufficiency、verdict 和 Provider approval 继续禁止执行。
+
+**Next**
+
+- 以修正提交的新三平台 CI 为准，完成全矩阵验证后再关闭该项。
+## DM-20260905-142 · P0-M-1B.0.1 formatter follow-up
+
+**Type**：C0 — formatter and CI infrastructure follow-up
+**Date**：2026-09-05
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW
+**Trigger**：run `33928995279` 的 Ubuntu/Windows 3.12 format check 报告三处 formatter mismatch；Windows 3.14 同一 run 在 Install uv 阶段失败。
+
+- 已按 formatter 精确输出折叠 bootstrap 条件表达式与两个测试函数签名；业务逻辑和治理边界不变。
+- 该 run 的后续 mypy、pytest、Spike、SDK-absent 和文档 gates 未形成有效通过证据；Windows 3.14 还需确认安装阶段失败是否为瞬时基础设施问题。
+- Online bootstrap、Production B1-B7、Data Sufficiency、verdict 和 Provider approval 继续禁止执行。
+
+**Next**
+
+- 以修正提交的新三平台 CI 为准；只有全矩阵及适用治理门禁均成功，才关闭 P0-M-1B.0.1。
+## DM-20260905-141 · P0-M-1B.0.1 formatter correction
+
+**Type**：C0 — CI-reported formatting correction
+**Date**：2026-09-05
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW
+**Trigger**：run `33928676300` 在三个平台均于 Ruff lint 阶段报告 `production_account_bootstrap.py:151` 的 E501。
+
+- 仅拆分超过 100 列的 profile-id projection 表达式；identity contract、Trial non-freezable gate、测试语义和空配置策略不变。
+- 该 run 的 pytest、mypy、Spike、SDK-absent 和文档 gates 因 Ruff 失败而未执行，不能据此宣称回归通过。
+- Online bootstrap、Production B1-B7、Data Sufficiency、verdict 和 Provider approval 继续禁止执行。
+
+**Next**
+
+- 等待修正提交的全矩阵 CI 完成，并以实际绿色结果关闭 P0-M-1B.0.1。
+## DM-20260905-140 · P0-M-1B.0.1 positive identity contract honesty closure
+
+**Type**：C1 — generated identity contract and bootstrap candidate gate
+**Date**：2026-09-05
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW
+**Trigger**：reviewer requirement identified a mismatch between the current AccountProfile generator and the wider scrubbed-id regex, plus a Trial-to-candidate honesty gap.
+
+- `is_generated_scrubbed_profile_id` now accepts only `UNKNOWN_<12hex>` and `TRIAL_SIMULATION_<12hex>`; `is_freezable_production_candidate_id` accepts only `UNKNOWN_<12hex>`.
+- Frozen config loading rejects legacy `ACCOUNT_*`, fake `PRODUCTION_*`, arbitrary kinds, wrong digest lengths, uppercase hex and whitespace; Trial profiles remain non-freezable.
+- Bootstrap returns an explicit `TRIAL_ACCOUNT_NOT_FREEZABLE` status for a successful known Trial profile and never emits `IDENTITY_CANDIDATE` for invalid/arbitrary ids.
+- Focused tests cover exact generated candidate and frozen review paths, while test fixtures remain test-only and `configs/production_account.yaml` remains empty.
+- No online bootstrap, formal Production B1-B7, Data Sufficiency, verdict or Provider approval is executed in this closure.
+
+**Next / Exit Gate**
+
+- Run the existing full regression and three-platform CI; only after all P0-M-1B.0.1 gates pass may PR #9 be considered merge-ready. Controlled online bootstrap remains prohibited until PR #9 is merged.
+## DM-20260905-139 · P0-M-1B.0 local offline bootstrap preflight
+
+**Type**：C1 — local SDK/runtime preflight  
+**Date**：2026-09-05  
+**Status**：VERIFIED (LOCAL OFFLINE) / READY_FOR_CONTROLLED_ONLINE_RUN / PENDING_REVIEW  
+**Trigger**：在不读取凭证、不连接正式服务端的前提下，对当前 PR #9 代码 head `e8acd855` 建立本地隔离执行副本并完成 offline bootstrap。
+
+- Windows Python 3.14.6、`AmazingData==1.1.9`、`tgw==1.0.9.2` 均就绪；SDK 状态 `SDK_INSTALLED`，运行时实际加载 verdict `RUNTIME_ACTUAL_LOAD_VERIFIED`，bootstrap 状态 `OFFLINE_RUNTIME_VERIFIED`。
+- 本次只验证 SDK/runtime 导入、加载和 safe projection；没有认证、网络查询或正式账号身份判断。
+- `configs/production_account.yaml` 继续保持空白；正式 identity freeze、Data Sufficiency Matrix、verdict、Provider approval 与 B1-B7 不得因本次离线结果提前执行。
+- 本地 SDK wheel、依赖包、临时源码副本和任何凭证均不进入 GitHub。
+
+**Blocker / Next**
+
+- Online bootstrap 仍需受控进程安全获得 `TGW_USERNAME`、`TGW_PASSWORD`、`TGW_SERVER_VIP`、`TGW_SERVER_PORT`；在此之前不得产生正式 identity candidate 或冻结配置。
+  
+## DM-20260905-138 · P0-M-1B.0 final candidate CI verification
+
+**Type**：C1 — final test-fixture and identity-gate CI verification  
+**Date**：2026-09-05  
+**Status**：VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW  
+**Trigger**：当前 PR #9 代码 head `66ab5ec7` 对应 run `33899576457`（run 277）完成三平台完整验证。
+
+- Ubuntu 3.14、Windows 3.12、Windows 3.14 均通过 Ruff lint/format、mypy、`1449 passed`、Spike dry-run 和 SDK-absent 检查；Windows 3.14 的 DEVLOG/Management governance gates 也通过。
+- run 275/276 的两个 fixture-only 失败已修正；最终夹具只使用 test-only host 和数值哨兵，不连接网络，也不代表真实服务端点。
+- 当前证据仍只覆盖仓库 guard 与回归测试；PR #9 保持 open / PENDING_REVIEW，不合并 PR，不把 CI 结果解释为 live identity 或 profile 证据。
+
+**Evidence / Blocker**
+
+- `configs/production_account.yaml` 仍为空。正式 identity freeze、Data Sufficiency Matrix、verdict 和 Provider approval 继续 blocked / not executed。
+- 凭证、Token、host、port、原始 profile 和原始 SDK 日志不进入 GitHub；下一步仍是受控 Windows + 官方 SDK 的 online bootstrap 与人工确认。
+
+## DM-20260905-137 · P0-M-1B.0 fixture assertion correction
+
+**Type**：C0 — test-only endpoint assertion correction  
+**Date**：2026-09-05  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：run 276 的 Ubuntu pytest 发现 bootstrap 对抗测试的 expected credentials tuple 未同步前一提交的 test-only 输入夹具。
+
+- 将断言同步为 test-only host 与数值哨兵 `0`；不连接网络、不代表实际服务端点，也不改变测试目标或运行语义。
+- 本提交仅修正测试断言，并同步治理记录；不引入凭证、Token、host、port、raw profile 或 live evidence。
+
+**Evidence / Next**
+
+- 等待本提交三平台 CI；`configs/production_account.yaml` 仍为空，正式 identity freeze、B1-B7、verdict、Data Sufficiency Matrix 和 Provider approval 继续未执行。
+
+## DM-20260905-136 · P0-M-1B.0 fixture sentinel correction
+
+**Type**：C0 — test-only numeric sentinel correction  
+**Date**：2026-09-05  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：run 275 的 Ubuntu pytest 显示非数字 endpoint placeholder 会触发既有 credentials parser 的 fail-closed 分支。
+
+- 将夹具端口值改为数值哨兵 `str(0)`；不连接网络，不代表任何实际服务端点，也不改变测试目标或运行语义。
+- 本提交仅修正测试输入类型，并同步治理记录；不引入凭证、Token、host、port、raw profile 或 live evidence。
+
+**Evidence / Next**
+
+- 等待本提交三平台 CI；`configs/production_account.yaml` 仍为空，正式 identity freeze、B1-B7、verdict、Data Sufficiency Matrix 和 Provider approval 继续未执行。
+
+## DM-20260905-135 · P0-M-1B.0 test fixture de-identification
+
+**Type**：C0 — test-only endpoint placeholder correction  
+**Date**：2026-09-05  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：最终 GitHub 侧差异扫描发现 bootstrap 对抗测试夹具含 endpoint-like literal；按最新“host/port 不入 Git”纪律改为明确测试占位符。
+
+- 将测试夹具的 VIP/port 替换为 `test-only-host` / `test-only-port`；不改变任何运行语义、秘密 containment、safe projection 或 identity gate 断言。
+- 该变更不引入真实凭证、Token、host、port、raw profile 或 live evidence。
+
+**Evidence / Next**
+
+- 等待本提交三平台 CI；`configs/production_account.yaml` 仍为空，正式 identity freeze、B1-B7、verdict、Data Sufficiency Matrix 和 Provider approval 继续未执行。
+
+## DM-20260905-134 · P0-M-1B.0 three-platform CI verification
+
+**Type**：C1 — positive production identity gate CI verification  
+**Date**：2026-09-05  
+**Status**：VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW  
+**Trigger**：GitHub Actions run `33896142967`（run `273`）完成三平台完整验证。
+
+- Ubuntu 3.14、Windows 3.12、Windows 3.14 均通过 Ruff lint/format、mypy、`1449 passed`、Spike dry-run 和 SDK-absent 检查；Windows 3.14 的 DEVLOG/Management governance gates 也通过。
+- 该证据覆盖 positive identity allowlist、bootstrap safe projection、focused tests 和现有回归；不等同于受控 online bootstrap、人工 identity freeze 或 Production B1-B7。
+- PR #9 仍为 open / PENDING_REVIEW；本次不合并 PR，也不把 CI 的 SDK-absent 结果解释为正式账号凭证或 profile 证据。
+
+**Evidence / Blocker**
+
+- `configs/production_account.yaml` 仍为空。正式 identity freeze、Data Sufficiency Matrix、verdict 和 Provider approval 继续 blocked / not executed。
+- 凭证、Token、host、port、原始 profile 和原始 SDK 日志不进入 GitHub；需在受控 Windows + 官方 SDK 环境执行 online bootstrap，并经 Owner/Reviewer 确认后才可独立冻结 allowlist。
+
+## DM-20260905-133 · P0-M-1B.0 Ruff format follow-up
+
+**Type**：C0 — bootstrap/test blank-line formatter correction  
+**Date**：2026-09-05  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：run 272 的 Ruff format 只报告 bootstrap 顶层函数和 focused test 方法之间的 canonical 空行差异。
+
+- 按 Ruff 输出补齐两个空行位置；不改变 positive identity allowlist、bootstrap projection、账号/权限判断、migration 或正式 B1-B7 边界。
+
+**Evidence / Next**
+
+- 等待修正后的三平台完整 CI；当前 production_account.yaml 仍为空，正式 identity freeze、B1-B7、verdict 和 Provider approval 仍未执行。
+
+## DM-20260905-132 · P0-M-1B.0 Ruff format correction
+
+**Type**：C0 — identity gate formatter correction  
+**Date**：2026-09-05  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：run 271 的 Ruff format 报告 identity/config fixture、bootstrap 空行和新增 bootstrap focused test 的 canonical 格式差异。
+
+- 按 formatter 输出修正 4 个文件的机械格式；不改变 positive identity allowlist、bootstrap projection、账号/权限判断、migration 或正式 B1-B7 边界。
+
+**Evidence / Next**
+
+- 等待修正后的三平台完整 CI；当前 production_account.yaml 仍为空，正式 identity freeze、B1-B7、verdict 和 Provider approval 仍未执行。
+
+## DM-20260905-131 · P0-M-1B.0 Ruff lint correction
+
+**Type**：C0 — focused identity fixture formatter correction  
+**Date**：2026-09-05  
+**Status**：IN_PROGRESS / CI_PENDING / PENDING_REVIEW  
+**Trigger**：run 270 的三平台 Ruff lint 报告 tests/integration/test_production_identity.py 中 7 行 fixture 超过 100 列。
+
+- 按 Ruff 输出把长 YAML fixture 拆成相邻字符串，并清理 bootstrap safe projection 前的机械多空行。
+- 不改变 positive identity allowlist、bootstrap projection、账号/权限判断、migration 或正式 B1-B7 边界；不包含任何真实账号数据。
+
+**Evidence / Next**
+
+- 等待修正后的三平台完整 CI；当前 production_account.yaml 仍为空，正式 identity freeze、B1-B7、verdict 和 Provider approval 仍未执行。
+
+## DM-20260905-130 · P0-M-1B.0 identity gate hardening
+
+**Type**：C1 — positive production identity configuration and bootstrap projection hardening  
+**Date**：2026-09-05  
+**Status**：DONE (guard implementation) / CI_PENDING / PENDING_REVIEW  
+**Trigger**：最新 Reviewer 要求将 P0-M-1B.0 限定为“受控 bootstrap → 人工确认脱敏 identity → 单独冻结 allowlist”，并明确 malformed/unconfirmed config 必须阻断。
+
+- load_frozen_production_identity 现在只接受 digest-shaped scrubbed profile id、带时区 confirmation timestamp、非空 approved human/operator marker；空、试用、畸形、额外字段或敏感 marker 一律返回无身份。
+- production_account_status 明确拒绝未认证、未解析、试用、缺 PermissionCode、非 scrubbed 或非 exact-match profile；RunKind.PRODUCTION 不改变这一事实。
+- bootstrap safe projection 对 provider 返回的 profile id、PermissionCode 和额度做 allowlist/类型投影，异常 provider 输出不进入 stdout 或本地 evidence。
+- 新增 focused tests 对应 Reviewer 要求 1–9；不修改 migrations、历史数据或 State/Provider 业务语义。
+
+**Evidence / Blocker**
+
+- 当前配置仍为空，未产生 governance freeze；正式 live bootstrap、人工确认、B1-B7、Data Sufficiency Matrix、verdict 和 Provider approval 均未宣称完成。
+- 本轮只提交仓库可验证的 fail-closed guard；不把账号、密码、Token、host、port、原始 profile 或原始 SDK 日志写入 GitHub。
+
 
 ## DM-20260904-129 · P0-AD-01.1 bootstrap I/O safety CI verification
 
