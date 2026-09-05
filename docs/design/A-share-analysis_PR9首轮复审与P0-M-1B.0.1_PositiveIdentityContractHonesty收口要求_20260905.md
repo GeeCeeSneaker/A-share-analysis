@@ -41,7 +41,7 @@ AmazingData Provider approval          BLOCKED
 
 ## 0.1 Closure evidence
 
-P0-M-1B.0.1 的技术 exit gate 已由 run `33935433194` 完成：三平台每腿 `1483 passed`，Ruff、format、mypy、Spike、SDK-absent 及适用 DEVLOG/Management gates 全部成功。generated identity predicate、freezable candidate gate、Trial non-freezable bootstrap gate、config fail-closed 和 bootstrap review paths 均有回归覆盖。
+P0-M-1B.0.1 的技术 exit gate 已由 run `33937401530` 完成：三平台每腿 `1485 passed`，Ruff、format、mypy、Spike、SDK-absent 及适用 DEVLOG/Management gates 全部成功。generated identity predicate、freezable candidate gate、Trial non-freezable bootstrap gate、config fail-closed、bootstrap exact-value 和 whitespace adversarial paths 均有回归覆盖。nt 及适用 DEVLOG/Management gates 全部成功。generated identity predicate、freezable candidate gate、Trial non-freezable bootstrap gate、config fail-closed 和 bootstrap review paths 均有回归覆盖。
 
 本闭环不产生 production identity，不写入 `configs/production_account.yaml`，也不授权在 PR #9 合并前执行 online bootstrap。
 
@@ -223,6 +223,7 @@ P0-M-1B.0.1 is closed only when:
 [x] fake PRODUCTION_* / arbitrary kind rejected
 [x] wrong digest lengths rejected
 [x] known Trial online bootstrap can never IDENTITY_CANDIDATE
+[x] bootstrap leading/trailing whitespace profile IDs reject fail closed and never become IDENTITY_CANDIDATE
 [x] exact non-trial generated identity can candidate
 [x] exact frozen identity can match Production
 [x] config remains empty in repository
