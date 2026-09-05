@@ -285,7 +285,7 @@ formal verdict
 ```text
 PR #9                            MERGED / CLOSED
 Identity contract                VERIFIED / FREEZE
-Controlled online bootstrap      AUTHORIZED / NOT YET REVIEWED
+Controlled online bootstrap      AUTHORIZED / NOT_TESTABLE_ACCOUNT / STOPPED BEFORE LOGIN
 Human identity confirmation      NOT YET DONE
 Production identity freeze       BLOCKED
 Formal Production B1-B7          BLOCKED
@@ -293,3 +293,15 @@ Data Sufficiency Matrix          BLOCKED
 AmazingData capability approval  BLOCKED
 2020+ backfill                   BLOCKED
 ```
+
+
+## 9. 2026-09-05 T1 preflight execution record
+
+**Status**：`NOT_TESTABLE_ACCOUNT` / `STOPPED BEFORE LOGIN`
+
+- clean main 已核对：main head `c22a7111cda3ba9c86ca17aec4cfd85a2ee1955a` 的父提交为 PR #9 merge commit `f38e77ff2cbcf040837bc1c15504f847e1cfb1d8`。
+- Windows Python 3.14.6 离线 preflight 已通过：`AmazingData==1.1.9`、`tgw==1.0.9.2` 实际可加载，runtime verdict `RUNTIME_ACTUAL_LOAD_VERIFIED`，offline 状态 `OFFLINE_RUNTIME_VERIFIED`。
+- 受控 online 入口在凭证门禁处停止：工作区无本地 `.env`，进程环境无 `TGW_*` 变量；未发起登录请求。无凭证安全检查返回 `NOT_TESTABLE_ACCOUNT`、exit 2，不是 live bootstrap，也不产生 scrubbed candidate。
+- `configs/production_account.yaml` 三个值继续为空；未写入 credential、Token、真实 endpoint、raw profile、raw SDK stdout/stderr 或任何线上结果。
+
+**Next**：由受控 Windows operator 将凭证安全注入本地进程环境或未被 Git 跟踪的 `.env` 后，重新执行唯一入口。只有得到并人工审查 `IDENTITY_CANDIDATE` 后才可进入 T2；T3、B1-B7、Data Sufficiency、verdict 和 Provider approval 继续禁止执行。
