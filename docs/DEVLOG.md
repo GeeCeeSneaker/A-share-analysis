@@ -2,14 +2,14 @@
 
 **Implementation Status / Review Status**
 
-- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_RE_REVIEW**：依据 [PR #16 二轮复审与 GT-H1.2 原子全量审核收口要求](design/A-share-analysis_PR16二轮复审与GT-H1.2原子全量审核收口要求_20260906.md) 修正 GT-P0-03；Reviewer 已确认 GT-H1.1 P0-01/P0-02 VERIFIED，但指出 partial review 会把 ACTIVE 永久留在 mixed `REVIEWED K/N + COMPILED` 状态。
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_RE_REVIEW**：依据 [PR #16 二轮复审与 GT-H1.2 原子全量审核收口要求](design/A-share-analysis_PR16二轮复审与GT-H1.2原子全量审核收口要求_20260906.md) 修正 GT-P0-03；Reviewer 已确认 GT-H1.1 P0-01/P0-02 VERIFIED，但指出 partial review 会把 ACTIVE 永久留在 mixed `REVIEWED K/N + COMPILED` 状态。代码 head `e1aebaa92d4dcb93599471c50f24984b2913317e` 的 GitHub Actions [run 319](https://github.com/GeeCeeSneaker/A-share-analysis/actions/runs/34008301203) 三平台 required CI 已全绿。
 - review publisher 现在在任何 evidence/version/ACTIVE 写入前解析并校验 submitted case IDs 与 ACTIVE case IDs 完全相等且各出现一次；N>1 的 `--case`、partial、duplicate、foreign 和 malformed batch 均 fail closed 并保持 ACTIVE、版本文件和 evidence 不变，N==1 的单 case 作为完整覆盖退化路径保留。
 - 所有 review entry 在内存中 apply 后先通过完整 `REVIEWED N/N`、review provenance、artifact digest binding、loader semantic-hash self-validation 和 manifest statistics 重算，再执行 evidence → immutable dataset/manifest → ACTIVE last；source artifact 在提交前后均复核真实字节 hash。
 - 本地 Windows Python 3.14.6：GT-H1/GT-H1.1/GT-H1.2 focused regression **61 passed**；未添加 Golden 事实，未执行 Human full review、Production B1-B7、Data Sufficiency、Provider capability、2020+ backfill。
 
 **Next**
 
-- 当前代码/测试/运行手册等待新 head 的 Windows 3.12、Windows 3.14、Ubuntu 3.14 required CI；CI 全绿后请求 Reviewer 对 GT-P0-03 复审，本批不自行批准或合并。
+- 当前代码/测试/运行手册的 Windows 3.12、Windows 3.14、Ubuntu 3.14 required CI 已全绿；已请求 Reviewer 对 GT-P0-03 复审，本批不自行批准或合并。
 - 只有 Reviewer closure 并合并 PR #16 后，才允许按文档启动 GT-H2 clean Golden corpus construction；在此之前正式 Production、Data Sufficiency、Provider capability 和回补继续冻结。
 
 ## 2026-09-06 · GT-H1.1 correctness closure after PR16 review
