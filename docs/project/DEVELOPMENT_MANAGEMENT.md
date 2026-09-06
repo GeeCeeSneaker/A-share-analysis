@@ -2,7 +2,7 @@
 
 ## DM-20260906-109 · GT-H2 clean Golden candidate construction
 
-**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
 **Review Status**：PENDING_REVIEW；本批不自行执行最终 review seal、CLOSE 或 MERGE。
 **Base SHA**：`5f76ad411801998de7bd3be7f26c880a73005853`
 **Authority**：[GT-H1关闭与GT-H2 CleanGoldenCorpus建设要求](../design/A-share-analysis_GT-H1关闭与GT-H2_CleanGoldenCorpus建设要求_20260906.md)。
@@ -21,6 +21,7 @@
 **Evidence separation**
 
 - 本地 Windows Python 3.14.6：H2 candidate、旧 Golden workflow 与 review/truth-gate 回归 **66 passed**；Ruff lint/format 与 `golden_store.py` mypy 定向检查通过。
+- GitHub Actions run `326`：Ubuntu 3.14、Windows 3.12、Windows 3.14 三平台 required CI 全部成功，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates。
 - `GoldenTruthStore.load` 已通过 v4 schema 2 自校验；`quantity_gate`、`event_coverage_gate`、`review_readiness_gate` 均通过，`production_formal_gate` 仅保留 `REVIEWED 0/128` 的人工复核阻断。
 - 事实来源是官方 SSE/SZSE/BSE/CNINFO 引用定位；`fact_proved` 仅是 Agent 来源检索标记，必须由 Reviewer 绑定 exact artifact/hash 后才可变为 REVIEWED。未运行 `review.py` 最终封存。
 - 未执行正式账号、B1–B7、Data Sufficiency、Provider capability、2020+ backfill、策略、回测或交易；密码、Token、端点、原始 SDK 输出和本地供应商包未进入仓库。
