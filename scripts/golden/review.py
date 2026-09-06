@@ -10,14 +10,20 @@ Hard rules:
   (R4A2-P1-06 option A).
 - Batch mode validates ALL entries (kind allowlist included) BEFORE
   writing anything; a failure leaves no orphan evidence (R4A2-P1-05).
+- A publishing invocation must cover every ACTIVE case exactly once.  A
+  single-case invocation is valid only when the ACTIVE dataset itself has
+  one case; review packets may be prepared incrementally, but ACTIVE
+  publication is an atomic full-corpus seal (GT-H1.2).
 - Versioned dataset/manifest files are create-only: same bytes are an
   idempotent no-op, different bytes BLOCK (R4A2-P1-04).
 - The ACTIVE pointer moves via staging + atomic replace.
 - COMPILED provenance is preserved untouched.
 
-    python scripts/golden/review.py --case <case-in-clean-v4-candidate> \
-        --artifact evidence-src/kangmei.txt \
-        --kind SSE_ANNOUNCEMENT --reviewer alice --note "verified"
+    python scripts/golden/review.py --manifest review-batch.json \
+        --reviewer alice
+
+  ``review-batch.json`` must contain one entry for every case in the clean
+  ACTIVE candidate, with each ``case`` ID appearing exactly once.
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ import argparse
 import hashlib
 import json
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -60,6 +67,124 @@ def _validate_artifact_kind(kind: str) -> None:
     if kind not in VALID_ARTIFACT_KINDS:
         msg = f"artifact kind {kind!r} not in allowlist {sorted(VALID_ARTIFACT_KINDS)}"
         raise ReviewError(msg)
+
+
+def _validate_review_coverage(lines: list[dict], submitted_case_ids: list[str]) -> None:
+    """Require one publishing entry for every ACTIVE case (GT-H1.2)."""
+    active_case_ids = [str(doc.get("golden_case_id", "")) for doc in lines]
+    if not active_case_ids:
+        raise ReviewError("active dataset has no cases to review")
+    if any(not case_id for case_id in active_case_ids):
+        raise ReviewError("active dataset contains a case with an empty golden_case_id")
+
+    def duplicates(values: list[str]) -> list[str]:
+        counts: dict[str, int] = {}
+        for value in values:
+            counts[value] = counts.get(value, 0) + 1
+        return sorted(value for value, count in counts.items() if count > 1)
+
+    active_duplicates = duplicates(active_case_ids)
+    if active_duplicates:
+        raise ReviewError(
+            "active dataset contains duplicate golden_case_id values: "
+            + ", ".join(active_duplicates[:5])
+        )
+
+    submitted_duplicates = duplicates(submitted_case_ids)
+    if submitted_duplicates:
+        raise ReviewError(
+            "review batch contains duplicate case IDs: "
+            + ", ".join(submitted_duplicates[:5])
+            + "; each ACTIVE golden_case_id must appear exactly once"
+        )
+
+    active_set = set(active_case_ids)
+    submitted_set = set(submitted_case_ids)
+    foreign = sorted(submitted_set - active_set)
+    if foreign:
+        raise ReviewError("review batch contains foreign case IDs: " + ", ".join(foreign[:5]))
+
+    missing = sorted(active_set - submitted_set)
+    if missing or len(submitted_case_ids) != len(active_case_ids):
+        suffix = ", ".join(missing[:5]) if missing else "case-count mismatch"
+        raise ReviewError(
+            "review batch must cover every active case exactly once; missing: " + suffix
+        )
+
+
+def _load_review_requests(args: argparse.Namespace) -> list[dict]:
+    """Parse review inputs without reading or writing evidence."""
+    if args.manifest and any((args.case, args.artifact, args.kind, args.expect_fields)):
+        raise ReviewError("--manifest cannot be combined with --case/--artifact/--kind")
+
+    if args.manifest:
+        try:
+            raw_entries = json.loads(args.manifest.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ReviewError(f"cannot read review manifest: {exc}") from exc
+        if not isinstance(raw_entries, list):
+            raise ReviewError("review manifest must be a JSON list")
+
+        requests: list[dict] = []
+        for index, entry in enumerate(raw_entries, start=1):
+            if not isinstance(entry, dict):
+                raise ReviewError(f"review manifest entry {index} must be a JSON object")
+            missing = [field for field in ("case", "artifact", "kind") if field not in entry]
+            if missing:
+                raise ReviewError(
+                    f"review manifest entry {index} is missing required fields: {missing}"
+                )
+            case_id = entry["case"]
+            artifact = entry["artifact"]
+            kind = entry["kind"]
+            if not isinstance(case_id, str) or not case_id:
+                raise ReviewError(f"review manifest entry {index} has an invalid case ID")
+            if not isinstance(artifact, str) or not artifact:
+                raise ReviewError(f"review manifest entry {index} has an invalid artifact path")
+            if not isinstance(kind, str) or not kind:
+                raise ReviewError(f"review manifest entry {index} has an invalid artifact kind")
+            expect_fields = entry.get("expect_fields")
+            if expect_fields is not None and not isinstance(expect_fields, dict):
+                raise ReviewError(f"review manifest entry {index} expect_fields must be an object")
+            requests.append(
+                {
+                    "case": case_id,
+                    "artifact": Path(artifact),
+                    "kind": kind,
+                    "note": entry.get("note", ""),
+                    "expect_fields": expect_fields,
+                }
+            )
+        return requests
+
+    missing = [
+        name
+        for name, value in (
+            ("--case", args.case),
+            ("--artifact", args.artifact),
+            ("--kind", args.kind),
+        )
+        if value is None
+    ]
+    if missing:
+        raise ReviewError(f"missing arguments: {missing} (or use --manifest)")
+    expect_fields = None
+    if args.expect_fields:
+        try:
+            expect_fields = json.loads(args.expect_fields)
+        except json.JSONDecodeError as exc:
+            raise ReviewError(f"--expect-fields must be valid JSON: {exc}") from exc
+        if not isinstance(expect_fields, dict):
+            raise ReviewError("--expect-fields must be a JSON object")
+    return [
+        {
+            "case": args.case,
+            "artifact": args.artifact,
+            "kind": args.kind,
+            "note": args.note,
+            "expect_fields": expect_fields,
+        }
+    ]
 
 
 # ---------------------------------------------------------------- loading
@@ -165,17 +290,22 @@ def _apply_review(
 # ----------------------------------------------------------------- commit
 
 
-def _commit_evidence(staged: list[tuple[Path, str]]) -> None:
+def _commit_evidence(staged: list[tuple[Path, str, str]]) -> None:
     """Copy staged artifacts into the evidence store (create-only)."""
-    for source, ref in staged:
+    for source, ref, expected_hash in staged:
         target = EVIDENCE_DIR / ref
-        target.parent.mkdir(parents=True, exist_ok=True)
         data = source.read_bytes()
+        actual_hash = hashlib.sha256(data).hexdigest()
+        if actual_hash != expected_hash:
+            raise ReviewError(
+                f"artifact changed after staging: {source} no longer matches {expected_hash}"
+            )
         if target.exists():
-            if hashlib.sha256(target.read_bytes()).hexdigest() != hashlib.sha256(data).hexdigest():
+            if hashlib.sha256(target.read_bytes()).hexdigest() != expected_hash:
                 msg = f"evidence {ref} already exists with different bytes"
                 raise ReviewError(msg)
             continue  # idempotent
+        target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_suffix(target.suffix + ".tmp")
         tmp.write_bytes(data)
         tmp.replace(target)
@@ -210,24 +340,58 @@ def _atomic_active_pointer(manifest: dict) -> None:
         staging.unlink(missing_ok=True)
 
 
-def _write_new_version(lines: list[dict], old_active: dict) -> str:
-    """Write the next dataset version (create-only) + move ACTIVE."""
+@dataclass(frozen=True)
+class _PreparedReview:
+    truth_version: str
+    dataset_path: Path
+    dataset_bytes: bytes
+    manifest_path: Path
+    manifest_bytes: bytes
+    manifest: dict
+
+
+def _prepare_new_version(
+    lines: list[dict], old_active: dict, staged_hashes: dict[str, str] | None = None
+) -> _PreparedReview:
+    """Build and fully validate the reviewed version without writing it."""
+    if not lines:
+        raise ReviewError("cannot publish a reviewed dataset with no cases")
+
     old_version = str(old_active["truth_version"])
     num = "".join(ch for ch in old_version.split("-")[0][1:] if ch.isdigit()) or "1"
     truth_version = f"v{int(num) + 1}-reviewed-{datetime.now(UTC).strftime('%Y%m%d')}"
-    for doc in lines:
+    final_lines: list[dict] = []
+    for original in lines:
+        doc = dict(original)
         doc["truth_version"] = truth_version
         doc["case_semantic_hash"] = _semantic_hash(doc)
+        final_lines.append(doc)
+
+    if staged_hashes is not None:
+        for doc in final_lines:
+            ref = str(doc.get("source_artifact_ref", ""))
+            digest = str(doc.get("source_artifact_hash", ""))
+            if staged_hashes.get(ref) != digest:
+                raise ReviewError(
+                    f"{doc.get('golden_case_id')}: reviewed artifact binding was not staged"
+                )
+
     dataset_file = f"golden_cases_{truth_version.split('-')[0]}.jsonl"
-    payload = "".join(json.dumps(c, ensure_ascii=False, sort_keys=True) + "\n" for c in lines)
+    payload = "".join(json.dumps(c, ensure_ascii=False, sort_keys=True) + "\n" for c in final_lines)
     try:
         cases = cases_from_dataset_bytes(payload.encode("utf-8"), truth_version)
     except GoldenTruthError as exc:
         raise ReviewError(f"reviewed dataset failed loader self-validation: {exc}") from exc
-    dataset_path = GOLDEN_ROOT / dataset_file
-    _create_only_write(dataset_path, payload.encode("utf-8"))
-    dataset_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     stats = recompute_manifest_statistics(cases)
+    expected_review_summary = {"REVIEWED": len(cases)}
+    if stats["review_summary"] != expected_review_summary:
+        raise ReviewError(
+            "reviewed output must be a complete REVIEWED seal: "
+            f"expected {expected_review_summary}, got {stats['review_summary']}"
+        )
+    dataset_bytes = payload.encode("utf-8")
+    dataset_path = GOLDEN_ROOT / dataset_file
+    dataset_hash = hashlib.sha256(dataset_bytes).hexdigest()
     manifest = {
         "manifest_schema": 2,
         "truth_version": truth_version,
@@ -243,12 +407,48 @@ def _write_new_version(lines: list[dict], old_active: dict) -> str:
         "distinct_delisted_securities": stats["distinct_delisted_securities"],
     }
     manifest_file = GOLDEN_ROOT / f"truth_manifest_{truth_version.split('-')[0]}.json"
-    _create_only_write(
-        manifest_file,
-        json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
+    manifest_bytes = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
+    return _PreparedReview(
+        truth_version=truth_version,
+        dataset_path=dataset_path,
+        dataset_bytes=dataset_bytes,
+        manifest_path=manifest_file,
+        manifest_bytes=manifest_bytes,
+        manifest=manifest,
     )
-    _atomic_active_pointer(manifest)
-    return truth_version
+
+
+def _preflight_create_only(path: Path, data: bytes) -> None:
+    """Check immutable version collisions before any evidence is committed."""
+    if path.exists() and path.read_bytes() != data:
+        raise ReviewError(f"versioned file {path.name} already exists with different bytes")
+
+
+def _preflight_evidence(staged: list[tuple[Path, str, str]]) -> None:
+    """Validate every source and existing content-addressed target pre-commit."""
+    for source, ref, expected_hash in staged:
+        data = source.read_bytes()
+        actual_hash = hashlib.sha256(data).hexdigest()
+        if actual_hash != expected_hash:
+            raise ReviewError(
+                f"artifact changed after staging: {source} no longer matches {expected_hash}"
+            )
+        target = EVIDENCE_DIR / ref
+        if target.exists() and target.read_bytes() != data:
+            raise ReviewError(f"evidence {ref} already exists with different bytes")
+
+
+def _publish_new_version(prepared: _PreparedReview) -> str:
+    """Publish a prevalidated version and move ACTIVE last."""
+    _create_only_write(prepared.dataset_path, prepared.dataset_bytes)
+    _create_only_write(prepared.manifest_path, prepared.manifest_bytes)
+    _atomic_active_pointer(prepared.manifest)
+    return prepared.truth_version
+
+
+def _write_new_version(lines: list[dict], old_active: dict) -> str:
+    """Write the next dataset version (create-only) + move ACTIVE."""
+    return _publish_new_version(_prepare_new_version(lines, old_active))
 
 
 # ------------------------------------------------------------------- main
@@ -274,40 +474,24 @@ def main() -> int:
     dataset, active, lines = _load_active()
     _ = dataset
 
+    requests = _load_review_requests(args)
+    _validate_review_coverage(lines, [request["case"] for request in requests])
+
     # -------- stage ALL entries first (P1-05: no orphan evidence) --------
-    staged_artifacts: list[tuple[Path, str]] = []
+    staged_artifacts: list[tuple[Path, str, str]] = []
     entries: list[dict] = []
-    if args.manifest:
-        raw_entries = json.loads(args.manifest.read_text(encoding="utf-8"))
-        for entry in raw_entries:
-            ref, digest, retrieved = _stage_artifact(Path(entry["artifact"]), entry["kind"])
-            staged_artifacts.append((Path(entry["artifact"]), ref))
-            entries.append(
-                {
-                    "case": entry["case"],
-                    "ref": ref,
-                    "digest": digest,
-                    "retrieved": retrieved,
-                    "kind": entry["kind"],
-                    "note": entry.get("note", ""),
-                    "expect_fields": entry.get("expect_fields"),
-                }
-            )
-    else:
-        missing = [f for f in (args.case, args.artifact, args.kind) if not f]
-        if missing:
-            parser.error(f"missing arguments: {missing} (or use --manifest)")
-        ref, digest, retrieved = _stage_artifact(args.artifact, args.kind)
-        staged_artifacts.append((args.artifact, ref))
+    for request in requests:
+        ref, digest, retrieved = _stage_artifact(request["artifact"], request["kind"])
+        staged_artifacts.append((request["artifact"], ref, digest))
         entries.append(
             {
-                "case": args.case,
+                "case": request["case"],
                 "ref": ref,
                 "digest": digest,
                 "retrieved": retrieved,
-                "kind": args.kind,
-                "note": args.note,
-                "expect_fields": json.loads(args.expect_fields) if args.expect_fields else None,
+                "kind": request["kind"],
+                "note": request["note"],
+                "expect_fields": request["expect_fields"],
             }
         )
 
@@ -325,9 +509,19 @@ def main() -> int:
             expect_fields=entry["expect_fields"],
         )
 
+    # -------- preflight the complete output before any durable publication --
+    prepared = _prepare_new_version(
+        lines,
+        active,
+        staged_hashes={ref: digest for _, ref, digest in staged_artifacts},
+    )
+    _preflight_create_only(prepared.dataset_path, prepared.dataset_bytes)
+    _preflight_create_only(prepared.manifest_path, prepared.manifest_bytes)
+    _preflight_evidence(staged_artifacts)
+
     # -------- commit: evidence -> version -> ACTIVE pointer ---------------
     _commit_evidence(staged_artifacts)
-    version = _write_new_version(lines, active)
+    version = _publish_new_version(prepared)
     reviewed = sum(1 for c in lines if c["review_status"] == "REVIEWED")
     print(f"reviewed dataset version: {version}")
     print(f"cases: {reviewed} REVIEWED")

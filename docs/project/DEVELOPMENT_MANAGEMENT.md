@@ -1,5 +1,32 @@
 # A-share-analysis 开发管理总册（Development Management）
 
+## DM-20260906-108 · GT-H1.2 atomic complete review publication after PR16 second review
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING
+**Review Status**：PENDING_RE_REVIEW；本批不自行 CLOSE / MERGE。
+**Authority**：[PR16 二轮复审与 GT-H1.2 原子全量审核收口要求](../design/A-share-analysis_PR16二轮复审与GT-H1.2原子全量审核收口要求_20260906.md)。
+**Reviewer baseline**：Reviewer 已于 `main@21754a65050817946cd246ffa9e3236b6c759331` 关闭 GT-H1.1 P0-01/P0-02，并重新打开 GT-H1.2 GT-P0-03。
+**Gate**：GT-H1.2 通过新 head 三平台 required CI 与 Reviewer closure 并合并前，GT-H2 reviewed corpus、Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 均保持冻结。
+
+| 审阅要求 | 本批修正 / 验证位置 | 状态 |
+|---|---|---|
+| submitted case IDs 必须与 ACTIVE case IDs 完全一致 | `review.py::_validate_review_coverage`；partial/duplicate/foreign/single-case adversarial tests | IMPLEMENTED / local PASS |
+| N>1 单条 review 不得发布 mixed ACTIVE | full-coverage gate；single-case zero-side-effect regression | IMPLEMENTED / local PASS |
+| 所有输出必须在持久化前成为 REVIEWED N/N | `_prepare_new_version`；full batch manifest/review_summary regression | IMPLEMENTED / local PASS |
+| review/provenance/artifact/hash/manifest 需统一 in-memory 自校验 | preflight output/evidence gates；loader and artifact closure tests | IMPLEMENTED / local PASS |
+| partial/duplicate/foreign/malformed 拒绝零副作用 | ACTIVE/version/evidence snapshot tests | IMPLEMENTED / local PASS |
+
+**Evidence separation**
+
+- 本地 GT-H1/GT-H1.1/GT-H1.2 focused regression 61 passed；本批未新增 Golden facts、未运行真实 Human full review 或 Production。
+- 新 head 的三平台 CI、Spike、SDK-absent、DEVLOG 和管理文档门禁尚待执行；公共 CI 继续不安装 AmazingData SDK、不接触任何生产凭证。
+
+**Required next work**
+
+1. 等待新 head 三平台 required CI 全绿后，请 Reviewer 复审 GT-P0-03 并提交 closure review；合并前不启动 GT-H2。
+2. 合并后按 GT-H2 重建真实 reviewed corpus；人工 review packet 可分批准备，但 ACTIVE 只能由一次 N/N 完整 review publication seal。
+3. GT-H2/GT-H3 审阅和 Formal gate 完成后，才重新评估 Production、Data Sufficiency、Provider capability 与回补。
+
 ## DM-20260906-107 · GT-H1.1 correctness closure after PR16 review
 
 **Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN

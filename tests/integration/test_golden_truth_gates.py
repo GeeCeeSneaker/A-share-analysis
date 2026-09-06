@@ -384,11 +384,28 @@ class TestBoundGoldenResolver:
         )
         _, bound_manifest = GoldenTruthStore(golden_env).load()
         bound_case_count = bound_manifest.case_count
-        # advance ACTIVE by reviewing one case (creates a new version)
+        # advance ACTIVE by reviewing the complete candidate (creates a new version)
         art = golden_env.parent / "adv.txt"
         art.write_text("advance evidence", encoding="utf-8")
-        import subprocess
-        import sys
+        rows = [
+            json.loads(line)
+            for line in _dataset(golden_env).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        batch = tmp_path / "full-review.json"
+        batch.write_text(
+            json.dumps(
+                [
+                    {
+                        "case": row["golden_case_id"],
+                        "artifact": str(art),
+                        "kind": "SSE_ANNOUNCEMENT",
+                    }
+                    for row in rows
+                ]
+            ),
+            encoding="utf-8",
+        )
 
         result = subprocess.run(
             [
@@ -396,12 +413,8 @@ class TestBoundGoldenResolver:
                 str(Path(__file__).resolve().parents[2] / "scripts/golden/review.py"),
                 "--root",
                 str(golden_env),
-                "--case",
-                "GT-LIMIT-MAIN10-600519",
-                "--artifact",
-                str(art),
-                "--kind",
-                "SSE_ANNOUNCEMENT",
+                "--manifest",
+                str(batch),
                 "--reviewer",
                 "bob",
             ],

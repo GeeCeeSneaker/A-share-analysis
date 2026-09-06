@@ -164,6 +164,39 @@ def _prepare_incomplete_v4_candidate(root: Path) -> None:
     active_path.write_text(json.dumps(active, indent=2), encoding="utf-8", newline="\n")
 
 
+def _prepare_single_case_v4_candidate(root: Path) -> str:
+    """Reduce the synthetic clean candidate to one valid case."""
+    _prepare_clean_v4_candidate(root)
+    active_path = root / "truth_manifest.json"
+    active = json.loads(active_path.read_text(encoding="utf-8"))
+    dataset_path = root / str(active["dataset_file"])
+    source = [
+        json.loads(line) for line in dataset_path.read_text(encoding="utf-8").splitlines() if line
+    ]
+    selected = next(
+        doc for doc in source if doc.get("event_class") not in {"ST_TRANSITION", "DELIST"}
+    )
+    payload = json.dumps(selected, ensure_ascii=False, sort_keys=True) + "\n"
+    dataset_path.write_text(payload, encoding="utf-8", newline="\n")
+    cases = cases_from_dataset_bytes(payload.encode("utf-8"), active["truth_version"])
+    stats = recompute_manifest_statistics(cases)
+    active.update(
+        {
+            "dataset_hash": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+            "case_count": stats["case_count"],
+            "counts_by_type": stats["counts_by_type"],
+            "review_summary": stats["review_summary"],
+            "distinct_events": stats["distinct_events"],
+            "distinct_securities": stats["distinct_securities"],
+            "st_add_events": stats["st_add_events"],
+            "st_remove_events": stats["st_remove_events"],
+            "distinct_delisted_securities": stats["distinct_delisted_securities"],
+        }
+    )
+    active_path.write_text(json.dumps(active, indent=2), encoding="utf-8", newline="\n")
+    return selected["golden_case_id"]
+
+
 def _review_state_snapshot(root: Path) -> dict[str, bytes]:
     snapshot: dict[str, bytes] = {}
     for path in sorted(root.rglob("*")):
@@ -179,26 +212,63 @@ def _review_state_snapshot(root: Path) -> dict[str, bytes]:
     return snapshot
 
 
+def _active_case_ids(root: Path) -> list[str]:
+    active = json.loads((root / "truth_manifest.json").read_text(encoding="utf-8"))
+    dataset = root / str(active["dataset_file"])
+    return [
+        json.loads(line)["golden_case_id"]
+        for line in dataset.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
+def _write_review_batch(root: Path, entries: list[dict], name: str = "review-batch") -> Path:
+    batch = root.parent / f"{name}.json"
+    batch.write_text(json.dumps(entries), encoding="utf-8")
+    return batch
+
+
+def _full_review_batch(
+    root: Path,
+    artifact: Path,
+    *,
+    artifact_by_case: dict[str, Path] | None = None,
+    name: str = "full-review-batch",
+) -> Path:
+    artifact_by_case = artifact_by_case or {}
+    entries = [
+        {
+            "case": case_id,
+            "artifact": str(artifact_by_case.get(case_id, artifact)),
+            "kind": "SSE_ANNOUNCEMENT",
+        }
+        for case_id in _active_case_ids(root)
+    ]
+    return _write_review_batch(root, entries, name)
+
+
+def _run_full_review(
+    root: Path,
+    *,
+    reviewer: str = "alice",
+    artifact_name: str = "full-review",
+    content: str = "full review artifact",
+    artifact_by_case: dict[str, Path] | None = None,
+) -> tuple[subprocess.CompletedProcess, Path]:
+    artifact = _make_artifact(root, artifact_name, content)
+    batch = _full_review_batch(root, artifact, artifact_by_case=artifact_by_case)
+    result = _run_review(root, "--manifest", str(batch), "--reviewer", reviewer)
+    return result, artifact
+
+
 class TestReviewWorkflow:
     def test_review_seals_real_artifact_bytes(self, golden_env: Path):
         _prepare_clean_v4_candidate(golden_env)
-        art = _make_artifact(
+        result, _ = _run_full_review(
             golden_env,
-            "kangmei",
-            "SSE announcement snapshot: Kangmei *ST effective 2019-05-06",
-        )
-        result = _run_review(
-            golden_env,
-            "--case",
-            "GT-LIMIT-MAIN10-600519",
-            "--artifact",
-            str(art),
-            "--kind",
-            "SSE_ANNOUNCEMENT",
-            "--reviewer",
-            "alice",
-            "--note",
-            "verified against SSE disclosure page",
+            reviewer="alice",
+            artifact_name="kangmei",
+            content="SSE announcement snapshot: Kangmei *ST effective 2019-05-06",
         )
         assert result.returncode == 0, result.stderr
         cases, manifest = GoldenTruthStore(golden_env).load()
@@ -211,7 +281,9 @@ class TestReviewWorkflow:
         assert hashlib.sha256(stored.read_bytes()).hexdigest() == case.source_artifact_hash
         # formal gate: artifact resolves and hash-verifies
         store = GoldenTruthStore(golden_env)
-        assert store._verify_artifact(case) == []
+        assert manifest.review_summary == {"REVIEWED": len(cases)}
+        assert not store.review_gate()
+        assert all(store._verify_artifact(reviewed_case) == [] for reviewed_case in cases)
         # new version is append-only: v3 file untouched, v4 created + ACTIVE
         assert (golden_env / "golden_cases_v3.jsonl").is_file()
         assert manifest.dataset_file != "golden_cases_v3.jsonl"
@@ -222,10 +294,12 @@ class TestReviewWorkflow:
         assert '"--hash"' not in source
         assert "--source-artifact-hash" not in source
 
-    def test_review_twice_rejected(self, golden_env: Path):
+    def test_partial_single_case_publish_rejected_before_any_mutation(self, golden_env: Path):
         _prepare_clean_v4_candidate(golden_env)
         art = _make_artifact(golden_env, "kangmei", "snapshot")
-        args = (
+        before = _review_state_snapshot(golden_env)
+        result = _run_review(
+            golden_env,
             "--case",
             "GT-LIMIT-MAIN10-600519",
             "--artifact",
@@ -235,26 +309,93 @@ class TestReviewWorkflow:
             "--reviewer",
             "alice",
         )
-        assert _run_review(golden_env, *args).returncode == 0
-        result = _run_review(golden_env, *args)
         assert result.returncode != 0
-        assert "every case must remain COMPILED" in result.stderr
+        assert "must cover every active case exactly once" in result.stderr
+        assert _review_state_snapshot(golden_env) == before
 
-    def test_missing_artifact_rejected(self, golden_env: Path):
-        _prepare_clean_v4_candidate(golden_env)
+
+class TestReviewCoverage:
+    def test_single_case_dataset_allows_single_case_publish(self, golden_env: Path):
+        case_id = _prepare_single_case_v4_candidate(golden_env)
+        artifact = _make_artifact(golden_env, "single", "single case")
         result = _run_review(
             golden_env,
             "--case",
-            "GT-LIMIT-MAIN10-600519",
+            case_id,
             "--artifact",
-            str(golden_env / "nonexistent.txt"),
+            str(artifact),
             "--kind",
             "SSE_ANNOUNCEMENT",
             "--reviewer",
             "alice",
         )
+        assert result.returncode == 0, result.stderr
+        cases, manifest = GoldenTruthStore(golden_env).load()
+        assert len(cases) == 1
+        assert manifest.review_summary == {"REVIEWED": 1}
+
+    def test_partial_batch_rejected_before_any_mutation(self, golden_env: Path):
+        _prepare_clean_v4_candidate(golden_env)
+        artifact = _make_artifact(golden_env, "partial", "partial batch")
+        ids = _active_case_ids(golden_env)
+        entries = [
+            {"case": case_id, "artifact": str(artifact), "kind": "SSE_ANNOUNCEMENT"}
+            for case_id in ids[:-1]
+        ]
+        batch = _write_review_batch(golden_env, entries, "partial-review-batch")
+        before = _review_state_snapshot(golden_env)
+        result = _run_review(golden_env, "--manifest", str(batch), "--reviewer", "alice")
+        assert result.returncode != 0
+        assert "must cover every active case exactly once" in result.stderr
+        assert _review_state_snapshot(golden_env) == before
+
+    def test_duplicate_case_batch_rejected_before_any_mutation(self, golden_env: Path):
+        _prepare_clean_v4_candidate(golden_env)
+        artifact = _make_artifact(golden_env, "duplicate", "duplicate batch")
+        ids = _active_case_ids(golden_env)
+        entries = [
+            {"case": case_id, "artifact": str(artifact), "kind": "SSE_ANNOUNCEMENT"}
+            for case_id in ids
+        ]
+        entries[-1]["case"] = entries[0]["case"]
+        batch = _write_review_batch(golden_env, entries, "duplicate-review-batch")
+        before = _review_state_snapshot(golden_env)
+        result = _run_review(golden_env, "--manifest", str(batch), "--reviewer", "alice")
+        assert result.returncode != 0
+        assert "duplicate case IDs" in result.stderr
+        assert _review_state_snapshot(golden_env) == before
+
+    def test_foreign_case_batch_rejected_before_any_mutation(self, golden_env: Path):
+        _prepare_clean_v4_candidate(golden_env)
+        artifact = _make_artifact(golden_env, "foreign", "foreign batch")
+        ids = _active_case_ids(golden_env)
+        entries = [
+            {"case": case_id, "artifact": str(artifact), "kind": "SSE_ANNOUNCEMENT"}
+            for case_id in ids
+        ]
+        entries[-1]["case"] = "GT-H12-FOREIGN-CASE"
+        batch = _write_review_batch(golden_env, entries, "foreign-review-batch")
+        before = _review_state_snapshot(golden_env)
+        result = _run_review(golden_env, "--manifest", str(batch), "--reviewer", "alice")
+        assert result.returncode != 0
+        assert "foreign case IDs" in result.stderr
+        assert _review_state_snapshot(golden_env) == before
+
+    def test_missing_artifact_rejected(self, golden_env: Path):
+        _prepare_clean_v4_candidate(golden_env)
+        artifact = _make_artifact(golden_env, "present", "present artifact")
+        missing = golden_env / "nonexistent.txt"
+        batch = _full_review_batch(
+            golden_env,
+            artifact,
+            artifact_by_case={_active_case_ids(golden_env)[-1]: missing},
+            name="missing-artifact-batch",
+        )
+        before = _review_state_snapshot(golden_env)
+        result = _run_review(golden_env, "--manifest", str(batch), "--reviewer", "alice")
         assert result.returncode != 0
         assert "does not exist" in result.stderr
+        assert _review_state_snapshot(golden_env) == before
 
     def test_review_refuses_legacy_v3_before_any_mutation(self, golden_env: Path):
         art = _make_artifact(golden_env, "incomplete-st", "snapshot")
@@ -299,21 +440,13 @@ class TestFormalArtifactGate:
         """A REVIEWED entry whose sealed hash does not match the artifact
         bytes is REVIEW_INCOMPLETE (formal gate)."""
         _prepare_clean_v4_candidate(golden_env)
-        art = _make_artifact(golden_env, "kangmei", "REAL snapshot bytes")
-        assert (
-            _run_review(
-                golden_env,
-                "--case",
-                "GT-LIMIT-MAIN10-600519",
-                "--artifact",
-                str(art),
-                "--kind",
-                "SSE_ANNOUNCEMENT",
-                "--reviewer",
-                "alice",
-            ).returncode
-            == 0
+        result, _ = _run_full_review(
+            golden_env,
+            reviewer="alice",
+            artifact_name="kangmei",
+            content="REAL snapshot bytes",
         )
+        assert result.returncode == 0, result.stderr
         # tamper the stored artifact after sealing
         cases, _ = GoldenTruthStore(golden_env).load()
         case = next(c for c in cases if c.golden_case_id == "GT-LIMIT-MAIN10-600519")
@@ -381,29 +514,19 @@ class TestReviewGateAllCases:
     """R4A2-P0-01: review_gate must verify EVERY reviewed case."""
 
     def _review_two(self, golden_env: Path) -> None:
-        """Review two cases (real artifacts) against the dataset."""
+        """Review the full dataset, with distinct bytes for two cases."""
         _prepare_clean_v4_candidate(golden_env)
         art1 = _make_artifact(golden_env, "a1", "artifact one")
         art2 = _make_artifact(golden_env, "a2", "artifact two")
-        batch = golden_env.parent / "batch.json"
-        batch.write_text(
-            json.dumps(
-                [
-                    {
-                        "case": "GT-LIMIT-MAIN10-600519",
-                        "artifact": str(art1),
-                        "kind": "SSE_ANNOUNCEMENT",
-                        "note": "n1",
-                    },
-                    {
-                        "case": "GT-LIMIT-MAIN10-600036",
-                        "artifact": str(art2),
-                        "kind": "SSE_ANNOUNCEMENT",
-                        "note": "n2",
-                    },
-                ]
-            ),
-            encoding="utf-8",
+        shared = _make_artifact(golden_env, "shared", "shared artifact")
+        batch = _full_review_batch(
+            golden_env,
+            shared,
+            artifact_by_case={
+                "GT-LIMIT-MAIN10-600519": art1,
+                "GT-LIMIT-MAIN10-600036": art2,
+            },
+            name="batch",
         )
         result = _run_review(golden_env, "--manifest", str(batch), "--reviewer", "bob")
         assert result.returncode == 0, result.stderr
@@ -412,13 +535,13 @@ class TestReviewGateAllCases:
         self._review_two(golden_env)
         store = GoldenTruthStore(golden_env)
         problems = store.review_gate()
-        # both artifacts valid -> no PER-CASE artifact problems
-        # (the dataset-wide "not fully reviewed" note may remain)
-        assert not [p for p in problems if "GT-ST" in p]
+        cases, manifest = store.load()
+        assert manifest.review_summary == {"REVIEWED": len(cases)}
+        assert not problems
 
     def test_first_artifact_valid_second_tampered_blocks(self, golden_env: Path):
         self._review_two(golden_env)
-        # tamper the SECOND artifact only
+        # tamper the SECOND artifact only; every other artifact remains valid
         cases, _ = GoldenTruthStore(golden_env).load()
         second = next(c for c in cases if c.golden_case_id == "GT-LIMIT-MAIN10-600036")
         stored = golden_env / "evidence" / second.source_artifact_ref
@@ -437,45 +560,34 @@ class TestReviewGateAllCases:
     def test_batch_review_rejects_unknown_artifact_kind(self, golden_env: Path):
         _prepare_clean_v4_candidate(golden_env)
         art = _make_artifact(golden_env, "k", "bytes")
-        batch = golden_env.parent / "bad_batch.json"
-        batch.write_text(
-            json.dumps(
-                [{"case": "GT-LIMIT-MAIN10-600519", "artifact": str(art), "kind": "FAKE_KIND"}]
-            ),
-            encoding="utf-8",
-        )
+        batch = _full_review_batch(golden_env, art, name="bad_batch")
+        entries = json.loads(batch.read_text(encoding="utf-8"))
+        entries[0]["kind"] = "FAKE_KIND"
+        batch.write_text(json.dumps(entries), encoding="utf-8")
+        before = _review_state_snapshot(golden_env)
         result = _run_review(golden_env, "--manifest", str(batch), "--reviewer", "bob")
         assert result.returncode != 0
         assert "not in allowlist" in result.stderr
+        assert _review_state_snapshot(golden_env) == before
 
     def test_batch_failure_leaves_no_orphan_evidence(self, golden_env: Path):
         """P1-05: a failing second entry must not write the first artifact."""
         _prepare_clean_v4_candidate(golden_env)
         art1 = _make_artifact(golden_env, "ok1", "good bytes")
         art2 = golden_env / "missing-artifact.txt"  # does not exist
-        batch = golden_env.parent / "mixed.json"
-        batch.write_text(
-            json.dumps(
-                [
-                    {
-                        "case": "GT-LIMIT-MAIN10-600519",
-                        "artifact": str(art1),
-                        "kind": "SSE_ANNOUNCEMENT",
-                    },
-                    {
-                        "case": "GT-LIMIT-MAIN10-600036",
-                        "artifact": str(art2),
-                        "kind": "SSE_ANNOUNCEMENT",
-                    },
-                ]
-            ),
-            encoding="utf-8",
+        batch = _full_review_batch(
+            golden_env,
+            art1,
+            artifact_by_case={"GT-LIMIT-MAIN10-600036": art2},
+            name="mixed",
         )
+        before = _review_state_snapshot(golden_env)
         result = _run_review(golden_env, "--manifest", str(batch), "--reviewer", "bob")
         assert result.returncode != 0
         evidence_dir = golden_env / "evidence"
         if evidence_dir.exists():
             assert not any(evidence_dir.rglob("sha256/*")), "orphan evidence written"
+        assert _review_state_snapshot(golden_env) == before
 
 
 class TestReviewProvenanceCompleteness:
@@ -601,21 +713,14 @@ class TestVersionImmutability:
         next_file = golden_env / f"golden_cases_v{int(num) + 1}.jsonl"
         next_file.write_text("CONFLICTING PREEXISTING BYTES\n", encoding="utf-8", newline="\n")
         art = _make_artifact(golden_env, "x", "bytes")
-        result = _run_review(
-            golden_env,
-            "--case",
-            "GT-LIMIT-MAIN10-600519",
-            "--artifact",
-            str(art),
-            "--kind",
-            "SSE_ANNOUNCEMENT",
-            "--reviewer",
-            "bob",
-        )
+        batch = _full_review_batch(golden_env, art, name="conflict")
+        before = _review_state_snapshot(golden_env)
+        result = _run_review(golden_env, "--manifest", str(batch), "--reviewer", "bob")
         assert result.returncode != 0
         assert "different bytes" in result.stderr
         # the conflicting file was NOT overwritten
         assert "CONFLICTING" in next_file.read_text(encoding="utf-8")
+        assert _review_state_snapshot(golden_env) == before
 
 
 def _semantic_hash(doc: dict) -> str:
