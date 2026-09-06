@@ -8,6 +8,7 @@
 - 新增 `scripts/golden/gt_h2_prepare.py`、`docs/golden/gt_h2/official_fact_registry.json`、`rebuild_plan_v4.json`、`review_packet_index.jsonl`、`GT_H2_CORPUS_REPORT.md` 和 H2 专项测试。packet 只保存官方引用和审阅清单；未下载/提交原始网页或 PDF，未绑定 artifact hash，未设置 `REVIEWED`。
 - 本批只使用官方 SSE、SZSE、BSE/CNINFO 来源定位来准备候选事实；`fact_proved` 是 Agent 的来源检索标记，不等同于人工复核。正式 gate 仍明确只因 128 条均未 human-reviewed 而阻断，Production B1–B7、Data Sufficiency、Provider capability、2020+ backfill、策略/回测/交易均未启动。
 - 未上传账号、密码、Token、真实端点、原始 SDK 输出或本地专有依赖；本地 `vendor/` 供应商包继续只作工作区依赖，不进入提交。
+- Follow-up：CI run 323 的 Ubuntu leg 已完成 `1554 passed`，仅因本地快照与 GitHub main 的两个 JSON manifest 终端换行差异触发不可变哈希测试；`609a8df` 已将 manifest 绑定改为仓库规范表示，JSONL 数据集仍保持精确字节哈希，等待新 CI 完成。
 
 **Next**
 
