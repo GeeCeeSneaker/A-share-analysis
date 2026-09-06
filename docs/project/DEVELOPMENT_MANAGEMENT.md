@@ -2,11 +2,11 @@
 
 ## DM-20260906-112 · GT-H2.2.1 BJ external-artifact honesty closure
 
-**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
 **Review Status**：PENDING_RE_REVIEW；本批不自行执行最终 review seal、CLOSE 或 MERGE。
 **Reviewer baseline**：main 最新要求 [PR18 三轮复审与 GT-H2.2.1 BJ 外部证据诚实性收口要求](../design/A-share-analysis_PR18三轮复审与GT-H2.2.1_BJ外部证据诚实性收口要求_20260906.md)，针对 GT-H2.2.1 P0-03；已关闭的 STAR/ST P0-01 保持不变。
 **Candidate hash**：`8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b`（v4，125 条）
-**Gate**：新 head 的三平台 required CI 与独立 Reviewer closure 未完成前，GT-H3 reviewed seal、Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 均保持冻结。
+**Gate**：本轮 head 的三平台 required CI 已全绿；在独立 Reviewer closure 完成前，GT-H3 reviewed seal、Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 仍保持冻结。
 
 | 审阅要求 | 本批实现 / 验证位置 | 状态 |
 |---|---|---|
@@ -19,13 +19,14 @@
 **Evidence separation**
 
 - 本地 GT-H2.2.1 生成、hash/manifest/packet/gate 校验、H2/candidate/golden review/corporate-action/router 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向 mypy 通过。
+- GitHub Actions run `337`（ID `34032603625`）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三个平台全绿，full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates 均成功。
 - 当前 ACTIVE 为 `COMPILED 125/125`；`review_readiness_gate`、quantity、event coverage 为零问题，`production_formal_gate` 只报告 `REVIEWED 0/125` 人工复核阻断。
 - 本批不下载或提交 raw web/PDF，不绑定 artifact hash，不运行 `review.py` final seal、GT-H3、Production B1–B7、Data Sufficiency、Provider capability 或回补；凭证、Token、端点、原始 SDK 输出和本地 vendor 依赖不进入 GitHub。
 
 **Required next work**
 
-1. 将本轮生成物、生成器、回归测试和本管理记录推送到 PR #18，等待包含 Reviewer 最新 main baseline 的三平台 required CI 全绿；若 CI 失败，按日志修正。
-2. CI 全绿后请独立 Reviewer 仅复审 GT-H2.2.1 P0-03；本批不自行提交批准或合并。
+1. 本轮生成物、生成器、回归测试和本管理记录已推送到 PR #18；run `337` 已完成包含 Reviewer 最新 main baseline 的三平台 required CI 全绿。
+2. 现请独立 Reviewer 仅复审 GT-H2.2.1 P0-03；本批不自行提交批准或合并。
 3. 只有 Reviewer closure 后，才按 GT-H3 进行逐案 artifact bytes/hash binding、N/N reviewed seal、bound replay 与 Formal gate。
 
 ## DM-20260906-111 · GT-H2.2 semantic-evidence alignment
