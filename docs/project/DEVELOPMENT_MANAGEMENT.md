@@ -19,6 +19,7 @@
 **Evidence separation**
 
 - 本地 GT-H2.2 生成、hash/manifest/packet 校验、H2/candidate/golden review/corporate-action 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向静态检查通过。
+- Follow-up：run `333` 三个平台均在 pytest 收集新测试时因根目录 `scripts` 未作为 wheel 包安装而报 `ModuleNotFoundError`，Ruff/mypy 及其余步骤成功；测试已改为按仓库路径加载 source-only 准备器，未改变生产打包边界，本地复测通过，修正 head 仍为 `CI_PENDING`。
 - `review_readiness_gate`、quantity、event coverage 继续通过；`production_formal_gate` 仍仅保留 `REVIEWED 0/128` 人工复核阻断。没有将 semantic source alignment 误报为 Human Review 或 GT-H3 完成。
 - 本批不下载或提交 raw web/PDF，不绑定 artifact hash，不运行 `review.py` final seal、Production B1–B7、Data Sufficiency、Provider capability 或回补；凭证、Token、端点、原始 SDK 输出和本地 vendor 依赖不进入 GitHub。
 

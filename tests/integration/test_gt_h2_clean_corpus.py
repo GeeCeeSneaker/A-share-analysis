@@ -3,18 +3,33 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
-
-from scripts.golden.gt_h2_prepare import _source_context
 
 from ashare_state.spike.golden_store import GoldenTruthStore, review_readiness_gate
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_ROOT = REPO_ROOT / "data" / "golden" / "provider" / "amazingdata"
 H2_ROOT = REPO_ROOT / "docs" / "golden" / "gt_h2"
+
+
+def _load_source_context():
+    """Load the source-only preparation helper without packaging ``scripts``."""
+
+    path = REPO_ROOT / "scripts" / "golden" / "gt_h2_prepare.py"
+    spec = importlib.util.spec_from_file_location("gt_h2_prepare_for_test", path)
+    if spec is None or spec.loader is None:
+        raise AssertionError(f"unable to load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module._source_context
+
+
+_source_context = _load_source_context()
+
 V3_VERSION = "v3-candidate-20260822"
 V3_HASH = "ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e"
 SOURCE_EVIDENCE_SCOPE = "CASE_SPECIFIC_OFFICIAL_ARTIFACT"

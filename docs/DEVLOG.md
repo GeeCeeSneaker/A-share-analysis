@@ -7,6 +7,7 @@
 - 新增 adversarial 回归，直接证明 STAR 20% 与 ST 5% 的来源名称、来源定位、期望字段和 packet 行一致；128 条 packet 重新生成，ACTIVE v4 dataset SHA256 为 `5d063e314ea4b04623ecf19321f09931edb2d4b478f0df055262768e43d66ec0`，manifest、registry、rebuild plan、packet index 和报告已同步重建。
 - 北交所三条案例的 truth/checklist 已与 `golden_router.py::_validate_bj_mapping()` 实际可执行证明对齐：只声明历史 security master 存在、精确日期状态行、运行绑定的 BSE 限价制度与 provider price proof；不再把 validator 未消费的旧新代码连续性或 920 segment 语义写成强事实。
 - 本地 H2、candidate、Golden truth/review、corporate-action 及 GT-H2.2 adversarial 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向静态检查通过。新 head 的 GitHub Actions 尚待运行，故 CI 状态暂为 `CI_PENDING`。
+- Follow-up：run 333 的 Ubuntu、Windows 3.12、Windows 3.14 三个平台均在 pytest 收集阶段因新测试直接导入未随 wheel 打包的根目录 `scripts` 而报 `ModuleNotFoundError`；Ruff、mypy、其余步骤均成功。测试已改为按仓库路径加载 source-only 准备器，未扩大生产包边界；本地复测通过，修正 head 仍等待 CI。
 - 正式 gate 仍只保留 `REVIEWED 0/128` 人工复核阻断；未运行 `review.py` final seal、GT-H3、Production B1–B7、Data Sufficiency、Provider capability、backfill、策略/回测/交易。
 - 未上传账号、密码、IP、Token、真实端点、原始 SDK 输出或专有依赖；本地 `vendor/` 继续只保留工作区依赖。
 
