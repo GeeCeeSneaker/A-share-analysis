@@ -1,3 +1,20 @@
+## 2026-09-06 · GT-H3 reviewer-friendly 125-case table
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_HUMAN_REVIEW**：面向非技术审阅人新增 GT-H3 逐案人工审阅表，基于当前 `v4-candidate-20260906` 的 104 个 artifact groups 展开为完整 125 行。
+- 每行提供案例 ID、分组、事件类型、证券代码、交易日、候选材料类型、官方材料名称、官方链接，以及按该行事实生成的“必须核对”说明；结果、简短反馈、审阅人和审阅日期均留空待真实审阅人填写。
+- 分类覆盖保持为：涨跌停制度 26 条、上市初期涨跌幅 4 条、ST/风险警示变更 50 条、退市/摘牌 20 条、分红/配股除权 25 条；覆盖 125 个唯一案例，不改变任何 Golden expected fields。
+- 同步提供 GitHub 可直接阅读的 Markdown 表和带筛选、结果下拉、进度统计的 Excel 表；两者都是审阅辅助材料，机器封印仍以 `review_decision_template.jsonl` 为准。
+- 表格初始状态为 0/125 已填写；没有检索或提交官方证据 bytes、preflight SHA256、`REVIEWED`、seal、ACTIVE pointer 或生产运行。账号、密码、IP、Token、真实端点、原始 SDK 输出和本地 vendor 依赖未进入 GitHub。
+- 本地 125 条覆盖测试、GT-H3A 定向测试、Ruff 和表格导入/公式错误扫描已通过；本次提交对应的 GitHub Actions CI 尚待完成。
+
+**Next**
+
+- 独立真实 Owner/Human Reviewer 按表逐行打开官方原文，完成 125/125 条 `APPROVE` 或 `REJECT`，并填写简短反馈、审阅人和日期。
+- 审阅人须把同样的决定写入 canonical `review_decision_template.jsonl`，并在 PR 评论明确声明完整 125/125 审阅及 human marker；任何事实不一致都退回 candidate governance。
+- 在该明确授权前，不构造 GT-H3B、不运行 `review.py` seal，不推进 Formal Production、Data Sufficiency、Provider capability approval、backfill、策略、回测或交易。
+
 ## 2026-09-06 · GT-H3A Human Review bundle preparation
 
 **Implementation Status / Review Status**

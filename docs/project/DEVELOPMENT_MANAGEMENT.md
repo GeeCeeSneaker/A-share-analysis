@@ -1,5 +1,27 @@
 # A-share-analysis 开发管理总册（Development Management）
 
+## DM-20260906-114 · GT-H3 人工审阅表可用性优化
+
+**状态**：`IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_HUMAN_REVIEW`
+
+**本次交付**
+
+- 将 GT-H3A 的 104 个材料分组展开为 125 条逐案审阅表，保证每个案例 ID 恰好出现一次。
+- 每行明确“去哪看”：提供候选官方材料名称和官方链接；明确“审什么”：提供代码、交易日、事件/规则适用范围和 expected semantics 的逐行核对目标。
+- 每行明确“怎么填”：结果仅允许 `APPROVE`/`REJECT`，`REJECT` 必须写一句简短原因；同时提供审阅人和审阅日期字段。
+- 提供 Markdown 阅读版和 Excel 填写版。Excel 版增加筛选、下拉、进度统计和反馈示例，方便非技术审阅人使用。
+- 不改变候选事实，不生成证据 bytes/hash，不写入 `REVIEWED`，不创建 seal manifest，不推进生产；canonical `review_decision_template.jsonl` 仍是机器封印输入。
+
+**验收证据**
+
+- 125 条唯一案例覆盖；分类数量为 26/4/50/20/25。
+- 本地逐案覆盖测试、GT-H3A 相关测试、Ruff、Excel 导入检查和公式错误扫描通过。
+- 本次提交后的 GitHub Actions 结果待 CI 返回；PR #19 保持未合并，等待独立真实 Owner/Human Reviewer。
+
+**下一步要求**
+
+独立真实审阅人逐行阅读官方原文并决定 `APPROVE` 或 `REJECT`；不得用搜索摘要、截图、接口输出或 AI 总结替代原文。完成 125/125 后，在 PR 评论明确授权并给出 human marker，项目管理者再按 GT-H3B 流程推进。
+
 ## DM-20260906-113 · GT-H3A Human Review bundle preparation
 
 **Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN

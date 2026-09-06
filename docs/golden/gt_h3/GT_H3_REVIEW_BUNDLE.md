@@ -135,6 +135,24 @@ The bundle contains `104` deterministic artifact groups covering `125` cases. Ev
 | `AG-103` | 1 | `SZSE_ANNOUNCEMENT` | `artifact-103.pdf` | [SZSE official disclosure referring to *ST 顺利 risk warning effective 2022-05-06](https://disc.static.szse.cn/disc/disk03/finalpage/2023-03-13/fd76e611-9f68-4ddc-96de-7c8a37fc5fda.PDF) |
 | `AG-104` | 1 | `SZSE_ANNOUNCEMENT` | `artifact-104.pdf` | [SZSE official disclosure referring to 002022 *ST removal effective 2023-04-04](https://disc.static.szse.cn/disc/disk03/finalpage/2024-03-22/e0b014e3-3416-4526-9063-9845e9e42a6f.PDF) |
 
+## Reviewer-friendly 125-case table
+
+For reviewers who do not want to edit JSONL directly, use either of these review aids:
+
+- [`GT_H3_HUMAN_REVIEW_TABLE.md`](GT_H3_HUMAN_REVIEW_TABLE.md): a GitHub-readable 125-row table. Each row gives the case ID, symbol, trade date, candidate artifact type, official source link, row-specific check target, result, short feedback, reviewer and review date.
+- [`GT_H3_HUMAN_REVIEW_TABLE.xlsx`](GT_H3_HUMAN_REVIEW_TABLE.xlsx): an optional fillable form with filters, an `APPROVE`/`REJECT` dropdown and progress counts.
+
+How to complete one row:
+
+1. Open the official link in that row and read the official document or rule. Do not use a search-result snippet, screenshot, data-interface output or AI summary as a substitute.
+2. Check every fact named in `必须核对`: issuer/rule version, scope, symbol, date, event subtype or effective date, and expected field semantics.
+3. Fill `APPROVE` only when the official text supports every item. If any item is inconsistent, the source is unavailable, or the source does not prove the claim, fill `REJECT`.
+4. In `简短反馈`, write one short reason for a rejection. Examples: `REJECT；原因：日期不一致。` or `REJECT；原因：官方原文打不开/不证明该事实。` Do not use `待定` or `差不多`.
+5. Fill the real reviewer identity and review date. Do not change the case ID, group, or expected-value text.
+6. After all 125 rows are complete, copy the same case-level decisions into the canonical `review_decision_template.jsonl` and add the required explicit 125/125 authorization statement.
+
+These files are reviewer aids only. The canonical machine input remains `review_decision_template.jsonl`; no evidence bytes, evidence hashes, `REVIEWED` fields, seal manifest or production pointer is created by this table.
+
 ## Tracked outputs
 
 - `review_bundle_index.jsonl`: one row per unique official artifact group, including all case-specific semantics and retrieval placeholders.
