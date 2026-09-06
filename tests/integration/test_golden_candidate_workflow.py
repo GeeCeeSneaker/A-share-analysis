@@ -28,6 +28,15 @@ CANDIDATE_SCRIPT = REPO_ROOT / "scripts" / "golden" / "candidate.py"
 def golden_env(tmp_path: Path, monkeypatch) -> Path:
     root = tmp_path / "data" / "golden" / "provider" / "amazingdata"
     shutil.copytree(REPO_GOLDEN, root)
+    # These workflow tests exercise the legacy-to-v4 transition from the
+    # immutable v3 fixture. The repository ACTIVE pointer is v4 after GT-H2.
+    for name in ("golden_cases_v4.jsonl", "truth_manifest_v4.json"):
+        (root / name).unlink(missing_ok=True)
+    (root / "truth_manifest.json").write_text(
+        (root / "truth_manifest_v3.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+        newline="\n",
+    )
     monkeypatch.setattr("ashare_state.spike.golden_store.GOLDEN_ROOT", root)
     monkeypatch.chdir(tmp_path)
     return root

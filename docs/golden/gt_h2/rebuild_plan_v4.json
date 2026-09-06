@@ -1,0 +1,2807 @@
+{
+  "plan_schema": 1,
+  "source_truth_version": "v3-candidate-20260822",
+  "source_dataset_file": "golden_cases_v3.jsonl",
+  "source_dataset_hash": "ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e",
+  "target_truth_version": "v4-candidate-20260906",
+  "policy": {
+    "old_structural_rows": "DROP: v3 ST/DELIST rows lack exact effective dates or distinct identities",
+    "old_negative_samples": "DROP: repetitive observations add no independent structural truth",
+    "old_non_structural_rows": "REPLACE: preserve case semantics while adding official rule/disclosure locators",
+    "new_structural_rows": "ADD: one canonical case per independently located official event",
+    "new_right_issue_rows": "ADD: supplement dividend-only CA coverage with right-issue ex-dates",
+    "review_boundary": "No source artifact is sealed and no case is marked REVIEWED by this utility"
+  },
+  "operation_summary": {
+    "DROP": 70,
+    "REPLACE": 53,
+    "ADD": 75
+  },
+  "registry_case_count": 75,
+  "operations": [
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-600518-20190506"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-600518-20190603"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-600518-20190801"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-600518-20191101"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-600518-20191231"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-002450-20190122"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-002450-20190222"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-002450-20190422"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-002450-20190722"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-002450-20191231"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600519-20190603"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600519-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600519-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600519-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600519-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600036-20190603"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600036-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600036-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600036-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600036-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000001-20190603"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000001-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000001-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000001-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000001-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000002-20190603"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000002-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000002-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000002-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000002-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000858-20190603"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000858-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000858-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000858-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000858-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600900-20190603"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600900-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600900-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600900-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-600900-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000333-20190603"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000333-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000333-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000333-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-000333-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-601318-20190603"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-601318-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-601318-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-601318-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-ST-NEG-601318-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-000979-20190601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-000979-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-002680-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-002680-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-002477-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-002477-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-002143-20200601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-002143-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-300104-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-300104-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-601558-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-601558-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-300156-20210601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-300156-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-002450-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-002450-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-601258-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-601258-20230601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-000018-20220601"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-DELIST-000018-20230601"
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-MAIN10-600519",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-MAIN-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1,
+          "PRICE_LOW_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-MAIN10-600519",
+        "provider_symbol": "600519.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "trade_date": "20230601",
+        "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-MAIN10-600036",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-MAIN-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1,
+          "PRICE_LOW_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-MAIN10-600036",
+        "provider_symbol": "600036.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "trade_date": "20230601",
+        "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-MAIN10-601318",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-MAIN-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1,
+          "PRICE_LOW_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-MAIN10-601318",
+        "provider_symbol": "601318.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "trade_date": "20230601",
+        "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-MAIN10-600900",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-MAIN-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1,
+          "PRICE_LOW_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-MAIN10-600900",
+        "provider_symbol": "600900.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "trade_date": "20230601",
+        "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-MAIN10-600104",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-MAIN-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1,
+          "PRICE_LOW_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-MAIN10-600104",
+        "provider_symbol": "600104.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "trade_date": "20230601",
+        "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-MAIN10-600019",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-MAIN-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1,
+          "PRICE_LOW_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-MAIN10-600019",
+        "provider_symbol": "600019.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "trade_date": "20230601",
+        "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-ST5-600518-20190603",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-ST-5",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.05,
+          "PRICE_LOW_LMT_RATE": 0.05
+        },
+        "golden_case_id": "GT-LIMIT-ST5-600518-20190603",
+        "provider_symbol": "600518.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official risk-warning stock trading rules: 5% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml | source claim: SSE/SZSE trading rules: risk-warning stocks 5%",
+        "trade_date": "20190603",
+        "truth_source": "Main board ST stock +/-5% daily limit",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-ST5-600518-20191028",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-ST-5",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.05,
+          "PRICE_LOW_LMT_RATE": 0.05
+        },
+        "golden_case_id": "GT-LIMIT-ST5-600518-20191028",
+        "provider_symbol": "600518.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official risk-warning stock trading rules: 5% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml | source claim: SSE/SZSE trading rules: risk-warning stocks 5%",
+        "trade_date": "20191028",
+        "truth_source": "Main board ST stock +/-5% daily limit",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-ST5-002450-20190422",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-ST-5",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.05,
+          "PRICE_LOW_LMT_RATE": 0.05
+        },
+        "golden_case_id": "GT-LIMIT-ST5-002450-20190422",
+        "provider_symbol": "002450.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official risk-warning stock trading rules: 5% limit | https://www.szse.cn/lawrules/rule/trade/ | source claim: SSE/SZSE trading rules: risk-warning stocks 5%",
+        "trade_date": "20190422",
+        "truth_source": "Main board ST stock +/-5% daily limit",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-ST5-002450-20190722",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-ST-5",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.05,
+          "PRICE_LOW_LMT_RATE": 0.05
+        },
+        "golden_case_id": "GT-LIMIT-ST5-002450-20190722",
+        "provider_symbol": "002450.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official risk-warning stock trading rules: 5% limit | https://www.szse.cn/lawrules/rule/trade/ | source claim: SSE/SZSE trading rules: risk-warning stocks 5%",
+        "trade_date": "20190722",
+        "truth_source": "Main board ST stock +/-5% daily limit",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN10-300001",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-CN-PRE-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-CN10-300001",
+        "provider_symbol": "300001.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext trading rules pre-reform",
+        "trade_date": "20200106",
+        "truth_source": "ChiNext +/-10% BEFORE the 2020-08-24 reform",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN10-300059",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-CN-PRE-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-CN10-300059",
+        "provider_symbol": "300059.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext trading rules pre-reform",
+        "trade_date": "20200106",
+        "truth_source": "ChiNext +/-10% BEFORE the 2020-08-24 reform",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN10-300015",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-CN-PRE-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-CN10-300015",
+        "provider_symbol": "300015.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext trading rules pre-reform",
+        "trade_date": "20200106",
+        "truth_source": "ChiNext +/-10% BEFORE the 2020-08-24 reform",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN10-300750",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-CN-PRE-10",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.1
+        },
+        "golden_case_id": "GT-LIMIT-CN10-300750",
+        "provider_symbol": "300750.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext trading rules pre-reform",
+        "trade_date": "20200106",
+        "truth_source": "ChiNext +/-10% BEFORE the 2020-08-24 reform",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300750",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300750",
+        "provider_symbol": "300750.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300059",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300059",
+        "provider_symbol": "300059.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300015",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300015",
+        "provider_symbol": "300015.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300124",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300124",
+        "provider_symbol": "300124.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300274",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300274",
+        "provider_symbol": "300274.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-STAR20-688981",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-STAR-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-STAR20-688981",
+        "provider_symbol": "688981.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "trade_date": "20210601",
+        "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-STAR20-688111",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-STAR-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-STAR20-688111",
+        "provider_symbol": "688111.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "trade_date": "20210601",
+        "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-STAR20-688036",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-STAR-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-STAR20-688036",
+        "provider_symbol": "688036.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "trade_date": "20210601",
+        "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-STAR20-688012",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-STAR-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-STAR20-688012",
+        "provider_symbol": "688012.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "trade_date": "20210601",
+        "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-STAR20-688599",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-STAR-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-STAR20-688599",
+        "provider_symbol": "688599.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "trade_date": "20210601",
+        "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-STARNO-20200722",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "NO_LIMIT_IPO",
+        "event_id": "NO_LIMIT_STAR_FIRST5",
+        "event_subtype": "",
+        "expected_fields": {
+          "HIGH_LIMITED": null,
+          "LOW_LIMITED": null
+        },
+        "golden_case_id": "GT-LIMIT-STARNO-20200722",
+        "provider_symbol": "688981.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE IPO first-day price-limit rules (2014-2023) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019): first-5-days no price limit",
+        "trade_date": "20200722",
+        "truth_source": "STAR Market IPO day: NO price limit during first 5 listing days",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-STARNO-20200723",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "NO_LIMIT_IPO",
+        "event_id": "NO_LIMIT_STAR_FIRST5",
+        "event_subtype": "",
+        "expected_fields": {
+          "HIGH_LIMITED": null,
+          "LOW_LIMITED": null
+        },
+        "golden_case_id": "GT-LIMIT-STARNO-20200723",
+        "provider_symbol": "688981.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE IPO first-day price-limit rules (2014-2023) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019): first-5-days no price limit",
+        "trade_date": "20200723",
+        "truth_source": "STAR Market IPO day+1: NO price limit during first 5 listing days",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-BSE30-20220104",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-BSE-30",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.3
+        },
+        "golden_case_id": "GT-LIMIT-BSE30-20220104",
+        "provider_symbol": "835185.BJ",
+        "review_status": "COMPILED",
+        "source_ref": "BSE official trading-rule portal: 30% price-limit regime | https://www.bse.cn/ | source claim: BSE trading rules (2021-11-15)",
+        "trade_date": "20220104",
+        "truth_source": "BSE +/-30% daily limit (post 2021-11-15 opening)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-BSE30-20220601",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_id": "REGIME-BSE-30",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.3
+        },
+        "golden_case_id": "GT-LIMIT-BSE30-20220601",
+        "provider_symbol": "835185.BJ",
+        "review_status": "COMPILED",
+        "source_ref": "BSE official trading-rule portal: 30% price-limit regime | https://www.bse.cn/ | source claim: BSE trading rules (2021-11-15)",
+        "trade_date": "20220601",
+        "truth_source": "BSE +/-30% daily limit (post 2021-11-15 opening)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-IPO44-601995",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "NO_LIMIT_IPO",
+        "event_id": "IPO44-601995.SH",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.44,
+          "PRICE_LOW_LMT_RATE": 0.36
+        },
+        "golden_case_id": "GT-LIMIT-IPO44-601995",
+        "provider_symbol": "601995.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE IPO first-day price-limit rules (2014-2023) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE IPO first-day price rule 2014-2023",
+        "trade_date": "20201102",
+        "truth_source": "Main-board IPO day 1: +44%/-36% caps (CICC A-share IPO, pre-2023 regime)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-IPO44-605499",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "NO_LIMIT_IPO",
+        "event_id": "IPO44-605499.SH",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.44,
+          "PRICE_LOW_LMT_RATE": 0.36
+        },
+        "golden_case_id": "GT-LIMIT-IPO44-605499",
+        "provider_symbol": "605499.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE IPO first-day price-limit rules (2014-2023) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE IPO first-day price rule 2014-2023",
+        "trade_date": "20210527",
+        "truth_source": "Main-board IPO day 1: +44%/-36% caps (Eastroc Beverage IPO, pre-2023 regime)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-600519-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-600519.SH-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-600519-20220630",
+        "provider_symbol": "600519.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "Kweichow Moutai 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-600519-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-600519.SH-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-600519-20230627",
+        "provider_symbol": "600519.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "Kweichow Moutai 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-601318-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-601318.SH-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-601318-20220630",
+        "provider_symbol": "601318.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "Ping An Insurance 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-601318-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-601318.SH-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-601318-20230627",
+        "provider_symbol": "601318.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "Ping An Insurance 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-600036-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-600036.SH-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-600036-20220630",
+        "provider_symbol": "600036.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "China Merchants Bank 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-600036-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-600036.SH-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-600036-20230627",
+        "provider_symbol": "600036.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "China Merchants Bank 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-000858-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-000858.SZ-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-000858-20220630",
+        "provider_symbol": "000858.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "Wuliangye 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-000858-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-000858.SZ-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-000858-20230627",
+        "provider_symbol": "000858.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "Wuliangye 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-000333-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-000333.SZ-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-000333-20220630",
+        "provider_symbol": "000333.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "Midea Group 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-000333-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-000333.SZ-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-000333-20230627",
+        "provider_symbol": "000333.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "Midea Group 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-601398-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-601398.SH-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-601398-20220630",
+        "provider_symbol": "601398.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "ICBC 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-601398-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-601398.SH-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-601398-20230627",
+        "provider_symbol": "601398.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "ICBC 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-000651-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-000651.SZ-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-000651-20220630",
+        "provider_symbol": "000651.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "Gree Electric 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-000651-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-000651.SZ-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-000651-20230627",
+        "provider_symbol": "000651.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "Gree Electric 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-000002-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-000002.SZ-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-000002-20220630",
+        "provider_symbol": "000002.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "Vanke A 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-000002-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-000002.SZ-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-000002-20230627",
+        "provider_symbol": "000002.SZ",
+        "review_status": "COMPILED",
+        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "Vanke A 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-600900-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-600900.SH-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-600900-20220630",
+        "provider_symbol": "600900.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "Yangtze Power 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-600900-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-600900.SH-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-600900-20230627",
+        "provider_symbol": "600900.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "Yangtze Power 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-600104-20220630",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-600104.SH-2021 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-600104-20220630",
+        "provider_symbol": "600104.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
+        "trade_date": "20220630",
+        "truth_source": "SAIC Motor 2021 annual dividend: ex-dividend date 20220630",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-CA-600104-20230627",
+      "case": {
+        "case_type": "golden_corporate_action",
+        "event_class": "DIVIDEND_EX_DATE",
+        "event_id": "DIV-600104.SH-2022 annual dividend",
+        "event_subtype": "",
+        "expected_fields": {
+          "IS_WD_SEC": true
+        },
+        "golden_case_id": "GT-CA-600104-20230627",
+        "provider_symbol": "600104.SH",
+        "review_status": "COMPILED",
+        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
+        "trade_date": "20230627",
+        "truth_source": "SAIC Motor 2022 annual dividend: ex-dividend date 20230627",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-BJ-835185-CONTINUITY",
+      "case": {
+        "case_type": "golden_bj_mapping",
+        "event_class": "BJ_CODE_MIGRATION",
+        "event_id": "BJ-MIGRATION-2021",
+        "event_subtype": "",
+        "expected_fields": {
+          "CODE_CONTINUITY": true
+        },
+        "golden_case_id": "GT-BJ-835185-CONTINUITY",
+        "provider_symbol": "835185.BJ",
+        "review_status": "COMPILED",
+        "source_ref": "BSE official issuer and quotation-rule portal: code continuity/migration | https://www.bse.cn/ | source claim: BSE opening announcement 2021-11: 71 selected-layer firms migrated, codes unchanged",
+        "trade_date": "20211115",
+        "truth_source": "BaiRui (BTR New Energy): selected-layer code 835185 carried over to BSE unchanged on the 2021-11-15 opening",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-BJ-835185-2022",
+      "case": {
+        "case_type": "golden_bj_mapping",
+        "event_class": "BJ_CODE_MIGRATION",
+        "event_id": "BJ-MIGRATION-2021",
+        "event_subtype": "",
+        "expected_fields": {
+          "CODE_CONTINUITY": true
+        },
+        "golden_case_id": "GT-BJ-835185-2022",
+        "provider_symbol": "835185.BJ",
+        "review_status": "COMPILED",
+        "source_ref": "BSE official issuer and quotation-rule portal: code continuity/migration | https://www.bse.cn/ | source claim: BSE daily quotation 2022",
+        "trade_date": "20220601",
+        "truth_source": "BaiRui trades as 835185.BJ post-migration (BSE 30% regime)",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-BJ-920-SEGMENT",
+      "case": {
+        "case_type": "golden_bj_mapping",
+        "event_class": "BJ_CODE_MIGRATION",
+        "event_id": "BJ-920-SEGMENT-2024",
+        "event_subtype": "",
+        "expected_fields": {
+          "SEGMENT_VALID": true
+        },
+        "golden_case_id": "GT-BJ-920-SEGMENT",
+        "provider_symbol": "920002.BJ",
+        "review_status": "COMPILED",
+        "source_ref": "BSE official issuer and quotation-rule portal: code continuity/migration | https://www.bse.cn/ | source claim: BSE code-segment announcement 2024",
+        "trade_date": "20240701",
+        "truth_source": "BSE 920xxx code segment: new BSE listings use the 920 prefix (effective 2024); no same-day (old, new) code ambiguity",
+        "truth_version": "v3-candidate-20260822"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002681-20200506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002681-20200506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002681.SZ",
+        "trade_date": "20200506",
+        "truth_source": "SZSE official announcement: *ST 奋达 risk warning effective 2020-05-06",
+        "source_ref": "SZSE official announcement: *ST 奋达 risk warning effective 2020-05-06 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-30/6c34f44d-5bee-46df-8f17-2c699b477d18.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002681-20200506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20200506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000408-20200506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000408-20200506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000408.SZ",
+        "trade_date": "20200506",
+        "truth_source": "SZSE official announcement: *ST 藏格 risk warning effective 2020-05-06",
+        "source_ref": "SZSE official announcement: *ST 藏格 risk warning effective 2020-05-06 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-30/5018e5ae-ddeb-4602-a0c1-7f2b0634f727.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000408-20200506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20200506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002513-20200429",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002513-20200429",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002513.SZ",
+        "trade_date": "20200429",
+        "truth_source": "SZSE official announcement: *ST 蓝丰 risk warning effective 2020-04-29",
+        "source_ref": "SZSE official announcement: *ST 蓝丰 risk warning effective 2020-04-29 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-28/e3e3b094-6f16-461a-858f-f77851a3e60f.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002513-20200429",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20200429"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000587-20200507",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000587-20200507",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000587.SZ",
+        "trade_date": "20200507",
+        "truth_source": "SZSE official announcement: *ST 金洲 risk warning effective 2020-05-07",
+        "source_ref": "SZSE official announcement: *ST 金洲 risk warning effective 2020-05-07 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-30/101bf255-d1eb-4791-96a2-28d2ebbcb1cc.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000587-20200507",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20200507"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002052-20200506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002052-20200506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002052.SZ",
+        "trade_date": "20200506",
+        "truth_source": "SZSE official disclosure referring to *ST 同洲 risk warning effective 2020-05-06",
+        "source_ref": "SZSE official disclosure referring to *ST 同洲 risk warning effective 2020-05-06 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2021-06-07/276460c6-f1c9-42f5-b2d7-9159e0cb3974.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002052-20200506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20200506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002319-20200428",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002319-20200428",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002319.SZ",
+        "trade_date": "20200428",
+        "truth_source": "SZSE official announcement: *ST 乐通 risk warning effective 2020-04-28",
+        "source_ref": "SZSE official announcement: *ST 乐通 risk warning effective 2020-04-28 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-25/805e9468-baf4-40b2-b042-10e4d1172063.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002319-20200428",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20200428"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000613-20210427",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000613-20210427",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000613.SZ",
+        "trade_date": "20210427",
+        "truth_source": "SZSE official announcement: *ST 东海 A risk warning effective 2021-04-27",
+        "source_ref": "SZSE official announcement: *ST 东海 A risk warning effective 2021-04-27 | https://disc.static.szse.cn/disc/disk02/finalpage/2021-04-24/780272c9-1bb5-4ce0-b6cf-6f95a71059be.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000613-20210427",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20210427"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300064-20210428",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300064-20210428",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300064.SZ",
+        "trade_date": "20210428",
+        "truth_source": "SZSE official announcement: *ST 金刚 risk warning effective 2021-04-28",
+        "source_ref": "SZSE official announcement: *ST 金刚 risk warning effective 2021-04-28 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2021-04-27/853620b1-b4a9-432d-9ee8-d8dcefd821d6.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300064-20210428",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20210428"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300312-20210429",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300312-20210429",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300312.SZ",
+        "trade_date": "20210429",
+        "truth_source": "SZSE official announcement: *ST 邦讯 risk warning effective 2021-04-29",
+        "source_ref": "SZSE official announcement: *ST 邦讯 risk warning effective 2021-04-29 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2021-04-28/3a1e7c33-47d7-43d3-ba85-203b8221353e.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300312-20210429",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20210429"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600593-20210722",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-600593-20210722",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "600593.SH",
+        "trade_date": "20210722",
+        "truth_source": "SSE official announcement: 600593 risk warning effective 2021-07-22",
+        "source_ref": "SSE official announcement: 600593 risk warning effective 2021-07-22 | http://www.sse.com.cn/disclosure/announcement/general/c/c_20210720_5526013.shtml",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-600593-20210722",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20210722"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002113-20200429",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002113-20200429",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002113.SZ",
+        "trade_date": "20200429",
+        "truth_source": "SZSE official disclosure referring to *ST 天润 risk warning effective 2020-04-29",
+        "source_ref": "SZSE official disclosure referring to *ST 天润 risk warning effective 2020-04-29 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2021-08-26/d61cb4c7-8be7-45c6-ace7-99e1faed88e1.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002113-20200429",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20200429"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000806-20220506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000806-20220506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000806.SZ",
+        "trade_date": "20220506",
+        "truth_source": "SZSE official announcement: *ST 银河 risk warning effective 2022-05-06",
+        "source_ref": "SZSE official announcement: *ST 银河 risk warning effective 2022-05-06 | http://disc.static.szse.cn/disc/disk03/finalpage/2022-04-30/b6d5b6a7-e992-4ff1-bd09-832e4e500651.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000806-20220506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002022-20220506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002022-20220506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002022.SZ",
+        "trade_date": "20220506",
+        "truth_source": "SZSE official announcement: *ST 科华 risk warning effective 2022-05-06",
+        "source_ref": "SZSE official announcement: *ST 科华 risk warning effective 2022-05-06 | http://disc.static.szse.cn/disc/disk02/finalpage/2022-04-30/a781efcd-39ab-4be8-9c80-0cc15863a36c.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002022-20220506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002417-20220421",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002417-20220421",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002417.SZ",
+        "trade_date": "20220421",
+        "truth_source": "SZSE official announcement: *ST 深南 risk warning effective 2022-04-21",
+        "source_ref": "SZSE official announcement: *ST 深南 risk warning effective 2022-04-21 | https://disc.static.szse.cn/disc/disk03/finalpage/2022-04-20/d5512186-9d1c-4c2b-98a6-5a3d641e83a6.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002417-20220421",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220421"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002781-20220506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002781-20220506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002781.SZ",
+        "trade_date": "20220506",
+        "truth_source": "SZSE official disclosure referring to *ST 奇信 risk warning effective 2022-05-06",
+        "source_ref": "SZSE official disclosure referring to *ST 奇信 risk warning effective 2022-05-06 | https://disc.static.szse.cn/disc/disk03/finalpage/2022-11-18/d507ec79-4364-4159-b566-3b52c4df5c48.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002781-20220506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000606-20220506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000606-20220506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000606.SZ",
+        "trade_date": "20220506",
+        "truth_source": "SZSE official disclosure referring to *ST 顺利 risk warning effective 2022-05-06",
+        "source_ref": "SZSE official disclosure referring to *ST 顺利 risk warning effective 2022-05-06 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-03-13/fd76e611-9f68-4ddc-96de-7c8a37fc5fda.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000606-20220506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000995-20220429",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000995-20220429",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000995.SZ",
+        "trade_date": "20220429",
+        "truth_source": "SZSE official disclosure referring to *ST 皇台 risk warning effective 2022-04-29",
+        "source_ref": "SZSE official disclosure referring to *ST 皇台 risk warning effective 2022-04-29 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-03-13/0637c8e3-59a6-45ce-a0e5-de996b4a72e5.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000995-20220429",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220429"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300336-20220429",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300336-20220429",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300336.SZ",
+        "trade_date": "20220429",
+        "truth_source": "SZSE official announcement: *ST 新文 risk warning effective 2022-04-29",
+        "source_ref": "SZSE official announcement: *ST 新文 risk warning effective 2022-04-29 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-01-30/58a93ed7-8b2f-4587-b43a-e9493b9daa60.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300336-20220429",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220429"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300297-20220429",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300297-20220429",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300297.SZ",
+        "trade_date": "20220429",
+        "truth_source": "SZSE official announcement: *ST 蓝盾 risk warning effective 2022-04-29",
+        "source_ref": "SZSE official announcement: *ST 蓝盾 risk warning effective 2022-04-29 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-03-28/39fe9657-2530-48aa-9ff9-98cac5f2e15e.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300297-20220429",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220429"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300330-20220808",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300330-20220808",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300330.SZ",
+        "trade_date": "20220808",
+        "truth_source": "SZSE official announcement: *ST 计通 risk warning effective 2022-08-08",
+        "source_ref": "SZSE official announcement: *ST 计通 risk warning effective 2022-08-08 | https://disc.static.szse.cn/disc/disk03/finalpage/2022-08-05/832ecade-fa63-42d8-8520-388cdd3930cd.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300330-20220808",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220808"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000410-20220419",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000410-20220419",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000410.SZ",
+        "trade_date": "20220419",
+        "truth_source": "SZSE official disclosure referring to *ST 沈机 risk warning effective 2022-04-19",
+        "source_ref": "SZSE official disclosure referring to *ST 沈机 risk warning effective 2022-04-19 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-04-29/fc4e9195-d651-477a-9bb9-a1e5f52cc43a.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000410-20220419",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220419"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002485-20220506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002485-20220506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002485.SZ",
+        "trade_date": "20220506",
+        "truth_source": "SZSE official announcement: *ST 雪发 risk warning effective 2022-05-06",
+        "source_ref": "SZSE official announcement: *ST 雪发 risk warning effective 2022-05-06 | http://disc.static.szse.cn/disc/disk03/finalpage/2022-04-30/4cb2d78e-0ec1-4c86-93b9-0d7e08127e5e.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002485-20220506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20220506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000616-20230504",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000616-20230504",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000616.SZ",
+        "trade_date": "20230504",
+        "truth_source": "SZSE official announcement: *ST 海投 risk warning effective 2023-05-04",
+        "source_ref": "SZSE official announcement: *ST 海投 risk warning effective 2023-05-04 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-04-28/10329d33-dd5b-416b-a0cf-2af0a33c4e13.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000616-20230504",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20230504"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000540-20230505",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000540-20230505",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000540.SZ",
+        "trade_date": "20230505",
+        "truth_source": "SZSE official announcement: *ST 中天 risk warning effective 2023-05-05",
+        "source_ref": "SZSE official announcement: *ST 中天 risk warning effective 2023-05-05 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-04-29/09ad58d3-6179-47a3-bba4-1cccf853ae04.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000540-20230505",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20230505"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002433-20230505",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002433-20230505",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002433.SZ",
+        "trade_date": "20230505",
+        "truth_source": "SZSE official disclosure referring to *ST 太安 risk warning effective 2023-05-05",
+        "source_ref": "SZSE official disclosure referring to *ST 太安 risk warning effective 2023-05-05 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-04-30/20e9fe23-010b-4cd6-a0e8-cb71676efd21.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002433-20230505",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20230505"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002086-20230505",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002086-20230505",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002086.SZ",
+        "trade_date": "20230505",
+        "truth_source": "SZSE official disclosure referring to *ST 东洋 risk warning effective 2023-05-05",
+        "source_ref": "SZSE official disclosure referring to *ST 东洋 risk warning effective 2023-05-05 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-12-01/d12ed6af-2ddf-4be3-9c59-050a5484375e.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002086-20230505",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20230505"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300742-20230504",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300742-20230504",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300742.SZ",
+        "trade_date": "20230504",
+        "truth_source": "SZSE official disclosure referring to *ST 越博 risk warning effective 2023-05-04",
+        "source_ref": "SZSE official disclosure referring to *ST 越博 risk warning effective 2023-05-04 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-05-08/f32b3983-feec-44e5-ba43-1bf9ec15cf84.pdf",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300742-20230504",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20230504"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300208-20240430",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300208-20240430",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300208.SZ",
+        "trade_date": "20240430",
+        "truth_source": "SZSE official announcement: *ST 中程 risk warning effective 2024-04-30",
+        "source_ref": "SZSE official announcement: *ST 中程 risk warning effective 2024-04-30 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-04-26/97177b91-6c27-437c-83e0-3c52d2f7b729.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300208-20240430",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240430"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002217-20240506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-002217-20240506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002217.SZ",
+        "trade_date": "20240506",
+        "truth_source": "SZSE official disclosure referring to *ST 合泰 risk warning effective 2024-05-06",
+        "source_ref": "SZSE official disclosure referring to *ST 合泰 risk warning effective 2024-05-06 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-05-16/a4389dc6-97e8-4f1b-a2cc-bae0de6e5dec.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-002217-20240506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300108-20240430",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300108-20240430",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300108.SZ",
+        "trade_date": "20240430",
+        "truth_source": "SZSE official disclosure referring to *ST 吉药 risk warning effective 2024-04-30",
+        "source_ref": "SZSE official disclosure referring to *ST 吉药 risk warning effective 2024-04-30 | https://disc.static.szse.cn/disc/disk03/finalpage/2025-03-10/cfd76336-3ab7-4c6d-8e17-8fdb4fe8c447.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300108-20240430",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240430"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300209-20240429",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300209-20240429",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300209.SZ",
+        "trade_date": "20240429",
+        "truth_source": "SZSE official disclosure referring to *ST 有树 risk warning effective 2024-04-29",
+        "source_ref": "SZSE official disclosure referring to *ST 有树 risk warning effective 2024-04-29 | https://disc.static.szse.cn/disc/disk03/finalpage/2025-04-17/16f33a70-834e-42b8-a894-d8b5abe35535.pdf",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300209-20240429",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240429"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300167-20240430",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300167-20240430",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300167.SZ",
+        "trade_date": "20240430",
+        "truth_source": "SZSE official disclosure referring to *ST 迪威风险警示 effective 2024-04-30",
+        "source_ref": "SZSE official disclosure referring to *ST 迪威风险警示 effective 2024-04-30 | https://disc.static.szse.cn/disc/disk03/finalpage/2025-04-29/30ec3b9a-dd82-4aaf-bf05-273e9edcb2a0.pdf",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300167-20240430",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240430"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000525-20240919",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-000525-20240919",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000525.SZ",
+        "trade_date": "20240919",
+        "truth_source": "SZSE official disclosure referring to *ST 红阳 risk warning effective 2024-09-19",
+        "source_ref": "SZSE official disclosure referring to *ST 红阳 risk warning effective 2024-09-19 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-10-09/a133a2c9-9d40-4c92-85ac-3efed7d8359d.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-000525-20240919",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240919"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300506-20240429",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300506-20240429",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300506.SZ",
+        "trade_date": "20240429",
+        "truth_source": "SZSE official disclosure referring to *ST 名家汇 risk warning effective 2024-04-29",
+        "source_ref": "SZSE official disclosure referring to *ST 名家汇 risk warning effective 2024-04-29 | https://disc.static.szse.cn/disc/disk03/finalpage/2025-03-20/cd19ee3f-0bc9-4e4b-9477-af6b6fab7c4b.pdf",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300506-20240429",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240429"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300965-20240429",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-300965-20240429",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300965.SZ",
+        "trade_date": "20240429",
+        "truth_source": "SZSE official disclosure referring to *ST 恒宇 risk warning effective 2024-04-29",
+        "source_ref": "SZSE official disclosure referring to *ST 恒宇 risk warning effective 2024-04-29 | https://disc.static.szse.cn/disc/disk03/finalpage/2025-04-11/d1f5b09c-3741-4e64-8984-a65441b01dd1.pdf",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-300965-20240429",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240429"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600213-20240506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-600213-20240506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "600213.SH",
+        "trade_date": "20240506",
+        "truth_source": "SSE official risk-warning adjustment list: 600213 effective 2024-05-06",
+        "source_ref": "SSE official risk-warning adjustment list: 600213 effective 2024-05-06 | https://www.sse.com.cn/disclosure/magin/announcement/ssereport/c/c_20240430_10753871.shtml",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-600213-20240506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-603363-20240506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_ADD-603363-20240506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "603363.SH",
+        "trade_date": "20240506",
+        "truth_source": "SSE official risk-warning adjustment list: 603363 effective 2024-05-06",
+        "source_ref": "SSE official risk-warning adjustment list: 603363 effective 2024-05-06 | https://www.sse.com.cn/disclosure/magin/announcement/ssereport/c/c_20240430_10753871.shtml",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-603363-20240506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_ADD",
+        "event_effective_date": "20240506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688282-20240506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688282-20240506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "688282.SH",
+        "trade_date": "20240506",
+        "truth_source": "SSE official risk-warning adjustment list: STAR 688282 effective 2024-05-06",
+        "source_ref": "SSE official risk-warning adjustment list: STAR 688282 effective 2024-05-06 | https://www.sse.com.cn/disclosure/magin/announcement/ssereport/c/c_20240430_10753871.shtml",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "event_id": "ST-ADD-688282-20240506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "STAR_ST_ADD",
+        "event_effective_date": "20240506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002681-20210413",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-002681-20210413",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002681.SZ",
+        "trade_date": "20210413",
+        "truth_source": "SZSE official announcement: 002681 *ST removal effective 2021-04-13",
+        "source_ref": "SZSE official announcement: 002681 *ST removal effective 2021-04-13 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2021-04-10/ff3c0039-575f-4554-8035-d061e882f2c7.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-002681-20210413",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20210413"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-000408-20210512",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-000408-20210512",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000408.SZ",
+        "trade_date": "20210512",
+        "truth_source": "SZSE official announcement: 000408 *ST removal effective 2021-05-12",
+        "source_ref": "SZSE official announcement: 000408 *ST removal effective 2021-05-12 | https://disc.static.szse.cn/disc/disk02/finalpage/2021-05-11/f9006990-ffd3-40bb-9cb9-be8dc0511516.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-000408-20210512",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20210512"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002513-20210621",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-002513-20210621",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002513.SZ",
+        "trade_date": "20210621",
+        "truth_source": "SZSE official announcement: 002513 *ST removal effective 2021-06-21",
+        "source_ref": "SZSE official announcement: 002513 *ST removal effective 2021-06-21 | https://disc.static.szse.cn/disc/disk02/finalpage/2021-06-18/0acbdccf-207a-4bab-a5fb-a6bf8d8c515a.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-002513-20210621",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20210621"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002058-20220523",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-002058-20220523",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002058.SZ",
+        "trade_date": "20220523",
+        "truth_source": "SZSE official announcement: 002058 *ST removal effective 2022-05-23",
+        "source_ref": "SZSE official announcement: 002058 *ST removal effective 2022-05-23 | https://disc.static.szse.cn/disc/disk03/finalpage/2022-05-20/9ac63995-9ddd-4dca-ada2-f9fd0ead9e60.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-002058-20220523",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20220523"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-000007-20220701",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-000007-20220701",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "000007.SZ",
+        "trade_date": "20220701",
+        "truth_source": "SZSE official announcement: 000007 *ST removal effective 2022-07-01",
+        "source_ref": "SZSE official announcement: 000007 *ST removal effective 2022-07-01 | https://disc.static.szse.cn/disc/disk03/finalpage/2022-06-30/7de6ae82-da34-47da-a35b-71cbb965c01e.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-000007-20220701",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20220701"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002022-20230404",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-002022-20230404",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002022.SZ",
+        "trade_date": "20230404",
+        "truth_source": "SZSE official disclosure referring to 002022 *ST removal effective 2023-04-04",
+        "source_ref": "SZSE official disclosure referring to 002022 *ST removal effective 2023-04-04 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-03-22/e0b014e3-3416-4526-9063-9845e9e42a6f.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-002022-20230404",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20230404"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-300010-20240613",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-300010-20240613",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300010.SZ",
+        "trade_date": "20240613",
+        "truth_source": "SZSE official announcement: 300010 *ST removal effective 2024-06-13",
+        "source_ref": "SZSE official announcement: 300010 *ST removal effective 2024-06-13 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-06-12/f438ff5f-8b32-4d10-aaab-a8598162ef43.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-300010-20240613",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20240613"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002482-20240618",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-002482-20240618",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002482.SZ",
+        "trade_date": "20240618",
+        "truth_source": "SZSE official announcement: 002482 full *ST removal effective 2024-06-18",
+        "source_ref": "SZSE official announcement: 002482 full *ST removal effective 2024-06-18 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-06-14/11ae7c86-7e5d-4eba-9e5d-6bd0c31767db.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-002482-20240618",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20240618"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002086-20240612",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-002086-20240612",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002086.SZ",
+        "trade_date": "20240612",
+        "truth_source": "SZSE official announcement: 002086 *ST removal effective 2024-06-12",
+        "source_ref": "SZSE official announcement: 002086 *ST removal effective 2024-06-12 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-06-07/cb052454-f6db-44e0-a320-079c4c14c864.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-002086-20240612",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20240612"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002021-20240603",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-002021-20240603",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "002021.SZ",
+        "trade_date": "20240603",
+        "truth_source": "SZSE official announcement: 002021 *ST removal effective 2024-06-03",
+        "source_ref": "SZSE official announcement: 002021 *ST removal effective 2024-06-03 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-05-31/09907ab2-b9f4-4891-bfb4-21ed2cfa090d.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-002021-20240603",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20240603"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-300209-20250513",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-300209-20250513",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300209.SZ",
+        "trade_date": "20250513",
+        "truth_source": "SZSE official announcement: 300209 *ST removal effective 2025-05-13",
+        "source_ref": "SZSE official announcement: 300209 *ST removal effective 2025-05-13 | https://disc.static.szse.cn/disc/disk03/finalpage/2025-05-09/f2d85e09-1b78-42bc-a128-f1862d6b0fe9.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-300209-20250513",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20250513"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-300965-20250506",
+      "case": {
+        "golden_case_id": "GT-H2-ST-ST_REMOVE-300965-20250506",
+        "case_type": "golden_st_transition",
+        "provider_symbol": "300965.SZ",
+        "trade_date": "20250506",
+        "truth_source": "SZSE official announcement: 300965 *ST removal effective 2025-05-06",
+        "source_ref": "SZSE official announcement: 300965 *ST removal effective 2025-05-06 | https://disc.static.szse.cn/disc/disk03/finalpage/2025-04-30/d8e3ad5c-377f-4d9c-8d6c-31a510424ff8.PDF",
+        "expected_fields": {
+          "IS_ST_SEC": false
+        },
+        "event_id": "ST-REMOVE-300965-20250506",
+        "event_class": "ST_TRANSITION",
+        "event_subtype": "ST_REMOVE",
+        "event_effective_date": "20250506"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-601558-20200702",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-601558-20200702",
+        "case_type": "golden_delisted",
+        "provider_symbol": "601558.SH",
+        "trade_date": "20200702",
+        "truth_source": "SSE official delisting notice: 601558摘牌 2020-07-02",
+        "source_ref": "SSE official delisting notice: 601558摘牌 2020-07-02 | http://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20200623_78480676.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-601558-20200702",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20200702"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600068-20210913",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600068-20210913",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600068.SH",
+        "trade_date": "20210913",
+        "truth_source": "SSE official delisting notice: 600068终止上市 effective 2021-09-13",
+        "source_ref": "SSE official delisting notice: 600068终止上市 effective 2021-09-13 | http://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20210909_82957014.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600068-20210913",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20210913"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600145-20220428",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600145-20220428",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600145.SH",
+        "trade_date": "20220428",
+        "truth_source": "SSE official delisting notice: 600145摘牌 2022-04-28",
+        "source_ref": "SSE official delisting notice: 600145摘牌 2022-04-28 | https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20220421_84964449.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600145-20220428",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20220428"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600093-20220623",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600093-20220623",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600093.SH",
+        "trade_date": "20220623",
+        "truth_source": "SSE official delisting notice: 600093摘牌 2022-06-23",
+        "source_ref": "SSE official delisting notice: 600093摘牌 2022-06-23 | http://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20220616_85759277.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600093-20220623",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20220623"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600695-20220614",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600695-20220614",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600695.SH",
+        "trade_date": "20220614",
+        "truth_source": "SSE official delisting notice: 600695摘牌 2022-06-14",
+        "source_ref": "SSE official delisting notice: 600695摘牌 2022-06-14 | http://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20220607_85645623.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600695-20220614",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20220614"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600781-20230628",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600781-20230628",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600781.SH",
+        "trade_date": "20230628",
+        "truth_source": "SSE official delisting notice: 600781摘牌 2023-06-28",
+        "source_ref": "SSE official delisting notice: 600781摘牌 2023-06-28 | http://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20230619_90006973.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600781-20230628",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20230628"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600225-20250306",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600225-20250306",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600225.SH",
+        "trade_date": "20250306",
+        "truth_source": "SSE official delisting notice: 600225摘牌 2025-03-06",
+        "source_ref": "SSE official delisting notice: 600225摘牌 2025-03-06 | https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20250227_10773066.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600225-20250306",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20250306"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600190-20250725",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600190-20250725",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600190.SH",
+        "trade_date": "20250725",
+        "truth_source": "SSE official delisting notice: 600190摘牌 2025-07-25",
+        "source_ref": "SSE official delisting notice: 600190摘牌 2025-07-25 | https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20250718_10785880.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600190-20250725",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20250725"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600837-20250304",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600837-20250304",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600837.SH",
+        "trade_date": "20250304",
+        "truth_source": "SSE official delisting decision: 600837终止上市 effective 2025-03-04",
+        "source_ref": "SSE official delisting decision: 600837终止上市 effective 2025-03-04 | https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20250226_10773005.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600837-20250304",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20250304"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-601989-20250905",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-601989-20250905",
+        "case_type": "golden_delisted",
+        "provider_symbol": "601989.SH",
+        "trade_date": "20250905",
+        "truth_source": "SSE official delisting decision: 601989终止上市 effective 2025-09-05",
+        "source_ref": "SSE official delisting decision: 601989终止上市 effective 2025-09-05 | https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20250829_10790128.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-601989-20250905",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20250905"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600462-20250721",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600462-20250721",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600462.SH",
+        "trade_date": "20250721",
+        "truth_source": "SSE official delisting notice: 600462摘牌 2025-07-21",
+        "source_ref": "SSE official delisting notice: 600462摘牌 2025-07-21 | https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20250714_10784844.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600462-20250721",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20250721"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-600421-20260626",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-600421-20260626",
+        "case_type": "golden_delisted",
+        "provider_symbol": "600421.SH",
+        "trade_date": "20260626",
+        "truth_source": "SSE official delisting notice: 600421摘牌 2026-06-26",
+        "source_ref": "SSE official delisting notice: 600421摘牌 2026-06-26 | https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20260622_10823158.shtml",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-600421-20260626",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20260626"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-000611-20220628",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-000611-20220628",
+        "case_type": "golden_delisted",
+        "provider_symbol": "000611.SZ",
+        "trade_date": "20220628",
+        "truth_source": "SZSE official delisting notice: 000611摘牌 2022-06-28",
+        "source_ref": "SZSE official delisting notice: 000611摘牌 2022-06-28 | https://disc.static.szse.cn/disc/disk03/finalpage/2022-06-28/0df4c2ca-295b-4581-a172-094d8cae8425.PDF",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-000611-20220628",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20220628"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-300064-20220627",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-300064-20220627",
+        "case_type": "golden_delisted",
+        "provider_symbol": "300064.SZ",
+        "trade_date": "20220627",
+        "truth_source": "SZSE official delisting notice: 300064摘牌 2022-06-27",
+        "source_ref": "SZSE official delisting notice: 300064摘牌 2022-06-27 | https://disc.static.szse.cn/disc/disk03/finalpage/2022-06-27/286a098f-56a5-4a5b-8e0d-1953eebf9f2f.PDF",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-300064-20220627",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20220627"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-000540-20230630",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-000540-20230630",
+        "case_type": "golden_delisted",
+        "provider_symbol": "000540.SZ",
+        "trade_date": "20230630",
+        "truth_source": "SZSE official delisting notice: 000540摘牌 2023-06-30",
+        "source_ref": "SZSE official delisting notice: 000540摘牌 2023-06-30 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-06-28/2d0e5c9f-a6d7-4c00-9ac2-bf286ba715b8.PDF",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-000540-20230630",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20230630"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-300273-20230706",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-300273-20230706",
+        "case_type": "golden_delisted",
+        "provider_symbol": "300273.SZ",
+        "trade_date": "20230706",
+        "truth_source": "SZSE official delisting notice: 300273摘牌 2023-07-06",
+        "source_ref": "SZSE official delisting notice: 300273摘牌 2023-07-06 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-07-05/776889cd-c8c1-48fb-b1a4-d0cf4819e8fd.PDF",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-300273-20230706",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20230706"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-002118-20230804",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-002118-20230804",
+        "case_type": "golden_delisted",
+        "provider_symbol": "002118.SZ",
+        "trade_date": "20230804",
+        "truth_source": "SZSE official delisting notice: 002118摘牌 2023-08-04",
+        "source_ref": "SZSE official delisting notice: 002118摘牌 2023-08-04 | http://disc.static.szse.cn/disc/disk03/finalpage/2023-07-31/44450b39-f154-45b0-a05f-4878f0c55261.PDF",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-002118-20230804",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20230804"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-002610-20240812",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-002610-20240812",
+        "case_type": "golden_delisted",
+        "provider_symbol": "002610.SZ",
+        "trade_date": "20240812",
+        "truth_source": "SZSE official delisting notice: 002610摘牌 2024-08-12",
+        "source_ref": "SZSE official delisting notice: 002610摘牌 2024-08-12 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-08-09/1dc535d8-fbe2-42bb-bab6-cd90d0e12e64.PDF",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-002610-20240812",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20240812"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-000982-20240812",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-000982-20240812",
+        "case_type": "golden_delisted",
+        "provider_symbol": "000982.SZ",
+        "trade_date": "20240812",
+        "truth_source": "SZSE official delisting notice: 000982摘牌 2024-08-12",
+        "source_ref": "SZSE official delisting notice: 000982摘牌 2024-08-12 | https://disc.static.szse.cn/disc/disk03/finalpage/2024-08-12/c552bbd6-8940-49ef-bbd0-c2c83a3ece6d.PDF",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-000982-20240812",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20240812"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-DELIST-300208-20250721",
+      "case": {
+        "golden_case_id": "GT-H2-DELIST-300208-20250721",
+        "case_type": "golden_delisted",
+        "provider_symbol": "300208.SZ",
+        "trade_date": "20250721",
+        "truth_source": "SZSE official delisting notice: 300208摘牌 2025-07-21",
+        "source_ref": "SZSE official delisting notice: 300208摘牌 2025-07-21 | https://disc.static.szse.cn/disc/disk03/finalpage/2025-07-18/ff3f8315-18fd-48e8-a473-545bcb5a0a67.PDF",
+        "expected_fields": {
+          "IS_LISTED": "3"
+        },
+        "event_id": "DELIST-300208-20250721",
+        "event_class": "DELIST",
+        "event_subtype": "",
+        "event_effective_date": "20250721"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-CA-RIGHT-002142-20211202",
+      "case": {
+        "golden_case_id": "GT-H2-CA-RIGHT-002142-20211202",
+        "case_type": "golden_corporate_action",
+        "provider_symbol": "002142.SZ",
+        "trade_date": "20211202",
+        "truth_source": "CNINFO company announcement: 宁波银行配股除权日 2021-12-02",
+        "source_ref": "CNINFO company announcement: 宁波银行配股除权日 2021-12-02 | http://static.cninfo.com.cn/finalpage/2021-12-02/1211763892.PDF",
+        "expected_fields": {
+          "IS_WD_SEC": true,
+          "event_type": "RIGHT_ISSUE"
+        },
+        "event_id": "RIGHT-ISSUE-002142-20211202",
+        "event_class": "RIGHT_ISSUE_EX_DATE",
+        "event_subtype": ""
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-CA-RIGHT-300475-20230216",
+      "case": {
+        "golden_case_id": "GT-H2-CA-RIGHT-300475-20230216",
+        "case_type": "golden_corporate_action",
+        "provider_symbol": "300475.SZ",
+        "trade_date": "20230216",
+        "truth_source": "SZSE company announcement: 香农芯创配股除权日 2023-02-16",
+        "source_ref": "SZSE company announcement: 香农芯创配股除权日 2023-02-16 | https://disc.static.szse.cn/disc/disk03/finalpage/2023-02-16/d2d8c9e3-0ad2-4a54-af01-e176019e9906.PDF",
+        "expected_fields": {
+          "IS_WD_SEC": true,
+          "event_type": "RIGHT_ISSUE"
+        },
+        "event_id": "RIGHT-ISSUE-300475-20230216",
+        "event_class": "RIGHT_ISSUE_EX_DATE",
+        "event_subtype": ""
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-CA-RIGHT-002788-20200917",
+      "case": {
+        "golden_case_id": "GT-H2-CA-RIGHT-002788-20200917",
+        "case_type": "golden_corporate_action",
+        "provider_symbol": "002788.SZ",
+        "trade_date": "20200917",
+        "truth_source": "SZSE company announcement: 鹭燕医药配股除权日 2020-09-17",
+        "source_ref": "SZSE company announcement: 鹭燕医药配股除权日 2020-09-17 | https://disc.static.szse.cn/disc/disk02/finalpage/2020-09-17/4851a060-520a-4116-a303-00d7eb5aef65.PDF",
+        "expected_fields": {
+          "IS_WD_SEC": true,
+          "event_type": "RIGHT_ISSUE"
+        },
+        "event_id": "RIGHT-ISSUE-002788-20200917",
+        "event_class": "RIGHT_ISSUE_EX_DATE",
+        "event_subtype": ""
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-CA-RIGHT-002202-20190329",
+      "case": {
+        "golden_case_id": "GT-H2-CA-RIGHT-002202-20190329",
+        "case_type": "golden_corporate_action",
+        "provider_symbol": "002202.SZ",
+        "trade_date": "20190329",
+        "truth_source": "SZSE company announcement: 金风科技配股除权日 2019-03-29",
+        "source_ref": "SZSE company announcement: 金风科技配股除权日 2019-03-29 | http://disc.static.szse.cn/disc/disk01/finalpage/2019-03-29/27a8f9a6-cfe2-41bb-a9c7-149f5219f383.PDF",
+        "expected_fields": {
+          "IS_WD_SEC": true,
+          "event_type": "RIGHT_ISSUE"
+        },
+        "event_id": "RIGHT-ISSUE-002202-20190329",
+        "event_class": "RIGHT_ISSUE_EX_DATE",
+        "event_subtype": ""
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-CA-RIGHT-000750-20200114",
+      "case": {
+        "golden_case_id": "GT-H2-CA-RIGHT-000750-20200114",
+        "case_type": "golden_corporate_action",
+        "provider_symbol": "000750.SZ",
+        "trade_date": "20200114",
+        "truth_source": "CNINFO annual report: 国海证券配股除权日 2020-01-14",
+        "source_ref": "CNINFO annual report: 国海证券配股除权日 2020-01-14 | http://static.cninfo.com.cn/finalpage/2025-03-29/1222948083.PDF",
+        "expected_fields": {
+          "IS_WD_SEC": true,
+          "event_type": "RIGHT_ISSUE"
+        },
+        "event_id": "RIGHT-ISSUE-000750-20200114",
+        "event_class": "RIGHT_ISSUE_EX_DATE",
+        "event_subtype": ""
+      }
+    }
+  ]
+}
