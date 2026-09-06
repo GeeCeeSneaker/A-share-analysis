@@ -2,7 +2,7 @@
 
 - Target truth version: `v4-candidate-20260906`
 - ACTIVE dataset: `golden_cases_v4.jsonl`
-- ACTIVE dataset SHA256: `edeef6925ef1854f705a1413c27eec0a268a7942d80fa060ede83354d607ea9a`
+- ACTIVE dataset SHA256: `5d063e314ea4b04623ecf19321f09931edb2d4b478f0df055262768e43d66ec0`
 - Source ACTIVE: `v3-candidate-20260822` / `golden_cases_v3.jsonl` / `ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e`
 - Scope: candidate corpus construction only. This report does not claim human review, Production B1-B7, Data Sufficiency, provider entitlement, 2020+ backfill, strategy, backtest, or trading readiness.
 
@@ -32,6 +32,11 @@ Dividend REPLACE operations use an explicit allow_rekey marker where the issuer'
 - Event-class source coverage: `{'BJ_CODE_MIGRATION': 3, 'DELIST': 20, 'DIVIDEND_EX_DATE': 20, 'LIMIT_REGIME': 26, 'NO_LIMIT_IPO': 4, 'RIGHT_ISSUE_EX_DATE': 5, 'ST_TRANSITION': 50}`; known portal-only locator denylist: `PASS`.
 - ST rebalance replaces seven SZSE ADD rows and one SZSE REMOVE row with seven exact SSE company announcements, including STAR 688500 ADD (2023-05-05) and STAR 688500 REMOVE (2024-06-11); a STAR removal is therefore evidenced rather than omitted.
 - All five right-issue cases are 2020+; 601555.SH replaces the pre-2020 002202.SZ case, and 000750.SZ now points to its contemporaneous 2020-01-09配股发行公告.
+
+### GT-H2.2 semantic-evidence alignment
+
+- Limit-regime source selection uses exact event IDs and an explicit expected-rate map; REGIME-STAR-20 resolves to the STAR 20% rule, while REGIME-ST-5 resolves to the risk-warning 5% rule. No substring-based ST/STAR classification is used.
+- BJ packet truth is intentionally limited to the executable validator proof: historical security-master presence, exact-date status, run-bound BSE rule/rate, and provider HIGH_LIMITED price consistency. It does not claim an old-to-new code or 920-segment relation that the validator does not execute.
 
 ### DELIST distribution
 

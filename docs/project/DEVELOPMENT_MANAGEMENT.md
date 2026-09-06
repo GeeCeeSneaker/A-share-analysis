@@ -1,5 +1,33 @@
 # A-share-analysis 开发管理总册（Development Management）
 
+## DM-20260906-111 · GT-H2.2 semantic-evidence alignment
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING
+**Review Status**：PENDING_RE_REVIEW；本批不自行执行最终 review seal、CLOSE 或 MERGE。
+**Reviewer baseline**：main 新增 [PR18 二轮复审与 GT-H2.2 语义证据对齐要求](../design/A-share-analysis_PR18二轮复审与GT-H2.2语义证据对齐要求_20260906.md)；该要求针对 GT-H2.1 复审后新增的 P0-01/P1-02。
+**Candidate hash**：`5d063e314ea4b04623ecf19321f09931edb2d4b478f0df055262768e43d66ec0`（v4，128 条）
+**Gate**：新 head 的三平台 required CI 与独立 Reviewer closure 未完成前，GT-H3 reviewed seal、Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 均保持冻结。
+
+| 审阅要求 | 本批实现 / 验证位置 | 状态 |
+|---|---|---|
+| 限价制度必须按精确语义选择来源，STAR 20% 不得落入 ST 5% 分支 | `gt_h2_prepare.py::_source_context` exact event-id mapping；无 `"ST" in event_id` / `"STAR" in event_id` 分类 | IMPLEMENTED / local PASS |
+| 每个限价案例的 source claim、expected rate 和 packet 必须一致 | `LIMIT_REGIME_EXPECTED_RATES`；生成器 fail-closed assertion；v4 dataset/registry/packet | IMPLEMENTED / local PASS |
+| 必须有 STAR 与 ST 的 adversarial regression | `test_limit_source_selection_is_exact_and_semantically_aligned`；直接检查来源和 5 条 STAR packet 行 | IMPLEMENTED / local PASS |
+| BJ truth 只能声明 validator 实际消费并证明的语义 | `golden_router.py::_validate_bj_mapping` contract；三条 BJ truth/checklist 限定 historical master、exact status、run-bound BSE regime/price | IMPLEMENTED / local PASS |
+| 重建后 packet、registry、plan、manifest、报告和 dataset hash 一致 | `candidate.py rebuild/finalize`；manifest/report hash `5d063e...`; packet 128/128 | IMPLEMENTED / local PASS |
+
+**Evidence separation**
+
+- 本地 GT-H2.2 生成、hash/manifest/packet 校验、H2/candidate/golden review/corporate-action 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向静态检查通过。
+- `review_readiness_gate`、quantity、event coverage 继续通过；`production_formal_gate` 仍仅保留 `REVIEWED 0/128` 人工复核阻断。没有将 semantic source alignment 误报为 Human Review 或 GT-H3 完成。
+- 本批不下载或提交 raw web/PDF，不绑定 artifact hash，不运行 `review.py` final seal、Production B1–B7、Data Sufficiency、Provider capability 或回补；凭证、Token、端点、原始 SDK 输出和本地 vendor 依赖不进入 GitHub。
+
+**Required next work**
+
+1. 将本批代码、测试和重建产物推送到 PR #18，等待新 head 三平台 required CI 全绿；若 CI 失败，按失败日志修正并重新验证。
+2. CI 全绿后请独立 Reviewer 复审 GT-H2.2 P0-01/P1-02；本批不自行提交批准或合并。
+3. 只有 Reviewer closure 后，才按 GT-H3 进行逐案 artifact bytes/hash binding、N/N reviewed seal、bound replay 与 Formal gate。
+
 ## DM-20260906-110 · GT-H2.1 source-quality and representativeness closure
 
 **Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN

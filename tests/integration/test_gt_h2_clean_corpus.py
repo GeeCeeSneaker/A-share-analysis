@@ -8,6 +8,8 @@ from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
 
+from scripts.golden.gt_h2_prepare import _source_context
+
 from ashare_state.spike.golden_store import GoldenTruthStore, review_readiness_gate
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -215,6 +217,76 @@ class TestGTH2CleanCorpus:
         assert all(
             not _is_case_specific_official_locator(locator) for locator in PORTAL_ONLY_LOCATORS
         )
+
+    def test_limit_source_selection_is_exact_and_semantically_aligned(self):
+        star_doc = {
+            "event_class": "LIMIT_REGIME",
+            "event_id": "REGIME-STAR-20",
+            "provider_symbol": "688036.SH",
+            "trade_date": "20210601",
+            "expected_fields": {"PRICE_HIGH_LMT_RATE": 0.2},
+        }
+        st_doc = {
+            "event_class": "LIMIT_REGIME",
+            "event_id": "REGIME-ST-5",
+            "provider_symbol": "600518.SH",
+            "trade_date": "20190603",
+            "expected_fields": {
+                "PRICE_HIGH_LMT_RATE": 0.05,
+                "PRICE_LOW_LMT_RATE": 0.05,
+            },
+        }
+        star_name, star_ref, _, _, _ = _source_context(star_doc)
+        st_name, st_ref, _, _, _ = _source_context(st_doc)
+
+        assert "STAR Market" in star_name
+        assert "20%" in star_name
+        assert star_ref.endswith("8c544552dc7e4c83a863440179f0b9de.pdf")
+        assert "Risk-Warning" in st_name
+        assert "5%" in st_name
+        assert st_ref.endswith("c_20210531_5478105.shtml")
+        assert 'if "ST" in event_id' not in (
+            REPO_ROOT / "scripts" / "golden" / "gt_h2_prepare.py"
+        ).read_text(encoding="utf-8")
+        assert 'if "STAR" in event_id' not in (
+            REPO_ROOT / "scripts" / "golden" / "gt_h2_prepare.py"
+        ).read_text(encoding="utf-8")
+
+        packet = _jsonl(H2_ROOT / "review_packet_index.jsonl")
+        star_rows = [row for row in packet if row["event_id"] == "REGIME-STAR-20"]
+        st_rows = [row for row in packet if row["event_id"] == "REGIME-ST-5"]
+        assert len(star_rows) == 5
+        assert len(st_rows) == 4
+        assert all(row["expected_fields"]["PRICE_HIGH_LMT_RATE"] == 0.2 for row in star_rows)
+        assert all("STAR Market" in row["official_source_name"] for row in star_rows)
+        assert all(
+            "Risk-Warning" in row["official_source_name"]
+            for row in st_rows
+            if row["provider_symbol"].endswith(".SH")
+        )
+
+    def test_bj_packet_truth_matches_executable_validator_contract(self):
+        cases = GoldenTruthStore(GOLDEN_ROOT).load()[0]
+        bj = [case for case in cases if case.event_class == "BJ_CODE_MIGRATION"]
+
+        assert len(bj) == 3
+        for case in bj:
+            assert case.expected_fields == {
+                "PRICE_HIGH_LMT_RATE": 0.3,
+                "PRICE_LOW_LMT_RATE": 0.3,
+            }
+            assert "historical security master" in case.truth_source
+            assert "old-to-new" not in case.truth_source
+            assert "920 segment" not in case.truth_source
+
+        packet = _jsonl(H2_ROOT / "review_packet_index.jsonl")
+        bj_packet = [row for row in packet if row["event_class"] == "BJ_CODE_MIGRATION"]
+        assert len(bj_packet) == 3
+        for row in bj_packet:
+            checklist = " ".join(row["human_review_checklist"])
+            assert "historical security master" in checklist
+            assert "run-bound BSE rule" in checklist
+            assert "old-to-new code relation" in checklist
 
     def test_report_keeps_review_and_provider_boundaries_explicit(self):
         report = (H2_ROOT / "GT_H2_CORPUS_REPORT.md").read_text(encoding="utf-8")

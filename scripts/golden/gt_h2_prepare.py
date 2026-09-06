@@ -50,6 +50,33 @@ TARGET_VERSION = "v4-candidate-20260906"
 V3_DATASET = "golden_cases_v3.jsonl"
 V3_DATASET_HASH = "ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e"
 
+LIMIT_REGIME_EXPECTED_RATES: dict[str, tuple[float, float | None]] = {
+    "REGIME-MAIN-10": (0.1, 0.1),
+    "REGIME-ST-5": (0.05, 0.05),
+    "REGIME-CN-PRE-10": (0.1, None),
+    "REGIME-CN-POST-20": (0.2, 0.2),
+    "REGIME-STAR-20": (0.2, None),
+    "REGIME-BSE-30": (0.3, None),
+}
+
+BJ_FORMAL_TRUTH_SOURCES: dict[str, str] = {
+    "GT-BJ-835185-CONTINUITY": (
+        "BSE historical security master contains 835185.BJ on 2021-11-15; "
+        "the exact-date status row and run-bound BSE 30% rule/price proof are "
+        "the executable semantics."
+    ),
+    "GT-BJ-835185-2022": (
+        "BSE historical security master contains 835185.BJ on 2022-06-01; "
+        "the exact-date status row and run-bound BSE 30% rule/price proof are "
+        "the executable semantics."
+    ),
+    "GT-BJ-920-SEGMENT": (
+        "BSE historical security master contains 920002.BJ on 2024-07-01; "
+        "the exact-date status row and run-bound BSE 30% rule/price proof are "
+        "the executable semantics."
+    ),
+}
+
 
 # These are source locators, not sealed review artifacts.  The source pages
 # were independently located in the official exchange/disclosure domains.
@@ -1141,13 +1168,64 @@ def _is_case_specific_official_locator(value: str) -> bool:
     )
 
 
+def _assert_limit_regime_semantics(doc: dict[str, Any]) -> None:
+    event_id = str(doc.get("event_id", ""))
+    required = LIMIT_REGIME_EXPECTED_RATES.get(event_id)
+    if required is None:
+        raise RuntimeError(f"no exact expected-rate mapping for limit regime {event_id!r}")
+    expected_fields = doc.get("expected_fields")
+    if not isinstance(expected_fields, dict):
+        raise RuntimeError(f"limit regime {event_id} has no expected_fields mapping")
+    expected_up = expected_fields.get("PRICE_HIGH_LMT_RATE")
+    if expected_up is None or abs(float(expected_up) - required[0]) > 1e-9:
+        raise RuntimeError(
+            f"limit regime {event_id} expected high rate {expected_up!r}, requires {required[0]}"
+        )
+    expected_down = expected_fields.get("PRICE_LOW_LMT_RATE")
+    if required[1] is not None and (
+        expected_down is None or abs(float(expected_down) - required[1]) > 1e-9
+    ):
+        raise RuntimeError(
+            f"limit regime {event_id} expected low rate {expected_down!r}, requires {required[1]}"
+        )
+    if (
+        required[1] is None
+        and expected_down is not None
+        and abs(float(expected_down) - required[0]) > 1e-9
+    ):
+        raise RuntimeError(
+            f"limit regime {event_id} expected low rate {expected_down!r} "
+            f"does not match its {required[0]}% regime"
+        )
+
+
 def _source_context(doc: dict[str, Any]) -> tuple[str, str, str, bool, str]:
     symbol = str(doc["provider_symbol"])
     event_class = str(doc["event_class"])
     event_id = str(doc.get("event_id", ""))
     case_id = str(doc.get("golden_case_id", ""))
     if event_class in {"LIMIT_REGIME", "NO_LIMIT_IPO"}:
-        if "BJ" in event_id or symbol.endswith(".BJ"):
+        if event_class == "NO_LIMIT_IPO":
+            if event_id == "NO_LIMIT_STAR_FIRST5":
+                return (
+                    "SSE STAR Market Trading Special Provisions (2019; first five listing days no limit, later 20%)",
+                    "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
+                    "EXCHANGE_RULEBOOK",
+                    True,
+                    SOURCE_EVIDENCE_SCOPE,
+                )
+            if event_id in {"IPO44-601995.SH", "IPO44-605499.SH"}:
+                return (
+                    "SSE Trading Rules (exact rule page; main-board IPO first-day ±44%/−36% regime)",
+                    "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
+                    "EXCHANGE_RULEBOOK",
+                    True,
+                    SOURCE_EVIDENCE_SCOPE,
+                )
+            raise RuntimeError(f"no exact IPO regime context for {event_id!r}")
+
+        _assert_limit_regime_semantics(doc)
+        if event_id == "REGIME-BSE-30":
             return (
                 "BSE Trading Rules (Announcement [2021]15; effective 2021-11-15; 30% price-limit clause)",
                 "https://www.bse.cn/jygl_list/200010919.html",
@@ -1155,29 +1233,15 @@ def _source_context(doc: dict[str, Any]) -> tuple[str, str, str, bool, str]:
                 True,
                 SOURCE_EVIDENCE_SCOPE,
             )
-        if event_class == "NO_LIMIT_IPO" and (
-            "STAR" in event_id or (symbol.endswith(".SH") and symbol.startswith("688"))
-        ):
+        if event_id == "REGIME-STAR-20":
             return (
-                "SSE STAR Market Trading Special Provisions (2019; first five listing days no limit, later 20%)",
+                "SSE STAR Market Trading Special Provisions (2019; beyond the first five listing days 20% price-limit clause)",
                 "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
                 "EXCHANGE_RULEBOOK",
                 True,
                 SOURCE_EVIDENCE_SCOPE,
             )
-        if event_class == "NO_LIMIT_IPO":
-            return (
-                "SSE Trading Rules (exact rule page; main-board IPO first-day ±44%/−36% regime)",
-                "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
-                "EXCHANGE_RULEBOOK",
-                True,
-                SOURCE_EVIDENCE_SCOPE,
-            )
-        if "CN-PRE" in event_id or (
-            symbol.endswith(".SZ")
-            and symbol.startswith("300")
-            and str(doc["trade_date"]) < "20200824"
-        ):
+        if event_id == "REGIME-CN-PRE-10":
             return (
                 "SZSE Trading Rules (exact historical rule page; ChiNext pre-2020-08-24 10% clause)",
                 "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
@@ -1185,7 +1249,7 @@ def _source_context(doc: dict[str, Any]) -> tuple[str, str, str, bool, str]:
                 True,
                 SOURCE_EVIDENCE_SCOPE,
             )
-        if "CN-POST" in event_id or (symbol.endswith(".SZ") and symbol.startswith("300")):
+        if event_id == "REGIME-CN-POST-20":
             return (
                 "SZSE ChiNext Trading Special Provisions (Notice [2020]515; effective with the 2020-08-24 reform; 20% clause)",
                 "https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
@@ -1193,7 +1257,7 @@ def _source_context(doc: dict[str, Any]) -> tuple[str, str, str, bool, str]:
                 True,
                 SOURCE_EVIDENCE_SCOPE,
             )
-        if "ST" in event_id:
+        if event_id == "REGIME-ST-5":
             if symbol.endswith(".SH"):
                 return (
                     "SSE Risk-Warning Board Trading Measures (exact rule page; 5% price-limit clause)",
@@ -1202,7 +1266,7 @@ def _source_context(doc: dict[str, Any]) -> tuple[str, str, str, bool, str]:
                     True,
                     SOURCE_EVIDENCE_SCOPE,
                 )
-            if str(doc["trade_date"]) < "20210101":
+            if symbol.endswith(".SZ") and str(doc["trade_date"]) < "20210101":
                 return (
                     "SZSE Trading Rules (exact historical rule page; rule 3.3.14 ST/*ST 5% clause)",
                     "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
@@ -1210,14 +1274,16 @@ def _source_context(doc: dict[str, Any]) -> tuple[str, str, str, bool, str]:
                     True,
                     SOURCE_EVIDENCE_SCOPE,
                 )
-            return (
-                "SZSE Trading Rules (2020-12 revision; main-board risk-warning 5% clause)",
-                "https://www.szse.cn/disclosure/notice/general/t20201231_584050.html",
-                "EXCHANGE_RULEBOOK",
-                True,
-                SOURCE_EVIDENCE_SCOPE,
-            )
-        if symbol.endswith(".SH"):
+            if symbol.endswith(".SZ"):
+                return (
+                    "SZSE Trading Rules (2020-12 revision; main-board risk-warning 5% clause)",
+                    "https://www.szse.cn/disclosure/notice/general/t20201231_584050.html",
+                    "EXCHANGE_RULEBOOK",
+                    True,
+                    SOURCE_EVIDENCE_SCOPE,
+                )
+            raise RuntimeError(f"REGIME-ST-5 has unsupported symbol {symbol!r}")
+        if event_id == "REGIME-MAIN-10" and symbol.endswith(".SH"):
             return (
                 "SSE Trading Rules (exact rule page; main-board 10% price-limit clause)",
                 "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
@@ -1225,13 +1291,15 @@ def _source_context(doc: dict[str, Any]) -> tuple[str, str, str, bool, str]:
                 True,
                 SOURCE_EVIDENCE_SCOPE,
             )
-        return (
-            "SZSE Trading Rules (2020-12 revision; main-board 10% price-limit clause)",
-            "https://www.szse.cn/disclosure/notice/general/t20201231_584050.html",
-            "EXCHANGE_RULEBOOK",
-            True,
-            SOURCE_EVIDENCE_SCOPE,
-        )
+        if event_id == "REGIME-MAIN-10" and symbol.endswith(".SZ"):
+            return (
+                "SZSE Trading Rules (2020-12 revision; main-board 10% price-limit clause)",
+                "https://www.szse.cn/disclosure/notice/general/t20201231_584050.html",
+                "EXCHANGE_RULEBOOK",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
+            )
+        raise RuntimeError(f"no exact limit regime context for {event_id!r}/{symbol}")
     if event_class == "DIVIDEND_EX_DATE":
         source = _dividend_source(doc)
         if source is None:
@@ -1306,6 +1374,19 @@ def _replacement(doc: dict[str, Any]) -> dict[str, Any]:
             )
         replacement["source_ref"] = f"{name} | {url}"
         replacement["source_evidence_scope"] = scope
+        if replacement.get("event_class") == "BJ_CODE_MIGRATION":
+            try:
+                replacement["truth_source"] = BJ_FORMAL_TRUTH_SOURCES[
+                    str(replacement["golden_case_id"])
+                ]
+            except KeyError as exc:
+                raise RuntimeError(
+                    f"no executable BJ truth mapping for {replacement.get('golden_case_id')}"
+                ) from exc
+            replacement["expected_fields"] = {
+                "PRICE_HIGH_LMT_RATE": 0.3,
+                "PRICE_LOW_LMT_RATE": 0.3,
+            }
     return replacement
 
 
@@ -1416,6 +1497,14 @@ def _checklist(doc: dict[str, Any]) -> list[str]:
             "Confirm the cited official rule applies to this exchange, board, regime, and observation date.",
             "Confirm both expected limit fields and the no-limit/IPO interpretation where applicable.",
             "Bind the exact rule artifact bytes and SHA256 in the human review workflow; Agent must not set REVIEWED.",
+        ]
+    if event_class == "BJ_CODE_MIGRATION":
+        return [
+            "Confirm the bare provider code exists in the provider historical security master for this case.",
+            "Confirm an exact status row exists for trade_date and the run-bound BSE rule resolves for the BJ symbol.",
+            "Confirm expected_fields.PRICE_HIGH_LMT_RATE/PRICE_LOW_LMT_RATE are the BSE rule rates and the provider HIGH_LIMITED price matches the rule-derived price.",
+            "This case does not assert an old-to-new code relation or 920 segment relation beyond the executable checks above; do not infer a stronger mapping guarantee from the contextual official document.",
+            "Bind the exact artifact bytes and SHA256 in the human review workflow; Agent must not set REVIEWED.",
         ]
     return [
         "Confirm the cited official exchange/disclosure source proves the mapping or corporate-action fact.",
@@ -1612,6 +1701,11 @@ def finalize() -> None:
         f"- Event-class source coverage: `{dict(sorted(packet_event_counts.items()))}`; known portal-only locator denylist: `PASS`.",
         "- ST rebalance replaces seven SZSE ADD rows and one SZSE REMOVE row with seven exact SSE company announcements, including STAR 688500 ADD (2023-05-05) and STAR 688500 REMOVE (2024-06-11); a STAR removal is therefore evidenced rather than omitted.",
         "- All five right-issue cases are 2020+; 601555.SH replaces the pre-2020 002202.SZ case, and 000750.SZ now points to its contemporaneous 2020-01-09配股发行公告.",
+        "",
+        "### GT-H2.2 semantic-evidence alignment",
+        "",
+        "- Limit-regime source selection uses exact event IDs and an explicit expected-rate map; REGIME-STAR-20 resolves to the STAR 20% rule, while REGIME-ST-5 resolves to the risk-warning 5% rule. No substring-based ST/STAR classification is used.",
+        "- BJ packet truth is intentionally limited to the executable validator proof: historical security-master presence, exact-date status, run-bound BSE rule/rate, and provider HIGH_LIMITED price consistency. It does not claim an old-to-new code or 920-segment relation that the validator does not execute.",
         "",
         "### DELIST distribution",
         "",

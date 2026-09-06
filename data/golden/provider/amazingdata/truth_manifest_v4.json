@@ -2,7 +2,7 @@
   "manifest_schema": 2,
   "truth_version": "v4-candidate-20260906",
   "dataset_file": "golden_cases_v4.jsonl",
-  "dataset_hash": "edeef6925ef1854f705a1413c27eec0a268a7942d80fa060ede83354d607ea9a",
+  "dataset_hash": "5d063e314ea4b04623ecf19321f09931edb2d4b478f0df055262768e43d66ec0",
   "case_count": 128,
   "counts_by_type": {
     "golden_limit_regime": 30,
