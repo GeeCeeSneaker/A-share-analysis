@@ -611,6 +611,68 @@ def recompute_manifest_statistics(cases: Iterable[GoldenCase]) -> dict[str, Any]
     return stats
 
 
+def review_readiness_gate(
+    cases: Iterable[GoldenCase],
+    manifest: GoldenManifest,
+) -> list[str]:
+    """Require a clean, compiled v4+ candidate before human review.
+
+    A v1-v3 ACTIVE dataset may remain loadable for historical replay, but it
+    is not a valid input lineage for producing a REVIEWED version because its
+    legacy structural rows can make the subsequent clean rebuild impossible.
+    """
+    case_list = list(cases)
+    problems: list[str] = []
+    if _truth_version_number(manifest.truth_version) < 4:
+        problems.append(
+            "active golden candidate is not review-ready: a clean v4+ truth_version is required"
+        )
+    if manifest.manifest_schema < 2:
+        problems.append(
+            "active golden candidate is not review-ready: manifest_schema 2 is required"
+        )
+
+    stats = recompute_manifest_statistics(case_list)
+    invalid = stats["invalid_structural_cases"]
+    if invalid:
+        examples = ", ".join(case_id for _, case_id in invalid[:3])
+        problems.append(
+            "active golden candidate is not review-ready: invalid structural cases "
+            f"({len(invalid)}; {examples}); clean rebuild is required"
+        )
+
+    non_compiled = [case.golden_case_id for case in case_list if case.review_status != "COMPILED"]
+    if non_compiled:
+        examples = ", ".join(non_compiled[:3])
+        problems.append(
+            "active golden candidate is not review-ready: every case must remain COMPILED "
+            f"before review ({examples})"
+        )
+
+    with_review_provenance = [
+        case.golden_case_id
+        for case in case_list
+        if any(
+            (
+                case.reviewed_by,
+                case.reviewed_at,
+                case.review_note,
+                case.source_artifact_ref,
+                case.source_artifact_hash,
+                case.source_artifact_kind,
+                case.source_retrieved_at,
+            )
+        )
+    ]
+    if with_review_provenance:
+        examples = ", ".join(with_review_provenance[:3])
+        problems.append(
+            "active golden candidate is not review-ready: compiled cases must not carry "
+            f"review provenance ({examples})"
+        )
+    return problems
+
+
 def _verify_structural_manifest_fields(active: Mapping[str, Any], stats: Mapping[str, Any]) -> None:
     """Verify the schema-v2 fields that must match row-level recomputation."""
     fields = (

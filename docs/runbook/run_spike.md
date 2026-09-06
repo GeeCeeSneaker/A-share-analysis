@@ -63,7 +63,7 @@ Trial 与 dry-run 的目录、身份和证据必须与 Production 物理隔离�
 
 正式 Production、Golden backfill 和 Data Sufficiency 在 GT-H1/H2/H3 完成前均不得启动。现有 v3 candidate 的 ST/DELIST 记录中，部分只有观察日，没有可验证的结构事件生效日；它们可以被旧 loader 读取，但不能通过 Formal gate，也不能被 review workflow 提升为 `REVIEWED`。
 
-候选重建必须显式绑定当前 ACTIVE 的 `truth_version` 和 dataset SHA256，并为每一条源记录提供且只提供一个操作：`KEEP`、`REPLACE` 或 `DROP`；新事实只能使用 `ADD`。`REPLACE`/`ADD` 必须带完整 COMPILED candidate，结构化 ST/DELIST 必须提供严格 `YYYYMMDD` 的 `event_effective_date`。同一 `(provider_symbol, event_effective_date, event_subtype)` 或 `(provider_symbol, event_effective_date)` 重复时，重建失败闭环。
+候选重建必须显式绑定当前 ACTIVE 的 `truth_version` 和 dataset SHA256，并为每一条源记录提供且只提供一个操作：`KEEP`、`REPLACE` 或 `DROP`；新事实只能使用 `ADD`。`REPLACE`/`ADD` 必须带完整 COMPILED candidate，结构化 ST/DELIST 必须提供严格 `YYYYMMDD` 的 `event_effective_date`。`golden_case_id` 必须唯一，但不同观察日的多个案例可以共享同一 `(provider_symbol, event_effective_date, event_subtype)` 或 `(provider_symbol, event_effective_date)` 结构身份；重建允许这些重复观察行，manifest 与 Formal gate 只按结构身份去重计数，不能按 `event_id` 或 `trade_date` 放大事件数。
 
 计划示例（占位值必须由本地 ACTIVE manifest 读取，不得手填或上传秘密）：
 
@@ -98,7 +98,7 @@ Trial 与 dry-run 的目录、身份和证据必须与 Production 物理隔离�
 uv run python scripts/golden/candidate.py --root data/golden/provider/amazingdata rebuild --plan <plan.json>
 ```
 
-`build-version` 已禁用，因为隐式追加无法删除或替换结构错误的旧行。重建工具会先在内存中校验全部输出、manifest 统计和 semantic hash，再 create-only 写入新版本，最后原子移动 `truth_manifest.json`；任何计划或输出校验失败都不得改变 ACTIVE 指针。新版本只产生 `COMPILED`，人工证据绑定仍由 `review.py` 完成。
+`build-version` 已禁用，因为隐式追加无法删除或替换结构错误的旧行。重建工具会先在内存中校验全部输出、manifest 统计和 semantic hash，再 create-only 写入新版本，最后原子移动 `truth_manifest.json`；任何计划或输出校验失败都不得改变 ACTIVE 指针。新版本只产生 `COMPILED`，人工证据绑定仍由 `review.py` 完成。`review.py` 只有在 ACTIVE 已是 `v4+`、manifest schema v2、全部结构案例具备有效显式生效日且全部案例仍为 `COMPILED` 时才可进入；旧 v3 或结构不完整的 ACTIVE 必须在证据暂存前拒绝，不能先生成 REVIEWED 版本再补做 clean rebuild。
 
 ## 3. L1 实时订阅（任务书 §1.2，必须交易时段）
 

@@ -14,7 +14,8 @@ Usage::
 
 The rebuild plan binds to the exact active ``truth_version`` and dataset
 SHA256.  Every output row is COMPILED, and structural ST/DELIST identities
-must be explicit and unique.  Human review remains the separate
+must be explicit; multiple observation rows may share one identity and are
+deduplicated only for qualification.  Human review remains the separate
 ``scripts/golden/review.py`` workflow.
 """
 
@@ -35,10 +36,8 @@ from ashare_state.spike.golden_store import (  # noqa: E402
     GoldenTruthError,
     StructuralEventError,
     cases_from_dataset_bytes,
-    delist_event_identity,
     recompute_manifest_statistics,
     semantic_hash_for_doc,
-    st_event_identity,
     validate_structural_event_fields,
 )
 
@@ -209,7 +208,7 @@ def _prepare_compiled_doc(doc: dict, truth_version: str) -> dict:
 
 
 def _validate_output_documents(lines: list[dict], truth_version: str) -> list:
-    """Validate every output row and reject duplicate structural aliases."""
+    """Validate every output row; structural identities are not row keys."""
     known_ids: set[str] = set()
     for doc in lines:
         _validate_candidate(doc, known_ids)
@@ -232,20 +231,6 @@ def _validate_output_documents(lines: list[dict], truth_version: str) -> list:
     except GoldenTruthError as exc:
         raise CandidateError(f"rebuilt dataset failed loader self-validation: {exc}") from exc
 
-    aliases: dict[tuple[str, object], str] = {}
-    for case in cases:
-        if case.event_class == "ST_TRANSITION":
-            alias = (case.event_class, st_event_identity(case))
-        elif case.event_class == "DELIST":
-            alias = (case.event_class, delist_event_identity(case))
-        else:
-            continue
-        previous = aliases.get(alias)
-        if previous is not None:
-            raise CandidateError(
-                f"duplicate structural event alias {alias!r}: {previous} and {case.golden_case_id}"
-            )
-        aliases[alias] = case.golden_case_id
     return cases
 
 

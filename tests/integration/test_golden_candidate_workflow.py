@@ -299,21 +299,41 @@ class TestStructuralEventIdentity:
         assert stats["distinct_delisted_securities"] == 1
         assert len({delist_event_identity(case) for case in delist_cases}) == 1
 
-    def test_event_gate_counts_structural_identities(self, golden_env: Path):
-        """Duplicate structural aliases fail closed during rebuild."""
-        entries = [
-            _st_candidate(f"GT-ST-FAKE-{i:03d}", "600000.SH", "20240506", "ST_ADD")
-            for i in range(2)
-        ]
+    def test_repeated_observations_publish_and_count_one_structural_event(self, golden_env: Path):
+        """Different observations of one event are legal dataset rows."""
+        first = _st_candidate("GT-ST-OBS-001", "600000.SH", "20240506", "ST_ADD")
+        second = _st_candidate("GT-ST-OBS-002", "600000.SH", "20240506", "ST_ADD")
+        second["trade_date"] = "20240507"
+        second["event_id"] = "same-event-different-source-alias"
         inp = golden_env.parent / "fakes.jsonl"
-        inp.write_text("".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8")
+        inp.write_text("".join(json.dumps(e) + "\n" for e in (first, second)), encoding="utf-8")
         assert _run_candidate(golden_env, "add-case", "--input", str(inp)).returncode == 0
-        before = (golden_env / "truth_manifest.json").read_bytes()
         plan = _plan_for_staged(golden_env)
-        result = _run_candidate(golden_env, "rebuild", "--plan", str(plan))
-        assert result.returncode != 0
-        assert "duplicate structural event alias" in result.stderr
-        assert (golden_env / "truth_manifest.json").read_bytes() == before
+        result = _run_candidate(
+            golden_env,
+            "rebuild",
+            "--plan",
+            str(plan),
+            "--truth-version",
+            "v4-candidate-20260906",
+        )
+        assert result.returncode == 0, result.stderr
+        cases, manifest = GoldenTruthStore(golden_env).load()
+        observations = [c for c in cases if c.golden_case_id.startswith("GT-ST-OBS-")]
+        assert len(observations) == 2
+        assert {c.trade_date for c in observations} == {"20240506", "20240507"}
+        assert {c.event_id for c in observations} == {
+            "ST-600000.SH-20240506",
+            "same-event-different-source-alias",
+        }
+        assert manifest.manifest_schema == 2
+        assert manifest.distinct_events["ST_TRANSITION"] == 1
+        assert manifest.st_add_events == 1
+        stats = recompute_manifest_statistics(cases)
+        assert manifest.distinct_events == stats["distinct_events"]
+        assert manifest.st_add_events == stats["st_add_events"]
+        assert manifest.st_remove_events == stats["st_remove_events"]
+        assert manifest.distinct_delisted_securities == stats["distinct_delisted_securities"]
 
     def test_rebuild_replaces_structural_row_and_preserves_v3(self, golden_env: Path):
         active = json.loads((golden_env / "truth_manifest.json").read_text(encoding="utf-8"))

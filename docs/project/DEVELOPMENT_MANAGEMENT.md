@@ -1,5 +1,32 @@
 # A-share-analysis 开发管理总册（Development Management）
 
+## DM-20260906-107 · GT-H1.1 correctness closure after PR16 review
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_FINAL_CI
+**Review Status**：PENDING_RE_REVIEW；本批不自行 CLOSE / MERGE。
+**Authority**：[PR16 首轮复审与 GT-H1.1 收口要求](../design/A-share-analysis_PR16首轮复审与GT-H1.1收口要求_20260906.md)。
+**Reviewer baseline**：`main@8f2ccb52a5ed2a58ef916a16a9c7e756173b08fd`；新要求已由 `bd088a257b0ffd1189e089b3a0bf8def32cd113c` 追加到 main。
+**Gate**：GT-H1.1 通过最终三平台 CI 与独立 Reviewer 复审并合并前，GT-H2 reviewed corpus、Formal Production、Data Sufficiency 和 2020+ backfill 均保持冻结。
+
+| 审阅要求 | 本批修正 / 验证位置 | 状态 |
+|---|---|---|
+| 同一结构事件允许多个观察案例 | `candidate.py` 不再拒绝重复结构身份；candidate integration regression | IMPLEMENTED / local PASS |
+| 结构统计不受 trade_date / event_id 放大 | shared structural set recomputation；重复观察测试 | IMPLEMENTED / local PASS |
+| review 只能从 clean v4+ candidate 开始 | `review_readiness_gate`；review entry boundary | IMPLEMENTED / local PASS |
+| v3 / 不完整 v4 review 零副作用拒绝 | legacy/incomplete readiness tests；ACTIVE/version/evidence snapshot | IMPLEMENTED / local PASS |
+| clean schema-v2 v4 可进入 review | synthetic clean candidate lifecycle test | IMPLEMENTED / local PASS |
+
+**Evidence separation**
+
+- 本地 GT-H1/GT-H1.1 candidate、review、truth-gate 定向回归通过；新代码提交后的三平台 CI 待验证。
+- 本批只修改工具链、测试和治理文档；不新增 Golden corpus 事实，不运行 Production，不上传凭证、端点、Token、SDK 输出或专有 wheel。
+
+**Required next work**
+
+1. 将修正推送到 PR #16 新 head，验证 Windows 3.12、Windows 3.14、Ubuntu 3.14 required CI 全绿。
+2. 由独立 Reviewer 对 P0-01/P0-02 复审并决定是否合并；合并前不得启动 GT-H2。
+3. GT-H1.1 合并后，按可追溯来源重建 clean reviewed corpus，再执行 GT-H3 seal/replay/formal gate。
+
 ## DM-20260906-106 · GT-H1 Golden Truth structural identity / rebuild toolchain
 
 **Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN

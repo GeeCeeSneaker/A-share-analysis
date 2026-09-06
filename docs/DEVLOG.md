@@ -1,3 +1,17 @@
+## 2026-09-06 · GT-H1.1 correctness closure after PR16 review
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_FINAL_CI / PENDING_REVIEW**：依据 [PR #16 首轮复审与 GT-H1.1 收口要求](design/A-share-analysis_PR16首轮复审与GT-H1.1收口要求_20260906.md) 修正两个合同缺陷；本轮以审阅者指出的 P0-01/P0-02 为范围，未合并、未启动 GT-H2。
+- P0-01：结构身份仅用于 Formal 去重，不再作为行级唯一键；不同 `golden_case_id`、不同观察日或不同 `event_id` 的多个案例可以共享同一 ST/DELIST 结构身份，manifest 与 event gate 仍以 set 语义只计一个事件。
+- P0-02：`review.py` 在证据暂存前要求 ACTIVE 为 `v4+`、manifest schema v2、无 `invalid_structural_cases`、所有案例保持 `COMPILED` 且无 review provenance；旧 v3 与不完整 v4 均零副作用拒绝，clean v4 candidate 才能进入人工 review。
+- 本地 Windows Python 3.14.6 GT-H1/GT-H1.1 定向回归通过；新 head 的三平台 required CI 待本轮提交后重新验证。v3 dataset/manifest 未改写，未添加 Golden 事实、账号信息、原始 SDK 输出或专有依赖。
+
+**Next**
+
+- 将 GT-H1.1 修正与回归测试作为 PR #16 新 head 推送，等待 Windows 3.12、Windows 3.14、Ubuntu 3.14 全量 CI 及独立 Reviewer 复审；本轮不自行批准或合并。
+- GT-H1.1 合并后才按审阅要求进入 GT-H2 clean Golden corpus；Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 继续冻结。
+
 ## 2026-09-06 · GT-H1 Golden Truth structural identity and rebuild contract
 
 **Implementation Status / Review Status**

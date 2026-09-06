@@ -15,7 +15,7 @@ Hard rules:
 - The ACTIVE pointer moves via staging + atomic replace.
 - COMPILED provenance is preserved untouched.
 
-    python scripts/golden/review.py --case GT-ST-600518-20190506 \
+    python scripts/golden/review.py --case <case-in-clean-v4-candidate> \
         --artifact evidence-src/kangmei.txt \
         --kind SSE_ANNOUNCEMENT --reviewer alice --note "verified"
 """
@@ -35,9 +35,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from ashare_state.spike.golden_store import (  # noqa: E402
     VALID_ARTIFACT_KINDS,
     GoldenTruthError,
+    GoldenTruthStore,
     StructuralEventError,
     cases_from_dataset_bytes,
     recompute_manifest_statistics,
+    review_readiness_gate,
     semantic_hash_for_doc,
     validate_structural_event_fields,
 )
@@ -73,6 +75,13 @@ def _load_active() -> tuple[Path, dict, list[dict]]:
     if hashlib.sha256(dataset.read_bytes()).hexdigest() != active["dataset_hash"]:
         msg = "active dataset hash mismatch - dataset file modified"
         raise ReviewError(msg)
+    try:
+        cases, manifest = GoldenTruthStore(GOLDEN_ROOT).load()
+    except (GoldenTruthError, KeyError, OSError, ValueError) as exc:
+        raise ReviewError(f"active dataset cannot be used for review: {exc}") from exc
+    readiness_problems = review_readiness_gate(cases, manifest)
+    if readiness_problems:
+        raise ReviewError("; ".join(readiness_problems))
     lines = [
         json.loads(line)
         for line in dataset.read_text(encoding="utf-8").splitlines()

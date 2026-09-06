@@ -11,11 +11,17 @@ from pathlib import Path
 
 import pytest
 
-from ashare_state.spike.golden_store import GoldenTruthStore
+from ashare_state.spike.golden_store import (
+    GoldenTruthStore,
+    cases_from_dataset_bytes,
+    recompute_manifest_statistics,
+    semantic_hash_for_doc,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPO_GOLDEN = REPO_ROOT / "data" / "golden" / "provider" / "amazingdata"
 REVIEW_SCRIPT = REPO_ROOT / "scripts" / "golden" / "review.py"
+CANDIDATE_SCRIPT = REPO_ROOT / "scripts" / "golden" / "candidate.py"
 
 
 @pytest.fixture
@@ -37,14 +43,145 @@ def _run_review(root: Path, *extra: str) -> subprocess.CompletedProcess:
     )
 
 
+def _run_candidate(root: Path, *extra: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(CANDIDATE_SCRIPT), "--root", str(root), *extra],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=60,
+    )
+
+
 def _make_artifact(root: Path, name: str, content: str) -> Path:
     art = root.parent / f"{name}.txt"
     art.write_text(content, encoding="utf-8")
     return art
 
 
+def _prepare_clean_v4_candidate(root: Path) -> None:
+    """Build a synthetic clean v4 candidate without adding corpus facts."""
+    active = json.loads((root / "truth_manifest.json").read_text(encoding="utf-8"))
+    dataset = root / str(active["dataset_file"])
+    source = [json.loads(line) for line in dataset.read_text(encoding="utf-8").splitlines() if line]
+    operations = [
+        {
+            "op": "DROP" if doc["event_class"] in {"ST_TRANSITION", "DELIST"} else "KEEP",
+            "golden_case_id": doc["golden_case_id"],
+        }
+        for doc in source
+    ]
+    operations.extend(
+        [
+            {
+                "op": "ADD",
+                "case": {
+                    "golden_case_id": "GT-H11-SYN-ST-1",
+                    "case_type": "golden_st_transition",
+                    "provider_symbol": "600000.SH",
+                    "trade_date": "20240102",
+                    "truth_source": "synthetic test fixture",
+                    "source_ref": "synthetic://st",
+                    "expected_fields": {"IS_ST_SEC": True},
+                    "event_id": "synthetic-st-event",
+                    "event_class": "ST_TRANSITION",
+                    "event_subtype": "ST_ADD",
+                    "event_effective_date": "20240101",
+                },
+            },
+            {
+                "op": "ADD",
+                "case": {
+                    "golden_case_id": "GT-H11-SYN-DELIST-1",
+                    "case_type": "golden_delisted",
+                    "provider_symbol": "600001.SH",
+                    "trade_date": "20240202",
+                    "truth_source": "synthetic test fixture",
+                    "source_ref": "synthetic://delist",
+                    "expected_fields": {"IS_DELISTED": True},
+                    "event_id": "synthetic-delist-event",
+                    "event_class": "DELIST",
+                    "event_effective_date": "20240201",
+                },
+            },
+        ]
+    )
+    plan = root.parent / "clean-v4-plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "source_truth_version": active["truth_version"],
+                "source_dataset_hash": active["dataset_hash"],
+                "operations": operations,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = _run_candidate(
+        root,
+        "rebuild",
+        "--plan",
+        str(plan),
+        "--truth-version",
+        "v4-candidate-20260906",
+    )
+    assert result.returncode == 0, result.stderr
+    cases, manifest = GoldenTruthStore(root).load()
+    assert manifest.manifest_schema == 2
+    assert manifest.truth_version.startswith("v4-")
+    assert recompute_manifest_statistics(cases)["invalid_structural_cases"] == []
+
+
+def _prepare_incomplete_v4_candidate(root: Path) -> None:
+    """Create a loadable schema-v2 v4 candidate with one invalid ST row."""
+    _prepare_clean_v4_candidate(root)
+    active_path = root / "truth_manifest.json"
+    active = json.loads(active_path.read_text(encoding="utf-8"))
+    dataset_path = root / str(active["dataset_file"])
+    lines = [
+        json.loads(line) for line in dataset_path.read_text(encoding="utf-8").splitlines() if line
+    ]
+    doc = next(d for d in lines if d["event_class"] == "ST_TRANSITION")
+    doc.pop("event_effective_date")
+    doc["case_semantic_hash"] = semantic_hash_for_doc(doc)
+    payload = "".join(json.dumps(d, ensure_ascii=False, sort_keys=True) + "\n" for d in lines)
+    dataset_path.write_text(payload, encoding="utf-8", newline="\n")
+    cases = cases_from_dataset_bytes(payload.encode("utf-8"), active["truth_version"])
+    stats = recompute_manifest_statistics(cases)
+    active.update(
+        {
+            "dataset_hash": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+            "case_count": stats["case_count"],
+            "counts_by_type": stats["counts_by_type"],
+            "review_summary": stats["review_summary"],
+            "distinct_events": stats["distinct_events"],
+            "distinct_securities": stats["distinct_securities"],
+            "st_add_events": stats["st_add_events"],
+            "st_remove_events": stats["st_remove_events"],
+            "distinct_delisted_securities": stats["distinct_delisted_securities"],
+        }
+    )
+    active_path.write_text(json.dumps(active, indent=2), encoding="utf-8", newline="\n")
+
+
+def _review_state_snapshot(root: Path) -> dict[str, bytes]:
+    snapshot: dict[str, bytes] = {}
+    for path in sorted(root.rglob("*")):
+        if path.is_file() and (
+            path.name.startswith("golden_cases_v") or path.name.startswith("truth_manifest")
+        ):
+            snapshot[str(path.relative_to(root))] = path.read_bytes()
+    evidence = root / "evidence"
+    if evidence.is_dir():
+        for path in sorted(evidence.rglob("*")):
+            if path.is_file():
+                snapshot[str(path.relative_to(root))] = path.read_bytes()
+    return snapshot
+
+
 class TestReviewWorkflow:
     def test_review_seals_real_artifact_bytes(self, golden_env: Path):
+        _prepare_clean_v4_candidate(golden_env)
         art = _make_artifact(
             golden_env,
             "kangmei",
@@ -86,6 +223,7 @@ class TestReviewWorkflow:
         assert "--source-artifact-hash" not in source
 
     def test_review_twice_rejected(self, golden_env: Path):
+        _prepare_clean_v4_candidate(golden_env)
         art = _make_artifact(golden_env, "kangmei", "snapshot")
         args = (
             "--case",
@@ -100,9 +238,10 @@ class TestReviewWorkflow:
         assert _run_review(golden_env, *args).returncode == 0
         result = _run_review(golden_env, *args)
         assert result.returncode != 0
-        assert "already REVIEWED" in result.stderr
+        assert "every case must remain COMPILED" in result.stderr
 
     def test_missing_artifact_rejected(self, golden_env: Path):
+        _prepare_clean_v4_candidate(golden_env)
         result = _run_review(
             golden_env,
             "--case",
@@ -117,12 +256,13 @@ class TestReviewWorkflow:
         assert result.returncode != 0
         assert "does not exist" in result.stderr
 
-    def test_review_refuses_incomplete_structural_case(self, golden_env: Path):
+    def test_review_refuses_legacy_v3_before_any_mutation(self, golden_env: Path):
         art = _make_artifact(golden_env, "incomplete-st", "snapshot")
+        before = _review_state_snapshot(golden_env)
         result = _run_review(
             golden_env,
             "--case",
-            "GT-ST-600518-20190506",
+            "GT-LIMIT-MAIN10-600519",
             "--artifact",
             str(art),
             "--kind",
@@ -131,13 +271,34 @@ class TestReviewWorkflow:
             "alice",
         )
         assert result.returncode != 0
-        assert "event_effective_date" in result.stderr
+        assert "v4+ truth_version is required" in result.stderr
+        assert _review_state_snapshot(golden_env) == before
+
+    def test_review_refuses_incomplete_v4_before_any_mutation(self, golden_env: Path):
+        _prepare_incomplete_v4_candidate(golden_env)
+        art = _make_artifact(golden_env, "incomplete-v4", "snapshot")
+        before = _review_state_snapshot(golden_env)
+        result = _run_review(
+            golden_env,
+            "--case",
+            "GT-H11-SYN-ST-1",
+            "--artifact",
+            str(art),
+            "--kind",
+            "SSE_ANNOUNCEMENT",
+            "--reviewer",
+            "alice",
+        )
+        assert result.returncode != 0
+        assert "invalid structural cases" in result.stderr
+        assert _review_state_snapshot(golden_env) == before
 
 
 class TestFormalArtifactGate:
     def test_hand_typed_hash_fails_artifact_gate(self, golden_env: Path):
         """A REVIEWED entry whose sealed hash does not match the artifact
         bytes is REVIEW_INCOMPLETE (formal gate)."""
+        _prepare_clean_v4_candidate(golden_env)
         art = _make_artifact(golden_env, "kangmei", "REAL snapshot bytes")
         assert (
             _run_review(
@@ -221,6 +382,7 @@ class TestReviewGateAllCases:
 
     def _review_two(self, golden_env: Path) -> None:
         """Review two cases (real artifacts) against the dataset."""
+        _prepare_clean_v4_candidate(golden_env)
         art1 = _make_artifact(golden_env, "a1", "artifact one")
         art2 = _make_artifact(golden_env, "a2", "artifact two")
         batch = golden_env.parent / "batch.json"
@@ -273,6 +435,7 @@ class TestReviewGateAllCases:
         assert any("does not resolve" in p for p in problems)
 
     def test_batch_review_rejects_unknown_artifact_kind(self, golden_env: Path):
+        _prepare_clean_v4_candidate(golden_env)
         art = _make_artifact(golden_env, "k", "bytes")
         batch = golden_env.parent / "bad_batch.json"
         batch.write_text(
@@ -287,6 +450,7 @@ class TestReviewGateAllCases:
 
     def test_batch_failure_leaves_no_orphan_evidence(self, golden_env: Path):
         """P1-05: a failing second entry must not write the first artifact."""
+        _prepare_clean_v4_candidate(golden_env)
         art1 = _make_artifact(golden_env, "ok1", "good bytes")
         art2 = golden_env / "missing-artifact.txt"  # does not exist
         batch = golden_env.parent / "mixed.json"
@@ -431,6 +595,7 @@ class TestVersionImmutability:
 
     def test_existing_version_file_with_different_bytes_blocks(self, golden_env: Path):
         # pre-plant a conflicting next-version file
+        _prepare_clean_v4_candidate(golden_env)
         active = json.loads((golden_env / "truth_manifest.json").read_text(encoding="utf-8"))
         num = "".join(ch for ch in str(active["truth_version"]).split("-")[0][1:] if ch.isdigit())
         next_file = golden_env / f"golden_cases_v{int(num) + 1}.jsonl"

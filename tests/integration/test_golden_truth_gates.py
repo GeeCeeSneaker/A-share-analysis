@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -82,6 +84,84 @@ def _reseal(root: Path) -> None:
     (root / "truth_manifest.json").write_text(
         json.dumps(active, indent=2), encoding="utf-8", newline="\n"
     )
+
+
+def _prepare_reviewable_v4_candidate(root: Path) -> None:
+    """Build a small synthetic v4 lineage so review can be tested safely."""
+    active = _active(root)
+    dataset = _dataset(root)
+    source = [json.loads(line) for line in dataset.read_text(encoding="utf-8").splitlines() if line]
+    operations = [
+        {
+            "op": "DROP" if doc["event_class"] in {"ST_TRANSITION", "DELIST"} else "KEEP",
+            "golden_case_id": doc["golden_case_id"],
+        }
+        for doc in source
+    ]
+    operations.extend(
+        [
+            {
+                "op": "ADD",
+                "case": {
+                    "golden_case_id": "GT-H11-BOUND-ST",
+                    "case_type": "golden_st_transition",
+                    "provider_symbol": "600000.SH",
+                    "trade_date": "20240102",
+                    "truth_source": "synthetic test fixture",
+                    "source_ref": "synthetic://st",
+                    "expected_fields": {"IS_ST_SEC": True},
+                    "event_id": "synthetic-st-event",
+                    "event_class": "ST_TRANSITION",
+                    "event_subtype": "ST_ADD",
+                    "event_effective_date": "20240101",
+                },
+            },
+            {
+                "op": "ADD",
+                "case": {
+                    "golden_case_id": "GT-H11-BOUND-DELIST",
+                    "case_type": "golden_delisted",
+                    "provider_symbol": "600001.SH",
+                    "trade_date": "20240202",
+                    "truth_source": "synthetic test fixture",
+                    "source_ref": "synthetic://delist",
+                    "expected_fields": {"IS_DELISTED": True},
+                    "event_id": "synthetic-delist-event",
+                    "event_class": "DELIST",
+                    "event_effective_date": "20240201",
+                },
+            },
+        ]
+    )
+    plan = root.parent / "bound-reviewable-v4-plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "source_truth_version": active["truth_version"],
+                "source_dataset_hash": active["dataset_hash"],
+                "operations": operations,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).resolve().parents[2] / "scripts/golden/candidate.py"),
+            "--root",
+            str(root),
+            "rebuild",
+            "--plan",
+            str(plan),
+            "--truth-version",
+            "v4-candidate-20260906",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).resolve().parents[2],
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 class TestManifestSelfVerification:
@@ -268,7 +348,10 @@ class TestBoundGoldenResolver:
         # relax entry gates (this test exercises BINDING, not review)
         import ashare_state.spike.golden_store as gs
 
-        original = gs.GoldenTruthStore.event_coverage_gate
+        original_quantity = gs.GoldenTruthStore.quantity_gate
+        original_events = gs.GoldenTruthStore.event_coverage_gate
+        original_review = gs.GoldenTruthStore.review_gate
+        gs.GoldenTruthStore.quantity_gate = lambda self: []
         gs.GoldenTruthStore.event_coverage_gate = lambda self: []
         gs.GoldenTruthStore.review_gate = lambda self: []
         try:
@@ -284,18 +367,23 @@ class TestBoundGoldenResolver:
                 account_profile=profile,
             )
         finally:
-            gs.GoldenTruthStore.event_coverage_gate = original
+            gs.GoldenTruthStore.quantity_gate = original_quantity
+            gs.GoldenTruthStore.event_coverage_gate = original_events
+            gs.GoldenTruthStore.review_gate = original_review
         return run, store, GoldenTruthStore(golden_env)
 
     def test_run_bound_golden_survives_active_pointer_advance(
         self, golden_env: Path, tmp_path: Path
     ):
+        _prepare_reviewable_v4_candidate(golden_env)
         run, store, store_obj = self._bound_run(golden_env, tmp_path)
         bound_file, bound_version, bound_hash = (
             run.golden_dataset_file,
             run.golden_truth_version,
             run.golden_dataset_hash,
         )
+        _, bound_manifest = GoldenTruthStore(golden_env).load()
+        bound_case_count = bound_manifest.case_count
         # advance ACTIVE by reviewing one case (creates a new version)
         art = golden_env.parent / "adv.txt"
         art.write_text("advance evidence", encoding="utf-8")
@@ -323,12 +411,12 @@ class TestBoundGoldenResolver:
         )
         assert result.returncode == 0, result.stderr
         # ACTIVE has advanced past the bound version...
-        _, new_manifest = store_obj.load()
+        _, new_manifest = GoldenTruthStore(golden_env).load()
         assert new_manifest.truth_version != bound_version
         # ...but the run still resolves its OWN bound dataset exactly
         cases, manifest = store_obj.load_bound(bound_file, bound_version, bound_hash)
-        assert manifest.case_count == 123
-        assert len(cases) == 123
+        assert manifest.case_count == bound_case_count
+        assert len(cases) == bound_case_count
 
     def test_bound_dataset_hash_mismatch_blocks(self, golden_env: Path, tmp_path: Path):
         run, store, store_obj = self._bound_run(golden_env, tmp_path)
