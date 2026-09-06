@@ -59,25 +59,6 @@ LIMIT_REGIME_EXPECTED_RATES: dict[str, tuple[float, float | None]] = {
     "REGIME-BSE-30": (0.3, None),
 }
 
-BJ_FORMAL_TRUTH_SOURCES: dict[str, str] = {
-    "GT-BJ-835185-CONTINUITY": (
-        "BSE historical security master contains 835185.BJ on 2021-11-15; "
-        "the exact-date status row and run-bound BSE 30% rule/price proof are "
-        "the executable semantics."
-    ),
-    "GT-BJ-835185-2022": (
-        "BSE historical security master contains 835185.BJ on 2022-06-01; "
-        "the exact-date status row and run-bound BSE 30% rule/price proof are "
-        "the executable semantics."
-    ),
-    "GT-BJ-920-SEGMENT": (
-        "BSE historical security master contains 920002.BJ on 2024-07-01; "
-        "the exact-date status row and run-bound BSE 30% rule/price proof are "
-        "the executable semantics."
-    ),
-}
-
-
 # These are source locators, not sealed review artifacts.  The source pages
 # were independently located in the official exchange/disclosure domains.
 # The final review workflow must still bind the exact bytes and hash.
@@ -1311,30 +1292,6 @@ def _source_context(doc: dict[str, Any]) -> tuple[str, str, str, bool, str]:
             True,
             SOURCE_EVIDENCE_SCOPE,
         )
-    if event_class == "BJ_CODE_MIGRATION":
-        if case_id == "GT-BJ-835185-2022":
-            return (
-                "BSE official new/old code mapping table (835185 to 920185 row)",
-                "https://www.bse.cn/service/code_mapping.html",
-                "BSE_ANNOUNCEMENT",
-                True,
-                SOURCE_EVIDENCE_SCOPE,
-            )
-        if case_id == "GT-BJ-920-SEGMENT":
-            return (
-                "BSE official 920 code-segment launch announcement (effective 2024-04-22)",
-                "https://www.bse.cn/important_news/200021629.html",
-                "BSE_ANNOUNCEMENT",
-                True,
-                SOURCE_EVIDENCE_SCOPE,
-            )
-        return (
-            "BSE Trading Rules (Announcement [2021]15; opening/migration-day quotation rules effective 2021-11-15)",
-            "https://www.bse.cn/jygl_list/200010919.html",
-            "BSE_ANNOUNCEMENT",
-            True,
-            SOURCE_EVIDENCE_SCOPE,
-        )
     raise RuntimeError(f"no official context mapping for {event_class}/{event_id}")
 
 
@@ -1374,19 +1331,6 @@ def _replacement(doc: dict[str, Any]) -> dict[str, Any]:
             )
         replacement["source_ref"] = f"{name} | {url}"
         replacement["source_evidence_scope"] = scope
-        if replacement.get("event_class") == "BJ_CODE_MIGRATION":
-            try:
-                replacement["truth_source"] = BJ_FORMAL_TRUTH_SOURCES[
-                    str(replacement["golden_case_id"])
-                ]
-            except KeyError as exc:
-                raise RuntimeError(
-                    f"no executable BJ truth mapping for {replacement.get('golden_case_id')}"
-                ) from exc
-            replacement["expected_fields"] = {
-                "PRICE_HIGH_LMT_RATE": 0.3,
-                "PRICE_LOW_LMT_RATE": 0.3,
-            }
     return replacement
 
 
@@ -1412,7 +1356,12 @@ def prepare() -> None:
     for doc in source_lines:
         event_class = str(doc.get("event_class", ""))
         case_id = str(doc["golden_case_id"])
-        if event_class in {"ST_TRANSITION", "DELIST", "NEGATIVE_SAMPLE"}:
+        if event_class in {
+            "ST_TRANSITION",
+            "DELIST",
+            "NEGATIVE_SAMPLE",
+            "BJ_CODE_MIGRATION",
+        }:
             operations.append({"op": "DROP", "golden_case_id": case_id})
             op_counts["DROP"] += 1
         else:
@@ -1445,6 +1394,7 @@ def prepare() -> None:
         "policy": {
             "old_structural_rows": "DROP: v3 ST/DELIST rows lack exact effective dates or distinct identities",
             "old_negative_samples": "DROP: repetitive observations add no independent structural truth",
+            "deferred_bj_mapping_rows": "DROP: current BJ mapping artifacts do not prove the narrowed Formal assertion; defer old/new code and 920-segment capability to a separately specified Provider/Data Sufficiency contract",
             "old_non_structural_rows": "REPLACE: preserve source lineage while adding exact official rule/disclosure locators; rekey only when an exact corporate-action date changes the case identity",
             "new_structural_rows": "ADD: one canonical case per independently located official event",
             "new_right_issue_rows": "ADD: supplement dividend-only CA coverage with right-issue ex-dates",
@@ -1497,14 +1447,6 @@ def _checklist(doc: dict[str, Any]) -> list[str]:
             "Confirm the cited official rule applies to this exchange, board, regime, and observation date.",
             "Confirm both expected limit fields and the no-limit/IPO interpretation where applicable.",
             "Bind the exact rule artifact bytes and SHA256 in the human review workflow; Agent must not set REVIEWED.",
-        ]
-    if event_class == "BJ_CODE_MIGRATION":
-        return [
-            "Confirm the bare provider code exists in the provider historical security master for this case.",
-            "Confirm an exact status row exists for trade_date and the run-bound BSE rule resolves for the BJ symbol.",
-            "Confirm expected_fields.PRICE_HIGH_LMT_RATE/PRICE_LOW_LMT_RATE are the BSE rule rates and the provider HIGH_LIMITED price matches the rule-derived price.",
-            "This case does not assert an old-to-new code relation or 920 segment relation beyond the executable checks above; do not infer a stronger mapping guarantee from the contextual official document.",
-            "Bind the exact artifact bytes and SHA256 in the human review workflow; Agent must not set REVIEWED.",
         ]
     return [
         "Confirm the cited official exchange/disclosure source proves the mapping or corporate-action fact.",
@@ -1658,7 +1600,8 @@ def finalize() -> None:
     dropped_classes = Counter(
         str(doc.get("event_class", ""))
         for doc in _load_jsonl(GOLDEN_ROOT / V3_DATASET)
-        if str(doc.get("event_class", "")) in {"ST_TRANSITION", "DELIST", "NEGATIVE_SAMPLE"}
+        if str(doc.get("event_class", ""))
+        in {"ST_TRANSITION", "DELIST", "NEGATIVE_SAMPLE", "BJ_CODE_MIGRATION"}
     )
     type_counts = Counter(str(doc["case_type"]) for doc in cases)
     st_dist = _distribution(cases, "ST_TRANSITION")
@@ -1705,7 +1648,7 @@ def finalize() -> None:
         "### GT-H2.2 semantic-evidence alignment",
         "",
         "- Limit-regime source selection uses exact event IDs and an explicit expected-rate map; REGIME-STAR-20 resolves to the STAR 20% rule, while REGIME-ST-5 resolves to the risk-warning 5% rule. No substring-based ST/STAR classification is used.",
-        "- BJ packet truth is intentionally limited to the executable validator proof: historical security-master presence, exact-date status, run-bound BSE rule/rate, and provider HIGH_LIMITED price consistency. It does not claim an old-to-new code or 920-segment relation that the validator does not execute.",
+        "- BJ old/new-code and 920-segment rows are intentionally deferred: current v4 has no golden_bj_mapping cases, and no contextual mapping artifact is used as proof for a different rate/master assertion. Provider capability/Data Sufficiency must define and independently evidence that mapping contract later.",
         "",
         "### DELIST distribution",
         "",

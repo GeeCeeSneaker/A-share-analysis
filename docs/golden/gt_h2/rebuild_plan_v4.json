@@ -7,14 +7,15 @@
   "policy": {
     "old_structural_rows": "DROP: v3 ST/DELIST rows lack exact effective dates or distinct identities",
     "old_negative_samples": "DROP: repetitive observations add no independent structural truth",
+    "deferred_bj_mapping_rows": "DROP: current BJ mapping artifacts do not prove the narrowed Formal assertion; defer old/new code and 920-segment capability to a separately specified Provider/Data Sufficiency contract",
     "old_non_structural_rows": "REPLACE: preserve source lineage while adding exact official rule/disclosure locators; rekey only when an exact corporate-action date changes the case identity",
     "new_structural_rows": "ADD: one canonical case per independently located official event",
     "new_right_issue_rows": "ADD: supplement dividend-only CA coverage with right-issue ex-dates",
     "review_boundary": "No source artifact is sealed and no case is marked REVIEWED by this utility"
   },
   "operation_summary": {
-    "DROP": 70,
-    "REPLACE": 53,
+    "DROP": 73,
+    "REPLACE": 50,
     "ADD": 75
   },
   "registry_case_count": 75,
@@ -1387,70 +1388,16 @@
       "allow_rekey": true
     },
     {
-      "op": "REPLACE",
-      "golden_case_id": "GT-BJ-835185-CONTINUITY",
-      "case": {
-        "case_type": "golden_bj_mapping",
-        "event_class": "BJ_CODE_MIGRATION",
-        "event_id": "BJ-MIGRATION-2021",
-        "event_subtype": "",
-        "expected_fields": {
-          "PRICE_HIGH_LMT_RATE": 0.3,
-          "PRICE_LOW_LMT_RATE": 0.3
-        },
-        "golden_case_id": "GT-BJ-835185-CONTINUITY",
-        "provider_symbol": "835185.BJ",
-        "review_status": "COMPILED",
-        "source_ref": "BSE Trading Rules (Announcement [2021]15; opening/migration-day quotation rules effective 2021-11-15) | https://www.bse.cn/jygl_list/200010919.html",
-        "trade_date": "20211115",
-        "truth_source": "BSE historical security master contains 835185.BJ on 2021-11-15; the exact-date status row and run-bound BSE 30% rule/price proof are the executable semantics.",
-        "truth_version": "v3-candidate-20260822",
-        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
-      }
+      "op": "DROP",
+      "golden_case_id": "GT-BJ-835185-CONTINUITY"
     },
     {
-      "op": "REPLACE",
-      "golden_case_id": "GT-BJ-835185-2022",
-      "case": {
-        "case_type": "golden_bj_mapping",
-        "event_class": "BJ_CODE_MIGRATION",
-        "event_id": "BJ-MIGRATION-2021",
-        "event_subtype": "",
-        "expected_fields": {
-          "PRICE_HIGH_LMT_RATE": 0.3,
-          "PRICE_LOW_LMT_RATE": 0.3
-        },
-        "golden_case_id": "GT-BJ-835185-2022",
-        "provider_symbol": "835185.BJ",
-        "review_status": "COMPILED",
-        "source_ref": "BSE official new/old code mapping table (835185 to 920185 row) | https://www.bse.cn/service/code_mapping.html",
-        "trade_date": "20220601",
-        "truth_source": "BSE historical security master contains 835185.BJ on 2022-06-01; the exact-date status row and run-bound BSE 30% rule/price proof are the executable semantics.",
-        "truth_version": "v3-candidate-20260822",
-        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
-      }
+      "op": "DROP",
+      "golden_case_id": "GT-BJ-835185-2022"
     },
     {
-      "op": "REPLACE",
-      "golden_case_id": "GT-BJ-920-SEGMENT",
-      "case": {
-        "case_type": "golden_bj_mapping",
-        "event_class": "BJ_CODE_MIGRATION",
-        "event_id": "BJ-920-SEGMENT-2024",
-        "event_subtype": "",
-        "expected_fields": {
-          "PRICE_HIGH_LMT_RATE": 0.3,
-          "PRICE_LOW_LMT_RATE": 0.3
-        },
-        "golden_case_id": "GT-BJ-920-SEGMENT",
-        "provider_symbol": "920002.BJ",
-        "review_status": "COMPILED",
-        "source_ref": "BSE official 920 code-segment launch announcement (effective 2024-04-22) | https://www.bse.cn/important_news/200021629.html",
-        "trade_date": "20240701",
-        "truth_source": "BSE historical security master contains 920002.BJ on 2024-07-01; the exact-date status row and run-bound BSE 30% rule/price proof are the executable semantics.",
-        "truth_version": "v3-candidate-20260822",
-        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
-      }
+      "op": "DROP",
+      "golden_case_id": "GT-BJ-920-SEGMENT"
     },
     {
       "op": "ADD",

@@ -87,9 +87,8 @@ class TestGTH2CleanCorpus:
 
         assert manifest.truth_version == "v4-candidate-20260906"
         assert manifest.manifest_schema == 2
-        assert manifest.case_count == 128
+        assert manifest.case_count == 125
         assert manifest.counts_by_type == {
-            "golden_bj_mapping": 3,
             "golden_corporate_action": 25,
             "golden_delisted": 20,
             "golden_limit_regime": 30,
@@ -100,7 +99,7 @@ class TestGTH2CleanCorpus:
         assert store.event_coverage_gate(cases, manifest) == []
         assert store.production_formal_gate(cases, manifest) == [
             (
-                "golden truth not fully human-reviewed (REVIEWED 0/128; "
+                "golden truth not fully human-reviewed (REVIEWED 0/125; "
                 "audit section 39 requires every golden entry reviewed before P0-M-1B)"
             )
         ]
@@ -156,7 +155,7 @@ class TestGTH2CleanCorpus:
         assert plan["source_truth_version"] == V3_VERSION
         assert plan["source_dataset_hash"] == V3_HASH
         assert Counter(op["op"] for op in operations) == Counter(
-            {"DROP": 70, "REPLACE": 53, "ADD": 75}
+            {"DROP": 73, "REPLACE": 50, "ADD": 75}
         )
         assert Counter(op["golden_case_id"] for op in old_operations) == Counter(source_ids)
         assert len({op["golden_case_id"] for op in add_operations}) == 75
@@ -164,7 +163,8 @@ class TestGTH2CleanCorpus:
         assert all(
             op["op"] == "DROP"
             for op, old in zip(old_operations, source, strict=True)
-            if old["event_class"] in {"ST_TRANSITION", "DELIST", "NEGATIVE_SAMPLE"}
+            if old["event_class"]
+            in {"ST_TRANSITION", "DELIST", "NEGATIVE_SAMPLE", "BJ_CODE_MIGRATION"}
         )
 
         expected_hashes = {
@@ -192,7 +192,7 @@ class TestGTH2CleanCorpus:
         packet_ids = [row["golden_case_id"] for row in packet]
 
         assert packet_ids == case_ids
-        assert len(packet_ids) == len(set(packet_ids)) == 128
+        assert len(packet_ids) == len(set(packet_ids)) == 125
         required = {
             "golden_case_id",
             "case_type",
@@ -280,28 +280,31 @@ class TestGTH2CleanCorpus:
             if row["provider_symbol"].endswith(".SH")
         )
 
-    def test_bj_packet_truth_matches_executable_validator_contract(self):
+    def test_bj_mapping_rows_are_deferred_until_their_contract_is_proven(self):
         cases = GoldenTruthStore(GOLDEN_ROOT).load()[0]
-        bj = [case for case in cases if case.event_class == "BJ_CODE_MIGRATION"]
-
-        assert len(bj) == 3
-        for case in bj:
-            assert case.expected_fields == {
-                "PRICE_HIGH_LMT_RATE": 0.3,
-                "PRICE_LOW_LMT_RATE": 0.3,
-            }
-            assert "historical security master" in case.truth_source
-            assert "old-to-new" not in case.truth_source
-            assert "920 segment" not in case.truth_source
-
+        assert not any(case.event_class == "BJ_CODE_MIGRATION" for case in cases)
         packet = _jsonl(H2_ROOT / "review_packet_index.jsonl")
-        bj_packet = [row for row in packet if row["event_class"] == "BJ_CODE_MIGRATION"]
-        assert len(bj_packet) == 3
-        for row in bj_packet:
-            checklist = " ".join(row["human_review_checklist"])
-            assert "historical security master" in checklist
-            assert "run-bound BSE rule" in checklist
-            assert "old-to-new code relation" in checklist
+        assert not any(row["event_class"] == "BJ_CODE_MIGRATION" for row in packet)
+        assert not any(row["golden_case_id"].startswith("GT-BJ-") for row in packet)
+        assert not any(
+            row["expected_fields"].get("PRICE_HIGH_LMT_RATE") == 0.3
+            and any(
+                token in str(row["official_source_name"]).lower()
+                for token in ("mapping", "segment")
+            )
+            for row in packet
+        )
+
+        plan = json.loads((H2_ROOT / "rebuild_plan_v4.json").read_text(encoding="utf-8"))
+        dropped = {op["golden_case_id"] for op in plan["operations"] if op["op"] == "DROP"}
+        assert dropped >= {
+            "GT-BJ-835185-CONTINUITY",
+            "GT-BJ-835185-2022",
+            "GT-BJ-920-SEGMENT",
+        }
+        report = (H2_ROOT / "GT_H2_CORPUS_REPORT.md").read_text(encoding="utf-8")
+        assert "no golden_bj_mapping cases" in report
+        assert "Provider capability/Data Sufficiency" in report
 
     def test_report_keeps_review_and_provider_boundaries_explicit(self):
         report = (H2_ROOT / "GT_H2_CORPUS_REPORT.md").read_text(encoding="utf-8")

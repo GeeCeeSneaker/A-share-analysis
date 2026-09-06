@@ -2,23 +2,21 @@
   "manifest_schema": 2,
   "truth_version": "v4-candidate-20260906",
   "dataset_file": "golden_cases_v4.jsonl",
-  "dataset_hash": "5d063e314ea4b04623ecf19321f09931edb2d4b478f0df055262768e43d66ec0",
-  "case_count": 128,
+  "dataset_hash": "8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b",
+  "case_count": 125,
   "counts_by_type": {
     "golden_limit_regime": 30,
     "golden_corporate_action": 25,
-    "golden_bj_mapping": 3,
     "golden_st_transition": 50,
     "golden_delisted": 20
   },
   "review_summary": {
-    "COMPILED": 128
+    "COMPILED": 125
   },
   "distinct_events": {
     "LIMIT_REGIME": 6,
     "NO_LIMIT_IPO": 3,
     "DIVIDEND_EX_DATE": 20,
-    "BJ_CODE_MIGRATION": 2,
     "RIGHT_ISSUE_EX_DATE": 5,
     "ST_TRANSITION": 50,
     "DELIST": 20
@@ -43,7 +41,7 @@
     "688036.SH": 1,
     "688012.SH": 1,
     "688599.SH": 1,
-    "835185.BJ": 4,
+    "835185.BJ": 2,
     "601995.SH": 1,
     "605499.SH": 1,
     "000858.SZ": 2,
@@ -51,7 +49,6 @@
     "601398.SH": 2,
     "000651.SZ": 2,
     "000002.SZ": 2,
-    "920002.BJ": 1,
     "600654.SH": 1,
     "600077.SH": 1,
     "601258.SH": 1,

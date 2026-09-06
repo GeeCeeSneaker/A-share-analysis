@@ -1,3 +1,20 @@
+## 2026-09-06 · GT-H2.2.1 BJ external-artifact honesty closure
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_RE_REVIEW**：依据 main 最新的 [PR18 三轮复审与 GT-H2.2.1 BJ 外部证据诚实性收口要求](design/A-share-analysis_PR18三轮复审与GT-H2.2.1_BJ外部证据诚实性收口要求_20260906.md)，收口 Reviewer 指出的 P0-03；保留已关闭的 STAR/ST 语义修正，不自行执行 review seal、批准或合并。
+- 采用 Reviewer 明确的首选低复杂度路径：从 v4 ACTIVE 和 review packet 删除 `GT-BJ-835185-CONTINUITY`、`GT-BJ-835185-2022`、`GT-BJ-920-SEGMENT` 三条 `golden_bj_mapping`；它们不是当前 Formal quantity hard gate，不为维持数量补 filler。
+- v3→v4 rebuild plan 仍逐条覆盖 123 条旧记录，操作变为 DROP 73 / REPLACE 50 / ADD 75；v4 当前为 125 条，类型为 ST 50、DELIST 20、LIMIT 30、corporate action 25，全部 `COMPILED`。三条 BJ mapping 只在 plan 中作为显式 DROP lineage 保留，未进入 ACTIVE、packet 或 registry。
+- 重建后的 ACTIVE v4 dataset SHA256 为 `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b`；`truth_manifest.json`、`truth_manifest_v4.json`、registry、rebuild plan、packet index 和报告已同步更新。报告明确将 old/new code 与 920 segment capability 延后到独立 Provider capability/Data Sufficiency 合同。
+- 新增回归证明 ACTIVE/packet 无 `golden_bj_mapping`、无 `GT-BJ-*`，不存在“expected 30% 但 source artifact 只证明 mapping/segment”的案例；`review_readiness_gate`、quantity、event coverage 通过，`production_formal_gate` 仅剩 `REVIEWED 0/125`。
+- 本地 GT-H2.2.1、H2/candidate、Golden truth/review、corporate-action/router 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向 mypy 通过。新 head 的 GitHub Actions 尚待运行，故 CI 状态暂为 `CI_PENDING`。
+- 继续冻结：不运行 `review.py` final seal、GT-H3、Production B1–B7、Data Sufficiency、Provider capability decision、2020+ backfill、策略/回测/交易；账号、密码、IP、Token、真实端点、原始 SDK 输出和专有依赖不上传。
+
+**Next**
+
+- 将本轮 v4/packet/plan/report、生成器、测试和管理记录推送到 PR #18，等待包含 Reviewer 最新 main baseline 的三平台 required CI 全绿，再请独立 Reviewer 复审 GT-H2.2.1 P0-03。
+- 只有 Reviewer closure 后，才可进入 GT-H3 artifact bytes/hash binding、N/N reviewed seal 与 Formal gate；Provider capability/Data Sufficiency 继续冻结。
+
 ## 2026-09-06 · GT-H2.2 semantic-evidence alignment
 
 **Implementation Status / Review Status**
