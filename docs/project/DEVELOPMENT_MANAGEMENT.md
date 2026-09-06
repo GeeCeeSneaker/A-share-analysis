@@ -1,5 +1,123 @@
 # A-share-analysis 开发管理总册（Development Management）
 
+## DM-20260906-112 · GT-H2.2.1 BJ external-artifact honesty closure
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
+**Review Status**：PENDING_RE_REVIEW；本批不自行执行最终 review seal、CLOSE 或 MERGE。
+**Reviewer baseline**：main 最新要求 [PR18 三轮复审与 GT-H2.2.1 BJ 外部证据诚实性收口要求](../design/A-share-analysis_PR18三轮复审与GT-H2.2.1_BJ外部证据诚实性收口要求_20260906.md)，针对 GT-H2.2.1 P0-03；已关闭的 STAR/ST P0-01 保持不变。
+**Candidate hash**：`8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b`（v4，125 条）
+**Gate**：本轮 head 的三平台 required CI 已全绿；在独立 Reviewer closure 完成前，GT-H3 reviewed seal、Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 仍保持冻结。
+
+| 审阅要求 | 本批实现 / 验证位置 | 状态 |
+|---|---|---|
+| 不把仅证明 mapping/segment 的 artifact 绑定为 30% rate/master truth | 三条 `GT-BJ-*` 从 ACTIVE、packet、registry 删除；只在 `rebuild_plan_v4.json` 作为显式 DROP lineage 保留 | IMPLEMENTED / local PASS |
+| 不为维持 128 条补 filler，Formal hard-gate 覆盖保持有效 | v4 125 条；ST 50 / DELIST 20 / LIMIT 30 / corporate action 25；`GoldenTruthStore.quantity_gate` 通过 | IMPLEMENTED / local PASS |
+| BJ old/new code 与 920 segment capability 延后到独立合同 | `GT_H2_CORPUS_REPORT.md` 与 plan policy 明确 deferred Provider capability/Data Sufficiency | IMPLEMENTED / local PASS |
+| v4、manifest、packet、registry、plan、报告重新生成且 hash 一致 | dataset/manifest hash `8c356c4a...`；packet 125/125；生成器 finalize 自校验 | IMPLEMENTED / local PASS |
+| regression 证明无 active BJ mapping 与仅有 contextual artifact 的冲突 case | `test_bj_mapping_rows_are_deferred_until_their_contract_is_proven` | IMPLEMENTED / local PASS |
+
+**Evidence separation**
+
+- 本地 GT-H2.2.1 生成、hash/manifest/packet/gate 校验、H2/candidate/golden review/corporate-action/router 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向 mypy 通过。
+- GitHub Actions run `337`（ID `34032603625`）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三个平台全绿，full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates 均成功。
+- 当前 ACTIVE 为 `COMPILED 125/125`；`review_readiness_gate`、quantity、event coverage 为零问题，`production_formal_gate` 只报告 `REVIEWED 0/125` 人工复核阻断。
+- 本批不下载或提交 raw web/PDF，不绑定 artifact hash，不运行 `review.py` final seal、GT-H3、Production B1–B7、Data Sufficiency、Provider capability 或回补；凭证、Token、端点、原始 SDK 输出和本地 vendor 依赖不进入 GitHub。
+
+**Required next work**
+
+1. 本轮生成物、生成器、回归测试和本管理记录已推送到 PR #18；run `337` 已完成包含 Reviewer 最新 main baseline 的三平台 required CI 全绿。
+2. 现请独立 Reviewer 仅复审 GT-H2.2.1 P0-03；本批不自行提交批准或合并。
+3. 只有 Reviewer closure 后，才按 GT-H3 进行逐案 artifact bytes/hash binding、N/N reviewed seal、bound replay 与 Formal gate。
+
+## DM-20260906-111 · GT-H2.2 semantic-evidence alignment
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
+**Review Status**：PENDING_RE_REVIEW；本批不自行执行最终 review seal、CLOSE 或 MERGE。
+**Reviewer baseline**：main 新增 [PR18 二轮复审与 GT-H2.2 语义证据对齐要求](../design/A-share-analysis_PR18二轮复审与GT-H2.2语义证据对齐要求_20260906.md)；该要求针对 GT-H2.1 复审后新增的 P0-01/P1-02。
+**Candidate hash**：`5d063e314ea4b04623ecf19321f09931edb2d4b478f0df055262768e43d66ec0`（v4，128 条）
+**Gate**：新 head 的三平台 required CI 与独立 Reviewer closure 未完成前，GT-H3 reviewed seal、Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 均保持冻结。
+
+| 审阅要求 | 本批实现 / 验证位置 | 状态 |
+|---|---|---|
+| 限价制度必须按精确语义选择来源，STAR 20% 不得落入 ST 5% 分支 | `gt_h2_prepare.py::_source_context` exact event-id mapping；无 `"ST" in event_id` / `"STAR" in event_id` 分类 | IMPLEMENTED / local PASS |
+| 每个限价案例的 source claim、expected rate 和 packet 必须一致 | `LIMIT_REGIME_EXPECTED_RATES`；生成器 fail-closed assertion；v4 dataset/registry/packet | IMPLEMENTED / local PASS |
+| 必须有 STAR 与 ST 的 adversarial regression | `test_limit_source_selection_is_exact_and_semantically_aligned`；直接检查来源和 5 条 STAR packet 行 | IMPLEMENTED / local PASS |
+| BJ truth 只能声明 validator 实际消费并证明的语义 | `golden_router.py::_validate_bj_mapping` contract；三条 BJ truth/checklist 限定 historical master、exact status、run-bound BSE regime/price | IMPLEMENTED / local PASS |
+| 重建后 packet、registry、plan、manifest、报告和 dataset hash 一致 | `candidate.py rebuild/finalize`；manifest/report hash `5d063e...`; packet 128/128 | IMPLEMENTED / local PASS |
+
+**Evidence separation**
+
+- 本地 GT-H2.2 生成、hash/manifest/packet 校验、H2/candidate/golden review/corporate-action 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向静态检查通过。
+- Follow-up：run `333` 三个平台均在 pytest 收集新测试时因根目录 `scripts` 未作为 wheel 包安装而报 `ModuleNotFoundError`，Ruff/mypy 及其余步骤成功；测试已改为按仓库路径加载 source-only 准备器，未改变生产打包边界，本地复测通过，修正 head 仍为 `CI_PENDING`。
+- Follow-up：修正后的 GitHub Actions run `334`（Ubuntu 3.14、Windows 3.12、Windows 3.14）全部成功，full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates 均通过。
+- `review_readiness_gate`、quantity、event coverage 继续通过；`production_formal_gate` 仍仅保留 `REVIEWED 0/128` 人工复核阻断。没有将 semantic source alignment 误报为 Human Review 或 GT-H3 完成。
+- 本批不下载或提交 raw web/PDF，不绑定 artifact hash，不运行 `review.py` final seal、Production B1–B7、Data Sufficiency、Provider capability 或回补；凭证、Token、端点、原始 SDK 输出和本地 vendor 依赖不进入 GitHub。
+
+**Required next work**
+
+1. run `334` 已完成三平台 required CI 全绿；请独立 Reviewer 复审 GT-H2.2 P0-01/P1-02，本批不自行提交批准或合并。
+2. 只有 Reviewer closure 后，才按 GT-H3 进行逐案 artifact bytes/hash binding、N/N reviewed seal、bound replay 与 Formal gate。
+
+## DM-20260906-110 · GT-H2.1 source-quality and representativeness closure
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
+**Review Status**：PENDING_RE_REVIEW；本批不自行执行最终 review seal、CLOSE 或 MERGE。
+**Authority**：[PR18 首轮复审与 GT-H2.1 来源质量收口要求](../design/A-share-analysis_PR18首轮复审与GT-H2.1来源质量收口要求_20260906.md)。
+**Gate**：GT-H2.1 修正 head 的三平台 required CI 与独立 Reviewer closure 未完成前，GT-H3 reviewed seal、Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 均保持冻结。
+
+| 审阅要求 | 本批实现 / 验证位置 | 状态 |
+|---|---|---|
+| 每条 case 使用可定位的官方 artifact/规则版本 | `gt_h2_prepare.py` exact source registry/context；packet source-scope gate | IMPLEMENTED / local PASS |
+| `fact_proved` 不得由 generic portal 推出 | `source_evidence_scope`；portal-only denylist；finalize regression | IMPLEMENTED / local PASS |
+| ST exchange/board/subtype 代表性修正 | v4 dataset/manifest；SSE 12 / SZSE 38；MAIN 32 / CHINEXT 15 / STAR 3 | IMPLEMENTED / local PASS |
+| RIGHT_ISSUE 只保留 2020+ 且使用同期公告 | `601555.SH/20200323` replacement；`000750.SZ/20200114` exact 2020 notice | IMPLEMENTED / local PASS |
+| explicit rekey 保留 v3→v4 lineage | `candidate.py` `allow_rekey=true`；adversarial candidate regression | IMPLEMENTED / local PASS |
+
+**Evidence separation**
+
+- 本地 H2、candidate、Golden truth/review、corporate-action 定向回归通过；Ruff check/format 与 candidate/H2 mypy 定向检查通过。
+- packet 仍为 128/128、全体 `COMPILED`；`review_readiness_gate`、quantity、event coverage 通过，`production_formal_gate` 仅保留 `REVIEWED 0/128` 人工复核阻断。
+- 本批不下载或提交 raw web/PDF、不绑定 artifact hash，不运行 `review.py` final seal、Production B1–B7、Data Sufficiency、Provider capability 或回补。
+- 未上传密码、账号、IP、Token、真实 endpoint、原始 SDK 输出或专有依赖；本地 vendor 依赖不进入 GitHub。
+- GitHub Actions run `330`（Ubuntu 3.14、Windows 3.12、Windows 3.14）三平台 required CI 已全部成功，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates。
+
+**Required next work**
+
+1. CI 已由 run `330` 全部通过；由独立 Reviewer 逐条复审 exact locator、日期、类型、exchange/board 和 `fact_proved` 语义，本批不自行批准或合并。
+2. Reviewer closure 后才按 GT-H3 执行 artifact bytes/hash binding、reviewed seal、bound replay 与 Formal gate。
+
+## DM-20260906-109 · GT-H2 clean Golden candidate construction
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
+**Review Status**：PENDING_REVIEW；本批不自行执行最终 review seal、CLOSE 或 MERGE。
+**Base SHA**：`5f76ad411801998de7bd3be7f26c880a73005853`
+**Authority**：[GT-H1关闭与GT-H2 CleanGoldenCorpus建设要求](../design/A-share-analysis_GT-H1关闭与GT-H2_CleanGoldenCorpus建设要求_20260906.md)。
+**Gate**：v4 candidate 可进入人工 review；Human Review、GT-H3 reviewed seal、Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 仍未完成。
+
+| 管理要求 | 本批实现 / 验证位置 | 状态 |
+|---|---|---|
+| v3 源绑定及旧版本不可变 | `rebuild_plan_v4.json`；v3 dataset SHA256；H2 专项 hash regression | IMPLEMENTED / local PASS |
+| 旧记录逐条 KEEP/REPLACE/DROP，新增事实显式 ADD | `scripts/golden/gt_h2_prepare.py`；198 条显式 operation | IMPLEMENTED / local PASS |
+| ST 结构事件达到 50 且包含 ADD/REMOVE | v4 dataset/manifest；`GoldenTruthStore.event_coverage_gate` | IMPLEMENTED / local PASS |
+| DELIST 20 个独立证券/日期且生效日显式 | v4 dataset/manifest；结构身份测试 | IMPLEMENTED / local PASS |
+| company action 覆盖 dividend 与 right issue | v4 `DIVIDEND_EX_DATE` 20 + `RIGHT_ISSUE_EX_DATE` 5 | IMPLEMENTED / local PASS |
+| packet 与 candidate 一一覆盖，禁止 Agent REVIEWED | `review_packet_index.jsonl`；packet exact-coverage test；`GT_H2_CORPUS_REPORT.md` | IMPLEMENTED / local PASS |
+| 原始网页/PDF、凭证和专有依赖不入库 | source refs only；本地 vendor boundary | IMPLEMENTED / local PASS |
+
+**Evidence separation**
+
+- 本地 Windows Python 3.14.6：H2 candidate、旧 Golden workflow 与 review/truth-gate 回归 **66 passed**；Ruff lint/format 与 `golden_store.py` mypy 定向检查通过。
+- GitHub Actions run `326`：Ubuntu 3.14、Windows 3.12、Windows 3.14 三平台 required CI 全部成功，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates。
+- `GoldenTruthStore.load` 已通过 v4 schema 2 自校验；`quantity_gate`、`event_coverage_gate`、`review_readiness_gate` 均通过，`production_formal_gate` 仅保留 `REVIEWED 0/128` 的人工复核阻断。
+- 事实来源是官方 SSE/SZSE/BSE/CNINFO 引用定位；`fact_proved` 仅是 Agent 来源检索标记，必须由 Reviewer 绑定 exact artifact/hash 后才可变为 REVIEWED。未运行 `review.py` 最终封存。
+- 未执行正式账号、B1–B7、Data Sufficiency、Provider capability、2020+ backfill、策略、回测或交易；密码、Token、端点、原始 SDK 输出和本地供应商包未进入仓库。
+
+**Required next work**
+
+1. 以独立 PR 运行三平台 required CI，并由独立 Reviewer 审阅本候选与 packet；本批不自行批准或合并。
+2. Reviewer 逐条核验事件日期/类型/交易所板块及官方 artifact bytes/hash，完成一次 N/N human review 后才允许 `review.py` 发布 reviewed version。
+3. GT-H3 完成 reviewed seal、bound replay 与 Formal gate 后，才重新评估 Production、Data Sufficiency、Provider capability 和回补。
+
 ## DM-20260906-108 · GT-H1.2 atomic complete review publication after PR16 second review
 
 **Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
@@ -119,11 +237,11 @@
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  
 > **项目**：A股市场态势数据基座（日频模块）  
 > **Frozen Baseline**：V1.3.2  
-> **Reviewed Repository HEAD**：`c22a7111cda3ba9c86ca17aec4cfd85a2ee1955a`（PR #9 merge commit `f38e77ff2cbcf040837bc1c15504f847e1cfb1d8` 之后的 main；进入受控线上身份确认阶段；分支历史保持 append-only）  
+> **Reviewed Repository HEAD**：`5f76ad411801998de7bd3be7f26c880a73005853`（GT-H1 closure merge 之后、GT-H2 candidate construction 分支的源 main；分支历史保持 append-only）
 > **Primary Implementation（CR-6.4 + 2020+ history contract）**：CR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d` 已随 PR #6 合入 main；2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`，format correction `22a99107`；State/Provider 语义边界保持冻结。  
 > **Latest full code CI baseline（PR #9 candidate）**：测试/代码 head `75b998a79931b8c7d0c9ebf67bcd7a1a4549c0df` 对应 GitHub Actions run `33937401530`，已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵成功；每腿 `1485 passed`，Ruff lint/format、mypy、Spike、SDK-absent 及适用的 DEVLOG/Management gates 均成功。  
 > **Current Code Baseline**：CR-5 已 VERIFIED / CLOSED / FREEZE 并在 PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` 生效；CR-6.0–6.4 的 Registry、deterministic State、artifact/ledger/replay、scope guard、fatal-vs-persisted contract 和 1–64 evidence mapping 已实现并在 PR #6 合入 main；2020+ history contract（`history_start_2020` / `history_coverage_2020_v1`，起点 `20200101`）已同步代码、测试和 Provider 文档；CR-6 已随 PR #6 合入 main；PR #8.1 CLI / resume honesty 当前 VERIFIED (CI) / PENDING_REVIEW；P0-M-1B.0 scrubbed bootstrap 与 positive identity gates 当前 VERIFIED (CI) / CLOSED / MERGED（PR #9）；P0-M-1B.0.1 positive identity contract honesty 当前 VERIFIED (CI) / CLOSED / MERGED（PR #9）；Production Runner Anchored Wiring P0 当前 VERIFIED (CI) / PENDING_REVIEW；Production P0-M-1B 仍独立 BLOCKED：T1 controlled online bootstrap 在本地凭证门禁处 NOT_TESTABLE_ACCOUNT，尚未产生 live identity candidate。  
-> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129 / DM-20260905-130 / DM-20260905-131 / DM-20260905-132 / DM-20260905-133 / DM-20260905-134 / DM-20260905-135 / DM-20260905-136 / DM-20260905-137 / DM-20260905-138 / DM-20260905-139 / DM-20260905-140 / DM-20260905-141 / DM-20260905-142 / DM-20260905-143 / DM-20260905-144 / DM-20260905-145 / DM-20260905-146 / DM-20260905-147
+> **Document Revision**：既有 DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085；新增 DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129 / DM-20260905-130 / DM-20260905-131 / DM-20260905-132 / DM-20260905-133 / DM-20260905-134 / DM-20260905-135 / DM-20260905-136 / DM-20260905-137 / DM-20260905-138 / DM-20260905-139 / DM-20260905-140 / DM-20260905-141 / DM-20260905-142 / DM-20260905-143 / DM-20260905-144 / DM-20260905-145 / DM-20260905-146 / DM-20260905-147 / DM-20260906-109
 > **Last Review**：2026-09-05（PR #9 已合并；进入 T1 controlled online bootstrap。clean main `c22a7111cda3ba9c86ca17aec4cfd85a2ee1955a` 的离线 SDK/runtime preflight 已通过，但在线入口因本地未提供安全凭证注入而返回 `NOT_TESTABLE_ACCOUNT` / exit 2；未产生 live identity candidate，配置继续为空）  
 > **Last Reviewer**：Design / Audit Review  
 > **CI Status**：PR #9 candidate 的 P0-M-1B.0.1 final code/test run `33937401530` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三矩阵全绿，每腿 `1485 passed`；Ruff lint/formatter、mypy、full pytest、Spike、SDK-absent 和适用的 DEVLOG/Management gates 均 success。main 的 merge-gate 历史基线不因本 PR 自动改变。  

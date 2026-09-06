@@ -20,6 +20,8 @@ from ashare_state.spike.golden_store import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPO_GOLDEN = REPO_ROOT / "data" / "golden" / "provider" / "amazingdata"
+V3_VERSION = "v3-candidate-20260822"
+V3_HASH = "ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e"
 REVIEW_SCRIPT = REPO_ROOT / "scripts" / "golden" / "review.py"
 CANDIDATE_SCRIPT = REPO_ROOT / "scripts" / "golden" / "candidate.py"
 
@@ -28,6 +30,15 @@ CANDIDATE_SCRIPT = REPO_ROOT / "scripts" / "golden" / "candidate.py"
 def golden_env(tmp_path: Path, monkeypatch) -> Path:
     root = tmp_path / "data" / "golden" / "provider" / "amazingdata"
     shutil.copytree(REPO_GOLDEN, root)
+    # Review workflow fixtures start from immutable v3; GT-H2 moves the
+    # repository ACTIVE pointer to v4 while preserving the old source.
+    for name in ("golden_cases_v4.jsonl", "truth_manifest_v4.json"):
+        (root / name).unlink(missing_ok=True)
+    (root / "truth_manifest.json").write_text(
+        (root / "truth_manifest_v3.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+        newline="\n",
+    )
     monkeypatch.setattr("ashare_state.spike.golden_store.GOLDEN_ROOT", root)
     monkeypatch.chdir(tmp_path)
     return root
@@ -502,11 +513,15 @@ class TestFormalArtifactGate:
 
 class TestEventSemantics:
     def test_st_gate_requires_remove_subtype(self):
-        problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
+        store = GoldenTruthStore(REPO_GOLDEN)
+        cases, manifest = store.load_bound("golden_cases_v3.jsonl", V3_VERSION, V3_HASH)
+        problems = store.event_coverage_gate(cases, manifest)
         assert any("no ST_REMOVE/STAR_ST_REMOVE" in p for p in problems)
 
     def test_delist_gate_requires_distinct_symbols(self):
-        problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
+        store = GoldenTruthStore(REPO_GOLDEN)
+        cases, manifest = store.load_bound("golden_cases_v3.jsonl", V3_VERSION, V3_HASH)
+        problems = store.event_coverage_gate(cases, manifest)
         assert any("distinct delisted securities" in p for p in problems)
 
 

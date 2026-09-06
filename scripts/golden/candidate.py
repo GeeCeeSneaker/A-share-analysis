@@ -344,14 +344,20 @@ def _build_rebuild_lines(
             replacement = raw.get("case")
             if not isinstance(replacement, dict):
                 raise CandidateError(f"rebuild operation {index}: REPLACE requires case object")
-            if replacement.get("golden_case_id") != case_id:
-                raise CandidateError(f"rebuild operation {index}: REPLACE case ID mismatch")
+            replacement_id = replacement.get("golden_case_id")
+            if replacement_id != case_id and raw.get("allow_rekey") is not True:
+                raise CandidateError(
+                    f"rebuild operation {index}: REPLACE case ID mismatch; "
+                    "set allow_rekey=true only for an explicit "
+                    "source-to-replacement identity change"
+                )
             _validate_candidate(replacement, (source_ids - {case_id}) | output_ids)
             normalized = _prepare_compiled_doc(replacement, truth_version)
-        if case_id in output_ids:
-            raise CandidateError(f"rebuild output duplicate golden_case_id {case_id}")
+        output_id = str(normalized["golden_case_id"])
+        if output_id in output_ids:
+            raise CandidateError(f"rebuild output duplicate golden_case_id {output_id}")
         output.append(normalized)
-        output_ids.add(case_id)
+        output_ids.add(output_id)
 
     missing = sorted(source_ids - seen_source_ids)
     if missing:

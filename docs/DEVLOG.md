@@ -1,3 +1,75 @@
+## 2026-09-06 · GT-H2.2.1 BJ external-artifact honesty closure
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_RE_REVIEW**：依据 main 最新的 [PR18 三轮复审与 GT-H2.2.1 BJ 外部证据诚实性收口要求](design/A-share-analysis_PR18三轮复审与GT-H2.2.1_BJ外部证据诚实性收口要求_20260906.md)，收口 Reviewer 指出的 P0-03；保留已关闭的 STAR/ST 语义修正，不自行执行 review seal、批准或合并。
+- 采用 Reviewer 明确的首选低复杂度路径：从 v4 ACTIVE 和 review packet 删除 `GT-BJ-835185-CONTINUITY`、`GT-BJ-835185-2022`、`GT-BJ-920-SEGMENT` 三条 `golden_bj_mapping`；它们不是当前 Formal quantity hard gate，不为维持数量补 filler。
+- v3→v4 rebuild plan 仍逐条覆盖 123 条旧记录，操作变为 DROP 73 / REPLACE 50 / ADD 75；v4 当前为 125 条，类型为 ST 50、DELIST 20、LIMIT 30、corporate action 25，全部 `COMPILED`。三条 BJ mapping 只在 plan 中作为显式 DROP lineage 保留，未进入 ACTIVE、packet 或 registry。
+- 重建后的 ACTIVE v4 dataset SHA256 为 `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b`；`truth_manifest.json`、`truth_manifest_v4.json`、registry、rebuild plan、packet index 和报告已同步更新。报告明确将 old/new code 与 920 segment capability 延后到独立 Provider capability/Data Sufficiency 合同。
+- 新增回归证明 ACTIVE/packet 无 `golden_bj_mapping`、无 `GT-BJ-*`，不存在“expected 30% 但 source artifact 只证明 mapping/segment”的案例；`review_readiness_gate`、quantity、event coverage 通过，`production_formal_gate` 仅剩 `REVIEWED 0/125`。
+- 本地 GT-H2.2.1、H2/candidate、Golden truth/review、corporate-action/router 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向 mypy 通过。GitHub Actions run `337`（ID `34032603625`）已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三个平台全绿，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates。
+- 继续冻结：不运行 `review.py` final seal、GT-H3、Production B1–B7、Data Sufficiency、Provider capability decision、2020+ backfill、策略/回测/交易；账号、密码、IP、Token、真实端点、原始 SDK 输出和专有依赖不上传。
+
+**Next**
+
+- 本轮 v4/packet/plan/report、生成器、测试和管理记录已推送到 PR #18；run `337` 已完成包含 Reviewer 最新 main baseline 的三平台 required CI 全绿，现请独立 Reviewer 复审 GT-H2.2.1 P0-03。
+- 只有 Reviewer closure 后，才可进入 GT-H3 artifact bytes/hash binding、N/N reviewed seal 与 Formal gate；Provider capability/Data Sufficiency 继续冻结。
+
+## 2026-09-06 · GT-H2.2 semantic-evidence alignment
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_RE_REVIEW**：依据 main 新增的 [PR18 二轮复审与 GT-H2.2 语义证据对齐要求](design/A-share-analysis_PR18二轮复审与GT-H2.2语义证据对齐要求_20260906.md)，收口 Reviewer 指出的 P0-01 与 P1-02；本批不自行执行最终 review seal、批准或合并。
+- 限价制度来源选择已改为逐个显式 `event_id` 语义映射，并增加期望涨跌幅的 fail-closed 断言；`REGIME-STAR-20` 只绑定 STAR 上市前五个交易日后 20% 规则，`REGIME-ST-5` 只绑定 SSE/SZSE 风险警示 5% 规则，彻底移除会把 `REGIME-STAR-20` 误判为 ST 的子串分类。
+- 新增 adversarial 回归，直接证明 STAR 20% 与 ST 5% 的来源名称、来源定位、期望字段和 packet 行一致；128 条 packet 重新生成，ACTIVE v4 dataset SHA256 为 `5d063e314ea4b04623ecf19321f09931edb2d4b478f0df055262768e43d66ec0`，manifest、registry、rebuild plan、packet index 和报告已同步重建。
+- 北交所三条案例的 truth/checklist 已与 `golden_router.py::_validate_bj_mapping()` 实际可执行证明对齐：只声明历史 security master 存在、精确日期状态行、运行绑定的 BSE 限价制度与 provider price proof；不再把 validator 未消费的旧新代码连续性或 920 segment 语义写成强事实。
+- 本地 H2、candidate、Golden truth/review、corporate-action 及 GT-H2.2 adversarial 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向静态检查通过。新 head 的 GitHub Actions 尚待运行，故 CI 状态暂为 `CI_PENDING`。
+- Follow-up：run 333 的 Ubuntu、Windows 3.12、Windows 3.14 三个平台均在 pytest 收集阶段因新测试直接导入未随 wheel 打包的根目录 `scripts` 而报 `ModuleNotFoundError`；Ruff、mypy、其余步骤均成功。测试已改为按仓库路径加载 source-only 准备器，未扩大生产包边界；本地复测通过，修正 head 仍等待 CI。
+- Follow-up：修正后的 GitHub Actions run 334（Ubuntu 3.14、Windows 3.12、Windows 3.14）已全部成功，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates。
+- 正式 gate 仍只保留 `REVIEWED 0/128` 人工复核阻断；未运行 `review.py` final seal、GT-H3、Production B1–B7、Data Sufficiency、Provider capability、backfill、策略/回测/交易。
+- 未上传账号、密码、IP、Token、真实端点、原始 SDK 输出或专有依赖；本地 `vendor/` 继续只保留工作区依赖。
+
+**Next**
+
+- run 334 已完成三平台 required CI 全绿；现在请独立 Reviewer 复审 GT-H2.2 P0-01/P1-02，本批不自行批准或合并。
+- Reviewer closure 后，才按 GT-H3 绑定 exact artifact bytes/hash 并发布 reviewed version；Human Review、Formal Production、Provider capability、Data Sufficiency 和 backfill 继续冻结。
+
+## 2026-09-06 · GT-H2.1 source-quality and representativeness closure
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_RE_REVIEW**：按 [GT-H2.1 来源质量收口要求](design/A-share-analysis_PR18首轮复审与GT-H2.1来源质量收口要求_20260906.md) 修正 PR #18 首轮审阅指出的 P0-01、P1-02、P1-03；本批不自行执行最终 review seal、批准或合并。
+- 128 条 packet row 现在全部绑定到逐案官方 artifact 或精确规则版本；新增 `source_evidence_scope=CASE_SPECIFIC_OFFICIAL_ARTIFACT`，`fact_proved=true` 只允许在该范围内生成。生成器、finalize 和回归测试共同拒绝 BSE 首页、CNINFO disclosure root、SSE announcement root 与 SZSE generic rule directory 等 portal-only locator。
+- 20 条 DIVIDEND_EX_DATE 已改为发行人/交易所逐案利润分配实施公告，并修正为公告中的实际除权日；必要的 case ID 改动通过 rebuild plan 的显式 `allow_rekey=true` 保留旧源 ID 到新案例的 lineage。BSE 30%、ChiNext 10%/20%、STAR、SSE/SZSE 主板规则均改为精确官方规则/通知定位。
+- ST 仍保持 50 个独立结构事件与 ADD/REMOVE 两类，但以 7 条 SSE 增加事件和 1 条 STAR 撤销事件替换原 SZSE 子集；当前分布为 SSE 12 / SZSE 38、MAIN 32 / CHINEXT 15 / STAR 3、`ST_ADD=36`、`ST_REMOVE=11`、`STAR_ST_ADD=2`、`STAR_ST_REMOVE=1`。STAR 688500 的 2023-05-05 增加和 2024-06-11 撤销均使用逐案 SSE 公告。
+- 五条 RIGHT_ISSUE_EX_DATE 均为 2020+；`601555.SH / 20200323` 替换原 `002202.SZ / 20190329`，`000750.SZ / 20200114` 改用 2020-01-09 配股发行公告而非后续年报。
+- 本地 H2、candidate rekey、Golden truth/review、corporate-action 专项回归通过；Ruff check/format 与 candidate/H2 mypy 定向检查通过。正式 gate 仍只保留 `REVIEWED 0/128` 人工复核阻断；未运行 `review.py` final seal、Production B1–B7、Data Sufficiency、Provider capability、backfill、策略/回测/交易。
+- 未上传账号、密码、IP、Token、真实端点、原始 SDK 输出或专有依赖；本地 `vendor/` 仅保留工作区依赖。
+
+**Next**
+
+- GitHub Actions run 330（Ubuntu 3.14、Windows 3.12、Windows 3.14）已全部成功，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates；现在请独立 Reviewer 对 GT-H2.1 P0-01/P1-02/P1-03 复审，本批不自行批准或合并。
+- Reviewer closure 后，才按 GT-H3 绑定 exact artifact bytes/hash 并发布 reviewed version；Production、Data Sufficiency、Provider capability 和 backfill 继续冻结。
+
+## 2026-09-06 · GT-H2 clean Golden candidate construction
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_REVIEW**：依据 [GT-H2 Clean Golden Corpus 建设要求](design/A-share-analysis_GT-H1关闭与GT-H2_CleanGoldenCorpus建设要求_20260906.md)，以 main merge `5f76ad411801998de7bd3be7f26c880a73005853` 和不可变 v3 dataset SHA256 `ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e` 为源，生成显式 v3→v4 rebuild plan。
+- 计划逐条覆盖旧 v3 的 123 条记录：70 条结构性/重复样本 DROP，53 条制度、公司行动和北交所样本 REPLACE，新增 50 条带官方来源定位的 ST 事件、20 条带明确摘牌/终止生效日的 DELIST 事件和 5 条配股除权事件 ADD；旧 v1–v3 文件未改写。
+- 新 ACTIVE candidate 为 `v4-candidate-20260906`：128 条，ST 结构事件 50（ST_ADD 38、ST_REMOVE 12，含 STAR_ST_ADD），DELIST 20 个独立证券/日期，corporate action 25（DIVIDEND 20、RIGHT_ISSUE 5）。`GoldenTruthStore.load`、schema v2、结构门禁、`review_readiness_gate` 和 packet exact-coverage 均在本地通过。
+- 新增 `scripts/golden/gt_h2_prepare.py`、`docs/golden/gt_h2/official_fact_registry.json`、`rebuild_plan_v4.json`、`review_packet_index.jsonl`、`GT_H2_CORPUS_REPORT.md` 和 H2 专项测试。packet 只保存官方引用和审阅清单；未下载/提交原始网页或 PDF，未绑定 artifact hash，未设置 `REVIEWED`。
+- 本批只使用官方 SSE、SZSE、BSE/CNINFO 来源定位来准备候选事实；`fact_proved` 是 Agent 的来源检索标记，不等同于人工复核。正式 gate 仍明确只因 128 条均未 human-reviewed 而阻断，Production B1–B7、Data Sufficiency、Provider capability、2020+ backfill、策略/回测/交易均未启动。
+- 未上传账号、密码、Token、真实端点、原始 SDK 输出或本地专有依赖；本地 `vendor/` 供应商包继续只作工作区依赖，不进入提交。
+- Follow-up：CI run 323 的 Ubuntu leg 已完成 `1554 passed`，仅因本地快照与 GitHub main 的两个 JSON manifest 终端换行差异触发不可变哈希测试；`609a8df` 已将 manifest 绑定改为仓库规范表示，JSONL 数据集仍保持精确字节哈希，等待新 CI 完成。
+- Follow-up：run 325 证明后续文档提交不能满足逐提交 DEVLOG gate 对 `609a8df` 的历史要求；不改写既有分支历史，改从 `main@5f76ad4` 以单提交重建本候选，并在该提交中同时包含 H2 代码、数据、报告、测试和 DEVLOG。
+- GitHub Actions run 326（Ubuntu 3.14、Windows 3.12、Windows 3.14）已全部成功，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates；当前仅等待独立 Reviewer 逐条核验并执行后续人工 review seal。
+
+**Next**
+
+- 通过 GitHub 连接器将本批提交为独立 PR，等待三平台 required CI 与独立 Reviewer 审阅；本批不自行运行 `review.py` 最终封存、不批准、不合并。
+- Reviewer 需逐条绑定官方 artifact bytes/hash，核验 symbol、exchange/board、事件 subtype、effective date、corporate-action 类型和制度适用期；完成一次全量 human review 后再按 GT-H3 执行 reviewed seal、bound replay 和 Formal gate。
+
 ## 2026-09-06 · GT-H1.2 atomic complete review publication after PR16 second review
 
 **Implementation Status / Review Status**
