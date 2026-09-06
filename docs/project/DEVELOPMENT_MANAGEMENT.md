@@ -2,7 +2,7 @@
 
 ## DM-20260906-113 · GT-H3A Human Review bundle preparation
 
-**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
 **Review Status**：GT-H3A PREPARED / NOT SEALED / PENDING_HUMAN_REVIEW；本批不自行执行 Human Review、final seal、CLOSE 或 MERGE。
 **Authority**：main 最新 [GT-H2 关闭与 GT-H3 HumanReview 原子封印执行要求](../design/A-share-analysis_GT-H2关闭与GT-H3_HumanReview原子封印执行要求_20260906.md)。
 **Baseline**：main `9979a0545531010b6b71fefe1f5d465aab349991`；GT-H2 Reviewer closure `5125393678`。
@@ -18,13 +18,13 @@
 
 **Evidence separation**
 
-- 本地 GT-H3A 生成与定向回归、Ruff、py_compile 通过；当前新 head CI 尚未运行，故暂为 `CI_PENDING`。
+- 本地 GT-H3A 生成与定向回归、Ruff、py_compile 通过；GitHub Actions run `341`（Ubuntu 3.14、Windows 3.12、Windows 3.14）已全部通过，当前为 `CI_GREEN`。
 - `GT_H3_REVIEW_BUNDLE.md` 明确要求 Human Reviewer 核对 issuer、rule/document version、适用市场/日期、symbol、expected semantics 和 exact effective date；不一致时必须 `REJECT` 并退回 candidate governance。
 - 本批只准备索引和模板，不检索/提交 HTML/PDF，不创建 evidence/sha256，不填写 `REVIEWED`，不构造 seal manifest，不运行 GT-H3B、Formal Production、Data Sufficiency、Provider capability approval 或 backfill。
 
 **Required next work**
 
-1. 推送 GT-H3A bundle、index、decision template、准备器、回归测试和本管理记录到新的 GT-H3 PR，运行三平台 required CI。
+1. GT-H3A bundle、index、decision template、准备器、回归测试和本管理记录已推送到 PR #19；GitHub Actions run `341` 三平台 required CI 全部通过，下一步是交由真实 Owner/Human Reviewer 完成完整 125/125 审阅。
 2. 将 bundle 交给真实 Owner/Human Reviewer；必须得到完整 125/125 的显式授权和 human marker 后，才能进入 GT-H3B。
 3. GT-H3B 只能使用 `case`、`artifact`、`kind`、`note` 四类字段；证据 bytes 由现有 `review.py` 自行 hash，任何 truth correction 走 candidate correction，不得在 review 中修复。
 4. GT-H3 最终 head 必须通过 CI 并获得独立 Reviewer closure 后才能合并；在此之前 Formal Production B1–B7、Data Sufficiency、Provider capability approval、2020+ backfill 和策略/回测/交易继续冻结。
