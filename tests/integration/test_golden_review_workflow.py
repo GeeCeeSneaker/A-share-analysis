@@ -53,7 +53,7 @@ class TestReviewWorkflow:
         result = _run_review(
             golden_env,
             "--case",
-            "GT-ST-600518-20190506",
+            "GT-LIMIT-MAIN10-600519",
             "--artifact",
             str(art),
             "--kind",
@@ -65,7 +65,7 @@ class TestReviewWorkflow:
         )
         assert result.returncode == 0, result.stderr
         cases, manifest = GoldenTruthStore(golden_env).load()
-        case = next(c for c in cases if c.golden_case_id == "GT-ST-600518-20190506")
+        case = next(c for c in cases if c.golden_case_id == "GT-LIMIT-MAIN10-600519")
         assert case.review_status == "REVIEWED"
         assert case.reviewed_by == "alice"
         assert case.compiled_by  # compiled provenance preserved
@@ -89,7 +89,7 @@ class TestReviewWorkflow:
         art = _make_artifact(golden_env, "kangmei", "snapshot")
         args = (
             "--case",
-            "GT-ST-600518-20190506",
+            "GT-LIMIT-MAIN10-600519",
             "--artifact",
             str(art),
             "--kind",
@@ -106,7 +106,7 @@ class TestReviewWorkflow:
         result = _run_review(
             golden_env,
             "--case",
-            "GT-ST-600518-20190506",
+            "GT-LIMIT-MAIN10-600519",
             "--artifact",
             str(golden_env / "nonexistent.txt"),
             "--kind",
@@ -116,6 +116,22 @@ class TestReviewWorkflow:
         )
         assert result.returncode != 0
         assert "does not exist" in result.stderr
+
+    def test_review_refuses_incomplete_structural_case(self, golden_env: Path):
+        art = _make_artifact(golden_env, "incomplete-st", "snapshot")
+        result = _run_review(
+            golden_env,
+            "--case",
+            "GT-ST-600518-20190506",
+            "--artifact",
+            str(art),
+            "--kind",
+            "SSE_ANNOUNCEMENT",
+            "--reviewer",
+            "alice",
+        )
+        assert result.returncode != 0
+        assert "event_effective_date" in result.stderr
 
 
 class TestFormalArtifactGate:
@@ -127,7 +143,7 @@ class TestFormalArtifactGate:
             _run_review(
                 golden_env,
                 "--case",
-                "GT-ST-600518-20190506",
+                "GT-LIMIT-MAIN10-600519",
                 "--artifact",
                 str(art),
                 "--kind",
@@ -139,7 +155,7 @@ class TestFormalArtifactGate:
         )
         # tamper the stored artifact after sealing
         cases, _ = GoldenTruthStore(golden_env).load()
-        case = next(c for c in cases if c.golden_case_id == "GT-ST-600518-20190506")
+        case = next(c for c in cases if c.golden_case_id == "GT-LIMIT-MAIN10-600519")
         stored = golden_env / "evidence" / case.source_artifact_ref
         stored.write_text("TAMPERED different bytes", encoding="utf-8")
         problems = GoldenTruthStore(golden_env).review_gate()
@@ -154,7 +170,7 @@ class TestFormalArtifactGate:
             for x in dataset_path.read_text(encoding="utf-8").splitlines()
             if x.strip()
         ]
-        doc = next(d for d in lines if d["golden_case_id"] == "GT-ST-600518-20190506")
+        doc = next(d for d in lines if d["golden_case_id"] == "GT-LIMIT-MAIN10-600519")
         doc["review_status"] = "REVIEWED"
         doc["reviewed_by"] = "hand-edit"
         doc["reviewed_at"] = "2026-08-22T00:00:00+00:00"
@@ -212,13 +228,13 @@ class TestReviewGateAllCases:
             json.dumps(
                 [
                     {
-                        "case": "GT-ST-600518-20190506",
+                        "case": "GT-LIMIT-MAIN10-600519",
                         "artifact": str(art1),
                         "kind": "SSE_ANNOUNCEMENT",
                         "note": "n1",
                     },
                     {
-                        "case": "GT-ST-600518-20190603",
+                        "case": "GT-LIMIT-MAIN10-600036",
                         "artifact": str(art2),
                         "kind": "SSE_ANNOUNCEMENT",
                         "note": "n2",
@@ -242,7 +258,7 @@ class TestReviewGateAllCases:
         self._review_two(golden_env)
         # tamper the SECOND artifact only
         cases, _ = GoldenTruthStore(golden_env).load()
-        second = next(c for c in cases if c.golden_case_id == "GT-ST-600518-20190603")
+        second = next(c for c in cases if c.golden_case_id == "GT-LIMIT-MAIN10-600036")
         stored = golden_env / "evidence" / second.source_artifact_ref
         stored.write_text("TAMPERED", encoding="utf-8")
         problems = GoldenTruthStore(golden_env).review_gate()
@@ -251,7 +267,7 @@ class TestReviewGateAllCases:
     def test_first_artifact_valid_later_missing_blocks(self, golden_env: Path):
         self._review_two(golden_env)
         cases, _ = GoldenTruthStore(golden_env).load()
-        second = next(c for c in cases if c.golden_case_id == "GT-ST-600518-20190603")
+        second = next(c for c in cases if c.golden_case_id == "GT-LIMIT-MAIN10-600036")
         (golden_env / "evidence" / second.source_artifact_ref).unlink()
         problems = GoldenTruthStore(golden_env).review_gate()
         assert any("does not resolve" in p for p in problems)
@@ -261,7 +277,7 @@ class TestReviewGateAllCases:
         batch = golden_env.parent / "bad_batch.json"
         batch.write_text(
             json.dumps(
-                [{"case": "GT-ST-600518-20190506", "artifact": str(art), "kind": "FAKE_KIND"}]
+                [{"case": "GT-LIMIT-MAIN10-600519", "artifact": str(art), "kind": "FAKE_KIND"}]
             ),
             encoding="utf-8",
         )
@@ -278,12 +294,12 @@ class TestReviewGateAllCases:
             json.dumps(
                 [
                     {
-                        "case": "GT-ST-600518-20190506",
+                        "case": "GT-LIMIT-MAIN10-600519",
                         "artifact": str(art1),
                         "kind": "SSE_ANNOUNCEMENT",
                     },
                     {
-                        "case": "GT-ST-600518-20190603",
+                        "case": "GT-LIMIT-MAIN10-600036",
                         "artifact": str(art2),
                         "kind": "SSE_ANNOUNCEMENT",
                     },
@@ -331,20 +347,20 @@ class TestReviewProvenanceCompleteness:
         )
 
     def test_missing_reviewer_fails_load(self, golden_env: Path):
-        self._hand_seal_reviewed(golden_env, "GT-ST-600518-20190506", {"reviewed_by": ""})
+        self._hand_seal_reviewed(golden_env, "GT-LIMIT-MAIN10-600519", {"reviewed_by": ""})
         with pytest.raises(Exception, match="reviewed_by is empty"):
             GoldenTruthStore(golden_env).load()
 
     def test_bad_kind_fails_load(self, golden_env: Path):
         self._hand_seal_reviewed(
-            golden_env, "GT-ST-600518-20190506", {"source_artifact_kind": "MYSTERY"}
+            golden_env, "GT-LIMIT-MAIN10-600519", {"source_artifact_kind": "MYSTERY"}
         )
         with pytest.raises(Exception, match="not in allowlist"):
             GoldenTruthStore(golden_env).load()
 
     def test_short_hash_fails_load(self, golden_env: Path):
         self._hand_seal_reviewed(
-            golden_env, "GT-ST-600518-20190506", {"source_artifact_hash": "abc"}
+            golden_env, "GT-LIMIT-MAIN10-600519", {"source_artifact_hash": "abc"}
         )
         with pytest.raises(Exception, match="64-hex"):
             GoldenTruthStore(golden_env).load()
@@ -388,7 +404,7 @@ class TestArtifactPathConfinement:
             for x in dataset_path.read_text(encoding="utf-8").splitlines()
             if x.strip()
         ]
-        doc = next(d for d in lines if d["golden_case_id"] == "GT-ST-600518-20190506")
+        doc = next(d for d in lines if d["golden_case_id"] == "GT-LIMIT-MAIN10-600519")
         doc.update(
             {
                 "review_status": "REVIEWED",
@@ -423,7 +439,7 @@ class TestVersionImmutability:
         result = _run_review(
             golden_env,
             "--case",
-            "GT-ST-600518-20190506",
+            "GT-LIMIT-MAIN10-600519",
             "--artifact",
             str(art),
             "--kind",

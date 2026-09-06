@@ -184,21 +184,21 @@ class TestReviewGate:
 class TestEventCoverageGate:
     def test_negative_st_samples_do_not_count_as_st_transition_events(self):
         _, manifest = GoldenTruthStore(REPO_GOLDEN).load()
-        # 40 negative ROWS but only 8 distinct negative-sample events;
-        # neither counts toward ST_CAP (which is honestly 2)
+        # Negative rows do not count toward ST_CAP.  Legacy ST rows have no
+        # explicit effective date, so strict structural recomputation returns
+        # zero rather than borrowing trade_date.
         assert manifest.distinct_events.get("NEGATIVE_SAMPLE", 0) == 8
-        assert manifest.distinct_events.get("ST_TRANSITION", 0) == 2  # honest count
+        assert manifest.distinct_events.get("ST_TRANSITION", 0) == 0
 
     def test_st_gate_requires_distinct_transition_events(self):
-        """Structural identity (audit section 14): the 10 ST rows over 2
-        real events (state-sampled dates) collapse to 10 distinct
-        (symbol, effective_date) identities - still far below 50."""
+        """Legacy ST rows cannot use trade_date as event_effective_date."""
         problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
-        assert any("ST_TRANSITION events 10 < 50" in p for p in problems)
+        assert any("ST_TRANSITION events 0 < 50" in p for p in problems)
+        assert any("event_effective_date" in p for p in problems)
 
     def test_delist_gate_requires_distinct_securities(self):
-        """Structural identities (10 symbols x 2 dates = 20) pass the event
-        count, but the distinct-SYMBOL gate still blocks at 10."""
+        """Missing effective dates block DELIST event coverage; the symbol
+        diagnostic remains independently visible."""
         problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
         assert any("distinct delisted securities 10 < 20" in p for p in problems)
 
@@ -309,7 +309,7 @@ class TestBoundGoldenResolver:
                 "--root",
                 str(golden_env),
                 "--case",
-                "GT-ST-600518-20190506",
+                "GT-LIMIT-MAIN10-600519",
                 "--artifact",
                 str(art),
                 "--kind",

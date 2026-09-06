@@ -28,10 +28,19 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from ashare_state.spike.golden_store import VALID_ARTIFACT_KINDS  # noqa: E402
+from ashare_state.spike.golden_store import (  # noqa: E402
+    VALID_ARTIFACT_KINDS,
+    GoldenTruthError,
+    StructuralEventError,
+    cases_from_dataset_bytes,
+    recompute_manifest_statistics,
+    semantic_hash_for_doc,
+    validate_structural_event_fields,
+)
 
 GOLDEN_ROOT = Path("data/golden/provider/amazingdata")
 EVIDENCE_DIR = GOLDEN_ROOT / "evidence"
@@ -73,22 +82,7 @@ def _load_active() -> tuple[Path, dict, list[dict]]:
 
 
 def _semantic_hash(doc: dict) -> str:
-    statement = json.dumps(
-        {
-            "golden_case_id": doc["golden_case_id"],
-            "case_type": doc["case_type"],
-            "provider_symbol": doc["provider_symbol"],
-            "trade_date": doc["trade_date"],
-            "expected_fields": doc["expected_fields"],
-            "truth_source": doc["truth_source"],
-            "source_ref": doc["source_ref"],
-            "source_artifact_hash": doc.get("source_artifact_hash", ""),
-            "truth_version": doc["truth_version"],
-        },
-        sort_keys=True,
-        ensure_ascii=False,
-    )
-    return hashlib.sha256(statement.encode("utf-8")).hexdigest()
+    return semantic_hash_for_doc(doc)
 
 
 # ---------------------------------------------------------------- staging
@@ -131,6 +125,18 @@ def _apply_review(
         if doc["review_status"] != "COMPILED":
             msg = f"case {case_id} is already {doc['review_status']}"
             raise ReviewError(msg)
+        try:
+            validate_structural_event_fields(
+                case_id=case_id,
+                event_class=doc.get("event_class", ""),
+                provider_symbol=doc.get("provider_symbol"),
+                event_subtype=doc.get("event_subtype", ""),
+                event_effective_date=doc.get("event_effective_date", ""),
+            )
+        except StructuralEventError as exc:
+            raise ReviewError(
+                f"case {case_id}: incomplete structural event; review cannot promote it: {exc}"
+            ) from exc
         if expect_fields is not None:
             doc["expected_fields"] = expect_fields
         doc["source_artifact_ref"] = artifact_ref
@@ -185,11 +191,14 @@ def _create_only_write(path: Path, data: bytes) -> None:
 def _atomic_active_pointer(manifest: dict) -> None:
     """Move the ACTIVE pointer via staging + atomic replace."""
     active_path = GOLDEN_ROOT / "truth_manifest.json"
-    staging = active_path.with_suffix(".json.tmp")
-    staging.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n"
-    )
-    staging.replace(active_path)
+    staging = active_path.with_name(f".{active_path.name}.{uuid4().hex}.tmp")
+    try:
+        staging.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n"
+        )
+        staging.replace(active_path)
+    finally:
+        staging.unlink(missing_ok=True)
 
 
 def _write_new_version(lines: list[dict], old_active: dict) -> str:
@@ -202,25 +211,27 @@ def _write_new_version(lines: list[dict], old_active: dict) -> str:
         doc["case_semantic_hash"] = _semantic_hash(doc)
     dataset_file = f"golden_cases_{truth_version.split('-')[0]}.jsonl"
     payload = "".join(json.dumps(c, ensure_ascii=False, sort_keys=True) + "\n" for c in lines)
+    try:
+        cases = cases_from_dataset_bytes(payload.encode("utf-8"), truth_version)
+    except GoldenTruthError as exc:
+        raise ReviewError(f"reviewed dataset failed loader self-validation: {exc}") from exc
     dataset_path = GOLDEN_ROOT / dataset_file
     _create_only_write(dataset_path, payload.encode("utf-8"))
-    dataset_hash = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
-
-    counts: dict[str, int] = {}
-    review: dict[str, int] = {}
-    events: dict[str, set[str]] = {}
-    for c in lines:
-        counts[c["case_type"]] = counts.get(c["case_type"], 0) + 1
-        review[c["review_status"]] = review.get(c["review_status"], 0) + 1
-        events.setdefault(c["event_class"], set()).add(c["event_id"])
+    dataset_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    stats = recompute_manifest_statistics(cases)
     manifest = {
+        "manifest_schema": 2,
         "truth_version": truth_version,
         "dataset_file": dataset_file,
         "dataset_hash": dataset_hash,
-        "case_count": len(lines),
-        "counts_by_type": counts,
-        "review_summary": review,
-        "distinct_events": {k: len(v) for k, v in events.items()},
+        "case_count": stats["case_count"],
+        "counts_by_type": stats["counts_by_type"],
+        "review_summary": stats["review_summary"],
+        "distinct_events": stats["distinct_events"],
+        "distinct_securities": stats["distinct_securities"],
+        "st_add_events": stats["st_add_events"],
+        "st_remove_events": stats["st_remove_events"],
+        "distinct_delisted_securities": stats["distinct_delisted_securities"],
     }
     manifest_file = GOLDEN_ROOT / f"truth_manifest_{truth_version.split('-')[0]}.json"
     _create_only_write(

@@ -59,6 +59,47 @@ uv run python scripts/spike/spike_runner.py --trial --date <as-of>
 
 Trial 与 dry-run 的目录、身份和证据必须与 Production 物理隔离。
 
+### 2.4 Golden Truth GT-H1 重建门禁
+
+正式 Production、Golden backfill 和 Data Sufficiency 在 GT-H1/H2/H3 完成前均不得启动。现有 v3 candidate 的 ST/DELIST 记录中，部分只有观察日，没有可验证的结构事件生效日；它们可以被旧 loader 读取，但不能通过 Formal gate，也不能被 review workflow 提升为 `REVIEWED`。
+
+候选重建必须显式绑定当前 ACTIVE 的 `truth_version` 和 dataset SHA256，并为每一条源记录提供且只提供一个操作：`KEEP`、`REPLACE` 或 `DROP`；新事实只能使用 `ADD`。`REPLACE`/`ADD` 必须带完整 COMPILED candidate，结构化 ST/DELIST 必须提供严格 `YYYYMMDD` 的 `event_effective_date`。同一 `(provider_symbol, event_effective_date, event_subtype)` 或 `(provider_symbol, event_effective_date)` 重复时，重建失败闭环。
+
+计划示例（占位值必须由本地 ACTIVE manifest 读取，不得手填或上传秘密）：
+
+```json
+{
+  "source_truth_version": "v3-candidate-20260822",
+  "source_dataset_hash": "<sha256-from-truth_manifest.json>",
+  "operations": [
+    {"op": "DROP", "golden_case_id": "<legacy-structural-case>"},
+    {"op": "REPLACE", "golden_case_id": "<case-id>", "case": {
+      "golden_case_id": "<case-id>",
+      "case_type": "golden_st_transition",
+      "provider_symbol": "600000.SH",
+      "trade_date": "20240102",
+      "truth_source": "<traceable official source>",
+      "source_ref": "<source reference>",
+      "expected_fields": {"IS_ST_SEC": true},
+      "event_id": "<source alias>",
+      "event_class": "ST_TRANSITION",
+      "event_subtype": "ST_ADD",
+      "event_effective_date": "20240101"
+    }},
+    {"op": "KEEP", "golden_case_id": "<non-structural-case>"},
+    {"op": "ADD", "case": {"<same candidate fields>": "<verified values>"}}
+  ]
+}
+```
+
+执行前先运行 `validate` 检查 staged candidates；发布使用：
+
+```powershell
+uv run python scripts/golden/candidate.py --root data/golden/provider/amazingdata rebuild --plan <plan.json>
+```
+
+`build-version` 已禁用，因为隐式追加无法删除或替换结构错误的旧行。重建工具会先在内存中校验全部输出、manifest 统计和 semantic hash，再 create-only 写入新版本，最后原子移动 `truth_manifest.json`；任何计划或输出校验失败都不得改变 ACTIVE 指针。新版本只产生 `COMPILED`，人工证据绑定仍由 `review.py` 完成。
+
 ## 3. L1 实时订阅（任务书 §1.2，必须交易时段）
 
 ```powershell

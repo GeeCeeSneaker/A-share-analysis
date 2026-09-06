@@ -1,75 +1,33 @@
-## DM-20260905-151 · T3 CI corrective follow-up（当前修正）
-
-**Type**：C0 — T3 phase-contract regression correction  
-**Date**：2026-09-05  
-**Status**：**IMPLEMENTED / LOCAL_TARGETED_VERIFIED / CI_PENDING / PENDING_REVIEW**  
-**Trigger**：PR #14 Actions run 306 Ubuntu Python 3.14 pytest failed because the pre-T3 H1 test still required an empty production identity.  
-**Correction**：测试现校验 Windows 3.14、Windows 3.12、Ubuntu 3.14 三腿 required 及 T3 exact config allowlist（`UNKNOWN_24e2ff401792` / `2026-09-05T22:19:58+08:00` / `project-owner`）。  
-**Scope**：不改变 Provider、identity parser、生产 runner 或 B1-B7 语义；不引入凭证、endpoint、Token、raw profile 或 raw SDK output。  
-**Evidence**：本地 focused H1 / production-identity tests 101 passed；PR #14 新 head 的完整三平台 CI 待验证。
-
-**Gate**
-
-T3 仍需独立 Reviewer 审阅、三平台 required CI 全绿并合并；在此之前不得启动 Formal Production B1-B7、Data Sufficiency、verdict、Provider capability approval 或 backfill。
-
----
-
-## DM-20260905-150 · T2 confirmed / T3 identity-freeze proposal（当前权威，覆盖下方历史状态）
-
-**Type**：C2 — human-confirmed production identity governance  
-**Date**：2026-09-05  
-**Status**：**T2_CONFIRMED / T3_PR_OPEN / PENDING_REVIEW / FORMAL_B1-B7_BLOCKED**  
-**Authority**：[T1/T2/T3 执行要求](../design/A-share-analysis_AUDIT-H1关闭与T1正式线上身份候选执行要求_20260905.md)  
-**T1 evidence**：[T1 脱敏证据](../provider_verification/t1_bootstrap_20260905.md)（PR #13 已合并）  
-**Current main**：`df78ad984de3817bb55b480372eef0a8f786dc99`
-
-### Confirmed facts
-
-- 项目 Owner 已确认 exact scrubbed identity `UNKNOWN_24e2ff401792` 对应计划使用的正式账号；confirmed_at 为 `2026-09-05T22:19:58+08:00`，confirmed_by 为 `project-owner`。
-- T1 的 `IDENTITY_CANDIDATE`、`RUNTIME_ACTUAL_LOAD_VERIFIED`、`AUTHENTICATED=YES`、`QUERY_READY=YES` 与 numeric entitlement evidence 已在前一治理批次记录。
-- T1 证据 PR #13 的三平台 required CI run 304（`33969635047`）全部成功；本 T3 仍需独立验证。
-
-### T3 change set
-
-- `configs/production_account.yaml` 仅包含 `production_account_profile_id`、`confirmed_at`、`confirmed_by` 三个字段；profile ID 与 T1 候选字节级一致。
-- 本 PR 不 trim、不做大小写归一化、不引入 alias，不增加其它 config keys。
-- 同批同步 Provider verification、DEVLOG 与本总册；不写入凭证、Token、真实 endpoint、raw profile、raw SDK 输出或本地 bootstrap 文件。
-
-### Gate / next
-
-T3 在独立 Reviewer 审阅、Windows 3.14 / Windows 3.12 / Ubuntu 3.14 required CI 全绿并合并前，不构成 production identity freeze。Formal Production B1-B7、Data Sufficiency、verdict、Provider capability approval 和 backfill 继续 blocked。T3 合并后才按文档启动单一受治理 Production run。
-
-
----
-
-## DM-20260905-149 · T1 controlled online bootstrap candidate（当前权威，覆盖下方历史状态）
-
-**Type**：C2 — controlled production identity qualification  
-**Date**：2026-09-05  
-**Status**：**IDENTITY_CANDIDATE / PENDING_T2 / CONFIG_EMPTY / FORMAL_B1-B7_BLOCKED**  
-**Authority**：[AUDIT-H1 关闭与 T1 执行要求](../design/A-share-analysis_AUDIT-H1关闭与T1正式线上身份候选执行要求_20260905.md)  
-**Source binding**：源码树 `6671c6e388163b9cb15137f716247b36d0290cc4` 已随 merge commit `c9787d243be5ca02a46496e38d5401fbf38a255b` 进入当前 main；当前 main `9b08d40b4318dbd6a7784a14a9e86a743374713f`。  
-**Evidence**：[T1 脱敏证据](../provider_verification/t1_bootstrap_20260905.md)
-
-### Current verified facts
-
-- Controlled Windows Python 3.14.6 successfully loaded AmazingData 1.1.9 / tgw 1.0.9.2; runtime verdict is `RUNTIME_ACTUAL_LOAD_VERIFIED`.
-- The single controlled T1 bootstrap returned `NETWORK_REACHABLE=REACHABLE`, `AUTHENTICATED=YES`, `QUERY_READY=YES`, parsed profile and verified numeric entitlement evidence.
-- The only candidate is the scrubbed generated ID `UNKNOWN_24e2ff401792`; `production_identity_status=NOT_FROZEN`, `config_written=false`, and `human_confirmation_required=true`.
-- `configs/production_account.yaml` remains empty. No raw credentials, endpoint, Token, profile, SDK output or local bootstrap file is repository evidence.
-
-### Gate
-
-T1 is complete and stopped at its truthful terminal result. T2 is now the blocking human decision: Owner/Reviewer must confirm the exact scrubbed ID outside SDK inference. Until then, T3 identity freeze, formal Production B1-B7, Data Sufficiency, verdict, Provider capability approval and backfill remain blocked.
-
-### Next
-
-Review this focused T1 evidence PR; after explicit T2 confirmation, create a separate T3 identity-freeze PR containing only the exact confirmed ID and required timezone-aware human confirmation fields.
-
-
----
-
 # A-share-analysis 开发管理总册（Development Management）
+
+## DM-20260906-106 · GT-H1 Golden Truth structural identity / rebuild toolchain
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_FINAL_CI
+**Review Status**：PENDING_REVIEW；本批不自行 CLOSE / MERGE。
+**Base SHA**：`8f2ccb52a5ed2a58ef916a16a9c7e756173b08fd`
+**Authority**：[PR15 关闭与 GoldenTruth 重建工作要求](../design/A-share-analysis_PR15关闭与GoldenTruth重建工作要求_20260906.md)；GT-H1。
+**Gate**：GT-H1 完成三平台 required CI 与 Reviewer closure 前，GT-H2 reviewed corpus、Formal Production、Data Sufficiency 和 2020+ backfill 均保持冻结。
+
+| 管理要求 | 本批实现 / 验证位置 | 状态 |
+|---|---|---|
+| 显式 ST/DELIST effective date，禁止 trade_date fallback | `src/ashare_state/spike/golden_store.py`；Golden gate/candidate tests | IMPLEMENTED / focused PASS |
+| Structural identity 与 free-form event_id 解耦 | `st_event_identity`、`delist_event_identity`、`recompute_structural_statistics` | IMPLEMENTED / focused PASS |
+| 追加式 clean rebuild，显式 KEEP/REPLACE/DROP/ADD | `scripts/golden/candidate.py rebuild --plan` | IMPLEMENTED / focused PASS |
+| create-only dataset/manifest 与 ACTIVE 原子发布 | candidate rebuild preflight/self-validation；rebuild failure tests | IMPLEMENTED / focused PASS |
+| schema v2 manifest honesty | structural counts、ADD/REMOVE、DELIST securities row-level recomputation | IMPLEMENTED / focused PASS |
+| Review 不得提升不完整结构事件 | `scripts/golden/review.py`；incomplete-case regression | IMPLEMENTED / focused PASS |
+
+**Evidence separation**
+
+- 本地定向 Golden 回归 56 passed；Ruff 与 `golden_store.py` mypy 定向检查通过。
+- 最终三平台完整 pytest、Ruff/format/mypy、Spike、SDK-absent 和治理门禁必须以本批 PR head 的 GitHub Actions 为权威；当前不预填成功结论。
+- v3 candidate 文件未被改写；本批没有新增 Golden 事实、账号信息或专有依赖，Formal Production 仍按 PR15 记录为 NOT AUTHORIZED。
+
+**Required next work**
+
+1. 由 GitHub Actions 完成三平台 required CI，并由独立 Reviewer 审阅 focused PR；合并前不运行真实 T1。
+2. 合并后按 GT-H2 重建真实 reviewed corpus：只使用可回溯来源填写有效 `event_effective_date`，不得用 `trade_date` 或自由 `event_id` 补数。
+3. GT-H3 完成 reviewed version seal、bound replay 与 Formal gate 复核后，才能重新评估 Production 和 Data Sufficiency。
 
 ## DM-20260905-148 · AUDIT-H1 当前整改状态（覆盖下方历史头部）
 
@@ -101,6 +59,7 @@ Review this focused T1 evidence PR; after explicit T2 confirmation, create a sep
 最终 head 全量三平台 CI 通过后交 Reviewer；合并前不恢复 T1，不通过整改 PR 冻结身份。其他 REV 按对应 recovery/history/unattended/scale/replay gate 另行推进。
 
 ---
+
 
 > **仓库固定路径（MUST NOT RENAME）**：`docs/project/DEVELOPMENT_MANAGEMENT.md`  
 > **文档性质**：长期持续维护的项目级“当前设计 + 当前状态 + 开发计划 + 变更控制”总册  

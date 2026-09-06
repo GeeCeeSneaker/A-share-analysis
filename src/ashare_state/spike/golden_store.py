@@ -16,7 +16,8 @@ R4-A2 additions over R4-A1.1 (review sections 5-12):
 - ST event semantics: ST_TRANSITION with subtypes (ST_ADD/ST_REMOVE/
   STAR_ST_ADD/STAR_ST_REMOVE); gate requires >=50 distinct events AND
   ADD>0 AND REMOVE>0.
-- Delist gate: distinct event_id >= 20 AND distinct provider_symbol >= 20.
+- Delist gate: distinct structural (provider_symbol, event_effective_date)
+  identities >= 20 AND distinct provider_symbol >= 20.
 - SpikeRun field renamed golden_dataset_hash (review section 11, option A).
 """
 
@@ -24,9 +25,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from ashare_state.spike.validators import GoldenCase
 
@@ -48,17 +51,113 @@ REQUIRED_DISTINCT_EVENTS = {
 }
 ST_ADD_SUBTYPES = ("ST_ADD", "STAR_ST_ADD")
 ST_REMOVE_SUBTYPES = ("ST_REMOVE", "STAR_ST_REMOVE")
+VALID_ST_SUBTYPES = frozenset((*ST_ADD_SUBTYPES, *ST_REMOVE_SUBTYPES))
+
+
+class StructuralEventError(ValueError):
+    """A structural ST/DELIST identity is incomplete or malformed."""
+
+
+def validate_event_effective_date(
+    value: object,
+    *,
+    case_id: str,
+    event_class: str,
+) -> str:
+    """Require an explicit, calendar-valid ``YYYYMMDD`` effective date.
+
+    ``trade_date`` is deliberately not accepted as a substitute.  The
+    historical v1-v3 files remain loadable for audit/replay, but their
+    incomplete structural rows are rejected by the Formal event gate and by
+    the new candidate/review workflows.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise StructuralEventError(
+            f"{case_id}: {event_class} requires a non-empty event_effective_date"
+        )
+    effective = value.strip()
+    if effective != value or len(effective) != 8 or not effective.isdigit():
+        raise StructuralEventError(
+            f"{case_id}: {event_class} event_effective_date must be YYYYMMDD"
+        )
+    try:
+        datetime.strptime(effective, "%Y%m%d")
+    except ValueError as exc:
+        raise StructuralEventError(
+            f"{case_id}: {event_class} event_effective_date is not a valid calendar date"
+        ) from exc
+    return effective
+
+
+def validate_structural_event_fields(
+    *,
+    case_id: str,
+    event_class: str,
+    provider_symbol: object,
+    event_subtype: object,
+    event_effective_date: object,
+) -> None:
+    """Validate the fields that define a structural event identity."""
+    if not isinstance(event_class, str) or event_class not in {"ST_TRANSITION", "DELIST"}:
+        return
+    if (
+        not isinstance(provider_symbol, str)
+        or not provider_symbol.strip()
+        or provider_symbol != provider_symbol.strip()
+    ):
+        raise StructuralEventError(f"{case_id}: {event_class} requires a non-empty provider_symbol")
+    if event_class == "ST_TRANSITION" and (
+        not isinstance(event_subtype, str) or event_subtype not in VALID_ST_SUBTYPES
+    ):
+        raise StructuralEventError(
+            f"{case_id}: ST_TRANSITION requires event_subtype in {sorted(VALID_ST_SUBTYPES)}"
+        )
+    validate_event_effective_date(
+        event_effective_date,
+        case_id=case_id,
+        event_class=event_class,
+    )
 
 
 def st_event_identity(case: GoldenCase) -> tuple[str, str, str]:
     """Structural ST event identity (audit section 14): the free-form
     event_id string can never inflate the count - identity is
     (provider_symbol, event_effective_date, event_subtype)."""
-    return (case.provider_symbol, case.event_effective_date or case.trade_date, case.event_subtype)
+    if case.event_class != "ST_TRANSITION":
+        raise StructuralEventError(
+            f"{case.golden_case_id}: st_event_identity requires ST_TRANSITION"
+        )
+    effective = validate_event_effective_date(
+        case.event_effective_date,
+        case_id=case.golden_case_id,
+        event_class=case.event_class,
+    )
+    validate_structural_event_fields(
+        case_id=case.golden_case_id,
+        event_class=case.event_class,
+        provider_symbol=case.provider_symbol,
+        event_subtype=case.event_subtype,
+        event_effective_date=case.event_effective_date,
+    )
+    return (case.provider_symbol, effective, case.event_subtype)
 
 
 def delist_event_identity(case: GoldenCase) -> tuple[str, str]:
-    return (case.provider_symbol, case.event_effective_date or case.trade_date)
+    if case.event_class != "DELIST":
+        raise StructuralEventError(f"{case.golden_case_id}: delist_event_identity requires DELIST")
+    effective = validate_event_effective_date(
+        case.event_effective_date,
+        case_id=case.golden_case_id,
+        event_class=case.event_class,
+    )
+    validate_structural_event_fields(
+        case_id=case.golden_case_id,
+        event_class=case.event_class,
+        provider_symbol=case.provider_symbol,
+        event_subtype=case.event_subtype,
+        event_effective_date=case.event_effective_date,
+    )
+    return (case.provider_symbol, effective)
 
 
 class GoldenTruthError(RuntimeError):
@@ -75,6 +174,10 @@ class GoldenManifest:
     review_summary: dict[str, int]
     distinct_events: dict[str, int]
     distinct_securities: dict[str, int]
+    manifest_schema: int = 1
+    st_add_events: int = 0
+    st_remove_events: int = 0
+    distinct_delisted_securities: int = 0
 
     @property
     def quantities_complete(self) -> bool:
@@ -128,42 +231,16 @@ class GoldenTruthStore:
             msg = "golden dataset hash mismatch vs the ACTIVE manifest pointer"
             raise GoldenTruthError(msg)
 
-        cases: list[GoldenCase] = []
-        seen_ids: set[str] = set()
         truth_version = str(active["truth_version"])
-        for line in dataset_bytes.decode("utf-8").splitlines():
-            if not line.strip():
-                continue
-            doc = json.loads(line)
-            golden = _case_from_doc(doc, truth_version)
-            expected = hashlib.sha256(_semantic_statement(golden).encode("utf-8")).hexdigest()
-            if golden.case_semantic_hash != expected:
-                msg = (
-                    f"golden case {golden.golden_case_id}: case_semantic_hash "
-                    "mismatch (entry edited without re-sealing)"
-                )
-                raise GoldenTruthError(msg)
-            if golden.golden_case_id in seen_ids:
-                msg = f"duplicate golden_case_id {golden.golden_case_id}"
-                raise GoldenTruthError(msg)
-            seen_ids.add(golden.golden_case_id)
-            cases.append(golden)
+        cases = cases_from_dataset_bytes(dataset_bytes, truth_version)
 
         # P0-01: manifest statistics RECOMPUTED from cases (self-verification)
-        actual_count = len(cases)
-        actual_counts: dict[str, int] = {}
-        actual_review: dict[str, int] = {}
-        event_ids_by_class: dict[str, set[str]] = {}
-        actual_securities: dict[str, int] = {}
-        for case in cases:
-            actual_counts[case.case_type] = actual_counts.get(case.case_type, 0) + 1
-            actual_review[case.review_status] = actual_review.get(case.review_status, 0) + 1
-            if case.event_class and case.event_id:
-                event_ids_by_class.setdefault(case.event_class, set()).add(case.event_id)
-            actual_securities[case.provider_symbol] = (
-                actual_securities.get(case.provider_symbol, 0) + 1
-            )
-        actual_events = {k: len(v) for k, v in event_ids_by_class.items()}
+        stats = recompute_manifest_statistics(cases)
+        actual_count = int(stats["case_count"])
+        actual_counts = stats["counts_by_type"]
+        actual_review = stats["review_summary"]
+        actual_events = stats["distinct_events"]
+        actual_securities = stats["distinct_securities"]
         if active.get("case_count") != actual_count:
             msg = f"manifest case_count {active.get('case_count')} != recomputed {actual_count}"
             raise GoldenTruthError(msg)
@@ -174,6 +251,13 @@ class GoldenTruthStore:
             msg = "manifest review_summary != recomputed summary (P0-01 tamper)"
             raise GoldenTruthError(msg)
 
+        try:
+            manifest_schema = int(active.get("manifest_schema", 1))
+        except (TypeError, ValueError) as exc:
+            raise GoldenTruthError("manifest_schema must be an integer") from exc
+        if manifest_schema >= 2:
+            _verify_structural_manifest_fields(active, stats)
+
         manifest = GoldenManifest(
             truth_version=truth_version,
             dataset_file=dataset_file,
@@ -183,6 +267,10 @@ class GoldenTruthStore:
             review_summary=actual_review,
             distinct_events=actual_events,
             distinct_securities=actual_securities,
+            manifest_schema=manifest_schema,
+            st_add_events=int(stats["st_add_events"]),
+            st_remove_events=int(stats["st_remove_events"]),
+            distinct_delisted_securities=int(stats["distinct_delisted_securities"]),
         )
         self._manifest, self._cases = manifest, cases
         return cases, manifest
@@ -217,40 +305,21 @@ class GoldenTruthStore:
             )
             raise GoldenTruthError(msg)
 
-        cases: list[GoldenCase] = []
-        for line in dataset_bytes.decode("utf-8").splitlines():
-            if not line.strip():
-                continue
-            doc = json.loads(line)
-            golden = _case_from_doc(doc, truth_version)
-            expected = hashlib.sha256(_semantic_statement(golden).encode("utf-8")).hexdigest()
-            if golden.case_semantic_hash != expected:
-                msg = (
-                    f"golden case {golden.golden_case_id}: case_semantic_hash "
-                    "mismatch in bound dataset"
-                )
-                raise GoldenTruthError(msg)
-            cases.append(golden)
-
-        counts: dict[str, int] = {}
-        review: dict[str, int] = {}
-        event_ids: dict[str, set[str]] = {}
-        securities: dict[str, int] = {}
-        for case in cases:
-            counts[case.case_type] = counts.get(case.case_type, 0) + 1
-            review[case.review_status] = review.get(case.review_status, 0) + 1
-            if case.event_class and case.event_id:
-                event_ids.setdefault(case.event_class, set()).add(case.event_id)
-            securities[case.provider_symbol] = securities.get(case.provider_symbol, 0) + 1
+        cases = cases_from_dataset_bytes(dataset_bytes, truth_version)
+        stats = recompute_manifest_statistics(cases)
         manifest = GoldenManifest(
             truth_version=truth_version,
             dataset_file=dataset_file,
             dataset_hash=actual_hash,
-            case_count=len(cases),
-            counts_by_type=counts,
-            review_summary=review,
-            distinct_events={k: len(v) for k, v in event_ids.items()},
-            distinct_securities=securities,
+            case_count=int(stats["case_count"]),
+            counts_by_type=stats["counts_by_type"],
+            review_summary=stats["review_summary"],
+            distinct_events=stats["distinct_events"],
+            distinct_securities=stats["distinct_securities"],
+            manifest_schema=2 if _truth_version_number(truth_version) >= 4 else 1,
+            st_add_events=int(stats["st_add_events"]),
+            st_remove_events=int(stats["st_remove_events"]),
+            distinct_delisted_securities=int(stats["distinct_delisted_securities"]),
         )
         return cases, manifest
 
@@ -319,31 +388,42 @@ class GoldenTruthStore:
         cases_, manifest_ = self._resolve_dataset(cases, manifest)
         _ = manifest_
         problems: list[str] = []
+        stats = recompute_manifest_statistics(cases_)
+        invalid = stats["invalid_structural_cases"]
+        invalid_by_class: dict[str, list[str]] = {"ST_TRANSITION": [], "DELIST": []}
+        for event_class, case_id in invalid:
+            invalid_by_class[event_class].append(case_id)
+        if invalid_by_class["ST_TRANSITION"]:
+            problems.append(
+                "golden_st_transition: invalid structural event identity for "
+                f"{len(invalid_by_class['ST_TRANSITION'])} cases; "
+                "event_effective_date is required and trade_date fallback is forbidden "
+                f"({', '.join(invalid_by_class['ST_TRANSITION'][:3])})"
+            )
+        if invalid_by_class["DELIST"]:
+            problems.append(
+                "golden_delisted: invalid structural event identity for "
+                f"{len(invalid_by_class['DELIST'])} cases; "
+                "event_effective_date is required and trade_date fallback is forbidden "
+                f"({', '.join(invalid_by_class['DELIST'][:3])})"
+            )
         # ST transitions: >= 50 distinct structural events, ADD>0, REMOVE>0
-        st_events: dict[tuple[str, str, str], str] = {}
-        for case in cases_:
-            if case.event_class == "ST_TRANSITION":
-                st_events[st_event_identity(case)] = case.event_subtype
-        st_count = len(st_events)
+        st_count = int(stats["distinct_events"].get("ST_TRANSITION", 0))
         if st_count < REQUIRED_DISTINCT_EVENTS["golden_st_transition"][1]:
             problems.append(f"golden_st_transition: distinct ST_TRANSITION events {st_count} < 50")
-        add_count = sum(1 for s in st_events.values() if s in ST_ADD_SUBTYPES)
-        remove_count = sum(1 for s in st_events.values() if s in ST_REMOVE_SUBTYPES)
+        add_count = int(stats["st_add_events"])
+        remove_count = int(stats["st_remove_events"])
         if add_count == 0:
             problems.append("golden_st_transition: no ST_ADD/STAR_ST_ADD subtype events")
         if remove_count == 0:
             problems.append("golden_st_transition: no ST_REMOVE/STAR_ST_REMOVE subtype events")
         # Delist: distinct (symbol, effective_date) >= 20 AND symbols >= 20
-        delist_identities = {delist_event_identity(c) for c in cases_ if c.event_class == "DELIST"}
-        delist_symbols = {c.provider_symbol for c in cases_ if c.event_class == "DELIST"}
-        if len(delist_identities) < REQUIRED_DISTINCT_EVENTS["golden_delisted"][1]:
-            problems.append(
-                f"golden_delisted: distinct DELIST events {len(delist_identities)} < 20"
-            )
-        if len(delist_symbols) < 20:
-            problems.append(
-                f"golden_delisted: distinct delisted securities {len(delist_symbols)} < 20"
-            )
+        delist_count = int(stats["distinct_events"].get("DELIST", 0))
+        delist_symbols = int(stats["distinct_delisted_securities"])
+        if delist_count < REQUIRED_DISTINCT_EVENTS["golden_delisted"][1]:
+            problems.append(f"golden_delisted: distinct DELIST events {delist_count} < 20")
+        if delist_symbols < 20:
+            problems.append(f"golden_delisted: distinct delisted securities {delist_symbols} < 20")
         return problems
 
     def review_gate(
@@ -429,6 +509,159 @@ class GoldenTruthStore:
         return []
 
 
+def cases_from_dataset_bytes(dataset_bytes: bytes, truth_version: str) -> list[GoldenCase]:
+    """Parse and fully seal-check a dataset in memory.
+
+    Candidate/review publishers call this before touching any versioned file;
+    the loader uses the same path so preflight and runtime validation cannot
+    drift apart.
+    """
+    try:
+        text = dataset_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise GoldenTruthError("golden dataset is not valid UTF-8") from exc
+    cases: list[GoldenCase] = []
+    seen_ids: set[str] = set()
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            doc = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise GoldenTruthError(f"golden dataset line {line_number}: invalid JSON") from exc
+        if not isinstance(doc, dict):
+            raise GoldenTruthError(f"golden dataset line {line_number}: case must be a JSON object")
+        golden = _case_from_doc(doc, truth_version)
+        if golden.case_semantic_hash != semantic_hash_of(golden):
+            raise GoldenTruthError(
+                f"golden case {golden.golden_case_id}: case_semantic_hash mismatch"
+            )
+        if golden.golden_case_id in seen_ids:
+            raise GoldenTruthError(f"duplicate golden_case_id {golden.golden_case_id}")
+        seen_ids.add(golden.golden_case_id)
+        cases.append(golden)
+    return cases
+
+
+def recompute_structural_statistics(cases: Iterable[GoldenCase]) -> dict[str, Any]:
+    """Recompute event statistics using the Formal structural identities.
+
+    Invalid legacy structural rows are reported, not silently converted into
+    trade-date identities.  That keeps v1-v3 readable while making every
+    missing effective date visible to the Formal gate.
+    """
+    event_ids_by_class: dict[str, set[str]] = {}
+    st_events: set[tuple[str, str, str]] = set()
+    delist_events: set[tuple[str, str]] = set()
+    delisted_symbols: set[str] = set()
+    invalid_structural_cases: list[tuple[str, str]] = []
+    securities: dict[str, int] = {}
+    for case in cases:
+        securities[case.provider_symbol] = securities.get(case.provider_symbol, 0) + 1
+        if case.event_class == "ST_TRANSITION":
+            try:
+                identity = st_event_identity(case)
+            except StructuralEventError:
+                invalid_structural_cases.append((case.event_class, case.golden_case_id))
+                continue
+            st_events.add(identity)
+        elif case.event_class == "DELIST":
+            delisted_symbols.add(case.provider_symbol)
+            try:
+                delist_events.add(delist_event_identity(case))
+            except StructuralEventError:
+                invalid_structural_cases.append((case.event_class, case.golden_case_id))
+        elif case.event_class:
+            if case.event_id:
+                event_ids_by_class.setdefault(case.event_class, set()).add(case.event_id)
+
+    distinct_events = {
+        event_class: len(event_ids) for event_class, event_ids in event_ids_by_class.items()
+    }
+    distinct_events["ST_TRANSITION"] = len(st_events)
+    distinct_events["DELIST"] = len(delist_events)
+    st_add_events = sum(1 for _, _, subtype in st_events if subtype in ST_ADD_SUBTYPES)
+    st_remove_events = sum(1 for _, _, subtype in st_events if subtype in ST_REMOVE_SUBTYPES)
+    return {
+        "distinct_events": distinct_events,
+        "distinct_securities": securities,
+        "st_add_events": st_add_events,
+        "st_remove_events": st_remove_events,
+        "distinct_delisted_securities": len(delisted_symbols),
+        "invalid_structural_cases": invalid_structural_cases,
+    }
+
+
+def recompute_manifest_statistics(cases: Iterable[GoldenCase]) -> dict[str, Any]:
+    """Return all row/review/structural statistics used by schema v2."""
+    case_list = list(cases)
+    counts: dict[str, int] = {}
+    review: dict[str, int] = {}
+    for case in case_list:
+        counts[case.case_type] = counts.get(case.case_type, 0) + 1
+        review[case.review_status] = review.get(case.review_status, 0) + 1
+    stats = recompute_structural_statistics(case_list)
+    stats.update(
+        {
+            "case_count": len(case_list),
+            "counts_by_type": counts,
+            "review_summary": review,
+        }
+    )
+    return stats
+
+
+def _verify_structural_manifest_fields(active: Mapping[str, Any], stats: Mapping[str, Any]) -> None:
+    """Verify the schema-v2 fields that must match row-level recomputation."""
+    fields = (
+        "distinct_events",
+        "distinct_securities",
+        "st_add_events",
+        "st_remove_events",
+        "distinct_delisted_securities",
+    )
+    for field in fields:
+        if field not in active:
+            raise GoldenTruthError(f"manifest_schema 2 requires {field}")
+        if active[field] != stats[field]:
+            raise GoldenTruthError(f"manifest {field} != recomputed structural statistics")
+
+
+def _truth_version_number(value: object) -> int:
+    prefix = str(value).split("-", 1)[0]
+    if not prefix.startswith("v"):
+        return 0
+    digits = prefix[1:]
+    return int(digits) if digits.isdigit() else 0
+
+
+def _semantic_statement_for_doc(doc: Mapping[str, Any]) -> str:
+    statement: dict[str, Any] = {
+        "golden_case_id": doc["golden_case_id"],
+        "case_type": doc["case_type"],
+        "provider_symbol": doc["provider_symbol"],
+        "trade_date": doc["trade_date"],
+        "expected_fields": doc["expected_fields"],
+        "truth_source": doc["truth_source"],
+        "source_ref": doc["source_ref"],
+        "source_artifact_hash": doc.get("source_artifact_hash", ""),
+        "truth_version": doc["truth_version"],
+    }
+    # v1-v3 hashes are immutable legacy contracts.  v4+ seals the event
+    # identity fields so a free-form alias/subtype/date edit cannot survive
+    # by merely recomputing the dataset hash.
+    if _truth_version_number(doc.get("truth_version")) >= 4:
+        statement.update(
+            {
+                "event_id": doc.get("event_id", ""),
+                "event_class": doc.get("event_class", ""),
+                "event_subtype": doc.get("event_subtype", ""),
+                "event_effective_date": doc.get("event_effective_date", ""),
+            }
+        )
+    return json.dumps(statement, sort_keys=True, ensure_ascii=False)
+
+
 def _semantic_statement(golden: GoldenCase) -> str:
     doc = {
         "golden_case_id": golden.golden_case_id,
@@ -440,8 +673,17 @@ def _semantic_statement(golden: GoldenCase) -> str:
         "source_ref": golden.source_ref,
         "source_artifact_hash": golden.source_artifact_hash,
         "truth_version": golden.truth_version,
+        "event_id": golden.event_id,
+        "event_class": golden.event_class,
+        "event_subtype": golden.event_subtype,
+        "event_effective_date": golden.event_effective_date,
     }
-    return json.dumps(doc, sort_keys=True, ensure_ascii=False)
+    return _semantic_statement_for_doc(doc)
+
+
+def semantic_hash_for_doc(doc: Mapping[str, Any]) -> str:
+    """Compute the version-aware semantic seal for a JSON document."""
+    return hashlib.sha256(_semantic_statement_for_doc(doc).encode("utf-8")).hexdigest()
 
 
 def semantic_hash_of(golden: GoldenCase) -> str:
