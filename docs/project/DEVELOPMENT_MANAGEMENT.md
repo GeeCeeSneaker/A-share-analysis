@@ -2,7 +2,7 @@
 
 ## DM-20260906-107 · GT-H1.1 correctness closure after PR16 review
 
-**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_FINAL_CI
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
 **Review Status**：PENDING_RE_REVIEW；本批不自行 CLOSE / MERGE。
 **Authority**：[PR16 首轮复审与 GT-H1.1 收口要求](../design/A-share-analysis_PR16首轮复审与GT-H1.1收口要求_20260906.md)。
 **Reviewer baseline**：`main@8f2ccb52a5ed2a58ef916a16a9c7e756173b08fd`；新要求已由 `bd088a257b0ffd1189e089b3a0bf8def32cd113c` 追加到 main。
@@ -18,13 +18,13 @@
 
 **Evidence separation**
 
-- 本地 GT-H1/GT-H1.1 candidate、review、truth-gate 定向回归通过；新代码提交后的三平台 CI 待验证。
+- 本地 GT-H1/GT-H1.1 candidate、review、truth-gate 定向回归通过；PR #16 修正 head `2281cd50b340fa85ee18955cee0ed9ca74f80be6` 的 GitHub Actions run 316 三平台 CI 全绿，包含 pytest、Ruff/format/mypy、Spike、SDK-absent、DEVLOG 和管理文档门禁。
 - 本批只修改工具链、测试和治理文档；不新增 Golden corpus 事实，不运行 Production，不上传凭证、端点、Token、SDK 输出或专有 wheel。
 
 **Required next work**
 
-1. 将修正推送到 PR #16 新 head，验证 Windows 3.12、Windows 3.14、Ubuntu 3.14 required CI 全绿。
-2. 由独立 Reviewer 对 P0-01/P0-02 复审并决定是否合并；合并前不得启动 GT-H2。
+1. 由 Reviewer 对 P0-01/P0-02 复审并决定是否合并；合并前不得启动 GT-H2。
+2. 保持 Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 冻结。
 3. GT-H1.1 合并后，按可追溯来源重建 clean reviewed corpus，再执行 GT-H3 seal/replay/formal gate。
 
 ## DM-20260906-106 · GT-H1 Golden Truth structural identity / rebuild toolchain
