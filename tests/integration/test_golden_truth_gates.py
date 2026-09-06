@@ -19,6 +19,8 @@ from ashare_state.spike.model import RunKind
 from ashare_state.spike.runner import RunLifecycleError, new_run
 
 REPO_GOLDEN = Path(__file__).resolve().parents[2] / "data" / "golden" / "provider" / "amazingdata"
+V3_VERSION = "v3-candidate-20260822"
+V3_HASH = "ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e"
 
 
 @pytest.fixture(autouse=True)
@@ -57,6 +59,15 @@ def _frozen_production_identity(monkeypatch):
 def golden_env(tmp_path: Path, monkeypatch) -> Path:
     root = tmp_path / "data" / "golden" / "provider" / "amazingdata"
     shutil.copytree(REPO_GOLDEN, root)
+    # Keep pre-H2 contract tests anchored to immutable v3. The repository
+    # ACTIVE pointer is intentionally v4 after GT-H2.
+    for name in ("golden_cases_v4.jsonl", "truth_manifest_v4.json"):
+        (root / name).unlink(missing_ok=True)
+    (root / "truth_manifest.json").write_text(
+        (root / "truth_manifest_v3.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+        newline="\n",
+    )
     monkeypatch.setattr("ashare_state.spike.golden_store.GOLDEN_ROOT", root)
     monkeypatch.chdir(tmp_path)
     return root
@@ -74,6 +85,11 @@ def _active(root: Path) -> dict:
 
 def _dataset(root: Path) -> Path:
     return root / _active(root)["dataset_file"]
+
+
+def _load_v3() -> tuple[list, object]:
+    """Load immutable v3 explicitly even after ACTIVE advances to v4."""
+    return GoldenTruthStore(REPO_GOLDEN).load_bound("golden_cases_v3.jsonl", V3_VERSION, V3_HASH)
 
 
 def _reseal(root: Path) -> None:
@@ -166,7 +182,7 @@ def _prepare_reviewable_v4_candidate(root: Path) -> None:
 
 class TestManifestSelfVerification:
     def test_manifest_stats_equal_recomputed_stats(self):
-        _, manifest = GoldenTruthStore(REPO_GOLDEN).load()
+        _, manifest = _load_v3()
         assert manifest.case_count == 123
         assert manifest.counts_by_type["golden_st_transition"] == 50
 
@@ -257,13 +273,14 @@ class TestReviewGate:
             GoldenTruthStore(golden_env).load()
 
     def test_review_gate_uses_cases_not_manifest_claim(self):
-        problems = GoldenTruthStore(REPO_GOLDEN).review_gate()
+        cases, manifest = _load_v3()
+        problems = GoldenTruthStore(REPO_GOLDEN).review_gate(cases, manifest)
         assert problems and "REVIEWED 0/123" in problems[0]
 
 
 class TestEventCoverageGate:
     def test_negative_st_samples_do_not_count_as_st_transition_events(self):
-        _, manifest = GoldenTruthStore(REPO_GOLDEN).load()
+        _, manifest = _load_v3()
         # Negative rows do not count toward ST_CAP.  Legacy ST rows have no
         # explicit effective date, so strict structural recomputation returns
         # zero rather than borrowing trade_date.
@@ -272,14 +289,16 @@ class TestEventCoverageGate:
 
     def test_st_gate_requires_distinct_transition_events(self):
         """Legacy ST rows cannot use trade_date as event_effective_date."""
-        problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
+        cases, manifest = _load_v3()
+        problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate(cases, manifest)
         assert any("ST_TRANSITION events 0 < 50" in p for p in problems)
         assert any("event_effective_date" in p for p in problems)
 
     def test_delist_gate_requires_distinct_securities(self):
         """Missing effective dates block DELIST event coverage; the symbol
         diagnostic remains independently visible."""
-        problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate()
+        cases, manifest = _load_v3()
+        problems = GoldenTruthStore(REPO_GOLDEN).event_coverage_gate(cases, manifest)
         assert any("distinct delisted securities 10 < 20" in p for p in problems)
 
     def test_production_run_refused_until_event_coverage_complete(
@@ -452,7 +471,7 @@ class TestBoundGoldenResolver:
 
 class TestSemanticConflictFix:
     def test_v2_has_no_st_removal_contradiction(self):
-        cases, _ = GoldenTruthStore(REPO_GOLDEN).load()
+        cases, _ = _load_v3()
         for case in cases:
             if case.case_type == "golden_st_transition":
                 assert not (

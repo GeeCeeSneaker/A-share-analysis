@@ -1,3 +1,19 @@
+## 2026-09-06 · GT-H2 clean Golden candidate construction
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_REVIEW**：依据 [GT-H2 Clean Golden Corpus 建设要求](design/A-share-analysis_GT-H1关闭与GT-H2_CleanGoldenCorpus建设要求_20260906.md)，以 main merge `5f76ad411801998de7bd3be7f26c880a73005853` 和不可变 v3 dataset SHA256 `ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e` 为源，生成显式 v3→v4 rebuild plan。
+- 计划逐条覆盖旧 v3 的 123 条记录：70 条结构性/重复样本 DROP，53 条制度、公司行动和北交所样本 REPLACE，新增 50 条带官方来源定位的 ST 事件、20 条带明确摘牌/终止生效日的 DELIST 事件和 5 条配股除权事件 ADD；旧 v1–v3 文件未改写。
+- 新 ACTIVE candidate 为 `v4-candidate-20260906`：128 条，ST 结构事件 50（ST_ADD 38、ST_REMOVE 12，含 STAR_ST_ADD），DELIST 20 个独立证券/日期，corporate action 25（DIVIDEND 20、RIGHT_ISSUE 5）。`GoldenTruthStore.load`、schema v2、结构门禁、`review_readiness_gate` 和 packet exact-coverage 均在本地通过。
+- 新增 `scripts/golden/gt_h2_prepare.py`、`docs/golden/gt_h2/official_fact_registry.json`、`rebuild_plan_v4.json`、`review_packet_index.jsonl`、`GT_H2_CORPUS_REPORT.md` 和 H2 专项测试。packet 只保存官方引用和审阅清单；未下载/提交原始网页或 PDF，未绑定 artifact hash，未设置 `REVIEWED`。
+- 本批只使用官方 SSE、SZSE、BSE/CNINFO 来源定位来准备候选事实；`fact_proved` 是 Agent 的来源检索标记，不等同于人工复核。正式 gate 仍明确只因 128 条均未 human-reviewed 而阻断，Production B1–B7、Data Sufficiency、Provider capability、2020+ backfill、策略/回测/交易均未启动。
+- 未上传账号、密码、Token、真实端点、原始 SDK 输出或本地专有依赖；本地 `vendor/` 供应商包继续只作工作区依赖，不进入提交。
+
+**Next**
+
+- 通过 GitHub 连接器将本批提交为独立 PR，等待三平台 required CI 与独立 Reviewer 审阅；本批不自行运行 `review.py` 最终封存、不批准、不合并。
+- Reviewer 需逐条绑定官方 artifact bytes/hash，核验 symbol、exchange/board、事件 subtype、effective date、corporate-action 类型和制度适用期；完成一次全量 human review 后再按 GT-H3 执行 reviewed seal、bound replay 和 Formal gate。
+
 ## 2026-09-06 · GT-H1.2 atomic complete review publication after PR16 second review
 
 **Implementation Status / Review Status**

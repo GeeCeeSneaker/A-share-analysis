@@ -35,6 +35,8 @@ from ashare_state.spike.target import FakeTarget
 from ashare_state.spike.validators import GoldenCase
 
 REPO_GOLDEN = Path(__file__).resolve().parents[2] / "data" / "golden" / "provider" / "amazingdata"
+V3_VERSION = "v3-candidate-20260822"
+V3_HASH = "ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e"
 _SHA = "b" * 40
 
 
@@ -210,7 +212,7 @@ class TestActualGoldenV3Truth:
         from ashare_state.spike.golden_store import GoldenTruthStore
 
         store = GoldenTruthStore(REPO_GOLDEN)
-        cases, _manifest = store.load()
+        cases, _manifest = store.load_bound("golden_cases_v3.jsonl", V3_VERSION, V3_HASH)
         return [c for c in cases if c.case_type == "golden_corporate_action"]
 
     def test_every_actual_v3_ca_case_resolves_a_type(self):
