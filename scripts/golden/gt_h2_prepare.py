@@ -32,6 +32,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -55,67 +56,67 @@ V3_DATASET_HASH = "ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f
 # The final review workflow must still bind the exact bytes and hash.
 ST_ADD_FACTS: tuple[dict[str, str], ...] = (
     {
-        "symbol": "002681.SZ",
-        "date": "20200506",
-        "url": "http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-30/6c34f44d-5bee-46df-8f17-2c699b477d18.PDF",
-        "name": "SZSE official announcement: *ST 奋达 risk warning effective 2020-05-06",
-        "kind": "SZSE_ANNOUNCEMENT",
-        "exchange": "SZSE",
+        "symbol": "600654.SH",
+        "date": "20220506",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-05-05/600654_20220505_1_dNOo6yTW.pdf",
+        "name": "SSE company announcement: ST 中安 risk-warning implementation effective 2022-05-06",
+        "kind": "SSE_ANNOUNCEMENT",
+        "exchange": "SSE",
         "board": "MAIN",
     },
     {
-        "symbol": "000408.SZ",
-        "date": "20200506",
-        "url": "http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-30/5018e5ae-ddeb-4602-a0c1-7f2b0634f727.PDF",
-        "name": "SZSE official announcement: *ST 藏格 risk warning effective 2020-05-06",
-        "kind": "SZSE_ANNOUNCEMENT",
-        "exchange": "SZSE",
+        "symbol": "600077.SH",
+        "date": "20230505",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-29/600077_20230429_PNOI.pdf",
+        "name": "SSE company announcement: 宋都股份 risk-warning implementation effective 2023-05-05",
+        "kind": "SSE_ANNOUNCEMENT",
+        "exchange": "SSE",
         "board": "MAIN",
     },
     {
-        "symbol": "002513.SZ",
-        "date": "20200429",
-        "url": "http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-28/e3e3b094-6f16-461a-858f-f77851a3e60f.PDF",
-        "name": "SZSE official announcement: *ST 蓝丰 risk warning effective 2020-04-29",
-        "kind": "SZSE_ANNOUNCEMENT",
-        "exchange": "SZSE",
+        "symbol": "601258.SH",
+        "date": "20230505",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-29/601258_20230429_KZL0.pdf",
+        "name": "SSE company announcement: 庞大集团 risk-warning implementation effective 2023-05-05",
+        "kind": "SSE_ANNOUNCEMENT",
+        "exchange": "SSE",
         "board": "MAIN",
     },
     {
-        "symbol": "000587.SZ",
-        "date": "20200507",
-        "url": "http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-30/101bf255-d1eb-4791-96a2-28d2ebbcb1cc.PDF",
-        "name": "SZSE official announcement: *ST 金洲 risk warning effective 2020-05-07",
-        "kind": "SZSE_ANNOUNCEMENT",
-        "exchange": "SZSE",
+        "symbol": "600466.SH",
+        "date": "20230504",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-28/600466_20230428_CP1N.pdf",
+        "name": "SSE company announcement: 蓝光发展 risk-warning implementation effective 2023-05-04",
+        "kind": "SSE_ANNOUNCEMENT",
+        "exchange": "SSE",
         "board": "MAIN",
     },
     {
-        "symbol": "002052.SZ",
-        "date": "20200506",
-        "url": "http://disc.static.szse.cn/download/disc/disk02/finalpage/2021-06-07/276460c6-f1c9-42f5-b2d7-9159e0cb3974.PDF",
-        "name": "SZSE official disclosure referring to *ST 同洲 risk warning effective 2020-05-06",
-        "kind": "SZSE_ANNOUNCEMENT",
-        "exchange": "SZSE",
+        "symbol": "600543.SH",
+        "date": "20230504",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-28/600543_20230428_TL0Y.pdf",
+        "name": "SSE company announcement: 莫高股份 risk-warning implementation effective 2023-05-04",
+        "kind": "SSE_ANNOUNCEMENT",
+        "exchange": "SSE",
         "board": "MAIN",
     },
     {
-        "symbol": "002319.SZ",
-        "date": "20200428",
-        "url": "http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-25/805e9468-baf4-40b2-b042-10e4d1172063.PDF",
-        "name": "SZSE official announcement: *ST 乐通 risk warning effective 2020-04-28",
-        "kind": "SZSE_ANNOUNCEMENT",
-        "exchange": "SZSE",
+        "symbol": "603963.SH",
+        "date": "20240429",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2024-04-26/603963_20240426_ZG5D.pdf",
+        "name": "SSE company announcement: 大理药业 risk-warning implementation effective 2024-04-29",
+        "kind": "SSE_ANNOUNCEMENT",
+        "exchange": "SSE",
         "board": "MAIN",
     },
     {
-        "symbol": "000613.SZ",
-        "date": "20210427",
-        "url": "https://disc.static.szse.cn/disc/disk02/finalpage/2021-04-24/780272c9-1bb5-4ce0-b6cf-6f95a71059be.PDF",
-        "name": "SZSE official announcement: *ST 东海 A risk warning effective 2021-04-27",
-        "kind": "SZSE_ANNOUNCEMENT",
-        "exchange": "SZSE",
-        "board": "MAIN",
+        "symbol": "688500.SH",
+        "date": "20230505",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-29/688500_20230429_MZM6.pdf",
+        "name": "SSE company announcement: 慧辰股份 risk-warning implementation effective 2023-05-05",
+        "kind": "SSE_ANNOUNCEMENT",
+        "exchange": "SSE",
+        "board": "STAR",
     },
     {
         "symbol": "300064.SZ",
@@ -400,13 +401,13 @@ ST_ADD_FACTS: tuple[dict[str, str], ...] = (
 
 ST_REMOVE_FACTS: tuple[dict[str, str], ...] = (
     {
-        "symbol": "002681.SZ",
-        "date": "20210413",
-        "url": "http://disc.static.szse.cn/download/disc/disk02/finalpage/2021-04-10/ff3c0039-575f-4554-8035-d061e882f2c7.PDF",
-        "name": "SZSE official announcement: 002681 *ST removal effective 2021-04-13",
-        "kind": "SZSE_ANNOUNCEMENT",
-        "exchange": "SZSE",
-        "board": "MAIN",
+        "symbol": "688500.SH",
+        "date": "20240611",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2024-06-07/688500_20240607_1TNQ.pdf",
+        "name": "SSE company announcement: 慧辰股份 risk-warning removal effective 2024-06-11",
+        "kind": "SSE_ANNOUNCEMENT",
+        "exchange": "SSE",
+        "board": "STAR",
     },
     {
         "symbol": "000408.SZ",
@@ -721,24 +722,216 @@ RIGHT_ISSUE_FACTS: tuple[dict[str, str], ...] = (
         "board": "MAIN",
     },
     {
-        "symbol": "002202.SZ",
-        "date": "20190329",
-        "url": "http://disc.static.szse.cn/disc/disk01/finalpage/2019-03-29/27a8f9a6-cfe2-41bb-a9c7-149f5219f383.PDF",
-        "name": "SZSE company announcement: 金风科技配股除权日 2019-03-29",
+        "symbol": "601555.SH",
+        "date": "20200323",
+        "url": "https://static.cninfo.com.cn/finalpage/2020-03-23/1207391500.PDF",
+        "name": "CNINFO company announcement: 东吴证券配股除权日 2020-03-23",
         "kind": "COMPANY_ANNOUNCEMENT",
-        "exchange": "SZSE",
+        "exchange": "SSE",
         "board": "MAIN",
     },
     {
         "symbol": "000750.SZ",
         "date": "20200114",
-        "url": "http://static.cninfo.com.cn/finalpage/2025-03-29/1222948083.PDF",
-        "name": "CNINFO annual report: 国海证券配股除权日 2020-01-14",
+        "url": "https://static.cninfo.com.cn/finalpage/2020-01-09/1207235277.PDF",
+        "name": "CNINFO company announcement: 国海证券配股除权日 2020-01-14",
         "kind": "COMPANY_ANNOUNCEMENT",
         "exchange": "SZSE",
         "board": "MAIN",
     },
 )
+
+
+SOURCE_EVIDENCE_SCOPE = "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+PORTAL_ONLY_LOCATORS = {
+    "https://www.bse.cn/",
+    "https://www.cninfo.com.cn/new/disclosure",
+    "https://www.sse.com.cn/disclosure/listedinfo/announcement/",
+    "https://www.szse.cn/lawrules/rule/trade/",
+}
+ALLOWED_OFFICIAL_HOSTS = {
+    "www.sse.com.cn",
+    "sse.com.cn",
+    "static.sse.com.cn",
+    "www.szse.cn",
+    "szse.cn",
+    "szse.com.cn",
+    "disc.static.szse.cn",
+    "static.cninfo.com.cn",
+    "www.cninfo.com.cn",
+    "www.bse.cn",
+}
+
+# The v3 dividend rows carried dates copied from a broad research note rather
+# than the issuer's implementation announcement.  Keep the old case IDs as
+# the rebuild source keys, but publish the exact ex-date and exact official
+# artifact as the v4 replacement.  This mapping is intentionally explicit so
+# a future correction cannot silently fall back to a disclosure portal.
+DIVIDEND_SOURCES: dict[str, dict[str, str]] = {
+    "GT-CA-600519-20220630": {
+        "symbol": "600519.SH",
+        "annual_year": "2021",
+        "date": "20220630",
+        "name": "SSE 600519 2021 annual profit-distribution implementation announcement; ex-date 2022-06-30",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-06-24/600519_20220624_1_uyoZ4ubX.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-600519-20230627": {
+        "symbol": "600519.SH",
+        "annual_year": "2022",
+        "date": "20230630",
+        "name": "SSE 600519 2022 annual profit-distribution implementation announcement; ex-date 2023-06-30",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-06-26/600519_20230626_V0SN.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-601318-20220630": {
+        "symbol": "601318.SH",
+        "annual_year": "2021",
+        "date": "20220620",
+        "name": "SSE 601318 2021 annual profit-distribution implementation announcement; ex-date 2022-06-20",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-06-11/601318_20220611_1_KRbdGZAx.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-601318-20230627": {
+        "symbol": "601318.SH",
+        "annual_year": "2022",
+        "date": "20230614",
+        "name": "SSE 601318 2022 annual profit-distribution implementation announcement; ex-date 2023-06-14",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-06-07/601318_20230607_A9V4.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-600036-20220630": {
+        "symbol": "600036.SH",
+        "annual_year": "2021",
+        "date": "20220715",
+        "name": "SSE 600036 2021 annual profit-distribution implementation announcement; ex-date 2022-07-15",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-07-08/600036_20220708_2_wBQHNFmu.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-600036-20230627": {
+        "symbol": "600036.SH",
+        "annual_year": "2022",
+        "date": "20230713",
+        "name": "SSE 600036 2022 annual profit-distribution implementation announcement; ex-date 2023-07-13",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-07-06/600036_20230706_PLK0.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-000858-20220630": {
+        "symbol": "000858.SZ",
+        "annual_year": "2021",
+        "date": "20220629",
+        "name": "CNINFO 000858 2021 annual profit-distribution implementation announcement; ex-date 2022-06-29",
+        "url": "https://static.cninfo.com.cn/finalpage/2022-06-22/1213776669.PDF",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-000858-20230627": {
+        "symbol": "000858.SZ",
+        "annual_year": "2022",
+        "date": "20230627",
+        "name": "CNINFO 000858 2022 annual profit-distribution implementation announcement; ex-date 2023-06-27",
+        "url": "https://static.cninfo.com.cn/finalpage/2023-06-17/1217085394.PDF",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-000333-20220630": {
+        "symbol": "000333.SZ",
+        "annual_year": "2021",
+        "date": "20220602",
+        "name": "CNINFO 000333 2021 annual profit-distribution implementation announcement; ex-date 2022-06-02",
+        "url": "https://static.cninfo.com.cn/finalpage/2022-05-27/1213516434.PDF",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-000333-20230627": {
+        "symbol": "000333.SZ",
+        "annual_year": "2022",
+        "date": "20230601",
+        "name": "CNINFO 000333 2022 annual profit-distribution implementation announcement; ex-date 2023-06-01",
+        "url": "https://static.cninfo.com.cn/finalpage/2023-05-25/1216898601.PDF",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-601398-20220630": {
+        "symbol": "601398.SH",
+        "annual_year": "2021",
+        "date": "20220712",
+        "name": "SSE 601398 2021 annual profit-distribution implementation announcement; ex-date 2022-07-12",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-07-05/601398_20220705_1_7xXht7EQ.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-601398-20230627": {
+        "symbol": "601398.SH",
+        "annual_year": "2022",
+        "date": "20230717",
+        "name": "SSE 601398 2022 annual profit-distribution implementation announcement; ex-date 2023-07-17",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-07-11/601398_20230711_UH4E.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-000651-20220630": {
+        "symbol": "000651.SZ",
+        "annual_year": "2021",
+        "date": "20220805",
+        "name": "CNINFO 000651 2021 annual profit-distribution implementation announcement; ex-date 2022-08-05",
+        "url": "https://disc.static.szse.cn/disc/disk03/finalpage/2022-07-29/f1bcbfd5-1827-4754-813a-4daab09c217f.PDF",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-000651-20230627": {
+        "symbol": "000651.SZ",
+        "annual_year": "2022",
+        "date": "20230809",
+        "name": "CNINFO 000651 2022 annual profit-distribution implementation announcement; ex-date 2023-08-09",
+        "url": "https://static.cninfo.com.cn/finalpage/2023-08-02/1217444821.PDF",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-000002-20220630": {
+        "symbol": "000002.SZ",
+        "annual_year": "2021",
+        "date": "20220825",
+        "name": "CNINFO 000002 2021 annual profit-distribution implementation announcement; ex-date 2022-08-25",
+        "url": "https://static.cninfo.com.cn/finalpage/2022-08-18/1214319792.PDF",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-000002-20230627": {
+        "symbol": "000002.SZ",
+        "annual_year": "2022",
+        "date": "20230825",
+        "name": "CNINFO 000002 2022 annual profit-distribution implementation announcement; ex-date 2023-08-25",
+        "url": "https://static.cninfo.com.cn/finalpage/2023-08-21/1217577962.PDF",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-600900-20220630": {
+        "symbol": "600900.SH",
+        "annual_year": "2021",
+        "date": "20220721",
+        "name": "SSE 600900 2021 annual profit-distribution implementation announcement; ex-date 2022-07-21",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-07-13/600900_20220713_1_zI17tKH7.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-600900-20230627": {
+        "symbol": "600900.SH",
+        "annual_year": "2022",
+        "date": "20230721",
+        "name": "SSE 600900 2022 annual profit-distribution implementation announcement; ex-date 2023-07-21",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-07-17/600900_20230717_R4MO.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-600104-20220630": {
+        "symbol": "600104.SH",
+        "annual_year": "2021",
+        "date": "20220715",
+        "name": "SSE 600104 2021 annual profit-distribution implementation announcement; ex-date 2022-07-15",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-07-08/600104_20220708_2_Cx62oZwE.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+    "GT-CA-600104-20230627": {
+        "symbol": "600104.SH",
+        "annual_year": "2022",
+        "date": "20230719",
+        "name": "SSE 600104 2022 annual profit-distribution implementation announcement; ex-date 2023-07-19",
+        "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-07-12/600104_20230712_ONIE.pdf",
+        "kind": "COMPANY_ANNOUNCEMENT",
+    },
+}
+DIVIDEND_SOURCES_BY_FINAL_KEY = {
+    (source["symbol"], source["date"]): source for source in DIVIDEND_SOURCES.values()
+}
 
 
 def _json_dump(path: Path, value: Any) -> None:
@@ -804,6 +997,7 @@ def _entry(
         "event_id": event_id,
         "event_class": event_class,
         "event_subtype": subtype,
+        "source_evidence_scope": SOURCE_EVIDENCE_SCOPE,
     }
     if event_class in {"ST_TRANSITION", "DELIST"}:
         case["event_effective_date"] = date
@@ -823,6 +1017,7 @@ def _entry(
         "official_source_ref": url,
         "artifact_kind_candidate": kind,
         "fact_proved": True,
+        "source_evidence_scope": SOURCE_EVIDENCE_SCOPE,
         "exchange": exchange,
         "board": board,
         "year": date[:4],
@@ -856,7 +1051,7 @@ def _registry() -> list[dict[str, Any]]:
                 symbol=fact["symbol"],
                 date=fact["date"],
                 event_class="ST_TRANSITION",
-                subtype="ST_REMOVE",
+                subtype="STAR_ST_REMOVE" if fact["board"] == "STAR" else "ST_REMOVE",
                 name=fact["name"],
                 url=fact["url"],
                 kind=fact["kind"],
@@ -925,75 +1120,152 @@ def _registry() -> list[dict[str, Any]]:
     return entries
 
 
-def _source_context(doc: dict[str, Any]) -> tuple[str, str, str]:
+def _dividend_source(doc: dict[str, Any]) -> dict[str, str] | None:
+    source = DIVIDEND_SOURCES.get(str(doc.get("golden_case_id", "")))
+    if source is not None:
+        return source
+    return DIVIDEND_SOURCES_BY_FINAL_KEY.get(
+        (str(doc.get("provider_symbol", "")), str(doc.get("trade_date", "")))
+    )
+
+
+def _is_case_specific_official_locator(value: str) -> bool:
+    parsed = urlparse(value)
+    normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip("/")
+    denied = {locator.rstrip("/") for locator in PORTAL_ONLY_LOCATORS}
+    return (
+        normalized not in denied
+        and parsed.scheme in {"http", "https"}
+        and parsed.netloc in ALLOWED_OFFICIAL_HOSTS
+        and parsed.path not in {"", "/"}
+    )
+
+
+def _source_context(doc: dict[str, Any]) -> tuple[str, str, str, bool, str]:
     symbol = str(doc["provider_symbol"])
     event_class = str(doc["event_class"])
     event_id = str(doc.get("event_id", ""))
+    case_id = str(doc.get("golden_case_id", ""))
     if event_class in {"LIMIT_REGIME", "NO_LIMIT_IPO"}:
-        if event_class == "NO_LIMIT_IPO":
-            return (
-                "SSE IPO first-day price-limit rules (2014-2023)",
-                "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
-                "EXCHANGE_RULEBOOK",
-            )
         if "BJ" in event_id or symbol.endswith(".BJ"):
             return (
-                "BSE official trading-rule portal: 30% price-limit regime",
-                "https://www.bse.cn/",
+                "BSE Trading Rules (Announcement [2021]15; effective 2021-11-15; 30% price-limit clause)",
+                "https://www.bse.cn/jygl_list/200010919.html",
                 "EXCHANGE_RULEBOOK",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
             )
-        if "STAR" in event_id or (symbol.endswith(".SH") and symbol.startswith("688")):
+        if event_class == "NO_LIMIT_IPO" and (
+            "STAR" in event_id or (symbol.endswith(".SH") and symbol.startswith("688"))
+        ):
             return (
-                "SSE official trading rules: STAR price-limit regime",
+                "SSE STAR Market Trading Special Provisions (2019; first five listing days no limit, later 20%)",
+                "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
+                "EXCHANGE_RULEBOOK",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
+            )
+        if event_class == "NO_LIMIT_IPO":
+            return (
+                "SSE Trading Rules (exact rule page; main-board IPO first-day ±44%/−36% regime)",
                 "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
                 "EXCHANGE_RULEBOOK",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
             )
-        if "CN" in event_id or (symbol.endswith(".SZ") and symbol.startswith("300")):
+        if "CN-PRE" in event_id or (
+            symbol.endswith(".SZ")
+            and symbol.startswith("300")
+            and str(doc["trade_date"]) < "20200824"
+        ):
             return (
-                "SZSE official trading-rule portal: ChiNext price-limit regime",
-                "https://www.szse.cn/lawrules/rule/trade/",
+                "SZSE Trading Rules (exact historical rule page; ChiNext pre-2020-08-24 10% clause)",
+                "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
                 "EXCHANGE_RULEBOOK",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
+            )
+        if "CN-POST" in event_id or (symbol.endswith(".SZ") and symbol.startswith("300")):
+            return (
+                "SZSE ChiNext Trading Special Provisions (Notice [2020]515; effective with the 2020-08-24 reform; 20% clause)",
+                "https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
+                "EXCHANGE_RULEBOOK",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
             )
         if "ST" in event_id:
             if symbol.endswith(".SH"):
                 return (
-                    "SSE official risk-warning stock trading rules: 5% limit",
+                    "SSE Risk-Warning Board Trading Measures (exact rule page; 5% price-limit clause)",
                     "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
                     "EXCHANGE_RULEBOOK",
+                    True,
+                    SOURCE_EVIDENCE_SCOPE,
+                )
+            if str(doc["trade_date"]) < "20210101":
+                return (
+                    "SZSE Trading Rules (exact historical rule page; rule 3.3.14 ST/*ST 5% clause)",
+                    "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
+                    "EXCHANGE_RULEBOOK",
+                    True,
+                    SOURCE_EVIDENCE_SCOPE,
                 )
             return (
-                "SZSE official risk-warning stock trading rules: 5% limit",
-                "https://www.szse.cn/lawrules/rule/trade/",
+                "SZSE Trading Rules (2020-12 revision; main-board risk-warning 5% clause)",
+                "https://www.szse.cn/disclosure/notice/general/t20201231_584050.html",
                 "EXCHANGE_RULEBOOK",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
             )
         if symbol.endswith(".SH"):
             return (
-                "SSE official trading rules: main-board 10% limit",
+                "SSE Trading Rules (exact rule page; main-board 10% price-limit clause)",
                 "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
                 "EXCHANGE_RULEBOOK",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
             )
         return (
-            "SZSE official trading rules: main-board 10% limit",
-            "https://www.szse.cn/lawrules/rule/trade/",
+            "SZSE Trading Rules (2020-12 revision; main-board 10% price-limit clause)",
+            "https://www.szse.cn/disclosure/notice/general/t20201231_584050.html",
             "EXCHANGE_RULEBOOK",
+            True,
+            SOURCE_EVIDENCE_SCOPE,
         )
     if event_class == "DIVIDEND_EX_DATE":
-        if symbol.endswith(".SH"):
-            return (
-                "SSE listed-company disclosure portal: dividend ex-date locator",
-                "https://www.sse.com.cn/disclosure/listedinfo/announcement/",
-                "COMPANY_ANNOUNCEMENT",
-            )
+        source = _dividend_source(doc)
+        if source is None:
+            raise RuntimeError(f"no exact dividend artifact mapping for {case_id}/{symbol}")
         return (
-            "CNINFO listed-company disclosure portal: dividend ex-date locator",
-            "https://www.cninfo.com.cn/new/disclosure",
-            "COMPANY_ANNOUNCEMENT",
+            source["name"],
+            source["url"],
+            source["kind"],
+            True,
+            SOURCE_EVIDENCE_SCOPE,
         )
     if event_class == "BJ_CODE_MIGRATION":
+        if case_id == "GT-BJ-835185-2022":
+            return (
+                "BSE official new/old code mapping table (835185 to 920185 row)",
+                "https://www.bse.cn/service/code_mapping.html",
+                "BSE_ANNOUNCEMENT",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
+            )
+        if case_id == "GT-BJ-920-SEGMENT":
+            return (
+                "BSE official 920 code-segment launch announcement (effective 2024-04-22)",
+                "https://www.bse.cn/important_news/200021629.html",
+                "BSE_ANNOUNCEMENT",
+                True,
+                SOURCE_EVIDENCE_SCOPE,
+            )
         return (
-            "BSE official issuer and quotation-rule portal: code continuity/migration",
-            "https://www.bse.cn/",
+            "BSE Trading Rules (Announcement [2021]15; opening/migration-day quotation rules effective 2021-11-15)",
+            "https://www.bse.cn/jygl_list/200010919.html",
             "BSE_ANNOUNCEMENT",
+            True,
+            SOURCE_EVIDENCE_SCOPE,
         )
     raise RuntimeError(f"no official context mapping for {event_class}/{event_id}")
 
@@ -1012,9 +1284,28 @@ def _replacement(doc: dict[str, Any]) -> dict[str, Any]:
         "source_retrieved_at",
     ):
         replacement.pop(field, None)
-    name, url, _ = _source_context(replacement)
-    replacement["source_ref"] = f"{name} | {url} | source claim: {doc['source_ref']}"
-    replacement["truth_source"] = str(doc["truth_source"])
+    if replacement.get("event_class") == "DIVIDEND_EX_DATE":
+        source = _dividend_source(replacement)
+        if source is None:
+            raise RuntimeError(
+                f"no exact dividend artifact mapping for {replacement.get('golden_case_id')}"
+            )
+        replacement["golden_case_id"] = f"GT-CA-{_code(source['symbol'])}-{source['date']}"
+        replacement["trade_date"] = source["date"]
+        replacement["source_ref"] = f"{source['name']} | {source['url']}"
+        replacement["source_evidence_scope"] = SOURCE_EVIDENCE_SCOPE
+        truth_source = str(doc["truth_source"])
+        replacement["truth_source"] = (
+            f"{truth_source.split(':', 1)[0]}: ex-dividend date {source['date']}"
+        )
+    else:
+        name, url, _, fact_proved, scope = _source_context(replacement)
+        if not fact_proved or scope != SOURCE_EVIDENCE_SCOPE:
+            raise RuntimeError(
+                f"replacement {replacement.get('golden_case_id')} lacks exact source evidence"
+            )
+        replacement["source_ref"] = f"{name} | {url}"
+        replacement["source_evidence_scope"] = scope
     return replacement
 
 
@@ -1044,13 +1335,15 @@ def prepare() -> None:
             operations.append({"op": "DROP", "golden_case_id": case_id})
             op_counts["DROP"] += 1
         else:
-            operations.append(
-                {
-                    "op": "REPLACE",
-                    "golden_case_id": case_id,
-                    "case": _replacement(doc),
-                }
-            )
+            replacement = _replacement(doc)
+            operation: dict[str, Any] = {
+                "op": "REPLACE",
+                "golden_case_id": case_id,
+                "case": replacement,
+            }
+            if replacement["golden_case_id"] != case_id:
+                operation["allow_rekey"] = True
+            operations.append(operation)
             op_counts["REPLACE"] += 1
     for entry in registry:
         operations.append(
@@ -1071,7 +1364,7 @@ def prepare() -> None:
         "policy": {
             "old_structural_rows": "DROP: v3 ST/DELIST rows lack exact effective dates or distinct identities",
             "old_negative_samples": "DROP: repetitive observations add no independent structural truth",
-            "old_non_structural_rows": "REPLACE: preserve case semantics while adding official rule/disclosure locators",
+            "old_non_structural_rows": "REPLACE: preserve source lineage while adding exact official rule/disclosure locators; rekey only when an exact corporate-action date changes the case identity",
             "new_structural_rows": "ADD: one canonical case per independently located official event",
             "new_right_issue_rows": "ADD: supplement dividend-only CA coverage with right-issue ex-dates",
             "review_boundary": "No source artifact is sealed and no case is marked REVIEWED by this utility",
@@ -1139,10 +1432,16 @@ def _packet_row(doc: dict[str, Any], registry_by_id: dict[str, dict[str, Any]]) 
         official_ref = registry["official_source_ref"]
         kind = registry["artifact_kind_candidate"]
         fact_proved = bool(registry["fact_proved"])
+        source_evidence_scope = str(registry["source_evidence_scope"])
         date_semantics = registry["date_semantics"]
     else:
-        official_name, official_ref, kind = _source_context(doc)
-        fact_proved = True
+        (
+            official_name,
+            official_ref,
+            kind,
+            fact_proved,
+            source_evidence_scope,
+        ) = _source_context(doc)
         if doc.get("event_class") == "ST_TRANSITION":
             date_semantics = (
                 "event_effective_date is the status-change date; trade_date is the observation date"
@@ -1170,6 +1469,7 @@ def _packet_row(doc: dict[str, Any], registry_by_id: dict[str, dict[str, Any]]) 
         "official_source_name/ref": f"{official_name} | {official_ref}",
         "artifact_kind_candidate": kind,
         "fact_proved": fact_proved,
+        "source_evidence_scope": source_evidence_scope,
         "human_review_checklist": _checklist(doc),
     }
 
@@ -1227,6 +1527,18 @@ def finalize() -> None:
     cases = _load_jsonl(GOLDEN_ROOT / str(active["dataset_file"]))
     registry_by_id = {str(entry["golden_case_id"]): entry for entry in registry}
     packet = [_packet_row(doc, registry_by_id) for doc in cases]
+    invalid_sources = [
+        str(row["golden_case_id"])
+        for row in packet
+        if row["fact_proved"] is not True
+        or row["source_evidence_scope"] != SOURCE_EVIDENCE_SCOPE
+        or not _is_case_specific_official_locator(str(row["official_source_ref"]))
+    ]
+    if invalid_sources:
+        raise RuntimeError(
+            "packet contains non-case-specific source evidence for "
+            + ", ".join(invalid_sources[:5])
+        )
     packet_ids = [str(row["golden_case_id"]) for row in packet]
     if len(packet_ids) != len(set(packet_ids)):
         raise RuntimeError("packet contains duplicate case IDs")
@@ -1263,6 +1575,8 @@ def finalize() -> None:
     st_dist = _distribution(cases, "ST_TRANSITION")
     delist_dist = _distribution(cases, "DELIST")
     registry_event_counts = Counter(str(entry["event_class"]) for entry in registry)
+    source_scope_counts = Counter(str(row["source_evidence_scope"]) for row in packet)
+    packet_event_counts = Counter(str(row["event_class"]) for row in packet)
     report_lines = [
         "# GT-H2 Clean Golden Corpus Candidate Report",
         "",
@@ -1276,7 +1590,8 @@ def finalize() -> None:
         "",
         f"The plan contains `{len(plan['operations'])}` explicit operations: `KEEP={op_counts.get('KEEP', 0)}`, `REPLACE={op_counts.get('REPLACE', 0)}`, `DROP={op_counts.get('DROP', 0)}`, `ADD={op_counts.get('ADD', 0)}`.",
         f"Every old v3 row is addressed exactly once. Structural/negative rows dropped by class: `{dict(sorted(dropped_classes.items()))}`.",
-        "All old v1/v2/v3 files remain immutable inputs; the plan does not edit or rewrite them. The old non-structural rows are REPLACE operations so their case identities remain traceable while official rule/disclosure locators are made explicit.",
+        "All old v1/v2/v3 files remain immutable inputs; the plan does not edit or rewrite them. Old non-structural rows remain traceable through their original operation IDs, while explicit corporate-action rekeys are used only when an exact official date changes the output case identity.",
+        "Dividend REPLACE operations use an explicit allow_rekey marker where the issuer's exact implementation announcement corrected the legacy ex-date; source-to-output lineage remains represented by the plan's original golden_case_id.",
         "",
         "## Candidate counts and structural gates",
         "",
@@ -1290,6 +1605,13 @@ def finalize() -> None:
         "### ST distribution",
         "",
         f"`{json.dumps(st_dist, ensure_ascii=False, sort_keys=True)}`",
+        "",
+        "### GT-H2.1 source-quality closure",
+        "",
+        f"- Case-specific official-artifact evidence: `{len(packet)}/{len(packet)}` packet rows; scope counts `{dict(sorted(source_scope_counts.items()))}`.",
+        f"- Event-class source coverage: `{dict(sorted(packet_event_counts.items()))}`; known portal-only locator denylist: `PASS`.",
+        "- ST rebalance replaces seven SZSE ADD rows and one SZSE REMOVE row with seven exact SSE company announcements, including STAR 688500 ADD (2023-05-05) and STAR 688500 REMOVE (2024-06-11); a STAR removal is therefore evidenced rather than omitted.",
+        "- All five right-issue cases are 2020+; 601555.SH replaces the pre-2020 002202.SZ case, and 000750.SZ now points to its contemporaneous 2020-01-09配股发行公告.",
         "",
         "### DELIST distribution",
         "",

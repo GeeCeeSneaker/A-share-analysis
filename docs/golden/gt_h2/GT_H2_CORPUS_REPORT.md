@@ -2,7 +2,7 @@
 
 - Target truth version: `v4-candidate-20260906`
 - ACTIVE dataset: `golden_cases_v4.jsonl`
-- ACTIVE dataset SHA256: `9ccf0a69774616fcfecdc9fae67f9c6eb13a18ceaf1ae646cff6e32ab854f34a`
+- ACTIVE dataset SHA256: `edeef6925ef1854f705a1413c27eec0a268a7942d80fa060ede83354d607ea9a`
 - Source ACTIVE: `v3-candidate-20260822` / `golden_cases_v3.jsonl` / `ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e`
 - Scope: candidate corpus construction only. This report does not claim human review, Production B1-B7, Data Sufficiency, provider entitlement, 2020+ backfill, strategy, backtest, or trading readiness.
 
@@ -10,7 +10,8 @@
 
 The plan contains `198` explicit operations: `KEEP=0`, `REPLACE=53`, `DROP=70`, `ADD=75`.
 Every old v3 row is addressed exactly once. Structural/negative rows dropped by class: `{'DELIST': 20, 'NEGATIVE_SAMPLE': 40, 'ST_TRANSITION': 10}`.
-All old v1/v2/v3 files remain immutable inputs; the plan does not edit or rewrite them. The old non-structural rows are REPLACE operations so their case identities remain traceable while official rule/disclosure locators are made explicit.
+All old v1/v2/v3 files remain immutable inputs; the plan does not edit or rewrite them. Old non-structural rows remain traceable through their original operation IDs, while explicit corporate-action rekeys are used only when an exact official date changes the output case identity.
+Dividend REPLACE operations use an explicit allow_rekey marker where the issuer's exact implementation announcement corrected the legacy ex-date; source-to-output lineage remains represented by the plan's original golden_case_id.
 
 ## Candidate counts and structural gates
 
@@ -23,7 +24,14 @@ All old v1/v2/v3 files remain immutable inputs; the plan does not edit or rewrit
 
 ### ST distribution
 
-`{"board": {"CHINEXT": 15, "MAIN": 34, "STAR": 1}, "exchange": {"SSE": 4, "SZSE": 46}, "subtype": {"STAR_ST_ADD": 1, "ST_ADD": 37, "ST_REMOVE": 12}, "year": {"2020": 7, "2021": 7, "2022": 13, "2023": 6, "2024": 15, "2025": 2}}`
+`{"board": {"CHINEXT": 15, "MAIN": 32, "STAR": 3}, "exchange": {"SSE": 12, "SZSE": 38}, "subtype": {"STAR_ST_ADD": 2, "STAR_ST_REMOVE": 1, "ST_ADD": 36, "ST_REMOVE": 11}, "year": {"2020": 1, "2021": 5, "2022": 14, "2023": 11, "2024": 17, "2025": 2}}`
+
+### GT-H2.1 source-quality closure
+
+- Case-specific official-artifact evidence: `128/128` packet rows; scope counts `{'CASE_SPECIFIC_OFFICIAL_ARTIFACT': 128}`.
+- Event-class source coverage: `{'BJ_CODE_MIGRATION': 3, 'DELIST': 20, 'DIVIDEND_EX_DATE': 20, 'LIMIT_REGIME': 26, 'NO_LIMIT_IPO': 4, 'RIGHT_ISSUE_EX_DATE': 5, 'ST_TRANSITION': 50}`; known portal-only locator denylist: `PASS`.
+- ST rebalance replaces seven SZSE ADD rows and one SZSE REMOVE row with seven exact SSE company announcements, including STAR 688500 ADD (2023-05-05) and STAR 688500 REMOVE (2024-06-11); a STAR removal is therefore evidenced rather than omitted.
+- All five right-issue cases are 2020+; 601555.SH replaces the pre-2020 002202.SZ case, and 000750.SZ now points to its contemporaneous 2020-01-09配股发行公告.
 
 ### DELIST distribution
 

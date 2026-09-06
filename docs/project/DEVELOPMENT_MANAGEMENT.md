@@ -1,4652 +1,787 @@
-# A-share-analysis å¼€å‘ç®¡ç†æ€»å†Œï¼ˆDevelopment Managementï¼‰
-
-## DM-20260906-109 Â· GT-H2 clean Golden candidate construction
-
-**Implementation Status**ï¼šIMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
-**Review Status**ï¼šPENDING_REVIEWï¼›æœ¬æ‰¹ä¸è‡ªè¡Œæ‰§è¡Œæœ€ç»ˆ review sealã€CLOSE æˆ– MERGEã€‚
-**Base SHA**ï¼š`5f76ad411801998de7bd3be7f26c880a73005853`
-**Authority**ï¼š[GT-H1å…³é—­ä¸ŽGT-H2 CleanGoldenCorpuså»ºè®¾è¦æ±‚](../design/A-share-analysis_GT-H1å…³é—­ä¸ŽGT-H2_CleanGoldenCorpuså»ºè®¾è¦æ±‚_20260906.md)ã€‚
-**Gate**ï¼šv4 candidate å¯è¿›å…¥äººå·¥ reviewï¼›Human Reviewã€GT-H3 reviewed sealã€Formal Productionã€Data Sufficiencyã€Provider capability å’Œ 2020+ backfill ä»æœªå®Œæˆã€‚
-
-| ç®¡ç†è¦æ±‚ | æœ¬æ‰¹å®žçŽ° / éªŒè¯ä½ç½® | çŠ¶æ€ |
-|---|---|---|
-| v3 æºç»‘å®šåŠæ—§ç‰ˆæœ¬ä¸å¯å˜ | `rebuild_plan_v4.json`ï¼›v3 dataset SHA256ï¼›H2 ä¸“é¡¹ hash regression | IMPLEMENTED / local PASS |
-| æ—§è®°å½•é€æ¡ KEEP/REPLACE/DROPï¼Œæ–°å¢žäº‹å®žæ˜¾å¼ ADD | `scripts/golden/gt_h2_prepare.py`ï¼›198 æ¡æ˜¾å¼ operation | IMPLEMENTED / local PASS |
-| ST ç»“æž„äº‹ä»¶è¾¾åˆ° 50 ä¸”åŒ…å« ADD/REMOVE | v4 dataset/manifestï¼›`GoldenTruthStore.event_coverage_gate` | IMPLEMENTED / local PASS |
-| DELIST 20 ä¸ªç‹¬ç«‹è¯åˆ¸/æ—¥æœŸä¸”ç”Ÿæ•ˆæ—¥æ˜¾å¼ | v4 dataset/manifestï¼›ç»“æž„èº«ä»½æµ‹è¯• | IMPLEMENTED / local PASS |
-| company action è¦†ç›– dividend ä¸Ž right issue | v4 `DIVIDEND_EX_DATE` 20 + `RIGHT_ISSUE_EX_DATE` 5 | IMPLEMENTED / local PASS |
-| packet ä¸Ž candidate ä¸€ä¸€è¦†ç›–ï¼Œç¦æ­¢ Agent REVIEWED | `review_packet_index.jsonl`ï¼›packet exact-coverage testï¼›`GT_H2_CORPUS_REPORT.md` | IMPLEMENTED / local PASS |
-| åŽŸå§‹ç½‘é¡µ/PDFã€å‡­è¯å’Œä¸“æœ‰ä¾èµ–ä¸å…¥åº“ | source refs onlyï¼›æœ¬åœ° vendor boundary | IMPLEMENTED / local PASS |
-
-**Evidence separation**
-
-- æœ¬åœ° Windows Python 3.14.6ï¼šH2 candidateã€æ—§ Golden workflow ä¸Ž review/truth-gate å›žå½’ **66 passed**ï¼›Ruff lint/format ä¸Ž `golden_store.py` mypy å®šå‘æ£€æŸ¥é€šè¿‡ã€‚
-- GitHub Actions run `326`ï¼šUbuntu 3.14ã€Windows 3.12ã€Windows 3.14 ä¸‰å¹³å° required CI å…¨éƒ¨æˆåŠŸï¼ŒåŒ…å« full pytestã€Spikeã€SDK-absentã€Ruff/formatã€mypyã€DEVLOG å’Œ Management gatesã€‚
-- `GoldenTruthStore.load` å·²é€šè¿‡ v4 schema 2 è‡ªæ ¡éªŒï¼›`quantity_gate`ã€`event_coverage_gate`ã€`review_readiness_gate` å‡é€šè¿‡ï¼Œ`production_formal_gate` ä»…ä¿ç•™ `REVIEWED 0/128` çš„äººå·¥å¤æ ¸é˜»æ–­ã€‚
-- äº‹å®žæ¥æºæ˜¯å®˜æ–¹ SSE/SZSE/BSE/CNINFO å¼•ç”¨å®šä½ï¼›`fact_proved` ä»…æ˜¯ Agent æ¥æºæ£€ç´¢æ ‡è®°ï¼Œå¿…é¡»ç”± Reviewer ç»‘å®š exact artifact/hash åŽæ‰å¯å˜ä¸º REVIEWEDã€‚æœªè¿è¡Œ `review.py` æœ€ç»ˆå°å­˜ã€‚
-- æœªæ‰§è¡Œæ­£å¼è´¦å·ã€B1â€“B7ã€Data Sufficiencyã€Provider capabilityã€2020+ backfillã€ç­–ç•¥ã€å›žæµ‹æˆ–äº¤æ˜“ï¼›å¯†ç ã€Tokenã€ç«¯ç‚¹ã€åŽŸå§‹ SDK è¾“å‡ºå’Œæœ¬åœ°ä¾›åº”å•†åŒ…æœªè¿›å…¥ä»“åº“ã€‚
-
-**Required next work**
-
-1. ä»¥ç‹¬ç«‹ PR è¿è¡Œä¸‰å¹³å° required CIï¼Œå¹¶ç”±ç‹¬ç«‹ Reviewer å®¡é˜…æœ¬å€™é€‰ä¸Ž packetï¼›æœ¬æ‰¹ä¸è‡ªè¡Œæ‰¹å‡†æˆ–åˆå¹¶ã€‚
-2. Reviewer é€æ¡æ ¸éªŒäº‹ä»¶æ—¥æœŸ/ç±»åž‹/äº¤æ˜“æ‰€æ¿å—åŠå®˜æ–¹ artifact bytes/hashï¼Œå®Œæˆä¸€æ¬¡ N/N human review åŽæ‰å…è®¸ `review.py` å‘å¸ƒ reviewed versionã€‚
-3. GT-H3 å®Œæˆ reviewed sealã€bound replay ä¸Ž Formal gate åŽï¼Œæ‰é‡æ–°è¯„ä¼° Productionã€Data Sufficiencyã€Provider capability å’Œå›žè¡¥ã€‚
-
-
-## DM-20260906-108 Â· GT-H1.2 atomic complete review publication after PR16 second review
-
-**Implementation Status**ï¼šIMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
-**Review Status**ï¼šPENDING_RE_REVIEWï¼›æœ¬æ‰¹ä¸è‡ªè¡Œ CLOSE / MERGEã€‚
-**Authority**ï¼š[PR16 äºŒè½®å¤å®¡ä¸Ž GT-H1.2 åŽŸå­å…¨é‡å®¡æ ¸æ”¶å£è¦æ±‚](../design/A-share-analysis_PR16äºŒè½®å¤å®¡ä¸ŽGT-H1.2åŽŸå­å…¨é‡å®¡æ ¸æ”¶å£è¦æ±‚_20260906.md)ã€‚
-**Reviewer baseline**ï¼šReviewer å·²äºŽ `main@21754a65050817946cd246ffa9e3236b6c759331` å…³é—­ GT-H1.1 P0-01/P0-02ï¼Œå¹¶é‡æ–°æ‰“å¼€ GT-H1.2 GT-P0-03ã€‚
-**Gate**ï¼šGT-H1.2 é€šè¿‡æ–° head ä¸‰å¹³å° required CI ä¸Ž Reviewer closure å¹¶åˆå¹¶å‰ï¼ŒGT-H2 reviewed corpusã€Formal Productionã€Data Sufficiencyã€Provider capability å’Œ 2020+ backfill å‡ä¿æŒå†»ç»“ã€‚
-
-| å®¡é˜…è¦æ±‚ | æœ¬æ‰¹ä¿®æ­£ / éªŒè¯ä½ç½® | çŠ¶æ€ |
-|---|---|---|
-| submitted case IDs å¿…é¡»ä¸Ž ACTIVE case IDs å®Œå…¨ä¸€è‡´ | `review.py::_validate_review_coverage`ï¼›partial/duplicate/foreign/single-case adversarial tests | IMPLEMENTED / local PASS |
-| N>1 å•æ¡ review ä¸å¾—å‘å¸ƒ mixed ACTIVE | full-coverage gateï¼›single-case zero-side-effect regression | IMPLEMENTED / local PASS |
-| æ‰€æœ‰è¾“å‡ºå¿…é¡»åœ¨æŒä¹…åŒ–å‰æˆä¸º REVIEWED N/N | `_prepare_new_version`ï¼›full batch manifest/review_summary regression | IMPLEMENTED / local PASS |
-| review/provenance/artifact/hash/manifest éœ€ç»Ÿä¸€ in-memory è‡ªæ ¡éªŒ | preflight output/evidence gatesï¼›loader and artifact closure tests | IMPLEMENTED / local PASS |
-| partial/duplicate/foreign/malformed æ‹’ç»é›¶å‰¯ä½œç”¨ | ACTIVE/version/evidence snapshot tests | IMPLEMENTED / local PASS |
-
-**Evidence separation**
-
-- æœ¬åœ° GT-H1/GT-H1.1/GT-H1.2 focused regression 61 passedï¼›æœ¬æ‰¹æœªæ–°å¢ž Golden factsã€æœªè¿è¡ŒçœŸå®ž Human full review æˆ– Productionã€‚
-- ä»£ç  head `e1aebaa92d4dcb93599471c50f24984b2913317e` çš„ GitHub Actions run 319 å·²å®Œæˆï¼šä¸‰å¹³å° CIã€Spikeã€SDK-absentã€DEVLOG å’Œç®¡ç†æ–‡æ¡£é—¨ç¦å…¨éƒ¨æˆåŠŸï¼›å…¬å…± CI ç»§ç»­ä¸å®‰è£… AmazingData SDKã€ä¸æŽ¥è§¦ä»»ä½•ç”Ÿäº§å‡­è¯ã€‚
-
-**Required next work**
-
-1. ç­‰å¾…æ–° head ä¸‰å¹³å° required CI å…¨ç»¿åŽï¼Œè¯· Reviewer å¤å®¡ GT-P0-03 å¹¶æäº¤ closure reviewï¼›åˆå¹¶å‰ä¸å¯åŠ¨ GT-H2ã€‚
-2. åˆå¹¶åŽæŒ‰ GT-H2 é‡å»ºçœŸå®ž reviewed corpusï¼›äººå·¥ review packet å¯åˆ†æ‰¹å‡†å¤‡ï¼Œä½† ACTIVE åªèƒ½ç”±ä¸€æ¬¡ N/N å®Œæ•´ review publication sealã€‚
-3. GT-H2/GT-H3 å®¡é˜…å’Œ Formal gate å®ŒæˆåŽï¼Œæ‰é‡æ–°è¯„ä¼° Productionã€Data Sufficiencyã€Provider capability ä¸Žå›žè¡¥ã€‚
-
-## DM-20260906-107 Â· GT-H1.1 correctness closure after PR16 review
-
-**Implementation Status**ï¼šIMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
-**Review Status**ï¼šPENDING_RE_REVIEWï¼›æœ¬æ‰¹ä¸è‡ªè¡Œ CLOSE / MERGEã€‚
-**Authority**ï¼š[PR16 é¦–è½®å¤å®¡ä¸Ž GT-H1.1 æ”¶å£è¦æ±‚](../design/A-share-analysis_PR16é¦–è½®å¤å®¡ä¸ŽGT-H1.1æ”¶å£è¦æ±‚_20260906.md)ã€‚
-**Reviewer baseline**ï¼š`main@8f2ccb52a5ed2a58ef916a16a9c7e756173b08fd`ï¼›æ–°è¦æ±‚å·²ç”± `bd088a257b0ffd1189e089b3a0bf8def32cd113c` è¿½åŠ åˆ° mainã€‚
-**Gate**ï¼šGT-H1.1 é€šè¿‡æœ€ç»ˆä¸‰å¹³å° CI ä¸Žç‹¬ç«‹ Reviewer å¤å®¡å¹¶åˆå¹¶å‰ï¼ŒGT-H2 reviewed corpusã€Formal Productionã€Data Sufficiency å’Œ 2020+ backfill å‡ä¿æŒå†»ç»“ã€‚
-
-| å®¡é˜…è¦æ±‚ | æœ¬æ‰¹ä¿®æ­£ / éªŒè¯ä½ç½® | çŠ¶æ€ |
-|---|---|---|
-| åŒä¸€ç»“æž„äº‹ä»¶å…è®¸å¤šä¸ªè§‚å¯Ÿæ¡ˆä¾‹ | `candidate.py` ä¸å†æ‹’ç»é‡å¤ç»“æž„èº«ä»½ï¼›candidate integration regression | IMPLEMENTED / local PASS |
-| ç»“æž„ç»Ÿè®¡ä¸å— trade_date / event_id æ”¾å¤§ | shared structural set recomputationï¼›é‡å¤è§‚å¯Ÿæµ‹è¯• | IMPLEMENTED / local PASS |
-| review åªèƒ½ä»Ž clean v4+ candidate å¼€å§‹ | `review_readiness_gate`ï¼›review entry boundary | IMPLEMENTED / local PASS |
-| v3 / ä¸å®Œæ•´ v4 review é›¶å‰¯ä½œç”¨æ‹’ç» | legacy/incomplete readiness testsï¼›ACTIVE/version/evidence snapshot | IMPLEMENTED / local PASS |
-| clean schema-v2 v4 å¯è¿›å…¥ review | synthetic clean candidate lifecycle test | IMPLEMENTED / local PASS |
-
-**Evidence separation**
-
-- æœ¬åœ° GT-H1/GT-H1.1 candidateã€reviewã€truth-gate å®šå‘å›žå½’é€šè¿‡ï¼›PR #16 ä¿®æ­£ head `2281cd50b340fa85ee18955cee0ed9ca74f80be6` çš„ GitHub Actions run 316 ä¸‰å¹³å° CI å…¨ç»¿ï¼ŒåŒ…å« pytestã€Ruff/format/mypyã€Spikeã€SDK-absentã€DEVLOG å’Œç®¡ç†æ–‡æ¡£é—¨ç¦ã€‚
-- æœ¬æ‰¹åªä¿®æ”¹å·¥å…·é“¾ã€æµ‹è¯•å’Œæ²»ç†æ–‡æ¡£ï¼›ä¸æ–°å¢ž Golden corpus äº‹å®žï¼Œä¸è¿è¡Œ Productionï¼Œä¸ä¸Šä¼ å‡­è¯ã€ç«¯ç‚¹ã€Tokenã€SDK è¾“å‡ºæˆ–ä¸“æœ‰ wheelã€‚
-
-**Required next work**
-
-1. ç”± Reviewer å¯¹ P0-01/P0-02 å¤å®¡å¹¶å†³å®šæ˜¯å¦åˆå¹¶ï¼›åˆå¹¶å‰ä¸å¾—å¯åŠ¨ GT-H2ã€‚
-2. ä¿æŒ Formal Productionã€Data Sufficiencyã€Provider capability å’Œ 2020+ backfill å†»ç»“ã€‚
-3. GT-H1.1 åˆå¹¶åŽï¼ŒæŒ‰å¯è¿½æº¯æ¥æºé‡å»º clean reviewed corpusï¼Œå†æ‰§è¡Œ GT-H3 seal/replay/formal gateã€‚
-
-## DM-20260906-106 Â· GT-H1 Golden Truth structural identity / rebuild toolchain
-
-**Implementation Status**ï¼šIMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
-**Review Status**ï¼šPENDING_REVIEWï¼›æœ¬æ‰¹ä¸è‡ªè¡Œ CLOSE / MERGEã€‚
-**Base SHA**ï¼š`8f2ccb52a5ed2a58ef916a16a9c7e756173b08fd`
-**Authority**ï¼š[PR15 å…³é—­ä¸Ž GoldenTruth é‡å»ºå·¥ä½œè¦æ±‚](../design/A-share-analysis_PR15å…³é—­ä¸ŽGoldenTruthé‡å»ºå·¥ä½œè¦æ±‚_20260906.md)ï¼›GT-H1ã€‚
-**Gate**ï¼šGT-H1 å®Œæˆä¸‰å¹³å° required CI ä¸Ž Reviewer closure å‰ï¼ŒGT-H2 reviewed corpusã€Formal Productionã€Data Sufficiency å’Œ 2020+ backfill å‡ä¿æŒå†»ç»“ã€‚
-
-| ç®¡ç†è¦æ±‚ | æœ¬æ‰¹å®žçŽ° / éªŒè¯ä½ç½® | çŠ¶æ€ |
-|---|---|---|
-| æ˜¾å¼ ST/DELIST effective dateï¼Œç¦æ­¢ trade_date fallback | `src/ashare_state/spike/golden_store.py`ï¼›Golden gate/candidate tests | IMPLEMENTED / focused PASS |
-| Structural identity ä¸Ž free-form event_id è§£è€¦ | `st_event_identity`ã€`delist_event_identity`ã€`recompute_structural_statistics` | IMPLEMENTED / focused PASS |
-| è¿½åŠ å¼ clean rebuildï¼Œæ˜¾å¼ KEEP/REPLACE/DROP/ADD | `scripts/golden/candidate.py rebuild --plan` | IMPLEMENTED / focused PASS |
-| create-only dataset/manifest ä¸Ž ACTIVE åŽŸå­å‘å¸ƒ | candidate rebuild preflight/self-validationï¼›rebuild failure tests | IMPLEMENTED / focused PASS |
-| schema v2 manifest honesty | structural countsã€ADD/REMOVEã€DELIST securities row-level recomputation | IMPLEMENTED / focused PASS |
-| Review ä¸å¾—æå‡ä¸å®Œæ•´ç»“æž„äº‹ä»¶ | `scripts/golden/review.py`ï¼›incomplete-case regression | IMPLEMENTED / focused PASS |
-
-**Evidence separation**
-
-- æœ¬åœ°å®šå‘ Golden å›žå½’ 56 passedï¼›Ruff ä¸Ž `golden_store.py` mypy å®šå‘æ£€æŸ¥é€šè¿‡ã€‚
-- PR #16 çš„ GitHub Actions run 313 å·²å®Œæˆï¼šWindows 3.12ã€Windows 3.14ã€Ubuntu 3.14 ä¸‰æ¡ required CI å…¨ç»¿ï¼Œä¸” pytestã€Ruff/format/mypyã€Spikeã€SDK-absentã€DEVLOG å’Œç®¡ç†æ–‡æ¡£é—¨ç¦å‡æˆåŠŸï¼›ç‹¬ç«‹ Reviewer closure ä»å¾…å®Œæˆã€‚
-- v3 candidate æ–‡ä»¶æœªè¢«æ”¹å†™ï¼›æœ¬æ‰¹æ²¡æœ‰æ–°å¢ž Golden äº‹å®žã€è´¦å·ä¿¡æ¯æˆ–ä¸“æœ‰ä¾èµ–ï¼ŒFormal Production ä»æŒ‰ PR15 è®°å½•ä¸º NOT AUTHORIZEDã€‚
-
-**Required next work**
-
-1. ç”±ç‹¬ç«‹ Reviewer å®¡é˜… PR #16 å¹¶å†³å®šæ˜¯å¦åˆå¹¶ï¼›åˆå¹¶å‰ä¸è¿è¡ŒçœŸå®ž T1ã€‚
-2. åˆå¹¶åŽæŒ‰ GT-H2 é‡å»ºçœŸå®ž reviewed corpusï¼šåªä½¿ç”¨å¯å›žæº¯æ¥æºå¡«å†™æœ‰æ•ˆ `event_effective_date`ï¼Œä¸å¾—ç”¨ `trade_date` æˆ–è‡ªç”± `event_id` è¡¥æ•°ã€‚
-3. GT-H3 å®Œæˆ reviewed version sealã€bound replay ä¸Ž Formal gate å¤æ ¸åŽï¼Œæ‰èƒ½é‡æ–°è¯„ä¼° Production å’Œ Data Sufficiencyã€‚
-
-## DM-20260905-148 Â· AUDIT-H1 å½“å‰æ•´æ”¹çŠ¶æ€ï¼ˆè¦†ç›–ä¸‹æ–¹åŽ†å²å¤´éƒ¨ï¼‰
-
-**Implementation Status**ï¼šIMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_FINAL_CI  
-**Review Status**ï¼šPENDING_REVIEWï¼›æœ¬æ‰¹ä¸è‡ªè¡Œ CLOSE / MERGEã€‚  
-**Base SHA**ï¼š`c939b747a46d4fc2ef62b8a427b431751346449a`  
-**Type / Authority**ï¼šC1ï¼›[å¤–éƒ¨å®¡è®¡ REV-01â€”08 ç®¡ç†è£å†³](../design/A-share-analysis_å¤–éƒ¨å®¡è®¡REV01-08ç®¡ç†è£å†³ä¸Žæ•´æ”¹è·¯çº¿_20260905.md) Â§3 / Â§9ã€‚  
-**Current Gate**ï¼šAUDIT-H1 æœªå®Œæˆæœ€ç»ˆä¸‰å¹³å° required CIã€Reviewer å®¡é˜…åŠåˆå¹¶å‰ï¼Œæš‚åœçœŸå®ž T1ï¼›æ—§å¤´éƒ¨â€œä»…ç­‰å¾…æœ¬åœ°é…ç½®â€çš„æè¿°ä¸ºåŽ†å²çŠ¶æ€ï¼Œä¸æ˜¯å½“å‰æ‰§è¡Œè®¸å¯ã€‚
-
-| ç®¡ç†è¦æ±‚ | æœ¬æ‰¹å®žçŽ° / éªŒè¯ä½ç½® | çŠ¶æ€ |
-|---|---|---|
-| REV-01 online actual-load + offline evidence strength | production_account_bootstrap.pyï¼›test_audit_h1_trust_boundary.py | IMPLEMENTED / focused PASS |
-| REV-01 ç¡®å®šæ€§æ•°å­—æƒé™ | safe_diagnostics.parse_permission_codesï¼›AccountProfile ä¸Ž bootstrap å…±ç”¨ | IMPLEMENTED / focused PASS |
-| REV-02A safe diagnostic projection | safe_diagnostics.pyï¼›doctor / cli / bootstrap | IMPLEMENTED / focused PASS |
-| REV-02A nested scrub / error / fd capture | stdout_capture.py / session.pyï¼›H1 sentinel tests | IMPLEMENTED / focused PASS |
-| REV-02B ä¸´æ—¶ä»‹è´¨çœŸå®žè¯´æ˜Ž | provider_doctor.mdï¼›capture/bootstrap docstrings | DOCUMENTEDï¼›ä»‹è´¨é‡æž„ç•™å¾… REV-06 |
-| REV-04 three required CI legs | ci.ymlï¼›H1 workflow structure regression | IMPLEMENTED / final CI pending |
-
-**Evidence separation**
-
-- Repository-verifiableï¼šæœ¬åœ° Python 3.14.6ï¼Œ70 é¡¹ H1/bootstrap focused ä¸Žæ­¤å‰ 87 é¡¹ session/capture/provider focused å›žå½’é€šè¿‡ï¼›Ruff check/formatã€mypyï¼ˆ93 source filesï¼‰ã€compileallã€Spike dry-runã€SDK-absent é€šè¿‡ã€‚
-- å®Œæ•´ pytest ä¸Ž Git åŽ†å²æ²»ç†é—¨ç¦ï¼šæœ€ç»ˆ PR head çš„ä¸‰å¹³å° CI ç»“æžœä¸ºæƒå¨ï¼›æœ¬æäº¤æ—¶ä¸é¢„å…ˆå®£ç§°é€šè¿‡ã€‚éž Git checkout çš„æœ¬åœ°éš”ç¦»å‰¯æœ¬åªä½œæºç è¿è¡ŒéªŒè¯ã€‚
-- Controlled SDK/runtimeï¼šæœ¬æ‰¹æœªæµ‹è¯•çœŸå®ž SDKã€‚
-- Formal account / Productionï¼šæœ¬æ‰¹æœªæ‰§è¡Œï¼›ç©º identity config ä¸å˜ã€‚
-
-**Scope preservation / Next**
-
-åŽŸ profile digestã€CR-5/CR-6 frozen semanticsã€migrations 023/024ã€2020 åŽ†å²è¾¹ç•Œå’Œ capability çŠ¶æ€ä¸å˜ã€‚æŒ‰ GitHub è¿žæŽ¥å™¨ä»¥å•æäº¤åŒæ­¥ä»£ç ã€testsã€DEVLOG ä¸Žæœ¬æ€»å†Œï¼Œä¸æ‰©å±•åŽ†å²ä¾‹å¤–ã€‚
-æœ€ç»ˆ head å…¨é‡ä¸‰å¹³å° CI é€šè¿‡åŽäº¤ Reviewerï¼›åˆå¹¶å‰ä¸æ¢å¤ T1ï¼Œä¸é€šè¿‡æ•´æ”¹ PR å†»ç»“èº«ä»½ã€‚å…¶ä»– REV æŒ‰å¯¹åº” recovery/history/unattended/scale/replay gate å¦è¡ŒæŽ¨è¿›ã€‚
-
----
-
-
-> **ä»“åº“å›ºå®šè·¯å¾„ï¼ˆMUST NOT RENAMEï¼‰**ï¼š`docs/project/DEVELOPMENT_MANAGEMENT.md`  
-> **æ–‡æ¡£æ€§è´¨**ï¼šé•¿æœŸæŒç»­ç»´æŠ¤çš„é¡¹ç›®çº§â€œå½“å‰è®¾è®¡ + å½“å‰çŠ¶æ€ + å¼€å‘è®¡åˆ’ + å˜æ›´æŽ§åˆ¶â€æ€»å†Œ  
-> **é¡¹ç›®**ï¼šAè‚¡å¸‚åœºæ€åŠ¿æ•°æ®åŸºåº§ï¼ˆæ—¥é¢‘æ¨¡å—ï¼‰  
-> **Frozen Baseline**ï¼šV1.3.2  
-> **Reviewed Repository HEAD**ï¼š`5f76ad411801998de7bd3be7f26c880a73005853`ï¼ˆGT-H1 closure merge ä¹‹åŽã€GT-H2 candidate construction åˆ†æ”¯çš„æº mainï¼›åˆ†æ”¯åŽ†å²ä¿æŒ append-onlyï¼‰
-> **Primary Implementationï¼ˆCR-6.4 + 2020+ history contractï¼‰**ï¼šCR-6.4 implementation `e47514a8afc864c9f197e18f95ea56fe81424a2d` å·²éš PR #6 åˆå…¥ mainï¼›2020+ contract source commits `4f83f7ac` / `5494a63f` / `33537559`ï¼Œformat correction `22a99107`ï¼›State/Provider è¯­ä¹‰è¾¹ç•Œä¿æŒå†»ç»“ã€‚  
-> **Latest full code CI baselineï¼ˆPR #9 candidateï¼‰**ï¼šæµ‹è¯•/ä»£ç  head `75b998a79931b8c7d0c9ebf67bcd7a1a4549c0df` å¯¹åº” GitHub Actions run `33937401530`ï¼Œå·²åœ¨ Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 ä¸‰çŸ©é˜µæˆåŠŸï¼›æ¯è…¿ `1485 passed`ï¼ŒRuff lint/formatã€mypyã€Spikeã€SDK-absent åŠé€‚ç”¨çš„ DEVLOG/Management gates å‡æˆåŠŸã€‚  
-> **Current Code Baseline**ï¼šCR-5 å·² VERIFIED / CLOSED / FREEZE å¹¶åœ¨ PR #3 merge commit `075ad80e5254998a0662a0f9c1cadc107a217fdb` ç”Ÿæ•ˆï¼›CR-6.0â€“6.4 çš„ Registryã€deterministic Stateã€artifact/ledger/replayã€scope guardã€fatal-vs-persisted contract å’Œ 1â€“64 evidence mapping å·²å®žçŽ°å¹¶åœ¨ PR #6 åˆå…¥ mainï¼›2020+ history contractï¼ˆ`history_start_2020` / `history_coverage_2020_v1`ï¼Œèµ·ç‚¹ `20200101`ï¼‰å·²åŒæ­¥ä»£ç ã€æµ‹è¯•å’Œ Provider æ–‡æ¡£ï¼›CR-6 å·²éš PR #6 åˆå…¥ mainï¼›PR #8.1 CLI / resume honesty å½“å‰ VERIFIED (CI) / PENDING_REVIEWï¼›P0-M-1B.0 scrubbed bootstrap ä¸Ž positive identity gates å½“å‰ VERIFIED (CI) / CLOSED / MERGEDï¼ˆPR #9ï¼‰ï¼›P0-M-1B.0.1 positive identity contract honesty å½“å‰ VERIFIED (CI) / CLOSED / MERGEDï¼ˆPR #9ï¼‰ï¼›Production Runner Anchored Wiring P0 å½“å‰ VERIFIED (CI) / PENDING_REVIEWï¼›Production P0-M-1B ä»ç‹¬ç«‹ BLOCKEDï¼šT1 controlled online bootstrap åœ¨æœ¬åœ°å‡­è¯é—¨ç¦å¤„ NOT_TESTABLE_ACCOUNTï¼Œå°šæœªäº§ç”Ÿ live identity candidateã€‚  
-> **Document Revision**ï¼šæ—¢æœ‰ DM-CR-20260830-054..060 / DM-20260831-061..064 / DM-20260901-065..070 / DM-20260902-071..074 / DM-20260903-075..082 / DM-20260904-083..085ï¼›æ–°å¢ž DM-20260904-100 / 101 / 102 / 103 / 104 / 105 / DM-20260904-106 / DM-20260904-107 / DM-20260904-108 / DM-20260904-109 / DM-20260904-110 / DM-20260904-111 / DM-20260904-112 / DM-20260904-113 / DM-20260904-114 / DM-20260904-115 / DM-20260904-116 / DM-20260904-117 / DM-20260904-118 / DM-20260904-119 / DM-20260904-120 / DM-20260904-121 / DM-20260904-124 / DM-20260904-125 / DM-20260904-126 / DM-20260904-127 / DM-20260904-128 / DM-20260904-129 / DM-20260905-130 / DM-20260905-131 / DM-20260905-132 / DM-20260905-133 / DM-20260905-134 / DM-20260905-135 / DM-20260905-136 / DM-20260905-137 / DM-20260905-138 / DM-20260905-139 / DM-20260905-140 / DM-20260905-141 / DM-20260905-142 / DM-20260905-143 / DM-20260905-144 / DM-20260905-145 / DM-20260905-146 / DM-20260905-147 / DM-20260906-109
-> **Last Review**ï¼š2026-09-05ï¼ˆPR #9 å·²åˆå¹¶ï¼›è¿›å…¥ T1 controlled online bootstrapã€‚clean main `c22a7111cda3ba9c86ca17aec4cfd85a2ee1955a` çš„ç¦»çº¿ SDK/runtime preflight å·²é€šè¿‡ï¼Œä½†åœ¨çº¿å…¥å£å› æœ¬åœ°æœªæä¾›å®‰å…¨å‡­è¯æ³¨å…¥è€Œè¿”å›ž `NOT_TESTABLE_ACCOUNT` / exit 2ï¼›æœªäº§ç”Ÿ live identity candidateï¼Œé…ç½®ç»§ç»­ä¸ºç©ºï¼‰  
-> **Last Reviewer**ï¼šDesign / Audit Review  
-> **CI Status**ï¼šPR #9 candidate çš„ P0-M-1B.0.1 final code/test run `33937401530` åœ¨ Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 ä¸‰çŸ©é˜µå…¨ç»¿ï¼Œæ¯è…¿ `1485 passed`ï¼›Ruff lint/formatterã€mypyã€full pytestã€Spikeã€SDK-absent å’Œé€‚ç”¨çš„ DEVLOG/Management gates å‡ successã€‚main çš„ merge-gate åŽ†å²åŸºçº¿ä¸å› æœ¬ PR è‡ªåŠ¨æ”¹å˜ã€‚  
-> **Phase Statusï¼ˆ2026-09-05ï¼ŒP0-M-1B.0 identity guard CI verification + local offline bootstrap preflightï¼‰**ï¼šR4-A2.x / CR-1.x â†’ **CLOSED / VERIFIED / FREEZEï¼ˆä¸é‡å¼€ï¼‰**ï¼›R4-A3 / A3.1 / A3.2 â†’ **CLOSED / VERIFIED / FREEZEï¼ˆä¸é‡å¼€ï¼‰**ï¼›R4-B1 / B1.1 / B1.2 â†’ **CLOSED / VERIFIED / FREEZEï¼ˆä¸é‡å¼€ï¼›ADR-020 ACCEPTEDï¼‰**ï¼›R4-B2 / B2.1 / B2.2 / B2.3 â†’ **CLOSED / VERIFIED / FREEZEï¼ˆä¸é‡å¼€ï¼›ADR-021 ACCEPTEDï¼‰**ï¼›CR-2 å…¨é“¾ â†’ **VERIFIED / CLOSED / FREEZEï¼ˆADR-022 ACCEPTEDï¼‰**ï¼›CR-3 å…¨é“¾ â†’ **VERIFIED / CLOSED / FREEZEï¼ˆADR-023 ACCEPTEDï¼‰**ï¼›CR-4 å…¨é“¾ â†’ **VERIFIED / CLOSED / FREEZEï¼ˆADR-024 ACCEPTEDï¼‰**ï¼›CR-5 / CR-5.1 / CR-5.2 / CR-5.2.1 â†’ **VERIFIED / CLOSED / FREEZEï¼ˆADR-025 ACCEPTEDï¼›PR #3 mergedï¼‰**ï¼›CR-6 State â†’ **VERIFIED / CLOSED / FREEZEï¼ˆCR-6.4 final Reviewer closure acceptedï¼›ADR-026 ACCEPTEDï¼‰**ï¼›2020+ history contract â†’ **VERIFIED / KEEPï¼ˆOwner-approved 2020+ contract implementationï¼›Provider capability remains pendingï¼‰**ï¼›P0-M-1B.0 / P0-M-1B.0.1 identity contract â†’ **VERIFIED (CI) / CLOSED / MERGEDï¼ˆPR #9ï¼‰**ï¼›Production P0-M-1B â†’ **T1 NOT_TESTABLE_ACCOUNT / BLOCKED BY LOCAL SECRET INJECTION**ï¼ˆproduction_account.yaml ä»ä¸ºç©ºï¼›æœªäº§ç”Ÿ live identity/entitlementã€formal B1-B7ã€Golden/Data Sufficiency Matrix æˆ–äººå·¥ confirmationï¼‰  
-> **Production Runner Anchored Wiringï¼ˆPR #8 reviewï¼‰**ï¼šoriginal anchored-wiring P0 å·² VERIFIED (CI) / PENDING_REVIEWï¼›PR #8.1 CLI / resume honesty å·² VERIFIED (CI) / PENDING_REVIEWï¼›PR #8 å·²äºŽ `74ae84e0e6950f7f7dc926d225be105fdb99279a` åˆå…¥ mainï¼›å½“å‰è¿›å…¥ P0-M-1B.0 å—æŽ§ identity candidate / human confirmation é˜¶æ®µã€‚  
-> **Historical snapshotï¼ˆå·²è¢«ä¸Šæ–¹å½“å‰çŠ¶æ€å–ä»£ï¼‰**ï¼šR4-A2.x / CR-1.x â†’ **CLOSED / VERIFIED / FREEZEï¼ˆä¸é‡å¼€ï¼‰**ï¼›R4-A3 / A3.1 / A3.2 â†’ **CLOSED / VERIFIED / FREEZEï¼ˆä¸é‡å¼€ï¼‰**ï¼›R4-B1 / B1.1 / B1.2 â†’ **CLOSED / VERIFIED / FREEZEï¼ˆä¸é‡å¼€ï¼‰**ï¼›R4-B2 / B2.1 / B2.2 / B2.3 â†’ **CLOSED / VERIFIED / FREEZEï¼ˆä¸é‡å¼€ï¼›ADR-021 ACCEPTEDï¼‰**ï¼›CR-2 å…¨é“¾ â†’ **VERIFIED / CLOSED / FREEZEï¼ˆADR-022 ACCEPTEDï¼‰**ï¼›CR-3 å…¨é“¾ â†’ **VERIFIED / CLOSED / FREEZEï¼ˆADR-023 ACCEPTEDï¼‰**ï¼›CR-4 å…¨é“¾ â†’ **VERIFIED / CLOSED / FREEZEï¼ˆADR-024 ACCEPTEDï¼‰**ï¼›CR-5 â†’ **DONE / REOPENED**ï¼ˆä¸»ä½“ PASSï¼›ä»…å‰© P1 bounded lineageï¼‰ï¼›CR-5.1 â†’ **VERIFIED / CLOSED / FREEZE**ï¼ˆcorrectness closureï¼‰ï¼›CR-5.2 â†’ **DONE / PENDING_REVIEW**ï¼ˆbounded selected-input lineageï¼›run 176 ä¸‰å¹³å°å…¨ç»¿ï¼ŒReviewer closure pendingï¼‰ï¼›CR-6 State â†’ **BLOCKED_BY_CR-5.2**ï¼›Production P0-M-1B â†’ **BLOCKED independently**ï¼ˆproduction_account.yaml ä»ä¸ºç©º + äººå·¥ Golden/Rule Review + æ­£å¼è´¦å·æ¡ä»¶ï¼‰  
-> **SHA Correctionï¼ˆ2026-08-31 17:42ï¼ŒReviewer CR-2 å¤å®¡ P1-01ï¼‰**ï¼šCR-2 æ‰¹æ¬¡å¤´éƒ¨ä¸Ž Implementation Mapping æ›¾è®°å½• implementation SHA `15cdae2e4f1a9df3b7844480979a2f1cb2b2f464`â€”â€”è¯¥ SHA éžçœŸå®ž implementation commitï¼›ä»¥ GitHub commit object ä¸ºå‡†ï¼š`15cdae25fd7d11e3be0da3683e821629e4226291`ï¼ˆrun 33378006770 å…³è” commitï¼‰ã€‚åŽ†å²æ¡ç›®åŽŸæ–‡ä¿ç•™ï¼ŒCR-2 å·¥ä½œè¦æ±‚æ–‡æ¡£å·²è¿½åŠ  Â§12 æ›´æ­£ã€‚  
-> **Governance Count Correctionï¼ˆReviewerï¼Œ2026-08-30ï¼‰**ï¼šADR-020 Amendment C.3 æ‰€å†™"SDK_METHOD_CLASSIFICATIONS è¡¨ï¼ˆ19 æ¡ï¼‰"ç» Reviewer é€é¡¹è®¡æ•°å®žä¸º **18 æ¡**ï¼ˆæ²»ç†æ–‡æ¡£æ•°å­—é”™è¯¯ï¼Œéž runtime ç¼ºé¡¹â€”â€”ç»“æž„å®ˆå« exact-set æœ¬èº«é€šè¿‡ï¼‰ï¼›å·²éš R4-B1.2 amendment D.3 æ›´æ­£ï¼ŒåŽ†å²ä¿ç•™ã€‚**Count Correctionï¼ˆ2026-08-31ï¼ŒCR-2 å¤å®¡ P1-02ï¼‰**ï¼šADR-022 Â§2.2 æ›¾å†™"9 SUPPORTED / 5 BLOCKED_PENDING_MAPPER"â€”â€”è¯¥æ‰¹å®žé™… 10/4ï¼Œä¸” 14 æ¡æœªè¦†ç›– index_daily ç­‰ capability surfaceï¼›CR-2.1 åŽ registry ä¸º **18 æ¡ï¼ˆ11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLEï¼Œruntime exact-set ç»Ÿè®¡ï¼‰**ï¼Œå·²éš ADR-022 Amendment A Â§6.1 æ›´æ­£ï¼ŒåŽ†å²ä¿ç•™ã€‚  
-> **SHA Correctionï¼ˆ2026-08-27ï¼ŒP1 æ²»ç†ï¼‰**ï¼šä¸Šæ‰¹å¤´éƒ¨è®°å½•çš„ R4-A3 implementation SHA `de9bf1ab6c5a75e4d57b8b84e5b16b20ed1ba2fe` æœ‰è¯¯ï¼Œä»¥ GitHub commit object ä¸ºå‡†ï¼š`de9bf1ab6f499b20916f8277dba45c21880fd908`ï¼ˆä¸Ž run 55 å…³è” commitï¼‰ï¼›åŒæ‰¹ SHA è®°å½• commit = `b5284bdc83631454c1d46add9e3478f86d81386e`ã€‚åŽ†å²æ¡ç›®åŽŸæ–‡ä¿ç•™ã€‚  
-> **SHA Correctionï¼ˆReviewerï¼Œ2026-08-26ï¼‰**ï¼šä¸Šæ‰¹è®°å½•çš„ `38da90e583a83dd0e83991987df7f29ddbc7189c6` / `6eac92dc1bfb7a3aa70619dc34695930e88a51af` æœ‰è¯¯ï¼Œä»¥ GitHub commit object ä¸ºå‡†ï¼š`38da90e5b5f3d698cc909cf7c258c163081bb9af` / `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`ï¼ˆæœ¬å¤´éƒ¨å³ä¸ºä¿®æ­£è®°å½•ï¼›åŽ†å²æ¡ç›®åŽŸæ–‡ä¿ç•™ï¼‰  
-> **çŠ¶æ€**ï¼šACTIVE / LIVING DOCUMENT  
-> **æ—¶é—´æ ‡å‡†**ï¼šæœ¬æ–‡æ¡£æ‰€æœ‰äººè¯»æ—¶é—´ä½¿ç”¨ `YYYY-MM-DD HH:mm +08:00`ï¼ˆAsia/Shanghaiï¼‰æˆ–ä»…æ—¥æœŸï¼›trade_date / market session / human timestamp å¿…é¡»æ˜Žç¡®åŒºåˆ†ã€‚
-
----
-
-## DM-20260905-147 Â· Post-merge T1 controlled online bootstrap preflight
-
-**Type**ï¼šC1 â€” controlled production identity preflight  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šNOT_TESTABLE_ACCOUNT / BLOCKED_BY_LOCAL_SECRET_INJECTION / PENDING_REVIEW  
-**Evidence**ï¼šmain head `c22a7111cda3ba9c86ca17aec4cfd85a2ee1955a` åŒ…å« PR #9 merge commit `f38e77ff2cbcf040837bc1c15504f847e1cfb1d8`ï¼›Windows Python 3.14.6 ç¦»çº¿ preflight å®žé™…åŠ è½½ `AmazingData==1.1.9` ä¸Ž `tgw==1.0.9.2`ï¼ŒçŠ¶æ€ `OFFLINE_RUNTIME_VERIFIED`ã€‚
-
-- å—æŽ§ online bootstrap æœªè¿›å…¥ç™»å½•ï¼šæœ¬åœ°å·¥ä½œåŒºæ²¡æœ‰ `.env`ï¼Œè¿›ç¨‹çŽ¯å¢ƒæ²¡æœ‰ `TGW_*` å˜é‡ï¼›å®‰å…¨æ— å‡­è¯æ£€æŸ¥è¿”å›ž `NOT_TESTABLE_ACCOUNT` / exit 2ã€‚è¯¥ç»“æžœä¸æ˜¯ live bootstrapï¼Œä¸äº§ç”Ÿ candidateï¼Œä¹Ÿä¸æž„æˆè´¦å·äº‹å®žã€‚
-- `configs/production_account.yaml` ç»§ç»­ä¸ºç©ºï¼›å‡­è¯ã€Tokenã€çœŸå®ž endpointã€raw profile å’Œ raw SDK è¾“å‡ºæœªè¿›å…¥ GitHubã€‚
-- T1 æœªå®Œæˆå‰ä¸è¿›å…¥ T2 human confirmationã€T3 identity-freezeã€Production B1-B7ã€Data Sufficiencyã€verdict æˆ– Provider approvalã€‚
-
-**Next**
-
-- ç”±å—æŽ§ Windows operator åœ¨æœ¬åœ°è¿›ç¨‹çŽ¯å¢ƒæˆ–æœªè¢« Git è·Ÿè¸ªçš„ `.env` ä¸­å®‰å…¨æ³¨å…¥å‡­è¯åŽï¼Œé‡æ–°æ‰§è¡Œä»“åº“å”¯ä¸€ bootstrap å…¥å£ï¼›å…ˆå®¡æŸ¥ scrubbed projectionï¼Œå†å†³å®šæ˜¯å¦è¿›å…¥ T2ã€‚
-
-
-## DM-20260905-146 Â· P0-M-1B.0.1 bootstrap whitespace regression closure
-
-**Type**ï¼šC1 â€” reviewer-required regression coverage  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šVERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE  
-**Evidence**ï¼šæµ‹è¯•/ä»£ç  head `75b998a79931b8c7d0c9ebf67bcd7a1a4549c0df`ï¼›GitHub Actions run `33937401530`ï¼›Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 æ¯è…¿ `1485 passed`ã€‚
-
-- å·²è¡¥å…… doctor `account_profile_id` å‰åŽç©ºç™½çš„å‚æ•°åŒ– bootstrap integration coverageï¼›ä¸¤ç§è¾“å…¥å‡å¿…é¡» fail closedï¼Œä¸èƒ½è¿›å…¥ `IDENTITY_CANDIDATE`ã€‚
-- Ruff lint/formatã€mypyã€å®Œæ•´ pytestã€Spikeã€SDK-absent å’Œé€‚ç”¨æ²»ç†é—¨ç¦å‡é€šè¿‡ï¼›`configs/production_account.yaml` ç»§ç»­ä¸ºç©ºã€‚
-- PR #9 çš„æŠ€æœ¯é—­çŽ¯å·²é‡æ–°æäº¤æœ€ç»ˆå®¡é˜…ï¼›æœ¬é¡¹ä¸æ‰§è¡Œ online bootstrapã€identity freezeã€Production B1-B7ã€Data Sufficiencyã€verdict æˆ– Provider approvalã€‚
-
-**Next**
-
-- ç­‰å¾… Owner/Reviewer å¯¹ PR #9 æœ€ç»ˆå®¡é˜…å¹¶åˆå¹¶ï¼›åˆå¹¶åŽå†æŒ‰æ–‡æ¡£å¯åŠ¨å—æŽ§ online bootstrapã€‚
-
-
-## DM-20260905-145 Â· P0-M-1B.0.1 full matrix closure
-
-**Type**ï¼šC1 â€” reviewer requirement exit-gate closure
-**Date**ï¼š2026-09-05
-**Status**ï¼šVERIFIED (CI) / CLOSED / READY_FOR_REVIEWED_MERGE
-**Evidence**ï¼šGitHub Actions run `33935433194`ï¼›Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 æ¯è…¿ `1483 passed`ï¼ŒRuff lint/formatã€mypyã€Spikeã€SDK-absent ä¸Žé€‚ç”¨æ²»ç†é—¨ç¦å…¨ç»¿ã€‚
-
-- generated scrubbed id shape å·²ä¸Ž `AccountProfile` å½“å‰ç”ŸæˆåˆåŒå¯¹é½ï¼›åªæœ‰ `UNKNOWN_<12hex>` å¯ä½œä¸º freezable production candidateã€‚
-- Trial profileã€legacy/arbitrary kindã€é”™è¯¯ digest é•¿åº¦ã€å¤§å°å†™å¼‚å¸¸å’Œå‰åŽç©ºæ ¼å‡ä¸ä¼šè¿›å…¥ production identity candidateã€‚
-- `configs/production_account.yaml` ä¿æŒç©ºç™½ï¼›æœ¬é¡¹ä¸æ‰§è¡Œ online bootstrapã€Production B1-B7ã€Data Sufficiencyã€verdict æˆ– Provider approvalã€‚
-- PR #9 çŽ°åœ¨å…·å¤‡æŠ€æœ¯ä¸Šçš„ reviewed-merge æ¡ä»¶ï¼Œä½†ä¸ç”±æœ¬æ¬¡ä»»åŠ¡è‡ªåŠ¨åˆå¹¶ï¼›åˆå¹¶åŽæ‰å…è®¸ä»Ž clean main å¯åŠ¨å—æŽ§ online bootstrapã€‚
-## DM-20260905-144 Â· P0-M-1B.0.1 whitespace validation correction
-
-**Type**ï¼šC1 â€” identity whitespace fail-closed correction
-**Date**ï¼š2026-09-05
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW
-**Trigger**ï¼šrun `33930460380` åœ¨ identity config focused tests ä¸­å‘çŽ° loader å¯¹ profile-id å…ˆ stripï¼Œå¯¼è‡´å¸¦ç©ºæ ¼çš„å€¼é€šè¿‡ strict predicateã€‚
-
-- loader ä¸Ž bootstrap projection çŽ°åœ¨å‡ä¿ç•™ profile-id åŽŸå€¼ï¼Œå†æ‰§è¡Œ generated/freezable predicateï¼›å‰åŽç©ºæ ¼ä¸ä¼šè¢«é™é»˜è§„èŒƒåŒ–ã€‚
-- è¿è¡Œæ—¶ contractã€Trial non-freezable gateã€ç©ºé…ç½®ç­–ç•¥å’Œ test-only fixture è¾¹ç•Œä¸å˜ã€‚
-- è¯¥ run çš„ Ruffã€formatã€mypy å·²é€šè¿‡ï¼Œä½† pytest ä¸º 1481 passed / 2 failedï¼ŒåŽç»­ Spikeã€SDK-absent å’Œæ–‡æ¡£ gatesæœªå½¢æˆæœ‰æ•ˆå…¨ç»¿è¯æ®ã€‚
-- Online bootstrapã€Production B1-B7ã€Data Sufficiencyã€verdict å’Œ Provider approval ç»§ç»­ç¦æ­¢æ‰§è¡Œã€‚
-
-**Next**
-
-- ä»¥ä¿®æ­£æäº¤çš„æ–°ä¸‰å¹³å° CI ä¸ºå‡†ï¼Œç¡®è®¤ whitespace/config closure åŠå®Œæ•´å›žå½’åŽå†å…³é—­è¯¥é¡¹ã€‚
-## DM-20260905-143 Â· P0-M-1B.0.1 format gate closure follow-up
-
-**Type**ï¼šC0 â€” final formatter correction
-**Date**ï¼š2026-09-05
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW
-**Trigger**ï¼šrun `33930352036` çš„ä¸‰å¹³å° format check ä»…æŠ¥å‘Šæµ‹è¯•æ–‡ä»¶æ–°å¢žæ–¹æ³•å‰å­˜åœ¨å¤šä½™ç©ºè¡Œã€‚
-
-- å·²åˆ é™¤å¤šä½™ç©ºè¡Œï¼›ä¸šåŠ¡é€»è¾‘ã€predicateã€Trial gateã€æµ‹è¯•è¯­ä¹‰å’Œé…ç½®è¾¹ç•Œä¸å˜ã€‚
-- è¯¥ run çš„åŽç»­è´¨é‡ä¸Žæ²»ç† gates æœªæ‰§è¡Œå®Œæˆï¼Œå› æ­¤ä¸èƒ½è®¡ä½œ P0-M-1B.0.1 é€šè¿‡ã€‚
-- Online bootstrapã€Production B1-B7ã€Data Sufficiencyã€verdict å’Œ Provider approval ç»§ç»­ç¦æ­¢æ‰§è¡Œã€‚
-
-**Next**
-
-- ä»¥ä¿®æ­£æäº¤çš„æ–°ä¸‰å¹³å° CI ä¸ºå‡†ï¼Œå®Œæˆå…¨çŸ©é˜µéªŒè¯åŽå†å…³é—­è¯¥é¡¹ã€‚
-## DM-20260905-142 Â· P0-M-1B.0.1 formatter follow-up
-
-**Type**ï¼šC0 â€” formatter and CI infrastructure follow-up
-**Date**ï¼š2026-09-05
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW
-**Trigger**ï¼šrun `33928995279` çš„ Ubuntu/Windows 3.12 format check æŠ¥å‘Šä¸‰å¤„ formatter mismatchï¼›Windows 3.14 åŒä¸€ run åœ¨ Install uv é˜¶æ®µå¤±è´¥ã€‚
-
-- å·²æŒ‰ formatter ç²¾ç¡®è¾“å‡ºæŠ˜å  bootstrap æ¡ä»¶è¡¨è¾¾å¼ä¸Žä¸¤ä¸ªæµ‹è¯•å‡½æ•°ç­¾åï¼›ä¸šåŠ¡é€»è¾‘å’Œæ²»ç†è¾¹ç•Œä¸å˜ã€‚
-- è¯¥ run çš„åŽç»­ mypyã€pytestã€Spikeã€SDK-absent å’Œæ–‡æ¡£ gates æœªå½¢æˆæœ‰æ•ˆé€šè¿‡è¯æ®ï¼›Windows 3.14 è¿˜éœ€ç¡®è®¤å®‰è£…é˜¶æ®µå¤±è´¥æ˜¯å¦ä¸ºçž¬æ—¶åŸºç¡€è®¾æ–½é—®é¢˜ã€‚
-- Online bootstrapã€Production B1-B7ã€Data Sufficiencyã€verdict å’Œ Provider approval ç»§ç»­ç¦æ­¢æ‰§è¡Œã€‚
-
-**Next**
-
-- ä»¥ä¿®æ­£æäº¤çš„æ–°ä¸‰å¹³å° CI ä¸ºå‡†ï¼›åªæœ‰å…¨çŸ©é˜µåŠé€‚ç”¨æ²»ç†é—¨ç¦å‡æˆåŠŸï¼Œæ‰å…³é—­ P0-M-1B.0.1ã€‚
-## DM-20260905-141 Â· P0-M-1B.0.1 formatter correction
-
-**Type**ï¼šC0 â€” CI-reported formatting correction
-**Date**ï¼š2026-09-05
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW
-**Trigger**ï¼šrun `33928676300` åœ¨ä¸‰ä¸ªå¹³å°å‡äºŽ Ruff lint é˜¶æ®µæŠ¥å‘Š `production_account_bootstrap.py:151` çš„ E501ã€‚
-
-- ä»…æ‹†åˆ†è¶…è¿‡ 100 åˆ—çš„ profile-id projection è¡¨è¾¾å¼ï¼›identity contractã€Trial non-freezable gateã€æµ‹è¯•è¯­ä¹‰å’Œç©ºé…ç½®ç­–ç•¥ä¸å˜ã€‚
-- è¯¥ run çš„ pytestã€mypyã€Spikeã€SDK-absent å’Œæ–‡æ¡£ gates å›  Ruff å¤±è´¥è€Œæœªæ‰§è¡Œï¼Œä¸èƒ½æ®æ­¤å®£ç§°å›žå½’é€šè¿‡ã€‚
-- Online bootstrapã€Production B1-B7ã€Data Sufficiencyã€verdict å’Œ Provider approval ç»§ç»­ç¦æ­¢æ‰§è¡Œã€‚
-
-**Next**
-
-- ç­‰å¾…ä¿®æ­£æäº¤çš„å…¨çŸ©é˜µ CI å®Œæˆï¼Œå¹¶ä»¥å®žé™…ç»¿è‰²ç»“æžœå…³é—­ P0-M-1B.0.1ã€‚
-## DM-20260905-140 Â· P0-M-1B.0.1 positive identity contract honesty closure
-
-**Type**ï¼šC1 â€” generated identity contract and bootstrap candidate gate
-**Date**ï¼š2026-09-05
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW
-**Trigger**ï¼šreviewer requirement identified a mismatch between the current AccountProfile generator and the wider scrubbed-id regex, plus a Trial-to-candidate honesty gap.
-
-- `is_generated_scrubbed_profile_id` now accepts only `UNKNOWN_<12hex>` and `TRIAL_SIMULATION_<12hex>`; `is_freezable_production_candidate_id` accepts only `UNKNOWN_<12hex>`.
-- Frozen config loading rejects legacy `ACCOUNT_*`, fake `PRODUCTION_*`, arbitrary kinds, wrong digest lengths, uppercase hex and whitespace; Trial profiles remain non-freezable.
-- Bootstrap returns an explicit `TRIAL_ACCOUNT_NOT_FREEZABLE` status for a successful known Trial profile and never emits `IDENTITY_CANDIDATE` for invalid/arbitrary ids.
-- Focused tests cover exact generated candidate and frozen review paths, while test fixtures remain test-only and `configs/production_account.yaml` remains empty.
-- No online bootstrap, formal Production B1-B7, Data Sufficiency, verdict or Provider approval is executed in this closure.
-
-**Next / Exit Gate**
-
-- Run the existing full regression and three-platform CI; only after all P0-M-1B.0.1 gates pass may PR #9 be considered merge-ready. Controlled online bootstrap remains prohibited until PR #9 is merged.
-## DM-20260905-139 Â· P0-M-1B.0 local offline bootstrap preflight
-
-**Type**ï¼šC1 â€” local SDK/runtime preflight  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šVERIFIED (LOCAL OFFLINE) / READY_FOR_CONTROLLED_ONLINE_RUN / PENDING_REVIEW  
-**Trigger**ï¼šåœ¨ä¸è¯»å–å‡­è¯ã€ä¸è¿žæŽ¥æ­£å¼æœåŠ¡ç«¯çš„å‰æä¸‹ï¼Œå¯¹å½“å‰ PR #9 ä»£ç  head `e8acd855` å»ºç«‹æœ¬åœ°éš”ç¦»æ‰§è¡Œå‰¯æœ¬å¹¶å®Œæˆ offline bootstrapã€‚
-
-- Windows Python 3.14.6ã€`AmazingData==1.1.9`ã€`tgw==1.0.9.2` å‡å°±ç»ªï¼›SDK çŠ¶æ€ `SDK_INSTALLED`ï¼Œè¿è¡Œæ—¶å®žé™…åŠ è½½ verdict `RUNTIME_ACTUAL_LOAD_VERIFIED`ï¼Œbootstrap çŠ¶æ€ `OFFLINE_RUNTIME_VERIFIED`ã€‚
-- æœ¬æ¬¡åªéªŒè¯ SDK/runtime å¯¼å…¥ã€åŠ è½½å’Œ safe projectionï¼›æ²¡æœ‰è®¤è¯ã€ç½‘ç»œæŸ¥è¯¢æˆ–æ­£å¼è´¦å·èº«ä»½åˆ¤æ–­ã€‚
-- `configs/production_account.yaml` ç»§ç»­ä¿æŒç©ºç™½ï¼›æ­£å¼ identity freezeã€Data Sufficiency Matrixã€verdictã€Provider approval ä¸Ž B1-B7 ä¸å¾—å› æœ¬æ¬¡ç¦»çº¿ç»“æžœæå‰æ‰§è¡Œã€‚
-- æœ¬åœ° SDK wheelã€ä¾èµ–åŒ…ã€ä¸´æ—¶æºç å‰¯æœ¬å’Œä»»ä½•å‡­è¯å‡ä¸è¿›å…¥ GitHubã€‚
-
-**Blocker / Next**
-
-- Online bootstrap ä»éœ€å—æŽ§è¿›ç¨‹å®‰å…¨èŽ·å¾— `TGW_USERNAME`ã€`TGW_PASSWORD`ã€`TGW_SERVER_VIP`ã€`TGW_SERVER_PORT`ï¼›åœ¨æ­¤ä¹‹å‰ä¸å¾—äº§ç”Ÿæ­£å¼ identity candidate æˆ–å†»ç»“é…ç½®ã€‚
-  
-## DM-20260905-138 Â· P0-M-1B.0 final candidate CI verification
-
-**Type**ï¼šC1 â€” final test-fixture and identity-gate CI verification  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šVERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW  
-**Trigger**ï¼šå½“å‰ PR #9 ä»£ç  head `66ab5ec7` å¯¹åº” run `33899576457`ï¼ˆrun 277ï¼‰å®Œæˆä¸‰å¹³å°å®Œæ•´éªŒè¯ã€‚
-
-- Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 å‡é€šè¿‡ Ruff lint/formatã€mypyã€`1449 passed`ã€Spike dry-run å’Œ SDK-absent æ£€æŸ¥ï¼›Windows 3.14 çš„ DEVLOG/Management governance gates ä¹Ÿé€šè¿‡ã€‚
-- run 275/276 çš„ä¸¤ä¸ª fixture-only å¤±è´¥å·²ä¿®æ­£ï¼›æœ€ç»ˆå¤¹å…·åªä½¿ç”¨ test-only host å’Œæ•°å€¼å“¨å…µï¼Œä¸è¿žæŽ¥ç½‘ç»œï¼Œä¹Ÿä¸ä»£è¡¨çœŸå®žæœåŠ¡ç«¯ç‚¹ã€‚
-- å½“å‰è¯æ®ä»åªè¦†ç›–ä»“åº“ guard ä¸Žå›žå½’æµ‹è¯•ï¼›PR #9 ä¿æŒ open / PENDING_REVIEWï¼Œä¸åˆå¹¶ PRï¼Œä¸æŠŠ CI ç»“æžœè§£é‡Šä¸º live identity æˆ– profile è¯æ®ã€‚
-
-**Evidence / Blocker**
-
-- `configs/production_account.yaml` ä»ä¸ºç©ºã€‚æ­£å¼ identity freezeã€Data Sufficiency Matrixã€verdict å’Œ Provider approval ç»§ç»­ blocked / not executedã€‚
-- å‡­è¯ã€Tokenã€hostã€portã€åŽŸå§‹ profile å’ŒåŽŸå§‹ SDK æ—¥å¿—ä¸è¿›å…¥ GitHubï¼›ä¸‹ä¸€æ­¥ä»æ˜¯å—æŽ§ Windows + å®˜æ–¹ SDK çš„ online bootstrap ä¸Žäººå·¥ç¡®è®¤ã€‚
-
-## DM-20260905-137 Â· P0-M-1B.0 fixture assertion correction
-
-**Type**ï¼šC0 â€” test-only endpoint assertion correction  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 276 çš„ Ubuntu pytest å‘çŽ° bootstrap å¯¹æŠ—æµ‹è¯•çš„ expected credentials tuple æœªåŒæ­¥å‰ä¸€æäº¤çš„ test-only è¾“å…¥å¤¹å…·ã€‚
-
-- å°†æ–­è¨€åŒæ­¥ä¸º test-only host ä¸Žæ•°å€¼å“¨å…µ `0`ï¼›ä¸è¿žæŽ¥ç½‘ç»œã€ä¸ä»£è¡¨å®žé™…æœåŠ¡ç«¯ç‚¹ï¼Œä¹Ÿä¸æ”¹å˜æµ‹è¯•ç›®æ ‡æˆ–è¿è¡Œè¯­ä¹‰ã€‚
-- æœ¬æäº¤ä»…ä¿®æ­£æµ‹è¯•æ–­è¨€ï¼Œå¹¶åŒæ­¥æ²»ç†è®°å½•ï¼›ä¸å¼•å…¥å‡­è¯ã€Tokenã€hostã€portã€raw profile æˆ– live evidenceã€‚
-
-**Evidence / Next**
-
-- ç­‰å¾…æœ¬æäº¤ä¸‰å¹³å° CIï¼›`configs/production_account.yaml` ä»ä¸ºç©ºï¼Œæ­£å¼ identity freezeã€B1-B7ã€verdictã€Data Sufficiency Matrix å’Œ Provider approval ç»§ç»­æœªæ‰§è¡Œã€‚
-
-## DM-20260905-136 Â· P0-M-1B.0 fixture sentinel correction
-
-**Type**ï¼šC0 â€” test-only numeric sentinel correction  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 275 çš„ Ubuntu pytest æ˜¾ç¤ºéžæ•°å­— endpoint placeholder ä¼šè§¦å‘æ—¢æœ‰ credentials parser çš„ fail-closed åˆ†æ”¯ã€‚
-
-- å°†å¤¹å…·ç«¯å£å€¼æ”¹ä¸ºæ•°å€¼å“¨å…µ `str(0)`ï¼›ä¸è¿žæŽ¥ç½‘ç»œï¼Œä¸ä»£è¡¨ä»»ä½•å®žé™…æœåŠ¡ç«¯ç‚¹ï¼Œä¹Ÿä¸æ”¹å˜æµ‹è¯•ç›®æ ‡æˆ–è¿è¡Œè¯­ä¹‰ã€‚
-- æœ¬æäº¤ä»…ä¿®æ­£æµ‹è¯•è¾“å…¥ç±»åž‹ï¼Œå¹¶åŒæ­¥æ²»ç†è®°å½•ï¼›ä¸å¼•å…¥å‡­è¯ã€Tokenã€hostã€portã€raw profile æˆ– live evidenceã€‚
-
-**Evidence / Next**
-
-- ç­‰å¾…æœ¬æäº¤ä¸‰å¹³å° CIï¼›`configs/production_account.yaml` ä»ä¸ºç©ºï¼Œæ­£å¼ identity freezeã€B1-B7ã€verdictã€Data Sufficiency Matrix å’Œ Provider approval ç»§ç»­æœªæ‰§è¡Œã€‚
-
-## DM-20260905-135 Â· P0-M-1B.0 test fixture de-identification
-
-**Type**ï¼šC0 â€” test-only endpoint placeholder correction  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šæœ€ç»ˆ GitHub ä¾§å·®å¼‚æ‰«æå‘çŽ° bootstrap å¯¹æŠ—æµ‹è¯•å¤¹å…·å« endpoint-like literalï¼›æŒ‰æœ€æ–°â€œhost/port ä¸å…¥ Gitâ€çºªå¾‹æ”¹ä¸ºæ˜Žç¡®æµ‹è¯•å ä½ç¬¦ã€‚
-
-- å°†æµ‹è¯•å¤¹å…·çš„ VIP/port æ›¿æ¢ä¸º `test-only-host` / `test-only-port`ï¼›ä¸æ”¹å˜ä»»ä½•è¿è¡Œè¯­ä¹‰ã€ç§˜å¯† containmentã€safe projection æˆ– identity gate æ–­è¨€ã€‚
-- è¯¥å˜æ›´ä¸å¼•å…¥çœŸå®žå‡­è¯ã€Tokenã€hostã€portã€raw profile æˆ– live evidenceã€‚
-
-**Evidence / Next**
-
-- ç­‰å¾…æœ¬æäº¤ä¸‰å¹³å° CIï¼›`configs/production_account.yaml` ä»ä¸ºç©ºï¼Œæ­£å¼ identity freezeã€B1-B7ã€verdictã€Data Sufficiency Matrix å’Œ Provider approval ç»§ç»­æœªæ‰§è¡Œã€‚
-
-## DM-20260905-134 Â· P0-M-1B.0 three-platform CI verification
-
-**Type**ï¼šC1 â€” positive production identity gate CI verification  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šVERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW  
-**Trigger**ï¼šGitHub Actions run `33896142967`ï¼ˆrun `273`ï¼‰å®Œæˆä¸‰å¹³å°å®Œæ•´éªŒè¯ã€‚
-
-- Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 å‡é€šè¿‡ Ruff lint/formatã€mypyã€`1449 passed`ã€Spike dry-run å’Œ SDK-absent æ£€æŸ¥ï¼›Windows 3.14 çš„ DEVLOG/Management governance gates ä¹Ÿé€šè¿‡ã€‚
-- è¯¥è¯æ®è¦†ç›– positive identity allowlistã€bootstrap safe projectionã€focused tests å’ŒçŽ°æœ‰å›žå½’ï¼›ä¸ç­‰åŒäºŽå—æŽ§ online bootstrapã€äººå·¥ identity freeze æˆ– Production B1-B7ã€‚
-- PR #9 ä»ä¸º open / PENDING_REVIEWï¼›æœ¬æ¬¡ä¸åˆå¹¶ PRï¼Œä¹Ÿä¸æŠŠ CI çš„ SDK-absent ç»“æžœè§£é‡Šä¸ºæ­£å¼è´¦å·å‡­è¯æˆ– profile è¯æ®ã€‚
-
-**Evidence / Blocker**
-
-- `configs/production_account.yaml` ä»ä¸ºç©ºã€‚æ­£å¼ identity freezeã€Data Sufficiency Matrixã€verdict å’Œ Provider approval ç»§ç»­ blocked / not executedã€‚
-- å‡­è¯ã€Tokenã€hostã€portã€åŽŸå§‹ profile å’ŒåŽŸå§‹ SDK æ—¥å¿—ä¸è¿›å…¥ GitHubï¼›éœ€åœ¨å—æŽ§ Windows + å®˜æ–¹ SDK çŽ¯å¢ƒæ‰§è¡Œ online bootstrapï¼Œå¹¶ç» Owner/Reviewer ç¡®è®¤åŽæ‰å¯ç‹¬ç«‹å†»ç»“ allowlistã€‚
-
-## DM-20260905-133 Â· P0-M-1B.0 Ruff format follow-up
-
-**Type**ï¼šC0 â€” bootstrap/test blank-line formatter correction  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 272 çš„ Ruff format åªæŠ¥å‘Š bootstrap é¡¶å±‚å‡½æ•°å’Œ focused test æ–¹æ³•ä¹‹é—´çš„ canonical ç©ºè¡Œå·®å¼‚ã€‚
-
-- æŒ‰ Ruff è¾“å‡ºè¡¥é½ä¸¤ä¸ªç©ºè¡Œä½ç½®ï¼›ä¸æ”¹å˜ positive identity allowlistã€bootstrap projectionã€è´¦å·/æƒé™åˆ¤æ–­ã€migration æˆ–æ­£å¼ B1-B7 è¾¹ç•Œã€‚
-
-**Evidence / Next**
-
-- ç­‰å¾…ä¿®æ­£åŽçš„ä¸‰å¹³å°å®Œæ•´ CIï¼›å½“å‰ production_account.yaml ä»ä¸ºç©ºï¼Œæ­£å¼ identity freezeã€B1-B7ã€verdict å’Œ Provider approval ä»æœªæ‰§è¡Œã€‚
-
-## DM-20260905-132 Â· P0-M-1B.0 Ruff format correction
-
-**Type**ï¼šC0 â€” identity gate formatter correction  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 271 çš„ Ruff format æŠ¥å‘Š identity/config fixtureã€bootstrap ç©ºè¡Œå’Œæ–°å¢ž bootstrap focused test çš„ canonical æ ¼å¼å·®å¼‚ã€‚
-
-- æŒ‰ formatter è¾“å‡ºä¿®æ­£ 4 ä¸ªæ–‡ä»¶çš„æœºæ¢°æ ¼å¼ï¼›ä¸æ”¹å˜ positive identity allowlistã€bootstrap projectionã€è´¦å·/æƒé™åˆ¤æ–­ã€migration æˆ–æ­£å¼ B1-B7 è¾¹ç•Œã€‚
-
-**Evidence / Next**
-
-- ç­‰å¾…ä¿®æ­£åŽçš„ä¸‰å¹³å°å®Œæ•´ CIï¼›å½“å‰ production_account.yaml ä»ä¸ºç©ºï¼Œæ­£å¼ identity freezeã€B1-B7ã€verdict å’Œ Provider approval ä»æœªæ‰§è¡Œã€‚
-
-## DM-20260905-131 Â· P0-M-1B.0 Ruff lint correction
-
-**Type**ï¼šC0 â€” focused identity fixture formatter correction  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 270 çš„ä¸‰å¹³å° Ruff lint æŠ¥å‘Š tests/integration/test_production_identity.py ä¸­ 7 è¡Œ fixture è¶…è¿‡ 100 åˆ—ã€‚
-
-- æŒ‰ Ruff è¾“å‡ºæŠŠé•¿ YAML fixture æ‹†æˆç›¸é‚»å­—ç¬¦ä¸²ï¼Œå¹¶æ¸…ç† bootstrap safe projection å‰çš„æœºæ¢°å¤šç©ºè¡Œã€‚
-- ä¸æ”¹å˜ positive identity allowlistã€bootstrap projectionã€è´¦å·/æƒé™åˆ¤æ–­ã€migration æˆ–æ­£å¼ B1-B7 è¾¹ç•Œï¼›ä¸åŒ…å«ä»»ä½•çœŸå®žè´¦å·æ•°æ®ã€‚
-
-**Evidence / Next**
-
-- ç­‰å¾…ä¿®æ­£åŽçš„ä¸‰å¹³å°å®Œæ•´ CIï¼›å½“å‰ production_account.yaml ä»ä¸ºç©ºï¼Œæ­£å¼ identity freezeã€B1-B7ã€verdict å’Œ Provider approval ä»æœªæ‰§è¡Œã€‚
-
-## DM-20260905-130 Â· P0-M-1B.0 identity gate hardening
-
-**Type**ï¼šC1 â€” positive production identity configuration and bootstrap projection hardening  
-**Date**ï¼š2026-09-05  
-**Status**ï¼šDONE (guard implementation) / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šæœ€æ–° Reviewer è¦æ±‚å°† P0-M-1B.0 é™å®šä¸ºâ€œå—æŽ§ bootstrap â†’ äººå·¥ç¡®è®¤è„±æ• identity â†’ å•ç‹¬å†»ç»“ allowlistâ€ï¼Œå¹¶æ˜Žç¡® malformed/unconfirmed config å¿…é¡»é˜»æ–­ã€‚
-
-- load_frozen_production_identity çŽ°åœ¨åªæŽ¥å— digest-shaped scrubbed profile idã€å¸¦æ—¶åŒº confirmation timestampã€éžç©º approved human/operator markerï¼›ç©ºã€è¯•ç”¨ã€ç•¸å½¢ã€é¢å¤–å­—æ®µæˆ–æ•æ„Ÿ marker ä¸€å¾‹è¿”å›žæ— èº«ä»½ã€‚
-- production_account_status æ˜Žç¡®æ‹’ç»æœªè®¤è¯ã€æœªè§£æžã€è¯•ç”¨ã€ç¼º PermissionCodeã€éž scrubbed æˆ–éž exact-match profileï¼›RunKind.PRODUCTION ä¸æ”¹å˜è¿™ä¸€äº‹å®žã€‚
-- bootstrap safe projection å¯¹ provider è¿”å›žçš„ profile idã€PermissionCode å’Œé¢åº¦åš allowlist/ç±»åž‹æŠ•å½±ï¼Œå¼‚å¸¸ provider è¾“å‡ºä¸è¿›å…¥ stdout æˆ–æœ¬åœ° evidenceã€‚
-- æ–°å¢ž focused tests å¯¹åº” Reviewer è¦æ±‚ 1â€“9ï¼›ä¸ä¿®æ”¹ migrationsã€åŽ†å²æ•°æ®æˆ– State/Provider ä¸šåŠ¡è¯­ä¹‰ã€‚
-
-**Evidence / Blocker**
-
-- å½“å‰é…ç½®ä»ä¸ºç©ºï¼Œæœªäº§ç”Ÿ governance freezeï¼›æ­£å¼ live bootstrapã€äººå·¥ç¡®è®¤ã€B1-B7ã€Data Sufficiency Matrixã€verdict å’Œ Provider approval å‡æœªå®£ç§°å®Œæˆã€‚
-- æœ¬è½®åªæäº¤ä»“åº“å¯éªŒè¯çš„ fail-closed guardï¼›ä¸æŠŠè´¦å·ã€å¯†ç ã€Tokenã€hostã€portã€åŽŸå§‹ profile æˆ–åŽŸå§‹ SDK æ—¥å¿—å†™å…¥ GitHubã€‚
-
-
-## DM-20260904-129 Â· P0-AD-01.1 bootstrap I/O safety CI verification
-
-**Type**ï¼šC1 â€” credential-bearing bootstrap I/O safety verification  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šVERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW  
-**Trigger**ï¼šrun `33889959971`ï¼ˆrun `266`ï¼‰å®Œæˆä¸‰å¹³å°å…¨é‡ CIã€‚
-
-- Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 å…¨éƒ¨æˆåŠŸï¼›æ¯è…¿ `1427 passed`ï¼ŒRuff lint/formatã€mypyã€Spikeã€SDK-absent åŠé€‚ç”¨æ²»ç†é—¨ç¦å‡é€šè¿‡ã€‚
-- offline é›¶ `load_env` è¯»å–ã€runtime-only reportã€OS fd2/Python stderr containmentã€native-style fd2ã€å¼‚å¸¸è·¯å¾„ã€è„±æ•å’Œ fd2 restore å‡æœ‰ focused evidenceï¼›fd1 captureã€å¹¶å‘é”å’Œæ—¢æœ‰å›žå½’ä¿æŒç»¿è‰²ã€‚
-- æœ¬æ¬¡åªå…³é—­ P0-AD-01.1 ä»“åº“ I/O å®‰å…¨è¾¹ç•Œï¼›production identity freezeã€çœŸå®ž B1-B7ã€Golden/Data Sufficiency Matrixã€verdict å’Œ Provider approval ä» pendingã€‚`configs/production_account.yaml` ä¿æŒç©º profileï¼›æ—  credentialsã€Tokenã€host/port/raw profileã€migration æˆ– CR-5/CR-6 è¯­ä¹‰å˜æ›´ã€‚
-
-**Evidence / Next**
-
-- P0-AD-01.1 å·²å…·å¤‡å—æŽ§è¿è¡Œå‰çš„ä»£ç /CIè¯æ®ï¼›PR #8 ä»ä¿æŒ openï¼Œç­‰å¾…æ˜¾å¼äººå·¥å¤å®¡ã€‚åˆå¹¶åŽæ‰è¿›å…¥ runtime æ³¨å…¥å‡­è¯çš„ controlled online bootstrap ä¸Žäººå·¥è„±æ• identity ç¡®è®¤ã€‚
-
-## DM-20260904-128 Â· P0-AD-01.1 Ruff format correction
-
-**Type**ï¼šC0 â€” bootstrap I/O safety formatter correction  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun `33889716446`ï¼ˆrun `265`ï¼‰åœ¨ Ruff format check æŠ¥å‘Š bootstrap è°ƒç”¨ä¸Žæµ‹è¯•è°ƒç”¨çš„æœºæ¢°æ¢è¡Œå·®å¼‚ã€‚
-
-- æŒ‰ Ruff 0.16.4 è¾“å‡ºåˆå¹¶ 1 å¤„ `_run_doctor_with_stderr_containment` è°ƒç”¨ã€1 å¤„ `write_text` è°ƒç”¨å’Œ 1 å¤„æµ‹è¯•å£°æ˜Žã€‚
-- æœ¬æäº¤ä¸Ž DEVLOG/Management åŒæ­¥ï¼›ä¸æ¶‰åŠè¿è¡Œè¯­ä¹‰ã€I/O containmentã€å‡­è¯è¾¹ç•Œã€Provider data contractã€migrationã€CR-5 æˆ– CR-6ã€‚
-
-**Evidence / Next**
-
-- run `265` å°šæœªè¿›å…¥åŠŸèƒ½æµ‹è¯•ï¼›ç­‰å¾…ä¿®æ­£åŽçš„ä¸‰å¹³å°å®Œæ•´ CIã€‚
-
-## DM-20260904-127 Â· P0-AD-01.1 Ruff lint correction
-
-**Type**ï¼šC0 â€” bootstrap I/O safety formatter/lint correction  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun `33889354399`ï¼ˆrun `264`ï¼‰åœ¨ä¸‰å¹³å°çš„ Ruff lint é˜¶æ®µæŠ¥å‘Š `stdout_capture.py:10 E501`ã€‚
-
-- æ‹†åˆ†æ¨¡å—è¯´æ˜Žä¸­çš„è¶…é•¿ stderr containment è¡Œï¼Œä¿æŒæ–‡æ¡£å«ä¹‰å’Œä»£ç è¡Œä¸ºä¸å˜ã€‚
-- æœ¬æäº¤ä¸Ž DEVLOG/Management åŒæ­¥ï¼›ä¸æ¶‰åŠ credentialsã€Tokenã€host/portã€raw profileã€fd2/Python stderr containment è¯­ä¹‰ã€Provider data contractã€migrationã€CR-5 æˆ– CR-6ã€‚
-
-**Evidence / Next**
-
-- run `264` å°šæœªè¿›å…¥åŠŸèƒ½æµ‹è¯•ï¼›ç­‰å¾…ä¿®æ­£åŽçš„ä¸‰å¹³å°å®Œæ•´ CIã€‚
-
-## DM-20260904-126 Â· P0-AD-01.1 bootstrap I/O safety closure implementation
-
-**Type**ï¼šC1 â€” credential-bearing bootstrap I/O safety closure  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šReviewer requirement `A-share-analysis_PR8.1å¤å®¡ä¸ŽP0-AD-01.1_ProductionBootstrapIOå®‰å…¨æ”¶å£è¦æ±‚_20260904.md` identifies two fail-closed blockers.
-
-- `--offline` now bypasses `load_env` entirely, including a supplied `--env-file`; its report is runtime/package-only and does not inspect frozen production identity.
-- Online `run_doctor` now runs inside OS fd2 plus Python `sys.stderr` containment; only scrubbed `sdk_stderr_observed` is retained, and exception/error paths do not expose raw stderr or exception detail.
-- Added adversarial tests for env-file bypass, native-style fd2 writes, Python stderr, exception path, output scrubbing and fd2 restoration.
-- No Provider/Canonical/Feature/State semantic change, migration, allowlist write, or formal Production B1-B7 claim; credentials, Token, host/port and raw profile remain outside the repository.
-
-**Evidence / Next**
-
-- Await the final three-platform CI. If green, update the reviewer requirement and governance status to `VERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW`; PR #8 remains open pending explicit human review.
-
-## DM-20260904-125 Â· P0-AD-01 bootstrap CI verification
-
-**Type**ï¼šC1 â€” controlled production identity bootstrap verification  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šVERIFIED (CI) / READY_FOR_CONTROLLED_RUN / PENDING_REVIEW  
-**Trigger**ï¼šbootstrap formatter/status corrections completed and run 258 finished.
-
-- run `33881832744`ï¼ˆrun `258`ï¼‰åœ¨ Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 ä¸‰çŸ©é˜µå…¨éƒ¨æˆåŠŸï¼›æ¯è…¿ `1425 passed`ï¼ŒRuff lint/formatã€mypyã€Spikeã€SDK-absent åŠé€‚ç”¨çš„æ²»ç†é—¨ç¦å‡é€šè¿‡ã€‚
-- æœ¬æ¬¡åªéªŒè¯ scrubbed bootstrap çš„å¯æ‰§è¡Œè¾¹ç•Œï¼›identity freezeã€çœŸå®ž Production B1-B7ã€Golden/Data Sufficiency Matrixã€verdict å’Œ Provider approval ä» pendingã€‚
-- `configs/production_account.yaml` ä¿æŒç©º profileï¼›å‡­è¯ã€Tokenã€host/port/raw profile ä¸è¿›å…¥ä»“åº“ï¼›ä¸æ¶‰åŠ migration æˆ– CR-5/CR-6/2020+ changesã€‚
-
-**Evidence / Next**
-
-- åœ¨å—æŽ§çŽ¯å¢ƒä¸­ä»…é€šè¿‡çŽ¯å¢ƒ/.env æ³¨å…¥å‡­è¯è¿è¡Œ bootstrapï¼Œè®°å½• scrubbed candidateï¼›Owner/Reviewer äººå·¥ç¡®è®¤å‰ä¸å¾—æäº¤ production allowlistï¼Œç¡®è®¤åŽä»éœ€æŒ‰å•ä¸€ production run æ‰§è¡Œ B1-B7ã€‚
-
-## DM-20260904-124 Â· P0-AD-01 formatter follow-up
-
-**Type**ï¼šC0 â€” bootstrap formatter follow-up  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 257 çš„ Ruff lint å·²é€šè¿‡ï¼Œformat check è¦æ±‚ç¼ºå°‘å‡­è¯åˆ†æ”¯çš„ `_safe_report` è°ƒç”¨æ¢å¤å•è¡Œã€‚
-
-- æŒ‰ formatter è¾“å‡ºä¿®æ­£è°ƒç”¨æ¢è¡Œï¼›ä¿æŒ `NOT_TESTABLE_ACCOUNT` ä¼˜å…ˆçº§ã€doctor ä¸è°ƒç”¨å’Œè„±æ•è¾¹ç•Œä¸å˜ã€‚
-- æœ¬æ¬¡ä¸æ¶‰åŠè´¦å·ã€Tokenã€host/port/raw profileã€migrationã€CR-5/CR-6ã€2020+ history æˆ– Provider approvalã€‚
-
-**Evidence / Next**
-
-- run 257 ä¸‰çŸ©é˜µå‡åœ¨ format é˜¶æ®µåœæ­¢ï¼Œå°šæœªè¿›å…¥åŠŸèƒ½æµ‹è¯•ï¼›ç­‰å¾…æ–°çš„å®Œæ•´ CIã€‚
-
-## DM-20260904-123 Â· P0-AD-01 missing-input classification correction
-
-**Type**ï¼šC0 â€” bootstrap fail-closed status correction  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 256 çš„æ–°å¢ž bootstrap test å‘çŽ°ç¼ºå°‘å‡­è¯æ—¶ `NOT_TESTABLE_SDK` è¦†ç›–äº†æ›´ç›´æŽ¥çš„ `NOT_TESTABLE_ACCOUNT` çŠ¶æ€ã€‚
-
-- ä¸ºå®‰å…¨æŠ¥å‘Šå¢žåŠ  credentials-available è¯­ä¹‰ï¼Œç¼ºå°‘å®Œæ•´çŽ¯å¢ƒæ—¶ä¼˜å…ˆè¿”å›ž `NOT_TESTABLE_ACCOUNT`ï¼Œå¹¶ä¿æŒä¸è°ƒç”¨ provider doctorã€‚
-- æœ¬æ¬¡ä¸æ”¹å˜ SDK/runtime æ£€æŸ¥ã€è„±æ•è¾“å‡ºã€äººå·¥ç¡®è®¤ã€production allowlistã€è´¦å·ã€Tokenã€host/port/raw profile æˆ–æ­£å¼ B1-B7 è¯­ä¹‰ã€‚
-
-**Evidence / Next**
-
-- run 256 Ubuntu 3.14 åœ¨æ–°å¢žæµ‹è¯•å¤„å¤±è´¥ï¼Œé™æ€æ£€æŸ¥é€šè¿‡ï¼›ç­‰å¾…ä¿®æ­£åŽçš„ä¸‰å¹³å°å®Œæ•´ CIã€‚
-
-## DM-20260904-122 Â· P0-AD-01 formatter correction
-
-**Type**ï¼šC0 â€” bootstrap formatter correction  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 255 çš„ Ruff lint å·²é€šè¿‡ï¼Œformat check è¦æ±‚è§„èŒƒåŒ– bootstrap é€€å‡ºç æ¡ä»¶è¡¨è¾¾å¼ã€‚
-
-- æŒ‰ formatter ç¡®å®šè¾“å‡ºè°ƒæ•´æ¡ä»¶è¡¨è¾¾å¼æ¢è¡Œï¼›è¿è¡Œè¯­ä¹‰ã€è„±æ•å­—æ®µã€å‡­è¯è¾¹ç•Œå’Œäººå·¥ç¡®è®¤æ­¥éª¤ä¸å˜ã€‚
-- æœ¬æ¬¡ä¸æ¶‰åŠè´¦å·ã€Tokenã€host/port/raw profileã€migrationã€CR-5/CR-6ã€2020+ history æˆ– Provider approvalã€‚
-
-**Evidence / Next**
-
-- run 255 ä¸‰çŸ©é˜µå‡åœ¨ format é˜¶æ®µåœæ­¢ï¼Œå°šæœªè¿›å…¥åŠŸèƒ½æµ‹è¯•ï¼›ç­‰å¾…æ–°çš„å®Œæ•´ CIã€‚
-
-## DM-20260904-121 Â· P0-AD-01 scrubbed production-account bootstrap
-
-**Type**ï¼šC1 â€” controlled production identity bootstrap boundary  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šæ­£å¼è´¦å·éªŒè¯ä»»åŠ¡è¦æ±‚æä¾›åªè¯»ã€è„±æ•ã€å¯å®¡è®¡çš„èº«ä»½ bootstrap å…¥å£ï¼Œå¹¶ç¦æ­¢ç›´æŽ¥å¤ç”¨å¸¦ simulation æ–‡æ¡ˆçš„æ—§ connectivity scriptã€‚
-
-- æ–°å¢ž `scripts/spike/production_account_bootstrap.py`ï¼šåªè¯»å–çŽ¯å¢ƒ/.envï¼Œè°ƒç”¨ provider doctorï¼Œè¾“å‡º allowlisted scrubbed identity candidateï¼›ä¸æŽ¥å— CLI å‡­è¯ï¼Œä¸å†™å…¥ `configs/production_account.yaml`ï¼Œäººå·¥ç¡®è®¤ä»æ˜¯ç‹¬ç«‹æ­¥éª¤ã€‚
-- æ–°å¢ž injected/offline testsï¼šç¼ºå°‘å‡­è¯ fail closedã€offline ä¸ä¼ å‡­è¯ã€doctor åŽŸå§‹ error/detail ä¸å‡ºçŽ°åœ¨ stdout/è¯æ®æ–‡ä»¶ï¼Œä¸”ä¸è‡ªåŠ¨å†»ç»“ production identityã€‚
-- åŒæ­¥æ­£å¼è´¦å·éªŒè¯æ–‡æ¡£ã€Provider verificationã€Spike reportã€DEVLOGï¼›ä¿®æ­£æ—§ resume/FAILED æ–‡æ¡ˆï¼Œä¸æ–°å¢ž migrationï¼Œä¸æ”¹å˜ CR-5/CR-6/2020+ history/Provider capability è¯­ä¹‰ã€‚
-
-**Evidence / Next**
-
-- ç­‰å¾…ä¸‰å¹³å° CI ä¸Žæ²»ç†é—¨ç¦ï¼›é€šè¿‡åŽå¯åœ¨å·²å®‰è£…å®˜æ–¹ wheel çš„å—æŽ§çŽ¯å¢ƒè¿è¡Œ bootstrapã€‚æ­£å¼ identity å†»ç»“ã€Production B1-B7ã€Golden/Data Sufficiency Matrixã€verdictã€Reviewer approval ä» blocked/pendingã€‚
-
-## DM-20260904-120 Â· PR8.1 three-platform CI verification
-
-**Type**ï¼šC1 â€” formal CLI contract and recovery verification  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šVERIFIED (CI) / PENDING_REVIEW  
-**Trigger**ï¼šPR8.1 format correction åŽçš„ run 253 å®Œæˆä¸‰å¹³å°å…¨é‡ CI ä¸Žæ²»ç†é—¨ç¦ã€‚
-
-- Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 å…¨éƒ¨æˆåŠŸï¼›æ¯è…¿ `1422 passed`ï¼ŒRuff lint/formatã€mypyã€Spikeã€SDK-absentã€DEVLOG å’Œ Management gates å‡é€šè¿‡ã€‚
-- CLI mode conflictã€Production replay-all/fresh catalogã€CLOSED ä¸Ž semantic FAIL çš„ focused evidence å·²é€šè¿‡ CIï¼›ä»»åŠ¡ä¹¦ Exit gate å·²å‹¾é€‰ï¼Œç­‰å¾…äººå·¥ Reviewer å¤å®¡ã€‚
-- è¯¥è¯æ®ä¸è¦†ç›–æ­£å¼è´¦å· identity/entitlementã€çœŸå®ž Production B1-B7ã€Golden/Data Sufficiency Matrixã€verdict æˆ– Provider approvalï¼›production profile ä»ä¸ºç©ºï¼ŒPR #8 ä¸è‡ªåŠ¨åˆå¹¶ã€‚
-- æœ¬æ¬¡ä¸æ¶‰åŠè´¦å·ã€å‡­è¯ã€Tokenã€host/port/raw profileã€migrationã€CR-5/CR-6 æˆ– 2020+ history contractã€‚
-
-## DM-20260904-119 Â· PR8.1 format correction
-
-**Type**ï¼šC0 â€” CI format blocker correction  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 252 çš„ Ruff check å·²é€šè¿‡ï¼Œformat check è¦æ±‚è§„èŒƒåŒ– `spike_runner.py` å’Œ focused CLI testã€‚
-
-- æŒ‰ CI formatter çš„ç¡®å®šè¾“å‡ºä¿®æ­£å‡½æ•°ç­¾åã€é•¿å­—ç¬¦ä¸²ã€æµ‹è¯• argv è®¾ç½®å’Œå¤šä½™ç©ºè¡Œï¼›ä¸æ”¹å˜è¿è¡Œè¯­ä¹‰ã€‚
-- æœ¬æ¬¡ä¸æ¶‰åŠè´¦å·ã€å‡­è¯ã€Tokenã€host/port/raw profileã€migrationã€CR-5/CR-6ã€2020+ historyã€production identity æˆ– Provider approvalã€‚
-
-**Evidence / Next**
-
-- run 252 ä¸‰çŸ©é˜µå‡åœ¨ format check é˜¶æ®µåœæ­¢ï¼Œå°šæœªè¿›å…¥åŠŸèƒ½æµ‹è¯•ï¼›æœ¬æäº¤ç­‰å¾…æ–°çš„å®Œæ•´ CI ä¸Žæ²»ç† gatesã€‚
-
-## DM-20260904-118 Â· PR8.1 CLI mode and replay-all recovery
-
-**Type**ï¼šC1 â€” formal CLI contract honesty and recovery semantics  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šæ–°å¢ž PR8.1 å¤å®¡è¦æ±‚å‘çŽ°å››ç§ CLI mode å¯é™é»˜ä¼˜å…ˆçº§è§£é‡Šï¼ŒProduction resume çš„ `--phase bN` ä¸Žå®žé™…æŒä¹…åŒ– catalog èƒ½åŠ›ä¸ä¸€è‡´ï¼Œä¸” runbook å¯¹ semantic FAIL çš„ FAILED è¡¨è¿°è¿‡å¼ºã€‚
-
-- é€‰æ‹©æ–¹æ¡ˆ A replay-allï¼šProduction resume å¼ºåˆ¶å®Œæ•´ B1-B7ã€ç¦æ­¢ caller phase selectorã€fresh unsealed catalog ä¸åŠ è½½æ—§ partial catalogï¼ŒæˆåŠŸåŽæ‰è¦†ç›– RUNNING run çš„ catalogï¼›æ—§ raw/anchor ä¿ç•™ã€‚
-- å¢žåŠ  mode conflictã€partial catalog rebuild/replay-all å’Œ semantic CLOSED + verdict NO_GO focused testsï¼›runbookã€PR8.1 requirementã€DEVLOG ä¸Žç®¡ç†æ€»å†ŒåŒæ­¥ã€‚
-- æœ¬æ¬¡ä¸æ–°å¢ž migrationï¼Œä¸ä¿®æ”¹ CR-5/CR-6/2020+ history/Provider capabilityï¼Œä¸å†™å…¥è´¦å·ã€å‡­è¯ã€Tokenã€host/port/raw profileã€‚
-
-**Evidence / Next**
-
-- ç­‰å¾…ä¸‰å¹³å°å®Œæ•´ CIã€Ruff/format/mypyã€Spike/SDK-absent ä¸Žæ–‡æ¡£æ²»ç†é—¨ç¦ï¼›CI é€šè¿‡åŽå†å°† PR8.1 æ ‡è®°ä¸º VERIFIEDï¼ŒPR #8 ä»ä¸è‡ªåŠ¨åˆå¹¶ã€‚
-
-## DM-20260904-117 Â· Formal Runner wiring CI verification
-
-**Type**ï¼šC1 â€” formal Spike runner execution-boundary verification  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šDONE / VERIFIED (CI) / PENDING_REVIEW  
-**Trigger**ï¼šrun 248 completed after the lint/format corrections and validated the full formal-runner wiring change.
-
-- ä¸‰çŸ©é˜µ Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 å…¨éƒ¨æˆåŠŸï¼›æ¯è…¿ `1414 passed`ã€‚
-- Ruff lint/formatã€mypyã€å…¨é‡ pytestã€Spike gatesã€SDK-absentã€DEVLOG å’Œ Management gates å‡é€šè¿‡ã€‚
-- è¯¥è¯æ®åªç¡®è®¤ä»“åº“å®žçŽ°å’Œç¦»çº¿/å‡æ•°æ®æµ‹è¯•çš„ contract closureï¼›æ­£å¼è´¦å· identity/entitlementã€çœŸå®ž Production B1-B7ã€Golden/Data Sufficiency Matrixã€verdict å’Œ Provider approval ä»ç‹¬ç«‹ pending/blockã€‚
-- æœ¬æ¬¡ä¸æ¶‰åŠè´¦å·ã€å‡­è¯ã€Tokenã€host/port/raw profileã€migrationã€CR-5/CR-6 æˆ– 2020+ history contractã€‚
-
-## DM-20260904-116 Â· Formal Runner formatting correction
-
-**Type**ï¼šC0 â€” CI format blocker correction  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 247 çš„ Ruff check å·²é€šè¿‡ï¼Œä½† format check æŠ¥å‘Š `spike_runner.py`ã€`spike/runner.py` ä¸Ž focused test éœ€è¦è§„èŒƒåŒ–ã€‚
-
-- æŒ‰ CI ç»™å‡ºçš„ç¡®å®šæ ¼å¼ä¿®æ­£å¤šä½™ç©ºè¡Œã€å¤šä¸Šä¸‹æ–‡ `with` å’Œæµ‹è¯•å‡½æ•°ç­¾åï¼›è¿è¡Œè¯­ä¹‰ä¿æŒä¸å˜ã€‚
-- æœ¬æ¬¡ä¸æ¶‰åŠè´¦å·ã€å‡­è¯ã€Tokenã€host/port/raw profileã€migrationã€CR-5/CR-6ã€production identity æˆ– Provider approvalã€‚
-
-**Evidence / Next**
-
-- run 247 ä¸‰çŸ©é˜µå‡åœ¨ format check é˜¶æ®µåœæ­¢ï¼Œå°šæœªè¿›å…¥åŠŸèƒ½æµ‹è¯•ï¼›æœ¬æäº¤ç­‰å¾…æ–°çš„å®Œæ•´ CI ä¸Žæ²»ç† gates ç»“æžœã€‚
-
-## DM-20260904-115 Â· Formal Runner lint correction
-
-**Type**ï¼šC0 â€” CI lint blocker correction  
-**Date**ï¼š2026-09-04  
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW  
-**Trigger**ï¼šrun 246 åœ¨ Ruff é˜¶æ®µå‘çŽ° `RunLifecycleError` ç¼ºå°‘å¯¼å…¥ã€focused test import æŽ’åºé”™è¯¯å’Œ SIM117ï¼›æµ‹è¯•é˜¶æ®µå°šæœªå¼€å§‹ã€‚
-
-- è¡¥é½ CLI å¯¹ `RunLifecycleError` çš„æ˜¾å¼å¯¼å…¥ï¼Œä¿®æ­£ focused test çš„å¯¼å…¥é¡ºåºï¼Œå¹¶åˆå¹¶åµŒå¥— context managerï¼›ä¸æ”¹å˜ runner çš„æŒä¹… anchorã€æ—¥æœŸå†»ç»“æˆ–ç»ˆæ€è¯­ä¹‰ã€‚
-- æœ¬æ¬¡ä¸æ¶‰åŠè´¦å·ã€å‡­è¯ã€Tokenã€host/port/raw profileã€migrationã€CR-5/CR-6ã€production identity æˆ– Provider approvalã€‚
-
-**Evidence / Next**
-
-- run 246 çš„å¤±è´¥æ˜¯é™æ€æ£€æŸ¥å¤±è´¥ï¼Œä¸‰çŸ©é˜µå‡æœªè¿›å…¥åŠŸèƒ½æµ‹è¯•ï¼›æœ¬æäº¤ç­‰å¾…æ–°çš„å®Œæ•´ CI ä¸Žæ²»ç† gates ç»“æžœã€‚
-
-## DM-20260904-114 Â· Production Runner Anchored Wiring
-
-**Type**ï¼šC1 â€” formal Spike runner execution-boundary closure
-**Date**ï¼š2026-09-04
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW
-**Trigger**ï¼šPR #8 å¤å®¡å‘çŽ° formal Production/Trial CLI æœªä¼ å…¥ anchor connectionã€resume as-of å¯æ¼‚ç§»ï¼Œä¸” context/setup failure å¯èƒ½ç•™ä¸‹ RUNNINGã€‚
-
-- Formal Production/Trial çŽ°åœ¨ä½¿ç”¨ `load_config().paths.duckdb_path` å¯¹åº”çš„æŒä¹… DuckDBï¼Œé€šè¿‡ `DuckDBConnectionManager(...).owner("read_write")` èŽ·å–å•è¿›ç¨‹æ‰€æœ‰æƒï¼Œå¹¶åœ¨ä»»ä½•æ–° run ä¹‹å‰æ‰§è¡Œå®Œæ•´ migration chain ä¸Ž anchor-schema readiness checkã€‚
-- åŒä¸€è¿žæŽ¥è¦†ç›– formal run çš„ ProbeContextã€AnchoredRawEvidenceWriterã€catalog flush å’Œç»ˆæ€å†™å…¥ï¼›Production/Trial ä¸å…è®¸ `:memory:`ï¼Œdry-run çš„éš”ç¦»å†…å­˜è¿žæŽ¥ä¿æŒä¸å˜ã€‚
-- æ–° run éœ€è¦æ˜¾å¼åˆæ³• YYYYMMDDï¼›resume æƒå¨æ—¥æœŸæ¥è‡ªåŽŸ `SpikeRun.as_of_date`ï¼Œæ˜¾å¼æ—¥æœŸä¸åŒ¹é…æ‹’ç»ï¼›context/catalog/phase/setup failure ç»Ÿä¸€è½åˆ° FAILED/ABORTED/CLOSED æ˜Žç¡®ç»ˆæ€ã€‚
-- æ–°å¢ž focused tests è¦†ç›–çœŸå®ž CLI context factoryã€anchor å…³é—­åŽé‡å¼€ã€æ— å†…å­˜ formal DBã€æ—¥æœŸå†»ç»“/æ‹’ç»å’Œ anchor failure fail-closedï¼›CI ç»“æžœå¾…å½“å‰æäº¤éªŒè¯ã€‚
-- æœ¬æ¬¡æ²¡æœ‰ä¿®æ”¹åŽ†å² migrationã€CR-5/CR-6ã€Provider capability approvalã€production_account.yaml æˆ–ä»»ä½•å‡­è¯/Token/host/port/raw profileã€‚
-
-**Evidence / Next**
-- æœ¬åœ°/è¿œç¨‹ä»£ç å®¡æŸ¥å·²ç¡®è®¤ formal runner çš„æ—§è°ƒç”¨ç¼ºå°‘ `conn`ï¼›å½“å‰æäº¤ç­‰å¾… Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 ä»¥åŠå…¨éƒ¨æ²»ç† gatesã€‚
-- CI é€šè¿‡åŽå†å›žå¡«å‡†ç¡® commit/runï¼›åœ¨äººå·¥ç¡®è®¤ production identity/entitlement å‰ï¼Œä¸æ‰§è¡Œæˆ–å®£ç§° formal Production B1-B7/verdict/capability approvalã€‚
-
-## DM-20260904-113 Â· Formal éªŒè¯è¿è¡Œæ‰‹å†Œ CI éªŒè¯å®Œæˆ
-
-**Status**ï¼šDONE / VERIFIED (CI) / PENDING_REVIEW
-
-- run `33861376660`ï¼ˆrun 243ï¼‰ä¸‰çŸ©é˜µå…¨éƒ¨æˆåŠŸï¼Œæ¯è…¿ `1408 passed`ï¼›Ruffã€mypyã€Spikeã€SDK-absentã€DEVLOG å’Œ Management gates å‡é€šè¿‡ã€‚
-- è¯¥è¯æ®è¦†ç›–è¿è¡Œæ‰‹å†Œçš„å•ä¸€ Production B1-B7 å‘½ä»¤ã€doctor verdict å£å¾„å’Œ run-scoped äº§ç‰©è¯´æ˜Žï¼›æ²¡æœ‰æ”¹å˜æ­£å¼è´¦å· frozen identityã€Production B1-B7ã€verdict æˆ– Provider approval çŠ¶æ€ã€‚
-
-## DM-20260904-112 Â· Formal éªŒè¯è¿è¡Œæ‰‹å†Œä¸Ž doctor verdict å£å¾„æ ¡æ­£
-
-**Status**ï¼šDONE / VERIFIED (CI) / PENDING_REVIEW
-
-- ä¿®æ­£ `run_spike.md` çš„å‡­è¯é”®åé”™è¯¯ï¼Œå¹¶å°†æ­£å¼ B1-B7 æ˜Žç¡®ä¸ºä¸€ä¸ª `RunKind.PRODUCTION` å• runï¼›ä¸­æ–­æ—¶æ‰å…è®¸ `--resume`ï¼Œrun CLOSED åŽä½¿ç”¨ `--verdict --run-id`ã€‚
-- è¡¥é½å½“å‰ run-scoped äº§ç‰©è·¯å¾„ã€2020+ capability åç§°å’Œ trial/dry-run ä¸Ž Production çš„ç‰©ç†éš”ç¦»è¯´æ˜Žã€‚
-- ä¿®æ­£ provider doctor / å®‰è£…æ‰‹å†Œå¯¹ `RUNTIME_PACKAGE_VERIFIED` ä¸Ž `RUNTIME_ACTUAL_LOAD_VERIFIED` çš„åŒºåˆ†ï¼›å½“å‰æœ¬åœ° native SDK smoke å·²æœ‰ç‹¬ç«‹è®°å½•ï¼Œä½† formal runner ä»æœªæ‰§è¡Œã€‚
-- æœ¬æ¬¡åªæ”¹è¿è¡Œæ‰‹å†Œï¼Œä¸æ”¹å˜ CR-6 å†»ç»“è¯­ä¹‰ã€æ­£å¼è´¦å· frozen identity è§„åˆ™æˆ– Provider approval çŠ¶æ€ã€‚
-
-## DM-20260904-111 Â· CR-6 åˆå¹¶åŽæ²»ç†åŒæ­¥ä¸Ž Provider å½“å‰çœŸç›¸æ ¡æ­£
-
-**Status**ï¼šDONE / PENDING_REVIEW
-
-- PR #6 å·²åœ¨ main åˆå¹¶æäº¤ `dda8c000d8585a95a66a91fbaa5072427053abb8` åˆå…¥ï¼›CR-6.0â€“6.4 ä¸Ž ADR-026 çš„æœ€ç»ˆ Reviewer closure å·²ç”Ÿæ•ˆï¼š**VERIFIED / CLOSED / FREEZE**ã€‚
-- Final merge-gate run `33854677630`ï¼ˆrun 239ï¼‰åœ¨ Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 å…¨éƒ¨æˆåŠŸï¼Œæ¯è…¿ `1408 passed`ï¼›Ruffã€mypyã€Spikeã€SDK-absentã€DEVLOG å’Œ Management gates å‡é€šè¿‡ã€‚
-- ADR-026ã€ADR-000 ç´¢å¼•ã€CR-6 å·¥ä½œè¦æ±‚ã€Provider Verification ä¸Žæœ¬æ€»å†Œçš„å½“å‰çŠ¶æ€å·²åŒæ­¥ï¼›åŽ†å²è¯•ç”¨è´¦å·ã€æ­£å¼è´¦å·æœ¬åœ° SDK smokeã€æ­£å¼ production profile æœªå†»ç»“ä¸‰è€…å·²æ˜Žç¡®åˆ†å¼€ã€‚
-- æ­£å¼ Production B1-B7ã€Golden/Data Sufficiency Matrixã€verdict å’Œ Provider capability approval ä»æœªå®Œæˆï¼›`configs/production_account.yaml` ç»§ç»­ä¸ºç©ºã€‚å‡­è¯ä¸Žè¿žæŽ¥æ˜Žæ–‡ä¸å…¥åº“ã€ä¸å…¥æ—¥å¿—ã€‚
-- ä¸‹ä¸€æ­¥æ˜¯æŠŠå—æŽ§ SDK ä¾èµ–çŽ¯å¢ƒä¸Žä»“åº“æºç çŽ¯å¢ƒæŽ¥é€šï¼Œè¿è¡Œ provider-doctor åŠå•ä¸€ CLOSED PRODUCTION B1-B7ï¼›åœ¨äººå·¥ç¡®è®¤ scrubbed identity/entitlement å‰ä¸å¾—æŽˆäºˆ capability APPROVEDã€‚
-
-## DM-20260904-106 Â· æ­£å¼ SDK å†’çƒŸå®Œæˆï¼Œå½¢å¼åŒ– Production run å¾…æ‰§è¡Œ
-
-**Status**ï¼šLOCAL_SMOKE_PASS / FORMAL_RUN_PENDING / PENDING_REVIEW
-
-- å—æŽ§æœ¬åœ° Python 3.14.6 çŽ¯å¢ƒå·²å¯¼å…¥å®˜æ–¹ `AmazingData==1.1.9`ã€`tgw==1.0.9.2` ä¸Ž `tables`ï¼›TGW runtime `V4.3.0.260626-rc2.0-YHZQ`ï¼Œ`uv pip check` é€šè¿‡ã€‚
-- æ­£å¼è´¦å·ç™»å½•ä¸Ž profile è§£æžæˆåŠŸï¼›permission/function-permission å­—æ®µå­˜åœ¨ã€‚SDK åŽŸå§‹ stdout/stderr åœ¨è¾¹ç•Œå†…æ•èŽ·ï¼Œæœªå°†è´¦å·ã€Tokenã€è¿žæŽ¥ä¿¡æ¯ã€åŽŸå§‹ payload æˆ–ä¸´æ—¶ profile æŒä¹…åŒ–ã€‚
-- å°çª—å£æŽ¥å£è¿”å›žè§„æ¨¡å·²è®°å½•ï¼šcalendar 8,719ã€æ²ªæ·±ä»£ç  5,215ã€åŽ†å²ä»£ç åˆ—è¡¨ 5,215ã€åŒ—äº¤æ‰€æ˜ å°„ 248ã€stock basic 1ã€history status 1ã€adj factor 8,719ã€dividend 54ã€right issue 0ã€equity structure 68ã€industry base 511ï¼›è¡Œä¸š/æ—¥çº¿æŽ¥å£è¿”å›žç»“æž„åŒ–ç»“æžœã€‚
-- è¯¥è¯æ®æ˜¯ native SDK smokeï¼Œä¸æ»¡è¶³ formal facade/provider-doctorã€run-scoped Production B1-B7ã€Golden/Data Sufficiency Matrixã€verdict æˆ– Provider approvalã€‚å…¨åŽ†å²è¦†ç›–ä»…åœ¨æ­£å¼å• Run ä¸­æŒ‰ 2020+ åˆåŒæ‰§è¡Œã€‚
-- ä¾èµ– wheel åªä¿å­˜åœ¨æœ¬åœ°è¢«å¿½ç•¥çš„ `vendor/amazingdata/`ï¼›`configs/production_account.yaml` ä»ä¸ºç©ºã€‚å› å½“å‰æœ¬åœ° SDK çŽ¯å¢ƒæœªè£…å…¥ä»“åº“æºç ï¼Œformal runner å°šæœªæ‰§è¡Œã€‚
-
-## DM-20260904-107 Â· 2020+ åŽ†å²è¾¹ç•Œé™æ€å®ˆå«æœ‰æ•ˆæ€§ä¿®æ­£
-
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW
-
-- ä¿®æ­£é›†æˆæµ‹è¯•å¯¹æ—§ 1990 è¾¹ç•Œçš„è‡ªåŒ¹é…é—®é¢˜ï¼›æµ‹è¯•çŽ°åœ¨åœ¨è¿è¡Œæ—¶æ‹¼æŽ¥æ—§è¾¹ç•Œå­—ç¬¦ä¸²ï¼Œå†æ–­è¨€æ­£å¼ gate ä¸Ž B2 probe æºç ä¸å«è¯¥è¾¹ç•Œã€‚
-- æ­£å¼ gateã€B2 probe ä»è°ƒç”¨ 2020-01-01ï¼›è¿™æ˜¯æµ‹è¯•æœ‰æ•ˆæ€§ä¿®æ­£ï¼Œä¸æ˜¯æ–°å¢ž State/Provider è¯­ä¹‰ã€‚
-- ç­‰å¾…æœ¬æäº¤çš„ä¸‰çŸ©é˜µ CIï¼›Production formal run ä»æœªæ‰§è¡Œã€‚
-
-## DM-20260904-108 Â· 2020+ åŽ†å²è¾¹ç•Œæµ‹è¯• Ruff æ ¼å¼ä¿®æ­£
-
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW
-
-- æŒ‰ Ubuntu Ruff format å®žé™…è¯Šæ–­å°†æ–°å¢žæµ‹è¯•çš„åŽ†å²è¾¹ç•Œå­—ç¬¦ä¸²æ”¶æ•›ä¸ºå•è¡Œï¼›æ–­è¨€èŒƒå›´ä¸Ž 2020+ åˆåŒä¸å˜ã€‚
-- å½“å‰æäº¤ç­‰å¾…ä¸‰çŸ©é˜µ CIï¼›æ­£å¼ Production B1-B7 ä»æœªæ‰§è¡Œã€‚
-
-## DM-20260904-109 Â· åŽ†å²è¾¹ç•Œæµ‹è¯•è·¯å¾„è¡¨è¾¾å¼ formatter ä¿®æ­£
-
-**Status**ï¼šIN_PROGRESS / CI_PENDING / PENDING_REVIEW
-
-- æŒ‰ Ubuntu Ruff format å®žé™…è¯Šæ–­ï¼Œå°†æ–°å¢žæµ‹è¯•ä¸­çš„å¤šè¡Œè·¯å¾„æ‹¼æŽ¥æ”¶æ•›ä¸ºç­‰ä»·å•è¡Œè¡¨è¾¾å¼ï¼›2020+ åŽ†å²åˆåŒä¸Žè¿è¡Œæ—¶è¡Œä¸ºä¸å˜ã€‚
-- å½“å‰ head ç­‰å¾…ä¸‰çŸ©é˜µ CIï¼›Production formal run ä»æœªæ‰§è¡Œã€‚
-
-## DM-20260904-110 Â· 2020+ åŽ†å²è¾¹ç•Œå®ˆå« CI éªŒè¯å®Œæˆ
-
-**Status**ï¼šDONE / VERIFIED / PENDING_REVIEW
-
-- å½“å‰ head `13235cf596867fbd798f050f1027a7349bd3daa5` çš„ run `33853588983`ï¼ˆrun 238ï¼‰ä¸‰çŸ©é˜µå…¨éƒ¨æˆåŠŸï¼Œæ¯è…¿ `1408 passed`ã€‚
-- Ruffã€mypyã€Spikeã€SDK-absentã€DEVLOG ä¸Ž Management-doc gates å‡é€šè¿‡ï¼›æ­£å¼ gate/B2 probe çš„ 2020-01-01 å‚æ•°å®ˆå«å·²èŽ·å¾—çœŸå®ž CI è¯æ®ã€‚
-- æ­£å¼è´¦å·çš„ native SDK smoke ä¸ç­‰åŒäºŽ formal Production runï¼›B1-B7ã€Golden/Data Sufficiency Matrixã€verdict ä¸Ž Provider approval ä»æœªå®Œæˆã€‚
-
-# 0. æ–‡æ¡£å®šä½
-
-æœ¬æ–‡ä»¶ä¸æ˜¯æ–°çš„ Frozen Baselineï¼Œä¹Ÿä¸æ˜¯ `docs/DEVLOG.md` çš„æ›¿ä»£å“ã€‚
-
-å®ƒé•¿æœŸæ‰¿æ‹…ä»¥ä¸‹èŒè´£ï¼š
-
-1. ç»Ÿä¸€æè¿°ç³»ç»Ÿå½“å‰æŒ‰ä»€ä¹ˆæ–¹æ¡ˆå¼€å‘ï¼›
-2. ç»Ÿä¸€æè¿°å½“å‰å¼€å‘è¿›åº¦ã€é‡Œç¨‹ç¢‘ã€Entry/Exit Gateã€é˜»å¡žé¡¹ï¼›
-3. ç»Ÿä¸€è®°å½•å·²æ‰¹å‡†çš„è®¾è®¡è°ƒæ•´ã€æ•°æ®è¯­ä¹‰è°ƒæ•´ã€å·¥ç¨‹å¥‘çº¦è°ƒæ•´åŠåŽŸå› ï¼›
-4. æŠŠ Frozen Baselineã€ADRã€Provider Verificationã€DEVLOGã€Risk Registerã€å®¡è®¡æŠ¥å‘Šã€æµ‹è¯•å’Œä»£ç æäº¤ä¸²æˆä¸€ä¸ªå¯è¿½è¸ªä½“ç³»ï¼›
-5. ä½œä¸ºåŽç»­å¼€å‘å·¥ä½œè¦æ±‚çš„ç®¡ç†å…¥å£ï¼šå‡¡å·¥ä½œè¦æ±‚æ¶‰åŠè®¾è®¡ã€Schemaã€æ•°æ®è¯­ä¹‰ã€Providerã€PITã€ç‰ˆæœ¬è¡€ç¼˜ã€Publish/Replayã€Feature å…¬å¼æˆ–é‡Œç¨‹ç¢‘è°ƒæ•´ï¼Œå¼€å‘äººå‘˜å¿…é¡»åœ¨åŒä¸€é€»è¾‘æäº¤ä¸­æ›´æ–°æœ¬æ–‡ä»¶ã€‚
-
-æœ¬æ–‡ä»¶å¿…é¡»ä¿æŒâ€œå½“å‰çœŸç›¸â€å±žæ€§ï¼›åŽ†å²é€šè¿‡ Gitã€DEVLOGã€ADR å’Œæœ¬æ–‡ Change Log ä¿ç•™ã€‚
-
----
-
-# 1. æ–‡æ¡£æƒå¨æ€§ä¸Žä¼˜å…ˆçº§
-
-å‘ç”Ÿå†²çªæ—¶æŒ‰ä»¥ä¸‹é¡ºåºè§£é‡Šï¼š
-
-```text
-1. æ˜Žç¡®æ‰¹å‡†çš„æ–° Frozen Baseline
-2. å½“å‰ Frozen Baseline V1.3.2
-3. å·² APPROVED çš„ ADRï¼ˆä¸å¾—ä¸Ž Frozen Baseline å†²çªï¼‰
-4. æœ¬æ–‡ä»¶çš„å½“å‰å®žæ–½çº¦æŸä¸ŽçŠ¶æ€
-5. Provider Verification / Spike / Exit Report
-6. docs/DEVLOG.md
-7. Audit / Work Requirement / Working Notes
-```
-
-è§„åˆ™ï¼š
-
-- V1.3.2 ä¸å¾—é€šè¿‡æ™®é€š Patch é™é»˜æ”¹å˜æ ¸å¿ƒè¯­ä¹‰ï¼›
-- ADR åªèƒ½è¡¥å……æˆ–æ›¿ä»£å®žçŽ°çº§å†³ç­–ï¼›
-- å®¡è®¡å»ºè®®åªæœ‰åœ¨å®žçŽ°ã€æµ‹è¯•å¹¶çº³å…¥æœ¬æ–‡ä»¶/ADR/ä»£ç åŽï¼Œæ‰æˆä¸ºå½“å‰å®žæ–½å¥‘çº¦ã€‚
-
----
-
-# 2. è§’è‰²ä¸Žè´£ä»»
-
-## Project Owner
-
-è´Ÿè´£ï¼š
-
-- ä¸šåŠ¡ç›®æ ‡å’Œä¼˜å…ˆçº§ï¼›
-- æ˜¯å¦æŽ¥å—é‡å¤§è®¾è®¡å˜åŒ–ï¼›
-- æ˜¯å¦å…è®¸ Frozen Baseline å‡ç‰ˆï¼›
-- æ­£å¼æ•°æ®è´¦å·ã€ä¾›åº”å•†å’Œå¤–éƒ¨èµ„æºçš„æœ€ç»ˆç¡®è®¤ã€‚
-
-## Development Executor
-
-è´Ÿè´£ï¼š
-
-- æŒ‰å·¥ä½œè¦æ±‚å®žçŽ°ï¼›
-- æ¯æ¬¡ä»£ç æäº¤åŒæ­¥ `docs/DEVLOG.md`ï¼›
-- è®¾è®¡/å¥‘çº¦å˜åŒ–æ—¶åŒæ­¥æœ¬æ–‡ä»¶ï¼›
-- Migrationã€æµ‹è¯•ã€æ–‡æ¡£ã€ä»£ç ä¿æŒä¸€è‡´ï¼›
-- ä¸ä»¥â€œæ–‡æ¡£å†™å®Œæˆâ€æ›¿ä»£çœŸå®žæµ‹è¯•å’Œè¿è¡Œè¯æ®ã€‚
-
-## Design / Audit Reviewer
-
-è´Ÿè´£ï¼š
-
-- å®¡æŸ¥ PIT æ­£ç¡®æ€§ã€æ•°æ®è¯­ä¹‰ã€å¯å¤çŽ°æ€§ã€Gate å¯ç»•è¿‡æ€§ï¼›
-- ä¸‹è¾¾åŽç»­å·¥ä½œè¦æ±‚ï¼›
-- å¤æ ¸åŽå°† `Review Status` æ ‡è®°ä¸º `VERIFIED` æˆ– `REOPENED`ã€‚
-
----
-
-# 3. å¼ºåˆ¶ç»´æŠ¤è§„åˆ™
-
-## 3.1 æ¯æ¬¡ä»£ç æäº¤
-
-ä¿®æ”¹ä»¥ä¸‹ä»»ä¸€è·¯å¾„æ—¶ï¼Œå¿…é¡»åŒæ­¥æ›´æ–° `docs/DEVLOG.md`ï¼š
-
-```text
-src/
-migrations/
-configs/
-scripts/
-data/golden/
-.gitattributes
-.github/workflows/
-```
-
-## 3.2 è®¾è®¡/å¥‘çº¦å˜åŒ–
-
-å‡ºçŽ°ä»¥ä¸‹ä»»ä¸€å˜åŒ–æ—¶ï¼ŒåŒä¸€é€»è¾‘æäº¤å¿…é¡»åŒæ­¥æ›´æ–°ï¼š
-
-```text
-docs/DEVLOG.md
-docs/project/DEVELOPMENT_MANAGEMENT.md
-```
-
-è§¦å‘èŒƒå›´åŒ…æ‹¬ï¼š
-
-```text
-Architecture / Layering
-Provider endpoint / capability / runtime
-Security Identity / Universe / Trading Rule
-Schema / Migration / Canonical Fact Contract
-PIT / available_at / Availability Policy
-Source Policy / Reconciliation
-Raw / Canonical / Snapshot / Artifact / Publish / Replay lineage
-Feature å®šä¹‰ã€å…¬å¼ã€è¾“å…¥ã€çª—å£ã€è¿”å›žçº¦å®š
-State / Regime æ•°å­¦å®šä¹‰
-Golden Truth / Spike Gate / Capability Approval
-CI / reproducibility / immutable storage contract
-Concurrency ownership
-Security / secrets
-Milestone Entry / Exit Gate
-```
-
-## 3.3 æ™®é€š Bugfix
-
-å¦‚æžœä¸æ”¹å˜å¤–éƒ¨è¯­ä¹‰ã€Schemaã€æ•°æ®å®šä¹‰ã€Gateã€ç‰ˆæœ¬ä¸Žè¡€ç¼˜ï¼Œä»…éœ€æ›´æ–° DEVLOGï¼Œä¸å¼ºåˆ¶æ”¹æœ¬æ–‡ä»¶ã€‚
-
-## 3.4 ç¦æ­¢é™é»˜è°ƒæ•´
-
-ç¦æ­¢â€œå…ˆæ”¹ä»£ç ï¼ŒåŽè¡¥è®¾è®¡æ–‡æ¡£â€ã€‚C1/C2/C3 å˜åŒ–å¿…é¡»ä¸Žä»£ç ã€æµ‹è¯•ã€æœ¬æ–‡ä»¶å’Œ ADRï¼ˆå¦‚éœ€è¦ï¼‰å½¢æˆåŒä¸€é€»è¾‘æ‰¹æ¬¡ã€‚
-
----
-
-# 4. Change Control åˆ†çº§
-
-## C0 â€” Implementation Only
-
-ä¾‹ï¼šé‡æž„ã€æ€§èƒ½ä¼˜åŒ–ã€bugfixï¼Œå¤–éƒ¨å¥‘çº¦ä¸å˜ã€‚
-
-è¦æ±‚ï¼š
-
-```text
-DEVLOG + Tests
-```
-
-## C1 â€” Contract Clarification
-
-ä¾‹ï¼šåŠ å¼º Validatorã€å¢žåŠ ä¸å¯ç»•è¿‡ Gateã€æ˜Žç¡®å·²æœ‰å­—æ®µå«ä¹‰ã€‚
-
-è¦æ±‚ï¼š
-
-```text
-DEVLOG
-DEVELOPMENT_MANAGEMENT
-Contract Tests
-```
-
-## C2 â€” Design Change
-
-ä¾‹ï¼šæ”¹å˜æ•°æ®æµã€SoRã€Schemaã€Feature å…¬å¼ã€PITã€Publish/Replayã€Provider èŒè´£ã€‚
-
-è¦æ±‚ï¼š
-
-```text
-DEVLOG
-DEVELOPMENT_MANAGEMENT
-ADR
-Migration / Compatibility Planï¼ˆå¦‚é€‚ç”¨ï¼‰
-Contract Tests
-Review = PENDING_REVIEW
-```
-
-## C3 â€” Frozen Baseline Change
-
-ä»»ä½•æ”¹å˜ V1.3.2 æ ¸å¿ƒå«ä¹‰çš„å˜åŒ–ã€‚
-
-è¦æ±‚ï¼š
-
-```text
-Project Owner æ˜Žç¡®æ‰¹å‡†
-æ–° Baseline Version
-Impact Analysis
-ADR
-Migration / Backfill Plan
-Regression Plan
-DEVELOPMENT_MANAGEMENT
-```
-
-ä¸å¾—åœ¨æ™®é€š Patch ä¸­å®Œæˆã€‚
-
----
-
-# 5. Change Record æ ‡å‡†
-
-C1/C2/C3 å˜åŒ–å¿…é¡»åœ¨æ–‡æœ«è¿½åŠ ï¼š
-
-```text
-Change ID:
-Type:
-Date:
-Status:
-Trigger:
-Old Contract:
-New Contract:
-Reason:
-Affected Modules:
-Affected Data:
-Compatibility:
-Migration / Backfill:
-Tests:
-ADR:
-Commit:
-Reviewer:
-```
-
-Change IDï¼š
-
-```text
-DM-CR-YYYYMMDD-NNN
-```
-
----
-
-# 6. é¡¹ç›®ç›®æ ‡
-
-æž„å»ºï¼š
-
-> Point-in-Time æ­£ç¡®ã€å¯å¤çŽ°ã€å¯å®¡è®¡ã€Provider-neutralã€å¯æ‰©å±•çš„ A è‚¡å¸‚åœºæ€åŠ¿æ•°æ®åŸºåº§ã€‚
-
-ç³»ç»Ÿé¦–å…ˆå›žç­”ï¼š
-
-```text
-å¸‚åœºå½“å‰å¤„äºŽä»€ä¹ˆçŠ¶æ€ï¼Ÿ
-```
-
-è€Œä¸æ˜¯ç›´æŽ¥å›žç­”ï¼š
-
-```text
-å¸‚åœºä¸‹ä¸€æ­¥ä¼šæ¶¨è¿˜æ˜¯è·Œï¼Ÿ
-```
-
-å¸‚åœºæè¿°ä¸Žé¢„æµ‹ã€ç­–ç•¥ã€æ‰§è¡Œåˆ†ç¦»ã€‚
-
----
-
-# 7. æ ¸å¿ƒè®¾è®¡åŽŸåˆ™
-
-```text
-Raw â†’ Canonical â†’ Feature â†’ State
-Continuous first; labels derived
-Description â‰  prediction
-State labels mathematical
-å…è®¸ä¸ç¡®å®šæ€§/å†²çªï¼Œä¸å¼ºåˆ¶å•ä¸€è¯„åˆ†
-Composite weights å¿…é¡»åœ¨ incremental validity åŽ
-æ‰€æœ‰ baseline åªä½¿ç”¨ t-1 åŠæ›´æ—©ä¿¡æ¯
-available_at / ingested_at / provider / version å¯è¿½è¸ª
-Exact Replay å¿…é¡»æˆç«‹
-Provider semantic label ä¸ä½œä¸ºæ ¸å¿ƒå¸‚åœºäº‹å®ž
-ST / Suspended / Corporate Action / Limit Rule å¿…é¡» PIT
-æ‰€æœ‰ä»·æ ¼é™åˆ¶ä½¿ç”¨å®žé™…æ³•å¾‹è§„åˆ™ï¼Œä¸ç¡¬ç¼–ç  Â±10/20
-```
-
----
-
-# 8. ç³»ç»Ÿåˆ†å±‚
-
-```text
-L0  PIT Security Universe / Industry Membership / Trading Rules
-L1  Fact / Raw Observations
-L2  Canonical Provider-independent Data
-L3  Feature
-L4  State
-L5  Regime
-L6  Historical Conditional Return / Risk
-
-Strategy / Portfolio / Execution
-    ä¸Žæ•°æ®åŸºåº§åˆ†ç¦»
-```
-
-Realtime ä¸Žæ—¥é¢‘å°½é‡å…±äº«å®šä¹‰ï¼Œä¸èƒ½å½¢æˆä¸¤å¥—ç›¸äº’çŸ›ç›¾çš„å¸‚åœºè¯­ä¹‰ã€‚
-
----
-
-# 9. Provider-neutral æ€»ä½“æž¶æž„
-
-```text
-AmazingData / TGW
-Tushare
-QMT
-        â†“
-Provider Adapter / Normalization
-        â†“
-Raw Immutable Evidence
-        â†“
-Provider-Normalized
-        â†“
-Source Policy / Reconciliation
-        â†“
-Canonical Selected
-        â†“
-Snapshot
-        â†“
-Feature Artifact
-        â†“
-Publish
-        â†“
-State / Regime / Analysis
-```
-
-å½“å‰åŽŸåˆ™ï¼š
-
-- AmazingDataï¼šå¸‚åœºäº‹å®žã€åŽ†å²/å®žæ—¶ L1ã€Security/Statusã€Daily/Klineã€Limitã€Adjustment/CAã€Snapshotï¼›
-- Tushareï¼šfree_shareã€æ˜Žç¡® SW/CITIC taxonomyã€ä¸»é¢˜ membershipã€ä¸“é¡¹äº¤å‰éªŒè¯ï¼›
-- QMTï¼šRealtimeã€Tradingã€Realtime cross-checkã€‚
-
-ä»»ä½• Provider è§’è‰²å˜åŒ–éƒ½å±žäºŽ C1/C2ï¼Œå¿…é¡»æ›´æ–°æœ¬æ–‡ä»¶ã€‚
-
----
-
-# 10. Observation Type
-
-Provider/Canonical æ•°æ®å¿…é¡»åŒºåˆ†ï¼š
-
-```text
-DIRECT_OBSERVATION
-DERIVED_FACT
-PROVIDER_DERIVED
-SEMANTIC_LABEL
-```
-
-ä¸å¾—æŠŠ Provider ç®—æ³•æ ‡ç­¾ä¼ªè£…æˆç›´æŽ¥å¸‚åœºäº‹å®žã€‚
-
----
-
-# 11. Security Identity
-
-æ­£å¼ Security IDï¼š
-
-```text
-UUIDv5(
-    normalized_exchange
-    + asset_type
-    + initial_symbol
-    + first_list_date
-)
-```
-
-åŽŸåˆ™ï¼š
-
-- Provider suffix ä¸å®šä¹‰å®žä½“èº«ä»½ï¼›
-- Temporary fallback ä»…å…è®¸ Spike/Staging/Quarantineï¼›
-- Publish Path ç¦æ­¢ Fallback Identityï¼›
-- æ­£å¼ Publish åŽä¸å¾— re-keyï¼›
-- Provider Symbol Mapping å¿…é¡» effective-date awareã€‚
-
----
-
-# 12. Universe
-
-æ ¸å¿ƒå¯äº¤æ˜“ Universeï¼š
-
-```text
-CORE_TRADABLE_V1
-=
-listed
-+ valid bar
-+ not suspended
-```
-
-ä¸å¾—æŠŠ 20/60 æ—¥åŽ†å²ä¸è¶³å†™è¿› Universeã€‚
-
-Feature è‡ªå·±é€šè¿‡ï¼š
-
-```text
-valid_mask
-valid_n
-```
-
-è¡¨è¾¾çª—å£ä¸è¶³ã€‚
-
-Universe å¿…é¡» PITï¼ŒåŒ…æ‹¬ list/delistã€STã€suspensionã€boardã€trading ruleã€‚
-
----
-
-# 13. Trading Rules
-
-å¿…é¡»ä½¿ç”¨å®žé™…åŽ†å²åˆ¶åº¦ï¼š
-
-```text
-Main Board
-ST / *ST
-ChiNext
-STAR
-BSE
-IPO / first-N-day no-limit
-special resumption
-tick size
-rounding
-```
-
-åŽ†å²è§„åˆ™å¿…é¡»æœ‰ï¼š
-
-```text
-effective_from
-effective_to
-```
-
-ä»·æ ¼è®¡ç®—ä½¿ç”¨æ˜Žç¡® Decimal roundingï¼Œä¸ä½¿ç”¨è¯­è¨€é»˜è®¤ round ä»£æ›¿äº¤æ˜“æ‰€è§„åˆ™ã€‚
-
----
-
-# 14. Point-in-Time / Availability
-
-ä»»ä½• Canonical Fact åœ¨ Validated Snapshot å‰å¿…é¡»æœ‰ï¼š
-
-```text
-available_at
-availability_kind
-availability_policy_version
-ingested_at
-```
-
-é¦–æ‰¹ï¼š
-
-```text
-OBSERVED
-CONSERVATIVE_ASSUMED
-```
-
-åŽ†å²å›žè¡¥ä¸å¾—ä¼ªç§°çŸ¥é“åŽ†å² provider çš„çœŸå®žå¯ç”¨æ—¶é—´ã€‚
-
-æ— æ³•ç»™å‡ºå®‰å…¨ available_at çš„è®°å½•ï¼š
-
-```text
-QUARANTINE / NOT_VALIDATED
-```
-
-ä¸å¾— Publishã€‚
-
----
-
-# 15. Storage / System of Record
-
-å½“å‰åŽŸåˆ™ï¼š
-
-```text
-Raw Immutable File = Provider Evidence
-Canonical Parquet  = Canonical System of Record
-DuckDB fact_*      = Rebuildable Read Model
-```
-
-Provider SDK è‡ªå¸¦ HDF5/ç¼“å­˜åªæ˜¯ ingestion cacheï¼Œä¸æ˜¯ç³»ç»Ÿ SoRã€‚
-
-ä»»ä½• Read Model å¿…é¡»èƒ½ä»Ž Snapshot Manifest + Canonical Parquet é‡å»ºã€‚
-
----
-
-# 16. Immutable File Contract
-
-```text
-Final Path ä¸å­˜åœ¨
-â†’ commit
-
-å·²å­˜åœ¨ä¸” hash ç›¸åŒ
-â†’ idempotent
-
-å·²å­˜åœ¨ä¸” bytes/hash ä¸åŒ
-â†’ BLOCK
-```
-
-Phase 0 å½“å‰ï¼š
-
-```text
-Single DB/File Commit Owner Process
-```
-
-Worker å¯å¹¶å‘ä¸‹è½½/è®¡ç®—ï¼Œä½†ä¸åº”è·¨è¿›ç¨‹ç›´æŽ¥äº‰æŠ¢ Final Commitã€‚
-
----
-
-# 17. Raw Evidence / ProviderExchange
-
-ç›®æ ‡ç»Ÿä¸€å®¡è®¡å•å…ƒï¼š
-
-```text
-ProviderExchange {
-    RawEnvelope
-    Payload
-}
-```
-
-ä¸€ä¸ª Exchange çš„ `request_id` å¿…é¡»è´¯ç©¿ï¼š
-
-```text
-Provider
-â†’ Spike
-â†’ RawWriter
-â†’ Provider-Normalized
-â†’ Canonical lineage
-```
-
-å¤±è´¥ Exchange ä¹Ÿä¿å­˜ RawEnvelopeã€‚
-
-Raw Evidence å¿…é¡»ï¼š
-
-```text
-immutable
-secret-scrubbed
-hash-sealed
-lossless
-```
-
-ç¦æ­¢ä»¥ `repr()` æˆªæ–­æ›¿ä»£åŽŸå§‹æ•°æ®ã€‚
-
----
-
-# 18. Canonical Core Fact Domains
-
-Real P0a ç¬¬ä¸€æ‰¹åªåšï¼š
-
-```text
-daily_bar
-security_status
-limit_price
-adj_factor
-corporate_action
-```
-
-æ¯æ¡ Canonical Fact è‡³å°‘å…·æœ‰ï¼š
-
-```text
-security_id
-trade_date / effective time
-selected_provider
-provider_dataset
-observation_type
-availability_kind
-available_at
-availability_policy_version
-source_policy_version
-source_revision
-data_version
-schema_version
-selection_reason
-reconciliation_status
-quality_flags
-ingested_at
-```
-
----
-
-# 19. Source Policy
-
-çŠ¶æ€ï¼š
-
-```text
-CANDIDATE
-APPROVED
-RETIRED
-```
-
-åŽŸåˆ™ï¼š
-
-```text
-åŒä¸€ Domain ä¸å…è®¸é‡å  APPROVED policy
-APPROVED version åŽä¸å¯åŽŸåœ°ä¿®æ”¹
-æ–°è¯­ä¹‰ = æ–° Version
-```
-
-æ­£å¼ Source Policy DB ä¸å¯å˜å†™è·¯å¾„ä»å±žäºŽ P0b å‰å¾…å®Œæˆé¡¹ã€‚
-
----
-
-# 20. Snapshot
-
-Snapshot å¿…é¡»ç»‘å®šï¼š
-
-```text
-data_snapshot_id
-source_policy_version
-availability_policy_version
-components
-logical_uri
-content_hash
-manifest_hash
-```
-
-ä¸å…è®¸ glob æŽ¨æ–­è¾“å…¥ï¼›metadata åªåœ¨ Validated åŽåˆ›å»ºã€‚
-
----
-
-# 21. Feature Artifact
-
-Feature ç»“æžœå¿…é¡»ç»‘å®šï¼š
-
-```text
-feature_artifact_set_id
-data_snapshot_id
-feature_set_version
-calc_run_id
-code_commit
-environment_lock_hash
-config_hash
-components
-feature manifest
-```
-
-ä¸å¾—å…è®¸â€œåªçŸ¥é“ Snapshot ID å°±çŒœ Featureâ€ã€‚
-
----
-
-# 22. Publish
-
-Publish å¿…é¡»ç»‘å®šï¼š
-
-```text
-publish_id
-data_snapshot_id
-feature_artifact_set_id
-feature_set_version
-pipeline_run_id
-artifact_validation_id
-```
-
-è§„åˆ™ï¼š
-
-```text
-ä»»ä½• Publish éƒ½å¿…é¡»æœ‰ Run
-Recovery / Republish ä¹Ÿå¿…é¡»å»ºå¯¹åº” Run
-```
-
-Publish å‰ Gateï¼š
-
-```text
-Snapshot Validated
-Artifact Validated
-FeatureSet Active + hash self-check
-Universe Valid
-Identity fallback count = 0
-blocking DQ count = 0
-Run/Artifact/Snapshot/Policy/Code/Config lineage ä¸€è‡´
-```
-
----
-
-# 23. Exact Replay
-
-é€šè¿‡ `publish_id` å¿…é¡»èƒ½ç²¾ç¡®æ‰¾å›žï¼š
-
-```text
-Snapshot
-Feature Artifact
-Feature Set
-Validation
-Run
-Code Commit
-Environment Lock
-Config
-Source/Availability Policy
-```
-
-ä»»ä½• `latest` é»˜è®¤è§£æžä¸å¾—æ”¹å˜å·²å‘å¸ƒåŽ†å²è¯­ä¹‰ã€‚
-
----
-
-# 24. Feature / State System
-
-State ç»´åº¦ï¼š
-
-```text
-Breadth
-Trend
-Priceâ€“Volume
-Volatility
-Risk Appetite
-Stress
-Style
-Payoff / Feedback
-Structure / Rotation
-Tradability / Opportunity Accessibility
-```
-
-æ¯ä¸ª Feature/State åº”æœ‰ï¼š
-
-```text
-Level
-Velocity
-Acceleration
-Duration
-Percentile
-Confidence
-Divergence
-```
-
----
-
-# 25. Trend BASE é¦–æ‰¹å…¬å¼
-
-```text
-RET_N = ln(P_t / P_{t-N})
-N = 5, 20, 60
-```
-
-```text
-SER_N =
-sum(r)
-/
-sum(abs(r))
-```
-
-é¦–æ‰¹è¿˜åŒ…æ‹¬ï¼š
-
-```text
-UP_DAY_RATIO
-MA_DIST
-MA_BREADTH
-POS_RET_BREADTH
-NEW_HIGH
-NEW_LOW
-```
-
-Canonical Vertical Slice é€šè¿‡å‰ï¼Œä¸æ‰©å¤§å®Œæ•´ PV/Vol/Stress/Theme/Styleã€‚
-
----
-
-# 26. Priceâ€“Volume å…³é”®çº¦å®š
-
-åŽç»­ï¼š
-
-```text
-TOR_RATIO20 =
-TOR_t / median(TOR_{t-20:t-1})
-
-PV_PRICE_RESPONSE_020
-    canonical standardized response
-
-RAD_LIMIT_NORM
-    raw Close/PreClose-1
-    denominator = actual legal limit
-    NO_LIMIT separate
-
-PV_EFF_N =
-RET_N / sum(turnover_rate_f)
-```
-
-`FLOAT_A_SHARE` ä¸å¾—æœªç»éªŒè¯ç­‰åŒ Tushare `free_share`ã€‚
-
----
-
-# 27. Breadth / Vol / Stress åŽç»­èŒƒå›´
-
-Breadthï¼š
-
-```text
-ADV / DEC / FLAT
-quantiles / IQR / tails
-strong/weak standardized response breadth
-participation HHI / Effective N
-```
-
-Volatilityï¼š
-
-```text
-close-close 5/20/60
-Parkinson
-cross-sectional IQR/tail
-downside semivol
-vol breadth
-vol5/vol60
-```
-
-Stressï¼š
-
-```text
-weak-tail breadth
-weak-tail amount share
-DD_N
-new lows
-down-limit pressure
-response Ã— turnover downside matrix
-```
-
----
-
-# 28. Feature Audit Framework
-
-Feature/State ä¸Šçº¿å‰ï¼š
-
-```text
-Reliability
-Logic
-Distribution
-Redundancy
-Incremental validity
-Out-of-sample
-Multiple testing
-```
-
-åŽ†å²æ¡ä»¶å›žæŠ¥è‡³å°‘ï¼š
-
-```text
-1 / 3 / 5 / 10 / 20 trading days
-```
-
----
-
-# 29. Provider Capability Governance
-
-Capability Approval å¿…é¡»ç³»ç»Ÿè‡ªè¯ï¼Œä¸æŽ¥å—è°ƒç”¨è€…å£°æ˜Žâ€œé€šè¿‡â€ã€‚
-
-æœ€ç»ˆåº”éªŒè¯ï¼š
-
-```text
-Closed PRODUCTION SpikeRun
-Complete Provenance
-Evidence Closure
-Golden Truth Binding
-Required Case Types
-Required Case Counts
-Required Provider Endpoints
-Account Profile
-Blocking Reasons = []
-```
-
-Capability è®°å½•å¿…é¡»èƒ½è¯´æ˜Ž providerã€datasetã€endpointã€é¢‘çŽ‡ã€åŽ†å²/å®žæ—¶ã€PIT gradeã€account profileã€SDK/runtime å’Œ verified_atã€‚
-
----
-
-# 30. Golden Truth æ²»ç†
-
-æ­£å¼ Golden Truth å¿…é¡»ï¼š
-
-```text
-Versioned
-Human Reviewed
-Externally Evidenced
-Hash Sealed
-Event Diverse
-```
-
-> **å½“å‰çŠ¶æ€ï¼ˆ2026-08-25ï¼ŒR4-A2.6 æ‰¹æ¬¡ç»Ÿä¸€ï¼‰**ï¼šGolden Truth ç»“æž„æ²»ç†
-> å…¨éƒ¨å°±ç»ªï¼ˆimmutable versions v1/v2/v3 + ACTIVE æŒ‡é’ˆ + semantic hash +
-> distinct-event gate + bound formal gates + domain router + typed CA
-> event truthï¼‰ã€‚**å½“å‰ ACTIVE = v3 COMPILED å€™é€‰**ï¼ˆ123 casesï¼›ç»“æž„åŒ–äº‹ä»¶
-> ST_TRANSITION=10<50ã€DELIST symbols=10<20 ä¸è¶³ï¼‰ï¼Œ**ä¸æ˜¯æ­£å¼ Reviewed
-> Truth**â€”â€”PRODUCTION run åœ¨äººå·¥ review è¡¥é½çœŸå®žäº‹ä»¶å‰è¢«åˆ›å»ºé—¨æ‹’ç»ã€‚
-> äººå·¥æ‰§è¡Œé¡¹ä¸Žæœ€æ–°ç»†èŠ‚è§ Â§31ï¼›åŽ†å²æ²¿é©è§ DEVLOGï¼ˆç®¡ç†æ€»å†Œåªä¿ç•™å½“å‰çœŸç›¸ï¼‰ã€‚
-
-Production Verdict å¿…é¡»ç­‰ Review Gate PASSã€‚
-
----
-
-# 31. Golden Truth å½“å‰å¾…ä¿®
-
-> 2026-08-25 çŠ¶æ€ï¼ˆR4-A2.4/CR-1.2 å¤å®¡ Â§10.4 æ”¹å†™ï¼›åŽŸæ–‡è¿‡æ—¶é™ˆè¿°å·²æ¸…é™¤ï¼‰ï¼š
-
-ç»“æž„ä¾§å…¨éƒ¨é—­çŽ¯ï¼ˆå¤šè½®å®¡è®¡å¸æ”¶ï¼‰ï¼š
-
-```text
-[x] Manifest stats ä»Ž cases å¤ç®—ï¼ˆç¯¡æ”¹å³æ‹¦æˆªï¼‰
-[x] case_semantic_hash / source_artifact_hash åˆ†ç¦»
-[x] case_type è¿›å…¥ semantic hash
-[x] event_id / event_class
-[x] distinct-event coverageï¼ˆPRODUCTION run åˆ›å»ºé—¨æ‹’ç»ï¼‰
-[x] append-only Golden Versionï¼ˆv1/v2/v3 + ACTIVE æŒ‡é’ˆï¼‰
-[x] domain-specific Golden Probe Routerï¼ˆR4-A2.3/CR-1.2ï¼Œevidence bundle åŒæºï¼‰
-[x] bound formal gatesï¼ˆverdict åªç”¨ run-bound datasetï¼ŒACTIVE æŽ¨è¿›/ç¯¡æ”¹ä¸æ³„æ¼ï¼‰
-```
-
-å‰©ä½™ä¸º**äººå·¥æ‰§è¡Œ**ï¼ˆç»“æž„å·²å°±ç»ªï¼Œä¸å¯å†ç”±å¼€å‘è€…ä»£åŠžï¼‰ï¼š
-
-```text
-[ ] äººå·¥ review 123 v3 casesï¼ˆscripts/golden/review.pyï¼‰
-[ ] è¡¥é½ â‰¥50 distinct ST_TRANSITION ç»“æž„åŒ–äº‹ä»¶ï¼ˆå½“å‰ 10ï¼‰
-[ ] è¡¥é½ â‰¥20 distinct DELIST symbolsï¼ˆå½“å‰ 10ï¼‰
-[ ] å°å­˜å¤–éƒ¨å·¥ä»¶ source_artifact_hash â†’ äº§å‡º REVIEWED ç‰ˆæœ¬
-```
-
-Domain Routerï¼ˆå·²å®žçŽ°ï¼ŒR4-A2.4/CR-1.2 è¯æ®åŒæº + bundle é—­åˆï¼‰ï¼š
-
-```text
-ST          â†’ history_stock_status
-Limit       â†’ status + hist master(listing_date) + PIT calendar + run-bound rule book
-Delisted    â†’ historical security master / stock basic
-Corp Action â†’ calendar + status + dividend + right_issue + adj + kline T-1/T/T+1
-BJ Mapping  â†’ hist masterï¼ˆcode continuityï¼‰+ exact-date status Â±30%
-```
-
----
-
-# 32. Provider Account / Environment
-
-å½“å‰ä»å¤„äºŽæ­£å¼è´¦å·å¼€é€šå‰å‡†å¤‡é˜¶æ®µã€‚
-
-è¯•ç”¨/ä»¿çœŸè´¦å·åªç”¨äºŽåŸºç¡€ L1 Snapshot è¿žæŽ¥ä¸Žæœ‰é™è®¢é˜…æµ‹è¯•ï¼Œä¸ç”¨äºŽè¯æ˜ŽåŽ†å²æ ¸å¿ƒäº‹å®žï¼Œä¹Ÿä¸ç”¨äºŽæŽ¨å¯¼æ­£å¼å¹³å° Capacityã€‚
-
-æ­£å¼ P0-M-1B å‰å¿…é¡»ï¼š
-
-```text
-æ­£å¼è´¦å· Profile äººå·¥ç¡®è®¤
-freeze production_account_profile_id
-Provider Doctor = RUNTIME_ACTUAL_LOAD_VERIFIED
-å®Œæ•´æƒé™/endpoint éªŒè¯
-```
-
----
-
-# 33. Trial L1
-
-å»ºè®®ï¼š
-
-```text
-1 â†’ 5 â†’ 20 symbols
-```
-
-éªŒè¯ï¼š
-
-```text
-login
-subscribe lifecycle
-callback
-provider_event_time
-received_at
-bid/ask
-cumulative volume/amount
-trading phase
-unsubscribe
-reconnect
-```
-
-100 symbol åªç”¨äºŽè®¢é˜…ä¸Šé™è¡Œä¸ºã€‚
-
----
-
-# 34. æŠ€æœ¯æ ˆä¸Ž SDK åŽŸåˆ™
-
-```text
-Python
-uv
-DuckDB
-Parquet
-Windows / Linux
-```
-
-AmazingData/TGWï¼š
-
-```text
-External Commercial Provider Runtime
-```
-
-è¦æ±‚ï¼š
-
-```text
-Core uv.lock ä¸å†™å•†ä¸š wheel æœºå™¨ç»å¯¹è·¯å¾„
-Local setup script å®‰è£… SDK
-Adapter lazy import
-CI ä½¿ç”¨ Fixture/Fake Provider
-Secrets ä¸è¿›å…¥ Git
-wheel ä¸è¿›å…¥ Git
-```
-
----
-
-# 35. DuckDB å¹¶å‘
-
-Phase 0ï¼š
-
-```text
-ä¸€ä¸ªè¿›ç¨‹æ‹¥æœ‰è¯»å†™ DB
-```
-
-ä¸è¦å‡è®¾å¤šä¸ªå¤–éƒ¨è¿›ç¨‹å¯åŒæ—¶æ— çº¦æŸè®¿é—®åŒä¸€æ–‡ä»¶ã€‚
-
-å¤šè¿›ç¨‹/é›¶åœæœºå±žäºŽæœªæ¥å•ç‹¬ ADRã€‚
-
----
-
-# 36. CI / Quality Gate
-
-æœ€å° Gateï¼š
-
-```text
-ruff
-format
-mypy
-pytest
-python -m compileall scripts
-Spike dry-run
-Migration continuity
-DEVLOG change gate
-```
-
-GitHub Actions åº”ä½¿ç”¨å®Œæ•´åŽ†å²ï¼š
-
-```text
-actions/checkout fetch-depth: 0
-```
-
-ä»¥ä¿è¯ Git lineage/DEVLOG Gate ç”Ÿæ•ˆã€‚
-
----
-
-# 37. Test Taxonomy
-
-```text
-Unit
-Contract
-Integration
-Fixture Vertical Slice
-Live Trial
-Production Spike
-Historical Replay
-```
-
-Dry-run/Fake ä¸èƒ½ä»£æ›¿ Formal Provider Truthã€‚
-
----
-
-# 38. Migration è§„åˆ™
-
-```text
-001..N è¿žç»­
-å·²æ‰§è¡Œ Migration ä¸ä¿®æ”¹
-å·²æ‰§è¡Œ Migration ä¸åˆ é™¤/æ”¹å
-Runner è®°å½• content hash
-Schema ä¿®å¤åªèƒ½æ–°å¢ž Migration
-```
-
----
-
-# 39. Secrets / Security
-
-Git ç¦æ­¢ï¼š
-
-```text
-ç”¨æˆ·å
-å¯†ç 
-Token
-Secret
-å•†ä¸š SDK wheel
-ç”Ÿäº§ç§å¯†é…ç½®
-```
-
-Evidence/Log/Exception å¿…é¡» scrub secretã€‚
-
----
-
-# 40. å½“å‰é¡¹ç›®é˜¶æ®µçŠ¶æ€
-
-| Workstream | Implementation | Review | å½“å‰ç»“è®º |
-|---|---|---|---|
-| P0-M0 Engineering Foundation | DONE | VERIFIED | PASS |
-| Round-1/2 Architecture Hardening | DONE | VERIFIED/absorbed | PASS |
-| R3 Formal Spike Structure | DONE | absorbed by R4 | STRUCTURE PASS |
-| R4-A1 Golden Dataset / Per-Type Gate / Catalog Seal | DONE | absorbed | PASSï¼ˆç”± A1.1 é—­çŽ¯ï¼‰ |
-| R4-A1.1 Truth Integrity | DONE | absorbed | PASSï¼ˆç”± R4-A2 æ‰¹æ¬¡é—­çŽ¯ï¼‰ |
-| R4-A2.1/A2.2 Semantic/PIT Validators + Review Workflow | DONE | absorbed | PASSï¼ˆç”± R4-A2.3 é—­çŽ¯ï¼‰ |
-| R4-A2.3 Correctness Closure | DONE | absorbed into R4-A2.7 | ç»“æž„ä¿ç•™ï¼›æœ€ç»ˆ VERIFIED éš R4-A2.7 é—¨ï¼ˆä¸é¢„å†™ PASSï¼‰ |
-| CR-1 ProviderExchange + RawWriter | DONE | absorbed into CR-1.2.3 | ç»“æž„ä¿ç•™ï¼›æœ€ç»ˆ VERIFIED éšæœ¬æ‰¹é—¨ |
-| CR-1.1 Explicit Exchange Runtime | DONE | absorbed into CR-1.2.3 | ç»“æž„ä¿ç•™ï¼›æœ€ç»ˆ VERIFIED éšæœ¬æ‰¹é—¨ |
-| R4-A2.4 Correctness Deepening | DONE | absorbed into R4-A2.7 | ç»“æž„ä¿ç•™ï¼›æœ€ç»ˆ VERIFIED éšæœ¬æ‰¹é—¨ |
-| CR-1.2 Complete Exchange + Raw Closure | DONE | absorbed into CR-1.2.3 | ç»“æž„ä¿ç•™ï¼›æœ€ç»ˆ VERIFIED éšæœ¬æ‰¹é—¨ |
-| R4-A2.5 Rule-SoR Closure + CR-1.2.1 Raw Hardening | DONE | absorbed into R4-A2.7 | ç»“æž„ä¿ç•™ï¼›æœ€ç»ˆ VERIFIED éšæœ¬æ‰¹é—¨ |
-| R4-A2.6 Formal Truth/Manifest Closure + CR-1.2.2 Probe Exchange Enforcement | DONE | absorbed into R4-A2.8 | ç»“æž„ä¿ç•™ï¼›æœ€ç»ˆ VERIFIED éšæœ¬æ‰¹é—¨ |
-| R4-A2.7 Final Integrity + CR-1.2.3 Evidence Identity Closure | DONE | absorbed into R4-A2.9 | ç»“æž„ä¿ç•™ï¼›æœ€ç»ˆ VERIFIED éšæœ¬æ‰¹é—¨ |
-| R4-A2.8 Final Exchange-Boundary + CR-1.2.4 Pre-Access Integrity | DONE | absorbed into R4-A2.10 | ç»“æž„ä¿ç•™ï¼›æœ€ç»ˆ VERIFIED éšæœ¬æ‰¹é—¨ |
-| R4-A2.9 Review-Seal Exactness + CR-1.2.5 Output Confinement | DONE | VERIFIED (absorbed) | PASS |
-| R4-A2.10 Review Publish Byte-Identity + CR-1.2.6 Review Publish Integrity | DONE | VERIFIED (absorbed) | PASS |
-| R4-A2.11 Final Single-Writer Lineage Closure + CR-1.2.7 Review Parent-Identity Serialization | DONE | **VERIFIED** | **R4-A2.x / CR-1.x å®¡è®¡é“¾ CLOSEDï¼ˆ2026-08-26ï¼‰** |
-| R4-A3 / R4-A3.1 / R4-A3.2 SDK Lifecycle / Gates / Early-Stop é“¾ | DONE | **CLOSED / VERIFIED / FREEZE** | å…¨é“¾é—­çŽ¯ï¼ˆReviewer 2026-08-28 è£å†³ï¼Œä¸é‡å¼€ï¼‰ |
-| R4-B1 / B1.1 / B1.2 Capability Endpoint Proof é“¾ | DONE | **CLOSED / VERIFIED / FREEZE** | å…¨é“¾é—­çŽ¯ï¼ˆReviewer 2026-08-30 è£å†³ï¼Œä¸é‡å¼€ï¼‰ |
-| R4-B2 / B2.1 / B2.2 / B2.3 Publish Validation Exactness é“¾ | DONE | **CLOSED / VERIFIED / FREEZE** | å…¨é“¾é—­çŽ¯ï¼ˆReviewer 2026-08-31 è£å†³ï¼›ADR-021 ACCEPTEDï¼‰ |
-| CR-2 Provider-Normalized + Quarantine | DONE | **VERIFIED / CLOSED / FREEZE** | 2026-09-01 17:06 æœ€ç»ˆå¤å®¡ï¼›ADR-022 ACCEPTED |
-| CR-2.1 Surface Identity + Registry Boundary + Replay + Commit Closure | DONE | **VERIFIED / absorbed / FREEZE** | åŒä¸Šï¼ˆå¹¶å…¥ CR-2 closureï¼‰ |
-| CR-2.2 Replay Provenance Seal | DONE | **VERIFIED / absorbed / FREEZE** | åŒä¸Š |
-| CR-2.3 Raw Trust Anchor + Operation Spec + Output Seal | DONE | **VERIFIED / absorbed / FREEZE** | åŒä¸Š |
-| CR-2.4 Anchored Raw Ingestion Boundary | DONE | **VERIFIED / CLOSED / FREEZE** | åŒä¸Š |
-| CR-3 AvailabilityPolicy + Canonicalizer | DONE | **REOPENED** | ä¸»ä½“æž¶æž„ PASS / FREEZEï¼ˆ2026-09-01 19:06 å¤å®¡ï¼‰ï¼›8 P0 ç”± CR-3.1 æ”¶å£ |
-| CR-3.1 Canonical Input Snapshot + Replay Seal | DONE | **REOPENEDï¼ˆå·²å¸æ”¶ï¼‰** | 19 é¡¹æœºåˆ¶ PASS / FREEZEï¼ˆ2026-09-01 21:08 å¤å®¡ï¼‰ï¼›5 P0 ç”± CR-3.2 æ”¶å£ |
-| CR-3.2 Transactional Snapshot + Full Seal | DONE | **REOPENEDï¼ˆå·²å¸æ”¶ï¼‰** | 16 é¡¹æœºåˆ¶ PASS / FREEZEï¼ˆ2026-09-02 06:56 å¤å®¡ï¼‰ï¼›2 P0 + 3 P1 ç”± CR-3.3 æ”¶å£ |
-| CR-3.3 Historical Input Continuity + Verification Evidence | DONE | **REOPENEDï¼ˆå·²å¸æ”¶ï¼‰** | 18 é¡¹æœºåˆ¶ PASS / FREEZEï¼ˆ2026-09-02 10:22 å¤å®¡ï¼‰ï¼›3 P0 ç”± CR-3.4 æ”¶å£ |
-| CR-3.4 Historical Canonical Seal Trust + Verification Replay Symmetry + Manifest Identity Binding | DONE | **REOPENEDï¼ˆå·²å¸æ”¶ï¼ŒåŽŸå®š 3 P0 PASS/FREEZEï¼‰** | 14 é¡¹æœºåˆ¶ PASS / FREEZEï¼ˆ2026-09-02 13:17 å¤å®¡ï¼‰ï¼›2 æ–° P0 ç”± CR-3.5 æ”¶å£ |
-| CR-3.5 Historical Candidate Discovery + Derived Run/Status Seal | DONE | **REOPENED** | derived run/status seal PASS / FREEZEâ€”â€”21 é¡¹æœºåˆ¶ï¼ˆ2026-09-02 17:36 å¤å®¡ï¼‰ï¼›2 æ–° P0 ç”± CR-3.6 æ”¶å£ |
-| CR-3.6 Selection-Free Historical Discovery + Historical Artifact Closure | DONE | **VERIFIED / CLOSED / FREEZE** | 2026-09-02 21:24 å¤å®¡æœ€ç»ˆè£å†³ï¼ˆ28 mandatory å…¨ PASSï¼‰ï¼›CR-3 å…¨é“¾å…³é—­ |
-| CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild | DONE | **VERIFIED / CLOSED / FREEZE** | CR-4 å…¨é“¾å·²å®Œæˆï¼ŒADR-024 ACCEPTEDï¼ŒPR #1 å·²åˆå¹¶ |
-| CR-5 Deterministic Feature Layer | DONE | **REOPENED** | ä¸»ä½“æœºåˆ¶ PASSï¼›ä»…å‰© P1 bounded lineageï¼Œè½¬å…¥ CR-5.2 |
-| CR-5.1 Registry Honest Execution + Feature Seal Closure | DONE | **VERIFIED / CLOSED / FREEZE** | Reviewer å·²éªŒè¯ correctness closure |
-| CR-5.2 Bounded Selected-Input Lineage | IN_PROGRESS | **START / ACTIVE** | 10k sparse/member-boundã€selected-input PITã€market O(N) guard ä¸Žæ²»ç†åŒæ­¥ |
-| CR-6 Market State Layer | BLOCKED | **BLOCKED_BY_CR-5.2** | CR-5.2 closure åŽæ‰å¯å¯åŠ¨ |
-| R4-CI | PLANNED | PENDING | Next |
-| CR-3 Availability + Canonicalizer | PLANNED | PENDING | CR-2 åŽ |
-| CR-4 Snapshot + Read Model Rebuild | PLANNED | PENDING | CR-3 åŽ |
-| Mock 20Ã—60d Vertical Slice | BLOCKED | PENDING | CR-2..4 åŽ |
-| Production P0-M-1B | BLOCKED | PENDING | æ­£å¼è´¦å· + R4 + Golden äººå·¥ Review |
-| Real P0a | BLOCKED | PENDING | Provider + Canonical Runtime |
-| Trend BASE | BLOCKED | PENDING | Real Vertical Slice åŽ |
-
----
-
-# 41. å½“å‰æœ€é«˜ä¼˜å…ˆçº§
-
-## CR-5.1 Registry Honest Execution + Feature Seal Closureï¼ˆVERIFIED / CLOSED / FREEZEï¼‰
-
-Reviewer commit `67d37f8e51b086e0585ba12b53e529e49d70a427` formally verified
-CR-5.1 correctness closure: Registry honest execution, Feature seal
-cross-binding, numeric/finding semantics, active missingness and the original
-1..66 mapping are frozen. The review reopened only the P1 bounded-lineage
-complexity item as CR-5.2; CR-6 remains blocked and PR #2 remains unmerged.
-
-Previous green evidence remains run `33759993886` (run 168), with Windows
-3.12, Windows 3.14 and Ubuntu 3.14 all green. The current CR-5.2 code/test
-head is `1bbfb2b9485fb62f8713e13584879fe33cb656fe`; its run `33766197492`
-(run 171) is still queued / in progress at this document revision.
-
-## CR-5.2 Bounded Selected-Input Lineageï¼ˆCI VERIFIED / REVIEW PENDINGï¼‰
-
-CR-5.2 implementation and CI verification are complete on clean atomic history head `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e` (PR #3). The final tree originated from `8281e258a7595f8e5fbbd8d0f7e023a494f0b821`; PR #2's history remains unchanged because its run 175 failure was corrected by a new branch rather than force-push or an expanded workflow exception.
-
-Run `33814571568` (run 176) is green on Ubuntu 3.14, Windows 3.14, and Windows 3.12, with `1320 passed` on each leg. Ruff lint/format, mypy, Spike, SDK-absent, and the required Windows 3.14 DEVLOG/Management-doc gates all pass. The bounded selected-input lineage, Registry-derived member bound, bounded lag dependency, market set/order guard, and focused mutation/availability tests are covered by this matrix.
-
-Numeric formulas, active finding truth, artifact schema, migration 023 and all State/score/signal/strategy/backtest/production work remain out of scope. CR-5.2 is DONE / PENDING_REVIEW pending Reviewer closure; PR #3 is not auto-merged, PR #2 is retained for historical traceability, and CR-6 remains BLOCKED_BY_CR-5.2.
-## CR-4 SnapshotBuilder + DuckDB ReadModelï¼ˆå‰æ‰¹ï¼ŒVERIFIED / CLOSED / FREEZEï¼‰
-
-CR-3 å…¨é“¾ VERIFIED / CLOSED / FREEZEï¼ˆ2026-09-02 21:24 å¤å®¡è£å†³ï¼ŒADR-023 ACCEPTEDï¼‰åŽæ­£å¼å¯åŠ¨ã€‚
-é¦–æ‰¹ï¼ˆDM-20260903-075ï¼›CR-4.4 closure DM-20260903-076/077ï¼›å·¥ä½œè¦æ±‚
-`docs/design/A-share-analysis_CR-4_SnapshotBuilderåŠDuckDBReadModelå¼€å‘å·¥ä½œè¦æ±‚_20260902.md`
-+ `A-share-analysis_CR-3.6æœ€ç»ˆå¤å®¡ç»“è®ºä¸ŽCR-4å¯åŠ¨è£å†³_20260902.md`ï¼‰ï¼š
-
-CR-4.4ï¼ˆ2026-09-03 å¤å®¡ reopenï¼‰å½“å‰åªå¤„ç†ä»¥ä¸‹ correctness closureï¼šSnapshotBuilder ä¸Ž
-`verify_snapshot` å…±ç”¨ç¡®å®šæ€§ canonical projection replayï¼›immutable artifact é‡‡ç”¨ identical
-no-op / missing-write / different-byte conflict å¹¶åœ¨å†™å…¥å‰æ•´ä½“ preflightï¼›registry åŠ å…¥æ˜¾å¼
-KeyBinding ä¸Ž stable sortï¼›Canonical/Snapshot verifier ä½¿ç”¨å·²æ ¡éªŒçš„åŒä¸€ Parquet bytesï¼ŒSnapshot
-schema_hash ä»Ž physical schema é‡ç®—ï¼›ReadModel å¢žåŠ åŒ fingerprintã€canonical_as_of/full
-domain_meta sealï¼Œå¹¶åœ¨ `open_read_only` è¿”å›žå¥æŸ„å‰å®Œæˆ verified-openã€‚migration 022 ä¸æ”¹ï¼›
-CR-5ã€Feature/Stateã€provider/fallback/production ä»ä¸åœ¨èŒƒå›´å†…ã€‚
-
-```text
-CR-4.1 Canonical å…¬å…±æ¶ˆè´¹éªŒè¯å™¨ï¼ˆcanonical/verifier.pyï¼‰ï¼š
-  verify_canonical_run_for_consumption = ä¸‹æ¸¸è¯»å– canonical truth çš„å”¯ä¸€æ”¯æŒå…¥å£ï¼›
-  å†…éƒ¨å¤ç”¨ CR-3 å”¯ä¸€å®žçŽ°ï¼ˆidentity seal / artifact closure / findings truth /
-  sealed-input æƒå¨+ç‰©ç†éªŒè¯â€”â€”_sealed_input_authority_problems å…±äº«æå–ï¼‰ï¼›
-  BLOCKED æ˜¾å¼æ‹’ç»ï¼›ä¸è¦æ±‚ current discovery presenceï¼ˆåˆæ³• superset ä¸è¿½æº¯
-  ç ´åå·² mint SUCCESS çš„æ¶ˆè´¹ï¼‰
-CR-4.2 SnapshotBuilderï¼ˆsnapshot/ åŒ…ï¼‰ï¼š
-  ç‰ˆæœ¬åŒ– schema registryï¼ˆåˆ—é›†/dtype/nullability/key arity/key projection
-  å•ä¸€äº‹å®žæºï¼›market=payloadã€factor_type=key projectionï¼‰ï¼›ç¡®å®šæ€§ identity
-  ï¼ˆcanonical run-level seals + contract + builder code fingerprint ->
-  UUID5ï¼‰ï¼›immutable artifactsï¼ˆartifact é›†==è¯·æ±‚ domain é›†ã€manifest LASTã€
-  _write_immutable æ‹’ç»è¦†ç›–ï¼‰ï¼›migration 022 meta_snapshot_buildï¼ˆdup-check
-  äº‹åŠ¡ / exact retry å¹‚ç­‰ replay / crash æ®‹ç•™ fail closedï¼‰ï¼›verify_snapshot
-  ï¼ˆdeterministic URI + identity UUID5 cross-bind + canonical provenance
-  cross-bind é‡è·‘æ¶ˆè´¹éªŒè¯å™¨ + artifact ç‰©ç†/è¯­ä¹‰ seal é‡ç®—ï¼‰
-CR-4.3 DuckDB ReadModelï¼ˆreadmodel/ åŒ…ï¼‰ï¼š
-  rebuild = verify_snapshot -> temp åº“ -> registry ç²¾ç¡®ç±»åž‹å»ºè¡¨ +
-  read_parquet(hive_partitioning=false) -> temp ä¸Š logical sealï¼ˆè¡¨é›†/è¡Œæ•°/
-  key å”¯ä¸€/è¡¨å†…å®¹é‡ç®— semantic hashï¼ˆTIMESTAMPTZ å½’ä¸€åŒ– UTCï¼‰/schema ç²¾ç¡®/
-  meta è¡¨ï¼‰-> Path.replace åŽŸå­æ›¿æ¢ï¼›å¤±è´¥ temp åˆ é™¤æ—§ç›®æ ‡å­—èŠ‚ä¸å˜
-è¾¹ç•Œï¼ˆAST guardï¼‰ï¼šsnapshot/readmodel ç¦ import providers/normalization/
-  raw_writerï¼›ç¦ pandas/talib/numpy/scipy/sklearn
-CR-3 latent ç¼ºé™·æ˜¾å¼ç”³æŠ¥ï¼ˆæè¯·å¤å®¡ä¸€å¹¶è£å†³ï¼Œæœªæ‚„æ‚„ä¿®å¤ï¼‰ï¼š
-  CR-3 selected/decision semantic seal æ›¾å¯¹æœªå¯¹é½ rows è®¡ç®—è€Œ parquet å†™
-  å¯¹é½åŽ rowsâ€”â€”å¤š domain exact replay å¿…è¯¯æŠ¥ DAMAGEDï¼ˆå• domain æ— å·®å¼‚æ•…
-  å…­è½®å¤å®¡æœªæš´éœ²ï¼‰ï¼›æœ€å°ä¿®å¤=seal å¯¹ aligned rows è®¡ç®—ï¼ˆå• domain è¡Œä¸ºé€
-  å­—èŠ‚ä¸å˜ï¼‰+ TestMultiDomainReplayRegression å›žå½’é’‰
-Adversarial Testsï¼ˆ+56ï¼šæ€»ä½“ 1235/0ï¼›mandatory 1-50 å…¨å¯¹åº”ï¼‰
-```
-
-### CR-3.6 Selection-Free Historical Discovery + Historical Canonical Artifact Closureï¼ˆå‰æ‰¹ï¼ŒVERIFIED / CLOSED / FREEZEï¼‰
-
-2026-09-02 17:36 å¤å®¡ REOPENED åŽæ”¶å£ï¼›2026-09-02 21:24 æœ€ç»ˆå¤å®¡ **VERIFIED /
-CLOSED / FREEZEï¼ˆä¸é‡å¼€ï¼‰**â€”â€”CR-3 å…¨é“¾å…³é—­ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260902-074
-ä¸Ž ADR-023 Amendment Fã€‚
-
-### CR-3.5 Historical Candidate Discovery + Derived Canonical Run/Status Sealï¼ˆå‰æ‰¹ï¼ŒVERIFIED / å·²å¸æ”¶ï¼‰
-
-CR-3.4 å¤å®¡ï¼ˆ2026-09-02 13:17 +08:00ï¼‰REOPENED åŽæ”¶å£ï¼›2026-09-02 17:36
-CR-3.5 å¤å®¡ï¼š**REOPENED**ï¼ˆDerived Run / Status Seal å…¨éƒ¨ PASS / FREEZEâ€”â€”
-21 é¡¹æœºåˆ¶ï¼›2 æ–° P0 ç”± CR-3.6 æ”¶å£ï¼Œè§ä¸Šï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260902-073
-ä¸Ž ADR-023 Amendment Eï¼ˆå…¶ä¸­"primitive request-world fields æŸ¥è¯¢"çš„å€™é€‰
-é€‰æ‹©å·²è¢« Amendment F Â§11.1 ä¿®è®¢â€”â€”primitive å­—æ®µçš„ integrity åªåœ¨ verifier
-å†…éƒ¨æ‰è¢«ç¡®è®¤ï¼Œä»»ä½• correctness field éƒ½ä¸å¾—ä½œä¸ºè¿›å…¥ verifier å‰çš„æŽ’ä»–æ¡ä»¶ï¼‰ï¼š
-
-```text
-P0-01 Tamper-Resistant Historical Candidate Discoveryï¼š
-  æ—§ç¼ºé™·ï¼šcontinuity å€™é€‰ SQL = WHERE canonical_context_hash = ? AND
-    status != 'BLOCKED'â€”â€”derived å­—æ®µé¢„è¿‡æ»¤ï¼›ledger status æ”¹ 'BLOCKED'
-    ï¼ˆè·¯å¾„ Aï¼‰æˆ– canonical_context_hash æ¼‚ç§»å‡å€¼ï¼ˆè·¯å¾„ Bï¼‰éƒ½è®© prior
-    SUCCESS åœ¨è¿›å…¥ seal verifier å‰è¢«éšè—
-  æ”¶å£ï¼šå€™é€‰å‘çŽ°æŒ‰ primitive request-world fieldsï¼ˆrequested_domains_hash
-    + as_ofï¼ˆPython ä¾§ç²¾ç¡®æ¯”è¾ƒï¼‰+ contract + ä¸‰ policy version/hash +
-    code_fingerprintï¼‰ï¼Œä¸ç”¨ status é¢„è¿‡æ»¤ã€ä¸æŠŠ stored context å½“
-    selection keyï¼›æ¯ä¸ªå€™é€‰å…ˆè¿‡ full historical sealï¼ˆÂ§9.1 å…¨éƒ¨ + derived
-    identity ç‰©ç†é‡ç®— + findings truthâ†’status è¯­ä¹‰é‡ç®—ï¼‰ï¼Œä¹‹åŽæ‰è§£é‡Šå·²
-    éªŒè¯çš„ world/statusï¼ˆSUCCESS åŒä¸–ç•Œ -> continuity ä¾èµ–ï¼›genuine
-    BLOCKED -> éžä¾èµ–ä¸é˜»å¡ž recoveryï¼›æ—§ bridge policy ä¸–ç•Œ -> è·³è¿‡ï¼‰
-  è·¯å¾„ A ç”± findingsâ†’status è¯­ä¹‰é‡ç®—æ‹¦æˆªï¼›è·¯å¾„ B / ledger+manifest åŒæ­¥
-    rebind ç”± primitive ç‰©ç†é‡ç®—æ‹¦æˆª
-P0-02 Derived Canonical Run Seal ç‰©ç†é—­çŽ¯ï¼š
-  æ—§ç¼ºé™·ï¼šderived å­—æ®µï¼ˆcontext/master set/dataset hash/base/idempotency/
-    run id/statusï¼‰åªéªŒ ledger == manifest + ä¸‰ input hash é‡ç®—â€”â€”
-    ledger+manifest åŒæ­¥ rebind æ— æ³•æ£€æµ‹ï¼ˆstatus å¯è¢«æ´—æˆ genuine
-    BLOCKED æˆ–åå‘æ´—æˆ SUCCESSï¼‰
-  æ”¶å£ï¼šæ¨¡å—çº§å•ä¸€æ´¾ç”Ÿå…¬å¼é›†ï¼ˆlive build / replay / historical
-    continuity ä¸‰æ–¹å…±ç”¨ï¼‰ï¼š_requested_domains_hash_from_list /
-    _input_hashes_from_entries / _master_input_set_hash_from_entries /
-    identity_dataset_hash_with_bridgeï¼ˆidentity.py å‚æ•°åŒ–â€”â€”ç”¨è¯¥ run
-    è‡ªå·±çš„ manifest bridge identity é‡ç®—ï¼Œå…¬å¼å”¯ä¸€ï¼‰/
-    _canonical_context_hash_from_primitives / _base_identity_hash_
-    from_primitives / _idempotency_key_from_hashes /
-    _canonical_run_id_from_idempotencyï¼ˆUUID5 cross-bindï¼‰/
-    _status_error_from_findings
-  _derived_run_identity_problems() å…¨éƒ¨é‡ç®—ä¸Ž ledger é€å­—æ®µæ¯”å¯¹ï¼Œæ¶ˆè´¹äºŽ
-    _verify_historical_canonical_seal + _verify_closureï¼ˆä¸‰æ–¹é—­çŽ¯ï¼‰ï¼›
-    snapshot å±žæ€§ / _build_snapshot / run() çŠ¶æ€æ´¾ç”Ÿå…¨éƒ¨å§”æ‰˜åŒä¸€
-    helpersï¼ˆæœ€å°å¿…è¦æŠ½å–ï¼Œå…¬å¼é€å­—èŠ‚ä¸å˜ï¼‰
-status semantic sealï¼š_verify_findings_truthï¼ˆreplay + historical å…±ç”¨ï¼‰
-  â€”â€”findings ä¸‰æ–¹ï¼ˆDB == parquet == sealï¼‰åŽä»Ž blocking truth é‡ç®—
-  status ä¸Ž error text å¹¶æ¶ˆè´¹ ledger/manifest å­—æ®µï¼›error_message å‡çº§
-  ä¸º derived audit textï¼ˆP1 æ”¶å£ï¼‰
-æ— æ–° migrationï¼ˆbridge identity å·²ç”± manifest æŒä¹…åŒ–ä¸”å‚ä¸Žç‰©ç†é‡ç®—ï¼›
-  migration é“¾ä¿æŒ 21ï¼‰
-Adversarial Testsï¼ˆ+15ï¼šcanonical 166 = 151 å›žå½’ + 15 æ–°å¢žï¼›æ€»ä½“ 1151/0ï¼‰ï¼š
-  audit Â§1.4/Â§2.3 mandatory 15 é¡¹å…¨å¯¹åº” + run-id cross-bind positive
-```
-
-### CR-3.4 Historical Canonical Seal Trust + Verification Replay Symmetry + Manifest Correctness Identity Bindingï¼ˆå‰æ‰¹ï¼ŒDONE / REOPENEDï¼‰
-
-CR-3.3 å¤å®¡ï¼ˆ2026-09-02 10:22 +08:00ï¼‰REOPENED åŽæ”¶å£ï¼›2026-09-02 13:17
-CR-3.4 å¤å®¡ï¼š**REOPENED**ï¼ˆåŽŸå®š 3 P0 PASS / FREEZEâ€”â€”14 é¡¹æœºåˆ¶ï¼›2 æ–° P0 ç”±
-CR-3.5 æ”¶å£ï¼Œè§ä¸Šï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260902-072 ä¸Ž ADR-023 Amendment D
-ï¼ˆå…¶ä¸­"continuity å®Œæ•´éªŒè¯"çš„è¡¨è¿°å·²è¢« Amendment E Â§10.1 ä¿®è®¢â€”â€”CR-3.4 åª
-å¼ºåŒ–äº†"å·²è¢«é€‰ä¸­çš„ prior run æ€Žä¹ˆéªŒ"ï¼Œå€™é€‰é€‰æ‹©æœ¬èº«ä»ä¾èµ– derived å­—æ®µï¼‰ï¼š
-
-```text
-P0-01 Historical Canonical Run Seal Trustï¼š
-  æ—§ç¼ºé™·ï¼šcontinuity guard ä¿¡ä»» prior manifest.input_normalized_runs å‰åªéªŒ
-    manifest å­˜åœ¨ + å¤–å±‚ bytes hash == ledger.manifest_hashâ€”â€”rebindï¼ˆæ”¹
-    input list åŽ» A + rehash + åªæ›´æ–° ledger.manifest_hash + DELETE CR-2
-    Aï¼‰å¯æŠŠå·²æ¶ˆè´¹è¾“å…¥"æ´—å‡º"continuity evidence
-  æ”¶å£ï¼štyped CanonicalRunSealï¼ˆfrom_ledgerï¼‰+ _verify_historical_
-    canonical_seal() åœ¨ä¿¡ä»»åŽ†å² input list å‰å®Œæ•´éªŒè¯ï¼š
-    1. deterministic manifest URI + manifest bytes == ledger.manifest_hash
-    2. manifest æ˜¾å¼ correctness å­—æ®µï¼ˆcanonical_run_id / contract /
-       as_of / idempotency_key / status / requested domains json+hash /
-       input_set_hash / input_seal_hash / identity_dataset_hash /
-       identity_master_input_set_hash / canonical_context_hash /
-       base_identity_hash / verification_state_hash / ä¸‰ policy
-       version+hash / code_fingerprintï¼‰== ledger seal
-    3. ç‰©ç†é‡ç®— _input_hashes_from_entries()ï¼ˆä¸Ž CanonicalInputSnapshot
-       åŒå…¬å¼ï¼‰ï¼šinput_seal_hashï¼ˆå…¨ seal entriesï¼‰/ input_set_hash
-       ï¼ˆidentity subsetâ€”â€”_INPUT_IDENTITY_FIELDS æ¨¡å—çº§å•ä¸€äº‹å®žæºï¼Œ
-       identity_dict åŒæºï¼‰/ verification_state_hashï¼ˆrun_id +
-       verification + verification_problem_hashï¼‰å¿…é¡» == ledger
-  prior manifest/ledger è‡ªèº« DAMAGED -> HARD DAMAGEDï¼šä¸ç”¨è¯¥ input list
-    åš continuity åˆ¤æ–­ï¼Œé›¶ replacement
-P0-02 Verification Evidence Replay Symmetryï¼š
-  æ—§ç¼ºé™·ï¼šreplay å¯¹ INVALID sealed input ç¡¬ç¼–ç  materialization_problems
-    =[]â€”â€”ä½† first consume å…è®¸ closure+anchor å¥åº·åŽåœ¨ _materialize_
-    outputs æ‰å¤±è´¥ï¼ˆTOCTOU pathï¼‰ï¼Œfirst-run seal å¯å«éžç©º materialization
-    evidenceï¼Œreplay æ— æ³•å¯¹ç§°é‡å»º exact evidence hash
-  æ”¶å£ï¼šfirst consume ä¸Ž replay å…±ç”¨åŒä¸€ collector _collect_input_
-    verification_evidence(run identity, role, as_of, keep_rows)ï¼š
-    closure problems -> anchored-evidence problems ->ï¼ˆclosure+anchor
-    å¥åº·æ—¶ï¼‰exact-byte materialization verify -> derived verification
-    enum -> canonical problem evidence -> problem hash
-  first-runï¼ˆkeep_rows=Trueï¼‰é¢å¤–ä¿ç•™ç‰©åŒ–è¡Œï¼›replayï¼ˆkeep_rows=Falseï¼‰
-    ä¸¢å¼ƒè¡Œä½†è¿è¡ŒåŒä¸€éªŒè¯åºåˆ—/è¯­ä¹‰
-  exact physical failure repeat -> idempotent replay åŒä¸€ BLOCKED runï¼›
-    cause å˜åŒ– -> æ–° exact evidence identityï¼›exact repair -> recovery
-    runï¼ˆåŽ†å² BLOCKED ä¿ç•™ï¼‰
-P0-03 Manifest Correctness Identity å…¨æ¶ˆè´¹ï¼š
-  canonical_context_hash / base_identity_hash / verification_state_hash
-    è¿›å…¥ _verify_closure çš„ typed manifest bindingï¼ˆmanifest == ledger ==
-    current recompute ä¸‰æ–¹é—­çŽ¯ï¼‰ï¼›continuity åŽ†å² seal åŒæ ·æ¶ˆè´¹
-æ— æ–° migrationï¼ˆå¤å®¡ Â§4 ä¼˜å…ˆä¸æ–°å¢ž schemaï¼›ä¸‰æ”¶å£å…¨éƒ¨ä¸º canonicalizer
-  runtime ä¾§ï¼›migration é“¾ä¿æŒ 21ï¼‰
-æ–°å…¬å¼€ç±»åž‹ï¼šCanonicalRunSeal / InputVerificationEvidence
-Adversarial Testsï¼ˆ+20ï¼šcanonical 151 = 131 å›žå½’ + 20 æ–°å¢žï¼›æ€»ä½“ 1136/0ï¼‰ï¼š
-  audit Â§1.3/Â§2.3/Â§3 mandatory 13 é¡¹å…¨å¯¹åº” + positive controls
-```
-
-### CR-3.3 Historical Input Continuity + Verification Evidence Exactness + Finding Truthfulnessï¼ˆå‰æ‰¹ï¼ŒDONE / REOPENEDï¼‰
-
-CR-3.2 å¤å®¡ï¼ˆ2026-09-02 06:56 +08:00ï¼‰REOPENED åŽæ”¶å£ï¼›2026-09-02 10:22
-CR-3.3 å¤å®¡ï¼š**REOPENED**ï¼ˆ18 é¡¹æœºåˆ¶ PASS / FREEZEï¼›3 P0 ç”± CR-3.4 æ”¶å£ï¼Œ
-è§ä¸Šï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260902-071 ä¸Ž ADR-023 Amendment Cï¼ˆå…¶ä¸­
-replay åˆ†æ”¯ materialization_problems æ’ç©ºçš„è¡¨è¿°å·²è¢« Amendment D Â§9.2
-ä¿®è®¢ï¼‰ï¼š
-
-```text
-P0-01 Historical Input Continuity Guardï¼ˆmigration 021
-  canonical_context_hashï¼‰ï¼š
-  context = requested domain set + as_of + contract + ä¸‰ policy
-    identities + identity bridge policy identity + canonical code
-    fingerprintï¼ˆåˆ»æ„ä¸å« current CR-2 input set / verification stateï¼‰
-  guardï¼šæŸ¥åŒ context å…¨éƒ¨åŽ†å²éž BLOCKED runï¼Œå¯¹æ¯ä¸ª prior çš„ sealed
-    input set é€ run æ£€æŸ¥ï¼š
-    1. run_id ä»åœ¨å½“å‰ authoritative CR-2 ledgerï¼ˆdisappearance ->
-       DAMAGEDï¼‰
-    2. ledger identityï¼ˆstatus + å…¨éƒ¨ seal å­—æ®µï¼‰== prior sealed
-       identityï¼ˆdrift -> DAMAGEDï¼‰
-    3. physical + anchored verification ä»å¥åº·ï¼ˆdegradation -> DAMAGEDï¼‰
-    4. å¥åº·çš„ prior input å¿…åœ¨ current snapshot discoveryï¼ˆåŒ context
-       => åŒ surface planï¼›ç¼ºå¤±å³ä¸å¯è§£é‡Š driftï¼‰
-  åˆæ³•æ–°å¢žï¼šå…¨éƒ¨ prior inputs å®Œæ•´ + current set æ˜¯ superset -> æ­£å¸¸
-    æ–° runï¼›exact restoration -> åŽ†å² SUCCESS exact replay
-P0-02 Verification Evidence Exactnessï¼š
-  InputRunSeal æ–°å¢ž verification_problem_hashï¼ˆcanonical sorted
-    problem evidenceï¼šrun_id + verification class + closure problems +
-    anchored-evidence problems + materialization problemsï¼‰
-  base identity ä¸å« problem hashï¼ˆidentity_dict æŽ’é™¤ï¼‰ï¼›verification
-    state / manifest input seal / input_seal_hash å‡å«
-  åŒä¸€ INVALID class + ä¸åŒ cause -> æ–° state -> æ–° BLOCKED evidence
-    runï¼ˆprior BLOCKED ä¿ç•™ append-onlyï¼›finding detail åæ˜ çœŸå®žå½“å‰
-    causeï¼‰ï¼›exact same failure -> idempotent replayï¼›INVALID ->
-    HEALTHY -> recovery run
-  replay sealed-input éªŒè¯åˆ†æµï¼šHEALTHY sealed input è¦æ±‚ä»å¥åº·ï¼›
-    INVALID sealed input è¦æ±‚å½“å‰ problem evidence == sealed problem
-    hashï¼ˆexact failure æ‰ replayï¼‰
-P1-01 finding scope çœŸå®žï¼šsource-scope findings ç”¨ reserved scope
-  input:<normalization_surface>ï¼ˆç»ä¸ç”¨ "source"ï¼‰ï¼Œdetail seal
-  affected_domains exact setï¼ˆshared surface å¦‚ security_status_history
-  åŒæ—¶å° security_status + limit_priceï¼‰
-P1-02 finding precedenceï¼šno discovered -> MISSINGï¼›discovered but
-  damaged -> ä»… closure/evidence findingï¼ˆä¸è¯¯æŠ¥ UNAVAILABLEâ€”â€”æŸåä¸æ˜¯
-  ä¸å¯ç”¨ï¼‰ï¼›healthy but all future -> UNAVAILABLEï¼ˆçœŸè¯­ä¹‰ä¿ç•™ï¼‰
-P1-03 æ²»ç†è®¡æ•°æ›´æ­£ï¼šCR-3.2 è¯´æ˜Ž "19 fields" å®žé™… 20ï¼›CR-3.3 åŽ 21
-  ï¼ˆ+verification_problem_hashï¼›identity_dict 17 å­—æ®µï¼‰ï¼›æµ‹è¯•æœºæ¢°æ–­è¨€
-  exact setï¼Œä¸å†æ‰‹å†™
-Migration 021ï¼šcanonical_context_hash åˆ—ï¼ˆæœªæ”¹ 018/019/020ï¼›21 é“¾
-  from-zero + 020->021 upgrade + idempotent + tamper probe 022ï¼‰
-Adversarial Testsï¼ˆ+20ï¼šcanonical 131 = 111 å›žå½’ + 20 æ–°å¢žï¼›æ€»ä½“
-  1116/0ï¼‰ï¼šaudit Â§1.4/Â§2.3 mandatory 15 é¡¹ + P1 ä¸‰é¡¹å…¨å¯¹åº”
-```
-
-### CR-3.2 Transactional Snapshot + Identity Master PIT + Honest Policy Execution + Full Seal + Verification-State Transitionï¼ˆå‰æ‰¹ï¼ŒDONE / REOPENEDï¼‰
-
-CR-3.1 å¤å®¡ï¼ˆ2026-09-01 21:08 +08:00ï¼‰REOPENED åŽæ”¶å£ï¼›2026-09-02 06:56
-CR-3.2 å¤å®¡ï¼š**REOPENED**ï¼ˆ16 é¡¹æœºåˆ¶ PASS / FREEZEï¼›2 P0 + 3 P1 ç”±
-CR-3.3 æ”¶å£ï¼Œè§ä¸Šï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260901-070 ä¸Ž ADR-023
-Amendment Bï¼ˆå…¶ä¸­ degraded-SUCCESS guard ä»¥ base identity æŸ¥è¯¢ã€
-verification state åªå°æžšä¸¾ä¸¤å¤„è¡¨è¿°å·²è¢« Amendment C Â§8.1-Â§8.2 ä¿®è®¢ï¼‰ï¼š
-
-```text
-P0-01 Transactional Materialized Snapshotï¼š
-  BEGIN TRANSACTIONï¼ˆMVCC boundaryâ€”â€”ç¬¬ä¸€ä¸ª authoritative broad SELECT
-    ä¹‹å‰ï¼‰-> surface åŽ»é‡å‘çŽ°ï¼ˆP1-02ï¼šåŒä¸€ surface ä¸€æ¬¡æŸ¥è¯¢ union
-    datasetsï¼‰-> é€ run closure+anchor verify -> ç‰©åŒ– exact sealed bytes
-    ï¼ˆè¯» bytes -> hash==manifest -> parse åŒä¸€ä»½ -> æ·±å†»ç»“è¡Œï¼‰-> COMMIT
-  candidate builder åªæ¶ˆè´¹ materialized rowsâ€”â€”ç»ä¸é‡æŸ¥å½“å‰ ledger path /
-    é‡è¯»å½“å‰æ–‡ä»¶ï¼ˆsnapshot åŽ UPDATE/æ›¿æ¢åªå½±å“ä¸‹æ¬¡ invocation/replayï¼‰
-  æ·±ä¸å¯å˜ï¼ˆP1-01ï¼‰ï¼šInputRunSeal / SnapshotRun / MaterializedOutput /
-    CanonicalFinding frozen dataclasses + tuple-frozen rows
-  race æµ‹è¯•ï¼šç¬¬äºŒ connection åœ¨ broad reads ä¹‹é—´çœŸå®ž commitï¼ˆfile-backed
-    DuckDB MVCCï¼‰â€”â€”éž"snapshot è¿”å›žåŽå†æ’å…¥"
-P0-02 Identity Master PITï¼š
-  security_master ä¸Ž market source åŒè§„åˆ™ï¼šanchor-verified
-    received_at <= as_of æ‰è¿› IdentityBridgeï¼›future master æ˜¯ discovery
-    evidenceï¼ˆinput seal pit_available=falseï¼‰ç»ä¸è§£æžåŽ†å² rows
-  typed findingsï¼šIDENTITY_DATASET_MISSING / UNAVAILABLE_AT_ASOF /
-    IDENTITY_EVIDENCE_INVALIDï¼›first-run/replay å¯¹ç§°ï¼ˆéƒ½éªŒ master
-    anchorï¼‰ï¼›relist ä¿æŒ early truth
-P0-03 Honest Policy Executionï¼š
-  explicit supported-value guardï¼šrequired_evidence_class /
-    reconciliation / tolerance id+version / conflict_action / fallback /
-    partial å…¨éƒ¨åªå…è®¸ v1 å®žçŽ°å€¼â€”â€”å£°æ˜Žä¸æ”¯æŒå€¼ fail closedï¼ˆrun ä¹‹å‰ï¼‰
-P0-04 Full Seal å…¨æ¶ˆè´¹ï¼š
-  input entry å‡çº§ typed full CR-2 sealï¼ˆInputRunSealï¼šcontract version /
-    mapper identity+code hash / manifest uri+hash / output_set+semantic
-    hash / status / raw identity / verification / received_at /
-    pit_availableï¼‰ï¼›input_seal_hash ä¸‰æ–¹ï¼ˆsnapshot==manifest==ledgerï¼‰
-  manifest æ˜¾å¼ provenance å…¨æ¶ˆè´¹ï¼šidentity_master_input_set_hash /
-    bridge policy version+hash / required_evidence_classesï¼ˆ==currentï¼‰
-  manifest_uri æœ¬èº« deterministic verifyï¼ˆexpected base + /manifest.jsonï¼‰
-  replay sealed-input éªŒè¯ seal-basedï¼ˆç”¨ seal å­—æ®µç›´æŽ¥éªŒ filesâ€”â€”ä¸ä¾èµ–
-    current DB rowï¼‰
-P0-05 Verification-State Transitionï¼š
-  run identity = base identityï¼ˆinput worldï¼Œä¸å« stateï¼‰+
-    verification_state_hashï¼ˆæ¯ discovered run çš„ verification outcomeï¼‰
-  migration 020 å››åˆ—ï¼ˆbase_identity_hash / verification_state_hash /
-    input_seal_hash / identity_master_input_set_hashï¼‰
-  state ç›¸åŒ -> exact replayï¼›BLOCKED(å¯æ¢å¤)+ä¿®å¤ -> æ–° deterministic
-    runï¼ˆç»ä¸ replay stale BLOCKEDï¼›åŽ†å²è¯æ®ä¿ç•™ï¼‰ï¼›SUCCESS+é€€åŒ– ->
-    DAMAGED æ‹’ç»ï¼ˆä¸ mint replacementï¼›exact repair åŽæ¢å¤åŽ†å² replayï¼‰
-  input_set_hash åªå« identity å­—æ®µï¼ˆstate å­—æ®µè¿› state hash / manifest
-    evidenceï¼Œç»ä¸è¿› base identityï¼‰
-P1ï¼šæ·±ä¸å¯å˜ snapshotï¼›shared surface discovery åŽ»é‡ï¼›domains=[] æ˜¾å¼
-  rejectï¼ˆNone = all supportedï¼‰
-Migration 020ï¼šå››åˆ—ï¼ˆæœªæ”¹ 018/019ï¼›20 é“¾ from-zero + 019->020 upgrade +
-  idempotent + tamper probe 021ï¼‰
-Adversarial Testsï¼ˆ+30ï¼šcanonical 111 = 81 å›žå½’ + 30 æ–°å¢žï¼›æ€»ä½“ 1096/0ï¼‰ï¼š
-  audit Â§7 çŸ©é˜µ 32 é¡¹å…¨å¯¹åº”ï¼ˆ01-06 race/materialize/immutability /
-  07-12 master PIT / 13-17 policy guard / 18-23 full seal rebind /
-  24-27 state transition / 28-32 migration+CI+regressionï¼‰
-```
-
-### CR-3.1 Canonical Input Snapshot + Anchored Availability Evidence + Full Replay Seal + Recoverable Commitï¼ˆå‰æ‰¹ï¼ŒDONE / REOPENEDï¼‰
-
-CR-3 å¤å®¡ï¼ˆ2026-09-01 19:06 +08:00ï¼‰REOPENED åŽæ”¶å£ï¼›2026-09-01 21:08
-CR-3.1 å¤å®¡ï¼š**REOPENED**ï¼ˆ19 é¡¹æœºåˆ¶ PASS / FREEZEï¼Œ5 P0 ç”± CR-3.2 æ”¶å£ï¼Œ
-è§ä¸Šï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260901-069 ä¸Ž ADR-023 Amendment Aï¼ˆå…¶ä¸­
-snapshot æž„é€ æ–¹å¼ / master éªŒè¯ / policy æ¶ˆè´¹ / manifest å­—æ®µæ¶ˆè´¹ / run
-identity äº”å¤„è¡¨è¿°å·²è¢« Amendment B Â§7.1-Â§7.5 ä¿®è®¢ï¼‰ï¼š
-
-```text
-P0-01 RequestedDomainSet è¿› run identityï¼š
-  è¯·æ±‚åŸŸåŽ»é‡æŽ’åº exact setï¼›canonical JSON hash è¿› identityï¼›migration 019
-  ledger åˆ— requested_domains_json/hash + manifest æ˜¾å¼ç»‘å®šï¼›replay è¿”å›ž
-  domains æ¥è‡ª ledger sealï¼›ä¸åŒ set å¿…ä¸åŒ run / åŒ set ä¸åŒé¡ºåºåŒ run
-P0-02 Availability completenessï¼š
-  æ—  eligible verified run -> REQUIRED_DOMAIN_MISSINGï¼›æœ‰ eligible run ä½†é›¶
-  PIT-available å€™é€‰ -> REQUIRED_DOMAIN_UNAVAILABLE_AT_ASOFï¼ˆå‡ blockingï¼›
-  "åˆæ³•ç©ºé›†"ä»… policy æ˜¾å¼å£°æ˜Žï¼Œv1 æ— ï¼‰ï¼›future-only æ°¸ä¸ false SUCCESS
-P0-03 CanonicalInputSnapshotï¼ˆä¸€æ¬¡ authoritative è§£æžï¼‰ï¼š
-  typed immutable dataclassï¼šrequested set + discovered CR-2 source/master
-  run exact setï¼ˆå«éªŒè¯å¤±è´¥ runâ€”â€”blocking prefinding è¯šå®žè®°å½•ï¼‰+ policy
-  identities + code fingerprintï¼›run identity / candidates / manifest /
-  ledger å…¨éƒ¨ä»Ž snapshot æ´¾ç”Ÿï¼Œä¸å†é‡å¤ broad queryï¼›mid-run æ’å…¥åªèƒ½è¢«
-  ä¸‹ä¸€æ¬¡ invocation çœ‹åˆ°ï¼ˆæ–° identityï¼‰
-P0-04 AnchoredAvailabilityEvidenceï¼š
-  è¯» received_at å‰è¯æ˜Ž current raw meta exact-byte SHA-256 ==
-  normalization run sealed raw_evidence_hash == anchor.evidence_hash +
-  cross-bind provider/dataset/request/uri/endpoint/surface/operation_id
-  ï¼ˆanchor==run==meta ä¸‰æ–¹ï¼‰ï¼›å¤±è´¥ -> AVAILABILITY_EVIDENCE_INVALID
-  blockingï¼›replay å¯¹æ¯ä¸ª sealed source run é‡æ–°æ‰§è¡Œ
-P0-05 Identity binding ç»Ÿä¸€ï¼š
-  identity_dataset_hash = hash(master_input_set_hash, bridge_policy_version,
-  bridge_policy_hash) è¿› identity/manifest/ledger ä¸‰å¤„åŒå€¼ï¼›bridge policy
-  å˜æ›´ -> æ–° runï¼›replay æ¯”å¯¹ä¸‰æ–¹
-P0-06 Policy hash å…¨å­—æ®µï¼š
-  source_policy_hash = asdict + sorted canonical JSON å…¨è¯­ä¹‰å­—æ®µï¼ˆfallback/
-  identity_missing_max/required_evidence_class/tolerance_version å‡è¦†ç›–ï¼‰ï¼›
-  runtime è¯šå®žæ¶ˆè´¹ï¼ˆå£°æ˜Ž fallback/partial æ— æ”¯æŒ -> æ˜¾å¼ raiseï¼›
-  identity_missing_max per-domain è®¡æ•° vs é˜ˆå€¼ï¼›required_evidence_classes
-  è¿› manifestï¼‰
-P0-07 Full replay sealï¼š
-  CURRENT snapshot identities == ledger == manifest == replay-time physical
-  recomputeï¼ˆselected_semantic_hash / decision_set_hash / finding_set_hash /
-  artifact exact set / deterministic URI / schema recompute / row_count /
-  findings parquet<->DB exact-set cross-bindï¼‰+ re-verify æ¯ä¸ª sealed CR-2
-  source run closure + anchored evidenceï¼›migration 019 ä¸¤ semantic seal åˆ—
-P0-08 Recoverable commitï¼š
-  findings.parquet æ—  wall-clockï¼ˆfinding id = uuid5ï¼›created_at ä»… DB
-  transaction-time audit metadataï¼ŒæŽ’é™¤å‡º semantic hashï¼‰ï¼›DB å¤±è´¥ ->
-  exact retry æ–‡ä»¶ byte-identical no-op -> ledger è¡¥æäº¤
-P1ï¼šidentity finding çœŸå®ž domainï¼ˆper-domain è®¡æ•°ï¼‰ï¼›domain matrix è®¡æ•°
-  æ›´æ­£ 12 -> 13ï¼ˆ5/2/6ï¼Œruntime exact-set ç»Ÿè®¡ï¼‰ï¼›naive datetime æ‹’ç» +
-  naive string å›ºå®š UTC è§„åˆ™ï¼ˆè·¨å¹³å° deterministicï¼‰
-Migration 019ï¼šrequested_domains_json/hash + selected_semantic_hash +
-  decision_set_hash å››åˆ—ï¼ˆæœªæ”¹ 018ï¼›19 é“¾ from-zero + 018->019 upgrade +
-  idempotent + tamper probe 020ï¼‰
-Adversarial Testsï¼ˆ+41ï¼šcanonical 81 = 40 å›žå½’ + 41 æ–°å¢žï¼›æ€»ä½“ 1066/0ï¼‰ï¼š
-  audit Â§10 çŸ©é˜µ 34 é¡¹å…¨å¯¹åº”ï¼ˆsnapshot race ç» _build_snapshot
-  monkeypatch æ³¨å…¥â€”â€”production æ—  hookï¼‰
-```
-
-### CR-3 AvailabilityPolicy + Canonicalizerï¼ˆå‰æ‰¹ï¼ŒDONE / REOPENEDï¼‰
-
-CR-2.4 æœ€ç»ˆå¤å®¡ï¼ˆ2026-09-01 17:06 +08:00ï¼‰VERIFIED åŽäº¤ä»˜ï¼›2026-09-01
-19:06 CR-3 å¤å®¡ï¼š**REOPENED**ï¼ˆä¸»ä½“æž¶æž„ PASS / FREEZEï¼Œ18 é¡¹å†»ç»“æ¸…å•ï¼›
-8 P0 ç”± CR-3.1 æ”¶å£ï¼Œè§ä¸Šï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260901-068 ä¸Ž
-ADR-023 Â§2ï¼ˆå…¶ä¸­ requested-domain-identity / input-set å£å¾„ / received_at
-è¯»å– / identity hash å£å¾„ / policy hash è¦†ç›– / replay seal æ¶ˆè´¹ / findings
-determinism ä¸ƒå¤„è¡¨è¿°å·²è¢« Amendment A Â§6.1-Â§6.8 ä¿®è®¢ï¼‰ï¼š
-
-```text
-P0-01/02 å”¯ä¸€è¾“å…¥ + eligibility æœºå™¨å®šä¹‰ï¼š
-  CanonicalRunner.run(as_of, domains=...)â€”â€”å”¯ä¸€æ­£å¼ canonical è¾¹ç•Œ
-  è¾“å…¥ = CR-2 verified Provider-Normalizedï¼ˆSUCCESS onlyï¼›PARTIAL é»˜è®¤
-    NOT eligibleâ€”â€”v1 å…¨éƒ¨ domain partial_run_allowed=Falseï¼›BLOCKED
-    NEVERï¼‰
-  æ¶ˆè´¹å‰é€ run è°ƒ verify_normalized_runï¼ˆnormalization/runner.py å…¬å¼€
-    åªè¯» closure verifierï¼šmanifest bytes / output content+schema+
-    row_count / quarantine exact set / typed seal vs current provenanceï¼‰
-    â€”â€”ä»»ä½• problem -> CLOSURE_VERIFICATION_FAILED blocking finding
-P0-03/04 AvailabilityPolicy æœºå™¨å…ˆè¡Œï¼š
-  candidate -> derive available_at -> filter <= as_of -> ONLY THEN
-    selectionï¼ˆé¡ºåºæœºå™¨å¼ºåˆ¶ï¼ŒEXCLUDED_FUTURE decision ç•™è¯ï¼‰
-  available_at å”¯ä¸€ basis = OBSERVED_AT_INGESTï¼ˆraw envelope
-    received_atï¼Œæ™šäºŽçœŸå®ž publish -> PIT ä¿å®ˆï¼‰ï¼›SOURCE_PUBLISHED_AT/
-    DOMAIN_RULE_DERIVED æœªæ³¨å†Œï¼ˆæ— å·²éªŒè¯ publish ts / æ— ç‰ˆæœ¬åŒ– Trading
-    Rule äº‹å®žï¼‰ï¼›NOT_VERIFIABLE æ°¸ä¸è¿›å…¥ PIT truth
-  typed basis å››åˆ†ç±» + policy ç‰ˆæœ¬ availability-v1 + hash è¿› run identity
-P0-05/06 Identity fail closed + typed natural keysï¼š
-  IdentityBridgeï¼šCR-2 verified security_master runsï¼ˆä¸‰ dataset å…¨é›†ï¼‰
-    -> ADR-002 resolve_security_identityï¼ˆEXCHANGE:STOCK:SYMBOL:F<date>ï¼‰
-  exchange å½’å±žåªæ¥è‡ª provider market åŽç¼€ï¼›è£¸ç å”¯ä¸€å¸‚åœºåŒ¹é…ï¼ˆä¸‰å˜ä½“
-    æ°ä¸€å­˜åœ¨ï¼›ä¸¤å­˜åœ¨ = ambiguous fail closedâ€”â€”ç»ä¸å‰ç¼€çŒœï¼‰
-  PIT relistï¼šlist_date <= trade_date æœ€æ–°ï¼›missing/ambiguous ->
-    IDENTITY_MISSING blocking findingï¼ˆidentity_missing_max=0ï¼‰+ è¡ŒæŽ’é™¤
-    â€”â€”è£¸ symbol ç»ä¸ä½œä¸º canonical key fallback
-  natural keys é™æ€ typedï¼ˆcalendar: market+trade_dateï¼›bars/status/
-    limit: security_id+trade_dateï¼›adj_factor: security_id+ex_date+
-    factor_typeï¼‰
-  Domain eligibility matrix 12 é¡¹å…¨æ˜¾å¼ï¼š5 CANONICAL_SUPPORTED /
-    2 AUXILIARY_ONLYï¼ˆsecurity_master=identity datasetï¼›ca_projection=
-    STATUS_FLAG_PROJECTION tierâ€”â€”direct CA mapper BLOCKED æœŸé—´ç»ä¸ä¼ªé€ 
-    direct truthï¼‰/ 5 BLOCKED_PENDING_SEMANTICSï¼ˆindex_daily æ— å·²éªŒè¯
-    å¸‚åœºå½’å±žç­‰ï¼‰ï¼›éž SUPPORTED domain è°ƒç”¨å³ raiseï¼ˆæ—  silent skip /
-    æ— ç»•è¿‡ CR-2 ç›´è¯» Rawï¼‰
-P0-07..09 SourcePolicy ç‰ˆæœ¬åŒ–é™æ€ + No Silent Fallbackï¼š
-  CanonicalSourcePolicy registryï¼ˆsource-policy-v1ï¼‰ï¼špriority /
-    fallback ç©º / partial False / SINGLE_SOURCE_EXACT / exact-v1 /
-    conflict BLOCKï¼›caller é›¶æ³¨å…¥é¢ï¼ˆç­¾åç»“æž„æµ‹è¯•ï¼‰
-  ä¸å¯ç”¨é¦–é€‰ -> REQUIRED_DOMAIN_MISSING blockingï¼ˆæ— é™é»˜ fallbackï¼‰
-  åŒ key å¤šå€™é€‰ EXACT æ¯”è¾ƒï¼šç­‰å€¼ -> EQUIVALENT_MERGED decision +
-    deterministic winnerï¼ˆ(priority, manifest hash, ordinal)â€”â€”iteration
-    order æ°¸ä¸å½±å“ï¼‰ï¼›ä¸ç­‰å€¼ -> SOURCE_CONFLICT blockingï¼›åŒ output
-    é‡å¤ key -> DUPLICATE_CANONICAL_KEY blockingï¼ˆç»ä¸ silent dedupe /
-    last-write-winsï¼‰
-P0-10 ç²¾ç¡® lineageï¼šcanonical row ç»‘å®š 12+ å­—æ®µï¼ˆrun_id/output_name/
-  row ordinal + row identity hash/raw request/evidence hash/mapper
-  identity/policy versions/availability basis...ï¼‰
-P0-12 æ— ç¡¬ç¼–ç åˆ¶åº¦äº‹å®žï¼šAST guard æ‰« canonical åŒ…ï¼ˆæ—  ST=5%/ç§‘åˆ›æ¿=20%/
-  åŒ—äº¤æ‰€=30%/è§„åˆ™å˜åŒ–æ—¥æœŸå­—é¢é‡ï¼‰
-P0-13..15 Immutable artifacts + deterministic identity + çŠ¶æ€æœºï¼š
-  canonical/contract=<V>/as_of=<T>/run=<id>/ ä¸‹ selected/decisions/
-  findings.parquet + manifest.json LASTï¼ˆæ— å¢™é’Ÿï¼›immutable åŒ bytes
-  no-opï¼‰ï¼›manifest å° input run exact set + ä¸‰ policy identity +
-  canonicalizer code fingerprintï¼ˆäº”æ¨¡å—æºç  SHA-256 è¡Œå°¾å½’ä¸€ï¼‰+
-  æ¯ artifact seal + selected_semantic_hash + finding_set_hash
-  run identity = uuid5(sha256(input_set + identity_hash + as_of +
-    contract + ä¸‰ policy identity + fingerprint))â€”â€”policy/ä»£ç /è¾“å…¥ä»»ä¸€
-    å˜åŒ– -> æ–° runï¼ˆåŽ†å²ä¿ç•™ï¼‰ï¼›prior åŒ identity å…ˆä¸‰æ–¹ seal closure
-    å¤éªŒå† idempotent replayï¼ˆç¯¡æ”¹ -> fail closedï¼‰
-  migration 018 ledgerï¼ˆmeta_canonicalization_run +
-    meta_canonical_reconciliation_findingï¼‰å•äº‹åŠ¡ + finding è¡Œæ•°æ–­è¨€
-  çŠ¶æ€æœº SUCCESS/BLOCKEDï¼ˆPARTIAL ä»… policy å…è®¸â€”â€”v1 æ— ï¼‰
-P1 guard åŠ å›ºï¼ˆCR-2.4 å¤å®¡ Â§2ï¼Œæœ¬æ‰¹å®Œæˆï¼‰ï¼š
-  _scan_unanchored_writes å‡çº§â€”â€”RawWriter write è°ƒç”¨ç‚¹ç» alias èµ‹å€¼
-    ï¼ˆrw = RawWriter(...); rw.write(...)ï¼‰ä¸Žç›´æŽ¥æž„é€ è°ƒç”¨ï¼ˆRawWriter
-    (...).write(...)ï¼‰åŒå½¢æ€è·Ÿè¸ªï¼›æž„é€ ç‚¹ç™½åå• = raw_writer.py /
-    raw_anchor.py + normalization/runner.pyï¼ˆread-only verified
-    readerï¼Œæ—  write è±å…ï¼‰ï¼›negative fixtures + production å…¨æ ‘é›¶è¿è§„
-Adversarial Testsï¼ˆ36 é¡¹ï¼Œtests/integration/test_canonical.pyï¼‰ï¼š
-  audit Â§8 çŸ©é˜µ 30 ç±»å…¨å¯¹åº” + P1 guard 4 é¡¹ï¼›æ€»ä½“ 1025/0
-```
-
-### CR-2.4 Anchored Raw Ingestion Boundaryï¼ˆå‰æ‰¹ï¼ŒVERIFIED / CLOSED / FREEZEï¼‰
-
-CR-2.3 å¤å®¡ï¼ˆ2026-09-01 14:26 +08:00ï¼‰REOPENED åŽ wiring æ”¶å£ï¼›2026-09-01
-17:06 CR-2.4 æœ€ç»ˆå¤å®¡ï¼š**VERIFIED / CLOSED / FREEZE**ï¼ˆCR-2 å…¨é“¾å…³é—­ï¼›
-ADR-022 ACCEPTEDï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260901-067 ä¸Ž ADR-022 Amendment D
-ï¼ˆå·¥ä½œè¦æ±‚
-`docs/design/A-share-analysis_CR-2.3å¤å®¡ä¸ŽCR-2.4æœ€ç»ˆAnchoredIngestionBoundaryæ”¶å£è¦æ±‚_20260901.md`ï¼‰ï¼š
-
-```text
-AnchoredRawEvidenceWriterï¼ˆaudit Â§3.1ï¼‰â€”â€”å”¯ä¸€ production-owned å†™å…¥è¾¹ç•Œï¼š
-  write_exchange(exchange) -> RawWriteResult
-    1. RawWriter.write(exchange)            # æ–‡ä»¶ä¾§ commitï¼ˆmeta æœ€åŽè½ç›˜ï¼‰
-    2. reread persisted meta bytesâ€”â€”VERIFY-ONLYï¼š
-       require sha256(reread) == RawWriteResult.evidence_hash
-       ï¼ˆwrite->enroll ä¹‹é—´æ¢å­—èŠ‚ï¼ˆTOCTOUï¼‰-> æ•´ä½“ HARD FAILï¼ŒH2 æ°¸ä¸ enrollï¼‰
-    3. identity cross-bindingï¼šmeta çš„ request_id/provider/provider_dataset/
-       endpoint/normalization_surface/operation_id == exchange envelope
-       ï¼ˆä¼ªé€  meta èº«ä»½ -> BLOCKï¼‰+ uri cross-binding
-    4. enroll immutable anchorï¼ˆkeyed to COMMIT identityï¼‰
-    5. returnâ€”â€”ingest è‡³æ­¤æ‰ç®—å®Œæˆï¼ˆä»»ä½•å¤±è´¥ = evidence ä¸ readyï¼‰
-å…¨éƒ¨ production evidence å†™å…¥æŽ¥çº¿ï¼ˆaudit Â§3.2ï¼‰ï¼š
-  ProbeContext æ–°å¢žå¿…éœ€ conn å‚æ•°ï¼›raw_writer -> AnchoredRawEvidenceWriter
-    ï¼ˆevidence_from_exchange / failure_evidence -> write_exchangeâ€”â€”
-    SUCCESS ä¸Ž ERROR exchange å‡è‡ªåŠ¨ anchorï¼‰
-  run_dry_run æ‰“å¼€ in-memory migrated DBâ€”â€”æ¡†æž¶è‡ªæ£€èµ°ä¸Ž production
-    å®Œå…¨ç›¸åŒçš„ anchored å†™è·¯å¾„
-  ç»“æž„å®ˆå«ï¼ˆASTï¼‰ï¼šsrc/ ä¸­ RawWriter write/write_success/write_failure
-    è°ƒç”¨ç‚¹åªå…è®¸ raw_writer.pyï¼ˆå®šä¹‰ï¼‰ä¸Ž raw_anchor.pyï¼ˆboundary å†…éƒ¨ï¼‰ï¼›
-    readerï¼ˆRawWriter.readï¼‰ä¸å—é™ï¼ˆnormalization åªè¯»æ¶ˆè´¹ï¼‰
-Enrollment å¯æ¢å¤ä½†ä¸å¯ rebaselineï¼ˆaudit Â§3.3ï¼‰ï¼š
-  anchor INSERT æ³¨å…¥å¤±è´¥ -> write_exchange æŠ›å‡º -> æœ¬æ¬¡ ingest å¤±è´¥ï¼›
-    raw bytesï¼ˆH1ï¼‰åœ¨ç›˜æ—  anchor -> Normalization RAW_ANCHOR_MISSING
-  exact retry åŒä¸€ exchangeï¼šRawWriter idempotentï¼ˆsame bytes ignoring
-    ingested_at -> no-op -> evidence_hash = é¦– commit çš„ H1ï¼‰-> enrollment
-    æˆåŠŸ -> ä¸€ä¸ª immutable anchorã€å•ä¸€ evidence identity
-  å·²æœ‰ anchor H1ï¼šsame H1 idempotent / H2 hard conflictï¼›æ°¸ä¸ rebaseline
-API æ”¶å£ï¼ˆaudit Â§3.4ï¼‰ï¼š
-  å…¬å¼€ record_raw_evidence_anchorï¼ˆ"çœ‹çŽ°åœº bytes å»ºé¦–æ¬¡ anchor"ï¼‰æ’¤é”€ï¼›
-    enrollment ç§æœ‰åŒ– _enroll_anchorâ€”â€”evidence_hash ä¸ºå¿…å¡«è°ƒç”¨æ–¹å£°æ˜Ž
-    commit identityï¼Œå‡½æ•°å†… verify-only æ¯”å¯¹ç£ç›˜ï¼ˆä¸è‡ªè¡Œå®šä¹‰çœŸå€¼ï¼‰
-  å…¬å¼€é¢ï¼šAnchoredRawEvidenceWriter / persist_exchange_with_anchor /
-    lookup_raw_evidence_anchor / RawEvidenceAnchor / RawAnchorError
-  tests åˆ¶é€  legacy/unanchored æˆ– governed-reingest å¤¹å…·ç”¨ç§æœ‰
-    primitiveï¼ˆtests-onlyï¼ŒB2 static registry åŒå£å¾„ï¼‰
-æ—  schema å˜æ›´ï¼ˆå¤ç”¨ migration 017 anchor è¡¨ï¼‰
-Adversarial Testsï¼ˆ+10ï¼šnormalization 114 = 104 å›žå½’ + 10 æ–°å¢žï¼‰ï¼š
-  audit Â§4 17 é¡¹çŸ©é˜µå…¨å¯¹åº”ï¼ˆProbeContext SUCCESS/ERROR anchor 2 /
-  ç»“æž„å®ˆå« 1 / TOCTOU 1 / enrollment å¤±è´¥æ¢å¤ 1 / same-H1 idempotent 1 /
-  H2 hard conflict 1 / anchored->runner SUCCESS 1 / identity
-  cross-binding 1 / API æ”¶å£ 1 + å›žå½’ 8 é¡¹å…¨ä¿æŒï¼‰ï¼›æ€»ä½“ 985/0
-```
-
-### CR-2.3 Raw Trust Anchor + Provider-Owned Operation Spec + Output Sealï¼ˆå‰æ‰¹ï¼ŒDONE / REOPENEDï¼‰
-
-CR-2.2 å¤å®¡ï¼ˆ2026-09-01 10:45 +08:00ï¼‰REOPENED åŽæ”¶å£ï¼›2026-09-01 14:26
-CR-2.3 å¤å®¡ï¼š**REOPENED**ï¼ˆoperation spec / anchor schema+runner
-verification / output-set+semantic seal PASS / FREEZEï¼›ä»… enrollment
-boundary ç”± CR-2.4 æ”¶å£ï¼Œè§ä¸Šï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260901-066 ä¸Ž
-ADR-022 Amendment Cï¼ˆå…¶ä¸­å…¬å¼€ recorderã€æµ‹è¯• helper æ‰‹å·¥ anchor ç­‰è¡¨è¿°
-å·²è¢« Amendment D Â§9.4 ä¿®è®¢ï¼‰ï¼š
-
-```text
-P0-01 Provider-Owned Operation Specï¼ˆaudit Â§2ï¼‰ï¼š
-  æ–° operations.pyï¼šProviderOperationSpecï¼ˆoperation_id/capability/endpoint/
-    provider_dataset/normalization_surfaceï¼‰ç§æœ‰ STATIC å¸¸é‡ 15 ä¸ªâ€”â€”æ¯ä¸ª
-    facade wrapper ç»‘å®šä¸€ä¸ª
-  call_exchange / _call_or_exchange æ’¤é”€ï¼šgeneric executor ç§æœ‰åŒ–ä¸º
-    _execute_exchange(spec, fn, params)â€”â€”endpoint/dataset/capability/
-    surface/operation_id å…¨éƒ¨ç”± spec æ´¾ç”Ÿï¼ˆæ™®é€š caller æ— æ³•ç»„åˆ
-    daily fn + index capabilityï¼›å…¬å¼€æ–¹æ³•ç­¾åæ— ä»»ä½• free-form
-    correctness selectorâ€”â€”ç»“æž„æµ‹è¯•æ–­è¨€ï¼‰
-  query_kline_exchange -> DAILY_BAR_KLINE / query_index_kline_exchange ->
-    INDEX_DAILY_KLINEï¼ˆAST ç»‘å®šæ–­è¨€ï¼‰
-  RawEnvelope / raw meta æ–°å¢ž operation_idï¼ˆanchor äº¤å‰ç»‘å®šï¼‰
-  ç»“æž„å®ˆå«ï¼š15 spec ä¸Ž SDK_METHOD_CLASSIFICATIONS + normalization
-    registry åŒå‘ exact æ ¸å¯¹ï¼ˆ3 NOT_APPLICABLE æ—  specï¼‰
-P0-02 Raw Evidence Trust Anchorï¼ˆaudit Â§3ï¼‰ï¼š
-  migration 017 meta_raw_evidence_anchorï¼ˆ(provider, dataset,
-    request_id) PK + evidence_uri/evidence_hash/endpoint/operation_id/
-    normalization_surface/payload_kind/ingest_run_id/created_atï¼‰
-  governed ingestion flowï¼ˆraw_anchor.py::record_raw_evidence_anchorï¼‰ï¼š
-    RawWriter commit meta LAST -> reread persisted bytes -> sha256 ->
-    anchorï¼ˆåŒ bytes å¹‚ç­‰ï¼›å¼‚ bytes RawAnchorError hard failâ€”â€”anchor
-    æ°¸ä¸ re-baselineï¼‰
-  NormalizationRunner åœ¨ä»»ä½• meta è§£æž/è·¯ç”±/æ˜ å°„ä¹‹å‰æŸ¥ anchorï¼š
-    ç¼ºå¤±ï¼ˆlegacy pre-017ï¼‰-> RAW_ANCHOR_MISSING BLOCKEDï¼ˆfail closedï¼›
-    governed repair = re-ingestï¼›ç»ä¸ auto-grandfatherâ€”â€”015-era
-    H1+H2 laundering history å‡çº§åŽ H2 æ°¸ä¸è¢«ä¿¡ä»»ï¼‰
-    current hash != anchor -> RAW_ANCHOR_MISMATCH INCIDENT HARD BLOCK
-    ï¼ˆevidence_conflict=TRUE ä»…è¯Šæ–­ï¼›ä¿¡ä»»æ ¹æ˜¯ anchorâ€”â€”é‡å¤è¿è¡Œæ°¸ç»­
-    BLOCKï¼›ä¿®å¤å›žåŽŸ bytes -> åŽŸ run exact replayï¼‰
-  evidence_conflictï¼ˆ016ï¼‰é™çº§ä¸ºè¯Šæ–­å±žæ€§ï¼›æ—§ baseline DISTINCT-hash
-    æŸ¥è¯¢åˆ é™¤
-P0-03 Expected Output Exact Set + Semantic Value Sealï¼ˆaudit Â§4ï¼‰ï¼š
-  migration 017 ledger ä¸¤åˆ— normalized_output_set_hash /
-    normalized_semantic_hash
-  output_set_hash = hash(sorted(output_name, canonical uri, content_hash,
-    schema_hash, row_count)) ä¸‰æ–¹æ¶ˆè´¹ï¼šledger == manifest ==
-    replay-time ç‰©ç†é‡ç®—
-  semantic_hashï¼ˆå…¨è¾“å‡ºè¡¨ sorted canonical JSONï¼‰ä¸‰æ–¹æ¶ˆè´¹ï¼šledger ==
-    manifest == replay-time ä»Žç‰©ç† parquet records é‡ç®—
-  expected exact setï¼šmanifest output_name set == CURRENT registry
-    spec.output_namesï¼ˆno missing / no extra / no duplicateâ€”â€”åˆ é™¤
-    required output + é‡ç»‘åŒ hash ä» DAMAGEDï¼‰
-  URI deterministic bindingï¼šæ¯ output uri == ledger èº«ä»½é‡ç®—çš„
-    base_path + output_nameï¼ˆé‡ç»‘åˆ°å¦ä¸€åˆæ³• logical path ä» DAMAGEDï¼‰
-  ç‰©åŒ–è¯­ä¹‰å‡çº§ï¼šmaterialized set æ°å¥½ç­‰äºŽ spec.output_namesï¼ˆç©ºè¡¨
-    ç‰©åŒ–ä¸ºç©º parquetâ€”â€”é›¶äº§å‡ºè¯æ®ï¼›empty-payload SUCCESS æµ‹è¯•è¦†ç›–ï¼‰
-  NormalizationRunSeal æ‰©å±• raw_evidence_uri / raw_payload_kind /
-    normalized_output_set_hash / normalized_semantic_hashï¼›manifest æ–°å¢ž
-    raw_payload_kind / output_set_hashï¼›pre-CR-2.3 è¡Œç¼º seal ä¸ä½œ
-    healthy replay
-Migration 017ï¼šanchor è¡¨ + ä¸¤ seal åˆ—ï¼ˆæœªæ”¹ 014/015/016ï¼›17 é“¾
-  from-zero + 001..016->017 upgrade + idempotent + tamper probe 018ï¼‰
-Adversarial Testsï¼ˆ+20ï¼šnormalization 104 = 84 å›žå½’ + 20 æ–°å¢žï¼‰ï¼š
-  audit Â§6 Aï¼ˆoperation provenance 3ï¼‰/ Bï¼ˆraw trust anchor 6ï¼‰/
-  Cï¼ˆoutput + semantic seal 10ï¼‰/ Dï¼ˆregressionâ€”â€”æ—¢æœ‰ 84 é¡¹å…¨ä¿æŒï¼‰çŸ©é˜µ
-  å…¨å¯¹åº”ï¼›æ€»ä½“ 975/0
-```
-
-### CR-2.2 Replay Provenance Sealï¼ˆå‰æ‰¹ï¼ŒDONE / REOPENEDï¼‰
-
-CR-2.1 å¤å®¡ï¼ˆ2026-09-01 10:15 +08:00ï¼‰è£å†³ **CR-2.1 REOPENED** åŽæ”¶å£ï¼›
-2026-09-01 10:45 CR-2.2 å¤å®¡ï¼š**REOPENED**ï¼ˆexact replay / full
-fingerprint / schema verify FREEZEï¼Œ3 P0 trust-root ç”± CR-2.3 æ”¶å£ï¼Œè§ä¸Šï¼‰ã€‚
-åŽ†å²ç»†èŠ‚è§ Â§61 DM-20260901-065 ä¸Ž ADR-022 Amendment Bï¼ˆå…¶ä¸­
-require_capability æ´¾ç”Ÿ surfaceã€run-history baselineã€å¤–å±‚æ–‡ä»¶ hash seal
-ä¸‰å¤„è¡¨è¿°å·²è¢« Amendment C Â§8.1-Â§8.3 ä¿®è®¢ï¼‰ï¼š
-
-```text
-P0-01 Surface çœŸæ­£ system-derivedï¼ˆaudit Â§2ï¼‰ï¼š
-  æ’¤é”€ call_exchange çš„ normalization_surface caller-override å¯é€‰å‚æ•°
-    ï¼ˆä¸Ž B1/B2 "caller-declared identity is not system-derived" åŒè£ï¼‰
-  surface_identity = str(require_capability or "")â€”â€”capability å¥‘çº¦æ´¾ç”Ÿï¼›
-    query_kline_exchangeï¼ˆcapability=daily_barï¼‰ä¸Ž
-    query_index_kline_exchangeï¼ˆcapability=index_dailyï¼‰ä»…é  capability åŒºåˆ†
-  ç»“æž„æµ‹è¯•ï¼šç­¾åæ— è¯¥å‚æ•° + provider.py å…¨éƒ¨ _call_or_exchange è°ƒç”¨ç‚¹
-    æ— è¯¥ kwarg + æ´¾ç”Ÿè¡¨è¾¾å¼æ–­è¨€ï¼›registry 18 æ¡æ˜ å°„ä¸å˜ï¼ˆsurface å€¼
-    æœ¬å°±ç­‰äºŽ capability åï¼Œé›¶æ•°æ®è¿ç§»ï¼‰
-P0-02 Raw Evidence Binding å†²çªä¸å¯æ´—ç™½ + å…¨åŽ†å² exact replayï¼ˆaudit Â§3ï¼‰ï¼š
-  baseline = è¯¥ request å…¨éƒ¨éž conflict run çš„ DISTINCT raw_evidence_hashï¼›
-    current hash ä¸åœ¨ baselineï¼ˆä¸” baseline éžç©ºï¼‰-> INCIDENT HARD BLOCK
-    ï¼ˆevidence_conflict=TRUEï¼Œmigration 016ï¼›ä¸æ”¹å˜ baselineï¼‰
-  ç¬¬äºŒæ¬¡/ç¬¬ä¸‰æ¬¡è¿è¡ŒåŒæ · BLOCKï¼ˆconflict BLOCK è®°å½•ä¸æˆä¸ºæ–° baselineï¼‰ï¼›
-    conflict run è‡ªèº«æŒ‰ exact key å¹‚ç­‰ replayï¼ˆä¸€ ledger è¡Œï¼‰
-  surface ç¯¡æ”¹ï¼ˆmeta surface å­—æ®µæ”¹ index_dailyï¼‰-> bytes å˜ -> conflict
-    BLOCK æ°¸ç»­ï¼Œæ°¸ä¸äº§å‡º index_daily SUCCESS
-  ä¿®å¤å›žåŽŸå§‹ bytes -> åŽŸ run ç…§å¸¸ exact replay
-  exact replay lookupï¼šrun_id = uuid5(namespace, idempotency_key) ç›´æŽ¥æŸ¥è¯¢
-    ledgerï¼ˆä¸å† latest-run æ¯”è¾ƒï¼‰â€”â€”mapper A->B->A / contract A->B->A
-    rollback replay åŽ†å² A runï¼ˆæ—  duplicate-PKã€æ—  B é˜´å½±ï¼‰ï¼›å…¨éƒ¨ blocked
-    åˆ†æ”¯ï¼ˆå« multi-table / accounting violationï¼‰ç»Ÿä¸€ exact lookup
-P0-03 Full Seal æ¶ˆè´¹ï¼ˆaudit Â§4ï¼‰ï¼š
-  _supported_key/_blocked_key æ··å…¥å®Œæ•´ MAPPER_CODE_FINGERPRINTï¼ˆ64 hexï¼‰
-    â€”â€”æ˜¾ç¤ºä¸²å¯ç¼© 16 hexï¼Œcorrectness hash input ä¸ç¼©çŸ­ï¼›å‰ 16 ä½ç›¸åŒ
-    çš„ fingerprint äº§ç”Ÿä¸åŒ run identity
-  typed NormalizationRunSeal dataclassï¼šfrom_ledger() / 
-    current_provenance_problems()ï¼ˆledger == å½“å‰ contract + å½“å‰ full fpï¼Œ
-    defense in depthï¼‰/ manifest_binding_problems()ï¼ˆmanifest å…¨è¯­ä¹‰å­—æ®µ
-    == ledger seal + quarantine ä¸‰æ–¹ç»‘å®š manifest == ledger == DB recomputeï¼‰
-  manifest policy typed åŒ–ï¼šSUCCESS/PARTIAL manifest REQUIREDï¼ˆledger status
-    ç¿»è½¬ä¼ªé€ ä¸å‡º manifest-free healthy replayï¼‰ï¼›BLOCKED æºå¸¦å³éªŒè¯
-  schema_hash é‡ç®—ï¼šreplay ä»Žç‰©ç† parquet é‡ç®— sha256(str(frame.schema))
-    ä¸Ž manifest æ¯”å¯¹â€”â€”rebindï¼ˆæ¢ parquet + æ›´æ–° content_hashï¼‰ä»è¢«æ‹¦æˆª
-  Rebind tamper çŸ©é˜µ 10 é¡¹ï¼šmanifest surface/status/counts/
-    quarantine_set_hash/mapper_code_hash ç¯¡æ”¹ + é‡ç®—å¤–å±‚ hash + UPDATE
-    ledger hash -> DAMAGEDï¼›ledger status/quarantine seal/mapper_code_hash
-    ç¯¡æ”¹ -> DAMAGEDï¼›output schema æ¢ç»‘ -> DAMAGED
-Migration 016ï¼šmeta_provider_normalization_run + evidence_conflict BOOLEAN
-  DEFAULT FALSEï¼ˆæœªæ”¹ 014/015ï¼›16 é“¾ from-zero + upgradeï¼ˆ001..015 å…ˆåº”ç”¨
-  å†è¡¥ 016 ä»…åº”ç”¨å°¾éƒ¨ï¼‰+ idempotent + tamper æµ‹è¯•ï¼‰
-Adversarial Testsï¼ˆ+17ï¼šnormalization 84 = 67 å›žå½’ + 17 æ–°å¢žï¼‰ï¼š
-  audit Â§2.4ï¼ˆç­¾å/AST/ä½Žå±‚ä¸å¯ overrideï¼‰+ Â§3.5ï¼ˆH1->H2 ä¸‰æ¬¡ BLOCK /
-  surface swap æ°¸ä¸ SUCCESS / ä¿®å¤å›ž H1 replay / mapper rollback /
-  contract rollbackï¼‰+ Â§4.6ï¼ˆfirst16 collision + rebind çŸ©é˜µ 10 é¡¹ï¼‰å…¨å¯¹åº”
-```
-
-### CR-2.1 Surface Identity + Registry Boundary + Replay + Commit Closureï¼ˆå‰æ‰¹ï¼ŒDONE / REOPENEDï¼‰
-
-CR-2 å¤å®¡ï¼ˆ2026-08-31 17:42 +08:00ï¼‰è£å†³ **CR-2 REOPENED** åŽæ”¶å£ï¼›2026-09-01 10:15 CR-2.1 å¤å®¡ï¼š**REOPENED**ï¼ˆæ”¶å£æ–¹å‘ä¿ç•™ï¼Œ3 P0 ç”± CR-2.2 æ”¶å£ï¼Œè§ä¸Šï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-CR-20260831-064 ä¸Ž ADR-022 Amendment Aï¼ˆå…¶ä¸­ call_exchange å¯é€‰ surface å‚æ•°ã€latest-run hash equalityã€16-hex æˆªæ–­ fingerprint ç­‰ 3 å¤„è¡¨è¿°å·²è¢« Amendment B Â§7.1-Â§7.3 ä¿®è®¢ï¼‰ï¼š
-
-```text
-P0-01 Surface Identityï¼ˆaudit Â§2ï¼‰ï¼š
-  registry key å‡çº§ä¸º typed å››å…ƒç»„ (provider, normalization_surface,
-    provider_dataset, endpoint)ï¼›
-  normalization_surface = SYSTEM-DERIVED æŒä¹…åŒ–èº«ä»½ï¼šprovider facade
-    call_exchange æ´¾ç”Ÿï¼ˆé»˜è®¤ capability èº«ä»½ï¼‰-> RawWriter å†™å…¥ raw meta
-    ï¼ˆå‘åŽå…¼å®¹å­—æ®µï¼‰ï¼›ç¦æ­¢ request å‚æ•° / symbol å‰ç¼€çŒœæµ‹
-  query_kline_exchange (surface=daily_bar -> DailyBarDTO) ä¸Ž
-    query_index_kline_exchange (surface=index_daily -> IndexDailyDTO)
-    ä¸¤ä¸ªæ˜¾å¼ production wrapperâ€”â€”åŒ endpoint+dataset çš„ä¸¤ä¸ªä¸šåŠ¡ surface
-    æ°¸ä¸è¯¯è·¯ç”±ï¼ˆæµ‹è¯•æ–­è¨€ schema äº’æ–¥ï¼‰
-  legacy æ­§ä¹‰ rawï¼ˆç¼º surface å­—æ®µä¸” pair å¤šä¹‰ï¼‰-> PAYLOAD_SURFACE_AMBIGUOUS
-    BLOCKEDï¼ˆä¸çŒœï¼‰ï¼›éžæ­§ä¹‰ pair ä»å¯è·¯ç”±ï¼ˆå‘åŽå…¼å®¹ï¼‰
-  æ–°é”™è¯¯ç±» PAYLOAD_SURFACE_AMBIGUOUSï¼ˆåˆ†ç±»è¡¨å…­ç±»ï¼‰
-  Coverage guard å‡çº§ï¼šprovider facade AST surfaces ä¸Ž
-    SDK_METHOD_CLASSIFICATIONS äº¤å‰æ ¸å¯¹ == registry exact setï¼ˆ18 æ¡ï¼‰ï¼›
-    optional æœªæ¶ˆè´¹ surfaceï¼ˆget_index_daily / get_industry_weight /
-    get_industry_dailyï¼‰æ˜¾å¼ NOT_APPLICABLEï¼Œä¸ä»Ž structural truth æ¶ˆå¤±
-P0-02 Immutable Registryï¼ˆaudit Â§3ï¼‰ï¼š
-  æ’¤é”€å…¬å¼€å¯å˜ DATASET_NORMALIZATION_REGISTRYï¼›module-private ä¸å¯å˜
-    tuple + private exact indexï¼›å…¬å¼€é¢åªæœ‰åªè¯» lookup_spec / specs_for /
-    registry_specsï¼ˆä¸å¯å˜ snapshotï¼‰
-  NormalizationRunner æž„é€ å™¨ä¸Ž run() ç­¾åæ—  spec/mapper/registry/surface
-    å‚æ•°ï¼ˆç»“æž„æµ‹è¯•æ–­è¨€ï¼‰ï¼›tests-only æ³¨å…¥ä»…ç» monkeypatch ç§æœ‰ state
-    ï¼ˆB2 scanner static registry åŒä¸€è£å†³å£å¾„ï¼‰
-P0-03 One Exact Replay Policyï¼ˆaudit Â§4ï¼‰ï¼š
-  SUCCESS / PARTIAL / BLOCKED å…¨ç»ˆæ€ç»Ÿä¸€ï¼šsame exact input identity ->
-    é‡éªŒæ—¢æœ‰ run closureï¼ˆmanifest bytes / outputs / quarantine exact
-    setï¼‰-> intact = idempotent returnï¼›damaged/tampered = fail closed
-    ï¼ˆrepair requiredï¼Œç»ä¸ false healthy replayï¼‰
-  mapper code identity è¿›å…¥ run identityï¼šMAPPER_CODE_FINGERPRINT =
-    SHA-256 over governed mapper + DTO module sourcesï¼ˆè¡Œå°¾å½’ä¸€è·¨ OS
-    ç¡®å®šæ€§ï¼Œimport æ—¶ system-derivedï¼‰â€”â€”mapper å®žçŽ°å˜æ›´ -> æ–° run
-    identityï¼ˆåŽ†å²ä¿ç•™ï¼‰ï¼›æ’¤é”€ caller è‡ªæŠ¥ code_commit å‚æ•°
-  CR-2 legacy ledger è¡Œç¼º quarantine_set_hash seal -> æ°¸ä¸ healthy replay
-  contract ç‰ˆæœ¬ bump cr2.1-v1
-P0-04 Atomic + Recoverable Commit Closureï¼ˆaudit Â§5ï¼‰ï¼š
-  å†™å…¥åè®®ï¼šè¾“å‡º parquet å…ˆè½ï¼ˆROW scope å…¨è¾“å‡ºç‰©åŒ–â€”â€”ç©º parquet å³é›¶äº§å‡º
-    è¯æ®ï¼›WHOLE_PAYLOAD ååˆ™é›¶è¾“å‡ºï¼‰-> manifest æœ€åŽè½ç›˜ï¼ˆcorrectness
-    bytes æ— å¢™é’Ÿæ—  caller provenanceï¼Œexact retry å­—èŠ‚ä¸å˜ï¼‰-> BEGIN
-    TRANSACTIONï¼ˆdup æ£€æŸ¥ + run INSERT + å…¨éƒ¨ quarantine INSERT + è¡Œæ•°
-    æ–­è¨€ï¼‰COMMITï¼ˆå¤±è´¥æ•´ä½“ ROLLBACKï¼‰
-  DB å¤±è´¥åŽ exact retryï¼šç¡®å®šæ€§æ–‡ä»¶ anchor å¹‚ç­‰ no-op -> ledger
-    reconciliationï¼ˆæ—  orphan manifest / åŠæäº¤ quarantineï¼‰
-  artifact è·¯å¾„åŠ  run=<run_id> æ®µï¼ˆæ–° run æ–°è·¯å¾„ï¼Œä¸è¦†ç›–åŽ†å²ï¼‰
-  quarantine exact-set sealï¼šquarantine_set_hash = canonical hash over
-    sorted semantic recordsï¼ŒåŒæ—¶ç»‘å®š manifest ä¸Ž ledgerï¼›UPDATE/DELETE/
-    ç¼ºè¡Œç”± replay å¤éªŒå‘çŽ°
-  çŠ¶æ€æœºç»†åŒ–ï¼šmapped==0 ä¸”æœ‰ quarantine -> BLOCKEDï¼ˆPARTIAL = æœ‰å¥½è¡Œä¿ç•™ï¼‰
-Migration 015ï¼šmeta_provider_normalization_run + normalization_surface /
-  mapper_code_hash / quarantine_set_hash ä¸‰åˆ—ï¼ˆADD COLUMN IF NOT EXISTSï¼›
-  æœªæ”¹ 014ï¼›from-zero 15 é“¾ + upgradeï¼ˆ001..014 å…ˆåº”ç”¨å†è¡¥ 015 ä»…åº”ç”¨å°¾éƒ¨ï¼‰
-  + idempotent æµ‹è¯•ï¼‰
-Adversarial Testsï¼ˆ67 é¡¹å…¨é‡ = CR-2 37 é¡¹å›žå½’ + CR-2.1 æ–°å¢ž 30 é¡¹ï¼‰ï¼š
-  audit Â§7 æ¸…å• 19 é¡¹å…¨å¯¹åº”ï¼ˆsurface åŒè·¯ç”± / legacy æ­§ä¹‰ fail closed /
-  è¦†ç›–å®ˆå«äº¤å‰æ ¸å¯¹ / æ— å…¬å¼€å¯å˜ registry / ä¸‰ç»ˆæ€å¹‚ç­‰ / è¾“å‡º-manifest-
-  quarantine ç¯¡æ”¹åˆ é™¤ fail closed / æ³¨å…¥ DB å¤±è´¥æ¢å¤ / å¤šè¾“å‡ºå†™å¤±è´¥ /
-  mapper code identity å˜æ›´ / åŒçŽ¯å¢ƒåŒ manifest identity / happy path
-  å›žå½’ / migration from-zero+upgrade / CI çŸ©é˜µ / å†»ç»“å›žå½’ï¼‰
-```
-
-### CR-2 Provider-Normalized + Quarantineï¼ˆå‰æ‰¹ï¼ŒDONE / REOPENEDï¼‰
-
-R4-B2.3 å¤å®¡ï¼ˆ2026-08-31 16:22 +08:00ï¼‰è£å†³ **R4-B2 / B2.1 / B2.2 / B2.3
-å…¨é“¾ VERIFIED / CLOSED / FREEZE**ï¼ˆADR-021 â†’ ACCEPTEDï¼‰ï¼›CR-2 æ‰¹æ¬¡è½åœ°
-CR2-P0-01..10ï¼ˆæ–° ADR-022ï¼›å·¥ä½œè¦æ±‚
-`docs/design/A-share-analysis_R4-B2.3å¤å®¡ç»“è®ºä¸ŽCR-2_ProviderNormalizedQuarantineå¼€å‘å·¥ä½œè¦æ±‚_20260831.md`ï¼‰ã€‚2026-08-31 17:42 CR-2 å¤å®¡ï¼šcore framework FREEZEï¼Œ4 P0 ç”± CR-2.1 æ”¶å£ï¼ˆè§ä¸Šï¼‰ã€‚åŽ†å²ç»†èŠ‚è§ Â§61 DM-CR-20260831-063 ä¸Ž ADR-022 Â§1-Â§5ï¼ˆå…¶ä¸­äºŒå…ƒ key / 9-5 åˆ†ç±»ç­‰è¡¨è¿°å·²è¢« ADR-022 Amendment A Â§6.1-Â§6.4 ä¿®è®¢ï¼‰ã€‚
-
-### R4-B2 / B2.1 / B2.2 / B2.3ï¼ˆå‰æ‰¹ï¼ŒCLOSED / VERIFIED / FREEZEï¼‰
-
-å…¨é“¾é—­çŽ¯ï¼ˆReviewer 2026-08-31 16:22 è£å†³ï¼šé™¤çœŸå®žå¯å¤çŽ° regression ä¸å†
-é‡å®¡ï¼›ADR-021 â†’ ACCEPTEDï¼‰ã€‚åŽ†å²ç»†èŠ‚è§å„æ‰¹ Change Log ä¸Ž ADR-021ï¼ˆå«
-Amendments B / E / F / Gï¼‰ã€‚
-
-## Golden / Trading Rule äººå·¥ Reviewï¼ˆç»“æž„å°±ç»ªï¼Œç­‰äººå·¥æ‰§è¡Œï¼‰
-
-```text
-scripts/golden/review.py é€æ¡æ ¸éªŒ 123 v3 cases + è¡¥é½ distinct events
-scripts/rules/review.py å¯¹å·²éªŒè¯ ACTIVE è§„åˆ™ç‰ˆæœ¬æ‰§è¡Œäººå·¥å¤æ ¸ï¼ˆexact-byte
-  + serialized-parent seal workflowï¼Œå·² VERIFIEDï¼‰
-```
-
-## R4-B1ï¼ˆR4-A3.1 VERIFIED åŽå¯åŠ¨ï¼›R4-B2 -> R4-B1 åŽï¼›CR-2 -> R4-B2 åŽï¼‰
-
-```text
-Capability Approval ä¸æŽ¥å— caller self-declareï¼›ç»‘å®š provider/dataset/
-  endpoint/account profile/runtimeï¼›persisted exchange evidenceï¼›
-  permission/endpoint proof ä¸Ž business-quality proof åˆ†ç¦»
-ï¼ˆR4-B1/B2 æ­£å¼å¼€å‘è¦æ±‚åœ¨ R4-A3.1 VERIFIED åŽç»†åŒ–ï¼›gate è¾¹ç•Œ
-  FORMAL_GATE_PROBE_KINDS å·²ä¸º endpoint/permission proof æä¾›æ¶ˆè´¹é¢ï¼‰
-```
-
-## åŽç»­ CR
-
-```text
-CR-2 Provider-Normalized + Quarantineï¼ˆafter R4-B2ï¼‰
-CR-3 AvailabilityPolicy + Canonicalizer
-CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild
-```
-
----
-
-# 42. Canonical Runtime Roadmap
-
-```text
-CR-1 ProviderExchange + RawWriter
-        â†“
-CR-2 Provider-Normalized + Quarantine
-        â†“
-CR-3 AvailabilityPolicy + Canonicalizer
-        â†“
-CR-4 SnapshotBuilder + DuckDB ReadModel Rebuild
-        â†“
-CR-A Fixture 20 securities Ã— 60 trading days
-        â†“
-P0-M-1B Production Provider Verification
-        â†“
-CR-B AmazingData 20 Ã— 60
-        â†“
-Real P0a
-        â†“
-Trend BASE
-```
-
----
-
-# 43. CR-1 / CR-1.1 Acceptance
-
-CR-1 è¾“å…¥ï¼š
-
-```text
-ProviderExchange
-```
-
-CR-1 è¾“å‡ºï¼š
-
-```text
-Raw immutable payload
-RawEnvelope
-logical_uri
-content_hash
-schema_hash
-row_count
-meta_ingest_run
-```
-
-CR-1 è¦æ±‚ï¼š
-
-```text
-success exchange â†’ payload persisted
-failed exchange â†’ envelope persisted
-request_id ä¸å˜
-secret scrub
-immutable
-same-hash retry idempotent
-different bytes same URI block
-```
-
-CR-1.1ï¼ˆRuntime Closureï¼ŒR4-A2.3 Â§3-Â§5 è¡¥å……ï¼‰è¦æ±‚ï¼š
-
-```text
-target.*_exchange æ˜¾å¼ APIï¼ˆRealTarget + FakeTargetï¼Œdry-run åŒç®¡çº¿ï¼‰
-è¿è¡Œæ—¶æ—  last_envelopes åæŸ¥ï¼ˆdiagnostic-onlyï¼ŒAST é™æ€æµ‹è¯•ï¼‰
-ProbeExecutor.call(fn)ï¼šfn å¿…é¡»è¿”å›ž ProviderExchangeï¼ˆå¦åˆ™ TypeErrorï¼‰
-å¤±è´¥ exchange ä¸€ç­‰å¯¹è±¡ï¼šProviderError.exchangeï¼ˆerror envelope + payload=Noneï¼‰
-    ï¼›æ²»ç†æ‹’ç» synthetic_failure_exchangeï¼ˆè¯šå®žè®°å½•ï¼Œä¸å†’å…… SDK exchangeï¼‰
-RawWriter.write(exchange) ç»Ÿä¸€å…¥å£ï¼š
-    exchange.request_id == envelope.request_id æ–­è¨€
-    provider/dataset envelope-firstï¼ˆå¤–éƒ¨å†²çª BLOCKï¼‰
-è½½è·å½¢çŠ¶æ”¯æŒï¼šlist[dict] / dict[str,list[dict]] / DataFrame(polars|pandas)
-    / dict[str,DataFrame] / pyarrow.Table / æ ‡é‡åˆ—è¡¨
-dict-of-tables æ–¹æ¡ˆ Aï¼šæ¯é€»è¾‘è¡¨ç‹¬ç«‹ Parquet + meta åˆ—å‡ºå…¨éƒ¨
-    (name,file,content_hash,schema_hash,row_count)ï¼›ç¦æ­¢é™é»˜å–é¦–å€¼
-Spike è¯æ®é“¾å”¯ä¸€æ­£å¼è·¯å¾„ï¼š
-    exchange â†’ RawWriter â†’ Parquet+meta â†’ RawWriteResult(evidence_uri/hash)
-    â†’ SpikeCase.evidence_ref/evidence_hashï¼ˆevidence_type=RAW_PARQUETï¼‰
-RunStore.write_evidence(JSON) ä¿ç•™ä¸ºå…¼å®¹ APIï¼Œä¸å†æ˜¯æ­£å¼ provider è¯æ®é“¾
-é€å­—æ®µ round-trip æµ‹è¯•ï¼ˆå€¼/ç±»åž‹/nullable/ä¸­æ–‡/NaN-None è¯­ä¹‰ï¼‰
-```
-
-CR-1.2ï¼ˆComplete Exchange + Raw Meta/Request Closureï¼ŒR4-A2.4 Â§2-Â§3ï¼‰è¦æ±‚ï¼š
-
-```text
-éšè—æ—¥åŽ†å‰ç½®æ˜¾å¼ï¼ˆOption Aï¼‰ï¼š
-    calendar exchange å…ˆæŒä¹…åŒ– â†’ çª—å£ trading_days æ˜¾å¼ä¼ å…¥
-    RealTarget.query_kline_exchange(trading_days=...)ï¼ˆæ— éšè—å†…éƒ¨å–æ•°ï¼‰
-    æ—¥åŽ†å¤±è´¥ â†’ å¤±è´¥ meta è½ç›˜ + kline ä¸å‘å°„ï¼ˆä¸ä¼ªé€ æˆåŠŸï¼‰
-B3/B7 code_list/calendar å‰ç½® = æŒä¹…åŒ– exchangeï¼ˆå‚æ•°è½ç›˜ï¼š
-    code_list/trading_daysï¼‰
-RawWriteResult æ‹†åˆ†ï¼špayload_artifacts[]ï¼ˆuri/content_hash/schema_hash/
-    row_countï¼‰+ meta_artifactï¼›evidence æ’ä¸º exchange .meta.json
-    ï¼ˆåŒå‘é—­åˆï¼špayload ç¯¡æ”¹/åˆ é™¤ â†’ BLOCKï¼›meta åˆ é™¤ â†’ BLOCKï¼‰
-meta æŒä¹…åŒ–å®Œæ•´è„±æ• request_params + params_hashï¼ˆç­‰é•¿ä¸åŒ symbols
-    hash ä¸åŒï¼‰+ ingested_at + ingest_run_id
-å¤šæ–‡ä»¶æäº¤ staging åŽŸå­åŒ–ï¼ˆå…¨éƒ¨ payload å…ˆè½ staging â†’ os.replace é€ä¸ª
-    â†’ meta æœ€åŽï¼‰ï¼›è¡¨åå‡€åŒ–å†²çª BLOCKï¼›read(verify=True) è¯»å‰å¤éªŒ
-AST é™æ€æµ‹è¯•ï¼šprobes.py / golden_router.py ç¦æ­¢è°ƒç”¨ payload-only
-    target æ–¹æ³•ï¼ˆget_code_list / get_calendar / query_kline ç­‰ä¸šåŠ¡é¢ï¼‰
-```
-
-CR-1.2.1ï¼ˆRaw Commit Hardeningï¼ŒR4-A2.5 Â§7ï¼‰è¦æ±‚ï¼š
-
-```text
-orphan payloadï¼ˆå­—èŠ‚åœ¨ç›˜ã€meta é”šç¼ºå¤±ï¼Œä¸­æ–­æäº¤æ®‹ç•™ï¼‰ï¼š
-    same-request retry ä¸”å­—èŠ‚ä¸€è‡´ -> æäº¤æ¢å¤ï¼ˆè¡¥è½ metaï¼Œidempotentï¼‰
-    retry å­—èŠ‚ä¸åŒ -> orphan ç§»å…¥ .quarantine/ï¼ˆå¯å–è¯ã€æ°¸ä¸å†’å……æœ‰æ•ˆ
-    è¯æ®ï¼‰ä¸”å†™å…¥ BLOCKï¼›partial orphanï¼ˆå¤šè¡¨è½ä¸€åŠï¼‰åŒéš”ç¦»
-list_orphan_payloads(raw_root) å·¡æ£€æŽ¥å£ï¼ˆå¥åº·å­˜å‚¨è¿”å›žç©ºï¼‰
-_commit_files payload è½ä½å¯¹"å·²å­˜åœ¨ä¸”å­—èŠ‚ä¸€è‡´"è·³è¿‡ï¼ˆæ¢å¤è¯­ä¹‰ï¼‰
-fault-injection æµ‹è¯•ï¼šmeta å†™å¤±è´¥ -> æ— é”šæ— æ®‹ç•™ã€retry æ¢å¤ï¼›
-    payload move å¤±è´¥ -> æ—  meta é”šï¼ˆmeta æœ€åŽè½ç›˜è¯­ä¹‰ä¿æŒï¼‰
-```
-
----
-
-# 44. CR-2 Acceptance
-
-```text
-Raw
-â†’ Provider Mapper
-â†’ Provider-Normalized
-```
-
-Mapping Validation å¤±è´¥è¿›å…¥ Quarantineï¼Œä¸å¾— silent drop / 1970 / 0.0 sentinelã€‚
-
-**CR-2 äº¤ä»˜çŠ¶æ€ï¼ˆ2026-08-31ï¼ŒDM-CR-20260831-063 / ADR-022ï¼›2026-08-31 17:42 å¤å®¡ REOPENEDï¼ŒCR-2.1 æ”¶å£ DM-CR-20260831-064ï¼›2026-09-01 10:15 CR-2.1 å¤å®¡ REOPENEDï¼ŒCR-2.2 æ”¶å£ DM-20260901-065ï¼›2026-09-01 10:45 CR-2.2 å¤å®¡ REOPENEDï¼ŒCR-2.3 æ”¶å£ DM-20260901-066ï¼›2026-09-01 14:26 CR-2.3 å¤å®¡ REOPENEDï¼ŒCR-2.4 æ”¶å£ DM-20260901-067ï¼›**2026-09-01 17:06 CR-2.4 æœ€ç»ˆå¤å®¡ï¼šCR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 å…¨é“¾ VERIFIED / CLOSED / FREEZEï¼ŒADR-022 REVIEWER ACCEPTED**ï¼‰**ï¼štyped dataset normalization registry + NormalizationRunnerï¼ˆraw evidence å”¯ä¸€è¾“å…¥ / verified reader / closure æ ¡éªŒ / SOURCE_EXCHANGE_FAILED åˆ†ç¦»ï¼‰+ first-class immutable æŒä¹…åŒ–è¾“å‡ºï¼ˆparquet + manifest + ledgerï¼‰+ no-silent-drop è®°è´¦ä¸å˜å¼ï¼ˆruntime æœºå™¨å¼ºåˆ¶ï¼‰+ first-class quarantineï¼ˆappend-only / row locator / scrubbed contextï¼‰+ deterministic replay + provider-faithful DTOï¼ˆä¸é¢„æ”¯ canonical è¯­ä¹‰ï¼‰+ SUCCESS/PARTIAL/BLOCKED çŠ¶æ€æœºã€‚CR-2.1 æ”¶å£åŽï¼štyped surface å››å…ƒ keyï¼ˆsystem-derived normalization_surface æŒä¹…åŒ–èº«ä»½ + index/daily åŒ wrapper + legacy æ­§ä¹‰ fail closedï¼‰/ private ä¸å¯å˜ registryï¼ˆæ— å…¬å¼€å¯å˜å¯¹è±¡ï¼Œrunner API æ— æ³¨å…¥é¢ï¼‰/ å…¨ç»ˆæ€ç»Ÿä¸€ exact replayï¼ˆé‡éªŒ closure åŽå¹‚ç­‰ï¼›ç¯¡æ”¹å³ fail closedï¼›system-derived mapper code fingerprint è¿›å…¥ run identityï¼‰/ atomic + recoverable commit closureï¼ˆmanifest æ— å¢™é’Ÿæœ€åŽè½ç›˜ + å•äº‹åŠ¡ ledger/quarantine + quarantine exact-set seal + æ³¨å…¥å¤±è´¥æ¢å¤æµ‹è¯•ï¼‰ã€‚67 é¡¹å¯¹æŠ—æµ‹è¯•ï¼ˆå«ç»“æž„å®ˆå« + è¦†ç›–äº¤å‰æ ¸å¯¹ï¼‰ï¼›migration 014 + 015ï¼›è¯¦è§ Â§41 / ADR-022ï¼ˆå« Amendment Aï¼‰ã€‚CR-2.2 æ”¶å£åŽï¼šsurface ä¸¥æ ¼ capability å¥‘çº¦æ´¾ç”Ÿï¼ˆæ—  caller-override å‚æ•°ï¼‰/ raw evidence binding å†²çªä¸å¯æ´—ç™½ï¼ˆevidence_conflict æ ‡è®° + INCIDENT HARD BLOCK æ°¸ç»­ï¼‰/ å…¨åŽ†å² exact run_id replayï¼ˆmapper/contract rollback æ—  duplicate-PKï¼‰/ full mapper hash è¿›å…¥ identity + typed NormalizationRunSeal å…¨è¯­ä¹‰å­—æ®µä¸‰æ–¹ç»‘å®š + schema_hash é‡ç®—ï¼ˆrebind tamper çŸ©é˜µ 10 é¡¹å…¨æ‹¦æˆªï¼‰ã€‚84 é¡¹å¯¹æŠ—æµ‹è¯•ï¼›migration 014 + 015 + 016ï¼›è¯¦è§ Â§41 / ADR-022ï¼ˆå« Amendment A + Bï¼‰ã€‚CR-2.3 æ”¶å£åŽï¼šprovider-owned operation specï¼ˆç§æœ‰é™æ€å¸¸é‡ + ç§æœ‰ executor + å…¬å¼€é¢æ—  generic callableï¼‰/ ingestion-time raw evidence anchorï¼ˆmeta ç²¾ç¡®å­—èŠ‚ hash å¤–éƒ¨æƒå¨ç™»è®°ï¼›legacy æ—  anchor fail closedï¼›mismatch æ°¸ç»­ BLOCKï¼›evidence_conflict é™çº§è¯Šæ–­ï¼‰/ expected output exact-set + semantic value sealï¼ˆä¸‰æ–¹ç»‘å®š ledger == manifest == ç‰©ç†é‡ç®—ï¼›expected set == å½“å‰ spec.output_namesï¼›URI deterministic é‡ç®—ï¼›ç©ºè¡¨ç‰©åŒ–ï¼‰ã€‚104 é¡¹å¯¹æŠ—æµ‹è¯•ï¼›migration 014 + 015 + 016 + 017ï¼›è¯¦è§ Â§41 / ADR-022ï¼ˆå« Amendment A + B + Cï¼‰ã€‚CR-2.4 wiring æ”¶å£åŽï¼šAnchoredRawEvidenceWriter å”¯ä¸€ production å†™å…¥è¾¹ç•Œï¼ˆcommit-identity ç»‘å®š enrollment + TOCTOU verify-only reread + envelope identity cross-bindingï¼‰/ ProbeContext + run_dry_run å…¨æŽ¥çº¿ï¼ˆSUCCESS/ERROR å‡è‡ªåŠ¨ anchorï¼‰/ enrollment API ç§æœ‰åŒ–æ”¶å£ï¼ˆverify-onlyï¼Œä¸æŽ¥å—çŽ°åœº hash å®šä¹‰çœŸå€¼ï¼‰/ ç»“æž„å®ˆå«å°æ­» unanchored å†™å…¥ã€‚114 é¡¹å¯¹æŠ—æµ‹è¯•ï¼›è¯¦è§ Â§41 / ADR-022ï¼ˆå« Amendment A + B + C + Dï¼‰ã€‚
-
-**CR-3 äº¤ä»˜çŠ¶æ€ï¼ˆ2026-09-01ï¼ŒDM-20260901-068 / ADR-023ï¼›å…­è½®å¤å®¡ REOPEN æ”¶å£ï¼šCR-3.1 DM-20260901-069 / CR-3.2 DM-20260901-070 / CR-3.3 DM-20260902-071 / CR-3.4 DM-20260902-072 / CR-3.5 DM-20260902-073 / CR-3.6 DM-20260902-074ï¼›**2026-09-02 21:24 æœ€ç»ˆå¤å®¡å…¨é“¾ VERIFIED / CLOSED / FREEZEï¼ŒADR-023 ACCEPTED**ï¼‰**ï¼šCanonicalRunnerï¼ˆCR-2 verified å”¯ä¸€è¾“å…¥ + åªè¯» closure verifier / SUCCESS-only eligibilityï¼‰/ IdentityBridgeï¼ˆsecurity_master ä¸‰ dataset å…¨é›† â†’ ADR-002 èº«ä»½ï¼›è£¸ç å”¯ä¸€å¸‚åœºåŒ¹é…ï¼›PIT relistï¼›missing/ambiguous fail closedï¼‰/ AvailabilityPolicyï¼ˆOBSERVED_AT_INGEST + as_of å…ˆè¡Œè¿‡æ»¤ï¼‰/ SourcePolicy é™æ€ç‰ˆæœ¬åŒ–ï¼ˆSINGLE_SOURCE_EXACTï¼›EXACT reconciliationï¼‰/ Domain eligibility matrix 13 é¡¹æ˜¾å¼ï¼ˆ5/2/6ï¼‰/ immutable canonical artifacts + deterministic run identity / migration 018ã€‚CR-3.1 æ”¶å£åŽï¼šRequestedDomainSet identityï¼ˆ019ï¼‰/ availability completeness / CanonicalInputSnapshot / anchored availability evidence / identity binding ç»Ÿä¸€ / policy hash å…¨å­—æ®µ / full replay seal / recoverable commitã€‚CR-3.2 æ”¶å£åŽï¼štransactional materialized snapshot / identity master PIT / honest policy execution / typed full CR-2 input seal / verification-state transitionã€‚CR-3.3 æ”¶å£åŽï¼šhistorical input continuity guardï¼ˆcanonical_context_hash 021â€”â€”ledger disappearance/status/seal drift å…¨éƒ¨ DAMAGED æ‹’ç»ï¼Œsuperset åˆæ³•æ–°å¢žã€exact restore æ¢å¤åŽ†å² replayã€master åŒè§„åˆ™ï¼‰/ verification evidence exactnessï¼ˆverification_problem_hash è¿› state/seal/input_seal_hashâ€”â€”åŒ class ä¸åŒ cause æ–° BLOCKED runã€exact failure å¹‚ç­‰ã€INVALID sealed input replay æ¯”å¯¹å½“å‰ problem evidenceï¼‰/ finding truthfulnessï¼ˆreserved scope input:\<surface\> + affected_domainsï¼›damaged ä¸è¯¯æŠ¥ UNAVAILABLEï¼‰/ seal count correctionï¼ˆ21/17ï¼Œæµ‹è¯•æœºæ¢°æ–­è¨€ï¼‰ã€‚**CR-3.4 æ”¶å£åŽ**ï¼šhistorical canonical run seal trustï¼ˆtyped CanonicalRunSeal + `_verify_historical_canonical_seal`â€”â€”åŽ†å² manifest input list åœ¨è¢« continuity ä¿¡ä»»å‰å…ˆè¿‡ deterministic URI + bytes hash + å…¨éƒ¨æ˜¾å¼ correctness å­—æ®µ == ledger + input_seal/input_set/verification_state ä¸‰ hash ç‰©ç†é‡ç®—ï¼›manifest+ledger outer-hash rebind æ— æ³•æ´—å‡ºå·²æ¶ˆè´¹è¾“å…¥ï¼›prior è‡ªèº« DAMAGED â†’ HARD DAMAGED é›¶ replacementï¼‰/ verification evidence replay symmetryï¼ˆfirst consume ä¸Ž replay å…±ç”¨ `_collect_input_verification_evidence` collectorâ€”â€”materialization-only failure çš„ exact evidence hash é¦–è·‘ä¸Žé‡æ”¾å¯¹ç§°é‡å»ºï¼Œkeep_rows æ˜¯å”¯ä¸€å·®å¼‚ï¼‰/ manifest correctness identity å…¨æ¶ˆè´¹ï¼ˆcanonical_context_hash + base_identity_hash + verification_state_hash è¿› typed manifest bindingï¼Œmanifest == ledger == current ä¸‰æ–¹é—­çŽ¯ï¼‰ã€‚151 é¡¹å¯¹æŠ—æµ‹è¯•ï¼›migration 018 + 019 + 020 + 021ï¼ˆCR-3.4 é›¶æ–° migrationï¼‰ï¼›æ€»ä½“ 1136/0ã€‚**CR-3.5 æ”¶å£åŽ**ï¼štamper-resistant historical candidate discoveryï¼ˆå€™é€‰å‘çŽ°æŒ‰ primitive request-world fieldsâ€”â€”requested_domains_hash + as_of + contract + ä¸‰ policy identities + code_fingerprintï¼Œä¸ç”¨ status é¢„è¿‡æ»¤ã€ä¸æŠŠ stored canonical_context_hash å½“ selection keyï¼›å€™é€‰å…ˆè¿‡ full historical seal å†è§£é‡Šå·²éªŒè¯çš„ world/statusâ€”â€”genuine BLOCKED éžä¾èµ–ä¸é˜»å¡ž recoveryã€æ—§ bridge policy ä¸–ç•Œè·³è¿‡ï¼‰/ derived canonical run seal ç‰©ç†é—­çŽ¯ï¼ˆæ¨¡å—çº§å•ä¸€æ´¾ç”Ÿå…¬å¼é›†ä¸‰æ–¹å…±ç”¨ï¼šrequested_domains_hash / ä¸‰ input hash / master set / dataset hashï¼ˆç”¨è¯¥ run è‡ªå·±çš„ manifest bridge identity é‡ç®—ï¼‰/ context / base / idempotency / run id UUID5 cross-bindï¼›`_derived_run_identity_problems` å…¨éƒ¨é‡ç®—ä¸Ž ledger é€å­—æ®µæ¯”å¯¹ï¼Œæ¶ˆè´¹äºŽ historical seal verifier + replay closure verifierï¼›live build å…¨éƒ¨å§”æ‰˜åŒä¸€ helpersï¼‰/ status semantic sealï¼ˆ`_verify_findings_truth`ï¼šfindings ä¸‰æ–¹ DB==parquet==seal åŽä»Ž blocking truth é‡ç®— status ä¸Ž error text å¹¶æ¶ˆè´¹ ledger/manifest å­—æ®µï¼›error_message å‡çº§ä¸º derived audit textâ€”â€”P1 æ”¶å£ï¼‰ã€‚166 é¡¹å¯¹æŠ—æµ‹è¯•ï¼›migration 018 + 019 + 020 + 021ï¼ˆCR-3.5 é›¶æ–° migrationï¼‰ï¼›æ€»ä½“ 1151/0ã€‚**CR-3.6 æ”¶å£åŽ**ï¼šselection-free / pre-verification-trust-free historical discoveryï¼ˆPhase A broad å…¨è¡¨æ‰«ææ—  WHERE æ—  Python é¢„è¿‡æ»¤â€”â€”"No correctness-bearing field may exclude a historical canonical row before its identity seal is verified"ï¼›Phase B `_verify_historical_identity_seal` å…ˆéªŒèº«ä»½ï¼ˆfindings truth åˆ»æ„ç§»å‡ºï¼Œåªåœ¨åŒ world åŽè¿è¡Œï¼‰ï¼›Phase C éªŒè¯åŽæ‰è§£é‡Š world/statusâ€”â€”different world å®‰å…¨ skip / same world â†’ artifact closure + findings truth â†’ CR-2 ä¾èµ– / genuine BLOCKED éžä¾èµ–ï¼›identity seal ä»»ä½• problem â†’ GLOBAL / HISTORICAL CANONICAL LEDGER DAMAGED fail closed é›¶ mintï¼›ledger+manifest å¯¹ rebind ç”± derived identity/run-id cross-bind åœ¨ world åˆ†ç±»å‰æ‹¦æˆªï¼‰/ shared historical canonical artifact closure verifierï¼ˆ`_verify_canonical_artifacts`ï¼šcounts==ledger + exact set + deterministic URIs + ç‰©ç† content_hash/row_count/schema_hash + selected/decision è¯­ä¹‰ sealsï¼Œexact replay ä¸Ž historical continuity å…±ç”¨ï¼›genuine BLOCKED äº¦é¡»è¯æ®å†…éƒ¨å®Œå¥½ï¼‰ã€‚194 é¡¹å¯¹æŠ—æµ‹è¯•ï¼›migration 018 + 019 + 020 + 021ï¼ˆCR-3.6 é›¶æ–° migrationï¼‰ï¼›æ€»ä½“ 1179/0ï¼›è¯¦è§ Â§41 / ADR-023ï¼ˆå« Amendment A + B + C + D + E + Fï¼‰ã€‚
-
-**CR-4 é¦–æ‰¹äº¤ä»˜çŠ¶æ€ï¼ˆ2026-09-03ï¼ŒDM-20260903-075 / ADR-024 PROPOSEDï¼‰**ï¼šCanonical å…¬å…±æ¶ˆè´¹éªŒè¯å™¨ï¼ˆ`canonical/verifier.py`â€”â€”verified SUCCESS å”¯ä¸€æ¶ˆè´¹å…¥å£ï¼ŒBLOCKED æ˜¾å¼æ‹’ç»ï¼Œsealed CR-2 æƒå¨+ç‰©ç†éªŒè¯ä¸è¦æ±‚ current discovery presenceï¼‰/ SnapshotBuilderï¼ˆ`snapshot/` åŒ…â€”â€”ç‰ˆæœ¬åŒ– schema registryï¼ˆmarket=payloadã€factor_type=key projectionï¼‰ï¼›ç¡®å®šæ€§ identityï¼ˆcanonical run-level seals + contract + builder fingerprint â†’ UUID5ï¼‰ï¼›immutable domain-partitioned artifacts + manifest LASTï¼›migration 022 `meta_snapshot_build`ï¼ˆexact retry å¹‚ç­‰ replay + crash æ®‹ç•™ fail closedï¼‰ï¼›`verify_snapshot`ï¼ˆidentity UUID5 cross-bind + canonical provenance cross-bind é‡è·‘æ¶ˆè´¹éªŒè¯å™¨ + artifact ç‰©ç†/è¯­ä¹‰/èšåˆ seal é‡ç®—ï¼‰ï¼‰/ DuckDB ReadModelï¼ˆ`readmodel/` åŒ…â€”â€”temp åº“æž„å»º + registry ç²¾ç¡®ç±»åž‹å»ºè¡¨ + `read_parquet(hive_partitioning=false)` + **temp ä¸Š logical seal**ï¼ˆè¡¨é›†/è¡Œæ•°/key å”¯ä¸€/è¡¨å†…å®¹é‡ç®— semantic hashï¼ˆUTC å½’ä¸€åŒ–ï¼‰/schema ç²¾ç¡®/meta è¡¨ï¼‰+ `Path.replace` åŽŸå­æ›¿æ¢ï¼›å¤±è´¥é›¶æ®‹ç•™ï¼‰/ è¾¹ç•Œ AST guardï¼ˆç¦ providers/normalization/raw_writer/ç‰¹å¾åº“ï¼‰/ **CR-3 latent ç¼ºé™·æ˜¾å¼ç”³æŠ¥ä¿®å¤**ï¼ˆmulti-domain semantic seal å¯¹é½ç¼ºé™·â€”â€”æè¯·å¤å®¡è£å†³ï¼‰ã€‚44+11+1 æ–°å¢žæµ‹è¯•ï¼›migration 018-022ï¼›æ€»ä½“ 1235/0ï¼›è¯¦è§ Â§41 / ADR-024ã€‚
-
----
-
-# 45. CR-3 Acceptance
-
-é¦–æ‰¹ï¼š
-
-```text
-daily_bar
-security_status
-limit_price
-adj_factor
-corporate_action
-```
-
-æ‰€æœ‰ Publishable Canonical Row å¿…é¡»å®Œæ•´æ»¡è¶³ PIT/Governance fieldsã€‚
-
----
-
-# 46. CR-4 Acceptance
-
-```text
-Canonical Parquet
-â†’ Snapshot Manifest
-â†’ DuckDB rebuild
-```
-
-Acceptanceï¼š
-
-```text
-æ¸…ç©º DuckDB read model
-â†’ åªå‡­ Snapshot + Parquet é‡å»º
-â†’ key / row / aggregate ä¸€è‡´
-```
-
-CR-4.4 additional closureï¼š
-
-```text
-canonical selected rows â†’ shared registry projection replay
-â†’ exact expected artifact rows (including zero-row domains)
-â†’ physical bytes/schema/semantic/aggregate verification
-â†’ verified Snapshot â†’ verified-open ReadModel
-```
-
----
-
-# 47. Mock Vertical Slice
-
-èŒƒå›´ï¼š
-
-```text
-20 securities Ã— 60 trading days
-```
-
-å®Œæ•´é“¾ï¼š
-
-```text
-Fixture Provider
-â†’ ProviderExchange
-â†’ Raw
-â†’ Provider-Normalized
-â†’ Canonical
-â†’ Snapshot
-â†’ DuckDB Rebuild
-â†’ Skeleton Artifact
-â†’ Artifact Validation
-â†’ Publish
-â†’ Exact Replay
-```
-
----
-
-# 48. æ­£å¼ P0-M-1B Entry Gate
-
-å¿…é¡»å…¨éƒ¨æ»¡è¶³ï¼š
-
-```text
-[ ] R4 Formal Spike P0 = 0
-[ ] Golden Reviewed Version
-[ ] External Source Artifact Hash
-[ ] Distinct-event Gate
-[ ] Golden Manifest / Catalog Seal
-[ ] Domain-specific Golden Routerï¼ˆevidence bundle åŒæºéªŒè¯ï¼‰
-[ ] Bound-aware Formal Gatesï¼ˆverdict åªç”¨ run-bound datasetï¼‰
-[ ] Trading Rule æ•°æ®å±‚ REVIEWEDï¼ˆconfigs/trading_rulesï¼ŒADR-011/012ï¼‰
-[ ] Trading Rule Run Bindingï¼ˆverdict å¤éªŒ bound file+hash+versionï¼‰
-[ ] Runtime Evidence é“¾ï¼ˆexchange â†’ RawWriter â†’ RAW_PARQUETï¼ŒCR-1.1ï¼‰
-[ ] Raw Exchange Closureï¼ˆmeta-anchored åŒå‘é—­åˆ + request å¯é‡å»ºï¼ŒCR-1.2ï¼‰
-[ ] Production Account Profile Freeze
-[ ] Provider Doctor actual runtime verified
-[ ] clean working tree
-[ ] full Git SHA
-[ ] uv.lock hash
-[ ] config hash
-[ ] Capability endpoint proof
-```
-
----
-
-# 49. Formal Flow
-
-```text
-Provider Doctor
-â†’ Production Account Gate
-â†’ ONE Production SpikeRun
-â†’ B2 + Phase Gate
-â†’ B3 + Phase Gate
-â†’ B4 Golden + Phase Gate
-â†’ B5
-â†’ B6
-â†’ B7
-â†’ Seal
-â†’ Close
-â†’ Evidence Closure
-â†’ Verdict
-â†’ Human Review
-â†’ Capability Approval
-```
-
-`NOT_TESTABLE / framework incomplete`ï¼š
-
-```text
-SPIKE_INCOMPLETE
-```
-
-åªæœ‰å……åˆ†éªŒè¯åŽæ ¸å¿ƒå¤±è´¥æ‰æ˜¯ï¼š
-
-```text
-NO_GO
-```
-
----
-
-# 50. Milestone Eligibility
-
-Provider Verdict ä¸Ž Milestone åˆ†ç¦»ï¼š
-
-```text
-provider_verdict:
-    GO_CORE
-    GO_DEGRADED
-    NO_GO
-    SPIKE_INCOMPLETE
-
-milestone:
-    p0a_eligible
-    p0b_eligible
-    historical_backfill_eligible
-```
-
----
-
-# 51. Performance æ”¾é‡
-
-```text
-Stage A  20 securities Ã— 60d
-Stage B  100 securities Ã— 2y
-Stage C  ALL_A Ã— 1 month
-Stage D  Full Historical Backfill
-```
-
-æ¯çº§å¿…é¡»è¿‡ï¼š
-
-```text
-DQ
-Exact Replay
-Coverage
-Performance
-```
-
----
-
-# 52. é£Žé™©æ‘˜è¦
-
-è¯¦ç»†é£Žé™©ç»§ç»­ç»´æŠ¤ `docs/risk_register.md`ã€‚
-
-## RISK-001 Formal Golden Truth æœªé—­çŽ¯
-
-```text
-Status: OPENï¼ˆç»“æž„å·²é—­çŽ¯ï¼šintegrity gates + review workflow + evidence
-        closure + bound gatesï¼›å‰©ä½™äººå·¥æ‰§è¡Œï¼š123 cases äººå·¥ Review +
-        è¡¥é½ distinct eventsï¼ˆå½“å‰ ST_TRANSITION=10<50ã€DELIST symbols=10<20ï¼‰
-        + å¤–éƒ¨å·¥ä»¶å°å­˜ï¼‰
-Impact: False GO / False NO_GO
-Mitigation: R4-A1.1/R4-A2.3 å·²è½åœ°ï¼ˆgates as codeï¼Œfail-closedï¼‰ï¼›
-           äººå·¥ review å®Œæˆå‰ P0-M-1B Entry Gate æ°¸è¿œ BLOCKED
-```
-
-## RISK-002 æ­£å¼ Provider è´¦å·æœªéªŒè¯
-
-```text
-Status: OPEN / EXTERNAL
-Impact: åŽ†å²æƒé™/åžå/Endpoint æ— æ­£å¼è¯æ®
-Mitigation: P0-M-1B
-```
-
-## RISK-003 Source Policy Production Immutability
-
-```text
-Status: OPEN
-Deadline: é¦–ä¸ª APPROVED Source Policy å‰
-```
-
-## RISK-004 ProviderExchange æœªç»Ÿä¸€
-
-```text
-Status: CLOSED for its current review-lineage definitionï¼ˆReviewer
-        2026-08-26 VERIFIED è£å†³ï¼šR4-A2.11/CR-1.2.7 lock-before-preflight
-        ä¸‰é‡è¯æ˜Ž + stale-parent å¯¹æŠ—é€šè¿‡ï¼›R4-A2.x / CR-1.x å®¡è®¡é“¾ CLOSEDã€‚
-        è¿žç»­ 11 ä¸ªæ‰¹æ¬¡çš„ exchange/evidence/review-lineage correctness
-        ä¿®å¤å…¨éƒ¨ VERIFIEDï¼Œå†»ç»“é¡¹æ— å›žå½’ï¼‰
-Note: æœªæ¥è‹¥ CR-2+ å¼•å…¥æ–°çš„ provider-normalized æ¶ˆè´¹é¢ï¼ŒæŒ‰æ–°å·¥ä½œè¦æ±‚
-      é‡æ–°å¼€é¡¹ï¼ˆä¸å¾—åœ¨æ—§æ¡ç›®ä¸Šå¤æ´»ï¼‰
-```
-
-## RISK-005 Trading Rule æ•°æ®å±‚æœªäººå·¥ Review
-
-```text
-Status: OPENï¼ˆç»“æž„å®Œå…¨é—­çŽ¯ï¼šimmutable versions + ACTIVE manifest + run
-        ç»‘å®šï¼ˆæ–‡ä»¶æ¸…å•+è”åˆ hashï¼‰+ review gateï¼ˆpath confinement + schemaï¼‰
-        + review å·¥å…·é“¾ï¼›å‰©ä½™äººå·¥æ‰§è¡Œï¼šscripts/rules/review.py å¯¹
-        v20260824-compiled äº§å‡º REVIEWED ç‰ˆæœ¬å¹¶åˆ‡æ¢ ACTIVEï¼‰
-Impact: åˆ¶åº¦äº‹å®žå½“å‰ ACTIVE=COMPILEDï¼›COMPILED è¢«ä»£ç å±‚ç¡¬é˜»æ–­
-        ï¼ˆPRODUCTION new_run/verdict æ‹’ç»ï¼‰
-Mitigation: P0-M-1B å‰äººå·¥æ‰§è¡Œï¼›fail-closed è¯­ä¹‰ + st_state ä¸¥æ ¼è§£æž
-        å·²åœ¨ä»£ç å±‚ï¼ˆRULE_UNRESOLVED æ°¸ä¸é™é»˜é€€åŒ–ï¼‰
-```
-
----
-
-# 53. Technical Debt
-
-```text
-TD-001 åŽ†å² audit/work_report è¾ƒå¤š
-    ä¸å½±å“è¿è¡Œï¼›ä¸åˆ é™¤ Git åŽ†å²
-
-TD-002 Spike/Canonical å°šæœªå…±äº« ProviderExchange
-    CR-1.1/CR-1.2 å·²é—­çŽ¯ Spike ä¾§ï¼›Canonical ä¾§åœ¨ CR-2 æ¶ˆè´¹ raw evidence
-
-TD-003 CI Governance full-history checkout å¾…å®Œå–„
-    R4-CI
-
-TD-004 RawWriter æ—§å…¥å£ write_success/write_failure ä¿ç•™ä¸ºå…¼å®¹åŒ…è£…
-    CR-2 æŽ¥å…¥åŽå¯ç§»é™¤ï¼ˆç»Ÿä¸€èµ° write(exchange)ï¼‰
-
-TD-005 golden v3 å€™é€‰ distinct events ä¸è¶³ï¼ˆST 10<50 / DELIST symbols 10<20ï¼‰
-    äººå·¥ review æ‰¹æ¬¡ä¸­ä»¥ candidate.py add-case è¡¥é½
-
-TD-006 FakeTarget dividend äº‹ä»¶æ•°æ®ä¸Ž golden CA cases çš„æ—¥æœŸå¯¹é½æœ‰é™
-    dry-run ä¸­éƒ¨åˆ† CA case è¯šå®ž FAILï¼ˆäº‹ä»¶æºç¼ºå¤±ï¼‰ï¼›æ­£å¼éªŒè¯ä»¥çœŸå®ž
-    provider dividend/right issue records ä¸ºå‡†ï¼ˆP0-M-1Bï¼‰
-
-TD-007 CI ruff format é—¨åœ¨ b7a84563..c7aa511 æœŸé—´ç¼ºæœ¬åœ°ç­‰ä»·æ£€æŸ¥
-    æœ¬æ‰¹èµ·æœ¬åœ°æäº¤å‰å¿…é¡»è·‘ ruff format --checkï¼ˆè¿žåŒ lint/mypy/pytest
-    çš„ CI ç­‰ä»·å››æ£€æŸ¥ï¼‰
-```
-
----
-
-# 54. ADR è§¦å‘è§„åˆ™
-
-å¿…é¡»æ–°å¢ž ADRï¼š
-
-```text
-æ”¹å˜ SoR
-æ”¹å˜ DB ownership/concurrency
-æ”¹å˜ Security ID
-æ”¹å˜ Publish/Replay lineage
-æ”¹å˜ Provider primary/fallback
-æ”¹å˜ Canonical Fact model
-æ”¹å˜ Feature formula semantics
-æ”¹å˜ State/Regime mathematics
-æ”¹å˜ Frozen Baseline
-```
-
-æ™®é€š bugfixã€æµ‹è¯•è¡¥å……ã€å®žçŽ°çº§é‡æž„é€šå¸¸ä¸éœ€è¦ ADRã€‚
-
----
-
-# 55. æ–‡æ¡£ä½“ç³»ç´¢å¼•
-
-```text
-docs/design/Aè‚¡å¸‚åœºæ€åŠ¿æ•°æ®åŸºåº§_æ—¥é¢‘æ¨¡å—_V1.3.2_å¼€å‘æ–¹æ¡ˆ.md
-    Frozen Baseline
-
-docs/project/DEVELOPMENT_MANAGEMENT.md
-    å½“å‰é¡¹ç›®ç®¡ç†æ€»å†Œ
-
-docs/DEVLOG.md
-    å•ä¸€æ»šåŠ¨å¼€å‘æ—¥å¿—
-
-docs/adr/
-    Architecture Decision Records
-
-docs/provider_verification/
-    Provider Verification
-
-docs/spike_report_p0m1.md
-    Provider Spike
-
-docs/m0_exit_report.md
-    M0 Exit
-
-docs/risk_register.md
-    Risk Register
-
-docs/runbook/
-    Runbooks
-
-docs/design/*å®¡è®¡*
-    åŽ†å²å®¡è®¡/å·¥ä½œè¦æ±‚
-```
-
----
-
-# 56. å·¥ä½œæµç¨‹
-
-```text
-Reviewer ä¸‹è¾¾ Work Requirement
-        â†“
-æ ‡è®°æ˜¯å¦è§¦å‘ DEVELOPMENT_MANAGEMENT æ›´æ–°
-        â†“
-Developer å®žçŽ°
-        â†“
-åŒ Commit æ›´æ–° DEVLOG
-        â†“
-C1/C2/C3 åŒ Commit æ›´æ–° DEVELOPMENT_MANAGEMENT
-        â†“
-ADR / Migrationï¼ˆå¦‚éœ€è¦ï¼‰
-        â†“
-Developer åœ¨å·¥ä½œè¦æ±‚æ–‡æ¡£å†…æ›´æ–°å„é—®é¢˜çš„ implementation mapping
-        â†“
-Tests / CI
-        â†“
-Implementation = DONE
-Review = PENDING_REVIEW
-        â†“
-Reviewer Recheck
-        â†“
-VERIFIED / REOPENED
-```
-
-## Reviewer Auto-Archive è§„åˆ™ï¼ˆR4-A2.3 Â§0 å¹¶å…¥ç®¡ç†æ€»å†Œï¼‰
-
-åŽ†å²å·¥ä½œè¦æ±‚æ–‡æ¡£ï¼ˆ`docs/design/*å·¥ä½œè¦æ±‚*` / `*å®¡è®¡*` / `*å¤å®¡*`ï¼‰ä¸åšæ‰‹å·¥å½’æ¡£ç§»åŠ¨ï¼›å…¶ç”Ÿå‘½å‘¨æœŸç”±æœ¬æ€»å†Œä¸Ž DEVLOG æ‰¿è½½ï¼š
-
-1. æ¯ä»½å·¥ä½œè¦æ±‚å¤„ç†å®Œæ¯•ï¼ˆæœ¬æ‰¹å…¨éƒ¨ P0 å…³é—­æˆ–æ˜Žç¡®è½¬ P1/DEFERREDï¼‰åŽï¼ŒDeveloper å¿…é¡»åœ¨è¯¥æ–‡æ¡£å†…è¿½åŠ  **implementation mapping** ç« èŠ‚ï¼ˆé—®é¢˜ç¼–å· â†’ ä»£ç /æµ‹è¯•/ADR å®šä½ï¼‰ï¼ŒéšåŽè¯¥æ–‡æ¡£å³è§†ä¸º**å·²å…³é—­å½’æ¡£**ï¼›
-2. å¤æ ¸è£å†³ï¼ˆVERIFIED/REOPENEDï¼‰ç›´æŽ¥è®°å½•äºŽ DEVLOG å¯¹åº”æ¡ç›®ä¸Žæœ¬æ€»å†Œ Â§61 Change Logï¼Œä¸å†ä¸ºæ—§å·¥ä½œè¦æ±‚æ–‡æ¡£æ–°å¼€å¤å®¡æ–‡ä»¶ï¼›
-3. è‹¥åŒä¸€ä¸»é¢˜éœ€è¦æ–°ä¸€è½®æ•´æ”¹ï¼ŒReviewer ä¸‹è¾¾**æ–°çš„**å·¥ä½œè¦æ±‚æ–‡æ¡£ï¼ˆæ–°æ–‡ä»¶åå¸¦æ—¥æœŸä¸Žæ‰¹æ¬¡å·ï¼‰ï¼Œä¸ä¿®æ”¹å·²å…³é—­æ–‡æ¡£æ­£æ–‡ï¼›
-4. å•ä¸€çœŸç›¸å…¥å£æ°¸è¿œæ˜¯æœ¬æ€»å†Œï¼ˆå½“å‰çŠ¶æ€ï¼‰+ DEVLOGï¼ˆæ—¶é—´çº¿ï¼‰+ ADRï¼ˆé•¿æœŸå†³ç­–ï¼‰ï¼ŒåŽ†å²å·¥ä½œè¦æ±‚æ–‡æ¡£åªä½œä¸ºè¾“å…¥è¯æ®ä¿ç•™ã€‚
-
----
-
-# 57. åŽç»­ Work Requirement çš„æ–‡æ¡£æ¡æ¬¾
-
-å‡¡å·¥ä½œè¦æ±‚å¼•èµ· C1/C2/C3ï¼Œå·¥ä½œè¦æ±‚ä¸­å¿…é¡»å†™ï¼š
-
-```text
-Documentation Update Required: YES
-
-Target:
-docs/project/DEVELOPMENT_MANAGEMENT.md
-
-Required Sections:
-<ç« èŠ‚>
-
-Change ID:
-DM-CR-...
-
-Same-commit rule:
-Code + Tests + DEVLOG + DEVELOPMENT_MANAGEMENT
-must be in the same logical change set.
-```
-
----
-
-# 58. Definition of Done
-
-Implementation DONEï¼š
-
-```text
-[ ] Code
-[ ] Tests
-[ ] Migration if required
-[ ] DEVLOG
-[ ] DEVELOPMENT_MANAGEMENT if C1/C2/C3
-[ ] ADR if required
-[ ] No secret/wheel leakage
-[ ] Static gates
-[ ] Evidence/Replay requirements
-[ ] Known issues recorded
-```
-
-Review VERIFIED è¿˜è¦æ±‚ï¼š
-
-```text
-[ ] Code-level recheck
-[ ] Gate cannot be bypassed
-[ ] Docs match runtime
-[ ] No false PASS / false GO path
-```
-
----
-
-# 59. çŠ¶æ€æžšä¸¾
-
-Implementationï¼š
-
-```text
-PLANNED
-READY
-IN_PROGRESS
-DONE
-BLOCKED
-DEFERRED
-```
-
-Reviewï¼š
-
-```text
-PENDING_REVIEW
-VERIFIED
-REOPENED
-NOT_REQUIRED
-```
-
-Runtime/Gateï¼š
-
-```text
-PASS
-FAIL
-BLOCKED
-SPIKE_INCOMPLETE
-NOT_TESTABLE
-```
-
-ç¦æ­¢â€œåŸºæœ¬å®Œæˆ/å·®ä¸å¤šé€šè¿‡/åº”è¯¥æ²¡é—®é¢˜â€ç­‰æ¨¡ç³ŠçŠ¶æ€ã€‚
-
----
-
-# 60. ç‰ˆæœ¬ä¸Žæ›´æ–°æ—¶é—´
-
-æ°¸è¿œç»´æŠ¤åŒä¸€è·¯å¾„ï¼š
-
-```text
-docs/project/DEVELOPMENT_MANAGEMENT.md
-```
-
-æ¯æ¬¡ C1/C2/C3ï¼š
-
-1. æ›´æ–°å—å½±å“è®¾è®¡ç« èŠ‚ï¼›
-2. æ›´æ–°â€œå½“å‰é¡¹ç›®é˜¶æ®µçŠ¶æ€â€ï¼›
-3. Change Log é¡¶éƒ¨è¿½åŠ ï¼›
-4. DEVLOG åŒæ­¥ï¼›
-5. Git ä¿å­˜è¿‡åŽ»ç‰ˆæœ¬ã€‚
-
----
-
-# 61. Change Log
-
-> æ–°æ¡ç›®å€’åºè¿½åŠ ï¼Œä¸åˆ é™¤åŽ†å²ã€‚
-
-## DM-20260904-083 â€” CR-5.2 atomic-history CI verification
-
-**Type**ï¼šC4 bounded-lineage complexity closure / governance synchronization  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šPR #2 run `33767742448`ï¼ˆrun 175ï¼‰æ­£ç¡®æš´éœ²åŽ†å² `0fe9897` ä»£ç æäº¤æœªåœ¨åŒä¸€ commit æ›´æ–° DEVLOG çš„é—¨ç¦é—®é¢˜ï¼›ä»“åº“ workflow æ˜Žç¡®ç¦æ­¢æ‰©å±•ä¾‹å¤–å’Œ force-push é‡å†™ã€‚  
-**Resolution**ï¼šä»Ž `main` ä»¥ CR-5.2 æœ€ç»ˆæ ‘åˆ›å»º clean branch `codex/cr-5-feature-layer-20260904`ï¼ŒåŽŸå­æäº¤ `3e7a0c27c5c7ee058c05721fca2e7b837cc8bb8e`ï¼Œä¿æŒ PR #2 åŽ†å²å¯è¿½è¸ªå¹¶ä»¥ PR #3 æŽ¥å—åŒä¸€å®Œæ•´å®¡è®¡ã€‚  
-**Evidence**ï¼šGitHub Actions run `33814571568`ï¼ˆrun 176ï¼‰ä¸‰çŸ©é˜µ successï¼›Ubuntu 3.14ã€Windows 3.14ã€Windows 3.12 æ¯è…¿ `1320 passed`ï¼›Ruff lint/formatterã€mypyã€full pytestã€Spikeã€SDK-absent å…¨éƒ¨é€šè¿‡ï¼›Windows 3.14 DEVLOG/Management-doc gates successã€‚  
-**Current State**ï¼šCR-5.2 implementation + CI completeï¼›Reviewer closure pendingï¼›ADR-025 ä» PROPOSEDï¼›PR #3 OPEN / NOT MERGEDï¼ŒPR #2 ä¿ç•™ä½†ä¸ä½œä¸ºåˆå¹¶ç›®æ ‡ï¼›CR-6 ç»§ç»­ BLOCKED_BY_CR-5.2ã€‚  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260903-082 â€” CR-5.2 bounded selected-input lineage implementation
-
-**Type**ï¼šC4 bounded-lineage complexity closure / governance synchronization  
-**Status**ï¼šIN_PROGRESS / PENDING_REVIEW  
-**Trigger**ï¼šReviewer æ–‡æ¡£ `A-share-analysis_CR-5.1å¤å®¡ä¸ŽCR-5.2_BoundedLineageComplexityæ”¶å£è¦æ±‚_20260903.md`ï¼ˆ2026-09-03 21:42 +08:00ï¼‰ç¡®è®¤ CR-5.1 correctness VERIFIED / CLOSED / FREEZEï¼Œå¹¶å°†å”¯ä¸€å‰©ä½™ P1 bounded-lineage complexity ç½®äºŽ CR-5.2 START / ACTIVEï¼›CR-6 ç»§ç»­ BLOCKED_BY_CR-5.2ã€‚  
-**Implementation**ï¼šsecurity row lineage ç»‘å®š current observationã€å›ºå®š observed/lag dependencies ä¸Ž selected valid amount/volatility membersï¼›`FeatureExecutionPlan.max_security_lineage_members` ä»Ž Registry/plan æŽ¨å¯¼ä¸Šç•Œå¹¶ç”± engine enforcementï¼›market verifier ä½¿ç”¨ set + previous-date order guardï¼›æ–°å¢ž 10k sparse/member-boundã€mutation/availabilityã€duplicate/order ä¸Ž structural focused testsã€‚  
-**Scope**ï¼šä¸æ”¹ Feature numeric formulasã€active finding truthã€artifact schema æˆ– migration 023ï¼›ä¸å¯åŠ¨ CR-6ï¼›ä¸è§¦ç¢° CR-2/3/4/productionã€‚  
-**Evidence**ï¼šä»£ç /test head `1bbfb2b9485fb62f8713e13584879fe33cb656fe`ï¼›CI run `33766197492`ï¼ˆrun 171ï¼‰åœ¨æœ¬æ–‡ä¿®è®¢æ—¶ queued / in progressï¼Œç»“æžœå¾…å®žé™…è¿”å›žï¼›ä¸Šä¸€è½® CR-5.1 green evidence ä¸º run `33759993886`ï¼ˆrun 168ï¼‰ã€‚  
-**Reviewer**ï¼šPENDING_REVIEW
-## DM-20260903-081 â€” CR-5.1 CI verification
-
-**Type**ï¼šC4 correctness closure verification / governance synchronization
-**Status**ï¼šDONE / PENDING_REVIEW
-**Evidence**ï¼šGitHub Actions run `33758109611`ï¼ˆrun 167ï¼‰å¯¹ CR-5.1 code head `06106c27652e14f13d360fd3e153ececb39a4434` çš„ Windows 3.12ã€Windows 3.14ã€Ubuntu 3.14 ä¸‰è…¿å…¨éƒ¨ successï¼›æ¯è…¿ `1312 passed`ã€‚Ruff lint/formatterã€mypyã€full pytestã€Spike frameworkã€SDK-absent å…¨éƒ¨é€šè¿‡ï¼›Windows 3.14 çš„ DEVLOG gate ä¸Ž Management-doc gate é€šè¿‡ï¼Œå…¶ä»–ä¸¤è…¿æŒ‰ workflow æ¡ä»¶è·³è¿‡æ²»ç† gatesã€‚
-**Decision**ï¼šCR-5.1 implementation evidence completeï¼›ADR-025 ä¿æŒ PROPOSED / PENDING_REVIEWï¼Œç­‰å¾… Reviewer closureã€‚PR #2 ä¿æŒ OPEN / NOT MERGEDï¼›CR-6 ç»§ç»­ BLOCKED_BY_CR-5.1ã€‚
-**Commit**ï¼šæœ¬æ¬¡ä¸ºæ–‡æ¡£ä¸Žè¯æ®åŒæ­¥ï¼›ä»£ç è¯æ®é”šå®š `06106c27652e14f13d360fd3e153ececb39a4434`ã€‚
-**Reviewer**ï¼šPENDING_REVIEW
-## DM-20260903-080 â€” CR-5.1 Registry Honest Execution / Feature Seal Closure
-
-**Type**ï¼šC4 correctness closureï¼ˆCR-5 é¦–æ‰¹å¤å®¡ reopenï¼›ADR-025 Amendment A PROPOSEDï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-5 é¦–æ‰¹å¤å®¡ï¼ˆ2026-09-03 19:22 +08:00ï¼‰è£å†³ CR-5 ä¸»ä½“æœºåˆ¶ PASS ä½† CR-5 DONE / REOPENEDï¼›CR-5.1 START / ACTIVEï¼›PR #2 æš‚ä¸åˆå¹¶ï¼›CR-6 BLOCKED_BY_CR-5.1ã€‚  
-**Scope**ï¼šä»… Registry honest executionã€Feature seal cross-bindingã€rolling denominator/missingnessã€active-span complexityã€mandatory 1..66 mappingï¼›ä¸æ”¹ migration 023ï¼Œä¸å¯åŠ¨ CR-6ï¼Œä¸é‡å¼€ CR-2/3/4ï¼Œä¸è§¦ç¢° productionã€‚  
-**Implementation**ï¼š
-- compile_feature_execution_plan() ä»¥ typed blocked semanticsã€V1 exact feature set å’Œ formula-rule dispatch ä¸ºå”¯ä¸€æ‰§è¡Œè®¡åˆ’ï¼›å£°æ˜Žå­—æ®µå˜åŒ–ã€é¢å¤– feature æˆ– blocked rename å‡ fail closedã€‚
-- FeatureBuilder / verifier æ¶ˆè´¹ Registry/plan çš„ price_basisã€window_basisã€universe_rule_idï¼›verifier å¯¹ manifest/ledger snapshot_as_ofã€SUCCESS error_messageã€ç‰©ç† security/market/finding counts åšäº¤å‰ç»‘å®šä¸Žé‡ç®—ã€‚
-- lagã€close-to-MAã€amount å…±ç”¨å±é™©åˆ†æ¯åˆ†ç±»ï¼›valid_ma20_count æŒ‰å®žé™…å¯æ¯”è¾ƒçš„ close-to-MA è¡Œè®¡æ•°ï¼›amount/volatility ä½¿ç”¨ active-span incremental historyï¼›duplicate key æ ¡éªŒä½¿ç”¨ setã€‚
-- tests/integration/test_features.py å¢žåŠ  Registry driftã€seal reboundã€numeric/PIT/lineageã€active missingnessã€recovery å’Œ mandatory focused casesï¼›CR-5 work requirement Â§16.10 å¢žåŠ  1..66 mappingï¼›ADR-025 Amendment A ä¸Ž DEVLOG åŒæ­¥ã€‚
-**Verification**ï¼šä»£ç  head `06106c27652e14f13d360fd3e153ececb39a4434` å¯¹åº” GitHub Actions run `33758109611`ï¼ˆrun 167ï¼‰ä¸‰çŸ©é˜µ successï¼›Windows 3.12ã€Windows 3.14ã€Ubuntu 3.14 æ¯è…¿ `1312 passed`ï¼ŒRuff lint/formatterã€mypyã€full pytestã€Spikeã€SDK-absent å‡é€šè¿‡ï¼›Windows 3.14 çš„ DEVLOG ä¸Ž Management-doc gates successï¼Œå…¶ä»–ä¸¤è…¿æŒ‰ workflow æ¡ä»¶è·³è¿‡æ²»ç† gatesã€‚  
-**Implementation Commit**ï¼š`06106c27652e14f13d360fd3e153ececb39a4434`ï¼ˆä»£ç  headï¼›æœ¬æ²»ç†åŒæ­¥å¦è¡Œæäº¤ï¼‰ã€‚
-**Migration**ï¼š023 ä¿æŒä¸å˜ï¼›001..022 ä¿æŒä¸å˜ã€‚  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260903-079 â€” CR-5 é¦–æ‰¹å¤å®¡ä¸Ž CR-5.1 å¯åŠ¨
-
-**Type**ï¼šC4 review verdict / next-stage work requirement  
-**Status**ï¼šCR-5 DONE / REOPENEDï¼›CR-5.1 START / ACTIVE  
-**Trigger**ï¼š2026-09-03 19:22 +08:00 reviewer æ–‡æ¡£ï¼›ä¸»ä½“æž¶æž„ä¸Ž run 33746604036 ä¸‰å¹³å° CI PASSï¼Œä½† P0-01 Registry honestyã€P0-02 Feature seal closureã€P0-03 denominator/finding closureã€P1 active missingness/complexityã€mandatory 66 mapping æœªé—­çŽ¯ã€‚  
-**Decision**ï¼šADR-025 ä¿æŒ PROPOSEDï¼›PR #2 OPEN / MERGEABLE / NOT MERGEDï¼›CR-6 BLOCKED_BY_CR-5.1ï¼›CR-2/3/4 ä¿æŒ CLOSED / FREEZEã€‚  
-**Required**ï¼šæŒ‰ reviewer work requirement å®žæ–½ focused closure åŽï¼Œé‡æ–°å–å¾—ä¸‰å¹³å° CI è¯æ®å¹¶ç­‰å¾… Reviewer closureã€‚  
-**Reviewer**ï¼šDesign / Audit Review
-
-## DM-20260903-077 â€” CR-4.4 CI éªŒè¯ä¸Žæ²»ç†åŒæ­¥
-
-**Type**ï¼šC4 correctness closure verification / governance synchronization
-**Status**ï¼šDONE / PENDING_REVIEW
-**Evidence**ï¼šGitHub Actions run `33732904158` å¯¹ CR-4.4 final head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9` ä¸‰è…¿ successï¼›æ¯è…¿ pytest 1256 passedã€‚
-**Governance Sync**ï¼šåŒæ­¥ DEVLOGã€CR-4 å·¥ä½œè¦æ±‚ Â§13.7ã€ADR-024 Amendment A ä¸Žæœ¬æ€»å†Œï¼›ä¸æ”¹å˜ ADR-024 PROPOSEDã€CR-5 blockedã€production independently blocked çš„çŠ¶æ€ã€‚
-**Commit**ï¼šæœ¬æ¬¡æ²»ç†åŒæ­¥æäº¤ï¼›ä»£ç è¯æ®é”šå®š `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`ã€‚
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260903-076 â€” CR-4.4 Snapshot å›žæ”¾ã€ä¸å¯å˜å†™å…¥ä¸Ž ReadModel provenance æ”¶å£
-
-**Type**ï¼šC4 correctness closureï¼ˆCR-4 é¦–æ‰¹å¤å®¡ reopenï¼›ADR-024 Amendment A PROPOSEDï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼š2026-09-03 CR-4 é¦–æ‰¹å¤å®¡è¦æ±‚æ”¶å£ P0-01 deterministic canonical projectionã€P0-02 recoverable immutable writeã€P0-03 explicit key bindingã€P0-04 physical schema hash / same-byte materializationã€P0-05 ReadModel provenance + verified-openã€‚  
-**Scope**ï¼šä»…ä¸Šè¿°äº”é¡¹ä¸Ž focused testsã€ADR-024 Amendment Aã€DEVLOGã€å·¥ä½œè¦æ±‚ Â§13.7ï¼›migration 022 ä¸æ”¹ï¼›CR-5ã€Feature/Stateã€provider/fallback/production ä¸åœ¨èŒƒå›´å†…ã€‚
-
-**Implementation**
-- Snapshot schema registry æ–°å¢ž `KeyBinding` ä¸Ž `stable_sort_key`ï¼›æ–°å¢žå…±äº« `project_verified_canonical_snapshot`ï¼ŒBuilder/verifier å®Œå…¨å…±ç”¨ã€‚
-- Snapshot verifier å¯¹æ¯ä¸ªç‰©ç† artifact çš„ expected canonical projection åš exact row/semantic æ¯”å¯¹ï¼›ä¸šåŠ¡å€¼æˆ– lineage è¿žåŒ manifest/ledger seals rebound ä» DAMAGEDã€‚
-- immutable writer æ”¯æŒ identical no-opã€missing writeã€different-byte conflictï¼›å…¨è®¡åˆ’ preflightï¼Œmanifest LASTï¼›ledger commit crash ä¸Ž partial residue å¯ exact retryã€‚
-- Canonical/Snapshot verifier ä»Žå·² hash-verify çš„åŒä¸€ bytes è§£æž Parquetï¼›Snapshot schema_hash physical recomputeï¼›å…¬å…± canonical verifier å¤ç”¨å·²ç‰©åŒ– selected rowsã€‚
-- ReadModel meta å¢žåŠ  snapshot/readmodel builder fingerprintsï¼›logical seal æ£€æŸ¥ canonical_as_ofã€å®Œæ•´ domain_meta snapshot bindingï¼›`open_read_only` / `verify_readmodel` æ‰§è¡Œ verified-openã€‚
-
-**Schema / Contract**ï¼šmigration 022 unchangedï¼›derived ReadModel schema change is per-build and does not add project migration 023ã€‚  
-**Affected Modules**ï¼š`src/ashare_state/snapshot/schema.py`ã€`snapshot/builder.py`ã€`snapshot/verifier.py`ã€`snapshot/__init__.py`ã€`src/ashare_state/canonical/canonicalizer.py`ã€`canonical/verifier.py`ã€`src/ashare_state/readmodel/duckdb_model.py`ã€`readmodel/__init__.py`ã€focused integration testsã€ADR-024ã€DEVLOGã€CR-4 work requirement Â§13.7ã€‚  
-**Tests**ï¼šGitHub Actions run 33732904158 ä¸‰è…¿ pytest å‡ä¸º **1256 passed / 0 failed**ï¼›æ–°å¢ž CR-4.4 focused adversarial tests å·²çº³å…¥è¯¥æ€»æ•°ã€‚
-**Verification**ï¼šGitHub Actions **run 33732904158ï¼ˆfinal head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`ï¼‰ä¸‰è…¿ success**ï¼›Windows 3.12 / Windows 3.14 / Ubuntu 3.14 çš„ Ruff lintã€Ruff formatã€mypyã€pytestã€Spike gatesã€SDK-absent å‡é€šè¿‡ï¼›Windows 3.14 çš„ DEVLOG gate ä¸Ž Management-doc gate é€šè¿‡ã€‚
-**Commit**ï¼šCR-4.4 final code head `3e19aa5690ebd1f90818a0ee7b52de44423b7dc9`ï¼ˆé¦–ä¸ªå®žçŽ° `cad56f39fc4f8d50b2eefdae45045dd5a86237a5`ï¼›CI ä¿®å¤é“¾è§ DEVLOGï¼‰ã€‚
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260903-075 â€” CR-4 é¦–æ‰¹ï¼šCanonical å…¬å…±æ¶ˆè´¹éªŒè¯å™¨ + SnapshotBuilder + DuckDB ReadModel
-
-**Type**ï¼šC4ï¼ˆCR-4 å¯åŠ¨é¦–æ‰¹ï¼›å« CR-3 closure æ²»ç†åŒæ­¥ä¸Ž CR-3 latent ç¼ºé™·æ˜¾å¼ç”³æŠ¥ä¿®å¤ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-3 å…¨é“¾æœ€ç»ˆå¤å®¡ï¼ˆ2026-09-02 21:24 +08:00ï¼ŒReviewer closure commit `ff3808b7a5036246ea11e37173aa31d863beb2d9`ï¼Œæ–‡æ¡£ `docs/design/A-share-analysis_CR-3.6æœ€ç»ˆå¤å®¡ç»“è®ºä¸ŽCR-4å¯åŠ¨è£å†³_20260902.md`ï¼‰è£å†³ **CR-3 / CR-3.1 / CR-3.2 / CR-3.3 / CR-3.4 / CR-3.5 / CR-3.6 å…¨é“¾ VERIFIED / CLOSED / FREEZEï¼›ADR-023 â†’ ACCEPTEDï¼›CR-4 SnapshotBuilder + DuckDB ReadModel START**ï¼›CR-4 å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-4_SnapshotBuilderåŠDuckDBReadModelå¼€å‘å·¥ä½œè¦æ±‚_20260902.md`ï¼ˆaudit 20260902ï¼›P0-A01..A03 / P0-A04..A12 / P0-B01..B09ï¼›mandatory æµ‹è¯• 1-50ï¼›Â§5 åé—®é¡» ADR å›žç­”ï¼›Â§12 æµå¼çº¢çº¿å«"CR-3 frozen ç¼ºé™·é¡»æ˜¾å¼ç”³æŠ¥ï¼Œä¸å¾—æ‚„æ‚„ä¿®å¤æˆ–ç»•è¿‡"ï¼‰ã€‚  
-**Governance Syncï¼ˆè£å†³è¦æ±‚çš„ç¬¬ä¸€åŠ¨ä½œï¼Œæœ¬ commit å†…å®Œæˆï¼‰**ï¼šADR-023 status â†’ ACCEPTEDï¼ˆå…­è½® Amendment è£å†³å¹¶å…¥ï¼‰ï¼›ADR-000 ç´¢å¼•åŒæ­¥ï¼›CR-3.6 å·¥ä½œè¦æ±‚è¿½åŠ  Reviewer Closure è£å†³ç« èŠ‚ï¼›DM å¤´éƒ¨åŸºçº¿åˆ‡æ¢è‡³ reviewer closure commit `ff3808b`ï¼›CR-3 å…¨é“¾ â†’ VERIFIED / CLOSED / FREEZEã€‚  
-**New Contract**ï¼ˆADR-024 PROPOSEDï¼ŒÂ§5 åé—®åç­”ï¼‰ï¼šï¼ˆ1ï¼‰**CR-4.1 Canonical å…¬å…±æ¶ˆè´¹éªŒè¯å™¨**ï¼ˆ`src/ashare_state/canonical/verifier.py`ï¼‰ï¼š`verify_canonical_run_for_consumption` æ˜¯ä¸‹æ¸¸è¯»å– canonical truth çš„å”¯ä¸€æ”¯æŒå…¥å£â€”â€”ledger row â†’ typed identity sealï¼ˆdeterministic URI + bytes hash + manifest==ledger + å…¨ derived identity ç‰©ç†é‡ç®—ï¼‰â†’ å…±äº« artifact closure verifier â†’ findings truth + status è¯­ä¹‰é‡ç®— â†’ **verified SUCCESS æ‰å¯æ¶ˆè´¹**ï¼ˆBLOCKED æ˜¾å¼æ‹’ç»ï¼‰â†’ æ¯ sealed CR-2 input æƒå¨ ledger identity + ç‰©ç†/anchor å¥åº·ï¼ˆ`_sealed_input_authority_problems` å…±äº«æå–ï¼Œ**ä¸è¦æ±‚ current discovery presence**â€”â€”åˆæ³• superset å¢žé•¿ä¸è¿½æº¯ç ´åå·² mint SUCCESS çš„æ¶ˆè´¹ï¼‰â†’ selected rows ä»Ž hash éªŒè¯è¿‡çš„ parquet ç‰©åŒ–ã€‚VerifiedCanonicalRun frozen dataclassã€‚ï¼ˆ2ï¼‰**CR-4.2 SnapshotBuilder**ï¼ˆ`src/ashare_state/snapshot/`ï¼‰ï¼šç‰ˆæœ¬åŒ– schema registryï¼ˆDomainSnapshotSchema/ColumnSpec/DTypeâ€”â€”åˆ—é›†/logical dtype/nullability/key arity/key projection å•ä¸€äº‹å®žæºï¼›trade_calendar.market=payload å­—æ®µã€adj_factor.factor_type=key projectionï¼ˆcanonical key ç¬¬ 3 æ®µ typed decodeï¼‰ï¼‰ï¼›ç¡®å®šæ€§ identityï¼ˆsnapshot_base_hash = canonical run-level sealsï¼ˆrun_id/manifest_hash/requested_domains_hash/selected_semantic_hash/as_ofï¼‰+ snapshot_contract_version + builder code fingerprint çš„ canonical JSON SHA-256 â†’ snapshot_id = UUID5(SNAPSHOT_NAMESPACE, ...)â€”â€”ä»Ž run-level seals è€ŒéžæŠ•å½±è¡Œæ´¾ç”Ÿï¼šå¯å…ˆç®—åŽå†™ã€manifest åŽŸè¯­å¯é‡ç®—ï¼‰ï¼›artifact å¸ƒå±€ `snapshot/contract=snapshot-v1/as_of=<fmt>/snapshot=<id>/<domain>.parquet + manifest.json(LAST)`ï¼ˆartifact é›† == è¯·æ±‚ domain é›†ç²¾ç¡®ï¼‰ï¼›ä¸¥æ ¼æŠ•å½±ï¼ˆcanonical_key JSON round-trip éªŒè¯ + PIT å¥‘çº¦æ–­è¨€ available_at <= as_of + typed è½¬æ¢ fail closed + canonical_key ç¨³å®šæŽ’åº + key å”¯ä¸€ï¼‰ï¼›`_write_immutable` æ‹’ç»è¦†ç›–ï¼›migration **022** `meta_snapshot_build`ï¼ˆä¸€äº‹åŠ¡ dup-check + INSERTï¼›exact retry â†’ verify_snapshot å…¨ç‰©ç†éªŒè¯åŽå¹‚ç­‰ replayï¼›ç›®å½•å­˜åœ¨ ledger æ— è¡Œ â†’ æ˜¾å¼ fail closed crash æ®‹ç•™ï¼‰ï¼›`verify_snapshot`ï¼ˆdeterministic URI + bytes hash + manifest==ledger + identity UUID5 cross-bind + builder fingerprint ä¸€è‡´ + **canonical provenance cross-bind**ï¼ˆé‡è·‘æ¶ˆè´¹éªŒè¯å™¨ + manifest canonical å­—æ®µ == VERIFIED ledger truthâ€”â€”canonical åœ¨ snapshot ä¹‹åŽæŸååŒæ · fail closedï¼‰+ artifact exact set == requested domains + ç‰©ç† content/schema/row_count/semantic seal é‡ç®— + row PIT/æŠ•å½± sanity + artifact_set_hash/snapshot_semantic_hash/row_count_total èšåˆé‡ç®—ï¼‰ã€‚ï¼ˆ3ï¼‰**CR-4.3 DuckDB ReadModel**ï¼ˆ`src/ashare_state/readmodel/`ï¼‰ï¼š`DuckDBReadModel.rebuild` = verify_snapshot â†’ temp åº“ï¼ˆ`.readmodel.building.duckdb`ï¼‰â†’ å»ºè¡¨ï¼ˆregistry ç²¾ç¡® DuckDB ç±»åž‹æ˜ å°„ + `PRIMARY KEY (canonical_key)` + NOT NULL identity åˆ—ï¼‰â†’ INSERTï¼ˆ`read_parquet(hive_partitioning=false)`â€”â€”ä¿®å¤è·¯å¾„ `contract=/as_of=/snapshot=` æ®µè¢«è¯¯è¯»ä¸ºåˆ†åŒºåˆ—ï¼‰â†’ **temp åº“ä¸Š logical seal**ï¼ˆè¡¨é›†ç²¾ç¡® == `{rm_<domain>} âˆª {rm_snapshot_meta, rm_domain_meta}` / è¡Œæ•° == snapshot seal / key å”¯ä¸€ / **ä»Žè¡¨å†…å®¹é‡ç®— semantic hash == snapshot åŸŸ seal**ï¼ˆTIMESTAMPTZ fetch å½’ä¸€åŒ–å›ž UTCï¼‰/ `information_schema` åˆ—ç±»åž‹ç²¾ç¡®æ¯”å¯¹ï¼ˆTIMESTAMP WITH TIME ZONE æ˜¾å¼æ—¶åŒºè¯­ä¹‰ï¼‰/ rm_snapshot_meta + rm_domain_meta å†…å®¹ï¼‰â†’ `Path.replace` åŽŸå­æ›¿æ¢ç¡®å®šæ€§ç›®æ ‡ `readmodel/contract=readmodel-v1/snapshot=<id>/readmodel.duckdb`ï¼›å¤±è´¥ temp åˆ é™¤æ—§ç›®æ ‡å­—èŠ‚ä¸å˜ï¼ˆæ— éƒ¨åˆ†/æŸåæ¨¡åž‹å¯è§ï¼‰ï¼›`open_read_only` æ¶ˆè´¹å…¥å£ã€‚ï¼ˆ4ï¼‰**è¾¹ç•Œ AST guard**ï¼šsnapshot/ ä¸Ž readmodel/ ç¦æ­¢ import providers/normalization/raw_writerï¼›ç¦æ­¢ pandas/talib/numpy/scipy/sklearnï¼ˆæ— ç‰¹å¾è®¡ç®—ï¼‰ï¼›`SnapshotBuilder.build` ç­¾ååªæŽ¥å— canonical_run_idã€‚  
-**CR-3 Latent ç¼ºé™·æ˜¾å¼ç”³æŠ¥ï¼ˆÂ§12 çº¢çº¿åˆè§„â€”â€”æè¯· Reviewer åœ¨ CR-4 å¤å®¡ä¸­ä¸€å¹¶è£å†³ï¼Œæœªæ‚„æ‚„ä¿®å¤ï¼‰**ï¼šCR-3 `_write_artifacts` çš„ selected/decision semantic seal æ›¾å¯¹**æœªå¯¹é½ rows**è®¡ç®—ï¼Œè€Œ parquet å†™ `_align_schema` å¯¹é½åŽçš„ rowsâ€”â€”**å¤š domain æ··åˆæ—¶ exact replay çš„ recompute å¿…ç„¶è¯¯æŠ¥ DAMAGED**ï¼ˆfail-closed æ–¹å‘ false positiveï¼›å• domain key é›†åˆä¸€è‡´æ•… 1179 é¡¹æ—¢æœ‰å›žå½’å…¨ç»¿ã€å…­è½®å¤å®¡æœªæš´éœ²ï¼›CR-4 å¤š domain æ¶ˆè´¹é¦–æ¬¡è§¦å‘ï¼‰ã€‚æœ€å°ä¿®å¤ï¼šseal æ”¹ä¸ºå¯¹ aligned rows è®¡ç®—ï¼ˆå• domain è¡Œä¸ºé€å­—èŠ‚ä¸å˜â€”â€”194 é¡¹æ—¢æœ‰ canonical å›žå½’å…¨ä¿æŒå³è¯æ˜Žï¼‰ï¼›æ–°å¢ž `TestMultiDomainReplayRegression::test_multi_domain_exact_replay_idempotent` å›žå½’é’‰ã€‚ç”³æŠ¥ä½ç½®ï¼šADR-024 Consequences / æœ¬æ¡ç›® / DEVLOG / CR-4 å·¥ä½œè¦æ±‚ Implementation Mapping Â§7.5ã€‚  
-**Schema**ï¼šmigration **022** `meta_snapshot_build`ï¼ˆé“¾ 21 â†’ 22ï¼›å« idx canonical_run_idï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/canonical/verifier.py`ï¼ˆæ–°ï¼‰ã€`src/ashare_state/canonical/canonicalizer.py`ï¼ˆ`_sealed_input_authority_problems` å…±äº«æå– + semantic seal aligned ä¿®å¤ï¼‰ã€`src/ashare_state/snapshot/`ï¼ˆschema/models/builder/verifierï¼Œæ–°åŒ…ï¼‰ã€`src/ashare_state/readmodel/`ï¼ˆschema/duckdb_modelï¼Œæ–°åŒ…ï¼‰ã€`migrations/022_snapshot_build.sql`ã€`tests/integration/test_snapshot.py`ï¼ˆæ–°ï¼Œ44ï¼‰ã€`tests/integration/test_readmodel.py`ï¼ˆæ–°ï¼Œ11ï¼‰ã€`tests/integration/test_canonical.py`ï¼ˆ+1 å›žå½’ï¼‰ã€`tests/integration/test_migrations.py`ï¼ˆ22 é“¾ + 021â†’022 å‡çº§ + probe 023ï¼‰ã€`tests/integration/conftest.py`ï¼ˆconn/env_root å…±äº«ï¼‰ã€`docs/adr/ADR-024`ï¼ˆæ–°ï¼‰ã€ADR-023/ADR-000ï¼ˆACCEPTED åŒæ­¥ï¼‰  
-**Tests**ï¼š1235/0ï¼ˆ1179 â†’ 1235ï¼Œ+56ï¼›mandatory 1-50 å…¨å¯¹åº”ï¼‰  
-**Verification**ï¼šLocal 1235/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ78 æºæ–‡ä»¶ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33715493176ï¼ˆfinal `0c328c3de95c636df053a52bb5b4814fde2d14cb`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-03 API positive confirmationï¼›implementation `2db6d8d` é¦–è·‘ run 33707982975 æš´éœ² 2 å¤„ä»…æµ‹è¯•æ–­è¨€çš„è·¨çŽ¯å¢ƒè„†å¼±æ€§ï¼Œ2 æ¬¡ assertion-only ä¿®å¤è½®æ¬¡åŽå…¨ç»¿â€”â€”é›¶äº§å“ä»£ç æ”¹åŠ¨ï¼‰  
-**Commit**ï¼š`2db6d8d6cc1fef047175b1f23c80016f003eee63`ï¼ˆCR-4 é¦–æ‰¹ implementationï¼‰+ `397ea7c`ï¼ˆfixï¼šsuperset winner è·¨çŽ¯å¢ƒæ–­è¨€ï¼‰+ `0c328c3de95c636df053a52bb5b4814fde2d14cb`ï¼ˆfixï¼šspike evidence glob å¹³å°åºæ–­è¨€ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260902-074 â€” CR-3.6 Selection-Free Historical Discovery + Historical Canonical Artifact Closure
-
-**Type**ï¼šC3 correctness closureï¼ˆADR-023 Amendment Fï¼›CR-3.5 å¤å®¡ 2 æ–° P0 å…¨æ”¶å£ï¼›é›¶æ–° migrationï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-3.5 å¤å®¡ï¼ˆ2026-09-02 17:36 +08:00ï¼ŒReviewed HEAD `3c6087e13de4af26143aa72a2a8bbeade052ecdb`ï¼ŒPrimary implementation `48982290056cf88e6daafbecb7d8b8a766da6e28`ï¼Œè£å†³ **REOPENED**â€”â€”**Derived Run / Status Seal å…¨éƒ¨ PASS / FREEZE**ï¼ˆ21 é¡¹æœºåˆ¶ï¼šstatus ä¸å†ä½œ historical SQL pre-filter / stored context ä¸å†ä½œ selection key / live build å…±äº« derived formulas / requested_domains_hashÂ·ä¸‰ input hashÂ·master setÂ·dataset hashï¼ˆrun è‡ªå·±çš„ bridge identityï¼‰Â·contextÂ·baseÂ·idempotencyÂ·run-id UUID5 cross-bindÂ·statusÂ·error_message å…¨ç‰©ç†é‡ç®— / findings DB==parquet==seal / materialization symmetry / genuine BLOCKED recovery / old bridge world skip / no new migrationï¼‰ï¼›P0-01ï¼šhistorical candidate discovery è™½ä¸å†ä¾èµ– status/contextï¼Œä»åœ¨ full-seal verification ä¹‹å‰ä¾èµ–å…¶å®ƒå¯æ¼‚ç§» correctness-bearing fieldsï¼ˆrequested_domains_hash / contract / policy identities / code_fingerprint / as_ofï¼‰åš SQL/Python filteringâ€”â€”åªæ¼‚ç§»å…¶ä¸­ä¸€ä¸ªå­—æ®µå³å¯æŠŠ prior SUCCESS ä»Ž verifier å‰éšè—ï¼›P0-02ï¼šhistorical Canonical seal åœ¨éž exact-replay çš„ continuity/superset è·¯å¾„å°šæœªéªŒè¯ prior SUCCESS çš„ selected / decisions artifact closureâ€”â€”æ—§ Canonical äº§ç‰©æŸååŽä»å¯èƒ½æ”¾è¡Œæ–° superset runï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-3.5å¤å®¡ä¸ŽCR-3.6æœ€ç»ˆPreVerificationDiscoveryåŠHistoricalCanonicalArtifactClosureæ”¶å£è¦æ±‚_20260902.md`ï¼Œreopen commit `dd31ca6`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-023 Amendment F Â§11.1-Â§11.2ï¼‰ï¼šï¼ˆ1ï¼‰**P0-01 Selection-Free / Pre-Verification-Trust-Free Discovery**ï¼šåŽŸåˆ™ "No correctness-bearing field may exclude a historical canonical row before its identity seal is verified"ã€‚Phase A broad discoveryï¼ˆ`SELECT å…¨éƒ¨ ledger row ORDER BY canonical_run_id`â€”â€”æ—  WHEREã€æ—  Python é¢„è¿‡æ»¤ï¼‰ï¼›Phase B æ¯è¡Œå…ˆè¿‡ historical identity sealï¼ˆ`_verify_historical_identity_seal`ï¼šdeterministic manifest URI / bytes hash / manifest æ˜¾å¼ correctness å­—æ®µ == ledger / requested domains hash + ä¸‰ input hash + master set + dataset hashï¼ˆrun è‡ªå·±çš„ bridge identityï¼‰+ context + base + idempotency + run-id å…¨ç‰©ç†é‡ç®—ï¼›findings truth åˆ»æ„ç§»å‡ºâ€”â€”åªåœ¨ same-world åˆ†ç±»åŽè¿è¡Œï¼‰ï¼›Phase C éªŒè¯åŽæ‰è§£é‡Š world/statusï¼ˆverified different request world â†’ safely skip / verified same world â†’ shared artifact verifier â†’ findings/status truth â†’ï¼ˆSUCCESSï¼‰CR-2 dependency continuity / verified genuine BLOCKED â†’ éžä¾èµ– recovery allowedï¼‰ã€‚identity seal ä»»ä½• problem â†’ **GLOBAL / HISTORICAL CANONICAL LEDGER DAMAGED**ï¼ˆä¸èƒ½å®‰å…¨è¯æ˜Žä¸Žå½“å‰ world æ— å…³ï¼Œfail closed é›¶ mintï¼‰ã€‚ledger+manifest å•å­—æ®µå¯¹ rebindï¼ˆä¼ªé€  different worldï¼‰ç”± derived identity / run-id cross-bind åœ¨ world åˆ†ç±»ä¹‹å‰æ‹¦æˆªï¼Œä¸å¯èƒ½å€Ÿ forged world æå‰ skipã€‚ï¼ˆ2ï¼‰**P0-02 Shared Historical Canonical Artifact Verifier**ï¼š`_verify_canonical_artifacts(record, manifest)`ï¼ˆè‡ª `_verify_closure` artifact æ®µæŠ½å–çš„å…±äº«åªè¯» helperï¼‰ï¼šmanifest selected_count/decision_count == ledger + artifact exact setï¼ˆselected/decisions/findingsï¼‰+ deterministic artifact URIs + physical content_hash/row_count/schema_hash é€ artifact + selected/decision semantic sealsï¼ˆrecompute == ledger == manifestï¼‰ã€‚æ¶ˆè´¹ç‚¹ï¼šexact replayï¼ˆ`_verify_closure`ï¼‰ä¸Ž historical continuityï¼ˆsame-world æ¯è¡Œâ€”â€”genuine BLOCKED äº¦é¡» recorded evidence å†…éƒ¨å®Œå¥½æ‰å¯è¢«åˆ†ç±»ä¸º genuineï¼‰ã€‚findings artifact ä¸‰æ–¹ truth ä¸Ž status recompute ä¿ç•™åœ¨å…±äº« `_verify_findings_truth`ã€‚  
-**Schema**ï¼šé›¶æ–° migrationï¼ˆå¤å®¡ Â§3.1 å…è®¸"ä»…å½“å¼•å…¥çœŸæ­£æœ‰ç‹¬ç«‹å®Œæ•´æ€§é”šçš„ history index"ï¼›æœªéªŒè¯çš„æ™®é€š ledger ç´¢å¼•å­—æ®µä¼šæ¢å›žæ—§æ¼æ´žï¼›migration é“¾ä¿æŒ 21ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/canonical/canonicalizer.py`ï¼ˆselection-free å‘çŽ°é‡å†™ + identity seal æ‹†åˆ† + `_verify_canonical_artifacts` æŠ½å–ä¸Žä¸¤è·¯æ¶ˆè´¹ï¼‰ã€`tests/integration/test_canonical.py`ï¼ˆ194 é¡¹ = 166 å›žå½’ + 28 æ–°å¢žï¼‰ã€`docs/adr/ADR-023`ï¼ˆAmendment Fï¼‰ã€`docs/adr/ADR-000`ï¼ˆç´¢å¼•ï¼‰  
-**Tests**ï¼š1179/0ï¼ˆ1151 â†’ 1179ï¼Œ+28ï¼šTestSelectionFreeDiscovery 20 / TestHistoricalArtifactClosure 8ï¼›å¤å®¡ Â§1.3/Â§2.4 mandatory 14 é¡¹å…¨å¯¹åº”ï¼‰  
-**Verification**ï¼šLocal 1179/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ69 æºæ–‡ä»¶é›¶é”™ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33623939024ï¼ˆimplementation `1ebe96b9d28617939c2782795395ef23eee597e0`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-02 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`1ebe96b9d28617939c2782795395ef23eee597e0`ï¼ˆCR-3.6 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260902-073 â€” CR-3.5 Historical Candidate Discovery + Derived Canonical Run/Status Seal
-
-**Type**ï¼šC3 correctness closureï¼ˆADR-023 Amendment Eï¼›CR-3.4 å¤å®¡ 2 æ–° P0 + P1 å…¨æ”¶å£ï¼›é›¶æ–° migrationï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-3.4 å¤å®¡ï¼ˆ2026-09-02 13:17 +08:00ï¼ŒReviewed HEAD `8585b08dc079207e8306bf3be38cf3de3de2f7a4`ï¼ŒPrimary implementation `fce2ca43a35b95d61dc390647fdc46d844d9b1a5`ï¼Œè£å†³ **REOPENED**â€”â€”åŽŸå®š 3 P0 PASS / FREEZEï¼ˆ14 é¡¹æœºåˆ¶ï¼šCanonicalRunSeal typed historical seal / continuity å…ˆéªŒåŽ†å² manifest URI+hash / ä¸‰ input hash ç‰©ç†é‡ç®— / `_INPUT_IDENTITY_FIELDS` å•ä¸€å­—æ®µçœŸç›¸ / first consume + replay å…±ç”¨ evidence collector / materialization symmetry å…¨é“¾ / manifest ä¸‰ correctness identity replay full-consume / no new migrationï¼‰ï¼›P0-01ï¼šhistorical continuity candidate discovery ä»åœ¨ seal verification ä¹‹å‰ä¾èµ–å¯æ¼‚ç§»çš„ `canonical_context_hash` ä¸Ž `status` å­—æ®µâ€”â€”è·¯å¾„ Aï¼ˆledger status æ”¹ 'BLOCKED'ï¼‰ä¸Žè·¯å¾„ Bï¼ˆcontext hash æ¼‚ç§»å‡å€¼ï¼‰éƒ½è®©åŽ†å² SUCCESS åœ¨è¿›å…¥ verifier å‰è¢«éšè—ï¼ŒéšåŽ DELETE å…¶æ¶ˆè´¹çš„ CR-2 è¾“å…¥å³å¯ mint æ–° truthï¼›P0-02ï¼šCanonicalRunSeal æœªæŠŠ context/base/idempotency/run-id/identity-master/status ç­‰ derived truth ä»Ž primitive seal / findings ç‰©ç†æŽ¨å¯¼å›žæ¥â€”â€”å°¤å…¶ status å¯è¢« ledger+manifest åŒæ—¶é‡ç»‘ï¼ˆSUCCESSâ†’BLOCKED æ´—æˆ genuine BLOCKED éšè— continuity ä¾èµ–ï¼›BLOCKEDâ†’SUCCESS åå‘ï¼‰ï¼›P1ï¼šerror_message å¤„äºŽ"çœ‹ä¼¼ correctness å®žåˆ™ä¸æ ¡éªŒ"çš„ä¸­é—´æ€ï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-3.4å¤å®¡ä¸ŽCR-3.5æœ€ç»ˆHistoricalCandidateDiscoveryåŠDerivedRunSealæ”¶å£è¦æ±‚_20260902.md`ï¼Œreopen commit `275fc93`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-023 Amendment E Â§10.1-Â§10.2ï¼‰ï¼šï¼ˆ1ï¼‰**P0-01 Tamper-Resistant Historical Candidate Discovery**ï¼šå€™é€‰å‘çŽ°æŒ‰ primitive request-world fieldsï¼ˆ`requested_domains_hash` + `as_of`ï¼ˆPython ä¾§ `_ledger_as_of` ç²¾ç¡®æ¯”è¾ƒï¼‰+ `canonical_contract_version` + ä¸‰ policy version/hash + `code_fingerprint`ï¼‰ï¼Œä¸ç”¨ `status` é¢„è¿‡æ»¤ã€ä¸æŠŠ stored `canonical_context_hash` å½“ selection keyï¼›æ¯ä¸ªå€™é€‰å…ˆè¿‡ full historical sealï¼ˆÂ§9.1 å…¨éƒ¨æ£€æŸ¥ + derived identity ç‰©ç†é‡ç®— + findings truthâ†’status è¯­ä¹‰é‡ç®—ï¼‰ï¼Œä¹‹åŽæ‰è§£é‡Šå·²éªŒè¯çš„ world/statusï¼šverified SUCCESS ä¸” ledger context == current â†’ continuity ä¾èµ–ï¼›verified genuine BLOCKED â†’ éžä¾èµ–ï¼ˆä¸é˜»å¡ž exact repair/recoveryï¼‰ï¼›verified ä½† context != currentï¼ˆæ—§ bridge policy ä¸–ç•Œï¼‰â†’ è·³è¿‡ã€‚ï¼ˆ2ï¼‰**P0-02 Derived Canonical Run Seal ç‰©ç†é—­çŽ¯**ï¼šæ¨¡å—çº§å•ä¸€æ´¾ç”Ÿå…¬å¼é›†ï¼ˆlive build / replay / historical continuity ä¸‰æ–¹å…±ç”¨ï¼‰ï¼š`_requested_domains_hash_from_list`ï¼ˆsha256 compact JSON of domain listï¼‰/ `_input_hashes_from_entries`ï¼ˆCR-3.4 æ—¢æœ‰ä¸‰ hashï¼‰/ `_master_input_set_hash_from_entries`ï¼ˆPIT-healthy master entriesï¼Œlive åŒå…¬å¼ï¼‰/ `identity_dataset_hash_with_bridge`ï¼ˆ`identity.py` å‚æ•°åŒ–æŠ½å–â€”â€”ç”¨è¯¥ run è‡ªå·±çš„ manifest bridge identity é‡ç®—ï¼Œå½“å‰ä¸–ç•Œå…¥å£å§”æ‰˜ä¹‹ï¼Œå…¬å¼å”¯ä¸€ï¼‰/ `_canonical_context_hash_from_primitives` / `_base_identity_hash_from_primitives` / `_idempotency_key_from_hashes` / `_canonical_run_id_from_idempotency`ï¼ˆUUID5(namespace, key) cross-bindï¼‰/ `_status_error_from_findings`ï¼ˆfindings blocking truth â†’ (status, error)ï¼‰ï¼›`_derived_run_identity_problems(entries, requested_domains, as_of, ledger, manifest)` æŠŠå…¨éƒ¨é‡ç®—ä¸Ž ledger é€å­—æ®µæ¯”å¯¹ï¼Œæ¶ˆè´¹äºŽ `_verify_historical_canonical_seal`ï¼ˆcontinuityï¼‰+ `_verify_closure`ï¼ˆreplayï¼Œä¸Ž expected_provenance/current + typed manifest binding æž„æˆä¸‰æ–¹é—­çŽ¯ï¼‰ï¼›live buildï¼ˆsnapshot å±žæ€§ / `_build_snapshot` / `run()` çŠ¶æ€æ´¾ç”Ÿï¼‰å…¨éƒ¨å§”æ‰˜åŒä¸€ helpersï¼ˆå¤å®¡ Â§3 å…è®¸çš„æœ€å°å¿…è¦æŠ½å–ï¼Œå…¬å¼é€å­—èŠ‚ä¸å˜ï¼‰ã€‚ï¼ˆ3ï¼‰**status semantic seal**ï¼š`_verify_findings_truth(record, manifest)`ï¼ˆreplay + historical å…±ç”¨ï¼‰â€”â€”findings ä¸‰æ–¹ï¼ˆDB rows == findings parquet == finding_set_hash sealï¼›parquet æŒ‰ deterministic URI + content hash + row count éªŒè¯ï¼‰åŽä»Ž blocking truth é‡ç®— status ä¸Ž error text å¹¶**æ¶ˆè´¹** ledger/manifest çš„ status/error_message å­—æ®µï¼›æœªæ¥æ–°å¢ž status å¿…é¡»ç”±æ˜Žç¡® typed transition è§„åˆ™æ‰©å±•ã€‚  
-**Schema**ï¼šé›¶æ–° migrationï¼ˆå¤å®¡ Â§3 å…è®¸"ä»…ç¡®éœ€æŒä¹…åŒ–é¢å¤– primitive request-world field æ—¶"â€”â€”bridge policy identity å·²ç”± manifest æŒä¹…åŒ–ä¸”å‚ä¸Žç‰©ç†é‡ç®—ï¼Œledger ä¾§æ–°å¢žåˆ—ä¸æ”¹å˜ primitive æ¼‚ç§»è¿™ä¸€å·²æŽ¥å—æ®‹ä½™è¾¹ç•Œçš„æœ¬è´¨ï¼›migration é“¾ä¿æŒ 21ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/canonical/canonicalizer.py`ï¼ˆå€™é€‰å‘çŽ°é‡å†™ + derived seal helpers + `_verify_findings_truth` + ä¸‰æ–¹æ¶ˆè´¹ç‚¹ + live å§”æ‰˜ï¼‰ã€`src/ashare_state/canonical/identity.py`ï¼ˆ`identity_dataset_hash_with_bridge` å‚æ•°åŒ–æŠ½å–ï¼‰ã€`tests/integration/test_canonical.py`ï¼ˆ166 é¡¹ = 151 å›žå½’ + 15 æ–°å¢žï¼‰ã€`docs/adr/ADR-023`ï¼ˆAmendment Eï¼‰ã€`docs/adr/ADR-000`ï¼ˆç´¢å¼•ï¼‰  
-**Tests**ï¼š1151/0ï¼ˆ1136 â†’ 1151ï¼Œ+15ï¼šTestHistoricalCandidateDiscovery 6 / TestDerivedRunSeal 9ï¼›å¤å®¡ Â§1.4/Â§2.3 mandatory 15 é¡¹å…¨å¯¹åº” + run-id cross-bind positive controlï¼‰  
-**Verification**ï¼šLocal 1151/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ69 æºæ–‡ä»¶é›¶é”™ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33601822767ï¼ˆimplementation `48982290056cf88e6daafbecb7d8b8a766da6e28`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-02 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`48982290056cf88e6daafbecb7d8b8a766da6e28`ï¼ˆCR-3.5 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260902-072 â€” CR-3.4 Historical Canonical Seal Trust + Verification Replay Symmetry + Manifest Correctness Identity Binding
-
-**Type**ï¼šC3 correctness closureï¼ˆADR-023 Amendment Dï¼›CR-3.3 å¤å®¡ 3 P0 å…¨æ”¶å£ï¼›é›¶æ–° migrationï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-3.3 å¤å®¡ï¼ˆ2026-09-02 10:22 +08:00ï¼ŒReviewed HEAD `b5fdc27b9f2fd9c262c7dc6dae9aa665b9494bc1`ï¼ŒPrimary implementation `f8b80b3212ff299f52ee3fb0308c248fd16c17df`ï¼Œè£å†³ **REOPENED**â€”â€”18 é¡¹æœºåˆ¶ PASS / FREEZEï¼ˆcanonical_context_hash æ–¹å‘ / continuity guard æŒ‰ context æŸ¥åŽ†å² / å…¨éƒ¨ CR-2 ledger drift æ£€æµ‹ / superset åˆæ³• / exact restore replay / verification_problem_hash è¿› seal+state / finding truthfulness / æ²»ç†è®¡æ•°ï¼‰ï¼›P0-01ï¼šcontinuity guard ä¿¡ä»»å¯è¢« rebind çš„åŽ†å² Canonical input listâ€”â€”æ”¹åŽ†å² manifest input listï¼ˆåŽ» Aï¼‰+ rehash + åªæ›´æ–° ledger.manifest_hash + DELETE CR-2 A â†’ A è¢«"æ´—å‡º"continuity evidenceï¼Œå¯ mint æ–° SUCCESS truthï¼›P0-02ï¼šmaterialization-only failure çš„ first-run/replay verification evidence ä¸å¯¹ç§°â€”â€”replay ç¡¬ç¼–ç  `materialization_problems=[]`ï¼Œfirst-run seal å¯å«éžç©º materialization evidenceï¼ˆTOCTOU pathï¼‰ï¼Œexact evidence hash æ— æ³•å¯¹ç§°é‡å»ºï¼Œäº§ç”Ÿè‡ªç›¸çŸ›ç›¾ï¼›P0-03ï¼šmanifest çš„ canonical_context_hash + base_identity_hash + verification_state_hash ä¸‰ correctness identity å­—æ®µå†™å…¥ä½† replay ä¸æ¶ˆè´¹â€”â€”display-only sealï¼Œedit manifest + rehash + update ledger.manifest_hash å¯é€ è‡ªç›¸çŸ›ç›¾ manifestï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-3.3å¤å®¡ä¸ŽCR-3.4æœ€ç»ˆContinuitySealåŠVerificationReplayæ”¶å£è¦æ±‚_20260902.md`ï¼Œreopen commit `33d0901`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-023 Amendment D Â§9.1-Â§9.3ï¼‰ï¼šï¼ˆ1ï¼‰**P0-01 Historical Canonical Run Seal Trust**ï¼štyped `CanonicalRunSeal`ï¼ˆfrozen dataclassï¼Œ`from_ledger`ï¼‰+ `_verify_historical_canonical_seal()`â€”â€”continuity åœ¨ä½¿ç”¨åŽ†å² manifest input list å‰å…ˆéªŒè¯å®Œæ•´åŽ†å² sealï¼šdeterministic manifest URIï¼ˆexpected base + /manifest.jsonï¼‰+ manifest bytes == ledger.manifest_hashï¼›manifest æ˜¾å¼ correctness å­—æ®µï¼ˆcanonical_run_id / contract / as_of / idempotency_key / status / requested domains json+hash / input_set_hash / input_seal_hash / identity_dataset_hash / identity_master_input_set_hash / canonical_context_hash / base_identity_hash / verification_state_hash / ä¸‰ policy version+hash / code_fingerprintï¼‰== ledger sealï¼›**ç‰©ç†é‡ç®—** `_input_hashes_from_entries()`ï¼ˆä¸Ž CanonicalInputSnapshot åŒå…¬å¼ï¼‰ï¼šhistorical input_seal_hashï¼ˆå…¨ seal entries canonical JSONï¼‰/ input_set_hashï¼ˆidentity subsetâ€”â€”`_INPUT_IDENTITY_FIELDS` æ¨¡å—çº§å•ä¸€äº‹å®žæºï¼Œ`InputRunSeal.identity_dict` åŒæºï¼‰/ verification_state_hashï¼ˆrun_id + verification + verification_problem_hash per entryï¼‰ä¸‰è€…å¿…é¡» == ledgerï¼ˆåˆ—è¡¨åˆ é™¤/æ”¹å†™/é‡æŽ’/æ”¹ seal å­—æ®µå‡æ— æ³•é‡ç®—å‡º sealed hashesï¼‰ã€‚prior canonical manifest/ledger è‡ªèº« DAMAGED â†’ HARD DAMAGEDï¼šä¸ç”¨è¯¥ input list åš continuity åˆ¤æ–­ï¼Œé›¶ replacementã€‚ï¼ˆ2ï¼‰**P0-02 Verification Evidence Replay Symmetry**ï¼šfirst consumeï¼ˆ`_snapshot_run`ï¼‰ä¸Ž replayï¼ˆ`_verify_sealed_input` INVALID åˆ†æ”¯ï¼‰**å…±ç”¨åŒä¸€ collector** `_collect_input_verification_evidence(run identity, role, as_of, keep_rows)`ï¼šclosure problems â†’ anchored-evidence problems â†’ï¼ˆclosure+anchor å¥åº·æ—¶ï¼‰exact-byte materialization verify â†’ derived verification enum â†’ canonical problem evidence â†’ problem hashï¼›first-runï¼ˆkeep_rows=Trueï¼‰é¢å¤–ä¿ç•™ç‰©åŒ–è¡Œï¼Œreplayï¼ˆkeep_rows=Falseï¼‰ä¸¢å¼ƒè¡Œä½†è¿è¡ŒåŒä¸€éªŒè¯åºåˆ—/è¯­ä¹‰ï¼›materialization-only failure è¢« replay ç²¾ç¡®é‡å»ºï¼ˆexact repeat â†’ idempotent replay åŒä¸€ BLOCKED runï¼›cause å˜åŒ– â†’ æ–° exact evidence identityï¼›exact repair â†’ recovery runï¼ŒåŽ†å² BLOCKED ä¿ç•™ï¼‰ï¼›typed `InputVerificationEvidence` frozen dataclass å°è£… collector è¾“å‡ºã€‚ï¼ˆ3ï¼‰**P0-03 Manifest Correctness Identity å…¨æ¶ˆè´¹**ï¼šcanonical_context_hash / base_identity_hash / verification_state_hash è¿›å…¥ `_verify_closure` çš„ typed manifest bindingï¼ˆmanifest == ledger == current recompute ä¸‰æ–¹é—­çŽ¯â€”â€”expected_provenance è¯ ledger==currentï¼Œmanifest binding è¯ manifest==ledgerï¼‰ï¼›continuity åŽ†å² seal expected_fields åŒæ ·æ¶ˆè´¹ä¸‰å­—æ®µã€‚  
-**Schema**ï¼šé›¶æ–° migrationï¼ˆå¤å®¡ Â§4 ä¼˜å…ˆä¸æ–°å¢ž schemaâ€”â€”ä¸‰æ”¶å£å…¨éƒ¨ä¸º canonicalizer runtime ä¾§ï¼Œ020/021 å·²æœ‰å…¨éƒ¨æ‰€éœ€åˆ—ï¼›migration é“¾ä¿æŒ 21ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/canonical/canonicalizer.py`ï¼ˆhistorical seal verify + shared evidence collector + manifest identity binding + `_INPUT_IDENTITY_FIELDS` æå–ï¼‰ã€`src/ashare_state/canonical/__init__.py`ï¼ˆå¯¼å‡º CanonicalRunSeal / InputVerificationEvidenceï¼‰ã€`tests/integration/test_canonical.py`ï¼ˆ151 é¡¹ = 131 å›žå½’ + 20 æ–°å¢žï¼‰ã€`docs/adr/ADR-023`ï¼ˆAmendment Dï¼‰ã€`docs/adr/ADR-000`ï¼ˆç´¢å¼•ï¼‰  
-**Tests**ï¼š1136/0ï¼ˆ1116 â†’ 1136ï¼Œ+20ï¼šTestHistoricalCanonicalSealTrust 9 / TestMaterializationEvidenceSymmetry 4 / TestManifestCorrectnessIdentityBinding 7ï¼›å¤å®¡ Â§1.3/Â§2.3/Â§3 mandatory 13 é¡¹å…¨å¯¹åº” + positive controlsï¼‰  
-**Verification**ï¼šLocal 1136/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33591527697ï¼ˆimplementation `fce2ca43a35b95d61dc390647fdc46d844d9b1a5`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-02 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`fce2ca43a35b95d61dc390647fdc46d844d9b1a5`ï¼ˆCR-3.4 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260902-071 â€” CR-3.3 Historical Input Continuity + Verification Evidence Exactness + Finding Truthfulness
-
-**Type**ï¼šC3 correctness closureï¼ˆADR-023 Amendment Cï¼›CR-3.2 å¤å®¡ 2 P0 + 3 P1 å…¨æ”¶å£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-3.2 å¤å®¡ï¼ˆ2026-09-02 06:56 +08:00ï¼ŒReviewed HEAD `9ffdf35f577e48ec4de1432057d954da07f78db0`ï¼ŒPrimary implementation `df409ede0ddb25ce5cee12a46fa66fe7a3ea093f`ï¼Œè£å†³ **REOPENED**â€”â€”16 é¡¹æœºåˆ¶ PASS / FREEZEï¼›P0-01ï¼šCR-2 ledger è¾“å…¥æ¶ˆå¤± / status æˆ– seal identity æ¼‚ç§»æ”¹å˜ current base identity ç»•è¿‡ prior SUCCESS degradation guardï¼ˆå¯èƒ½ mint æ–° BLOCKED ç”šè‡³æ–° SUCCESS truthï¼‰ï¼›P0-02ï¼šverification_state_hash åªå° verification æžšä¸¾ä¸å°å…·ä½“ problem evidenceâ€”â€”åŒé”™è¯¯å¤§ç±»å†… cause å˜åŒ–ï¼ˆanchor missing â†’ anchor hash mismatchï¼‰replay stale BLOCKED findingï¼›P1-01ï¼šsource-scope finding canonical_domain="source" éžçœŸå®ž domainï¼›P1-02ï¼šdamaged source è¿½åŠ è¯¯å¯¼æ€§ UNAVAILABLE_AT_ASOFï¼›P1-03ï¼šæ²»ç†æ–‡æ¡£ InputRunSeal "19 fields" å®žé™… 20ï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-3.2å¤å®¡ä¸ŽCR-3.3æœ€ç»ˆHistoricalInputContinuityåŠVerificationEvidenceæ”¶å£è¦æ±‚_20260902.md`ï¼Œreopen commit `9ec2fca`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-023 Amendment C Â§8.1-Â§8.3ï¼‰ï¼šï¼ˆ1ï¼‰**P0-01 Historical Input Continuity Guard**ï¼šmigration 021 `canonical_context_hash`ï¼ˆrequested domain set + as_of + contract + ä¸‰ policy identities + identity bridge policy identity + canonical code fingerprintâ€”â€”åˆ»æ„ä¸å« current CR-2 input set / verification stateï¼‰ï¼›`_check_historical_continuity`ï¼šæŸ¥åŒ context å…¨éƒ¨åŽ†å²éž BLOCKED runï¼Œå¯¹æ¯ä¸ª prior çš„ sealed input set é€ run æ£€æŸ¥ï¼ˆledger å­˜åœ¨æ€§ / ledger identity == prior sealed identityï¼ˆstatus + å…¨éƒ¨ seal å­—æ®µï¼‰/ physical + anchored verification ä»å¥åº· / å¥åº·çš„ prior input å¿…åœ¨ current snapshot discoveryï¼‰ï¼›disappearance / drift / degradation â†’ DAMAGEDï¼ˆä¸ mint ä»»ä½• replacementï¼‰ï¼›åˆæ³•æ–°å¢žï¼ˆprior inputs å…¨éƒ¨å®Œæ•´ + current supersetï¼‰â†’ æ­£å¸¸æ–° runï¼›exact restoration â†’ åŽ†å² SUCCESS exact replayï¼›identity master åŒè§„åˆ™ã€‚ï¼ˆ2ï¼‰**P0-02 Verification Evidence Exactness**ï¼š`InputRunSeal.verification_problem_hash`ï¼ˆcanonical sorted problem evidenceï¼šrun_id + verification class + closure problems + anchored-evidence problems + materialization problemsï¼‰ï¼›base identity ä¸å«ï¼ˆidentity_dict æŽ’é™¤ï¼‰ï¼›verification stateï¼ˆrun_id + class + problem hashï¼‰/ manifest input seal / input_seal_hash å‡å«ï¼›åŒ INVALID class + ä¸åŒ cause â†’ æ–° BLOCKED evidence runï¼ˆprior BLOCKED ä¿ç•™ append-onlyï¼Œfinding detail åæ˜ çœŸå®žå½“å‰ causeï¼‰ï¼›exact same failure â†’ idempotent replayï¼›INVALID â†’ HEALTHY â†’ recovery runï¼›replay sealed-input éªŒè¯åˆ†æµï¼ˆHEALTHY è¦æ±‚ä»å¥åº·ï¼›INVALID è¦æ±‚å½“å‰ problem evidence == sealed problem hashï¼‰ã€‚ï¼ˆ3ï¼‰**P1-01**ï¼šsource-scope findings ç”¨ reserved scope `input:<normalization_surface>` + detail seal `affected_domains` exact setï¼ˆshared surface åŒåŸŸï¼‰ã€‚ï¼ˆ4ï¼‰**P1-02**ï¼šfinding precedence ä¸‰åˆ†æ”¯ï¼ˆno discovered â†’ MISSINGï¼›discovered but damaged â†’ ä»… closure/evidence findingï¼›healthy but all future â†’ UNAVAILABLEï¼‰ã€‚ï¼ˆ5ï¼‰**P1-03**ï¼šseal count correction 19â†’20â†’21ï¼ˆidentity_dict 17ï¼‰ï¼›æµ‹è¯•æœºæ¢°æ–­è¨€ exact setã€‚  
-**Schema**ï¼šmigration 021ï¼ˆcanonical_context_hash åˆ—ï¼›æœªæ”¹ 018/019/020ï¼›21 é“¾ from-zero + 020â†’021 upgrade + idempotent + tamper probe 022ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/canonical/canonicalizer.py`ï¼ˆcontinuity guard + problem hash + finding scope/precedence + replay åˆ†æµï¼‰ã€`migrations/021_canonical_context_hash.sql`ã€`tests/integration/test_canonical.py`ï¼ˆ131 é¡¹ = 111 å›žå½’ + 20 æ–°å¢žï¼‰ã€`tests/integration/test_migrations.py`ï¼ˆ21 é“¾ï¼‰ã€`docs/adr/ADR-023`ï¼ˆAmendment Cï¼‰ã€`docs/adr/ADR-000`ï¼ˆç´¢å¼•ï¼‰  
-**Tests**ï¼š1116/0ï¼ˆ1096 â†’ 1116ï¼Œ+20ï¼šTestHistoricalInputContinuity 11 / TestVerificationEvidenceState 4 / TestFindingTruthfulness 4 / TestSealFieldCountCorrection 1ï¼‰  
-**Verification**ï¼šLocal 1116/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ69 æºæ–‡ä»¶é›¶é”™ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33581493160ï¼ˆimplementation `f8b80b3212ff299f52ee3fb0308c248fd16c17df`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-02 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`f8b80b3212ff299f52ee3fb0308c248fd16c17df`ï¼ˆCR-3.3 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260901-070 â€” CR-3.2 Transactional Snapshot + Identity Master PIT + Honest Policy Execution + Full Seal + Verification-State Transition
-
-**Type**ï¼šC3 correctness closureï¼ˆADR-023 Amendment Bï¼›CR-3.1 å¤å®¡ 5 P0 + 3 P1 å…¨æ”¶å£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-3.1 å¤å®¡ï¼ˆ2026-09-01 21:08 +08:00ï¼ŒReviewed HEAD `bd3bcad6aa3e55580cfd03943c4c52f3a31efd0a`ï¼ŒPrimary implementation `75744aaa89487aae09474b3569519a73f0efba24`ï¼Œè£å†³ **REOPENED**â€”â€”19 é¡¹æœºåˆ¶ PASS / FREEZEï¼›P0ï¼šsnapshot æ— çœŸå®ž DB transaction boundaryï¼ˆå¤šæ¬¡ç‹¬ç«‹ SELECTï¼Œrace ä¸‹æ··å…¥å¤šæ—¶åˆ»ä¸–ç•Œï¼‰+ éªŒè¯åŽ `_read_output_rows` é‡è¯»å½“å‰ DB/pathï¼ˆTOCTOUï¼šidentity seal=S1 ä½† consumed rows=S2ï¼‰+ frozen éžæ·±å±‚ immutable / identity master æ—  PIT è¿‡æ»¤ä¸Ž anchor éªŒè¯ï¼ˆfuture leakage + first/replay ä¸å¯¹ç§°â€”â€”åˆšåˆ›å»ºçš„ SUCCESS æ— æ³•é€šè¿‡è‡ªå·±çš„ replay verifierï¼‰/ policy hash å…¨å­—æ®µä½† runtime æœªè¯šå®žæ¶ˆè´¹ï¼ˆrequired_evidence_class ç­‰å…­å­—æ®µå£°æ˜Žä¸Žæ‰§è¡Œè„±èŠ‚ï¼‰/ manifest æ˜¾å¼ provenance å­—æ®µï¼ˆidentity_master_input_set_hash / bridge policy version+hash / required_evidence_classesï¼‰å†™å…¥ä½† replay ä¸æ¶ˆè´¹ + input entry æœªå°å®Œæ•´ CR-2 sealï¼ˆcontract version / mapper code hash / output set / semantic hash / status ç¼ºå¤±ï¼‰+ manifest_uri æœª deterministic verify / verification state ä¸å‚ä¸Ž replay çŠ¶æ€è½¬æ¢ï¼ˆä¸Šæ¸¸ä¿®å¤åŽæ°¸ä¹… replay æ—§ BLOCKEDï¼›SUCCESS é€€åŒ–éœ€ fail closedï¼‰ï¼›P1ï¼šdeep immutability / shared surface åŽ»é‡ / domains=[] truthinessï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-3.1å¤å®¡ä¸ŽCR-3.2æœ€ç»ˆTransactionalSnapshotåŠPolicyExecutionæ”¶å£è¦æ±‚_20260901.md`ï¼Œreopen commit `a3f181a`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-023 Amendment B Â§7.1-Â§7.5ï¼‰ï¼šï¼ˆ1ï¼‰**P0-01 Transactional Materialized Snapshot**ï¼š`_build_snapshot` ç”¨ `BEGIN TRANSACTION`ï¼ˆMVCC boundaryâ€”â€”ç¬¬ä¸€ä¸ª authoritative broad SELECT ä¹‹å‰ï¼‰åŒ…è£¹å…¨éƒ¨å‘çŽ°ï¼›surface åŽ»é‡ï¼ˆ`_surface_plan`ï¼šåŒä¸€ surface union datasets ä¸€æ¬¡æŸ¥è¯¢ï¼Œå¤š domain å…±äº«ä¸é‡å¤å‘çŽ°ï¼‰ï¼›é€ run closure+anchor verify åŽ**ç‰©åŒ– exact sealed bytes**ï¼ˆ`_materialize_outputs`ï¼šè¯» bytes â†’ hash == manifest content_hash â†’ parse åŒä¸€ä»½ bytes â†’ æ·±å†»ç»“è¡Œä¸º tuple of sorted item-tuplesï¼‰ï¼›candidate builder åªæ¶ˆè´¹ `SnapshotRun.outputs`ï¼ˆç»ä¸é‡æŸ¥å½“å‰ ledger path / é‡è¯»å½“å‰æ–‡ä»¶ï¼‰ï¼›æ·±ä¸å¯å˜ typed recordsï¼ˆ`InputRunSeal` / `SnapshotRun` / `MaterializedOutput` / `CanonicalFinding` frozen dataclassesï¼‰ï¼›race æµ‹è¯•ç”¨ç¬¬äºŒ connection åœ¨ broad reads ä¹‹é—´çœŸå®ž commitï¼ˆfile-backed DuckDB MVCCï¼‰ã€‚ï¼ˆ2ï¼‰**P0-02 Identity Master PIT**ï¼šmaster ä¸Ž source åŒè§„åˆ™â€”â€”`_verify_anchored_availability` + `received_at <= as_of` æ‰è¿› IdentityBridgeï¼ˆ`available_master_rows`ï¼‰ï¼›future master ç•™ discovery evidenceï¼ˆinput seal `pit_available=false`ï¼‰ï¼›typed findings `IDENTITY_DATASET_MISSING` / `IDENTITY_DATASET_UNAVAILABLE_AT_ASOF` / `IDENTITY_EVIDENCE_INVALID`ï¼›first/replay å¯¹ç§°ï¼›`identity_master_input_set_hash` = available masters setã€‚ï¼ˆ3ï¼‰**P0-03 Honest Policy Execution**ï¼š`_assert_policy_honestly_executed` æ‰©å±•ä¸º supported-value guardï¼ˆrequired_evidence_class==PROVIDER_NORMALIZED_VERIFIED / reconciliation==SINGLE_SOURCE_EXACT / tolerance exact-v1@1 / conflict_action==BLOCK / fallback ç©º / partial Falseâ€”â€”ä»»ä½•ä¸æ”¯æŒå€¼åœ¨ canonical run ä¹‹å‰ raiseï¼‰ã€‚ï¼ˆ4ï¼‰**P0-04 Full Seal**ï¼š`InputRunSeal` typed full CR-2 sealï¼ˆ19 å­—æ®µå« contract version / mapper identity+code hash / manifest uri+hash / output_set+semantic hash / status / raw identity / verification / received_at / pit_availableï¼‰ï¼›`input_seal_hash` ä¸‰æ–¹ï¼ˆsnapshot == manifest == ledgerï¼‰ï¼›manifest æ˜¾å¼ provenance å…¨æ¶ˆè´¹ï¼ˆidentity_master_input_set_hash / bridge policy version+hash / required_evidence_classes == current policyï¼‰ï¼›manifest_uri deterministic verifyï¼›replay sealed-input éªŒè¯ seal-basedï¼ˆ`_verify_sealed_input`ï¼šç”¨ seal å­—æ®µç›´æŽ¥éªŒ filesâ€”â€”manifest bytes / outputs content+schema+row_count / CR-2 manifest è‡ªèº« sealå­—æ®µ == typed seal / raw meta + anchorâ€”â€”ä¸ä¾èµ– current DB rowï¼‰ã€‚ï¼ˆ5ï¼‰**P0-05 Verification-State Transition**ï¼šrun identity = base identityï¼ˆ`base_identity_hash`ï¼šrequested set + identity seal entries + identity hash + as_of + contract + policies + fingerprintâ€”â€”**ä¸å« state**ï¼‰+ `verification_state_hash`ï¼ˆæ¯ discovered run verification outcomeï¼‰ï¼›degraded-SUCCESS guardï¼ˆåŒ base å­˜åœ¨éž BLOCKED åŽ†å² + å½“å‰ state damaged â†’ DAMAGED raiseï¼Œä¸ mint replacementï¼‰ï¼›BLOCKED å¯æ¢å¤ + exact repair â†’ state hash å˜ â†’ æ–° deterministic run idï¼ˆrecovery runï¼›åŽ†å² BLOCKED è¯æ® append-only ä¿ç•™ï¼‰ï¼›`input_set_hash` åªå« identity å­—æ®µï¼ˆ`InputRunSeal.identity_dict()`â€”â€”state å­—æ®µç»ä¸è¿› base identityï¼‰ã€‚ï¼ˆ6ï¼‰**P1**ï¼šæ·±ä¸å¯å˜ï¼›surface åŽ»é‡ï¼›`domains=[]` æ˜¾å¼ rejectã€‚  
-**Schema**ï¼šmigration 020ï¼ˆbase_identity_hash / verification_state_hash / input_seal_hash / identity_master_input_set_hash å››åˆ—ï¼›æœªæ”¹ 018/019ï¼›20 é“¾ from-zero + 019â†’020 upgrade + idempotent + tamper probe 021ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/canonical/canonicalizer.py`ï¼ˆtransactional snapshot + materialization + typed records + state transition + full seal é‡æž„ï¼‰ã€`migrations/020_canonical_full_seal.sql`ã€`tests/integration/test_canonical.py`ï¼ˆ111 é¡¹ = 81 å›žå½’ + 30 æ–°å¢žï¼‰ã€`tests/integration/test_migrations.py`ï¼ˆ20 é“¾ï¼‰ã€`docs/adr/ADR-023`ï¼ˆAmendment Bï¼‰ã€`docs/adr/ADR-000`ï¼ˆç´¢å¼•ï¼‰  
-**Tests**ï¼š1096/0ï¼ˆ1066 â†’ 1096ï¼Œ+30ï¼šTestTransactionalSnapshot 6 / TestIdentityMasterPIT 6 / TestHonestPolicyExecution 8 / TestFullSealConsumption 7 / TestVerificationStateTransition 3ï¼‰  
-**Verification**ï¼šLocal 1096/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ69 æºæ–‡ä»¶é›¶é”™ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33521594830ï¼ˆimplementation `df409ede0ddb25ce5cee12a46fa66fe7a3ea093f`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-01 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`df409ede0ddb25ce5cee12a46fa66fe7a3ea093f`ï¼ˆCR-3.2 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260901-069 â€” CR-3.1 Canonical Input Snapshot + Anchored Availability Evidence + Full Replay Seal + Recoverable Commit
-
-**Type**ï¼šC3 correctness closureï¼ˆADR-023 Amendment Aï¼›CR-3 å¤å®¡ 8 P0 + 3 P1 å…¨æ”¶å£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-3 å¤å®¡ï¼ˆ2026-09-01 19:06 +08:00ï¼ŒReviewed HEAD `e1c6bb2236a1b0eac06ee214b7cf64cf4fe13f79`ï¼ŒPrimary implementation `ae5b76c998196f936ae6430408d2a016a35aec0d`ï¼Œè£å†³ **REOPENED**â€”â€”ä¸»ä½“æž¶æž„ PASS / FREEZEï¼ˆ18 é¡¹å†»ç»“æ¸…å•ï¼‰ï¼›P0ï¼šrequested domain set æœªè¿› identity / future-only å¯ false SUCCESS / æ—  authoritative snapshotï¼ˆread-raceï¼‰/ received_at æœªéªŒ anchorï¼ˆPIT trust-rootï¼‰/ identity policy hash å£å¾„ä¸ä¸€è‡´ / policy hash æ¼å­—æ®µ / replay full seal æœªæ¶ˆè´¹ / findings wall-clock ä¸å¯æ¢å¤ï¼›P1ï¼šidentity finding åŸŸé”™æ ‡ / domain è®¡æ•° 12â†’13 / naive datetimeï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-3å¤å®¡ä¸ŽCR-3.1æœ€ç»ˆCanonicalInputSnapshotåŠReplaySealæ”¶å£è¦æ±‚_20260901.md`ï¼Œreopen commit `f720447`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-023 Amendment A Â§6.1-Â§6.8 + P1ï¼‰ï¼šï¼ˆ1ï¼‰**P0-01 RequestedDomainSet identity**ï¼šè¯·æ±‚åŸŸåŽ»é‡æŽ’åº exact set + canonical hash è¿› run identityï¼›migration 019 `requested_domains_json/hash`ï¼›manifest æ˜¾å¼ç»‘å®šï¼›replay domains æ¥è‡ª ledger sealï¼›ä¸åŒ set ä¸åŒ run / åŒ set å¼‚åºåŒ run / é‡å¤åŸŸåŽ»é‡ã€‚ï¼ˆ2ï¼‰**P0-02 availability completeness**ï¼šæ—  eligible verified run â†’ `REQUIRED_DOMAIN_MISSING`ï¼›æœ‰ eligible ä½†é›¶ PIT-available â†’ `REQUIRED_DOMAIN_UNAVAILABLE_AT_ASOF`ï¼ˆå‡ blockingï¼‰ï¼›EXCLUDED_FUTURE decisions ç•™è¯ï¼›future-only æ°¸ä¸ SUCCESSï¼›æ–°å¢ž future run ä¸æ”¹æ—©æœŸ selected çœŸå€¼ï¼ˆä»… input identity å˜åŒ–ï¼‰ã€‚ï¼ˆ3ï¼‰**P0-03 CanonicalInputSnapshot**ï¼štyped immutable dataclass ä¸€æ¬¡æ€§è§£æžï¼ˆrequested set + discovered source/master run exact set + closure/anchor éªŒè¯ç»“æžœ + policy identities + fingerprintï¼‰ï¼›run identity/candidates/manifest/ledger å…¨éƒ¨æ´¾ç”Ÿè‡ª snapshotï¼ˆæ— é‡å¤ broad queryï¼‰ï¼›**discovered set å«éªŒè¯å¤±è´¥ run**ï¼ˆblocking prefinding è¯šå®žè®°å½•ï¼›post-success tamper è¡¨çŽ°ä¸º DAMAGED replay è€Œéžæ–° identityï¼‰ï¼›mid-run æ’å…¥ä»…ä¸‹ä¸€æ¬¡ invocation å¯è§ï¼›æµ‹è¯•ç» `_build_snapshot` monkeypatch æ³¨å…¥ raceï¼ˆproduction æ—  hookï¼‰ã€‚ï¼ˆ4ï¼‰**P0-04 AnchoredAvailabilityEvidence**ï¼šè¯» received_at å‰è¯æ˜Ž raw meta exact-byte SHA-256 == run sealed raw_evidence_hash == anchor.evidence_hash + cross-bind provider/dataset/request/uri/endpoint/surface/operation_idï¼ˆä¸‰æ–¹ï¼‰ï¼›å¤±è´¥ â†’ `AVAILABILITY_EVIDENCE_INVALID` blockingï¼›replay å¯¹ sealed source runs é‡éªŒã€‚ï¼ˆ5ï¼‰**P0-05 identity binding ç»Ÿä¸€**ï¼š`identity_dataset_hash = hash(master_input_set_hash, bridge_policy_version, bridge_policy_hash)` å”¯ä¸€å£å¾„è¿› identity/manifest/ledgerï¼›bridge policy å˜æ›´æ–° runï¼›ä¸‰æ–¹æ¯”å¯¹ã€‚ï¼ˆ6ï¼‰**P0-06 policy hash å…¨å­—æ®µ**ï¼šasdict + sorted canonical JSONï¼›runtime è¯šå®žæ¶ˆè´¹ï¼ˆfallback/partial å£°æ˜Žæ— æ”¯æŒ â†’ raiseï¼›identity_missing_max per-domain vs é˜ˆå€¼ï¼›required_evidence_classes è¿› manifestï¼‰ã€‚ï¼ˆ7ï¼‰**P0-07 full replay seal**ï¼šCURRENT snapshot == ledger == manifest == physical recomputeï¼ˆselected_semantic_hash/decision_set_hash/finding_set_hash/artifact exact set/deterministic URI/schema recompute/row_count/findings parquetâ†”DB exact-setï¼‰+ CR-2 source closure + anchor re-verifyï¼›rebind çŸ©é˜µå…¨æ‹¦æˆªã€‚ï¼ˆ8ï¼‰**P0-08 recoverable commit**ï¼šfindings.parquet æ—  wall-clockï¼ˆuuid5 idï¼›created_at ä»… DB audit metadata æŽ’é™¤å‡º semantic hashï¼‰ï¼›DB æ³¨å…¥å¤±è´¥ â†’ exact retry byte-identical no-op â†’ ledger è¡¥æäº¤ï¼ˆBLOCKED-with-findings çƒ­è·¯å¾„æµ‹è¯•ï¼‰ã€‚ï¼ˆ9ï¼‰**P1**ï¼šidentity finding çœŸå®ž domainï¼›matrix è®¡æ•°æ›´æ­£ 13ï¼ˆ5/2/6ï¼ŒADR-023 Â§2.4 åŽŸæ–‡ 12/5 è¿½åŠ æ›´æ­£ä¿ç•™åŽ†å²ï¼‰ï¼›naive datetime æ‹’ç» + naive string å›ºå®š UTC è§„åˆ™ã€‚  
-**Schema**ï¼šmigration 019ï¼ˆrequested_domains_json/hash + selected_semantic_hash + decision_set_hash å››åˆ—ï¼›æœªæ”¹ 018ï¼›19 é“¾ from-zero + 018â†’019 upgrade + idempotent + tamper probe 020ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/canonical/canonicalizer.py`ï¼ˆCanonicalInputSnapshot + anchored evidence + full seal + recoverable commit é‡æž„ï¼‰ã€`identity.py`ï¼ˆidentity_bridge_policy_version/hash + identity_dataset_hash ç»Ÿä¸€å£å¾„ + master_input_set_hash æž„é€ ï¼‰ã€`source_policy.py`ï¼ˆå…¨å­—æ®µ canonical hash + tolerance canonical JSONï¼‰ã€`migrations/019_canonical_replay_seal.sql`ã€`tests/integration/test_canonical.py`ï¼ˆ81 é¡¹ = 40 å›žå½’ + 41 æ–°å¢žï¼‰ã€`tests/integration/test_migrations.py`ï¼ˆ19 é“¾ï¼‰ã€`docs/adr/ADR-023`ï¼ˆAmendment A + Â§2.4 è®¡æ•°æ›´æ­£ï¼‰ã€`docs/adr/ADR-000`ï¼ˆç´¢å¼•ï¼‰  
-**Tests**ï¼š1066/0ï¼ˆ1025 â†’ 1066ï¼Œ+41ï¼šTestRequestedDomainIdentity 6 / TestAvailabilityCompleteness 3 / TestInputSnapshot 3 / TestAnchoredAvailabilityEvidence 6 / TestIdentityPolicyBinding 4 / TestPolicyHashCompleteness 6 / TestFullReplaySeal 7 / TestRecoverableCommit 2 / TestP1Corrections 4ï¼‰  
-**Verification**ï¼šLocal 1066/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ69 æºæ–‡ä»¶é›¶é”™ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33508307611ï¼ˆimplementation `75744aaa89487aae09474b3569519a73f0efba24`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-01 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`75744aaa89487aae09474b3569519a73f0efba24`ï¼ˆCR-3.1 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260901-068 â€” CR-3 AvailabilityPolicy + Canonicalizer Runtimeï¼ˆå« ADR-022 ACCEPTED æ²»ç†åŒæ­¥ + CR-2.4 P1 guard åŠ å›ºï¼‰
-
-**Type**ï¼šC3 æ­£å¼æ‰¹æ¬¡ï¼ˆADR-023 PROPOSEDï¼›CR-3 runtime å…¨é‡äº¤ä»˜ï¼‰+ æ²»ç†çœŸç›¸åŒæ­¥ï¼ˆReviewer æœ€ç»ˆè£å†³ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-2.4 æœ€ç»ˆå¤å®¡ï¼ˆ2026-09-01 17:06 +08:00ï¼ŒReviewed HEAD `0b4ef7a1c91c896054501853adf40324ba3687fc`ï¼Œè£å†³ **CR-2 / CR-2.1 / CR-2.2 / CR-2.3 / CR-2.4 å…¨é“¾ VERIFIED / CLOSED / FREEZEï¼›ADR-022 REVIEWER ACCEPTEDï¼›CR-3 START / ACTIVE NEXTï¼›CR-4 BLOCKED_BY_CR-3**ï¼›P1 éžé˜»å¡žï¼šRawWriter AST guard alias-tracking åŠ å¼ºäºŽ CR-3 é¦–æ‰¹å®Œæˆï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-2.4æœ€ç»ˆå¤å®¡ç»“è®ºä¸ŽCR-3_AvailabilityPolicy_Canonicalizerå¼€å‘å·¥ä½œè¦æ±‚_20260901.md`ï¼Œclosure commit `cfa5940`ï¼‰ã€‚  
-**Governance Syncï¼ˆå·¥ä½œè¦æ±‚ Â§10ï¼Œæœ¬æ‰¹å®Œæˆï¼‰**ï¼šADR-022 Status â†’ **ACCEPTED**ï¼ˆæ­£æ–‡å¤´éƒ¨ + Reviewer è£å†³å¼•æ–‡ï¼‰ï¼›ADR-000 index ADR-022 â†’ ACCEPTED + VERIFIED 2026-09-01ï¼›ADR-023 æ–°å»ºï¼ˆPROPOSEDï¼‰ï¼›DEVLOG è¿½åŠ  Reviewer closure + æœ¬æ‰¹æ¡ç›®ï¼›æ€»å†Œå¤´éƒ¨ / Â§40 / Â§41 / Â§44 / Â§61 åŒæ­¥ï¼›CR-2.4 P1 AST guard æŠ€æœ¯å€ºç™»è®°å¹¶**æœ¬æ‰¹é—­çŽ¯**ã€‚  
-**New Contract**ï¼ˆADR-023 Â§2ï¼‰ï¼šï¼ˆ1ï¼‰**P0-01/02 å”¯ä¸€è¾“å…¥ + eligibility**ï¼š`CanonicalRunner.run(as_of, domains=...)` å”¯ä¸€æ­£å¼è¾¹ç•Œï¼›è¾“å…¥ä»… CR-2 verified Provider-Normalizedï¼ˆSUCCESS onlyï¼›PARTIAL é»˜è®¤ NOT eligibleâ€”â€”v1 å…¨éƒ¨ domain partial_run_allowed=Falseï¼›BLOCKED NEVERï¼‰ï¼›æ¶ˆè´¹å‰é€ run `verify_normalized_run`ï¼ˆnormalization/runner.py æ–°å…¬å¼€åªè¯» closure verifierï¼šmanifest bytes / output content+schema+row_count / quarantine exact set / typed seal vs current provenanceï¼‰â€”â€”problem â†’ CLOSURE_VERIFICATION_FAILED blockingã€‚ï¼ˆ2ï¼‰**P0-03/04 AvailabilityPolicy**ï¼šavailable_at å”¯ä¸€ basis = OBSERVED_AT_INGESTï¼ˆraw envelope received_atâ€”â€”PIT ä¿å®ˆï¼‰ï¼›typed å››åˆ†ç±»ä¸­ä»… OBSERVED_AT_INGEST æ³¨å†Œï¼›as_of è¿‡æ»¤åœ¨ selection ä¹‹å‰ï¼ˆEXCLUDED_FUTURE decision ç•™è¯ï¼‰ï¼›policy ç‰ˆæœ¬ availability-v1 + hash è¿› run identityã€‚ï¼ˆ3ï¼‰**P0-05/06 Identity fail closed**ï¼šIdentityBridge ä»Ž CR-2 verified security_masterï¼ˆcode_list/hist_code_list/stock_basic ä¸‰ dataset å…¨é›†ï¼‰ç» ADR-002 resolve_security_identity æž„å»ºï¼›exchange å½’å±žä»…æ¥è‡ª provider market åŽç¼€ï¼›è£¸ç å”¯ä¸€å¸‚åœºåŒ¹é…ï¼ˆæ­§ä¹‰ fail closedï¼‰ï¼›PIT relistï¼ˆlist_date <= trade_date æœ€æ–°ï¼‰ï¼›missing/ambiguous â†’ IDENTITY_MISSING blockingï¼ˆidentity_missing_max=0ï¼‰+ è¡ŒæŽ’é™¤ï¼›natural keys é™æ€ typedï¼›Domain eligibility matrix 12 é¡¹æ˜¾å¼ï¼ˆ5 CANONICAL_SUPPORTED / 2 AUXILIARY_ONLYï¼šsecurity_master identity dataset + ca_projection STATUS_FLAG_PROJECTION tier / 5 BLOCKED_PENDING_SEMANTICSï¼šcorporate_action directã€index_dailyã€industry_memberã€equity_structureã€bj_code_mappingã€industry_taxonomy_definitionï¼‰ï¼›éž SUPPORTED domain è°ƒç”¨å³ raiseã€‚ï¼ˆ4ï¼‰**P0-07..09 SourcePolicy é™æ€ç‰ˆæœ¬åŒ–**ï¼šCanonicalSourcePolicy registryï¼ˆsource-policy-v1ï¼›priority/fallback ç©º/partial False/SINGLE_SOURCE_EXACT/exact-v1/conflict BLOCK/identity_missing_max 0ï¼‰ï¼›caller é›¶æ³¨å…¥é¢ï¼›ä¸å¯ç”¨é¦–é€‰ â†’ REQUIRED_DOMAIN_MISSING blockingï¼›åŒ key EXACT æ¯”è¾ƒâ€”â€”ç­‰å€¼ EQUIVALENT_MERGED decision + deterministic winnerï¼ˆ(priority, manifest hash, ordinal)ï¼‰ï¼Œä¸ç­‰å€¼ SOURCE_CONFLICT blockingï¼ŒåŒ output é‡å¤ key DUPLICATE_CANONICAL_KEY blockingï¼ˆæ—  last-write-wins / keep-first / silent dedupeï¼‰ã€‚ï¼ˆ5ï¼‰**P0-10 lineage**ï¼šcanonical row ç»‘å®š 12+ å­—æ®µï¼ˆsource run/output/row ordinal + row identity hash/raw request/evidence hash/mapper identity/policy versions/availability basisï¼‰ã€‚ï¼ˆ6ï¼‰**P0-12 æ— ç¡¬ç¼–ç åˆ¶åº¦äº‹å®ž**ï¼šAST guardã€‚ï¼ˆ7ï¼‰**P0-13..15 artifacts + identity + çŠ¶æ€æœº**ï¼šcanonical/contract/as_of/run å¸ƒå±€ï¼ˆselected/decisions/findings parquet + manifest LAST æ— å¢™é’Ÿ immutableï¼‰ï¼›manifest å° input run exact set + input_set_hash + identity_dataset_hashï¼ˆbridge dataset + policyï¼‰+ ä¸‰ policy version/hash + canonicalizer code fingerprintï¼ˆäº”æ¨¡å—æºç  SHA-256 è¡Œå°¾å½’ä¸€ï¼‰+ artifact seals + selected_semantic_hash + finding_set_hashï¼›run identity = uuid5(sha256(input_set + identity_hash + as_of + contract + ä¸‰ policy identity + fingerprint))â€”â€”åŽ†å² exact replayï¼ˆä¸‰æ–¹ seal closure å¤éªŒï¼›ç¯¡æ”¹ fail closedï¼‰ï¼›migration 018 ledger å•äº‹åŠ¡ï¼ˆdup æ£€æŸ¥ + finding è¡Œæ•°æ–­è¨€ï¼‰ï¼›SUCCESS/BLOCKED çŠ¶æ€æœºï¼ˆPARTIAL ä»… policy å…è®¸ï¼‰ã€‚ï¼ˆ8ï¼‰**P1 guard åŠ å›º**ï¼š`_scan_unanchored_writes` å‡çº§â€”â€”alias èµ‹å€¼ï¼ˆ`rw = RawWriter(...); rw.write(...)`ï¼‰ä¸Žç›´æŽ¥æž„é€ è°ƒç”¨ï¼ˆ`RawWriter(...).write(...)`ï¼‰åŒå½¢æ€è·Ÿè¸ªï¼›æž„é€ ç™½åå• = raw_writer.py / raw_anchor.py + normalization/runner.pyï¼ˆread-only reader æ—  write è±å…ï¼‰ï¼›negative fixtures + production å…¨æ ‘é›¶è¿è§„ã€‚  
-**Schema**ï¼šmigration 018ï¼ˆmeta_canonicalization_run 24 åˆ— + meta_canonical_reconciliation_finding 10 åˆ—ï¼›æœªæ”¹æ—§æ–‡ä»¶ï¼›18 é“¾ from-zero + 001..017â†’018 upgrade + idempotent + tamper probe 019ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/canonical/`ï¼ˆæ–°åŒ… 5 æ¨¡å—ï¼šcanonicalizer.py / eligibility.py / availability.py / source_policy.py / identity.pyï¼‰ã€`src/ashare_state/normalization/runner.py`ï¼ˆå…¬å¼€åªè¯» verify_normalized_runï¼‰ã€`migrations/018_canonicalization.sql`ã€`tests/integration/test_canonical.py`ï¼ˆ36 é¡¹ï¼‰ã€`tests/integration/test_migrations.py`ï¼ˆ18 é“¾ï¼‰ã€`docs/adr/ADR-022`ï¼ˆACCEPTEDï¼‰ã€`docs/adr/ADR-023`ï¼ˆæ–°å»º PROPOSEDï¼‰ã€`docs/adr/ADR-000`ï¼ˆç´¢å¼•ï¼‰  
-**Tests**ï¼š1025/0ï¼ˆ985 â†’ 1025ï¼Œ+40ï¼šTestBoundaryStructure 4 / TestClosureVerification 2 / TestAvailability 4 / TestIdentityResolution 3 / TestSelection 7 / TestRunIdentity 5 / TestDomainMatrix 6 / TestLedgerAndArtifacts 3 + TestRawWriterGuardHardening 4â€”â€”36 canonical + 4 guard é‡æž„è®¡å…¥ï¼‰  
-**Verification**ï¼šLocal 1025/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ69 æºæ–‡ä»¶é›¶é”™ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33498314119ï¼ˆimplementation `ae5b76c998196f936ae6430408d2a016a35aec0d`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-01 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`ae5b76c998196f936ae6430408d2a016a35aec0d`ï¼ˆCR-3 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260901-067 â€” CR-2.4 Anchored Raw Ingestion Boundary
-
-**Type**ï¼šC2 correctness wiringï¼ˆADR-022 Amendment Dï¼›CR-2.3 å¤å®¡å”¯ä¸€å‰©ä½™ P0 æ”¶å£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-2.3 å¤å®¡ï¼ˆ2026-09-01 14:26 +08:00ï¼ŒReviewed HEAD `81d6b8d53a97cdcc7ee1cdfbd627d4dac2913e4d`ï¼Œè£å†³ **REOPENEDï¼ˆä»…å‰© Anchored Ingestion Boundary wiring / enrollment correctnessï¼‰**â€”â€”operation spec / anchor schema+runner verification / output-set+semantic seal PASS / FREEZEï¼›P0ï¼šæ­£å¼ Raw evidence å†™å…¥é“¾ï¼ˆProbeContext.evidence_from_exchangeï¼‰æœªæŽ¥çº¿ anchorï¼ˆæµ‹è¯•é  helper æ‰‹å·¥æ¨¡æ‹Ÿ governed flowï¼‰/ recorder åª hash "è°ƒç”¨æ—¶çœ‹åˆ°çš„ meta" æœªç»‘å®š RawWriter åˆšè¿”å›žçš„ exact evidence hashï¼ˆwriteâ†’anchor TOCTOU / late-enrollment blessing çª—å£ï¼‰/ enrollment æ˜¯æ™®é€šå¯è°ƒç”¨ primitive æœªæ”¶å£ï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-2.3å¤å®¡ä¸ŽCR-2.4æœ€ç»ˆAnchoredIngestionBoundaryæ”¶å£è¦æ±‚_20260901.md`ï¼Œreopen commit `3348200`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-022 Amendment D Â§9.1-Â§9.4ï¼‰ï¼šï¼ˆ1ï¼‰**AnchoredRawEvidenceWriter**ï¼ˆ`raw_anchor.py`ï¼‰ï¼šå”¯ä¸€ production-owned å†™å…¥è¾¹ç•Œ `write_exchange(exchange)`â€”â€”RawWriter.writeï¼ˆæ–‡ä»¶ commitï¼Œmeta LASTï¼‰â†’ reread persisted meta bytesï¼ˆVERIFY-ONLYï¼šrequire sha256(reread) == RawWriteResult.evidence_hashï¼›TOCTOU æ¢å­—èŠ‚ â†’ æ•´ä½“ HARD FAILï¼ŒH2 æ°¸ä¸ enrollï¼‰â†’ identity cross-bindingï¼ˆmeta çš„ request_id/provider/provider_dataset/endpoint/normalization_surface/operation_id == exchange envelope + uri cross-bindingï¼‰â†’ enroll immutable anchorï¼ˆkeyed to COMMIT identityï¼‰ï¼›ä»»ä½•å¤±è´¥ = evidence ä¸ readyã€‚ï¼ˆ2ï¼‰**å…¨éƒ¨ production evidence å†™å…¥æŽ¥çº¿**ï¼š`ProbeContext.__init__` æ–°å¢žå¿…éœ€ `conn` å‚æ•°ï¼Œ`raw_writer` â†’ `AnchoredRawEvidenceWriter`ï¼ˆSUCCESS ä¸Ž ERROR exchange å‡è‡ªåŠ¨ anchorï¼‰ï¼›`run_dry_run` æ‰“å¼€ in-memory migrated DBï¼ˆrepo migrations å…¨é“¾ï¼‰â€”â€”æ¡†æž¶è‡ªæ£€èµ°ä¸Ž production å®Œå…¨ç›¸åŒçš„ anchored å†™è·¯å¾„ï¼›ç»“æž„å®ˆå«ï¼ˆASTï¼‰ï¼šsrc/ ä¸­ RawWriter write/write_success/write_failure è°ƒç”¨ç‚¹åªå…è®¸ raw_writer.pyï¼ˆå®šä¹‰ï¼‰ä¸Ž raw_anchor.pyï¼ˆboundary å†…éƒ¨ï¼‰ï¼Œreader ä¸å—é™ã€‚ï¼ˆ3ï¼‰**Enrollment å¯æ¢å¤ä¸å¯ rebaseline**ï¼šanchor INSERT æ³¨å…¥å¤±è´¥ â†’ ingest å¤±è´¥ï¼ˆraw bytes H1 åœ¨ç›˜æ—  anchor â†’ Normalization RAW_ANCHOR_MISSINGï¼‰ï¼›exact retryï¼šRawWriter idempotentï¼ˆsame bytes ignoring ingested_at â†’ no-op â†’ evidence_hash = é¦– commit H1ï¼‰â†’ enrollment æˆåŠŸ â†’ ä¸€ä¸ª immutable anchorã€å•ä¸€ evidence identityï¼›å·²æœ‰ anchor H1ï¼šsame H1 idempotent / H2 hard conflictã€‚ï¼ˆ4ï¼‰**API æ”¶å£**ï¼šå…¬å¼€ `record_raw_evidence_anchor` æ’¤é”€ï¼Œç§æœ‰åŒ– `_enroll_anchor`ï¼ˆevidence_hash ä¸ºå¿…å¡«è°ƒç”¨æ–¹å£°æ˜Ž commit identityï¼Œå‡½æ•°å†… verify-only æ¯”å¯¹ç£ç›˜ï¼‰ï¼›å…¬å¼€é¢ä»… AnchoredRawEvidenceWriter / persist_exchange_with_anchor / lookup_raw_evidence_anchor / RawEvidenceAnchor / RawAnchorErrorï¼›tests ç”¨ç§æœ‰ primitive åˆ¶é€ å¤¹å…·ï¼ˆB2 static registry åŒå£å¾„ï¼‰ã€‚  
-**Schema**ï¼šæ— ï¼ˆå¤ç”¨ migration 017 anchor è¡¨ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/storage/raw_anchor.py`ï¼ˆAnchoredRawEvidenceWriter + ç§æœ‰ _enroll_anchor + å…¬å¼€ recorder æ’¤é”€ï¼‰ã€`src/ashare_state/spike/probes.py`ï¼ˆProbeContext conn å‚æ•° + anchored writer æŽ¥çº¿ï¼‰ã€`src/ashare_state/spike/runner.py`ï¼ˆrun_dry_run in-memory DB + migrationsï¼‰ã€`tests/integration/_anchored_ctx.py`ï¼ˆæ–°å…±äº« helperï¼‰ã€11 ä¸ª spike æµ‹è¯•æ–‡ä»¶ + test_formal_gate_wiring + test_endpoint_requirement_proof + test_cr11ï¼ˆProbeContext conn æŽ¥çº¿ï¼‰ã€`tests/integration/test_provider_normalization.py`ï¼ˆ114 é¡¹ï¼šç§æœ‰ enrollment å¤¹å…·è¿ç§» + 10 æ–°å¢žï¼‰ã€`docs/adr/ADR-022`ï¼ˆAmendment Dï¼‰  
-**Tests**ï¼š985/0ï¼ˆ975 â†’ 985ï¼Œ+10ï¼šTestAnchoredIngestionBoundary 10 é¡¹ï¼‰  
-**Verification**ï¼šLocal 985/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ63 æ–‡ä»¶é›¶é”™ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33482144065ï¼ˆimplementation `3bc5c53d2217f2b01d26766eabe470b7bcc4d5bc`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-01 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`3bc5c53d2217f2b01d26766eabe470b7bcc4d5bc`ï¼ˆCR-2.4 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260901-066 â€” CR-2.3 Raw Trust Anchor + Provider-Owned Operation Spec + Output Seal
-
-**Type**ï¼šC2 correctness closureï¼ˆADR-022 Amendment Cï¼›CR-2.2 å¤å®¡ 3 P0 å…¨æ”¶å£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-2.2 å¤å®¡ï¼ˆ2026-09-01 10:45 +08:00ï¼ŒReviewed HEAD `a4a23cd3f758a6cdc450b4256f1d66172ba3524c`ï¼Œè£å†³ **REOPENED**â€”â€”exact replay / full fingerprint / schema verify ç­‰ FREEZEï¼Œ3 P0ï¼šsurface provenance ä»ç» public `require_capability` é—´æŽ¥ caller-declared / é¦–æ¬¡æ¶ˆè´¹çš„ raw meta æ— æ–‡ä»¶ç³»ç»Ÿä¹‹å¤– authoritative anchorï¼ˆé¦–æ¶ˆè´¹ meta-only ç¯¡æ”¹å¯æˆ"åˆå§‹çœŸç›¸"ï¼›016 legacy æ— æ³•å®‰å…¨è¯†åˆ« 015-era launderingï¼‰/ seal æœªå°ä½ expected output exact set ä¸Ž normalized semantic valuesï¼ˆåˆ  output é‡ç»‘åŒ hash å¯è¿‡ï¼›åŒ schema/row_count æ¢å€¼é‡ç»‘å¯è¿‡ï¼‰ï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-2.2å¤å®¡ä¸ŽCR-2.3æœ€ç»ˆRawTrustAnchoråŠOutputSealæ”¶å£è¦æ±‚_20260901.md`ï¼Œreopen commit `323bbb5`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-022 Amendment C Â§8.1-Â§8.3ï¼‰ï¼šï¼ˆ1ï¼‰**P0-01 Provider-Owned Operation Spec**ï¼šæ–° `operations.py`â€”â€”`ProviderOperationSpec`ï¼ˆoperation_id/capability/endpoint/provider_dataset/normalization_surfaceï¼‰ç§æœ‰é™æ€å¸¸é‡ 15 ä¸ªï¼ˆæ¯ facade wrapper ä¸€ä¸ªï¼‰ï¼›`call_exchange`/`_call_or_exchange` æ’¤é”€ï¼Œgeneric executor ç§æœ‰åŒ–ä¸º `_execute_exchange(spec, fn, params)`ï¼ˆendpoint/dataset/capability/surface/operation_id å…¨ç”± spec æ´¾ç”Ÿï¼‰ï¼›`query_kline_exchange`â†’`DAILY_BAR_KLINE`ã€`query_index_kline_exchange`â†’`INDEX_DAILY_KLINE`ï¼ˆAST ç»‘å®šæ–­è¨€ï¼‰ï¼›RawEnvelope/raw meta æ–°å¢ž `operation_id`ï¼›ç»“æž„å®ˆå«ï¼š15 spec ä¸Ž `SDK_METHOD_CLASSIFICATIONS` + normalization registry åŒå‘ exact æ ¸å¯¹ï¼›å…¬å¼€æ–¹æ³•ç­¾åæ— ä»»ä½• free-form correctness selectorï¼ˆendpoint/dataset/require_capability/capability/normalization_surface/specï¼‰ã€‚ï¼ˆ2ï¼‰**P0-02 Raw Evidence Trust Anchor**ï¼šmigration 017 `meta_raw_evidence_anchor`ï¼ˆPK (provider, dataset, request_id) + evidence_uri/evidence_hash/endpoint/operation_id/normalization_surface/payload_kind/ingest_run_id/created_atï¼‰ï¼›`raw_anchor.py::record_raw_evidence_anchor`ï¼ˆgoverned ingestion flowï¼šRawWriter commit meta LAST â†’ reread bytes â†’ sha256 â†’ anchorï¼›åŒ bytes å¹‚ç­‰ / å¼‚ bytes `RawAnchorError` hard failâ€”â€”anchor æ°¸ä¸ re-baselineï¼‰+ `lookup_raw_evidence_anchor`ï¼›Runner åœ¨ä»»ä½• meta è§£æž/è·¯ç”±/æ˜ å°„ä¹‹å‰æŸ¥ anchorâ€”â€”ç¼ºå¤±ï¼ˆlegacy pre-017ï¼‰â†’ `RAW_ANCHOR_MISSING` BLOCKEDï¼ˆfail closedï¼›governed repair = re-ingestï¼›ç»ä¸ auto-grandfatherâ€”â€”015-era H1+H2 history å‡çº§åŽ H2 æ°¸ä¸è¢«ä¿¡ä»»ï¼Œä¸”å¤±è´¥è¿è¡Œä¸è‡ªåŠ¨å»º anchorï¼‰/ current hash â‰  anchor â†’ `RAW_ANCHOR_MISMATCH` INCIDENT HARD BLOCKï¼ˆ`evidence_conflict=TRUE` ä»…è¯Šæ–­â€”â€”016 åˆ—é™çº§ä¸ºè¯Šæ–­å±žæ€§ï¼›ä¿¡ä»»æ ¹æ˜¯ anchorï¼šé‡å¤è¿è¡Œæ°¸ç»­ BLOCKã€ä¿®å¤å›žåŽŸ bytes â†’ åŽŸ run exact replayï¼‰ï¼›æ—§ baseline DISTINCT-hash æŸ¥è¯¢åˆ é™¤ã€‚ï¼ˆ3ï¼‰**P0-03 Expected Output Exact Set + Semantic Value Seal**ï¼šmigration 017 ledger ä¸¤åˆ— `normalized_output_set_hash` / `normalized_semantic_hash`ï¼›output_set_hash = hash(sorted(output_name, canonical uri, content_hash, schema_hash, row_count)) ä¸‰æ–¹æ¶ˆè´¹ï¼ˆledger == manifest == replay-time ç‰©ç†é‡ç®—ï¼‰ï¼›semantic_hashï¼ˆå…¨è¾“å‡ºè¡¨ sorted canonical JSONï¼‰ä¸‰æ–¹æ¶ˆè´¹ï¼ˆledger == manifest == replay-time ä»Žç‰©ç† parquet records é‡ç®—ï¼‰ï¼›expected exact setï¼ˆmanifest output_name set == CURRENT registry spec.output_namesï¼Œno missing/extra/duplicateï¼‰ï¼›URI deterministic bindingï¼ˆæ¯ output uri == ledger èº«ä»½é‡ç®— base_path + output_nameï¼‰ï¼›ç‰©åŒ–è¯­ä¹‰å‡çº§ï¼ˆmaterialized set æ°å¥½ç­‰äºŽ spec.output_namesâ€”â€”ç©ºè¡¨ç‰©åŒ–ä¸ºç©º parquet é›¶äº§å‡ºè¯æ®ï¼Œempty-payload SUCCESS æµ‹è¯•ï¼‰ï¼›`NormalizationRunSeal` æ‰©å±• raw_evidence_uri/raw_payload_kind/normalized_output_set_hash/normalized_semantic_hashï¼›manifest æ–°å¢ž raw_payload_kind/output_set_hashï¼›pre-CR-2.3 è¡Œç¼º seal ä¸ä½œ healthy replayã€‚  
-**Schema**ï¼šmigration 017ï¼ˆanchor è¡¨ + ä¸¤ seal åˆ—ï¼›æœªæ”¹ 014/015/016ï¼›17 é“¾ from-zero + 001..016â†’017 upgrade + idempotent + tamper probe 018ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/providers/amazingdata/operations.py`ï¼ˆæ–°ï¼‰ã€`provider.py`ï¼ˆspec åŒ– executor + 15 wrapper é‡æž„ + RawEnvelope.operation_idï¼‰ã€`src/ashare_state/storage/raw_anchor.py`ï¼ˆæ–°ï¼‰ã€`raw_writer.py`ï¼ˆmeta æŒä¹…åŒ– operation_idï¼‰ã€`src/ashare_state/normalization/runner.py`ï¼ˆanchor éªŒè¯ + exact-set/semantic seal + seal æ‰©å±•ï¼‰ã€`registry.py`ï¼ˆRAW_ANCHOR_MISSING/MISMATCH é”™è¯¯ç±»ï¼‰ã€`migrations/017_raw_trust_anchor_and_output_seal.sql`ã€`tests/integration/test_provider_normalization.py`ï¼ˆ104 é¡¹ï¼‰ã€`tests/integration/test_migrations.py`ï¼ˆ17 é“¾ï¼‰ã€`tests/integration/test_cr1_provider_exchange.py` / `test_runtime_early_stop.py` / `tests/unit/test_provider_reliability.py`ï¼ˆcall_exchange â†’ ç§æœ‰ _execute_exchange + æµ‹è¯• specï¼‰ã€`docs/adr/ADR-022`ï¼ˆAmendment Cï¼‰  
-**Tests**ï¼š975/0ï¼ˆ955 â†’ 975ï¼Œ+20ï¼šTestOperationSpecProvenance 3 / TestRawTrustAnchor 6 / TestOutputExactSetSeal 6 / TestSemanticValueSeal 4 / å…¬å¼€ç­¾åå®ˆå«é‡æž„ 1ï¼‰  
-**Verification**ï¼šLocal 975/0ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ63 æ–‡ä»¶é›¶é”™ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33472357951ï¼ˆimplementation `480dc7549bb512e9c187213e5010fab424248774`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-01 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`480dc7549bb512e9c187213e5010fab424248774`ï¼ˆCR-2.3 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-20260901-065 â€” CR-2.2 Replay Provenance Seal
-
-**Type**ï¼šC2 correctness closureï¼ˆADR-022 Amendment Bï¼›CR-2.1 å¤å®¡ 3 P0 å…¨æ”¶å£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-2.1 å¤å®¡ï¼ˆ2026-09-01 10:15 +08:00ï¼ŒReviewed HEAD `70bb1018e8445a3b9d2b5897f3f0b4a4260cb0a`ï¼Œè£å†³ **REOPENED**â€”â€”æ”¶å£æ–¹å‘ä¿ç•™ï¼Œ3 P0ï¼šsurface provenance caller-override å‚æ•° / raw hash conflict å¯è¢« BLOCK è®°å½•æ´—ç™½ + latest-run replay é®è”½åŽ†å² exact match / seal åªéªŒå¤–å±‚æ–‡ä»¶ hash ä¸æ¯”å¯¹å…¨é‡å­—æ®µä¸Ž current fingerprintï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-2.1å¤å®¡ä¸ŽCR-2.2æœ€ç»ˆReplayProvenanceSealæ”¶å£è¦æ±‚_20260901.md`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-022 Amendment B Â§7.1-Â§7.3ï¼‰ï¼šï¼ˆ1ï¼‰**P0-01 Surface çœŸæ­£ system-derived**ï¼šæ’¤é”€ `call_exchange` çš„ `normalization_surface` caller-override å‚æ•°ï¼›`surface_identity = str(require_capability or "")`ï¼ˆcapability å¥‘çº¦æ´¾ç”Ÿï¼‰ï¼›`query_kline_exchange`ï¼ˆcapability=daily_barï¼‰ä¸Ž `query_index_kline_exchange`ï¼ˆcapability=index_dailyï¼‰ä»…é  capability åŒºåˆ†ï¼›registry 18 æ¡æ˜ å°„ä¸å˜ï¼ˆsurface å€¼ç­‰äºŽ capability åï¼Œé›¶æ•°æ®è¿ç§»ï¼‰ï¼›ç»“æž„æµ‹è¯•æ–­è¨€ç­¾åæ— è¯¥å‚æ•° + provider.py å…¨éƒ¨ `_call_or_exchange` è°ƒç”¨ç‚¹æ— è¯¥ kwarg + æ´¾ç”Ÿè¡¨è¾¾å¼ã€‚ï¼ˆ2ï¼‰**P0-02 Raw Evidence Binding å†²çªä¸å¯æ´—ç™½ + å…¨åŽ†å² exact replay**ï¼šbaseline = è¯¥ request å…¨éƒ¨éž conflict run çš„ DISTINCT `raw_evidence_hash`ï¼ˆ`evidence_conflict=TRUE` çš„ run æŽ’é™¤ï¼Œmigration 016 æ–°åˆ—ï¼‰ï¼›current hash ä¸åœ¨ baselineï¼ˆä¸”éžç©ºï¼‰â†’ INCIDENT HARD BLOCKï¼ˆconflict run è®°å½•ã€ä¸æ”¹å˜ baselineï¼›ç¬¬äºŒ/ä¸‰æ¬¡è¿è¡ŒåŒæ · BLOCKï¼›conflict run è‡ªèº«æŒ‰ exact key å¹‚ç­‰ replayï¼‰ï¼›surface ç¯¡æ”¹ï¼ˆmeta surface å­—æ®µæ”¹ index_dailyï¼‰â†’ bytes å˜ â†’ conflict BLOCK æ°¸ç»­ï¼›ä¿®å¤å›žåŽŸå§‹ bytes â†’ åŽŸ run exact replayï¼›exact replay lookup æ”¹ä¸º `run_id = uuid5(namespace, idempotency_key)` ç›´æŽ¥æŸ¥è¯¢ï¼ˆä¸å† latest-run ORDER BY æ¯”è¾ƒï¼‰â€”â€”mapper Aâ†’Bâ†’A / contract Aâ†’Bâ†’A rollback replay åŽ†å² A runï¼ˆæ—  duplicate-PKã€æ—  B é˜´å½±ï¼‰ï¼›å…¨éƒ¨ blocked åˆ†æ”¯ï¼ˆå« multi-table / accounting violationï¼‰ç»Ÿä¸€ exact lookupã€‚ï¼ˆ3ï¼‰**P0-03 Full Seal æ¶ˆè´¹**ï¼š`_supported_key`/`_blocked_key` æ··å…¥å®Œæ•´ `MAPPER_CODE_FINGERPRINT`ï¼ˆ64 hexï¼Œæ˜¾ç¤ºä¸²ä» 16 hexï¼‰â€”â€”å‰ 16 ä½ç›¸åŒçš„ fingerprint äº§ç”Ÿä¸åŒ run identityï¼›typed `NormalizationRunSeal` dataclassï¼ˆ`from_ledger()` / `current_provenance_problems()`ï¼šledger == å½“å‰ contract + å½“å‰ full fingerprintï¼Œdefense in depth / `manifest_binding_problems()`ï¼šmanifest å…¨è¯­ä¹‰å­—æ®µ == ledger seal + quarantine ä¸‰æ–¹ç»‘å®š manifest == ledger == DB recomputeï¼‰ï¼›manifest policy typed åŒ–ï¼ˆSUCCESS/PARTIAL manifest REQUIREDâ€”â€”ledger status ç¿»è½¬ä¼ªé€ ä¸å‡º manifest-free healthy replayï¼›BLOCKED æºå¸¦å³éªŒè¯ï¼‰ï¼›schema_hash é‡ç®—ï¼ˆreplay ä»Žç‰©ç† parquet é‡ç®— `sha256(str(frame.schema))` ä¸Ž manifest æ¯”å¯¹â€”â€”rebind æ¢ parquet + æ›´æ–° content_hash ä»è¢«æ‹¦æˆªï¼‰ï¼›rebind tamper çŸ©é˜µ 10 é¡¹å…¨è½åœ°ï¼ˆmanifest surface/status/counts/quarantine_set_hash/mapper_code_hash ç¯¡æ”¹ + é‡ç®—å¤–å±‚ hash + UPDATE ledger hash â†’ DAMAGEDï¼›ledger status/quarantine seal/mapper_code_hash ç¯¡æ”¹ â†’ DAMAGEDï¼›output schema æ¢ç»‘ â†’ DAMAGEDï¼‰ã€‚  
-**Schema**ï¼šmigration 016ï¼ˆmeta_provider_normalization_run + `evidence_conflict BOOLEAN DEFAULT FALSE`ï¼›æœªæ”¹ 014/015ï¼›16 é“¾ from-zero + upgradeï¼ˆ001..015 å…ˆåº”ç”¨å†è¡¥ 016 ä»…åº”ç”¨å°¾éƒ¨ï¼‰+ idempotent + tamper æµ‹è¯•ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/providers/amazingdata/provider.py`ï¼ˆæ’¤é”€ surface override å‚æ•° + capability æ´¾ç”Ÿï¼‰ã€`src/ashare_state/normalization/runner.py`ï¼ˆbaseline conflict check + exact run_id lookup + typed seal + schema_hash recompute + evidence_conflict ä¼ é€’ï¼‰ã€`src/ashare_state/normalization/__init__.py`ï¼ˆå¯¼å‡º NormalizationRunSealï¼‰ã€`migrations/016_replay_provenance_seal.sql`ã€`tests/integration/test_provider_normalization.py`ï¼ˆ84 é¡¹ = 67 å›žå½’ + 17 æ–°å¢žï¼‰ã€`tests/integration/test_migrations.py`ï¼ˆ16 é“¾ + upgrade + probe 017ï¼‰ã€`docs/adr/ADR-022`ï¼ˆAmendment Bï¼‰  
-**Tests**ï¼š955/0ï¼ˆ938 â†’ 955ï¼Œ+17ï¼šTestRawEvidenceBindingPermanence 5 é¡¹ / TestFullMapperIdentity 1 é¡¹ / TestFullSealConsumption 10 é¡¹ / ç»“æž„ç­¾åæµ‹è¯• 1 é¡¹ï¼‰  
-**Verification**ï¼šLocal 955/0ï¼ˆ938 â†’ 955ï¼Œ+17ï¼‰ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼ˆ61 æ–‡ä»¶é›¶é”™ï¼‰ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33460094366ï¼ˆimplementation `a06ea2202cb4f7a5ea0a91c09e666867267a8575`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-09-01 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`a06ea2202cb4f7a5ea0a91c09e666867267a8575`ï¼ˆCR-2.2 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260831-064 â€” CR-2.1 Surface Identity + Registry Boundary + Full-State Replay + Atomic Commit Closure
-
-**Type**ï¼šC2 correctness closureï¼ˆADR-022 Amendment Aï¼›CR-2 å¤å®¡ 4 P0 å…¨æ”¶å£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-2 å¤å®¡ï¼ˆ2026-08-31 17:42 +08:00ï¼ŒReviewed HEAD `ab20871e9eb207563d0fdeb6228a08416153e2c9`ï¼Œè£å†³ **REOPENED**â€”â€”core framework FREEZEï¼Œ4 P0ï¼šsurface identity å†²çª / å…¬å¼€å¯å˜ registry / happy-path-only å¹‚ç­‰ / æ— åŽŸå­æäº¤åè®®ï¼›å·¥ä½œè¦æ±‚ `docs/design/A-share-analysis_CR-2å¤å®¡ä¸ŽCR-2.1æœ€ç»ˆSurfaceIdentityåŠCommitClosureæ”¶å£è¦æ±‚_20260831.md`ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-022 Amendment Aï¼‰ï¼šï¼ˆ1ï¼‰**P0-01 Surface Identity**ï¼šregistry key å‡çº§ typed å››å…ƒç»„ `(provider, normalization_surface, provider_dataset, endpoint)`ï¼›`normalization_surface` ä¸º system-derived æŒä¹…åŒ–èº«ä»½ï¼ˆprovider facade `call_exchange` æ´¾ç”Ÿé»˜è®¤ capability èº«ä»½ â†’ RawWriter å†™å…¥ raw meta å‘åŽå…¼å®¹å­—æ®µï¼›ç¦æ­¢ request å‚æ•°/symbol å‰ç¼€çŒœæµ‹ï¼‰ï¼›`query_kline_exchange`ï¼ˆdaily_bar â†’ DailyBarDTOï¼‰ä¸Ž `query_index_kline_exchange`ï¼ˆindex_daily â†’ IndexDailyDTOï¼‰åŒæ˜¾å¼ wrapperï¼›legacy æ­§ä¹‰ raw â†’ `PAYLOAD_SURFACE_AMBIGUOUS` BLOCKEDï¼ˆæ–°é”™è¯¯ç±»ï¼Œåˆ†ç±»è¡¨å…­ç±»ï¼‰ï¼›coverage guard å‡çº§ä¸º facade AST + `SDK_METHOD_CLASSIFICATIONS` äº¤å‰æ ¸å¯¹ == registry exact setï¼ˆ18 æ¡ï¼š11 SUPPORTED / 4 BLOCKED_PENDING_MAPPER / 3 NOT_APPLICABLEâ€”â€”optional æœªæ¶ˆè´¹ surface æ˜¾å¼ NOT_APPLICABLE ä¸æ¶ˆå¤±ï¼‰ã€‚ï¼ˆ2ï¼‰**P0-02 Immutable Registry**ï¼šæ’¤é”€å…¬å¼€å¯å˜ `DATASET_NORMALIZATION_REGISTRY`ï¼›module-private ä¸å¯å˜ tuple + private exact indexï¼›å…¬å¼€é¢ä»…åªè¯» `lookup_spec` / `specs_for` / `registry_specs`ï¼›runner æž„é€ å™¨ä¸Ž `run()` ç­¾åæ—  spec/mapper/registry/surface å‚æ•°ï¼ˆç»“æž„æµ‹è¯•æ–­è¨€ï¼‰ï¼›tests-only æ³¨å…¥ä»…ç» monkeypatch ç§æœ‰ stateã€‚ï¼ˆ3ï¼‰**P0-03 One Exact Replay Policy**ï¼šSUCCESS/PARTIAL/BLOCKED å…¨ç»ˆæ€ç»Ÿä¸€â€”â€”same exact input identityï¼ˆevidence hash + contract `cr2.1-v1` + system-derived mapper identityï¼‰â†’ é‡éªŒæ—¢æœ‰ run closureï¼ˆmanifest bytes == ledger hash / outputs bytes+row_count == manifest / quarantine exact set seal == ledgerï¼‰â†’ intact = idempotent returnï¼Œdamaged/tampered = fail closedï¼ˆrepair requiredï¼‰ï¼›`MAPPER_CODE_FINGERPRINT` = SHA-256 over governed mapper + DTO module sourcesï¼ˆè¡Œå°¾å½’ä¸€ï¼‰è¿›å…¥ run identityâ€”â€”mapper å®žçŽ°å˜æ›´äº§ç”Ÿæ–° runï¼ˆåŽ†å²ä¿ç•™ï¼‰ï¼›æ’¤é”€ caller è‡ªæŠ¥ `code_commit`ï¼›CR-2 legacy è¡Œç¼º seal æ°¸ä¸ healthy replayã€‚ï¼ˆ4ï¼‰**P0-04 Atomic + Recoverable Commit Closure**ï¼šè¾“å‡º parquet å…ˆè½ï¼ˆROW scope å…¨è¾“å‡ºç‰©åŒ–ï¼Œç©º parquet = é›¶äº§å‡ºè¯æ®ï¼‰â†’ manifest æœ€åŽè½ç›˜ï¼ˆcorrectness bytes æ— å¢™é’Ÿæ—  caller provenanceï¼Œexact retry å­—èŠ‚ä¸å˜ï¼‰â†’ å• DuckDB äº‹åŠ¡ï¼ˆdup æ£€æŸ¥ + run INSERT + å…¨éƒ¨ quarantine INSERT + è¡Œæ•°æ–­è¨€ï¼‰COMMIT/ROLLBACKï¼›DB å¤±è´¥ exact retry ç¡®å®šæ€§æ¢å¤ï¼›artifact è·¯å¾„åŠ  `run=<run_id>` æ®µï¼›`quarantine_set_hash`ï¼ˆcanonical hash over sorted semantic recordsï¼‰åŒé”šå®š manifest+ledgerï¼›çŠ¶æ€æœºç»†åŒ–ï¼ˆmapped==0 æœ‰ quarantine â†’ BLOCKEDï¼‰ã€‚  
-**Schema**ï¼šmigration 015ï¼ˆmeta_provider_normalization_run + `normalization_surface` / `mapper_code_hash` / `quarantine_set_hash` ä¸‰åˆ—ï¼ŒADD COLUMN IF NOT EXISTSï¼›æœªæ”¹ 014ï¼›from-zero 15 é“¾ + upgradeï¼ˆ001..014 â†’ 015 ä»…å°¾éƒ¨ï¼‰+ idempotent æµ‹è¯•ï¼‰  
-**Affected Modules**ï¼š`src/ashare_state/normalization/`ï¼ˆregistry.py é‡æž„ typed key + ç§æœ‰åŒ–ï¼›runner.py é‡å†™ replay/commit åè®®ï¼‰ã€`src/ashare_state/providers/amazingdata/provider.py`ï¼ˆRawEnvelope.normalization_surface å­—æ®µ + call_exchange æ´¾ç”Ÿ + query_index_kline_exchangeï¼‰ã€`src/ashare_state/storage/raw_writer.py`ï¼ˆmeta æŒä¹…åŒ– surface å­—æ®µï¼‰ã€`migrations/015_normalization_surface_closure.sql`ã€`tests/integration/test_provider_normalization.py`ï¼ˆ67 é¡¹ï¼‰ã€`tests/integration/test_migrations.py`ï¼ˆ15 é“¾ + upgradeï¼‰ã€`docs/adr/ADR-022`ï¼ˆAmendment A + P1-02 count æ›´æ­£ï¼‰ã€CR-2 å·¥ä½œè¦æ±‚æ–‡æ¡£ï¼ˆÂ§12 SHA correction P1-01ï¼‰  
-**Tests**ï¼š67 é¡¹ normalization å¯¹æŠ—æµ‹è¯•ï¼ˆCR-2 37 é¡¹å›žå½’ + CR-2.1 æ–°å¢ž 30 é¡¹ï¼Œaudit Â§7 æ¸…å• 19 é¡¹å…¨å¯¹åº”ï¼‰+ migrations 11 é¡¹ï¼ˆ15 é“¾ from-zero/upgrade/idempotent/tamperï¼‰  
-**Governance**ï¼šP1-01 SHA æ›´æ­£ï¼ˆCR-2 implementation canonical = `15cdae25fd7d11e3be0da3683e821629e4226291`ï¼ŒåŽŸè®°å½• `15cdae2e4f1...` ä¸ºç¬”è¯¯â€”â€”åŽ†å²åŽŸæ–‡ä¿ç•™ï¼Œå·¥ä½œè¦æ±‚æ–‡æ¡£è¿½åŠ  Â§12 æ›´æ­£ï¼‰ï¼›P1-02 count æ›´æ­£ï¼ˆADR-022 Â§2.2 "9/5" â†’ runtime exact-set 18 æ¡ 11/4/3ï¼Œç» Amendment A Â§6.1ï¼‰  
-**Verification**ï¼šLocal 938/0ï¼ˆ907 â†’ 938ï¼Œ+31ï¼šnormalization 37 â†’ 67ï¼ˆ+30ï¼‰+ migrations 10 â†’ 11ï¼ˆ+1 upgradeï¼‰ï¼‰ï¼›ruff check / ruff format / mypy å…¨ç»¿ï¼›CI åŒæ¬¾ `uv run pytest` å¤éªŒï¼›GitHub Actions **run 33398654940ï¼ˆimplementation `2bd0c31fa47c18b520c192265ce306f44a217fc3`ï¼‰ä¸‰è…¿ success**ï¼ˆ2026-08-31 API positive confirmationï¼Œä¸€æ¬¡é€šè¿‡é›¶ä¿®å¤è½®æ¬¡ï¼‰  
-**Commit**ï¼š`2bd0c31fa47c18b520c192265ce306f44a217fc3`ï¼ˆCR-2.1 implementationï¼›SHA ç”± docs å›žå¡« commit è¡¥è®°ï¼‰  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260831-063 â€” Provider-Normalized + Quarantine Runtime (CR-2)
-
-**Type**ï¼šC2 æ•°æ®å±‚æ–°å¥‘çº¦ï¼ˆæ–° ADRï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-2ï¼ˆaudit 20260831 Â§3-Â§6ï¼‰â€”â€”"caller å®žé™…å¦‚ä½•ä»Ž Raw evidence deterministic åœ°æ‰§è¡Œ mapperã€å¦‚ä½•æŒä¹…åŒ– normalized ç»“æžœã€å¦‚ä½•è½ Quarantineã€å¦‚ä½•ä¿è¯æ²¡æœ‰ silent drop"å°šæœªå½¢æˆæ­£å¼ runtimeã€‚  
-**New Contract**ï¼ˆADR-022ï¼‰ï¼šæ–°åŒ… `ashare_state.normalization`â€”â€”ï¼ˆ1ï¼‰**registry**ï¼šSTATIC production-owned typed registryï¼Œkeyed by (provider_dataset, endpoint) exact routingï¼Œ14 ä¸ª provider surface å…¨æ˜¾å¼åˆ†ç±»ï¼ˆ9 SUPPORTED / 5 BLOCKED_PENDING_MAPPERâ€”â€”dividend / right_issue / bj_code_mapping / industry_base_info mapper æœªå…·å¤‡è¶³å¤Ÿå·²éªŒè¯å­—æ®µè¯­ä¹‰ï¼Œfail closedï¼‰ï¼›ç»“æž„å®ˆå«æµ‹è¯• AST æŠ½å– provider surface è¦æ±‚ exact è¦†ç›–ã€‚ï¼ˆ2ï¼‰**runner**ï¼š`NormalizationRunner.run(provider, provider_dataset, request_id)` å”¯ä¸€æ­£å¼å½’ä¸€åŒ–è¾¹ç•Œâ€”â€”raw evidence å”¯ä¸€è¾“å…¥ï¼ˆverify_meta_closure + RawWriter.read(verify=True) å¤ç”¨ï¼›æ—  provider/SDK è®¿é—®ï¼‰ï¼›å¤±è´¥ exchange = SOURCE_EXCHANGE_FAILED BLOCKEDï¼ˆâ‰  mapping quarantineï¼‰ï¼›multi-table ä¸¥æ ¼ table è·¯ç”±ï¼ˆä¸å–ç¬¬ä¸€ä¸ª tableï¼‰ã€‚ï¼ˆ3ï¼‰**æŒä¹…åŒ–**ï¼šnormalized/provider=<P>/dataset=<D>/raw_request=<rid>/contract=cr2-v1/ ä¸‹ parquetï¼ˆcanonical å…¨åˆ—æŽ’åºï¼‰+ manifest.jsonï¼ˆç»‘å®š raw evidence / contract / mapper identity / è¾“å‡ºè¡¨èº«ä»½ / semantic_hash / counts / statusï¼‰+ ledger è¡¨ meta_provider_normalization_runï¼›URI ç» frozen logical-URI confinementï¼ˆç»„ä»¶æ ¡éªŒ + physical_from_logical_uriï¼‰ï¼›artifact ä¸å¯å˜ã€‚ï¼ˆ4ï¼‰**è®°è´¦ä¸å˜å¼**ï¼šinput == mapped + quarantined ç”± runtime æœºå™¨å¼ºåˆ¶ï¼ˆè¿å â†’ NORMALIZATION_INTERNAL_ERROR BLOCKEDï¼‰ï¼›mapper éž MappingValidationError å¼‚å¸¸è®°ä¸º internal-error quarantineï¼ˆå¸¦ locatorï¼‰å¹¶ BLOCKEDâ€”â€”ä¸è¢«åžæŽ‰ã€‚ï¼ˆ5ï¼‰**quarantine**ï¼šmeta_provider_quarantineï¼ˆappend-onlyï¼‰â€”â€”raw request/table/row ordinal ç²¾ç¡®å®šä½ + scrubbed structured contextï¼ˆcredential é€’å½’ REDACTï¼‰+ scope/error_class/mapper identity/contractã€‚ï¼ˆ6ï¼‰**determinism**ï¼šrun_id = uuid5(sha256(evidence hash + contract + mapper identity))ï¼›idempotent replay è¿”å›žæ—¢æœ‰ runï¼ˆé›¶é‡å¤è¡Œï¼‰ï¼›semantic_hash è¡Œåºæ— å…³ï¼ˆreversed è¾“å…¥æµ‹è¯•ï¼‰ï¼›åŒ request ä¸åŒ evidence bytes â†’ RAW_EVIDENCE_INVALID BLOCKã€‚ï¼ˆ7ï¼‰**provider-faithful**ï¼šæ—¢æœ‰ mappers åŽŸæ ·æ³¨å†Œâ€”â€”provider literals/units/æœªéªŒè¯æ ‡è®°é€šè¿‡ï¼›history_stock_status â†’ ä¸‰è¾“å‡ºï¼ˆé•œåƒ + limit-price + CA-flag projectionï¼Œevent_type=STATUS_FLAG_PROJECTIONï¼‰ã€‚ï¼ˆ8ï¼‰**çŠ¶æ€æœº**ï¼šSUCCESS/PARTIAL/BLOCKEDï¼›PARTIAL ç”± registry é€ surface å£°æ˜Žã€‚  
-**Schema**ï¼šmigration 014ï¼ˆmeta_provider_normalization_run 22 åˆ— + meta_provider_quarantine 17 åˆ—ï¼›from-zero 14 é“¾ + idempotent + tamper å®ˆå«ï¼›æœªæ”¹æ—§æ–‡ä»¶ï¼‰  
-**Tests**ï¼štests/integration/test_provider_normalization.pyï¼ˆ37ï¼šraw å”¯ä¸€è¾“å…¥ / meta+bytes tamper BLOCK / missing-field / unparsable-date / unparsable-numeric quarantine æ—  sentinel / legal zero ä¸å½“ missing / è®°è´¦ä¸å˜å¼ / whole-payload calendar / multi-table è·¯ç”± / BLOCKED_PENDING_MAPPER / row locator / secret ä¸æ³„æ¼ / internal exception è®°å½• / idempotent + deterministic + conflicting evidence / URI confinement + evil request id / provider-faithfulï¼ˆunits/literals/GALAXY_UNVERIFIEDï¼‰/ ä¸‰è¾“å‡ºè·¯ç”± / çŠ¶æ€æœºä¸‰æ€ / ç»“æž„å®ˆå« Ã—3ï¼‰  
-**ADR**ï¼š[ADR-022](../adr/ADR-022_provider_normalization_quarantine.md)ï¼ˆæ–°ï¼›PROPOSED å¾…å¤å®¡ï¼‰ï¼›[ADR-021](../adr/ADR-021_publish_validation_exactness.md) status â†’ ACCEPTEDï¼ˆB2 é“¾ CLOSED åŒæ­¥ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260831-062 â€” Final DQ Authoritative Input Seal + Scan Transaction Closure
-
-**Type**ï¼šC1 validation å¥‘çº¦æ”¶å£ï¼ˆinput freshness sealï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B2.3 P0ï¼ˆaudit 20260831 Â§2/Â§3/Â§5ï¼‰â€”â€”completion proof åª seal `scanned_component_manifest_hash`ï¼Œæœªè¦†ç›– checker å®žé™…è¯»å–çš„å®Œæ•´ authoritative inputï¼šIDENTITY_FALLBACK è¿˜è¯» `dim_security.identity_key_version`ï¼ˆscan åŽæ”¹ä¸º FALLBACK â†’ components æœªå˜ manifest åŒ¹é… findings 0 â†’ false PASSï¼‰ï¼›BLOCKING_DQ è¿˜è¯» snapshot + äº” fact è¡¨ quality_flagsï¼ˆscan åŽåŠ  blocking flag â†’ åŒä¸Šï¼‰ï¼›artifact é‡ç»‘ snapshot è€Œ components ä¸å˜ â†’ proof æ— å­—æ®µè¯æ˜Žå½“æ—¶æ‰«çš„ snapshotï¼›ä¸” scanner çš„ artifact/components è¯»å–åœ¨ BEGIN TRANSACTION ä¹‹å‰ï¼ˆaudit Â§5 é¡ºåºç¼ºé™·ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-021 Amendment Gï¼‰ï¼šï¼ˆ1ï¼‰**å•ä¸€ production-owned spec å°è£…**ï¼ˆÂ§4.3 é˜²æ¼‚ç§»ï¼‰â€”â€”`ArtifactDQCheckerSpec` å¢žåŠ  `resolve_input`ï¼ˆè§£æž authoritative input stateï¼‰+ `evaluate`ï¼ˆå¯¹åŒä¸€ state åˆ¤å®šï¼‰ï¼›`fingerprint(input_state)` = canonical JSONï¼ˆå« check_id + checker_version + stateï¼‰â†’ SHA-256â€”â€”fingerprint ä¸Ž evaluation å¤©ç„¶åŒæºï¼›ï¼ˆ2ï¼‰input state å®šä¹‰ï¼ˆÂ§4.1/4.2ï¼‰ï¼šIDENTITY_FALLBACK = components distinct security_id + æ¯ä¸ªçš„å½“å‰ identity_key_versionï¼ˆæœªæ³¨å†Œ â†’ `__MISSING__`ï¼‰ï¼›BLOCKING_DQ = å½“å‰ data_snapshot_id + æ¯ fact è¡¨ (table_name, quality_flags, row_count) ç¨³å®šèšåˆï¼ˆNULL/empty è§„èŒƒåŒ–ï¼‰â€”â€”åª seal å½±å“ evaluator ç»“æžœçš„è¾“å…¥ï¼›ï¼ˆ3ï¼‰migration 013ï¼š`authoritative_input_hash` + `scanned_data_snapshot_id` ä¸¤åˆ—ï¼›DQ_SCAN_CONTRACT_VERSION â†’ dq-scan-b2.3-v1ï¼›validation contract â†’ b2-exact-v3ï¼›ï¼ˆ4ï¼‰**ä¸‰å±‚ seal æ¶ˆè´¹é“¾**ï¼ˆÂ§3ï¼‰ï¼šscanner proof â†’ validation reportï¼ˆdq_execution_seals ç»‘å®š execution_id/contract/producer/input seal/manifest/snapshotï¼‰â†’ publish transaction current-input recheckï¼ˆé‡ç®— CURRENT fingerprints æ¯”å¯¹â€”â€”validation åŽ input å˜åŒ– â†’ DQ_INPUT_STALE BLOCKï¼›ä¸å¯è§£æž â†’ DQ_INPUT_UNRESOLVABLE BLOCKï¼‰ï¼›ç‰©ç† bytes ç»ˆéªŒå…ˆè¡Œï¼ˆmissing/tampered æŠ¥å…·ä½“é”™è¯¯ï¼‰ï¼›ï¼ˆ5ï¼‰**Scan Transaction Closure**ï¼ˆÂ§5ï¼‰ï¼šBEGIN TRANSACTION FIRSTâ€”â€”authoritative reads å…¨éƒ¨ç§»å…¥äº‹åŠ¡å†…ï¼ˆ`_resolve_scan_context`ï¼‰ï¼›AST ordering å®ˆå«ï¼ˆé¦–ä¸ª execute å³ BEGIN ä¸”å…ˆäºŽ context è§£æžï¼‰ï¼›ï¼ˆ6ï¼‰validatorï¼šinput seal ç¼ºå¤±ï¼ˆlegacyï¼‰/ stale â†’ NOT_TESTABLEã€‚  
-**Tests**ï¼šTestR4B23AuthoritativeInputSealï¼ˆ12ï¼šAST ordering / identity æ”¹ FALLBACK / åˆ æ³¨å†Œ / fact åŠ  STALE_WINDOW / snapshot é‡ç»‘â€”â€”å››ç±» scan åŽ input å˜åŒ– stale-proof BLOCK / validation åŽ input å˜åŒ– Ã—2 â†’ publish recheck BLOCK / seal tamper+NULL â†’ fail closed / rescan åŽçœŸå®ž finding FAIL / genuine zero unchanged PASS+publish / report seal ä¸Ž ledger ä¸€è‡´ / ç¼º seals çš„ report æ‹’ç»ï¼‰+ æ—¢æœ‰ B2.2/B2.1 æµ‹è¯•é€‚é…é›¶å›žå½’ï¼ˆ67â†’69 å±€éƒ¨ï¼›å…¨é‡ 870/0ï¼‰  
-**ADR**ï¼š[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Amendment G  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260831-061 â€” Final Governed DQ Scan Execution Boundary
-
-**Type**ï¼šC1 validation å¥‘çº¦ç»“æž„æ€§æ”¶å£ï¼ˆexecution truthï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B2.2 P0ï¼ˆaudit 20260831 Â§2ï¼‰â€”â€”R4-B2.1 çš„ `record_artifact_check_execution` ä¸æ‰§è¡Œä»»ä½• scanï¼šcaller è¯» registry + å…¬å¼€ `compute_component_manifest_hash` å³å¯å¯¹ä¸¤ä¸ª check å„ä¼ªé€ ä¸€è¡Œ completionï¼ˆcontract/producer ä»»æ„éžç©ºä¸²ï¼‰ï¼Œä¸å†™ findingï¼Œvalidate å³ PASSâ€”â€”"caller self-declare scan executed"ï¼Œä¸Ž B1ï¼ˆself-declare APPROVEDï¼‰/ B2ï¼ˆself-declare 0 countsï¼‰åŒæž„ï¼›mock happy path æ­£åœ¨ä½¿ç”¨å£°æ˜Žè·¯å¾„ï¼›proof çš„ scan_contract_version / producer æ—  current-contract / checker-identity æ ¡éªŒï¼ˆ"fake-v0" + "attacker" ä¹Ÿèƒ½æˆä¸º PASS å‰ç½®ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-021 Amendment Fï¼‰ï¼šæ–°æ¨¡å— `pipeline/artifact_dq_scan.py`â€”â€”`run_required_artifact_dq_scan(conn, *, data_root, feature_artifact_set_id)` ä¸ºå”¯ä¸€ governed DQ scan execution boundaryï¼ˆç­¾ååªæœ‰ä¸‰é¡¹ï¼ŒAST å®ˆå«æ–­è¨€æ—  identity/result/count/completion å‚æ•°ï¼‰ï¼šSTATIC production registryï¼ˆARTIFACT_DQ_CHECKERSï¼šcheck_id / finding_class / checker_version / evaluatorï¼Œä¸å¯æ³¨å…¥ï¼‰â†’ å†…éƒ¨ resolve CURRENT components + compute manifest â†’ é€ check æ‰§è¡Œ evaluatorï¼ˆauthoritative inputï¼‰â†’ persist findingsï¼ˆappend-onlyï¼ŒæŒ‰ detail åŽ»é‡ï¼‰â†’ INSERT completion proof LASTï¼ˆcontract = CURRENT "dq-scan-b2.2-v1"ï¼›producer = registry æ´¾ç”Ÿ checker èº«ä»½â€”â€”å…¨éƒ¨ system-derivedï¼‰â†’ å•äº‹åŠ¡ COMMITï¼ˆevaluator raise â†’ ROLLBACK â†’ é›¶ completion row â†’ NOT_TESTABLEï¼‰ã€‚æ—§ `record_artifact_check_execution` ä»Žç”Ÿäº§å‘½åç©ºé—´åˆ é™¤ï¼ˆproduction INSERT å”¯ä¸€å‡ºçŽ°åœ¨ scan boundaryï¼ŒAST å®ˆå«ï¼‰ã€‚validator ä¸‰é‡æ ¡éªŒï¼šproof ç¼ºå¤± / contract != CURRENT / producer != system-derived checker identity / manifest != current â†’ NOT_TESTABLEã€‚**Authoritative inputs**ï¼ˆÂ§4.5ï¼‰ï¼šIDENTITY_FALLBACK = feature parquet security_idï¼ˆdistinctï¼‰Ã— dim_security.identity_key_versionï¼ˆFALLBACK ç‰ˆæœ¬æˆ–æœªæ³¨å†Œå‡ findingâ€”â€”fail closedï¼›mock_e2e è¡¥ dim_security æ³¨å†Œï¼‰ï¼›BLOCKING_DQ = snapshot äº”ä¸ª fact è¡¨ quality_flagsï¼ˆblocking é›† = QualityFlag å‡ IDENTITY_FALLBACKï¼‰ã€‚validation contract version â†’ b2-exact-v2ï¼ˆcount_source è¯­ä¹‰æ›´æ–°ï¼Œæ—§ seal ç”± current-contract recheck å¤±æ•ˆï¼‰ã€‚çœŸå®žæ£€æµ‹æµ‹è¯•ï¼ˆæ— ä¼ªé€ è¯­ä¹‰ï¼‰ï¼šfallback èº«ä»½ UPDATE â†’ çœŸå®žå‘çŽ° â†’ FAILï¼›STALE_WINDOW fact è¡Œ â†’ çœŸå®žå‘çŽ° â†’ FAILã€‚  
-**Tests**ï¼štest_publish_validation_exactness.py::TestR4B22GovernedScanBoundaryï¼ˆ10ï¼‰+ TestR4B21DQExecutionProof é€‚é…ï¼ˆ6 é¡¹ B2.1 è¯­ä¹‰åœ¨æ–°ç»“æž„ä¸‹é›¶å›žå½’ï¼‰+ confinement æµ‹è¯•é€‚é…ï¼ˆattacker re-seal åœºæ™¯â€”â€”scanner è‡ªèº«æ‹’å¼€æ¶æ„ URIï¼Œvalidation å±‚ä» fail closedï¼‰  
-**ADR**ï¼š[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Amendment F  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-060 â€” Publish Validation Logical-URI Confinement + Manifest Check Rename
-
-**Type**ï¼šC1 correctness closureï¼ˆfrozen P0-4 å›žå½’ä¿®å¤ + check è¯­ä¹‰è¯šå®žåŒ–ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B2.1 P0-04 + P1-01ï¼ˆaudit 20260830 Â§5/Â§6ï¼‰â€”â€”R4-B2 æ–°ç‰©ç†æ–‡ä»¶è¯»å–ï¼ˆvalidator ç»„ä»¶é‡éªŒ / publish bytes ç»ˆéªŒ / report è¯»å–ï¼‰ç›´æŽ¥ `data_root / uri`ï¼Œç»•è¿‡ frozen `physical_from_logical_uri` helperï¼šescaped/absolute/drive/backslash/alias URI å¯è¯» data_root å¤–æ–‡ä»¶ä¸”è¢«"ä¸€è‡´åœ°éªŒè¯"ï¼›ARTIFACT_MANIFEST_INTEGRITY åªè¯æ˜Ž"manifest_hash éžç©º + æœ‰ components"ï¼Œåç§°ä¸Žè¯æ®ä¸ä¸€è‡´ã€‚  
-**New Contract**ï¼ˆADR-021 Amendment E.5/E.6ï¼‰ï¼šï¼ˆ1ï¼‰validation ä¸Ž publish final recheck è§£æžä»»ä½• registry `file_uri` åŠ report_uri ç»Ÿä¸€ç» `physical_from_logical_uri(data_root, uri)`ï¼ˆfrozen P0-4 helperï¼›URI å±‚ fail closed å…ˆäºŽä»»ä½• data_root å¤–è¯»å–ï¼›ä¿æŒ exact string identityï¼Œä¸ normalize æŽ¥å— aliasï¼‰ï¼›æ¶æ„ URI â†’ validation required check FAILï¼ˆconfinement è¯è®°å½•ï¼‰â†’ publish BLOCKã€‚ï¼ˆ2ï¼‰check renameï¼š`ARTIFACT_MANIFEST_INTEGRITY` â†’ `ARTIFACT_MANIFEST_PRESENT_AND_SEALED`ï¼ˆOption Bâ€”â€”è¯æ˜Žæ³¨å†Œä¸Šæ¸¸ seal å­˜åœ¨ï¼›exact component integrity ç”± component manifest seal + COMPONENT_* checks è¯æ˜Žï¼›å½“å‰ schema æ— æ³•æ— æŸé‡å»º registration formulaï¼Œä¸ overclaimï¼‰ã€‚  
-**Tests**ï¼šTestR4B21LogicalURIConfinementï¼ˆ7ï¼š../outside / /absolute / C:/drive / backslash / a//b / a/./b å…­ç±»æ¶æ„ URIï¼ˆdata_root å¤– perfect sentinel bytes ä¸€è‡´ä»è¢«æ‹’ï¼‰+ canonical unchanged PASSï¼‰ï¼›æ—¢æœ‰ happy æ–­è¨€ç» REQUIRED_VALIDATION_CHECKS æžšä¸¾è‡ªåŠ¨è¦†ç›– rename  
-**ADR**ï¼š[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Amendment E.5/E.6  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-059 â€” Full Transaction-Internal Publish Preconditions
-
-**Type**ï¼šC1 publish å¥‘çº¦æ”¶å£ï¼ˆOption A å®Œæˆï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B2.1 P0-03ï¼ˆaudit 20260830 Â§4ï¼‰â€”â€”R4-B2 åªæŠŠ `_b2_recheck` æ”¾è¿›äº‹åŠ¡ï¼Œå®Œæ•´ lineage readsï¼ˆsnapshot / artifact / feature-set / run / universeï¼‰ä»åœ¨äº‹åŠ¡å¤–ï¼šADR "TOCTOU closed" ä¸Ž "precondition read ä»åœ¨äº‹åŠ¡å¤–"ä¸èƒ½åŒæ—¶æˆç«‹ï¼›äº‹åŠ¡å¤–è¯»å–çš„çŠ¶æ€ä¸æ˜¯ transaction å†… authoritative factã€‚  
-**New Contract**ï¼ˆADR-021 Amendment E.4ï¼‰ï¼š`publish_snapshot` é‡æž„â€”â€”å…¨éƒ¨ authoritative reads åœ¨ `BEGIN TRANSACTION` ä¹‹åŽæ‰§è¡Œï¼ˆæ–° helper `_resolve_publish_preconditions`ï¼ˆå®Œæ•´ lineage gate è¯­ä¹‰é›¶å˜æ›´ï¼‰äº‹åŠ¡å†…è°ƒç”¨ï¼›`_b2_recheck` åŒï¼‰ï¼›å†™å…¥åªæ¶ˆè´¹äº‹åŠ¡å†…å€¼ï¼›äº‹åŠ¡å¤–æ— ä»»ä½• correctness readã€‚AST ordering å®ˆå«ï¼ˆæµ‹è¯•ï¼‰ï¼špublish_snapshot ä½“å†… BEGIN TRANSACTION å…ˆäºŽ precondition resolver / seal recheck / é¦–ä¸ª conn.executeã€‚çŠ¶æ€å˜åŒ–åœºæ™¯ï¼ˆsnapshot demoted / artifact demoted/rebound / feature-set member æ”¹åŠ¨ / run çŠ¶æ€å˜åŒ– / universe åˆ é™¤ï¼‰å…¨éƒ¨ BLOCKï¼›å¤±è´¥ rollback ä¿ç•™æ—§ PUBLISHEDï¼ˆåŽŸå­ republish å¥‘çº¦ FREEZE é›¶å›žå½’ï¼‰ã€‚  
-**Tests**ï¼šTestR4B21TransactionInternalPreconditionsï¼ˆ8ï¼šAST ordering å®ˆå« + ä¸ƒä¸ªçŠ¶æ€å˜åŒ–åœºæ™¯ BLOCKï¼‰ï¼›test_failure_injection scenario D é›¶å›žå½’  
-**ADR**ï¼š[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Amendment E.4  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-058 â€” Full Validation Seal Consumption / Current Contract Recheck
-
-**Type**ï¼šC1 publish å¥‘çº¦æ”¶å£ï¼ˆseal æˆä¸º correctness inputï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B2.1 P0-02ï¼ˆaudit 20260830 Â§3ï¼‰â€”â€”R4-B2 å†™å…¥äº†å®Œæ•´ seal å­—æ®µï¼ˆcontract hash / checks hash / validator commit / validation versionï¼‰ä½† `_b2_recheck` åªæ¶ˆè´¹ id/counts/report_uri/report_hash/åŒ manifestâ€”â€”"å†™äº† seal"è€Œéž"seal æˆä¸º correctness input"ï¼›ADR "contract hash changes invalidate prior seals" ä¸æˆç«‹ï¼ˆcheck IDs ä¸å˜ + è¯­ä¹‰å˜åŒ–æ—¶æ—§ report ä»å…¨ PASS å¯å‘å¸ƒï¼‰ã€‚  
-**New Contract**ï¼ˆADR-021 Amendment E.3ï¼‰ï¼š`_b2_recheck` å®Œæ•´ seal ä¸‰æ–¹äº¤å‰éªŒè¯ï¼š`validation_contract_hash` ledger == report == `validation_contract_hash()` CURRENTï¼ˆè¯­ä¹‰æ€§ contract æ¼”è¿›ä½¿æ—§ seal å¤±æ•ˆï¼‰ï¼›`required_checks_hash` ledger == report == report checks æ•°ç»„é‡ç®— hashï¼ˆstatus æ”¹åŠ¨æœªé‡å°å³æš´éœ²ï¼‰+ duplicate check_id æ‹’ç»ï¼ˆé˜² dict collapseï¼‰ï¼›`validator_code_commit` ledger == report ä¸”éžç©ºï¼›`validation_version` ledger == report == å½“å‰ supported ç‰ˆæœ¬ã€‚`validate_artifact_for_publish` ç§»é™¤ caller `validation_version` å‚æ•°ï¼ˆsystem-derivedâ€”â€”ä¸å…è®¸è‡ªæŠ¥ provenanceï¼›æ—  silent grandfatherï¼‰ã€‚  
-**Tests**ï¼šTestR4B21FullSealConsumptionï¼ˆ9ï¼šreport contract hash stale / ledger-report mismatch / current contract monkeypatch å˜åŒ–ï¼ˆIDs ä¸å˜ï¼‰/ report checks hash tamper / ledger mismatch / status æ”¹åŠ¨æœªé‡å° / validator commit mismatch / version mismatch / duplicate check idâ€”â€”å…¨éƒ¨åœ¨ re-bind report hash åŽä» BLOCKï¼‰  
-**ADR**ï¼š[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Amendment E.3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-057 â€” DQ Required-Check Positive Execution Proof
-
-**Type**ï¼šC1 validation å¥‘çº¦æ”¶å£ï¼ˆæ¶ˆé™¤"æœªæ‰§è¡Œå³ PASS"ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B2.1 P0-01ï¼ˆaudit 20260830 Â§2ï¼‰â€”â€”IDENTITY_FALLBACK_ZERO / BLOCKING_DQ_ZERO ä»…å‡­ finding è¡¨ count==0 å³ PASSï¼šfeature pipeline æ ¹æœ¬æ²¡è·‘æ‰«ææ—¶è¡¨è‡ªç„¶ä¸ºç©ºâ€”â€”"æ£€æŸ¥è¿‡ä¸”ä¸ºé›¶"ä¸Ž"æ ¹æœ¬æ²¡æ£€æŸ¥"ä¸å¯åŒºåˆ†ï¼ˆB2-02 æœ¬è¦æ¶ˆé™¤çš„æ­£æ˜¯è¿™ä¸ªï¼‰ã€‚ADR-021 æŠŠå®ƒåˆ—ä¸º CR-3 residual risk ä¸èƒ½ä½œä¸º VERIFIED å‰æï¼ˆB2 è‡ªå·±å·²å£°æ˜Žè¿™ä¸¤é¡¹ REQUIREDï¼‰ã€‚  
-**New Contract**ï¼ˆADR-021 Amendment E.2ï¼‰ï¼šæ–°è¡¨ `meta_artifact_check_execution`ï¼ˆmigration 012ï¼‰ï¼šgoverned scan çš„æ­£å‘æ‰§è¡Œè¯æ˜Žâ€”â€”check_id / feature_artifact_set_id / scan_contract_version / producer / **scanned_component_manifest_hash**ï¼ˆexact æ‰«æè¾“å…¥èº«ä»½ï¼‰/ completed_atï¼›**ä¸å« count ä¸å« result**ï¼ˆ`record_artifact_check_execution` ç­¾åæ—  result å‚æ•° + production å”¯ä¸€ INSERT è¾¹ç•Œ AST å®ˆå«â€”â€”caller æ— æ³• declare count=0/PASSï¼‰ã€‚validator è¯­ä¹‰ï¼šæ—  proof â†’ NOT_TESTABLEï¼ˆabsence of bad findings != proof of zero findingsï¼‰ï¼›stale proofï¼ˆscanned manifest != currentï¼‰â†’ NOT_TESTABLEï¼ˆrescan requiredï¼‰ï¼›åŒ¹é… proof + æ´¾ç”Ÿ count==0 â†’ PASSï¼ˆdetail è®°å½• scan executed + producer + contractï¼‰ã€‚findings ä»èµ° append-only äº‹å®žè¡¨ï¼›counts ä»æ˜¯æ´¾ç”Ÿå€¼ã€‚æ®‹ä½™è¾¹ç•Œå¦‚å®žè®°å½•ï¼šproof è¯æ˜Ž"æ‰«ææ‰§è¡Œè¿‡ä¸”ç»‘å®š exact è¾“å…¥"ï¼Œä¸è¯æ˜Ž"æ‰«æè€…è¯šå®žä¸ŠæŠ¥å…¨éƒ¨ findings"ï¼ˆfeature pipeline DQ æ²»ç†é“¾ / CR-3 åŸŸï¼‰ã€‚  
-**Tests**ï¼šTestR4B21DQExecutionProofï¼ˆ6ï¼šno proof + no findings â†’ NOT_TESTABLE BLOCK / valid proof zero findings PASS / foreign artifact proof ä¸è½¬ç§» / stale proof after component change BLOCK / ç¼ºä¸€é¡¹ proof BLOCK / API æ—  result å‚æ•° + å”¯ä¸€ INSERT è¾¹ç•Œï¼‰ï¼›mock_e2e åœ¨ validate å‰è®°å½• proofsï¼ˆproduction mock é“¾ç¤ºèŒƒï¼‰  
-**ADR**ï¼š[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Amendment E.2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-056 â€” Publish Final Recheck / TOCTOU Closure + Latest-Head Policy
-
-**Type**ï¼šC1 publish å¥‘çº¦æ”¶å£  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B2 B2-05/B2-06ï¼ˆaudit 20260830 Â§7/Â§8ï¼‰â€”â€”publish_snapshot çš„ precondition read ä¸Ž latest validation selection åœ¨ BEGIN TRANSACTION ä¹‹å‰å®Œæˆï¼Œä¹‹åŽæ‰å¼€å†™äº‹åŠ¡ï¼ˆTOCTOUï¼šprecheck ä¸Ž commit ä¹‹é—´çŠ¶æ€å˜åŒ–ä¸è¢«å‘çŽ°ï¼Œpublish å¯èƒ½ commit åŸºäºŽæ—§è¯»æ•°çš„ç»“è®ºï¼‰ï¼›latest-head é€‰æ‹©è§„åˆ™æœªæœºå™¨æ˜Žç¡®ï¼ˆold PASS + newer FAIL æ—¶ä¸å¾—é€‰æ—§ PASSï¼‰ã€‚  
-**New Contract**ï¼ˆADR-021 Â§2.4/2.5ï¼‰ï¼špublish_snapshot æ–°å¢ž required å‚æ•° `data_root`ï¼›publish-critical é‡éªŒç§»å…¥äº‹åŠ¡å†…ï¼ˆ`_b2_recheck`ï¼ŒReviewer æŽ¨è Option Aï¼‰ï¼šï¼ˆ1ï¼‰deterministic latest-headï¼ˆvalidated_at DESC, artifact_validation_id DESCï¼›validated_at ç”± validator ç³»ç»Ÿæ—¶é’Ÿå†™å…¥ï¼‰ï¼›ï¼ˆ2ï¼‰legacy æ—  seal è¡Œ BLOCKï¼›ï¼ˆ3ï¼‰report bytes sha256 == ledger report_hash + id/artifact-set èº«ä»½æ¯”å¯¹ï¼›ï¼ˆ4ï¼‰current registered artifact_manifest_hash == seal ä¸” registry é‡ç®— component_manifest_hash == sealï¼›ï¼ˆ5ï¼‰required check é›†å®Œæ•´ä¸”å…¨ PASSï¼›ï¼ˆ6ï¼‰counts==0ï¼›ï¼ˆ7ï¼‰ç‰©ç†å­—èŠ‚ç»ˆéªŒï¼ˆæ¯ç»„ä»¶æ–‡ä»¶å­˜åœ¨ + sha256 == æ³¨å†Œ content_hashâ€”â€”validate åŽæ–‡ä»¶è¢«æ›¿æ¢å³ä½¿ registry æœªå˜ä¹Ÿ BLOCKï¼‰ã€‚ä»»ä½•å¤±è´¥ â†’ ROLLBACK â†’ æ—§ PUBLISHED ä¿ç•™ï¼ˆåŽŸå­ republish å¥‘çº¦ FREEZEï¼‰ï¼›supersede/insert/universe/run/uniqueness é€»è¾‘é›¶æ”¹åŠ¨ã€‚caller æ—  API ä¼ åŽ†å² validation idã€‚  
-**Tests**ï¼štest_publish_validation_exactness.pyï¼ˆnewer FAIL åŽ‹ old PASS / legacy row BLOCK / registry+bytes tamper Ã—4 / report tamper/missing/æ¢ç»‘ / PK æ³¨å…¥ rollback / happy ç»‘å®š exact idï¼‰ï¼›test_failure_injection.pyï¼ˆscenario D rollback è¿ç§» data_root åŽé›¶å›žå½’ï¼‰  
-**ADR**ï¼š[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Â§2.4/2.5  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-055 â€” Exact Artifact Validation Seal / Persisted Report
-
-**Type**ï¼šC1 validation å¥‘çº¦æ‰©å±•  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B2 B2-03/B2-04ï¼ˆaudit 20260830 Â§5/Â§6ï¼‰â€”â€”ledger åªç»‘ feature_artifact_set_id å­—ç¬¦ä¸²ï¼Œä¸ç»‘ artifact/component çš„ exact identityï¼ˆbytes/schema/row/manifestï¼‰ï¼›validation æ—  persisted evidence identityï¼›publish æ— æ³•æœºå™¨é‡éªŒ"è¿™æ¬¡ PASS éªŒè¯çš„å°±æ˜¯çŽ°åœ¨è¦å‘å¸ƒçš„å­—èŠ‚"ã€‚  
-**New Contract**ï¼ˆADR-021 Â§2.3ï¼‰ï¼šmigration 011 ledger æ–°å¢ž 6 åˆ—ï¼ˆartifact_manifest_hash / component_manifest_hash / validation_contract_hash / report_uri / report_hash / required_checks_hashï¼‰ï¼›component_manifest_hash é‡‡ç”¨ B2 å…¨å­—æ®µå…¬å¼ï¼ˆfile_uri/content/schema hash/row_count/family/version/layer/partition æŽ’åº canonical JSON hashâ€”â€”component ä»»ä½•å¢žåˆ æ”¹éƒ½æ”¹å˜å®ƒï¼‰ï¼›validation_contract_hash() æ˜¯ check contract èº«ä»½ï¼ˆç‰ˆæœ¬ + required check é›† + seal å­—æ®µ + count æºï¼‰ï¼›report ç‰©ç†è½ç›˜ `data_root/validation/<artifact_validation_id>.json`ï¼ˆwrite_file_atomicï¼Œimmutable bytesï¼Œå«å…¨éƒ¨ seal + checks[] + derived summary countsï¼‰ï¼›ledger.detail åªæ˜¯æ‘˜è¦ï¼Œcorrectness identity å…¨åœ¨ reportã€‚publish é‡éªŒ = report bytes hash + ledger èº«ä»½ + current registry åŒ hash + required checksï¼ˆè§ DM-CR-20260830-056ï¼‰ã€‚  
-**Tests**ï¼šhappy report å…¨ check PASS æ–­è¨€ï¼›report tamper/missing/æ¢ç»‘ä¸‰åœºæ™¯ BLOCK  
-**ADR**ï¼š[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Â§2.3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-054 â€” Formal Artifact Validation Execution Boundary + Typed Checks
-
-**Type**ï¼šC1 æ–°æ­£å¼è·¯å¾„å¥‘çº¦ï¼ˆç»“æž„æ€§ anti-bypassï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B2 B2-01/B2-02ï¼ˆaudit 20260830 Â§2/Â§3/Â§4ï¼‰â€”â€”record_artifact_validation ç›´æŽ¥æŠŠ caller æäº¤çš„ä¸¤ä¸ªè®¡æ•°å†™è¿› append-only ledger è€Œä¸æ‰§è¡Œä»»ä½• artifact validationï¼ˆcaller self-declare "0/0" â†’ PASS-shaped record â†’ publish eligibleï¼Œä¸Ž B1 æ—©æœŸ approval bypass åŒæž„ï¼‰ï¼›publish gate åªæœ‰ aggregate countsï¼Œæ— æ³•è¯æ˜Ž required checks å…¨éƒ¨æ‰§è¡Œã€‚  
-**New Contract**ï¼ˆADR-021 Â§2.1/2.2ï¼‰ï¼šï¼ˆ1ï¼‰æ–°æ¨¡å— `pipeline/artifact_validation.py`â€”â€”`validate_artifact_for_publish(conn, *, data_root, feature_artifact_set_id, validator_code_commit)` ä¸ºå”¯ä¸€æ­£å¼ validation æ‰§è¡Œè¾¹ç•Œï¼ˆresolve registry â†’ ç‰©ç†å­—èŠ‚é‡éªŒ â†’ typed checks â†’ æ´¾ç”Ÿ counts â†’ seal â†’ æŒä¹…åŒ– report â†’ inline INSERTï¼›æ²¿ B1.2 Option A æ¨¡å¼ï¼Œæ— ç‹¬ç«‹ persistence callableï¼‰ï¼›ï¼ˆ2ï¼‰æ—§ `record_artifact_validation` ä»Žç”Ÿäº§å‘½åç©ºé—´åˆ é™¤ï¼Œmeta_artifact_validation çš„ INSERT å…¨ä»“åº“å”¯ä¸€å‡ºçŽ°åœ¨è¾¹ç•Œå‡½æ•°å†…ï¼ˆAST å®ˆå«ï¼›ç­¾åæ—  count/result/checks/report å‚æ•°ï¼‰ï¼›ï¼ˆ3ï¼‰æ–°è¡¨ `meta_artifact_dq_finding`ï¼ˆmigration 011ï¼Œappend-only åäº‹å®žï¼Œfinding_class ç™½åå•ï¼‰â€”â€”counts ç”± `SELECT count(*)` æ´¾ç”Ÿï¼Œ`record_artifact_dq_finding` åªèƒ½è¿½åŠ åäº‹å®žï¼ˆç»“æž„ä¸Šä¸å¯èƒ½åˆ¶é€  PASSï¼‰ï¼›ï¼ˆ4ï¼‰`ArtifactValidationCheckId` åç±» required checkï¼ˆPASS/FAIL/NOT_TESTABLEï¼ŒNOT_TESTABLE=blockingï¼›ç‰©ç†å­—èŠ‚çº§ content/schema/row é‡éªŒï¼›FEATURE_FAMILY_COVERAGE= components distinct (family,version) == member (id,version) é›†åˆâ€”â€”mock_e2e component feature_family å¯¹é½ member idï¼Œç‰©ç† bytes ä¸å˜ï¼‰ã€‚æ—¢æœ‰æµ‹è¯•è¿ç§»ï¼šrecord_artifact_validation ä¸‰å¤„è°ƒç”¨æ”¹ DQ facts + formal validatorï¼›æ–­è¨€æ›´æ–°ä¸º check-level é˜»æ–­ã€‚  
-**Tests**ï¼štest_publish_validation_exactness.py::TestNoCallerDeclaredPassï¼ˆ3ï¼šcount-writer æ¶ˆå¤± / AST å®ˆå« / raw SQL ä¼ªé€ æ—  seal è¡Œ BLOCKï¼‰+ TestTypedRequiredChecksï¼ˆ4ï¼šhappy å…¨ PASS / missing check / NOT_TESTABLE / unknown check æ›¿ä»£ï¼‰ï¼›test_publish_validation_gate.py + test_publish_lineage.py è¿ç§»åŽå…¨è¿‡ï¼ˆ25/0ï¼‰ï¼›test_migrations.py 11-migration é€‚é…  
-**ADR**ï¼š[ADR-021](../adr/ADR-021_publish_validation_exactness.md) Â§2.1/2.2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-053 â€” Industry Constituent REQUIRED Endpoint Proof
-
-**Type**ï¼šC1 contract è¯­ä¹‰ä¿®æ­£ï¼ˆå¿…è¦äº¤ä»˜é¢ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B1.2 P0-02ï¼ˆaudit 20260830 Â§3ï¼‰â€”â€”industry_taxonomy çš„ canonical deliverable æ˜¯ bridge_industry_memberï¼ˆsecurity â†” industry MEMBERSHIPï¼‰ï¼Œä½† R4-B1.1 æŠŠ constituent æ ‡ä¸º OPTIONAL_NON_APPROVAL_SURFACEï¼šbase_info PASS + constituent DENIED æ—¶ ENDPOINT gate ä» PASS å¹¶å¯ APPROVEDï¼Œè€Œ bridge_industry_member æ— æ³•å¯é æž„å»ºï¼ˆè¯æ˜Žä»£è¡¨æ€§ endpoint â‰  è¯æ˜Žå¿…è¦äº¤ä»˜é¢ï¼Œä¸Ž security_master é—®é¢˜åŒæž„ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-020 Amendment D.2ï¼‰ï¼š`industry_taxonomy:InfoData.get_industry_constituent` = REQUIRED_ENDPOINT_PROOFï¼ˆrequirements è¡¨ + classification åŒæ­¥ï¼Œreason ç»‘å®š bridge_industry_member äº¤ä»˜è¯­ä¹‰ï¼‰ï¼›`get_industry_weight` / `get_industry_daily` ç»´æŒ OPTIONAL ä½† reason æ˜¾å¼æŒ‡å‘å½“å‰æ¶ˆè´¹è¾¹ç•Œï¼ˆmembership æž„å»ºä¸æ¶ˆè´¹ï¼›consumer å˜åŒ–æ—¶é‡æ–°è¯„ä¼°ï¼‰ï¼›provider/target æ–°å¢ž exact exchange surface `get_industry_constituent_exchange`ï¼ˆprovider + Protocol + RealTarget + FakeTarget å››å¤„åŒæ­¥ï¼‰+ probe factoryã€‚**canonical-deliverable ç»“æž„å®ˆå«**ï¼ˆæ–°æµ‹è¯•ï¼‰ï¼šmulti-endpoint capability çš„ REQUIRED requirements é›†åˆ == canonical äº¤ä»˜é¢å¿…è¦ç«¯ç‚¹é›†åˆï¼ˆsecurity_master={hist}ï¼›adj_factor={forward}ï¼›corporate_action={dividend,right_issue}ï¼›industry_taxonomy={base_info,constituent}ï¼›index_daily={query_kline}ï¼‰ã€‚  
-**Tests**ï¼štest_endpoint_requirement_proof.py::TestIndustryConstituentRequiredSurfaceï¼ˆ3ï¼šbase_info PASS + constituent DENIED â†’ ENDPOINT FAIL + BUSINESS fired==0 + å¤±è´¥ exchange æŒä¹…åŒ– + VALIDATED_FAIL caseï¼›b1 BLOCKED + REPORT è¯šå®žå¤±è´¥ï¼›canonical-deliverable surfaces == REQUIRED requirementsï¼‰  
-**ADR**ï¼š[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) Amendment D.2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-052 â€” Structural Approval Anti-Bypassï¼ˆOption Aï¼‰
-
-**Type**ï¼šC1 approval è¾¹ç•Œç»“æž„æ€§é‡æž„  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B1.2 P0-01ï¼ˆaudit 20260830 Â§2ï¼‰â€”â€”R4-B1.1 çš„ anti-bypass æ˜¯ Python å‘½åçº¦å®šéžè®¿é—®æŽ§åˆ¶ï¼š`_approve_and_persist_capability_testonly()` å¯è¢«æ˜¾å¼ importï¼›`VerifiedCapabilityApproval` æ˜¯æ™®é€šå¯å®žä¾‹åŒ– dataclassï¼ˆ`__post_init__` åªæŸ¥éžç©ºï¼‰ï¼Œcaller ä¼ªé€ åŽç›´è°ƒ `_persist_verified_capability()`â€”â€”åŽè€…åªé‡åš `_validate_evidence`ï¼Œä¸é‡éªŒ closed production run / verdict / formal gate REPORT / endpoint proof / Raw meta cross-bindingã€‚  
-**New Contract**ï¼ˆADR-020 Amendment D.1ï¼ŒReviewer Preferred Option Aï¼‰ï¼šç”Ÿäº§æ¨¡å—å½»åº•ä¸å­˜åœ¨"æ— éœ€ formal run å³å¯å†™ APPROVED"çš„ callableâ€”â€”ï¼ˆ1ï¼‰`_approve_capability_in_memory_testonly` / `_approve_and_persist_capability_testonly` / `VerifiedCapabilityApproval` / `_persist_verified_capability` å…¨éƒ¨ä»Ž capability.py åˆ é™¤ï¼›ï¼ˆ2ï¼‰æŒä¹…åŒ–äº‹åŠ¡ï¼ˆR3-P1-05 validate-before-mutate / å•äº‹åŠ¡ / cache-rebuild / R2-P1-01 UPDATE-only-governance-fieldsï¼‰inline è¿› `approve_from_spike_run` å°¾éƒ¨â€”â€”caller åˆ°è¾¾å†™å…¥ç‚¹å¿…å·²é€šè¿‡å®Œæ•´éªŒè¯é“¾ï¼›ï¼ˆ3ï¼‰æµ‹è¯•æ‰€éœ€ transaction/cache mechanics ç§»å…¥ `tests/integration/_capability_test_persistence.py`ï¼ˆtests/ å†…ï¼›ç”Ÿäº§ src ä¸ import test æ¨¡å—ï¼‰ï¼›ï¼ˆ4ï¼‰å¯¹æŠ—æµ‹è¯•æ”¹ä¸ºçœŸå®žç»•è¿‡å°è¯•ï¼ˆ7 é¡¹ï¼‰ï¼šä¼ªé€  verified object â†’ ç±»ä¸å­˜åœ¨ï¼›caller-built evidence + frozen id â†’ æ—  importable è·¯ç”±ï¼›AST å®ˆå«ï¼ˆcapability.py ä¸­å”¯ä¸€å¼•ç”¨ APPROVED çŠ¶æ€çš„å‡½æ•°æ˜¯ approve_from_spike_run ä¸”ç­¾åæ—  evidence/verified å‚æ•°ï¼›src/ å…¨æ¨¡å—ä¸ import tests.*ï¼‰ã€‚  
-**Tests**ï¼štest_approval_anti_bypass.py::TestApprovalAntiBypass é‡å†™ï¼ˆ7ï¼‰ï¼›test_capability_governance.py / test_trial_production_boundary.py è¿ç§»è‡³ tests/ helperï¼ˆapprove_and_persist_testonly / approve_in_memory_testonlyï¼‰  
-**ADR**ï¼š[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) Amendment D.1  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-051 â€” Persisted Identity Cross-Binding
-
-**Type**ï¼šC1 approval å¥‘çº¦æ”¶å£ï¼ˆå››å±‚ç²¾ç¡®ç»‘å®šï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B1.1 P0-03ï¼ˆaudit 20260830 Â§4ï¼‰â€”â€”REPORT re-check æœªæ ¸éªŒ provider_dataset/actual_dataset exactnessï¼Œæœªè¦æ±‚ endpoint proof case çš„ evidence_ref/hash == REPORT entry çš„ evidence_uri/hashï¼ˆcase ä¸Ž artifact ä¹‹é—´æ—  identity equalityï¼‰ï¼Œæœªä»Ž persisted Raw meta åå‘é‡éªŒ request_id/endpoint/provider_datasetâ€”â€”ç¯¡æ”¹ REPORT entry åŽ re-bind hash å³å¯é€šè¿‡ã€‚  
-**New Contract**ï¼ˆADR-020 Amendment C.5ï¼‰ï¼š`_require_formal_gate_proof` é‡å†™å¹¶è¿”å›ž proven requirement idsï¼ˆä¾› VerifiedCapabilityApproval æ¶ˆè´¹ï¼‰â€”â€”å¯¹æ¯ä¸ªæ»¡è¶³ requirement çš„ PASS è¯æ˜Žï¼šcontract â†” REPORT entryï¼ˆendpoint + provider_dataset + capability ä¸‰å­—æ®µï¼‰ï¼›proof case â†” REPORT entryï¼ˆevidence_ref == evidence_uri ä¸” evidence_hash == evidence_hashâ€”â€”case ä¸Ž artifact å¯¹"ä»€ä¹ˆè¯æ®è¯æ˜Žäº†è¯¥ç«¯ç‚¹"å¿…é¡»ä¸€è‡´ï¼‰ï¼›REPORT entry â†” persisted Raw metaï¼ˆsha256(bytes) == entry.evidence_hashï¼‰ï¼›Raw meta â†” contract/entryï¼ˆendpoint + provider_dataset + request_id ç²¾ç¡®ç›¸ç­‰ï¼‰ã€‚approval æ–°å¢ž spike_root å‚æ•°ï¼›run_dir/spike_root ç¼ºå¤±å³æ‹’ç»ï¼ˆfail closedï¼‰ã€‚9 é¡¹å¯¹æŠ—æµ‹è¯•å…¨éƒ¨åœ¨ REPORT hash re-bind åŽä»æ‹’ç»ï¼šactual_dataset tamper / provider_dataset tamper / evidence_uri æ¢ permission è¯æ® / evidence_hash æ¢å¦ä¸€ä»½åˆæ³• hash / case evidence_ref ä¸Ž entry ä¸ä¸€è‡´ / case evidence_hash ä¸Ž entry ä¸ä¸€è‡´ / raw meta endpoint tamper / raw meta provider_dataset mismatch / raw meta request_id mismatchã€‚  
-**Tests**ï¼štests/integration/test_approval_anti_bypass.py::TestCrossBindingTamperï¼ˆ9ï¼‰  
-**ADR**ï¼š[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) Amendment C.5  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-050 â€” Approval Anti-Bypassï¼ˆå”¯ä¸€ç”Ÿäº§ APPROVED transitionï¼‰
-
-**Type**ï¼šC1 approval è¾¹ç•Œé‡æž„  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B1.1 P0-02ï¼ˆaudit 20260830 Â§3ï¼‰â€”â€”approve_and_persist_capability() / approve_capability() æ˜¯ public è·¯å¾„ä¸”åªåš _validate_evidenceï¼ˆå­—æ®µéžç©º + RETIRED æ‹’ç» + positive frozen identityï¼‰ï¼Œä¸æ¶ˆè´¹ formal endpoint proofâ€”â€”caller self-declare CapabilityEvidence å³å¯ APPROVEDã€‚  
-**New Contract**ï¼ˆADR-020 Amendment C.4ï¼‰ï¼šæ–°å¢žå†…éƒ¨ sealed proof object `VerifiedCapabilityApproval`ï¼ˆname / evidence / verified_from_run / endpoint_requirements_provenï¼›ç©ºè¯æ˜Žç¦æ­¢æž„é€ ï¼‰â€”â€”åªåœ¨ approve_from_spike_run å…¨éªŒè¯é“¾é€šè¿‡åŽæž„é€ ï¼›DB å†™ APPROVED çš„å”¯ä¸€è¾¹ç•Œ = private `_persist_verified_capability(conn, verified)`ï¼ˆåªæŽ¥å— verified objectï¼›ä¿ç•™ R3-P1-05 validate-before-mutate / å•äº‹åŠ¡ / cache-rebuild è¯­ä¹‰ä¸Ž R2-P1-01 UPDATE-only-governance-fieldsï¼‰ã€‚æ—§ public å‡½æ•°ç§»é™¤ï¼šapprove_and_persist_capability / approve_capability ä»Žæ¨¡å—å‘½åç©ºé—´æ¶ˆå¤±ï¼›æµ‹è¯•æ”¹ç”¨æ˜¾å¼ test-only helperï¼ˆ_approve_and_persist_capability_testonly / _approve_capability_in_memory_testonlyï¼Œdocstring å£°æ˜Žéžç”Ÿäº§è·¯å¾„ï¼‰ã€‚AST å®ˆå« Ã—2ï¼šsrc/ å…¨æ¨¡å—ç¦æ­¢å¼•ç”¨ test-only helperï¼›capability.py ä¸­ APPROVED å­—é¢é‡åªå…è®¸å‡ºçŽ°åœ¨ governed è¾¹ç•Œï¼ˆ_persist_verified_capability / testonly helper / load_approvalsï¼‰ã€‚fabricated CapabilityEvidence æ— ä»»ä½• public è·¯å¾„å¯è¾¾ APPROVEDï¼›failed endpoint requirement çš„ run æ‹’ç»åŽ DB ä¸Žå†…å­˜ cache ä¸€è‡´ï¼ˆCANDIDATEï¼‰ã€‚  
-**Tests**ï¼štests/integration/test_approval_anti_bypass.py::TestApprovalAntiBypassï¼ˆ6ï¼‰ï¼›test_capability_governance.py / test_trial_production_boundary.py è¿ç§»è‡³ test-only helper  
-**ADR**ï¼š[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) Amendment C.4  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260830-049 â€” Endpoint Contract Semantic Reconciliation
-
-**Type**ï¼šC1 contract è¯­ä¹‰ä¿®æ­£ï¼ˆæ’¤å›žé”™è¯¯ç¼–ç»„ + å…¨é‡ method reconcileï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B1.1 P0-01ï¼ˆaudit 20260830 Â§2ï¼‰â€”â€”security_master æŠŠ current snapshot ä¸Ž historical rebuild é”™å½“ official alternativesï¼ˆä¸Ž security_master_with_delisted çš„ survivorship core å†²çªï¼šsnapshot PASS + hist DENIED æ—¶ ENDPOINT gate ä» PASSï¼Œé  BUSINESS gate å…œåº•è¿å B1-03ï¼‰ï¼›ADR-020 å£°ç§° adj_factor ä¸¤ç«¯ç‚¹"å„è‡ª REQUIRED"ä¸Žä»£ç  contractï¼ˆåªæœ‰ get_adj_factorï¼‰ç›´æŽ¥çŸ›ç›¾ï¼›registry å…¶å®ƒå¤š endpoint capabilityï¼ˆindustry_taxonomy å››æ–¹æ³• / index_daily ä¸¤æ–¹æ³• / security_master ä¸‰æ–¹æ³•ï¼‰æœªé€é¡¹æ˜¾å¼è¯´æ˜Žä¸ºä½•çº³å…¥/æŽ’é™¤ proof contractã€‚  
-**New Contract**ï¼ˆADR-020 Amendment C.1/C.2/C.3ï¼‰ï¼šï¼ˆ1ï¼‰security_masterï¼šBaseData.get_hist_code_list = REQUIREDï¼ˆsurvivorship å¿…è¦æ¡ä»¶ï¼‰ï¼›get_code_list ç§»å‡º requirementsï¼ˆOPTIONAL_NON_APPROVAL_SURFACEï¼‰â€”â€”å¿«ç…§å•ç‹¬å¯ç”¨æ°¸ä¸æ»¡è¶³ endpoint proofï¼›ENDPOINT_PROBE_SPECS åŒæ­¥ç§»é™¤ get_code_list æ¡ç›®ã€‚ï¼ˆ2ï¼‰adj_factor Option Bï¼šæ’¤å›ž ADR "å„è‡ª REQUIRED"ï¼›get_backward_factor æ˜¾å¼åˆ†ç±» OPTIONAL_NON_APPROVAL_SURFACEï¼ˆå½“å‰ç®¡çº¿ä¸æ¶ˆè´¹çš„åŽå¤æƒæ•°æ®æµï¼‰ã€‚ï¼ˆ3ï¼‰æ–°å¢ž SdkMethodProofClass äº”åˆ†ç±» + SDK_METHOD_CLASSIFICATIONS è¡¨ï¼ˆ19 æ¡ï¼Œæ¯æ¡å« auditable reasonï¼‰ï¼šæ¯ä¸ª registry sdk_method æ°ä¸€æ¡åˆ†ç±»ï¼›validate_endpoint_requirements() æ‰©å±•ï¼ˆåˆ†ç±»è¡¨å†…éƒ¨ä¸€è‡´ + REQUIRED åˆ†ç±» â†” requirements åŒå‘ä¸€è‡´ + ALTERNATIVE_GROUP åˆ†ç±» â†” ç»„æˆå‘˜ä¸€è‡´ï¼‰ï¼›ç»“æž„æµ‹è¯•éªŒè¯ set(registry.sdk_methods) == set(classified)ã€‚å›ºåŒ–é”™è¯¯è¯­ä¹‰çš„ test_alternative_group_single_member_pass_is_pass æŒ‰ Reviewer Â§6 æ”¹å†™ä¸º hist-denied ä¸¤æµ‹è¯•ï¼ˆENDPOINT FAIL + BUSINESS fired==0 + approval impossible + REPORT è®°å½•è¯šå®žå¤±è´¥ï¼‰ã€‚  
-**Tests**ï¼štest_endpoint_requirement_proof.pyï¼ˆcontract ç±» 4 é¡¹æ–°å¢žï¼šhist REQUIRED / å…¨é‡ classified / Option B / ç»„ç»“æž„ï¼›exact-proof ç±» 2 é¡¹æ”¹å†™ï¼‰  
-**ADR**ï¼š[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) Amendment C.1-C.3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260828-048 â€” Approval Consumes Exact Endpoint Identity
-
-**Type**ï¼šC1 approval å¥‘çº¦é‡å†™  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B1 B1-04ï¼ˆaudit 20260828 Â§2.4ï¼‰â€”â€”approval é  case-id å‘½åæŽ¨æ–­ proofï¼ˆ`GATE-{cap}-ENDPOINT` å­˜åœ¨å³è®¤ä¸ºç«¯ç‚¹å·²è¯æ˜Žï¼‰ï¼Œä¸éªŒè¯ actual endpoint ä¸Žå£°æ˜Žä¸€è‡´ï¼›ç¯¡æ”¹/é”™ä½æ£€æµ‹ä¸ºé›¶ã€‚  
-**New Contract**ï¼ˆADR-020 Â§2.3ï¼‰ï¼š`_require_formal_gate_proof` é‡å†™â€”â€”ï¼ˆ1ï¼‰PERMISSION/BUSINESS/REPORT case è¯­ä¹‰ä¿ç•™ï¼›ï¼ˆ2ï¼‰æ¯ä¸ª REQUIRED requirement å¿…é¡»æœ‰ PASS proof caseï¼ˆ`endpoint_requirement_case_id`ï¼‰ä¸” evidence_ref/hash éžç©ºï¼›æ¯ä¸ª ALTERNATIVE_GROUP è‡³å°‘ä¸€ä¸ªæˆå‘˜ PASSï¼›ï¼ˆ3ï¼‰**REPORT artifact é‡éªŒ**ï¼šé‡ç®— `{run}/gates/{cap}.json` çš„ sha256 == REPORT case evidence_hashï¼›é€æ¡ entry ä¸Ž contract æ¯”å¯¹ï¼ˆexpected_endpoint == contract endpointï¼›PASS æ¡ç›® actual_endpoint == contract endpointâ€”â€”stand-in å³æ‹’ç»ï¼›evidence_uri/hash éžç©ºï¼‰â€”â€”ä»»ä½• mismatch â†’ CapabilityGovernanceErrorï¼ˆfail closedï¼‰ã€‚èº«ä»½ä»Ž hash é”šå®š artifact è¯»ï¼Œä¸ä»Ž case-id åç§°æŽ¨æ–­ã€‚`approve_from_spike_run` ä¼ å…¥ run_dir ä»¥æ‰§è¡Œ artifact é‡éªŒã€‚  
-**Tests**ï¼štest_endpoint_requirement_proof.py::TestApprovalConsumesExactEndpointIdentityï¼ˆ3ï¼šbind åŽç¯¡æ”¹ artifact å­—èŠ‚ â†’ hash mismatch æ‹’ç»ï¼›actual_endpoint æ”¹ä¸º calendar + re-bind hash â†’ stand-in æ‹’ç»ï¼›åˆ é™¤ REQUIRED requirement case â†’ æ‹’ç»ï¼‰  
-**ADR**ï¼š[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) Â§2.3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260828-047 â€” Provider/Target Exact Exchange Surface
-
-**Type**ï¼šC1 provider surface æ‰©å±•  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B1 B1-02ï¼ˆaudit 20260828 Â§2.2ï¼‰â€”â€”industry_taxonomy / equity_structure / code_mapping_bj çš„å®˜æ–¹ endpointï¼ˆget_industry_base_info / get_equity_structure / get_bj_code_mappingï¼‰ä¸åœ¨ exchange surface ä¸Šï¼ŒR4-A3.1 æ—¶ä»£ç”¨ stand-in probeï¼ˆstock_basic / generic code-listï¼‰ã€‚  
-**New Contract**ï¼ˆADR-020 Â§2.2ï¼‰ï¼š`AmazingDataProvider` æ–°å¢žä¸‰ä¸ª explicit-exchange æ–¹æ³•â€”â€”`get_bj_code_mapping_exchange`ï¼ˆendpoint=InfoData.get_bj_code_mapping / dataset=code_mapping_bj / require_capability=code_mapping_bjï¼‰ã€`get_equity_structure_exchange`ï¼ˆInfoData.get_equity_structure / equity_structureï¼‰ã€`get_industry_base_info_exchange`ï¼ˆInfoData.get_industry_base_info / industry_taxonomyï¼‰ï¼›`SpikeTarget` Protocol / `RealTarget`ï¼ˆdelegateï¼‰/ `FakeTarget`ï¼ˆfake exchangeï¼Œendpoint èº«ä»½ç²¾ç¡®ï¼‰å››å¤„åŒæ­¥ï¼›å„å¸¦ payload convenience æ–¹æ³•ã€‚  
-**Tests**ï¼šFakeTarget exact endpoint ç» test_endpoint_requirement_proof.py::test_every_capability_proves_its_exact_endpoint å…¨é‡è¦†ç›–ï¼ˆ10 capability å…¨ PASSï¼‰  
-**ADR**ï¼š[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md) Â§2.2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260828-046 â€” Endpoint Requirement Contract + Exact Gate
-
-**Type**ï¼šC1 æ–°å¥‘çº¦ï¼ˆtyped contract + gate é‡æž„ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-B1 B1-01/B1-02/B1-05ï¼ˆaudit 20260828 Â§2.2/Â§2.3/Â§2.5ï¼‰â€”â€”capabilityâ†’endpoint æ˜ å°„æ— å•ä¸€å®¡è®¡äº‹å®žæºï¼ˆæ•£è½ if/else è§£é‡Š registry tupleï¼‰ï¼›ENDPOINT gate probe æ˜¯ capability-chosen è°ƒç”¨ï¼ˆstand-in å¯ PASSï¼Œfail-openï¼‰ã€‚  
-**New Contract**ï¼ˆADR-020 Â§2.1/Â§2.2ï¼‰ï¼šæ–°æ¨¡å— `providers/amazingdata/endpoint_requirements.py`â€”â€”`EndpointRequirement` typed dataclassï¼ˆrequirement_id/capability/endpoint/provider_dataset/mode/group_id/proof_roleï¼‰+ `ENDPOINT_REQUIREMENTS` è¡¨ï¼ˆ10 capability / 13 æ¡ï¼šsecurity_master ä¸º ALTERNATIVE_GROUP listing_surface åŒæˆå‘˜ï¼Œcorporate_action ä¸ºåŒ REQUIRED dividend+right_issueï¼Œå…¶ä½™å• REQUIREDï¼‰+ `validate_endpoint_requirements()` ç»“æž„è‡ªæ£€ã€‚`spike/formal_gates.py`ï¼š`CapabilityProbePlan.endpoint_requirements` ä»Ž contract æ´¾ç”Ÿï¼ˆcaller æ— å…¥å£ï¼‰ï¼›`ENDPOINT_PROBE_SPECS` é™æ€è¡¨ keyed by requirement_idï¼›`_ExactEndpointRequirementsGate` æ›¿ä»£å• probe endpoint gateâ€”â€”æ¯ requirement ä¸€æ¬¡åŽŸå­ evaluationï¼ˆfire+persist+verdictï¼‰ï¼Œenvelope endpoint+dataset ç²¾ç¡®åŒ¹é…ï¼ˆmismatch = blocking FAILï¼Œstand-in æ°¸ä¸ PASSï¼›å¤±è´¥ exchange çš„ endpoint åŒæ ·æ ¡éªŒï¼‰ï¼ŒREQUIRED å…¨ PASS + ç»„ â‰¥1 æˆå‘˜ PASS â†’ PASSï¼Œå¦åˆ™ FAILï¼ˆearly-stopï¼Œæ—  fallbackï¼‰ï¼›æ¯ requirement ä¸€ä¸ª proof caseï¼ˆæˆåŠŸ/å¤±è´¥éƒ½è½ï¼ŒSKIPPED ä¸è½ï¼‰ï¼›REPORT artifact æºå¸¦ `endpoint_requirements[]` ç»“æž„åŒ–èº«ä»½ã€‚  
-**Tests**ï¼štest_endpoint_requirement_proof.pyï¼ˆ17ï¼šcontract ç»“æž„ 6 + exact proof 5 + approval èº«ä»½ 3 + ç»“æž„å®ˆå« 2 + å…¨ capability ç²¾ç¡®è¯æ˜Ž 1ï¼‰ï¼›test_formal_gate_wiring.py é€‚é…ï¼ˆper-requirement outcomes/probes æ–­è¨€ï¼‰  
-**ADR**ï¼š[ADR-020](../adr/ADR-020_endpoint_requirement_contract.md)  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260828-045 â€” Trial-L1 Script SdkLifecycle Wiring Fix
-
-**Type**ï¼šC1 correctness closure  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A3.2 P1-01ï¼ˆaudit 20260828 Â§3ï¼‰â€”â€”`scripts/spike/l1_subscription_test.py` å°† `lifecycle = SdkLifecycle()` éšåŽåŒåé‡ç»‘ä¸º `lifecycle: dict[str, object] = {}`ï¼šSubscriptionController å®žé™…æ”¶åˆ° dictï¼ˆæ—  `transition`ï¼ŒçœŸå®žè¿è¡Œå³ AttributeErrorï¼‰ï¼›`state = lifecycle.state` ä¸Ž `lifecycle.close()` å¤±æ•ˆï¼›finally ä¸­ close å¼‚å¸¸è¢« suppress ä½¿é”™è¯¯æ›´éšè”½ã€‚controller ç»„ä»¶æµ‹è¯• PASS ä¸èƒ½è¯æ˜ŽçœŸå®žè„šæœ¬ wiring PASSã€‚  
-**New Contract**ï¼ˆADR-019 Amendment B.2ï¼‰ï¼šcorrectness SoR ä¸Ž diagnostic view åˆ†ç¦»å‘½åâ€”â€”`sdk_lifecycle: SdkLifecycle`ï¼ˆSoRï¼šæ³¨å…¥ SubscriptionControllerã€verdict ä»Žå®ƒæ´¾ç”Ÿã€finally ä¸­å¹‚ç­‰ `close()`ï¼‰+ `lifecycle_diag: dict`ï¼ˆVIEWï¼š`report["lifecycle"]`ï¼‰ï¼›SDK-dependent ä¸»æµç¨‹æå–ä¸º `execute_subscription_flow(sdk, stage, duration_seconds, *, sleep, monotonic)`â€”â€”å¯æ³¨å…¥ fake SDK **è¡Œä¸ºçº§**æµ‹è¯•çœŸå®žè„šæœ¬æŽ§åˆ¶æµï¼›main() åªä¿ç•™ login/env/session-gate/flush ä¸Ž terminal closeã€‚  
-**Tests**ï¼štests/integration/test_l1_subscription_script.pyï¼ˆ5ï¼šç«¯åˆ°ç«¯çŠ¶æ€æœºè·¯å¾„ SESSION_READYâ†’SUBSCRIBE_STARTEDâ†’CALLBACK_ACTIVEâ†’UNSUBSCRIBED + verdict åŒæº + register å¤±è´¥ä¸ fake çŠ¶æ€ + terminal close å¹‚ç­‰ + AST guard Ã—2 é˜² dict é®è”½å›žå½’ï¼‰  
-**ADR**ï¼š[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment B.2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260828-044 â€” Persistence-Failure Structural Early-Stop
-
-**Type**ï¼šC1 correctness closureï¼ˆå‡ early-stop ä¿®å¤ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A3.2 P0-01ï¼ˆaudit 20260828 Â§2ï¼‰â€”â€”R4-A3.1 çš„ `_PersistedProbe` åœ¨æŒä¹…åŒ–å¤±è´¥æ—¶åªè®°å½• `persist_error` å¹¶ç…§å¸¸è¿”å›žæˆåŠŸ exchangeï¼špipeline è§† PERMISSION ä¸º PASS å¹¶ç»§ç»­è¯„ä¼° ENDPOINT/CACHE/FRESHNESS/BUSINESSï¼ˆ**çœŸå®ž downstream provider calls å·²å‘ç”Ÿ**ï¼‰ï¼Œpipeline è·‘å®ŒåŽ execute() post-processing æ‰æŠŠ PASS æ”¹å†™ FAILâ€”â€”æŠ¥å‘Šå‘ˆçŽ° early stopped ä½†ç»“æž„ä¸Šä»Žæœª early stopï¼Œè¿å Exit Gate çš„ fail-closed ç»“æž„è¦æ±‚ã€‚  
-**New Contract**ï¼ˆADR-019 Amendment B.1ï¼ŒOption Aï¼‰ï¼šfire + persist + verdict åˆå¹¶ä¸º pipeline å†…éƒ¨çš„ä¸€æ¬¡**åŽŸå­ gate evaluation**â€”â€”`_PersistedPermissionGate` / `_PersistedEndpointGate` / `_PersistedBusinessGate`ï¼ˆ`spike/formal_gates.py`ï¼‰evaluate() åŽç» `_finalize_persisted`ï¼špersist æˆåŠŸ â†’ ç»‘å®šä¸‰æ®µè¯æ®èº«ä»½ï¼›persist å¤±è´¥ä¸” exchange æˆåŠŸ â†’ **å½“åœºé™çº§ blocking FAIL**ï¼ˆrequest_id å¯æºå¸¦ä½† URI/hash ä¸ºç©ºï¼‰ï¼›å·² FAIL ç»“æžœä¿ç•™å…·ä½“åŽŸå› å¹¶é™„åŠ æŒä¹…åŒ–å¤±è´¥ä¿¡æ¯ã€‚å†»ç»“ pipeline çœ‹åˆ° FAIL â†’ early stop â†’ ä¸‹æ¸¸ probe ä»Žä¸ fireï¼ˆ`probes[kind].fired == 0` + raw ç›®å½•é›¶æ–° evidence åŒè¯æ˜Žï¼‰ã€‚execute() post-hoc é™çº§é€»è¾‘**åˆ é™¤**ï¼Œæ›¿ä»£ä¸ºé˜²å¾¡æ€§ `FormalGateProofError`ï¼ˆPASS æ— ç»‘å®šæŠµè¾¾è¯¥å¤„ = åŽŸå­ gate å¥‘çº¦å¤±æ•ˆ â†’ fail loudlyï¼Œç»ä¸é™é»˜æ”¹å†™æŠ¥å‘Šï¼‰ã€‚**ç¦æ­¢å…ˆå®Œæ•´è·‘å®Œ pipeline å†æŠŠ PASS æ”¹ FAILã€‚**  
-**Tests**ï¼štest_formal_gate_wiring.py å¯¹æŠ—é›†ï¼ˆPERMISSION persist å¤±è´¥ â†’ ENDPOINT/BUSINESS fired==0 + SKIPPED_BLOCKED + é›¶ raw evidenceï¼›ENDPOINT persist å¤±è´¥ â†’ BUSINESS fired==0ï¼›BUSINESS persist å¤±è´¥ â†’ all_passed æ‹’ç»ï¼›request_id å­˜åœ¨ä½† URI/hash ç¼ºå¤±æ°¸ä¸ PASSâ€”â€”æ–­è¨€ç›´æŽ¥è½åœ¨ `_BoundReport.probes[kind].fired`ï¼‰ï¼›æ—¢æœ‰ provider-denial early-stop ä¸Ž success/failure binding æµ‹è¯•é›¶å›žå½’  
-**ADR**ï¼š[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment B.1  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260827-043 â€” Subscription Lifecycle SoR Integration
-
-**Type**ï¼šC1 correctness closure  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A3.1 P1-01ï¼ˆaudit 20260827 Â§5.2ï¼‰â€”â€”subscription lifecycle states å·²äº¤ä»˜ä½†çœŸå®ž Trial L1 è„šæœ¬ä»ç”¨ç§æœ‰ dict ä½œä¸ºç¬¬äºŒ lifecycle SoRã€‚  
-**New Contract**ï¼ˆADR-019 Amendment A.4ï¼‰ï¼š`ashare_state.providers.amazingdata.subscription.SubscriptionController`â€”â€”register/run/unregister/stop é©±åŠ¨çœŸå®ž `SdkLifecycle`ï¼ˆSESSION_READY â†’ SUBSCRIBE_STARTED â†’ CALLBACK_ACTIVE â†’ UNSUBSCRIBED â†’ LOGGED_OUTï¼‰ï¼›register å¤±è´¥ä¸ fake SUBSCRIBE_STARTEDï¼›unregister/stop retry-safeï¼›UNSUBSCRIBED åŽå›žè°ƒè®¡æ•° late_callbacks æ°¸ä¸ reactivationï¼›è¯Šæ–­ dict æ˜¯ VIEWï¼ŒçŠ¶æ€æœºæ˜¯ SoRï¼›`scripts/spike/l1_subscription_test.py` æ¶ˆè´¹ controllerï¼ˆreport å¢žåŠ  lifecycle_state_machine è§†å›¾ï¼Œverdict ç”±çŠ¶æ€æœºæ´¾ç”Ÿï¼‰ã€‚  
-**Tests**ï¼štest_subscription_controller.pyï¼ˆ14ï¼‰  
-**ADR**ï¼š[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment A.4  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260827-042 â€” Positive Production Account Identityï¼ˆblacklist â†’ allowlistï¼‰
-
-**Type**ï¼šC1 correctness closureï¼ˆfail-open ä¿®å¤ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A3.1 P0-03ï¼ˆaudit 20260827 Â§4.3/Â§7ï¼‰â€”â€”"not Trial == Production" ä¸º fail-openï¼šä»»æ„ unknown/educational/other-vendor-tier è´¦å·è¢«ç›– `ACCOUNT_*` å³èŽ·å¾— approval èµ„æ ¼ã€‚  
-**New Contract**ï¼ˆADR-019 Amendment A.3ï¼‰ï¼š`configs/production_account.yaml` å†»ç»“ scrubbed stable profile idï¼ˆéžå‡­è¯ï¼›ç©º = æœªç¡®è®¤ = fail closedâ€”â€”å½“å‰ä»“åº“çœŸå€¼ï¼‰ï¼›`AccountProfile.kind` ä¸ºè§£æžäº‹å®žï¼ˆTRIAL / UNKNOWNï¼›éž trial â‰  productionï¼›`ACCOUNT_` å‰ç¼€åºŸé™¤ â†’ `UNKNOWN_<digest>`ï¼‰ï¼›å››å¤„åŒæ­¥ exact-match æ”¾è¡Œï¼š`verify_production_account`ï¼ˆproduction run åˆ›å»ºé—¨ï¼‰ã€`_validate_evidence`ã€`approve_from_spike_run`ã€`AuthAccountGate(require_production_identity=True)`ï¼ˆformal boundary çš„ production proof inputï¼‰ï¼›æ—  frozen identity â†’ NOT_TESTABLE / BLOCKEDï¼›RunKind.PRODUCTION æ°¸ä¸æ›¿ä»£è´¦å·èº«ä»½ã€‚æ—§ fail-open æ–­è¨€ï¼ˆä»»æ„ `ACCOUNT_abc123` å¯ approveï¼‰åºŸé™¤å¹¶é‡å†™ä¸º exact-match å¯¹æŠ—é›†ã€‚  
-**Tests**ï¼štest_trial_production_boundary.py é‡å†™ï¼ˆ15ï¼šexact match æ”¾è¡Œ / mismatch æ‹’ç» / æ—  frozen fail-closed / RunKind ä¸æ›¿ä»£èº«ä»½ / production_account_status ä¸‰æ€ï¼‰+ test_amazingdata_provider.pyï¼ˆkind æ–­è¨€ï¼‰+ å„ production-run æµ‹è¯• fixture åŒ– frozen identity  
-**ADR**ï¼š[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment A.3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260827-041 â€” Persisted Gate Evidence Identity
-
-**Type**ï¼šC1 evidence å¥‘çº¦  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A3.1 P0-02ï¼ˆaudit 20260827 Â§4.2ï¼‰â€”â€”gate evidence åªæœ‰ request_idï¼šä¸€ä¸ª request id åªæ˜¯è¯·æ±‚èº«ä»½ï¼Œä¸æ˜¯æŒä¹…åŒ–è¯æ®èº«ä»½ï¼›probe å¤±è´¥æ— ç¬¬ä¸€ç±»å¤±è´¥ exchange è½ç›˜ã€‚  
-**New Contract**ï¼ˆADR-019 Amendment A.2ï¼‰ï¼š`GateResult` è¯æ®è¯­ä¹‰æ˜¾å¼æ‹†åˆ† `request_id` / `evidence_uri`ï¼ˆRawWriter .meta.json é”šï¼‰/ `evidence_hash`ï¼Œ`has_persisted_evidence` è¦æ±‚ URI+hash åŒæ—¶å­˜åœ¨ï¼›probe exchangeï¼ˆæˆåŠŸä¸Žå¤±è´¥ï¼‰ç» `ProbeContext.evidence_from_exchange` ç»Ÿä¸€æŒä¹…åŒ–åŽç»‘å®šï¼ˆæ—  private writerï¼‰ï¼›æŒä¹…åŒ–å¤±è´¥ï¼ˆexchange å·² fire ä½†å­—èŠ‚æœªè½ç›˜ï¼‰â†’ PASS é™çº§ FAIL å¹¶ç½® blocked_byï¼ˆfail closedï¼‰ï¼›gate proof case ä¸Ž gates/{cap}.json report artifact çº³å…¥ç»Ÿä¸€ evidence closureï¼ˆç¯¡æ”¹å³é˜»æ–­ verdictï¼‰ã€‚  
-**Tests**ï¼štest_formal_gate_wiring.pyï¼ˆç»‘å®š hash è¯»ç›˜éªŒè¯ / å¤±è´¥ exchange æŒä¹…åŒ–ç»‘å®š / æŒä¹…åŒ–å¤±è´¥é™çº§ / meta ä¸Ž report ç¯¡æ”¹é˜»æ–­ closureï¼‰  
-**ADR**ï¼š[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment A.2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260827-040 â€” Formal Runtime-Gate Execution Boundary Wiring
-
-**Type**ï¼šC1 æ–°æ­£å¼è·¯å¾„å¥‘çº¦  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A3.1 P0-01ï¼ˆaudit 20260827 Â§4.1ï¼‰â€”â€”RuntimeGatePipeline ä»…ä¸ºå¯å¤ç”¨ç»„ä»¶ï¼Œformal Spike/Provider execution path æœªæ¶ˆè´¹ï¼šç»„ä»¶æµ‹è¯•è¯æ˜Žçš„æ˜¯åº“ï¼Œä¸æ˜¯æ­£å¼è·¯å¾„ã€‚  
-**New Contract**ï¼ˆADR-019 Amendment A.1ï¼‰ï¼š`ashare_state.spike.formal_gates.FormalRuntimeGateExecutor` ä¸º**å”¯ä¸€** formal gate execution boundaryï¼›`CapabilityProbePlan` å…­ gate å…¨é‡å¿…å¡«ï¼ˆcaller æ— æ³•é€‰æ‹©æ€§è·³è¿‡ permission/freshnessï¼‰ï¼›å†»ç»“é¡ºåº pipelineï¼›`probe_b1_formal_gates` ä¸ºå…¨éƒ¨ formal runï¼ˆå« dry-runï¼‰çš„å¼ºåˆ¶ç¬¬ä¸€é˜¶æ®µï¼ˆrun_dry_run + scripts/spike/spike_runner.py PHASESï¼‰ï¼›blocking gate åŽ downstream probe fired == 0 ä¸”é›¶æ–° raw evidenceï¼›æ¯ capability è½ 4 ä¸ª `formal_runtime_gate` caseï¼ˆPERMISSION/ENDPOINT/BUSINESS ç»‘æŒä¹…åŒ– meta + REPORT ç»‘å…­ gate æŠ¥å‘Š artifactï¼‰ï¼›`approve_from_spike_run` â†’ `_require_formal_gate_proof`ï¼ˆå›› case ç¼ºä¸€æˆ–éž VALIDATED_PASS å³æ‹’ç»â€”â€”early stop å¤©ç„¶é˜»æ–­ approvalï¼‰ï¼›AST é™æ€å®ˆå« Ã—4 é˜²ç»•è¿‡ã€‚  
-**Tests**ï¼štest_formal_gate_wiring.pyï¼ˆ14ï¼‰+ test_capability_approval_from_spike.pyï¼ˆbypass æ‹’ç»ï¼‰+ test_spike_framework.pyï¼ˆb1 phase æ–­è¨€ï¼‰  
-**ADR**ï¼š[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Amendment A.1  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260826-033 â€” R4-A2.x / CR-1.x VERIFIED Governance Closure
-
-**Type**ï¼šC1ï¼ˆæ²»ç†é—­çŽ¯ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.11/CR-1.2.7 å¤å®¡ï¼ˆ2026-08-26 23:57 +08:00ï¼‰è£å†³ **VERIFIEDâ€”â€”R4-A2.x / CR-1.x å®¡è®¡é“¾ CLOSED**ï¼›Reviewer è¦æ±‚ä¸‹ä¸€é€»è¾‘å¼€å‘æäº¤åŒæ­¥çŠ¶æ€è‡³æ€»å†Œä¸Ž DEVLOGï¼ˆä¸å¾—æ”¹å†™åŽ†å²ï¼‰ï¼Œå¹¶ä¿®æ­£ä¸¤ä¸ªè¯¯è®° SHAï¼ˆä»¥ GitHub commit object ä¸ºå‡†ï¼šPrimary `38da90e5b5f3d698cc909cf7c258c163081bb9af`ï¼›Lint fix `6eac92dceaf57014f07d93bd5e6eabcea1dcbc79`ï¼›Reviewed HEAD `ab0cde7db4673224518540e1974c4e918bdbbf33`ï¼‰ã€‚  
-**Closure**ï¼šæ€»å†Œå¤´éƒ¨ï¼ˆReviewed HEAD / Primary / Lint fix æ­£ç¡® SHA + Phase Status å— + SHA Correction è®°å½•ï¼‰ï¼›Â§40ï¼ˆR4-A2.9/A2.10 â†’ VERIFIED (absorbed)ï¼›R4-A2.11 â†’ VERIFIEDï¼›å®¡è®¡é“¾ CLOSEDï¼›R4-A3 â†’ PENDING_REVIEWï¼›R4-B1/B2/CR-2 æŽ’åºè½ä½ï¼‰ï¼›Â§41 é‡å†™ä¸º R4-A3 æ‰¹æ¬¡ï¼›Â§52 RISK-004 â†’ CLOSED for its current review-lineage definitionï¼ˆå«"æ–°æ¶ˆè´¹é¢é‡æ–°å¼€é¡¹"æ³¨è®°ï¼‰ï¼›ADR-018 ç´¢å¼•æ ‡æ³¨ VERIFIEDï¼›DEVLOG é¡¶éƒ¨æ–°æ¡ç›®ã€‚  
-**Affected Modules**ï¼šDocumentation / Governanceï¼ˆDEVLOGã€æ€»å†Œã€ADR-000ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260826-032 â€” Runtime Trial/Production Truth Boundary
-
-**Type**ï¼šC1 correctness closure  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A3 A3-04â€”â€”Trial/Fake æˆåŠŸä¸å¾—æŠŠ capability æ ‡ä¸º PRODUCTION APPROVEDï¼›run kind PRODUCTION æœ¬èº«ä¸æž„æˆ production truthã€‚  
-**New Contract**ï¼ˆADR-019 Â§2.4ï¼‰ï¼šcapability approval **åŒå…¥å£**æ‹’ç»éžç”Ÿäº§è´¦å·â€”â€”`_validate_evidence`ï¼ˆæ‰€æœ‰ approve è·¯å¾„å…±ç”¨ï¼‰ä¸Ž `approve_from_spike_run`ï¼ˆspike æ´¾ç”Ÿè·¯å¾„ï¼‰å‡æ‹’ç» `TRIAL_*` / `FAKE*` / `UNKNOWN` / ç©º account_profile_idï¼›æ—¢æœ‰ `new_run(PRODUCTION)` çš„ `verify_production_account` åˆ›å»ºé—¨ä¿æŒï¼ˆé˜²å¾¡çºµæ·±ï¼šåˆ›å»ºé—¨è¢«ç»•è¿‡/ç¯¡æ”¹æ—¶ approval è·¯å¾„ä»æ‹’ï¼‰ã€‚  
-**Tests**ï¼štest_trial_production_boundary.pyï¼ˆ7ï¼šå‚æ•°åŒ– 5 ç±»éžæ³•è´¦å·åŒè¯­ä¹‰æ‹’ç» + ç”Ÿäº§è´¦å·å¯¹ç…§ + spike-run è·¯å¾„é˜²å¾¡çºµæ·±â€”â€”monkeypatch åˆ›å»ºé—¨åŽ APPROVAL ä»æ‹’ï¼›æ¨¡å—å±žæ€§è®¿é—®çºªå¾‹ + registry snapshot/restore é˜²æ³„æ¼ï¼‰  
-**ADR**ï¼š[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Â§2.4  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260826-031 â€” Permission / Cache / Freshness Gate Separation
-
-**Type**ï¼šC1 æ–° runtime å¥‘çº¦  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A3 A3-02/A3-03â€”â€”ä¸åŒæ€§è´¨å¤±è´¥ä¸å¾—æŠ˜å ä¸ºå•ä¸€ "provider unavailable"ï¼›æƒé™å¤±è´¥ä¸èƒ½è¢«ç¼“å­˜æŽ©ç›–ï¼›ç¼“å­˜å‘½ä¸­ä¸èƒ½æ›¿ä»£ endpoint proofï¼›freshness ä¸è¶³ä¸å¾—é™çº§ä¸º"æœ‰æ•°æ®å³ PASS"ï¼›early-stop é¡»ä»¥è®¡æ•°è¯æ˜Žã€‚  
-**New Contract**ï¼ˆADR-019 Â§2.3ï¼‰ï¼š`ashare_state.providers.runtime_gates`â€”â€”å…­ç±» GateKind æ˜¾å¼åˆ†ç¦»ï¼ˆAUTH_ACCOUNT/PERMISSION/ENDPOINT_AVAILABLE/CACHE_METADATA/FRESHNESS_ASOF/BUSINESS_DATAï¼‰ï¼›GateResultï¼ˆstatus: PASS/FAIL/**NOT_TESTABLE**/SKIPPED_BLOCKED + reason + evidence_ref + provider_calls_firedï¼‰ï¼›`RuntimeGatePipeline` é¡ºåºè¯„ä¼° + early stopï¼ˆé¦–ä¸ª blocking=FAIL æˆ– NOT_TESTABLE åŽï¼ŒåŽç»­ gate çš„ evaluate **ä»Žä¸æ‰§è¡Œ**ï¼‰ã€‚éžæŽ©ç›–æ€§ç”±é¡ºåº+early-stop ç¼–ç ï¼šPERMISSION å…ˆäºŽ CACHEï¼›ENDPOINT ç”¨çœŸå®ž probe exchangeï¼›FRESHNESS FAIL é˜»æ–­ BUSINESSã€‚gate çš„ probe èµ° ProviderExchange æ˜¾å¼è¾¹ç•Œï¼ˆæˆåŠŸ/å¤±è´¥ exchange æºå¸¦ evidenceâ€”â€”A3-05ï¼‰ã€‚  
-**Tests**ï¼štest_runtime_gate_separation.pyï¼ˆ15ï¼šå„ gate è¯­ä¹‰ Ã—9 / pipeline å…¨è¿‡ / permission-fail é˜»æ–­ï¼ˆprobe è®¡æ•°==1ã€business==0ã€total==1ï¼‰/ ç¼“å­˜å¥åº·ä¸æŽ©ç›–æƒé™ / freshness é˜»æ–­ business / cache-metadata é˜»æ–­ / endpoint å¤±è´¥é˜»æ–­ / NOT_TESTABLE auth å…¨é˜»æ–­é›¶è°ƒç”¨ / æ¯ç»“æžœå¯å®¡è®¡ï¼‰  
-**ADR**ï¼š[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Â§2.3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260826-030 â€” SDK Lifecycle State Machine + Early-Stop Enforcement
-
-**Type**ï¼šC1 æ–° runtime å¥‘çº¦ï¼ˆsession/provider æŽ§åˆ¶æµå˜æ›´ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A3 A3-01â€”â€”SDK unavailable/load failed/login failed/auth rejected/session ready/subscribe/callback/unsubscribe/logout å¿…é¡»æ˜¯æ˜¾å¼ lifecycle state/terminal stateï¼›ä¸å…è®¸å¼‚å¸¸å­—ç¬¦ä¸²çŒœæµ‹æµç¨‹çŠ¶æ€ï¼›terminal åŽæ—  business callï¼›cleanup å¹‚ç­‰ã€‚  
-**New Contract**ï¼ˆADR-019 Â§1/Â§2.1/Â§2.2ï¼‰ï¼š`ashare_state.providers.lifecycle.SdkLifecycle`ï¼ˆæ˜¾å¼çŠ¶æ€ + åˆæ³•è¿ç§»è¡¨ + è¿ç§»åŽ†å² + å¹‚ç­‰ closeï¼ˆå¤±è´¥æ€å…³é—­=åˆæ³•æ¸…ç†ï¼‰+ `require_ready` â†’ `ProviderLifecycleTerminalError`ï¼ˆProviderError å­ç±»ï¼Œcontext å« state/reason/evidence/refused_action/early_stopï¼‰ï¼‰ã€‚é›†æˆï¼š`AmazingDataSession.login` å…¨å¤±è´¥ç±»è½æ˜¾å¼ terminal æ€ï¼ˆSDK_UNAVAILABLE/LOAD_FAILED/AUTH_REJECTED/LOGIN_FAILEDï¼‰ã€æˆåŠŸè½ SESSION_READYï¼ˆevidence=account_profile_idï¼‰ï¼›`logout` â†’ close()ï¼›`AmazingDataProvider.call_exchange` **ç¬¬ä¸€é“ lifecycle é—¨**ï¼ˆterminal åŽ capability gate ä¸Ž SDK å‡½æ•°å‡ä¸æ‰§è¡Œã€é›¶ exchange/é›¶ evidenceï¼‰ã€‚æµ‹è¯• fake session åŒæ­¥æºå¸¦ lifecycleï¼ˆSESSION_READYï¼‰ã€‚  
-**Compatibility**ï¼šProviderError å±‚æ–°å¢žä¸€ä¸ªå­ç±»ï¼›æ—¢æœ‰è°ƒç”¨æ–¹ï¼ˆæ•èŽ· ProviderErrorï¼‰ä¸å—å½±å“ã€‚  
-**Tests**ï¼štest_sdk_lifecycle.pyï¼ˆ15ï¼‰+ test_runtime_early_stop.pyï¼ˆ11ï¼šSDK absent/load å¼‚å¸¸/auth æ‹’ç»/network å¤±è´¥çš„ call-count è¯æ˜Žï¼›terminal åŽ endpoint å‡½æ•°é›¶è°ƒç”¨+é›¶ envelopeï¼ˆå‚æ•°åŒ– 5 æ€ï¼‰ï¼›INIT æ‹’ç»ï¼›READY å¯¹ç…§ï¼›çœŸå®ž session login/logout/close é©±åŠ¨ï¼‰  
-**ADR**ï¼š[ADR-019](../adr/ADR-019_sdk_lifecycle_runtime_gates.md) Â§1-Â§2.2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-029 â€” R4-A2.10 Reviewer Governance Correction
-
-**Type**ï¼šC1ï¼ˆæ²»ç†ä¿®æ­£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.10/CR-1.2.6 å¤å®¡ Â§5â€”â€”æ²»ç†æ–‡æ¡£é¡»è®°å½• Reviewed HEAD `846fd458cc2c740f423699dabdbe0f4d48bf9c24`ï¼ˆrun 49 ä¸‰è…¿ successï¼‰ä¸Ž Primary Implementation `8d29c16d2476a48e105b091a9ec63b2b39c3d77e`ï¼›R4-A2.10 = Implementation DONE / Review REOPENEDï¼ˆP0 byte-identity ä¸»ä½“ = PASS / frozenï¼›publish cleanup = PASS / frozenï¼›DM-CR-20260825-025 single-writer = REOPENEDï¼ŒåŽŸå›  = lock acquired AFTER parent-dependent Phase 1ï¼‰ï¼›ADR-018 Â§4 overclaim éœ€ amendment ä¸åˆ åŽ†å²ï¼›RISK-004/CR-2/R4-A3/P0-M-1B ä¿æŒã€‚  
-**Correction**ï¼šæ€»å†Œå¤´éƒ¨æ›´æ–°ï¼ˆReviewed HEAD + Reviewer Correction æ®µï¼šlock è¦†ç›–èŒƒå›´ overclaimï¼‰ï¼›Â§40 R4-A2.10 â†’ REOPENEDï¼ˆPASS/FREEZE é¡¹ä¸Ž REOPENED é¡¹åˆ†åˆ—ï¼‰ï¼›ADR-018 Â§4 amendmentï¼ˆä¿®æ­£è®°å½• + ç´¢å¼•æ ‡æ³¨ï¼‰ã€‚  
-**Affected Modules**ï¼šDocumentation / Governanceï¼ˆDEVLOGã€æ€»å†Œ Â§40/Â§41/Â§52/Â§61ã€ADR-018/ADR-000ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-028 â€” Single-Writer Lock Scope / Stale-Parent Regression
-
-**Type**ï¼šC1 correctness closureï¼ˆå«æµ‹è¯•çŸ©é˜µï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.11 P0-01 æµ‹è¯•è¦æ±‚â€”â€”çŽ°æœ‰æµ‹è¯•åªè¦†ç›–é”æ–‡ä»¶å­˜åœ¨æ€§ï¼ˆfail fast / æˆåŠŸé‡Šæ”¾ / å¤±è´¥é‡Šæ”¾ï¼‰ï¼Œå­˜åœ¨ control-flow blind spotï¼šæœªè¦†ç›–"ä¸¤ä¸ª reviewer åœ¨ä»»ä¸€èŽ·é”å‰éƒ½å¯¹åŒä¸€ parent å®Œæˆ Phase 1"çš„ stale-preflight raceã€‚  
-**New Contract**ï¼ˆADR-018 Â§4 amendmentï¼‰ï¼šä¸‰é‡è¯æ˜ŽçŸ©é˜µâ€”â€”â‘ runtime counterï¼š`load_active_rules`ï¼ˆparent selectionï¼‰æ‰§è¡Œæ—¶ `.review.lock` å¿…å·²å­˜åœ¨ï¼ˆ`lock_exists_at_preflight is True`ï¼‰ï¼›â‘¡AST ç»“æž„å®ˆå«ï¼šé”èŽ·å–ï¼ˆO_EXCL openï¼Œå« BitOr åµŒå¥— flag åŒ¹é…ï¼‰è¡Œå·å…ˆäºŽé¦–ä¸ª `load_active_rules`ï¼›â‘¢stale-parent å¯¹æŠ—ï¼šA æäº¤ v2 åŽ B çš„ v1-based æäº¤ï¼ˆ`--from-version v1`ï¼‰BLOCKï¼ˆlineage movedï¼›é›¶æ–° version/é›¶æ–° evidence/é›¶ manifest æŽ¨è¿›/é”é‡Šæ”¾ï¼‰ï¼›æ—  `--from-version` æ—¶ stale `--rules` è¾“å…¥è¢« input==ACTIVE æ‹’ç»ï¼›B ä»Ž current ACTIVEï¼ˆæ–° COMPILED å€™é€‰ï¼‰é‡å¯æ­£å¸¸ï¼›åŒç‰ˆæœ¬ race æ’ž immutable collisionï¼ˆé¦–ç‰ˆå­—èŠ‚é€å­—èŠ‚ä¸åŠ¨ï¼‰ï¼›å¹¶å‘é” fail fast å…ˆäºŽä»»ä½• ACTIVE è¯»å–ï¼ˆ`load_active_rules` è°ƒç”¨æ•° == 0ï¼‰ï¼›æˆåŠŸ/å¤±è´¥åŽé”é‡Šæ”¾ä¿æŒã€‚  
-**Affected Modules**ï¼štests/integration/test_review_lineage_serialization.pyï¼ˆ8 ä¸ªï¼‰  
-**ADR**ï¼š[ADR-018](../adr/ADR-018_review_publish_byte_identity.md) Â§4 amendment  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-027 â€” Review Parent-Identity Serialization Closure
-
-**Type**ï¼šC1 correctness closureï¼ˆæŽ§åˆ¶æµé‡æŽ’ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.11 P0-01â€”â€”`.review.lock` èŽ·å–ä½äºŽ Phase 1ï¼ˆsnapshot/sandboxï¼‰ä¹‹åŽï¼šä¸¤ä¸ª reviewer å¯åŸºäºŽåŒä¸€æ—§ parent å®Œæˆ Phase 1ï¼ŒéšåŽä¾æ¬¡èŽ·é”æäº¤ï¼Œç¬¬äºŒä¸ªç”¨ stale parent snapshot è¦†ç›–ç¬¬ä¸€ä¸ªçš„ ACTIVE advanceã€‚"Phase 2/3 ä¸²è¡Œ" != "review parent lineage ä¸²è¡Œ"ã€‚  
-**Old Contract**ï¼š`main()` å®Œæˆå…¨éƒ¨ ACTIVE-dependent è¯»å–ï¼ˆload_active_rules / lineage / COMPILED / version æ£€æŸ¥ / snapshot / reviewed_bytes / sandboxï¼‰åŽæ‰èŽ·å–é”ï¼›é”åªåŒ… `_review_locked_workflow`ï¼ˆPhase 2/3ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-018 Â§4 amendmentï¼ŒOption Aï¼‰ï¼š**lock-before-preflight**â€”â€”`main()` ä»…åš CLI parse + å‚æ•° lexical æ£€æŸ¥ + rules_path/artifact å­˜åœ¨æ€§æ£€æŸ¥åŽå³èŽ·å–é”ï¼›æ•´ä¸ª workflowï¼ˆACTIVE integrity + parent identity â†’ snapshot â†’ transform â†’ sandbox â†’ staged gate â†’ publish â†’ manifest commit â†’ post-commit verificationï¼‰åœ¨ `_review_workflow_locked` å†…äºŽé”å†…æ‰§è¡Œï¼›finally é‡Šæ”¾ä¿æŒã€‚**å››é—®**ï¼šâ‘ åŽŸ placement åªä¸²è¡ŒåŒ–æäº¤ä¸ä¸²è¡ŒåŒ– parent é€‰æ‹©ï¼ˆstale-preflight race å®žæµ‹å¯å¤çŽ°ï¼‰ï¼›â‘¡parent identity åœ¨é”å†…å»ºç«‹ï¼ˆpreflight æœ¬èº«æŒé”ï¼‰ï¼›â‘¢é€‰ Option A è€Œéž Option Bï¼ˆrecheckï¼‰â€”â€”A ä½¿ ADR-018 åŽŸå¹¿å‘Šè¯­ä¹‰æˆç«‹ä¸”å•ä¸€ä»£ç è·¯å¾„ï¼ŒB éœ€åŒä»½ parent éªŒè¯ + ADR æ”¹å†™ä¸º optimistic snapshot è¯­ä¹‰ï¼›â‘£æˆæœ¬ = æŒé”æ—¶é—´ç¨é•¿ï¼ˆpreflight çº³å…¥ï¼Œç«žäº‰æ—¶å¿«é€Ÿå¤±è´¥ï¼‰ï¼Œæ”¶ç›Š = stale-parent è¦†ç›–åœ¨æž„é€ ä¸Šä¸å¯èƒ½ã€‚  
-**Affected Modules**ï¼šscripts/rules/review.pyï¼ˆmain æ‹†åˆ†ï¼šPhase 0 é”èŽ·å– + `_review_workflow_locked` å…¨æµç¨‹ï¼‰  
-**Tests**ï¼štest_review_lineage_serialization.pyï¼ˆ8ï¼‰+ å…¨é‡ 658 ä¿æŒï¼ˆæ—¢æœ‰ byte-identity/cleanup/confinement æµ‹è¯•é›¶å›žå½’ï¼‰  
-**ADR**ï¼š[ADR-018](../adr/ADR-018_review_publish_byte_identity.md) Â§4 amendment  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-026 â€” R4-A2.9 Reviewer Governance Correction
-
-**Type**ï¼šC1ï¼ˆæ²»ç†ä¿®æ­£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.9/CR-1.2.5 å¤å®¡ Â§7â€”â€”æ²»ç†æ–‡æ¡£é¡»è®°å½• exact SHAï¼ˆReviewed HEAD `8a6f4149e0f7090850b77c3b2e6a804b8ef45595` / Primary Implementation `793dfc1220e3d1b8669483c008a8596150b0dcd6` / Cross-Platform CI Fix `b429220663897060b7940c727d0e09ec902192de`ï¼‰ï¼›R4-A2.9 â†’ REOPENEDï¼ˆè¾“å…¥ä¾§å†»ç»“ + è¾“å‡ºä¾§æœªé—­åˆï¼‰ï¼›RISK-004 ä¿æŒï¼›ADR-017 éœ€ amendment ä¸åˆ åŽ†å²ï¼›CI = run 46 å…¨ä¸‰è…¿ successï¼ˆä¸å¾—å†å†™"optional Ubuntu ä»å¤±è´¥"ï¼‰ã€‚  
-**Correction**ï¼šæ€»å†Œå¤´éƒ¨æ”¹ä¸º exact SHA ä¸‰å…ƒç»„ï¼ˆReviewer doc commit ä¸å†è¢«è¯¯å†™æˆ implementation baselineï¼‰ï¼›Â§40 R4-A2.9 â†’ REOPENEDï¼›RISK-004 ç†ç”±æ›´æ–°ï¼›ADR-018 ä¸º ADR-017 Â§1 æœªå®ŒæˆçŽ¯çš„ä¿®æ­£è®°å½•ï¼ˆç´¢å¼•æ ‡æ³¨ amended byï¼‰ã€‚  
-**Affected Modules**ï¼šDocumentation / Governanceï¼ˆDEVLOGã€æ€»å†Œ Â§40/Â§41/Â§52/Â§61ã€ADR-018/ADR-000ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-025 â€” Review Single-Writer / Commit-Lineage Policy
-
-**Type**ï¼šC1ï¼ˆè¿ç»´å¥‘çº¦ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.10 P1-02â€”â€”`--from-version` åªåœ¨ Phase 1 éªŒè¯ lineageï¼›é•¿æµç¨‹ä¸­å¦ä¸€ reviewer æŽ¨è¿› ACTIVE æ—¶ Phase 3 ä»å¯èƒ½è¦†ç›–æ–° selectorï¼›ä¸å¾—ç»§ç»­æŠŠ `--from-version` æè¿°æˆå®Œæ•´å¹¶å‘ CASã€‚  
-**New Contract**ï¼ˆADR-018 Â§4ï¼ŒOption Aï¼‰ï¼š`rules_root/.review.lock`ï¼ˆ`O_CREAT|O_EXCL`ï¼‰è¦†ç›– preflight â†’ snapshot â†’ staged gate â†’ manifest commit å…¨ç¨‹ï¼›å¹¶å‘ reviewer fail fastï¼ˆé”™è¯¯ä¿¡æ¯æŒ‡æ˜Ž stale lock æ‰‹åŠ¨æ¸…ç†è·¯å¾„ï¼‰ï¼›finally é‡Šæ”¾ï¼ˆæˆåŠŸ/å¤±è´¥å‡é‡Šæ”¾ï¼‰ã€‚**è¯šå®žè®°å½•**ï¼šadvisory + è¿›ç¨‹çº§é”ï¼Œéž OS-level CASï¼›check ä¸Ž replace ä¹‹é—´ä»éžåŽŸå­ CASï¼Œæ­£å¼å¹¶å‘å†™ç”± single-writer è¿ç»´å¥‘çº¦å…œåº•ï¼›`--from-version` è¯­ä¹‰é™çº§ä¸º lineage æç¤ºã€‚  
-**Tests**ï¼štest_review_publish_integrity.py::TestSingleWriterLock Ã—3ï¼ˆå¹¶å‘ fail fast + é›¶ mutation + å¤–æ¥é”ä¸è¢«åˆ é™¤ / æˆåŠŸåŽé‡Šæ”¾ / å¤±è´¥åŽé‡Šæ”¾ï¼‰  
-**ADR**ï¼š[ADR-018](../adr/ADR-018_review_publish_byte_identity.md) Â§4  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-024 â€” Review Publish Failure Cleanup / Retry Semantics
-
-**Type**ï¼šC1 correctness closure  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.10 P1-01â€”â€”publish çš„ except åªæ¸… staging_dirï¼šrename æˆåŠŸåŽ manifest å†™å¤±è´¥ä¼šç•™ä¸‹ finalized versions/<new>/ï¼ˆimmutable collision ä½¿ same-version retry æ°¸ä¹…å¤±è´¥ï¼‰+ å­¤å„¿ evidence + ACTIVE ä»æ—§ã€‚  
-**New Contract**ï¼ˆADR-018 Â§3ï¼‰ï¼š**commit boundary = ACTIVE manifest åŽŸå­æ›¿æ¢æˆåŠŸ**ã€‚`published_version` / `created_evidence` / `manifest_committed` çŠ¶æ€è·Ÿè¸ªé©±åŠ¨ `_cleanup_uncommitted`ï¼šæäº¤å‰ä»»ä½•å¤±è´¥ï¼ˆå«æ³¨å…¥çš„ tmp manifest write å¤±è´¥ / manifest replace å¤±è´¥ / read-back mismatch / gate å¤±è´¥ / å¼‚å¸¸ï¼‰â†’ ç§»é™¤æ–° published version_dir + æœ¬æ¬¡åˆ›å»º evidence + staging + tmp manifest â†’ ACTIVE ä¿æŒæ—§ selector â†’ åŒç‰ˆæœ¬é‡è¯•å¯è¡Œï¼›æäº¤åŽéªŒè¯å¤±è´¥ â†’ æ˜¾å¼ `REVIEW_COMMIT_INCONSISTENT` ç¡¬å¤±è´¥ï¼ˆexit 3â€”â€”ACTIVE å·²æŒ‡å‘æ–°ç‰ˆæœ¬ï¼Œäººå·¥ä»‹å…¥ï¼Œç»ä¸ä¼ªè£…æˆå¯é‡è¯•å¤±è´¥ï¼‰ã€‚  
-**Tests**ï¼šTestPreCommitFailureCleanup Ã—2ï¼ˆwrite/replace æ³¨å…¥ â†’ å®Œæ•´æ¸…ç† + åŒç‰ˆæœ¬é‡è¯•æˆåŠŸï¼‰+ TestPublishWindowTamper::test_tampered_retry_is_deterministic  
-**ADR**ï¼š[ADR-018](../adr/ADR-018_review_publish_byte_identity.md) Â§3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-023 â€” Manifest Seal Identity / Publish TOCTOU Closure
-
-**Type**ï¼šC1 correctness closureï¼ˆmanifest identity è¯­ä¹‰å˜æ›´ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.10 P0-02â€”â€”æ—§ Phase 3 åœ¨ rename åŽ**é‡æ–° read final rules.yaml** å¹¶ç”¨è¯¥ read è®¡ç®— manifest.dataset_hashï¼šgate éªŒè¯ R â†’ rename â†’ final è¢«æ›¿æ¢ä¸º T â†’ reread T â†’ manifest å°å­˜ hash(T) â†’ ACTIVE æŒ‡å‘ T ä¸” coherence é€šè¿‡â€”â€”"gate éªŒè¯äº† Rï¼Œmanifest ç¥ç¦äº† T"ï¼ˆè¾“å…¥ä¾§ double-read TOCTOU çš„è¾“å‡ºä¾§é•œåƒï¼‰ã€‚  
-**Old Contract**ï¼š`published_bytes = read_bytes(final); manifest.dataset_hash = hash(published_bytes)`ã€‚  
-**New Contract**ï¼ˆADR-018 Â§2ï¼‰ï¼šmanifest identity å”¯ä¸€æ¥æº = gate-validated **in-memory reviewed_bytes**ï¼ˆ`expected_dataset_hash = _hash_snapshot([(final_rel, reviewed_bytes)])`ï¼‰ï¼›publish åŽ read-back ä¸º **VERIFICATION ONLY**ï¼ˆ`actual != reviewed_bytes` â†’ BLOCK + rollbackï¼šç§»é™¤å·² publish çš„ version_dir ä¸Žæœ¬æ¬¡ evidenceï¼ŒACTIVE ä¸æŽ¨è¿›ï¼‰ã€‚ç¯¡æ”¹å­—èŠ‚åœ¨æž„é€ ä¸Šä¸å¯èƒ½è¿›å…¥ manifestã€‚  
-**Tests**ï¼šTestPublishWindowTamper::test_post_rename_tamper_fails_closed_and_rolls_backï¼ˆmonkeypatch Path.replace åœ¨ rename åŽæ³¨å…¥ tamper â†’ fail closed + å›žæ»š + ACTIVE ä¿æŒ v1-compiled + dataset_files ä¸å˜ï¼‰+ test_manifest_hash_derives_from_reviewed_bytesï¼ˆç‹¬ç«‹é‡ç®—ï¼‰  
-**ADR**ï¼š[ADR-018](../adr/ADR-018_review_publish_byte_identity.md) Â§2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-022 â€” Persisted REVIEWED Exact-Byte Identity
-
-**Type**ï¼šC1 correctness closureï¼ˆè¾“å‡ºè·¯å¾„å­—èŠ‚è¯­ä¹‰å˜æ›´ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.10 P0-01â€”â€”REVIEWED ç» `Path.write_text()` è½ç›˜ï¼šWindows æ–‡æœ¬æ¨¡å¼æ¢è¡Œç¿»è¯‘å¯æŠŠå†…å­˜ LF å†™æˆ CRLFï¼ˆpersisted bytes != exact transformed bytesï¼‰ï¼›æ—¢æœ‰ç­‰ä»·æµ‹è¯•ç”¨ `read_text().splitlines()` è¢« universal-newline å½’ä¸€åŒ–è’™è”½ã€‚  
-**Old Contract**ï¼š`staged_yaml.write_text(reviewed_text)`ï¼ˆsandbox åŒï¼‰ã€‚  
-**New Contract**ï¼ˆADR-018 Â§1ï¼‰ï¼š`reviewed_bytes = reviewed_text.encode("utf-8")` å•ä¸€ä¸å¯å˜å†…å­˜å¯¹è±¡ï¼›sandbox è§£æž / staged rules.yaml / å…¨éƒ¨æ­£å¼ dataset å†™å…¥ **write_bytes ONLY**ï¼›ä¸å˜é‡é“¾ ACTIVE snapshot â†’ reviewed_bytes â†’ write_bytes â†’ staged â†’ atomic rename â†’ final å…¨ç¨‹å­—èŠ‚åŒä¸€ï¼›**AST é™æ€å®ˆå«**ï¼ˆreview.py ç¦æ­¢ä»»ä½• `write_text` è°ƒç”¨â€”â€”æ–‡æœ¬æ¨¡å¼åœ¨æž„é€ ä¸Šè¢«æŽ’é™¤ï¼‰ã€‚  
-**Tests**ï¼šTestPersistedByteIdentity Ã—4ï¼ˆfinal bytes LF-only ä¸” == ç‹¬ç«‹é‡å»ºçš„ reviewed_bytesï¼ˆyaml datetime isoformat è¿˜åŽŸï¼‰/ manifest hash ç‹¬ç«‹é‡ç®—ä¸€è‡´ / ç”Ÿæˆç‰ˆæœ¬ load_active_rules + load_bound_rule_book é‡æ”¾ï¼ˆè·¨å¹³å°å­—èŠ‚çœŸç›¸ï¼‰/ AST ç¦ write_textï¼‰â€”â€”CI ä¸¤ OS matrix å‡æ‰§è¡Œï¼ˆæµ‹è¯•å¯¹è±¡æ˜¯**å·¥å…·ç”Ÿæˆçš„**æ•°æ®é›†ï¼Œéžä»“åº“å·²æäº¤ yamlï¼‰  
-**ADR**ï¼š[ADR-018](../adr/ADR-018_review_publish_byte_identity.md) Â§1  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-020 â€” R4-A2.8 Reviewer Governance Correction
-
-**Type**ï¼šC1ï¼ˆæ²»ç†ä¿®æ­£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.8/CR-1.2.4 å¤å®¡ Â§6â€”â€”æ²»ç†æ–‡æ¡£é¡»è®°å½• Reviewed baseline `ada0eac2d973730605f7af65f57e72a22e1483c1` / ä¸‰ä¸ªåŽŸå§‹ P0 ä¸»ä½“å†»ç»“ / REOPENED / CI job-level truth / RISK-004 ä¿æŒï¼›ADR-016 Â§3 çš„"exact ACTIVE bytes"è¡¨è¿°ä¸º overclaimï¼ˆdouble-read gapï¼‰ï¼Œéœ€ amendment ä¸åˆ åŽ†å²ã€‚  
-**Correction**ï¼šæ€»å†Œå¤´éƒ¨æ›´æ–°ï¼ˆReviewed baseline + Reviewer Correction æ®µï¼šseal double-read TOCTOU / version è¾“å‡ºæ—  confinement / CI å…¨çŸ©é˜µéžç»¿ï¼‰ï¼›Â§40 R4-A2.8/CR-1.2.4 â†’ REOPENEDï¼ˆä¸»ä½“å†»ç»“ + ç”±æœ¬æ‰¹ä¿®å¤ï¼‰ï¼›RISK-004 ç†ç”±æ›´æ–°ï¼›ADR-017 ä¸º ADR-016 Â§3 çš„ä¿®æ­£è®°å½•ï¼ˆç´¢å¼•æ ‡æ³¨ amended byï¼‰ã€‚  
-**Affected Modules**ï¼šDocumentation / Governanceï¼ˆDEVLOGã€æ€»å†Œ Â§40/Â§41/Â§52/Â§61ã€ADR-017/ADR-000ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-019 â€” Cross-Platform CI Truth / Byte-Exact Fix
-
-**Type**ï¼šC1 correctness fixï¼ˆçœŸå®žè·¨å¹³å° bugï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.9 Â§5â€”â€”Reviewer ä¸‹é’» run 42 job matrixï¼šoptional Ubuntu 3.14 çš„ Pytest step å®žé™… FAILEDï¼ˆ~20 æµ‹è¯•åŒé”™ `ACTIVE dataset hash mismatch: declared 7dc5f627... recomputed dd2219d2...`ï¼‰ï¼Œoverall SUCCESS ä»…å›  `continue-on-error: ${{ !matrix.required }}`ï¼›ä¸å¾—è¡¨è¿°"å…¨çŸ©é˜µç»¿"ã€‚  
-**Root Causeï¼ˆAPI æ—¥å¿—æŸ¥è¯ï¼‰**ï¼š**æ ¹å›  1**â€”â€”`.gitattributes` è¦†ç›– `data/golden/**`/`*.json`/`*.jsonl` ä½†**æ¼ `*.yaml`**ï¼šWindows autocrlf checkout é‡å†™ LFâ†’CRLFï¼ˆæœ¬åœ° hash ä¸Ž manifest ä¸€è‡´æ•… Windows CI è¿‡ï¼‰ï¼ŒUbuntu checkout ä¿æŒ LFï¼ˆé‡ç®— hash å¤±é…ï¼‰ï¼›golden æœªæŒ‚å› å·²æœ‰ LF è§„åˆ™ã€‚**æ ¹å›  2ï¼ˆrun 44 æŸ¥è¯ï¼‰**â€”â€”golden review gate çš„ artifact confinement å¹³å°ä¾èµ–ï¼šLinux ä¸Š `evidence_dir / "C:/evil.txt"` æ˜¯**ç›¸å¯¹**æ‹¼æŽ¥ï¼ˆresolved æ£€æŸ¥ä¸è§é€ƒé€¸ï¼Œä»…æŠ¥"ä¸å­˜åœ¨"ï¼‰ï¼ŒWindows ä¸Šç›˜ç¬¦ä½¿å…¶ç»å¯¹ï¼ˆè¢«æ£€å‡ºï¼‰ï¼›`test_absolute_artifact_ref_rejected` å› æ­¤åœ¨ Ubuntu å¤±è´¥ã€‚å‡å±ž**çœŸå®žè·¨å¹³å° correctness bug**ï¼ˆéžçŽ¯å¢ƒä¾èµ–ï¼‰ã€‚  
-**Fix**ï¼šæ ¹å›  1â€”â€”`.gitattributes` è¡¥ `*.yaml`/`*.yml text eol=lf` + `configs/trading_rules/evidence/** -text`ï¼ˆå†…å®¹å¯»å€ artifact ç¦ eol å½’ä¸€åŒ–ï¼‰ï¼›å·¥ä½œæ ‘ yaml è§„èŒƒåŒ– LFï¼ˆ`git diff` ä¸Ž blob å­—èŠ‚é›¶å·®å¼‚ï¼‰ï¼›`rule_manifest.json` dataset_hash ä»¥ LF å­—èŠ‚é‡ç®—ï¼ˆ`dd2219d2...` ä¸Ž Ubuntu é‡ç®—å€¼å®Œå…¨ä¸€è‡´â€”â€”ä¸¤å¹³å°è‡ªæ­¤åŒå­—èŠ‚ï¼‰ã€‚æ ¹å›  2â€”â€”`golden_store._verify_artifact` å…ˆåš**å¹³å°æ— å…³ lexical æ£€æŸ¥**ï¼ˆå‰å¯¼ `/`ã€ç›˜ç¬¦å‰ç¼€ã€`..` ç©¿è¶Šâ€”â€”ä¸Žå…¶ä»– confinement åŒä¸€"lexical first, resolved second"è®¾è®¡è¯­è¨€ï¼‰å† resolved æ¯”è¾ƒã€‚å›žå½’æµ‹è¯• Ã—5ï¼ˆyaml æ—  CRLF / .gitattributes è§„åˆ™ / å·¥ä½œæ ‘ == git blob / ç›˜ç¬¦ ref åŒå¹³å°æ‹’ / POSIX ç»å¯¹ ref åŒå¹³å°æ‹’ï¼‰ã€‚  
-**Policyï¼ˆÂ§5.2ï¼‰**ï¼šæœªå‰Šå¼± required gateã€æœª skip æµ‹è¯•ã€æœªåˆ é™¤ Ubuntu legï¼›`continue-on-error` ç­–ç•¥ä¸å˜ï¼›CI çœŸç›¸ä»¥ job-level è®°å½•äºŽæ€»å†Œå¤´éƒ¨ï¼›æœ¬æ‰¹æäº¤åŽä»¥ Actions å®žé™…ç»“æžœä¸ºå‡†ï¼ˆé‡ç‚¹è§‚å¯Ÿ Ubuntu leg è½¬ç»¿ï¼‰ã€‚  
-**Affected Modules**ï¼š.gitattributesã€configs/trading_rules/{rule_manifest.json, versions/v20260824-compiled/rules.yaml}ã€spike/golden_store.py  
-**Tests**ï¼štest_review_failure_cleanup.py::TestCrossPlatformRuleBytes Ã—3 + test_golden_review_workflow.py å¹³å°æ— å…³ Ã—2  
-**ADR**ï¼š[ADR-017](../adr/ADR-017_review_seal_output_confinement.md) Â§4  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-018 â€” Trading Rule Review Output-Version Confinement
-
-**Type**ï¼šC1 correctness closure  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.9 P0-02â€”â€”`--version` æœªéªŒè¯å³æ‹¼è·¯å¾„ï¼š`../escape`/`foo\/bar`/ç»å¯¹è·¯å¾„/ç›˜ç¬¦æ ·å¼å¯åœ¨ versions root å¤–åˆ›å»ºç›®å½•ï¼›ä¸” evidence æ‹·è´ç­‰ mutation å…ˆäºŽ version å†²çªæ£€æŸ¥ã€‚  
-**Old Contract**ï¼š`version_dir = rules_root / "versions" / args.version` ç›´æŽ¥ mkdir/writeã€‚  
-**New Contract**ï¼ˆADR-017 Â§2ï¼‰ï¼š`_validate_version_id`â€”â€”Step A lexicalï¼ˆå•ä¸€ç»„ä»¶è¯­æ³• `^[A-Za-z0-9][A-Za-z0-9._-]*$`ï¼Œæ˜¾å¼æ‹’ `.`/`..`ï¼›åˆ†éš”ç¬¦/ç›˜ç¬¦/ç»å¯¹è·¯å¾„åœ¨è¯­æ³•å±‚ä¸å¯èƒ½ï¼‰ï¼›Step B resolved confinementï¼ˆ`versions_root/<id>` resolve åŽå¿…é¡»ä½äºŽ versions/ å†…ï¼‰ï¼›Step C é¡ºåºï¼ˆversion è¯­æ³•+confinence+ä¸å­˜åœ¨æ€§ç­‰**å…¨éƒ¨ç¡®å®šæ€§æ ¡éªŒ**å…ˆäºŽä»»ä½•è¾“å‡º mutationâ€”â€”æ—¢æœ‰ç‰ˆæœ¬å†²çªå…ˆäºŽ evidence æ‹·è´ï¼‰ã€‚**æµ‹è¯•**ï¼š12 ç±»éžæ³• id â†’ æ‹’ç» + **before/after æ–‡ä»¶æ ‘å¿«ç…§é›¶å·®å¼‚**ï¼ˆè¦†ç›– versions/ å†…åˆ›å»ºä¸Žè¶Šç•Œé€ƒé€¸ï¼‰ï¼›åˆæ³• id è¾“å‡ºä»…åœ¨ versions/<id>/ ä¸”æ°ä¸º rules.yamlã€‚  
-**Affected Modules**ï¼šscripts/rules/review.py  
-**Tests**ï¼štest_review_version_confinement.pyï¼ˆ17ï¼šå‚æ•°åŒ– 12 + åˆæ³• 1 + å†²çª 1 + eol è±å… 1 + blob ä¸€è‡´æ€§ 1 + tree snapshot å†…å«ï¼‰  
-**ADR**ï¼š[ADR-017](../adr/ADR-017_review_seal_output_confinement.md) Â§2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-017 â€” Trading Rule Review Exact-Byte Seal + Staged Output
-
-**Type**ï¼šC1 correctness closureï¼ˆreview å·¥ä½œæµ seal è¯­ä¹‰å˜æ›´ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.9 P0-01â€”â€”æ—§å®žçŽ°ä¸¤æ¬¡ç‹¬ç«‹è¯»å– ACTIVE æ–‡ä»¶ï¼ˆRead A ç”Ÿæˆ REVIEWED å‰¯æœ¬ã€Read B `_dataset_files_hash` éªŒè¯ï¼‰ï¼šswapâ†’captureâ†’restoreâ†’verifyâ†’seal-tampered çš„ TOCTOU ä½¿"hash éªŒè¯çš„å­—èŠ‚ â‰  è¢«å°å­˜çš„å­—èŠ‚"ã€‚  
-**Old Contract**ï¼šcapture ä¸Ž verify åˆ†ç¦»ï¼ˆADR-016 Â§3 çš„"å·²éªŒè¯ ACTIVE bytes"è¡¨è¿°ä¸º overclaimï¼‰ã€‚  
-**New Contract**ï¼ˆADR-017 Â§1/Â§3ï¼‰ï¼š**ä¸€æ¬¡æ€§ snapshot**â€”â€”`active_bytes = read_bytes()` å•æ¬¡è¯»å–ï¼›`_hash_snapshot([(rel, active_bytes)])` ç”¨ manifest åŒä¸€ç®—æ³•å¯¹**å†…å­˜å­—èŠ‚**è®¡ç®—ï¼ˆä¸Ž manifest hash ç›¸ç­‰å³è¯æ˜Ž snapshot å°±æ˜¯ ACTIVE å­—èŠ‚ï¼‰ï¼›`_build_reviewed_text(active_bytes, ...)` ä»ŽåŒä¸€ snapshot æž„é€ å‰¯æœ¬ï¼›æ­¤åŽ**æ— ä»»ä½• ACTIVE æ–‡ä»¶ç¬¬äºŒæ¬¡è¯»å–**ï¼›è¾“å‡º `sealed from ACTIVE snapshot sha256=<hash>` ä¾›å¤æ ¸ã€‚**Staged è¾“å‡º**ï¼ˆP1 å¹¶å…¥ï¼‰ï¼šPhase 1 çº¯æ ¡éªŒ/snapshotï¼ˆå« REVIEWED å‰¯æœ¬ä¸´æ—¶æ²™ç®±è§£æžâ€”â€”é›¶ rule-store mutationï¼‰â†’ Phase 2 stagedï¼ˆevidence å†…å®¹å¯»å€ + `versions/.staging-<id>/` è¿è¡Œå®Œæ•´ gateï¼›gate å¤±è´¥æ˜¾å¼ç§»é™¤ staging+æœ¬æ¬¡ evidenceâ€”â€”`return` åœ¨ try å†…ä¸è§¦å‘ except çš„å‘å·²ä¿®ï¼‰â†’ Phase 3 publishï¼ˆstaging åŽŸå­æ”¹å `versions/<id>/`ï¼›ACTIVE manifest æœ€åŽåŽŸå­æ›¿æ¢ï¼›publish åŽ manifest çš„ dataset_hash ä»Ž published bytes è®¡ç®—ï¼‰ã€‚**æµ‹è¯•**ï¼šexact-byte 7ï¼ˆå¥åº·æµæŠ¥å‘Š snapshot sha / REVIEWED å†…å®¹ä»Ž exact snapshot é€è¡ŒæŽ¨å¯¼ / preflight åŽç¯¡æ”¹è¯»å– BLOCK é›¶è¾“å‡º / æ— ç¬¬äºŒæ¬¡è¯»å–å¯æ›¿æ¢ seal èº«ä»½ / æŽ§åˆ¶ç»„ / ACTIVE æ–‡ä»¶è¯»å–æ•° == preflight+1 / ç¯¡æ”¹é›¶è¾“å‡ºï¼‰+ cleanup 4ï¼ˆgate å¤±è´¥æ—  finalized version+æ—  evidence / ä¸æŽ¨è¿› ACTIVE / preflight å¤±è´¥æ—  temp / å¤±è´¥åŽé‡è¯•ç¡®å®šæ€§ï¼‰ã€‚  
-**Affected Modules**ï¼šscripts/rules/review.py  
-**Tests**ï¼štest_review_seal_exactness.pyï¼ˆ7ï¼‰+ test_review_failure_cleanup.pyï¼ˆ7 ä¸­ 4 é¡¹å±žæœ¬æ¡ï¼‰  
-**ADR**ï¼š[ADR-017](../adr/ADR-017_review_seal_output_confinement.md) Â§1/Â§3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-016 â€” R4-A2.7 Reviewer Governance Correction + P1 Hardening
-
-**Type**ï¼šC1ï¼ˆæ²»ç†ä¿®æ­£ + P1 åŠ å›ºï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.7/CR-1.2.3 å¤å®¡ Â§6â€”â€”æ²»ç†æ–‡æ¡£é¡»è®°å½• Reviewed Code Baseline `47b47437b0828262e4f9f11c57862af2558a4d34` / REOPENED / CI run 40 SUCCESS / RISK-004 ä¿æŒ REOPENEDï¼›P1-01ï¼ˆendpoint èº«ä»½äº¤å‰æ ¡éªŒï¼‰ä¸Ž P1-02ï¼ˆç©º frame schemaï¼‰å»ºè®®æœ¬æ‰¹æ¸…æŽ‰ã€‚  
-**Correction & P1**ï¼šæ€»å†Œå¤´éƒ¨æ›´æ–°ï¼ˆReviewed baseline + Reviewer Correction æ®µï¼šCA control-flow / lexical-first é¡ºåº / review integrity æœªå…³é—­ï¼‰ï¼›Â§40 R4-A2.7/CR-1.2.3 â†’ REOPENEDï¼›`CA_STREAM_ENDPOINTS` å›ºå®šæ˜ å°„ï¼ˆdividendâ†”get_dividend / right_issueâ†”get_right_issueï¼›è·¨æµé‡æ ‡ â†’ `CAProviderShapeError`ï¼‰ï¼›`_payload_columns` + `_ca_provider_view(payload_columns=)`ï¼š0 è¡Œ+å¿…éœ€åˆ—=åˆæ³•ç©ºäº‹ä»¶æµã€0 è¡Œ+ç¼ºåˆ—=`PROVIDER_SCHEMA`ã€‚  
-**Affected Modules**ï¼šspike/golden_router.pyã€Documentation / Governance  
-**Tests**ï¼štest_ca_atomic_boundary.py::TestEmptyFrameSchema Ã—3 + TestEndpointIdentityCrossCheck Ã—2  
-**ADR**ï¼š[ADR-016](../adr/ADR-016_atomic_boundary_integrity.md) Â§4  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-015 â€” Trading Rule Review Input Integrity Gate
-
-**Type**ï¼šC1/C2ï¼ˆreview å·¥ä½œæµå¥‘çº¦å˜æ›´ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.8 P0-03â€”â€”review.py åªéªŒè¯ selector å¯è§£æžï¼ˆ`load_rule_manifest`ï¼‰ï¼Œè¢«ç¯¡æ”¹/ä¸ä¸€è‡´çš„ COMPILED ACTIVE å¯è¢«"æ´—æˆ"æ–°çš„åˆæ³• REVIEWED ç‰ˆæœ¬ï¼ˆhuman review â‰  re-seal an integrity-broken candidateï¼‰ã€‚  
-**Old Contract**ï¼špreflight = manifest å¯è¯» + --from-version / å•æ–‡ä»¶ / --rules==ACTIVE è·¯å¾„æ¯”è¾ƒï¼›REVIEWED å‰¯æœ¬ä»Ž --rules è·¯å¾„äºŒæ¬¡è¯»å–ã€‚  
-**New Contract**ï¼ˆADR-016 Â§3ï¼‰ï¼špreflight ä¸å¯ç»•è¿‡æ‰§è¡Œ `load_active_rules`ï¼ˆACTIVE dataset hash å¤ç®— + manifestâ†”dataset å››å­—æ®µ coherenceâ€”â€”ä¸Ž runtime åŒä¸€ gateï¼‰ï¼›å¢žåŠ  review_status==COMPILED æ ¡éªŒï¼ˆREVIEWED ACTIVE æ‹’ç»å† reviewï¼‰ï¼›REVIEWED å‰¯æœ¬ä»Ž**å·²éªŒè¯ ACTIVE bytes** äº§ç”Ÿï¼ˆcanonical è·¯å¾„è¯»å– + è¯»å–åŽå¤éªŒ hashï¼Œæ—  TOCTOUï¼‰ï¼›preflight å¤±è´¥ â†’ **é›¶è¾“å‡º**ï¼ˆæ—  evidence æ‹·è´ã€æ—  versions/<new>/ã€æ—  temp/final manifest å˜æ›´ï¼‰ï¼›Â§4.4ï¼šsource_version/dataset_version REQUIRED ä¸‹æ²‰ `load_rule_manifest` schema æ ¡éªŒï¼ˆreview/selector å·¥å…·ä¸Ž runtime å…±äº«å•ä¸€ manifest API å¥‘çº¦ï¼‰ã€‚  
-**Affected Modules**ï¼šscripts/rules/review.pyã€spike/trading_rule.pyï¼ˆmanifest schemaï¼‰  
-**Tests**ï¼štest_review_input_integrity.pyï¼ˆ9ï¼šç¯¡æ”¹ bytes/ç¯¡æ”¹ manifest hash/ç¼º source_version/ç©º dataset_version/coherence mismatch Ã—3/å¥åº·æµæˆåŠŸ/REVIEWED æ‹’ç»â€”â€”å…¨éƒ¨å«é›¶è¾“å‡ºæ–­è¨€ï¼‰  
-**ADR**ï¼š[ADR-016](../adr/ADR-016_atomic_boundary_integrity.md) Â§3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-014 â€” Bound Rule Lexical-First Pre-Access Confinement
-
-**Type**ï¼šC1 correctness closureï¼ˆADR-014/015 å¥‘çº¦è¡¥å…¨ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.8 P0-02â€”â€”`_confined()` å…ˆ `Path.resolve()` å† containment æ¯”è¾ƒï¼šéžæ³• `../..` ref åœ¨ lexical æ‹’ç»å‰å·²è§¦å‘ filesystem resolutionï¼ˆ"confinement before ANY fs access" ä»ä¸º overclaimï¼‰ã€‚  
-**Old Contract**ï¼š`_confined(root, rel)`ï¼ˆresolve-firstï¼‰+ `_confined_dataset_file`ï¼ˆå†…å« lexicalï¼‰å¹¶åˆ—è°ƒç”¨ï¼Œé¡ºåºä¸é€æ˜Žã€‚  
-**New Contract**ï¼ˆADR-016 Â§2ï¼‰ï¼š`_lexically_confined_dataset_file`ï¼ˆStep Aï¼šéžç©º/ç›¸å¯¹/æ— ç›˜ç¬¦/æ—  `..`/versions/<rule_version>/ ç»“æž„â€”â€”**é›¶ fs è®¿é—®**ï¼‰ï¼›`_confined_dataset_file` æˆä¸º**å”¯ä¸€å…¥å£**ï¼ˆStep A â†’ Step B resolved symlink escapeï¼‰ï¼›bound loop åˆ é™¤å‰ç½® `_confined`ï¼ˆåŒ helper å¹¶åˆ—åºŸé™¤ï¼‰ï¼›evidence ref çš„ `_confined` å¢žåŠ  lexical `..` å‰ç½®æ‹’ç»ã€‚**æµ‹è¯•**ï¼š`Path.resolve` spyâ€”â€”traversalï¼ˆå¤–éƒ¨æ–‡ä»¶å­˜åœ¨ï¼‰/ç»å¯¹/ç›˜ç¬¦/å¼‚ç‰ˆæœ¬ç›®å½•çš„æ‹’ç»å…¨ç¨‹ **candidate æœªè¢« resolve**ï¼›åˆæ³•è·¯å¾„æ‰è§¦å‘ resolveï¼›symlink escape ä»åœ¨ Step B æ‹¦æˆªï¼›æ­£å¸¸ bound replay ä¿æŒé€šè¿‡ã€‚  
-**Affected Modules**ï¼šspike/trading_rule.py  
-**Tests**ï¼štest_lexical_first_confinement.pyï¼ˆ9ï¼šæ‹’ç»å‰é›¶ resolve Ã—4 / åˆæ³• resolve / symlink / æ­£å¸¸é€šè¿‡ / helper å•å…ƒ Ã—2ï¼‰  
-**ADR**ï¼š[ADR-016](../adr/ADR-016_atomic_boundary_integrity.md) Â§2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-013 â€” Golden Domain Atomic Exchange Persistence
-
-**Type**ï¼šC1 correctness closure  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.8 P0-01â€”â€”CA åŸŸ assign-then-persistï¼ˆ`x = target.X(); ...; collector.persist(x)`ï¼‰é‡æ–°æ‰“å¼€"çœŸå®ž exchange å·²åˆ›å»ºä½†æœªæŒä¹…åŒ–"çª—å£ï¼šç¬¬äºŒä¸ª provider call å¤±è´¥æ—¶ç¬¬ä¸€ä¸ª success exchange æ°¸ä¹…ä¸¢è¯æ®ï¼ˆreal calls=2 / persisted=1ï¼‰ï¼›AST å®ˆå«å·²é€€åŒ–ä¸º name-presence æ£€æŸ¥ã€‚  
-**Old Contract**ï¼šè°ƒç”¨è€…å–å¾— exchange å¼•ç”¨åŽå¦è¡Œ persistï¼ˆ"è®°å¾—ç¨åŽæŒä¹…åŒ–"ï¼‰ï¼›AST å®ˆå«æŽ¥å— assign-then-persistï¼ˆå˜é‡åæŸå¤„å‡ºçŽ° persist å³å¯ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-016 Â§1ï¼‰ï¼š`_DomainCollector.call(fn) -> PersistedExchangeView`ï¼ˆfrozen dataclassï¼špayload/request_id/endpoint/evidence_metaï¼‰â€”â€”**call+persist æ˜¯ä¸€ä¸ªè¾¹ç•Œæ“ä½œ**ï¼ˆexchange åœ¨è¾¹ç•Œè¿”å›žå‰å·²æŒä¹…åŒ–ï¼›lineage ä»Ž view è¯»å–ï¼‰ï¼›**å…¨éƒ¨åŸŸ fetch**ï¼ˆST_STATUS/DELISTED_MASTER/LIMIT_PIT_RULE/CORP_ACTION_CONTEXT/BJ_MAPPINGï¼‰ç»Ÿä¸€èµ°åŽŸå­è¾¹ç•Œï¼›AST å®ˆå«å‡çº§**æŽ§åˆ¶æµå®‰å…¨**ï¼ˆexchange è°ƒç”¨å¿…é¡»ä½äºŽ `collector.call(lambda: ...)` çš„ lambda å†…ï¼›è´Ÿå‘æµ‹è¯•è¯æ˜Žæ—§ assign-then-persist æºç è¢«æ‹’ï¼‰ã€‚  
-**Affected Modules**ï¼šspike/golden_router.pyã€tests/integration/test_probe_exchange_enforcement.pyï¼ˆå®ˆå«æ”¶ç´§ï¼‰  
-**Tests**ï¼štest_ca_atomic_boundary.pyï¼ˆ7ï¼šdividend æˆåŠŸ+right_issue å¤±è´¥â†’ä¸¤è€…éƒ½æŒä¹…åŒ–+call æ•°==persisted æ•° / persist å¤±è´¥â†’åŽç»­ provider call ä¸å‘å°„ / dividend å¤±è´¥â†’right_issue ä¸å‘å°„ / full success lineage / ç©º frame Ã—3 / endpoint äº¤å‰ Ã—2ï¼‰ï¼›æ—¢æœ‰ router/CA/enforcement æµ‹è¯•é€‚é…  
-**ADR**ï¼š[ADR-016](../adr/ADR-016_atomic_boundary_integrity.md) Â§1  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-012 â€” R4-A2.6 Review Correction & Governance Sync + Review Tool Hardening
-
-**Type**ï¼šC1ï¼ˆæ²»ç†ä¿®æ­£ + å·¥å…·åŠ å›ºï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.6/CR-1.2.2 å¤å®¡ Â§8â€”â€”æ€»å†Œ Baseline ç¼º exact SHAï¼ˆ2e85f447...ï¼‰ï¼›CI çŠ¶æ€æœªæ›´æ–°è‡³ run 38ï¼›ADR-014/Â§41 å£°æ˜Ž"ä»»ä½• fs è®¿é—®å‰ confinement"è€Œ runtime ä¸å®Œå…¨æ»¡è¶³ï¼ˆoverclaimï¼‰ï¼›P1-01/02ï¼ˆreview.py å•æ–‡ä»¶é™é»˜é™åˆ¶ / durability wordingï¼‰ã€‚  
-**Correction**ï¼šæ€»å†Œå¤´éƒ¨ exact SHAï¼ˆä¸Šæ‰¹ implementation 2e85f447 + run 38 successï¼‰+ Reviewer Correction æ®µï¼ˆADR-014 overclaim è®°å½•ï¼Œä»¥ ADR-015 Â§5 ä¸ºå‡†ï¼‰ï¼›Â§40 R4-A2.6/CR-1.2.2 â†’ REOPENEDï¼ˆç”±æœ¬æ‰¹ä¿®å¤ï¼‰ï¼›RISK-004 ä¿æŒ REOPENEDï¼›review.pyï¼šmulti-file ACTIVE æ˜¾å¼ fail loudï¼ˆOption Aï¼Œç¦æ­¢æœªæ¥ silent review only first fileï¼‰+ wording æ›´æ­£ï¼ˆatomic replacement / reader-safeâ€”â€”éž power-loss durableï¼Œæ—  fsyncï¼‰ã€‚  
-**Affected Modules**ï¼šscripts/rules/review.pyã€Documentation / Governance  
-**Tests**ï¼šbinding::TestReviewScriptHardeningï¼ˆä¿æŒï¼‰+ å•æ–‡ä»¶æ‹’ç»é€»è¾‘ï¼ˆmulti-file manifest åœºæ™¯ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-011 â€” Corporate-Action Provider-Shape Validation Adapter
-
-**Type**ï¼šC1/C2 implementation-semantic closureï¼ˆRaw SoR ä¸å˜ï¼›validation è¾¹ç•Œæ–°å¢ž adapter å¥‘çº¦ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.7 P0-04â€”â€”CA validator/FakeTarget æ¶ˆè´¹ canonical-like å­—æ®µï¼ˆSECURITY_CODE/EX_DATE/EVENT_TYPEï¼‰ï¼Œè€Œ AmazingData å®˜æ–¹æ–‡æ¡£ï¼ˆ3.5.7.1/3.5.7.2ï¼‰çœŸå®žå­—æ®µä¸º MARKET_CODE/DATE_EX ä¸Ž MARKET_CODE/EX_DIVIDEND_DATEï¼›EVENT_TYPE è¢«ä¼ªé€ æˆ payload åˆ—ã€‚çœŸå®žè´¦å·ä¸Š CA formal Golden æ— æ³•æŒ‰çœŸå®žæ•°æ®éªŒè¯ã€‚  
-**Old Contract**ï¼švalidator ç›´æŽ¥ `r.get("SECURITY_CODE"/"EX_DATE"/"EVENT_TYPE")`ï¼›FakeTarget åˆæˆåŒåå­—æ®µï¼ˆcanonical æ—è·¯ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-015ï¼‰ï¼š`CA_PROVIDER_FIELD_CONTRACT` æ˜¾å¼æ–‡æ¡£å¥‘çº¦ï¼›`_ca_provider_view` ephemeral å½’ä¸€åŒ–ï¼ˆMARKET_CODEâ†’security_codeï¼›DATE_EX/EX_DIVIDEND_DATEâ†’ex_dateï¼›event_type=**ç«¯ç‚¹èº«ä»½**æ´¾ç”Ÿï¼Œpayload ä¼ªé€  EVENT_TYPE åˆ—è¢«å¿½ç•¥ï¼‰ï¼›view æºå¸¦ source_endpoint/raw_request_id lineageï¼›ç¼ºæ–‡æ¡£å­—æ®µâ†’`CAProviderShapeError`â†’route_all ç»“æž„åŒ– `VALIDATED_FAIL(PROVIDER_SCHEMA)`ï¼ˆfail loudï¼‰ï¼›FakeTarget æ”¹ provider åŽŸç”Ÿå­—æ®µï¼ˆdry-run ä¸Ž real åŒä¸€ adapterï¼‰ï¼›raw evidence ä¿æŒ provider åŽŸç”Ÿå­—æ®µåï¼ˆparquet åˆ—åæ–­è¨€ï¼‰ï¼›validator v6ï¼ˆæ¶ˆè´¹å°å†™è¯­ä¹‰å­—æ®µï¼‰ã€‚**æ–¹æ¡ˆå–èˆ**ï¼ˆå®¡è®¡ Â§13 å››é—®ï¼‰ï¼šä¸æ”¹ rawï¼ˆRaw SoR ä¸å¯å˜ï¼‰ã€ä¸åœ¨ validator å†…æ•£è½åˆ«åæŽ¢æµ‹ï¼ˆfirst-alias-wins ç¦æ­¢ï¼‰ã€ä¸å¯åŠ¨ CR-2ï¼ˆä¸ç¨³å®šå¥‘çº¦ä¸ä¼ æ’­ï¼‰â€”â€”ephemeral adapter æ˜¯æœ€å°ä¸”é›†ä¸­çš„å¥‘çº¦ç‚¹ã€‚  
-**Affected Modules**ï¼šspike/golden_router.pyã€spike/target.py  
-**Tests**ï¼štest_ca_provider_shape.pyï¼ˆ13ï¼šview å½’ä¸€åŒ–Ã—3/ä¼ªé€  EVENT_TYPE å¿½ç•¥/ç¼ºå­—æ®µÃ—3/æœªçŸ¥æµ/FakeTarget provider å­—æ®µ/raw parquet åŽŸç”Ÿåˆ—å/ç«¯åˆ°ç«¯ PASS/åå‘ endpoint/ç»“æž„åŒ– PROVIDER_SCHEMA/çœŸå®ž v3 caseï¼‰+ test_ca_event_type/sor é€‚é…  
-**ADR**ï¼š[ADR-015](../adr/ADR-015_ca_provider_shape_adapter.md) Â§1-Â§4  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-010 â€” Required Rule Metadata Coherence
-
-**Type**ï¼šC2 amendment to ADR-014 Â§2  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.7 P0-03â€”â€”coherence å¯¹ source_version/dataset_version ä»æ˜¯"å¡«äº†æ‰æ¯”è¾ƒ"å¯é€‰è¯­ä¹‰ï¼šmanifest ç©ºå­—æ®µå¯æ”¾è¡Œï¼ˆdataset çœŸå®ž lineage è¢«èµ°ç§ï¼›new_run ä¼šç»‘å®šç©º source_version å½¢æˆ formal lineage ç¼ºå¤±ï¼‰ã€‚  
-**Old Contract**ï¼š`if manifest.dataset_version and ...` / `if manifest.source_version and ...`ï¼ˆæ¡ä»¶æ¯”è¾ƒï¼‰ï¼›provenance_complete ä¸è¦æ±‚ dataset_version/source_versionï¼›bound replay åªå¤éªŒ selector+hash+content-versionã€‚  
-**New Contract**ï¼ˆADR-015 Â§5.3ï¼‰ï¼šä¸¤å­—æ®µ **å¿…å¡«éžç©º + æ— æ¡ä»¶ç²¾ç¡®æ¯”è¾ƒ**ï¼ˆmissing/empty/mismatch å…¨ BLOCKï¼‰ï¼›`provenance_complete()` å¯¹ PRODUCTION è¦æ±‚ dataset_version + source_version éžç©ºï¼›`load_bound_rule_book` å¢ž source_version/review_status å¤éªŒå‚æ•°ï¼ˆrunner çš„ verdict/resume + probes.rule_book ä¸‰å¤„è°ƒç”¨å…¨ä¼ å®Œæ•´èº«ä»½â€”â€”bound ä¸Ž loaded ä¸ä¸€è‡´å³ BLOCKï¼‰ã€‚  
-**Affected Modules**ï¼šspike/trading_rule.pyã€spike/model.pyã€spike/runner.pyã€spike/probes.py  
-**Tests**ï¼štest_rule_required_coherence.pyï¼ˆ12ï¼šrequiredÃ—4 + mismatchÃ—2 + coherent PASS + provenanceÃ—3 + bound disagreeÃ—2 + å®Œæ•´ä¸€è‡´åŠ è½½ï¼‰  
-**ADR**ï¼š[ADR-015](../adr/ADR-015_ca_provider_shape_adapter.md) Â§5.3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-009 â€” Raw Evidence Identity / Idempotency Closure
-
-**Type**ï¼šC1 correctness closure  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.7 P0-02â€”â€”å®Œæ•´å¹‚ç­‰æˆåŠŸé‡è¯•è¿”å›ž sha256(æ–° meta_bytes)ï¼ˆå«æ–° ingested_atï¼‰ï¼Œè€Œç£ç›˜ä¿ç•™æ—§ meta â†’ returned evidence_hash != sha256(persisted file)ï¼›SpikeCase ç»‘å®šäºŒæ¬¡è¿”å›žå€¼åŽ verify_evidence_closure å¿…ç„¶å¤±è´¥ã€‚è¿å "RawWriteResult must describe the persisted evidence"ã€‚  
-**Old Contract**ï¼š`meta_hash = sha256(meta_bytes)`ï¼ˆin-memory serializationï¼‰ã€‚  
-**New Contract**ï¼ˆADR-015 Â§5.2ï¼‰ï¼šæ‰€æœ‰ success return path ä»¥**ç£ç›˜å®žé™… bytes** è®¡ç®— evidence_hash/meta_artifactï¼ˆ`meta_path.read_bytes()`ï¼‰ï¼›fresh commit æ–­è¨€ persisted == intendedï¼›å¹‚ç­‰é‡è¯•è¿”å›ž existing persisted hashï¼ˆ**ä¸è¦†ç›–æ—§ meta**â€”â€”immutable semantics ä¿ç•™é¦–æ¬¡æˆåŠŸè½ç›˜ bytesï¼‰ã€‚**æ–¹æ¡ˆå–èˆ**ï¼šä¸ä¸º hash ä¸€è‡´è€Œé‡å†™æ—§ metaï¼ˆä¼šç ´å immutable è¯­ä¹‰ä¸Žé¦–æ¬¡å®¡è®¡ç—•è¿¹ï¼‰ã€‚  
-**Affected Modules**ï¼šstorage/raw_writer.py  
-**Tests**ï¼štest_raw_identity.pyï¼ˆ6ï¼šå¹‚ç­‰è¿”å›žç£ç›˜ hash/å•è¡¨/å¤šè¡¨ closure/å¤±è´¥å¹‚ç­‰/orphan æ¢å¤/fresh æ–­è¨€ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-008 â€” Bound Rule Pre-Access Confinement Closure
-
-**Type**ï¼šC1 correctness closureï¼ˆADR-014 å¥‘çº¦è¡¥å…¨ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.7 P0-01â€”â€”`load_bound_rule_book` æ›¾ä»¥ `(root / dataset_files[0]).is_file()` æŽ¢æµ‹ rootï¼ˆ**fs probe å…ˆäºŽ confinement**ï¼‰ï¼šç¯¡æ”¹ç»‘å®š `../../outside.yaml` åœ¨è¢«æ‹’ç»å‰å·²å¯¹ root å¤–è·¯å¾„å‘ç”Ÿä¸€æ¬¡å­˜åœ¨æ€§æŽ¢æµ‹ã€‚ADR-014 å£°æ˜Žçš„ "confinement before ANY filesystem access" ä»… ACTIVE è·¯å¾„æˆç«‹ï¼ˆoverclaimï¼‰ã€‚  
-**Old Contract**ï¼šroot = ç¬¬ä¸€ä¸ªä½¿ dataset_files[0] å­˜åœ¨çš„å€™é€‰ï¼›éšåŽé€æ–‡ä»¶ confinementã€‚  
-**New Contract**ï¼ˆADR-015 Â§5.1ï¼‰ï¼šroot ç”±å‚æ•°**ç¡®å®šæ€§**è§£æžï¼ˆrules_root / repo_root / default dirâ€”â€”ä¸è§¦ç¢° dataset_filesï¼‰ï¼›å…¨æ–‡ä»¶ confinementï¼ˆlexical + resolved + versions/<rule_version>/ ç»“æž„ï¼‰å…ˆè¡Œï¼›**ä¹‹åŽ**æ‰å­˜åœ¨æ€§/read/hash/loadã€‚FsSpyï¼ˆpatch Path.is_file/read_bytes/openï¼‰æµ‹è¯•è¯æ˜Žï¼štraversalï¼ˆå¤–éƒ¨æ–‡ä»¶çœŸå®žå­˜åœ¨ï¼‰/ç»å¯¹è·¯å¾„/å¼‚ç‰ˆæœ¬ç›®å½•çš„æ‹’ç»å…¨ç¨‹**é›¶è¶Šç•Œ fs è®¿é—®**ã€‚  
-**Affected Modules**ï¼šspike/trading_rule.py  
-**Tests**ï¼štest_bound_pre_access.pyï¼ˆ4ï¼štraversal é›¶æŽ¢æµ‹/ç»å¯¹é›¶æŽ¢æµ‹/å¼‚ç‰ˆæœ¬ç›®å½•é›¶æŽ¢æµ‹/åˆæ³• multi-file PASSï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-007 â€” R4-A2.5 Review Correction & Governance Sync
-
-**Type**ï¼šC1ï¼ˆæ²»ç†ä¿®æ­£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.5/CR-1.2.1 å¤å®¡ Â§9â€”â€”DEVLOG è‡ªç›¸çŸ›ç›¾ï¼ˆCONFIRMED GREEN vs "å¾… Actions ç¡®è®¤"ï¼‰ï¼›"v3 æ— éœ€é‡å°"çš„ CA å£°æ˜Žä¸Žå®žé™…æ•°æ®ï¼ˆv3 untypedï¼‰ä¸ç¬¦ï¼›Current Code Baseline éž exact SHAï¼›Â§30 ä¿ç•™è¿‡æ—¶ current-stateï¼›Â§40 æå‰å†™ upstream PASSã€‚  
-**Correction**ï¼šDEVLOG R4-A2.5 æ¡ç›®ä¸¤å¤„å°±åœ°ä¿®æ­£ï¼ˆä¿ç•™åŽ†å²ï¼Œæ ‡æ³¨å¤å®¡ä¿®æ­£ï¼‰ï¼›æ€»å†Œå¤´éƒ¨åŸºçº¿æ”¹ä¸º exact SHA å¼•ç”¨ï¼ˆä¸Šæ‰¹ implementation 13d02a1 + å¤å®¡ HEAD cdd3608ï¼›æœ¬æ‰¹æäº¤åŽä»¥å…¶ SHA ä¸ºæ–°åŸºçº¿ï¼‰ï¼›Â§30 é‡å†™ä¸ºå½“å‰çœŸç›¸ç»Ÿä¸€ï¼ˆ2026-08-25ï¼‰ï¼›Â§40 å…¨éƒ¨ upstream è¡Œæ”¹ä¸º "absorbed into R4-A2.6/CR-1.2.2â€”â€”æœ€ç»ˆ VERIFIED éšæœ¬æ‰¹é—¨"ï¼ˆä¸é¢„å†™ PASSï¼‰ï¼›RISK-004 ä¿æŒ REOPENED ç›´åˆ° Reviewer éªŒè¯æœ¬æ‰¹ï¼›CI = VERIFIED GREENï¼ˆReviewer ç¡®è®¤ run 35/36ï¼‰ã€‚  
-**Affected Modules**ï¼šDocumentation / Governanceï¼ˆDEVLOGã€æ€»å†Œ Â§30/Â§40/Â§61ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-006 â€” Rule Manifest Confinement & Metadata Coherence
-
-**Type**ï¼šC2 amendment to ADR-013ï¼ˆmanifest selector å¥‘çº¦æ”¶ç´§ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.6 P0-03/P0-04â€”â€”ACTIVE manifest çš„ dataset_files[] æ—  confinementï¼ˆ../ ä¸Žç»å¯¹è·¯å¾„å¯é€ƒå‡º rules rootï¼‰ï¼›manifest ä¸Ž dataset æ²»ç†å­—æ®µï¼ˆreview_status/source_version/review_provenance/dataset_versionï¼‰çœŸå®žä¸ä¸€è‡´ï¼ˆsource_version å®žé”¤ï¼‰ä¸”ä¸æ¯”è¾ƒï¼›run çš„ trading_rule_version è¯­ä¹‰æ··æ·†ï¼ˆselector id vs yaml content versionï¼‰ã€‚  
-**Old Contract**ï¼š`load_rule_manifest` ä»…æ£€æŸ¥ `(root/rel).is_file()`ï¼›`load_active_rules` åªæ ¡éªŒ dataset_hash + dataset_versionï¼›SpikeRun.trading_rule_version = yaml content versionã€‚  
-**New Contract**ï¼š`_confined_dataset_file`ï¼ˆç›¸å¯¹/æ—  `..`/æ— ç»å¯¹/symlink resolve åŽä»é¡»åœ¨ root å†… + å¿…é¡»ä½äºŽ `versions/<rule_version>/` ä¸‹ï¼‰åœ¨ä»»ä½• fs è®¿é—®å‰æ‰§è¡Œâ€”â€”ACTIVEï¼ˆload_rule_manifestï¼‰ä¸Ž boundï¼ˆload_bound_rule_bookï¼‰å…±ç”¨åŒä¸€ helperï¼›`load_active_rules` å¼ºåˆ¶ manifestâ†”dataset å››å­—æ®µä¸€è‡´ï¼ˆreview_provenance è¯­ä¹‰ç­‰ä»·æ¯”è¾ƒï¼šç©ºå€¼é”®è±å…ã€datetime è§„èŒƒåŒ–ï¼‰ï¼›çœŸå®ž rule_manifest.json çš„ source_version ä¿®æ­£ä¸ºä¸Ž yaml ä¸€è‡´ï¼›SpikeRun ç»‘å®š `trading_rule_version`ï¼ˆselectorï¼‰+ `trading_rule_dataset_version`ï¼ˆcontentï¼‰+ `trading_rule_source_version`ï¼Œload_bound åŒç‰ˆæœ¬å¤éªŒï¼ˆæ—§ run json å…¼å®¹è¯»å–ï¼‰ï¼›P1ï¼š`provenance_complete()` çº³å…¥ rule bindingï¼›review.py manifest åŽŸå­åˆ‡æ¢ï¼ˆtmp+os.replaceï¼‰+ `--from-version` è¡€ç¼˜æ£€æŸ¥ + éž ACTIVE è¾“å…¥æ‹’ç» + åˆ‡æ¢åŽ coherence è‡ªéªŒè¯ã€‚  
-**Affected Modules**ï¼šspike/trading_rule.pyã€spike/model.pyã€spike/run_store.pyã€spike/runner.pyã€spike/probes.pyã€scripts/rules/review.pyã€configs/trading_rules/rule_manifest.json  
-**Tests**ï¼štests/integration/test_rule_manifest_closure.pyï¼ˆ16ï¼štraversal/ç»å¯¹/symlink/version-dirÃ—2/ä¸€è‡´æ€§Ã—5/åŒç‰ˆæœ¬ç»‘å®š/provenanceÃ—3/review è„šæœ¬Ã—3ï¼‰+ binding é€‚é…  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-005 â€” Golden CA Event-Type Truth Closure
-
-**Type**ï¼šC1/C2 implementation-semantic closureï¼ˆä¸åˆ›å»ºæ–° Golden ç‰ˆæœ¬â€”â€”event_class å·²åœ¨è¯­ä¹‰ hash å†…ï¼Œæ—  v3 bytes å˜æ›´ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.6 P0-02â€”â€”CA äº‹ä»¶ç±»åž‹æ ¡éªŒåªå¯¹ synthetic æµ‹è¯•ç”Ÿæ•ˆï¼ˆexpected_fields.event_typeï¼‰ï¼›çœŸå®ž golden v3 çš„ 20 ä¸ª CA cases å‡ untypedï¼ˆevent_class=DIVIDEND_EX_DATE è¢« validator å¿½ç•¥ï¼‰ï¼Œ"untyped accepts any" æ—è·¯åœ¨ formal path ä¿ç•™ã€‚  
-**Old Contract**ï¼š`expected_type = case.expected_fields.get("event_type")`â€”â€”ç©ºåˆ™è·³è¿‡ç±»åž‹æ ¡éªŒï¼ˆä»»æ„äº‹ä»¶ç±»åž‹å¯è¿‡ç²¾ç¡®æ—¥æœŸåŽè¿›å…¥åŽç»­éªŒè¯ï¼‰ã€‚  
-**New Contract**ï¼š`_resolve_expected_event_type(case)`â€”â€”event_classï¼ˆè¯­ä¹‰ hash æˆå‘˜ï¼‰ä¸º PRIMARY ç±»åž‹äº‹å®žæºï¼ˆDIVIDEND_EX_DATEâ†’DIVIDEND / RIGHT_ISSUE_EX_DATEâ†’RIGHT_ISSUEï¼‰ï¼›expected_fields.event_type å­˜åœ¨æ—¶å¿…é¡»ä¸Ž event_class æ´¾ç”Ÿä¸€è‡´ï¼ˆå†²çªâ†’fail closedï¼‰ï¼›unknown/missing event_classâ†’`EVENT_TYPE_UNRESOLVED` fail closedï¼›ç±»åž‹æ¯”å¯¹ä¸º**å¼ºåˆ¶**ï¼ˆvalidator v5ï¼‰ï¼›åˆ é™¤å¹¶åè½¬æ—§ "untyped accepts any" æµ‹è¯•ï¼›actual-truth regressionï¼šload çœŸå®ž golden_cases_v3.jsonl å…¨éƒ¨ 20 ä¸ª CA casesï¼ˆæ¯ä¸ªè§£æžä¸º DIVIDEND å¹¶è·‘ typed validator ç«¯åˆ°ç«¯ï¼›right-issue-only è¯æ®å¯¹çœŸå®ž DIVIDEND case äº§ç”Ÿ EVENT_TYPE_MISMATCHï¼‰ã€‚  
-**Affected Modules**ï¼šspike/golden_router.pyã€tests/integration/test_ca_event_type.pyï¼ˆé‡å†™ï¼‰  
-**Compatibility**ï¼šv3 bytes ä¸Žè¯­ä¹‰ hash é›¶å˜æ›´ï¼ˆevent_class æ—©å·²å…¥ hashï¼‰ï¼›å¸¦ event_type çš„åˆæˆ case å¿…é¡»ä¸Ž event_class ä¸€è‡´ã€‚  
-**Tests**ï¼štest_ca_event_type.pyï¼ˆ16ï¼šè§£æžÃ—6 + typed éªŒè¯Ã—7 + çœŸå®ž v3Ã—3ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-004 â€” Formal Probe Exchange Enforcement
-
-**Type**ï¼šC1 correctness closure  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šCR-1.2.2 P0-01ï¼ˆR4-A2.5/CR-1.2.1 å¤å®¡ Â§2ï¼‰â€”â€”B5/B6 çš„ code-list å‰ç½®ç»•è¿‡ ProbeExecutor ç›´æŽ¥è°ƒç”¨ `ctx.target.get_code_list_exchange`ï¼šB5 å¤±è´¥è·¯å¾„çš„ failure exchange ä¸æŒä¹…åŒ–ï¼ˆå¼‚å¸¸åœ¨æ‰‹å·¥ persist å‰é€ƒé€¸ï¼‰ï¼›B6 è¿žæˆåŠŸè·¯å¾„éƒ½ä¸æŒä¹…åŒ–ã€‚è¿å"formal path æ¯ä¸ª exchange éƒ½æ˜¯ immutable evidence"ä¸å˜é‡ã€‚  
-**Old Contract**ï¼šè°ƒç”¨è€…è‡ªè¡Œå–å¾— exchangeã€æˆåŠŸåŽæ‰‹å·¥ `evidence_from_exchange`ï¼ˆ"è®°å¾—æŒä¹…åŒ–"çš„ correctness contractï¼‰ã€‚  
-**New Contract**ï¼šB5/B6 code-list å‰ç½®æ”¹èµ° `executor.call(...)`ï¼ˆæˆåŠŸ/å¤±è´¥éƒ½æŒä¹…åŒ– + å¤±è´¥â†’ç»“æž„åŒ– case + ProviderError ä¸é€ƒé€¸ï¼‰ï¼›B6 ä¾èµ–å‰ç½®å¤±è´¥â†’stock_basic ä¸å‘å°„ï¼›**AST åŒé™æ€å®ˆå«**ï¼šprobes.py çš„ `ctx.target.*_exchange` è°ƒç”¨å¿…é¡»ä½äºŽ lambda å†…ï¼ˆexecutor è¾¹ç•Œï¼‰ã€golden_router.py çš„å¿…é¡»ä½äºŽ `collector.persist(...)` å‚æ•°å†…ï¼ˆapproved boundary æ˜¾å¼åŒ–â€”â€”ä¸é å¼€å‘è€…è®°å¿†ï¼Œä¹Ÿä¸è¯¯ä¼¤ `_DomainCollector` è¿™ç±»è°ƒç”¨å³æŒä¹…åŒ–çš„ä¸“ç”¨è¾¹ç•Œï¼‰ï¼›**Spy è®¡æ•°é—­åˆæµ‹è¯•**ï¼šB2-B7 æ¯ä¸ª probe çš„çœŸå®ž exchange è°ƒç”¨æ•° == æŒä¹…åŒ– raw meta æ•°ï¼ˆå« B4 golden è·¯ç”±ï¼‰ã€‚  
-**Affected Modules**ï¼šspike/probes.pyï¼ˆB5/B6ï¼‰  
-**Tests**ï¼štests/integration/test_probe_exchange_enforcement.pyï¼ˆ12ï¼šB5/B6 æˆåŠŸæ°å¥½ä¸€ä¸ª meta Ã—2 + B5/B6 å¤±è´¥æŒä¹…åŒ–+ç»“æž„åŒ– Ã—2 + B6 ä¾èµ–ä¸å‘å°„ + Spy è®¡æ•° Ã—6 + AST å®ˆå« Ã—2ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-003 â€” CA Event Taxonomy + B5/B6 Payload Shapes + CI æ ¹å› ä¿®å¤
-
-**Type**ï¼šC1ï¼ˆCA è¯æ®ç»„åˆæ‰©å±•ï¼‰+ C2ï¼ˆCI é—¨æ–°å¢ž format check æ‰§è¡Œä¿®æ­£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.4/CR-1.2 å¤å®¡ P0-04/P0-05ï¼ˆCA äº‹ä»¶ç±»åž‹ä¸å¯æ›¿ä»£ï¼›B5/B6 æ ‡é‡è½½è·é™é»˜åžƒåœ¾ï¼‰+ Â§10 æ²»ç†ï¼ˆCI å…¨çº¢æ ¹å› ï¼šruff format --check é—¨è‡ª b7a84563 èµ·æœªè¿‡ï¼Œå¼€å‘è€…æœ¬åœ°åªè·‘ ruff checkï¼‰ã€‚  
-**Old Contract**ï¼šCA äº‹ä»¶æºä»… dividend æµï¼ˆä»»ä½•äº‹ä»¶è®°å½•å¯è¯æ˜Žä»»ä½•ç±»åž‹æœŸæœ›ï¼‰ï¼›B5/B6 çš„ code_list æ¶ˆè´¹æŠŠ row dict å¼ºè½¬ä¸ºå­—ç¬¦ä¸²ï¼ˆ`"{'value': '600519.SH'}"` åžƒåœ¾ä½†é™é»˜"é€šè¿‡"ï¼‰ï¼›`_rows_of` å¯¹ polars frame èµ° `list(to_dict())` è¿”å›žåˆ—ååˆ—è¡¨ï¼ˆé™é»˜åžƒåœ¾è¡Œï¼‰ã€‚  
-**New Contract**ï¼ˆADR-013 Â§4-Â§5ï¼‰ï¼šäº‹ä»¶åˆ†ç±»å­¦ DIVIDEND/RIGHT_ISSUE ä¸¤ç‹¬ç«‹æµï¼ˆprovider `get_right_issue_exchange`ï¼›CA åŸŸ fetch å…­ exchange å…¨å…¥ bundleï¼‰ï¼›golden case ä»¥ `expected_fields["event_type"]` å£°æ˜ŽæœŸæœ›ç±»åž‹ï¼ˆè¯­ä¹‰ hash å…¼å®¹è½½ä½“ï¼‰ï¼›æ ¡éªŒ (symbol, EX_DATE, type) ç²¾ç¡®ä¸‰å…ƒç»„ï¼ŒDIVIDEND æ°¸ä¸æ›¿ä»£ RIGHT_ISSUEï¼ˆ`EVENT_TYPE_MISMATCH`ï¼‰ï¼›provider å­—é¢é‡å½’ä¸€åŒ–ï¼ˆåˆ†çº¢/é…è‚¡ç­‰ï¼‰ï¼›`event_type` ä¸ºéªŒè¯å™¨å…ƒé”®ï¼ˆstatus å­—æ®µæ¯”å¯¹å‰å‰¥ç¦»ï¼‰ï¼›`_flat_values` æ ‡é‡åˆ—è¡¨å±•å¼€ + å¤šåˆ— fail loudï¼›`_rows_of` polars ä¼˜å…ˆ `.rows()`ã€‚CIï¼šæœ¬åœ°ç­‰ä»·å››æ£€æŸ¥ï¼ˆruff check + format --check + mypy + pytestï¼‰å…¥æäº¤å‰æµç¨‹ï¼›8 ä¸ªçº¢æäº¤çš„æ ¹å› è®°å½•äºŽå¤´éƒ¨ CI Statusã€‚  
-**Affected Modules**ï¼šproviders/amazingdata/provider.pyã€spike/{target,golden_router,probes}.pyã€scripts/rules/review.pyã€configs/trading_rules/**ï¼ˆç‰ˆæœ¬æ¨¡åž‹è¿ç§»ï¼šv20260824-compiled + manifestï¼‰  
-**Tests**ï¼štest_ca_event_type.pyï¼ˆ8ï¼‰ã€test_b5_b6_payload_shapes.pyï¼ˆ9ï¼‰ã€test_raw_commit_recovery.pyï¼ˆ8ï¼‰ã€test_rule_binding_adversarial.pyï¼ˆ4ï¼‰+ é€‚é…  
-**ADR**ï¼š[ADR-013](../adr/ADR-013_rule_version_model.md) Â§4-Â§6  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-002 â€” Trading Rule Version Model + Review Gate Hardening
-
-**Type**ï¼šC2 amendment to ADR-012 Â§2  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.5 P0-02/P0-03ï¼ˆè§„åˆ™æ•°æ®é›†ç¼ºç‰ˆæœ¬æ¨¡åž‹ï¼šç›®å½• glob åˆå¹¶åœ¨ COMPILED/REVIEWED å…±å­˜æ—¶æ­§ä¹‰ï¼›ç»‘å®šåªè®°å½•ç¬¬ä¸€ä¸ªæ–‡ä»¶ï¼›gate çš„ ref æ—  confinement/hash/timestamp schemaï¼‰ã€‚  
-**Old Contract**ï¼š`TradingRuleBook.load(dir)` glob åˆå¹¶ç›®å½•å…¨éƒ¨ yamlï¼›SpikeRun ç»‘å®šå• file+hashï¼›gate çš„ artifact ref ä»»æ„ç›¸å¯¹è·¯å¾„ï¼ˆå¯æŒ‡å‘ evidence å¤–ï¼‰ã€hash æ—  schemaã€æ—¶é—´æˆ³æ— æ ¡éªŒï¼›review.pyåŽŸåœ°æ”¹å†™ã€‚  
-**New Contract**ï¼ˆADR-013 Â§1-Â§2ï¼‰ï¼š`rule_manifest.json`ï¼ˆACTIVE é€‰æ‹©å™¨ï¼‰+ `versions/<v>/rules.yaml`ï¼ˆä¸å¯å˜å…±å­˜ï¼‰+ `evidence/`ï¼›`load_active_rules` å¤ç®— dataset_hashï¼ˆACTIVE ç¯¡æ”¹â†’new_run é˜»æ–­ï¼‰ï¼›SpikeRun ç»‘å®š `trading_rule_dataset_files[] + dataset_hash`ï¼ˆè”åˆ hash ç®—æ³•=manifestï¼›ç¯¡æ”¹ä»»ä¸€æ–‡ä»¶é˜»æ–­ replayï¼›æ—§ run json å…¼å®¹è¯»å–ï¼‰ï¼›`load_bound_rule_book` é€æ–‡ä»¶ confinement+hash+version æ ¡éªŒï¼›ç›®å½• glob åˆå¹¶è¯­ä¹‰åºŸé™¤ï¼›gateï¼šref ç›¸å¯¹ evidence root + path confinementï¼ˆç»å¯¹/`..` æ‹’ç»äºŽ fs è®¿é—®å‰ï¼‰+ hash 64 lower-hex + reviewed_at/source_retrieved_at ISO-8601 + artifact bytes å¤éªŒï¼›review.py é‡å†™ï¼ˆæ–° immutable ç‰ˆæœ¬ + ACTIVE åˆ‡æ¢ + evidence å†…å®¹å¯»å€ + å‰¯æœ¬è‡ªéªŒè¯ + é‡å¤ review æ‹’ç»ï¼‰ã€‚  
-**Affected Modules**ï¼šspike/trading_rule.pyã€spike/{model,run_store,runner,probes}.pyã€scripts/rules/review.pyã€configs/trading_rules/**ï¼ˆè¿ç§»è‡³ç‰ˆæœ¬å¸ƒå±€ï¼‰  
-**Compatibility**ï¼šæ—§ SpikeRun json çš„ trading_rule_file/hash æ˜ å°„ä¸ºå•æ–‡ä»¶ dataset_filesï¼ˆå…¼å®¹è¯»å–ï¼‰ï¼›å•æ–‡ä»¶ `TradingRuleBook.load(file)` ä¿ç•™ã€‚  
-**Tests**ï¼štest_trading_rule_binding.py é‡å†™ï¼ˆ24ï¼šç‰ˆæœ¬å…±å­˜/ACTIVE æŽ¨è¿›/ç¯¡æ”¹é˜»æ–­Ã—4/ç»‘å®šæŒä¹…åŒ–/gate åŠ å›ºÃ—5/review è„šæœ¬ç«¯åˆ°ç«¯/st_stateÃ—4/book å¿…å¡«Ã—2ï¼‰+ test_trading_rule_data.py é€‚é…  
-**ADR**ï¼š[ADR-013](../adr/ADR-013_rule_version_model.md) Â§1-Â§2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260825-001 â€” Formal Rule-SoR Closureï¼ˆå…¨æ¶ˆè´¹è€… run-bound bookï¼‰
-
-**Type**ï¼šC1ï¼ˆéªŒè¯å™¨å¥‘çº¦å¼ºåŒ–ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.5 P0-01ï¼ˆvalidate_limit_rule ä»å¯ç”¨ module fallbackï¼štrial/prod çš„ B3/B5 æ¶ˆè´¹å·¥ä½œæ ‘å½“å‰è§„åˆ™ï¼Œè¿å Exact Replayï¼‰ã€‚  
-**Old Contract**ï¼š`validate_limit_rule(rows, book=None)`â€”â€”book å¯é€‰ï¼ŒNone æ—¶ resolve é“¾ fallback `default_rule_book()`ï¼ˆå·¥ä½œæ ‘å½“å‰çŠ¶æ€ï¼‰ã€‚  
-**New Contract**ï¼ˆADR-013 Â§3ï¼‰ï¼š`book` ä¸º**å¿…å¡« keyword**ï¼ˆæ— é»˜è®¤å€¼ï¼›æ˜¾å¼ Noneâ†’ç»“æž„åŒ– VALIDATED_FAILï¼Œæ¶ˆæ¯å« "book=None refused"ï¼‰ï¼›B3/B5ï¼ˆprobesï¼‰ä¼  `ctx.rule_book`ï¼›`route_all` æŠŠ run-bound book ä¼ å…¥ limit/BJ éªŒè¯å™¨ï¼›AST å®ˆå«æµ‹è¯•ï¼šprobes/golden_router çš„ validate_limit_rule è°ƒç”¨å¿…å¸¦ book= ä¸”éž None å­—é¢é‡ã€resolve_* å¿…å¸¦ book=ï¼›å¯¹æŠ—æµ‹è¯•ï¼šACTIVE v1(10%)â†’v2(20%) æŽ¨è¿›åŽåŒ run é‡æ”¾ B5 limit cases æ’ç­‰ï¼ˆbound ä» 10%ï¼‰ï¼›bound æ–‡ä»¶ç¯¡æ”¹â†’`ctx.rule_book` è®¿é—®å³é˜»æ–­ã€‚  
-**Affected Modules**ï¼šspike/validators.pyã€spike/probes.pyã€spike/golden_router.pyã€tests/unit/test_spike_validators_v2.pyï¼ˆæ˜¾å¼ bookï¼‰  
-**Compatibility**ï¼šæ— ï¼ˆvalidate_limit_rule ç­¾åæ”¶ç´§ä¸ºç ´åæ€§å˜æ›´â€”â€”è°ƒç”¨æ–¹å…¨éƒ¨åŒæ‰¹æ›´æ–°ï¼›æµ‹è¯•æ˜¾å¼åŠ è½½ ACTIVE bookï¼‰ã€‚  
-**Tests**ï¼štest_rule_binding_adversarial.pyï¼ˆ4ï¼‰+ TestLimitRule é€‚é… + 502 å…¨é‡å›žå½’  
-**ADR**ï¼š[ADR-013](../adr/ADR-013_rule_version_model.md) Â§3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260824-011 â€” R4-A2.3/CR-1.1 Review Correction & Governance Sync
-
-**Type**ï¼šC1ï¼ˆæ²»ç†ä¿®æ­£ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.3/CR-1.1 å¤å®¡ Â§10â€”â€”ä¸Šæ‰¹ DEVLOG/ç®¡ç†æ€»å†Œå®£ç§°ä¸Ž runtime æœ‰å‡ºå…¥ï¼ˆBJ mapping endpoint è¡¨è¿° / CI çŠ¶æ€ / Last Review æ—¶é—´åŸºçº¿ï¼‰ã€‚  
-**Correction**ï¼šæœ¬æ‰¹ DEVLOG ä¸Žæ€»å†Œå¦‚å®žè®°å½•ï¼šBJ è¯æ˜Žä¸º hist master + exact-date regimeï¼ˆæ—  mapping endpoint ä¾èµ–ï¼‰ï¼›CI ä»¥æŽ¨é€åŽ Actions å®žé™…ç»“æžœä¸ºå‡†ï¼ˆæœ¬åœ°ä¸Ž CI åŒºåˆ†å£å¾„ Â§49 ä¸å˜ï¼‰ï¼›Last Review æŒ‡å‘æœ€æ–°å¤å®¡æ–‡æ¡£ã€‚ä¸Šæ‰¹ R4-A2.3/CR-1.1 æ¡ç›®çŠ¶æ€ç”± PENDING_REVIEW å½’æ¡£ä¸º absorbedï¼ˆç”± R4-A2.4/CR-1.2 æ‰¹æ¬¡é—­çŽ¯ï¼‰ã€‚  
-**Affected Modules**ï¼šDocumentation / Governanceï¼ˆDEVLOGã€æ€»å†Œ Â§40/Â§41/Â§61ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260824-010 â€” Corporate Action Event SoR Closure
-
-**Type**ï¼šC1ï¼ˆå®žçŽ° closureï¼›Frozen Baseline CA SoR è¯­ä¹‰æœªå˜â€”â€”corporate_action æ•°æ®é›†æœ¬å«äº‹ä»¶è®°å½•ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.4 P0-05â€”â€”CA è¯æ®ç»„åˆç¼ºå°‘äº‹ä»¶äº‹å®žæºï¼Œadj æµå•ç‹¬ä¸æ˜¯å……åˆ† SoRã€‚  
-**Old Contract**ï¼šCA åŸŸ fetch = calendar + status + adj + klineï¼›adj-only ä¹Ÿèƒ½ PASSã€‚  
-**New Contract**ï¼šCA åŸŸ fetch = calendar + status + **dividendï¼ˆäº‹ä»¶äº‹å®žæºï¼‰** + adj + klineï¼ˆäº” exchange å…¨å…¥ bundleï¼‰ï¼›`_validate_corp_action_context`ï¼šæ— äº‹ä»¶è®°å½•â†’`VALIDATED_FAIL(EVENT_SOURCE_MISSING)`ï¼ˆ"adj-factor movement alone is not a sufficient event SoR"ï¼‰ï¼›äº‹ä»¶å­˜åœ¨ä½† EX_DATEâ‰ Tâ†’`EVENT_DATE_MISMATCH`ï¼›event+adj+kline ä¸€è‡´â†’PASSï¼›äº‹ä»¶æ—¥åœç‰Œâ†’`NOT_TESTABLE_TIME(SUSPENSION_AT_EVENT)`ï¼›FakeTarget `get_dividend_exchange`ï¼ˆäº‹ä»¶ç«¯ç‚¹è¿› dry-run è¦†ç›–ï¼‰ã€‚  
-**Affected Modules**ï¼šspike/golden_router.pyã€spike/target.pyï¼ˆFakeTarget + SpikeTarget Protocolï¼‰  
-**Tests**ï¼štests/integration/test_ca_event_sor.pyï¼ˆ6 ä¸ªï¼šä¸€è‡´ PASS+bundle lineage / adj-only FAIL / æ—¥æœŸé”™é… FAIL / åœç‰Œ NOT_TESTABLE / bundle é—­åˆï¼‰  
-**ADR**ï¼šADR-012 Â§3  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260824-009 â€” Trading Rule Run Binding + Formal Review Gate
-
-**Type**ï¼šC2 amendment to ADR-011  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.4 P0-03/P0-04â€”â€”è§„åˆ™æ•°æ®é›†ç¼º run ç»‘å®šä¸Žå®¡é˜…é—­çŽ¯ï¼›compute_config_hash å¹³é“º glob çœ‹ä¸è§åµŒå¥—è§„åˆ™æ–‡ä»¶ã€‚  
-**Old Contract**ï¼šSpikeRun æ— è§„åˆ™ç»‘å®šï¼›validators ç”¨å·¥ä½œæ ‘å½“å‰è§„åˆ™ï¼ˆworking-tree advance æ³„æ¼è¿›åŽ†å² runï¼‰ï¼›COMPILED è§„åˆ™å¯è¿› PRODUCTIONï¼›`compute_config_hash` åªæ‰« `configs/*.yaml`ï¼›st_state truthiness è§£æžã€‚  
-**New Contract**ï¼šSpikeRun ç»‘å®š `trading_rule_file/version/hash/review_status`ï¼ˆTRIAL/PRODUCTION åˆ›å»ºæ—¶ï¼‰ï¼›`compute_config_hash` é€’å½’ `configs/**`ï¼ˆç›¸å¯¹è·¯å¾„è§„èŒƒåŒ–ï¼‰ï¼›RUNNING/RESUME/VERDICT/REPLAY åªç”¨ `load_bound_rule_book`ï¼ˆbytes hash + version å¤éªŒï¼Œmismatchâ†’`RuleUnresolvedError`ï¼‰ï¼›`ProbeContext.rule_book`ï¼ˆrun-boundï¼‰ä¼ å…¥ limit/BJ éªŒè¯å™¨ï¼›Review Gateï¼ˆCOMPILEDâ†’REVIEWEDï¼šprovenance å…­å­—æ®µå®Œæ•´ + artifact kind allowlist + artifact bytes hash å¤éªŒï¼‰åœ¨ `new_run(PRODUCTION)`ï¼ˆfail-fastï¼‰ä¸Ž `compute_verdict(PRODUCTION)`ï¼ˆå¤æ ¸ï¼‰æ‰§è¡Œï¼›`scripts/rules/review.py`ï¼ˆå·¥å…·è‡ªç®— SHA-256 å†™å…¥ REVIEWED å‰¯æœ¬ + å‰¯æœ¬è‡ªéªŒè¯ + é‡å¤ review æ‹’ç»ï¼‰ï¼›`_parse_st_state` ä¸¥æ ¼è§£æžï¼ˆtruthiness ç¦æ­¢ï¼Œ"false" å­—ç¬¦ä¸²ä¸å†åè½¬ä¸º Trueï¼‰ã€‚  
-**Affected Modules**ï¼šspike/model.pyã€spike/run_store.pyã€spike/runner.pyã€spike/probes.pyã€spike/trading_rule.pyã€scripts/rules/review.pyï¼ˆæ–°ï¼‰  
-**Compatibility**ï¼šSpikeRun æ–°å­—æ®µé»˜è®¤ç©ºï¼ˆæ—§ run json å…¼å®¹è¯»å–ï¼‰ï¼›REVIEWED å‰¯æœ¬ä¸Ž COMPILED åŽŸä»¶å¹¶å­˜ï¼ˆå•æ–‡ä»¶çº¦å®šç”±è¿ç»´è½ä½ï¼‰ã€‚  
-**Tests**ï¼štests/integration/test_trading_rule_binding.pyï¼ˆ14 ä¸ªï¼šconfig é€’å½’ / ç»‘å®šæŒä¹…åŒ– / working-tree ç¯¡æ”¹é˜»æ–­ / version mismatch / COMPILED é˜»æ–­ PRODUCTION / REVIEWED é€šè¿‡ / artifact ç¯¡æ”¹é˜»æ–­ / provenance ç¼ºå¤±é˜»æ–­ / kind éžæ³• / review è„šæœ¬ç«¯åˆ°ç«¯ / st_state ä¸¥æ ¼è§£æžÃ—4ï¼‰  
-**ADR**ï¼š[ADR-012](../adr/ADR-012_raw_exchange_closure.md) Â§2  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260824-008 â€” CR-1.2 Complete Exchange + Raw Meta/Request Closure
-
-**Type**ï¼šC2 amendment to ADR-010  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.3/CR-1.1 å¤å®¡ REOPENEDï¼ˆCR-1.1 å›› P0ï¼šæ—¥åŽ†å‰ç½®éšè— / RawWriteResult è¯­ä¹‰ä¸å®Œæ•´ / request ä¸å¯é‡å»º / evidence é”šå®šä¸é—­åˆï¼‰ã€‚  
-**Old Contract**ï¼šquery_kline å†…éƒ¨éšè— get_calendarï¼›å•è¡¨ evidence ç»‘è£¸ parquetï¼ˆmeta åˆ é™¤ä¸ç ´åé—­åˆï¼‰ï¼›meta åªæœ‰ request_params_hashï¼ˆè¯·æ±‚ä¸å¯é‡å»ºï¼‰ï¼›å¤šè¡¨æäº¤æ—  staging åŽŸå­æ€§ï¼›è¡¨åå†²çªé™é»˜è¦†ç›–ï¼›read æ— éªŒè¯ã€‚  
-**New Contract**ï¼šè§ Â§43 CR-1.2 è¦æ±‚å—ï¼ˆéšè—æ—¥åŽ†å‰ç½®æ˜¾å¼åŒ– Option A / payload+meta åŒå‘é—­åˆ / å®Œæ•´ params + ingested_at + ingest_run_id / staging åŽŸå­æäº¤ meta æœ€åŽ / è¡¨åå†²çª BLOCK / read(verify=True) / AST ç¦æ­¢ payload-only è°ƒç”¨é¢ï¼‰ã€‚  
-**Affected Modules**ï¼šstorage/raw_writer.pyï¼ˆverify_meta_closure + staging + ArtifactRefï¼‰ã€spike/runner.pyï¼ˆé€’å½’åŒå‘é—­åˆï¼‰ã€spike/probes.pyï¼ˆevidence meta å¸¦ payload_artifacts + ingest run æ³¨å…¥ï¼‰ã€spike/golden_router.pyï¼ˆbundle entry å¸¦ payload/meta å¼•ç”¨ï¼‰ã€spike/target.pyï¼ˆFakeTarget çœŸå®ž params + trading_daysï¼›RealTarget.query_kline_exchange(trading_days)ï¼‰  
-**Compatibility**ï¼šè¯æ®é”šå®šå˜æ›´ä¸º meta.jsonâ€”â€”æ—§ run çš„ parquet è¯æ®æŒ‰ legacy è·¯å¾„é—­åˆï¼ˆmeta å¿…é¡»åœ¨ï¼‰ï¼›RawWriteResult å­—æ®µåªå¢žä¸å‡ã€‚  
-**Tests**ï¼štests/unit/test_raw_closure.pyï¼ˆ13 ä¸ªï¼štamper/deletion åŒå‘ / å¤šè¡¨ tamper / combined hash / å®Œæ•´ params + ç­‰é•¿å¼‚ symbols / è„±æ• / ingest ç»‘å®š / staging æ— æ®‹ç•™ / å†²çªé›¶è½ç›˜ / å¤±è´¥æ—  meta é”š / read verifyÃ—2ï¼‰+ tests/integration/test_cr12_exchange_completeness.pyï¼ˆ7 ä¸ªï¼šä¸¤ exchange æ°å¥½ / æ—¥åŽ†å¤±è´¥ kline ä¸å‘å°„ / B3/B7 å‰ç½® / ASTÃ—2 / rule_book ç»‘å®šï¼‰  
-**ADR**ï¼š[ADR-012](../adr/ADR-012_raw_exchange_closure.md) Â§1  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260824-007 â€” Reviewer Auto-Archive è§„åˆ™å¹¶å…¥ç®¡ç†æ€»å†Œ
-
-**Type**ï¼šC1ï¼ˆæ²»ç†æµç¨‹ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.3 å·¥ä½œè¦æ±‚ Â§0ï¼ˆReviewer é—­çŽ¯è§„åˆ™ï¼‰è¦æ±‚å¹¶å…¥ç®¡ç†æ€»å†Œã€‚  
-**Old Contract**ï¼šå·¥ä½œè¦æ±‚æ–‡æ¡£ç”Ÿå‘½å‘¨æœŸæœªå®šä¹‰ï¼›åŽ†å²å¤å®¡æ–‡æ¡£é€ä»½ç‹¬ç«‹æˆæ–‡ã€‚  
-**New Contract**ï¼šÂ§56 æ–°å¢ž"Reviewer Auto-Archive è§„åˆ™"â€”â€”å·¥ä½œè¦æ±‚å¤„ç†å®Œæ¯•åŽ Developer åœ¨æ–‡æ¡£å†…è¿½åŠ  implementation mapping å³è§†ä¸ºå…³é—­å½’æ¡£ï¼›å¤æ ¸è£å†³è®°å½•äºŽ DEVLOG ä¸Ž Â§61ï¼›æ–°æ•´æ”¹ä¸‹è¾¾æ–°å·¥ä½œè¦æ±‚æ–‡æ¡£ï¼Œä¸ä¿®æ”¹å·²å…³é—­æ­£æ–‡ã€‚  
-**Affected Modules**ï¼šDocumentation / Governanceï¼ˆÂ§56ï¼‰  
-**Tests**ï¼šDM CI guardï¼ˆç®¡ç†æ€»å†Œç»“æž„å®ˆå«ï¼‰ç»§ç»­è¦†ç›–  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260824-006 â€” Raw Evidence Modelï¼ˆCR-1.1 Explicit Exchange Runtimeï¼‰
-
-**Type**ï¼šC2ï¼ˆæ­£å¼ evidence model å˜æ›´ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.2 å¤å®¡è£å†³ REOPENEDâ€”â€”CR-1 çš„ ProviderExchange/RawWriter å­˜åœ¨ 4 é¡¹ P0ï¼ˆè¿è¡Œæ—¶é“¾ä¸å®Œæ•´ / RawWriter æœªæŽ¥å…¥ / åºåˆ—åŒ–é£Žé™© / router è¯æ®ä¸åŒæºï¼‰ã€‚  
-**Old Contract**ï¼šæŽ¢é’ˆæ¶ˆè´¹ payload ä¾¿æ·æ–¹æ³•ï¼›å¤±è´¥ envelope ä¾èµ– `provider.last_envelopes` åæŸ¥ï¼ˆå…±äº«çŠ¶æ€ï¼‰ï¼›æ­£å¼ provider è¯æ®é“¾ = `payload â†’ RunStore.write_evidence(JSON)`ï¼›B4 è·¯ç”± `lambda: None` ä¼ªè°ƒç”¨ + å•æ¡ domain envelopeï¼›dict payload é™é»˜å–ç¬¬ä¸€ä¸ª valueã€‚  
-**New Contract**ï¼ˆADR-010ï¼‰ï¼š
-- è¿è¡Œæ—¶è¯æ®é“¾å”¯ä¸€æ­£å¼è·¯å¾„ï¼š`target.*_exchange() â†’ RawWriter.write(exchange) â†’ Parquet + .meta.json â†’ RawWriteResult â†’ SpikeCase.evidence_ref/evidence_hash`ï¼ˆevidence_type=RAW_PARQUETï¼‰ï¼›
-- å¤±è´¥ exchange ä¸€ç­‰å¯¹è±¡ï¼š`ProviderError.exchange`ï¼ˆ`call_exchange` é™„åŠ ï¼‰ï¼›æ²»ç†æ‹’ç» `synthetic_failure_exchange`ï¼›`last_envelopes` é™çº§ diagnostic-onlyï¼ˆAST é™æ€æµ‹è¯•å¼ºåˆ¶ probes/golden_router/runner ä¸å¾—è®¿é—®ï¼‰ï¼›
-- `ProbeExecutor.call(fn)` çš„ fn å¿…é¡»è¿”å›ž ProviderExchangeï¼ˆTypeError fail loudï¼‰ï¼›
-- è½½è·å½¢çŠ¶å…¨æ”¯æŒ + dict-of-tables æ–¹æ¡ˆ Aï¼ˆæ¯é€»è¾‘è¡¨ç‹¬ç«‹ Parquetï¼›meta è®°å½•å…¨éƒ¨ hash/schema/rowsï¼‰ï¼›æ··åˆ/æœªçŸ¥å½¢çŠ¶æŠ› RawWriterErrorï¼›é€å­—æ®µ round-trip æµ‹è¯•ï¼ˆå«ä¸­æ–‡/NaN/None/nullableï¼‰ï¼›
-- Golden Router è¯æ®åŒæºï¼šæ¯ domain å…¨éƒ¨ exchange å…ˆæŒä¹…åŒ–ã€DomainData æ¥è‡ªç²¾ç¡® payloadã€case ç»‘å®š **evidence bundle**ï¼ˆ`raw/bundles/*.json` åˆ—å‡ºå…¨éƒ¨ request_id/ref/hashï¼‰ï¼›`verify_evidence_closure` å¯¹ bundle é€’å½’å¤éªŒï¼›domain fetch å¤±è´¥æŒ‰é”™è¯¯ç±»ç»“æž„åŒ–å…¨éƒ¨ caseï¼›
-- RawWriter `write(exchange)`ï¼šrequest_id ä¸€è‡´æ€§æ–­è¨€ + envelope-first provider/datasetï¼ˆå¤–éƒ¨å†²çª BLOCKï¼‰ï¼›æ—§å…¥å£ä¿ç•™ä¸ºå…¼å®¹åŒ…è£…ã€‚  
-**Affected Modules**ï¼šproviders/exchange.pyã€providers/errors.pyã€providers/amazingdata/provider.pyã€storage/raw_writer.pyã€spike/target.pyã€spike/probes.pyã€spike/golden_router.pyã€spike/runner.py  
-**Compatibility**ï¼š`RunStore.write_evidence`ï¼ˆJSONï¼‰ä¿ç•™ï¼ˆæµ‹è¯•/æ—§æ•°æ®å…¼å®¹ï¼‰ï¼Œä¸å†æ˜¯æ­£å¼è¯æ®é“¾ï¼›SpikeCase.evidence_type RAW_JSONâ†’RAW_PARQUETï¼›æ—§ raw ç›®å½•å¸ƒå±€ä¸å˜ï¼ˆåŒ request_id åŒå­—èŠ‚å¹‚ç­‰ï¼‰ã€‚  
-**Tests**ï¼š418 passingï¼ˆæ–°å¢ž test_cr11_explicit_exchange 10 + test_raw_writer_shapes 22 + test_golden_router_evidence 13ï¼›CR-1/spike/golden gates æ—¢æœ‰æµ‹è¯•é€‚é…ï¼‰  
-**ADR**ï¼š[ADR-010](../adr/ADR-010_raw_evidence_model.md)  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260824-005 â€” R4-A2.3 Correctness Closureï¼ˆbound gates / rule data / exact-date / CA contextï¼‰
-
-**Type**ï¼šC2ï¼ˆTrading Rules å¥‘çº¦å˜æ›´ï¼‰+ C1ï¼ˆgates è¯­ä¹‰å¼ºåŒ–ï¼‰  
-**Status**ï¼šDONE / PENDING_REVIEW  
-**Trigger**ï¼šR4-A2.2 å¤å®¡è£å†³ REOPENEDâ€”â€”5 é¡¹ P0ï¼ˆrun-bound ACTIVE æ³„æ¼ / åˆ¶åº¦äº‹å®žç¡¬ç¼–ç  / é¦– N æ—¥æ—¥åŽ†å¤©è¿‘ä¼¼ / limit æœªç²¾ç¡®æŒ‰æ—¥åŒ¹é… / CA T-1/T/T+1 åªæ˜¯æ³¨é‡Šï¼‰+ P1ï¼ˆBJ ç‹¬ç«‹è¯­ä¹‰è¯æ˜Žï¼‰ã€‚  
-**Old Contract**ï¼š`production_formal_gate(bound_manifest)` å†…éƒ¨ä»è°ƒ `review_gate()`ï¼ˆè¯» ACTIVEï¼‰ï¼›`verify_binding` ç”¨ ACTIVE å¯¹æ¯”ï¼ˆè¿å bound-run å¥‘çº¦ï¼‰ï¼›`trading_rule.py`/`validators.py` ç¡¬ç¼–ç  Â±10/20/30% ç­‰åˆ¶åº¦è´¹çŽ‡ï¼›é¦– N æ—¥æ— åˆ¤å®šï¼ˆCHINEXT first-5 è§„åˆ™ç›´æŽ¥ Noneï¼‰ï¼›`_validate_limit_pit` å–é¦–ä¸ª symbol åŒ¹é…è¡Œï¼ˆéžç²¾ç¡®æ—¥æœŸï¼‰ï¼›`_validate_corp_action_context` åªåšå­—æ®µæ¯”è¾ƒï¼ˆæ—  T-1/T/T+1 ä»·æ ¼ä¸Šä¸‹æ–‡ï¼‰ï¼›`_validate_bj_mapping` ä¾èµ–ä¸å­˜åœ¨çš„ mapping endpointã€‚  
-**New Contract**ï¼š
-- **Bound-aware gates**ï¼š`quantity_gate/event_coverage_gate/review_gate/production_formal_gate` å…¨éƒ¨æŽ¥å— `(cases, manifest)`ï¼›VERDICT åªç”¨ run-bound æ•°æ®é›†ï¼›`verify_binding`ï¼ˆACTIVE å¯¹æ¯”è¯­ä¹‰ï¼‰åˆ é™¤ï¼›ACTIVE advance/tamper åŒå‘å¯¹æŠ—æµ‹è¯•è¯æ˜Žä¸æ³„æ¼ï¼›
-- **Trading Rule æ•°æ®å±‚**ï¼ˆADR-011ï¼‰ï¼šåˆ¶åº¦äº‹å®žè¿å…¥ `configs/trading_rules/a_share_limit_v1.yaml`ï¼ˆversion/review_status + rules[]ï¼‰ï¼›Python åª load/validate/PIT åŒ¹é…/å†²çªæ£€æµ‹/resolve/Decimal è®¡ç®—ï¼›fail-closedï¼ˆ0 åŒ¹é… / >1 equally-valid / ç¼º listing_date+calendar / æœªçŸ¥æ¿åˆ« â†’ `RuleUnresolvedError`ï¼Œæ°¸ä¸é™é»˜é€€åŒ– MAIN 10%ï¼‰ï¼›Python æºç å‡ºçŽ°è´¹çŽ‡å­—é¢é‡å³æµ‹è¯•å¤±è´¥ï¼›
-- **é¦– N æ—¥ = session åºå·**ï¼š`first_n_sessions` ç”¨ PIT äº¤æ˜“æ—¥åŽ† indexï¼ˆä¸Šå¸‚æ—¥=ç¬¬ 1 ä¸ª sessionï¼‰ï¼›æ—¥åŽ†ç¼ºè¡Œ fail-closedï¼›æµ‹è¯•è¦†ç›–æ˜¥èŠ‚/å›½åº†/è·¨å‘¨æœ«/ç¬¬ 5-6 æ—¥ï¼›
-- **Limit ç²¾ç¡®åŒ¹é…**ï¼š`(SECURITY_CODE, TRADE_DATE)` ç²¾ç¡®åŒ¹é…ï¼ˆ0 è¡Œ/å¤šè¡Œ fail closedï¼‰ï¼›listing_date å¿…é¡»æ¥è‡ªåŒä¸€ PIT hist masterï¼ˆç¼ºå¤±å³ FAILï¼Œä¸å…è®¸ None é€€åŒ–ï¼‰ï¼›é™ä»· Decimal ROUND_HALF_UP ä¸Ž provider é«˜ä½Žé™ä»·ä¸€è‡´æ€§æ ¡éªŒï¼›
-- **CA T-1/T/T+1 çœŸéªŒè¯**ï¼šexact event dateï¼ˆadj EX_DATE==Tï¼‰/ factor transition at T / raw discontinuityï¼ˆfactorâ‰ 1 æ—¶ raw_retâ‰ adj_retï¼‰/ adjusted continuityï¼ˆ|adj_ret|â‰¤35%ï¼‰/ åœç‰Œâ†’`NOT_TESTABLE_TIME(SUSPENSION_AT_EVENT)`ï¼ˆç»ä¸é™é»˜ PASSï¼‰ï¼›
-- **BJ è¯­ä¹‰è¯æ˜Ž**ï¼šhist master å­˜åœ¨æ€§ï¼ˆcode continuityï¼‰+ exact-date status Â±30% regimeï¼ˆæ•°æ®é©±åŠ¨ ruleï¼‰ï¼Œä¸å†ä¾èµ– mapping endpointã€‚  
-**Affected Modules**ï¼šspike/golden_store.pyã€spike/golden_router.pyã€spike/trading_rule.pyã€spike/validators.pyã€spike/runner.pyã€configs/trading_rules/ï¼ˆæ–°ï¼‰  
-**Affected Data**ï¼šconfigs/trading_rules/a_share_limit_v1.yamlï¼ˆCOMPILEDï¼Œå¾…äººå·¥ reviewï¼‰  
-**Compatibility**ï¼š`resolve_trading_rule` è¿”å›žå€¼ä»Ž `TradingRule | None` æ”¹ä¸º raise `RuleUnresolvedError`ï¼ˆfail-closedï¼‰ï¼›`validate_limit_rule` å‡çº§ v3ï¼ˆæ•°æ®é©±åŠ¨ï¼‰ï¼›`BOARD_LIMIT_RATES/board_of/expected_limit_price` åˆ é™¤ï¼ˆæ— å¤–éƒ¨å¼•ç”¨ï¼‰ã€‚  
-**Tests**ï¼š418 passingï¼ˆæ–°å¢ž test_trading_rule_data 21 + test_bound_formal_gates 8 + router/CA/BJ åœºæ™¯ 13ï¼‰  
-**ADR**ï¼š[ADR-011](../adr/ADR-011_trading_rule_data_sor.md)  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260822-004 â€” CR-1 ProviderExchange / RawWriter Runtime Contract
-
-**Type**ï¼šC1ï¼ˆæ–°å¢žè¿è¡Œæ—¶å¥‘çº¦ï¼‰  
-**Status**ï¼šDONEï¼ˆImplementationï¼‰/ PENDING_REVIEW  
-**Trigger**ï¼šR4-A2 Batch-1 å¤æ ¸è£å†³ CR-1 READY / SHOULD START NOWã€‚  
-**Old Contract**ï¼šprovider `get_xxx` ç›´æŽ¥è¿”å›ž payloadï¼›envelope è—åœ¨ `last_envelopes`ï¼ˆthread-local å¼ï¼‰ï¼›æ—  Raw å±‚æŒä¹…åŒ–ï¼›query_kline å†…éƒ¨ get_calendar æ— ç‹¬ç«‹å®¡è®¡ã€‚  
-**New Contract**ï¼š
-- `ProviderExchange`ï¼ˆ1 SDK exchange = 1 request_id = 1 RawEnvelope = â‰¤1 payloadï¼‰ï¼›`call_exchange()` æ˜¾å¼è¿”å›ž exchangeï¼›ä¸šåŠ¡ wrapper å– `.payload`ï¼›**æ—  last_exchange/consume æ¨¡å¼**
-- hidden SDK callï¼ˆ`query_kline â†’ get_calendar`ï¼‰ç‹¬ç«‹ exchangeï¼ˆcalendar ä¸åŸ‹è¿› kline envelopeï¼‰
-- `RawWriter`ï¼šæˆåŠŸ exchange â†’ Parquet å·¥ä»¶ + .meta.jsonï¼ˆenvelopeï¼‰ï¼›å¤±è´¥ exchange â†’ envelope-only å¤±è´¥è¯æ®ï¼ˆè¯·æ±‚å®¡è®¡æ°¸ä¸ä¸¢å¤±ï¼‰ï¼›same hash å¹‚ç­‰ / different bytes BLOCKï¼›è·¨å¹³å°é€»è¾‘ URIï¼›secret è„±æ•ï¼›**æ—  repr() åºåˆ—åŒ–**
-- Spike `ProbeContext.evidence` å¤ç”¨ exchange çš„ request_idï¼ˆä¸å†é‡æ–°ç”Ÿæˆï¼‰  
-**Affected Modules**ï¼šproviders/exchange.pyï¼ˆæ–°ï¼‰ã€providers/amazingdata/provider.pyã€storage/raw_writer.pyï¼ˆæ–°ï¼‰ã€spike/probes.py  
-**Tests**ï¼š348 passingï¼ˆæ–°å¢ž test_cr1_provider_exchangeï¼šrequest_id ä¿æŒ / å¤±è´¥ envelope / å¹‚ç­‰ / å†²çª BLOCK / secret è„±æ• / è·¨å¹³å° URI / æ—  repr / hidden calendar ç‹¬ç«‹ exchange / spike request_id lineageï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260822-003 â€” R4-A2 Golden Review / Domain Router / PIT Validator Contractï¼ˆç¬¬ä¸€æ‰¹ï¼‰
-
-**Part 2ï¼ˆæœ¬æ‰¹ï¼‰**ï¼šR4-A2 Batch-1 å¤æ ¸å››é¡¹ P0 å…¨éƒ¨ä¿®å¤â€”â€”
-- **P0-01** review_gate å…¨ case æ ¡éªŒï¼ˆåˆ é™¤ early breakï¼›å®Œæ•´é”™è¯¯æ”¶é›†ï¼›first-valid-second-tampered æµ‹è¯•ï¼‰
-- **P0-02** Run-bound Golden resolverï¼š`load_bound(dataset_file, truth_version, dataset_hash)` ç›´è¯» immutable datasetï¼›resume/verdict/B4 å…¨éƒ¨èµ° boundï¼ˆACTIVE ä»…å†³å®š NEW run é»˜è®¤ç‰ˆæœ¬ï¼‰ï¼›ACTIVE æŽ¨è¿›åŽåŽ†å² run ä»å¯ Exact Replayï¼ˆæµ‹è¯•ï¼‰
-- **P0-03** Candidate Augmentation Workflowï¼ˆ`scripts/golden/candidate.py`ï¼šadd-case/validate/build-versionï¼‰ï¼›review åªæ ¸éªŒä¸åˆ›å»ºäº‹ä»¶ï¼›ç”Ÿå‘½å‘¨æœŸæ–‡æ¡£æ›´æ–°
-- **P0-04** PRODUCTION new_run æ‰§è¡Œå®Œæ•´ formal gateï¼ˆquantity + events + reviewï¼‰fail-fastï¼ˆä¸å†çƒ§å®Œæ­£å¼è´¦å·æµé‡æ‰åœ¨ verdict å‘çŽ° golden æœª reviewï¼‰
-- P1-01 batch kind ç»Ÿä¸€ allowlistï¼›P1-02 REVIEWED provenance load æ—¶å®Œæ•´æ ¡éªŒï¼›P1-03 artifact ref path confinementï¼›P1-04 ç‰ˆæœ¬æ–‡ä»¶ create-onlyï¼ˆä¸åŒ bytes BLOCKï¼‰ï¼›P1-05 batch stage-all-then-commitï¼ˆæ— å­¤å„¿ evidenceï¼‰ï¼›P1-06 evidence çœŸæ­£ content-addressedï¼ˆsha256/ è·¯å¾„ï¼Œæ–¹æ¡ˆ Aï¼‰
-- **R4-A2.2**ï¼šDomain Routerï¼ˆgolden_router.pyï¼šSTâ†’status / Delistedâ†’hist_code_list+stock_basic / Limitâ†’status+PIT rule / CAâ†’status+adj+kline / BJâ†’mappingï¼‰ï¼›B3 çŽ°åœº ST truth åˆ é™¤ï¼ˆB3 ç»“æž„æ€§ã€B4 è¯­ä¹‰æ€§å½»åº•åˆ†ç¦»ï¼‰ï¼›PIT TradingRuleï¼ˆç‰ˆæœ¬åŒ– effective_from/to + Decimal ROUND_HALF_UPï¼‰ï¼›History å›ºå®š fixturesï¼ˆ600519/000001/835185/300104ï¼Œä¸å† get_code_list()[:2]ï¼‰ï¼›BSE ç‹¬ç«‹ core evidence
-- äº‹ä»¶ identity ç»“æž„åŒ–ï¼šST=(symbol, effective_date, subtype)ã€DELIST=(symbol, effective_date)â€”â€”è‡ªç”±å­—ç¬¦ä¸² event_id æ— æ³•å‡‘æ•°ï¼ˆ60 fake-id åˆå¹¶ä¸º 1 çš„æµ‹è¯•ï¼‰
-**Status æ›´æ–°**ï¼šImplementation DONEï¼ˆR4-A2.1 + R4-A2.2 å…¨éƒ¨è½åœ°ï¼‰/ Review PENDING_REVIEW  
-**Tests**ï¼š348 passingï¼ˆæœ¬æ‰¹ +13ï¼šbound resolver 4 + candidate workflow 4 + router/trading_rule ç›¸å…³ + CR-1 13 é¡¹ï¼‰
-
-**Type**ï¼šC1 Contract Clarification  
-**Status**ï¼šIN_PROGRESSï¼ˆç¬¬ä¸€æ‰¹å·²è½åœ°ï¼šEvidence Closure + Review Workflow + äº‹ä»¶è¯­ä¹‰ + hash æ›´åï¼›Router/PIT/BSE/BJ è¿›è¡Œä¸­ï¼‰  
-**Trigger**ï¼šR4-A1.1 å¤æ ¸ REOPENED Formal Truth Closureâ€”â€”source_artifact_hash æœªçœŸæ­£ç»‘å®š Source Artifactã€‚  
-**Old Contract**ï¼šREVIEWED åªæ£€æŸ¥ source_artifact_hash éžç©ºï¼ˆå¯æ‰‹å·¥å¡«ä»»æ„å€¼ï¼‰ï¼›event gate åªæœ‰ ST_CAP å•ç±»ï¼›SpikeRun å­—æ®µå golden_manifest_hash å­˜çš„æ˜¯ dataset_hashã€‚  
-**New Contract**ï¼š
-- **Review Workflow æ˜¯å”¯ä¸€ COMPILEDâ†’REVIEWED è·¯å¾„**ï¼ˆ`scripts/golden/review.py`ï¼‰ï¼šreviewer æä¾›å¤–éƒ¨è¯æ®å·¥ä»¶æ–‡ä»¶ï¼Œworkflow è‡ªå·±è¯»å– bytes è®¡ç®— SHA256 å¹¶å¤åˆ¶å…¥ evidence storeï¼ˆå†…å®¹å¯»å€ï¼‰ï¼›**æ—  --hash å‚æ•°**ï¼ˆæ‰‹å·¥ hash æ°¸è¿œæ— æ³•è¾“å…¥ï¼‰
-- **Formal Review Gate**ï¼ˆreview_gateï¼‰ï¼šæ¯ä¸ª REVIEWED case çš„ source_artifact_ref å¿…é¡» resolve åˆ° evidence å·¥ä»¶ä¸” SHA256 ä¸Žå°å­˜å€¼ä¸€è‡´ï¼Œå¦åˆ™ REVIEW_INCOMPLETE
-- **Provenance åˆ†ç¦»**ï¼šcompiled_by/compiled_at ä¸Ž reviewed_by/reviewed_at ç‹¬ç«‹ï¼›COMPILED case å¸¦ reviewer å­—æ®µå³ load å¤±è´¥
-- **äº‹ä»¶è¯­ä¹‰**ï¼ˆÂ§9/Â§10ï¼‰ï¼šST_TRANSITION + subtypeï¼ˆST_ADD/ST_REMOVE/STAR_ST_ADD/STAR_ST_REMOVEï¼‰ï¼Œgate è¦æ±‚ â‰¥50 distinct ä¸” ADD>0 ä¸” REMOVE>0ï¼›DELIST è¦æ±‚ distinct event â‰¥20 **AND** distinct symbol â‰¥20
-- **å­—æ®µæ›´å**ï¼ˆÂ§11 æ–¹æ¡ˆ Aï¼‰ï¼šSpikeRun.golden_manifest_hash â†’ golden_dataset_hashï¼ˆload å…¼å®¹æ—§ keyï¼‰
-- æ•°æ®é›† v3 candidateï¼ˆcompiled/reviewed åˆ†ç¦» + ST_TRANSITION è¯­ä¹‰ï¼›è¯šå®žè¦†ç›–ï¼šST_TRANSITION=2<50 æ—  REMOVE subtypeã€DELIST=10<20ï¼‰  
-**Reason**ï¼šè®©"å°å­˜çš„ hash"ä»Ž Claim å˜æˆå¯æœºå™¨å¤éªŒçš„ External Evidenceã€‚  
-**Affected Modules**ï¼šspike/golden_storeã€spike/validatorsã€spike/modelã€spike/run_storeã€spike/runnerã€providers/amazingdata/capabilityã€scripts/golden  
-**Affected Data**ï¼šdata/golden/provider/amazingdata/ï¼ˆv3 ACTIVEï¼›evidence/ ç”± review workflow äº§ç”Ÿï¼‰  
-**Compatibility**ï¼šGoldenCase å­—æ®µæ‰©å±•ï¼›golden_dataset_hash æ›´åï¼ˆlegacy json key å…¼å®¹è¯»å–ï¼‰ã€‚  
-**Migration / Backfill**ï¼šgolden_cases_v3.jsonlã€‚  
-**Tests**ï¼š313 passingï¼ˆæ–°å¢ž test_golden_review_workflowï¼šartifact å­—èŠ‚å°å­˜/æ—  hash å‚æ•°/é‡å¤ review æ‹’ç»/ç¼ºå¤± artifact æ‹’ç»/å°å­˜åŽç¯¡æ”¹æ£€æµ‹/ghost ref æ£€æµ‹/ST_REMOVE subtype gate/symbol åŒé—¨/æ›´åå…¼å®¹ï¼‰ã€‚  
-**ADR**ï¼šNot Requiredï¼ˆå¥‘çº¦æ¾„æ¸…ï¼‰  
-**Commit**ï¼šæœ¬æ‰¹  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260822-002 â€” Adopt R4-A1.1 Golden Truth Integrity Contract
-
-**Type**ï¼šC1 Contract Clarification  
-**Status**ï¼šREOPENEDï¼ˆFormal Source Evidence æœªé—­çŽ¯ï¼›source_artifact_hash å°šæœªç»‘å®šçœŸå®žå·¥ä»¶â€”â€”R4-A2 ç¬¬ä¸€ä»»åŠ¡ï¼‰  
-**Trigger**ï¼šR4-A1 å¤æ ¸ REOPENEDï¼Œå››é¡¹ P0ï¼ˆmanifest è‡ªéªŒè¯ / hash æ‹†åˆ† / event è¦†ç›– / ç‰ˆæœ¬é€‰æ‹©ï¼‰ã€‚  
-**Old Contract**ï¼šsource_hash å•å“ˆå¸Œï¼›manifest ç»Ÿè®¡å¯è¢«å•ç‚¹ç¯¡æ”¹ï¼›loader æŒ‰å­—å…¸åºçŒœç‰ˆæœ¬ã€‚  
-**New Contract**ï¼šmanifest ç»Ÿè®¡ä»Ž cases å¤ç®—ï¼ˆç¯¡æ”¹å³æ‹¦æˆªï¼‰ï¼›case_semantic_hashï¼ˆå« case_typeï¼‰ä¸Ž source_artifact_hash åˆ†ç¦»ï¼›event_id/event_class + distinct-event gateï¼ˆPRODUCTION run åˆ›å»ºå³æ‹’ç»ï¼Œfail-closedï¼‰ï¼›append-only v1/v2 + ACTIVE æŒ‡é’ˆã€‚  
-**Reason**ï¼šGolden ä»Ž "Versioned Claim Set" æŽ¨è¿›åˆ° "Versioned + Reviewed + Externally-Evidenced Truth Set" çš„ç»“æž„å‰æã€‚  
-**Affected Modules**ï¼šspike/golden_storeã€spike/runnerã€spike/validatorsã€scripts/golden  
-**Affected Data**ï¼šdata/golden/provider/amazingdata/ï¼ˆv2 candidateï¼Œ123 casesï¼Œå…¨éƒ¨ COMPILEDï¼‰  
-**Compatibility**ï¼šGoldenCase å­—æ®µæ‰©å±•ï¼ˆsource_hashâ†’case_semantic_hash + æ–°å­—æ®µï¼‰ï¼›load API ä¸å˜ã€‚  
-**Migration / Backfill**ï¼šgolden_cases_v2.jsonl ç”± compile_v2 ç”Ÿæˆã€‚  
-**Tests**ï¼š302 passingï¼ˆå« Â§22 å…³é”®æµ‹è¯•ï¼šmanifest åŒç±»ç¯¡æ”¹ / entry æ”¹+é‡å° / case_type æ”¹ / REVIEWED æ—  artifact / è´Ÿæ ·æœ¬ä¸ç®—äº‹ä»¶ / è¯±é¥µ loader / append-onlyï¼‰ã€‚  
-**ADR**ï¼šNot Requiredï¼ˆå¥‘çº¦æ¾„æ¸…ï¼Œä¸æ”¹æž¶æž„ï¼‰  
-**Implementation Commit**ï¼š`b3a3d27`  
-**Reviewer**ï¼šDesign/Audit Reviewï¼ˆ2026-08-22ï¼šStructure SUBSTANTIALLY PASSï¼›Formal Truth Closure REOPENEDï¼‰
-
-## DM-CR-20260822-001 â€” å»ºç«‹ Development Management æ€»å†Œ
-
-**Type**ï¼šC1 / Governance  
-**Status**ï¼šVERIFIEDï¼ˆ2026-08-22 R4-A1.1 å¤æ ¸ï¼šDevelopment Management Governance PASS_WITH_MINOR_FIXESï¼ŒÂ§2 å››å°é¡¹å·²åœ¨æœ¬æ‰¹ä¿®æ­£ï¼‰  
-**Trigger**ï¼šé¡¹ç›®è¿›å…¥å¤šè½®å®¡è®¡ã€Formal Spike ä¸Ž Canonical Runtime å¹¶è¡Œé˜¶æ®µï¼Œéœ€è¦ç»Ÿä¸€é•¿æœŸç®¡ç†å…¥å£ã€‚  
-**Old Contract**ï¼šè®¾è®¡ã€è¿›åº¦ã€å®¡è®¡ã€é£Žé™©ã€æ—¥å¿—åˆ†æ•£åœ¨å¤šä¸ªæ–‡æ¡£ã€‚  
-**New Contract**ï¼šå»ºç«‹ `docs/project/DEVELOPMENT_MANAGEMENT.md`ï¼Œç»Ÿä¸€ç»´æŠ¤å½“å‰è®¾è®¡æ‘˜è¦ã€çŠ¶æ€ã€Gateã€Roadmapã€å˜æ›´æŽ§åˆ¶å’Œæ–‡æ¡£ç´¢å¼•ã€‚  
-**Reason**ï¼šé™ä½Žè¯­ä¹‰æ¼‚ç§»ï¼Œé¿å…â€œä»£ç æ”¹å˜è€Œå½“å‰æ–¹æ¡ˆä¸åŒæ­¥â€ã€‚  
-**Affected Modules**ï¼šDocumentation / Governance  
-**Affected Data**ï¼šNone  
-**Compatibility**ï¼šä¸æ”¹å˜è¿è¡Œæ—¶ä»£ç ã€‚  
-**Migration / Backfill**ï¼šNone  
-**Tests**ï¼šmanagement-doc governance testï¼ˆDM CI guardï¼Œæœ¬æ‰¹è½åœ°ï¼‰ã€‚  
-**ADR**ï¼šNot Required  
-**Commit**ï¼š`f102394`ï¼ˆåˆå§‹åŒ–ï¼‰+ `8d7d4aa`ï¼ˆSHA å›žå¡«ï¼‰+ æœ¬æ‰¹ï¼ˆÂ§2 ä¿®æ­£ï¼‰  
-**Reviewer**ï¼šDesign/Audit Reviewï¼ˆVERIFIED 2026-08-22ï¼‰
-
----
-
-
-## DM-CR-20260903-078 â€” CR-5 Deterministic Feature Layer + PIT Feature Snapshot
-
-**Type**ï¼šC2ï¼ˆFeature / PIT / lineage / artifact contractï¼‰  
-**Status**ï¼šDONEï¼ˆImplementationï¼‰/ PENDING_REVIEW  
-**Trigger**ï¼šCR-4.4 final review accepted CR-4 full-chain closure and issued the CR-5 work requirement after PR #1 merge.  
-**Old Contract**ï¼šCR-4 produced verified Snapshot and ReadModel, but no governed feature input boundary, feature registry, PIT feature lineage, deterministic feature identity, feature findings artifact, or feature ledger.  
-**New Contract**ï¼š
-- `FeatureBuilder.build(snapshot_id, feature_set_id)` accepts only an explicit verified ReadModel world and a static registry set; no latest/best, fallback, direct Snapshot/Canonical/Raw/Provider access, or hidden rebuild;
-- V1 emits only `UNADJUSTED_CANONICAL` raw-price features, `OBSERVED_SECURITY_BARS` windows, and `OBSERVED_DAILY_BAR_UNIVERSE` breadth; adjusted/total returns, session semantics, full-universe claims, State/strategy semantics remain blocked;
-- null, unsafe denominator, insufficient history, optional omission, and non-finite outcomes are deterministic typed findings; no fill, sentinel, copied suspension value, shortened window, or silent drop;
-- every row carries knowledge-time `feature_available_at` and ordered source lineage; one feature run binds one Snapshot world + one Registry/contract/code identity;
-- exact feature artifacts are immutable and recoverable, manifest-last / ledger-last, and the public verifier replays `compute_feature_set` from the verified ReadModel and consumes all physical/semantic seals.
-**Reason**ï¼šä¸ºæœªæ¥ CR-6 State æä¾›å¯ç¡®å®šæ€§é‡å»ºã€PIT å¯è¿½æº¯ä¸”ç¼ºå¤±åŽŸå› å¯å®¡è®¡çš„ç‰¹å¾äº‹å®žå±‚ï¼Œä¸æå‰å¼•å…¥ç­–ç•¥åˆ¤æ–­ã€‚  
-**Affected Modules**ï¼š`src/ashare_state/features/`ã€`migrations/023_feature_build.sql`ã€`tests/integration/test_features.py`  
-**Affected Data**ï¼š`meta_feature_build`ï¼›`feature/contract=feature-v1/.../manifest.json` åŠä¸‰ç±» Parquet correctness artifacts  
-**Compatibility**ï¼šCR-2/CR-3/CR-4 frozen inputs unchangedï¼›æ–°å¢ž 023 migration tailï¼›Feature artifacts require current Registry / builder fingerprint for consumptionã€‚  
-**Migration / Backfill**ï¼šfrom-zero ä¸Ž 022â†’023 upgrade testsï¼›æ— åŽ†å² Feature backfillã€‚  
-**Tests**ï¼šCR-5 contract matrix added; GitHub Actions validation pending.  
-**ADR**ï¼š[ADR-025](../adr/ADR-025_feature_layer_pit_missingness.md)ï¼›ADR-024 merged/accepted.  
-**Commit**ï¼šthis CR-5 implementation commit  
-**Reviewer**ï¼šPENDING_REVIEW
-
-## DM-CR-20260903-079 â€” CR-5 CI å®Œæ•´éªŒè¯ä¸Ž Reviewer closure å‰çŠ¶æ€
-
-**Type**ï¼šC2ï¼ˆFeature / PIT / lineage / artifact contractï¼‰  
-**Status**ï¼šDONEï¼ˆImplementation + CIï¼‰/ PENDING_REVIEW  
-**Trigger**ï¼šPR #2 CR-5 implementation head å®Œæˆ CI éªŒè¯ã€‚  
-**Evidence**ï¼šGitHub Actions run `33745226956`ï¼ˆrun 155ï¼‰ä¸‰çŸ©é˜µ successï¼›Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 æ¯è…¿ `1270 passed`ï¼ŒRuff lintã€formatterã€mypyã€Spikeã€SDK-absent å…¨éƒ¨é€šè¿‡ï¼›Windows 3.14 çš„ DEVLOG ä¸Ž Management-doc gates successã€‚  
-**Current State**ï¼šFeature Layer implementation ä¸Ž CI å·²å®Œæˆï¼›CR-5 ä»ç­‰å¾… Reviewer closureï¼ŒPR #2 ä¸è‡ªåŠ¨åˆå¹¶ï¼›CR-6 State ä¸Ž production P0-M-1B ç»§ç»­ blockedã€‚  
-**Commit**ï¼šimplementation head `eaebce48ad373d7302f208f2f7fe7ddd53bf6cfb`ï¼›æœ¬æ¡ä¸ºéªŒè¯çŠ¶æ€æ–‡æ¡£åŒæ­¥ã€‚  
-**Reviewer**ï¼šPENDING_REVIEW
-
-# 62. ä¸‹ä¸€æ¬¡ç»´æŠ¤æ£€æŸ¥ç‚¹
-
-R4-A3 å·²æ›´æ–°ï¼ˆ2026-08-26ï¼Œè§ DM-CR-20260826-030/031/032/033ï¼‰ï¼š
-
-```text
-Â§40 Â§41 Â§52 Â§61 Â§62 + å¤´éƒ¨ï¼ˆVERIFIED closure åŒæ­¥ / SHA correction / Phase Statusï¼‰(done 2026-08-26)
-```
-
-R4-B1 è½åœ°æ—¶è‡³å°‘æ›´æ–°ï¼š
-
-```text
-Â§41 Â§44             (B1 å¥‘çº¦ä¸Ž acceptance)
-Â§48 Â§52 Â§61         (entry gate / é£Žé™© / Change Log)
-ADRï¼ˆè‹¥ capability approval å¥‘çº¦æ¼”è¿›ï¼‰
-```
-
-ä¸‹ä¸€æ‰¹ï¼ˆR4-A3 / CR-2ï¼Œé¡»å¾…æœ¬æ‰¹ VERIFIEDï¼‰è½åœ°æ—¶è‡³å°‘æ›´æ–°ï¼š
-
-```text
-Â§17                 (CR-2 Provider-Normalized å¥‘çº¦)
-Â§40 Â§42 Â§44         (roadmap / acceptance)
-Â§48                 (å¦‚æ–°å¢ž entry gate æ¡ç›®)
-Â§52 Â§53 Â§61         (é£Žé™© / TD / Change Log)
-```
-
-Golden / Trading Rule äººå·¥ Review æ‰§è¡Œæ—¶è‡³å°‘æ›´æ–°ï¼š
-
-```text
-Â§40 Â§48 Â§52 Â§61     (RISK-001/005 çŠ¶æ€ + REVIEWED ç‰ˆæœ¬è½ä½)
-```
-
----
-
-# 63. é¡¹ç›®ç®¡ç†åŽŸåˆ™æ€»ç»“
-
-```text
-Frozen Baseline ä¸é™é»˜æ¼‚ç§»
-Design Change å¿…é¡»æœ‰ Change Record
-Code / Tests / DEVLOG / Management Doc åŒæ­¥
-Data Definition å…ˆäºŽ Feature Expansion
-PIT æ­£ç¡®æ€§å…ˆäºŽâ€œæœ‰æ•°æ®â€
-Exact Replay å…ˆäºŽâ€œè·‘å¾—å¿«â€
-Formal Truth å…ˆäºŽ GO/NO-GO
-Canonical Runtime å…ˆäºŽå¤§è§„æ¨¡ Feature
-```
-
-æœ¬æ–‡ä»¶é•¿æœŸæŒç»­ç»´æŠ¤ï¼Œä¸å¦èµ· `DEVELOPMENT_MANAGEMENT_v2/v3.md`ã€‚
-Git åŽ†å²è´Ÿè´£ä¿å­˜è¿‡åŽ»ç‰ˆæœ¬ã€‚
-
-
----
-
-## DM-CR-20260904-084 â€” CR-6.0 Governance Bootstrap
-
-**Type**ï¼šC2ï¼ˆState interpretation contract and downstream layer bootstrapï¼‰  
-**Status**ï¼šIN_PROGRESS / PENDING_REVIEW  
-**Trigger**ï¼šPR #3 merged to main and the CR-6 activation document authorized the downstream State layer to start.  
-**Old Contract**ï¼šCR-6 was BLOCKED_BY_CR-5.2 while ADR-025 and the management headers still described the pre-merge review state.  
-**New Contract**ï¼šCR-5 and ADR-025 are synchronized to VERIFIED / CLOSED / FREEZE and ACCEPTED; CR-6 is START / ACTIVE under the separate deterministic State contract. CR-6.0 introduces ADR-026 in PROPOSED / PENDING_REVIEW status and typed State registry/model/schema skeletons.  
-**Reason**ï¼šThe reviewer-defined merge gate is now satisfied. The State layer needs an explicit interpretation contract before any runtime rule, artifact, ledger, or verifier can be implemented.  
-**Affected Modules**ï¼šdocs/adr/ADR-000_adr_index.mdã€docs/adr/ADR-025_feature_layer_pit_missingness.mdã€docs/adr/ADR-026_deterministic_market_state_interpretation.mdã€docs/DEVLOG.mdã€docs/project/DEVELOPMENT_MANAGEMENT.mdã€src/ashare_state/state/  
-**Compatibility**ï¼šCR-5 V1 formulas, windows, universe, missingness, lineage, migration 023, and artifacts remain frozen. No State runtime or migration is introduced in CR-6.0.  
-**Tests / Evidence**ï¼šupstream run 33818320010 (run 179) SUCCESS; CR-6.0 is a documentation/type/schema bootstrap and will be covered by the existing static CI plus later State contract tests.  
-**ADR**ï¼š[ADR-026](../adr/ADR-026_deterministic_market_state_interpretation.md)  
-**Commit**ï¼šCR-6.0 bootstrap commit  
-**Reviewer**ï¼šPENDING_REVIEW
-
-
----
-
-## DM-CR-20260904-085 â€” CR-6.1 Registry and Deterministic State Engine
-
-**Type**ï¼šC2ï¼ˆState interpretation contract implementationï¼‰  
-**Status**ï¼šIN_PROGRESS / PENDING_REVIEW  
-**Trigger**ï¼šCR-6.0 governance bootstrap completed on the merged CR-5 mainline.  
-**Old Contract**ï¼šCR-6 had only typed identity/schema skeletons and no executable State declarations.  
-**New Contract**ï¼šA single static State Registry declares exactly four V1 descriptive dimensions and compiles them into a typed plan with exact dependencies, enums, rule IDs, threshold policies, missingness, availability, eligibility, and one handler per supported declaration. The shared engine computes deterministic State rows and typed findings from one VerifiedFeatureRun market projection.  
-**Reason**ï¼šMake Registry declarations the sole rule truth before adding publication or replay infrastructure.  
-**Affected Modules**ï¼šsrc/ashare_state/state/registry.pyã€src/ashare_state/state/engine.pyã€src/ashare_state/state/schema.pyã€src/ashare_state/state/__init__.pyã€tests/integration/test_state.pyã€docs/DEVLOG.md  
-**Compatibility**ï¼šCR-5 formulas, artifacts, migration 023, and public Feature verifier remain unchanged. CR-6.1 adds no StateBuilder, artifact, ledger, migration, prediction, or strategy behavior.  
-**Tests / Evidence**ï¼šCR-6.1 focused tests map the Registry and rule semantics groups 11â€“44; full three-platform CI remains the acceptance evidence.  
-**ADR**ï¼š[ADR-026](../adr/ADR-026_deterministic_market_state_interpretation.md)  
-**Commit**ï¼šCR-6.1 implementation commit  
-**Reviewer**ï¼šPENDING_REVIEW
-
-
----
-
-## Change Record: DM-CR-20260904-086
-
-- **Type**ï¼šC1/C2 â€” State artifact, replay and migration contract implementation
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / PENDING_REVIEW
-- **Trigger**ï¼šCR-6.2 sequencing in the approved Deterministic Market State Layer work contract.
-- **Old Contract**ï¼šCR-6.1 supplied only verified-input State Registry/engine truth; State publication and persistence were not available.
-- **New Contract**ï¼šOne explicit feature_run_id plus state_set_id produces one deterministic state_run_id, two immutable state artifacts, a manifest, and one meta_state_build ledger row; public verification replays the public Feature verifier and shared State engine.
-- **Reason**ï¼šMake descriptive State consumable, recoverable, and auditable without adding predictive or strategy semantics.
-- **Affected Modules**ï¼šsrc/ashare_state/state/{builder,verifier,__init__}.py; migrations/024_state_build.sql; tests/integration/{test_state_persistence,test_migrations}.py.
-- **Affected Data**ï¼šNew state-v1 logical artifact namespace and meta_state_build; migrations 001â€“023 remain frozen.
-- **Compatibility**ï¼šCR-5 Feature artifacts and public verifier remain unchanged; CR-6.1 State rules remain the single computation truth.
-- **Migration / Backfill**ï¼šMigration 024 applies from zero and upgrades a 023 database; no historical State backfill is performed.
-- **Tests**ï¼šFocused builder/public-verifier/tamper tests plus migration from-zero, 023â†’024 and idempotency assertions; full CI pending for this batch.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼šCurrent CR-6.2 implementation batch.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
-
----
-
-## Change Record: DM-CR-20260904-087
-
-- **Type**ï¼šC0 â€” CR-6.2 lint correction
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / PENDING_REVIEW
-- **Trigger**ï¼šCI run 33828734327ï¼ˆrun 197ï¼‰Ruff diagnostics.
-- **Old Contract**ï¼šCR-6.2 implementation batch had unchanged runtime intent but did not satisfy the repository's import and line-length gates.
-- **New Contract**ï¼šState package imports are Ruff-clean and CR-6.2 focused tests satisfy the repository line-length rule.
-- **Reason**ï¼šRestore the mandatory static gates without modifying State computation or persistence semantics.
-- **Affected Modules**ï¼šsrc/ashare_state/state/{__init__,builder,verifier}.py; tests/integration/test_state_persistence.py.
-- **Tests**ï¼šRuff lint/format and subsequent full CI pending.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼šCurrent CR-6.2 lint correction batch.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-088
-
-- **Type**ï¼šC0 â€” CR-6.2 formatter correction
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / PENDING_REVIEW
-- **Trigger**ï¼šCI run 33828840805ï¼ˆrun 198ï¼‰Ruff formatter output.
-- **Old Contract**ï¼šCR-6.2 implementation had passed Ruff diagnostics but still differed from the repository formatter's canonical line wrapping.
-- **New Contract**ï¼šCR-6.2 State builder, verifier, migration test, and persistence test are aligned with the repository formatter without changing runtime semantics.
-- **Reason**ï¼šRestore the mandatory formatter gate before mypy and runtime validation.
-- **Affected Modules**ï¼šsrc/ashare_state/state/{builder,verifier}.py; tests/integration/{test_migrations,test_state_persistence}.py.
-- **Tests**ï¼šRuff formatter and subsequent full CI pending.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼šCurrent CR-6.2 formatter correction batch.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-089
-
-- **Type**ï¼šC0 â€” CR-6.2 formatter follow-up
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / PENDING_REVIEW
-- **Trigger**ï¼šCI run 33829344918ï¼ˆrun 199ï¼‰Ruff formatter output.
-- **Old Contract**ï¼šOne State verifier semantic-seal exception retained a non-canonical multi-line form.
-- **New Contract**ï¼šThe State verifier satisfies the repository formatter without changing replay, artifact, or ledger semantics.
-- **Reason**ï¼šClear the last observed formatter-only gate before runtime validation.
-- **Affected Modules**ï¼šsrc/ashare_state/state/verifier.py.
-- **Tests**ï¼šRuff formatter and subsequent full CI pending.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼šCurrent CR-6.2 formatter follow-up batch.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-090
-
-- **Type**ï¼šC0 â€” CR-6.2 migration upgrade test correction
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / PENDING_REVIEW
-- **Trigger**ï¼šCI run 33829428832ï¼ˆrun 200ï¼‰failed the State ledger schema assertion because the test stopped at migration 023.
-- **Old Contract**ï¼šThe 023â†’024 upgrade test asserted the migration-024 table without copying or applying migration 024.
-- **New Contract**ï¼šThe upgrade test explicitly copies migration 024, applies it as the fourth tail migration, and asserts the 24-entry ledger before checking State schema columns.
-- **Reason**ï¼šMake the migration test exercise the documented 023â†’024 path rather than assert an unapplied table.
-- **Affected Modules**ï¼štests/integration/test_migrations.py.
-- **Tests**ï¼šFull CI pending after this correction.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼šCurrent CR-6.2 migration test correction batch.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-091
-
-- **Type**ï¼šC2 â€” CR-6.2 CI verification
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šDONE / PENDING_REVIEW
-- **Trigger**ï¼šPR #6 clean head completed the CR-6.2 migration upgrade correction.
-- **Evidence**ï¼šGitHub Actions run 33829733713ï¼ˆrun 202ï¼‰ä¸‰çŸ©é˜µ SUCCESSï¼›Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 each reported 1368 passed, with Ruff lint/formatter, mypy, Spike, SDK-absent and applicable governance gates successful.
-- **Affected Modules**ï¼šCR-6.2 State builder/verifier, migration 024, persistence/replay tests.
-- **Compatibility**ï¼šCR-5 frozen; CR-6.1 State rules unchanged; no predictive, strategy, or production semantics.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼š2c70d0ccc1e5b9389fad62fcbba98e019316eff8.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-092
-
-- **Type**ï¼šC2 â€” CR-6.3 static scope guard
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / PENDING_REVIEW
-- **Trigger**ï¼šCR-6 full-closure Group F requirements 61â€“63.
-- **New Contract**ï¼šAST guards enforce the State import boundary, reject duplicated Feature implementation symbols, reject research/predictive identifiers, and freeze the non-future State artifact columns.
-- **Affected Modules**ï¼štests/integration/test_state_scope.py; docs/adr/ADR-026_deterministic_market_state_interpretation.md.
-- **Tests**ï¼šThree-leg CI pending for this batch.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼šCurrent CR-6.3 scope-guard batch.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-093
-
-- **Type**ï¼šC0 â€” CR-6.3 scope guard lint correction
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / PENDING_REVIEW
-- **Trigger**ï¼šCI run 33830718832ï¼ˆrun 203ï¼‰Ruff SIM102 in the new static scope guard test.
-- **Old Contract**ï¼šThe dynamic-import branch used a nested condition that violated the repository's Ruff rule.
-- **New Contract**ï¼šThe scope guard uses one explicit compound condition; its import-boundary assertions are unchanged.
-- **Affected Modules**ï¼štests/integration/test_state_scope.py.
-- **Tests**ï¼šRuff lint and subsequent full CI pending.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼šCurrent CR-6.3 scope-guard lint correction batch.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-094
-
-- **Type**ï¼šC0 â€” CR-6.3 scope guard formatter correction
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / PENDING_REVIEW
-- **Trigger**ï¼šCI run 33830803320ï¼ˆrun 204ï¼‰Ruff formatter output.
-- **Old Contract**ï¼šTwo scope guard expressions used valid but non-canonical multi-line formatting.
-- **New Contract**ï¼šThe guard remains semantically identical and matches the repository formatter.
-- **Affected Modules**ï¼štests/integration/test_state_scope.py.
-- **Tests**ï¼šRuff lint/format and subsequent full CI pending.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼šCurrent CR-6.3 scope-guard formatter correction batch.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-095
-
-- **Type**ï¼šC0 â€” CR-6.3 scope guard false-positive correction
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / PENDING_REVIEW
-- **Trigger**ï¼šCI run 33830878360ï¼ˆrun 205ï¼‰scope guard rejected the neutral verifier loop variable position.
-- **Old Contract**ï¼šThe identifier blacklist treated a generic loop-position variable as a prohibited research term.
-- **New Contract**ï¼šThe guard removes that false positive while retaining the explicit research/predictive identifier checks required by Group F-63.
-- **Affected Modules**ï¼štests/integration/test_state_scope.py.
-- **Tests**ï¼šFull CI pending after this correction.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW.
-- **Commit**ï¼šCurrent CR-6.3 scope-guard false-positive correction batch.
-- **Reviewer**ï¼šDesign / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-096
-
-- **Type**ï¼šC2 â€” CR-6.3 scope guard and frozen-regression CI verification
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šDONE / PENDING_REVIEW
-- **Trigger**ï¼šCR-6 full-closure Groups F-61â€“64.
-- **Evidence**ï¼šGitHub Actions run 33831161954ï¼ˆrun 206ï¼‰ä¸‰çŸ©é˜µ SUCCESSï¼›Ubuntu 3.14ã€Windows 3.12ã€Windows 3.14 each reported 1372 passed, with Ruff lint/formatter, mypy, Spike, SDK-absent and applicable Windows governance gates successful.
-- **New Contract**ï¼šAST scope guards enforce the State boundary and frozen non-future columns; the full 1â€“64 implementation evidence is recorded across CR-6.1, CR-6.2 and CR-6.3.
-- **Compatibility**ï¼šCR-5 and CR-6.1/6.2 semantics remain frozen; no prediction, strategy, portfolio, backtest, or production behavior is introduced.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW with completed implementation mapping.
-- **Commit**ï¼š331d98a245d508348864e43feb2ccc51557b1224.
-- **Reviewer**ï¼šFinal Design / Audit Review pending; PR #6 remains open and not merged.
-
-
-
----
-
-## Change Record: DM-CR-20260904-097
-
-- **Type**ï¼šC2 â€” CR-6.4 final adversarial / contract-honesty implementation
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / REOPENED
-- **Trigger**ï¼šReviewer reopened CR-6 after identifying that fatal finding semantics, recovery/rebind evidence, 1..64 mapping, and current-main synchronization were not mechanically closed.
-- **New Contract**ï¼šState fatal contradictions use typed error codes and publish no SUCCESS artifact/ledger; only null and empty-denominator findings are persisted. Focused State tests cover the mandatory recovery matrix and the public Feature failure propagation boundary.
-- **Affected Modules**ï¼šsrc/ashare_state/state/models.py; schema.py; engine.py; builder.py; verifier.py; tests/integration/test_state.py; tests/integration/test_state_persistence.py.
-- **Compatibility**ï¼šNo new State dimensions; migration 024 remains unchanged; CR-5 Feature semantics, public-repository governance, and AmazingData 2020+ validation contracts are preserved.
-- **Tests**ï¼šFinal post-merge three-leg CI pending at implementation commit.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE.
-- **Commit**ï¼šCurrent CR-6.4 closure implementation batch.
-- **Reviewer**ï¼šFinal Design / Audit Review pending; PR #6 remains open and not merged.
-
-
-
----
-
-## Change Record: DM-CR-20260904-098
-
-- **Type**ï¼šC0 â€” CR-6.4 import-order correction
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / REOPENED
-- **Trigger**ï¼šCI run 33836030319ï¼ˆrun 211ï¼‰Ruff lint detected two import-order diagnostics before runtime tests.
-- **New Contract**ï¼šState public exports and Builder model imports follow the repository's deterministic Ruff/isort ordering; no runtime or contract semantics changed.
-- **Affected Modules**ï¼šsrc/ashare_state/state/__init__.py; src/ashare_state/state/builder.py.
-- **Tests**ï¼šRuff lint passed for this correction; full post-correction CI pending.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE.
-- **Commit**ï¼šCurrent CR-6.4 import-order correction batch.
-- **Reviewer**ï¼šFinal Design / Audit Review pending; PR #6 remains open and not merged.
-
-
-
----
-
-## Change Record: DM-CR-20260904-099
-
-- **Type**ï¼šC0 â€” CR-6.4 Builder import-order correction
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / REOPENED
-- **Trigger**ï¼šCI run 33836130295ï¼ˆrun 212ï¼‰Ruff fix diff required StateBuilderError before StateBuildResult.
-- **New Contract**ï¼šBuilder import order matches the repository's Ruff/isort output; no runtime or State contract semantics changed.
-- **Affected Modules**ï¼šsrc/ashare_state/state/builder.py.
-- **Tests**ï¼šFull post-correction CI pending.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE.
-- **Commit**ï¼šCurrent CR-6.4 Builder-order correction batch.
-- **Reviewer**ï¼šFinal Design / Audit Review pending; PR #6 remains open and not merged.
-
-
----
-
-## Change Record: DM-CR-20260904-100
-
-- **Type**ï¼šC2 â€” CR-6.4 final adversarial implementation CI and contract-honesty evidence
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šDONE (implementation) / REOPENED (CR-6) / PENDING_REVIEW
-- **Trigger**ï¼šCR-6.4 reviewer requirements P0-01/P0-02/P0-03 and stale-contract correction.
-- **Evidence**ï¼šImplementation head `e47514a8afc864c9f197e18f95ea56fe81424a2d` was verified by GitHub Actions run 33836243605 (run 213). Ubuntu 3.14, Windows 3.12, and Windows 3.14 each reported 1401 passed; Ruff lint/format, mypy, Spike, and SDK-absent checks passed; applicable Windows 3.14 DEVLOG/Management gates passed.
-- **New Contract**ï¼šPersisted State findings are limited to STATE_INPUT_NULL and STATE_INPUT_EMPTY_DENOMINATOR. STATE_INPUT_INVARIANT_VIOLATION and STATE_RULE_UNAVAILABLE are typed fatal error codes raised before publication; fatal errors create no State artifacts and no SUCCESS ledger row. The concrete 1â€“64 mapping and recovery/rebind evidence are recorded in the CR-6 work requirement addendum.
-- **Affected Modules**ï¼šsrc/ashare_state/state/{models,schema,engine,builder,verifier}.py; tests/integration/test_state.py; tests/integration/test_state_persistence.py; docs/adr/ADR-026_deterministic_market_state_interpretation.md; docs/design/A-share-analysis_CR-6_DeterministicMarketStateLayerå¼€å‘å·¥ä½œè¦æ±‚_20260904.md.
-- **Compatibility**ï¼šNo new State dimensions; migration 024 unchanged; CR-5 Feature semantics, public-repository governance, CODEOWNERS/SECURITY/CONTRIBUTING, and AmazingData 2020+ contracts preserved. Current main was merged normally into the branch without history rewrite.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE; PR #6 remains open and not merged.
-- **Commit**ï¼š`e47514a8afc864c9f197e18f95ea56fe81424a2d` implementation head; this record is synchronized with the contract-evidence documentation batch.
-- **Reviewer**ï¼šFinal Design / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-101
-
-- **Type**ï¼šC1 â€” CR-6.4 contract-evidence documentation synchronization verification
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šDONE / PENDING_REVIEW
-- **Trigger**ï¼šFinal audit-only documentation synchronization after the implementation-head CI passed.
-- **Evidence**ï¼šDocumentation synchronization commit `f293e696e3fe8b751a56b51a2d4b4b8b3892c318` passed GitHub Actions run 33837386772 (run 214) on Ubuntu 3.14, Windows 3.12, and Windows 3.14; every leg reported 1401 passed, with Ruff lint/format, mypy, Spike, SDK-absent, and applicable Windows 3.14 DEVLOG/Management gates successful.
-- **New Contract**ï¼šADR-026 and the CR-6 work requirement now retain the honest fatal-vs-persisted-finding contract and concrete 1â€“64 mapping as review evidence; no runtime semantics or State scope changed.
-- **Affected Modules**ï¼šdocs/adr/ADR-026_deterministic_market_state_interpretation.md; docs/design/A-share-analysis_CR-6_DeterministicMarketStateLayerå¼€å‘å·¥ä½œè¦æ±‚_20260904.md; docs/DEVLOG.md.
-- **Compatibility**ï¼šNo new State dimensions; migration 024, CR-5 Feature contracts, public-repository governance, and AmazingData 2020+ contracts remain unchanged. PR #6 remains open and not merged.
-- **ADR**ï¼šADR-026 PROPOSED / PENDING_REVIEW; CR-6.4 START / ACTIVE.
-- **Commit**ï¼š`f293e696e3fe8b751a56b51a2d4b4b8b3892c318` documentation synchronization head; final verification run 33837386772.
-- **Reviewer**ï¼šFinal Design / Audit Review pending.
-
----
-
-## Change Record: DM-CR-20260904-102
-
-- **Type**ï¼šC2 â€” 2020+ Provider History Contract implementation/documentation synchronization and disclosed governance exception
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šDONE (implementation and docs) / PENDING_REVIEW
-- **Trigger**ï¼šOwner decision replacing the obsolete pre-2020 warmup gate and the need to synchronize code, tests, Provider documents, Spike report, DEVLOG and governance records.
-- **Evidence**ï¼š`history_start_2020` / `history_coverage_2020_v1` are implemented; B5 starts at `20200101`; unit and integration wiring tests are present. Production account and formal Spike facts remain unavailable.
-- **Governance exception**ï¼šThe source SHAs `4f83f7ac3a19327e9f724c9730cbfbfef03de38b`, `5494a63f83a57e4b5034bc62073fb7d2057db63b`, `335375597421dcc91c48602f5112e817adfc7044`, and `22a991079ddebe90bef3cac45eed258dc4e56269` were split by the one-path-per-commit GitHub contents API. The branch is not rewritten; the CI workflow and governance test contain a one-time exact-SHA exception, disclosed here and in DEVLOG. This exception must not be extended.
-- **Current contract**ï¼š2020-01-01 is the required history boundary; pre-2020 routine backfill and Feature warmup are forbidden/not required. 2020+ gaps remain fail closed.
-- **Remaining blockers**ï¼šformal production account identity/entitlement, closed production B1-B7 evidence, Data Sufficiency Matrix, Reviewer approval, ADR-026 acceptance and PR #6 merge. These require external facts or human decisions and are not claimed complete.
-
----
-
-## Change Record: DM-CR-20260904-103
-
-- **Type**ï¼šC1 â€” contract-document gate exception completion record
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šDONE (exception disclosure) / PENDING_REVIEW
-- **Trigger**ï¼šCI run 33841714828 (run 231) reached the management-doc gate after all code, test and Spike checks passed, and identified the two ADR-only commits that predated management synchronization.
-- **Exact exception set**ï¼š`4f83f7ac3a19327e9f724c9730cbfbfef03de38b` (capabilities), `eceb99468bd28a37a7532b723f092a9d2f8bd469` (ADR-026), `4ae9151979287a8a4e86c5f95906b88546c993e3` (ADR index).
-- **Reason / boundary**ï¼šThe GitHub contents API updated those paths as separate commits and the append-only branch is not rewritten. The workflow and governance test now contain an exact-SHA, one-time, disclosed exception; it must not be extended to future commits.
-- **Remaining blockers**ï¼šADR-026/CR-6 formal Reviewer closure, PR #6 merge, AmazingData production account/entitlement, CLOSED PRODUCTION B1-B7, Golden and Data Sufficiency Matrix remain pending or blocked.
-
-
-
----
-
-## Change Record: DM-CR-20260904-104
-
-- **Type**ï¼šC1 â€” final 2020+ contract CI verification and documentation status closure
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šDONE (implementation/documentation verification) / PENDING_REVIEW
-- **Evidence**ï¼šCurrent pre-record head `0a79be1cb8de7349c40668da059bf8b7480bd304` passed GitHub Actions run `33842361483` (run 232). Ubuntu 3.14, Windows 3.12 and Windows 3.14 each reported `1407 passed`; Ruff lint/format, mypy, Spike, SDK-absent, DEVLOG and Management gates all succeeded.
-- **Completed docs**ï¼š2020+ history checklist CI item, CR-6 work requirement evidence, reviewer evidence, DEVLOG and this current-status header are synchronized.
-- **Remaining blockers**ï¼šData Sufficiency Matrix, formal AmazingData account/entitlement and production B1-B7 evidence, Reviewer acceptance of ADR-026/CR-6.4, and PR #6 merge remain pending; no approval or closure is claimed.
-
-
----
-
-## Change Record: DM-CR-20260904-105
-
-- **Type**ï¼šC1/C2 â€” formal provider validation status update
-- **Date**ï¼š2026-09-04
-- **Status**ï¼šIN_PROGRESS / BLOCKED_BY_OFFICIAL_SDK / PENDING_REVIEW
-- **Trigger**ï¼šOwner supplied formal-account connection information for the pending Production Spike.
-- **Evidence**ï¼šAn independent TCP probe found both Owner-provided candidate service endpoints reachable on the configured port. The controlled Python 3.14.6 environment has no official `AmazingData` or `tgw` wheel, so no login request was sent and no account profile or B1-B7 evidence was produced.
-- **Secret boundary**ï¼šUsername, password, Token, host literals and port values were not written to GitHub, repository configuration, logs, DEVLOG, Issue, PR or this record. `configs/production_account.yaml` remains empty.
-- **Interpretation**ï¼šNetwork reachability is not authentication, entitlement, production identity, data correctness or Provider approval. Formal verdict and Data Sufficiency Matrix remain unassessed.
-- **Next input**ï¼šInstall the Galaxy-provided official wheels in the controlled environment, record their fingerprints, run provider doctor, then execute one CLOSED PRODUCTION B1-B7 run with evidence closure and human review.
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×nüëDèµ©hºÚn¶X§zÍHÈK\Ú\™KX[˜[\Ú\È9o 9cäyë¨yä!¹ .ùa£;ï"]™[ÜY[X[˜YÙ[Y[;ï"B‚ˆÈÈKLŒŒL‹LLL0­ÈÕR‹ŒHÛÝ\˜ÙK\]X[]H[™™\™\Ù[]]™[™\ÜÈÛÜÝ\™B‚ŠŠ’[\[Y[][ÛˆÝ]\ÊŠ»ï&’STSQS•QÈÐÐSÑ“ÐÕTÑQÕ‘T’Q’QQÈÒWÔS‘S‘ÂŠŠ”™]šY]ÈÝ]\ÊŠ»ï&”S‘S‘×Ô‘WÔ‘U’QUûï&ù§+9¢ny.#z!êº(c9¢iú(c9§ 9îâ™]šY]ÈÙX[8à PÓÔÑH9¢%ˆQT‘Ñxà ‚ŠŠ]]Üš]JŠ»ï&–ÔŒN:i¥º/k¹i#yk¨y.#ˆÕR‹ŒH9§iy®¤:-*:aãù¥-¹cèú) y¬`—J‹‹Ù\ÚYÛ‹ÐK\Ú\™KX[˜[\Ú\×ÔŒN:i¥º/k¹i#yk¨y.#‘ÕR‹Œy§iy®¤:-*:aãù¥-¹cèú) y¬`—ÌŒŒL‹›Y
+xà ‚ŠŠ‘Ø]JŠ»ï&‘ÕR‹ŒH9/ë¹«hÈXY9æ¡9."ynlùcì™\]Z\™YÒH9.#¹âë9êâÈ™]šY]Ù\ˆÛÜÝ\™H9§*¹k£9¢$9bc{ï#ÕRÈ™]šY]ÙYÙX[8à Q›Ü›X[›ÙXÝ[Û¸à Q]HÝY™šXÚY[˜Þxà T›ÝšY\ˆØ\Xš[]H9d£ŒŒ
+È˜XÚÙš[9gaù/çy£ ya®ùîäøà ‚‚Ÿ9k¨zf!z) y¬`ˆ9§+9¢nyk§¹ã¬È:j£:+ày/cyïkˆ9â­¹  HŸKK_KK_KK_Ÿ9«ãù§hHØ\ÙH9/oùå*9cëùk¦¹/cyæ¡9k¦9¥®H\Y˜XÝú)á9b&yâb9§+ÝÚ—Ü™\\™KœX^XÝÛÝ\˜ÙH™YÚ\ÝžKØÛÛ^;ï&ÜXÚÙ]ÛÝ\˜ÙK\ØÛÜHØ]HSTSQS•QÈØØ[TÔÈŸ˜XÝÜ›Ý™Y9.#yo¥ùå,HÙ[™\šXÈÜ[9£ª9aîˆÛÝ\˜ÙWÙ]šY[˜ÙWÜØÛÜX;ï&ÜÜ[[Û›H[ž[\Ý;ï&Ùš[˜[^™H™YÜ™\ÜÚ[ÛˆSTSQS•QÈØØ[TÔÈŸÕ^Ú[™ÙKØ›Ø\™ÜÝX\H9.èú(j9 )ù/ë¹«hÈ]\Ù]ÛX[šY™\Ý;ï&ÔÔÑHLˆÈÖ”ÑHÎ;ï&ÓPRSˆÌˆÈÒS‘VMHÈÕTˆÈSTSQS•QÈØØ[TÔÈŸ’QÒÒTÔÕQH9cê¹/çyåfHŒŒ
+È9.%9/oùå*9d#9§'ùak9dbˆŒMMMK”ÒÌŒŒÌŒØ™\XÙ[Y[;ï&ØÍL”Ö‹ÌŒŒLM^XÝŒŒ›ÝXÙHSTSQS•QÈØØ[TÔÈŸ^XÚ]™ZÙ^H9/çyåfHŒø¡¤[™XYÙHØ[™Y]KœX[Ý×Ü™ZÙ^O]YX;ï&ØY™\œØ\šX[Ø[™Y]H™YÜ™\ÜÚ[ÛˆSTSQS•QÈØØ[TÔÈ‚ŠŠ‘]šY[˜ÙHÙ\\˜][ÛŠŠ‚‚‹H9§+9g,¸à XØ[™Y]xà QÛÛ[ˆ]Ü™]šY]øà XÛÜœÜ˜]KXXÝ[Ûˆ9k¦¹d$yfç¹odº`&º/áûï&ÔY™ˆÚXÚËÙ›Ü›X]9.#ˆØ[™Y]KÒˆ^\H9k¦¹d$y¨à9§éz`&º/áøà ‚‹HXÚÙ]9.ãy..ˆLŽÌLŽ8à yaj9/dÈÓÓTSQ;ï&Ø™]šY]×Ü™XY[™\Ü×ÙØ]X8à \]X[]xà Y]™[ÛÝ™\˜YÙH:`&º/áûï#›ÙXÝ[Û—Ù›Ü›X[ÙØ]X9.áy/çyåfH‘U’QUÑQÌLŽ9.®¹méyi#y¨.:f.ù¥«xà ‚‹H9§+9¢ny.#y."ú/oy¢%¹£ä9.©˜]ÈÙX‹Ô¸à y.#yîäyk¦ˆ\Y˜XÝ\Ú;ï#9.#z/ä:(c™]šY]ËœXš[˜[ÙX[8à T›ÙXÝ[ÛˆŒx $Ðøà Q]HÝY™šXÚY[˜Þxà T›ÝšY\ˆØ\Xš[]H9¢%¹fçº(ixà ‚‹H9§*¹."¹/(9ká¹è xà z-)¹cíøà RT8à UÚÙ[¸à yç'ùk§ˆ[™Ú[8à yc§ùiâÈÑÈ:/¤ùaî¹¢%¹.$ù§"y/§z-e»ï&ù§+9g,™[™Üˆ9/§z-e¹.#z/æùaiHÚ]X¸à ‚‚ŠŠ”™\]Z\™Y™^ÛÜšÊŠ‚‚ŒKˆ:/ä:(c9§+9/ë¹«hÈXY9æ¡Ú[™ÝÜÈËŒM8à UÚ[™ÝÜÈËŒL¸à UX[HËŒM9d£9aj:`ê9¬®ùä!ºeê9é {ï&ÐÒH9§*¹aj9îïùbcy.#yk¨ùéì9§+9¢nz/ç9ê"új£:+àyk£9¢$8à ‚Œ‹ˆÒH9aj9îïùd#¹å,yâë9êâÈ™]šY]Ù\ˆ:`$9§hyi#yk¨H^XÝØØ]Ü¸à y¥éy§'øà yìnùg¢øà Y^Ú[™ÙKØ›Ø\™9d£˜XÝÜ›Ý™Y:+ëy.b{ï&ù§+9¢ny.#z!êº(c9¢nyaá¹¢%¹d"9nm¸à ‚ŒËˆ™]šY]Ù\ˆÛÜÝ\™H9d#¹¢cy£"HÕRÈ9¢iú(c\Y˜XÝž]\ËÚ\Úš[™[™øà \™]šY]ÙYÙX[8à X›Ý[™™\^H9.#ˆ›Ü›X[Ø]xà ‚‚ˆÈÈKLŒŒL‹LLH0­ÈÕRˆÛX[ˆÛÛ[ˆØ[™Y]HÛÛœÝXÝ[Û‚‚ŠŠ’[\[Y[][ÛˆÝ]\ÊŠ»ï&’STSQS•QÈÐÐSÑ“ÐÕTÑQÕ‘T’Q’QQÈÒWÑÔ‘QS‚ŠŠ”™]šY]ÈÝ]\ÊŠ»ï&”S‘S‘×Ô‘U’QUûï&ù§+9¢ny.#z!êº(c9¢iú(c9§ 9îâ™]šY]ÈÙX[8à PÓÔÑH9¢%ˆQT‘Ñxà ‚ŠŠ˜\ÙHÒJŠ»ï&˜YÍ˜YLNNNNMØ™Ø™MÙŒ˜ÎMÌÌNLØŠŠ]]Üš]JŠ»ï&–ÑÕRyalúeëy.#‘ÕRˆÛX[‘ÛÛ[ÛÜœ\ùnîº+¯º) y¬`—J‹‹Ù\ÚYÛ‹ÐK\Ú\™KX[˜[\Ú\×ÑÕRyalúeëy.#‘ÕR—ÐÛX[‘ÛÛ[ÛÜœ\ùnîº+¯º) y¬`—ÌŒŒL‹›Y
+xà ‚ŠŠ‘Ø]JŠ»ï&Ø[™Y]H9cëú/æùaiy.®¹méH™]šY]ûï&Ò[X[ˆ™]šY]øà QÕRÈ™]šY]ÙYÙX[8à Q›Ü›X[›ÙXÝ[Û¸à Q]HÝY™šXÚY[˜Þxà T›ÝšY\ˆØ\Xš[]H9d£ŒŒ
+È˜XÚÙš[9.ãy§*¹k£9¢$8à ‚‚Ÿ9ë¨yä!º) y¬`ˆ9§+9¢nyk§¹ã¬È:j£:+ày/cyïkˆ9â­¹  HŸKK_KK_KK_ŸŒÈ9®¤9îäyk¦¹câ¹¥éùâb9§+9.#ycëùcæ™XZ[Ü[—ÝšœÛÛ˜;ï&ÝŒÈ]\Ù]ÒLM»ï&Òˆ9.$úhnH\Ú™YÜ™\ÜÚ[ÛˆSTSQS•QÈØØ[TÔÈŸ9¥éú+¬9oez`$9§hHÑQTÔ‘TPÑKÑ“Ô;ï#9¥¬9h§¹.¢ùk§¹¦/¹o#ÈQØÜš\ËÙÛÛ[‹ÙÝÚ—Ü™\\™KœX;ï&ÌNN9§hy¦/¹o#ÈÜ\˜][ÛˆSTSQS•QÈØØ[TÔÈŸÕ9îäù§¡9.¢ù.íº/¯¹b,L9.%9c!yd*ÈQÔ‘SSÕ‘H]\Ù]ÛX[šY™\Ý;ï&ØÛÛ[•]ÝÜ™K™]™[ØÛÝ™\˜YÙWÙØ]XSTSQS•QÈØØ[TÔÈŸSTÕŒ9.*¹âë9êâú+àyb.ù¥éy§'ù.%9å'ù¥b9¥éy¦/¹o#È]\Ù]ÛX[šY™\Ý;ï&ùîäù§¡:.ªù.ïy­bú+åHSTSQS•QÈØØ[TÔÈŸÛÛ\[žHXÝ[Ûˆ:)¡¹æåˆ]šY[™9.#ˆšYÚ\ÜÝYHU’QS‘ÑVÑUXŒ
+È’QÒÒTÔÕQWÑVÑUXHSTSQS•QÈØØ[TÔÈŸXÚÙ]9.#ˆØ[™Y]H9. 9. :)¡¹æå»ï#9é y«hˆYÙ[‘U’QUÑQ™]šY]×ÜXÚÙ]Ú[™^šœÛÛ›;ï&ÜXÚÙ]^XÝXÛÝ™\˜YÙH\Ý;ï&ØÕÒ—ÐÓÔ”T×Ô‘TÔ•›YSTSQS•QÈØØ[TÔÈŸ9c§ùiâùïdzhmKÔ¸à yaëz+àyd£9.$ù§"y/§z-e¹.#yaiyn¤ÈÛÝ\˜ÙH™YœÈÛ›{ï&ù§+9g,™[™Üˆ›Ý[™\žHSTSQS•QÈØØ[TÔÈ‚ŠŠ‘]šY[˜ÙHÙ\\˜][ÛŠŠ‚‚‹H9§+9g,Ú[™ÝÜÈ]ÛˆËŒM»ï&’ˆØ[™Y]xà y¥éÈÛÛ[ˆÛÜšÙ›ÝÈ9.#ˆ™]šY]ËÝ]YØ]H9fç¹odˆ
+Šˆ\ÜÙY
+Š»ï&ÔY™ˆ[Ù›Ü›X]9.#ˆÛÛ[—ÜÝÜ™KœX^\H9k¦¹d$y¨à9§éz`&º/áøà ‚‹HÚ]XˆXÝ[ÛœÈ[ˆÌ˜;ï&•X[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9."ynlùcì™\]Z\™YÒH9aj:`ê9¢$9b§ûï#9c!yd*È[]\Ý8à TÜZÙxà TÑËXXœÙ[8à TY™‹Ù›Ü›X]8à [^\xà QU“ÑÈ9d£X[˜YÙ[Y[Ø]\øà ‚‹HÛÛ[•]ÝÜ™K›ØY9mìº`&º/áÈØÚ[XHˆ:!ê¹¨(zj£;ï&Ø]X[]WÙØ]X8à X]™[ØÛÝ™\˜YÙWÙØ]X8à X™]šY]×Ü™XY[™\Ü×ÙØ]X9gaú`&º/áûï#›ÙXÝ[Û—Ù›Ü›X[ÙØ]X9.áy/çyåfH‘U’QUÑQÌLŽ9æ¡9.®¹méyi#y¨.:f.ù¥«xà ‚‹H9.¢ùk§¹§iy®¤9¦+ùk¦9¥®HÔÑKÔÖ”ÑKÐ”ÑKÐÓ’S‘“È9o%yå*9k¦¹/c{ï&Ø˜XÝÜ›Ý™Y9.áy¦+ÈYÙ[9§iy®¤9¨à9í(¹¨!ú+¬;ï#9oázhnùå,H™]šY]Ù\ˆ9îäyk¦ˆ^XÝ\Y˜XÝÚ\Ú9d#¹¢cycëùcæ9..ˆ‘U’QUÑQ8à ¹§*º/ä:(c™]šY]ËœX9§ 9îâ9l ykf8à ‚‹H9§*¹¢iú(c9«hùo#ú-)¹cíøà PŒx $Ðøà Q]HÝY™šXÚY[˜Þxà T›ÝšY\ˆØ\Xš[]xà LŒŒ
+È˜XÚÙš[8à yëe¹åixà yfç¹­bù¢%¹.©9¦$ûï&ùká¹è xà UÚÙ[¸à yêëùà®xà yc§ùiâÈÑÈ:/¤ùaî¹d£9§+9g,9/¦ùn¥9ea¹c!y§*º/æùaiy.äùn¤øà ‚‚ŠŠ”™\]Z\™Y™^ÛÜšÊŠ‚‚ŒKˆ9.éyâë9êâÈˆ:/ä:(c9."ynlùcì™\]Z\™YÒ{ï#9nm¹å,yâë9êâÈ™]šY]Ù\ˆ9k¨zf!y§+9`&z`"y.#ˆXÚÙ];ï&ù§+9¢ny.#z!êº(c9¢nyaá¹¢%¹d"9nm¸à ‚Œ‹ˆ™]šY]Ù\ˆ:`$9§hy¨.:j£9.¢ù.í¹¥éy§'Ëùìnùg¢Ëù.©9¦$ù¢`9§oùgeùcâ¹k¦9¥®H\Y˜XÝž]\ËÚ\Ú;ï#9k£9¢$9. 9«(H‹Óˆ[X[ˆ™]šY]È9d#¹¢cya`z+®™]šY]ËœX9cäyn È™]šY]ÙY™\œÚ[Û¸à ‚ŒËˆÕRÈ9k£9¢$™]šY]ÙYÙX[8à X›Ý[™™\^H9.#ˆ›Ü›X[Ø]H9d#»ï#9¢czaãy¥¬:+á9/,›ÙXÝ[Û¸à Q]HÝY™šXÚY[˜Þxà T›ÝšY\ˆØ\Xš[]H9d£9fçº(ixà ‚‚ˆÈÈKLŒŒL‹LL0­ÈÕRKŒˆ]ÛZXÈÛÛ\]H™]šY]ÈX›XØ][ÛˆY\ˆŒMˆÙXÛÛ™™]šY]Â‚ŠŠ’[\[Y[][ÛˆÝ]\ÊŠ»ï&’STSQS•QÈÐÐSÑ“ÐÕTÑQÕ‘T’Q’QQÈÒWÑÔ‘QS‚ŠŠ”™]šY]ÈÝ]\ÊŠ»ï&”S‘S‘×Ô‘WÔ‘U’QUûï&ù§+9¢ny.#z!êº(cÓÔÑHÈQT‘Ñxà ‚ŠŠ]]Üš]JŠ»ï&–ÔŒMˆ9.£:/k¹i#yk¨y.#ˆÕRKŒˆ9c§ùkd9aj:aãùk¨y¨.9¥-¹cèú) y¬`—J‹‹Ù\ÚYÛ‹ÐK\Ú\™KX[˜[\Ú\×ÔŒM¹.£:/k¹i#yk¨y.#‘ÕRKŒ¹c§ùkd9aj:aãùk¨y¨.9¥-¹cèú) y¬`—ÌŒŒL‹›Y
+xà ‚ŠŠ”™]šY]Ù\ˆ˜\Ù[[™JŠ»ï&”™]šY]Ù\ˆ9mì¹.£ˆXZ[ŒMÍMMLLMÎM˜Ù™™˜NYLÌŒÍ˜˜ÍÍNLÌÌX9alúeëHÕRKŒHLKÔL»ï#9nmºaãy¥¬9¢dùo ÕRKŒˆÕTLøà ‚ŠŠ‘Ø]JŠ»ï&‘ÕRKŒˆ:`&º/áù¥¬XY9."ynlùcì™\]Z\™YÒH9.#ˆ™]šY]Ù\ˆÛÜÝ\™H9nm¹d"9nm¹bc{ï#ÕRˆ™]šY]ÙYÛÜœ\øà Q›Ü›X[›ÙXÝ[Û¸à Q]HÝY™šXÚY[˜Þxà T›ÝšY\ˆØ\Xš[]H9d£ŒŒ
+È˜XÚÙš[9gaù/çy£ ya®ùîäøà ‚‚Ÿ9k¨zf!z) y¬`ˆ9§+9¢ny/ë¹«hÈÈ:j£:+ày/cyïkˆ9â­¹  HŸKK_KK_KK_ŸÝX›Z]YØ\ÙHQÈ9oázhnù.#ˆPÕU‘HØ\ÙHQÈ9k£9aj9. :!í™]šY]ËœNŽ—Ý˜[Y]WÜ™]šY]×ØÛÝ™\˜YÙX;ï&Ü\X[Ù\XØ]KÙ›Ü™ZYÛ‹ÜÚ[™ÛKXØ\ÙHY™\œØ\šX[\ÝÈSTSQS•QÈØØ[TÔÈŸŒH9cey§hH™]šY]È9.#yo¥ùcäyn ÈZ^YPÕU‘H[XÛÝ™\˜YÙHØ]{ï&ÜÚ[™ÛKXØ\ÙH™\›Ë\ÚYKYY™™XÝ™YÜ™\ÜÚ[ÛˆSTSQS•QÈØØ[TÔÈŸ9¢`9§"z/¤ùaî¹oázhnùg*9£ y.ayc%¹bcy¢$9..ˆ‘U’QUÑQ‹ÓˆÜ™\\™WÛ™]×Ý™\œÚ[Û˜;ï&Ù[˜]ÚX[šY™\ÝÜ™]šY]×ÜÝ[[X\žH™YÜ™\ÜÚ[ÛˆSTSQS•QÈØØ[TÔÈŸ™]šY]ËÜ›Ý™[˜[˜ÙKØ\Y˜XÝÚ\ÚÛX[šY™\Ý:g 9îçù. [‹[Y[[ÜžH:!ê¹¨(zj£™Y›YÚÝ]]Ù]šY[˜ÙHØ]\ûï&ÛØY\ˆ[™\Y˜XÝÛÜÝ\™H\ÝÈSTSQS•QÈØØ[TÔÈŸ\X[Ù\XØ]KÙ›Ü™ZYÛ‹ÛX[›Ü›YY9¢ä¹îçzfí¹bkù/g9å*PÕU‘KÝ™\œÚ[Û‹Ù]šY[˜ÙHÛ˜\ÚÝ\ÝÈSTSQS•QÈØØ[TÔÈ‚ŠŠ‘]šY[˜ÙHÙ\\˜][ÛŠŠ‚‚‹H9§+9g,ÕRKÑÕRKŒKÑÕRKŒˆ›ØÝ\ÙY™YÜ™\ÜÚ[ÛˆŒH\ÜÙY;ï&ù§+9¢ny§*¹¥¬9h§ˆÛÛ[ˆ˜XÝøà y§*º/ä:(c9ç'ùk§ˆ[X[ˆ[™]šY]È9¢%ˆ›ÙXÝ[Û¸à ‚‹H9.èùè HXYLXYX˜XNL™ØŽLÍNNMÌXÍLŒNŒŽLLÌÌMÙX9æ¡Ú]XˆXÝ[ÛœÈ[ˆÌNH9mì¹k£9¢$;ï&¹."ynlùcìÒxà TÜZÙxà TÑËXXœÙ[8à QU“ÑÈ9d£9ë¨yä!¹¥¡ù¨húeê9é yaj:`ê9¢$9b§ûï&ùak9alHÒH9îéùîëy.#yk¢z(áH[X^š[™Ñ]HÑøà y.#y£©z)é¹.îù/eyå'ù.©ùaëz+àxà ‚‚ŠŠ”™\]Z\™Y™^ÛÜšÊŠ‚‚ŒKˆ9ëbyo¡y¥¬XY9."ynlùcì™\]Z\™YÒH9aj9îïùd#»ï#:+íÈ™]šY]Ù\ˆ9i#yk¨HÕTLÈ9nm¹£ä9.©ÛÜÝ\™H™]šY]ûï&ùd"9nm¹bcy.#yd+ùbªÕR¸à ‚Œ‹ˆ9d"9nm¹d#¹£"HÕRˆ:aãynî¹ç'ùk§ˆ™]šY]ÙYÛÜœ\ûï&ù.®¹méH™]šY]ÈXÚÙ]9cëùb!¹¢nyaá¹i!ûï#9/aˆPÕU‘H9cêº ïyå,y. 9«(H‹Óˆ9k£9¥m™]šY]ÈX›XØ][ÛˆÙX[8à ‚ŒËˆÕR‹ÑÕRÈ9k¨zf!yd£›Ü›X[Ø]H9k£9¢$9d#»ï#9¢czaãy¥¬:+á9/,›ÙXÝ[Û¸à Q]HÝY™šXÚY[˜Þxà T›ÝšY\ˆØ\Xš[]H9.#¹fçº(ixà ‚‚ˆÈÈKLŒŒL‹LLÈ0­ÈÕRKŒHÛÜœ™XÝ™\ÜÈÛÜÝ\™HY\ˆŒMˆ™]šY]Â‚ŠŠ’[\[Y[][ÛˆÝ]\ÊŠ»ï&’STSQS•QÈÐÐSÑ“ÐÕTÑQÕ‘T’Q’QQÈÒWÑÔ‘QS‚ŠŠ”™]šY]ÈÝ]\ÊŠ»ï&”S‘S‘×Ô‘WÔ‘U’QUûï&ù§+9¢ny.#z!êº(cÓÔÑHÈQT‘Ñxà ‚ŠŠ]]Üš]JŠ»ï&–ÔŒMˆ:i¥º/k¹i#yk¨y.#ˆÕRKŒH9¥-¹cèú) y¬`—J‹‹Ù\ÚYÛ‹ÐK\Ú\™KX[˜[\Ú\×ÔŒMºi¥º/k¹i#yk¨y.#‘ÕRKŒy¥-¹cèú) y¬`—ÌŒŒL‹›Y
+xà ‚ŠŠ”™]šY]Ù\ˆ˜\Ù[[™JŠ»ï&˜XZ[Œ˜ØØL˜MYY˜MNYŽLM˜LM˜NXÍÙMÍMŒMÌØŒ™;ï&ù¥¬:) y¬`¹mì¹å,H™LMØŒ™™LNYLXŒØL™ŽYŒÌ˜ÙLLØØ:/ïyb¨9b,XZ[¸à ‚ŠŠ‘Ø]JŠ»ï&‘ÕRKŒH:`&º/áù§ 9îâ9."ynlùcìÒH9.#¹âë9êâÈ™]šY]Ù\ˆ9i#yk¨ynm¹d"9nm¹bc{ï#ÕRˆ™]šY]ÙYÛÜœ\øà Q›Ü›X[›ÙXÝ[Û¸à Q]HÝY™šXÚY[˜ÞH9d£ŒŒ
+È˜XÚÙš[9gaù/çy£ ya®ùîäøà ‚‚Ÿ9k¨zf!z) y¬`ˆ9§+9¢ny/ë¹«hÈÈ:j£:+ày/cyïkˆ9â­¹  HŸKK_KK_KK_Ÿ9d#9. 9îäù§¡9.¢ù.í¹a`z+®9i&¹.*º)à¹kçù¨b9/¢ÈØ[™Y]KœX9.#ya£y¢ä¹îçzaãyi#yîäù§¡:.ªù.ï{ï&ØØ[™Y]H[YÜ˜][Ûˆ™YÜ™\ÜÚ[ÛˆSTSQS•QÈØØ[TÔÈŸ9îäù§¡9îçú+¨y.#ycåÈ˜YWÙ]HÈ]™[ÚY9¥/¹i)ÈÚ\™YÝXÝ\˜[Ù]™XÛÛ\]][Û»ï&úaãyi#z)à¹kçù­bú+åHSTSQS•QÈØØ[TÔÈŸ™]šY]È9cêº ïy.ãˆÛX[ˆ
+ÈØ[™Y]H9o 9iâÈ™]šY]×Ü™XY[™\Ü×ÙØ]X;ï&Ü™]šY]È[žH›Ý[™\žHSTSQS•QÈØØ[TÔÈŸŒÈÈ9.#yk£9¥m™]šY]È:fí¹bkù/g9å*9¢ä¹îçHYØXÞKÚ[˜ÛÛ\]H™XY[™\ÜÈ\Ýûï&ÐPÕU‘KÝ™\œÚ[Û‹Ù]šY[˜ÙHÛ˜\ÚÝSTSQS•QÈØØ[TÔÈŸÛX[ˆØÚ[XK]Œˆ9cëú/æùaiH™]šY]ÈÞ[]XÈÛX[ˆØ[™Y]HY™XÞXÛH\ÝSTSQS•QÈØØ[TÔÈ‚ŠŠ‘]šY[˜ÙHÙ\\˜][ÛŠŠ‚‚‹H9§+9g,ÕRKÑÕRKŒHØ[™Y]xà \™]šY]øà ]]YØ]H9k¦¹d$yfç¹odº`&º/áûï&ÔˆÌMˆ9/ë¹«hÈXYŒŽXÙLŒÍ˜NYYLNMMXÙYLYXØMÍŽ™M˜9æ¡Ú]XˆXÝ[ÛœÈ[ˆÌMˆ9."ynlùcìÒH9aj9îïûï#9c!yd*È]\Ý8à TY™‹Ù›Ü›X]Û^\xà TÜZÙxà TÑËXXœÙ[8à QU“ÑÈ9d£9ë¨yä!¹¥¡ù¨húeê9é xà ‚‹H9§+9¢nycê¹/ë¹¥.yméyamúdï¸à y­bú+åyd£9¬®ùä!¹¥¡ù¨hûï&ù.#y¥¬9h§ˆÛÛ[ˆÛÜœ\È9.¢ùk§»ï#9.#z/ä:(c›ÙXÝ[Û»ï#9.#y."¹/(9aëz+àxà yêëùà®xà UÚÙ[¸à TÑÈ:/¤ùaî¹¢%¹.$ù§"HÚY[8à ‚‚ŠŠ”™\]Z\™Y™^ÛÜšÊŠ‚‚ŒKˆ9å,H™]šY]Ù\ˆ9kîHLKÔLˆ9i#yk¨ynm¹a¬ùk¦¹¦+ùd)¹d"9nm»ï&ùd"9nm¹bcy.#yo¥ùd+ùbªÕR¸à ‚Œ‹ˆ9/çy£ H›Ü›X[›ÙXÝ[Û¸à Q]HÝY™šXÚY[˜Þxà T›ÝšY\ˆØ\Xš[]H9d£ŒŒ
+È˜XÚÙš[9a®ùîäøà ‚ŒËˆÕRKŒH9d"9nm¹d#»ï#9£"ycëú/ïy®«ù§iy®¤:aãynîˆÛX[ˆ™]šY]ÙYÛÜœ\ûï#9a£y¢iú(cÕRÈÙX[Ü™\^KÙ›Ü›X[Ø]xà ‚‚ˆÈÈKLŒŒL‹LLˆ0­ÈÕRHÛÛ[ˆ]ÝXÝ\˜[Y[]HÈ™XZ[ÛÛÚZ[‚‚ŠŠ’[\[Y[][ÛˆÝ]\ÊŠ»ï&’STSQS•QÈÐÐSÑ“ÐÕTÑQÕ‘T’Q’QQÈÒWÑÔ‘QS‚ŠŠ”™]šY]ÈÝ]\ÊŠ»ï&”S‘S‘×Ô‘U’QUûï&ù§+9¢ny.#z!êº(cÓÔÑHÈQT‘Ñxà ‚ŠŠ˜\ÙHÒJŠ»ï&˜Œ˜ØØL˜MYY˜MNYŽLM˜LM˜NXÍÙMÍMŒMÌØŒ™ŠŠ]]Üš]JŠ»ï&–ÔŒMH9alúeëy.#ˆÛÛ[•]:aãynî¹méy/g:) y¬`—J‹‹Ù\ÚYÛ‹ÐK\Ú\™KX[˜[\Ú\×ÔŒMyalúeëy.#‘ÛÛ[•]:aãynî¹méy/g:) y¬`—ÌŒŒL‹›Y
+{ï&ÑÕRxà ‚ŠŠ‘Ø]JŠ»ï&‘ÕRH9k£9¢$9."ynlùcì™\]Z\™YÒH9.#ˆ™]šY]Ù\ˆÛÜÝ\™H9bc{ï#ÕRˆ™]šY]ÙYÛÜœ\øà Q›Ü›X[›ÙXÝ[Û¸à Q]HÝY™šXÚY[˜ÞH9d£ŒŒ
+È˜XÚÙš[9gaù/çy£ ya®ùîäøà ‚‚Ÿ9ë¨yä!º) y¬`ˆ9§+9¢nyk§¹ã¬È:j£:+ày/cyïkˆ9â­¹  HŸKK_KK_KK_Ÿ9¦/¹o#ÈÕÑSTÕY™™XÝ]™H]{ï#9é y«hˆ˜YWÙ]H˜[˜XÚÈÜ˜ËØ\Ú\™WÜÝ]KÜÜZÙKÙÛÛ[—ÜÝÜ™KœX;ï&ÑÛÛ[ˆØ]KØØ[™Y]H\ÝÈSTSQS•QÈ›ØÝ\ÙYTÔÈŸÝXÝ\˜[Y[]H9.#ˆœ™YKY›Ü›H]™[ÚY:)èú )ˆÝÙ]™[ÚY[]X8à X[\ÝÙ]™[ÚY[]X8à X™XÛÛ\]WÜÝXÝ\˜[ÜÝ]\ÝXÜØSTSQS•QÈ›ØÝ\ÙYTÔÈŸ:/ïyb¨9o#ÈÛX[ˆ™XZ[;ï#9¦/¹o#ÈÑQTÔ‘TPÑKÑ“ÔÐQØÜš\ËÙÛÛ[‹ØØ[™Y]KœH™XZ[K\[˜STSQS•QÈ›ØÝ\ÙYTÔÈŸÜ™X]K[Û›H]\Ù]ÛX[šY™\Ý9.#ˆPÕU‘H9c§ùkd9cäyn ÈØ[™Y]H™XZ[™Y›YÚÜÙ[‹]˜[Y][Û»ï&Ü™XZ[˜Z[\™H\ÝÈSTSQS•QÈ›ØÝ\ÙYTÔÈŸØÚ[XHŒˆX[šY™\ÝÛ™\ÝHÝXÝ\˜[ÛÝ[øà PQÔ‘SSÕ‘xà QSTÕÙXÝ\š]Y\È›ÝË[]™[™XÛÛ\]][ÛˆSTSQS•QÈ›ØÝ\ÙYTÔÈŸ™]šY]È9.#yo¥ù£ä9caù.#yk£9¥m9îäù§¡9.¢ù.íˆØÜš\ËÙÛÛ[‹Ü™]šY]ËœX;ï&Ú[˜ÛÛ\]KXØ\ÙH™YÜ™\ÜÚ[ÛˆSTSQS•QÈ›ØÝ\ÙYTÔÈ‚ŠŠ‘]šY[˜ÙHÙ\\˜][ÛŠŠ‚‚‹H9§+9g,9k¦¹d$HÛÛ[ˆ9fç¹odˆMˆ\ÜÙY;ï&ÔY™ˆ9.#ˆÛÛ[—ÜÝÜ™KœX^\H9k¦¹d$y¨à9§éz`&º/áøà ‚‹HˆÌMˆ9æ¡Ú]XˆXÝ[ÛœÈ[ˆÌLÈ9mì¹k£9¢$;ï&•Ú[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM8à UX[HËŒM9."y§hH™\]Z\™YÒH9aj9îïûï#9.%]\Ý8à TY™‹Ù›Ü›X]Û^\xà TÜZÙxà TÑËXXœÙ[8à QU“ÑÈ9d£9ë¨yä!¹¥¡ù¨húeê9é ygaù¢$9b§ûï&ùâë9êâÈ™]šY]Ù\ˆÛÜÝ\™H9.ãyo¡yk£9¢$8à ‚‹HŒÈØ[™Y]H9¥¡ù.í¹§*º(ªù¥.ya¦{ï&ù§+9¢ny¬¨y§"y¥¬9h§ˆÛÛ[ˆ9.¢ùk§¸à z-)¹cíù/èy kù¢%¹.$ù§"y/§z-e»ï#›Ü›X[›ÙXÝ[Ûˆ9.ãy£"HŒMH:+¬9oey..ˆ“ÕUUÔ’V‘Q8à ‚‚ŠŠ”™\]Z\™Y™^ÛÜšÊŠ‚‚ŒKˆ9å,yâë9êâÈ™]šY]Ù\ˆ9k¨zf!HˆÌMˆ9nm¹a¬ùk¦¹¦+ùd)¹d"9nm»ï&ùd"9nm¹bcy.#z/ä:(c9ç'ùk§ˆxà ‚Œ‹ˆ9d"9nm¹d#¹£"HÕRˆ:aãynî¹ç'ùk§ˆ™]šY]ÙYÛÜœ\ûï&¹cê¹/oùå*9cëùfç¹®«ù§iy®¤9hjùa¦y§"y¥b]™[ÙY™™XÝ]™WÙ]X;ï#9.#yo¥ùå*˜YWÙ]X9¢%º!ê¹å,H]™[ÚY:(iy¥l8à ‚ŒËˆÕRÈ9k£9¢$™]šY]ÙY™\œÚ[ÛˆÙX[8à X›Ý[™™\^H9.#ˆ›Ü›X[Ø]H9i#y¨.9d#»ï#9¢cz ïzaãy¥¬:+á9/,›ÙXÝ[Ûˆ9d£]HÝY™šXÚY[˜Þxà ‚‚ˆÈÈKLŒŒLKLM0­ÈUQURH9odùbcy¥m9¥.yâ­¹  {ï":)¡¹æå¹."ù¥®yc¡¹cì¹i-:`ê;ï"B‚ŠŠ’[\[Y[][ÛˆÝ]\ÊŠ»ï&’STSQS•QÈÐÐSÑ“ÐÕTÑQÕ‘T’Q’QQÈS‘S‘×Ñ’SSÐÒHŠŠ”™]šY]ÈÝ]\ÊŠ»ï&”S‘S‘×Ô‘U’QUûï&ù§+9¢ny.#z!êº(cÓÔÑHÈQT‘Ñxà ˆŠŠ˜\ÙHÒJŠ»ï&˜ÎLÎXÍØM™˜Ì™YŒ˜ŽMØÌMÍLLÍXXŠŠ•\HÈ]]Üš]JŠ»ï&Ì{ï&Öùi%º`ê9k¨z+¨H‘U‹Lx %9ë¨yä!º(àya¬×J‹‹Ù\ÚYÛ‹ÐK\Ú\™KX[˜[\Ú\×ùi%º`ê9k¨z+¨T‘UŒKL9ë¨yä!º(àya¬ù.#¹¥m9¥.z-ëùî¯×ÌŒŒLK›Y
+H0©ÌÈÈ0©Îxà ˆŠŠÝ\œ™[Ø]JŠ»ï&UQURH9§*¹k£9¢$9§ 9îâ9."ynlùcì™\]Z\™YÒxà T™]šY]Ù\ˆ9k¨zf!ycâ¹d"9nm¹bc{ï#9¦ ¹`g9ç'ùk§ˆ{ï&ù¥éùi-:`ê8 '9.áyëbyo¡y§+9g,:acyïk¸ 'yæ¡9£ãú/ì9..¹c¡¹cì¹â­¹  {ï#9.#y¦+ùodùbcy¢iú(c:+®9cëøà ‚‚Ÿ9ë¨yä!º) y¬`ˆ9§+9¢nyk§¹ã¬È:j£:+ày/cyïkˆ9â­¹  HŸKK_KK_KK_Ÿ‘U‹LHÛ›[™HXÝX[[ØY
+ÈÙ™›[™H]šY[˜ÙHÝ™[™Ý›ÙXÝ[Û—ØXØÛÝ[Ø›ÛÝÝ˜\œ{ï&Ý\ÝØ]Y]ÚWÝ\ÝØ›Ý[™\žKœHSTSQS•QÈ›ØÝ\ÙYTÔÈŸ‘U‹LH9èk¹k¦¹ )ù¥l9keù§`úfdØY™WÙXYÛ›ÜÝXÜËœ\œÙWÜ\›Z\ÜÚ[Û—ØÛÙ\ûï&ÐXØÛÝ[›Ùš[H9.#ˆ›ÛÝÝ˜\9alyå*STSQS•QÈ›ØÝ\ÙYTÔÈŸ‘U‹LHØY™HXYÛ›ÜÝXÈ›Ú™XÝ[ÛˆØY™WÙXYÛ›ÜÝXÜËœ{ï&ÙØÝÜˆÈÛHÈ›ÛÝÝ˜\STSQS•QÈ›ØÝ\ÙYTÔÈŸ‘U‹LH™\ÝYØÜXˆÈ\œ›ÜˆÈ™Ø\\™HÝÝ]ØØ\\™KœHÈÙ\ÜÚ[Û‹œ{ï&ÒHÙ[[™[\ÝÈSTSQS•QÈ›ØÝ\ÙYTÔÈŸ‘U‹Lˆ9.-9¥í¹.âú-*9ç'ùk§º+í9¦#ˆ›ÝšY\—ÙØÝÜ‹›Y;ï&ØØ\\™KØ›ÛÝÝ˜\ØÜÝš[™ÜÈÐÕSQS•Q;ï&ù.âú-*:aãy§¡9åfyo¡H‘U‹LˆŸ‘U‹L™YH™\]Z\™YÒHYÜÈÚKž[[;ï&ÒHÛÜšÙ›ÝÈÝXÝ\™H™YÜ™\ÜÚ[ÛˆSTSQS•QÈš[˜[ÒH[™[™È‚ŠŠ‘]šY[˜ÙHÙ\\˜][ÛŠŠ‚‚‹H™\ÜÚ]ÜžK]™\šYšXX›{ï&¹§+9g,]ÛˆËŒM»ï#Ì:hnHKØ›ÛÝÝ˜\›ØÝ\ÙY9.#¹«i9bcHÈ:hnHÙ\ÜÚ[Û‹ØØ\\™KÜ›ÝšY\ˆ›ØÝ\ÙY9fç¹odº`&º/áûï&ÔY™ˆÚXÚËÙ›Ü›X]8à [^\{ï"LÈÛÝ\˜ÙHš[\ûï"xà XÛÛ\[X[8à TÜZÙHžK\[¸à TÑËXXœÙ[:`&º/áøà ‚‹H9k£9¥m]\Ý9.#ˆÚ]9c¡¹cì¹¬®ùä!ºeê9é {ï&¹§ 9îâˆXY9æ¡9."ynlùcìÒH9îäù§§9..¹§`ùj {ï&ù§+9£ä9.©9¥í¹.#zh¡9ab9k¨ùéì:`&º/áøà ºggˆÚ]ÚXÚÛÝ]9æ¡9§+9g,:f¥9é®ùbkù§+9cê¹/g9®¤9è z/ä:(c:j£:+àxà ‚‹HÛÛ›ÛYÑËÜ[[Y{ï&¹§+9¢ny§*¹­bú+åyç'ùk§ˆÑøà ‚‹H›Ü›X[XØÛÝ[È›ÙXÝ[Û»ï&¹§+9¢ny§*¹¢iú(c;ï&ùênˆY[]HÛÛ™šYÈ9.#ycæ8à ‚‚ŠŠ”ØÛÜH™\Ù\˜][ÛˆÈ™^
+Š‚‚¹c§È›Ùš[HYÙ\Ý8à PÔ‹MKÐÔ‹Mˆœ›Þ™[ˆÙ[X[XÜøà [ZYÜ˜][ÛœÈŒËÌ8à LŒŒ9c¡¹cìº/®yåc9d£Ø\Xš[]H9â­¹  y.#ycæ8à ¹£"HÚ]Xˆ:/ç¹£©yfj9.éycey£ä9.©9d#9«iy.èùè xà ]\Ýøà QU“ÑÈ9.#¹§+9 .ùa£;ï#9.#y¢jyleyc¡¹cì¹/¢ùi%¸à ‚¹§ 9îâXY9aj:aãù."ynlùcìÒH:`&º/áùd#¹.©™]šY]Ù\»ï&ùd"9nm¹bcy.#y h¹i#H{ï#9.#z`&º/áù¥m9¥.Hˆ9a®ùîäú.ªù.ïxà ¹am¹.åˆ‘Uˆ9£"ykîyn¥™XÛÝ™\žKÚ\ÝÜžKÝ[˜][™YÜØØ[KÜ™\^HØ]H9céº(c9£ª:/æøà ‚‚‹KKB‚‚ˆ
+Š¹.äùn¤ùfî¹k¦º-ëùo¡;ï"UTÕ“Õ‘SSQ{ï"JŠ»ï&˜ØÜËÜ›Ú™XÝÑU‘SÔQS•ÓPSQÑSQS•›Yˆ
+Š¹¥¡ù¨hù )ú-*
+Š»ï&ºeoù§'ù£ yîëyîí9¢©9æ¡:hnyæë¹î©ø '9odùbcz+¯º+¨H
+È9odùbcyâ­¹  H
+È9o 9cäz+¨yb$ˆ
+È9cæ9¦í9£©ùb-¸ 'y .ùa£ˆ
+ŠºhnyæëŠŠ»ï&z ¨yn ¹g.¹  yb¯ù¥l9£k¹gî¹n©ûï"9¥ézh¤yª(ygeûï"Hˆ
+Š‘œ›Þ™[ˆ˜\Ù[[™JŠ»ï&•ŒKŒËŒˆˆ
+Š”™]šY]ÙY™\ÜÚ]ÜžHPQ
+Š»ï&˜YÍ˜YLNNNNMØ™Ø™MÙŒ˜ÎMÌÌNLØ;ï"ÕRHÛÜÝ\™HY\™ÙH9.bùd#¸à QÕRˆØ[™Y]HÛÛœÝXÝ[Ûˆ9b!¹¥+ùæ¡9®¤XZ[»ï&ùb!¹¥+ùc¡¹cì¹/çy£ H\[™[Û›{ï"Bˆ
+Š”š[X\žH[\[Y[][Û»ï"Ô‹M‹
+ÈŒŒ
+È\ÝÜžHÛÛ˜XÝ;ï"JŠ»ï&Ô‹M‹[\[Y[][ÛˆMÍLMNY˜ÎÎYŒNMÙLNŽMYXMM™™NML™9mìºf£ÈˆÍˆ9d"9aiHXZ[»ï&ÌŒŒ
+ÈÛÛ˜XÝÛÝ\˜ÙHÛÛ[Z]ÈŽÙØXØÈMMMŒÙ˜ÈÌÍLÍÍMNX;ï#›Ü›X]ÛÜœ™XÝ[ÛˆŒ˜NNLLØ;ï&ÔÝ]KÔ›ÝšY\ˆ:+ëy.bz/®yåc9/çy£ ya®ùîäøà ˆˆ
+Š“]\Ý[ÛÙHÒH˜\Ù[[™{ï"ˆÎHØ[™Y]{ï"JŠ»ï&¹­bú+åKù.èùè HXYÍXŽNNMÎNLÌXŽÍÙÎYX™Ø˜ÙØLXMMXÌ˜9kîyn¥Ú]XˆXÝ[ÛœÈ[ˆÌÎLÍÍMLÌ;ï#9mì¹g*X[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9."yçêzf-y¢$9b§ûï&ù«ãú!oÈMH\ÜÙY;ï#Y™ˆ[Ù›Ü›X]8à [^\xà TÜZÙxà TÑËXXœÙ[9câº` ¹å*9æ¡U“ÑËÓX[˜YÙ[Y[Ø]\È9gaù¢$9b§øà ˆˆ
+ŠÝ\œ™[ÛÙH˜\Ù[[™JŠ»ï&Ô‹MH9mìˆ‘T’Q’QQÈÓÔÑQÈ”‘QV‘H9nm¹g*ˆÌÈY\™ÙHÛÛ[Z]ÍXYMLMNNLŒ˜LŽXÌXØYÌLØLŒMÙ™˜9å'ù¥b;ï&ÐÔ‹M‹Œ8 $Í‹9æ¡™YÚ\Ýžxà Y]\›Z[š\ÝXÈÝ]xà X\Y˜XÝÛYÙ\‹Ü™\^xà \ØÛÜHÝX\™8à Y˜][]œË\\œÚ\ÝYÛÛ˜XÝ9d£x $Í]šY[˜ÙHX\[™È9mì¹k§¹ã¬9nm¹g*ˆÍˆ9d"9aiHXZ[»ï&ÌŒŒ
+È\ÝÜžHÛÛ˜XÝ;ï"\ÝÜžWÜÝ\ÌŒŒÈ\ÝÜžWØÛÝ™\˜YÙWÌŒŒÝŒX;ï#:-mùà®HŒŒLX;ï"ymì¹d#9«iy.èùè xà y­bú+åyd£›ÝšY\ˆ9¥¡ù¨hûï&ÐÔ‹Mˆ9mìºf£ÈˆÍˆ9d"9aiHXZ[»ï&ÔˆÎŒHÓHÈ™\Ý[YHÛ™\ÝH9odùbcH‘T’Q’QQ
+ÒJHÈS‘S‘×Ô‘U’QUûï&ÔSKLP‹ŒØÜX˜™Y›ÛÝÝ˜\9.#ˆÜÚ]]™HY[]HØ]\È9odùbcH‘T’Q’QQ
+ÒJHÈÓÔÑQÈQT‘ÑQ;ï"ˆÎ{ï"{ï&ÔSKLP‹ŒŒHÜÚ]]™HY[]HÛÛ˜XÝÛ™\ÝH9odùbcH‘T’Q’QQ
+ÒJHÈÓÔÑQÈQT‘ÑQ;ï"ˆÎ{ï"{ï&Ô›ÙXÝ[Ûˆ[›™\ˆ[˜ÚÜ™YÚ\š[™È9odùbcH‘T’Q’QQ
+ÒJHÈS‘S‘×Ô‘U’QUûï&Ô›ÙXÝ[ÛˆSKLPˆ9.ãyâë9êâÈ“ÐÒÑQ;ï&•HÛÛ›ÛYÛ›[™H›ÛÝÝ˜\9g*9§+9g,9aëz+àzeê9é yi!“ÕÕTÕP“WÐPÐÓÕS•;ï#9l&¹§*¹.©ùå'È]™HY[]HØ[™Y]xà ˆˆ
+Š‘ØÝ[Y[™]š\Ú[ÛŠŠ»ï&¹¥è¹§"HKPÔ‹LŒŒÌLM‹ŒŒÈKLŒŒÌKLŒK‹ŒÈKLŒŒLKLK‹ŒÌÈKLŒŒL‹LÌK‹ŒÍÈKLŒŒLËLÍK‹ŒˆÈKLŒŒLLË‹Œ{ï&ù¥¬9h§ˆKLŒŒLLLÈLHÈLˆÈLÈÈLÈLHÈKLŒŒLLLˆÈKLŒŒLLLÈÈKLŒŒLLLÈKLŒŒLLLHÈKLŒŒLLLLÈKLŒŒLLLLHÈKLŒŒLLLLˆÈKLŒŒLLLLÈÈKLŒŒLLLMÈKLŒŒLLLMHÈKLŒŒLLLMˆÈKLŒŒLLLMÈÈKLŒŒLLLNÈKLŒŒLLLNHÈKLŒŒLLLŒÈKLŒŒLLLŒHÈKLŒŒLLLÈKLŒŒLLLHÈKLŒŒLLLˆÈKLŒŒLLLÈÈKLŒŒLLLŽÈKLŒŒLLLŽHÈKLŒŒLKLLÌÈKLŒŒLKLLÌHÈKLŒŒLKLLÌˆÈKLŒŒLKLLÌÈÈKLŒŒLKLLÍÈKLŒŒLKLLÍHÈKLŒŒLKLLÍˆÈKLŒŒLKLLÍÈÈKLŒŒLKLLÎÈKLŒŒLKLLÎHÈKLŒŒLKLMÈKLŒŒLKLMHÈKLŒŒLKLMˆÈKLŒŒLKLMÈÈKLŒŒLKLMÈKLŒŒLKLMHÈKLŒŒLKLMˆÈKLŒŒLKLMÈÈKLŒŒL‹LLBˆ
+Š“\Ý™]šY]ÊŠ»ï&ŒŒ‹LKL{ï"ˆÎH9mì¹d"9nm»ï&ú/æùaiHHÛÛ›ÛYÛ›[™H›ÛÝÝ˜\8à ˜ÛX[ˆXZ[ˆÌŒ˜MÌLLXÙLØ˜NXÎ˜ØLMØYXÍÙ™XL™YLNMMXX9æ¡9é®ùî¯ÈÑËÜ[[YH™Y›YÚ9mìº`&º/áûï#9/a¹g*9î¯ùaiycèùfè9§+9g,9§*¹£ä9/¦ùk¢yaj9aëz+ày¬ê9aiz #:/å9fçˆ“ÕÕTÕP“WÐPÐÓÕS•È^]»ï&ù§*¹.©ùå'È]™HY[]HØ[™Y]{ï#:acyïk¹îéùîëy..¹ên»ï"Hˆ
+Š“\Ý™]šY]Ù\ŠŠ»ï&‘\ÚYÛˆÈ]Y]™]šY]Èˆ
+ŠÒHÝ]\ÊŠ»ï&”ˆÎHØ[™Y]H9æ¡SKLP‹ŒŒHš[˜[ÛÙKÝ\Ý[ˆÌÎLÍÍMLÌ9g*X[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9."yçêzf-yaj9îïûï#9«ãú!oÈMH\ÜÙY;ï&ÔY™ˆ[Ù›Ü›X]\¸à [^\xà Y[]\Ý8à TÜZÙxà TÑËXXœÙ[9d£:` ¹å*9æ¡U“ÑËÓX[˜YÙ[Y[Ø]\È9gaÈÝXØÙ\Üøà ›XZ[ˆ9æ¡Y\™ÙKYØ]H9c¡¹cì¹gî¹î¯ù.#yfè9§+ˆ:!ê¹bª9¥.ycæ8à ˆˆ
+Š”\ÙHÝ]\ûï"Œ‹LKL{ï#SKLP‹ŒY[]HÝX\™ÒH™\šYšXØ][Ûˆ
+ÈØØ[Ù™›[™H›ÛÝÝ˜\™Y›YÚ;ï"JŠ»ï&”PL‹žÈÔ‹LKž8¡¤ˆ
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘{ï"9.#zaãyo ;ï"JŠ»ï&ÔPLÈÈLËŒHÈLËŒˆ8¡¤ˆ
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘{ï"9.#zaãyo ;ï"JŠ»ï&ÔPŒHÈŒKŒHÈŒKŒˆ8¡¤ˆ
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘{ï"9.#zaãyo ;ï&ÐQ‹LŒPÐÑTQ;ï"JŠ»ï&ÔPŒˆÈŒ‹ŒHÈŒ‹ŒˆÈŒ‹ŒÈ8¡¤ˆ
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘{ï"9.#zaãyo ;ï&ÐQ‹LŒHPÐÑTQ;ï"JŠ»ï&ÐÔ‹Lˆ9aj:dïˆ8¡¤ˆ
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"Q‹LŒˆPÐÑTQ;ï"JŠ»ï&ÐÔ‹LÈ9aj:dïˆ8¡¤ˆ
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"Q‹LŒÈPÐÑTQ;ï"JŠ»ï&ÐÔ‹M9aj:dïˆ8¡¤ˆ
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"Q‹LPÐÑTQ;ï"JŠ»ï&ÐÔ‹MHÈÔ‹MKŒHÈÔ‹MKŒˆÈÔ‹MKŒ‹ŒH8¡¤ˆ
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"Q‹LHPÐÑTQ;ï&ÔˆÌÈY\™ÙY;ï"JŠ»ï&ÐÔ‹MˆÝ]H8¡¤ˆ
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"Ô‹M‹š[˜[™]šY]Ù\ˆÛÜÝ\™HXØÙ\Y;ï&ÐQ‹LˆPÐÑTQ;ï"JŠ»ï&ÌŒŒ
+È\ÝÜžHÛÛ˜XÝ8¡¤ˆ
+Š•‘T’Q’QQÈÑQT;ï"ÝÛ™\‹X\›Ý™YŒŒ
+ÈÛÛ˜XÝ[\[Y[][Û»ï&Ô›ÝšY\ˆØ\Xš[]H™[XZ[œÈ[™[™ûï"JŠ»ï&ÔSKLP‹ŒÈSKLP‹ŒŒHY[]HÛÛ˜XÝ8¡¤ˆ
+Š•‘T’Q’QQ
+ÒJHÈÓÔÑQÈQT‘ÑQ;ï"ˆÎ{ï"JŠ»ï&Ô›ÙXÝ[ÛˆSKLPˆ8¡¤ˆ
+Š•H“ÕÕTÕP“WÐPÐÓÕS•È“ÐÒÑQ–HÐÐSÑPÔ‘US’‘PÕSÓŠŠ»ï"›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên»ï&ù§*¹.©ùå'È]™HY[]KÙ[][Y[8à Y›Ü›X[ŒKPøà QÛÛ[‹Ñ]HÝY™šXÚY[˜ÞHX]š^9¢%¹.®¹méHÛÛ™š\›X][Û»ï"Hˆ
+Š”›ÙXÝ[Ûˆ[›™\ˆ[˜ÚÜ™YÚ\š[™ûï"ˆÎ™]šY]ûï"JŠ»ï&›ÜšYÚ[˜[[˜ÚÜ™Y]Ú\š[™È9mìˆ‘T’Q’QQ
+ÒJHÈS‘S‘×Ô‘U’QUûï&ÔˆÎŒHÓHÈ™\Ý[YHÛ™\ÝH9mìˆ‘T’Q’QQ
+ÒJHÈS‘S‘×Ô‘U’QUûï&ÔˆÎ9mì¹.£ˆÍYNLMŽMLÙÙÎL™ŒX™LLY™ŽNLÎXX9d"9aiHXZ[»ï&ùodùbcz/æùaiHSKLP‹Œ9cåù£©ÈY[]HØ[™Y]HÈ[X[ˆÛÛ™š\›X][Ûˆ:f-¹«­xà ˆˆ
+Š’\ÝÜšXØ[Û˜\ÚÝ;ï"9mìº(ªù."¹¥®yodùbcyâ­¹  ycå¹.èûï"JŠ»ï&”PL‹žÈÔ‹LKž8¡¤ˆ
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘{ï"9.#zaãyo ;ï"JŠ»ï&ÔPLÈÈLËŒHÈLËŒˆ8¡¤ˆ
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘{ï"9.#zaãyo ;ï"JŠ»ï&ÔPŒHÈŒKŒHÈŒKŒˆ8¡¤ˆ
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘{ï"9.#zaãyo ;ï"JŠ»ï&ÔPŒˆÈŒ‹ŒHÈŒ‹ŒˆÈŒ‹ŒÈ8¡¤ˆ
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘{ï"9.#zaãyo ;ï&ÐQ‹LŒHPÐÑTQ;ï"JŠ»ï&ÐÔ‹Lˆ9aj:dïˆ8¡¤ˆ
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"Q‹LŒˆPÐÑTQ;ï"JŠ»ï&ÐÔ‹LÈ9aj:dïˆ8¡¤ˆ
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"Q‹LŒÈPÐÑTQ;ï"JŠ»ï&ÐÔ‹M9aj:dïˆ8¡¤ˆ
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"Q‹LPÐÑTQ;ï"JŠ»ï&ÐÔ‹MH8¡¤ˆ
+Š‘Ó‘HÈ‘SÔS‘Q
+Š»ï"9..ù/dÈTÔûï&ù.áybjHH›Ý[™Y[™XYÙ{ï"{ï&ÐÔ‹MKŒH8¡¤ˆ
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘JŠ»ï"ÛÜœ™XÝ™\ÜÈÛÜÝ\™{ï"{ï&ÐÔ‹MKŒˆ8¡¤ˆ
+Š‘Ó‘HÈS‘S‘×Ô‘U’QUÊŠ»ï"›Ý[™YÙ[XÝYZ[œ][™XYÙ{ï&Ü[ˆMÍˆ9."ynlùcì9aj9îïûï#™]šY]Ù\ˆÛÜÝ\™H[™[™ûï"{ï&ÐÔ‹MˆÝ]H8¡¤ˆ
+Š“ÐÒÑQÐ–WÐÔ‹MKŒŠŠ»ï&Ô›ÙXÝ[ÛˆSKLPˆ8¡¤ˆ
+Š“ÐÒÑQ[™\[™[JŠ»ï"›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ênˆ
+È9.®¹méHÛÛ[‹Ô[H™]šY]È
+È9«hùo#ú-)¹cíù§hy.í»ï"Hˆ
+Š”ÒHÛÜœ™XÝ[Û»ï"Œ‹LLÌHMÎ»ï#™]šY]Ù\ˆÔ‹Lˆ9i#yk¨HKL{ï"JŠ»ï&Ô‹Lˆ9¢ny«(yi-:`ê9.#ˆ[\[Y[][ÛˆX\[™È9¦ïº+¬9oeH[\[Y[][ÛˆÒHMXÙYL™MŒXNYŒØÎMÎXL™ŒXØŒ˜Œ™8 %8 %:+éHÒH:gg¹ç'ùk§ˆ[\[Y[][ÛˆÛÛ[Z];ï&ù.éHÚ]XˆÛÛ[Z]Øš™XÝ9..¹aá»ï&˜MXÙYLY™ÙLYLØ™LLÍŽÙNŒMŒŽYMŒŒŽLX;ï"[ˆÌÌÍÎÍÌ9alú eÛÛ[Z];ï"xà ¹c¡¹cì¹§hyæë¹c§ù¥¡ù/çyåf{ï#Ô‹Lˆ9méy/g:) y¬`¹¥¡ù¨hùmìº/ïyb¨0©ÌLˆ9¦í9«høà ˆˆ
+Š‘ÛÝ™\›˜[˜ÙHÛÝ[ÛÜœ™XÝ[Û»ï"™]šY]Ù\»ï#Œ‹LLÌ;ï"JŠ»ï&Q‹LŒ[Y[™Y[ËŒÈ9¢`9a¦H”Ñ×ÓQUÑÐÓTÔÒQ’PÐUSÓ”È:(j;ï"NH9§h{ï"H¹îãÈ™]šY]Ù\ˆ:`$:hnz+¨y¥l9k§¹..ˆ
+ŠŒN9§hJŠ»ï"9¬®ùä!¹¥¡ù¨hù¥l9keúe&z+ëûï#:ggˆ[[YH9ï.ºhnx %8 %9îäù§¡9k¢9cjÈ^XÝ\Ù]9§+:.ªú`&º/áûï"{ï&ùmìºf£ÈPŒKŒˆ[Y[™Y[ŒÈ9¦í9«hûï#9c¡¹cì¹/çyåfxà ŠŠÛÝ[ÛÜœ™XÝ[Û»ï"Œ‹LLÌ{ï#Ô‹Lˆ9i#yk¨HKL»ï"JŠ»ï&Q‹LŒˆ0©Ì‹Œˆ9¦ï¹a¦HŽHÕTÔ•QÈH“ÐÒÑQÔS‘S‘×ÓPTTˆ¸ %8 %:+éy¢nyk§ºfaHLÍ;ï#9.%M9§hy§*º)¡¹æåˆ[™^ÙZ[H9ëbHØ\Xš[]HÝ\™˜XÙ{ï&ÐÔ‹L‹ŒH9d#ˆ™YÚ\ÝžH9..ˆ
+ŠŒN9§h{ï"LHÕTÔ•QÈ“ÐÒÑQÔS‘S‘×ÓPTTˆÈÈ“ÕÐTPÐP“{ï#[[YH^XÝ\Ù]9îçú+¨{ï"JŠ»ï#9mìºf£ÈQ‹LŒˆ[Y[™Y[H0©Í‹ŒH9¦í9«hûï#9c¡¹cì¹/çyåfxà ˆˆ
+Š”ÒHÛÜœ™XÝ[Û»ï"Œ‹LLûï#H9¬®ùä!»ï"JŠ»ï&¹."¹¢nyi-:`ê:+¬9oeyæ¡PLÈ[\[Y[][ÛˆÒHNX™ŒXX˜ÍXMÍYMMØŽŽMXŒM˜ŒŒYX˜L™™X9§"z+ëûï#9.éHÚ]XˆÛÛ[Z]Øš™XÝ9..¹aá»ï&˜NX™ŒXX™NXŒŒLM™ŽÍÙ˜MXÌŒN™L;ï"9.#ˆ[ˆMH9alú eÛÛ[Z];ï"{ï&ùd#9¢nHÒH:+¬9oeHÛÛ[Z]HLŽ™ÎÍŒÌMMÌY˜YYLÍÎŽ™LÎ™X8à ¹c¡¹cì¹§hyæë¹c§ù¥¡ù/çyåfxà ˆˆ
+Š”ÒHÛÜœ™XÝ[Û»ï"™]šY]Ù\»ï#Œ‹LL»ï"JŠ»ï&¹."¹¢nz+¬9oeyæ¡ÎNLMNØNÙNÎNLNNÙÙŒŽY˜ÍÌNXÍ˜È™XXÎL™ÌX™˜ØLØXMÌŒNYÌÍŽMNLÌNMLXY˜9§"z+ëûï#9.éHÚ]XˆÛÛ[Z]Øš™XÝ9..¹aá»ï&˜ÎNLMXYŒÙŽNØÎLXÙØÌNÌMŒÌX˜ŽXY˜È™XXÎL™ÙXYMÌMŒÙLØ™YM™XX˜ÙXLYØ˜ÍÎX;ï"9§+9i-:`ê9clù..¹/ë¹«hú+¬9oe{ï&ùc¡¹cì¹§hyæë¹c§ù¥¡ù/çyåf{ï"Hˆ
+Š¹â­¹  JŠ»ï&PÕU‘HÈU’S‘ÈÐÕSQS•ˆ
+Š¹¥íºeí9¨!ùaáŠŠ»ï&¹§+9¥¡ù¨hù¢`9§"y.®º+îù¥íºeí9/oùå*VVVKSSKQ›[H
+ÌŒ;ï"\ÚXKÔÚ[™ÚZ{ï"y¢%¹.áy¥éy§'ûï&Ý˜YWÙ]HÈX\šÙ]Ù\ÜÚ[ÛˆÈ[X[ˆ[Y\Ý[\9oázhnù¦#¹èk¹c.¹b!¸à ‚‚‹KKB‚ˆÈÈKLŒŒLKLMÈ0­ÈÜÝ[Y\™ÙHHÛÛ›ÛYÛ›[™H›ÛÝÝ˜\™Y›YÚ‚ŠŠ•\JŠ»ï&ÌH8 %ÛÛ›ÛY›ÙXÝ[ÛˆY[]H™Y›YÚŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&““ÕÕTÕP“WÐPÐÓÕS•È“ÐÒÑQÐ–WÓÐÐSÔÑPÔ‘UÒS’‘PÕSÓˆÈS‘S‘×Ô‘U’QUÈŠŠ‘]šY[˜ÙJŠ»ï&›XZ[ˆXYÌŒ˜MÌLLXÙLØ˜NXÎ˜ØLMØYXÍÙ™XL™YLNMMXX9c!yd*ÈˆÎHY\™ÙHÛÛ[Z]ŒÎMÍÙ™Œ˜Ø˜ÙŒÍØ˜ÌXÌMMLŽÙLXÙ˜ŒY;ï&ÕÚ[™ÝÜÈ]ÛˆËŒMˆ9é®ùî¯È™Y›YÚ9k§ºfayb¨:/oH[X^š[™Ñ]OOLKŒKŽX9.#ˆÝÏOLKŒŽKŒ˜;ï#9â­¹  HÑ‘“S‘WÔ•S•SQWÕ‘T’Q’QQ8à ‚‚‹H9cåù£©ÈÛ›[™H›ÛÝÝ˜\9§*º/æùaiyænùoe{ï&¹§+9g,9méy/g9c.¹¬¨y§"H™[˜;ï#:/æùê"ùã«ùh ù¬¨y§"HÕ×Ê˜9cæ:aãûï&ùk¢yaj9¥è9aëz+ày¨à9§éz/å9fçˆ“ÕÕTÕP“WÐPÐÓÕS•È^]¸à º+éyîäù§§9.#y¦+È]™H›ÛÝÝ˜\;ï#9.#y.©ùå'ÈØ[™Y]{ï#9.gù.#y§¡9¢$:-)¹cíù.¢ùk§¸à ‚‹HÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9îéùîëy..¹ên»ï&ùaëz+àxà UÚÙ[¸à yç'ùk§ˆ[™Ú[8à \˜]È›Ùš[H9d£˜]ÈÑÈ:/¤ùaî¹§*º/æùaiHÚ]X¸à ‚‹HH9§*¹k£9¢$9bcy.#z/æùaiHˆ[X[ˆÛÛ™š\›X][Û¸à UÈY[]KYœ™Y^™xà T›ÙXÝ[ÛˆŒKPøà Q]HÝY™šXÚY[˜Þxà ]™\™XÝ9¢%ˆ›ÝšY\ˆ\›Ý˜[8à ‚‚ŠŠ“™^
+Š‚‚‹H9å,ycåù£©ÈÚ[™ÝÜÈÜ\˜]Üˆ9g*9§+9g,:/æùê"ùã«ùh ù¢%¹§*º(ªÈÚ]:-çú.*¹æ¡™[˜9.+yk¢yaj9¬ê9aiyaëz+àyd#»ï#:aãy¥¬9¢iú(c9.äùn¤ùe+ù. ›ÛÝÝ˜\9aiycèûï&ùab9k¨y§éHØÜX˜™Y›Ú™XÝ[Û»ï#9a£ya¬ùk¦¹¦+ùd)º/æùaiH¸à ‚‚‚ˆÈÈKLŒŒLKLMˆ0­ÈSKLP‹ŒŒH›ÛÝÝ˜\Ú]\ÜXÙH™YÜ™\ÜÚ[ÛˆÛÜÝ\™B‚ŠŠ•\JŠ»ï&ÌH8 %™]šY]Ù\‹\™\]Z\™Y™YÜ™\ÜÚ[ÛˆÛÝ™\˜YÙHŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&•‘T’Q’QQ
+ÒJHÈÓÔÑQÈ‘PQWÑ“Ô—Ô‘U’QUÑQÓQT‘ÑHŠŠ‘]šY[˜ÙJŠ»ï&¹­bú+åKù.èùè HXYÍXŽNNMÎNLÌXŽÍÙÎYX™Ø˜ÙØLXMMXÌ˜;ï&ÑÚ]XˆXÝ[ÛœÈ[ˆÌÎLÍÍMLÌ;ï&ÕX[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9«ãú!oÈMH\ÜÙY8à ‚‚‹H9mìº(iyaaHØÝÜˆXØÛÝ[Ü›Ùš[WÚY9bcyd#¹ên¹æoyæ¡9cà¹¥l9c%ˆ›ÛÝÝ˜\[YÜ˜][ÛˆÛÝ™\˜YÙ{ï&ù.)9éãz/¤ùaiygaùoázhnÈ˜Z[ÛÜÙY;ï#9.#z ïz/æùaiHQS•UWÐÐS‘QUX8à ‚‹HY™ˆ[Ù›Ü›X]8à [^\xà yk£9¥m]\Ý8à TÜZÙxà TÑËXXœÙ[9d£:` ¹å*9¬®ùä!ºeê9é ygaú`&º/áûï&ØÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9îéùîëy..¹ên¸à ‚‹HˆÎH9æ¡9¢ 9§+úeëyã«ùmìºaãy¥¬9£ä9.©9§ 9îâ9k¨zf!{ï&ù§+:hny.#y¢iú(cÛ›[™H›ÛÝÝ˜\8à ZY[]Hœ™Y^™xà T›ÙXÝ[ÛˆŒKPøà Q]HÝY™šXÚY[˜Þxà ]™\™XÝ9¢%ˆ›ÝšY\ˆ\›Ý˜[8à ‚‚ŠŠ“™^
+Š‚‚‹H9ëbyo¡HÝÛ™\‹Ô™]šY]Ù\ˆ9kîHˆÎH9§ 9îâ9k¨zf!ynm¹d"9nm»ï&ùd"9nm¹d#¹a£y£"y¥¡ù¨hùd+ùbª9cåù£©ÈÛ›[™H›ÛÝÝ˜\8à ‚‚‚ˆÈÈKLŒŒLKLMH0­ÈSKLP‹ŒŒH[X]š^ÛÜÝ\™B‚ŠŠ•\JŠ»ï&ÌH8 %™]šY]Ù\ˆ™\]Z\™[Y[^]YØ]HÛÜÝ\™BŠŠ‘]JŠ»ï&ŒŒ‹LKLBŠŠ”Ý]\ÊŠ»ï&•‘T’Q’QQ
+ÒJHÈÓÔÑQÈ‘PQWÑ“Ô—Ô‘U’QUÑQÓQT‘ÑBŠŠ‘]šY[˜ÙJŠ»ï&‘Ú]XˆXÝ[ÛœÈ[ˆÌÎLÍMÌÌNM;ï&ÕX[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9«ãú!oÈMÈ\ÜÙY;ï#Y™ˆ[Ù›Ü›X]8à [^\xà TÜZÙxà TÑËXXœÙ[9.#º` ¹å*9¬®ùä!ºeê9é yaj9îïøà ‚‚‹HÙ[™\˜]YØÜX˜™YYÚ\H9mì¹.#ˆXØÛÝ[›Ùš[X9odùbcyå'ù¢$9d"9d#9kîzod;ï&ùcê¹§"HS’Ó“ÕÓ—ÏLš^˜9cëù/g9..ˆœ™Y^˜X›H›ÙXÝ[ÛˆØ[™Y]xà ‚‹HšX[›Ùš[xà [YØXÞKØ\˜š]˜\žHÚ[™8à ze&z+ëÈYÙ\Ý:eoùn©¸à yi)ùl#ùa¦yo ¹n.9d£9bcyd#¹ên¹¨/9gaù.#y/&º/æùaiH›ÙXÝ[ÛˆY[]HØ[™Y]xà ‚‹HÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9/çy£ yên¹æo{ï&ù§+:hny.#y¢iú(cÛ›[™H›ÛÝÝ˜\8à T›ÙXÝ[ÛˆŒKPøà Q]HÝY™šXÚY[˜Þxà ]™\™XÝ9¢%ˆ›ÝšY\ˆ\›Ý˜[8à ‚‹HˆÎH9ã¬9g*9amùi!ù¢ 9§+ù."¹æ¡™]šY]ÙY[Y\™ÙH9§hy.í»ï#9/a¹.#yå,y§+9«(y.îùb¨z!ê¹bª9d"9nm»ï&ùd"9nm¹d#¹¢cya`z+®9.ãˆÛX[ˆXZ[ˆ9d+ùbª9cåù£©ÈÛ›[™H›ÛÝÝ˜\8à ‚ˆÈÈKLŒŒLKLM0­ÈSKLP‹ŒŒHÚ]\ÜXÙH˜[Y][ÛˆÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&ÌH8 %Y[]HÚ]\ÜXÙH˜Z[XÛÜÙYÛÜœ™XÝ[Û‚ŠŠ‘]JŠ»ï&ŒŒ‹LKLBŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌÎLÌŒÎ9g*Y[]HÛÛ™šYÈ›ØÝ\ÙY\ÝÈ9.+ycäyã¬ØY\ˆ9kîH›Ùš[KZY9abÝš\;ï#9kï:!í9n)¹ên¹¨/9æ¡9`/:`&º/áÈÝšXÝ™YXØ]xà ‚‚‹HØY\ˆ9.#ˆ›ÛÝÝ˜\›Ú™XÝ[Ûˆ9ã¬9g*9gaù/çyåfH›Ùš[KZY9c§ù`/;ï#9a£y¢iú(cÙ[™\˜]YÙœ™Y^˜X›H™YXØ]{ï&ùbcyd#¹ên¹¨/9.#y/&º(ªúgfznæ:)á:# ùc%¸à ‚‹H:/ä:(c9¥íˆÛÛ˜XÝ8à UšX[›Û‹Yœ™Y^˜X›HØ]xà yênºacyïk¹ëe¹åiyd£\Ý[Û›Hš^\™H:/®yåc9.#ycæ8à ‚‹H:+éH[ˆ9æ¡Y™¸à Y›Ü›X]8à [^\H9mìº`&º/áûï#9/aˆ]\Ý9..ˆMH\ÜÙYÈˆ˜Z[Y;ï#9d#¹îëHÜZÙxà TÑËXXœÙ[9d£9¥¡ù¨hÈØ]\ù§*¹oh¹¢$9§"y¥b9aj9îïú+ày£k¸à ‚‹HÛ›[™H›ÛÝÝ˜\8à T›ÙXÝ[ÛˆŒKPøà Q]HÝY™šXÚY[˜Þxà ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9îéùîëyé y«h¹¢iú(c8à ‚‚ŠŠ“™^
+Š‚‚‹H9.éy/ë¹«hù£ä9.©9æ¡9¥¬9."ynlùcìÒH9..¹aá»ï#9èkº+©Ú]\ÜXÙKØÛÛ™šYÈÛÜÝ\™H9câ¹k£9¥m9fç¹od¹d#¹a£yalúeëz+ézhnxà ‚ˆÈÈKLŒŒLKLMÈ0­ÈSKLP‹ŒŒH›Ü›X]Ø]HÛÜÝ\™H›ÛÝË]\‚ŠŠ•\JŠ»ï&Ì8 %š[˜[›Ü›X]\ˆÛÜœ™XÝ[Û‚ŠŠ‘]JŠ»ï&ŒŒ‹LKLBŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌÎLÌÍLŒÍ˜9æ¡9."ynlùcì›Ü›X]ÚXÚÈ9.áy¢©ydb¹­bú+åy¥¡ù.í¹¥¬9h§¹¥®y¬åybcykf9g*9i&¹/fyênº(c8à ‚‚‹H9mì¹b(:fi9i&¹/fyênº(c;ï&ù.&¹b¨z`.ú/¤xà \™YXØ]xà UšX[Ø]xà y­bú+åz+ëy.byd£:acyïkº/®yåc9.#ycæ8à ‚‹H:+éH[ˆ9æ¡9d#¹îëz-*:aãù.#¹¬®ùä!ˆØ]\È9§*¹¢iú(c9k£9¢$;ï#9fè9«i9.#z ïz+¨y/gSKLP‹ŒŒH:`&º/áøà ‚‹HÛ›[™H›ÛÝÝ˜\8à T›ÙXÝ[ÛˆŒKPøà Q]HÝY™šXÚY[˜Þxà ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9îéùîëyé y«h¹¢iú(c8à ‚‚ŠŠ“™^
+Š‚‚‹H9.éy/ë¹«hù£ä9.©9æ¡9¥¬9."ynlùcìÒH9..¹aá»ï#9k£9¢$9aj9çêzf-zj£:+àyd#¹a£yalúeëz+ézhnxà ‚ˆÈÈKLŒŒLKLMˆ0­ÈSKLP‹ŒŒH›Ü›X]\ˆ›ÛÝË]\‚ŠŠ•\JŠ»ï&Ì8 %›Ü›X]\ˆ[™ÒH[™œ˜\ÝXÝ\™H›ÛÝË]\ŠŠ‘]JŠ»ï&ŒŒ‹LKLBŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌÎLŽNMLÎX9æ¡X[KÕÚ[™ÝÜÈËŒLˆ›Ü›X]ÚXÚÈ9¢©ydb¹."yi!›Ü›X]\ˆZ\ÛX]Ú;ï&ÕÚ[™ÝÜÈËŒM9d#9. [ˆ9g*[œÝ[]ˆ:f-¹«­yi,z-)xà ‚‚‹H9mì¹£"H›Ü›X]\ˆ9ì¯¹èkº/¤ùaî¹¢¦9cè›ÛÝÝ˜\9§hy.íº(j:/¯¹o#ù.#¹.)9.*¹­bú+åyaïy¥l9ëo¹d#{ï&ù.&¹b¨z`.ú/¤yd£9¬®ùä!º/®yåc9.#ycæ8à ‚‹H:+éH[ˆ9æ¡9d#¹îëH^\xà \]\Ý8à TÜZÙxà TÑËXXœÙ[9d£9¥¡ù¨hÈØ]\È9§*¹oh¹¢$9§"y¥b:`&º/áú+ày£k»ï&ÕÚ[™ÝÜÈËŒM:/æ:g 9èkº+©9k¢z(ázf-¹«­yi,z-)y¦+ùd)¹..¹ç«9¥í¹gî¹è`:+¯¹¥¯zeëºh¦8à ‚‹HÛ›[™H›ÛÝÝ˜\8à T›ÙXÝ[ÛˆŒKPøà Q]HÝY™šXÚY[˜Þxà ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9îéùîëyé y«h¹¢iú(c8à ‚‚ŠŠ“™^
+Š‚‚‹H9.éy/ë¹«hù£ä9.©9æ¡9¥¬9."ynlùcìÒH9..¹aá»ï&ùcê¹§"yaj9çêzf-ycâº` ¹å*9¬®ùä!ºeê9é ygaù¢$9b§ûï#9¢cyalúeëHSKLP‹ŒŒxà ‚ˆÈÈKLŒŒLKLMH0­ÈSKLP‹ŒŒH›Ü›X]\ˆÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %ÒK\™\ÜY›Ü›X][™ÈÛÜœ™XÝ[Û‚ŠŠ‘]JŠ»ï&ŒŒ‹LKLBŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌÎLŽÍŒÌ9g*9."y.*¹nlùcì9gaù.£ˆY™ˆ[:f-¹«­y¢©ydbˆ›ÙXÝ[Û—ØXØÛÝ[Ø›ÛÝÝ˜\œNŒMLX9æ¡MLxà ‚‚‹H9.áy¢á¹b!º-¡z/áÈL9b%ùæ¡›Ùš[KZY›Ú™XÝ[Ûˆ:(j:/¯¹o#ûï&ÚY[]HÛÛ˜XÝ8à UšX[›Û‹Yœ™Y^˜X›HØ]xà y­bú+åz+ëy.byd£9ênºacyïk¹ëe¹åiy.#ycæ8à ‚‹H:+éH[ˆ9æ¡]\Ý8à [^\xà TÜZÙxà TÑËXXœÙ[9d£9¥¡ù¨hÈØ]\È9fèY™ˆ9i,z-)z #9§*¹¢iú(c;ï#9.#z ïy£k¹«i9k¨ùéì9fç¹odº`&º/áøà ‚‹HÛ›[™H›ÛÝÝ˜\8à T›ÙXÝ[ÛˆŒKPøà Q]HÝY™šXÚY[˜Þxà ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9îéùîëyé y«h¹¢iú(c8à ‚‚ŠŠ“™^
+Š‚‚‹H9ëbyo¡y/ë¹«hù£ä9.©9æ¡9aj9çêzf-HÒH9k£9¢$;ï#9nm¹.éyk§ºfayîïú"l¹îäù§§9alúeëHSKLP‹ŒŒxà ‚ˆÈÈKLŒŒLKLM0­ÈSKLP‹ŒŒHÜÚ]]™HY[]HÛÛ˜XÝÛ™\ÝHÛÜÝ\™B‚ŠŠ•\JŠ»ï&ÌH8 %Ù[™\˜]YY[]HÛÛ˜XÝ[™›ÛÝÝ˜\Ø[™Y]HØ]BŠŠ‘]JŠ»ï&ŒŒ‹LKLBŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂŠŠ•šYÙÙ\ŠŠ»ï&œ™]šY]Ù\ˆ™\]Z\™[Y[Y[YšYYHZ\ÛX]Ú™]ÙY[ˆHÝ\œ™[XØÛÝ[›Ùš[HÙ[™\˜]Üˆ[™HÚY\ˆØÜX˜™YZY™YÙ^\ÈHšX[]ËXØ[™Y]HÛ™\ÝHØ\‚‚‹H\×ÙÙ[™\˜]YÜØÜX˜™YÜ›Ùš[WÚY›ÝÈXØÙ\ÈÛ›HS’Ó“ÕÓ—ÏLš^˜[™’PSÔÒSUSUSÓ—ÏLš^˜È\×Ùœ™Y^˜X›WÜ›ÙXÝ[Û—ØØ[™Y]WÚYXØÙ\ÈÛ›HS’Ó“ÕÓ—ÏLš^˜‚‹Hœ›Þ™[ˆÛÛ™šYÈØY[™È™Z™XÝÈYØXÞHPÐÓÕS•Ê˜˜ZÙH“ÑPÕSÓ—Ê˜\˜š]˜\žHÚ[™ËÜ›Û™ÈYÙ\Ý[™ÝË\\˜Ø\ÙH^[™Ú]\ÜXÙNÈšX[›Ùš[\È™[XZ[ˆ›Û‹Yœ™Y^˜X›K‚‹H›ÛÝÝ˜\™]\›œÈ[ˆ^XÚ]’PSÐPÐÓÕS•Ó“ÕÑ”‘QVP“XÝ]\È›ÜˆHÝXØÙ\ÜÙ[Û›ÝÛˆšX[›Ùš[H[™™]™\ˆ[Z]ÈQS•UWÐÐS‘QUX›Üˆ[˜[YØ\˜š]˜\žHYË‚‹H›ØÝ\ÙY\ÝÈÛÝ™\ˆ^XÝÙ[™\˜]YØ[™Y]H[™œ›Þ™[ˆ™]šY]È]ËÚ[H\Ýš^\™\È™[XZ[ˆ\Ý[Û›H[™ÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[™[XZ[œÈ[\K‚‹H›ÈÛ›[™H›ÛÝÝ˜\›Ü›X[›ÙXÝ[ÛˆŒKPË]HÝY™šXÚY[˜ÞK™\™XÝÜˆ›ÝšY\ˆ\›Ý˜[\È^XÝ]Y[ˆ\ÈÛÜÝ\™K‚‚ŠŠ“™^È^]Ø]JŠ‚‚‹H[ˆH^\Ý[™È[™YÜ™\ÜÚ[Ûˆ[™™YK\]›Ü›HÒNÈÛ›HY\ˆ[SKLP‹ŒŒHØ]\È\ÜÈX^HˆÎH™HÛÛœÚY\™YY\™ÙK\™XYKˆÛÛ›ÛYÛ›[™H›ÛÝÝ˜\™[XZ[œÈ›ÚXš]Y[[ˆÎH\ÈY\™ÙY‚ˆÈÈKLŒŒLKLLÎH0­ÈSKLP‹ŒØØ[Ù™›[™H›ÛÝÝ˜\™Y›YÚ‚ŠŠ•\JŠ»ï&ÌH8 %ØØ[ÑËÜ[[YH™Y›YÚŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&•‘T’Q’QQ
+ÐÐSÑ‘“S‘JHÈ‘PQWÑ“Ô—ÐÓÓ•“ÓQÓÓ“S‘WÔ•SˆÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&¹g*9.#z+îùcå¹aëz+àxà y.#z/ç¹£©y«hùo#ù§#yb¨yêëùæ¡9bcy£ä9."ûï#9kîyodùbcHˆÎH9.èùè HXYNXÙMX9nî¹êâù§+9g,:f¥9é®ù¢iú(c9bkù§+9nm¹k£9¢$Ù™›[™H›ÛÝÝ˜\8à ‚‚‹HÚ[™ÝÜÈ]ÛˆËŒM¸à X[X^š[™Ñ]OOLKŒKŽX8à XÝÏOLKŒŽKŒ˜9gaùl,yîê»ï&ÔÑÈ9â­¹  HÑ×ÒS”ÕSQ;ï#:/ä:(c9¥í¹k§ºfayb¨:/oH™\™XÝ•S•SQWÐPÕPSÓÐQÕ‘T’Q’QQ;ï#›ÛÝÝ˜\9â­¹  HÑ‘“S‘WÔ•S•SQWÕ‘T’Q’QQ8à ‚‹H9§+9«(ycêºj£:+àHÑËÜ[[YH9kï9aixà yb¨:/oyd£ØY™H›Ú™XÝ[Û»ï&ù¬¨y§"z+©:+àxà yïdyîç9§éz+è¹¢%¹«hùo#ú-)¹cíú.ªù.ïyb)9¥«xà ‚‹HÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9îéùîëy/çy£ yên¹æo{ï&ù«hùo#ÈY[]Hœ™Y^™xà Q]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ8à T›ÝšY\ˆ\›Ý˜[9.#ˆŒKPÈ9.#yo¥ùfè9§+9«(yé®ùî¯ùîäù§§9£ä9bcy¢iú(c8à ‚‹H9§+9g,ÑÈÚY[8à y/§z-e¹c!xà y.-9¥í¹®¤9è ybkù§+9d£9.îù/eyaëz+àygaù.#z/æùaiHÚ]X¸à ‚‚ŠŠ›ØÚÙ\ˆÈ™^
+Š‚‚‹HÛ›[™H›ÛÝÝ˜\9.ãzg 9cåù£©ú/æùê"ùk¢yaj:#­ùo¥ÈÕ×ÕTÑT“SQX8à XÕ×ÔTÔÕÓÔ‘8à XÕ×ÔÑT•‘T—Õ’T8à XÕ×ÔÑT•‘T—ÔÔ•;ï&ùg*9«i9.bùbcy.#yo¥ù.©ùå'ù«hùo#ÈY[]HØ[™Y]H9¢%¹a®ùîäúacyïk¸à ‚ˆˆÈÈKLŒŒLKLLÎ0­ÈSKLP‹Œš[˜[Ø[™Y]HÒH™\šYšXØ][Û‚‚ŠŠ•\JŠ»ï&ÌH8 %š[˜[\ÝYš^\™H[™Y[]KYØ]HÒH™\šYšXØ][ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&•‘T’Q’QQ
+ÒJHÈ‘PQWÑ“Ô—ÐÓÓ•“ÓQÔ•SˆÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&¹odùbcHˆÎH9.èùè HXY˜XYXÍØ9kîyn¥[ˆÌÎNMMÍMØ;ï"[ˆÍûï"yk£9¢$9."ynlùcì9k£9¥m:j£:+àxà ‚‚‹HX[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9gaú`&º/áÈY™ˆ[Ù›Ü›X]8à [^\xà XMH\ÜÙY8à TÜZÙHžK\[ˆ9d£ÑËXXœÙ[9¨à9§é{ï&ÕÚ[™ÝÜÈËŒM9æ¡U“ÑËÓX[˜YÙ[Y[ÛÝ™\›˜[˜ÙHØ]\È9.gú`&º/áøà ‚‹H[ˆÍKÌÍˆ9æ¡9.)9.*ˆš^\™K[Û›H9i,z-)ymì¹/ë¹«hûï&ù§ 9îâ9i.yamùcê¹/oùå*\Ý[Û›HÜÝ9d£9¥l9`/9dê9am{ï#9.#z/ç¹£©yïdyîç;ï#9.gù.#y.èú(j9ç'ùk§¹§#yb¨yêëùà®xà ‚‹H9odùbcz+ày£k¹.ãycêº)¡¹æå¹.äùn¤ÈÝX\™9.#¹fç¹od¹­bú+å{ï&ÔˆÎH9/çy£ HÜ[ˆÈS‘S‘×Ô‘U’QUûï#9.#yd"9nmˆ»ï#9.#y¢¢ˆÒH9îäù§§:)èúaâ¹..ˆ]™HY[]H9¢%ˆ›Ùš[H:+ày£k¸à ‚‚ŠŠ‘]šY[˜ÙHÈ›ØÚÙ\ŠŠ‚‚‹HÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên¸à ¹«hùo#ÈY[]Hœ™Y^™xà Q]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9îéùîëH›ØÚÙYÈ›Ý^XÝ]Y8à ‚‹H9aëz+àxà UÚÙ[¸à ZÜÝ8à \Ü8à yc§ùiâÈ›Ùš[H9d£9c§ùiâÈÑÈ9¥éyoåù.#z/æùaiHÚ]X»ï&ù."ù. 9«iy.ãy¦+ùcåù£©ÈÚ[™ÝÜÈ
+È9k¦9¥®HÑÈ9æ¡Û›[™H›ÛÝÝ˜\9.#¹.®¹méyèkº+©8à ‚‚ˆÈÈKLŒŒLKLLÍÈ0­ÈSKLP‹Œš^\™H\ÜÙ\[ÛˆÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %\Ý[Û›H[™Ú[\ÜÙ\[ÛˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÍˆ9æ¡X[H]\Ý9cäyã¬›ÛÝÝ˜\9kîy¢¥ù­bú+åyæ¡^XÝYÜ™Y[X[È\H9§*¹d#9«iybcy. 9£ä9.©9æ¡\Ý[Û›H:/¤ùaiyi.yamøà ‚‚‹H9l!¹¥«z* 9d#9«iy..ˆ\Ý[Û›HÜÝ9.#¹¥l9`/9dê9amH;ï&ù.#z/ç¹£©yïdyîç8à y.#y.èú(j9k§ºfay§#yb¨yêëùà®{ï#9.gù.#y¥.ycæ9­bú+åyæë¹¨!ù¢%º/ä:(c:+ëy.bxà ‚‹H9§+9£ä9.©9.áy/ë¹«hù­bú+åy¥«z* ;ï#9nm¹d#9«iy¬®ùä!º+¬9oe{ï&ù.#yo%yaiyaëz+àxà UÚÙ[¸à ZÜÝ8à \Ü8à \˜]È›Ùš[H9¢%ˆ]™H]šY[˜Ùxà ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H9ëbyo¡y§+9£ä9.©9."ynlùcìÒ{ï&ØÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên»ï#9«hùo#ÈY[]Hœ™Y^™xà PŒKPøà ]™\™XÝ8à Q]HÝY™šXÚY[˜ÞHX]š^9d£›ÝšY\ˆ\›Ý˜[9îéùîëy§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLKLLÍˆ0­ÈSKLP‹Œš^\™HÙ[[™[ÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %\Ý[Û›H[Y\šXÈÙ[[™[ÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÍH9æ¡X[H]\Ý9¦/¹é.ºgg¹¥l9keÈ[™Ú[XÙZÛ\ˆ9/&º)é¹cäy¥è¹§"HÜ™Y[X[È\œÙ\ˆ9æ¡˜Z[XÛÜÙY9b!¹¥+øà ‚‚‹H9l!¹i.yamùêëùcèù`/9¥.y..¹¥l9`/9dê9amHÝŠ
+X;ï&ù.#z/ç¹£©yïdyîç;ï#9.#y.èú(j9.îù/eyk§ºfay§#yb¨yêëùà®{ï#9.gù.#y¥.ycæ9­bú+åyæë¹¨!ù¢%º/ä:(c:+ëy.bxà ‚‹H9§+9£ä9.©9.áy/ë¹«hù­bú+åz/¤ùaiyìnùg¢ûï#9nm¹d#9«iy¬®ùä!º+¬9oe{ï&ù.#yo%yaiyaëz+àxà UÚÙ[¸à ZÜÝ8à \Ü8à \˜]È›Ùš[H9¢%ˆ]™H]šY[˜Ùxà ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H9ëbyo¡y§+9£ä9.©9."ynlùcìÒ{ï&ØÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên»ï#9«hùo#ÈY[]Hœ™Y^™xà PŒKPøà ]™\™XÝ8à Q]HÝY™šXÚY[˜ÞHX]š^9d£›ÝšY\ˆ\›Ý˜[9îéùîëy§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLKLLÍH0­ÈSKLP‹Œ\Ýš^\™HKZY[YšXØ][Û‚‚ŠŠ•\JŠ»ï&Ì8 %\Ý[Û›H[™Ú[XÙZÛ\ˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&¹§ 9îâÚ]Xˆ9/©ùmë¹o ¹¢jù£ãùcäyã¬›ÛÝÝ˜\9kîy¢¥ù­bú+åyi.yamùd*È[™Ú[[ZÙH]\˜[;ï&ù£"y§ 9¥¬8 'ÜÝÜÜ9.#yaiHÚ]8 'yîª¹o¢ù¥.y..¹¦#¹èk¹­bú+åych9/cyë)¸à ‚‚‹H9l!¹­bú+åyi.yamùæ¡’TÜÜ9¦ïù£h¹..ˆ\Ý[Û›KZÜÝÈ\Ý[Û›K\Ü;ï&ù.#y¥.ycæ9.îù/ez/ä:(c:+ëy.bxà yéæ9káˆÛÛZ[›Y[8à \ØY™H›Ú™XÝ[Ûˆ9¢%ˆY[]HØ]H9¥«z* 8à ‚‹H:+éycæ9¦í9.#yo%yaiyç'ùk§¹aëz+àxà UÚÙ[¸à ZÜÝ8à \Ü8à \˜]È›Ùš[H9¢%ˆ]™H]šY[˜Ùxà ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H9ëbyo¡y§+9£ä9.©9."ynlùcìÒ{ï&ØÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên»ï#9«hùo#ÈY[]Hœ™Y^™xà PŒKPøà ]™\™XÝ8à Q]HÝY™šXÚY[˜ÞHX]š^9d£›ÝšY\ˆ\›Ý˜[9îéùîëy§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLKLLÍ0­ÈSKLP‹Œ™YK\]›Ü›HÒH™\šYšXØ][Û‚‚ŠŠ•\JŠ»ï&ÌH8 %ÜÚ]]™H›ÙXÝ[ÛˆY[]HØ]HÒH™\šYšXØ][ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&•‘T’Q’QQ
+ÒJHÈ‘PQWÑ“Ô—ÐÓÓ•“ÓQÔ•SˆÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&‘Ú]XˆXÝ[ÛœÈ[ˆÌÎMŒMŽMØ;ï"[ˆÌØ;ï"yk£9¢$9."ynlùcì9k£9¥m:j£:+àxà ‚‚‹HX[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9gaú`&º/áÈY™ˆ[Ù›Ü›X]8à [^\xà XMH\ÜÙY8à TÜZÙHžK\[ˆ9d£ÑËXXœÙ[9¨à9§é{ï&ÕÚ[™ÝÜÈËŒM9æ¡U“ÑËÓX[˜YÙ[Y[ÛÝ™\›˜[˜ÙHØ]\È9.gú`&º/áøà ‚‹H:+éz+ày£kº)¡¹æåˆÜÚ]]™HY[]H[ÝÛ\Ý8à X›ÛÝÝ˜\ØY™H›Ú™XÝ[Û¸à Y›ØÝ\ÙY\ÝÈ9d£9ã¬9§"yfç¹od»ï&ù.#yëbyd#9.£¹cåù£©ÈÛ›[™H›ÛÝÝ˜\8à y.®¹méHY[]Hœ™Y^™H9¢%ˆ›ÙXÝ[ÛˆŒKPøà ‚‹HˆÎH9.ãy..ˆÜ[ˆÈS‘S‘×Ô‘U’QUûï&ù§+9«(y.#yd"9nmˆ»ï#9.gù.#y¢¢ˆÒH9æ¡ÑËXXœÙ[9îäù§§:)èúaâ¹..¹«hùo#ú-)¹cíùaëz+ày¢%ˆ›Ùš[H:+ày£k¸à ‚‚ŠŠ‘]šY[˜ÙHÈ›ØÚÙ\ŠŠ‚‚‹HÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên¸à ¹«hùo#ÈY[]Hœ™Y^™xà Q]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9îéùîëH›ØÚÙYÈ›Ý^XÝ]Y8à ‚‹H9aëz+àxà UÚÙ[¸à ZÜÝ8à \Ü8à yc§ùiâÈ›Ùš[H9d£9c§ùiâÈÑÈ9¥éyoåù.#z/æùaiHÚ]X»ï&úg 9g*9cåù£©ÈÚ[™ÝÜÈ
+È9k¦9¥®HÑÈ9ã«ùh ù¢iú(cÛ›[™H›ÛÝÝ˜\;ï#9nm¹îãÈÝÛ™\‹Ô™]šY]Ù\ˆ9èkº+©9d#¹¢cycëùâë9êâùa®ùîäÈ[ÝÛ\Ý8à ‚‚ˆÈÈKLŒŒLKLLÌÈ0­ÈSKLP‹ŒY™ˆ›Ü›X]›ÛÝË]\‚ŠŠ•\JŠ»ï&Ì8 %›ÛÝÝ˜\Ý\Ý›[šË[[™H›Ü›X]\ˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌˆ9æ¡Y™ˆ›Ü›X]9cê¹¢©ydbˆ›ÛÝÝ˜\:hm¹l`¹aïy¥l9d£›ØÝ\ÙY\Ý9¥®y¬åy.búeí9æ¡Ø[›ÛšXØ[9ênº(c9më¹o ¸à ‚‚‹H9£"HY™ˆ:/¤ùaîº(izod9.)9.*¹ênº(c9/cyïk»ï&ù.#y¥.ycæÜÚ]]™HY[]H[ÝÛ\Ý8à X›ÛÝÝ˜\›Ú™XÝ[Û¸à z-)¹cíËù§`úfd9b)9¥«xà [ZYÜ˜][Ûˆ9¢%¹«hùo#ÈŒKPÈ:/®yåc8à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H9ëbyo¡y/ë¹«hùd#¹æ¡9."ynlùcì9k£9¥mÒ{ï&ùodùbcH›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên»ï#9«hùo#ÈY[]Hœ™Y^™xà PŒKPøà ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9.ãy§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLKLLÌˆ0­ÈSKLP‹ŒY™ˆ›Ü›X]ÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %Y[]HØ]H›Ü›X]\ˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌH9æ¡Y™ˆ›Ü›X]9¢©ydbˆY[]KØÛÛ™šYÈš^\™xà X›ÛÝÝ˜\9ênº(c9d£9¥¬9h§ˆ›ÛÝÝ˜\›ØÝ\ÙY\Ý9æ¡Ø[›ÛšXØ[9¨/9o#ùmë¹o ¸à ‚‚‹H9£"H›Ü›X]\ˆ:/¤ùaî¹/ë¹«hÈ9.*¹¥¡ù.í¹æ¡9§.¹¨¬9¨/9o#ûï&ù.#y¥.ycæÜÚ]]™HY[]H[ÝÛ\Ý8à X›ÛÝÝ˜\›Ú™XÝ[Û¸à z-)¹cíËù§`úfd9b)9¥«xà [ZYÜ˜][Ûˆ9¢%¹«hùo#ÈŒKPÈ:/®yåc8à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H9ëbyo¡y/ë¹«hùd#¹æ¡9."ynlùcì9k£9¥mÒ{ï&ùodùbcH›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên»ï#9«hùo#ÈY[]Hœ™Y^™xà PŒKPøà ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9.ãy§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLKLLÌH0­ÈSKLP‹ŒY™ˆ[ÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %›ØÝ\ÙYY[]Hš^\™H›Ü›X]\ˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌ9æ¡9."ynlùcìY™ˆ[9¢©ydbˆ\ÝËÚ[YÜ˜][Û‹Ý\ÝÜ›ÙXÝ[Û—ÚY[]KœH9.+HÈ:(cš^\™H:-¡z/áÈL9b%øà ‚‚‹H9£"HY™ˆ:/¤ùaî¹¢¢ºeoÈPSSš^\™H9¢á¹¢$9æî:`®ùkeùë)¹.,»ï#9nm¹®!yä!ˆ›ÛÝÝ˜\ØY™H›Ú™XÝ[Ûˆ9bcyæ¡9§.¹¨¬9i&¹ênº(c8à ‚‹H9.#y¥.ycæÜÚ]]™HY[]H[ÝÛ\Ý8à X›ÛÝÝ˜\›Ú™XÝ[Û¸à z-)¹cíËù§`úfd9b)9¥«xà [ZYÜ˜][Ûˆ9¢%¹«hùo#ÈŒKPÈ:/®yåc;ï&ù.#yc!yd*ù.îù/eyç'ùk§º-)¹cíù¥l9£k¸à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H9ëbyo¡y/ë¹«hùd#¹æ¡9."ynlùcì9k£9¥mÒ{ï&ùodùbcH›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên»ï#9«hùo#ÈY[]Hœ™Y^™xà PŒKPøà ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9.ãy§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLKLLÌ0­ÈSKLP‹ŒY[]HØ]H\™[š[™Â‚ŠŠ•\JŠ»ï&ÌH8 %ÜÚ]]™H›ÙXÝ[ÛˆY[]HÛÛ™šYÝ\˜][Ûˆ[™›ÛÝÝ˜\›Ú™XÝ[Ûˆ\™[š[™ÈŠŠ‘]JŠ»ï&ŒŒ‹LKLHŠŠ”Ý]\ÊŠ»ï&‘Ó‘H
+ÝX\™[\[Y[][ÛŠHÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&¹§ 9¥¬™]šY]Ù\ˆ:) y¬`¹l!ˆSKLP‹Œ:fd9k¦¹..¸ '9cåù£©È›ÛÝÝ˜\8¡¤ˆ9.®¹méyèkº+©:!,y¥cÈY[]H8¡¤ˆ9ceyâë9a®ùîäÈ[ÝÛ\Ý8 '{ï#9nm¹¦#¹èkˆX[›Ü›YYÝ[˜ÛÛ™š\›YYÛÛ™šYÈ9oázhnúf.ù¥«xà ‚‚‹HØYÙœ›Þ™[—Ü›ÙXÝ[Û—ÚY[]H9ã¬9g*9cê¹£©ycåÈYÙ\Ý\Ú\YØÜX˜™Y›Ùš[HY8à yn)¹¥í¹c.ˆÛÛ™š\›X][Ûˆ[Y\Ý[\8à zgg¹ênˆ\›Ý™Y[X[‹ÛÜ\˜]ÜˆX\šÙ\»ï&ùên¸à z+åyå*8à yån9oh¸à zh§yi%¹keù«­y¢%¹¥cù¡'ÈX\šÙ\ˆ9. 9o¢ú/å9fç¹¥è:.ªù.ïxà ‚‹H›ÙXÝ[Û—ØXØÛÝ[ÜÝ]\È9¦#¹èk¹¢ä¹îçy§*º+©:+àxà y§*º)èù§¤8à z+åyå*8à yï.ˆ\›Z\ÜÚ[ÛÛÙxà zggˆØÜX˜™Y9¢%ºggˆ^XÝ[X]Ú›Ùš[{ï&Ô[’Ú[™”“ÑPÕSÓˆ9.#y¥.ycæ:/æy. 9.¢ùk§¸à ‚‹H›ÛÝÝ˜\ØY™H›Ú™XÝ[Ûˆ9kîH›ÝšY\ˆ:/å9fç¹æ¡›Ùš[HY8à T\›Z\ÜÚ[ÛÛÙH9d£:h§yn©¹`fˆ[ÝÛ\Ýùìnùg¢ù¢¥yol{ï#9o ¹n.›ÝšY\ˆ:/¤ùaî¹.#z/æùaiHÝÝ]9¢%¹§+9g,]šY[˜Ùxà ‚‹H9¥¬9h§ˆ›ØÝ\ÙY\ÝÈ9kîyn¥™]šY]Ù\ˆ:) y¬`ˆx $Î{ï&ù.#y/ë¹¥.HZYÜ˜][Ûœøà yc¡¹cì¹¥l9£k¹¢%ˆÝ]KÔ›ÝšY\ˆ9.&¹b¨z+ëy.bxà ‚‚ŠŠ‘]šY[˜ÙHÈ›ØÚÙ\ŠŠ‚‚‹H9odùbczacyïk¹.ãy..¹ên»ï#9§*¹.©ùå'ÈÛÝ™\›˜[˜ÙHœ™Y^™{ï&ù«hùo#È]™H›ÛÝÝ˜\8à y.®¹méyèkº+©8à PŒKPøà Q]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9gaù§*¹k¨ùéì9k£9¢$8à ‚‹H9§+:/k¹cê¹£ä9.©9.äùn¤ùcëúj£:+àyæ¡˜Z[XÛÜÙYÝX\™;ï&ù.#y¢¢º-)¹cíøà yká¹è xà UÚÙ[¸à ZÜÝ8à \Ü8à yc§ùiâÈ›Ùš[H9¢%¹c§ùiâÈÑÈ9¥éyoåùa¦yaiHÚ]X¸à ‚‚‚ˆÈÈKLŒŒLLLŽH0­ÈPQLKŒH›ÛÝÝ˜\KÓÈØY™]HÒH™\šYšXØ][Û‚‚ŠŠ•\JŠ»ï&ÌH8 %Ü™Y[X[X™X\š[™È›ÛÝÝ˜\KÓÈØY™]H™\šYšXØ][ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&•‘T’Q’QQ
+ÒJHÈ‘PQWÑ“Ô—ÐÓÓ•“ÓQÔ•SˆÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌÎNMNNMÌX;ï"[ˆ˜;ï"yk£9¢$9."ynlùcì9aj:aãÈÒxà ‚‚‹HX[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9aj:`ê9¢$9b§ûï&ù«ãú!oÈMÈ\ÜÙY;ï#Y™ˆ[Ù›Ü›X]8à [^\xà TÜZÙxà TÑËXXœÙ[9câº` ¹å*9¬®ùä!ºeê9é ygaú`&º/áøà ‚‹HÙ™›[™H:fíˆØYÙ[˜:+îùcå¸à \[[YK[Û›H™\Ü8à SÔÈ™‹Ô]ÛˆÝ\œˆÛÛZ[›Y[8à [˜]]™K\Ý[H™¸à yo ¹n.:-ëùo¡8à z!,y¥cùd£™ˆ™\ÝÜ™H9gaù§"H›ØÝ\ÙY]šY[˜Ù{ï&Ù™HØ\\™xà ynm¹cäze yd£9¥è¹§"yfç¹od¹/çy£ yîïú"l¸à ‚‹H9§+9«(ycê¹alúeëHPQLKŒH9.äùn¤ÈKÓÈ9k¢yaj:/®yåc;ï&Ü›ÙXÝ[ÛˆY[]Hœ™Y^™xà yç'ùk§ˆŒKPøà QÛÛ[‹Ñ]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9.ãH[™[™øà ˜ÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9/çy£ yênˆ›Ùš[{ï&ù¥èÜ™Y[X[øà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[xà [ZYÜ˜][Ûˆ9¢%ˆÔ‹MKÐÔ‹Mˆ:+ëy.bycæ9¦í8à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹HPQLKŒH9mì¹amùi!ùcåù£©ú/ä:(c9bcyæ¡9.èùè KÐÒz+ày£k»ï&ÔˆÎ9.ãy/çy£ HÜ[»ï#9ëbyo¡y¦/¹o#ù.®¹méyi#yk¨xà ¹d"9nm¹d#¹¢cz/æùaiH[[YH9¬ê9aiyaëz+àyæ¡ÛÛ›ÛYÛ›[™H›ÛÝÝ˜\9.#¹.®¹méz!,y¥cÈY[]H9èkº+©8à ‚‚ˆÈÈKLŒŒLLLŽ0­ÈPQLKŒHY™ˆ›Ü›X]ÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %›ÛÝÝ˜\KÓÈØY™]H›Ü›X]\ˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌÎMÌM˜;ï"[ˆX;ï"yg*Y™ˆ›Ü›X]ÚXÚÈ9¢©ydbˆ›ÛÝÝ˜\:, ùå*9.#¹­bú+åz, ùå*9æ¡9§.¹¨¬9£hº(c9më¹o ¸à ‚‚‹H9£"HY™ˆŒM‹:/¤ùaî¹d"9nmˆH9i!Ü[—ÙØÝÜ—ÝÚ]ÜÝ\œ—ØÛÛZ[›Y[:, ùå*8à LH9i!Üš]WÝ^:, ùå*9d£H9i!9­bú+åyhì9¦#¸à ‚‹H9§+9£ä9.©9.#ˆU“ÑËÓX[˜YÙ[Y[9d#9«i{ï&ù.#y­¢ycâº/ä:(c:+ëy.bxà RKÓÈÛÛZ[›Y[8à yaëz+àz/®yåc8à T›ÝšY\ˆ]HÛÛ˜XÝ8à [ZYÜ˜][Û¸à PÔ‹MH9¢%ˆÔ‹M¸à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H[ˆX9l&¹§*º/æùaiyb§ú ïy­bú+å{ï&ùëbyo¡y/ë¹«hùd#¹æ¡9."ynlùcì9k£9¥mÒxà ‚‚ˆÈÈKLŒŒLLLÈ0­ÈPQLKŒHY™ˆ[ÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %›ÛÝÝ˜\KÓÈØY™]H›Ü›X]\‹Û[ÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÌÎLÍMÎNX;ï"[ˆ;ï"yg*9."ynlùcì9æ¡Y™ˆ[:f-¹«­y¢©ydbˆÝÝ]ØØ\\™KœNŒLMLX8à ‚‚‹H9¢á¹b!¹ª(ygeú+í9¦#¹.+yæ¡:-¡zeoÈÝ\œˆÛÛZ[›Y[:(c;ï#9/çy£ y¥¡ù¨hùd*ù.byd£9.èùè z(c9..¹.#ycæ8à ‚‹H9§+9£ä9.©9.#ˆU“ÑËÓX[˜YÙ[Y[9d#9«i{ï&ù.#y­¢ycâˆÜ™Y[X[øà UÚÙ[¸à ZÜÝÜÜ8à \˜]È›Ùš[xà Y™‹Ô]ÛˆÝ\œˆÛÛZ[›Y[:+ëy.bxà T›ÝšY\ˆ]HÛÛ˜XÝ8à [ZYÜ˜][Û¸à PÔ‹MH9¢%ˆÔ‹M¸à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H[ˆ9l&¹§*º/æùaiyb§ú ïy­bú+å{ï&ùëbyo¡y/ë¹«hùd#¹æ¡9."ynlùcì9k£9¥mÒxà ‚‚ˆÈÈKLŒŒLLLˆ0­ÈPQLKŒH›ÛÝÝ˜\KÓÈØY™]HÛÜÝ\™H[\[Y[][Û‚‚ŠŠ•\JŠ»ï&ÌH8 %Ü™Y[X[X™X\š[™È›ÛÝÝ˜\KÓÈØY™]HÛÜÝ\™HŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&”™]šY]Ù\ˆ™\]Z\™[Y[K\Ú\™KX[˜[\Ú\×ÔŽŒyi#yk¨y.#”PQLKŒWÔ›ÙXÝ[Û›ÛÝÝ˜\Sùk¢yaj9¥-¹cèú) y¬`—ÌŒŒL›YY[YšY\ÈÛÈ˜Z[XÛÜÙY›ØÚÙ\œË‚‚‹HK[Ù™›[™X›ÝÈž\\ÜÙ\ÈØYÙ[˜[\™[K[˜ÛY[™ÈHÝ\YYKY[‹Yš[XÈ]È™\Ü\È[[YKÜXÚØYÙK[Û›H[™Ù\È›Ý[œÜXÝœ›Þ™[ˆ›ÙXÝ[ÛˆY[]K‚‹HÛ›[™H[—ÙØÝÜ˜›ÝÈ[œÈ[œÚYHÔÈ™ˆ\È]ÛˆÞ\ËœÝ\œ˜ÛÛZ[›Y[ÈÛ›HØÜX˜™YÙ×ÜÝ\œ—ÛØœÙ\™Y\È™]Z[™Y[™^Ù\[Û‹Ù\œ›Üˆ]ÈÈ›Ý^ÜÙH˜]ÈÝ\œˆÜˆ^Ù\[Ûˆ]Z[‚‹HYYY™\œØ\šX[\ÝÈ›Üˆ[‹Yš[Hž\\ÜË˜]]™K\Ý[H™ˆÜš]\Ë]ÛˆÝ\œ‹^Ù\[Ûˆ]Ý]]ØÜX˜š[™È[™™ˆ™\ÝÜ˜][Û‹‚‹H›È›ÝšY\‹ÐØ[›ÛšXØ[Ñ™X]\™KÔÝ]HÙ[X[XÈÚ[™ÙKZYÜ˜][Û‹[ÝÛ\ÝÜš]KÜˆ›Ü›X[›ÙXÝ[ÛˆŒKPÈÛZ[NÈÜ™Y[X[ËÚÙ[‹ÜÝÜÜ[™˜]È›Ùš[H™[XZ[ˆÝ]ÚYHH™\ÜÚ]ÜžK‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H]ØZ]Hš[˜[™YK\]›Ü›HÒKˆYˆÜ™Y[‹\]HH™]šY]Ù\ˆ™\]Z\™[Y[[™ÛÝ™\›˜[˜ÙHÝ]\ÈÈ‘T’Q’QQ
+ÒJHÈ‘PQWÑ“Ô—ÐÓÓ•“ÓQÔ•SˆÈS‘S‘×Ô‘U’QUØÈˆÎ™[XZ[œÈÜ[ˆ[™[™È^XÚ][X[ˆ™]šY]Ë‚‚ˆÈÈKLŒŒLLLH0­ÈPQLH›ÛÝÝ˜\ÒH™\šYšXØ][Û‚‚ŠŠ•\JŠ»ï&ÌH8 %ÛÛ›ÛY›ÙXÝ[ÛˆY[]H›ÛÝÝ˜\™\šYšXØ][ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&•‘T’Q’QQ
+ÒJHÈ‘PQWÑ“Ô—ÐÓÓ•“ÓQÔ•SˆÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&˜›ÛÝÝ˜\›Ü›X]\‹ÜÝ]\ÈÛÜœ™XÝ[ÛœÈÛÛ\]Y[™[ˆNš[š\ÚY‚‚‹H[ˆÌÎNÌÍ;ï"[ˆN;ï"yg*X[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9."yçêzf-yaj:`ê9¢$9b§ûï&ù«ãú!oÈMH\ÜÙY;ï#Y™ˆ[Ù›Ü›X]8à [^\xà TÜZÙxà TÑËXXœÙ[9câº` ¹å*9æ¡9¬®ùä!ºeê9é ygaú`&º/áøà ‚‹H9§+9«(ycêºj£:+àHØÜX˜™Y›ÛÝÝ˜\9æ¡9cëù¢iú(c:/®yåc;ï&ÚY[]Hœ™Y^™xà yç'ùk§ˆ›ÙXÝ[ÛˆŒKPøà QÛÛ[‹Ñ]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9.ãH[™[™øà ‚‹HÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9/çy£ yênˆ›Ùš[{ï&ùaëz+àxà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[H9.#z/æùaiy.äùn¤ûï&ù.#y­¢ycâˆZYÜ˜][Ûˆ9¢%ˆÔ‹MKÐÔ‹M‹ÌŒŒ
+ÈÚ[™Ù\øà ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H9g*9cåù£©ùã«ùh ù.+y.áz`&º/áùã«ùh ËË™[ˆ9¬ê9aiyaëz+àz/ä:(c›ÛÝÝ˜\;ï#:+¬9oeHØÜX˜™YØ[™Y]{ï&ÓÝÛ™\‹Ô™]šY]Ù\ˆ9.®¹méyèkº+©9bcy.#yo¥ù£ä9.©›ÙXÝ[Ûˆ[ÝÛ\Ý;ï#9èkº+©9d#¹.ãzg 9£"ycey. ›ÙXÝ[Ûˆ[ˆ9¢iú(cŒKPøà ‚‚ˆÈÈKLŒŒLLL0­ÈPQLH›Ü›X]\ˆ›ÛÝË]\‚ŠŠ•\JŠ»ï&Ì8 %›ÛÝÝ˜\›Ü›X]\ˆ›ÛÝË]\ŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆMÈ9æ¡Y™ˆ[9mìº`&º/áûï#›Ü›X]ÚXÚÈ:) y¬`¹ï.¹l$yaëz+àyb!¹¥+ùæ¡ÜØY™WÜ™\Ü:, ùå*9 h¹i#ycez(c8à ‚‚‹H9£"H›Ü›X]\ˆ:/¤ùaî¹/ë¹«hú, ùå*9£hº(c;ï&ù/çy£ H“ÕÕTÕP“WÐPÐÓÕS•9/&9ab9î©øà YØÝÜˆ9.#z, ùå*9d£:!,y¥cú/®yåc9.#ycæ8à ‚‹H9§+9«(y.#y­¢ycâº-)¹cíøà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[xà [ZYÜ˜][Û¸à PÔ‹MKÐÔ‹M¸à LŒŒ
+È\ÝÜžH9¢%ˆ›ÝšY\ˆ\›Ý˜[8à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H[ˆMÈ9."yçêzf-ygaùg*›Ü›X]:f-¹«­y`g9«h»ï#9l&¹§*º/æùaiyb§ú ïy­bú+å{ï&ùëbyo¡y¥¬9æ¡9k£9¥mÒxà ‚‚ˆÈÈKLŒŒLLLŒÈ0­ÈPQLHZ\ÜÚ[™ËZ[œ]Û\ÜÚYšXØ][ÛˆÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %›ÛÝÝ˜\˜Z[XÛÜÙYÝ]\ÈÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆMˆ9æ¡9¥¬9h§ˆ›ÛÝÝ˜\\Ý9cäyã¬9ï.¹l$yaëz+ày¥íˆ“ÕÕTÕP“WÔÑØ:)¡¹æå¹.¡¹¦í9æí9£©yæ¡“ÕÕTÕP“WÐPÐÓÕS•9â­¹  xà ‚‚‹H9..¹k¢yaj9¢©ydb¹h§¹b¨Ü™Y[X[ËX]˜Z[X›H:+ëy.b{ï#9ï.¹l$yk£9¥m9ã«ùh ù¥í¹/&9ab:/å9fçˆ“ÕÕTÕP“WÐPÐÓÕS•;ï#9nm¹/çy£ y.#z, ùå*›ÝšY\ˆØÝÜ¸à ‚‹H9§+9«(y.#y¥.ycæÑËÜ[[YH9¨à9§éxà z!,y¥cú/¤ùaî¸à y.®¹méyèkº+©8à \›ÙXÝ[Ûˆ[ÝÛ\Ý8à z-)¹cíøà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[H9¢%¹«hùo#ÈŒKPÈ:+ëy.bxà ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H[ˆMˆX[HËŒM9g*9¥¬9h§¹­bú+åyi!9i,z-){ï#:gfy  y¨à9§éz`&º/áûï&ùëbyo¡y/ë¹«hùd#¹æ¡9."ynlùcì9k£9¥mÒxà ‚‚ˆÈÈKLŒŒLLLŒˆ0­ÈPQLH›Ü›X]\ˆÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %›ÛÝÝ˜\›Ü›X]\ˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆMH9æ¡Y™ˆ[9mìº`&º/áûï#›Ü›X]ÚXÚÈ:) y¬`º)á:# ùc%ˆ›ÛÝÝ˜\:` 9aî¹è y§hy.íº(j:/¯¹o#øà ‚‚‹H9£"H›Ü›X]\ˆ9èk¹k¦º/¤ùaîº, ù¥m9§hy.íº(j:/¯¹o#ù£hº(c;ï&ú/ä:(c:+ëy.bxà z!,y¥cùkeù«­xà yaëz+àz/®yåc9d£9.®¹méyèkº+©9«izj©9.#ycæ8à ‚‹H9§+9«(y.#y­¢ycâº-)¹cíøà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[xà [ZYÜ˜][Û¸à PÔ‹MKÐÔ‹M¸à LŒŒ
+È\ÝÜžH9¢%ˆ›ÝšY\ˆ\›Ý˜[8à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H[ˆMH9."yçêzf-ygaùg*›Ü›X]:f-¹«­y`g9«h»ï#9l&¹§*º/æùaiyb§ú ïy­bú+å{ï&ùëbyo¡y¥¬9æ¡9k£9¥mÒxà ‚‚ˆÈÈKLŒŒLLLŒH0­ÈPQLHØÜX˜™Y›ÙXÝ[Û‹XXØÛÝ[›ÛÝÝ˜\‚ŠŠ•\JŠ»ï&ÌH8 %ÛÛ›ÛY›ÙXÝ[ÛˆY[]H›ÛÝÝ˜\›Ý[™\žHŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&¹«hùo#ú-)¹cíúj£:+ày.îùb¨z) y¬`¹£ä9/¦ùcêº+îøà z!,y¥cøà ycëùk¨z+¨yæ¡:.ªù.ïH›ÛÝÝ˜\9aiycèûï#9nm¹é y«h¹æí9£©yi#yå*9n)ˆÚ[][][Ûˆ9¥¡ù¨b9æ¡9¥éÈÛÛ›™XÝ]š]HØÜš\8à ‚‚‹H9¥¬9h§ˆØÜš\ËÜÜZÙKÜ›ÙXÝ[Û—ØXØÛÝ[Ø›ÛÝÝ˜\œX;ï&¹cêº+îùcå¹ã«ùh ËË™[»ï#:, ùå*›ÝšY\ˆØÝÜ»ï#:/¤ùaîˆ[ÝÛ\ÝYØÜX˜™YY[]HØ[™Y]{ï&ù.#y£©ycåÈÓH9aëz+à{ï#9.#ya¦yaiHÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[;ï#9.®¹méyèkº+©9.ãy¦+ùâë9êâù«izj©8à ‚‹H9¥¬9h§ˆ[š™XÝYÛÙ™›[™H\Ýûï&¹ï.¹l$yaëz+àH˜Z[ÛÜÙY8à [Ù™›[™H9.#y/(9aëz+àxà YØÝÜˆ9c§ùiâÈ\œ›Ü‹Ù]Z[9.#yaî¹ã¬9g*ÝÝ]ú+ày£k¹¥¡ù.í»ï#9.%9.#z!ê¹bª9a®ùîäÈ›ÙXÝ[ÛˆY[]xà ‚‹H9d#9«iy«hùo#ú-)¹cíúj£:+ày¥¡ù¨høà T›ÝšY\ˆ™\šYšXØ][Û¸à TÜZÙH™\Ü8à QU“Ñûï&ù/ë¹«hù¥éÈ™\Ý[YKÑRSQ9¥¡ù¨b;ï#9.#y¥¬9h§ˆZYÜ˜][Û»ï#9.#y¥.ycæÔ‹MKÐÔ‹M‹ÌŒŒ
+È\ÝÜžKÔ›ÝšY\ˆØ\Xš[]H:+ëy.bxà ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H9ëbyo¡y."ynlùcìÒH9.#¹¬®ùä!ºeê9é {ï&ú`&º/áùd#¹cëùg*9mì¹k¢z(áyk¦9¥®HÚY[9æ¡9cåù£©ùã«ùh ú/ä:(c›ÛÝÝ˜\8à ¹«hùo#ÈY[]H9a®ùîäøà T›ÙXÝ[ÛˆŒKPøà QÛÛ[‹Ñ]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ8à T™]šY]Ù\ˆ\›Ý˜[9.ãH›ØÚÙYÜ[™[™øà ‚‚ˆÈÈKLŒŒLLLŒ0­ÈŽŒH™YK\]›Ü›HÒH™\šYšXØ][Û‚‚ŠŠ•\JŠ»ï&ÌH8 %›Ü›X[ÓHÛÛ˜XÝ[™™XÛÝ™\žH™\šYšXØ][ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&•‘T’Q’QQ
+ÒJHÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&”ŽŒH›Ü›X]ÛÜœ™XÝ[Ûˆ9d#¹æ¡[ˆLÈ9k£9¢$9."ynlùcì9aj:aãÈÒH9.#¹¬®ùä!ºeê9é xà ‚‚‹HX[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9aj:`ê9¢$9b§ûï&ù«ãú!oÈMŒˆ\ÜÙY;ï#Y™ˆ[Ù›Ü›X]8à [^\xà TÜZÙxà TÑËXXœÙ[8à QU“ÑÈ9d£X[˜YÙ[Y[Ø]\È9gaú`&º/áøà ‚‹HÓH[ÙHÛÛ™›XÝ8à T›ÙXÝ[Ûˆ™\^KX[Ùœ™\ÚØ][Ùøà PÓÔÑQ9.#ˆÙ[X[XÈRS9æ¡›ØÝ\ÙY]šY[˜ÙH9mìº`&º/áÈÒ{ï&ù.îùb¨y.iˆ^]Ø]H9mì¹bïº`"{ï#9ëbyo¡y.®¹méH™]šY]Ù\ˆ9i#yk¨xà ‚‹H:+éz+ày£k¹.#z)¡¹æå¹«hùo#ú-)¹cíÈY[]KÙ[][Y[8à yç'ùk§ˆ›ÙXÝ[ÛˆŒKPøà QÛÛ[‹Ñ]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9¢%ˆ›ÝšY\ˆ\›Ý˜[;ï&Ü›ÙXÝ[Ûˆ›Ùš[H9.ãy..¹ên»ï#ˆÎ9.#z!ê¹bª9d"9nm¸à ‚‹H9§+9«(y.#y­¢ycâº-)¹cíøà yaëz+àxà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[xà [ZYÜ˜][Û¸à PÔ‹MKÐÔ‹Mˆ9¢%ˆŒŒ
+È\ÝÜžHÛÛ˜XÝ8à ‚‚ˆÈÈKLŒŒLLLNH0­ÈŽŒH›Ü›X]ÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %ÒH›Ü›X]›ØÚÙ\ˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆLˆ9æ¡Y™ˆÚXÚÈ9mìº`&º/áûï#›Ü›X]ÚXÚÈ:) y¬`º)á:# ùc%ˆÜZÙWÜ[›™\‹œX9d£›ØÝ\ÙYÓH\Ý8à ‚‚‹H9£"HÒH›Ü›X]\ˆ9æ¡9èk¹k¦º/¤ùaî¹/ë¹«hùaïy¥l9ëo¹d#xà zeoùkeùë)¹.,¸à y­bú+åH\™Ýˆ:+¯¹ïk¹d£9i&¹/fyênº(c;ï&ù.#y¥.ycæ:/ä:(c:+ëy.bxà ‚‹H9§+9«(y.#y­¢ycâº-)¹cíøà yaëz+àxà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[xà [ZYÜ˜][Û¸à PÔ‹MKÐÔ‹M¸à LŒŒ
+È\ÝÜžxà \›ÙXÝ[ÛˆY[]H9¢%ˆ›ÝšY\ˆ\›Ý˜[8à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H[ˆLˆ9."yçêzf-ygaùg*›Ü›X]ÚXÚÈ:f-¹«­y`g9«h»ï#9l&¹§*º/æùaiyb§ú ïy­bú+å{ï&ù§+9£ä9.©9ëbyo¡y¥¬9æ¡9k£9¥mÒH9.#¹¬®ùä!ˆØ]\øà ‚‚ˆÈÈKLŒŒLLLN0­ÈŽŒHÓH[ÙH[™™\^KX[™XÛÝ™\žB‚ŠŠ•\JŠ»ï&ÌH8 %›Ü›X[ÓHÛÛ˜XÝÛ™\ÝH[™™XÛÝ™\žHÙ[X[XÜÈŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&¹¥¬9h§ˆŽŒH9i#yk¨z) y¬`¹cäyã¬9fæùéãHÓH[ÙH9cëúgfznæ9/&9ab9î©ú)èúaâ»ï#›ÙXÝ[Ûˆ™\Ý[YH9æ¡K\\ÙH“˜9.#¹k§ºfay£ y.ayc%ˆØ][ÙÈ: ïyb¦ù.#y. :!í;ï#9.%[˜›ÛÚÈ9kîHÙ[X[XÈRS9æ¡RSQ:(j:/ì:/áùo.¸à ‚‚‹H:`"y¢êy¥®y¨bH™\^KX[;ï&”›ÙXÝ[Ûˆ™\Ý[YH9o.¹b-¹k£9¥mŒKPøà yé y«hˆØ[\ˆ\ÙHÙ[XÝÜ¸à Yœ™\Ú[œÙX[YØ][ÙÈ9.#yb¨:/oy¥éÈ\X[Ø][Ùûï#9¢$9b§ùd#¹¢cz)¡¹æåˆ•S“’S‘È[ˆ9æ¡Ø][Ùûï&ù¥éÈ˜]ËØ[˜ÚÜˆ9/çyåfxà ‚‹H9h§¹b¨[ÙHÛÛ™›XÝ8à \\X[Ø][ÙÈ™XZ[Ü™\^KX[9d£Ù[X[XÈÓÔÑQ
+È™\™XÝ“×ÑÓÈ›ØÝ\ÙY\Ýûï&Ü[˜›ÛÚøà TŽŒH™\]Z\™[Y[8à QU“ÑÈ9.#¹ë¨yä!¹ .ùa£9d#9«ixà ‚‹H9§+9«(y.#y¥¬9h§ˆZYÜ˜][Û»ï#9.#y/ë¹¥.HÔ‹MKÐÔ‹M‹ÌŒŒ
+È\ÝÜžKÔ›ÝšY\ˆØ\Xš[]{ï#9.#ya¦yaiz-)¹cíøà yaëz+àxà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[xà ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H9ëbyo¡y."ynlùcì9k£9¥mÒxà TY™‹Ù›Ü›X]Û^\xà TÜZÙKÔÑËXXœÙ[9.#¹¥¡ù¨hù¬®ùä!ºeê9é {ï&ÐÒH:`&º/áùd#¹a£yl!ˆŽŒH9¨!ú+¬9..ˆ‘T’Q’QQ;ï#ˆÎ9.ãy.#z!ê¹bª9d"9nm¸à ‚‚ˆÈÈKLŒŒLLLMÈ0­È›Ü›X[[›™\ˆÚ\š[™ÈÒH™\šYšXØ][Û‚‚ŠŠ•\JŠ»ï&ÌH8 %›Ü›X[ÜZÙH[›™\ˆ^XÝ][Û‹X›Ý[™\žH™\šYšXØ][ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&‘Ó‘HÈ‘T’Q’QQ
+ÒJHÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÛÛ\]YY\ˆH[Ù›Ü›X]ÛÜœ™XÝ[ÛœÈ[™˜[Y]YH[›Ü›X[\[›™\ˆÚ\š[™ÈÚ[™ÙK‚‚‹H9."yçêzf-HX[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9aj:`ê9¢$9b§ûï&ù«ãú!oÈMM\ÜÙY8à ‚‹HY™ˆ[Ù›Ü›X]8à [^\xà yaj:aãÈ]\Ý8à TÜZÙHØ]\øà TÑËXXœÙ[8à QU“ÑÈ9d£X[˜YÙ[Y[Ø]\È9gaú`&º/áøà ‚‹H:+éz+ày£k¹cê¹èkº+©9.äùn¤ùk§¹ã¬9d£9é®ùî¯Ëù`aù¥l9£k¹­bú+åyæ¡ÛÛ˜XÝÛÜÝ\™{ï&ù«hùo#ú-)¹cíÈY[]KÙ[][Y[8à yç'ùk§ˆ›ÙXÝ[ÛˆŒKPøà QÛÛ[‹Ñ]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9d£›ÝšY\ˆ\›Ý˜[9.ãyâë9êâÈ[™[™ËØ›ØÚøà ‚‹H9§+9«(y.#y­¢ycâº-)¹cíøà yaëz+àxà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[xà [ZYÜ˜][Û¸à PÔ‹MKÐÔ‹Mˆ9¢%ˆŒŒ
+È\ÝÜžHÛÛ˜XÝ8à ‚‚ˆÈÈKLŒŒLLLMˆ0­È›Ü›X[[›™\ˆ›Ü›X][™ÈÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %ÒH›Ü›X]›ØÚÙ\ˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆÈ9æ¡Y™ˆÚXÚÈ9mìº`&º/áûï#9/aˆ›Ü›X]ÚXÚÈ9¢©ydbˆÜZÙWÜ[›™\‹œX8à XÜZÙKÜ[›™\‹œX9.#ˆ›ØÝ\ÙY\Ý:g :) z)á:# ùc%¸à ‚‚‹H9£"HÒH9îæyaî¹æ¡9èk¹k¦¹¨/9o#ù/ë¹«hùi&¹/fyênº(c8à yi&¹."¹."ù¥¡ÈÚ]9d£9­bú+åyaïy¥l9ëo¹d#{ï&ú/ä:(c:+ëy.by/çy£ y.#ycæ8à ‚‹H9§+9«(y.#y­¢ycâº-)¹cíøà yaëz+àxà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[xà [ZYÜ˜][Û¸à PÔ‹MKÐÔ‹M¸à \›ÙXÝ[ÛˆY[]H9¢%ˆ›ÝšY\ˆ\›Ý˜[8à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H[ˆÈ9."yçêzf-ygaùg*›Ü›X]ÚXÚÈ:f-¹«­y`g9«h»ï#9l&¹§*º/æùaiyb§ú ïy­bú+å{ï&ù§+9£ä9.©9ëbyo¡y¥¬9æ¡9k£9¥mÒH9.#¹¬®ùä!ˆØ]\È9îäù§§8à ‚‚ˆÈÈKLŒŒLLLMH0­È›Ü›X[[›™\ˆ[ÛÜœ™XÝ[Û‚‚ŠŠ•\JŠ»ï&Ì8 %ÒH[›ØÚÙ\ˆÛÜœ™XÝ[ÛˆŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÈŠŠ•šYÙÙ\ŠŠ»ï&œ[ˆˆ9g*Y™ˆ:f-¹«­ycäyã¬[“Y™XÞXÛQ\œ›Ü˜9ï.¹l$ykï9aixà Y›ØÝ\ÙY\Ý[\Ü9£¤¹n£úe&z+ëùd£ÒSLLMûï&ù­bú+åzf-¹«­yl&¹§*¹o 9iâøà ‚‚‹H:(izodÓH9kîH[“Y™XÞXÛQ\œ›Ü˜9æ¡9¦/¹o#ùkï9ai{ï#9/ë¹«hÈ›ØÝ\ÙY\Ý9æ¡9kï9aizhn¹n£ûï#9nm¹d"9nm¹mc9ieÈÛÛ^X[˜YÙ\»ï&ù.#y¥.ycæ[›™\ˆ9æ¡9£ y.aH[˜ÚÜ¸à y¥éy§'ùa®ùîäù¢%¹îâ9  z+ëy.bxà ‚‹H9§+9«(y.#y­¢ycâº-)¹cíøà yaëz+àxà UÚÙ[¸à ZÜÝÜÜÜ˜]È›Ùš[xà [ZYÜ˜][Û¸à PÔ‹MKÐÔ‹M¸à \›ÙXÝ[ÛˆY[]H9¢%ˆ›ÝšY\ˆ\›Ý˜[8à ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‚‹H[ˆˆ9æ¡9i,z-)y¦+úgfy  y¨à9§éyi,z-){ï#9."yçêzf-ygaù§*º/æùaiyb§ú ïy­bú+å{ï&ù§+9£ä9.©9ëbyo¡y¥¬9æ¡9k£9¥mÒH9.#¹¬®ùä!ˆØ]\È9îäù§§8à ‚‚ˆÈÈKLŒŒLLLM0­È›ÙXÝ[Ûˆ[›™\ˆ[˜ÚÜ™YÚ\š[™Â‚ŠŠ•\JŠ»ï&ÌH8 %›Ü›X[ÜZÙH[›™\ˆ^XÝ][Û‹X›Ý[™\žHÛÜÝ\™BŠŠ‘]JŠ»ï&ŒŒ‹LKLŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂŠŠ•šYÙÙ\ŠŠ»ï&”ˆÎ9i#yk¨ycäyã¬›Ü›X[›ÙXÝ[Û‹ÕšX[ÓH9§*¹/(9aiH[˜ÚÜˆÛÛ›™XÝ[Û¸à \™\Ý[YH\Ë[Ùˆ9cëù¯ ¹éîûï#9.%ÛÛ^ÜÙ]\˜Z[\™H9cëú ïyåfy."È•S“’S‘øà ‚‚‹H›Ü›X[›ÙXÝ[Û‹ÕšX[9ã¬9g*9/oùå*ØYØÛÛ™šYÊ
+Kœ]Ë™XÚÙ—Ü]9kîyn¥9æ¡9£ y.aHXÚÑ»ï#:`&º/áÈXÚÑÛÛ›™XÝ[Û“X[˜YÙ\Š‹‹ŠK›ÝÛ™\Šœ™XYÝÜš]HŠX:#­ùcå¹cez/æùê"ù¢`9§"y§`ûï#9nm¹g*9.îù/ey¥¬[ˆ9.bùbcy¢iú(c9k£9¥mZYÜ˜][ÛˆÚZ[ˆ9.#ˆ[˜ÚÜ‹\ØÚ[XH™XY[™\ÜÈÚXÚøà ‚‹H9d#9. :/ç¹£©z)¡¹æåˆ›Ü›X[[ˆ9æ¡›Ø™PÛÛ^8à P[˜ÚÜ™Y˜]Ñ]šY[˜ÙUÜš]\¸à XØ][ÙÈ›\Ú9d£9îâ9  ya¦yai{ï&Ô›ÙXÝ[Û‹ÕšX[9.#ya`z+®›Y[[ÜžN˜;ï#žK\[ˆ9æ¡:f¥9é®ùa¡ykf:/ç¹£©y/çy£ y.#ycæ8à ‚‹H9¥¬[ˆ:g :) y¦/¹o#ùd"9¬åHVVVSSQ;ï&Ü™\Ý[YH9§`ùj y¥éy§'ù§iz!ê¹c§ÈÜZÙT[‹˜\×ÛÙ—Ù]X;ï#9¦/¹o#ù¥éy§'ù.#yc.zacy¢ä¹îç{ï&ØÛÛ^ØØ][ÙËÜ\ÙKÜÙ]\˜Z[\™H9îçù. :$/yb,RSQÐP“Ô•QÐÓÔÑQ9¦#¹èk¹îâ9  xà ‚‹H9¥¬9h§ˆ›ØÝ\ÙY\ÝÈ:)¡¹æå¹ç'ùk§ˆÓHÛÛ^˜XÝÜžxà X[˜ÚÜˆ9alúeëyd#ºaãyo 8à y¥è9a¡ykf›Ü›X[¸à y¥éy§'ùa®ùîäËù¢ä¹îçyd£[˜ÚÜˆ˜Z[\™H˜Z[XÛÜÙY;ï&ÐÒH9îäù§§9o¡yodùbcy£ä9.©:j£:+àxà ‚‹H9§+9«(y¬¨y§"y/ë¹¥.yc¡¹cìˆZYÜ˜][Û¸à PÔ‹MKÐÔ‹M¸à T›ÝšY\ˆØ\Xš[]H\›Ý˜[8à \›ÙXÝ[Û—ØXØÛÝ[žX[[9¢%¹.îù/eyaëz+àKÕÚÙ[‹ÚÜÝÜÜÜ˜]È›Ùš[xà ‚‚ŠŠ‘]šY[˜ÙHÈ™^
+Š‚‹H9§+9g,ú/ç9ê"ù.èùè yk¨y§éymì¹èkº+©›Ü›X[[›™\ˆ9æ¡9¥éú, ùå*9ï.¹l$HÛÛ›˜;ï&ùodùbcy£ä9.©9ëbyo¡HX[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9.éycâ¹aj:`ê9¬®ùä!ˆØ]\øà ‚‹HÒH:`&º/áùd#¹a£yfç¹hjùaá¹èkˆÛÛ[Z]Ü[»ï&ùg*9.®¹méyèkº+©›ÙXÝ[ÛˆY[]KÙ[][Y[9bc{ï#9.#y¢iú(c9¢%¹k¨ùéì›Ü›X[›ÙXÝ[ÛˆŒKPËÝ™\™XÝØØ\Xš[]H\›Ý˜[8à ‚‚ˆÈÈKLŒŒLLLLÈ0­È›Ü›X[:j£:+àz/ä:(c9¢bùa£ÒH:j£:+àyk£9¢$‚ŠŠ”Ý]\ÊŠ»ï&‘Ó‘HÈ‘T’Q’QQ
+ÒJHÈS‘S‘×Ô‘U’QUÂ‚‹H[ˆÌÎŒLÍÍŒ;ï"[ˆûï"y."yçêzf-yaj:`ê9¢$9b§ûï#9«ãú!oÈM\ÜÙY;ï&ÔY™¸à [^\xà TÜZÙxà TÑËXXœÙ[8à QU“ÑÈ9d£X[˜YÙ[Y[Ø]\È9gaú`&º/áøà ‚‹H:+éz+ày£kº)¡¹æåº/ä:(c9¢bùa£9æ¡9cey. ›ÙXÝ[ÛˆŒKPÈ9doy.é8à YØÝÜˆ™\™XÝ9cèùo¡9d£[‹\ØÛÜY9.©ùâjz+í9¦#»ï&ù¬¨y§"y¥.ycæ9«hùo#ú-)¹cíÈœ›Þ™[ˆY[]xà T›ÙXÝ[ÛˆŒKPøà ]™\™XÝ9¢%ˆ›ÝšY\ˆ\›Ý˜[9â­¹  xà ‚‚ˆÈÈKLŒŒLLLLˆ0­È›Ü›X[:j£:+àz/ä:(c9¢bùa£9.#ˆØÝÜˆ™\™XÝ9cèùo¡9¨(y«hÂ‚ŠŠ”Ý]\ÊŠ»ï&‘Ó‘HÈ‘T’Q’QQ
+ÒJHÈS‘S‘×Ô‘U’QUÂ‚‹H9/ë¹«hÈ[—ÜÜZÙK›Y9æ¡9aëz+àze+¹d#ze&z+ëûï#9nm¹l!¹«hùo#ÈŒKPÈ9¦#¹èk¹..¹. 9.*ˆ[’Ú[™”“ÑPÕSÓ˜9ceH[»ï&ù.+y¥«y¥í¹¢cya`z+®K\™\Ý[YX;ï#[ˆÓÔÑQ9d#¹/oùå*K]™\™XÝK\[‹ZY8à ‚‹H:(izod9odùbcH[‹\ØÛÜY9.©ùâjz-ëùo¡8à LŒŒ
+ÈØ\Xš[]H9d#yéì9d£šX[ÙžK\[ˆ9.#ˆ›ÙXÝ[Ûˆ9æ¡9âjyä!ºf¥9é®ú+í9¦#¸à ‚‹H9/ë¹«hÈ›ÝšY\ˆØÝÜˆÈ9k¢z(áy¢bùa£9kîH•S•SQWÔPÒÐQÑWÕ‘T’Q’QQ9.#ˆ•S•SQWÐPÕPSÓÐQÕ‘T’Q’QQ9æ¡9c.¹b!»ï&ùodùbcy§+9g,˜]]™HÑÈÛ[ÚÙH9mì¹§"yâë9êâú+¬9oe{ï#9/aˆ›Ü›X[[›™\ˆ9.ãy§*¹¢iú(c8à ‚‹H9§+9«(ycê¹¥.z/ä:(c9¢bùa£;ï#9.#y¥.ycæÔ‹Mˆ9a®ùîäú+ëy.bxà y«hùo#ú-)¹cíÈœ›Þ™[ˆY[]H:)á9b&y¢%ˆ›ÝšY\ˆ\›Ý˜[9â­¹  xà ‚‚ˆÈÈKLŒŒLLLLH0­ÈÔ‹Mˆ9d"9nm¹d#¹¬®ùä!¹d#9«iy.#ˆ›ÝšY\ˆ9odùbcyç'ùæî9¨(y«hÂ‚ŠŠ”Ý]\ÊŠ»ï&‘Ó‘HÈS‘S‘×Ô‘U’QUÂ‚‹HˆÍˆ9mì¹g*XZ[ˆ9d"9nm¹£ä9.©NÌNXNMXM˜NLY˜˜XMLÌÌLØX˜Ž9d"9ai{ï&ÐÔ‹M‹Œ8 $Í‹9.#ˆQ‹Lˆ9æ¡9§ 9îâ™]šY]Ù\ˆÛÜÝ\™H9mì¹å'ù¥b;ï&ŠŠ•‘T’Q’QQÈÓÔÑQÈ”‘QV‘JŠ¸à ‚‹Hš[˜[Y\™ÙKYØ]H[ˆÌÎMÍÍŒÌ;ï"[ˆŒÎ{ï"yg*X[HËŒM8à UÚ[™ÝÜÈËŒL¸à UÚ[™ÝÜÈËŒM9aj:`ê9¢$9b§ûï#9«ãú!oÈM\ÜÙY;ï&ÔY™¸à [^\xà TÜZÙxà TÑËXXœÙ[8à QU“ÑÈ9d£X[˜YÙ[Y[Ø]\È9gaú`&º/áøà ‚‹HQ‹L¸à PQ‹L9í(¹o%xà PÔ‹Mˆ9méy/g:) y¬`¸à T›ÝšY\ˆ™\šYšXØ][Ûˆ9.#¹§+9 .ùa£9æ¡9odùbcyâ­¹  ymì¹d#9«i{ï&ùc¡¹cìº+åyå*:-)¹cíøà y«hùo#ú-)¹cíù§+9g,ÑÈÛ[ÚÙxà y«hùo#È›ÙXÝ[Ûˆ›Ùš[H9§*¹a®ùîäù."z !ymì¹¦#¹èk¹b!¹o 8à ‚‹H9«hùo#È›ÙXÝ[ÛˆŒKPøà QÛÛ[‹Ñ]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9d£›ÝšY\ˆØ\Xš[]H\›Ý˜[9.ãy§*¹k£9¢$;ï&ØÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9îéùîëy..¹ên¸à ¹aëz+ày.#º/ç¹£©y¦#¹¥¡ù.#yaiyn¤øà y.#yaiy¥éyoåøà ‚‹H9."ù. 9«iy¦+ù¢¢¹cåù£©ÈÑÈ9/§z-e¹ã«ùh ù.#¹.äùn¤ù®¤9è yã«ùh ù£©z`&»ï#:/ä:(c›ÝšY\‹YØÝÜˆ9câ¹cey. ÓÔÑQ“ÑPÕSÓˆŒKPûï&ùg*9.®¹méyèkº+©ØÜX˜™YY[]KÙ[][Y[9bcy.#yo¥ù£¢9.¢Ø\Xš[]HT“Õ‘Q8à ‚‚ˆÈÈKLŒŒLLLˆ0­È9«hùo#ÈÑÈ9a¤¹àçùk£9¢$;ï#9oh¹o#ùc%ˆ›ÙXÝ[Ûˆ[ˆ9o¡y¢iú(c‚ŠŠ”Ý]\ÊŠ»ï&“ÐÐSÔÓSÒÑWÔTÔÈÈ“Ô“PSÔ•S—ÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂ‚‹H9cåù£©ù§+9g,]ÛˆËŒMˆ9ã«ùh ùmì¹kï9aiyk¦9¥®H[X^š[™Ñ]OOLKŒKŽX8à XÝÏOLKŒŽKŒ˜9.#ˆX›\Ø;ï&ÕÕÈ[[YHŒËŒŒŒŒ‹\˜Ì‹ŒVR”X;ï#]ˆ\ÚXÚØ:`&º/áøà ‚‹H9«hùo#ú-)¹cíùænùoey.#ˆ›Ùš[H:)èù§¤9¢$9b§ûï&Ü\›Z\ÜÚ[Û‹Ù[˜Ý[Û‹\\›Z\ÜÚ[Ûˆ9keù«­ykf9g*8à ”ÑÈ9c§ùiâÈÝÝ]ÜÝ\œˆ9g*:/®yåc9a¡y£ez#­ûï#9§*¹l!º-)¹cíøà UÚÙ[¸à z/ç¹£©y/èy køà yc§ùiâÈ^[ØY9¢%¹.-9¥íˆ›Ùš[H9£ y.ayc%¸à ‚‹H9l#ùê¥ùcèù£©ycèú/å9fçº)á9ª(ymìº+¬9oe{ï&˜Ø[[™\ˆÌNxà y¬ª¹­ìy.èùè HKŒMxà yc¡¹cì¹.èùè yb%ú(jKŒMxà yc%ù.©9¢`9¦(9l!8à \ÝØÚÈ˜\ÚXÈxà Z\ÝÜžHÝ]\Èxà XYˆ˜XÝÜˆÌNxà Y]šY[™M8à \šYÚ\ÜÝYH8à Y\]Z]HÝXÝ\™HŽ8à Z[™\ÝžH˜\ÙHLL{ï&ú(c9.&‹ù¥éyî¯ù£©ycèú/å9fç¹îäù§¡9c%¹îäù§§8à ‚‹H:+éz+ày£k¹¦+È˜]]™HÑÈÛ[ÚÙ{ï#9.#y®èz-¬È›Ü›X[˜XØYKÜ›ÝšY\‹YØÝÜ¸à \[‹\ØÛÜY›ÙXÝ[ÛˆŒKPøà QÛÛ[‹Ñ]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9¢%ˆ›ÝšY\ˆ\›Ý˜[8à ¹aj9c¡¹cìº)¡¹æå¹.áyg*9«hùo#ùceH[ˆ9.+y£"HŒŒ
+È9d"9d#9¢iú(c8à ‚‹H9/§z-eˆÚY[9cê¹/çykf9g*9§+9g,:(ªùoïyåiyæ¡™[™Ü‹Ø[X^š[™Ù]KØ;ï&ØÛÛ™šYÜËÜ›ÙXÝ[Û—ØXØÛÝ[žX[[9.ãy..¹ên¸à ¹fè9odùbcy§+9g,ÑÈ9ã«ùh ù§*º(áyaiy.äùn¤ù®¤9è {ï#›Ü›X[[›™\ˆ9l&¹§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLLLÈ0­ÈŒŒ
+È9c¡¹cìº/®yåc:gfy  yk¢9cjù§"y¥b9 )ù/ë¹«hÂ‚ŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂ‚‹H9/ë¹«húfá¹¢$9­bú+åykîy¥éÈNNL:/®yåc9æ¡:!ê¹c.zaczeëºh¦;ï&ù­bú+åyã¬9g*9g*:/ä:(c9¥í¹¢ï9£©y¥éú/®yåc9keùë)¹.,»ï#9a£y¥«z* 9«hùo#ÈØ]H9.#ˆŒˆ›Ø™H9®¤9è y.#yd*ú+éz/®yåc8à ‚‹H9«hùo#ÈØ]xà PŒˆ›Ø™H9.ãz, ùå*ŒŒLKL{ï&ú/æy¦+ù­bú+åy§"y¥b9 )ù/ë¹«hûï#9.#y¦+ù¥¬9h§ˆÝ]KÔ›ÝšY\ˆ:+ëy.bxà ‚‹H9ëbyo¡y§+9£ä9.©9æ¡9."yçêzf-HÒ{ï&Ô›ÙXÝ[Ûˆ›Ü›X[[ˆ9.ãy§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLLL0­ÈŒŒ
+È9c¡¹cìº/®yåc9­bú+åHY™ˆ9¨/9o#ù/ë¹«hÂ‚ŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂ‚‹H9£"HX[HY™ˆ›Ü›X]9k§ºfaz+â¹¥«yl!¹¥¬9h§¹­bú+åyæ¡9c¡¹cìº/®yåc9keùë)¹.,¹¥-¹¥fù..¹cez(c;ï&ù¥«z* :# ùfí9.#ˆŒŒ
+È9d"9d#9.#ycæ8à ‚‹H9odùbcy£ä9.©9ëbyo¡y."yçêzf-HÒ{ï&ù«hùo#È›ÙXÝ[ÛˆŒKPÈ9.ãy§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLLLH0­È9c¡¹cìº/®yåc9­bú+åz-ëùo¡:(j:/¯¹o#È›Ü›X]\ˆ9/ë¹«hÂ‚ŠŠ”Ý]\ÊŠ»ï&’S—Ô“ÑÔ‘TÔÈÈÒWÔS‘S‘ÈÈS‘S‘×Ô‘U’QUÂ‚‹H9£"HX[HY™ˆ›Ü›X]9k§ºfaz+â¹¥«{ï#9l!¹¥¬9h§¹­bú+åy.+yæ¡9i&º(c:-ëùo¡9¢ï9£©y¥-¹¥fù..¹ëby.íùcez(c:(j:/¯¹o#ûï&ÌŒŒ
+È9c¡¹cì¹d"9d#9.#º/ä:(c9¥íº(c9..¹.#ycæ8à ‚‹H9odùbcHXY9ëbyo¡y."yçêzf-HÒ{ï&Ô›ÙXÝ[Ûˆ›Ü›X[[ˆ9.ãy§*¹¢iú(c8à ‚‚ˆÈÈKLŒŒLLLL0­ÈŒŒ
+È9c¡¹cìº/®yåc9k¢9cjÈÒH:j£:+àyk£9¢$‚ŠŠ”Ý]\ÊŠ»ï&‘Ó‘HÈ‘T’Q’QQÈS‘S‘×Ô‘U’QUÂ‚‹H9odùbcHXYLÌŒÍXÙNMŽÙ˜™ÎNŒLŒLØMÌÍX™ÙXMX9æ¡[ˆÌÎLÍNNØ;ï"[ˆŒÎ;ï"y."yçêzf-yaj:`ê9¢$9b§ûï#9«ãú!oÈM\ÜÙY8à ‚‹HY™¸à [^\xà TÜZÙxà TÑËXXœÙ[8à QU“ÑÈ9.#ˆX[˜YÙ[Y[YØÈØ]\È9gaú`&º/áûï&ù«hùo#ÈØ]KÐŒˆ›Ø™H9æ¡ŒŒLKLH9cà¹¥l9k¢9cjùmìº#­ùo¥ùç'ùk§ˆÒH:+ày£k¸à ‚‹H9«hùo#ú-)¹cíùæ¡˜]]™HÑÈÛ[ÚÙH9.#yëbyd#9.£ˆ›Ü›X[›ÙXÝ[Ûˆ[»ï&ÐŒKPøà QÛÛ[‹Ñ]HÝY™šXÚY[˜ÞHX]š^8à ]™\™XÝ9.#ˆ›ÝšY\ˆ\›Ý˜[9.ãy§*¹k£9¢$8à ‚‚ˆÈˆ9¥¡ù¨hùk¦¹/cB‚¹§+9¥¡ù.í¹.#y¦+ù¥¬9æ¡œ›Þ™[ˆ˜\Ù[[™{ï#9.gù.#y¦+ÈØÜËÑU“ÑË›Y9æ¡9¦ïù.èùdàxà ‚‚¹k úeoù§'ù¢où¢áy.éy."ú c:-(ûï&‚‚ŒKˆ9îçù. 9£ãú/ì9ìîùîçùodùbcy£"y.à9.b9¥®y¨b9o 9cä{ï&ÂŒ‹ˆ9îçù. 9£ãú/ì9odùbcyo 9cäz/æùn©¸à zaã9ê"ùè¤xà Q[žKÑ^]Ø]xà zf.ùhgºhn{ï&ÂŒËˆ9îçù. :+¬9oeymì¹¢nyaá¹æ¡:+¯º+¨z, ù¥m8à y¥l9£kº+ëy.bz, ù¥m8à yméyê"ùidyî©º, ù¥m9câ¹c§ùfè;ï&Âˆ9¢¢ˆœ›Þ™[ˆ˜\Ù[[™xà PQ¸à T›ÝšY\ˆ™\šYšXØ][Û¸à QU“Ñøà Tš\ÚÈ™YÚ\Ý\¸à yk¨z+¨y¢©ydb¸à y­bú+åyd£9.èùè y£ä9.©9.,¹¢$9. 9.*¹cëú/ïz.*¹/dùìîûï&ÂKˆ9/g9..¹d#¹îëyo 9cäyméy/g:) y¬`¹æ¡9ë¨yä!¹aiycèûï&¹aèyméy/g:) y¬`¹­¢ycâº+¯º+¨xà TØÚ[Xxà y¥l9£kº+ëy.bxà T›ÝšY\¸à TU8à yâb9§+:(`9ï&8à TX›\ÚÔ™\^xà Q™X]\™H9ak9o#ù¢%ºaã9ê"ùè¤z, ù¥m;ï#9o 9cäy.®¹df9oázhnùg*9d#9. :`.ú/¤y£ä9.©9.+y¦í9¥¬9§+9¥¡ù.í¸à ‚‚¹§+9¥¡ù.í¹oázhnù/çy£ x '9odùbcyç'ùæî8 'ylg¹ )ûï&ùc¡¹cìº`&º/áÈÚ]8à QU“Ñøà PQˆ9d£9§+9¥¡ÈÚ[™ÙHÙÈ9/çyåfxà ‚‚‹KKB‚ˆÈKˆ9¥¡ù¨hù§`ùj y )ù.#¹/&9ab9î©Â‚¹cäyå'ùa¬¹ê y¥í¹£"y.éy."úhn¹n£ú)èúaâ»ï&‚‚˜^ŒKˆ9¦#¹èk¹¢nyaá¹æ¡9¥¬œ›Þ™[ˆ˜\Ù[[™BŒ‹ˆ9odùbcHœ›Þ™[ˆ˜\Ù[[™HŒKŒËŒ‚ŒËˆ9mìˆT“Õ‘Q9æ¡Q»ï"9.#yo¥ù.#ˆœ›Þ™[ˆ˜\Ù[[™H9a¬¹ê {ï"Bˆ9§+9¥¡ù.í¹æ¡9odùbcyk§¹¥¯yî©¹§gù.#¹â­¹  BKˆ›ÝšY\ˆ™\šYšXØ][ÛˆÈÜZÙHÈ^]™\Ü‹ˆØÜËÑU“ÑË›YËˆ]Y]ÈÛÜšÈ™\]Z\™[Y[ÈÛÜšÚ[™È›Ý\Â˜‚º)á9b&{ï&‚‚‹HŒKŒËŒˆ9.#yo¥ú`&º/áù¦kº`&ˆ]Ú:gfznæ9¥.ycæ9¨.9oàú+ëy.b{ï&Â‹HQˆ9cêº ïz(iyaay¢%¹¦ïù.èùk§¹ã¬9î©ùa¬ùëe»ï&Â‹H9k¨z+¨ynîº+«¹cê¹§"yg*9k§¹ã¬8à y­bú+åynm¹î¬ùaiy§+9¥¡ù.í‹ÐQ‹ù.èùè yd#»ï#9¢cy¢$9..¹odùbcyk§¹¥¯yidyî©¸à ‚‚‹KKB‚ˆÈ‹ˆ:)äº"l¹.#º-(ù.îÂ‚ˆÈÈ›Ú™XÝÝÛ™\‚‚º-'ú-(ûï&‚‚‹H9.&¹b¨yæë¹¨!ùd£9/&9ab9î©ûï&Â‹H9¦+ùd)¹£©ycåúaãyi)ú+¯º+¨ycæ9c%»ï&Â‹H9¦+ùd)¹a`z+®œ›Þ™[ˆ˜\Ù[[™H9caùâb;ï&Â‹H9«hùo#ù¥l9£kº-)¹cíøà y/¦ùn¥9ea¹d£9i%º`ê:-a9®¤9æ¡9§ 9îâ9èkº+©8à ‚‚ˆÈÈ]™[ÜY[^XÝ]Ü‚‚º-'ú-(ûï&‚‚‹H9£"yméy/g:) y¬`¹k§¹ã¬;ï&Â‹H9«ãù«(y.èùè y£ä9.©9d#9«iHØÜËÑU“ÑË›Y;ï&Â‹H:+¯º+¨Kùidyî©¹cæ9c%¹¥í¹d#9«iy§+9¥¡ù.í»ï&Â‹HZYÜ˜][Û¸à y­bú+åxà y¥¡ù¨høà y.èùè y/çy£ y. :!í;ï&Â‹H9.#y.éx '9¥¡ù¨hùa¦yk£9¢$8 'y¦ïù.èùç'ùk§¹­bú+åyd£:/ä:(c:+ày£k¸à ‚‚ˆÈÈ\ÚYÛˆÈ]Y]™]šY]Ù\‚‚º-'ú-(ûï&‚‚‹H9k¨y§éHU9«hùèk¹ )øà y¥l9£kº+ëy.bxà ycëùi#yã¬9 )øà QØ]H9cëùîåz/áù )ûï&Â‹H9."ú/¯¹d#¹îëyméy/g:) y¬`»ï&Â‹H9i#y¨.9d#¹l!ˆ™]šY]ÈÝ]\Ø9¨!ú+¬9..ˆ‘T’Q’QQ9¢%ˆ‘SÔS‘Q8à ‚‚‹KKB‚ˆÈËˆ9o.¹b-¹îí9¢©:)á9b&B‚ˆÈÈËŒH9«ãù«(y.èùè y£ä9.©‚¹/ë¹¥.y.éy."ù.îù. :-ëùo¡9¥í»ï#9oázhnùd#9«iy¦í9¥¬ØÜËÑU“ÑË›Y;ï&‚‚˜^œÜ˜ËÂ›ZYÜ˜][ÛœËÂ˜ÛÛ™šYÜËÂœØÜš\ËÂ™]KÙÛÛ[‹Â‹™Ú]]šX]\Â‹™Ú]X‹ÝÛÜšÙ›ÝÜËÂ˜‚ˆÈÈËŒˆ:+¯º+¨Kùidyî©¹cæ9c%‚‚¹aî¹ã¬9.éy."ù.îù. 9cæ9c%¹¥í»ï#9d#9. :`.ú/¤y£ä9.©9oázhnùd#9«iy¦í9¥¬;ï&‚‚˜^™ØÜËÑU“ÑË›Y™ØÜËÜ›Ú™XÝÑU‘SÔQS•ÓPSQÑSQS•›Y˜‚º)é¹cäz# ùfí9c!y¢ë;ï&‚‚˜^\˜Ú]XÝ\™HÈ^Y\š[™Â”›ÝšY\ˆ[™Ú[ÈØ\Xš[]HÈ[[YB”ÙXÝ\š]HY[]HÈ[š]™\œÙHÈ˜Y[™È[B”ØÚ[XHÈZYÜ˜][ÛˆÈØ[›ÛšXØ[˜XÝÛÛ˜XÝ”UÈ]˜Z[X›WØ]È]˜Z[Xš[]HÛXÞB”ÛÝ\˜ÙHÛXÞHÈ™XÛÛ˜Ú[X][Û‚”˜]ÈÈØ[›ÛšXØ[ÈÛ˜\ÚÝÈ\Y˜XÝÈX›\ÚÈ™\^H[™XYÙB‘™X]\™H9k¦¹.bxà yak9o#øà z/¤ùaixà yê¥ùcèøà z/å9fç¹î©¹k¦‚”Ý]HÈ™YÚ[YH9¥l9ki¹k¦¹.bB‘ÛÛ[ˆ]ÈÜZÙHØ]HÈØ\Xš[]H\›Ý˜[ÒHÈ™\›ÙXÚXš[]HÈ[[]]X›HÝÜ˜YÙHÛÛ˜XÝÛÛ˜Ý\œ™[˜ÞHÝÛ™\œÚ\”ÙXÝ\š]HÈÙXÜ™]Â“Z[\ÝÛ™H[žHÈ^]Ø]B˜‚ˆÈÈËŒÈ9¦kº`&ˆYÙš^‚¹i ¹§§9.#y¥.ycæ9i%º`ê:+ëy.bxà TØÚ[Xxà y¥l9£k¹k¦¹.bxà QØ]xà yâb9§+9.#º(`9ï&;ï#9.ázg 9¦í9¥¬U“Ñûï#9.#yo.¹b-¹¥.y§+9¥¡ù.í¸à ‚‚ˆÈÈË9é y«hºgfznæ:, ù¥m‚¹é y«h¸ '9ab9¥.y.èùè {ï#9d#º(iz+¯º+¨y¥¡ù¨hø 'xà ÌKÐÌ‹ÐÌÈ9cæ9c%¹oázhnù.#¹.èùè xà y­bú+åxà y§+9¥¡ù.í¹d£Q»ï"9i ºg :) {ï"yoh¹¢$9d#9. :`.ú/¤y¢ny«(xà ‚‚‹KKB‚ˆÈˆÚ[™ÙHÛÛ›Û9b!¹î©Â‚ˆÈÈÌ8 %[\[Y[][ÛˆÛ›B‚¹/¢ûï&ºaãy§¡8à y )ú ïy/&9c%¸à XYÙš^;ï#9i%º`ê9idyî©¹.#ycæ8à ‚‚º) y¬`»ï&‚‚˜^‘U“ÑÈ
+È\ÝÂ˜‚ˆÈÈÌH8 %ÛÛ˜XÝÛ\šYšXØ][Û‚‚¹/¢ûï&¹b¨9o.ˆ˜[Y]Ü¸à yh§¹b¨9.#ycëùîåz/áÈØ]xà y¦#¹èk¹mì¹§"ykeù«­yd*ù.bxà ‚‚º) y¬`»ï&‚‚˜^‘U“ÑÂ‘U‘SÔQS•ÓPSQÑSQS•ÛÛ˜XÝ\ÝÂ˜‚ˆÈÈÌˆ8 %\ÚYÛˆÚ[™ÙB‚¹/¢ûï&¹¥.ycæ9¥l9£k¹­`xà TÛÔ¸à TØÚ[Xxà Q™X]\™H9ak9o#øà TU8à TX›\ÚÔ™\^xà T›ÝšY\ˆ: c:-(øà ‚‚º) y¬`»ï&‚‚˜^‘U“ÑÂ‘U‘SÔQS•ÓPSQÑSQS•Q‚“ZYÜ˜][ÛˆÈÛÛ\]Xš[]H[»ï"9i º` ¹å*;ï"BÛÛ˜XÝ\ÝÂ”™]šY]ÈHS‘S‘×Ô‘U’QUÂ˜‚ˆÈÈÌÈ8 %œ›Þ™[ˆ˜\Ù[[™HÚ[™ÙB‚¹.îù/ey¥.ycæŒKŒËŒˆ9¨.9oàùd*ù.byæ¡9cæ9c%¸à ‚‚º) y¬`»ï&‚‚˜^”›Ú™XÝÝÛ™\ˆ9¦#¹èk¹¢nyaá‚¹¥¬˜\Ù[[™H™\œÚ[Û‚’[\XÝ[˜[\Ú\ÂQ‚“ZYÜ˜][ÛˆÈ˜XÚÙš[[‚”™YÜ™\ÜÚ[Ûˆ[‚‘U‘SÔQS•ÓPSQÑSQS•˜‚¹.#yo¥ùg*9¦kº`&ˆ]Ú9.+yk£9¢$8à ‚‚‹KKB‚ˆÈKˆÚ[™ÙH™XÛÜ™9¨!ùaá‚‚ÌKÐÌ‹ÐÌÈ9cæ9c%¹oázhnùg*9¥¡ù§*ú/ïyb¨;ï&‚‚˜^Ú[™ÙHQ‚•\N‚‘]N‚”Ý]\Î‚•šYÙÙ\Ž‚“ÛÛÛ˜XÝ‚“™]ÈÛÛ˜XÝ‚”™X\ÛÛŽ‚Y™™XÝY[Ù[\Î‚Y™™XÝY]N‚ÛÛ\]Xš[]N‚“ZYÜ˜][ÛˆÈ˜XÚÙš[‚•\ÝÎ‚QŽ‚ÛÛ[Z]‚”™]šY]Ù\Ž‚˜‚Ú[™ÙHQ;ï&‚‚˜^‘KPÔ‹VVVVSSQS““‚˜‚‹KKB‚ˆÈ‹ˆ:hnyæë¹æë¹¨!Â‚¹§¡9nî»ï&‚‚ˆÚ[Z[‹U[YH9«hùèk¸à ycëùi#yã¬8à ycëùk¨z+¨xà T›ÝšY\‹[™]]˜[8à ycëù¢jyleyæ¡H: ¨yn ¹g.¹  yb¯ù¥l9£k¹gî¹n©øà ‚‚¹ìîùîçúi¥¹ab9fç¹ëe;ï&‚‚˜^¹n ¹g.¹odùbcyi!9.£¹.à9.b9â­¹  {ï'Â˜‚º #9.#y¦+ùæí9£©yfç¹ëe;ï&‚‚˜^¹n ¹g.¹."ù. 9«iy/&¹­ª:/æ9¦+ú-ã;ï'Â˜‚¹n ¹g.¹£ãú/ì9.#ºh¡9­bøà yëe¹åixà y¢iú(c9b!¹é®øà ‚‚‹KKB‚ˆÈËˆ9¨.9oàú+¯º+¨yc§ùb&B‚˜^”˜]È8¡¤ˆØ[›ÛšXØ[8¡¤ˆ™X]\™H8¡¤ˆÝ]BÛÛ[[Ý\Èš\œÝÈX™[È\š]™Y‘\ØÜš\[Ûˆ8¢h™YXÝ[Û‚”Ý]HX™[ÈX][X]XØ[¹a`z+®9.#yèk¹k¦¹ )Ëùa¬¹ê {ï#9.#yo.¹b-¹cey. :+á9b!‚ÛÛ\ÜÚ]HÙZYÚÈ9oázhnùg*[˜Ü™[Y[[˜[Y]H9d#‚¹¢`9§"H˜\Ù[[™H9cê¹/oùå*LH9câ¹¦í9¥êy/èy kÂ˜]˜Z[X›WØ]È[™Ù\ÝYØ]È›ÝšY\ˆÈ™\œÚ[Ûˆ9cëú/ïz.*‚‘^XÝ™\^H9oázhnù¢$9êâÂ”›ÝšY\ˆÙ[X[XÈX™[9.#y/g9..¹¨.9oàùn ¹g.¹.¢ùk§‚”ÕÈÝ\Ü[™YÈÛÜœÜ˜]HXÝ[ÛˆÈ[Z][H9oázhnÈU¹¢`9§"y.íù¨/:fd9b-¹/oùå*9k§ºfay¬åyo¢ú)á9b&{ï#9.#yèk9ï%¹è H0¬LLÌŒ˜‚‹KKB‚ˆÈˆ9ìîùîçùb!¹l`‚‚˜^“UÙXÝ\š]H[š]™\œÙHÈ[™\ÝžHY[X™\œÚ\È˜Y[™È[\Â“H˜XÝÈ˜]ÈØœÙ\˜][ÛœÂ“ˆØ[›ÛšXØ[›ÝšY\‹Z[™\[™[]B“È™X]\™B“Ý]B“H™YÚ[YB“ˆ\ÝÜšXØ[ÛÛ™][Û˜[™]\›ˆÈš\ÚÂ‚”Ý˜]YÞHÈÜ›Û[ÈÈ^XÝ][Û‚ˆ9.#¹¥l9£k¹gî¹n©ùb!¹é®Â˜‚”™X[[YH9.#¹¥ézh¤yl/zaãùaly.ªùk¦¹.b{ï#9.#z ïyoh¹¢$9.)9ieùæî9.¤¹çæùæï¹æ¡9n ¹g.º+ëy.bxà ‚‚‹KKB‚ˆÈKˆ›ÝšY\‹[™]]˜[9 .ù/dù§­¹§¡‚˜^[X^š[™Ñ]HÈÕÂ•\Ú\™B”SUˆ8¡¤Â”›ÝšY\ˆY\\ˆÈ›Ü›X[^˜][Û‚ˆ8¡¤Â”˜]È[[]]X›H]šY[˜ÙBˆ8¡¤Â”›ÝšY\‹S›Ü›X[^™Yˆ8¡¤Â”ÛÝ\˜ÙHÛXÞHÈ™XÛÛ˜Ú[X][Û‚ˆ8¡¤ÂØ[›ÛšXØ[Ù[XÝYˆ8¡¤Â”Û˜\ÚÝˆ8¡¤Â‘™X]\™H\Y˜XÝˆ8¡¤Â”X›\Úˆ8¡¤Â”Ý]HÈ™YÚ[YHÈ[˜[\Ú\Â˜‚¹odùbcyc§ùb&{ï&‚‚‹H[X^š[™Ñ]{ï&¹n ¹g.¹.¢ùk§¸à yc¡¹cì‹ùk§¹¥íˆxà TÙXÝ\š]KÔÝ]\øà QZ[KÒÛ[™xà S[Z]8à PY\ÝY[ÐÐxà TÛ˜\ÚÝ;ï&Â‹H\Ú\™{ï&™œ™YWÜÚ\™xà y¦#¹èkˆÕËÐÒUPÈ^Û›Û^xà y..úh¦Y[X™\œÚ\8à y.$úhny.©9câzj£:+à{ï&Â‹HSU;ï&”™X[[Yxà U˜Y[™øà T™X[[YHÜ›ÜÜËXÚXÚøà ‚‚¹.îù/eH›ÝšY\ˆ:)äº"l¹cæ9c%º`ïylg¹.£ˆÌKÐÌ»ï#9oázhnù¦í9¥¬9§+9¥¡ù.í¸à ‚‚‹KKB‚ˆÈLˆØœÙ\˜][Ûˆ\B‚”›ÝšY\‹ÐØ[›ÛšXØ[9¥l9£k¹oázhnùc.¹b!»ï&‚‚˜^‘T‘PÕÓÐ”ÑT•USÓ‚‘T’U‘QÑPÕ”“Õ’QT—ÑT’U‘Q”ÑSPS•P×ÓP‘S˜‚¹.#yo¥ù¢¢ˆ›ÝšY\ˆ9ë¥ù¬åy¨!ùëo¹/*º(áy¢$9æí9£©yn ¹g.¹.¢ùk§¸à ‚‚‹KKB‚ˆÈLKˆÙXÝ\š]HY[]B‚¹«hùo#ÈÙXÝ\š]HQ;ï&‚‚˜^•URQJˆ›Ü›X[^™YÙ^Ú[™ÙBˆ
+È\ÜÙ]Ý\Bˆ
+È[š]X[ÜÞ[X›Ûˆ
+Èš\œÝÛ\ÝÙ]BŠB˜‚¹c§ùb&{ï&‚‚‹H›ÝšY\ˆÝY™š^9.#yk¦¹.byk§¹/dú.ªù.ï{ï&Â‹H[\Ü˜\žH˜[˜XÚÈ9.áya`z+®ÜZÙKÔÝYÚ[™ËÔ]X\˜[[™{ï&Â‹HX›\Ú]9é y«hˆ˜[˜XÚÈY[]{ï&Â‹H9«hùo#ÈX›\Ú9d#¹.#yo¥È™KZÙ^{ï&Â‹H›ÝšY\ˆÞ[X›ÛX\[™È9oázhnÈY™™XÝ]™KY]H]Ø\™xà ‚‚‹KKB‚ˆÈL‹ˆ[š]™\œÙB‚¹¨.9oàùcëù.©9¦$È[š]™\œÙ{ï&‚‚˜^ÓÔ‘WÕQP“WÕŒBB›\ÝYŠÈ˜[Y˜\‚ŠÈ›ÝÝ\Ü[™Y˜‚¹.#yo¥ù¢¢ˆŒÍŒ9¥éyc¡¹cì¹.#z-¬ùa¦z/æÈ[š]™\œÙxà ‚‚‘™X]\™H:!ê¹mìz`&º/áûï&‚‚˜^˜[YÛX\ÚÂ˜[YÛ‚˜‚º(j:/¯¹ê¥ùcèù.#z-¬øà ‚‚•[š]™\œÙH9oázhnÈU;ï#9c!y¢ë\ÝÙ[\Ý8à TÕ8à \Ý\Ü[œÚ[Û¸à X›Ø\™8à ]˜Y[™È[xà ‚‚‹KKB‚ˆÈLËˆ˜Y[™È[\Â‚¹oázhnù/oùå*9k§ºfayc¡¹cì¹b-¹n©»ï&‚‚˜^“XZ[ˆ›Ø\™”ÕÈ
+”ÕÚS™^”ÕT‚”ÑB’TÈÈš\œÝS‹Y^H›Ë[[Z]œÜXÚX[™\Ý[\[Û‚XÚÈÚ^™Bœ›Ý[™[™Â˜‚¹c¡¹cìº)á9b&yoázhnù§"{ï&‚‚˜^™Y™™XÝ]™WÙœ›ÛB™Y™™XÝ]™WÝÂ˜‚¹.íù¨/:+¨yë¥ù/oùå*9¦#¹èkˆXÚ[X[›Ý[™[™ûï#9.#y/oùå*:+ëz* :næ:+©›Ý[™9.èù¦ïù.©9¦$ù¢`:)á9b&xà ‚‚‹KKB‚ˆÈMˆÚ[Z[‹U[YHÈ]˜Z[Xš[]B‚¹.îù/eHØ[›ÛšXØ[˜XÝ9g*˜[Y]YÛ˜\ÚÝ9bcyoázhnù§"{ï&‚‚˜^˜]˜Z[X›WØ]˜]˜Z[Xš[]WÚÚ[™˜]˜Z[Xš[]WÜÛXÞWÝ™\œÚ[Û‚š[™Ù\ÝYØ]˜‚ºi¥¹¢n{ï&‚‚˜^“Ð”ÑT•‘QÓÓ”ÑT•UU‘WÐTÔÕSQQ˜‚¹c¡¹cì¹fçº(iy.#yo¥ù/*¹éì9çéz`dùc¡¹cìˆ›ÝšY\ˆ9æ¡9ç'ùk§¹cëùå*9¥íºeí8à ‚‚¹¥è9¬åyîæyaî¹k¢yaj]˜Z[X›WØ]9æ¡:+¬9oe{ï&‚‚˜^”UPTS•S‘HÈ“ÕÕSQUQ˜‚¹.#yo¥ÈX›\Ú8à ‚‚‹KKB‚ˆÈMKˆÝÜ˜YÙHÈÞ\Ý[HÙˆ™XÛÜ™‚¹odùbcyc§ùb&{ï&‚‚˜^”˜]È[[]]X›Hš[HH›ÝšY\ˆ]šY[˜ÙBØ[›ÛšXØ[\œ]Y]HØ[›ÛšXØ[Þ\Ý[HÙˆ™XÛÜ™‘XÚÑˆ˜XÝÊˆH™XZ[X›H™XY[Ù[˜‚”›ÝšY\ˆÑÈ:!ê¹n)ˆKùï$ùkf9cê¹¦+È[™Ù\Ý[ÛˆØXÚ{ï#9.#y¦+ùìîùîçÈÛÔ¸à ‚‚¹.îù/eH™XY[Ù[9oázhnú ïy.ãˆÛ˜\ÚÝX[šY™\Ý
+ÈØ[›ÛšXØ[\œ]Y]:aãynî¸à ‚‚‹KKB‚ˆÈM‹ˆ[[]]X›Hš[HÛÛ˜XÝ‚˜^‘š[˜[]9.#ykf9g*¸¡¤ˆÛÛ[Z]‚¹mì¹kf9g*9.%\Ú9æî9d#¸¡¤ˆY[\Ý[‚¹mì¹kf9g*9.%ž]\ËÚ\Ú9.#yd#¸¡¤ˆ“ÐÒÂ˜‚”\ÙH9odùbc{ï&‚‚˜^”Ú[™ÛH‹Ñš[HÛÛ[Z]ÝÛ™\ˆ›ØÙ\ÜÂ˜‚•ÛÜšÙ\ˆ9cëùnm¹cäy."ú/oKú+¨yë¥ûï#9/a¹.#yn¥:-ê:/æùê"ùæí9£©y.¢y¢¨ˆš[˜[ÛÛ[Z]8à ‚‚‹KKB‚ˆÈMËˆ˜]È]šY[˜ÙHÈ›ÝšY\‘^Ú[™ÙB‚¹æë¹¨!ùîçù. 9k¨z+¨yceya`ûï&‚‚˜^”›ÝšY\‘^Ú[™ÙHÂˆ˜]Ñ[™[ÜBˆ^[ØYŸB˜‚¹. 9.*ˆ^Ú[™ÙH9æ¡™\]Y\ÝÚY9oázhnú-+ùêoûï&‚‚˜^”›ÝšY\‚¸¡¤ˆÜZÙB¸¡¤ˆ˜]ÕÜš]\‚¸¡¤ˆ›ÝšY\‹S›Ü›X[^™Y¸¡¤ˆØ[›ÛšXØ[[™XYÙB˜‚¹i,z-)H^Ú[™ÙH9.gù/çykf˜]Ñ[™[Üxà ‚‚”˜]È]šY[˜ÙH9oázhnûï&‚‚˜^š[[]]X›BœÙXÜ™]\ØÜX˜™Yš\Ú\ÙX[Y›ÜÜÛ\ÜÂ˜‚¹é y«h¹.éH™\Š
+X9¢*¹¥«y¦ïù.èùc§ùiâù¥l9£k¸à ‚‚‹KKB‚ˆÈNˆØ[›ÛšXØ[ÛÜ™H˜XÝÛXZ[œÂ‚”™X[H9ë+9. 9¢nycê¹`f»ï&‚‚˜^™Z[WØ˜\‚œÙXÝ\š]WÜÝ]\Â›[Z]ÜšXÙB˜Y—Ù˜XÝÜ‚˜ÛÜœÜ˜]WØXÝ[Û‚˜‚¹«ãù§hHØ[›ÛšXØ[˜XÝ:!ìùl$yamù§"{ï&‚‚˜^œÙXÝ\š]WÚY˜YWÙ]HÈY™™XÝ]™H[YBœÙ[XÝYÜ›ÝšY\‚œ›ÝšY\—Ù]\Ù]›ØœÙ\˜][Û—Ý\B˜]˜Z[Xš[]WÚÚ[™˜]˜Z[X›WØ]˜]˜Z[Xš[]WÜÛXÞWÝ™\œÚ[Û‚œÛÝ\˜ÙWÜÛXÞWÝ™\œÚ[Û‚œÛÝ\˜ÙWÜ™]š\Ú[Û‚™]WÝ™\œÚ[Û‚œØÚ[XWÝ™\œÚ[Û‚œÙ[XÝ[Û—Ü™X\ÛÛ‚œ™XÛÛ˜Ú[X][Û—ÜÝ]\Âœ]X[]WÙ›YÜÂš[™Ù\ÝYØ]˜‚‹KKB‚ˆÈNKˆÛÝ\˜ÙHÛXÞB‚¹â­¹  {ï&‚‚˜^ÐS‘QUBT“Õ‘Q”‘UT‘Q˜‚¹c§ùb&{ï&‚‚˜^¹d#9. ÛXZ[ˆ9.#ya`z+®:aãycèT“Õ‘QÛXÞBT“Õ‘Q™\œÚ[Ûˆ9d#¹.#ycëùc§ùg,9/ë¹¥.B¹¥¬:+ëy.bHH9¥¬™\œÚ[Û‚˜‚¹«hùo#ÈÛÝ\˜ÙHÛXÞHˆ9.#ycëùcæ9a¦z-ëùo¡9.ãylg¹.£ˆˆ9bcyo¡yk£9¢$:hnxà ‚‚‹KKB‚ˆÈŒˆÛ˜\ÚÝ‚”Û˜\ÚÝ9oázhnùîäyk¦»ï&‚‚˜^™]WÜÛ˜\ÚÝÚYœÛÝ\˜ÙWÜÛXÞWÝ™\œÚ[Û‚˜]˜Z[Xš[]WÜÛXÞWÝ™\œÚ[Û‚˜ÛÛ\Û™[Â›ÙÚXØ[Ý\šB˜ÛÛ[Ú\Ú›X[šY™\ÝÚ\Ú˜‚¹.#ya`z+®ÛØˆ9£ª9¥«z/¤ùai{ï&ÛY]Y]H9cê¹g*˜[Y]Y9d#¹b&ùnî¸à ‚‚‹KKB‚ˆÈŒKˆ™X]\™H\Y˜XÝ‚‘™X]\™H9îäù§§9oázhnùîäyk¦»ï&‚‚˜^™™X]\™WØ\Y˜XÝÜÙ]ÚY™]WÜÛ˜\ÚÝÚY™™X]\™WÜÙ]Ý™\œÚ[Û‚˜Ø[×Ü[—ÚY˜ÛÙWØÛÛ[Z]™[š\›Û›Y[ÛØÚ×Ú\Ú˜ÛÛ™šY×Ú\Ú˜ÛÛ\Û™[Â™™X]\™HX[šY™\Ý˜‚¹.#yo¥ùa`z+®8 '9cê¹çéz`dÈÛ˜\ÚÝQ9l,yã'™X]\™x 'xà ‚‚‹KKB‚ˆÈŒ‹ˆX›\Ú‚”X›\Ú9oázhnùîäyk¦»ï&‚‚˜^œX›\ÚÚY™]WÜÛ˜\ÚÝÚY™™X]\™WØ\Y˜XÝÜÙ]ÚY™™X]\™WÜÙ]Ý™\œÚ[Û‚œ\[[™WÜ[—ÚY˜\Y˜XÝÝ˜[Y][Û—ÚY˜‚º)á9b&{ï&‚‚˜^¹.îù/eHX›\Ú:`ïyoázhnù§"H[‚”™XÛÝ™\žHÈ™\X›\Ú9.gùoázhnùnî¹kîyn¥[‚˜‚”X›\Ú9bcHØ]{ï&‚‚˜^”Û˜\ÚÝ˜[Y]Y\Y˜XÝ˜[Y]Y‘™X]\™TÙ]XÝ]™H
+È\ÚÙ[‹XÚXÚÂ•[š]™\œÙH˜[Y’Y[]H˜[˜XÚÈÛÝ[H˜›ØÚÚ[™ÈHÛÝ[H”[‹Ð\Y˜XÝÔÛ˜\ÚÝÔÛXÞKÐÛÙKÐÛÛ™šYÈ[™XYÙH9. :!í˜‚‹KKB‚ˆÈŒËˆ^XÝ™\^B‚º`&º/áÈX›\ÚÚY9oázhnú ïyì¯¹èk¹¢o¹fç»ï&‚‚˜^”Û˜\ÚÝ‘™X]\™H\Y˜XÝ‘™X]\™HÙ]•˜[Y][Û‚”[‚ÛÙHÛÛ[Z]‘[š\›Û›Y[ØÚÂÛÛ™šYÂ”ÛÝ\˜ÙKÐ]˜Z[Xš[]HÛXÞB˜‚¹.îù/eH]\Ý:næ:+©:)èù§¤9.#yo¥ù¥.ycæ9mì¹cäyn ùc¡¹cìº+ëy.bxà ‚‚‹KKB‚ˆÈˆ™X]\™HÈÝ]HÞ\Ý[B‚”Ý]H9îí9n©»ï&‚‚˜^œ™XY•™[™”šXÙx $Õ›Û[YB•›Û][]B”š\ÚÈ\]]B”Ý™\ÜÂ”Ý[B”^[Ù™ˆÈ™YY˜XÚÂ”ÝXÝ\™HÈ›Ý][Û‚•˜YXš[]HÈÜÜ[š]HXØÙ\ÜÚXš[]B˜‚¹«ãù.*ˆ™X]\™KÔÝ]H9n¥9§"{ï&‚‚˜^“]™[•™[ØÚ]BXØÙ[\˜][Û‚‘\˜][Û‚”\˜Ù[[BÛÛ™šY[˜ÙB‘]™\™Ù[˜ÙB˜‚‹KKB‚ˆÈKˆ™[™TÑH:i¥¹¢nyak9o#Â‚˜^”‘UÓˆHŠÝÈÞÝSŸJB“ˆHKŒŒ˜‚˜^”ÑT—ÓˆBœÝ[JŠB‹ÂœÝ[JXœÊŠJB˜‚ºi¥¹¢nz/æ9c!y¢ë;ï&‚‚˜^•TÑVWÔUSÂ“PWÑTÕ“PWÐ”‘PQ”Ô×Ô‘UÐ”‘PQ“‘U×ÒQÒ“‘U×ÓÕÂ˜‚Ø[›ÛšXØ[™\XØ[ÛXÙH:`&º/áùbc{ï#9.#y¢jyi)ùk£9¥m‹Õ›ÛÔÝ™\ÜËÕ[YKÔÝ[xà ‚‚‹KKB‚ˆÈ‹ˆšXÙx $Õ›Û[YH9alúe+¹î©¹k¦‚‚¹d#¹îë{ï&‚‚˜^•Ô—ÔUSÌŒB•Ô—ÝÈYYX[ŠÔ—ÞÝLŒL_JB‚”—Ô’PÑWÔ‘TÔÓ”ÑWÌŒˆØ[›ÛšXØ[Ý[™\™^™Y™\ÜÛœÙB‚”QÓSRUÓ“Ô“Bˆ˜]ÈÛÜÙKÔ™PÛÜÙKLBˆ[›ÛZ[˜]ÜˆHXÝX[YØ[[Z]ˆ“×ÓSRUÙ\\˜]B‚”—ÑQ‘—ÓˆB”‘UÓˆÈÝ[J\››Ý™\—Ü˜]WÙŠB˜‚˜“ÐUÐWÔÒT‘X9.#yo¥ù§*¹îãúj£:+àyëbyd#\Ú\™Hœ™YWÜÚ\™X8à ‚‚‹KKB‚ˆÈËˆœ™XYÈ›ÛÈÝ™\ÜÈ9d#¹îëz# ùfí‚œ™XY;ï&‚‚˜^QˆÈPÈÈ“Uœ]X[[\ÈÈTTˆÈZ[ÂœÝ›Û™ËÝÙXZÈÝ[™\™^™Y™\ÜÛœÙHœ™XYœ\XÚ\][ÛˆHÈY™™XÝ]™H‚˜‚•›Û][]{ï&‚‚˜^˜ÛÜÙKXÛÜÙHKÌŒÍŒ”\šÚ[œÛÛ‚˜Ü›ÜÜË\ÙXÝ[Û˜[TT‹ÝZ[™ÝÛœÚYHÙ[Z]›Û›Ûœ™XY›ÛKÝ›ÛŒ˜‚”Ý™\Üûï&‚‚˜^ÙXZË]Z[œ™XYÙXZË]Z[[[Ý[Ú\™B‘Ó‚›™]ÈÝÜÂ™ÝÛ‹[[Z]™\ÜÝ\™Bœ™\ÜÛœÙH0åÈ\››Ý™\ˆÝÛœÚYHX]š^˜‚‹KKB‚ˆÈŽˆ™X]\™H]Y]œ˜[Y]ÛÜšÂ‚‘™X]\™KÔÝ]H9."¹î¯ùbc{ï&‚‚˜^”™[XXš[]B“ÙÚXÂ‘\ÝšX][Û‚”™Y[™[˜ÞB’[˜Ü™[Y[[˜[Y]B“Ý][Ù‹\Ø[\B“][\H\Ý[™Â˜‚¹c¡¹cì¹§hy.í¹fç¹¢©z!ìùl${ï&‚‚˜^ŒHÈÈÈHÈLÈŒ˜Y[™È^\Â˜‚‹KKB‚ˆÈŽKˆ›ÝšY\ˆØ\Xš[]HÛÝ™\›˜[˜ÙB‚Ø\Xš[]H\›Ý˜[9oázhnùìîùîçú!êº+à{ï#9.#y£©ycåú, ùå*: !yhì9¦#¸ ':`&º/áø 'xà ‚‚¹§ 9îâ9n¥:j£:+à{ï&‚‚˜^ÛÜÙY“ÑPÕSÓˆÜZÙT[‚ÛÛ\]H›Ý™[˜[˜ÙB‘]šY[˜ÙHÛÜÝ\™B‘ÛÛ[ˆ]š[™[™Â”™\]Z\™YØ\ÙH\\Â”™\]Z\™YØ\ÙHÛÝ[Â”™\]Z\™Y›ÝšY\ˆ[™Ú[ÂXØÛÝ[›Ùš[B›ØÚÚ[™È™X\ÛÛœÈH×B˜‚Ø\Xš[]H:+¬9oeyoázhnú ïz+í9¦#ˆ›ÝšY\¸à Y]\Ù]8à Y[™Ú[8à zh¤yã¡øà yc¡¹cì‹ùk§¹¥í¸à TUÜ˜Yxà XXØÛÝ[›Ùš[xà TÑËÜ[[YH9d£™\šYšYYØ]8à ‚‚‹KKB‚ˆÈÌˆÛÛ[ˆ]9¬®ùä!‚‚¹«hùo#ÈÛÛ[ˆ]9oázhnûï&‚‚˜^•™\œÚ[Û™Y’[X[ˆ™]šY]ÙY‘^\›˜[H]šY[˜ÙY’\ÚÙX[Y‘]™[]™\œÙB˜‚ˆ
+Š¹odùbcyâ­¹  {ï"Œ‹LL{ï#PL‹ˆ9¢ny«(yîçù. ;ï"JŠ»ï&‘ÛÛ[ˆ]9îäù§¡9¬®ùä!‚ˆ9aj:`ê9l,yîê»ï"[[]]X›H™\œÚ[ÛœÈŒKÝŒ‹ÝŒÈ
+ÈPÕU‘H9£!úd¢
+ÈÙ[X[XÈ\Ú
+Âˆ\Ý[˜ÝY]™[Ø]H
+È›Ý[™›Ü›X[Ø]\È
+ÈÛXZ[ˆ›Ý]\ˆ
+È\YÐBˆ]™[];ï"xà ŠŠ¹odùbcHPÕU‘HHŒÈÓÓTSQ9`&z`"JŠ»ï"LŒÈØ\Ù\ûï&ùîäù§¡9c%¹.¢ù.í‚ˆÕÕS”ÒUSÓLLL8à QSTÕÞ[X›ÛÏLLŒ9.#z-¬ûï"{ï#
+Š¹.#y¦+ù«hùo#È™]šY]ÙYˆ]
+Š¸ %8 %“ÑPÕSÓˆ[ˆ9g*9.®¹méH™]šY]È:(izod9ç'ùk§¹.¢ù.í¹bcz(ªùb&ùnîºeê9¢ä¹îçxà ‚ˆ9.®¹méy¢iú(c:hny.#¹§ 9¥¬9îáº" º)àH0©ÌÌ{ï&ùc¡¹cì¹¬¯úgjz)àHU“Ñûï"9ë¨yä!¹ .ùa£9cê¹/çyåfyodùbcyç'ùæî;ï"xà ‚‚”›ÙXÝ[Ûˆ™\™XÝ9oázhnùëbH™]šY]ÈØ]HTÔøà ‚‚‹KKB‚ˆÈÌKˆÛÛ[ˆ]9odùbcyo¡y/ë‚‚ˆŒ‹LLH9â­¹  {ï"PL‹ÐÔ‹LKŒˆ9i#yk¨H0©ÌL9¥.ya¦{ï&ùc§ù¥¡ú/áù¥íºfb:/ì9mì¹®!zfi;ï"{ï&‚‚¹îäù§¡9/©ùaj:`ê:eëyã«ûï"9i&º/k¹k¨z+¨yd.9¥-»ï"{ï&‚‚˜^–ÞHX[šY™\ÝÝ]È9.ãˆØ\Ù\È9i#yë¥ûï"9ëèy¥.yclù¢é¹¢*»ï"B–ÞHØ\ÙWÜÙ[X[X×Ú\ÚÈÛÝ\˜ÙWØ\Y˜XÝÚ\Ú9b!¹é®Â–ÞHØ\ÙWÝ\H:/æùaiHÙ[X[XÈ\Ú–ÞH]™[ÚYÈ]™[ØÛ\ÜÂ–ÞH\Ý[˜ÝY]™[ÛÝ™\˜YÙ{ï"“ÑPÕSÓˆ[ˆ9b&ùnîºeê9¢ä¹îç{ï"B–ÞH\[™[Û›HÛÛ[ˆ™\œÚ[Û»ï"ŒKÝŒ‹ÝŒÈ
+ÈPÕU‘H9£!úd¢;ï"B–ÞHÛXZ[‹\ÜXÚYšXÈÛÛ[ˆ›Ø™H›Ý]\»ï"PL‹ŒËÐÔ‹LKŒ»ï#]šY[˜ÙH[™H9d#9®¤;ï"B–ÞH›Ý[™›Ü›X[Ø]\ûï"™\™XÝ9cê¹å*[‹X›Ý[™]\Ù];ï#PÕU‘H9£ª:/æËùëèy¥.y.#y¬á9¯#ûï"B˜‚¹bjy/fy..ŠŠ¹.®¹méy¢iú(c
+Š»ï"9îäù§¡9mì¹l,yîê»ï#9.#ycëùa£yå,yo 9cäz !y.èùb§»ï"{ï&‚‚˜^–ÈH9.®¹méH™]šY]ÈLŒÈŒÈØ\Ù\ûï"ØÜš\ËÙÛÛ[‹Ü™]šY]Ëœ{ï"B–ÈH:(izod8¢iML\Ý[˜ÝÕÕS”ÒUSÓˆ9îäù§¡9c%¹.¢ù.í»ï"9odùbcHL;ï"B–ÈH:(izod8¢iLŒ\Ý[˜ÝSTÕÞ[X›Ûûï"9odùbcHL;ï"B–ÈH9l ykf9i%º`ê9méy.íˆÛÝ\˜ÙWØ\Y˜XÝÚ\Ú8¡¤ˆ9.©ùaîˆ‘U’QUÑQ9âb9§+˜‚‘ÛXZ[ˆ›Ý]\»ï"9mì¹k§¹ã¬;ï#PL‹ÐÔ‹LKŒˆ:+ày£k¹d#9®¤
+È[™H:eëyd";ï"{ï&‚‚˜^”Õ8¡¤ˆ\ÝÜžWÜÝØÚ×ÜÝ]\Â“[Z]8¡¤ˆÝ]\È
+È\ÝX\Ý\Š\Ý[™×Ù]JH
+ÈUØ[[™\ˆ
+È[‹X›Ý[™[H›ÛÚÂ‘[\ÝY8¡¤ˆ\ÝÜšXØ[ÙXÝ\š]HX\Ý\ˆÈÝØÚÈ˜\ÚXÂÛÜœXÝ[Ûˆ8¡¤ˆØ[[™\ˆ
+ÈÝ]\È
+È]šY[™
+ÈšYÚÚ\ÜÝYH
+ÈYˆ
+ÈÛ[™HLKÕÕ
+ÌB’ˆX\[™È8¡¤ˆ\ÝX\Ý\»ï"ÛÙHÛÛ[Z]{ï"JÈ^XÝY]HÝ]\È0¬LÌ	B˜‚‹KKB‚ˆÈÌ‹ˆ›ÝšY\ˆXØÛÝ[È[š\›Û›Y[‚¹odùbcy.ãyi!9.£¹«hùo#ú-)¹cíùo :`&¹bcyaá¹i!úf-¹«­xà ‚‚º+åyå*ù.ïùç'ú-)¹cíùcê¹å*9.£¹gî¹è`HÛ˜\ÚÝ:/ç¹£©y.#¹§"zfd:+¨ºf!y­bú+å{ï#9.#yå*9.£º+ày¦#¹c¡¹cì¹¨.9oàù.¢ùk§»ï#9.gù.#yå*9.£¹£ª9kï9«hùo#ùnlùcìØ\XÚ]xà ‚‚¹«hùo#ÈSKLPˆ9bcyoázhnûï&‚‚˜^¹«hùo#ú-)¹cíÈ›Ùš[H9.®¹méyèkº+©™œ™Y^™H›ÙXÝ[Û—ØXØÛÝ[Ü›Ùš[WÚY”›ÝšY\ˆØÝÜˆH•S•SQWÐPÕPSÓÐQÕ‘T’Q’QQ¹k£9¥m9§`úfdÙ[™Ú[:j£:+àB˜‚‹KKB‚ˆÈÌËˆšX[B‚¹nîº+«»ï&‚‚˜^ŒH8¡¤ˆH8¡¤ˆŒÞ[X›ÛÂ˜‚ºj£:+à{ï&‚‚˜^›ÙÚ[‚œÝXœØÜšX™HY™XÞXÛB˜Ø[˜XÚÂœ›ÝšY\—Ù]™[Ý[YBœ™XÙZ]™YØ]˜šYØ\ÚÂ˜Ý[][]]™H›Û[YKØ[[Ý[˜Y[™È\ÙB[œÝXœØÜšX™Bœ™XÛÛ›™XÝ˜‚ŒLÞ[X›Û9cê¹å*9.£º+¨ºf!y."ºfd:(c9..¸à ‚‚‹KKB‚ˆÈÍˆ9¢ 9§+ù¨"9.#ˆÑÈ9c§ùb&B‚˜^”]Û‚]‚‘XÚÑ‚”\œ]Y]•Ú[™ÝÜÈÈ[^˜‚[X^š[™Ñ]KÕÕûï&‚‚˜^‘^\›˜[ÛÛ[Y\˜ÚX[›ÝšY\ˆ[[YB˜‚º) y¬`»ï&‚‚˜^ÛÜ™H]‹›ØÚÈ9.#ya¦yea¹.&ˆÚY[9§.¹fj9îçykîz-ëùo¡“ØØ[Ù]\ØÜš\9k¢z(áHÑÂY\\ˆ^žH[\ÜÒH9/oùå*š^\™KÑ˜ZÙH›ÝšY\‚”ÙXÜ™]È9.#z/æùaiHÚ]ÚY[9.#z/æùaiHÚ]˜‚‹KKB‚ˆÈÍKˆXÚÑˆ9nm¹cäB‚”\ÙH;ï&‚‚˜^¹. 9.*º/æùê"ù¢éy§"z+îùa¦H‚˜‚¹.#z) y`aú+¯¹i&¹.*¹i%º`ê:/æùê"ùcëùd#9¥í¹¥è9î©¹§gú+¯úeë¹d#9. 9¥¡ù.í¸à ‚‚¹i&º/æùê"Ëúfí¹`g9§.¹lg¹.£¹§*¹§iyceyâëQ¸à ‚‚‹KKB‚ˆÈÍ‹ˆÒHÈ]X[]HØ]B‚¹§ 9l#ÈØ]{ï&‚‚˜^œY™‚™›Ü›X]›^\Bœ]\Ýœ]Ûˆ[HÛÛ\[X[ØÜš\Â”ÜZÙHžK\[‚“ZYÜ˜][ÛˆÛÛ[Z]B‘U“ÑÈÚ[™ÙHØ]B˜‚‘Ú]XˆXÝ[ÛœÈ9n¥9/oùå*9k£9¥m9c¡¹cì»ï&‚‚˜^˜XÝ[ÛœËØÚXÚÛÝ]™]ÚY\ˆ˜‚¹.éy/çz+àHÚ][™XYÙKÑU“ÑÈØ]H9å'ù¥b8à ‚‚‹KKB‚ˆÈÍËˆ\Ý^Û›Û^B‚˜^•[š]ÛÛ˜XÝ’[YÜ˜][Û‚‘š^\™H™\XØ[ÛXÙB“]™HšX[”›ÙXÝ[ÛˆÜZÙB’\ÝÜšXØ[™\^B˜‚‘žK\[‹Ñ˜ZÙH9.#z ïy.èù¦ïÈ›Ü›X[›ÝšY\ˆ]8à ‚‚‹KKB‚ˆÈÎˆZYÜ˜][Ûˆ:)á9b&B‚˜^ŒK‹“ˆ:/ç¹îëB¹mì¹¢iú(cZYÜ˜][Ûˆ9.#y/ë¹¥.B¹mì¹¢iú(cZYÜ˜][Ûˆ9.#yb(:fiù¥.yd#B”[›™\ˆ:+¬9oeHÛÛ[\Ú”ØÚ[XH9/ë¹i#ycêº ïy¥¬9h§ˆZYÜ˜][Û‚˜‚‹KKB‚ˆÈÎKˆÙXÜ™]ÈÈÙXÝ\š]B‚‘Ú]9é y«h»ï&‚‚˜^¹å*9¢-ùd#B¹ká¹è B•ÚÙ[‚”ÙXÜ™]¹ea¹.&ˆÑÈÚY[¹å'ù.©ùéàykáºacyïk‚˜‚‘]šY[˜ÙKÓÙËÑ^Ù\[Ûˆ9oázhnÈØÜXˆÙXÜ™]8à ‚‚‹KKB‚ˆÈˆ9odùbczhnyæëºf-¹«­yâ­¹  B‚ŸÛÜšÜÝ™X[H[\[Y[][Ûˆ™]šY]È9odùbcyîäú+®ˆŸKK_KK_KK_KK_ŸSL[™Ú[™Y\š[™È›Ý[™][ÛˆÓ‘H‘T’Q’QQTÔÈŸ›Ý[™LKÌˆ\˜Ú]XÝ\™H\™[š[™ÈÓ‘H‘T’Q’QQØXœÛÜ˜™YTÔÈŸŒÈ›Ü›X[ÜZÙHÝXÝ\™HÓ‘HXœÛÜ˜™YžHÕ•PÕT‘HTÔÈŸPLHÛÛ[ˆ]\Ù]È\‹U\HØ]HÈØ][ÙÈÙX[Ó‘HXœÛÜ˜™YTÔûï"9å,HLKŒH:eëyã«ûï"HŸPLKŒH][YÜš]HÓ‘HXœÛÜ˜™YTÔûï"9å,HPLˆ9¢ny«(zeëyã«ûï"HŸPL‹ŒKÐL‹ŒˆÙ[X[XËÔU˜[Y]ÜœÈ
+È™]šY]ÈÛÜšÙ›ÝÈÓ‘HXœÛÜ˜™YTÔûï"9å,HPL‹ŒÈ:eëyã«ûï"HŸPL‹ŒÈÛÜœ™XÝ™\ÜÈÛÜÝ\™HÓ‘HXœÛÜ˜™Y[ÈPL‹È9îäù§¡9/çyåf{ï&ù§ 9îâ‘T’Q’QQ:f£ÈPL‹È:eê;ï"9.#zh¡9a¦HTÔûï"HŸÔ‹LH›ÝšY\‘^Ú[™ÙH
+È˜]ÕÜš]\ˆÓ‘HXœÛÜ˜™Y[ÈÔ‹LKŒ‹ŒÈ9îäù§¡9/çyåf{ï&ù§ 9îâ‘T’Q’QQ:f£ù§+9¢nzeêŸÔ‹LKŒH^XÚ]^Ú[™ÙH[[YHÓ‘HXœÛÜ˜™Y[ÈÔ‹LKŒ‹ŒÈ9îäù§¡9/çyåf{ï&ù§ 9îâ‘T’Q’QQ:f£ù§+9¢nzeêŸPL‹ÛÜœ™XÝ™\ÜÈY\[š[™ÈÓ‘HXœÛÜ˜™Y[ÈPL‹È9îäù§¡9/çyåf{ï&ù§ 9îâ‘T’Q’QQ:f£ù§+9¢nzeêŸÔ‹LKŒˆÛÛ\]H^Ú[™ÙH
+È˜]ÈÛÜÝ\™HÓ‘HXœÛÜ˜™Y[ÈÔ‹LKŒ‹ŒÈ9îäù§¡9/çyåf{ï&ù§ 9îâ‘T’Q’QQ:f£ù§+9¢nzeêŸPL‹H[KTÛÔˆÛÜÝ\™H
+ÈÔ‹LKŒ‹ŒH˜]È\™[š[™ÈÓ‘HXœÛÜ˜™Y[ÈPL‹È9îäù§¡9/çyåf{ï&ù§ 9îâ‘T’Q’QQ:f£ù§+9¢nzeêŸPL‹ˆ›Ü›X[]ÓX[šY™\ÝÛÜÝ\™H
+ÈÔ‹LKŒ‹Œˆ›Ø™H^Ú[™ÙH[™›Ü˜Ù[Y[Ó‘HXœÛÜ˜™Y[ÈPL‹Ž9îäù§¡9/çyåf{ï&ù§ 9îâ‘T’Q’QQ:f£ù§+9¢nzeêŸPL‹Èš[˜[[YÜš]H
+ÈÔ‹LKŒ‹ŒÈ]šY[˜ÙHY[]HÛÜÝ\™HÓ‘HXœÛÜ˜™Y[ÈPL‹ŽH9îäù§¡9/çyåf{ï&ù§ 9îâ‘T’Q’QQ:f£ù§+9¢nzeêŸPL‹Žš[˜[^Ú[™ÙKP›Ý[™\žH
+ÈÔ‹LKŒ‹™KPXØÙ\ÜÈ[YÜš]HÓ‘HXœÛÜ˜™Y[ÈPL‹ŒL9îäù§¡9/çyåf{ï&ù§ 9îâ‘T’Q’QQ:f£ù§+9¢nzeêŸPL‹ŽH™]šY]ËTÙX[^XÝ™\ÜÈ
+ÈÔ‹LKŒ‹HÝ]]ÛÛ™š[™[Y[Ó‘H‘T’Q’QQ
+XœÛÜ˜™Y
+HTÔÈŸPL‹ŒL™]šY]ÈX›\Úž]KRY[]H
+ÈÔ‹LKŒ‹ˆ™]šY]ÈX›\Ú[YÜš]HÓ‘H‘T’Q’QQ
+XœÛÜ˜™Y
+HTÔÈŸPL‹ŒLHš[˜[Ú[™ÛKUÜš]\ˆ[™XYÙHÛÜÝ\™H
+ÈÔ‹LKŒ‹È™]šY]È\™[RY[]HÙ\šX[^˜][ÛˆÓ‘H
+Š•‘T’Q’QQ
+Šˆ
+Š”PL‹žÈÔ‹LKž9k¨z+¨zdïˆÓÔÑQ;ï"Œ‹LL»ï"JŠˆŸPLÈÈPLËŒHÈPLËŒˆÑÈY™XÞXÛHÈØ]\ÈÈX\›KTÝÜ:dïˆÓ‘H
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘JŠˆ9aj:dïºeëyã«ûï"™]šY]Ù\ˆŒ‹LLŽ:(àya¬ûï#9.#zaãyo ;ï"HŸPŒHÈŒKŒHÈŒKŒˆØ\Xš[]H[™Ú[›ÛÙˆ:dïˆÓ‘H
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘JŠˆ9aj:dïºeëyã«ûï"™]šY]Ù\ˆŒ‹LLÌ:(àya¬ûï#9.#zaãyo ;ï"HŸPŒˆÈŒ‹ŒHÈŒ‹ŒˆÈŒ‹ŒÈX›\Ú˜[Y][Ûˆ^XÝ™\ÜÈ:dïˆÓ‘H
+ŠÓÔÑQÈ‘T’Q’QQÈ”‘QV‘JŠˆ9aj:dïºeëyã«ûï"™]šY]Ù\ˆŒ‹LLÌH:(àya¬ûï&ÐQ‹LŒHPÐÑTQ;ï"HŸÔ‹Lˆ›ÝšY\‹S›Ü›X[^™Y
+È]X\˜[[™HÓ‘H
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘JŠˆŒ‹LKLHMÎŒˆ9§ 9îâ9i#yk¨{ï&ÐQ‹LŒˆPÐÑTQŸÔ‹L‹ŒHÝ\™˜XÙHY[]H
+È™YÚ\ÝžH›Ý[™\žH
+È™\^H
+ÈÛÛ[Z]ÛÜÝ\™HÓ‘H
+Š•‘T’Q’QQÈXœÛÜ˜™YÈ”‘QV‘JŠˆ9d#9."»ï"9nm¹aiHÔ‹LˆÛÜÝ\™{ï"HŸÔ‹L‹Œˆ™\^H›Ý™[˜[˜ÙHÙX[Ó‘H
+Š•‘T’Q’QQÈXœÛÜ˜™YÈ”‘QV‘JŠˆ9d#9."ˆŸÔ‹L‹ŒÈ˜]È\Ý[˜ÚÜˆ
+ÈÜ\˜][ÛˆÜXÈ
+ÈÝ]]ÙX[Ó‘H
+Š•‘T’Q’QQÈXœÛÜ˜™YÈ”‘QV‘JŠˆ9d#9."ˆŸÔ‹L‹[˜ÚÜ™Y˜]È[™Ù\Ý[Ûˆ›Ý[™\žHÓ‘H
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘JŠˆ9d#9."ˆŸÔ‹LÈ]˜Z[Xš[]TÛXÞH
+ÈØ[›ÛšXØ[^™\ˆÓ‘H
+Š”‘SÔS‘Q
+Šˆ9..ù/dù§­¹§¡TÔÈÈ”‘QV‘{ï"Œ‹LKLHNNŒˆ9i#yk¨{ï"{ï&Î9å,HÔ‹LËŒH9¥-¹cèÈŸÔ‹LËŒHØ[›ÛšXØ[[œ]Û˜\ÚÝ
+È™\^HÙX[Ó‘H
+Š”‘SÔS‘Q;ï"9mì¹d.9¥-»ï"JŠˆNH:hny§.¹b-ˆTÔÈÈ”‘QV‘{ï"Œ‹LKLHŒNŒ9i#yk¨{ï"{ï&ÍH9å,HÔ‹LËŒˆ9¥-¹cèÈŸÔ‹LËŒˆ˜[œØXÝ[Û˜[Û˜\ÚÝ
+È[ÙX[Ó‘H
+Š”‘SÔS‘Q;ï"9mì¹d.9¥-»ï"JŠˆMˆ:hny§.¹b-ˆTÔÈÈ”‘QV‘{ï"Œ‹LKLˆŽMˆ9i#yk¨{ï"{ï&Ìˆ
+ÈÈH9å,HÔ‹LËŒÈ9¥-¹cèÈŸÔ‹LËŒÈ\ÝÜšXØ[[œ]ÛÛ[Z]H
+È™\šYšXØ][Ûˆ]šY[˜ÙHÓ‘H
+Š”‘SÔS‘Q;ï"9mì¹d.9¥-»ï"JŠˆN:hny§.¹b-ˆTÔÈÈ”‘QV‘{ï"Œ‹LKLˆLŒŒˆ9i#yk¨{ï"{ï&ÌÈ9å,HÔ‹LË9¥-¹cèÈŸÔ‹LË\ÝÜšXØ[Ø[›ÛšXØ[ÙX[\Ý
+È™\šYšXØ][Ûˆ™\^HÞ[[Y]žH
+ÈX[šY™\ÝY[]Hš[™[™ÈÓ‘H
+Š”‘SÔS‘Q;ï"9mì¹d.9¥-»ï#9c§ùk¦ˆÈTÔËÑ”‘QV‘{ï"JŠˆM:hny§.¹b-ˆTÔÈÈ”‘QV‘{ï"Œ‹LKLˆLÎŒMÈ9i#yk¨{ï"{ï&Ìˆ9¥¬9å,HÔ‹LËH9¥-¹cèÈŸÔ‹LËH\ÝÜšXØ[Ø[™Y]H\ØÛÝ™\žH
+È\š]™Y[‹ÔÝ]\ÈÙX[Ó‘H
+Š”‘SÔS‘Q
+Šˆ\š]™Y[‹ÜÝ]\ÈÙX[TÔÈÈ”‘QV‘x %8 %ŒH:hny§.¹b-»ï"Œ‹LKLˆMÎŒÍˆ9i#yk¨{ï"{ï&Ìˆ9¥¬9å,HÔ‹LËˆ9¥-¹cèÈŸÔ‹LËˆÙ[XÝ[Û‹Qœ™YH\ÝÜšXØ[\ØÛÝ™\žH
+È\ÝÜšXØ[\Y˜XÝÛÜÝ\™HÓ‘H
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘JŠˆŒ‹LKLˆŒNŒ9i#yk¨y§ 9îâ:(àya¬ûï"ŽX[™]ÜžH9ajTÔûï"{ï&ÐÔ‹LÈ9aj:dï¹alúeëHŸÔ‹MÛ˜\ÚÝZ[\ˆ
+ÈXÚÑˆ™XY[Ù[™XZ[Ó‘H
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘JŠˆÔ‹M9aj:dï¹mì¹k£9¢$;ï#Q‹LPÐÑTQ;ï#ˆÌH9mì¹d"9nmˆŸÔ‹MH]\›Z[š\ÝXÈ™X]\™H^Y\ˆÓ‘H
+Š”‘SÔS‘Q
+Šˆ9..ù/dù§.¹b-ˆTÔûï&ù.áybjHH›Ý[™Y[™XYÙ{ï#:/k9aiHÔ‹MKŒˆŸÔ‹MKŒH™YÚ\ÝžHÛ™\Ý^XÝ][Ûˆ
+È™X]\™HÙX[ÛÜÝ\™HÓ‘H
+Š•‘T’Q’QQÈÓÔÑQÈ”‘QV‘JŠˆ™]šY]Ù\ˆ9mìºj£:+àHÛÜœ™XÝ™\ÜÈÛÜÝ\™HŸÔ‹MKŒˆ›Ý[™YÙ[XÝYR[œ][™XYÙHS—Ô“ÑÔ‘TÔÈ
+Š”ÕT•ÈPÕU‘JŠˆLÈÜ\œÙKÛY[X™\‹X›Ý[™8à \Ù[XÝYZ[œ]U8à [X\šÙ]ÊŠHÝX\™9.#¹¬®ùä!¹d#9«iHŸÔ‹MˆX\šÙ]Ý]H^Y\ˆ“ÐÒÑQ
+Š“ÐÒÑQÐ–WÐÔ‹MKŒŠŠˆÔ‹MKŒˆÛÜÝ\™H9d#¹¢cycëùd+ùbªŸPÒHS“‘QS‘S‘È™^ŸÔ‹LÈ]˜Z[Xš[]H
+ÈØ[›ÛšXØ[^™\ˆS“‘QS‘S‘ÈÔ‹Lˆ9d#ˆŸÔ‹MÛ˜\ÚÝ
+È™XY[Ù[™XZ[S“‘QS‘S‘ÈÔ‹LÈ9d#ˆŸ[ØÚÈŒ0åÍŒ™\XØ[ÛXÙH“ÐÒÑQS‘S‘ÈÔ‹L‹‹9d#ˆŸ›ÙXÝ[ÛˆSKLPˆ“ÐÒÑQS‘S‘È9«hùo#ú-)¹cíÈ
+È
+ÈÛÛ[ˆ9.®¹méH™]šY]ÈŸ™X[H“ÐÒÑQS‘S‘È›ÝšY\ˆ
+ÈØ[›ÛšXØ[[[YHŸ™[™TÑH“ÐÒÑQS‘S‘È™X[™\XØ[ÛXÙH9d#ˆ‚‹KKB‚ˆÈKˆ9odùbcy§ :jæ9/&9ab9î©Â‚ˆÈÈÔ‹MKŒH™YÚ\ÝžHÛ™\Ý^XÝ][Ûˆ
+È™X]\™HÙX[ÛÜÝ\™{ï"‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"B‚”™]šY]Ù\ˆÛÛ[Z]ÙÍÙŽMLXŒ™LNX˜LL˜LÙMLŽYMYÌMØ›Ü›X[H™\šYšYYÔ‹MKŒHÛÜœ™XÝ™\ÜÈÛÜÝ\™Nˆ™YÚ\ÝžHÛ™\Ý^XÝ][Û‹™X]\™HÙX[˜Ü›ÜÜËXš[™[™Ë[Y\šXËÙš[™[™ÈÙ[X[XÜËXÝ]™HZ\ÜÚ[™Û™\ÜÈ[™HÜšYÚ[˜[ŒK‹ˆX\[™È\™Hœ›Þ™[‹ˆH™]šY]È™[Ü[™YÛ›HHH›Ý[™Y[[™XYÙB˜ÛÛ\^]H][H\ÈÔ‹MKŒŽÈÔ‹Mˆ™[XZ[œÈ›ØÚÙY[™ˆÌˆ™[XZ[œÈ[›Y\™ÙY‚‚”™]š[Ý\ÈÜ™Y[ˆ]šY[˜ÙH™[XZ[œÈ[ˆÌÍÍNNNLÎ˜
+[ˆMŽ
+KÚ]Ú[™ÝÜÂŒËŒL‹Ú[™ÝÜÈËŒM[™X[HËŒM[Ü™Y[‹ˆHÝ\œ™[Ô‹MKŒˆÛÙKÝ\ÝšXY\ÈX˜™˜Œ˜ŽMY˜Œ™ŽÌLÙLLÍNÎY™LÌØØM™™XÈ]È[ˆÌÍÍŒNMÍL˜Š[ˆMÌJH\ÈÝ[]Y]YYÈ[ˆ›ÙÜ™\ÜÈ]\ÈØÝ[Y[™]š\Ú[Û‹‚‚ˆÈÈÔ‹MKŒˆ›Ý[™YÙ[XÝYR[œ][™XYÙ{ï"ÒH‘T’Q’QQÈ‘U’QUÈS‘S‘ûï"B‚Ô‹MKŒˆ[\[Y[][Ûˆ[™ÒH™\šYšXØ][Ûˆ\™HÛÛ\]HÛˆÛX[ˆ]ÛZXÈ\ÝÜžHXYÙMØLÌØÍXÍÙYLNÌMÌŒY˜ØL™MØŽÍØØÎ˜ŽX
+ˆÌÊKˆHš[˜[™YHÜšYÚ[˜]Yœ›ÛHŽYLNMÍNMYŽMY˜˜™ÙLŒØMMŒŽŒXÈˆÌ‰ÜÈ\ÝÜžH™[XZ[œÈ[˜Ú[™ÙY™XØ]\ÙH]È[ˆMÍH˜Z[\™HØ\ÈÛÜœ™XÝYžHH™]Èœ˜[˜Ú˜]\ˆ[ˆ›Ü˜ÙK\\ÚÜˆ[ˆ^[™YÛÜšÙ›ÝÈ^Ù\[Û‹‚‚”[ˆÌÎMMÌMMŽ
+[ˆMÍŠH\ÈÜ™Y[ˆÛˆX[HËŒMÚ[™ÝÜÈËŒM[™Ú[™ÝÜÈËŒL‹Ú]LÌŒ\ÜÙYÛˆXXÚYËˆY™ˆ[Ù›Ü›X]^\KÜZÙKÑËXXœÙ[[™H™\]Z\™YÚ[™ÝÜÈËŒMU“ÑËÓX[˜YÙ[Y[YØÈØ]\È[\ÜËˆH›Ý[™YÙ[XÝYZ[œ][™XYÙK™YÚ\ÝžKY\š]™YY[X™\ˆ›Ý[™›Ý[™YYÈ\[™[˜ÞKX\šÙ]Ù]ÛÜ™\ˆÝX\™[™›ØÝ\ÙY]]][Û‹Ø]˜Z[Xš[]H\ÝÈ\™HÛÝ™\™YžH\ÈX]š^‚‚“[Y\šXÈ›Ü›][\ËXÝ]™Hš[™[™È]\Y˜XÝØÚ[XKZYÜ˜][ÛˆŒÈ[™[Ý]KÜØÛÜ™KÜÚYÛ˜[ÜÝ˜]YÞKØ˜XÚÝ\ÝÜ›ÙXÝ[ÛˆÛÜšÈ™[XZ[ˆÝ]ÙˆØÛÜKˆÔ‹MKŒˆ\ÈÓ‘HÈS‘S‘×Ô‘U’QUÈ[™[™È™]šY]Ù\ˆÛÜÝ\™NÈˆÌÈ\È›Ý]]Ë[Y\™ÙYˆÌˆ\È™]Z[™Y›Üˆ\ÝÜšXØ[˜XÙXXš[]K[™Ô‹Mˆ™[XZ[œÈ“ÐÒÑQÐ–WÐÔ‹MKŒ‹‚ˆÈÈÔ‹MÛ˜\ÚÝZ[\ˆ
+ÈXÚÑˆ™XY[Ù[;ï"9bcy¢n{ï#‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"B‚Ô‹LÈ9aj:dïˆ‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"Œ‹LKLˆŒNŒ9i#yk¨z(àya¬ûï#Q‹LŒÈPÐÑTQ;ï"yd#¹«hùo#ùd+ùbª8à ‚ºi¥¹¢n{ï"KLŒŒLËLÍ{ï&ÐÔ‹MÛÜÝ\™HKLŒŒLËLÍ‹ÌÍûï&ùméy/g:) y¬`‚˜ØÜËÙ\ÚYÛ‹ÐK\Ú\™KX[˜[\Ú\×ÐÔ‹MÔÛ˜\ÚÝZ[\¹câ‘XÚÑ”™XY[Ù[9o 9cäyméy/g:) y¬`—ÌŒŒL‹›YŠÈK\Ú\™KX[˜[\Ú\×ÐÔ‹LË¹§ 9îâ9i#yk¨yîäú+®¹.#Ô‹M9d+ùbª:(àya¬×ÌŒŒL‹›Y;ï"{ï&‚‚Ô‹M;ï"Œ‹LKLÈ9i#yk¨H™[Ü[»ï"yodùbcycê¹i!9ä!¹.éy."ÈÛÜœ™XÝ™\ÜÈÛÜÝ\™{ï&”Û˜\ÚÝZ[\ˆ9.#‚˜™\šYžWÜÛ˜\ÚÝ9alyå*9èk¹k¦¹ )ÈØ[›ÛšXØ[›Ú™XÝ[Ûˆ™\^{ï&Ú[[]]X›H\Y˜XÝ:aáùå*Y[XØ[››Ë[ÜÈZ\ÜÚ[™Ë]Üš]HÈY™™\™[Xž]HÛÛ™›XÝ9nm¹g*9a¦yaiybcy¥m9/dÈ™Y›YÚ;ï&Ü™YÚ\ÝžH9b¨9aiy¦/¹o#Â’Ù^Pš[™[™È9.#ˆÝX›HÛÜ;ï&ÐØ[›ÛšXØ[ÔÛ˜\ÚÝ™\šYšY\ˆ9/oùå*9mì¹¨(zj£9æ¡9d#9. \œ]Y]ž]\ûï#Û˜\ÚÝœØÚ[XWÚ\Ú9.ãˆ\ÚXØ[ØÚ[XH:aãyë¥ûï&Ô™XY[Ù[9h§¹b¨9cãš[™Ù\œš[8à XØ[›ÛšXØ[Ø\×ÛÙ‹Ù[™ÛXZ[—ÛY]HÙX[;ï#9nm¹g*Ü[—Ü™XYÛÛ›X:/å9fç¹céy§á9bcyk£9¢$™\šYšYY[Ü[¸à ›ZYÜ˜][ÛˆŒˆ9.#y¥.{ï&ÂÔ‹Mxà Q™X]\™KÔÝ]xà \›ÝšY\‹Ù˜[˜XÚËÜ›ÙXÝ[Ûˆ9.ãy.#yg*:# ùfí9a¡xà ‚‚˜^Ô‹MŒHØ[›ÛšXØ[9ak9aly­¢:-.zj£:+àyfj;ï"Ø[›ÛšXØ[Ý™\šYšY\‹œ{ï"{ï&‚ˆ™\šYžWØØ[›ÛšXØ[Ü[—Ù›Ü—ØÛÛœÝ[\[ÛˆH9."ù®.:+îùcåˆØ[›ÛšXØ[]9æ¡9e+ù. 9¥+ù£ yaiycèûï&Âˆ9a¡z`ê9i#yå*Ô‹LÈ9e+ù. 9k§¹ã¬;ï"Y[]HÙX[È\Y˜XÝÛÜÝ\™HÈš[™[™ÜÈ]ÂˆÙX[YZ[œ]9§`ùj Jùâjyä!ºj£:+àx %8 %ÜÙX[YÚ[œ]Ø]]Üš]WÜ›Ø›[\È9aly.ªù£ä9cå»ï"{ï&Âˆ“ÐÒÑQ9¦/¹o#ù¢ä¹îç{ï&ù.#z) y¬`ˆÝ\œ™[\ØÛÝ™\žH™\Ù[˜Ù{ï"9d"9¬åHÝ\\œÙ]9.#z/ïy®«Âˆ9è-9gcùmìˆZ[ÕPÐÑTÔÈ9æ¡9­¢:-.{ï"BÔ‹MŒˆÛ˜\ÚÝZ[\»ï"Û˜\ÚÝÈ9c!{ï"{ï&‚ˆ9âb9§+9c%ˆØÚ[XH™YÚ\Ýž{ï"9b%úfá‹Ù\KÛ[Xš[]KÚÙ^H\š]KÚÙ^H›Ú™XÝ[Û‚ˆ9cey. 9.¢ùk§¹®¤;ï&ÛX\šÙ]\^[ØY8à Y˜XÝÜ—Ý\OZÙ^H›Ú™XÝ[Û»ï"{ï&ùèk¹k¦¹ )ÈY[]Bˆ;ï"Ø[›ÛšXØ[[‹[]™[ÙX[È
+ÈÛÛ˜XÝ
+ÈZ[\ˆÛÙHš[™Ù\œš[O‚ˆURQ{ï"{ï&Ú[[]]X›H\Y˜XÝûï"\Y˜XÝ:fáOz+íù¬`ˆÛXZ[ˆ:fá¸à [X[šY™\ÝTÕ8à BˆÝÜš]WÚ[[]]X›H9¢ä¹îçz)¡¹æå»ï"{ï&ÛZYÜ˜][ÛˆŒˆY]WÜÛ˜\ÚÝØZ[;ï"\XÚXÚÂˆ9.¢ùb¨HÈ^XÝ™]žH9n`¹ëbH™\^HÈÜ˜\Ú9«¢ùåfH˜Z[ÛÜÙY;ï"{ï&Ý™\šYžWÜÛ˜\ÚÝˆ;ï"]\›Z[š\ÝXÈT’H
+ÈY[]HURQHÜ›ÜÜËXš[™
+ÈØ[›ÛšXØ[›Ý™[˜[˜ÙBˆÜ›ÜÜËXš[™:aãz-äy­¢:-.zj£:+àyfj
+È\Y˜XÝ9âjyä!‹ú+ëy.bHÙX[:aãyë¥ûï"BÔ‹MŒÈXÚÑˆ™XY[Ù[;ï"™XY[Ù[È9c!{ï"{ï&‚ˆ™XZ[H™\šYžWÜÛ˜\ÚÝOˆ[\9n¤ÈOˆ™YÚ\ÝžH9ì¯¹èk¹ìnùg¢ùnîº(j
+Âˆ™XYÜ\œ]Y]
+]™WÜ\][Ûš[™ÏY˜[ÙJHOˆ[\9."ˆÙÚXØ[ÙX[;ï":(j:fá‹ú(c9¥lÂˆÙ^H9e+ù. ú(j9a¡yk®zaãyë¥ÈÙ[X[XÈ\Ú;ï"SQTÕSTˆ9od¹. 9c%ˆUûï"KÜØÚ[XH9ì¯¹èk‹ÂˆY]H:(j;ï"KOˆ]œ™\XÙH9c§ùkd9¦ïù£h»ï&ùi,z-)H[\9b(:fi9¥éùæë¹¨!ùkeú" ¹.#ycæº/®yåc;ï"TÕÝX\™;ï"{ï&œÛ˜\ÚÝÜ™XY[Ù[9é H[\Ü›ÝšY\œËÛ›Ü›X[^˜][Û‹Âˆ˜]×ÝÜš]\»ï&ùé H[™\ËÝ[X‹Û[\KÜØÚ\KÜÚÛX\›‚Ô‹LÈ][9ï.ºfmù¦/¹o#ùå,ù¢©{ï"9£ä:+íùi#yk¨y. 9nmº(àya¬ûï#9§*¹ ¡9 ¡9/ë¹i#{ï"{ï&‚ˆÔ‹LÈÙ[XÝYÙXÚ\Ú[ÛˆÙ[X[XÈÙX[9¦ï¹kîy§*¹kîzod›ÝÜÈ:+¨yë¥ú #\œ]Y]9a¦Bˆ9kîzod9d#ˆ›ÝÜø %8 %9i&ˆÛXZ[ˆ^XÝ™\^H9oáz+ëù¢©HSPQÑQ;ï"9ceHÛXZ[ˆ9¥è9më¹o ¹¥aBˆ9akz/k¹i#yk¨y§*¹¦­:g,»ï"{ï&ù§ 9l#ù/ë¹i#O\ÙX[9kîH[YÛ™Y›ÝÜÈ:+¨yë¥ûï"9ceHÛXZ[ˆ:(c9..º`$ˆ9keú" ¹.#ycæ;ï"JÈ\Ý][QÛXZ[”™\^T™YÜ™\ÜÚ[Ûˆ9fç¹odºd¢BY™\œØ\šX[\Ýûï"
+ÍM»ï&¹ .ù/dÈLŒÍKÌ;ï&ÛX[™]ÜžHKML9aj9kîyn¥;ï"B˜‚ˆÈÈÈÔ‹LËˆÙ[XÝ[Û‹Qœ™YH\ÝÜšXØ[\ØÛÝ™\žH
+È\ÝÜšXØ[Ø[›ÛšXØ[\Y˜XÝÛÜÝ\™{ï"9bcy¢n{ï#‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"B‚ŒŒ‹LKLˆMÎŒÍˆ9i#yk¨H‘SÔS‘Q9d#¹¥-¹cèûï&ÌŒ‹LKLˆŒNŒ9§ 9îâ9i#yk¨H
+Š•‘T’Q’QQÂÓÔÑQÈ”‘QV‘{ï"9.#zaãyo ;ï"JŠ¸ %8 %Ô‹LÈ9aj:dï¹alúeëxà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒL‹LÍ¹.#ˆQ‹LŒÈ[Y[™Y[¸à ‚‚ˆÈÈÈÔ‹LËH\ÝÜšXØ[Ø[™Y]H\ØÛÝ™\žH
+È\š]™YØ[›ÛšXØ[[‹ÔÝ]\ÈÙX[;ï"9bcy¢n{ï#‘T’Q’QQÈ9mì¹d.9¥-»ï"B‚Ô‹LË9i#yk¨{ï"Œ‹LKLˆLÎŒMÈ
+ÌŒ;ï"T‘SÔS‘Q9d#¹¥-¹cèûï&ÌŒ‹LKLˆMÎŒÍ‚Ô‹LËH9i#yk¨{ï&ŠŠ”‘SÔS‘Q
+Š»ï"\š]™Y[ˆÈÝ]\ÈÙX[9aj:`êTÔÈÈ”‘QV‘x %8 %ŒŒH:hny§.¹b-»ï&Ìˆ9¥¬9å,HÔ‹LËˆ9¥-¹cèûï#:)ày."»ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒL‹LÌÂ¹.#ˆQ‹LŒÈ[Y[™Y[{ï"9am¹.+Hœš[Z]]™H™\]Y\Ý]ÛÜ›šY[È9§éz+èˆ¹æ¡9`&z`"Bº`"y¢êymìº(ªÈ[Y[™Y[ˆ0©ÌLKŒH9/ëº+¨¸ %8 %š[Z]]™H9keù«­yæ¡[YÜš]H9cê¹g*™\šYšY\‚¹a¡z`ê9¢cz(ªùèkº+©;ï#9.îù/eHÛÜœ™XÝ™\ÜÈšY[:`ïy.#yo¥ù/g9..º/æùaiH™\šYšY\ˆ9bcyæ¡9£¤¹.å¹§hy.í»ï"{ï&‚‚˜^”LH[\\‹T™\Ú\Ý[\ÝÜšXØ[Ø[™Y]H\ØÛÝ™\ž{ï&‚ˆ9¥éùï.ºfmûï&˜ÛÛ[Z]H9`&z`"HÔSHÒT‘HØ[›ÛšXØ[ØÛÛ^Ú\ÚHÈS‘ˆÝ]\ÈOH	Ð“ÐÒÑQ	ø %8 %\š]™Y9keù«­zh¡:/áù®é;ï&ÛYÙ\ˆÝ]\È9¥.H	Ð“ÐÒÑQ	Âˆ;ï":-ëùo¡{ï"y¢%ˆØ[›ÛšXØ[ØÛÛ^Ú\Ú9¯ ¹éîù`aù`/;ï":-ëùo¡»ï"z`ïz+ªHš[Ü‚ˆÕPÐÑTÔÈ9g*:/æùaiHÙX[™\šYšY\ˆ9bcz(ªúf¤:%ãÂˆ9¥-¹cèûï&¹`&z`"ycäyã¬9£"Hš[Z]]™H™\]Y\Ý]ÛÜ›šY[ûï"™\]Y\ÝYÙÛXZ[œ×Ú\Úˆ
+È\×ÛÙ»ï"]Ûˆ9/©ùì¯¹èk¹«å:/ ûï"JÈÛÛ˜XÝ
+È9."HÛXÞH™\œÚ[Û‹Ú\Ú
+ÂˆÛÙWÙš[™Ù\œš[;ï"{ï#9.#yå*Ý]\È:h¡:/áù®é8à y.#y¢¢ˆÝÜ™YÛÛ^9odÂˆÙ[XÝ[ÛˆÙ^{ï&ù«ãù.*¹`&z`"yab:/áÈ[\ÝÜšXØ[ÙX[;ï"0©ÎKŒH9aj:`ê
+È\š]™YˆY[]H9âjyä!ºaãyë¥È
+Èš[™[™ÜÈ]8¡¤œÝ]\È:+ëy.bzaãyë¥ûï"{ï#9.bùd#¹¢cz)èúaâ¹mì‚ˆ:j£:+àyæ¡ÛÜ›ÜÝ]\ûï"ÕPÐÑTÔÈ9d#9.%¹åcOˆÛÛ[Z]H9/§z-e»ï&ÙÙ[Z[™Bˆ“ÐÒÑQOˆ:gg¹/§z-e¹.#zf.ùhgˆ™XÛÝ™\ž{ï&ù¥éÈœšYÙHÛXÞH9.%¹åcOˆ:-ìú/áûï"Bˆ:-ëùo¡H9å,Hš[™[™Üø¡¤œÝ]\È:+ëy.bzaãyë¥ù¢é¹¢*»ï&ú-ëùo¡ˆÈYÙ\ŠÛX[šY™\Ý9d#9«iBˆ™Xš[™9å,Hš[Z]]™H9âjyä!ºaãyë¥ù¢é¹¢*‚”Lˆ\š]™YØ[›ÛšXØ[[ˆÙX[9âjyä!ºeëyã«ûï&‚ˆ9¥éùï.ºfmûï&™\š]™Y9keù«­{ï"ÛÛ^ÛX\Ý\ˆÙ]Ù]\Ù]\ÚØ˜\ÙKÚY[\Ý[˜ÞKÂˆ[ˆYÜÝ]\ûï"ycêºj£YÙ\ˆOHX[šY™\Ý
+È9."H[œ]\Ú:aãyë¥ø %8 %ˆYÙ\ŠÛX[šY™\Ý9d#9«iH™Xš[™9¥è9¬åy¨à9­bûï"Ý]\È9cëú(ªù­%ù¢$Ù[Z[™Bˆ“ÐÒÑQ9¢%¹cãyd$y­%ù¢$ÕPÐÑTÔûï"Bˆ9¥-¹cèûï&¹ª(ygeùî©ùcey. 9­/¹å'ùak9o#úfá»ï"]™HZ[È™\^HÈ\ÝÜšXØ[ˆÛÛ[Z]H9."y¥®yalyå*;ï"{ï&—Ü™\]Y\ÝYÙÛXZ[œ×Ú\ÚÙœ›ÛWÛ\ÝÂˆÚ[œ]Ú\Ú\×Ùœ›ÛWÙ[šY\ÈÈÛX\Ý\—Ú[œ]ÜÙ]Ú\ÚÙœ›ÛWÙ[šY\ÈÂˆY[]WÙ]\Ù]Ú\ÚÝÚ]ØœšYÙ{ï"Y[]KœH9cà¹¥l9c%¸ %8 %9å*:+éH[‚ˆ:!ê¹mìyæ¡X[šY™\ÝœšYÙHY[]H:aãyë¥ûï#9ak9o#ùe+ù. ;ï"KÂˆØØ[›ÛšXØ[ØÛÛ^Ú\ÚÙœ›ÛWÜš[Z]]™\ÈÈØ˜\ÙWÚY[]WÚ\ÚÂˆœ›ÛWÜš[Z]]™\ÈÈÚY[\Ý[˜ÞWÚÙ^WÙœ›ÛWÚ\Ú\ÈÂˆØØ[›ÛšXØ[Ü[—ÚYÙœ›ÛWÚY[\Ý[˜Þ{ï"URQHÜ›ÜÜËXš[™;ï"KÂˆÜÝ]\×Ù\œ›Ü—Ùœ›ÛWÙš[™[™ÜÂˆÙ\š]™YÜ[—ÚY[]WÜ›Ø›[\Ê
+H9aj:`ê:aãyë¥ù.#ˆYÙ\ˆ:`$9keù«­y«å9kî{ï#9­¢:-.y.£‚ˆÝ™\šYžWÚ\ÝÜšXØ[ØØ[›ÛšXØ[ÜÙX[
+ÈÝ™\šYžWØÛÜÝ\™{ï"9."y¥®zeëyã«ûï"{ï&ÂˆÛ˜\ÚÝ9lg¹ )ÈÈØZ[ÜÛ˜\ÚÝÈ[Š
+H9â­¹  y­/¹å'ùaj:`ê9iå9¢f9d#9. ˆ[\œûï"9§ 9l#ùoáz) y¢¯ycå»ï#9ak9o#ú`$9keú" ¹.#ycæ;ï"BœÝ]\ÈÙ[X[XÈÙX[;ï&—Ý™\šYžWÙš[™[™Ü×Ý];ï"™\^H
+È\ÝÜšXØ[9alyå*;ï"Bˆ8 %8 %š[™[™ÜÈ9."y¥®{ï"ˆOH\œ]Y]OHÙX[;ï"yd#¹.ãˆ›ØÚÚ[™È]:aãyë¥ÂˆÝ]\È9.#ˆ\œ›Üˆ^9nm¹­¢:-.HYÙ\‹ÛX[šY™\Ý9keù«­{ï&Ù\œ›Ü—ÛY\ÜØYÙH9caùî©Âˆ9..ˆ\š]™Y]Y]^;ï"H9¥-¹cèûï"B¹¥è9¥¬ZYÜ˜][Û»ï"œšYÙHY[]H9mì¹å,HX[šY™\Ý9£ y.ayc%¹.%9cà¹.#¹âjyä!ºaãyë¥ûï&ÂˆZYÜ˜][Ûˆ:dï¹/çy£ HŒ{ï"BY™\œØ\šX[\Ýûï"
+ÌM{ï&˜Ø[›ÛšXØ[MˆHMLH9fç¹odˆ
+ÈMH9¥¬9h§»ï&ù .ù/dÈLMLKÌ;ï"{ï&‚ˆ]Y]0©ÌKð©Ì‹ŒÈX[™]ÜžHMH:hnyaj9kîyn¥
+È[‹ZYÜ›ÜÜËXš[™ÜÚ]]™B˜‚ˆÈÈÈÔ‹LË\ÝÜšXØ[Ø[›ÛšXØ[ÙX[\Ý
+È™\šYšXØ][Ûˆ™\^HÞ[[Y]žH
+ÈX[šY™\ÝÛÜœ™XÝ™\ÜÈY[]Hš[™[™ûï"9bcy¢n{ï#Ó‘HÈ‘SÔS‘Q;ï"B‚Ô‹LËŒÈ9i#yk¨{ï"Œ‹LKLˆLŒŒˆ
+ÌŒ;ï"T‘SÔS‘Q9d#¹¥-¹cèûï&ÌŒ‹LKLˆLÎŒMÂÔ‹LË9i#yk¨{ï&ŠŠ”‘SÔS‘Q
+Š»ï"9c§ùk¦ˆÈTÔÈÈ”‘QV‘x %8 %M:hny§.¹b-»ï&Ìˆ9¥¬9å,BÔ‹LËH9¥-¹cèûï#:)ày."»ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒL‹LÌˆ9.#ˆQ‹LŒÈ[Y[™Y[»ï"9am¹.+H˜ÛÛ[Z]H9k£9¥m:j£:+àH¹æ¡:(j:/ì9mìº(ªÈ[Y[™Y[H0©ÌLŒH9/ëº+¨¸ %8 %Ô‹LË9cê‚¹o.¹c%¹.¡ˆ¹mìº(ªú`"y.+yæ¡š[Üˆ[ˆ9 #¹.b:j£»ï#9`&z`"z`"y¢êy§+:.ªù.ãy/§z-eˆ\š]™Y9keù«­{ï"{ï&‚‚˜^”LH\ÝÜšXØ[Ø[›ÛšXØ[[ˆÙX[\Ý;ï&‚ˆ9¥éùï.ºfmûï&˜ÛÛ[Z]HÝX\™9/èy.îÈš[ÜˆX[šY™\Ýš[œ]Û›Ü›X[^™YÜ[œÈ9bcycêºj£ˆX[šY™\Ý9kf9g*
+È9i%¹l`ˆž]\È\ÚOHYÙ\‹›X[šY™\ÝÚ\Ú8 %8 %™Xš[™;ï"9¥.Bˆ[œ]\Ý9c®ÈH
+È™Z\Ú
+È9cê¹¦í9¥¬YÙ\‹›X[šY™\ÝÚ\Ú
+ÈSUHÔ‹L‚ˆ{ï"ycëù¢¢¹mì¹­¢:-.z/¤ùaiH¹­%ùaîˆ˜ÛÛ[Z]H]šY[˜ÙBˆ9¥-¹cèûï&\YØ[›ÛšXØ[[”ÙX[;ï"œ›ÛWÛYÙ\»ï"JÈÝ™\šYžWÚ\ÝÜšXØ[ÂˆØ[›ÛšXØ[ÜÙX[
+
+H9g*9/èy.îùc¡¹cìˆ[œ]\Ý9bcyk£9¥m:j£:+à{ï&‚ˆKˆ]\›Z[š\ÝXÈX[šY™\ÝT’H
+ÈX[šY™\Ýž]\ÈOHYÙ\‹›X[šY™\ÝÚ\Úˆ‹ˆX[šY™\Ý9¦/¹o#ÈÛÜœ™XÝ™\ÜÈ9keù«­{ï"Ø[›ÛšXØ[Ü[—ÚYÈÛÛ˜XÝÂˆ\×ÛÙˆÈY[\Ý[˜ÞWÚÙ^HÈÝ]\ÈÈ™\]Y\ÝYÛXZ[œÈœÛÛŠÚ\ÚÂˆ[œ]ÜÙ]Ú\ÚÈ[œ]ÜÙX[Ú\ÚÈY[]WÙ]\Ù]Ú\ÚÂˆY[]WÛX\Ý\—Ú[œ]ÜÙ]Ú\ÚÈØ[›ÛšXØ[ØÛÛ^Ú\ÚÂˆ˜\ÙWÚY[]WÚ\ÚÈ™\šYšXØ][Û—ÜÝ]WÚ\ÚÈ9."HÛXÞBˆ™\œÚ[ÛŠÚ\ÚÈÛÙWÙš[™Ù\œš[;ï"OOHYÙ\ˆÙX[ˆËˆ9âjyä!ºaãyë¥ÈÚ[œ]Ú\Ú\×Ùœ›ÛWÙ[šY\Ê
+{ï"9.#ˆØ[›ÛšXØ[[œ]Û˜\ÚÝˆ9d#9ak9o#ûï"{ï&š[œ]ÜÙX[Ú\Ú;ï"9ajÙX[[šY\ûï"KÈ[œ]ÜÙ]Ú\Úˆ;ï"Y[]HÝXœÙ]8 %8 %ÒS”UÒQS•UWÑ’QSÈ9ª(ygeùî©ùcey. 9.¢ùk§¹®¤;ï#ˆY[]WÙXÝ9d#9®¤;ï"KÈ™\šYšXØ][Û—ÜÝ]WÚ\Ú;ï"[—ÚY
+Âˆ™\šYšXØ][Ûˆ
+È™\šYšXØ][Û—Ü›Ø›[WÚ\Ú;ï"yoázhnÈOHYÙ\‚ˆš[ÜˆX[šY™\ÝÛYÙ\ˆ:!êº.ªÈSPQÑQOˆT‘SPQÑQ;ï&¹.#yå*:+éH[œ]\Ýˆ9`fˆÛÛ[Z]H9b)9¥«{ï#:fíˆ™\XÙ[Y[”Lˆ™\šYšXØ][Ûˆ]šY[˜ÙH™\^HÞ[[Y]ž{ï&‚ˆ9¥éùï.ºfmûï&œ™\^H9kîHS•SQÙX[Y[œ]9èk9ï%¹è HX]\šX[^˜][Û—Ü›Ø›[\ÂˆV×x %8 %9/aˆš\œÝÛÛœÝ[YH9a`z+®ÛÜÝ\™JØ[˜ÚÜˆ9`iyn­ùd#¹g*ÛX]\šX[^™WÂˆÝ]]È9¢cyi,z-){ï"ÐÕÕH];ï"{ï#š\œÝ\[ˆÙX[9cëùd*úgg¹ênˆX]\šX[^˜][Û‚ˆ]šY[˜Ù{ï#™\^H9¥è9¬åykîyéì:aãynîˆ^XÝ]šY[˜ÙH\Úˆ9¥-¹cèûï&™š\œÝÛÛœÝ[YH9.#ˆ™\^H9alyå*9d#9. ÛÛXÝÜˆØÛÛXÝÚ[œ]Âˆ™\šYšXØ][Û—Ù]šY[˜ÙJ[ˆY[]K›ÛK\×ÛÙ‹ÙY\Ü›ÝÜÊ{ï&‚ˆÛÜÝ\™H›Ø›[\ÈOˆ[˜ÚÜ™YY]šY[˜ÙH›Ø›[\ÈO»ï"ÛÜÝ\™JØ[˜ÚÜ‚ˆ9`iyn­ù¥í»ï"Y^XÝXž]HX]\šX[^˜][Ûˆ™\šYžHOˆ\š]™Y™\šYšXØ][Û‚ˆ[[HOˆØ[›ÛšXØ[›Ø›[H]šY[˜ÙHOˆ›Ø›[H\Úˆš\œÝ\[»ï"ÙY\Ü›ÝÜÏUY{ï"zh§yi%¹/çyåfyâjyc%º(c;ï&Ü™\^{ï"ÙY\Ü›ÝÜÏQ˜[Ù{ï"Bˆ9.(¹o ú(c9/aº/ä:(c9d#9. :j£:+àyn£ùb%Ëú+ëy.bBˆ^XÝ\ÚXØ[˜Z[\™H™\X]OˆY[\Ý[™\^H9d#9. “ÐÒÑQ[»ï&ÂˆØ]\ÙH9cæ9c%ˆOˆ9¥¬^XÝ]šY[˜ÙHY[]{ï&Ù^XÝ™\Z\ˆOˆ™XÛÝ™\žBˆ[»ï"9c¡¹cìˆ“ÐÒÑQ9/çyåf{ï"B”LÈX[šY™\ÝÛÜœ™XÝ™\ÜÈY[]H9aj9­¢:-.{ï&‚ˆØ[›ÛšXØ[ØÛÛ^Ú\ÚÈ˜\ÙWÚY[]WÚ\ÚÈ™\šYšXØ][Û—ÜÝ]WÚ\Úˆ:/æùaiHÝ™\šYžWØÛÜÝ\™H9æ¡\YX[šY™\Ýš[™[™ûï"X[šY™\ÝOHYÙ\ˆOBˆÝ\œ™[™XÛÛ\]H9."y¥®zeëyã«ûï"{ï&ØÛÛ[Z]H9c¡¹cìˆÙX[9d#9¨-ù­¢:-.B¹¥è9¥¬ZYÜ˜][Û»ï"9i#yk¨H0©Í9/&9ab9.#y¥¬9h§ˆØÚ[X{ï&ù."y¥-¹cèùaj:`ê9..ˆØ[›ÛšXØ[^™\‚ˆ[[YH9/©ûï&ÛZYÜ˜][Ûˆ:dï¹/çy£ HŒ{ï"B¹¥¬9ak9o 9ìnùg¢ûï&Ø[›ÛšXØ[[”ÙX[È[œ]™\šYšXØ][Û‘]šY[˜ÙBY™\œØ\šX[\Ýûï"
+ÌŒ;ï&˜Ø[›ÛšXØ[MLHHLÌH9fç¹odˆ
+ÈŒ9¥¬9h§»ï&ù .ù/dÈLLÍ‹Ì;ï"{ï&‚ˆ]Y]0©ÌKŒËð©Ì‹ŒËð©ÌÈX[™]ÜžHLÈ:hnyaj9kîyn¥
+ÈÜÚ]]™HÛÛ›ÛÂ˜‚ˆÈÈÈÔ‹LËŒÈ\ÝÜšXØ[[œ]ÛÛ[Z]H
+È™\šYšXØ][Ûˆ]šY[˜ÙH^XÝ™\ÜÈ
+Èš[™[™È][™\Üûï"9bcy¢n{ï#Ó‘HÈ‘SÔS‘Q;ï"B‚Ô‹LËŒˆ9i#yk¨{ï"Œ‹LKLˆŽMˆ
+ÌŒ;ï"T‘SÔS‘Q9d#¹¥-¹cèûï&ÌŒ‹LKLˆLŒŒ‚Ô‹LËŒÈ9i#yk¨{ï&ŠŠ”‘SÔS‘Q
+Š»ï"N:hny§.¹b-ˆTÔÈÈ”‘QV‘{ï&ÌÈ9å,HÔ‹LË9¥-¹cèûï#º)ày."»ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒL‹LÌH9.#ˆQ‹LŒÈ[Y[™Y[ûï"9am¹.+Bœ™\^H9b!¹¥+ÈX]\šX[^˜][Û—Ü›Ø›[\È9 d¹ên¹æ¡:(j:/ì9mìº(ªÈ[Y[™Y[0©ÎKŒ‚¹/ëº+¨»ï"{ï&‚‚˜^”LH\ÝÜšXØ[[œ]ÛÛ[Z]HÝX\™;ï"ZYÜ˜][ÛˆŒBˆØ[›ÛšXØ[ØÛÛ^Ú\Ú;ï"{ï&‚ˆÛÛ^H™\]Y\ÝYÛXZ[ˆÙ]
+È\×ÛÙˆ
+ÈÛÛ˜XÝ
+È9."HÛXÞBˆY[]Y\È
+ÈY[]HœšYÙHÛXÞHY[]H
+ÈØ[›ÛšXØ[ÛÙBˆš[™Ù\œš[;ï"9b.ù¡#ù.#yd*ÈÝ\œ™[Ô‹Lˆ[œ]Ù]È™\šYšXØ][ÛˆÝ]{ï"BˆÝX\™;ï&¹§éyd#ÛÛ^9aj:`ê9c¡¹cìºggˆ“ÐÒÑQ[»ï#9kîy«ãù.*ˆš[Üˆ9æ¡ÙX[Yˆ[œ]Ù]:`$[ˆ9¨à9§é{ï&‚ˆKˆ[—ÚY9.ãyg*9odùbcH]]Üš]]]™HÔ‹LˆYÙ\»ï"\Ø\X\˜[˜ÙHO‚ˆSPQÑQ;ï"Bˆ‹ˆYÙ\ˆY[]{ï"Ý]\È
+È9aj:`êÙX[9keù«­{ï"OOHš[ÜˆÙX[YˆY[]{ï"šYOˆSPQÑQ;ï"BˆËˆ\ÚXØ[
+È[˜ÚÜ™Y™\šYšXØ][Ûˆ9.ãy`iyn­ûï"YÜ˜Y][ÛˆOˆSPQÑQ;ï"Bˆˆ9`iyn­ùæ¡š[Üˆ[œ]9oáyg*Ý\œ™[Û˜\ÚÝ\ØÛÝ™\ž{ï"9d#ÛÛ^ˆOˆ9d#Ý\™˜XÙH[»ï&ùï.¹i,yclù.#ycëú)èúaâˆšY;ï"Bˆ9d"9¬åy¥¬9h§»ï&¹aj:`êš[Üˆ[œ]È9k£9¥m
+ÈÝ\œ™[Ù]9¦+ÈÝ\\œÙ]Oˆ9«hùn.ˆ9¥¬[»ï&Ù^XÝ™\ÝÜ˜][ÛˆOˆ9c¡¹cìˆÕPÐÑTÔÈ^XÝ™\^B”Lˆ™\šYšXØ][Ûˆ]šY[˜ÙH^XÝ™\Üûï&‚ˆ[œ][”ÙX[9¥¬9h§ˆ™\šYšXØ][Û—Ü›Ø›[WÚ\Ú;ï"Ø[›ÛšXØ[ÛÜYˆ›Ø›[H]šY[˜Ù{ï&œ[—ÚY
+È™\šYšXØ][ÛˆÛ\ÜÈ
+ÈÛÜÝ\™H›Ø›[\È
+Âˆ[˜ÚÜ™YY]šY[˜ÙH›Ø›[\È
+ÈX]\šX[^˜][Ûˆ›Ø›[\ûï"Bˆ˜\ÙHY[]H9.#yd*È›Ø›[H\Ú;ï"Y[]WÙXÝ9£¤ºfi;ï"{ï&Ý™\šYšXØ][Û‚ˆÝ]HÈX[šY™\Ý[œ]ÙX[È[œ]ÜÙX[Ú\Ú9gaùd*Âˆ9d#9. S•SQÛ\ÜÈ
+È9.#yd#Ø]\ÙHOˆ9¥¬Ý]HOˆ9¥¬“ÐÒÑQ]šY[˜ÙBˆ[»ï"š[Üˆ“ÐÒÑQ9/çyåfH\[™[Û›{ï&Ùš[™[™È]Z[9cãy¦(9ç'ùk§¹odùbcBˆØ]\Ù{ï"{ï&Ù^XÝØ[YH˜Z[\™HOˆY[\Ý[™\^{ï&ÒS•SQO‚ˆPSHOˆ™XÛÝ™\žH[‚ˆ™\^HÙX[YZ[œ]:j£:+àyb!¹­`{ï&’PSHÙX[Y[œ]:) y¬`¹.ãy`iyn­ûï&ÂˆS•SQÙX[Y[œ]:) y¬`¹odùbcH›Ø›[H]šY[˜ÙHOHÙX[Y›Ø›[Bˆ\Ú;ï"^XÝ˜Z[\™H9¢cH™\^{ï"B”KLHš[™[™ÈØÛÜH9ç'ùk§»ï&œÛÝ\˜ÙK\ØÛÜHš[™[™ÜÈ9å*™\Ù\™YØÛÜBˆ[œ]›Ü›X[^˜][Û—ÜÝ\™˜XÙO»ï"9îçy.#yå*œÛÝ\˜ÙH»ï"{ï#]Z[ÙX[ˆY™™XÝYÙÛXZ[œÈ^XÝÙ];ï"Ú\™YÝ\™˜XÙH9i ˆÙXÝ\š]WÜÝ]\×Ú\ÝÜžBˆ9d#9¥í¹l HÙXÝ\š]WÜÝ]\È
+È[Z]ÜšXÙ{ï"B”KLˆš[™[™È™XÙY[˜Ù{ï&››È\ØÛÝ™\™YOˆRTÔÒS‘ûï&Ù\ØÛÝ™\™Y]ˆ[XYÙYOˆ9.áHÛÜÝ\™KÙ]šY[˜ÙHš[™[™ûï"9.#z+ëù¢©HSURSP“x %8 %9£gùgcù.#y¦+Âˆ9.#ycëùå*;ï"{ï&ÚX[H][]\™HOˆSURSP“{ï"9ç'ú+ëy.by/çyåf{ï"B”KLÈ9¬®ùä!º+¨y¥l9¦í9«hûï&Ô‹LËŒˆ:+í9¦#ˆŒNHšY[Èˆ9k§ºfaHŒ;ï&ÐÔ‹LËŒÈ9d#ˆŒBˆ;ï"
+Ý™\šYšXØ][Û—Ü›Ø›[WÚ\Ú;ï&ÚY[]WÙXÝMÈ9keù«­{ï"{ï&ù­bú+åy§.¹¨¬9¥«z* ˆ^XÝÙ];ï#9.#ya£y¢bùa¦B“ZYÜ˜][ÛˆŒ{ï&˜Ø[›ÛšXØ[ØÛÛ^Ú\Ú9b%ûï"9§*¹¥.HNÌNKÌŒ;ï&ÌŒH:dï‚ˆœ›ÛK^™\›È
+ÈŒOŒŒH\Ü˜YH
+ÈY[\Ý[
+È[\\ˆ›Ø™HŒ»ï"BY™\œØ\šX[\Ýûï"
+ÌŒ;ï&˜Ø[›ÛšXØ[LÌHHLLH9fç¹odˆ
+ÈŒ9¥¬9h§»ï&ù .ù/dÂˆLLM‹Ì;ï"{ï&˜]Y]0©ÌKð©Ì‹ŒÈX[™]ÜžHMH:hnH
+ÈH9."zhnyaj9kîyn¥˜‚ˆÈÈÈÔ‹LËŒˆ˜[œØXÝ[Û˜[Û˜\ÚÝ
+ÈY[]HX\Ý\ˆU
+ÈÛ™\ÝÛXÞH^XÝ][Ûˆ
+È[ÙX[
+È™\šYšXØ][Û‹TÝ]H˜[œÚ][Û»ï"9bcy¢n{ï#Ó‘HÈ‘SÔS‘Q;ï"B‚Ô‹LËŒH9i#yk¨{ï"Œ‹LKLHŒNŒ
+ÌŒ;ï"T‘SÔS‘Q9d#¹¥-¹cèûï&ÌŒ‹LKLˆŽM‚Ô‹LËŒˆ9i#yk¨{ï&ŠŠ”‘SÔS‘Q
+Š»ï"Mˆ:hny§.¹b-ˆTÔÈÈ”‘QV‘{ï&Ìˆ
+ÈÈH9å,BÔ‹LËŒÈ9¥-¹cèûï#:)ày."»ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒLKLÌ9.#ˆQ‹LŒÂ[Y[™Y[»ï"9am¹.+HYÜ˜YYTÕPÐÑTÔÈÝX\™9.éH˜\ÙHY[]H9§éz+è¸à B™\šYšXØ][ÛˆÝ]H9cê¹l y§¦¹./¹.)9i!:(j:/ì9mìº(ªÈ[Y[™Y[È0©ÎŒKp©ÎŒˆ9/ëº+¨»ï"{ï&‚‚˜^”LH˜[œØXÝ[Û˜[X]\šX[^™YÛ˜\ÚÝ;ï&‚ˆ‘QÒSˆS”ÐPÕSÓ»ï"UÐÈ›Ý[™\žx %8 %9ë+9. 9.*ˆ]]Üš]]]™Hœ›ØYÑSPÕˆ9.bùbc{ï"KOˆÝ\™˜XÙH9c®úaãycäyã¬;ï"KL»ï&¹d#9. Ý\™˜XÙH9. 9«(y§éz+èˆ[š[Û‚ˆ]\Ù]ûï"KOˆ:`$[ˆÛÜÝ\™JØ[˜ÚÜˆ™\šYžHOˆ9âjyc%ˆ^XÝÙX[Yž]\Âˆ;ï":+îÈž]\ÈOˆ\ÚO[X[šY™\ÝOˆ\œÙH9d#9. 9.ïHOˆ9­ìya®ùîäú(c;ï"KOˆÓÓSRUˆØ[™Y]HZ[\ˆ9cê¹­¢:-.HX]\šX[^™Y›ÝÜø %8 %9îçy.#zaãy§éyodùbcHYÙ\ˆ]Âˆ:aãz+îùodùbcy¥¡ù.í»ï"Û˜\ÚÝ9d#ˆTUKù¦ïù£h¹cê¹olydãy."ù«(H[›ØØ][Û‹Ü™\^{ï"Bˆ9­ìy.#ycëùcæ;ï"KL{ï"{ï&’[œ][”ÙX[ÈÛ˜\ÚÝ[ˆÈX]\šX[^™YÝ]]ÂˆØ[›ÛšXØ[š[™[™Èœ›Þ™[ˆ]XÛ\ÜÙ\È
+È\KYœ›Þ™[ˆ›ÝÜÂˆ˜XÙH9­bú+å{ï&¹ë+9.£ÛÛ›™XÝ[Ûˆ9g*œ›ØY™XYÈ9.búeí9ç'ùk§ˆÛÛ[Z];ï"š[KX˜XÚÙYˆXÚÑˆUÐûï"x %8 %:ggˆœÛ˜\ÚÝ:/å9fç¹d#¹a£y£ä¹aiH‚”LˆY[]HX\Ý\ˆU;ï&‚ˆÙXÝ\š]WÛX\Ý\ˆ9.#ˆX\šÙ]ÛÝ\˜ÙH9d#:)á9b&{ï&˜[˜ÚÜ‹]™\šYšYYˆ™XÙZ]™YØ]H\×ÛÙˆ9¢cz/æÈY[]PœšYÙ{ï&Ù]\™HX\Ý\ˆ9¦+È\ØÛÝ™\žBˆ]šY[˜Ù{ï"[œ]ÙX[]Ø]˜Z[X›OY˜[Ù{ï"yîçy.#z)èù§¤9c¡¹cìˆ›ÝÜÂˆ\Yš[™[™Üûï&’QS•UWÑUTÑUÓRTÔÒS‘ÈÈSURSP“WÐUÐTÓÑˆÂˆQS•UWÑU’QSÑWÒS•SQ;ï&Ùš\œÝ\[‹Ü™\^H9kîyéì;ï":`ïzj£X\Ý\‚ˆ[˜ÚÜ»ï"{ï&Ü™[\Ý9/çy£ HX\›H]”LÈÛ™\ÝÛXÞH^XÝ][Û»ï&‚ˆ^XÚ]Ý\ÜY]˜[YHÝX\™;ï&œ™\]Z\™YÙ]šY[˜ÙWØÛ\ÜÈÂˆ™XÛÛ˜Ú[X][ÛˆÈÛ\˜[˜ÙHY
+Ý™\œÚ[ÛˆÈÛÛ™›XÝØXÝ[ÛˆÈ˜[˜XÚÈÂˆ\X[9aj:`ê9cê¹a`z+®ŒH9k§¹ã¬9`/8 %8 %9hì9¦#¹.#y¥+ù£ y`/˜Z[ÛÜÙY;ï"[ˆ9.bùbc{ï"B”L[ÙX[9aj9­¢:-.{ï&‚ˆ[œ][žH9caùî©È\Y[Ô‹LˆÙX[;ï"[œ][”ÙX[;ï&˜ÛÛ˜XÝ™\œÚ[ÛˆÂˆX\\ˆY[]JØÛÙH\ÚÈX[šY™\Ý\šJÚ\ÚÈÝ]]ÜÙ]
+ÜÙ[X[XÂˆ\ÚÈÝ]\ÈÈ˜]ÈY[]HÈ™\šYšXØ][ÛˆÈ™XÙZ]™YØ]Âˆ]Ø]˜Z[X›{ï"{ï&Ú[œ]ÜÙX[Ú\Ú9."y¥®{ï"Û˜\ÚÝO[X[šY™\ÝO[YÙ\»ï"BˆX[šY™\Ý9¦/¹o#È›Ý™[˜[˜ÙH9aj9­¢:-.{ï&šY[]WÛX\Ý\—Ú[œ]ÜÙ]Ú\ÚÂˆœšYÙHÛXÞH™\œÚ[ÛŠÚ\ÚÈ™\]Z\™YÙ]šY[˜ÙWØÛ\ÜÙ\ûï"OXÝ\œ™[;ï"BˆX[šY™\ÝÝ\šH9§+:.ªÈ]\›Z[š\ÝXÈ™\šYž{ï"^XÝY˜\ÙH
+ÈÛX[šY™\ÝšœÛÛ»ï"Bˆ™\^HÙX[YZ[œ]:j£:+àHÙX[X˜\ÙY;ï"9å*ÙX[9keù«­yæí9£©zj£š[\ø %8 %9.#y/§z-e‚ˆÝ\œ™[ˆ›Ýûï"B”LH™\šYšXØ][Û‹TÝ]H˜[œÚ][Û»ï&‚ˆ[ˆY[]HH˜\ÙHY[]{ï"[œ]ÛÜ›;ï#9.#yd*ÈÝ]{ï"JÂˆ™\šYšXØ][Û—ÜÝ]WÚ\Ú;ï"9«ãÈ\ØÛÝ™\™Y[ˆ9æ¡™\šYšXØ][ÛˆÝ]ÛÛY{ï"BˆZYÜ˜][ÛˆŒ9fæùb%ûï"˜\ÙWÚY[]WÚ\ÚÈ™\šYšXØ][Û—ÜÝ]WÚ\ÚÂˆ[œ]ÜÙX[Ú\ÚÈY[]WÛX\Ý\—Ú[œ]ÜÙ]Ú\Ú;ï"BˆÝ]H9æî9d#Oˆ^XÝ™\^{ï&Ð“ÐÒÑQ
+9cëù h¹i#JJù/ë¹i#HOˆ9¥¬]\›Z[š\ÝXÂˆ[»ï"9îçy.#H™\^HÝ[H“ÐÒÑQ;ï&ùc¡¹cìº+ày£k¹/çyåf{ï"{ï&ÔÕPÐÑTÔÊú` 9c%ˆO‚ˆSPQÑQ9¢ä¹îç{ï"9.#HZ[™\XÙ[Y[;ï&Ù^XÝ™\Z\ˆ9d#¹ h¹i#yc¡¹cìˆ™\^{ï"Bˆ[œ]ÜÙ]Ú\Ú9cê¹d*ÈY[]H9keù«­{ï"Ý]H9keù«­z/æÈÝ]H\ÚÈX[šY™\Ýˆ]šY[˜Ù{ï#9îçy.#z/æÈ˜\ÙHY[]{ï"B”{ï&¹­ìy.#ycëùcæÛ˜\ÚÝ;ï&ÜÚ\™YÝ\™˜XÙH\ØÛÝ™\žH9c®úaã{ï&ÙÛXZ[œÏV×H9¦/¹o#Âˆ™Z™XÝ;ï"›Û™HH[Ý\ÜY;ï"B“ZYÜ˜][ÛˆŒ;ï&¹fæùb%ûï"9§*¹¥.HNÌN{ï&ÌŒ:dïˆœ›ÛK^™\›È
+ÈNKOŒŒ\Ü˜YH
+ÂˆY[\Ý[
+È[\\ˆ›Ø™HŒ{ï"BY™\œØ\šX[\Ýûï"
+ÌÌ;ï&˜Ø[›ÛšXØ[LLHHH9fç¹odˆ
+ÈÌ9¥¬9h§»ï&ù .ù/dÈLM‹Ì;ï"{ï&‚ˆ]Y]0©ÍÈ9çêzf-HÌˆ:hnyaj9kîyn¥;ï"KLˆ˜XÙKÛX]\šX[^™KÚ[[]]Xš[]HÂˆËLLˆX\Ý\ˆUÈLËLMÈÛXÞHÝX\™ÈNLŒÈ[ÙX[™Xš[™ÂˆLÈÝ]H˜[œÚ][ÛˆÈŽLÌˆZYÜ˜][ÛŠÐÒJÜ™YÜ™\ÜÚ[Û»ï"B˜‚ˆÈÈÈÔ‹LËŒHØ[›ÛšXØ[[œ]Û˜\ÚÝ
+È[˜ÚÜ™Y]˜Z[Xš[]H]šY[˜ÙH
+È[™\^HÙX[
+È™XÛÝ™\˜X›HÛÛ[Z];ï"9bcy¢n{ï#Ó‘HÈ‘SÔS‘Q;ï"B‚Ô‹LÈ9i#yk¨{ï"Œ‹LKLHNNŒˆ
+ÌŒ;ï"T‘SÔS‘Q9d#¹¥-¹cèûï&ÌŒ‹LKLHŒNŒÔ‹LËŒH9i#yk¨{ï&ŠŠ”‘SÔS‘Q
+Š»ï"NH:hny§.¹b-ˆTÔÈÈ”‘QV‘{ï#H9å,HÔ‹LËŒˆ9¥-¹cèûï#º)ày."»ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒLKLŽH9.#ˆQ‹LŒÈ[Y[™Y[{ï"9am¹.+BœÛ˜\ÚÝ9§¡:`(9¥®yo#ÈÈX\Ý\ˆ:j£:+àHÈÛXÞH9­¢:-.HÈX[šY™\Ý9keù«­y­¢:-.HÈ[‚šY[]H9.¥9i!:(j:/ì9mìº(ªÈ[Y[™Y[ˆ0©ÍËŒKp©ÍËH9/ëº+¨»ï"{ï&‚‚˜^”LH™\]Y\ÝYÛXZ[”Ù]:/æÈ[ˆY[]{ï&‚ˆ:+íù¬`¹gçùc®úaãy£¤¹n£È^XÝÙ];ï&ØØ[›ÛšXØ[”ÓÓˆ\Ú:/æÈY[]{ï&ÛZYÜ˜][ÛˆNBˆYÙ\ˆ9b%È™\]Y\ÝYÙÛXZ[œ×ÚœÛÛ‹Ú\Ú
+ÈX[šY™\Ý9¦/¹o#ùîäyk¦»ï&Ü™\^H:/å9fç‚ˆÛXZ[œÈ9§iz!êˆYÙ\ˆÙX[;ï&ù.#yd#Ù]9oáy.#yd#[ˆÈ9d#Ù]9.#yd#:hn¹n£ùd#[‚”Lˆ]˜Z[Xš[]HÛÛ\][™\Üûï&‚ˆ9¥è[YÚX›H™\šYšYY[ˆOˆ‘TURT‘QÑÓPRS—ÓRTÔÒS‘ûï&ù§"H[YÚX›H[ˆ9/aºfí‚ˆUX]˜Z[X›H9`&z`"HOˆ‘TURT‘QÑÓPRS—ÕSURSP“WÐUÐTÓÑ»ï"9gaÈ›ØÚÚ[™ûï&Âˆ¹d"9¬åyênºfáˆ¹.áHÛXÞH9¦/¹o#ùhì9¦#»ï#ŒH9¥è;ï"{ï&Ù]\™K[Û›H9¬.9.#H˜[ÙHÕPÐÑTÔÂ”LÈØ[›ÛšXØ[[œ]Û˜\ÚÝ;ï"9. 9«(H]]Üš]]]™H:)èù§¤;ï"{ï&‚ˆ\Y[[]]X›H]XÛ\Üûï&œ™\]Y\ÝYÙ]
+È\ØÛÝ™\™YÔ‹LˆÛÝ\˜ÙKÛX\Ý\‚ˆ[ˆ^XÝÙ];ï"9d*új£:+àyi,z-)H[¸ %8 %›ØÚÚ[™È™Yš[™[™È:+æ¹k§º+¬9oe{ï"JÈÛXÞBˆY[]Y\È
+ÈÛÙHš[™Ù\œš[;ï&Ü[ˆY[]HÈØ[™Y]\ÈÈX[šY™\ÝÂˆYÙ\ˆ9aj:`ê9.ãˆÛ˜\ÚÝ9­/¹å'ûï#9.#ya£zaãyi#Hœ›ØY]Y\ž{ï&ÛZY\[ˆ9£ä¹aiycêº ïz(ªÂˆ9."ù. 9«(H[›ØØ][Ûˆ9ç"ùb,;ï"9¥¬Y[]{ï"B”L[˜ÚÜ™Y]˜Z[Xš[]Q]šY[˜Ù{ï&‚ˆ:+îÈ™XÙZ]™YØ]9bcz+ày¦#ˆÝ\œ™[˜]ÈY]H^XÝXž]HÒKLMˆOBˆ›Ü›X[^˜][Ûˆ[ˆÙX[Y˜]×Ù]šY[˜ÙWÚ\ÚOH[˜ÚÜ‹™]šY[˜ÙWÚ\Ú
+ÂˆÜ›ÜÜËXš[™›ÝšY\‹Ù]\Ù]Ü™\]Y\ÝÝ\šKÙ[™Ú[ÜÝ\™˜XÙKÛÜ\˜][Û—ÚYˆ;ï"[˜ÚÜO\[O[Y]H9."y¥®{ï"{ï&ùi,z-)HOˆURSP’SUWÑU’QSÑWÒS•SQˆ›ØÚÚ[™ûï&Ü™\^H9kîy«ãù.*ˆÙX[YÛÝ\˜ÙH[ˆ:aãy¥¬9¢iú(c”LHY[]Hš[™[™È9îçù. ;ï&‚ˆY[]WÙ]\Ù]Ú\ÚH\Ú
+X\Ý\—Ú[œ]ÜÙ]Ú\ÚœšYÙWÜÛXÞWÝ™\œÚ[Û‹ˆœšYÙWÜÛXÞWÚ\Ú
+H:/æÈY[]KÛX[šY™\ÝÛYÙ\ˆ9."yi!9d#9`/;ï&ØœšYÙHÛXÞBˆ9cæ9¦íOˆ9¥¬[»ï&Ü™\^H9«å9kîy."y¥®B”LˆÛXÞH\Ú9aj9keù«­{ï&‚ˆÛÝ\˜ÙWÜÛXÞWÚ\ÚH\ÙXÝ
+ÈÛÜYØ[›ÛšXØ[”ÓÓˆ9aj:+ëy.bykeù«­{ï"˜[˜XÚËÂˆY[]WÛZ\ÜÚ[™×ÛX^Ü™\]Z\™YÙ]šY[˜ÙWØÛ\ÜËÝÛ\˜[˜ÙWÝ™\œÚ[Ûˆ9gaú)¡¹æå»ï"{ï&Âˆ[[YH:+æ¹k§¹­¢:-.{ï"9hì9¦#ˆ˜[˜XÚËÜ\X[9¥è9¥+ù£ HOˆ9¦/¹o#È˜Z\Ù{ï&ÂˆY[]WÛZ\ÜÚ[™×ÛX^\‹YÛXZ[ˆ:+¨y¥lœÈ:f"9`/;ï&Ü™\]Z\™YÙ]šY[˜ÙWØÛ\ÜÙ\Âˆ:/æÈX[šY™\Ý;ï"B”LÈ[™\^HÙX[;ï&‚ˆÕT”‘S•Û˜\ÚÝY[]Y\ÈOHYÙ\ˆOHX[šY™\ÝOH™\^K][YH\ÚXØ[ˆ™XÛÛ\]{ï"Ù[XÝYÜÙ[X[X×Ú\ÚÈXÚ\Ú[Û—ÜÙ]Ú\ÚÈš[™[™×ÜÙ]Ú\ÚÂˆ\Y˜XÝ^XÝÙ]È]\›Z[š\ÝXÈT’HÈØÚ[XH™XÛÛ\]HÈ›Ý×ØÛÝ[Âˆš[™[™ÜÈ\œ]Y]O‘ˆ^XÝ\Ù]Ü›ÜÜËXš[™;ï"JÈ™K]™\šYžH9«ãù.*ˆÙX[YÔ‹L‚ˆÛÝ\˜ÙH[ˆÛÜÝ\™H
+È[˜ÚÜ™Y]šY[˜Ù{ï&ÛZYÜ˜][ÛˆNH9.)Ù[X[XÈÙX[9b%Â”L™XÛÝ™\˜X›HÛÛ[Z];ï&‚ˆš[™[™ÜËœ\œ]Y]9¥èØ[XÛØÚûï"š[™[™ÈYH]ZY{ï&ØÜ™X]YØ]9.áH‚ˆ˜[œØXÝ[Û‹][YH]Y]Y]Y]{ï#9£¤ºfi9aîˆÙ[X[XÈ\Ú;ï"{ï&Ñˆ9i,z-)HO‚ˆ^XÝ™]žH9¥¡ù.íˆž]KZY[XØ[›Ë[ÜOˆYÙ\ˆ:(iy£ä9.©”{ï&šY[]Hš[™[™È9ç'ùk§ˆÛXZ[»ï"\‹YÛXZ[ˆ:+¨y¥l;ï"{ï&ÙÛXZ[ˆX]š^:+¨y¥lˆ9¦í9«hÈLˆOˆLûï"KÌ‹Í»ï#[[YH^XÝ\Ù]9îçú+¨{ï"{ï&Û˜Z]™H]][YH9¢ä¹îçH
+Âˆ˜Z]™HÝš[™È9fî¹k¦ˆUÈ:)á9b&{ï":-ê9nlùcì]\›Z[š\ÝXûï"B“ZYÜ˜][ÛˆN{ï&œ™\]Y\ÝYÙÛXZ[œ×ÚœÛÛ‹Ú\Ú
+ÈÙ[XÝYÜÙ[X[X×Ú\Ú
+ÂˆXÚ\Ú[Û—ÜÙ]Ú\Ú9fæùb%ûï"9§*¹¥.HN;ï&ÌNH:dïˆœ›ÛK^™\›È
+ÈNOŒNH\Ü˜YH
+ÂˆY[\Ý[
+È[\\ˆ›Ø™HŒ;ï"BY™\œØ\šX[\Ýûï"
+Í{ï&˜Ø[›ÛšXØ[HH9fç¹odˆ
+ÈH9¥¬9h§»ï&ù .ù/dÈL‹Ì;ï"{ï&‚ˆ]Y]0©ÌL9çêzf-HÍ:hnyaj9kîyn¥;ï"Û˜\ÚÝ˜XÙH9îãÈØZ[ÜÛ˜\ÚÝˆ[ÛšÙ^\]Ú9¬ê9aix %8 %›ÙXÝ[Ûˆ9¥èÛÚûï"B˜‚ˆÈÈÈÔ‹LÈ]˜Z[Xš[]TÛXÞH
+ÈØ[›ÛšXØ[^™\»ï"9bcy¢n{ï#Ó‘HÈ‘SÔS‘Q;ï"B‚Ô‹L‹9§ 9îâ9i#yk¨{ï"Œ‹LKLHMÎŒˆ
+ÌŒ;ï"U‘T’Q’QQ9d#¹.©9.æ;ï&ÌŒ‹LKLBŒNNŒˆÔ‹LÈ9i#yk¨{ï&ŠŠ”‘SÔS‘Q
+Š»ï"9..ù/dù§­¹§¡TÔÈÈ”‘QV‘{ï#N:hnya®ùîäù®!yce{ï&ÂŽ9å,HÔ‹LËŒH9¥-¹cèûï#:)ày."»ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒLKLŽ9.#‚Q‹LŒÈ0©Ì»ï"9am¹.+H™\]Y\ÝYYÛXZ[‹ZY[]HÈ[œ]\Ù]9cèùo¡È™XÙZ]™YØ]º+îùcåˆÈY[]H\Ú9cèùo¡ÈÛXÞH\Ú:)¡¹æåˆÈ™\^HÙX[9­¢:-.HÈš[™[™ÜÂ™]\›Z[š\ÛH9. ùi!:(j:/ì9mìº(ªÈ[Y[™Y[H0©Í‹ŒKp©Í‹Ž9/ëº+¨»ï"{ï&‚‚˜^”LKÌˆ9e+ù. :/¤ùaiH
+È[YÚXš[]H9§.¹fj9k¦¹.b{ï&‚ˆØ[›ÛšXØ[[›™\‹œ[Š\×ÛÙ‹ÛXZ[œÏK‹‹Šx %8 %9e+ù. 9«hùo#ÈØ[›ÛšXØ[:/®yåcˆ:/¤ùaiHHÔ‹Lˆ™\šYšYY›ÝšY\‹S›Ü›X[^™Y;ï"ÕPÐÑTÔÈÛ›{ï&ÔT•PS:næ:+©ˆ“Õ[YÚX›x %8 %ŒH9aj:`êÛXZ[ˆ\X[Ü[—Ø[ÝÙYQ˜[Ù{ï&Ð“ÐÒÑQˆ‘U‘T»ï"Bˆ9­¢:-.ybcz`$[ˆ:, È™\šYžWÛ›Ü›X[^™YÜ[»ï"›Ü›X[^˜][Û‹Ü[›™\‹œH9ak9o ˆ9cêº+îÈÛÜÝ\™H™\šYšY\»ï&›X[šY™\Ýž]\ÈÈÝ]]ÛÛ[
+ÜØÚ[XJÂˆ›Ý×ØÛÝ[È]X\˜[[™H^XÝÙ]È\YÙX[œÈÝ\œ™[›Ý™[˜[˜Ù{ï"Bˆ8 %8 %9.îù/eH›Ø›[HOˆÓÔÕT‘WÕ‘T’Q’PÐUSÓ—ÑRSQ›ØÚÚ[™Èš[™[™Â”LËÌ]˜Z[Xš[]TÛXÞH9§.¹fj9ab:(c;ï&‚ˆØ[™Y]HOˆ\š]™H]˜Z[X›WØ]Oˆš[\ˆH\×ÛÙˆOˆÓ“HS‚ˆÙ[XÝ[Û»ï":hn¹n£ù§.¹fj9o.¹b-»ï#VÓQQÑ•UT‘HXÚ\Ú[Ûˆ9åfz+à{ï"Bˆ]˜Z[X›WØ]9e+ù. ˜\Ú\ÈHÐ”ÑT•‘QÐUÒS‘ÑTÕ;ï"˜]È[™[ÜBˆ™XÙZ]™YØ];ï#9¦f¹.£¹ç'ùk§ˆX›\ÚOˆU9/çyk¢;ï"{ï&ÔÓÕTÑWÔP“TÒQÐUÂˆÓPRS—Ô•SWÑT’U‘Q9§*¹¬ê9a£;ï"9¥è9mìºj£:+àHX›\ÚÈÈ9¥è9âb9§+9c%ˆ˜Y[™Âˆ[H9.¢ùk§»ï"{ï&Ó“ÕÕ‘T’Q’PP“H9¬.9.#z/æùaiHU]ˆ\Y˜\Ú\È9fæùb!¹ìnÈ
+ÈÛXÞH9âb9§+]˜Z[Xš[]K]ŒH
+È\Ú:/æÈ[ˆY[]B”LKÌˆY[]H˜Z[ÛÜÙY
+È\Y˜]\˜[Ù^\ûï&‚ˆY[]PœšYÙ{ï&Ô‹Lˆ™\šYšYYÙXÝ\š]WÛX\Ý\ˆ[œûï"9."H]\Ù]9aj:fá»ï"BˆOˆQ‹Lˆ™\ÛÛ™WÜÙXÝ\š]WÚY[]{ï"VÒS‘ÑN”ÕÐÒÎ”ÖSP“Ó‘]O»ï"Bˆ^Ú[™ÙH9od¹lg¹cê¹§iz!êˆ›ÝšY\ˆX\šÙ]9d#¹ï ;ï&ú(î9è ye+ù. 9n ¹g.¹c.zac{ï"9."ycæ9/dÂˆ9 l9. 9kf9g*;ï&ù.)9kf9g*H[XšYÝ[Ý\È˜Z[ÛÜÙY8 %8 %9îçy.#ybcyï 9ã';ï"BˆU™[\Ý;ï&›\ÝÙ]HH˜YWÙ]H9§ 9¥¬;ï&ÛZ\ÜÚ[™ËØ[XšYÝ[Ý\ÈO‚ˆQS•UWÓRTÔÒS‘È›ØÚÚ[™Èš[™[™ûï"Y[]WÛZ\ÜÚ[™×ÛX^L;ï"JÈ:(c9£¤ºfiˆ8 %8 %:(îÞ[X›Û9îçy.#y/g9..ˆØ[›ÛšXØ[Ù^H˜[˜XÚÂˆ˜]\˜[Ù^\È:gfy  H\Y;ï"Ø[[™\ŽˆX\šÙ]
+Ý˜YWÙ]{ï&Ø˜\œËÜÝ]\ËÂˆ[Z]ˆÙXÝ\š]WÚY
+Ý˜YWÙ]{ï&ØY—Ù˜XÝÜŽˆÙXÝ\š]WÚY
+Ù^Ù]JÂˆ˜XÝÜ—Ý\{ï"BˆÛXZ[ˆ[YÚXš[]HX]š^Lˆ:hnyaj9¦/¹o#ûï&HÐS“Ó’PÐSÔÕTÔ•QÂˆˆUVSPT–WÓÓ“{ï"ÙXÝ\š]WÛX\Ý\ZY[]H]\Ù];ï&ØØWÜ›Ú™XÝ[ÛBˆÕUT×Ñ“Q×Ô“Ò‘PÕSÓˆY\¸ %8 %\™XÝÐHX\\ˆ“ÐÒÑQ9§'úeí9îçy.#y/*º`(ˆ\™XÝ];ï"KÈH“ÐÒÑQÔS‘S‘×ÔÑSPS•PÔûï"[™^ÙZ[H9¥è9mìºj£:+àBˆ9n ¹g.¹od¹lg¹ëb{ï"{ï&úggˆÕTÔ•QÛXZ[ˆ:, ùå*9clÈ˜Z\Ù{ï"9¥èÚ[[ÚÚ\Âˆ9¥è9îåz/áÈÔ‹Lˆ9æí:+îÈ˜]ûï"B”LË‹ŒHÛÝ\˜ÙTÛXÞH9âb9§+9c%ºgfy  H
+È›ÈÚ[[˜[˜XÚûï&‚ˆØ[›ÛšXØ[ÛÝ\˜ÙTÛXÞH™YÚ\Ýž{ï"ÛÝ\˜ÙK\ÛXÞK]Œ{ï"{ï&œš[Üš]HÂˆ˜[˜XÚÈ9ênˆÈ\X[˜[ÙHÈÒS‘ÓWÔÓÕTÑWÑVPÕÈ^XÝ]ŒHÂˆÛÛ™›XÝ“ÐÒûï&ØØ[\ˆ:fí¹¬ê9aizgh»ï"9ëo¹d#yîäù§¡9­bú+å{ï"Bˆ9.#ycëùå*:i¥º`"HOˆ‘TURT‘QÑÓPRS—ÓRTÔÒS‘È›ØÚÚ[™ûï"9¥è:gfznæ˜[˜XÚûï"Bˆ9d#Ù^H9i&¹`&z`"HVPÕ9«å:/ ûï&¹ëby`/OˆTURUSS•ÓQT‘ÑQXÚ\Ú[Ûˆ
+Âˆ]\›Z[š\ÝXÈÚ[›™\»ï"
+š[Üš]KX[šY™\Ý\ÚÜ™[˜[
+x %8 %]\˜][Û‚ˆÜ™\ˆ9¬.9.#yolydã{ï"{ï&ù.#yëby`/OˆÓÕTÑWÐÓÓ‘“PÕ›ØÚÚ[™ûï&ùd#Ý]]ˆ:aãyi#HÙ^HOˆTPÐUWÐÐS“Ó’PÐSÒÑVH›ØÚÚ[™ûï"9îçy.#HÚ[[Y\HÂˆ\Ý]Üš]K]Ú[œûï"B”LL9ì¯¹èkˆ[™XYÙ{ï&˜Ø[›ÛšXØ[›ÝÈ9îäyk¦ˆLŠÈ9keù«­{ï"[—ÚYÛÝ]]Û˜[YKÂˆ›ÝÈÜ™[˜[
+È›ÝÈY[]H\ÚÜ˜]È™\]Y\ÝÙ]šY[˜ÙH\ÚÛX\\‚ˆY[]KÜÛXÞH™\œÚ[ÛœËØ]˜Z[Xš[]H˜\Ú\Ë‹‹»ï"B”LLˆ9¥è9èk9ï%¹è yb-¹n©¹.¢ùk§»ï&TÕÝX\™9¢jÈØ[›ÛšXØ[9c!{ï"9¥èÕMIKùéäyb&ù§oÏLŒ	KÂˆ9c%ù.©9¢`LÌ	Kú)á9b&ycæ9c%¹¥éy§'ùkeúghºaãûï"B”LLË‹ŒMH[[]]X›H\Y˜XÝÈ
+È]\›Z[š\ÝXÈY[]H
+È9â­¹  y§.»ï&‚ˆØ[›ÛšXØ[ØÛÛ˜XÝO‹Ø\×ÛÙO‹Ü[OY‹È9."ÈÙ[XÝYÙXÚ\Ú[ÛœËÂˆš[™[™ÜËœ\œ]Y]
+ÈX[šY™\ÝšœÛÛˆTÕ;ï"9¥è9h¦zd§ûï&Ú[[]]X›H9d#ž]\Âˆ›Ë[Ü;ï"{ï&ÛX[šY™\Ý9l H[œ][ˆ^XÝÙ]
+È9."HÛXÞHY[]H
+ÂˆØ[›ÛšXØ[^™\ˆÛÙHš[™Ù\œš[;ï"9.¥9ª(ygeù®¤9è HÒKLMˆ:(c9l/¹od¹. ;ï"JÂˆ9«ãÈ\Y˜XÝÙX[
+ÈÙ[XÝYÜÙ[X[X×Ú\Ú
+Èš[™[™×ÜÙ]Ú\Úˆ[ˆY[]HH]ZYJÚLMŠ[œ]ÜÙ]
+ÈY[]WÚ\Ú
+È\×ÛÙˆ
+ÂˆÛÛ˜XÝ
+È9."HÛXÞHY[]H
+Èš[™Ù\œš[
+Jx %8 %ÛXÞKù.èùè Kú/¤ùaiy.îù. ˆ9cæ9c%ˆOˆ9¥¬[»ï"9c¡¹cì¹/çyåf{ï"{ï&Üš[Üˆ9d#Y[]H9ab9."y¥®HÙX[ÛÜÝ\™Bˆ9i#zj£9a£HY[\Ý[™\^{ï"9ëèy¥.HOˆ˜Z[ÛÜÙY;ï"BˆZYÜ˜][ÛˆNYÙ\»ï"Y]WØØ[›ÛšXØ[^˜][Û—Ü[ˆ
+ÂˆY]WØØ[›ÛšXØ[Ü™XÛÛ˜Ú[X][Û—Ùš[™[™ûï"ycey.¢ùb¨H
+Èš[™[™È:(c9¥l9¥«z* ˆ9â­¹  y§.ˆÕPÐÑTÔËÐ“ÐÒÑQ;ï"T•PS9.áHÛXÞH9a`z+®8 %8 %ŒH9¥è;ï"B”HÝX\™9b¨9fî»ï"Ô‹L‹9i#yk¨H0©Ì»ï#9§+9¢nyk£9¢$;ï"{ï&‚ˆÜØØ[—Ý[˜[˜ÚÜ™YÝÜš]\È9caùî©ø %8 %˜]ÕÜš]\ˆÜš]H:, ùå*9à®yîãÈ[X\È:-bù`/ˆ;ï"ÈH˜]ÕÜš]\Š‹‹ŠNÈËÜš]J‹‹Š{ï"y.#¹æí9£©y§¡:`(:, ùå*;ï"˜]ÕÜš]\‚ˆ
+‹‹ŠKÜš]J‹‹Š{ï"ycã9oh¹  z-çú.*»ï&ù§¡:`(9à®yæoyd#yceHH˜]×ÝÜš]\‹œHÂˆ˜]×Ø[˜ÚÜ‹œH
+È›Ü›X[^˜][Û‹Ü[›™\‹œ{ï"™XY[Û›H™\šYšYYˆ™XY\»ï#9¥èÜš]H:,`yac{ï"{ï&Û™YØ]]™Hš^\™\È
+È›ÙXÝ[Ûˆ9aj9¨$zfíº/çz)áY™\œØ\šX[\Ýûï"Íˆ:hn{ï#\ÝËÚ[YÜ˜][Û‹Ý\ÝØØ[›ÛšXØ[œ{ï"{ï&‚ˆ]Y]0©Î9çêzf-HÌ9ìnùaj9kîyn¥
+ÈHÝX\™:hn{ï&ù .ù/dÈLKÌ˜‚ˆÈÈÈÔ‹L‹[˜ÚÜ™Y˜]È[™Ù\Ý[Ûˆ›Ý[™\ž{ï"9bcy¢n{ï#‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï"B‚Ô‹L‹ŒÈ9i#yk¨{ï"Œ‹LKLHMŒˆ
+ÌŒ;ï"T‘SÔS‘Q9d#ˆÚ\š[™È9¥-¹cèûï&ÌŒ‹LKLBŒMÎŒˆÔ‹L‹9§ 9îâ9i#yk¨{ï&ŠŠ•‘T’Q’QQÈÓÔÑQÈ”‘QV‘JŠ»ï"Ô‹Lˆ9aj:dï¹alúeë{ï&ÂQ‹LŒˆPÐÑTQ;ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒLKLÈ9.#ˆQ‹LŒˆ[Y[™Y[»ï"9méy/g:) y¬`‚˜ØÜËÙ\ÚYÛ‹ÐK\Ú\™KX[˜[\Ú\×ÐÔ‹L‹Œùi#yk¨y.#Ô‹L‹9§ 9îâ[˜ÚÜ™Y[™Ù\Ý[Û›Ý[™\žy¥-¹cèú) y¬`—ÌŒŒLK›Y;ï"{ï&‚‚˜^[˜ÚÜ™Y˜]Ñ]šY[˜ÙUÜš]\»ï"]Y]0©ÌËŒ{ï"x %8 %9e+ù. ›ÙXÝ[Û‹[ÝÛ™Y9a¦yaiz/®yåc;ï&‚ˆÜš]WÙ^Ú[™ÙJ^Ú[™ÙJHOˆ˜]ÕÜš]T™\Ý[ˆKˆ˜]ÕÜš]\‹Üš]J^Ú[™ÙJHÈ9¥¡ù.í¹/©ÈÛÛ[Z];ï"Y]H9§ 9d#º$/yææ;ï"Bˆ‹ˆ™\™XY\œÚ\ÝYY]Hž]\ø %8 %‘T’Q–KSÓ“{ï&‚ˆ™\]Z\™HÚLMŠ™\™XY
+HOH˜]ÕÜš]T™\Ý[™]šY[˜ÙWÚ\Úˆ;ï"Üš]KO™[œ›Û9.búeí9£h¹keú" »ï"ÐÕÕ{ï"KOˆ9¥m9/dÈT‘RS;ï#ˆ9¬.9.#H[œ›Û;ï"BˆËˆY[]HÜ›ÜÜËXš[™[™ûï&›Y]H9æ¡™\]Y\ÝÚYÜ›ÝšY\‹Ü›ÝšY\—Ù]\Ù]Âˆ[™Ú[Û›Ü›X[^˜][Û—ÜÝ\™˜XÙKÛÜ\˜][Û—ÚYOH^Ú[™ÙH[™[ÜBˆ;ï"9/*º`(Y]H:.ªù.ïHOˆ“ÐÒûï"JÈ\šHÜ›ÜÜËXš[™[™Âˆˆ[œ›Û[[]]X›H[˜ÚÜ»ï"Ù^YYÈÓÓSRUY[]{ï"BˆKˆ™]\›¸ %8 %[™Ù\Ý:!ìù«i9¢cyë¥ùk£9¢$;ï"9.îù/eyi,z-)HH]šY[˜ÙH9.#H™XY{ï"B¹aj:`ê›ÙXÝ[Ûˆ]šY[˜ÙH9a¦yaiy£©yî¯ûï"]Y]0©ÌËŒ»ï"{ï&‚ˆ›Ø™PÛÛ^9¥¬9h§¹oázg ÛÛ›ˆ9cà¹¥l;ï&Ü˜]×ÝÜš]\ˆOˆ[˜ÚÜ™Y˜]Ñ]šY[˜ÙUÜš]\‚ˆ;ï"]šY[˜ÙWÙœ›ÛWÙ^Ú[™ÙHÈ˜Z[\™WÙ]šY[˜ÙHOˆÜš]WÙ^Ú[™Ùx %8 %ˆÕPÐÑTÔÈ9.#ˆT”“Ôˆ^Ú[™ÙH9gaú!ê¹bª[˜ÚÜ»ï"Bˆ[—ÙžWÜ[ˆ9¢dùo [‹[Y[[ÜžHZYÜ˜]Y¸ %8 %9¨a¹§­º!ê¹¨à:-l9.#ˆ›ÙXÝ[Û‚ˆ9k£9aj9æî9d#9æ¡[˜ÚÜ™Y9a¦z-ëùo¡ˆ9îäù§¡9k¢9cjûï"TÕ;ï"{ï&œÜ˜ËÈ9.+H˜]ÕÜš]\ˆÜš]KÝÜš]WÜÝXØÙ\ÜËÝÜš]WÙ˜Z[\™Bˆ:, ùå*9à®ycê¹a`z+®˜]×ÝÜš]\‹œ{ï"9k¦¹.b{ï"y.#ˆ˜]×Ø[˜ÚÜ‹œ{ï"›Ý[™\žH9a¡z`ê;ï"{ï&Âˆ™XY\»ï"˜]ÕÜš]\‹œ™XY;ï"y.#ycåúfd;ï"›Ü›X[^˜][Ûˆ9cêº+îù­¢:-.{ï"B‘[œ›ÛY[9cëù h¹i#y/a¹.#ycëÈ™X˜\Ù[[™{ï"]Y]0©ÌËŒûï"{ï&‚ˆ[˜ÚÜˆS”ÑT•9¬ê9aiyi,z-)HOˆÜš]WÙ^Ú[™ÙH9¢¦ùaîˆOˆ9§+9«(H[™Ù\Ý9i,z-){ï&Âˆ˜]Èž]\ûï"{ï"yg*9ææ9¥è[˜ÚÜˆOˆ›Ü›X[^˜][ÛˆU×ÐSÒÔ—ÓRTÔÒS‘Âˆ^XÝ™]žH9d#9. ^Ú[™Ù{ï&”˜]ÕÜš]\ˆY[\Ý[;ï"Ø[YHž]\ÈYÛ›Üš[™Âˆ[™Ù\ÝYØ]Oˆ›Ë[ÜOˆ]šY[˜ÙWÚ\ÚH:i¥ˆÛÛ[Z]9æ¡{ï"KOˆ[œ›ÛY[ˆ9¢$9b§ÈOˆ9. 9.*ˆ[[]]X›H[˜ÚÜ¸à ycey. ]šY[˜ÙHY[]Bˆ9mì¹§"H[˜ÚÜˆ{ï&œØ[YHHY[\Ý[Èˆ\™ÛÛ™›XÝ;ï&ù¬.9.#H™X˜\Ù[[™BTH9¥-¹cèûï"]Y]0©ÌË;ï"{ï&‚ˆ9ak9o ™XÛÜ™Ü˜]×Ù]šY[˜ÙWØ[˜ÚÜ»ï"¹ç"ùã¬9g.ˆž]\È9nîºi¥¹«(H[˜ÚÜˆ»ï"y¤©:e ;ï&Âˆ[œ›ÛY[9éày§"yc%ˆÙ[œ›ÛØ[˜ÚÜ¸ %8 %]šY[˜ÙWÚ\Ú9..¹oáyhjú, ùå*9¥®yhì9¦#‚ˆÛÛ[Z]Y[]{ï#9aïy¥l9a¡H™\šYžK[Û›H9«å9kîyèàyææ;ï"9.#z!êº(c9k¦¹.byç'ù`/;ï"Bˆ9ak9o :gh»ï&[˜ÚÜ™Y˜]Ñ]šY[˜ÙUÜš]\ˆÈ\œÚ\ÝÙ^Ú[™ÙWÝÚ]Ø[˜ÚÜˆÂˆÛÚÝ\Ü˜]×Ù]šY[˜ÙWØ[˜ÚÜˆÈ˜]Ñ]šY[˜ÙP[˜ÚÜˆÈ˜]Ð[˜ÚÜ‘\œ›Ü‚ˆ\ÝÈ9b-º`(YØXÞKÝ[˜[˜ÚÜ™Y9¢%ˆÛÝ™\›™Y\™Z[™Ù\Ý9i.yamùå*9éày§"Bˆš[Z]]™{ï"\ÝË[Û›{ï#ŒˆÝ]XÈ™YÚ\ÝžH9d#9cèùo¡;ï"B¹¥èØÚ[XH9cæ9¦í;ï"9i#yå*ZYÜ˜][ÛˆMÈ[˜ÚÜˆ:(j;ï"BY™\œØ\šX[\Ýûï"
+ÌL;ï&››Ü›X[^˜][ÛˆLMHL9fç¹odˆ
+ÈL9¥¬9h§»ï"{ï&‚ˆ]Y]0©ÍMÈ:hnyçêzf-yaj9kîyn¥;ï"›Ø™PÛÛ^ÕPÐÑTÔËÑT”“Ôˆ[˜ÚÜˆˆÂˆ9îäù§¡9k¢9cjÈHÈÐÕÕHHÈ[œ›ÛY[9i,z-)y h¹i#HHÈØ[YKRHY[\Ý[HÂˆˆ\™ÛÛ™›XÝHÈ[˜ÚÜ™YOœ[›™\ˆÕPÐÑTÔÈHÈY[]BˆÜ›ÜÜËXš[™[™ÈHÈTH9¥-¹cèÈH
+È9fç¹odˆ:hnyaj9/çy£ {ï"{ï&ù .ù/dÈNKÌ˜‚ˆÈÈÈÔ‹L‹ŒÈ˜]È\Ý[˜ÚÜˆ
+È›ÝšY\‹SÝÛ™YÜ\˜][ÛˆÜXÈ
+ÈÝ]]ÙX[;ï"9bcy¢n{ï#Ó‘HÈ‘SÔS‘Q;ï"B‚Ô‹L‹Œˆ9i#yk¨{ï"Œ‹LKLHLH
+ÌŒ;ï"T‘SÔS‘Q9d#¹¥-¹cèûï&ÌŒ‹LKLHMŒ‚Ô‹L‹ŒÈ9i#yk¨{ï&ŠŠ”‘SÔS‘Q
+Š»ï"Ü\˜][ÛˆÜXÈÈ[˜ÚÜˆØÚ[XJÜ[›™\‚™\šYšXØ][ÛˆÈÝ]]\Ù]
+ÜÙ[X[XÈÙX[TÔÈÈ”‘QV‘{ï&ù.áH[œ›ÛY[˜›Ý[™\žH9å,HÔ‹L‹9¥-¹cèûï#:)ày."»ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒLKLˆ9.#‚Q‹LŒˆ[Y[™Y[ûï"9am¹.+yak9o ™XÛÜ™\¸à y­bú+åH[\ˆ9¢bùméH[˜ÚÜˆ9ëbz(j:/ì¹mìº(ªÈ[Y[™Y[0©ÎK9/ëº+¨»ï"{ï&‚‚˜^”LH›ÝšY\‹SÝÛ™YÜ\˜][ÛˆÜXûï"]Y]0©Ì»ï"{ï&‚ˆ9¥¬Ü\˜][ÛœËœ{ï&”›ÝšY\“Ü\˜][Û”ÜXûï"Ü\˜][Û—ÚYØØ\Xš[]KÙ[™Ú[Âˆ›ÝšY\—Ù]\Ù]Û›Ü›X[^˜][Û—ÜÝ\™˜XÙ{ï"yéày§"HÕUPÈ9n.:aãÈMH9.*¸ %8 %9«ãù.*‚ˆ˜XØYHÜ˜\\ˆ9îäyk¦¹. 9.*‚ˆØ[Ù^Ú[™ÙHÈØØ[ÛÜ—Ù^Ú[™ÙH9¤©:e ;ï&™Ù[™\šXÈ^XÝ]Üˆ9éày§"yc%¹..‚ˆÙ^XÝ]WÙ^Ú[™ÙJÜXË›‹\˜[\Êx %8 %[™Ú[Ù]\Ù]ØØ\Xš[]KÂˆÝ\™˜XÙKÛÜ\˜][Û—ÚY9aj:`ê9å,HÜXÈ9­/¹å'ûï"9¦kº`&ˆØ[\ˆ9¥è9¬åyîá9d"ˆZ[H›ˆ
+È[™^Ø\Xš[]{ï&ùak9o 9¥®y¬åyëo¹d#y¥è9.îù/eHœ™YKY›Ü›BˆÛÜœ™XÝ™\ÜÈÙ[XÝÜ¸ %8 %9îäù§¡9­bú+åy¥«z* ;ï"Bˆ]Y\žWÚÛ[™WÙ^Ú[™ÙHOˆRSWÐT—ÒÓS‘HÈ]Y\žWÚ[™^ÚÛ[™WÙ^Ú[™ÙHO‚ˆS‘VÑRSWÒÓS‘{ï"TÕ9îäyk¦¹¥«z* ;ï"Bˆ˜]Ñ[™[ÜHÈ˜]ÈY]H9¥¬9h§ˆÜ\˜][Û—ÚY;ï"[˜ÚÜˆ9.©9câyîäyk¦»ï"Bˆ9îäù§¡9k¢9cjûï&ŒMHÜXÈ9.#ˆÑ×ÓQUÑÐÓTÔÒQ’PÐUSÓ”È
+È›Ü›X[^˜][Û‚ˆ™YÚ\ÝžH9cã9d$H^XÝ9¨.9kî{ï"È“ÕÐTPÐP“H9¥èÜXûï"B”Lˆ˜]È]šY[˜ÙH\Ý[˜ÚÜ»ï"]Y]0©Ìûï"{ï&‚ˆZYÜ˜][ÛˆMÈY]WÜ˜]×Ù]šY[˜ÙWØ[˜ÚÜ»ï"
+›ÝšY\‹]\Ù]ˆ™\]Y\ÝÚY
+HÈ
+È]šY[˜ÙWÝ\šKÙ]šY[˜ÙWÚ\ÚÙ[™Ú[ÛÜ\˜][Û—ÚYÂˆ›Ü›X[^˜][Û—ÜÝ\™˜XÙKÜ^[ØYÚÚ[™Ú[™Ù\ÝÜ[—ÚYØÜ™X]YØ];ï"BˆÛÝ™\›™Y[™Ù\Ý[Ûˆ›Ýûï"˜]×Ø[˜ÚÜ‹œNŽœ™XÛÜ™Ü˜]×Ù]šY[˜ÙWØ[˜ÚÜ»ï"{ï&‚ˆ˜]ÕÜš]\ˆÛÛ[Z]Y]HTÕOˆ™\™XY\œÚ\ÝYž]\ÈOˆÚLMˆO‚ˆ[˜ÚÜ»ï"9d#ž]\È9n`¹ëb{ï&ùo ˆž]\È˜]Ð[˜ÚÜ‘\œ›Üˆ\™˜Z[8 %8 %[˜ÚÜ‚ˆ9¬.9.#H™KX˜\Ù[[™{ï"Bˆ›Ü›X[^˜][Û”[›™\ˆ9g*9.îù/eHY]H:)èù§¤ú-ëùå,Kù¦(9l!9.bùbcy§éH[˜ÚÜ»ï&‚ˆ9ï.¹i,{ï"YØXÞH™KLMûï"KOˆU×ÐSÒÔ—ÓRTÔÒS‘È“ÐÒÑQ;ï"˜Z[ÛÜÙY;ï&ÂˆÛÝ™\›™Y™\Z\ˆH™KZ[™Ù\Ý;ï&ùîçy.#H]]ËYÜ˜[™˜]\¸ %8 %MKY\˜BˆJÒˆ][™\š[™È\ÝÜžH9caùî©ùd#ˆˆ9¬.9.#z(ªù/èy.îûï"BˆÝ\œ™[\ÚOH[˜ÚÜˆOˆU×ÐSÒÔ—ÓRTÓPUÒSÒQS•T‘“ÐÒÂˆ;ï"]šY[˜ÙWØÛÛ™›XÝU•QH9.áz+â¹¥«{ï&ù/èy.îù¨.y¦+È[˜ÚÜ¸ %8 %:aãyi#z/ä:(c9¬.9îëBˆ“ÐÒûï&ù/ë¹i#yfç¹c§Èž]\ÈOˆ9c§È[ˆ^XÝ™\^{ï"Bˆ]šY[˜ÙWØÛÛ™›XÝ;ï"M»ï"zfcyî©ù..º+â¹¥«ylg¹ )ûï&ù¥éÈ˜\Ù[[™HTÕSÕZ\Úˆ9§éz+è¹b(:fi”LÈ^XÝYÝ]]^XÝÙ]
+ÈÙ[X[XÈ˜[YHÙX[;ï"]Y]0©Í;ï"{ï&‚ˆZYÜ˜][ÛˆMÈYÙ\ˆ9.)9b%È›Ü›X[^™YÛÝ]]ÜÙ]Ú\ÚÂˆ›Ü›X[^™YÜÙ[X[X×Ú\ÚˆÝ]]ÜÙ]Ú\ÚH\Ú
+ÛÜY
+Ý]]Û˜[YKØ[›ÛšXØ[\šKÛÛ[Ú\ÚˆØÚ[XWÚ\Ú›Ý×ØÛÝ[
+JH9."y¥®y­¢:-.{ï&›YÙ\ˆOHX[šY™\ÝOBˆ™\^K][YH9âjyä!ºaãyë¥ÂˆÙ[X[X×Ú\Ú;ï"9aj:/¤ùaîº(jÛÜYØ[›ÛšXØ[”ÓÓ»ï"y."y¥®y­¢:-.{ï&›YÙ\ˆOBˆX[šY™\ÝOH™\^K][YH9.ã¹âjyä!ˆ\œ]Y]™XÛÜ™È:aãyë¥Âˆ^XÝY^XÝÙ];ï&›X[šY™\ÝÝ]]Û˜[YHÙ]OHÕT”‘S•™YÚ\ÝžBˆÜXË›Ý]]Û˜[Y\ûï"›ÈZ\ÜÚ[™ÈÈ›È^˜HÈ›È\XØ]x %8 %9b(:fiˆ™\]Z\™YÝ]]
+È:aãyîäycã\Ú9.ãHSPQÑQ;ï"BˆT’H]\›Z[š\ÝXÈš[™[™ûï&¹«ãÈÝ]]\šHOHYÙ\ˆ:.ªù.ïzaãyë¥ùæ¡ˆ˜\ÙWÜ]
+ÈÝ]]Û˜[Y{ï":aãyîäyb,9cé¹. 9d"9¬åHÙÚXØ[]9.ãHSPQÑQ;ï"Bˆ9âjyc%º+ëy.bycaùî©ûï&›X]\šX[^™YÙ]9 l9ioyëby.£ˆÜXË›Ý]]Û˜[Y\ûï"9ênº(jˆ9âjyc%¹..¹ênˆ\œ]Y]8 %8 %:fí¹.©ùaîº+ày£k»ï&Ù[\K\^[ØYÕPÐÑTÔÈ9­bú+åz)¡¹æå»ï"Bˆ›Ü›X[^˜][Û”[”ÙX[9¢jyleH˜]×Ù]šY[˜ÙWÝ\šHÈ˜]×Ü^[ØYÚÚ[™Âˆ›Ü›X[^™YÛÝ]]ÜÙ]Ú\ÚÈ›Ü›X[^™YÜÙ[X[X×Ú\Ú;ï&ÛX[šY™\Ý9¥¬9h§‚ˆ˜]×Ü^[ØYÚÚ[™ÈÝ]]ÜÙ]Ú\Ú;ï&Ü™KPÔ‹L‹ŒÈ:(c9ï.ˆÙX[9.#y/gˆX[H™\^B“ZYÜ˜][ÛˆMûï&˜[˜ÚÜˆ:(j
+È9.)ÙX[9b%ûï"9§*¹¥.HMÌMKÌM»ï&ÌMÈ:dï‚ˆœ›ÛK^™\›È
+ÈK‹ŒM‹OŒMÈ\Ü˜YH
+ÈY[\Ý[
+È[\\ˆ›Ø™HN;ï"BY™\œØ\šX[\Ýûï"
+ÌŒ;ï&››Ü›X[^˜][ÛˆLH9fç¹odˆ
+ÈŒ9¥¬9h§»ï"{ï&‚ˆ]Y]0©Íˆ{ï"Ü\˜][Ûˆ›Ý™[˜[˜ÙHûï"KÈ»ï"˜]È\Ý[˜ÚÜˆ»ï"KÂˆûï"Ý]]
+ÈÙ[X[XÈÙX[L;ï"KÈ;ï"™YÜ™\ÜÚ[Û¸ %8 %9¥è¹§"H:hnyaj9/çy£ {ï"yçêzf-Bˆ9aj9kîyn¥;ï&ù .ù/dÈMÍKÌ˜‚ˆÈÈÈÔ‹L‹Œˆ™\^H›Ý™[˜[˜ÙHÙX[;ï"9bcy¢n{ï#Ó‘HÈ‘SÔS‘Q;ï"B‚Ô‹L‹ŒH9i#yk¨{ï"Œ‹LKLHLŒMH
+ÌŒ;ï"z(àya¬È
+ŠÔ‹L‹ŒH‘SÔS‘Q
+Šˆ9d#¹¥-¹cèûï&ÂŒŒ‹LKLHLHÔ‹L‹Œˆ9i#yk¨{ï&ŠŠ”‘SÔS‘Q
+Š»ï"^XÝ™\^HÈ[™š[™Ù\œš[ÈØÚ[XH™\šYžH”‘QV‘{ï#È\Ý\›ÛÝ9å,HÔ‹L‹ŒÈ9¥-¹cèûï#:)ày."»ï"xà ‚¹c¡¹cì¹îáº" º)àH0©ÍŒHKLŒŒLKLH9.#ˆQ‹LŒˆ[Y[™Y[»ï"9am¹.+Bœ™\]Z\™WØØ\Xš[]H9­/¹å'ÈÝ\™˜XÙxà \[‹Z\ÝÜžH˜\Ù[[™xà yi%¹l`¹¥¡ù.íˆ\ÚÙX[¹."yi!:(j:/ì9mìº(ªÈ[Y[™Y[È0©ÎŒKp©ÎŒÈ9/ëº+¨»ï"{ï&‚‚˜^”LHÝ\™˜XÙH9ç'ù«hÈÞ\Ý[KY\š]™Y;ï"]Y]0©Ì»ï"{ï&‚ˆ9¤©:e Ø[Ù^Ú[™ÙH9æ¡›Ü›X[^˜][Û—ÜÝ\™˜XÙHØ[\‹[Ý™\œšYH9cëú`"ycà¹¥lˆ;ï"9.#ˆŒKÐŒˆ˜Ø[\‹YXÛ\™YY[]H\È›ÝÞ\Ý[KY\š]™Yˆ9d#:(à{ï"BˆÝ\™˜XÙWÚY[]HHÝŠ™\]Z\™WØØ\Xš[]HÜˆˆŠx %8 %Ø\Xš[]H9idyî©¹­/¹å'ûï&Âˆ]Y\žWÚÛ[™WÙ^Ú[™Ù{ï"Ø\Xš[]OYZ[WØ˜\»ï"y.#‚ˆ]Y\žWÚ[™^ÚÛ[™WÙ^Ú[™Ù{ï"Ø\Xš[]OZ[™^ÙZ[{ï"y.ázghØ\Xš[]H9c.¹b!‚ˆ9îäù§¡9­bú+å{ï&¹ëo¹d#y¥è:+éycà¹¥l
+È›ÝšY\‹œH9aj:`êØØ[ÛÜ—Ù^Ú[™ÙH:, ùå*9à®Bˆ9¥è:+éHÝØ\™È
+È9­/¹å'ú(j:/¯¹o#ù¥«z* ;ï&Ü™YÚ\ÝžHN9§hy¦(9l!9.#ycæ;ï"Ý\™˜XÙH9`/ˆ9§+9l,yëby.£ˆØ\Xš[]H9d#{ï#:fí¹¥l9£kº/àyéîûï"B”Lˆ˜]È]šY[˜ÙHš[™[™È9a¬¹ê y.#ycëù­%ùæoH
+È9aj9c¡¹cìˆ^XÝ™\^{ï"]Y]0©Ìûï"{ï&‚ˆ˜\Ù[[™HH:+éH™\]Y\Ý9aj:`ê:ggˆÛÛ™›XÝ[ˆ9æ¡TÕSÕ˜]×Ù]šY[˜ÙWÚ\Ú;ï&ÂˆÝ\œ™[\Ú9.#yg*˜\Ù[[™{ï"9.%˜\Ù[[™H:gg¹ên»ï"KOˆSÒQS•T‘“ÐÒÂˆ;ï"]šY[˜ÙWØÛÛ™›XÝU•Q{ï#ZYÜ˜][ÛˆM»ï&ù.#y¥.ycæ˜\Ù[[™{ï"Bˆ9ë+9.£9«(Kùë+9."y«(z/ä:(c9d#9¨-È“ÐÒûï"ÛÛ™›XÝ“ÐÒÈ:+¬9oey.#y¢$9..¹¥¬˜\Ù[[™{ï"{ï&ÂˆÛÛ™›XÝ[ˆ:!êº.ªù£"H^XÝÙ^H9n`¹ëbH™\^{ï"9. YÙ\ˆ:(c;ï"BˆÝ\™˜XÙH9ëèy¥.{ï"Y]HÝ\™˜XÙH9keù«­y¥.H[™^ÙZ[{ï"KOˆž]\È9cæOˆÛÛ™›XÝˆ“ÐÒÈ9¬.9îë{ï#9¬.9.#y.©ùaîˆ[™^ÙZ[HÕPÐÑTÔÂˆ9/ë¹i#yfç¹c§ùiâÈž]\ÈOˆ9c§È[ˆ9áiùn.^XÝ™\^Bˆ^XÝ™\^HÛÚÝ\;ï&œ[—ÚYH]ZYJ˜[Y\ÜXÙKY[\Ý[˜ÞWÚÙ^JH9æí9£©y§éz+è‚ˆYÙ\»ï"9.#ya£H]\Ý\[ˆ9«å:/ ûï"x %8 %X\\ˆKO‹OHÈÛÛ˜XÝKO‹OBˆ›Û˜XÚÈ™\^H9c¡¹cìˆH[»ï"9¥è\XØ]KTøà y¥èˆ:f-9ol{ï"{ï&ùaj:`ê›ØÚÙYˆ9b!¹¥+ûï"9d*È][K]X›HÈXØÛÝ[[™Èš[Û][Û»ï"yîçù. ^XÝÛÚÝ\”LÈ[ÙX[9­¢:-.{ï"]Y]0©Í;ï"{ï&‚ˆÜÝ\ÜYÚÙ^K×Ø›ØÚÙYÚÙ^H9­íùaiyk£9¥mPTT—ÐÓÑWÑ’S‘ÑT”’S•;ï"^;ï"Bˆ8 %8 %9¦/¹é.¹.,¹cëùï*HMˆ^;ï#ÛÜœ™XÝ™\ÜÈ\Ú[œ]9.#yï*yçë{ï&ùbcHMˆ9/cyæî9d#ˆ9æ¡š[™Ù\œš[9.©ùå'ù.#yd#[ˆY[]Bˆ\Y›Ü›X[^˜][Û”[”ÙX[]XÛ\Üûï&™œ›ÛWÛYÙ\Š
+HÈˆÝ\œ™[Ü›Ý™[˜[˜ÙWÜ›Ø›[\Ê
+{ï"YÙ\ˆOH9odùbcHÛÛ˜XÝ
+È9odùbcH[œ;ï#ˆY™[œÙH[ˆ\;ï"KÈX[šY™\ÝØš[™[™×Ü›Ø›[\Ê
+{ï"X[šY™\Ý9aj:+ëy.bykeù«­BˆOHYÙ\ˆÙX[
+È]X\˜[[™H9."y¥®yîäyk¦ˆX[šY™\ÝOHYÙ\ˆOHˆ™XÛÛ\]{ï"BˆX[šY™\ÝÛXÞH\Y9c%»ï&”ÕPÐÑTÔËÔT•PSX[šY™\Ý‘TURT‘Q;ï"YÙ\ˆÝ]\Âˆ9ïîú/k9/*º`(9.#yaîˆX[šY™\ÝYœ™YHX[H™\^{ï"{ï&Ð“ÐÒÑQ9¤.¹n)¹clúj£:+àBˆØÚ[XWÚ\Ú:aãyë¥ûï&œ™\^H9.ã¹âjyä!ˆ\œ]Y]:aãyë¥ÈÚLMŠÝŠœ˜[YKœØÚ[XJJBˆ9.#ˆX[šY™\Ý9«å9kîx %8 %™Xš[™;ï"9£hˆ\œ]Y]
+È9¦í9¥¬ÛÛ[Ú\Ú;ï"y.ãz(ªù¢é¹¢*‚ˆ™Xš[™[\\ˆ9çêzf-HL:hn{ï&›X[šY™\ÝÝ\™˜XÙKÜÝ]\ËØÛÝ[ËÂˆ]X\˜[[™WÜÙ]Ú\ÚÛX\\—ØÛÙWÚ\Ú9ëèy¥.H
+È:aãyë¥ùi%¹l`ˆ\Ú
+ÈTUBˆYÙ\ˆ\ÚOˆSPQÑQ;ï&ÛYÙ\ˆÝ]\ËÜ]X\˜[[™HÙX[ÛX\\—ØÛÙWÚ\Úˆ9ëèy¥.HOˆSPQÑQ;ï&ÛÝ]]ØÚ[XH9£h¹îäHOˆSPQÑQ“ZYÜ˜][ÛˆM»ï&›Y]WÜ›ÝšY\—Û›Ü›X[^˜][Û—Ü[ˆ
+È]šY[˜ÙWØÛÛ™›XÝ“ÓÓPS‚ˆQUSSÑ{ï"9§*¹¥.HMÌM{ï&ÌMˆ:dïˆœ›ÛK^™\›È
+È\Ü˜Y{ï"K‹ŒMH9ab9n¥9å*ˆ9a£z(iHMˆ9.áyn¥9å*9l/º`ê;ï"JÈY[\Ý[
+È[\\ˆ9­bú+å{ï"BY™\œØ\šX[\Ýûï"
+ÌMûï&››Ü›X[^˜][ÛˆHÈ9fç¹odˆ
+ÈMÈ9¥¬9h§»ï"{ï&‚ˆ]Y]0©Ì‹;ï"9ëo¹d#KÐTÕù/c¹l`¹.#ycëÈÝ™\œšY{ï"JÈ0©ÌË{ï"KO’ˆ9."y«(H“ÐÒÈÂˆÝ\™˜XÙHÝØ\9¬.9.#HÕPÐÑTÔÈÈ9/ë¹i#yfçˆH™\^HÈX\\ˆ›Û˜XÚÈÂˆÛÛ˜XÝ›Û˜XÚûï"JÈ0©Í»ï"š\œÝMˆÛÛ\Ú[Ûˆ
+È™Xš[™9çêzf-HL:hn{ï"yaj9kîyn¥˜‚ˆÈÈÈÔ‹L‹ŒHÝ\™˜XÙHY[]H
+È™YÚ\ÝžH›Ý[™\žH
+È™\^H
+ÈÛÛ[Z]ÛÜÝ\™{ï"9bcy¢n{ï#Ó‘HÈ‘SÔS‘Q;ï"B‚Ô‹Lˆ9i#yk¨{ï"Œ‹LLÌHMÎˆ
+ÌŒ;ï"z(àya¬È
+ŠÔ‹Lˆ‘SÔS‘Q
+Šˆ9d#¹¥-¹cèûï&ÌŒ‹LKLHLŒMHÔ‹L‹ŒH9i#yk¨{ï&ŠŠ”‘SÔS‘Q
+Š»ï"9¥-¹cèù¥®yd$y/çyåf{ï#È9å,HÔ‹L‹Œˆ9¥-¹cèûï#:)ày."»ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKPÔ‹LŒŒÌKL9.#ˆQ‹LŒˆ[Y[™Y[{ï"9am¹.+HØ[Ù^Ú[™ÙH9cëú`"HÝ\™˜XÙH9cà¹¥l8à []\Ý\[ˆ\Ú\]X[]xà LM‹Z^9¢*¹¥«Hš[™Ù\œš[9ëbHÈ9i!:(j:/ì9mìº(ªÈ[Y[™Y[ˆ0©ÍËŒKp©ÍËŒÈ9/ëº+¨»ï"{ï&‚‚˜^”LHÝ\™˜XÙHY[]{ï"]Y]0©Ì»ï"{ï&‚ˆ™YÚ\ÝžHÙ^H9caùî©ù..ˆ\Y9fæùa`ùîá
+›ÝšY\‹›Ü›X[^˜][Û—ÜÝ\™˜XÙKˆ›ÝšY\—Ù]\Ù][™Ú[
+{ï&Âˆ›Ü›X[^˜][Û—ÜÝ\™˜XÙHHÖTÕSKQT’U‘Q9£ y.ayc%º.ªù.ï{ï&œ›ÝšY\ˆ˜XØYBˆØ[Ù^Ú[™ÙH9­/¹å'ûï":næ:+©Ø\Xš[]H:.ªù.ï{ï"KOˆ˜]ÕÜš]\ˆ9a¦yaiH˜]ÈY]Bˆ;ï"9d$yd#¹ao9k®ykeù«­{ï"{ï&ùé y«hˆ™\]Y\Ý9cà¹¥lÈÞ[X›Û9bcyï 9ã'9­bÂˆ]Y\žWÚÛ[™WÙ^Ú[™ÙH
+Ý\™˜XÙOYZ[WØ˜\ˆOˆZ[P˜\‘ÊH9.#‚ˆ]Y\žWÚ[™^ÚÛ[™WÙ^Ú[™ÙH
+Ý\™˜XÙOZ[™^ÙZ[HOˆ[™^Z[QÊBˆ9.)9.*¹¦/¹o#È›ÙXÝ[ÛˆÜ˜\\¸ %8 %9d#[™Ú[
+Ù]\Ù]9æ¡9.)9.*¹.&¹b¨HÝ\™˜XÙBˆ9¬.9.#z+ëú-ëùå,{ï"9­bú+åy¥«z* ØÚ[XH9.¤¹¥©{ï"BˆYØXÞH9«iù.bH˜]ûï"9ï.ˆÝ\™˜XÙH9keù«­y.%Z\ˆ9i&¹.b{ï"KOˆVSÐQÔÕT‘PÑWÐSP’QÕSÕTÂˆ“ÐÒÑQ;ï"9.#yã';ï"{ï&úgg¹«iù.bHZ\ˆ9.ãycëú-ëùå,{ï"9d$yd#¹ao9k®{ï"Bˆ9¥¬:e&z+ëùìnÈVSÐQÔÕT‘PÑWÐSP’QÕSÕTûï"9b!¹ìnú(j9akyìnûï"BˆÛÝ™\˜YÙHÝX\™9caùî©ûï&œ›ÝšY\ˆ˜XØYHTÕÝ\™˜XÙ\È9.#‚ˆÑ×ÓQUÑÐÓTÔÒQ’PÐUSÓ”È9.©9cây¨.9kîHOH™YÚ\ÝžH^XÝÙ];ï"N9§h{ï"{ï&ÂˆÜ[Û˜[9§*¹­¢:-.HÝ\™˜XÙ{ï"Ù]Ú[™^ÙZ[HÈÙ]Ú[™\ÝžWÝÙZYÚÂˆÙ]Ú[™\ÝžWÙZ[{ï"y¦/¹o#È“ÕÐTPÐP“{ï#9.#y.ãˆÝXÝ\˜[]9­¢9i,B”Lˆ[[]]X›H™YÚ\Ýž{ï"]Y]0©Ìûï"{ï&‚ˆ9¤©:e 9ak9o 9cëùcæUTÑUÓ“Ô“PSVUSÓ—Ô‘QÒTÕ–{ï&Û[Ù[K\š]˜]H9.#ycëùcæˆ\H
+Èš]˜]H^XÝ[™^;ï&ùak9o :gh¹cê¹§"ycêº+îÈÛÚÝ\ÜÜXÈÈÜXÜ×Ù›ÜˆÂˆ™YÚ\ÝžWÜÜXÜûï"9.#ycëùcæÛ˜\ÚÝ;ï"Bˆ›Ü›X[^˜][Û”[›™\ˆ9§¡:`(9fj9.#ˆ[Š
+H9ëo¹d#y¥èÜXËÛX\\‹Ü™YÚ\ÝžKÜÝ\™˜XÙBˆ9cà¹¥l;ï"9îäù§¡9­bú+åy¥«z* ;ï"{ï&Ý\ÝË[Û›H9¬ê9aiy.áyîãÈ[ÛšÙ^\]Ú9éày§"HÝ]Bˆ;ï"ŒˆØØ[›™\ˆÝ]XÈ™YÚ\ÝžH9d#9. :(àya¬ùcèùo¡;ï"B”LÈÛ™H^XÝ™\^HÛXÞ{ï"]Y]0©Í;ï"{ï&‚ˆÕPÐÑTÔÈÈT•PSÈ“ÐÒÑQ9aj9îâ9  yîçù. ;ï&œØ[YH^XÝ[œ]Y[]HO‚ˆ:aãzj£9¥è¹§"H[ˆÛÜÝ\™{ï"X[šY™\Ýž]\ÈÈÝ]]ÈÈ]X\˜[[™H^XÝˆÙ];ï"KOˆ[XÝHY[\Ý[™]\›»ï&Ù[XYÙYÝ[\\™YH˜Z[ÛÜÙYˆ;ï"™\Z\ˆ™\]Z\™Y;ï#9îçy.#H˜[ÙHX[H™\^{ï"BˆX\\ˆÛÙHY[]H:/æùaiH[ˆY[]{ï&“PTT—ÐÓÑWÑ’S‘ÑT”’S•BˆÒKLMˆÝ™\ˆÛÝ™\›™YX\\ˆ
+ÈÈ[Ù[HÛÝ\˜Ù\ûï":(c9l/¹od¹. :-êÔÂˆ9èk¹k¦¹ )ûï#[\Ü9¥íˆÞ\Ý[KY\š]™Y;ï"x %8 %X\\ˆ9k§¹ã¬9cæ9¦íOˆ9¥¬[‚ˆY[]{ï"9c¡¹cì¹/çyåf{ï"{ï&ù¤©:e Ø[\ˆ:!ê¹¢©HÛÙWØÛÛ[Z]9cà¹¥lˆÔ‹LˆYØXÞHYÙ\ˆ:(c9ï.ˆ]X\˜[[™WÜÙ]Ú\ÚÙX[Oˆ9¬.9.#HX[H™\^BˆÛÛ˜XÝ9âb9§+[\ÜŒ‹ŒK]ŒB”L]ÛZXÈ
+È™XÛÝ™\˜X›HÛÛ[Z]ÛÜÝ\™{ï"]Y]0©Í{ï"{ï&‚ˆ9a¦yaiyccú+«»ï&º/¤ùaîˆ\œ]Y]9ab:$/{ï"“ÕÈØÛÜH9aj:/¤ùaî¹âjyc%¸ %8 %9ênˆ\œ]Y]9clúfí¹.©ùaî‚ˆ:+ày£k»ï&ÕÒÓWÔVSÐQ9gcùb&zfíº/¤ùaî»ï"KOˆX[šY™\Ý9§ 9d#º$/yææ;ï"ÛÜœ™XÝ™\ÜÂˆž]\È9¥è9h¦zd§ù¥èØ[\ˆ›Ý™[˜[˜Ù{ï#^XÝ™]žH9keú" ¹.#ycæ;ï"KOˆ‘QÒS‚ˆS”ÐPÕSÓ»ï"\9¨à9§éH
+È[ˆS”ÑT•
+È9aj:`ê]X\˜[[™HS”ÑT•
+È:(c9¥lˆ9¥«z* ;ï"PÓÓSRU;ï"9i,z-)y¥m9/dÈ“ÓPÒûï"Bˆˆ9i,z-)yd#ˆ^XÝ™]ž{ï&¹èk¹k¦¹ )ù¥¡ù.íˆ[˜ÚÜˆ9n`¹ëbH›Ë[ÜOˆYÙ\‚ˆ™XÛÛ˜Ú[X][Û»ï"9¥èÜœ[ˆX[šY™\ÝÈ9cb¹£ä9.©]X\˜[[™{ï"Bˆ\Y˜XÝ:-ëùo¡9b¨[O[—ÚYˆ9«­{ï"9¥¬[ˆ9¥¬:-ëùo¡;ï#9.#z)¡¹æå¹c¡¹cì»ï"Bˆ]X\˜[[™H^XÝ\Ù]ÙX[;ï&œ]X\˜[[™WÜÙ]Ú\ÚHØ[›ÛšXØ[\ÚÝ™\‚ˆÛÜYÙ[X[XÈ™XÛÜ™ûï#9d#9¥í¹îäyk¦ˆX[šY™\Ý9.#ˆYÙ\»ï&ÕTUKÑSUKÂˆ9ï.º(c9å,H™\^H9i#zj£9cäyã¬ˆ9â­¹  y§.¹îá¹c%»ï&›X\YOL9.%9§"H]X\˜[[™HOˆ“ÐÒÑQ;ï"T•PSH9§"yioz(c9/çyåf{ï"B“ZYÜ˜][ÛˆM{ï&›Y]WÜ›ÝšY\—Û›Ü›X[^˜][Û—Ü[ˆ
+È›Ü›X[^˜][Û—ÜÝ\™˜XÙHÂˆX\\—ØÛÙWÚ\ÚÈ]X\˜[[™WÜÙ]Ú\Ú9."yb%ûï"QÓÓSSˆQˆ“ÕVTÕûï&Âˆ9§*¹¥.HM;ï&Ùœ›ÛK^™\›ÈMH:dïˆ
+È\Ü˜Y{ï"K‹ŒM9ab9n¥9å*9a£z(iHMH9.áyn¥9å*9l/º`ê;ï"Bˆ
+ÈY[\Ý[9­bú+å{ï"BY™\œØ\šX[\Ýûï"È:hnyaj:aãÈHÔ‹LˆÍÈ:hnyfç¹odˆ
+ÈÔ‹L‹ŒH9¥¬9h§ˆÌ:hn{ï"{ï&‚ˆ]Y]0©ÍÈ9®!yceHNH:hnyaj9kîyn¥;ï"Ý\™˜XÙH9cã:-ëùå,HÈYØXÞH9«iù.bH˜Z[ÛÜÙYÂˆ:)¡¹æå¹k¢9cjù.©9cây¨.9kîHÈ9¥è9ak9o 9cëùcæ™YÚ\ÝžHÈ9."yîâ9  yn`¹ëbHÈ:/¤ùaî‹[X[šY™\ÝBˆ]X\˜[[™H9ëèy¥.yb(:fi˜Z[ÛÜÙYÈ9¬ê9aiHˆ9i,z-)y h¹i#HÈ9i&º/¤ùaî¹a¦yi,z-)HÂˆX\\ˆÛÙHY[]H9cæ9¦íÈ9cã9ã«ùh ùd#X[šY™\ÝY[]HÈ\H]ˆ9fç¹odˆÈZYÜ˜][Ûˆœ›ÛK^™\›ÊÝ\Ü˜YHÈÒH9çêzf-HÈ9a®ùîäùfç¹od»ï"B˜‚ˆÈÈÈÔ‹Lˆ›ÝšY\‹S›Ü›X[^™Y
+È]X\˜[[™{ï"9bcy¢n{ï#Ó‘HÈ‘SÔS‘Q;ï"B‚”PŒ‹ŒÈ9i#yk¨{ï"Œ‹LLÌHMŽŒŒˆ
+ÌŒ;ï"z(àya¬È
+Š”PŒˆÈŒ‹ŒHÈŒ‹ŒˆÈŒ‹ŒÂ¹aj:dïˆ‘T’Q’QQÈÓÔÑQÈ”‘QV‘JŠ»ï"Q‹LŒH8¡¤ˆPÐÑTQ;ï"{ï&ÐÔ‹Lˆ9¢ny«(z$/yg,ÔŒ‹TLK‹ŒL;ï"9¥¬Q‹LŒ»ï&ùméy/g:) y¬`‚˜ØÜËÙ\ÚYÛ‹ÐK\Ú\™KX[˜[\Ú\×ÔPŒ‹Œùi#yk¨yîäú+®¹.#Ô‹L—Ô›ÝšY\“›Ü›X[^™Y]X\˜[[™yo 9cäyméy/g:) y¬`—ÌŒŒÌK›Y;ï"xà ŒŒ‹LLÌHMÎˆÔ‹Lˆ9i#yk¨{ï&˜ÛÜ™Hœ˜[Y]ÛÜšÈ”‘QV‘{ï#9å,HÔ‹L‹ŒH9¥-¹cèûï":)ày."»ï"xà ¹c¡¹cì¹îáº" º)àH0©ÍŒHKPÔ‹LŒŒÌKLŒÈ9.#ˆQ‹LŒˆ0©ÌKp©Í{ï"9am¹.+y.£9a`ÈÙ^HÈKMH9b!¹ìnùëbz(j:/ì9mìº(ªÈQ‹LŒˆ[Y[™Y[H0©Í‹ŒKp©Í‹9/ëº+¨»ï"xà ‚‚ˆÈÈÈPŒˆÈŒ‹ŒHÈŒ‹ŒˆÈŒ‹Œûï"9bcy¢n{ï#ÓÔÑQÈ‘T’Q’QQÈ”‘QV‘{ï"B‚¹aj:dïºeëyã«ûï"™]šY]Ù\ˆŒ‹LLÌHMŽŒŒˆ:(àya¬ûï&ºfi9ç'ùk§¹cëùi#yã¬™YÜ™\ÜÚ[Ûˆ9.#ya£Bºaãyk¨{ï&ÐQ‹LŒH8¡¤ˆPÐÑTQ;ï"xà ¹c¡¹cì¹îáº" º)àyd!9¢nHÚ[™ÙHÙÈ9.#ˆQ‹LŒ{ï"9d*Â[Y[™Y[ÈˆÈHÈˆÈûï"xà ‚‚ˆÈÈÛÛ[ˆÈ˜Y[™È[H9.®¹méH™]šY]ûï"9îäù§¡9l,yîê»ï#9ëby.®¹méy¢iú(c;ï"B‚˜^œØÜš\ËÙÛÛ[‹Ü™]šY]ËœH:`$9§hy¨.:j£LŒÈŒÈØ\Ù\È
+È:(izod\Ý[˜Ý]™[ÂœØÜš\ËÜ[\ËÜ™]šY]ËœH9kîymìºj£:+àHPÕU‘H:)á9b&yâb9§+9¢iú(c9.®¹méyi#y¨.;ï"^XÝXž]Bˆ
+ÈÙ\šX[^™Y\\™[ÙX[ÛÜšÙ›Ýûï#9mìˆ‘T’Q’QQ;ï"B˜‚ˆÈÈPŒ{ï"PLËŒH‘T’Q’QQ9d#¹d+ùbª;ï&ÔPŒˆOˆPŒH9d#»ï&ÐÔ‹LˆOˆPŒˆ9d#»ï"B‚˜^Ø\Xš[]H\›Ý˜[9.#y£©ycåÈØ[\ˆÙ[‹YXÛ\™{ï&ùîäyk¦ˆ›ÝšY\‹Ù]\Ù]Âˆ[™Ú[ØXØÛÝ[›Ùš[KÜ[[Y{ï&Ü\œÚ\ÝY^Ú[™ÙH]šY[˜Ù{ï&Âˆ\›Z\ÜÚ[Û‹Ù[™Ú[›ÛÙˆ9.#ˆ\Ú[™\ÜË\]X[]H›ÛÙˆ9b!¹é®Â»ï"PŒKÐŒˆ9«hùo#ùo 9cäz) y¬`¹g*PLËŒH‘T’Q’QQ9d#¹îá¹c%»ï&ÙØ]H:/®yåcˆ“Ô“PSÑÐUWÔ“Ð‘WÒÒS‘È9mì¹..ˆ[™Ú[Ü\›Z\ÜÚ[Ûˆ›ÛÙˆ9£ä9/¦ù­¢:-.zgh»ï"B˜‚ˆÈÈ9d#¹îëHÔ‚‚˜^Ô‹Lˆ›ÝšY\‹S›Ü›X[^™Y
+È]X\˜[[™{ï"Y\ˆPŒ»ï"BÔ‹LÈ]˜Z[Xš[]TÛXÞH
+ÈØ[›ÛšXØ[^™\‚Ô‹MÛ˜\ÚÝZ[\ˆ
+ÈXÚÑˆ™XY[Ù[™XZ[˜‚‹KKB‚ˆÈ‹ˆØ[›ÛšXØ[[[YH›ØYX\‚˜^Ô‹LH›ÝšY\‘^Ú[™ÙH
+È˜]ÕÜš]\‚ˆ8¡¤ÂÔ‹Lˆ›ÝšY\‹S›Ü›X[^™Y
+È]X\˜[[™Bˆ8¡¤ÂÔ‹LÈ]˜Z[Xš[]TÛXÞH
+ÈØ[›ÛšXØ[^™\‚ˆ8¡¤ÂÔ‹MÛ˜\ÚÝZ[\ˆ
+ÈXÚÑˆ™XY[Ù[™XZ[ˆ8¡¤ÂÔ‹PHš^\™HŒÙXÝ\š]Y\È0åÈŒ˜Y[™È^\Âˆ8¡¤Â”SKLPˆ›ÙXÝ[Ûˆ›ÝšY\ˆ™\šYšXØ][Û‚ˆ8¡¤ÂÔ‹Pˆ[X^š[™Ñ]HŒ0åÈŒˆ8¡¤Â”™X[Bˆ8¡¤Â•™[™TÑB˜‚‹KKB‚ˆÈËˆÔ‹LHÈÔ‹LKŒHXØÙ\[˜ÙB‚Ô‹LH:/¤ùai{ï&‚‚˜^”›ÝšY\‘^Ú[™ÙB˜‚Ô‹LH:/¤ùaî»ï&‚‚˜^”˜]È[[]]X›H^[ØY”˜]Ñ[™[ÜB›ÙÚXØ[Ý\šB˜ÛÛ[Ú\ÚœØÚ[XWÚ\Úœ›Ý×ØÛÝ[›Y]WÚ[™Ù\ÝÜ[‚˜‚Ô‹LH:) y¬`»ï&‚‚˜^œÝXØÙ\ÜÈ^Ú[™ÙH8¡¤ˆ^[ØY\œÚ\ÝY™˜Z[Y^Ú[™ÙH8¡¤ˆ[™[ÜH\œÚ\ÝYœ™\]Y\ÝÚY9.#ycæœÙXÜ™]ØÜX‚š[[]]X›BœØ[YKZ\Ú™]žHY[\Ý[™Y™™\™[ž]\ÈØ[YHT’H›ØÚÂ˜‚Ô‹LKŒ{ï"[[YHÛÜÝ\™{ï#PL‹ŒÈ0©ÌËp©ÍH:(iyaa{ï"z) y¬`»ï&‚‚˜^\™Ù]Š—Ù^Ú[™ÙH9¦/¹o#ÈT{ï"™X[\™Ù]
+È˜ZÙU\™Ù];ï#žK\[ˆ9d#9ë¨yî¯ûï"Bº/ä:(c9¥í¹¥è\ÝÙ[™[Ü\È9cãy§é{ï"XYÛ›ÜÝXË[Û›{ï#TÕ:gfy  y­bú+å{ï"B”›Ø™Q^XÝ]Ü‹˜Ø[
+›Š{ï&™›ˆ9oázhnú/å9fçˆ›ÝšY\‘^Ú[™Ù{ï"9d)¹b&H\Q\œ›Ü»ï"B¹i,z-)H^Ú[™ÙH9. 9ëbykîz,h{ï&”›ÝšY\‘\œ›Ü‹™^Ú[™Ù{ï"\œ›Üˆ[™[ÜH
+È^[ØYS›Û™{ï"Bˆ;ï&ù¬®ùä!¹¢ä¹îçHÞ[]X×Ù˜Z[\™WÙ^Ú[™Ù{ï":+æ¹k§º+¬9oe{ï#9.#ya¤¹aaHÑÈ^Ú[™Ù{ï"B”˜]ÕÜš]\‹Üš]J^Ú[™ÙJH9îçù. 9aiycèûï&‚ˆ^Ú[™ÙKœ™\]Y\ÝÚYOH[™[ÜKœ™\]Y\ÝÚY9¥«z* ˆ›ÝšY\‹Ù]\Ù][™[ÜKYš\œÝ;ï"9i%º`ê9a¬¹ê H“ÐÒûï"Bº/oz#mùoh¹â­¹¥+ù£ {ï&›\ÝÙXÝHÈXÝÜÝ‹\ÝÙXÝWHÈ]Qœ˜[YJÛ\œß[™\ÊBˆÈXÝÜÝ‹]Qœ˜[YWHÈX\œ›ÝË•X›HÈ9¨!úaãùb%ú(j™XÝ[Ù‹]X›\È9¥®y¨b{ï&¹«ãú`.ú/¤z(j9âë9êâÈ\œ]Y]
+ÈY]H9b%ùaî¹aj:`êˆ
+˜[YKš[KÛÛ[Ú\ÚØÚ[XWÚ\Ú›Ý×ØÛÝ[
+{ï&ùé y«hºgfznæ9cåºi¥¹`/”ÜZÙH:+ày£kºdï¹e+ù. 9«hùo#ú-ëùo¡;ï&‚ˆ^Ú[™ÙH8¡¤ˆ˜]ÕÜš]\ˆ8¡¤ˆ\œ]Y]
+ÛY]H8¡¤ˆ˜]ÕÜš]T™\Ý[
+]šY[˜ÙWÝ\šKÚ\Ú
+Bˆ8¡¤ˆÜZÙPØ\ÙK™]šY[˜ÙWÜ™Y‹Ù]šY[˜ÙWÚ\Ú;ï"]šY[˜ÙWÝ\OTU×ÔT”UQU;ï"B”[”ÝÜ™KÜš]WÙ]šY[˜ÙJ”ÓÓŠH9/çyåfy..¹ao9k®HT{ï#9.#ya£y¦+ù«hùo#È›ÝšY\ˆ:+ày£kºdï‚º`$9keù«­H›Ý[™]š\9­bú+å{ï"9`/ùìnùg¢ËÛ[X›Kù.+y¥¡ËÓ˜S‹S›Û™H:+ëy.b{ï"B˜‚Ô‹LKŒ»ï"ÛÛ\]H^Ú[™ÙH
+È˜]ÈY]KÔ™\]Y\ÝÛÜÝ\™{ï#PL‹0©Ì‹p©Ìûï"z) y¬`»ï&‚‚˜^ºf¤:%ãù¥éyc¡¹bcyïk¹¦/¹o#ûï"Ü[Ûˆ{ï"{ï&‚ˆØ[[™\ˆ^Ú[™ÙH9ab9£ y.ayc%ˆ8¡¤ˆ9ê¥ùcèÈ˜Y[™×Ù^\È9¦/¹o#ù/(9aiBˆ™X[\™Ù]œ]Y\žWÚÛ[™WÙ^Ú[™ÙJ˜Y[™×Ù^\ÏK‹‹Š{ï"9¥è:f¤:%ãùa¡z`ê9cå¹¥l;ï"Bˆ9¥éyc¡¹i,z-)H8¡¤ˆ9i,z-)HY]H:$/yææ
+ÈÛ[™H9.#ycäyl!;ï"9.#y/*º`(9¢$9b§ûï"BŒËÐÈÛÙWÛ\ÝØØ[[™\ˆ9bcyïkˆH9£ y.ayc%ˆ^Ú[™Ù{ï"9cà¹¥l:$/yææ;ï&‚ˆÛÙWÛ\ÝÝ˜Y[™×Ù^\ûï"B”˜]ÕÜš]T™\Ý[9¢á¹b!»ï&œ^[ØYØ\Y˜XÝÖ×{ï"\šKØÛÛ[Ú\ÚÜØÚ[XWÚ\ÚÂˆ›Ý×ØÛÝ[;ï"JÈY]WØ\Y˜XÝ;ï&Ù]šY[˜ÙH9 d¹..ˆ^Ú[™ÙH›Y]KšœÛÛ‚ˆ;ï"9cã9d$zeëyd";ï&œ^[ØY9ëèy¥.Kùb(:fi8¡¤ˆ“ÐÒûï&ÛY]H9b(:fi8¡¤ˆ“ÐÒûï"B›Y]H9£ y.ayc%¹k£9¥m:!,y¥cÈ™\]Y\ÝÜ\˜[\È
+È\˜[\×Ú\Ú;ï"9ëbzeoù.#yd#Þ[X›ÛÂˆ\Ú9.#yd#;ï"JÈ[™Ù\ÝYØ]
+È[™Ù\ÝÜ[—ÚY¹i&¹¥¡ù.í¹£ä9.©ÝYÚ[™È9c§ùkd9c%»ï"9aj:`ê^[ØY9ab:$/HÝYÚ[™È8¡¤ˆÜËœ™\XÙH:`$9.*‚ˆ8¡¤ˆY]H9§ 9d#»ï"{ï&ú(j9d#yaà9c%¹a¬¹ê H“ÐÒûï&Ü™XY
+™\šYžOUYJH:+îùbcyi#zj£TÕ:gfy  y­bú+å{ï&œ›Ø™\ËœHÈÛÛ[—Ü›Ý]\‹œH9é y«hº, ùå*^[ØY[Û›Bˆ\™Ù]9¥®y¬å{ï"Ù]ØÛÙWÛ\ÝÈÙ]ØØ[[™\ˆÈ]Y\žWÚÛ[™H9ëby.&¹b¨zgh»ï"B˜‚Ô‹LKŒ‹Œ{ï"˜]ÈÛÛ[Z]\™[š[™ûï#PL‹H0©Íûï"z) y¬`»ï&‚‚˜^›Üœ[ˆ^[ØY;ï"9keú" ¹g*9ææ8à [Y]H:e&¹ï.¹i,{ï#9.+y¥«y£ä9.©9«¢ùåf{ï"{ï&‚ˆØ[YK\™\]Y\Ý™]žH9.%9keú" ¹. :!íOˆ9£ä9.©9 h¹i#{ï":(iz$/HY]{ï#Y[\Ý[;ï"Bˆ™]žH9keú" ¹.#yd#OˆÜœ[ˆ9éîùaiHœ]X\˜[[™Kûï"9cëùcåº+àxà y¬.9.#ya¤¹aay§"y¥bˆ:+ày£k»ï"y.%9a¦yaiH“ÐÒûï&Ü\X[Üœ[»ï"9i&º(j:$/y. 9cb»ï"yd#:f¥9é®Â›\ÝÛÜœ[—Ü^[ØYÊ˜]×Ü›ÛÝ
+H9mèy¨à9£©ycèûï"9`iyn­ùkf9`ª:/å9fç¹ên»ï"B—ØÛÛ[Z]Ùš[\È^[ØY:$/y/cykîH¹mì¹kf9g*9.%9keú" ¹. :!íº-ìú/áûï"9 h¹i#z+ëy.b{ï"B™˜][Z[š™XÝ[Ûˆ9­bú+å{ï&›Y]H9a¦yi,z-)HOˆ9¥è:e&¹¥è9«¢ùåfxà \™]žH9 h¹i#{ï&Âˆ^[ØY[Ý™H9i,z-)HOˆ9¥èY]H:e&»ï"Y]H9§ 9d#º$/yææ:+ëy.by/çy£ {ï"B˜‚‹KKB‚ˆÈˆÔ‹LˆXØÙ\[˜ÙB‚˜^”˜]Â¸¡¤ˆ›ÝšY\ˆX\\‚¸¡¤ˆ›ÝšY\‹S›Ü›X[^™Y˜‚“X\[™È˜[Y][Ûˆ9i,z-)z/æùaiH]X\˜[[™{ï#9.#yo¥ÈÚ[[›ÜÈNMÌÈŒÙ[[™[8à ‚‚ŠŠÔ‹Lˆ9.©9.æ9â­¹  {ï"Œ‹LLÌ{ï#KPÔ‹LŒŒÌKLŒÈÈQ‹LŒ»ï&ÌŒ‹LLÌHMÎˆ9i#yk¨H‘SÔS‘Q;ï#Ô‹L‹ŒH9¥-¹cèÈKPÔ‹LŒŒÌKL;ï&ÌŒ‹LKLHLŒMHÔ‹L‹ŒH9i#yk¨H‘SÔS‘Q;ï#Ô‹L‹Œˆ9¥-¹cèÈKLŒŒLKL{ï&ÌŒ‹LKLHLHÔ‹L‹Œˆ9i#yk¨H‘SÔS‘Q;ï#Ô‹L‹ŒÈ9¥-¹cèÈKLŒŒLKL»ï&ÌŒ‹LKLHMŒˆÔ‹L‹ŒÈ9i#yk¨H‘SÔS‘Q;ï#Ô‹L‹9¥-¹cèÈKLŒŒLKLûï&ÊŠŒŒ‹LKLHMÎŒˆÔ‹L‹9§ 9îâ9i#yk¨{ï&Ô‹LˆÈÔ‹L‹ŒHÈÔ‹L‹ŒˆÈÔ‹L‹ŒÈÈÔ‹L‹9aj:dïˆ‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï#Q‹LŒˆ‘U’QUÑTˆPÐÑTQ
+Š»ï"JŠ»ï&\Y]\Ù]›Ü›X[^˜][Ûˆ™YÚ\ÝžH
+È›Ü›X[^˜][Û”[›™\»ï"˜]È]šY[˜ÙH9e+ù. :/¤ùaiHÈ™\šYšYY™XY\ˆÈÛÜÝ\™H9¨(zj£ÈÓÕTÑWÑVÒS‘ÑWÑRSQ9b!¹é®ûï"JÈš\œÝXÛ\ÜÈ[[]]X›H9£ y.ayc%º/¤ùaî»ï"\œ]Y]
+ÈX[šY™\Ý
+ÈYÙ\»ï"JÈ›Ë\Ú[[Y›Ü:+¬:-)¹.#ycæ9o#ûï"[[YH9§.¹fj9o.¹b-»ï"JÈš\œÝXÛ\ÜÈ]X\˜[[™{ï"\[™[Û›HÈ›ÝÈØØ]ÜˆÈØÜX˜™YÛÛ^;ï"JÈ]\›Z[š\ÝXÈ™\^H
+È›ÝšY\‹Y˜Z][ûï"9.#zh¡9¥+ÈØ[›ÛšXØ[:+ëy.b{ï"JÈÕPÐÑTÔËÔT•PSÐ“ÐÒÑQ9â­¹  y§.¸à Ô‹L‹ŒH9¥-¹cèùd#»ï&\YÝ\™˜XÙH9fæùa`ÈÙ^{ï"Þ\Ý[KY\š]™Y›Ü›X[^˜][Û—ÜÝ\™˜XÙH9£ y.ayc%º.ªù.ïH
+È[™^ÙZ[H9cãÜ˜\\ˆ
+ÈYØXÞH9«iù.bH˜Z[ÛÜÙY;ï"KÈš]˜]H9.#ycëùcæ™YÚ\Ýž{ï"9¥è9ak9o 9cëùcæ9kîz,h{ï#[›™\ˆTH9¥è9¬ê9aizgh»ï"KÈ9aj9îâ9  yîçù. ^XÝ™\^{ï":aãzj£ÛÜÝ\™H9d#¹n`¹ëb{ï&ùëèy¥.yclÈ˜Z[ÛÜÙY;ï&ÜÞ\Ý[KY\š]™YX\\ˆÛÙHš[™Ù\œš[:/æùaiH[ˆY[]{ï"KÈ]ÛZXÈ
+È™XÛÝ™\˜X›HÛÛ[Z]ÛÜÝ\™{ï"X[šY™\Ý9¥è9h¦zd§ù§ 9d#º$/yææ
+È9cey.¢ùb¨HYÙ\‹Ü]X\˜[[™H
+È]X\˜[[™H^XÝ\Ù]ÙX[
+È9¬ê9aiyi,z-)y h¹i#y­bú+å{ï"xà È:hnykîy¢¥ù­bú+å{ï"9d*ùîäù§¡9k¢9cjÈ
+È:)¡¹æå¹.©9cây¨.9kî{ï"{ï&ÛZYÜ˜][ÛˆM
+ÈM{ï&ú+éº)àH0©ÍHÈQ‹LŒ»ï"9d*È[Y[™Y[{ï"xà Ô‹L‹Œˆ9¥-¹cèùd#»ï&œÝ\™˜XÙH9.)y¨/Ø\Xš[]H9idyî©¹­/¹å'ûï"9¥èØ[\‹[Ý™\œšYH9cà¹¥l;ï"KÈ˜]È]šY[˜ÙHš[™[™È9a¬¹ê y.#ycëù­%ùæo{ï"]šY[˜ÙWØÛÛ™›XÝ9¨!ú+¬
+ÈSÒQS•T‘“ÐÒÈ9¬.9îë{ï"KÈ9aj9c¡¹cìˆ^XÝ[—ÚY™\^{ï"X\\‹ØÛÛ˜XÝ›Û˜XÚÈ9¥è\XØ]KTûï"KÈ[X\\ˆ\Ú:/æùaiHY[]H
+È\Y›Ü›X[^˜][Û”[”ÙX[9aj:+ëy.bykeù«­y."y¥®yîäyk¦ˆ
+ÈØÚ[XWÚ\Ú:aãyë¥ûï"™Xš[™[\\ˆ9çêzf-HL:hnyaj9¢é¹¢*»ï"xà Ž:hnykîy¢¥ù­bú+å{ï&ÛZYÜ˜][ÛˆM
+ÈMH
+ÈM»ï&ú+éº)àH0©ÍHÈQ‹LŒ»ï"9d*È[Y[™Y[H
+È»ï"xà Ô‹L‹ŒÈ9¥-¹cèùd#»ï&œ›ÝšY\‹[ÝÛ™YÜ\˜][ÛˆÜXûï"9éày§"zgfy  yn.:aãÈ
+È9éày§"H^XÝ]Üˆ
+È9ak9o :gh¹¥èÙ[™\šXÈØ[X›{ï"KÈ[™Ù\Ý[Û‹][YH˜]È]šY[˜ÙH[˜ÚÜ»ï"Y]H9ì¯¹èk¹keú" ˆ\Ú9i%º`ê9§`ùj yænú+¬;ï&ÛYØXÞH9¥è[˜ÚÜˆ˜Z[ÛÜÙY;ï&ÛZ\ÛX]Ú9¬.9îëH“ÐÒûï&Ù]šY[˜ÙWØÛÛ™›XÝ:fcyî©ú+â¹¥«{ï"KÈ^XÝYÝ]]^XÝ\Ù]
+ÈÙ[X[XÈ˜[YHÙX[;ï"9."y¥®yîäyk¦ˆYÙ\ˆOHX[šY™\ÝOH9âjyä!ºaãyë¥ûï&Ù^XÝYÙ]OH9odùbcHÜXË›Ý]]Û˜[Y\ûï&ÕT’H]\›Z[š\ÝXÈ:aãyë¥ûï&ùênº(j9âjyc%»ï"xà ŒL:hnykîy¢¥ù­bú+å{ï&ÛZYÜ˜][ÛˆM
+ÈMH
+ÈMˆ
+ÈMûï&ú+éº)àH0©ÍHÈQ‹LŒ»ï"9d*È[Y[™Y[H
+Èˆ
+Èûï"xà Ô‹L‹Ú\š[™È9¥-¹cèùd#»ï&[˜ÚÜ™Y˜]Ñ]šY[˜ÙUÜš]\ˆ9e+ù. ›ÙXÝ[Ûˆ9a¦yaiz/®yåc;ï"ÛÛ[Z]ZY[]H9îäyk¦ˆ[œ›ÛY[
+ÈÐÕÕH™\šYžK[Û›H™\™XY
+È[™[ÜHY[]HÜ›ÜÜËXš[™[™ûï"KÈ›Ø™PÛÛ^
+È[—ÙžWÜ[ˆ9aj9£©yî¯ûï"ÕPÐÑTÔËÑT”“Ôˆ9gaú!ê¹bª[˜ÚÜ»ï"KÈ[œ›ÛY[TH9éày§"yc%¹¥-¹cèûï"™\šYžK[Û›{ï#9.#y£©ycåùã¬9g.ˆ\Ú9k¦¹.byç'ù`/;ï"KÈ9îäù§¡9k¢9cjùl y«nÈ[˜[˜ÚÜ™Y9a¦yaixà ŒLM:hnykîy¢¥ù­bú+å{ï&ú+éº)àH0©ÍHÈQ‹LŒ»ï"9d*È[Y[™Y[H
+Èˆ
+ÈÈ
+È;ï"xà ‚‚ŠŠÔ‹LÈ9.©9.æ9â­¹  {ï"Œ‹LKL{ï#KLŒŒLKLŽÈQ‹LŒûï&ùakz/k¹i#yk¨H‘SÔSˆ9¥-¹cèûï&Ô‹LËŒHKLŒŒLKLŽHÈÔ‹LËŒˆKLŒŒLKLÌÈÔ‹LËŒÈKLŒŒL‹LÌHÈÔ‹LËKLŒŒL‹LÌˆÈÔ‹LËHKLŒŒL‹LÌÈÈÔ‹LËˆKLŒŒL‹LÍ;ï&ÊŠŒŒ‹LKLˆŒNŒ9§ 9îâ9i#yk¨yaj:dïˆ‘T’Q’QQÈÓÔÑQÈ”‘QV‘{ï#Q‹LŒÈPÐÑTQ
+Š»ï"JŠ»ï&Ø[›ÛšXØ[[›™\»ï"Ô‹Lˆ™\šYšYY9e+ù. :/¤ùaiH
+È9cêº+îÈÛÜÝ\™H™\šYšY\ˆÈÕPÐÑTÔË[Û›H[YÚXš[]{ï"KÈY[]PœšYÙ{ï"ÙXÝ\š]WÛX\Ý\ˆ9."H]\Ù]9aj:fáˆ8¡¤ˆQ‹Lˆ:.ªù.ï{ï&ú(î9è ye+ù. 9n ¹g.¹c.zac{ï&ÔU™[\Ý;ï&ÛZ\ÜÚ[™ËØ[XšYÝ[Ý\È˜Z[ÛÜÙY;ï"KÈ]˜Z[Xš[]TÛXÞ{ï"Ð”ÑT•‘QÐUÒS‘ÑTÕ
+È\×ÛÙˆ9ab:(c:/áù®é;ï"KÈÛÝ\˜ÙTÛXÞH:gfy  yâb9§+9c%»ï"ÒS‘ÓWÔÓÕTÑWÑVPÕ;ï&ÑVPÕ™XÛÛ˜Ú[X][Û»ï"KÈÛXZ[ˆ[YÚXš[]HX]š^LÈ:hny¦/¹o#ûï"KÌ‹Í»ï"KÈ[[]]X›HØ[›ÛšXØ[\Y˜XÝÈ
+È]\›Z[š\ÝXÈ[ˆY[]HÈZYÜ˜][ÛˆN8à Ô‹LËŒH9¥-¹cèùd#»ï&”™\]Y\ÝYÛXZ[”Ù]Y[]{ï"N{ï"KÈ]˜Z[Xš[]HÛÛ\][™\ÜÈÈØ[›ÛšXØ[[œ]Û˜\ÚÝÈ[˜ÚÜ™Y]˜Z[Xš[]H]šY[˜ÙHÈY[]Hš[™[™È9îçù. ÈÛXÞH\Ú9aj9keù«­HÈ[™\^HÙX[È™XÛÝ™\˜X›HÛÛ[Z]8à Ô‹LËŒˆ9¥-¹cèùd#»ï&˜[œØXÝ[Û˜[X]\šX[^™YÛ˜\ÚÝÈY[]HX\Ý\ˆUÈÛ™\ÝÛXÞH^XÝ][ÛˆÈ\Y[Ô‹Lˆ[œ]ÙX[È™\šYšXØ][Û‹\Ý]H˜[œÚ][Û¸à Ô‹LËŒÈ9¥-¹cèùd#»ï&š\ÝÜšXØ[[œ]ÛÛ[Z]HÝX\™;ï"Ø[›ÛšXØ[ØÛÛ^Ú\ÚŒx %8 %YÙ\ˆ\Ø\X\˜[˜ÙKÜÝ]\ËÜÙX[šY9aj:`êSPQÑQ9¢ä¹îç{ï#Ý\\œÙ]9d"9¬åy¥¬9h§¸à Y^XÝ™\ÝÜ™H9 h¹i#yc¡¹cìˆ™\^xà [X\Ý\ˆ9d#:)á9b&{ï"KÈ™\šYšXØ][Ûˆ]šY[˜ÙH^XÝ™\Üûï"™\šYšXØ][Û—Ü›Ø›[WÚ\Ú:/æÈÝ]KÜÙX[Ú[œ]ÜÙX[Ú\Ú8 %8 %9d#Û\ÜÈ9.#yd#Ø]\ÙH9¥¬“ÐÒÑQ[¸à Y^XÝ˜Z[\™H9n`¹ëbxà RS•SQÙX[Y[œ]™\^H9«å9kîyodùbcH›Ø›[H]šY[˜Ù{ï"KÈš[™[™È][™\Üûï"™\Ù\™YØÛÜH[œ]—Ý\™˜XÙWˆ
+ÈY™™XÝYÙÛXZ[œûï&Ù[XYÙY9.#z+ëù¢©HSURSP“{ï"KÈÙX[ÛÝ[ÛÜœ™XÝ[Û»ï"ŒKÌMûï#9­bú+åy§.¹¨¬9¥«z* ;ï"xà ŠŠÔ‹LË9¥-¹cèùd#ŠŠ»ï&š\ÝÜšXØ[Ø[›ÛšXØ[[ˆÙX[\Ý;ï"\YØ[›ÛšXØ[[”ÙX[
+ÈÝ™\šYžWÚ\ÝÜšXØ[ØØ[›ÛšXØ[ÜÙX[8 %8 %9c¡¹cìˆX[šY™\Ý[œ]\Ý9g*:(ªÈÛÛ[Z]H9/èy.îùbcyab:/áÈ]\›Z[š\ÝXÈT’H
+Èž]\È\Ú
+È9aj:`ê9¦/¹o#ÈÛÜœ™XÝ™\ÜÈ9keù«­HOHYÙ\ˆ
+È[œ]ÜÙX[Ú[œ]ÜÙ]Ý™\šYšXØ][Û—ÜÝ]H9."H\Ú9âjyä!ºaãyë¥ûï&ÛX[šY™\Ý
+ÛYÙ\ˆÝ]\‹Z\Ú™Xš[™9¥è9¬åy­%ùaî¹mì¹­¢:-.z/¤ùai{ï&Üš[Üˆ:!êº.ªÈSPQÑQ8¡¤ˆT‘SPQÑQ:fíˆ™\XÙ[Y[;ï"KÈ™\šYšXØ][Ûˆ]šY[˜ÙH™\^HÞ[[Y]ž{ï"š\œÝÛÛœÝ[YH9.#ˆ™\^H9alyå*ØÛÛXÝÚ[œ]Ý™\šYšXØ][Û—Ù]šY[˜ÙXÛÛXÝÜ¸ %8 %X]\šX[^˜][Û‹[Û›H˜Z[\™H9æ¡^XÝ]šY[˜ÙH\Ú:i¥º-äy.#ºaãy¥/¹kîyéì:aãynî»ï#ÙY\Ü›ÝÜÈ9¦+ùe+ù. 9më¹o »ï"KÈX[šY™\ÝÛÜœ™XÝ™\ÜÈY[]H9aj9­¢:-.{ï"Ø[›ÛšXØ[ØÛÛ^Ú\Ú
+È˜\ÙWÚY[]WÚ\Ú
+È™\šYšXØ][Û—ÜÝ]WÚ\Ú:/æÈ\YX[šY™\Ýš[™[™ûï#X[šY™\ÝOHYÙ\ˆOHÝ\œ™[9."y¥®zeëyã«ûï"xà ŒMLH:hnykîy¢¥ù­bú+å{ï&ÛZYÜ˜][ÛˆN
+ÈNH
+ÈŒ
+ÈŒ{ï"Ô‹LË:fí¹¥¬ZYÜ˜][Û»ï"{ï&ù .ù/dÈLLÍ‹Ì8à ŠŠÔ‹LËH9¥-¹cèùd#ŠŠ»ï&[\\‹\™\Ú\Ý[\ÝÜšXØ[Ø[™Y]H\ØÛÝ™\ž{ï"9`&z`"ycäyã¬9£"Hš[Z]]™H™\]Y\Ý]ÛÜ›šY[ø %8 %™\]Y\ÝYÙÛXZ[œ×Ú\Ú
+È\×ÛÙˆ
+ÈÛÛ˜XÝ
+È9."HÛXÞHY[]Y\È
+ÈÛÙWÙš[™Ù\œš[;ï#9.#yå*Ý]\È:h¡:/áù®é8à y.#y¢¢ˆÝÜ™YØ[›ÛšXØ[ØÛÛ^Ú\Ú9odÈÙ[XÝ[ÛˆÙ^{ï&ù`&z`"yab:/áÈ[\ÝÜšXØ[ÙX[9a£z)èúaâ¹mìºj£:+àyæ¡ÛÜ›ÜÝ]\ø %8 %Ù[Z[™H“ÐÒÑQ:gg¹/§z-e¹.#zf.ùhgˆ™XÛÝ™\žxà y¥éÈœšYÙHÛXÞH9.%¹åc:-ìú/áûï"KÈ\š]™YØ[›ÛšXØ[[ˆÙX[9âjyä!ºeëyã«ûï"9ª(ygeùî©ùcey. 9­/¹å'ùak9o#úfá¹."y¥®yalyå*;ï&œ™\]Y\ÝYÙÛXZ[œ×Ú\ÚÈ9."H[œ]\ÚÈX\Ý\ˆÙ]È]\Ù]\Ú;ï"9å*:+éH[ˆ:!ê¹mìyæ¡X[šY™\ÝœšYÙHY[]H:aãyë¥ûï"KÈÛÛ^È˜\ÙHÈY[\Ý[˜ÞHÈ[ˆYURQHÜ›ÜÜËXš[™;ï&ØÙ\š]™YÜ[—ÚY[]WÜ›Ø›[\Ø9aj:`ê:aãyë¥ù.#ˆYÙ\ˆ:`$9keù«­y«å9kî{ï#9­¢:-.y.£ˆ\ÝÜšXØ[ÙX[™\šYšY\ˆ
+È™\^HÛÜÝ\™H™\šYšY\»ï&Û]™HZ[9aj:`ê9iå9¢f9d#9. [\œûï"KÈÝ]\ÈÙ[X[XÈÙX[;ï"Ý™\šYžWÙš[™[™Ü×Ý];ï&™š[™[™ÜÈ9."y¥®HO\\œ]Y]O\ÙX[9d#¹.ãˆ›ØÚÚ[™È]:aãyë¥ÈÝ]\È9.#ˆ\œ›Üˆ^9nm¹­¢:-.HYÙ\‹ÛX[šY™\Ý9keù«­{ï&Ù\œ›Ü—ÛY\ÜØYÙH9caùî©ù..ˆ\š]™Y]Y]^8 %8 %H9¥-¹cèûï"xà ŒMˆ:hnykîy¢¥ù­bú+å{ï&ÛZYÜ˜][ÛˆN
+ÈNH
+ÈŒ
+ÈŒ{ï"Ô‹LËH:fí¹¥¬ZYÜ˜][Û»ï"{ï&ù .ù/dÈLMLKÌ8à ŠŠÔ‹LËˆ9¥-¹cèùd#ŠŠ»ï&œÙ[XÝ[Û‹Yœ™YHÈ™K]™\šYšXØ][Û‹]\ÝYœ™YH\ÝÜšXØ[\ØÛÝ™\ž{ï"\ÙHHœ›ØY9aj:(j9¢jù£ãù¥èÒT‘H9¥è]Ûˆ:h¡:/áù®é8 %8 %“›ÈÛÜœ™XÝ™\ÜËX™X\š[™ÈšY[X^H^ÛYHH\ÝÜšXØ[Ø[›ÛšXØ[›ÝÈ™Y›Ü™H]ÈY[]HÙX[\È™\šYšYY»ï&Ô\ÙHˆÝ™\šYžWÚ\ÝÜšXØ[ÚY[]WÜÙX[9ab:j£:.ªù.ï{ï"š[™[™ÜÈ]9b.ù¡#ùéîùaî»ï#9cê¹g*9d#ÛÜ›9d#º/ä:(c;ï"{ï&Ô\ÙHÈ:j£:+àyd#¹¢cz)èúaâˆÛÜ›ÜÝ]\ø %8 %Y™™\™[ÛÜ›9k¢yajÚÚ\ÈØ[YHÛÜ›8¡¤ˆ\Y˜XÝÛÜÝ\™H
+Èš[™[™ÜÈ]8¡¤ˆÔ‹Lˆ9/§z-eˆÈÙ[Z[™H“ÐÒÑQ:gg¹/§z-e»ï&ÚY[]HÙX[9.îù/eH›Ø›[H8¡¤ˆÓÐSÈTÕÔ’PÐSÐS“Ó’PÐSQÑTˆSPQÑQ˜Z[ÛÜÙY:fíˆZ[;ï&ÛYÙ\ŠÛX[šY™\Ý9kîH™Xš[™9å,H\š]™YY[]KÜ[‹ZYÜ›ÜÜËXš[™9g*ÛÜ›9b!¹ìnùbcy¢é¹¢*»ï"KÈÚ\™Y\ÝÜšXØ[Ø[›ÛšXØ[\Y˜XÝÛÜÝ\™H™\šYšY\»ï"Ý™\šYžWØØ[›ÛšXØ[Ø\Y˜XÝØ;ï&˜ÛÝ[ÏO[YÙ\ˆ
+È^XÝÙ]
+È]\›Z[š\ÝXÈT’\È
+È9âjyä!ˆÛÛ[Ú\ÚÜ›Ý×ØÛÝ[ÜØÚ[XWÚ\Ú
+ÈÙ[XÝYÙXÚ\Ú[Ûˆ:+ëy.bHÙX[ûï#^XÝ™\^H9.#ˆ\ÝÜšXØ[ÛÛ[Z]H9alyå*;ï&ÙÙ[Z[™H“ÐÒÑQ9.©ºhnú+ày£k¹a¡z`ê9k£9io{ï"xà ŒNM:hnykîy¢¥ù­bú+å{ï&ÛZYÜ˜][ÛˆN
+ÈNH
+ÈŒ
+ÈŒ{ï"Ô‹LËˆ:fí¹¥¬ZYÜ˜][Û»ï"{ï&ù .ù/dÈLMÎKÌ;ï&ú+éº)àH0©ÍHÈQ‹LŒûï"9d*È[Y[™Y[H
+Èˆ
+ÈÈ
+È
+ÈH
+È»ï"xà ‚‚ŠŠÔ‹M:i¥¹¢ny.©9.æ9â­¹  {ï"Œ‹LKLûï#KLŒŒLËLÍHÈQ‹L“ÔÔÑQ;ï"JŠ»ï&Ø[›ÛšXØ[9ak9aly­¢:-.zj£:+àyfj;ï"Ø[›ÛšXØ[Ý™\šYšY\‹œX8 %8 %™\šYšYYÕPÐÑTÔÈ9e+ù. 9­¢:-.yaiycèûï#“ÐÒÑQ9¦/¹o#ù¢ä¹îç{ï#ÙX[YÔ‹Lˆ9§`ùj Jùâjyä!ºj£:+ày.#z) y¬`ˆÝ\œ™[\ØÛÝ™\žH™\Ù[˜Ù{ï"KÈÛ˜\ÚÝZ[\»ï"Û˜\ÚÝØ9c!x %8 %9âb9§+9c%ˆØÚ[XH™YÚ\Ýž{ï"X\šÙ]\^[ØY8à Y˜XÝÜ—Ý\OZÙ^H›Ú™XÝ[Û»ï"{ï&ùèk¹k¦¹ )ÈY[]{ï"Ø[›ÛšXØ[[‹[]™[ÙX[È
+ÈÛÛ˜XÝ
+ÈZ[\ˆš[™Ù\œš[8¡¤ˆURQ{ï"{ï&Ú[[]]X›HÛXZ[‹\\][Û™Y\Y˜XÝÈ
+ÈX[šY™\ÝTÕ;ï&ÛZYÜ˜][ÛˆŒˆY]WÜÛ˜\ÚÝØZ[;ï"^XÝ™]žH9n`¹ëbH™\^H
+ÈÜ˜\Ú9«¢ùåfH˜Z[ÛÜÙY;ï"{ï&Ø™\šYžWÜÛ˜\ÚÝ;ï"Y[]HURQHÜ›ÜÜËXš[™
+ÈØ[›ÛšXØ[›Ý™[˜[˜ÙHÜ›ÜÜËXš[™:aãz-äy­¢:-.zj£:+àyfj
+È\Y˜XÝ9âjyä!‹ú+ëy.bKú f¹d"ÙX[:aãyë¥ûï"{ï"KÈXÚÑˆ™XY[Ù[;ï"™XY[Ù[Ø9c!x %8 %[\9n¤ù§¡9nîˆ
+È™YÚ\ÝžH9ì¯¹èk¹ìnùg¢ùnîº(j
+È™XYÜ\œ]Y]
+]™WÜ\][Ûš[™ÏY˜[ÙJX
+È
+Š[\9."ˆÙÚXØ[ÙX[
+Š»ï":(j:fá‹ú(c9¥lÚÙ^H9e+ù. ú(j9a¡yk®zaãyë¥ÈÙ[X[XÈ\Ú;ï"UÈ9od¹. 9c%»ï"KÜØÚ[XH9ì¯¹èk‹ÛY]H:(j;ï"JÈ]œ™\XÙX9c§ùkd9¦ïù£h»ï&ùi,z-)zfí¹«¢ùåf{ï"KÈ:/®yåcTÕÝX\™;ï"9é H›ÝšY\œËÛ›Ü›X[^˜][Û‹Ü˜]×ÝÜš]\‹ùânyo yn¤ûï"KÈ
+ŠÔ‹LÈ][9ï.ºfmù¦/¹o#ùå,ù¢©y/ë¹i#JŠ»ï"][KYÛXZ[ˆÙ[X[XÈÙX[9kîzod9ï.ºfmø %8 %9£ä:+íùi#yk¨z(àya¬ûï"xà 
+ÌLJÌH9¥¬9h§¹­bú+å{ï&ÛZYÜ˜][ÛˆNLŒ»ï&ù .ù/dÈLŒÍKÌ;ï&ú+éº)àH0©ÍHÈQ‹L8à ‚‚‹KKB‚ˆÈKˆÔ‹LÈXØÙ\[˜ÙB‚ºi¥¹¢n{ï&‚‚˜^™Z[WØ˜\‚œÙXÝ\š]WÜÝ]\Â›[Z]ÜšXÙB˜Y—Ù˜XÝÜ‚˜ÛÜœÜ˜]WØXÝ[Û‚˜‚¹¢`9§"HX›\ÚX›HØ[›ÛšXØ[›ÝÈ9oázhnùk£9¥m9®èz-¬ÈUÑÛÝ™\›˜[˜ÙHšY[øà ‚‚‹KKB‚ˆÈ‹ˆÔ‹MXØÙ\[˜ÙB‚˜^Ø[›ÛšXØ[\œ]Y]¸¡¤ˆÛ˜\ÚÝX[šY™\Ý¸¡¤ˆXÚÑˆ™XZ[˜‚XØÙ\[˜Ù{ï&‚‚˜^¹®!yênˆXÚÑˆ™XY[Ù[¸¡¤ˆ9cê¹aëHÛ˜\ÚÝ
+È\œ]Y]:aãynî‚¸¡¤ˆÙ^HÈ›ÝÈÈYÙÜ™YØ]H9. :!í˜‚Ô‹MY][Û˜[ÛÜÝ\™{ï&‚‚˜^˜Ø[›ÛšXØ[Ù[XÝY›ÝÜÈ8¡¤ˆÚ\™Y™YÚ\ÝžH›Ú™XÝ[Ûˆ™\^B¸¡¤ˆ^XÝ^XÝY\Y˜XÝ›ÝÜÈ
+[˜ÛY[™È™\›Ë\›ÝÈÛXZ[œÊB¸¡¤ˆ\ÚXØ[ž]\ËÜØÚ[XKÜÙ[X[XËØYÙÜ™YØ]H™\šYšXØ][Û‚¸¡¤ˆ™\šYšYYÛ˜\ÚÝ8¡¤ˆ™\šYšYY[Ü[ˆ™XY[Ù[˜‚‹KKB‚ˆÈËˆ[ØÚÈ™\XØ[ÛXÙB‚º# ùfí;ï&‚‚˜^ŒŒÙXÝ\š]Y\È0åÈŒ˜Y[™È^\Â˜‚¹k£9¥m:dï»ï&‚‚˜^‘š^\™H›ÝšY\‚¸¡¤ˆ›ÝšY\‘^Ú[™ÙB¸¡¤ˆ˜]Â¸¡¤ˆ›ÝšY\‹S›Ü›X[^™Y¸¡¤ˆØ[›ÛšXØ[¸¡¤ˆÛ˜\ÚÝ¸¡¤ˆXÚÑˆ™XZ[¸¡¤ˆÚÙ[]Ûˆ\Y˜XÝ¸¡¤ˆ\Y˜XÝ˜[Y][Û‚¸¡¤ˆX›\Ú¸¡¤ˆ^XÝ™\^B˜‚‹KKB‚ˆÈˆ9«hùo#ÈSKLPˆ[žHØ]B‚¹oázhnùaj:`ê9®èz-¬ûï&‚‚˜^–ÈH›Ü›X[ÜZÙHH–ÈHÛÛ[ˆ™]šY]ÙY™\œÚ[Û‚–ÈH^\›˜[ÛÝ\˜ÙH\Y˜XÝ\Ú–ÈH\Ý[˜ÝY]™[Ø]B–ÈHÛÛ[ˆX[šY™\ÝÈØ][ÙÈÙX[–ÈHÛXZ[‹\ÜXÚYšXÈÛÛ[ˆ›Ý]\»ï"]šY[˜ÙH[™H9d#9®¤:j£:+à{ï"B–ÈH›Ý[™X]Ø\™H›Ü›X[Ø]\ûï"¶ïÎ´¶‰žËkºwµçMÕÉ™…•}±½ÍÕÉ”¹ÍÅ±ƒŽÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÁÉ½Ù¥‘•É}¹½Éµ…±¥é…Ñ¥½¸¹Áåƒ¾ò ØÜƒ¦†ç¾ò'ŽÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}µ¥É…Ñ¥½¹Ì¹Áåƒ¾ò ÄÔƒ¦Nø€¬ÕÁÉ…‘—¾ò'Ž‘½Ì½…‘È½H´ÀÈÉƒ¾ò!µ•¹‘µ•¹Ð€¬@Ä´ÀÈ½Õ¹ÐƒšnÓš¶¾ò'ŽH´Èƒ–Þ—’ös¢ššÆšZš†¾ò#
+œÄÈM!½ÉÉ•Ñ¥½¸@Ä´ÀÇ¾ò$€€(¨©Q•ÍÑÌ¨«¾òhØÜƒ¦†ä¹½Éµ…±¥é…Ñ¥½¸ƒ–¾çš*_šÖ/¢¾W¾ò!H´È€ÌÜƒ¦†ç–n{–öH€¬H´È¸ÄƒšZÃ–Šx€ÌÀƒ¦†ç¾ò1…Õ‘¥Ðƒ
+œÜƒšâ–6T€Ääƒ¦†ç–£–¾ç–êS¾ò$¬µ¥É…Ñ¥½¹Ì€ÄÄƒ¦†ç¾ò ÄÔƒ¦Nø™É½´µé•É¼½ÕÁÉ…‘”½¥‘•µÁ½Ñ•¹Ð½Ñ…µÁ•Ë¾ò$€€(¨©½Ù•É¹…¹”¨«¾òi@Ä´ÀÄM!ƒšnÓš¶¾ò!H´È¥µÁ±•µ•¹Ñ…Ñ¥½¸…¹½¹¥…°€ô€ÄÕ‘…”ÈÕ™ÝÄÅ”Í‰”Á‘„ÌØàÍ”àÈÄØÈå”ÐÈÈØÈäÅƒ¾ò3–:¢ºÃ–öT€ÄÕ‘…”É”Ñ˜Ä¸¸¹€ƒ’âëž²S¢¾¿ŠSŠS–:–>Ë–:šZ’þwžVg¾ò3–Þ—’ös¢ššÆšZš†¢þ÷–*€ƒ
+œÄÈƒšnÓš¶¾ò'¾òm@Ä´ÀÈ½Õ¹ÐƒšnÓš¶¾ò!H´ÀÈÈƒ
+œÈ¸È€ˆä¼ÔˆƒŠHÉÕ¹Ñ¥µ”•á…ÐµÍ•Ð€Äàƒšv„€ÄÄ¼Ð¼Ï¾ò3žî<µ•¹‘µ•¹Ðƒ
+œØ¸Ç¾ò$€€(¨©Y•É¥™¥…Ñ¥½¸¨«¾òi1½…°€äÌà¼Ã¾ò äÀÜƒŠH€äÌã¾ò0¬ÌÇ¾òi¹½Éµ…±¥é…Ñ¥½¸€ÌÜƒŠH€Øß¾ò ¬ÌÃ¾ò$¬µ¥É…Ñ¥½¹Ì€ÄÀƒŠH€ÄÇ¾ò ¬ÄÕÁÉ…‘—¾ò'¾ò'¾òmÉÕ™˜¡•¬€¼ÉÕ™˜™½Éµ…Ð€¼µåÁäƒ–£žîÿ¾òm$ƒ–B3š²øÕØÉÕ¸ÁåÑ•ÍÑ€ƒ–’7¦ª3¾òm¥Ñ!ÕˆÑ¥½¹Ì€¨©ÉÕ¸€ÌÌÌäàØÔÐäÐÃ¾ò!¥µÁ±•µ•¹Ñ…Ñ¥½¸€É‰ÁŒÌÅ™„ÐÝŒÄáˆÔÈÁŒÄäÈÈØÕ”ÌÀÙ˜ÐÑ„ÈÄÝ™ŒÍƒ¾ò'’â'¢üÍÕ•ÍÌ¨«¾ò ÈÀÈØ´Àà´ÌÄA$Á½Í¥Ñ¥Ù”½¹™¥Éµ…Ñ¥½»¾ò3’âš²‡¦k¢þ¦nÛ’þ»–’7¢ö»š²‡¾ò$€€(¨©½µµ¥Ð¨«¾òi€É‰ÁŒÌÅ™„ÐÝŒÄáˆÔÈÁŒÄäÈÈØÕ”ÌÀÙ˜ÐÑ„ÈÄÝ™ŒÍƒ¾ò!H´È¸Ä¥µÁ±•µ•¹Ñ…Ñ¥½»¾òmM!ƒžRÄ‘½Ìƒ–n{–†¬½µµ¥Ðƒ¢†—¢ºÃ¾ò$€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÄ´ÀØÌƒŠPAÉ½Ù¥‘•Èµ9½Éµ…±¥é•€¬EÕ…É…¹Ñ¥¹”IÕ¹Ñ¥µ”€¡H´È¤((¨©QåÁ”¨«¾òiÈƒšVÃš6»–ÆšZÃ––Gžê›¾ò#šZÀK¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiH´Ë¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÄƒ
+œÌ·
+œÛ¾ò'ŠSŠP‰…±±•Èƒ–º{¦f–š’öW’î8I…Ü•Ù¥‘•¹”‘•Ñ•Éµ¥¹¥ÍÑ¥Œƒ–rÃš&Ÿ¢†0µ…ÁÁ•ËŽ–š’öWš2’æ–2X¹½Éµ…±¥é•ƒžîOšzsŽ–š’öW¢BôEÕ…É…¹Ñ¥¹—Ž–š’öW’þw¢¾šÊ‡šr$Í¥±•¹Ð‘É½À‹–Âkšr«–ö‹š"Cš¶–ò<ÉÕ¹Ñ¥µ—Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈË¾ò'¾òkšZÃ–2…Í¡…É•}ÍÑ…Ñ”¹¹½Éµ…±¥é…Ñ¥½¹ƒŠSŠS¾ò Ç¾ò$¨©É•¥ÍÑÉä¨«¾òiMQQ%ÁÉ½‘ÕÑ¥½¸µ½Ý¹•ÑåÁ•É•¥ÍÑÉç¾ò1­•å•‰ä€¡ÁÉ½Ù¥‘•É}‘…Ñ…Í•Ð°•¹‘Á½¥¹Ð¤•á…ÐÉ½ÕÑ¥¹Ÿ¾ò0ÄÐƒ’â¨ÁÉ½Ù¥‘•ÈÍÕÉ™…”ƒ–£šbû–ò?–"žÆï¾ò äMUAA=IQ€¼€Ô	1=-}A9%9}5AAKŠSŠQ‘¥Ù¥‘•¹€¼É¥¡Ñ}¥ÍÍÕ”€¼‰©}½‘•}µ…ÁÁ¥¹œ€¼¥¹‘ÕÍÑÉå}‰…Í•}¥¹™¼µ…ÁÁ•Èƒšr«–ß–’¢ÚÏ–’–ÞË¦ª3¢¾–¶_šº×¢¾·’æ'¾ò1™…¥°±½Í•“¾ò'¾òožîOšz–º#–6¯šÖ/¢¾TMPƒš*÷–>XÁÉ½Ù¥‘•ÈÍÕÉ™…”ƒ¢ššÆ•á…Ðƒ¢šžn[Ž¾ò Ë¾ò$¨©ÉÕ¹¹•È¨«¾òi9½Éµ…±¥é…Ñ¥½¹IÕ¹¹•È¹ÉÕ¸¡ÁÉ½Ù¥‘•È°ÁÉ½Ù¥‘•É}‘…Ñ…Í•Ð°É•ÅÕ•ÍÑ}¥¥€ƒ–R¿’âš¶–ò?–öK’â–2[¢úçžV3ŠSŠQÉ…Ü•Ù¥‘•¹”ƒ–R¿’â¢úO–—¾ò!Ù•É¥™å}µ•Ñ…}±½ÍÕÉ”€¬I…Ý]É¥Ñ•È¹É•…¡Ù•É¥™äõQÉÕ”¤ƒ–’7žR£¾òoš^€ÁÉ½Ù¥‘•È½M,ƒ¢ºÿ¦^»¾ò'¾òo–’Ç¢Ò”•á¡…¹”€ôM=UI}a!9}%1	1=-¾ò#Š&€µ…ÁÁ¥¹œÅÕ…É…¹Ñ¥¹—¾ò'¾òmµÕ±Ñ¤µÑ…‰±”ƒ’â—š‚ðÑ…‰±”ƒ¢Þ¿žRÇ¾ò#’â7–>[ž²³’â’â¨Ñ…‰±—¾ò'Ž¾ò Ï¾ò$¨«š2’æ–2X¨«¾òi¹½Éµ…±¥é•½ÁÉ½Ù¥‘•Èôñ@ø½‘…Ñ…Í•Ðôñø½É…Ý}É•ÅÕ•ÍÐôñÉ¥ø½½¹ÑÉ…ÐõÈÈµØÄ¼ƒ’â,Á…ÉÅÕ•Ó¾ò!…¹½¹¥…°ƒ–£–"_š:K–ê?¾ò$¬µ…¹¥™•ÍÐ¹©Í½»¾ò#žîG–ºhÉ…Ü•Ù¥‘•¹”€¼½¹ÑÉ…Ð€¼µ…ÁÁ•È¥‘•¹Ñ¥Ñä€¼ƒ¢úO–ë¢†£¢ê¯’îô€¼Í•µ…¹Ñ¥}¡…Í €¼½Õ¹ÑÌ€¼ÍÑ…ÑÕÏ¾ò$¬±•‘•Èƒ¢† µ•Ñ…}ÁÉ½Ù¥‘•É}¹½Éµ…±¥é…Ñ¥½¹}ÉÕ»¾òmUI$ƒžî<™É½é•¸±½¥…°µUI$½¹™¥¹•µ•¹Ó¾ò#žî’îÛš‚‡¦ª0€¬Á¡åÍ¥…±}™É½µ}±½¥…±}ÕÉ§¾ò'¾òm…ÉÑ¥™…Ðƒ’â7–>¿–>cŽ¾ò Ó¾ò$¨«¢ºÃ¢Ò›’â7–>c–ò<¨«¾òi¥¹ÁÕÐ€ôôµ…ÁÁ•€¬ÅÕ…É…¹Ñ¥¹•ƒžRÄÉÕ¹Ñ¥µ”ƒšrë–f£–òë–"Û¾ò#¢þw–>4ƒŠH9=I51%iQ%=9}%9QI91}II=H	1=-¾ò'¾òmµ…ÁÁ•Èƒ¦vx5…ÁÁ¥¹Y…±¥‘…Ñ¥½¹ÉÉ½Èƒ–ò–âã¢ºÃ’âè¥¹Ñ•É¹…°µ•ÉÉ½ÈÅÕ…É…¹Ñ¥¹—¾ò#–â˜±½…Ñ½Ë¾ò'–æØ	1=-ŠSŠS’â7¢Š¯–B{š:'Ž¾ò ×¾ò$¨©ÅÕ…É…¹Ñ¥¹”¨«¾òiµ•Ñ…}ÁÉ½Ù¥‘•É}ÅÕ…É…¹Ñ¥¹—¾ò!…ÁÁ•¹µ½¹±ç¾ò'ŠSŠQÉ…ÜÉ•ÅÕ•ÍÐ½Ñ…‰±”½É½Ü½É‘¥¹…°ƒžÊûž†»–ºk’ö4€¬ÍÉÕ‰‰•ÍÑÉÕÑÕÉ•½¹Ñ•áÓ¾ò!É•‘•¹Ñ¥…°ƒ¦K–öHIS¾ò$¬Í½Á”½•ÉÉ½É}±…ÍÌ½µ…ÁÁ•È¥‘•¹Ñ¥Ñä½½¹ÑÉ…ÓŽ¾ò Û¾ò$¨©‘•Ñ•Éµ¥¹¥Í´¨«¾òiÉÕ¹}¥€ôÕÕ¥Ô¡Í¡„ÈÔØ¡•Ù¥‘•¹”¡…Í €¬½¹ÑÉ…Ð€¬µ…ÁÁ•È¥‘•¹Ñ¥Ñä¤§¾òm¥‘•µÁ½Ñ•¹ÐÉ•Á±…äƒ¢þS–n{š^‹šr$ÉÕ»¾ò#¦nÛ¦7–’7¢†3¾ò'¾òmÍ•µ…¹Ñ¥}¡…Í ƒ¢†3–ê?š^ƒ–Ï¾ò!É•Ù•ÉÍ•ƒ¢úO–—šÖ/¢¾W¾ò'¾òo–B0É•ÅÕ•ÍÐƒ’â7–B0•Ù¥‘•¹”‰åÑ•ÌƒŠHI]}Y%9}%9Y1%	1=/Ž¾ò ß¾ò$¨©ÁÉ½Ù¥‘•Èµ™…¥Ñ¡™Õ°¨«¾òkš^‹šr$µ…ÁÁ•ÉÌƒ–:š‚ßšÎ£–3ŠSŠQÁÉ½Ù¥‘•È±¥Ñ•É…±Ì½Õ¹¥ÑÌ¿šr«¦ª3¢¾š‚¢ºÃ¦k¢þ¾òm¡¥ÍÑ½Éå}ÍÑ½­}ÍÑ…ÑÕÌƒŠHƒ’â'¢úO–ë¾ò#¦Vs–<€¬±¥µ¥ÐµÁÉ¥”€¬µ™±…œÁÉ½©•Ñ¥½»¾ò1•Ù•¹Ñ}ÑåÁ”õMQQUM}1}AI=)Q%=;¾ò'Ž¾ò ã¾ò$¨«ž*Ûššrè¨«¾òiMUML½AIQ%0½	1=-¾òmAIQ%0ƒžRÄÉ•¥ÍÑÉäƒ¦@ÍÕÉ™…”ƒ–ŽÃšb;Ž€€(¨©M¡•µ„¨«¾òiµ¥É…Ñ¥½¸€ÀÄÓ¾ò!µ•Ñ…}ÁÉ½Ù¥‘•É}¹½Éµ…±¥é…Ñ¥½¹}ÉÕ¸€ÈÈƒ–"\€¬µ•Ñ…}ÁÉ½Ù¥‘•É}ÅÕ…É…¹Ñ¥¹”€ÄÜƒ–"_¾òm™É½´µé•É¼€ÄÐƒ¦Nø€¬¥‘•µÁ½Ñ•¹Ð€¬Ñ…µÁ•Èƒ–º#–6¯¾òošr«šRçš^ŸšZ’îÛ¾ò$€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÁÉ½Ù¥‘•É}¹½Éµ…±¥é…Ñ¥½¸¹Áç¾ò Ìß¾òiÉ…Üƒ–R¿’â¢úO–”€¼µ•Ñ„­‰åÑ•ÌÑ…µÁ•È	1=,€¼µ¥ÍÍ¥¹œµ™¥•±€¼Õ¹Á…ÉÍ…‰±”µ‘…Ñ”€¼Õ¹Á…ÉÍ…‰±”µ¹Õµ•É¥ŒÅÕ…É…¹Ñ¥¹”ƒš^€Í•¹Ñ¥¹•°€¼±•…°é•É¼ƒ’â7–öLµ¥ÍÍ¥¹œ€¼ƒ¢ºÃ¢Ò›’â7–>c–ò<€¼Ý¡½±”µÁ…å±½……±•¹‘…È€¼µÕ±Ñ¤µÑ…‰±”ƒ¢Þ¿žRÄ€¼	1=-}A9%9}5AAH€¼É½Ü±½…Ñ½È€¼Í•É•Ðƒ’â7šÎšò<€¼¥¹Ñ•É¹…°•á•ÁÑ¥½¸ƒ¢ºÃ–öT€¼¥‘•µÁ½Ñ•¹Ð€¬‘•Ñ•Éµ¥¹¥ÍÑ¥Œ€¬½¹™±¥Ñ¥¹œ•Ù¥‘•¹”€¼UI$½¹™¥¹•µ•¹Ð€¬•Ù¥°É•ÅÕ•ÍÐ¥€¼ÁÉ½Ù¥‘•Èµ™…¥Ñ¡™Õ³¾ò!Õ¹¥ÑÌ½±¥Ñ•É…±Ì½1ae}U9YI%%¾ò$¼ƒ’â'¢úO–ë¢Þ¿žRÄ€¼ƒž*Ûššrë’â'š€¼ƒžîOšz–º#–6¬ƒ\Ï¾ò$€€(¨©H¨«¾òimH´ÀÈÉt ¸¸½…‘È½H´ÀÈÉ}ÁÉ½Ù¥‘•É}¹½Éµ…±¥é…Ñ¥½¹}ÅÕ…É…¹Ñ¥¹”¹µ§¾ò#šZÃ¾òmAI=A=Mƒ–ú–’7–º‡¾ò'¾òmmH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤ÍÑ…ÑÕÌƒŠHAQ¾ò!Èƒ¦Nø1=Mƒ–B3š¶—¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÄ´ÀØÈƒŠP¥¹…°DÕÑ¡½É¥Ñ…Ñ¥Ù”%¹ÁÕÐM•…°€¬M…¸QÉ…¹Í…Ñ¥½¸±½ÍÕÉ”((¨©QåÁ”¨«¾òiÄÙ…±¥‘…Ñ¥½¸ƒ––Gžê›šRÛ–>¾ò!¥¹ÁÕÐ™É•Í¡¹•ÍÌÍ•…³¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ì@Ã¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÄƒ
+œÈ¿
+œÌ¿
+œ×¾ò'ŠSŠQ½µÁ±•Ñ¥½¸ÁÉ½½˜ƒ–>¨Í•…°Í…¹¹•‘}½µÁ½¹•¹Ñ}µ…¹¥™•ÍÑ}¡…Í¡ƒ¾ò3šr«¢šžnX¡•­•Èƒ–º{¦f¢¾ï–>[žj–º3šVÐ…ÕÑ¡½É¥Ñ…Ñ¥Ù”¥¹ÁÕÓ¾òi%9Q%Qe}11	,ƒ¢þc¢¾ì‘¥µ}Í•ÕÉ¥Ñä¹¥‘•¹Ñ¥Ñå}­•å}Ù•ÉÍ¥½¹ƒ¾ò!Í…¸ƒ–B;šRç’âè11	,ƒŠH½µÁ½¹•¹ÑÌƒšr«–>`µ…¹¥™•ÍÐƒ–2ç¦4™¥¹‘¥¹Ì€ÀƒŠH™…±Í”AMO¾ò'¾òm	1=-%9}Dƒ¢þc¢¾ìÍ¹…ÁÍ¡½Ð€¬ƒ’êP™…Ðƒ¢† ÅÕ…±¥Ñå}™±…Ï¾ò!Í…¸ƒ–B;–*€‰±½­¥¹œ™±…œƒŠHƒ–B3’â+¾ò'¾òm…ÉÑ¥™…Ðƒ¦7žîDÍ¹…ÁÍ¡½Ðƒ¢0½µÁ½¹•¹ÑÌƒ’â7–>`ƒŠHÁÉ½½˜ƒš^ƒ–¶_šº×¢¾šb;–öOš^Ûš&¯žjÍ¹…ÁÍ¡½Ó¾òo’âPÍ…¹¹•Èƒžj…ÉÑ¥™…Ð½½µÁ½¹•¹ÑÌƒ¢¾ï–>[–r 	%8QI9MQ%=8ƒ’æ/–&7¾ò!…Õ‘¥Ðƒ
+œÔƒ¦†ë–ê?žòë¦fß¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÄµ•¹‘µ•¹Ð¾ò'¾òk¾ò Ç¾ò$¨«–6W’â ÁÉ½‘ÕÑ¥½¸µ½Ý¹•ÍÁ•Œƒ–Â¢Ž¨«¾ò#
+œÐ¸Ìƒ¦bËšòžžï¾ò'ŠSŠQÉÑ¥™…ÑE¡•­•ÉMÁ•€ƒ–Š{–*€É•Í½±Ù•}¥¹ÁÕÑƒ¾ò#¢žšz@…ÕÑ¡½É¥Ñ…Ñ¥Ù”¥¹ÁÕÐÍÑ…Ñ—¾ò$¬•Ù…±Õ…Ñ•ƒ¾ò#–¾ç–B3’â ÍÑ…Ñ”ƒ–"“–ºk¾ò'¾òm™¥¹•ÉÁÉ¥¹Ð¡¥¹ÁÕÑ}ÍÑ…Ñ”¥€€ô…¹½¹¥…°)M=;¾ò#–B¬¡•­}¥€¬¡•­•É}Ù•ÉÍ¥½¸€¬ÍÑ…Ñ—¾ò'ŠHM!´ÈÔÛŠSŠQ™¥¹•ÉÁÉ¥¹Ðƒ’â8•Ù…±Õ…Ñ¥½¸ƒ–’§žÛ–B3šêC¾òo¾ò Ë¾ò%¥¹ÁÕÐÍÑ…Ñ”ƒ–ºk’æ'¾ò#
+œÐ¸Ä¼Ð¸Ë¾ò'¾òi%9Q%Qe}11	,€ô½µÁ½¹•¹ÑÌ‘¥ÍÑ¥¹ÐÍ•ÕÉ¥Ñå}¥€¬ƒš¾?’â«žj–öO–&4¥‘•¹Ñ¥Ñå}­•å}Ù•ÉÍ¥½»¾ò#šr«šÎ£–0ƒŠH}}5%MM%9}}ƒ¾ò'¾òm	1=-%9}D€ôƒ–öO–&4‘…Ñ…}Í¹…ÁÍ¡½Ñ}¥€¬ƒš¾<™…Ðƒ¢† €¡Ñ…‰±•}¹…µ”°ÅÕ…±¥Ñå}™±…Ì°É½Ý}½Õ¹Ð¤ƒž¢Ï–ºk¢k–B#¾ò!9U10½•µÁÑäƒ¢ž¢2–2[¾ò'ŠSŠS–>¨Í•…°ƒ–öÇ–N4•Ù…±Õ…Ñ½ÈƒžîOšzsžj¢úO–—¾òo¾ò Ï¾ò%µ¥É…Ñ¥½¸€ÀÄÏ¾òi…ÕÑ¡½É¥Ñ…Ñ¥Ù•}¥¹ÁÕÑ}¡…Í¡€€¬Í…¹¹•‘}‘…Ñ…}Í¹…ÁÍ¡½Ñ}¥‘€ƒ’â“–"_¾òmE}M9}=9QIQ}YIM%=8ƒŠH‘ÄµÍ…¸µˆÈ¸ÌµØÇ¾òmÙ…±¥‘…Ñ¥½¸½¹ÑÉ…ÐƒŠHˆÈµ•á…ÐµØÏ¾òo¾ò Ó¾ò$¨«’â'–ÆÍ•…°ƒšÚ#¢Òç¦Nø¨«¾ò#
+œÏ¾ò'¾òiÍ…¹¹•ÈÁÉ½½˜ƒŠHÙ…±¥‘…Ñ¥½¸É•Á½ÉÓ¾ò!‘Å}•á•ÕÑ¥½¹}Í•…±ÌƒžîG–ºh•á•ÕÑ¥½¹}¥½½¹ÑÉ…Ð½ÁÉ½‘Õ•È½¥¹ÁÕÐÍ•…°½µ…¹¥™•ÍÐ½Í¹…ÁÍ¡½Ó¾ò'ŠHÁÕ‰±¥Í ÑÉ…¹Í…Ñ¥½¸ÕÉÉ•¹Ðµ¥¹ÁÕÐÉ•¡•¯¾ò#¦7žº\UII9P™¥¹•ÉÁÉ¥¹ÑÌƒš¾S–¾çŠSŠQÙ…±¥‘…Ñ¥½¸ƒ–B8¥¹ÁÕÐƒ–>c–2XƒŠHE}%9AUQ}MQ1	1=/¾òo’â7–>¿¢žšz@ƒŠHE}%9AUQ}U9IM=1Y	1	1=/¾ò'¾òož&§žB‰åÑ•Ìƒžî#¦ª3–#¢†3¾ò!µ¥ÍÍ¥¹œ½Ñ…µÁ•É•ƒš*—–ß’öO¦Rg¢¾¿¾ò'¾òo¾ò ×¾ò$¨©M…¸QÉ…¹Í…Ñ¥½¸±½ÍÕÉ”¨«¾ò#
+œ×¾ò'¾òi	%8QI9MQ%=8%IMSŠSŠQ…ÕÑ¡½É¥Ñ…Ñ¥Ù”É•…‘Ìƒ–£¦£žžï–—’ê/–*‡–¾ò!}É•Í½±Ù•}Í…¹}½¹Ñ•áÑƒ¾ò'¾òmMP½É‘•É¥¹œƒ–º#–6¯¾ò#¦š[’â¨•á•ÕÑ”ƒ–6Ì	%8ƒ’âS–#’ê8½¹Ñ•áÐƒ¢žšzC¾ò'¾òo¾ò Û¾ò%Ù…±¥‘…Ñ½Ë¾òi¥¹ÁÕÐÍ•…°ƒžòë–’Ç¾ò!±•…ç¾ò$¼ÍÑ…±”ƒŠH9=Q}QMQ	1Ž€€(¨©Q•ÍÑÌ¨«¾òiQ•ÍÑHÑÈÍÕÑ¡½É¥Ñ…Ñ¥Ù•%¹ÁÕÑM•…³¾ò ÄË¾òiMP½É‘•É¥¹œ€¼¥‘•¹Ñ¥ÑäƒšRä11	,€¼ƒ–"ƒšÎ£–0€¼™…Ðƒ–*€MQ1}]%9=\€¼Í¹…ÁÍ¡½Ðƒ¦7žîGŠSŠS–nožÆìÍ…¸ƒ–B8¥¹ÁÕÐƒ–>c–2XÍÑ…±”µÁÉ½½˜	1=,€¼Ù…±¥‘…Ñ¥½¸ƒ–B8¥¹ÁÕÐƒ–>c–2Xƒ\ÈƒŠHÁÕ‰±¥Í É•¡•¬	1=,€¼Í•…°Ñ…µÁ•È­9U10ƒŠH™…¥°±½Í•€¼É•Í…¸ƒ–B;žr–ºx™¥¹‘¥¹œ%0€¼•¹Õ¥¹”é•É¼Õ¹¡…¹•AML­ÁÕ‰±¥Í €¼É•Á½ÉÐÍ•…°ƒ’â8±•‘•Èƒ’â¢Ð€¼ƒžòèÍ•…±ÌƒžjÉ•Á½ÉÐƒš.Kžîw¾ò$¬ƒš^‹šr$È¸È½È¸ÄƒšÖ/¢¾W¦¦7¦nÛ–n{–öK¾ò ØßŠHØäƒ–Æ¦£¾òo–£¦<€àÜÀ¼Ã¾ò$€€(¨©H¨«¾òimH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤µ•¹‘µ•¹Ð€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÄ´ÀØÄƒŠP¥¹…°½Ù•É¹•DM…¸á•ÕÑ¥½¸	½Õ¹‘…Éä((¨©QåÁ”¨«¾òiÄÙ…±¥‘…Ñ¥½¸ƒ––Gžê›žîOšzšŸšRÛ–>¾ò!•á•ÕÑ¥½¸ÑÉÕÑ£¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸È@Ã¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÄƒ
+œË¾ò'ŠSŠQHÐµÈ¸ÄƒžjÉ•½É‘}…ÉÑ¥™…Ñ}¡•­}•á•ÕÑ¥½¹€ƒ’â7š&Ÿ¢†3’îï’öTÍ…»¾òi…±±•Èƒ¢¾ìÉ•¥ÍÑÉä€¬ƒ–³–ò ½µÁÕÑ•}½µÁ½¹•¹Ñ}µ…¹¥™•ÍÑ}¡…Í¡€ƒ–6Ï–>¿–¾ç’â“’â¨¡•¬ƒ–B’ò«¦ƒ’â¢†0½µÁ±•Ñ¥½»¾ò!½¹ÑÉ…Ð½ÁÉ½‘Õ•Èƒ’îïš?¦v{ž¦ë’âË¾ò'¾ò3’â7–d™¥¹‘¥¹Ÿ¾ò1Ù…±¥‘…Ñ”ƒ–6ÌAMOŠSŠP‰…±±•ÈÍ•±˜µ‘•±…É”Í…¸•á•ÕÑ•‹¾ò3’â8Ç¾ò!Í•±˜µ‘•±…É”AAI=Y¾ò$¼Ë¾ò!Í•±˜µ‘•±…É”€À½Õ¹ÑÏ¾ò'–B3šz¾òmµ½¬¡…ÁÁäÁ…Ñ ƒš¶–r£’öÿžR£–ŽÃšb;¢Þ¿–ú¾òmÁÉ½½˜ƒžjÍ…¹}½¹ÑÉ…Ñ}Ù•ÉÍ¥½¸€¼ÁÉ½‘Õ•Èƒš^€ÕÉÉ•¹Ðµ½¹ÑÉ…Ð€¼¡•­•Èµ¥‘•¹Ñ¥Ñäƒš‚‡¦ª3¾ò ‰™…­”µØÀˆ€¬€‰…ÑÑ…­•Èˆƒ’æ¢÷š"C’âèAMLƒ–&7žö»¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÄµ•¹‘µ•¹Ð¾ò'¾òkšZÃš¢‡–v\Á¥Á•±¥¹”½…ÉÑ¥™…Ñ}‘Å}Í…¸¹ÁåƒŠSŠQÉÕ¹}É•ÅÕ¥É•‘}…ÉÑ¥™…Ñ}‘Å}Í…¸¡½¹¸°€¨°‘…Ñ…}É½½Ð°™•…ÑÕÉ•}…ÉÑ¥™…Ñ}Í•Ñ}¥¥€ƒ’âë–R¿’â ½Ù•É¹•DÍ…¸•á•ÕÑ¥½¸‰½Õ¹‘…Éç¾ò#ž¶û–B7–>«šr'’â'¦†ç¾ò1MPƒ–º#–6¯šZ·¢¢š^€¥‘•¹Ñ¥Ñä½É•ÍÕ±Ð½½Õ¹Ð½½µÁ±•Ñ¥½¸ƒ–>šVÃ¾ò'¾òiMQQ%ÁÉ½‘ÕÑ¥½¸É•¥ÍÑÉç¾ò!IQ%Q}E}!-IO¾òi¡•­}¥€¼™¥¹‘¥¹}±…ÍÌ€¼¡•­•É}Ù•ÉÍ¥½¸€¼•Ù…±Õ…Ñ½Ë¾ò3’â7–>¿šÎ£–—¾ò'ŠHƒ–¦ É•Í½±Ù”UII9P½µÁ½¹•¹ÑÌ€¬½µÁÕÑ”µ…¹¥™•ÍÐƒŠHƒ¦@¡•¬ƒš&Ÿ¢†0•Ù…±Õ…Ñ½Ë¾ò!…ÕÑ¡½É¥Ñ…Ñ¥Ù”¥¹ÁÕÓ¾ò'ŠHÁ•ÉÍ¥ÍÐ™¥¹‘¥¹Ï¾ò!…ÁÁ•¹µ½¹±ç¾ò3š2$‘•Ñ…¥°ƒ–:ï¦7¾ò'ŠH%9MIP½µÁ±•Ñ¥½¸ÁÉ½½˜1MS¾ò!½¹ÑÉ…Ð€ôUII9P€‰‘ÄµÍ…¸µˆÈ¸ÈµØÄ‹¾òmÁÉ½‘Õ•È€ôÉ•¥ÍÑÉäƒšÒûžR|¡•­•Èƒ¢ê¯’î÷ŠSŠS–£¦ ÍåÍÑ•´µ‘•É¥Ù•“¾ò'ŠHƒ–6W’ê/–*„=55%S¾ò!•Ù…±Õ…Ñ½ÈÉ…¥Í”ƒŠHI=11	,ƒŠHƒ¦nØ½µÁ±•Ñ¥½¸É½ÜƒŠH9=Q}QMQ	1¾ò'Žš^œÉ•½É‘}…ÉÑ¥™…Ñ}¡•­}•á•ÕÑ¥½¹€ƒ’î;žR’êŸ–F÷–B7ž¦ë¦^Ó–"ƒ¦f“¾ò!ÁÉ½‘ÕÑ¥½¸%9MIPƒ–R¿’â–ëž:Ã–r Í…¸‰½Õ¹‘…Éç¾ò1MPƒ–º#–6¯¾ò'Ž	Ù…±¥‘…Ñ½Èƒ’â'¦7š‚‡¦ª3¾òiÁÉ½½˜ƒžòë–’Ä€¼½¹ÑÉ…Ð€„ôUII9P€¼ÁÉ½‘Õ•È€„ôÍåÍÑ•´µ‘•É¥Ù•¡•­•È¥‘•¹Ñ¥Ñä€¼µ…¹¥™•ÍÐ€„ôÕÉÉ•¹ÐƒŠH9=Q}QMQ	1Ž¨©ÕÑ¡½É¥Ñ…Ñ¥Ù”¥¹ÁÕÑÌ¨«¾ò#
+œÐ¸×¾ò'¾òi%9Q%Qe}11	,€ô™•…ÑÕÉ”Á…ÉÅÕ•ÐÍ•ÕÉ¥Ñå}¥“¾ò!‘¥ÍÑ¥¹Ó¾ò'\‘¥µ}Í•ÕÉ¥Ñä¹¥‘•¹Ñ¥Ñå}­•å}Ù•ÉÍ¥½»¾ò!11	,ƒž&#šr³š"[šr«šÎ£–3–v™¥¹‘¥¹ŸŠSŠQ™…¥°±½Í•“¾òmµ½­}”É”ƒ¢†”‘¥µ}Í•ÕÉ¥ÑäƒšÎ£–3¾ò'¾òm	1=-%9}D€ôÍ¹…ÁÍ¡½Ðƒ’êS’â¨™…Ðƒ¢† ÅÕ…±¥Ñå}™±…Ï¾ò!‰±½­¥¹œƒ¦n€ôEÕ…±¥Ñå±…œƒ–<%9Q%Qe}11	/¾ò'Ž	Ù…±¥‘…Ñ¥½¸½¹ÑÉ…ÐÙ•ÉÍ¥½¸ƒŠHˆÈµ•á…ÐµØË¾ò!½Õ¹Ñ}Í½ÕÉ”ƒ¢¾·’æ'šnÓšZÃ¾ò3š^œÍ•…°ƒžRÄÕÉÉ•¹Ðµ½¹ÑÉ…ÐÉ•¡•¬ƒ–’ÇšV#¾ò'Žžr–º{šŽšÖ/šÖ/¢¾W¾ò#š^ƒ’ò«¦ƒ¢¾·’æ'¾ò'¾òi™…±±‰…¬ƒ¢ê¯’îôUAQƒŠHƒžr–º{–>Gž:ÀƒŠH%3¾òmMQ1}]%9=\™…Ðƒ¢†0ƒŠHƒžr–º{–>Gž:ÀƒŠH%3Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹ÁäèéQ•ÍÑHÑÈÉ½Ù•É¹•‘M…¹	½Õ¹‘…Éç¾ò ÄÃ¾ò$¬Q•ÍÑHÑÈÅEá•ÕÑ¥½¹AÉ½½˜ƒ¦¦7¾ò Øƒ¦†äÈ¸Äƒ¢¾·’æ'–r£šZÃžîOšz’â/¦nÛ–n{–öK¾ò$¬½¹™¥¹•µ•¹ÐƒšÖ/¢¾W¦¦7¾ò!…ÑÑ…­•ÈÉ”µÍ•…°ƒ–rëšf¿ŠSŠQÍ…¹¹•Èƒ¢«¢ê¯š.K–òšÛš<UI'¾ò1Ù…±¥‘…Ñ¥½¸ƒ–Æ’î4™…¥°±½Í•“¾ò$€€(¨©H¨«¾òimH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤µ•¹‘µ•¹Ð€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀØÀƒŠPAÕ‰±¥Í Y…±¥‘…Ñ¥½¸1½¥…°µUI$½¹™¥¹•µ•¹Ð€¬5…¹¥™•ÍÐ¡•¬I•¹…µ”((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò!™É½é•¸@À´Ðƒ–n{–öK’þ»–’4€¬¡•¬ƒ¢¾·’æ'¢¾k–º{–2[¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ä@À´ÀÐ€¬@Ä´ÀÇ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œÔ¿
+œÛ¾ò'ŠSŠQHÐµÈƒšZÃž&§žBšZ’îÛ¢¾ï–>[¾ò!Ù…±¥‘…Ñ½Èƒžî’îÛ¦7¦ª0€¼ÁÕ‰±¥Í ‰åÑ•Ìƒžî#¦ª0€¼É•Á½ÉÐƒ¢¾ï–>[¾ò'žnÓš:”‘…Ñ…}É½½Ð€¼ÕÉ¥ƒ¾ò3žîW¢þ™É½é•¸Á¡åÍ¥…±}™É½µ}±½¥…±}ÕÉ¥€¡•±Á•Ë¾òi•Í…Á•½…‰Í½±ÕÑ”½‘É¥Ù”½‰…­Í±…Í ½…±¥…ÌUI$ƒ–>¿¢¾ì‘…Ñ…}É½½Ðƒ–’[šZ’îÛ’âS¢Š¬‹’â¢Ó–rÃ¦ª3¢¾‹¾òmIQ%Q}59%MQ}%9QI%Qdƒ–>«¢¾šb8‰µ…¹¥™•ÍÑ}¡…Í ƒ¦v{ž¦è€¬ƒšr$½µÁ½¹•¹ÑÌ‹¾ò3–B7žžÃ’â;¢¾š6»’â7’â¢ÓŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÄµ•¹‘µ•¹Ð¸Ô½¸Û¾ò'¾òk¾ò Ç¾ò%Ù…±¥‘…Ñ¥½¸ƒ’â8ÁÕ‰±¥Í ™¥¹…°É•¡•¬ƒ¢žšzC’îï’öTÉ•¥ÍÑÉä™¥±•}ÕÉ¥€ƒ–>(É•Á½ÉÑ}ÕÉ¤ƒžî’âžî<Á¡åÍ¥…±}™É½µ}±½¥…±}ÕÉ¤¡‘…Ñ…}É½½Ð°ÕÉ¤¥ƒ¾ò!™É½é•¸@À´Ð¡•±Á•Ë¾òmUI$ƒ–Æ™…¥°±½Í•ƒ–#’ê;’îï’öT‘…Ñ…}É½½Ðƒ–’[¢¾ï–>[¾òo’þwš2•á…ÐÍÑÉ¥¹œ¥‘•¹Ñ¥Ñç¾ò3’â4¹½Éµ…±¥é”ƒš:—–>\…±¥…Ï¾ò'¾òošÛš<UI$ƒŠHÙ…±¥‘…Ñ¥½¸É•ÅÕ¥É•¡•¬%3¾ò!½¹™¥¹•µ•¹Ðƒ¢¾7¢ºÃ–öW¾ò'ŠHÁÕ‰±¥Í 	1=/Ž¾ò Ë¾ò%¡•¬É•¹…µ—¾òiIQ%Q}59%MQ}%9QI%Qe€ƒŠHIQ%Q}59%MQ}AIM9Q}9}M1ƒ¾ò!=ÁÑ¥½¸ŠSŠS¢¾šb;šÎ£–3’â+šâàÍ•…°ƒ–¶c–r£¾òm•á…Ð½µÁ½¹•¹Ð¥¹Ñ•É¥ÑäƒžRÄ½µÁ½¹•¹Ðµ…¹¥™•ÍÐÍ•…°€¬=5A=99Q|¨¡•­Ìƒ¢¾šb;¾òo–öO–&4Í¡•µ„ƒš^ƒšÎWš^ƒš6¦7–îèÉ•¥ÍÑÉ…Ñ¥½¸™½ÉµÕ±‡¾ò3’â4½Ù•É±…¥·¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiQ•ÍÑHÑÈÅ1½¥…±UI%½¹™¥¹•µ•¹Ó¾ò ß¾òh¸¸½½ÕÑÍ¥‘”€¼€½…‰Í½±ÕÑ”€¼è½‘É¥Ù”€¼‰…­Í±…Í €¼„¼½ˆ€¼„¼¸½ˆƒ–·žÆïšÛš<UI'¾ò!‘…Ñ…}É½½Ðƒ–’XÁ•É™•ÐÍ•¹Ñ¥¹•°‰åÑ•Ìƒ’â¢Ó’î7¢Š¯š.K¾ò$¬…¹½¹¥…°Õ¹¡…¹•AMO¾ò'¾òoš^‹šr$¡…ÁÁäƒšZ·¢¢žî<IEU%I}Y1%Q%=9}!-Lƒšzk’âû¢«–*£¢šžnXÉ•¹…µ”€€(¨©H¨«¾òimH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤µ•¹‘µ•¹Ð¸Ô½¸Ø€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔäƒŠPÕ±°QÉ…¹Í…Ñ¥½¸µ%¹Ñ•É¹…°AÕ‰±¥Í AÉ•½¹‘¥Ñ¥½¹Ì((¨©QåÁ”¨«¾òiÄÁÕ‰±¥Í ƒ––Gžê›šRÛ–>¾ò!=ÁÑ¥½¸ƒ–º3š"C¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ä@À´ÀÏ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œÓ¾ò'ŠSŠQHÐµÈƒ–>«š*(}ˆÉ}É•¡•­€ƒšRû¢þo’ê/–*‡¾ò3–º3šVÐ±¥¹•…”É•…‘Ï¾ò!Í¹…ÁÍ¡½Ð€¼…ÉÑ¥™…Ð€¼™•…ÑÕÉ”µÍ•Ð€¼ÉÕ¸€¼Õ¹¥Ù•ÉÍ—¾ò'’î7–r£’ê/–*‡–’[¾òiH€‰Q=Q=T±½Í•ˆƒ’â8€‰ÁÉ•½¹‘¥Ñ¥½¸É•…ƒ’î7–r£’ê/–*‡–’X‹’â7¢÷–B3š^Ûš"Cž®/¾òo’ê/–*‡–’[¢¾ï–>[žjž*Ûš’â7šb¼ÑÉ…¹Í…Ñ¥½¸ƒ–…ÕÑ¡½É¥Ñ…Ñ¥Ù”™…ÓŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÄµ•¹‘µ•¹Ð¸Ó¾ò'¾òiÁÕ‰±¥Í¡}Í¹…ÁÍ¡½Ñ€ƒ¦7šzŠSŠS–£¦ …ÕÑ¡½É¥Ñ…Ñ¥Ù”É•…‘Ìƒ–r 	%8QI9MQ%=9€ƒ’æ/–B;š&Ÿ¢†3¾ò#šZÀ¡•±Á•È}É•Í½±Ù•}ÁÕ‰±¥Í¡}ÁÉ•½¹‘¥Ñ¥½¹Íƒ¾ò#–º3šVÐ±¥¹•…”…Ñ”ƒ¢¾·’æ'¦nÛ–>cšnÓ¾ò'’ê/–*‡–¢ÂžR£¾òm}ˆÉ}É•¡•­€ƒ–B3¾ò'¾òo–g–—–>«šÚ#¢Òç’ê/–*‡––ó¾òo’ê/–*‡–’[š^ƒ’îï’öT½ÉÉ•Ñ¹•ÍÌÉ•…“Ž	MP½É‘•É¥¹œƒ–º#–6¯¾ò#šÖ/¢¾W¾ò'¾òiÁÕ‰±¥Í¡}Í¹…ÁÍ¡½Ðƒ’öO–	%8QI9MQ%=8ƒ–#’ê8ÁÉ•½¹‘¥Ñ¥½¸É•Í½±Ù•È€¼Í•…°É•¡•¬€¼ƒ¦š[’â¨½¹¸¹•á•ÕÑ—Žž*Ûš–>c–2[–rëšf¿¾ò!Í¹…ÁÍ¡½Ð‘•µ½Ñ•€¼…ÉÑ¥™…Ð‘•µ½Ñ•½É•‰½Õ¹€¼™•…ÑÕÉ”µÍ•Ðµ•µ‰•ÈƒšRç–* €¼ÉÕ¸ƒž*Ûš–>c–2X€¼Õ¹¥Ù•ÉÍ”ƒ–"ƒ¦f“¾ò'–£¦ 	1=/¾òo–’Ç¢Ò”É½±±‰…¬ƒ’þwžVgš^œAU	1%M!¾ò#–:–¶@É•ÁÕ‰±¥Í ƒ––Gžê˜Iiƒ¦nÛ–n{–öK¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiQ•ÍÑHÑÈÅQÉ…¹Í…Ñ¥½¹%¹Ñ•É¹…±AÉ•½¹‘¥Ñ¥½¹Ï¾ò ã¾òiMP½É‘•É¥¹œƒ–º#–6¬€¬ƒ’â’â«ž*Ûš–>c–2[–rëšf¼	1=/¾ò'¾òmÑ•ÍÑ}™…¥±ÕÉ•}¥¹©•Ñ¥½¸Í•¹…É¥¼ƒ¦nÛ–n{–öH€€(¨©H¨«¾òimH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤µ•¹‘µ•¹Ð¸Ð€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔàƒŠPÕ±°Y…±¥‘…Ñ¥½¸M•…°½¹ÍÕµÁÑ¥½¸€¼ÕÉÉ•¹Ð½¹ÑÉ…ÐI•¡•¬((¨©QåÁ”¨«¾òiÄÁÕ‰±¥Í ƒ––Gžê›šRÛ–>¾ò!Í•…°ƒš"C’âè½ÉÉ•Ñ¹•ÍÌ¥¹ÁÕÓ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ä@À´ÀË¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œÏ¾ò'ŠSŠQHÐµÈƒ–g–—’ê–º3šVÐÍ•…°ƒ–¶_šº×¾ò!½¹ÑÉ…Ð¡…Í €¼¡•­Ì¡…Í €¼Ù…±¥‘…Ñ½È½µµ¥Ð€¼Ù…±¥‘…Ñ¥½¸Ù•ÉÍ¥½»¾ò'’ö}ˆÉ}É•¡•­€ƒ–>«šÚ#¢Òä¥½½Õ¹ÑÌ½É•Á½ÉÑ}ÕÉ¤½É•Á½ÉÑ}¡…Í ¿–>0µ…¹¥™•ÍÓŠSŠP‹–g’êÍ•…°‹¢3¦vx‰Í•…°ƒš"C’âè½ÉÉ•Ñ¹•ÍÌ¥¹ÁÕÐ‹¾òmH€‰½¹ÑÉ…Ð¡…Í ¡…¹•Ì¥¹Ù…±¥‘…Ñ”ÁÉ¥½ÈÍ•…±Ìˆƒ’â7š"Cž®/¾ò!¡•¬%Ìƒ’â7–>`€¬ƒ¢¾·’æ'–>c–2[š^Ûš^œÉ•Á½ÉÐƒ’î7– AMLƒ–>¿–>G–â¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÄµ•¹‘µ•¹Ð¸Ï¾ò'¾òi}ˆÉ}É•¡•­€ƒ–º3šVÐÍ•…°ƒ’â'šZç’ê“–>'¦ª3¢¾¾òiÙ…±¥‘…Ñ¥½¹}½¹ÑÉ…Ñ}¡…Í¡€±•‘•È€ôôÉ•Á½ÉÐ€ôôÙ…±¥‘…Ñ¥½¹}½¹ÑÉ…Ñ}¡…Í  ¥€UII9S¾ò#¢¾·’æ'šœ½¹ÑÉ…ÐƒšòS¢þo’öÿš^œÍ•…°ƒ–’ÇšV#¾ò'¾òmÉ•ÅÕ¥É•‘}¡•­Í}¡…Í¡€±•‘•È€ôôÉ•Á½ÉÐ€ôôÉ•Á½ÉÐ¡•­ÌƒšVÃžî¦7žº\¡…Í£¾ò!ÍÑ…ÑÕÌƒšRç–*£šr«¦7–Â–6ÏšjÓ¦rË¾ò$¬‘ÕÁ±¥…Ñ”¡•­}¥ƒš.Kžîw¾ò#¦bÈ‘¥Ð½±±…ÁÍ—¾ò'¾òmÙ…±¥‘…Ñ½É}½‘•}½µµ¥Ñ€±•‘•È€ôôÉ•Á½ÉÐƒ’âS¦v{ž¦ë¾òmÙ…±¥‘…Ñ¥½¹}Ù•ÉÍ¥½¹€±•‘•È€ôôÉ•Á½ÉÐ€ôôƒ–öO–&4ÍÕÁÁ½ÉÑ•ƒž&#šr³Ž	Ù…±¥‘…Ñ•}…ÉÑ¥™…Ñ}™½É}ÁÕ‰±¥Í¡€ƒžžï¦f…±±•ÈÙ…±¥‘…Ñ¥½¹}Ù•ÉÍ¥½¹€ƒ–>šVÃ¾ò!ÍåÍÑ•´µ‘•É¥Ù•“ŠSŠS’â7–¢ºã¢«š*”ÁÉ½Ù•¹…¹—¾òoš^€Í¥±•¹ÐÉ…¹‘™…Ñ¡•Ë¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiQ•ÍÑHÑÈÅÕ±±M•…±½¹ÍÕµÁÑ¥½»¾ò ç¾òiÉ•Á½ÉÐ½¹ÑÉ…Ð¡…Í ÍÑ…±”€¼±•‘•ÈµÉ•Á½ÉÐµ¥Íµ…Ñ €¼ÕÉÉ•¹Ð½¹ÑÉ…Ðµ½¹­•åÁ…Ñ ƒ–>c–2[¾ò!%Ìƒ’â7–>c¾ò$¼É•Á½ÉÐ¡•­Ì¡…Í Ñ…µÁ•È€¼±•‘•Èµ¥Íµ…Ñ €¼ÍÑ…ÑÕÌƒšRç–*£šr«¦7–Â€¼Ù…±¥‘…Ñ½È½µµ¥Ðµ¥Íµ…Ñ €¼Ù•ÉÍ¥½¸µ¥Íµ…Ñ €¼‘ÕÁ±¥…Ñ”¡•¬¥“ŠSŠS–£¦£–r É”µ‰¥¹É•Á½ÉÐ¡…Í ƒ–B;’î4	1=/¾ò$€€(¨©H¨«¾òimH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤µ•¹‘µ•¹Ð¸Ì€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔÜƒŠPDI•ÅÕ¥É•µ¡•¬A½Í¥Ñ¥Ù”á•ÕÑ¥½¸AÉ½½˜((¨©QåÁ”¨«¾òiÄÙ…±¥‘…Ñ¥½¸ƒ––Gžê›šRÛ–>¾ò#šÚ#¦f‹šr«š&Ÿ¢†3–6ÌAML‹¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ä@À´ÀÇ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œË¾ò'ŠSŠQ%9Q%Qe}11	-}iI<€¼	1=-%9}E}iI<ƒ’î–´™¥¹‘¥¹œƒ¢† ½Õ¹ÐôôÀƒ–6ÌAMO¾òi™•…ÑÕÉ”Á¥Á•±¥¹”ƒš‚çšr³šÊ‡¢ÞGš&¯š>?š^Û¢†£¢«žÛ’âëž¦ëŠSŠP‹šŽš~—¢þ’âS’âë¦nØ‹’â8‹š‚çšr³šÊ‡šŽš~”‹’â7–>¿–2ë–"¾ò!È´ÀÈƒšr³¢ššÚ#¦f“žjš¶šb¿¢þg’â«¾ò'Ž	H´ÀÈÄƒš*+–º–"_’âèH´ÌÉ•Í¥‘Õ…°É¥Í¬ƒ’â7¢÷’ös’âèYI%%ƒ–&7š>C¾ò!Èƒ¢«–ÞÇ–ÞË–ŽÃšb;¢þg’â“¦†äIEU%I¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÄµ•¹‘µ•¹Ð¸Ë¾ò'¾òkšZÃ¢† µ•Ñ…}…ÉÑ¥™…Ñ}¡•­}•á•ÕÑ¥½¹ƒ¾ò!µ¥É…Ñ¥½¸€ÀÄË¾ò'¾òi½Ù•É¹•Í…¸ƒžjš¶–BGš&Ÿ¢†3¢¾šb;ŠSŠQ¡•­}¥€¼™•…ÑÕÉ•}…ÉÑ¥™…Ñ}Í•Ñ}¥€¼Í…¹}½¹ÑÉ…Ñ}Ù•ÉÍ¥½¸€¼ÁÉ½‘Õ•È€¼€¨©Í…¹¹•‘}½µÁ½¹•¹Ñ}µ…¹¥™•ÍÑ}¡…Í ¨«¾ò!•á…Ðƒš&¯š>?¢úO–—¢ê¯’î÷¾ò$¼½µÁ±•Ñ•‘}…Ó¾òl¨«’â7–B¬½Õ¹Ðƒ’â7–B¬É•ÍÕ±Ð¨«¾ò!É•½É‘}…ÉÑ¥™…Ñ}¡•­}•á•ÕÑ¥½¹€ƒž¶û–B7š^€É•ÍÕ±Ðƒ–>šVÀ€¬ÁÉ½‘ÕÑ¥½¸ƒ–R¿’â %9MIPƒ¢úçžV0MPƒ–º#–6¯ŠSŠQ…±±•Èƒš^ƒšÎT‘•±…É”½Õ¹ÐôÀ½AMO¾ò'Ž	Ù…±¥‘…Ñ½Èƒ¢¾·’æ'¾òkš^€ÁÉ½½˜ƒŠH9=Q}QMQ	1¾ò!…‰Í•¹”½˜‰…™¥¹‘¥¹Ì€„ôÁÉ½½˜½˜é•É¼™¥¹‘¥¹Ï¾ò'¾òmÍÑ…±”ÁÉ½½›¾ò!Í…¹¹•µ…¹¥™•ÍÐ€„ôÕÉÉ•¹Ó¾ò'ŠH9=Q}QMQ	1¾ò!É•Í…¸É•ÅÕ¥É•“¾ò'¾òo–2ç¦4ÁÉ½½˜€¬ƒšÒûžR|½Õ¹ÐôôÀƒŠHAMO¾ò!‘•Ñ…¥°ƒ¢ºÃ–öTÍ…¸•á•ÕÑ•€¬ÁÉ½‘Õ•È€¬½¹ÑÉ…Ó¾ò'Ž	™¥¹‘¥¹Ìƒ’î7¢ÖÀ…ÁÁ•¹µ½¹±äƒ’ê/–º{¢†£¾òm½Õ¹ÑÌƒ’î7šb¿šÒûžR–óŽšº/’ög¢úçžV3–š–º{¢ºÃ–öW¾òiÁÉ½½˜ƒ¢¾šb8‹š&¯š>?š&Ÿ¢†3¢þ’âSžîG–ºh•á…Ðƒ¢úO–”‹¾ò3’â7¢¾šb8‹š&¯š>?¢¢¾k–º{’â+š*—–£¦ ™¥¹‘¥¹Ì‹¾ò!™•…ÑÕÉ”Á¥Á•±¥¹”DƒšÊïžB¦Nø€¼H´Ìƒ–~¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiQ•ÍÑHÑÈÅEá•ÕÑ¥½¹AÉ½½›¾ò Û¾òi¹¼ÁÉ½½˜€¬¹¼™¥¹‘¥¹ÌƒŠH9=Q}QMQ	1	1=,€¼Ù…±¥ÁÉ½½˜é•É¼™¥¹‘¥¹ÌAML€¼™½É•¥¸…ÉÑ¥™…ÐÁÉ½½˜ƒ’â7¢ö³žžì€¼ÍÑ…±”ÁÉ½½˜…™Ñ•È½µÁ½¹•¹Ð¡…¹”	1=,€¼ƒžòë’â¦†äÁÉ½½˜	1=,€¼A$ƒš^€É•ÍÕ±Ðƒ–>šVÀ€¬ƒ–R¿’â %9MIPƒ¢úçžV3¾ò'¾òmµ½­}”É”ƒ–r Ù…±¥‘…Ñ”ƒ–&7¢ºÃ–öTÁÉ½½™Ï¾ò!ÁÉ½‘ÕÑ¥½¸µ½¬ƒ¦Nûž’ë¢2¾ò$€€(¨©H¨«¾òimH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤µ•¹‘µ•¹Ð¸È€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔØƒŠPAÕ‰±¥Í ¥¹…°I•¡•¬€¼Q=Q=T±½ÍÕÉ”€¬1…Ñ•ÍÐµ!•…A½±¥ä((¨©QåÁ”¨«¾òiÄÁÕ‰±¥Í ƒ––Gžê›šRÛ–>Œ€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈÈ´ÀÔ½È´ÀÛ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œÜ¿
+œã¾ò'ŠSŠQÁÕ‰±¥Í¡}Í¹…ÁÍ¡½ÐƒžjÁÉ•½¹‘¥Ñ¥½¸É•…ƒ’â8±…Ñ•ÍÐÙ…±¥‘…Ñ¥½¸Í•±•Ñ¥½¸ƒ–r 	%8QI9MQ%=8ƒ’æ/–&7–º3š"C¾ò3’æ/–B;š&7–ò–g’ê/–*‡¾ò!Q=Q=W¾òiÁÉ•¡•¬ƒ’â8½µµ¥Ðƒ’æ/¦^Óž*Ûš–>c–2[’â7¢Š¯–>Gž:Ã¾ò1ÁÕ‰±¥Í ƒ–>¿¢ô½µµ¥Ðƒ–~ë’ê;š^Ÿ¢¾ïšVÃžjžîO¢ºë¾ò'¾òm±…Ñ•ÍÐµ¡•…ƒ¦'š.§¢ž–"gšr«šrë–f£šb;ž†»¾ò!½±AML€¬¹•Ý•È%0ƒš^Û’â7–ú_¦'š^œAMO¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÄƒ
+œÈ¸Ð¼È¸×¾ò'¾òiÁÕ‰±¥Í¡}Í¹…ÁÍ¡½ÐƒšZÃ–ŠxÉ•ÅÕ¥É•ƒ–>šVÀ‘…Ñ…}É½½Ñƒ¾òmÁÕ‰±¥Í µÉ¥Ñ¥…°ƒ¦7¦ª3žžï–—’ê/–*‡–¾ò!}ˆÉ}É•¡•­ƒ¾ò1I•Ù¥•Ý•Èƒš:£¢6@=ÁÑ¥½¸¾ò'¾òk¾ò Ç¾ò%‘•Ñ•Éµ¥¹¥ÍÑ¥Œ±…Ñ•ÍÐµ¡•…“¾ò!Ù…±¥‘…Ñ•‘}…ÐM°…ÉÑ¥™…Ñ}Ù…±¥‘…Ñ¥½¹}¥M¾òmÙ…±¥‘…Ñ•‘}…ÐƒžRÄÙ…±¥‘…Ñ½ÈƒžÎïžîš^Û¦J–g–—¾ò'¾òo¾ò Ë¾ò%±•…äƒš^€Í•…°ƒ¢†0	1=/¾òo¾ò Ï¾ò%É•Á½ÉÐ‰åÑ•ÌÍ¡„ÈÔØ€ôô±•‘•ÈÉ•Á½ÉÑ}¡…Í €¬¥½…ÉÑ¥™…ÐµÍ•Ðƒ¢ê¯’î÷š¾S–¾ç¾òo¾ò Ó¾ò%ÕÉÉ•¹ÐÉ•¥ÍÑ•É•…ÉÑ¥™…Ñ}µ…¹¥™•ÍÑ}¡…Í €ôôÍ•…°ƒ’âPÉ•¥ÍÑÉäƒ¦7žº\½µÁ½¹•¹Ñ}µ…¹¥™•ÍÑ}¡…Í €ôôÍ•…³¾òo¾ò ×¾ò%É•ÅÕ¥É•¡•¬ƒ¦n–º3šVÓ’âS– AMO¾òo¾ò Û¾ò%½Õ¹ÑÌôôÃ¾òo¾ò ß¾ò'ž&§žB–¶_¢*žî#¦ª3¾ò#š¾?žî’îÛšZ’îÛ–¶c–r €¬Í¡„ÈÔØ€ôôƒšÎ£–0½¹Ñ•¹Ñ}¡…Í£ŠSŠQÙ…±¥‘…Ñ”ƒ–B;šZ’îÛ¢Š¯šnÿš6‹–6Ï’öüÉ•¥ÍÑÉäƒšr«–>c’æ|	1=/¾ò'Ž’îï’öW–’Ç¢Ò”ƒŠHI=11	,ƒŠHƒš^œAU	1%M!ƒ’þwžVg¾ò#–:–¶@É•ÁÕ‰±¥Í ƒ––Gžê˜Ii¾ò'¾òmÍÕÁ•ÉÍ•‘”½¥¹Í•ÉÐ½Õ¹¥Ù•ÉÍ”½ÉÕ¸½Õ¹¥ÅÕ•¹•ÍÌƒ¦ï¢úG¦nÛšRç–*£Ž	…±±•Èƒš^€A$ƒ’òƒ–:–>ÈÙ…±¥‘…Ñ¥½¸¥“Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹Áç¾ò!¹•Ý•È%0ƒ–:,½±AML€¼±•…äÉ½Ü	1=,€¼É•¥ÍÑÉä­‰åÑ•ÌÑ…µÁ•Èƒ\Ð€¼É•Á½ÉÐÑ…µÁ•È½µ¥ÍÍ¥¹œ¿š6‹žîD€¼A,ƒšÎ£–”É½±±‰…¬€¼¡…ÁÁäƒžîG–ºh•á…Ð¥“¾ò'¾òmÑ•ÍÑ}™…¥±ÕÉ•}¥¹©•Ñ¥½¸¹Áç¾ò!Í•¹…É¥¼É½±±‰…¬ƒ¢þžžì‘…Ñ…}É½½Ðƒ–B;¦nÛ–n{–öK¾ò$€€(¨©H¨«¾òimH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤ƒ
+œÈ¸Ð¼È¸Ô€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔÔƒŠPá…ÐÉÑ¥™…ÐY…±¥‘…Ñ¥½¸M•…°€¼A•ÉÍ¥ÍÑ•I•Á½ÉÐ((¨©QåÁ”¨«¾òiÄÙ…±¥‘…Ñ¥½¸ƒ––Gžê›š&§–ÆT€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈÈ´ÀÌ½È´ÀÓ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œÔ¿
+œÛ¾ò'ŠSŠQ±•‘•Èƒ–>«žîD™•…ÑÕÉ•}…ÉÑ¥™…Ñ}Í•Ñ}¥ƒ–¶_ž²›’âË¾ò3’â7žîD…ÉÑ¥™…Ð½½µÁ½¹•¹Ðƒžj•á…Ð¥‘•¹Ñ¥Ñç¾ò!‰åÑ•Ì½Í¡•µ„½É½Ü½µ…¹¥™•ÍÓ¾ò'¾òmÙ…±¥‘…Ñ¥½¸ƒš^€Á•ÉÍ¥ÍÑ••Ù¥‘•¹”¥‘•¹Ñ¥Ñç¾òmÁÕ‰±¥Í ƒš^ƒšÎWšrë–f£¦7¦ª0‹¢þgš²„AMLƒ¦ª3¢¾žj–ÂÇšb¿ž:Ã–r£¢š–>G–âžj–¶_¢*‹Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÄƒ
+œÈ¸Ï¾ò'¾òiµ¥É…Ñ¥½¸€ÀÄÄ±•‘•ÈƒšZÃ–Šx€Øƒ–"_¾ò!…ÉÑ¥™…Ñ}µ…¹¥™•ÍÑ}¡…Í €¼½µÁ½¹•¹Ñ}µ…¹¥™•ÍÑ}¡…Í €¼Ù…±¥‘…Ñ¥½¹}½¹ÑÉ…Ñ}¡…Í €¼É•Á½ÉÑ}ÕÉ¤€¼É•Á½ÉÑ}¡…Í €¼É•ÅÕ¥É•‘}¡•­Í}¡…Í£¾ò'¾òm½µÁ½¹•¹Ñ}µ…¹¥™•ÍÑ}¡…Í ƒ¦žR Èƒ–£–¶_šº×–³–ò?¾ò!™¥±•}ÕÉ¤½½¹Ñ•¹Ð½Í¡•µ„¡…Í ½É½Ý}½Õ¹Ð½™…µ¥±ä½Ù•ÉÍ¥½¸½±…å•È½Á…ÉÑ¥Ñ¥½¸ƒš:K–ê<…¹½¹¥…°)M=8¡…Í£ŠSŠQ½µÁ½¹•¹Ðƒ’îï’öW–Š{–"ƒšRç¦÷šRç–>c–º¾ò'¾òmÙ…±¥‘…Ñ¥½¹}½¹ÑÉ…Ñ}¡…Í  ¤ƒšb¼¡•¬½¹ÑÉ…Ðƒ¢ê¯’î÷¾ò#ž&#šr°€¬É•ÅÕ¥É•¡•¬ƒ¦n€¬Í•…°ƒ–¶_šºÔ€¬½Õ¹ÐƒšêC¾ò'¾òmÉ•Á½ÉÐƒž&§žB¢B÷žn`‘…Ñ…}É½½Ð½Ù…±¥‘…Ñ¥½¸¼ñ…ÉÑ¥™…Ñ}Ù…±¥‘…Ñ¥½¹}¥ø¹©Í½¹ƒ¾ò!ÝÉ¥Ñ•}™¥±•}…Ñ½µ¥¾ò1¥µµÕÑ…‰±”‰åÑ•Ï¾ò3–B¯–£¦ Í•…°€¬¡•­Ímt€¬‘•É¥Ù•ÍÕµµ…Éä½Õ¹ÑÏ¾ò'¾òm±•‘•È¹‘•Ñ…¥°ƒ–>«šb¿šFc¢š¾ò1½ÉÉ•Ñ¹•ÍÌ¥‘•¹Ñ¥Ñäƒ–£–r É•Á½ÉÓŽ	ÁÕ‰±¥Í ƒ¦7¦ª0€ôÉ•Á½ÉÐ‰åÑ•Ì¡…Í €¬±•‘•Èƒ¢ê¯’îô€¬ÕÉÉ•¹ÐÉ•¥ÍÑÉäƒ–>0¡…Í €¬É•ÅÕ¥É•¡•­Ï¾ò#¢ž4µH´ÈÀÈØÀàÌÀ´ÀÔÛ¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òi¡…ÁÁäÉ•Á½ÉÐƒ– ¡•¬AMLƒšZ·¢¢¾òmÉ•Á½ÉÐÑ…µÁ•È½µ¥ÍÍ¥¹œ¿š6‹žîG’â'–rëšf¼	1=,€€(¨©H¨«¾òimH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤ƒ
+œÈ¸Ì€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔÐƒŠP½Éµ…°ÉÑ¥™…ÐY…±¥‘…Ñ¥½¸á•ÕÑ¥½¸	½Õ¹‘…Éä€¬QåÁ•¡•­Ì((¨©QåÁ”¨«¾òiÄƒšZÃš¶–ò?¢Þ¿–ú––Gžê›¾ò#žîOšzšœ…¹Ñ¤µ‰åÁ…ÍÏ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈÈ´ÀÄ½È´ÀË¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œÈ¿
+œÌ¿
+œÓ¾ò'ŠSŠQÉ•½É‘}…ÉÑ¥™…Ñ}Ù…±¥‘…Ñ¥½¸ƒžnÓš:—š*(…±±•Èƒš>C’ê“žj’â“’â«¢º‡šVÃ–g¢þl…ÁÁ•¹µ½¹±ä±•‘•Èƒ¢3’â7š&Ÿ¢†3’îï’öT…ÉÑ¥™…ÐÙ…±¥‘…Ñ¥½»¾ò!…±±•ÈÍ•±˜µ‘•±…É”€ˆÀ¼ÀˆƒŠHAMLµÍ¡…Á•É•½ÉƒŠHÁÕ‰±¥Í •±¥¥‰±—¾ò3’â8Äƒš^§šr|…ÁÁÉ½Ù…°‰åÁ…ÍÌƒ–B3šz¾ò'¾òmÁÕ‰±¥Í …Ñ”ƒ–>«šr$…É•…Ñ”½Õ¹ÑÏ¾ò3š^ƒšÎW¢¾šb8É•ÅÕ¥É•¡•­Ìƒ–£¦£š&Ÿ¢†3Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÄƒ
+œÈ¸Ä¼È¸Ë¾ò'¾òk¾ò Ç¾ò'šZÃš¢‡–v\Á¥Á•±¥¹”½…ÉÑ¥™…Ñ}Ù…±¥‘…Ñ¥½¸¹ÁåƒŠSŠQÙ…±¥‘…Ñ•}…ÉÑ¥™…Ñ}™½É}ÁÕ‰±¥Í ¡½¹¸°€¨°‘…Ñ…}É½½Ð°™•…ÑÕÉ•}…ÉÑ¥™…Ñ}Í•Ñ}¥°Ù…±¥‘…Ñ½É}½‘•}½µµ¥Ð¥€ƒ’âë–R¿’âš¶–ò<Ù…±¥‘…Ñ¥½¸ƒš&Ÿ¢†3¢úçžV3¾ò!É•Í½±Ù”É•¥ÍÑÉäƒŠHƒž&§žB–¶_¢*¦7¦ª0ƒŠHÑåÁ•¡•­ÌƒŠHƒšÒûžR|½Õ¹ÑÌƒŠHÍ•…°ƒŠHƒš2’æ–2XÉ•Á½ÉÐƒŠH¥¹±¥¹”%9MIS¾òošÊüÄ¸È=ÁÑ¥½¸ƒš¢‡–ò?¾ò3š^ƒž.³ž®,Á•ÉÍ¥ÍÑ•¹”…±±…‰±—¾ò'¾òo¾ò Ë¾ò'š^œÉ•½É‘}…ÉÑ¥™…Ñ}Ù…±¥‘…Ñ¥½¹€ƒ’î;žR’êŸ–F÷–B7ž¦ë¦^Ó–"ƒ¦f“¾ò1µ•Ñ…}…ÉÑ¥™…Ñ}Ù…±¥‘…Ñ¥½¸ƒžj%9MIPƒ–£’îO–êO–R¿’â–ëž:Ã–r£¢úçžV3–÷šVÃ–¾ò!MPƒ–º#–6¯¾òož¶û–B7š^€½Õ¹Ð½É•ÍÕ±Ð½¡•­Ì½É•Á½ÉÐƒ–>šVÃ¾ò'¾òo¾ò Ï¾ò'šZÃ¢† µ•Ñ…}…ÉÑ¥™…Ñ}‘Å}™¥¹‘¥¹ƒ¾ò!µ¥É…Ñ¥½¸€ÀÄÇ¾ò1…ÁÁ•¹µ½¹±äƒ–v?’ê/–º{¾ò1™¥¹‘¥¹}±…ÍÌƒžf÷–B7–6W¾ò'ŠSŠQ½Õ¹ÑÌƒžRÄM1P½Õ¹Ð ¨¥€ƒšÒûžR¾ò1É•½É‘}…ÉÑ¥™…Ñ}‘Å}™¥¹‘¥¹€ƒ–>«¢÷¢þ÷–*ƒ–v?’ê/–º{¾ò#žîOšz’â+’â7–>¿¢÷–"Û¦€AMO¾ò'¾òo¾ò Ó¾ò%ÉÑ¥™…ÑY…±¥‘…Ñ¥½¹¡•­%‘€ƒ–6žÆìÉ•ÅÕ¥É•¡•¯¾ò!AML½%0½9=Q}QMQ	1¾ò19=Q}QMQ	1õ‰±½­¥¹Ÿ¾òož&§žB–¶_¢*žêœ½¹Ñ•¹Ð½Í¡•µ„½É½Üƒ¦7¦ª3¾òmQUI}5%1e}=YIô½µÁ½¹•¹ÑÌ‘¥ÍÑ¥¹Ð€¡™…µ¥±ä±Ù•ÉÍ¥½¸¤€ôôµ•µ‰•È€¡¥±Ù•ÉÍ¥½¸¤ƒ¦n–B#ŠSŠQµ½­}”É”½µÁ½¹•¹Ð™•…ÑÕÉ•}™…µ¥±äƒ–¾ç¦ö@µ•µ‰•È¥“¾ò3ž&§žB‰åÑ•Ìƒ’â7–>c¾ò'Žš^‹šr'šÖ/¢¾W¢þžžï¾òiÉ•½É‘}…ÉÑ¥™…Ñ}Ù…±¥‘…Ñ¥½¸ƒ’â'–’¢ÂžR£šRäD™…ÑÌ€¬™½Éµ…°Ù…±¥‘…Ñ½Ë¾òošZ·¢¢šnÓšZÃ’âè¡•¬µ±•Ù•°ƒ¦bïšZ·Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹ÁäèéQ•ÍÑ9½…±±•É•±…É•‘A…ÍÏ¾ò Ï¾òi½Õ¹ÐµÝÉ¥Ñ•ÈƒšÚ#–’Ä€¼MPƒ–º#–6¬€¼É…ÜME0ƒ’ò«¦ƒš^€Í•…°ƒ¢†0	1=/¾ò$¬Q•ÍÑQåÁ•‘I•ÅÕ¥É•‘¡•­Ï¾ò Ó¾òi¡…ÁÁäƒ– AML€¼µ¥ÍÍ¥¹œ¡•¬€¼9=Q}QMQ	1€¼Õ¹­¹½Ý¸¡•¬ƒšnÿ’î¾ò'¾òmÑ•ÍÑ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}…Ñ”¹Áä€¬Ñ•ÍÑ}ÁÕ‰±¥Í¡}±¥¹•…”¹Áäƒ¢þžžï–B;–£¢þ¾ò ÈÔ¼Ã¾ò'¾òmÑ•ÍÑ}µ¥É…Ñ¥½¹Ì¹Áä€ÄÄµµ¥É…Ñ¥½¸ƒ¦¦4€€(¨©H¨«¾òimH´ÀÈÅt ¸¸½…‘È½H´ÀÈÅ}ÁÕ‰±¥Í¡}Ù…±¥‘…Ñ¥½¹}•á…Ñ¹•ÍÌ¹µ¤ƒ
+œÈ¸Ä¼È¸È€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔÌƒŠP%¹‘ÕÍÑÉä½¹ÍÑ¥ÑÕ•¹ÐIEU%I¹‘Á½¥¹ÐAÉ½½˜((¨©QåÁ”¨«¾òiÄ½¹ÑÉ…Ðƒ¢¾·’æ'’þ»š¶¾ò#–þ¢š’ê“’îc¦v‹¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÄ¸È@À´ÀË¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œÏ¾ò'ŠSŠQ¥¹‘ÕÍÑÉå}Ñ…á½¹½µäƒžj…¹½¹¥…°‘•±¥Ù•É…‰±”ƒšb¼‰É¥‘•}¥¹‘ÕÍÑÉå}µ•µ‰•Ë¾ò!Í•ÕÉ¥ÑäƒŠP¥¹‘ÕÍÑÉä55	IM!%C¾ò'¾ò3’öHÐµÄ¸Äƒš*(½¹ÍÑ¥ÑÕ•¹Ðƒš‚’âè=AQ%=91}9=9}AAI=Y1}MUI¾òi‰…Í•}¥¹™¼AML€¬½¹ÍÑ¥ÑÕ•¹Ð9%ƒš^Ø9A=%9P…Ñ”ƒ’î4AMLƒ–æÛ–>¼AAI=Y¾ò3¢0‰É¥‘•}¥¹‘ÕÍÑÉå}µ•µ‰•Èƒš^ƒšÎW–>¿¦vƒšz–îë¾ò#¢¾šb;’î¢†£šœ•¹‘Á½¥¹ÐƒŠ&€ƒ¢¾šb;–þ¢š’ê“’îc¦v‹¾ò3’â8Í•ÕÉ¥Ñå}µ…ÍÑ•Èƒ¦^»¦Šc–B3šz¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÀµ•¹‘µ•¹Ð¸Ë¾ò'¾òi¥¹‘ÕÍÑÉå}Ñ…á½¹½µäé%¹™½…Ñ„¹•Ñ}¥¹‘ÕÍÑÉå}½¹ÍÑ¥ÑÕ•¹Ñ€€ôIEU%I}9A=%9Q}AI==¾ò!É•ÅÕ¥É•µ•¹ÑÌƒ¢† €¬±…ÍÍ¥™¥…Ñ¥½¸ƒ–B3š¶—¾ò1É•…Í½¸ƒžîG–ºh‰É¥‘•}¥¹‘ÕÍÑÉå}µ•µ‰•Èƒ’ê“’îc¢¾·’æ'¾ò'¾òm•Ñ}¥¹‘ÕÍÑÉå}Ý•¥¡Ñ€€¼•Ñ}¥¹‘ÕÍÑÉå}‘…¥±å€ƒžîÓš2=AQ%=90ƒ’öÉ•…Í½¸ƒšbû–ò?š2–BG–öO–&7šÚ#¢Òç¢úçžV3¾ò!µ•µ‰•ÉÍ¡¥Àƒšz–îë’â7šÚ#¢Òç¾òm½¹ÍÕµ•Èƒ–>c–2[š^Û¦7šZÃ¢¾’òÃ¾ò'¾òmÁÉ½Ù¥‘•È½Ñ…É•ÐƒšZÃ–Šx•á…Ð•á¡…¹”ÍÕÉ™…”•Ñ}¥¹‘ÕÍÑÉå}½¹ÍÑ¥ÑÕ•¹Ñ}•á¡…¹•ƒ¾ò!ÁÉ½Ù¥‘•È€¬AÉ½Ñ½½°€¬I•…±Q…É•Ð€¬…­•Q…É•Ðƒ–no–’–B3š¶—¾ò$¬ÁÉ½‰”™…Ñ½ÉçŽ¨©…¹½¹¥…°µ‘•±¥Ù•É…‰±”ƒžîOšz–º#–6¬¨«¾ò#šZÃšÖ/¢¾W¾ò'¾òiµÕ±Ñ¤µ•¹‘Á½¥¹Ð…Á…‰¥±¥ÑäƒžjIEU%IÉ•ÅÕ¥É•µ•¹ÑÌƒ¦n–B €ôô…¹½¹¥…°ƒ’ê“’îc¦v‹–þ¢šž®¿ž
+ç¦n–B#¾ò!Í•ÕÉ¥Ñå}µ…ÍÑ•Èõí¡¥ÍÑ÷¾òm…‘©}™…Ñ½Èõí™½ÉÝ…É‘÷¾òm½ÉÁ½É…Ñ•}…Ñ¥½¸õí‘¥Ù¥‘•¹±É¥¡Ñ}¥ÍÍÕ•÷¾òm¥¹‘ÕÍÑÉå}Ñ…á½¹½µäõí‰…Í•}¥¹™¼±½¹ÍÑ¥ÑÕ•¹Ñ÷¾òm¥¹‘•á}‘…¥±äõíÅÕ•Éå}­±¥¹•÷¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}ÁÉ½½˜¹ÁäèéQ•ÍÑ%¹‘ÕÍÑÉå½¹ÍÑ¥ÑÕ•¹ÑI•ÅÕ¥É•‘MÕÉ™…—¾ò Ï¾òi‰…Í•}¥¹™¼AML€¬½¹ÍÑ¥ÑÕ•¹Ð9%ƒŠH9A=%9P%0€¬	UM%9ML™¥É•ôôÀ€¬ƒ–’Ç¢Ò”•á¡…¹”ƒš2’æ–2X€¬Y1%Q}%0…Í—¾òmˆÄ	1=-€¬IA=IPƒ¢¾k–º{–’Ç¢Ò—¾òm…¹½¹¥…°µ‘•±¥Ù•É…‰±”ÍÕÉ™…•Ì€ôôIEU%IÉ•ÅÕ¥É•µ•¹ÑÏ¾ò$€€(¨©H¨«¾òimH´ÀÈÁt ¸¸½…‘È½H´ÀÈÁ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}½¹ÑÉ…Ð¹µ¤µ•¹‘µ•¹Ð¸È€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔÈƒŠPMÑÉÕÑÕÉ…°ÁÁÉ½Ù…°¹Ñ¤µ	åÁ…ÍÏ¾ò!=ÁÑ¥½¸¾ò$((¨©QåÁ”¨«¾òiÄ…ÁÁÉ½Ù…°ƒ¢úçžV3žîOšzšŸ¦7šz€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÄ¸È@À´ÀÇ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œË¾ò'ŠSŠQHÐµÄ¸Äƒžj…¹Ñ¤µ‰åÁ…ÍÌƒšb¼AåÑ¡½¸ƒ–F÷–B7žê›–ºk¦v{¢ºÿ¦^»š:Ÿ–"Û¾òi}…ÁÁÉ½Ù•}…¹‘}Á•ÉÍ¥ÍÑ}…Á…‰¥±¥Ñå}Ñ•ÍÑ½¹±ä ¥€ƒ–>¿¢Š¯šbû–ò<¥µÁ½ÉÓ¾òmY•É¥™¥•‘…Á…‰¥±¥ÑåÁÁÉ½Ù…±€ƒšb¿šf»¦k–>¿–º{’ú/–2X‘…Ñ…±…ÍÏ¾ò!}}Á½ÍÑ}¥¹¥Ñ}}€ƒ–>«š~—¦v{ž¦ë¾ò'¾ò1…±±•Èƒ’ò«¦ƒ–B;žnÓ¢Â}Á•ÉÍ¥ÍÑ}Ù•É¥™¥•‘}…Á…‰¥±¥Ñä ¥ƒŠSŠS–B;¢–>«¦7–h}Ù…±¥‘…Ñ•}•Ù¥‘•¹•ƒ¾ò3’â7¦7¦ª0±½Í•ÁÉ½‘ÕÑ¥½¸ÉÕ¸€¼Ù•É‘¥Ð€¼™½Éµ…°…Ñ”IA=IP€¼•¹‘Á½¥¹ÐÁÉ½½˜€¼I…Üµ•Ñ„É½ÍÌµ‰¥¹‘¥¹ŸŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÀµ•¹‘µ•¹Ð¸Ç¾ò1I•Ù¥•Ý•ÈAÉ•™•ÉÉ•=ÁÑ¥½¸¾ò'¾òkžR’êŸš¢‡–v_–öï–êW’â7–¶c–r ‹š^ƒ¦r ™½Éµ…°ÉÕ¸ƒ–6Ï–>¿–dAAI=Y‹žj…±±…‰±—ŠSŠS¾ò Ç¾ò%}…ÁÁÉ½Ù•}…Á…‰¥±¥Ñå}¥¹}µ•µ½Éå}Ñ•ÍÑ½¹±å€€¼}…ÁÁÉ½Ù•}…¹‘}Á•ÉÍ¥ÍÑ}…Á…‰¥±¥Ñå}Ñ•ÍÑ½¹±å€€¼Y•É¥™¥•‘…Á…‰¥±¥ÑåÁÁÉ½Ù…±€€¼}Á•ÉÍ¥ÍÑ}Ù•É¥™¥•‘}…Á…‰¥±¥Ñå€ƒ–£¦£’î8…Á…‰¥±¥Ñä¹Áäƒ–"ƒ¦f“¾òo¾ò Ë¾ò'š2’æ–2[’ê/–*‡¾ò!HÌµ@Ä´ÀÔÙ…±¥‘…Ñ”µ‰•™½É”µµÕÑ…Ñ”€¼ƒ–6W’ê/–*„€¼…¡”µÉ•‰Õ¥±€¼HÈµ@Ä´ÀÄUAQµ½¹±äµ½Ù•É¹…¹”µ™¥•±‘Ï¾ò%¥¹±¥¹”ƒ¢þl…ÁÁÉ½Ù•}™É½µ}ÍÁ¥­•}ÉÕ¹€ƒ–Âû¦£ŠSŠQ…±±•Èƒ–"Ã¢úû–g–—ž
+ç–þ–ÞË¦k¢þ–º3šVÓ¦ª3¢¾¦Nû¾òo¾ò Ï¾ò'šÖ/¢¾Wš&¦r ÑÉ…¹Í…Ñ¥½¸½…¡”µ•¡…¹¥Ìƒžžï–”Ñ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½}…Á…‰¥±¥Ñå}Ñ•ÍÑ}Á•ÉÍ¥ÍÑ•¹”¹Áåƒ¾ò!Ñ•ÍÑÌ¼ƒ–¾òožR’êœÍÉŒƒ’â4¥µÁ½ÉÐÑ•ÍÐƒš¢‡–v_¾ò'¾òo¾ò Ó¾ò'–¾çš*_šÖ/¢¾WšRç’âëžr–º{žîW¢þ–Âw¢¾W¾ò Üƒ¦†ç¾ò'¾òk’ò«¦€Ù•É¥™¥•½‰©•ÐƒŠHƒžÆï’â7–¶c–r£¾òm…±±•Èµ‰Õ¥±Ð•Ù¥‘•¹”€¬™É½é•¸¥ƒŠHƒš^€¥µÁ½ÉÑ…‰±”ƒ¢Þ¿žRÇ¾òmMPƒ–º#–6¯¾ò!…Á…‰¥±¥Ñä¹Áäƒ’â·–R¿’â–òWžR AAI=Yƒž*Ûšžj–÷šVÃšb¼…ÁÁÉ½Ù•}™É½µ}ÍÁ¥­•}ÉÕ¸ƒ’âSž¶û–B7š^€•Ù¥‘•¹”½Ù•É¥™¥•ƒ–>šVÃ¾òmÍÉŒ¼ƒ–£š¢‡–v_’â4¥µÁ½ÉÐÑ•ÍÑÌ¸«¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}…ÁÁÉ½Ù…±}…¹Ñ¥}‰åÁ…ÍÌ¹ÁäèéQ•ÍÑÁÁÉ½Ù…±¹Ñ¥	åÁ…ÍÌƒ¦7–g¾ò ß¾ò'¾òmÑ•ÍÑ}…Á…‰¥±¥Ñå}½Ù•É¹…¹”¹Áä€¼Ñ•ÍÑ}ÑÉ¥…±}ÁÉ½‘ÕÑ¥½¹}‰½Õ¹‘…Éä¹Áäƒ¢þžžï¢ÌÑ•ÍÑÌ¼¡•±Á•Ë¾ò!…ÁÁÉ½Ù•}…¹‘}Á•ÉÍ¥ÍÑ}Ñ•ÍÑ½¹±ä€¼…ÁÁÉ½Ù•}¥¹}µ•µ½Éå}Ñ•ÍÑ½¹±ç¾ò$€€(¨©H¨«¾òimH´ÀÈÁt ¸¸½…‘È½H´ÀÈÁ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}½¹ÑÉ…Ð¹µ¤µ•¹‘µ•¹Ð¸Ä€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔÄƒŠPA•ÉÍ¥ÍÑ•%‘•¹Ñ¥ÑäÉ½ÍÌµ	¥¹‘¥¹œ((¨©QåÁ”¨«¾òiÄ…ÁÁÉ½Ù…°ƒ––Gžê›šRÛ–>¾ò#–no–ÆžÊûž†»žîG–ºk¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÄ¸Ä@À´ÀÏ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œÓ¾ò'ŠSŠQIA=IPÉ”µ¡•¬ƒšr«š‚ã¦ª0ÁÉ½Ù¥‘•É}‘…Ñ…Í•Ð½…ÑÕ…±}‘…Ñ…Í•Ð•á…Ñ¹•ÍÏ¾ò3šr«¢ššÆ•¹‘Á½¥¹ÐÁÉ½½˜…Í”ƒžj•Ù¥‘•¹•}É•˜½¡…Í €ôôIA=IP•¹ÑÉäƒžj•Ù¥‘•¹•}ÕÉ¤½¡…Í£¾ò!…Í”ƒ’â8…ÉÑ¥™…Ðƒ’æ/¦^Óš^€¥‘•¹Ñ¥Ñä•ÅÕ…±¥Ñç¾ò'¾ò3šr«’î8Á•ÉÍ¥ÍÑ•I…Üµ•Ñ„ƒ–>7–BG¦7¦ª0É•ÅÕ•ÍÑ}¥½•¹‘Á½¥¹Ð½ÁÉ½Ù¥‘•É}‘…Ñ…Í•ÓŠSŠSž¾‡šRäIA=IP•¹ÑÉäƒ–B8É”µ‰¥¹¡…Í ƒ–6Ï–>¿¦k¢þŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÀµ•¹‘µ•¹Ð¸×¾ò'¾òi}É•ÅÕ¥É•}™½Éµ…±}…Ñ•}ÁÉ½½™€ƒ¦7–g–æÛ¢þS–nxÁÉ½Ù•¸É•ÅÕ¥É•µ•¹Ð¥‘Ï¾ò#’úlY•É¥™¥•‘…Á…‰¥±¥ÑåÁÁÉ½Ù…°ƒšÚ#¢Òç¾ò'ŠSŠS–¾çš¾?’â«šî‡¢ÚÌÉ•ÅÕ¥É•µ•¹ÐƒžjAMLƒ¢¾šb;¾òi½¹ÑÉ…ÐƒŠPIA=IP•¹ÑÉç¾ò!•¹‘Á½¥¹Ð€¬ÁÉ½Ù¥‘•É}‘…Ñ…Í•Ð€¬…Á…‰¥±¥Ñäƒ’â'–¶_šº×¾ò'¾òmÁÉ½½˜…Í”ƒŠPIA=IP•¹ÑÉç¾ò!•Ù¥‘•¹•}É•˜€ôô•Ù¥‘•¹•}ÕÉ¤ƒ’âP•Ù¥‘•¹•}¡…Í €ôô•Ù¥‘•¹•}¡…Í£ŠSŠQ…Í”ƒ’â8…ÉÑ¥™…Ðƒ–¾ä‹’î’æ#¢¾š6»¢¾šb;’ê¢¾—ž®¿ž
+ä‹–þ¦†ï’â¢Ó¾ò'¾òmIA=IP•¹ÑÉäƒŠPÁ•ÉÍ¥ÍÑ•I…Üµ•Ñ‡¾ò!Í¡„ÈÔØ¡‰åÑ•Ì¤€ôô•¹ÑÉä¹•Ù¥‘•¹•}¡…Í£¾ò'¾òmI…Üµ•Ñ„ƒŠP½¹ÑÉ…Ð½•¹ÑÉç¾ò!•¹‘Á½¥¹Ð€¬ÁÉ½Ù¥‘•É}‘…Ñ…Í•Ð€¬É•ÅÕ•ÍÑ}¥ƒžÊûž†»žnãž¶'¾ò'Ž	…ÁÁÉ½Ù…°ƒšZÃ–ŠxÍÁ¥­•}É½½Ðƒ–>šVÃ¾òmÉÕ¹}‘¥È½ÍÁ¥­•}É½½Ðƒžòë–’Ç–6Ïš.Kžîw¾ò!™…¥°±½Í•“¾ò'Žäƒ¦†ç–¾çš*_šÖ/¢¾W–£¦£–r IA=IP¡…Í É”µ‰¥¹ƒ–B;’î7š.Kžîw¾òi…ÑÕ…±}‘…Ñ…Í•ÐÑ…µÁ•È€¼ÁÉ½Ù¥‘•É}‘…Ñ…Í•ÐÑ…µÁ•È€¼•Ù¥‘•¹•}ÕÉ¤ƒš6ˆÁ•Éµ¥ÍÍ¥½¸ƒ¢¾š6¸€¼•Ù¥‘•¹•}¡…Í ƒš6‹–>›’â’î÷–B#šÎT¡…Í €¼…Í”•Ù¥‘•¹•}É•˜ƒ’â8•¹ÑÉäƒ’â7’â¢Ð€¼…Í”•Ù¥‘•¹•}¡…Í ƒ’â8•¹ÑÉäƒ’â7’â¢Ð€¼É…Üµ•Ñ„•¹‘Á½¥¹ÐÑ…µÁ•È€¼É…Üµ•Ñ„ÁÉ½Ù¥‘•É}‘…Ñ…Í•Ðµ¥Íµ…Ñ €¼É…Üµ•Ñ„É•ÅÕ•ÍÑ}¥µ¥Íµ…Ñ£Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}…ÁÁÉ½Ù…±}…¹Ñ¥}‰åÁ…ÍÌ¹ÁäèéQ•ÍÑÉ½ÍÍ	¥¹‘¥¹Q…µÁ•Ë¾ò ç¾ò$€€(¨©H¨«¾òimH´ÀÈÁt ¸¸½…‘È½H´ÀÈÁ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}½¹ÑÉ…Ð¹µ¤µ•¹‘µ•¹Ð¸Ô€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÔÀƒŠPÁÁÉ½Ù…°¹Ñ¤µ	åÁ…ÍÏ¾ò#–R¿’âžR’êœAAI=YÑÉ…¹Í¥Ñ¥½»¾ò$((¨©QåÁ”¨«¾òiÄ…ÁÁÉ½Ù…°ƒ¢úçžV3¦7šz€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÄ¸Ä@À´ÀË¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œÏ¾ò'ŠSŠQ…ÁÁÉ½Ù•}…¹‘}Á•ÉÍ¥ÍÑ}…Á…‰¥±¥Ñä ¤€¼…ÁÁÉ½Ù•}…Á…‰¥±¥Ñä ¤ƒšb¼ÁÕ‰±¥Œƒ¢Þ¿–ú’âS–>«–h}Ù…±¥‘…Ñ•}•Ù¥‘•¹—¾ò#–¶_šº×¦v{ž¦è€¬IQ%Iƒš.Kžît€¬Á½Í¥Ñ¥Ù”™É½é•¸¥‘•¹Ñ¥Ñç¾ò'¾ò3’â7šÚ#¢Òä™½Éµ…°•¹‘Á½¥¹ÐÁÉ½½›ŠSŠQ…±±•ÈÍ•±˜µ‘•±…É”…Á…‰¥±¥ÑåÙ¥‘•¹”ƒ–6Ï–>¼AAI=YŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÀµ•¹‘µ•¹Ð¸Ó¾ò'¾òkšZÃ–Š{–¦ Í•…±•ÁÉ½½˜½‰©•ÐY•É¥™¥•‘…Á…‰¥±¥ÑåÁÁÉ½Ù…±ƒ¾ò!¹…µ”€¼•Ù¥‘•¹”€¼Ù•É¥™¥•‘}™É½µ}ÉÕ¸€¼•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹ÑÍ}ÁÉ½Ù•»¾òož¦ë¢¾šb;žšš¶‹šz¦ƒ¾ò'ŠSŠS–>«–r …ÁÁÉ½Ù•}™É½µ}ÍÁ¥­•}ÉÕ¸ƒ–£¦ª3¢¾¦Nû¦k¢þ–B;šz¦ƒ¾òmƒ–dAAI=Yƒžj–R¿’â¢úçžV0€ôÁÉ¥Ù…Ñ”}Á•ÉÍ¥ÍÑ}Ù•É¥™¥•‘}…Á…‰¥±¥Ñä¡½¹¸°Ù•É¥™¥•¥ƒ¾ò#–>«š:—–>\Ù•É¥™¥•½‰©•Ó¾òo’þwžVdHÌµ@Ä´ÀÔÙ…±¥‘…Ñ”µ‰•™½É”µµÕÑ…Ñ”€¼ƒ–6W’ê/–*„€¼…¡”µÉ•‰Õ¥±ƒ¢¾·’æ'’â8HÈµ@Ä´ÀÄUAQµ½¹±äµ½Ù•É¹…¹”µ™¥•±‘Ï¾ò'Žš^œÁÕ‰±¥Œƒ–÷šVÃžžï¦f“¾òi…ÁÁÉ½Ù•}…¹‘}Á•ÉÍ¥ÍÑ}…Á…‰¥±¥Ñä€¼…ÁÁÉ½Ù•}…Á…‰¥±¥Ñäƒ’î;š¢‡–v_–F÷–B7ž¦ë¦^ÓšÚ#–’Ç¾òošÖ/¢¾WšRçžR£šbû–ò<Ñ•ÍÐµ½¹±ä¡•±Á•Ë¾ò!}…ÁÁÉ½Ù•}…¹‘}Á•ÉÍ¥ÍÑ}…Á…‰¥±¥Ñå}Ñ•ÍÑ½¹±ä€¼}…ÁÁÉ½Ù•}…Á…‰¥±¥Ñå}¥¹}µ•µ½Éå}Ñ•ÍÑ½¹±ç¾ò1‘½ÍÑÉ¥¹œƒ–ŽÃšb;¦v{žR’êŸ¢Þ¿–ú¾ò'Ž	MPƒ–º#–6¬ƒ\Ë¾òiÍÉŒ¼ƒ–£š¢‡–v_žšš¶‹–òWžR Ñ•ÍÐµ½¹±ä¡•±Á•Ë¾òm…Á…‰¥±¥Ñä¹Áäƒ’â´AAI=Yƒ–¶_¦v‹¦?–>«–¢ºã–ëž:Ã–r ½Ù•É¹•ƒ¢úçžV3¾ò!}Á•ÉÍ¥ÍÑ}Ù•É¥™¥•‘}…Á…‰¥±¥Ñä€¼Ñ•ÍÑ½¹±ä¡•±Á•È€¼±½…‘}…ÁÁÉ½Ù…±Ï¾ò'Ž	™…‰É¥…Ñ•…Á…‰¥±¥ÑåÙ¥‘•¹”ƒš^ƒ’îï’öTÁÕ‰±¥Œƒ¢Þ¿–ú–>¿¢úøAAI=Y¾òm™…¥±••¹‘Á½¥¹ÐÉ•ÅÕ¥É•µ•¹ÐƒžjÉÕ¸ƒš.Kžîw–B8ƒ’â;––¶`…¡”ƒ’â¢Ó¾ò!9%Q¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}…ÁÁÉ½Ù…±}…¹Ñ¥}‰åÁ…ÍÌ¹ÁäèéQ•ÍÑÁÁÉ½Ù…±¹Ñ¥	åÁ…ÍÏ¾ò Û¾ò'¾òmÑ•ÍÑ}…Á…‰¥±¥Ñå}½Ù•É¹…¹”¹Áä€¼Ñ•ÍÑ}ÑÉ¥…±}ÁÉ½‘ÕÑ¥½¹}‰½Õ¹‘…Éä¹Áäƒ¢þžžï¢ÌÑ•ÍÐµ½¹±ä¡•±Á•È€€(¨©H¨«¾òimH´ÀÈÁt ¸¸½…‘È½H´ÀÈÁ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}½¹ÑÉ…Ð¹µ¤µ•¹‘µ•¹Ð¸Ð€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÌÀ´ÀÐäƒŠP¹‘Á½¥¹Ð½¹ÑÉ…ÐM•µ…¹Ñ¥ŒI•½¹¥±¥…Ñ¥½¸((¨©QåÁ”¨«¾òiÄ½¹ÑÉ…Ðƒ¢¾·’æ'’þ»š¶¾ò#šJ“–n{¦Rg¢¾¿žò[žî€¬ƒ–£¦<µ•Ñ¡½É•½¹¥±—¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÄ¸Ä@À´ÀÇ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÌÀƒ
+œË¾ò'ŠSŠQÍ•ÕÉ¥Ñå}µ…ÍÑ•Èƒš*(ÕÉÉ•¹ÐÍ¹…ÁÍ¡½Ðƒ’â8¡¥ÍÑ½É¥…°É•‰Õ¥±ƒ¦Rg–öL½™™¥¥…°…±Ñ•É¹…Ñ¥Ù•Ï¾ò#’â8Í•ÕÉ¥Ñå}µ…ÍÑ•É}Ý¥Ñ¡}‘•±¥ÍÑ•ƒžjÍÕÉÙ¥Ù½ÉÍ¡¥À½É”ƒ–Ëžª¾òiÍ¹…ÁÍ¡½ÐAML€¬¡¥ÍÐ9%ƒš^Ø9A=%9P…Ñ”ƒ’î4AMO¾ò3¦v€	UM%9ML…Ñ”ƒ–s–êW¢þw–>4Ä´ÀÏ¾ò'¾òmH´ÀÈÀƒ–ŽÃžžÀ…‘©}™…Ñ½Èƒ’â“ž®¿ž
+ä‹–B¢¨IEU%I‹’â;’îž‚½¹ÑÉ…Ó¾ò#–>«šr$•Ñ}…‘©}™…Ñ½Ë¾ò'žnÓš:—ž~ožnû¾òmÉ•¥ÍÑÉäƒ–Û–º–’h•¹‘Á½¥¹Ð…Á…‰¥±¥Ñç¾ò!¥¹‘ÕÍÑÉå}Ñ…á½¹½µäƒ–nošZçšÎT€¼¥¹‘•á}‘…¥±äƒ’â“šZçšÎT€¼Í•ÕÉ¥Ñå}µ…ÍÑ•Èƒ’â'šZçšÎW¾ò'šr«¦C¦†çšbû–ò?¢¾Óšb;’âë’öWžêÏ–”¿š:K¦fÁÉ½½˜½¹ÑÉ…ÓŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÀµ•¹‘µ•¹Ð¸Ä½¸È½¸Ï¾ò'¾òk¾ò Ç¾ò%Í•ÕÉ¥Ñå}µ…ÍÑ•Ë¾òi	…Í•…Ñ„¹•Ñ}¡¥ÍÑ}½‘•}±¥ÍÐ€ôIEU%I¾ò!ÍÕÉÙ¥Ù½ÉÍ¡¥Àƒ–þ¢ššv‡’îÛ¾ò'¾òm•Ñ}½‘•}±¥ÍÐƒžžï–èÉ•ÅÕ¥É•µ•¹ÑÏ¾ò!=AQ%=91}9=9}AAI=Y1}MUI¾ò'ŠSŠS–þ¯žŸ–6Wž.³–>¿žR£šÂã’â7šî‡¢ÚÌ•¹‘Á½¥¹ÐÁÉ½½›¾òm9A=%9Q}AI=	}MALƒ–B3š¶—žžï¦f•Ñ}½‘•}±¥ÍÐƒšv‡žn»Ž¾ò Ë¾ò%…‘©}™…Ñ½È=ÁÑ¥½¸¾òkšJ“–nxH€‹–B¢¨IEU%I‹¾òm•Ñ}‰…­Ý…É‘}™…Ñ½Èƒšbû–ò?–"žÆì=AQ%=91}9=9}AAI=Y1}MUI¾ò#–öO–&7žº‡žêÿ’â7šÚ#¢Òçžj–B;–’7švšVÃš6»šÖ¾ò'Ž¾ò Ï¾ò'šZÃ–ŠxM‘­5•Ñ¡½‘AÉ½½™±…ÍÌƒ’êS–"žÆì€¬M-}5Q!=}1MM%%Q%=9Lƒ¢†£¾ò Ääƒšv‡¾ò3š¾?šv‡–B¬…Õ‘¥Ñ…‰±”É•…Í½»¾ò'¾òkš¾?’â¨É•¥ÍÑÉäÍ‘­}µ•Ñ¡½ƒšÃ’âšv‡–"žÆï¾òmÙ…±¥‘…Ñ•}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹ÑÌ ¤ƒš&§–ÆW¾ò#–"žÆï¢†£–¦£’â¢Ð€¬IEU%Iƒ–"žÆìƒŠPÉ•ÅÕ¥É•µ•¹ÑÌƒ–>3–BG’â¢Ð€¬1QI9Q%Y}I=U@ƒ–"žÆìƒŠPƒžîš"C–Fc’â¢Ó¾ò'¾òožîOšzšÖ/¢¾W¦ª3¢¾Í•Ð¡É•¥ÍÑÉä¹Í‘­}µ•Ñ¡½‘Ì¤€ôôÍ•Ð¡±…ÍÍ¥™¥•§Ž–në–2[¦Rg¢¾¿¢¾·’æ'žjÑ•ÍÑ}…±Ñ•É¹…Ñ¥Ù•}É½ÕÁ}Í¥¹±•}µ•µ‰•É}Á…ÍÍ}¥Í}Á…ÍÌƒš2$I•Ù¥•Ý•Èƒ
+œØƒšRç–g’âè¡¥ÍÐµ‘•¹¥•ƒ’â“šÖ/¢¾W¾ò!9A=%9P%0€¬	UM%9ML™¥É•ôôÀ€¬…ÁÁÉ½Ù…°¥µÁ½ÍÍ¥‰±”€¬IA=IPƒ¢ºÃ–öW¢¾k–º{–’Ç¢Ò—¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}ÁÉ½½˜¹Áç¾ò!½¹ÑÉ…ÐƒžÆì€Ðƒ¦†çšZÃ–Š{¾òi¡¥ÍÐIEU%I€¼ƒ–£¦<±…ÍÍ¥™¥•€¼=ÁÑ¥½¸€¼ƒžîžîOšz¾òm•á…ÐµÁÉ½½˜ƒžÆì€Èƒ¦†çšRç–g¾ò$€€(¨©H¨«¾òimH´ÀÈÁt ¸¸½…‘È½H´ÀÈÁ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}½¹ÑÉ…Ð¹µ¤µ•¹‘µ•¹Ð¸Äµ¸Ì€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈà´ÀÐàƒŠPÁÁÉ½Ù…°½¹ÍÕµ•Ìá…Ð¹‘Á½¥¹Ð%‘•¹Ñ¥Ñä((¨©QåÁ”¨«¾òiÄ…ÁÁÉ½Ù…°ƒ––Gžê›¦7–d€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÄÄ´ÀÓ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÈàƒ
+œÈ¸Ó¾ò'ŠSŠQ…ÁÁÉ½Ù…°ƒ¦v€…Í”µ¥ƒ–F÷–B7š:£šZ´ÁÉ½½›¾ò!Qµí…Áôµ9A=%9Q€ƒ–¶c–r£–6Ï¢º“’âëž®¿ž
+ç–ÞË¢¾šb;¾ò'¾ò3’â7¦ª3¢¾…ÑÕ…°•¹‘Á½¥¹Ðƒ’â;–ŽÃšb;’â¢Ó¾òož¾‡šRä¿¦Rg’ö7šŽšÖ/’âë¦nÛŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÀƒ
+œÈ¸Ï¾ò'¾òi}É•ÅÕ¥É•}™½Éµ…±}…Ñ•}ÁÉ½½™€ƒ¦7–gŠSŠS¾ò Ç¾ò%AI5%MM%=8½	UM%9ML½IA=IP…Í”ƒ¢¾·’æ'’þwžVg¾òo¾ò Ë¾ò'š¾?’â¨IEU%IÉ•ÅÕ¥É•µ•¹Ðƒ–þ¦†ïšr$AMLÁÉ½½˜…Í—¾ò!•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}…Í•}¥‘ƒ¾ò'’âP•Ù¥‘•¹•}É•˜½¡…Í ƒ¦v{ž¦ë¾òoš¾?’â¨1QI9Q%Y}I=U@ƒ¢Ï–ÂG’â’â«š"C–F`AMO¾òo¾ò Ï¾ò$¨©IA=IP…ÉÑ¥™…Ðƒ¦7¦ª0¨«¾òk¦7žº\íÉÕ¹ô½…Ñ•Ì½í…Áô¹©Í½¹€ƒžjÍ¡„ÈÔØ€ôôIA=IP…Í”•Ù¥‘•¹•}¡…Í£¾òo¦Cšv„•¹ÑÉäƒ’â8½¹ÑÉ…Ðƒš¾S–¾ç¾ò!•áÁ•Ñ•‘}•¹‘Á½¥¹Ð€ôô½¹ÑÉ…Ð•¹‘Á½¥¹Ó¾òmAMLƒšv‡žn¸…ÑÕ…±}•¹‘Á½¥¹Ð€ôô½¹ÑÉ…Ð•¹‘Á½¥¹ÓŠSŠQÍÑ…¹µ¥¸ƒ–6Ïš.Kžîw¾òm•Ù¥‘•¹•}ÕÉ¤½¡…Í ƒ¦v{ž¦ë¾ò'ŠSŠS’îï’öTµ¥Íµ…Ñ ƒŠH…Á…‰¥±¥Ñå½Ù•É¹…¹•ÉÉ½Ë¾ò!™…¥°±½Í•“¾ò'Ž¢ê¯’î÷’î8¡…Í ƒ¦Rk–ºh…ÉÑ¥™…Ðƒ¢¾ï¾ò3’â7’î8…Í”µ¥ƒ–B7žžÃš:£šZ·Ž	…ÁÁÉ½Ù•}™É½µ}ÍÁ¥­•}ÉÕ¹€ƒ’òƒ–”ÉÕ¹}‘¥Èƒ’î—š&Ÿ¢†0…ÉÑ¥™…Ðƒ¦7¦ª3Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}ÁÉ½½˜¹ÁäèéQ•ÍÑÁÁÉ½Ù…±½¹ÍÕµ•Íá…Ñ¹‘Á½¥¹Ñ%‘•¹Ñ¥Ñç¾ò Ï¾òi‰¥¹ƒ–B;ž¾‡šRä…ÉÑ¥™…Ðƒ–¶_¢*ƒŠH¡…Í µ¥Íµ…Ñ ƒš.Kžîw¾òm…ÑÕ…±}•¹‘Á½¥¹ÐƒšRç’âè…±•¹‘…È€¬É”µ‰¥¹¡…Í ƒŠHÍÑ…¹µ¥¸ƒš.Kžîw¾òo–"ƒ¦fIEU%IÉ•ÅÕ¥É•µ•¹Ð…Í”ƒŠHƒš.Kžîw¾ò$€€(¨©H¨«¾òimH´ÀÈÁt ¸¸½…‘È½H´ÀÈÁ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}½¹ÑÉ…Ð¹µ¤ƒ
+œÈ¸Ì€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈà´ÀÐÜƒŠPAÉ½Ù¥‘•È½Q…É•Ðá…Ðá¡…¹”MÕÉ™…”((¨©QåÁ”¨«¾òiÄÁÉ½Ù¥‘•ÈÍÕÉ™…”ƒš&§–ÆT€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÄÄ´ÀË¾ò!…Õ‘¥Ð€ÈÀÈØÀàÈàƒ
+œÈ¸Ë¾ò'ŠSŠQ¥¹‘ÕÍÑÉå}Ñ…á½¹½µä€¼•ÅÕ¥Ñå}ÍÑÉÕÑÕÉ”€¼½‘•}µ…ÁÁ¥¹}‰¨ƒžj–ºcšZä•¹‘Á½¥¹Ó¾ò!•Ñ}¥¹‘ÕÍÑÉå}‰…Í•}¥¹™¼€¼•Ñ}•ÅÕ¥Ñå}ÍÑÉÕÑÕÉ”€¼•Ñ}‰©}½‘•}µ…ÁÁ¥¹Ÿ¾ò'’â7–r •á¡…¹”ÍÕÉ™…”ƒ’â+¾ò1HÐµÌ¸Äƒš^Û’îžR ÍÑ…¹µ¥¸ÁÉ½‰—¾ò!ÍÑ½­}‰…Í¥Œ€¼•¹•É¥Œ½‘”µ±¥ÍÓ¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÀƒ
+œÈ¸Ë¾ò'¾òiµ…é¥¹…Ñ…AÉ½Ù¥‘•É€ƒšZÃ–Š{’â'’â¨•áÁ±¥¥Ðµ•á¡…¹”ƒšZçšÎWŠSŠQ•Ñ}‰©}½‘•}µ…ÁÁ¥¹}•á¡…¹•ƒ¾ò!•¹‘Á½¥¹Ðõ%¹™½…Ñ„¹•Ñ}‰©}½‘•}µ…ÁÁ¥¹œ€¼‘…Ñ…Í•Ðõ½‘•}µ…ÁÁ¥¹}‰¨€¼É•ÅÕ¥É•}…Á…‰¥±¥Ñäõ½‘•}µ…ÁÁ¥¹}‰«¾ò'Ž•Ñ}•ÅÕ¥Ñå}ÍÑÉÕÑÕÉ•}•á¡…¹•ƒ¾ò!%¹™½…Ñ„¹•Ñ}•ÅÕ¥Ñå}ÍÑÉÕÑÕÉ”€¼•ÅÕ¥Ñå}ÍÑÉÕÑÕÉ—¾ò'Ž•Ñ}¥¹‘ÕÍÑÉå}‰…Í•}¥¹™½}•á¡…¹•ƒ¾ò!%¹™½…Ñ„¹•Ñ}¥¹‘ÕÍÑÉå}‰…Í•}¥¹™¼€¼¥¹‘ÕÍÑÉå}Ñ…á½¹½µç¾ò'¾òmMÁ¥­•Q…É•Ñ€AÉ½Ñ½½°€¼I•…±Q…É•Ñƒ¾ò!‘•±•…Ñ—¾ò$¼…­•Q…É•Ñƒ¾ò!™…­”•á¡…¹—¾ò1•¹‘Á½¥¹Ðƒ¢ê¯’î÷žÊûž†»¾ò'–no–’–B3š¶—¾òo–B–â˜Á…å±½…½¹Ù•¹¥•¹”ƒšZçšÎWŽ€€(¨©Q•ÍÑÌ¨«¾òi…­•Q…É•Ð•á…Ð•¹‘Á½¥¹Ðƒžî<Ñ•ÍÑ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}ÁÉ½½˜¹ÁäèéÑ•ÍÑ}•Ù•Éå}…Á…‰¥±¥Ñå}ÁÉ½Ù•Í}¥ÑÍ}•á…Ñ}•¹‘Á½¥¹Ðƒ–£¦?¢šžn[¾ò ÄÀ…Á…‰¥±¥Ñäƒ– AMO¾ò$€€(¨©H¨«¾òimH´ÀÈÁt ¸¸½…‘È½H´ÀÈÁ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}½¹ÑÉ…Ð¹µ¤ƒ
+œÈ¸È€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈà´ÀÐØƒŠP¹‘Á½¥¹ÐI•ÅÕ¥É•µ•¹Ð½¹ÑÉ…Ð€¬á…Ð…Ñ”((¨©QåÁ”¨«¾òiÄƒšZÃ––Gžê›¾ò!ÑåÁ•½¹ÑÉ…Ð€¬…Ñ”ƒ¦7šz¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÄÄ´ÀÄ½Ä´ÀÈ½Ä´À×¾ò!…Õ‘¥Ð€ÈÀÈØÀàÈàƒ
+œÈ¸È¿
+œÈ¸Ì¿
+œÈ¸×¾ò'ŠSŠQ…Á…‰¥±¥ÑçŠI•¹‘Á½¥¹Ðƒšbƒ–Âš^ƒ–6W’â–º‡¢º‡’ê/–º{šêC¾ò#šV¢Bô¥˜½•±Í”ƒ¢ž¦(É•¥ÍÑÉäÑÕÁ±—¾ò'¾òm9A=%9P…Ñ”ÁÉ½‰”ƒšb¼…Á…‰¥±¥Ñäµ¡½Í•¸ƒ¢ÂžR£¾ò!ÍÑ…¹µ¥¸ƒ–>¼AMO¾ò1™…¥°µ½Á•»¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÈÀƒ
+œÈ¸Ä¿
+œÈ¸Ë¾ò'¾òkšZÃš¢‡–v\ÁÉ½Ù¥‘•ÉÌ½…µ…é¥¹‘…Ñ„½•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹ÑÌ¹ÁåƒŠSŠQ¹‘Á½¥¹ÑI•ÅÕ¥É•µ•¹Ñ€ÑåÁ•‘…Ñ…±…ÍÏ¾ò!É•ÅÕ¥É•µ•¹Ñ}¥½…Á…‰¥±¥Ñä½•¹‘Á½¥¹Ð½ÁÉ½Ù¥‘•É}‘…Ñ…Í•Ð½µ½‘”½É½ÕÁ}¥½ÁÉ½½™}É½±—¾ò$¬9A=%9Q}IEU%I59QM€ƒ¢†£¾ò ÄÀ…Á…‰¥±¥Ñä€¼€ÄÌƒšv‡¾òiÍ•ÕÉ¥Ñå}µ…ÍÑ•Èƒ’âè1QI9Q%Y}I=U@±¥ÍÑ¥¹}ÍÕÉ™…”ƒ–>3š"C–Fc¾ò1½ÉÁ½É…Ñ•}…Ñ¥½¸ƒ’âë–>0IEU%I‘¥Ù¥‘•¹­É¥¡Ñ}¥ÍÍÕ—¾ò3–Û’ög–6TIEU%I¾ò$¬Ù…±¥‘…Ñ•}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹ÑÌ ¥€ƒžîOšz¢«šŽŽ	ÍÁ¥­”½™½Éµ…±}…Ñ•Ì¹Áåƒ¾òi…Á…‰¥±¥ÑåAÉ½‰•A±…¸¹•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹ÑÍ€ƒ’î8½¹ÑÉ…ÐƒšÒûžR¾ò!…±±•Èƒš^ƒ–—–>¾ò'¾òm9A=%9Q}AI=	}MAM€ƒ¦vgš¢† ­•å•‰äÉ•ÅÕ¥É•µ•¹Ñ}¥“¾òm}á…Ñ¹‘Á½¥¹ÑI•ÅÕ¥É•µ•¹ÑÍ…Ñ•€ƒšnÿ’î–6TÁÉ½‰”•¹‘Á½¥¹Ð…Ñ—ŠSŠSš¾<É•ÅÕ¥É•µ•¹Ðƒ’âš²‡–:–¶@•Ù…±Õ…Ñ¥½»¾ò!™¥É”­Á•ÉÍ¥ÍÐ­Ù•É‘¥Ó¾ò'¾ò1•¹Ù•±½Á”•¹‘Á½¥¹Ð­‘…Ñ…Í•ÐƒžÊûž†»–2ç¦7¾ò!µ¥Íµ…Ñ €ô‰±½­¥¹œ%3¾ò1ÍÑ…¹µ¥¸ƒšÂã’â4AMO¾òo–’Ç¢Ò”•á¡…¹”ƒžj•¹‘Á½¥¹Ðƒ–B3š‚ßš‚‡¦ª3¾ò'¾ò1IEU%Iƒ– AML€¬ƒžîƒŠ&”Äƒš"C–F`AMLƒŠHAMO¾ò3–B›–"d%3¾ò!•…É±äµÍÑ½Ã¾ò3š^€™…±±‰…¯¾ò'¾òoš¾<É•ÅÕ¥É•µ•¹Ðƒ’â’â¨ÁÉ½½˜…Í—¾ò#š"C–*|¿–’Ç¢Ò—¦÷¢B÷¾ò1M-%AAƒ’â7¢B÷¾ò'¾òmIA=IP…ÉÑ¥™…ÐƒšBë–â˜•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹ÑÍmu€ƒžîOšz–2[¢ê¯’î÷Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}ÁÉ½½˜¹Áç¾ò Äß¾òi½¹ÑÉ…ÐƒžîOšz€Ø€¬•á…ÐÁÉ½½˜€Ô€¬…ÁÁÉ½Ù…°ƒ¢ê¯’îô€Ì€¬ƒžîOšz–º#–6¬€È€¬ƒ– …Á…‰¥±¥ÑäƒžÊûž†»¢¾šb8€Ç¾ò'¾òmÑ•ÍÑ}™½Éµ…±}…Ñ•}Ý¥É¥¹œ¹Áäƒ¦¦7¾ò!Á•ÈµÉ•ÅÕ¥É•µ•¹Ð½ÕÑ½µ•Ì½ÁÉ½‰•ÌƒšZ·¢¢¾ò$€€(¨©H¨«¾òimH´ÀÈÁt ¸¸½…‘È½H´ÀÈÁ}•¹‘Á½¥¹Ñ}É•ÅÕ¥É•µ•¹Ñ}½¹ÑÉ…Ð¹µ¤€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈà´ÀÐÔƒŠPQÉ¥…°µ0ÄMÉ¥ÁÐM‘­1¥™•å±”]¥É¥¹œ¥à((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ”€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÌ¸È@Ä´ÀÇ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÈàƒ
+œÏ¾ò'ŠSŠQÍÉ¥ÁÑÌ½ÍÁ¥­”½°Å}ÍÕ‰ÍÉ¥ÁÑ¥½¹}Ñ•ÍÐ¹Áå€ƒ–Â±¥™•å±”€ôM‘­1¥™•å±” ¥€ƒ¦j?–B;–B3–B7¦7žîG’âè±¥™•å±”è‘¥ÑmÍÑÈ°½‰©•Ñt€ôíõƒ¾òiMÕ‰ÍÉ¥ÁÑ¥½¹½¹ÑÉ½±±•Èƒ–º{¦fšRÛ–"À‘¥Ó¾ò#š^€ÑÉ…¹Í¥Ñ¥½¹ƒ¾ò3žr–º{¢þC¢†3–6ÌÑÑÉ¥‰ÕÑ•ÉÉ½Ë¾ò'¾òmÍÑ…Ñ”€ô±¥™•å±”¹ÍÑ…Ñ•€ƒ’â8±¥™•å±”¹±½Í” ¥€ƒ–’ÇšV#¾òm™¥¹…±±äƒ’â´±½Í”ƒ–ò–âã¢Š¬ÍÕÁÁÉ•ÍÌƒ’öÿ¦Rg¢¾¿šnÓ¦jC¢R÷Ž	½¹ÑÉ½±±•Èƒžî’îÛšÖ/¢¾TAMLƒ’â7¢÷¢¾šb;žr–º{¢kšr°Ý¥É¥¹œAMOŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄäµ•¹‘µ•¹Ð¸Ë¾ò'¾òi½ÉÉ•Ñ¹•ÍÌM½Hƒ’â8‘¥…¹½ÍÑ¥ŒÙ¥•Üƒ–"žšï–F÷–B7ŠSŠQÍ‘­}±¥™•å±”èM‘­1¥™•å±•ƒ¾ò!M½K¾òkšÎ£–”MÕ‰ÍÉ¥ÁÑ¥½¹½¹ÑÉ½±±•ËŽÙ•É‘¥Ðƒ’î;–ºšÒûžRŽ™¥¹…±±äƒ’â·–æž¶$±½Í” ¥ƒ¾ò$¬±¥™•å±•}‘¥…œè‘¥Ñƒ¾ò!Y%_¾òiÉ•Á½ÉÑl‰±¥™•å±”‰uƒ¾ò'¾òmM,µ‘•Á•¹‘•¹Ðƒ’âïšÖž¢/š>C–>[’âè•á•ÕÑ•}ÍÕ‰ÍÉ¥ÁÑ¥½¹}™±½Ü¡Í‘¬°ÍÑ…”°‘ÕÉ…Ñ¥½¹}Í•½¹‘Ì°€¨°Í±••À°µ½¹½Ñ½¹¥Œ¥ƒŠSŠS–>¿šÎ£–”™…­”M,€¨«¢†3’âëžêœ¨«šÖ/¢¾Wžr–º{¢kšr³š:Ÿ–"ÛšÖ¾òmµ…¥¸ ¤ƒ–>«’þwžVd±½¥¸½•¹Ø½Í•ÍÍ¥½¸µ…Ñ”½™±ÕÍ ƒ’â8Ñ•Éµ¥¹…°±½Í—Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}°Å}ÍÕ‰ÍÉ¥ÁÑ¥½¹}ÍÉ¥ÁÐ¹Áç¾ò ×¾òkž®¿–"Ãž®¿ž*Ûššrë¢Þ¿–úMMM%=9}IgŠIMU	MI%	}MQIQŠI11	-}Q%YŠIU9MU	MI%	€¬Ù•É‘¥Ðƒ–B3šê@€¬É•¥ÍÑ•Èƒ–’Ç¢Ò—’â4™…­”ƒž*Ûš€¬Ñ•Éµ¥¹…°±½Í”ƒ–æž¶$€¬MPÕ…Éƒ\Èƒ¦bÈ‘¥Ðƒ¦»¢R÷–n{–öK¾ò$€€(¨©H¨«¾òimH´ÀÄåt ¸¸½…‘È½H´ÀÄå}Í‘­}±¥™•å±•}ÉÕ¹Ñ¥µ•}…Ñ•Ì¹µ¤µ•¹‘µ•¹Ð¸È€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈà´ÀÐÐƒŠPA•ÉÍ¥ÍÑ•¹”µ…¥±ÕÉ”MÑÉÕÑÕÉ…°…É±äµMÑ½À((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò#–•…É±äµÍÑ½Àƒ’þ»–’7¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÌ¸È@À´ÀÇ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÈàƒ
+œË¾ò'ŠSŠQHÐµÌ¸Äƒžj}A•ÉÍ¥ÍÑ•‘AÉ½‰•€ƒ–r£š2’æ–2[–’Ç¢Ò—š^Û–>«¢ºÃ–öTÁ•ÉÍ¥ÍÑ}•ÉÉ½É€ƒ–æÛžŸ–âã¢þS–n{š"C–*|•á¡…¹—¾òiÁ¥Á•±¥¹”ƒ¢žAI5%MM%=8ƒ’âèAMLƒ–æÛžîŸžî·¢¾’òÀ9A=%9P½!½IM!9ML½	UM%9MO¾ò ¨«žr–ºx‘½Ý¹ÍÑÉ•…´ÁÉ½Ù¥‘•È…±±Ìƒ–ÞË–>GžR|¨«¾ò'¾ò1Á¥Á•±¥¹”ƒ¢ÞG–º3–B8•á•ÕÑ” ¤Á½ÍÐµÁÉ½•ÍÍ¥¹œƒš&7š*(AMLƒšRç–d%3ŠSŠSš*—–F+–F#ž:À•…É±äÍÑ½ÁÁ•ƒ’öžîOšz’â+’î;šr¨•…É±äÍÑ½Ã¾ò3¢þw–>4á¥Ð…Ñ”ƒžj™…¥°µ±½Í•ƒžîOšz¢ššÆŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄäµ•¹‘µ•¹Ð¸Ç¾ò1=ÁÑ¥½¸¾ò'¾òi™¥É”€¬Á•ÉÍ¥ÍÐ€¬Ù•É‘¥Ðƒ–B#–æÛ’âèÁ¥Á•±¥¹”ƒ–¦£žj’âš²„¨«–:–¶@…Ñ”•Ù…±Õ…Ñ¥½¸¨«ŠSŠQ}A•ÉÍ¥ÍÑ•‘A•Éµ¥ÍÍ¥½¹…Ñ•€€¼}A•ÉÍ¥ÍÑ•‘¹‘Á½¥¹Ñ…Ñ•€€¼}A•ÉÍ¥ÍÑ•‘	ÕÍ¥¹•ÍÍ…Ñ•ƒ¾ò!ÍÁ¥­”½™½Éµ…±}…Ñ•Ì¹Áåƒ¾ò%•Ù…±Õ…Ñ” ¤ƒ–B;žî<}™¥¹…±¥é•}Á•ÉÍ¥ÍÑ•‘ƒ¾òiÁ•ÉÍ¥ÍÐƒš"C–*|ƒŠHƒžîG–ºk’â'šº×¢¾š6»¢ê¯’î÷¾òmÁ•ÉÍ¥ÍÐƒ–’Ç¢Ò—’âP•á¡…¹”ƒš"C–*|ƒŠH€¨«–öO–rë¦f7žêœ‰±½­¥¹œ%0¨«¾ò!É•ÅÕ•ÍÑ}¥ƒ–>¿šBë–â›’öUI$½¡…Í ƒ’âëž¦ë¾ò'¾òo–ÞÈ%0ƒžîOšzs’þwžVg–ß’öO–:–nƒ–æÛ¦f–*ƒš2’æ–2[–’Ç¢Ò—’þ‡š¿Ž–ïžîLÁ¥Á•±¥¹”ƒžr/–"À%0ƒŠH•…É±äÍÑ½ÀƒŠHƒ’â/šâàÁÉ½‰”ƒ’î;’â4™¥É—¾ò!ÁÉ½‰•Ím­¥¹‘t¹™¥É•€ôô€Á€€¬É…Üƒžn»–öW¦nÛšZÀ•Ù¥‘•¹”ƒ–>3¢¾šb;¾ò'Ž	•á•ÕÑ” ¤Á½ÍÐµ¡½Œƒ¦f7žêŸ¦ï¢úD¨«–"ƒ¦f¨«¾ò3šnÿ’î’âë¦bË–ú‡šœ½Éµ…±…Ñ•AÉ½½™ÉÉ½Éƒ¾ò!AMLƒš^ƒžîG–ºkš*×¢úû¢¾—–’€ôƒ–:–¶@…Ñ”ƒ––Gžê›–’ÇšV ƒŠH™…¥°±½Õ‘±ç¾ò3žîw’â7¦vg¦îcšRç–gš*—–F+¾ò'Ž¨«žšš¶‹–#–º3šVÓ¢ÞG–º0Á¥Á•±¥¹”ƒ–7š*(AMLƒšRä%3Ž¨¨€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}™½Éµ…±}…Ñ•}Ý¥É¥¹œ¹Áäƒ–¾çš*_¦n¾ò!AI5%MM%=8Á•ÉÍ¥ÍÐƒ–’Ç¢Ò”ƒŠH9A=%9P½	UM%9ML™¥É•ôôÀ€¬M-%AA}	1=-€¬ƒ¦nØÉ…Ü•Ù¥‘•¹—¾òm9A=%9PÁ•ÉÍ¥ÍÐƒ–’Ç¢Ò”ƒŠH	UM%9ML™¥É•ôôÃ¾òm	UM%9MLÁ•ÉÍ¥ÍÐƒ–’Ç¢Ò”ƒŠH…±±}Á…ÍÍ•ƒš.Kžîw¾òmÉ•ÅÕ•ÍÑ}¥ƒ–¶c–r£’öUI$½¡…Í ƒžòë–’ÇšÂã’â4AMOŠSŠSšZ·¢¢žnÓš:—¢B÷–r }	½Õ¹‘I•Á½ÉÐ¹ÁÉ½‰•Ím­¥¹‘t¹™¥É•‘ƒ¾ò'¾òoš^‹šr$ÁÉ½Ù¥‘•Èµ‘•¹¥…°•…É±äµÍÑ½Àƒ’â8ÍÕ•ÍÌ½™…¥±ÕÉ”‰¥¹‘¥¹œƒšÖ/¢¾W¦nÛ–n{–öH€€(¨©H¨«¾òimH´ÀÄåt ¸¸½…‘È½H´ÀÄå}Í‘­}±¥™•å±•}ÉÕ¹Ñ¥µ•}…Ñ•Ì¹µ¤µ•¹‘µ•¹Ð¸Ä€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÜ´ÀÐÌƒŠPMÕ‰ÍÉ¥ÁÑ¥½¸1¥™•å±”M½H%¹Ñ•É…Ñ¥½¸((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ”€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÌ¸Ä@Ä´ÀÇ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÈÜƒ
+œÔ¸Ë¾ò'ŠSŠQÍÕ‰ÍÉ¥ÁÑ¥½¸±¥™•å±”ÍÑ…Ñ•Ìƒ–ÞË’ê“’îc’öžr–ºxQÉ¥…°0Äƒ¢kšr³’î7žR£žžšr$‘¥Ðƒ’ös’âëž²³’ê0±¥™•å±”M½KŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄäµ•¹‘µ•¹Ð¸Ó¾ò'¾òi…Í¡…É•}ÍÑ…Ñ”¹ÁÉ½Ù¥‘•ÉÌ¹…µ…é¥¹‘…Ñ„¹ÍÕ‰ÍÉ¥ÁÑ¥½¸¹MÕ‰ÍÉ¥ÁÑ¥½¹½¹ÑÉ½±±•ÉƒŠSŠQÉ•¥ÍÑ•È½ÉÕ¸½Õ¹É•¥ÍÑ•È½ÍÑ½Àƒ¦¦Ç–*£žr–ºxM‘­1¥™•å±•ƒ¾ò!MMM%=9}IdƒŠHMU	MI%	}MQIQƒŠH11	-}Q%YƒŠHU9MU	MI%	ƒŠH1=}=US¾ò'¾òmÉ•¥ÍÑ•Èƒ–’Ç¢Ò—’â4™…­”MU	MI%	}MQIQ¾òmÕ¹É•¥ÍÑ•È½ÍÑ½ÀÉ•ÑÉäµÍ…™—¾òmU9MU	MI%	ƒ–B;–n{¢Â¢º‡šVÀ±…Ñ•}…±±‰…­ÌƒšÂã’â4É•…Ñ¥Ù…Ñ¥½»¾òo¢¾+šZ´‘¥Ðƒšb¼Y%_¾ò3ž*Ûššrëšb¼M½K¾òmÍÉ¥ÁÑÌ½ÍÁ¥­”½°Å}ÍÕ‰ÍÉ¥ÁÑ¥½¹}Ñ•ÍÐ¹Áå€ƒšÚ#¢Òä½¹ÑÉ½±±•Ë¾ò!É•Á½ÉÐƒ–Š{–*€±¥™•å±•}ÍÑ…Ñ•}µ…¡¥¹”ƒ¢ž–nû¾ò1Ù•É‘¥ÐƒžRÇž*ÛššrëšÒûžR¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÍÕ‰ÍÉ¥ÁÑ¥½¹}½¹ÑÉ½±±•È¹Áç¾ò ÄÓ¾ò$€€(¨©H¨«¾òimH´ÀÄåt ¸¸½…‘È½H´ÀÄå}Í‘­}±¥™•å±•}ÉÕ¹Ñ¥µ•}…Ñ•Ì¹µ¤µ•¹‘µ•¹Ð¸Ð€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÜ´ÀÐÈƒŠPA½Í¥Ñ¥Ù”AÉ½‘ÕÑ¥½¸½Õ¹Ð%‘•¹Ñ¥Ñç¾ò!‰±…­±¥ÍÐƒŠH…±±½Ý±¥ÍÓ¾ò$((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò!™…¥°µ½Á•¸ƒ’þ»–’7¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÌ¸Ä@À´ÀÏ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÈÜƒ
+œÐ¸Ì¿
+œß¾ò'ŠSŠP‰¹½ÐQÉ¥…°€ôôAÉ½‘ÕÑ¥½¸ˆƒ’âè™…¥°µ½Á•»¾òk’îïš<Õ¹­¹½Ý¸½•‘Õ…Ñ¥½¹…°½½Ñ¡•ÈµÙ•¹‘½ÈµÑ¥•Èƒ¢Ò›–>ß¢Š¯žnX=U9Q|©€ƒ–6Ï¢:ß–ú\…ÁÁÉ½Ù…°ƒ¢Öš‚óŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄäµ•¹‘µ•¹Ð¸Ï¾ò'¾òi½¹™¥Ì½ÁÉ½‘ÕÑ¥½¹}…½Õ¹Ð¹å…µ±€ƒ–ïžîLÍÉÕ‰‰•ÍÑ…‰±”ÁÉ½™¥±”¥“¾ò#¦v{–·¢¾¾òož¦è€ôƒšr«ž†»¢º€ô™…¥°±½Í•“ŠSŠS–öO–&7’îO–êOžr–ó¾ò'¾òm½Õ¹ÑAÉ½™¥±”¹­¥¹‘€ƒ’âë¢žšzC’ê/–º{¾ò!QI%0€¼U9-9=];¾òo¦vxÑÉ¥…°ƒŠ&€ÁÉ½‘ÕÑ¥½»¾òm=U9Q}€ƒ–&7žò–ê¦fƒŠHU9-9=]9|ñ‘¥•ÍÐùƒ¾ò'¾òo–no–’–B3š¶”•á…Ðµµ…Ñ ƒšRû¢†3¾òiÙ•É¥™å}ÁÉ½‘ÕÑ¥½¹}…½Õ¹Ñƒ¾ò!ÁÉ½‘ÕÑ¥½¸ÉÕ¸ƒ–"o–îë¦^£¾ò'Ž}Ù…±¥‘…Ñ•}•Ù¥‘•¹•ƒŽ…ÁÁÉ½Ù•}™É½µ}ÍÁ¥­•}ÉÕ¹ƒŽÕÑ¡½Õ¹Ñ…Ñ”¡É•ÅÕ¥É•}ÁÉ½‘ÕÑ¥½¹}¥‘•¹Ñ¥ÑäõQÉÕ”¥ƒ¾ò!™½Éµ…°‰½Õ¹‘…ÉäƒžjÁÉ½‘ÕÑ¥½¸ÁÉ½½˜¥¹ÁÕÓ¾ò'¾òoš^€™É½é•¸¥‘•¹Ñ¥ÑäƒŠH9=Q}QMQ	1€¼	1=-¾òmIÕ¹-¥¹¹AI=UQ%=8ƒšÂã’â7šnÿ’î¢Ò›–>ß¢ê¯’î÷Žš^œ™…¥°µ½Á•¸ƒšZ·¢¢¾ò#’îïš<=U9Q}…‰ŒÄÈÍ€ƒ–>¼…ÁÁÉ½Ù—¾ò'–ê¦f“–æÛ¦7–g’âè•á…Ðµµ…Ñ ƒ–¾çš*_¦nŽ€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÑÉ¥…±}ÁÉ½‘ÕÑ¥½¹}‰½Õ¹‘…Éä¹Áäƒ¦7–g¾ò Ä×¾òi•á…Ðµ…Ñ ƒšRû¢†0€¼µ¥Íµ…Ñ ƒš.Kžît€¼ƒš^€™É½é•¸™…¥°µ±½Í•€¼IÕ¹-¥¹ƒ’â7šnÿ’î¢ê¯’îô€¼ÁÉ½‘ÕÑ¥½¹}…½Õ¹Ñ}ÍÑ…ÑÕÌƒ’â'š¾ò$¬Ñ•ÍÑ}…µ…é¥¹‘…Ñ…}ÁÉ½Ù¥‘•È¹Áç¾ò!­¥¹ƒšZ·¢¢¾ò$¬ƒ–BÁÉ½‘ÕÑ¥½¸µÉÕ¸ƒšÖ/¢¾T™¥áÑÕÉ”ƒ–2X™É½é•¸¥‘•¹Ñ¥Ñä€€(¨©H¨«¾òimH´ÀÄåt ¸¸½…‘È½H´ÀÄå}Í‘­}±¥™•å±•}ÉÕ¹Ñ¥µ•}…Ñ•Ì¹µ¤µ•¹‘µ•¹Ð¸Ì€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÜ´ÀÐÄƒŠPA•ÉÍ¥ÍÑ•…Ñ”Ù¥‘•¹”%‘•¹Ñ¥Ñä((¨©QåÁ”¨«¾òiÄ•Ù¥‘•¹”ƒ––Gžê˜€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÌ¸Ä@À´ÀË¾ò!…Õ‘¥Ð€ÈÀÈØÀàÈÜƒ
+œÐ¸Ë¾ò'ŠSŠQ…Ñ”•Ù¥‘•¹”ƒ–>«šr$É•ÅÕ•ÍÑ}¥“¾òk’â’â¨É•ÅÕ•ÍÐ¥ƒ–>«šb¿¢¾ßšÆ¢ê¯’î÷¾ò3’â7šb¿š2’æ–2[¢¾š6»¢ê¯’î÷¾òmÁÉ½‰”ƒ–’Ç¢Ò—š^ƒž²³’âžÆï–’Ç¢Ò”•á¡…¹”ƒ¢B÷žncŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄäµ•¹‘µ•¹Ð¸Ë¾ò'¾òi…Ñ•I•ÍÕ±Ñ€ƒ¢¾š6»¢¾·’æ'šbû–ò?š.–"É•ÅÕ•ÍÑ}¥‘€€¼•Ù¥‘•¹•}ÕÉ¥ƒ¾ò!I…Ý]É¥Ñ•È€¹µ•Ñ„¹©Í½¸ƒ¦Rk¾ò$¼•Ù¥‘•¹•}¡…Í¡ƒ¾ò1¡…Í}Á•ÉÍ¥ÍÑ•‘}•Ù¥‘•¹•€ƒ¢ššÆUI$­¡…Í ƒ–B3š^Û–¶c–r£¾òmÁÉ½‰”•á¡…¹—¾ò#š"C–*’â;–’Ç¢Ò—¾ò'žî<AÉ½‰•½¹Ñ•áÐ¹•Ù¥‘•¹•}™É½µ}•á¡…¹•€ƒžî’âš2’æ–2[–B;žîG–ºk¾ò#š^€ÁÉ¥Ù…Ñ”ÝÉ¥Ñ•Ë¾ò'¾òoš2’æ–2[–’Ç¢Ò—¾ò!•á¡…¹”ƒ–ÞÈ™¥É”ƒ’ö–¶_¢*šr«¢B÷žnc¾ò'ŠHAMLƒ¦f7žêœ%0ƒ–æÛžö¸‰±½­•‘}‰ç¾ò!™…¥°±½Í•“¾ò'¾òm…Ñ”ÁÉ½½˜…Í”ƒ’â8…Ñ•Ì½í…Áô¹©Í½¸É•Á½ÉÐ…ÉÑ¥™…ÐƒžêÏ–—žî’â •Ù¥‘•¹”±½ÍÕÉ—¾ò#ž¾‡šRç–6Ï¦bïšZ´Ù•É‘¥Ó¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}™½Éµ…±}…Ñ•}Ý¥É¥¹œ¹Áç¾ò#žîG–ºh¡…Í ƒ¢¾ïžnc¦ª3¢¾€¼ƒ–’Ç¢Ò”•á¡…¹”ƒš2’æ–2[žîG–ºh€¼ƒš2’æ–2[–’Ç¢Ò—¦f7žêœ€¼µ•Ñ„ƒ’â8É•Á½ÉÐƒž¾‡šRç¦bïšZ´±½ÍÕÉ—¾ò$€€(¨©H¨«¾òimH´ÀÄåt ¸¸½…‘È½H´ÀÄå}Í‘­}±¥™•å±•}ÉÕ¹Ñ¥µ•}…Ñ•Ì¹µ¤µ•¹‘µ•¹Ð¸È€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÜ´ÀÐÀƒŠP½Éµ…°IÕ¹Ñ¥µ”µ…Ñ”á•ÕÑ¥½¸	½Õ¹‘…Éä]¥É¥¹œ((¨©QåÁ”¨«¾òiÄƒšZÃš¶–ò?¢Þ¿–ú––Gžê˜€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÌ¸Ä@À´ÀÇ¾ò!…Õ‘¥Ð€ÈÀÈØÀàÈÜƒ
+œÐ¸Ç¾ò'ŠSŠQIÕ¹Ñ¥µ•…Ñ•A¥Á•±¥¹”ƒ’î’âë–>¿–’7žR£žî’îÛ¾ò1™½Éµ…°MÁ¥­”½AÉ½Ù¥‘•È•á•ÕÑ¥½¸Á…Ñ ƒšr«šÚ#¢Òç¾òkžî’îÛšÖ/¢¾W¢¾šb;žjšb¿–êO¾ò3’â7šb¿š¶–ò?¢Þ¿–úŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄäµ•¹‘µ•¹Ð¸Ç¾ò'¾òi…Í¡…É•}ÍÑ…Ñ”¹ÍÁ¥­”¹™½Éµ…±}…Ñ•Ì¹½Éµ…±IÕ¹Ñ¥µ•…Ñ•á•ÕÑ½É€ƒ’âè¨«–R¿’â ¨¨™½Éµ…°…Ñ”•á•ÕÑ¥½¸‰½Õ¹‘…Éç¾òm…Á…‰¥±¥ÑåAÉ½‰•A±…¹€ƒ–´…Ñ”ƒ–£¦?–þ–†¯¾ò!…±±•Èƒš^ƒšÎW¦'š.§šŸ¢ÞÏ¢þÁ•Éµ¥ÍÍ¥½¸½™É•Í¡¹•ÍÏ¾ò'¾òo–ïžîO¦†ë–ê<Á¥Á•±¥¹—¾òmÁÉ½‰•}ˆÅ}™½Éµ…±}…Ñ•Í€ƒ’âë–£¦ ™½Éµ…°ÉÕ»¾ò#–B¬‘ÉäµÉÕ»¾ò'žj–òë–"Ûž²³’â¦bÛšº×¾ò!ÉÕ¹}‘Éå}ÉÕ¸€¬ÍÉ¥ÁÑÌ½ÍÁ¥­”½ÍÁ¥­•}ÉÕ¹¹•È¹ÁäA!MO¾ò'¾òm‰±½­¥¹œ…Ñ”ƒ–B8‘½Ý¹ÍÑÉ•…´ÁÉ½‰”™¥É•€ôô€Àƒ’âS¦nÛšZÀÉ…Ü•Ù¥‘•¹—¾òoš¾<…Á…‰¥±¥Ñäƒ¢Bô€Ðƒ’â¨™½Éµ…±}ÉÕ¹Ñ¥µ•}…Ñ•€…Í—¾ò!AI5%MM%=8½9A=%9P½	UM%9MLƒžîGš2’æ–2Xµ•Ñ„€¬IA=IPƒžîG–´…Ñ”ƒš*—–F(…ÉÑ¥™…Ó¾ò'¾òm…ÁÁÉ½Ù•}™É½µ}ÍÁ¥­•}ÉÕ¹€ƒŠH}É•ÅÕ¥É•}™½Éµ…±}…Ñ•}ÁÉ½½™ƒ¾ò#–nl…Í”ƒžòë’âš"[¦vxY1%Q}AMLƒ–6Ïš.KžîwŠSŠQ•…É±äÍÑ½Àƒ–’§žÛ¦bïšZ´…ÁÁÉ½Ù…³¾ò'¾òmMPƒ¦vgš–º#–6¬ƒ\Ðƒ¦bËžîW¢þŽ€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}™½Éµ…±}…Ñ•}Ý¥É¥¹œ¹Áç¾ò ÄÓ¾ò$¬Ñ•ÍÑ}…Á…‰¥±¥Ñå}…ÁÁÉ½Ù…±}™É½µ}ÍÁ¥­”¹Áç¾ò!‰åÁ…ÍÌƒš.Kžîw¾ò$¬Ñ•ÍÑ}ÍÁ¥­•}™É…µ•Ý½É¬¹Áç¾ò!ˆÄÁ¡…Í”ƒšZ·¢¢¾ò$€€(¨©H¨«¾òimH´ÀÄåt ¸¸½…‘È½H´ÀÄå}Í‘­}±¥™•å±•}ÉÕ¹Ñ¥µ•}…Ñ•Ì¹µ¤µ•¹‘µ•¹Ð¸Ä€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈØ´ÀÌÌƒŠPHÐµÈ¹à€¼H´Ä¹àYI%%½Ù•É¹…¹”±½ÍÕÉ”((¨©QåÁ”¨«¾òiÇ¾ò#šÊïžB¦^·ž:¿¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ÄÄ½H´Ä¸È¸Üƒ–’7–º‡¾ò ÈÀÈØ´Àà´ÈØ€ÈÌèÔÜ€¬ÀàèÀÃ¾ò'¢Ž–Ì€¨©YI%%ŠSŠQHÐµÈ¹à€¼H´Ä¹àƒ–º‡¢º‡¦Nø1=M¨«¾òmI•Ù¥•Ý•Èƒ¢ššÆ’â/’â¦ï¢úG–ò–>Gš>C’ê“–B3š¶—ž*Ûš¢Ïšï–3’â8Y1=¾ò#’â7–ú_šRç–g–:–>Ë¾ò'¾ò3–æÛ’þ»š¶’â“’â«¢¾¿¢ºÀM!¾ò#’î”¥Ñ!Õˆ½µµ¥Ð½‰©•Ðƒ’âë–¾òiAÉ¥µ…Éä€Ìá‘„äÁ”ÕˆÕ˜ÍØäáŒäÀå˜ÝŒÈÔáŒÄØÌÀàÅ‰ˆå…™ƒ¾òm1¥¹Ð™¥à€Ù•…ŒäÉ‘•…˜ÔÜÀÄÑ˜ÀÝäÍ‰Õ”Ù•…‰•„Å‘‰ŒÜåƒ¾òmI•Ù¥•Ý•!…ˆÁ‘”Ý‘ˆÐØÜÌÈÈÐÔÄàÔÐÁ”ÄäÜÑŒÑ”äÄá‰‘‰‰˜ÌÍƒ¾ò'Ž€€(¨©±½ÍÕÉ”¨«¾òkšï–3–’Ó¦£¾ò!I•Ù¥•Ý•!€¼AÉ¥µ…Éä€¼1¥¹Ð™¥àƒš¶ž†¸M!€¬A¡…Í”MÑ…ÑÕÌƒ–v\€¬M!½ÉÉ•Ñ¥½¸ƒ¢ºÃ–öW¾ò'¾òo
+œÐÃ¾ò!HÐµÈ¸ä½È¸ÄÀƒŠHYI%%€¡…‰Í½É‰•§¾òmHÐµÈ¸ÄÄƒŠHYI%%¾òo–º‡¢º‡¦Nø1=M¾òmHÐµÌƒŠHA9%9}IY%_¾òmHÐµÄ½È½H´Èƒš:K–ê?¢B÷’ö7¾ò'¾òo
+œÐÄƒ¦7–g’âèHÐµÌƒš&çš²‡¾òo
+œÔÈI%M,´ÀÀÐƒŠH1=M™½È¥ÑÌÕÉÉ•¹ÐÉ•Ù¥•Üµ±¥¹•…”‘•™¥¹¥Ñ¥½»¾ò#–B¬‹šZÃšÚ#¢Òç¦v‹¦7šZÃ–ò¦†ä‹šÎ£¢ºÃ¾ò'¾òmH´ÀÄàƒžÒ‹–òWš‚šÎ YI%%¾òmY1=ƒ¦†Û¦£šZÃšv‡žn»Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹—¾ò!Y1=Žšï–3ŽH´ÀÀÃ¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈØ´ÀÌÈƒŠPIÕ¹Ñ¥µ”QÉ¥…°½AÉ½‘ÕÑ¥½¸QÉÕÑ 	½Õ¹‘…Éä((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ”€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÌÌ´ÀÓŠSŠQQÉ¥…°½…­”ƒš"C–*’â7–ú_š*(…Á…‰¥±¥Ñäƒš‚’âèAI=UQ%=8AAI=Y¾òmÉÕ¸­¥¹AI=UQ%=8ƒšr³¢ê¯’â7šzš"@ÁÉ½‘ÕÑ¥½¸ÑÉÕÑ£Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄäƒ
+œÈ¸Ó¾ò'¾òi…Á…‰¥±¥Ñä…ÁÁÉ½Ù…°€¨«–>3–—–>Œ¨«š.Kžîw¦v{žR’êŸ¢Ò›–>ßŠSŠQ}Ù…±¥‘…Ñ•}•Ù¥‘•¹•ƒ¾ò#š&šr$…ÁÁÉ½Ù”ƒ¢Þ¿–ú–ÇžR£¾ò'’â8…ÁÁÉ½Ù•}™É½µ}ÍÁ¥­•}ÉÕ¹ƒ¾ò!ÍÁ¥­”ƒšÒûžR¢Þ¿–ú¾ò'–vš.KžîtQI%1|©€€¼-©€€¼U9-9=]9€€¼ƒž¦è…½Õ¹Ñ}ÁÉ½™¥±•}¥“¾òoš^‹šr$¹•Ý}ÉÕ¸¡AI=UQ%=8¥€ƒžjÙ•É¥™å}ÁÉ½‘ÕÑ¥½¹}…½Õ¹Ñ€ƒ–"o–îë¦^£’þwš2¾ò#¦bË–ú‡žê×šÞÇ¾òk–"o–îë¦^£¢Š¯žîW¢þ¿ž¾‡šRçš^Ø…ÁÁÉ½Ù…°ƒ¢Þ¿–ú’î7š.K¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÑÉ¥…±}ÁÉ½‘ÕÑ¥½¹}‰½Õ¹‘…Éä¹Áç¾ò ß¾òk–>šVÃ–2X€ÔƒžÆï¦v{šÎW¢Ò›–>ß–>3¢¾·’æ'š.Kžît€¬ƒžR’êŸ¢Ò›–>ß–¾çžœ€¬ÍÁ¥­”µÉÕ¸ƒ¢Þ¿–ú¦bË–ú‡žê×šÞÇŠSŠQµ½¹­•åÁ…Ñ ƒ–"o–îë¦^£–B8AAI=Y0ƒ’î7š.K¾òoš¢‡–v_–Æ{šŸ¢ºÿ¦^»žê«–ú,€¬É•¥ÍÑÉäÍ¹…ÁÍ¡½Ð½É•ÍÑ½É”ƒ¦bËšÎšò?¾ò$€€(¨©H¨«¾òimH´ÀÄåt ¸¸½…‘È½H´ÀÄå}Í‘­}±¥™•å±•}ÉÕ¹Ñ¥µ•}…Ñ•Ì¹µ¤ƒ
+œÈ¸Ð€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈØ´ÀÌÄƒŠPA•Éµ¥ÍÍ¥½¸€¼…¡”€¼É•Í¡¹•ÍÌ…Ñ”M•Á…É…Ñ¥½¸((¨©QåÁ”¨«¾òiÄƒšZÀÉÕ¹Ñ¥µ”ƒ––Gžê˜€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÌÌ´ÀÈ½Ì´ÀÏŠSŠS’â7–B3šŸ¢Ò£–’Ç¢Ò—’â7–ú_š*c–>ƒ’âë–6W’â €‰ÁÉ½Ù¥‘•ÈÕ¹…Ù…¥±…‰±”‹¾òošv¦fC–’Ç¢Ò—’â7¢÷¢Š¯žòO–¶cš:§žn[¾òožòO–¶c–F÷’â·’â7¢÷šnÿ’îŒ•¹‘Á½¥¹ÐÁÉ½½›¾òm™É•Í¡¹•ÍÌƒ’â7¢ÚÏ’â7–ú_¦f7žêŸ’âè‹šr'šVÃš6»–6ÌAML‹¾òm•…É±äµÍÑ½Àƒ¦†ï’î—¢º‡šVÃ¢¾šb;Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄäƒ
+œÈ¸Ï¾ò'¾òi…Í¡…É•}ÍÑ…Ñ”¹ÁÉ½Ù¥‘•ÉÌ¹ÉÕ¹Ñ¥µ•}…Ñ•ÍƒŠSŠS–·žÆì…Ñ•-¥¹ƒšbû–ò?–"žšï¾ò!UQ!}=U9P½AI5%MM%=8½9A=%9Q}Y%1	1½!}5QQ½IM!9MM}M=½	UM%9MM}Q¾ò'¾òm…Ñ•I•ÍÕ±Ó¾ò!ÍÑ…ÑÕÌèAML½%0¼¨©9=Q}QMQ	1¨¨½M-%AA}	1=-€¬É•…Í½¸€¬•Ù¥‘•¹•}É•˜€¬ÁÉ½Ù¥‘•É}…±±Í}™¥É•“¾ò'¾òmIÕ¹Ñ¥µ•…Ñ•A¥Á•±¥¹•€ƒ¦†ë–ê?¢¾’òÀ€¬•…É±äÍÑ½Ã¾ò#¦š[’â¨‰±½­¥¹œõ%0ƒš"X9=Q}QMQ	1ƒ–B;¾ò3–B;žî´…Ñ”ƒžj•Ù…±Õ…Ñ”€¨«’î;’â7š&Ÿ¢†0¨«¾ò'Ž¦v{š:§žn[šŸžRÇ¦†ë–ê<­•…É±äµÍÑ½Àƒžò[ž‚¾òiAI5%MM%=8ƒ–#’ê8!¾òm9A=%9PƒžR£žr–ºxÁÉ½‰”•á¡…¹—¾òmIM!9ML%0ƒ¦bïšZ´	UM%9MOŽ	…Ñ”ƒžjÁÉ½‰”ƒ¢ÖÀAÉ½Ù¥‘•Éá¡…¹”ƒšbû–ò?¢úçžV3¾ò#š"C–*|¿–’Ç¢Ò”•á¡…¹”ƒšBë–â˜•Ù¥‘•¹—ŠSŠQÌ´À×¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÉÕ¹Ñ¥µ•}…Ñ•}Í•Á…É…Ñ¥½¸¹Áç¾ò Ä×¾òk–B…Ñ”ƒ¢¾·’æ$ƒ\ä€¼Á¥Á•±¥¹”ƒ–£¢þ€¼Á•Éµ¥ÍÍ¥½¸µ™…¥°ƒ¦bïšZ·¾ò!ÁÉ½‰”ƒ¢º‡šVÀôôÇŽ‰ÕÍ¥¹•ÍÌôôÃŽÑ½Ñ…°ôôÇ¾ò$¼ƒžòO–¶c–—–êß’â7š:§žn[šv¦f@€¼™É•Í¡¹•ÍÌƒ¦bïšZ´‰ÕÍ¥¹•ÍÌ€¼…¡”µµ•Ñ…‘…Ñ„ƒ¦bïšZ´€¼•¹‘Á½¥¹Ðƒ–’Ç¢Ò—¦bïšZ´€¼9=Q}QMQ	1…ÕÑ ƒ–£¦bïšZ·¦nÛ¢ÂžR €¼ƒš¾?žîOšzs–>¿–º‡¢º‡¾ò$€€(¨©H¨«¾òimH´ÀÄåt ¸¸½…‘È½H´ÀÄå}Í‘­}±¥™•å±•}ÉÕ¹Ñ¥µ•}…Ñ•Ì¹µ¤ƒ
+œÈ¸Ì€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈØ´ÀÌÀƒŠPM,1¥™•å±”MÑ…Ñ”5…¡¥¹”€¬…É±äµMÑ½À¹™½É•µ•¹Ð((¨©QåÁ”¨«¾òiÄƒšZÀÉÕ¹Ñ¥µ”ƒ––Gžê›¾ò!Í•ÍÍ¥½¸½ÁÉ½Ù¥‘•Èƒš:Ÿ–"ÛšÖ–>cšnÓ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÌÌ´ÀÇŠSŠQM,Õ¹…Ù…¥±…‰±”½±½…™…¥±•½±½¥¸™…¥±•½…ÕÑ É•©•Ñ•½Í•ÍÍ¥½¸É•…‘ä½ÍÕ‰ÍÉ¥‰”½…±±‰…¬½Õ¹ÍÕ‰ÍÉ¥‰”½±½½ÕÐƒ–þ¦†ïšb¿šbû–ò<±¥™•å±”ÍÑ…Ñ”½Ñ•Éµ¥¹…°ÍÑ…Ñ—¾òo’â7–¢ºã–ò–âã–¶_ž²›’âËž2sšÖ/šÖž¢/ž*Ûš¾òmÑ•Éµ¥¹…°ƒ–B;š^€‰ÕÍ¥¹•ÍÌ…±³¾òm±•…¹ÕÀƒ–æž¶'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄäƒ
+œÄ¿
+œÈ¸Ä¿
+œÈ¸Ë¾ò'¾òi…Í¡…É•}ÍÑ…Ñ”¹ÁÉ½Ù¥‘•ÉÌ¹±¥™•å±”¹M‘­1¥™•å±•ƒ¾ò#šbû–ò?ž*Ûš€¬ƒ–B#šÎW¢þžžï¢† €¬ƒ¢þžžï–:–>È€¬ƒ–æž¶$±½Í—¾ò#–’Ç¢Ò—š–Ï¦^´÷–B#šÎWšâžB¾ò$¬É•ÅÕ¥É•}É•…‘å€ƒŠHAÉ½Ù¥‘•É1¥™•å±•Q•Éµ¥¹…±ÉÉ½Éƒ¾ò!AÉ½Ù¥‘•ÉÉÉ½Èƒ–¶CžÆï¾ò1½¹Ñ•áÐƒ–B¬ÍÑ…Ñ”½É•…Í½¸½•Ù¥‘•¹”½É•™ÕÍ•‘}…Ñ¥½¸½•…É±å}ÍÑ½Ã¾ò'¾ò'Ž¦nš"C¾òiµ…é¥¹…Ñ…M•ÍÍ¥½¸¹±½¥¹€ƒ–£–’Ç¢Ò—žÆï¢B÷šbû–ò<Ñ•Éµ¥¹…°ƒš¾ò!M-}U9Y%1	1½1=}%1½UQ!}I)Q½1=%9}%1¾ò'Žš"C–*¢BôMMM%=9}Ig¾ò!•Ù¥‘•¹”õ…½Õ¹Ñ}ÁÉ½™¥±•}¥“¾ò'¾òm±½½ÕÑ€ƒŠH±½Í” §¾òmµ…é¥¹…Ñ…AÉ½Ù¥‘•È¹…±±}•á¡…¹•€€¨«ž²³’â¦L±¥™•å±”ƒ¦^ ¨«¾ò!Ñ•Éµ¥¹…°ƒ–B8…Á…‰¥±¥Ñä…Ñ”ƒ’â8M,ƒ–÷šVÃ–v’â7š&Ÿ¢†3Ž¦nØ•á¡…¹”¿¦nØ•Ù¥‘•¹—¾ò'ŽšÖ/¢¾T™…­”Í•ÍÍ¥½¸ƒ–B3š¶—šBë–â˜±¥™•å±—¾ò!MMM%=9}Ig¾ò'Ž€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiAÉ½Ù¥‘•ÉÉÉ½Èƒ–ÆšZÃ–Š{’â’â«–¶CžÆï¾òoš^‹šr'¢ÂžR£šZç¾ò#š6W¢:ÜAÉ½Ù¥‘•ÉÉÉ½Ë¾ò'’â7–>_–öÇ–N7Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}Í‘­}±¥™•å±”¹Áç¾ò Ä×¾ò$¬Ñ•ÍÑ}ÉÕ¹Ñ¥µ•}•…É±å}ÍÑ½À¹Áç¾ò ÄÇ¾òiM,…‰Í•¹Ð½±½…ƒ–ò–âà½…ÕÑ ƒš.Kžît½¹•ÑÝ½É¬ƒ–’Ç¢Ò—žj…±°µ½Õ¹Ðƒ¢¾šb;¾òmÑ•Éµ¥¹…°ƒ–B8•¹‘Á½¥¹Ðƒ–÷šVÃ¦nÛ¢ÂžR ¯¦nØ•¹Ù•±½Á—¾ò#–>šVÃ–2X€Ôƒš¾ò'¾òm%9%Pƒš.Kžîw¾òmIdƒ–¾çžŸ¾òožr–ºxÍ•ÍÍ¥½¸±½¥¸½±½½ÕÐ½±½Í”ƒ¦¦Ç–*£¾ò$€€(¨©H¨«¾òimH´ÀÄåt ¸¸½…‘È½H´ÀÄå}Í‘­}±¥™•å±•}ÉÕ¹Ñ¥µ•}…Ñ•Ì¹µ¤ƒ
+œÄ·
+œÈ¸È€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÈäƒŠPHÐµÈ¸ÄÀI•Ù¥•Ý•È½Ù•É¹…¹”½ÉÉ•Ñ¥½¸((¨©QåÁ”¨«¾òiÇ¾ò#šÊïžB’þ»š¶¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ÄÀ½H´Ä¸È¸Øƒ–’7–º„ƒ
+œ×ŠSŠSšÊïžBšZš†¦†ï¢ºÃ–öTI•Ù¥•Ý•!€àÐÙ™ÐÔáŒÉŒÜÐÁ˜ÐÈÌØäå‘…‰‘‰”Á˜ÑÐá‰˜åŒÈÑƒ¾ò!ÉÕ¸€Ðäƒ’â'¢üÍÕ•ÍÏ¾ò'’â8AÉ¥µ…Éä%µÁ±•µ•¹Ñ…Ñ¥½¸€áÈåŒÄÙÈÐÜÙ„Ðá”ÄÀÕˆÀäÅ„å•ŒØÍˆÉˆÌåŒÍÜÝ•ƒ¾òmHÐµÈ¸ÄÀ€ô%µÁ±•µ•¹Ñ…Ñ¥½¸=9€¼I•Ù¥•ÜI=A9¾ò!@À‰åÑ”µ¥‘•¹Ñ¥Ñäƒ’âï’öL€ôAML€¼™É½é•»¾òmÁÕ‰±¥Í ±•…¹ÕÀ€ôAML€¼™É½é•»¾òm4µH´ÈÀÈØÀàÈÔ´ÀÈÔÍ¥¹±”µÝÉ¥Ñ•È€ôI=A9¾ò3–:–n€€ô±½¬…ÅÕ¥É•QHÁ…É•¹Ðµ‘•Á•¹‘•¹ÐA¡…Í”€Ç¾ò'¾òmH´ÀÄàƒ
+œÐ½Ù•É±…¥´ƒ¦r …µ•¹‘µ•¹Ðƒ’â7–"ƒ–:–>Ë¾òmI%M,´ÀÀÐ½H´È½HÐµÌ½@Àµ4´Åƒ’þwš2Ž€€(¨©½ÉÉ•Ñ¥½¸¨«¾òkšï–3–’Ó¦£šnÓšZÃ¾ò!I•Ù¥•Ý•!€¬I•Ù¥•Ý•È½ÉÉ•Ñ¥½¸ƒšº×¾òi±½¬ƒ¢šžn[¢2–nÐ½Ù•É±…¥·¾ò'¾òo
+œÐÀHÐµÈ¸ÄÀƒŠHI=A9¾ò!AML½Iiƒ¦†ç’â8I=A9ƒ¦†ç–"–"_¾ò'¾òmH´ÀÄàƒ
+œÐ…µ•¹‘µ•¹Ó¾ò#’þ»š¶¢ºÃ–öT€¬ƒžÒ‹–òWš‚šÎ£¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹—¾ò!Y1=Žšï–0ƒ
+œÐÀ¿
+œÐÄ¿
+œÔÈ¿
+œØÇŽH´ÀÄà½H´ÀÀÃ¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÈàƒŠPM¥¹±”µ]É¥Ñ•È1½¬M½Á”€¼MÑ…±”µA…É•¹ÐI•É•ÍÍ¥½¸((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò#–B¯šÖ/¢¾Wž~§¦b×¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ÄÄ@À´ÀÄƒšÖ/¢¾W¢ššÆŠSŠSž:Ãšr'šÖ/¢¾W–>«¢šžn[¦RšZ’îÛ–¶c–r£šŸ¾ò!™…¥°™…ÍÐ€¼ƒš"C–*¦+šRø€¼ƒ–’Ç¢Ò—¦+šRû¾ò'¾ò3–¶c–r ½¹ÑÉ½°µ™±½Ü‰±¥¹ÍÁ½Ó¾òkšr«¢šžnX‹’â“’â¨É•Ù¥•Ý•Èƒ–r£’îï’â¢:ß¦R–&7¦÷–¾ç–B3’â Á…É•¹Ðƒ–º3š"@A¡…Í”€Ä‹žjÍÑ…±”µÁÉ•™±¥¡ÐÉ…—Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄàƒ
+œÐ…µ•¹‘µ•¹Ó¾ò'¾òk’â'¦7¢¾šb;ž~§¦b×ŠSŠSŠFÉÕ¹Ñ¥µ”½Õ¹Ñ•Ë¾òi±½…‘}…Ñ¥Ù•}ÉÕ±•Íƒ¾ò!Á…É•¹ÐÍ•±•Ñ¥½»¾ò'š&Ÿ¢†3š^Ø€¹É•Ù¥•Ü¹±½­€ƒ–þ–ÞË–¶c–r£¾ò!±½­}•á¥ÍÑÍ}…Ñ}ÁÉ•™±¥¡Ð¥ÌQÉÕ•ƒ¾ò'¾òoŠF…MPƒžîOšz–º#–6¯¾òk¦R¢:ß–>[¾ò!=}a0½Á•»¾ò3–B¬	¥Ñ=Èƒ–Ö3––\™±…œƒ–2ç¦7¾ò'¢†3–>ß–#’ê;¦š[’â¨±½…‘}…Ñ¥Ù•}ÉÕ±•Íƒ¾òoŠF‰ÍÑ…±”µÁ…É•¹Ðƒ–¾çš*_¾òiƒš>C’êØÈƒ–B8ƒžjØÄµ‰…Í•ƒš>C’ê“¾ò!€´µ™É½´µÙ•ÉÍ¥½¸ØÅƒ¾ò%	1=/¾ò!±¥¹•…”µ½Ù•“¾òo¦nÛšZÀÙ•ÉÍ¥½¸¿¦nÛšZÀ•Ù¥‘•¹”¿¦nØµ…¹¥™•ÍÐƒš:£¢þl¿¦R¦+šRû¾ò'¾òoš^€€´µ™É½´µÙ•ÉÍ¥½¹€ƒš^ØÍÑ…±”€´µÉÕ±•Í€ƒ¢úO–—¢Š¬¥¹ÁÕÐôõQ%Yƒš.Kžîw¾òmƒ’î8ÕÉÉ•¹ÐQ%Y¾ò#šZÀ=5A%1ƒ–g¦'¾ò'¦7–B¿š¶–âã¾òo–B3ž&#šr°É…”ƒšJx¥µµÕÑ…‰±”½±±¥Í¥½»¾ò#¦š[ž&#–¶_¢*¦C–¶_¢*’â7–*£¾ò'¾òo–æÛ–>G¦R™…¥°™…ÍÐƒ–#’ê;’îï’öTQ%Yƒ¢¾ï–>[¾ò!±½…‘}…Ñ¥Ù•}ÉÕ±•Í€ƒ¢ÂžR£šVÀ€ôô€Ã¾ò'¾òoš"C–*|¿–’Ç¢Ò—–B;¦R¦+šRû’þwš2Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}É•Ù¥•Ý}±¥¹•…•}Í•É¥…±¥é…Ñ¥½¸¹Áç¾ò àƒ’â«¾ò$€€(¨©H¨«¾òimH´ÀÄát ¸¸½…‘È½H´ÀÄá}É•Ù¥•Ý}ÁÕ‰±¥Í¡}‰åÑ•}¥‘•¹Ñ¥Ñä¹µ¤ƒ
+œÐ…µ•¹‘µ•¹Ð€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÈÜƒŠPI•Ù¥•ÜA…É•¹Ðµ%‘•¹Ñ¥ÑäM•É¥…±¥é…Ñ¥½¸±½ÍÕÉ”((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò#š:Ÿ–"ÛšÖ¦7š:K¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ÄÄ@À´ÀÇŠSŠQ€¹É•Ù¥•Ü¹±½­€ƒ¢:ß–>[’ö7’ê8A¡…Í”€Ç¾ò!Í¹…ÁÍ¡½Ð½Í…¹‘‰½ã¾ò'’æ/–B;¾òk’â“’â¨É•Ù¥•Ý•Èƒ–>¿–~ë’ê;–B3’âš^œÁ…É•¹Ðƒ–º3š"@A¡…Í”€Ç¾ò3¦j?–B;’úwš²‡¢:ß¦Rš>C’ê“¾ò3ž²³’ê3’â«žR ÍÑ…±”Á…É•¹ÐÍ¹…ÁÍ¡½Ðƒ¢šžn[ž²³’â’â«žjQ%Y…‘Ù…¹—Ž‰A¡…Í”€È¼Ìƒ’âË¢†0ˆ€„ô€‰É•Ù¥•ÜÁ…É•¹Ð±¥¹•…”ƒ’âË¢†0‹Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiµ…¥¸ ¥€ƒ–º3š"C–£¦ Q%Yµ‘•Á•¹‘•¹Ðƒ¢¾ï–>[¾ò!±½…‘}…Ñ¥Ù•}ÉÕ±•Ì€¼±¥¹•…”€¼=5A%1€¼Ù•ÉÍ¥½¸ƒšŽš~”€¼Í¹…ÁÍ¡½Ð€¼É•Ù¥•Ý•‘}‰åÑ•Ì€¼Í…¹‘‰½ã¾ò'–B;š&7¢:ß–>[¦R¾òo¦R–>«–2}É•Ù¥•Ý}±½­•‘}Ý½É­™±½Ýƒ¾ò!A¡…Í”€È¼Ï¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄàƒ
+œÐ…µ•¹‘µ•¹Ó¾ò1=ÁÑ¥½¸¾ò'¾òh¨©±½¬µ‰•™½É”µÁÉ•™±¥¡Ð¨«ŠSŠQµ…¥¸ ¥€ƒ’î–h1$Á…ÉÍ”€¬ƒ–>šVÀ±•á¥…°ƒšŽš~”€¬ÉÕ±•Í}Á…Ñ ½…ÉÑ¥™…Ðƒ–¶c–r£šŸšŽš~—–B;–6Ï¢:ß–>[¦R¾òošVÓ’â¨Ý½É­™±½ß¾ò!Q%Y¥¹Ñ•É¥Ñä€¬Á…É•¹Ð¥‘•¹Ñ¥ÑäƒŠHÍ¹…ÁÍ¡½ÐƒŠHÑÉ…¹Í™½É´ƒŠHÍ…¹‘‰½àƒŠHÍÑ…•…Ñ”ƒŠHÁÕ‰±¥Í ƒŠHµ…¹¥™•ÍÐ½µµ¥ÐƒŠHÁ½ÍÐµ½µµ¥ÐÙ•É¥™¥…Ñ¥½»¾ò'–r }É•Ù¥•Ý}Ý½É­™±½Ý}±½­•‘€ƒ–’ê;¦R–š&Ÿ¢†3¾òm™¥¹…±±äƒ¦+šRû’þwš2Ž¨«–no¦^¸¨«¾òkŠFƒ–:|Á±…•µ•¹Ðƒ–>«’âË¢†3–2[š>C’ê“’â7’âË¢†3–2XÁ…É•¹Ðƒ¦'š.§¾ò!ÍÑ…±”µÁÉ•™±¥¡ÐÉ…”ƒ–º{šÖ/–>¿–’7ž:Ã¾ò'¾òoŠF…Á…É•¹Ð¥‘•¹Ñ¥Ñäƒ–r£¦R––îëž®/¾ò!ÁÉ•™±¥¡Ðƒšr³¢ê¯š2¦R¾ò'¾òoŠF‹¦$=ÁÑ¥½¸ƒ¢3¦vx=ÁÑ¥½¸¾ò!É•¡•¯¾ò'ŠSŠQƒ’öüH´ÀÄàƒ–:–æÿ–F+¢¾·’æ'š"Cž®/’âS–6W’â’îž‚¢Þ¿–ú¾ò1ƒ¦r–>3’îôÁ…É•¹Ðƒ¦ª3¢¾€¬HƒšRç–g’âè½ÁÑ¥µ¥ÍÑ¥ŒÍ¹…ÁÍ¡½Ðƒ¢¾·’æ'¾òoŠFš"Cšr°€ôƒš2¦Rš^Û¦^Óž¢7¦Vÿ¾ò!ÁÉ•™±¥¡ÐƒžêÏ–—¾ò3ž®{’ê'š^Û–þ¯¦–’Ç¢Ò—¾ò'¾ò3šRÛžn(€ôÍÑ…±”µÁ…É•¹Ðƒ¢šžn[–r£šz¦ƒ’â+’â7–>¿¢÷Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹Áç¾ò!µ…¥¸ƒš.–"¾òiA¡…Í”€Àƒ¦R¢:ß–>X€¬}É•Ù¥•Ý}Ý½É­™±½Ý}±½­•‘€ƒ–£šÖž¢/¾ò$€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}É•Ù¥•Ý}±¥¹•…•}Í•É¥…±¥é…Ñ¥½¸¹Áç¾ò ã¾ò$¬ƒ–£¦<€ØÔàƒ’þwš2¾ò#š^‹šr$‰åÑ”µ¥‘•¹Ñ¥Ñä½±•…¹ÕÀ½½¹™¥¹•µ•¹ÐƒšÖ/¢¾W¦nÛ–n{–öK¾ò$€€(¨©H¨«¾òimH´ÀÄát ¸¸½…‘È½H´ÀÄá}É•Ù¥•Ý}ÁÕ‰±¥Í¡}‰åÑ•}¥‘•¹Ñ¥Ñä¹µ¤ƒ
+œÐ…µ•¹‘µ•¹Ð€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÈØƒŠPHÐµÈ¸äI•Ù¥•Ý•È½Ù•É¹…¹”½ÉÉ•Ñ¥½¸((¨©QåÁ”¨«¾òiÇ¾ò#šÊïžB’þ»š¶¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ä½H´Ä¸È¸Ôƒ–’7–º„ƒ
+œßŠSŠSšÊïžBšZš†¦†ï¢ºÃ–öT•á…ÐM!¾ò!I•Ù¥•Ý•!€á„Ù˜ÐÄÐå”Á˜ÜÀäÀàÔÁˆÜÝŒÍˆÉ”Ù„àÀÑˆá•˜ÐÔÔäÕ€€¼AÉ¥µ…Éä%µÁ±•µ•¹Ñ…Ñ¥½¸€ÜäÍ‘™ŒÄÈÈÁ”ÍÅˆàØØäÐàÍŒÀÀá„àÔäØÄÔÁˆÁ‘Ù€€¼É½ÍÌµA±…Ñ™½É´$¥àˆÐÈäÈÈÀØØÌàäÜÀØÁˆÜäÐÁŒÜÈÝÁ”Àå•ŒäÀÈÄäÉ‘•ƒ¾ò'¾òmHÐµÈ¸äƒŠHI=A9¾ò#¢úO–—’úŸ–ïžîL€¬ƒ¢úO–ë’úŸšr«¦^·–B#¾ò'¾òmI%M,´ÀÀÐƒ’þwš2¾òmH´ÀÄÜƒ¦r …µ•¹‘µ•¹Ðƒ’â7–"ƒ–:–>Ë¾òm$€ôÉÕ¸€ÐØƒ–£’â'¢üÍÕ•ÍÏ¾ò#’â7–ú_–7–d‰½ÁÑ¥½¹…°U‰Õ¹ÑÔƒ’î7–’Ç¢Ò”‹¾ò'Ž€€(¨©½ÉÉ•Ñ¥½¸¨«¾òkšï–3–’Ó¦£šRç’âè•á…ÐM!ƒ’â'–žî¾ò!I•Ù¥•Ý•È‘½Œ½µµ¥Ðƒ’â7–7¢Š¯¢¾¿–gš"@¥µÁ±•µ•¹Ñ…Ñ¥½¸‰…Í•±¥¹—¾ò'¾òo
+œÐÀHÐµÈ¸äƒŠHI=A9¾òmI%M,´ÀÀÐƒžBžRÇšnÓšZÃ¾òmH´ÀÄàƒ’âèH´ÀÄÜƒ
+œÄƒšr«–º3š"Cž:¿žj’þ»š¶¢ºÃ–öW¾ò#žÒ‹–òWš‚šÎ …µ•¹‘•‰ç¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹—¾ò!Y1=Žšï–0ƒ
+œÐÀ¿
+œÐÄ¿
+œÔÈ¿
+œØÇŽH´ÀÄà½H´ÀÀÃ¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÈÔƒŠPI•Ù¥•ÜM¥¹±”µ]É¥Ñ•È€¼½µµ¥Ðµ1¥¹•…”A½±¥ä((¨©QåÁ”¨«¾òiÇ¾ò#¢þCžîÓ––Gžê›¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ÄÀ@Ä´ÀËŠSŠQ€´µ™É½´µÙ•ÉÍ¥½¹€ƒ–>«–r A¡…Í”€Äƒ¦ª3¢¾±¥¹•…—¾òo¦VÿšÖž¢/’â·–>›’â É•Ù¥•Ý•Èƒš:£¢þlQ%Yƒš^ØA¡…Í”€Ìƒ’î7–>¿¢÷¢šžn[šZÀÍ•±•Ñ½Ë¾òo’â7–ú_žîŸžî·š*(€´µ™É½´µÙ•ÉÍ¥½¹€ƒš>?¢þÃš"C–º3šVÓ–æÛ–>DOŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄàƒ
+œÓ¾ò1=ÁÑ¥½¸¾ò'¾òiÉÕ±•Í}É½½Ð¼¹É•Ù¥•Ü¹±½­ƒ¾ò!=}IQñ=}a1ƒ¾ò'¢šžnXÁÉ•™±¥¡ÐƒŠHÍ¹…ÁÍ¡½ÐƒŠHÍÑ…•…Ñ”ƒŠHµ…¹¥™•ÍÐ½µµ¥Ðƒ–£ž¢/¾òo–æÛ–>DÉ•Ù¥•Ý•È™…¥°™…ÍÓ¾ò#¦Rg¢¾¿’þ‡š¿š2šb8ÍÑ…±”±½¬ƒš&/–*£šâžB¢Þ¿–ú¾ò'¾òm™¥¹…±±äƒ¦+šRû¾ò#š"C–*|¿–’Ç¢Ò—–v¦+šRû¾ò'Ž¨«¢¾k–º{¢ºÃ–öT¨«¾òi…‘Ù¥Í½Éä€¬ƒ¢þož¢/žêŸ¦R¾ò3¦vx=Lµ±•Ù•°O¾òm¡•¬ƒ’â8É•Á±…”ƒ’æ/¦^Ó’î7¦v{–:–¶@O¾ò3š¶–ò?–æÛ–>G–gžRÄÍ¥¹±”µÝÉ¥Ñ•Èƒ¢þCžîÓ––Gžê›–s–êW¾òm€´µ™É½´µÙ•ÉÍ¥½¹€ƒ¢¾·’æ'¦f7žêŸ’âè±¥¹•…”ƒš>Cž’ëŽ€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}É•Ù¥•Ý}ÁÕ‰±¥Í¡}¥¹Ñ•É¥Ñä¹ÁäèéQ•ÍÑM¥¹±•]É¥Ñ•É1½¬ƒ\Ï¾ò#–æÛ–>D™…¥°™…ÍÐ€¬ƒ¦nØµÕÑ…Ñ¥½¸€¬ƒ–’[šv—¦R’â7¢Š¯–"ƒ¦f€¼ƒš"C–*–B;¦+šRø€¼ƒ–’Ç¢Ò—–B;¦+šRû¾ò$€€(¨©H¨«¾òimH´ÀÄát ¸¸½…‘È½H´ÀÄá}É•Ù¥•Ý}ÁÕ‰±¥Í¡}‰åÑ•}¥‘•¹Ñ¥Ñä¹µ¤ƒ
+œÐ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÈÐƒŠPI•Ù¥•ÜAÕ‰±¥Í …¥±ÕÉ”±•…¹ÕÀ€¼I•ÑÉäM•µ…¹Ñ¥Ì((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ”€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ÄÀ@Ä´ÀÇŠSŠQÁÕ‰±¥Í ƒžj•á•ÁÐƒ–>«šâÍÑ…¥¹}‘¥Ë¾òiÉ•¹…µ”ƒš"C–*–B8µ…¹¥™•ÍÐƒ–g–’Ç¢Ò—’òkžVg’â,™¥¹…±¥é•Ù•ÉÍ¥½¹Ì¼ñ¹•Üø¿¾ò!¥µµÕÑ…‰±”½±±¥Í¥½¸ƒ’öüÍ…µ”µÙ•ÉÍ¥½¸É•ÑÉäƒšÂã’æ–’Ç¢Ò—¾ò$¬ƒ–¶“–ü•Ù¥‘•¹”€¬Q%Yƒ’î7š^ŸŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄàƒ
+œÏ¾ò'¾òh¨©½µµ¥Ð‰½Õ¹‘…Éä€ôQ%Yµ…¹¥™•ÍÐƒ–:–¶Cšnÿš6‹š"C–*|¨«Ž	ÁÕ‰±¥Í¡•‘}Ù•ÉÍ¥½¹€€¼É•…Ñ•‘}•Ù¥‘•¹•€€¼µ…¹¥™•ÍÑ}½µµ¥ÑÑ•‘€ƒž*Ûš¢Þ¢â«¦¦Ç–* }±•…¹ÕÁ}Õ¹½µµ¥ÑÑ•‘ƒ¾òkš>C’ê“–&7’îï’öW–’Ç¢Ò—¾ò#–B¯šÎ£–—žjÑµÀµ…¹¥™•ÍÐÝÉ¥Ñ”ƒ–’Ç¢Ò”€¼µ…¹¥™•ÍÐÉ•Á±…”ƒ–’Ç¢Ò”€¼É•…µ‰…¬µ¥Íµ…Ñ €¼…Ñ”ƒ–’Ç¢Ò”€¼ƒ–ò–âã¾ò'ŠHƒžžï¦f“šZÀÁÕ‰±¥Í¡•Ù•ÉÍ¥½¹}‘¥È€¬ƒšr³š²‡–"o–îè•Ù¥‘•¹”€¬ÍÑ…¥¹œ€¬ÑµÀµ…¹¥™•ÍÐƒŠHQ%Yƒ’þwš2š^œÍ•±•Ñ½ÈƒŠHƒ–B3ž&#šr³¦7¢¾W–>¿¢†3¾òoš>C’ê“–B;¦ª3¢¾–’Ç¢Ò”ƒŠHƒšbû–ò<IY%]}=55%Q}%9=9M%MQ9Q€ƒž†³–’Ç¢Ò—¾ò!•á¥Ð€ÏŠSŠQQ%Yƒ–ÞËš2–BGšZÃž&#šr³¾ò3’êë–Þ—’î/–—¾ò3žîw’â7’ò«¢Žš"C–>¿¦7¢¾W–’Ç¢Ò—¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiQ•ÍÑAÉ•½µµ¥Ñ…¥±ÕÉ•±•…¹ÕÀƒ\Ë¾ò!ÝÉ¥Ñ”½É•Á±…”ƒšÎ£–”ƒŠHƒ–º3šVÓšâžB€¬ƒ–B3ž&#šr³¦7¢¾Wš"C–*¾ò$¬Q•ÍÑAÕ‰±¥Í¡]¥¹‘½ÝQ…µÁ•ÈèéÑ•ÍÑ}Ñ…µÁ•É•‘}É•ÑÉå}¥Í}‘•Ñ•Éµ¥¹¥ÍÑ¥Œ€€(¨©H¨«¾òimH´ÀÄát ¸¸½…‘È½H´ÀÄá}É•Ù¥•Ý}ÁÕ‰±¥Í¡}‰åÑ•}¥‘•¹Ñ¥Ñä¹µ¤ƒ
+œÌ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÈÌƒŠP5…¹¥™•ÍÐM•…°%‘•¹Ñ¥Ñä€¼AÕ‰±¥Í Q=Q=T±½ÍÕÉ”((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò!µ…¹¥™•ÍÐ¥‘•¹Ñ¥Ñäƒ¢¾·’æ'–>cšnÓ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ÄÀ@À´ÀËŠSŠSš^œA¡…Í”€Ìƒ–r É•¹…µ”ƒ–B8¨«¦7šZÀÉ•…™¥¹…°ÉÕ±•Ì¹å…µ°¨¨ƒ–æÛžR£¢¾”É•…ƒ¢º‡žº\µ…¹¥™•ÍÐ¹‘…Ñ…Í•Ñ}¡…Í£¾òi…Ñ”ƒ¦ª3¢¾HƒŠHÉ•¹…µ”ƒŠH™¥¹…°ƒ¢Š¯šnÿš6‹’âèPƒŠHÉ•É•…PƒŠHµ…¹¥™•ÍÐƒ–Â–¶`¡…Í ¡P¤ƒŠHQ%Yƒš2–BDPƒ’âP½¡•É•¹”ƒ¦k¢þŠSŠP‰…Ñ”ƒ¦ª3¢¾’êK¾ò1µ…¹¥™•ÍÐƒž–wžš?’êP‹¾ò#¢úO–—’úœ‘½Õ‰±”µÉ•…Q=Q=Tƒžj¢úO–ë’úŸ¦Vs–?¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÁÕ‰±¥Í¡•‘}‰åÑ•Ì€ôÉ•…‘}‰åÑ•Ì¡™¥¹…°¤ìµ…¹¥™•ÍÐ¹‘…Ñ…Í•Ñ}¡…Í €ô¡…Í ¡ÁÕ‰±¥Í¡•‘}‰åÑ•Ì¥ƒŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄàƒ
+œË¾ò'¾òiµ…¹¥™•ÍÐ¥‘•¹Ñ¥Ñäƒ–R¿’âšv—šê@€ô…Ñ”µÙ…±¥‘…Ñ•€¨©¥¸µµ•µ½ÉäÉ•Ù¥•Ý•‘}‰åÑ•Ì¨«¾ò!•áÁ•Ñ•‘}‘…Ñ…Í•Ñ}¡…Í €ô}¡…Í¡}Í¹…ÁÍ¡½Ð¡l¡™¥¹…±}É•°°É•Ù¥•Ý•‘}‰åÑ•Ì¥t¥ƒ¾ò'¾òmÁÕ‰±¥Í ƒ–B8É•…µ‰…¬ƒ’âè€¨©YI%%Q%=8=91d¨«¾ò!…ÑÕ…°€„ôÉ•Ù¥•Ý•‘}‰åÑ•Í€ƒŠH	1=,€¬É½±±‰…¯¾òkžžï¦f“–ÞÈÁÕ‰±¥Í ƒžjÙ•ÉÍ¥½¹}‘¥Èƒ’â;šr³š²„•Ù¥‘•¹—¾ò1Q%Yƒ’â7š:£¢þo¾ò'Žž¾‡šRç–¶_¢*–r£šz¦ƒ’â+’â7–>¿¢÷¢þo–”µ…¹¥™•ÍÓŽ€€(¨©Q•ÍÑÌ¨«¾òiQ•ÍÑAÕ‰±¥Í¡]¥¹‘½ÝQ…µÁ•ÈèéÑ•ÍÑ}Á½ÍÑ}É•¹…µ•}Ñ…µÁ•É}™…¥±Í}±½Í•‘}…¹‘}É½±±Í}‰…¯¾ò!µ½¹­•åÁ…Ñ A…Ñ ¹É•Á±…”ƒ–r É•¹…µ”ƒ–B;šÎ£–”Ñ…µÁ•ÈƒŠH™…¥°±½Í•€¬ƒ–n{šîh€¬Q%Yƒ’þwš2ØÄµ½µÁ¥±•€¬‘…Ñ…Í•Ñ}™¥±•Ìƒ’â7–>c¾ò$¬Ñ•ÍÑ}µ…¹¥™•ÍÑ}¡…Í¡}‘•É¥Ù•Í}™É½µ}É•Ù¥•Ý•‘}‰åÑ•Ï¾ò#ž.³ž®/¦7žº_¾ò$€€(¨©H¨«¾òimH´ÀÄát ¸¸½…‘È½H´ÀÄá}É•Ù¥•Ý}ÁÕ‰±¥Í¡}‰åÑ•}¥‘•¹Ñ¥Ñä¹µ¤ƒ
+œÈ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÈÈƒŠPA•ÉÍ¥ÍÑ•IY%]á…Ðµ	åÑ”%‘•¹Ñ¥Ñä((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò#¢úO–ë¢Þ¿–ú–¶_¢*¢¾·’æ'–>cšnÓ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ÄÀ@À´ÀÇŠSŠQIY%]ƒžî<A…Ñ ¹ÝÉ¥Ñ•}Ñ•áÐ ¥€ƒ¢B÷žnc¾òi]¥¹‘½ÝÌƒšZšr³š¢‡–ò?š6‹¢†3žþï¢¾G–>¿š*+––¶`1ƒ–gš"@I1¾ò!Á•ÉÍ¥ÍÑ•‰åÑ•Ì€„ô•á…ÐÑÉ…¹Í™½Éµ•‰åÑ•Ï¾ò'¾òoš^‹šr'ž¶'’îßšÖ/¢¾WžR É•…‘}Ñ•áÐ ¤¹ÍÁ±¥Ñ±¥¹•Ì ¥€ƒ¢Š¬Õ¹¥Ù•ÉÍ…°µ¹•Ý±¥¹”ƒ–öK’â–2[¢Jg¢R÷Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÍÑ…•‘}å…µ°¹ÝÉ¥Ñ•}Ñ•áÐ¡É•Ù¥•Ý•‘}Ñ•áÐ¥ƒ¾ò!Í…¹‘‰½àƒ–B3¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄàƒ
+œÇ¾ò'¾òiÉ•Ù¥•Ý•‘}‰åÑ•Ì€ôÉ•Ù¥•Ý•‘}Ñ•áÐ¹•¹½‘” ‰ÕÑ˜´àˆ¥€ƒ–6W’â’â7–>¿–>c––¶c–¾ç¢Æ‡¾òmÍ…¹‘‰½àƒ¢žšz@€¼ÍÑ…•ÉÕ±•Ì¹å…µ°€¼ƒ–£¦£š¶–ò<‘…Ñ…Í•Ðƒ–g–”€¨©ÝÉ¥Ñ•}‰åÑ•Ì=91d¨«¾òo’â7–>c¦?¦NøQ%YÍ¹…ÁÍ¡½ÐƒŠHÉ•Ù¥•Ý•‘}‰åÑ•ÌƒŠHÝÉ¥Ñ•}‰åÑ•ÌƒŠHÍÑ…•ƒŠH…Ñ½µ¥ŒÉ•¹…µ”ƒŠH™¥¹…°ƒ–£ž¢/–¶_¢*–B3’â¾òl¨©MPƒ¦vgš–º#–6¬¨«¾ò!É•Ù¥•Ü¹Áäƒžšš¶‹’îï’öTÝÉ¥Ñ•}Ñ•áÑ€ƒ¢ÂžR£ŠSŠSšZšr³š¢‡–ò?–r£šz¦ƒ’â+¢Š¯š:K¦f“¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiQ•ÍÑA•ÉÍ¥ÍÑ•‘	åÑ•%‘•¹Ñ¥Ñäƒ\Ó¾ò!™¥¹…°‰åÑ•Ì1µ½¹±äƒ’âP€ôôƒž.³ž®/¦7–îëžjÉ•Ù¥•Ý•‘}‰åÑ•Ï¾ò!å…µ°‘…Ñ•Ñ¥µ”¥Í½™½Éµ…Ðƒ¢þc–:¾ò$¼µ…¹¥™•ÍÐ¡…Í ƒž.³ž®/¦7žº_’â¢Ð€¼ƒžRš"Cž&#šr°±½…‘}…Ñ¥Ù•}ÉÕ±•Ì€¬±½…‘}‰½Õ¹‘}ÉÕ±•}‰½½¬ƒ¦7šRû¾ò#¢Þ£–æÏ–>Ã–¶_¢*žržnã¾ò$¼MPƒžšÝÉ¥Ñ•}Ñ•áÓ¾ò'ŠSŠQ$ƒ’â=Lµ…ÑÉ¥àƒ–vš&Ÿ¢†3¾ò#šÖ/¢¾W–¾ç¢Æ‡šb¼¨«–Þ—–ßžRš"Cžj¨«šVÃš6»¦n¾ò3¦v{’îO–êO–ÞËš>C’êå…µ³¾ò$€€(¨©H¨«¾òimH´ÀÄát ¸¸½…‘È½H´ÀÄá}É•Ù¥•Ý}ÁÕ‰±¥Í¡}‰åÑ•}¥‘•¹Ñ¥Ñä¹µ¤ƒ
+œÄ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÈÀƒŠPHÐµÈ¸àI•Ù¥•Ý•È½Ù•É¹…¹”½ÉÉ•Ñ¥½¸((¨©QåÁ”¨«¾òiÇ¾ò#šÊïžB’þ»š¶¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸à½H´Ä¸È¸Ðƒ–’7–º„ƒ
+œÛŠSŠSšÊïžBšZš†¦†ï¢ºÃ–öTI•Ù¥•Ý•‰…Í•±¥¹”…‘„Á•…ŒÉäÜÌÜÌÀØÀÕ˜Ý…˜ØÕ˜ÔÝ”ÜÉ„ÈÉ”ÄÐàÍŒÅ€€¼ƒ’â'’â«–:–ž,@Àƒ’âï’öO–ïžîL€¼I=A9€¼$©½ˆµ±•Ù•°ÑÉÕÑ €¼I%M,´ÀÀÐƒ’þwš2¾òmH´ÀÄØƒ
+œÌƒžj‰•á…ÐQ%Y‰åÑ•Ì‹¢†£¢þÃ’âè½Ù•É±…¥·¾ò!‘½Õ‰±”µÉ•……Ã¾ò'¾ò3¦r …µ•¹‘µ•¹Ðƒ’â7–"ƒ–:–>ËŽ€€(¨©½ÉÉ•Ñ¥½¸¨«¾òkšï–3–’Ó¦£šnÓšZÃ¾ò!I•Ù¥•Ý•‰…Í•±¥¹”€¬I•Ù¥•Ý•È½ÉÉ•Ñ¥½¸ƒšº×¾òiÍ•…°‘½Õ‰±”µÉ•…Q=Q=T€¼Ù•ÉÍ¥½¸ƒ¢úO–ëš^€½¹™¥¹•µ•¹Ð€¼$ƒ–£ž~§¦b×¦v{žîÿ¾ò'¾òo
+œÐÀHÐµÈ¸à½H´Ä¸È¸ÐƒŠHI=A9¾ò#’âï’öO–ïžîL€¬ƒžRÇšr³š&ç’þ»–’7¾ò'¾òmI%M,´ÀÀÐƒžBžRÇšnÓšZÃ¾òmH´ÀÄÜƒ’âèH´ÀÄØƒ
+œÌƒžj’þ»š¶¢ºÃ–öW¾ò#žÒ‹–òWš‚šÎ …µ•¹‘•‰ç¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹—¾ò!Y1=Žšï–0ƒ
+œÐÀ¿
+œÐÄ¿
+œÔÈ¿
+œØÇŽH´ÀÄÜ½H´ÀÀÃ¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄäƒŠPÉ½ÍÌµA±…Ñ™½É´$QÉÕÑ €¼	åÑ”µá…Ð¥à((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ™¥ã¾ò#žr–º{¢Þ£–æÏ–>À‰ÕŸ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸äƒ
+œ×ŠSŠQI•Ù¥•Ý•Èƒ’â/¦JìÉÕ¸€ÐÈ©½ˆµ…ÑÉ¥ã¾òi½ÁÑ¥½¹…°U‰Õ¹ÑÔ€Ì¸ÄÐƒžjAåÑ•ÍÐÍÑ•Àƒ–º{¦f%1¾ò!øÈÀƒšÖ/¢¾W–B3¦RdQ%Y‘…Ñ…Í•Ð¡…Í µ¥Íµ…Ñ è‘•±…É•€Ý‘ŒÕ˜ØÈÜ¸¸¸É•½µÁÕÑ•‘ÈÈÄåÈ¸¸¹ƒ¾ò'¾ò1½Ù•É…±°MUMLƒ’î–n€½¹Ñ¥¹Õ”µ½¸µ•ÉÉ½Èè€‘íì€…µ…ÑÉ¥à¹É•ÅÕ¥É•õõƒ¾òo’â7–ú_¢†£¢þÀ‹–£ž~§¦b×žîü‹Ž€€(¨©I½½Ð…ÕÍ—¾ò!A$ƒš^—–þ_š~—¢¾¾ò$¨«¾òh¨«š‚ç–n€€Ä¨«ŠSŠQ€¹¥Ñ…ÑÑÉ¥‰ÕÑ•Í€ƒ¢šžnX‘…Ñ„½½±‘•¸¼¨©€½€¨¹©Í½¹€½€¨¹©Í½¹±€ƒ’ö¨«šò<€¨¹å…µ±€¨«¾òi]¥¹‘½ÝÌ…ÕÑ½É±˜¡•­½ÕÐƒ¦7–d1ŠII1¾ò#šr³–rÀ¡…Í ƒ’â8µ…¹¥™•ÍÐƒ’â¢ÓšV]¥¹‘½ÝÌ$ƒ¢þ¾ò'¾ò1U‰Õ¹ÑÔ¡•­½ÕÐƒ’þwš21¾ò#¦7žº\¡…Í ƒ–’Ç¦7¾ò'¾òm½±‘•¸ƒšr«š2–nƒ–ÞËšr$1ƒ¢ž–"gŽ¨«š‚ç–n€€Ë¾ò!ÉÕ¸€ÐÐƒš~—¢¾¾ò$¨«ŠSŠQ½±‘•¸É•Ù¥•Ü…Ñ”ƒžj…ÉÑ¥™…Ð½¹™¥¹•µ•¹Ðƒ–æÏ–>Ã’úw¢Ö[¾òi1¥¹Õàƒ’â(•Ù¥‘•¹•}‘¥È€¼€‰è½•Ù¥°¹ÑáÐ‰€ƒšb¼¨«žnã–¾ä¨«š.óš:—¾ò!É•Í½±Ù•ƒšŽš~—’â7¢ž¦¦ã¾ò3’îš*”‹’â7–¶c–r ‹¾ò'¾ò1]¥¹‘½ÝÌƒ’â+žncž²›’öÿ–Ûžîw–¾ç¾ò#¢Š¯šŽ–ë¾ò'¾òmÑ•ÍÑ}…‰Í½±ÕÑ•}…ÉÑ¥™…Ñ}É•™}É•©•Ñ•‘€ƒ–nƒš¶“–r U‰Õ¹ÑÔƒ–’Ç¢Ò—Ž–v–Æx¨«žr–º{¢Þ£–æÏ–>À½ÉÉ•Ñ¹•ÍÌ‰Õœ¨«¾ò#¦v{ž:¿–Š’úw¢Ö[¾ò'Ž€€(¨©¥à¨«¾òkš‚ç–n€€ÇŠSŠQ€¹¥Ñ…ÑÑÉ¥‰ÕÑ•Í€ƒ¢†”€¨¹å…µ±€½€¨¹åµ°Ñ•áÐ•½°õ±™€€¬½¹™¥Ì½ÑÉ…‘¥¹}ÉÕ±•Ì½•Ù¥‘•¹”¼¨¨€µÑ•áÑƒ¾ò#––ºç–¾ï–v …ÉÑ¥™…Ðƒžš•½°ƒ–öK’â–2[¾ò'¾òo–Þ—’ösš‚Då…µ°ƒ¢ž¢2–2X1¾ò!¥Ð‘¥™™€ƒ’â8‰±½ˆƒ–¶_¢*¦nÛ–Þ»–ò¾ò'¾òmÉÕ±•}µ…¹¥™•ÍÐ¹©Í½¹€‘…Ñ…Í•Ñ}¡…Í ƒ’î”1ƒ–¶_¢*¦7žº_¾ò!‘ÈÈÄåÈ¸¸¹€ƒ’â8U‰Õ¹ÑÔƒ¦7žº_–ó–º3–£’â¢ÓŠSŠS’â“–æÏ–>Ã¢«š¶“–B3–¶_¢*¾ò'Žš‚ç–n€€ËŠSŠQ½±‘•¹}ÍÑ½É”¹}Ù•É¥™å}…ÉÑ¥™…Ñ€ƒ–#–h¨«–æÏ–>Ãš^ƒ–Ì±•á¥…°ƒšŽš~”¨«¾ò#–&7–¾ð€½ƒŽžncž²›–&7žòŽ€¸¹€ƒž¦ÿ¢Ú+ŠSŠS’â;–Û’îX½¹™¥¹•µ•¹Ðƒ–B3’â ‰±•á¥…°™¥ÉÍÐ°É•Í½±Ù•Í•½¹‹¢ºû¢º‡¢¾·¢¢¾ò'–4É•Í½±Ù•ƒš¾S¢úŽ–n{–öKšÖ/¢¾Tƒ\×¾ò!å…µ°ƒš^€I1€¼€¹¥Ñ…ÑÑÉ¥‰ÕÑ•Ìƒ¢ž–"d€¼ƒ–Þ—’ösš‚D€ôô¥Ð‰±½ˆ€¼ƒžncž²˜É•˜ƒ–>3–æÏ–>Ãš.H€¼A=M%`ƒžîw–¾äÉ•˜ƒ–>3–æÏ–>Ãš.K¾ò'Ž€€(¨©A½±¥ç¾ò#
+œÔ¸Ë¾ò$¨«¾òkšr«–&+–òÄÉ•ÅÕ¥É•…Ñ—Žšr¨Í­¥ÀƒšÖ/¢¾WŽšr«–"ƒ¦fU‰Õ¹ÑÔ±•Ÿ¾òm½¹Ñ¥¹Õ”µ½¸µ•ÉÉ½É€ƒž¶[žV—’â7–>c¾òm$ƒžržnã’î”©½ˆµ±•Ù•°ƒ¢ºÃ–öW’ê;šï–3–’Ó¦£¾òošr³š&çš>C’ê“–B;’î”Ñ¥½¹Ìƒ–º{¦fžîOšzs’âë–¾ò#¦7ž
+ç¢ž–¾|U‰Õ¹ÑÔ±•œƒ¢ö³žîÿ¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òh¹¥Ñ…ÑÑÉ¥‰ÕÑ•ÏŽ½¹™¥Ì½ÑÉ…‘¥¹}ÉÕ±•Ì½íÉÕ±•}µ…¹¥™•ÍÐ¹©Í½¸°Ù•ÉÍ¥½¹Ì½ØÈÀÈØÀàÈÐµ½µÁ¥±•½ÉÕ±•Ì¹å…µ±÷ŽÍÁ¥­”½½±‘•¹}ÍÑ½É”¹Áä€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}É•Ù¥•Ý}™…¥±ÕÉ•}±•…¹ÕÀ¹ÁäèéQ•ÍÑÉ½ÍÍA±…Ñ™½ÉµIÕ±•	åÑ•Ìƒ\Ì€¬Ñ•ÍÑ}½±‘•¹}É•Ù¥•Ý}Ý½É­™±½Ü¹Áäƒ–æÏ–>Ãš^ƒ–Ìƒ\È€€(¨©H¨«¾òimH´ÀÄÝt ¸¸½…‘È½H´ÀÄÝ}É•Ù¥•Ý}Í•…±}½ÕÑÁÕÑ}½¹™¥¹•µ•¹Ð¹µ¤ƒ
+œÐ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄàƒŠPQÉ…‘¥¹œIÕ±”I•Ù¥•Ü=ÕÑÁÕÐµY•ÉÍ¥½¸½¹™¥¹•µ•¹Ð((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ”€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ä@À´ÀËŠSŠQ€´µÙ•ÉÍ¥½¹€ƒšr«¦ª3¢¾–6Ïš.ó¢Þ¿–ú¾òi€¸¸½•Í…Á•€½™½½p½‰…É€¿žîw–¾ç¢Þ¿–ú¿žncž²›š‚ß–ò?–>¿–r Ù•ÉÍ¥½¹ÌÉ½½Ðƒ–’[–"o–îëžn»–öW¾òo’âP•Ù¥‘•¹”ƒš.ß¢Òwž¶$µÕÑ…Ñ¥½¸ƒ–#’ê8Ù•ÉÍ¥½¸ƒ–ËžªšŽš~—Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÙ•ÉÍ¥½¹}‘¥È€ôÉÕ±•Í}É½½Ð€¼€‰Ù•ÉÍ¥½¹Ìˆ€¼…ÉÌ¹Ù•ÉÍ¥½¹€ƒžnÓš:”µ­‘¥È½ÝÉ¥Ñ—Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄÜƒ
+œË¾ò'¾òi}Ù…±¥‘…Ñ•}Ù•ÉÍ¥½¹}¥‘ƒŠSŠQMÑ•À±•á¥…³¾ò#–6W’âžî’îÛ¢¾·šÎTymµi„µèÀ´åumµi„µèÀ´ä¹|µt¨‘ƒ¾ò3šbû–ò?š.H€¹€½€¸¹ƒ¾òo–"¦jSž²˜¿žncž²˜¿žîw–¾ç¢Þ¿–ú–r£¢¾·šÎW–Æ’â7–>¿¢÷¾ò'¾òmMÑ•ÀÉ•Í½±Ù•½¹™¥¹•µ•¹Ó¾ò!Ù•ÉÍ¥½¹Í}É½½Ð¼ñ¥ù€É•Í½±Ù”ƒ–B;–þ¦†ï’ö7’ê8Ù•ÉÍ¥½¹Ì¼ƒ–¾ò'¾òmMÑ•Àƒ¦†ë–ê?¾ò!Ù•ÉÍ¥½¸ƒ¢¾·šÎT­½¹™¥¹•¹”¯’â7–¶c–r£šŸž¶$¨«–£¦£ž†»–ºkšŸš‚‡¦ª0¨«–#’ê;’îï’öW¢úO–èµÕÑ…Ñ¥½»ŠSŠSš^‹šr'ž&#šr³–Ëžª–#’ê8•Ù¥‘•¹”ƒš.ß¢Òw¾ò'Ž¨«šÖ/¢¾T¨«¾òhÄÈƒžÆï¦v{šÎT¥ƒŠHƒš.Kžît€¬€¨©‰•™½É”½…™Ñ•ÈƒšZ’îÛš‚G–þ¯žŸ¦nÛ–Þ»–ò¨«¾ò#¢šžnXÙ•ÉÍ¥½¹Ì¼ƒ––"o–îë’â;¢Ú+žV3¦¦ã¾ò'¾òo–B#šÎT¥ƒ¢úO–ë’î–r Ù•ÉÍ¥½¹Ì¼ñ¥ø¼ƒ’âSšÃ’âèÉÕ±•Ì¹å…µ³Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹Áä€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}É•Ù¥•Ý}Ù•ÉÍ¥½¹}½¹™¥¹•µ•¹Ð¹Áç¾ò Äß¾òk–>šVÃ–2X€ÄÈ€¬ƒ–B#šÎT€Ä€¬ƒ–Ëžª€Ä€¬•½°ƒ¢Æ–4€Ä€¬‰±½ˆƒ’â¢Óšœ€Ä€¬ÑÉ•”Í¹…ÁÍ¡½Ðƒ––B¯¾ò$€€(¨©H¨«¾òimH´ÀÄÝt ¸¸½…‘È½H´ÀÄÝ}É•Ù¥•Ý}Í•…±}½ÕÑÁÕÑ}½¹™¥¹•µ•¹Ð¹µ¤ƒ
+œÈ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄÜƒŠPQÉ…‘¥¹œIÕ±”I•Ù¥•Üá…Ðµ	åÑ”M•…°€¬MÑ…•=ÕÑÁÕÐ((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò!É•Ù¥•Üƒ–Þ—’ösšÖÍ•…°ƒ¢¾·’æ'–>cšnÓ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸ä@À´ÀÇŠSŠSš^Ÿ–º{ž:Ã’â“š²‡ž.³ž®/¢¾ï–>XQ%YƒšZ’îÛ¾ò!I•…ƒžRš"@IY%]ƒ–&¿šr³ŽI•…}‘…Ñ…Í•Ñ}™¥±•Í}¡…Í¡€ƒ¦ª3¢¾¾ò'¾òiÍÝ…ÃŠI…ÁÑÕÉ—ŠIÉ•ÍÑ½É—ŠIÙ•É¥™çŠIÍ•…°µÑ…µÁ•É•ƒžjQ=Q=Tƒ’öü‰¡…Í ƒ¦ª3¢¾žj–¶_¢*ƒŠ&€ƒ¢Š¯–Â–¶cžj–¶_¢*‹Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òi…ÁÑÕÉ”ƒ’â8Ù•É¥™äƒ–"žšï¾ò!H´ÀÄØƒ
+œÌƒžj‹–ÞË¦ª3¢¾Q%Y‰åÑ•Ì‹¢†£¢þÃ’âè½Ù•É±…¥·¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄÜƒ
+œÄ¿
+œÏ¾ò'¾òh¨«’âš²‡šœÍ¹…ÁÍ¡½Ð¨«ŠSŠQ…Ñ¥Ù•}‰åÑ•Ì€ôÉ•…‘}‰åÑ•Ì ¥€ƒ–6Wš²‡¢¾ï–>[¾òm}¡…Í¡}Í¹…ÁÍ¡½Ð¡l¡É•°°…Ñ¥Ù•}‰åÑ•Ì¥t¥€ƒžR µ…¹¥™•ÍÐƒ–B3’âžº_šÎW–¾ä¨«––¶c–¶_¢*¨«¢º‡žº_¾ò#’â8µ…¹¥™•ÍÐ¡…Í ƒžnãž¶'–6Ï¢¾šb8Í¹…ÁÍ¡½Ðƒ–ÂÇšb¼Q%Yƒ–¶_¢*¾ò'¾òm}‰Õ¥±‘}É•Ù¥•Ý•‘}Ñ•áÐ¡…Ñ¥Ù•}‰åÑ•Ì°€¸¸¸¥€ƒ’î;–B3’â Í¹…ÁÍ¡½Ðƒšz¦ƒ–&¿šr³¾òoš¶“–B8¨«š^ƒ’îï’öTQ%YƒšZ’îÛž²³’ê3š²‡¢¾ï–>X¨«¾òo¢úO–èÍ•…±•™É½´Q%YÍ¹…ÁÍ¡½ÐÍ¡„ÈÔØôñ¡…Í ù€ƒ’úo–’7š‚ãŽ¨©MÑ…•ƒ¢úO–è¨«¾ò!@Äƒ–æÛ–—¾ò'¾òiA¡…Í”€Äƒžê¿š‚‡¦ª0½Í¹…ÁÍ¡½Ó¾ò#–B¬IY%]ƒ–&¿šr³’âÓš^ÛšÊgžºÇ¢žšzCŠSŠS¦nØÉÕ±”µÍÑ½É”µÕÑ…Ñ¥½»¾ò'ŠHA¡…Í”€ÈÍÑ…•“¾ò!•Ù¥‘•¹”ƒ––ºç–¾ï–v €¬Ù•ÉÍ¥½¹Ì¼¹ÍÑ…¥¹œ´ñ¥ø½€ƒ¢þC¢†3–º3šVÐ…Ñ—¾òm…Ñ”ƒ–’Ç¢Ò—šbû–ò?žžï¦fÍÑ…¥¹œ¯šr³š²„•Ù¥‘•¹—ŠSŠQÉ•ÑÕÉ¹€ƒ–r ÑÉäƒ–’â7¢ž›–>D•á•ÁÐƒžj–vG–ÞË’þ»¾ò'ŠHA¡…Í”€ÌÁÕ‰±¥Í£¾ò!ÍÑ…¥¹œƒ–:–¶CšRç–B4Ù•ÉÍ¥½¹Ì¼ñ¥ø½ƒ¾òmQ%Yµ…¹¥™•ÍÐƒšr–B;–:–¶Cšnÿš6‹¾òmÁÕ‰±¥Í ƒ–B8µ…¹¥™•ÍÐƒžj‘…Ñ…Í•Ñ}¡…Í ƒ’î8ÁÕ‰±¥Í¡•‰åÑ•Ìƒ¢º‡žº_¾ò'Ž¨«šÖ/¢¾T¨«¾òi•á…Ðµ‰åÑ”€ß¾ò#–—–êßšÖš*—–F(Í¹…ÁÍ¡½ÐÍ¡„€¼IY%]ƒ––ºç’î8•á…ÐÍ¹…ÁÍ¡½Ðƒ¦C¢†3š:£–¾ð€¼ÁÉ•™±¥¡Ðƒ–B;ž¾‡šRç¢¾ï–>X	1=,ƒ¦nÛ¢úO–è€¼ƒš^ƒž²³’ê3š²‡¢¾ï–>[–>¿šnÿš6ˆÍ•…°ƒ¢ê¯’îô€¼ƒš:Ÿ–"Ûžî€¼Q%YƒšZ’îÛ¢¾ï–>[šVÀ€ôôÁÉ•™±¥¡Ð¬Ä€¼ƒž¾‡šRç¦nÛ¢úO–ë¾ò$¬±•…¹ÕÀ€Ó¾ò!…Ñ”ƒ–’Ç¢Ò—š^€™¥¹…±¥é•Ù•ÉÍ¥½¸¯š^€•Ù¥‘•¹”€¼ƒ’â7š:£¢þlQ%Y€¼ÁÉ•™±¥¡Ðƒ–’Ç¢Ò—š^€Ñ•µÀ€¼ƒ–’Ç¢Ò—–B;¦7¢¾Wž†»–ºkšŸ¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹Áä€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}É•Ù¥•Ý}Í•…±}•á…Ñ¹•ÍÌ¹Áç¾ò ß¾ò$¬Ñ•ÍÑ}É•Ù¥•Ý}™…¥±ÕÉ•}±•…¹ÕÀ¹Áç¾ò Üƒ’â´€Ðƒ¦†ç–Æ{šr³šv‡¾ò$€€(¨©H¨«¾òimH´ÀÄÝt ¸¸½…‘È½H´ÀÄÝ}É•Ù¥•Ý}Í•…±}½ÕÑÁÕÑ}½¹™¥¹•µ•¹Ð¹µ¤ƒ
+œÄ¿
+œÌ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄØƒŠPHÐµÈ¸ÜI•Ù¥•Ý•È½Ù•É¹…¹”½ÉÉ•Ñ¥½¸€¬@Ä!…É‘•¹¥¹œ((¨©QåÁ”¨«¾òiÇ¾ò#šÊïžB’þ»š¶Œ€¬@Äƒ–*ƒ–në¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ü½H´Ä¸È¸Ìƒ–’7–º„ƒ
+œÛŠSŠSšÊïžBšZš†¦†ï¢ºÃ–öTI•Ù¥•Ý•½‘”	…Í•±¥¹”€ÐÝˆÐÜÐÌÝˆÀàÈàÈØÉ”Ñ˜å˜ÄÅŒÔÜàØÉ…˜ÈÔÔá„ÑÌÑ€€¼I=A9€¼$ÉÕ¸€ÐÀMUML€¼I%M,´ÀÀÐƒ’þwš2I=A9¾òm@Ä´ÀÇ¾ò!•¹‘Á½¥¹Ðƒ¢ê¯’î÷’ê“–>'š‚‡¦ª3¾ò'’â8@Ä´ÀË¾ò#ž¦è™É…µ”Í¡•µ‡¾ò'–îë¢º»šr³š&çšâš:'Ž€€(¨©½ÉÉ•Ñ¥½¸€˜@Ä¨«¾òkšï–3–’Ó¦£šnÓšZÃ¾ò!I•Ù¥•Ý•‰…Í•±¥¹”€¬I•Ù¥•Ý•È½ÉÉ•Ñ¥½¸ƒšº×¾òi½¹ÑÉ½°µ™±½Ü€¼±•á¥…°µ™¥ÉÍÐƒ¦†ë–ê<€¼É•Ù¥•Ü¥¹Ñ•É¥Ñäƒšr«–Ï¦^·¾ò'¾òo
+œÐÀHÐµÈ¸Ü½H´Ä¸È¸ÌƒŠHI=A9¾òm}MQI5}9A=%9QM€ƒ–në–ºkšbƒ–Â¾ò!‘¥Ù¥‘•¹“ŠQ•Ñ}‘¥Ù¥‘•¹€¼É¥¡Ñ}¥ÍÍÕ—ŠQ•Ñ}É¥¡Ñ}¥ÍÍÕ—¾òo¢Þ£šÖ¦7š‚ƒŠHAÉ½Ù¥‘•ÉM¡…Á•ÉÉ½Éƒ¾ò'¾òm}Á…å±½…‘}½±Õµ¹Í€€¬}…}ÁÉ½Ù¥‘•É}Ù¥•Ü¡Á…å±½…‘}½±Õµ¹Ìô¥ƒ¾òhÀƒ¢†0¯–þ¦r–"\÷–B#šÎWž¦ë’ê/’îÛšÖŽÀƒ¢†0¯žòë–"\õAI=Y%I}M!5ƒŽ€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½½±‘•¹}É½ÕÑ•È¹ÁçŽ½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹”€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}…}…Ñ½µ¥}‰½Õ¹‘…Éä¹ÁäèéQ•ÍÑµÁÑåÉ…µ•M¡•µ„ƒ\Ì€¬Q•ÍÑ¹‘Á½¥¹Ñ%‘•¹Ñ¥ÑåÉ½ÍÍ¡•¬ƒ\È€€(¨©H¨«¾òimH´ÀÄÙt ¸¸½…‘È½H´ÀÄÙ}…Ñ½µ¥}‰½Õ¹‘…Éå}¥¹Ñ•É¥Ñä¹µ¤ƒ
+œÐ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄÔƒŠPQÉ…‘¥¹œIÕ±”I•Ù¥•Ü%¹ÁÕÐ%¹Ñ•É¥Ñä…Ñ”((¨©QåÁ”¨«¾òiÄ½Ë¾ò!É•Ù¥•Üƒ–Þ—’ösšÖ––Gžê›–>cšnÓ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸à@À´ÀÏŠSŠQÉ•Ù¥•Ü¹Áäƒ–>«¦ª3¢¾Í•±•Ñ½Èƒ–>¿¢žšzC¾ò!±½…‘}ÉÕ±•}µ…¹¥™•ÍÑƒ¾ò'¾ò3¢Š¯ž¾‡šRä¿’â7’â¢Óžj=5A%1Q%Yƒ–>¿¢Š¬‹šÒ_š"@‹šZÃžj–B#šÎTIY%]ƒž&#šr³¾ò!¡Õµ…¸É•Ù¥•ÜƒŠ&€É”µÍ•…°…¸¥¹Ñ•É¥Ñäµ‰É½­•¸…¹‘¥‘…Ñ—¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÁÉ•™±¥¡Ð€ôµ…¹¥™•ÍÐƒ–>¿¢¾ì€¬€´µ™É½´µÙ•ÉÍ¥½¸€¼ƒ–6WšZ’îØ€¼€´µÉÕ±•ÌôõQ%Yƒ¢Þ¿–úš¾S¢ú¾òmIY%]ƒ–&¿šr³’î8€´µÉÕ±•Ìƒ¢Þ¿–ú’ê3š²‡¢¾ï–>[Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄØƒ
+œÏ¾ò'¾òiÁÉ•™±¥¡Ðƒ’â7–>¿žîW¢þš&Ÿ¢†0±½…‘}…Ñ¥Ù•}ÉÕ±•Íƒ¾ò!Q%Y‘…Ñ…Í•Ð¡…Í ƒ–’7žº\€¬µ…¹¥™•ÍÓŠQ‘…Ñ…Í•Ðƒ–no–¶_šºÔ½¡•É•¹—ŠSŠS’â8ÉÕ¹Ñ¥µ”ƒ–B3’â …Ñ—¾ò'¾òo–Š{–*€É•Ù¥•Ý}ÍÑ…ÑÕÌôõ=5A%1ƒš‚‡¦ª3¾ò!IY%]Q%Yƒš.Kžîw–4É•Ù¥•ß¾ò'¾òmIY%]ƒ–&¿šr³’î8¨«–ÞË¦ª3¢¾Q%Y‰åÑ•Ì¨¨ƒ’êŸžR¾ò!…¹½¹¥…°ƒ¢Þ¿–ú¢¾ï–>X€¬ƒ¢¾ï–>[–B;–’7¦ª0¡…Í£¾ò3š^€Q=Q=W¾ò'¾òmÁÉ•™±¥¡Ðƒ–’Ç¢Ò”ƒŠH€¨«¦nÛ¢úO–è¨«¾ò#š^€•Ù¥‘•¹”ƒš.ß¢ÒwŽš^€Ù•ÉÍ¥½¹Ì¼ñ¹•Üø¿Žš^€Ñ•µÀ½™¥¹…°µ…¹¥™•ÍÐƒ–>cšnÓ¾ò'¾òo
+œÐ¸Ó¾òiÍ½ÕÉ•}Ù•ÉÍ¥½¸½‘…Ñ…Í•Ñ}Ù•ÉÍ¥½¸IEU%Iƒ’â/šÊ$±½…‘}ÉÕ±•}µ…¹¥™•ÍÑ€Í¡•µ„ƒš‚‡¦ª3¾ò!É•Ù¥•Ü½Í•±•Ñ½Èƒ–Þ—–ß’â8ÉÕ¹Ñ¥µ”ƒ–Ç’ê¯–6W’â µ…¹¥™•ÍÐA$ƒ––Gžê›¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹ÁçŽÍÁ¥­”½ÑÉ…‘¥¹}ÉÕ±”¹Áç¾ò!µ…¹¥™•ÍÐÍ¡•µ‡¾ò$€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}É•Ù¥•Ý}¥¹ÁÕÑ}¥¹Ñ•É¥Ñä¹Áç¾ò ç¾òkž¾‡šRä‰åÑ•Ì¿ž¾‡šRäµ…¹¥™•ÍÐ¡…Í ¿žòèÍ½ÕÉ•}Ù•ÉÍ¥½¸¿ž¦è‘…Ñ…Í•Ñ}Ù•ÉÍ¥½¸½½¡•É•¹”µ¥Íµ…Ñ ƒ\Ì¿–—–êßšÖš"C–*|½IY%]ƒš.KžîwŠSŠS–£¦£–B¯¦nÛ¢úO–ëšZ·¢¢¾ò$€€(¨©H¨«¾òimH´ÀÄÙt ¸¸½…‘È½H´ÀÄÙ}…Ñ½µ¥}‰½Õ¹‘…Éå}¥¹Ñ•É¥Ñä¹µ¤ƒ
+œÌ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄÐƒŠP	½Õ¹IÕ±”1•á¥…°µ¥ÉÍÐAÉ”µ•ÍÌ½¹™¥¹•µ•¹Ð((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò!H´ÀÄÐ¼ÀÄÔƒ––Gžê›¢†—–£¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸à@À´ÀËŠSŠQ}½¹™¥¹• ¥€ƒ– A…Ñ ¹É•Í½±Ù” ¥€ƒ–4½¹Ñ…¥¹µ•¹Ðƒš¾S¢ú¾òk¦v{šÎT€¸¸¼¸¹€É•˜ƒ–r ±•á¥…°ƒš.Kžîw–&7–ÞË¢ž›–>D™¥±•ÍåÍÑ•´É•Í½±ÕÑ¥½»¾ò ‰½¹™¥¹•µ•¹Ð‰•™½É”9d™Ì…•ÍÌˆƒ’î7’âè½Ù•É±…¥·¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òi}½¹™¥¹•¡É½½Ð°É•°¥ƒ¾ò!É•Í½±Ù”µ™¥ÉÍÓ¾ò$¬}½¹™¥¹•‘}‘…Ñ…Í•Ñ}™¥±•ƒ¾ò#––B¬±•á¥…³¾ò'–æÛ–"_¢ÂžR£¾ò3¦†ë–ê?’â7¦?šb;Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄØƒ
+œË¾ò'¾òi}±•á¥…±±å}½¹™¥¹•‘}‘…Ñ…Í•Ñ}™¥±•ƒ¾ò!MÑ•À¾òk¦v{ž¦è¿žnã–¾ä¿š^ƒžncž²˜¿š^€€¸¹€½Ù•ÉÍ¥½¹Ì¼ñÉÕ±•}Ù•ÉÍ¥½¸ø¼ƒžîOšzŠSŠP¨«¦nØ™Ìƒ¢ºÿ¦^¸¨«¾ò'¾òm}½¹™¥¹•‘}‘…Ñ…Í•Ñ}™¥±•€ƒš"C’âè¨«–R¿’â–—–>Œ¨«¾ò!MÑ•ÀƒŠHMÑ•ÀÉ•Í½±Ù•Íåµ±¥¹¬•Í…Á—¾ò'¾òm‰½Õ¹±½½Àƒ–"ƒ¦f“–&7žö¸}½¹™¥¹•‘ƒ¾ò#–>0¡•±Á•Èƒ–æÛ–"_–ê¦f“¾ò'¾òm•Ù¥‘•¹”É•˜ƒžj}½¹™¥¹•‘€ƒ–Š{–*€±•á¥…°€¸¹€ƒ–&7žö»š.KžîwŽ¨«šÖ/¢¾T¨«¾òiA…Ñ ¹É•Í½±Ù•€ÍÁçŠSŠQÑÉ…Ù•ÉÍ…³¾ò#–’[¦£šZ’îÛ–¶c–r£¾ò$¿žîw–¾ä¿žncž²˜¿–òž&#šr³žn»–öWžjš.Kžîw–£ž¢,€¨©…¹‘¥‘…Ñ”ƒšr«¢Š¬É•Í½±Ù”¨«¾òo–B#šÎW¢Þ¿–úš&7¢ž›–>DÉ•Í½±Ù—¾òmÍåµ±¥¹¬•Í…Á”ƒ’î7–r MÑ•Àƒš.›š"«¾òoš¶–âà‰½Õ¹É•Á±…äƒ’þwš2¦k¢þŽ€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½ÑÉ…‘¥¹}ÉÕ±”¹Áä€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}±•á¥…±}™¥ÉÍÑ}½¹™¥¹•µ•¹Ð¹Áç¾ò ç¾òkš.Kžîw–&7¦nØÉ•Í½±Ù”ƒ\Ð€¼ƒ–B#šÎTÉ•Í½±Ù”€¼Íåµ±¥¹¬€¼ƒš¶–âã¦k¢þ€¼¡•±Á•Èƒ–6W–ƒ\Ë¾ò$€€(¨©H¨«¾òimH´ÀÄÙt ¸¸½…‘È½H´ÀÄÙ}…Ñ½µ¥}‰½Õ¹‘…Éå}¥¹Ñ•É¥Ñä¹µ¤ƒ
+œÈ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄÌƒŠP½±‘•¸½µ…¥¸Ñ½µ¥Œá¡…¹”A•ÉÍ¥ÍÑ•¹”((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ”€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸à@À´ÀÇŠSŠQƒ–~|…ÍÍ¥¸µÑ¡•¸µÁ•ÉÍ¥ÍÓ¾ò!à€ôÑ…É•Ð¹` ¤ì€¸¸¸ì½±±•Ñ½È¹Á•ÉÍ¥ÍÐ¡à¥ƒ¾ò'¦7šZÃš&O–ò ‹žr–ºx•á¡…¹”ƒ–ÞË–"o–îë’öšr«š2’æ–2X‹žª_–>¾òkž²³’ê3’â¨ÁÉ½Ù¥‘•È…±°ƒ–’Ç¢Ò—š^Ûž²³’â’â¨ÍÕ•ÍÌ•á¡…¹”ƒšÂã’æ’â‹¢¾š6»¾ò!É•…°…±±ÌôÈ€¼Á•ÉÍ¥ÍÑ•ôÇ¾ò'¾òmMPƒ–º#–6¯–ÞË¦–2[’âè¹…µ”µÁÉ•Í•¹”ƒšŽš~—Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òk¢ÂžR£¢–>[–ú\•á¡…¹”ƒ–òWžR£–B;–>›¢†0Á•ÉÍ¥ÍÓ¾ò ‹¢ºÃ–ú_ž¢7–B;š2’æ–2X‹¾ò'¾òmMPƒ–º#–6¯š:—–>\…ÍÍ¥¸µÑ¡•¸µÁ•ÉÍ¥ÍÓ¾ò#–>c¦?–B7š~C–’–ëž:ÀÁ•ÉÍ¥ÍÐƒ–6Ï–>¿¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄØƒ
+œÇ¾ò'¾òi}½µ…¥¹½±±•Ñ½È¹…±°¡™¸¤€´øA•ÉÍ¥ÍÑ•‘á¡…¹•Y¥•Ýƒ¾ò!™É½é•¸‘…Ñ…±…ÍÏ¾òiÁ…å±½…½É•ÅÕ•ÍÑ}¥½•¹‘Á½¥¹Ð½•Ù¥‘•¹•}µ•Ñ‡¾ò'ŠSŠP¨©…±°­Á•ÉÍ¥ÍÐƒšb¿’â’â«¢úçžV3šN7’öp¨«¾ò!•á¡…¹”ƒ–r£¢úçžV3¢þS–n{–&7–ÞËš2’æ–2[¾òm±¥¹•…”ƒ’î8Ù¥•Üƒ¢¾ï–>[¾ò'¾òl¨«–£¦£–~|™•Ñ ¨«¾ò!MQ}MQQUL½1%MQ}5MQH½1%5%Q}A%Q}IU1½=IA}Q%=9}=9QaP½	)}5AA%9¾ò'žî’â¢ÖÃ–:–¶C¢úçžV3¾òmMPƒ–º#–6¯–6žêœ¨«š:Ÿ–"ÛšÖ–º'– ¨«¾ò!•á¡…¹”ƒ¢ÂžR£–þ¦†ï’ö7’ê8½±±•Ñ½È¹…±°¡±…µ‰‘„è€¸¸¸¥€ƒžj±…µ‰‘„ƒ–¾òo¢Ò–BGšÖ/¢¾W¢¾šb;š^œ…ÍÍ¥¸µÑ¡•¸µÁ•ÉÍ¥ÍÐƒšêCž‚¢Š¯š.K¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½½±‘•¹}É½ÕÑ•È¹ÁçŽÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÁÉ½‰•}•á¡…¹•}•¹™½É•µ•¹Ð¹Áç¾ò#–º#–6¯šRÛžÒŸ¾ò$€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}…}…Ñ½µ¥}‰½Õ¹‘…Éä¹Áç¾ò ß¾òi‘¥Ù¥‘•¹ƒš"C–*|­É¥¡Ñ}¥ÍÍÕ”ƒ–’Ç¢Ò—ŠK’â“¢¦÷š2’æ–2X­…±°ƒšVÀôõÁ•ÉÍ¥ÍÑ•ƒšVÀ€¼Á•ÉÍ¥ÍÐƒ–’Ç¢Ò—ŠK–B;žî´ÁÉ½Ù¥‘•È…±°ƒ’â7–>G–Â€¼‘¥Ù¥‘•¹ƒ–’Ç¢Ò—ŠIÉ¥¡Ñ}¥ÍÍÕ”ƒ’â7–>G–Â€¼™Õ±°ÍÕ•ÍÌ±¥¹•…”€¼ƒž¦è™É…µ”ƒ\Ì€¼•¹‘Á½¥¹Ðƒ’ê“–>$ƒ\Ë¾ò'¾òoš^‹šr$É½ÕÑ•È½½•¹™½É•µ•¹ÐƒšÖ/¢¾W¦¦4€€(¨©H¨«¾òimH´ÀÄÙt ¸¸½…‘È½H´ÀÄÙ}…Ñ½µ¥}‰½Õ¹‘…Éå}¥¹Ñ•É¥Ñä¹µ¤ƒ
+œÄ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄÈƒŠPHÐµÈ¸ØI•Ù¥•Ü½ÉÉ•Ñ¥½¸€˜½Ù•É¹…¹”Må¹Œ€¬I•Ù¥•ÜQ½½°!…É‘•¹¥¹œ((¨©QåÁ”¨«¾òiÇ¾ò#šÊïžB’þ»š¶Œ€¬ƒ–Þ—–ß–*ƒ–në¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ø½H´Ä¸È¸Èƒ–’7–º„ƒ
+œãŠSŠSšï–0	…Í•±¥¹”ƒžòè•á…ÐM!¾ò É”àÕ˜ÐÐÜ¸¸»¾ò'¾òm$ƒž*Ûššr«šnÓšZÃ¢ÌÉÕ¸€Ìã¾òmH´ÀÄÐ¿
+œÐÄƒ–ŽÃšb8‹’îï’öT™Ìƒ¢ºÿ¦^»–&4½¹™¥¹•µ•¹Ð‹¢0ÉÕ¹Ñ¥µ”ƒ’â7–º3–£šî‡¢ÚÏ¾ò!½Ù•É±…¥·¾ò'¾òm@Ä´ÀÄ¼ÀË¾ò!É•Ù¥•Ü¹Áäƒ–6WšZ’îÛ¦vg¦îc¦fC–"Ø€¼‘ÕÉ…‰¥±¥ÑäÝ½É‘¥¹Ÿ¾ò'Ž€€(¨©½ÉÉ•Ñ¥½¸¨«¾òkšï–3–’Ó¦ •á…ÐM!¾ò#’â+š&ä¥µÁ±•µ•¹Ñ…Ñ¥½¸€É”àÕ˜ÐÐÜ€¬ÉÕ¸€ÌàÍÕ•ÍÏ¾ò$¬I•Ù¥•Ý•È½ÉÉ•Ñ¥½¸ƒšº×¾ò!H´ÀÄÐ½Ù•É±…¥´ƒ¢ºÃ–öW¾ò3’î”H´ÀÄÔƒ
+œÔƒ’âë–¾ò'¾òo
+œÐÀHÐµÈ¸Ø½H´Ä¸È¸ÈƒŠHI=A9¾ò#žRÇšr³š&ç’þ»–’7¾ò'¾òmI%M,´ÀÀÐƒ’þwš2I=A9¾òmÉ•Ù¥•Ü¹Áç¾òiµÕ±Ñ¤µ™¥±”Q%Yƒšbû–ò<™…¥°±½Õ“¾ò!=ÁÑ¥½¸¾ò3žšš¶‹šr«šv”Í¥±•¹ÐÉ•Ù¥•Ü½¹±ä™¥ÉÍÐ™¥±—¾ò$¬Ý½É‘¥¹œƒšnÓš¶¾ò!…Ñ½µ¥ŒÉ•Á±…•µ•¹Ð€¼É•…‘•ÈµÍ…™—ŠSŠS¦vxÁ½Ý•Èµ±½ÍÌ‘ÕÉ…‰±—¾ò3š^€™Íå¹¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹ÁçŽ½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹”€€(¨©Q•ÍÑÌ¨«¾òi‰¥¹‘¥¹œèéQ•ÍÑI•Ù¥•ÝMÉ¥ÁÑ!…É‘•¹¥¹Ÿ¾ò#’þwš2¾ò$¬ƒ–6WšZ’îÛš.Kžîw¦ï¢úG¾ò!µÕ±Ñ¤µ™¥±”µ…¹¥™•ÍÐƒ–rëšf¿¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄÄƒŠP½ÉÁ½É…Ñ”µÑ¥½¸AÉ½Ù¥‘•ÈµM¡…Á”Y…±¥‘…Ñ¥½¸‘…ÁÑ•È((¨©QåÁ”¨«¾òiÄ½È¥µÁ±•µ•¹Ñ…Ñ¥½¸µÍ•µ…¹Ñ¥Œ±½ÍÕÉ—¾ò!I…ÜM½Hƒ’â7–>c¾òmÙ…±¥‘…Ñ¥½¸ƒ¢úçžV3šZÃ–Šx…‘…ÁÑ•Èƒ––Gžê›¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ü@À´ÀÓŠSŠQÙ…±¥‘…Ñ½È½…­•Q…É•ÐƒšÚ#¢Òä…¹½¹¥…°µ±¥­”ƒ–¶_šº×¾ò!MUI%Qe}=½a}Q½Y9Q}QeA¾ò'¾ò3¢0µ…é¥¹…Ñ„ƒ–ºcšZçšZš†¾ò Ì¸Ô¸Ü¸Ä¼Ì¸Ô¸Ü¸Ë¾ò'žr–º{–¶_šº×’âè5I-Q}=½Q}`ƒ’â85I-Q}=½a}%Y%9}Q¾òmY9Q}QeAƒ¢Š¯’ò«¦ƒš"@Á…å±½…ƒ–"_Žžr–º{¢Ò›–>ß’â(™½Éµ…°½±‘•¸ƒš^ƒšÎWš2'žr–º{šVÃš6»¦ª3¢¾Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÙ…±¥‘…Ñ½ÈƒžnÓš:”È¹•Ð ‰MUI%Qe}=ˆ¼‰a}Qˆ¼‰Y9Q}QeAˆ¥ƒ¾òm…­•Q…É•Ðƒ–B#š"C–B3–B7–¶_šº×¾ò!…¹½¹¥…°ƒš^¢Þ¿¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄ×¾ò'¾òi}AI=Y%I}%1}=9QIQ€ƒšbû–ò?šZš†––Gžê›¾òm}…}ÁÉ½Ù¥‘•É}Ù¥•Ý€•Á¡•µ•É…°ƒ–öK’â–2[¾ò!5I-Q}=ŠIÍ•ÕÉ¥Ñå}½‘—¾òmQ}`½a}%Y%9}QŠI•á}‘…Ñ—¾òm•Ù•¹Ñ}ÑåÁ”ô¨«ž®¿ž
+ç¢ê¯’îô¨«šÒûžR¾ò1Á…å±½…ƒ’ò«¦€Y9Q}QeAƒ–"_¢Š¯–þ÷žV—¾ò'¾òmÙ¥•ÜƒšBë–â˜Í½ÕÉ•}•¹‘Á½¥¹Ð½É…Ý}É•ÅÕ•ÍÑ}¥±¥¹•…—¾òožòëšZš†–¶_šº×ŠIAÉ½Ù¥‘•ÉM¡…Á•ÉÉ½ÉƒŠIÉ½ÕÑ•}…±°ƒžîOšz–2XY1%Q}%0¡AI=Y%I}M!5¥ƒ¾ò!™…¥°±½Õ“¾ò'¾òm…­•Q…É•ÐƒšRäÁÉ½Ù¥‘•Èƒ–:žR–¶_šº×¾ò!‘ÉäµÉÕ¸ƒ’â8É•…°ƒ–B3’â …‘…ÁÑ•Ë¾ò'¾òmÉ…Ü•Ù¥‘•¹”ƒ’þwš2ÁÉ½Ù¥‘•Èƒ–:žR–¶_šº×–B7¾ò!Á…ÉÅÕ•Ðƒ–"_–B7šZ·¢¢¾ò'¾òmÙ…±¥‘…Ñ½ÈØÛ¾ò#šÚ#¢Òç–Â?–g¢¾·’æ'–¶_šº×¾ò'Ž¨«šZçš†#–>[¢"4¨«¾ò#–º‡¢º„ƒ
+œÄÌƒ–no¦^»¾ò'¾òk’â7šRäÉ…ß¾ò!I…ÜM½Hƒ’â7–>¿–>c¾ò'Ž’â7–r Ù…±¥‘…Ñ½Èƒ–šV¢B÷–"¯–B7š:‹šÖ/¾ò!™¥ÉÍÐµ…±¥…ÌµÝ¥¹Ìƒžšš¶‹¾ò'Ž’â7–B¿–* H´Ë¾ò#’â7ž¢Ï–ºk––Gžê›’â7’òƒšJ·¾ò'ŠSŠQ•Á¡•µ•É…°…‘…ÁÑ•Èƒšb¿šr–Â?’âS¦n’â·žj––Gžê›ž
+çŽ€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½½±‘•¹}É½ÕÑ•È¹ÁçŽÍÁ¥­”½Ñ…É•Ð¹Áä€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}…}ÁÉ½Ù¥‘•É}Í¡…Á”¹Áç¾ò ÄÏ¾òiÙ¥•Üƒ–öK’â–2[\Ì¿’ò«¦€Y9Q}QeAƒ–þ÷žV”¿žòë–¶_šº×\Ì¿šr«ž~—šÖ½…­•Q…É•ÐÁÉ½Ù¥‘•Èƒ–¶_šºÔ½É…ÜÁ…ÉÅÕ•Ðƒ–:žR–"_–B4¿ž®¿–"Ãž®¼AML¿–>7–BD•¹‘Á½¥¹Ð¿žîOšz–2XAI=Y%I}M!5¿žr–ºxØÌ…Í—¾ò$¬Ñ•ÍÑ}…}•Ù•¹Ñ}ÑåÁ”½Í½Èƒ¦¦4€€(¨©H¨«¾òimH´ÀÄÕt ¸¸½…‘È½H´ÀÄÕ}…}ÁÉ½Ù¥‘•É}Í¡…Á•}…‘…ÁÑ•È¹µ¤ƒ
+œÄ·
+œÐ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÄÀƒŠPI•ÅÕ¥É•IÕ±”5•Ñ…‘…Ñ„½¡•É•¹”((¨©QåÁ”¨«¾òiÈ…µ•¹‘µ•¹ÐÑ¼H´ÀÄÐƒ
+œÈ€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ü@À´ÀÏŠSŠQ½¡•É•¹”ƒ–¾äÍ½ÕÉ•}Ù•ÉÍ¥½¸½‘…Ñ…Í•Ñ}Ù•ÉÍ¥½¸ƒ’î7šb¼‹–†¯’êš&7š¾S¢ú‹–>¿¦'¢¾·’æ'¾òiµ…¹¥™•ÍÐƒž¦ë–¶_šº×–>¿šRû¢†3¾ò!‘…Ñ…Í•Ðƒžr–ºx±¥¹•…”ƒ¢Š¯¢ÖÃžž¾òm¹•Ý}ÉÕ¸ƒ’òkžîG–ºkž¦èÍ½ÕÉ•}Ù•ÉÍ¥½¸ƒ–ö‹š"@™½Éµ…°±¥¹•…”ƒžòë–’Ç¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òi¥˜µ…¹¥™•ÍÐ¹‘…Ñ…Í•Ñ}Ù•ÉÍ¥½¸…¹€¸¸¹€€¼¥˜µ…¹¥™•ÍÐ¹Í½ÕÉ•}Ù•ÉÍ¥½¸…¹€¸¸¹ƒ¾ò#šv‡’îÛš¾S¢ú¾ò'¾òmÁÉ½Ù•¹…¹•}½µÁ±•Ñ”ƒ’â7¢ššÆ‘…Ñ…Í•Ñ}Ù•ÉÍ¥½¸½Í½ÕÉ•}Ù•ÉÍ¥½»¾òm‰½Õ¹É•Á±…äƒ–>«–’7¦ª0Í•±•Ñ½È­¡…Í ­½¹Ñ•¹ÐµÙ•ÉÍ¥½»Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄÔƒ
+œÔ¸Ï¾ò'¾òk’â“–¶_šºÔ€¨«–þ–†¯¦v{ž¦è€¬ƒš^ƒšv‡’îÛžÊûž†»š¾S¢ú¨«¾ò!µ¥ÍÍ¥¹œ½•µÁÑä½µ¥Íµ…Ñ ƒ– 	1=/¾ò'¾òmÁÉ½Ù•¹…¹•}½µÁ±•Ñ” ¥€ƒ–¾äAI=UQ%=8ƒ¢ššÆ‘…Ñ…Í•Ñ}Ù•ÉÍ¥½¸€¬Í½ÕÉ•}Ù•ÉÍ¥½¸ƒ¦v{ž¦ë¾òm±½…‘}‰½Õ¹‘}ÉÕ±•}‰½½­€ƒ–ŠxÍ½ÕÉ•}Ù•ÉÍ¥½¸½É•Ù¥•Ý}ÍÑ…ÑÕÌƒ–’7¦ª3–>šVÃ¾ò!ÉÕ¹¹•ÈƒžjÙ•É‘¥Ð½É•ÍÕµ”€¬ÁÉ½‰•Ì¹ÉÕ±•}‰½½¬ƒ’â'–’¢ÂžR£–£’òƒ–º3šVÓ¢ê¯’î÷ŠSŠQ‰½Õ¹ƒ’â8±½…‘•ƒ’â7’â¢Ó–6Ì	1=/¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½ÑÉ…‘¥¹}ÉÕ±”¹ÁçŽÍÁ¥­”½µ½‘•°¹ÁçŽÍÁ¥­”½ÉÕ¹¹•È¹ÁçŽÍÁ¥­”½ÁÉ½‰•Ì¹Áä€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÉÕ±•}É•ÅÕ¥É•‘}½¡•É•¹”¹Áç¾ò ÄË¾òiÉ•ÅÕ¥É•“\Ð€¬µ¥Íµ…Ñ£\È€¬½¡•É•¹ÐAML€¬ÁÉ½Ù•¹…¹—\Ì€¬‰½Õ¹‘¥Í…É•—\È€¬ƒ–º3šVÓ’â¢Ó–*ƒ¢ö÷¾ò$€€(¨©H¨«¾òimH´ÀÄÕt ¸¸½…‘È½H´ÀÄÕ}…}ÁÉ½Ù¥‘•É}Í¡…Á•}…‘…ÁÑ•È¹µ¤ƒ
+œÔ¸Ì€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÀäƒŠPI…ÜÙ¥‘•¹”%‘•¹Ñ¥Ñä€¼%‘•µÁ½Ñ•¹ä±½ÍÕÉ”((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ”€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ü@À´ÀËŠSŠS–º3šVÓ–æž¶'š"C–*¦7¢¾W¢þS–nxÍ¡„ÈÔØ£šZÀµ•Ñ…}‰åÑ•Ì§¾ò#–B¯šZÀ¥¹•ÍÑ•‘}…Ó¾ò'¾ò3¢3žŽžnc’þwžVgš^œµ•Ñ„ƒŠHÉ•ÑÕÉ¹••Ù¥‘•¹•}¡…Í €„ôÍ¡„ÈÔØ¡Á•ÉÍ¥ÍÑ•™¥±”§¾òmMÁ¥­•…Í”ƒžîG–ºk’ê3š²‡¢þS–n{–ó–B8Ù•É¥™å}•Ù¥‘•¹•}±½ÍÕÉ”ƒ–þžÛ–’Ç¢Ò—Ž¢þw–>4€‰I…Ý]É¥Ñ•I•ÍÕ±ÐµÕÍÐ‘•ÍÉ¥‰”Ñ¡”Á•ÉÍ¥ÍÑ••Ù¥‘•¹”‹Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiµ•Ñ…}¡…Í €ôÍ¡„ÈÔØ¡µ•Ñ…}‰åÑ•Ì¥ƒ¾ò!¥¸µµ•µ½ÉäÍ•É¥…±¥é…Ñ¥½»¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄÔƒ
+œÔ¸Ë¾ò'¾òkš&šr$ÍÕ•ÍÌÉ•ÑÕÉ¸Á…Ñ ƒ’î”¨«žŽžnc–º{¦f‰åÑ•Ì¨¨ƒ¢º‡žº\•Ù¥‘•¹•}¡…Í ½µ•Ñ…}…ÉÑ¥™…Ó¾ò!µ•Ñ…}Á…Ñ ¹É•…‘}‰åÑ•Ì ¥ƒ¾ò'¾òm™É•Í ½µµ¥ÐƒšZ·¢¢ Á•ÉÍ¥ÍÑ•€ôô¥¹Ñ•¹‘•“¾òo–æž¶'¦7¢¾W¢þS–nx•á¥ÍÑ¥¹œÁ•ÉÍ¥ÍÑ•¡…Í£¾ò ¨«’â7¢šžn[š^œµ•Ñ„¨«ŠSŠQ¥µµÕÑ…‰±”Í•µ…¹Ñ¥Ìƒ’þwžVg¦š[š²‡š"C–*¢B÷žn`‰åÑ•Ï¾ò'Ž¨«šZçš†#–>[¢"4¨«¾òk’â7’âè¡…Í ƒ’â¢Ó¢3¦7–gš^œµ•Ñ‡¾ò#’òkž‚Ó–v<¥µµÕÑ…‰±”ƒ¢¾·’æ'’â;¦š[š²‡–º‡¢º‡ž^W¢þç¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÑ½É…”½É…Ý}ÝÉ¥Ñ•È¹Áä€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}É…Ý}¥‘•¹Ñ¥Ñä¹Áç¾ò Û¾òk–æž¶'¢þS–n{žŽžn`¡…Í ¿–6W¢† ¿–’k¢† ±½ÍÕÉ”¿–’Ç¢Ò—–æž¶$½½ÉÁ¡…¸ƒš‹–’4½™É•Í ƒšZ·¢¢¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÀàƒŠP	½Õ¹IÕ±”AÉ”µ•ÍÌ½¹™¥¹•µ•¹Ð±½ÍÕÉ”((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò!H´ÀÄÐƒ––Gžê›¢†—–£¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ü@À´ÀÇŠSŠQ±½…‘}‰½Õ¹‘}ÉÕ±•}‰½½­€ƒšnû’î”€¡É½½Ð€¼‘…Ñ…Í•Ñ}™¥±•ÍlÁt¤¹¥Í}™¥±” ¥€ƒš:‹šÖ,É½½Ó¾ò ¨©™ÌÁÉ½‰”ƒ–#’ê8½¹™¥¹•µ•¹Ð¨«¾ò'¾òkž¾‡šRçžîG–ºh€¸¸¼¸¸½½ÕÑÍ¥‘”¹å…µ±€ƒ–r£¢Š¯š.Kžîw–&7–ÞË–¾äÉ½½Ðƒ–’[¢Þ¿–ú–>GžR’âš²‡–¶c–r£šŸš:‹šÖ/Ž	H´ÀÄÐƒ–ŽÃšb;žj€‰½¹™¥¹•µ•¹Ð‰•™½É”9d™¥±•ÍåÍÑ•´…•ÍÌˆƒ’îQ%Yƒ¢Þ¿–úš"Cž®/¾ò!½Ù•É±…¥·¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÉ½½Ð€ôƒž²³’â’â«’öü‘…Ñ…Í•Ñ}™¥±•ÍlÁtƒ–¶c–r£žj–g¦'¾òo¦j?–B;¦CšZ’îØ½¹™¥¹•µ•¹ÓŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄÔƒ
+œÔ¸Ç¾ò'¾òiÉ½½ÐƒžRÇ–>šVÀ¨«ž†»–ºkšœ¨«¢žšzC¾ò!ÉÕ±•Í}É½½Ð€¼É•Á½}É½½Ð€¼‘•™…Õ±Ð‘¥ËŠSŠS’â7¢ž›žŠÀ‘…Ñ…Í•Ñ}™¥±•Ï¾ò'¾òo–£šZ’îØ½¹™¥¹•µ•¹Ó¾ò!±•á¥…°€¬É•Í½±Ù•€¬Ù•ÉÍ¥½¹Ì¼ñÉÕ±•}Ù•ÉÍ¥½¸ø¼ƒžîOšz¾ò'–#¢†3¾òl¨«’æ/–B8¨«š&7–¶c–r£šœ½É•…½¡…Í ½±½…“Ž	ÍMÁç¾ò!Á…Ñ A…Ñ ¹¥Í}™¥±”½É•…‘}‰åÑ•Ì½½Á•»¾ò'šÖ/¢¾W¢¾šb;¾òiÑÉ…Ù•ÉÍ…³¾ò#–’[¦£šZ’îÛžr–º{–¶c–r£¾ò$¿žîw–¾ç¢Þ¿–ú¿–òž&#šr³žn»–öWžjš.Kžîw–£ž¢,¨«¦nÛ¢Ú+žV0™Ìƒ¢ºÿ¦^¸¨«Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½ÑÉ…‘¥¹}ÉÕ±”¹Áä€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}‰½Õ¹‘}ÁÉ•}…•ÍÌ¹Áç¾ò Ó¾òiÑÉ…Ù•ÉÍ…°ƒ¦nÛš:‹šÖ,¿žîw–¾ç¦nÛš:‹šÖ,¿–òž&#šr³žn»–öW¦nÛš:‹šÖ,¿–B#šÎTµÕ±Ñ¤µ™¥±”AMO¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÀÜƒŠPHÐµÈ¸ÔI•Ù¥•Ü½ÉÉ•Ñ¥½¸€˜½Ù•É¹…¹”Må¹Œ((¨©QåÁ”¨«¾òiÇ¾ò#šÊïžB’þ»š¶¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ô½H´Ä¸È¸Äƒ–’7–º„ƒ
+œçŠSŠQY1=ƒ¢«žnãž~ožnû¾ò!=9%I5I8ÙÌ€‹–úÑ¥½¹Ìƒž†»¢º‹¾ò'¾òl‰ØÌƒš^ƒ¦r¦7–Â‹žjƒ–ŽÃšb;’â;–º{¦fšVÃš6»¾ò!ØÌÕ¹ÑåÁ•“¾ò'’â7ž²›¾òmÕÉÉ•¹Ð½‘”	…Í•±¥¹”ƒ¦vx•á…ÐM!¾òo
+œÌÀƒ’þwžVg¢þš^ØÕÉÉ•¹ÐµÍÑ…Ñ—¾òo
+œÐÀƒš>C–&7–dÕÁÍÑÉ•…´AMOŽ€€(¨©½ÉÉ•Ñ¥½¸¨«¾òiY1=HÐµÈ¸Ôƒšv‡žn»’â“–’–ÂÇ–rÃ’þ»š¶¾ò#’þwžVg–:–>Ë¾ò3š‚šÎ£–’7–º‡’þ»š¶¾ò'¾òošï–3–’Ó¦£–~ëžêÿšRç’âè•á…ÐM!ƒ–òWžR£¾ò#’â+š&ä¥µÁ±•µ•¹Ñ…Ñ¥½¸€ÄÍÀÉ„Ä€¬ƒ–’7–º„!‘ÌØÀã¾òošr³š&çš>C’ê“–B;’î—–ØM!ƒ’âëšZÃ–~ëžêÿ¾ò'¾òo
+œÌÀƒ¦7–g’âë–öO–&7žržnãžî’â¾ò ÈÀÈØ´Àà´È×¾ò'¾òo
+œÐÀƒ–£¦ ÕÁÍÑÉ•…´ƒ¢†3šRç’âè€‰…‰Í½É‰•¥¹Ñ¼HÐµÈ¸Ø½H´Ä¸È¸ËŠSŠSšržî YI%%ƒ¦j?šr³š&ç¦^ ‹¾ò#’â7¦Š–dAMO¾ò'¾òmI%M,´ÀÀÐƒ’þwš2I=A9ƒžnÓ–"ÀI•Ù¥•Ý•Èƒ¦ª3¢¾šr³š&ç¾òm$€ôYI%%I;¾ò!I•Ù¥•Ý•Èƒž†»¢ºÉÕ¸€ÌÔ¼ÌÛ¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹—¾ò!Y1=Žšï–0ƒ
+œÌÀ¿
+œÐÀ¿
+œØÇ¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÀØƒŠPIÕ±”5…¹¥™•ÍÐ½¹™¥¹•µ•¹Ð€˜5•Ñ…‘…Ñ„½¡•É•¹”((¨©QåÁ”¨«¾òiÈ…µ•¹‘µ•¹ÐÑ¼H´ÀÄÏ¾ò!µ…¹¥™•ÍÐÍ•±•Ñ½Èƒ––Gžê›šRÛžÒŸ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ø@À´ÀÌ½@À´ÀÓŠSŠQQ%Yµ…¹¥™•ÍÐƒžj‘…Ñ…Í•Ñ}™¥±•Ímtƒš^€½¹™¥¹•µ•¹Ó¾ò ¸¸¼ƒ’â;žîw–¾ç¢Þ¿–ú–>¿¦–èÉÕ±•ÌÉ½½Ó¾ò'¾òmµ…¹¥™•ÍÐƒ’â8‘…Ñ…Í•ÐƒšÊïžB–¶_šº×¾ò!É•Ù¥•Ý}ÍÑ…ÑÕÌ½Í½ÕÉ•}Ù•ÉÍ¥½¸½É•Ù¥•Ý}ÁÉ½Ù•¹…¹”½‘…Ñ…Í•Ñ}Ù•ÉÍ¥½»¾ò'žr–º{’â7’â¢Ó¾ò!Í½ÕÉ•}Ù•ÉÍ¥½¸ƒ–º{¦R“¾ò'’âS’â7š¾S¢ú¾òmÉÕ¸ƒžjÑÉ…‘¥¹}ÉÕ±•}Ù•ÉÍ¥½¸ƒ¢¾·’æ'šÞßšÞ¾ò!Í•±•Ñ½È¥ÙÌå…µ°½¹Ñ•¹ÐÙ•ÉÍ¥½»¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òi±½…‘}ÉÕ±•}µ…¹¥™•ÍÑ€ƒ’îšŽš~”€¡É½½Ð½É•°¤¹¥Í}™¥±” ¥ƒ¾òm±½…‘}…Ñ¥Ù•}ÉÕ±•Í€ƒ–>«š‚‡¦ª0‘…Ñ…Í•Ñ}¡…Í €¬‘…Ñ…Í•Ñ}Ù•ÉÍ¥½»¾òmMÁ¥­•IÕ¸¹ÑÉ…‘¥¹}ÉÕ±•}Ù•ÉÍ¥½¸€ôå…µ°½¹Ñ•¹ÐÙ•ÉÍ¥½»Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òi}½¹™¥¹•‘}‘…Ñ…Í•Ñ}™¥±•ƒ¾ò#žnã–¾ä¿š^€€¸¹€¿š^ƒžîw–¾ä½Íåµ±¥¹¬É•Í½±Ù”ƒ–B;’î7¦†ï–r É½½Ðƒ–€¬ƒ–þ¦†ï’ö7’ê8Ù•ÉÍ¥½¹Ì¼ñÉÕ±•}Ù•ÉÍ¥½¸ø½€ƒ’â/¾ò'–r£’îï’öT™Ìƒ¢ºÿ¦^»–&7š&Ÿ¢†3ŠSŠQQ%Y¾ò!±½…‘}ÉÕ±•}µ…¹¥™•ÍÓ¾ò'’â8‰½Õ¹“¾ò!±½…‘}‰½Õ¹‘}ÉÕ±•}‰½½¯¾ò'–ÇžR£–B3’â ¡•±Á•Ë¾òm±½…‘}…Ñ¥Ù•}ÉÕ±•Í€ƒ–òë–"Øµ…¹¥™•ÍÓŠQ‘…Ñ…Í•Ðƒ–no–¶_šº×’â¢Ó¾ò!É•Ù¥•Ý}ÁÉ½Ù•¹…¹”ƒ¢¾·’æ'ž¶'’îßš¾S¢ú¾òkž¦ë–ó¦R»¢Æ–7Ž‘…Ñ•Ñ¥µ”ƒ¢ž¢2–2[¾ò'¾òožr–ºxÉÕ±•}µ…¹¥™•ÍÐ¹©Í½¸ƒžjÍ½ÕÉ•}Ù•ÉÍ¥½¸ƒ’þ»š¶’âë’â8å…µ°ƒ’â¢Ó¾òmMÁ¥­•IÕ¸ƒžîG–ºhÑÉ…‘¥¹}ÉÕ±•}Ù•ÉÍ¥½¹ƒ¾ò!Í•±•Ñ½Ë¾ò$¬ÑÉ…‘¥¹}ÉÕ±•}‘…Ñ…Í•Ñ}Ù•ÉÍ¥½¹ƒ¾ò!½¹Ñ•¹Ó¾ò$¬ÑÉ…‘¥¹}ÉÕ±•}Í½ÕÉ•}Ù•ÉÍ¥½¹ƒ¾ò1±½…‘}‰½Õ¹ƒ–>3ž&#šr³–’7¦ª3¾ò#š^œÉÕ¸©Í½¸ƒ–ó–ºç¢¾ï–>[¾ò'¾òm@Ç¾òiÁÉ½Ù•¹…¹•}½µÁ±•Ñ” ¥€ƒžêÏ–”ÉÕ±”‰¥¹‘¥¹Ÿ¾òmÉ•Ù¥•Ü¹Áäµ…¹¥™•ÍÐƒ–:–¶C–"š6‹¾ò!ÑµÀ­½Ì¹É•Á±…—¾ò$¬€´µ™É½´µÙ•ÉÍ¥½¹€ƒ¢†žòcšŽš~”€¬ƒ¦vxQ%Yƒ¢úO–—š.Kžît€¬ƒ–"š6‹–B8½¡•É•¹”ƒ¢«¦ª3¢¾Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½ÑÉ…‘¥¹}ÉÕ±”¹ÁçŽÍÁ¥­”½µ½‘•°¹ÁçŽÍÁ¥­”½ÉÕ¹}ÍÑ½É”¹ÁçŽÍÁ¥­”½ÉÕ¹¹•È¹ÁçŽÍÁ¥­”½ÁÉ½‰•Ì¹ÁçŽÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹ÁçŽ½¹™¥Ì½ÑÉ…‘¥¹}ÉÕ±•Ì½ÉÕ±•}µ…¹¥™•ÍÐ¹©Í½¸€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÉÕ±•}µ…¹¥™•ÍÑ}±½ÍÕÉ”¹Áç¾ò ÄÛ¾òiÑÉ…Ù•ÉÍ…°¿žîw–¾ä½Íåµ±¥¹¬½Ù•ÉÍ¥½¸µ‘¥Ë\È¿’â¢ÓšŸ\Ô¿–>3ž&#šr³žîG–ºh½ÁÉ½Ù•¹…¹—\Ì½É•Ù¥•Üƒ¢kšr³\Ï¾ò$¬‰¥¹‘¥¹œƒ¦¦4€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÀÔƒŠP½±‘•¸Ù•¹ÐµQåÁ”QÉÕÑ ±½ÍÕÉ”((¨©QåÁ”¨«¾òiÄ½È¥µÁ±•µ•¹Ñ…Ñ¥½¸µÍ•µ…¹Ñ¥Œ±½ÍÕÉ—¾ò#’â7–"o–îëšZÀ½±‘•¸ƒž&#šr³ŠSŠQ•Ù•¹Ñ}±…ÍÌƒ–ÞË–r£¢¾·’æ$¡…Í ƒ–¾ò3š^€ØÌ‰åÑ•Ìƒ–>cšnÓ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ø@À´ÀËŠSŠQƒ’ê/’îÛžÆï–z/š‚‡¦ª3–>«–¾äÍå¹Ñ¡•Ñ¥ŒƒšÖ/¢¾WžRšV#¾ò!•áÁ•Ñ•‘}™¥•±‘Ì¹•Ù•¹Ñ}ÑåÁ—¾ò'¾òožr–ºx½±‘•¸ØÌƒžj€ÈÀƒ’â¨…Í•Ìƒ–vÕ¹ÑåÁ•“¾ò!•Ù•¹Ñ}±…ÍÌõ%Y%9}a}Qƒ¢Š¬Ù…±¥‘…Ñ½Èƒ–þ÷žV—¾ò'¾ò0‰Õ¹ÑåÁ•…•ÁÑÌ…¹äˆƒš^¢Þ¿–r ™½Éµ…°Á…Ñ ƒ’þwžVgŽ€€(¨©=±½¹ÑÉ…Ð¨«¾òi•áÁ•Ñ•‘}ÑåÁ”€ô…Í”¹•áÁ•Ñ•‘}™¥•±‘Ì¹•Ð ‰•Ù•¹Ñ}ÑåÁ”ˆ¥ƒŠSŠSž¦ë–"g¢ÞÏ¢þžÆï–z/š‚‡¦ª3¾ò#’îïš?’ê/’îÛžÆï–z/–>¿¢þžÊûž†»š^—šr–B;¢þo–—–B;žî·¦ª3¢¾¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òi}É•Í½±Ù•}•áÁ•Ñ•‘}•Ù•¹Ñ}ÑåÁ”¡…Í”¥ƒŠSŠQ•Ù•¹Ñ}±…ÍÏ¾ò#¢¾·’æ$¡…Í ƒš"C–Fc¾ò'’âèAI%5IdƒžÆï–z/’ê/–º{šêC¾ò!%Y%9}a}QŠI%Y%9€¼I%!Q}%MMU}a}QŠII%!Q}%MMU¾ò'¾òm•áÁ•Ñ•‘}™¥•±‘Ì¹•Ù•¹Ñ}ÑåÁ”ƒ–¶c–r£š^Û–þ¦†ï’â8•Ù•¹Ñ}±…ÍÌƒšÒûžR’â¢Ó¾ò#–ËžªŠI™…¥°±½Í•“¾ò'¾òmÕ¹­¹½Ý¸½µ¥ÍÍ¥¹œ•Ù•¹Ñ}±…ÍÏŠIY9Q}QeA}U9IM=1Y€™…¥°±½Í•“¾òožÆï–z/š¾S–¾ç’âè¨«–òë–"Ø¨«¾ò!Ù…±¥‘…Ñ½ÈØ×¾ò'¾òo–"ƒ¦f“–æÛ–>7¢ö³š^œ€‰Õ¹ÑåÁ•…•ÁÑÌ…¹äˆƒšÖ/¢¾W¾òm…ÑÕ…°µÑÉÕÑ É•É•ÍÍ¥½»¾òi±½…ƒžr–ºx½±‘•¹}…Í•Í}ØÌ¹©Í½¹°ƒ–£¦ €ÈÀƒ’â¨…Í•Ï¾ò#š¾?’â«¢žšzC’âè%Y%9ƒ–æÛ¢ÞDÑåÁ•Ù…±¥‘…Ñ½Èƒž®¿–"Ãž®¿¾òmÉ¥¡Ðµ¥ÍÍÕ”µ½¹±äƒ¢¾š6»–¾çžr–ºx%Y%9…Í”ƒ’êŸžR|Y9Q}QeA}5%M5Q#¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½½±‘•¹}É½ÕÑ•È¹ÁçŽÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}…}•Ù•¹Ñ}ÑåÁ”¹Áç¾ò#¦7–g¾ò$€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiØÌ‰åÑ•Ìƒ’â;¢¾·’æ$¡…Í ƒ¦nÛ–>cšnÓ¾ò!•Ù•¹Ñ}±…ÍÌƒš^§–ÞË–”¡…Í£¾ò'¾òo–â˜•Ù•¹Ñ}ÑåÁ”ƒžj–B#š"@…Í”ƒ–þ¦†ï’â8•Ù•¹Ñ}±…ÍÌƒ’â¢ÓŽ€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}…}•Ù•¹Ñ}ÑåÁ”¹Áç¾ò ÄÛ¾òk¢žšzC\Ø€¬ÑåÁ•ƒ¦ª3¢¾\Ü€¬ƒžr–ºxØÏ\Ï¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÀÐƒŠP½Éµ…°AÉ½‰”á¡…¹”¹™½É•µ•¹Ð((¨©QåÁ”¨«¾òiÄ½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ”€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiH´Ä¸È¸È@À´ÀÇ¾ò!HÐµÈ¸Ô½H´Ä¸È¸Äƒ–’7–º„ƒ
+œË¾ò'ŠSŠQÔ½Øƒžj½‘”µ±¥ÍÐƒ–&7žö»žîW¢þAÉ½‰•á•ÕÑ½ÈƒžnÓš:—¢ÂžR Ñà¹Ñ…É•Ð¹•Ñ}½‘•}±¥ÍÑ}•á¡…¹•ƒ¾òiÔƒ–’Ç¢Ò—¢Þ¿–úžj™…¥±ÕÉ”•á¡…¹”ƒ’â7š2’æ–2[¾ò#–ò–âã–r£š&/–Þ”Á•ÉÍ¥ÍÐƒ–&7¦¦ã¾ò'¾òmØƒ¢þ{š"C–*¢Þ¿–ú¦÷’â7š2’æ–2[Ž¢þw–>4‰™½Éµ…°Á…Ñ ƒš¾?’â¨•á¡…¹”ƒ¦÷šb¼¥µµÕÑ…‰±”•Ù¥‘•¹”‹’â7–>c¦?Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òk¢ÂžR£¢¢«¢†3–>[–ú\•á¡…¹—Žš"C–*–B;š&/–Þ”•Ù¥‘•¹•}™É½µ}•á¡…¹•ƒ¾ò ‹¢ºÃ–ú_š2’æ–2X‹žj½ÉÉ•Ñ¹•ÍÌ½¹ÑÉ…Ó¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òiÔ½Ø½‘”µ±¥ÍÐƒ–&7žö»šRç¢ÖÀ•á•ÕÑ½È¹…±° ¸¸¸¥ƒ¾ò#š"C–*|¿–’Ç¢Ò—¦÷š2’æ–2X€¬ƒ–’Ç¢Ò—ŠKžîOšz–2X…Í”€¬AÉ½Ù¥‘•ÉÉÉ½Èƒ’â7¦¦ã¾ò'¾òmØƒ’úw¢Ö[–&7žö»–’Ç¢Ò—ŠIÍÑ½­}‰…Í¥Œƒ’â7–>G–Â¾òl¨©MPƒ–>3¦vgš–º#–6¬¨«¾òiÁÉ½‰•Ì¹ÁäƒžjÑà¹Ñ…É•Ð¸©}•á¡…¹•€ƒ¢ÂžR£–þ¦†ï’ö7’ê8±…µ‰‘„ƒ–¾ò!•á•ÕÑ½Èƒ¢úçžV3¾ò'Ž½±‘•¹}É½ÕÑ•È¹Áäƒžj–þ¦†ï’ö7’ê8½±±•Ñ½È¹Á•ÉÍ¥ÍÐ ¸¸¸¥€ƒ–>šVÃ–¾ò!…ÁÁÉ½Ù•‰½Õ¹‘…Éäƒšbû–ò?–2[ŠSŠS’â7¦vƒ–ò–>G¢¢ºÃ–þ¾ò3’æ’â7¢¾¿’ò}½µ…¥¹½±±•Ñ½É€ƒ¢þgžÆï¢ÂžR£–6Ïš2’æ–2[žj’âOžR£¢úçžV3¾ò'¾òl¨©MÁäƒ¢º‡šVÃ¦^·–B#šÖ/¢¾T¨«¾òiÈµÜƒš¾?’â¨ÁÉ½‰”ƒžjžr–ºx•á¡…¹”ƒ¢ÂžR£šVÀ€ôôƒš2’æ–2XÉ…Üµ•Ñ„ƒšVÃ¾ò#–B¬Ð½±‘•¸ƒ¢Þ¿žRÇ¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½ÁÉ½‰•Ì¹Áç¾ò!Ô½Û¾ò$€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÁÉ½‰•}•á¡…¹•}•¹™½É•µ•¹Ð¹Áç¾ò ÄË¾òiÔ½Øƒš"C–*šÃ––÷’â’â¨µ•Ñ„ƒ\È€¬Ô½Øƒ–’Ç¢Ò—š2’æ–2X¯žîOšz–2Xƒ\È€¬Øƒ’úw¢Ö[’â7–>G–Â€¬MÁäƒ¢º‡šVÀƒ\Ø€¬MPƒ–º#–6¬ƒ\Ë¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÀÌƒŠPÙ•¹ÐQ…á½¹½µä€¬Ô½ØA…å±½…M¡…Á•Ì€¬$ƒš‚ç–nƒ’þ»–’4((¨©QåÁ”¨«¾òiÇ¾ò!ƒ¢¾š6»žî–B#š&§–ÆW¾ò$¬Ë¾ò!$ƒ¦^£šZÃ–Šx™½Éµ…Ð¡•¬ƒš&Ÿ¢†3’þ»š¶¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ð½H´Ä¸Èƒ–’7–º„@À´ÀÐ½@À´À×¾ò!ƒ’ê/’îÛžÆï–z/’â7–>¿šnÿ’î¾òmÔ½Øƒš‚¦?¢ö÷¢6ß¦vg¦îc–z–rû¾ò$¬ƒ
+œÄÀƒšÊïžB¾ò!$ƒ–£žê‹š‚ç–nƒ¾òiÉÕ™˜™½Éµ…Ð€´µ¡•¬ƒ¦^£¢¨ˆÝ„àÐÔØÌƒ¢Ößšr«¢þ¾ò3–ò–>G¢šr³–rÃ–>«¢ÞDÉÕ™˜¡•¯¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiƒ’ê/’îÛšêC’î‘¥Ù¥‘•¹ƒšÖ¾ò#’îï’öW’ê/’îÛ¢ºÃ–öW–>¿¢¾šb;’îï’öWžÆï–z/šršro¾ò'¾òmÔ½Øƒžj½‘•}±¥ÍÐƒšÚ#¢Òçš*(É½Ü‘¥Ðƒ–òë¢ö³’âë–¶_ž²›’âË¾ò!€‰ìÙ…±Õ”œè€œØÀÀÔÄä¹M ô‰€ƒ–z–rû’ö¦vg¦î`‹¦k¢þ‹¾ò'¾òm}É½ÝÍ}½™€ƒ–¾äÁ½±…ÉÌ™É…µ”ƒ¢ÖÀ±¥ÍÐ¡Ñ½}‘¥Ð ¤¥€ƒ¢þS–n{–"_–B7–"_¢†£¾ò#¦vg¦îc–z–rû¢†3¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄÌƒ
+œÐ·
+œ×¾ò'¾òk’ê/’îÛ–"žÆï–¶˜%Y%9½I%!Q}%MMUƒ’â“ž.³ž®/šÖ¾ò!ÁÉ½Ù¥‘•È•Ñ}É¥¡Ñ}¥ÍÍÕ•}•á¡…¹•ƒ¾òmƒ–~|™•Ñ ƒ–´•á¡…¹”ƒ–£–”‰Õ¹‘±—¾ò'¾òm½±‘•¸…Í”ƒ’î”•áÁ•Ñ•‘}™¥•±‘Íl‰•Ù•¹Ñ}ÑåÁ”‰u€ƒ–ŽÃšb;šršrožÆï–z/¾ò#¢¾·’æ$¡…Í ƒ–ó–ºç¢ö÷’öO¾ò'¾òoš‚‡¦ª0€¡Íåµ‰½°°a}Q°ÑåÁ”¤ƒžÊûž†»’â'–žî¾ò1%Y%9ƒšÂã’â7šnÿ’îŒI%!Q}%MMU¾ò!Y9Q}QeA}5%M5Q!ƒ¾ò'¾òmÁÉ½Ù¥‘•Èƒ–¶_¦v‹¦?–öK’â–2[¾ò#–"žêˆ¿¦7¢
+‡ž¶'¾ò'¾òm•Ù•¹Ñ}ÑåÁ•€ƒ’âë¦ª3¢¾–f£–¦R»¾ò!ÍÑ…ÑÕÌƒ–¶_šº×š¾S–¾ç–&7–&—žšï¾ò'¾òm}™±…Ñ}Ù…±Õ•Í€ƒš‚¦?–"_¢†£–ÆW–ò €¬ƒ–’k–"\™…¥°±½Õ“¾òm}É½ÝÍ}½™€Á½±…ÉÌƒ’òc– €¹É½ÝÌ ¥ƒŽ	'¾òkšr³–rÃž¶'’îß–nošŽš~—¾ò!ÉÕ™˜¡•¬€¬™½Éµ…Ð€´µ¡•¬€¬µåÁä€¬ÁåÑ•ÍÓ¾ò'–—š>C’ê“–&7šÖž¢/¾òlàƒ’â«žê‹š>C’ê“žjš‚ç–nƒ¢ºÃ–öW’ê;–’Ó¦ $MÑ…ÑÕÏŽ€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÁÉ½Ù¥‘•ÉÌ½…µ…é¥¹‘…Ñ„½ÁÉ½Ù¥‘•È¹ÁçŽÍÁ¥­”½íÑ…É•Ð±½±‘•¹}É½ÕÑ•È±ÁÉ½‰•Íô¹ÁçŽÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹ÁçŽ½¹™¥Ì½ÑÉ…‘¥¹}ÉÕ±•Ì¼¨«¾ò#ž&#šr³š¢‡–z/¢þžžï¾òiØÈÀÈØÀàÈÐµ½µÁ¥±•€¬µ…¹¥™•ÍÓ¾ò$€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}…}•Ù•¹Ñ}ÑåÁ”¹Áç¾ò ã¾ò'ŽÑ•ÍÑ}ˆÕ}ˆÙ}Á…å±½…‘}Í¡…Á•Ì¹Áç¾ò ç¾ò'ŽÑ•ÍÑ}É…Ý}½µµ¥Ñ}É•½Ù•Éä¹Áç¾ò ã¾ò'ŽÑ•ÍÑ}ÉÕ±•}‰¥¹‘¥¹}…‘Ù•ÉÍ…É¥…°¹Áç¾ò Ó¾ò$¬ƒ¦¦4€€(¨©H¨«¾òimH´ÀÄÍt ¸¸½…‘È½H´ÀÄÍ}ÉÕ±•}Ù•ÉÍ¥½¹}µ½‘•°¹µ¤ƒ
+œÐ·
+œØ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÀÈƒŠPQÉ…‘¥¹œIÕ±”Y•ÉÍ¥½¸5½‘•°€¬I•Ù¥•Ü…Ñ”!…É‘•¹¥¹œ((¨©QåÁ”¨«¾òiÈ…µ•¹‘µ•¹ÐÑ¼H´ÀÄÈƒ
+œÈ€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ô@À´ÀÈ½@À´ÀÏ¾ò#¢ž–"gšVÃš6»¦nžòëž&#šr³š¢‡–z/¾òkžn»–öT±½ˆƒ–B#–æÛ–r =5A%1½IY%]ƒ–Ç–¶cš^Ûš¶Ÿ’æ'¾òožîG–ºk–>«¢ºÃ–öWž²³’â’â«šZ’îÛ¾òm…Ñ”ƒžjÉ•˜ƒš^€½¹™¥¹•µ•¹Ð½¡…Í ½Ñ¥µ•ÍÑ…µÀÍ¡•µ‡¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiQÉ…‘¥¹IÕ±•	½½¬¹±½…¡‘¥È¥€±½ˆƒ–B#–æÛžn»–öW–£¦ å…µ³¾òmMÁ¥­•IÕ¸ƒžîG–ºk–6T™¥±”­¡…Í£¾òm…Ñ”ƒžj…ÉÑ¥™…ÐÉ•˜ƒ’îïš?žnã–¾ç¢Þ¿–ú¾ò#–>¿š2–BD•Ù¥‘•¹”ƒ–’[¾ò'Ž¡…Í ƒš^€Í¡•µ‡Žš^Û¦^Óš"Ïš^ƒš‚‡¦ª3¾òmÉ•Ù¥•Ü¹Áç–:–rÃšRç–gŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄÌƒ
+œÄ·
+œË¾ò'¾òiÉÕ±•}µ…¹¥™•ÍÐ¹©Í½¹ƒ¾ò!Q%Yƒ¦'š.§–f£¾ò$¬Ù•ÉÍ¥½¹Ì¼ñØø½ÉÕ±•Ì¹å…µ±ƒ¾ò#’â7–>¿–>c–Ç–¶c¾ò$¬•Ù¥‘•¹”½ƒ¾òm±½…‘}…Ñ¥Ù•}ÉÕ±•Í€ƒ–’7žº\‘…Ñ…Í•Ñ}¡…Í£¾ò!Q%Yƒž¾‡šRçŠI¹•Ý}ÉÕ¸ƒ¦bïšZ·¾ò'¾òmMÁ¥­•IÕ¸ƒžîG–ºhÑÉ…‘¥¹}ÉÕ±•}‘…Ñ…Í•Ñ}™¥±•Ímt€¬‘…Ñ…Í•Ñ}¡…Í¡ƒ¾ò#¢S–B ¡…Í ƒžº_šÎTõµ…¹¥™•ÍÓ¾òož¾‡šRç’îï’âšZ’îÛ¦bïšZ´É•Á±…ç¾òoš^œÉÕ¸©Í½¸ƒ–ó–ºç¢¾ï–>[¾ò'¾òm±½…‘}‰½Õ¹‘}ÉÕ±•}‰½½­€ƒ¦CšZ’îØ½¹™¥¹•µ•¹Ð­¡…Í ­Ù•ÉÍ¥½¸ƒš‚‡¦ª3¾òožn»–öT±½ˆƒ–B#–æÛ¢¾·’æ'–ê¦f“¾òm…Ñ—¾òiÉ•˜ƒžnã–¾ä•Ù¥‘•¹”É½½Ð€¬Á…Ñ ½¹™¥¹•µ•¹Ó¾ò#žîw–¾ä½€¸¹€ƒš.Kžîw’ê8™Ìƒ¢ºÿ¦^»–&7¾ò$¬¡…Í €ØÐ±½Ý•Èµ¡•à€¬É•Ù¥•Ý•‘}…Ð½Í½ÕÉ•}É•ÑÉ¥•Ù•‘}…Ð%M<´àØÀÄ€¬…ÉÑ¥™…Ð‰åÑ•Ìƒ–’7¦ª3¾òmÉ•Ù¥•Ü¹Áäƒ¦7–g¾ò#šZÀ¥µµÕÑ…‰±”ƒž&#šr°€¬Q%Yƒ–"š6ˆ€¬•Ù¥‘•¹”ƒ––ºç–¾ï–v €¬ƒ–&¿šr³¢«¦ª3¢¾€¬ƒ¦7–’4É•Ù¥•Üƒš.Kžîw¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½ÑÉ…‘¥¹}ÉÕ±”¹ÁçŽÍÁ¥­”½íµ½‘•°±ÉÕ¹}ÍÑ½É”±ÉÕ¹¹•È±ÁÉ½‰•Íô¹ÁçŽÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹ÁçŽ½¹™¥Ì½ÑÉ…‘¥¹}ÉÕ±•Ì¼¨«¾ò#¢þžžï¢Ïž&#šr³–â–Æ¾ò$€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òkš^œMÁ¥­•IÕ¸©Í½¸ƒžjÑÉ…‘¥¹}ÉÕ±•}™¥±”½¡…Í ƒšbƒ–Â’âë–6WšZ’îØ‘…Ñ…Í•Ñ}™¥±•Ï¾ò#–ó–ºç¢¾ï–>[¾ò'¾òo–6WšZ’îØQÉ…‘¥¹IÕ±•	½½¬¹±½…¡™¥±”¥€ƒ’þwžVgŽ€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÑÉ…‘¥¹}ÉÕ±•}‰¥¹‘¥¹œ¹Áäƒ¦7–g¾ò ÈÓ¾òkž&#šr³–Ç–¶`½Q%Yƒš:£¢þl¿ž¾‡šRç¦bïšZ·\Ð¿žîG–ºkš2’æ–2X½…Ñ”ƒ–*ƒ–në\Ô½É•Ù¥•Üƒ¢kšr³ž®¿–"Ãž®¼½ÍÑ}ÍÑ…Ñ—\Ð½‰½½¬ƒ–þ–†¯\Ë¾ò$¬Ñ•ÍÑ}ÑÉ…‘¥¹}ÉÕ±•}‘…Ñ„¹Áäƒ¦¦4€€(¨©H¨«¾òimH´ÀÄÍt ¸¸½…‘È½H´ÀÄÍ}ÉÕ±•}Ù•ÉÍ¥½¹}µ½‘•°¹µ¤ƒ
+œÄ·
+œÈ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÔ´ÀÀÄƒŠP½Éµ…°IÕ±”µM½H±½ÍÕÉ—¾ò#–£šÚ#¢Òç¢ÉÕ¸µ‰½Õ¹‰½½¯¾ò$((¨©QåÁ”¨«¾òiÇ¾ò#¦ª3¢¾–f£––Gžê›–òë–2[¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ô@À´ÀÇ¾ò!Ù…±¥‘…Ñ•}±¥µ¥Ñ}ÉÕ±”ƒ’î7–>¿žR µ½‘Õ±”™…±±‰…¯¾òiÑÉ¥…°½ÁÉ½ƒžjÌ½ÔƒšÚ#¢Òç–Þ—’ösš‚G–öO–&7¢ž–"g¾ò3¢þw–>4á…ÐI•Á±…ç¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÙ…±¥‘…Ñ•}±¥µ¥Ñ}ÉÕ±”¡É½ÝÌ°‰½½¬õ9½¹”¥ƒŠSŠQ‰½½¬ƒ–>¿¦'¾ò19½¹”ƒš^ØÉ•Í½±Ù”ƒ¦Nø™…±±‰…¬‘•™…Õ±Ñ}ÉÕ±•}‰½½¬ ¥ƒ¾ò#–Þ—’ösš‚G–öO–&7ž*Ûš¾ò'Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄÌƒ
+œÏ¾ò'¾òi‰½½­€ƒ’âè¨«–þ–†¬­•åÝ½É¨«¾ò#š^ƒ¦îc¢º“–ó¾òošbû–ò<9½¹—ŠKžîOšz–2XY1%Q}%3¾ò3šÚ#š¿–B¬€‰‰½½¬õ9½¹”É•™ÕÍ•‹¾ò'¾òmÌ½×¾ò!ÁÉ½‰•Ï¾ò'’ò€Ñà¹ÉÕ±•}‰½½­ƒ¾òmÉ½ÕÑ•}…±±€ƒš*(ÉÕ¸µ‰½Õ¹‰½½¬ƒ’òƒ–”±¥µ¥Ð½	(ƒ¦ª3¢¾–f£¾òmMPƒ–º#–6¯šÖ/¢¾W¾òiÁÉ½‰•Ì½½±‘•¹}É½ÕÑ•ÈƒžjÙ…±¥‘…Ñ•}±¥µ¥Ñ}ÉÕ±”ƒ¢ÂžR£–þ–â˜‰½½¬ôƒ’âS¦vx9½¹”ƒ–¶_¦v‹¦?ŽÉ•Í½±Ù•|¨ƒ–þ–â˜‰½½¬÷¾òo–¾çš*_šÖ/¢¾W¾òiQ%YØÄ ÄÀ”§ŠIØÈ ÈÀ”¤ƒš:£¢þo–B;–B0ÉÕ¸ƒ¦7šRøÔ±¥µ¥Ð…Í•ÌƒšKž¶'¾ò!‰½Õ¹ƒ’î4€ÄÀ—¾ò'¾òm‰½Õ¹ƒšZ’îÛž¾‡šRçŠIÑà¹ÉÕ±•}‰½½­€ƒ¢ºÿ¦^»–6Ï¦bïšZ·Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½Ù…±¥‘…Ñ½ÉÌ¹ÁçŽÍÁ¥­”½ÁÉ½‰•Ì¹ÁçŽÍÁ¥­”½½±‘•¹}É½ÕÑ•È¹ÁçŽÑ•ÍÑÌ½Õ¹¥Ð½Ñ•ÍÑ}ÍÁ¥­•}Ù…±¥‘…Ñ½ÉÍ}ØÈ¹Áç¾ò#šbû–ò<‰½½¯¾ò$€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òkš^ƒ¾ò!Ù…±¥‘…Ñ•}±¥µ¥Ñ}ÉÕ±”ƒž¶û–B7šRÛžÒŸ’âëž‚Ó–v?šŸ–>cšnÓŠSŠS¢ÂžR£šZç–£¦£–B3š&çšnÓšZÃ¾òošÖ/¢¾Wšbû–ò?–*ƒ¢öôQ%Y‰½½¯¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑ}ÉÕ±•}‰¥¹‘¥¹}…‘Ù•ÉÍ…É¥…°¹Áç¾ò Ó¾ò$¬Q•ÍÑ1¥µ¥ÑIÕ±”ƒ¦¦4€¬€ÔÀÈƒ–£¦?–n{–öH€€(¨©H¨«¾òimH´ÀÄÍt ¸¸½…‘È½H´ÀÄÍ}ÉÕ±•}Ù•ÉÍ¥½¹}µ½‘•°¹µ¤ƒ
+œÌ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÐ´ÀÄÄƒŠPHÐµÈ¸Ì½H´Ä¸ÄI•Ù¥•Ü½ÉÉ•Ñ¥½¸€˜½Ù•É¹…¹”Må¹Œ((¨©QåÁ”¨«¾òiÇ¾ò#šÊïžB’þ»š¶¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ì½H´Ä¸Äƒ–’7–º„ƒ
+œÄÃŠSŠS’â+š&äY1=¿žº‡žBšï–3–ºžžÃ’â8ÉÕ¹Ñ¥µ”ƒšr'–ë–—¾ò!	(µ…ÁÁ¥¹œ•¹‘Á½¥¹Ðƒ¢†£¢þÀ€¼$ƒž*Ûš€¼1…ÍÐI•Ù¥•Üƒš^Û¦^Ó–~ëžêÿ¾ò'Ž€€(¨©½ÉÉ•Ñ¥½¸¨«¾òkšr³š&äY1=ƒ’â;šï–3–š–º{¢ºÃ–öW¾òi	(ƒ¢¾šb;’âè¡¥ÍÐµ…ÍÑ•È€¬•á…Ðµ‘…Ñ”É•¥µ—¾ò#š^€µ…ÁÁ¥¹œ•¹‘Á½¥¹Ðƒ’úw¢Ö[¾ò'¾òm$ƒ’î—š:£¦–B8Ñ¥½¹Ìƒ–º{¦fžîOšzs’âë–¾ò#šr³–rÃ’â8$ƒ–2ë–"–>–úƒ
+œÐäƒ’â7–>c¾ò'¾òm1…ÍÐI•Ù¥•Üƒš2–BGšršZÃ–’7–º‡šZš†Ž’â+š&äHÐµÈ¸Ì½H´Ä¸Äƒšv‡žn»ž*ÛšžRÄA9%9}IY%\ƒ–öKš†’âè…‰Í½É‰•“¾ò#žRÄHÐµÈ¸Ð½H´Ä¸Èƒš&çš²‡¦^·ž:¿¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹—¾ò!Y1=Žšï–0ƒ
+œÐÀ¿
+œÐÄ¿
+œØÇ¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÐ´ÀÄÀƒŠP½ÉÁ½É…Ñ”Ñ¥½¸Ù•¹ÐM½H±½ÍÕÉ”((¨©QåÁ”¨«¾òiÇ¾ò#–º{ž:À±½ÍÕÉ—¾òmÉ½é•¸	…Í•±¥¹”M½Hƒ¢¾·’æ'šr«–>cŠSŠQ½ÉÁ½É…Ñ•}…Ñ¥½¸ƒšVÃš6»¦nšr³–B¯’ê/’îÛ¢ºÃ–öW¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ð@À´À×ŠSŠQƒ¢¾š6»žî–B#žòë–ÂG’ê/’îÛ’ê/–º{šêC¾ò1…‘¨ƒšÖ–6Wž.³’â7šb¿––"M½KŽ€€(¨©=±½¹ÑÉ…Ð¨«¾òiƒ–~|™•Ñ €ô…±•¹‘…È€¬ÍÑ…ÑÕÌ€¬…‘¨€¬­±¥¹—¾òm…‘¨µ½¹±äƒ’æ¢ôAMOŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òiƒ–~|™•Ñ €ô…±•¹‘…È€¬ÍÑ…ÑÕÌ€¬€¨©‘¥Ù¥‘•¹“¾ò#’ê/’îÛ’ê/–º{šêC¾ò$¨¨€¬…‘¨€¬­±¥¹—¾ò#’êP•á¡…¹”ƒ–£–”‰Õ¹‘±—¾ò'¾òm}Ù…±¥‘…Ñ•}½ÉÁ}…Ñ¥½¹}½¹Ñ•áÑƒ¾òkš^ƒ’ê/’îÛ¢ºÃ–öWŠIY1%Q}%0¡Y9Q}M=UI}5%MM%9¥ƒ¾ò ‰…‘¨µ™…Ñ½Èµ½Ù•µ•¹Ð…±½¹”¥Ì¹½Ð„ÍÕ™™¥¥•¹Ð•Ù•¹ÐM½H‹¾ò'¾òo’ê/’îÛ–¶c–r£’öa}QŠ&SŠIY9Q}Q}5%M5Q!ƒ¾òm•Ù•¹Ð­…‘¨­­±¥¹”ƒ’â¢ÓŠIAMO¾òo’ê/’îÛš^—–sž&3ŠI9=Q}QMQ	1}Q%5¡MUMA9M%=9}Q}Y9P¥ƒ¾òm…­•Q…É•Ð•Ñ}‘¥Ù¥‘•¹‘}•á¡…¹•ƒ¾ò#’ê/’îÛž®¿ž
+ç¢þl‘ÉäµÉÕ¸ƒ¢šžn[¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½½±‘•¹}É½ÕÑ•È¹ÁçŽÍÁ¥­”½Ñ…É•Ð¹Áç¾ò!…­•Q…É•Ð€¬MÁ¥­•Q…É•ÐAÉ½Ñ½½³¾ò$€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}…}•Ù•¹Ñ}Í½È¹Áç¾ò Øƒ’â«¾òk’â¢ÐAML­‰Õ¹‘±”±¥¹•…”€¼…‘¨µ½¹±ä%0€¼ƒš^—šr¦Rg¦4%0€¼ƒ–sž&09=Q}QMQ	1€¼‰Õ¹‘±”ƒ¦^·–B#¾ò$€€(¨©H¨«¾òiH´ÀÄÈƒ
+œÌ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÐ´ÀÀäƒŠPQÉ…‘¥¹œIÕ±”IÕ¸	¥¹‘¥¹œ€¬½Éµ…°I•Ù¥•Ü…Ñ”((¨©QåÁ”¨«¾òiÈ…µ•¹‘µ•¹ÐÑ¼H´ÀÄÄ€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ð@À´ÀÌ½@À´ÀÓŠSŠS¢ž–"gšVÃš6»¦nžòèÉÕ¸ƒžîG–ºk’â;–º‡¦b¦^·ž:¿¾òm½µÁÕÑ•}½¹™¥}¡…Í ƒ–æÏ¦Nè±½ˆƒžr/’â7¢ž–Ö3––_¢ž–"gšZ’îÛŽ€€(¨©=±½¹ÑÉ…Ð¨«¾òiMÁ¥­•IÕ¸ƒš^ƒ¢ž–"gžîG–ºk¾òmÙ…±¥‘…Ñ½ÉÌƒžR£–Þ—’ösš‚G–öO–&7¢ž–"g¾ò!Ý½É­¥¹œµÑÉ•”…‘Ù…¹”ƒšÎšò?¢þo–:–>ÈÉÕ»¾ò'¾òm=5A%1ƒ¢ž–"g–>¿¢þlAI=UQ%=;¾òm½µÁÕÑ•}½¹™¥}¡…Í¡€ƒ–>«š&¬½¹™¥Ì¼¨¹å…µ±ƒ¾òmÍÑ}ÍÑ…Ñ”ÑÉÕÑ¡¥¹•ÍÌƒ¢žšzCŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òiMÁ¥­•IÕ¸ƒžîG–ºhÑÉ…‘¥¹}ÉÕ±•}™¥±”½Ù•ÉÍ¥½¸½¡…Í ½É•Ù¥•Ý}ÍÑ…ÑÕÍƒ¾ò!QI%0½AI=UQ%=8ƒ–"o–îëš^Û¾ò'¾òm½µÁÕÑ•}½¹™¥}¡…Í¡€ƒ¦K–öH½¹™¥Ì¼¨©ƒ¾ò#žnã–¾ç¢Þ¿–ú¢ž¢2–2[¾ò'¾òmIU99%9½IMU5½YI%P½IA1dƒ–>«žR ±½…‘}‰½Õ¹‘}ÉÕ±•}‰½½­ƒ¾ò!‰åÑ•Ì¡…Í €¬Ù•ÉÍ¥½¸ƒ–’7¦ª3¾ò1µ¥Íµ…Ñ£ŠIIÕ±•U¹É•Í½±Ù•‘ÉÉ½Éƒ¾ò'¾òmAÉ½‰•½¹Ñ•áÐ¹ÉÕ±•}‰½½­ƒ¾ò!ÉÕ¸µ‰½Õ¹“¾ò'’òƒ–”±¥µ¥Ð½	(ƒ¦ª3¢¾–f£¾òmI•Ù¥•Ü…Ñ—¾ò!=5A%1ŠIIY%]¾òiÁÉ½Ù•¹…¹”ƒ–·–¶_šº×–º3šVÐ€¬…ÉÑ¥™…Ð­¥¹…±±½Ý±¥ÍÐ€¬…ÉÑ¥™…Ð‰åÑ•Ì¡…Í ƒ–’7¦ª3¾ò'–r ¹•Ý}ÉÕ¸¡AI=UQ%=8¥ƒ¾ò!™…¥°µ™…ÍÓ¾ò'’â8½µÁÕÑ•}Ù•É‘¥Ð¡AI=UQ%=8¥ƒ¾ò#–’7š‚ã¾ò'š&Ÿ¢†3¾òmÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹Áåƒ¾ò#–Þ—–ß¢«žº\M!´ÈÔØƒ–g–”IY%]ƒ–&¿šr°€¬ƒ–&¿šr³¢«¦ª3¢¾€¬ƒ¦7–’4É•Ù¥•Üƒš.Kžîw¾ò'¾òm}Á…ÉÍ•}ÍÑ}ÍÑ…Ñ•€ƒ’â—š‚ó¢žšzC¾ò!ÑÉÕÑ¡¥¹•ÍÌƒžšš¶‹¾ò0‰™…±Í”ˆƒ–¶_ž²›’âË’â7–7–>7¢ö³’âèQÉÕ—¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½µ½‘•°¹ÁçŽÍÁ¥­”½ÉÕ¹}ÍÑ½É”¹ÁçŽÍÁ¥­”½ÉÕ¹¹•È¹ÁçŽÍÁ¥­”½ÁÉ½‰•Ì¹ÁçŽÍÁ¥­”½ÑÉ…‘¥¹}ÉÕ±”¹ÁçŽÍÉ¥ÁÑÌ½ÉÕ±•Ì½É•Ù¥•Ü¹Áç¾ò#šZÃ¾ò$€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiMÁ¥­•IÕ¸ƒšZÃ–¶_šº×¦îc¢º“ž¦ë¾ò#š^œÉÕ¸©Í½¸ƒ–ó–ºç¢¾ï–>[¾ò'¾òmIY%]ƒ–&¿šr³’â8=5A%1ƒ–:’îÛ–æÛ–¶c¾ò#–6WšZ’îÛžê›–ºkžRÇ¢þCžîÓ¢B÷’ö7¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÑÉ…‘¥¹}ÉÕ±•}‰¥¹‘¥¹œ¹Áç¾ò ÄÐƒ’â«¾òi½¹™¥œƒ¦K–öH€¼ƒžîG–ºkš2’æ–2X€¼Ý½É­¥¹œµÑÉ•”ƒž¾‡šRç¦bïšZ´€¼Ù•ÉÍ¥½¸µ¥Íµ…Ñ €¼=5A%1ƒ¦bïšZ´AI=UQ%=8€¼IY%]ƒ¦k¢þ€¼…ÉÑ¥™…Ðƒž¾‡šRç¦bïšZ´€¼ÁÉ½Ù•¹…¹”ƒžòë–’Ç¦bïšZ´€¼­¥¹ƒ¦v{šÎT€¼É•Ù¥•Üƒ¢kšr³ž®¿–"Ãž®¼€¼ÍÑ}ÍÑ…Ñ”ƒ’â—š‚ó¢žšzC\Ó¾ò$€€(¨©H¨«¾òimH´ÀÄÉt ¸¸½…‘È½H´ÀÄÉ}É…Ý}•á¡…¹•}±½ÍÕÉ”¹µ¤ƒ
+œÈ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÐ´ÀÀàƒŠPH´Ä¸È½µÁ±•Ñ”á¡…¹”€¬I…Ü5•Ñ„½I•ÅÕ•ÍÐ±½ÍÕÉ”((¨©QåÁ”¨«¾òiÈ…µ•¹‘µ•¹ÐÑ¼H´ÀÄÀ€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ì½H´Ä¸Äƒ–’7–º„I=A9¾ò!H´Ä¸Äƒ–nl@Ã¾òkš^—–:–&7žö»¦jC¢^<€¼I…Ý]É¥Ñ•I•ÍÕ±Ðƒ¢¾·’æ'’â7–º3šVÐ€¼É•ÅÕ•ÍÐƒ’â7–>¿¦7–îè€¼•Ù¥‘•¹”ƒ¦Rk–ºk’â7¦^·–B#¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÅÕ•Éå}­±¥¹”ƒ–¦£¦jC¢^<•Ñ}…±•¹‘…Ë¾òo–6W¢† •Ù¥‘•¹”ƒžîG¢ŽàÁ…ÉÅÕ•Ó¾ò!µ•Ñ„ƒ–"ƒ¦f“’â7ž‚Ó–v?¦^·–B#¾ò'¾òmµ•Ñ„ƒ–>«šr$É•ÅÕ•ÍÑ}Á…É…µÍ}¡…Í£¾ò#¢¾ßšÆ’â7–>¿¦7–îë¾ò'¾òo–’k¢†£š>C’ê“š^€ÍÑ…¥¹œƒ–:–¶CšŸ¾òo¢†£–B7–Ëžª¦vg¦îc¢šžn[¾òmÉ•…ƒš^ƒ¦ª3¢¾Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òk¢žƒ
+œÐÌH´Ä¸Èƒ¢ššÆ–v_¾ò#¦jC¢^?š^—–:–&7žö»šbû–ò?–2X=ÁÑ¥½¸€¼Á…å±½…­µ•Ñ„ƒ–>3–BG¦^·–B €¼ƒ–º3šVÐÁ…É…µÌ€¬¥¹•ÍÑ•‘}…Ð€¬¥¹•ÍÑ}ÉÕ¹}¥€¼ÍÑ…¥¹œƒ–:–¶Cš>C’êµ•Ñ„ƒšr–B8€¼ƒ¢†£–B7–Ëžª	1=,€¼É•…¡Ù•É¥™äõQÉÕ”¤€¼MPƒžšš¶ˆÁ…å±½…µ½¹±äƒ¢ÂžR£¦v‹¾ò'Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÑ½É…”½É…Ý}ÝÉ¥Ñ•È¹Áç¾ò!Ù•É¥™å}µ•Ñ…}±½ÍÕÉ”€¬ÍÑ…¥¹œ€¬ÉÑ¥™…ÑI•›¾ò'ŽÍÁ¥­”½ÉÕ¹¹•È¹Áç¾ò#¦K–öK–>3–BG¦^·–B#¾ò'ŽÍÁ¥­”½ÁÉ½‰•Ì¹Áç¾ò!•Ù¥‘•¹”µ•Ñ„ƒ–â˜Á…å±½…‘}…ÉÑ¥™…ÑÌ€¬¥¹•ÍÐÉÕ¸ƒšÎ£–—¾ò'ŽÍÁ¥­”½½±‘•¹}É½ÕÑ•È¹Áç¾ò!‰Õ¹‘±”•¹ÑÉäƒ–â˜Á…å±½…½µ•Ñ„ƒ–òWžR£¾ò'ŽÍÁ¥­”½Ñ…É•Ð¹Áç¾ò!…­•Q…É•Ðƒžr–ºxÁ…É…µÌ€¬ÑÉ…‘¥¹}‘…åÏ¾òmI•…±Q…É•Ð¹ÅÕ•Éå}­±¥¹•}•á¡…¹”¡ÑÉ…‘¥¹}‘…åÌ§¾ò$€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òk¢¾š6»¦Rk–ºk–>cšnÓ’âèµ•Ñ„¹©Í½»ŠSŠSš^œÉÕ¸ƒžjÁ…ÉÅÕ•Ðƒ¢¾š6»š2$±•…äƒ¢Þ¿–ú¦^·–B#¾ò!µ•Ñ„ƒ–þ¦†ï–r£¾ò'¾òmI…Ý]É¥Ñ•I•ÍÕ±Ðƒ–¶_šº×–>«–Š{’â7–?Ž€€(¨©Q•ÍÑÌ¨«¾òiÑ•ÍÑÌ½Õ¹¥Ð½Ñ•ÍÑ}É…Ý}±½ÍÕÉ”¹Áç¾ò ÄÌƒ’â«¾òiÑ…µÁ•È½‘•±•Ñ¥½¸ƒ–>3–BD€¼ƒ–’k¢† Ñ…µÁ•È€¼½µ‰¥¹•¡…Í €¼ƒ–º3šVÐÁ…É…µÌ€¬ƒž¶'¦Vÿ–òÍåµ‰½±Ì€¼ƒ¢ÇšV<€¼¥¹•ÍÐƒžîG–ºh€¼ÍÑ…¥¹œƒš^ƒšº/žVd€¼ƒ–Ëžª¦nÛ¢B÷žn`€¼ƒ–’Ç¢Ò—š^€µ•Ñ„ƒ¦Rh€¼É•…Ù•É¥™ç\Ë¾ò$¬Ñ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÈÄÉ}•á¡…¹•}½µÁ±•Ñ•¹•ÍÌ¹Áç¾ò Üƒ’â«¾òk’â•á¡…¹”ƒšÃ––ô€¼ƒš^—–:–’Ç¢Ò”­±¥¹”ƒ’â7–>G–Â€¼Ì½Üƒ–&7žö¸€¼MS\È€¼ÉÕ±•}‰½½¬ƒžîG–ºk¾ò$€€(¨©H¨«¾òimH´ÀÄÉt ¸¸½…‘È½H´ÀÄÉ}É…Ý}•á¡…¹•}±½ÍÕÉ”¹µ¤ƒ
+œÄ€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÐ´ÀÀÜƒŠPI•Ù¥•Ý•ÈÕÑ¼µÉ¡¥Ù”ƒ¢ž–"g–æÛ–—žº‡žBšï–0((¨©QåÁ”¨«¾òiÇ¾ò#šÊïžBšÖž¢/¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Ìƒ–Þ—’ös¢ššÆƒ
+œÃ¾ò!I•Ù¥•Ý•Èƒ¦^·ž:¿¢ž–"g¾ò'¢ššÆ–æÛ–—žº‡žBšï–3Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òk–Þ—’ös¢ššÆšZš†žR–F÷–F£šršr«–ºk’æ'¾òo–:–>Ë–’7–º‡šZš†¦C’î÷ž.³ž®/š"CšZŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òk
+œÔØƒšZÃ–Šx‰I•Ù¥•Ý•ÈÕÑ¼µÉ¡¥Ù”ƒ¢ž–"d‹ŠSŠS–Þ—’ös¢ššÆ–’žB–º3š¾W–B8•Ù•±½Á•Èƒ–r£šZš†–¢þ÷–*€¥µÁ±•µ•¹Ñ…Ñ¥½¸µ…ÁÁ¥¹œƒ–6Ï¢ž’âë–Ï¦^·–öKš†¾òo–’7š‚ã¢Ž–Ï¢ºÃ–öW’ê8Y1=ƒ’â8ƒ
+œØÇ¾òošZÃšVÓšRç’â/¢úûšZÃ–Þ—’ös¢ššÆšZš†¾ò3’â7’þ»šRç–ÞË–Ï¦^·š¶šZŽ€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹—¾ò#
+œÔÛ¾ò$€€(¨©Q•ÍÑÌ¨«¾òi4$Õ…É“¾ò#žº‡žBšï–3žîOšz–º#–6¯¾ò'žîŸžî·¢šžnX€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÐ´ÀÀØƒŠPI…ÜÙ¥‘•¹”5½‘•³¾ò!H´Ä¸ÄáÁ±¥¥Ðá¡…¹”IÕ¹Ñ¥µ—¾ò$((¨©QåÁ”¨«¾òiË¾ò#š¶–ò<•Ù¥‘•¹”µ½‘•°ƒ–>cšnÓ¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Èƒ–’7–º‡¢Ž–ÌI=A9ŠSŠQH´ÄƒžjAÉ½Ù¥‘•Éá¡…¹”½I…Ý]É¥Ñ•Èƒ–¶c–r €Ðƒ¦†ä@Ã¾ò#¢þC¢†3š^Û¦Nû’â7–º3šVÐ€¼I…Ý]É¥Ñ•Èƒšr«š:—–”€¼ƒ–ê?–"_–2[¦Ž;¦f¤€¼É½ÕÑ•Èƒ¢¾š6»’â7–B3šêC¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òkš:‹¦J#šÚ#¢ÒäÁ…å±½…ƒ’úÿš6ßšZçšÎW¾òo–’Ç¢Ò”•¹Ù•±½Á”ƒ’úw¢ÖXÁÉ½Ù¥‘•È¹±…ÍÑ}•¹Ù•±½Á•Í€ƒ–>7š~—¾ò#–Ç’ê¯ž*Ûš¾ò'¾òoš¶–ò<ÁÉ½Ù¥‘•Èƒ¢¾š6»¦Nø€ôÁ…å±½…ƒŠHIÕ¹MÑ½É”¹ÝÉ¥Ñ•}•Ù¥‘•¹”¡)M=8¥ƒ¾òmÐƒ¢Þ¿žRÄ±…µ‰‘„è9½¹•€ƒ’ò«¢ÂžR €¬ƒ–6Wšv„‘½µ…¥¸•¹Ù•±½Á—¾òm‘¥ÐÁ…å±½…ƒ¦vg¦îc–>[ž²³’â’â¨Ù…±Õ—Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾ò!H´ÀÄÃ¾ò'¾òh(´ƒ¢þC¢†3š^Û¢¾š6»¦Nû–R¿’âš¶–ò?¢Þ¿–ú¾òiÑ…É•Ð¸©}•á¡…¹” ¤ƒŠHI…Ý]É¥Ñ•È¹ÝÉ¥Ñ”¡•á¡…¹”¤ƒŠHA…ÉÅÕ•Ð€¬€¹µ•Ñ„¹©Í½¸ƒŠHI…Ý]É¥Ñ•I•ÍÕ±ÐƒŠHMÁ¥­•…Í”¹•Ù¥‘•¹•}É•˜½•Ù¥‘•¹•}¡…Í¡ƒ¾ò!•Ù¥‘•¹•}ÑåÁ”õI]}AIEUS¾ò'¾òl(´ƒ–’Ç¢Ò”•á¡…¹”ƒ’âž¶'–¾ç¢Æ‡¾òiAÉ½Ù¥‘•ÉÉÉ½È¹•á¡…¹•ƒ¾ò!…±±}•á¡…¹•€ƒ¦f–*ƒ¾ò'¾òošÊïžBš.KžîtÍå¹Ñ¡•Ñ¥}™…¥±ÕÉ•}•á¡…¹•ƒ¾òm±…ÍÑ}•¹Ù•±½Á•Í€ƒ¦f7žêœ‘¥…¹½ÍÑ¥Œµ½¹±ç¾ò!MPƒ¦vgššÖ/¢¾W–òë–"ØÁÉ½‰•Ì½½±‘•¹}É½ÕÑ•È½ÉÕ¹¹•Èƒ’â7–ú_¢ºÿ¦^»¾ò'¾òl(´AÉ½‰•á•ÕÑ½È¹…±°¡™¸¥€ƒžj™¸ƒ–þ¦†ï¢þS–nxAÉ½Ù¥‘•Éá¡…¹—¾ò!QåÁ•ÉÉ½È™…¥°±½Õ“¾ò'¾òl(´ƒ¢ö÷¢6ß–ö‹ž*Û–£šR¿š2€¬‘¥Ðµ½˜µÑ…‰±•ÌƒšZçš† ¾ò#š¾?¦ï¢úG¢†£ž.³ž®,A…ÉÅÕ•Ó¾òmµ•Ñ„ƒ¢ºÃ–öW–£¦ ¡…Í ½Í¡•µ„½É½ÝÏ¾ò'¾òošÞß–B ¿šr«ž~—–ö‹ž*Ûš*lI…Ý]É¥Ñ•ÉÉÉ½Ë¾òo¦C–¶_šºÔÉ½Õ¹µÑÉ¥ÀƒšÖ/¢¾W¾ò#–B¯’â·šZ½9…8½9½¹”½¹Õ±±…‰±—¾ò'¾òl(´½±‘•¸I½ÕÑ•Èƒ¢¾š6»–B3šêC¾òkš¾<‘½µ…¥¸ƒ–£¦ •á¡…¹”ƒ–#š2’æ–2[Ž½µ…¥¹…Ñ„ƒšv—¢«žÊûž†¸Á…å±½…“Ž…Í”ƒžîG–ºh€¨©•Ù¥‘•¹”‰Õ¹‘±”¨«¾ò!É…Ü½‰Õ¹‘±•Ì¼¨¹©Í½¹€ƒ–"_–ë–£¦ É•ÅÕ•ÍÑ}¥½É•˜½¡…Í£¾ò'¾òmÙ•É¥™å}•Ù¥‘•¹•}±½ÍÕÉ•€ƒ–¾ä‰Õ¹‘±”ƒ¦K–öK–’7¦ª3¾òm‘½µ…¥¸™•Ñ ƒ–’Ç¢Ò—š2'¦Rg¢¾¿žÆïžîOšz–2[–£¦ …Í—¾òl(´I…Ý]É¥Ñ•ÈÝÉ¥Ñ”¡•á¡…¹”¥ƒ¾òiÉ•ÅÕ•ÍÑ}¥ƒ’â¢ÓšŸšZ·¢¢ €¬•¹Ù•±½Á”µ™¥ÉÍÐÁÉ½Ù¥‘•È½‘…Ñ…Í•Ó¾ò#–’[¦£–Ëžª	1=/¾ò'¾òoš^Ÿ–—–>’þwžVg’âë–ó–ºç–2¢ŽŽ€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÁÉ½Ù¥‘•ÉÌ½•á¡…¹”¹ÁçŽÁÉ½Ù¥‘•ÉÌ½•ÉÉ½ÉÌ¹ÁçŽÁÉ½Ù¥‘•ÉÌ½…µ…é¥¹‘…Ñ„½ÁÉ½Ù¥‘•È¹ÁçŽÍÑ½É…”½É…Ý}ÝÉ¥Ñ•È¹ÁçŽÍÁ¥­”½Ñ…É•Ð¹ÁçŽÍÁ¥­”½ÁÉ½‰•Ì¹ÁçŽÍÁ¥­”½½±‘•¹}É½ÕÑ•È¹ÁçŽÍÁ¥­”½ÉÕ¹¹•È¹Áä€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiIÕ¹MÑ½É”¹ÝÉ¥Ñ•}•Ù¥‘•¹•ƒ¾ò!)M=;¾ò'’þwžVg¾ò#šÖ/¢¾T¿š^ŸšVÃš6»–ó–ºç¾ò'¾ò3’â7–7šb¿š¶–ò?¢¾š6»¦Nû¾òmMÁ¥­•…Í”¹•Ù¥‘•¹•}ÑåÁ”I]})M=;ŠII]}AIEUS¾òoš^œÉ…Üƒžn»–öW–â–Æ’â7–>c¾ò#–B0É•ÅÕ•ÍÑ}¥ƒ–B3–¶_¢*–æž¶'¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òhÐÄàÁ…ÍÍ¥¹Ÿ¾ò#šZÃ–ŠxÑ•ÍÑ}ÈÄÅ}•áÁ±¥¥Ñ}•á¡…¹”€ÄÀ€¬Ñ•ÍÑ}É…Ý}ÝÉ¥Ñ•É}Í¡…Á•Ì€ÈÈ€¬Ñ•ÍÑ}½±‘•¹}É½ÕÑ•É}•Ù¥‘•¹”€ÄÏ¾òmH´Ä½ÍÁ¥­”½½±‘•¸…Ñ•Ìƒš^‹šr'šÖ/¢¾W¦¦7¾ò$€€(¨©H¨«¾òimH´ÀÄÁt ¸¸½…‘È½H´ÀÄÁ}É…Ý}•Ù¥‘•¹•}µ½‘•°¹µ¤€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÐ´ÀÀÔƒŠPHÐµÈ¸Ì½ÉÉ•Ñ¹•ÍÌ±½ÍÕÉ—¾ò!‰½Õ¹…Ñ•Ì€¼ÉÕ±”‘…Ñ„€¼•á…Ðµ‘…Ñ”€¼½¹Ñ•áÓ¾ò$((¨©QåÁ”¨«¾òiË¾ò!QÉ…‘¥¹œIÕ±•Ìƒ––Gžê›–>cšnÓ¾ò$¬Ç¾ò!…Ñ•Ìƒ¢¾·’æ'–òë–2[¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ¸Èƒ–’7–º‡¢Ž–ÌI=A9ŠSŠPÔƒ¦†ä@Ã¾ò!ÉÕ¸µ‰½Õ¹Q%YƒšÎšò<€¼ƒ–"Û–ê›’ê/–º{ž†³žò[ž‚€¼ƒ¦šX8ƒš^—š^—–:–’§¢þG’òð€¼±¥µ¥Ðƒšr«žÊûž†»š2'š^—–2ç¦4€¼P´Ä½P½P¬Äƒ–>«šb¿šÎ£¦+¾ò$¬@Ç¾ò!	(ƒž.³ž®/¢¾·’æ'¢¾šb;¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÁÉ½‘ÕÑ¥½¹}™½Éµ…±}…Ñ”¡‰½Õ¹‘}µ…¹¥™•ÍÐ¥€ƒ–¦£’î7¢ÂÉ•Ù¥•Ý}…Ñ” ¥ƒ¾ò#¢¾ìQ%Y¾ò'¾òmÙ•É¥™å}‰¥¹‘¥¹€ƒžR Q%Yƒ–¾çš¾S¾ò#¢þw–>4‰½Õ¹µÉÕ¸ƒ––Gžê›¾ò'¾òmÑÉ…‘¥¹}ÉÕ±”¹Áå€½Ù…±¥‘…Ñ½ÉÌ¹Áå€ƒž†³žò[ž‚ƒ
+ÄÄÀ¼ÈÀ¼ÌÀ”ƒž¶'–"Û–ê›¢Òçž:¾òo¦šX8ƒš^—š^ƒ–"“–ºk¾ò!!%9aP™¥ÉÍÐ´Ôƒ¢ž–"gžnÓš:”9½¹—¾ò'¾òm}Ù…±¥‘…Ñ•}±¥µ¥Ñ}Á¥Ñ€ƒ–>[¦š[’â¨Íåµ‰½°ƒ–2ç¦7¢†3¾ò#¦v{žÊûž†»š^—šr¾ò'¾òm}Ù…±¥‘…Ñ•}½ÉÁ}…Ñ¥½¹}½¹Ñ•áÑ€ƒ–>«–k–¶_šº×š¾S¢ú¾ò#š^€P´Ä½P½P¬Äƒ’îßš‚ó’â+’â/šZ¾ò'¾òm}Ù…±¥‘…Ñ•}‰©}µ…ÁÁ¥¹€ƒ’úw¢Ö[’â7–¶c–r£žjµ…ÁÁ¥¹œ•¹‘Á½¥¹ÓŽ€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òh(´€¨©	½Õ¹µ…Ý…É”…Ñ•Ì¨«¾òiÅÕ…¹Ñ¥Ñå}…Ñ”½•Ù•¹Ñ}½Ù•É…•}…Ñ”½É•Ù¥•Ý}…Ñ”½ÁÉ½‘ÕÑ¥½¹}™½Éµ…±}…Ñ•€ƒ–£¦£š:—–>\€¡…Í•Ì°µ…¹¥™•ÍÐ¥ƒ¾òmYI%Pƒ–>«žR ÉÕ¸µ‰½Õ¹ƒšVÃš6»¦n¾òmÙ•É¥™å}‰¥¹‘¥¹ƒ¾ò!Q%Yƒ–¾çš¾S¢¾·’æ'¾ò'–"ƒ¦f“¾òmQ%Y…‘Ù…¹”½Ñ…µÁ•Èƒ–>3–BG–¾çš*_šÖ/¢¾W¢¾šb;’â7šÎšò?¾òl(´€¨©QÉ…‘¥¹œIÕ±”ƒšVÃš6»–Æ¨«¾ò!H´ÀÄÇ¾ò'¾òk–"Û–ê›’ê/–º{¢þ–”½¹™¥Ì½ÑÉ…‘¥¹}ÉÕ±•Ì½…}Í¡…É•}±¥µ¥Ñ}ØÄ¹å…µ±ƒ¾ò!Ù•ÉÍ¥½¸½É•Ù¥•Ý}ÍÑ…ÑÕÌ€¬ÉÕ±•Ímw¾ò'¾òmAåÑ¡½¸ƒ–>¨±½…½Ù…±¥‘…Ñ”½A%Pƒ–2ç¦4¿–ËžªšŽšÖ,½É•Í½±Ù”½•¥µ…°ƒ¢º‡žº_¾òm™…¥°µ±½Í•“¾ò Àƒ–2ç¦4€¼€øÄ•ÅÕ…±±äµÙ…±¥€¼ƒžòè±¥ÍÑ¥¹}‘…Ñ”­…±•¹‘…È€¼ƒšr«ž~—švÿ–"¬ƒŠHIÕ±•U¹É•Í½±Ù•‘ÉÉ½Éƒ¾ò3šÂã’â7¦vg¦îc¦–2X5%8€ÄÀ—¾ò'¾òmAåÑ¡½¸ƒšêCž‚–ëž:Ã¢Òçž:–¶_¦v‹¦?–6ÏšÖ/¢¾W–’Ç¢Ò—¾òl(´€¨«¦šX8ƒš^”€ôÍ•ÍÍ¥½¸ƒ–ê?–>Ü¨«¾òi™¥ÉÍÑ}¹}Í•ÍÍ¥½¹Í€ƒžR A%Pƒ’ê“šbOš^—–:¥¹‘•ã¾ò#’â+–âš^”÷ž²°€Äƒ’â¨Í•ÍÍ¥½»¾ò'¾òoš^—–:žòë¢†0™…¥°µ±½Í•“¾òošÖ/¢¾W¢šžn[šb—¢*¿–n÷–ê¿¢Þ£–F£šr¬¿ž²°€Ô´Øƒš^—¾òl(´€¨©1¥µ¥ÐƒžÊûž†»–2ç¦4¨«¾òi€¡MUI%Qe}=°QI}Q¥€ƒžÊûž†»–2ç¦7¾ò Àƒ¢†0¿–’k¢†0™…¥°±½Í•“¾ò'¾òm±¥ÍÑ¥¹}‘…Ñ”ƒ–þ¦†ïšv—¢«–B3’â A%P¡¥ÍÐµ…ÍÑ•Ë¾ò#žòë–’Ç–6Ì%3¾ò3’â7–¢ºà9½¹”ƒ¦–2[¾ò'¾òo¦fC’îÜ•¥µ…°I=U9}!1}U@ƒ’â8ÁÉ½Ù¥‘•Èƒ¦®c’ö;¦fC’îß’â¢ÓšŸš‚‡¦ª3¾òl(´€¨©P´Ä½P½P¬Äƒžr¦ª3¢¾¨«¾òi•á…Ð•Ù•¹Ð‘…Ñ—¾ò!…‘¨a}QôõS¾ò$¼™…Ñ½ÈÑÉ…¹Í¥Ñ¥½¸…ÐP€¼É…Ü‘¥Í½¹Ñ¥¹Õ¥Ñç¾ò!™…Ñ½ËŠ&€Äƒš^ØÉ…Ý}É•ÓŠ&…‘©}É•Ó¾ò$¼…‘©ÕÍÑ•½¹Ñ¥¹Õ¥Ñç¾ò!ñ…‘©}É•ÑóŠ&ÌÔ—¾ò$¼ƒ–sž&3ŠI9=Q}QMQ	1}Q%5¡MUMA9M%=9}Q}Y9P¥ƒ¾ò#žîw’â7¦vg¦î`AMO¾ò'¾òl(´€¨©	(ƒ¢¾·’æ'¢¾šb8¨«¾òi¡¥ÍÐµ…ÍÑ•Èƒ–¶c–r£šŸ¾ò!½‘”½¹Ñ¥¹Õ¥Ñç¾ò$¬•á…Ðµ‘…Ñ”ÍÑ…ÑÕÌƒ
+ÄÌÀ”É•¥µ—¾ò#šVÃš6»¦¦Ç–* ÉÕ±—¾ò'¾ò3’â7–7’úw¢ÖXµ…ÁÁ¥¹œ•¹‘Á½¥¹ÓŽ€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½½±‘•¹}ÍÑ½É”¹ÁçŽÍÁ¥­”½½±‘•¹}É½ÕÑ•È¹ÁçŽÍÁ¥­”½ÑÉ…‘¥¹}ÉÕ±”¹ÁçŽÍÁ¥­”½Ù…±¥‘…Ñ½ÉÌ¹ÁçŽÍÁ¥­”½ÉÕ¹¹•È¹ÁçŽ½¹™¥Ì½ÑÉ…‘¥¹}ÉÕ±•Ì¿¾ò#šZÃ¾ò$€€(¨©™™•Ñ•…Ñ„¨«¾òi½¹™¥Ì½ÑÉ…‘¥¹}ÉÕ±•Ì½…}Í¡…É•}±¥µ¥Ñ}ØÄ¹å…µ³¾ò!=5A%1¾ò3–ú’êë–Þ”É•Ù¥•ß¾ò$€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiÉ•Í½±Ù•}ÑÉ…‘¥¹}ÉÕ±•€ƒ¢þS–n{–ó’î8QÉ…‘¥¹IÕ±”ð9½¹•€ƒšRç’âèÉ…¥Í”IÕ±•U¹É•Í½±Ù•‘ÉÉ½Éƒ¾ò!™…¥°µ±½Í•“¾ò'¾òmÙ…±¥‘…Ñ•}±¥µ¥Ñ}ÉÕ±•€ƒ–6žêœØÏ¾ò#šVÃš6»¦¦Ç–*£¾ò'¾òm	=I}1%5%Q}IQL½‰½…É‘}½˜½•áÁ•Ñ•‘}±¥µ¥Ñ}ÁÉ¥•€ƒ–"ƒ¦f“¾ò#š^ƒ–’[¦£–òWžR£¾ò'Ž€€(¨©Q•ÍÑÌ¨«¾òhÐÄàÁ…ÍÍ¥¹Ÿ¾ò#šZÃ–ŠxÑ•ÍÑ}ÑÉ…‘¥¹}ÉÕ±•}‘…Ñ„€ÈÄ€¬Ñ•ÍÑ}‰½Õ¹‘}™½Éµ…±}…Ñ•Ì€à€¬É½ÕÑ•È½½	(ƒ–rëšf¼€ÄÏ¾ò$€€(¨©H¨«¾òimH´ÀÄÅt ¸¸½…‘È½H´ÀÄÅ}ÑÉ…‘¥¹}ÉÕ±•}‘…Ñ…}Í½È¹µ¤€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÈ´ÀÀÐƒŠPH´ÄAÉ½Ù¥‘•Éá¡…¹”€¼I…Ý]É¥Ñ•ÈIÕ¹Ñ¥µ”½¹ÑÉ…Ð((¨©QåÁ”¨«¾òiÇ¾ò#šZÃ–Š{¢þC¢†3š^Û––Gžê›¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9¾ò!%µÁ±•µ•¹Ñ…Ñ¥½»¾ò$¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiHÐµÈ	…Ñ ´Äƒ–’7š‚ã¢Ž–ÌH´ÄId€¼M!=U1MQIP9=_Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÁÉ½Ù¥‘•È•Ñ}ááá€ƒžnÓš:—¢þS–nxÁ…å±½…“¾òm•¹Ù•±½Á”ƒ¢^?–r ±…ÍÑ}•¹Ù•±½Á•Íƒ¾ò!Ñ¡É•…µ±½…°ƒ–ò?¾ò'¾òoš^€I…Üƒ–Æš2’æ–2[¾òmÅÕ•Éå}­±¥¹”ƒ–¦ •Ñ}…±•¹‘…Èƒš^ƒž.³ž®/–º‡¢º‡Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òh(´AÉ½Ù¥‘•Éá¡…¹•ƒ¾ò ÄM,•á¡…¹”€ô€ÄÉ•ÅÕ•ÍÑ}¥€ô€ÄI…Ý¹Ù•±½Á”€ôƒŠ&ÄÁ…å±½…“¾ò'¾òm…±±}•á¡…¹” ¥€ƒšbû–ò?¢þS–nx•á¡…¹—¾òo’âk–*„ÝÉ…ÁÁ•Èƒ–>X€¹Á…å±½…‘ƒ¾òl¨«š^€±…ÍÑ}•á¡…¹”½½¹ÍÕµ”ƒš¢‡–ò<¨¨(´¡¥‘‘•¸M,…±³¾ò!ÅÕ•Éå}­±¥¹”ƒŠH•Ñ}…±•¹‘…Éƒ¾ò'ž.³ž®,•á¡…¹—¾ò!…±•¹‘…Èƒ’â7–~/¢þl­±¥¹”•¹Ù•±½Á—¾ò$(´I…Ý]É¥Ñ•Éƒ¾òkš"C–*|•á¡…¹”ƒŠHA…ÉÅÕ•Ðƒ–Þ—’îØ€¬€¹µ•Ñ„¹©Í½»¾ò!•¹Ù•±½Á—¾ò'¾òo–’Ç¢Ò”•á¡…¹”ƒŠH•¹Ù•±½Á”µ½¹±äƒ–’Ç¢Ò—¢¾š6»¾ò#¢¾ßšÆ–º‡¢º‡šÂã’â7’â‹–’Ç¾ò'¾òmÍ…µ”¡…Í ƒ–æž¶$€¼‘¥™™•É•¹Ð‰åÑ•Ì	1=/¾òo¢Þ£–æÏ–>Ã¦ï¢úDUI'¾òmÍ•É•Ðƒ¢ÇšV?¾òl¨«š^€É•ÁÈ ¤ƒ–ê?–"_–2X¨¨(´MÁ¥­”AÉ½‰•½¹Ñ•áÐ¹•Ù¥‘•¹•€ƒ–’7žR •á¡…¹”ƒžjÉ•ÅÕ•ÍÑ}¥“¾ò#’â7–7¦7šZÃžRš"C¾ò$€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÁÉ½Ù¥‘•ÉÌ½•á¡…¹”¹Áç¾ò#šZÃ¾ò'ŽÁÉ½Ù¥‘•ÉÌ½…µ…é¥¹‘…Ñ„½ÁÉ½Ù¥‘•È¹ÁçŽÍÑ½É…”½É…Ý}ÝÉ¥Ñ•È¹Áç¾ò#šZÃ¾ò'ŽÍÁ¥­”½ÁÉ½‰•Ì¹Áä€€(¨©Q•ÍÑÌ¨«¾òhÌÐàÁ…ÍÍ¥¹Ÿ¾ò#šZÃ–ŠxÑ•ÍÑ}ÈÅ}ÁÉ½Ù¥‘•É}•á¡…¹—¾òiÉ•ÅÕ•ÍÑ}¥ƒ’þwš2€¼ƒ–’Ç¢Ò”•¹Ù•±½Á”€¼ƒ–æž¶$€¼ƒ–Ëžª	1=,€¼Í•É•Ðƒ¢ÇšV<€¼ƒ¢Þ£–æÏ–>ÀUI$€¼ƒš^€É•ÁÈ€¼¡¥‘‘•¸…±•¹‘…Èƒž.³ž®,•á¡…¹”€¼ÍÁ¥­”É•ÅÕ•ÍÑ}¥±¥¹•…—¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÈ´ÀÀÌƒŠPHÐµÈ½±‘•¸I•Ù¥•Ü€¼½µ…¥¸I½ÕÑ•È€¼A%PY…±¥‘…Ñ½È½¹ÑÉ…Ó¾ò#ž²³’âš&ç¾ò$((¨©A…ÉÐ€Ë¾ò#šr³š&ç¾ò$¨«¾òiHÐµÈ	…Ñ ´Äƒ–’7š‚ã–no¦†ä@Àƒ–£¦£’þ»–’7ŠSŠP(´€¨©@À´ÀÄ¨¨É•Ù¥•Ý}…Ñ”ƒ– …Í”ƒš‚‡¦ª3¾ò#–"ƒ¦f•…É±ä‰É•…¯¾òo–º3šVÓ¦Rg¢¾¿šRÛ¦n¾òm™¥ÉÍÐµÙ…±¥µÍ•½¹µÑ…µÁ•É•ƒšÖ/¢¾W¾ò$(´€¨©@À´ÀÈ¨¨IÕ¸µ‰½Õ¹½±‘•¸É•Í½±Ù•Ë¾òi±½…‘}‰½Õ¹¡‘…Ñ…Í•Ñ}™¥±”°ÑÉÕÑ¡}Ù•ÉÍ¥½¸°‘…Ñ…Í•Ñ}¡…Í ¥€ƒžnÓ¢¾ì¥µµÕÑ…‰±”‘…Ñ…Í•Ó¾òmÉ•ÍÕµ”½Ù•É‘¥Ð½Ðƒ–£¦£¢ÖÀ‰½Õ¹“¾ò!Q%Yƒ’î–Ï–ºh9\ÉÕ¸ƒ¦îc¢º“ž&#šr³¾ò'¾òmQ%Yƒš:£¢þo–B;–:–>ÈÉÕ¸ƒ’î7–>¼á…ÐI•Á±…ç¾ò#šÖ/¢¾W¾ò$(´€¨©@À´ÀÌ¨¨…¹‘¥‘…Ñ”Õµ•¹Ñ…Ñ¥½¸]½É­™±½ß¾ò!ÍÉ¥ÁÑÌ½½±‘•¸½…¹‘¥‘…Ñ”¹Áåƒ¾òi…‘µ…Í”½Ù…±¥‘…Ñ”½‰Õ¥±µÙ•ÉÍ¥½»¾ò'¾òmÉ•Ù¥•Üƒ–>«š‚ã¦ª3’â7–"o–îë’ê/’îÛ¾òožR–F÷–F£šršZš†šnÓšZÀ(´€¨©@À´ÀÐ¨¨AI=UQ%=8¹•Ý}ÉÕ¸ƒš&Ÿ¢†3–º3šVÐ™½Éµ…°…Ñ—¾ò!ÅÕ…¹Ñ¥Ñä€¬•Ù•¹ÑÌ€¬É•Ù¥•ß¾ò%™…¥°µ™…ÍÓ¾ò#’â7–7žŸ–º3š¶–ò?¢Ò›–>ßšÖ¦?š&7–r Ù•É‘¥Ðƒ–>Gž:À½±‘•¸ƒšr¨É•Ù¥•ß¾ò$(´@Ä´ÀÄ‰…Ñ ­¥¹ƒžî’â …±±½Ý±¥ÍÓ¾òm@Ä´ÀÈIY%]ÁÉ½Ù•¹…¹”±½…ƒš^Û–º3šVÓš‚‡¦ª3¾òm@Ä´ÀÌ…ÉÑ¥™…ÐÉ•˜Á…Ñ ½¹™¥¹•µ•¹Ó¾òm@Ä´ÀÐƒž&#šr³šZ’îØÉ•…Ñ”µ½¹±ç¾ò#’â7–B0‰åÑ•Ì	1=/¾ò'¾òm@Ä´ÀÔ‰…Ñ ÍÑ…”µ…±°µÑ¡•¸µ½µµ¥Ó¾ò#š^ƒ–¶“–ü•Ù¥‘•¹—¾ò'¾òm@Ä´ÀØ•Ù¥‘•¹”ƒžrš¶Œ½¹Ñ•¹Ðµ…‘‘É•ÍÍ•“¾ò!Í¡„ÈÔØ¼ƒ¢Þ¿–ú¾ò3šZçš† ¾ò$(´€¨©HÐµÈ¸È¨«¾òi½µ…¥¸I½ÕÑ•Ë¾ò!½±‘•¹}É½ÕÑ•È¹Áç¾òiMSŠIÍÑ…ÑÕÌ€¼•±¥ÍÑ•“ŠI¡¥ÍÑ}½‘•}±¥ÍÐ­ÍÑ½­}‰…Í¥Œ€¼1¥µ¥ÓŠIÍÑ…ÑÕÌ­A%PÉÕ±”€¼ŠIÍÑ…ÑÕÌ­…‘¨­­±¥¹”€¼	+ŠIµ…ÁÁ¥¹Ÿ¾ò'¾òmÌƒž:Ã–rèMPÑÉÕÑ ƒ–"ƒ¦f“¾ò!ÌƒžîOšzšŸŽÐƒ¢¾·’æ'šŸ–öï–êW–"žšï¾ò'¾òmA%PQÉ…‘¥¹IÕ±—¾ò#ž&#šr³–2X•™™•Ñ¥Ù•}™É½´½Ñ¼€¬•¥µ…°I=U9}!1}UC¾ò'¾òm!¥ÍÑ½Éäƒ–në–ºh™¥áÑÕÉ•Ï¾ò ØÀÀÔÄä¼ÀÀÀÀÀÄ¼àÌÔÄàÔ¼ÌÀÀÄÀÓ¾ò3’â7–4•Ñ}½‘•}±¥ÍÐ ¥lèÉw¾ò'¾òm	Mƒž.³ž®,½É”•Ù¥‘•¹”(´ƒ’ê/’îØ¥‘•¹Ñ¥ÑäƒžîOšz–2[¾òiMPô¡Íåµ‰½°°•™™•Ñ¥Ù•}‘…Ñ”°ÍÕ‰ÑåÁ”§Ž1%MPô¡Íåµ‰½°°•™™•Ñ¥Ù•}‘…Ñ”§ŠSŠS¢«žRÇ–¶_ž²›’âÈ•Ù•¹Ñ}¥ƒš^ƒšÎW–GšVÃ¾ò ØÀ™…­”µ¥ƒ–B#–æÛ’âè€ÄƒžjšÖ/¢¾W¾ò$(¨©MÑ…ÑÕÌƒšnÓšZÀ¨«¾òi%µÁ±•µ•¹Ñ…Ñ¥½¸=9¾ò!HÐµÈ¸Ä€¬HÐµÈ¸Èƒ–£¦£¢B÷–rÃ¾ò$¼I•Ù¥•ÜA9%9}IY%\€€(¨©Q•ÍÑÌ¨«¾òhÌÐàÁ…ÍÍ¥¹Ÿ¾ò#šr³š&ä€¬ÄÏ¾òi‰½Õ¹É•Í½±Ù•È€Ð€¬…¹‘¥‘…Ñ”Ý½É­™±½Ü€Ð€¬É½ÕÑ•È½ÑÉ…‘¥¹}ÉÕ±”ƒžnã–Ì€¬H´Ä€ÄÌƒ¦†ç¾ò$((¨©QåÁ”¨«¾òiÄ½¹ÑÉ…Ð±…É¥™¥…Ñ¥½¸€€(¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IMO¾ò#ž²³’âš&ç–ÞË¢B÷–rÃ¾òiÙ¥‘•¹”±½ÍÕÉ”€¬I•Ù¥•Ü]½É­™±½Ü€¬ƒ’ê/’îÛ¢¾·’æ$€¬¡…Í ƒšnÓ–B7¾òmI½ÕÑ•È½A%P½	M½	(ƒ¢þo¢†3’â·¾ò$€€(¨©QÉ¥•È¨«¾òiHÐµÄ¸Äƒ–’7š‚àI=A9½Éµ…°QÉÕÑ ±½ÍÕÉ—ŠSŠQÍ½ÕÉ•}…ÉÑ¥™…Ñ}¡…Í ƒšr«žrš¶žîG–ºhM½ÕÉ”ÉÑ¥™…ÓŽ€€(¨©=±½¹ÑÉ…Ð¨«¾òiIY%]ƒ–>«šŽš~”Í½ÕÉ•}…ÉÑ¥™…Ñ}¡…Í ƒ¦v{ž¦ë¾ò#–>¿š&/–Þ—–†¯’îïš?–ó¾ò'¾òm•Ù•¹Ð…Ñ”ƒ–>«šr$MQ}@ƒ–6WžÆï¾òmMÁ¥­•IÕ¸ƒ–¶_šº×–B4½±‘•¹}µ…¹¥™•ÍÑ}¡…Í ƒ–¶cžjšb¼‘…Ñ…Í•Ñ}¡…Í£Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òh(´€¨©I•Ù¥•Ü]½É­™±½Üƒšb¿–R¿’â =5A%1ŠIIY%]ƒ¢Þ¿–ú¨«¾ò!ÍÉ¥ÁÑÌ½½±‘•¸½É•Ù¥•Ü¹Áåƒ¾ò'¾òiÉ•Ù¥•Ý•Èƒš>C’úo–’[¦£¢¾š6»–Þ—’îÛšZ’îÛ¾ò1Ý½É­™±½Üƒ¢«–ÞÇ¢¾ï–>X‰åÑ•Ìƒ¢º‡žº\M!ÈÔØƒ–æÛ–’7–"Û–”•Ù¥‘•¹”ÍÑ½É—¾ò#––ºç–¾ï–v¾ò'¾òl¨«š^€€´µ¡…Í ƒ–>šVÀ¨«¾ò#š&/–Þ”¡…Í ƒšÂã¢þsš^ƒšÎW¢úO–—¾ò$(´€¨©½Éµ…°I•Ù¥•Ü…Ñ”¨«¾ò!É•Ù¥•Ý}…Ñ—¾ò'¾òkš¾?’â¨IY%]…Í”ƒžjÍ½ÕÉ•}…ÉÑ¥™…Ñ}É•˜ƒ–þ¦†ìÉ•Í½±Ù”ƒ–"À•Ù¥‘•¹”ƒ–Þ—’îÛ’âPM!ÈÔØƒ’â;–Â–¶c–ó’â¢Ó¾ò3–B›–"dIY%]}%9=5A1Q(´€¨©AÉ½Ù•¹…¹”ƒ–"žšì¨«¾òi½µÁ¥±•‘}‰ä½½µÁ¥±•‘}…Ðƒ’â8É•Ù¥•Ý•‘}‰ä½É•Ù¥•Ý•‘}…Ðƒž.³ž®/¾òm=5A%1…Í”ƒ–â˜É•Ù¥•Ý•Èƒ–¶_šº×–6Ì±½…ƒ–’Ç¢Ò”(´€¨«’ê/’îÛ¢¾·’æ$¨«¾ò#
+œä¿
+œÄÃ¾ò'¾òiMQ}QI9M%Q%=8€¬ÍÕ‰ÑåÁ—¾ò!MQ}½MQ}I5=Y½MQI}MQ}½MQI}MQ}I5=Y¾ò'¾ò1…Ñ”ƒ¢ššÆƒŠ&”ÔÀ‘¥ÍÑ¥¹Ðƒ’âPøÀƒ’âPI5=YøÃ¾òm1%MPƒ¢ššÆ‘¥ÍÑ¥¹Ð•Ù•¹ÐƒŠ&”ÈÀ€¨©9¨¨‘¥ÍÑ¥¹ÐÍåµ‰½°ƒŠ&”ÈÀ(´€¨«–¶_šº×šnÓ–B4¨«¾ò#
+œÄÄƒšZçš† ¾ò'¾òiMÁ¥­•IÕ¸¹½±‘•¹}µ…¹¥™•ÍÑ}¡…Í ƒŠH½±‘•¹}‘…Ñ…Í•Ñ}¡…Í£¾ò!±½…ƒ–ó–ºçš^œ­•ç¾ò$(´ƒšVÃš6»¦nØÌ…¹‘¥‘…Ñ—¾ò!½µÁ¥±•½É•Ù¥•Ý•ƒ–"žšì€¬MQ}QI9M%Q%=8ƒ¢¾·’æ'¾òo¢¾k–º{¢šžn[¾òiMQ}QI9M%Q%=8ôÈðÔÀƒš^€I5=YÍÕ‰ÑåÁ—Ž1%MPôÄÀðÈÃ¾ò$€€(¨©I•…Í½¸¨«¾òk¢º¤‹–Â–¶cžj¡…Í ‹’î8±…¥´ƒ–>cš"C–>¿šrë–f£–’7¦ª3žjáÑ•É¹…°Ù¥‘•¹—Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½½±‘•¹}ÍÑ½É—ŽÍÁ¥­”½Ù…±¥‘…Ñ½ÉÏŽÍÁ¥­”½µ½‘•³ŽÍÁ¥­”½ÉÕ¹}ÍÑ½É—ŽÍÁ¥­”½ÉÕ¹¹•ËŽÁÉ½Ù¥‘•ÉÌ½…µ…é¥¹‘…Ñ„½…Á…‰¥±¥ÑçŽÍÉ¥ÁÑÌ½½±‘•¸€€(¨©™™•Ñ•…Ñ„¨«¾òi‘…Ñ„½½±‘•¸½ÁÉ½Ù¥‘•È½…µ…é¥¹‘…Ñ„¿¾ò!ØÌQ%Y¾òm•Ù¥‘•¹”¼ƒžRÄÉ•Ù¥•ÜÝ½É­™±½Üƒ’êŸžR¾ò$€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òi½±‘•¹…Í”ƒ–¶_šº×š&§–ÆW¾òm½±‘•¹}‘…Ñ…Í•Ñ}¡…Í ƒšnÓ–B7¾ò!±•…ä©Í½¸­•äƒ–ó–ºç¢¾ï–>[¾ò'Ž€€(¨©5¥É…Ñ¥½¸€¼	…­™¥±°¨«¾òi½±‘•¹}…Í•Í}ØÌ¹©Í½¹³Ž€€(¨©Q•ÍÑÌ¨«¾òhÌÄÌÁ…ÍÍ¥¹Ÿ¾ò#šZÃ–ŠxÑ•ÍÑ}½±‘•¹}É•Ù¥•Ý}Ý½É­™±½ß¾òi…ÉÑ¥™…Ðƒ–¶_¢*–Â–¶`¿š^€¡…Í ƒ–>šVÀ¿¦7–’4É•Ù¥•Üƒš.Kžît¿žòë–’Ä…ÉÑ¥™…Ðƒš.Kžît¿–Â–¶c–B;ž¾‡šRçšŽšÖ,½¡½ÍÐÉ•˜ƒšŽšÖ,½MQ}I5=YÍÕ‰ÑåÁ”…Ñ”½Íåµ‰½°ƒ–>3¦^ ¿šnÓ–B7–ó–ºç¾ò'Ž€€(¨©H¨«¾òi9½ÐI•ÅÕ¥É•“¾ò#––Gžê›šúšâ¾ò$€€(¨©½µµ¥Ð¨«¾òkšr³š&ä€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀàÈÈ´ÀÀÈƒŠP‘½ÁÐHÐµÄ¸Ä½±‘•¸QÉÕÑ %¹Ñ•É¥Ñä½¹ÑÉ…Ð((¨©QåÁ”¨«¾òiÄ½¹ÑÉ…Ð±…É¥™¥…Ñ¥½¸€€(¨©MÑ…ÑÕÌ¨«¾òiI=A9¾ò!½Éµ…°M½ÕÉ”Ù¥‘•¹”ƒšr«¦^·ž:¿¾òmÍ½ÕÉ•}…ÉÑ¥™…Ñ}¡…Í ƒ–Âkšr«žîG–ºkžr–º{–Þ—’îÛŠSŠQHÐµÈƒž²³’â’îï–*‡¾ò$€€(¨©QÉ¥•È¨«¾òiHÐµÄƒ–’7š‚àI=A9¾ò3–no¦†ä@Ã¾ò!µ…¹¥™•ÍÐƒ¢«¦ª3¢¾€¼¡…Í ƒš.–"€¼•Ù•¹Ðƒ¢šžnX€¼ƒž&#šr³¦'š.§¾ò'Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òiÍ½ÕÉ•}¡…Í ƒ–6W–N#–â3¾òmµ…¹¥™•ÍÐƒžî¢º‡–>¿¢Š¯–6Wž
+çž¾‡šRç¾òm±½…‘•Èƒš2'–¶_–ã–ê?ž2sž&#šr³Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òiµ…¹¥™•ÍÐƒžî¢º‡’î8…Í•Ìƒ–’7žº_¾ò#ž¾‡šRç–6Ïš.›š"«¾ò'¾òm…Í•}Í•µ…¹Ñ¥}¡…Í£¾ò#–B¬…Í•}ÑåÁ—¾ò'’â8Í½ÕÉ•}…ÉÑ¥™…Ñ}¡…Í ƒ–"žšï¾òm•Ù•¹Ñ}¥½•Ù•¹Ñ}±…ÍÌ€¬‘¥ÍÑ¥¹Ðµ•Ù•¹Ð…Ñ—¾ò!AI=UQ%=8ÉÕ¸ƒ–"o–îë–6Ïš.Kžîw¾ò1™…¥°µ±½Í•“¾ò'¾òm…ÁÁ•¹µ½¹±äØÄ½ØÈ€¬Q%Yƒš2¦J#Ž€€(¨©I•…Í½¸¨«¾òi½±‘•¸ƒ’î8€‰Y•ÉÍ¥½¹•±…¥´M•Ðˆƒš:£¢þo–"À€‰Y•ÉÍ¥½¹•€¬I•Ù¥•Ý•€¬áÑ•É¹…±±äµÙ¥‘•¹•QÉÕÑ M•ÐˆƒžjžîOšz–&7š>CŽ€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÁ¥­”½½±‘•¹}ÍÑ½É—ŽÍÁ¥­”½ÉÕ¹¹•ËŽÍÁ¥­”½Ù…±¥‘…Ñ½ÉÏŽÍÉ¥ÁÑÌ½½±‘•¸€€(¨©™™•Ñ•…Ñ„¨«¾òi‘…Ñ„½½±‘•¸½ÁÉ½Ù¥‘•È½…µ…é¥¹‘…Ñ„¿¾ò!ØÈ…¹‘¥‘…Ñ—¾ò0ÄÈÌ…Í•Ï¾ò3–£¦ =5A%1¾ò$€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òi½±‘•¹…Í”ƒ–¶_šº×š&§–ÆW¾ò!Í½ÕÉ•}¡…Í£ŠI…Í•}Í•µ…¹Ñ¥}¡…Í €¬ƒšZÃ–¶_šº×¾ò'¾òm±½…A$ƒ’â7–>cŽ€€(¨©5¥É…Ñ¥½¸€¼	…­™¥±°¨«¾òi½±‘•¹}…Í•Í}ØÈ¹©Í½¹°ƒžRÄ½µÁ¥±•}ØÈƒžRš"CŽ€€(¨©Q•ÍÑÌ¨«¾òhÌÀÈÁ…ÍÍ¥¹Ÿ¾ò#–B¬ƒ
+œÈÈƒ–Ï¦R»šÖ/¢¾W¾òiµ…¹¥™•ÍÐƒ–>3žÆïž¾‡šRä€¼•¹ÑÉäƒšRä¯¦7–Â€¼…Í•}ÑåÁ”ƒšRä€¼IY%]ƒš^€…ÉÑ¥™…Ð€¼ƒ¢Òš‚ßšr³’â7žº_’ê/’îØ€¼ƒ¢¾Ç¦–Ô±½…‘•È€¼…ÁÁ•¹µ½¹±ç¾ò'Ž€€(¨©H¨«¾òi9½ÐI•ÅÕ¥É•“¾ò#––Gžê›šúšâ¾ò3’â7šRçšzÛšz¾ò$€€(¨©%µÁ±•µ•¹Ñ…Ñ¥½¸½µµ¥Ð¨«¾òiˆÍ„ÍÈÝ€€€(¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸½Õ‘¥ÐI•Ù¥•ß¾ò ÈÀÈØ´Àà´ÈË¾òiMÑÉÕÑÕÉ”MU	MQ9Q%11dAMO¾òm½Éµ…°QÉÕÑ ±½ÍÕÉ”I=A9¾ò$((ŒŒ4µH´ÈÀÈØÀàÈÈ´ÀÀÄƒŠPƒ–îëž®,•Ù•±½Áµ•¹Ð5…¹…•µ•¹Ðƒšï–0((¨©QåÁ”¨«¾òiÄ€¼½Ù•É¹…¹”€€(¨©MÑ…ÑÕÌ¨«¾òiYI%%¾ò ÈÀÈØ´Àà´ÈÈHÐµÄ¸Äƒ–’7š‚ã¾òi•Ù•±½Áµ•¹Ð5…¹…•µ•¹Ð½Ù•É¹…¹”AMM}]%Q!}5%9=I}%aO¾ò3
+œÈƒ–no–Â?¦†ç–ÞË–r£šr³š&ç’þ»š¶¾ò$€€(¨©QÉ¥•È¨«¾òk¦†çžn»¢þo–—–’k¢ö»–º‡¢º‡Ž½Éµ…°MÁ¥­”ƒ’â8…¹½¹¥…°IÕ¹Ñ¥µ”ƒ–æÛ¢†3¦bÛšº×¾ò3¦r¢šžî’â¦Vÿšržº‡žB–—–>Ž€€(¨©=±½¹ÑÉ…Ð¨«¾òk¢ºû¢º‡Ž¢þo–ê›Ž–º‡¢º‡Ž¦Ž;¦f§Žš^—–þ_–"šV–r£–’k’â«šZš†Ž€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òk–îëž®,‘½Ì½ÁÉ½©•Ð½Y1=A59Q}5959P¹µ‘ƒ¾ò3žî’âžîÓš*“–öO–&7¢ºû¢º‡šFc¢šŽž*ÛšŽ…Ñ—ŽI½…‘µ…ÃŽ–>cšnÓš:Ÿ–"Û–J3šZš†žÒ‹–òWŽ€€(¨©I•…Í½¸¨«¾òk¦f7’ö;¢¾·’æ'šòžžï¾ò3¦ÿ–7Šs’îž‚šRç–>c¢3–öO–&7šZçš†#’â7–B3š¶—ŠwŽ€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi½Õµ•¹Ñ…Ñ¥½¸€¼½Ù•É¹…¹”€€(¨©™™•Ñ•…Ñ„¨«¾òi9½¹”€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òk’â7šRç–>c¢þC¢†3š^Û’îž‚Ž€€(¨©5¥É…Ñ¥½¸€¼	…­™¥±°¨«¾òi9½¹”€€(¨©Q•ÍÑÌ¨«¾òiµ…¹…•µ•¹Ðµ‘½Œ½Ù•É¹…¹”Ñ•ÍÓ¾ò!4$Õ…É“¾ò3šr³š&ç¢B÷–rÃ¾ò'Ž€€(¨©H¨«¾òi9½ÐI•ÅÕ¥É•€€(¨©½µµ¥Ð¨«¾òi˜ÄÀÈÌäÑƒ¾ò#–"w–ž/–2[¾ò$¬€áÝÑ……ƒ¾ò!M!ƒ–n{–†¯¾ò$¬ƒšr³š&ç¾ò#
+œÈƒ’þ»š¶¾ò$€€(¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸½Õ‘¥ÐI•Ù¥•ß¾ò!YI%%€ÈÀÈØ´Àà´ÈË¾ò$((´´´(((ŒŒ4µH´ÈÀÈØÀäÀÌ´ÀÜàƒŠPH´Ô•Ñ•Éµ¥¹¥ÍÑ¥Œ•…ÑÕÉ”1…å•È€¬A%P•…ÑÕÉ”M¹…ÁÍ¡½Ð((¨©QåÁ”¨«¾òiË¾ò!•…ÑÕÉ”€¼A%P€¼±¥¹•…”€¼…ÉÑ¥™…Ð½¹ÑÉ…Ó¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9¾ò!%µÁ±•µ•¹Ñ…Ñ¥½»¾ò$¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiH´Ð¸Ð™¥¹…°É•Ù¥•Ü…•ÁÑ•H´Ð™Õ±°µ¡…¥¸±½ÍÕÉ”…¹¥ÍÍÕ•Ñ¡”H´ÔÝ½É¬É•ÅÕ¥É•µ•¹Ð…™Ñ•ÈAH€ŒÄµ•É”¸€€(¨©=±½¹ÑÉ…Ð¨«¾òiH´ÐÁÉ½‘Õ•Ù•É¥™¥•M¹…ÁÍ¡½Ð…¹I•…‘5½‘•°°‰ÕÐ¹¼½Ù•É¹•™•…ÑÕÉ”¥¹ÁÕÐ‰½Õ¹‘…Éä°™•…ÑÕÉ”É•¥ÍÑÉä°A%P™•…ÑÕÉ”±¥¹•…”°‘•Ñ•Éµ¥¹¥ÍÑ¥Œ™•…ÑÕÉ”¥‘•¹Ñ¥Ñä°™•…ÑÕÉ”™¥¹‘¥¹Ì…ÉÑ¥™…Ð°½È™•…ÑÕÉ”±•‘•È¸€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òh(´•…ÑÕÉ•	Õ¥±‘•È¹‰Õ¥±¡Í¹…ÁÍ¡½Ñ}¥°™•…ÑÕÉ•}Í•Ñ}¥¥€…•ÁÑÌ½¹±ä…¸•áÁ±¥¥ÐÙ•É¥™¥•I•…‘5½‘•°Ý½É±…¹„ÍÑ…Ñ¥ŒÉ•¥ÍÑÉäÍ•Ðì¹¼±…Ñ•ÍÐ½‰•ÍÐ°™…±±‰…¬°‘¥É•ÐM¹…ÁÍ¡½Ð½…¹½¹¥…°½I…Ü½AÉ½Ù¥‘•È…•ÍÌ°½È¡¥‘‘•¸É•‰Õ¥±ì(´XÄ•µ¥ÑÌ½¹±äU9)UMQ}9=9%1€É…ÜµÁÉ¥”™•…ÑÕÉ•Ì°=	MIY}MUI%Qe}	IM€Ý¥¹‘½ÝÌ°…¹=	MIY}%1e}	I}U9%YIM€‰É•…‘Ñ ì…‘©ÕÍÑ•½Ñ½Ñ…°É•ÑÕÉ¹Ì°Í•ÍÍ¥½¸Í•µ…¹Ñ¥Ì°™Õ±°µÕ¹¥Ù•ÉÍ”±…¥µÌ°MÑ…Ñ”½ÍÑÉ…Ñ•äÍ•µ…¹Ñ¥ÌÉ•µ…¥¸‰±½­•ì(´¹Õ±°°Õ¹Í…™”‘•¹½µ¥¹…Ñ½È°¥¹ÍÕ™™¥¥•¹Ð¡¥ÍÑ½Éä°½ÁÑ¥½¹…°½µ¥ÍÍ¥½¸°…¹¹½¸µ™¥¹¥Ñ”½ÕÑ½µ•Ì…É”‘•Ñ•Éµ¥¹¥ÍÑ¥ŒÑåÁ•™¥¹‘¥¹Ìì¹¼™¥±°°Í•¹Ñ¥¹•°°½Á¥•ÍÕÍÁ•¹Í¥½¸Ù…±Õ”°Í¡½ÉÑ•¹•Ý¥¹‘½Ü°½ÈÍ¥±•¹Ð‘É½Àì(´•Ù•ÉäÉ½Ü…ÉÉ¥•Ì­¹½Ý±•‘”µÑ¥µ”™•…ÑÕÉ•}…Ù…¥±…‰±•}…Ñ€…¹½É‘•É•Í½ÕÉ”±¥¹•…”ì½¹”™•…ÑÕÉ”ÉÕ¸‰¥¹‘Ì½¹”M¹…ÁÍ¡½ÐÝ½É±€¬½¹”I•¥ÍÑÉä½½¹ÑÉ…Ð½½‘”¥‘•¹Ñ¥Ñäì(´•á…Ð™•…ÑÕÉ”…ÉÑ¥™…ÑÌ…É”¥µµÕÑ…‰±”…¹É•½Ù•É…‰±”°µ…¹¥™•ÍÐµ±…ÍÐ€¼±•‘•Èµ±…ÍÐ°…¹Ñ¡”ÁÕ‰±¥ŒÙ•É¥™¥•ÈÉ•Á±…åÌ½µÁÕÑ•}™•…ÑÕÉ•}Í•Ñ€™É½´Ñ¡”Ù•É¥™¥•I•…‘5½‘•°…¹½¹ÍÕµ•Ì…±°Á¡åÍ¥…°½Í•µ…¹Ñ¥ŒÍ•…±Ì¸(¨©I•…Í½¸¨«¾òk’âëšr«šv”H´ØMÑ…Ñ”ƒš>C’úo–>¿ž†»–ºkšŸ¦7–îëŽA%Pƒ–>¿¢þ÷šê¿’âSžòë–’Ç–:–nƒ–>¿–º‡¢º‡žjž&ç–ú’ê/–º{–Æ¾ò3’â7š>C–&7–òW–—ž¶[žV—–"“šZ·Ž€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½™•…ÑÕÉ•Ì½ƒŽµ¥É…Ñ¥½¹Ì¼ÀÈÍ}™•…ÑÕÉ•}‰Õ¥±¹ÍÅ±ƒŽÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}™•…ÑÕÉ•Ì¹Áå€€€(¨©™™•Ñ•…Ñ„¨«¾òiµ•Ñ…}™•…ÑÕÉ•}‰Õ¥±‘ƒ¾òm™•…ÑÕÉ”½½¹ÑÉ…Ðõ™•…ÑÕÉ”µØÄ¼¸¸¸½µ…¹¥™•ÍÐ¹©Í½¹€ƒ–>+’â'žÆìA…ÉÅÕ•Ð½ÉÉ•Ñ¹•ÍÌ…ÉÑ¥™…ÑÌ€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiH´È½H´Ì½H´Ð™É½é•¸¥¹ÁÕÑÌÕ¹¡…¹•“¾òošZÃ–Šx€ÀÈÌµ¥É…Ñ¥½¸Ñ…¥³¾òm•…ÑÕÉ”…ÉÑ¥™…ÑÌÉ•ÅÕ¥É”ÕÉÉ•¹ÐI•¥ÍÑÉä€¼‰Õ¥±‘•È™¥¹•ÉÁÉ¥¹Ð™½È½¹ÍÕµÁÑ¥½»Ž€€(¨©5¥É…Ñ¥½¸€¼	…­™¥±°¨«¾òi™É½´µé•É¼ƒ’â8€ÀÈËŠHÀÈÌÕÁÉ…‘”Ñ•ÍÑÏ¾òoš^ƒ–:–>È•…ÑÕÉ”‰…­™¥±³Ž€€(¨©Q•ÍÑÌ¨«¾òiH´Ô½¹ÑÉ…Ðµ…ÑÉ¥à…‘‘•ì¥Ñ!ÕˆÑ¥½¹ÌÙ…±¥‘…Ñ¥½¸Á•¹‘¥¹œ¸€€(¨©H¨«¾òimH´ÀÈÕt ¸¸½…‘È½H´ÀÈÕ}™•…ÑÕÉ•}±…å•É}Á¥Ñ}µ¥ÍÍ¥¹¹•ÍÌ¹µ§¾òmH´ÀÈÐµ•É•½…•ÁÑ•¸€€(¨©½µµ¥Ð¨«¾òiÑ¡¥ÌH´Ô¥µÁ±•µ•¹Ñ…Ñ¥½¸½µµ¥Ð€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((ŒŒ4µH´ÈÀÈØÀäÀÌ´ÀÜäƒŠPH´Ô$ƒ–º3šVÓ¦ª3¢¾’â8I•Ù¥•Ý•È±½ÍÕÉ”ƒ–&7ž*Ûš((¨©QåÁ”¨«¾òiË¾ò!•…ÑÕÉ”€¼A%P€¼±¥¹•…”€¼…ÉÑ¥™…Ð½¹ÑÉ…Ó¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi=9¾ò!%µÁ±•µ•¹Ñ…Ñ¥½¸€¬'¾ò$¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiAH€ŒÈH´Ô¥µÁ±•µ•¹Ñ…Ñ¥½¸¡•…ƒ–º3š"@$ƒ¦ª3¢¾Ž€€(¨©Ù¥‘•¹”¨«¾òi¥Ñ!ÕˆÑ¥½¹ÌÉÕ¸€ÌÌÜÐÔÈÈØäÔÙƒ¾ò!ÉÕ¸€ÄÔ×¾ò'’â'ž~§¦bÔÍÕ•ÍÏ¾òmU‰Õ¹ÑÔ€Ì¸ÄÓŽ]¥¹‘½ÝÌ€Ì¸ÄËŽ]¥¹‘½ÝÌ€Ì¸ÄÐƒš¾?¢ü€ÄÈÜÀÁ…ÍÍ•‘ƒ¾ò1IÕ™˜±¥¹ÓŽ™½Éµ…ÑÑ•ËŽµåÁçŽMÁ¥­—ŽM,µ…‰Í•¹Ðƒ–£¦£¦k¢þ¾òm]¥¹‘½ÝÌ€Ì¸ÄÐƒžjY1=ƒ’â85…¹…•µ•¹Ðµ‘½Œ…Ñ•ÌÍÕ•ÍÏŽ€€(¨©ÕÉÉ•¹ÐMÑ…Ñ”¨«¾òi•…ÑÕÉ”1…å•È¥µÁ±•µ•¹Ñ…Ñ¥½¸ƒ’â8$ƒ–ÞË–º3š"C¾òmH´Ôƒ’î7ž¶'–úI•Ù¥•Ý•È±½ÍÕÉ—¾ò1AH€ŒÈƒ’â7¢«–*£–B#–æÛ¾òmH´ØMÑ…Ñ”ƒ’â8ÁÉ½‘ÕÑ¥½¸@Àµ4´ÅƒžîŸžî´‰±½­•“Ž€€(¨©½µµ¥Ð¨«¾òi¥µÁ±•µ•¹Ñ…Ñ¥½¸¡•…•…•‰”Ðá…ÌÜÍÜÌÀÉ˜ÈÀá˜É˜Ý™”Ý‘‘ÔÍ‰˜Ù™‰ƒ¾òošr³šv‡’âë¦ª3¢¾ž*ÛššZš†–B3š¶—Ž€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\((Œ€ØÈ¸ƒ’â/’âš²‡žîÓš*“šŽš~—ž
+ä()HÐµÌƒ–ÞËšnÓšZÃ¾ò ÈÀÈØ´Àà´ÈÛ¾ò3¢ž4µH´ÈÀÈØÀàÈØ´ÀÌÀ¼ÀÌÄ¼ÀÌÈ¼ÀÌÏ¾ò'¾òh()Ñ•áÐ+
+œÐÀƒ
+œÐÄƒ
+œÔÈƒ
+œØÄƒ
+œØÈ€¬ƒ–’Ó¦£¾ò!YI%%±½ÍÕÉ”ƒ–B3š¶”€¼M!½ÉÉ•Ñ¥½¸€¼A¡…Í”MÑ…ÑÕÏ¾ò$¡‘½¹”€ÈÀÈØ´Àà´ÈØ¤)€()HÐµÄƒ¢B÷–rÃš^Û¢Ï–ÂGšnÓšZÃ¾òh()Ñ•áÐ+
+œÐÄƒ
+œÐÐ€€€€€€€€€€€€€¡Äƒ––Gžê›’â8…•ÁÑ…¹”¤+
+œÐàƒ
+œÔÈƒ
+œØÄ€€€€€€€€€¡•¹ÑÉä…Ñ”€¼ƒ¦Ž;¦f¤€¼¡…¹”1½œ¤)K¾ò#¢.”…Á…‰¥±¥Ñä…ÁÁÉ½Ù…°ƒ––Gžê›šòS¢þo¾ò$)€(+’â/’âš&ç¾ò!HÐµÌ€¼H´Ë¾ò3¦†ï–úšr³š&äYI%%¾ò'¢B÷–rÃš^Û¢Ï–ÂGšnÓšZÃ¾òh()Ñ•áÐ+
+œÄÜ€€€€€€€€€€€€€€€€€¡H´ÈAÉ½Ù¥‘•Èµ9½Éµ…±¥é•ƒ––Gžê˜¤+
+œÐÀƒ
+œÐÈƒ
+œÐÐ€€€€€€€€€¡É½…‘µ…À€¼…•ÁÑ…¹”¤+
+œÐà€€€€€€€€€€€€€€€€€£–ššZÃ–Šx•¹ÑÉä…Ñ”ƒšv‡žn¸¤+
+œÔÈƒ
+œÔÌƒ
+œØÄ€€€€€€€€€£¦Ž;¦f¤€¼Q€¼¡…¹”1½œ¤)€()½±‘•¸€¼QÉ…‘¥¹œIÕ±”ƒ’êë–Þ”I•Ù¥•Üƒš&Ÿ¢†3š^Û¢Ï–ÂGšnÓšZÃ¾òh()Ñ•áÐ+
+œÐÀƒ
+œÐàƒ
+œÔÈƒ
+œØÄ€€€€€¡I%M,´ÀÀÄ¼ÀÀÔƒž*Ûš€¬IY%]ƒž&#šr³¢B÷’ö4¤)€((´´´((Œ€ØÌ¸ƒ¦†çžn»žº‡žB–:–"gšïžîL()Ñ•áÐ)É½é•¸	…Í•±¥¹”ƒ’â7¦vg¦îcšòžžì)•Í¥¸¡…¹”ƒ–þ¦†ïšr$¡…¹”I•½É)½‘”€¼Q•ÍÑÌ€¼Y1=€¼5…¹…•µ•¹Ð½Œƒ–B3š¶”)…Ñ„•™¥¹¥Ñ¥½¸ƒ–#’ê8•…ÑÕÉ”áÁ…¹Í¥½¸)A%Pƒš¶ž†»šŸ–#’ê;Šsšr'šVÃš6»Št)á…ÐI•Á±…äƒ–#’ê;Šs¢ÞG–ú_–þ¯Št)½Éµ…°QÉÕÑ ƒ–#’ê8<½9<µ<)…¹½¹¥…°IÕ¹Ñ¥µ”ƒ–#’ê;–’Ÿ¢žš¢„•…ÑÕÉ”)€(+šr³šZ’îÛ¦Vÿšrš2žî·žîÓš*“¾ò3’â7–>›¢ÖÜY1=A59Q}5959Q}ØÈ½ØÌ¹µ‘ƒŽ)¥Ðƒ–:–>Ë¢Ò¢Ò’þw–¶c¢þ–:ïž&#šr³Ž(((´´´((ŒŒ4µH´ÈÀÈØÀäÀÐ´ÀàÐƒŠPH´Ø¸À½Ù•É¹…¹”	½½ÑÍÑÉ…À((¨©QåÁ”¨«¾òiË¾ò!MÑ…Ñ”¥¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸½¹ÑÉ…Ð…¹‘½Ý¹ÍÑÉ•…´±…å•È‰½½ÑÍÑÉ…Ã¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiAH€ŒÌµ•É•Ñ¼µ…¥¸…¹Ñ¡”H´Ø…Ñ¥Ù…Ñ¥½¸‘½Õµ•¹Ð…ÕÑ¡½É¥é•Ñ¡”‘½Ý¹ÍÑÉ•…´MÑ…Ñ”±…å•ÈÑ¼ÍÑ…ÉÐ¸€€(¨©=±½¹ÑÉ…Ð¨«¾òiH´ØÝ…Ì	1=-}	e}H´Ô¸ÈÝ¡¥±”H´ÀÈÔ…¹Ñ¡”µ…¹…•µ•¹Ð¡•…‘•ÉÌÍÑ¥±°‘•ÍÉ¥‰•Ñ¡”ÁÉ”µµ•É”É•Ù¥•ÜÍÑ…Ñ”¸€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òiH´Ô…¹H´ÀÈÔ…É”Íå¹¡É½¹¥é•Ñ¼YI%%€¼1=M€¼Ii…¹AQìH´Ø¥ÌMQIP€¼Q%YÕ¹‘•ÈÑ¡”Í•Á…É…Ñ”‘•Ñ•Éµ¥¹¥ÍÑ¥ŒMÑ…Ñ”½¹ÑÉ…Ð¸H´Ø¸À¥¹ÑÉ½‘Õ•ÌH´ÀÈØ¥¸AI=A=M€¼A9%9}IY%\ÍÑ…ÑÕÌ…¹ÑåÁ•MÑ…Ñ”É•¥ÍÑÉä½µ½‘•°½Í¡•µ„Í­•±•Ñ½¹Ì¸€€(¨©I•…Í½¸¨«¾òiQ¡”É•Ù¥•Ý•Èµ‘•™¥¹•µ•É”…Ñ”¥Ì¹½ÜÍ…Ñ¥Í™¥•¸Q¡”MÑ…Ñ”±…å•È¹••‘Ì…¸•áÁ±¥¥Ð¥¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸½¹ÑÉ…Ð‰•™½É”…¹äÉÕ¹Ñ¥µ”ÉÕ±”°…ÉÑ¥™…Ð°±•‘•È°½ÈÙ•É¥™¥•È…¸‰”¥µÁ±•µ•¹Ñ•¸€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi‘½Ì½…‘È½H´ÀÀÁ}…‘É}¥¹‘•à¹µ“Ž‘½Ì½…‘È½H´ÀÈÕ}™•…ÑÕÉ•}±…å•É}Á¥Ñ}µ¥ÍÍ¥¹¹•ÍÌ¹µ“Ž‘½Ì½…‘È½H´ÀÈÙ}‘•Ñ•Éµ¥¹¥ÍÑ¥}µ…É­•Ñ}ÍÑ…Ñ•}¥¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸¹µ“Ž‘½Ì½Y1=¹µ“Ž‘½Ì½ÁÉ½©•Ð½Y1=A59Q}5959P¹µ“ŽÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”¼€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiH´ÔXÄ™½ÉµÕ±…Ì°Ý¥¹‘½ÝÌ°Õ¹¥Ù•ÉÍ”°µ¥ÍÍ¥¹¹•ÍÌ°±¥¹•…”°µ¥É…Ñ¥½¸€ÀÈÌ°…¹…ÉÑ¥™…ÑÌÉ•µ…¥¸™É½é•¸¸9¼MÑ…Ñ”ÉÕ¹Ñ¥µ”½Èµ¥É…Ñ¥½¸¥Ì¥¹ÑÉ½‘Õ•¥¸H´Ø¸À¸€€(¨©Q•ÍÑÌ€¼Ù¥‘•¹”¨«¾òiÕÁÍÑÉ•…´ÉÕ¸€ÌÌàÄàÌÈÀÀÄÀ€¡ÉÕ¸€ÄÜä¤MUMLìH´Ø¸À¥Ì„‘½Õµ•¹Ñ…Ñ¥½¸½ÑåÁ”½Í¡•µ„‰½½ÑÍÑÉ…À…¹Ý¥±°‰”½Ù•É•‰äÑ¡”•á¥ÍÑ¥¹œÍÑ…Ñ¥Œ$Á±ÕÌ±…Ñ•ÈMÑ…Ñ”½¹ÑÉ…ÐÑ•ÍÑÌ¸€€(¨©H¨«¾òimH´ÀÈÙt ¸¸½…‘È½H´ÀÈÙ}‘•Ñ•Éµ¥¹¥ÍÑ¥}µ…É­•Ñ}ÍÑ…Ñ•}¥¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸¹µ¤€€(¨©½µµ¥Ð¨«¾òiH´Ø¸À‰½½ÑÍÑÉ…À½µµ¥Ð€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\(((´´´((ŒŒ4µH´ÈÀÈØÀäÀÐ´ÀàÔƒŠPH´Ø¸ÄI•¥ÍÑÉä…¹•Ñ•Éµ¥¹¥ÍÑ¥ŒMÑ…Ñ”¹¥¹”((¨©QåÁ”¨«¾òiË¾ò!MÑ…Ñ”¥¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸½¹ÑÉ…Ð¥µÁ±•µ•¹Ñ…Ñ¥½»¾ò$€€(¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\€€(¨©QÉ¥•È¨«¾òiH´Ø¸À½Ù•É¹…¹”‰½½ÑÍÑÉ…À½µÁ±•Ñ•½¸Ñ¡”µ•É•H´Ôµ…¥¹±¥¹”¸€€(¨©=±½¹ÑÉ…Ð¨«¾òiH´Ø¡…½¹±äÑåÁ•¥‘•¹Ñ¥Ñä½Í¡•µ„Í­•±•Ñ½¹Ì…¹¹¼•á•ÕÑ…‰±”MÑ…Ñ”‘•±…É…Ñ¥½¹Ì¸€€(¨©9•Ü½¹ÑÉ…Ð¨«¾òiÍ¥¹±”ÍÑ…Ñ¥ŒMÑ…Ñ”I•¥ÍÑÉä‘•±…É•Ì•á…Ñ±ä™½ÕÈXÄ‘•ÍÉ¥ÁÑ¥Ù”‘¥µ•¹Í¥½¹Ì…¹½µÁ¥±•ÌÑ¡•´¥¹Ñ¼„ÑåÁ•Á±…¸Ý¥Ñ •á…Ð‘•Á•¹‘•¹¥•Ì°•¹ÕµÌ°ÉÕ±”%Ì°Ñ¡É•Í¡½±Á½±¥¥•Ì°µ¥ÍÍ¥¹¹•ÍÌ°…Ù…¥±…‰¥±¥Ñä°•±¥¥‰¥±¥Ñä°…¹½¹”¡…¹‘±•ÈÁ•ÈÍÕÁÁ½ÉÑ•‘•±…É…Ñ¥½¸¸Q¡”Í¡…É••¹¥¹”½µÁÕÑ•Ì‘•Ñ•Éµ¥¹¥ÍÑ¥ŒMÑ…Ñ”É½ÝÌ…¹ÑåÁ•™¥¹‘¥¹Ì™É½´½¹”Y•É¥™¥•‘•…ÑÕÉ•IÕ¸µ…É­•ÐÁÉ½©•Ñ¥½¸¸€€(¨©I•…Í½¸¨«¾òi5…­”I•¥ÍÑÉä‘•±…É…Ñ¥½¹ÌÑ¡”Í½±”ÉÕ±”ÑÉÕÑ ‰•™½É”…‘‘¥¹œÁÕ‰±¥…Ñ¥½¸½ÈÉ•Á±…ä¥¹™É…ÍÑÉÕÑÕÉ”¸€€(¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½É•¥ÍÑÉä¹ÁçŽÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½•¹¥¹”¹ÁçŽÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½Í¡•µ„¹ÁçŽÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½}}¥¹¥Ñ}|¹ÁçŽÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ”¹ÁçŽ‘½Ì½Y1=¹µ€€(¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiH´Ô™½ÉµÕ±…Ì°…ÉÑ¥™…ÑÌ°µ¥É…Ñ¥½¸€ÀÈÌ°…¹ÁÕ‰±¥Œ•…ÑÕÉ”Ù•É¥™¥•ÈÉ•µ…¥¸Õ¹¡…¹•¸H´Ø¸Ä…‘‘Ì¹¼MÑ…Ñ•	Õ¥±‘•È°…ÉÑ¥™…Ð°±•‘•È°µ¥É…Ñ¥½¸°ÁÉ•‘¥Ñ¥½¸°½ÈÍÑÉ…Ñ•ä‰•¡…Ù¥½È¸€€(¨©Q•ÍÑÌ€¼Ù¥‘•¹”¨«¾òiH´Ø¸Ä™½ÕÍ•Ñ•ÍÑÌµ…ÀÑ¡”I•¥ÍÑÉä…¹ÉÕ±”Í•µ…¹Ñ¥ÌÉ½ÕÁÌ€ÄÇŠLÐÐì™Õ±°Ñ¡É•”µÁ±…Ñ™½É´$É•µ…¥¹ÌÑ¡”…•ÁÑ…¹”•Ù¥‘•¹”¸€€(¨©H¨«¾òimH´ÀÈÙt ¸¸½…‘È½H´ÀÈÙ}‘•Ñ•Éµ¥¹¥ÍÑ¥}µ…É­•Ñ}ÍÑ…Ñ•}¥¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸¹µ¤€€(¨©½µµ¥Ð¨«¾òiH´Ø¸Ä¥µÁ±•µ•¹Ñ…Ñ¥½¸½µµ¥Ð€€(¨©I•Ù¥•Ý•È¨«¾òiA9%9}IY%\(((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀàØ((´€¨©QåÁ”¨«¾òiÄ½ÈƒŠPMÑ…Ñ”…ÉÑ¥™…Ð°É•Á±…ä…¹µ¥É…Ñ¥½¸½¹ÑÉ…Ð¥µÁ±•µ•¹Ñ…Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òiH´Ø¸ÈÍ•ÅÕ•¹¥¹œ¥¸Ñ¡”…ÁÁÉ½Ù••Ñ•Éµ¥¹¥ÍÑ¥Œ5…É­•ÐMÑ…Ñ”1…å•ÈÝ½É¬½¹ÑÉ…Ð¸(´€¨©=±½¹ÑÉ…Ð¨«¾òiH´Ø¸ÄÍÕÁÁ±¥•½¹±äÙ•É¥™¥•µ¥¹ÁÕÐMÑ…Ñ”I•¥ÍÑÉä½•¹¥¹”ÑÉÕÑ ìMÑ…Ñ”ÁÕ‰±¥…Ñ¥½¸…¹Á•ÉÍ¥ÍÑ•¹”Ý•É”¹½Ð…Ù…¥±…‰±”¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òi=¹”•áÁ±¥¥Ð™•…ÑÕÉ•}ÉÕ¹}¥Á±ÕÌÍÑ…Ñ•}Í•Ñ}¥ÁÉ½‘Õ•Ì½¹”‘•Ñ•Éµ¥¹¥ÍÑ¥ŒÍÑ…Ñ•}ÉÕ¹}¥°ÑÝ¼¥µµÕÑ…‰±”ÍÑ…Ñ”…ÉÑ¥™…ÑÌ°„µ…¹¥™•ÍÐ°…¹½¹”µ•Ñ…}ÍÑ…Ñ•}‰Õ¥±±•‘•ÈÉ½ÜìÁÕ‰±¥ŒÙ•É¥™¥…Ñ¥½¸É•Á±…åÌÑ¡”ÁÕ‰±¥Œ•…ÑÕÉ”Ù•É¥™¥•È…¹Í¡…É•MÑ…Ñ”•¹¥¹”¸(´€¨©I•…Í½¸¨«¾òi5…­”‘•ÍÉ¥ÁÑ¥Ù”MÑ…Ñ”½¹ÍÕµ…‰±”°É•½Ù•É…‰±”°…¹…Õ‘¥Ñ…‰±”Ý¥Ñ¡½ÕÐ…‘‘¥¹œÁÉ•‘¥Ñ¥Ù”½ÈÍÑÉ…Ñ•äÍ•µ…¹Ñ¥Ì¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½í‰Õ¥±‘•È±Ù•É¥™¥•È±}}¥¹¥Ñ}}ô¹Áäìµ¥É…Ñ¥½¹Ì¼ÀÈÑ}ÍÑ…Ñ•}‰Õ¥±¹ÍÅ°ìÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½íÑ•ÍÑ}ÍÑ…Ñ•}Á•ÉÍ¥ÍÑ•¹”±Ñ•ÍÑ}µ¥É…Ñ¥½¹Íô¹Áä¸(´€¨©™™•Ñ•…Ñ„¨«¾òi9•ÜÍÑ…Ñ”µØÄ±½¥…°…ÉÑ¥™…Ð¹…µ•ÍÁ…”…¹µ•Ñ…}ÍÑ…Ñ•}‰Õ¥±ìµ¥É…Ñ¥½¹Ì€ÀÀÇŠLÀÈÌÉ•µ…¥¸™É½é•¸¸(´€¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiH´Ô•…ÑÕÉ”…ÉÑ¥™…ÑÌ…¹ÁÕ‰±¥ŒÙ•É¥™¥•ÈÉ•µ…¥¸Õ¹¡…¹•ìH´Ø¸ÄMÑ…Ñ”ÉÕ±•ÌÉ•µ…¥¸Ñ¡”Í¥¹±”½µÁÕÑ…Ñ¥½¸ÑÉÕÑ ¸(´€¨©5¥É…Ñ¥½¸€¼	…­™¥±°¨«¾òi5¥É…Ñ¥½¸€ÀÈÐ…ÁÁ±¥•Ì™É½´é•É¼…¹ÕÁÉ…‘•Ì„€ÀÈÌ‘…Ñ…‰…Í”ì¹¼¡¥ÍÑ½É¥…°MÑ…Ñ”‰…­™¥±°¥ÌÁ•É™½Éµ•¸(´€¨©Q•ÍÑÌ¨«¾òi½ÕÍ•‰Õ¥±‘•È½ÁÕ‰±¥ŒµÙ•É¥™¥•È½Ñ…µÁ•ÈÑ•ÍÑÌÁ±ÕÌµ¥É…Ñ¥½¸™É½´µé•É¼°€ÀÈÏŠHÀÈÐ…¹¥‘•µÁ½Ñ•¹ä…ÍÍ•ÉÑ¥½¹Ìì™Õ±°$Á•¹‘¥¹œ™½ÈÑ¡¥Ì‰…Ñ ¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸È¥µÁ±•µ•¹Ñ…Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸(((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀàÜ((´€¨©QåÁ”¨«¾òiÀƒŠPH´Ø¸È±¥¹Ð½ÉÉ•Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÈàÜÌÐÌÈß¾ò!ÉÕ¸€Ääß¾ò%IÕ™˜‘¥…¹½ÍÑ¥Ì¸(´€¨©=±½¹ÑÉ…Ð¨«¾òiH´Ø¸È¥µÁ±•µ•¹Ñ…Ñ¥½¸‰…Ñ ¡…Õ¹¡…¹•ÉÕ¹Ñ¥µ”¥¹Ñ•¹Ð‰ÕÐ‘¥¹½ÐÍ…Ñ¥Í™äÑ¡”É•Á½Í¥Ñ½ÉäÌ¥µÁ½ÉÐ…¹±¥¹”µ±•¹Ñ …Ñ•Ì¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiMÑ…Ñ”Á…­…”¥µÁ½ÉÑÌ…É”IÕ™˜µ±•…¸…¹H´Ø¸È™½ÕÍ•Ñ•ÍÑÌÍ…Ñ¥Í™äÑ¡”É•Á½Í¥Ñ½Éä±¥¹”µ±•¹Ñ ÉÕ±”¸(´€¨©I•…Í½¸¨«¾òiI•ÍÑ½É”Ñ¡”µ…¹‘…Ñ½ÉäÍÑ…Ñ¥Œ…Ñ•ÌÝ¥Ñ¡½ÕÐµ½‘¥™å¥¹œMÑ…Ñ”½µÁÕÑ…Ñ¥½¸½ÈÁ•ÉÍ¥ÍÑ•¹”Í•µ…¹Ñ¥Ì¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½í}}¥¹¥Ñ}|±‰Õ¥±‘•È±Ù•É¥™¥•Éô¹ÁäìÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ•}Á•ÉÍ¥ÍÑ•¹”¹Áä¸(´€¨©Q•ÍÑÌ¨«¾òiIÕ™˜±¥¹Ð½™½Éµ…Ð…¹ÍÕ‰Í•ÅÕ•¹Ð™Õ±°$Á•¹‘¥¹œ¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸È±¥¹Ð½ÉÉ•Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´Ààà((´€¨©QåÁ”¨«¾òiÀƒŠPH´Ø¸È™½Éµ…ÑÑ•È½ÉÉ•Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÈààÐÀàÀ×¾ò!ÉÕ¸€Ääã¾ò%IÕ™˜™½Éµ…ÑÑ•È½ÕÑÁÕÐ¸(´€¨©=±½¹ÑÉ…Ð¨«¾òiH´Ø¸È¥µÁ±•µ•¹Ñ…Ñ¥½¸¡…Á…ÍÍ•IÕ™˜‘¥…¹½ÍÑ¥Ì‰ÕÐÍÑ¥±°‘¥™™•É•™É½´Ñ¡”É•Á½Í¥Ñ½Éä™½Éµ…ÑÑ•ÈÌ…¹½¹¥…°±¥¹”ÝÉ…ÁÁ¥¹œ¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiH´Ø¸ÈMÑ…Ñ”‰Õ¥±‘•È°Ù•É¥™¥•È°µ¥É…Ñ¥½¸Ñ•ÍÐ°…¹Á•ÉÍ¥ÍÑ•¹”Ñ•ÍÐ…É”…±¥¹•Ý¥Ñ Ñ¡”É•Á½Í¥Ñ½Éä™½Éµ…ÑÑ•ÈÝ¥Ñ¡½ÕÐ¡…¹¥¹œÉÕ¹Ñ¥µ”Í•µ…¹Ñ¥Ì¸(´€¨©I•…Í½¸¨«¾òiI•ÍÑ½É”Ñ¡”µ…¹‘…Ñ½Éä™½Éµ…ÑÑ•È…Ñ”‰•™½É”µåÁä…¹ÉÕ¹Ñ¥µ”Ù…±¥‘…Ñ¥½¸¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½í‰Õ¥±‘•È±Ù•É¥™¥•Éô¹ÁäìÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½íÑ•ÍÑ}µ¥É…Ñ¥½¹Ì±Ñ•ÍÑ}ÍÑ…Ñ•}Á•ÉÍ¥ÍÑ•¹•ô¹Áä¸(´€¨©Q•ÍÑÌ¨«¾òiIÕ™˜™½Éµ…ÑÑ•È…¹ÍÕ‰Í•ÅÕ•¹Ð™Õ±°$Á•¹‘¥¹œ¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸È™½Éµ…ÑÑ•È½ÉÉ•Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´Ààä((´€¨©QåÁ”¨«¾òiÀƒŠPH´Ø¸È™½Éµ…ÑÑ•È™½±±½ÜµÕÀ(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÈäÌÐÐäÄã¾ò!ÉÕ¸€Ääç¾ò%IÕ™˜™½Éµ…ÑÑ•È½ÕÑÁÕÐ¸(´€¨©=±½¹ÑÉ…Ð¨«¾òi=¹”MÑ…Ñ”Ù•É¥™¥•ÈÍ•µ…¹Ñ¥ŒµÍ•…°•á•ÁÑ¥½¸É•Ñ…¥¹•„¹½¸µ…¹½¹¥…°µÕ±Ñ¤µ±¥¹”™½É´¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiQ¡”MÑ…Ñ”Ù•É¥™¥•ÈÍ…Ñ¥Í™¥•ÌÑ¡”É•Á½Í¥Ñ½Éä™½Éµ…ÑÑ•ÈÝ¥Ñ¡½ÕÐ¡…¹¥¹œÉ•Á±…ä°…ÉÑ¥™…Ð°½È±•‘•ÈÍ•µ…¹Ñ¥Ì¸(´€¨©I•…Í½¸¨«¾òi±•…ÈÑ¡”±…ÍÐ½‰Í•ÉÙ•™½Éµ…ÑÑ•Èµ½¹±ä…Ñ”‰•™½É”ÉÕ¹Ñ¥µ”Ù…±¥‘…Ñ¥½¸¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½Ù•É¥™¥•È¹Áä¸(´€¨©Q•ÍÑÌ¨«¾òiIÕ™˜™½Éµ…ÑÑ•È…¹ÍÕ‰Í•ÅÕ•¹Ð™Õ±°$Á•¹‘¥¹œ¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸È™½Éµ…ÑÑ•È™½±±½ÜµÕÀ‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀäÀ((´€¨©QåÁ”¨«¾òiÀƒŠPH´Ø¸Èµ¥É…Ñ¥½¸ÕÁÉ…‘”Ñ•ÍÐ½ÉÉ•Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÈäÐÈààÌË¾ò!ÉÕ¸€ÈÀÃ¾ò%™…¥±•Ñ¡”MÑ…Ñ”±•‘•ÈÍ¡•µ„…ÍÍ•ÉÑ¥½¸‰•…ÕÍ”Ñ¡”Ñ•ÍÐÍÑ½ÁÁ•…Ðµ¥É…Ñ¥½¸€ÀÈÌ¸(´€¨©=±½¹ÑÉ…Ð¨«¾òiQ¡”€ÀÈÏŠHÀÈÐÕÁÉ…‘”Ñ•ÍÐ…ÍÍ•ÉÑ•Ñ¡”µ¥É…Ñ¥½¸´ÀÈÐÑ…‰±”Ý¥Ñ¡½ÕÐ½Áå¥¹œ½È…ÁÁ±å¥¹œµ¥É…Ñ¥½¸€ÀÈÐ¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiQ¡”ÕÁÉ…‘”Ñ•ÍÐ•áÁ±¥¥Ñ±ä½Á¥•Ìµ¥É…Ñ¥½¸€ÀÈÐ°…ÁÁ±¥•Ì¥Ð…ÌÑ¡”™½ÕÉÑ Ñ…¥°µ¥É…Ñ¥½¸°…¹…ÍÍ•ÉÑÌÑ¡”€ÈÐµ•¹ÑÉä±•‘•È‰•™½É”¡•­¥¹œMÑ…Ñ”Í¡•µ„½±Õµ¹Ì¸(´€¨©I•…Í½¸¨«¾òi5…­”Ñ¡”µ¥É…Ñ¥½¸Ñ•ÍÐ•á•É¥Í”Ñ¡”‘½Õµ•¹Ñ•€ÀÈÏŠHÀÈÐÁ…Ñ É…Ñ¡•ÈÑ¡…¸…ÍÍ•ÉÐ…¸Õ¹…ÁÁ±¥•Ñ…‰±”¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}µ¥É…Ñ¥½¹Ì¹Áä¸(´€¨©Q•ÍÑÌ¨«¾òiÕ±°$Á•¹‘¥¹œ…™Ñ•ÈÑ¡¥Ì½ÉÉ•Ñ¥½¸¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸Èµ¥É…Ñ¥½¸Ñ•ÍÐ½ÉÉ•Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀäÄ((´€¨©QåÁ”¨«¾òiÈƒŠPH´Ø¸È$Ù•É¥™¥…Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òiAH€ŒØ±•…¸¡•…½µÁ±•Ñ•Ñ¡”H´Ø¸Èµ¥É…Ñ¥½¸ÕÁÉ…‘”½ÉÉ•Ñ¥½¸¸(´€¨©Ù¥‘•¹”¨«¾òi¥Ñ!ÕˆÑ¥½¹ÌÉÕ¸€ÌÌàÈäÜÌÌÜÄÏ¾ò!ÉÕ¸€ÈÀË¾ò'’â'ž~§¦bÔMUMO¾òmU‰Õ¹ÑÔ€Ì¸ÄÓŽ]¥¹‘½ÝÌ€Ì¸ÄËŽ]¥¹‘½ÝÌ€Ì¸ÄÐ•… É•Á½ÉÑ•€ÄÌØàÁ…ÍÍ•°Ý¥Ñ IÕ™˜±¥¹Ð½™½Éµ…ÑÑ•È°µåÁä°MÁ¥­”°M,µ…‰Í•¹Ð…¹…ÁÁ±¥…‰±”½Ù•É¹…¹”…Ñ•ÌÍÕ•ÍÍ™Õ°¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiH´Ø¸ÈMÑ…Ñ”‰Õ¥±‘•È½Ù•É¥™¥•È°µ¥É…Ñ¥½¸€ÀÈÐ°Á•ÉÍ¥ÍÑ•¹”½É•Á±…äÑ•ÍÑÌ¸(´€¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiH´Ô™É½é•¸ìH´Ø¸ÄMÑ…Ñ”ÉÕ±•ÌÕ¹¡…¹•ì¹¼ÁÉ•‘¥Ñ¥Ù”°ÍÑÉ…Ñ•ä°½ÈÁÉ½‘ÕÑ¥½¸Í•µ…¹Ñ¥Ì¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òhÉŒÜÁÁŒÅ”ÕˆäÌàå™…ØÉ™‰‰„äá”ÀÄäÌÄÙ•™˜à¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀäÈ((´€¨©QåÁ”¨«¾òiÈƒŠPH´Ø¸ÌÍÑ…Ñ¥ŒÍ½Á”Õ…É(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òiH´Ø™Õ±°µ±½ÍÕÉ”É½ÕÀÉ•ÅÕ¥É•µ•¹ÑÌ€ØÇŠLØÌ¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiMPÕ…É‘Ì•¹™½É”Ñ¡”MÑ…Ñ”¥µÁ½ÉÐ‰½Õ¹‘…Éä°É•©•Ð‘ÕÁ±¥…Ñ••…ÑÕÉ”¥µÁ±•µ•¹Ñ…Ñ¥½¸Íåµ‰½±Ì°É•©•ÐÉ•Í•…É ½ÁÉ•‘¥Ñ¥Ù”¥‘•¹Ñ¥™¥•ÉÌ°…¹™É••é”Ñ¡”¹½¸µ™ÕÑÕÉ”MÑ…Ñ”…ÉÑ¥™…Ð½±Õµ¹Ì¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ•}Í½Á”¹Áäì‘½Ì½…‘È½H´ÀÈÙ}‘•Ñ•Éµ¥¹¥ÍÑ¥}µ…É­•Ñ}ÍÑ…Ñ•}¥¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸¹µ¸(´€¨©Q•ÍÑÌ¨«¾òiQ¡É•”µ±•œ$Á•¹‘¥¹œ™½ÈÑ¡¥Ì‰…Ñ ¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸ÌÍ½Á”µÕ…É‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀäÌ((´€¨©QåÁ”¨«¾òiÀƒŠPH´Ø¸ÌÍ½Á”Õ…É±¥¹Ð½ÉÉ•Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÌÀÜÄààÌË¾ò!ÉÕ¸€ÈÀÏ¾ò%IÕ™˜M%4ÄÀÈ¥¸Ñ¡”¹•ÜÍÑ…Ñ¥ŒÍ½Á”Õ…ÉÑ•ÍÐ¸(´€¨©=±½¹ÑÉ…Ð¨«¾òiQ¡”‘å¹…µ¥Œµ¥µÁ½ÉÐ‰É…¹ ÕÍ•„¹•ÍÑ•½¹‘¥Ñ¥½¸Ñ¡…ÐÙ¥½±…Ñ•Ñ¡”É•Á½Í¥Ñ½ÉäÌIÕ™˜ÉÕ±”¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiQ¡”Í½Á”Õ…ÉÕÍ•Ì½¹”•áÁ±¥¥Ð½µÁ½Õ¹½¹‘¥Ñ¥½¸ì¥ÑÌ¥µÁ½ÉÐµ‰½Õ¹‘…Éä…ÍÍ•ÉÑ¥½¹Ì…É”Õ¹¡…¹•¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ•}Í½Á”¹Áä¸(´€¨©Q•ÍÑÌ¨«¾òiIÕ™˜±¥¹Ð…¹ÍÕ‰Í•ÅÕ•¹Ð™Õ±°$Á•¹‘¥¹œ¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸ÌÍ½Á”µÕ…É±¥¹Ð½ÉÉ•Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀäÐ((´€¨©QåÁ”¨«¾òiÀƒŠPH´Ø¸ÌÍ½Á”Õ…É™½Éµ…ÑÑ•È½ÉÉ•Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÌÀàÀÌÌÈÃ¾ò!ÉÕ¸€ÈÀÓ¾ò%IÕ™˜™½Éµ…ÑÑ•È½ÕÑÁÕÐ¸(´€¨©=±½¹ÑÉ…Ð¨«¾òiQÝ¼Í½Á”Õ…É•áÁÉ•ÍÍ¥½¹ÌÕÍ•Ù…±¥‰ÕÐ¹½¸µ…¹½¹¥…°µÕ±Ñ¤µ±¥¹”™½Éµ…ÑÑ¥¹œ¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiQ¡”Õ…ÉÉ•µ…¥¹ÌÍ•µ…¹Ñ¥…±±ä¥‘•¹Ñ¥…°…¹µ…Ñ¡•ÌÑ¡”É•Á½Í¥Ñ½Éä™½Éµ…ÑÑ•È¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ•}Í½Á”¹Áä¸(´€¨©Q•ÍÑÌ¨«¾òiIÕ™˜±¥¹Ð½™½Éµ…Ð…¹ÍÕ‰Í•ÅÕ•¹Ð™Õ±°$Á•¹‘¥¹œ¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸ÌÍ½Á”µÕ…É™½Éµ…ÑÑ•È½ÉÉ•Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀäÔ((´€¨©QåÁ”¨«¾òiÀƒŠPH´Ø¸ÌÍ½Á”Õ…É™…±Í”µÁ½Í¥Ñ¥Ù”½ÉÉ•Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÌÀàÜàÌØÃ¾ò!ÉÕ¸€ÈÀ×¾ò%Í½Á”Õ…ÉÉ•©•Ñ•Ñ¡”¹•ÕÑÉ…°Ù•É¥™¥•È±½½ÀÙ…É¥…‰±”Á½Í¥Ñ¥½¸¸(´€¨©=±½¹ÑÉ…Ð¨«¾òiQ¡”¥‘•¹Ñ¥™¥•È‰±…­±¥ÍÐÑÉ•…Ñ•„•¹•É¥Œ±½½ÀµÁ½Í¥Ñ¥½¸Ù…É¥…‰±”…Ì„ÁÉ½¡¥‰¥Ñ•É•Í•…É Ñ•É´¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiQ¡”Õ…ÉÉ•µ½Ù•ÌÑ¡…Ð™…±Í”Á½Í¥Ñ¥Ù”Ý¡¥±”É•Ñ…¥¹¥¹œÑ¡”•áÁ±¥¥ÐÉ•Í•…É ½ÁÉ•‘¥Ñ¥Ù”¥‘•¹Ñ¥™¥•È¡•­ÌÉ•ÅÕ¥É•‰äÉ½ÕÀ´ØÌ¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ•}Í½Á”¹Áä¸(´€¨©Q•ÍÑÌ¨«¾òiÕ±°$Á•¹‘¥¹œ…™Ñ•ÈÑ¡¥Ì½ÉÉ•Ñ¥½¸¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸ÌÍ½Á”µÕ…É™…±Í”µÁ½Í¥Ñ¥Ù”½ÉÉ•Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀäØ((´€¨©QåÁ”¨«¾òiÈƒŠPH´Ø¸ÌÍ½Á”Õ…É…¹™É½é•¸µÉ•É•ÍÍ¥½¸$Ù•É¥™¥…Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òiH´Ø™Õ±°µ±½ÍÕÉ”É½ÕÁÌ´ØÇŠLØÐ¸(´€¨©Ù¥‘•¹”¨«¾òi¥Ñ!ÕˆÑ¥½¹ÌÉÕ¸€ÌÌàÌÄÄØÄäÔÓ¾ò!ÉÕ¸€ÈÀÛ¾ò'’â'ž~§¦bÔMUMO¾òmU‰Õ¹ÑÔ€Ì¸ÄÓŽ]¥¹‘½ÝÌ€Ì¸ÄËŽ]¥¹‘½ÝÌ€Ì¸ÄÐ•… É•Á½ÉÑ•€ÄÌÜÈÁ…ÍÍ•°Ý¥Ñ IÕ™˜±¥¹Ð½™½Éµ…ÑÑ•È°µåÁä°MÁ¥­”°M,µ…‰Í•¹Ð…¹…ÁÁ±¥…‰±”]¥¹‘½ÝÌ½Ù•É¹…¹”…Ñ•ÌÍÕ•ÍÍ™Õ°¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiMPÍ½Á”Õ…É‘Ì•¹™½É”Ñ¡”MÑ…Ñ”‰½Õ¹‘…Éä…¹™É½é•¸¹½¸µ™ÕÑÕÉ”½±Õµ¹ÌìÑ¡”™Õ±°€ÇŠLØÐ¥µÁ±•µ•¹Ñ…Ñ¥½¸•Ù¥‘•¹”¥ÌÉ•½É‘•…É½ÍÌH´Ø¸Ä°H´Ø¸È…¹H´Ø¸Ì¸(´€¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òiH´Ô…¹H´Ø¸Ä¼Ø¸ÈÍ•µ…¹Ñ¥ÌÉ•µ…¥¸™É½é•¸ì¹¼ÁÉ•‘¥Ñ¥½¸°ÍÑÉ…Ñ•ä°Á½ÉÑ™½±¥¼°‰…­Ñ•ÍÐ°½ÈÁÉ½‘ÕÑ¥½¸‰•¡…Ù¥½È¥Ì¥¹ÑÉ½‘Õ•¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\Ý¥Ñ ½µÁ±•Ñ•¥µÁ±•µ•¹Ñ…Ñ¥½¸µ…ÁÁ¥¹œ¸(´€¨©½µµ¥Ð¨«¾òhÌÌÅäá„ÈÐÕÔÀàÌÐààØÑ”ÐÍ™•ˆÉŒÔÄÔÔÝˆÄÈÈÐ¸(´€¨©I•Ù¥•Ý•È¨«¾òi¥¹…°•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œìAH€ŒØÉ•µ…¥¹Ì½Á•¸…¹¹½Ðµ•É•¸((((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÀäÜ((´€¨©QåÁ”¨«¾òiÈƒŠPH´Ø¸Ð™¥¹…°…‘Ù•ÉÍ…É¥…°€¼½¹ÑÉ…Ðµ¡½¹•ÍÑä¥µÁ±•µ•¹Ñ…Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼I=A9(´€¨©QÉ¥•È¨«¾òiI•Ù¥•Ý•ÈÉ•½Á•¹•H´Ø…™Ñ•È¥‘•¹Ñ¥™å¥¹œÑ¡…Ð™…Ñ…°™¥¹‘¥¹œÍ•µ…¹Ñ¥Ì°É•½Ù•Éä½É•‰¥¹•Ù¥‘•¹”°€Ä¸¸ØÐµ…ÁÁ¥¹œ°…¹ÕÉÉ•¹Ðµµ…¥¸Íå¹¡É½¹¥é…Ñ¥½¸Ý•É”¹½Ðµ•¡…¹¥…±±ä±½Í•¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiMÑ…Ñ”™…Ñ…°½¹ÑÉ…‘¥Ñ¥½¹ÌÕÍ”ÑåÁ••ÉÉ½È½‘•Ì…¹ÁÕ‰±¥Í ¹¼MUML…ÉÑ¥™…Ð½±•‘•Èì½¹±ä¹Õ±°…¹•µÁÑäµ‘•¹½µ¥¹…Ñ½È™¥¹‘¥¹Ì…É”Á•ÉÍ¥ÍÑ•¸½ÕÍ•MÑ…Ñ”Ñ•ÍÑÌ½Ù•ÈÑ¡”µ…¹‘…Ñ½ÉäÉ•½Ù•Éäµ…ÑÉ¥à…¹Ñ¡”ÁÕ‰±¥Œ•…ÑÕÉ”™…¥±ÕÉ”ÁÉ½Á……Ñ¥½¸‰½Õ¹‘…Éä¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½µ½‘•±Ì¹ÁäìÍ¡•µ„¹Áäì•¹¥¹”¹Áäì‰Õ¥±‘•È¹ÁäìÙ•É¥™¥•È¹ÁäìÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ”¹ÁäìÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ•}Á•ÉÍ¥ÍÑ•¹”¹Áä¸(´€¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òi9¼¹•ÜMÑ…Ñ”‘¥µ•¹Í¥½¹Ììµ¥É…Ñ¥½¸€ÀÈÐÉ•µ…¥¹ÌÕ¹¡…¹•ìH´Ô•…ÑÕÉ”Í•µ…¹Ñ¥Ì°ÁÕ‰±¥ŒµÉ•Á½Í¥Ñ½Éä½Ù•É¹…¹”°…¹µ…é¥¹…Ñ„€ÈÀÈÀ¬Ù…±¥‘…Ñ¥½¸½¹ÑÉ…ÑÌ…É”ÁÉ•Í•ÉÙ•¸(´€¨©Q•ÍÑÌ¨«¾òi¥¹…°Á½ÍÐµµ•É”Ñ¡É•”µ±•œ$Á•¹‘¥¹œ…Ð¥µÁ±•µ•¹Ñ…Ñ¥½¸½µµ¥Ð¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\ìH´Ø¸ÐMQIP€¼Q%Y¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸Ð±½ÍÕÉ”¥µÁ±•µ•¹Ñ…Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi¥¹…°•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œìAH€ŒØÉ•µ…¥¹Ì½Á•¸…¹¹½Ðµ•É•¸((((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´Àäà((´€¨©QåÁ”¨«¾òiÀƒŠPH´Ø¸Ð¥µÁ½ÉÐµ½É‘•È½ÉÉ•Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼I=A9(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÌØÀÌÀÌÄç¾ò!ÉÕ¸€ÈÄÇ¾ò%IÕ™˜±¥¹Ð‘•Ñ•Ñ•ÑÝ¼¥µÁ½ÉÐµ½É‘•È‘¥…¹½ÍÑ¥Ì‰•™½É”ÉÕ¹Ñ¥µ”Ñ•ÍÑÌ¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiMÑ…Ñ”ÁÕ‰±¥Œ•áÁ½ÉÑÌ…¹	Õ¥±‘•Èµ½‘•°¥µÁ½ÉÑÌ™½±±½ÜÑ¡”É•Á½Í¥Ñ½ÉäÌ‘•Ñ•Éµ¥¹¥ÍÑ¥ŒIÕ™˜½¥Í½ÉÐ½É‘•É¥¹œì¹¼ÉÕ¹Ñ¥µ”½È½¹ÑÉ…ÐÍ•µ…¹Ñ¥Ì¡…¹•¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½}}¥¹¥Ñ}|¹ÁäìÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½‰Õ¥±‘•È¹Áä¸(´€¨©Q•ÍÑÌ¨«¾òiIÕ™˜±¥¹ÐÁ…ÍÍ•™½ÈÑ¡¥Ì½ÉÉ•Ñ¥½¸ì™Õ±°Á½ÍÐµ½ÉÉ•Ñ¥½¸$Á•¹‘¥¹œ¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\ìH´Ø¸ÐMQIP€¼Q%Y¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸Ð¥µÁ½ÉÐµ½É‘•È½ÉÉ•Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi¥¹…°•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œìAH€ŒØÉ•µ…¥¹Ì½Á•¸…¹¹½Ðµ•É•¸((((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´Àää((´€¨©QåÁ”¨«¾òiÀƒŠPH´Ø¸Ð	Õ¥±‘•È¥µÁ½ÉÐµ½É‘•È½ÉÉ•Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼I=A9(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÌØÄÌÀÈä×¾ò!ÉÕ¸€ÈÄË¾ò%IÕ™˜™¥à‘¥™˜É•ÅÕ¥É•MÑ…Ñ•	Õ¥±‘•ÉÉÉ½È‰•™½É”MÑ…Ñ•	Õ¥±‘I•ÍÕ±Ð¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òi	Õ¥±‘•È¥µÁ½ÉÐ½É‘•Èµ…Ñ¡•ÌÑ¡”É•Á½Í¥Ñ½ÉäÌIÕ™˜½¥Í½ÉÐ½ÕÑÁÕÐì¹¼ÉÕ¹Ñ¥µ”½ÈMÑ…Ñ”½¹ÑÉ…ÐÍ•µ…¹Ñ¥Ì¡…¹•¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½‰Õ¥±‘•È¹Áä¸(´€¨©Q•ÍÑÌ¨«¾òiÕ±°Á½ÍÐµ½ÉÉ•Ñ¥½¸$Á•¹‘¥¹œ¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\ìH´Ø¸ÐMQIP€¼Q%Y¸(´€¨©½µµ¥Ð¨«¾òiÕÉÉ•¹ÐH´Ø¸Ð	Õ¥±‘•Èµ½É‘•È½ÉÉ•Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi¥¹…°•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œìAH€ŒØÉ•µ…¥¹Ì½Á•¸…¹¹½Ðµ•É•¸(((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÄÀÀ((´€¨©QåÁ”¨«¾òiÈƒŠPH´Ø¸Ð™¥¹…°…‘Ù•ÉÍ…É¥…°¥µÁ±•µ•¹Ñ…Ñ¥½¸$…¹½¹ÑÉ…Ðµ¡½¹•ÍÑä•Ù¥‘•¹”(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi=9€¡¥µÁ±•µ•¹Ñ…Ñ¥½¸¤€¼I=A9€¡H´Ø¤€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òiH´Ø¸ÐÉ•Ù¥•Ý•ÈÉ•ÅÕ¥É•µ•¹ÑÌ@À´ÀÄ½@À´ÀÈ½@À´ÀÌ…¹ÍÑ…±”µ½¹ÑÉ…Ð½ÉÉ•Ñ¥½¸¸(´€¨©Ù¥‘•¹”¨«¾òi%µÁ±•µ•¹Ñ…Ñ¥½¸¡•…”ÐÜÔÄÑ„á…™ŒàØÑŒå˜ÄäÝ”Äá˜äÕ•„ÔÙ™”àÄÐÈÑ„É‘€Ý…ÌÙ•É¥™¥•‰ä¥Ñ!ÕˆÑ¥½¹ÌÉÕ¸€ÌÌàÌØÈÐÌØÀÔ€¡ÉÕ¸€ÈÄÌ¤¸U‰Õ¹ÑÔ€Ì¸ÄÐ°]¥¹‘½ÝÌ€Ì¸ÄÈ°…¹]¥¹‘½ÝÌ€Ì¸ÄÐ•… É•Á½ÉÑ•€ÄÐÀÄÁ…ÍÍ•ìIÕ™˜±¥¹Ð½™½Éµ…Ð°µåÁä°MÁ¥­”°…¹M,µ…‰Í•¹Ð¡•­ÌÁ…ÍÍ•ì…ÁÁ±¥…‰±”]¥¹‘½ÝÌ€Ì¸ÄÐY1=½5…¹…•µ•¹Ð…Ñ•ÌÁ…ÍÍ•¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiA•ÉÍ¥ÍÑ•MÑ…Ñ”™¥¹‘¥¹Ì…É”±¥µ¥Ñ•Ñ¼MQQ}%9AUQ}9U10…¹MQQ}%9AUQ}5AQe}9=5%9Q=H¸MQQ}%9AUQ}%9YI%9Q}Y%=1Q%=8…¹MQQ}IU1}U9Y%1	1…É”ÑåÁ•™…Ñ…°•ÉÉ½È½‘•ÌÉ…¥Í•‰•™½É”ÁÕ‰±¥…Ñ¥½¸ì™…Ñ…°•ÉÉ½ÉÌÉ•…Ñ”¹¼MÑ…Ñ”…ÉÑ¥™…ÑÌ…¹¹¼MUML±•‘•ÈÉ½Ü¸Q¡”½¹É•Ñ”€ÇŠLØÐµ…ÁÁ¥¹œ…¹É•½Ù•Éä½É•‰¥¹•Ù¥‘•¹”…É”É•½É‘•¥¸Ñ¡”H´ØÝ½É¬É•ÅÕ¥É•µ•¹Ð…‘‘•¹‘Õ´¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òiÍÉŒ½…Í¡…É•}ÍÑ…Ñ”½ÍÑ…Ñ”½íµ½‘•±Ì±Í¡•µ„±•¹¥¹”±‰Õ¥±‘•È±Ù•É¥™¥•Éô¹ÁäìÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ”¹ÁäìÑ•ÍÑÌ½¥¹Ñ•É…Ñ¥½¸½Ñ•ÍÑ}ÍÑ…Ñ•}Á•ÉÍ¥ÍÑ•¹”¹Áäì‘½Ì½…‘È½H´ÀÈÙ}‘•Ñ•Éµ¥¹¥ÍÑ¥}µ…É­•Ñ}ÍÑ…Ñ•}¥¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸¹µì‘½Ì½‘•Í¥¸½µÍ¡…É”µ…¹…±åÍ¥Í}H´Ù}•Ñ•Éµ¥¹¥ÍÑ¥5…É­•ÑMÑ…Ñ•1…å•Ë–ò–>G–Þ—’ös¢ššÆ	|ÈÀÈØÀäÀÐ¹µ¸(´€¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òi9¼¹•ÜMÑ…Ñ”‘¥µ•¹Í¥½¹Ììµ¥É…Ñ¥½¸€ÀÈÐÕ¹¡…¹•ìH´Ô•…ÑÕÉ”Í•µ…¹Ñ¥Ì°ÁÕ‰±¥ŒµÉ•Á½Í¥Ñ½Éä½Ù•É¹…¹”°==]9IL½MUI%Qd½=9QI%	UQ%9°…¹µ…é¥¹…Ñ„€ÈÀÈÀ¬½¹ÑÉ…ÑÌÁÉ•Í•ÉÙ•¸ÕÉÉ•¹Ðµ…¥¸Ý…Ìµ•É•¹½Éµ…±±ä¥¹Ñ¼Ñ¡”‰É…¹ Ý¥Ñ¡½ÕÐ¡¥ÍÑ½ÉäÉ•ÝÉ¥Ñ”¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\ìH´Ø¸ÐMQIP€¼Q%YìAH€ŒØÉ•µ…¥¹Ì½Á•¸…¹¹½Ðµ•É•¸(´€¨©½µµ¥Ð¨«¾òi”ÐÜÔÄÑ„á…™ŒàØÑŒå˜ÄäÝ”Äá˜äÕ•„ÔÙ™”àÄÐÈÑ„É‘€¥µÁ±•µ•¹Ñ…Ñ¥½¸¡•…ìÑ¡¥ÌÉ•½É¥ÌÍå¹¡É½¹¥é•Ý¥Ñ Ñ¡”½¹ÑÉ…Ðµ•Ù¥‘•¹”‘½Õµ•¹Ñ…Ñ¥½¸‰…Ñ ¸(´€¨©I•Ù¥•Ý•È¨«¾òi¥¹…°•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÄÀÄ((´€¨©QåÁ”¨«¾òiÄƒŠPH´Ø¸Ð½¹ÑÉ…Ðµ•Ù¥‘•¹”‘½Õµ•¹Ñ…Ñ¥½¸Íå¹¡É½¹¥é…Ñ¥½¸Ù•É¥™¥…Ñ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi=9€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi¥¹…°…Õ‘¥Ðµ½¹±ä‘½Õµ•¹Ñ…Ñ¥½¸Íå¹¡É½¹¥é…Ñ¥½¸…™Ñ•ÈÑ¡”¥µÁ±•µ•¹Ñ…Ñ¥½¸µ¡•…$Á…ÍÍ•¸(´€¨©Ù¥‘•¹”¨«¾òi½Õµ•¹Ñ…Ñ¥½¸Íå¹¡É½¹¥é…Ñ¥½¸½µµ¥Ð˜ÈäÍ”ØäÙ”Í™”áˆÜÔÅ„ÔÙˆÔÅ„ÉÑˆÑˆáˆÌàäÉŒÌÄá€Á…ÍÍ•¥Ñ!ÕˆÑ¥½¹ÌÉÕ¸€ÌÌàÌÜÌàØÜÜÈ€¡ÉÕ¸€ÈÄÐ¤½¸U‰Õ¹ÑÔ€Ì¸ÄÐ°]¥¹‘½ÝÌ€Ì¸ÄÈ°…¹]¥¹‘½ÝÌ€Ì¸ÄÐì•Ù•Éä±•œÉ•Á½ÉÑ•€ÄÐÀÄÁ…ÍÍ•°Ý¥Ñ IÕ™˜±¥¹Ð½™½Éµ…Ð°µåÁä°MÁ¥­”°M,µ…‰Í•¹Ð°…¹…ÁÁ±¥…‰±”]¥¹‘½ÝÌ€Ì¸ÄÐY1=½5…¹…•µ•¹Ð…Ñ•ÌÍÕ•ÍÍ™Õ°¸(´€¨©9•Ü½¹ÑÉ…Ð¨«¾òiH´ÀÈØ…¹Ñ¡”H´ØÝ½É¬É•ÅÕ¥É•µ•¹Ð¹½ÜÉ•Ñ…¥¸Ñ¡”¡½¹•ÍÐ™…Ñ…°µÙÌµÁ•ÉÍ¥ÍÑ•µ™¥¹‘¥¹œ½¹ÑÉ…Ð…¹½¹É•Ñ”€ÇŠLØÐµ…ÁÁ¥¹œ…ÌÉ•Ù¥•Ü•Ù¥‘•¹”ì¹¼ÉÕ¹Ñ¥µ”Í•µ…¹Ñ¥Ì½ÈMÑ…Ñ”Í½Á”¡…¹•¸(´€¨©™™•Ñ•5½‘Õ±•Ì¨«¾òi‘½Ì½…‘È½H´ÀÈÙ}‘•Ñ•Éµ¥¹¥ÍÑ¥}µ…É­•Ñ}ÍÑ…Ñ•}¥¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸¹µì‘½Ì½‘•Í¥¸½µÍ¡…É”µ…¹…±åÍ¥Í}H´Ù}•Ñ•Éµ¥¹¥ÍÑ¥5…É­•ÑMÑ…Ñ•1…å•Ë–ò–>G–Þ—’ös¢ššÆ	|ÈÀÈØÀäÀÐ¹µì‘½Ì½Y1=¹µ¸(´€¨©½µÁ…Ñ¥‰¥±¥Ñä¨«¾òi9¼¹•ÜMÑ…Ñ”‘¥µ•¹Í¥½¹Ììµ¥É…Ñ¥½¸€ÀÈÐ°H´Ô•…ÑÕÉ”½¹ÑÉ…ÑÌ°ÁÕ‰±¥ŒµÉ•Á½Í¥Ñ½Éä½Ù•É¹…¹”°…¹µ…é¥¹…Ñ„€ÈÀÈÀ¬½¹ÑÉ…ÑÌÉ•µ…¥¸Õ¹¡…¹•¸AH€ŒØÉ•µ…¥¹Ì½Á•¸…¹¹½Ðµ•É•¸(´€¨©H¨«¾òiH´ÀÈØAI=A=M€¼A9%9}IY%\ìH´Ø¸ÐMQIP€¼Q%Y¸(´€¨©½µµ¥Ð¨«¾òi˜ÈäÍ”ØäÙ”Í™”áˆÜÔÅ„ÔÙˆÔÅ„ÉÑˆÑˆáˆÌàäÉŒÌÄá€‘½Õµ•¹Ñ…Ñ¥½¸Íå¹¡É½¹¥é…Ñ¥½¸¡•…ì™¥¹…°Ù•É¥™¥…Ñ¥½¸ÉÕ¸€ÌÌàÌÜÌàØÜÜÈ¸(´€¨©I•Ù¥•Ý•È¨«¾òi¥¹…°•Í¥¸€¼Õ‘¥ÐI•Ù¥•ÜÁ•¹‘¥¹œ¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÄÀÈ((´€¨©QåÁ”¨«¾òiÈƒŠP€ÈÀÈÀ¬AÉ½Ù¥‘•È!¥ÍÑ½Éä½¹ÑÉ…Ð¥µÁ±•µ•¹Ñ…Ñ¥½¸½‘½Õµ•¹Ñ…Ñ¥½¸Íå¹¡É½¹¥é…Ñ¥½¸…¹‘¥Í±½Í•½Ù•É¹…¹”•á•ÁÑ¥½¸(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi=9€¡¥µÁ±•µ•¹Ñ…Ñ¥½¸…¹‘½Ì¤€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi=Ý¹•È‘•¥Í¥½¸É•Á±…¥¹œÑ¡”½‰Í½±•Ñ”ÁÉ”´ÈÀÈÀÝ…ÉµÕÀ…Ñ”…¹Ñ¡”¹••Ñ¼Íå¹¡É½¹¥é”½‘”°Ñ•ÍÑÌ°AÉ½Ù¥‘•È‘½Õµ•¹ÑÌ°MÁ¥­”É•Á½ÉÐ°Y1=…¹½Ù•É¹…¹”É•½É‘Ì¸(´€¨©Ù¥‘•¹”¨«¾òi¡¥ÍÑ½Éå}ÍÑ…ÉÑ|ÈÀÈÁ€€¼¡¥ÍÑ½Éå}½Ù•É…•|ÈÀÈÁ}ØÅ€…É”¥µÁ±•µ•¹Ñ•ìÔÍÑ…ÉÑÌ…Ð€ÈÀÈÀÀÄÀÅ€ìÕ¹¥Ð…¹¥¹Ñ•É…Ñ¥½¸Ý¥É¥¹œÑ•ÍÑÌ…É”ÁÉ•Í•¹Ð¸AÉ½‘ÕÑ¥½¸…½Õ¹Ð…¹™½Éµ…°MÁ¥­”™…ÑÌÉ•µ…¥¸Õ¹…Ù…¥±…‰±”¸(´€¨©½Ù•É¹…¹”•á•ÁÑ¥½¸¨«¾òiQ¡”Í½ÕÉ”M!Ì€Ñ˜àÍ˜Ý…ŒÍ„ÄäÌÈÝ”å˜ÜÈÑŒäÜÌÁ‰™‰™•˜ÀÍ‘”Ìá‰€°€ÔÐäÑ„ØÍ˜àÍ„ÔÝ”ÑˆÔÀÌÑ‰ŒØÈÀÜÍ™ˆÝÈÀÔÝ‘ˆØÍ‰€°€ÌÌÔÌÜÔÔäÜÐÈÅ‘ŒäÅŒÐàØÀÉ˜ÔÄÄÉ”àÄÝ…‘™ŒÜÀÐÑ€°…¹€ÈÉ„ääÄÀÜå‘‘•‰”äÁ‰•˜Í…ŒÐÕ••ÈÔá‘ŒÑ”ÔØÈØå€Ý•É”ÍÁ±¥Ð‰äÑ¡”½¹”µÁ…Ñ µÁ•Èµ½µµ¥Ð¥Ñ!Õˆ½¹Ñ•¹ÑÌA$¸Q¡”‰É…¹ ¥Ì¹½ÐÉ•ÝÉ¥ÑÑ•¸ìÑ¡”$Ý½É­™±½Ü…¹½Ù•É¹…¹”Ñ•ÍÐ½¹Ñ…¥¸„½¹”µÑ¥µ”•á…ÐµM!•á•ÁÑ¥½¸°‘¥Í±½Í•¡•É”…¹¥¸Y1=¸Q¡¥Ì•á•ÁÑ¥½¸µÕÍÐ¹½Ð‰”•áÑ•¹‘•¸(´€¨©ÕÉÉ•¹Ð½¹ÑÉ…Ð¨«¾òhÈÀÈÀ´ÀÄ´ÀÄ¥ÌÑ¡”É•ÅÕ¥É•¡¥ÍÑ½Éä‰½Õ¹‘…ÉäìÁÉ”´ÈÀÈÀÉ½ÕÑ¥¹”‰…­™¥±°…¹•…ÑÕÉ”Ý…ÉµÕÀ…É”™½É‰¥‘‘•¸½¹½ÐÉ•ÅÕ¥É•¸€ÈÀÈÀ¬…ÁÌÉ•µ…¥¸™…¥°±½Í•¸(´€¨©I•µ…¥¹¥¹œ‰±½­•ÉÌ¨«¾òi™½Éµ…°ÁÉ½‘ÕÑ¥½¸…½Õ¹Ð¥‘•¹Ñ¥Ñä½•¹Ñ¥Ñ±•µ•¹Ð°±½Í•ÁÉ½‘ÕÑ¥½¸ÄµÜ•Ù¥‘•¹”°…Ñ„MÕ™™¥¥•¹ä5…ÑÉ¥à°I•Ù¥•Ý•È…ÁÁÉ½Ù…°°H´ÀÈØ…•ÁÑ…¹”…¹AH€ŒØµ•É”¸Q¡•Í”É•ÅÕ¥É”•áÑ•É¹…°™…ÑÌ½È¡Õµ…¸‘•¥Í¥½¹Ì…¹…É”¹½Ð±…¥µ•½µÁ±•Ñ”¸((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÄÀÌ((´€¨©QåÁ”¨«¾òiÄƒŠP½¹ÑÉ…Ðµ‘½Õµ•¹Ð…Ñ”•á•ÁÑ¥½¸½µÁ±•Ñ¥½¸É•½É(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi=9€¡•á•ÁÑ¥½¸‘¥Í±½ÍÕÉ”¤€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi$ÉÕ¸€ÌÌàÐÄÜÄÐàÈà€¡ÉÕ¸€ÈÌÄ¤É•…¡•Ñ¡”µ…¹…•µ•¹Ðµ‘½Œ…Ñ”…™Ñ•È…±°½‘”°Ñ•ÍÐ…¹MÁ¥­”¡•­ÌÁ…ÍÍ•°…¹¥‘•¹Ñ¥™¥•Ñ¡”ÑÝ¼Hµ½¹±ä½µµ¥ÑÌÑ¡…ÐÁÉ•‘…Ñ•µ…¹…•µ•¹ÐÍå¹¡É½¹¥é…Ñ¥½¸¸(´€¨©á…Ð•á•ÁÑ¥½¸Í•Ð¨«¾òi€Ñ˜àÍ˜Ý…ŒÍ„ÄäÌÈÝ”å˜ÜÈÑŒäÜÌÁ‰™‰™•˜ÀÍ‘”Ìá‰€€¡…Á…‰¥±¥Ñ¥•Ì¤°••ˆääÐØá‰Èá„ÌÝ„ÜÔÌÉˆÜÈÍ˜ÀäÉ„åÉ˜á‰ÐØå€€¡H´ÀÈØ¤°€Ñ…”äÄÔÄäÜäÈàÝ„á„Ñ”àÙŒÕ˜äÔäÀÙˆààÔÐÙŒääÍ”Í€€¡H¥¹‘•à¤¸(´€¨©I•…Í½¸€¼‰½Õ¹‘…Éä¨«¾òiQ¡”¥Ñ!Õˆ½¹Ñ•¹ÑÌA$ÕÁ‘…Ñ•Ñ¡½Í”Á…Ñ¡Ì…ÌÍ•Á…É…Ñ”½µµ¥ÑÌ…¹Ñ¡”…ÁÁ•¹µ½¹±ä‰É…¹ ¥Ì¹½ÐÉ•ÝÉ¥ÑÑ•¸¸Q¡”Ý½É­™±½Ü…¹½Ù•É¹…¹”Ñ•ÍÐ¹½Ü½¹Ñ…¥¸…¸•á…ÐµM!°½¹”µÑ¥µ”°‘¥Í±½Í••á•ÁÑ¥½¸ì¥ÐµÕÍÐ¹½Ð‰”•áÑ•¹‘•Ñ¼™ÕÑÕÉ”½µµ¥ÑÌ¸(´€¨©I•µ…¥¹¥¹œ‰±½­•ÉÌ¨«¾òiH´ÀÈØ½H´Ø™½Éµ…°I•Ù¥•Ý•È±½ÍÕÉ”°AH€ŒØµ•É”°µ…é¥¹…Ñ„ÁÉ½‘ÕÑ¥½¸…½Õ¹Ð½•¹Ñ¥Ñ±•µ•¹Ð°1=MAI=UQ%=8ÄµÜ°½±‘•¸…¹…Ñ„MÕ™™¥¥•¹ä5…ÑÉ¥àÉ•µ…¥¸Á•¹‘¥¹œ½È‰±½­•¸((((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÄÀÐ((´€¨©QåÁ”¨«¾òiÄƒŠP™¥¹…°€ÈÀÈÀ¬½¹ÑÉ…Ð$Ù•É¥™¥…Ñ¥½¸…¹‘½Õµ•¹Ñ…Ñ¥½¸ÍÑ…ÑÕÌ±½ÍÕÉ”(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi=9€¡¥µÁ±•µ•¹Ñ…Ñ¥½¸½‘½Õµ•¹Ñ…Ñ¥½¸Ù•É¥™¥…Ñ¥½¸¤€¼A9%9}IY%\(´€¨©Ù¥‘•¹”¨«¾òiÕÉÉ•¹ÐÁÉ”µÉ•½É¡•…€Á„Üå‰”Åˆá‘”ÜÌÐåŒÐÀØØá‘„ÀÔå‰˜áˆÜÐàÁ‰ÌÀÑ€Á…ÍÍ•¥Ñ!ÕˆÑ¥½¹ÌÉÕ¸€ÌÌàÐÈÌØÄÐàÍ€€¡ÉÕ¸€ÈÌÈ¤¸U‰Õ¹ÑÔ€Ì¸ÄÐ°]¥¹‘½ÝÌ€Ì¸ÄÈ…¹]¥¹‘½ÝÌ€Ì¸ÄÐ•… É•Á½ÉÑ•€ÄÐÀÜÁ…ÍÍ•‘€ìIÕ™˜±¥¹Ð½™½Éµ…Ð°µåÁä°MÁ¥­”°M,µ…‰Í•¹Ð°Y1=…¹5…¹…•µ•¹Ð…Ñ•Ì…±°ÍÕ••‘•¸(´€¨©½µÁ±•Ñ•‘½Ì¨«¾òhÈÀÈÀ¬¡¥ÍÑ½Éä¡•­±¥ÍÐ$¥Ñ•´°H´ØÝ½É¬É•ÅÕ¥É•µ•¹Ð•Ù¥‘•¹”°É•Ù¥•Ý•È•Ù¥‘•¹”°Y1=…¹Ñ¡¥ÌÕÉÉ•¹ÐµÍÑ…ÑÕÌ¡•…‘•È…É”Íå¹¡É½¹¥é•¸(´€¨©I•µ…¥¹¥¹œ‰±½­•ÉÌ¨«¾òi…Ñ„MÕ™™¥¥•¹ä5…ÑÉ¥à°™½Éµ…°µ…é¥¹…Ñ„…½Õ¹Ð½•¹Ñ¥Ñ±•µ•¹Ð…¹ÁÉ½‘ÕÑ¥½¸ÄµÜ•Ù¥‘•¹”°I•Ù¥•Ý•È…•ÁÑ…¹”½˜H´ÀÈØ½H´Ø¸Ð°…¹AH€ŒØµ•É”É•µ…¥¸Á•¹‘¥¹œì¹¼…ÁÁÉ½Ù…°½È±½ÍÕÉ”¥Ì±…¥µ•¸(((´´´((ŒŒ¡…¹”I•½Éè4µH´ÈÀÈØÀäÀÐ´ÄÀÔ((´€¨©QåÁ”¨«¾òiÄ½ÈƒŠP™½Éµ…°ÁÉ½Ù¥‘•ÈÙ…±¥‘…Ñ¥½¸ÍÑ…ÑÕÌÕÁ‘…Ñ”(´€¨©…Ñ”¨«¾òhÈÀÈØ´Àä´ÀÐ(´€¨©MÑ…ÑÕÌ¨«¾òi%9}AI=IML€¼	1=-}	e}=%%1}M,€¼A9%9}IY%\(´€¨©QÉ¥•È¨«¾òi=Ý¹•ÈÍÕÁÁ±¥•™½Éµ…°µ…½Õ¹Ð½¹¹•Ñ¥½¸¥¹™½Éµ…Ñ¥½¸™½ÈÑ¡”Á•¹‘¥¹œAÉ½‘ÕÑ¥½¸MÁ¥­”¸(´€¨©Ù¥‘•¹”¨«¾òi¸¥¹‘•Á•¹‘•¹ÐQ@ÁÉ½‰”™½Õ¹‰½Ñ =Ý¹•ÈµÁÉ½Ù¥‘•…¹‘¥‘…Ñ”Í•ÉÙ¥”•¹‘Á½¥¹ÑÌÉ•…¡…‰±”½¸Ñ¡”½¹™¥ÕÉ•Á½ÉÐ¸Q¡”½¹ÑÉ½±±•AåÑ¡½¸€Ì¸ÄÐ¸Ø•¹Ù¥É½¹µ•¹Ð¡…Ì¹¼½™™¥¥…°µ…é¥¹…Ñ…€½ÈÑÝ€Ý¡••°°Í¼¹¼±½¥¸É•ÅÕ•ÍÐÝ…ÌÍ•¹Ð…¹¹¼…½Õ¹ÐÁÉ½™¥±”½ÈÄµÜ•Ù¥‘•¹”Ý…ÌÁÉ½‘Õ•¸(´€¨©M•É•Ð‰½Õ¹‘…Éä¨«¾òiUÍ•É¹…µ”°Á…ÍÍÝ½É°Q½­•¸°¡½ÍÐ±¥Ñ•É…±Ì…¹Á½ÉÐÙ…±Õ•ÌÝ•É”¹½ÐÝÉ¥ÑÑ•¸Ñ¼¥Ñ!Õˆ°É•Á½Í¥Ñ½Éä½¹™¥ÕÉ…Ñ¥½¸°±½Ì°Y1=°%ÍÍÕ”°AH½ÈÑ¡¥ÌÉ•½É¸½¹™¥Ì½ÁÉ½‘ÕÑ¥½¹}…½Õ¹Ð¹å…µ±€É•µ…¥¹Ì•µÁÑä¸(´€¨©%¹Ñ•ÉÁÉ•Ñ…Ñ¥½¸¨«¾òi9•ÑÝ½É¬É•…¡…‰¥±¥Ñä¥Ì¹½Ð…ÕÑ¡•¹Ñ¥…Ñ¥½¸°•¹Ñ¥Ñ±•µ•¹Ð°ÁÉ½‘ÕÑ¥½¸¥‘•¹Ñ¥Ñä°‘…Ñ„½ÉÉ•Ñ¹•ÍÌ½ÈAÉ½Ù¥‘•È…ÁÁÉ½Ù…°¸½Éµ…°Ù•É‘¥Ð…¹…Ñ„MÕ™™¥¥•¹ä5…ÑÉ¥àÉ•µ…¥¸Õ¹…ÍÍ•ÍÍ•¸(´€¨©9•áÐ¥¹ÁÕÐ¨«¾òi%¹ÍÑ…±°Ñ¡”…±…áäµÁÉ½Ù¥‘•½™™¥¥…°Ý¡••±Ì¥¸Ñ¡”½¹ÑÉ½±±••¹Ù¥É½¹µ•¹Ð°É•½ÉÑ¡•¥È™¥¹•ÉÁÉ¥¹ÑÌ°ÉÕ¸ÁÉ½Ù¥‘•È‘½Ñ½È°Ñ¡•¸•á•ÕÑ”½¹”1=MAI=UQ%=8ÄµÜÉÕ¸Ý¥Ñ •Ù¥‘•¹”±½ÍÕÉ”…¹¡Õµ…¸É•Ù¥•Ü¸(

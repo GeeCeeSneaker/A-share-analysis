@@ -7,7 +7,7 @@
   "policy": {
     "old_structural_rows": "DROP: v3 ST/DELIST rows lack exact effective dates or distinct identities",
     "old_negative_samples": "DROP: repetitive observations add no independent structural truth",
-    "old_non_structural_rows": "REPLACE: preserve case semantics while adding official rule/disclosure locators",
+    "old_non_structural_rows": "REPLACE: preserve source lineage while adding exact official rule/disclosure locators; rekey only when an exact corporate-action date changes the case identity",
     "new_structural_rows": "ADD: one canonical case per independently located official event",
     "new_right_issue_rows": "ADD: supplement dividend-only CA coverage with right-issue ex-dates",
     "review_boundary": "No source artifact is sealed and no case is marked REVIEWED by this utility"
@@ -314,10 +314,11 @@
         "golden_case_id": "GT-LIMIT-MAIN10-600519",
         "provider_symbol": "600519.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "source_ref": "SSE Trading Rules (exact rule page; main-board 10% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
         "trade_date": "20230601",
         "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -335,10 +336,11 @@
         "golden_case_id": "GT-LIMIT-MAIN10-600036",
         "provider_symbol": "600036.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "source_ref": "SSE Trading Rules (exact rule page; main-board 10% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
         "trade_date": "20230601",
         "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -356,10 +358,11 @@
         "golden_case_id": "GT-LIMIT-MAIN10-601318",
         "provider_symbol": "601318.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "source_ref": "SSE Trading Rules (exact rule page; main-board 10% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
         "trade_date": "20230601",
         "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -377,10 +380,11 @@
         "golden_case_id": "GT-LIMIT-MAIN10-600900",
         "provider_symbol": "600900.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "source_ref": "SSE Trading Rules (exact rule page; main-board 10% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
         "trade_date": "20230601",
         "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -398,10 +402,11 @@
         "golden_case_id": "GT-LIMIT-MAIN10-600104",
         "provider_symbol": "600104.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "source_ref": "SSE Trading Rules (exact rule page; main-board 10% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
         "trade_date": "20230601",
         "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -419,10 +424,11 @@
         "golden_case_id": "GT-LIMIT-MAIN10-600019",
         "provider_symbol": "600019.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: main-board 10% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: sse.com.cn trading rules (2023 revision), art. price limits",
+        "source_ref": "SSE Trading Rules (exact rule page; main-board 10% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
         "trade_date": "20230601",
         "truth_source": "SSE main board +/-10% daily limit (non-ST, non-IPO)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -440,10 +446,11 @@
         "golden_case_id": "GT-LIMIT-ST5-600518-20190603",
         "provider_symbol": "600518.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official risk-warning stock trading rules: 5% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml | source claim: SSE/SZSE trading rules: risk-warning stocks 5%",
+        "source_ref": "SSE Risk-Warning Board Trading Measures (exact rule page; 5% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
         "trade_date": "20190603",
         "truth_source": "Main board ST stock +/-5% daily limit",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -461,10 +468,11 @@
         "golden_case_id": "GT-LIMIT-ST5-600518-20191028",
         "provider_symbol": "600518.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official risk-warning stock trading rules: 5% limit | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml | source claim: SSE/SZSE trading rules: risk-warning stocks 5%",
+        "source_ref": "SSE Risk-Warning Board Trading Measures (exact rule page; 5% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
         "trade_date": "20191028",
         "truth_source": "Main board ST stock +/-5% daily limit",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -482,10 +490,11 @@
         "golden_case_id": "GT-LIMIT-ST5-002450-20190422",
         "provider_symbol": "002450.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official risk-warning stock trading rules: 5% limit | https://www.szse.cn/lawrules/rule/trade/ | source claim: SSE/SZSE trading rules: risk-warning stocks 5%",
+        "source_ref": "SZSE Trading Rules (exact historical rule page; rule 3.3.14 ST/*ST 5% clause) | https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
         "trade_date": "20190422",
         "truth_source": "Main board ST stock +/-5% daily limit",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -503,10 +512,11 @@
         "golden_case_id": "GT-LIMIT-ST5-002450-20190722",
         "provider_symbol": "002450.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official risk-warning stock trading rules: 5% limit | https://www.szse.cn/lawrules/rule/trade/ | source claim: SSE/SZSE trading rules: risk-warning stocks 5%",
+        "source_ref": "SZSE Trading Rules (exact historical rule page; rule 3.3.14 ST/*ST 5% clause) | https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
         "trade_date": "20190722",
         "truth_source": "Main board ST stock +/-5% daily limit",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -523,10 +533,11 @@
         "golden_case_id": "GT-LIMIT-CN10-300001",
         "provider_symbol": "300001.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext trading rules pre-reform",
+        "source_ref": "SZSE Trading Rules (exact historical rule page; ChiNext pre-2020-08-24 10% clause) | https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
         "trade_date": "20200106",
         "truth_source": "ChiNext +/-10% BEFORE the 2020-08-24 reform",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -543,10 +554,11 @@
         "golden_case_id": "GT-LIMIT-CN10-300059",
         "provider_symbol": "300059.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext trading rules pre-reform",
+        "source_ref": "SZSE Trading Rules (exact historical rule page; ChiNext pre-2020-08-24 10% clause) | https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
         "trade_date": "20200106",
         "truth_source": "ChiNext +/-10% BEFORE the 2020-08-24 reform",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -563,10 +575,11 @@
         "golden_case_id": "GT-LIMIT-CN10-300015",
         "provider_symbol": "300015.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext trading rules pre-reform",
+        "source_ref": "SZSE Trading Rules (exact historical rule page; ChiNext pre-2020-08-24 10% clause) | https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
         "trade_date": "20200106",
         "truth_source": "ChiNext +/-10% BEFORE the 2020-08-24 reform",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -583,10 +596,11 @@
         "golden_case_id": "GT-LIMIT-CN10-300750",
         "provider_symbol": "300750.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext trading rules pre-reform",
+        "source_ref": "SZSE Trading Rules (exact historical rule page; ChiNext pre-2020-08-24 10% clause) | https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
         "trade_date": "20200106",
         "truth_source": "ChiNext +/-10% BEFORE the 2020-08-24 reform",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -604,10 +618,11 @@
         "golden_case_id": "GT-LIMIT-CN20-300750",
         "provider_symbol": "300750.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "source_ref": "SZSE ChiNext Trading Special Provisions (Notice [2020]515; effective with the 2020-08-24 reform; 20% clause) | https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
         "trade_date": "20210601",
         "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -625,10 +640,11 @@
         "golden_case_id": "GT-LIMIT-CN20-300059",
         "provider_symbol": "300059.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "source_ref": "SZSE ChiNext Trading Special Provisions (Notice [2020]515; effective with the 2020-08-24 reform; 20% clause) | https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
         "trade_date": "20210601",
         "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -646,10 +662,11 @@
         "golden_case_id": "GT-LIMIT-CN20-300015",
         "provider_symbol": "300015.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "source_ref": "SZSE ChiNext Trading Special Provisions (Notice [2020]515; effective with the 2020-08-24 reform; 20% clause) | https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
         "trade_date": "20210601",
         "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -667,10 +684,11 @@
         "golden_case_id": "GT-LIMIT-CN20-300124",
         "provider_symbol": "300124.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "source_ref": "SZSE ChiNext Trading Special Provisions (Notice [2020]515; effective with the 2020-08-24 reform; 20% clause) | https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
         "trade_date": "20210601",
         "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -688,10 +706,11 @@
         "golden_case_id": "GT-LIMIT-CN20-300274",
         "provider_symbol": "300274.SZ",
         "review_status": "COMPILED",
-        "source_ref": "SZSE official trading-rule portal: ChiNext price-limit regime | https://www.szse.cn/lawrules/rule/trade/ | source claim: SZSE ChiNext registration-reform trading rules",
+        "source_ref": "SZSE ChiNext Trading Special Provisions (Notice [2020]515; effective with the 2020-08-24 reform; 20% clause) | https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
         "trade_date": "20210601",
         "truth_source": "ChiNext +/-20% after the 2020-08-24 reform",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -708,10 +727,11 @@
         "golden_case_id": "GT-LIMIT-STAR20-688981",
         "provider_symbol": "688981.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "source_ref": "SSE Risk-Warning Board Trading Measures (exact rule page; 5% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
         "trade_date": "20210601",
         "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -728,10 +748,11 @@
         "golden_case_id": "GT-LIMIT-STAR20-688111",
         "provider_symbol": "688111.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "source_ref": "SSE Risk-Warning Board Trading Measures (exact rule page; 5% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
         "trade_date": "20210601",
         "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -748,10 +769,11 @@
         "golden_case_id": "GT-LIMIT-STAR20-688036",
         "provider_symbol": "688036.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "source_ref": "SSE Risk-Warning Board Trading Measures (exact rule page; 5% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
         "trade_date": "20210601",
         "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -768,10 +790,11 @@
         "golden_case_id": "GT-LIMIT-STAR20-688012",
         "provider_symbol": "688012.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "source_ref": "SSE Risk-Warning Board Trading Measures (exact rule page; 5% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
         "trade_date": "20210601",
         "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -788,10 +811,11 @@
         "golden_case_id": "GT-LIMIT-STAR20-688599",
         "provider_symbol": "688599.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE official trading rules: STAR price-limit regime | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019)",
+        "source_ref": "SSE Risk-Warning Board Trading Measures (exact rule page; 5% price-limit clause) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
         "trade_date": "20210601",
         "truth_source": "STAR Market +/-20% (beyond first 5 listing days)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -809,10 +833,11 @@
         "golden_case_id": "GT-LIMIT-STARNO-20200722",
         "provider_symbol": "688981.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE IPO first-day price-limit rules (2014-2023) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019): first-5-days no price limit",
+        "source_ref": "SSE STAR Market Trading Special Provisions (2019; first five listing days no limit, later 20%) | https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
         "trade_date": "20200722",
         "truth_source": "STAR Market IPO day: NO price limit during first 5 listing days",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -830,10 +855,11 @@
         "golden_case_id": "GT-LIMIT-STARNO-20200723",
         "provider_symbol": "688981.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE IPO first-day price-limit rules (2014-2023) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE STAR market rules (2019): first-5-days no price limit",
+        "source_ref": "SSE STAR Market Trading Special Provisions (2019; first five listing days no limit, later 20%) | https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
         "trade_date": "20200723",
         "truth_source": "STAR Market IPO day+1: NO price limit during first 5 listing days",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -850,10 +876,11 @@
         "golden_case_id": "GT-LIMIT-BSE30-20220104",
         "provider_symbol": "835185.BJ",
         "review_status": "COMPILED",
-        "source_ref": "BSE official trading-rule portal: 30% price-limit regime | https://www.bse.cn/ | source claim: BSE trading rules (2021-11-15)",
+        "source_ref": "BSE Trading Rules (Announcement [2021]15; effective 2021-11-15; 30% price-limit clause) | https://www.bse.cn/jygl_list/200010919.html",
         "trade_date": "20220104",
         "truth_source": "BSE +/-30% daily limit (post 2021-11-15 opening)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -870,10 +897,11 @@
         "golden_case_id": "GT-LIMIT-BSE30-20220601",
         "provider_symbol": "835185.BJ",
         "review_status": "COMPILED",
-        "source_ref": "BSE official trading-rule portal: 30% price-limit regime | https://www.bse.cn/ | source claim: BSE trading rules (2021-11-15)",
+        "source_ref": "BSE Trading Rules (Announcement [2021]15; effective 2021-11-15; 30% price-limit clause) | https://www.bse.cn/jygl_list/200010919.html",
         "trade_date": "20220601",
         "truth_source": "BSE +/-30% daily limit (post 2021-11-15 opening)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -891,10 +919,11 @@
         "golden_case_id": "GT-LIMIT-IPO44-601995",
         "provider_symbol": "601995.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE IPO first-day price-limit rules (2014-2023) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE IPO first-day price rule 2014-2023",
+        "source_ref": "SSE Trading Rules (exact rule page; main-board IPO first-day ±44%/−36% regime) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
         "trade_date": "20201102",
         "truth_source": "Main-board IPO day 1: +44%/-36% caps (CICC A-share IPO, pre-2023 regime)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -912,10 +941,11 @@
         "golden_case_id": "GT-LIMIT-IPO44-605499",
         "provider_symbol": "605499.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE IPO first-day price-limit rules (2014-2023) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | source claim: SSE IPO first-day price rule 2014-2023",
+        "source_ref": "SSE Trading Rules (exact rule page; main-board IPO first-day ±44%/−36% regime) | https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
         "trade_date": "20210527",
         "truth_source": "Main-board IPO day 1: +44%/-36% caps (Eastroc Beverage IPO, pre-2023 regime)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -932,10 +962,11 @@
         "golden_case_id": "GT-CA-600519-20220630",
         "provider_symbol": "600519.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
+        "source_ref": "SSE 600519 2021 annual profit-distribution implementation announcement; ex-date 2022-06-30 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-06-24/600519_20220624_1_uyoZ4ubX.pdf",
         "trade_date": "20220630",
         "truth_source": "Kweichow Moutai 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -949,14 +980,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-600519-20230627",
+        "golden_case_id": "GT-CA-600519-20230630",
         "provider_symbol": "600519.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
-        "trade_date": "20230627",
-        "truth_source": "Kweichow Moutai 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 600519 2022 annual profit-distribution implementation announcement; ex-date 2023-06-30 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-06-26/600519_20230626_V0SN.pdf",
+        "trade_date": "20230630",
+        "truth_source": "Kweichow Moutai 2022 annual dividend: ex-dividend date 20230630",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -969,14 +1002,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-601318-20220630",
+        "golden_case_id": "GT-CA-601318-20220620",
         "provider_symbol": "601318.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
-        "trade_date": "20220630",
-        "truth_source": "Ping An Insurance 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 601318 2021 annual profit-distribution implementation announcement; ex-date 2022-06-20 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-06-11/601318_20220611_1_KRbdGZAx.pdf",
+        "trade_date": "20220620",
+        "truth_source": "Ping An Insurance 2021 annual dividend: ex-dividend date 20220620",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -989,14 +1024,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-601318-20230627",
+        "golden_case_id": "GT-CA-601318-20230614",
         "provider_symbol": "601318.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
-        "trade_date": "20230627",
-        "truth_source": "Ping An Insurance 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 601318 2022 annual profit-distribution implementation announcement; ex-date 2023-06-14 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-06-07/601318_20230607_A9V4.pdf",
+        "trade_date": "20230614",
+        "truth_source": "Ping An Insurance 2022 annual dividend: ex-dividend date 20230614",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1009,14 +1046,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-600036-20220630",
+        "golden_case_id": "GT-CA-600036-20220715",
         "provider_symbol": "600036.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
-        "trade_date": "20220630",
-        "truth_source": "China Merchants Bank 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 600036 2021 annual profit-distribution implementation announcement; ex-date 2022-07-15 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-07-08/600036_20220708_2_wBQHNFmu.pdf",
+        "trade_date": "20220715",
+        "truth_source": "China Merchants Bank 2021 annual dividend: ex-dividend date 20220715",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1029,14 +1068,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-600036-20230627",
+        "golden_case_id": "GT-CA-600036-20230713",
         "provider_symbol": "600036.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
-        "trade_date": "20230627",
-        "truth_source": "China Merchants Bank 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 600036 2022 annual profit-distribution implementation announcement; ex-date 2023-07-13 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-07-06/600036_20230706_PLK0.pdf",
+        "trade_date": "20230713",
+        "truth_source": "China Merchants Bank 2022 annual dividend: ex-dividend date 20230713",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1049,14 +1090,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-000858-20220630",
+        "golden_case_id": "GT-CA-000858-20220629",
         "provider_symbol": "000858.SZ",
         "review_status": "COMPILED",
-        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2021 annual dividend)",
-        "trade_date": "20220630",
-        "truth_source": "Wuliangye 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "CNINFO 000858 2021 annual profit-distribution implementation announcement; ex-date 2022-06-29 | https://static.cninfo.com.cn/finalpage/2022-06-22/1213776669.PDF",
+        "trade_date": "20220629",
+        "truth_source": "Wuliangye 2021 annual dividend: ex-dividend date 20220629",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1072,10 +1115,11 @@
         "golden_case_id": "GT-CA-000858-20230627",
         "provider_symbol": "000858.SZ",
         "review_status": "COMPILED",
-        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2022 annual dividend)",
+        "source_ref": "CNINFO 000858 2022 annual profit-distribution implementation announcement; ex-date 2023-06-27 | https://static.cninfo.com.cn/finalpage/2023-06-17/1217085394.PDF",
         "trade_date": "20230627",
         "truth_source": "Wuliangye 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -1089,14 +1133,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-000333-20220630",
+        "golden_case_id": "GT-CA-000333-20220602",
         "provider_symbol": "000333.SZ",
         "review_status": "COMPILED",
-        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2021 annual dividend)",
-        "trade_date": "20220630",
-        "truth_source": "Midea Group 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "CNINFO 000333 2021 annual profit-distribution implementation announcement; ex-date 2022-06-02 | https://static.cninfo.com.cn/finalpage/2022-05-27/1213516434.PDF",
+        "trade_date": "20220602",
+        "truth_source": "Midea Group 2021 annual dividend: ex-dividend date 20220602",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1109,14 +1155,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-000333-20230627",
+        "golden_case_id": "GT-CA-000333-20230601",
         "provider_symbol": "000333.SZ",
         "review_status": "COMPILED",
-        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2022 annual dividend)",
-        "trade_date": "20230627",
-        "truth_source": "Midea Group 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "CNINFO 000333 2022 annual profit-distribution implementation announcement; ex-date 2023-06-01 | https://static.cninfo.com.cn/finalpage/2023-05-25/1216898601.PDF",
+        "trade_date": "20230601",
+        "truth_source": "Midea Group 2022 annual dividend: ex-dividend date 20230601",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1129,14 +1177,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-601398-20220630",
+        "golden_case_id": "GT-CA-601398-20220712",
         "provider_symbol": "601398.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
-        "trade_date": "20220630",
-        "truth_source": "ICBC 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 601398 2021 annual profit-distribution implementation announcement; ex-date 2022-07-12 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-07-05/601398_20220705_1_7xXht7EQ.pdf",
+        "trade_date": "20220712",
+        "truth_source": "ICBC 2021 annual dividend: ex-dividend date 20220712",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1149,14 +1199,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-601398-20230627",
+        "golden_case_id": "GT-CA-601398-20230717",
         "provider_symbol": "601398.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
-        "trade_date": "20230627",
-        "truth_source": "ICBC 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 601398 2022 annual profit-distribution implementation announcement; ex-date 2023-07-17 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-07-11/601398_20230711_UH4E.pdf",
+        "trade_date": "20230717",
+        "truth_source": "ICBC 2022 annual dividend: ex-dividend date 20230717",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1169,14 +1221,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-000651-20220630",
+        "golden_case_id": "GT-CA-000651-20220805",
         "provider_symbol": "000651.SZ",
         "review_status": "COMPILED",
-        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2021 annual dividend)",
-        "trade_date": "20220630",
-        "truth_source": "Gree Electric 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "CNINFO 000651 2021 annual profit-distribution implementation announcement; ex-date 2022-08-05 | https://disc.static.szse.cn/disc/disk03/finalpage/2022-07-29/f1bcbfd5-1827-4754-813a-4daab09c217f.PDF",
+        "trade_date": "20220805",
+        "truth_source": "Gree Electric 2021 annual dividend: ex-dividend date 20220805",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1189,14 +1243,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-000651-20230627",
+        "golden_case_id": "GT-CA-000651-20230809",
         "provider_symbol": "000651.SZ",
         "review_status": "COMPILED",
-        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2022 annual dividend)",
-        "trade_date": "20230627",
-        "truth_source": "Gree Electric 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "CNINFO 000651 2022 annual profit-distribution implementation announcement; ex-date 2023-08-09 | https://static.cninfo.com.cn/finalpage/2023-08-02/1217444821.PDF",
+        "trade_date": "20230809",
+        "truth_source": "Gree Electric 2022 annual dividend: ex-dividend date 20230809",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1209,14 +1265,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-000002-20220630",
+        "golden_case_id": "GT-CA-000002-20220825",
         "provider_symbol": "000002.SZ",
         "review_status": "COMPILED",
-        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2021 annual dividend)",
-        "trade_date": "20220630",
-        "truth_source": "Vanke A 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "CNINFO 000002 2021 annual profit-distribution implementation announcement; ex-date 2022-08-25 | https://static.cninfo.com.cn/finalpage/2022-08-18/1214319792.PDF",
+        "trade_date": "20220825",
+        "truth_source": "Vanke A 2021 annual dividend: ex-dividend date 20220825",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1229,14 +1287,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-000002-20230627",
+        "golden_case_id": "GT-CA-000002-20230825",
         "provider_symbol": "000002.SZ",
         "review_status": "COMPILED",
-        "source_ref": "CNINFO listed-company disclosure portal: dividend ex-date locator | https://www.cninfo.com.cn/new/disclosure | source claim: company profit distribution announcement (2022 annual dividend)",
-        "trade_date": "20230627",
-        "truth_source": "Vanke A 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "CNINFO 000002 2022 annual profit-distribution implementation announcement; ex-date 2023-08-25 | https://static.cninfo.com.cn/finalpage/2023-08-21/1217577962.PDF",
+        "trade_date": "20230825",
+        "truth_source": "Vanke A 2022 annual dividend: ex-dividend date 20230825",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1249,14 +1309,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-600900-20220630",
+        "golden_case_id": "GT-CA-600900-20220721",
         "provider_symbol": "600900.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
-        "trade_date": "20220630",
-        "truth_source": "Yangtze Power 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 600900 2021 annual profit-distribution implementation announcement; ex-date 2022-07-21 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-07-13/600900_20220713_1_zI17tKH7.pdf",
+        "trade_date": "20220721",
+        "truth_source": "Yangtze Power 2021 annual dividend: ex-dividend date 20220721",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1269,14 +1331,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-600900-20230627",
+        "golden_case_id": "GT-CA-600900-20230721",
         "provider_symbol": "600900.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
-        "trade_date": "20230627",
-        "truth_source": "Yangtze Power 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 600900 2022 annual profit-distribution implementation announcement; ex-date 2023-07-21 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-07-17/600900_20230717_R4MO.pdf",
+        "trade_date": "20230721",
+        "truth_source": "Yangtze Power 2022 annual dividend: ex-dividend date 20230721",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1289,14 +1353,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-600104-20220630",
+        "golden_case_id": "GT-CA-600104-20220715",
         "provider_symbol": "600104.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2021 annual dividend)",
-        "trade_date": "20220630",
-        "truth_source": "SAIC Motor 2021 annual dividend: ex-dividend date 20220630",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 600104 2021 annual profit-distribution implementation announcement; ex-date 2022-07-15 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-07-08/600104_20220708_2_Cx62oZwE.pdf",
+        "trade_date": "20220715",
+        "truth_source": "SAIC Motor 2021 annual dividend: ex-dividend date 20220715",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1309,14 +1375,16 @@
         "expected_fields": {
           "IS_WD_SEC": true
         },
-        "golden_case_id": "GT-CA-600104-20230627",
+        "golden_case_id": "GT-CA-600104-20230719",
         "provider_symbol": "600104.SH",
         "review_status": "COMPILED",
-        "source_ref": "SSE listed-company disclosure portal: dividend ex-date locator | https://www.sse.com.cn/disclosure/listedinfo/announcement/ | source claim: company profit distribution announcement (2022 annual dividend)",
-        "trade_date": "20230627",
-        "truth_source": "SAIC Motor 2022 annual dividend: ex-dividend date 20230627",
-        "truth_version": "v3-candidate-20260822"
-      }
+        "source_ref": "SSE 600104 2022 annual profit-distribution implementation announcement; ex-date 2023-07-19 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-07-12/600104_20230712_ONIE.pdf",
+        "trade_date": "20230719",
+        "truth_source": "SAIC Motor 2022 annual dividend: ex-dividend date 20230719",
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
+      },
+      "allow_rekey": true
     },
     {
       "op": "REPLACE",
@@ -1332,10 +1400,11 @@
         "golden_case_id": "GT-BJ-835185-CONTINUITY",
         "provider_symbol": "835185.BJ",
         "review_status": "COMPILED",
-        "source_ref": "BSE official issuer and quotation-rule portal: code continuity/migration | https://www.bse.cn/ | source claim: BSE opening announcement 2021-11: 71 selected-layer firms migrated, codes unchanged",
+        "source_ref": "BSE Trading Rules (Announcement [2021]15; opening/migration-day quotation rules effective 2021-11-15) | https://www.bse.cn/jygl_list/200010919.html",
         "trade_date": "20211115",
         "truth_source": "BaiRui (BTR New Energy): selected-layer code 835185 carried over to BSE unchanged on the 2021-11-15 opening",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -1352,10 +1421,11 @@
         "golden_case_id": "GT-BJ-835185-2022",
         "provider_symbol": "835185.BJ",
         "review_status": "COMPILED",
-        "source_ref": "BSE official issuer and quotation-rule portal: code continuity/migration | https://www.bse.cn/ | source claim: BSE daily quotation 2022",
+        "source_ref": "BSE official new/old code mapping table (835185 to 920185 row) | https://www.bse.cn/service/code_mapping.html",
         "trade_date": "20220601",
         "truth_source": "BaiRui trades as 835185.BJ post-migration (BSE 30% regime)",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -1372,143 +1442,151 @@
         "golden_case_id": "GT-BJ-920-SEGMENT",
         "provider_symbol": "920002.BJ",
         "review_status": "COMPILED",
-        "source_ref": "BSE official issuer and quotation-rule portal: code continuity/migration | https://www.bse.cn/ | source claim: BSE code-segment announcement 2024",
+        "source_ref": "BSE official 920 code-segment launch announcement (effective 2024-04-22) | https://www.bse.cn/important_news/200021629.html",
         "trade_date": "20240701",
         "truth_source": "BSE 920xxx code segment: new BSE listings use the 920 prefix (effective 2024); no same-day (old, new) code ambiguity",
-        "truth_version": "v3-candidate-20260822"
+        "truth_version": "v3-candidate-20260822",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
       "op": "ADD",
-      "golden_case_id": "GT-H2-ST-ST_ADD-002681-20200506",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600654-20220506",
       "case": {
-        "golden_case_id": "GT-H2-ST-ST_ADD-002681-20200506",
+        "golden_case_id": "GT-H2-ST-ST_ADD-600654-20220506",
         "case_type": "golden_st_transition",
-        "provider_symbol": "002681.SZ",
-        "trade_date": "20200506",
-        "truth_source": "SZSE official announcement: *ST 奋达 risk warning effective 2020-05-06",
-        "source_ref": "SZSE official announcement: *ST 奋达 risk warning effective 2020-05-06 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-30/6c34f44d-5bee-46df-8f17-2c699b477d18.PDF",
+        "provider_symbol": "600654.SH",
+        "trade_date": "20220506",
+        "truth_source": "SSE company announcement: ST 中安 risk-warning implementation effective 2022-05-06",
+        "source_ref": "SSE company announcement: ST 中安 risk-warning implementation effective 2022-05-06 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2022-05-05/600654_20220505_1_dNOo6yTW.pdf",
         "expected_fields": {
           "IS_ST_SEC": true
         },
-        "event_id": "ST-ADD-002681-20200506",
+        "event_id": "ST-ADD-600654-20220506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
-        "event_effective_date": "20200506"
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "event_effective_date": "20220506"
       }
     },
     {
       "op": "ADD",
-      "golden_case_id": "GT-H2-ST-ST_ADD-000408-20200506",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600077-20230505",
       "case": {
-        "golden_case_id": "GT-H2-ST-ST_ADD-000408-20200506",
+        "golden_case_id": "GT-H2-ST-ST_ADD-600077-20230505",
         "case_type": "golden_st_transition",
-        "provider_symbol": "000408.SZ",
-        "trade_date": "20200506",
-        "truth_source": "SZSE official announcement: *ST 藏格 risk warning effective 2020-05-06",
-        "source_ref": "SZSE official announcement: *ST 藏格 risk warning effective 2020-05-06 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-30/5018e5ae-ddeb-4602-a0c1-7f2b0634f727.PDF",
+        "provider_symbol": "600077.SH",
+        "trade_date": "20230505",
+        "truth_source": "SSE company announcement: 宋都股份 risk-warning implementation effective 2023-05-05",
+        "source_ref": "SSE company announcement: 宋都股份 risk-warning implementation effective 2023-05-05 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-29/600077_20230429_PNOI.pdf",
         "expected_fields": {
           "IS_ST_SEC": true
         },
-        "event_id": "ST-ADD-000408-20200506",
+        "event_id": "ST-ADD-600077-20230505",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
-        "event_effective_date": "20200506"
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "event_effective_date": "20230505"
       }
     },
     {
       "op": "ADD",
-      "golden_case_id": "GT-H2-ST-ST_ADD-002513-20200429",
+      "golden_case_id": "GT-H2-ST-ST_ADD-601258-20230505",
       "case": {
-        "golden_case_id": "GT-H2-ST-ST_ADD-002513-20200429",
+        "golden_case_id": "GT-H2-ST-ST_ADD-601258-20230505",
         "case_type": "golden_st_transition",
-        "provider_symbol": "002513.SZ",
-        "trade_date": "20200429",
-        "truth_source": "SZSE official announcement: *ST 蓝丰 risk warning effective 2020-04-29",
-        "source_ref": "SZSE official announcement: *ST 蓝丰 risk warning effective 2020-04-29 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-28/e3e3b094-6f16-461a-858f-f77851a3e60f.PDF",
+        "provider_symbol": "601258.SH",
+        "trade_date": "20230505",
+        "truth_source": "SSE company announcement: 庞大集团 risk-warning implementation effective 2023-05-05",
+        "source_ref": "SSE company announcement: 庞大集团 risk-warning implementation effective 2023-05-05 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-29/601258_20230429_KZL0.pdf",
         "expected_fields": {
           "IS_ST_SEC": true
         },
-        "event_id": "ST-ADD-002513-20200429",
+        "event_id": "ST-ADD-601258-20230505",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
-        "event_effective_date": "20200429"
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "event_effective_date": "20230505"
       }
     },
     {
       "op": "ADD",
-      "golden_case_id": "GT-H2-ST-ST_ADD-000587-20200507",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600466-20230504",
       "case": {
-        "golden_case_id": "GT-H2-ST-ST_ADD-000587-20200507",
+        "golden_case_id": "GT-H2-ST-ST_ADD-600466-20230504",
         "case_type": "golden_st_transition",
-        "provider_symbol": "000587.SZ",
-        "trade_date": "20200507",
-        "truth_source": "SZSE official announcement: *ST 金洲 risk warning effective 2020-05-07",
-        "source_ref": "SZSE official announcement: *ST 金洲 risk warning effective 2020-05-07 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-30/101bf255-d1eb-4791-96a2-28d2ebbcb1cc.PDF",
+        "provider_symbol": "600466.SH",
+        "trade_date": "20230504",
+        "truth_source": "SSE company announcement: 蓝光发展 risk-warning implementation effective 2023-05-04",
+        "source_ref": "SSE company announcement: 蓝光发展 risk-warning implementation effective 2023-05-04 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-28/600466_20230428_CP1N.pdf",
         "expected_fields": {
           "IS_ST_SEC": true
         },
-        "event_id": "ST-ADD-000587-20200507",
+        "event_id": "ST-ADD-600466-20230504",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
-        "event_effective_date": "20200507"
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "event_effective_date": "20230504"
       }
     },
     {
       "op": "ADD",
-      "golden_case_id": "GT-H2-ST-ST_ADD-002052-20200506",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600543-20230504",
       "case": {
-        "golden_case_id": "GT-H2-ST-ST_ADD-002052-20200506",
+        "golden_case_id": "GT-H2-ST-ST_ADD-600543-20230504",
         "case_type": "golden_st_transition",
-        "provider_symbol": "002052.SZ",
-        "trade_date": "20200506",
-        "truth_source": "SZSE official disclosure referring to *ST 同洲 risk warning effective 2020-05-06",
-        "source_ref": "SZSE official disclosure referring to *ST 同洲 risk warning effective 2020-05-06 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2021-06-07/276460c6-f1c9-42f5-b2d7-9159e0cb3974.PDF",
+        "provider_symbol": "600543.SH",
+        "trade_date": "20230504",
+        "truth_source": "SSE company announcement: 莫高股份 risk-warning implementation effective 2023-05-04",
+        "source_ref": "SSE company announcement: 莫高股份 risk-warning implementation effective 2023-05-04 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-28/600543_20230428_TL0Y.pdf",
         "expected_fields": {
           "IS_ST_SEC": true
         },
-        "event_id": "ST-ADD-002052-20200506",
+        "event_id": "ST-ADD-600543-20230504",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
-        "event_effective_date": "20200506"
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "event_effective_date": "20230504"
       }
     },
     {
       "op": "ADD",
-      "golden_case_id": "GT-H2-ST-ST_ADD-002319-20200428",
+      "golden_case_id": "GT-H2-ST-ST_ADD-603963-20240429",
       "case": {
-        "golden_case_id": "GT-H2-ST-ST_ADD-002319-20200428",
+        "golden_case_id": "GT-H2-ST-ST_ADD-603963-20240429",
         "case_type": "golden_st_transition",
-        "provider_symbol": "002319.SZ",
-        "trade_date": "20200428",
-        "truth_source": "SZSE official announcement: *ST 乐通 risk warning effective 2020-04-28",
-        "source_ref": "SZSE official announcement: *ST 乐通 risk warning effective 2020-04-28 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2020-04-25/805e9468-baf4-40b2-b042-10e4d1172063.PDF",
+        "provider_symbol": "603963.SH",
+        "trade_date": "20240429",
+        "truth_source": "SSE company announcement: 大理药业 risk-warning implementation effective 2024-04-29",
+        "source_ref": "SSE company announcement: 大理药业 risk-warning implementation effective 2024-04-29 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2024-04-26/603963_20240426_ZG5D.pdf",
         "expected_fields": {
           "IS_ST_SEC": true
         },
-        "event_id": "ST-ADD-002319-20200428",
+        "event_id": "ST-ADD-603963-20240429",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
-        "event_effective_date": "20200428"
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "event_effective_date": "20240429"
       }
     },
     {
       "op": "ADD",
-      "golden_case_id": "GT-H2-ST-ST_ADD-000613-20210427",
+      "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688500-20230505",
       "case": {
-        "golden_case_id": "GT-H2-ST-ST_ADD-000613-20210427",
+        "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688500-20230505",
         "case_type": "golden_st_transition",
-        "provider_symbol": "000613.SZ",
-        "trade_date": "20210427",
-        "truth_source": "SZSE official announcement: *ST 东海 A risk warning effective 2021-04-27",
-        "source_ref": "SZSE official announcement: *ST 东海 A risk warning effective 2021-04-27 | https://disc.static.szse.cn/disc/disk02/finalpage/2021-04-24/780272c9-1bb5-4ce0-b6cf-6f95a71059be.PDF",
+        "provider_symbol": "688500.SH",
+        "trade_date": "20230505",
+        "truth_source": "SSE company announcement: 慧辰股份 risk-warning implementation effective 2023-05-05",
+        "source_ref": "SSE company announcement: 慧辰股份 risk-warning implementation effective 2023-05-05 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2023-04-29/688500_20230429_MZM6.pdf",
         "expected_fields": {
           "IS_ST_SEC": true
         },
-        "event_id": "ST-ADD-000613-20210427",
+        "event_id": "ST-ADD-688500-20230505",
         "event_class": "ST_TRANSITION",
-        "event_subtype": "ST_ADD",
-        "event_effective_date": "20210427"
+        "event_subtype": "STAR_ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "event_effective_date": "20230505"
       }
     },
     {
@@ -1527,6 +1605,7 @@
         "event_id": "ST-ADD-300064-20210428",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20210428"
       }
     },
@@ -1546,6 +1625,7 @@
         "event_id": "ST-ADD-300312-20210429",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20210429"
       }
     },
@@ -1565,6 +1645,7 @@
         "event_id": "ST-ADD-600593-20210722",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20210722"
       }
     },
@@ -1584,6 +1665,7 @@
         "event_id": "ST-ADD-002113-20200429",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20200429"
       }
     },
@@ -1603,6 +1685,7 @@
         "event_id": "ST-ADD-000806-20220506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220506"
       }
     },
@@ -1622,6 +1705,7 @@
         "event_id": "ST-ADD-002022-20220506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220506"
       }
     },
@@ -1641,6 +1725,7 @@
         "event_id": "ST-ADD-002417-20220421",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220421"
       }
     },
@@ -1660,6 +1745,7 @@
         "event_id": "ST-ADD-002781-20220506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220506"
       }
     },
@@ -1679,6 +1765,7 @@
         "event_id": "ST-ADD-000606-20220506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220506"
       }
     },
@@ -1698,6 +1785,7 @@
         "event_id": "ST-ADD-000995-20220429",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220429"
       }
     },
@@ -1717,6 +1805,7 @@
         "event_id": "ST-ADD-300336-20220429",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220429"
       }
     },
@@ -1736,6 +1825,7 @@
         "event_id": "ST-ADD-300297-20220429",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220429"
       }
     },
@@ -1755,6 +1845,7 @@
         "event_id": "ST-ADD-300330-20220808",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220808"
       }
     },
@@ -1774,6 +1865,7 @@
         "event_id": "ST-ADD-000410-20220419",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220419"
       }
     },
@@ -1793,6 +1885,7 @@
         "event_id": "ST-ADD-002485-20220506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220506"
       }
     },
@@ -1812,6 +1905,7 @@
         "event_id": "ST-ADD-000616-20230504",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230504"
       }
     },
@@ -1831,6 +1925,7 @@
         "event_id": "ST-ADD-000540-20230505",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230505"
       }
     },
@@ -1850,6 +1945,7 @@
         "event_id": "ST-ADD-002433-20230505",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230505"
       }
     },
@@ -1869,6 +1965,7 @@
         "event_id": "ST-ADD-002086-20230505",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230505"
       }
     },
@@ -1888,6 +1985,7 @@
         "event_id": "ST-ADD-300742-20230504",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230504"
       }
     },
@@ -1907,6 +2005,7 @@
         "event_id": "ST-ADD-300208-20240430",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240430"
       }
     },
@@ -1926,6 +2025,7 @@
         "event_id": "ST-ADD-002217-20240506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240506"
       }
     },
@@ -1945,6 +2045,7 @@
         "event_id": "ST-ADD-300108-20240430",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240430"
       }
     },
@@ -1964,6 +2065,7 @@
         "event_id": "ST-ADD-300209-20240429",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240429"
       }
     },
@@ -1983,6 +2085,7 @@
         "event_id": "ST-ADD-300167-20240430",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240430"
       }
     },
@@ -2002,6 +2105,7 @@
         "event_id": "ST-ADD-000525-20240919",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240919"
       }
     },
@@ -2021,6 +2125,7 @@
         "event_id": "ST-ADD-300506-20240429",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240429"
       }
     },
@@ -2040,6 +2145,7 @@
         "event_id": "ST-ADD-300965-20240429",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240429"
       }
     },
@@ -2059,6 +2165,7 @@
         "event_id": "ST-ADD-600213-20240506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240506"
       }
     },
@@ -2078,6 +2185,7 @@
         "event_id": "ST-ADD-603363-20240506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240506"
       }
     },
@@ -2097,26 +2205,28 @@
         "event_id": "ST-ADD-688282-20240506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "STAR_ST_ADD",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240506"
       }
     },
     {
       "op": "ADD",
-      "golden_case_id": "GT-H2-ST-ST_REMOVE-002681-20210413",
+      "golden_case_id": "GT-H2-ST-STAR_ST_REMOVE-688500-20240611",
       "case": {
-        "golden_case_id": "GT-H2-ST-ST_REMOVE-002681-20210413",
+        "golden_case_id": "GT-H2-ST-STAR_ST_REMOVE-688500-20240611",
         "case_type": "golden_st_transition",
-        "provider_symbol": "002681.SZ",
-        "trade_date": "20210413",
-        "truth_source": "SZSE official announcement: 002681 *ST removal effective 2021-04-13",
-        "source_ref": "SZSE official announcement: 002681 *ST removal effective 2021-04-13 | http://disc.static.szse.cn/download/disc/disk02/finalpage/2021-04-10/ff3c0039-575f-4554-8035-d061e882f2c7.PDF",
+        "provider_symbol": "688500.SH",
+        "trade_date": "20240611",
+        "truth_source": "SSE company announcement: 慧辰股份 risk-warning removal effective 2024-06-11",
+        "source_ref": "SSE company announcement: 慧辰股份 risk-warning removal effective 2024-06-11 | https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2024-06-07/688500_20240607_1TNQ.pdf",
         "expected_fields": {
           "IS_ST_SEC": false
         },
-        "event_id": "ST-REMOVE-002681-20210413",
+        "event_id": "ST-REMOVE-688500-20240611",
         "event_class": "ST_TRANSITION",
-        "event_subtype": "ST_REMOVE",
-        "event_effective_date": "20210413"
+        "event_subtype": "STAR_ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "event_effective_date": "20240611"
       }
     },
     {
@@ -2135,6 +2245,7 @@
         "event_id": "ST-REMOVE-000408-20210512",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20210512"
       }
     },
@@ -2154,6 +2265,7 @@
         "event_id": "ST-REMOVE-002513-20210621",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20210621"
       }
     },
@@ -2173,6 +2285,7 @@
         "event_id": "ST-REMOVE-002058-20220523",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220523"
       }
     },
@@ -2192,6 +2305,7 @@
         "event_id": "ST-REMOVE-000007-20220701",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220701"
       }
     },
@@ -2211,6 +2325,7 @@
         "event_id": "ST-REMOVE-002022-20230404",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230404"
       }
     },
@@ -2230,6 +2345,7 @@
         "event_id": "ST-REMOVE-300010-20240613",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240613"
       }
     },
@@ -2249,6 +2365,7 @@
         "event_id": "ST-REMOVE-002482-20240618",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240618"
       }
     },
@@ -2268,6 +2385,7 @@
         "event_id": "ST-REMOVE-002086-20240612",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240612"
       }
     },
@@ -2287,6 +2405,7 @@
         "event_id": "ST-REMOVE-002021-20240603",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240603"
       }
     },
@@ -2306,6 +2425,7 @@
         "event_id": "ST-REMOVE-300209-20250513",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20250513"
       }
     },
@@ -2325,6 +2445,7 @@
         "event_id": "ST-REMOVE-300965-20250506",
         "event_class": "ST_TRANSITION",
         "event_subtype": "ST_REMOVE",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20250506"
       }
     },
@@ -2344,6 +2465,7 @@
         "event_id": "DELIST-601558-20200702",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20200702"
       }
     },
@@ -2363,6 +2485,7 @@
         "event_id": "DELIST-600068-20210913",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20210913"
       }
     },
@@ -2382,6 +2505,7 @@
         "event_id": "DELIST-600145-20220428",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220428"
       }
     },
@@ -2401,6 +2525,7 @@
         "event_id": "DELIST-600093-20220623",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220623"
       }
     },
@@ -2420,6 +2545,7 @@
         "event_id": "DELIST-600695-20220614",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220614"
       }
     },
@@ -2439,6 +2565,7 @@
         "event_id": "DELIST-600781-20230628",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230628"
       }
     },
@@ -2458,6 +2585,7 @@
         "event_id": "DELIST-600225-20250306",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20250306"
       }
     },
@@ -2477,6 +2605,7 @@
         "event_id": "DELIST-600190-20250725",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20250725"
       }
     },
@@ -2496,6 +2625,7 @@
         "event_id": "DELIST-600837-20250304",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20250304"
       }
     },
@@ -2515,6 +2645,7 @@
         "event_id": "DELIST-601989-20250905",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20250905"
       }
     },
@@ -2534,6 +2665,7 @@
         "event_id": "DELIST-600462-20250721",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20250721"
       }
     },
@@ -2553,6 +2685,7 @@
         "event_id": "DELIST-600421-20260626",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20260626"
       }
     },
@@ -2572,6 +2705,7 @@
         "event_id": "DELIST-000611-20220628",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220628"
       }
     },
@@ -2591,6 +2725,7 @@
         "event_id": "DELIST-300064-20220627",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20220627"
       }
     },
@@ -2610,6 +2745,7 @@
         "event_id": "DELIST-000540-20230630",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230630"
       }
     },
@@ -2629,6 +2765,7 @@
         "event_id": "DELIST-300273-20230706",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230706"
       }
     },
@@ -2648,6 +2785,7 @@
         "event_id": "DELIST-002118-20230804",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20230804"
       }
     },
@@ -2667,6 +2805,7 @@
         "event_id": "DELIST-002610-20240812",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240812"
       }
     },
@@ -2686,6 +2825,7 @@
         "event_id": "DELIST-000982-20240812",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20240812"
       }
     },
@@ -2705,6 +2845,7 @@
         "event_id": "DELIST-300208-20250721",
         "event_class": "DELIST",
         "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
         "event_effective_date": "20250721"
       }
     },
@@ -2724,7 +2865,8 @@
         },
         "event_id": "RIGHT-ISSUE-002142-20211202",
         "event_class": "RIGHT_ISSUE_EX_DATE",
-        "event_subtype": ""
+        "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -2743,7 +2885,8 @@
         },
         "event_id": "RIGHT-ISSUE-300475-20230216",
         "event_class": "RIGHT_ISSUE_EX_DATE",
-        "event_subtype": ""
+        "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -2762,26 +2905,28 @@
         },
         "event_id": "RIGHT-ISSUE-002788-20200917",
         "event_class": "RIGHT_ISSUE_EX_DATE",
-        "event_subtype": ""
+        "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
       "op": "ADD",
-      "golden_case_id": "GT-H2-CA-RIGHT-002202-20190329",
+      "golden_case_id": "GT-H2-CA-RIGHT-601555-20200323",
       "case": {
-        "golden_case_id": "GT-H2-CA-RIGHT-002202-20190329",
+        "golden_case_id": "GT-H2-CA-RIGHT-601555-20200323",
         "case_type": "golden_corporate_action",
-        "provider_symbol": "002202.SZ",
-        "trade_date": "20190329",
-        "truth_source": "SZSE company announcement: 金风科技配股除权日 2019-03-29",
-        "source_ref": "SZSE company announcement: 金风科技配股除权日 2019-03-29 | http://disc.static.szse.cn/disc/disk01/finalpage/2019-03-29/27a8f9a6-cfe2-41bb-a9c7-149f5219f383.PDF",
+        "provider_symbol": "601555.SH",
+        "trade_date": "20200323",
+        "truth_source": "CNINFO company announcement: 东吴证券配股除权日 2020-03-23",
+        "source_ref": "CNINFO company announcement: 东吴证券配股除权日 2020-03-23 | https://static.cninfo.com.cn/finalpage/2020-03-23/1207391500.PDF",
         "expected_fields": {
           "IS_WD_SEC": true,
           "event_type": "RIGHT_ISSUE"
         },
-        "event_id": "RIGHT-ISSUE-002202-20190329",
+        "event_id": "RIGHT-ISSUE-601555-20200323",
         "event_class": "RIGHT_ISSUE_EX_DATE",
-        "event_subtype": ""
+        "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     },
     {
@@ -2792,15 +2937,16 @@
         "case_type": "golden_corporate_action",
         "provider_symbol": "000750.SZ",
         "trade_date": "20200114",
-        "truth_source": "CNINFO annual report: 国海证券配股除权日 2020-01-14",
-        "source_ref": "CNINFO annual report: 国海证券配股除权日 2020-01-14 | http://static.cninfo.com.cn/finalpage/2025-03-29/1222948083.PDF",
+        "truth_source": "CNINFO company announcement: 国海证券配股除权日 2020-01-14",
+        "source_ref": "CNINFO company announcement: 国海证券配股除权日 2020-01-14 | https://static.cninfo.com.cn/finalpage/2020-01-09/1207235277.PDF",
         "expected_fields": {
           "IS_WD_SEC": true,
           "event_type": "RIGHT_ISSUE"
         },
         "event_id": "RIGHT-ISSUE-000750-20200114",
         "event_class": "RIGHT_ISSUE_EX_DATE",
-        "event_subtype": ""
+        "event_subtype": "",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
       }
     }
   ]

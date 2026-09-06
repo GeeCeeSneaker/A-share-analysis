@@ -381,3 +381,51 @@ class TestStructuralEventIdentity:
         replaced = next(case for case in cases if case.golden_case_id == replacement_id)
         assert replaced.event_effective_date == "20190506"
         assert (golden_env / "golden_cases_v3.jsonl").read_bytes() == legacy_bytes
+
+    def test_rebuild_rekey_requires_explicit_opt_in(self, golden_env: Path):
+        active = json.loads((golden_env / "truth_manifest.json").read_text(encoding="utf-8"))
+        source = [
+            json.loads(line)
+            for line in (golden_env / str(active["dataset_file"]))
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line
+        ]
+        source_id = "GT-CA-600519-20220630"
+        replacement = next(doc for doc in source if doc["golden_case_id"] == source_id).copy()
+        replacement["golden_case_id"] = "GT-CA-600519-20220701"
+        replacement["trade_date"] = "20220701"
+        operations = []
+        for doc in source:
+            if doc["golden_case_id"] == source_id:
+                operations.append(
+                    {"op": "REPLACE", "golden_case_id": source_id, "case": replacement}
+                )
+            elif doc["event_class"] in {"ST_TRANSITION", "DELIST"}:
+                operations.append({"op": "DROP", "golden_case_id": doc["golden_case_id"]})
+            else:
+                operations.append({"op": "KEEP", "golden_case_id": doc["golden_case_id"]})
+        plan = golden_env.parent / "rekey.json"
+        rekey_operation = next(op for op in operations if op["golden_case_id"] == source_id)
+
+        def write_plan(allow_rekey: bool):
+            payload = {
+                "source_truth_version": active["truth_version"],
+                "source_dataset_hash": active["dataset_hash"],
+                "operations": operations,
+            }
+            if allow_rekey:
+                rekey_operation["allow_rekey"] = True
+            plan.write_text(json.dumps(payload), encoding="utf-8")
+
+        write_plan(False)
+        rejected = _run_candidate(golden_env, "rebuild", "--plan", str(plan))
+        assert rejected.returncode != 0
+        assert "allow_rekey" in rejected.stderr
+
+        write_plan(True)
+        accepted = _run_candidate(golden_env, "rebuild", "--plan", str(plan))
+        assert accepted.returncode == 0, accepted.stderr
+        cases, _ = GoldenTruthStore(golden_env).load()
+        assert any(case.golden_case_id == "GT-CA-600519-20220701" for case in cases)
+        assert not any(case.golden_case_id == source_id for case in cases)
