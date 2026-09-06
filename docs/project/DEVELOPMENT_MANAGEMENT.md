@@ -2,7 +2,7 @@
 
 ## DM-20260906-106 · GT-H1 Golden Truth structural identity / rebuild toolchain
 
-**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_FINAL_CI
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
 **Review Status**：PENDING_REVIEW；本批不自行 CLOSE / MERGE。
 **Base SHA**：`8f2ccb52a5ed2a58ef916a16a9c7e756173b08fd`
 **Authority**：[PR15 关闭与 GoldenTruth 重建工作要求](../design/A-share-analysis_PR15关闭与GoldenTruth重建工作要求_20260906.md)；GT-H1。
@@ -20,12 +20,12 @@
 **Evidence separation**
 
 - 本地定向 Golden 回归 56 passed；Ruff 与 `golden_store.py` mypy 定向检查通过。
-- 最终三平台完整 pytest、Ruff/format/mypy、Spike、SDK-absent 和治理门禁必须以本批 PR head 的 GitHub Actions 为权威；当前不预填成功结论。
+- PR #16 的 GitHub Actions run 313 已完成：Windows 3.12、Windows 3.14、Ubuntu 3.14 三条 required CI 全绿，且 pytest、Ruff/format/mypy、Spike、SDK-absent、DEVLOG 和管理文档门禁均成功；独立 Reviewer closure 仍待完成。
 - v3 candidate 文件未被改写；本批没有新增 Golden 事实、账号信息或专有依赖，Formal Production 仍按 PR15 记录为 NOT AUTHORIZED。
 
 **Required next work**
 
-1. 由 GitHub Actions 完成三平台 required CI，并由独立 Reviewer 审阅 focused PR；合并前不运行真实 T1。
+1. 由独立 Reviewer 审阅 PR #16 并决定是否合并；合并前不运行真实 T1。
 2. 合并后按 GT-H2 重建真实 reviewed corpus：只使用可回溯来源填写有效 `event_effective_date`，不得用 `trade_date` 或自由 `event_id` 补数。
 3. GT-H3 完成 reviewed version seal、bound replay 与 Formal gate 复核后，才能重新评估 Production 和 Data Sufficiency。
 

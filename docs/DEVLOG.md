@@ -2,16 +2,16 @@
 
 **Implementation Status / Review Status**
 
-- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_FINAL_CI / PENDING_REVIEW**：以当前 `main` `8f2ccb52a5ed2a58ef916a16a9c7e756173b08fd` 为基线，落实 [PR15 关闭与 GoldenTruth 重建工作要求](design/A-share-analysis_PR15关闭与GoldenTruth重建工作要求_20260906.md) 的 GT-H1 工具链范围。
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_REVIEW**：以当前 `main` `8f2ccb52a5ed2a58ef916a16a9c7e756173b08fd` 为基线，落实 [PR15 关闭与 GoldenTruth 重建工作要求](design/A-share-analysis_PR15关闭与GoldenTruth重建工作要求_20260906.md) 的 GT-H1 工具链范围；[PR #16](https://github.com/GeeCeeSneaker/A-share-analysis/pull/16) 的 GitHub Actions [run 313](https://github.com/GeeCeeSneaker/A-share-analysis/actions/runs/34001128529) 三平台 required CI 已全绿，独立 Reviewer closure 仍待完成。
 - `golden_store.py` 现在只接受显式、严格校验的 ST/DELIST `event_effective_date`；旧 v1–v3 数据文件保持可加载，但缺失有效事件日期时只能在 Formal gate 中 fail-closed，绝不回退到 `trade_date`。结构统计统一由 `(provider_symbol, event_effective_date, event_subtype)` / `(provider_symbol, event_effective_date)` 重算。
 - `scripts/golden/candidate.py rebuild --plan` 提供追加式 KEEP/REPLACE/DROP/ADD 重建：精确绑定源 `truth_version` 与 dataset SHA256，要求每条旧记录恰好一个操作，完整输出在内存中校验后才 create-only 写入新 dataset/manifest，最后才原子更新 ACTIVE；旧 `build-version` 隐式追加入口已禁用。新版本所有记录为 COMPILED，review provenance 仍只能由 `review.py` 产生。
 - manifest schema v2 增加并校验结构化 ST 数量、ADD/REMOVE 数量、DELIST 结构事件数量及 distinct delisted securities；v4+ semantic hash 纳入事件身份字段，v1–v3 继续使用其不可变旧 hash 合约。`review.py` 也拒绝把缺少结构事件日期的记录提升为 REVIEWED，并使用同一统计/自校验路径。
-- 本地 Windows Python 3.14.6 定向 Golden 回归 **56 passed**；Ruff 与 `golden_store.py` mypy 定向检查通过。该记录尚未宣称最终三平台 CI、Reviewer closure、GT-H2 reviewed corpus 或 Formal Production 授权完成。
+- 本地 Windows Python 3.14.6 定向 Golden 回归 **56 passed**；Ruff 与 `golden_store.py` mypy 定向检查通过。run 313 的 Windows 3.12、Windows 3.14、Ubuntu 3.14 全量 CI 均成功，包含 pytest、Spike gates、SDK-absent、DEVLOG 和管理文档门禁；Reviewer closure、GT-H2 reviewed corpus 或 Formal Production 授权仍未完成。
 - 未新增或修改任何 Golden 事实；未执行账号登录、T1/T2/T3、B1–B7、Data Sufficiency 或 2020+ 回填；凭证、Token、端点、原始 SDK 输出和专有 wheel 均未进入 GitHub。
 
 **Next**
 
-- 将本批代码、测试和治理文档作为单一 GitHub 提交提交 focused PR；等待 Ubuntu 3.14、Windows 3.12、Windows 3.14 三条 required CI 全绿及独立 Reviewer 审阅。
+- PR #16 的三平台 required CI 已全绿；下一步等待独立 Reviewer 审阅并按项目规则决定是否合并，本批不自行批准或合并。
 - GT-H1 关闭并合并后，按文档由人工提供真实、可追溯的结构事件事实执行 GT-H2；在 GT-H1/H2/H3 完成前继续保持正式 Production、Golden backfill 和 Data Sufficiency 冻结。
 
 ## 2026-09-05 · AUDIT-H1 CI corrective follow-up
