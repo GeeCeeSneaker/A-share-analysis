@@ -1175,7 +1175,13 @@ def _packet_row(doc: dict[str, Any], registry_by_id: dict[str, dict[str, Any]]) 
 
 
 def _short_hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # GitHub stores the JSON manifests without a terminal LF; local snapshots
+    # may add one. Dataset JSONL hashes remain exact because their terminal LF
+    # is part of the existing binding.
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    if path.suffix == ".json" and data.endswith(b"\n"):
+        data = data[:-1]
+    return hashlib.sha256(data).hexdigest()
 
 
 def _distribution(rows: list[dict[str, Any]], event_class: str) -> dict[str, Any]:
@@ -1306,7 +1312,7 @@ def finalize() -> None:
         "",
         "## Immutable lineage evidence",
         "",
-        "The following hashes were computed locally from the versioned files and must remain unchanged:",
+        "The following hashes use repository-canonical text bytes (LF; JSON manifests ignore one local terminal LF) and must remain unchanged:",
         "",
         "| File | SHA256 |",
         "| --- | --- |",

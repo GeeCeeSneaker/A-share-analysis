@@ -46,15 +46,15 @@ All old v1/v2/v3 files remain immutable inputs; the plan does not edit or rewrit
 
 ## Immutable lineage evidence
 
-The following hashes were computed locally from the versioned files and must remain unchanged:
+The following hashes use repository-canonical text bytes (LF; JSON manifests ignore one local terminal LF) and must remain unchanged:
 
 | File | SHA256 |
 | --- | --- |
 | `golden_cases_v1.jsonl` | `b19b807612ca20436aeb766ba216ff47880c9ed6bd5843e446e547841612c1c8` |
 | `golden_cases_v2.jsonl` | `d36c1845c0780a3a063919062c3a55aa2227e98152a1993319a0f1cf4b3c1631` |
 | `golden_cases_v3.jsonl` | `ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e` |
-| `truth_manifest_v2.json` | `b9f9377a69050d48ac9b8b2ec4a87ef75bd34bd0b4318d42f0bfcdf162ac209d` |
-| `truth_manifest_v3.json` | `3402d8689575ae7e3920bd05773dc528d3e5866c640ab37587dfa21854702a18` |
+| `truth_manifest_v2.json` | `902eee047d73b578a3de28fd0e9f610a52dadf5f836ae9b5b6eef21195f8ca80` |
+| `truth_manifest_v3.json` | `9f77fc6e6487f7ffa97b3d56647ad9008ca9ebd06f3788f73a63f492028e1937` |
 
 ## Human review hand-off
 

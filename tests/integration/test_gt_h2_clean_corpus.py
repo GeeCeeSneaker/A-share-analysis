@@ -23,6 +23,15 @@ def _jsonl(path: Path) -> list[dict]:
     ]
 
 
+def _repository_text_hash(path: Path) -> str:
+    """Hash repository-canonical text bytes across local line-ending snapshots."""
+
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    if path.suffix == ".json" and data.endswith(b"\n"):
+        data = data[:-1]
+    return hashlib.sha256(data).hexdigest()
+
+
 class TestGTH2CleanCorpus:
     def test_active_candidate_passes_clean_readiness_and_all_non_review_gates(self):
         store = GoldenTruthStore(GOLDEN_ROOT)
@@ -112,14 +121,14 @@ class TestGTH2CleanCorpus:
             ),
             "golden_cases_v3.jsonl": V3_HASH,
             "truth_manifest_v2.json": (
-                "b9f9377a69050d48ac9b8b2ec4a87ef75bd34bd0b4318d42f0bfcdf162ac209d"
+                "902eee047d73b578a3de28fd0e9f610a52dadf5f836ae9b5b6eef21195f8ca80"
             ),
             "truth_manifest_v3.json": (
-                "3402d8689575ae7e3920bd05773dc528d3e5866c640ab37587dfa21854702a18"
+                "9f77fc6e6487f7ffa97b3d56647ad9008ca9ebd06f3788f73a63f492028e1937"
             ),
         }
         for name, expected in expected_hashes.items():
-            assert hashlib.sha256((GOLDEN_ROOT / name).read_bytes()).hexdigest() == expected
+            assert _repository_text_hash(GOLDEN_ROOT / name) == expected
 
     def test_review_packet_has_exact_coverage_and_official_references(self):
         cases, _ = GoldenTruthStore(GOLDEN_ROOT).load()
