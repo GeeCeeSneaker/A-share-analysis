@@ -10,14 +10,20 @@ Hard rules:
   (R4A2-P1-06 option A).
 - Batch mode validates ALL entries (kind allowlist included) BEFORE
   writing anything; a failure leaves no orphan evidence (R4A2-P1-05).
+- A publishing invocation must cover every ACTIVE case exactly once.  A
+  single-case invocation is valid only when the ACTIVE dataset itself has
+  one case; review packets may be prepared incrementally, but ACTIVE
+  publication is an atomic full-corpus seal (GT-H1.2).
 - Versioned dataset/manifest files are create-only: same bytes are an
   idempotent no-op, different bytes BLOCK (R4A2-P1-04).
 - The ACTIVE pointer moves via staging + atomic replace.
 - COMPILED provenance is preserved untouched.
 
-    python scripts/golden/review.py --case GT-ST-600518-20190506 \
-        --artifact evidence-src/kangmei.txt \
-        --kind SSE_ANNOUNCEMENT --reviewer alice --note "verified"
+    python scripts/golden/review.py --manifest review-batch.json \
+        --reviewer alice
+
+  ``review-batch.json`` must contain one entry for every case in the clean
+  ACTIVE candidate, with each ``case`` ID appearing exactly once.
 """
 
 from __future__ import annotations
@@ -26,12 +32,24 @@ import argparse
 import hashlib
 import json
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from ashare_state.spike.golden_store import VALID_ARTIFACT_KINDS  # noqa: E402
+from ashare_state.spike.golden_store import (  # noqa: E402
+    VALID_ARTIFACT_KINDS,
+    GoldenTruthError,
+    GoldenTruthStore,
+    StructuralEventError,
+    cases_from_dataset_bytes,
+    recompute_manifest_statistics,
+    review_readiness_gate,
+    semantic_hash_for_doc,
+    validate_structural_event_fields,
+)
 
 GOLDEN_ROOT = Path("data/golden/provider/amazingdata")
 EVIDENCE_DIR = GOLDEN_ROOT / "evidence"
@@ -51,6 +69,124 @@ def _validate_artifact_kind(kind: str) -> None:
         raise ReviewError(msg)
 
 
+def _validate_review_coverage(lines: list[dict], submitted_case_ids: list[str]) -> None:
+    """Require one publishing entry for every ACTIVE case (GT-H1.2)."""
+    active_case_ids = [str(doc.get("golden_case_id", "")) for doc in lines]
+    if not active_case_ids:
+        raise ReviewError("active dataset has no cases to review")
+    if any(not case_id for case_id in active_case_ids):
+        raise ReviewError("active dataset contains a case with an empty golden_case_id")
+
+    def duplicates(values: list[str]) -> list[str]:
+        counts: dict[str, int] = {}
+        for value in values:
+            counts[value] = counts.get(value, 0) + 1
+        return sorted(value for value, count in counts.items() if count > 1)
+
+    active_duplicates = duplicates(active_case_ids)
+    if active_duplicates:
+        raise ReviewError(
+            "active dataset contains duplicate golden_case_id values: "
+            + ", ".join(active_duplicates[:5])
+        )
+
+    submitted_duplicates = duplicates(submitted_case_ids)
+    if submitted_duplicates:
+        raise ReviewError(
+            "review batch contains duplicate case IDs: "
+            + ", ".join(submitted_duplicates[:5])
+            + "; each ACTIVE golden_case_id must appear exactly once"
+        )
+
+    active_set = set(active_case_ids)
+    submitted_set = set(submitted_case_ids)
+    foreign = sorted(submitted_set - active_set)
+    if foreign:
+        raise ReviewError("review batch contains foreign case IDs: " + ", ".join(foreign[:5]))
+
+    missing = sorted(active_set - submitted_set)
+    if missing or len(submitted_case_ids) != len(active_case_ids):
+        suffix = ", ".join(missing[:5]) if missing else "case-count mismatch"
+        raise ReviewError(
+            "review batch must cover every active case exactly once; missing: " + suffix
+        )
+
+
+def _load_review_requests(args: argparse.Namespace) -> list[dict]:
+    """Parse review inputs without reading or writing evidence."""
+    if args.manifest and any((args.case, args.artifact, args.kind, args.expect_fields)):
+        raise ReviewError("--manifest cannot be combined with --case/--artifact/--kind")
+
+    if args.manifest:
+        try:
+            raw_entries = json.loads(args.manifest.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ReviewError(f"cannot read review manifest: {exc}") from exc
+        if not isinstance(raw_entries, list):
+            raise ReviewError("review manifest must be a JSON list")
+
+        requests: list[dict] = []
+        for index, entry in enumerate(raw_entries, start=1):
+            if not isinstance(entry, dict):
+                raise ReviewError(f"review manifest entry {index} must be a JSON object")
+            missing = [field for field in ("case", "artifact", "kind") if field not in entry]
+            if missing:
+                raise ReviewError(
+                    f"review manifest entry {index} is missing required fields: {missing}"
+                )
+            case_id = entry["case"]
+            artifact = entry["artifact"]
+            kind = entry["kind"]
+            if not isinstance(case_id, str) or not case_id:
+                raise ReviewError(f"review manifest entry {index} has an invalid case ID")
+            if not isinstance(artifact, str) or not artifact:
+                raise ReviewError(f"review manifest entry {index} has an invalid artifact path")
+            if not isinstance(kind, str) or not kind:
+                raise ReviewError(f"review manifest entry {index} has an invalid artifact kind")
+            expect_fields = entry.get("expect_fields")
+            if expect_fields is not None and not isinstance(expect_fields, dict):
+                raise ReviewError(f"review manifest entry {index} expect_fields must be an object")
+            requests.append(
+                {
+                    "case": case_id,
+                    "artifact": Path(artifact),
+                    "kind": kind,
+                    "note": entry.get("note", ""),
+                    "expect_fields": expect_fields,
+                }
+            )
+        return requests
+
+    missing = [
+        name
+        for name, value in (
+            ("--case", args.case),
+            ("--artifact", args.artifact),
+            ("--kind", args.kind),
+        )
+        if value is None
+    ]
+    if missing:
+        raise ReviewError(f"missing arguments: {missing} (or use --manifest)")
+    expect_fields = None
+    if args.expect_fields:
+        try:
+            expect_fields = json.loads(args.expect_fields)
+        except json.JSONDecodeError as exc:
+            raise ReviewError(f"--expect-fields must be valid JSON: {exc}") from exc
+        if not isinstance(expect_fields, dict):
+            raise ReviewError("--expect-fields must be a JSON object")
+    return [
+        {
+            "case": args.case,
+            "artifact": args.artifact,
+            "kind": args.kind,
+            "note": args.note,
+            "expect_fields": expect_fields,
+        }
+    ]
+
+
 # ---------------------------------------------------------------- loading
 
 
@@ -64,6 +200,13 @@ def _load_active() -> tuple[Path, dict, list[dict]]:
     if hashlib.sha256(dataset.read_bytes()).hexdigest() != active["dataset_hash"]:
         msg = "active dataset hash mismatch - dataset file modified"
         raise ReviewError(msg)
+    try:
+        cases, manifest = GoldenTruthStore(GOLDEN_ROOT).load()
+    except (GoldenTruthError, KeyError, OSError, ValueError) as exc:
+        raise ReviewError(f"active dataset cannot be used for review: {exc}") from exc
+    readiness_problems = review_readiness_gate(cases, manifest)
+    if readiness_problems:
+        raise ReviewError("; ".join(readiness_problems))
     lines = [
         json.loads(line)
         for line in dataset.read_text(encoding="utf-8").splitlines()
@@ -73,22 +216,7 @@ def _load_active() -> tuple[Path, dict, list[dict]]:
 
 
 def _semantic_hash(doc: dict) -> str:
-    statement = json.dumps(
-        {
-            "golden_case_id": doc["golden_case_id"],
-            "case_type": doc["case_type"],
-            "provider_symbol": doc["provider_symbol"],
-            "trade_date": doc["trade_date"],
-            "expected_fields": doc["expected_fields"],
-            "truth_source": doc["truth_source"],
-            "source_ref": doc["source_ref"],
-            "source_artifact_hash": doc.get("source_artifact_hash", ""),
-            "truth_version": doc["truth_version"],
-        },
-        sort_keys=True,
-        ensure_ascii=False,
-    )
-    return hashlib.sha256(statement.encode("utf-8")).hexdigest()
+    return semantic_hash_for_doc(doc)
 
 
 # ---------------------------------------------------------------- staging
@@ -131,6 +259,18 @@ def _apply_review(
         if doc["review_status"] != "COMPILED":
             msg = f"case {case_id} is already {doc['review_status']}"
             raise ReviewError(msg)
+        try:
+            validate_structural_event_fields(
+                case_id=case_id,
+                event_class=doc.get("event_class", ""),
+                provider_symbol=doc.get("provider_symbol"),
+                event_subtype=doc.get("event_subtype", ""),
+                event_effective_date=doc.get("event_effective_date", ""),
+            )
+        except StructuralEventError as exc:
+            raise ReviewError(
+                f"case {case_id}: incomplete structural event; review cannot promote it: {exc}"
+            ) from exc
         if expect_fields is not None:
             doc["expected_fields"] = expect_fields
         doc["source_artifact_ref"] = artifact_ref
@@ -150,17 +290,22 @@ def _apply_review(
 # ----------------------------------------------------------------- commit
 
 
-def _commit_evidence(staged: list[tuple[Path, str]]) -> None:
+def _commit_evidence(staged: list[tuple[Path, str, str]]) -> None:
     """Copy staged artifacts into the evidence store (create-only)."""
-    for source, ref in staged:
+    for source, ref, expected_hash in staged:
         target = EVIDENCE_DIR / ref
-        target.parent.mkdir(parents=True, exist_ok=True)
         data = source.read_bytes()
+        actual_hash = hashlib.sha256(data).hexdigest()
+        if actual_hash != expected_hash:
+            raise ReviewError(
+                f"artifact changed after staging: {source} no longer matches {expected_hash}"
+            )
         if target.exists():
-            if hashlib.sha256(target.read_bytes()).hexdigest() != hashlib.sha256(data).hexdigest():
+            if hashlib.sha256(target.read_bytes()).hexdigest() != expected_hash:
                 msg = f"evidence {ref} already exists with different bytes"
                 raise ReviewError(msg)
             continue  # idempotent
+        target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_suffix(target.suffix + ".tmp")
         tmp.write_bytes(data)
         tmp.replace(target)
@@ -185,50 +330,125 @@ def _create_only_write(path: Path, data: bytes) -> None:
 def _atomic_active_pointer(manifest: dict) -> None:
     """Move the ACTIVE pointer via staging + atomic replace."""
     active_path = GOLDEN_ROOT / "truth_manifest.json"
-    staging = active_path.with_suffix(".json.tmp")
-    staging.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n"
+    staging = active_path.with_name(f".{active_path.name}.{uuid4().hex}.tmp")
+    try:
+        staging.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n"
+        )
+        staging.replace(active_path)
+    finally:
+        staging.unlink(missing_ok=True)
+
+
+@dataclass(frozen=True)
+class _PreparedReview:
+    truth_version: str
+    dataset_path: Path
+    dataset_bytes: bytes
+    manifest_path: Path
+    manifest_bytes: bytes
+    manifest: dict
+
+
+def _prepare_new_version(
+    lines: list[dict], old_active: dict, staged_hashes: dict[str, str] | None = None
+) -> _PreparedReview:
+    """Build and fully validate the reviewed version without writing it."""
+    if not lines:
+        raise ReviewError("cannot publish a reviewed dataset with no cases")
+
+    old_version = str(old_active["truth_version"])
+    num = "".join(ch for ch in old_version.split("-")[0][1:] if ch.isdigit()) or "1"
+    truth_version = f"v{int(num) + 1}-reviewed-{datetime.now(UTC).strftime('%Y%m%d')}"
+    final_lines: list[dict] = []
+    for original in lines:
+        doc = dict(original)
+        doc["truth_version"] = truth_version
+        doc["case_semantic_hash"] = _semantic_hash(doc)
+        final_lines.append(doc)
+
+    if staged_hashes is not None:
+        for doc in final_lines:
+            ref = str(doc.get("source_artifact_ref", ""))
+            digest = str(doc.get("source_artifact_hash", ""))
+            if staged_hashes.get(ref) != digest:
+                raise ReviewError(
+                    f"{doc.get('golden_case_id')}: reviewed artifact binding was not staged"
+                )
+
+    dataset_file = f"golden_cases_{truth_version.split('-')[0]}.jsonl"
+    payload = "".join(json.dumps(c, ensure_ascii=False, sort_keys=True) + "\n" for c in final_lines)
+    try:
+        cases = cases_from_dataset_bytes(payload.encode("utf-8"), truth_version)
+    except GoldenTruthError as exc:
+        raise ReviewError(f"reviewed dataset failed loader self-validation: {exc}") from exc
+    stats = recompute_manifest_statistics(cases)
+    expected_review_summary = {"REVIEWED": len(cases)}
+    if stats["review_summary"] != expected_review_summary:
+        raise ReviewError(
+            "reviewed output must be a complete REVIEWED seal: "
+            f"expected {expected_review_summary}, got {stats['review_summary']}"
+        )
+    dataset_bytes = payload.encode("utf-8")
+    dataset_path = GOLDEN_ROOT / dataset_file
+    dataset_hash = hashlib.sha256(dataset_bytes).hexdigest()
+    manifest = {
+        "manifest_schema": 2,
+        "truth_version": truth_version,
+        "dataset_file": dataset_file,
+        "dataset_hash": dataset_hash,
+        "case_count": stats["case_count"],
+        "counts_by_type": stats["counts_by_type"],
+        "review_summary": stats["review_summary"],
+        "distinct_events": stats["distinct_events"],
+        "distinct_securities": stats["distinct_securities"],
+        "st_add_events": stats["st_add_events"],
+        "st_remove_events": stats["st_remove_events"],
+        "distinct_delisted_securities": stats["distinct_delisted_securities"],
+    }
+    manifest_file = GOLDEN_ROOT / f"truth_manifest_{truth_version.split('-')[0]}.json"
+    manifest_bytes = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
+    return _PreparedReview(
+        truth_version=truth_version,
+        dataset_path=dataset_path,
+        dataset_bytes=dataset_bytes,
+        manifest_path=manifest_file,
+        manifest_bytes=manifest_bytes,
+        manifest=manifest,
     )
-    staging.replace(active_path)
+
+
+def _preflight_create_only(path: Path, data: bytes) -> None:
+    """Check immutable version collisions before any evidence is committed."""
+    if path.exists() and path.read_bytes() != data:
+        raise ReviewError(f"versioned file {path.name} already exists with different bytes")
+
+
+def _preflight_evidence(staged: list[tuple[Path, str, str]]) -> None:
+    """Validate every source and existing content-addressed target pre-commit."""
+    for source, ref, expected_hash in staged:
+        data = source.read_bytes()
+        actual_hash = hashlib.sha256(data).hexdigest()
+        if actual_hash != expected_hash:
+            raise ReviewError(
+                f"artifact changed after staging: {source} no longer matches {expected_hash}"
+            )
+        target = EVIDENCE_DIR / ref
+        if target.exists() and target.read_bytes() != data:
+            raise ReviewError(f"evidence {ref} already exists with different bytes")
+
+
+def _publish_new_version(prepared: _PreparedReview) -> str:
+    """Publish a prevalidated version and move ACTIVE last."""
+    _create_only_write(prepared.dataset_path, prepared.dataset_bytes)
+    _create_only_write(prepared.manifest_path, prepared.manifest_bytes)
+    _atomic_active_pointer(prepared.manifest)
+    return prepared.truth_version
 
 
 def _write_new_version(lines: list[dict], old_active: dict) -> str:
     """Write the next dataset version (create-only) + move ACTIVE."""
-    old_version = str(old_active["truth_version"])
-    num = "".join(ch for ch in old_version.split("-")[0][1:] if ch.isdigit()) or "1"
-    truth_version = f"v{int(num) + 1}-reviewed-{datetime.now(UTC).strftime('%Y%m%d')}"
-    for doc in lines:
-        doc["truth_version"] = truth_version
-        doc["case_semantic_hash"] = _semantic_hash(doc)
-    dataset_file = f"golden_cases_{truth_version.split('-')[0]}.jsonl"
-    payload = "".join(json.dumps(c, ensure_ascii=False, sort_keys=True) + "\n" for c in lines)
-    dataset_path = GOLDEN_ROOT / dataset_file
-    _create_only_write(dataset_path, payload.encode("utf-8"))
-    dataset_hash = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
-
-    counts: dict[str, int] = {}
-    review: dict[str, int] = {}
-    events: dict[str, set[str]] = {}
-    for c in lines:
-        counts[c["case_type"]] = counts.get(c["case_type"], 0) + 1
-        review[c["review_status"]] = review.get(c["review_status"], 0) + 1
-        events.setdefault(c["event_class"], set()).add(c["event_id"])
-    manifest = {
-        "truth_version": truth_version,
-        "dataset_file": dataset_file,
-        "dataset_hash": dataset_hash,
-        "case_count": len(lines),
-        "counts_by_type": counts,
-        "review_summary": review,
-        "distinct_events": {k: len(v) for k, v in events.items()},
-    }
-    manifest_file = GOLDEN_ROOT / f"truth_manifest_{truth_version.split('-')[0]}.json"
-    _create_only_write(
-        manifest_file,
-        json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
-    )
-    _atomic_active_pointer(manifest)
-    return truth_version
+    return _publish_new_version(_prepare_new_version(lines, old_active))
 
 
 # ------------------------------------------------------------------- main
@@ -254,40 +474,24 @@ def main() -> int:
     dataset, active, lines = _load_active()
     _ = dataset
 
+    requests = _load_review_requests(args)
+    _validate_review_coverage(lines, [request["case"] for request in requests])
+
     # -------- stage ALL entries first (P1-05: no orphan evidence) --------
-    staged_artifacts: list[tuple[Path, str]] = []
+    staged_artifacts: list[tuple[Path, str, str]] = []
     entries: list[dict] = []
-    if args.manifest:
-        raw_entries = json.loads(args.manifest.read_text(encoding="utf-8"))
-        for entry in raw_entries:
-            ref, digest, retrieved = _stage_artifact(Path(entry["artifact"]), entry["kind"])
-            staged_artifacts.append((Path(entry["artifact"]), ref))
-            entries.append(
-                {
-                    "case": entry["case"],
-                    "ref": ref,
-                    "digest": digest,
-                    "retrieved": retrieved,
-                    "kind": entry["kind"],
-                    "note": entry.get("note", ""),
-                    "expect_fields": entry.get("expect_fields"),
-                }
-            )
-    else:
-        missing = [f for f in (args.case, args.artifact, args.kind) if not f]
-        if missing:
-            parser.error(f"missing arguments: {missing} (or use --manifest)")
-        ref, digest, retrieved = _stage_artifact(args.artifact, args.kind)
-        staged_artifacts.append((args.artifact, ref))
+    for request in requests:
+        ref, digest, retrieved = _stage_artifact(request["artifact"], request["kind"])
+        staged_artifacts.append((request["artifact"], ref, digest))
         entries.append(
             {
-                "case": args.case,
+                "case": request["case"],
                 "ref": ref,
                 "digest": digest,
                 "retrieved": retrieved,
-                "kind": args.kind,
-                "note": args.note,
-                "expect_fields": json.loads(args.expect_fields) if args.expect_fields else None,
+                "kind": request["kind"],
+                "note": request["note"],
+                "expect_fields": request["expect_fields"],
             }
         )
 
@@ -305,9 +509,19 @@ def main() -> int:
             expect_fields=entry["expect_fields"],
         )
 
+    # -------- preflight the complete output before any durable publication --
+    prepared = _prepare_new_version(
+        lines,
+        active,
+        staged_hashes={ref: digest for _, ref, digest in staged_artifacts},
+    )
+    _preflight_create_only(prepared.dataset_path, prepared.dataset_bytes)
+    _preflight_create_only(prepared.manifest_path, prepared.manifest_bytes)
+    _preflight_evidence(staged_artifacts)
+
     # -------- commit: evidence -> version -> ACTIVE pointer ---------------
     _commit_evidence(staged_artifacts)
-    version = _write_new_version(lines, active)
+    version = _publish_new_version(prepared)
     reviewed = sum(1 for c in lines if c["review_status"] == "REVIEWED")
     print(f"reviewed dataset version: {version}")
     print(f"cases: {reviewed} REVIEWED")

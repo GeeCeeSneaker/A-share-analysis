@@ -59,6 +59,66 @@ uv run python scripts/spike/spike_runner.py --trial --date <as-of>
 
 Trial 与 dry-run 的目录、身份和证据必须与 Production 物理隔离。
 
+### 2.4 Golden Truth GT-H1 重建门禁
+
+正式 Production、Golden backfill 和 Data Sufficiency 在 GT-H1/H2/H3 完成前均不得启动。现有 v3 candidate 的 ST/DELIST 记录中，部分只有观察日，没有可验证的结构事件生效日；它们可以被旧 loader 读取，但不能通过 Formal gate，也不能被 review workflow 提升为 `REVIEWED`。
+
+候选重建必须显式绑定当前 ACTIVE 的 `truth_version` 和 dataset SHA256，并为每一条源记录提供且只提供一个操作：`KEEP`、`REPLACE` 或 `DROP`；新事实只能使用 `ADD`。`REPLACE`/`ADD` 必须带完整 COMPILED candidate，结构化 ST/DELIST 必须提供严格 `YYYYMMDD` 的 `event_effective_date`。`golden_case_id` 必须唯一，但不同观察日的多个案例可以共享同一 `(provider_symbol, event_effective_date, event_subtype)` 或 `(provider_symbol, event_effective_date)` 结构身份；重建允许这些重复观察行，manifest 与 Formal gate 只按结构身份去重计数，不能按 `event_id` 或 `trade_date` 放大事件数。
+
+计划示例（占位值必须由本地 ACTIVE manifest 读取，不得手填或上传秘密）：
+
+```json
+{
+  "source_truth_version": "v3-candidate-20260822",
+  "source_dataset_hash": "<sha256-from-truth_manifest.json>",
+  "operations": [
+    {"op": "DROP", "golden_case_id": "<legacy-structural-case>"},
+    {"op": "REPLACE", "golden_case_id": "<case-id>", "case": {
+      "golden_case_id": "<case-id>",
+      "case_type": "golden_st_transition",
+      "provider_symbol": "600000.SH",
+      "trade_date": "20240102",
+      "truth_source": "<traceable official source>",
+      "source_ref": "<source reference>",
+      "expected_fields": {"IS_ST_SEC": true},
+      "event_id": "<source alias>",
+      "event_class": "ST_TRANSITION",
+      "event_subtype": "ST_ADD",
+      "event_effective_date": "20240101"
+    }},
+    {"op": "KEEP", "golden_case_id": "<non-structural-case>"},
+    {"op": "ADD", "case": {"<same candidate fields>": "<verified values>"}}
+  ]
+}
+```
+
+执行前先运行 `validate` 检查 staged candidates；发布使用：
+
+```powershell
+uv run python scripts/golden/candidate.py --root data/golden/provider/amazingdata rebuild --plan <plan.json>
+```
+
+`build-version` 已禁用，因为隐式追加无法删除或替换结构错误的旧行。重建工具会先在内存中校验全部输出、manifest 统计和 semantic hash，再 create-only 写入新版本，最后原子移动 `truth_manifest.json`；任何计划或输出校验失败都不得改变 ACTIVE 指针。新版本只产生 `COMPILED`，人工证据绑定仍由 `review.py` 完成。`review.py` 只有在 ACTIVE 已是 `v4+`、manifest schema v2、全部结构案例具备有效显式生效日且全部案例仍为 `COMPILED` 时才可进入；旧 v3 或结构不完整的 ACTIVE 必须在证据暂存前拒绝，不能先生成 REVIEWED 版本再补做 clean rebuild。
+
+人工 review packet 可以分批在 ACTIVE 之外准备，但发布 review 版本时必须使用一个覆盖当前 ACTIVE 全部案例的 JSON list manifest：每个 `golden_case_id` 必须恰好出现一次，不得缺失、重复或引入 foreign case。N>1 的候选禁止用单条 `--case` 发布；只有 N==1 时单条命令才是完整覆盖。review 工具会在读取/复制 evidence、创建版本文件或移动 ACTIVE 前校验 coverage，并在内存中确认所有输出均为 `REVIEWED N/N`、review provenance 完整、artifact hash/semantic hash/manifest 统计自洽；任何 partial、duplicate、foreign 或 malformed 输入都必须零副作用拒绝。示例：
+
+```json
+[
+  {
+    "case": "<every-active-golden-case-id>",
+    "artifact": "<local-evidence-file>",
+    "kind": "SSE_ANNOUNCEMENT",
+    "note": "<review note>"
+  }
+]
+```
+
+```powershell
+uv run python scripts/golden/review.py --manifest <complete-review-batch.json> --reviewer <reviewer-id>
+```
+
+发布后应检查 ACTIVE manifest 的 `review_summary` 必须严格为 `{\"REVIEWED\": N}`；不得把 `REVIEWED K/N` 的中间状态发布为 ACTIVE。旧 v1–v3、schema<2 或结构不完整候选仍按 fail-closed 规则处理。
+
 ## 3. L1 实时订阅（任务书 §1.2，必须交易时段）
 
 ```powershell

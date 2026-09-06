@@ -1,51 +1,46 @@
-## 2026-09-05 · T3 CI corrective follow-up
+## 2026-09-06 · GT-H1.2 atomic complete review publication after PR16 second review
 
 **Implementation Status / Review Status**
 
-- **CORRECTIVE / LOCAL_TARGETED_VERIFIED / CI_PENDING / PENDING_REVIEW**：T3 首次 CI run 306 的 Ubuntu Python 3.14 pytest 暴露旧 AUDIT-H1 回归测试仍断言生产配置必须为空；这是阶段合同未更新，不是 T3 配置值或身份格式失败。
-- 已将该测试改为校验三平台 required CI 与 T3 三字段 exact allowlist：`UNKNOWN_24e2ff401792`、`2026-09-05T22:19:58+08:00`、`project-owner`；不改变运行时逻辑或生产执行边界。
-- 本地 Windows Python 3.14.6 targeted H1 / production-identity 回归 **101 passed**；重新验证以 GitHub Actions 新 head 的三平台全量 CI 为准。
-- T3 仍不启动 Production B1-B7、Data Sufficiency、verdict、Provider capability approval 或 backfill；身份冻结以独立 Reviewer 审阅、全绿 CI 和合并为准。
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_RE_REVIEW**：依据 [PR #16 二轮复审与 GT-H1.2 原子全量审核收口要求](design/A-share-analysis_PR16二轮复审与GT-H1.2原子全量审核收口要求_20260906.md) 修正 GT-P0-03；Reviewer 已确认 GT-H1.1 P0-01/P0-02 VERIFIED，但指出 partial review 会把 ACTIVE 永久留在 mixed `REVIEWED K/N + COMPILED` 状态。代码 head `e1aebaa92d4dcb93599471c50f24984b2913317e` 的 GitHub Actions [run 319](https://github.com/GeeCeeSneaker/A-share-analysis/actions/runs/34008301203) 三平台 required CI 已全绿。
+- review publisher 现在在任何 evidence/version/ACTIVE 写入前解析并校验 submitted case IDs 与 ACTIVE case IDs 完全相等且各出现一次；N>1 的 `--case`、partial、duplicate、foreign 和 malformed batch 均 fail closed 并保持 ACTIVE、版本文件和 evidence 不变，N==1 的单 case 作为完整覆盖退化路径保留。
+- 所有 review entry 在内存中 apply 后先通过完整 `REVIEWED N/N`、review provenance、artifact digest binding、loader semantic-hash self-validation 和 manifest statistics 重算，再执行 evidence → immutable dataset/manifest → ACTIVE last；source artifact 在提交前后均复核真实字节 hash。
+- 本地 Windows Python 3.14.6：GT-H1/GT-H1.1/GT-H1.2 focused regression **61 passed**；未添加 Golden 事实，未执行 Human full review、Production B1-B7、Data Sufficiency、Provider capability、2020+ backfill。
 
 **Next**
 
-- 等待 PR #14 新提交的三平台 required CI；通过后提交独立 Reviewer 关闭 T3。
-## 2026-09-05 · T2 confirmed — separate T3 identity-freeze proposal
+- 当前代码/测试/运行手册的 Windows 3.12、Windows 3.14、Ubuntu 3.14 required CI 已全绿；已请求 Reviewer 对 GT-P0-03 复审，本批不自行批准或合并。
+- 只有 Reviewer closure 并合并 PR #16 后，才允许按文档启动 GT-H2 clean Golden corpus construction；在此之前正式 Production、Data Sufficiency、Provider capability 和回补继续冻结。
+
+## 2026-09-06 · GT-H1.1 correctness closure after PR16 review
 
 **Implementation Status / Review Status**
 
-- **T2_CONFIRMED / T3_PR_OPEN / PENDING_REVIEW / FORMAL_B1-B7_BLOCKED**：项目 Owner 已确认 exact scrubbed candidate `UNKNOWN_24e2ff401792` 对应计划使用的正式账号；确认时间 `2026-09-05T22:19:58+08:00`，安全标记 `project-owner`。
-- T1 证据 PR #13 已合并到 main；三平台 required CI run 304（`33969635047`）全绿。T1 记录仍保持为脱敏事实，不把原始账号资料带入仓库。
-- 本次 T3 只提出以下三个配置字段：`production_account_profile_id=${candidate}`、带时区 `confirmed_at`、安全 `confirmed_by`；不修改其它配置键，不执行任何 provider 或生产数据动作。
-- 在 T3 PR 独立审阅、三平台 CI 通过并合并前，生产身份不视为已冻结；未执行 Production B1-B7、Data Sufficiency、verdict、Provider approval 或 backfill。
-
-**Evidence**
-
-- T1 脱敏投影：[t1_bootstrap_20260905.md](provider_verification/t1_bootstrap_20260905.md)。
-- T3 配置候选与本次治理变更由本 PR 单独审阅；用户名、密码、Token、真实 endpoint、raw profile、raw SDK 输出和本地原始文件均不进入 GitHub。
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_RE_REVIEW**：依据 [PR #16 首轮复审与 GT-H1.1 收口要求](design/A-share-analysis_PR16首轮复审与GT-H1.1收口要求_20260906.md) 修正两个合同缺陷；PR #16 修正 head `2281cd50b340fa85ee18955cee0ed9ca74f80be6` 的 GitHub Actions [run 316](https://github.com/GeeCeeSneaker/A-share-analysis/actions/runs/34004688902) 三平台 required CI 已全绿，本轮未合并、未启动 GT-H2。
+- P0-01：结构身份仅用于 Formal 去重，不再作为行级唯一键；不同 `golden_case_id`、不同观察日或不同 `event_id` 的多个案例可以共享同一 ST/DELIST 结构身份，manifest 与 event gate 仍以 set 语义只计一个事件。
+- P0-02：`review.py` 在证据暂存前要求 ACTIVE 为 `v4+`、manifest schema v2、无 `invalid_structural_cases`、所有案例保持 `COMPILED` 且无 review provenance；旧 v3 与不完整 v4 均零副作用拒绝，clean v4 candidate 才能进入人工 review。
+- 本地 Windows Python 3.14.6 GT-H1/GT-H1.1 定向回归通过；run 316 的 Windows 3.12、Windows 3.14、Ubuntu 3.14 全量 pytest、Spike、SDK-absent、DEVLOG 和管理文档门禁均成功。v3 dataset/manifest 未改写，未添加 Golden 事实、账号信息、原始 SDK 输出或专有依赖。
 
 **Next**
 
-- 等待独立 Reviewer 审阅 T3 exact config；合并前保持 Formal Production B1-B7 blocked。T3 合并后再按文档单独启动一个受治理 Production run。
+- run 316 已验证 PR #16 新 head 的三平台 CI 全绿；等待 Reviewer 对 P0-01/P0-02 复审并决定是否合并，本轮不自行批准或合并。
+- GT-H1.1 合并后才按审阅要求进入 GT-H2 clean Golden corpus；Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 继续冻结。
 
-## 2026-09-05 · T1 controlled online bootstrap — identity candidate
+## 2026-09-06 · GT-H1 Golden Truth structural identity and rebuild contract
 
 **Implementation Status / Review Status**
 
-- **T1_CANDIDATE / PENDING_T2 / CONFIG_EMPTY / FORMAL_B1-B7_BLOCKED**：按 [T1 受控线上身份候选执行要求](design/A-share-analysis_AUDIT-H1关闭与T1正式线上身份候选执行要求_20260905.md) 使用唯一 bootstrap 入口完成一次受控 Windows online 执行。结果为 `IDENTITY_CANDIDATE`，不是 Provider 能力批准或 Production verdict。
-- 源码树 `6671c6e388163b9cb15137f716247b36d0290cc4` 已随 H1 merge commit `c9787d243be5ca02a46496e38d5401fbf38a255b` 进入 main；本次执行后复核当前 main 为 `9b08d40b4318dbd6a7784a14a9e86a743374713f`。
-- 安全投影：`SDK_INSTALLED`、`RUNTIME_ACTUAL_LOAD_VERIFIED`、`AUTHENTICATED=YES`、`QUERY_READY=YES`、`profile_parsed=true`、`entitlement_verified=true`；脱敏候选为 `UNKNOWN_24e2ff401792`，解析出数字权限码，`production_identity_status=NOT_FROZEN`。
-- 本次 checked_at 为 `2026-09-05T13:36:45.179509+00:00`；Windows Python 3.14.6，AmazingData 1.1.9，tgw 1.0.9.2；仅记录安全字段，未记录用户名、密码、Token、真实 endpoint、raw profile 或 raw SDK 输出。
-- `configs/production_account.yaml` 保持为空；执行在候选投影后停止，未进入 T3、Production B1-B7、Data Sufficiency、verdict、Provider approval 或 backfill。
-
-**Evidence**
-
-- 脱敏字段与完整 allowlist 见 [T1 evidence](provider_verification/t1_bootstrap_20260905.md)。
-- 本地原始 bootstrap 文件不进入仓库；仓库只保存上述最小安全投影。
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_REVIEW**：以当前 `main` `8f2ccb52a5ed2a58ef916a16a9c7e756173b08fd` 为基线，落实 [PR15 关闭与 GoldenTruth 重建工作要求](design/A-share-analysis_PR15关闭与GoldenTruth重建工作要求_20260906.md) 的 GT-H1 工具链范围；[PR #16](https://github.com/GeeCeeSneaker/A-share-analysis/pull/16) 的 GitHub Actions [run 313](https://github.com/GeeCeeSneaker/A-share-analysis/actions/runs/34001128529) 三平台 required CI 已全绿，独立 Reviewer closure 仍待完成。
+- `golden_store.py` 现在只接受显式、严格校验的 ST/DELIST `event_effective_date`；旧 v1–v3 数据文件保持可加载，但缺失有效事件日期时只能在 Formal gate 中 fail-closed，绝不回退到 `trade_date`。结构统计统一由 `(provider_symbol, event_effective_date, event_subtype)` / `(provider_symbol, event_effective_date)` 重算。
+- `scripts/golden/candidate.py rebuild --plan` 提供追加式 KEEP/REPLACE/DROP/ADD 重建：精确绑定源 `truth_version` 与 dataset SHA256，要求每条旧记录恰好一个操作，完整输出在内存中校验后才 create-only 写入新 dataset/manifest，最后才原子更新 ACTIVE；旧 `build-version` 隐式追加入口已禁用。新版本所有记录为 COMPILED，review provenance 仍只能由 `review.py` 产生。
+- manifest schema v2 增加并校验结构化 ST 数量、ADD/REMOVE 数量、DELIST 结构事件数量及 distinct delisted securities；v4+ semantic hash 纳入事件身份字段，v1–v3 继续使用其不可变旧 hash 合约。`review.py` 也拒绝把缺少结构事件日期的记录提升为 REVIEWED，并使用同一统计/自校验路径。
+- 本地 Windows Python 3.14.6 定向 Golden 回归 **56 passed**；Ruff 与 `golden_store.py` mypy 定向检查通过。run 313 的 Windows 3.12、Windows 3.14、Ubuntu 3.14 全量 CI 均成功，包含 pytest、Spike gates、SDK-absent、DEVLOG 和管理文档门禁；Reviewer closure、GT-H2 reviewed corpus 或 Formal Production 授权仍未完成。
+- 未新增或修改任何 Golden 事实；未执行账号登录、T1/T2/T3、B1–B7、Data Sufficiency 或 2020+ 回填；凭证、Token、端点、原始 SDK 输出和专有 wheel 均未进入 GitHub。
 
 **Next**
 
-- 等待 Owner/Reviewer 对 exact `UNKNOWN_24e2ff401792` 做 T2 人工确认；确认前保持 production identity 未冻结，不创建 T3 配置提交，不启动 B1-B7。
+- PR #16 的三平台 required CI 已全绿；下一步等待独立 Reviewer 审阅并按项目规则决定是否合并，本批不自行批准或合并。
+- GT-H1 关闭并合并后，按文档由人工提供真实、可追溯的结构事件事实执行 GT-H2；在 GT-H1/H2/H3 完成前继续保持正式 Production、Golden backfill 和 Data Sufficiency 冻结。
 
 ## 2026-09-05 · AUDIT-H1 CI corrective follow-up
 
@@ -60,6 +55,7 @@
 
 - 等待新 PR head 的 Windows 3.14、Windows 3.12、Ubuntu 3.14 required CI 和治理门禁全绿，再交 Reviewer 审阅；在合并前保持真实 T1 暂停。
 - 旧 run 300 的失败只作为过程记录，不作为新 head 的测试结论。
+
 ## 2026-09-05 · AUDIT-H1 T1 trust-boundary remediation
 
 **Implementation Status / Review Status**
@@ -77,6 +73,7 @@
 
 - 收齐最终 head 三平台 required CI 和治理门禁证据，提交 Reviewer 审阅；本次不自行合并。通过并合并后才恢复真实 T1。
 - REV-02B 介质架构、REV-03 recovery、REV-05 history、REV-06 hard deadline、REV-07 performance、REV-08 replay 按管理裁决的对应阶段关闭，本轮不混入整改。
+
 
 ## 2026-09-05 · Comprehensive project review handoff (documentation only)
 
@@ -2715,4 +2712,3 @@
 - Two later ADR-only commits, `eceb99468bd28a37a7532b723f092a9d2f8bd469` (ADR-026) and `4ae9151979287a8a4e86c5f95906b88546c993e3` (ADR index), also predated this management synchronization. They are now explicitly included in the same one-time contract-path grandfathered set, together with capabilities commit `4f83f7ac3a19327e9f724c9730cbfbfef03de38b`.
 - This is a disclosed historical exception, not a relaxation of the rule: future `docs/adr/` or contract-path commits must update `docs/project/DEVELOPMENT_MANAGEMENT.md` in the same commit. No history was rewritten.
 - Production account / formal AmazingData Spike / Data Sufficiency Matrix remain BLOCKED or NOT_TESTABLE and are not marked complete.
-
