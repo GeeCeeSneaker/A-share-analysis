@@ -2,7 +2,7 @@
 
 **Implementation Status / Review Status**
 
-- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_RE_REVIEW**：按 [GT-H2.1 来源质量收口要求](design/A-share-analysis_PR18首轮复审与GT-H2.1来源质量收口要求_20260906.md) 修正 PR #18 首轮审阅指出的 P0-01、P1-02、P1-03；本批不自行执行最终 review seal、批准或合并。
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_RE_REVIEW**：按 [GT-H2.1 来源质量收口要求](design/A-share-analysis_PR18首轮复审与GT-H2.1来源质量收口要求_20260906.md) 修正 PR #18 首轮审阅指出的 P0-01、P1-02、P1-03；本批不自行执行最终 review seal、批准或合并。
 - 128 条 packet row 现在全部绑定到逐案官方 artifact 或精确规则版本；新增 `source_evidence_scope=CASE_SPECIFIC_OFFICIAL_ARTIFACT`，`fact_proved=true` 只允许在该范围内生成。生成器、finalize 和回归测试共同拒绝 BSE 首页、CNINFO disclosure root、SSE announcement root 与 SZSE generic rule directory 等 portal-only locator。
 - 20 条 DIVIDEND_EX_DATE 已改为发行人/交易所逐案利润分配实施公告，并修正为公告中的实际除权日；必要的 case ID 改动通过 rebuild plan 的显式 `allow_rekey=true` 保留旧源 ID 到新案例的 lineage。BSE 30%、ChiNext 10%/20%、STAR、SSE/SZSE 主板规则均改为精确官方规则/通知定位。
 - ST 仍保持 50 个独立结构事件与 ADD/REMOVE 两类，但以 7 条 SSE 增加事件和 1 条 STAR 撤销事件替换原 SZSE 子集；当前分布为 SSE 12 / SZSE 38、MAIN 32 / CHINEXT 15 / STAR 3、`ST_ADD=36`、`ST_REMOVE=11`、`STAR_ST_ADD=2`、`STAR_ST_REMOVE=1`。STAR 688500 的 2023-05-05 增加和 2024-06-11 撤销均使用逐案 SSE 公告。
@@ -12,7 +12,7 @@
 
 **Next**
 
-- 等待本修正 head 的 Windows 3.14、Windows 3.12、Ubuntu 3.14 与治理门禁全部成功，再请独立 Reviewer 对 GT-H2.1 P0-01/P1-02/P1-03 复审；本批不自行批准或合并。
+- GitHub Actions run 330（Ubuntu 3.14、Windows 3.12、Windows 3.14）已全部成功，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates；现在请独立 Reviewer 对 GT-H2.1 P0-01/P1-02/P1-03 复审，本批不自行批准或合并。
 - Reviewer closure 后，才按 GT-H3 绑定 exact artifact bytes/hash 并发布 reviewed version；Production、Data Sufficiency、Provider capability 和 backfill 继续冻结。
 
 ## 2026-09-06 · GT-H2 clean Golden candidate construction

@@ -2,7 +2,7 @@
 
 ## DM-20260906-110 · GT-H2.1 source-quality and representativeness closure
 
-**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
 **Review Status**：PENDING_RE_REVIEW；本批不自行执行最终 review seal、CLOSE 或 MERGE。
 **Authority**：[PR18 首轮复审与 GT-H2.1 来源质量收口要求](../design/A-share-analysis_PR18首轮复审与GT-H2.1来源质量收口要求_20260906.md)。
 **Gate**：GT-H2.1 修正 head 的三平台 required CI 与独立 Reviewer closure 未完成前，GT-H3 reviewed seal、Formal Production、Data Sufficiency、Provider capability 和 2020+ backfill 均保持冻结。
@@ -21,12 +21,12 @@
 - packet 仍为 128/128、全体 `COMPILED`；`review_readiness_gate`、quantity、event coverage 通过，`production_formal_gate` 仅保留 `REVIEWED 0/128` 人工复核阻断。
 - 本批不下载或提交 raw web/PDF、不绑定 artifact hash，不运行 `review.py` final seal、Production B1–B7、Data Sufficiency、Provider capability 或回补。
 - 未上传密码、账号、IP、Token、真实 endpoint、原始 SDK 输出或专有依赖；本地 vendor 依赖不进入 GitHub。
+- GitHub Actions run `330`（Ubuntu 3.14、Windows 3.12、Windows 3.14）三平台 required CI 已全部成功，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates。
 
 **Required next work**
 
-1. 运行本修正 head 的 Windows 3.14、Windows 3.12、Ubuntu 3.14 和全部治理门禁；CI 未全绿前不宣称本批远程验证完成。
-2. CI 全绿后由独立 Reviewer 逐条复审 exact locator、日期、类型、exchange/board 和 `fact_proved` 语义；本批不自行批准或合并。
-3. Reviewer closure 后才按 GT-H3 执行 artifact bytes/hash binding、reviewed seal、bound replay 与 Formal gate。
+1. CI 已由 run `330` 全部通过；由独立 Reviewer 逐条复审 exact locator、日期、类型、exchange/board 和 `fact_proved` 语义，本批不自行批准或合并。
+2. Reviewer closure 后才按 GT-H3 执行 artifact bytes/hash binding、reviewed seal、bound replay 与 Formal gate。
 
 ## DM-20260906-109 · GT-H2 clean Golden candidate construction
 
