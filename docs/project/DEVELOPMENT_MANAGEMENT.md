@@ -1,5 +1,34 @@
 # A-share-analysis 开发管理总册（Development Management）
 
+## DM-20260906-113 · GT-H3A Human Review bundle preparation
+
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING
+**Review Status**：GT-H3A PREPARED / NOT SEALED / PENDING_HUMAN_REVIEW；本批不自行执行 Human Review、final seal、CLOSE 或 MERGE。
+**Authority**：main 最新 [GT-H2 关闭与 GT-H3 HumanReview 原子封印执行要求](../design/A-share-analysis_GT-H2关闭与GT-H3_HumanReview原子封印执行要求_20260906.md)。
+**Baseline**：main `9979a0545531010b6b71fefe1f5d465aab349991`；GT-H2 Reviewer closure `5125393678`。
+**Candidate**：`v4-candidate-20260906`，ACTIVE dataset SHA256 `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b`，125 条 `COMPILED`，`REVIEWED 0/125`。
+
+| GT-H3A 要求 | 本批实现 / 验证位置 | 状态 |
+|---|---|---|
+| 按官方 artifact group 降低人工核验负担，同时逐案可追踪 | `docs/golden/gt_h3/review_bundle_index.jsonl`；104 groups covering 125 cases | IMPLEMENTED / local PASS |
+| bundle 必须从 merged ACTIVE candidate 派生，不能改变 Golden truth | `scripts/golden/gt_h3_prepare.py`；ACTIVE hash/version/count 和 packet exact coverage fail-closed | IMPLEMENTED / local PASS |
+| 决策模板必须逐案覆盖且不伪造人工结果 | `review_decision_template.jsonl`；125 rows，decision/review_note/reviewer fields blank | IMPLEMENTED / local PASS |
+| GT-H3 seal manifest 不得用 `expect_fields` 修改 expected truth | `validate_seal_manifest_entries()` 与 `test_gt_h3_seal_manifest_rejects_expect_fields_mutation` | IMPLEMENTED / local PASS |
+| Checkpoint A 不提交证据 bytes/hash、不推进 ACTIVE | bundle retrieval status `PENDING_HUMAN_REVIEW`；preflight hash 为 null；未运行 `review.py` | IMPLEMENTED / local PASS |
+
+**Evidence separation**
+
+- 本地 GT-H3A 生成与定向回归、Ruff、py_compile 通过；当前新 head CI 尚未运行，故暂为 `CI_PENDING`。
+- `GT_H3_REVIEW_BUNDLE.md` 明确要求 Human Reviewer 核对 issuer、rule/document version、适用市场/日期、symbol、expected semantics 和 exact effective date；不一致时必须 `REJECT` 并退回 candidate governance。
+- 本批只准备索引和模板，不检索/提交 HTML/PDF，不创建 evidence/sha256，不填写 `REVIEWED`，不构造 seal manifest，不运行 GT-H3B、Formal Production、Data Sufficiency、Provider capability approval 或 backfill。
+
+**Required next work**
+
+1. 推送 GT-H3A bundle、index、decision template、准备器、回归测试和本管理记录到新的 GT-H3 PR，运行三平台 required CI。
+2. 将 bundle 交给真实 Owner/Human Reviewer；必须得到完整 125/125 的显式授权和 human marker 后，才能进入 GT-H3B。
+3. GT-H3B 只能使用 `case`、`artifact`、`kind`、`note` 四类字段；证据 bytes 由现有 `review.py` 自行 hash，任何 truth correction 走 candidate correction，不得在 review 中修复。
+4. GT-H3 最终 head 必须通过 CI 并获得独立 Reviewer closure 后才能合并；在此之前 Formal Production B1–B7、Data Sufficiency、Provider capability approval、2020+ backfill 和策略/回测/交易继续冻结。
+
 ## DM-20260906-112 · GT-H2.2.1 BJ external-artifact honesty closure
 
 **Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN

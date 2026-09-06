@@ -1,3 +1,21 @@
+## 2026-09-06 · GT-H3A Human Review bundle preparation
+
+**Implementation Status / Review Status**
+
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_HUMAN_REVIEW**：依据 main 最新的 [GT-H2 关闭与 GT-H3 Human Review 原子封印执行要求](design/A-share-analysis_GT-H2关闭与GT-H3_HumanReview原子封印执行要求_20260906.md)，在 GT-H2 已独立关闭并合并后，只推进 Checkpoint A：`GT-H3A PREPARED / NOT SEALED`。
+- 以 main `9979a0545531010b6b71fefe1f5d465aab349991`、GT-H2 Reviewer closure `5125393678` 和 ACTIVE `v4-candidate-20260906` 为基线，新增 `scripts/golden/gt_h3_prepare.py`，从 GT-H2 ACTIVE dataset 与 packet 确定性生成 104 个 artifact groups，覆盖全部 125 个 case。
+- 新增 `docs/golden/gt_h3/GT_H3_REVIEW_BUNDLE.md`、`review_bundle_index.jsonl` 与 `review_decision_template.jsonl`；每个 group 记录官方来源、候选 artifact kind、case-specific expected semantics、建议本地文件名和待检索状态；模板逐案 125 行，决策/人工备注均为空。
+- 当前没有检索或提交任何官方 HTML/PDF bytes，没有 preflight SHA256，没有 `source_artifact_*` 绑定，没有 `REVIEWED` 或 ACTIVE pointer 改动；不以 artifact group 的上下文替代人工对事实、日期、制度和语义的核验。
+- 准备器明确拒绝 GT-H3 seal manifest 中的 `expect_fields` 等额外字段，防止 Human Review 通过 review 输入修改 Golden truth；新增回归覆盖 packet 缺失、已 REVIEWED candidate 和 expect_fields mutation。
+- 本地 GT-H3A 定向 pytest、Ruff、py_compile 通过；新 head 的 GitHub Actions 尚待运行，故 CI 状态暂为 `CI_PENDING`。正式 `REVIEWED 0/125`、GT-H3B、Formal Production、Data Sufficiency、Provider capability approval、2020+ backfill、策略/回测/交易继续冻结。
+- 不执行 `review.py` final seal、虚构 human reviewer、批准/合并；账号、密码、IP、Token、真实端点、原始 SDK 输出和本地 vendor 依赖不进入 GitHub。
+
+**Next**
+
+- 将 GT-H3A bundle、artifact-group index、case-level decision template、准备器、回归测试和管理记录推送到新的 GT-H3 PR，等待 required CI。
+- 只有真实 Owner/Human Reviewer 完成并明确授权完整 125/125 review set 后，才可构造不含 `expect_fields` 的 GT-H3B manifest，并运行现有 atomic `review.py` seal；任何事实不一致必须退回 candidate correction。
+- GT-H3 PR 在最终 CI 与独立 Reviewer closure 前不得合并；GT-H3 合并前的 Formal Production B1–B7、Data Sufficiency、Provider capability approval 和 backfill 仍保持 BLOCKED。
+
 ## 2026-09-06 · GT-H2.2.1 BJ external-artifact honesty closure
 
 **Implementation Status / Review Status**
