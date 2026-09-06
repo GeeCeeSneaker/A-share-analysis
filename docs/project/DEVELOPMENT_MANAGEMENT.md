@@ -1,5 +1,21 @@
 # A-share-analysis 开发管理总册（Development Management）
 
+## DM-20260906-115 · GT-H3 审阅表测试格式修正
+
+**状态**：`CORRECTED / CI_PENDING / PENDING_HUMAN_REVIEW`
+
+**说明**
+
+`efa0551` 的三平台 CI 在 Ruff lint 后于 format check 停止，日志明确指向新增审阅表覆盖测试文件末尾多余空行。本次只删除该多余空行并保留最终换行，测试逻辑和业务内容不变；同时补记 DEVLOG 与本管理册，满足代码提交记录要求。
+
+**边界**
+
+125 行审阅表、104 个材料分组、canonical `review_decision_template.jsonl`、expected fields 和 GT-H3A PREPARED / NOT SEALED 状态均不变。没有证据 bytes/hash、`REVIEWED`、seal 或生产动作。
+
+**下一步**
+
+等待修正提交的三平台 CI 通过；独立真实审阅人仍需逐案决定 `APPROVE`/`REJECT` 并在 PR 评论明确授权完整 125/125。
+
 ## DM-20260906-114 · GT-H3 人工审阅表可用性优化
 
 **状态**：`IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_HUMAN_REVIEW`

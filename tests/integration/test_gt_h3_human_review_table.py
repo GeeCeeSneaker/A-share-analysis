@@ -42,4 +42,3 @@ def test_human_review_table_exposes_official_locator_and_simple_feedback_fields(
     assert len(data_lines) == 125
     assert all("打开官方原文" in line for line in data_lines)
     assert all(len(line.split("|")) >= 15 for line in data_lines)
-

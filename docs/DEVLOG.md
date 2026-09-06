@@ -1,3 +1,16 @@
+## 2026-09-06 · GT-H3 review table CI formatting correction
+
+**Implementation Status / Review Status**
+
+- **CORRECTED / CI_PENDING / PENDING_HUMAN_REVIEW**：针对 `efa0551` 的 CI 反馈，仅规范化 `tests/integration/test_gt_h3_human_review_table.py` 文件末尾的多余空行；三平台 Ruff lint 原本已通过，未改变测试逻辑、125 条案例、表格内容或 GT-H3 状态。
+- 保持 Markdown/Excel 审阅表、canonical JSONL、expected fields、证据边界和 PREPARED / NOT SEALED 不变；账号、密码、IP、Token、真实端点、原始 SDK 输出和本地 vendor 依赖仍未进入 GitHub。
+- 前一轮 CI 失败原因为 Ruff format check 的文件末尾空行；修正后的提交等待 GitHub Actions 重新验证。
+
+**Next**
+
+- 等待修正提交的三平台 CI 全部通过；随后由独立真实 Owner/Human Reviewer 使用 125 行表逐案审阅。
+- 在 125/125 明确授权前，不构造 GT-H3B、不运行 `review.py` seal，不推进生产、回测或交易。
+
 ## 2026-09-06 · GT-H3 reviewer-friendly 125-case table
 
 **Implementation Status / Review Status**
