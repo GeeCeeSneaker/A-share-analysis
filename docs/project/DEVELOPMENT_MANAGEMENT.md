@@ -2,7 +2,7 @@
 
 ## DM-20260906-111 · GT-H2.2 semantic-evidence alignment
 
-**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
 **Review Status**：PENDING_RE_REVIEW；本批不自行执行最终 review seal、CLOSE 或 MERGE。
 **Reviewer baseline**：main 新增 [PR18 二轮复审与 GT-H2.2 语义证据对齐要求](../design/A-share-analysis_PR18二轮复审与GT-H2.2语义证据对齐要求_20260906.md)；该要求针对 GT-H2.1 复审后新增的 P0-01/P1-02。
 **Candidate hash**：`5d063e314ea4b04623ecf19321f09931edb2d4b478f0df055262768e43d66ec0`（v4，128 条）
@@ -20,14 +20,14 @@
 
 - 本地 GT-H2.2 生成、hash/manifest/packet 校验、H2/candidate/golden review/corporate-action 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向静态检查通过。
 - Follow-up：run `333` 三个平台均在 pytest 收集新测试时因根目录 `scripts` 未作为 wheel 包安装而报 `ModuleNotFoundError`，Ruff/mypy 及其余步骤成功；测试已改为按仓库路径加载 source-only 准备器，未改变生产打包边界，本地复测通过，修正 head 仍为 `CI_PENDING`。
+- Follow-up：修正后的 GitHub Actions run `334`（Ubuntu 3.14、Windows 3.12、Windows 3.14）全部成功，full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates 均通过。
 - `review_readiness_gate`、quantity、event coverage 继续通过；`production_formal_gate` 仍仅保留 `REVIEWED 0/128` 人工复核阻断。没有将 semantic source alignment 误报为 Human Review 或 GT-H3 完成。
 - 本批不下载或提交 raw web/PDF，不绑定 artifact hash，不运行 `review.py` final seal、Production B1–B7、Data Sufficiency、Provider capability 或回补；凭证、Token、端点、原始 SDK 输出和本地 vendor 依赖不进入 GitHub。
 
 **Required next work**
 
-1. 将本批代码、测试和重建产物推送到 PR #18，等待新 head 三平台 required CI 全绿；若 CI 失败，按失败日志修正并重新验证。
-2. CI 全绿后请独立 Reviewer 复审 GT-H2.2 P0-01/P1-02；本批不自行提交批准或合并。
-3. 只有 Reviewer closure 后，才按 GT-H3 进行逐案 artifact bytes/hash binding、N/N reviewed seal、bound replay 与 Formal gate。
+1. run `334` 已完成三平台 required CI 全绿；请独立 Reviewer 复审 GT-H2.2 P0-01/P1-02，本批不自行提交批准或合并。
+2. 只有 Reviewer closure 后，才按 GT-H3 进行逐案 artifact bytes/hash binding、N/N reviewed seal、bound replay 与 Formal gate。
 
 ## DM-20260906-110 · GT-H2.1 source-quality and representativeness closure
 

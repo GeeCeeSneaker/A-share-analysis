@@ -2,18 +2,19 @@
 
 **Implementation Status / Review Status**
 
-- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_RE_REVIEW**：依据 main 新增的 [PR18 二轮复审与 GT-H2.2 语义证据对齐要求](design/A-share-analysis_PR18二轮复审与GT-H2.2语义证据对齐要求_20260906.md)，收口 Reviewer 指出的 P0-01 与 P1-02；本批不自行执行最终 review seal、批准或合并。
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_RE_REVIEW**：依据 main 新增的 [PR18 二轮复审与 GT-H2.2 语义证据对齐要求](design/A-share-analysis_PR18二轮复审与GT-H2.2语义证据对齐要求_20260906.md)，收口 Reviewer 指出的 P0-01 与 P1-02；本批不自行执行最终 review seal、批准或合并。
 - 限价制度来源选择已改为逐个显式 `event_id` 语义映射，并增加期望涨跌幅的 fail-closed 断言；`REGIME-STAR-20` 只绑定 STAR 上市前五个交易日后 20% 规则，`REGIME-ST-5` 只绑定 SSE/SZSE 风险警示 5% 规则，彻底移除会把 `REGIME-STAR-20` 误判为 ST 的子串分类。
 - 新增 adversarial 回归，直接证明 STAR 20% 与 ST 5% 的来源名称、来源定位、期望字段和 packet 行一致；128 条 packet 重新生成，ACTIVE v4 dataset SHA256 为 `5d063e314ea4b04623ecf19321f09931edb2d4b478f0df055262768e43d66ec0`，manifest、registry、rebuild plan、packet index 和报告已同步重建。
 - 北交所三条案例的 truth/checklist 已与 `golden_router.py::_validate_bj_mapping()` 实际可执行证明对齐：只声明历史 security master 存在、精确日期状态行、运行绑定的 BSE 限价制度与 provider price proof；不再把 validator 未消费的旧新代码连续性或 920 segment 语义写成强事实。
 - 本地 H2、candidate、Golden truth/review、corporate-action 及 GT-H2.2 adversarial 定向回归通过；Ruff check/format、py_compile 与 candidate/H2 定向静态检查通过。新 head 的 GitHub Actions 尚待运行，故 CI 状态暂为 `CI_PENDING`。
 - Follow-up：run 333 的 Ubuntu、Windows 3.12、Windows 3.14 三个平台均在 pytest 收集阶段因新测试直接导入未随 wheel 打包的根目录 `scripts` 而报 `ModuleNotFoundError`；Ruff、mypy、其余步骤均成功。测试已改为按仓库路径加载 source-only 准备器，未扩大生产包边界；本地复测通过，修正 head 仍等待 CI。
+- Follow-up：修正后的 GitHub Actions run 334（Ubuntu 3.14、Windows 3.12、Windows 3.14）已全部成功，包含 full pytest、Spike、SDK-absent、Ruff/format、mypy、DEVLOG 和 Management gates。
 - 正式 gate 仍只保留 `REVIEWED 0/128` 人工复核阻断；未运行 `review.py` final seal、GT-H3、Production B1–B7、Data Sufficiency、Provider capability、backfill、策略/回测/交易。
 - 未上传账号、密码、IP、Token、真实端点、原始 SDK 输出或专有依赖；本地 `vendor/` 继续只保留工作区依赖。
 
 **Next**
 
-- 推送本轮代码、测试和 v4 生成物，等待三平台 required CI 全绿后，请独立 Reviewer 复审 GT-H2.2 P0-01/P1-02；本批不自行批准或合并。
+- run 334 已完成三平台 required CI 全绿；现在请独立 Reviewer 复审 GT-H2.2 P0-01/P1-02，本批不自行批准或合并。
 - Reviewer closure 后，才按 GT-H3 绑定 exact artifact bytes/hash 并发布 reviewed version；Human Review、Formal Production、Provider capability、Data Sufficiency 和 backfill 继续冻结。
 
 ## 2026-09-06 · GT-H2.1 source-quality and representativeness closure
