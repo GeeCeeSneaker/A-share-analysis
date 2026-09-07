@@ -26,7 +26,7 @@ def test_staged_v6_verifier_reports_exact_invariants() -> None:
         "v5_truth_version": "v5-candidate-20260907",
         "v5_dataset_hash": ("5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"),
         "v6_truth_version": "v6-candidate-20260908",
-        "v6_dataset_hash": ("d11b6cd0314e9a1b63e1728668f61bfacc29f97b255f00f40fcdb98e9d0b1b0c"),
+        "v6_dataset_hash": ("0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343"),
         "active_truth_version": "v5-candidate-20260907",
         "case_count": 125,
         "st_transition": 50,

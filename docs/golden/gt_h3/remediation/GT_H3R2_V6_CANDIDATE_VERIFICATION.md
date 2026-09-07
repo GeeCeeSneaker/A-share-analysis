@@ -7,7 +7,7 @@
 - Source: v5-candidate-20260907
 - Source dataset SHA256: 5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c
 - Target: v6-candidate-20260908
-- Target dataset SHA256: d11b6cd0314e9a1b63e1728668f61bfacc29f97b255f00f40fcdb98e9d0b1b0c
+- Target dataset SHA256: 0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343
 - Active pointer: remains v5-candidate-20260907
 
 ## Recomputed checks
@@ -23,6 +23,8 @@
 | Review summary | COMPILED 125 |
 
 The carry-forward count is recomputed from review_identity_hash; 110 is only the expected sanity check for this exact 15-for-15 plan, not a hard-coded acceptance shortcut.
+
+- JSONL serialization is verified as one JSON object per line with no inter-row comma; the v6 hash below covers the corrected bytes.
 
 ## Lineage and review boundary
 

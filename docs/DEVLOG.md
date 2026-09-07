@@ -1,3 +1,11 @@
+## 2026-09-08 · GT-H3R2 v6 JSONL serialization correction
+
+> 状态：**DATA SERIALIZATION FIX STAGED / HASH RECOMPUTED**
+
+- CI 测试发现 v6 dataset、ST audit 和 carry-forward 三个 JSONL 提交内容的行间分隔符误带逗号，导致第二行无法解析；该问题来自提交载荷生成，不是 Golden 语义判断。
+- 已恢复为标准 newline-delimited JSON，重新计算 v6 dataset SHA256 为 `0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343`，并同步 manifest、验证器和回归测试。
+- v5 数据、15 条 DROP/ADD 语义、审计结论及 ACTIVE 指针均未改变；本提交记录完整的数据载荷修正。
+
 ## 2026-09-08 · GT-H3R2 v6 verifier test import portability
 
 > 状态：**TEST HARNESS FIX STAGED / SEMANTICS UNCHANGED**

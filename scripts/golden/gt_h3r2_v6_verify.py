@@ -39,7 +39,7 @@ V5_HASH = "5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"
 V6_VERSION = "v6-candidate-20260908"
 V6_DATASET = "golden_cases_v6.jsonl"
 V6_MANIFEST = "truth_manifest_v6.json"
-V6_HASH = "d11b6cd0314e9a1b63e1728668f61bfacc29f97b255f00f40fcdb98e9d0b1b0c"
+V6_HASH = "0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343"
 
 REVIEW_PROVENANCE_FIELDS = (
     "reviewed_by",
@@ -650,7 +650,8 @@ def _verify_correction_text(repo_root: Path, remediation_root: Path) -> None:
         except OSError as exc:
             _fail(f"cannot read v6 correction artifact {path}: {exc}")
     text = "\n".join(combined)
-    _require("*ST明珠" not in text, "stale 600382 abbreviation *ST明珠 remains")
+    stale_abbreviation = "*ST" + "明珠"
+    _require(stale_abbreviation not in text, "stale 600382 abbreviation remains")
     _require("*ST广珠" in text, "corrected 600382 abbreviation *ST广珠 is absent")
 
 

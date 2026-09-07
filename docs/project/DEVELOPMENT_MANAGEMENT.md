@@ -1,3 +1,12 @@
+## DM-20260908-005 · GT-H3R2 v6 JSONL 载荷修正
+
+- **Type**：C1 — governed data serialization correction
+- **Date**：2026-09-08
+- **Status**：FIX STAGED / ACTIVE STILL v5 / PUBLICATION BLOCKED
+- **Finding**：CI 发现新提交的 v6 dataset、ST audit 和 carry-forward JSONL 行间错误带有逗号，第二行无法被 JSONL 解析。
+- **Correction**：三份 JSONL 已恢复为逐行独立 JSON 对象；v6 dataset SHA256 已重算并同步到 manifest、只读验证器和回归测试。
+- **Boundary**：这只是提交载荷格式修正，不改变 v5 immutable、15 条 DROP/ADD、50 条审计 PASS、110/15 重算或 Human Review 门。
+
 ## DM-20260908-004 · GT-H3R2 v6 candidate 治理重建
 
 - **Type**：C1 — governed candidate rebuild and transition-audit closure
