@@ -1,3 +1,25 @@
+## DM-20260907-004 · GT-H3R 合并后审计链固化与 12 条真实人工复审授权
+
+**状态**：`MERGED / 12-CASE REAL HUMAN RE-REVIEW AUTHORIZED / GT-H3B NOT AUTHORIZED`
+
+**合并后权威元数据**
+
+- PR：#20；merge commit：`b03ada73bc15d5e1ea1a62a28962ba8204b5bd51`
+- Reviewer 最终核验 head：`4fb60f1cbb5a23f71bcbbfffbc72d488fd2a157d`
+- pre-merge main：`669759adf34bece4c9e41c7be2ce2e9f858e5277`
+- GitHub test-merge：`11cf4e4b811b0a5c90042087a544216863b4e1e1`
+- Reviewer closure：`5130860878`
+- final CI：run `34109324402` / #358；Windows py3.14、Windows py3.12、Ubuntu py3.14 全部 SUCCESS
+- 本次合并后记录提交前的 main HEAD：`06cdab7b6985effd26bdf2309eeff0f154fff366`
+
+**执行结论**
+
+- v5 `v5-candidate-20260907` 保持 125 条 `COMPILED`；113 条 carry-forward verified，12 条 corrected cases 是唯一新增人工工作范围。
+- GT-H3R/GT-H3R.1 的候选重建、复合来源契约、审计历史恢复和 CI 门禁已按 Reviewer closure 冻结，不在人工复审阶段重新设计。
+- 当前 main 的 12-case Markdown/Excel 结果栏、反馈、审阅人和日期仍为空；本条记录不代表任何人工 APPROVE/REJECT，也不产生 `REVIEWED` 或 seal。
+- 真实 Human Reviewer 仍需逐条打开全部 required official sources，并在受审计记录中提交 12/12 结果、113 条沿用确认、legacy `50` 的中和/定义和最终 human marker。
+- 在上述声明被核验前，GT-H3B、`review.py`、Production B1-B7、Data Sufficiency、Provider capability verdict、2020+ backfill、策略/回测/交易均保持 BLOCKED。
+
 ## DM-20260907-003 · GT-H3R.1 格式门禁修正
 
 - 格式修复仅影响 GT-H3R verifier 的 Python 排版；Golden 数据、来源侧车和人工复审状态不变。
