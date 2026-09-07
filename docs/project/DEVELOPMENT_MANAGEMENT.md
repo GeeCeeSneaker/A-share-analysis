@@ -1,3 +1,21 @@
+## DM-20260907-005 · GT-H3R v5 12 条真实人工复审结果接收
+
+**状态**：`12/12 APPROVE RECEIVED / 113 CARRY-FORWARD CONFIRMED / LEGACY 50 NEUTRALIZED / FINAL HUMAN MARKER PENDING / NOT SEALED`
+
+**接收与核对**
+
+- 收到 v5 12 条逐案复审裁决，结果为 APPROVE 12、REJECT 0；提交者声明已逐条打开 sidecar 中的全部 required official source 原文。
+- 结果快照存放于 `docs/golden/gt_h3/remediation/GT_H3R_V5_HUMAN_REVIEW_RESULT_RECEIVED.md` 和 JSONL；空白复审表、sidecar 和 canonical review template 未覆盖。
+- 仓库侧重算确认 v5 为 125 条 COMPILED，ST_TRANSITION 为 50 条（38 条 IS_ST_SEC=true、12 条 false），expected_fields 命中数值 50 为 0。
+- carry-forward ledger 确认为 113 eligible、12 not_eligible，113 条身份重算不一致为 0；12 条 exactly 对应 10 条换源和 2 条语义修正。
+- legacy `50` 已被定义为 ST_TRANSITION 语料覆盖配额，不是市场语义真值；本次没有改变 Golden expected fields。
+
+**尚未完成**
+
+- 本次消息没有提供 final human marker，也没有可关联的审阅人标识和审阅日期。
+- 结果快照中的官方原始 bytes/hash 未提交仓库；后续 GT-H3B 获授权后再按 required source 建立 deterministic child manifest。
+- 在 final marker 和独立项目 Reviewer closure 到位前，GT-H3B、`review.py`、REVIEWED provenance、Production、Data Sufficiency、Provider capability verdict、backfill、策略/回测/交易继续 BLOCKED。
+
 ## DM-20260907-004 · GT-H3R 合并后审计链固化与 12 条真实人工复审授权
 
 **状态**：`MERGED / 12-CASE REAL HUMAN RE-REVIEW AUTHORIZED / GT-H3B NOT AUTHORIZED`
