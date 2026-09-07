@@ -1,3 +1,16 @@
+## 2026-09-08 · GT-H3R2 v6 candidate governed build
+
+> 状态：**V6 CANDIDATE STAGED / 50 条 AUDIT PASS / 110 CARRY-FORWARD ELIGIBLE / 15 条新增 Human Review PENDING / ACTIVE STILL v5 / NOT SEALED**
+
+- 根据独立 Reviewer checkpoint 的授权，先修正 600382 的简称：官方事件是“广东明珠 → *ST广珠”，并同步到候选池、v6 truth_source 与审计定位；v6 生成内容已统一为官方简称。
+- 以不可变 v5（v5-candidate-20260907 / SHA256 5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c）为唯一源，通过显式 15 条 DROP + 15 条 ADD + 110 条 KEEP plan 构建 v6-candidate-20260908；v5 数据、v4/v5 hash 未改。
+- v6 重算通过：125 行、50 条 ST_TRANSITION、38 ADD / 12 REMOVE、无重复 ST structural identity；非 ST 75 条 review identity 未变。
+- v5→v6 ledger 按 review_identity_hash 实际重算为 110 eligible / 15 not eligible；110 只是当前 15-for-15 方案的 sanity check，不是硬编码门槛。
+- 50 条审计台账已重绑 v6 exact ST set，全部 PASS，PRE/EFFECTIVE 两侧均为已复核官方来源定位；15 条新增/替换行仍是 COMPILED 且需要新的 Human Review。
+- v6 versioned artifacts 已推送，但 truth_manifest.json 活动指针仍是 v5；未运行 review.py，未写入 REVIEWED provenance，未解除 GT-H3B 或正式发布阻塞。
+
+下一步：运行 final-head/current-main 三平台 CI，随后交回独立 Reviewer 做 v6 closure；任一新增 Human Review 或独立复核不通过，继续保持 v6 非 ACTIVE。
+
 ## 2026-09-08 · GT-H3R2 15 条真实替换候选池
 
 > 状态：**DRAFT CANDIDATE POOL / 35 条 PASS / 15 条 INVALID / v5 IMMUTABLE / v6 NOT PUBLISHED / PUBLICATION BLOCKED**

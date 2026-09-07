@@ -1,3 +1,21 @@
+## DM-20260908-004 · GT-H3R2 v6 candidate 治理重建
+
+- **Type**：C1 — governed candidate rebuild and transition-audit closure
+- **Date**：2026-09-08
+- **Status**：V6 CANDIDATE STAGED / ACTIVE STILL v5 / PUBLICATION BLOCKED / PENDING HUMAN REVIEW
+- **Trigger**：Reviewer checkpoint 已确认候选事件身份可用，并要求修正 600382 简称、重算 v5→v6 carry-forward 后再构建 v6。
+- **Correction**：600382 官方简称变化固定为“广东明珠 → *ST广珠”；该文本已统一为官方简称。
+- **Build**：从 immutable v5-candidate-20260907 通过显式 110 KEEP、15 DROP、15 ADD 计划生成非 ACTIVE v6-candidate-20260908；旧 15 行未改判，新增 15 行带 accounting-only lineage。
+- **Verification**：重算 125 行、50 条 ST_TRANSITION、38/12、无重复 structural identity、其他 75 行 review identity 不变；v5→v6 ledger 实际得到 110 eligible / 15 not eligible，110 只是当前方案的 sanity check，不是硬编码门槛。
+- **Audit**：50 条 v6 exact ST identity 全部 PASS，PRE/EFFECTIVE 两侧均绑定已复核官方来源和 locator。
+- **Review boundary**：15 条新增/替换行保持 COMPILED、不得自动 carry-forward，需新的 Human Review；不运行 review.py、不推进 GT-H3B、不修改 ACTIVE 指针。
+
+**Next gate**
+
+1. final-head/current-main 三平台 CI；
+2. 独立 Reviewer 对 v6 audit 和 15 条增量做 closure；
+3. 新增 15 条 Human Review 完成后，才可评估 review.py / GT-H3B。
+
 ## DM-20260908-003 · GT-H3R2 15 条替换候选池准备
 
 - **Type**：C1 — evidence-backed replacement candidate planning
@@ -27,7 +45,7 @@
 1. 逐条复开 35 条 PASS 的 pre/effective 材料，确认代码、日期、简称和二元状态。
 2. 逐条复核 15 条 INVALID_ST_LEVEL_CHANGE，决定真实替换、删改或保留为非 ST_TRANSITION；不得以台账改判代替 Golden 数据变更。
 3. 保持 ST distinct、ADD/REMOVE 双向配额和 125 条总量；替换后的事件必须重新取得第一方全文并保留 lineage。
-4. Reviewer closure 后，再生成 v6 candidate，重跑 125 条总量、113 carry-forward、身份唯一性、其他事件语义和三平台 CI；未完成前不合并 PR #23。
+4. Reviewer closure 后，再生成 v6 candidate，重跑 125 条总量、v5→v6 review_identity_hash carry-forward（当前 15-for-15 方案预期 110，由校验重算）、身份唯一性、其他事件语义和三平台 CI；未完成前不合并 PR #23。
 
 ## DM-20260908-001 · GT-H3R2 官方原文补证结果入账
 
@@ -79,7 +97,7 @@ PR #23 首轮 CI 的 lint 已通过，但 Ruff format check 在三套矩阵均�
     python scripts/golden/gt_h3r2_transition_audit.py
     python scripts/golden/gt_h3r2_transition_audit.py --require-clean
 
-下一步验收：50 条台账全部完成官方双核复核；无效条目用独立一手证据做真实替换/删改；维持 125 总量、ST distinct identity、ADD/REMOVE 双向配额、113 carry-forward 只沿用未变身份；最后在 final-head/current-main 分别跑 Windows 3.14、Windows 3.12、Ubuntu 3.14 CI，并由独立 Reviewer 关闭后才能讨论合并。
+下一步验收：50 条台账全部完成官方双核复核；无效条目用独立一手证据做真实替换/删改；维持 125 总量、ST distinct identity、ADD/REMOVE 双向配额、v5→v6 review_identity_hash carry-forward（当前 15-for-15 方案预期 110，由校验重算） 只沿用未变身份；最后在 final-head/current-main 分别跑 Windows 3.14、Windows 3.12、Ubuntu 3.14 CI，并由独立 Reviewer 关闭后才能讨论合并。
 
 ## DM-20260907-005 · GT-H3R v5 12 条真实人工复审结果接收
 

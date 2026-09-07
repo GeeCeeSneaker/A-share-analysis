@@ -1,10 +1,10 @@
 # GT-H3R2 ST_TRANSITION 替换候选池（草案）
 
-> 状态：**DRAFT / NOT CANONICAL / NOT INDEPENDENTLY REVIEWED / v5 IMMUTABLE / v6 NOT PUBLISHED**
+> 状态：**DRAFT / NOT CANONICAL / NOT INDEPENDENTLY REVIEWED / v5 IMMUTABLE / v6 CANDIDATE STAGED / ACTIVE STILL v5**
 
 ## 1. 目的与边界
 
-本文件为当前 15 条 `INVALID_ST_LEVEL_CHANGE` 准备的真实替换候选池。它不是 Golden 数据、不是独立复核结论，也不把原有无效条目改判为通过；在独立 Reviewer closure 前，不得据此生成 v6、写入 `REVIEWED` provenance 或解除 GT-H3B。
+本文件为当前 15 条 `INVALID_ST_LEVEL_CHANGE` 准备的真实替换候选池。它不是 Golden 数据或最终独立复核结论，也不把原有无效条目改判为通过；当前仅按 Reviewer checkpoint 授权生成了一个非 ACTIVE 的 v6 candidate，仍不得写入 `REVIEWED` provenance 或解除 GT-H3B。
 
 候选必须满足：同一官方一手原文明确给出代码、有效日、有效日前的普通简称，以及有效日后带 `*ST` 的简称；语义为 `false -> true`。本轮 15 份直链均以 HTTP 200 返回 PDF，并完成全文提取；表内只保存官方 URL 和复核定位，原始 bytes 不上传 GitHub。
 
@@ -16,7 +16,7 @@ CNINFO 查询接口只用于发现材料，不能作为证据；本表证据边�
 | ---: | --- | --- | --- | ---: | --- | --- | --- | --- | --- | --- |
 | 1 | `GT-H2-ST-ST_ADD-300495-20210507` | `300495.SZ` | `ST_ADD` | `20210507` | 美尚生态 → *ST美尚 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209893133.PDF)；p.1：证券代码 300495；公告同时写明 2021-05-07 起实施退市风险警示，简称由“美尚生态”变更为“*ST美尚”。 |  |  |  |  |  |
 | 2 | `GT-H2-ST-ST_ADD-002640-20210507` | `002640.SZ` | `ST_ADD` | `20210507` | 跨境通 → *ST跨境 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209892047.PDF)；p.1：证券代码 002640；公告同时写明 2021-05-07 起实施退市及其他风险警示，简称由“跨境通”变更为“*ST跨境”。 |  |  |  |  |  |
-| 3 | `GT-H2-ST-ST_ADD-600382-20210506` | `600382.SH` | `ST_ADD` | `20210506` | 广东明珠 → *ST明珠 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209878423.PDF)；p.1：证券代码 600382；公告写明退市风险警示起始日 2021-05-06，简称由“广东明珠”变更为“*ST明珠”。 |  |  |  |  |  |
+| 3 | `GT-H2-ST-ST_ADD-600382-20210506` | `600382.SH` | `ST_ADD` | `20210506` | 广东明珠 → *ST广珠 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209878423.PDF)；p.1：证券代码 600382；公告写明退市风险警示起始日 2021-05-06，简称由“广东明珠”变更为“*ST广珠”。 |  |  |  |  |  |
 | 4 | `GT-H2-ST-ST_ADD-600291-20210506` | `600291.SH` | `ST_ADD` | `20210506` | 西水股份 → *ST西水 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209878259.PDF)；p.1：证券代码 600291；公告写明退市风险警示起始日 2021-05-06，简称由“西水股份”变更为“*ST西水”。 |  |  |  |  |  |
 | 5 | `GT-H2-ST-ST_ADD-600078-20210506` | `600078.SH` | `ST_ADD` | `20210506` | 澄星股份 → *ST澄星 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209877776.PDF)；p.1：证券代码 600078；公告写明退市风险警示起始日 2021-05-06，简称由“澄星股份”变更为“*ST澄星”。 |  |  |  |  |  |
 | 6 | `GT-H2-ST-ST_ADD-600896-20210506` | `600896.SH` | `ST_ADD` | `20210506` | 览海医疗 → *ST海医 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209875156.PDF)；p.1：证券代码 600896；公告写明退市风险警示起始日 2021-05-06，简称由“览海医疗”变更为“*ST海医”。 |  |  |  |  |  |
@@ -30,7 +30,7 @@ CNINFO 查询接口只用于发现材料，不能作为证据；本表证据边�
 | 14 | `GT-H2-ST-ST_ADD-002316-20220506` | `002316.SZ` | `ST_ADD` | `20220506` | 亚联发展 → *ST亚联 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213265483.PDF)；p.1：证券代码 002316；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“亚联发展”变更为“*ST亚联”。 |  |  |  |  |  |
 | 15 | `GT-H2-ST-ST_ADD-002366-20220506` | `002366.SZ` | `ST_ADD` | `20220506` | 台海核电 → *ST海核 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213263830.PDF)；p.1：证券代码 002366；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“台海核电”变更为“*ST海核”。 |  |  |  |  |  |
 
-右侧四列由独立 Reviewer 填写；开发者不预填裁决。共同预期：`pre_effective_is_st=false`、`effective_is_st=true`、`transition_valid=true`。688086 使用 `STAR_ST_ADD`，其余使用 `ST_ADD`。候选案例 ID、代码和有效日均未与当前 v5 50 条 ST_TRANSITION 重复；最终仍须由 Reviewer 复核后再写入 v6 行。
+右侧四列由独立 Reviewer 填写；开发者不预填裁决。共同预期：`pre_effective_is_st=false`、`effective_is_st=true`、`transition_valid=true`。688086 使用 `STAR_ST_ADD`，其余使用 `ST_ADD`。候选案例 ID、代码和有效日均未与当前 v5 50 条 ST_TRANSITION 重复；v6 candidate 已按计划落盘但保持非 ACTIVE，最终仍须由 Reviewer closure 复核。
 
 ## 3. 当前必须移出的 15 条无效源行
 
@@ -52,7 +52,7 @@ CNINFO 查询接口只用于发现材料，不能作为证据；本表证据边�
 - `GT-H2-ST-ST_ADD-000525-20240919`
 - `GT-H2-ST-ST_ADD-300506-20240429`
 
-这是“删除旧源行 + 新增真实候选”的候选池，不是旧 ID 到新 ID 的语义映射；逐项 DROP/ADD 或 REPLACE 操作必须在 Reviewer closure 后另行编制并保留 lineage。
+这是“删除旧源行 + 新增真实候选”的候选池，不是旧 ID 到新 ID 的语义映射；本轮已在 v5→v6 计划中逐项保留 DROP/ADD lineage，但最终 closure 仍可拒绝任一候选。
 
 ## 4. 独立 Reviewer 逐案反馈要求
 
@@ -68,11 +68,12 @@ Reviewer 请对每一行实际打开直链 PDF 原文，至少确认：
 
 ## 5. Reviewer closure 后的开发顺序
 
-- 保持 v5 文件、v4/v5 hash、既有 113 carry-forward 结论不变；不把 v5 审计台账回写 Golden。
-- 依据 Reviewer 结果，把无效 15 行做真实 DROP/REPLACE，并从通过的候选池补足真实 ST_TRANSITION；不得降低“至少 50”配额，也不得把层级变化重新计入。
-- 生成带 source lineage 的 v6 candidate 后，重新验证 125 总量、50 条 ST_TRANSITION、38 ADD/12 REMOVE、身份唯一性、其他事件语义和版本迁移关系；v6 的 carry-forward 数量须重新计算，不能沿用 113 的 v4→v5 结论。
-- 只有清洁 v6 与独立 Reviewer closure 均完成，才允许按仓库文档决定是否进入 `review.py`、GT-H3B、Data Sufficiency 和后续发布门。
+- 保持 v5 文件、v4/v5 hash 与既有历史记录不变；其中 113 carry-forward 只属于 v4→v5，不能沿用到 v5→v6；不把审计台账回写 Golden。
+- 按 Reviewer checkpoint 授权，把无效 15 行真实 DROP，并从官方候选池 ADD 15 条二元 ST 事件；不得降低“至少 50”配额，也不得把层级变化重新计入。
+- v5→v6 的 carry-forward 必须按 `review_identity_hash` 重算；本轮重算为 110 eligible / 15 not eligible，110 只作当前 15-for-15 方案的 sanity check，不是硬编码门槛。
+- 当前 v6 candidate、审计台账、plan、manifest 和 lineage 已落盘，但 ACTIVE 仍指向 v5；15 条新增/替换行保持 COMPILED 并需要新的 Human Review。
+- 只有 v6 独立 Reviewer closure 与新增 Human Review 均完成，才允许按仓库文档决定是否进入 `review.py`、GT-H3B、Data Sufficiency 和后续发布门。
 
 ## 6. 本轮结论
 
-候选池已具备下一轮独立复核所需的 15 份官方原文入口，但当前项目仍为 **PUBLICATION BLOCKED / PENDING REVIEW**。本文件本身不改变 50 行审计台账的 35 PASS / 15 INVALID 统计。
+15 份官方原文入口已被纳入非 ACTIVE 的 v6 candidate 与全量 50 行 PASS 审计台账；当前项目仍为 **PUBLICATION BLOCKED / PENDING REVIEW**。本文件不改变 v5，也不产生 REVIEWED provenance 或 seal。

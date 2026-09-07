@@ -1,0 +1,1062 @@
+{
+  "plan_schema": 1,
+  "source_truth_version": "v5-candidate-20260907",
+  "source_dataset_file": "golden_cases_v5.jsonl",
+  "source_dataset_hash": "5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c",
+  "target_truth_version": "v6-candidate-20260908",
+  "policy": {
+    "v5_immutability": "Never edit golden_cases_v5.jsonl or truth_manifest_v5.json",
+    "transition_semantics": "ST_ADD/STAR_ST_ADD must prove false -> true; ST_REMOVE/STAR_ST_REMOVE must prove true -> false",
+    "invalid_source_rows": "DROP the 15 v5 rows classified as ST-level changes; do not reclassify them as PASS",
+    "replacement_strategy": "ADD 15 independently checked official binary ST candidates; lineage is accounting-only, not semantic equivalence",
+    "review_boundary": "All output remains COMPILED; new/changed cases are not Human-review carry-forward; no review.py or seal"
+  },
+  "operation_summary": {
+    "KEEP": 110,
+    "REPLACE": 0,
+    "DROP": 15,
+    "ADD": 15
+  },
+  "operations": [
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600519"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600036"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-601318"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600900"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600104"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600019"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-ST5-600518-20190603"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-ST5-600518-20191028"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-ST5-002450-20190422"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-ST5-002450-20190722"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN10-300001"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN10-300059"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN10-300015"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN10-300750"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN20-300750"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN20-300059"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN20-300015"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN20-300124"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN20-300274"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688981"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688111"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688036"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688012"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688599"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STARNO-20200722"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688981-20200723"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-BSE30-20220104"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-BSE30-20220601"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-IPO44-601995"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-IPO44-605499"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600519-20220630"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600519-20230630"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-601318-20220620"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-601318-20230614"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600036-20220715"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600036-20230713"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000858-20220629"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000858-20230627"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000333-20220602"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000333-20230601"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-601398-20220712"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-601398-20230717"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000651-20220805"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000651-20230809"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000002-20220825"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000002-20230825"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600900-20220721"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600900-20230721"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600104-20220715"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600104-20230719"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600654-20220506",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-600654-20220506",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600077-20230505"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-601258-20230505"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600466-20230504"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600543-20230504"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-603963-20240429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688500-20230505"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300064-20210428",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300064-20210428",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300312-20210429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600593-20210722"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002113-20200429",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-002113-20200429",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000806-20220506",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000806-20220506",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002022-20220506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002417-20220421"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002781-20220506",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-002781-20220506",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000606-20220506",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000606-20220506",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000995-20220429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300336-20220429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300297-20220429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300330-20220808"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000410-20220419",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000410-20220419",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002485-20220506"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000616-20230504",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000616-20230504",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000540-20230505"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002433-20230505",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-002433-20230505",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002086-20230505",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-002086-20230505",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300742-20230504"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300208-20240430"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002217-20240506"
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300108-20240430",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300108-20240430",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300209-20240429",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300209-20240429",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300167-20240430",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300167-20240430",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000525-20240919",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000525-20240919",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "DROP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300506-20240429",
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300506-20240429",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING",
+        "reason": "v5 ST_ADD was independently classified as an ST-level change, not binary false-to-true"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300965-20240426"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600213-20240506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-603363-20240506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688282-20240506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-STAR_ST_REMOVE-688500-20240611"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-000408-20210512"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002513-20210621"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002058-20220523"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-000007-20220701"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002022-20230404"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-300010-20240613"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002482-20240618"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002086-20240612"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002021-20240603"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-300209-20250513"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-300965-20250506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-601558-20200702"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600068-20210913"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600145-20220428"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600093-20220623"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600695-20220614"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600781-20230628"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600225-20250306"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600190-20250725"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600837-20250304"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-601989-20250905"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600462-20250721"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600421-20260626"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-000611-20220628"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-300064-20220627"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-000540-20230630"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-300273-20230706"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-002118-20230804"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-002610-20240812"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-000982-20240812"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-300208-20250721"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-002142-20211202"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-300475-20230216"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-002788-20200917"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-601555-20200323"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-000750-20200114"
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300495-20210507",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20210507",
+        "event_id": "ST-ADD-300495-20210507",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-300495-20210507",
+        "provider_symbol": "300495.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 美尚生态 → *ST美尚; binary ST_ADD effective 20210507 | https://static.cninfo.com.cn/finalpage/2021-04-30/1209893133.PDF",
+        "trade_date": "20210507",
+        "truth_source": "CNINFO official announcement: 美尚生态 → *ST美尚; ST_ADD effective 20210507",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-600654-20220506",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-600654-20220506",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002640-20210507",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20210507",
+        "event_id": "ST-ADD-002640-20210507",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-002640-20210507",
+        "provider_symbol": "002640.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 跨境通 → *ST跨境; binary ST_ADD effective 20210507 | https://static.cninfo.com.cn/finalpage/2021-04-30/1209892047.PDF",
+        "trade_date": "20210507",
+        "truth_source": "CNINFO official announcement: 跨境通 → *ST跨境; ST_ADD effective 20210507",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-300064-20210428",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300064-20210428",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600382-20210506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20210506",
+        "event_id": "ST-ADD-600382-20210506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-600382-20210506",
+        "provider_symbol": "600382.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 广东明珠 → *ST广珠; binary ST_ADD effective 20210506 | https://static.cninfo.com.cn/finalpage/2021-04-30/1209878423.PDF",
+        "trade_date": "20210506",
+        "truth_source": "CNINFO official announcement: 广东明珠 → *ST广珠; ST_ADD effective 20210506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-002113-20200429",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-002113-20200429",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600291-20210506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20210506",
+        "event_id": "ST-ADD-600291-20210506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-600291-20210506",
+        "provider_symbol": "600291.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 西水股份 → *ST西水; binary ST_ADD effective 20210506 | https://static.cninfo.com.cn/finalpage/2021-04-30/1209878259.PDF",
+        "trade_date": "20210506",
+        "truth_source": "CNINFO official announcement: 西水股份 → *ST西水; ST_ADD effective 20210506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-000806-20220506",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000806-20220506",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600078-20210506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20210506",
+        "event_id": "ST-ADD-600078-20210506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-600078-20210506",
+        "provider_symbol": "600078.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 澄星股份 → *ST澄星; binary ST_ADD effective 20210506 | https://static.cninfo.com.cn/finalpage/2021-04-30/1209877776.PDF",
+        "trade_date": "20210506",
+        "truth_source": "CNINFO official announcement: 澄星股份 → *ST澄星; ST_ADD effective 20210506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-002781-20220506",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-002781-20220506",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600896-20210506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20210506",
+        "event_id": "ST-ADD-600896-20210506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-600896-20210506",
+        "provider_symbol": "600896.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 览海医疗 → *ST海医; binary ST_ADD effective 20210506 | https://static.cninfo.com.cn/finalpage/2021-04-30/1209875156.PDF",
+        "trade_date": "20210506",
+        "truth_source": "CNINFO official announcement: 览海医疗 → *ST海医; ST_ADD effective 20210506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-000606-20220506",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000606-20220506",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600615-20210506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20210506",
+        "event_id": "ST-ADD-600615-20210506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-600615-20210506",
+        "provider_symbol": "600615.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 丰华股份 → *ST丰华; binary ST_ADD effective 20210506 | https://static.cninfo.com.cn/finalpage/2021-04-30/1209874374.PDF",
+        "trade_date": "20210506",
+        "truth_source": "CNINFO official announcement: 丰华股份 → *ST丰华; ST_ADD effective 20210506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-000410-20220419",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000410-20220419",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000502-20210506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20210506",
+        "event_id": "ST-ADD-000502-20210506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-000502-20210506",
+        "provider_symbol": "000502.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 绿景控股 → *ST绿景; binary ST_ADD effective 20210506 | https://static.cninfo.com.cn/finalpage/2021-04-30/1209872529.PDF",
+        "trade_date": "20210506",
+        "truth_source": "CNINFO official announcement: 绿景控股 → *ST绿景; ST_ADD effective 20210506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-000616-20230504",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000616-20230504",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688086-20220506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20220506",
+        "event_id": "ST-ADD-688086-20220506",
+        "event_subtype": "STAR_ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688086-20220506",
+        "provider_symbol": "688086.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 紫晶存储 → *ST紫晶; binary STAR_ST_ADD effective 20220506 | https://static.cninfo.com.cn/finalpage/2022-04-30/1213274157.PDF",
+        "trade_date": "20220506",
+        "truth_source": "CNINFO official announcement: 紫晶存储 → *ST紫晶; STAR_ST_ADD effective 20220506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-002433-20230505",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-002433-20230505",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-603603-20220506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20220506",
+        "event_id": "ST-ADD-603603-20220506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-603603-20220506",
+        "provider_symbol": "603603.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 博天环境 → *ST博天; binary ST_ADD effective 20220506 | https://static.cninfo.com.cn/finalpage/2022-04-30/1213274090.PDF",
+        "trade_date": "20220506",
+        "truth_source": "CNINFO official announcement: 博天环境 → *ST博天; ST_ADD effective 20220506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-002086-20230505",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-002086-20230505",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002313-20220506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20220506",
+        "event_id": "ST-ADD-002313-20220506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-002313-20220506",
+        "provider_symbol": "002313.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 日海智能 → *ST日海; binary ST_ADD effective 20220506 | https://static.cninfo.com.cn/finalpage/2022-04-30/1213267451.PDF",
+        "trade_date": "20220506",
+        "truth_source": "CNINFO official announcement: 日海智能 → *ST日海; ST_ADD effective 20220506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-300108-20240430",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300108-20240430",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300301-20220506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20220506",
+        "event_id": "ST-ADD-300301-20220506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-300301-20220506",
+        "provider_symbol": "300301.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 长方集团 → *ST长方; binary ST_ADD effective 20220506 | https://static.cninfo.com.cn/finalpage/2022-04-30/1213267090.PDF",
+        "trade_date": "20220506",
+        "truth_source": "CNINFO official announcement: 长方集团 → *ST长方; ST_ADD effective 20220506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-300209-20240429",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300209-20240429",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002751-20220506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20220506",
+        "event_id": "ST-ADD-002751-20220506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-002751-20220506",
+        "provider_symbol": "002751.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 易尚展示 → *ST易尚; binary ST_ADD effective 20220506 | https://static.cninfo.com.cn/finalpage/2022-04-30/1213266378.PDF",
+        "trade_date": "20220506",
+        "truth_source": "CNINFO official announcement: 易尚展示 → *ST易尚; ST_ADD effective 20220506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-300167-20240430",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300167-20240430",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002316-20220506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20220506",
+        "event_id": "ST-ADD-002316-20220506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-002316-20220506",
+        "provider_symbol": "002316.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 亚联发展 → *ST亚联; binary ST_ADD effective 20220506 | https://static.cninfo.com.cn/finalpage/2022-04-30/1213265483.PDF",
+        "trade_date": "20220506",
+        "truth_source": "CNINFO official announcement: 亚联发展 → *ST亚联; ST_ADD effective 20220506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-000525-20240919",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-000525-20240919",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    },
+    {
+      "op": "ADD",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002366-20220506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20220506",
+        "event_id": "ST-ADD-002366-20220506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-002366-20220506",
+        "provider_symbol": "002366.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO official announcement: 台海核电 → *ST海核; binary ST_ADD effective 20220506 | https://static.cninfo.com.cn/finalpage/2022-04-30/1213263830.PDF",
+        "trade_date": "20220506",
+        "truth_source": "CNINFO official announcement: 台海核电 → *ST海核; ST_ADD effective 20220506",
+        "lineage": {
+          "source_truth_version": "v5-candidate-20260907",
+          "source_case_id": "GT-H2-ST-ST_ADD-300506-20240429",
+          "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+        }
+      },
+      "lineage": {
+        "source_truth_version": "v5-candidate-20260907",
+        "source_case_id": "GT-H2-ST-ST_ADD-300506-20240429",
+        "replacement_relation": "DROP_ADD_ACCOUNTING_ONLY_NOT_SEMANTIC_MAPPING"
+      }
+    }
+  ]
+}
