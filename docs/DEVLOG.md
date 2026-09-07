@@ -1,3 +1,17 @@
+## 2026-09-07 · GT-H3R2 ST_TRANSITION 全量语义审计台账
+
+> 状态：**台账已建立 / 14 条已识别无效或层级变化 / 36 条待补证 / v5 IMMUTABLE / v6 NOT PUBLISHED**
+
+根据主线最新的 GT-H3R2 要求，本次先完成可审计的全量 inventory，不把不完整证据包装成通过：
+
+- 逐条覆盖 v5 的 50 条 ST_TRANSITION，绑定 provider symbol、event subtype、effective date 与源案例 ID。
+- 14 条按 pre=true, effective=true 记录为 INVALID_ST_LEVEL_CHANGE：最新独立复核提供的 12 条，加本轮官方原文扫描识别的 300064、000616。
+- 其余 36 条记录为 NEED_MORE_EVIDENCE，缺少 effective 前官方二元状态材料即 fail closed；transition_valid=false 不能被解释为已证伪，必须查看 audit_status。
+- 新增独立校验模块、命令行检查器和回归测试；目标版本达到 v6 时，candidate rebuild 会拒绝缺失/不完整的 ST 审计台账。
+- 没有改写 v5、没有生成 v6、没有触碰 review.py 或 GT-H3B 状态。完整台账与阻塞原因见 docs/golden/gt_h3/remediation/GT_H3R2_ST_TRANSITION_AUDIT.md。
+
+阻塞是实质性的：36 条需要逐条取得并打开官方一手材料证明 pre-state；部分 SSE static PDF 直取被反爬挑战拦截，不能用挑战页或搜索摘要代替原文。下一步只能补齐官方双核证据后，制作带 lineage 的干净 v6 candidate，并重新核对 125 总量、其他事件语义、carry-forward 身份和三平台 CI。
+
 ## 2026-09-07 · GT-H3R v5 12 条真实人工复审结果接收
 
 > 状态：**12/12 APPROVE RECEIVED / 113 CARRY-FORWARD CONFIRMED / LEGACY 50 NEUTRALIZED / FINAL HUMAN MARKER PENDING / NOT SEALED**

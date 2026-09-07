@@ -1,3 +1,25 @@
+## DM-20260907-006 · GT-H3R2 ST_TRANSITION 全量语义审计台账与 fail-closed 门
+
+**状态**：GT-H3R2 AUDIT INVENTORY COMPLETE / PUBLICATION BLOCKED / v5 IMMUTABLE
+
+**基线**：主线 ab4911d；v5 v5-candidate-20260907 不改写，50 条 ST_TRANSITION 仅建立独立审计台账。
+
+本次落地：
+
+1. 新增 docs/golden/gt_h3/remediation/GT_H3R2_ST_TRANSITION_AUDIT.jsonl，逐条覆盖 50 条 ST_TRANSITION，明确 pre_effective_is_st、effective_is_st、双侧官方证据定位、transition_valid 和判断。
+2. 新增 src/ashare_state/spike/st_transition_audit.py，校验候选身份精确覆盖、ST_ADD 的 false→true、ST_REMOVE 的 true→false、双侧官方一手证据和 fail-closed 发布条件。
+3. 新增 scripts/golden/gt_h3r2_transition_audit.py 与测试，专门覆盖 ST→*ST 不得伪装成 ST_ADD、*ST→ST 不得伪装成 ST_REMOVE、缺证据失败和覆盖绑定。
+4. 将候选发布流程接入门控：目标版本达到 v6 时，缺少审计台账或审计门不通过即拒绝发布；v5 路径保持不变。
+
+台账结果：50 条中 14 条已识别为层级变化而非二元 ST_ADD，36 条仍缺 effective 前官方状态证据，当前 transition_valid=true/PASS=0，因此没有生成 v6、没有修改 review.py、没有解除 GT-H3B/正式发布阻塞。部分 SSE static PDF 仍受交易所反爬挑战影响，不能把挑战页当作原文；需补齐真实全文并由独立 Reviewer 逐案关闭。
+
+复核命令：
+
+    python scripts/golden/gt_h3r2_transition_audit.py
+    python scripts/golden/gt_h3r2_transition_audit.py --require-clean
+
+下一步验收：50 条台账全部完成官方双核复核；无效条目用独立一手证据做真实替换/删改；维持 125 总量、ST distinct identity、ADD/REMOVE 双向配额、113 carry-forward 只沿用未变身份；最后在 final-head/current-main 分别跑 Windows 3.14、Windows 3.12、Ubuntu 3.14 CI，并由独立 Reviewer 关闭后才能讨论合并。
+
 ## DM-20260907-005 · GT-H3R v5 12 条真实人工复审结果接收
 
 **状态**：`12/12 APPROVE RECEIVED / 113 CARRY-FORWARD CONFIRMED / LEGACY 50 NEUTRALIZED / FINAL HUMAN MARKER PENDING / NOT SEALED`

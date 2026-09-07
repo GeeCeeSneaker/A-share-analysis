@@ -40,9 +40,17 @@ from ashare_state.spike.golden_store import (  # noqa: E402
     semantic_hash_for_doc,
     validate_structural_event_fields,
 )
+from ashare_state.spike.st_transition_audit import (  # noqa: E402
+    transition_audit_publication_gate,
+)
 
 GOLDEN_ROOT = Path("data/golden/provider/amazingdata")
 CANDIDATE_STAGING = GOLDEN_ROOT / "candidate_staging.jsonl"
+
+DEFAULT_TRANSITION_AUDIT = (
+    Path(__file__).resolve().parents[2]
+    / "docs/golden/gt_h3/remediation/GT_H3R2_ST_TRANSITION_AUDIT.jsonl"
+)
 
 REQUIRED_FIELDS = (
     "golden_case_id",
@@ -234,6 +242,42 @@ def _validate_output_documents(lines: list[dict], truth_version: str) -> list:
     return cases
 
 
+def _validate_transition_audit_for_publication(
+    lines: list[dict],
+    truth_version: str,
+    audit_path: Path | None,
+) -> None:
+    """Fail closed on ST semantics for v6+ candidates; v5 remains immutable."""
+    if _version_number(truth_version) < 6:
+        return
+    st_lines = [line for line in lines if line.get("event_class") == "ST_TRANSITION"]
+    if not st_lines:
+        return
+    resolved_audit_path = audit_path or DEFAULT_TRANSITION_AUDIT
+    if not resolved_audit_path.is_file():
+        raise CandidateError(
+            "GT-H3R2 ST transition audit is required before publishing v6+: "
+            f"missing {resolved_audit_path}"
+        )
+    try:
+        audit_rows = [
+            json.loads(line)
+            for line in resolved_audit_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CandidateError(
+            f"cannot read GT-H3R2 ST transition audit {resolved_audit_path}: {exc}"
+        ) from exc
+    problems = transition_audit_publication_gate(audit_rows, lines)
+    if problems:
+        detail = "; ".join(problems[:8])
+        more = " ..." if len(problems) > 8 else ""
+        raise CandidateError(
+            "GT-H3R2 ST transition audit failed closed: " + detail + more
+        )
+
+
 def _jsonl_bytes(lines: list[dict]) -> bytes:
     payload = "".join(json.dumps(doc, ensure_ascii=False, sort_keys=True) + "\n" for doc in lines)
     return payload.encode("utf-8")
@@ -368,7 +412,11 @@ def _build_rebuild_lines(
     return output
 
 
-def cmd_rebuild(plan_path: Path, requested_truth_version: str | None) -> None:
+def cmd_rebuild(
+    plan_path: Path,
+    requested_truth_version: str | None,
+    transition_audit_path: Path | None = None,
+) -> None:
     """Build and publish one fully prevalidated candidate version."""
     active, source_lines = _load_active_cases()
     plan = _load_rebuild_plan(plan_path)
@@ -387,6 +435,9 @@ def cmd_rebuild(plan_path: Path, requested_truth_version: str | None) -> None:
 
     lines = _build_rebuild_lines(active, source_lines, plan, truth_version)
     cases = _validate_output_documents(lines, truth_version)
+    _validate_transition_audit_for_publication(
+        lines, truth_version, transition_audit_path
+    )
     dataset_file = f"golden_cases_{truth_version.split('-', 1)[0]}.jsonl"
     manifest_file = f"truth_manifest_{truth_version.split('-', 1)[0]}.json"
     payload = _jsonl_bytes(lines)
@@ -494,6 +545,7 @@ def main() -> int:
     rebuild = sub.add_parser("rebuild")
     rebuild.add_argument("--plan", type=Path, required=True)
     rebuild.add_argument("--truth-version")
+    rebuild.add_argument("--transition-audit", type=Path)
     args = parser.parse_args()
 
     global GOLDEN_ROOT, CANDIDATE_STAGING
@@ -508,7 +560,7 @@ def main() -> int:
     elif args.command == "build-version":
         cmd_build_version()
     elif args.command == "rebuild":
-        cmd_rebuild(args.plan, args.truth_version)
+        cmd_rebuild(args.plan, args.truth_version, args.transition_audit)
     return 0
 
 
