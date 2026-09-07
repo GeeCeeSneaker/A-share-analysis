@@ -11,7 +11,7 @@
 
 ## 仓库侧独立一致性重算
 
-- main 上 v5 文件 SHA：74c5a2dea28b877ad7375fe5efc8af2e3da3224e；125 条，review_status=COMPILED 125 条。
+- main 上 v5 JSONL 的 Git blob SHA：74c5a2dea28b877ad7375fe5efc8af2e3da3224e；权威 dataset SHA256：5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c；125 条，review_status=COMPILED 125 条。
 - ST_TRANSITION：50 条；IS_ST_SEC=true 38 条、false 12 条；manifest 的 golden_st_transition=50。
 - expected_fields 中命中数值 50：0 条；reviewed_by 非空：0 条。
 - carry-forward ledger：125 条；eligible=113、not_eligible=12；113 条中 old_case_id/new_case_id、prior_decision 和版本中立哈希一致性重算不一致：0 条。
