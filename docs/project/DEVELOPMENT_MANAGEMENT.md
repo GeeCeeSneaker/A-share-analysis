@@ -1,3 +1,23 @@
+## DM-20260908-002 · GT-H3R2 10 条补证闭环与发布门状态
+
+**状态**：IN_PROGRESS / EVIDENCE_CLOSED / PUBLICATION_BLOCKED / PENDING_REVIEW
+
+**范围**：PR #23 的 GT-H3R2 独立审计台账；v5-candidate-20260907 保持 immutable。
+
+**本次完成**
+
+- 10 条此前 NEED_MORE_EVIDENCE 已完成官方全文补证，台账由 25 PASS / 10 待补证更新为 35 PASS / 0 待补证。
+- 15 条 INVALID_ST_LEVEL_CHANGE 保持原结论：它们是 ST→*ST、*ST→ST 或退市风险层级叠加/移除，不是二元 ST false↔true 事件；没有把“有证据”误写成“语义合格”。
+- 新增材料均为可读取的官方第一方全文：CNINFO 发行人公告、上交所正式公告和官方年报；GitHub 只登记 URL 与页码/正文定位，不上传原始 bytes，也不写入任何账号、Token、IP 或密码。
+- v5、review.py、GT-H3B、正式发布、Data Sufficiency 和 Provider verdict 均未触碰；`--require-clean` 仍应因 15 条语义无效而 fail closed。
+
+**独立 Reviewer 需完成**
+
+1. 逐条复开 35 条 PASS 的 pre/effective 材料，确认代码、日期、简称和二元状态。
+2. 逐条复核 15 条 INVALID_ST_LEVEL_CHANGE，决定真实替换、删改或保留为非 ST_TRANSITION；不得以台账改判代替 Golden 数据变更。
+3. 保持 ST distinct、ADD/REMOVE 双向配额和 125 条总量；替换后的事件必须重新取得第一方全文并保留 lineage。
+4. Reviewer closure 后，再生成 v6 candidate，重跑 125 条总量、113 carry-forward、身份唯一性、其他事件语义和三平台 CI；未完成前不合并 PR #23。
+
 ## DM-20260908-001 · GT-H3R2 官方原文补证结果入账
 
 **状态**：IN_PROGRESS / PUBLICATION_BLOCKED / PENDING_REVIEW

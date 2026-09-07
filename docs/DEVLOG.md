@@ -1,3 +1,17 @@
+## 2026-09-08 · GT-H3R2 10 条官方原文补证闭环
+
+> 状态：**35 条官方双核 PASS / 15 条语义无效 / 0 条待补证 / PUBLICATION BLOCKED / v5 IMMUTABLE**
+
+在不改写 v5 的前提下，已对此前 10 条待补证项完成再次取证，并把可读取的官方全文定位写入独立台账：
+
+- 600077、601258、600466、600543、688500（ADD）和 600213 的发行人公告已从 CNINFO 官方全文取得；每条原文同时给出代码、有效日和简称变更，直接支持 false -> true。
+- 603963 由有效日前官方年报与后续官方风险状态披露互证；603363、688282 由有效日前官方年报与上交所正式公告互证；688500（REMOVE）由有效日前官方材料与上交所正式撤销公告互证。
+- 10 条已从 NEED_MORE_EVIDENCE 改为 transition_valid=true、audit_status=PASS；台账现为 35 条 PASS、15 条 INVALID_ST_LEVEL_CHANGE、0 条待补证。
+- 15 条语义无效仍未被“补证”掩盖：它们是 ST 层级变化或其他风险层级变化，必须真实替换/删改；因此没有生成 v6、没有修改 review.py、没有解除 GT-H3B 或正式发布阻塞。
+- 本轮只在 GitHub 保存官方 URL 与页码/正文定位，不上传原始文件 bytes，也不保存任何账号、Token、IP 或密码。
+
+下一步：由独立 Reviewer 逐案复开 35 条 PASS 与 15 条无效项；经 Reviewer closure 后，才能在不改 v5 的前提下设计真实替换事件、生成带 lineage 的 v6 candidate，并重跑 125 总量、身份唯一性、carry-forward、其他事件语义和三平台 CI。
+
 ## 2026-09-08 · GT-H3R2 官方原文补证与语义复核推进
 
 > 状态：**25 条双核 PASS / 15 条语义无效 / 10 条待补证 / PUBLICATION BLOCKED / v5 IMMUTABLE**
