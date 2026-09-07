@@ -1,3 +1,14 @@
+## 2026-09-08 · GT-H3R2 15 条真实替换候选池
+
+> 状态：**DRAFT CANDIDATE POOL / 35 条 PASS / 15 条 INVALID / v5 IMMUTABLE / v6 NOT PUBLISHED / PUBLICATION BLOCKED**
+
+- 针对 15 条 `INVALID_ST_LEVEL_CHANGE`，从官方 CNINFO 直链 PDF 中筛选并完整读取了 15 个新的 ST 加帽候选；每份材料 HTTP 200，正文同时给出代码、有效日、普通简称与 `*ST` 简称。
+- 候选见 `docs/golden/gt_h3/remediation/GT_H3R2_REPLACEMENT_CANDIDATES.md`；全部标记为 `PENDING_INDEPENDENT_REVIEW`，开发者读取不等于独立 Reviewer 批准。
+- 原 15 条无效行没有改判、没有修改 v5；当前仍须“移出无效源行 + 引入真实候选”，保持 50 条 ST_TRANSITION 与 38 ADD / 12 REMOVE，并在 v6 阶段重新计算迁移关系。
+- 本轮只登记官方 URL 与正文定位，不上传原始 PDF bytes，不保存账号、Token、IP 或密码；未生成 v6，未运行 `review.py`，未解除 GT-H3B/正式发布门。
+
+下一步：请独立 Reviewer 实际打开 15 份官方原文并逐条填写 APPROVE/REJECT/NEED_MORE_EVIDENCE；closure 后再编制带 lineage 的 v6 DROP/ADD/REPLACE 计划，并重跑 125 总量、唯一性、其他事件语义和三平台 CI。
+
 ## 2026-09-08 · GT-H3R2 10 条官方原文补证闭环
 
 > 状态：**35 条官方双核 PASS / 15 条语义无效 / 0 条待补证 / PUBLICATION BLOCKED / v5 IMMUTABLE**

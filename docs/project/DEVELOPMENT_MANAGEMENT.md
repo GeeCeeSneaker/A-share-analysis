@@ -1,3 +1,14 @@
+## DM-20260908-003 · GT-H3R2 15 条替换候选池准备
+
+- **Type**：C1 — evidence-backed replacement candidate planning
+- **Date**：2026-09-08
+- **Status**：IN_PROGRESS / PUBLICATION_BLOCKED / PENDING_INDEPENDENT_REVIEW
+- **Trigger**：GT-H3R2 全量台账已关闭 10 条补证项，但仍保留 15 条 `INVALID_ST_LEVEL_CHANGE`；这些行不能通过补证修复。
+- **New artifact**：`docs/golden/gt_h3/remediation/GT_H3R2_REPLACEMENT_CANDIDATES.md`，提供 15 个新的 `ST_ADD/STAR_ST_ADD` 候选及官方 CNINFO PDF 直链、页码定位和独立复核清单。
+- **Evidence boundary**：15 份直链均 HTTP 200、为官方 PDF 且已完成全文提取；GitHub 只保存 URL/定位，不保存原始 bytes，也不保存任何账号或连接信息。
+- **Governance**：候选池是草案，不是 Golden/v6，不是 Reviewer closure；不得把旧无效行改为 PASS，不得降低 ST_TRANSITION 配额。
+- **Next gate**：独立 Reviewer 逐案复核候选后，项目 Owner 才能编制 15 条真实 DROP/ADD/REPLACE 的 v6 plan；随后必须重新检查 125 总量、50 条 ST_TRANSITION、38/12 配额、唯一性、其他事件语义和 v5→v6 lineage，再决定是否进入 `review.py`/GT-H3B/发布门。
+
 ## DM-20260908-002 · GT-H3R2 10 条补证闭环与发布门状态
 
 **状态**：IN_PROGRESS / EVIDENCE_CLOSED / PUBLICATION_BLOCKED / PENDING_REVIEW
