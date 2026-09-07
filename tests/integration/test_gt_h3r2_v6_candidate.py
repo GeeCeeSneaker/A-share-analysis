@@ -6,15 +6,22 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.golden.gt_h3r2_v6_verify import verify
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_ROOT = REPO_ROOT / "data/golden/provider/amazingdata"
 REMEDIATION_ROOT = REPO_ROOT / "docs/golden/gt_h3/remediation"
+VERIFY_SCRIPT = REPO_ROOT / "scripts/golden/gt_h3r2_v6_verify.py"
 
 
 def test_staged_v6_verifier_reports_exact_invariants() -> None:
-    summary = verify(REPO_ROOT)
+    result = subprocess.run(
+        [sys.executable, str(VERIFY_SCRIPT), "verify"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)
     assert summary == {
         "v5_truth_version": "v5-candidate-20260907",
         "v5_dataset_hash": ("5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"),

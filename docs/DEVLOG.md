@@ -1,3 +1,10 @@
+## 2026-09-08 · GT-H3R2 v6 verifier test import portability
+
+> 状态：**TEST HARNESS FIX STAGED / SEMANTICS UNCHANGED**
+
+- CI 证明三平台的 Ruff lint、format 和 mypy 均通过；测试收集暴露出 `scripts/` 不是可导入包。
+- 回归测试改为通过公开 CLI 子进程调用只读验证器，覆盖真实命令入口，同时不改变 v6 数据或校验规则。
+
 ## 2026-09-08 · GT-H3R2 v6 formatter parity correction
 
 > 状态：**FORMAT FIX 2 STAGED / SEMANTICS UNCHANGED**
