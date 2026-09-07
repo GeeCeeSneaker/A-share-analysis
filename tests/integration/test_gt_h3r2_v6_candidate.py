@@ -8,7 +8,6 @@ from pathlib import Path
 
 from scripts.golden.gt_h3r2_v6_verify import verify
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_ROOT = REPO_ROOT / "data/golden/provider/amazingdata"
 REMEDIATION_ROOT = REPO_ROOT / "docs/golden/gt_h3/remediation"
@@ -50,7 +49,10 @@ def test_candidate_rebuild_reproduces_committed_v6(tmp_path: Path) -> None:
         GOLDEN_ROOT / "truth_manifest_v5.json",
         temporary_golden_root / "truth_manifest_v5.json",
     )
-    shutil.copy2(GOLDEN_ROOT / "truth_manifest.json", temporary_golden_root / "truth_manifest.json")
+    shutil.copy2(
+        GOLDEN_ROOT / "truth_manifest.json",
+        temporary_golden_root / "truth_manifest.json",
+    )
     plan_path = REMEDIATION_ROOT / "v5_to_v6_rebuild_plan.json"
     audit_path = REMEDIATION_ROOT / "GT_H3R2_ST_TRANSITION_AUDIT.jsonl"
     command = [
@@ -82,6 +84,6 @@ def test_candidate_rebuild_reproduces_committed_v6(tmp_path: Path) -> None:
         (temporary_golden_root / "truth_manifest_v6.json").read_bytes()
         == (GOLDEN_ROOT / "truth_manifest_v6.json").read_bytes()
     )
-    assert json.loads((temporary_golden_root / "truth_manifest.json").read_text()) == json.loads(
-        (GOLDEN_ROOT / "truth_manifest_v6.json").read_text()
-    )
+    assert json.loads(
+        (temporary_golden_root / "truth_manifest.json").read_text(encoding="utf-8")
+    ) == json.loads((GOLDEN_ROOT / "truth_manifest_v6.json").read_text(encoding="utf-8"))
