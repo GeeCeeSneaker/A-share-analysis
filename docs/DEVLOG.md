@@ -1,3 +1,11 @@
+## 2026-09-08 · GT-H3R2 v6 verifier format gate correction
+
+> 状态：**FORMAT FIX STAGED / SEMANTICS UNCHANGED**
+
+- 首轮 v6 提交的 CI 已通过 Ruff lint，格式门发现只读验证器的三个集合推导排版未按仓库 Ruff formatter 规范输出。
+- 本次仅按 CI 给出的 formatter 结果调整排版；v5/v6 数据、计划、carry-forward、审计台账与哈希均不变。
+- 该提交继续遵守 DEVLOG 同提交记录要求；下一轮 CI 需重新跑完整三平台门禁。
+
 ## 2026-09-08 · GT-H3R2 v6 candidate governed build
 
 > 状态：**V6 CANDIDATE STAGED / 50 条 AUDIT PASS / 110 CARRY-FORWARD ELIGIBLE / 15 条新增 Human Review PENDING / ACTIVE STILL v5 / NOT SEALED**

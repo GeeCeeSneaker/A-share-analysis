@@ -453,9 +453,7 @@ def _verify_row_sets(
         )
 
     other_ids = {
-        case_id
-        for case_id, row in v5_by_id.items()
-        if row.get("event_class") != "ST_TRANSITION"
+        case_id for case_id, row in v5_by_id.items() if row.get("event_class") != "ST_TRANSITION"
     }
     _require(len(other_ids) == 75, "v5 non-ST population is not 75")
     _require(other_ids <= unchanged_ids, "a non-ST case was not carried forward")
@@ -522,9 +520,7 @@ def _verify_plan(
     drop_ids = {str(op.get("golden_case_id")) for op in source_operations if op.get("op") == "DROP"}
     keep_ids = {str(op.get("golden_case_id")) for op in source_operations if op.get("op") == "KEEP"}
     replace_ids = {
-        str(op.get("golden_case_id"))
-        for op in source_operations
-        if op.get("op") == "REPLACE"
+        str(op.get("golden_case_id")) for op in source_operations if op.get("op") == "REPLACE"
     }
     _require(drop_ids == INVALID_SOURCE_IDS, "plan DROP IDs mismatch")
     _require(keep_ids == v5_ids - INVALID_SOURCE_IDS, "plan KEEP IDs mismatch")
@@ -613,9 +609,7 @@ def _verify_audit(
 ) -> dict[str, int]:
     _require(len(rows) == 50, "GT-H3R2 audit must contain 50 rows")
     st_ids = {
-        str(row["golden_case_id"])
-        for row in v6_docs
-        if row.get("event_class") == "ST_TRANSITION"
+        str(row["golden_case_id"]) for row in v6_docs if row.get("event_class") == "ST_TRANSITION"
     }
     audit_ids = {str(row.get("golden_case_id")) for row in rows}
     _require(audit_ids == st_ids, "GT-H3R2 audit ID set does not match v6 ST set")
