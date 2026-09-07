@@ -1,3 +1,9 @@
+## DM-20260907-008 · GT-H3R2 Ruff line-length 配置对齐
+
+**状态**：修复 CI format check 的配置偏差，语义与治理状态不变。
+
+PR #23 首轮格式提交使用了默认 stdin 行宽，CI 使用仓库的 line-length=100，导致 4 个 Python 文件出现相反的重排结果。本次显式采用仓库配置重新格式化，并在同一提交更新 DEVLOG 与管理文档；审计台账、候选门和 v5 immutable 状态不变。
+
 ## DM-20260907-007 · GT-H3R2 Python 格式修正
 
 **状态**：Ruff 格式门修正，语义与治理状态不变。

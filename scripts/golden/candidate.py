@@ -106,9 +106,7 @@ def _validate_candidate(doc: dict, known_ids: set[str]) -> None:
         raise CandidateError(f"candidate {case_id}: duplicate golden_case_id")
     event_class = doc["event_class"]
     if not isinstance(event_class, str) or event_class not in VALID_EVENT_CLASSES:
-        raise CandidateError(
-            f"candidate {case_id}: unknown event_class {event_class!r}"
-        )
+        raise CandidateError(f"candidate {case_id}: unknown event_class {event_class!r}")
     if doc.get("review_status") not in (None, "COMPILED"):
         raise CandidateError(
             f"candidate {case_id}: augmentation may only add COMPILED candidates "
@@ -150,18 +148,14 @@ def _load_active_cases() -> tuple[dict, list[dict]]:
     except GoldenTruthError as exc:
         raise CandidateError(f"active dataset is not loadable: {exc}") from exc
     lines = [
-        json.loads(line)
-        for line in dataset_bytes.decode("utf-8").splitlines()
-        if line.strip()
+        json.loads(line) for line in dataset_bytes.decode("utf-8").splitlines() if line.strip()
     ]
     return active, lines
 
 
 def _preflight_create_only(path: Path, data: bytes) -> None:
     if path.exists() and path.read_bytes() != data:
-        raise CandidateError(
-            f"versioned file {path.name} already exists with different bytes"
-        )
+        raise CandidateError(f"versioned file {path.name} already exists with different bytes")
 
 
 def _create_only_write(path: Path, data: bytes) -> None:
@@ -230,17 +224,11 @@ def _validate_output_documents(lines: list[dict], truth_version: str) -> list:
         if doc.get("truth_version") != truth_version:
             raise CandidateError(f"candidate {case_id}: wrong output truth_version")
         if doc.get("review_status") != "COMPILED":
-            raise CandidateError(
-                f"candidate {case_id}: rebuild output must be COMPILED"
-            )
+            raise CandidateError(f"candidate {case_id}: rebuild output must be COMPILED")
         if any(str(doc.get(field, "")) for field in REVIEW_PROVENANCE_FIELDS):
-            raise CandidateError(
-                f"candidate {case_id}: rebuild output contains review provenance"
-            )
+            raise CandidateError(f"candidate {case_id}: rebuild output contains review provenance")
         if not doc.get("compiled_by") or not doc.get("compiled_at"):
-            raise CandidateError(
-                f"candidate {case_id}: compiled provenance is incomplete"
-            )
+            raise CandidateError(f"candidate {case_id}: compiled provenance is incomplete")
         if doc.get("case_semantic_hash") != _semantic_hash(doc):
             raise CandidateError(f"candidate {case_id}: case_semantic_hash mismatch")
         known_ids.add(case_id)
@@ -249,9 +237,7 @@ def _validate_output_documents(lines: list[dict], truth_version: str) -> list:
     try:
         cases = cases_from_dataset_bytes(payload, truth_version)
     except GoldenTruthError as exc:
-        raise CandidateError(
-            f"rebuilt dataset failed loader self-validation: {exc}"
-        ) from exc
+        raise CandidateError(f"rebuilt dataset failed loader self-validation: {exc}") from exc
 
     return cases
 
@@ -287,15 +273,11 @@ def _validate_transition_audit_for_publication(
     if problems:
         detail = "; ".join(problems[:8])
         more = " ..." if len(problems) > 8 else ""
-        raise CandidateError(
-            "GT-H3R2 ST transition audit failed closed: " + detail + more
-        )
+        raise CandidateError("GT-H3R2 ST transition audit failed closed: " + detail + more)
 
 
 def _jsonl_bytes(lines: list[dict]) -> bytes:
-    payload = "".join(
-        json.dumps(doc, ensure_ascii=False, sort_keys=True) + "\n" for doc in lines
-    )
+    payload = "".join(json.dumps(doc, ensure_ascii=False, sort_keys=True) + "\n" for doc in lines)
     return payload.encode("utf-8")
 
 
@@ -349,13 +331,9 @@ def _build_rebuild_lines(
             f"{expected_version!r} does not match active {source_version!r}"
         )
     if expected_hash != active.get("dataset_hash"):
-        raise CandidateError(
-            "rebuild source_dataset_hash does not match the active dataset"
-        )
+        raise CandidateError("rebuild source_dataset_hash does not match the active dataset")
     if plan.get("source_dataset_file") not in (None, active.get("dataset_file")):
-        raise CandidateError(
-            "rebuild source_dataset_file does not match the active dataset"
-        )
+        raise CandidateError("rebuild source_dataset_file does not match the active dataset")
 
     source_by_id = {str(doc["golden_case_id"]): doc for doc in source_lines}
     if len(source_by_id) != len(source_lines):
@@ -377,16 +355,12 @@ def _build_rebuild_lines(
         if op == "ADD":
             case = raw.get("case")
             if not isinstance(case, dict):
-                raise CandidateError(
-                    f"rebuild operation {index}: ADD requires case object"
-                )
+                raise CandidateError(f"rebuild operation {index}: ADD requires case object")
             case_id = case.get("golden_case_id")
             if raw.get("golden_case_id") not in (None, case_id):
                 raise CandidateError(f"rebuild operation {index}: ADD case ID mismatch")
             if not isinstance(case_id, str) or not case_id:
-                raise CandidateError(
-                    f"rebuild operation {index}: ADD requires case.golden_case_id"
-                )
+                raise CandidateError(f"rebuild operation {index}: ADD requires case.golden_case_id")
             _validate_candidate(case, source_ids | output_ids)
             normalized = _prepare_compiled_doc(case, truth_version)
             output.append(normalized)
@@ -395,15 +369,11 @@ def _build_rebuild_lines(
 
         case_id = raw.get("golden_case_id")
         if not isinstance(case_id, str) or not case_id:
-            raise CandidateError(
-                f"rebuild operation {index}: {op} requires golden_case_id"
-            )
+            raise CandidateError(f"rebuild operation {index}: {op} requires golden_case_id")
         if op not in {"KEEP", "REPLACE", "DROP"}:
             raise CandidateError(f"rebuild operation {index}: unknown op {op!r}")
         if case_id not in source_by_id:
-            raise CandidateError(
-                f"rebuild operation {index}: unknown source case {case_id}"
-            )
+            raise CandidateError(f"rebuild operation {index}: unknown source case {case_id}")
         if case_id in seen_source_ids:
             raise CandidateError(f"rebuild source case {case_id}: duplicate operation")
         seen_source_ids.add(case_id)
@@ -415,9 +385,7 @@ def _build_rebuild_lines(
         else:
             replacement = raw.get("case")
             if not isinstance(replacement, dict):
-                raise CandidateError(
-                    f"rebuild operation {index}: REPLACE requires case object"
-                )
+                raise CandidateError(f"rebuild operation {index}: REPLACE requires case object")
             replacement_id = replacement.get("golden_case_id")
             if replacement_id != case_id and raw.get("allow_rekey") is not True:
                 raise CandidateError(
@@ -451,13 +419,8 @@ def cmd_rebuild(
     active, source_lines = _load_active_cases()
     plan = _load_rebuild_plan(plan_path)
     plan_truth_version = plan.get("target_truth_version")
-    if plan_truth_version is not None and requested_truth_version not in (
-        None,
-        plan_truth_version,
-    ):
-        raise CandidateError(
-            "CLI --truth-version conflicts with plan target_truth_version"
-        )
+    if plan_truth_version is not None and requested_truth_version not in (None, plan_truth_version):
+        raise CandidateError("CLI --truth-version conflicts with plan target_truth_version")
     truth_version = str(
         requested_truth_version
         or plan_truth_version
@@ -466,15 +429,11 @@ def cmd_rebuild(
     if "/" in truth_version or "\\" in truth_version:
         raise CandidateError("target truth_version may not contain a path separator")
     if _version_number(truth_version) <= _version_number(str(active["truth_version"])):
-        raise CandidateError(
-            "target truth_version must be newer than the active version"
-        )
+        raise CandidateError("target truth_version must be newer than the active version")
 
     lines = _build_rebuild_lines(active, source_lines, plan, truth_version)
     cases = _validate_output_documents(lines, truth_version)
-    _validate_transition_audit_for_publication(
-        lines, truth_version, transition_audit_path
-    )
+    _validate_transition_audit_for_publication(lines, truth_version, transition_audit_path)
     dataset_file = f"golden_cases_{truth_version.split('-', 1)[0]}.jsonl"
     manifest_file = f"truth_manifest_{truth_version.split('-', 1)[0]}.json"
     payload = _jsonl_bytes(lines)
@@ -531,9 +490,7 @@ def cmd_add_case(input_path: Path) -> None:
         doc["truth_version"] = "staged"
         doc["case_semantic_hash"] = _semantic_hash(doc)
         staged.append(doc)
-    payload = "".join(
-        json.dumps(doc, ensure_ascii=False, sort_keys=True) + "\n" for doc in staged
-    )
+    payload = "".join(json.dumps(doc, ensure_ascii=False, sort_keys=True) + "\n" for doc in staged)
     CANDIDATE_STAGING.write_text(payload, encoding="utf-8", newline="\n")
     print(f"staged: {len(new_entries)} new candidates (total staged: {len(staged)})")
 
@@ -558,17 +515,11 @@ def cmd_validate() -> None:
                 f"candidate {doc['golden_case_id']}: staged semantic hash mismatch"
             )
     st_ids = {
-        (
-            d["provider_symbol"],
-            d.get("event_effective_date", ""),
-            d.get("event_subtype", ""),
-        )
+        (d["provider_symbol"], d.get("event_effective_date", ""), d.get("event_subtype", ""))
         for d in staged
         if d["event_class"] == "ST_TRANSITION"
     }
-    print(
-        f"staged candidates valid: {len(staged)}; distinct ST identities: {len(st_ids)}"
-    )
+    print(f"staged candidates valid: {len(staged)}; distinct ST identities: {len(st_ids)}")
 
 
 def cmd_build_version() -> None:
@@ -580,9 +531,7 @@ def cmd_build_version() -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Golden candidate compilation and rebuild"
-    )
+    parser = argparse.ArgumentParser(description="Golden candidate compilation and rebuild")
     parser.add_argument("--root", type=Path, help="golden root override (tests)")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("validate")

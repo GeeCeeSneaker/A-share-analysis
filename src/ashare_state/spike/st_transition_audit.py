@@ -124,8 +124,7 @@ def validate_transition_audit(
         missing = [field for field in REQUIRED_AUDIT_FIELDS if field not in row]
         if missing:
             problems.append(
-                f"audit row {index} {row.get('golden_case_id', '?')}: "
-                f"missing fields {missing}"
+                f"audit row {index} {row.get('golden_case_id', '?')}: missing fields {missing}"
             )
         case_id = str(row.get("golden_case_id", ""))
         if not case_id:
@@ -137,9 +136,7 @@ def validate_transition_audit(
         audit_by_id[case_id] = row
         candidate = expected_by_id.get(case_id)
         if candidate is None:
-            problems.append(
-                f"audit {case_id}: not present in candidate ST_TRANSITION rows"
-            )
+            problems.append(f"audit {case_id}: not present in candidate ST_TRANSITION rows")
             continue
         for field in ("provider_symbol", "event_subtype", "event_effective_date"):
             if row.get(field) != candidate.get(field):
@@ -152,19 +149,14 @@ def validate_transition_audit(
         effective_expected = _expected_effective_state(row.get("event_subtype"))
         if not _is_bool(row.get("effective_is_st")):
             problems.append(f"audit {case_id}: effective_is_st must be boolean")
-        elif (
-            effective_expected is not None
-            and row.get("effective_is_st") != effective_expected
-        ):
+        elif effective_expected is not None and row.get("effective_is_st") != effective_expected:
             problems.append(
                 f"audit {case_id}: effective_is_st does not match subtype "
                 f"{row.get('event_subtype')}"
             )
         pre_state = row.get("pre_effective_is_st")
         if pre_state is not None and not _is_bool(pre_state):
-            problems.append(
-                f"audit {case_id}: pre_effective_is_st must be boolean or null"
-            )
+            problems.append(f"audit {case_id}: pre_effective_is_st must be boolean or null")
         for field in (
             "pre_state_official_evidence",
             "effective_state_official_evidence",
@@ -194,9 +186,7 @@ def transition_audit_publication_gate(
 
     candidate_st, _ = _candidate_st_rows(candidate_rows)
     audit_by_id = {
-        str(row.get("golden_case_id")): row
-        for row in audit_rows
-        if isinstance(row, Mapping)
+        str(row.get("golden_case_id")): row for row in audit_rows if isinstance(row, Mapping)
     }
     for candidate in candidate_st:
         case_id = str(candidate["golden_case_id"])
@@ -216,13 +206,10 @@ def transition_audit_publication_gate(
                 f"observed pre={row.get('pre_effective_is_st')!r}"
             )
         if row.get("effective_is_st") is not expected_effective:
-            problems.append(
-                f"audit {case_id}: effective state does not prove {expected_effective}"
-            )
+            problems.append(f"audit {case_id}: effective state does not prove {expected_effective}")
         if row.get("audit_status") != "PASS":
             problems.append(
-                f"audit {case_id}: audit_status must be PASS "
-                f"(got {row.get('audit_status')!r})"
+                f"audit {case_id}: audit_status must be PASS (got {row.get('audit_status')!r})"
             )
         for field in (
             "pre_state_official_evidence",
@@ -230,7 +217,6 @@ def transition_audit_publication_gate(
         ):
             if not _evidence_is_complete(row.get(field)):
                 problems.append(
-                    f"audit {case_id}: {field} is not a fully reviewed "
-                    "first-party official locator"
+                    f"audit {case_id}: {field} is not a fully reviewed first-party official locator"
                 )
     return problems

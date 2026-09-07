@@ -55,11 +55,7 @@ def _active_dataset(root: Path) -> tuple[dict, list[dict]]:
     except (KeyError, OSError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"cannot load active golden dataset: {exc}") from exc
     cases_from_dataset_bytes(dataset_bytes, str(manifest["truth_version"]))
-    rows = [
-        json.loads(line)
-        for line in dataset_bytes.decode("utf-8").splitlines()
-        if line.strip()
-    ]
+    rows = [json.loads(line) for line in dataset_bytes.decode("utf-8").splitlines() if line.strip()]
     return manifest, rows
 
 
@@ -74,9 +70,7 @@ def main() -> int:
     audit_rows = _jsonl(args.audit)
     structural = validate_transition_audit(audit_rows, candidate_rows)
     publication = transition_audit_publication_gate(audit_rows, candidate_rows)
-    status_counts = Counter(
-        str(row.get("audit_status", "MISSING")) for row in audit_rows
-    )
+    status_counts = Counter(str(row.get("audit_status", "MISSING")) for row in audit_rows)
     summary = {
         "truth_version": manifest.get("truth_version"),
         "candidate_st_transition_count": sum(
