@@ -1,5 +1,26 @@
 # A-share-analysis 开发管理总册（Development Management）
 
+## DM-20260907-001 · GT-H3 人工核验结果接收与项目管理复核
+
+**状态**：`RECEIVED / STRUCTURE_CHECKED / PENDING_PROJECT_MANAGER_REVIEW / NOT_SEALED`
+
+**确认结果**
+
+- 收到审阅人 `LY审阅` 于 2026-09-07 填写的 125 条结果：APPROVE 113 条，REJECT 12 条。
+- 结果表覆盖当前候选 125/125 个案例，案例身份字段与 PR #19 当前 GT-H3 index 完全对齐。
+- 12 条 REJECT 按材料分组归并为 6 组：AG-054、AG-025、AG-029、AG-027、AG-064、AG-096；报告中保留每条案例和人工原因。
+- 原始工作簿、结构化摘录和分析报告已推送，便于项目管理者逐项处理。
+
+**需管理者确认**
+
+- 113 条 APPROVE 的反馈栏统一是 `50`，当前无法判断是页码、条款号还是评分。
+- 填写说明页 B5:B7 在本地导入时显示 `#NAME?`，应修复公式或以逐案结果为准。
+- 该结果没有替代官方原文复核，也没有完整 125/125 授权声明和 human marker，因此不能推进 GT-H3B 或 seal。
+
+**下一步**
+
+先完成 6 个材料分组的补证据/候选修正/重新裁决，再由真实 Owner/Human Reviewer 明确授权完整 125/125；canonical 空白模板不被覆盖。
+
 ## DM-20260906-115 · GT-H3 审阅表测试格式修正
 
 **状态**：`CORRECTED / CI_PENDING / PENDING_HUMAN_REVIEW`

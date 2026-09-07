@@ -153,6 +153,18 @@ How to complete one row:
 
 These files are reviewer aids only. The canonical machine input remains `review_decision_template.jsonl`; no evidence bytes, evidence hashes, `REVIEWED` fields, seal manifest or production pointer is created by this table.
 
+## Human result received (2026-09-07)
+
+The completed workbook has been received and checked read-only.
+
+- [Original human result workbook](GT_H3_HUMAN_REVIEW_RESULT_20260907.xlsx)
+- [Result analysis](GT_H3_HUMAN_REVIEW_ANALYSIS_20260907.md)
+- [Structured result extract](GT_H3_HUMAN_REVIEW_RESULT.jsonl)
+
+The submitted result reports 125/125 rows completed: 113 `APPROVE` and 12 `REJECT`, reviewed by `LY审阅` on 2026-09-07. The result is structurally aligned with the current case bundle, but it is not a complete approval: six artifact groups require project-manager review, and the workbook does not contain the required explicit 125/125 authorization statement and human marker.
+
+These files are review records, not seal inputs. They do not update `REVIEWED`, evidence bytes/hashes, the ACTIVE pointer or any production state.
+
 ## Tracked outputs
 
 - `review_bundle_index.jsonl`: one row per unique official artifact group, including all case-specific semantics and retrieval placeholders.
