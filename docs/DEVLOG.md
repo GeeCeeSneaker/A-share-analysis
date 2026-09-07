@@ -1,3 +1,27 @@
+## 2026-09-07 · GT-H3R v5 12 条真实人工复审结果接收
+
+> 状态：**12/12 APPROVE RECEIVED / 113 CARRY-FORWARD CONFIRMED / LEGACY 50 NEUTRALIZED / FINAL HUMAN MARKER PENDING / NOT SEALED**
+
+- 收到提交者提供的 v5 12 条逐案复审裁决：`APPROVE 12 / REJECT 0`；提交者声明已逐条打开 sidecar 所列全部 required official source 原文并完成全文提取。
+- 结果已登记到 `docs/golden/gt_h3/remediation/GT_H3R_V5_HUMAN_REVIEW_RESULT_RECEIVED.md` 与同名 JSONL；原有空白审阅表保持不变。
+- 对 main 上 v5 数据的独立重算：125 条 `COMPILED`；ST_TRANSITION 50 条，其中 `IS_ST_SEC=true` 为 38、false 为 12；`expected_fields` 命中数值 50 为 0；reviewed provenance 仍为 0 条。
+- carry-forward ledger 独立核对为 eligible 113、not_eligible 12；113 条的 old/new ID、prior APPROVE 和版本中立哈希一致性不一致为 0；12 条与 10 条换源、2 条语义修正逐行对应。
+- legacy `50` 已由提交者明确为 ST_TRANSITION 语料配额而非市场语义真值，并以 v5 结构重算支持；未修改 v4/v5 Golden expected fields。
+- A2 日期 slug、A3 浏览器挑战、D2 回溯材料等已按提交者观察登记为非阻断事项；原始证据 bytes 仍在本地，不上传 GitHub。
+- 仍缺明确的 final human marker 及可关联的审阅人标识/日期。独立项目 Reviewer closure 也尚未完成，因此不运行 `review.py`、不写入 `REVIEWED` provenance、不生成 GT-H3B，不推进 Production、Data Sufficiency、Provider verdict 或 backfill。
+
+## 2026-09-07 · GT-H3R 合并后审计记录与 12 条真实人工复审授权
+
+> 状态：**MERGED / 12-CASE REAL HUMAN RE-REVIEW AUTHORIZED / GT-H3B NOT AUTHORIZED**
+
+- PR #20 已合并；合并提交：`b03ada73bc15d5e1ea1a62a28962ba8204b5bd51`。
+- 被 Reviewer 最终核验的 PR head：`4fb60f1cbb5a23f71bcbbfffbc72d488fd2a157d`；合并前 main：`669759adf34bece4c9e41c7be2ce2e9f858e5277`；GitHub test-merge：`11cf4e4b811b0a5c90042087a544216863b4e1e1`。
+- Reviewer closure：`5130860878`；对应 CI run `34109324402` / #358，Windows py3.14、Windows py3.12、Ubuntu py3.14 全部成功。
+- 合并后 main 当前记录基线为 `06cdab7b6985effd26bdf2309eeff0f154fff366`；本条记录只固化已完成合并的审计元数据，不改变 Golden 数据或审核结论。
+- v5 仍为 `v5-candidate-20260907`、125 条 `COMPILED`；113 条 carry-forward 已验证，12 条 corrected cases 获授权进入真实人工复审。
+- 使用 remediation 目录中的 Markdown/Excel 表和 supporting-source sidecar；当前 main 未收到新的 12 条人工结果，人工结果、反馈、审阅人和日期继续保持空白。
+- GT-H3R/GT-H3R.1 已关闭；GT-H3B、`review.py`、REVIEWED、Production、Data Sufficiency、Provider verdict 和 backfill 仍未授权。下一步只接受真实 Human Reviewer 的 12/12 结果、113 条沿用确认、legacy `50` 的中和/定义及最终 human marker。
+
 ## 2026-09-07 · GT-H3R.1 Python 格式门禁修正
 
 - 格式修复已按仓库 Ruff 规则完成；本次仅改变 GT-H3R verifier 的排版，不改变 v4/v5 Golden bytes、12 条范围、来源契约或人工结果。
