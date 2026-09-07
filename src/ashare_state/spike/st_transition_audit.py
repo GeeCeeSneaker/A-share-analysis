@@ -114,9 +114,7 @@ def validate_transition_audit(
     """
 
     candidate_st, problems = _candidate_st_rows(candidate_rows)
-    expected_by_id = {
-        str(row.get("golden_case_id")): row for row in candidate_st
-    }
+    expected_by_id = {str(row.get("golden_case_id")): row for row in candidate_st}
     audit_by_id: dict[str, Mapping[str, object]] = {}
 
     for index, row in enumerate(audit_rows, start=1):
@@ -139,7 +137,9 @@ def validate_transition_audit(
         audit_by_id[case_id] = row
         candidate = expected_by_id.get(case_id)
         if candidate is None:
-            problems.append(f"audit {case_id}: not present in candidate ST_TRANSITION rows")
+            problems.append(
+                f"audit {case_id}: not present in candidate ST_TRANSITION rows"
+            )
             continue
         for field in ("provider_symbol", "event_subtype", "event_effective_date"):
             if row.get(field) != candidate.get(field):
@@ -152,7 +152,10 @@ def validate_transition_audit(
         effective_expected = _expected_effective_state(row.get("event_subtype"))
         if not _is_bool(row.get("effective_is_st")):
             problems.append(f"audit {case_id}: effective_is_st must be boolean")
-        elif effective_expected is not None and row.get("effective_is_st") != effective_expected:
+        elif (
+            effective_expected is not None
+            and row.get("effective_is_st") != effective_expected
+        ):
             problems.append(
                 f"audit {case_id}: effective_is_st does not match subtype "
                 f"{row.get('event_subtype')}"
@@ -214,8 +217,7 @@ def transition_audit_publication_gate(
             )
         if row.get("effective_is_st") is not expected_effective:
             problems.append(
-                f"audit {case_id}: effective state does not prove "
-                f"{expected_effective}"
+                f"audit {case_id}: effective state does not prove {expected_effective}"
             )
         if row.get("audit_status") != "PASS":
             problems.append(

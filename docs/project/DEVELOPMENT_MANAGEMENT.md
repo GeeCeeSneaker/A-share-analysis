@@ -1,3 +1,9 @@
+## DM-20260907-007 · GT-H3R2 Python 格式修正
+
+**状态**：Ruff 格式门修正，语义与治理状态不变。
+
+PR #23 首轮 CI 的 lint 已通过，但 Ruff format check 在三套矩阵均失败。本次按 uv.lock 锁定的 Ruff 0.16.4 重新格式化新增审计模块、检查器、测试及 candidate.py，并在同一提交更新 DEVLOG 与本管理文档。v5、GT-H3R2 台账结论和 fail-closed 状态均未改变。
+
 ## DM-20260907-006 · GT-H3R2 ST_TRANSITION 全量语义审计台账与 fail-closed 门
 
 **状态**：GT-H3R2 AUDIT INVENTORY COMPLETE / PUBLICATION BLOCKED / v5 IMMUTABLE

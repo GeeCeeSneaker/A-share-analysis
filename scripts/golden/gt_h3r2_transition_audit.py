@@ -74,7 +74,9 @@ def main() -> int:
     audit_rows = _jsonl(args.audit)
     structural = validate_transition_audit(audit_rows, candidate_rows)
     publication = transition_audit_publication_gate(audit_rows, candidate_rows)
-    status_counts = Counter(str(row.get("audit_status", "MISSING")) for row in audit_rows)
+    status_counts = Counter(
+        str(row.get("audit_status", "MISSING")) for row in audit_rows
+    )
     summary = {
         "truth_version": manifest.get("truth_version"),
         "candidate_st_transition_count": sum(

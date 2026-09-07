@@ -22,7 +22,9 @@ def _evidence() -> dict:
     }
 
 
-def _audit(candidate: dict, pre: bool | None, effective: bool, valid: bool = True) -> dict:
+def _audit(
+    candidate: dict, pre: bool | None, effective: bool, valid: bool = True
+) -> dict:
     return {
         "golden_case_id": candidate["golden_case_id"],
         "provider_symbol": candidate["provider_symbol"],
@@ -85,4 +87,6 @@ def test_effective_state_is_bound_to_subtype():
     candidate = _candidate("wrong-effective", "ST_ADD")
     audit = _audit(candidate, False, False)
     structural = validate_transition_audit([audit], [candidate])
-    assert any("effective_is_st does not match subtype" in problem for problem in structural)
+    assert any(
+        "effective_is_st does not match subtype" in problem for problem in structural
+    )
