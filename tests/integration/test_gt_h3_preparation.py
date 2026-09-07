@@ -98,4 +98,3 @@ def test_gt_h3_seal_manifest_rejects_expect_fields_mutation():
     mutated = [dict(valid[0], expect_fields={"IS_ST_SEC": False})]
     with pytest.raises(module.PreparationError, match="forbidden fields.*expect_fields"):
         module.validate_seal_manifest_entries(mutated, ["GT-1"])
-

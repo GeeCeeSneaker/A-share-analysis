@@ -48,4 +48,3 @@
 - `50` 不被写入 v5 reviewed provenance；真实审阅人必须显式确认其为非语义值或给出定义。
 - 仅当 12/12 复审通过、113 条 carry-forward 证明成立、`50` 被中和/定义并给出 human marker 后，才能请求最终 125/125 授权和 GT-H3B。
 - Formal Production、Data Sufficiency、Provider capability、backfill、策略、回测、交易和 `review.py` 继续 BLOCKED。
-

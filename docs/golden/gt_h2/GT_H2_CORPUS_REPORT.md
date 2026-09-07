@@ -77,4 +77,3 @@ The following hashes use repository-canonical text bytes (LF; JSON manifests ign
 2. Check symbol, board/exchange, date semantics, subtype/action type, and expected fields against the artifact.
 3. Run the repository review workflow to create the reviewed version only after all cases pass; do not treat this candidate report or `fact_proved` as REVIEWED evidence.
 4. Keep CR-5/CR-6, Production B1-B7, Data Sufficiency, provider decisions, credentials/tokens, and raw SDK/profile material outside this corpus PR.
-

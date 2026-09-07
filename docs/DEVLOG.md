@@ -2819,4 +2819,3 @@
 - Two later ADR-only commits, `eceb99468bd28a37a7532b723f092a9d2f8bd469` (ADR-026) and `4ae9151979287a8a4e86c5f95906b88546c993e3` (ADR index), also predated this management synchronization. They are now explicitly included in the same one-time contract-path grandfathered set, together with capabilities commit `4f83f7ac3a19327e9f724c9730cbfbfef03de38b`.
 - This is a disclosed historical exception, not a relaxation of the rule: future `docs/adr/` or contract-path commits must update `docs/project/DEVELOPMENT_MANAGEMENT.md` in the same commit. No history was rewritten.
 - Production account / formal AmazingData Spike / Data Sufficiency Matrix remain BLOCKED or NOT_TESTABLE and are not marked complete.
-

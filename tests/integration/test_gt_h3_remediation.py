@@ -162,4 +162,3 @@ def test_governed_candidate_rebuild_reproduces_committed_v5(tmp_path: Path):
     assert json.loads(
         (golden_root / "truth_manifest_v5.json").read_text(encoding="utf-8")
     ) == json.loads((GOLDEN_ROOT / "truth_manifest_v5.json").read_text(encoding="utf-8"))
-

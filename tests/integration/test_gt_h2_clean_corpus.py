@@ -316,4 +316,3 @@ class TestGTH2CleanCorpus:
         assert "No raw bulk web pages or PDFs are committed" in report
         assert "Production B1-B7" in report
         assert "Data Sufficiency" in report
-

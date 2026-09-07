@@ -148,4 +148,3 @@ The bundle contains `105` deterministic artifact groups covering `125` cases. Ev
 - No official HTML/PDF bytes were retrieved or committed in Checkpoint A.
 - No `REVIEWED` field, evidence hash, ACTIVE pointer advance or reviewed dataset was created.
 - No `review.py` seal, GT-H3B, Formal Production B1-B7, Data Sufficiency, Provider capability approval, backfill, strategy, backtest or trading run was executed.
-

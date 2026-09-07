@@ -489,4 +489,3 @@ class TestSemanticConflictFix:
                 has_no_limit = fields.get("HIGH_LIMITED", "x") is None
                 has_rate = "PRICE_HIGH_LMT_RATE" in fields
                 assert not (has_no_limit and has_rate), case.golden_case_id
-

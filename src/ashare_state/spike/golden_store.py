@@ -876,4 +876,3 @@ def _case_from_doc(doc: dict, dataset_truth_version: str) -> GoldenCase:
         event_subtype=str(doc.get("event_subtype", "")),
         event_effective_date=str(doc.get("event_effective_date", "")),
     )
-

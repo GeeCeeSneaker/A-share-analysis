@@ -790,4 +790,3 @@ class TestDatasetHashRename:
         run_file.write_text(json.dumps(doc, indent=2), encoding="utf-8", newline="\n")
         loaded = store.load_run("legacy-run", RunKind.TRIAL)
         assert loaded.golden_dataset_hash == "a" * 64
-
