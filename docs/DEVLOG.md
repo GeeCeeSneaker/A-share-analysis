@@ -2,16 +2,16 @@
 
 **Implementation Status / Review Status**
 
-- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / NOT_SEALED**：依据 main `277ef6fabac265eb70081231923b9a4a8487417f` 的 [GT-H3A 人工审阅裁决与 GT-H3R v5 候选整改要求](design/A-share-analysis_GT-H3A人工审阅裁决与GT-H3R_v5候选整改要求_20260907.md)，建立独立 v4→v5 整改批次；PR #19 仅作为不可变的 v4 首轮人工审阅审计记录保留。
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / NOT_SEALED**：依据 main `277ef6fabac265eb70081231923b9a4a8487417f` 的 [GT-H3A 人工审阅裁决与 GT-H3R v5 候选整改要求](design/A-share-analysis_GT-H3A人工审阅裁决与GT-H3R_v5候选整改要求_20260907.md)，建立独立 v4→v5 整改批次；PR #19 仅作为不可变的 v4 首轮人工审阅审计记录保留。
 - v4 source `v4-candidate-20260906` 与 dataset SHA256 `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b` 未修改。通过现有 `scripts/golden/candidate.py rebuild --plan` 生成 v5 `v5-candidate-20260907`，ACTIVE dataset SHA256 为 `5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c`，共 125 条且 `COMPILED 125/125`。
 - 整改范围严格为 12 条首轮 REJECT：AG-054 5 条、AG-025 2 条、AG-029 2 条、AG-064 1 条仅替换官方来源定位；AG-027 将 688981.SH 2020-07-23 修正为上市后第 6 个交易日的 STAR 20% 案例；AG-096 将 300965.SZ 的 ST_ADD 生效日/交易日修正为 2024-04-26。无 filler、无无关清理。
 - 新增 `scripts/golden/gt_h3_remediate.py verify`、`docs/golden/gt_h3/remediation/v4_to_v5_rebuild_plan.json` 和 carry-forward ledger。113 条原 APPROVE 使用版本中立的 `review_identity_hash_for_doc()` 证明语义身份未变；两版真实版本感知 `case_semantic_hash` 另行留痕，避免把版本切换后的不同 seal hash 伪称为相等。12 条原 REJECT 均不可自动沿用。
 - H2 packet/registry 和 GT-H3A 空白 bundle 已随 v5 的 12 条精确变更同步，另提供可直接填写的 `GT_H3R_V5_REVIEW_TABLE.xlsx`、Markdown 表和交接包；表格结果、审阅人、日期保持空白，未写入任何 `REVIEWED` 或证据 hash。
-- 本地 verifier、GT-H3R/H2/H3 定向 pytest 已通过；xlsx 已导出并完成公式错误扫描。远端 required CI 尚待新 PR 运行，当前不得宣称 Reviewer closure、seal 或生产就绪。账号、密码、IP、Token、真实端点、原始 SDK 输出和专有依赖不进入 GitHub。
+- 本地 verifier、GT-H3R/H2/H3 定向 pytest 已通过；xlsx 已导出并完成公式错误扫描。PR #20 最终 head `b431af578ce9210621d7da9eebc1dbae3817657e` 的 required CI run `34100003654` 已通过 Windows 3.14、Windows 3.12、Ubuntu 3.14 三平台及 Ruff、format、mypy、full pytest、Spike、SDK-absent、DEVLOG、Management gates；当前仍不得宣称 Reviewer closure、seal 或生产就绪。账号、密码、IP、Token、真实端点、原始 SDK 输出和专有依赖不进入 GitHub。
 
 **Next**
 
-- 将本批提交为独立 remediation PR，运行 Windows 3.14/3.12、Ubuntu 3.14、Ruff、format、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates，并核对 test-merge SHA。
+- PR #20 的 test-merge SHA 为 `74d73989a4f05ef43a1f5d6f8f1d26224fb162a6`，required CI run `34100003654` 已全部通过；等待独立 Reviewer 技术核验。
 - 技术 CI 通过后交由独立 Reviewer 审阅；真实 Owner/Human Reviewer 只需复审 v5 表中的 12 行，同时明确 113 条沿用、`50` 的中和/定义和最终 human marker。
 - 在上述授权完成前继续保持 GT-H3B、`review.py`、Formal Production B1-B7、Data Sufficiency、Provider capability、backfill、策略/回测/交易冻结。
 

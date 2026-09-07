@@ -2,11 +2,12 @@
 
 ## DM-20260907-114 · GT-H3R v5 rejected-case remediation
 
-**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING
+**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
 **Review Status**：GT-H3A REJECTS ADJUDICATED / GT-H3R AUTHORIZED / NOT SEALED；本批不自行批准、合并或执行 `review.py`。
 **Authority**：main 最新 [GT-H3A 人工审阅裁决与 GT-H3R v5 候选整改要求](../design/A-share-analysis_GT-H3A人工审阅裁决与GT-H3R_v5候选整改要求_20260907.md)。
 **Baseline**：main `277ef6fabac265eb70081231923b9a4a8487417f`；v4 `v4-candidate-20260906` / `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b`。
 **Candidate**：v5 `v5-candidate-20260907` / `5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c`，125 条，`COMPILED 125/125`，ACTIVE 已指向 v5。
+**CI**：PR #20 最终 head `b431af578ce9210621d7da9eebc1dbae3817657e`；test-merge `74d73989a4f05ef43a1f5d6f8f1d26224fb162a6`；required run `34100003654` 三平台及全部 gates PASS。
 
 | 管理要求 | 实现 / 验证位置 | 状态 |
 |---|---|---|
@@ -21,7 +22,7 @@
 
 - `docs/golden/gt_h3/GT_H3_HUMAN_REVIEW_RESULT.jsonl` 继续作为 v4 首轮 113 APPROVE / 12 REJECT 的历史输入；本批不改写其人工结果，也不把 `50` 猜测成语义。
 - v5 的现有 H2 packet/registry 与 GT-H3A 空白 bundle 已同步两条 rekey 和 10 条来源替换，防止下游入口继续引用 v4 的旧 ID/定位；v4 H2 rebuild plan/report 仍记录历史 v4 构建基线。
-- 本地 v5 verifier、GT-H3R/H2/H3 定向 pytest、候选重建复现和 xlsx 公式错误扫描通过；远端 CI 在 remediation PR 上完成前为 `CI_PENDING`。
+- 本地 v5 verifier、GT-H3R/H2/H3 定向 pytest、候选重建复现和 xlsx 公式错误扫描通过；PR #20 required CI 已完成并为 `CI_GREEN`。独立 Reviewer 和真实 Human Reviewer 仍未完成闭环，因此本批仍 `NOT_SEALED`。
 - 未提交账号、密码、IP、Token、真实端点、原始 SDK 输出或专有依赖；未检索/提交证据 bytes/hash，未写 `REVIEWED`，未运行 `review.py`、GT-H3B、Formal Production、Data Sufficiency、Provider capability、backfill、策略/回测/交易。
 
 **Required next work**
