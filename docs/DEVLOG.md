@@ -1,3 +1,17 @@
+## 2026-09-08 · GT-H3R2 官方原文补证与语义复核推进
+
+> 状态：**25 条双核 PASS / 15 条语义无效 / 10 条待补证 / PUBLICATION BLOCKED / v5 IMMUTABLE**
+
+在不改写 v5 的前提下，继续对 50 条 ST_TRANSITION 的 sidecar 官方材料逐案打开并读取全文：
+
+- 14 条 ADD 和 11 条 REMOVE 已补齐 pre/effective 两侧官方 source_ref 与页码或正文定位，台账标记为 PASS。
+- 300506（2024-04-29）通过官方原文确认是既有其他风险警示上叠加退市风险警示，新增为第 15 条 INVALID_ST_LEVEL_CHANGE；没有把层级变化伪装成 false→true。
+- 10 条仍未闭环：6 条 SSE static ADD 受反爬挑战阻断，3 条 SSE 共用公告只给出 effective 侧，1 条 STAR_ST_REMOVE 受同类原文取得问题阻断。
+- 25 条 PASS 仅表示本轮原文扫描完成，仍需独立 Reviewer 最终逐条复开；没有生成 v6、没有修改 review.py、没有解除 GT-H3B 或正式发布阻塞。
+- 所有新增材料只在本地临时目录用于核验；GitHub 仅保存官方 URL 与定位，不保存原始文件 bytes，也不保存任何账号、Token 或连接参数。
+
+后续：先为 10 条补齐官方双核证据；再对 15 条无效事件做真实替换/删改，保持 ST distinct、ADD/REMOVE 双向配额与 125 条总量，生成带 lineage 的 v6 candidate，最后完成独立 Reviewer closure 与三平台 CI。
+
 ## 2026-09-07 · GT-H3R2 Ruff line-length 配置修正
 
 > 状态：**按 CI 的 line-length=100 重新格式化 / 无语义变更**

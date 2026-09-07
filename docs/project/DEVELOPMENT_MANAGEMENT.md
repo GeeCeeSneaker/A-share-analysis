@@ -1,3 +1,21 @@
+## DM-20260908-001 · GT-H3R2 官方原文补证结果入账
+
+**状态**：IN_PROGRESS / PUBLICATION_BLOCKED / PENDING_REVIEW
+
+**范围**：PR #23 的 GT-H3R2 独立审计台账；v5-candidate-20260907 保持 immutable。
+
+**本次确认**
+
+- 50 条 ST_TRANSITION 中，14 条 ADD、11 条 REMOVE 已完成官方原文双核定位并标记 PASS。
+- 15 条标记为 INVALID_ST_LEVEL_CHANGE：原独立复核 12 条、300064、000616，以及本轮从官方原文确认的 300506。
+- 10 条保持 NEED_MORE_EVIDENCE：6 条 SSE static ADD 的全文取得受反爬挑战影响，3 条 SSE 共用公告缺 pre-state，1 条 STAR_ST_REMOVE-688500 仍缺完整闭环。
+- 25 条 PASS 不等同于最终 Reviewer 批准；审计发布门仍 fail closed，v6、review.py、GT-H3B 和正式发布仍 blocked。
+- 本次仅更新独立 JSONL/说明与治理记录，未修改 v5；原始官方文件未上传 GitHub，未写入账号、Token、IP 或密码。
+
+**下一步要求**
+
+补齐 10 条的 pre/effective 官方双核证据；对 15 条无效事件做真实替换/删改并保留 lineage；重新验证 50 条结构、ADD/REMOVE 双向配额、125 总量、carry-forward 身份、其他事件语义和三平台 CI；完成独立 Reviewer closure 后再讨论合并。
+
 ## DM-20260907-008 · GT-H3R2 Ruff line-length 配置对齐
 
 **状态**：修复 CI format check 的配置偏差，语义与治理状态不变。
