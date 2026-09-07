@@ -1,3 +1,16 @@
+## DM-20260907-003 · GT-H3R.1 格式门禁修正
+
+- 格式修复仅影响 GT-H3R verifier 的 Python 排版；Golden 数据、来源侧车和人工复审状态不变。
+- 已同步更新 DEVLOG 与本管理文档以满足“代码提交必须带审计记录”的门禁，待新提交 CI 全部收敛。
+
+## DM-20260907-002 · GT-H3R.1 复合事实证据适用性收口
+
+- 状态：**执行中；12 条人工复审待完成；未封版；未运行 review.py**。
+- 采用最新 main `669759adf34bece4c9e41c7be2ce2e9f858e5277` 作为重组基线，恢复 PR #19 的审计历史与 GT-H3A v4 快照；v5 仍为独立 remediation 目录。
+- v4/v5 绑定分别为 `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b` 与 `5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c`；125 条保持 `COMPILED`，113 条可机器证明沿用，12 条不得自动批准。
+- 五条复合事实（AG-025×2、AG-027×1、AG-029×2）新增逐案例 RULE/APPLICABILITY 来源契约。契约明确为候选来源声明，未宣称 `fact_proved`，未提交官方 bytes/hash；Human 必须打开全部链接并逐案填写结果。
+- 已增加 fail-closed 校验和保护 v4 快照的 GT-H3A 输出目录；聚焦测试、当前提交的 test-merge 和三平台 CI 需在推送后登记。
+
 # A-share-analysis 开发管理总册（Development Management）
 
 ## DM-20260907-001 · GT-H3 人工核验结果接收与项目管理复核

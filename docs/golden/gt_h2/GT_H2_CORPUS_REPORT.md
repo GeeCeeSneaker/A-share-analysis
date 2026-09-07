@@ -1,5 +1,7 @@
 # GT-H2 Clean Golden Corpus Candidate Report
 
+> This document records the closed GT-H2 `v4-candidate-20260906` construction baseline. After the GT-H3A adjudication, ACTIVE is the separate `v5-candidate-20260907`; its exact 12-row dependent packet/registry updates and carry-forward controls are documented in `docs/golden/gt_h3/remediation/`.
+
 - Target truth version: `v4-candidate-20260906`
 - ACTIVE dataset: `golden_cases_v4.jsonl`
 - ACTIVE dataset SHA256: `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b`

@@ -1,3 +1,18 @@
+## 2026-09-07 · GT-H3R.1 Python 格式门禁修正
+
+- 格式修复已按仓库 Ruff 规则完成；本次仅改变 GT-H3R verifier 的排版，不改变 v4/v5 Golden bytes、12 条范围、来源契约或人工结果。
+- 根据 DEVLOG 门禁，本记录与格式修复提交同批登记；下一次 CI 需重新确认 lint、format、mypy、pytest、Spike、SDK-absent、审计文档和管理文档门禁。
+
+## 2026-09-07 · GT-H3R.1 复合事实证据适用性收口
+
+> 状态：**V5 CANDIDATE / 12-CASE HUMAN RE-REVIEW PENDING / CI PENDING / NOT SEALED**
+
+- 基于最新 main `669759adf34bece4c9e41c7be2ce2e9f858e5277` 重新组装 PR #20，保留 PR #19 的 GT-H3A v4 快照与既有审计历史。
+- v4 `v4-candidate-20260906` SHA256：`8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b`；v5 `v5-candidate-20260907` SHA256：`5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c`。
+- 机器校验保持 125 条 `COMPILED`、113 条 carry-forward、12 条重新人工复审；未写入 `REVIEWED`、`fact_proved` 或来源 bytes/hash。
+- 新增 `GT_H3R_V5_SUPPORTING_OFFICIAL_SOURCES.jsonl`：AG-025×2、AG-027×1、AG-029×2 各自要求 RULE 与 APPLICABILITY 两份官方材料；其余 7 条不扩大来源要求。Markdown/Excel 审阅表已拆列并保持人工结果空白。
+- `gt_h3_remediate.py verify` 与聚焦 GT-H3 测试通过；远端提交后的 current-main test-merge、三平台 CI 和最终 commit 元数据将在推送后补记。
+
 ## 2026-09-07 · GT-H3 human result received and analyzed
 
 **Implementation Status / Review Status**

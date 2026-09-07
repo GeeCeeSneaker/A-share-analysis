@@ -748,6 +748,22 @@ def semantic_hash_for_doc(doc: Mapping[str, Any]) -> str:
     return hashlib.sha256(_semantic_statement_for_doc(doc).encode("utf-8")).hexdigest()
 
 
+def review_identity_hash_for_doc(doc: Mapping[str, Any]) -> str:
+    """Compute a version-neutral identity hash for review carry-forward.
+
+    ``semantic_hash_for_doc`` deliberately includes ``truth_version`` because
+    it seals one immutable dataset version.  A carry-forward ledger compares
+    the same reviewed fact across two immutable versions, so it needs the
+    same canonical statement with only the version label removed.  Source
+    references, expected fields and structural event fields remain included;
+    changing any of those therefore invalidates carry-forward eligibility.
+    """
+    statement = json.loads(_semantic_statement_for_doc(doc))
+    statement.pop("truth_version", None)
+    payload = json.dumps(statement, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def semantic_hash_of(golden: GoldenCase) -> str:
     """Recompute the case semantic hash (used by the review workflow)."""
     return hashlib.sha256(_semantic_statement(golden).encode("utf-8")).hexdigest()

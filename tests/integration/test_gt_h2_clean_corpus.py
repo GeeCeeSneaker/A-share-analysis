@@ -85,7 +85,7 @@ class TestGTH2CleanCorpus:
         store = GoldenTruthStore(GOLDEN_ROOT)
         cases, manifest = store.load()
 
-        assert manifest.truth_version == "v4-candidate-20260906"
+        assert manifest.truth_version == "v5-candidate-20260907"
         assert manifest.manifest_schema == 2
         assert manifest.case_count == 125
         assert manifest.counts_by_type == {
@@ -270,12 +270,15 @@ class TestGTH2CleanCorpus:
         packet = _jsonl(H2_ROOT / "review_packet_index.jsonl")
         star_rows = [row for row in packet if row["event_id"] == "REGIME-STAR-20"]
         st_rows = [row for row in packet if row["event_id"] == "REGIME-ST-5"]
-        assert len(star_rows) == 5
+        assert len(star_rows) == 6
         assert len(st_rows) == 4
         assert all(row["expected_fields"]["PRICE_HIGH_LMT_RATE"] == 0.2 for row in star_rows)
         assert all("STAR Market" in row["official_source_name"] for row in star_rows)
         assert all(
-            "Risk-Warning" in row["official_source_name"]
+            (
+                "Risk-Warning" in row["official_source_name"]
+                or "风险警示板" in row["official_source_name"]
+            )
             for row in st_rows
             if row["provider_symbol"].endswith(".SH")
         )
