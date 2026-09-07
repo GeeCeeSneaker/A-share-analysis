@@ -12,25 +12,25 @@ CNINFO 查询接口只用于发现材料，不能作为证据；本表证据边�
 
 ## 2. 15 条替换候选
 
-| # | 候选案例 ID | provider_symbol | subtype | effective date | 原文证明的简称变化 | 官方原文（HTTP 200，全文已读） |
-| ---: | --- | --- | --- | ---: | --- | --- |
-| 1 | `GT-H2-ST-ST_ADD-300495-20210507` | `300495.SZ` | `ST_ADD` | `20210507` | 美尚生态 → *ST美尚 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209893133.PDF)；p.1：证券代码 300495；公告同时写明 2021-05-07 起实施退市风险警示，简称由“美尚生态”变更为“*ST美尚”。 |
-| 2 | `GT-H2-ST-ST_ADD-002640-20210507` | `002640.SZ` | `ST_ADD` | `20210507` | 跨境通 → *ST跨境 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209892047.PDF)；p.1：证券代码 002640；公告同时写明 2021-05-07 起实施退市及其他风险警示，简称由“跨境通”变更为“*ST跨境”。 |
-| 3 | `GT-H2-ST-ST_ADD-600382-20210506` | `600382.SH` | `ST_ADD` | `20210506` | 广东明珠 → *ST明珠 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209878423.PDF)；p.1：证券代码 600382；公告写明退市风险警示起始日 2021-05-06，简称由“广东明珠”变更为“*ST明珠”。 |
-| 4 | `GT-H2-ST-ST_ADD-600291-20210506` | `600291.SH` | `ST_ADD` | `20210506` | 西水股份 → *ST西水 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209878259.PDF)；p.1：证券代码 600291；公告写明退市风险警示起始日 2021-05-06，简称由“西水股份”变更为“*ST西水”。 |
-| 5 | `GT-H2-ST-ST_ADD-600078-20210506` | `600078.SH` | `ST_ADD` | `20210506` | 澄星股份 → *ST澄星 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209877776.PDF)；p.1：证券代码 600078；公告写明退市风险警示起始日 2021-05-06，简称由“澄星股份”变更为“*ST澄星”。 |
-| 6 | `GT-H2-ST-ST_ADD-600896-20210506` | `600896.SH` | `ST_ADD` | `20210506` | 览海医疗 → *ST海医 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209875156.PDF)；p.1：证券代码 600896；公告写明退市风险警示起始日 2021-05-06，简称由“览海医疗”变更为“*ST海医”。 |
-| 7 | `GT-H2-ST-ST_ADD-600615-20210506` | `600615.SH` | `ST_ADD` | `20210506` | 丰华股份 → *ST丰华 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209874374.PDF)；p.1：证券代码 600615；公告写明退市风险警示起始日 2021-05-06，简称由“丰华股份”变更为“*ST丰华”。 |
-| 8 | `GT-H2-ST-ST_ADD-000502-20210506` | `000502.SZ` | `ST_ADD` | `20210506` | 绿景控股 → *ST绿景 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209872529.PDF)；p.1：证券代码 000502；公告写明 2021-05-06 起实施退市风险警示，简称由“绿景控股”变更为“*ST绿景”。 |
-| 9 | `GT-H2-ST-STAR_ST_ADD-688086-20220506` | `688086.SH` | `STAR_ST_ADD` | `20220506` | 紫晶存储 → *ST紫晶 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213274157.PDF)；p.1：证券代码 688086；公告列明简称由“紫晶存储”变更为“*ST紫晶”，实施退市风险警示起始日为 2022-05-06。 |
-| 10 | `GT-H2-ST-ST_ADD-603603-20220506` | `603603.SH` | `ST_ADD` | `20220506` | 博天环境 → *ST博天 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213274090.PDF)；p.1：证券代码 603603；公告写明 2022-05-06 起实施风险警示，简称由“博天环境”变更为“*ST博天”。 |
-| 11 | `GT-H2-ST-ST_ADD-002313-20220506` | `002313.SZ` | `ST_ADD` | `20220506` | 日海智能 → *ST日海 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213267451.PDF)；p.1：证券代码 002313；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“日海智能”变更为“*ST日海”。 |
-| 12 | `GT-H2-ST-ST_ADD-300301-20220506` | `300301.SZ` | `ST_ADD` | `20220506` | 长方集团 → *ST长方 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213267090.PDF)；p.1：证券代码 300301；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“长方集团”变更为“*ST长方”。 |
-| 13 | `GT-H2-ST-ST_ADD-002751-20220506` | `002751.SZ` | `ST_ADD` | `20220506` | 易尚展示 → *ST易尚 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213266378.PDF)；p.1：证券代码 002751；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“易尚展示”变更为“*ST易尚”。 |
-| 14 | `GT-H2-ST-ST_ADD-002316-20220506` | `002316.SZ` | `ST_ADD` | `20220506` | 亚联发展 → *ST亚联 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213265483.PDF)；p.1：证券代码 002316；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“亚联发展”变更为“*ST亚联”。 |
-| 15 | `GT-H2-ST-ST_ADD-002366-20220506` | `002366.SZ` | `ST_ADD` | `20220506` | 台海核电 → *ST海核 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213263830.PDF)；p.1：证券代码 002366；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“台海核电”变更为“*ST海核”。 |
+| # | 候选案例 ID | provider_symbol | subtype | effective date | 原文证明的简称变化 | 官方原文（HTTP 200，全文已读） | Reviewer decision | Reviewer | Reviewed at | One-line feedback |
+| ---: | --- | --- | --- | ---: | --- | --- | --- | --- | --- | --- |
+| 1 | `GT-H2-ST-ST_ADD-300495-20210507` | `300495.SZ` | `ST_ADD` | `20210507` | 美尚生态 → *ST美尚 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209893133.PDF)；p.1：证券代码 300495；公告同时写明 2021-05-07 起实施退市风险警示，简称由“美尚生态”变更为“*ST美尚”。 |  |  |  |  |  |
+| 2 | `GT-H2-ST-ST_ADD-002640-20210507` | `002640.SZ` | `ST_ADD` | `20210507` | 跨境通 → *ST跨境 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209892047.PDF)；p.1：证券代码 002640；公告同时写明 2021-05-07 起实施退市及其他风险警示，简称由“跨境通”变更为“*ST跨境”。 |  |  |  |  |  |
+| 3 | `GT-H2-ST-ST_ADD-600382-20210506` | `600382.SH` | `ST_ADD` | `20210506` | 广东明珠 → *ST明珠 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209878423.PDF)；p.1：证券代码 600382；公告写明退市风险警示起始日 2021-05-06，简称由“广东明珠”变更为“*ST明珠”。 |  |  |  |  |  |
+| 4 | `GT-H2-ST-ST_ADD-600291-20210506` | `600291.SH` | `ST_ADD` | `20210506` | 西水股份 → *ST西水 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209878259.PDF)；p.1：证券代码 600291；公告写明退市风险警示起始日 2021-05-06，简称由“西水股份”变更为“*ST西水”。 |  |  |  |  |  |
+| 5 | `GT-H2-ST-ST_ADD-600078-20210506` | `600078.SH` | `ST_ADD` | `20210506` | 澄星股份 → *ST澄星 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209877776.PDF)；p.1：证券代码 600078；公告写明退市风险警示起始日 2021-05-06，简称由“澄星股份”变更为“*ST澄星”。 |  |  |  |  |  |
+| 6 | `GT-H2-ST-ST_ADD-600896-20210506` | `600896.SH` | `ST_ADD` | `20210506` | 览海医疗 → *ST海医 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209875156.PDF)；p.1：证券代码 600896；公告写明退市风险警示起始日 2021-05-06，简称由“览海医疗”变更为“*ST海医”。 |  |  |  |  |  |
+| 7 | `GT-H2-ST-ST_ADD-600615-20210506` | `600615.SH` | `ST_ADD` | `20210506` | 丰华股份 → *ST丰华 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209874374.PDF)；p.1：证券代码 600615；公告写明退市风险警示起始日 2021-05-06，简称由“丰华股份”变更为“*ST丰华”。 |  |  |  |  |  |
+| 8 | `GT-H2-ST-ST_ADD-000502-20210506` | `000502.SZ` | `ST_ADD` | `20210506` | 绿景控股 → *ST绿景 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2021-04-30/1209872529.PDF)；p.1：证券代码 000502；公告写明 2021-05-06 起实施退市风险警示，简称由“绿景控股”变更为“*ST绿景”。 |  |  |  |  |  |
+| 9 | `GT-H2-ST-STAR_ST_ADD-688086-20220506` | `688086.SH` | `STAR_ST_ADD` | `20220506` | 紫晶存储 → *ST紫晶 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213274157.PDF)；p.1：证券代码 688086；公告列明简称由“紫晶存储”变更为“*ST紫晶”，实施退市风险警示起始日为 2022-05-06。 |  |  |  |  |  |
+| 10 | `GT-H2-ST-ST_ADD-603603-20220506` | `603603.SH` | `ST_ADD` | `20220506` | 博天环境 → *ST博天 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213274090.PDF)；p.1：证券代码 603603；公告写明 2022-05-06 起实施风险警示，简称由“博天环境”变更为“*ST博天”。 |  |  |  |  |  |
+| 11 | `GT-H2-ST-ST_ADD-002313-20220506` | `002313.SZ` | `ST_ADD` | `20220506` | 日海智能 → *ST日海 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213267451.PDF)；p.1：证券代码 002313；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“日海智能”变更为“*ST日海”。 |  |  |  |  |  |
+| 12 | `GT-H2-ST-ST_ADD-300301-20220506` | `300301.SZ` | `ST_ADD` | `20220506` | 长方集团 → *ST长方 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213267090.PDF)；p.1：证券代码 300301；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“长方集团”变更为“*ST长方”。 |  |  |  |  |  |
+| 13 | `GT-H2-ST-ST_ADD-002751-20220506` | `002751.SZ` | `ST_ADD` | `20220506` | 易尚展示 → *ST易尚 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213266378.PDF)；p.1：证券代码 002751；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“易尚展示”变更为“*ST易尚”。 |  |  |  |  |  |
+| 14 | `GT-H2-ST-ST_ADD-002316-20220506` | `002316.SZ` | `ST_ADD` | `20220506` | 亚联发展 → *ST亚联 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213265483.PDF)；p.1：证券代码 002316；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“亚联发展”变更为“*ST亚联”。 |  |  |  |  |  |
+| 15 | `GT-H2-ST-ST_ADD-002366-20220506` | `002366.SZ` | `ST_ADD` | `20220506` | 台海核电 → *ST海核 | [CNINFO official PDF](https://static.cninfo.com.cn/finalpage/2022-04-30/1213263830.PDF)；p.1：证券代码 002366；公告写明 2022-05-06 起实施退市及其他风险警示，简称由“台海核电”变更为“*ST海核”。 |  |  |  |  |  |
 
-共同预期：`pre_effective_is_st=false`、`effective_is_st=true`、`transition_valid=true`。688086 使用 `STAR_ST_ADD`，其余使用 `ST_ADD`。候选案例 ID、代码和有效日均未与当前 v5 50 条 ST_TRANSITION 重复；最终仍须由 Reviewer 复核后再写入 v6 行。
+右侧四列由独立 Reviewer 填写；开发者不预填裁决。共同预期：`pre_effective_is_st=false`、`effective_is_st=true`、`transition_valid=true`。688086 使用 `STAR_ST_ADD`，其余使用 `ST_ADD`。候选案例 ID、代码和有效日均未与当前 v5 50 条 ST_TRANSITION 重复；最终仍须由 Reviewer 复核后再写入 v6 行。
 
 ## 3. 当前必须移出的 15 条无效源行
 
