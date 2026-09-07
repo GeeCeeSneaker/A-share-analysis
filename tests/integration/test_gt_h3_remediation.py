@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 from ashare_state.spike.golden_store import review_identity_hash_for_doc, semantic_hash_for_doc
 
@@ -35,6 +38,17 @@ def _run_verifier() -> subprocess.CompletedProcess[str]:
         timeout=60,
         check=False,
     )
+
+
+def _remediation_module():
+    spec = importlib.util.spec_from_file_location(
+        "gt_h3_remediate_test", REPO_ROOT / "scripts/golden/gt_h3_remediate.py"
+    )
+    if spec is None or spec.loader is None:
+        raise AssertionError("could not load GT-H3R verifier")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_committed_v5_remediation_verifier_passes():
@@ -126,6 +140,47 @@ def test_review_identity_is_version_neutral_but_dataset_seal_is_not():
     assert review_identity_hash_for_doc(next_version) != review_identity_hash_for_doc(
         changed_source
     )
+
+
+def test_supporting_source_contract_splits_only_five_composite_cases(tmp_path: Path):
+    module = _remediation_module()
+    old_rows = module._jsonl(GOLDEN_ROOT / "golden_cases_v4.jsonl")
+    new_rows = module._jsonl(GOLDEN_ROOT / "golden_cases_v5.jsonl")
+    sidecar_rows = module._jsonl(REMEDIATION_ROOT / "GT_H3R_V5_SUPPORTING_OFFICIAL_SOURCES.jsonl")
+
+    module._validate_supporting_sources(old_rows, new_rows)
+    assert len(sidecar_rows) == 12
+    composite = {
+        row["old_case_id"]
+        for row in sidecar_rows
+        if row["old_case_id"] in module.COMPOSITE_CASE_IDS
+    }
+    assert composite == module.COMPOSITE_CASE_IDS
+    for row in sidecar_rows:
+        assert "fact_proved" not in row
+        assert row["evidence_status"] == module.NOT_HUMAN_VERIFIED
+        assert not row["human_review_result"]
+        assert not row["reviewed_by"]
+        roles = {source["role"] for source in row["required_official_sources"]}
+        if row["old_case_id"] in module.COMPOSITE_CASE_IDS:
+            assert {"RULE", "APPLICABILITY"}.issubset(roles)
+        else:
+            assert "APPLICABILITY" not in roles
+        assert all(source["source_sha256"] == "" for source in row["required_official_sources"])
+
+    broken = json.loads(json.dumps(sidecar_rows, ensure_ascii=False))
+    broken[0]["required_official_sources"] = [
+        source for source in broken[0]["required_official_sources"] if source["role"] == "RULE"
+    ]
+    broken_path = tmp_path / "supporting_sources.jsonl"
+    broken_path.write_text(
+        "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in broken),
+        encoding="utf-8",
+        newline="\n",
+    )
+    module.SUPPORTING_SOURCES_PATH = broken_path
+    with pytest.raises(module.RemediationError, match="requires RULE and APPLICABILITY"):
+        module._validate_supporting_sources(old_rows, new_rows)
 
 
 def test_governed_candidate_rebuild_reproduces_committed_v5(tmp_path: Path):

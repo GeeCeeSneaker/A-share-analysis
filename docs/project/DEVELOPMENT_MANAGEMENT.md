@@ -1,35 +1,76 @@
+## DM-20260907-003 · GT-H3R.1 格式门禁修正
+
+- 格式修复仅影响 GT-H3R verifier 的 Python 排版；Golden 数据、来源侧车和人工复审状态不变。
+- 已同步更新 DEVLOG 与本管理文档以满足“代码提交必须带审计记录”的门禁，待新提交 CI 全部收敛。
+
+## DM-20260907-002 · GT-H3R.1 复合事实证据适用性收口
+
+- 状态：**执行中；12 条人工复审待完成；未封版；未运行 review.py**。
+- 采用最新 main `669759adf34bece4c9e41c7be2ce2e9f858e5277` 作为重组基线，恢复 PR #19 的审计历史与 GT-H3A v4 快照；v5 仍为独立 remediation 目录。
+- v4/v5 绑定分别为 `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b` 与 `5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c`；125 条保持 `COMPILED`，113 条可机器证明沿用，12 条不得自动批准。
+- 五条复合事实（AG-025×2、AG-027×1、AG-029×2）新增逐案例 RULE/APPLICABILITY 来源契约。契约明确为候选来源声明，未宣称 `fact_proved`，未提交官方 bytes/hash；Human 必须打开全部链接并逐案填写结果。
+- 已增加 fail-closed 校验和保护 v4 快照的 GT-H3A 输出目录；聚焦测试、当前提交的 test-merge 和三平台 CI 需在推送后登记。
+
 # A-share-analysis 开发管理总册（Development Management）
 
-## DM-20260907-114 · GT-H3R v5 rejected-case remediation
+## DM-20260907-001 · GT-H3 人工核验结果接收与项目管理复核
 
-**Implementation Status**：IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN
-**Review Status**：GT-H3A REJECTS ADJUDICATED / GT-H3R AUTHORIZED / NOT SEALED；本批不自行批准、合并或执行 `review.py`。
-**Authority**：main 最新 [GT-H3A 人工审阅裁决与 GT-H3R v5 候选整改要求](../design/A-share-analysis_GT-H3A人工审阅裁决与GT-H3R_v5候选整改要求_20260907.md)。
-**Baseline**：main `277ef6fabac265eb70081231923b9a4a8487417f`；v4 `v4-candidate-20260906` / `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b`。
-**Candidate**：v5 `v5-candidate-20260907` / `5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c`，125 条，`COMPILED 125/125`，ACTIVE 已指向 v5。
-**CI**：PR #20 最终 head `b431af578ce9210621d7da9eebc1dbae3817657e`；test-merge `74d73989a4f05ef43a1f5d6f8f1d26224fb162a6`；required run `34100003654` 三平台及全部 gates PASS。
+**状态**：`RECEIVED / STRUCTURE_CHECKED / PENDING_PROJECT_MANAGER_REVIEW / NOT_SEALED`
 
-| 管理要求 | 实现 / 验证位置 | 状态 |
-|---|---|---|
-| v4 文件不可变，使用受治理的 v4→v5 rebuild | `v4_to_v5_rebuild_plan.json`；`test_governed_candidate_rebuild_reproduces_committed_v5` | IMPLEMENTED / local PASS |
-| 113 条原 APPROVE 只在语义身份未变时沿用 | `v4_to_v5_human_review_carry_forward.jsonl`；版本中立 `review_identity_hash_for_doc()`；eligible=113 | IMPLEMENTED / local PASS |
-| 10 条 evidence-only 只更换官方定位 | `golden_cases_v5.jsonl`、v5 H2 packet；expected/event/date 保持不变 | IMPLEMENTED / local PASS |
-| 2 条 candidate-fact reject 按裁决精准修正 | AG-027 rekey 为 `GT-LIMIT-STAR20-688981-20200723`；AG-096 rekey 为 `GT-H2-ST-ST_ADD-300965-20240426` | IMPLEMENTED / local PASS |
-| 人工复审只回到 12 条且不能自动批准 | `GT_H3R_V5_REVIEW_TABLE.xlsx`、Markdown 表、`GT_H3R_V5_REMEDIATION_BUNDLE.md` | READY / blank decisions |
-| v5 不携带 review/evidence provenance，不执行封印 | `gt_h3_remediate.py verify`；ACTIVE `COMPILED 125/125`；`review_seal=NOT_RUN` | IMPLEMENTED / local PASS |
+**确认结果**
 
-**Evidence and gate boundary**
+- 收到审阅人 `LY审阅` 于 2026-09-07 填写的 125 条结果：APPROVE 113 条，REJECT 12 条。
+- 结果表覆盖当前候选 125/125 个案例，案例身份字段与 PR #19 当前 GT-H3 index 完全对齐。
+- 12 条 REJECT 按材料分组归并为 6 组：AG-054、AG-025、AG-029、AG-027、AG-064、AG-096；报告中保留每条案例和人工原因。
+- 原始工作簿、结构化摘录和分析报告已推送，便于项目管理者逐项处理。
 
-- `docs/golden/gt_h3/GT_H3_HUMAN_REVIEW_RESULT.jsonl` 继续作为 v4 首轮 113 APPROVE / 12 REJECT 的历史输入；本批不改写其人工结果，也不把 `50` 猜测成语义。
-- v5 的现有 H2 packet/registry 与 GT-H3A 空白 bundle 已同步两条 rekey 和 10 条来源替换，防止下游入口继续引用 v4 的旧 ID/定位；v4 H2 rebuild plan/report 仍记录历史 v4 构建基线。
-- 本地 v5 verifier、GT-H3R/H2/H3 定向 pytest、候选重建复现和 xlsx 公式错误扫描通过；PR #20 required CI 已完成并为 `CI_GREEN`。独立 Reviewer 和真实 Human Reviewer 仍未完成闭环，因此本批仍 `NOT_SEALED`。
-- 未提交账号、密码、IP、Token、真实端点、原始 SDK 输出或专有依赖；未检索/提交证据 bytes/hash，未写 `REVIEWED`，未运行 `review.py`、GT-H3B、Formal Production、Data Sufficiency、Provider capability、backfill、策略/回测/交易。
+**需管理者确认**
 
-**Required next work**
+- 113 条 APPROVE 的反馈栏统一是 `50`，当前无法判断是页码、条款号还是评分。
+- 填写说明页 B5:B7 在本地导入时显示 `#NAME?`，应修复公式或以逐案结果为准。
+- 该结果没有替代官方原文复核，也没有完整 125/125 授权声明和 human marker，因此不能推进 GT-H3B 或 seal。
 
-1. 将本批作为独立 PR 推送，完成 required 三平台 CI 与静态检查，并由独立 Reviewer 复核最终 head/test-merge SHA。
-2. 技术 closure 后，把 v5 12 行表交给真实 Owner/Human Reviewer；须明确 12/12 结果、113 条 carry-forward、`50` 的中和/定义和 human marker。
-3. 仅在 12/12 APPROVE、carry-forward 通过且完整 125/125 授权后，才允许进入 GT-H3B；在此之前所有正式生产与 provider/data sufficiency 工作保持 BLOCKED。
+**下一步**
+
+先完成 6 个材料分组的补证据/候选修正/重新裁决，再由真实 Owner/Human Reviewer 明确授权完整 125/125；canonical 空白模板不被覆盖。
+
+## DM-20260906-115 · GT-H3 审阅表测试格式修正
+
+**状态**：`CORRECTED / CI_PENDING / PENDING_HUMAN_REVIEW`
+
+**说明**
+
+`efa0551` 的三平台 CI 在 Ruff lint 后于 format check 停止，日志明确指向新增审阅表覆盖测试文件末尾多余空行。本次只删除该多余空行并保留最终换行，测试逻辑和业务内容不变；同时补记 DEVLOG 与本管理册，满足代码提交记录要求。
+
+**边界**
+
+125 行审阅表、104 个材料分组、canonical `review_decision_template.jsonl`、expected fields 和 GT-H3A PREPARED / NOT SEALED 状态均不变。没有证据 bytes/hash、`REVIEWED`、seal 或生产动作。
+
+**下一步**
+
+等待修正提交的三平台 CI 通过；独立真实审阅人仍需逐案决定 `APPROVE`/`REJECT` 并在 PR 评论明确授权完整 125/125。
+
+## DM-20260906-114 · GT-H3 人工审阅表可用性优化
+
+**状态**：`IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_HUMAN_REVIEW`
+
+**本次交付**
+
+- 将 GT-H3A 的 104 个材料分组展开为 125 条逐案审阅表，保证每个案例 ID 恰好出现一次。
+- 每行明确“去哪看”：提供候选官方材料名称和官方链接；明确“审什么”：提供代码、交易日、事件/规则适用范围和 expected semantics 的逐行核对目标。
+- 每行明确“怎么填”：结果仅允许 `APPROVE`/`REJECT`，`REJECT` 必须写一句简短原因；同时提供审阅人和审阅日期字段。
+- 提供 Markdown 阅读版和 Excel 填写版。Excel 版增加筛选、下拉、进度统计和反馈示例，方便非技术审阅人使用。
+- 不改变候选事实，不生成证据 bytes/hash，不写入 `REVIEWED`，不创建 seal manifest，不推进生产；canonical `review_decision_template.jsonl` 仍是机器封印输入。
+
+**验收证据**
+
+- 125 条唯一案例覆盖；分类数量为 26/4/50/20/25。
+- 本地逐案覆盖测试、GT-H3A 相关测试、Ruff、Excel 导入检查和公式错误扫描通过。
+- 本次提交后的 GitHub Actions 结果待 CI 返回；PR #19 保持未合并，等待独立真实 Owner/Human Reviewer。
+
+**下一步要求**
+
+独立真实审阅人逐行阅读官方原文并决定 `APPROVE` 或 `REJECT`；不得用搜索摘要、截图、接口输出或 AI 总结替代原文。完成 125/125 后，在 PR 评论明确授权并给出 human marker，项目管理者再按 GT-H3B 流程推进。
 
 ## DM-20260906-113 · GT-H3A Human Review bundle preparation
 
@@ -55,7 +96,7 @@
 
 **Required next work**
 
-1. 推送 GT-H3A bundle、index、decision template、准备器、回归测试和本管理记录到新的 GT-H3 PR，运行三平台 required CI。
+1. GT-H3A bundle、index、decision template、准备器、回归测试和本管理记录已推送到 PR #19；GitHub Actions run `341` 三平台 required CI 全部通过，下一步是交由真实 Owner/Human Reviewer 完成完整 125/125 审阅。
 2. 将 bundle 交给真实 Owner/Human Reviewer；必须得到完整 125/125 的显式授权和 human marker 后，才能进入 GT-H3B。
 3. GT-H3B 只能使用 `case`、`artifact`、`kind`、`note` 四类字段；证据 bytes 由现有 `review.py` 自行 hash，任何 truth correction 走 candidate correction，不得在 review 中修复。
 4. GT-H3 最终 head 必须通过 CI 并获得独立 Reviewer closure 后才能合并；在此之前 Formal Production B1–B7、Data Sufficiency、Provider capability approval、2020+ backfill 和策略/回测/交易继续冻结。

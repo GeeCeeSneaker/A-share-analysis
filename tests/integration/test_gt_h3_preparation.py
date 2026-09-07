@@ -90,6 +90,21 @@ def test_prepare_bundle_rejects_reviewed_candidate(tmp_path: Path):
         module.prepare_bundle(root, PACKET, tmp_path / "gt_h3")
 
 
+def test_prepare_bundle_refuses_to_overwrite_versioned_snapshot(tmp_path: Path):
+    module = _module()
+    snapshot_dir = tmp_path / "snapshot"
+    snapshot_dir.mkdir()
+    (snapshot_dir / "GT_H3_REVIEW_BUNDLE.md").write_text(
+        "ACTIVE truth version: `v4-candidate-20260906`\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    module.DEFAULT_OUTPUT_DIR = snapshot_dir
+
+    with pytest.raises(module.PreparationError, match="refusing to overwrite"):
+        module.prepare_bundle(GOLDEN_ROOT, PACKET, snapshot_dir)
+
+
 def test_gt_h3_seal_manifest_rejects_expect_fields_mutation():
     module = _module()
     valid = [{"case": "GT-1", "artifact": "evidence.pdf", "kind": "SSE_ANNOUNCEMENT", "note": "ok"}]

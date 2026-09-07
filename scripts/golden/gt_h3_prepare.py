@@ -24,7 +24,7 @@ EXPECTED_TRUTH_VERSION = "v5-candidate-20260907"
 EXPECTED_CASE_COUNT = 125
 REVIEWER_CLOSURE_ID = "5125393678"
 GT_H3A_ADJUDICATION_ID = "5128750265"
-MAIN_BASELINE = "277ef6fabac265eb70081231923b9a4a8487417f"
+MAIN_BASELINE = "669759adf34bece4c9e41c7be2ce2e9f858e5277"
 
 _EMPTY_REVIEW_FIELDS = (
     "reviewed_by",
@@ -40,6 +40,18 @@ _SEAL_ENTRY_FIELDS = frozenset({"case", "artifact", "kind", "note"})
 
 class PreparationError(RuntimeError):
     """GT-H3A input or output contract violation."""
+
+
+def _guard_output_dir(output_dir: Path) -> None:
+    """Keep the versioned v4 GT-H3A snapshot from being overwritten."""
+    if output_dir.resolve() != DEFAULT_OUTPUT_DIR.resolve():
+        return
+    snapshot = output_dir / "GT_H3_REVIEW_BUNDLE.md"
+    if snapshot.is_file():
+        raise PreparationError(
+            "refusing to overwrite the version-scoped GT-H3A snapshot; "
+            "pass --output-dir docs/golden/gt_h3/remediation for v5 remediation outputs"
+        )
 
 
 def _read_json(path: Path) -> dict:
@@ -351,6 +363,7 @@ def prepare_bundle(
     output_dir: Path = DEFAULT_OUTPUT_DIR,
 ) -> dict:
     """Build GT-H3A outputs and return a compact summary."""
+    _guard_output_dir(output_dir)
     manifest, candidate_rows = _load_candidate(golden_root)
     packet_rows = _read_jsonl(packet_path)
     packet_by_id = _validate_packet(packet_rows, candidate_rows)

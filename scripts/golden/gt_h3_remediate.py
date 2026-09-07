@@ -10,9 +10,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
@@ -27,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_ROOT = ROOT / "data" / "golden" / "provider" / "amazingdata"
 REMEDIATION_ROOT = ROOT / "docs" / "golden" / "gt_h3" / "remediation"
 PRIOR_RESULT = ROOT / "docs" / "golden" / "gt_h3" / "GT_H3_HUMAN_REVIEW_RESULT.jsonl"
+SUPPORTING_SOURCES_PATH = REMEDIATION_ROOT / "GT_H3R_V5_SUPPORTING_OFFICIAL_SOURCES.jsonl"
 V4_VERSION = "v4-candidate-20260906"
 V5_VERSION = "v5-candidate-20260907"
 V4_DATASET_HASH = "8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b"
@@ -51,6 +54,27 @@ NEW_ID_BY_OLD_ID = {
     "GT-LIMIT-STARNO-20200723": "GT-LIMIT-STAR20-688981-20200723",
     "GT-H2-ST-ST_ADD-300965-20240429": "GT-H2-ST-ST_ADD-300965-20240426",
 }
+
+COMPOSITE_CASE_IDS = {
+    "GT-LIMIT-ST5-600518-20190603",
+    "GT-LIMIT-ST5-600518-20191028",
+    "GT-LIMIT-STARNO-20200723",
+    "GT-LIMIT-IPO44-601995",
+    "GT-LIMIT-IPO44-605499",
+}
+OFFICIAL_HOSTS = {
+    "sse.com.cn",
+    "www.sse.com.cn",
+    "static.sse.com.cn",
+    "star.sse.com.cn",
+    "szse.cn",
+    "www.szse.cn",
+    "static.cninfo.com.cn",
+    "cninfo.com.cn",
+    "disc.static.szse.cn",
+}
+NOT_HUMAN_VERIFIED = "CANDIDATE_SOURCES_DECLARED_NOT_HUMAN_VERIFIED"
+NOT_MATERIALIZED = "NOT_MATERIALIZED_IN_GT_H3R"
 
 EXPECTED_SOURCE_REFS = {
     "GT-LIMIT-CN20-300015": "P020231230545310237980.pdf",
@@ -291,12 +315,119 @@ def _validate_carry_forward(
     return eligible, len(ledger_rows) - eligible
 
 
+def _validate_supporting_sources(
+    old_rows: list[dict[str, Any]], new_rows: list[dict[str, Any]]
+) -> None:
+    """Validate the Human-review source contract without claiming fact proof.
+
+    This sidecar is deliberately separate from Golden truth.  It declares the
+    official materials a reviewer must inspect, but it contains neither
+    retrieved bytes nor a ``fact_proved`` assertion.  Composite cases require
+    a rule artifact and a case/date applicability artifact; the other seven
+    delta rows retain their single primary source.
+    """
+    rows = _jsonl(SUPPORTING_SOURCES_PATH)
+    if len(rows) != 12:
+        raise RemediationError("supporting-source sidecar must contain exactly 12 rows")
+    old_by_id = {str(row["golden_case_id"]): row for row in old_rows}
+    new_by_id = {str(row["golden_case_id"]): row for row in new_rows}
+    expected_old_ids = SOURCE_ONLY_IDS | FACT_CORRECTION_IDS
+    if {str(row.get("old_case_id", "")) for row in rows} != expected_old_ids:
+        raise RemediationError("supporting-source sidecar does not cover the exact 12-case delta")
+    seen_case_ids: set[str] = set()
+    for index, row in enumerate(rows, start=1):
+        old_id = str(row.get("old_case_id", ""))
+        case_id = str(row.get("case_id", ""))
+        expected_case_id = NEW_ID_BY_OLD_ID.get(old_id, old_id)
+        if old_id not in old_by_id or case_id != expected_case_id or case_id not in new_by_id:
+            raise RemediationError(
+                f"supporting-source sidecar row {index} has an invalid case mapping"
+            )
+        if case_id in seen_case_ids:
+            raise RemediationError(f"supporting-source sidecar has duplicate case_id: {case_id}")
+        seen_case_ids.add(case_id)
+        if row.get("truth_version") != V5_VERSION:
+            raise RemediationError(f"{old_id}: supporting-source truth_version is unexpected")
+        if row.get("evidence_status") != NOT_HUMAN_VERIFIED:
+            raise RemediationError(f"{old_id}: supporting-source status must remain candidate-only")
+        for field in (
+            "human_review_result",
+            "human_review_feedback",
+            "reviewed_by",
+            "reviewed_at",
+        ):
+            if row.get(field, "") not in ("", None):
+                raise RemediationError(
+                    f"{old_id}: supporting-source review field is populated: {field}"
+                )
+        if "fact_proved" in row:
+            raise RemediationError(
+                f"{old_id}: supporting-source sidecar must not claim fact_proved"
+            )
+        sources = row.get("required_official_sources")
+        if not isinstance(sources, list) or not sources:
+            raise RemediationError(f"{old_id}: supporting-source list is empty")
+        roles: set[str] = set()
+        for source_index, source in enumerate(sources, start=1):
+            if not isinstance(source, dict):
+                raise RemediationError(f"{old_id}: source {source_index} is not an object")
+            required = (
+                "role",
+                "source_name",
+                "official_source_ref",
+                "artifact_kind",
+                "proof_scope",
+                "required_claim",
+            )
+            missing = [field for field in required if not str(source.get(field, ""))]
+            if missing:
+                raise RemediationError(f"{old_id}: source {source_index} is missing {missing}")
+            if source.get("source_sha256", "") != "":
+                raise RemediationError(
+                    f"{old_id}: source bytes/hash must not be asserted before review"
+                )
+            if source.get("hash_status", NOT_MATERIALIZED) != NOT_MATERIALIZED:
+                raise RemediationError(f"{old_id}: source hash status is not candidate-only")
+            role = str(source["role"])
+            roles.add(role)
+            parsed = urlparse(str(source["official_source_ref"]))
+            host = (parsed.hostname or "").lower()
+            if parsed.scheme != "https" or host not in OFFICIAL_HOSTS:
+                raise RemediationError(
+                    f"{old_id}: source {source_index} is not an allowed HTTPS official host"
+                )
+            searchable_text = " ".join(
+                str(source.get(field, ""))
+                for field in ("source_name", "official_source_ref", "proof_scope")
+            ).lower()
+            forbidden_label = any(
+                token in searchable_text for token in ("provider", "search", "sdk", "摘要")
+            ) or re.search(r"(?<![a-z])ai(?![a-z])", searchable_text)
+            if forbidden_label:
+                raise RemediationError(
+                    f"{old_id}: source {source_index} contains a forbidden locator label"
+                )
+        if old_id in COMPOSITE_CASE_IDS:
+            if len(sources) < 2 or not {"RULE", "APPLICABILITY"}.issubset(roles):
+                raise RemediationError(
+                    f"{old_id}: composite case requires RULE and APPLICABILITY sources"
+                )
+        elif "APPLICABILITY" in roles:
+            raise RemediationError(
+                f"{old_id}: non-composite case must not add an applicability source"
+            )
+    expected_case_ids = {NEW_ID_BY_OLD_ID.get(old_id, old_id) for old_id in expected_old_ids}
+    if seen_case_ids != set(new_by_id) & expected_case_ids:
+        raise RemediationError("supporting-source sidecar case coverage is incomplete")
+
+
 def verify() -> dict[str, Any]:
     v4_manifest, old_rows = _load_v4()
     v5_manifest, new_rows = _load_v5()
     results = _load_prior_results()
     _validate_exact_scope(old_rows, new_rows)
     eligible, not_eligible = _validate_carry_forward(old_rows, new_rows, results)
+    _validate_supporting_sources(old_rows, new_rows)
     delta_lines = (
         (REMEDIATION_ROOT / "GT_H3R_V5_REVIEW_TABLE.md").read_text(encoding="utf-8").splitlines()
     )
@@ -312,6 +443,16 @@ def verify() -> dict[str, Any]:
         for part in line.split("|")[1:3]
         if part.strip().startswith("GT-")
     }
+    table_text = "\n".join(delta_lines)
+    if (
+        "制度规则材料/主官方材料" not in table_text
+        or "案例适用性材料（复合事实必填）" not in table_text
+    ):
+        raise RemediationError("v5 delta review table must split rule and applicability materials")
+    for old_id in COMPOSITE_CASE_IDS:
+        matching = [line for line in delta_lines if f"| {old_id} |" in line]
+        if len(matching) != 1 or matching[0].count("](https://") < 2:
+            raise RemediationError(f"{old_id}: review table must show both official source links")
     if not delta_case_ids.issubset(table_case_ids) or len(table_case_ids) != 12:
         raise RemediationError("v5 delta review table does not list exactly the 12 old case IDs")
     return {

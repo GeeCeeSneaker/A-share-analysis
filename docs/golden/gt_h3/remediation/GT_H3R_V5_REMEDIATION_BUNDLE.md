@@ -7,9 +7,10 @@
 ## 审阅人先看什么
 
 1. 先看 `GT_H3R_V5_REMEDIATION_REPORT.md`，确认本次只改 12 条被拒案例。
-2. 再打开 `GT_H3R_V5_REVIEW_TABLE.xlsx` 或同名 Markdown 表，逐行打开“官方链接”，阅读官方原文。
-3. 每行只在“结果”填写 `APPROVE` 或 `REJECT`；不一致、链接失效或原文不能证明事实时填 `REJECT`，并在“简短反馈”写明原因。
-4. 完成 12 行后，由真实 Owner/Human Reviewer 在 PR 评论中明确写出：12/12 结果、113 条沿用确认、`50` 已中和/定义，以及最终 human marker。
+2. 再打开 `GT_H3R_V5_REVIEW_TABLE.xlsx` 或同名 Markdown 表，按两类材料逐行打开全部官方原文：制度规则/主官方材料，以及复合事实要求的案例适用性材料。
+3. 5 条复合事实案例（AG-025 两条、AG-027 一条、AG-029 两条）必须同时检查规则和案例适用性两份材料；缺任一份、打不开或不能证明精确代码/日期/规则关系时填 `REJECT`。
+4. 每行只在“结果”填写 `APPROVE` 或 `REJECT`；不一致、链接失效或原文不能证明事实时在“简短反馈”写一句具体原因。
+5. 完成 12 行后，由真实 Owner/Human Reviewer 在 PR 评论中明确写出：12/12 结果、113 条沿用确认、`50` 已中和/定义，以及最终 human marker。
 
 ## 候选绑定
 
@@ -28,6 +29,12 @@
 - AG-054（5 条）、AG-025（2 条）、AG-029（2 条）、AG-064（1 条）：只换官方来源定位，expected semantics 不变。
 - AG-027（1 条）：将 688981.SH 2020-07-23 改为上市后第 6 个交易日的 STAR 20% 首个受限日案例，保留 2020-07-22 的无涨跌幅边界案例。
 - AG-096（1 条）：将 300965.SZ 的 ST_ADD 生效日/交易日改为 2024-04-26，expected `IS_ST_SEC=true` 不变。
+
+## 来源契约与证据边界
+
+- `GT_H3R_V5_SUPPORTING_OFFICIAL_SOURCES.jsonl` 是本次 12 条复审的逐案例来源契约；它只声明待人工打开的官方来源，不代表事实已被证明。
+- 契约中的 `evidence_status` 固定为 `CANDIDATE_SOURCES_DECLARED_NOT_HUMAN_VERIFIED`，`source_sha256` 为空且 `hash_status` 为 `NOT_MATERIALIZED_IN_GT_H3R`；当前没有提交官方 HTML/PDF bytes，也没有填写 `fact_proved`。
+- 601995 和 2019-10-28 的 600518 来源是官方回溯材料，审阅人必须检查其是否足以覆盖目标代码和日期；不能把来源声明自动当成通过。
 
 机器校验脚本为 `scripts/golden/gt_h3_remediate.py verify`。它同时确认 v4 文件哈希未变、v5 只有上述两条 rekey、10 条证据-only 语义未变、113 条 carry-forward 合格以及 12 条未自动沿用。
 
