@@ -1,3 +1,15 @@
+## 2026-09-07 · GT-H3R 合并后审计记录与 12 条真实人工复审授权
+
+> 状态：**MERGED / 12-CASE REAL HUMAN RE-REVIEW AUTHORIZED / GT-H3B NOT AUTHORIZED**
+
+- PR #20 已合并；合并提交：`b03ada73bc15d5e1ea1a62a28962ba8204b5bd51`。
+- 被 Reviewer 最终核验的 PR head：`4fb60f1cbb5a23f71bcbbfffbc72d488fd2a157d`；合并前 main：`669759adf34bece4c9e41c7be2ce2e9f858e5277`；GitHub test-merge：`11cf4e4b811b0a5c90042087a544216863b4e1e1`。
+- Reviewer closure：`5130860878`；对应 CI run `34109324402` / #358，Windows py3.14、Windows py3.12、Ubuntu py3.14 全部成功。
+- 合并后 main 当前记录基线为 `06cdab7b6985effd26bdf2309eeff0f154fff366`；本条记录只固化已完成合并的审计元数据，不改变 Golden 数据或审核结论。
+- v5 仍为 `v5-candidate-20260907`、125 条 `COMPILED`；113 条 carry-forward 已验证，12 条 corrected cases 获授权进入真实人工复审。
+- 使用 remediation 目录中的 Markdown/Excel 表和 supporting-source sidecar；当前 main 未收到新的 12 条人工结果，人工结果、反馈、审阅人和日期继续保持空白。
+- GT-H3R/GT-H3R.1 已关闭；GT-H3B、`review.py`、REVIEWED、Production、Data Sufficiency、Provider verdict 和 backfill 仍未授权。下一步只接受真实 Human Reviewer 的 12/12 结果、113 条沿用确认、legacy `50` 的中和/定义及最终 human marker。
+
 ## 2026-09-07 · GT-H3R.1 Python 格式门禁修正
 
 - 格式修复已按仓库 Ruff 规则完成；本次仅改变 GT-H3R verifier 的排版，不改变 v4/v5 Golden bytes、12 条范围、来源契约或人工结果。
