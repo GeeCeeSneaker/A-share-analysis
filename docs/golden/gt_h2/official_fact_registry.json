@@ -1258,18 +1258,18 @@
     }
   },
   {
-    "golden_case_id": "GT-H2-ST-ST_ADD-300965-20240429",
+    "golden_case_id": "GT-H2-ST-ST_ADD-300965-20240426",
     "case_type": "golden_st_transition",
     "provider_symbol": "300965.SZ",
-    "trade_date": "20240429",
+    "trade_date": "20240426",
     "event_class": "ST_TRANSITION",
     "event_subtype": "ST_ADD",
-    "event_effective_date": "20240429",
+    "event_effective_date": "20240426",
     "expected_fields": {
       "IS_ST_SEC": true
     },
-    "official_source_name": "SZSE official disclosure referring to *ST 恒宇 risk warning effective 2024-04-29",
-    "official_source_ref": "https://disc.static.szse.cn/disc/disk03/finalpage/2025-04-11/d1f5b09c-3741-4e64-8984-a65441b01dd1.pdf",
+    "official_source_name": "CNINFO 300965 official disclosure (delisting risk warning effective 2024-04-26)",
+    "official_source_ref": "https://static.cninfo.com.cn/finalpage/2024-04-25/1219804789.PDF",
     "artifact_kind_candidate": "SZSE_ANNOUNCEMENT",
     "fact_proved": true,
     "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
@@ -1278,20 +1278,20 @@
     "year": "2024",
     "date_semantics": "event_effective_date is the official status-change date; trade_date intentionally equals that date for the single event-day observation",
     "case": {
-      "golden_case_id": "GT-H2-ST-ST_ADD-300965-20240429",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300965-20240426",
       "case_type": "golden_st_transition",
       "provider_symbol": "300965.SZ",
-      "trade_date": "20240429",
-      "truth_source": "SZSE official disclosure referring to *ST 恒宇 risk warning effective 2024-04-29",
-      "source_ref": "SZSE official disclosure referring to *ST 恒宇 risk warning effective 2024-04-29 | https://disc.static.szse.cn/disc/disk03/finalpage/2025-04-11/d1f5b09c-3741-4e64-8984-a65441b01dd1.pdf",
+      "trade_date": "20240426",
+      "truth_source": "SZSE/CNINFO official disclosure referring to *ST 恒宇 risk warning effective 2024-04-26",
+      "source_ref": "CNINFO 300965 official disclosure (delisting risk warning effective 2024-04-26) | https://static.cninfo.com.cn/finalpage/2024-04-25/1219804789.PDF",
       "expected_fields": {
         "IS_ST_SEC": true
       },
-      "event_id": "ST-ADD-300965-20240429",
+      "event_id": "ST-ADD-300965-20240426",
       "event_class": "ST_TRANSITION",
       "event_subtype": "ST_ADD",
       "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
-      "event_effective_date": "20240429"
+      "event_effective_date": "20240426"
     }
   },
   {
@@ -2780,3 +2780,4 @@
     }
   }
 ]
+

@@ -1,0 +1,725 @@
+{
+  "plan_schema": 1,
+  "source_truth_version": "v4-candidate-20260906",
+  "source_dataset_file": "golden_cases_v4.jsonl",
+  "source_dataset_hash": "8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b",
+  "target_truth_version": "v5-candidate-20260907",
+  "policy": {
+    "v4_immutability": "Never edit v4 version files",
+    "evidence_only": "10 rejected rows replace source_ref only",
+    "fact_corrections": "2 rejected rows change only the adjudicated semantics",
+    "review_boundary": "No evidence bytes, REVIEWED fields or seal are created"
+  },
+  "operation_summary": {
+    "KEEP": 113,
+    "REPLACE": 12,
+    "DROP": 0,
+    "ADD": 0
+  },
+  "operations": [
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600519"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600036"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-601318"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600900"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600104"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-MAIN10-600019"
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-ST5-600518-20190603",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_effective_date": "",
+        "event_id": "REGIME-ST-5",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.05,
+          "PRICE_LOW_LMT_RATE": 0.05
+        },
+        "golden_case_id": "GT-LIMIT-ST5-600518-20190603",
+        "provider_symbol": "600518.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SSE 《上海证券交易所风险警示板股票交易暂行办法》 Article 7 (risk-warning stock 5% price limit) | https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/c_20121216_10785153.shtml",
+        "trade_date": "20190603",
+        "truth_source": "Main board ST stock +/-5% daily limit"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-ST5-600518-20191028",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_effective_date": "",
+        "event_id": "REGIME-ST-5",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.05,
+          "PRICE_LOW_LMT_RATE": 0.05
+        },
+        "golden_case_id": "GT-LIMIT-ST5-600518-20191028",
+        "provider_symbol": "600518.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SSE 《上海证券交易所风险警示板股票交易暂行办法》 Article 7 (risk-warning stock 5% price limit) | https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/c_20121216_10785153.shtml",
+        "trade_date": "20191028",
+        "truth_source": "Main board ST stock +/-5% daily limit"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-ST5-002450-20190422"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-ST5-002450-20190722"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN10-300001"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN10-300059"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN10-300015"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-CN10-300750"
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300750",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_effective_date": "",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300750",
+        "provider_symbol": "300750.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SZSE 《深圳证券交易所创业板交易特别规定》 §2.1 (20% price-limit clause; first five listing days no limit) | https://www.szse.cn/lawrules/rule/repeal/rules/P020231230545310237980.pdf",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300059",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_effective_date": "",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300059",
+        "provider_symbol": "300059.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SZSE 《深圳证券交易所创业板交易特别规定》 §2.1 (20% price-limit clause; first five listing days no limit) | https://www.szse.cn/lawrules/rule/repeal/rules/P020231230545310237980.pdf",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300015",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_effective_date": "",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300015",
+        "provider_symbol": "300015.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SZSE 《深圳证券交易所创业板交易特别规定》 §2.1 (20% price-limit clause; first five listing days no limit) | https://www.szse.cn/lawrules/rule/repeal/rules/P020231230545310237980.pdf",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300124",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_effective_date": "",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300124",
+        "provider_symbol": "300124.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SZSE 《深圳证券交易所创业板交易特别规定》 §2.1 (20% price-limit clause; first five listing days no limit) | https://www.szse.cn/lawrules/rule/repeal/rules/P020231230545310237980.pdf",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-CN20-300274",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_effective_date": "",
+        "event_id": "REGIME-CN-POST-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2,
+          "PRICE_LOW_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-CN20-300274",
+        "provider_symbol": "300274.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SZSE 《深圳证券交易所创业板交易特别规定》 §2.1 (20% price-limit clause; first five listing days no limit) | https://www.szse.cn/lawrules/rule/repeal/rules/P020231230545310237980.pdf",
+        "trade_date": "20210601",
+        "truth_source": "ChiNext +/-20% after the 2020-08-24 reform"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688981"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688111"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688036"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688012"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STAR20-688599"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-STARNO-20200722"
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-STARNO-20200723",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "LIMIT_REGIME",
+        "event_effective_date": "",
+        "event_id": "REGIME-STAR-20",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.2
+        },
+        "golden_case_id": "GT-LIMIT-STAR20-688981-20200723",
+        "provider_symbol": "688981.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SSE STAR Market Trading Special Provisions (2019; first five listing days no limit, later 20%; boundary case) | https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
+        "trade_date": "20200723",
+        "truth_source": "STAR Market first constrained trading day after five no-limit listing days: +/-20% price limit"
+      },
+      "allow_rekey": true
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-BSE30-20220104"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-LIMIT-BSE30-20220601"
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-IPO44-601995",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "NO_LIMIT_IPO",
+        "event_effective_date": "",
+        "event_id": "IPO44-601995.SH",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.44,
+          "PRICE_LOW_LMT_RATE": 0.36
+        },
+        "golden_case_id": "GT-LIMIT-IPO44-601995",
+        "provider_symbol": "601995.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SSE 2014 《关于新股上市初期交易监管有关事项的通知》 (144%/64% declaration bounds) | https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20150912_3988761.shtml",
+        "trade_date": "20201102",
+        "truth_source": "Main-board IPO day 1: +44%/-36% caps (CICC A-share IPO, pre-2023 regime)"
+      }
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-LIMIT-IPO44-605499",
+      "case": {
+        "case_type": "golden_limit_regime",
+        "event_class": "NO_LIMIT_IPO",
+        "event_effective_date": "",
+        "event_id": "IPO44-605499.SH",
+        "event_subtype": "",
+        "expected_fields": {
+          "PRICE_HIGH_LMT_RATE": 0.44,
+          "PRICE_LOW_LMT_RATE": 0.36
+        },
+        "golden_case_id": "GT-LIMIT-IPO44-605499",
+        "provider_symbol": "605499.SH",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "SSE 2014 《关于新股上市初期交易监管有关事项的通知》 (144%/64% declaration bounds) | https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20150912_3988761.shtml",
+        "trade_date": "20210527",
+        "truth_source": "Main-board IPO day 1: +44%/-36% caps (Eastroc Beverage IPO, pre-2023 regime)"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600519-20220630"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600519-20230630"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-601318-20220620"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-601318-20230614"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600036-20220715"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600036-20230713"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000858-20220629"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000858-20230627"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000333-20220602"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000333-20230601"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-601398-20220712"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-601398-20230717"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000651-20220805"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000651-20230809"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000002-20220825"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-000002-20230825"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600900-20220721"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600900-20230721"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600104-20220715"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-CA-600104-20230719"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600654-20220506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600077-20230505"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-601258-20230505"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600466-20230504"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600543-20230504"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-603963-20240429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688500-20230505"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300064-20210428"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300312-20210429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600593-20210722"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002113-20200429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000806-20220506"
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002022-20220506",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20220506",
+        "event_id": "ST-ADD-002022-20220506",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-002022-20220506",
+        "provider_symbol": "002022.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO 002022 official announcement (trading risk warnings effective 2022-05-06) | https://static.cninfo.com.cn/finalpage/2022-04-30/1213259774.PDF",
+        "trade_date": "20220506",
+        "truth_source": "SZSE official announcement: *ST 科华 risk warning effective 2022-05-06"
+      }
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002417-20220421"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002781-20220506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000606-20220506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000995-20220429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300336-20220429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300297-20220429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300330-20220808"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000410-20220419"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002485-20220506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000616-20230504"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000540-20230505"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002433-20230505"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002086-20230505"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300742-20230504"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300208-20240430"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-002217-20240506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300108-20240430"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300209-20240429"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300167-20240430"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-000525-20240919"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300506-20240429"
+    },
+    {
+      "op": "REPLACE",
+      "golden_case_id": "GT-H2-ST-ST_ADD-300965-20240429",
+      "case": {
+        "case_type": "golden_st_transition",
+        "event_class": "ST_TRANSITION",
+        "event_effective_date": "20240426",
+        "event_id": "ST-ADD-300965-20240426",
+        "event_subtype": "ST_ADD",
+        "expected_fields": {
+          "IS_ST_SEC": true
+        },
+        "golden_case_id": "GT-H2-ST-ST_ADD-300965-20240426",
+        "provider_symbol": "300965.SZ",
+        "source_evidence_scope": "CASE_SPECIFIC_OFFICIAL_ARTIFACT",
+        "source_ref": "CNINFO 300965 official disclosure (delisting risk warning effective 2024-04-26) | https://static.cninfo.com.cn/finalpage/2024-04-25/1219804789.PDF",
+        "trade_date": "20240426",
+        "truth_source": "SZSE/CNINFO official disclosure referring to *ST 恒宇 risk warning effective 2024-04-26"
+      },
+      "allow_rekey": true
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-600213-20240506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_ADD-603363-20240506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-STAR_ST_ADD-688282-20240506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-STAR_ST_REMOVE-688500-20240611"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-000408-20210512"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002513-20210621"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002058-20220523"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-000007-20220701"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002022-20230404"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-300010-20240613"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002482-20240618"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002086-20240612"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-002021-20240603"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-300209-20250513"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-ST-ST_REMOVE-300965-20250506"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-601558-20200702"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600068-20210913"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600145-20220428"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600093-20220623"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600695-20220614"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600781-20230628"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600225-20250306"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600190-20250725"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600837-20250304"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-601989-20250905"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600462-20250721"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-600421-20260626"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-000611-20220628"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-300064-20220627"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-000540-20230630"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-300273-20230706"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-002118-20230804"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-002610-20240812"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-000982-20240812"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-DELIST-300208-20250721"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-002142-20211202"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-300475-20230216"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-002788-20200917"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-601555-20200323"
+    },
+    {
+      "op": "KEEP",
+      "golden_case_id": "GT-H2-CA-RIGHT-000750-20200114"
+    }
+  ]
+}
+

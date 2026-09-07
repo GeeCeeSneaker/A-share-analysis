@@ -1,49 +1,19 @@
-## 2026-09-07 · GT-H3 human result received and analyzed
+## 2026-09-07 · GT-H3R v5 rejected-case remediation
 
 **Implementation Status / Review Status**
 
-- **RECEIVED / STRUCTURE_CHECKED / PENDING_PROJECT_MANAGER_REVIEW / NOT_SEALED**：收到 `GT_H3_HUMAN_REVIEW_RESULT.xlsx`，只读导入检查 2 个工作表和 125 条逐案记录。
-- 结果为 125/125 条已填写：`APPROVE` 113 条、`REJECT` 12 条；无重复或缺失案例 ID，结果值合法，12 条拒绝均有原因，审阅人和日期 125/125 已填。
-- 与当前 PR #19 HEAD `866f81e0519a5666e56a0dcc480b0be24297a93d` 的 GT-H3 index（blob `1bef4c31a548eb7eafe43a9f60b8494bbc286682`）比对，125/125 案例的分组、证券代码、交易日和官方链接定位一致。
-- 12 条拒绝集中在 AG-054（5 条）、AG-025（2 条）、AG-029（2 条）、AG-027（1 条）、AG-064（1 条）和 AG-096（1 条）；分析报告逐案列出官方链接、人工原因和下一步。
-- 发现两项需要项目管理者确认的记录问题：113 条 APPROVE 的反馈栏均为 `50`，含义不明；填写说明页的 B5:B7 统计公式在本地导入复核时显示 `#NAME?`，逐案 K 列直接统计仍为 113/12。
-- 原始 Excel、结构化结果摘录和分析报告已加入 GT-H3 文档；没有修改 canonical `review_decision_template.jsonl`，没有写入 `REVIEWED`、证据 bytes/hash、seal 或生产状态。工作簿文本扫描未发现账号、密码、Token 或 API key 等敏感词。
-- 本次分析验证的是结果表的结构和与候选索引的对齐，不替代人工重新阅读 104 组官方原文；113 条 APPROVE 仍需项目管理者审阅。
+- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / NOT_SEALED**：依据 main `277ef6fabac265eb70081231923b9a4a8487417f` 的 [GT-H3A 人工审阅裁决与 GT-H3R v5 候选整改要求](design/A-share-analysis_GT-H3A人工审阅裁决与GT-H3R_v5候选整改要求_20260907.md)，建立独立 v4→v5 整改批次；PR #19 仅作为不可变的 v4 首轮人工审阅审计记录保留。
+- v4 source `v4-candidate-20260906` 与 dataset SHA256 `8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b` 未修改。通过现有 `scripts/golden/candidate.py rebuild --plan` 生成 v5 `v5-candidate-20260907`，ACTIVE dataset SHA256 为 `5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c`，共 125 条且 `COMPILED 125/125`。
+- 整改范围严格为 12 条首轮 REJECT：AG-054 5 条、AG-025 2 条、AG-029 2 条、AG-064 1 条仅替换官方来源定位；AG-027 将 688981.SH 2020-07-23 修正为上市后第 6 个交易日的 STAR 20% 案例；AG-096 将 300965.SZ 的 ST_ADD 生效日/交易日修正为 2024-04-26。无 filler、无无关清理。
+- 新增 `scripts/golden/gt_h3_remediate.py verify`、`docs/golden/gt_h3/remediation/v4_to_v5_rebuild_plan.json` 和 carry-forward ledger。113 条原 APPROVE 使用版本中立的 `review_identity_hash_for_doc()` 证明语义身份未变；两版真实版本感知 `case_semantic_hash` 另行留痕，避免把版本切换后的不同 seal hash 伪称为相等。12 条原 REJECT 均不可自动沿用。
+- H2 packet/registry 和 GT-H3A 空白 bundle 已随 v5 的 12 条精确变更同步，另提供可直接填写的 `GT_H3R_V5_REVIEW_TABLE.xlsx`、Markdown 表和交接包；表格结果、审阅人、日期保持空白，未写入任何 `REVIEWED` 或证据 hash。
+- 本地 verifier、GT-H3R/H2/H3 定向 pytest 已通过；xlsx 已导出并完成公式错误扫描。远端 required CI 尚待新 PR 运行，当前不得宣称 Reviewer closure、seal 或生产就绪。账号、密码、IP、Token、真实端点、原始 SDK 输出和专有依赖不进入 GitHub。
 
 **Next**
 
-- 项目管理者先处理 6 个材料分组和 12 条 REJECT，再确认 `50` 的含义及统计公式问题。
-- 真实 Owner/Human Reviewer 仍需在 PR 评论明确声明完整 125/125 审阅结论并给出 human marker；在此之前不得构造 GT-H3B 或运行 `review.py` seal。
-
-## 2026-09-06 · GT-H3 review table CI formatting correction
-
-**Implementation Status / Review Status**
-
-- **CORRECTED / CI_PENDING / PENDING_HUMAN_REVIEW**：针对 `efa0551` 的 CI 反馈，仅规范化 `tests/integration/test_gt_h3_human_review_table.py` 文件末尾的多余空行；三平台 Ruff lint 原本已通过，未改变测试逻辑、125 条案例、表格内容或 GT-H3 状态。
-- 保持 Markdown/Excel 审阅表、canonical JSONL、expected fields、证据边界和 PREPARED / NOT SEALED 不变；账号、密码、IP、Token、真实端点、原始 SDK 输出和本地 vendor 依赖仍未进入 GitHub。
-- 前一轮 CI 失败原因为 Ruff format check 的文件末尾空行；修正后的提交等待 GitHub Actions 重新验证。
-
-**Next**
-
-- 等待修正提交的三平台 CI 全部通过；随后由独立真实 Owner/Human Reviewer 使用 125 行表逐案审阅。
-- 在 125/125 明确授权前，不构造 GT-H3B、不运行 `review.py` seal，不推进生产、回测或交易。
-
-## 2026-09-06 · GT-H3 reviewer-friendly 125-case table
-
-**Implementation Status / Review Status**
-
-- **IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / PENDING_HUMAN_REVIEW**：面向非技术审阅人新增 GT-H3 逐案人工审阅表，基于当前 `v4-candidate-20260906` 的 104 个 artifact groups 展开为完整 125 行。
-- 每行提供案例 ID、分组、事件类型、证券代码、交易日、候选材料类型、官方材料名称、官方链接，以及按该行事实生成的“必须核对”说明；结果、简短反馈、审阅人和审阅日期均留空待真实审阅人填写。
-- 分类覆盖保持为：涨跌停制度 26 条、上市初期涨跌幅 4 条、ST/风险警示变更 50 条、退市/摘牌 20 条、分红/配股除权 25 条；覆盖 125 个唯一案例，不改变任何 Golden expected fields。
-- 同步提供 GitHub 可直接阅读的 Markdown 表和带筛选、结果下拉、进度统计的 Excel 表；两者都是审阅辅助材料，机器封印仍以 `review_decision_template.jsonl` 为准。
-- 表格初始状态为 0/125 已填写；没有检索或提交官方证据 bytes、preflight SHA256、`REVIEWED`、seal、ACTIVE pointer 或生产运行。账号、密码、IP、Token、真实端点、原始 SDK 输出和本地 vendor 依赖未进入 GitHub。
-- 本地 125 条覆盖测试、GT-H3A 定向测试、Ruff 和表格导入/公式错误扫描已通过；本次提交对应的 GitHub Actions CI 尚待完成。
-
-**Next**
-
-- 独立真实 Owner/Human Reviewer 按表逐行打开官方原文，完成 125/125 条 `APPROVE` 或 `REJECT`，并填写简短反馈、审阅人和日期。
-- 审阅人须把同样的决定写入 canonical `review_decision_template.jsonl`，并在 PR 评论明确声明完整 125/125 审阅及 human marker；任何事实不一致都退回 candidate governance。
-- 在该明确授权前，不构造 GT-H3B、不运行 `review.py` seal，不推进 Formal Production、Data Sufficiency、Provider capability approval、backfill、策略、回测或交易。
+- 将本批提交为独立 remediation PR，运行 Windows 3.14/3.12、Ubuntu 3.14、Ruff、format、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates，并核对 test-merge SHA。
+- 技术 CI 通过后交由独立 Reviewer 审阅；真实 Owner/Human Reviewer 只需复审 v5 表中的 12 行，同时明确 113 条沿用、`50` 的中和/定义和最终 human marker。
+- 在上述授权完成前继续保持 GT-H3B、`review.py`、Formal Production B1-B7、Data Sufficiency、Provider capability、backfill、策略/回测/交易冻结。
 
 ## 2026-09-06 · GT-H3A Human Review bundle preparation
 
@@ -59,7 +29,7 @@
 
 **Next**
 
-- GT-H3A bundle、artifact-group index、case-level decision template、准备器、回归测试和管理记录已推送到 PR #19；GitHub Actions run `341` 三平台 required CI 全部通过，现等待独立真实 Owner/Human Reviewer 完成完整 125/125 审阅与明确授权。
+- 将 GT-H3A bundle、artifact-group index、case-level decision template、准备器、回归测试和管理记录推送到新的 GT-H3 PR，等待 required CI。
 - 只有真实 Owner/Human Reviewer 完成并明确授权完整 125/125 review set 后，才可构造不含 `expect_fields` 的 GT-H3B manifest，并运行现有 atomic `review.py` seal；任何事实不一致必须退回 candidate correction。
 - GT-H3 PR 在最终 CI 与独立 Reviewer closure 前不得合并；GT-H3 合并前的 Formal Production B1–B7、Data Sufficiency、Provider capability approval 和 backfill 仍保持 BLOCKED。
 
@@ -2849,3 +2819,4 @@
 - Two later ADR-only commits, `eceb99468bd28a37a7532b723f092a9d2f8bd469` (ADR-026) and `4ae9151979287a8a4e86c5f95906b88546c993e3` (ADR index), also predated this management synchronization. They are now explicitly included in the same one-time contract-path grandfathered set, together with capabilities commit `4f83f7ac3a19327e9f724c9730cbfbfef03de38b`.
 - This is a disclosed historical exception, not a relaxation of the rule: future `docs/adr/` or contract-path commits must update `docs/project/DEVELOPMENT_MANAGEMENT.md` in the same commit. No history was rewritten.
 - Production account / formal AmazingData Spike / Data Sufficiency Matrix remain BLOCKED or NOT_TESTABLE and are not marked complete.
+

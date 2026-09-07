@@ -28,9 +28,9 @@ def test_prepare_bundle_groups_all_compiled_cases_without_review(tmp_path: Path)
     module = _module()
     summary = module.prepare_bundle(GOLDEN_ROOT, PACKET, tmp_path / "gt_h3")
 
-    assert summary["truth_version"] == "v4-candidate-20260906"
+    assert summary["truth_version"] == "v5-candidate-20260907"
     assert summary["dataset_hash"] == (
-        "8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b"
+        "5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"
     )
     assert summary["case_count"] == 125
     assert summary["artifact_group_count"] > 0
@@ -72,9 +72,9 @@ def test_prepare_bundle_rejects_reviewed_candidate(tmp_path: Path):
     module = _module()
     root = tmp_path / "golden"
     root.mkdir()
-    for name in ("truth_manifest.json", "golden_cases_v4.jsonl"):
+    for name in ("truth_manifest.json", "golden_cases_v5.jsonl"):
         shutil.copy2(GOLDEN_ROOT / name, root / name)
-    dataset = root / "golden_cases_v4.jsonl"
+    dataset = root / "golden_cases_v5.jsonl"
     lines = dataset.read_text(encoding="utf-8").splitlines()
     first = json.loads(lines[0])
     first["review_status"] = "REVIEWED"
@@ -98,3 +98,4 @@ def test_gt_h3_seal_manifest_rejects_expect_fields_mutation():
     mutated = [dict(valid[0], expect_fields={"IS_ST_SEC": False})]
     with pytest.raises(module.PreparationError, match="forbidden fields.*expect_fields"):
         module.validate_seal_manifest_entries(mutated, ["GT-1"])
+

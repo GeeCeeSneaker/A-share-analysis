@@ -30,9 +30,14 @@ CANDIDATE_SCRIPT = REPO_ROOT / "scripts" / "golden" / "candidate.py"
 def golden_env(tmp_path: Path, monkeypatch) -> Path:
     root = tmp_path / "data" / "golden" / "provider" / "amazingdata"
     shutil.copytree(REPO_GOLDEN, root)
-    # Review workflow fixtures start from immutable v3; GT-H2 moves the
-    # repository ACTIVE pointer to v4 while preserving the old source.
-    for name in ("golden_cases_v4.jsonl", "truth_manifest_v4.json"):
+    # Review workflow fixtures start from immutable v3; the synthetic helpers
+    # move their isolated ACTIVE pointer to v4 while preserving the old source.
+    for name in (
+        "golden_cases_v4.jsonl",
+        "truth_manifest_v4.json",
+        "golden_cases_v5.jsonl",
+        "truth_manifest_v5.json",
+    ):
         (root / name).unlink(missing_ok=True)
     (root / "truth_manifest.json").write_text(
         (root / "truth_manifest_v3.json").read_text(encoding="utf-8"),
@@ -785,3 +790,4 @@ class TestDatasetHashRename:
         run_file.write_text(json.dumps(doc, indent=2), encoding="utf-8", newline="\n")
         loaded = store.load_run("legacy-run", RunKind.TRIAL)
         assert loaded.golden_dataset_hash == "a" * 64
+

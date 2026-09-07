@@ -1,7 +1,7 @@
 """Prepare the GT-H3 human-review bundle without sealing any case.
 
 GT-H3A is deliberately read-only with respect to Golden truth.  It derives
-artifact groups and a case-level decision template from the merged v4
+artifact groups and a case-level decision template from the adjudicated v5
 candidate and its GT-H2 packet.  It does not retrieve evidence, write
 ``REVIEWED`` fields, or invoke ``review.py``.
 """
@@ -20,10 +20,11 @@ DEFAULT_GOLDEN_ROOT = REPO_ROOT / "data/golden/provider/amazingdata"
 DEFAULT_PACKET = REPO_ROOT / "docs/golden/gt_h2/review_packet_index.jsonl"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "docs/golden/gt_h3"
 
-EXPECTED_TRUTH_VERSION = "v4-candidate-20260906"
+EXPECTED_TRUTH_VERSION = "v5-candidate-20260907"
 EXPECTED_CASE_COUNT = 125
 REVIEWER_CLOSURE_ID = "5125393678"
-MAIN_BASELINE = "9979a0545531010b6b71fefe1f5d465aab349991"
+GT_H3A_ADJUDICATION_ID = "5128750265"
+MAIN_BASELINE = "277ef6fabac265eb70081231923b9a4a8487417f"
 
 _EMPTY_REVIEW_FIELDS = (
     "reviewed_by",
@@ -84,7 +85,8 @@ def _load_candidate(golden_root: Path) -> tuple[dict, list[dict]]:
     manifest = _read_json(golden_root / "truth_manifest.json")
     if manifest.get("truth_version") != EXPECTED_TRUTH_VERSION:
         raise PreparationError(
-            f"GT-H3A must start from the merged v4 candidate: got {manifest.get('truth_version')!r}"
+            "GT-H3A must start from the adjudicated v5 candidate: "
+            f"got {manifest.get('truth_version')!r}"
         )
     dataset_path = golden_root / str(manifest.get("dataset_file", ""))
     if not dataset_path.is_file():
@@ -282,6 +284,7 @@ def _bundle_markdown(manifest: dict, groups: list[dict], case_count: int) -> str
         f"- ACTIVE case count: `{case_count}` (`COMPILED {case_count}/125`, `REVIEWED 0/125`)",
         f"- Main baseline used for this preparation: `{MAIN_BASELINE}`",
         f"- GT-H2 Reviewer closure: `{REVIEWER_CLOSURE_ID}`",
+        f"- GT-H3A adjudication review: `{GT_H3A_ADJUDICATION_ID}`",
         "- Required boundary: Human Reviewer must explicitly approve or reject every case "
         "before any GT-H3 seal manifest is constructed.",
         "",
@@ -394,3 +397,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

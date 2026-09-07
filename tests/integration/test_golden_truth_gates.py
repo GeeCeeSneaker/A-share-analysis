@@ -60,8 +60,14 @@ def golden_env(tmp_path: Path, monkeypatch) -> Path:
     root = tmp_path / "data" / "golden" / "provider" / "amazingdata"
     shutil.copytree(REPO_GOLDEN, root)
     # Keep pre-H2 contract tests anchored to immutable v3. The repository
-    # ACTIVE pointer is intentionally v4 after GT-H2.
-    for name in ("golden_cases_v4.jsonl", "truth_manifest_v4.json"):
+    # ACTIVE pointer is now a later candidate, but these fixtures exercise
+    # the historical v3 contract in isolation.
+    for name in (
+        "golden_cases_v4.jsonl",
+        "truth_manifest_v4.json",
+        "golden_cases_v5.jsonl",
+        "truth_manifest_v5.json",
+    ):
         (root / name).unlink(missing_ok=True)
     (root / "truth_manifest.json").write_text(
         (root / "truth_manifest_v3.json").read_text(encoding="utf-8"),
@@ -483,3 +489,4 @@ class TestSemanticConflictFix:
                 has_no_limit = fields.get("HIGH_LIMITED", "x") is None
                 has_rate = "PRICE_HIGH_LMT_RATE" in fields
                 assert not (has_no_limit and has_rate), case.golden_case_id
+
