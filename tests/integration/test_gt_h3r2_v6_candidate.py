@@ -17,13 +17,9 @@ def test_staged_v6_verifier_reports_exact_invariants() -> None:
     summary = verify(REPO_ROOT)
     assert summary == {
         "v5_truth_version": "v5-candidate-20260907",
-        "v5_dataset_hash": (
-            "5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"
-        ),
+        "v5_dataset_hash": ("5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"),
         "v6_truth_version": "v6-candidate-20260908",
-        "v6_dataset_hash": (
-            "d11b6cd0314e9a1b63e1728668f61bfacc29f97b255f00f40fcdb98e9d0b1b0c"
-        ),
+        "v6_dataset_hash": ("d11b6cd0314e9a1b63e1728668f61bfacc29f97b255f00f40fcdb98e9d0b1b0c"),
         "active_truth_version": "v5-candidate-20260907",
         "case_count": 125,
         "st_transition": 50,
@@ -76,14 +72,12 @@ def test_candidate_rebuild_reproduces_committed_v6(tmp_path: Path) -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert (
-        (temporary_golden_root / "golden_cases_v6.jsonl").read_bytes()
-        == (GOLDEN_ROOT / "golden_cases_v6.jsonl").read_bytes()
-    )
-    assert (
-        (temporary_golden_root / "truth_manifest_v6.json").read_bytes()
-        == (GOLDEN_ROOT / "truth_manifest_v6.json").read_bytes()
-    )
+    assert (temporary_golden_root / "golden_cases_v6.jsonl").read_bytes() == (
+        GOLDEN_ROOT / "golden_cases_v6.jsonl"
+    ).read_bytes()
+    assert (temporary_golden_root / "truth_manifest_v6.json").read_bytes() == (
+        GOLDEN_ROOT / "truth_manifest_v6.json"
+    ).read_bytes()
     assert json.loads(
         (temporary_golden_root / "truth_manifest.json").read_text(encoding="utf-8")
     ) == json.loads((GOLDEN_ROOT / "truth_manifest_v6.json").read_text(encoding="utf-8"))

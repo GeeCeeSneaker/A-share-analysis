@@ -1,3 +1,11 @@
+## 2026-09-08 · GT-H3R2 v6 formatter parity correction
+
+> 状态：**FORMAT FIX 2 STAGED / SEMANTICS UNCHANGED**
+
+- CI formatter 又指出验证器调用和 v6 回归测试中的可折叠表达式未按 Ruff 0.16.4 输出。
+- 本次仍只同步 formatter 的确定性排版结果；数据字节、哈希、审计和治理边界不变。
+- 因修改了 `scripts/` 验证器，继续在同一提交记录 DEVLOG。
+
 ## 2026-09-08 · GT-H3R2 v6 verifier format gate correction
 
 > 状态：**FORMAT FIX STAGED / SEMANTICS UNCHANGED**

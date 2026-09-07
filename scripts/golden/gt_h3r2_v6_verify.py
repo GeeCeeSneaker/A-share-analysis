@@ -667,9 +667,7 @@ def verify(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     _require(active == v5_manifest, "ACTIVE pointer changed: it must remain byte-equivalent to v5")
     _, v5_docs, _ = _read_dataset(v5_manifest_path, V5_VERSION, V5_DATASET, V5_HASH)
     _validate_compiled_docs(v5_docs, V5_VERSION, "v5")
-    v6_payload, v6_docs, v6_cases = _read_dataset(
-        v6_manifest_path, V6_VERSION, V6_DATASET, V6_HASH
-    )
+    v6_payload, v6_docs, v6_cases = _read_dataset(v6_manifest_path, V6_VERSION, V6_DATASET, V6_HASH)
     _validate_compiled_docs(v6_docs, V6_VERSION, "v6")
     v6_manifest = _read_json(v6_manifest_path)
     _verify_manifest_stats(v6_manifest, v6_cases)
