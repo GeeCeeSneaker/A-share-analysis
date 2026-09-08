@@ -63,12 +63,12 @@ jobs:
         run: |
           set -euo pipefail
           while IFS= read -r entry; do
-            path="\${entry:3}"
-            case "\$path" in
+            path="${entry:3}"
+            case "$path" in
               data/golden/provider/amazingdata/*|docs/golden/gt_h3/gt_h3b/GT_H3B_EXECUTION_RECEIPT.json|docs/DEVLOG.md|docs/project/DEVELOPMENT_MANAGEMENT.md)
                 ;;
               *)
-                echo "::error::unexpected execution output: \$path"
+                echo "::error::unexpected execution output: $path"
                 exit 1
                 ;;
             esac

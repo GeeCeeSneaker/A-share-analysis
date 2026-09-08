@@ -5504,3 +5504,15 @@ Git 历史负责保存过去版本。
 - 原实现把 pre-review 的 `review_readiness_gate` 用在已 REVIEWED dataset，因而将 `REVIEWED` 状态和审阅溯源字段错误报告为 non-empty gate。
 - 已改为 `GoldenTruthStore.review_gate`，该 gate 检查完整 REVIEWED seal 及 evidence artifact/hash；quantity、event coverage、production formal、复合 bundle、v1-v6 immutable 检查仍保留。
 - 失败 job 的临时 evidence/v7 输出未提交，未形成成功回执；v1-v6、v6 contract、ACTIVE baseline 和凭据边界未改变，需由新受控 run 证明闭环。
+
+## DM-CR-20260908-151 · GT-H3B execution scope-check correction
+
+**Type**：C0 — controlled execution workflow correction
+**Date**：2026-09-08
+**Status**：FIX STAGED / RETRY PENDING
+**Evidence**：PR #25；controlled run 34210356154 retry attempt 102011201511。
+
+- A/B/C 已完成：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空。
+- 失败发生在 scope-check：YAML bash 将 `\${entry:3}` 与 `\$path` 当作字面量，合法生成输出因而被误拒。
+- 已改为实际 bash 变量展开；未扩大允许的生成路径集合，receipt/evidence/Governance 输出边界保持不变。
+- scope-check 失败发生在提交步骤前，因此未形成 durable receipt/evidence；v1-v6、v6 contract、ACTIVE baseline 和凭据边界未改变，需由新 run 完成提交。
