@@ -5326,3 +5326,13 @@ Git 历史负责保存过去版本。
 - 继续拒绝 challenge HTML、非官方重定向、超限文件和非 `%PDF-` 内容；不改变 source contract、Golden bytes 或 seal 边界。
 - 修正版提交后重新运行 CI 和受控流程；当前仍未形成真实 evidence、REVIEWED seal 或回执。
 
+## DM-CR-20260908-133 · GT-H3B browser download formatter correction
+
+**Type**：C0 — controlled execution tooling formatting correction  
+**Date**：2026-09-08  
+**Status**：FORMAT FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；CI run `34201546053` 的 Ruff formatter diff。  
+
+- 按 formatter 机器输出合并下载 key 表达式；不改变来源绑定、原始字节校验、Golden bytes 或 seal 边界。
+- 当前仍未形成真实 evidence、REVIEWED seal 或回执。
+

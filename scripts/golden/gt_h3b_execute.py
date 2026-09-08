@@ -291,9 +291,7 @@ def _fetch_pdf_with_browser(
                 for download in reversed(downloads):
                     download_url = str(getattr(download, "url", ""))
                     download_parts = urlsplit(download_url)
-                    download_key = (
-                        (download_parts.hostname or "").lower() + download_parts.path
-                    )
+                    download_key = (download_parts.hostname or "").lower() + download_parts.path
                     if (
                         download_parts.scheme.lower() != "https"
                         or download_parts.hostname is None

@@ -3272,3 +3272,10 @@
 - fallback 现在启用浏览器下载接收，读取下载落盘的原始字节，并要求下载 URL 与同 host/path 的 HTTP 200 响应绑定后才接受；仍检查官方 allowlist、大小上限和 `%PDF-` magic bytes。
 - 不使用打印到 PDF、渲染页面、截图或 HTML；不记录正文、Cookie、账号或密码。当前尚未重新执行。
 
+## 2026-09-08 · GT-H3B browser download formatter correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run `34201546053` 的 formatter 只要求合并下载 URL key 的可读短表达式；已按机器输出同步。
+- 不改变下载与 HTTP 200 响应的 host/path 绑定、原始 PDF 校验或任何 Golden/seal 边界；受控 run `34201546052` 仍待核验。
+
