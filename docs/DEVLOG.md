@@ -3201,3 +3201,11 @@
 - 按三平台 CI 的唯一 Ruff 报告拆分 unsafe evidence ref 的异常行；不改变数据、promotion、source contract、evidence 或 seal 逻辑。
 - 执行 runner 上一轮仍在官方来源获取阶段；本修正提交不引入凭据，也不修改任何 Golden versioned bytes。
 
+## 2026-09-08 · GT-H3B runner formatter/concurrency correction
+
+> 状态：**EXECUTION RUNNER FORMAT FIX STAGED / STALE RUN CANCELLATION ENABLED**
+
+- 按 CI formatter 输出完成 runner 的确定性格式同步；未改变 promotion、source contract、evidence 或 seal 语义。
+- 专用执行工作流启用 cancel-in-progress，修正版提交到达时取消旧的同 PR 网络执行，避免并发写执行分支。
+- 前序运行只在官方来源获取过程中，未生成成功回执；未改变 main。
+

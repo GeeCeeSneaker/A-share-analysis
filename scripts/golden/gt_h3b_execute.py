@@ -87,9 +87,7 @@ def _path_hash(path: Path) -> str:
 
 
 def _json_bytes(value: object) -> bytes:
-    return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode(
-        "utf-8"
-    )
+    return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
 def _read_json(path: Path) -> dict:
@@ -121,12 +119,8 @@ def _run_checked(command: list[str], *, cwd: Path, label: str) -> str:
         check=False,
     )
     if completed.returncode != 0:
-        output = "\n".join(
-            (completed.stdout + "\n" + completed.stderr).splitlines()[-40:]
-        ).strip()
-        raise ExecutionError(
-            f"{label} failed with exit code {completed.returncode}:\n{output}"
-        )
+        output = "\n".join((completed.stdout + "\n" + completed.stderr).splitlines()[-40:]).strip()
+        raise ExecutionError(f"{label} failed with exit code {completed.returncode}:\n{output}")
     return completed.stdout
 
 
@@ -145,13 +139,10 @@ def _assert_immutable(repo_root: Path, expected: dict[str, str]) -> None:
     actual = _snapshot_immutable(repo_root)
     if actual != expected:
         changed = sorted(
-            name
-            for name in set(actual) | set(expected)
-            if actual.get(name) != expected.get(name)
+            name for name in set(actual) | set(expected) if actual.get(name) != expected.get(name)
         )
         raise ExecutionError(
-            "v1-v6 versioned Golden files changed during execution: "
-            + ", ".join(changed)
+            "v1-v6 versioned Golden files changed during execution: " + ", ".join(changed)
         )
 
 
@@ -196,10 +187,7 @@ def _run_promotion(repo_root: Path) -> tuple[dict, str]:
     golden = repo_root / GOLDEN_RELATIVE
     active = _read_json(golden / "truth_manifest.json")
     if active.get("truth_version") not in {V5_VERSION, V6_VERSION}:
-        raise ExecutionError(
-            "Phase A requires ACTIVE v5 or v6; found "
-            + repr(active.get("truth_version"))
-        )
+        raise ExecutionError("Phase A requires ACTIVE v5 or v6; found " + repr(active.get("truth_version")))
     command = [
         sys.executable,
         str(repo_root / "scripts/golden/candidate.py"),
@@ -209,11 +197,7 @@ def _run_promotion(repo_root: Path) -> tuple[dict, str]:
         "--transition-audit",
         str(repo_root / REMEDIATION_RELATIVE / "GT_H3R2_ST_TRANSITION_AUDIT.jsonl"),
         "--carry-forward",
-        str(
-            repo_root
-            / REMEDIATION_RELATIVE
-            / "v5_to_v6_human_review_carry_forward.jsonl"
-        ),
+        str(repo_root / REMEDIATION_RELATIVE / "v5_to_v6_human_review_carry_forward.jsonl"),
         "--plan",
         str(repo_root / REMEDIATION_RELATIVE / "v5_to_v6_rebuild_plan.json"),
     ]
@@ -395,9 +379,7 @@ def _build_review_manifest(
                 "case": case_id,
                 "kind": "EVIDENCE_BUNDLE",
                 "note": "GT-H3B frozen RULE/APPLICABILITY raw bytes",
-                "bundle_sources": [
-                    _binding_declaration(binding) for binding in bindings
-                ],
+                "bundle_sources": [_binding_declaration(binding) for binding in bindings],
             }
         )
         composite_count += 1
@@ -481,9 +463,7 @@ def _verify_reviewed_output(
         store = GoldenTruthStore(golden)
         cases, manifest = store.load()
     except (GoldenTruthError, OSError, ValueError) as exc:
-        raise ExecutionError(
-            f"reviewed ACTIVE failed Golden loader verification: {exc}"
-        ) from exc
+        raise ExecutionError(f"reviewed ACTIVE failed Golden loader verification: {exc}") from exc
     gates = {
         "review_readiness": review_readiness_gate(cases, manifest),
         "quantity": store.quantity_gate(cases, manifest),
@@ -503,8 +483,7 @@ def _verify_reviewed_output(
         if document.get("source_artifact_ref")
     }
     evidence_bytes = sum(
-        (golden / "evidence" / Path(reference)).stat().st_size
-        for reference in evidence_refs
+        (golden / "evidence" / Path(reference)).stat().st_size for reference in evidence_refs
     )
     return {
         "active": _active_summary(active),
@@ -562,56 +541,58 @@ def _write_receipt_and_governance(repo_root: Path, receipt: dict) -> None:
     executed_at = str(receipt["executed_at"])
     date = executed_at[:10]
     run_id = str(receipt.get("workflow_run_id") or "local")
-    source_sha = str(
-        receipt.get("source_head_sha")
-        or receipt.get("source_main_sha")
-        or "unknown"
-    )
+    source_sha = str(receipt.get("source_head_sha") or receipt.get("source_main_sha") or "unknown")
     phase_b = receipt["phase_b"]
     phase_c = receipt["phase_c"]
-    devlog_entry = "\n".join(
-        [
-            f"## {date} · GT-H3B controlled execution succeeded",
-            "",
-            "> 状态：**GT-H3B PHASE A/B/C SUCCEEDED / REVIEWED 125/125 / "
-            "FORMAL PRODUCTION NOT RUN**",
-            "",
-            f"- source execution SHA：{source_sha}；workflow run：{run_id}。",
-            "- Phase A 通过已治理的 candidate.py promote-existing，ACTIVE 从 v5 推进到 v6；",
-            "  v1-v6 versioned files 经执行前后 hash 对比保持不变。",
-            f"- Phase B 按冻结合同 {phase_b['contract_sha256']} 获取 "
-            f"{phase_b['case_count']} 个 case 的官方原始 bytes；",
-            f"  普通 {phase_b['ordinary_cases']}、复合 {phase_b['composite_cases']}、"
-            f"deterministic bundle {phase_b['bundle_count']}。",
-            f"- 125-entry review manifest SHA256：{phase_b['review_manifest_sha256']}；",
-            "  未使用 expect_fields。",
-            f"- Phase C 通过 review.py --reviewer project-owner 一次性生成 "
-            f"{phase_c['reviewed_version']}，REVIEWED 125/125；",
-            f"  evidence refs {phase_c['evidence_ref_count']}，hash consistency 已复核。",
-            "- Formal Production B1-B7：**NOT RUN**；未提交任何账号、密码、Token、",
-            "  IP、Cookie 或 Provider 凭据。",
-        ]
-    ) + "\n"
-    management_entry = "\n".join(
-        [
-            f"## DM-CR-{date.replace('-', '')}-121 · GT-H3B受控真实执行闭环",
-            "",
-            "**Type**：C1 — controlled GT-H3B execution",
-            f"**Date**：{date}",
-            "**Status**：SUCCEEDED / REVIEWED 125/125 / FORMAL PRODUCTION NOT RUN",
-            f"**Evidence**：{RECEIPT_RELATIVE.as_posix()}；workflow run {run_id}；",
-            f"reviewed version {phase_c['reviewed_version']}；",
-            f"dataset SHA256 {phase_c['dataset_hash']}。",
-            "",
-            "- Phase A 使用已审阅的 promote-existing，没有重写 v1-v6 versioned bytes。",
-            "- Phase B 只使用冻结 source contract，125 case exactly once，含 5 个",
-            "  RULE → APPLICABILITY deterministic bundles；证据 bytes/hash 由 review.py 复核。",
-            "- Phase C 是一次性 REVIEWED 125/125，reviewer marker 为 project-owner；",
-            "  quantity/event/review/production formal gates 均为空。",
-            "- Formal Production B1-B7、Provider capability verdict、Data Sufficiency",
-            "  和 2020+ backfill 均未执行。",
-        ]
-    ) + "\n"
+    devlog_entry = (
+        "\n".join(
+            [
+                f"## {date} · GT-H3B controlled execution succeeded",
+                "",
+                "> 状态：**GT-H3B PHASE A/B/C SUCCEEDED / REVIEWED 125/125 / "
+                "FORMAL PRODUCTION NOT RUN**",
+                "",
+                f"- source execution SHA：{source_sha}；workflow run：{run_id}。",
+                "- Phase A 通过已治理的 candidate.py promote-existing，ACTIVE 从 v5 推进到 v6；",
+                "  v1-v6 versioned files 经执行前后 hash 对比保持不变。",
+                f"- Phase B 按冻结合同 {phase_b['contract_sha256']} 获取 "
+                f"{phase_b['case_count']} 个 case 的官方原始 bytes；",
+                f"  普通 {phase_b['ordinary_cases']}、复合 {phase_b['composite_cases']}、"
+                f"deterministic bundle {phase_b['bundle_count']}。",
+                f"- 125-entry review manifest SHA256：{phase_b['review_manifest_sha256']}；",
+                "  未使用 expect_fields。",
+                f"- Phase C 通过 review.py --reviewer project-owner 一次性生成 "
+                f"{phase_c['reviewed_version']}，REVIEWED 125/125；",
+                f"  evidence refs {phase_c['evidence_ref_count']}，hash consistency 已复核。",
+                "- Formal Production B1-B7：**NOT RUN**；未提交任何账号、密码、Token、",
+                "  IP、Cookie 或 Provider 凭据。",
+            ]
+        )
+        + "\n"
+    )
+    management_entry = (
+        "\n".join(
+            [
+                f"## DM-CR-{date.replace('-', '')}-121 · GT-H3B受控真实执行闭环",
+                "",
+                "**Type**：C1 — controlled GT-H3B execution",
+                f"**Date**：{date}",
+                "**Status**：SUCCEEDED / REVIEWED 125/125 / FORMAL PRODUCTION NOT RUN",
+                f"**Evidence**：{RECEIPT_RELATIVE.as_posix()}；workflow run {run_id}；",
+                f"reviewed version {phase_c['reviewed_version']}；",
+                f"dataset SHA256 {phase_c['dataset_hash']}。",
+                "",
+                "- Phase A 使用已审阅的 promote-existing，没有重写 v1-v6 versioned bytes。",
+                "- Phase B 只使用冻结 source contract，125 case exactly once，含 5 个",
+                "  RULE → APPLICABILITY deterministic bundles；证据 bytes/hash 由 review.py 复核。",
+                "- Phase C 是一次性 REVIEWED 125/125，reviewer marker 为 project-owner；",
+                "  quantity/event/review/production formal gates 均为空。",
+                "- Formal Production B1-B7、Provider capability verdict、Data Sufficiency",
+                "  和 2020+ backfill 均未执行。",
+            ]
+        )
+        + "\n"
+    )
     _append_once(
         repo_root / "docs/DEVLOG.md",
         f"## {date} · GT-H3B controlled execution succeeded",
@@ -667,9 +648,7 @@ def execute(repo_root: Path, *, reviewer: str, timeout: float) -> dict:
             reviewer,
             manifest_sha256,
         )
-        source_binding_occurrences = sum(
-            len(contract.for_case(case_id)) for case_id in case_ids
-        )
+        source_binding_occurrences = sum(len(contract.for_case(case_id)) for case_id in case_ids)
         receipt = {
             "format": "GT-H3B-CONTROLLED-EXECUTION-RECEIPT/v1",
             "status": "SUCCEEDED",

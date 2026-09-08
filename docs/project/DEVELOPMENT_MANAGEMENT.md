@@ -5232,3 +5232,13 @@ Git 历史负责保存过去版本。
 
 - 仅拆分一条 101 字符异常行，保持执行器边界和证据政策不变。
 
+## DM-CR-20260908-124 · GT-H3B runner formatter/concurrency correction
+
+**Type**：C1 — controlled execution tooling correction
+**Date**：2026-09-08
+**Status**：FORMAT FIX STAGED / RETRY PENDING
+**Evidence**：PR #25；CI run 34198996417；controlled run 34198841750。
+
+- 同步 Ruff formatter 结果，并将同一专用 PR 的旧执行在新修正版到达时取消。
+- 不改变数据与安全边界；前序执行未产生可合并的成功回执。
+
