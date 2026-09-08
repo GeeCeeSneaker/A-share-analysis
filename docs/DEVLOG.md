@@ -3457,3 +3457,18 @@
 - 已增加与实际目录一致的 `data/golden/provider/amazingdata/evidence/sha256/* -text !eol -diff` 精确规则，并在 `git add` 后逐个以 index blob 与工作区文件做二进制比较；任何 byte drift 都立即失败。
 - 此前失败 job 的 v7/evidence/receipt 未提交；未改变 source、review、Golden gate、输出白名单或凭据边界，待新 run 证明 raw-byte guard、commit 与幂等验证通过。
 
+## 2026-09-08 · GT-H3B controlled execution succeeded
+
+> 状态：**GT-H3B PHASE A/B/C SUCCEEDED / REVIEWED 125/125 / FORMAL PRODUCTION NOT RUN**
+
+- source execution SHA：928a23cdc924cf2da17915eca2c439a9a97d56de；workflow run：34219109525。
+- Phase A 通过已治理的 candidate.py promote-existing，ACTIVE 从 v5 推进到 v6；
+  v1-v6 versioned files 经执行前后 hash 对比保持不变。
+- Phase B 按冻结合同 3c235e35d1a09f0171322a7f0c610edb3cbe3d5ad8c6afc701f7b90afa77d3bb 获取 125 个 case 的官方原始 bytes；
+  普通 120、复合 5、deterministic bundle 5。
+- 125-entry review manifest SHA256：906d86314842699fd523c9eaf5f57eb16b0a18bd85dc13465dcc31dc8e89f1eb；
+  未使用 expect_fields。
+- Phase C 通过 review.py --reviewer project-owner 一次性生成 v7-reviewed-20260908，REVIEWED 125/125；
+  evidence refs 103，hash consistency 已复核。
+- Formal Production B1-B7：**NOT RUN**；未提交任何账号、密码、Token、
+  IP、Cookie 或 Provider 凭据。

@@ -5588,3 +5588,19 @@ Git 历史负责保存过去版本。
 - 已加入精确的 `data/golden/provider/amazingdata/evidence/sha256/* -text !eol -diff` 规则；commit step 同时比较 index blob 与工作区 evidence 文件，任何 staged byte drift 都 fail-closed。
 - 失败 job 的临时输出未提交；source/review/gate/白名单/凭据边界不变，需下一次受控 run 证明提交与幂等验证闭环。
 
+## DM-CR-20260908-121 · GT-H3B受控真实执行闭环
+
+**Type**：C1 — controlled GT-H3B execution
+**Date**：2026-09-08
+**Status**：SUCCEEDED / REVIEWED 125/125 / FORMAL PRODUCTION NOT RUN
+**Evidence**：docs/golden/gt_h3/gt_h3b/GT_H3B_EXECUTION_RECEIPT.json；workflow run 34219109525；
+reviewed version v7-reviewed-20260908；
+dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e。
+
+- Phase A 使用已审阅的 promote-existing，没有重写 v1-v6 versioned bytes。
+- Phase B 只使用冻结 source contract，125 case exactly once，含 5 个
+  RULE → APPLICABILITY deterministic bundles；证据 bytes/hash 由 review.py 复核。
+- Phase C 是一次性 REVIEWED 125/125，reviewer marker 为 project-owner；
+  quantity/event/review/production formal gates 均为空。
+- Formal Production B1-B7、Provider capability verdict、Data Sufficiency
+  和 2020+ backfill 均未执行。
