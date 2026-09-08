@@ -5032,3 +5032,5 @@ Git 历史负责保存过去版本。
 - **P1 tooling correction 1**：run #392 的 Ubuntu Ruff lint 仅报告 evidence_bundle.py 一条超长异常信息，已拆行修复；P1 contract 与 ACTIVE 边界不变。
 
 - **P1 tooling correction 2**：run #393 的 formatter 仅要求 3 处确定性格式化，已同步；P1 行为和未 seal 边界不变。
+
+- **P1 tooling correction 3**：run #394 暴露 manifest member 特判和动态导入测试注册缺口，已修复；EVIDENCE_BUNDLE 仍要求清单完整、成员重算和 source declaration 精确匹配。

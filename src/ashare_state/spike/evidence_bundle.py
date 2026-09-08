@@ -115,9 +115,10 @@ def read_evidence_bundle(
             if len(names) != len(set(names)):
                 raise EvidenceBundleError("EVIDENCE_BUNDLE contains duplicate member names")
             for info in infos:
-                _member_name(info.filename)
                 if info.is_dir() or info.filename.endswith("/"):
                     raise EvidenceBundleError("EVIDENCE_BUNDLE cannot contain directory members")
+                if info.filename != MANIFEST_NAME:
+                    _member_name(info.filename)
                 if info.flag_bits & 0x1:
                     raise EvidenceBundleError("encrypted EVIDENCE_BUNDLE members are forbidden")
                 mode = (info.external_attr >> 16) & 0o170000

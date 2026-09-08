@@ -3063,3 +3063,7 @@
 ### GT-H3B-P1 tooling correction 2
 
 - run #393 的 Ruff formatter 仅要求 review.py、bundle 模块和 P1 测试吸收 3 处确定性格式输出；本修正无行为变化。
+
+### GT-H3B-P1 tooling correction 3
+
+- run #394 的 Ubuntu pytest 暴露 bundle 校验器误将合法 manifest.json 当作 source member，以及 dataclass 动态导入测试未注册 sys.modules；已分别修复校验分支和测试加载器，未放宽 source-member 完整性或 seal 规则。
