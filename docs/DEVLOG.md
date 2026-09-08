@@ -3141,3 +3141,13 @@
 - 最终代码 head `07480debc9ef461023356fdb3223ebd62c5a348d` 对应 CI run `34188753542`；Ubuntu 3.14、Windows 3.12、Windows 3.14 均通过，所有平台均为 `1606 passed`。
 - Ruff、mypy、compileall、Spike、SDK-absent、DEVLOG/Management 治理门均通过；本记录仅确认工具实现与测试门禁，不等同于真实 evidence、REVIEWED seal、ACTIVE promotion 或生产发布。
 - 当前下一关仍是独立 Reviewer 对 final head 与 current-main test-merge 的复核关闭。
+
+
+## 2026-09-08 · GT-H3B P0-BYPASS-01 override boundary hardening
+
+> 状态：**IMPLEMENTED / CI_PENDING / PENDING_INDEPENDENT_REVIEW**
+
+- 独立 Reviewer 复核发现：`--contract` 与 `--root` 同时传入时，代码未拒绝把测试合同指向正式 Golden root，可能绕过 production contract SHA pin 和 composite policy。
+- `review.py` 现在对 `--root` 与脚本真实 production Golden root 做 `Path.resolve()` 比较；精确路径、`.`、`..` 和符号链接等价路径均 fail closed，临时测试 root + custom contract 继续允许。
+- 新增 exact/dot/parent 等价路径对抗测试；拒绝发生在 source-contract 读取前，因此不进入 evidence staging、version 或 ACTIVE 写入。
+- 本修正不改变 v6 contract bytes、v4-v6 versioned bytes、ACTIVE、grandfather list 或真实 evidence；需重新跑 final-head/current-main 三平台 CI，随后交回 Reviewer closure。

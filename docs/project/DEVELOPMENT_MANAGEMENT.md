@@ -5149,3 +5149,17 @@ Git 历史负责保存过去版本。
 
 - This confirms the P1.1 implementation and adversarial test gate only. It does not claim 125/125 real official evidence bytes, REVIEWED seal, ACTIVE promotion, production validation or PR merge.
 - Independent Reviewer must still close the final head against current-main test-merge before the controlled post-merge steps.
+
+
+
+## DM-CR-20260908-117 · GT-H3B P0-BYPASS-01 override boundary hardening
+
+**Type**：C1 — production/test contract boundary hardening  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / CI_PENDING / PENDING_INDEPENDENT_REVIEW  
+**Trigger**：独立 Reviewer 发现 `--contract + --root` 可把任意 test contract 传入正式 Golden root，未被代码阻断。
+
+- 新增 resolved-path guard：当 `--contract` 非空时，`--root` resolve 后等于正式 production Golden root 即拒绝；`.`、`..`、符号链接等价路径不改变判断。
+- 保留临时测试 root + custom contract 的合法测试路径；拒绝发生在 contract 读取和任何 evidence/version/ACTIVE 写入之前。
+- 增加 exact/dot/parent 等价路径对抗测试；不改变 v6 contract bytes、v4-v6 versioned bytes、ACTIVE、grandfather list 或真实 evidence。
+- 后续重新运行 final-head/current-main 三平台 CI，成功后再交独立 Reviewer 做 final closure。

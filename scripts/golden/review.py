@@ -63,6 +63,7 @@ from ashare_state.spike.golden_store import (  # noqa: E402
 )
 
 GOLDEN_ROOT = Path("data/golden/provider/amazingdata")
+PRODUCTION_GOLDEN_ROOT = (Path(__file__).resolve().parents[2] / GOLDEN_ROOT).resolve()
 EVIDENCE_DIR = GOLDEN_ROOT / "evidence"
 EVIDENCE_SOURCE_CONTRACT_PATH = Path(__file__).resolve().parents[2] / CONTRACT_RELATIVE_PATH
 
@@ -337,8 +338,20 @@ def _load_evidence_source_contract(
     lines: list[dict],
 ):
     contract_path = args.contract or EVIDENCE_SOURCE_CONTRACT_PATH
-    if args.contract is not None and args.root is None:
-        raise ReviewError("--contract is a test override and requires --root")
+    if args.contract is not None:
+        if args.root is None:
+            raise ReviewError("--contract is a test override and requires --root")
+        try:
+            requested_root = Path(args.root).resolve()
+            production_root = PRODUCTION_GOLDEN_ROOT.resolve()
+        except (OSError, RuntimeError) as exc:
+            raise ReviewError(
+                "cannot resolve --root for test contract boundary validation"
+            ) from exc
+        if requested_root == production_root:
+            raise ReviewError(
+                "--contract test override cannot target the production Golden root"
+            )
     try:
         return load_evidence_source_contract(
             contract_path,
@@ -657,7 +670,7 @@ def main() -> int:
     parser.add_argument(
         "--contract",
         type=Path,
-        help="test-only source contract override; requires --root",
+        help="test-only source contract override; requires a non-production --root",
     )
     parser.add_argument("--root", type=Path, help="golden root override (tests)")
     args = parser.parse_args()

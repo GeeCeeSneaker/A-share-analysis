@@ -99,7 +99,7 @@ P1.1 的机器合同位于 `docs/golden/gt_h3/gt_h3b/v6_case_evidence_source_con
 - 15 个新增 GT-H3R2 ST 案例固定使用 v6/rebuild 中已有的精确 `static.cninfo.com.cn` 定位，kind 为 `COMPANY_ANNOUNCEMENT`。
 - official host 是显式 allowlist： `www.sse.com.cn`、 `static.sse.com.cn`、 `star.sse.com.cn`、 `www.szse.cn`、 `disc.static.szse.cn`、 `www.bse.cn`、 `static.cninfo.com.cn`；不使用通配符或宽泛后缀。
 
-review.py 在任何 artifact staging 前，把 ordinary entry 的 `sources` 或复合 entry 的 `bundle_sources` 与合同按 case ID、source_ref、kind、顺序逐项比较；任意来源错配、缺失、交换、额外或非 allowlist host 都 fail closed。`--contract` 仅允许与 `--root` 一起用于测试临时合同，生产默认使用 pinned contract。
+review.py 在任何 artifact staging 前，把 ordinary entry 的 `sources` 或复合 entry 的 `bundle_sources` 与合同按 case ID、source_ref、kind、顺序逐项比较；任意来源错配、缺失、交换、额外或非 allowlist host 都 fail closed。`--contract` 仅允许与 `--root` 一起用于测试临时合同；先将 `--root` resolve，若等于正式 Golden root（包括 `.`、`..` 或符号链接等价路径）立即拒绝，生产默认使用 pinned contract。
 
 该合同和校验只负责信任边界，不下载网络、不上传证据、不改变 ACTIVE；真实 125/125 bytes、P0 promotion 和 REVIEWED seal 仍按既定退出门执行。
 

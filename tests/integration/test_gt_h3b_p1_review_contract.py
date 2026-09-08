@@ -196,6 +196,26 @@ def _write_test_source_contract(
     )
 
 
+@pytest.mark.parametrize("variant", ["exact", "dot", "parent"])
+def test_custom_contract_cannot_target_production_root(
+    tmp_path: Path, variant: str
+) -> None:
+    module = _load_review_module()
+    if variant == "exact":
+        root = REPO_GOLDEN
+    elif variant == "dot":
+        root = REPO_GOLDEN / "."
+    else:
+        root = REPO_GOLDEN / ".." / REPO_GOLDEN.name
+
+    args = Namespace(
+        contract=tmp_path / "not-read.jsonl",
+        root=root,
+    )
+    with pytest.raises(module.ReviewError, match="production Golden root"):
+        module._load_evidence_source_contract(args, Path("unused"), {}, [])
+
+
 def test_review_seals_a_declared_evidence_bundle(tmp_path: Path) -> None:
     root = _make_v4_root(tmp_path)
     sources = _sources(tmp_path)
