@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import hashlib
 import json
 import os
@@ -277,8 +278,21 @@ def _fetch_pdf_with_browser(
                 page.on("download", record_download)
                 cdp_session = context.new_cdp_session(page)
                 cdp_session.send("Network.enable")
+                cdp_session.send(
+                    "Fetch.enable",
+                    {
+                        "patterns": [
+                            {
+                                "urlPattern": f"*{Path(urlsplit(source_ref).path).name}*",
+                                "requestStage": "Response",
+                            }
+                        ]
+                    },
+                )
                 cdp_responses: dict[str, tuple[str, dict]] = {}
                 finished_request_ids: list[str] = []
+                fetch_bodies: list[tuple[bytes, str, str]] = []
+                fetch_errors: list[ExecutionError] = []
 
                 def record_cdp_response(event: dict) -> None:
                     response = event.get("response", {})
@@ -294,8 +308,62 @@ def _fetch_pdf_with_browser(
                     if request_id in cdp_responses:
                         finished_request_ids.append(request_id)
 
+                def record_fetch_paused(event: dict) -> None:
+                    request_id = str(event.get("requestId", ""))
+                    request = event.get("request") or {}
+                    response_url = str(request.get("url", ""))
+                    response_parts = urlsplit(response_url)
+                    response_headers = {
+                        str(header.get("name", "")).lower(): str(header.get("value", ""))
+                        for header in event.get("responseHeaders") or []
+                        if isinstance(header, dict)
+                    }
+                    content_type = response_headers.get("content-type", "")
+                    content_type = content_type.split(";", 1)[0].strip().lower()
+                    if (
+                        event.get("responseStatusCode") == 200
+                        and response_parts.scheme.lower() == "https"
+                        and (response_parts.hostname or "").lower() in OFFICIAL_SOURCE_HOSTS
+                        and content_type == "application/pdf"
+                    ):
+                        with suppress(PlaywrightError, binascii.Error, UnicodeError, ValueError):
+                            body_result = cdp_session.send(
+                                "Fetch.getResponseBody",
+                                {"requestId": request_id},
+                            )
+                            encoded_body = body_result.get("body")
+                            if isinstance(encoded_body, str):
+                                body = (
+                                    base64.b64decode(encoded_body)
+                                    if body_result.get("base64Encoded")
+                                    else encoded_body.encode("utf-8")
+                                )
+                                if len(body) > MAX_SOURCE_BYTES:
+                                    fetch_errors.append(
+                                        ExecutionError(
+                                            f"CDP Fetch PDF response exceeded the {MAX_SOURCE_BYTES} "
+                                            "byte safety limit"
+                                        )
+                                    )
+                                elif body.startswith(b"%PDF-"):
+                                    fetch_bodies.append(
+                                        (body, content_type, response_url)
+                                    )
+                    try:
+                        cdp_session.send(
+                            "Fetch.continueResponse",
+                            {"requestId": request_id},
+                        )
+                    except PlaywrightError:
+                        with suppress(PlaywrightError):
+                            cdp_session.send(
+                                "Fetch.continueRequest",
+                                {"requestId": request_id},
+                            )
+
                 cdp_session.on("Network.responseReceived", record_cdp_response)
                 cdp_session.on("Network.loadingFinished", record_cdp_finished)
+                cdp_session.on("Fetch.requestPaused", record_fetch_paused)
                 # PDF downloads can abort page.goto; inspect captured responses below.
                 with suppress(PlaywrightError, PlaywrightTimeoutError):
                     page.goto(
@@ -304,6 +372,10 @@ def _fetch_pdf_with_browser(
                         timeout=max(1000, int(timeout * 1000)),
                     )
                 page.wait_for_timeout(min(10000, max(2000, int(timeout * 1000))))
+                if fetch_errors:
+                    raise fetch_errors[0]
+                for body, content_type, response_url in reversed(fetch_bodies):
+                    return body, content_type, response_url
                 for request_id in reversed(finished_request_ids):
                     response_info = cdp_responses.get(request_id)
                     if response_info is None:

@@ -3287,3 +3287,11 @@
 - runner 增加 Chromium CDP `Network.getResponseBody` 路径，在 `loadingFinished` 后读取同一 HTTP 200 官方响应的原始 body；继续校验官方 HTTPS host、大小上限和 `%PDF-` magic bytes。
 - 不使用打印到 PDF、渲染页面、截图、HTML 或镜像；不记录正文、Cookie、账号或密码。本次修正尚未重新执行。
 
+## 2026-09-08 · GT-H3B Fetch response-stage body correction
+
+> 状态：**FETCH BODY FIX STAGED / RETRY PENDING**
+
+- 受控 run `34201917119` 的 CDP Network body 仍无法从 Chromium PDF 内置处理路径读取；目标响应已确认 HTTP 200/application/pdf。
+- runner 现在对目标 PDF 文件名启用 CDP Fetch response-stage 拦截，在交给 PDF 处理器前调用 `Fetch.getResponseBody`，并要求继续绑定同一官方 host、HTTP 200、大小上限和 `%PDF-`。
+- 未使用渲染/打印结果、截图、HTML 或镜像；未写入或输出正文、Cookie、账号或密码。本次修正尚未重新执行。
+

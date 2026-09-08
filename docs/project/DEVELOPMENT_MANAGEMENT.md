@@ -5347,3 +5347,14 @@ Git 历史负责保存过去版本。
 - CDP 路径不改变 required URL、官方 host、大小上限、PDF magic bytes、source contract 或 fail-closed 规则。
 - 当前仍未形成真实 evidence、REVIEWED seal 或执行回执；待 CI 及新受控 run 验证。
 
+## DM-CR-20260908-136 · GT-H3B Fetch response-stage body correction
+
+**Type**：C1 — controlled execution evidence retrieval correction  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / RETRY PENDING  
+**Evidence**：PR #25；controlled run `34201917119` 的 CDP 结果。  
+
+- 对目标 PDF 文件名启用 CDP Fetch response-stage 拦截，使用 `Fetch.getResponseBody` 读取交给内置 PDF 处理器前的原始响应体，并继续请求。
+- 只有 HTTP 200、HTTPS 官方 allowlist host、application/pdf、`%PDF-` 且未超限的 body 才进入 evidence staging；其他响应继续 fail closed。
+- 不改变 source contract、Golden bytes、ACTIVE 或 seal 边界；当前仍未形成真实 evidence、REVIEWED seal 或回执。
+
