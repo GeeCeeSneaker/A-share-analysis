@@ -3159,3 +3159,11 @@
 
 - CI run `34191452213` 的 Ubuntu job 在运行时测试前仅报告 override guard 的 Ruff formatter 差异；已按机器输出合并短异常信息为单行。
 - production-root resolved-path guard、临时 test root 允许路径、v6/v4-v6 bytes、ACTIVE、grandfather list 和真实 evidence 边界均不变；需重新跑完整三平台 CI。
+
+
+## 2026-09-08 · GT-H3B P0-BYPASS-01 formatter correction 2
+
+> 状态：**FORMAT FIX STAGED / CI_PENDING / PENDING_INDEPENDENT_REVIEW**
+
+- CI run `34191561514` 的 Ubuntu 与 Windows 3.12 job 在 pytest 前仅报告新增 root-override 对抗测试函数签名的 Ruff formatter 差异；已按机器输出合并为单行。
+- resolved production-root guard、exact/dot/parent 等价路径测试、临时 test root 允许路径及 ACTIVE/seal 边界不变；需重新跑完整三平台 CI。

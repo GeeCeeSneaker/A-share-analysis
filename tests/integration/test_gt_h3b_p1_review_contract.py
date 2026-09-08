@@ -197,9 +197,7 @@ def _write_test_source_contract(
 
 
 @pytest.mark.parametrize("variant", ["exact", "dot", "parent"])
-def test_custom_contract_cannot_target_production_root(
-    tmp_path: Path, variant: str
-) -> None:
+def test_custom_contract_cannot_target_production_root(tmp_path: Path, variant: str) -> None:
     module = _load_review_module()
     if variant == "exact":
         root = REPO_GOLDEN

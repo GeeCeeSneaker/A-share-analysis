@@ -5175,3 +5175,15 @@ Git 历史负责保存过去版本。
 
 - 按 Ruff 机器输出将短 `ReviewError` 合并为单行；不改变 resolved production-root guard、custom test root、source contract、ACTIVE 或 seal 边界。
 - 该修正与 DEVLOG 同一多文件 commit 提交，随后重新运行完整三平台 CI。
+
+
+
+## DM-CR-20260908-119 · GT-H3B P0-BYPASS-01 formatter correction 2
+
+**Type**：C0 — formatting consistency  
+**Date**：2026-09-08  
+**Status**：RECORDED / CI_PENDING / PENDING_INDEPENDENT_REVIEW  
+**Trigger**：CI run `34191561514` 的 Ubuntu 与 Windows 3.12 job 在 pytest 前报告新增对抗测试签名的 Ruff formatter 差异。
+
+- 按 Ruff 机器输出将测试签名合并为单行；不改变 production-root resolved-path guard、custom test root、source contract、ACTIVE 或 seal 边界。
+- 该修正与 DEVLOG 同一多文件 commit 提交，随后重新运行完整三平台 CI。
