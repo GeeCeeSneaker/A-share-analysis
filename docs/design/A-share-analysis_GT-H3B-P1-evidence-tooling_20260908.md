@@ -83,3 +83,9 @@ review.py 自己计算外层 bundle bytes 的 authoritative SHA256，并在 stag
 - 获取并审阅 ACTIVE v6 的 125 份官方原始 bytes；5 个复合 case 需按上面格式绑定双证据。
 - 在受控环境中运行 125-entry batch，验证 REVIEWED 125 / COMPILED 0、artifact hashes、历史版本不变、ACTIVE last。
 - 由独立 Reviewer 对包含证据 bytes 与 seal 的 final head 做 current-main test-merge 后再合并；GT-H3B merged 后才执行一次 Formal Production B1-B7。
+
+## 发布失败回滚补强（2026-09-08）
+
+在真正开始 durable publication 后，工具现在记录本次调用新建的 evidence/version 文件。若 ACTIVE 指针仍保持旧字节而提交阶段失败，工具只删除“本次新建且字节未被外部改动”的文件；已有同 hash evidence 和所有历史 versioned 文件不会删除。若无法确认 ACTIVE 是否仍为旧值，或发现新文件已被外部改动，工具保留现场并明确报错，避免把 ACTIVE 指向的文件误删。
+
+该保护覆盖指针写失败、versioned 文件创建失败和 evidence 写入中途失败；测试验证旧 ACTIVE 不变、无新 version 文件、无新 evidence 文件。它不能替代操作系统崩溃恢复或真实 evidence 获取，仍必须以 CI 和最终 125/125 seal 结果为准。
