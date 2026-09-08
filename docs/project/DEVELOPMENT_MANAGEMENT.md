@@ -5223,3 +5223,12 @@ Git 历史负责保存过去版本。
 - 将 immutable snapshot 对齐仓库真实 v1-v6 文件布局，并按 Ruff 结果修正生成文档的确定性排版。
 - 失败发生在 Phase A 之前；没有 evidence bytes、REVIEWED provenance 或 ACTIVE pointer 变更。
 
+## DM-CR-20260908-123 · GT-H3B runner lint correction
+
+**Type**：C1 — controlled execution tooling correction
+**Date**：2026-09-08
+**Status**：FIX STAGED / RETRY PENDING
+**Evidence**：PR #25；CI run 34198841835 的 Ruff 报告。
+
+- 仅拆分一条 101 字符异常行，保持执行器边界和证据政策不变。
+

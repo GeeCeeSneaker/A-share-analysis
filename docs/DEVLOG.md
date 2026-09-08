@@ -3194,3 +3194,10 @@
 - 按 Ruff 机器门禁拆分 runner 自动生成的 DEVLOG/Management 文本，去除尾随空格；不改变 promotion、source contract、evidence 或 seal 语义。
 - 上一轮只在执行前置快照与 lint 阶段失败，未生成 receipt、未写入 evidence、未改变 ACTIVE。
 
+## 2026-09-08 · GT-H3B runner lint correction
+
+> 状态：**EXECUTION RUNNER LINT FIX STAGED / RETRY PENDING**
+
+- 按三平台 CI 的唯一 Ruff 报告拆分 unsafe evidence ref 的异常行；不改变数据、promotion、source contract、evidence 或 seal 逻辑。
+- 执行 runner 上一轮仍在官方来源获取阶段；本修正提交不引入凭据，也不修改任何 Golden versioned bytes。
+

@@ -453,7 +453,9 @@ def _verify_reviewed_output(
             )
         relative_ref = Path(ref)
         if relative_ref.is_absolute() or ".." in relative_ref.parts:
-            raise ExecutionError(f"case {document.get('golden_case_id')} has an unsafe evidence ref")
+            raise ExecutionError(
+                f"case {document.get('golden_case_id')} has an unsafe evidence ref"
+            )
         evidence_path = golden / "evidence" / relative_ref
         if not evidence_path.is_file():
             raise ExecutionError(f"missing evidence bytes for {document.get('golden_case_id')}")
