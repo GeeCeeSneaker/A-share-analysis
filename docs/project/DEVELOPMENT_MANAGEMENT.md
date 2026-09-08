@@ -5336,3 +5336,14 @@ Git 历史负责保存过去版本。
 - 按 formatter 机器输出合并下载 key 表达式；不改变来源绑定、原始字节校验、Golden bytes 或 seal 边界。
 - 当前仍未形成真实 evidence、REVIEWED seal 或回执。
 
+## DM-CR-20260908-134 · GT-H3B CDP PDF body capture correction
+
+**Type**：C1 — controlled execution evidence retrieval correction  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / RETRY PENDING  
+**Evidence**：PR #25；controlled run `34201546052` 和 `34201258549` 的响应/下载诊断。  
+
+- 对已完成且状态为 HTTP 200 的官方响应调用 Chromium CDP `Network.getResponseBody`，获取浏览器网络层原始字节；下载与普通 response body 路径仍保留为后备。
+- CDP 路径不改变 required URL、官方 host、大小上限、PDF magic bytes、source contract 或 fail-closed 规则。
+- 当前仍未形成真实 evidence、REVIEWED seal 或执行回执；待 CI 及新受控 run 验证。
+

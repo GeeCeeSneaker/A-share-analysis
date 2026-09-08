@@ -9,6 +9,7 @@ contract, or publication mismatch.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -274,6 +275,27 @@ def _fetch_pdf_with_browser(
 
                 page.on("response", record_response)
                 page.on("download", record_download)
+                cdp_session = context.new_cdp_session(page)
+                cdp_session.send("Network.enable")
+                cdp_responses: dict[str, tuple[str, dict]] = {}
+                finished_request_ids: list[str] = []
+
+                def record_cdp_response(event: dict) -> None:
+                    response = event.get("response", {})
+                    request_id = str(event.get("requestId", ""))
+                    if request_id and response.get("status") == 200:
+                        cdp_responses[request_id] = (
+                            str(response.get("url", "")),
+                            response.get("headers") or {},
+                        )
+
+                def record_cdp_finished(event: dict) -> None:
+                    request_id = str(event.get("requestId", ""))
+                    if request_id in cdp_responses:
+                        finished_request_ids.append(request_id)
+
+                cdp_session.on("Network.responseReceived", record_cdp_response)
+                cdp_session.on("Network.loadingFinished", record_cdp_finished)
                 # PDF downloads can abort page.goto; inspect captured responses below.
                 with suppress(PlaywrightError, PlaywrightTimeoutError):
                     page.goto(
@@ -282,6 +304,44 @@ def _fetch_pdf_with_browser(
                         timeout=max(1000, int(timeout * 1000)),
                     )
                 page.wait_for_timeout(min(10000, max(2000, int(timeout * 1000))))
+                for request_id in reversed(finished_request_ids):
+                    response_info = cdp_responses.get(request_id)
+                    if response_info is None:
+                        continue
+                    response_url, headers = response_info
+                    final = urlsplit(response_url)
+                    if (
+                        final.scheme.lower() != "https"
+                        or (final.hostname or "").lower() not in OFFICIAL_SOURCE_HOSTS
+                    ):
+                        continue
+                    try:
+                        body_result = cdp_session.send(
+                            "Network.getResponseBody",
+                            {"requestId": request_id},
+                        )
+                    except PlaywrightError:
+                        continue
+                    encoded_body = body_result.get("body")
+                    if not isinstance(encoded_body, str):
+                        continue
+                    try:
+                        body = (
+                            base64.b64decode(encoded_body)
+                            if body_result.get("base64Encoded")
+                            else encoded_body.encode("utf-8")
+                        )
+                    except (ValueError, UnicodeError):
+                        continue
+                    if len(body) > MAX_SOURCE_BYTES:
+                        raise ExecutionError(
+                            f"CDP PDF response exceeded the {MAX_SOURCE_BYTES} "
+                            "byte safety limit"
+                        )
+                    if body.startswith(b"%PDF-"):
+                        raw_content_type = str(headers.get("content-type", ""))
+                        content_type = raw_content_type.split(";", 1)[0].strip().lower()
+                        return body, content_type or "application/pdf", response_url
                 successful_response_paths = {
                     (urlsplit(str(getattr(response, "url", ""))).hostname or "").lower()
                     + urlsplit(str(getattr(response, "url", ""))).path

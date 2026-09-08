@@ -3279,3 +3279,11 @@
 - CI run `34201546053` 的 formatter 只要求合并下载 URL key 的可读短表达式；已按机器输出同步。
 - 不改变下载与 HTTP 200 响应的 host/path 绑定、原始 PDF 校验或任何 Golden/seal 边界；受控 run `34201546052` 仍待核验。
 
+## 2026-09-08 · GT-H3B CDP PDF body capture correction
+
+> 状态：**CDP CAPTURE FIX STAGED / RETRY PENDING**
+
+- 受控 run `34201546052` / `34201258549` 均观察到 SSE 最终 HTTP 200/application/pdf，但 Chromium 内置 PDF 处理既不暴露可读 response body，也不触发 Playwright download event。
+- runner 增加 Chromium CDP `Network.getResponseBody` 路径，在 `loadingFinished` 后读取同一 HTTP 200 官方响应的原始 body；继续校验官方 HTTPS host、大小上限和 `%PDF-` magic bytes。
+- 不使用打印到 PDF、渲染页面、截图、HTML 或镜像；不记录正文、Cookie、账号或密码。本次修正尚未重新执行。
+
