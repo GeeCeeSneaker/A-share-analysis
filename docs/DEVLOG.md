@@ -3255,3 +3255,12 @@
 - CI run `34200571774` 三个平台一致报告 runner 的 Ruff formatter parity；已按机器 diff 收敛 Phase A 诊断、fallback 异常、嵌套回调和 content-type 排版。
 - 不改变真实浏览器网络响应、官方 host、HTTP 200、PDF magic bytes、大小上限或 fail-closed 规则；受控 run `34200571773` 仍待完成核验。
 
+## 2026-09-08 · GT-H3B headed-browser and response-diagnostic correction
+
+> 状态：**BROWSER RETRY HARDENED / RETRY PENDING**
+
+- 受控 run `34200774412` 已安装 Playwright/Chromium，但 headless fallback 在 60 秒内没有捕获 HTTP 200 PDF；没有生成 evidence、回执或 seal。
+- runner 改为在专用工作流的 Xvfb 虚拟显示中使用 headed Chromium，导航等待改为 `commit`，并仅记录 status/host/path/content-type 摘要用于诊断；不记录响应正文、Cookie、账号或密码。
+- content-type 排版改为短语句，避免 formatter 与 E501 冲突；来源、HTTP 200、官方 allowlist、PDF magic bytes 和 fail-closed 规则不变。
+- 本修正尚未重新执行；新的日志将决定是否可继续 125/125 materialization。
+

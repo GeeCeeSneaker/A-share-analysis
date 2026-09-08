@@ -48,6 +48,7 @@ jobs:
         run: |
           uv pip install --python .venv/bin/python "playwright==1.52.0"
           uv run playwright install --with-deps chromium
+          command -v xvfb-run
 
       - name: Run governed GT-H3B phases A/B/C
         env:
@@ -55,7 +56,7 @@ jobs:
           GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
-        run: uv run python scripts/golden/gt_h3b_execute.py --reviewer project-owner
+        run: xvfb-run -a uv run python scripts/golden/gt_h3b_execute.py --reviewer project-owner
 
       - name: Enforce execution output scope
         shell: bash

@@ -243,8 +243,10 @@ def _fetch_pdf_with_browser(
         raise ExecutionError("browser fallback unavailable for PDF anti-bot challenge") from exc
 
     responses: list[object] = []
+    observed: list[str] = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
+        headless = not bool(os.environ.get("DISPLAY"))
+        browser = playwright.chromium.launch(headless=headless)
         try:
             context = browser.new_context(
                 accept_downloads=False,
@@ -254,6 +256,16 @@ def _fetch_pdf_with_browser(
                 page = context.new_page()
 
                 def record_response(response: object) -> None:
+                    status = getattr(response, "status", None)
+                    response_url = str(getattr(response, "url", ""))
+                    response_parts = urlsplit(response_url)
+                    headers = getattr(response, "headers", {})
+                    raw_content_type = str(headers.get("content-type", ""))
+                    content_type = raw_content_type.split(";", 1)[0].strip().lower()
+                    observed.append(
+                        f"{status}:{(response_parts.hostname or '').lower()}:"
+                        f"{response_parts.path}:{content_type}"
+                    )
                     responses.append(response)
 
                 page.on("response", record_response)
@@ -261,10 +273,10 @@ def _fetch_pdf_with_browser(
                 with suppress(PlaywrightError, PlaywrightTimeoutError):
                     page.goto(
                         source_ref,
-                        wait_until="domcontentloaded",
+                        wait_until="commit",
                         timeout=max(1000, int(timeout * 1000)),
                     )
-                page.wait_for_timeout(min(5000, max(1000, int(timeout * 1000))))
+                page.wait_for_timeout(min(10000, max(2000, int(timeout * 1000))))
                 for response in reversed(responses):
                     if getattr(response, "status", None) != 200:
                         continue
@@ -296,14 +308,17 @@ def _fetch_pdf_with_browser(
                             "byte safety limit"
                         )
                     if body.startswith(b"%PDF-"):
-                        content_type = str(headers.get("content-type", "")).split(";", 1)[0].strip().lower()
+                        raw_content_type = str(headers.get("content-type", ""))
+                        content_type = raw_content_type.split(";", 1)[0].strip().lower()
                         return body, content_type or "application/pdf", response_url
             finally:
                 context.close()
         finally:
             browser.close()
+    summary = ", ".join(observed[-12:]) or "none"
     raise ExecutionError(
-        f"browser fallback did not obtain an HTTP 200 PDF response for {source_ref}"
+        f"browser fallback did not obtain an HTTP 200 PDF response for {source_ref}; "
+        f"observed {len(observed)} responses: {summary}"
     )
 
 

@@ -5304,3 +5304,14 @@ Git 历史负责保存过去版本。
 - 按 formatter 机器输出同步 runner 的排版，不改变浏览器取证、来源校验、证据 hash、Golden 或发布边界。
 - 该修正会重新触发 CI 和受控执行；当前仍未声称获取真实 evidence 或完成 seal。
 
+## DM-CR-20260908-131 · GT-H3B headed-browser and response-diagnostic correction
+
+**Type**：C1 — controlled execution evidence retrieval hardening  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / RETRY PENDING  
+**Evidence**：PR #25；controlled run `34200774412` 的浏览器 fallback 结果。  
+
+- 在 Xvfb 中运行 headed Chromium，并用 `wait_until=commit` 尽早捕获导航响应，针对可能的 headless challenge 继续执行页面脚本。
+- 失败摘要只保留响应状态、官方 host/path 和 content-type；不保存或打印正文、Cookie、账号、密码或其他凭据。
+- 不放宽 required source URL、HTTP 200、官方 host、原始 PDF body 和大小上限要求；当前仍未形成真实 evidence、REVIEWED seal 或回执。
+
