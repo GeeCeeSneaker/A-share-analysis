@@ -202,9 +202,7 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
                             f"bundle source {source_index}"
                         )
                     seen_bundle_sources.add(source_key)
-                    bundle_sources.append(
-                        {"source_ref": source_ref, "kind": source_kind}
-                    )
+                    bundle_sources.append({"source_ref": source_ref, "kind": source_kind})
             elif "bundle_sources" in entry:
                 raise ReviewError(
                     f"review manifest entry {index} bundle_sources is only valid "

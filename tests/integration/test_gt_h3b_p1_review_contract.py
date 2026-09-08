@@ -73,9 +73,10 @@ def test_bundle_tamper_and_declaration_drift_fail_closed(tmp_path: Path) -> None
     bundle = tmp_path / "bundle.zip"
     tampered = tmp_path / "tampered.zip"
     write_evidence_bundle(bundle, sources)
-    with zipfile.ZipFile(bundle) as source_archive, zipfile.ZipFile(
-        tampered, mode="w", compression=zipfile.ZIP_STORED
-    ) as target_archive:
+    with (
+        zipfile.ZipFile(bundle) as source_archive,
+        zipfile.ZipFile(tampered, mode="w", compression=zipfile.ZIP_STORED) as target_archive,
+    ):
         for info in source_archive.infolist():
             data = source_archive.read(info.filename)
             if info.filename != "manifest.json":
@@ -164,8 +165,7 @@ def test_review_seals_a_declared_evidence_bundle(tmp_path: Path) -> None:
         }
         if index == 0:
             entry["bundle_sources"] = [
-                {"source_ref": source["source_ref"], "kind": source["kind"]}
-                for source in sources
+                {"source_ref": source["source_ref"], "kind": source["kind"]} for source in sources
             ]
         entries.append(entry)
     review_manifest.write_text(

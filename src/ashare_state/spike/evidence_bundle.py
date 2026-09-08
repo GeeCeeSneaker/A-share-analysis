@@ -146,9 +146,7 @@ def read_evidence_bundle(
                 required = ("source_ref", "artifact_kind", "member_name", "sha256", "size")
                 missing = [field for field in required if field not in raw_entry]
                 if missing:
-                    raise EvidenceBundleError(
-                        f"bundle manifest entry {index} is missing {missing}"
-                    )
+                    raise EvidenceBundleError(f"bundle manifest entry {index} is missing {missing}")
                 source_ref = _source_ref(raw_entry["source_ref"])
                 artifact_kind = _artifact_kind(raw_entry["artifact_kind"])
                 member_name = _member_name(raw_entry["member_name"])

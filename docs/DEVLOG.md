@@ -3059,3 +3059,7 @@
 ### GT-H3B-P1 tooling correction 1
 
 - run #392 的 Ubuntu Ruff lint 发现 evidence_bundle.py 一条异常信息超过 100 列；已仅按 Ruff 规范拆行，bundle 校验语义不变。
+
+### GT-H3B-P1 tooling correction 2
+
+- run #393 的 Ruff formatter 仅要求 review.py、bundle 模块和 P1 测试吸收 3 处确定性格式输出；本修正无行为变化。
