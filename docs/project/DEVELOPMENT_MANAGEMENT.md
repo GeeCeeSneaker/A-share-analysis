@@ -5007,3 +5007,5 @@ Git 历史负责保存过去版本。
 - **P0 CI correction 2**：run #385 发现新增 candidate/test 未完全匹配 Ruff formatter；已在本同步提交中吸收格式输出，语义不变。
 
 - **P0 CI correction 3**：run #386 仅发现测试列表推导的 Ruff formatter 差异；本同步提交按 formatter 输出收敛，功能和治理边界不变。
+
+- **P0 CI correction 4**：run #387 的 Ruff lint 已通过；formatter 仅报告 candidate.py 的 4 处空行规范差异，本同步提交按机器输出收敛，功能和治理边界不变。

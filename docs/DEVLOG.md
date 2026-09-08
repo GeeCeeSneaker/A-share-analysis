@@ -3033,3 +3033,7 @@
 ### P0 CI correction 3
 
 - run #386 的 Ruff lint 已通过；formatter 要求将重复 ST identity 测试的列表推导保持为三行，已按精确 formatter 输出同步。
+
+### P0 CI correction 4
+
+- run #387 的 Ruff lint 已通过；formatter 仅报告 candidate.py 的 4 处空行规范差异，本修正按机器输出收敛，未改变 promotion 语义或 ACTIVE 边界。

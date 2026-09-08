@@ -210,8 +210,6 @@ def _load_active_cases() -> tuple[dict, list[dict]]:
     return active, lines
 
 
-
-
 def _read_json_object(path: Path, label: str) -> dict:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -241,7 +239,6 @@ def _read_jsonl_objects(path: Path, label: str) -> list[dict]:
     return rows
 
 
-
 def _jsonl_objects_from_bytes(payload: bytes, label: str) -> list[dict]:
     try:
         raw_lines = payload.decode("utf-8").splitlines()
@@ -259,6 +256,7 @@ def _jsonl_objects_from_bytes(payload: bytes, label: str) -> list[dict]:
             raise CandidateError(f"JSONL {label}:{line_number} must be an object")
         rows.append(value)
     return rows
+
 
 def _assert_file_hash(path: Path, expected_hash: str, label: str) -> bytes:
     try:
@@ -625,6 +623,7 @@ def cmd_promote_existing(
     if published_bytes != v6_manifest_bytes:
         raise CandidateError("promoted ACTIVE pointer is not byte-equivalent to v6 manifest")
     print(f"promoted existing candidate to ACTIVE: {GT_H3B_V6_VERSION}")
+
 
 def _preflight_create_only(path: Path, data: bytes) -> None:
     if path.exists() and path.read_bytes() != data:
