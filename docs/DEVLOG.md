@@ -3430,3 +3430,12 @@
 - scope-check 现对这两个精确路径仅在状态为未暂存 tracked 修改（` M`）且 `git diff --ignore-cr-at-eol` 确认无内容差异时跳过；untracked、staged、删除或语义变更仍 fail-closed。
 - 这次仅补齐已确认的基线伪变更集合，未扩大 GT-H3B 生成输出白名单、未改变 source/evidence/gate/凭据边界；待新 run 验证 scope-check 与 durable receipt 提交。
 
+## 2026-09-08 · GT-H3B scope-check CRLF baseline inventory correction
+
+> 状态：**WORKFLOW FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34215930357`（run 33 重跑 attempt）再次完成 Phase A/B/C：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空；scope-check 发现第三个既有 CRLF 伪变更 `docs/golden/gt_h3/remediation/GT_H3R_V5_SUPPORTING_OFFICIAL_SOURCES.jsonl`。
+- 通过 GitHub 连接器按仓库 `eol=lf` 管理范围盘点后，确认既有 CRLF blob 共 5 个：GT-H2 v4 plan、GT-H3 human review result、GT-H3R v5 supporting sources、v4→v5 carry-forward、v4→v5 rebuild plan；它们均不是本次 runner 生成物。
+- scope-check 现对这 5 个精确路径仅在状态为未暂存 tracked 修改（` M`）且 `git diff --ignore-cr-at-eol` 确认无内容差异时跳过；untracked、staged、删除或语义变更仍 fail-closed。
+- 本次修正没有使用通配符或扩大 GT-H3B 输出白名单，也未改变 source/evidence/gate/凭据边界；待新 run 完成 scope-check 并提交 durable receipt。
+

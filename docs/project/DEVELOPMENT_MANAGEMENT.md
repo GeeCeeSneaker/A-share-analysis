@@ -5552,3 +5552,15 @@ Git 历史负责保存过去版本。
 - scope-check 仅对这两个精确路径的 ` M` + `git diff --ignore-cr-at-eol` 无内容差异组合豁免；所有真实新增、暂存、删除或语义修改继续阻断。
 - 本次没有扩大生成输出白名单，也没有改变官方 source、evidence hash、Golden gates 或凭据边界；需由下一次受控 run 证明 durable receipt 已提交。
 
+## DM-CR-20260908-155 · GT-H3B scope-check CRLF baseline inventory correction
+
+**Type**：C0 — controlled execution workflow correction  
+**Date**：2026-09-08  
+**Status**：FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；controlled run 34215930357（run 33 重跑 attempt）。
+
+- A/B/C 再次完成：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空；scope-check 发现第三个既有 CRLF 伪变更 `docs/golden/gt_h3/remediation/GT_H3R_V5_SUPPORTING_OFFICIAL_SOURCES.jsonl`。
+- 已完成仓库 `eol=lf` 管理范围盘点，确认 5 个既有 CRLF blob：GT-H2 v4 plan、GT-H3 human review result、GT-H3R v5 supporting sources、v4→v5 carry-forward、v4→v5 rebuild plan。
+- scope-check 仅豁免这 5 个精确路径的 ` M` + `git diff --ignore-cr-at-eol` 无内容差异组合；所有真实新增、暂存、删除或语义修改继续阻断。
+- 未使用通配符、未扩大生成输出白名单、未改变官方 source/evidence hash/Golden gate/凭据边界；需由下一次受控 run 证明 durable receipt 已提交。
+

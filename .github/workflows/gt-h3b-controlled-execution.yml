@@ -71,7 +71,10 @@ jobs:
             # status entry remains fail-closed.
             if [[ "$status" == " M" &&
                   ( "$path" == "docs/golden/gt_h2/rebuild_plan_v4.json" ||
-                    "$path" == "docs/golden/gt_h3/GT_H3_HUMAN_REVIEW_RESULT.jsonl" ) ]] &&
+                    "$path" == "docs/golden/gt_h3/GT_H3_HUMAN_REVIEW_RESULT.jsonl" ||
+                    "$path" == "docs/golden/gt_h3/remediation/GT_H3R_V5_SUPPORTING_OFFICIAL_SOURCES.jsonl" ||
+                    "$path" == "docs/golden/gt_h3/remediation/v4_to_v5_human_review_carry_forward.jsonl" ||
+                    "$path" == "docs/golden/gt_h3/remediation/v4_to_v5_rebuild_plan.json" ) ]] &&
                git diff --quiet --ignore-cr-at-eol -- "$path"; then
               continue
             fi
