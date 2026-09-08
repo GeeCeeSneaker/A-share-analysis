@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from contextlib import suppress
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -257,15 +258,13 @@ def _fetch_pdf_with_browser(
             try:
                 page = context.new_page()
                 page.on("response", responses.append)
-                try:
+                # PDF downloads can abort page.goto; inspect captured responses below.
+                with suppress(PlaywrightError, PlaywrightTimeoutError):
                     page.goto(
                         source_ref,
                         wait_until="domcontentloaded",
                         timeout=max(1000, int(timeout * 1000)),
                     )
-                except (PlaywrightError, PlaywrightTimeoutError):
-                    # PDF downloads can abort page.goto; inspect captured responses below.
-                    pass
                 page.wait_for_timeout(min(5000, max(1000, int(timeout * 1000))))
                 for response in reversed(responses):
                     if getattr(response, "status", None) != 200:

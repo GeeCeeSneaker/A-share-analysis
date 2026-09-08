@@ -3226,3 +3226,10 @@
 - 专用工作流安装固定版本的 Playwright 与 Chromium；不安装 Provider SDK，不接收账号、密码、Token、IP 或 Cookie。
 - 该修正尚未重新执行；新的 CI 和受控运行通过后，仍需独立审阅真实 evidence 与 seal。
 
+## 2026-09-08 · GT-H3B browser fallback lint correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run `34200190899` 的三平台 Ruff lint 均只报告 Playwright 导航异常的 `SIM105`；已按机器建议改用 `contextlib.suppress`。
+- 不改变浏览器响应捕获、HTTP 200、官方 host、大小上限、PDF magic bytes 或 fail-closed 规则；受控 run `34200191050` 的真实执行结果仍待核验。
+

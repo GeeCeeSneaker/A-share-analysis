@@ -5264,3 +5264,13 @@ Git 历史负责保存过去版本。
 - 浏览器 fallback 在响应层重新核验状态、最终 HTTPS 官方主机、大小上限和 PDF magic bytes；不把渲染结果、截图、HTML 或媒体镜像当作证据。
 - 当前仍未生成 125/125 evidence、REVIEWED seal、ACTIVE promotion 或执行回执；下一步先验证三平台 CI，再重跑受控执行。
 
+## DM-CR-20260908-127 · GT-H3B browser fallback lint correction
+
+**Type**：C0 — controlled execution tooling lint correction  
+**Date**：2026-09-08  
+**Status**：LINT FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；CI run `34200190899` 的 Ruff `SIM105` 报告。  
+
+- 用 `contextlib.suppress` 替换 Playwright 导航的等价异常吞噬写法，保持浏览器取证流程和 fail-closed 边界不变。
+- 受控 run `34200191050` 尚未形成可合并回执；待其完成后结合本次修正版重新核对。
+
