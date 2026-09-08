@@ -3507,3 +3507,11 @@
 - 受控 GT-H3B run `34222958398`（#40）全部成功；已有 v7 seal 未被重写，receipt 仍为 `SUCCEEDED`，REVIEWED 125/125。
 - 当前 PR head 为 `de8e4c1c930649d7009174797b6a4184d12bde74`，PR #25 仍保持 open、未合并，等待独立 Reviewer 对 final head/current-main test-merge 完成审阅。
 
+## 2026-09-08 · GT-H3B post-merge hardening and formal preflight
+
+> 状态：幂等 verifier 已加固；Formal Production B1-B7 AUTHORIZED / NOT EXECUTED。
+
+- 按 Reviewer 非阻断意见，gt_h3b_execute.py::_verify_existing_seal() 现在重用首次 reviewed-output 强校验：逐 evidence ref 重哈希、校验 v6 contract 对应的 5 个 composite bundles，并重跑四类 Golden gates；历史 v7/evidence/receipt 原字节未改。
+- 后续受控 receipt 改为 v2，明确记录 source_base_sha、source_merge_ref_sha、source_head_sha；历史 v1 的 source_main_sha 语义仅作兼容读取。
+- 远端仓库基线、身份和 reviewed Golden 已满足正式授权条件，但当前工作区没有可执行的干净 main checkout，因此本轮没有登录、查询、run_id、B1-B7 或 verdict；未上传任何凭证。
+

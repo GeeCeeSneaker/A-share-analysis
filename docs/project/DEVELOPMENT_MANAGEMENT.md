@@ -5638,3 +5638,15 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 受控幂等复核成功，v7-reviewed-20260908、REVIEWED 125/125、receipt/evidence/hash 状态保持不变；未运行 Formal Production B1-B7。
 - PR #25 的独立 Reviewer 复核和合并仍是下一道必要门槛；在其完成前不启动正式生产链路。
 
+## DM-20260908-POSTMERGE-001 · GT-H3B receipt/verifier hardening and formal preflight
+
+**Type**：C1 — post-merge governance hardening  
+**Date**：2026-09-08  
+**Status**：HARDENING IMPLEMENTED / FORMAL PRODUCTION AUTHORIZED BUT NOT EXECUTED  
+**Evidence**：docs/provider_verification/gt_h3b_post_merge_governance_and_formal_preflight_20260908.md；base 22b5423109f0448ee954cac40b6c4c186c298a27。
+
+- 历史 GT-H3B v1 receipt 保持原字节；后续 receipt v2 明确区分 source_base_sha、source_merge_ref_sha、source_head_sha。
+- 幂等 seal verifier 复用首次 strong verification，重新校验 v7 ACTIVE、所有 evidence ref、5 个 composite bundles、四类 Golden gates，并逐字段比对 receipt phase C 摘要。
+- 当前工作区缺少可执行的干净 main checkout，未启动正式 Provider 登录、B1-B7 或 verdict；未产生 run ID，授权未消耗。
+- 下一步仍须由受控 Windows operator 在源码 SHA 绑定和本地 SDK 注入完成后，按 runbook 启动单一完整 Formal Production run。
+

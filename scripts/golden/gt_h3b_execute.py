@@ -188,6 +188,33 @@ def _load_v6_contract(
         raise ExecutionError(f"frozen evidence-source contract rejected: {exc}") from exc
 
 
+def _load_frozen_v6_contract(
+    repo_root: Path,
+    current_case_ids: list[str],
+) -> EvidenceSourceContract:
+    """Load the v6 contract for verifying a later reviewed v7 seal.
+
+    Phase B is bound to the immutable v6 candidate, while Phase C changes the
+    ACTIVE pointer to v7.  The idempotent path must therefore verify the
+    frozen v6 dataset/contract identity separately instead of pretending the
+    v6 contract describes the v7 header.
+    """
+    golden = repo_root / GOLDEN_RELATIVE
+    v6_manifest = _read_json(golden / "truth_manifest_v6.json")
+    if (
+        v6_manifest.get("truth_version") != V6_VERSION
+        or v6_manifest.get("dataset_file") != "golden_cases_v6.jsonl"
+        or v6_manifest.get("dataset_hash") != V6_DATASET_HASH
+        or v6_manifest.get("case_count") != 125
+    ):
+        raise ExecutionError("immutable v6 manifest is not the pinned GT-H3B contract baseline")
+    v6_documents = _load_active_case_documents(repo_root, v6_manifest)
+    v6_case_ids = [str(document.get("golden_case_id", "")) for document in v6_documents]
+    if v6_case_ids != current_case_ids:
+        raise ExecutionError("reviewed v7 case IDs no longer match the frozen v6 contract")
+    return _load_v6_contract(repo_root, v6_manifest, v6_documents)
+
+
 def _run_promotion(repo_root: Path) -> tuple[dict, str]:
     golden = repo_root / GOLDEN_RELATIVE
     active = _read_json(golden / "truth_manifest.json")
@@ -859,23 +886,66 @@ def _verify_reviewed_output(
 
 
 def _verify_existing_seal(repo_root: Path, receipt: dict) -> None:
+    """Re-run the same strong checks used by the first reviewed seal.
+
+    The receipt is an immutable historical record, not a substitute for
+    re-reading the current dataset and evidence.  v1 receipts are accepted
+    for the already-published seal; v2 receipts use explicit commit-role
+    fields and are emitted for future executions.
+    """
+    if receipt.get("format") not in {
+        "GT-H3B-CONTROLLED-EXECUTION-RECEIPT/v1",
+        "GT-H3B-CONTROLLED-EXECUTION-RECEIPT/v2",
+    }:
+        raise ExecutionError("existing execution receipt has an unsupported format")
     golden = repo_root / GOLDEN_RELATIVE
     active = _read_json(golden / "truth_manifest.json")
-    expected_version = receipt.get("phase_c", {}).get("reviewed_version")
+    phase_c = receipt.get("phase_c")
+    if not isinstance(phase_c, dict):
+        raise ExecutionError("existing execution receipt has no phase_c summary")
+    expected_version = phase_c.get("reviewed_version")
     if active.get("truth_version") != expected_version:
         raise ExecutionError("existing receipt does not match the current ACTIVE pointer")
     if not str(active.get("truth_version", "")).startswith("v7-reviewed-"):
         raise ExecutionError("existing receipt does not point to a v7 reviewed version")
-    try:
-        store = GoldenTruthStore(golden)
-        cases, manifest = store.load()
-    except (GoldenTruthError, OSError, ValueError) as exc:
-        raise ExecutionError(f"existing reviewed ACTIVE failed verification: {exc}") from exc
-    if len(cases) != 125 or manifest.review_summary != {"REVIEWED": 125}:
-        raise ExecutionError("existing reviewed ACTIVE is not a 125/125 seal")
-    if any(document.reviewed_by != "project-owner" for document in cases):
-        raise ExecutionError("existing reviewed ACTIVE reviewer provenance changed")
-    _assert_immutable(repo_root, receipt.get("immutable_v1_v6", {}))
+    if active.get("dataset_hash") != phase_c.get("dataset_hash"):
+        raise ExecutionError("existing receipt does not match the current ACTIVE dataset hash")
+
+    reviewer = phase_c.get("reviewer")
+    if reviewer != "project-owner":
+        raise ExecutionError("existing reviewed ACTIVE reviewer provenance is not project-owner")
+    documents = _load_active_case_documents(repo_root, active)
+    case_ids = [str(document.get("golden_case_id", "")) for document in documents]
+    if len(case_ids) != 125 or any(not case_id for case_id in case_ids):
+        raise ExecutionError("existing reviewed ACTIVE does not contain 125 valid case IDs")
+    contract = _load_frozen_v6_contract(repo_root, case_ids)
+
+    immutable = receipt.get("immutable_v1_v6")
+    if not isinstance(immutable, dict):
+        raise ExecutionError("existing execution receipt has no immutable v1-v6 snapshot")
+    phase_b = receipt.get("phase_b")
+    if not isinstance(phase_b, dict) or not phase_b.get("review_manifest_sha256"):
+        raise ExecutionError("existing execution receipt has no review manifest hash")
+
+    final = _verify_reviewed_output(
+        repo_root,
+        contract,
+        case_ids,
+        immutable,
+        reviewer,
+        str(phase_b["review_manifest_sha256"]),
+    )
+    for field in (
+        "reviewed_version",
+        "dataset_hash",
+        "case_count",
+        "review_summary",
+        "evidence_ref_count",
+        "evidence_bytes",
+        "gates",
+    ):
+        if final.get(field) != phase_c.get(field):
+            raise ExecutionError(f"existing receipt phase_c mismatch for {field}")
 
 
 def _append_once(path: Path, marker: str, entry: str) -> None:
@@ -902,7 +972,12 @@ def _write_receipt_and_governance(repo_root: Path, receipt: dict) -> None:
     executed_at = str(receipt["executed_at"])
     date = executed_at[:10]
     run_id = str(receipt.get("workflow_run_id") or "local")
-    source_sha = str(receipt.get("source_head_sha") or receipt.get("source_main_sha") or "unknown")
+    source_sha = str(
+        receipt.get("source_head_sha")
+        or receipt.get("source_merge_ref_sha")
+        or receipt.get("source_main_sha")
+        or "unknown"
+    )
     phase_b = receipt["phase_b"]
     phase_c = receipt["phase_c"]
     devlog_entry = (
@@ -1011,10 +1086,14 @@ def execute(repo_root: Path, *, reviewer: str, timeout: float) -> dict:
         )
         source_binding_occurrences = sum(len(contract.for_case(case_id)) for case_id in case_ids)
         receipt = {
-            "format": "GT-H3B-CONTROLLED-EXECUTION-RECEIPT/v1",
+            "format": "GT-H3B-CONTROLLED-EXECUTION-RECEIPT/v2",
             "status": "SUCCEEDED",
             "executed_at": datetime.now(UTC).isoformat(),
-            "source_main_sha": os.environ.get("GITHUB_SHA"),
+            # v1 called GITHUB_SHA "source_main_sha", although on a PR
+            # workflow it is the merge-ref SHA.  v2 records the three roles
+            # explicitly; the historical v1 receipt is never rewritten.
+            "source_base_sha": os.environ.get("GITHUB_BASE_SHA"),
+            "source_merge_ref_sha": os.environ.get("GITHUB_SHA"),
             "source_head_sha": os.environ.get("GITHUB_HEAD_SHA"),
             "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
             "workflow_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
