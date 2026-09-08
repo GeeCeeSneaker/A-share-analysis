@@ -669,9 +669,7 @@ def main() -> int:
             ) from exc
         if isinstance(exc, ReviewError):
             raise
-        raise ReviewError(
-            f"review publication failed before ACTIVE pointer commit: {exc}"
-        ) from exc
+        raise ReviewError(f"review publication failed before ACTIVE pointer commit: {exc}") from exc
     reviewed = sum(1 for c in lines if c["review_status"] == "REVIEWED")
     print(f"reviewed dataset version: {version}")
     print(f"cases: {reviewed} REVIEWED")
