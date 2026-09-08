@@ -5627,3 +5627,14 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 已移除冗余赋值；immutable v5 manifest 仍由后续 `_read_dataset` 直接读取并校验，v6 与全部 remediation invariants 不变。
 - v1-v7 Golden/evidence/receipt、冻结 source contract、review seal 和 Provider/credential boundary 均未改变；Formal Production B1-B7 仍为 NOT RUN。
 
+## DM-CR-20260908-160 · GT-H3B compatibility fix verified
+
+**Type**：C1 — cross-platform CI and controlled idempotent verification  
+**Date**：2026-09-08  
+**Status**：VERIFIED / INDEPENDENT REVIEW PENDING  
+**Evidence**：PR #25；CI run 34222958240（#464）；controlled run 34222958398（#40）。
+
+- Windows 3.12、Windows 3.14、Ubuntu 3.14 全部 SUCCESS；full pytest、Ruff、format、mypy、Spike、SDK-absent、DEVLOG 和 Management gates 均通过。
+- 受控幂等复核成功，v7-reviewed-20260908、REVIEWED 125/125、receipt/evidence/hash 状态保持不变；未运行 Formal Production B1-B7。
+- PR #25 的独立 Reviewer 复核和合并仍是下一道必要门槛；在其完成前不启动正式生产链路。
+

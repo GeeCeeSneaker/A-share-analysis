@@ -3499,3 +3499,11 @@
 - 已删除该未使用赋值；v5 manifest 仍由 verifier 的 immutable `_read_dataset` 路径完整读取并校验，未削弱任何 v5/v6 hash、结构、计划、carry-forward 或审计检查。
 - 受控 GT-H3B run 39 不涉及该静态检查问题；本提交不改 v1-v7 Golden/evidence/receipt，不运行 Provider，不写入任何凭据。
 
+## 2026-09-08 · GT-H3B historical-baseline compatibility verified
+
+> 状态：**VERIFIED / CI AND CONTROLLED IDEMPOTENT CHECKS SUCCESS**
+
+- CI run `34222958240`（#464）在 Windows 3.12、Windows 3.14、Ubuntu 3.14 全部成功；Ruff、format、mypy、pytest、Spike、SDK-absent、DEVLOG 和 Management gates 均通过。
+- 受控 GT-H3B run `34222958398`（#40）全部成功；已有 v7 seal 未被重写，receipt 仍为 `SUCCEEDED`，REVIEWED 125/125。
+- 当前 PR head 为 `de8e4c1c930649d7009174797b6a4184d12bde74`，PR #25 仍保持 open、未合并，等待独立 Reviewer 对 final head/current-main test-merge 完成审阅。
+
