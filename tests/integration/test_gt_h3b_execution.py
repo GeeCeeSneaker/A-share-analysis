@@ -325,3 +325,86 @@ def test_append_once_does_not_duplicate_governance_entry(tmp_path):
     module._append_once(path, "## unique marker", entry)
     module._append_once(path, "## unique marker", entry)
     assert path.read_text(encoding="utf-8").count("## unique marker") == 1
+
+
+def test_existing_seal_uses_strong_reviewed_verifier(monkeypatch, tmp_path):
+    module = _load_module()
+    receipt = {
+        "format": "GT-H3B-CONTROLLED-EXECUTION-RECEIPT/v1",
+        "phase_b": {"review_manifest_sha256": "manifest-hash"},
+        "phase_c": {
+            "reviewer": "project-owner",
+            "reviewed_version": "v7-reviewed-20260908",
+            "dataset_hash": "dataset-hash",
+            "case_count": 125,
+            "review_summary": {"REVIEWED": 125},
+            "evidence_ref_count": 1,
+            "evidence_bytes": 10,
+            "gates": {
+                "review": [],
+                "quantity": [],
+                "event_coverage": [],
+                "production_formal": [],
+            },
+        },
+        "immutable_v1_v6": {"golden_cases_v1.jsonl": "immutable-hash"},
+    }
+    active = {"truth_version": "v7-reviewed-20260908", "dataset_hash": "dataset-hash"}
+    case_ids = [f"CASE-{index:03d}" for index in range(125)]
+    monkeypatch.setattr(module, "_read_json", lambda path: active)
+    monkeypatch.setattr(
+        module,
+        "_load_active_case_documents",
+        lambda *args: [{"golden_case_id": case_id} for case_id in case_ids],
+    )
+    frozen_contract = object()
+    captured = {}
+
+    def load_contract(repo_root, case_ids):
+        captured["contract"] = (repo_root, case_ids)
+        return frozen_contract
+
+    def strong_verifier(
+        repo_root,
+        contract,
+        case_ids,
+        immutable_before,
+        reviewer,
+        manifest_sha256,
+    ):
+        captured["strong"] = (
+            repo_root,
+            contract,
+            case_ids,
+            immutable_before,
+            reviewer,
+            manifest_sha256,
+        )
+        return {
+            "reviewed_version": "v7-reviewed-20260908",
+            "dataset_hash": "dataset-hash",
+            "case_count": 125,
+            "review_summary": {"REVIEWED": 125},
+            "evidence_ref_count": 1,
+            "evidence_bytes": 10,
+            "gates": {
+                "review": [],
+                "quantity": [],
+                "event_coverage": [],
+                "production_formal": [],
+            },
+        }
+
+    monkeypatch.setattr(module, "_load_frozen_v6_contract", load_contract)
+    monkeypatch.setattr(module, "_verify_reviewed_output", strong_verifier)
+    module._verify_existing_seal(tmp_path, receipt)
+
+    assert captured["contract"] == (tmp_path, case_ids)
+    assert captured["strong"] == (
+        tmp_path,
+        frozen_contract,
+        case_ids,
+        receipt["immutable_v1_v6"],
+        "project-owner",
+        "manifest-hash",
+    )

@@ -53,6 +53,7 @@ jobs:
       - name: Run governed GT-H3B phases A/B/C
         env:
           GITHUB_SHA: ${{ github.sha }}
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
