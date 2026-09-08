@@ -5671,3 +5671,14 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 针对审阅者在 PR #26 提出的非阻断建议，新增真实 v7 sealed corpus 测试，读取提交在仓库中的历史 receipt 后调用 `_verify_existing_seal`。
 - 该测试不改写 Golden/evidence/receipt，不访问网络，不注入账号，不创建生产 run；它覆盖真实证据哈希、5 个复合包、冻结 v6 合同和四类 Golden gates。
 - CI 完成后若全绿，再提交独立审阅；Formal Production B1-B7 仍保持 AUTHORIZED / NOT EXECUTED。
+
+## DM-20260908-POSTMERGE-004 · Real v7 test formatting correction
+
+**Type**：C0 — CI formatting correction  
+**Date**：2026-09-08  
+**Status**：FIXED / CI RE-RUN PENDING  
+**Evidence**：PR #27；CI run 34236196134。
+
+- 三个平台首轮均在 Ruff format check 处停止；日志明确指出真实 v7 集成测试定义前缺少一个空行。
+- 仅补齐顶层函数间的格式空行；不改 Golden、evidence、历史 receipt、verifier 逻辑或 Provider 边界。
+- 修复后须重跑三平台 CI；Formal Production B1-B7 仍保持 AUTHORIZED / NOT EXECUTED。

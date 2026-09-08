@@ -409,6 +409,7 @@ def test_existing_seal_uses_strong_reviewed_verifier(monkeypatch, tmp_path):
         "manifest-hash",
     )
 
+
 def test_existing_seal_verifies_real_v7_corpus():
     """Exercise the idempotent path against the committed sealed v7 corpus."""
     module = _load_module()
