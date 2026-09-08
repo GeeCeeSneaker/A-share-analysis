@@ -3102,3 +3102,9 @@
 - `review.py` 现在要求 ordinary manifest entry 声明 `sources`，bundle entry 声明 `bundle_sources`，并在 staging 前按 case ID、source_ref、kind、顺序与冻结合同精确比较；无实时网络访问。
 - 新增对抗测试覆盖任意 host、case A→case B 重用、ordinary 缺来源、复合来源缺失/交换/额外和 125 条合同覆盖；既有 P1 合同测试同步使用临时合同，不再以无绑定的 125-case synthetic seal 代表生产信任。
 - 本批次仍不获取/提交真实 125 evidence bytes、不运行 review.py seal、不执行 promote-existing、不推进 ACTIVE；等待三平台 CI 和独立 Reviewer closure。
+
+
+### GT-H3B P1.1 documentation correction（2026-09-08）
+
+- 清理 P1 工具说明中的 `official.example` 示例，改为显式 allowlist 内的交易所域名示例；补充说明 HTTP(S) scheme 本身不构成官方来源证明。
+- 该修正仅同步文档与已实现的 P1.1 host policy，不改变 Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal 边界。

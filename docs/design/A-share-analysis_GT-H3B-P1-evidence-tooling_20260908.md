@@ -13,7 +13,7 @@
 复合事实 case 使用 .zip 作为最小双证据容器：
 
 1. manifest.json 的 format 必须是 GT-H3B-EVIDENCE-BUNDLE/v1。
-2. 清单至少包含两条记录，每条记录写明 source_ref（HTTP(S) 官方 URL）、artifact_kind、member_name、实际 sha256 和 size。
+2. 清单至少包含两条记录，每条记录写明 source_ref（HTTP(S) URL，host 必须命中显式官方 allowlist）、artifact_kind、member_name、实际 sha256 和 size。
 3. 除 manifest.json 外的每个 ZIP member 都必须在清单中出现；review 工具会重新读取并计算每份 member 的 SHA256/长度。
 4. bundle 不压缩，member 时间戳固定，创建操作 create-only；同输入重复创建应得到相同 bytes。
 5. 审阅 manifest 中 kind 必须为 EVIDENCE_BUNDLE，并以 bundle_sources 再声明同顺序的 URL/kind 清单；review 工具会比较两份清单，防止只提交一个未绑定的链接包。
@@ -35,12 +35,12 @@ bundle_sources.json 是 JSON 数组，成员形如：
 [
   {
     "path": "local/rule.pdf",
-    "source_ref": "https://official.example/rule.pdf",
+    "source_ref": "https://www.sse.com.cn/example/rule.pdf",
     "kind": "EXCHANGE_RULEBOOK"
   },
   {
     "path": "local/applicability.html",
-    "source_ref": "https://official.example/applicability.html",
+    "source_ref": "https://star.sse.com.cn/example/applicability.html",
     "kind": "COMPANY_ANNOUNCEMENT"
   }
 ]
@@ -57,11 +57,11 @@ bundle_sources.json 是 JSON 数组，成员形如：
   "kind": "EVIDENCE_BUNDLE",
   "bundle_sources": [
     {
-      "source_ref": "https://official.example/rule.pdf",
+      "source_ref": "https://www.sse.com.cn/example/rule.pdf",
       "kind": "EXCHANGE_RULEBOOK"
     },
     {
-      "source_ref": "https://official.example/applicability.html",
+      "source_ref": "https://star.sse.com.cn/example/applicability.html",
       "kind": "COMPANY_ANNOUNCEMENT"
     }
   ]

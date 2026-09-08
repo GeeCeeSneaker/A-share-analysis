@@ -5088,3 +5088,15 @@ Git 历史负责保存过去版本。
 - 新增 125 coverage、任意 host、case A→B、ordinary 缺绑定、composite missing/swapped/extra 对抗测试；`expect_fields` 禁止和 no-network 边界保持不变。
 - 本批次不获取真实 evidence、不运行 REVIEWED seal、不执行 P0 promotion、不改变 ACTIVE；需先完成本次三平台 CI 和 Reviewer closure。
 - **Affected paths**：`src/ashare_state/spike/evidence_contract.py`; `scripts/golden/review.py`; `tests/integration/test_gt_h3b_p1_review_contract.py`; `tests/integration/test_gt_h3b_p1_source_contract.py`; `docs/golden/gt_h3b/v6_case_evidence_source_contract.jsonl`; 本文档、`docs/DEVLOG.md`、本管理记录。
+
+
+
+## DM-CR-20260908-112 · GT-H3B P1.1 documentation allowlist alignment
+
+**Type**：C0 — documentation consistency  
+**Date**：2026-09-08  
+**Status**：RECORDED / CI_PENDING / PENDING_REVIEW  
+**Trigger**：P1 工具说明仍保留 `official.example` 示例，可能让读者误解为任意 HTTP(S) URL 自动具备官方资格。
+
+- 将示例改为显式 host allowlist 内的交易所域名，并明确 HTTP(S) scheme 不足以证明来源官方性。
+- 本修正与 DEVLOG 同一文档 commit 提交；不改变代码、Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal。
