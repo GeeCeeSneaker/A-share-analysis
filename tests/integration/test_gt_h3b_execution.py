@@ -68,6 +68,33 @@ def test_fetch_source_accepts_http_200_pdf_and_hashes_raw_bytes(tmp_path, monkey
     assert result.path.read_bytes() == body
 
 
+def test_fetch_source_retries_transient_network_failure(tmp_path, monkeypatch):
+    module = _load_module()
+    body = b"%PDF-1.7\nretryable raw bytes\n"
+    attempts = 0
+
+    def flaky_urlopen(request, timeout):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise module.URLError("connection reset")
+        return _FakeResponse(body)
+
+    monkeypatch.setattr(module, "urlopen", flaky_urlopen)
+    monkeypatch.setattr(module.time, "sleep", lambda seconds: None)
+
+    result = module._fetch_source(
+        "https://www.sse.com.cn/example.pdf",
+        "EXCHANGE_RULEBOOK",
+        tmp_path / "sources",
+        1,
+        5,
+    )
+
+    assert attempts == 2
+    assert result.path.read_bytes() == body
+
+
 def test_fetch_source_rejects_pdf_challenge_body(tmp_path, monkeypatch):
     module = _load_module()
     monkeypatch.setattr(

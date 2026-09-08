@@ -5388,3 +5388,14 @@ Git 历史负责保存过去版本。
 - 按 formatter 机器输出合并三处表达式；不改变 Fetch body capture、来源校验、Golden bytes 或 seal 边界。
 - 当前受控执行结果仍待核验。
 
+## DM-CR-20260908-140 · GT-H3B transient official-source retry
+
+**Type**：C1 — controlled execution network resilience  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / RETRY PENDING  
+**Evidence**：PR #25；controlled run `34202640306` 的 SZSE `URLError` connection reset。  
+
+- 对网络层 `URLError` 最多重试 3 次；HTTPError（含业务状态错误）直接 fail closed，不通过重试掩盖来源不可用。
+- 每次成功响应仍经过 HTTP 200、最终 HTTPS official allowlist、大小上限、PDF magic bytes 和 source contract 校验。
+- 本次不改变证据内容、Golden bytes、ACTIVE 或 seal；待 CI 和受控运行重新核验。
+

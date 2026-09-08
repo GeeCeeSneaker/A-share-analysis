@@ -17,6 +17,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -56,6 +57,7 @@ V5_VERSION = "v5-candidate-20260907"
 V6_VERSION = "v6-candidate-20260908"
 V6_DATASET_HASH = "0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343"
 MAX_SOURCE_BYTES = 50 * 1024 * 1024
+SOURCE_FETCH_ATTEMPTS = 3
 # v1 is a legacy dataset snapshot; its versioned manifest starts at v2.
 IMMUTABLE_VERSION_FILES = tuple(
     [f"golden_cases_v{number}.jsonl" for number in range(1, 7)]
@@ -489,6 +491,19 @@ def _fetch_pdf_with_browser(
     )
 
 
+
+def _open_source(request: Request, timeout: float):
+    for attempt in range(SOURCE_FETCH_ATTEMPTS):
+        try:
+            return urlopen(request, timeout=timeout)
+        except HTTPError:
+            raise
+        except URLError:
+            if attempt + 1 == SOURCE_FETCH_ATTEMPTS:
+                raise
+            time.sleep(attempt + 1)
+    raise AssertionError("source retry loop completed without a response")
+
 def _fetch_source(
     source_ref: str,
     kind: str,
@@ -511,7 +526,7 @@ def _fetch_source(
         },
     )
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with _open_source(request, timeout) as response:
             status = getattr(response, "status", None) or response.getcode()
             if status != 200:
                 raise ExecutionError(

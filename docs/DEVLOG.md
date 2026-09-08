@@ -3316,3 +3316,11 @@
 - CI run `34202640337` 的 formatter 仅要求合并 Fetch 超限异常、Fetch body tuple 和 Network 超限异常的可读排版；已按机器 diff 同步。
 - 不改变 Fetch response-stage、原始字节、HTTP 200、官方 host、大小上限或 PDF magic bytes 校验；受控 run `34202640306` 的结果仍待核验。
 
+## 2026-09-08 · GT-H3B transient official-source retry
+
+> 状态：**RETRY HARDENING STAGED / RETRY PENDING**
+
+- 受控 run `34202640306` 在访问 SZSE 官方 HTML 时收到 connection reset，发生在目标 PDF 之前；没有 evidence、回执或 seal。
+- runner 对标准库来源请求增加最多 3 次的瞬态网络重试，仅重试 `URLError` 网络失败，不重试 HTTP 4xx/5xx 业务响应；每次仍要求 HTTP 200、官方 host 和原始 body 校验。
+- 新增离线回归测试验证首次 reset 后重试成功；不改变 source contract、Golden bytes、ACTIVE 或 seal 边界。
+
