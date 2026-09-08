@@ -285,6 +285,14 @@ def validate_review_source_bindings(
             )
             for index, source in enumerate(raw_sources, start=1)
         )
+        request_kind = request.get("kind")
+        if request_kind != "EVIDENCE_BUNDLE":
+            source_kind = declared[0].kind if len(declared) == 1 else None
+            if request_kind != source_kind:
+                raise EvidenceSourceContractError(
+                    f"ordinary review request {position} case {case_id!r} artifact kind "
+                    f"{request_kind!r} does not match source kind {source_kind!r}"
+                )
         expected = contract.for_case(case_id)
         actual_pairs = tuple(source.pair() for source in declared)
         expected_pairs = tuple(source.pair() for source in expected)

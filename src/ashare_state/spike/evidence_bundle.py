@@ -10,8 +10,10 @@ import zipfile
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlparse
-
+from ashare_state.spike.evidence_contract import (
+    EvidenceSourceContractError,
+    validate_official_source_ref,
+)
 from ashare_state.spike.golden_store import VALID_ARTIFACT_KINDS
 
 BUNDLE_FORMAT = "GT-H3B-EVIDENCE-BUNDLE/v1"
@@ -32,12 +34,10 @@ class EvidenceBundleEntry:
 
 
 def _source_ref(value: object) -> str:
-    if not isinstance(value, str) or not value:
-        raise EvidenceBundleError("source_ref must be a non-empty string")
-    parsed = urlparse(value)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise EvidenceBundleError(f"source_ref must be an HTTP(S) URL: {value!r}")
-    return value
+    try:
+        return validate_official_source_ref(value)
+    except EvidenceSourceContractError as exc:
+        raise EvidenceBundleError(str(exc)) from exc
 
 
 def _artifact_kind(value: object) -> str:

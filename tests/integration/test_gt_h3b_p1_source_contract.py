@@ -235,6 +235,31 @@ def test_case_a_source_cannot_be_reused_for_case_b(tmp_path: Path) -> None:
         )
 
 
+def test_ordinary_artifact_kind_must_match_source_contract(tmp_path: Path) -> None:
+    path = tmp_path / "contract.jsonl"
+    source_map = {"CASE-A": [_official_source("case-a.html")]}
+    _write_contract(path, case_ids=["CASE-A"], source_map=source_map)
+    contract = load_evidence_source_contract(
+        path,
+        expected_truth_version="test-v1",
+        expected_dataset_file="golden_cases_test.jsonl",
+        expected_dataset_hash="0" * 64,
+        expected_case_ids=["CASE-A"],
+        enforce_known_composites=False,
+    )
+    with pytest.raises(EvidenceSourceContractError, match="artifact kind"):
+        validate_review_source_bindings(
+            contract,
+            [
+                {
+                    "case": "CASE-A",
+                    "kind": "SSE_ANNOUNCEMENT",
+                    "sources": source_map["CASE-A"],
+                }
+            ],
+        )
+
+
 def test_ordinary_review_entry_requires_sources(tmp_path: Path) -> None:
     module = _load_review_module()
     manifest = tmp_path / "ordinary-review-manifest.json"

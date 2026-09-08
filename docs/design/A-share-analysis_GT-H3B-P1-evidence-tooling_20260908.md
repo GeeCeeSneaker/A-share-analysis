@@ -102,3 +102,5 @@ P1.1 的机器合同位于 `docs/golden/gt_h3/gt_h3b/v6_case_evidence_source_con
 review.py 在任何 artifact staging 前，把 ordinary entry 的 `sources` 或复合 entry 的 `bundle_sources` 与合同按 case ID、source_ref、kind、顺序逐项比较；任意来源错配、缺失、交换、额外或非 allowlist host 都 fail closed。`--contract` 仅允许与 `--root` 一起用于测试临时合同，生产默认使用 pinned contract。
 
 该合同和校验只负责信任边界，不下载网络、不上传证据、不改变 ACTIVE；真实 125/125 bytes、P0 promotion 和 REVIEWED seal 仍按既定退出门执行。
+
+- bundle 创建/检查也复用同一显式 host validator；因此即使绕过 review.py 直接生成或检查 bundle，非 allowlist host 也会被拒绝。

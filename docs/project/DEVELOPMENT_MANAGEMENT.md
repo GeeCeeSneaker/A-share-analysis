@@ -5100,3 +5100,15 @@ Git 历史负责保存过去版本。
 
 - 将示例改为显式 host allowlist 内的交易所域名，并明确 HTTP(S) scheme 不足以证明来源官方性。
 - 本修正与 DEVLOG 同一文档 commit 提交；不改变代码、Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal。
+
+
+
+## DM-CR-20260908-113 · GT-H3B P1.1 bundle host and artifact-kind alignment
+
+**Type**：C1 — source validation consistency  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / CI_PENDING / PENDING_REVIEW  
+**Trigger**：冻结合同已执行官方 host 校验，但 evidence_bundle 独立入口仍仅校验 HTTP(S) 语法；ordinary request 的 artifact kind 也未与唯一 source kind 交叉校验。
+
+- 让 bundle 创建/检查复用 P1.1 host validator，并要求 ordinary artifact kind 与合同 source kind 一致。
+- 增加对应 fail-closed 回归测试；不改变 Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal。

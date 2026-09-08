@@ -3108,3 +3108,10 @@
 
 - 清理 P1 工具说明中的 `official.example` 示例，改为显式 allowlist 内的交易所域名示例；补充说明 HTTP(S) scheme 本身不构成官方来源证明。
 - 该修正仅同步文档与已实现的 P1.1 host policy，不改变 Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal 边界。
+
+
+### GT-H3B P1.1 follow-up: bundle host policy and ordinary kind alignment（2026-09-08）
+
+- 复核发现 evidence_bundle 独立入口仍只校验 HTTP(S) 语法，已改为复用 P1.1 显式官方 host validator；任意非 allowlist host 在 bundle 创建/检查和 production contract validation 中均 fail closed。
+- review source binding 现在要求 ordinary artifact kind 与冻结合同唯一 source kind 一致；bundle 仍使用 EVIDENCE_BUNDLE 外层 kind，并逐项校验成员 source kind。
+- 增加非 allowlist bundle、ordinary kind mismatch 回归测试；不改变 Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal 边界。

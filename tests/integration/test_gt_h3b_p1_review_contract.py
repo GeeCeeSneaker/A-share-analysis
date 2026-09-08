@@ -70,6 +70,16 @@ def test_bundle_is_deterministic_and_rehashes_raw_members(tmp_path: Path) -> Non
     assert all(len(entry.sha256) == 64 for entry in entries)
 
 
+def test_bundle_rejects_non_allowlisted_source(tmp_path: Path) -> None:
+    sources = _sources(tmp_path)
+    invalid = [
+        {**sources[0], "source_ref": "https://official.example/rule.pdf"},
+        sources[1],
+    ]
+    with pytest.raises(EvidenceBundleError, match="official allowlist"):
+        write_evidence_bundle(tmp_path / "invalid.zip", invalid)
+
+
 def test_bundle_tamper_and_declaration_drift_fail_closed(tmp_path: Path) -> None:
     sources = _sources(tmp_path)
     bundle = tmp_path / "bundle.zip"
@@ -106,11 +116,11 @@ def test_gt_h3b_batch_manifest_rejects_expect_fields_even_when_null(tmp_path: Pa
                     "kind": "EVIDENCE_BUNDLE",
                     "bundle_sources": [
                         {
-                            "source_ref": "https://official.example/rule.pdf",
+                            "source_ref": "https://www.sse.com.cn/test/rule.pdf",
                             "kind": "EXCHANGE_RULEBOOK",
                         },
                         {
-                            "source_ref": "https://official.example/app.html",
+                            "source_ref": "https://star.sse.com.cn/test/app.html",
                             "kind": "COMPANY_ANNOUNCEMENT",
                         },
                     ],
