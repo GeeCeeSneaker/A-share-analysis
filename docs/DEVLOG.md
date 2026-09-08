@@ -3151,3 +3151,11 @@
 - `review.py` 现在对 `--root` 与脚本真实 production Golden root 做 `Path.resolve()` 比较；精确路径、`.`、`..` 和符号链接等价路径均 fail closed，临时测试 root + custom contract 继续允许。
 - 新增 exact/dot/parent 等价路径对抗测试；拒绝发生在 source-contract 读取前，因此不进入 evidence staging、version 或 ACTIVE 写入。
 - 本修正不改变 v6 contract bytes、v4-v6 versioned bytes、ACTIVE、grandfather list 或真实 evidence；需重新跑 final-head/current-main 三平台 CI，随后交回 Reviewer closure。
+
+
+## 2026-09-08 · GT-H3B P0-BYPASS-01 formatter correction
+
+> 状态：**FORMAT FIX STAGED / CI_PENDING / PENDING_INDEPENDENT_REVIEW**
+
+- CI run `34191452213` 的 Ubuntu job 在运行时测试前仅报告 override guard 的 Ruff formatter 差异；已按机器输出合并短异常信息为单行。
+- production-root resolved-path guard、临时 test root 允许路径、v6/v4-v6 bytes、ACTIVE、grandfather list 和真实 evidence 边界均不变；需重新跑完整三平台 CI。

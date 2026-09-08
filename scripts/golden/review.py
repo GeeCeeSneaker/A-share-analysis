@@ -349,9 +349,7 @@ def _load_evidence_source_contract(
                 "cannot resolve --root for test contract boundary validation"
             ) from exc
         if requested_root == production_root:
-            raise ReviewError(
-                "--contract test override cannot target the production Golden root"
-            )
+            raise ReviewError("--contract test override cannot target the production Golden root")
     try:
         return load_evidence_source_contract(
             contract_path,

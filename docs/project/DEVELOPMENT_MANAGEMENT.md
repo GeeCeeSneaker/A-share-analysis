@@ -5163,3 +5163,15 @@ Git 历史负责保存过去版本。
 - 保留临时测试 root + custom contract 的合法测试路径；拒绝发生在 contract 读取和任何 evidence/version/ACTIVE 写入之前。
 - 增加 exact/dot/parent 等价路径对抗测试；不改变 v6 contract bytes、v4-v6 versioned bytes、ACTIVE、grandfather list 或真实 evidence。
 - 后续重新运行 final-head/current-main 三平台 CI，成功后再交独立 Reviewer 做 final closure。
+
+
+
+## DM-CR-20260908-118 · GT-H3B P0-BYPASS-01 formatter correction
+
+**Type**：C0 — formatting consistency  
+**Date**：2026-09-08  
+**Status**：RECORDED / CI_PENDING / PENDING_INDEPENDENT_REVIEW  
+**Trigger**：CI run `34191452213` 的 Ubuntu job 在 pytest 前报告 override guard 的 Ruff formatter 差异。
+
+- 按 Ruff 机器输出将短 `ReviewError` 合并为单行；不改变 resolved production-root guard、custom test root、source contract、ACTIVE 或 seal 边界。
+- 该修正与 DEVLOG 同一多文件 commit 提交，随后重新运行完整三平台 CI。
