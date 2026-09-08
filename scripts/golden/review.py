@@ -363,8 +363,17 @@ def _apply_review(
 # ----------------------------------------------------------------- commit
 
 
-def _commit_evidence(staged: list[tuple[Path, str, str]]) -> None:
-    """Copy staged artifacts into the evidence store (create-only)."""
+def _commit_evidence(
+    staged: list[tuple[Path, str, str]],
+    created: list[tuple[Path, bytes]] | None = None,
+) -> list[tuple[Path, bytes]]:
+    """Copy staged artifacts into the evidence store (create-only).
+
+    The returned/received list records only files created by this invocation.
+    It lets the caller remove unreferenced outputs if the final ACTIVE pointer
+    commit fails.
+    """
+    created_files = created if created is not None else []
     for source, ref, expected_hash in staged:
         target = EVIDENCE_DIR / ref
         data = source.read_bytes()
@@ -382,9 +391,11 @@ def _commit_evidence(staged: list[tuple[Path, str, str]]) -> None:
         tmp = target.with_suffix(target.suffix + ".tmp")
         tmp.write_bytes(data)
         tmp.replace(target)
+        created_files.append((target, data))
+    return created_files
 
 
-def _create_only_write(path: Path, data: bytes) -> None:
+def _create_only_write(path: Path, data: bytes) -> bool:
     """R4A2-P1-04: versioned files are create-only.
 
     absent -> create; exists + same bytes -> idempotent no-op;
@@ -392,12 +403,37 @@ def _create_only_write(path: Path, data: bytes) -> None:
     """
     if path.exists():
         if path.read_bytes() == data:
-            return
+            return False
         msg = f"versioned file {path.name} already exists with different bytes"
         raise ReviewError(msg)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_bytes(data)
     Path(tmp).replace(Path(path))
+    return True
+
+
+def _rollback_created_files(created: list[tuple[Path, bytes]]) -> list[str]:
+    """Remove only unchanged files created before a failed publication."""
+    failures: list[str] = []
+    for path, expected in reversed(created):
+        if not path.exists():
+            continue
+        if path.is_symlink() or not path.is_file():
+            failures.append(str(path))
+            continue
+        try:
+            actual = path.read_bytes()
+        except OSError as exc:
+            failures.append(f"{path}: {exc}")
+            continue
+        if actual != expected:
+            failures.append(f"{path}: bytes changed after creation")
+            continue
+        try:
+            path.unlink()
+        except OSError as exc:
+            failures.append(f"{path}: {exc}")
+    return failures
 
 
 def _atomic_active_pointer(manifest: dict) -> None:
@@ -511,10 +547,16 @@ def _preflight_evidence(staged: list[tuple[Path, str, str]]) -> None:
             raise ReviewError(f"evidence {ref} already exists with different bytes")
 
 
-def _publish_new_version(prepared: _PreparedReview) -> str:
+def _publish_new_version(
+    prepared: _PreparedReview,
+    created: list[tuple[Path, bytes]] | None = None,
+) -> str:
     """Publish a prevalidated version and move ACTIVE last."""
-    _create_only_write(prepared.dataset_path, prepared.dataset_bytes)
-    _create_only_write(prepared.manifest_path, prepared.manifest_bytes)
+    created_files = created if created is not None else []
+    if _create_only_write(prepared.dataset_path, prepared.dataset_bytes):
+        created_files.append((prepared.dataset_path, prepared.dataset_bytes))
+    if _create_only_write(prepared.manifest_path, prepared.manifest_bytes):
+        created_files.append((prepared.manifest_path, prepared.manifest_bytes))
     _atomic_active_pointer(prepared.manifest)
     return prepared.truth_version
 
@@ -595,8 +637,41 @@ def main() -> int:
     _preflight_evidence(staged_artifacts)
 
     # -------- commit: evidence -> version -> ACTIVE pointer ---------------
-    _commit_evidence(staged_artifacts)
-    version = _publish_new_version(prepared)
+    active_path = GOLDEN_ROOT / "truth_manifest.json"
+    try:
+        active_before = active_path.read_bytes()
+    except OSError as exc:
+        raise ReviewError(f"cannot snapshot ACTIVE pointer before commit: {exc}") from exc
+
+    created_files: list[tuple[Path, bytes]] = []
+    try:
+        _commit_evidence(staged_artifacts, created_files)
+        version = _publish_new_version(prepared, created_files)
+    except Exception as exc:
+        try:
+            active_after = active_path.read_bytes()
+        except OSError as pointer_exc:
+            raise ReviewError(
+                "review publication failed and ACTIVE could not be verified; "
+                "durable outputs were retained for recovery"
+            ) from pointer_exc
+        if active_after != active_before:
+            raise ReviewError(
+                "review publication failed after ACTIVE pointer changed; "
+                "durable outputs were retained for recovery"
+            ) from exc
+        rollback_errors = _rollback_created_files(created_files)
+        if rollback_errors:
+            detail = "; ".join(rollback_errors[:5])
+            raise ReviewError(
+                "review publication failed before ACTIVE pointer commit; "
+                f"rollback incomplete: {detail}"
+            ) from exc
+        if isinstance(exc, ReviewError):
+            raise
+        raise ReviewError(
+            f"review publication failed before ACTIVE pointer commit: {exc}"
+        ) from exc
     reviewed = sum(1 for c in lines if c["review_status"] == "REVIEWED")
     print(f"reviewed dataset version: {version}")
     print(f"cases: {reviewed} REVIEWED")
