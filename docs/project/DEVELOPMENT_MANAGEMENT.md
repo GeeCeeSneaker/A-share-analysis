@@ -5440,3 +5440,14 @@ Git 历史负责保存过去版本。
 
 - 按 Ruff formatter 机器输出收敛 runner 和新增测试的两处确定性排版；不改变来源、原始 bytes、HTTPS transport upgrade、Golden 或 seal 边界。
 - 受控 run 34204686124 使用旧提交，待并发策略取消后由新提交重新执行。
+
+## DM-CR-20260908-145 · GT-H3B governance exception disclosure
+
+**Type**：C0 — per-commit governance correction
+**Date**：2026-09-08
+**Status**：DISCLOSED / RETRY PENDING
+**Evidence**：PR #25；CI run 34204920923 的 DEVLOG gate。
+
+- b236a8352211dbebe9702d36f4a631f6d8f27de6 为 runner 代码提交，但因复用已有 DEVLOG 主题标记未在同一提交中产生新的 DEVLOG diff。
+- 不改写历史；将完整 SHA 纳入一次性 grandfathered 清单并同步测试，后续提交不沿用该豁免。
+- 不改变来源获取、HTTPS transport upgrade、Golden bytes、ACTIVE、evidence 或 seal 逻辑。

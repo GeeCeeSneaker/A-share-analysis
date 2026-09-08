@@ -3347,3 +3347,11 @@
 
 - CI run 34204686131 仅报告 runner 与新增集成测试的 Ruff formatter 差异；已按机器 diff 收敛两处排版。
 - 不改变官方来源访问、HTTP 200、同一 source path、原始 body、HTTPS transport upgrade、Golden bytes、ACTIVE 或 seal 边界；受控 run 34204686124 将重新核验。
+
+## 2026-09-08 · GT-H3B governance exception disclosure for b236a835
+
+> 状态：**GOVERNANCE EXCEPTION DISCLOSED / RETRY PENDING**
+
+- 提交 b236a8352211dbebe9702d36f4a631f6d8f27de6 修改了 runner，但因自动记录逻辑复用了已有主题标记，实际没有在该提交中产生新的 docs/DEVLOG.md diff。
+- 历史不做重写；按仓库既有一次性 SHA 豁免规则，将该完整 SHA 加入 workflow 与回归门禁的固定清单，并在本记录中披露。该豁免不适用于任何后续提交。
+- 本次只修正治理可见性；不改变官方来源、原始 body、v1-v6 Golden bytes、冻结合同、ACTIVE 或 seal 边界。
