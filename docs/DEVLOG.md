@@ -3055,3 +3055,7 @@
 - 增加 src/ashare_state/spike/evidence_bundle.py 与 scripts/golden/evidence_bundle.py：定义并实现不可压缩、create-only、可重现的 GT-H3B EVIDENCE_BUNDLE；review.py 会重新读取清单、校验官方 HTTP(S) source_ref、成员完整性及每份原始 member 的 SHA256/size。
 - review.py 的批量 --manifest 现在拒绝任何 expect_fields 键（包括 null），复合 bundle 必须声明至少两份且顺序一致的 source_ref/kind；新增 P1 集成测试覆盖确定性、篡改、声明漂移、expect_fields 禁止和实际 batch seal。
 - 本 checkpoint 只交付工具和 fail-closed 测试；尚未获取 125/125 官方 evidence bytes，未执行 REVIEWED seal，未改变 ACTIVE。
+
+### GT-H3B-P1 tooling correction 1
+
+- run #392 的 Ubuntu Ruff lint 发现 evidence_bundle.py 一条异常信息超过 100 列；已仅按 Ruff 规范拆行，bundle 校验语义不变。

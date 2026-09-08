@@ -5028,3 +5028,5 @@ Git 历史负责保存过去版本。
 - **Tests**：新增 P1 集成测试覆盖 bundle determinism、raw-member tamper、source declaration drift、null expect_fields、125-entry bundle batch seal。
 - **Boundary**：本批次不包含真实 125/125 官方 evidence bytes，不执行 REVIEWED seal，不推进 ACTIVE，不替代独立 Reviewer/current-main test-merge。
 - **Affected paths**：src/ashare_state/spike/evidence_bundle.py; scripts/golden/evidence_bundle.py; scripts/golden/review.py; src/ashare_state/spike/golden_store.py; tests/integration/test_gt_h3b_p1_review_contract.py; docs/design/A-share-analysis_GT-H3B-P1-evidence-tooling_20260908.md; docs/DEVLOG.md.
+
+- **P1 tooling correction 1**：run #392 的 Ubuntu Ruff lint 仅报告 evidence_bundle.py 一条超长异常信息，已拆行修复；P1 contract 与 ACTIVE 边界不变。

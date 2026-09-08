@@ -129,7 +129,9 @@ def read_evidence_bundle(
             try:
                 manifest = json.loads(raw_manifest.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise EvidenceBundleError("EVIDENCE_BUNDLE manifest is not valid UTF-8 JSON") from exc
+                raise EvidenceBundleError(
+                    "EVIDENCE_BUNDLE manifest is not valid UTF-8 JSON"
+                ) from exc
             if not isinstance(manifest, dict) or manifest.get("format") != BUNDLE_FORMAT:
                 raise EvidenceBundleError("unsupported EVIDENCE_BUNDLE format")
             raw_entries = manifest.get("entries")
