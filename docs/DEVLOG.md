@@ -3176,3 +3176,334 @@
 - root-override boundary 修复后的最终代码 head `9c965bd3c85cd744a4c376f15fa37b512cad5a7c` 对应 CI run `34191667025`；Ubuntu 3.14、Windows 3.12、Windows 3.14 均成功，各平台均为 `1609 passed`。
 - Ruff、mypy、compileall、Spike、SDK-absent、DEVLOG/Management 治理门均通过；exact/dot/parent 等价 production root 测试已纳入回归。
 - 本记录只确认边界修复与测试门禁，不等同于真实 evidence、REVIEWED seal、ACTIVE promotion、生产验证或 PR merge；下一关是独立 Reviewer final closure。
+
+## 2026-09-08 · GT-H3B 受控真实执行 PR 建立
+
+> 状态：**CONTROLLED EXECUTION PR PREPARED / NOT RUN**
+
+- 基于当前主分支 `main@36d238a97f1d1fbadd3a8f5f7b74c13d6c0be096` 建立专用执行分支 `ops/gt-h3b-controlled-execution-20260908`。
+- 新增窄范围 runner：先调用已审阅的 `candidate.py promote-existing`，再按冻结 v6 source contract 获取官方原始 bytes、生成 5 个 deterministic bundle，并在 125/125 contract/hash/gate 全部通过后执行一次性 `review.py --reviewer project-owner`。
+- runner 仅在同仓库专用 PR 分支运行，失败 fail-closed；执行输出只能写入 Golden evidence/version、执行回执和本 DEVLOG/Management 文件。
+- 当前提交建立请求与工作流，ACTIVE 仍为 `v5-candidate-20260907`；未声称 promotion、evidence materialization 或 REVIEWED seal 已完成。
+
+## 2026-09-08 · GT-H3B runner portability correction
+
+> 状态：**EXECUTION RUNNER FIX STAGED / RETRY PENDING**
+
+- 修正 versioned-file 快照：仓库实际保存的是 v1 数据集和 v2-v6 manifest，不能假定存在 truth_manifest_v1.json。
+- 按 Ruff 机器门禁拆分 runner 自动生成的 DEVLOG/Management 文本，去除尾随空格；不改变 promotion、source contract、evidence 或 seal 语义。
+- 上一轮只在执行前置快照与 lint 阶段失败，未生成 receipt、未写入 evidence、未改变 ACTIVE。
+
+## 2026-09-08 · GT-H3B runner lint correction
+
+> 状态：**EXECUTION RUNNER LINT FIX STAGED / RETRY PENDING**
+
+- 按三平台 CI 的唯一 Ruff 报告拆分 unsafe evidence ref 的异常行；不改变数据、promotion、source contract、evidence 或 seal 逻辑。
+- 执行 runner 上一轮仍在官方来源获取阶段；本修正提交不引入凭据，也不修改任何 Golden versioned bytes。
+
+## 2026-09-08 · GT-H3B runner formatter/concurrency correction
+
+> 状态：**EXECUTION RUNNER FORMAT FIX STAGED / STALE RUN CANCELLATION ENABLED**
+
+- 按 CI formatter 输出完成 runner 的确定性格式同步；未改变 promotion、source contract、evidence 或 seal 语义。
+- 专用执行工作流启用 cancel-in-progress，修正版提交到达时取消旧的同 PR 网络执行，避免并发写执行分支。
+- 前序运行只在官方来源获取过程中，未生成成功回执；未改变 main。
+
+## 2026-09-08 · GT-H3B runner Phase A diagnostic line correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- 针对最新 CI run `34199338780` 的 Ruff E501 报告，将 Phase A 的 truth_version 诊断拆为局部变量；执行顺序、校验条件和失败边界不变。
+- 本次仅修正 runner 源码与治理记录；不修改 v1-v6 Golden bytes、ACTIVE、evidence、review seal 或任何凭据。
+- 旧的受控执行 run 由修正版提交触发的并发取消策略处理；新的 CI 与受控执行结果须重新核实后才能宣称完成。
+
+## 2026-09-08 · GT-H3B official PDF browser fallback
+
+> 状态：**BROWSER FALLBACK STAGED / RETRY PENDING**
+
+- 受控执行 run `34199650996` 在 Phase B 对 SSE 官方 PDF 返回的 JavaScript 反爬挑战页按 fail-closed 停止；该运行没有生成成功回执、evidence 或 REVIEWED seal。
+- runner 增加仅针对 PDF challenge 的 Playwright Chromium fallback，并且只接受浏览器网络层捕获的 HTTP 200、官方 allowlist 主机下的 `%PDF-` 原始响应体；不接受渲染页面、截图、HTML、搜索摘要或镜像。
+- 专用工作流安装固定版本的 Playwright 与 Chromium；不安装 Provider SDK，不接收账号、密码、Token、IP 或 Cookie。
+- 该修正尚未重新执行；新的 CI 和受控运行通过后，仍需独立审阅真实 evidence 与 seal。
+
+## 2026-09-08 · GT-H3B browser fallback lint correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run `34200190899` 的三平台 Ruff lint 均只报告 Playwright 导航异常的 `SIM105`；已按机器建议改用 `contextlib.suppress`。
+- 不改变浏览器响应捕获、HTTP 200、官方 host、大小上限、PDF magic bytes 或 fail-closed 规则；受控 run `34200191050` 的真实执行结果仍待核验。
+
+## 2026-09-08 · GT-H3B browser response callback correction
+
+> 状态：**BROWSER FALLBACK FIX STAGED / RETRY PENDING**
+
+- 受控 run `34200191050` 在 Playwright fallback 注册响应监听时因内建方法绑定限制退出，尚未读取任何证据响应；无成功回执、evidence 或 REVIEWED seal。
+- 将 `responses.append` 改为显式回调函数，保持仅捕获网络响应 body 的设计；不改变 HTTP 200、官方 host、大小上限、PDF magic bytes 或 fail-closed 规则。
+- 修正版提交会取消 run `34200348385` 并重新触发受控流程；结果仍需实际日志核验。
+
+## 2026-09-08 · GT-H3B browser fallback import-order correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run `34200443329` 的已完成 job 只报告 `collections.abc` 与 `contextlib` 导入顺序；已按 Ruff isort 结果调整。
+- 该文案/格式修正不改变浏览器网络响应取证逻辑；受控 run `34200443216` 的最终结果仍待核验。
+
+## 2026-09-08 · GT-H3B browser fallback formatter parity correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run `34200571774` 三个平台一致报告 runner 的 Ruff formatter parity；已按机器 diff 收敛 Phase A 诊断、fallback 异常、嵌套回调和 content-type 排版。
+- 不改变真实浏览器网络响应、官方 host、HTTP 200、PDF magic bytes、大小上限或 fail-closed 规则；受控 run `34200571773` 仍待完成核验。
+
+## 2026-09-08 · GT-H3B headed-browser and response-diagnostic correction
+
+> 状态：**BROWSER RETRY HARDENED / RETRY PENDING**
+
+- 受控 run `34200774412` 已安装 Playwright/Chromium，但 headless fallback 在 60 秒内没有捕获 HTTP 200 PDF；没有生成 evidence、回执或 seal。
+- runner 改为在专用工作流的 Xvfb 虚拟显示中使用 headed Chromium，导航等待改为 `commit`，并仅记录 status/host/path/content-type 摘要用于诊断；不记录响应正文、Cookie、账号或密码。
+- content-type 排版改为短语句，避免 formatter 与 E501 冲突；来源、HTTP 200、官方 allowlist、PDF magic bytes 和 fail-closed 规则不变。
+- 本修正尚未重新执行；新的日志将决定是否可继续 125/125 materialization。
+
+## 2026-09-08 · GT-H3B browser download capture correction
+
+> 状态：**DOWNLOAD CAPTURE FIX STAGED / RETRY PENDING**
+
+- 受控 run `34201258549` 已在 headed Chromium 中观察到 SSE 的 HTTP 200 `application/pdf` 响应，但该响应由浏览器作为下载处理，Playwright `response.body()` 不可读；因此没有 evidence、回执或 seal。
+- fallback 现在启用浏览器下载接收，读取下载落盘的原始字节，并要求下载 URL 与同 host/path 的 HTTP 200 响应绑定后才接受；仍检查官方 allowlist、大小上限和 `%PDF-` magic bytes。
+- 不使用打印到 PDF、渲染页面、截图或 HTML；不记录正文、Cookie、账号或密码。当前尚未重新执行。
+
+## 2026-09-08 · GT-H3B browser download formatter correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run `34201546053` 的 formatter 只要求合并下载 URL key 的可读短表达式；已按机器输出同步。
+- 不改变下载与 HTTP 200 响应的 host/path 绑定、原始 PDF 校验或任何 Golden/seal 边界；受控 run `34201546052` 仍待核验。
+
+## 2026-09-08 · GT-H3B CDP PDF body capture correction
+
+> 状态：**CDP CAPTURE FIX STAGED / RETRY PENDING**
+
+- 受控 run `34201546052` / `34201258549` 均观察到 SSE 最终 HTTP 200/application/pdf，但 Chromium 内置 PDF 处理既不暴露可读 response body，也不触发 Playwright download event。
+- runner 增加 Chromium CDP `Network.getResponseBody` 路径，在 `loadingFinished` 后读取同一 HTTP 200 官方响应的原始 body；继续校验官方 HTTPS host、大小上限和 `%PDF-` magic bytes。
+- 不使用打印到 PDF、渲染页面、截图、HTML 或镜像；不记录正文、Cookie、账号或密码。本次修正尚未重新执行。
+
+## 2026-09-08 · GT-H3B Fetch response-stage body correction
+
+> 状态：**FETCH BODY FIX STAGED / RETRY PENDING**
+
+- 受控 run `34201917119` 的 CDP Network body 仍无法从 Chromium PDF 内置处理路径读取；目标响应已确认 HTTP 200/application/pdf。
+- runner 现在对目标 PDF 文件名启用 CDP Fetch response-stage 拦截，在交给 PDF 处理器前调用 `Fetch.getResponseBody`，并要求继续绑定同一官方 host、HTTP 200、大小上限和 `%PDF-`。
+- 未使用渲染/打印结果、截图、HTML 或镜像；未写入或输出正文、Cookie、账号或密码。本次修正尚未重新执行。
+
+## 2026-09-08 · GT-H3B CDP Fetch error-text correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run `34202354798` 的 Ruff lint 只报告 CDP Fetch 超限异常文本超出行长；已缩短为等义表达。
+- 不改变大小上限判断、HTTP 200/官方 host/PDF magic bytes 校验或受控执行边界；run `34202354818` 的 Fetch 实际结果仍待核验。
+
+## 2026-09-08 · GT-H3B CDP Fetch error-text lint correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run `34202354798` 的后续检查仍只报告 CDP Fetch 超限异常文本行长；已缩短提示，不改变 MAX_SOURCE_BYTES 判断或 fail-closed 行为。
+- 不改变 Fetch response-stage、HTTP 200、官方 host、`application/pdf`、`%PDF-` 校验或证据发布边界；受控 run `34202515066` 尚待核验。
+
+## 2026-09-08 · GT-H3B CDP Fetch formatter parity correction 2
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run `34202640337` 的 formatter 仅要求合并 Fetch 超限异常、Fetch body tuple 和 Network 超限异常的可读排版；已按机器 diff 同步。
+- 不改变 Fetch response-stage、原始字节、HTTP 200、官方 host、大小上限或 PDF magic bytes 校验；受控 run `34202640306` 的结果仍待核验。
+
+## 2026-09-08 · GT-H3B transient official-source retry
+
+> 状态：**RETRY HARDENING STAGED / RETRY PENDING**
+
+- 受控 run `34202640306` 在访问 SZSE 官方 HTML 时收到 connection reset，发生在目标 PDF 之前；没有 evidence、回执或 seal。
+- runner 对标准库来源请求增加最多 3 次的瞬态网络重试，仅重试 `URLError` 网络失败，不重试 HTTP 4xx/5xx 业务响应；每次仍要求 HTTP 200、官方 host 和原始 body 校验。
+- 新增离线回归测试验证首次 reset 后重试成功；不改变 source contract、Golden bytes、ACTIVE 或 seal 边界。
+
+## 2026-09-08 · GT-H3B retry helper formatter correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run `34202971111` 仅报告 `_open_source` 前后空行与 formatter 输出不一致；已按机器 diff 收敛。
+- 不改变瞬态 `URLError` 重试、HTTPError 直接失败、Fetch 取证或 Golden/seal 边界；受控 run `34202971105` 仍待核验。
+
+## 2026-09-08 · GT-H3B official-source fallback and CI regression correction
+
+> 状态：**RUN BLOCKED BY OFFICIAL SOURCE ACCESS / CI FIX STAGED / NO EVIDENCE OR SEAL**
+
+- 受控 run 34203167616 在 Phase B 首个 SSE 历史规则页面收到 HTTP 403；没有生成 evidence、执行回执或 REVIEWED seal。
+- runner 现在对官方 allowlist 内、HTTP 403/429/5xx 或瞬态网络失败启用一次受控的正常 Chromium 网络兜底；只接收同一官方主机/路径、HTTP 200 的原始 HTML/PDF body，并继续执行大小上限、PDF magic bytes 和 challenge 检查。
+- 合同中遗留的 http:// 定位符不改 source_ref；仅显式升级到同一官方主机/路径的 HTTPS transport，最终响应仍必须通过 HTTPS allowlist 校验，回执记录升级数量。
+- Python 3.14 动态加载测试先注册 sys.modules；DEVLOG 测试的两个已披露历史提交已与 CI 的七项 SHA 豁免清单对齐。
+- 本次不修改 v1-v6 versioned Golden bytes、v6 source contract、ACTIVE、真实 evidence 或 seal；下一步以新 CI 和受控 run 的实际日志决定是否继续。
+
+## 2026-09-08 · GT-H3B browser fallback formatter correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run 34204686131 仅报告 runner 与新增集成测试的 Ruff formatter 差异；已按机器 diff 收敛两处排版。
+- 不改变官方来源访问、HTTP 200、同一 source path、原始 body、HTTPS transport upgrade、Golden bytes、ACTIVE 或 seal 边界；受控 run 34204686124 将重新核验。
+
+## 2026-09-08 · GT-H3B governance exception disclosure for b236a835
+
+> 状态：**GOVERNANCE EXCEPTION DISCLOSED / RETRY PENDING**
+
+- 提交 b236a8352211dbebe9702d36f4a631f6d8f27de6 修改了 runner，但因自动记录逻辑复用了已有主题标记，实际没有在该提交中产生新的 docs/DEVLOG.md diff。
+- 历史不做重写；按仓库既有一次性 SHA 豁免规则，将该完整 SHA 加入 workflow 与回归门禁的固定清单，并在本记录中披露。该豁免不适用于任何后续提交。
+- 本次只修正治理可见性；不改变官方来源、原始 body、v1-v6 Golden bytes、冻结合同、ACTIVE 或 seal 边界。
+
+## 2026-09-08 · GT-H3B controlled execution progress and timeout correction
+
+> 状态：**EXECUTION OBSERVABILITY HARDENED / RETRY PENDING / NO EVIDENCE OR SEAL**
+
+- 受控 run 34205465169 在 30 分钟上限时仍处于 Phase B，最终被取消；由于 runner 原先不打印 source 进度，无法从终态日志定位最后一个耗时来源，未生成 evidence、回执或 REVIEWED seal。
+- runner 现在按唯一 source binding 输出 ordinal/总数、公开 source_ref、原始 bytes 大小、sha256 和最终 URL；不输出正文、Cookie、账号、密码或 Token，且不改变 evidence 内容。
+- 专用 workflow 上限调整为 60 分钟；每个 urllib 请求仍为最多 3 次瞬态重试、固定读取上限，浏览器 fallback 仍有 page timeout，所有来源继续要求 HTTP 200、官方 HTTPS、同一 source path 和原始 body 校验。
+- 本次不修改 v1-v6 versioned Golden bytes、冻结合同、ACTIVE、真实 evidence 或 seal；下一轮以具体进度日志判断是否仍存在外部端点阻塞。
+
+## 2026-09-08 · GT-H3B source progress formatter correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run 34208481864 仅报告唯一 source 计数集合推导的 Ruff formatter 差异；已按机器输出收敛为确定性单行。
+- 不改变进度日志内容、官方来源、原始 body、固定超时、Golden bytes、ACTIVE 或 seal 边界；受控 run 34208481906 使用旧提交，待新提交重新执行。
+
+## 2026-09-08 · GT-H3B source progress lint correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run 34208659859 的 Ruff E501 报告指出唯一 source 计数单行超过 100 列；已拆成命名集合与长度计算，保持 formatter 和 lint 同时稳定。
+- 不改变 source progress telemetry、固定超时、官方来源、原始 body、Golden bytes、ACTIVE 或 seal 边界；受控 run 34208659861 使用旧提交，待重新执行。
+
+## 2026-09-08 · GT-H3B source progress formatter correction 2
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run 34208776223 仅报告 source progress 唯一绑定集合的 Ruff formatter 差异；已按 formatter 保持内部推导单行并满足 E501。
+- 不改变 source 进度日志、固定超时、官方原始 bytes、Golden bytes、ACTIVE 或 seal 边界；受控 run 34208776209 使用旧提交，待修正版重新执行。
+
+## 2026-09-08 · GT-H3B post-seal gate correction
+
+> 状态：**BUG FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34208884086` 已完成唯一 105/105 个官方 source binding 的 HTTP 200 原始 bytes 获取；之后在 post-seal verification 阶段失败。
+- 根因是 `_verify_reviewed_output` 误将仅适用于 REVIEWED 之前 COMPILED candidate 的 `review_readiness_gate` 用于已 REVIEWED 的输出，因此把正常的 `review_status=REVIEWED` 和 review provenance 报成阻断。
+- 已改为在 reviewed output 上调用 `GoldenTruthStore.review_gate`，并继续保留 quantity、event coverage、production formal、evidence hash、composite bundle、v1-v6 immutable checks；不放宽任何来源或发布校验。
+- 本轮失败 job 工作区中的临时 v7/evidence 未提交；没有生成可合并的执行回执或 durable REVIEWED seal。v1-v6、v6 contract、ACTIVE baseline 与凭据边界均未改变，待新受控 run 实测。
+
+## 2026-09-08 · GT-H3B execution scope-check correction
+
+> 状态：**WORKFLOW FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34210356154` 的重跑 attempt 已完成 105/105 个官方 source binding，Phase C 输出 `v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空。
+- 随后的 workflow scope-check 因 shell 变量展开被写成转义字面量（`\${entry:3}`、`\$path`），将合法生成路径误判为 `$path` 并阻止提交。
+- 已修正为实际展开 `entry`/ `path` 的 bash 表达式；允许输出路径集合与 evidence、receipt、治理文档边界不变。
+- 该 job 在 scope-check 前失败，临时 v7/evidence 未提交为 durable 输出；v1-v6、v6 contract、ACTIVE baseline 与凭据边界未改变，待修正版重新执行。
+
+## 2026-09-08 · GT-H3B untracked-output commit detection correction
+
+> 状态：**WORKFLOW FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34211652563` 尚未形成分支提交；审查 workflow 后发现生成的 v7 dataset、evidence 和 receipt 属于新文件，原提交步骤使用 `git diff --quiet` 只检测 tracked changes，可能错误跳过提交。
+- 已将提交前变更检测改为受管路径范围内的 `git status --porcelain`，从而同时识别 tracked 与 untracked 输出；scope 白名单、`git add` 路径和凭据边界不变。
+- 本修正不改变 A/B/C、HTTP 200、证据 hash、复合 bundle、Golden gates 或 v1-v6 immutable checks；待新 run 验证并产生 durable receipt。
+
+## 2026-09-08 · GT-H3B scope-check checkout-normalization correction
+
+> 状态：**WORKFLOW FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34212605690` 已完成 Phase A/B/C：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空；失败仅发生在提交前 scope-check。
+- 根因是历史 `docs/golden/gt_h2/rebuild_plan_v4.json` 的仓库 blob 使用 CRLF，而仓库 `*.json text eol=lf` 规则在 Linux checkout 物化 LF；`git status` 因换行差异报告了一个不属于 GT-H3B 的伪变更。
+- scope-check 现在只对该精确路径、精确的未暂存 tracked 状态（` M`）且 `git diff --ignore-cr-at-eol` 确认无内容差异的情形跳过；untracked、staged、删除或语义变更仍 fail-closed。
+- 同步修正执行提交步骤的 `GITHUB_HEAD_REF` shell 展开；未扩大 GT-H3B 输出白名单，未改变官方 source、raw bytes、evidence hash、Golden gate 或凭据边界，待新 run 证明 durable receipt 已提交。
+
+## 2026-09-08 · GT-H3B scope-check legacy CRLF artifact-set correction
+
+> 状态：**WORKFLOW FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34214566280`（run 32）再次完成 Phase A/B/C：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空；scope-check 发现的第二个路径是仓库中既有的 `docs/golden/gt_h3/GT_H3_HUMAN_REVIEW_RESULT.jsonl`。
+- 该文件与历史 `docs/golden/gt_h2/rebuild_plan_v4.json` 一样，仓库 blob 保留 CRLF，而 `*.jsonl text eol=lf` / `*.json text eol=lf` 在 Linux checkout 物化 LF；两者都是 tracked 的换行伪变更，并非 runner 新生成的 GT-H3B 输出。
+- scope-check 现对这两个精确路径仅在状态为未暂存 tracked 修改（` M`）且 `git diff --ignore-cr-at-eol` 确认无内容差异时跳过；untracked、staged、删除或语义变更仍 fail-closed。
+- 这次仅补齐已确认的基线伪变更集合，未扩大 GT-H3B 生成输出白名单、未改变 source/evidence/gate/凭据边界；待新 run 验证 scope-check 与 durable receipt 提交。
+
+## 2026-09-08 · GT-H3B scope-check CRLF baseline inventory correction
+
+> 状态：**WORKFLOW FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34215930357`（run 33 重跑 attempt）再次完成 Phase A/B/C：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空；scope-check 发现第三个既有 CRLF 伪变更 `docs/golden/gt_h3/remediation/GT_H3R_V5_SUPPORTING_OFFICIAL_SOURCES.jsonl`。
+- 通过 GitHub 连接器按仓库 `eol=lf` 管理范围盘点后，确认既有 CRLF blob 共 5 个：GT-H2 v4 plan、GT-H3 human review result、GT-H3R v5 supporting sources、v4→v5 carry-forward、v4→v5 rebuild plan；它们均不是本次 runner 生成物。
+- scope-check 现对这 5 个精确路径仅在状态为未暂存 tracked 修改（` M`）且 `git diff --ignore-cr-at-eol` 确认无内容差异时跳过；untracked、staged、删除或语义变更仍 fail-closed。
+- 本次修正没有使用通配符或扩大 GT-H3B 输出白名单，也未改变 source/evidence/gate/凭据边界；待新 run 完成 scope-check 并提交 durable receipt。
+
+## 2026-09-08 · GT-H3B evidence byte-preservation correction
+
+> 状态：**ATTRIBUTE FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34217567739`（run 34）已完成 Phase A/B/C 与 scope-check：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125、post-seal gates 全空；失败发生在 commit step 的 `git diff --cached --check`。
+- 根因是 `data/golden/** text eol=lf` 误覆盖了 GT-H3B content-addressed evidence 下的 PDF/HTML/ZIP；`git add` 因此提示会将 raw bytes 的 CRLF 转为 LF，且 `diff --check` 对原始 HTML 的空白报错。
+- 已在更具体路径加入 `data/golden/provider/amazingdata/evidence/** -text`，确保证据按原始 bytes 提交，不被换行转换；此前失败 job 的临时 evidence/v7/receipt 未进入分支。
+- 本修正不改变 source 获取、evidence hash、review/gate 逻辑或输出白名单；下一次 run 必须证明证据 raw bytes、commit、后续幂等校验均通过。
+
+## 2026-09-08 · GT-H3B staged-evidence raw-byte guard correction
+
+> 状态：**ATTRIBUTE FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34218230119`（run 35）完成 Phase A/B/C 与 scope-check：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125、post-seal gates 全空；commit step 在 `git add` 后的 `git diff --cached --check` 被 evidence 原始 HTML 的空白报错阻断。
+- 日志同时确认现有 `evidence/** -text` 规则没有覆盖 runner 实际写入的 `evidence/sha256/*` 文件，Git 提示会将 evidence raw bytes 的 CRLF 转为 LF；不能据此提交。
+- 已增加与实际目录一致的 `data/golden/provider/amazingdata/evidence/sha256/* -text !eol -diff` 精确规则，并在 `git add` 后逐个以 index blob 与工作区文件做二进制比较；任何 byte drift 都立即失败。
+- 此前失败 job 的 v7/evidence/receipt 未提交；未改变 source、review、Golden gate、输出白名单或凭据边界，待新 run 证明 raw-byte guard、commit 与幂等验证通过。
+
+## 2026-09-08 · GT-H3B controlled execution succeeded
+
+> 状态：**GT-H3B PHASE A/B/C SUCCEEDED / REVIEWED 125/125 / FORMAL PRODUCTION NOT RUN**
+
+- source execution SHA：928a23cdc924cf2da17915eca2c439a9a97d56de；workflow run：34219109525。
+- Phase A 通过已治理的 candidate.py promote-existing，ACTIVE 从 v5 推进到 v6；
+  v1-v6 versioned files 经执行前后 hash 对比保持不变。
+- Phase B 按冻结合同 3c235e35d1a09f0171322a7f0c610edb3cbe3d5ad8c6afc701f7b90afa77d3bb 获取 125 个 case 的官方原始 bytes；
+  普通 120、复合 5、deterministic bundle 5。
+- 125-entry review manifest SHA256：906d86314842699fd523c9eaf5f57eb16b0a18bd85dc13465dcc31dc8e89f1eb；
+  未使用 expect_fields。
+- Phase C 通过 review.py --reviewer project-owner 一次性生成 v7-reviewed-20260908，REVIEWED 125/125；
+  evidence refs 103，hash consistency 已复核。
+- Formal Production B1-B7：**NOT RUN**；未提交任何账号、密码、Token、
+  IP、Cookie 或 Provider 凭据。
+
+## 2026-09-08 · GT-H3B post-seal workflow actor boundary
+
+> 状态：**DURABLE SEAL PRESENT / IDEMPOTENT RECHECK DISPATCHED / INDEPENDENT PR REVIEW PENDING**
+
+- durable execution commit：`72c6d15e3c8db65b23b339393946d8efaa60730e`；receipt 已报告 Phase A/B/C 成功、v7-reviewed-20260908、REVIEWED 125/125、Formal Production B1-B7 **NOT RUN**。
+- 该执行 job 由 `github-actions[bot]` 写回 receipt 后，GitHub 为同一 PR 生成的两个 `pull_request` workflow run（GT-H3B run 37、CI run 461）均立即显示 `action_required`、job 数为 0；这不是 Phase A/B/C 或 evidence 校验失败。
+- 为使最终 PR head 由项目账号触发一次真正的幂等检查，补记本条日志；该提交不改 v1-v7 Golden/evidence/receipt 内容、不提交任何凭据，受控 runner 应只执行已有封印的验证并不产生新的 bot commit。
+- 该平台触发边界与独立审阅要求已记录；在项目账号触发的 CI 与受控幂等检查成功、且独立审阅者确认 receipt/evidence 后，PR #25 才可进入合并评估。
+
+## 2026-09-08 · GT-H3B historical-baseline test compatibility
+
+> 状态：**COMPATIBILITY FIX COMMITTED / CI VALIDATION IN PROGRESS**
+
+- CI run `34221479446` 在 Ubuntu pytest 阶段暴露 14 个失败；受控 GT-H3B run 38 已成功。失败集中于历史 v3/v4/v5/v6 测试仍直接跟随已推进到 `v7-reviewed-20260908` 的 ACTIVE 指针，或把已有 v7 evidence 误判为隔离测试产生的 orphan。
+- 这不是 v7 seal、source bytes、review gate 或生产 B1-B7 的失败；问题是测试夹具没有遵守仓库已经实现的 run-bound/immutable-version 约定。
+- 已将历史 GT-H2、GT-H3A、GT-H3R、GT-H3B-P0 和 GT-H3R2 测试改为显式加载 immutable v5/v6/v4 数据；review workflow 夹具从空 evidence store 起步；GT-H3R/GT-H3R2 历史 verifier 不再错误约束后续 ACTIVE。
+- v1-v7 Golden/evidence/receipt 未修改；本修正不运行 Provider，不写入任何账号、密码、Token、IP、Cookie 或其他凭据。
+
+## 2026-09-08 · GT-H3B historical-verifier lint correction
+
+> 状态：**LINT FIX COMMITTED / CI VALIDATION IN PROGRESS**
+
+- CI run `34222758877` 在 Ubuntu 与 Windows 的 Ruff 阶段均发现同一个未使用局部变量 `v5_manifest`；这是前一项历史 verifier 解耦修正留下的静态检查问题。
+- 已删除该未使用赋值；v5 manifest 仍由 verifier 的 immutable `_read_dataset` 路径完整读取并校验，未削弱任何 v5/v6 hash、结构、计划、carry-forward 或审计检查。
+- 受控 GT-H3B run 39 不涉及该静态检查问题；本提交不改 v1-v7 Golden/evidence/receipt，不运行 Provider，不写入任何凭据。
+
+## 2026-09-08 · GT-H3B historical-baseline compatibility verified
+
+> 状态：**VERIFIED / CI AND CONTROLLED IDEMPOTENT CHECKS SUCCESS**
+
+- CI run `34222958240`（#464）在 Windows 3.12、Windows 3.14、Ubuntu 3.14 全部成功；Ruff、format、mypy、pytest、Spike、SDK-absent、DEVLOG 和 Management gates 均通过。
+- 受控 GT-H3B run `34222958398`（#40）全部成功；已有 v7 seal 未被重写，receipt 仍为 `SUCCEEDED`，REVIEWED 125/125。
+- 当前 PR head 为 `de8e4c1c930649d7009174797b6a4184d12bde74`，PR #25 仍保持 open、未合并，等待独立 Reviewer 对 final head/current-main test-merge 完成审阅。
+

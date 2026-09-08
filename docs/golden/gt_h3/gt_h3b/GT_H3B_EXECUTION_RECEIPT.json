@@ -1,0 +1,97 @@
+{
+  "credentials_committed": false,
+  "executed_at": "2026-09-08T11:26:46.475842+00:00",
+  "formal_production_b1_b7": "NOT_RUN",
+  "format": "GT-H3B-CONTROLLED-EXECUTION-RECEIPT/v1",
+  "immutable_v1_v6": {
+    "golden_cases_v1.jsonl": "b19b807612ca20436aeb766ba216ff47880c9ed6bd5843e446e547841612c1c8",
+    "golden_cases_v2.jsonl": "d36c1845c0780a3a063919062c3a55aa2227e98152a1993319a0f1cf4b3c1631",
+    "golden_cases_v3.jsonl": "ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e",
+    "golden_cases_v4.jsonl": "8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b",
+    "golden_cases_v5.jsonl": "5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c",
+    "golden_cases_v6.jsonl": "0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343",
+    "truth_manifest_v2.json": "902eee047d73b578a3de28fd0e9f610a52dadf5f836ae9b5b6eef21195f8ca80",
+    "truth_manifest_v3.json": "9f77fc6e6487f7ffa97b3d56647ad9008ca9ebd06f3788f73a63f492028e1937",
+    "truth_manifest_v4.json": "e7ee1f51ccc53bf79307c0ce629152e30c0c3dbdcc597070885f7abd446c783d",
+    "truth_manifest_v5.json": "abe3bd38600ff9091ed9746fb9ff1a6a5012c839d3d1fe8a99ac9324a1493801",
+    "truth_manifest_v6.json": "ec73d72e91c0511f48eeb389f73dd67494ae2f328f22edaffdacce54f9c6db3c"
+  },
+  "phase_a": {
+    "active_after": {
+      "case_count": 125,
+      "dataset_file": "golden_cases_v6.jsonl",
+      "dataset_hash": "0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343",
+      "review_summary": {
+        "COMPILED": 125
+      },
+      "truth_version": "v6-candidate-20260908"
+    },
+    "active_before": {
+      "case_count": 125,
+      "dataset_file": "golden_cases_v5.jsonl",
+      "dataset_hash": "5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c",
+      "review_summary": {
+        "COMPILED": 125
+      },
+      "truth_version": "v5-candidate-20260907"
+    },
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "scripts/golden/candidate.py",
+      "promote-existing",
+      "--truth-version",
+      "v6-candidate-20260908"
+    ],
+    "result": "SUCCEEDED",
+    "stdout_tail": [
+      "promoted existing candidate to ACTIVE: v6-candidate-20260908"
+    ]
+  },
+  "phase_b": {
+    "bundle_count": 5,
+    "case_count": 125,
+    "composite_cases": 5,
+    "contract_sha256": "3c235e35d1a09f0171322a7f0c610edb3cbe3d5ad8c6afc701f7b90afa77d3bb",
+    "https_transport_upgrades": 10,
+    "official_http_200": 105,
+    "ordinary_cases": 120,
+    "redirected_sources": 11,
+    "review_manifest_sha256": "906d86314842699fd523c9eaf5f57eb16b0a18bd85dc13465dcc31dc8e89f1eb",
+    "source_binding_occurrences": 130,
+    "unique_source_bindings": 105
+  },
+  "phase_c": {
+    "case_count": 125,
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "scripts/golden/review.py",
+      "--manifest",
+      "<generated-125-entry-manifest>",
+      "--reviewer",
+      "project-owner"
+    ],
+    "dataset_hash": "a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e",
+    "evidence_bytes": 33785075,
+    "evidence_ref_count": 103,
+    "gates": {
+      "event_coverage": [],
+      "production_formal": [],
+      "quantity": [],
+      "review": []
+    },
+    "review_summary": {
+      "REVIEWED": 125
+    },
+    "reviewed_version": "v7-reviewed-20260908",
+    "reviewer": "project-owner"
+  },
+  "source_head_sha": "928a23cdc924cf2da17915eca2c439a9a97d56de",
+  "source_main_sha": "5a32e6dafd1e88b9bd5f3f10600f1c81b9e510e6",
+  "status": "SUCCEEDED",
+  "workflow_run_attempt": "1",
+  "workflow_run_id": "34219109525"
+}
