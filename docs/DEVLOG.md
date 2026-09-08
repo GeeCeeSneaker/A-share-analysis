@@ -3403,3 +3403,11 @@
 - 随后的 workflow scope-check 因 shell 变量展开被写成转义字面量（`\${entry:3}`、`\$path`），将合法生成路径误判为 `$path` 并阻止提交。
 - 已修正为实际展开 `entry`/ `path` 的 bash 表达式；允许输出路径集合与 evidence、receipt、治理文档边界不变。
 - 该 job 在 scope-check 前失败，临时 v7/evidence 未提交为 durable 输出；v1-v6、v6 contract、ACTIVE baseline 与凭据边界未改变，待修正版重新执行。
+
+## 2026-09-08 · GT-H3B untracked-output commit detection correction
+
+> 状态：**WORKFLOW FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34211652563` 尚未形成分支提交；审查 workflow 后发现生成的 v7 dataset、evidence 和 receipt 属于新文件，原提交步骤使用 `git diff --quiet` 只检测 tracked changes，可能错误跳过提交。
+- 已将提交前变更检测改为受管路径范围内的 `git status --porcelain`，从而同时识别 tracked 与 untracked 输出；scope 白名单、`git add` 路径和凭据边界不变。
+- 本修正不改变 A/B/C、HTTP 200、证据 hash、复合 bundle、Golden gates 或 v1-v6 immutable checks；待新 run 验证并产生 durable receipt。

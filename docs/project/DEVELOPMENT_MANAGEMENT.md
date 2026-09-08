@@ -5516,3 +5516,14 @@ Git 历史负责保存过去版本。
 - 失败发生在 scope-check：YAML bash 将 `\${entry:3}` 与 `\$path` 当作字面量，合法生成输出因而被误拒。
 - 已改为实际 bash 变量展开；未扩大允许的生成路径集合，receipt/evidence/Governance 输出边界保持不变。
 - scope-check 失败发生在提交步骤前，因此未形成 durable receipt/evidence；v1-v6、v6 contract、ACTIVE baseline 和凭据边界未改变，需由新 run 完成提交。
+
+## DM-CR-20260908-152 · GT-H3B untracked-output commit detection correction
+
+**Type**：C0 — controlled execution workflow correction
+**Date**：2026-09-08
+**Status**：FIX STAGED / RETRY PENDING
+**Evidence**：PR #25；workflow commit step review after controlled run 34211652563。
+
+- 生成的 v7 dataset、evidence、receipt 属于 untracked 新文件；原 `git diff --quiet` 检查无法可靠识别它们，存在 A/B/C 成功但不提交 durable output 的风险。
+- 已改为在同一受管路径集合内执行 `git status --porcelain` 检测；空状态才走幂等分支，非空状态继续执行既有 `git add`/commit/push。
+- 未扩大输出白名单、未改变 runner 校验或任何 source/credential 规则；新的受控 run 必须证明回执实际出现在执行分支。
