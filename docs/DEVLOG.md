@@ -3331,3 +3331,12 @@
 - CI run `34202971111` 仅报告 `_open_source` 前后空行与 formatter 输出不一致；已按机器 diff 收敛。
 - 不改变瞬态 `URLError` 重试、HTTPError 直接失败、Fetch 取证或 Golden/seal 边界；受控 run `34202971105` 仍待核验。
 
+## 2026-09-08 · GT-H3B official-source fallback and CI regression correction
+
+> 状态：**RUN BLOCKED BY OFFICIAL SOURCE ACCESS / CI FIX STAGED / NO EVIDENCE OR SEAL**
+
+- 受控 run 34203167616 在 Phase B 首个 SSE 历史规则页面收到 HTTP 403；没有生成 evidence、执行回执或 REVIEWED seal。
+- runner 现在对官方 allowlist 内、HTTP 403/429/5xx 或瞬态网络失败启用一次受控的正常 Chromium 网络兜底；只接收同一官方主机/路径、HTTP 200 的原始 HTML/PDF body，并继续执行大小上限、PDF magic bytes 和 challenge 检查。
+- 合同中遗留的 http:// 定位符不改 source_ref；仅显式升级到同一官方主机/路径的 HTTPS transport，最终响应仍必须通过 HTTPS allowlist 校验，回执记录升级数量。
+- Python 3.14 动态加载测试先注册 sys.modules；DEVLOG 测试的两个已披露历史提交已与 CI 的七项 SHA 豁免清单对齐。
+- 本次不修改 v1-v6 versioned Golden bytes、v6 source contract、ACTIVE、真实 evidence 或 seal；下一步以新 CI 和受控 run 的实际日志决定是否继续。

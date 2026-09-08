@@ -5409,3 +5409,14 @@ Git 历史负责保存过去版本。
 - 同步 `_open_source` 两侧空行到 formatter 规范；不改变网络重试、来源校验、原始字节或发布边界。
 - 当前受控执行结果仍待核验。
 
+## DM-CR-20260908-142 · GT-H3B official-source fallback and CI regression correction
+
+**Type**：C1 — controlled execution source-access hardening and CI correction
+**Date**：2026-09-08
+**Status**：IMPLEMENTED / RETRY PENDING
+**Evidence**：PR #25；controlled run 34203167616；CI run 34203167617。
+
+- 对官方 source_ref 的 HTTP 403/429/5xx 与耗尽后的瞬态网络错误，增加普通 Chromium 网络层兜底；只接收 HTTP 200、allowlist 官方 HTTPS、同一 source path 的原始 body。
+- 将合同中 http:// 历史定位符显式升级为相同 host/path 的 HTTPS transport，manifest 仍保留合同原始 source_ref，最终 URL 和回执均可审计。
+- 修正 Python 3.14 动态导入测试与 DEVLOG 七项历史豁免同步；不改变 source contract、v1-v6 bytes、ACTIVE、evidence 或 seal 边界。
+- 当前 403 仍未被证明可通过浏览器获得正文；需要新受控 run 实测，成功前不得声称真实 evidence 或 REVIEWED seal。

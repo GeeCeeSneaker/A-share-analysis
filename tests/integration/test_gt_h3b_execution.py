@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,16 +16,24 @@ def _load_module():
     spec = importlib.util.spec_from_file_location("gt_h3b_execute", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
 
 class _FakeResponse:
-    def __init__(self, body: bytes, *, status: int = 200, url: str | None = None):
+    def __init__(
+        self,
+        body: bytes,
+        *,
+        status: int = 200,
+        url: str | None = None,
+        content_type: str = "application/pdf",
+    ):
         self.status = status
         self._body = body
         self._url = url
-        self.headers = {"Content-Type": "application/pdf"}
+        self.headers = {"Content-Type": content_type}
 
     def __enter__(self):
         return self
@@ -92,6 +101,67 @@ def test_fetch_source_retries_transient_network_failure(tmp_path, monkeypatch):
     )
 
     assert attempts == 2
+    assert result.path.read_bytes() == body
+
+
+def test_fetch_source_upgrades_legacy_http_locator_to_https(
+    tmp_path, monkeypatch
+):
+    module = _load_module()
+    body = b"<html>official historical source</html>"
+    requested_urls = []
+
+    def capture_urlopen(request, timeout):
+        requested_urls.append(request.full_url)
+        return _FakeResponse(
+            body,
+            url="https://www.sse.com.cn/legacy.shtml",
+            content_type="text/html",
+        )
+
+    monkeypatch.setattr(module, "urlopen", capture_urlopen)
+    result = module._fetch_source(
+        "http://www.sse.com.cn/legacy.shtml",
+        "SSE_ANNOUNCEMENT",
+        tmp_path / "sources",
+        1,
+        5,
+    )
+
+    assert requested_urls == ["https://www.sse.com.cn/legacy.shtml"]
+    assert result.source_ref == "http://www.sse.com.cn/legacy.shtml"
+    assert result.final_url == "https://www.sse.com.cn/legacy.shtml"
+    assert result.path.read_bytes() == body
+
+
+def test_fetch_source_uses_browser_for_http_403(
+    tmp_path, monkeypatch
+):
+    module = _load_module()
+    body = b"<html>browser-resolved official source</html>"
+    monkeypatch.setattr(
+        module,
+        "urlopen",
+        lambda request, timeout: (_ for _ in ()).throw(
+            module.HTTPError(request.full_url, 403, "forbidden", {}, None)
+        ),
+    )
+    browser_calls = []
+
+    def browser_fetch(source_ref, timeout, *, require_pdf):
+        browser_calls.append((source_ref, require_pdf))
+        return body, "text/html", source_ref
+
+    monkeypatch.setattr(module, "_fetch_source_with_browser", browser_fetch)
+    result = module._fetch_source(
+        "https://www.sse.com.cn/blocked.shtml",
+        "SSE_ANNOUNCEMENT",
+        tmp_path / "sources",
+        1,
+        5,
+    )
+
+    assert browser_calls == [("https://www.sse.com.cn/blocked.shtml", False)]
     assert result.path.read_bytes() == body
 
 

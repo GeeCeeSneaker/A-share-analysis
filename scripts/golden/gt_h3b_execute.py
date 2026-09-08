@@ -58,6 +58,7 @@ V6_VERSION = "v6-candidate-20260908"
 V6_DATASET_HASH = "0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343"
 MAX_SOURCE_BYTES = 50 * 1024 * 1024
 SOURCE_FETCH_ATTEMPTS = 3
+BROWSER_FALLBACK_HTTP_CODES = frozenset({403, 429, 500, 502, 503, 504})
 # v1 is a legacy dataset snapshot; its versioned manifest starts at v2.
 IMMUTABLE_VERSION_FILES = tuple(
     [f"golden_cases_v{number}.jsonl" for number in range(1, 7)]
@@ -234,17 +235,88 @@ def _read_bounded(response: object) -> bytes:
     return b"".join(chunks)
 
 
-def _fetch_pdf_with_browser(
+def _fetch_source_with_browser(
     source_ref: str,
     timeout: float,
+    *,
+    require_pdf: bool,
 ) -> tuple[bytes, str, str]:
-    """Resolve a JavaScript anti-bot challenge through a browser network response."""
+    """Capture an HTTP 200 official raw body with a normal browser."""
     try:
         from playwright.sync_api import Error as PlaywrightError
         from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
-        raise ExecutionError("browser fallback unavailable for PDF anti-bot challenge") from exc
+        raise ExecutionError(
+            "browser fallback unavailable for official source anti-bot challenge"
+        ) from exc
+
+    requested = urlsplit(source_ref)
+    requested_path = requested.path
+    requested_query = requested.query
+
+    def is_source_response(response_url: str) -> bool:
+        parsed = urlsplit(response_url)
+        return (
+            parsed.scheme.lower() == "https"
+            and (parsed.hostname or "").lower() in OFFICIAL_SOURCE_HOSTS
+            and parsed.path == requested_path
+            and parsed.query == requested_query
+        )
+
+    def content_type_from_headers(headers: object) -> str:
+        if not isinstance(headers, dict):
+            return ""
+        for name, value in headers.items():
+            if str(name).lower() == "content-type":
+                return str(value).split(";", 1)[0].strip().lower()
+        return ""
+
+    def decode_cdp_body(result: object) -> bytes | None:
+        if not isinstance(result, dict):
+            return None
+        encoded_body = result.get("body")
+        if not isinstance(encoded_body, str):
+            return None
+        try:
+            return (
+                base64.b64decode(encoded_body)
+                if result.get("base64Encoded")
+                else encoded_body.encode("utf-8")
+            )
+        except (binascii.Error, UnicodeError, ValueError):
+            return None
+
+    def looks_like_challenge(body: bytes, content_type: str) -> bool:
+        if require_pdf or content_type not in {"text/html", "application/xhtml+xml"}:
+            return False
+        preview = body[: 1024 * 1024].lower()
+        markers = (
+            b"challenge-platform",
+            b"cf-chl-",
+            b"captcha",
+            b"verify you are human",
+            b"security verification",
+        )
+        return any(marker in preview for marker in markers)
+
+    candidate_bodies: list[tuple[bytes, str, str]] = []
+
+    def store_candidate(body: bytes, content_type: str, response_url: str) -> None:
+        if not body:
+            return
+        if len(body) > MAX_SOURCE_BYTES:
+            raise ExecutionError(
+                f"browser source exceeded the {MAX_SOURCE_BYTES} byte safety limit"
+            )
+        if require_pdf and not body.startswith(b"%PDF-"):
+            return
+        if looks_like_challenge(body, content_type):
+            return
+        normalized_type = content_type or (
+            "application/pdf" if body.startswith(b"%PDF-") else "text/html"
+        )
+        candidate_bodies.append((body, normalized_type, response_url))
 
     responses: list[object] = []
     downloads: list[object] = []
@@ -253,10 +325,7 @@ def _fetch_pdf_with_browser(
         headless = not bool(os.environ.get("DISPLAY"))
         browser = playwright.chromium.launch(headless=headless)
         try:
-            context = browser.new_context(
-                accept_downloads=True,
-                user_agent="A-share-analysis-GT-H3B-materializer/1.0",
-            )
+            context = browser.new_context(accept_downloads=True)
             try:
                 page = context.new_page()
 
@@ -264,9 +333,9 @@ def _fetch_pdf_with_browser(
                     status = getattr(response, "status", None)
                     response_url = str(getattr(response, "url", ""))
                     response_parts = urlsplit(response_url)
-                    headers = getattr(response, "headers", {})
-                    raw_content_type = str(headers.get("content-type", ""))
-                    content_type = raw_content_type.split(";", 1)[0].strip().lower()
+                    content_type = content_type_from_headers(
+                        getattr(response, "headers", {})
+                    )
                     observed.append(
                         f"{status}:{(response_parts.hostname or '').lower()}:"
                         f"{response_parts.path}:{content_type}"
@@ -285,7 +354,7 @@ def _fetch_pdf_with_browser(
                     {
                         "patterns": [
                             {
-                                "urlPattern": f"*{Path(urlsplit(source_ref).path).name}*",
+                                "urlPattern": f"*{requested_path.rsplit('/', 1)[-1]}*",
                                 "requestStage": "Response",
                             }
                         ]
@@ -293,16 +362,17 @@ def _fetch_pdf_with_browser(
                 )
                 cdp_responses: dict[str, tuple[str, dict]] = {}
                 finished_request_ids: list[str] = []
-                fetch_bodies: list[tuple[bytes, str, str]] = []
                 fetch_errors: list[ExecutionError] = []
 
                 def record_cdp_response(event: dict) -> None:
                     response = event.get("response", {})
                     request_id = str(event.get("requestId", ""))
                     if request_id and response.get("status") == 200:
+                        raw_headers = response.get("headers") or {}
+                        headers = dict(raw_headers) if isinstance(raw_headers, dict) else {}
                         cdp_responses[request_id] = (
                             str(response.get("url", "")),
-                            response.get("headers") or {},
+                            headers,
                         )
 
                 def record_cdp_finished(event: dict) -> None:
@@ -320,32 +390,30 @@ def _fetch_pdf_with_browser(
                         for header in event.get("responseHeaders") or []
                         if isinstance(header, dict)
                     }
-                    content_type = response_headers.get("content-type", "")
-                    content_type = content_type.split(";", 1)[0].strip().lower()
+                    content_type = content_type_from_headers(response_headers)
                     if (
                         event.get("responseStatusCode") == 200
                         and response_parts.scheme.lower() == "https"
                         and (response_parts.hostname or "").lower() in OFFICIAL_SOURCE_HOSTS
-                        and content_type == "application/pdf"
+                        and is_source_response(response_url)
                     ):
-                        with suppress(PlaywrightError, binascii.Error, UnicodeError, ValueError):
+                        try:
                             body_result = cdp_session.send(
                                 "Fetch.getResponseBody",
                                 {"requestId": request_id},
                             )
-                            encoded_body = body_result.get("body")
-                            if isinstance(encoded_body, str):
-                                body = (
-                                    base64.b64decode(encoded_body)
-                                    if body_result.get("base64Encoded")
-                                    else encoded_body.encode("utf-8")
-                                )
-                                if len(body) > MAX_SOURCE_BYTES:
-                                    fetch_errors.append(
-                                        ExecutionError("CDP Fetch PDF exceeded size limit")
-                                    )
-                                elif body.startswith(b"%PDF-"):
-                                    fetch_bodies.append((body, content_type, response_url))
+                            body = decode_cdp_body(body_result)
+                            if body is not None:
+                                store_candidate(body, content_type, response_url)
+                        except ExecutionError as exc:
+                            fetch_errors.append(exc)
+                        except (
+                            PlaywrightError,
+                            binascii.Error,
+                            UnicodeError,
+                            ValueError,
+                        ):
+                            pass
                     try:
                         cdp_session.send(
                             "Fetch.continueResponse",
@@ -361,28 +429,24 @@ def _fetch_pdf_with_browser(
                 cdp_session.on("Network.responseReceived", record_cdp_response)
                 cdp_session.on("Network.loadingFinished", record_cdp_finished)
                 cdp_session.on("Fetch.requestPaused", record_fetch_paused)
-                # PDF downloads can abort page.goto; inspect captured responses below.
                 with suppress(PlaywrightError, PlaywrightTimeoutError):
                     page.goto(
                         source_ref,
                         wait_until="commit",
                         timeout=max(1000, int(timeout * 1000)),
                     )
-                page.wait_for_timeout(min(10000, max(2000, int(timeout * 1000))))
+                with suppress(PlaywrightError):
+                    page.wait_for_timeout(min(10000, max(2000, int(timeout * 1000))))
                 if fetch_errors:
                     raise fetch_errors[0]
-                for body, content_type, response_url in reversed(fetch_bodies):
-                    return body, content_type, response_url
+                if candidate_bodies:
+                    return candidate_bodies[-1]
                 for request_id in reversed(finished_request_ids):
                     response_info = cdp_responses.get(request_id)
                     if response_info is None:
                         continue
                     response_url, headers = response_info
-                    final = urlsplit(response_url)
-                    if (
-                        final.scheme.lower() != "https"
-                        or (final.hostname or "").lower() not in OFFICIAL_SOURCE_HOSTS
-                    ):
+                    if not is_source_response(response_url):
                         continue
                     try:
                         body_result = cdp_session.send(
@@ -391,41 +455,27 @@ def _fetch_pdf_with_browser(
                         )
                     except PlaywrightError:
                         continue
-                    encoded_body = body_result.get("body")
-                    if not isinstance(encoded_body, str):
+                    body = decode_cdp_body(body_result)
+                    if body is None:
                         continue
-                    try:
-                        body = (
-                            base64.b64decode(encoded_body)
-                            if body_result.get("base64Encoded")
-                            else encoded_body.encode("utf-8")
-                        )
-                    except (ValueError, UnicodeError):
-                        continue
-                    if len(body) > MAX_SOURCE_BYTES:
-                        raise ExecutionError(
-                            f"CDP PDF response exceeded the {MAX_SOURCE_BYTES} byte safety limit"
-                        )
-                    if body.startswith(b"%PDF-"):
-                        raw_content_type = str(headers.get("content-type", ""))
-                        content_type = raw_content_type.split(";", 1)[0].strip().lower()
-                        return body, content_type or "application/pdf", response_url
+                    before = len(candidate_bodies)
+                    store_candidate(
+                        body,
+                        content_type_from_headers(headers),
+                        response_url,
+                    )
+                    if len(candidate_bodies) > before:
+                        return candidate_bodies[-1]
                 successful_response_paths = {
-                    (urlsplit(str(getattr(response, "url", ""))).hostname or "").lower()
-                    + urlsplit(str(getattr(response, "url", ""))).path
+                    response_url
                     for response in responses
                     if getattr(response, "status", None) == 200
+                    for response_url in [str(getattr(response, "url", ""))]
+                    if is_source_response(response_url)
                 }
                 for download in reversed(downloads):
                     download_url = str(getattr(download, "url", ""))
-                    download_parts = urlsplit(download_url)
-                    download_key = (download_parts.hostname or "").lower() + download_parts.path
-                    if (
-                        download_parts.scheme.lower() != "https"
-                        or download_parts.hostname is None
-                        or download_parts.hostname.lower() not in OFFICIAL_SOURCE_HOSTS
-                        or download_key not in successful_response_paths
-                    ):
+                    if not is_source_response(download_url):
                         continue
                     try:
                         download_path = download.path()
@@ -444,51 +494,46 @@ def _fetch_pdf_with_browser(
                         raise ExecutionError(
                             f"browser PDF download could not be read: {exc}"
                         ) from exc
-                    if body.startswith(b"%PDF-"):
-                        return body, "application/pdf", download_url
+                    before = len(candidate_bodies)
+                    store_candidate(body, "application/pdf", download_url)
+                    if len(candidate_bodies) > before:
+                        return candidate_bodies[-1]
                 for response in reversed(responses):
                     if getattr(response, "status", None) != 200:
                         continue
                     response_url = str(getattr(response, "url", ""))
-                    final = urlsplit(response_url)
-                    if (
-                        final.scheme.lower() != "https"
-                        or (final.hostname or "").lower() not in OFFICIAL_SOURCE_HOSTS
-                    ):
+                    if not is_source_response(response_url):
                         continue
                     headers = getattr(response, "headers", {})
-                    content_length = headers.get("content-length")
-                    if content_length:
-                        try:
-                            if int(content_length) > MAX_SOURCE_BYTES:
-                                raise ExecutionError(
-                                    f"browser PDF response exceeded the {MAX_SOURCE_BYTES} "
-                                    "byte safety limit"
-                                )
-                        except ValueError:
-                            pass
                     try:
                         body = response.body()
                     except PlaywrightError:
                         continue
-                    if len(body) > MAX_SOURCE_BYTES:
-                        raise ExecutionError(
-                            f"browser PDF response exceeded the {MAX_SOURCE_BYTES} "
-                            "byte safety limit"
-                        )
-                    if body.startswith(b"%PDF-"):
-                        raw_content_type = str(headers.get("content-type", ""))
-                        content_type = raw_content_type.split(";", 1)[0].strip().lower()
-                        return body, content_type or "application/pdf", response_url
+                    before = len(candidate_bodies)
+                    store_candidate(
+                        body,
+                        content_type_from_headers(headers),
+                        response_url,
+                    )
+                    if len(candidate_bodies) > before:
+                        return candidate_bodies[-1]
             finally:
                 context.close()
         finally:
             browser.close()
     summary = ", ".join(observed[-12:]) or "none"
     raise ExecutionError(
-        f"browser fallback did not obtain an HTTP 200 PDF response for {source_ref}; "
-        f"observed {len(observed)} responses and {len(downloads)} downloads: {summary}"
+        f"browser fallback did not obtain an HTTP 200 official raw response for "
+        f"{source_ref}; observed {len(observed)} responses and "
+        f"{len(downloads)} downloads: {summary}"
     )
+
+
+def _fetch_pdf_with_browser(
+    source_ref: str,
+    timeout: float,
+) -> tuple[bytes, str, str]:
+    return _fetch_source_with_browser(source_ref, timeout, require_pdf=True)
 
 
 def _open_source(request: Request, timeout: float):
@@ -516,19 +561,36 @@ def _fetch_source(
         parsed = urlsplit(source_ref)
     except ValueError as exc:
         raise ExecutionError(f"invalid official source {source_ref!r}: {exc}") from exc
-    if parsed.scheme.lower() != "https":
-        raise ExecutionError(f"official source must use HTTPS: {source_ref}")
+    if parsed.scheme.lower() not in {"http", "https"}:
+        raise ExecutionError(f"official source must use HTTP(S): {source_ref}")
+
+    is_pdf_url = parsed.path.lower().endswith(".pdf")
+    transport_ref = source_ref
+    if parsed.scheme.lower() == "http":
+        transport_ref = parsed._replace(scheme="https").geturl()
     request = Request(
-        source_ref,
+        transport_ref,
         headers={
             "Accept": "application/pdf,text/html,application/xhtml+xml,*/*;q=0.1",
             "User-Agent": "A-share-analysis-GT-H3B-materializer/1.0",
         },
     )
+    data: bytes | None = None
+    content_type = ""
+    final_url = transport_ref
+    browser_fallback_reason: str | None = None
     try:
         with _open_source(request, timeout) as response:
             status = getattr(response, "status", None) or response.getcode()
             if status != 200:
+                if status in BROWSER_FALLBACK_HTTP_CODES:
+                    raise HTTPError(
+                        transport_ref,
+                        status,
+                        f"official source returned HTTP {status}",
+                        None,
+                        None,
+                    )
                 raise ExecutionError(
                     f"official source {source_ref} returned HTTP {status}, not 200"
                 )
@@ -543,19 +605,34 @@ def _fetch_source(
             content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
             data = _read_bounded(response)
     except HTTPError as exc:
-        raise ExecutionError(f"official source {source_ref} returned HTTP {exc.code}") from exc
+        if exc.code not in BROWSER_FALLBACK_HTTP_CODES:
+            raise ExecutionError(f"official source {source_ref} returned HTTP {exc.code}") from exc
+        browser_fallback_reason = f"HTTP {exc.code}"
     except URLError as exc:
-        raise ExecutionError(f"official source {source_ref} could not be retrieved: {exc}") from exc
+        browser_fallback_reason = f"network error: {exc}"
 
-    is_pdf_url = parsed.path.lower().endswith(".pdf")
-    if is_pdf_url and (not data or not data.startswith(b"%PDF-")):
+    if browser_fallback_reason is not None:
         try:
-            data, content_type, final_url = _fetch_pdf_with_browser(source_ref, timeout)
+            data, content_type, final_url = _fetch_source_with_browser(
+                transport_ref,
+                timeout,
+                require_pdf=is_pdf_url,
+            )
+        except ExecutionError as exc:
+            raise ExecutionError(
+                f"official source {source_ref} direct retrieval failed "
+                f"({browser_fallback_reason}); browser fallback failed: {exc}"
+            ) from exc
+    elif is_pdf_url and (not data or not data.startswith(b"%PDF-")):
+        try:
+            data, content_type, final_url = _fetch_pdf_with_browser(transport_ref, timeout)
         except ExecutionError as exc:
             raise ExecutionError(
                 f"official PDF source {source_ref} did not return a PDF body; "
                 f"browser fallback failed: {exc}"
             ) from exc
+    if data is None:
+        raise ExecutionError(f"official source {source_ref} returned no body")
     if not data:
         raise ExecutionError(f"official source {source_ref} returned an empty body")
     is_pdf = data.startswith(b"%PDF-") or content_type == "application/pdf"
@@ -961,6 +1038,9 @@ def execute(repo_root: Path, *, reviewer: str, timeout: float) -> dict:
                 "source_binding_occurrences": source_binding_occurrences,
                 "redirected_sources": sum(
                     source.final_url != source.source_ref for source in sources.values()
+                ),
+                "https_transport_upgrades": sum(
+                    source.source_ref.startswith("http://") for source in sources.values()
                 ),
                 "official_http_200": len(sources),
                 "review_manifest_sha256": manifest_sha256,

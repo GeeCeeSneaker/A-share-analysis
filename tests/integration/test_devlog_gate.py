@@ -25,7 +25,7 @@ def _main_history_ref() -> str:
 
 
 #: Explicitly grandfathered commits (full disclosure, V2.3 rule note):
-#: The four 2020+ history-contract source commits below were split from
+#: The seven 2020+ history-contract source commits below were split from
 #: their DEVLOG/Management synchronization because the GitHub contents API
 #: updates one path per commit. The branch history is append-only and is not
 #: rewritten; the exception is SHA-scoped, disclosed in DEVLOG/Management,
@@ -37,6 +37,8 @@ GRANDFATHERED_WITH_DISCLOSURE = frozenset(
         "5494a63f83a57e4b5034bc62073fb7d2057db63b",
         "335375597421dcc91c48602f5112e817adfc7044",
         "22a991079ddebe90bef3cac45eed258dc4e56269",
+        "3c66d1118835266bd7d608b6af460bf91a03c57c",
+        "d07d9628cb69b60f4d951033b12d0bc5dc00e8e5",
     }
 )
 
