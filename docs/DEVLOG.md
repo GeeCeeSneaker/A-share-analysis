@@ -3309,3 +3309,10 @@
 - CI run `34202354798` 的后续检查仍只报告 CDP Fetch 超限异常文本行长；已缩短提示，不改变 MAX_SOURCE_BYTES 判断或 fail-closed 行为。
 - 不改变 Fetch response-stage、HTTP 200、官方 host、`application/pdf`、`%PDF-` 校验或证据发布边界；受控 run `34202515066` 尚待核验。
 
+## 2026-09-08 · GT-H3B CDP Fetch formatter parity correction 2
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run `34202640337` 的 formatter 仅要求合并 Fetch 超限异常、Fetch body tuple 和 Network 超限异常的可读排版；已按机器 diff 同步。
+- 不改变 Fetch response-stage、原始字节、HTTP 200、官方 host、大小上限或 PDF magic bytes 校验；受控 run `34202640306` 的结果仍待核验。
+

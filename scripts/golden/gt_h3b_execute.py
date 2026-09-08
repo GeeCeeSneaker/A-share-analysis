@@ -340,14 +340,10 @@ def _fetch_pdf_with_browser(
                                 )
                                 if len(body) > MAX_SOURCE_BYTES:
                                     fetch_errors.append(
-                                        ExecutionError(
-                                            "CDP Fetch PDF exceeded size limit"
-                                        )
+                                        ExecutionError("CDP Fetch PDF exceeded size limit")
                                     )
                                 elif body.startswith(b"%PDF-"):
-                                    fetch_bodies.append(
-                                        (body, content_type, response_url)
-                                    )
+                                    fetch_bodies.append((body, content_type, response_url))
                     try:
                         cdp_session.send(
                             "Fetch.continueResponse",
@@ -406,8 +402,7 @@ def _fetch_pdf_with_browser(
                         continue
                     if len(body) > MAX_SOURCE_BYTES:
                         raise ExecutionError(
-                            f"CDP PDF response exceeded the {MAX_SOURCE_BYTES} "
-                            "byte safety limit"
+                            f"CDP PDF response exceeded the {MAX_SOURCE_BYTES} byte safety limit"
                         )
                     if body.startswith(b"%PDF-"):
                         raw_content_type = str(headers.get("content-type", ""))

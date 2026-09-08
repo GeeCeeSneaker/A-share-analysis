@@ -5378,3 +5378,13 @@ Git 历史负责保存过去版本。
 - 缩短 CDP Fetch 超限提示，保留大小上限判断；不改变浏览器取证、source contract、Golden bytes、ACTIVE 或 seal 边界。
 - 当前受控执行结果仍待核验。
 
+## DM-CR-20260908-139 · GT-H3B CDP Fetch formatter parity correction 2
+
+**Type**：C0 — controlled execution tooling formatting correction  
+**Date**：2026-09-08  
+**Status**：FORMAT FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；CI run `34202640337` 的 Ruff format diff。  
+
+- 按 formatter 机器输出合并三处表达式；不改变 Fetch body capture、来源校验、Golden bytes 或 seal 边界。
+- 当前受控执行结果仍待核验。
+
