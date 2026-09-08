@@ -1,3 +1,112 @@
+## 2026-09-08 · GT-H3R2 v6 JSONL serialization correction
+
+> 状态：**DATA SERIALIZATION FIX STAGED / HASH RECOMPUTED**
+
+- CI 测试发现 v6 dataset、ST audit 和 carry-forward 三个 JSONL 提交内容的行间分隔符误带逗号，导致第二行无法解析；该问题来自提交载荷生成，不是 Golden 语义判断。
+- 已恢复为标准 newline-delimited JSON，重新计算 v6 dataset SHA256 为 `0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343`，并同步 manifest、验证器和回归测试。
+- v5 数据、15 条 DROP/ADD 语义、审计结论及 ACTIVE 指针均未改变；本提交记录完整的数据载荷修正。
+
+## 2026-09-08 · GT-H3R2 v6 verifier test import portability
+
+> 状态：**TEST HARNESS FIX STAGED / SEMANTICS UNCHANGED**
+
+- CI 证明三平台的 Ruff lint、format 和 mypy 均通过；测试收集暴露出 `scripts/` 不是可导入包。
+- 回归测试改为通过公开 CLI 子进程调用只读验证器，覆盖真实命令入口，同时不改变 v6 数据或校验规则。
+
+## 2026-09-08 · GT-H3R2 v6 formatter parity correction
+
+> 状态：**FORMAT FIX 2 STAGED / SEMANTICS UNCHANGED**
+
+- CI formatter 又指出验证器调用和 v6 回归测试中的可折叠表达式未按 Ruff 0.16.4 输出。
+- 本次仍只同步 formatter 的确定性排版结果；数据字节、哈希、审计和治理边界不变。
+- 因修改了 `scripts/` 验证器，继续在同一提交记录 DEVLOG。
+
+## 2026-09-08 · GT-H3R2 v6 verifier format gate correction
+
+> 状态：**FORMAT FIX STAGED / SEMANTICS UNCHANGED**
+
+- 首轮 v6 提交的 CI 已通过 Ruff lint，格式门发现只读验证器的三个集合推导排版未按仓库 Ruff formatter 规范输出。
+- 本次仅按 CI 给出的 formatter 结果调整排版；v5/v6 数据、计划、carry-forward、审计台账与哈希均不变。
+- 该提交继续遵守 DEVLOG 同提交记录要求；下一轮 CI 需重新跑完整三平台门禁。
+
+## 2026-09-08 · GT-H3R2 v6 candidate governed build
+
+> 状态：**V6 CANDIDATE STAGED / 50 条 AUDIT PASS / 110 CARRY-FORWARD ELIGIBLE / 15 条新增 Human Review PENDING / ACTIVE STILL v5 / NOT SEALED**
+
+- 根据独立 Reviewer checkpoint 的授权，先修正 600382 的简称：官方事件是“广东明珠 → *ST广珠”，并同步到候选池、v6 truth_source 与审计定位；v6 生成内容已统一为官方简称。
+- 以不可变 v5（v5-candidate-20260907 / SHA256 5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c）为唯一源，通过显式 15 条 DROP + 15 条 ADD + 110 条 KEEP plan 构建 v6-candidate-20260908；v5 数据、v4/v5 hash 未改。
+- v6 重算通过：125 行、50 条 ST_TRANSITION、38 ADD / 12 REMOVE、无重复 ST structural identity；非 ST 75 条 review identity 未变。
+- v5→v6 ledger 按 review_identity_hash 实际重算为 110 eligible / 15 not eligible；110 只是当前 15-for-15 方案的 sanity check，不是硬编码门槛。
+- 50 条审计台账已重绑 v6 exact ST set，全部 PASS，PRE/EFFECTIVE 两侧均为已复核官方来源定位；15 条新增/替换行仍是 COMPILED 且需要新的 Human Review。
+- v6 versioned artifacts 已推送，但 truth_manifest.json 活动指针仍是 v5；未运行 review.py，未写入 REVIEWED provenance，未解除 GT-H3B 或正式发布阻塞。
+
+下一步：运行 final-head/current-main 三平台 CI，随后交回独立 Reviewer 做 v6 closure；任一新增 Human Review 或独立复核不通过，继续保持 v6 非 ACTIVE。
+
+## 2026-09-08 · GT-H3R2 15 条真实替换候选池
+
+> 状态：**DRAFT CANDIDATE POOL / 35 条 PASS / 15 条 INVALID / v5 IMMUTABLE / v6 NOT PUBLISHED / PUBLICATION BLOCKED**
+
+- 针对 15 条 `INVALID_ST_LEVEL_CHANGE`，从官方 CNINFO 直链 PDF 中筛选并完整读取了 15 个新的 ST 加帽候选；每份材料 HTTP 200，正文同时给出代码、有效日、普通简称与 `*ST` 简称。
+- 候选见 `docs/golden/gt_h3/remediation/GT_H3R2_REPLACEMENT_CANDIDATES.md`；全部标记为 `PENDING_INDEPENDENT_REVIEW`，开发者读取不等于独立 Reviewer 批准。
+- 原 15 条无效行没有改判、没有修改 v5；当前仍须“移出无效源行 + 引入真实候选”，保持 50 条 ST_TRANSITION 与 38 ADD / 12 REMOVE，并在 v6 阶段重新计算迁移关系。
+- 本轮只登记官方 URL 与正文定位，不上传原始 PDF bytes，不保存账号、Token、IP 或密码；未生成 v6，未运行 `review.py`，未解除 GT-H3B/正式发布门。
+
+下一步：请独立 Reviewer 实际打开 15 份官方原文并逐条填写 APPROVE/REJECT/NEED_MORE_EVIDENCE；closure 后再编制带 lineage 的 v6 DROP/ADD/REPLACE 计划，并重跑 125 总量、唯一性、其他事件语义和三平台 CI。
+
+## 2026-09-08 · GT-H3R2 10 条官方原文补证闭环
+
+> 状态：**35 条官方双核 PASS / 15 条语义无效 / 0 条待补证 / PUBLICATION BLOCKED / v5 IMMUTABLE**
+
+在不改写 v5 的前提下，已对此前 10 条待补证项完成再次取证，并把可读取的官方全文定位写入独立台账：
+
+- 600077、601258、600466、600543、688500（ADD）和 600213 的发行人公告已从 CNINFO 官方全文取得；每条原文同时给出代码、有效日和简称变更，直接支持 false -> true。
+- 603963 由有效日前官方年报与后续官方风险状态披露互证；603363、688282 由有效日前官方年报与上交所正式公告互证；688500（REMOVE）由有效日前官方材料与上交所正式撤销公告互证。
+- 10 条已从 NEED_MORE_EVIDENCE 改为 transition_valid=true、audit_status=PASS；台账现为 35 条 PASS、15 条 INVALID_ST_LEVEL_CHANGE、0 条待补证。
+- 15 条语义无效仍未被“补证”掩盖：它们是 ST 层级变化或其他风险层级变化，必须真实替换/删改；因此没有生成 v6、没有修改 review.py、没有解除 GT-H3B 或正式发布阻塞。
+- 本轮只在 GitHub 保存官方 URL 与页码/正文定位，不上传原始文件 bytes，也不保存任何账号、Token、IP 或密码。
+
+下一步：由独立 Reviewer 逐案复开 35 条 PASS 与 15 条无效项；经 Reviewer closure 后，才能在不改 v5 的前提下设计真实替换事件、生成带 lineage 的 v6 candidate，并重跑 125 总量、身份唯一性、carry-forward、其他事件语义和三平台 CI。
+
+## 2026-09-08 · GT-H3R2 官方原文补证与语义复核推进
+
+> 状态：**25 条双核 PASS / 15 条语义无效 / 10 条待补证 / PUBLICATION BLOCKED / v5 IMMUTABLE**
+
+在不改写 v5 的前提下，继续对 50 条 ST_TRANSITION 的 sidecar 官方材料逐案打开并读取全文：
+
+- 14 条 ADD 和 11 条 REMOVE 已补齐 pre/effective 两侧官方 source_ref 与页码或正文定位，台账标记为 PASS。
+- 300506（2024-04-29）通过官方原文确认是既有其他风险警示上叠加退市风险警示，新增为第 15 条 INVALID_ST_LEVEL_CHANGE；没有把层级变化伪装成 false→true。
+- 10 条仍未闭环：6 条 SSE static ADD 受反爬挑战阻断，3 条 SSE 共用公告只给出 effective 侧，1 条 STAR_ST_REMOVE 受同类原文取得问题阻断。
+- 25 条 PASS 仅表示本轮原文扫描完成，仍需独立 Reviewer 最终逐条复开；没有生成 v6、没有修改 review.py、没有解除 GT-H3B 或正式发布阻塞。
+- 所有新增材料只在本地临时目录用于核验；GitHub 仅保存官方 URL 与定位，不保存原始文件 bytes，也不保存任何账号、Token 或连接参数。
+
+后续：先为 10 条补齐官方双核证据；再对 15 条无效事件做真实替换/删改，保持 ST distinct、ADD/REMOVE 双向配额与 125 条总量，生成带 lineage 的 v6 candidate，最后完成独立 Reviewer closure 与三平台 CI。
+
+## 2026-09-07 · GT-H3R2 Ruff line-length 配置修正
+
+> 状态：**按 CI 的 line-length=100 重新格式化 / 无语义变更**
+
+首轮格式修正使用了 Ruff 的默认输入格式，未显式绑定仓库的 line-length=100，导致 CI 仍将 4 个 Python 文件判为可重排。本次按 pyproject.toml 与 uv.lock 中的实际配置重新生成格式；仅恢复配置要求的紧凑布局，不改变代码逻辑、台账结果、v5 或 v6 状态。
+
+## 2026-09-07 · GT-H3R2 CI 格式修正
+
+> 状态：**Ruff 0.16.4 格式修正 / 无语义变更**
+
+针对 PR #23 首轮三平台 CI 在 Ruff format check 阶段暴露的格式差异，已按仓库锁定版本重新格式化本次新增/修改的 Python 文件。该提交不改变审计规则、台账判定、v5 内容或 v6 发布状态；DEVLOG 与管理文档在同一提交同步更新。
+
+## 2026-09-07 · GT-H3R2 ST_TRANSITION 全量语义审计台账
+
+> 状态：**台账已建立 / 14 条已识别无效或层级变化 / 36 条待补证 / v5 IMMUTABLE / v6 NOT PUBLISHED**
+
+根据主线最新的 GT-H3R2 要求，本次先完成可审计的全量 inventory，不把不完整证据包装成通过：
+
+- 逐条覆盖 v5 的 50 条 ST_TRANSITION，绑定 provider symbol、event subtype、effective date 与源案例 ID。
+- 14 条按 pre=true, effective=true 记录为 INVALID_ST_LEVEL_CHANGE：最新独立复核提供的 12 条，加本轮官方原文扫描识别的 300064、000616。
+- 其余 36 条记录为 NEED_MORE_EVIDENCE，缺少 effective 前官方二元状态材料即 fail closed；transition_valid=false 不能被解释为已证伪，必须查看 audit_status。
+- 新增独立校验模块、命令行检查器和回归测试；目标版本达到 v6 时，candidate rebuild 会拒绝缺失/不完整的 ST 审计台账。
+- 没有改写 v5、没有生成 v6、没有触碰 review.py 或 GT-H3B 状态。完整台账与阻塞原因见 docs/golden/gt_h3/remediation/GT_H3R2_ST_TRANSITION_AUDIT.md。
+
+阻塞是实质性的：36 条需要逐条取得并打开官方一手材料证明 pre-state；部分 SSE static PDF 直取被反爬挑战拦截，不能用挑战页或搜索摘要代替原文。下一步只能补齐官方双核证据后，制作带 lineage 的干净 v6 candidate，并重新核对 125 总量、其他事件语义、carry-forward 身份和三平台 CI。
+
 ## 2026-09-07 · GT-H3R v5 12 条真实人工复审结果接收
 
 > 状态：**12/12 APPROVE RECEIVED / 113 CARRY-FORWARD CONFIRMED / LEGACY 50 NEUTRALIZED / FINAL HUMAN MARKER PENDING / NOT SEALED**

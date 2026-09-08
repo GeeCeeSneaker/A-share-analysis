@@ -1,3 +1,113 @@
+## DM-20260908-005 · GT-H3R2 v6 JSONL 载荷修正
+
+- **Type**：C1 — governed data serialization correction
+- **Date**：2026-09-08
+- **Status**：FIX STAGED / ACTIVE STILL v5 / PUBLICATION BLOCKED
+- **Finding**：CI 发现新提交的 v6 dataset、ST audit 和 carry-forward JSONL 行间错误带有逗号，第二行无法被 JSONL 解析。
+- **Correction**：三份 JSONL 已恢复为逐行独立 JSON 对象；v6 dataset SHA256 已重算并同步到 manifest、只读验证器和回归测试。
+- **Boundary**：这只是提交载荷格式修正，不改变 v5 immutable、15 条 DROP/ADD、50 条审计 PASS、110/15 重算或 Human Review 门。
+
+## DM-20260908-004 · GT-H3R2 v6 candidate 治理重建
+
+- **Type**：C1 — governed candidate rebuild and transition-audit closure
+- **Date**：2026-09-08
+- **Status**：V6 CANDIDATE STAGED / ACTIVE STILL v5 / PUBLICATION BLOCKED / PENDING HUMAN REVIEW
+- **Trigger**：Reviewer checkpoint 已确认候选事件身份可用，并要求修正 600382 简称、重算 v5→v6 carry-forward 后再构建 v6。
+- **Correction**：600382 官方简称变化固定为“广东明珠 → *ST广珠”；该文本已统一为官方简称。
+- **Build**：从 immutable v5-candidate-20260907 通过显式 110 KEEP、15 DROP、15 ADD 计划生成非 ACTIVE v6-candidate-20260908；旧 15 行未改判，新增 15 行带 accounting-only lineage。
+- **Verification**：重算 125 行、50 条 ST_TRANSITION、38/12、无重复 structural identity、其他 75 行 review identity 不变；v5→v6 ledger 实际得到 110 eligible / 15 not eligible，110 只是当前方案的 sanity check，不是硬编码门槛。
+- **Audit**：50 条 v6 exact ST identity 全部 PASS，PRE/EFFECTIVE 两侧均绑定已复核官方来源和 locator。
+- **Review boundary**：15 条新增/替换行保持 COMPILED、不得自动 carry-forward，需新的 Human Review；不运行 review.py、不推进 GT-H3B、不修改 ACTIVE 指针。
+
+**Next gate**
+
+1. final-head/current-main 三平台 CI；
+2. 独立 Reviewer 对 v6 audit 和 15 条增量做 closure；
+3. 新增 15 条 Human Review 完成后，才可评估 review.py / GT-H3B。
+
+## DM-20260908-003 · GT-H3R2 15 条替换候选池准备
+
+- **Type**：C1 — evidence-backed replacement candidate planning
+- **Date**：2026-09-08
+- **Status**：IN_PROGRESS / PUBLICATION_BLOCKED / PENDING_INDEPENDENT_REVIEW
+- **Trigger**：GT-H3R2 全量台账已关闭 10 条补证项，但仍保留 15 条 `INVALID_ST_LEVEL_CHANGE`；这些行不能通过补证修复。
+- **New artifact**：`docs/golden/gt_h3/remediation/GT_H3R2_REPLACEMENT_CANDIDATES.md`，提供 15 个新的 `ST_ADD/STAR_ST_ADD` 候选及官方 CNINFO PDF 直链、页码定位和独立复核清单。
+- **Evidence boundary**：15 份直链均 HTTP 200、为官方 PDF 且已完成全文提取；GitHub 只保存 URL/定位，不保存原始 bytes，也不保存任何账号或连接信息。
+- **Governance**：候选池是草案，不是 Golden/v6，不是 Reviewer closure；不得把旧无效行改为 PASS，不得降低 ST_TRANSITION 配额。
+- **Next gate**：独立 Reviewer 逐案复核候选后，项目 Owner 才能编制 15 条真实 DROP/ADD/REPLACE 的 v6 plan；随后必须重新检查 125 总量、50 条 ST_TRANSITION、38/12 配额、唯一性、其他事件语义和 v5→v6 lineage，再决定是否进入 `review.py`/GT-H3B/发布门。
+
+## DM-20260908-002 · GT-H3R2 10 条补证闭环与发布门状态
+
+**状态**：IN_PROGRESS / EVIDENCE_CLOSED / PUBLICATION_BLOCKED / PENDING_REVIEW
+
+**范围**：PR #23 的 GT-H3R2 独立审计台账；v5-candidate-20260907 保持 immutable。
+
+**本次完成**
+
+- 10 条此前 NEED_MORE_EVIDENCE 已完成官方全文补证，台账由 25 PASS / 10 待补证更新为 35 PASS / 0 待补证。
+- 15 条 INVALID_ST_LEVEL_CHANGE 保持原结论：它们是 ST→*ST、*ST→ST 或退市风险层级叠加/移除，不是二元 ST false↔true 事件；没有把“有证据”误写成“语义合格”。
+- 新增材料均为可读取的官方第一方全文：CNINFO 发行人公告、上交所正式公告和官方年报；GitHub 只登记 URL 与页码/正文定位，不上传原始 bytes，也不写入任何账号、Token、IP 或密码。
+- v5、review.py、GT-H3B、正式发布、Data Sufficiency 和 Provider verdict 均未触碰；`--require-clean` 仍应因 15 条语义无效而 fail closed。
+
+**独立 Reviewer 需完成**
+
+1. 逐条复开 35 条 PASS 的 pre/effective 材料，确认代码、日期、简称和二元状态。
+2. 逐条复核 15 条 INVALID_ST_LEVEL_CHANGE，决定真实替换、删改或保留为非 ST_TRANSITION；不得以台账改判代替 Golden 数据变更。
+3. 保持 ST distinct、ADD/REMOVE 双向配额和 125 条总量；替换后的事件必须重新取得第一方全文并保留 lineage。
+4. Reviewer closure 后，再生成 v6 candidate，重跑 125 条总量、v5→v6 review_identity_hash carry-forward（当前 15-for-15 方案预期 110，由校验重算）、身份唯一性、其他事件语义和三平台 CI；未完成前不合并 PR #23。
+
+## DM-20260908-001 · GT-H3R2 官方原文补证结果入账
+
+**状态**：IN_PROGRESS / PUBLICATION_BLOCKED / PENDING_REVIEW
+
+**范围**：PR #23 的 GT-H3R2 独立审计台账；v5-candidate-20260907 保持 immutable。
+
+**本次确认**
+
+- 50 条 ST_TRANSITION 中，14 条 ADD、11 条 REMOVE 已完成官方原文双核定位并标记 PASS。
+- 15 条标记为 INVALID_ST_LEVEL_CHANGE：原独立复核 12 条、300064、000616，以及本轮从官方原文确认的 300506。
+- 10 条保持 NEED_MORE_EVIDENCE：6 条 SSE static ADD 的全文取得受反爬挑战影响，3 条 SSE 共用公告缺 pre-state，1 条 STAR_ST_REMOVE-688500 仍缺完整闭环。
+- 25 条 PASS 不等同于最终 Reviewer 批准；审计发布门仍 fail closed，v6、review.py、GT-H3B 和正式发布仍 blocked。
+- 本次仅更新独立 JSONL/说明与治理记录，未修改 v5；原始官方文件未上传 GitHub，未写入账号、Token、IP 或密码。
+
+**下一步要求**
+
+补齐 10 条的 pre/effective 官方双核证据；对 15 条无效事件做真实替换/删改并保留 lineage；重新验证 50 条结构、ADD/REMOVE 双向配额、125 总量、carry-forward 身份、其他事件语义和三平台 CI；完成独立 Reviewer closure 后再讨论合并。
+
+## DM-20260907-008 · GT-H3R2 Ruff line-length 配置对齐
+
+**状态**：修复 CI format check 的配置偏差，语义与治理状态不变。
+
+PR #23 首轮格式提交使用了默认 stdin 行宽，CI 使用仓库的 line-length=100，导致 4 个 Python 文件出现相反的重排结果。本次显式采用仓库配置重新格式化，并在同一提交更新 DEVLOG 与管理文档；审计台账、候选门和 v5 immutable 状态不变。
+
+## DM-20260907-007 · GT-H3R2 Python 格式修正
+
+**状态**：Ruff 格式门修正，语义与治理状态不变。
+
+PR #23 首轮 CI 的 lint 已通过，但 Ruff format check 在三套矩阵均失败。本次按 uv.lock 锁定的 Ruff 0.16.4 重新格式化新增审计模块、检查器、测试及 candidate.py，并在同一提交更新 DEVLOG 与本管理文档。v5、GT-H3R2 台账结论和 fail-closed 状态均未改变。
+
+## DM-20260907-006 · GT-H3R2 ST_TRANSITION 全量语义审计台账与 fail-closed 门
+
+**状态**：GT-H3R2 AUDIT INVENTORY COMPLETE / PUBLICATION BLOCKED / v5 IMMUTABLE
+
+**基线**：主线 ab4911d；v5 v5-candidate-20260907 不改写，50 条 ST_TRANSITION 仅建立独立审计台账。
+
+本次落地：
+
+1. 新增 docs/golden/gt_h3/remediation/GT_H3R2_ST_TRANSITION_AUDIT.jsonl，逐条覆盖 50 条 ST_TRANSITION，明确 pre_effective_is_st、effective_is_st、双侧官方证据定位、transition_valid 和判断。
+2. 新增 src/ashare_state/spike/st_transition_audit.py，校验候选身份精确覆盖、ST_ADD 的 false→true、ST_REMOVE 的 true→false、双侧官方一手证据和 fail-closed 发布条件。
+3. 新增 scripts/golden/gt_h3r2_transition_audit.py 与测试，专门覆盖 ST→*ST 不得伪装成 ST_ADD、*ST→ST 不得伪装成 ST_REMOVE、缺证据失败和覆盖绑定。
+4. 将候选发布流程接入门控：目标版本达到 v6 时，缺少审计台账或审计门不通过即拒绝发布；v5 路径保持不变。
+
+台账结果：50 条中 14 条已识别为层级变化而非二元 ST_ADD，36 条仍缺 effective 前官方状态证据，当前 transition_valid=true/PASS=0，因此没有生成 v6、没有修改 review.py、没有解除 GT-H3B/正式发布阻塞。部分 SSE static PDF 仍受交易所反爬挑战影响，不能把挑战页当作原文；需补齐真实全文并由独立 Reviewer 逐案关闭。
+
+复核命令：
+
+    python scripts/golden/gt_h3r2_transition_audit.py
+    python scripts/golden/gt_h3r2_transition_audit.py --require-clean
+
+下一步验收：50 条台账全部完成官方双核复核；无效条目用独立一手证据做真实替换/删改；维持 125 总量、ST distinct identity、ADD/REMOVE 双向配额、v5→v6 review_identity_hash carry-forward（当前 15-for-15 方案预期 110，由校验重算） 只沿用未变身份；最后在 final-head/current-main 分别跑 Windows 3.14、Windows 3.12、Ubuntu 3.14 CI，并由独立 Reviewer 关闭后才能讨论合并。
+
 ## DM-20260907-005 · GT-H3R v5 12 条真实人工复审结果接收
 
 **状态**：`12/12 APPROVE RECEIVED / 113 CARRY-FORWARD CONFIRMED / LEGACY 50 NEUTRALIZED / FINAL HUMAN MARKER PENDING / NOT SEALED`
