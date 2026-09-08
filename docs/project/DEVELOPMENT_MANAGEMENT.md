@@ -5009,3 +5009,5 @@ Git 历史负责保存过去版本。
 - **P0 CI correction 3**：run #386 仅发现测试列表推导的 Ruff formatter 差异；本同步提交按 formatter 输出收敛，功能和治理边界不变。
 
 - **P0 CI correction 4**：run #387 的 Ruff lint 已通过；formatter 仅报告 candidate.py 的 4 处空行规范差异，本同步提交按机器输出收敛，功能和治理边界不变。
+
+- **P0 CI correction 5**：Ubuntu run #388 暴露固定 manifest SHA 与当前仓库字节不同，已同步为当前 v4/v5/v6 文件的实测 SHA；重复 ST identity 测试改为构造真实重复结构身份，仍保持 fail-closed。版本化数据与 ACTIVE 边界不变。

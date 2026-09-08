@@ -197,7 +197,9 @@ def test_duplicate_st_identity_fails_closed() -> None:
     st_cases = [case for case in cases if case.event_class == "ST_TRANSITION"]
     duplicate = replace(
         st_cases[1],
+        provider_symbol=st_cases[0].provider_symbol,
         event_effective_date=st_cases[0].event_effective_date,
+        event_subtype=st_cases[0].event_subtype,
     )
     mutated = [
         duplicate if case.golden_case_id == duplicate.golden_case_id else case for case in cases

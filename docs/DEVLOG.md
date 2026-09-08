@@ -3037,3 +3037,7 @@
 ### P0 CI correction 4
 
 - run #387 的 Ruff lint 已通过；formatter 仅报告 candidate.py 的 4 处空行规范差异，本修正按机器输出收敛，未改变 promotion 语义或 ACTIVE 边界。
+
+### P0 CI correction 5
+
+- Ubuntu run #388 发现 promotion 常量记录的 manifest SHA 与仓库当前精确字节不一致；已按当前 v4/v5/v6 manifest 重新计算并更新固定常量。同步修正重复 ST identity 对抗测试，使其真正复用同一 `(provider_symbol, event_effective_date, event_subtype)` 身份；未改变 versioned dataset、manifest 或 ACTIVE 指针。
