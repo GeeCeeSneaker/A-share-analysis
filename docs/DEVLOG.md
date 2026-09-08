@@ -3371,3 +3371,10 @@
 
 - CI run 34208481864 仅报告唯一 source 计数集合推导的 Ruff formatter 差异；已按机器输出收敛为确定性单行。
 - 不改变进度日志内容、官方来源、原始 body、固定超时、Golden bytes、ACTIVE 或 seal 边界；受控 run 34208481906 使用旧提交，待新提交重新执行。
+
+## 2026-09-08 · GT-H3B source progress lint correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run 34208659859 的 Ruff E501 报告指出唯一 source 计数单行超过 100 列；已拆成命名集合与长度计算，保持 formatter 和 lint 同时稳定。
+- 不改变 source progress telemetry、固定超时、官方来源、原始 body、Golden bytes、ACTIVE 或 seal 边界；受控 run 34208659861 使用旧提交，待重新执行。

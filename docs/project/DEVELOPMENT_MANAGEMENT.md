@@ -5472,3 +5472,13 @@ Git 历史负责保存过去版本。
 
 - 按 Ruff formatter 机器输出收敛 source progress telemetry 的唯一计数表达式；不改变抓取、证据、Golden 或 seal 逻辑。
 - 受控 run 34208481906 使用旧提交，待并发策略取消后重新执行。
+
+## DM-CR-20260908-148 · GT-H3B source progress lint correction
+
+**Type**：C0 — controlled execution tooling lint correction
+**Date**：2026-09-08
+**Status**：IMPLEMENTED / RETRY PENDING
+**Evidence**：PR #25；CI run 34208659859。
+
+- 按 Ruff E501 报告拆分 source count 表达式，消除 107 列超长行；不改变抓取顺序、日志、来源校验或 Golden/seal 边界。
+- 受控 run 34208659861 使用旧提交，待并发策略取消后由修正版重新执行。
