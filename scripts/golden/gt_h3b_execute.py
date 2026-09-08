@@ -257,7 +257,10 @@ def _fetch_pdf_with_browser(
             )
             try:
                 page = context.new_page()
-                page.on("response", responses.append)
+                def record_response(response: object) -> None:
+                    responses.append(response)
+
+                page.on("response", record_response)
                 # PDF downloads can abort page.goto; inspect captured responses below.
                 with suppress(PlaywrightError, PlaywrightTimeoutError):
                     page.goto(

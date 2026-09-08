@@ -5274,3 +5274,13 @@ Git 历史负责保存过去版本。
 - 用 `contextlib.suppress` 替换 Playwright 导航的等价异常吞噬写法，保持浏览器取证流程和 fail-closed 边界不变。
 - 受控 run `34200191050` 尚未形成可合并回执；待其完成后结合本次修正版重新核对。
 
+## DM-CR-20260908-128 · GT-H3B browser response callback correction
+
+**Type**：C1 — controlled execution tooling correction  
+**Date**：2026-09-08  
+**Status**：FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；controlled run `34200191050` 的 traceback。  
+
+- Playwright 事件 API 不能直接接收内建 `responses.append`；改用具名回调以完成响应收集。
+- 该修正不放宽来源或证据规则，也不改变任何 Golden bytes；run `34200348385` 将由并发取消策略终止并重新执行。
+

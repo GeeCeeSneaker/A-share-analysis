@@ -3233,3 +3233,11 @@
 - CI run `34200190899` 的三平台 Ruff lint 均只报告 Playwright 导航异常的 `SIM105`；已按机器建议改用 `contextlib.suppress`。
 - 不改变浏览器响应捕获、HTTP 200、官方 host、大小上限、PDF magic bytes 或 fail-closed 规则；受控 run `34200191050` 的真实执行结果仍待核验。
 
+## 2026-09-08 · GT-H3B browser response callback correction
+
+> 状态：**BROWSER FALLBACK FIX STAGED / RETRY PENDING**
+
+- 受控 run `34200191050` 在 Playwright fallback 注册响应监听时因内建方法绑定限制退出，尚未读取任何证据响应；无成功回执、evidence 或 REVIEWED seal。
+- 将 `responses.append` 改为显式回调函数，保持仅捕获网络响应 body 的设计；不改变 HTTP 200、官方 host、大小上限、PDF magic bytes 或 fail-closed 规则。
+- 修正版提交会取消 run `34200348385` 并重新触发受控流程；结果仍需实际日志核验。
+
