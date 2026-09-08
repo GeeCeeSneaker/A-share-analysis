@@ -3085,3 +3085,9 @@
 - GitHub Contents API 逐文件写入造成两个已完成的 P1 代码提交未能与 DEVLOG 同 commit：3c66d1118835266bd7d608b6af460bf91a03c57c（review rollback implementation）和 d07d9628cb69b60f4d951033b12d0bc5dc00e8e5（Ruff correction）。
 - 按仓库 CI V2.3 规则，将这两个完整 SHA 加入 CI 的一次性 GRANDFATHERED 定点豁免；本记录与豁免清单在同一多文件 commit 中提交。豁免不适用于任何后续提交，未改写历史。
 - 后续代码/测试治理记录将使用 Git 数据 API 的多文件 commit，确保代码与 DEVLOG 同 commit；本次不改变功能、Golden bytes 或 ACTIVE。
+
+
+### GT-H3B CI exception comment-count correction（2026-09-08）
+
+- CI 的 GRANDFATHERED 清单已从 5 个历史提交扩展为 7 个完整 SHA（新增 3c66d111 与 d07d9628 两个 P1 提交）；同步修正 workflow 注释中的数量和版本说明。
+- 该修改仅使豁免清单与已披露记录一致，不改变豁免范围、P0/P1 语义、Golden bytes 或 ACTIVE；本 commit 同时更新 DEVLOG，后续不再扩展豁免。

@@ -5061,3 +5061,14 @@ Git 历史负责保存过去版本。
 - 本条记录与 CI 豁免清单通过同一次多文件 Git 数据提交落盘；后续代码提交必须同时更新 DEVLOG，避免再次依赖豁免。
 - 该治理修正不改变 GT-H3B P0/P1 语义、v4/v5/v6 bytes、ACTIVE、真实 evidence 或 review seal。
 
+
+
+## DM-CR-20260908-110 · GT-H3B CI exception comment-count correction
+
+**Type**：C0 — governance documentation consistency  
+**Date**：2026-09-08  
+**Status**：RECORDED / CI_PENDING / PENDING_REVIEW  
+**Trigger**：GRANDFATHERED 清单已包含 7 个已披露 SHA，但 CI 注释仍写 5 个，造成治理文案不一致。
+
+- 将 workflow 注释同步为 7 个、V2.3/V2.5 两次定点豁免；不增加新的 SHA，不改变豁免范围和历史。
+- 本纯文案修正与 DEVLOG 在同一多文件 commit 中提交；后续不再扩展豁免。
