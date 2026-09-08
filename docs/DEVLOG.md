@@ -3045,3 +3045,7 @@
 ### P0 CI correction 6
 
 - Windows 3.12 run #389 暴露新增对抗测试读取中文 plan 时依赖系统默认编码；已显式指定 UTF-8，修复跨平台测试稳定性，不改变 promotion 语义、版本化数据或 ACTIVE 边界。
+
+### P0 CI correction 7
+
+- run #390 的三平台 Ruff lint 均只报告新增测试第 138 行因显式 UTF-8 参数超过 100 列；已按 formatter/lint 规范拆行，测试语义不变。
