@@ -3302,3 +3302,10 @@
 - CI run `34202354798` 的 Ruff lint 只报告 CDP Fetch 超限异常文本超出行长；已缩短为等义表达。
 - 不改变大小上限判断、HTTP 200/官方 host/PDF magic bytes 校验或受控执行边界；run `34202354818` 的 Fetch 实际结果仍待核验。
 
+## 2026-09-08 · GT-H3B CDP Fetch error-text lint correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run `34202354798` 的后续检查仍只报告 CDP Fetch 超限异常文本行长；已缩短提示，不改变 MAX_SOURCE_BYTES 判断或 fail-closed 行为。
+- 不改变 Fetch response-stage、HTTP 200、官方 host、`application/pdf`、`%PDF-` 校验或证据发布边界；受控 run `34202515066` 尚待核验。
+

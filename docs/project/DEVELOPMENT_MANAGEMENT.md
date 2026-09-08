@@ -5368,3 +5368,13 @@ Git 历史负责保存过去版本。
 - 缩短 CDP Fetch 超限错误文本，保留原有 MAX_SOURCE_BYTES 判断和 fail-closed 行为。
 - 不改变浏览器取证、source contract、Golden bytes、ACTIVE 或 seal 边界；当前仍待受控执行结果。
 
+## DM-CR-20260908-138 · GT-H3B CDP Fetch error-text lint correction
+
+**Type**：C0 — controlled execution tooling lint correction  
+**Date**：2026-09-08  
+**Status**：LINT FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；CI run `34202354798` 的 Ruff E501 报告。  
+
+- 缩短 CDP Fetch 超限提示，保留大小上限判断；不改变浏览器取证、source contract、Golden bytes、ACTIVE 或 seal 边界。
+- 当前受控执行结果仍待核验。
+
