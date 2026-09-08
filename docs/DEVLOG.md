@@ -3378,3 +3378,10 @@
 
 - CI run 34208659859 的 Ruff E501 报告指出唯一 source 计数单行超过 100 列；已拆成命名集合与长度计算，保持 formatter 和 lint 同时稳定。
 - 不改变 source progress telemetry、固定超时、官方来源、原始 body、Golden bytes、ACTIVE 或 seal 边界；受控 run 34208659861 使用旧提交，待重新执行。
+
+## 2026-09-08 · GT-H3B source progress formatter correction 2
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run 34208776223 仅报告 source progress 唯一绑定集合的 Ruff formatter 差异；已按 formatter 保持内部推导单行并满足 E501。
+- 不改变 source 进度日志、固定超时、官方原始 bytes、Golden bytes、ACTIVE 或 seal 边界；受控 run 34208776209 使用旧提交，待修正版重新执行。

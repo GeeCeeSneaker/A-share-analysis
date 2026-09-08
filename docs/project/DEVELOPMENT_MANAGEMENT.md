@@ -5482,3 +5482,13 @@ Git 历史负责保存过去版本。
 
 - 按 Ruff E501 报告拆分 source count 表达式，消除 107 列超长行；不改变抓取顺序、日志、来源校验或 Golden/seal 边界。
 - 受控 run 34208659861 使用旧提交，待并发策略取消后由修正版重新执行。
+
+## DM-CR-20260908-149 · GT-H3B source progress formatter correction 2
+
+**Type**：C0 — controlled execution tooling formatting correction
+**Date**：2026-09-08
+**Status**：IMPLEMENTED / RETRY PENDING
+**Evidence**：PR #25；CI run 34208776223。
+
+- 按 Ruff formatter 输出收敛 source_bindings 集合推导，且保留 E501 安全边界；不改变抓取与证据逻辑。
+- 受控 run 34208776209 使用旧提交，待并发策略取消后重新执行。
