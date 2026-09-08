@@ -2997,3 +2997,27 @@
 - Two later ADR-only commits, `eceb99468bd28a37a7532b723f092a9d2f8bd469` (ADR-026) and `4ae9151979287a8a4e86c5f95906b88546c993e3` (ADR index), also predated this management synchronization. They are now explicitly included in the same one-time contract-path grandfathered set, together with capabilities commit `4f83f7ac3a19327e9f724c9730cbfbfef03de38b`.
 - This is a disclosed historical exception, not a relaxation of the rule: future `docs/adr/` or contract-path commits must update `docs/project/DEVELOPMENT_MANAGEMENT.md` in the same commit. No history was rewritten.
 - Production account / formal AmazingData Spike / Data Sufficiency Matrix remain BLOCKED or NOT_TESTABLE and are not marked complete.
+
+---
+
+## 2026-09-08 · GT-H3B-P0 safe promotion implementation
+
+**Status**：IN_PROGRESS / PENDING_REVIEW
+
+**授权基线**：GT-H3R2 已由独立 Reviewer 关闭；Owner 授权继续推进 GT-H3B。v6 candidate v6-candidate-20260908 的既定 dataset SHA256 为 0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343。本批次不改变 v5/v6 versioned bytes，也不在代码提交中推进 ACTIVE。
+
+**完成事项**：
+
+- 在 scripts/golden/candidate.py 增加 promote-existing 窄范围命令：只接受既定 v6 版本，重新读取 Golden loader、v4/v5/v6 固定字节、manifest 统计、完整重建 plan、110/15 carry-forward 和 50/50 ST audit，所有检查通过后才用 staging + atomic replace 推进 ACTIVE。
+- promotion 对错误 ACTIVE、错误/篡改 v4/v5/v6 bytes、plan/carry/audit 漂移、重复 ST identity 和 pointer 写入失败保持 fail closed；已存在完全相同 v6 ACTIVE 时幂等 no-op。
+- 新增 tests/integration/test_gt_h3b_p0_promotion.py 覆盖成功/幂等、不可变文件篡改、错误 ACTIVE、plan 漂移、carry-forward 漂移、49/50 audit、重复 ST identity 与 pointer 写失败。
+
+**安全边界**：
+
+- 本批次仅实现和验证 promotion path；不运行 review.py，不创建 REVIEWED provenance，不获取/提交证据 bytes，不执行 GT-H3B-P1 seal。
+- v5 ACTIVE、v4-v6 历史 versioned 文件仍保持 immutable；正式生产账号、Token、IP、密码和 Provider-under-test 输出不进入仓库或 CI。
+
+**验证与后续**：
+
+- CI 需通过 Windows 3.14、Windows 3.12、Ubuntu 3.14、Ruff、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates。
+- 本批次经独立 Reviewer 审阅并合并后，才在受控环境运行 promote-existing；随后进入 GT-H3B-P1 evidence-byte materialization。

@@ -4986,3 +4986,18 @@ Git 历史负责保存过去版本。
 - **Secret boundary**：Username, password, Token, host literals and port values were not written to GitHub, repository configuration, logs, DEVLOG, Issue, PR or this record. `configs/production_account.yaml` remains empty.
 - **Interpretation**：Network reachability is not authentication, entitlement, production identity, data correctness or Provider approval. Formal verdict and Data Sufficiency Matrix remain unassessed.
 - **Next input**：Install the Galaxy-provided official wheels in the controlled environment, record their fingerprints, run provider doctor, then execute one CLOSED PRODUCTION B1-B7 run with evidence closure and human review.
+
+---
+
+## Change Record: DM-CR-20260908-106
+
+- **Type**：C2 — GT-H3B-P0 existing-candidate promotion implementation
+- **Date**：2026-09-08
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Trigger**：GT-H3R2 independent final review closed; Owner authorized GT-H3B preparation in docs/design/A-share-analysis_GT-H3R2关闭与GT-H3B执行授权_20260908.md.
+- **Contract**：scripts/golden/candidate.py promote-existing validates the fixed v4/v5 baselines, exact existing v6 dataset/manifest bytes, Golden loader output, 125-row statistics, explicit v5→v6 plan reproduction, recomputed 110/15 carry-forward, and 50/50 transition audit before an atomic ACTIVE pointer move. It never rebuilds or overwrites versioned candidate bytes.
+- **Adversarial coverage**：Tests cover wrong/tampered v4-v6 bytes, wrong ACTIVE, plan set drift, carry-forward drift, 49/50 audit, duplicate ST identity, failed pointer write, and idempotent promotion. Failures assert the old ACTIVE pointer remains unchanged.
+- **Governance boundary**：v5 remains ACTIVE in this implementation PR; no review.py, REVIEWED provenance, evidence-byte commit, GT-H3B seal, Formal Production, Data Sufficiency, Provider verdict, or backfill is claimed.
+- **Affected paths**：scripts/golden/candidate.py; tests/integration/test_gt_h3b_p0_promotion.py; docs/DEVLOG.md; this management record.
+- **Tests**：P0 test suite and mandatory three-platform CI pending on the atomic implementation batch.
+- **Next**：Independent review of the P0 final head and current-main test-merge; after merge, controlled execution of promote-existing, then P1 evidence-byte materialization.
