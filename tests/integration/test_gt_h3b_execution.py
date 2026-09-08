@@ -408,3 +408,21 @@ def test_existing_seal_uses_strong_reviewed_verifier(monkeypatch, tmp_path):
         "project-owner",
         "manifest-hash",
     )
+
+
+def test_existing_seal_verifies_real_v7_corpus():
+    """Exercise the idempotent path against the committed sealed v7 corpus."""
+    module = _load_module()
+    repo_root = SCRIPT.parents[2]
+    receipt_path = repo_root / module.RECEIPT_RELATIVE
+
+    assert receipt_path.is_file()
+    receipt = module._read_json(receipt_path)
+    assert receipt["status"] == "SUCCEEDED"
+    assert receipt["format"] in {
+        "GT-H3B-CONTROLLED-EXECUTION-RECEIPT/v1",
+        "GT-H3B-CONTROLLED-EXECUTION-RECEIPT/v2",
+    }
+    assert receipt["phase_c"]["reviewed_version"] == "v7-reviewed-20260908"
+
+    module._verify_existing_seal(repo_root, receipt)

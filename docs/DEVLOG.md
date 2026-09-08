@@ -3521,3 +3521,18 @@
 
 - 生产 verifier 的 125-case guard 在 Ubuntu 3.14 中按预期拒绝了不完整输入；首轮新回归测试只构造 1 个 fake case，造成 1/1619 failure。
 - 回归夹具现已扩展为 125 个模拟 case ID，继续验证强校验委托和 receipt 摘要逐字段比对；Golden 数据集、证据 bytes、历史 receipt 未修改。
+
+## 2026-09-08 · Real v7 sealed-corpus offline integration coverage
+
+> 状态：按审阅建议补充真实 Golden 封印语料的离线幂等集成覆盖。
+
+- 新测试直接读取仓库内的 GT-H3B v1 receipt，并以真实仓库根目录调用 `_verify_existing_seal`；不使用 mock、不联网、不登录 Provider。
+- 测试实际重载 v7 ACTIVE、冻结 v6 合同、103 个证据引用、5 个复合 evidence bundle，并重跑四类 Golden gates；既有 Golden/evidence/receipt 字节未改。
+- Formal Production B1-B7 仍未执行；该测试仅证明本地封印验证链路，不产生 Provider GO/NO-GO 或 Data Sufficiency 结论。
+
+## 2026-09-08 · Real v7 sealed-corpus test formatting correction
+
+> 状态：已修正 PR #27 首轮 CI 的纯格式失败，等待重跑。
+
+- Ruff 指出真实 v7 集成测试顶层定义前缺少一个空行；仅修正 `tests/integration/test_gt_h3b_execution.py:412` 的格式。
+- 业务逻辑、Golden/evidence/receipt、运行边界均未改变；本条修复不联网、不登录 Provider。
