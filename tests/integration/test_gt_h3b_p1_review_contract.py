@@ -200,9 +200,7 @@ def test_review_seals_a_declared_evidence_bundle(tmp_path: Path) -> None:
     assert manifest.fully_reviewed
 
 
-def test_review_pointer_failure_rolls_back_new_outputs(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_review_pointer_failure_rolls_back_new_outputs(tmp_path: Path, monkeypatch) -> None:
     root = _make_v4_root(tmp_path)
     module = _load_review_module()
     sources = _sources(tmp_path)
@@ -228,8 +226,7 @@ def test_review_pointer_failure_rolls_back_new_outputs(
         }
         if index == 0:
             entry["bundle_sources"] = [
-                {"source_ref": source["source_ref"], "kind": source["kind"]}
-                for source in sources
+                {"source_ref": source["source_ref"], "kind": source["kind"]} for source in sources
             ]
         entries.append(entry)
     review_manifest.write_text(
