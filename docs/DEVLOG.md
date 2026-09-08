@@ -3123,3 +3123,12 @@
 
 - 最新三平台 CI 仅报告 `src/ashare_state/spike/evidence_bundle.py` 缺少 stdlib 与 local import 之间的分隔空行；已按 Ruff 机器输出修正。
 - 本次不改变官方 host allowlist、case-bound source contract、bundle 字节校验、Golden bytes、ACTIVE 指针或 REVIEWED seal 边界；需重新跑完整三平台 CI。
+
+
+## 2026-09-08 · GT-H3B P1.1 validation-order correction
+
+> 状态：**VALIDATION FIX STAGED / CI_PENDING / PENDING_REVIEW**
+
+- CI run `34188427123` 的首个完成平台报告 `1605 passed, 1 failed`：未知顶层 artifact kind 在新的 case-kind 交叉校验前被拦截，回归测试要求先得到既有的 allowlist 诊断。
+- 已把 review-request kind allowlist 校验前置到 contract boundary，并保留 fail-closed 的 case/source/kind 精确绑定；有效请求、官方 host allowlist、Golden bytes、ACTIVE 与 REVIEWED seal 边界不变。
+- 该修正只统一错误优先级和诊断，不放宽任何来源或 artifact 资格；需重新运行完整三平台 CI。

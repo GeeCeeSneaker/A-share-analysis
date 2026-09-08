@@ -5124,3 +5124,16 @@ Git 历史负责保存过去版本。
 
 - 按 Ruff 输出补充 stdlib 与 local import 之间的空行；不改变 source contract、官方 host 校验、Golden bytes、ACTIVE 或 REVIEWED seal。
 - 本次修正与 DEVLOG 在同一多文件 commit 中提交；下一步重新运行完整三平台门禁。
+
+
+
+## DM-CR-20260908-115 · GT-H3B P1.1 validation-order correction
+
+**Type**：C1 — fail-closed validation ordering  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / CI_PENDING / PENDING_REVIEW  
+**Trigger**：CI run `34188427123` 首个完成的 Ubuntu job 报告未知顶层 artifact kind 的既有 allowlist 回归断言未满足。
+
+- 在 `validate_review_source_bindings` 入口先验证 request kind 是否属于 artifact allowlist，再执行 ordinary kind 与 frozen source kind 的交叉绑定。
+- 这只恢复确定性的错误优先级和可读诊断；不改变有效请求路径、source contract、官方 host allowlist、Golden bytes、ACTIVE 或 REVIEWED seal。
+- 本次代码修正与 DEVLOG 同一多文件 commit 提交，随后重新跑完整三平台门禁。

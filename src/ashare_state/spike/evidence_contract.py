@@ -269,6 +269,11 @@ def validate_review_source_bindings(
 ) -> None:
     """Require every review request to match its case's frozen source pairs."""
     for position, request in enumerate(requests, start=1):
+        request_kind = request.get("kind")
+        if not isinstance(request_kind, str) or request_kind not in VALID_ARTIFACT_KINDS:
+            raise EvidenceSourceContractError(
+                f"review request {position} artifact kind {request_kind!r} not in allowlist"
+            )
         case_id = request.get("case")
         if not isinstance(case_id, str) or not case_id:
             raise EvidenceSourceContractError(f"review request {position} has an invalid case ID")
@@ -285,7 +290,6 @@ def validate_review_source_bindings(
             )
             for index, source in enumerate(raw_sources, start=1)
         )
-        request_kind = request.get("kind")
         if request_kind != "EVIDENCE_BUNDLE":
             source_kind = declared[0].kind if len(declared) == 1 else None
             if request_kind != source_kind:
