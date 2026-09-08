@@ -5137,3 +5137,15 @@ Git 历史负责保存过去版本。
 - 在 `validate_review_source_bindings` 入口先验证 request kind 是否属于 artifact allowlist，再执行 ordinary kind 与 frozen source kind 的交叉绑定。
 - 这只恢复确定性的错误优先级和可读诊断；不改变有效请求路径、source contract、官方 host allowlist、Golden bytes、ACTIVE 或 REVIEWED seal。
 - 本次代码修正与 DEVLOG 同一多文件 commit 提交，随后重新跑完整三平台门禁。
+
+
+
+## DM-CR-20260908-116 · GT-H3B P1.1 final CI verification
+
+**Type**：C0 — final CI verification  
+**Date**：2026-09-08  
+**Status**：CI PASSED / PENDING_INDEPENDENT_REVIEW  
+**Evidence**：Final implementation head `07480debc9ef461023356fdb3223ebd62c5a348d` passed GitHub Actions run `34188753542` on Ubuntu 3.14, Windows 3.12 and Windows 3.14; each reported `1606 passed`. Ruff, mypy, compileall, Spike, SDK-absent and DEVLOG/Management governance gates passed.
+
+- This confirms the P1.1 implementation and adversarial test gate only. It does not claim 125/125 real official evidence bytes, REVIEWED seal, ACTIVE promotion, production validation or PR merge.
+- Independent Reviewer must still close the final head against current-main test-merge before the controlled post-merge steps.

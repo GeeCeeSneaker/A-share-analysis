@@ -3132,3 +3132,12 @@
 - CI run `34188427123` 的首个完成平台报告 `1605 passed, 1 failed`：未知顶层 artifact kind 在新的 case-kind 交叉校验前被拦截，回归测试要求先得到既有的 allowlist 诊断。
 - 已把 review-request kind allowlist 校验前置到 contract boundary，并保留 fail-closed 的 case/source/kind 精确绑定；有效请求、官方 host allowlist、Golden bytes、ACTIVE 与 REVIEWED seal 边界不变。
 - 该修正只统一错误优先级和诊断，不放宽任何来源或 artifact 资格；需重新运行完整三平台 CI。
+
+
+## 2026-09-08 · GT-H3B P1.1 final CI verification
+
+> 状态：**CI PASSED / PENDING_INDEPENDENT_REVIEW / REAL EVIDENCE NOT MATERIALIZED**
+
+- 最终代码 head `07480debc9ef461023356fdb3223ebd62c5a348d` 对应 CI run `34188753542`；Ubuntu 3.14、Windows 3.12、Windows 3.14 均通过，所有平台均为 `1606 passed`。
+- Ruff、mypy、compileall、Spike、SDK-absent、DEVLOG/Management 治理门均通过；本记录仅确认工具实现与测试门禁，不等同于真实 evidence、REVIEWED seal、ACTIVE promotion 或生产发布。
+- 当前下一关仍是独立 Reviewer 对 final head 与 current-main test-merge 的复核关闭。
