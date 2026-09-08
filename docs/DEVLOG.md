@@ -3025,3 +3025,7 @@
 ### P0 CI correction
 
 - 首轮 CI 仅发现 candidate/test 新增行超过 Ruff 100 列限制；已在本修正提交中完成格式收敛，未改变 promotion 语义。
+
+### P0 CI correction 2
+
+- run #385 的 Ruff format diff 已逐项吸收；本修正仍只影响格式，不改变 promotion contract。

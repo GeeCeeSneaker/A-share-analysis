@@ -59,15 +59,9 @@ def _run_promotion(
             "--plan",
             str(plan or (REMEDIATION_ROOT / "v5_to_v6_rebuild_plan.json")),
             "--carry-forward",
-            str(
-                carry_forward
-                or (REMEDIATION_ROOT / "v5_to_v6_human_review_carry_forward.jsonl")
-            ),
+            str(carry_forward or (REMEDIATION_ROOT / "v5_to_v6_human_review_carry_forward.jsonl")),
             "--transition-audit",
-            str(
-                transition_audit
-                or (REMEDIATION_ROOT / "GT_H3R2_ST_TRANSITION_AUDIT.jsonl")
-            ),
+            str(transition_audit or (REMEDIATION_ROOT / "GT_H3R2_ST_TRANSITION_AUDIT.jsonl")),
         ],
         cwd=REPO_ROOT,
         capture_output=True,
@@ -114,9 +108,7 @@ def test_existing_v6_promotion_is_idempotent_and_preserves_versioned_bytes(tmp_p
     "tampered_name",
     ["golden_cases_v6.jsonl", "truth_manifest_v6.json", "golden_cases_v4.jsonl"],
 )
-def test_tampered_immutable_bytes_fail_closed(
-    tmp_path: Path, tampered_name: str
-) -> None:
+def test_tampered_immutable_bytes_fail_closed(tmp_path: Path, tampered_name: str) -> None:
     root = _make_root(tmp_path)
     victim = root / tampered_name
     victim.write_bytes(victim.read_bytes() + b"\n")
@@ -182,8 +174,10 @@ def test_audit_49_of_50_fails_closed(tmp_path: Path) -> None:
     root = _make_root(tmp_path)
     audit = tmp_path / "short-audit.jsonl"
     lines = (
-        REMEDIATION_ROOT / "GT_H3R2_ST_TRANSITION_AUDIT.jsonl"
-    ).read_text(encoding="utf-8").splitlines()
+        (REMEDIATION_ROOT / "GT_H3R2_ST_TRANSITION_AUDIT.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
     audit.write_text("\n".join(lines[:-1]) + "\n", encoding="utf-8")
     active_before = (root / "truth_manifest.json").read_bytes()
 
@@ -205,10 +199,7 @@ def test_duplicate_st_identity_fails_closed() -> None:
         st_cases[1],
         event_effective_date=st_cases[0].event_effective_date,
     )
-    mutated = [
-        duplicate if case.golden_case_id == duplicate.golden_case_id else case
-        for case in cases
-    ]
+    mutated = [duplicate if case.golden_case_id == duplicate.golden_case_id else case for case in cases]
     manifest = json.loads((REPO_GOLDEN / "truth_manifest_v6.json").read_text(encoding="utf-8"))
 
     with pytest.raises(module.CandidateError, match="recomputation distinct_events"):

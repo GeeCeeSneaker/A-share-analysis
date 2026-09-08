@@ -64,31 +64,19 @@ DEFAULT_TRANSITION_AUDIT = (
 # identify the already-staged bytes; they are deliberately not CLI inputs.
 GT_H3B_V4_VERSION = "v4-candidate-20260906"
 GT_H3B_V4_DATASET = "golden_cases_v4.jsonl"
-GT_H3B_V4_DATASET_HASH = (
-    "8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b"
-)
+GT_H3B_V4_DATASET_HASH = "8c356c4a98e174c53d0fb8b2f502325d931866d8988dff502c8a3e4b451d1b9b"
 GT_H3B_V4_MANIFEST = "truth_manifest_v4.json"
-GT_H3B_V4_MANIFEST_SHA256 = (
-    "ad69052c29e13f412f8608b7f4c11af4bb920430f0fa70ddf42af5dc5f756960"
-)
+GT_H3B_V4_MANIFEST_SHA256 = "ad69052c29e13f412f8608b7f4c11af4bb920430f0fa70ddf42af5dc5f756960"
 GT_H3B_V5_VERSION = "v5-candidate-20260907"
 GT_H3B_V5_DATASET = "golden_cases_v5.jsonl"
-GT_H3B_V5_DATASET_HASH = (
-    "5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"
-)
+GT_H3B_V5_DATASET_HASH = "5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"
 GT_H3B_V5_MANIFEST = "truth_manifest_v5.json"
-GT_H3B_V5_MANIFEST_SHA256 = (
-    "0019e22d947614a884f7573468e44d20b1bbbfcacebe94f583372fb8686569dc"
-)
+GT_H3B_V5_MANIFEST_SHA256 = "0019e22d947614a884f7573468e44d20b1bbbfcacebe94f583372fb8686569dc"
 GT_H3B_V6_VERSION = "v6-candidate-20260908"
 GT_H3B_V6_DATASET = "golden_cases_v6.jsonl"
-GT_H3B_V6_DATASET_HASH = (
-    "0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343"
-)
+GT_H3B_V6_DATASET_HASH = "0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343"
 GT_H3B_V6_MANIFEST = "truth_manifest_v6.json"
-GT_H3B_V6_MANIFEST_SHA256 = (
-    "f6cd5aa41a95ab3e640155c3050ec50ab69073b03e7d17b3f4ca68cadb250c06"
-)
+GT_H3B_V6_MANIFEST_SHA256 = "f6cd5aa41a95ab3e640155c3050ec50ab69073b03e7d17b3f4ca68cadb250c06"
 GT_H3B_REQUIRED_STATS = {
     "case_count": 125,
     "counts_by_type": {
@@ -298,9 +286,7 @@ def _validate_promotion_stats(manifest: dict, cases: list, label: str) -> dict:
     return stats
 
 
-def _validate_promotion_compiled_docs(
-    docs: list[dict], truth_version: str, label: str
-) -> list:
+def _validate_promotion_compiled_docs(docs: list[dict], truth_version: str, label: str) -> list:
     try:
         cases = _validate_output_documents(docs, truth_version)
     except CandidateError as exc:
@@ -405,7 +391,7 @@ def _validate_promotion_carry_forward(
     for new_id, source_id in add_source_by_new_id.items():
         if source_id in added_by_source:
             raise CandidateError(
-                "promotion plan maps one source to multiple ADD cases: " f"{source_id}"
+                f"promotion plan maps one source to multiple ADD cases: {source_id}"
             )
         added_by_source[source_id] = new_id
     expected_map: dict[str, str] = {}
@@ -444,8 +430,7 @@ def _validate_promotion_carry_forward(
         eligible = old_id == new_id and old_identity == new_identity
         if row.get("carry_forward_eligible") is not eligible:
             raise CandidateError(
-                "promotion carry-forward "
-                f"{old_id}: eligibility was not recomputed"
+                f"promotion carry-forward {old_id}: eligibility was not recomputed"
             )
         if row.get("new_review_required") is not (not eligible):
             raise CandidateError(f"promotion carry-forward {old_id}: review-required mismatch")

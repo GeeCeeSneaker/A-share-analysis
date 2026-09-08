@@ -5003,3 +5003,5 @@ Git 历史负责保存过去版本。
 - **Next**：Independent review of the P0 final head and current-main test-merge; after merge, controlled execution of promote-existing, then P1 evidence-byte materialization.
 
 - **P0 CI correction**：首轮 run #384 仅报新增 candidate/test 的 Ruff E501；本同步提交只做格式修正，promotion contract 与 v5 ACTIVE 边界不变。
+
+- **P0 CI correction 2**：run #385 发现新增 candidate/test 未完全匹配 Ruff formatter；已在本同步提交中吸收格式输出，语义不变。
