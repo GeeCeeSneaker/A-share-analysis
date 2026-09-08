@@ -3115,3 +3115,11 @@
 - 复核发现 evidence_bundle 独立入口仍只校验 HTTP(S) 语法，已改为复用 P1.1 显式官方 host validator；任意非 allowlist host 在 bundle 创建/检查和 production contract validation 中均 fail closed。
 - review source binding 现在要求 ordinary artifact kind 与冻结合同唯一 source kind 一致；bundle 仍使用 EVIDENCE_BUNDLE 外层 kind，并逐项校验成员 source kind。
 - 增加非 allowlist bundle、ordinary kind mismatch 回归测试；不改变 Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal 边界。
+
+
+## 2026-09-08 · GT-H3B P1.1 formatter correction
+
+> 状态：**FORMAT FIX STAGED / CI_PENDING / PENDING_REVIEW**
+
+- 最新三平台 CI 仅报告 `src/ashare_state/spike/evidence_bundle.py` 缺少 stdlib 与 local import 之间的分隔空行；已按 Ruff 机器输出修正。
+- 本次不改变官方 host allowlist、case-bound source contract、bundle 字节校验、Golden bytes、ACTIVE 指针或 REVIEWED seal 边界；需重新跑完整三平台 CI。

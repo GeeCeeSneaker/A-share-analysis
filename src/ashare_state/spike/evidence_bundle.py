@@ -10,6 +10,7 @@ import zipfile
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+
 from ashare_state.spike.evidence_contract import (
     EvidenceSourceContractError,
     validate_official_source_ref,

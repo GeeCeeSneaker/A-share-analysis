@@ -5112,3 +5112,15 @@ Git 历史负责保存过去版本。
 
 - 让 bundle 创建/检查复用 P1.1 host validator，并要求 ordinary artifact kind 与合同 source kind 一致。
 - 增加对应 fail-closed 回归测试；不改变 Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal。
+
+
+
+## DM-CR-20260908-114 · GT-H3B P1.1 formatter correction
+
+**Type**：C0 — formatting consistency  
+**Date**：2026-09-08  
+**Status**：RECORDED / CI_PENDING / PENDING_REVIEW  
+**Trigger**：最新三平台 CI 仅报告 `evidence_bundle.py` 的 Ruff import 分隔格式。
+
+- 按 Ruff 输出补充 stdlib 与 local import 之间的空行；不改变 source contract、官方 host 校验、Golden bytes、ACTIVE 或 REVIEWED seal。
+- 本次修正与 DEVLOG 在同一多文件 commit 中提交；下一步重新运行完整三平台门禁。
