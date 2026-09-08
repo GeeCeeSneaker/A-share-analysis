@@ -32,6 +32,8 @@ _source_context = _load_source_context()
 
 V3_VERSION = "v3-candidate-20260822"
 V3_HASH = "ab841d25858a5520c2357dcf72da9932fc1f25f988d900fd94730eb5a1a6f79e"
+V5_VERSION = "v5-candidate-20260907"
+V5_HASH = "5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"
 SOURCE_EVIDENCE_SCOPE = "CASE_SPECIFIC_OFFICIAL_ARTIFACT"
 PORTAL_ONLY_LOCATORS = {
     "https://www.bse.cn/",
@@ -56,6 +58,16 @@ def _jsonl(path: Path) -> list[dict]:
     return [
         json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
+
+
+def _load_v5_candidate():
+    """Load the immutable v5 corpus without following the mutable ACTIVE pointer."""
+
+    return GoldenTruthStore(GOLDEN_ROOT).load_bound(
+        "golden_cases_v5.jsonl",
+        V5_VERSION,
+        V5_HASH,
+    )
 
 
 def _repository_text_hash(path: Path) -> str:
@@ -83,7 +95,7 @@ def _is_case_specific_official_locator(value: str) -> bool:
 class TestGTH2CleanCorpus:
     def test_active_candidate_passes_clean_readiness_and_all_non_review_gates(self):
         store = GoldenTruthStore(GOLDEN_ROOT)
-        cases, manifest = store.load()
+        cases, manifest = _load_v5_candidate()
 
         assert manifest.truth_version == "v5-candidate-20260907"
         assert manifest.manifest_schema == 2
@@ -114,7 +126,7 @@ class TestGTH2CleanCorpus:
             assert not case.source_retrieved_at
 
     def test_structural_and_corporate_action_semantics_are_real_cases(self):
-        cases = GoldenTruthStore(GOLDEN_ROOT).load()[0]
+        cases = _load_v5_candidate()[0]
         st = [case for case in cases if case.event_class == "ST_TRANSITION"]
         delisted = [case for case in cases if case.event_class == "DELIST"]
         actions = Counter(case.event_class for case in cases)
@@ -186,7 +198,7 @@ class TestGTH2CleanCorpus:
             assert _repository_text_hash(GOLDEN_ROOT / name) == expected
 
     def test_review_packet_has_exact_coverage_and_official_references(self):
-        cases, _ = GoldenTruthStore(GOLDEN_ROOT).load()
+        cases, _ = _load_v5_candidate()
         packet = _jsonl(H2_ROOT / "review_packet_index.jsonl")
         case_ids = [case.golden_case_id for case in cases]
         packet_ids = [row["golden_case_id"] for row in packet]
@@ -284,7 +296,7 @@ class TestGTH2CleanCorpus:
         )
 
     def test_bj_mapping_rows_are_deferred_until_their_contract_is_proven(self):
-        cases = GoldenTruthStore(GOLDEN_ROOT).load()[0]
+        cases = _load_v5_candidate()[0]
         assert not any(case.event_class == "BJ_CODE_MIGRATION" for case in cases)
         packet = _jsonl(H2_ROOT / "review_packet_index.jsonl")
         assert not any(row["event_class"] == "BJ_CODE_MIGRATION" for row in packet)

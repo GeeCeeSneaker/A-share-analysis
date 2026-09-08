@@ -3482,3 +3482,12 @@
 - 为使最终 PR head 由项目账号触发一次真正的幂等检查，补记本条日志；该提交不改 v1-v7 Golden/evidence/receipt 内容、不提交任何凭据，受控 runner 应只执行已有封印的验证并不产生新的 bot commit。
 - 该平台触发边界与独立审阅要求已记录；在项目账号触发的 CI 与受控幂等检查成功、且独立审阅者确认 receipt/evidence 后，PR #25 才可进入合并评估。
 
+## 2026-09-08 · GT-H3B historical-baseline test compatibility
+
+> 状态：**COMPATIBILITY FIX COMMITTED / CI VALIDATION IN PROGRESS**
+
+- CI run `34221479446` 在 Ubuntu pytest 阶段暴露 14 个失败；受控 GT-H3B run 38 已成功。失败集中于历史 v3/v4/v5/v6 测试仍直接跟随已推进到 `v7-reviewed-20260908` 的 ACTIVE 指针，或把已有 v7 evidence 误判为隔离测试产生的 orphan。
+- 这不是 v7 seal、source bytes、review gate 或生产 B1-B7 的失败；问题是测试夹具没有遵守仓库已经实现的 run-bound/immutable-version 约定。
+- 已将历史 GT-H2、GT-H3A、GT-H3R、GT-H3B-P0 和 GT-H3R2 测试改为显式加载 immutable v5/v6/v4 数据；review workflow 夹具从空 evidence store 起步；GT-H3R/GT-H3R2 历史 verifier 不再错误约束后续 ACTIVE。
+- v1-v7 Golden/evidence/receipt 未修改；本修正不运行 Provider，不写入任何账号、密码、Token、IP、Cookie 或其他凭据。
+

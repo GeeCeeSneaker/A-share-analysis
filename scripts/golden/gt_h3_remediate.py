@@ -126,11 +126,11 @@ def _load_v4() -> tuple[dict[str, Any], list[dict[str, Any]]]:
 
 def _load_v5() -> tuple[dict[str, Any], list[dict[str, Any]]]:
     version_path = GOLDEN_ROOT / "truth_manifest_v5.json"
-    active_path = GOLDEN_ROOT / "truth_manifest.json"
+    # This verifier protects the immutable v4 -> v5 remediation record.
+    # ACTIVE may legitimately point to a later reviewed version after the
+    # remediation has been promoted, so historical verification must not
+    # follow or constrain the mutable pointer.
     version_manifest = json.loads(version_path.read_text(encoding="utf-8"))
-    active_manifest = json.loads(active_path.read_text(encoding="utf-8"))
-    if active_manifest != version_manifest:
-        raise RemediationError("ACTIVE pointer is not byte-equivalent to truth_manifest_v5.json")
     if version_manifest.get("truth_version") != V5_VERSION:
         raise RemediationError("v5 manifest truth_version is unexpected")
     dataset_path = GOLDEN_ROOT / str(version_manifest.get("dataset_file", ""))

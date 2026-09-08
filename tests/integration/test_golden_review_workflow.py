@@ -30,6 +30,10 @@ CANDIDATE_SCRIPT = REPO_ROOT / "scripts" / "golden" / "candidate.py"
 def golden_env(tmp_path: Path, monkeypatch) -> Path:
     root = tmp_path / "data" / "golden" / "provider" / "amazingdata"
     shutil.copytree(REPO_GOLDEN, root)
+    # The repository now contains durable v7 evidence.  Review workflow
+    # fixtures must start with an empty evidence store so orphan-file tests
+    # observe only artifacts created by the isolated test.
+    shutil.rmtree(root / "evidence", ignore_errors=True)
     # Review workflow fixtures start from immutable v3; the synthetic helpers
     # move their isolated ACTIVE pointer to v4 while preserving the old source.
     for name in (

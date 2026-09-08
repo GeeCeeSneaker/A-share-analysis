@@ -33,9 +33,11 @@ def _make_root(tmp_path: Path) -> Path:
         "truth_manifest_v5.json",
         "golden_cases_v6.jsonl",
         "truth_manifest_v6.json",
-        "truth_manifest.json",
     ):
         shutil.copy2(REPO_GOLDEN / name, root / name)
+    # Promotion tests must start from the authorized v5 ACTIVE pointer even
+    # after the repository has advanced to the reviewed v7 pointer.
+    shutil.copy2(REPO_GOLDEN / "truth_manifest_v5.json", root / "truth_manifest.json")
     return root
 
 

@@ -38,6 +38,10 @@ _NOW = "2026-08-24T00:00:00+00:00"
 def golden_env(tmp_path: Path, monkeypatch) -> Path:
     root = tmp_path / "golden"
     shutil.copytree(REPO_GOLDEN, root)
+    # These tests exercise a compiled run-bound dataset.  The repository
+    # ACTIVE pointer may legitimately advance to a reviewed version.
+    (root / "truth_manifest.json").write_bytes((root / "truth_manifest_v5.json").read_bytes())
+    shutil.rmtree(root / "evidence", ignore_errors=True)
     monkeypatch.setattr("ashare_state.spike.golden_store.GOLDEN_ROOT", root)
     monkeypatch.chdir(tmp_path)
     return root

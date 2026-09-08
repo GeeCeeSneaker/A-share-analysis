@@ -665,7 +665,10 @@ def verify(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
 
     active = _read_json(active_manifest_path)
     v5_manifest = _read_json(v5_manifest_path)
-    _require(active == v5_manifest, "ACTIVE pointer changed: it must remain byte-equivalent to v5")
+    # This is a historical v5 -> v6 verifier.  Once a later governed
+    # version is promoted, ACTIVE is expected to move forward; the verifier
+    # continues to validate the immutable v5/v6 inputs and only reports the
+    # current pointer version in its summary.
     _, v5_docs, _ = _read_dataset(v5_manifest_path, V5_VERSION, V5_DATASET, V5_HASH)
     _validate_compiled_docs(v5_docs, V5_VERSION, "v5")
     v6_payload, v6_docs, v6_cases = _read_dataset(v6_manifest_path, V6_VERSION, V6_DATASET, V6_HASH)

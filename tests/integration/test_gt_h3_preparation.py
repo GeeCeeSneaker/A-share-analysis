@@ -13,6 +13,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_ROOT = REPO_ROOT / "data/golden/provider/amazingdata"
 PACKET = REPO_ROOT / "docs/golden/gt_h2/review_packet_index.jsonl"
 PREPARE_PATH = REPO_ROOT / "scripts/golden/gt_h3_prepare.py"
+V5_DATASET = "golden_cases_v5.jsonl"
+V5_MANIFEST = "truth_manifest_v5.json"
+
+
+def _v5_golden_root(tmp_path: Path) -> Path:
+    """Create an isolated v5 ACTIVE root for historical GT-H3A tests."""
+
+    root = tmp_path / "golden"
+    root.mkdir()
+    shutil.copy2(GOLDEN_ROOT / V5_DATASET, root / V5_DATASET)
+    shutil.copy2(GOLDEN_ROOT / V5_MANIFEST, root / "truth_manifest.json")
+    return root
 
 
 def _module():
@@ -26,7 +38,8 @@ def _module():
 
 def test_prepare_bundle_groups_all_compiled_cases_without_review(tmp_path: Path):
     module = _module()
-    summary = module.prepare_bundle(GOLDEN_ROOT, PACKET, tmp_path / "gt_h3")
+    golden_root = _v5_golden_root(tmp_path)
+    summary = module.prepare_bundle(golden_root, PACKET, tmp_path / "gt_h3")
 
     assert summary["truth_version"] == "v5-candidate-20260907"
     assert summary["dataset_hash"] == (
@@ -60,20 +73,18 @@ def test_prepare_bundle_groups_all_compiled_cases_without_review(tmp_path: Path)
 
 def test_prepare_bundle_rejects_packet_missing_case(tmp_path: Path):
     module = _module()
+    golden_root = _v5_golden_root(tmp_path)
     packet_copy = tmp_path / "packet.jsonl"
     rows = PACKET.read_text(encoding="utf-8").splitlines()
     packet_copy.write_text("\n".join(rows[:-1]) + "\n", encoding="utf-8", newline="\n")
 
     with pytest.raises(module.PreparationError, match="cover ACTIVE exactly once"):
-        module.prepare_bundle(GOLDEN_ROOT, packet_copy, tmp_path / "gt_h3")
+        module.prepare_bundle(golden_root, packet_copy, tmp_path / "gt_h3")
 
 
 def test_prepare_bundle_rejects_reviewed_candidate(tmp_path: Path):
     module = _module()
-    root = tmp_path / "golden"
-    root.mkdir()
-    for name in ("truth_manifest.json", "golden_cases_v5.jsonl"):
-        shutil.copy2(GOLDEN_ROOT / name, root / name)
+    root = _v5_golden_root(tmp_path)
     dataset = root / "golden_cases_v5.jsonl"
     lines = dataset.read_text(encoding="utf-8").splitlines()
     first = json.loads(lines[0])
@@ -92,6 +103,7 @@ def test_prepare_bundle_rejects_reviewed_candidate(tmp_path: Path):
 
 def test_prepare_bundle_refuses_to_overwrite_versioned_snapshot(tmp_path: Path):
     module = _module()
+    golden_root = _v5_golden_root(tmp_path)
     snapshot_dir = tmp_path / "snapshot"
     snapshot_dir.mkdir()
     (snapshot_dir / "GT_H3_REVIEW_BUNDLE.md").write_text(
@@ -102,7 +114,7 @@ def test_prepare_bundle_refuses_to_overwrite_versioned_snapshot(tmp_path: Path):
     module.DEFAULT_OUTPUT_DIR = snapshot_dir
 
     with pytest.raises(module.PreparationError, match="refusing to overwrite"):
-        module.prepare_bundle(GOLDEN_ROOT, PACKET, snapshot_dir)
+        module.prepare_bundle(golden_root, PACKET, snapshot_dir)
 
 
 def test_gt_h3_seal_manifest_rejects_expect_fields_mutation():

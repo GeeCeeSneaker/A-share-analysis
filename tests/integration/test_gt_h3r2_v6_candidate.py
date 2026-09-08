@@ -27,7 +27,7 @@ def test_staged_v6_verifier_reports_exact_invariants() -> None:
         "v5_dataset_hash": ("5ab7ddf7a03115ad475cf85b3660e09414b0399004097f6121a3624e7330122c"),
         "v6_truth_version": "v6-candidate-20260908",
         "v6_dataset_hash": ("0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343"),
-        "active_truth_version": "v5-candidate-20260907",
+        "active_truth_version": "v7-reviewed-20260908",
         "case_count": 125,
         "st_transition": 50,
         "st_add_events": 38,
@@ -53,7 +53,7 @@ def test_candidate_rebuild_reproduces_committed_v6(tmp_path: Path) -> None:
         temporary_golden_root / "truth_manifest_v5.json",
     )
     shutil.copy2(
-        GOLDEN_ROOT / "truth_manifest.json",
+        GOLDEN_ROOT / "truth_manifest_v5.json",
         temporary_golden_root / "truth_manifest.json",
     )
     plan_path = REMEDIATION_ROOT / "v5_to_v6_rebuild_plan.json"

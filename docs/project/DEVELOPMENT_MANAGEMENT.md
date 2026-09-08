@@ -5604,3 +5604,15 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
   quantity/event/review/production formal gates 均为空。
 - Formal Production B1-B7、Provider capability verdict、Data Sufficiency
   和 2020+ backfill 均未执行。
+
+## DM-CR-20260908-158 · GT-H3B historical test baseline compatibility
+
+**Type**：C0 — test fixture and historical verifier compatibility  
+**Date**：2026-09-08  
+**Status**：FIX COMMITTED / CI VALIDATION IN PROGRESS  
+**Evidence**：PR #25；CI run 34221479446；controlled run 34221479385。
+
+- 受控 GT-H3B run 38 已成功完成既有 v7 seal 的幂等校验；CI run 462 的 Ubuntu pytest 暴露 14 个旧测试假设仍把 ACTIVE 固定为 v5，或未清空仓库现有 v7 evidence。
+- 已按 run-bound / append-only contract 修正历史测试：显式绑定 v5 immutable dataset，GT-H3A/P0 promotion fixtures 从 v5 ACTIVE 起步，review workflow fixture 使用空 evidence store；v6/v5 historical verifier 允许后续 ACTIVE 版本存在。
+- 该修正没有修改 v1-v7 Golden/evidence/receipt、冻结 source contract、review seal 或 Provider 边界；formal Production B1-B7 仍为 NOT RUN。
+
