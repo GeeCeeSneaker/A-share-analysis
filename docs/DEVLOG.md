@@ -2997,3 +2997,182 @@
 - Two later ADR-only commits, `eceb99468bd28a37a7532b723f092a9d2f8bd469` (ADR-026) and `4ae9151979287a8a4e86c5f95906b88546c993e3` (ADR index), also predated this management synchronization. They are now explicitly included in the same one-time contract-path grandfathered set, together with capabilities commit `4f83f7ac3a19327e9f724c9730cbfbfef03de38b`.
 - This is a disclosed historical exception, not a relaxation of the rule: future `docs/adr/` or contract-path commits must update `docs/project/DEVELOPMENT_MANAGEMENT.md` in the same commit. No history was rewritten.
 - Production account / formal AmazingData Spike / Data Sufficiency Matrix remain BLOCKED or NOT_TESTABLE and are not marked complete.
+
+---
+
+## 2026-09-08 · GT-H3B-P0 safe promotion implementation
+
+**Status**：IN_PROGRESS / PENDING_REVIEW
+
+**授权基线**：GT-H3R2 已由独立 Reviewer 关闭；Owner 授权继续推进 GT-H3B。v6 candidate v6-candidate-20260908 的既定 dataset SHA256 为 0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343。本批次不改变 v5/v6 versioned bytes，也不在代码提交中推进 ACTIVE。
+
+**完成事项**：
+
+- 在 scripts/golden/candidate.py 增加 promote-existing 窄范围命令：只接受既定 v6 版本，重新读取 Golden loader、v4/v5/v6 固定字节、manifest 统计、完整重建 plan、110/15 carry-forward 和 50/50 ST audit，所有检查通过后才用 staging + atomic replace 推进 ACTIVE。
+- promotion 对错误 ACTIVE、错误/篡改 v4/v5/v6 bytes、plan/carry/audit 漂移、重复 ST identity 和 pointer 写入失败保持 fail closed；已存在完全相同 v6 ACTIVE 时幂等 no-op。
+- 新增 tests/integration/test_gt_h3b_p0_promotion.py 覆盖成功/幂等、不可变文件篡改、错误 ACTIVE、plan 漂移、carry-forward 漂移、49/50 audit、重复 ST identity 与 pointer 写失败。
+
+**安全边界**：
+
+- 本批次仅实现和验证 promotion path；不运行 review.py，不创建 REVIEWED provenance，不获取/提交证据 bytes，不执行 GT-H3B-P1 seal。
+- v5 ACTIVE、v4-v6 历史 versioned 文件仍保持 immutable；正式生产账号、Token、IP、密码和 Provider-under-test 输出不进入仓库或 CI。
+
+**验证与后续**：
+
+- CI 需通过 Windows 3.14、Windows 3.12、Ubuntu 3.14、Ruff、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates。
+- 本批次经独立 Reviewer 审阅并合并后，才在受控环境运行 promote-existing；随后进入 GT-H3B-P1 evidence-byte materialization。
+
+### P0 CI correction
+
+- 首轮 CI 仅发现 candidate/test 新增行超过 Ruff 100 列限制；已在本修正提交中完成格式收敛，未改变 promotion 语义。
+
+### P0 CI correction 2
+
+- run #385 的 Ruff format diff 已逐项吸收；本修正仍只影响格式，不改变 promotion contract。
+
+### P0 CI correction 3
+
+- run #386 的 Ruff lint 已通过；formatter 要求将重复 ST identity 测试的列表推导保持为三行，已按精确 formatter 输出同步。
+
+### P0 CI correction 4
+
+- run #387 的 Ruff lint 已通过；formatter 仅报告 candidate.py 的 4 处空行规范差异，本修正按机器输出收敛，未改变 promotion 语义或 ACTIVE 边界。
+
+### P0 CI correction 5
+
+- Ubuntu run #388 发现 promotion 常量记录的 manifest SHA 与仓库当前精确字节不一致；已按当前 v4/v5/v6 manifest 重新计算并更新固定常量。同步修正重复 ST identity 对抗测试，使其真正复用同一 `(provider_symbol, event_effective_date, event_subtype)` 身份；未改变 versioned dataset、manifest 或 ACTIVE 指针。
+
+### P0 CI correction 6
+
+- Windows 3.12 run #389 暴露新增对抗测试读取中文 plan 时依赖系统默认编码；已显式指定 UTF-8，修复跨平台测试稳定性，不改变 promotion 语义、版本化数据或 ACTIVE 边界。
+
+### P0 CI correction 7
+
+- run #390 的三平台 Ruff lint 均只报告新增测试第 138 行因显式 UTF-8 参数超过 100 列；已按 formatter/lint 规范拆行，测试语义不变。
+
+### GT-H3B-P1 tooling checkpoint
+
+- 增加 src/ashare_state/spike/evidence_bundle.py 与 scripts/golden/evidence_bundle.py：定义并实现不可压缩、create-only、可重现的 GT-H3B EVIDENCE_BUNDLE；review.py 会重新读取清单、校验官方 HTTP(S) source_ref、成员完整性及每份原始 member 的 SHA256/size。
+- review.py 的批量 --manifest 现在拒绝任何 expect_fields 键（包括 null），复合 bundle 必须声明至少两份且顺序一致的 source_ref/kind；新增 P1 集成测试覆盖确定性、篡改、声明漂移、expect_fields 禁止和实际 batch seal。
+- 本 checkpoint 只交付工具和 fail-closed 测试；尚未获取 125/125 官方 evidence bytes，未执行 REVIEWED seal，未改变 ACTIVE。
+
+### GT-H3B-P1 tooling correction 1
+
+- run #392 的 Ubuntu Ruff lint 发现 evidence_bundle.py 一条异常信息超过 100 列；已仅按 Ruff 规范拆行，bundle 校验语义不变。
+
+### GT-H3B-P1 tooling correction 2
+
+- run #393 的 Ruff formatter 仅要求 review.py、bundle 模块和 P1 测试吸收 3 处确定性格式输出；本修正无行为变化。
+
+### GT-H3B-P1 tooling correction 3
+
+- run #394 的 Ubuntu pytest 暴露 bundle 校验器误将合法 manifest.json 当作 source member，以及 dataclass 动态导入测试未注册 sys.modules；已分别修复校验分支和测试加载器，未放宽 source-member 完整性或 seal 规则。
+
+
+## 2026-09-08 · GT-H3B P1 publication rollback hardening
+
+> 状态：**TOOLING HARDENED / CI PENDING**
+
+- 复核发现 batch review 在 evidence/version 已写入后若 ACTIVE 指针提交失败，旧 ACTIVE 虽通常不变，但新文件可能残留；这与“失败不得留下半发布状态”的要求不完全一致。
+- review.py 现在跟踪本次调用新建的 evidence/version 文件；仅当 ACTIVE 字节仍等于提交前快照且文件字节未被外部改动时回滚，已有同 hash evidence 和历史 versioned 文件不删除。
+- 增加指针失败回归测试，验证旧 ACTIVE 保持不变、新 version/evidence 文件不残留；无法确认指针状态或现场发生外部改动时 fail closed 并保留现场。
+- 本次不获取真实官方证据、不执行 P0 promotion、不改变 v4/v5/v6 bytes 或 ACTIVE；等待新的三平台 CI 和独立 Reviewer。
+
+
+
+### GT-H3B P1 per-commit governance exception disclosure（2026-09-08）
+
+- GitHub Contents API 逐文件写入造成两个已完成的 P1 代码提交未能与 DEVLOG 同 commit：3c66d1118835266bd7d608b6af460bf91a03c57c（review rollback implementation）和 d07d9628cb69b60f4d951033b12d0bc5dc00e8e5（Ruff correction）。
+- 按仓库 CI V2.3 规则，将这两个完整 SHA 加入 CI 的一次性 GRANDFATHERED 定点豁免；本记录与豁免清单在同一多文件 commit 中提交。豁免不适用于任何后续提交，未改写历史。
+- 后续代码/测试治理记录将使用 Git 数据 API 的多文件 commit，确保代码与 DEVLOG 同 commit；本次不改变功能、Golden bytes 或 ACTIVE。
+
+
+### GT-H3B CI exception comment-count correction（2026-09-08）
+
+- CI 的 GRANDFATHERED 清单已从 5 个历史提交扩展为 7 个完整 SHA（新增 3c66d111 与 d07d9628 两个 P1 提交）；同步修正 workflow 注释中的数量和版本说明。
+- 该修改仅使豁免清单与已披露记录一致，不改变豁免范围、P0/P1 语义、Golden bytes 或 ACTIVE；本 commit 同时更新 DEVLOG，后续不再扩展豁免。
+
+## 2026-09-08 · GT-H3B P1.1 case-bound official-source contract
+
+> 状态：**TOOLING HARDENED / CI PENDING / REAL EVIDENCE NOT MATERIALIZED**
+
+- 针对独立 Reviewer 指出的信任缺口，新增 `evidence_contract.py` 和冻结合同 `docs/golden/gt_h3/gt_h3b/v6_case_evidence_source_contract.jsonl`。合同精确覆盖 v6 candidate 的 125 个 case ID，合同 bytes pinned SHA256 为 `3c235e35d1a09f0171322a7f0c610edb3cbe3d5ad8c6afc701f7b90afa77d3bb`，并绑定 v6 dataset hash；未修改 v4/v5/v6 versioned Golden bytes。
+- 合同来源只从既有 GT-H3 `review_bundle_index.jsonl`、GT-H3R 人工结果中的 `required_source_refs`、以及 GT-H3R2 v6 candidate source_ref 派生；5 个复合 case 保留 RULE → APPLICABILITY 双来源，15 个新增 ST case 使用已有 CNINFO locator。
+- 增加显式官方 host allowlist（SSE/SZSE/BSE/CNINFO 的仓库已用主机与静态/披露别名），不使用宽泛域名匹配；`official.example` 等测试地址不能通过 production contract validation。
+- `review.py` 现在要求 ordinary manifest entry 声明 `sources`，bundle entry 声明 `bundle_sources`，并在 staging 前按 case ID、source_ref、kind、顺序与冻结合同精确比较；无实时网络访问。
+- 新增对抗测试覆盖任意 host、case A→case B 重用、ordinary 缺来源、复合来源缺失/交换/额外和 125 条合同覆盖；既有 P1 合同测试同步使用临时合同，不再以无绑定的 125-case synthetic seal 代表生产信任。
+- 本批次仍不获取/提交真实 125 evidence bytes、不运行 review.py seal、不执行 promote-existing、不推进 ACTIVE；等待三平台 CI 和独立 Reviewer closure。
+
+
+### GT-H3B P1.1 documentation correction（2026-09-08）
+
+- 清理 P1 工具说明中的 `official.example` 示例，改为显式 allowlist 内的交易所域名示例；补充说明 HTTP(S) scheme 本身不构成官方来源证明。
+- 该修正仅同步文档与已实现的 P1.1 host policy，不改变 Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal 边界。
+
+
+### GT-H3B P1.1 follow-up: bundle host policy and ordinary kind alignment（2026-09-08）
+
+- 复核发现 evidence_bundle 独立入口仍只校验 HTTP(S) 语法，已改为复用 P1.1 显式官方 host validator；任意非 allowlist host 在 bundle 创建/检查和 production contract validation 中均 fail closed。
+- review source binding 现在要求 ordinary artifact kind 与冻结合同唯一 source kind 一致；bundle 仍使用 EVIDENCE_BUNDLE 外层 kind，并逐项校验成员 source kind。
+- 增加非 allowlist bundle、ordinary kind mismatch 回归测试；不改变 Golden bytes、ACTIVE、真实 evidence 或 REVIEWED seal 边界。
+
+
+## 2026-09-08 · GT-H3B P1.1 formatter correction
+
+> 状态：**FORMAT FIX STAGED / CI_PENDING / PENDING_REVIEW**
+
+- 最新三平台 CI 仅报告 `src/ashare_state/spike/evidence_bundle.py` 缺少 stdlib 与 local import 之间的分隔空行；已按 Ruff 机器输出修正。
+- 本次不改变官方 host allowlist、case-bound source contract、bundle 字节校验、Golden bytes、ACTIVE 指针或 REVIEWED seal 边界；需重新跑完整三平台 CI。
+
+
+## 2026-09-08 · GT-H3B P1.1 validation-order correction
+
+> 状态：**VALIDATION FIX STAGED / CI_PENDING / PENDING_REVIEW**
+
+- CI run `34188427123` 的首个完成平台报告 `1605 passed, 1 failed`：未知顶层 artifact kind 在新的 case-kind 交叉校验前被拦截，回归测试要求先得到既有的 allowlist 诊断。
+- 已把 review-request kind allowlist 校验前置到 contract boundary，并保留 fail-closed 的 case/source/kind 精确绑定；有效请求、官方 host allowlist、Golden bytes、ACTIVE 与 REVIEWED seal 边界不变。
+- 该修正只统一错误优先级和诊断，不放宽任何来源或 artifact 资格；需重新运行完整三平台 CI。
+
+
+## 2026-09-08 · GT-H3B P1.1 final CI verification
+
+> 状态：**CI PASSED / PENDING_INDEPENDENT_REVIEW / REAL EVIDENCE NOT MATERIALIZED**
+
+- 最终代码 head `07480debc9ef461023356fdb3223ebd62c5a348d` 对应 CI run `34188753542`；Ubuntu 3.14、Windows 3.12、Windows 3.14 均通过，所有平台均为 `1606 passed`。
+- Ruff、mypy、compileall、Spike、SDK-absent、DEVLOG/Management 治理门均通过；本记录仅确认工具实现与测试门禁，不等同于真实 evidence、REVIEWED seal、ACTIVE promotion 或生产发布。
+- 当前下一关仍是独立 Reviewer 对 final head 与 current-main test-merge 的复核关闭。
+
+
+## 2026-09-08 · GT-H3B P0-BYPASS-01 override boundary hardening
+
+> 状态：**IMPLEMENTED / CI_PENDING / PENDING_INDEPENDENT_REVIEW**
+
+- 独立 Reviewer 复核发现：`--contract` 与 `--root` 同时传入时，代码未拒绝把测试合同指向正式 Golden root，可能绕过 production contract SHA pin 和 composite policy。
+- `review.py` 现在对 `--root` 与脚本真实 production Golden root 做 `Path.resolve()` 比较；精确路径、`.`、`..` 和符号链接等价路径均 fail closed，临时测试 root + custom contract 继续允许。
+- 新增 exact/dot/parent 等价路径对抗测试；拒绝发生在 source-contract 读取前，因此不进入 evidence staging、version 或 ACTIVE 写入。
+- 本修正不改变 v6 contract bytes、v4-v6 versioned bytes、ACTIVE、grandfather list 或真实 evidence；需重新跑 final-head/current-main 三平台 CI，随后交回 Reviewer closure。
+
+
+## 2026-09-08 · GT-H3B P0-BYPASS-01 formatter correction
+
+> 状态：**FORMAT FIX STAGED / CI_PENDING / PENDING_INDEPENDENT_REVIEW**
+
+- CI run `34191452213` 的 Ubuntu job 在运行时测试前仅报告 override guard 的 Ruff formatter 差异；已按机器输出合并短异常信息为单行。
+- production-root resolved-path guard、临时 test root 允许路径、v6/v4-v6 bytes、ACTIVE、grandfather list 和真实 evidence 边界均不变；需重新跑完整三平台 CI。
+
+
+## 2026-09-08 · GT-H3B P0-BYPASS-01 formatter correction 2
+
+> 状态：**FORMAT FIX STAGED / CI_PENDING / PENDING_INDEPENDENT_REVIEW**
+
+- CI run `34191561514` 的 Ubuntu 与 Windows 3.12 job 在 pytest 前仅报告新增 root-override 对抗测试函数签名的 Ruff formatter 差异；已按机器输出合并为单行。
+- resolved production-root guard、exact/dot/parent 等价路径测试、临时 test root 允许路径及 ACTIVE/seal 边界不变；需重新跑完整三平台 CI。
+
+
+## 2026-09-08 · GT-H3B P0-BYPASS-01 final CI verification
+
+> 状态：**CI PASSED / PENDING_INDEPENDENT_REVIEW / REAL EVIDENCE NOT MATERIALIZED**
+
+- root-override boundary 修复后的最终代码 head `9c965bd3c85cd744a4c376f15fa37b512cad5a7c` 对应 CI run `34191667025`；Ubuntu 3.14、Windows 3.12、Windows 3.14 均成功，各平台均为 `1609 passed`。
+- Ruff、mypy、compileall、Spike、SDK-absent、DEVLOG/Management 治理门均通过；exact/dot/parent 等价 production root 测试已纳入回归。
+- 本记录只确认边界修复与测试门禁，不等同于真实 evidence、REVIEWED seal、ACTIVE promotion、生产验证或 PR merge；下一关是独立 Reviewer final closure。

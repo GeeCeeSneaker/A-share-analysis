@@ -39,6 +39,17 @@ from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
+from ashare_state.spike.evidence_bundle import (  # noqa: E402
+    EvidenceBundleError,
+    read_evidence_bundle,
+)
+from ashare_state.spike.evidence_contract import (  # noqa: E402
+    CONTRACT_RELATIVE_PATH,
+    PRODUCTION_CONTRACT_SHA256,
+    EvidenceSourceContractError,
+    load_evidence_source_contract,
+    validate_review_source_bindings,
+)
 from ashare_state.spike.golden_store import (  # noqa: E402
     VALID_ARTIFACT_KINDS,
     GoldenTruthError,
@@ -52,7 +63,9 @@ from ashare_state.spike.golden_store import (  # noqa: E402
 )
 
 GOLDEN_ROOT = Path("data/golden/provider/amazingdata")
+PRODUCTION_GOLDEN_ROOT = (Path(__file__).resolve().parents[2] / GOLDEN_ROOT).resolve()
 EVIDENCE_DIR = GOLDEN_ROOT / "evidence"
+EVIDENCE_SOURCE_CONTRACT_PATH = Path(__file__).resolve().parents[2] / CONTRACT_RELATIVE_PATH
 
 
 class ReviewError(RuntimeError):
@@ -67,6 +80,55 @@ def _validate_artifact_kind(kind: str) -> None:
     if kind not in VALID_ARTIFACT_KINDS:
         msg = f"artifact kind {kind!r} not in allowlist {sorted(VALID_ARTIFACT_KINDS)}"
         raise ReviewError(msg)
+
+
+def _parse_source_declarations(
+    raw_sources: object,
+    *,
+    entry_index: int,
+    field_name: str,
+    minimum: int,
+) -> list[dict]:
+    if not isinstance(raw_sources, list) or len(raw_sources) < minimum:
+        raise ReviewError(
+            f"review manifest entry {entry_index} {field_name} requires "
+            f"at least {minimum} source declaration(s)"
+        )
+    sources: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for source_index, source in enumerate(raw_sources, start=1):
+        if not isinstance(source, dict):
+            raise ReviewError(
+                f"review manifest entry {entry_index} {field_name} source "
+                f"{source_index} must be an object"
+            )
+        source_ref = source.get("source_ref")
+        source_kind = source.get("kind")
+        if not isinstance(source_ref, str) or not source_ref:
+            raise ReviewError(
+                f"review manifest entry {entry_index} {field_name} source "
+                f"{source_index} has an invalid source_ref"
+            )
+        if not isinstance(source_kind, str) or not source_kind:
+            raise ReviewError(
+                f"review manifest entry {entry_index} {field_name} source "
+                f"{source_index} has an invalid kind"
+            )
+        _validate_artifact_kind(source_kind)
+        if source_kind == "EVIDENCE_BUNDLE":
+            raise ReviewError(
+                f"review manifest entry {entry_index} {field_name} source "
+                f"{source_index} cannot itself be an EVIDENCE_BUNDLE"
+            )
+        key = (source_ref, source_kind)
+        if key in seen:
+            raise ReviewError(
+                f"review manifest entry {entry_index} contains duplicate "
+                f"{field_name} source {source_index}"
+            )
+        seen.add(key)
+        sources.append({"source_ref": source_ref, "kind": source_kind})
+    return sources
 
 
 def _validate_review_coverage(lines: list[dict], submitted_case_ids: list[str]) -> None:
@@ -114,8 +176,19 @@ def _validate_review_coverage(lines: list[dict], submitted_case_ids: list[str]) 
 
 def _load_review_requests(args: argparse.Namespace) -> list[dict]:
     """Parse review inputs without reading or writing evidence."""
-    if args.manifest and any((args.case, args.artifact, args.kind, args.expect_fields)):
-        raise ReviewError("--manifest cannot be combined with --case/--artifact/--kind")
+    if args.manifest and any(
+        (
+            args.case,
+            args.artifact,
+            args.kind,
+            args.expect_fields,
+            getattr(args, "source_ref", None),
+            getattr(args, "source_kind", None),
+        )
+    ):
+        raise ReviewError(
+            "--manifest cannot be combined with --case/--artifact/--kind/source-ref/source-kind"
+        )
 
     if args.manifest:
         try:
@@ -143,9 +216,41 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
                 raise ReviewError(f"review manifest entry {index} has an invalid artifact path")
             if not isinstance(kind, str) or not kind:
                 raise ReviewError(f"review manifest entry {index} has an invalid artifact kind")
+            if "expect_fields" in entry:
+                raise ReviewError(
+                    "GT-H3B batch review manifest must not contain expect_fields; "
+                    "correct the candidate before review"
+                )
             expect_fields = entry.get("expect_fields")
             if expect_fields is not None and not isinstance(expect_fields, dict):
                 raise ReviewError(f"review manifest entry {index} expect_fields must be an object")
+
+            sources: list[dict] | None = None
+            bundle_sources: list[dict] | None = None
+            if kind == "EVIDENCE_BUNDLE":
+                if "sources" in entry:
+                    raise ReviewError(
+                        f"review manifest entry {index} sources is only valid "
+                        "for ordinary artifacts"
+                    )
+                bundle_sources = _parse_source_declarations(
+                    entry.get("bundle_sources"),
+                    entry_index=index,
+                    field_name="bundle_sources",
+                    minimum=2,
+                )
+            else:
+                if "bundle_sources" in entry:
+                    raise ReviewError(
+                        f"review manifest entry {index} bundle_sources is only valid "
+                        "for EVIDENCE_BUNDLE"
+                    )
+                sources = _parse_source_declarations(
+                    entry.get("sources"),
+                    entry_index=index,
+                    field_name="sources",
+                    minimum=1,
+                )
             requests.append(
                 {
                     "case": case_id,
@@ -153,6 +258,8 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
                     "kind": kind,
                     "note": entry.get("note", ""),
                     "expect_fields": expect_fields,
+                    "sources": sources,
+                    "bundle_sources": bundle_sources,
                 }
             )
         return requests
@@ -163,6 +270,8 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
             ("--case", args.case),
             ("--artifact", args.artifact),
             ("--kind", args.kind),
+            ("--source-ref", getattr(args, "source_ref", None)),
+            ("--source-kind", getattr(args, "source_kind", None)),
         )
         if value is None
     ]
@@ -183,6 +292,13 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
             "kind": args.kind,
             "note": args.note,
             "expect_fields": expect_fields,
+            "sources": [
+                {
+                    "source_ref": args.source_ref,
+                    "kind": args.source_kind,
+                }
+            ],
+            "bundle_sources": None,
         }
     ]
 
@@ -215,6 +331,39 @@ def _load_active() -> tuple[Path, dict, list[dict]]:
     return dataset, active, lines
 
 
+def _load_evidence_source_contract(
+    args: argparse.Namespace,
+    dataset: Path,
+    active: dict,
+    lines: list[dict],
+):
+    contract_path = args.contract or EVIDENCE_SOURCE_CONTRACT_PATH
+    if args.contract is not None:
+        if args.root is None:
+            raise ReviewError("--contract is a test override and requires --root")
+        try:
+            requested_root = Path(args.root).resolve()
+            production_root = PRODUCTION_GOLDEN_ROOT.resolve()
+        except (OSError, RuntimeError) as exc:
+            raise ReviewError(
+                "cannot resolve --root for test contract boundary validation"
+            ) from exc
+        if requested_root == production_root:
+            raise ReviewError("--contract test override cannot target the production Golden root")
+    try:
+        return load_evidence_source_contract(
+            contract_path,
+            expected_truth_version=str(active["truth_version"]),
+            expected_dataset_file=dataset.name,
+            expected_dataset_hash=str(active["dataset_hash"]),
+            expected_case_ids=[str(doc["golden_case_id"]) for doc in lines],
+            expected_sha256=None if args.contract is not None else PRODUCTION_CONTRACT_SHA256,
+            enforce_known_composites=args.contract is None,
+        )
+    except (EvidenceSourceContractError, OSError, ValueError) as exc:
+        raise ReviewError(f"cannot load evidence-source contract: {exc}") from exc
+
+
 def _semantic_hash(doc: dict) -> str:
     return semantic_hash_for_doc(doc)
 
@@ -222,11 +371,20 @@ def _semantic_hash(doc: dict) -> str:
 # ---------------------------------------------------------------- staging
 
 
-def _stage_artifact(artifact: Path, kind: str) -> tuple[str, str, str]:
+def _stage_artifact(
+    artifact: Path, kind: str, bundle_sources: list[dict] | None = None
+) -> tuple[str, str, str]:
     """Stage ONE artifact: validate kind, hash the real bytes, return
     (content-addressed ref, sha256, retrieved_at). Nothing is written yet
     (R4A2-P1-05: stage-all-then-commit)."""
     _validate_artifact_kind(kind)
+    if kind == "EVIDENCE_BUNDLE":
+        if bundle_sources is None:
+            raise ReviewError("EVIDENCE_BUNDLE requires declared bundle_sources")
+        try:
+            read_evidence_bundle(artifact, expected_sources=bundle_sources)
+        except EvidenceBundleError as exc:
+            raise ReviewError(f"invalid EVIDENCE_BUNDLE {artifact}: {exc}") from exc
     if not artifact.is_file():
         msg = f"artifact file does not exist: {artifact}"
         raise ReviewError(msg)
@@ -290,8 +448,17 @@ def _apply_review(
 # ----------------------------------------------------------------- commit
 
 
-def _commit_evidence(staged: list[tuple[Path, str, str]]) -> None:
-    """Copy staged artifacts into the evidence store (create-only)."""
+def _commit_evidence(
+    staged: list[tuple[Path, str, str]],
+    created: list[tuple[Path, bytes]] | None = None,
+) -> list[tuple[Path, bytes]]:
+    """Copy staged artifacts into the evidence store (create-only).
+
+    The returned/received list records only files created by this invocation.
+    It lets the caller remove unreferenced outputs if the final ACTIVE pointer
+    commit fails.
+    """
+    created_files = created if created is not None else []
     for source, ref, expected_hash in staged:
         target = EVIDENCE_DIR / ref
         data = source.read_bytes()
@@ -309,9 +476,11 @@ def _commit_evidence(staged: list[tuple[Path, str, str]]) -> None:
         tmp = target.with_suffix(target.suffix + ".tmp")
         tmp.write_bytes(data)
         tmp.replace(target)
+        created_files.append((target, data))
+    return created_files
 
 
-def _create_only_write(path: Path, data: bytes) -> None:
+def _create_only_write(path: Path, data: bytes) -> bool:
     """R4A2-P1-04: versioned files are create-only.
 
     absent -> create; exists + same bytes -> idempotent no-op;
@@ -319,12 +488,37 @@ def _create_only_write(path: Path, data: bytes) -> None:
     """
     if path.exists():
         if path.read_bytes() == data:
-            return
+            return False
         msg = f"versioned file {path.name} already exists with different bytes"
         raise ReviewError(msg)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_bytes(data)
     Path(tmp).replace(Path(path))
+    return True
+
+
+def _rollback_created_files(created: list[tuple[Path, bytes]]) -> list[str]:
+    """Remove only unchanged files created before a failed publication."""
+    failures: list[str] = []
+    for path, expected in reversed(created):
+        if not path.exists():
+            continue
+        if path.is_symlink() or not path.is_file():
+            failures.append(str(path))
+            continue
+        try:
+            actual = path.read_bytes()
+        except OSError as exc:
+            failures.append(f"{path}: {exc}")
+            continue
+        if actual != expected:
+            failures.append(f"{path}: bytes changed after creation")
+            continue
+        try:
+            path.unlink()
+        except OSError as exc:
+            failures.append(f"{path}: {exc}")
+    return failures
 
 
 def _atomic_active_pointer(manifest: dict) -> None:
@@ -438,10 +632,16 @@ def _preflight_evidence(staged: list[tuple[Path, str, str]]) -> None:
             raise ReviewError(f"evidence {ref} already exists with different bytes")
 
 
-def _publish_new_version(prepared: _PreparedReview) -> str:
+def _publish_new_version(
+    prepared: _PreparedReview,
+    created: list[tuple[Path, bytes]] | None = None,
+) -> str:
     """Publish a prevalidated version and move ACTIVE last."""
-    _create_only_write(prepared.dataset_path, prepared.dataset_bytes)
-    _create_only_write(prepared.manifest_path, prepared.manifest_bytes)
+    created_files = created if created is not None else []
+    if _create_only_write(prepared.dataset_path, prepared.dataset_bytes):
+        created_files.append((prepared.dataset_path, prepared.dataset_bytes))
+    if _create_only_write(prepared.manifest_path, prepared.manifest_bytes):
+        created_files.append((prepared.manifest_path, prepared.manifest_bytes))
     _atomic_active_pointer(prepared.manifest)
     return prepared.truth_version
 
@@ -462,7 +662,14 @@ def main() -> int:
     parser.add_argument("--reviewer", required=True)
     parser.add_argument("--note", default="")
     parser.add_argument("--expect-fields", help="JSON: corrected expected_fields (optional)")
+    parser.add_argument("--source-ref", help="single-case source locator")
+    parser.add_argument("--source-kind", help="single-case source artifact kind")
     parser.add_argument("--manifest", type=Path, help="batch review manifest (JSON list)")
+    parser.add_argument(
+        "--contract",
+        type=Path,
+        help="test-only source contract override; requires a non-production --root",
+    )
     parser.add_argument("--root", type=Path, help="golden root override (tests)")
     args = parser.parse_args()
 
@@ -476,12 +683,19 @@ def main() -> int:
 
     requests = _load_review_requests(args)
     _validate_review_coverage(lines, [request["case"] for request in requests])
+    contract = _load_evidence_source_contract(args, dataset, active, lines)
+    try:
+        validate_review_source_bindings(contract, requests)
+    except EvidenceSourceContractError as exc:
+        raise ReviewError(f"review source binding failed: {exc}") from exc
 
     # -------- stage ALL entries first (P1-05: no orphan evidence) --------
     staged_artifacts: list[tuple[Path, str, str]] = []
     entries: list[dict] = []
     for request in requests:
-        ref, digest, retrieved = _stage_artifact(request["artifact"], request["kind"])
+        ref, digest, retrieved = _stage_artifact(
+            request["artifact"], request["kind"], request["bundle_sources"]
+        )
         staged_artifacts.append((request["artifact"], ref, digest))
         entries.append(
             {
@@ -520,8 +734,39 @@ def main() -> int:
     _preflight_evidence(staged_artifacts)
 
     # -------- commit: evidence -> version -> ACTIVE pointer ---------------
-    _commit_evidence(staged_artifacts)
-    version = _publish_new_version(prepared)
+    active_path = GOLDEN_ROOT / "truth_manifest.json"
+    try:
+        active_before = active_path.read_bytes()
+    except OSError as exc:
+        raise ReviewError(f"cannot snapshot ACTIVE pointer before commit: {exc}") from exc
+
+    created_files: list[tuple[Path, bytes]] = []
+    try:
+        _commit_evidence(staged_artifacts, created_files)
+        version = _publish_new_version(prepared, created_files)
+    except Exception as exc:
+        try:
+            active_after = active_path.read_bytes()
+        except OSError as pointer_exc:
+            raise ReviewError(
+                "review publication failed and ACTIVE could not be verified; "
+                "durable outputs were retained for recovery"
+            ) from pointer_exc
+        if active_after != active_before:
+            raise ReviewError(
+                "review publication failed after ACTIVE pointer changed; "
+                "durable outputs were retained for recovery"
+            ) from exc
+        rollback_errors = _rollback_created_files(created_files)
+        if rollback_errors:
+            detail = "; ".join(rollback_errors[:5])
+            raise ReviewError(
+                "review publication failed before ACTIVE pointer commit; "
+                f"rollback incomplete: {detail}"
+            ) from exc
+        if isinstance(exc, ReviewError):
+            raise
+        raise ReviewError(f"review publication failed before ACTIVE pointer commit: {exc}") from exc
     reviewed = sum(1 for c in lines if c["review_status"] == "REVIEWED")
     print(f"reviewed dataset version: {version}")
     print(f"cases: {reviewed} REVIEWED")

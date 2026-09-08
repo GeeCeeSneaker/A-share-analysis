@@ -49,9 +49,68 @@ def golden_env(tmp_path: Path, monkeypatch) -> Path:
     return root
 
 
+def _test_source(case_id: str) -> dict[str, str]:
+    return {
+        "source_ref": f"https://www.sse.com.cn/test/{case_id}.html",
+        "kind": "SSE_ANNOUNCEMENT",
+    }
+
+
+def _write_test_source_contract(root: Path) -> Path:
+    active = json.loads((root / "truth_manifest.json").read_text(encoding="utf-8"))
+    dataset = root / str(active["dataset_file"])
+    case_ids = _active_case_ids(root)
+    records: list[dict[str, object]] = [
+        {
+            "record_type": "contract_header",
+            "schema": 1,
+            "format": "GT-H3B-CASE-EVIDENCE-CONTRACT/v1",
+            "truth_version": active["truth_version"],
+            "dataset_file": dataset.name,
+            "dataset_sha256": active["dataset_hash"],
+            "case_count": len(case_ids),
+        }
+    ]
+    records.extend(
+        {
+            "record_type": "case",
+            "golden_case_id": case_id,
+            "sources": [_test_source(case_id)],
+        }
+        for case_id in case_ids
+    )
+    path = root.parent / "review-source-contract.jsonl"
+    path.write_text(
+        "".join(json.dumps(record) + "\n" for record in records),
+        encoding="utf-8",
+        newline="\n",
+    )
+    return path
+
+
 def _run_review(root: Path, *extra: str) -> subprocess.CompletedProcess:
+    extra_args = list(extra)
+    if "--manifest" not in extra_args and "--source-ref" not in extra_args:
+        case_id = extra_args[extra_args.index("--case") + 1]
+        extra_args.extend(
+            [
+                "--source-ref",
+                _test_source(case_id)["source_ref"],
+                "--source-kind",
+                _test_source(case_id)["kind"],
+            ]
+        )
+    contract = _write_test_source_contract(root)
     return subprocess.run(
-        [sys.executable, str(REVIEW_SCRIPT), "--root", str(root), *extra],
+        [
+            sys.executable,
+            str(REVIEW_SCRIPT),
+            "--root",
+            str(root),
+            *extra_args,
+            "--contract",
+            str(contract),
+        ],
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,
@@ -239,8 +298,14 @@ def _active_case_ids(root: Path) -> list[str]:
 
 
 def _write_review_batch(root: Path, entries: list[dict], name: str = "review-batch") -> Path:
+    normalized = []
+    for entry in entries:
+        item = dict(entry)
+        if item.get("kind") != "EVIDENCE_BUNDLE" and "sources" not in item:
+            item["sources"] = [_test_source(str(item["case"]))]
+        normalized.append(item)
     batch = root.parent / f"{name}.json"
-    batch.write_text(json.dumps(entries), encoding="utf-8")
+    batch.write_text(json.dumps(normalized), encoding="utf-8")
     return batch
 
 

@@ -417,6 +417,14 @@ class TestBoundGoldenResolver:
             for line in _dataset(golden_env).read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
+        active = json.loads((golden_env / "truth_manifest.json").read_text(encoding="utf-8"))
+        source_map = {
+            row["golden_case_id"]: {
+                "source_ref": (f"https://www.sse.com.cn/test/{row['golden_case_id']}.html"),
+                "kind": "SSE_ANNOUNCEMENT",
+            }
+            for row in rows
+        }
         batch = tmp_path / "full-review.json"
         batch.write_text(
             json.dumps(
@@ -425,11 +433,37 @@ class TestBoundGoldenResolver:
                         "case": row["golden_case_id"],
                         "artifact": str(art),
                         "kind": "SSE_ANNOUNCEMENT",
+                        "sources": [source_map[row["golden_case_id"]]],
                     }
                     for row in rows
                 ]
             ),
             encoding="utf-8",
+        )
+        contract = tmp_path / "review-source-contract.jsonl"
+        contract_records = [
+            {
+                "record_type": "contract_header",
+                "schema": 1,
+                "format": "GT-H3B-CASE-EVIDENCE-CONTRACT/v1",
+                "truth_version": active["truth_version"],
+                "dataset_file": _dataset(golden_env).name,
+                "dataset_sha256": active["dataset_hash"],
+                "case_count": len(rows),
+            }
+        ]
+        contract_records.extend(
+            {
+                "record_type": "case",
+                "golden_case_id": row["golden_case_id"],
+                "sources": [source_map[row["golden_case_id"]]],
+            }
+            for row in rows
+        )
+        contract.write_text(
+            "".join(json.dumps(record) + "\n" for record in contract_records),
+            encoding="utf-8",
+            newline="\n",
         )
 
         result = subprocess.run(
@@ -442,6 +476,8 @@ class TestBoundGoldenResolver:
                 str(batch),
                 "--reviewer",
                 "bob",
+                "--contract",
+                str(contract),
             ],
             capture_output=True,
             text=True,

@@ -79,17 +79,19 @@ jobs:
           # R3 audit section 4: per-commit check, not per-PR.
           # Commits older than the rule's introduction are grandfathered.
           RULE_SINCE="9a12184"
-          # V2.3 rule note (2026-09-04): the following five source
-          # commits were created before the documentation commit because the
-          # GitHub contents API updates one path per commit. History rewrite
-          # is not authorized, so the exception is explicit, SHA-scoped, and
-          # disclosed in DEVLOG/Management. Never extend it to future commits.
+          # V2.3/V2.5 rule note (2026-09-04/08): the following seven
+          # source commits were created before the documentation commit
+          # because the GitHub contents API updates one path per commit.
+          # History rewrite is not authorized, so each exception is explicit,
+          # SHA-scoped, and disclosed in DEVLOG/Management. Never extend it.
           GRANDFATHERED=(
             "9bfe327dabdf4504e7252b745022b91ef71b88f8"
             "4f83f7ac3a19327e9f724c9730cbfbfef03de38b"
             "5494a63f83a57e4b5034bc62073fb7d2057db63b"
             "335375597421dcc91c48602f5112e817adfc7044"
             "22a991079ddebe90bef3cac45eed258dc4e56269"
+            "3c66d1118835266bd7d608b6af460bf91a03c57c"
+            "d07d9628cb69b60f4d951033b12d0bc5dc00e8e5"
           )
           for commit in $(git rev-list HEAD --max-count=300); do
             case "$commit" in "$RULE_SINCE"*) continue ;; esac  # last pre-rule commit
