@@ -466,13 +466,6 @@ def _fetch_source_with_browser(
                     )
                     if len(candidate_bodies) > before:
                         return candidate_bodies[-1]
-                successful_response_paths = {
-                    response_url
-                    for response in responses
-                    if getattr(response, "status", None) == 200
-                    for response_url in [str(getattr(response, "url", ""))]
-                    if is_source_response(response_url)
-                }
                 for download in reversed(downloads):
                     download_url = str(getattr(download, "url", ""))
                     if not is_source_response(download_url):

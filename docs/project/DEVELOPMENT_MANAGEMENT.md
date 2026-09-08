@@ -5420,3 +5420,13 @@ Git 历史负责保存过去版本。
 - 将合同中 http:// 历史定位符显式升级为相同 host/path 的 HTTPS transport，manifest 仍保留合同原始 source_ref，最终 URL 和回执均可审计。
 - 修正 Python 3.14 动态导入测试与 DEVLOG 七项历史豁免同步；不改变 source contract、v1-v6 bytes、ACTIVE、evidence 或 seal 边界。
 - 当前 403 仍未被证明可通过浏览器获得正文；需要新受控 run 实测，成功前不得声称真实 evidence 或 REVIEWED seal。
+
+## DM-CR-20260908-143 · GT-H3B browser fallback lint correction
+
+**Type**：C0 — controlled execution tooling lint correction
+**Date**：2026-09-08
+**Status**：IMPLEMENTED / RETRY PENDING
+**Evidence**：PR #25；CI run 34204515918。
+
+- 删除浏览器 source-path 过滤中未再使用的临时集合，恢复三平台 Ruff 门禁通过条件。
+- 不改变官方来源、原始 body、HTTP 200、allowlist、大小上限、HTTPS transport upgrade 或 Golden/seal 边界；旧受控 run 将由并发策略取消并重新执行。
