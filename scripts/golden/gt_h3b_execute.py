@@ -653,13 +653,7 @@ def _download_sources(
 ) -> dict[tuple[str, str], RetrievedSource]:
     cache: dict[tuple[str, str], RetrievedSource] = {}
     source_dir = work_dir / "sources"
-    total_sources = len(
-        {
-            binding.pair()
-            for case_id in case_ids
-            for binding in contract.for_case(case_id)
-        }
-    )
+    total_sources = len({binding.pair() for case_id in case_ids for binding in contract.for_case(case_id)})
     ordinal = 0
     for case_id in case_ids:
         for binding in contract.for_case(case_id):

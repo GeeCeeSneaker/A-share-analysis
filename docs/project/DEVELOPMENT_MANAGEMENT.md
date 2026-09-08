@@ -5462,3 +5462,13 @@ Git 历史负责保存过去版本。
 - 为 105 个唯一 source binding 增加逐条 fetch/fetched 元数据日志，便于在不记录正文或凭据的前提下定位慢来源和失败来源。
 - 将专用受控 workflow 上限从 30 分钟调整为 60 分钟；urllib、浏览器、body size 和官方 HTTPS/path 校验边界保持不变。
 - run 34205465169 未生成 evidence、回执或 seal；新一轮必须以日志和 durable receipt 为准。
+
+## DM-CR-20260908-147 · GT-H3B source progress formatter correction
+
+**Type**：C0 — controlled execution tooling formatting correction
+**Date**：2026-09-08
+**Status**：IMPLEMENTED / RETRY PENDING
+**Evidence**：PR #25；CI run 34208481864。
+
+- 按 Ruff formatter 机器输出收敛 source progress telemetry 的唯一计数表达式；不改变抓取、证据、Golden 或 seal 逻辑。
+- 受控 run 34208481906 使用旧提交，待并发策略取消后重新执行。

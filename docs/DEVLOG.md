@@ -3364,3 +3364,10 @@
 - runner 现在按唯一 source binding 输出 ordinal/总数、公开 source_ref、原始 bytes 大小、sha256 和最终 URL；不输出正文、Cookie、账号、密码或 Token，且不改变 evidence 内容。
 - 专用 workflow 上限调整为 60 分钟；每个 urllib 请求仍为最多 3 次瞬态重试、固定读取上限，浏览器 fallback 仍有 page timeout，所有来源继续要求 HTTP 200、官方 HTTPS、同一 source path 和原始 body 校验。
 - 本次不修改 v1-v6 versioned Golden bytes、冻结合同、ACTIVE、真实 evidence 或 seal；下一轮以具体进度日志判断是否仍存在外部端点阻塞。
+
+## 2026-09-08 · GT-H3B source progress formatter correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run 34208481864 仅报告唯一 source 计数集合推导的 Ruff formatter 差异；已按机器输出收敛为确定性单行。
+- 不改变进度日志内容、官方来源、原始 body、固定超时、Golden bytes、ACTIVE 或 seal 边界；受控 run 34208481906 使用旧提交，待新提交重新执行。
