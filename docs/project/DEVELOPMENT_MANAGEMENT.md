@@ -5451,3 +5451,14 @@ Git 历史负责保存过去版本。
 - b236a8352211dbebe9702d36f4a631f6d8f27de6 为 runner 代码提交，但因复用已有 DEVLOG 主题标记未在同一提交中产生新的 DEVLOG diff。
 - 不改写历史；将完整 SHA 纳入一次性 grandfathered 清单并同步测试，后续提交不沿用该豁免。
 - 不改变来源获取、HTTPS transport upgrade、Golden bytes、ACTIVE、evidence 或 seal 逻辑。
+
+## DM-CR-20260908-146 · GT-H3B controlled execution progress and timeout correction
+
+**Type**：C1 — controlled execution observability and bounded runtime correction
+**Date**：2026-09-08
+**Status**：IMPLEMENTED / RETRY PENDING
+**Evidence**：PR #25；controlled run 34205465169 超时取消。
+
+- 为 105 个唯一 source binding 增加逐条 fetch/fetched 元数据日志，便于在不记录正文或凭据的前提下定位慢来源和失败来源。
+- 将专用受控 workflow 上限从 30 分钟调整为 60 分钟；urllib、浏览器、body size 和官方 HTTPS/path 校验边界保持不变。
+- run 34205465169 未生成 evidence、回执或 seal；新一轮必须以日志和 durable receipt 为准。

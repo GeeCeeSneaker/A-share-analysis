@@ -26,7 +26,7 @@ jobs:
   execute:
     if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ops/gt-h3b-controlled-execution-20260908'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout execution branch
         uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
       - name: Sync locked dependencies
         run: uv sync --frozen
 
-      - name: Install pinned browser fallback for official PDF challenges
+      - name: Install pinned browser fallback for official source challenges
         shell: bash
         run: |
           uv pip install --python .venv/bin/python "playwright==1.52.0"

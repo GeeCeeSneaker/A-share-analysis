@@ -3355,3 +3355,12 @@
 - 提交 b236a8352211dbebe9702d36f4a631f6d8f27de6 修改了 runner，但因自动记录逻辑复用了已有主题标记，实际没有在该提交中产生新的 docs/DEVLOG.md diff。
 - 历史不做重写；按仓库既有一次性 SHA 豁免规则，将该完整 SHA 加入 workflow 与回归门禁的固定清单，并在本记录中披露。该豁免不适用于任何后续提交。
 - 本次只修正治理可见性；不改变官方来源、原始 body、v1-v6 Golden bytes、冻结合同、ACTIVE 或 seal 边界。
+
+## 2026-09-08 · GT-H3B controlled execution progress and timeout correction
+
+> 状态：**EXECUTION OBSERVABILITY HARDENED / RETRY PENDING / NO EVIDENCE OR SEAL**
+
+- 受控 run 34205465169 在 30 分钟上限时仍处于 Phase B，最终被取消；由于 runner 原先不打印 source 进度，无法从终态日志定位最后一个耗时来源，未生成 evidence、回执或 REVIEWED seal。
+- runner 现在按唯一 source binding 输出 ordinal/总数、公开 source_ref、原始 bytes 大小、sha256 和最终 URL；不输出正文、Cookie、账号、密码或 Token，且不改变 evidence 内容。
+- 专用 workflow 上限调整为 60 分钟；每个 urllib 请求仍为最多 3 次瞬态重试、固定读取上限，浏览器 fallback 仍有 page timeout，所有来源继续要求 HTTP 200、官方 HTTPS、同一 source path 和原始 body 校验。
+- 本次不修改 v1-v6 versioned Golden bytes、冻结合同、ACTIVE、真实 evidence 或 seal；下一轮以具体进度日志判断是否仍存在外部端点阻塞。

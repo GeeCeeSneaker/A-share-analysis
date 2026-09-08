@@ -653,6 +653,13 @@ def _download_sources(
 ) -> dict[tuple[str, str], RetrievedSource]:
     cache: dict[tuple[str, str], RetrievedSource] = {}
     source_dir = work_dir / "sources"
+    total_sources = len(
+        {
+            binding.pair()
+            for case_id in case_ids
+            for binding in contract.for_case(case_id)
+        }
+    )
     ordinal = 0
     for case_id in case_ids:
         for binding in contract.for_case(case_id):
@@ -660,12 +667,23 @@ def _download_sources(
             if key in cache:
                 continue
             ordinal += 1
-            cache[key] = fetcher(
+            print(
+                f"GT-H3B source {ordinal}/{total_sources}: "
+                f"fetching {binding.source_ref} ({binding.kind})",
+                flush=True,
+            )
+            source = fetcher(
                 binding.source_ref,
                 binding.kind,
                 source_dir,
                 ordinal,
                 timeout,
+            )
+            cache[key] = source
+            print(
+                f"GT-H3B source {ordinal}/{total_sources}: fetched "
+                f"{source.size} bytes sha256={source.sha256} final={source.final_url}",
+                flush=True,
             )
     return cache
 
