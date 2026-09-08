@@ -3186,3 +3186,11 @@
 - runner 仅在同仓库专用 PR 分支运行，失败 fail-closed；执行输出只能写入 Golden evidence/version、执行回执和本 DEVLOG/Management 文件。
 - 当前提交建立请求与工作流，ACTIVE 仍为 `v5-candidate-20260907`；未声称 promotion、evidence materialization 或 REVIEWED seal 已完成。
 
+## 2026-09-08 · GT-H3B runner portability correction
+
+> 状态：**EXECUTION RUNNER FIX STAGED / RETRY PENDING**
+
+- 修正 versioned-file 快照：仓库实际保存的是 v1 数据集和 v2-v6 manifest，不能假定存在 truth_manifest_v1.json。
+- 按 Ruff 机器门禁拆分 runner 自动生成的 DEVLOG/Management 文本，去除尾随空格；不改变 promotion、source contract、evidence 或 seal 语义。
+- 上一轮只在执行前置快照与 lint 阶段失败，未生成 receipt、未写入 evidence、未改变 ACTIVE。
+

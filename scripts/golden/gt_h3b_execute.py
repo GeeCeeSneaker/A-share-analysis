@@ -53,9 +53,10 @@ V5_VERSION = "v5-candidate-20260907"
 V6_VERSION = "v6-candidate-20260908"
 V6_DATASET_HASH = "0b3952f9f82ee4f6a55a7f060c47af3cc781b0054ed1f83b5868246c0642a343"
 MAX_SOURCE_BYTES = 50 * 1024 * 1024
+# v1 is a legacy dataset snapshot; its versioned manifest starts at v2.
 IMMUTABLE_VERSION_FILES = tuple(
     [f"golden_cases_v{number}.jsonl" for number in range(1, 7)]
-    + [f"truth_manifest_v{number}.json" for number in range(1, 7)]
+    + [f"truth_manifest_v{number}.json" for number in range(2, 7)]
 )
 
 
@@ -566,29 +567,49 @@ def _write_receipt_and_governance(repo_root: Path, receipt: dict) -> None:
     )
     phase_b = receipt["phase_b"]
     phase_c = receipt["phase_c"]
-    devlog_entry = f"""## {date} · GT-H3B controlled execution succeeded
-
-> 状态：**GT-H3B PHASE A/B/C SUCCEEDED / REVIEWED 125/125 / FORMAL PRODUCTION NOT RUN**
-
-- source execution SHA：{source_sha}；workflow run：{run_id}。
-- Phase A 通过已治理的 candidate.py promote-existing，ACTIVE 从 v5 推进到 v6；v1-v6 versioned files 经执行前后 hash 对比保持不变。
-- Phase B 按冻结合同 {phase_b["contract_sha256"]} 获取 {phase_b["case_count"]} 个 case 的官方原始 bytes；普通 {phase_b["ordinary_cases"]}、复合 {phase_b["composite_cases"]}、deterministic bundle {phase_b["bundle_count"]}。
-- 125-entry review manifest SHA256：{phase_b["review_manifest_sha256"]}；未使用 expect_fields。
-- Phase C 通过 review.py --reviewer project-owner 一次性生成 {phase_c["reviewed_version"]}，REVIEWED 125/125；evidence refs {phase_c["evidence_ref_count"]}，hash consistency 已复核。
-- Formal Production B1-B7：**NOT RUN**；未提交任何账号、密码、Token、IP、Cookie 或 Provider 凭据。
-"""
-    management_entry = f"""## DM-CR-{date.replace("-", "")}-121 · GT-H3B受控真实执行闭环
-
-**Type**：C1 — controlled GT-H3B execution  
-**Date**：{date}  
-**Status**：SUCCEEDED / REVIEWED 125/125 / FORMAL PRODUCTION NOT RUN  
-**Evidence**：{RECEIPT_RELATIVE.as_posix()}；workflow run {run_id}；reviewed version {phase_c["reviewed_version"]}；dataset SHA256 {phase_c["dataset_hash"]}。
-
-- Phase A 使用已审阅的 promote-existing，没有重写 v1-v6 versioned bytes。
-- Phase B 只使用冻结 source contract，125 case exactly once，含 5 个 RULE → APPLICABILITY deterministic bundles；证据 bytes/hash 由 review.py 复核。
-- Phase C 是一次性 REVIEWED 125/125，reviewer marker 为 project-owner；quantity/event/review/production formal gates 均为空。
-- Formal Production B1-B7、Provider capability verdict、Data Sufficiency 和 2020+ backfill 均未执行。
-"""
+    devlog_entry = "\n".join(
+        [
+            f"## {date} · GT-H3B controlled execution succeeded",
+            "",
+            "> 状态：**GT-H3B PHASE A/B/C SUCCEEDED / REVIEWED 125/125 / "
+            "FORMAL PRODUCTION NOT RUN**",
+            "",
+            f"- source execution SHA：{source_sha}；workflow run：{run_id}。",
+            "- Phase A 通过已治理的 candidate.py promote-existing，ACTIVE 从 v5 推进到 v6；",
+            "  v1-v6 versioned files 经执行前后 hash 对比保持不变。",
+            f"- Phase B 按冻结合同 {phase_b['contract_sha256']} 获取 "
+            f"{phase_b['case_count']} 个 case 的官方原始 bytes；",
+            f"  普通 {phase_b['ordinary_cases']}、复合 {phase_b['composite_cases']}、"
+            f"deterministic bundle {phase_b['bundle_count']}。",
+            f"- 125-entry review manifest SHA256：{phase_b['review_manifest_sha256']}；",
+            "  未使用 expect_fields。",
+            f"- Phase C 通过 review.py --reviewer project-owner 一次性生成 "
+            f"{phase_c['reviewed_version']}，REVIEWED 125/125；",
+            f"  evidence refs {phase_c['evidence_ref_count']}，hash consistency 已复核。",
+            "- Formal Production B1-B7：**NOT RUN**；未提交任何账号、密码、Token、",
+            "  IP、Cookie 或 Provider 凭据。",
+        ]
+    ) + "\n"
+    management_entry = "\n".join(
+        [
+            f"## DM-CR-{date.replace('-', '')}-121 · GT-H3B受控真实执行闭环",
+            "",
+            "**Type**：C1 — controlled GT-H3B execution",
+            f"**Date**：{date}",
+            "**Status**：SUCCEEDED / REVIEWED 125/125 / FORMAL PRODUCTION NOT RUN",
+            f"**Evidence**：{RECEIPT_RELATIVE.as_posix()}；workflow run {run_id}；",
+            f"reviewed version {phase_c['reviewed_version']}；",
+            f"dataset SHA256 {phase_c['dataset_hash']}。",
+            "",
+            "- Phase A 使用已审阅的 promote-existing，没有重写 v1-v6 versioned bytes。",
+            "- Phase B 只使用冻结 source contract，125 case exactly once，含 5 个",
+            "  RULE → APPLICABILITY deterministic bundles；证据 bytes/hash 由 review.py 复核。",
+            "- Phase C 是一次性 REVIEWED 125/125，reviewer marker 为 project-owner；",
+            "  quantity/event/review/production formal gates 均为空。",
+            "- Formal Production B1-B7、Provider capability verdict、Data Sufficiency",
+            "  和 2020+ backfill 均未执行。",
+        ]
+    ) + "\n"
     _append_once(
         repo_root / "docs/DEVLOG.md",
         f"## {date} · GT-H3B controlled execution succeeded",

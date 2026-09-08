@@ -5213,3 +5213,13 @@ Git 历史负责保存过去版本。
 - 任何来源/证据/contract/hash/gate 失败均保持未成功状态；成功时才生成执行回执并通过后续 PR 审阅。
 - 本执行请求不包含 Formal Production B1-B7、Provider capability verdict、Data Sufficiency 或 2020+ backfill。
 
+## DM-CR-20260908-122 · GT-H3B runner portability correction
+
+**Type**：C1 — controlled execution tooling correction
+**Date**：2026-09-08
+**Status**：FIX STAGED / RETRY PENDING
+**Evidence**：PR #25；failed workflow run 34198591631 / CI run 34198591458。
+
+- 将 immutable snapshot 对齐仓库真实 v1-v6 文件布局，并按 Ruff 结果修正生成文档的确定性排版。
+- 失败发生在 Phase A 之前；没有 evidence bytes、REVIEWED provenance 或 ACTIVE pointer 变更。
+
