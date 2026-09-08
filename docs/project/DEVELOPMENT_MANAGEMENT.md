@@ -5564,3 +5564,15 @@ Git 历史负责保存过去版本。
 - scope-check 仅豁免这 5 个精确路径的 ` M` + `git diff --ignore-cr-at-eol` 无内容差异组合；所有真实新增、暂存、删除或语义修改继续阻断。
 - 未使用通配符、未扩大生成输出白名单、未改变官方 source/evidence hash/Golden gate/凭据边界；需由下一次受控 run 证明 durable receipt 已提交。
 
+## DM-CR-20260908-156 · GT-H3B evidence byte-preservation correction
+
+**Type**：C0 — content-addressed evidence attribute correction  
+**Date**：2026-09-08  
+**Status**：FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；controlled run 34217567739（run 34）。
+
+- A/B/C 与 scope-check 已通过：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125、post-seal gates 全空；失败发生在 commit step 的 `git diff --cached --check`。
+- `data/golden/** text eol=lf` 错把 GT-H3B content-addressed evidence 下的 PDF/HTML/ZIP 当成文本，`git add` 会尝试换行转换并使原始 evidence hash 不再可靠。
+- 已增加精确的 `data/golden/provider/amazingdata/evidence/** -text` 规则，保留证据 raw bytes；失败 job 的临时 evidence/v7/receipt 未提交。
+- 未改变 source、review、gate 或输出白名单边界；下一次受控 run 需证明 raw bytes、提交与幂等验证完整通过。
+

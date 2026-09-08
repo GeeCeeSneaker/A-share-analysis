@@ -3439,3 +3439,12 @@
 - scope-check 现对这 5 个精确路径仅在状态为未暂存 tracked 修改（` M`）且 `git diff --ignore-cr-at-eol` 确认无内容差异时跳过；untracked、staged、删除或语义变更仍 fail-closed。
 - 本次修正没有使用通配符或扩大 GT-H3B 输出白名单，也未改变 source/evidence/gate/凭据边界；待新 run 完成 scope-check 并提交 durable receipt。
 
+## 2026-09-08 · GT-H3B evidence byte-preservation correction
+
+> 状态：**ATTRIBUTE FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34217567739`（run 34）已完成 Phase A/B/C 与 scope-check：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125、post-seal gates 全空；失败发生在 commit step 的 `git diff --cached --check`。
+- 根因是 `data/golden/** text eol=lf` 误覆盖了 GT-H3B content-addressed evidence 下的 PDF/HTML/ZIP；`git add` 因此提示会将 raw bytes 的 CRLF 转为 LF，且 `diff --check` 对原始 HTML 的空白报错。
+- 已在更具体路径加入 `data/golden/provider/amazingdata/evidence/** -text`，确保证据按原始 bytes 提交，不被换行转换；此前失败 job 的临时 evidence/v7/receipt 未进入分支。
+- 本修正不改变 source 获取、evidence hash、review/gate 逻辑或输出白名单；下一次 run 必须证明证据 raw bytes、commit、后续幂等校验均通过。
+
