@@ -350,11 +350,12 @@ def test_existing_seal_uses_strong_reviewed_verifier(monkeypatch, tmp_path):
         "immutable_v1_v6": {"golden_cases_v1.jsonl": "immutable-hash"},
     }
     active = {"truth_version": "v7-reviewed-20260908", "dataset_hash": "dataset-hash"}
+    case_ids = [f"CASE-{index:03d}" for index in range(125)]
     monkeypatch.setattr(module, "_read_json", lambda path: active)
     monkeypatch.setattr(
         module,
         "_load_active_case_documents",
-        lambda *args: [{"golden_case_id": "CASE-A"}],
+        lambda *args: [{"golden_case_id": case_id} for case_id in case_ids],
     )
     frozen_contract = object()
     captured = {}
@@ -398,11 +399,11 @@ def test_existing_seal_uses_strong_reviewed_verifier(monkeypatch, tmp_path):
     monkeypatch.setattr(module, "_verify_reviewed_output", strong_verifier)
     module._verify_existing_seal(tmp_path, receipt)
 
-    assert captured["contract"] == (tmp_path, ["CASE-A"])
+    assert captured["contract"] == (tmp_path, case_ids)
     assert captured["strong"] == (
         tmp_path,
         frozen_contract,
-        ["CASE-A"],
+        case_ids,
         receipt["immutable_v1_v6"],
         "project-owner",
         "manifest-hash",

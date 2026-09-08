@@ -3515,3 +3515,9 @@
 - 后续受控 receipt 改为 v2，明确记录 source_base_sha、source_merge_ref_sha、source_head_sha；历史 v1 的 source_main_sha 语义仅作兼容读取。
 - 远端仓库基线、身份和 reviewed Golden 已满足正式授权条件，但当前工作区没有可执行的干净 main checkout，因此本轮没有登录、查询、run_id、B1-B7 或 verdict；未上传任何凭证。
 
+## 2026-09-08 · CI fixture correction for GT-H3B verifier hardening
+
+> 状态：PR #26 首轮 CI 发现并修正测试夹具缺陷。
+
+- 生产 verifier 的 125-case guard 在 Ubuntu 3.14 中按预期拒绝了不完整输入；首轮新回归测试只构造 1 个 fake case，造成 1/1619 failure。
+- 回归夹具现已扩展为 125 个模拟 case ID，继续验证强校验委托和 receipt 摘要逐字段比对；Golden 数据集、证据 bytes、历史 receipt 未修改。

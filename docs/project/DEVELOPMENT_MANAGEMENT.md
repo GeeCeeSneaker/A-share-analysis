@@ -5650,3 +5650,13 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 当前工作区缺少可执行的干净 main checkout，未启动正式 Provider 登录、B1-B7 或 verdict；未产生 run ID，授权未消耗。
 - 下一步仍须由受控 Windows operator 在源码 SHA 绑定和本地 SDK 注入完成后，按 runbook 启动单一完整 Formal Production run。
 
+## DM-20260908-POSTMERGE-002 · GT-H3B verifier test fixture correction
+
+**Type**：C1 — CI regression correction  
+**Date**：2026-09-08  
+**Status**：FIXED / CI RE-RUN PENDING  
+**Evidence**：PR #26；Ubuntu 3.14 run 34231537185。
+
+- 首轮失败由新测试夹具只提供 1 个 case，而被测既有 125-case 完整性门禁要求 125 个 case 引起；不是 Golden、evidence 或 receipt 数据变更。
+- 测试现构造 125 个 case ID，保持对 `_verify_reviewed_output` 委托、冻结合同绑定和 receipt 摘要比对的覆盖。
+- 修复后须等待三平台 CI 完成，再进入独立审阅。
