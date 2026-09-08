@@ -89,3 +89,16 @@ review.py 自己计算外层 bundle bytes 的 authoritative SHA256，并在 stag
 在真正开始 durable publication 后，工具现在记录本次调用新建的 evidence/version 文件。若 ACTIVE 指针仍保持旧字节而提交阶段失败，工具只删除“本次新建且字节未被外部改动”的文件；已有同 hash evidence 和所有历史 versioned 文件不会删除。若无法确认 ACTIVE 是否仍为旧值，或发现新文件已被外部改动，工具保留现场并明确报错，避免把 ACTIVE 指向的文件误删。
 
 该保护覆盖指针写失败、versioned 文件创建失败和 evidence 写入中途失败；测试验证旧 ACTIVE 不变、无新 version 文件、无新 evidence 文件。它不能替代操作系统崩溃恢复或真实 evidence 获取，仍必须以 CI 和最终 125/125 seal 结果为准。
+
+## P1.1 案例—官方来源强绑定
+
+P1.1 的机器合同位于 `docs/golden/gt_h3/gt_h3b/v6_case_evidence_source_contract.jsonl`，固定绑定 v6-candidate-20260908 的 125 个案例和 dataset SHA256；合同完整 bytes 的 pinned SHA256 为 `3c235e35d1a09f0171322a7f0c610edb3cbe3d5ad8c6afc701f7b90afa77d3bb`。合同来源只从现有 GT-H3 / GT-H3R / GT-H3R2 元数据派生，本 PR 不在 seal 阶段临时创造事实。
+
+- 合同逐行要求 125 个案例 ID 与 ACTIVE 数据集顺序完全一致；普通案例恰好一个 source_ref/kind。
+- 五个复合案例固定为 RULE → APPLICABILITY 两条来源，review manifest 使用 `bundle_sources` 按相同顺序声明。
+- 15 个新增 GT-H3R2 ST 案例固定使用 v6/rebuild 中已有的精确 `static.cninfo.com.cn` 定位，kind 为 `COMPANY_ANNOUNCEMENT`。
+- official host 是显式 allowlist： `www.sse.com.cn`、 `static.sse.com.cn`、 `star.sse.com.cn`、 `www.szse.cn`、 `disc.static.szse.cn`、 `www.bse.cn`、 `static.cninfo.com.cn`；不使用通配符或宽泛后缀。
+
+review.py 在任何 artifact staging 前，把 ordinary entry 的 `sources` 或复合 entry 的 `bundle_sources` 与合同按 case ID、source_ref、kind、顺序逐项比较；任意来源错配、缺失、交换、额外或非 allowlist host 都 fail closed。`--contract` 仅允许与 `--root` 一起用于测试临时合同，生产默认使用 pinned contract。
+
+该合同和校验只负责信任边界，不下载网络、不上传证据、不改变 ACTIVE；真实 125/125 bytes、P0 promotion 和 REVIEWED seal 仍按既定退出门执行。

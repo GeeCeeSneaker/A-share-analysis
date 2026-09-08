@@ -3091,3 +3091,14 @@
 
 - CI 的 GRANDFATHERED 清单已从 5 个历史提交扩展为 7 个完整 SHA（新增 3c66d111 与 d07d9628 两个 P1 提交）；同步修正 workflow 注释中的数量和版本说明。
 - 该修改仅使豁免清单与已披露记录一致，不改变豁免范围、P0/P1 语义、Golden bytes 或 ACTIVE；本 commit 同时更新 DEVLOG，后续不再扩展豁免。
+
+## 2026-09-08 · GT-H3B P1.1 case-bound official-source contract
+
+> 状态：**TOOLING HARDENED / CI PENDING / REAL EVIDENCE NOT MATERIALIZED**
+
+- 针对独立 Reviewer 指出的信任缺口，新增 `evidence_contract.py` 和冻结合同 `docs/golden/gt_h3/gt_h3b/v6_case_evidence_source_contract.jsonl`。合同精确覆盖 v6 candidate 的 125 个 case ID，合同 bytes pinned SHA256 为 `3c235e35d1a09f0171322a7f0c610edb3cbe3d5ad8c6afc701f7b90afa77d3bb`，并绑定 v6 dataset hash；未修改 v4/v5/v6 versioned Golden bytes。
+- 合同来源只从既有 GT-H3 `review_bundle_index.jsonl`、GT-H3R 人工结果中的 `required_source_refs`、以及 GT-H3R2 v6 candidate source_ref 派生；5 个复合 case 保留 RULE → APPLICABILITY 双来源，15 个新增 ST case 使用已有 CNINFO locator。
+- 增加显式官方 host allowlist（SSE/SZSE/BSE/CNINFO 的仓库已用主机与静态/披露别名），不使用宽泛域名匹配；`official.example` 等测试地址不能通过 production contract validation。
+- `review.py` 现在要求 ordinary manifest entry 声明 `sources`，bundle entry 声明 `bundle_sources`，并在 staging 前按 case ID、source_ref、kind、顺序与冻结合同精确比较；无实时网络访问。
+- 新增对抗测试覆盖任意 host、case A→case B 重用、ordinary 缺来源、复合来源缺失/交换/额外和 125 条合同覆盖；既有 P1 合同测试同步使用临时合同，不再以无绑定的 125-case synthetic seal 代表生产信任。
+- 本批次仍不获取/提交真实 125 evidence bytes、不运行 review.py seal、不执行 promote-existing、不推进 ACTIVE；等待三平台 CI 和独立 Reviewer closure。

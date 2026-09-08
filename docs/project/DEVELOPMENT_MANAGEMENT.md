@@ -5072,3 +5072,19 @@ Git 历史负责保存过去版本。
 
 - 将 workflow 注释同步为 7 个、V2.3/V2.5 两次定点豁免；不增加新的 SHA，不改变豁免范围和历史。
 - 本纯文案修正与 DEVLOG 在同一多文件 commit 中提交；后续不再扩展豁免。
+
+---
+
+## DM-CR-20260908-111 · GT-H3B P1.1 case-bound official-source contract
+
+**Type**：C1 — evidence-source trust binding hardening  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / CI_PENDING / PENDING_REVIEW  
+**Trigger**：独立 Reviewer 认定 P1 只能证明 artifact ↔ bundle ↔ manifest，不能证明 review declaration ↔ 对应 Golden case 的已授权官方来源。
+
+- 新增版本化 v6 evidence-source contract，精确覆盖 125 个 case ID、v6 dataset hash 和合同 pinned SHA256；合同来源从现有 GT-H3/GT-H3R/GT-H3R2 元数据派生，不在 seal 阶段新增事实。
+- `review.py` 在 artifact staging 前要求 ordinary `sources` 或 bundle `bundle_sources` 与合同按 case、locator、kind、顺序精确匹配；5 个 composite 的 RULE/APPLICABILITY 组合和顺序固定。
+- 增加显式 SSE/SZSE/BSE/CNINFO 官方 host allowlist，仅允许仓库已有的 7 个精确主机/别名；任意 `official.example` 等测试地址在 production contract validation 中失败。
+- 新增 125 coverage、任意 host、case A→B、ordinary 缺绑定、composite missing/swapped/extra 对抗测试；`expect_fields` 禁止和 no-network 边界保持不变。
+- 本批次不获取真实 evidence、不运行 REVIEWED seal、不执行 P0 promotion、不改变 ACTIVE；需先完成本次三平台 CI 和 Reviewer closure。
+- **Affected paths**：`src/ashare_state/spike/evidence_contract.py`; `scripts/golden/review.py`; `tests/integration/test_gt_h3b_p1_review_contract.py`; `tests/integration/test_gt_h3b_p1_source_contract.py`; `docs/golden/gt_h3b/v6_case_evidence_source_contract.jsonl`; 本文档、`docs/DEVLOG.md`、本管理记录。

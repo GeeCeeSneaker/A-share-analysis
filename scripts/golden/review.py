@@ -43,6 +43,13 @@ from ashare_state.spike.evidence_bundle import (  # noqa: E402
     EvidenceBundleError,
     read_evidence_bundle,
 )
+from ashare_state.spike.evidence_contract import (  # noqa: E402
+    CONTRACT_RELATIVE_PATH,
+    PRODUCTION_CONTRACT_SHA256,
+    EvidenceSourceContractError,
+    load_evidence_source_contract,
+    validate_review_source_bindings,
+)
 from ashare_state.spike.golden_store import (  # noqa: E402
     VALID_ARTIFACT_KINDS,
     GoldenTruthError,
@@ -57,6 +64,7 @@ from ashare_state.spike.golden_store import (  # noqa: E402
 
 GOLDEN_ROOT = Path("data/golden/provider/amazingdata")
 EVIDENCE_DIR = GOLDEN_ROOT / "evidence"
+EVIDENCE_SOURCE_CONTRACT_PATH = Path(__file__).resolve().parents[2] / CONTRACT_RELATIVE_PATH
 
 
 class ReviewError(RuntimeError):
@@ -71,6 +79,55 @@ def _validate_artifact_kind(kind: str) -> None:
     if kind not in VALID_ARTIFACT_KINDS:
         msg = f"artifact kind {kind!r} not in allowlist {sorted(VALID_ARTIFACT_KINDS)}"
         raise ReviewError(msg)
+
+
+def _parse_source_declarations(
+    raw_sources: object,
+    *,
+    entry_index: int,
+    field_name: str,
+    minimum: int,
+) -> list[dict]:
+    if not isinstance(raw_sources, list) or len(raw_sources) < minimum:
+        raise ReviewError(
+            f"review manifest entry {entry_index} {field_name} requires "
+            f"at least {minimum} source declaration(s)"
+        )
+    sources: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for source_index, source in enumerate(raw_sources, start=1):
+        if not isinstance(source, dict):
+            raise ReviewError(
+                f"review manifest entry {entry_index} {field_name} source "
+                f"{source_index} must be an object"
+            )
+        source_ref = source.get("source_ref")
+        source_kind = source.get("kind")
+        if not isinstance(source_ref, str) or not source_ref:
+            raise ReviewError(
+                f"review manifest entry {entry_index} {field_name} source "
+                f"{source_index} has an invalid source_ref"
+            )
+        if not isinstance(source_kind, str) or not source_kind:
+            raise ReviewError(
+                f"review manifest entry {entry_index} {field_name} source "
+                f"{source_index} has an invalid kind"
+            )
+        _validate_artifact_kind(source_kind)
+        if source_kind == "EVIDENCE_BUNDLE":
+            raise ReviewError(
+                f"review manifest entry {entry_index} {field_name} source "
+                f"{source_index} cannot itself be an EVIDENCE_BUNDLE"
+            )
+        key = (source_ref, source_kind)
+        if key in seen:
+            raise ReviewError(
+                f"review manifest entry {entry_index} contains duplicate "
+                f"{field_name} source {source_index}"
+            )
+        seen.add(key)
+        sources.append({"source_ref": source_ref, "kind": source_kind})
+    return sources
 
 
 def _validate_review_coverage(lines: list[dict], submitted_case_ids: list[str]) -> None:
@@ -118,8 +175,19 @@ def _validate_review_coverage(lines: list[dict], submitted_case_ids: list[str]) 
 
 def _load_review_requests(args: argparse.Namespace) -> list[dict]:
     """Parse review inputs without reading or writing evidence."""
-    if args.manifest and any((args.case, args.artifact, args.kind, args.expect_fields)):
-        raise ReviewError("--manifest cannot be combined with --case/--artifact/--kind")
+    if args.manifest and any(
+        (
+            args.case,
+            args.artifact,
+            args.kind,
+            args.expect_fields,
+            getattr(args, "source_ref", None),
+            getattr(args, "source_kind", None),
+        )
+    ):
+        raise ReviewError(
+            "--manifest cannot be combined with --case/--artifact/--kind/source-ref/source-kind"
+        )
 
     if args.manifest:
         try:
@@ -156,57 +224,31 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
             if expect_fields is not None and not isinstance(expect_fields, dict):
                 raise ReviewError(f"review manifest entry {index} expect_fields must be an object")
 
+            sources: list[dict] | None = None
             bundle_sources: list[dict] | None = None
             if kind == "EVIDENCE_BUNDLE":
-                raw_bundle_sources = entry.get("bundle_sources")
-                if not isinstance(raw_bundle_sources, list) or len(raw_bundle_sources) < 2:
+                if "sources" in entry:
                     raise ReviewError(
-                        f"review manifest entry {index} EVIDENCE_BUNDLE requires "
-                        "at least two bundle_sources"
+                        f"review manifest entry {index} sources is only valid "
+                        "for ordinary artifacts"
                     )
-                bundle_sources = []
-                seen_bundle_sources: set[tuple[str, str]] = set()
-                for source_index, source in enumerate(raw_bundle_sources, start=1):
-                    if not isinstance(source, dict):
-                        raise ReviewError(
-                            f"review manifest entry {index} bundle source "
-                            f"{source_index} must be an object"
-                        )
-                    if "source_ref" not in source or "kind" not in source:
-                        raise ReviewError(
-                            f"review manifest entry {index} bundle source "
-                            f"{source_index} must contain source_ref and kind"
-                        )
-                    source_ref = source["source_ref"]
-                    source_kind = source["kind"]
-                    if not isinstance(source_ref, str) or not source_ref:
-                        raise ReviewError(
-                            f"review manifest entry {index} bundle source "
-                            f"{source_index} has an invalid source_ref"
-                        )
-                    if not isinstance(source_kind, str) or not source_kind:
-                        raise ReviewError(
-                            f"review manifest entry {index} bundle source "
-                            f"{source_index} has an invalid kind"
-                        )
-                    _validate_artifact_kind(source_kind)
-                    if source_kind == "EVIDENCE_BUNDLE":
-                        raise ReviewError(
-                            f"review manifest entry {index} bundle source "
-                            "cannot itself be an EVIDENCE_BUNDLE"
-                        )
-                    source_key = (source_ref, source_kind)
-                    if source_key in seen_bundle_sources:
-                        raise ReviewError(
-                            f"review manifest entry {index} contains duplicate "
-                            f"bundle source {source_index}"
-                        )
-                    seen_bundle_sources.add(source_key)
-                    bundle_sources.append({"source_ref": source_ref, "kind": source_kind})
-            elif "bundle_sources" in entry:
-                raise ReviewError(
-                    f"review manifest entry {index} bundle_sources is only valid "
-                    "for EVIDENCE_BUNDLE"
+                bundle_sources = _parse_source_declarations(
+                    entry.get("bundle_sources"),
+                    entry_index=index,
+                    field_name="bundle_sources",
+                    minimum=2,
+                )
+            else:
+                if "bundle_sources" in entry:
+                    raise ReviewError(
+                        f"review manifest entry {index} bundle_sources is only valid "
+                        "for EVIDENCE_BUNDLE"
+                    )
+                sources = _parse_source_declarations(
+                    entry.get("sources"),
+                    entry_index=index,
+                    field_name="sources",
+                    minimum=1,
                 )
             requests.append(
                 {
@@ -215,6 +257,7 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
                     "kind": kind,
                     "note": entry.get("note", ""),
                     "expect_fields": expect_fields,
+                    "sources": sources,
                     "bundle_sources": bundle_sources,
                 }
             )
@@ -226,6 +269,8 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
             ("--case", args.case),
             ("--artifact", args.artifact),
             ("--kind", args.kind),
+            ("--source-ref", getattr(args, "source_ref", None)),
+            ("--source-kind", getattr(args, "source_kind", None)),
         )
         if value is None
     ]
@@ -246,6 +291,12 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
             "kind": args.kind,
             "note": args.note,
             "expect_fields": expect_fields,
+            "sources": [
+                {
+                    "source_ref": args.source_ref,
+                    "kind": args.source_kind,
+                }
+            ],
             "bundle_sources": None,
         }
     ]
@@ -277,6 +328,29 @@ def _load_active() -> tuple[Path, dict, list[dict]]:
         if line.strip()
     ]
     return dataset, active, lines
+
+
+def _load_evidence_source_contract(
+    args: argparse.Namespace,
+    dataset: Path,
+    active: dict,
+    lines: list[dict],
+):
+    contract_path = args.contract or EVIDENCE_SOURCE_CONTRACT_PATH
+    if args.contract is not None and args.root is None:
+        raise ReviewError("--contract is a test override and requires --root")
+    try:
+        return load_evidence_source_contract(
+            contract_path,
+            expected_truth_version=str(active["truth_version"]),
+            expected_dataset_file=dataset.name,
+            expected_dataset_hash=str(active["dataset_hash"]),
+            expected_case_ids=[str(doc["golden_case_id"]) for doc in lines],
+            expected_sha256=None if args.contract is not None else PRODUCTION_CONTRACT_SHA256,
+            enforce_known_composites=args.contract is None,
+        )
+    except (EvidenceSourceContractError, OSError, ValueError) as exc:
+        raise ReviewError(f"cannot load evidence-source contract: {exc}") from exc
 
 
 def _semantic_hash(doc: dict) -> str:
@@ -577,7 +651,14 @@ def main() -> int:
     parser.add_argument("--reviewer", required=True)
     parser.add_argument("--note", default="")
     parser.add_argument("--expect-fields", help="JSON: corrected expected_fields (optional)")
+    parser.add_argument("--source-ref", help="single-case source locator")
+    parser.add_argument("--source-kind", help="single-case source artifact kind")
     parser.add_argument("--manifest", type=Path, help="batch review manifest (JSON list)")
+    parser.add_argument(
+        "--contract",
+        type=Path,
+        help="test-only source contract override; requires --root",
+    )
     parser.add_argument("--root", type=Path, help="golden root override (tests)")
     args = parser.parse_args()
 
@@ -591,6 +672,11 @@ def main() -> int:
 
     requests = _load_review_requests(args)
     _validate_review_coverage(lines, [request["case"] for request in requests])
+    contract = _load_evidence_source_contract(args, dataset, active, lines)
+    try:
+        validate_review_source_bindings(contract, requests)
+    except EvidenceSourceContractError as exc:
+        raise ReviewError(f"review source binding failed: {exc}") from exc
 
     # -------- stage ALL entries first (P1-05: no orphan evidence) --------
     staged_artifacts: list[tuple[Path, str, str]] = []

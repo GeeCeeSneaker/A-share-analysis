@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -42,12 +43,12 @@ def _sources(tmp_path: Path) -> list[dict[str, str]]:
     return [
         {
             "path": str(first),
-            "source_ref": "https://official.example/rule.pdf",
+            "source_ref": "https://www.sse.com.cn/test/rule.pdf",
             "kind": "EXCHANGE_RULEBOOK",
         },
         {
             "path": str(second),
-            "source_ref": "https://official.example/applicability.html",
+            "source_ref": "https://star.sse.com.cn/test/applicability.html",
             "kind": "COMPANY_ANNOUNCEMENT",
         },
     ]
@@ -63,8 +64,8 @@ def test_bundle_is_deterministic_and_rehashes_raw_members(tmp_path: Path) -> Non
     assert left.read_bytes() == right.read_bytes()
     entries = read_evidence_bundle(left, expected_sources=sources)
     assert [entry.source_ref for entry in entries] == [
-        "https://official.example/rule.pdf",
-        "https://official.example/applicability.html",
+        "https://www.sse.com.cn/test/rule.pdf",
+        "https://star.sse.com.cn/test/applicability.html",
     ]
     assert all(len(entry.sha256) == 64 for entry in entries)
 
@@ -142,6 +143,49 @@ def _make_v4_root(tmp_path: Path) -> Path:
     return root
 
 
+def _write_test_source_contract(
+    path: Path,
+    *,
+    dataset: Path,
+    truth_version: str,
+    case_ids: list[str],
+    composite_sources: list[dict[str, str]],
+) -> None:
+    records: list[dict[str, object]] = [
+        {
+            "record_type": "contract_header",
+            "schema": 1,
+            "format": "GT-H3B-CASE-EVIDENCE-CONTRACT/v1",
+            "truth_version": truth_version,
+            "dataset_file": dataset.name,
+            "dataset_sha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
+            "case_count": len(case_ids),
+        }
+    ]
+    for index, case_id in enumerate(case_ids):
+        sources = (
+            composite_sources
+            if index == 0
+            else [
+                {
+                    "source_ref": f"https://www.sse.com.cn/test/{case_id}.html",
+                    "kind": "OTHER_OFFICIAL",
+                }
+            ]
+        )
+        records.append(
+            {
+                "record_type": "case",
+                "golden_case_id": case_id,
+                "sources": sources,
+            }
+        )
+    path.write_text(
+        "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records),
+        encoding="utf-8",
+    )
+
+
 def test_review_seals_a_declared_evidence_bundle(tmp_path: Path) -> None:
     root = _make_v4_root(tmp_path)
     sources = _sources(tmp_path)
@@ -156,6 +200,16 @@ def test_review_seals_a_declared_evidence_bundle(tmp_path: Path) -> None:
         for line in dataset.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+    contract = tmp_path / "source-contract.jsonl"
+    _write_test_source_contract(
+        contract,
+        dataset=dataset,
+        truth_version=active["truth_version"],
+        case_ids=case_ids,
+        composite_sources=[
+            {"source_ref": source["source_ref"], "kind": source["kind"]} for source in sources
+        ],
+    )
     review_manifest = tmp_path / "gt_h3b_review.json"
     entries: list[dict[str, object]] = []
     for index, case_id in enumerate(case_ids):
@@ -167,6 +221,13 @@ def test_review_seals_a_declared_evidence_bundle(tmp_path: Path) -> None:
         if index == 0:
             entry["bundle_sources"] = [
                 {"source_ref": source["source_ref"], "kind": source["kind"]} for source in sources
+            ]
+        else:
+            entry["sources"] = [
+                {
+                    "source_ref": f"https://www.sse.com.cn/test/{case_id}.html",
+                    "kind": "OTHER_OFFICIAL",
+                }
             ]
         entries.append(entry)
     review_manifest.write_text(
@@ -183,6 +244,8 @@ def test_review_seals_a_declared_evidence_bundle(tmp_path: Path) -> None:
             "project-owner",
             "--root",
             str(root),
+            "--contract",
+            str(contract),
         ],
         cwd=REPO_ROOT,
         capture_output=True,
@@ -216,6 +279,16 @@ def test_review_pointer_failure_rolls_back_new_outputs(tmp_path: Path, monkeypat
         for line in dataset.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+    contract = tmp_path / "source-contract.jsonl"
+    _write_test_source_contract(
+        contract,
+        dataset=dataset,
+        truth_version=active["truth_version"],
+        case_ids=case_ids,
+        composite_sources=[
+            {"source_ref": source["source_ref"], "kind": source["kind"]} for source in sources
+        ],
+    )
     review_manifest = tmp_path / "gt_h3b_review.json"
     entries: list[dict[str, object]] = []
     for index, case_id in enumerate(case_ids):
@@ -227,6 +300,13 @@ def test_review_pointer_failure_rolls_back_new_outputs(tmp_path: Path, monkeypat
         if index == 0:
             entry["bundle_sources"] = [
                 {"source_ref": source["source_ref"], "kind": source["kind"]} for source in sources
+            ]
+        else:
+            entry["sources"] = [
+                {
+                    "source_ref": f"https://www.sse.com.cn/test/{case_id}.html",
+                    "kind": "OTHER_OFFICIAL",
+                }
             ]
         entries.append(entry)
     review_manifest.write_text(
@@ -250,6 +330,8 @@ def test_review_pointer_failure_rolls_back_new_outputs(tmp_path: Path, monkeypat
             "project-owner",
             "--root",
             str(root),
+            "--contract",
+            str(contract),
         ],
     )
 
