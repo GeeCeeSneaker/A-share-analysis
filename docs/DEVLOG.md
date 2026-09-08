@@ -3385,3 +3385,12 @@
 
 - CI run 34208776223 仅报告 source progress 唯一绑定集合的 Ruff formatter 差异；已按 formatter 保持内部推导单行并满足 E501。
 - 不改变 source 进度日志、固定超时、官方原始 bytes、Golden bytes、ACTIVE 或 seal 边界；受控 run 34208776209 使用旧提交，待修正版重新执行。
+
+## 2026-09-08 · GT-H3B post-seal gate correction
+
+> 状态：**BUG FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34208884086` 已完成唯一 105/105 个官方 source binding 的 HTTP 200 原始 bytes 获取；之后在 post-seal verification 阶段失败。
+- 根因是 `_verify_reviewed_output` 误将仅适用于 REVIEWED 之前 COMPILED candidate 的 `review_readiness_gate` 用于已 REVIEWED 的输出，因此把正常的 `review_status=REVIEWED` 和 review provenance 报成阻断。
+- 已改为在 reviewed output 上调用 `GoldenTruthStore.review_gate`，并继续保留 quantity、event coverage、production formal、evidence hash、composite bundle、v1-v6 immutable checks；不放宽任何来源或发布校验。
+- 本轮失败 job 工作区中的临时 v7/evidence 未提交；没有生成可合并的执行回执或 durable REVIEWED seal。v1-v6、v6 contract、ACTIVE baseline 与凭据边界均未改变，待新受控 run 实测。

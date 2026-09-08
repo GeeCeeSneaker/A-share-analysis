@@ -47,7 +47,6 @@ from ashare_state.spike.evidence_contract import (  # noqa: E402
 from ashare_state.spike.golden_store import (  # noqa: E402
     GoldenTruthError,
     GoldenTruthStore,
-    review_readiness_gate,
 )
 
 GOLDEN_RELATIVE = Path("data/golden/provider/amazingdata")
@@ -827,7 +826,7 @@ def _verify_reviewed_output(
     except (GoldenTruthError, OSError, ValueError) as exc:
         raise ExecutionError(f"reviewed ACTIVE failed Golden loader verification: {exc}") from exc
     gates = {
-        "review_readiness": review_readiness_gate(cases, manifest),
+        "review": store.review_gate(cases, manifest),
         "quantity": store.quantity_gate(cases, manifest),
         "event_coverage": store.event_coverage_gate(cases, manifest),
         "production_formal": store.production_formal_gate(cases, manifest),

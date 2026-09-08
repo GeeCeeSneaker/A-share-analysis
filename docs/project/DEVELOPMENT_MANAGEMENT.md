@@ -5492,3 +5492,15 @@ Git 历史负责保存过去版本。
 
 - 按 Ruff formatter 输出收敛 source_bindings 集合推导，且保留 E501 安全边界；不改变抓取与证据逻辑。
 - 受控 run 34208776209 使用旧提交，待并发策略取消后重新执行。
+
+## DM-CR-20260908-150 · GT-H3B post-seal gate correction
+
+**Type**：C1 — controlled execution post-seal verification correction
+**Date**：2026-09-08
+**Status**：FIX STAGED / RETRY PENDING
+**Evidence**：PR #25；controlled run 34208884086；job 102004952670。
+
+- run 已取得 105/105 个唯一官方 source binding 的 HTTP 200 原始 bytes，失败发生在 `review.py` 之后的 post-seal verification，而非来源抓取。
+- 原实现把 pre-review 的 `review_readiness_gate` 用在已 REVIEWED dataset，因而将 `REVIEWED` 状态和审阅溯源字段错误报告为 non-empty gate。
+- 已改为 `GoldenTruthStore.review_gate`，该 gate 检查完整 REVIEWED seal 及 evidence artifact/hash；quantity、event coverage、production formal、复合 bundle、v1-v6 immutable 检查仍保留。
+- 失败 job 的临时 evidence/v7 输出未提交，未形成成功回执；v1-v6、v6 contract、ACTIVE baseline 和凭据边界未改变，需由新受控 run 证明闭环。
