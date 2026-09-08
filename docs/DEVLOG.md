@@ -3217,3 +3217,12 @@
 - 本次仅修正 runner 源码与治理记录；不修改 v1-v6 Golden bytes、ACTIVE、evidence、review seal 或任何凭据。
 - 旧的受控执行 run 由修正版提交触发的并发取消策略处理；新的 CI 与受控执行结果须重新核实后才能宣称完成。
 
+## 2026-09-08 · GT-H3B official PDF browser fallback
+
+> 状态：**BROWSER FALLBACK STAGED / RETRY PENDING**
+
+- 受控执行 run `34199650996` 在 Phase B 对 SSE 官方 PDF 返回的 JavaScript 反爬挑战页按 fail-closed 停止；该运行没有生成成功回执、evidence 或 REVIEWED seal。
+- runner 增加仅针对 PDF challenge 的 Playwright Chromium fallback，并且只接受浏览器网络层捕获的 HTTP 200、官方 allowlist 主机下的 `%PDF-` 原始响应体；不接受渲染页面、截图、HTML、搜索摘要或镜像。
+- 专用工作流安装固定版本的 Playwright 与 Chromium；不安装 Provider SDK，不接收账号、密码、Token、IP 或 Cookie。
+- 该修正尚未重新执行；新的 CI 和受控运行通过后，仍需独立审阅真实 evidence 与 seal。
+

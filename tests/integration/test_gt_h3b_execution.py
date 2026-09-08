@@ -86,6 +86,32 @@ def test_fetch_source_rejects_pdf_challenge_body(tmp_path, monkeypatch):
         )
 
 
+def test_fetch_source_uses_browser_for_pdf_challenge(tmp_path, monkeypatch):
+    module = _load_module()
+    body = b"%PDF-1.7\nbrowser-resolved raw bytes\n"
+    monkeypatch.setattr(
+        module,
+        "urlopen",
+        lambda request, timeout: _FakeResponse(b"<html>challenge</html>"),
+    )
+    monkeypatch.setattr(
+        module,
+        "_fetch_pdf_with_browser",
+        lambda source_ref, timeout: (body, "application/pdf", source_ref),
+    )
+
+    result = module._fetch_source(
+        "https://www.sse.com.cn/example.pdf",
+        "EXCHANGE_RULEBOOK",
+        tmp_path / "sources",
+        1,
+        5,
+    )
+
+    assert result.path.read_bytes() == body
+    assert result.content_type == "application/pdf"
+
+
 def test_fetch_source_rejects_non_official_redirect(tmp_path, monkeypatch):
     module = _load_module()
     body = b"<html>official page</html>"

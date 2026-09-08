@@ -231,6 +231,88 @@ def _read_bounded(response: object) -> bytes:
     return b"".join(chunks)
 
 
+
+def _fetch_pdf_with_browser(
+    source_ref: str,
+    timeout: float,
+) -> tuple[bytes, str, str]:
+    """Resolve a JavaScript anti-bot challenge through a browser network response."""
+    try:
+        from playwright.sync_api import Error as PlaywrightError
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:
+        raise ExecutionError(
+            "browser fallback unavailable for PDF anti-bot challenge"
+        ) from exc
+
+    responses: list[object] = []
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        try:
+            context = browser.new_context(
+                accept_downloads=False,
+                user_agent="A-share-analysis-GT-H3B-materializer/1.0",
+            )
+            try:
+                page = context.new_page()
+                page.on("response", responses.append)
+                try:
+                    page.goto(
+                        source_ref,
+                        wait_until="domcontentloaded",
+                        timeout=max(1000, int(timeout * 1000)),
+                    )
+                except (PlaywrightError, PlaywrightTimeoutError):
+                    # PDF downloads can abort page.goto; inspect captured responses below.
+                    pass
+                page.wait_for_timeout(min(5000, max(1000, int(timeout * 1000))))
+                for response in reversed(responses):
+                    if getattr(response, "status", None) != 200:
+                        continue
+                    response_url = str(getattr(response, "url", ""))
+                    final = urlsplit(response_url)
+                    if (
+                        final.scheme.lower() != "https"
+                        or (final.hostname or "").lower() not in OFFICIAL_SOURCE_HOSTS
+                    ):
+                        continue
+                    headers = getattr(response, "headers", {})
+                    content_length = headers.get("content-length")
+                    if content_length:
+                        try:
+                            if int(content_length) > MAX_SOURCE_BYTES:
+                                raise ExecutionError(
+                                    f"browser PDF response exceeded the {MAX_SOURCE_BYTES} "
+                                    "byte safety limit"
+                                )
+                        except ValueError:
+                            pass
+                    try:
+                        body = response.body()
+                    except PlaywrightError:
+                        continue
+                    if len(body) > MAX_SOURCE_BYTES:
+                        raise ExecutionError(
+                            f"browser PDF response exceeded the {MAX_SOURCE_BYTES} "
+                            "byte safety limit"
+                        )
+                    if body.startswith(b"%PDF-"):
+                        content_type = (
+                            str(headers.get("content-type", ""))
+                            .split(";", 1)[0]
+                            .strip()
+                            .lower()
+                        )
+                        return body, content_type or "application/pdf", response_url
+            finally:
+                context.close()
+        finally:
+            browser.close()
+    raise ExecutionError(
+        f"browser fallback did not obtain an HTTP 200 PDF response for {source_ref}"
+    )
+
 def _fetch_source(
     source_ref: str,
     kind: str,
@@ -274,15 +356,18 @@ def _fetch_source(
     except URLError as exc:
         raise ExecutionError(f"official source {source_ref} could not be retrieved: {exc}") from exc
 
+    is_pdf_url = parsed.path.lower().endswith(".pdf")
+    if is_pdf_url and (not data or not data.startswith(b"%PDF-")):
+        try:
+            data, content_type, final_url = _fetch_pdf_with_browser(source_ref, timeout)
+        except ExecutionError as exc:
+            raise ExecutionError(
+                f"official PDF source {source_ref} did not return a PDF body; "
+                f"browser fallback failed: {exc}"
+            ) from exc
     if not data:
         raise ExecutionError(f"official source {source_ref} returned an empty body")
-    is_pdf_url = parsed.path.lower().endswith(".pdf")
     is_pdf = data.startswith(b"%PDF-") or content_type == "application/pdf"
-    if is_pdf_url and not data.startswith(b"%PDF-"):
-        raise ExecutionError(
-            f"official PDF source {source_ref} did not return a PDF body; "
-            "possible anti-bot/challenge response"
-        )
     suffix = ".pdf" if is_pdf else ".html"
     output = source_dir / f"source-{ordinal:04d}{suffix}"
     temporary = source_dir / f".source-{ordinal:04d}.tmp"

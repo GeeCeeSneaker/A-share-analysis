@@ -5253,3 +5253,14 @@ Git 历史负责保存过去版本。
 - 该修正与 DEVLOG 在同一 Git 数据提交中落盘；修正版会重新触发三平台 CI 和受控 GT-H3B 工作流。
 - 在新的工作流成功回执及独立审阅完成前，不声称 125/125 evidence、REVIEWED seal、ACTIVE promotion 或 PR merge 已完成。
 
+## DM-CR-20260908-126 · GT-H3B official PDF browser fallback
+
+**Type**：C1 — controlled execution evidence retrieval hardening  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / RETRY PENDING  
+**Evidence**：PR #25；controlled run `34199650996` 的 Phase B 日志；失败来源为 SSE 官方 PDF `600518_20211127_2_wfwElR2q.pdf` 返回 challenge body。  
+
+- 保持原 required source URL、官方 host allowlist、HTTP 200 和原始 `%PDF-` body 要求不变；仅在标准库请求收到 PDF challenge 时，使用固定 Playwright Chromium 捕获真实浏览器网络响应。
+- 浏览器 fallback 在响应层重新核验状态、最终 HTTPS 官方主机、大小上限和 PDF magic bytes；不把渲染结果、截图、HTML 或媒体镜像当作证据。
+- 当前仍未生成 125/125 evidence、REVIEWED seal、ACTIVE promotion 或执行回执；下一步先验证三平台 CI，再重跑受控执行。
+

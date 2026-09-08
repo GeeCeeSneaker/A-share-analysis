@@ -43,6 +43,12 @@ jobs:
       - name: Sync locked dependencies
         run: uv sync --frozen
 
+      - name: Install pinned browser fallback for official PDF challenges
+        shell: bash
+        run: |
+          uv pip install --python .venv/bin/python "playwright==1.52.0"
+          uv run playwright install --with-deps chromium
+
       - name: Run governed GT-H3B phases A/B/C
         env:
           GITHUB_SHA: ${{ github.sha }}
