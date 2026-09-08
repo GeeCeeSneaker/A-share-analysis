@@ -28,3 +28,11 @@ uv run python scripts/spike/spike_runner.py --production --date <provider-derive
 ```
 
 Formal run 完成后才允许执行 verdict 并创建独立 evidence PR。不得把本记录、CI 结果或离线检查解释为 Provider GO / Data Sufficiency 批准。
+
+
+## 2026-09-09 连接器复核补充
+
+- 通过 GitHub 连接器已成功读取当前 `main` 的 v7 manifest、v7 dataset、Formal 脚本、evidence bundle/contract 以及历史 receipt 文本，说明远端文件可访问。
+- 但当前连接器提供的是按路径读取/写入的 GitHub 文件接口，不会自动把包含二进制 evidence 的完整 Git tree 同步为本地 checkout；工作区也没有另一个完整、干净、绑定 `main@d08530ef7f02472761d6db6eb61bea9be316765c` 的副本。
+- 因此“远端可读取”不能等同于“正式运行所需的本地源码、v7、evidence 和提交身份已完整落地”。在项目管理者准备好该本地 checkout 前，B1-B7 继续保持 `NOT_RUN`。
+- 请项目管理者解决以下任一项：提供当前 `main` 的完整干净本地 checkout；或为运行环境配置受治理的 GitHub checkout/materialization 方式（含二进制 evidence），并保留可核验的 source SHA。不得通过修改 Golden、伪造本地 SHA 或绕过 clean-worktree gate 解决。
