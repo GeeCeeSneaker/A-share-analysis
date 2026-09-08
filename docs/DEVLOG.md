@@ -3167,3 +3167,12 @@
 
 - CI run `34191561514` 的 Ubuntu 与 Windows 3.12 job 在 pytest 前仅报告新增 root-override 对抗测试函数签名的 Ruff formatter 差异；已按机器输出合并为单行。
 - resolved production-root guard、exact/dot/parent 等价路径测试、临时 test root 允许路径及 ACTIVE/seal 边界不变；需重新跑完整三平台 CI。
+
+
+## 2026-09-08 · GT-H3B P0-BYPASS-01 final CI verification
+
+> 状态：**CI PASSED / PENDING_INDEPENDENT_REVIEW / REAL EVIDENCE NOT MATERIALIZED**
+
+- root-override boundary 修复后的最终代码 head `9c965bd3c85cd744a4c376f15fa37b512cad5a7c` 对应 CI run `34191667025`；Ubuntu 3.14、Windows 3.12、Windows 3.14 均成功，各平台均为 `1609 passed`。
+- Ruff、mypy、compileall、Spike、SDK-absent、DEVLOG/Management 治理门均通过；exact/dot/parent 等价 production root 测试已纳入回归。
+- 本记录只确认边界修复与测试门禁，不等同于真实 evidence、REVIEWED seal、ACTIVE promotion、生产验证或 PR merge；下一关是独立 Reviewer final closure。

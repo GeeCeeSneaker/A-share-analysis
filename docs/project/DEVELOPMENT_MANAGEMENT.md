@@ -5187,3 +5187,16 @@ Git 历史负责保存过去版本。
 
 - 按 Ruff 机器输出将测试签名合并为单行；不改变 production-root resolved-path guard、custom test root、source contract、ACTIVE 或 seal 边界。
 - 该修正与 DEVLOG 同一多文件 commit 提交，随后重新运行完整三平台 CI。
+
+
+
+## DM-CR-20260908-120 · GT-H3B P0-BYPASS-01 final CI verification
+
+**Type**：C0 — final CI verification  
+**Date**：2026-09-08  
+**Status**：CI PASSED / PENDING_INDEPENDENT_REVIEW  
+**Evidence**：Root-override boundary fix head `9c965bd3c85cd744a4c376f15fa37b512cad5a7c` passed GitHub Actions run `34191667025` on Ubuntu 3.14, Windows 3.12 and Windows 3.14; each reported `1609 passed`. Ruff, mypy, compileall, Spike, SDK-absent and DEVLOG/Management governance gates passed.
+
+- The test suite includes exact/dot/parent equivalent production-root override rejection; custom contract + temporary test root remains allowed.
+- This verifies the code/test gate only. It does not claim real official evidence, REVIEWED seal, ACTIVE promotion, production validation or PR merge.
+- Independent Reviewer must close the final head against the current-main test-merge before controlled post-merge work.
