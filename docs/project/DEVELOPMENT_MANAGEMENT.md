@@ -5284,3 +5284,13 @@ Git 历史负责保存过去版本。
 - Playwright 事件 API 不能直接接收内建 `responses.append`；改用具名回调以完成响应收集。
 - 该修正不放宽来源或证据规则，也不改变任何 Golden bytes；run `34200348385` 将由并发取消策略终止并重新执行。
 
+## DM-CR-20260908-129 · GT-H3B browser fallback import-order correction
+
+**Type**：C0 — controlled execution tooling lint correction  
+**Date**：2026-09-08  
+**Status**：LINT FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；CI run `34200443329` 的 Ruff `I001` 报告。  
+
+- 按 Ruff isort 输出调整标准库导入顺序；不改变来源、浏览器响应、证据 hash 或 fail-closed 规则。
+- 该修正会重新触发 CI 和受控执行；在新结果核验前不声称任何 seal 或回执完成。
+

@@ -3241,3 +3241,10 @@
 - 将 `responses.append` 改为显式回调函数，保持仅捕获网络响应 body 的设计；不改变 HTTP 200、官方 host、大小上限、PDF magic bytes 或 fail-closed 规则。
 - 修正版提交会取消 run `34200348385` 并重新触发受控流程；结果仍需实际日志核验。
 
+## 2026-09-08 · GT-H3B browser fallback import-order correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run `34200443329` 的已完成 job 只报告 `collections.abc` 与 `contextlib` 导入顺序；已按 Ruff isort 结果调整。
+- 该文案/格式修正不改变浏览器网络响应取证逻辑；受控 run `34200443216` 的最终结果仍待核验。
+
