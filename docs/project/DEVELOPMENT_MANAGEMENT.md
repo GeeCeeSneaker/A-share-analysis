@@ -5034,3 +5034,17 @@ Git 历史负责保存过去版本。
 - **P1 tooling correction 2**：run #393 的 formatter 仅要求 3 处确定性格式化，已同步；P1 行为和未 seal 边界不变。
 
 - **P1 tooling correction 3**：run #394 暴露 manifest member 特判和动态导入测试注册缺口，已修复；EVIDENCE_BUNDLE 仍要求清单完整、成员重算和 source declaration 精确匹配。
+
+
+## DM-CR-20260908-108 · GT-H3B P1 publication rollback hardening
+
+**Type**：C1 — atomic review publication failure containment  
+**Date**：2026-09-08  
+**Status**：TOOLING HARDENED / CI_PENDING / PENDING_REVIEW  
+**Trigger**：复核发现 batch review 已写入 evidence/version 后若 ACTIVE 指针提交失败，旧 ACTIVE 可保持不变但新文件可能残留，不满足“失败不得留下半发布状态”的严格要求。
+
+- review workflow 现在记录本次调用新建的 evidence/version 文件；只有在 ACTIVE 字节仍等于提交前快照、且文件字节未被外部改动时才回滚这些新文件。
+- 已有同 hash evidence、历史 versioned 文件和任何无法确认状态的现场均不删除；指针状态不确定或现场被外部修改时 fail closed 并保留现场供恢复。
+- 新增指针失败回归测试，覆盖旧 ACTIVE 不变、无新 version 文件、无新 evidence 文件。
+- 本次不获取真实官方 evidence、不执行 P0 promotion、不改变 v4/v5/v6 bytes 或 ACTIVE；等待三平台 CI、独立 Reviewer final-head/current-main test-merge 及后续受控步骤。
+
