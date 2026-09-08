@@ -3295,3 +3295,10 @@
 - runner 现在对目标 PDF 文件名启用 CDP Fetch response-stage 拦截，在交给 PDF 处理器前调用 `Fetch.getResponseBody`，并要求继续绑定同一官方 host、HTTP 200、大小上限和 `%PDF-`。
 - 未使用渲染/打印结果、截图、HTML 或镜像；未写入或输出正文、Cookie、账号或密码。本次修正尚未重新执行。
 
+## 2026-09-08 · GT-H3B CDP Fetch error-text correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- CI run `34202354798` 的 Ruff lint 只报告 CDP Fetch 超限异常文本超出行长；已缩短为等义表达。
+- 不改变大小上限判断、HTTP 200/官方 host/PDF magic bytes 校验或受控执行边界；run `34202354818` 的 Fetch 实际结果仍待核验。
+

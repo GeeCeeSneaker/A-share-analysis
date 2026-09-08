@@ -5358,3 +5358,13 @@ Git 历史负责保存过去版本。
 - 只有 HTTP 200、HTTPS 官方 allowlist host、application/pdf、`%PDF-` 且未超限的 body 才进入 evidence staging；其他响应继续 fail closed。
 - 不改变 source contract、Golden bytes、ACTIVE 或 seal 边界；当前仍未形成真实 evidence、REVIEWED seal 或回执。
 
+## DM-CR-20260908-137 · GT-H3B CDP Fetch error-text correction
+
+**Type**：C0 — controlled execution tooling lint correction  
+**Date**：2026-09-08  
+**Status**：LINT FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；CI run `34202354798` 的 Ruff E501 报告。  
+
+- 缩短 CDP Fetch 超限错误文本，保留原有 MAX_SOURCE_BYTES 判断和 fail-closed 行为。
+- 不改变浏览器取证、source contract、Golden bytes、ACTIVE 或 seal 边界；当前仍待受控执行结果。
+

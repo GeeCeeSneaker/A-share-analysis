@@ -341,8 +341,7 @@ def _fetch_pdf_with_browser(
                                 if len(body) > MAX_SOURCE_BYTES:
                                     fetch_errors.append(
                                         ExecutionError(
-                                            f"CDP Fetch PDF response exceeded the {MAX_SOURCE_BYTES} "
-                                            "byte safety limit"
+                                            f"CDP Fetch PDF response exceeded {MAX_SOURCE_BYTES} bytes"
                                         )
                                     )
                                 elif body.startswith(b"%PDF-"):
