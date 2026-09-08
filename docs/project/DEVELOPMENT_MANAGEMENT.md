@@ -5399,3 +5399,13 @@ Git 历史负责保存过去版本。
 - 每次成功响应仍经过 HTTP 200、最终 HTTPS official allowlist、大小上限、PDF magic bytes 和 source contract 校验。
 - 本次不改变证据内容、Golden bytes、ACTIVE 或 seal；待 CI 和受控运行重新核验。
 
+## DM-CR-20260908-141 · GT-H3B retry helper formatter correction
+
+**Type**：C0 — controlled execution tooling formatting correction  
+**Date**：2026-09-08  
+**Status**：FORMAT FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；CI run `34202971111` 的 Ruff formatter diff。  
+
+- 同步 `_open_source` 两侧空行到 formatter 规范；不改变网络重试、来源校验、原始字节或发布边界。
+- 当前受控执行结果仍待核验。
+

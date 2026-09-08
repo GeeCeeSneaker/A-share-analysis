@@ -3324,3 +3324,10 @@
 - runner 对标准库来源请求增加最多 3 次的瞬态网络重试，仅重试 `URLError` 网络失败，不重试 HTTP 4xx/5xx 业务响应；每次仍要求 HTTP 200、官方 host 和原始 body 校验。
 - 新增离线回归测试验证首次 reset 后重试成功；不改变 source contract、Golden bytes、ACTIVE 或 seal 边界。
 
+## 2026-09-08 · GT-H3B retry helper formatter correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run `34202971111` 仅报告 `_open_source` 前后空行与 formatter 输出不一致；已按机器 diff 收敛。
+- 不改变瞬态 `URLError` 重试、HTTPError 直接失败、Fetch 取证或 Golden/seal 边界；受控 run `34202971105` 仍待核验。
+

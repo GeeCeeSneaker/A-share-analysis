@@ -491,7 +491,6 @@ def _fetch_pdf_with_browser(
     )
 
 
-
 def _open_source(request: Request, timeout: float):
     for attempt in range(SOURCE_FETCH_ATTEMPTS):
         try:
@@ -503,6 +502,7 @@ def _open_source(request: Request, timeout: float):
                 raise
             time.sleep(attempt + 1)
     raise AssertionError("source retry loop completed without a response")
+
 
 def _fetch_source(
     source_ref: str,
