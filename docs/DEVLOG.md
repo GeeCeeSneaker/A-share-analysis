@@ -3411,3 +3411,13 @@
 - 受控 run `34211652563` 尚未形成分支提交；审查 workflow 后发现生成的 v7 dataset、evidence 和 receipt 属于新文件，原提交步骤使用 `git diff --quiet` 只检测 tracked changes，可能错误跳过提交。
 - 已将提交前变更检测改为受管路径范围内的 `git status --porcelain`，从而同时识别 tracked 与 untracked 输出；scope 白名单、`git add` 路径和凭据边界不变。
 - 本修正不改变 A/B/C、HTTP 200、证据 hash、复合 bundle、Golden gates 或 v1-v6 immutable checks；待新 run 验证并产生 durable receipt。
+
+## 2026-09-08 · GT-H3B scope-check checkout-normalization correction
+
+> 状态：**WORKFLOW FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34212605690` 已完成 Phase A/B/C：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空；失败仅发生在提交前 scope-check。
+- 根因是历史 `docs/golden/gt_h2/rebuild_plan_v4.json` 的仓库 blob 使用 CRLF，而仓库 `*.json text eol=lf` 规则在 Linux checkout 物化 LF；`git status` 因换行差异报告了一个不属于 GT-H3B 的伪变更。
+- scope-check 现在只对该精确路径、精确的未暂存 tracked 状态（` M`）且 `git diff --ignore-cr-at-eol` 确认无内容差异的情形跳过；untracked、staged、删除或语义变更仍 fail-closed。
+- 同步修正执行提交步骤的 `GITHUB_HEAD_REF` shell 展开；未扩大 GT-H3B 输出白名单，未改变官方 source、raw bytes、evidence hash、Golden gate 或凭据边界，待新 run 证明 durable receipt 已提交。
+

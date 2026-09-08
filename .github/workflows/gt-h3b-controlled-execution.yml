@@ -63,7 +63,16 @@ jobs:
         run: |
           set -euo pipefail
           while IFS= read -r entry; do
+            status="${entry:0:2}"
             path="${entry:3}"
+            # This legacy plan is stored as CRLF while the repository-wide
+            # *.json eol=lf rule materializes LF on the Linux runner. Ignore
+            # only this exact tracked EOL-only checkout artifact; every other
+            # status entry remains fail-closed.
+            if [[ "$path" == "docs/golden/gt_h2/rebuild_plan_v4.json" && "$status" == " M" ]] &&
+               git diff --quiet --ignore-cr-at-eol -- "$path"; then
+              continue
+            fi
             case "$path" in
               data/golden/provider/amazingdata/*|docs/golden/gt_h3/gt_h3b/GT_H3B_EXECUTION_RECEIPT.json|docs/DEVLOG.md|docs/project/DEVELOPMENT_MANAGEMENT.md)
                 ;;
@@ -92,4 +101,4 @@ jobs:
           git add -- data/golden/provider/amazingdata docs/golden/gt_h3/gt_h3b/GT_H3B_EXECUTION_RECEIPT.json docs/DEVLOG.md docs/project/DEVELOPMENT_MANAGEMENT.md
           git diff --cached --check
           git commit -m "chore: record GT-H3B controlled execution"
-          git push origin "HEAD:\${GITHUB_HEAD_REF}"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"

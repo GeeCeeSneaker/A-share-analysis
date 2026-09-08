@@ -5527,3 +5527,16 @@ Git 历史负责保存过去版本。
 - 生成的 v7 dataset、evidence、receipt 属于 untracked 新文件；原 `git diff --quiet` 检查无法可靠识别它们，存在 A/B/C 成功但不提交 durable output 的风险。
 - 已改为在同一受管路径集合内执行 `git status --porcelain` 检测；空状态才走幂等分支，非空状态继续执行既有 `git add`/commit/push。
 - 未扩大输出白名单、未改变 runner 校验或任何 source/credential 规则；新的受控 run 必须证明回执实际出现在执行分支。
+
+## DM-CR-20260908-153 · GT-H3B scope-check checkout-normalization correction
+
+**Type**：C0 — controlled execution workflow correction  
+**Date**：2026-09-08  
+**Status**：FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；controlled run 34212605690。
+
+- A/B/C 已完成：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空；失败仅在提交前 scope-check。
+- 根因是历史 GT-H2 v4 plan 的 CRLF blob 与 `*.json text eol=lf` checkout 规则冲突，Linux 工作区仅发生换行物化差异，导致普通 `git status` 误报无关文件。
+- scope-check 仅豁免该已知路径的 ` M` + `git diff --ignore-cr-at-eol` 无内容差异组合；所有真实新增、暂存、删除或语义修改继续阻断。
+- 修正了 commit step 的 `GITHUB_HEAD_REF` 展开；输出白名单、source/evidence 校验、Golden seal 和凭据边界均未放宽，需重新执行确认回执实际落入执行分支。
+
