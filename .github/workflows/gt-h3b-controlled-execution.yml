@@ -1,0 +1,84 @@
+name: GT-H3B controlled execution
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/gt-h3b-controlled-execution.yml"
+      - "scripts/golden/gt_h3b_execute.py"
+      - "data/golden/provider/amazingdata/**"
+      - "docs/golden/gt_h3/gt_h3b/**"
+      - "docs/DEVLOG.md"
+      - "docs/project/DEVELOPMENT_MANAGEMENT.md"
+
+# This workflow is intentionally narrow and only runs for the dedicated
+# same-repository execution branch. It has no provider credentials.
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: gt-h3b-controlled-execution-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ops/gt-h3b-controlled-execution-20260908'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout execution branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Sync locked dependencies
+        run: uv sync --frozen
+
+      - name: Run governed GT-H3B phases A/B/C
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: uv run python scripts/golden/gt_h3b_execute.py --reviewer project-owner
+
+      - name: Enforce execution output scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r entry; do
+            path="\${entry:3}"
+            case "\$path" in
+              data/golden/provider/amazingdata/*|docs/golden/gt_h3/gt_h3b/GT_H3B_EXECUTION_RECEIPT.json|docs/DEVLOG.md|docs/project/DEVELOPMENT_MANAGEMENT.md)
+                ;;
+              *)
+                echo "::error::unexpected execution output: \$path"
+                exit 1
+                ;;
+            esac
+          done < <(git status --porcelain)
+          echo "OK: generated output is within the governed scope"
+
+      - name: Commit execution receipt and generated Golden output
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- data/golden/provider/amazingdata docs/golden/gt_h3/gt_h3b/GT_H3B_EXECUTION_RECEIPT.json docs/DEVLOG.md docs/project/DEVELOPMENT_MANAGEMENT.md; then
+            echo "No durable changes; idempotent execution verification only"
+            exit 0
+          fi
+          git config user.name "gt-h3b-controlled-execution"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- data/golden/provider/amazingdata docs/golden/gt_h3/gt_h3b/GT_H3B_EXECUTION_RECEIPT.json docs/DEVLOG.md docs/project/DEVELOPMENT_MANAGEMENT.md
+          git diff --cached --check
+          git commit -m "chore: record GT-H3B controlled execution"
+          git push origin "HEAD:\${GITHUB_HEAD_REF}"

@@ -3176,3 +3176,13 @@
 - root-override boundary 修复后的最终代码 head `9c965bd3c85cd744a4c376f15fa37b512cad5a7c` 对应 CI run `34191667025`；Ubuntu 3.14、Windows 3.12、Windows 3.14 均成功，各平台均为 `1609 passed`。
 - Ruff、mypy、compileall、Spike、SDK-absent、DEVLOG/Management 治理门均通过；exact/dot/parent 等价 production root 测试已纳入回归。
 - 本记录只确认边界修复与测试门禁，不等同于真实 evidence、REVIEWED seal、ACTIVE promotion、生产验证或 PR merge；下一关是独立 Reviewer final closure。
+
+## 2026-09-08 · GT-H3B 受控真实执行 PR 建立
+
+> 状态：**CONTROLLED EXECUTION PR PREPARED / NOT RUN**
+
+- 基于当前主分支 `main@36d238a97f1d1fbadd3a8f5f7b74c13d6c0be096` 建立专用执行分支 `ops/gt-h3b-controlled-execution-20260908`。
+- 新增窄范围 runner：先调用已审阅的 `candidate.py promote-existing`，再按冻结 v6 source contract 获取官方原始 bytes、生成 5 个 deterministic bundle，并在 125/125 contract/hash/gate 全部通过后执行一次性 `review.py --reviewer project-owner`。
+- runner 仅在同仓库专用 PR 分支运行，失败 fail-closed；执行输出只能写入 Golden evidence/version、执行回执和本 DEVLOG/Management 文件。
+- 当前提交建立请求与工作流，ACTIVE 仍为 `v5-candidate-20260907`；未声称 promotion、evidence materialization 或 REVIEWED seal 已完成。
+

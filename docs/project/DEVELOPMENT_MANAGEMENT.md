@@ -5200,3 +5200,16 @@ Git 历史负责保存过去版本。
 - The test suite includes exact/dot/parent equivalent production-root override rejection; custom contract + temporary test root remains allowed.
 - This verifies the code/test gate only. It does not claim real official evidence, REVIEWED seal, ACTIVE promotion, production validation or PR merge.
 - Independent Reviewer must close the final head against the current-main test-merge before controlled post-merge work.
+
+## DM-CR-20260908-121 · GT-H3B受控真实执行 PR 建立
+
+**Type**：C1 — controlled GT-H3B execution preparation  \
+**Date**：2026-09-08  \
+**Status**：PR OPEN / EXECUTION NOT RUN  \
+**Evidence**：`ops/gt-h3b-controlled-execution-20260908`；`docs/golden/gt_h3/gt_h3b/GT_H3B_EXECUTION_REQUEST.md`。
+
+- 基线为 `main@36d238a97f1d1fbadd3a8f5f7b74c13d6c0be096`；当前 ACTIVE 仍是 v5，v4/v5/v6 versioned bytes 不变。
+- 工作流只允许按授权顺序运行 Phase A/B/C，账号、密码、Token、IP、Cookie 和 Provider 输出不进入仓库。
+- 任何来源/证据/contract/hash/gate 失败均保持未成功状态；成功时才生成执行回执并通过后续 PR 审阅。
+- 本执行请求不包含 Formal Production B1-B7、Provider capability verdict、Data Sufficiency 或 2020+ backfill。
+
