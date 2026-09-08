@@ -41,6 +41,19 @@ Formal run 完成后才允许执行 verdict 并创建独立 evidence PR。不得
 
 > 本节记录本次实际运行时事实；前文关于旧提交和旧本地副本的内容保留为历史记录。正式执行以本次执行时已审阅进入 `main` 的源码为准。
 
+### 操作台账与当前堵点（摘要）
+
+| 阶段 | 实际操作 | 结果 | 当前状态 |
+|---|---|---|---|
+| 仓库基线 | GitHub 连接器复核当前 `main`，再建立完整 HTTPS Git checkout | `main@0148ae06cdd7b84709b235476eda7b170ad7e026`；非 shallow；444 commits / 531 tracked entries；工作区干净 | 已完成 |
+| 依赖与运行时 | 在本地隔离环境同步依赖，安装用户提供的本地 SDK 包并运行 doctor / pip check | AmazingData `1.1.9`、tgw `1.0.9.2`；runtime 实际加载验证通过；依赖兼容性通过 | 已完成；依赖文件仅保存在本地 `vendor/`，未上传 |
+| 在线预检 | 使用临时进程环境变量执行生产 bootstrap，并在线查询 Provider 日历 | 网络、认证、查询均通过；生产身份与已确认的脱敏标识一致；Provider 解析出 `20260908` | 已完成；凭证、真实 endpoint、raw 输出未落盘 |
+| Formal 入口 | 只执行唯一允许的命令：`uv run python scripts/spike/spike_runner.py --production --date 20260908` | 在创建 `SpikeRun` 前因 ACTIVE trading rules 为 `COMPILED` fail-closed，退出码 1 | B1-B7 未执行；无 `run_id`、无 verdict |
+| 质量门禁 | 执行 pytest、Ruff、mypy、`uv pip check` | 1618 passed / 2 skipped；Ruff、mypy、依赖检查均通过 | 已完成 |
+| 当前堵点 | 人工复核 ACTIVE 交易制度规则集，并封存官方来源证据 | 当前 `v20260824-compiled` 有 9 条规则，`review_status=COMPILED`，缺少已封存 source artifact | 必须由项目管理者 / Reviewer 解除 |
+
+因此，当前问题已经不是“拿不到完整 checkout”、不是账号权限、不是 SDK 安装，也不是 Provider 网络连通性；唯一实际阻断是交易制度规则数据尚未完成受治理的人工复核。GT-H3R v7 的 125/125 REVIEWED 属于另一审阅对象，不能替代这 9 条规则的审核。
+
 ### 完整 checkout
 
 - 先由 GitHub 连接器复核 `main`，得到当前 HEAD：`0148ae06cdd7b84709b235476eda7b170ad7e026`。
@@ -71,9 +84,9 @@ formal run refused: PRODUCTION run refused: trading rule dataset not reviewed
 ```
 
 - 退出码：1。
-- 正式 `run_id)：没有创建。
+- 正式 `run_id`：没有创建。
 - B1-B7：未执行。
-- `--verdict)：未执行。
+- `--verdict`：未执行。
 - 本次属于执行前 fail-closed blocker，不应标记为 FAILED/ABORTED/CLOSED，也不应以 Provider NO-GO 解释；没有消耗一次合法的正式 run。
 
 ### 当前真实 blocker：交易制度规则集未完成人工复核
