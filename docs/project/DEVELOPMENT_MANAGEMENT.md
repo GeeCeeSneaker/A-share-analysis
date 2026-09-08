@@ -5430,3 +5430,13 @@ Git 历史负责保存过去版本。
 
 - 删除浏览器 source-path 过滤中未再使用的临时集合，恢复三平台 Ruff 门禁通过条件。
 - 不改变官方来源、原始 body、HTTP 200、allowlist、大小上限、HTTPS transport upgrade 或 Golden/seal 边界；旧受控 run 将由并发策略取消并重新执行。
+
+## DM-CR-20260908-144 · GT-H3B browser fallback formatter correction
+
+**Type**：C0 — controlled execution tooling formatting correction
+**Date**：2026-09-08
+**Status**：IMPLEMENTED / RETRY PENDING
+**Evidence**：PR #25；CI run 34204686131。
+
+- 按 Ruff formatter 机器输出收敛 runner 和新增测试的两处确定性排版；不改变来源、原始 bytes、HTTPS transport upgrade、Golden 或 seal 边界。
+- 受控 run 34204686124 使用旧提交，待并发策略取消后由新提交重新执行。

@@ -333,9 +333,7 @@ def _fetch_source_with_browser(
                     status = getattr(response, "status", None)
                     response_url = str(getattr(response, "url", ""))
                     response_parts = urlsplit(response_url)
-                    content_type = content_type_from_headers(
-                        getattr(response, "headers", {})
-                    )
+                    content_type = content_type_from_headers(getattr(response, "headers", {}))
                     observed.append(
                         f"{status}:{(response_parts.hostname or '').lower()}:"
                         f"{response_parts.path}:{content_type}"

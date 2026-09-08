@@ -3340,3 +3340,10 @@
 - 合同中遗留的 http:// 定位符不改 source_ref；仅显式升级到同一官方主机/路径的 HTTPS transport，最终响应仍必须通过 HTTPS allowlist 校验，回执记录升级数量。
 - Python 3.14 动态加载测试先注册 sys.modules；DEVLOG 测试的两个已披露历史提交已与 CI 的七项 SHA 豁免清单对齐。
 - 本次不修改 v1-v6 versioned Golden bytes、v6 source contract、ACTIVE、真实 evidence 或 seal；下一步以新 CI 和受控 run 的实际日志决定是否继续。
+
+## 2026-09-08 · GT-H3B browser fallback formatter correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run 34204686131 仅报告 runner 与新增集成测试的 Ruff formatter 差异；已按机器 diff 收敛两处排版。
+- 不改变官方来源访问、HTTP 200、同一 source path、原始 body、HTTPS transport upgrade、Golden bytes、ACTIVE 或 seal 边界；受控 run 34204686124 将重新核验。

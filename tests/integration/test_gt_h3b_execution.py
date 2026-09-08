@@ -104,9 +104,7 @@ def test_fetch_source_retries_transient_network_failure(tmp_path, monkeypatch):
     assert result.path.read_bytes() == body
 
 
-def test_fetch_source_upgrades_legacy_http_locator_to_https(
-    tmp_path, monkeypatch
-):
+def test_fetch_source_upgrades_legacy_http_locator_to_https(tmp_path, monkeypatch):
     module = _load_module()
     body = b"<html>official historical source</html>"
     requested_urls = []
@@ -134,9 +132,7 @@ def test_fetch_source_upgrades_legacy_http_locator_to_https(
     assert result.path.read_bytes() == body
 
 
-def test_fetch_source_uses_browser_for_http_403(
-    tmp_path, monkeypatch
-):
+def test_fetch_source_uses_browser_for_http_403(tmp_path, monkeypatch):
     module = _load_module()
     body = b"<html>browser-resolved official source</html>"
     monkeypatch.setattr(
