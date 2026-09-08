@@ -3472,3 +3472,13 @@
   evidence refs 103，hash consistency 已复核。
 - Formal Production B1-B7：**NOT RUN**；未提交任何账号、密码、Token、
   IP、Cookie 或 Provider 凭据。
+
+## 2026-09-08 · GT-H3B post-seal workflow actor boundary
+
+> 状态：**DURABLE SEAL PRESENT / IDEMPOTENT RECHECK DISPATCHED / INDEPENDENT PR REVIEW PENDING**
+
+- durable execution commit：`72c6d15e3c8db65b23b339393946d8efaa60730e`；receipt 已报告 Phase A/B/C 成功、v7-reviewed-20260908、REVIEWED 125/125、Formal Production B1-B7 **NOT RUN**。
+- 该执行 job 由 `github-actions[bot]` 写回 receipt 后，GitHub 为同一 PR 生成的两个 `pull_request` workflow run（GT-H3B run 37、CI run 461）均立即显示 `action_required`、job 数为 0；这不是 Phase A/B/C 或 evidence 校验失败。
+- 为使最终 PR head 由项目账号触发一次真正的幂等检查，补记本条日志；该提交不改 v1-v7 Golden/evidence/receipt 内容、不提交任何凭据，受控 runner 应只执行已有封印的验证并不产生新的 bot commit。
+- 该平台触发边界与独立审阅要求已记录；在项目账号触发的 CI 与受控幂等检查成功、且独立审阅者确认 receipt/evidence 后，PR #25 才可进入合并评估。
+
