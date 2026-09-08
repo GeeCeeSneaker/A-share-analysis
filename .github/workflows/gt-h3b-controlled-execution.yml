@@ -65,11 +65,13 @@ jobs:
           while IFS= read -r entry; do
             status="${entry:0:2}"
             path="${entry:3}"
-            # This legacy plan is stored as CRLF while the repository-wide
-            # *.json eol=lf rule materializes LF on the Linux runner. Ignore
-            # only this exact tracked EOL-only checkout artifact; every other
+            # These legacy review/planning files are stored with CRLF while the
+            # repository-wide text eol=lf rules materialize LF on Linux checkout.
+            # Ignore only their exact tracked EOL-only artifacts; every other
             # status entry remains fail-closed.
-            if [[ "$path" == "docs/golden/gt_h2/rebuild_plan_v4.json" && "$status" == " M" ]] &&
+            if [[ "$status" == " M" &&
+                  ( "$path" == "docs/golden/gt_h2/rebuild_plan_v4.json" ||
+                    "$path" == "docs/golden/gt_h3/GT_H3_HUMAN_REVIEW_RESULT.jsonl" ) ]] &&
                git diff --quiet --ignore-cr-at-eol -- "$path"; then
               continue
             fi

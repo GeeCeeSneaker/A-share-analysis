@@ -5540,3 +5540,15 @@ Git 历史负责保存过去版本。
 - scope-check 仅豁免该已知路径的 ` M` + `git diff --ignore-cr-at-eol` 无内容差异组合；所有真实新增、暂存、删除或语义修改继续阻断。
 - 修正了 commit step 的 `GITHUB_HEAD_REF` 展开；输出白名单、source/evidence 校验、Golden seal 和凭据边界均未放宽，需重新执行确认回执实际落入执行分支。
 
+## DM-CR-20260908-154 · GT-H3B scope-check legacy CRLF artifact-set correction
+
+**Type**：C0 — controlled execution workflow correction  
+**Date**：2026-09-08  
+**Status**：FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；controlled run 34214566280（run 32）。
+
+- A/B/C 再次完成：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空；scope-check 发现第二个既有路径 `docs/golden/gt_h3/GT_H3_HUMAN_REVIEW_RESULT.jsonl`。
+- 该路径与 GT-H2 v4 plan 一样属于历史 CRLF blob，与 `*.jsonl/json text eol=lf` 的 Linux checkout 物化规则冲突，造成 tracked 的 EOL-only 伪变更。
+- scope-check 仅对这两个精确路径的 ` M` + `git diff --ignore-cr-at-eol` 无内容差异组合豁免；所有真实新增、暂存、删除或语义修改继续阻断。
+- 本次没有扩大生成输出白名单，也没有改变官方 source、evidence hash、Golden gates 或凭据边界；需由下一次受控 run 证明 durable receipt 已提交。
+

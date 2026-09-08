@@ -3421,3 +3421,12 @@
 - scope-check 现在只对该精确路径、精确的未暂存 tracked 状态（` M`）且 `git diff --ignore-cr-at-eol` 确认无内容差异的情形跳过；untracked、staged、删除或语义变更仍 fail-closed。
 - 同步修正执行提交步骤的 `GITHUB_HEAD_REF` shell 展开；未扩大 GT-H3B 输出白名单，未改变官方 source、raw bytes、evidence hash、Golden gate 或凭据边界，待新 run 证明 durable receipt 已提交。
 
+## 2026-09-08 · GT-H3B scope-check legacy CRLF artifact-set correction
+
+> 状态：**WORKFLOW FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34214566280`（run 32）再次完成 Phase A/B/C：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125，post-seal gates 全空；scope-check 发现的第二个路径是仓库中既有的 `docs/golden/gt_h3/GT_H3_HUMAN_REVIEW_RESULT.jsonl`。
+- 该文件与历史 `docs/golden/gt_h2/rebuild_plan_v4.json` 一样，仓库 blob 保留 CRLF，而 `*.jsonl text eol=lf` / `*.json text eol=lf` 在 Linux checkout 物化 LF；两者都是 tracked 的换行伪变更，并非 runner 新生成的 GT-H3B 输出。
+- scope-check 现对这两个精确路径仅在状态为未暂存 tracked 修改（` M`）且 `git diff --ignore-cr-at-eol` 确认无内容差异时跳过；untracked、staged、删除或语义变更仍 fail-closed。
+- 这次仅补齐已确认的基线伪变更集合，未扩大 GT-H3B 生成输出白名单、未改变 source/evidence/gate/凭据边界；待新 run 验证 scope-check 与 durable receipt 提交。
+
