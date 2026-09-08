@@ -5315,3 +5315,14 @@ Git 历史负责保存过去版本。
 - 失败摘要只保留响应状态、官方 host/path 和 content-type；不保存或打印正文、Cookie、账号、密码或其他凭据。
 - 不放宽 required source URL、HTTP 200、官方 host、原始 PDF body 和大小上限要求；当前仍未形成真实 evidence、REVIEWED seal 或回执。
 
+## DM-CR-20260908-132 · GT-H3B browser download capture correction
+
+**Type**：C1 — controlled execution evidence retrieval correction  
+**Date**：2026-09-08  
+**Status**：IMPLEMENTED / RETRY PENDING  
+**Evidence**：PR #25；controlled run `34201258549` 的响应诊断：SSE final response 为 HTTP 200/application/pdf，但 response body 不可直接读取。  
+
+- 使用 `accept_downloads=True` 捕获浏览器下载原始文件；下载仅在官方 HTTPS host/path 与已观察到的 HTTP 200 响应匹配时进入 evidence staging。
+- 继续拒绝 challenge HTML、非官方重定向、超限文件和非 `%PDF-` 内容；不改变 source contract、Golden bytes 或 seal 边界。
+- 修正版提交后重新运行 CI 和受控流程；当前仍未形成真实 evidence、REVIEWED seal 或回执。
+

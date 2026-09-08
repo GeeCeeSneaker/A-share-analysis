@@ -243,13 +243,14 @@ def _fetch_pdf_with_browser(
         raise ExecutionError("browser fallback unavailable for PDF anti-bot challenge") from exc
 
     responses: list[object] = []
+    downloads: list[object] = []
     observed: list[str] = []
     with sync_playwright() as playwright:
         headless = not bool(os.environ.get("DISPLAY"))
         browser = playwright.chromium.launch(headless=headless)
         try:
             context = browser.new_context(
-                accept_downloads=False,
+                accept_downloads=True,
                 user_agent="A-share-analysis-GT-H3B-materializer/1.0",
             )
             try:
@@ -268,7 +269,11 @@ def _fetch_pdf_with_browser(
                     )
                     responses.append(response)
 
+                def record_download(download: object) -> None:
+                    downloads.append(download)
+
                 page.on("response", record_response)
+                page.on("download", record_download)
                 # PDF downloads can abort page.goto; inspect captured responses below.
                 with suppress(PlaywrightError, PlaywrightTimeoutError):
                     page.goto(
@@ -277,6 +282,44 @@ def _fetch_pdf_with_browser(
                         timeout=max(1000, int(timeout * 1000)),
                     )
                 page.wait_for_timeout(min(10000, max(2000, int(timeout * 1000))))
+                successful_response_paths = {
+                    (urlsplit(str(getattr(response, "url", ""))).hostname or "").lower()
+                    + urlsplit(str(getattr(response, "url", ""))).path
+                    for response in responses
+                    if getattr(response, "status", None) == 200
+                }
+                for download in reversed(downloads):
+                    download_url = str(getattr(download, "url", ""))
+                    download_parts = urlsplit(download_url)
+                    download_key = (
+                        (download_parts.hostname or "").lower() + download_parts.path
+                    )
+                    if (
+                        download_parts.scheme.lower() != "https"
+                        or download_parts.hostname is None
+                        or download_parts.hostname.lower() not in OFFICIAL_SOURCE_HOSTS
+                        or download_key not in successful_response_paths
+                    ):
+                        continue
+                    try:
+                        download_path = download.path()
+                        if download_path is None:
+                            continue
+                        download_file = Path(download_path)
+                        if download_file.stat().st_size > MAX_SOURCE_BYTES:
+                            raise ExecutionError(
+                                f"browser PDF download exceeded the {MAX_SOURCE_BYTES} "
+                                "byte safety limit"
+                            )
+                        body = download_file.read_bytes()
+                    except PlaywrightError:
+                        continue
+                    except OSError as exc:
+                        raise ExecutionError(
+                            f"browser PDF download could not be read: {exc}"
+                        ) from exc
+                    if body.startswith(b"%PDF-"):
+                        return body, "application/pdf", download_url
                 for response in reversed(responses):
                     if getattr(response, "status", None) != 200:
                         continue
@@ -318,7 +361,7 @@ def _fetch_pdf_with_browser(
     summary = ", ".join(observed[-12:]) or "none"
     raise ExecutionError(
         f"browser fallback did not obtain an HTTP 200 PDF response for {source_ref}; "
-        f"observed {len(observed)} responses: {summary}"
+        f"observed {len(observed)} responses and {len(downloads)} downloads: {summary}"
     )
 
 

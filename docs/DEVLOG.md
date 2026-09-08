@@ -3264,3 +3264,11 @@
 - content-type 排版改为短语句，避免 formatter 与 E501 冲突；来源、HTTP 200、官方 allowlist、PDF magic bytes 和 fail-closed 规则不变。
 - 本修正尚未重新执行；新的日志将决定是否可继续 125/125 materialization。
 
+## 2026-09-08 · GT-H3B browser download capture correction
+
+> 状态：**DOWNLOAD CAPTURE FIX STAGED / RETRY PENDING**
+
+- 受控 run `34201258549` 已在 headed Chromium 中观察到 SSE 的 HTTP 200 `application/pdf` 响应，但该响应由浏览器作为下载处理，Playwright `response.body()` 不可读；因此没有 evidence、回执或 seal。
+- fallback 现在启用浏览器下载接收，读取下载落盘的原始字节，并要求下载 URL 与同 host/path 的 HTTP 200 响应绑定后才接受；仍检查官方 allowlist、大小上限和 `%PDF-` magic bytes。
+- 不使用打印到 PDF、渲染页面、截图或 HTML；不记录正文、Cookie、账号或密码。当前尚未重新执行。
+
