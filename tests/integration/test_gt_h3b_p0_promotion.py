@@ -135,7 +135,7 @@ def test_wrong_active_pointer_fails_closed(tmp_path: Path) -> None:
 def test_plan_set_drift_fails_closed(tmp_path: Path) -> None:
     root = _make_root(tmp_path)
     plan = tmp_path / "drifted-plan.json"
-    payload = json.loads((REMEDIATION_ROOT / "v5_to_v6_rebuild_plan.json").read_text())
+    payload = json.loads((REMEDIATION_ROOT / "v5_to_v6_rebuild_plan.json").read_text(encoding="utf-8"))
     drop = next(operation for operation in payload["operations"] if operation["op"] == "DROP")
     drop["op"] = "KEEP"
     plan.write_text(json.dumps(payload), encoding="utf-8")
