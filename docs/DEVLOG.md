@@ -3078,3 +3078,10 @@
 - 增加指针失败回归测试，验证旧 ACTIVE 保持不变、新 version/evidence 文件不残留；无法确认指针状态或现场发生外部改动时 fail closed 并保留现场。
 - 本次不获取真实官方证据、不执行 P0 promotion、不改变 v4/v5/v6 bytes 或 ACTIVE；等待新的三平台 CI 和独立 Reviewer。
 
+
+
+### GT-H3B P1 per-commit governance exception disclosure（2026-09-08）
+
+- GitHub Contents API 逐文件写入造成两个已完成的 P1 代码提交未能与 DEVLOG 同 commit：3c66d1118835266bd7d608b6af460bf91a03c57c（review rollback implementation）和 d07d9628cb69b60f4d951033b12d0bc5dc00e8e5（Ruff correction）。
+- 按仓库 CI V2.3 规则，将这两个完整 SHA 加入 CI 的一次性 GRANDFATHERED 定点豁免；本记录与豁免清单在同一多文件 commit 中提交。豁免不适用于任何后续提交，未改写历史。
+- 后续代码/测试治理记录将使用 Git 数据 API 的多文件 commit，确保代码与 DEVLOG 同 commit；本次不改变功能、Golden bytes 或 ACTIVE。

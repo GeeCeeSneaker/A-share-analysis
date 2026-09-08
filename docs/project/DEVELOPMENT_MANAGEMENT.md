@@ -5048,3 +5048,16 @@ Git 历史负责保存过去版本。
 - 新增指针失败回归测试，覆盖旧 ACTIVE 不变、无新 version 文件、无新 evidence 文件。
 - 本次不获取真实官方 evidence、不执行 P0 promotion、不改变 v4/v5/v6 bytes 或 ACTIVE；等待三平台 CI、独立 Reviewer final-head/current-main test-merge 及后续受控步骤。
 
+
+
+## DM-CR-20260908-109 · GT-H3B P1 per-commit governance exception disclosure
+
+**Type**：C0 — explicit historical CI exception disclosure  
+**Date**：2026-09-08  
+**Status**：RECORDED / CI_PENDING / PENDING_REVIEW  
+**Trigger**：GitHub Contents API 逐文件提交使两个已完成的 P1 代码提交未能在同一 commit 更新 DEVLOG，CI 的 per-commit governance gate 因此准确阻断。
+
+- 仅对完整 SHA 3c66d1118835266bd7d608b6af460bf91a03c57c 与 d07d9628cb69b60f4d951033b12d0bc5dc00e8e5 增加一次性、不可复用的 GRANDFATHERED 定点豁免；不改写历史，不扩大到后续提交。
+- 本条记录与 CI 豁免清单通过同一次多文件 Git 数据提交落盘；后续代码提交必须同时更新 DEVLOG，避免再次依赖豁免。
+- 该治理修正不改变 GT-H3B P0/P1 语义、v4/v5/v6 bytes、ACTIVE、真实 evidence 或 review seal。
+
