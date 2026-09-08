@@ -3491,3 +3491,11 @@
 - 已将历史 GT-H2、GT-H3A、GT-H3R、GT-H3B-P0 和 GT-H3R2 测试改为显式加载 immutable v5/v6/v4 数据；review workflow 夹具从空 evidence store 起步；GT-H3R/GT-H3R2 历史 verifier 不再错误约束后续 ACTIVE。
 - v1-v7 Golden/evidence/receipt 未修改；本修正不运行 Provider，不写入任何账号、密码、Token、IP、Cookie 或其他凭据。
 
+## 2026-09-08 · GT-H3B historical-verifier lint correction
+
+> 状态：**LINT FIX COMMITTED / CI VALIDATION IN PROGRESS**
+
+- CI run `34222758877` 在 Ubuntu 与 Windows 的 Ruff 阶段均发现同一个未使用局部变量 `v5_manifest`；这是前一项历史 verifier 解耦修正留下的静态检查问题。
+- 已删除该未使用赋值；v5 manifest 仍由 verifier 的 immutable `_read_dataset` 路径完整读取并校验，未削弱任何 v5/v6 hash、结构、计划、carry-forward 或审计检查。
+- 受控 GT-H3B run 39 不涉及该静态检查问题；本提交不改 v1-v7 Golden/evidence/receipt，不运行 Provider，不写入任何凭据。
+

@@ -664,7 +664,6 @@ def verify(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     active_manifest_path = golden_root / "truth_manifest.json"
 
     active = _read_json(active_manifest_path)
-    v5_manifest = _read_json(v5_manifest_path)
     # This is a historical v5 -> v6 verifier.  Once a later governed
     # version is promoted, ACTIVE is expected to move forward; the verifier
     # continues to validate the immutable v5/v6 inputs and only reports the

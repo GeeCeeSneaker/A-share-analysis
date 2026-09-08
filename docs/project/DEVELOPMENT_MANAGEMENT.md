@@ -5616,3 +5616,14 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 已按 run-bound / append-only contract 修正历史测试：显式绑定 v5 immutable dataset，GT-H3A/P0 promotion fixtures 从 v5 ACTIVE 起步，review workflow fixture 使用空 evidence store；v6/v5 historical verifier 允许后续 ACTIVE 版本存在。
 - 该修正没有修改 v1-v7 Golden/evidence/receipt、冻结 source contract、review seal 或 Provider 边界；formal Production B1-B7 仍为 NOT RUN。
 
+## DM-CR-20260908-159 · GT-H3R2 historical verifier lint correction
+
+**Type**：C0 — historical verifier lint correction  
+**Date**：2026-09-08  
+**Status**：FIX COMMITTED / CI VALIDATION IN PROGRESS  
+**Evidence**：PR #25；CI run 34222758877。
+
+- Ruff 在新矩阵运行中报告 `scripts/golden/gt_h3r2_v6_verify.py:667` 的 `v5_manifest` 未使用。
+- 已移除冗余赋值；immutable v5 manifest 仍由后续 `_read_dataset` 直接读取并校验，v6 与全部 remediation invariants 不变。
+- v1-v7 Golden/evidence/receipt、冻结 source contract、review seal 和 Provider/credential boundary 均未改变；Formal Production B1-B7 仍为 NOT RUN。
+
