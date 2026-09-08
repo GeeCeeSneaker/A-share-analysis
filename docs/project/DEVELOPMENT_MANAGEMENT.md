@@ -5576,3 +5576,15 @@ Git 历史负责保存过去版本。
 - 已增加精确的 `data/golden/provider/amazingdata/evidence/** -text` 规则，保留证据 raw bytes；失败 job 的临时 evidence/v7/receipt 未提交。
 - 未改变 source、review、gate 或输出白名单边界；下一次受控 run 需证明 raw bytes、提交与幂等验证完整通过。
 
+## DM-CR-20260908-157 · GT-H3B staged-evidence raw-byte guard correction
+
+**Type**：C0 — content-addressed evidence staging guard correction  
+**Date**：2026-09-08  
+**Status**：FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；controlled run 34218230119（run 35）。
+
+- A/B/C 与 scope-check 已通过：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125、post-seal gates 全空；commit step 在 `git add` 后的 `git diff --cached --check` 失败。
+- 现有 `evidence/** -text` 规则没有覆盖 runner 实际写入的 `evidence/sha256/*`，Git 提示会把原始 evidence bytes 的 CRLF 转为 LF，存在 hash 失真的风险。
+- 已加入精确的 `data/golden/provider/amazingdata/evidence/sha256/* -text !eol -diff` 规则；commit step 同时比较 index blob 与工作区 evidence 文件，任何 staged byte drift 都 fail-closed。
+- 失败 job 的临时输出未提交；source/review/gate/白名单/凭据边界不变，需下一次受控 run 证明提交与幂等验证闭环。
+

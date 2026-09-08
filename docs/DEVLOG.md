@@ -3448,3 +3448,12 @@
 - 已在更具体路径加入 `data/golden/provider/amazingdata/evidence/** -text`，确保证据按原始 bytes 提交，不被换行转换；此前失败 job 的临时 evidence/v7/receipt 未进入分支。
 - 本修正不改变 source 获取、evidence hash、review/gate 逻辑或输出白名单；下一次 run 必须证明证据 raw bytes、commit、后续幂等校验均通过。
 
+## 2026-09-08 · GT-H3B staged-evidence raw-byte guard correction
+
+> 状态：**ATTRIBUTE FIX STAGED / RETRY PENDING / NO DURABLE EVIDENCE OR SEAL**
+
+- 受控 run `34218230119`（run 35）完成 Phase A/B/C 与 scope-check：105/105 个官方 source binding、`v7-reviewed-20260908`、REVIEWED 125/125、post-seal gates 全空；commit step 在 `git add` 后的 `git diff --cached --check` 被 evidence 原始 HTML 的空白报错阻断。
+- 日志同时确认现有 `evidence/** -text` 规则没有覆盖 runner 实际写入的 `evidence/sha256/*` 文件，Git 提示会将 evidence raw bytes 的 CRLF 转为 LF；不能据此提交。
+- 已增加与实际目录一致的 `data/golden/provider/amazingdata/evidence/sha256/* -text !eol -diff` 精确规则，并在 `git add` 后逐个以 index blob 与工作区文件做二进制比较；任何 byte drift 都立即失败。
+- 此前失败 job 的 v7/evidence/receipt 未提交；未改变 source、review、Golden gate、输出白名单或凭据边界，待新 run 证明 raw-byte guard、commit 与幂等验证通过。
+

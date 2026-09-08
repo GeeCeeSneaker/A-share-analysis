@@ -5,6 +5,8 @@ data/golden/** text eol=lf
 # Content-addressed GT-H3B evidence contains raw PDFs/HTML/ZIP; line-ending
 # conversion would change the bytes and invalidate its content-addressed hash.
 data/golden/provider/amazingdata/evidence/** -text
+# The runner stores each content-addressed artifact directly under sha256/.
+data/golden/provider/amazingdata/evidence/sha256/* -text !eol -diff
 *.jsonl text eol=lf
 *.json text eol=lf
 uv.lock text eol=lf
