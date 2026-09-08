@@ -36,3 +36,68 @@ Formal run 完成后才允许执行 verdict 并创建独立 evidence PR。不得
 - 但当前连接器提供的是按路径读取/写入的 GitHub 文件接口，不会自动把包含二进制 evidence 的完整 Git tree 同步为本地 checkout；工作区也没有另一个完整、干净、绑定 `main@d08530ef7f02472761d6db6eb61bea9be316765c` 的副本。
 - 因此“远端可读取”不能等同于“正式运行所需的本地源码、v7、evidence 和提交身份已完整落地”。在项目管理者准备好该本地 checkout 前，B1-B7 继续保持 `NOT_RUN`。
 - 请项目管理者解决以下任一项：提供当前 `main` 的完整干净本地 checkout；或为运行环境配置受治理的 GitHub checkout/materialization 方式（含二进制 evidence），并保留可核验的 source SHA。不得通过修改 Golden、伪造本地 SHA 或绕过 clean-worktree gate 解决。
+
+## 2026-09-09 直接 Git checkout 与 Formal Production 预检补充
+
+> 本节记录本次实际运行时事实；前文关于旧提交和旧本地副本的内容保留为历史记录。正式执行以本次执行时已审阅进入 `main` 的源码为准。
+
+### 完整 checkout
+
+- 先由 GitHub 连接器复核 `main`，得到当前 HEAD：`0148ae06cdd7b84709b235476eda7b170ad7e026`。
+- 在用户解除直接 Git 限制后，使用标准 HTTPS Git clone 建立了独立完整副本 `work/A-share-analysis-clean-20260909`；不是旧的 `work/audit_h1_c939b747`，保留完整 `.git`。
+- `git rev-parse HEAD`、`git branch --show-current` 和连接器结果一致：`main@0148ae06cdd7b84709b235476eda7b170ad7e026`；`git ls-tree -r` 与 `git ls-files` 均为 531 个 tracked entries。
+- Windows 默认换行配置使 5 个历史 CRLF blob 出现 EOL-only 伪变更；逐个核对后，5 个工作区文件的原始 blob SHA 均与 HEAD 一致。本地仅在 `.git/info/attributes` 对这 5 个精确路径关闭文本换行转换，未改 tracked 文件、未改提交、未上传该本地配置；随后 `git status --porcelain` 为空。该本地 checkout 差异已披露，不能把它解释成修改 Golden。
+- v7 文件完整存在：`truth_manifest.json` / `truth_manifest_v7.json` 均为 `v7-reviewed-20260908`、125 条、`REVIEWED:125`；`golden_cases_v7.jsonl` 为 125 行，dataset hash 为 `a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e`。Formal runner、evidence store、5 个 composite bundles、receipt、Provider/Golden/capability 代码均已在 clone 中存在。
+
+### 本次 runtime / online preflight
+
+- 新 checkout 的离线依赖同步和 SDK 安装成功：AmazingData `1.1.9`、tgw `1.0.9.2`。
+- 新 checkout 离线 doctor：`SDK_INSTALLED` / `RUNTIME_ACTUAL_LOAD_VERIFIED`；runtime reported version `V4.3.0.260626-rc2.0-YHZQ`。
+- 本次在线 bootstrap（不落盘凭证、不输出 raw SDK 内容）返回：`NETWORK_REACHABLE=REACHABLE`、`AUTHENTICATED=YES`、`QUERY_READY=YES`、`production_identity_status=PRODUCTION`；脱敏 profile 为已确认的 `UNKNOWN_24e2ff401792`。脚本没有写入 `configs/production_account.yaml`。
+- 通过 `AmazingData.BaseData.get_calendar()` 在线读取交易日历；查询时本地日期为 `20260909`，Provider 返回的最近交易日为 `20260908`。尾部还含 `20260909`，所以本次按“严格早于本地日期”的保守规则选取 `20260908`。
+
+### Formal 入口结果
+
+按当前主线唯一入口执行：
+
+```text
+uv run python scripts/spike/spike_runner.py --production --date 20260908
+```
+
+运行器在创建 `RunKind.PRODUCTION` / `SpikeRun` 前后完成 clean、身份和 Golden 绑定检查，但因交易制度规则集仍为 COMPILED 而拒绝继续：
+
+```text
+formal run refused: PRODUCTION run refused: trading rule dataset not reviewed
+```
+
+- 退出码：1。
+- 正式 `run_id)：没有创建。
+- B1-B7：未执行。
+- `--verdict)：未执行。
+- 本次属于执行前 fail-closed blocker，不应标记为 FAILED/ABORTED/CLOSED，也不应以 Provider NO-GO 解释；没有消耗一次合法的正式 run。
+
+### 当前真实 blocker：交易制度规则集未完成人工复核
+
+本次门禁实际加载的是：
+
+| 字段 | 当前值 |
+|---|---|
+| ACTIVE rule version | `v20260824-compiled` |
+| review_status | `COMPILED` |
+| dataset file | `versions/v20260824-compiled/rules.yaml` |
+| dataset hash | `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8` |
+| rule records | 9 |
+| source artifact | 当前 `configs/trading_rules` 未提供已封存的官方 source artifact |
+
+这与 GT-H3R v5/v7 的 12 条换源/语义修正人工裁决是不同审阅对象。GT-H3R v7 已是 `REVIEWED 125/125`，但不能替代这里的 9 条交易制度规则复核。
+
+### 解除条件
+
+项目管理者/人工 Reviewer 需要：
+
+1. 对 `MAIN_BOARD_NORMAL`、`MAIN_BOARD_ST`、`MAIN_BOARD_IPO_DAY`、`CHINEXT_PRE_REGISTRATION`、`CHINEXT_REGISTRATION`、`CHINEXT_REGISTRATION_FIRST5`、`STAR_MARKET`、`STAR_MARKET_FIRST5`、`BSE_LIMIT` 逐条核对适用交易所、代码范围、起止日期、涨跌幅、首五交易日语义和 tick/舍入规则；
+2. 提供可实际打开的官方 source artifact，并由审阅流程计算并封存 artifact hash、来源类型、检索时间和 reviewer provenance；
+3. 使用 `scripts/rules/review.py` 生成新的不可变 REVIEWED 版本，保持原 COMPILED 版本不变，再通过受审阅的 manifest/CI 提交切换 ACTIVE；
+4. 重新建立最新 main 的 clean checkout，并在规则集 REVIEWED 后才重新申请一次完整 B1-B7。不得手工把 `COMPILED` 改成 `REVIEWED`，不得用 GT-H3R 证据冒充规则集 source artifact。
+
+本次记录没有写入账号密码、真实 endpoint、Token、raw profile、raw SDK 输出或本地 SDK 文件。
