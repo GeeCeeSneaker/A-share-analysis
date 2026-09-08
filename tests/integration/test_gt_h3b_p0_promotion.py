@@ -205,7 +205,10 @@ def test_duplicate_st_identity_fails_closed() -> None:
         st_cases[1],
         event_effective_date=st_cases[0].event_effective_date,
     )
-    mutated = [duplicate if case.golden_case_id == duplicate.golden_case_id else case for case in cases]
+    mutated = [
+        duplicate if case.golden_case_id == duplicate.golden_case_id else case
+        for case in cases
+    ]
     manifest = json.loads((REPO_GOLDEN / "truth_manifest_v6.json").read_text(encoding="utf-8"))
 
     with pytest.raises(module.CandidateError, match="recomputation distinct_events"):

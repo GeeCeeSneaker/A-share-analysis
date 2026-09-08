@@ -3021,3 +3021,7 @@
 
 - CI 需通过 Windows 3.14、Windows 3.12、Ubuntu 3.14、Ruff、mypy、full pytest、Spike、SDK-absent、DEVLOG 和 Management gates。
 - 本批次经独立 Reviewer 审阅并合并后，才在受控环境运行 promote-existing；随后进入 GT-H3B-P1 evidence-byte materialization。
+
+### P0 CI correction
+
+- 首轮 CI 仅发现 candidate/test 新增行超过 Ruff 100 列限制；已在本修正提交中完成格式收敛，未改变 promotion 语义。

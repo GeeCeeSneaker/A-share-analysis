@@ -404,7 +404,9 @@ def _validate_promotion_carry_forward(
     added_by_source: dict[str, str] = {}
     for new_id, source_id in add_source_by_new_id.items():
         if source_id in added_by_source:
-            raise CandidateError(f"promotion plan maps one source to multiple ADD cases: {source_id}")
+            raise CandidateError(
+                "promotion plan maps one source to multiple ADD cases: " f"{source_id}"
+            )
         added_by_source[source_id] = new_id
     expected_map: dict[str, str] = {}
     for old_id in v5_by_id:
@@ -441,7 +443,10 @@ def _validate_promotion_carry_forward(
             raise CandidateError(f"promotion carry-forward {old_id}: new dataset hash mismatch")
         eligible = old_id == new_id and old_identity == new_identity
         if row.get("carry_forward_eligible") is not eligible:
-            raise CandidateError(f"promotion carry-forward {old_id}: eligibility was not recomputed")
+            raise CandidateError(
+                "promotion carry-forward "
+                f"{old_id}: eligibility was not recomputed"
+            )
         if row.get("new_review_required") is not (not eligible):
             raise CandidateError(f"promotion carry-forward {old_id}: review-required mismatch")
         if eligible:

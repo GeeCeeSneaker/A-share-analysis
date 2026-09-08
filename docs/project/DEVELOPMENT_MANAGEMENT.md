@@ -5001,3 +5001,5 @@ Git 历史负责保存过去版本。
 - **Affected paths**：scripts/golden/candidate.py; tests/integration/test_gt_h3b_p0_promotion.py; docs/DEVLOG.md; this management record.
 - **Tests**：P0 test suite and mandatory three-platform CI pending on the atomic implementation batch.
 - **Next**：Independent review of the P0 final head and current-main test-merge; after merge, controlled execution of promote-existing, then P1 evidence-byte materialization.
+
+- **P0 CI correction**：首轮 run #384 仅报新增 candidate/test 的 Ruff E501；本同步提交只做格式修正，promotion contract 与 v5 ACTIVE 边界不变。
