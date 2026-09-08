@@ -198,3 +198,70 @@ def test_review_seals_a_declared_evidence_bundle(tmp_path: Path) -> None:
     evidence = root / "evidence" / cases[0].source_artifact_ref
     assert evidence.is_file()
     assert manifest.fully_reviewed
+
+
+def test_review_pointer_failure_rolls_back_new_outputs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = _make_v4_root(tmp_path)
+    module = _load_review_module()
+    sources = _sources(tmp_path)
+    bundle = tmp_path / "composite.zip"
+    write_evidence_bundle(bundle, sources)
+    ordinary = tmp_path / "ordinary.html"
+    ordinary.write_bytes(b"one official raw response body")
+
+    active = json.loads((root / "truth_manifest.json").read_text(encoding="utf-8"))
+    dataset = root / active["dataset_file"]
+    case_ids = [
+        json.loads(line)["golden_case_id"]
+        for line in dataset.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    review_manifest = tmp_path / "gt_h3b_review.json"
+    entries: list[dict[str, object]] = []
+    for index, case_id in enumerate(case_ids):
+        entry: dict[str, object] = {
+            "case": case_id,
+            "artifact": str(bundle if index == 0 else ordinary),
+            "kind": "EVIDENCE_BUNDLE" if index == 0 else "OTHER_OFFICIAL",
+        }
+        if index == 0:
+            entry["bundle_sources"] = [
+                {"source_ref": source["source_ref"], "kind": source["kind"]}
+                for source in sources
+            ]
+        entries.append(entry)
+    review_manifest.write_text(
+        json.dumps(entries, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    def fail_pointer(manifest: dict) -> None:
+        raise OSError("injected pointer write failure")
+
+    active_before = (root / "truth_manifest.json").read_bytes()
+    monkeypatch.setattr(module, "_atomic_active_pointer", fail_pointer)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(REVIEW_SCRIPT),
+            "--manifest",
+            str(review_manifest),
+            "--reviewer",
+            "project-owner",
+            "--root",
+            str(root),
+        ],
+    )
+
+    with pytest.raises(module.ReviewError, match="before ACTIVE pointer commit"):
+        module.main()
+
+    assert (root / "truth_manifest.json").read_bytes() == active_before
+    assert not (root / "golden_cases_v5.jsonl").exists()
+    assert not (root / "truth_manifest_v5.json").exists()
+    evidence = root / "evidence"
+    if evidence.exists():
+        assert not any(path.is_file() for path in evidence.rglob("*"))
