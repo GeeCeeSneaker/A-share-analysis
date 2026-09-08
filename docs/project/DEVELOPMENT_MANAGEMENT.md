@@ -5242,3 +5242,14 @@ Git 历史负责保存过去版本。
 - 同步 Ruff formatter 结果，并将同一专用 PR 的旧执行在新修正版到达时取消。
 - 不改变数据与安全边界；前序执行未产生可合并的成功回执。
 
+## DM-CR-20260908-125 · GT-H3B runner Phase A diagnostic line correction
+
+**Type**：C1 — controlled execution tooling correction  
+**Date**：2026-09-08  
+**Status**：LINT FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；CI run `34199338780` 的 Ruff E501 报告。  
+
+- 将 Phase A “ACTIVE v5/v6”错误诊断拆分为 `truth_version` 局部变量，消除 108 字符行；不改变执行逻辑、数据边界和 fail-closed 语义。
+- 该修正与 DEVLOG 在同一 Git 数据提交中落盘；修正版会重新触发三平台 CI 和受控 GT-H3B 工作流。
+- 在新的工作流成功回执及独立审阅完成前，不声称 125/125 evidence、REVIEWED seal、ACTIVE promotion 或 PR merge 已完成。
+

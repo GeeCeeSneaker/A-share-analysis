@@ -187,7 +187,10 @@ def _run_promotion(repo_root: Path) -> tuple[dict, str]:
     golden = repo_root / GOLDEN_RELATIVE
     active = _read_json(golden / "truth_manifest.json")
     if active.get("truth_version") not in {V5_VERSION, V6_VERSION}:
-        raise ExecutionError("Phase A requires ACTIVE v5 or v6; found " + repr(active.get("truth_version")))
+        truth_version = repr(active.get("truth_version"))
+        raise ExecutionError(
+            "Phase A requires ACTIVE v5 or v6; found " + truth_version
+        )
     command = [
         sys.executable,
         str(repo_root / "scripts/golden/candidate.py"),

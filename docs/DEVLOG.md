@@ -3209,3 +3209,11 @@
 - 专用执行工作流启用 cancel-in-progress，修正版提交到达时取消旧的同 PR 网络执行，避免并发写执行分支。
 - 前序运行只在官方来源获取过程中，未生成成功回执；未改变 main。
 
+## 2026-09-08 · GT-H3B runner Phase A diagnostic line correction
+
+> 状态：**LINT FIX STAGED / RETRY PENDING**
+
+- 针对最新 CI run `34199338780` 的 Ruff E501 报告，将 Phase A 的 truth_version 诊断拆为局部变量；执行顺序、校验条件和失败边界不变。
+- 本次仅修正 runner 源码与治理记录；不修改 v1-v6 Golden bytes、ACTIVE、evidence、review seal 或任何凭据。
+- 旧的受控执行 run 由修正版提交触发的并发取消策略处理；新的 CI 与受控执行结果须重新核实后才能宣称完成。
+
