@@ -189,9 +189,7 @@ def _run_promotion(repo_root: Path) -> tuple[dict, str]:
     active = _read_json(golden / "truth_manifest.json")
     if active.get("truth_version") not in {V5_VERSION, V6_VERSION}:
         truth_version = repr(active.get("truth_version"))
-        raise ExecutionError(
-            "Phase A requires ACTIVE v5 or v6; found " + truth_version
-        )
+        raise ExecutionError("Phase A requires ACTIVE v5 or v6; found " + truth_version)
     command = [
         sys.executable,
         str(repo_root / "scripts/golden/candidate.py"),
@@ -232,7 +230,6 @@ def _read_bounded(response: object) -> bytes:
     return b"".join(chunks)
 
 
-
 def _fetch_pdf_with_browser(
     source_ref: str,
     timeout: float,
@@ -243,9 +240,7 @@ def _fetch_pdf_with_browser(
         from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
-        raise ExecutionError(
-            "browser fallback unavailable for PDF anti-bot challenge"
-        ) from exc
+        raise ExecutionError("browser fallback unavailable for PDF anti-bot challenge") from exc
 
     responses: list[object] = []
     with sync_playwright() as playwright:
@@ -257,6 +252,7 @@ def _fetch_pdf_with_browser(
             )
             try:
                 page = context.new_page()
+
                 def record_response(response: object) -> None:
                     responses.append(response)
 
@@ -300,12 +296,7 @@ def _fetch_pdf_with_browser(
                             "byte safety limit"
                         )
                     if body.startswith(b"%PDF-"):
-                        content_type = (
-                            str(headers.get("content-type", ""))
-                            .split(";", 1)[0]
-                            .strip()
-                            .lower()
-                        )
+                        content_type = str(headers.get("content-type", "")).split(";", 1)[0].strip().lower()
                         return body, content_type or "application/pdf", response_url
             finally:
                 context.close()
@@ -314,6 +305,7 @@ def _fetch_pdf_with_browser(
     raise ExecutionError(
         f"browser fallback did not obtain an HTTP 200 PDF response for {source_ref}"
     )
+
 
 def _fetch_source(
     source_ref: str,

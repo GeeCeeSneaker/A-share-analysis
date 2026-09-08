@@ -5294,3 +5294,13 @@ Git 历史负责保存过去版本。
 - 按 Ruff isort 输出调整标准库导入顺序；不改变来源、浏览器响应、证据 hash 或 fail-closed 规则。
 - 该修正会重新触发 CI 和受控执行；在新结果核验前不声称任何 seal 或回执完成。
 
+## DM-CR-20260908-130 · GT-H3B browser fallback formatter parity correction
+
+**Type**：C0 — controlled execution tooling formatting correction  
+**Date**：2026-09-08  
+**Status**：FORMAT FIX STAGED / RETRY PENDING  
+**Evidence**：PR #25；CI run `34200571774` 的 Ruff format diff。  
+
+- 按 formatter 机器输出同步 runner 的排版，不改变浏览器取证、来源校验、证据 hash、Golden 或发布边界。
+- 该修正会重新触发 CI 和受控执行；当前仍未声称获取真实 evidence 或完成 seal。
+

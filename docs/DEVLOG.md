@@ -3248,3 +3248,10 @@
 - CI run `34200443329` 的已完成 job 只报告 `collections.abc` 与 `contextlib` 导入顺序；已按 Ruff isort 结果调整。
 - 该文案/格式修正不改变浏览器网络响应取证逻辑；受控 run `34200443216` 的最终结果仍待核验。
 
+## 2026-09-08 · GT-H3B browser fallback formatter parity correction
+
+> 状态：**FORMAT FIX STAGED / RETRY PENDING**
+
+- CI run `34200571774` 三个平台一致报告 runner 的 Ruff formatter parity；已按机器 diff 收敛 Phase A 诊断、fallback 异常、嵌套回调和 content-type 排版。
+- 不改变真实浏览器网络响应、官方 host、HTTP 200、PDF magic bytes、大小上限或 fail-closed 规则；受控 run `34200571773` 仍待完成核验。
+
