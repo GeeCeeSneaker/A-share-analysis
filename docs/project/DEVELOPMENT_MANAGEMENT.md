@@ -5005,3 +5005,5 @@ Git 历史负责保存过去版本。
 - **P0 CI correction**：首轮 run #384 仅报新增 candidate/test 的 Ruff E501；本同步提交只做格式修正，promotion contract 与 v5 ACTIVE 边界不变。
 
 - **P0 CI correction 2**：run #385 发现新增 candidate/test 未完全匹配 Ruff formatter；已在本同步提交中吸收格式输出，语义不变。
+
+- **P0 CI correction 3**：run #386 仅发现测试列表推导的 Ruff formatter 差异；本同步提交按 formatter 输出收敛，功能和治理边界不变。

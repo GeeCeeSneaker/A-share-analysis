@@ -3029,3 +3029,7 @@
 ### P0 CI correction 2
 
 - run #385 的 Ruff format diff 已逐项吸收；本修正仍只影响格式，不改变 promotion contract。
+
+### P0 CI correction 3
+
+- run #386 的 Ruff lint 已通过；formatter 要求将重复 ST identity 测试的列表推导保持为三行，已按精确 formatter 输出同步。
