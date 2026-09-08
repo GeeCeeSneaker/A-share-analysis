@@ -3049,3 +3049,9 @@
 ### P0 CI correction 7
 
 - run #390 的三平台 Ruff lint 均只报告新增测试第 138 行因显式 UTF-8 参数超过 100 列；已按 formatter/lint 规范拆行，测试语义不变。
+
+### GT-H3B-P1 tooling checkpoint
+
+- 增加 src/ashare_state/spike/evidence_bundle.py 与 scripts/golden/evidence_bundle.py：定义并实现不可压缩、create-only、可重现的 GT-H3B EVIDENCE_BUNDLE；review.py 会重新读取清单、校验官方 HTTP(S) source_ref、成员完整性及每份原始 member 的 SHA256/size。
+- review.py 的批量 --manifest 现在拒绝任何 expect_fields 键（包括 null），复合 bundle 必须声明至少两份且顺序一致的 source_ref/kind；新增 P1 集成测试覆盖确定性、篡改、声明漂移、expect_fields 禁止和实际 batch seal。
+- 本 checkpoint 只交付工具和 fail-closed 测试；尚未获取 125/125 官方 evidence bytes，未执行 REVIEWED seal，未改变 ACTIVE。

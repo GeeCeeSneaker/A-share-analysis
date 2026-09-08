@@ -5015,3 +5015,16 @@ Git 历史负责保存过去版本。
 - **P0 CI correction 6**：Windows 3.12 run #389 的唯一失败为新增测试使用系统默认 cp1252 读取含中文 plan；已改为显式 UTF-8，promotion contract 与 ACTIVE 边界不变。
 
 - **P0 CI correction 7**：run #390 三平台在 pytest 前均因新增测试第 138 行 E501 失败；已按 Ruff 规范拆行，编码修复与 promotion contract 保持不变。
+
+
+---
+
+## Change Record: DM-CR-20260908-107
+
+- **Type**：C2 — GT-H3B-P1 evidence tooling implementation
+- **Date**：2026-09-08
+- **Status**：IN_PROGRESS / PENDING_REVIEW
+- **Contract**：批量 review manifest 严格禁止 expect_fields；新增 EVIDENCE_BUNDLE allowlist、确定性 ZIP 原始字节格式、source_ref/kind 双重清单绑定，以及 review.py 的 member hash/size 重算。
+- **Tests**：新增 P1 集成测试覆盖 bundle determinism、raw-member tamper、source declaration drift、null expect_fields、125-entry bundle batch seal。
+- **Boundary**：本批次不包含真实 125/125 官方 evidence bytes，不执行 REVIEWED seal，不推进 ACTIVE，不替代独立 Reviewer/current-main test-merge。
+- **Affected paths**：src/ashare_state/spike/evidence_bundle.py; scripts/golden/evidence_bundle.py; scripts/golden/review.py; src/ashare_state/spike/golden_store.py; tests/integration/test_gt_h3b_p1_review_contract.py; docs/design/A-share-analysis_GT-H3B-P1-evidence-tooling_20260908.md; docs/DEVLOG.md.

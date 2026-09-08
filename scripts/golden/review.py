@@ -39,6 +39,10 @@ from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
+from ashare_state.spike.evidence_bundle import (  # noqa: E402
+    EvidenceBundleError,
+    read_evidence_bundle,
+)
 from ashare_state.spike.golden_store import (  # noqa: E402
     VALID_ARTIFACT_KINDS,
     GoldenTruthError,
@@ -143,9 +147,69 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
                 raise ReviewError(f"review manifest entry {index} has an invalid artifact path")
             if not isinstance(kind, str) or not kind:
                 raise ReviewError(f"review manifest entry {index} has an invalid artifact kind")
+            if "expect_fields" in entry:
+                raise ReviewError(
+                    "GT-H3B batch review manifest must not contain expect_fields; "
+                    "correct the candidate before review"
+                )
             expect_fields = entry.get("expect_fields")
             if expect_fields is not None and not isinstance(expect_fields, dict):
                 raise ReviewError(f"review manifest entry {index} expect_fields must be an object")
+
+            bundle_sources: list[dict] | None = None
+            if kind == "EVIDENCE_BUNDLE":
+                raw_bundle_sources = entry.get("bundle_sources")
+                if not isinstance(raw_bundle_sources, list) or len(raw_bundle_sources) < 2:
+                    raise ReviewError(
+                        f"review manifest entry {index} EVIDENCE_BUNDLE requires "
+                        "at least two bundle_sources"
+                    )
+                bundle_sources = []
+                seen_bundle_sources: set[tuple[str, str]] = set()
+                for source_index, source in enumerate(raw_bundle_sources, start=1):
+                    if not isinstance(source, dict):
+                        raise ReviewError(
+                            f"review manifest entry {index} bundle source "
+                            f"{source_index} must be an object"
+                        )
+                    if "source_ref" not in source or "kind" not in source:
+                        raise ReviewError(
+                            f"review manifest entry {index} bundle source "
+                            f"{source_index} must contain source_ref and kind"
+                        )
+                    source_ref = source["source_ref"]
+                    source_kind = source["kind"]
+                    if not isinstance(source_ref, str) or not source_ref:
+                        raise ReviewError(
+                            f"review manifest entry {index} bundle source "
+                            f"{source_index} has an invalid source_ref"
+                        )
+                    if not isinstance(source_kind, str) or not source_kind:
+                        raise ReviewError(
+                            f"review manifest entry {index} bundle source "
+                            f"{source_index} has an invalid kind"
+                        )
+                    _validate_artifact_kind(source_kind)
+                    if source_kind == "EVIDENCE_BUNDLE":
+                        raise ReviewError(
+                            f"review manifest entry {index} bundle source "
+                            "cannot itself be an EVIDENCE_BUNDLE"
+                        )
+                    source_key = (source_ref, source_kind)
+                    if source_key in seen_bundle_sources:
+                        raise ReviewError(
+                            f"review manifest entry {index} contains duplicate "
+                            f"bundle source {source_index}"
+                        )
+                    seen_bundle_sources.add(source_key)
+                    bundle_sources.append(
+                        {"source_ref": source_ref, "kind": source_kind}
+                    )
+            elif "bundle_sources" in entry:
+                raise ReviewError(
+                    f"review manifest entry {index} bundle_sources is only valid "
+                    "for EVIDENCE_BUNDLE"
+                )
             requests.append(
                 {
                     "case": case_id,
@@ -153,6 +217,7 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
                     "kind": kind,
                     "note": entry.get("note", ""),
                     "expect_fields": expect_fields,
+                    "bundle_sources": bundle_sources,
                 }
             )
         return requests
@@ -183,6 +248,7 @@ def _load_review_requests(args: argparse.Namespace) -> list[dict]:
             "kind": args.kind,
             "note": args.note,
             "expect_fields": expect_fields,
+            "bundle_sources": None,
         }
     ]
 
@@ -222,11 +288,20 @@ def _semantic_hash(doc: dict) -> str:
 # ---------------------------------------------------------------- staging
 
 
-def _stage_artifact(artifact: Path, kind: str) -> tuple[str, str, str]:
+def _stage_artifact(
+    artifact: Path, kind: str, bundle_sources: list[dict] | None = None
+) -> tuple[str, str, str]:
     """Stage ONE artifact: validate kind, hash the real bytes, return
     (content-addressed ref, sha256, retrieved_at). Nothing is written yet
     (R4A2-P1-05: stage-all-then-commit)."""
     _validate_artifact_kind(kind)
+    if kind == "EVIDENCE_BUNDLE":
+        if bundle_sources is None:
+            raise ReviewError("EVIDENCE_BUNDLE requires declared bundle_sources")
+        try:
+            read_evidence_bundle(artifact, expected_sources=bundle_sources)
+        except EvidenceBundleError as exc:
+            raise ReviewError(f"invalid EVIDENCE_BUNDLE {artifact}: {exc}") from exc
     if not artifact.is_file():
         msg = f"artifact file does not exist: {artifact}"
         raise ReviewError(msg)
@@ -481,7 +556,9 @@ def main() -> int:
     staged_artifacts: list[tuple[Path, str, str]] = []
     entries: list[dict] = []
     for request in requests:
-        ref, digest, retrieved = _stage_artifact(request["artifact"], request["kind"])
+        ref, digest, retrieved = _stage_artifact(
+            request["artifact"], request["kind"], request["bundle_sources"]
+        )
         staged_artifacts.append((request["artifact"], ref, digest))
         entries.append(
             {
