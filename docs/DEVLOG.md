@@ -1,3 +1,15 @@
+## 2026-09-09 · Trading Rule H1 non-ACTIVE candidate seal lifecycle P0
+
+> 状态：**IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_INDEPENDENT_REVIEW / REAL EVIDENCE NOT MATERIALIZED**
+
+- 基于最新 `main@6f2bd1e` 的生命周期 P0 要求，`scripts/rules/review.py` 新增显式 `--candidate` 路径：要求 `--candidate-version`、manifest-style `--expected-candidate-hash`、显式 expected ACTIVE parent（`--from-version`/`--expected-active-version`）、`RULE_EVIDENCE_BUNDLE.v1` 和 reviewer marker `project-owner`。
+- candidate 必须精确位于 `versions/<candidate-version>/rules.yaml`，拒绝外部路径、`.`/`..`、staging 目录和符号链接；candidate bytes 从版本库只读取一次，候选 hash、解析、变换和 reviewed output 均绑定同一内存 snapshot。
+- 新路径在同一 single-writer lock 内验证旧 ACTIVE、验证 candidate、准备 exact-coverage evidence、staging gate、先发布新 REVIEWED 版本、最后原子替换 ACTIVE manifest，并在提交后重跑 ACTIVE/evidence gate；父版本漂移、gate/manifest 写入失败均保持旧 ACTIVE 并清理本次新输出。
+- 新增 `tests/integration/test_h1_rule_seal_lifecycle.py`，覆盖 candidate happy path、父版本错配/漂移、路径/符号链接/哈希/状态拒绝、单次快照、锁竞争、staging 清理和 manifest 回滚；本地 focused 结果为 `12 passed, 1 skipped`（13 个用例），skip 仅因测试环境符号链接不可用。
+- 当前 H1 `v20260909-h1-compiled`、旧 ACTIVE `v20260824-compiled`、Golden v7、真实 H1 evidence、REVIEWED seal、ACTIVE 生产切换和 Formal Production B1-B7 均未触碰；账号、密码、IP、Token、原始 Provider 输出和专有依赖未写入 GitHub。
+
+下一步：等待三平台 CI 与独立 Reviewer 合并本生命周期修复；合并后才在 clean current-main checkout 受控获取 14 条规则的真实第一方原始 bytes，创建独立 evidence/seal PR，合并后再重试 B1-B7。
+
 ## 2026-09-08 · GT-H3R2 v6 JSONL serialization correction
 
 > 状态：**DATA SERIALIZATION FIX STAGED / HASH RECOMPUTED**

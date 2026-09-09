@@ -49,6 +49,22 @@ Usage:
         --version v20260825-reviewed \
         --from-version v20260824-compiled
 
+The H1 production candidate path is explicit and does not require making the
+candidate ACTIVE first:
+
+    uv run python scripts/rules/review.py \
+        --candidate configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml \
+        --candidate-version v20260909-h1-compiled \
+        --expected-candidate-hash <manifest-style-sha256> \
+        --evidence-bundle <prepared-bundle.json> \
+        --reviewer project-owner \
+        --version v20260909-h1-reviewed \
+        --from-version v20260824-compiled
+
+The candidate path requires the explicit expected ACTIVE parent, candidate
+directory identity, and candidate dataset hash. It keeps the candidate
+non-ACTIVE until the final atomic manifest replacement.
+
 The legacy ``--artifact`` mode remains available for compatibility tests and
 non-production tooling; it cannot satisfy the strict production review gate.
 """
@@ -56,8 +72,10 @@ non-production tooling; it cannot satisfy the strict production review gate.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
+import os
 import re
 import shutil
 import sys
@@ -181,6 +199,75 @@ def _validate_version_id(version: str, rules_root: Path) -> Path:
     return candidate
 
 
+def _validate_candidate_path(
+    candidate: Path,
+    *,
+    candidate_version: str,
+    rules_root: Path,
+) -> tuple[Path, str]:
+    """Validate the H1 candidate path before reading any candidate bytes.
+
+    The candidate is intentionally narrower than the legacy ``--rules``
+    input: it must be exactly ``versions/<candidate-version>/rules.yaml``.
+    This prevents a caller from supplying an arbitrary external file, a
+    traversal spelling, or a staging/symlink path while still claiming to
+    seal the named version.
+    """
+    if candidate_version.startswith(".staging-"):
+        raise ValueError("candidate version must not be a staging version")
+    version_dir = _validate_version_id(candidate_version, rules_root)
+    versions_root_raw = rules_root / "versions"
+    versions_root = versions_root_raw.resolve()
+    if versions_root_raw.is_symlink():
+        raise ValueError("candidate versions root must not be a symlink")
+    raw_version_dir = versions_root_raw / candidate_version
+    if raw_version_dir.is_symlink():
+        raise ValueError("candidate version directory must not be a symlink")
+    if not version_dir.is_dir():
+        raise ValueError(f"candidate version directory not found: {raw_version_dir}")
+
+    candidate_text = str(candidate).replace("\\", "/")
+    if any(part in (".", "..") for part in candidate_text.split("/")):
+        raise ValueError("candidate path must not contain '.' or '..' components")
+    root_abs = rules_root.absolute()
+    candidate_abs = candidate if candidate.is_absolute() else Path.cwd() / candidate
+    expected_abs = root_abs / "versions" / candidate_version / "rules.yaml"
+    normalized_candidate = os.path.normcase(os.path.normpath(str(candidate_abs)))
+    normalized_expected = os.path.normcase(os.path.normpath(str(expected_abs)))
+    if normalized_candidate != normalized_expected:
+        raise ValueError(
+            "candidate path must be exactly "
+            f"versions/{candidate_version}/rules.yaml under the rules root"
+        )
+    if candidate_abs.is_symlink():
+        raise ValueError("candidate rules file must not be a symlink")
+    if not candidate_abs.is_file():
+        raise ValueError(f"candidate rules file not found: {candidate_abs}")
+    resolved = candidate_abs.resolve()
+    try:
+        resolved.relative_to(versions_root)
+    except ValueError as exc:
+        raise ValueError("candidate path escapes the versions root") from exc
+    if resolved != (version_dir / "rules.yaml").resolve():
+        raise ValueError("candidate path resolves to a different version file")
+    return candidate_abs, f"versions/{candidate_version}/rules.yaml"
+
+
+def _load_snapshot_book(snapshot_bytes: bytes) -> TradingRuleBook:
+    """Parse a version book from already captured bytes.
+
+    The temporary file is deliberately separate from the mutable rule store:
+    the candidate file is read once by the caller, and all later parsing uses
+    this immutable in-memory byte object.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="rule-candidate-") as sandbox:
+        sandbox_yaml = Path(sandbox) / "rules.yaml"
+        sandbox_yaml.write_bytes(snapshot_bytes)
+        return TradingRuleBook.load(sandbox_yaml)
+
+
 def _build_reviewed_text(
     snapshot_bytes: bytes,
     *,
@@ -286,7 +373,18 @@ def _prepare_review_evidence(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--rules", required=True, help="COMPILED rule yaml to review")
+    rules_input = parser.add_mutually_exclusive_group(required=True)
+    rules_input.add_argument(
+        "--rules",
+        help="COMPILED ACTIVE rule yaml to review (legacy compatibility path)",
+    )
+    rules_input.add_argument(
+        "--candidate",
+        help=(
+            "explicit non-ACTIVE COMPILED candidate yaml for the H1 seal path; "
+            "must be under versions/<candidate-version>/rules.yaml"
+        ),
+    )
     evidence_input = parser.add_mutually_exclusive_group(required=True)
     evidence_input.add_argument(
         "--artifact",
@@ -312,17 +410,36 @@ def main() -> int:
         help="new immutable version name (e.g. v20260825-reviewed)",
     )
     parser.add_argument(
+        "--candidate-version",
+        default="",
+        help=(
+            "candidate directory identity for --candidate; required for the "
+            "explicit H1 candidate path"
+        ),
+    )
+    parser.add_argument(
+        "--expected-candidate-hash",
+        "--candidate-dataset-hash",
+        dest="expected_candidate_hash",
+        default="",
+        help=(
+            "frozen manifest-style SHA-256 over "
+            "versions/<candidate-version>/rules.yaml + bytes; required for --candidate"
+        ),
+    )
+    parser.add_argument(
         "--rules-root",
         default="configs/trading_rules",
         help="rules root holding versions/ + evidence/ + rule_manifest.json",
     )
     parser.add_argument(
         "--from-version",
+        "--expected-active-version",
+        dest="from_version",
         default="",
         help=(
-            "expected CURRENT ACTIVE version (lineage check: refuse when the "
-            "ACTIVE selector moved elsewhere - avoids reviewing an arbitrary "
-            "old/external compiled yaml and silently flipping ACTIVE)"
+            "expected CURRENT ACTIVE parent version (lineage check; required "
+            "for --candidate and optional for legacy --rules)"
         ),
     )
     args = parser.parse_args()
@@ -330,8 +447,19 @@ def main() -> int:
         parser.error("--kind is required with --artifact")
     if args.evidence_bundle and args.kind:
         parser.error("--kind is only valid with --artifact")
+    if args.candidate and args.artifact:
+        parser.error("--candidate requires --evidence-bundle, not legacy --artifact")
+    if args.candidate and args.reviewer != "project-owner":
+        parser.error("--candidate requires the reviewer marker 'project-owner'")
+    if args.candidate and not args.from_version:
+        parser.error("--candidate requires --from-version/--expected-active-version")
+    if args.candidate and not args.candidate_version:
+        parser.error("--candidate requires --candidate-version")
+    if args.candidate and not args.expected_candidate_hash:
+        parser.error("--candidate requires --expected-candidate-hash")
 
-    rules_path = Path(args.rules)
+    rules_path = Path(args.rules) if args.rules else None
+    candidate_path = Path(args.candidate) if args.candidate else None
     artifact = Path(args.artifact) if args.artifact else None
     bundle_manifest = Path(args.evidence_bundle) if args.evidence_bundle else None
     rules_root = Path(args.rules_root)
@@ -350,7 +478,7 @@ def main() -> int:
     # Allowed BEFORE the lock: CLI parse + pure lexical argument checks +
     # basic rules_root existence - none of these read the ACTIVE selector
     # or the mutable version store.
-    if not rules_path.is_file():
+    if rules_path is not None and not rules_path.is_file():
         return _fail(f"rules file not found: {rules_path}")
     if artifact is not None and not artifact.is_file():
         return _fail(f"source artifact not found: {artifact}")
@@ -374,6 +502,18 @@ def main() -> int:
             f"pid={os_mod.getpid()} started={datetime.now(UTC).isoformat()}".encode(),
         )
         os_mod.close(lock_fd)
+        if candidate_path is not None:
+            return _candidate_review_workflow_locked(
+                rules_root=rules_root,
+                candidate_path=candidate_path,
+                candidate_version=args.candidate_version,
+                expected_candidate_hash=args.expected_candidate_hash,
+                bundle_manifest=bundle_manifest,
+                expected_active_version=args.from_version,
+                version=args.version,
+                reviewer=args.reviewer,
+            )
+        assert rules_path is not None
         return _review_workflow_locked(
             rules_root=rules_root,
             rules_path=rules_path,
@@ -386,6 +526,182 @@ def main() -> int:
         )
     finally:
         lock_path.unlink(missing_ok=True)
+
+
+def _candidate_review_workflow_locked(
+    *,
+    rules_root: Path,
+    candidate_path: Path,
+    candidate_version: str,
+    expected_candidate_hash: str,
+    bundle_manifest: Path | None,
+    expected_active_version: str,
+    version: str,
+    reviewer: str,
+) -> int:
+    """Seal one explicit non-ACTIVE COMPILED candidate under the lock.
+
+    This is the H1 production path. The current ACTIVE dataset is only the
+    expected parent; the candidate is read once into ``candidate_bytes`` and
+    all evidence contracts, parsing, transformation, and dataset identity
+    checks use that snapshot. ACTIVE is not changed until the shared staged
+    workflow has passed every gate.
+    """
+    if reviewer != "project-owner":
+        return _fail("H1 candidate seal requires reviewer marker 'project-owner'")
+    if not expected_active_version:
+        return _fail("H1 candidate seal requires an explicit expected ACTIVE parent")
+    if not re.fullmatch(r"[0-9a-f]{64}", expected_candidate_hash):
+        return _fail("expected candidate hash must be 64 lower-hex characters")
+
+    try:
+        active_book, active = load_active_rules(rules_root)
+    except Exception as exc:  # noqa: BLE001 - clear operator error
+        return _fail(f"ACTIVE parent failed the integrity preflight: {exc}")
+    if active.rule_version != expected_active_version:
+        return _fail(
+            f"ACTIVE parent is {active.rule_version!r}, expected "
+            f"{expected_active_version!r} - the selector moved"
+        )
+    if active.review_status != "COMPILED":
+        return _fail(f"expected ACTIVE parent must be COMPILED, got {active.review_status!r}")
+    if len(active.dataset_files) != 1:
+        return _fail(
+            "H1 candidate seal requires a single-file ACTIVE parent; "
+            f"got {list(active.dataset_files)!r}"
+        )
+
+    try:
+        candidate_file, candidate_rel = _validate_candidate_path(
+            candidate_path,
+            candidate_version=candidate_version,
+            rules_root=rules_root,
+        )
+    except ValueError as exc:
+        return _fail(str(exc))
+    active_rel = active.dataset_files[0].replace("\\", "/")
+    if candidate_rel == active_rel or candidate_version == active.rule_version:
+        return _fail("H1 candidate must be non-ACTIVE and distinct from the expected parent")
+
+    # Candidate bytes are read exactly once from the mutable version store.
+    # The returned object is the only source used by the transform and the
+    # candidate hash; no later candidate read can substitute new bytes.
+    try:
+        candidate_bytes = candidate_file.read_bytes()
+    except OSError as exc:
+        return _fail(f"candidate rules file could not be read: {exc}")
+    candidate_hash = _hash_snapshot([(candidate_rel, candidate_bytes)])
+    if candidate_hash != expected_candidate_hash:
+        return _fail(
+            "candidate dataset hash mismatch: expected "
+            f"{expected_candidate_hash[:16]}..., snapshot {candidate_hash[:16]}..."
+        )
+    try:
+        candidate_book = _load_snapshot_book(candidate_bytes)
+    except (OSError, UnicodeError, ValueError) as exc:
+        return _fail(f"candidate snapshot does not parse as a rule dataset: {exc}")
+    if candidate_book.review_status != "COMPILED":
+        return _fail(f"candidate snapshot must be COMPILED, got {candidate_book.review_status!r}")
+    if candidate_book.evidence_contract != RULE_EVIDENCE_BUNDLE_SCHEMA:
+        return _fail(
+            f"H1 candidate snapshot must declare evidence_contract={RULE_EVIDENCE_BUNDLE_SCHEMA!r}"
+        )
+    if not candidate_book.version:
+        return _fail("candidate snapshot must declare a non-empty dataset version")
+    try:
+        reviewed_version_dir = _validate_version_id(version, rules_root)
+    except ValueError as exc:
+        return _fail(str(exc))
+    if reviewed_version_dir.exists():
+        return _fail(
+            f"version directory already exists: {reviewed_version_dir} "
+            "(versions are immutable - pick a NEW version name)"
+        )
+
+    now = datetime.now(UTC).isoformat()
+    try:
+        review_evidence = _prepare_review_evidence(
+            artifact=None,
+            bundle_manifest=bundle_manifest,
+            expected_rule_ids=[rule.rule_id for rule in candidate_book.rules],
+            expected_dataset_version=candidate_book.version,
+            expected_source_urls_by_rule={
+                rule.rule_id: source_urls_from_ref(rule.source_ref) for rule in candidate_book.rules
+            },
+            kind=RULE_EVIDENCE_BUNDLE_KIND,
+        )
+    except (OSError, ValueError) as exc:
+        return _fail(f"review evidence preparation failed: {exc}")
+    artifact_bytes = review_evidence.artifact_bytes
+    artifact_hash = review_evidence.artifact_hash
+    artifact_ref = review_evidence.artifact_ref
+    try:
+        reviewed_text = _build_reviewed_text(
+            candidate_bytes,
+            reviewer=reviewer,
+            now=now,
+            artifact_ref=artifact_ref,
+            artifact_hash=artifact_hash,
+            kind=review_evidence.artifact_kind,
+            evidence_contract=review_evidence.evidence_contract,
+        )
+    except (UnicodeError, ValueError) as exc:
+        return _fail(f"candidate snapshot could not be transformed: {exc}")
+    reviewed_bytes = reviewed_text.encode("utf-8")
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="rule-review-") as sandbox:
+        sandbox_yaml = Path(sandbox) / "rules.yaml"
+        sandbox_yaml.write_bytes(reviewed_bytes)
+        try:
+            TradingRuleBook.load(sandbox_yaml)
+        except Exception as exc:  # noqa: BLE001 - parse failure blocks
+            return _fail(f"reviewed candidate copy does not parse: {exc}")
+
+    return _review_locked_workflow(
+        rules_root=rules_root,
+        snapshot_hash=candidate_hash,
+        version=version,
+        version_dir=reviewed_version_dir,
+        reviewed_bytes=reviewed_bytes,
+        artifact_bytes=artifact_bytes,
+        artifact_hash=artifact_hash,
+        artifact_ref=artifact_ref,
+        artifact_copy=rules_root / RULE_EVIDENCE_SUBDIR / artifact_ref,
+        raw_artifacts=review_evidence.raw_artifacts,
+        reviewer=reviewer,
+        now=now,
+        kind=review_evidence.artifact_kind,
+        evidence_contract=review_evidence.evidence_contract,
+        expected_parent_version=active.rule_version,
+        expected_parent_dataset_hash=active.dataset_hash,
+        expected_parent_dataset_files=active.dataset_files,
+        source_rule_identity=candidate_book.rules,
+    )
+
+
+def _expected_parent_problem(
+    *,
+    rules_root: Path,
+    expected_version: str,
+    expected_dataset_hash: str,
+    expected_dataset_files: tuple[str, ...],
+) -> str:
+    """Return a stale/tampered ACTIVE-parent error without mutating output."""
+    try:
+        _book, current = load_active_rules(rules_root)
+    except Exception as exc:  # noqa: BLE001 - parent must remain loadable
+        return f"ACTIVE parent changed or became invalid during seal: {exc}"
+    if current.rule_version != expected_version:
+        return (
+            f"ACTIVE parent moved during seal: current {current.rule_version!r}, "
+            f"expected {expected_version!r}"
+        )
+    if current.dataset_hash != expected_dataset_hash:
+        return "ACTIVE parent dataset hash changed during seal"
+    if current.dataset_files != expected_dataset_files:
+        return "ACTIVE parent dataset file list changed during seal"
+    return ""
 
 
 def _review_workflow_locked(
@@ -575,6 +891,10 @@ def _review_locked_workflow(
     now: str,
     kind: str,
     evidence_contract: str,
+    expected_parent_version: str = "",
+    expected_parent_dataset_hash: str = "",
+    expected_parent_dataset_files: tuple[str, ...] = (),
+    source_rule_identity: tuple[object, ...] | None = None,
 ) -> int:
     """The staged review workflow, executed under the single-writer lock.
 
@@ -594,11 +914,25 @@ def _review_locked_workflow(
     must equal reviewed_bytes; a tampered final file can never have its
     bytes re-hashed into the manifest)."""
     evidence_dir = rules_root / RULE_EVIDENCE_SUBDIR
+    evidence_dir_preexisting = evidence_dir.exists()
     created_evidence_refs: set[str] = set()
     published_version = False
     manifest_committed = False
     staging_dir = rules_root / "versions" / f".staging-{version}-{uuid.uuid4().hex[:8]}"
     tmp_manifest = rules_root / f".{RULE_MANIFEST_FILE}.tmp-{version}"
+
+    # H1 candidate path: re-check the expected old ACTIVE parent immediately
+    # before any evidence/version mutation. Legacy ACTIVE->REVIEWED callers
+    # leave these arguments empty and retain their existing behavior.
+    if expected_parent_version:
+        parent_problem = _expected_parent_problem(
+            rules_root=rules_root,
+            expected_version=expected_parent_version,
+            expected_dataset_hash=expected_parent_dataset_hash,
+            expected_dataset_files=expected_parent_dataset_files,
+        )
+        if parent_problem:
+            return _fail(parent_problem)
 
     def _cleanup_uncommitted() -> None:
         # remove every byte THIS run created (staged/published/evidence/tmp)
@@ -608,6 +942,19 @@ def _review_locked_workflow(
         for ref in created_evidence_refs:
             (evidence_dir / ref).unlink(missing_ok=True)
         tmp_manifest.unlink(missing_ok=True)
+        if not evidence_dir_preexisting and evidence_dir.is_dir():
+            # Bundle refs create evidence/sha256/. Remove only empty
+            # directories created by this attempt; never remove a preexisting
+            # evidence tree or an unexpected file.
+            for directory in sorted(
+                (path for path in evidence_dir.rglob("*") if path.is_dir()),
+                key=lambda path: len(path.parts),
+                reverse=True,
+            ):
+                with contextlib.suppress(OSError):
+                    directory.rmdir()
+            with contextlib.suppress(OSError):
+                evidence_dir.rmdir()
 
     try:
         # ================= Phase 2: staged output =================
@@ -636,6 +983,10 @@ def _review_locked_workflow(
             rules_root=rules_root,
             require_evidence_bundle=bool(evidence_contract),
         )
+        if source_rule_identity is not None and tuple(reviewed_book.rules) != source_rule_identity:
+            problems.append(
+                "reviewed candidate rule identity differs from the captured candidate snapshot"
+            )
         if problems:
             _cleanup_uncommitted()
             return _fail(f"reviewed copy fails the review gate: {problems}")
@@ -662,6 +1013,16 @@ def _review_locked_workflow(
                 "reviewed_bytes identity - rolled back; ACTIVE unchanged "
                 "(read-back is verification-only, never a hash source)"
             )
+        if expected_parent_version:
+            parent_problem = _expected_parent_problem(
+                rules_root=rules_root,
+                expected_version=expected_parent_version,
+                expected_dataset_hash=expected_parent_dataset_hash,
+                expected_dataset_files=expected_parent_dataset_files,
+            )
+            if parent_problem:
+                _cleanup_uncommitted()
+                return _fail(parent_problem)
         manifest = {
             "rule_version": version,
             "review_status": "REVIEWED",
@@ -710,11 +1071,23 @@ def _review_locked_workflow(
         )
         return 3
     try:
-        load_active_rules(rules_root)
+        committed_book, _committed_manifest = load_active_rules(rules_root)
     except Exception as exc:  # noqa: BLE001 - coherence failure must surface
         print(
             f"REVIEW_COMMIT_INCONSISTENT: the committed ACTIVE state fails "
             f"coherence load: {exc} - manual intervention required",
+            file=sys.stderr,
+        )
+        return 3
+    post_problems = trading_rule_review_gate(
+        committed_book,
+        rules_root=rules_root,
+        require_evidence_bundle=bool(evidence_contract),
+    )
+    if post_problems:
+        print(
+            "REVIEW_COMMIT_INCONSISTENT: committed ACTIVE fails the post-commit "
+            f"review/evidence gate: {post_problems} - manual intervention required",
             file=sys.stderr,
         )
         return 3
