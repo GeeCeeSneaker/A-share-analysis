@@ -1,3 +1,45 @@
+## DM-20260909-007 · H1 Seal 生命周期独立审阅阻断项修复
+
+- **Type**：C0 — reviewer-blocking lifecycle hardening
+- **Date**：2026-09-09
+- **Status**：`REVIEW_BLOCKERS_ADDRESSED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / INDEPENDENT_REVIEW_RETRY_PENDING / REAL EVIDENCE NOT MATERIALIZED`
+- **Scope**：PR #33；独立 Reviewer 暂不合并，要求 candidate immutability verification 和新的 candidate 入口 evidence 对抗覆盖。
+
+**本次修复**
+
+- candidate source bytes 仍只读取一次；hash、解析、变换和 reviewed output 继续绑定原始内存 snapshot。新增提交前/提交后 verification-only 回读，比较 bytes、candidate hash、固定路径和可用文件身份；回读内容不会参与 seal 重绑定。
+- candidate 在 snapshot 后变更时，提交前清理本次 staging/version/evidence 并保持旧 ACTIVE；若在 manifest commit 后变更，返回 `REVIEW_COMMIT_INCONSISTENT`，不伪装成功。
+- `tests/integration/test_h1_rule_seal_lifecycle.py` 新增 missing、extra、duplicate、wrong-hash、raw tamper 五类 evidence bundle 入口级测试，以及 pre/post-commit candidate/old-parent mutation 测试；本地结果 `19 passed, 1 skipped`（20 个用例）。
+- 补强后的本地全量 `uv run pytest -q` 已运行至 `100%` 无失败；Ruff、format、mypy、`uv pip check` 和 `git diff --check` 亦全部通过。
+- 修复提交 `25858a7` 的 GitHub Actions CI run `34323121858` 已完成三平台全量门禁：Windows Python 3.12、Windows Python 3.14、Ubuntu Python 3.14 均为 `success`，无失败步骤。
+
+**边界与下一关**
+
+- 真实 H1 evidence、REVIEWED seal、ACTIVE 切换、Formal Production attempt 和 B1-B7 仍未执行；candidate、旧 ACTIVE、Golden v7 和凭据边界不变。
+- 待最终 head 三平台 CI 通过后重新交独立 Reviewer；在 Reviewer 合并 PR #33 前，不得进行真实 evidence materialization 或 H1 seal。
+
+## DM-20260909-006 · Trading Rule H1 Seal 生命周期 P0 实现
+
+- **Type**：C1 — explicit non-ACTIVE candidate seal lifecycle
+- **Date**：2026-09-09
+- **Status**：`IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_INDEPENDENT_REVIEW / REAL EVIDENCE NOT MATERIALIZED`
+- **Baseline**：最新 `main@6f2bd1e` 的 `A-share-analysis_TradingRule-H1关闭后Seal生命周期P0整改要求_20260909.md`；PR #32 已合并，旧 ACTIVE 仍为 `v20260824-compiled`。
+
+**本次完成**
+
+- `scripts/rules/review.py` 增加 H1 专用 `--candidate` 路径；显式绑定 expected ACTIVE parent、candidate version、candidate dataset hash、证据 bundle、reviewer marker `project-owner`，不再要求先把 candidate 设为 ACTIVE。
+- candidate 路径仅接受 `versions/<candidate-version>/rules.yaml`，拒绝 traversal、外部路径、staging 和符号链接；candidate bytes 只读取一次，并从同一 snapshot 完成 hash、解析、变换和新 REVIEWED output。
+- single-writer lock 覆盖 parent/candidate 读取至 ACTIVE commit；父 ACTIVE 的版本、文件列表和 hash 在 staging 前及 publish 前重新核验；新版本和证据先 staging/校验，ACTIVE manifest 最后原子替换，失败清理本次新增物。
+- post-commit 重新加载 ACTIVE 并执行完整 `trading_rule_review_gate(..., require_evidence_bundle=True)`；不一致明确返回 `REVIEW_COMMIT_INCONSISTENT`，不伪装成功。
+- 新增 `tests/integration/test_h1_rule_seal_lifecycle.py`；本地 focused `12 passed, 1 skipped`（13 个用例）。详细实现、CLI、候选 hash 与覆盖清单见 [`TradingRule-H1Seal生命周期P0实现记录_20260909.md`](../design/A-share-analysis_TradingRule-H1Seal生命周期P0实现记录_20260909.md)。
+- PR #33 初始生命周期实现提交的 GitHub Actions CI run `34315957568` 已完成三平台全量门禁：Windows Python 3.12、Windows Python 3.14、Ubuntu Python 3.14 均为 `success`，无失败步骤。
+
+**边界与下一关**
+
+- 本轮只实现生命周期，不改变 H1 14 条规则真值、旧 ACTIVE、Golden v7、H1 真实 evidence 或任何账号信息；测试中的证据是临时合成字节，不能当作正式 evidence。
+- 在独立 Reviewer 审查并合并本 P0 修复前，不启动真实 14-rule evidence materialization、不运行 H1 seal、不切 ACTIVE、不消耗 Formal Production attempt。
+- 合并后按 P0 要求从 clean current-main checkout 获取真实第一方原始 bytes，提交独立 evidence/seal PR；该 PR 合并后才重新执行 Formal Production B1-B7。
+
 ## DM-20260908-005 · GT-H3R2 v6 JSONL 载荷修正
 
 - **Type**：C1 — governed data serialization correction
