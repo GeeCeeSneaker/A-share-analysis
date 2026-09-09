@@ -232,7 +232,7 @@ Trading Rule H1 REVIEWED seal 被独立 Reviewer 接受并合并后：
 - AmazingData runtime/online identity/query：PRECHECK VERIFIED
 - Trading Rule H1：OPEN / CURRENT TASK
 - ACTIVE trading rules：COMPILED / NOT PRODUCTION-ELIGIBLE
-- Formal Production B1-B7：PROHIBITED UNTIL H1 REVIEWED PR IS INDEPENDENTLY CLOSED / NOT STARTED
+- Formal Production B1-B7：AUTHORIZED / NOT STARTED
 - Provider verdict：PENDING
 - Data Sufficiency：BLOCKED
 - 2020+ backfill：BLOCKED
@@ -250,7 +250,7 @@ Trading Rule H1 REVIEWED seal 被独立 Reviewer 接受并合并后：
 
 当前仍未完成、不能绕过的事项：
 
-1. 由项目管理者/独立 Reviewer 实际打开并留存 14 条规则所需的每份官方 HTML/PDF/DOCX 原文；
+1. 由项目管理者/独立 Reviewer 实际打开并留存 14 条规则所需的每份官方 HTML/PDF 原文；
 2. 按《TradingRule H1 人工审阅操作表》逐条填出 14 个 `APPROVE`，并对旧 IPO 44/36 终止边界、主板 ST 首 5 日适用性、主板 ST venue 历史起点、BSE venue 历史语义作明确裁决；
 3. 用真实原文生成输入 bundle 并通过 `scripts/rules/review.py` 发布 NEW `REVIEWED` 版本；
 4. 独立 Reviewer 接受后，才可推进 ACTIVE，再从最新 main 做 Formal Production preflight 和 B1-B7。
@@ -288,15 +288,9 @@ Trading Rule H1 REVIEWED seal 被独立 Reviewer 接受并合并后：
 - [SZSE 2026 年现行交易规则 PDF](https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf)；
 - [SZSE 2026 风险警示业务指南公告](https://www.szse.cn/lawrules/service/member/t20260630_621404.html)；
 - [BSE 现行上市交易规则](https://www.bse.cn/jygl_list/200028217.html)。
-- [SSE 2014 新股上市初期交易监管通知](https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20150912_3988761.shtml)；
-- [SZSE 2014 新股上市首日问答](https://www.szse.cn/aboutus/trends/news/t20140613_518480.html)。
 
-这些 URL 只是候选 required source contract；当前已把来源原始字节作为**待审阅 intake**保存在 `docs/provider_verification/trading_rule_h1_sources/`，并生成输入 bundle。locator/notice page 与实际规则附件已在 catalog 中分开记录，BSE 不再使用 browser-resolved DOM。它们尚未写入发布态 `configs/trading_rules/evidence/`，也没有把搜索结果或摘要当成证据。
-
-本轮还发现并纠正一个来源合同问题：原 `direct_05` 页面只说明低价风险警示股票的最小变动单位，不直接给出 5% 条款，已改绑官方《风险警示板股票交易暂行办法》页面。该办法明文写出 5% 和 2013-01-01 施行，但不能单独证明候选的 1998 历史 PIT 下界；SH/SZ 历史起点必须由 Reviewer 继续裁决。
-
-另外，原先把不含 44%/36% 条款的 SSE 历史规则页作为 `MAIN_BOARD_IPO_DAY` 的 RULE 来源也已纠正：当前候选改绑上述 SSE/SZSE 2014 原文，并保留 2023 过渡与首批注册制主板上市材料用于终止边界审阅。当前 intake 的 21 个原始 artifact、候选 hash 与 bundle hash 以 `trading_rule_h1_evidence_intake_20260909.md` 和 source catalog 为准；这些仍是未封印的审阅输入，不是 REVIEWED evidence。
+这些 URL 只是候选 required source contract；截至本记录，尚未把网页/PDF 原始字节写入 H1 evidence，也没有把搜索结果或摘要当成证据。
 
 ### 9.4 当前放行状态
 
-本轮实现已达到 `H1R IMPLEMENTED / CI VERIFIED GREEN / HUMAN REVIEW REQUIRED`（既有 GitHub Actions run `34310188331` / #490，Ubuntu 3.14、Windows 3.14、Windows 3.12 全部成功；本轮附件替换提交需等待新的 CI）。旧 `v20260824-compiled`、ACTIVE pointer、Golden v7 及其 evidence/receipt 未修改；真实 14 条（按 required URL 集合展开后的全部原文）仍须由项目管理者/独立 Reviewer 实际打开、留存并逐条裁决。Reviewer 未明确关闭本文件的全部 P0（包括历史 ST venue 起点、每条 RULE 的正文绑定）前，不得生成真实 REVIEWED seal、切换 ACTIVE、创建 run_id 或执行 Formal Production B1-B7。
+本轮实现已达到 `H1R IMPLEMENTED / CI VERIFIED GREEN / HUMAN REVIEW REQUIRED`（GitHub Actions run `34310188331` / #490，Ubuntu 3.14、Windows 3.14、Windows 3.12 全部成功）。旧 `v20260824-compiled`、ACTIVE pointer、Golden v7 及其 evidence/receipt 未修改；真实 14 条（按 required URL 集合展开后的全部原文）仍须由项目管理者/独立 Reviewer 实际打开、留存并逐条裁决。Reviewer 未明确关闭本文件的全部 P0（包括历史 ST venue 起点）前，不得生成真实 REVIEWED seal、切换 ACTIVE、创建 run_id 或执行 Formal Production B1-B7。

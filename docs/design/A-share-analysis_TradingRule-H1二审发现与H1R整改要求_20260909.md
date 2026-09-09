@@ -64,7 +64,7 @@ rule_id 名称不冻结，可采用清晰的历史/当前命名。规则总数�
 
 因此，H1R 候选将历史 ST 5% 规则改为按 venue 分开表达：`SH/60xxxx` 自 `19980422` 起，`SZ/000xxx、001xxx、002xxx、003xxx` 自 `19980428` 起，二者均至 `20260705`。这是根据交易所第一方历史记录收紧 PIT 下界的候选实现；“首次记载日期”是否足以作为完整法律生效日，仍须独立 Reviewer 打开原文后确认，不能仅凭搜索摘要或本记录自动视为已审定。
 
-必须增加起点前一日 fail-closed 与起点当日 5% 的测试：SH `19980421/19980422`、SZ `19980427/19980428`。在 Reviewer 关闭该历史边界 P0 前，候选继续保持 `COMPILED`、非 `ACTIVE`，不得生成可发布到 `configs/trading_rules/evidence/` 的真实 H1 evidence bundle；供 Reviewer 查看的本地 intake 原文和未封印输入清单不等同于发布态 bundle。
+必须增加起点前一日 fail-closed 与起点当日 5% 的测试：SH `19980421/19980422`、SZ `19980427/19980428`。在 Reviewer 关闭该历史边界 P0 前，候选继续保持 `COMPILED`、非 `ACTIVE`，不得生成真实 H1 evidence bundle。
 
 ## 3. P0-TR-H1-07 · evidence source contract 必须从 subset 升级为 exact coverage
 
@@ -162,7 +162,7 @@ PR #32 可在同一分支继续整改，不需要另起复杂分支。最终必�
 - Trading Rule H1R：CURRENT TASK
 - PR #32：DO NOT MERGE YET
 - ACTIVE trading rules：仍为旧 COMPILED，NOT PRODUCTION-ELIGIBLE
-- Formal Production B1-B7：PROHIBITED UNTIL H1 REVIEWED PR IS INDEPENDENTLY CLOSED / NOT STARTED
+- Formal Production B1-B7：AUTHORIZED / NOT STARTED
 - Formal attempt：未消耗
 - Provider verdict：PENDING
 - Data Sufficiency：BLOCKED

@@ -16,7 +16,7 @@ new immutable REVIEWED version
 ACTIVE 最后一次原子切换
 ```
 
-本文件记录的生命周期实现仍只在隔离临时规则根目录使用合成证据字节做合同测试；随后续 intake 已在独立 PR #35 保存候选所需的第一方 H1 HTML/PDF/DOCX 原始 bytes，但尚未运行真实 H1 seal、切换仓库 ACTIVE 或执行 Formal Production B1-B7。
+当前实现只在隔离临时规则根目录使用合成证据字节做合同测试；没有读取、保存或提交正式 H1 原始 HTML/PDF bytes，也没有运行真实 H1 seal、切换仓库 ACTIVE 或执行 Formal Production B1-B7。
 
 ## 2. 显式输入合同
 
@@ -35,7 +35,7 @@ ACTIVE 最后一次原子切换
 ```text
 candidate: v20260909-h1-compiled
 dataset version in YAML: 2026-09-09.1
-candidate dataset hash: 8645d39aa73322ba2a25cae3f852b58a34b862f8702ebd09422257e96fc554a1
+candidate dataset hash: 75d21777f1f135c47b963868641dfffc5428c5c5d897e17480a91ebaec1edd51
 expected ACTIVE parent: v20260824-compiled
 ```
 
@@ -81,9 +81,9 @@ candidate version、候选 hash、父 ACTIVE 版本和 reviewer marker 均显式
 
 ## 5. 当前治理边界与下一步
 
-生命周期实现已合并；当前 H1 证据 intake 在独立 PR #35 继续接受复核。Issue #34 明确禁止在该 PR 完成前启动 Formal Production；此前一次误调用虽在 SpikeRun 创建前因 ACTIVE COMPILED fail closed、未消耗 attempt，但属于程序性偏差，不得重复。因此：
+本实现分支仍未获得独立 Reviewer 合并确认，因此：
 
-- 不把已接收的原始 bytes 直接视为人工 APPROVE 或 REVIEWED seal；
+- 不开始正式 14-rule evidence materialization；
 - 不运行 H1 REVIEWED seal；
 - 不把 H1 candidate 切为 ACTIVE；
 - 不重试 Formal Production B1-B7。

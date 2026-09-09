@@ -1,7 +1,7 @@
 {
   "schema": "h1_source_catalog.v1",
   "retrieved_date": "2026-09-09",
-  "source_count": 21,
+  "source_count": 19,
   "catalog": [
     {
       "url": "https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf",
@@ -30,12 +30,13 @@
       "review_note": "Direct HTTP 200 body"
     },
     {
-      "url": "https://www.bse.cn/cxjg_list/200010908.html",
+      "url": "https://www.bse.cn/uploads/6/file/public/202209/20220924113331_fwbg1kr3qu.docx",
       "artifact_path": "docs/provider_verification/trading_rule_h1_sources/bse_200010908.docx",
       "archive_mode": "first_party_linked_docx",
-      "initial_http_status": 302,
+      "initial_http_status": 200,
       "source_page_url": "https://www.bse.cn/cxjg_list/200010908.html",
       "source_page_kind": "EXCHANGE_NOTICE",
+      "source_page_http_status": 302,
       "download_url": "https://www.bse.cn/uploads/6/file/public/202209/20220924113331_fwbg1kr3qu.docx",
       "download_http_status": 200,
       "final_url": "https://www.bse.cn/uploads/6/file/public/202209/20220924113331_fwbg1kr3qu.docx",
@@ -48,12 +49,13 @@
       "review_note": "The publication page is an official exchange notice, while the linked original DOCX bytes are the listed rulebook body used for the TRANSITION source. Page direct request was 302/WAF and the attachment response was HTTP 200. No DOM is archived."
     },
     {
-      "url": "https://www.bse.cn/jygl_list/200010919.html",
+      "url": "https://www.bse.cn/uploads/6/file/public/202209/20220924123627_d6405jicv9.docx",
       "artifact_path": "docs/provider_verification/trading_rule_h1_sources/bse_200010919.docx",
       "archive_mode": "first_party_linked_docx",
-      "initial_http_status": 302,
+      "initial_http_status": 200,
       "source_page_url": "https://www.bse.cn/jygl_list/200010919.html",
       "source_page_kind": "EXCHANGE_NOTICE",
+      "source_page_http_status": 302,
       "download_url": "https://www.bse.cn/uploads/6/file/public/202209/20220924123627_d6405jicv9.docx",
       "download_http_status": 200,
       "final_url": "https://www.bse.cn/uploads/6/file/public/202209/20220924123627_d6405jicv9.docx",
@@ -66,12 +68,13 @@
       "review_note": "Original first-party DOCX attachment downloaded from the official BSE source page; page direct request was 302/WAF and the attachment response was HTTP 200. No DOM is archived."
     },
     {
-      "url": "https://www.bse.cn/jygl_list/200028217.html",
+      "url": "https://www.bse.cn/uploads/6/file/public/202604/20260424170528_52kqyhc7p9.docx",
       "artifact_path": "docs/provider_verification/trading_rule_h1_sources/bse_200028217.docx",
       "archive_mode": "first_party_linked_docx",
-      "initial_http_status": 302,
+      "initial_http_status": 200,
       "source_page_url": "https://www.bse.cn/jygl_list/200028217.html",
       "source_page_kind": "EXCHANGE_NOTICE",
+      "source_page_http_status": 302,
       "download_url": "https://www.bse.cn/uploads/6/file/public/202604/20260424170528_52kqyhc7p9.docx",
       "download_http_status": 200,
       "final_url": "https://www.bse.cn/uploads/6/file/public/202604/20260424170528_52kqyhc7p9.docx",
@@ -136,19 +139,6 @@
       "review_note": "Direct HTTP 200 body"
     },
     {
-      "url": "https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf",
-      "artifact_path": "docs/provider_verification/trading_rule_h1_sources/direct_06.pdf",
-      "archive_mode": "direct_http_200",
-      "initial_http_status": 200,
-      "final_url": "https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf",
-      "content_type": "application/pdf",
-      "byte_size": 850696,
-      "sha256": "082ae3ec1f73d1bff7fded0787951316a547a4b1c48144db4e3ac0c0b827447e",
-      "text_chars": 175309,
-      "pdf_pages": 155,
-      "review_note": "Direct HTTP 200 body"
-    },
-    {
       "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/c_20121216_10785153.shtml",
       "artifact_path": "docs/provider_verification/trading_rule_h1_sources/sse_risk_warning_2012.html",
       "archive_mode": "direct_http_200",
@@ -188,12 +178,13 @@
       "review_note": "Direct HTTP 200 body"
     },
     {
-      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml",
+      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/10816482/files/959da0158c65434daa8a43a6e32be7ba.docx",
       "artifact_path": "docs/provider_verification/trading_rule_h1_sources/sse_10816482_rules.docx",
       "archive_mode": "first_party_linked_docx",
       "initial_http_status": 200,
       "source_page_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml",
       "source_page_kind": "EXCHANGE_PUBLICATION_PAGE",
+      "source_page_http_status": 200,
       "download_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/10816482/files/959da0158c65434daa8a43a6e32be7ba.docx",
       "download_http_status": 200,
       "final_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/10816482/files/959da0158c65434daa8a43a6e32be7ba.docx",
@@ -204,19 +195,6 @@
       "text_chars": 20108,
       "pdf_pages": null,
       "review_note": "Original first-party DOCX attachment downloaded from the official SSE source page; the page was HTTP 200 and the attachment was HTTP 200. The locator page is retained in source_page_url; the rule body is the archived DOCX."
-    },
-    {
-      "url": "https://www.szse.cn/aboutus/sse/events/t20070328_497832.html",
-      "artifact_path": "docs/provider_verification/trading_rule_h1_sources/direct_07.html",
-      "archive_mode": "direct_http_200",
-      "initial_http_status": 200,
-      "final_url": "https://www.szse.cn/aboutus/sse/events/t20070328_497832.html",
-      "content_type": "text/html",
-      "byte_size": 144804,
-      "sha256": "5532c4de1ab86be5129a61502e49e12d4d1563c3069a64d667557b877cd13264",
-      "text_chars": 11552,
-      "pdf_pages": null,
-      "review_note": "Direct HTTP 200 body"
     },
     {
       "url": "https://www.szse.cn/aboutus/trends/news/t20230404_599697.html",
@@ -258,12 +236,13 @@
       "review_note": "Direct HTTP 200 body"
     },
     {
-      "url": "https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
+      "url": "https://docs.static.szse.cn/www/disclosure/notice/general/W020200612831351578076.pdf",
       "artifact_path": "docs/provider_verification/trading_rule_h1_sources/szse_chinext_special_rules.pdf",
       "archive_mode": "first_party_linked_pdf",
       "initial_http_status": 200,
       "source_page_url": "https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
       "source_page_kind": "EXCHANGE_NOTICE",
+      "source_page_http_status": 200,
       "download_url": "https://docs.static.szse.cn/www/disclosure/notice/general/W020200612831351578076.pdf",
       "download_http_status": 200,
       "final_url": "https://docs.static.szse.cn/www/disclosure/notice/general/W020200612831351578076.pdf",

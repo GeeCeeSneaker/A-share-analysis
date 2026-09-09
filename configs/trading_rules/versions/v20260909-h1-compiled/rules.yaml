@@ -39,7 +39,7 @@ rules:
     down_rate: 0.05
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SSE historical risk-warning board trading measures (5% clause): https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/c_20121216_10785153.shtml | SSE official market history (first special treatment recorded 1998-04-22): https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf"
+    source_ref: "SSE historical risk-warning board trading measures (5% clause): https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml | SSE official market history (first special treatment recorded 1998-04-22): https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf"
 
   - rule_id: MAIN_BOARD_ST_HISTORICAL_SZ
     board: MAIN
@@ -81,7 +81,7 @@ rules:
     down_rate: 0.36
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SSE 2014 main-board IPO listing-day 44%/36% notice: https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20150912_3988761.shtml | SZSE 2014 main-board IPO listing-day 44%/36% Q&A: https://www.szse.cn/aboutus/trends/news/t20140613_518480.html | SSE transition notice: https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230217_5716420.shtml | SZSE first registration-system main-board listing: https://www.szse.cn/aboutus/trends/news/t20230404_599697.html"
+    source_ref: "SSE main-board IPO listing-day 44%/36% rule: https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | SSE transition notice: https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230217_5716420.shtml | SZSE first registration-system main-board listing: https://www.szse.cn/aboutus/trends/news/t20230404_599697.html"
 
   - rule_id: MAIN_BOARD_FIRST5_NO_LIMIT
     board: MAIN
