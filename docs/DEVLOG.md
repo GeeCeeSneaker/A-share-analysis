@@ -3567,10 +3567,12 @@
 
 ## 2026-09-09 · Trading Rule H1R historical venue-boundary tightening
 
-> 状态：**IMPLEMENTED / CI VALIDATION PENDING / INDEPENDENT HUMAN REVIEW PENDING**
+> 状态：**IMPLEMENTED / CI VERIFIED GREEN / INDEPENDENT HUMAN REVIEW PENDING**
 
 - 复核 PR #32 时间线中的额外历史边界意见，并对照交易所第一方历史材料：SSE 官方市场史记载 1998-04-22 实施特别处理，SZSE 官方 1998 年大事记记载 1998-04-28 首次实行特别处理。
 - 将候选的共享 `MAIN_BOARD_ST_HISTORICAL` 拆为 `MAIN_BOARD_ST_HISTORICAL_SH`（SH/60xxxx，19980422—20260705，5%）和 `MAIN_BOARD_ST_HISTORICAL_SZ`（SZ/000xxx、001xxx、002xxx、003xxx，19980428—20260705，5%）；`MAIN_BOARD_ST_CURRENT` 仍自 20260706 起为 10%。这是候选 PIT 下界收紧，不代表已完成法律生效日的人审确认。
 - 新增起点前一日 fail-closed 与起点当日命中 5% 的回归测试；候选数量更新为 14 条，人工审阅表和 evidence input template 的 rule_id/source URL 集同步更新。清理主板 FIRST5 YAML 中重复的 `st_state` 键，保留唯一 `null`（状态无关）表达。
 - 该项登记为补充 P0 `P0-TR-H1-08`：独立 Reviewer 必须实际打开并保存 SSE/SZSE 历史材料，确认“首次实施日期”是否足以支撑候选 effective_from；确认前不得生成 H1 evidence、REVIEWED、ACTIVE、run_id 或执行 B1-B7。
-- 旧 `v20260824-compiled`、ACTIVE pointer、Golden v7 及其 evidence/receipt 未修改；账号、密码、IP、端口、Token 未写入仓库。CI 和全量本地验证将在本提交后补记。
+- 旧 `v20260824-compiled`、ACTIVE pointer、Golden v7 及其 evidence/receipt 未修改；账号、密码、IP、端口、Token 未写入仓库。
+- 本地全量 `uv run pytest -q` 退出码为 0（1,654 项收集、2 项既有跳过、无失败）；Ruff、format、mypy、`uv pip check` 和 `git diff --check` 均通过。
+- GitHub Actions CI run `34310188331` / #490 已验证 Ubuntu 3.14、Windows 3.14、Windows 3.12 三个平台全部成功；H1R 的历史 venue 起点整改仍须独立 Reviewer 关闭后，才能进入真实 evidence、REVIEWED、ACTIVE 或 B1-B7。
