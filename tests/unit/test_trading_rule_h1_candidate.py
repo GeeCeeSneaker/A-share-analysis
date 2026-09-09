@@ -25,6 +25,15 @@ def _candidate_hash(path: Path, version: str) -> str:
     return digest.hexdigest()
 
 
+def _reject_duplicate_json_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
 @pytest.fixture(scope="module")
 def h1_book() -> TradingRuleBook:
     return TradingRuleBook.load(CANDIDATE)
@@ -318,6 +327,11 @@ def test_h1r2_st_transition_remains_2026_pit_exact(h1r2_book: TradingRuleBook):
     assert historical.up_rate == Decimal("0.05")
     assert current.rule_id == "MAIN_BOARD_ST_CURRENT"
     assert current.up_rate == Decimal("0.10")
+
+
+def test_h1r2_evidence_input_has_no_duplicate_json_keys():
+    path = Path("docs/provider_verification/trading_rule_h1_evidence_input.json")
+    json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_json_keys)
 
 
 def test_h1r2_source_contract_matches_candidate_source_refs(h1r2_book: TradingRuleBook):

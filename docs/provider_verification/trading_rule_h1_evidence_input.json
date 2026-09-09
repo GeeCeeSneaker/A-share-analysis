@@ -58,7 +58,6 @@
           "role": "RULE"
         },
         {
-          "artifact_path": "trading_rule_h1_sources/direct_07.html",
           "artifact_path": "trading_rule_h1_sources/direct_09.html",
           "source_url": "https://www.szse.cn/lawrules/service/member/t20260630_621404.html",
           "artifact_kind": "EXCHANGE_NOTICE",

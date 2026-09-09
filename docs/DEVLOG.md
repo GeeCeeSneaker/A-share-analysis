@@ -1,15 +1,16 @@
 ## 2026-09-09 · H1R2 来源合同修正与 2020+ 范围收缩
 
-> 状态：**H1R2 CANDIDATE STAGED / SOURCE URL EXACTLY BOUND / 2020+ SCOPED / LOCAL PREPARE GREEN / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**
+> 状态：**H1R2 CANDIDATE STAGED / SOURCE URL EXACTLY BOUND / 2020+ SCOPED / LOCAL PREPARE GREEN / REVIEW CHECKLIST PREPARED / HUMAN REVIEW DEFERRED TO SEPARATE SEAL PR / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**
 
 - 根据 PR #35 最新项目范围修正，本轮不再把 1998 年 SH/SZ ST 起点作为 P0；H1R2 只覆盖 2020-01-01 以后，并保留 2020-08-24、2023-04-10、2026-07-06 等必要制度切换。完整 pre-2020 历史重建列为后续非阻断 backlog，不代表放宽 2020+ PIT 证据要求。
 - `configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml` 已恢复到 `main@a797f1186209e7548167e2fa652ce78715f24180` 的原始字节，manifest-style SHA-256 为 `75d21777f1f135c47b963868641dfffc5428c5c5d897e17480a91ebaec1edd51`；未在原目录原地改写。
 - 新建非 ACTIVE `configs/trading_rules/versions/v20260909-h1r2-compiled/rules.yaml`，dataset version `2026-09-09.2`，14 条规则，manifest-style SHA-256 为 `6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`。
 - H1R2 evidence input 与候选 `source_ref` 精确绑定实际原始 HTML/PDF/DOCX URL；locator/notice page 只保留在 source catalog 的 `source_page_url`，不再以 `download_url` 之外的 unsealed 关系冒充 bundle provenance。当前 19 个唯一来源、19 个去重 raw artifact、1,702,416 bytes；canonical bundle 16,557 bytes，SHA-256 为 `14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`。
-- 旧 H1R1 的 `direct_06` / `direct_07` 原文仅保留在工作区供未来历史研究，不在 H1R2 source catalog 或 bundle 中；历史治理文档恢复为主分支已接受版本，新整改说明见 [`A-share-analysis_TradingRule-H1R2来源合同与范围收缩整改记录_20260909.md`](design/A-share-analysis_TradingRule-H1R2来源合同与范围收缩整改记录_20260909.md)。
+- 修复 H1R2 evidence input 中 `MAIN_BOARD_ST_HISTORICAL_SZ` 的重复 `artifact_path` key；新增递归 `object_pairs_hook` 回归断言，防止标准 JSON 解析静默丢字段。删除不再属于 H1R2 的 `direct_06.pdf` / `direct_07.html` 孤立 pre-2020 原件。
+- 旧 H1R1 的 `direct_06` / `direct_07` 不再加入本 PR，已从当前分支移除；其 pre-2020 历史事实不在 H1R2 source catalog 或 bundle 中，完整历史研究退回 backlog。历史治理文档恢复为主分支已接受版本，新整改说明见 [`A-share-analysis_TradingRule-H1R2来源合同与范围收缩整改记录_20260909.md`](design/A-share-analysis_TradingRule-H1R2来源合同与范围收缩整改记录_20260909.md)。
 - 当前仍未运行 seal、未创建 REVIEWED、未切换 ACTIVE、未创建 Formal Production run，B1-B7 继续禁止；账号、密码、endpoint、Token、Cookie、原始 profile、Provider 输出和专有 SDK/runtime 未进入 GitHub。
 
-下一步：项目管理者/独立 Reviewer 按更新后的 [`TradingRule_H1_人工审阅操作表_20260909.md`](design/TradingRule_H1_人工审阅操作表_20260909.md) 实际打开 H1R2 原文并完成 14/14 逐条裁决；在独立审阅和合并前不得 seal 或进入 Formal Production。
+下一步：当前 PR 只等待独立 Reviewer 审查 H1R2 的候选/source contract、重复键修正、2020+ 范围和 CI；14/14 人工原文裁决使用已准备的 [`TradingRule_H1_人工审阅操作表_20260909.md`](design/TradingRule_H1_人工审阅操作表_20260909.md)，后移到合并后的独立 evidence/seal PR。合并前不得 seal 或进入 Formal Production。
 
 ## 2026-09-09 · H1 证据接收与 Formal Production 前置拒绝
 

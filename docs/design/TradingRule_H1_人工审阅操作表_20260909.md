@@ -2,7 +2,7 @@
 
 适用候选：`configs/trading_rules/versions/v20260909-h1r2-compiled/rules.yaml`
 候选版本：`2026-09-09.2`，共 14 条，当前 `COMPILED`、非 `ACTIVE`。
-目的：在不修改候选 YAML 的前提下，逐条打开官方原文，确认规则事实、适用范围和制度切换边界。
+目的：作为后续独立 evidence/seal PR 的审阅清单，在不修改候选 YAML 的前提下逐条打开官方原文，确认规则事实、适用范围和制度切换边界。本表不是 PR #35 合并前置条件。
 
 ## 一、审阅原则
 

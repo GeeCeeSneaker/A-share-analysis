@@ -1,7 +1,7 @@
 # Trading Rule H1R2 来源合同与范围收缩整改记录
 
 日期：2026-09-09（Asia/Shanghai）
-状态：`SOURCE-CONTRACT-CORRECTION STAGED / 2020+ SCOPED / COMPILED NON-ACTIVE / HUMAN REVIEW PENDING`
+状态：`SOURCE-CONTRACT-CORRECTION STAGED / 2020+ SCOPED / COMPILED NON-ACTIVE / REVIEW CHECKLIST PREPARED / HUMAN REVIEW DEFERRED TO SEPARATE SEAL PR`
 
 ## 1. 记录关系与已确认事实
 
@@ -27,9 +27,18 @@
 
 H1R2 输入校验结果：19 个唯一 source URL、19 个去重 raw artifact、1,702,416 bytes；canonical bundle 16,557 bytes，SHA-256 为 `14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`。这些是未封印的候选校验值，不是 REVIEWED provenance。
 
-## 3. 当前人工审阅范围
+本次复审整改还删除了 `MAIN_BOARD_ST_HISTORICAL_SZ` 输入中的重复 `artifact_path` key，并新增递归 JSON duplicate-key 回归断言；H1R1 的 `direct_06.pdf` / `direct_07.html` 已从当前分支移除，不再保留为 H1R2 的孤立 pre-2020 负载。
 
-审阅对象改为 [`TradingRule_H1_人工审阅操作表_20260909.md`](TradingRule_H1_人工审阅操作表_20260909.md) 中的 H1R2 候选。项目管理者/独立 Reviewer 仍需实际打开每份 raw artifact，逐行填写 14 条：
+## 3. 当前审阅分层
+
+审阅对象改为 [`TradingRule_H1_人工审阅操作表_20260909.md`](TradingRule_H1_人工审阅操作表_20260909.md) 中的 H1R2 候选。该表已准备好，但 14/14 人工原文审阅属于合并后的独立 evidence/seal PR，不是 PR #35 的合并前置条件。PR #35 当前只需要独立 Reviewer 核验：
+
+- 新旧 COMPILED candidate 的不可变性与版本分离；
+- H1R2 的 2020+ 范围、必要制度切换和 fail-closed 边界；
+- `source_ref`/`source_url` 与实际归档 bytes 的一一绑定、重复 JSON key 已清理；
+- 19 个 source artifact、catalog、bundle 统计和三平台 CI。
+
+合并后的独立 evidence/seal PR 再由项目管理者/独立 Reviewer 实际打开每份 raw artifact，逐行填写 14 条：
 
 - 数值或语义是否与正文一致；
 - 2020+ 生效区间、交易所和代码范围是否一致；
@@ -37,14 +46,13 @@ H1R2 输入校验结果：19 个唯一 source URL、19 个去重 raw artifact、
 - 每个 `RULE` 来源是否真的是包含所声明条款的正文，而不是只有 locator page；
 - BSE 的 venue、上市日语义和真实 `listing_date` 依赖是否成立。
 
-在 14/14 `APPROVE`、边界测试闭合、独立 Reviewer 接受并合并前，不能运行 candidate seal。即使人工审阅通过，也必须在后续单独 evidence/seal PR 中重新核验旧 candidate、H1R2 candidate、旧 ACTIVE 和 bundle 的不可变性。
+PR #35 不以 14/14 `APPROVE` 作为合并条件；但在后续独立 evidence/seal PR 中，只有 14/14 `APPROVE`、边界测试闭合且独立 Reviewer 接受并合并后，才能运行 candidate seal。该独立 PR 仍必须重新核验旧 candidate、H1R2 candidate、旧 ACTIVE 和 bundle 的不可变性。
 
 ## 4. 后续工作顺序
 
-1. 对 H1R2 的 14 条来源完成实际原文审阅并提交简洁条款/页码记录；
-2. 在 PR #35 中只保留本来源合同、候选版本和 2020+ 范围整改，保持 Draft，不在本 PR seal 或切 ACTIVE；
-3. CI 与独立复审通过后合并 PR #35；再更新或 supersede Issue #34，使其指向 H1R2 candidate/hash；
-4. 从合并后的最新 clean `main` 开单独 evidence/seal PR，重新冻结 bundle，完成人工审阅和一次性 `--candidate` seal；
-5. REVIEWED evidence/seal PR 独立审阅并合并后，才允许按 Formal baseline 重新做 SDK/runtime/网络/query preflight；在此之前 Formal B1-B7 仍禁止。
+1. 在 PR #35 中完成独立 Reviewer 对 source contract、范围、不可变性和 CI 的核验，保持 Draft，不在本 PR seal 或切 ACTIVE；
+2. CI 与独立复审通过后合并 PR #35；再更新或 supersede Issue #34，使其指向 H1R2 candidate/hash；
+3. 从合并后的最新 clean `main` 开单独 evidence/seal PR，重新冻结 bundle，完成人工 14/14 审阅和一次性 `--candidate` seal；
+4. REVIEWED evidence/seal PR 独立审阅并合并后，才允许按 Formal baseline 重新做 SDK/runtime/网络/query preflight；在此之前 Formal B1-B7 仍禁止。
 
 账号、密码、IP、端口、Token、Cookie、profile、原始 Provider 输出和专有 SDK/runtime 文件均不得进入 GitHub。

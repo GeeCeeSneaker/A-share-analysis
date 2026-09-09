@@ -2,7 +2,7 @@
 
 **Type**：C1 — immutable candidate/source-contract correction
 **Date**：2026-09-09
-**Status**：`H1R2 CANDIDATE STAGED / 2020+ SCOPED / LOCAL PREPARE GREEN / HUMAN REVIEW PENDING / FORMAL ENTRY PROHIBITED`
+**Status**：`H1R2 CANDIDATE STAGED / 2020+ SCOPED / LOCAL PREPARE GREEN / REVIEW CHECKLIST PREPARED / HUMAN REVIEW DEFERRED TO SEPARATE SEAL PR / FORMAL ENTRY PROHIBITED`
 
 **依据**：PR #35 独立复审指出原 `v20260909-h1-compiled` 被原地修改、locator page 与附件 bytes 未在 v1 bundle 中形成同一 URL provenance；项目管理者随后明确研究基线为 2020+，不再把 1998 年起点闭合作为本轮 P0。
 
@@ -12,16 +12,17 @@
 - 新建非 ACTIVE、`COMPILED` 的 `v20260909-h1r2-compiled`，dataset version `2026-09-09.2`，14 条，manifest-style hash `6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`。
 - H1R2 的 19 个 source URL 均直接对应 `artifact_path` 的原始 HTML/PDF/DOCX bytes；SSE 2026 DOCX、SZSE 2020 创业板 PDF 和 3 份 BSE DOCX 均使用实际附件 URL，发布页关系保留在 catalog 的 `source_page_url`。
 - H1R2 prepare 校验通过：14/14 rule_id、19 个去重 raw artifact、1,702,416 bytes；canonical bundle 16,557 bytes，SHA-256 `14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`。
+- 已清理 `MAIN_BOARD_ST_HISTORICAL_SZ` 输入中的重复 JSON `artifact_path` key，并加入 duplicate-key 回归守卫；已删除不再属于 H1R2 的 `direct_06.pdf` / `direct_07.html` 孤立 pre-2020 原件。
 - 主板普通/ST、主板 IPO 旧制度、创业板改革前和科创板更早的 `effective_from` 收窄至 2020-01-01；1998 年历史材料不再参与 H1R2 bundle 或放行判断，完整 pre-2020 重建列为 backlog。
 - 旧 PR #32/#33 历史要求/实现记录已恢复为其 checkpoint 原貌；当前纠正与 supersedes 关系单独记录在 [`H1R2 来源合同与范围收缩整改记录`](../design/A-share-analysis_TradingRule-H1R2来源合同与范围收缩整改记录_20260909.md)。
 
 **未完成与硬边界**
 
-- 14 条仍需项目管理者/独立 Reviewer 实际打开 raw artifact 后逐条填写 `APPROVE`/`REJECT`、条款/页码和边界理由；prepare 通过不等于人工批准。
+- 14 条人工 `APPROVE`/`REJECT`、条款/页码和边界理由的表格已准备，但按最新分层安排后移到 PR #35 合并后的独立 evidence/seal PR；prepare 通过不等于人工批准，也不把该人工审阅作为本 PR 合并门。
 - 未运行 `scripts/rules/review.py --candidate`，未创建 REVIEWED，未切换 ACTIVE，未创建或消耗 Formal Production run；Formal B1-B7 在 evidence/seal PR 独立审阅并合并前继续禁止。
 - 账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
 
-**下一步**：完成 H1R2 14/14 人工审阅和 2020+ 边界审阅；CI 与独立 Reviewer 通过后合并本来源合同整改，再从合并后的最新 clean main 开立单独 evidence/seal PR。
+**下一步**：由独立 Reviewer 审阅 H1R2 source contract、2020+ 边界、重复 key 修正、候选不可变性和 CI 后合并本来源合同整改；再从合并后的最新 clean main 开立单独 evidence/seal PR，完成 14/14 人工原文审阅和 seal。
 
 ## DM-20260909-008 · H1 证据接收与 Formal 前置拒绝
 

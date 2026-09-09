@@ -43,7 +43,7 @@ PRODUCTION run refused: trading rule dataset not reviewed
 - 原先 `MAIN_BOARD_IPO_DAY` 错把不含 44%/36% 条款的 SSE 历史规则页列为 RULE 来源；现已改绑 SSE 2014 通知与 SZSE 2014 问答，两份原文均直接写出 144%/64%，并保留独立的 2023 过渡/首批上市来源用于终止边界裁决；
 - 所有来源的 URL、来源页/附件关系、传输状态、归档方式、字节数、SHA-256 和抽取统计见 [`trading_rule_h1_source_catalog.json`](trading_rule_h1_source_catalog.json)。
 
-原 H1R1 的 `direct_06` / `direct_07` 历史材料仍留在工作区供未来非阻断性历史研究，但不属于 H1R2 的 2020+ source contract；当前 catalog 和 bundle 只统计 H1R2 使用的 19 个来源。
+原 H1R1 的 `direct_06` / `direct_07` 已从当前分支移除，不属于 H1R2 的 2020+ source contract；当前 catalog 和 bundle 只统计 H1R2 使用的 19 个来源，完整 pre-2020 历史研究另列 backlog。
 
 输入 bundle 已按 14 个且仅 14 个 `rule_id` 生成并通过纯校验（没有发布副作用）：
 
@@ -51,13 +51,13 @@ PRODUCTION run refused: trading rule dataset not reviewed
 - 去重后的 raw artifact：19 个；合计 1,702,416 bytes；
 - 输入文件：[`trading_rule_h1_evidence_input.json`](trading_rule_h1_evidence_input.json)。
 
-## 3. 尚未完成、不得跳过的事项
+## 3. 当前状态与后续门禁
 
-本记录不等于 H1 人工审阅，也没有写入 `APPROVE`、`REJECT`、`REVIEWED` 或 ACTIVE 切换。项目管理者/独立 Reviewer 仍需：
+本记录不等于 H1 人工审阅，也没有写入 `APPROVE`、`REJECT`、`REVIEWED` 或 ACTIVE 切换。PR #35 的合并门只要求独立 Reviewer 核验 H1R2 candidate/source contract、重复 JSON key 修正、2020+ 范围、旧候选不可变性和 CI；14/14 人工原文审阅不是本 PR 的合并前置条件。
 
-1. 实际打开 H1R2 的 14 条所需官方原文，逐条按 [`TradingRule_H1_人工审阅操作表_20260909.md`](../design/TradingRule_H1_人工审阅操作表_20260909.md) 填写结果、条款/页码和简短理由；
-2. 重点裁决 2020-01-01 起主板 ST 5% 与 2026-07-06 切换、主板 IPO 44/36 终止边界、创业板 2020-08-24 改革、BSE venue 起点，以及每条 `RULE` 来源是否确实包含所声明条款；本轮不把 1998 年起点作为 H1R2 放行条件；
-3. 只有 14/14 `APPROVE` 且 Reviewer 关闭 2020+ 边界测试、来源绑定和两个 COMPILED candidate 不可变性后，才允许在受控环境运行 `scripts/rules/review.py --candidate ... --evidence-bundle ...` 创建新的 REVIEWED 版本；
+1. 合并后从最新 clean `main` 开立独立 evidence/seal PR，实际打开 H1R2 的 14 条所需官方原文，按 [`TradingRule_H1_人工审阅操作表_20260909.md`](../design/TradingRule_H1_人工审阅操作表_20260909.md) 填写结果、条款/页码和简短理由；
+2. 在该独立 PR 中重点裁决 2020-01-01 起主板 ST 5% 与 2026-07-06 切换、主板 IPO 44/36 终止边界、创业板 2020-08-24 改革、BSE venue 起点，以及每条 `RULE` 来源是否确实包含所声明条款；本轮不把 1998 年起点作为 H1R2 放行条件；
+3. 只有该独立 PR 的 14/14 `APPROVE` 且 Reviewer 关闭 2020+ 边界测试、来源绑定和两个 COMPILED candidate 不可变性后，才允许在受控环境运行 `scripts/rules/review.py --candidate ... --evidence-bundle ...` 创建新的 REVIEWED 版本；
 4. REVIEWED 版本独立审阅并合并后，再从届时最新 clean `main` 重做 preflight，并重试尚未消耗的唯一 Formal Production B1-B7。
 
 账号、密码、真实 endpoint、Token、Cookie、原始 profile 和 SDK 原始输出未写入本记录、输入 bundle 或 Git。
