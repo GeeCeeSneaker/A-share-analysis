@@ -5682,3 +5682,53 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 三个平台首轮均在 Ruff format check 处停止；日志明确指出真实 v7 集成测试定义前缺少一个空行。
 - 仅补齐顶层函数间的格式空行；不改 Golden、evidence、历史 receipt、verifier 逻辑或 Provider 边界。
 - 修复后须重跑三平台 CI；Formal Production B1-B7 仍保持 AUTHORIZED / NOT EXECUTED。
+
+## DM-20260909-TRADING-RULE-H1-001 · Trading Rule H1 evidence contract
+
+**Type**：C1 — trading-rule truth remediation and review-gate hardening
+**Date**：2026-09-09
+**Status**：IMPLEMENTED / INDEPENDENT HUMAN REVIEW PENDING / FORMAL BLOCKED
+**Evidence**：`configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml`；`src/ashare_state/spike/rule_evidence.py`；`docs/design/TradingRule_H1_人工审阅操作表_20260909.md`。
+
+- H1 候选保持 `COMPILED` 且不在 ACTIVE；旧 `v20260824-compiled`、ACTIVE pointer 和 Golden v7 保持不变。
+- `RULE_EVIDENCE_BUNDLE.v1` 要求每个 rule_id 精确绑定第一方来源，重验 source URL、kind/role、raw bytes 的 SHA-256/size、bundle hash 和路径安全；Production run 创建与 verdict 均强制执行该门禁。
+- 本批新增主板/创业板/STAR/BSE 的 PIT 边界测试、bundle 缺失/多余/错误 role/hash/原文篡改测试和完整发布流程测试；本地全量为 `1633 passed, 2 skipped`，Ruff、mypy、依赖检查通过。
+- 真实官方原文的完整留存与独立逐条人工裁决尚未完成；BSE 来源在当前环境 403/重定向循环，不能用响应体代替原文。完成 Reviewer 接受并合并 REVIEWED 版本前，不得切换 ACTIVE 或执行 Formal Production B1-B7。
+
+## DM-20260909-TRADING-RULE-H1-002 · Source identity and content-addressing hardening
+
+**Type**：C0 — evidence contract hardening
+**Date**：2026-09-09
+**Status**：IMPLEMENTED / CI VALIDATION PENDING / HUMAN REVIEW PENDING
+**Evidence**：`src/ashare_state/spike/rule_evidence.py`；`scripts/rules/review.py`；`tests/unit/test_rule_evidence.py`。
+
+- bundle preparation/runtime validation 现在要求每个 `source_url` 精确命中对应候选 `rule_id` 的 `source_ref` 声明；source URL contract 的 rule-id 集合也做缺失/多余校验。
+- bundle ref 与 raw artifact ref 均必须是 `sha256/<对应 hash>`；新增非内容寻址 bundle/raw 路径回归测试。
+- 当前 main 中 GT-H3B Golden v7 已有的 BSE raw evidence 不跨域复用为 H1 evidence；H1 的 13 条独立官方原文与人工裁决仍是未完成门禁，ACTIVE、REVIEWED seal 和 Formal Production B1-B7 均不推进。
+
+## DM-20260909-TRADING-RULE-H1-003 · H1R PIT 与 exact-coverage 整改
+
+**Type**：C1 — second-review P0 remediation
+**Date**：2026-09-09
+**Status**：IMPLEMENTED / CI VERIFIED GREEN / INDEPENDENT HUMAN REVIEW PENDING
+**Evidence**：`configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml`；`src/ashare_state/spike/trading_rule.py`；`src/ashare_state/spike/rule_evidence.py`；PR #32 review `5149191372`。
+
+- 主板 ST 已按 2026-07-06 做 PIT split：历史 `MAIN_BOARD_ST_HISTORICAL` 为 5%，当前 `MAIN_BOARD_ST_CURRENT` 为 10%；SH/SZ 边界和 `20260908` 解析均有回归测试，普通主板同期仍为 10%。
+- `MAIN_BOARD_FIRST5_NO_LIMIT` 改为 `st_state: null`，删除独立 ST FIRST5 候选；解析器按 listing-age regime 进行 ST-specific/ANY 选择，避免 ST 的 NONE 规则遮蔽首五日不限价规则。未决 source-ref marker 现在在 rule data validation 中 fail closed。
+- evidence bundle 的实际 `source_url` 列表必须与每条 rule 的 `source_ref` required URL set 完全相等；缺失、额外、重复均拒绝。新增 subset/pass/duplicate/extra 四类对抗测试，并覆盖 prepare 与 runtime validation。
+- `MAIN_BOARD_NORMAL/FIRST5/ST_CURRENT`、ChiNext 20%/FIRST5、STAR 20%/FIRST5、BSE 30% 的长期有效候选均已补充 2026 第一方 current-effective locator。URL contract 不等于 evidence：原始网页/PDF 尚未留存，且 BSE 当前获取问题仍未解除。
+- 本地定向测试：15 个候选测试、20 个 evidence contract 测试全部通过，Ruff 已通过；CI run `34306959611`（#488）已确认 current-main 三平台全部成功。old compiled、ACTIVE pointer、Golden v7/evidence/receipt 不得改动。
+- 管理门槛：独立 Reviewer 未关闭 `P0-TR-H1-06/07` 前，不生成真实 H1 evidence bundle、不发布 REVIEWED、不切换 ACTIVE、不创建 run_id、不启动 Formal Production B1-B7。
+
+## DM-20260909-TRADING-RULE-H1-004 · H1R 历史 ST venue 起点收紧
+
+**Type**：C1 — additional second-review truth boundary
+**Date**：2026-09-09
+**Status**：IMPLEMENTED / CI VERIFIED GREEN / INDEPENDENT HUMAN REVIEW PENDING
+**Evidence**：`configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml`；`tests/unit/test_trading_rule_h1_candidate.py`；`docs/design/TradingRule_H1_人工审阅操作表_20260909.md`。
+
+- PR #32 时间线中的独立审阅指出，共用 `19980401` 作为沪深 ST 历史起点缺少第一方历史依据；对照交易所官方历史材料后，候选改为 SH `19980422` 起、SZ `19980428` 起，均至 `20260705` 为 5%，并保留 `20260706` 起 10% 的当前片段。
+- 候选由 13 条变为 14 条：新增 `MAIN_BOARD_ST_HISTORICAL_SH` 与 `MAIN_BOARD_ST_HISTORICAL_SZ`，按 venue/code pattern 限定适用范围；起点前一日必须 `RuleUnresolvedError`，不回退到普通主板规则。
+- SSE 官方市场史：[链接](https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf)；SZSE 官方 1998 年大事记：[链接](https://www.szse.cn/aboutus/sse/events/t20070328_497832.html)。这些来源已进入候选 required URL contract，但原始 bytes 尚未纳入 H1 evidence，完整法律生效日仍须独立 Reviewer 实际核验。
+- 人工审阅表和 template 已同步为 14 条；旧 compiled、ACTIVE pointer、Golden v7/evidence/receipt 不变。确认该 P0 前仍禁止 REVIEWED、ACTIVE、run_id 和 B1-B7。
+- 本地全量 `uv run pytest -q` 退出码为 0（1,654 项收集、2 项既有跳过、无失败）；Ruff、format、mypy、`uv pip check` 和 `git diff --check` 均通过。GitHub Actions CI run `34310188331` / #490 的 Ubuntu 3.14、Windows 3.14、Windows 3.12 全部成功。

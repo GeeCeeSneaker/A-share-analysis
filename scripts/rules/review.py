@@ -6,7 +6,7 @@ Rule dataset lifecycle (mirrors golden truth):
     -- reviewer supplies an OFFICIAL source artifact -->
     versions/<v-reviewed>/rules.yaml   REVIEWED copy (immutable, NEW version)
     rule_manifest.json                 ACTIVE selector -> the reviewed version
-    evidence/<ref>                     sealed source artifact bytes
+    evidence/<ref>                     sealed bundle + raw source bytes
 
 R4-A2.9 / CR-1.2.5 (audit 20260825 #5) - EXACT-BYTE SEAL + OUTPUT
 CONFINEMENT + STAGED OUTPUT:
@@ -21,7 +21,7 @@ Phase 1 - pure validation / snapshot (ZERO output mutation):
     MEMORY from the exact snapshot bytes.
 
 Phase 2 - staged output:
-    stage the evidence artifact (content-addressed), stage the reviewed
+    stage the evidence bundle and all raw artifacts (content-addressed), stage the reviewed
     version under versions/.staging-<id>/ and run the FULL review gate
     against the staged layout; any failure removes every staged byte.
 
@@ -33,21 +33,24 @@ The invariant enforced throughout:
 
     hash-checked ACTIVE bytes == bytes transformed == bytes sealed
 
-The tool computes the artifact's SHA-256 itself, writes the reviewed copy
-under a NEW immutable version directory (the COMPILED original is never
-modified), stores the artifact under the evidence root, and flips the
-ACTIVE manifest. The provenance is verifiable forever after via
+The tool computes every source and bundle SHA-256 itself, writes the reviewed
+copy under a NEW immutable version directory (the COMPILED original is never
+modified), stores the bundle and raw sources under the evidence root, and
+flips the ACTIVE manifest. The provenance is verifiable forever after via
 ``ashare_state.spike.trading_rule.trading_rule_review_gate`` - the gate
-resolves ``source_artifact_ref`` RELATIVE TO THE EVIDENCE ROOT (path
-confined) and re-hashes the bytes.
+resolves the bundle and every raw source RELATIVE TO THE EVIDENCE ROOT (path
+confined) and re-hashes the bytes. Production requires the bundle form.
 
 Usage:
     uv run python scripts/rules/review.py \
         --rules configs/trading_rules/versions/v20260824-compiled/rules.yaml \
-        --artifact docs/evidence/a_share_limit_source.pdf \
-        --kind EXCHANGE_NOTICE \
+        --evidence-bundle docs/provider_verification/trading_rule_h1_evidence_input.json \
         --reviewer "human-name" \
-        --version v20260825-reviewed
+        --version v20260825-reviewed \
+        --from-version v20260824-compiled
+
+The legacy ``--artifact`` mode remains available for compatibility tests and
+non-production tooling; it cannot satisfy the strict production review gate.
 """
 
 from __future__ import annotations
@@ -64,6 +67,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
+from ashare_state.spike.rule_evidence import (  # noqa: E402
+    RULE_EVIDENCE_BUNDLE_HASH,
+    RULE_EVIDENCE_BUNDLE_KIND,
+    RULE_EVIDENCE_BUNDLE_REF,
+    RULE_EVIDENCE_BUNDLE_SCHEMA,
+    PreparedRuleEvidenceBundle,
+    RawRuleEvidence,
+    prepare_rule_evidence_bundle,
+    source_urls_from_ref,
+)
 from ashare_state.spike.trading_rule import (  # noqa: E402
     RULE_EVIDENCE_SUBDIR,
     RULE_MANIFEST_FILE,
@@ -73,13 +86,47 @@ from ashare_state.spike.trading_rule import (  # noqa: E402
     trading_rule_review_gate,
 )
 
-_KINDS = ("OTHER_OFFICIAL", "EXCHANGE_NOTICE", "REGULATOR_DOC", "DATASET_DOC")
+_KINDS = (
+    "OTHER_OFFICIAL",
+    "EXCHANGE_NOTICE",
+    "REGULATOR_DOC",
+    "DATASET_DOC",
+    RULE_EVIDENCE_BUNDLE_KIND,
+)
 
 #: R4-A2.9 P0-02 (audit 20260825 #5 section 3.2): a version id is ONE
 #: single path component - starts alphanumeric, then alnum/./_/- only.
 #: Rejects traversal, separators, drive prefixes, '.', '..' and any
 #: multi-component input BEFORE any output mutation.
 _VERSION_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+class _ReviewEvidence:
+    __slots__ = (
+        "artifact_ref",
+        "artifact_hash",
+        "artifact_kind",
+        "artifact_bytes",
+        "raw_artifacts",
+        "evidence_contract",
+    )
+
+    def __init__(
+        self,
+        *,
+        artifact_ref: str,
+        artifact_hash: str,
+        artifact_kind: str,
+        artifact_bytes: bytes,
+        raw_artifacts: tuple[RawRuleEvidence, ...] = (),
+        evidence_contract: str = "",
+    ) -> None:
+        self.artifact_ref = artifact_ref
+        self.artifact_hash = artifact_hash
+        self.artifact_kind = artifact_kind
+        self.artifact_bytes = artifact_bytes
+        self.raw_artifacts = raw_artifacts
+        self.evidence_contract = evidence_contract
 
 
 def _hash_snapshot(snapshot: list[tuple[str, bytes]]) -> str:
@@ -142,6 +189,7 @@ def _build_reviewed_text(
     artifact_ref: str,
     artifact_hash: str,
     kind: str,
+    evidence_contract: str = "",
 ) -> str:
     """Build the REVIEWED yaml text IN MEMORY from the EXACT snapshot
     bytes (R4-A2.9 P0-01: hash-checked bytes == bytes transformed)."""
@@ -153,6 +201,9 @@ def _build_reviewed_text(
         "source_artifact_hash:",
         "source_artifact_kind:",
         "source_retrieved_at:",
+        RULE_EVIDENCE_BUNDLE_REF + ":",
+        RULE_EVIDENCE_BUNDLE_HASH + ":",
+        "evidence_contract:",
     )
     reviewed: list[str] = []
     inserted = False
@@ -169,6 +220,14 @@ def _build_reviewed_text(
                     f"source_retrieved_at: {now}\n",
                 ]
             )
+            if evidence_contract:
+                reviewed.extend(
+                    [
+                        f"evidence_contract: {evidence_contract}\n",
+                        f"{RULE_EVIDENCE_BUNDLE_REF}: {artifact_ref}\n",
+                        f"{RULE_EVIDENCE_BUNDLE_HASH}: {artifact_hash}\n",
+                    ]
+                )
             inserted = True
         elif line.startswith(provenance_keys):
             # drop COMPILED placeholder provenance (empty values) - keeping
@@ -188,11 +247,64 @@ def _fail(message: str) -> int:
     return 2
 
 
+def _prepare_review_evidence(
+    *,
+    artifact: Path | None,
+    bundle_manifest: Path | None,
+    expected_rule_ids: list[str],
+    expected_dataset_version: str,
+    expected_source_urls_by_rule: dict[str, tuple[str, ...]],
+    kind: str,
+) -> _ReviewEvidence:
+    if bundle_manifest is not None:
+        prepared: PreparedRuleEvidenceBundle = prepare_rule_evidence_bundle(
+            bundle_manifest,
+            expected_rule_ids=expected_rule_ids,
+            expected_dataset_version=expected_dataset_version,
+            expected_source_urls_by_rule=expected_source_urls_by_rule,
+        )
+        bundle_hash = hashlib.sha256(prepared.content).hexdigest()
+        return _ReviewEvidence(
+            artifact_ref=f"sha256/{bundle_hash}",
+            artifact_hash=bundle_hash,
+            artifact_kind=RULE_EVIDENCE_BUNDLE_KIND,
+            artifact_bytes=prepared.content,
+            raw_artifacts=prepared.raw_artifacts,
+            evidence_contract=RULE_EVIDENCE_BUNDLE_SCHEMA,
+        )
+    if artifact is None:
+        raise ValueError("one of --artifact or --evidence-bundle is required")
+    artifact_bytes = artifact.read_bytes()
+    artifact_hash = hashlib.sha256(artifact_bytes).hexdigest()
+    return _ReviewEvidence(
+        artifact_ref=f"{artifact_hash[:16]}-{artifact.name}",
+        artifact_hash=artifact_hash,
+        artifact_kind=kind,
+        artifact_bytes=artifact_bytes,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rules", required=True, help="COMPILED rule yaml to review")
-    parser.add_argument("--artifact", required=True, help="official source artifact file")
-    parser.add_argument("--kind", required=True, choices=_KINDS)
+    evidence_input = parser.add_mutually_exclusive_group(required=True)
+    evidence_input.add_argument(
+        "--artifact",
+        help="one official source artifact file (legacy single-artifact mode)",
+    )
+    evidence_input.add_argument(
+        "--evidence-bundle",
+        dest="evidence_bundle",
+        help=(
+            "input RULE_EVIDENCE_BUNDLE.v1 JSON; each source must provide "
+            "artifact_path, official source_url, kind, and role"
+        ),
+    )
+    parser.add_argument(
+        "--kind",
+        choices=_KINDS[:-1],
+        help="artifact kind for legacy --artifact mode",
+    )
     parser.add_argument("--reviewer", required=True, help="human reviewer identity")
     parser.add_argument(
         "--version",
@@ -214,9 +326,14 @@ def main() -> int:
         ),
     )
     args = parser.parse_args()
+    if args.artifact and not args.kind:
+        parser.error("--kind is required with --artifact")
+    if args.evidence_bundle and args.kind:
+        parser.error("--kind is only valid with --artifact")
 
     rules_path = Path(args.rules)
-    artifact = Path(args.artifact)
+    artifact = Path(args.artifact) if args.artifact else None
+    bundle_manifest = Path(args.evidence_bundle) if args.evidence_bundle else None
     rules_root = Path(args.rules_root)
 
     # ================= Phase 0: lock acquisition =================
@@ -235,8 +352,10 @@ def main() -> int:
     # or the mutable version store.
     if not rules_path.is_file():
         return _fail(f"rules file not found: {rules_path}")
-    if not artifact.is_file():
+    if artifact is not None and not artifact.is_file():
         return _fail(f"source artifact not found: {artifact}")
+    if bundle_manifest is not None and not bundle_manifest.is_file():
+        return _fail(f"evidence bundle manifest not found: {bundle_manifest}")
 
     import os as os_mod
 
@@ -259,10 +378,11 @@ def main() -> int:
             rules_root=rules_root,
             rules_path=rules_path,
             artifact=artifact,
+            bundle_manifest=bundle_manifest,
             from_version=args.from_version,
             version=args.version,
             reviewer=args.reviewer,
-            kind=args.kind,
+            kind=args.kind or RULE_EVIDENCE_BUNDLE_KIND,
         )
     finally:
         lock_path.unlink(missing_ok=True)
@@ -272,7 +392,8 @@ def _review_workflow_locked(
     *,
     rules_root: Path,
     rules_path: Path,
-    artifact: Path,
+    artifact: Path | None,
+    bundle_manifest: Path | None,
     from_version: str,
     version: str,
     reviewer: str,
@@ -357,16 +478,31 @@ def _review_workflow_locked(
             "the file changed during the review; aborting, no output written"
         )
 
-    artifact_bytes = artifact.read_bytes()
-    artifact_hash = hashlib.sha256(artifact_bytes).hexdigest()
     now = datetime.now(UTC).isoformat()
-    # seal the artifact bytes under the evidence root (the gate's confined
-    # resolution root); ref is RELATIVE to evidence/
-    artifact_ref = f"{artifact_hash[:16]}-{artifact.name}"
+    try:
+        review_evidence = _prepare_review_evidence(
+            artifact=artifact,
+            bundle_manifest=bundle_manifest,
+            expected_rule_ids=[rule.rule_id for rule in active_book.rules],
+            expected_dataset_version=active_book.version,
+            expected_source_urls_by_rule={
+                rule.rule_id: source_urls_from_ref(rule.source_ref) for rule in active_book.rules
+            },
+            kind=kind,
+        )
+    except (OSError, ValueError) as exc:
+        return _fail(f"review evidence preparation failed: {exc}")
+    artifact_bytes = review_evidence.artifact_bytes
+    artifact_hash = review_evidence.artifact_hash
+    artifact_ref = review_evidence.artifact_ref
     evidence_dir = rules_root / RULE_EVIDENCE_SUBDIR
     artifact_copy = evidence_dir / artifact_ref
     if artifact_copy.exists() and artifact_copy.read_bytes() != artifact_bytes:
         return _fail(f"evidence collision with different bytes: {artifact_ref}")
+    for raw in review_evidence.raw_artifacts:
+        raw_copy = evidence_dir / raw.artifact_ref
+        if raw_copy.exists() and raw_copy.read_bytes() != raw.content:
+            return _fail(f"evidence collision with different bytes: {raw.artifact_ref}")
 
     # build the REVIEWED copy IN MEMORY from the exact snapshot bytes.
     # R4-A2.10 P0-01 (audit 20260825 #6 section 2): the transformed
@@ -381,7 +517,8 @@ def _review_workflow_locked(
             now=now,
             artifact_ref=artifact_ref,
             artifact_hash=artifact_hash,
-            kind=kind,
+            kind=review_evidence.artifact_kind,
+            evidence_contract=review_evidence.evidence_contract,
         )
     except ValueError as exc:
         return _fail(str(exc))
@@ -414,9 +551,11 @@ def _review_workflow_locked(
         artifact_hash=artifact_hash,
         artifact_ref=artifact_ref,
         artifact_copy=artifact_copy,
+        raw_artifacts=review_evidence.raw_artifacts,
         reviewer=reviewer,
         now=now,
-        kind=kind,
+        kind=review_evidence.artifact_kind,
+        evidence_contract=review_evidence.evidence_contract,
     )
 
 
@@ -431,9 +570,11 @@ def _review_locked_workflow(
     artifact_hash: str,
     artifact_ref: str,
     artifact_copy: Path,
+    raw_artifacts: tuple[RawRuleEvidence, ...],
     reviewer: str,
     now: str,
     kind: str,
+    evidence_contract: str,
 ) -> int:
     """The staged review workflow, executed under the single-writer lock.
 
@@ -453,7 +594,7 @@ def _review_locked_workflow(
     must equal reviewed_bytes; a tampered final file can never have its
     bytes re-hashed into the manifest)."""
     evidence_dir = rules_root / RULE_EVIDENCE_SUBDIR
-    created_evidence = False
+    created_evidence_refs: set[str] = set()
     published_version = False
     manifest_committed = False
     staging_dir = rules_root / "versions" / f".staging-{version}-{uuid.uuid4().hex[:8]}"
@@ -464,8 +605,8 @@ def _review_locked_workflow(
         shutil.rmtree(staging_dir, ignore_errors=True)
         if published_version and version_dir.is_dir():
             shutil.rmtree(version_dir, ignore_errors=True)
-        if created_evidence:
-            artifact_copy.unlink(missing_ok=True)
+        for ref in created_evidence_refs:
+            (evidence_dir / ref).unlink(missing_ok=True)
         tmp_manifest.unlink(missing_ok=True)
 
     try:
@@ -474,16 +615,27 @@ def _review_locked_workflow(
         # the reviewed version under versions/.staging-<id>/, then run the
         # FULL review gate against the staged layout.
         evidence_dir.mkdir(parents=True, exist_ok=True)
+        for raw in raw_artifacts:
+            raw_copy = evidence_dir / raw.artifact_ref
+            if not raw_copy.exists():
+                raw_copy.parent.mkdir(parents=True, exist_ok=True)
+                raw_copy.write_bytes(raw.content)
+                created_evidence_refs.add(raw.artifact_ref)
         if not artifact_copy.exists():
+            artifact_copy.parent.mkdir(parents=True, exist_ok=True)
             artifact_copy.write_bytes(artifact_bytes)
-            created_evidence = True
+            created_evidence_refs.add(artifact_ref)
         staging_dir.mkdir(parents=True)
         staged_yaml = staging_dir / "rules.yaml"
         staged_yaml.write_bytes(reviewed_bytes)  # byte identity preserved
         # full gate against the staged layout: the evidence artifact is in
         # place so the gate's confined artifact resolution works
         reviewed_book = TradingRuleBook.load(staged_yaml)
-        problems = trading_rule_review_gate(reviewed_book, rules_root=rules_root)
+        problems = trading_rule_review_gate(
+            reviewed_book,
+            rules_root=rules_root,
+            require_evidence_bundle=bool(evidence_contract),
+        )
         if problems:
             _cleanup_uncommitted()
             return _fail(f"reviewed copy fails the review gate: {problems}")
@@ -526,6 +678,10 @@ def _review_locked_workflow(
                 "source_retrieved_at": now,
             },
         }
+        if evidence_contract:
+            manifest["evidence_contract"] = evidence_contract
+            manifest["review_provenance"][RULE_EVIDENCE_BUNDLE_REF] = artifact_ref
+            manifest["review_provenance"][RULE_EVIDENCE_BUNDLE_HASH] = artifact_hash
         manifest_path = rules_root / RULE_MANIFEST_FILE
         manifest_bytes = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
         tmp_manifest.write_bytes(manifest_bytes + b"\n")

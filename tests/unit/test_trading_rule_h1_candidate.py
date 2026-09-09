@@ -1,0 +1,240 @@
+"""PIT boundary tests for the non-ACTIVE Trading Rule H1 candidate."""
+
+from __future__ import annotations
+
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+from ashare_state.spike.trading_rule import RuleUnresolvedError, TradingRuleBook
+
+CANDIDATE = Path("configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml")
+
+
+@pytest.fixture(scope="module")
+def h1_book() -> TradingRuleBook:
+    return TradingRuleBook.load(CANDIDATE)
+
+
+def test_candidate_is_compiled_and_not_active(h1_book: TradingRuleBook):
+    assert h1_book.version == "2026-09-09.1"
+    assert h1_book.review_status == "COMPILED"
+    assert h1_book.evidence_contract == "RULE_EVIDENCE_BUNDLE.v1"
+    assert len(h1_book.rules) == 14
+
+
+def test_candidate_source_refs_have_no_unresolved_review_markers(h1_book: TradingRuleBook):
+    markers = ("to be checked", "todo", "tbd", "待确认", "待核")
+    assert all(
+        not any(marker in rule.source_ref.casefold() for marker in markers)
+        for rule in h1_book.rules
+    )
+
+
+def test_main_board_registration_first_five_and_day_six(h1_book: TradingRuleBook):
+    calendar = [20230410, 20230411, 20230412, 20230413, 20230414, 20230417]
+    day_one = h1_book.resolve(
+        exchange="SH",
+        code="601900.SH",
+        trade_date="20230410",
+        listing_date="20230410",
+        calendar=calendar,
+    )
+    day_five = h1_book.resolve(
+        exchange="SH",
+        code="601900.SH",
+        trade_date="20230414",
+        listing_date="20230410",
+        calendar=calendar,
+    )
+    day_six = h1_book.resolve(
+        exchange="SH",
+        code="601900.SH",
+        trade_date="20230417",
+        listing_date="20230410",
+        calendar=calendar,
+    )
+    assert day_one.rule_id == day_five.rule_id == "MAIN_BOARD_FIRST5_NO_LIMIT"
+    assert day_one.is_no_limit and day_five.is_no_limit
+    assert day_six.rule_id == "MAIN_BOARD_NORMAL"
+    assert day_six.up_rate == Decimal("0.10")
+
+
+def test_main_board_first_five_is_st_state_agnostic(h1_book: TradingRuleBook):
+    calendar = [20230410, 20230411, 20230412, 20230413, 20230414, 20230417]
+    first_normal = h1_book.resolve(
+        exchange="SZ",
+        code="000001.SZ",
+        trade_date="20230410",
+        is_st=False,
+        listing_date="20230410",
+        calendar=calendar,
+    )
+    first_st = h1_book.resolve(
+        exchange="SZ",
+        code="000001.SZ",
+        trade_date="20230410",
+        is_st=True,
+        listing_date="20230410",
+        calendar=calendar,
+    )
+    sixth = h1_book.resolve(
+        exchange="SZ",
+        code="000001.SZ",
+        trade_date="20230417",
+        is_st=True,
+        listing_date="20230410",
+        calendar=calendar,
+    )
+    assert first_normal.rule_id == first_st.rule_id == "MAIN_BOARD_FIRST5_NO_LIMIT"
+    assert first_normal.is_no_limit and first_st.is_no_limit
+    assert sixth.rule_id == "MAIN_BOARD_ST_HISTORICAL_SZ"
+    assert sixth.up_rate == Decimal("0.05")
+
+
+@pytest.mark.parametrize(
+    ("exchange", "code", "historical_rule_id"),
+    [
+        ("SH", "600001.SH", "MAIN_BOARD_ST_HISTORICAL_SH"),
+        ("SZ", "000001.SZ", "MAIN_BOARD_ST_HISTORICAL_SZ"),
+    ],
+)
+def test_main_board_st_pit_transition_for_both_venues(
+    h1_book: TradingRuleBook,
+    exchange: str,
+    code: str,
+    historical_rule_id: str,
+):
+    historical = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date="20260703",
+        is_st=True,
+    )
+    current = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date="20260706",
+        is_st=True,
+    )
+    as_of = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date="20260908",
+        is_st=True,
+    )
+    assert historical.rule_id == historical_rule_id
+    assert historical.up_rate == Decimal("0.05")
+    assert current.rule_id == as_of.rule_id == "MAIN_BOARD_ST_CURRENT"
+    assert current.up_rate == as_of.up_rate == Decimal("0.10")
+
+
+@pytest.mark.parametrize(
+    ("exchange", "code", "before_date", "start_date", "historical_rule_id"),
+    [
+        ("SH", "600001.SH", "19980421", "19980422", "MAIN_BOARD_ST_HISTORICAL_SH"),
+        ("SZ", "000001.SZ", "19980427", "19980428", "MAIN_BOARD_ST_HISTORICAL_SZ"),
+    ],
+)
+def test_main_board_st_historical_venue_start_boundaries(
+    h1_book: TradingRuleBook,
+    exchange: str,
+    code: str,
+    before_date: str,
+    start_date: str,
+    historical_rule_id: str,
+):
+    with pytest.raises(RuleUnresolvedError, match="no applicable rule"):
+        h1_book.resolve_limit_regime(
+            exchange=exchange,
+            code=code,
+            trade_date=before_date,
+            is_st=True,
+        )
+    first_day = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date=start_date,
+        is_st=True,
+    )
+    assert first_day.rule_id == historical_rule_id
+    assert first_day.up_rate == Decimal("0.05")
+
+
+@pytest.mark.parametrize("trade_date", ["20260703", "20260706", "20260908"])
+@pytest.mark.parametrize(
+    ("exchange", "code"),
+    [("SH", "600001.SH"), ("SZ", "000001.SZ")],
+)
+def test_main_board_normal_remains_ten_percent_at_st_transition(
+    h1_book: TradingRuleBook, trade_date: str, exchange: str, code: str
+):
+    rule = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date=trade_date,
+        is_st=False,
+    )
+    assert rule.rule_id == "MAIN_BOARD_NORMAL"
+    assert rule.up_rate == Decimal("0.10")
+
+
+def test_old_main_board_ipo_regime_ends_before_registration_first_listing(
+    h1_book: TradingRuleBook,
+):
+    old = h1_book.resolve(
+        exchange="SH",
+        code="605499.SH",
+        trade_date="20230407",
+        listing_date="20230407",
+        calendar=[20230407],
+    )
+    assert old.rule_id == "MAIN_BOARD_IPO_DAY"
+    assert (old.up_rate, old.down_rate) == (Decimal("0.44"), Decimal("0.36"))
+
+
+def test_chinext_pre_registration_separates_st_semantics(h1_book: TradingRuleBook):
+    normal = h1_book.resolve_limit_regime(
+        exchange="SZ",
+        code="300001.SZ",
+        trade_date="20200821",
+    )
+    st = h1_book.resolve_limit_regime(
+        exchange="SZ",
+        code="300001.SZ",
+        trade_date="20200821",
+        is_st=True,
+    )
+    assert normal.rule_id == "CHINEXT_PRE_REGISTRATION_NORMAL"
+    assert normal.up_rate == Decimal("0.10")
+    assert st.rule_id == "CHINEXT_PRE_REGISTRATION_ST"
+    assert st.up_rate == Decimal("0.05")
+
+
+def test_bse_boundary_and_listing_day(h1_book: TradingRuleBook):
+    calendar = [20211115, 20211116]
+    listing_day = h1_book.resolve(
+        exchange="BJ",
+        code="835185.BJ",
+        trade_date="20211115",
+        listing_date="20211115",
+        calendar=calendar,
+    )
+    next_day = h1_book.resolve(
+        exchange="BJ",
+        code="835185.BJ",
+        trade_date="20211116",
+        listing_date="20211115",
+        calendar=calendar,
+    )
+    assert listing_day.rule_id == "BSE_IPO_DAY_NO_LIMIT"
+    assert listing_day.is_no_limit
+    assert next_day.rule_id == "BSE_LIMIT"
+    assert next_day.up_rate == Decimal("0.30")
+    with pytest.raises(RuleUnresolvedError, match="no matching rule"):
+        h1_book.resolve_limit_regime(
+            exchange="BJ",
+            code="835185.BJ",
+            trade_date="20211112",
+        )

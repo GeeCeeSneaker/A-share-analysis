@@ -55,6 +55,17 @@ rule_id 名称不冻结，可采用清晰的历史/当前命名。规则总数�
 
 不得修改 Golden v7 或 Provider 输出制造匹配。
 
+### 2.1 补充历史起点边界：当前候选不得继续共用 `19980401`
+
+在本文件形成后，PR #32 时间线中的独立只读审阅又指出了历史起点证据缺口。该意见不是对本节 2026 制度结论的替代，而是同一候选的额外生产阻断项：
+
+- [SSE 官方市场史](https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf)记载 1998-04-22 对“财务状况异常”的上市公司实施股票交易特别处理；
+- [SZSE 官方 1998 年大事记](https://www.szse.cn/aboutus/sse/events/t20070328_497832.html)记载 1998-04-28 首次对上市股票实行特别处理。
+
+因此，H1R 候选将历史 ST 5% 规则改为按 venue 分开表达：`SH/60xxxx` 自 `19980422` 起，`SZ/000xxx、001xxx、002xxx、003xxx` 自 `19980428` 起，二者均至 `20260705`。这是根据交易所第一方历史记录收紧 PIT 下界的候选实现；“首次记载日期”是否足以作为完整法律生效日，仍须独立 Reviewer 打开原文后确认，不能仅凭搜索摘要或本记录自动视为已审定。
+
+必须增加起点前一日 fail-closed 与起点当日 5% 的测试：SH `19980421/19980422`、SZ `19980427/19980428`。在 Reviewer 关闭该历史边界 P0 前，候选继续保持 `COMPILED`、非 `ACTIVE`，不得生成真实 H1 evidence bundle。
+
 ## 3. P0-TR-H1-07 · evidence source contract 必须从 subset 升级为 exact coverage
 
 当前实现的核心检查是：每个 bundle source URL 必须属于对应 rule 的 `source_ref` URL 集合。
@@ -141,7 +152,8 @@ PR #32 可在同一分支继续整改，不需要另起复杂分支。最终必�
 7. 当前有效 2026 制度有第一方 current-effective evidence；
 8. old compiled / ACTIVE / Golden v7 不变；
 9. final-head + current-main test-merge 三平台 CI green；
-10. 独立 Reviewer 明确关闭本文件的 P0 后，才允许真实 evidence materialization 与 REVIEWED seal。
+10. 历史 ST 起点按 venue 的第一方记录建模，且起点前一日 fail-closed 测试通过；
+11. 独立 Reviewer 明确关闭本文件的全部 P0 后，才允许真实 evidence materialization 与 REVIEWED seal。
 
 ## 7. 阶段状态
 

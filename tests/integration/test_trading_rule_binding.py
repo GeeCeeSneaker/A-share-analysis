@@ -62,26 +62,26 @@ def _write_manifest(
     dataset_version: str,
     source_version: str = "",
     provenance: dict | None = None,
+    evidence_contract: str = "",
 ) -> None:
     if not source_version:
         # R4-A2.6 P0-04: keep the manifest's governance metadata coherent
         # with the dataset files it selects (read it from the first file)
         doc = yaml.safe_load((root / dataset_files[0]).read_text(encoding="utf-8"))
         source_version = str(doc.get("source_version", ""))
+    document = {
+        "rule_version": rule_version,
+        "review_status": review_status,
+        "dataset_files": dataset_files,
+        "dataset_hash": _manifest_hash(root, dataset_files),
+        "source_version": source_version,
+        "dataset_version": dataset_version,
+        "review_provenance": provenance or {},
+    }
+    if evidence_contract:
+        document["evidence_contract"] = evidence_contract
     (root / "rule_manifest.json").write_text(
-        json.dumps(
-            {
-                "rule_version": rule_version,
-                "review_status": review_status,
-                "dataset_files": dataset_files,
-                "dataset_hash": _manifest_hash(root, dataset_files),
-                "source_version": source_version,
-                "dataset_version": dataset_version,
-                "review_provenance": provenance or {},
-            },
-            indent=2,
-            ensure_ascii=False,
-        ),
+        json.dumps(document, indent=2, ensure_ascii=False),
         encoding="utf-8",
         newline="\n",
     )
@@ -173,24 +173,64 @@ def _relax_golden_gates(mp: pytest.MonkeyPatch) -> None:
 def _flip_active_to_reviewed(root: Path) -> None:
     """Point the ACTIVE manifest at the REVIEWED version with COHERENT
     governance metadata (R4-A2.6 P0-04)."""
-    reviewed = TradingRuleBook.load(root / "versions" / "v2-reviewed" / "rules.yaml")
+    reviewed_path = root / "versions" / "v2-reviewed" / "rules.yaml"
+    reviewed_doc = yaml.safe_load(reviewed_path.read_text(encoding="utf-8"))
+    for rule in reviewed_doc["rules"]:
+        rule["source_ref"] = "synthetic review source: https://www.sse.com.cn/"
+    raw_content = b"synthetic official-source bytes for the review-gate fixture"
+    raw_hash = hashlib.sha256(raw_content).hexdigest()
+    raw_ref = f"sha256/{raw_hash}"
+    raw_path = root / "evidence" / raw_ref
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_path.write_bytes(raw_content)
+    source_url = "https://www.sse.com.cn/"
+    bundle = {
+        "dataset_version": reviewed_doc["version"],
+        "entries": [
+            {
+                "rule_id": rule["rule_id"],
+                "sources": [
+                    {
+                        "artifact_kind": "OTHER_OFFICIAL",
+                        "artifact_ref": raw_ref,
+                        "byte_size": len(raw_content),
+                        "role": "RULE",
+                        "sha256": raw_hash,
+                        "source_url": source_url,
+                    }
+                ],
+            }
+            for rule in sorted(reviewed_doc["rules"], key=lambda item: item["rule_id"])
+        ],
+        "schema_version": "RULE_EVIDENCE_BUNDLE.v1",
+    }
+    bundle_content = (
+        json.dumps(bundle, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    bundle_hash = hashlib.sha256(bundle_content).hexdigest()
+    bundle_ref = f"sha256/{bundle_hash}"
+    (root / "evidence" / bundle_ref).parent.mkdir(parents=True, exist_ok=True)
+    (root / "evidence" / bundle_ref).write_bytes(bundle_content)
+    reviewed_doc.update(
+        {
+            "evidence_contract": "RULE_EVIDENCE_BUNDLE.v1",
+            "source_artifact_ref": bundle_ref,
+            "source_artifact_hash": bundle_hash,
+            "source_artifact_kind": "EVIDENCE_BUNDLE",
+            "rule_evidence_bundle_ref": bundle_ref,
+            "rule_evidence_bundle_hash": bundle_hash,
+        }
+    )
+    reviewed_path.write_text(yaml.safe_dump(reviewed_doc, allow_unicode=True), encoding="utf-8")
+    reviewed = TradingRuleBook.load(reviewed_path)
     _write_manifest(
         root,
         rule_version="v2-reviewed",
         review_status="REVIEWED",
         dataset_files=["versions/v2-reviewed/rules.yaml"],
         dataset_version=reviewed.version,
-        provenance={
-            key: reviewed.review_provenance[key]
-            for key in (
-                "reviewed_by",
-                "reviewed_at",
-                "source_artifact_ref",
-                "source_artifact_hash",
-                "source_artifact_kind",
-                "source_retrieved_at",
-            )
-        },
+        provenance=dict(reviewed.review_provenance),
+        evidence_contract=reviewed.evidence_contract,
     )
 
 
