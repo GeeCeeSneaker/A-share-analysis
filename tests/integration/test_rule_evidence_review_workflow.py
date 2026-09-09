@@ -30,6 +30,12 @@ def _rules_root(tmp_path: Path) -> tuple[Path, dict]:
     version_dir.mkdir(parents=True)
     shutil.copy(SOURCE_RULES, version_dir / "rules.yaml")
     document = yaml.safe_load((version_dir / "rules.yaml").read_text(encoding="utf-8"))
+    for rule in document["rules"]:
+        rule["source_ref"] = "synthetic H1 source: https://www.sse.com.cn/rules"
+    (version_dir / "rules.yaml").write_text(
+        yaml.safe_dump(document, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
     rel = "versions/v1-compiled/rules.yaml"
     digest = hashlib.sha256(rel.encode("utf-8") + (root / rel).read_bytes()).hexdigest()
     manifest = {

@@ -121,6 +121,22 @@ def test_input_manifest_rejects_wrong_role(tmp_path: Path):
         raise AssertionError("invalid source role was accepted")
 
 
+def test_input_manifest_rejects_source_url_not_declared_by_rule(tmp_path: Path):
+    manifest = _input_manifest(tmp_path)
+    declared = dict.fromkeys(_rule_ids(), ("https://www.sse.com.cn/declared-source",))
+    try:
+        prepare_rule_evidence_bundle(
+            manifest,
+            expected_rule_ids=_rule_ids(),
+            expected_dataset_version="2026-08-24.1",
+            expected_source_urls_by_rule=declared,
+        )
+    except ValueError as exc:
+        assert "is not declared by rule_id" in str(exc)
+    else:
+        raise AssertionError("undeclared official source URL was accepted")
+
+
 def test_bundle_validation_rejects_missing_and_extra_rule_ids(tmp_path: Path):
     manifest = _input_manifest(tmp_path)
     document = json.loads(manifest.read_text(encoding="utf-8"))
@@ -178,6 +194,42 @@ def test_bundle_validation_rejects_wrong_declared_raw_hash(tmp_path: Path):
         rules_root=tmp_path,
     )
     assert any("sha256 mismatch" in problem for problem in problems)
+
+
+def test_bundle_validation_rejects_non_content_addressed_refs(tmp_path: Path):
+    manifest = _input_manifest(tmp_path)
+    evidence, bundle_ref, bundle_hash = _publish_bundle(tmp_path, manifest)
+    bundle = json.loads((evidence / bundle_ref).read_text(encoding="utf-8"))
+    source = bundle["entries"][0]["sources"][0]
+    source["artifact_ref"] = f"renamed/{source['sha256']}"
+    bundle_content = (
+        json.dumps(bundle, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    new_hash = hashlib.sha256(bundle_content).hexdigest()
+    new_ref = f"sha256/{new_hash}"
+    (evidence / new_ref).write_bytes(bundle_content)
+    problems = validate_rule_evidence_bundle(
+        bundle_ref=new_ref,
+        bundle_hash=new_hash,
+        expected_rule_ids=_rule_ids(),
+        expected_dataset_version="2026-08-24.1",
+        rules_root=tmp_path,
+    )
+    assert any("artifact_ref must be content-addressed" in problem for problem in problems)
+
+
+def test_bundle_validation_rejects_non_content_addressed_bundle_ref(tmp_path: Path):
+    manifest = _input_manifest(tmp_path)
+    evidence, bundle_ref, bundle_hash = _publish_bundle(tmp_path, manifest)
+    (evidence / "bundle.json").write_bytes((evidence / bundle_ref).read_bytes())
+    problems = validate_rule_evidence_bundle(
+        bundle_ref="bundle.json",
+        bundle_hash=bundle_hash,
+        expected_rule_ids=_rule_ids(),
+        expected_dataset_version="2026-08-24.1",
+        rules_root=tmp_path,
+    )
+    assert any("bundle ref must be content-addressed" in problem for problem in problems)
 
 
 def test_production_gate_requires_bundle_for_reviewed_dataset(tmp_path: Path):

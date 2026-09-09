@@ -65,6 +65,8 @@
 
 实际提交时，`entries` 必须包含 13 个且仅包含上述 13 个 `rule_id`；每个 `sources` 必须非空。复合事实按需要为同一条规则提供 `RULE`、`APPLICABILITY`、`TRANSITION` 多个来源。来源 URL 必须是 HTTPS 且属于 SSE、SZSE、BSE、NEEQ 或 CSRC 官方域名。
 
+工具还会把输入中的 `source_url` 与候选 YAML 对应 `rule_id` 的 `source_ref` 中声明的 URL 做精确匹配；不能用另一条规则的官方链接替换。bundle 和 raw artifact 的发布引用必须分别是 `sha256/<bundle_hash>` 与 `sha256/<raw_sha256>`，仅“文件内容能验 hash”但路径未按内容寻址也会被拒绝。
+
 ## 五、封印命令与放行条件
 
 人工审阅全部 APPROVE、原文文件已留存后，由项目管理者在仓库根目录运行：
@@ -93,3 +95,5 @@ uv run python scripts/rules/review.py \
 2026-09-09 在当前本地环境做了只读连通性检查：列出的 SSE、SZSE 页面和科创板 PDF 返回 HTTP 200；BSE 页面及 BSE PDF 在该环境返回 HTTP 403，部分请求还出现重定向循环。403 响应不是官方原文，不能作为证据包成员，也不能据此判定规则事实。
 
 因此，BSE 两条规则的原文需要项目管理者或独立 Reviewer 用真实浏览器完成反爬挑战后保存，或直接提供从 BSE 官方页面下载的原始 PDF/HTML。保存后仍需用文件原始字节生成 SHA-256，不能把截图、搜索摘要或手工摘录当作 raw artifact。其余来源即使能抓取，也必须由 Reviewer 实际打开并确认条款后，才算 `APPROVE`。
+
+补充边界：当前 main 已有 GT-H3B Golden v7 的历史 BSE evidence，但它属于 Golden 证据域；按本表第三节的项目约束，不能直接充当 Trading Rule H1 evidence。它的存在不等于 H1 两条 BSE 规则已经完成独立原文留存与裁决。

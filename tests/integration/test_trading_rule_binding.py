@@ -175,6 +175,8 @@ def _flip_active_to_reviewed(root: Path) -> None:
     governance metadata (R4-A2.6 P0-04)."""
     reviewed_path = root / "versions" / "v2-reviewed" / "rules.yaml"
     reviewed_doc = yaml.safe_load(reviewed_path.read_text(encoding="utf-8"))
+    for rule in reviewed_doc["rules"]:
+        rule["source_ref"] = "synthetic review source: https://www.sse.com.cn/"
     raw_content = b"synthetic official-source bytes for the review-gate fixture"
     raw_hash = hashlib.sha256(raw_content).hexdigest()
     raw_ref = f"sha256/{raw_hash}"

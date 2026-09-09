@@ -75,6 +75,7 @@ from ashare_state.spike.rule_evidence import (  # noqa: E402
     PreparedRuleEvidenceBundle,
     RawRuleEvidence,
     prepare_rule_evidence_bundle,
+    source_urls_from_ref,
 )
 from ashare_state.spike.trading_rule import (  # noqa: E402
     RULE_EVIDENCE_SUBDIR,
@@ -252,6 +253,7 @@ def _prepare_review_evidence(
     bundle_manifest: Path | None,
     expected_rule_ids: list[str],
     expected_dataset_version: str,
+    expected_source_urls_by_rule: dict[str, tuple[str, ...]],
     kind: str,
 ) -> _ReviewEvidence:
     if bundle_manifest is not None:
@@ -259,6 +261,7 @@ def _prepare_review_evidence(
             bundle_manifest,
             expected_rule_ids=expected_rule_ids,
             expected_dataset_version=expected_dataset_version,
+            expected_source_urls_by_rule=expected_source_urls_by_rule,
         )
         bundle_hash = hashlib.sha256(prepared.content).hexdigest()
         return _ReviewEvidence(
@@ -482,6 +485,9 @@ def _review_workflow_locked(
             bundle_manifest=bundle_manifest,
             expected_rule_ids=[rule.rule_id for rule in active_book.rules],
             expected_dataset_version=active_book.version,
+            expected_source_urls_by_rule={
+                rule.rule_id: source_urls_from_ref(rule.source_ref) for rule in active_book.rules
+            },
             kind=kind,
         )
     except (OSError, ValueError) as exc:

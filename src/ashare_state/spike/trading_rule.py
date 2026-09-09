@@ -33,6 +33,7 @@ from ashare_state.spike.rule_evidence import (  # noqa: E402
     RULE_EVIDENCE_BUNDLE_KIND,
     RULE_EVIDENCE_BUNDLE_REF,
     RULE_EVIDENCE_BUNDLE_SCHEMA,
+    source_urls_from_ref,
     validate_rule_evidence_bundle,
 )
 
@@ -931,6 +932,9 @@ def trading_rule_review_gate(
                     expected_rule_ids=[rule.rule_id for rule in book.rules],
                     expected_dataset_version=book.version,
                     rules_root=root,
+                    expected_source_urls_by_rule={
+                        rule.rule_id: source_urls_from_ref(rule.source_ref) for rule in book.rules
+                    },
                 )
             )
     return problems

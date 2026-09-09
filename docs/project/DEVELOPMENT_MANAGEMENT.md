@@ -5694,3 +5694,14 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - `RULE_EVIDENCE_BUNDLE.v1` 要求每个 rule_id 精确绑定第一方来源，重验 source URL、kind/role、raw bytes 的 SHA-256/size、bundle hash 和路径安全；Production run 创建与 verdict 均强制执行该门禁。
 - 本批新增主板/创业板/STAR/BSE 的 PIT 边界测试、bundle 缺失/多余/错误 role/hash/原文篡改测试和完整发布流程测试；本地全量为 `1633 passed, 2 skipped`，Ruff、mypy、依赖检查通过。
 - 真实官方原文的完整留存与独立逐条人工裁决尚未完成；BSE 来源在当前环境 403/重定向循环，不能用响应体代替原文。完成 Reviewer 接受并合并 REVIEWED 版本前，不得切换 ACTIVE 或执行 Formal Production B1-B7。
+
+## DM-20260909-TRADING-RULE-H1-002 · Source identity and content-addressing hardening
+
+**Type**：C0 — evidence contract hardening
+**Date**：2026-09-09
+**Status**：IMPLEMENTED / CI VALIDATION PENDING / HUMAN REVIEW PENDING
+**Evidence**：`src/ashare_state/spike/rule_evidence.py`；`scripts/rules/review.py`；`tests/unit/test_rule_evidence.py`。
+
+- bundle preparation/runtime validation 现在要求每个 `source_url` 精确命中对应候选 `rule_id` 的 `source_ref` 声明；source URL contract 的 rule-id 集合也做缺失/多余校验。
+- bundle ref 与 raw artifact ref 均必须是 `sha256/<对应 hash>`；新增非内容寻址 bundle/raw 路径回归测试。
+- 当前 main 中 GT-H3B Golden v7 已有的 BSE raw evidence 不跨域复用为 H1 evidence；H1 的 13 条独立官方原文与人工裁决仍是未完成门禁，ACTIVE、REVIEWED seal 和 Formal Production B1-B7 均不推进。

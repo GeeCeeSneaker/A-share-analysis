@@ -3545,3 +3545,11 @@
 - 新增 `RULE_EVIDENCE_BUNDLE.v1` 及严格校验：每个 `rule_id` 必须有官方来源，验证来源域名、kind/role、bundle 与 raw artifact 的路径、字节数和 SHA-256；Production run 创建与 verdict 均要求 bundle gate。`--artifact` 仅保留兼容旧测试和非生产工具。
 - 新增逐条人工审阅表和 13 条输入模板；实际官方原文留存、13 条独立人工裁决、REVIEWED seal 和 ACTIVE 推进仍未完成。当前本地环境对 BSE 页面/PDF 返回 403 或重定向循环，响应体未被当作证据，获取堵点已记录在 H1 文档。
 - 本提交本地验证：`uv run pytest` 为 `1633 passed, 2 skipped`；Ruff lint/format、mypy、`uv pip check` 均通过。未登录 Provider、未创建 run_id、未执行 B1-B7、未消耗正式 attempt，未提交任何运行凭据。
+
+## 2026-09-09 · Trading Rule H1 source-identity and content-addressing hardening
+
+> 状态：HARDENING IMPLEMENTED / CI VALIDATION PENDING / HUMAN REVIEW STILL REQUIRED
+
+- evidence bundle 现在把每条输入 `source_url` 与对应候选规则 `source_ref` 做精确绑定；缺失或跨 rule 替换官方链接会在准备阶段和运行时复核阶段 fail closed。
+- bundle 外层引用与 raw artifact 引用均强制使用 `sha256/<hash>` 内容寻址，防止仅凭可重算的文件 hash 使用任意别名路径伪装成已封印 artifact。
+- 现有 GT-H3B Golden v7 BSE evidence 继续只属于 Golden evidence 域，不被复用为 H1 evidence；H1 13 条原文留存、人工裁决、REVIEWED seal、ACTIVE 和 Formal Production B1-B7 状态不变。
