@@ -3556,10 +3556,11 @@
 
 ## 2026-09-09 · Trading Rule H1R second-review remediation
 
-> 状态：**IMPLEMENTED / LOCAL TARGETED TESTS GREEN / CI AND INDEPENDENT REVIEW PENDING**
+> 状态：**IMPLEMENTED / CI VERIFIED GREEN / INDEPENDENT HUMAN REVIEW PENDING**
 
 - 按 current `main@6700af9` 的二审要求，将 H1 候选的主板 ST 拆成 `MAIN_BOARD_ST_HISTORICAL`（5%，至 2026-07-05）与 `MAIN_BOARD_ST_CURRENT`（10%，自 2026-07-06）；SH/SZ 共用该 PIT 切换，不使用运行时特判。普通主板仍保持 10%。
 - 删除带有未决适用性文案的 `MAIN_BOARD_ST_FIRST5_NO_LIMIT`，保留一个 `st_state: null` 的 `MAIN_BOARD_FIRST5_NO_LIMIT`；解析器按 listing-age regime 分别处理 ST-specific/ANY，普通和 ST 首五日测试均返回不限价，第六日返回对应 PIT ST 规则。
 - `RULE_EVIDENCE_BUNDLE.v1` 的 prepare/runtime 两条路径现在要求每个 rule 的实际 URL 集与 `source_ref` required URL 集 exact match；missing、extra、duplicate URL 均 fail closed，并保留 host/kind/role/hash/size/path/content-addressed checks。新增四类对抗测试。
 - 为所有延续到 2026-09 的候选规则补记官方 2026 current-effective locator；这些只是 required contract，未下载、未写入或伪造 H1 原始证据。candidate 仍 `COMPILED`、非 ACTIVE；旧 compiled、ACTIVE、Golden v7/evidence/receipt 未改。
-- 本地定向验证：H1 candidate `14 passed`；evidence contract `20 passed`；Ruff check/format passed。等待将合并后的分支推送后由三平台 CI 验证；独立 Reviewer 关闭 P0 前仍不得 materialize evidence、seal REVIEWED、推进 ACTIVE 或执行 B1-B7。
+- 本地定向验证：H1 candidate `15 passed`；evidence contract `20 passed`；Ruff check/format passed。等待将合并后的分支推送后由三平台 CI 验证；独立 Reviewer 关闭 P0 前仍不得 materialize evidence、seal REVIEWED、推进 ACTIVE 或执行 B1-B7。
+- CI run `34306959611`（#488）已验证 Windows 3.12、Windows 3.14、Ubuntu 3.14 三个矩阵全部成功；包括 full pytest、Ruff、mypy、Spike、SDK-absent、DEVLOG 和 Management gates。该结果不等于人工证据裁决，也不解除 H1 evidence/ACTIVE/B1-B7 门槛。
