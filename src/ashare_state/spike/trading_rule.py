@@ -27,7 +27,21 @@ from typing import Any
 
 import yaml
 
-_LISTING_AGE_RULES = ("NONE", "FIRST_5_DAYS_NO_LIMIT", "IPO_DAY_44_36")
+from ashare_state.spike.rule_evidence import (  # noqa: E402
+    RULE_EVIDENCE_ARTIFACT_KINDS,
+    RULE_EVIDENCE_BUNDLE_HASH,
+    RULE_EVIDENCE_BUNDLE_KIND,
+    RULE_EVIDENCE_BUNDLE_REF,
+    RULE_EVIDENCE_BUNDLE_SCHEMA,
+    validate_rule_evidence_bundle,
+)
+
+_LISTING_AGE_RULES = (
+    "NONE",
+    "FIRST_5_DAYS_NO_LIMIT",
+    "IPO_DAY_44_36",
+    "IPO_DAY_NO_LIMIT",
+)
 _ROUNDING_MODES = ("ROUND_HALF_UP",)
 
 #: default rule data location (repo-relative; override for tests)
@@ -197,6 +211,7 @@ class TradingRuleBook:
         dataset_files: tuple[str, ...] = (),
         content_hash: str = "",
         review_provenance: dict[str, Any] | None = None,
+        evidence_contract: str = "",
     ) -> None:
         self.rules: tuple[TradingRuleRow, ...] = tuple(rules)
         self.version = version
@@ -206,6 +221,7 @@ class TradingRuleBook:
         self.dataset_files = dataset_files
         self.content_hash = content_hash
         self.review_provenance = dict(review_provenance or {})
+        self.evidence_contract = evidence_contract
         problems = self.validate()
         if problems:
             msg = "trading rule data invalid: " + "; ".join(problems)
@@ -262,7 +278,7 @@ class TradingRuleBook:
             if not isinstance(doc, dict):
                 msg = f"rule file {file} must be a mapping"
                 raise ValueError(msg)
-            for key in ("version", "source_version", "review_status"):
+            for key in ("version", "source_version", "review_status", "evidence_contract"):
                 value = str(doc.get(key, "") or "")
                 if key in doc_meta and doc_meta[key] != value:
                     msg = f"rule file {file}: {key} conflicts with a previous file"
@@ -275,6 +291,8 @@ class TradingRuleBook:
                 "source_artifact_hash",
                 "source_artifact_kind",
                 "source_retrieved_at",
+                RULE_EVIDENCE_BUNDLE_REF,
+                RULE_EVIDENCE_BUNDLE_HASH,
             ):
                 if key in doc:
                     if key in provenance and provenance[key] != doc[key]:
@@ -290,6 +308,7 @@ class TradingRuleBook:
             dataset_files=tuple(names),
             content_hash=digest.hexdigest(),
             review_provenance=provenance,
+            evidence_contract=doc_meta.get("evidence_contract", ""),
         )
 
     @staticmethod
@@ -401,8 +420,11 @@ class TradingRuleBook:
                 )
                 raise RuleUnresolvedError(msg)
             ipo_day = _yyyymmdd(listing_date) == day
-            if ipo_day and any(r.listing_age_rule == "IPO_DAY_44_36" for r in selected):
-                selected = [r for r in selected if r.listing_age_rule == "IPO_DAY_44_36"]
+            ipo_rules = [
+                r for r in selected if r.listing_age_rule in ("IPO_DAY_44_36", "IPO_DAY_NO_LIMIT")
+            ]
+            if ipo_day and ipo_rules:
+                selected = ipo_rules
                 first_n = True
             else:
                 first_n = first_n_sessions(day, listing_date, calendar, n=5)
@@ -515,12 +537,9 @@ class TradingRuleBook:
 
 _DEFAULT_BOOK: TradingRuleBook | None = None
 
-#: allowed source artifact kinds (aligned with the golden review gate)
-_REVIEW_ARTIFACT_KINDS = (
-    "OTHER_OFFICIAL",
-    "EXCHANGE_NOTICE",
-    "REGULATOR_DOC",
-    "DATASET_DOC",
+#: allowed source artifact kinds (aligned with the per-rule evidence contract)
+_REVIEW_ARTIFACT_KINDS = tuple(
+    dict.fromkeys((*RULE_EVIDENCE_ARTIFACT_KINDS, RULE_EVIDENCE_BUNDLE_KIND))
 )
 
 #: R4-A2.5 P0-02: the ACTIVE selector file inside the rules root
@@ -546,6 +565,7 @@ class RuleDatasetManifest:
     #: version) - distinct from rule_version (the selector/directory id)
     dataset_version: str = ""
     review_provenance: dict[str, Any] = field(default_factory=dict)
+    evidence_contract: str = ""
 
 
 def _dataset_files_hash(root: Path, rel_files: Sequence[str]) -> str:
@@ -680,6 +700,7 @@ def load_rule_manifest(root: Path | str) -> RuleDatasetManifest:
     dataset_hash = str(doc.get("dataset_hash", "") or "")
     source_version = str(doc.get("source_version", "") or "")
     dataset_version = str(doc.get("dataset_version", "") or "")
+    evidence_contract = str(doc.get("evidence_contract", "") or "")
     if not version:
         problems.append("rule_version missing")
     if status not in ("COMPILED", "REVIEWED"):
@@ -725,6 +746,7 @@ def load_rule_manifest(root: Path | str) -> RuleDatasetManifest:
         source_version=source_version,
         dataset_version=dataset_version,
         review_provenance=dict(doc.get("review_provenance", {}) or {}),
+        evidence_contract=evidence_contract,
     )
 
 
@@ -768,6 +790,11 @@ def load_active_rules(
             f"review_status: manifest says {manifest.review_status!r}, "
             f"files say {book.review_status!r}"
         )
+    if manifest.evidence_contract != book.evidence_contract:
+        coherence.append(
+            f"evidence_contract: manifest says {manifest.evidence_contract!r}, "
+            f"files say {book.evidence_contract!r}"
+        )
     if not manifest.source_version:
         coherence.append("source_version: manifest field is REQUIRED and empty")
     elif manifest.source_version != book.source_version:
@@ -796,6 +823,7 @@ def trading_rule_review_gate(
     book: TradingRuleBook,
     *,
     rules_root: Path | str | None = None,
+    require_evidence_bundle: bool = False,
 ) -> list[str]:
     """R4-A2.4 P0-04 + R4-A2.5 P0-03: Trading Rule Review Gate.
 
@@ -814,6 +842,8 @@ def trading_rule_review_gate(
       - source_artifact_hash must be 64 lower-hex chars
       - reviewed_at / source_retrieved_at must be ISO-8601 timestamps
       - the artifact bytes must hash to source_artifact_hash
+      - a RULE_EVIDENCE_BUNDLE.v1 contract is required when requested by
+        the production caller or declared by the reviewed dataset
     """
     import hashlib
     from datetime import datetime
@@ -871,6 +901,38 @@ def trading_rule_review_gate(
     actual = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
     if actual != expected_hash:
         problems.append(f"source artifact hash mismatch: {ref}")
+    bundle_required = require_evidence_bundle or bool(book.evidence_contract)
+    if bundle_required:
+        if book.evidence_contract != RULE_EVIDENCE_BUNDLE_SCHEMA:
+            problems.append(
+                f"reviewed dataset must declare evidence_contract={RULE_EVIDENCE_BUNDLE_SCHEMA!r}"
+            )
+        bundle_ref = str(prov.get(RULE_EVIDENCE_BUNDLE_REF, "") or "").strip()
+        bundle_hash = str(prov.get(RULE_EVIDENCE_BUNDLE_HASH, "") or "").strip()
+        if not bundle_ref or not bundle_hash:
+            problems.append(
+                "REVIEWED dataset missing per-rule evidence bundle provenance "
+                f"({RULE_EVIDENCE_BUNDLE_REF}/{RULE_EVIDENCE_BUNDLE_HASH})"
+            )
+        else:
+            if str(prov.get("source_artifact_kind", "")) != RULE_EVIDENCE_BUNDLE_KIND:
+                problems.append(
+                    "per-rule evidence bundle requires "
+                    f"source_artifact_kind={RULE_EVIDENCE_BUNDLE_KIND!r}"
+                )
+            if str(prov.get("source_artifact_ref", "")) != bundle_ref:
+                problems.append("source_artifact_ref must equal rule_evidence_bundle_ref")
+            if str(prov.get("source_artifact_hash", "")) != bundle_hash:
+                problems.append("source_artifact_hash must equal rule_evidence_bundle_hash")
+            problems.extend(
+                validate_rule_evidence_bundle(
+                    bundle_ref=bundle_ref,
+                    bundle_hash=bundle_hash,
+                    expected_rule_ids=[rule.rule_id for rule in book.rules],
+                    expected_dataset_version=book.version,
+                    rules_root=root,
+                )
+            )
     return problems
 
 

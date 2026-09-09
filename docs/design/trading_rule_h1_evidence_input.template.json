@@ -1,0 +1,203 @@
+{
+  "schema_version": "RULE_EVIDENCE_BUNDLE.v1",
+  "dataset_version": "2026-09-09.1",
+  "entries": [
+    {
+      "rule_id": "MAIN_BOARD_NORMAL",
+      "sources": [
+        {
+          "artifact_path": "sources/main_board_normal_sse.html",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_normal_szse.html",
+          "source_url": "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        }
+      ]
+    },
+    {
+      "rule_id": "MAIN_BOARD_ST",
+      "sources": [
+        {
+          "artifact_path": "sources/main_board_st_sse.html",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_st_szse.html",
+          "source_url": "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        }
+      ]
+    },
+    {
+      "rule_id": "MAIN_BOARD_IPO_DAY",
+      "sources": [
+        {
+          "artifact_path": "sources/main_board_ipo_old_sse.html",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_ipo_transition_sse.html",
+          "source_url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230217_5716420.shtml",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "TRANSITION"
+        },
+        {
+          "artifact_path": "sources/main_board_ipo_first_registration_szse.html",
+          "source_url": "https://www.szse.cn/aboutus/trends/news/t20230404_599697.html",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "APPLICABILITY"
+        }
+      ]
+    },
+    {
+      "rule_id": "MAIN_BOARD_FIRST5_NO_LIMIT",
+      "sources": [
+        {
+          "artifact_path": "sources/main_board_first5_sse.html",
+          "source_url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230201_5715605.shtml",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_first5_szse_qna.html",
+          "source_url": "https://investor.szse.cn/knowledge/qa/t20230306_599093.html",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_first5_first_listing_szse.html",
+          "source_url": "https://www.szse.cn/aboutus/trends/news/t20230404_599697.html",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "APPLICABILITY"
+        }
+      ]
+    },
+    {
+      "rule_id": "MAIN_BOARD_ST_FIRST5_NO_LIMIT",
+      "sources": [
+        {
+          "artifact_path": "sources/main_board_st_first5_sse.html",
+          "source_url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230201_5715605.shtml",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_st_first5_szse_qna.html",
+          "source_url": "https://investor.szse.cn/knowledge/qa/t20230306_599093.html",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "RULE"
+        }
+      ]
+    },
+    {
+      "rule_id": "CHINEXT_PRE_REGISTRATION_NORMAL",
+      "sources": [
+        {
+          "artifact_path": "sources/chinext_pre_normal_szse.html",
+          "source_url": "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/chinext_reform_transition_szse.html",
+          "source_url": "https://www.szse.cn/disclosure/notice/general/t20200710_579459.html",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "TRANSITION"
+        }
+      ]
+    },
+    {
+      "rule_id": "CHINEXT_PRE_REGISTRATION_ST",
+      "sources": [
+        {
+          "artifact_path": "sources/chinext_pre_st_szse.html",
+          "source_url": "https://www.szse.cn/disclosure/notice/general/t20200710_579459.html",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "RULE"
+        }
+      ]
+    },
+    {
+      "rule_id": "CHINEXT_REGISTRATION",
+      "sources": [
+        {
+          "artifact_path": "sources/chinext_registration_szse.html",
+          "source_url": "https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        }
+      ]
+    },
+    {
+      "rule_id": "CHINEXT_REGISTRATION_FIRST5",
+      "sources": [
+        {
+          "artifact_path": "sources/chinext_registration_first5_szse.html",
+          "source_url": "https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        }
+      ]
+    },
+    {
+      "rule_id": "STAR_MARKET",
+      "sources": [
+        {
+          "artifact_path": "sources/star_market_rules.pdf",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        }
+      ]
+    },
+    {
+      "rule_id": "STAR_MARKET_FIRST5",
+      "sources": [
+        {
+          "artifact_path": "sources/star_market_rules.pdf",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        }
+      ]
+    },
+    {
+      "rule_id": "BSE_LIMIT",
+      "sources": [
+        {
+          "artifact_path": "sources/bse_trading_rules.html",
+          "source_url": "https://www.bse.cn/jygl_list/200010919.html",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/bse_effective_date.html",
+          "source_url": "https://www.bse.cn/cxjg_list/200010908.html",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "TRANSITION"
+        }
+      ]
+    },
+    {
+      "rule_id": "BSE_IPO_DAY_NO_LIMIT",
+      "sources": [
+        {
+          "artifact_path": "sources/bse_ipo_listing_day.html",
+          "source_url": "https://www.bse.cn/jygl_list/200028217.html",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        }
+      ]
+    }
+  ]
+}
