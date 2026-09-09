@@ -1,3 +1,21 @@
+## DM-20260909-007 · H1 Seal 生命周期独立审阅阻断项修复
+
+- **Type**：C0 — reviewer-blocking lifecycle hardening
+- **Date**：2026-09-09
+- **Status**：`REVIEW_BLOCKERS_ADDRESSED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / INDEPENDENT_REVIEW_RETRY_PENDING / REAL EVIDENCE NOT MATERIALIZED`
+- **Scope**：PR #33；独立 Reviewer 暂不合并，要求 candidate immutability verification 和新的 candidate 入口 evidence 对抗覆盖。
+
+**本次修复**
+
+- candidate source bytes 仍只读取一次；hash、解析、变换和 reviewed output 继续绑定原始内存 snapshot。新增提交前/提交后 verification-only 回读，比较 bytes、candidate hash、固定路径和可用文件身份；回读内容不会参与 seal 重绑定。
+- candidate 在 snapshot 后变更时，提交前清理本次 staging/version/evidence 并保持旧 ACTIVE；若在 manifest commit 后变更，返回 `REVIEW_COMMIT_INCONSISTENT`，不伪装成功。
+- `tests/integration/test_h1_rule_seal_lifecycle.py` 新增 missing、extra、duplicate、wrong-hash、raw tamper 五类 evidence bundle 入口级测试，以及 pre/post-commit candidate mutation 测试；本地结果 `18 passed, 1 skipped`（19 个用例）。
+
+**边界与下一关**
+
+- 真实 H1 evidence、REVIEWED seal、ACTIVE 切换、Formal Production attempt 和 B1-B7 仍未执行；candidate、旧 ACTIVE、Golden v7 和凭据边界不变。
+- 待最终 head 三平台 CI 通过后重新交独立 Reviewer；在 Reviewer 合并 PR #33 前，不得进行真实 evidence materialization 或 H1 seal。
+
 ## DM-20260909-006 · Trading Rule H1 Seal 生命周期 P0 实现
 
 - **Type**：C1 — explicit non-ACTIVE candidate seal lifecycle

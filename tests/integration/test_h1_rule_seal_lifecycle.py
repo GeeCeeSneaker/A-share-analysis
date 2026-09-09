@@ -17,7 +17,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from ashare_state.spike.rule_evidence import RULE_EVIDENCE_BUNDLE_SCHEMA, source_urls_from_ref
+from ashare_state.spike.rule_evidence import (
+    RULE_EVIDENCE_BUNDLE_SCHEMA,
+    prepare_rule_evidence_bundle,
+    source_urls_from_ref,
+)
 from ashare_state.spike.trading_rule import TradingRuleBook, load_active_rules, load_rule_manifest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -139,6 +143,19 @@ def _make_bundle(tmp_path: Path, root: Path) -> Path:
     return manifest
 
 
+def _prepare_candidate_bundle(root: Path, bundle: Path):
+    candidate_doc = yaml.safe_load(_candidate_path(root).read_text(encoding="utf-8"))
+    return prepare_rule_evidence_bundle(
+        bundle,
+        expected_rule_ids=[str(rule["rule_id"]) for rule in candidate_doc["rules"]],
+        expected_dataset_version=str(candidate_doc["version"]),
+        expected_source_urls_by_rule={
+            str(rule["rule_id"]): source_urls_from_ref(rule["source_ref"])
+            for rule in candidate_doc["rules"]
+        },
+    )
+
+
 def _argv(
     root: Path,
     bundle: Path,
@@ -225,7 +242,7 @@ class TestH1CandidateSealHappyPath:
         )
         assert CANDIDATE_VERSION not in (root / "rule_manifest.json").read_text(encoding="utf-8")
 
-    def test_candidate_snapshot_is_the_only_transform_source(self, tmp_path, monkeypatch, capsys):
+    def test_post_snapshot_candidate_mutation_fails_closed(self, tmp_path, monkeypatch, capsys):
         root = _make_root(tmp_path)
         bundle = _make_bundle(tmp_path, root)
         candidate = _candidate_path(root)
@@ -250,27 +267,44 @@ class TestH1CandidateSealHappyPath:
                 module,
                 _argv(root, bundle, expected_candidate_hash=expected_candidate_hash),
             )
-            == 0
+            != 0
         )
         monkeypatch.undo()
         capsys.readouterr()
 
-        assert state["candidate_reads"] == 1
-        output = root / "versions" / REVIEWED_VERSION / "rules.yaml"
-        output_doc = yaml.safe_load(output.read_text(encoding="utf-8"))
-        reviewed_at = output_doc["reviewed_at"]
-        if not isinstance(reviewed_at, str):
-            reviewed_at = reviewed_at.isoformat()
-        expected = module._build_reviewed_text(
-            original_candidate_bytes,
-            reviewer="project-owner",
-            now=reviewed_at,
-            artifact_ref=output_doc["source_artifact_ref"],
-            artifact_hash=output_doc["source_artifact_hash"],
-            kind=output_doc["source_artifact_kind"],
-            evidence_contract=RULE_EVIDENCE_BUNDLE_SCHEMA,
-        ).encode("utf-8")
-        assert output.read_bytes() == expected
+        assert state["candidate_reads"] == 2
+        assert candidate.read_bytes() != original_candidate_bytes
+        assert load_rule_manifest(root).rule_version == PARENT_VERSION
+        assert not (root / "versions" / REVIEWED_VERSION).exists()
+        evidence = root / "evidence"
+        assert not evidence.exists() or not list(evidence.rglob("*"))
+        assert not list((root / "versions").glob(".staging-*"))
+
+    def test_candidate_mutation_after_precommit_check_is_commit_inconsistent(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        root = _make_root(tmp_path)
+        bundle = _make_bundle(tmp_path, root)
+        candidate = _candidate_path(root)
+        original_candidate_bytes = candidate.read_bytes()
+        module = _load_review_module()
+        original_replace = Path.replace
+
+        def mutate_after_manifest_replace(path: Path, target: Path, *args, **kwargs):
+            result = original_replace(path, target, *args, **kwargs)
+            if path.name.startswith(".rule_manifest.json.tmp-"):
+                candidate.write_bytes(original_candidate_bytes + b"\n# changed after commit\n")
+            return result
+
+        monkeypatch.setattr(Path, "replace", mutate_after_manifest_replace)
+        assert _run(module, _argv(root, bundle)) == 3
+        monkeypatch.undo()
+        captured = capsys.readouterr()
+
+        assert "REVIEW_COMMIT_INCONSISTENT" in captured.err
+        assert candidate.read_bytes() != original_candidate_bytes
+        assert load_rule_manifest(root).rule_version == REVIEWED_VERSION
+        assert (root / "versions" / REVIEWED_VERSION / "rules.yaml").is_file()
 
 
 class TestH1CandidateSealPreflight:
@@ -430,6 +464,90 @@ class TestH1CandidateSealPreflight:
         )
         assert reads["candidate"] == 0
         assert (root / ".review.lock").is_file()
+
+
+class TestH1CandidateEvidenceFailures:
+    @pytest.mark.parametrize("mutation", ["missing", "extra", "duplicate"])
+    def test_malformed_input_bundle_fails_through_candidate_entry_point(
+        self, tmp_path, mutation, capsys
+    ):
+        root = _make_root(tmp_path)
+        bundle = _make_bundle(tmp_path, root)
+        document = json.loads(bundle.read_text(encoding="utf-8"))
+        first_sources = document["entries"][0]["sources"]
+        if mutation == "missing":
+            first_sources.pop()
+        elif mutation == "extra":
+            extra_name = "extra-source.bin"
+            (bundle.parent / extra_name).write_bytes(b"undeclared extra source")
+            extra = dict(first_sources[0])
+            extra["artifact_path"] = extra_name
+            extra["source_url"] = "https://www.sse.com.cn/not-declared-by-rule"
+            first_sources.append(extra)
+        else:
+            first_sources.append(dict(first_sources[0]))
+        bundle.write_text(json.dumps(document), encoding="utf-8")
+
+        parent_bytes = (root / "versions" / PARENT_VERSION / "rules.yaml").read_bytes()
+        candidate_bytes = _candidate_path(root).read_bytes()
+        module = _load_review_module()
+
+        assert _run(module, _argv(root, bundle)) != 0
+        capsys.readouterr()
+        _assert_old_state(root, parent_bytes, candidate_bytes)
+
+    def test_preexisting_bundle_wrong_hash_fails_closed(self, tmp_path, capsys):
+        root = _make_root(tmp_path)
+        bundle = _make_bundle(tmp_path, root)
+        prepared = _prepare_candidate_bundle(root, bundle)
+        bundle_hash = hashlib.sha256(prepared.content).hexdigest()
+        wrong_bundle_path = root / "evidence" / f"sha256/{bundle_hash}"
+        wrong_bundle_path.parent.mkdir(parents=True)
+        wrong_bundle_path.write_bytes(b"wrong bundle bytes")
+        parent_bytes = (root / "versions" / PARENT_VERSION / "rules.yaml").read_bytes()
+        candidate_bytes = _candidate_path(root).read_bytes()
+        module = _load_review_module()
+
+        assert _run(module, _argv(root, bundle)) != 0
+        capsys.readouterr()
+
+        assert load_rule_manifest(root).rule_version == PARENT_VERSION
+        assert (root / "versions" / PARENT_VERSION / "rules.yaml").read_bytes() == parent_bytes
+        assert _candidate_path(root).read_bytes() == candidate_bytes
+        assert not (root / "versions" / REVIEWED_VERSION).exists()
+        assert wrong_bundle_path.read_bytes() == b"wrong bundle bytes"
+        assert [path for path in (root / "evidence").rglob("*") if path.is_file()] == [
+            wrong_bundle_path
+        ]
+        assert not list((root / "versions").glob(".staging-*"))
+
+    def test_raw_evidence_tamper_during_candidate_seal_fails_closed(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        root = _make_root(tmp_path)
+        bundle = _make_bundle(tmp_path, root)
+        prepared = _prepare_candidate_bundle(root, bundle)
+        target = root / "evidence" / prepared.raw_artifacts[0].artifact_ref
+        module = _load_review_module()
+        original_write = Path.write_bytes
+        tampered = {"done": False}
+
+        def write_then_tamper(path: Path, data: bytes, *args, **kwargs):
+            result = original_write(path, data, *args, **kwargs)
+            if path == target and not tampered["done"]:
+                original_write(path, b"tampered raw source")
+                tampered["done"] = True
+            return result
+
+        monkeypatch.setattr(Path, "write_bytes", write_then_tamper)
+        parent_bytes = (root / "versions" / PARENT_VERSION / "rules.yaml").read_bytes()
+        candidate_bytes = _candidate_path(root).read_bytes()
+        assert _run(module, _argv(root, bundle)) != 0
+        monkeypatch.undo()
+        capsys.readouterr()
+
+        assert tampered["done"]
+        _assert_old_state(root, parent_bytes, candidate_bytes)
 
 
 class TestH1CandidateSealRollback:

@@ -15,10 +15,11 @@ Phase 1 - pure validation / snapshot (ZERO output mutation):
     ACTIVE integrity (load_active_rules), from-version lineage,
     single-file support, input == ACTIVE file, ACTIVE COMPILED,
     version-id confinement (lexical single-component grammar +
-    resolved confinement + non-existence), ONE-TIME snapshot capture
-    whose hash is computed FROM THE SNAPSHOT BYTES (never a second
-    filesystem read), artifact read + hash, reviewed copy built IN
-    MEMORY from the exact snapshot bytes.
+    resolved confinement + non-existence), ONE-TIME source snapshot capture
+    whose hash is computed FROM THE SNAPSHOT BYTES, artifact read + hash,
+    reviewed copy built IN MEMORY from the exact snapshot bytes. Candidate
+    read-backs, when used, are verification-only and never replace the
+    source snapshot.
 
 Phase 2 - staged output:
     stage the evidence bundle and all raw artifacts (content-addressed), stage the reviewed
@@ -251,6 +252,60 @@ def _validate_candidate_path(
     if resolved != (version_dir / "rules.yaml").resolve():
         raise ValueError("candidate path resolves to a different version file")
     return candidate_abs, f"versions/{candidate_version}/rules.yaml"
+
+
+def _candidate_file_identity(path: Path) -> tuple[int, int] | None:
+    """Return a portable replacement-detection identity when available."""
+
+    stat = path.stat()
+    if not stat.st_ino:
+        return None
+    return stat.st_dev, stat.st_ino
+
+
+def _verify_candidate_snapshot(
+    *,
+    candidate_file: Path,
+    candidate_version: str,
+    rules_root: Path,
+    candidate_rel: str,
+    snapshot_bytes: bytes,
+    snapshot_hash: str,
+    snapshot_file_identity: tuple[int, int] | None,
+) -> str:
+    """Verify the candidate still matches its captured identity.
+
+    The read in this function is deliberately a read-back only. Its bytes
+    are compared with the original snapshot and its derived hash is compared
+    with ``snapshot_hash``; neither is ever used to build or rebind the
+    reviewed output. This closes the gap between the one-time source read
+    and the final ACTIVE manifest commit while keeping the source of truth
+    bound to the original in-memory snapshot.
+    """
+
+    try:
+        verified_file, verified_rel = _validate_candidate_path(
+            candidate_file,
+            candidate_version=candidate_version,
+            rules_root=rules_root,
+        )
+        verified_identity = _candidate_file_identity(verified_file)
+        verification_bytes = verified_file.read_bytes()
+    except (OSError, ValueError) as exc:
+        return f"candidate identity verification failed: {exc}"
+    if verified_rel != candidate_rel:
+        return (
+            "candidate identity verification failed: candidate relative path "
+            f"changed from {candidate_rel!r} to {verified_rel!r}"
+        )
+    if snapshot_file_identity is not None and verified_identity != snapshot_file_identity:
+        return "candidate file identity changed after the source snapshot"
+    if verification_bytes != snapshot_bytes:
+        return "candidate bytes changed after the source snapshot"
+    verification_hash = _hash_snapshot([(verified_rel, verification_bytes)])
+    if verification_hash != snapshot_hash:
+        return "candidate snapshot verification hash changed after the source snapshot"
+    return ""
 
 
 def _load_snapshot_book(snapshot_bytes: bytes) -> TradingRuleBook:
@@ -583,13 +638,15 @@ def _candidate_review_workflow_locked(
     if candidate_rel == active_rel or candidate_version == active.rule_version:
         return _fail("H1 candidate must be non-ACTIVE and distinct from the expected parent")
 
-    # Candidate bytes are read exactly once from the mutable version store.
-    # The returned object is the only source used by the transform and the
-    # candidate hash; no later candidate read can substitute new bytes.
+    # Candidate source bytes are read exactly once from the mutable version
+    # store. The returned object is the only source used by the transform and
+    # the frozen candidate hash. Any later candidate read is verification-only
+    # and cannot substitute new bytes.
     try:
+        candidate_file_identity = _candidate_file_identity(candidate_file)
         candidate_bytes = candidate_file.read_bytes()
     except OSError as exc:
-        return _fail(f"candidate rules file could not be read: {exc}")
+        return _fail(f"candidate file could not be read or identified: {exc}")
     candidate_hash = _hash_snapshot([(candidate_rel, candidate_bytes)])
     if candidate_hash != expected_candidate_hash:
         return _fail(
@@ -677,6 +734,11 @@ def _candidate_review_workflow_locked(
         expected_parent_dataset_hash=active.dataset_hash,
         expected_parent_dataset_files=active.dataset_files,
         source_rule_identity=candidate_book.rules,
+        candidate_file=candidate_file,
+        candidate_version=candidate_version,
+        candidate_rel=candidate_rel,
+        candidate_snapshot_bytes=candidate_bytes,
+        candidate_snapshot_file_identity=candidate_file_identity,
     )
 
 
@@ -895,6 +957,11 @@ def _review_locked_workflow(
     expected_parent_dataset_hash: str = "",
     expected_parent_dataset_files: tuple[str, ...] = (),
     source_rule_identity: tuple[object, ...] | None = None,
+    candidate_file: Path | None = None,
+    candidate_version: str = "",
+    candidate_rel: str = "",
+    candidate_snapshot_bytes: bytes | None = None,
+    candidate_snapshot_file_identity: tuple[int, int] | None = None,
 ) -> int:
     """The staged review workflow, executed under the single-writer lock.
 
@@ -1046,6 +1113,22 @@ def _review_locked_workflow(
         manifest_path = rules_root / RULE_MANIFEST_FILE
         manifest_bytes = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
         tmp_manifest.write_bytes(manifest_bytes + b"\n")
+        if candidate_file is not None:
+            assert candidate_snapshot_bytes is not None
+            candidate_problem = _verify_candidate_snapshot(
+                candidate_file=candidate_file,
+                candidate_version=candidate_version,
+                rules_root=rules_root,
+                candidate_rel=candidate_rel,
+                snapshot_bytes=candidate_snapshot_bytes,
+                snapshot_hash=snapshot_hash,
+                snapshot_file_identity=candidate_snapshot_file_identity,
+            )
+            if candidate_problem:
+                _cleanup_uncommitted()
+                return _fail(
+                    f"candidate changed before ACTIVE manifest commit: {candidate_problem}"
+                )
         # ATOMIC REPLACEMENT / READER-SAFE: concurrent readers see either
         # the complete old manifest or the complete new one. (NOT a
         # power-loss durability guarantee - no fsync is performed.)
@@ -1091,6 +1174,24 @@ def _review_locked_workflow(
             file=sys.stderr,
         )
         return 3
+    if candidate_file is not None:
+        assert candidate_snapshot_bytes is not None
+        candidate_problem = _verify_candidate_snapshot(
+            candidate_file=candidate_file,
+            candidate_version=candidate_version,
+            rules_root=rules_root,
+            candidate_rel=candidate_rel,
+            snapshot_bytes=candidate_snapshot_bytes,
+            snapshot_hash=snapshot_hash,
+            snapshot_file_identity=candidate_snapshot_file_identity,
+        )
+        if candidate_problem:
+            print(
+                "REVIEW_COMMIT_INCONSISTENT: candidate changed after ACTIVE "
+                f"manifest commit: {candidate_problem} - manual intervention required",
+                file=sys.stderr,
+            )
+            return 3
     print(
         f"REVIEWED version written: {version_dir / 'rules.yaml'}\n"
         f"  version={version} rules={len(reviewed_book.rules)}\n"
