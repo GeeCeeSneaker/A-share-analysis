@@ -25,7 +25,14 @@ from ashare_state.spike.trading_rule import TradingRuleBook
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_VERSION = "v20260909-h1-compiled"
-DEFAULT_RULES = REPO_ROOT / "configs" / "trading_rules" / "versions" / DEFAULT_VERSION / "rules.yaml"
+DEFAULT_RULES = (
+    REPO_ROOT
+    / "configs"
+    / "trading_rules"
+    / "versions"
+    / DEFAULT_VERSION
+    / "rules.yaml"
+)
 DEFAULT_CONTRACT = (
     REPO_ROOT
     / "configs"
@@ -59,7 +66,8 @@ def validate_h1_candidate(
     book = TradingRuleBook.load(rules_path)
     if book.review_status != "COMPILED":
         raise H1CandidateError(
-            f"candidate must remain COMPILED before independent review; got {book.review_status!r}"
+            "candidate must remain COMPILED before independent review; "
+            f"got {book.review_status!r}"
         )
 
     contract = _load_json(contract_path)
@@ -111,7 +119,12 @@ def validate_h1_candidate(
                 f"got {rule.source_ref!r}"
             )
         refs = rule_sources[rule_id]
-        if not isinstance(refs, list) or not refs or not all(isinstance(x, str) and x for x in refs):
+        valid_refs = (
+            isinstance(refs, list)
+            and bool(refs)
+            and all(isinstance(value, str) and value for value in refs)
+        )
+        if not valid_refs:
             raise H1CandidateError(f"{rule_id}: source list must be non-empty strings")
         referenced_sources.update(refs)
 
@@ -127,8 +140,13 @@ def validate_h1_candidate(
         role = item.get("role")
         kind = item.get("kind")
         locator = item.get("locator")
-        if not all(isinstance(x, str) and x.strip() for x in (url, role, kind, locator)):
-            raise H1CandidateError(f"{source_id}: url/role/kind/locator must be non-empty strings")
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (url, role, kind, locator)
+        ):
+            raise H1CandidateError(
+                f"{source_id}: url/role/kind/locator must be non-empty strings"
+            )
         parsed = urlparse(url)
         if parsed.scheme != "https" or parsed.hostname not in allowed_hosts:
             raise H1CandidateError(
@@ -138,9 +156,13 @@ def validate_h1_candidate(
             raise H1CandidateError(f"{source_id}: unsupported evidence role {role!r}")
         # This is intentionally pre-seal. Fake/non-null raw hashes at this stage
         # are refused so the implementer cannot manufacture review evidence.
-        if item.get("artifact_sha256") is not None or item.get("artifact_size") is not None:
+        if (
+            item.get("artifact_sha256") is not None
+            or item.get("artifact_size") is not None
+        ):
             raise H1CandidateError(
-                f"{source_id}: raw artifact identity belongs to independent review/seal, not COMPILED stage"
+                f"{source_id}: raw artifact identity belongs to independent "
+                "review/seal, not COMPILED stage"
             )
 
     seal_requirements = contract.get("review_seal_requirements")
@@ -154,13 +176,17 @@ def validate_h1_candidate(
         "sealed_bundle_must_preserve_rule_to_source_mapping",
         "independent_reviewer_must_close_transition_boundaries",
     }
-    not_enabled = sorted(key for key in required_true if seal_requirements.get(key) is not True)
+    not_enabled = sorted(
+        key for key in required_true if seal_requirements.get(key) is not True
+    )
     if not_enabled:
         raise H1CandidateError(f"required review/seal controls disabled: {not_enabled}")
 
     active = _load_json(active_manifest_path)
     if active.get("rule_version") == contract.get("candidate_version"):
-        raise H1CandidateError("H1 COMPILED candidate must not be ACTIVE before independent review")
+        raise H1CandidateError(
+            "H1 COMPILED candidate must not be ACTIVE before independent review"
+        )
 
     return {
         "rule_count": len(book.rules),
