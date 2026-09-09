@@ -4,7 +4,8 @@
 
 - PR #33 的独立 Reviewer 已确认方向正确但暂不合并，指出两项阻断：candidate 在 snapshot 后发生落盘变更时仍可能正常成功；新的 `--candidate` 入口缺少 evidence bundle missing、extra、duplicate、wrong-hash、tamper 五类入口级对抗证明。
 - 保留 candidate source bytes 只读一次并以该内存 snapshot 作为 hash、解析和变换唯一来源；新增提交前与提交后的 verification-only 回读，比较原始 bytes、manifest-style hash、受支持时的文件身份和固定路径，任何漂移均 fail closed 或返回 `REVIEW_COMMIT_INCONSISTENT`，不会重绑定 seal。
-- 新增 candidate 入口级的五类 evidence 失败测试，并补充 snapshot 后变更的提交前失败、提交后不一致测试；当前 focused 结果为 `18 passed, 1 skipped`（19 个用例）。
+- 新增 candidate 入口级的五类 evidence 失败测试，并补充 snapshot 后变更的提交前失败、提交后不一致测试，以及旧 parent 在 manifest 提交后的不一致测试；当前 focused 结果为 `19 passed, 1 skipped`（20 个用例）。
+- 补强后的本地全量 `uv run pytest -q` 已运行至 `100%` 无失败；Ruff、format、mypy、`uv pip check` 和 `git diff --check` 亦全部通过。
 - 本轮仍未获取或提交真实 H1 原始 HTML/PDF、未运行真实 H1 seal、未切换 ACTIVE、未启动 Formal Production B1-B7；账号、密码、IP、Token、原始 Provider 输出和专有依赖未写入 GitHub。
 
 下一步：完成最终 head 三平台 CI，交回独立 Reviewer 复核并合并；在合并前继续禁止真实 evidence materialization、H1 seal、ACTIVE 切换和 B1-B7。

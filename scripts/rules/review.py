@@ -766,6 +766,29 @@ def _expected_parent_problem(
     return ""
 
 
+def _verify_parent_snapshot(
+    *,
+    rules_root: Path,
+    expected_dataset_hash: str,
+    expected_dataset_files: tuple[str, ...],
+) -> str:
+    """Verify the old parent bytes after the ACTIVE commit."""
+
+    if len(expected_dataset_files) != 1:
+        return "expected ACTIVE parent no longer has a single dataset file"
+    expected_rel = expected_dataset_files[0].replace("\\", "/")
+    parent_path = rules_root / expected_rel
+    try:
+        parent_path.resolve().relative_to(rules_root.resolve())
+        parent_bytes = parent_path.read_bytes()
+    except (OSError, ValueError) as exc:
+        return f"old ACTIVE parent snapshot verification failed: {exc}"
+    actual_hash = _hash_snapshot([(expected_rel, parent_bytes)])
+    if actual_hash != expected_dataset_hash:
+        return "old ACTIVE parent bytes changed after ACTIVE manifest commit"
+    return ""
+
+
 def _review_workflow_locked(
     *,
     rules_root: Path,
@@ -1174,6 +1197,19 @@ def _review_locked_workflow(
             file=sys.stderr,
         )
         return 3
+    if expected_parent_version:
+        parent_problem = _verify_parent_snapshot(
+            rules_root=rules_root,
+            expected_dataset_hash=expected_parent_dataset_hash,
+            expected_dataset_files=expected_parent_dataset_files,
+        )
+        if parent_problem:
+            print(
+                "REVIEW_COMMIT_INCONSISTENT: old ACTIVE parent changed after "
+                f"manifest commit: {parent_problem} - manual intervention required",
+                file=sys.stderr,
+            )
+            return 3
     if candidate_file is not None:
         assert candidate_snapshot_bytes is not None
         candidate_problem = _verify_candidate_snapshot(

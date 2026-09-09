@@ -75,7 +75,7 @@ candidate version、候选 hash、父 ACTIVE 版本和 reviewer marker 均显式
 11. ACTIVE manifest 写入失败回滚并释放锁；
 12. happy path post-commit bundle gate 为空且候选/旧 parent bytes 不变。
 
-本地 focused 结果：`18 passed, 1 skipped`（19 个用例）；skip 仅表示当前 Windows 环境无法创建测试符号链接，不代表生产路径放宽该检查。
+本地 focused 结果：`19 passed, 1 skipped`（20 个用例）；skip 仅表示当前 Windows 环境无法创建测试符号链接，不代表生产路径放宽该检查。
 
 ## 5. 当前治理边界与下一步
 

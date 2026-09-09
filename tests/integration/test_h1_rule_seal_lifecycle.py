@@ -306,6 +306,32 @@ class TestH1CandidateSealHappyPath:
         assert load_rule_manifest(root).rule_version == REVIEWED_VERSION
         assert (root / "versions" / REVIEWED_VERSION / "rules.yaml").is_file()
 
+    def test_parent_mutation_after_manifest_commit_is_commit_inconsistent(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        root = _make_root(tmp_path)
+        bundle = _make_bundle(tmp_path, root)
+        parent = root / "versions" / PARENT_VERSION / "rules.yaml"
+        original_parent_bytes = parent.read_bytes()
+        module = _load_review_module()
+        original_replace = Path.replace
+
+        def mutate_parent_after_manifest_replace(path: Path, target: Path, *args, **kwargs):
+            result = original_replace(path, target, *args, **kwargs)
+            if path.name.startswith(".rule_manifest.json.tmp-"):
+                parent.write_bytes(original_parent_bytes + b"\n# changed after commit\n")
+            return result
+
+        monkeypatch.setattr(Path, "replace", mutate_parent_after_manifest_replace)
+        assert _run(module, _argv(root, bundle)) == 3
+        monkeypatch.undo()
+        captured = capsys.readouterr()
+
+        assert "REVIEW_COMMIT_INCONSISTENT" in captured.err
+        assert parent.read_bytes() != original_parent_bytes
+        assert load_rule_manifest(root).rule_version == REVIEWED_VERSION
+        assert (root / "versions" / REVIEWED_VERSION / "rules.yaml").is_file()
+
 
 class TestH1CandidateSealPreflight:
     def test_wrong_expected_parent_has_zero_mutation(self, tmp_path, capsys):

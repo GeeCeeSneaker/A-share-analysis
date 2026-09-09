@@ -9,7 +9,8 @@
 
 - candidate source bytes 仍只读取一次；hash、解析、变换和 reviewed output 继续绑定原始内存 snapshot。新增提交前/提交后 verification-only 回读，比较 bytes、candidate hash、固定路径和可用文件身份；回读内容不会参与 seal 重绑定。
 - candidate 在 snapshot 后变更时，提交前清理本次 staging/version/evidence 并保持旧 ACTIVE；若在 manifest commit 后变更，返回 `REVIEW_COMMIT_INCONSISTENT`，不伪装成功。
-- `tests/integration/test_h1_rule_seal_lifecycle.py` 新增 missing、extra、duplicate、wrong-hash、raw tamper 五类 evidence bundle 入口级测试，以及 pre/post-commit candidate mutation 测试；本地结果 `18 passed, 1 skipped`（19 个用例）。
+- `tests/integration/test_h1_rule_seal_lifecycle.py` 新增 missing、extra、duplicate、wrong-hash、raw tamper 五类 evidence bundle 入口级测试，以及 pre/post-commit candidate/old-parent mutation 测试；本地结果 `19 passed, 1 skipped`（20 个用例）。
+- 补强后的本地全量 `uv run pytest -q` 已运行至 `100%` 无失败；Ruff、format、mypy、`uv pip check` 和 `git diff --check` 亦全部通过。
 
 **边界与下一关**
 
