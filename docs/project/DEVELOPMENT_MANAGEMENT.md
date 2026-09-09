@@ -2,7 +2,7 @@
 
 - **Type**：C0 — reviewer-blocking lifecycle hardening
 - **Date**：2026-09-09
-- **Status**：`REVIEW_BLOCKERS_ADDRESSED / LOCAL_FOCUSED_VERIFIED / CI_PENDING / INDEPENDENT_REVIEW_RETRY_PENDING / REAL EVIDENCE NOT MATERIALIZED`
+- **Status**：`REVIEW_BLOCKERS_ADDRESSED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / INDEPENDENT_REVIEW_RETRY_PENDING / REAL EVIDENCE NOT MATERIALIZED`
 - **Scope**：PR #33；独立 Reviewer 暂不合并，要求 candidate immutability verification 和新的 candidate 入口 evidence 对抗覆盖。
 
 **本次修复**
@@ -11,6 +11,7 @@
 - candidate 在 snapshot 后变更时，提交前清理本次 staging/version/evidence 并保持旧 ACTIVE；若在 manifest commit 后变更，返回 `REVIEW_COMMIT_INCONSISTENT`，不伪装成功。
 - `tests/integration/test_h1_rule_seal_lifecycle.py` 新增 missing、extra、duplicate、wrong-hash、raw tamper 五类 evidence bundle 入口级测试，以及 pre/post-commit candidate/old-parent mutation 测试；本地结果 `19 passed, 1 skipped`（20 个用例）。
 - 补强后的本地全量 `uv run pytest -q` 已运行至 `100%` 无失败；Ruff、format、mypy、`uv pip check` 和 `git diff --check` 亦全部通过。
+- 修复提交 `25858a7` 的 GitHub Actions CI run `34323121858` 已完成三平台全量门禁：Windows Python 3.12、Windows Python 3.14、Ubuntu Python 3.14 均为 `success`，无失败步骤。
 
 **边界与下一关**
 
@@ -31,7 +32,7 @@
 - single-writer lock 覆盖 parent/candidate 读取至 ACTIVE commit；父 ACTIVE 的版本、文件列表和 hash 在 staging 前及 publish 前重新核验；新版本和证据先 staging/校验，ACTIVE manifest 最后原子替换，失败清理本次新增物。
 - post-commit 重新加载 ACTIVE 并执行完整 `trading_rule_review_gate(..., require_evidence_bundle=True)`；不一致明确返回 `REVIEW_COMMIT_INCONSISTENT`，不伪装成功。
 - 新增 `tests/integration/test_h1_rule_seal_lifecycle.py`；本地 focused `12 passed, 1 skipped`（13 个用例）。详细实现、CLI、候选 hash 与覆盖清单见 [`TradingRule-H1Seal生命周期P0实现记录_20260909.md`](../design/A-share-analysis_TradingRule-H1Seal生命周期P0实现记录_20260909.md)。
-- PR #33 的 GitHub Actions CI run `34315957568` 已完成三平台全量门禁：Windows Python 3.12、Windows Python 3.14、Ubuntu Python 3.14 均为 `success`，无失败步骤。
+- PR #33 初始生命周期实现提交的 GitHub Actions CI run `34315957568` 已完成三平台全量门禁：Windows Python 3.12、Windows Python 3.14、Ubuntu Python 3.14 均为 `success`，无失败步骤。
 
 **边界与下一关**
 

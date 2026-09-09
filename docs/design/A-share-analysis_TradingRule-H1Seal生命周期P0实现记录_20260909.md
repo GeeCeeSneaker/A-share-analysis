@@ -77,6 +77,8 @@ candidate version、候选 hash、父 ACTIVE 版本和 reviewer marker 均显式
 
 本地 focused 结果：`19 passed, 1 skipped`（20 个用例）；skip 仅表示当前 Windows 环境无法创建测试符号链接，不代表生产路径放宽该检查。
 
+修复提交 `25858a7` 的 GitHub Actions CI run `34323121858` 已通过 Windows Python 3.12、Windows Python 3.14、Ubuntu Python 3.14 三平台全量门禁；当前仍等待独立 Reviewer 复审，不代表已合并或已授权真实 seal。
+
 ## 5. 当前治理边界与下一步
 
 本实现分支仍未获得独立 Reviewer 合并确认，因此：
