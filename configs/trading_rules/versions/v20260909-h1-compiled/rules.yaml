@@ -1,0 +1,219 @@
+# Trading Rule H1 corrected COMPILED candidate.
+#
+# This version is create-only and is NOT ACTIVE. It fixes the known H1
+# institutional-truth gaps discovered before Formal Production. It must not
+# become REVIEWED/ACTIVE until the independent H1 review checkpoint closes.
+#
+# Institutional facts stay in this data layer. The Python resolver remains a
+# fail-closed interpreter of these facts.
+version: "2026-09-09.h1"
+source_version: "SSE/SZSE/BSE first-party H1 evidence contract 2026-09-09"
+source_retrieved_at: "2026-09-09"
+review_status: "COMPILED"
+reviewed_by: ""
+review_note: >
+  Corrected Trading Rule H1 candidate. Every rule points to the colocated
+  evidence_source_contract.json. Raw official artifacts are intentionally not
+  self-approved/sealed by the implementer; independent review must close the
+  source contract and use the governed review path before any REVIEWED/ACTIVE
+  publication.
+rules:
+  # --------------------------------------------------------------- MAIN
+  - rule_id: MAIN_BOARD_NORMAL
+    board: MAIN
+    exchanges: [SH, SZ]
+    code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
+    effective_from: "19961216"
+    effective_to: "20991231"
+    st_state: false
+    listing_age_rule: NONE
+    up_rate: 0.10
+    down_rate: 0.10
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#MAIN_BOARD_NORMAL"
+
+  # ST was not one common 1998-04-01 market-wide switch. The exchange-hosted
+  # historical records identify SSE implementation on 1998-04-22 and the
+  # first SZSE special-treatment stock on 1998-04-28, so the candidate keeps
+  # the two venue boundaries explicit instead of inventing a shared date.
+  - rule_id: MAIN_BOARD_ST_SH
+    board: MAIN
+    exchanges: [SH]
+    code_patterns: ["60xxxx"]
+    effective_from: "19980422"
+    effective_to: "20991231"
+    st_state: true
+    listing_age_rule: NONE
+    up_rate: 0.05
+    down_rate: 0.05
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#MAIN_BOARD_ST_SH"
+
+  - rule_id: MAIN_BOARD_ST_SZ
+    board: MAIN
+    exchanges: [SZ]
+    code_patterns: ["000xxx", "001xxx", "002xxx", "003xxx"]
+    effective_from: "19980428"
+    effective_to: "20991231"
+    st_state: true
+    listing_age_rule: NONE
+    up_rate: 0.05
+    down_rate: 0.05
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#MAIN_BOARD_ST_SZ"
+
+  # Legacy approval-based main-board IPO listing-day regime. The 2023 trading
+  # rules took effect when the first registration-system main-board shares
+  # listed on 2023-04-10, so the legacy window ends on 2023-04-09.
+  - rule_id: MAIN_BOARD_IPO_DAY
+    board: MAIN
+    exchanges: [SH, SZ]
+    code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
+    effective_from: "20140101"
+    effective_to: "20230409"
+    st_state: false
+    listing_age_rule: IPO_DAY_44_36
+    up_rate: 0.44
+    down_rate: 0.36
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#MAIN_BOARD_IPO_DAY"
+
+  - rule_id: MAIN_BOARD_REGISTRATION_FIRST5
+    board: MAIN
+    exchanges: [SH, SZ]
+    code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
+    effective_from: "20230410"
+    effective_to: "20991231"
+    st_state: false
+    listing_age_rule: FIRST_5_DAYS_NO_LIMIT
+    up_rate: 0.0
+    down_rate: 0.0
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#MAIN_BOARD_REGISTRATION_FIRST5"
+
+  # ------------------------------------------------------------ CHINEXT
+  - rule_id: CHINEXT_PRE_REGISTRATION_NORMAL
+    board: CHINEXT
+    exchanges: [SZ]
+    code_patterns: ["30xxxx"]
+    effective_from: "20091030"
+    effective_to: "20200823"
+    st_state: false
+    listing_age_rule: NONE
+    up_rate: 0.10
+    down_rate: 0.10
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#CHINEXT_PRE_REGISTRATION_NORMAL"
+
+  - rule_id: CHINEXT_PRE_REGISTRATION_ST
+    board: CHINEXT
+    exchanges: [SZ]
+    code_patterns: ["30xxxx"]
+    effective_from: "20091030"
+    effective_to: "20200823"
+    st_state: true
+    listing_age_rule: NONE
+    up_rate: 0.05
+    down_rate: 0.05
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#CHINEXT_PRE_REGISTRATION_ST"
+
+  - rule_id: CHINEXT_REGISTRATION
+    board: CHINEXT
+    exchanges: [SZ]
+    code_patterns: ["30xxxx"]
+    effective_from: "20200824"
+    effective_to: "20991231"
+    st_state: null
+    listing_age_rule: NONE
+    up_rate: 0.20
+    down_rate: 0.20
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#CHINEXT_REGISTRATION"
+
+  - rule_id: CHINEXT_REGISTRATION_FIRST5
+    board: CHINEXT
+    exchanges: [SZ]
+    code_patterns: ["30xxxx"]
+    effective_from: "20200824"
+    effective_to: "20991231"
+    st_state: null
+    listing_age_rule: FIRST_5_DAYS_NO_LIMIT
+    up_rate: 0.0
+    down_rate: 0.0
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#CHINEXT_REGISTRATION_FIRST5"
+
+  # --------------------------------------------------------------- STAR
+  - rule_id: STAR_MARKET
+    board: STAR
+    exchanges: [SH]
+    code_patterns: ["688xxx", "689xxx"]
+    effective_from: "20190722"
+    effective_to: "20991231"
+    st_state: null
+    listing_age_rule: NONE
+    up_rate: 0.20
+    down_rate: 0.20
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#STAR_MARKET"
+
+  - rule_id: STAR_MARKET_FIRST5
+    board: STAR
+    exchanges: [SH]
+    code_patterns: ["688xxx", "689xxx"]
+    effective_from: "20190722"
+    effective_to: "20991231"
+    st_state: null
+    listing_age_rule: FIRST_5_DAYS_NO_LIMIT
+    up_rate: 0.0
+    down_rate: 0.0
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#STAR_MARKET_FIRST5"
+
+  # ---------------------------------------------------------------- BSE
+  # BJ institutional truth starts with BSE on 2021-11-15. The prior Selected
+  # Layer is deliberately not back-labelled as exchange=BJ.
+  - rule_id: BSE_LIMIT
+    board: BSE
+    exchanges: [BJ]
+    code_patterns: ["43xxxx", "83xxxx", "87xxxx", "92xxxx"]
+    effective_from: "20211115"
+    effective_to: "20991231"
+    st_state: null
+    listing_age_rule: NONE
+    up_rate: 0.30
+    down_rate: 0.30
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#BSE_LIMIT"
+
+  # The current resolver's legacy IPO_DAY_44_36 discriminator actually means
+  # "listing-day-only candidate"; rates remain data-driven. Reusing it here
+  # is the minimum behavior-preserving change for this candidate: 0/0 means
+  # no limit. The misleading discriminator name is recorded as schema debt and
+  # must not be interpreted as a 44/36 rate assumption.
+  - rule_id: BSE_LISTING_DAY_NO_LIMIT
+    board: BSE
+    exchanges: [BJ]
+    code_patterns: ["43xxxx", "83xxxx", "87xxxx", "92xxxx"]
+    effective_from: "20211115"
+    effective_to: "20991231"
+    st_state: null
+    listing_age_rule: IPO_DAY_44_36
+    up_rate: 0.0
+    down_rate: 0.0
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "evidence_source_contract.json#BSE_LISTING_DAY_NO_LIMIT"
