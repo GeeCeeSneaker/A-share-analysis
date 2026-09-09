@@ -2,7 +2,7 @@
 
 - **Type**：C1 — explicit non-ACTIVE candidate seal lifecycle
 - **Date**：2026-09-09
-- **Status**：`IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / PENDING_INDEPENDENT_REVIEW / REAL EVIDENCE NOT MATERIALIZED`
+- **Status**：`IMPLEMENTED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / PENDING_INDEPENDENT_REVIEW / REAL EVIDENCE NOT MATERIALIZED`
 - **Baseline**：最新 `main@6f2bd1e` 的 `A-share-analysis_TradingRule-H1关闭后Seal生命周期P0整改要求_20260909.md`；PR #32 已合并，旧 ACTIVE 仍为 `v20260824-compiled`。
 
 **本次完成**
@@ -12,6 +12,7 @@
 - single-writer lock 覆盖 parent/candidate 读取至 ACTIVE commit；父 ACTIVE 的版本、文件列表和 hash 在 staging 前及 publish 前重新核验；新版本和证据先 staging/校验，ACTIVE manifest 最后原子替换，失败清理本次新增物。
 - post-commit 重新加载 ACTIVE 并执行完整 `trading_rule_review_gate(..., require_evidence_bundle=True)`；不一致明确返回 `REVIEW_COMMIT_INCONSISTENT`，不伪装成功。
 - 新增 `tests/integration/test_h1_rule_seal_lifecycle.py`；本地 focused `12 passed, 1 skipped`（13 个用例）。详细实现、CLI、候选 hash 与覆盖清单见 [`TradingRule-H1Seal生命周期P0实现记录_20260909.md`](../design/A-share-analysis_TradingRule-H1Seal生命周期P0实现记录_20260909.md)。
+- PR #33 的 GitHub Actions CI run `34315957568` 已完成三平台全量门禁：Windows Python 3.12、Windows Python 3.14、Ubuntu Python 3.14 均为 `success`，无失败步骤。
 
 **边界与下一关**
 
