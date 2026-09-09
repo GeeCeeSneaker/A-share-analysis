@@ -5705,3 +5705,17 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - bundle preparation/runtime validation 现在要求每个 `source_url` 精确命中对应候选 `rule_id` 的 `source_ref` 声明；source URL contract 的 rule-id 集合也做缺失/多余校验。
 - bundle ref 与 raw artifact ref 均必须是 `sha256/<对应 hash>`；新增非内容寻址 bundle/raw 路径回归测试。
 - 当前 main 中 GT-H3B Golden v7 已有的 BSE raw evidence 不跨域复用为 H1 evidence；H1 的 13 条独立官方原文与人工裁决仍是未完成门禁，ACTIVE、REVIEWED seal 和 Formal Production B1-B7 均不推进。
+
+## DM-20260909-TRADING-RULE-H1-003 · H1R PIT 与 exact-coverage 整改
+
+**Type**：C1 — second-review P0 remediation
+**Date**：2026-09-09
+**Status**：IMPLEMENTED / LOCAL TARGETED TESTS GREEN / CI AND INDEPENDENT REVIEW PENDING
+**Evidence**：`configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml`；`src/ashare_state/spike/trading_rule.py`；`src/ashare_state/spike/rule_evidence.py`；PR #32 review `5149191372`。
+
+- 主板 ST 已按 2026-07-06 做 PIT split：历史 `MAIN_BOARD_ST_HISTORICAL` 为 5%，当前 `MAIN_BOARD_ST_CURRENT` 为 10%；SH/SZ 边界和 `20260908` 解析均有回归测试，普通主板同期仍为 10%。
+- `MAIN_BOARD_FIRST5_NO_LIMIT` 改为 `st_state: null`，删除独立 ST FIRST5 候选；解析器按 listing-age regime 进行 ST-specific/ANY 选择，避免 ST 的 NONE 规则遮蔽首五日不限价规则。未决 source-ref marker 现在在 rule data validation 中 fail closed。
+- evidence bundle 的实际 `source_url` 列表必须与每条 rule 的 `source_ref` required URL set 完全相等；缺失、额外、重复均拒绝。新增 subset/pass/duplicate/extra 四类对抗测试，并覆盖 prepare 与 runtime validation。
+- `MAIN_BOARD_NORMAL/FIRST5/ST_CURRENT`、ChiNext 20%/FIRST5、STAR 20%/FIRST5、BSE 30% 的长期有效候选均已补充 2026 第一方 current-effective locator。URL contract 不等于 evidence：原始网页/PDF 尚未留存，且 BSE 当前获取问题仍未解除。
+- 本地定向测试：14 个候选边界测试、20 个 evidence contract 测试全部通过，Ruff 已通过；待推送后等待 current-main 三平台 CI。old compiled、ACTIVE pointer、Golden v7/evidence/receipt 不得改动。
+- 管理门槛：独立 Reviewer 未关闭 `P0-TR-H1-06/07` 前，不生成真实 H1 evidence bundle、不发布 REVIEWED、不切换 ACTIVE、不创建 run_id、不启动 Formal Production B1-B7。

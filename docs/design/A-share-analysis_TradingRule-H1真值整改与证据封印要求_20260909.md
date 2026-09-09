@@ -256,3 +256,40 @@ Trading Rule H1 REVIEWED seal 被独立 Reviewer 接受并合并后：
 4. 独立 Reviewer 接受后，才可推进 ACTIVE，再从最新 main 做 Formal Production preflight 和 B1-B7。
 
 在上述事项完成前，旧 ACTIVE `v20260824-compiled` 继续保持原样，Formal Production 继续保持 NOT STARTED；没有生成 run_id，也没有消耗正式 attempt。当前 main 中已有 GT-H3B Golden v7 的历史 BSE evidence，但该 evidence 域不得替代 H1 的独立 Trading Rule 原文证据。
+
+## 9. H1R 二审整改已落地的实现约束（2026-09-09）
+
+本节记录并落实最新 main 的二审要求（PR #32 review checkpoint `5149191372`）。它不改变“候选不得直接封印”的状态。
+
+### 9.1 主板 ST 的 PIT 分段
+
+候选 `2026-09-09.1` 仍为 13 条，但主板 ST 已改为两个时间片：
+
+- `MAIN_BOARD_ST_HISTORICAL`：`19980401`—`20260705`，5%；
+- `MAIN_BOARD_ST_CURRENT`：自 `20260706` 起，10%。
+
+SH/SZ 在候选中共用相同时间边界；解析依赖规则数据，不使用运行时日期特判。已加入 SH、SZ 的 2026-07-03、2026-07-06、2026-09-08 边界测试，普通主板同期仍必须为 10%。
+
+### 9.2 主板首五日语义收口
+
+删除 `MAIN_BOARD_ST_FIRST5_NO_LIMIT`，将 `MAIN_BOARD_FIRST5_NO_LIMIT` 设为 `st_state: null`。解析器按 `listing_age_rule` 分别选择 ST-specific 与 ANY 规则，使同一条首五日不限价规则同时覆盖 `is_st=false/true`，而第六个交易日仍回到对应的历史 5%或当前 10% ST 规则。
+
+候选 `source_ref` 不再允许 `to be checked`、`TODO`、`TBD` 或“待确认/待核”等未决标记；规则加载校验会 fail closed。
+
+### 9.3 Evidence required URL set 升级为 exact coverage
+
+`RULE_EVIDENCE_BUNDLE.v1` 的 prepare 与 runtime validator 现在都要求：对每个 `rule_id`，bundle 实际 `source_url` 列表与候选 `source_ref` 中的 required URL set 完全相等；缺失、额外或重复 URL 均拒绝，同时保留官方 host、kind/role、路径、SHA-256、字节数和 `sha256/<hash>` 内容寻址校验。
+
+新增反例测试覆盖：两条声明只提交一条、两条全部提交、同一 URL 重复、增加第三条官方 URL。模板已同步到 13 个新 rule_id，并为所有延续至 2026-09 的规则加入当前第一方来源 locator：
+
+- [SSE 2026 年修订交易规则](https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml)；
+- [SSE 2026 风险警示调整公告](https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20260424_10816474.shtml)；
+- [SZSE 2026 年现行交易规则 PDF](https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf)；
+- [SZSE 2026 风险警示业务指南公告](https://www.szse.cn/lawrules/service/member/t20260630_621404.html)；
+- [BSE 现行上市交易规则](https://www.bse.cn/jygl_list/200028217.html)。
+
+这些 URL 只是候选 required source contract；截至本记录，尚未把网页/PDF 原始字节写入 H1 evidence，也没有把搜索结果或摘要当成证据。
+
+### 9.4 当前放行状态
+
+本轮实现只推进到 `H1R IMPLEMENTED / CI PENDING / HUMAN REVIEW REQUIRED`。旧 `v20260824-compiled`、ACTIVE pointer、Golden v7 及其 evidence/receipt 未修改；真实 13 条（按 required URL 集合展开后的全部原文）仍须由项目管理者/独立 Reviewer 实际打开、留存并逐条裁决。Reviewer 未明确关闭本文件的 P0 前，不得生成真实 REVIEWED seal、切换 ACTIVE、创建 run_id 或执行 Formal Production B1-B7。

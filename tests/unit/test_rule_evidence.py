@@ -51,11 +51,17 @@ def _input_manifest(tmp_path: Path, *, url: str = "https://www.sse.com.cn/rules"
     return manifest
 
 
-def _publish_bundle(tmp_path: Path, manifest_path: Path) -> tuple[Path, str, str]:
+def _publish_bundle(
+    tmp_path: Path,
+    manifest_path: Path,
+    *,
+    expected_source_urls_by_rule: dict[str, tuple[str, ...]] | None = None,
+) -> tuple[Path, str, str]:
     prepared = prepare_rule_evidence_bundle(
         manifest_path,
         expected_rule_ids=_rule_ids(),
         expected_dataset_version="2026-08-24.1",
+        expected_source_urls_by_rule=expected_source_urls_by_rule,
     )
     evidence = tmp_path / "evidence"
     evidence.mkdir()
@@ -67,6 +73,31 @@ def _publish_bundle(tmp_path: Path, manifest_path: Path) -> tuple[Path, str, str
     (evidence / bundle_ref).parent.mkdir(parents=True, exist_ok=True)
     (evidence / bundle_ref).write_bytes(prepared.content)
     return evidence, bundle_ref, bundle_hash
+
+
+def _two_url_contract() -> dict[str, tuple[str, ...]]:
+    rule_ids = _rule_ids()
+    contract = dict.fromkeys(rule_ids, ("https://www.sse.com.cn/rules",))
+    contract[rule_ids[0]] = (
+        "https://www.sse.com.cn/rules",
+        "https://www.szse.cn/rules",
+    )
+    return contract
+
+
+def _append_first_source(manifest: Path, tmp_path: Path, *, url: str, name: str) -> None:
+    artifact = tmp_path / name
+    artifact.write_bytes(f"additional fixture bytes for {url}".encode())
+    document = json.loads(manifest.read_text(encoding="utf-8"))
+    document["entries"][0]["sources"].append(
+        {
+            "artifact_kind": "EXCHANGE_RULEBOOK",
+            "artifact_path": artifact.name,
+            "role": "RULE",
+            "source_url": url,
+        }
+    )
+    manifest.write_text(json.dumps(document), encoding="utf-8")
 
 
 def test_prepare_and_validate_bundle_is_deterministic(tmp_path: Path):
@@ -135,6 +166,107 @@ def test_input_manifest_rejects_source_url_not_declared_by_rule(tmp_path: Path):
         assert "is not declared by rule_id" in str(exc)
     else:
         raise AssertionError("undeclared official source URL was accepted")
+
+
+def test_input_manifest_rejects_source_url_subset(tmp_path: Path):
+    manifest = _input_manifest(tmp_path)
+    try:
+        prepare_rule_evidence_bundle(
+            manifest,
+            expected_rule_ids=_rule_ids(),
+            expected_dataset_version="2026-08-24.1",
+            expected_source_urls_by_rule=_two_url_contract(),
+        )
+    except ValueError as exc:
+        assert "missing required URL" in str(exc)
+    else:
+        raise AssertionError("a source URL subset was accepted")
+
+
+def test_input_manifest_accepts_exact_source_url_coverage(tmp_path: Path):
+    manifest = _input_manifest(tmp_path)
+    _append_first_source(
+        manifest,
+        tmp_path,
+        url="https://www.szse.cn/rules",
+        name="source-second.html",
+    )
+    contract = _two_url_contract()
+    evidence, bundle_ref, bundle_hash = _publish_bundle(
+        tmp_path,
+        manifest,
+        expected_source_urls_by_rule=contract,
+    )
+    assert (
+        validate_rule_evidence_bundle(
+            bundle_ref=bundle_ref,
+            bundle_hash=bundle_hash,
+            expected_rule_ids=_rule_ids(),
+            expected_dataset_version="2026-08-24.1",
+            rules_root=tmp_path,
+            expected_source_urls_by_rule=contract,
+        )
+        == []
+    )
+    entries = json.loads((evidence / bundle_ref).read_text(encoding="utf-8"))["entries"]
+    first_rule = next(entry for entry in entries if entry["rule_id"] == _rule_ids()[0])
+    assert len(first_rule["sources"]) == 2
+
+
+def test_bundle_validation_rejects_source_url_subset(tmp_path: Path):
+    manifest = _input_manifest(tmp_path)
+    evidence, bundle_ref, bundle_hash = _publish_bundle(tmp_path, manifest)
+    problems = validate_rule_evidence_bundle(
+        bundle_ref=bundle_ref,
+        bundle_hash=bundle_hash,
+        expected_rule_ids=_rule_ids(),
+        expected_dataset_version="2026-08-24.1",
+        rules_root=tmp_path,
+        expected_source_urls_by_rule=_two_url_contract(),
+    )
+    assert any("missing required URL" in problem for problem in problems)
+
+
+def test_bundle_validation_rejects_duplicate_source_url(tmp_path: Path):
+    manifest = _input_manifest(tmp_path)
+    _append_first_source(
+        manifest,
+        tmp_path,
+        url="https://www.sse.com.cn/rules",
+        name="source-duplicate.html",
+    )
+    evidence, bundle_ref, bundle_hash = _publish_bundle(tmp_path, manifest)
+    contract = dict.fromkeys(_rule_ids(), ("https://www.sse.com.cn/rules",))
+    problems = validate_rule_evidence_bundle(
+        bundle_ref=bundle_ref,
+        bundle_hash=bundle_hash,
+        expected_rule_ids=_rule_ids(),
+        expected_dataset_version="2026-08-24.1",
+        rules_root=tmp_path,
+        expected_source_urls_by_rule=contract,
+    )
+    assert any("duplicate URL" in problem for problem in problems)
+
+
+def test_bundle_validation_rejects_extra_source_url(tmp_path: Path):
+    manifest = _input_manifest(tmp_path)
+    _append_first_source(
+        manifest,
+        tmp_path,
+        url="https://www.szse.cn/rules",
+        name="source-extra.html",
+    )
+    evidence, bundle_ref, bundle_hash = _publish_bundle(tmp_path, manifest)
+    contract = dict.fromkeys(_rule_ids(), ("https://www.sse.com.cn/rules",))
+    problems = validate_rule_evidence_bundle(
+        bundle_ref=bundle_ref,
+        bundle_hash=bundle_hash,
+        expected_rule_ids=_rule_ids(),
+        expected_dataset_version="2026-08-24.1",
+        rules_root=tmp_path,
+        expected_source_urls_by_rule=contract,
+    )
+    assert any("extra URL" in problem for problem in problems)
 
 
 def test_bundle_validation_rejects_missing_and_extra_rule_ids(tmp_path: Path):

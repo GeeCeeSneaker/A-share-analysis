@@ -16,11 +16,23 @@
           "source_url": "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
           "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_normal_sse_current_2026.html",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_normal_szse_current_2026.pdf",
+          "source_url": "https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
         }
       ]
     },
     {
-      "rule_id": "MAIN_BOARD_ST",
+      "rule_id": "MAIN_BOARD_ST_HISTORICAL",
       "sources": [
         {
           "artifact_path": "sources/main_board_st_sse.html",
@@ -33,6 +45,35 @@
           "source_url": "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
           "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
+        }
+      ]
+    },
+    {
+      "rule_id": "MAIN_BOARD_ST_CURRENT",
+      "sources": [
+        {
+          "artifact_path": "sources/main_board_st_sse_current_2026.html",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_st_sse_notice_2026.html",
+          "source_url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20260424_10816474.shtml",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "TRANSITION"
+        },
+        {
+          "artifact_path": "sources/main_board_st_szse_current_2026.pdf",
+          "source_url": "https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_st_szse_guide_2026.html",
+          "source_url": "https://www.szse.cn/lawrules/service/member/t20260630_621404.html",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "TRANSITION"
         }
       ]
     },
@@ -79,22 +120,17 @@
           "source_url": "https://www.szse.cn/aboutus/trends/news/t20230404_599697.html",
           "artifact_kind": "EXCHANGE_NOTICE",
           "role": "APPLICABILITY"
-        }
-      ]
-    },
-    {
-      "rule_id": "MAIN_BOARD_ST_FIRST5_NO_LIMIT",
-      "sources": [
+        },
         {
-          "artifact_path": "sources/main_board_st_first5_sse.html",
-          "source_url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230201_5715605.shtml",
-          "artifact_kind": "EXCHANGE_NOTICE",
+          "artifact_path": "sources/main_board_first5_sse_current_2026.html",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
         },
         {
-          "artifact_path": "sources/main_board_st_first5_szse_qna.html",
-          "source_url": "https://investor.szse.cn/knowledge/qa/t20230306_599093.html",
-          "artifact_kind": "EXCHANGE_NOTICE",
+          "artifact_path": "sources/main_board_first5_szse_current_2026.pdf",
+          "source_url": "https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
         }
       ]
@@ -135,6 +171,12 @@
           "source_url": "https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
           "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/chinext_registration_szse_current_2026.pdf",
+          "source_url": "https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
         }
       ]
     },
@@ -144,6 +186,12 @@
         {
           "artifact_path": "sources/chinext_registration_first5_szse.html",
           "source_url": "https://www.szse.cn/disclosure/notice/general/t20200612_578381.html",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/chinext_registration_first5_szse_current_2026.pdf",
+          "source_url": "https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf",
           "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
         }
@@ -157,6 +205,12 @@
           "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
           "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/star_market_current_2026.html",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
         }
       ]
     },
@@ -166,6 +220,12 @@
         {
           "artifact_path": "sources/star_market_rules.pdf",
           "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/star_market_first5_current_2026.html",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml",
           "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
         }
@@ -185,6 +245,12 @@
           "source_url": "https://www.bse.cn/cxjg_list/200010908.html",
           "artifact_kind": "EXCHANGE_NOTICE",
           "role": "TRANSITION"
+        },
+        {
+          "artifact_path": "sources/bse_trading_rules_current_2026.html",
+          "source_url": "https://www.bse.cn/jygl_list/200028217.html",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "role": "RULE"
         }
       ]
     },

@@ -24,6 +24,14 @@ def test_candidate_is_compiled_and_not_active(h1_book: TradingRuleBook):
     assert len(h1_book.rules) == 13
 
 
+def test_candidate_source_refs_have_no_unresolved_review_markers(h1_book: TradingRuleBook):
+    markers = ("to be checked", "todo", "tbd", "待确认", "待核")
+    assert all(
+        not any(marker in rule.source_ref.casefold() for marker in markers)
+        for rule in h1_book.rules
+    )
+
+
 def test_main_board_registration_first_five_and_day_six(h1_book: TradingRuleBook):
     calendar = [20230410, 20230411, 20230412, 20230413, 20230414, 20230417]
     day_one = h1_book.resolve(
@@ -53,9 +61,17 @@ def test_main_board_registration_first_five_and_day_six(h1_book: TradingRuleBook
     assert day_six.up_rate == Decimal("0.10")
 
 
-def test_main_board_st_first_five_does_not_select_five_percent(h1_book: TradingRuleBook):
+def test_main_board_first_five_is_st_state_agnostic(h1_book: TradingRuleBook):
     calendar = [20230410, 20230411, 20230412, 20230413, 20230414, 20230417]
-    first = h1_book.resolve(
+    first_normal = h1_book.resolve(
+        exchange="SZ",
+        code="000001.SZ",
+        trade_date="20230410",
+        is_st=False,
+        listing_date="20230410",
+        calendar=calendar,
+    )
+    first_st = h1_book.resolve(
         exchange="SZ",
         code="000001.SZ",
         trade_date="20230410",
@@ -71,10 +87,59 @@ def test_main_board_st_first_five_does_not_select_five_percent(h1_book: TradingR
         listing_date="20230410",
         calendar=calendar,
     )
-    assert first.rule_id == "MAIN_BOARD_ST_FIRST5_NO_LIMIT"
-    assert first.is_no_limit
-    assert sixth.rule_id == "MAIN_BOARD_ST"
+    assert first_normal.rule_id == first_st.rule_id == "MAIN_BOARD_FIRST5_NO_LIMIT"
+    assert first_normal.is_no_limit and first_st.is_no_limit
+    assert sixth.rule_id == "MAIN_BOARD_ST_HISTORICAL"
     assert sixth.up_rate == Decimal("0.05")
+
+
+@pytest.mark.parametrize(
+    ("exchange", "code"),
+    [("SH", "600001.SH"), ("SZ", "000001.SZ")],
+)
+def test_main_board_st_pit_transition_for_both_venues(
+    h1_book: TradingRuleBook, exchange: str, code: str
+):
+    historical = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date="20260703",
+        is_st=True,
+    )
+    current = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date="20260706",
+        is_st=True,
+    )
+    as_of = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date="20260908",
+        is_st=True,
+    )
+    assert historical.rule_id == "MAIN_BOARD_ST_HISTORICAL"
+    assert historical.up_rate == Decimal("0.05")
+    assert current.rule_id == as_of.rule_id == "MAIN_BOARD_ST_CURRENT"
+    assert current.up_rate == as_of.up_rate == Decimal("0.10")
+
+
+@pytest.mark.parametrize("trade_date", ["20260703", "20260706", "20260908"])
+@pytest.mark.parametrize(
+    ("exchange", "code"),
+    [("SH", "600001.SH"), ("SZ", "000001.SZ")],
+)
+def test_main_board_normal_remains_ten_percent_at_st_transition(
+    h1_book: TradingRuleBook, trade_date: str, exchange: str, code: str
+):
+    rule = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date=trade_date,
+        is_st=False,
+    )
+    assert rule.rule_id == "MAIN_BOARD_NORMAL"
+    assert rule.up_rate == Decimal("0.10")
 
 
 def test_old_main_board_ipo_regime_ends_before_registration_first_listing(

@@ -126,6 +126,42 @@ def _source_url_contract_shape_problems(
     return problems
 
 
+def _source_url_coverage_problems(
+    rule_id: str,
+    supplied_source_urls: Sequence[str],
+    expected_source_urls_by_rule: Mapping[str, Sequence[str]] | None,
+) -> list[str]:
+    """Require the bundle URL list to exactly cover one rule's contract.
+
+    Membership checks alone allow a multi-source rule to submit only one of
+    its declared sources. The required set is intentionally derived from
+    ``source_ref`` by the caller; this helper only enforces exact coverage:
+    no missing, extra, or repeated URL.
+    """
+
+    if expected_source_urls_by_rule is None:
+        return []
+    declared = expected_source_urls_by_rule.get(rule_id)
+    if declared is None:
+        return []
+    declared_values = (declared,) if isinstance(declared, str) else declared
+    required = tuple(dict.fromkeys(str(value) for value in declared_values))
+    supplied = tuple(str(value) for value in supplied_source_urls)
+    required_set = set(required)
+    supplied_set = set(supplied)
+    problems: list[str] = []
+    missing = sorted(required_set - supplied_set)
+    extra = sorted(supplied_set - required_set)
+    duplicates = sorted({url for url in supplied if supplied.count(url) > 1})
+    if missing:
+        problems.append(f"{rule_id} source URL coverage missing required URL(s): {missing}")
+    if extra:
+        problems.append(f"{rule_id} source URL coverage has extra URL(s): {extra}")
+    if duplicates:
+        problems.append(f"{rule_id} source URL coverage has duplicate URL(s): {duplicates}")
+    return problems
+
+
 def _safe_relative_ref(ref: object) -> tuple[bool, str]:
     """Validate a relative evidence-root path without filesystem access."""
 
@@ -253,9 +289,13 @@ def prepare_rule_evidence_bundle(
         sources = entry.get("sources")
         if not isinstance(sources, list) or not sources:
             problems.append(f"{rule_id}.sources must be a non-empty list")
+            problems.extend(
+                _source_url_coverage_problems(rule_id, (), expected_source_urls_by_rule)
+            )
             continue
         canonical_sources: list[dict[str, object]] = []
         source_refs: set[str] = set()
+        supplied_source_urls: list[str] = []
         for source_index, source in enumerate(sources):
             if not isinstance(source, Mapping):
                 problems.append(f"{rule_id}.sources[{source_index}] must be an object")
@@ -263,6 +303,7 @@ def prepare_rule_evidence_bundle(
             kind = str(source.get("artifact_kind", "") or "")
             role = str(source.get("role", "") or "")
             source_url = str(source.get("source_url", "") or "")
+            supplied_source_urls.append(source_url)
             artifact_path_raw = str(source.get("artifact_path", "") or "")
             if kind not in RULE_EVIDENCE_ARTIFACT_KINDS:
                 problems.append(
@@ -314,6 +355,11 @@ def prepare_rule_evidence_bundle(
                     "source_url": source_url,
                 }
             )
+        problems.extend(
+            _source_url_coverage_problems(
+                rule_id, supplied_source_urls, expected_source_urls_by_rule
+            )
+        )
         canonical_entries.append(
             {
                 "rule_id": rule_id,
@@ -410,8 +456,12 @@ def validate_rule_evidence_bundle(
         sources = entry.get("sources")
         if not isinstance(sources, list) or not sources:
             problems.append(f"{rule_id}.sources must be a non-empty list")
+            problems.extend(
+                _source_url_coverage_problems(rule_id, (), expected_source_urls_by_rule)
+            )
             continue
         seen_refs: set[str] = set()
+        supplied_source_urls: list[str] = []
         for source_index, source in enumerate(sources):
             prefix = f"{rule_id}.sources[{source_index}]"
             if not isinstance(source, Mapping):
@@ -419,6 +469,7 @@ def validate_rule_evidence_bundle(
             kind = str(source.get("artifact_kind", "") or "")
             role = str(source.get("role", "") or "")
             source_url = str(source.get("source_url", "") or "")
+            supplied_source_urls.append(source_url)
             ref = str(source.get("artifact_ref", "") or "")
             declared_hash = str(source.get("sha256", "") or "")
             declared_size = source.get("byte_size")
@@ -468,6 +519,11 @@ def validate_rule_evidence_bundle(
                 problems.append(
                     f"{prefix}.sha256 mismatch: declared {declared_hash}, actual {actual_hash}"
                 )
+        problems.extend(
+            _source_url_coverage_problems(
+                rule_id, supplied_source_urls, expected_source_urls_by_rule
+            )
+        )
     return problems
 
 

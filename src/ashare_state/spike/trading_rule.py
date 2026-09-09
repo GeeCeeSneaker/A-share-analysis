@@ -45,6 +45,14 @@ _LISTING_AGE_RULES = (
 )
 _ROUNDING_MODES = ("ROUND_HALF_UP",)
 
+_UNRESOLVED_SOURCE_MARKERS = (
+    "to be checked",
+    "todo",
+    "tbd",
+    "待确认",
+    "待核",
+)
+
 #: default rule data location (repo-relative; override for tests)
 _DEFAULT_RULES_DIR = Path("configs/trading_rules")
 
@@ -391,6 +399,13 @@ class TradingRuleBook:
                 )
             if rule.rounding_mode not in _ROUNDING_MODES:
                 problems.append(f"{rule.rule_id}: unknown rounding_mode {rule.rounding_mode!r}")
+            source_ref_lower = rule.source_ref.casefold()
+            for marker in _UNRESOLVED_SOURCE_MARKERS:
+                if marker in source_ref_lower:
+                    problems.append(
+                        f"{rule.rule_id}: source_ref contains unresolved review marker {marker!r}"
+                    )
+                    break
         if not self.rules:
             problems.append("no rules loaded")
         return problems
@@ -508,7 +523,19 @@ class TradingRuleBook:
             raise RuleUnresolvedError(msg)
         st_specific = [r for r in candidates if r.st_state is not None and r.st_state == is_st]
         st_any = [r for r in candidates if r.st_state is None]
-        selected = st_specific or st_any
+        # ST specificity is resolved independently for each listing-age
+        # regime. A state-agnostic FIRST_5 rule must coexist with a
+        # state-specific NONE rule (for example, main-board ST 5%/10%)
+        # instead of causing the latter to hide the former.
+        age_rule_order: list[str] = []
+        for rule in candidates:
+            if rule.listing_age_rule not in age_rule_order:
+                age_rule_order.append(rule.listing_age_rule)
+        selected: list[TradingRuleRow] = []
+        for age_rule in age_rule_order:
+            specific_for_age = [r for r in st_specific if r.listing_age_rule == age_rule]
+            any_for_age = [r for r in st_any if r.listing_age_rule == age_rule]
+            selected.extend(specific_for_age or any_for_age)
         if not selected:
             msg = (
                 f"RULE_UNRESOLVED: is_st={is_st} has no applicable rule for {exch} {bare} on {day}"

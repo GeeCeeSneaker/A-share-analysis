@@ -2,7 +2,7 @@
 # It incorporates the H1 truth-gap corrections documented in
 # docs/design/A-share-analysis_TradingRule-H1真值整改与证据封印要求_20260909.md.
 version: "2026-09-09.1"
-source_version: "SSE/SZSE/BSE public trading rules, H1 candidate 2026-09"
+source_version: "SSE/SZSE/BSE public trading rules, H1R candidate with 2026-07-06 current-effective split"
 source_retrieved_at: "2026-09-09"
 review_status: "COMPILED"
 evidence_contract: "RULE_EVIDENCE_BUNDLE.v1"
@@ -25,21 +25,35 @@ rules:
     down_rate: 0.10
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SSE main-board trading rules (10% clause): https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | SZSE historical trading rules: https://www.szse.cn/disclosure/notice/general/t20060515_499577.html"
+    source_ref: "SSE historical main-board trading rules (10% clause): https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | SZSE historical trading rules: https://www.szse.cn/disclosure/notice/general/t20060515_499577.html | SSE current trading rules (effective 2026-07-06): https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml | SZSE current trading rules (effective 2026-07-06): https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf"
 
-  - rule_id: MAIN_BOARD_ST
+  - rule_id: MAIN_BOARD_ST_HISTORICAL
     board: MAIN
     exchanges: [SH, SZ]
     code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
     effective_from: "19980401"
-    effective_to: "20991231"
+    effective_to: "20260705"
     st_state: true
     listing_age_rule: NONE
     up_rate: 0.05
     down_rate: 0.05
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SSE risk-warning board trading measures (5% clause): https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml | SZSE historical trading rules: https://www.szse.cn/disclosure/notice/general/t20060515_499577.html"
+    source_ref: "SSE historical risk-warning board trading measures (5% clause): https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml | SZSE historical trading rules: https://www.szse.cn/disclosure/notice/general/t20060515_499577.html"
+
+  - rule_id: MAIN_BOARD_ST_CURRENT
+    board: MAIN
+    exchanges: [SH, SZ]
+    code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
+    effective_from: "20260706"
+    effective_to: "20991231"
+    st_state: true
+    listing_age_rule: NONE
+    up_rate: 0.10
+    down_rate: 0.10
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SSE current trading rules (risk-warning limit effective 2026-07-06): https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml | SSE 2026 risk-warning limit adjustment notice: https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20260424_10816474.shtml | SZSE current trading rules (effective 2026-07-06): https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf | SZSE 2026 risk-warning business guide notice: https://www.szse.cn/lawrules/service/member/t20260630_621404.html"
 
   - rule_id: MAIN_BOARD_IPO_DAY
     board: MAIN
@@ -67,21 +81,8 @@ rules:
     down_rate: 0.0
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SSE main-board first-five-session no-limit notice: https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230201_5715605.shtml | SZSE main-board IPO Q&A: https://investor.szse.cn/knowledge/qa/t20230306_599093.html | first implementation: https://www.szse.cn/aboutus/trends/news/t20230404_599697.html"
-
-  - rule_id: MAIN_BOARD_ST_FIRST5_NO_LIMIT
-    board: MAIN
-    exchanges: [SH, SZ]
-    code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
-    effective_from: "20230410"
-    effective_to: "20991231"
-    st_state: true
-    listing_age_rule: FIRST_5_DAYS_NO_LIMIT
-    up_rate: 0.0
-    down_rate: 0.0
-    tick_size: "0.01"
-    rounding_mode: ROUND_HALF_UP
-    source_ref: "SSE main-board first-five-session no-limit notice (including risk-warning applicability to be checked): https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230201_5715605.shtml | SZSE main-board IPO Q&A: https://investor.szse.cn/knowledge/qa/t20230306_599093.html"
+    st_state: null
+    source_ref: "SSE main-board first-five-session no-limit notice: https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230201_5715605.shtml | SZSE main-board IPO Q&A: https://investor.szse.cn/knowledge/qa/t20230306_599093.html | first implementation: https://www.szse.cn/aboutus/trends/news/t20230404_599697.html | SSE current trading rules (effective 2026-07-06): https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml | SZSE current trading rules (effective 2026-07-06): https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf"
 
   # ------------------------------------------------------------ CHINEXT
   - rule_id: CHINEXT_PRE_REGISTRATION_NORMAL
@@ -124,7 +125,7 @@ rules:
     down_rate: 0.20
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SZSE ChiNext Trading Special Provisions (20% clause, effective 2020-08-24): https://www.szse.cn/disclosure/notice/general/t20200612_578381.html"
+    source_ref: "SZSE ChiNext Trading Special Provisions (20% clause, effective 2020-08-24): https://www.szse.cn/disclosure/notice/general/t20200612_578381.html | SZSE current trading rules (effective 2026-07-06): https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf"
 
   - rule_id: CHINEXT_REGISTRATION_FIRST5
     board: CHINEXT
@@ -138,7 +139,7 @@ rules:
     down_rate: 0.0
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SZSE ChiNext Trading Special Provisions (first five sessions without price limits): https://www.szse.cn/disclosure/notice/general/t20200612_578381.html"
+    source_ref: "SZSE ChiNext Trading Special Provisions (first five sessions without price limits): https://www.szse.cn/disclosure/notice/general/t20200612_578381.html | SZSE current trading rules (effective 2026-07-06): https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf"
 
   # ---------------------------------------------------------------- STAR
   - rule_id: STAR_MARKET
@@ -153,7 +154,7 @@ rules:
     down_rate: 0.20
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SSE STAR Market Trading Special Provisions (20% clause): https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf"
+    source_ref: "SSE STAR Market Trading Special Provisions (20% clause): https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf | SSE current trading rules (effective 2026-07-06): https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml"
 
   - rule_id: STAR_MARKET_FIRST5
     board: STAR
@@ -167,7 +168,7 @@ rules:
     down_rate: 0.0
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SSE STAR Market Trading Special Provisions (first five sessions without price limits): https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf"
+    source_ref: "SSE STAR Market Trading Special Provisions (first five sessions without price limits): https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10785118/files/8c544552dc7e4c83a863440179f0b9de.pdf | SSE current trading rules (effective 2026-07-06): https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml"
 
   # ------------------------------------------------------------------ BSE
   - rule_id: BSE_LIMIT
@@ -182,7 +183,7 @@ rules:
     down_rate: 0.30
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "BSE Trading Rules (effective 2021-11-15, 30% clause): https://www.bse.cn/jygl_list/200010919.html | BSE listing-rule effective-date notice: https://www.bse.cn/cxjg_list/200010908.html"
+    source_ref: "BSE Trading Rules (effective 2021-11-15, 30% clause): https://www.bse.cn/jygl_list/200010919.html | BSE listing-rule effective-date notice: https://www.bse.cn/cxjg_list/200010908.html | BSE current trading rules (effective 2026-07-06): https://www.bse.cn/jygl_list/200028217.html"
 
   - rule_id: BSE_IPO_DAY_NO_LIMIT
     board: BSE
