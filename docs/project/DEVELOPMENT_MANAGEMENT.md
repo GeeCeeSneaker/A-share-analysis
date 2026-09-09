@@ -30,7 +30,7 @@
 
 **Type**：C1 — evidence provenance correction and formal-entry governance
 **Date**：2026-09-09
-**Status**：IMPLEMENTED / LOCAL FULL TEST GREEN / CI VALIDATION PENDING / HUMAN REVIEW PENDING / FORMAL ENTRY PROHIBITED
+**Status**：IMPLEMENTED / LOCAL FULL TEST GREEN / CI GREEN / HUMAN REVIEW PENDING / FORMAL ENTRY PROHIBITED
 **Evidence**：PR #35；`docs/provider_verification/trading_rule_h1_evidence_input.json`；`docs/provider_verification/trading_rule_h1_source_catalog.json`；`docs/provider_verification/trading_rule_h1_evidence_intake_20260909.md`。
 
 - 外部独立审阅指出：BSE 的 `browser_resolved_dom` 不是原始下载字节；现已删除 3 份 DOM，改存 BSE 官方发布页链接的 3 份原始 DOCX，附件响应均为 HTTP 200，catalog 保存发布页 URL、附件 URL、状态、大小与 SHA-256。
@@ -39,6 +39,7 @@
 - 当前候选因 source contract 修正重算为 manifest-style SHA-256 `8645d39aa73322ba2a25cae3f852b58a34b862f8702ebd09422257e96fc554a1`；input bundle 为 21 个 raw artifact、2,697,916 bytes、16,280 bytes、SHA-256 `e57906370cc941ca3527ad6af1510cec73542bc4466835dd36e8eea869ebda00`。这些只是未封印的 candidate/intake 校验值。
 - 本地 `uv run pytest -q` 在移除一次性来源抓取用 Playwright 包后退出码为 0，完成 100% 回归；CI 仍需以本次提交的新 head 结果为准。
 - Issue #34 明确要求 H1 阶段不得启动、重试或消耗 Formal Production B1-B7。此前一次误调用在 `SpikeRun` 创建前因 ACTIVE 为 `COMPILED` fail closed，未创建 run、未消耗 attempt；该调用仍是不合规的程序性偏差，必须保留记录且不得重复。
+- GitHub Actions CI run `34339703418` / #501 已完成三平台全量门禁并全部为 `success`；受控 Formal workflow 为 `skipped`，符合当前禁止状态。
 - 当前仍禁止人工结果代填、H1 seal、REVIEWED/ACTIVE 切换和任何 Formal Production 入口；必须先完成 14/14 原文条款与边界审阅、独立 Reviewer closure，并在审阅合并后从最新 clean main 重新执行下游流程。
 
 
