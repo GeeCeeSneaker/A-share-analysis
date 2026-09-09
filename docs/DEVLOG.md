@@ -1,3 +1,17 @@
+## 2026-09-09 · H1 证据接收与 Formal Production 前置拒绝
+
+> 状态：**H1 EVIDENCE INTAKE PREPARED / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ATTEMPT NOT CONSUMED**
+
+- PR #33 已由独立 Reviewer 通过并合并，当前 clean current-main 为 `a797f1186209e7548167e2fa652ce78715f24180`；本次新建 detached checkout，`git status --porcelain` 为空。
+- 本次在线预检重新确认 SDK/runtime、网络、认证、查询就绪和脱敏身份 `UNKNOWN_24e2ff401792`；SH 交易日历实际解析的最近完整交易日为 `20260908`。
+- 按唯一入口尝试 `uv run python scripts/spike/spike_runner.py --production --date 20260908`，在 `SpikeRun` 创建前因 ACTIVE `v20260824-compiled` 仍为 `COMPILED` fail closed；无 run ID、无 B1-B7 结果、无 verdict、未消耗正式 attempt。
+- 已获取 H1 候选声明的 19 个唯一来源：16 个直接 HTTP 200 原始 HTML/PDF，3 个 BSE 页面直连为 302/WAF 后使用隔离 Chrome 得到浏览器解析 DOM；后 3 个已明确标注，待 Reviewer 确认是否满足原文/原始字节要求。
+- `trading_rule_h1_evidence_input.json` 已按 14 个 rule_id 生成并通过纯 prepare 校验：bundle SHA256 `a63b652ab08dda4cc12bd20716131ed3eff3b6f7845ddb6b1fa3af3462c33aa`，19 个去重 raw artifacts，合计 3,232,349 bytes。未执行 seal，未写入 REVIEWED 或 ACTIVE。
+- 账号、密码、真实 endpoint、Token、Cookie、raw profile、原始 SDK 输出和专有 wheel 均未进入 GitHub。
+
+下一步：项目管理者/独立 Reviewer 按 `TradingRule_H1_人工审阅操作表_20260909.md` 实际打开 14 条所需原文并填写结果；只有 14/14 APPROVE、独立关闭边界/来源/不可变性审阅后，才可运行 H1 candidate seal，随后再从最新 main 重做 Formal B1-B7。
+
+
 ## 2026-09-09 · H1 Seal 生命周期独立审阅阻断项修复
 
 > 状态：**REVIEW_BLOCKERS_ADDRESSED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / INDEPENDENT_REVIEW_RETRY_PENDING / REAL EVIDENCE NOT MATERIALIZED**

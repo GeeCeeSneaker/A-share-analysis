@@ -289,7 +289,7 @@ Trading Rule H1 REVIEWED seal 被独立 Reviewer 接受并合并后：
 - [SZSE 2026 风险警示业务指南公告](https://www.szse.cn/lawrules/service/member/t20260630_621404.html)；
 - [BSE 现行上市交易规则](https://www.bse.cn/jygl_list/200028217.html)。
 
-这些 URL 只是候选 required source contract；截至本记录，尚未把网页/PDF 原始字节写入 H1 evidence，也没有把搜索结果或摘要当成证据。
+这些 URL 只是候选 required source contract；当前已把来源原始字节/浏览器归档作为**待审阅 intake**保存在 `docs/provider_verification/trading_rule_h1_sources/`，并生成输入 bundle。它们尚未写入发布态 `configs/trading_rules/evidence/`，也没有把搜索结果或摘要当成证据。
 
 ### 9.4 当前放行状态
 

@@ -93,8 +93,8 @@ uv run python scripts/rules/review.py \
 
 ## 七、原文获取状态与堵点
 
-2026-09-09 在当前本地环境做了只读连通性检查：列出的 SSE、SZSE 页面和科创板 PDF 返回 HTTP 200；BSE 页面及 BSE PDF 在该环境返回 HTTP 403，部分请求还出现重定向循环。403 响应不是官方原文，不能作为证据包成员，也不能据此判定规则事实。
+2026-09-09 在当前本地环境完成了来源接收：SSE、SZSE 页面和 PDF 直接请求返回 HTTP 200；BSE 三个必需页面的直接请求返回自指向 302/WAF challenge，不能把 challenge 响应当作证据。随后使用隔离 Chrome profile 完成页面 challenge，保存了三个浏览器解析后的官方页面 DOM，并在 [`trading_rule_h1_source_catalog.json`](../provider_verification/trading_rule_h1_source_catalog.json) 中标明 `browser_resolved_dom`、原始直连状态、字节数和 SHA-256。
 
-因此，BSE 两条规则的原文需要项目管理者或独立 Reviewer 用真实浏览器完成反爬挑战后保存，或直接提供从 BSE 官方页面下载的原始 PDF/HTML。保存后仍需用文件原始字节生成 SHA-256，不能把截图、搜索摘要或手工摘录当作 raw artifact。其余来源即使能抓取，也必须由 Reviewer 实际打开并确认条款后，才算 `APPROVE`。
+BSE 三份浏览器归档仍需项目管理者或独立 Reviewer 实际打开并确认是否满足“官方原文/原始字节”要求；如果不接受，需提供从 BSE 官方页面下载的原始 HTML/PDF/DOCX 并替换文件后重算 SHA-256。任何情况下都不能用截图、搜索摘要或手工摘录替代 raw artifact。其余来源也必须由 Reviewer 实际打开并确认条款后，才算 `APPROVE`。
 
 补充边界：当前 main 已有 GT-H3B Golden v7 的历史 BSE evidence，但它属于 Golden 证据域；按本表第三节的项目约束，不能直接充当 Trading Rule H1 evidence。它的存在不等于 H1 两条 BSE 规则已经完成独立原文留存与裁决。

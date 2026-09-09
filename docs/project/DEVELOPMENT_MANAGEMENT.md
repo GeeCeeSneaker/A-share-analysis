@@ -1,3 +1,30 @@
+## DM-20260909-008 · H1 证据接收与 Formal 前置拒绝
+
+- **Type**：C0 — Formal Production fail-closed preflight and H1 evidence intake
+- **Date**：2026-09-09
+- **Status**：`H1 EVIDENCE INTAKE PREPARED / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ATTEMPT NOT CONSUMED`
+- **Baseline**：current `main@a797f1186209e7548167e2fa652ce78715f24180`，PR #33 已经独立复审并合并。
+
+**已确认事实**
+
+- 新 clean checkout 的源码身份与当前 main 一致，工作树为空；AmazingData `1.1.9`、tgw `1.0.9.2`、runtime `V4.3.0.260626-rc2.0-YHZQ` 可实际加载。
+- 本次在线预检重新确认网络、认证和查询就绪，脱敏 profile `UNKNOWN_24e2ff401792` 与冻结值一致；SH 交易日历解析最近完整交易日 `20260908`。
+- 正式入口因 ACTIVE trading rule dataset 为 `COMPILED` 在 `SpikeRun` 创建前拒绝；没有 run ID、B1-B7 结果或 verdict，正式单次 attempt 未消耗。这不是 Provider `FAILED` 或 `NO-GO`。
+- 已准备 14-rule H1 evidence input：19 个唯一 raw artifact，16 个 direct HTTP 200，3 个 BSE 页面为直连 302/WAF 后的隔离 Chrome browser-resolved DOM；bundle SHA256 为 `a63b652ab08dda4cc12bd20716131ed3eff3b6f7845ddb6b1fa3af3462c33aa`。
+
+**治理边界**
+
+- H1 输入文件与 source catalog 已落在 `docs/provider_verification/`，但不代表人工 APPROVE、REVIEWED seal 或 ACTIVE 切换；当前候选/ACTIVE/Golden v7 均未改写。
+- BSE 三份浏览器归档必须由 Reviewer 确认原文资格；若不接受，管理者需提供浏览器下载的原始 HTML/PDF/DOCX 并重算 hash。
+- 14 条人工审阅、独立 Reviewer closure、H1 REVIEWED 合并之前，禁止切 ACTIVE、创建 Formal run、计算 verdict、批准 Provider/Data Sufficiency 或运行 backfill。
+
+**项目文件**
+
+- [`trading_rule_h1_evidence_intake_20260909.md`](../provider_verification/trading_rule_h1_evidence_intake_20260909.md)
+- [`trading_rule_h1_evidence_input.json`](../provider_verification/trading_rule_h1_evidence_input.json)
+- [`trading_rule_h1_source_catalog.json`](../provider_verification/trading_rule_h1_source_catalog.json)
+
+
 ## DM-20260909-007 · H1 Seal 生命周期独立审阅阻断项修复
 
 - **Type**：C0 — reviewer-blocking lifecycle hardening

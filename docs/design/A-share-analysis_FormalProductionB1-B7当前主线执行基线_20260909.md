@@ -160,9 +160,10 @@ uv run python scripts/spike/spike_runner.py --verdict --run-id <run-id>
 - GT-H3B：CLOSED；
 - reviewed Golden v7：ACTIVE / REVIEWED 125/125；
 - real-corpus offline verifier：三平台集成回归已建立；
-- Formal Production B1-B7：AUTHORIZED FOR ONE CONTROLLED ATTEMPT / NOT YET EXECUTED；
+- H1 trading-rule prerequisite：`v20260909-h1-compiled` 已完成来源 intake，但 14 条人工审阅、独立 Reviewer closure 和 REVIEWED seal 尚未完成；ACTIVE 仍为 `v20260824-compiled` / `COMPILED`；
+- Formal Production B1-B7：AUTHORIZED FOR ONE CONTROLLED ATTEMPT / BLOCKED BEFORE RUN CREATION BY ACTIVE COMPILED RULES；
 - Provider verdict：PENDING；
 - Data Sufficiency Matrix：BLOCKED pending accepted Formal Production evidence；
 - 2020+ backfill：BLOCKED。
 
-从本文件起，除非出现新的真实 preflight blocker，不再以继续增加治理文档或 Golden hardening 代替 Formal Production 执行。
+本文件原定的唯一 Formal Production 动作已在执行时被 H1 ACTIVE `COMPILED` 硬门诚实拒绝；当前应先完成 H1 人工审阅和独立封印，不得用继续增加无关治理文档或 Golden hardening 替代该前置工作。H1 seal 合并后，必须从届时最新 main 重新做本文件第 4-6 节 preflight，再执行唯一正式 attempt。

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+    <meta charset="utf-8">
+<title>关于发布《深圳证券交易所交易规则》的通知</title>
+<script>
+  if(location.protocol == 'https:'){
+    document.write('<link href="https://res.szse.cn/common/images/favicon.ico" rel="shortcut icon" type="image/x-icon" />');
+  }else{
+    document.write('<link href="http://res.static.szse.cn/common/images/favicon.ico" rel="shortcut icon" type="image/x-icon" />');
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0" />
+<meta http-equiv="cache-control" content="max-age=0">
+<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="expires" content="0">
+<meta http-equiv="expires" content="Web, 26 Feb 1997 08:21:57 GMT">
+<meta http-equiv="pragma" content="no-cache">
+<meta name="author" content="www.szse.cn">
+<meta name="description" content="深交所官网">
+<meta name="keywords" content="深交所,深交所官网,深圳证券交易所,交易所,交易所官网,深圳证券交易所官网">
+<meta name="renderer" content=webkit>
+<meta name="X-UA-Compatible" content="IE=edge">
+<meta name="google" value="notranslate"> 
+<meta name="format-detection" content="telephone=no">
+<meta name="format-detection" content="email=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="screen-orientation" content="portrait">
+<meta name="full-screen" content="yes">
+<meta name="browermode" content="application">
+<meta name="x5-orientation" content="portrait">
+<meta name="HandheldFriendly" content="true">
+<script type="text/javascript">
+	var u = navigator.userAgent;
+	var isAndroid = u.indexOf('Android') > -1 || u.indexOf('Adr') > -1;//android终端
+
+	function addElementMeta(name,  content) {
+		var head = document.getElementsByTagName('head')[0];
+		var meta = document.createElement('meta');
+
+		meta.setAttribute('name', name);
+		meta.setAttribute('content', content);
+		head.appendChild(meta);
+	}
+	if(isAndroid) {
+		addElementMeta('x5-fullscreen', 'true');
+		addElementMeta('x5-page-mode', 'app');
+	}
+</script> 
+    <script>
+  (function () {
+    var _versionDate = new Date().getTime();
+    if (location.protocol == 'https:') {
+      var _path = 'https://res.szse.cn';
+    } else {
+      var _path = 'http://res.static.szse.cn';
+    }
+    // _path = _path.replace(".static.", ".");
+    //var _path = 'http://res.szse.cn';
+    //document.write( " <script src='" + _path + "/common/js/first.js?random=" + _versionDate + "'> <\/script> ");
+    var _host = 'http://www.szse.cn';
+    if (location.protocol == 'https:') {
+      _host = 'https://www.szse.cn';
+    }
+
+
+    var backDomain = 'http://www.sse.org.cn'
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    if (backDomain && window.location.host.match(reg)[2] === backDomain.match(reg)[2]) {
+      _host = 'http://www.sse.org.cn';
+      _path = 'http://res.static.sse.org.cn';
+      if (location.protocol == 'https:') {
+        _host = 'https://www.sse.org.cn';
+        _path = 'https://res.static.sse.org.cn';
+      }
+
+    }
+
+    _path = _path.replace(".static.", ".");
+
+    document.write(" <script src='" + _host + "/szsePath.js?random=" + _versionDate + "'> <\/script> "
+      + " <script src='" + _path + "/common/js/concatversion.js?random=" + _versionDate + "'> <\/script> ");
+  }());
+</script>
+
+<script>
+
+  function backDomainLinkSwitch(value, type) {
+    var _port = location.port ? (":" + location.port) : "";
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    var urlRegx = /(.*)(http:|https:)(\/\/)(([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+))\.?(:\d+)?(.*)/;
+
+    // html字符串替换
+    if (type == 'str') {
+      var strArr = value.split("=");
+      strArr = strArr.map(function (v) {
+        var host = reg.test(v) ? v.match(reg)[0] : null;
+        if (pathObj.szseHosts.indexOf(host) > -1) {
+          if (window.location.protocol == 'https:' && urlRegx.test(v)) {
+            v = v.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+          };
+          if (pathObj.current_host === pathObj.back_host) {
+            v = v.replace(pathObj.main_host, pathObj.back_host);
+          }
+        }
+        return v
+      });
+      value = strArr.join("=");
+      return value;
+    }
+
+    // a标签地址替换
+    if (type === 'A') {
+      var eleA = document.querySelectorAll(value);
+      for (var i = 0; i < eleA.length; i++) {
+        var href = eleA[i].getAttribute("href");
+        var host = reg.test(href) ? href.match(reg)[0] : null;
+        if (href && pathObj.szseHosts.indexOf(host) > -1) {
+          if (window.location.protocol == 'https:') {
+            href = href.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+          };
+          if (pathObj.current_host === pathObj.back_host) {
+            href = href.replace(pathObj.main_host, pathObj.back_host);
+          }
+          eleA[i].setAttribute('href', href);
+        }
+      }
+    }
+
+    // 单链接替换
+    if (type === "link") {
+      if (window.location.protocol == 'https:' && !!value) {
+        value = value.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+      };
+      if (pathObj.current_host === pathObj.back_host) {
+        var host = reg.test(value) ? value.match(reg)[0] : null;
+        if (value && pathObj.szseHosts.indexOf(host) > -1) {
+          value = value.replace(pathObj.main_host, pathObj.back_host);
+        }
+      }
+      return value;
+    }
+
+    // 背景图地址更换
+    if (type === "background") {
+      var eleBg = document.querySelectorAll(value);
+      for (var i = 0; i < eleBg.length; i++) {
+        var href = eleBg[i].style.backgroundImage;
+        if (window.location.protocol == 'https:' && !!href) {
+          href = href.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+        };
+        var host = reg.test(href) ? href.match(reg)[0] : null;
+        if (href && pathObj.szseHosts.indexOf(host) > -1) {
+          if (pathObj.current_host === pathObj.back_host) {
+            href = href.replace(pathObj.main_host, pathObj.back_host);
+          }
+          eleBg[i].style.backgroundImage = href;
+        }
+      }
+    }
+
+  }
+
+</script>
+
+<script>
+   if(document.cookie.indexOf('ft_language=1')>-1){
+    var style = document.createElement('style');
+    style.textContent='body{visibility:hidden;}';
+    document.head.appendChild(style);
+  }
+</script>
+<script>
+    addComCssFile()
+</script>
+<script>
+        changeVertion('/modules/report/css/report.css', 'css');
+        changeVertion('/modules/aboutus_column/introduction/css/journal.css', 'css');
+    </script>
+    <script>
+  changeVertion('/lib/validator/validator.min.css', 'css');
+  changeVertion('/common/plugins/css/index.min.css', 'css');
+  changeVertion('/common/css/form.css', 'css');
+  changeVertion('/common/css/articleDetailUtil.css','css');
+</script>
+</head>
+  <body class="article-body">
+    <script>
+  navMenuAJAX('/application/publicindex/header/index.html', '/application/publicindex/header/index.html', 'header', 'www');
+</script>
+<div class="g-locationnav">
+    <div class="banner-wrap">
+      <img src="http://res.static.szse.cn/common/images/legalrules-banner.jpg" />
+    </div>
+    <div class="g-container">
+      <div class="g-banner-txt">
+            <h2 class="hidden-xs">通知公告</h2>
+            <p>
+              <img src="http://res.static.szse.cn/common/icon/er-banneradr.png" />位置：<a href="../../" class="CurrChnlCls">信息披露</a>/<a href="../" class="CurrChnlCls">本所公告</a>/<a href="./" class="CurrChnlCls">通知公告</a>
+            </p>
+          </div>
+    </div>
+</div>
+  
+      <div class="g-container-wrap">
+            <div class="g-container">
+<!--startprint-->
+                <div class="news-detail-con g-conbox"> 
+                	<div class="des-header">
+                  <h2 class="title">关于发布《深圳证券交易所交易规则》的通知</h2>
+                  		<script>
+                  			var curSubTitle ='';
+                  			if(curSubTitle != ''){
+                  				document.write('<h4 style="text-align: center;" class="sub-title"><i class=""></i><span class="">'+curSubTitle+'</span></h4>')
+                  			}                  		
+                  		</script>
+              <div class="time">时间：<span>2006-05-15</span></div>
+              <div class="des-switchsize">
+                字体：
+                <span class="bigger">大</span>
+                <span class="medium">中</span>
+                <span class="smaller">小</span>
+              </div>
+    					
+        	</div>
+    				 <div class="des-content" id="desContent">
+                       <P class=MsoNormal style="MARGIN: 0cm 0cm 0pt"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-ascii-font-family: 'Times New Roman'; mso-hansi-font-family: 'Times New Roman'">各会员单位：</SPAN><SPAN lang=EN-US style="FONT-SIZE: 9pt"><?xml:namespace prefix = o ns = "urn:schemas-microsoft-com:office:office" /><o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 18pt; mso-char-indent-count: 2.0"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-font-kerning: 0pt; mso-bidi-font-family: 宋体">《深圳证券交易所交易规则》已经中国证监会批准，现予以发布，并就相关实施事项通知如下：<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 18pt; mso-char-indent-count: 2.0"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-font-kerning: 0pt; mso-bidi-font-family: 宋体">（一）《深圳证券交易所交易规则》自<SPAN lang=EN-US>2006年7月1日起施行，2001年8月31日发布的《深圳、上海证券交易所交易规则》同时废止。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 18pt; mso-char-indent-count: 2.0"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-font-kerning: 0pt; mso-bidi-font-family: 宋体">（二）本所暂不接受《深圳证券交易所交易规则》第<SPAN lang=EN-US>3.3.4条所述的最优五档即时成交剩余撤销申报、即时成交剩余撤销申报和全额成交或撤销申报，接受以上三种市价申报方式的时间由本所另行通知。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 18pt; mso-char-indent-count: 2.0"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-font-kerning: 0pt; mso-bidi-font-family: 宋体">特此通知<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 18pt; mso-char-indent-count: 2.0"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-font-kerning: 0pt; mso-bidi-font-family: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 18pt; mso-char-indent-count: 2.0"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-font-kerning: 0pt; mso-bidi-font-family: 宋体">附件：《深圳证券交易所交易规则》<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 18pt; mso-char-indent-count: 2.0"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-font-kerning: 0pt; mso-bidi-font-family: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 18pt; mso-char-indent-count: 2.0"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-font-kerning: 0pt; mso-bidi-font-family: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 14pt 0pt 0cm; TEXT-INDENT: 18pt; TEXT-ALIGN: right; mso-char-indent-count: 2.0" align=right><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-font-kerning: 0pt; mso-bidi-font-family: 宋体">深圳证券交易所<SPAN lang=EN-US> <o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 28.5pt; TEXT-ALIGN: right" align=right><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><SPAN style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN>二○○六年五月十五日<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt"><SPAN lang=EN-US style="FONT-SIZE: 9pt"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt"><SPAN lang=EN-US style="FONT-SIZE: 9pt"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-ALIGN: center" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">深圳证券交易所交易规则<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-ALIGN: center" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第一章<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>总则<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">1.1 为规范证券市场交易行为，维护证券市场秩序，保护投资者合法权益，根据《中华人民共和国证券法》等法律、行政法规、部门规章以及《深圳证券交易所章程》，制定本规则。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">1.2 深圳证券交易所 (以下简称“本所”)上市证券及其衍生品种（以下统称“证券”）的交易，适用本规则。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">本规则未作规定的，适用本所其他有关规定。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">1.3 证券交易遵循公开、公平、公正的原则。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">1.4 投资者交易行为应当遵守法律、行政法规、部门规章以及本所有关业务规则，遵循自愿、有偿、诚实信用原则。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">1.5<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>证券交易采用无纸化的集中交易或经中国证券监督管理委员会（以下简称“证监会”）批准的其他方式。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第二章 交易市场<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第一节 交易场所<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">2.1.1<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>本所为证券交易提供交易场所及设施。交易场所及设施由交易主机、交易大厅、交易席位、报盘系统及相关的通信系统等组成。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">2.1.2　经本所同意，会员可以通过其派驻交易大厅的交易员进行申报。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">除经本所特许外，进入交易大厅的，仅限于下列人员：<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">(一)登记在册交易员；<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">(二)场内监管人员。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">2.1.3<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>本所对会员实施交易权限管理，具体办法另行规定，报证监会批准后生效。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第二节 交易品种<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">2.2.1　下列证券可以在本所市场挂牌交易：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）股票；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）基金；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）债券；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）债券回购；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（五）权证；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（六）经证监会批准的其他交易品种。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第三节<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>交易时间<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">2.3.1 本所交易日为每周一至周五。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">国家法定假日和本所公告的休市日，本所市场休市。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">2.3.2　证券采用竞价交易方式的，每个交易日的9:15至9:25为开盘集合竞价时间，9:30至11:30、13:00至14:57为连续竞价时间，14：57至15:00为收盘集合竞价时间。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">经证监会批准，本所可以调整交易时间。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">2.3.3 交易时间内因故停市，交易时间不作顺延。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第三章<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>证券买卖<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第一节<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>一般规定<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.1.1会员接受投资者的买卖委托后，应当按照委托的内容向本所申报，并承担相应的交易、交收责任。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">会员接受投资者买卖委托达成交易的，投资者应当向会员交付其委托会员卖出的证券或其委托会员买入证券的款项，会员应当向投资者交付卖出证券所得款项或买入的证券。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.1.2 会员通过报盘系统向本所交易主机发送买卖申报指令，并按本规则达成交易，交易记录由本所发送至会员。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.1.3 会员应当按有关规定妥善保管委托和申报记录。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.1.4 投资者买入的证券，在交收前不得卖出，但实行回转交易的除外。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">证券的回转交易是指投资者买入的证券，经确认成交后，在交收前全部或部分卖出。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.1.5 债券、债券回购实行当日回转交易，B股实行次交易日起回转交易。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.1.6 本所可以根据市场需要，实行主交易商制度，具体办法由本所另行规定，报证监会批准后生效。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第二节 委托<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.2.1　投资者买卖证券，应当开立证券账户和资金账户，并与会员签订证券交易委托协议。协议生效后，投资者为该会员经纪业务的客户。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-bidi-font-weight: bold">投资者开立证券账户，按本所指定登记结算机构的规定办理。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.2.2　客户可以通过书面或电话、自助终端、互联网等自助委托方式委托会员买卖证券。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">电话、自助终端、互联网等自助委托应当按相关规定操作。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.2.3　客户通过自助委托方式参与证券买卖的，会员应当与其签订自助委托协议。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.2.4　除本所另有规定外，客户的委托指令应当包括下列内容：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）证券账户号码；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）证券代码；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）买卖方向；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）委托数量；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（五）委托价格；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（六）本所及会员要求的其他内容。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.2.5　客户可以采用限价委托或市价委托的方式委托会员买卖证券。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">限价委托是指客户委托会员按其限定的价格买卖证券，会员必须按限定的价格或低于限定的价格申报买入证券；按限定的价格或高于限定的价格申报卖出证券。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">市价委托是指客户委托会员按市场价格买卖证券。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.2.6　客户可以撤销委托的未成交部分。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.2.7　被撤销和失效的委托，会员应当在确认后及时向客户返还相应的资金或证券。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.2.8 会员向客户买卖证券提供融资融券服务的，应当按照有关规定办理。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第三节 申报<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.1<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>本所接受会员竞价交易申报的时间为每个交易日9:15至 11:30 、13:00至15:00。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">每个交易日<SPAN lang=EN-US>9:20至9:25、14:57至15:00，本所交易主机不接受参与竞价交易的撤销申报，在其他接受申报的时间内，未成交申报可以撤销。撤销申报经本所交易主机确认方为有效。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">每个交易日<SPAN lang=EN-US>9:25至9:30，交易主机只接受申报，但不对买卖申报或撤销申报作处理。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">本所可以调整接受会员申报的时间。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.2 会员应当按照接受客户委托的时间先后顺序及时向本所申报。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.3 本所接受会员的限价申报和市价申报。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.4本所可以根据市场需要，接受下列类型的市价申报：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）对手方最优价格申报；<SPAN lang=EN-US> <o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）本方最优价格申报；<SPAN lang=EN-US> <o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）最优五档即时成交剩余撤销申报；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）即时成交剩余撤销申报；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（五）全额成交或撤销申报；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（六）本所规定的其他类型。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">对手方最优价格申报，以申报进入交易主机时集中申报簿中对手方队列的最优价格为其申报价格。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">本方最优价格申报，以申报进入交易主机时集中申报簿中本方队列的最优价格为其申报价格。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">最优五档即时成交剩余撤销申报，以对手方价格为成交价格，与申报进入交易主机时集中申报簿中对手方最优五个价位的申报队列依次成交，未成交部分自动撤销。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">即时成交并撤销申报，以对手方价格为成交价格，与申报进入交易主机时集中申报簿中对手方所有申报队列依次成交，未成交部分自动撤销。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">全额成交或撤销申报，以对手方价格为成交价格，如与申报进入交易主机时集中申报簿中对手方所有申报队列依次成交能够使其完全成交的，则依次成交，否则申报全部自动撤销。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.5 市价申报只适用于有价格涨跌幅限制证券连续竞价期间的交易。其他交易时间，交易主机不接受市价申报。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.6 本方最优价格申报进入交易主机时，集中申报簿中本方无申报的，申报自动撤销。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">其他市价申报类型进入交易主机时，集中申报簿中对手方无申报的，申报自动撤销。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.7<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>限价申报指令应当包括证券账号、证券代码、席位代码、买卖方向、数量、价格等内容。 <o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">市价申报指令应当包括申报类型、证券账号、证券代码、席位代码、买卖方向、数量等内容。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">申报指令应当按本所规定的格式传送。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.8　通过竞价交易买入股票或基金的，申报数量应当为100股(份)或其整数倍。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">卖出股票或基金时，余额不足<SPAN lang=EN-US>100股（份）部分，应当一次性申报卖出。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.9　通过竞价交易买入债券以10张或其整数倍进行申报。买入、卖出债券质押式回购以10张或其整数倍进行申报。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">卖出债券时，余额不足<SPAN lang=EN-US>10张部分，应当一次性申报卖出。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">债券以人民币<SPAN lang=EN-US>100元面额为1张。债券质押式回购以100元标准券为1张。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.10　股票（基金）竞价交易单笔申报最大数量应当不超过100万股（份），债券和债券质押式回购竞价交易单笔申报最大数量应当不超过10万张。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.11　不同证券的交易采用不同的计价单位。股票为“每股价格”，基金为“每份基金价格”，债券为“每百元面值的价格”，债券质押式回购为“每百元资金到期年收益”。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.12　 A股、债券、债券质押式回购交易的申报价格最小变动单位为0.01元人民币；基金交易为0.001元人民币；B股交易为0.01港元。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.13　本所可以根据市场需要，调整证券单笔买卖申报数量和申报价格的最小变动单位。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.14 本所对股票、基金交易实行价格涨跌幅限制，涨跌幅比例为10%,其中ST和*ST股票价格涨跌幅比例为5%。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">涨跌幅价格的计算公式为：涨跌幅价格<SPAN lang=EN-US>=前收盘价×(1± 涨跌幅比例)。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">计算结果按照四舍五入原则取至价格最小变动单位。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">属于下列情形之一的，股票上市首日不实行价格涨跌幅限制：<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）首次公开发行股票上市的；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）增发股票上市的；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）暂停上市后恢复上市的；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）本所或证监会认定的其他情形。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-bidi-font-weight: bold">经证监会批准，本所可以调整证券的涨跌幅比例。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.15　买卖有价格涨跌幅限制的证券，在价格涨跌幅限制以内的申报为有效申报。超过涨跌幅限制的申报为无效申报。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">买卖有价格涨跌幅限制的中小企业板股票，连续竞价期间超过有效竞价范围的有效申报不能即时参加竞价，暂存于交易主机；当成交价格波动使其进入有效竞价范围时，交易主机自动取出申报，参加竞价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.16　买卖无价格涨跌幅限制的证券，超过有效竞价范围的申报不能即时参加竞价，暂存于交易主机；当成交价格波动使其进入有效竞价范围时，交易主机自动取出申报，参加竞价。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.3.17　申报当日有效。每笔竞价交易的申报不能一次全部成交时，未成交部分继续参加当日竞价，但第3.3.4条第（三）、（四）、（五）项市价申报类型除外。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第四节<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>竞价<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.4.1　证券竞价交易采用集合竞价和连续竞价两种方式。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">集合竞价是指对一段时间内接受的买卖申报一次性集中撮合的竞价方式。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">连续竞价是指对买卖申报逐笔连续撮合的竞价方式。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.4.2<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>开盘集合竞价期间未成交的买卖申报，自动进入连续竞价。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">连续竞价期间未成交的买卖申报，自动进入收盘集合竞价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.4.3<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>有涨跌幅限制证券集合竞价期间有效竞价范围与涨跌幅限制范围一致。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">中小企业板股票连续竞价期间有效竞价范围为最近成交价的上下<SPAN lang=EN-US>3%。开盘集合竞价期间没有产生成交的，连续竞价开始时有效竞价范围调整为前收盘价的上下3%。其他有涨跌幅限制证券连续竞价期间有效竞价范围与涨跌幅限制范围一致。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">有效竞价范围计算结果按照四舍五入原则取至价格最小变动单位。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.4.4　无涨跌幅限制证券的交易按下列方法确定有效竞价范围：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）股票上市首日开盘集合竞价的有效竞价范围为发行价的<SPAN lang=EN-US>900%以内，连续竞价、收盘集合竞价的有效竞价范围为最近成交价的上下10%；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）债券上市首日开盘集合竞价的有效竞价范围为发行价的上下<SPAN lang=EN-US>30%，连续竞价、收盘集合竞价的有效竞价范围为最近成交价的上下10%;非上市首日开盘集合竞价的有效竞价范围为前收盘价的上下10%，连续竞价、收盘集合竞价的有效竞价范围为最近成交价的上下10%;<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）债券质押式回购非上市首日开盘集合竞价的有效竞价范围为前收盘价的上下<SPAN lang=EN-US>100%，连续竞价、收盘集合竞价的有效竞价范围为最近成交价的上下100%。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.4.5　无价格涨跌幅限制的证券在开盘集合竞价期间没有产生成交的，连续竞价开始时，按下列方式调整有效竞价范围：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）有效竞价范围内的最高买入申报价高于发行价或前收盘价的，以最高买入申报价为基准调整有效竞价范围；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）有效竞价范围内的最低卖出申报价低于发行价或前收盘价的，以最低卖出申报价为基准调整有效竞价范围。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.4.6本所可以根据市场需要，调整证券的有效竞价范围。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第五节 成交<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.5.1　证券竞价交易按价格优先、时间优先的原则撮合成交。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">成交时价格优先的原则为：较高价格买入申报优先于较低价格买入申报，较低价格卖出申报优先于较高价格卖出申报。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">成交时时间优先的原则为：买卖方向、价格相同的，先申报者优先于后申报者。先后顺序按交易主机接受申报的时间确定。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.5.2　集合竞价时，成交价格的确定原则为：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）可实现最大成交量的价格；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）高于该价格的买入申报与低于该价格的卖出申报全部成交；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）与该价格相同的买方或卖方至少有一方全部成交。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">两个以上价格符合上述条件的，取距前收盘价最近的价格为成交价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">集合竞价的所有交易以同一价格成交。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.5.3　连续竞价时，成交价格的确定原则为：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）最高买入申报与最低卖出申报价格相同，以该价格为成交价；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）买入申报价格高于集中申报簿当时最低卖出申报价格时，以集中申报簿当时的最低卖出申报价格为成交价；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）卖出申报价格低于集中申报簿当时最高买入申报价格时，以集中申报簿当时的最高买入申报价格为成交价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.5.4　买卖申报经交易主机撮合成交后，交易即告成立。符合本规则各项规定达成的交易于成立时生效，买卖双方必须承认交易结果，履行清算交收义务。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">因不可抗力、意外事件、交易系统被非法侵入等原因造成严重后果的交易，本所可以采取适当措施或认定无效。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">对显失公平的交易，经本所认定，可以采取适当措施。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">违反本规则，严重破坏证券市场正常运行的交易，本所有权宣布取消交易。由此造成的损失由违规交易者承担。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.5.5 依照本规则达成的交易，其成交结果以本所交易主机记录的成交数据为准。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.5.6　会员间的清算交收业务由本所指定的登记结算机构负责办理。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第六节　大宗交易<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.6.1 在本所进行的证券买卖符合以下条件的，可以采用大宗交易方式：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）<SPAN lang=EN-US>A股单笔交易数量不低于50万股，或者交易金额不低于300万元人民币；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）<SPAN lang=EN-US>B股单笔交易数量不低于5万股，或者交易金额不低于30万元港币；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）基金单笔交易数量不低于<SPAN lang=EN-US>300万份，或者交易金额不低于300万元人民币；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）债券单笔交易数量不低于<SPAN lang=EN-US>1万张（以人民币100元面额为1张），或者交易金额不低于100万元人民币；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（五）债券质押式回购单笔交易数量不低于<SPAN lang=EN-US>1万张（以人民币100元面额为1张），或者交易金额不低于100万元人民币。 <o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（六）多只<SPAN lang=EN-US>A股合计单向买入或卖出的交易金额不低于500万元人民币，且其中单只A股的交易数量不低于20万股。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（七）多只基金合计单向买入或卖出的交易金额不低于<SPAN lang=EN-US>500万元人民币，且其中单只基金的交易数量不低于100万份。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（八）多只债券合计单向买入或卖出的交易金额不低于<SPAN lang=EN-US>500万元人民币，且其中单只债券的交易数量不低于1.5万张。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">本所可以根据市场需要，调整大宗交易的最低限额。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.6.2 本所接受大宗交易申报的时间为每个交易日9:15至11:30、13:00至15:30。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.6.3 大宗交易的申报包括意向申报和成交申报。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">意向申报指令应包括证券账号、证券代码、买卖方向、本方席位代码等内容。意向申报是否明确交易价格和交易数量由申报方自行决定。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">成交申报指令应包括证券账号、证券代码、买卖方向、交易价格、交易数量、对手方席位代码等内容。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.6.4 有价格涨跌幅限制证券的大宗交易成交价格，由买卖双方在该证券当日涨跌幅价格限制范围内确定。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">无价格涨跌幅限制证券的大宗交易成交价格，由买卖双方在前收盘价的上下<SPAN lang=EN-US>30%或当日已成交的最高、最低价之间自行协商确定。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.6.5 买卖双方达成协议后，向本所交易主机提出成交申报，成交申报的交易价格和数量必须一致。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.6.6 每个交易日15：00至15:30，交易主机对买卖双方的成交申报进行成交确认。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">成交申报一经本所确认，不得变更或撤销，买卖双方必须承认交易结果。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.6.7 会员应当保证大宗交易参与者实际拥有与意向申报和成交申报相对应的证券或资金。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.6.8 大宗交易不纳入本所即时行情和指数的计算，成交量在大宗交易结束后计入当日该证券成交总量。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.6.9<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>每个交易日大宗交易结束后，本所公布大宗交易的证券名称、成交量、成交价以及买卖双方所在会员营业部或席位的名称。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第七节 债券回购交易<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.7.1 债券回购交易可以采取质押式回购交易等方式。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.7.2 债券质押式回购交易是指，债券持有人在将债券质押并将相应债券以标准券折算比率计算出的标准券数量为融资额度向交易对手方进行质押融资的同时，交易双方约定在回购期满后返还资金和解除质押的交易。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">3.7.3 债券回购交易的期限按日历时间计算。如到期日为非交易日，顺延至下一个交易日结算。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第四章 其他交易事项<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第一节 转托管<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.1.1<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>投资者可以以同一证券账户在多个证券营业部买入证券。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.1.2<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>投资者买入的证券可通过原买入证券的席位委托卖出，也可以向原买入证券的席位发出转托管指令，转托管完成后，在转入的席位委托卖出。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-bidi-font-weight: bold">转托管的具体规则，由本所指定登记结算机构制定。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体; mso-bidi-font-weight: bold"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第二节　开盘价与收盘价<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.2.1<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>证券的开盘价为当日该证券的第一笔成交价。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.2.2　证券的开盘价通过集合竞价方式产生，不能产生开盘价的，以连续竞价方式产生。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.2.3<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>证券的收盘价通过集合竞价的方式产生。收盘集合竞价不能产生收盘价的，以当日该证券最后一笔交易前一分钟所有交易的成交量加权平均价（含最后一笔交易）为收盘价。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">当日无成交的，以前收盘价为当日收盘价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第三节　挂牌、摘牌、停牌与复牌<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.3.1　本所对上市证券实施挂牌交易。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.3.2　证券上市期届满或依法不再具备上市条件的，本所终止其上市交易，予以摘牌。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.3.3　股票、封闭式基金交易出现第5.4.3条规定的异常波动的，本所对相关证券实施停牌，直至有披露义务的当事人作出公告的当日10:30复牌；公告日为非交易日的，在公告后首个交易日开市时复牌。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.3.4 证券交易出现第6.1条规定的异常交易行为的，本所可以视情况对相关证券实施停牌，发布公告，并根据需要公布相关交易、股份统计信息。有披露义务的当事人应按照本所的要求及时公告。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">停牌及复牌的时间，由本所决定。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.3.5　证券停牌时，本所发布的行情中包括该证券的信息；证券摘牌后，行情信息中无该证券的信息。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.3.6　证券开市期间停牌的，停牌前的申报参加当日该证券复牌后的交易；停牌期间，可以继续申报，也可以撤销申报；复牌时对已接受的申报实行集合竞价，但不揭示集合竞价参考价格、匹配量和未匹配量。集合竞价产生开盘价后，以连续竞价继续当日交易。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.3.7 证券的挂牌、摘牌、停牌与复牌，本所予以公告。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.3.8 证券挂牌、摘牌、停牌与复牌的其他规定，按照本所上市规则及其他有关规定执行。</SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p></o:p></SPAN>&nbsp;</P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><STRONG>第四节　除权与除息<SPAN lang=EN-US><o:p></o:p></SPAN></STRONG></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.4.1　上市证券发生权益分派、公积金转增股本、配股等情况，本所在权益登记日（B股为最后交易日）次一交易日对该证券作除权除息处理，本所另有规定的除外。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.4.2　除权(息)参考价的计算公式为：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">除权<SPAN lang=EN-US>(息)参考价＝[(前收盘价-现金红利)+配(新)股价格× 流通股份变动比例]÷ (1+流通股份变动比例)<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">证券发行人认为有必要调整上述计算公式时，可向本所提出调整申请并说明理由。本所可以根据申请调整除权<SPAN lang=EN-US>(息)参考价计算公式，并予以公布。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">除权（息）日即时行情中显示的该证券的前收盘价为除权<SPAN lang=EN-US>(息) 参考价。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">4.4.3　除权(息)日证券买卖，按除权(息)参考价作为计算涨跌幅度的基准，本所另有规定的除外。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第五章 交易信息<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第一节 一般规定<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.1.1　本所每个交易日发布证券交易即时行情、证券指数、证券交易公开信息等交易信息。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.1.2<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>本所及时编制反映市场成交情况的各类日报表、周报表、月报表和年报表，并通过本所网站或其他媒体予以公布。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.1.3　本所交易信息归本所所有。未经许可，任何机构和个人不得使用和传播。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">经本所许可使用交易信息的机构和个人，未经同意，不得将交易信息提供给其他机构和个人使用或予以传播。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">证券交易信息的管理办法，本所另行制定。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第二节 即时行情<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.2.1<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>集合竞价期间，即时行情内容包括：证券代码、证券简称、集合竞价参考价格、匹配量和未匹配量等。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.2.2<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>连续竞价期间,即时行情内容包括：证券代码、证券简称、前收盘价、最近成交价、当日最高价、当日最低价、当日累计成交数量、当日累计成交金额、实时最高五个价位买入申报价和数量、实时最低五个价位卖出申报价和数量等。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.2.3 首次上市股票、债券上市首日，其即时行情显示的前收盘价为其发行价，基金为其前一日基金份额净值（四舍五入至0.001元）。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.2.4　即时行情通过本所许可的通信系统传输，会员应在本所许可的范围内使用。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.2.5本所可以根据市场需要，调整即时行情发布的方式和内容。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第三节<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>证券指数<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.3.1　本所编制综合指数、成份指数、分类指数等证券指数，以反映证券交易总体价格或某类证券价格的变动和走势，随即时行情发布。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.3.2<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>证券指数的设置和编制方法，本所另行制定。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第四节<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>证券交易公开信息<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.4.1　有价格涨跌幅限制的股票、封闭式基金竞价交易出现下列情形之一的，本所分别公布相关证券当日买入、卖出金额最大五家会员营业部或席位的名称及其各自的买入、卖出金额：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）日收盘价格涨跌幅偏离值达到±<SPAN lang=EN-US>7%的各前三只证券；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">收盘价格涨跌幅偏离值的计算公式为：<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">收盘价格涨跌幅偏离值<SPAN lang=EN-US>=单只证券涨跌幅-对应分类指数涨跌幅<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）日价格振幅达到<SPAN lang=EN-US>15%的前三只证券；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">价格振幅的计算公式为：<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">价格振幅<SPAN lang=EN-US>=（当日最高价-当日最低价）/当日最低价×100%<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）日换手率达到<SPAN lang=EN-US>20%的前三只证券；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">换手率的计算公式为：<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">换手率<SPAN lang=EN-US>=成交股数/流通股数×100%<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">收盘价格涨跌幅偏离值、价格振幅或换手率相同的，依次按成交金额和成交量选取。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">A股股票（中小企业板股票除外）、中小企业板股票、B股股票、封闭式基金的对应分类指数是指本所编制的深证A股指数、中小企业板指数、深证B股指数和深证基金指数。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.4.2 第3.3.14条规定的无价格涨跌幅限制股票，本所公布其当日买入、卖出金额最大的五家会员营业部或席位的名称及其买入、卖出金额。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.4.3 股票、封闭式基金竞价交易出现下列情况之一的，属于异常波动，本所分别公布其在交易异常波动期间累计买入、卖出金额最大五家会员营业部或席位的名称及其各自累计买入、卖出金额：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）连续三个交易日内日收盘价格涨跌幅偏离值累计达到±<SPAN lang=EN-US>20%的；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）<SPAN lang=EN-US>ST和*ST股票连续三个交易日内日收盘价格涨跌幅偏离值累计达到±15%的；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）连续三个交易日内日均换手率与前五个交易日的日均换手率的比值达到<SPAN lang=EN-US>30倍，并且该证券连续三个交易日内的累计换手率达到20%的；<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）本所或证监会认为属于异常波动的其他情况。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">异常波动指标自复牌之日起重新计算。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第<SPAN lang=EN-US>3.3.14条规定的无价格涨跌幅限制股票不纳入异常波动指标的计算。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">5.4.4证券交易公开信息涉及机构专用席位的，公布名称为“机构专用”。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第六章 交易行为监督<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">6.1本所对下列可能影响证券交易价格或者证券交易量的异常交易行为，予以重点监控： <o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）可能对证券交易价格产生重大影响的信息披露前，大量买入或者卖出相关证券；<SPAN lang=EN-US> <o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）以同一身份证明文件、营业执照或其他有效证明文件开立的证券账户之间，大量或者频繁进行互为对手方的交易；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）委托、授权同一机构或者同一个人代为从事交易的证券账户之间，大量或者频繁进行互为对手方的交易；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）两个或两个以上固定的或涉嫌关联的证券账户之间，大量或者频繁进行互为对手方的交易；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（五）大笔申报、连续申报或者密集申报，以影响证券交易价格；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（六）频繁申报或撤销申报，以影响证券交易价格或其他投资者的投资决定；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（七）巨额申报，且申报价格明显偏离申报时的成交价格；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（八）一段时期内进行大量且连续的交易；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（九）在同一价位或者相近价位大量或者频繁进行回转交易；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（十）大量或者频繁进行高买低卖交易；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><SPAN style="mso-spacerun: yes">&nbsp;</SPAN>(十一) 进行与自身公开发布的投资分析、预测或建议相背离的证券交易；<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（十二）在大宗交易中进行虚假或其他扰乱市场秩序的申报；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（十三）本所认为需要重点监控的其他异常交易行为。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">6.2 会员发现投资者的证券交易出现第6.1条所列异常交易行为之一，且可能严重影响证券交易秩序的，应当予以提醒，并及时向本所报告。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">6.3 出现第6.1条所列异常交易行为之一，且对证券交易价格或者交易量产生影响的，本所可采取非现场调查和现场调查措施，要求相关会员及其营业部提供投资者开户资料、授权委托书、资金存取凭证、资金账户情况说明、相关交易情况说明等资料；本所也可以要求相关投资者提供资料。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">6.4 会员及其营业部、投资者应当配合本所进行相关调查，及时、真实、准确、完整地提供有关文件和资料。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">6.5 对情节严重的异常交易行为，本所可以视情况采取下列措施：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）口头或书面警示；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）约见谈话；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）要求提交书面承诺；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）限制相关证券账户交易；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（五）报请证监会冻结相关证券账户或资金账户；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（六）上报证监会查处。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">对第（四）项措施有异议的，可以自接到相关措施执行通知之日起<SPAN lang=EN-US>15日内，向本所申请复核。复核期间不停止该措施的执行。<o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第七章<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>交易异常情况处理<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">7.1<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>发生下列交易异常情况之一，导致部分或全部交易不能进行的，本所可以决定技术性停牌或临时停市：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">(一) 不可抗力；<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">(二) 意外事件；<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">(三) 技术故障；<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">(四) 本所认定的其他异常情况。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">7.2　出现无法申报的席位数量或行情传输中断的营业部数量超过本所已开通席位或营业部总数的10%以上的交易异常情况，本所可以实行临时停市。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">7.3　本所认为可能发生第7.1条、第7.2条规定的交易异常情况，并严重影响交易正常进行的，可以决定技术性停牌或临时停市。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">7.4 本所对技术性停牌或临时停市决定予以公告。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">7.5　技术性停牌或临时停市原因消除后，本所可以决定恢复交易。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">7.6　除本所认定的特殊情况之外，技术性停牌或临时停市前交易主机已经接受的申报在当日有效。交易主机在技术性停牌或临时停市期间继续接受申报，在恢复交易时对已接受的申报实行集合竞价。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">7.7　因交易异常情况及本所采取的技术性停牌或临时停市措施造成的损失，本所不承担责任。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第八章<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>交易纠纷<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">8.1<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>会员之间、会员与客户之间发生交易纠纷，相关会员应当记录有关情况，以备本所查阅。交易纠纷影响正常交易的，会员应当及时向本所报告。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">8.2<SPAN style="mso-spacerun: yes">&nbsp; </SPAN>会员之间、会员与客户之间发生交易纠纷，本所可以按有关规定，提供必要的交易数据。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">8.3　投资者对交易有疑义的，会员有义务协调处理。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第九章<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp; </SPAN>交易费用<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">9.1 投资者买卖证券成交的，应当按规定向会员交纳佣金。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">9.2 会员应当按规定向本所交纳席位费、会员费、交易经手费及其他费用。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">9.3 证券交易的收费项目、收费标准和管理办法按照有关规定执行。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第十章<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp;&nbsp; </SPAN>纪律处分<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">10.1 会员违反本规则的，本所责令其改正，并视情节轻重单处或并处： <SPAN style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;</SPAN><o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）通报批评；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）公开谴责；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）暂停或限制交易；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）取消交易资格；<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（五）取消会员资格。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">10.2 会员对前条第（二）、（三）、（四）、（五）项处分有异议的，可以自接到处分通知之日起15日内向本所申请复核。复核期间不停止相关处分的执行。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体"><o:p>&nbsp;</o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.35pt; TEXT-ALIGN: center; mso-char-indent-count: 2.25" align=center><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">第十一章<SPAN lang=EN-US><SPAN style="mso-spacerun: yes">&nbsp;&nbsp; </SPAN>附则<o:p></o:p></SPAN></SPAN></B></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">11.1 交易型开放式指数基金、债券回购、权证等品种的交易，本所相关规则另有规定的，从其规定。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">11.2 本规则中所述时间，以本所交易主机的时间为准。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">11.3　本规则下列用语具有如下含义：<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（一）市场：指本所设立的证券交易市场。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（二）交易席位：指由本所提供并经会员申请获得的参与本所证券交易的专用设施。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（三）委托：指投资者向会员进行具体授权买卖证券的行为。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（四）申报：指会员向本所交易主机发送证券买卖指令的行为。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（五）标准券：指由不同债券品种按相应折算率折算形成的，用以确定可利用质押式回购交易进行融资的额度。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（六）集中申报簿：指交易主机某一时点有效竞价范围内按买卖方向以及价格优先、时间优先顺序排列的所有未成交申报队列。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">对手方（本方）队列最优价格是指集中申报簿中买方的最高价或卖方的最低价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（七）集合竞价参考价格：指截至揭示时集中申报簿中所有申报按照集合竞价规则形成的虚拟集合竞价成交价格。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoBodyText style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（八）匹配量：指截至揭示时集中申报簿中所有申报按照集合竞价规则形成的虚拟成交数量。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">（九）未匹配量：指截至揭示时集中申报簿中在集合竞价参考价位上的不能按照集合竞价参考价虚拟成交的买方或卖方申报剩余量。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">11.4 本规则未定义的用语的含义，依照法律、行政法规、部门规章及本所有关业务规则确定。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">11.5 本规则所称“超过”、“低于”、“不足”不含本数，“达到”含本数。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">11.6　本规则经本所理事会通过，报证监会批准后生效。修改时亦同。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">11.7　本规则由本所负责解释。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt; TEXT-INDENT: 20.25pt; mso-char-indent-count: 2.25"><SPAN lang=EN-US style="FONT-SIZE: 9pt; FONT-FAMILY: 宋体">11.8　本规则自2006年7月1日起施行。<o:p></o:p></SPAN></P>
+<P class=MsoNormal style="MARGIN: 0cm 0cm 0pt"><SPAN lang=EN-US style="FONT-SIZE: 9pt"><o:p>&nbsp;</o:p></SPAN></P>
+<P>&nbsp;</P>
+                    </div>
+                    <script>
+                        var oldCon = document.getElementById("desContent").innerHTML;
+                        oldCon = oldCon.replace(/(o:p)|(u:p)/gi,'span');
+                        oldCon = oldCon.replace(/&lt;!--\[endif\]--&gt;/g,"");
+                        document.getElementById("desContent").innerHTML = oldCon;
+                    </script>
+<!--endprint-->
+    				<div class="des-footer">
+    					<div class="article-page display-none">
+                   
+    						
+    					</div>
+    					<div class="article-btn">
+    						<a href="javascript:void(0);" class="btn btn-gray art-print">打印</a>
+        						<a href="javascript:void(0);" target="_blank" class="btn btn-gray ml10 art-collect">收藏</a>
+        						<a href="javascript:void(0);" class="btn btn-gray ml10 art-close">关闭</a>
+    					</div>
+    				</div>  
+				</div>
+     
+            </div>
+      </div>
+
+    <script>
+  changeVertion('/common/js/toggleBig5.js', 'js');
+  navMenuAJAX('/application/publicindex/footer/index.html','/application/publicindex/footer/index.html', 'footer','www');
+  addComJsFile();
+</script>
+    <script>
+  (function () {
+    var _versionDate = new Date().getTime();
+
+    var _host = 'http://www.szse.cn';
+    if (location.protocol == 'https:') {
+      _host = 'https://www.szse.cn';
+    }
+
+    var backDomain = 'http://www.sse.org.cn'
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    if (backDomain && window.location.host.match(reg)[2] === backDomain.match(reg)[2]) {
+      _host = 'http://www.sse.org.cn';
+      if (location.protocol == 'https:') {
+        _host = 'https://www.sse.org.cn';
+      }
+
+    }
+    document.write(" <script src='" + _host + "/dynamicmodule/index/sysconfig.js?random=" + _versionDate + "'> <\/script> ");
+
+  }());
+</script>
+    <script>
+    	var articleDetail = {
+    		docTitle:'关于发布《深圳证券交易所交易规则》的通知',
+    		subDocTitle:'',
+    		docAbstract:'',
+                articleId:'499577',
+		channelCode:'general_news',
+    channelId : '212'
+    	}
+    </script>
+    <script>
+    	changeVertion('/common/js/articleDetail.js','js');
+    </script>
+    <script>
+  changeVertion('/lib/validator/jquery.validate.js', 'js');
+  changeVertion('/common/js/jquery.validate_extend.js', 'js');
+  changeVertion('/lib/webuploader-0.1.5/webuploader.js', 'js');
+  changeVertion('/common/plugins/index.min.js', 'js');
+  changeVertion('/common/js/articleDetailUtil.js','js');
+</script>
+  </body>
+</html>
+
+
+
