@@ -20,3 +20,6 @@ uv.lock text eol=lf
 # (never eol-normalized - their sha256 IS their name).
 configs/trading_rules/evidence/** -text
 
+# Draft H1 source intake is also byte-exact; the evidence bundle computes
+# SHA-256 over these files and must not receive platform line-ending changes.
+docs/provider_verification/trading_rule_h1_sources/** -text !eol -diff

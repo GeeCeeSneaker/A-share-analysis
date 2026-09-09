@@ -1,3 +1,34 @@
+## 2026-09-09 · H1R2 来源合同修正与 2020+ 范围收缩
+
+> 状态：**H1R2 CANDIDATE STAGED / SOURCE URL EXACTLY BOUND / 2020+ SCOPED / LOCAL PREPARE GREEN / REVIEW CHECKLIST PREPARED / HUMAN REVIEW DEFERRED TO SEPARATE SEAL PR / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**
+
+- 根据 PR #35 最新项目范围修正，本轮不再把 1998 年 SH/SZ ST 起点作为 P0；H1R2 只覆盖 2020-01-01 以后，并保留 2020-08-24、2023-04-10、2026-07-06 等必要制度切换。完整 pre-2020 历史重建列为后续非阻断 backlog，不代表放宽 2020+ PIT 证据要求。
+- `configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml` 已恢复到 `main@a797f1186209e7548167e2fa652ce78715f24180` 的原始字节，manifest-style SHA-256 为 `75d21777f1f135c47b963868641dfffc5428c5c5d897e17480a91ebaec1edd51`；未在原目录原地改写。
+- 新建非 ACTIVE `configs/trading_rules/versions/v20260909-h1r2-compiled/rules.yaml`，dataset version `2026-09-09.2`，14 条规则，manifest-style SHA-256 为 `6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`。
+- H1R2 evidence input 与候选 `source_ref` 精确绑定实际原始 HTML/PDF/DOCX URL；locator/notice page 只保留在 source catalog 的 `source_page_url`，不再以 `download_url` 之外的 unsealed 关系冒充 bundle provenance。当前 19 个唯一来源、19 个去重 raw artifact、1,702,416 bytes；canonical bundle 16,557 bytes，SHA-256 为 `14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`。
+- 修复 H1R2 evidence input 中 `MAIN_BOARD_ST_HISTORICAL_SZ` 的重复 `artifact_path` key；新增递归 `object_pairs_hook` 回归断言，防止标准 JSON 解析静默丢字段。删除不再属于 H1R2 的 `direct_06.pdf` / `direct_07.html` 孤立 pre-2020 原件。
+- 旧 H1R1 的 `direct_06` / `direct_07` 不再加入本 PR，已从当前分支移除；其 pre-2020 历史事实不在 H1R2 source catalog 或 bundle 中，完整历史研究退回 backlog。历史治理文档恢复为主分支已接受版本，新整改说明见 [`A-share-analysis_TradingRule-H1R2来源合同与范围收缩整改记录_20260909.md`](design/A-share-analysis_TradingRule-H1R2来源合同与范围收缩整改记录_20260909.md)。
+- 当前仍未运行 seal、未创建 REVIEWED、未切换 ACTIVE、未创建 Formal Production run，B1-B7 继续禁止；账号、密码、endpoint、Token、Cookie、原始 profile、Provider 输出和专有 SDK/runtime 未进入 GitHub。
+
+下一步：当前 PR 只等待独立 Reviewer 审查 H1R2 的候选/source contract、重复键修正、2020+ 范围和 CI；14/14 人工原文裁决使用已准备的 [`TradingRule_H1_人工审阅操作表_20260909.md`](design/TradingRule_H1_人工审阅操作表_20260909.md)，后移到合并后的独立 evidence/seal PR。合并前不得 seal 或进入 Formal Production。
+
+## 2026-09-09 · H1 证据接收与 Formal Production 前置拒绝
+
+> 状态：**H1 EVIDENCE INTAKE PREPARED / LOCAL_FULL_TEST_GREEN / CI_GREEN / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED / NO ATTEMPT CONSUMED**
+
+- PR #33 已由独立 Reviewer 通过并合并，当前 clean current-main 为 `a797f1186209e7548167e2fa652ce78715f24180`；本次新建 detached checkout，`git status --porcelain` 为空。
+- 本次在线预检重新确认 SDK/runtime、网络、认证、查询就绪和脱敏身份 `UNKNOWN_24e2ff401792`；SH 交易日历实际解析的最近完整交易日为 `20260908`。
+- **程序性偏差**：Issue #34 已明确要求 H1 阶段不得启动 Formal Production，但此前仍误调用 `uv run python scripts/spike/spike_runner.py --production --date 20260908`；运行器在 `SpikeRun` 创建前因 ACTIVE `v20260824-compiled` 仍为 `COMPILED` fail closed。因此无 run ID、无 B1-B7 结果、无 verdict、未消耗正式 attempt；该调用不符合流程，禁止重复。
+- 已获取 H1 候选声明的 21 个唯一来源：16 个直接 HTTP 200 原始 HTML/PDF，SSE 2026 规则与 SZSE 2020 创业板规则改用发布页链接的原始 DOCX/PDF 附件，3 个 BSE 页面改用官方链接的原始 DOCX 附件；不再使用浏览器解析 DOM。source catalog 记录发布页、附件 URL、HTTP 状态、字节数与 hash。
+- SSE 历史 ST 来源已从不含 5% 条款的低价申报通知改为官方《风险警示板股票交易暂行办法》原文；其 2013-01-01 生效日不能自动证明候选的 1998 历史起点，该边界仍待独立 Reviewer 裁决。
+- `trading_rule_h1_evidence_input.json` 已按 14 个 rule_id 重新生成并通过纯 prepare 校验：21 个去重 raw artifact、2,697,916 bytes；bundle 16,280 bytes，SHA256 为 `e57906370cc941ca3527ad6af1510cec73542bc4466835dd36e8eea869ebda00`。候选 manifest-style SHA256 为 `8645d39aa73322ba2a25cae3f852b58a34b862f8702ebd09422257e96fc554a1`。未执行 seal，未写入 REVIEWED 或 ACTIVE。
+- 本地 `uv run pytest -q` 在移除为一次性来源抓取临时安装的 Playwright 包后以退出码 0 完成 100% 回归；此前唯一失败是本地缺失 Playwright 浏览器二进制的环境分支，非本轮 H1 文件或生产代码失败。
+- GitHub Actions CI run `34339703418` / #501 已完成：Ubuntu 3.14、Windows 3.12、Windows 3.14 三个矩阵均为 `success`；受控 Formal workflow 按当前门禁为 `skipped`。
+- 账号、密码、真实 endpoint、Token、Cookie、raw profile、原始 SDK 输出和专有 wheel 均未进入 GitHub。
+
+下一步：项目管理者/独立 Reviewer 按 `TradingRule_H1_人工审阅操作表_20260909.md` 实际打开 14 条所需原文并填写结果；只有 14/14 APPROVE、独立关闭边界/来源/不可变性审阅后，才可运行 H1 candidate seal，随后再从最新 main 重做 Formal B1-B7。
+
+
 ## 2026-09-09 · H1 Seal 生命周期独立审阅阻断项修复
 
 > 状态：**REVIEW_BLOCKERS_ADDRESSED / LOCAL_FOCUSED_VERIFIED / CI_GREEN / INDEPENDENT_REVIEW_RETRY_PENDING / REAL EVIDENCE NOT MATERIALIZED**
