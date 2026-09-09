@@ -1,9 +1,17 @@
 # Trading Rule H1R2 证据接收与 Formal 预检记录
 
 日期：2026-09-09（Asia/Shanghai）
-源码基线：`main@a797f1186209e7548167e2fa652ce78715f24180`
+源码基线（原始接收记录）：`main@a797f1186209e7548167e2fa652ce78715f24180`
 候选：`v20260909-h1r2-compiled` / dataset version `2026-09-09.2`
 候选 manifest-style SHA-256：`6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`
+
+## 0. 合并后独立 evidence/seal lane
+
+PR #35 已合并，当前独立执行基线为 clean `main@e096b0364d3dc5a00e21879fe5bd8fc4a758b07f`。合并后重新验证 ACTIVE 仍为 `v20260824-compiled` / `COMPILED`，旧 ACTIVE dataset hash 为 `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8`。
+
+当前 H1R2 candidate hash 未变，仍为 `6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`。已按 candidate `source_ref` 精确派生 19 个 required URL，并将 19 个 raw artifact（1,702,416 bytes）和 canonical bundle（16,557 bytes）物化到 `configs/trading_rules/evidence/sha256/`；bundle ref/hash 为 `sha256/14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`。
+
+本段是合并后的当前执行事实；下方第 1、2 节保留原始 intake 的历史接收与前置拒绝记录。14 条人工审阅尚未开始，未运行 seal、未创建 REVIEWED、未切换 ACTIVE，也未启动 Formal Production。
 
 本记录已由 H1R2 来源合同整改更新。此前 H1R1 intake 的候选字节、1998 起点材料和旧 bundle 数字仅作为本 PR 的历史接收事实；它们不再是当前候选的放行依据。旧 `v20260909-h1-compiled/rules.yaml` 已恢复并保持与 `main` 字节一致，H1R2 使用独立目录。
 

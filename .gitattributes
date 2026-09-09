@@ -17,8 +17,9 @@ uv.lock text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
 # Content-addressed review evidence artifacts must stay byte-exact
-# (never eol-normalized - their sha256 IS their name).
-configs/trading_rules/evidence/** -text
+# (never eol-normalized - their sha256 IS their name). Disable text diff
+# checks too: raw HTML may legitimately contain trailing spaces/tabs.
+configs/trading_rules/evidence/** -text !eol -diff
 
 # Draft H1 source intake is also byte-exact; the evidence bundle computes
 # SHA-256 over these files and must not receive platform line-ending changes.

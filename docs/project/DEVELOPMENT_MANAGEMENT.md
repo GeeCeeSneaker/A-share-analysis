@@ -5845,3 +5845,25 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - SSE 官方市场史：[链接](https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf)；SZSE 官方 1998 年大事记：[链接](https://www.szse.cn/aboutus/sse/events/t20070328_497832.html)。这些来源已进入候选 required URL contract，但原始 bytes 尚未纳入 H1 evidence，完整法律生效日仍须独立 Reviewer 实际核验。
 - 人工审阅表和 template 已同步为 14 条；旧 compiled、ACTIVE pointer、Golden v7/evidence/receipt 不变。确认该 P0 前仍禁止 REVIEWED、ACTIVE、run_id 和 B1-B7。
 - 本地全量 `uv run pytest -q` 退出码为 0（1,654 项收集、2 项既有跳过、无失败）；Ruff、format、mypy、`uv pip check` 和 `git diff --check` 均通过。GitHub Actions CI run `34310188331` / #490 的 Ubuntu 3.14、Windows 3.14、Windows 3.12 全部成功。
+## DM-20260909-TRADING-RULE-H1R2-007 · 合并后独立 evidence/seal 执行准备
+
+**Type**：C2 — real first-party evidence materialization and review preparation
+**Date**：2026-09-09
+**Status**：`EVIDENCE MATERIALIZED / BASELINE VERIFIED / BUNDLE VERIFIED / HUMAN REVIEW PENDING / NOT SEALED / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED`
+
+**执行基线**：PR #35 已合并，clean `main` 为 `e096b0364d3dc5a00e21879fe5bd8fc4a758b07f`。重新运行 `load_active_rules()` 后，ACTIVE 仍为 `v20260824-compiled` / `COMPILED`，dataset hash 为 `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8`。
+
+**已完成**
+
+- H1R2 `v20260909-h1r2-compiled` 保持非 ACTIVE、`COMPILED`、14 条，候选 manifest-style hash 为 `6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`。
+- 从候选 `source_ref` 精确派生 19 个 required official URL；canonical `RULE_EVIDENCE_BUNDLE.v1` 与 19 个 raw artifact 已写入 `configs/trading_rules/evidence/sha256/`。
+- bundle 为 16,557 bytes，ref/hash 为 `sha256/14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`；raw artifact 合计 1,702,416 bytes。`validate_rule_evidence_bundle()` 已通过。
+- 完整 artifact/ref/bytes/规则映射见 [`TradingRule_H1R2证据封印执行记录_20260909.md`](../design/TradingRule_H1R2证据封印执行记录_20260909.md)。
+
+**未完成与硬边界**
+
+- 14 行人工审阅表仍待实际打开 raw artifact 后填写；当前没有伪造的 `APPROVE`/`REJECT`、reviewer marker 或 `REVIEWED` provenance。
+- 未运行 `scripts/rules/review.py --candidate`，未创建 REVIEWED、未切换 ACTIVE，未启动/重试/消耗 Formal Production；Golden v7 和旧 parent/candidate 未修改。
+- 必须先完成 14/14 人工原文裁决，再由独立 Reviewer 复核来源、hash lineage、两个 COMPILED candidate 和旧 ACTIVE 不可变性；之后才允许运行一次性 seal。
+
+**下一步**：将本记录、bundle、raw artifact 和人工审阅表提交为独立 evidence/seal PR；审阅与后续 seal 完成并独立合并前，Formal Production B1-B7 继续禁止。账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。

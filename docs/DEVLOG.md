@@ -3633,3 +3633,14 @@
 - 旧 `v20260824-compiled`、ACTIVE pointer、Golden v7 及其 evidence/receipt 未修改；账号、密码、IP、端口、Token 未写入仓库。
 - 本地全量 `uv run pytest -q` 退出码为 0（1,654 项收集、2 项既有跳过、无失败）；Ruff、format、mypy、`uv pip check` 和 `git diff --check` 均通过。
 - GitHub Actions CI run `34310188331` / #490 已验证 Ubuntu 3.14、Windows 3.14、Windows 3.12 三个平台全部成功；H1R 的历史 venue 起点整改仍须独立 Reviewer 关闭后，才能进入真实 evidence、REVIEWED、ACTIVE 或 B1-B7。
+## 2026-09-09 · H1R2 合并后独立 evidence/seal 执行准备
+
+> 状态：**EVIDENCE MATERIALIZED / CLEAN MAIN BASELINE VERIFIED / BUNDLE CONTRACT VERIFIED / HUMAN REVIEW PENDING / NOT SEALED / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**
+
+- PR #35 已由独立 Reviewer 授权并合并，合并提交为 `e096b0364d3dc5a00e21879fe5bd8fc4a758b07f`；本执行分支从该 clean `main` 建立。
+- 合并后重新运行 `load_active_rules()`：ACTIVE 仍为 `v20260824-compiled`、`COMPILED`，dataset hash 仍为 `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8`；H1R2 候选 14 条，manifest-style hash 仍为 `6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`。
+- 按候选 `source_ref` 和合并后的 `RULE_EVIDENCE_BUNDLE.v1` 实现重新派生并校验 19 个且仅 19 个官方 URL；已将 19 个 raw artifact（合计 1,702,416 bytes）和 16,557 bytes canonical bundle 写入 `configs/trading_rules/evidence/sha256/`。bundle ref/hash 为 `sha256/14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`。
+- `validate_rule_evidence_bundle()` 通过，候选 hash、required URL exact coverage、raw hash/size、content-address 和路径约束均通过；逐源清单见 [`TradingRule_H1R2证据封印执行记录_20260909.md`](design/TradingRule_H1R2证据封印执行记录_20260909.md)。
+- 14 条人工表仍为 `待填`：尚未写入任何 `APPROVE`/`REJECT`、reviewer marker 或 `REVIEWED` provenance；未运行 `scripts/rules/review.py --candidate`，未切换 ACTIVE，未启动/重试/消耗 Formal Production。
+
+下一步：在本独立 evidence/seal PR 中由项目 Owner/人工 Reviewer 实际打开每一份 raw artifact，完成 14 行条款、页码和 2020+ 边界裁决；再由独立 Reviewer 核验原文、来源 URL、hash lineage、候选/旧 parent 不可变性和最终迁移计划。两类审阅均关闭前不得 seal、切 ACTIVE 或进入 Formal B1-B7。

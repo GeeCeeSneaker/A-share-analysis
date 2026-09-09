@@ -2,7 +2,9 @@
 
 适用候选：`configs/trading_rules/versions/v20260909-h1r2-compiled/rules.yaml`
 候选版本：`2026-09-09.2`，共 14 条，当前 `COMPILED`、非 `ACTIVE`。
-目的：作为后续独立 evidence/seal PR 的审阅清单，在不修改候选 YAML 的前提下逐条打开官方原文，确认规则事实、适用范围和制度切换边界。本表不是 PR #35 合并前置条件。
+目的：作为独立 evidence/seal PR 的审阅清单，在不修改候选 YAML 的前提下逐条打开官方原文，确认规则事实、适用范围和制度切换边界。本表不是已合并 PR #35 的合并前置条件。
+
+本次执行基线：`main@e096b0364d3dc5a00e21879fe5bd8fc4a758b07f`；candidate hash：`6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`；已物化 bundle：`sha256/14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`（16,557 bytes），raw artifact 19 个（1,702,416 bytes）。每行结果仍必须由人工实际打开对应原文后填写，当前不得视为已审阅。
 
 ## 一、审阅原则
 
