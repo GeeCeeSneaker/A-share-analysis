@@ -36,7 +36,7 @@
       "sources": [
         {
           "artifact_path": "sources/main_board_st_sse.html",
-          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml",
+          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/c_20121216_10785153.shtml",
           "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
         },
@@ -98,9 +98,15 @@
       "rule_id": "MAIN_BOARD_IPO_DAY",
       "sources": [
         {
-          "artifact_path": "sources/main_board_ipo_old_sse.html",
-          "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
-          "artifact_kind": "EXCHANGE_RULEBOOK",
+          "artifact_path": "sources/main_board_ipo_2014_sse.html",
+          "source_url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20150912_3988761.shtml",
+          "artifact_kind": "EXCHANGE_NOTICE",
+          "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_ipo_2014_szse.html",
+          "source_url": "https://www.szse.cn/aboutus/trends/news/t20140613_518480.html",
+          "artifact_kind": "EXCHANGE_NOTICE",
           "role": "RULE"
         },
         {
@@ -258,9 +264,9 @@
           "role": "RULE"
         },
         {
-          "artifact_path": "sources/bse_effective_date.html",
+          "artifact_path": "sources/bse_effective_date.docx",
           "source_url": "https://www.bse.cn/cxjg_list/200010908.html",
-          "artifact_kind": "EXCHANGE_NOTICE",
+          "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "TRANSITION"
         },
         {

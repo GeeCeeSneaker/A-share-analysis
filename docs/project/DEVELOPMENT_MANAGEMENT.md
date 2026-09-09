@@ -1,5 +1,7 @@
 ## DM-20260909-008 · H1 证据接收与 Formal 前置拒绝
 
+> 本条保留首次 intake 的历史记录；其浏览器 DOM 和旧 bundle 数字已被后续独立 PR #35 的纠正记录 supersede，当前状态以紧接其后的 H1 source replacement 记录为准。
+
 - **Type**：C0 — Formal Production fail-closed preflight and H1 evidence intake
 - **Date**：2026-09-09
 - **Status**：`H1 EVIDENCE INTAKE PREPARED / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ATTEMPT NOT CONSUMED`
@@ -9,13 +11,13 @@
 
 - 新 clean checkout 的源码身份与当前 main 一致，工作树为空；AmazingData `1.1.9`、tgw `1.0.9.2`、runtime `V4.3.0.260626-rc2.0-YHZQ` 可实际加载。
 - 本次在线预检重新确认网络、认证和查询就绪，脱敏 profile `UNKNOWN_24e2ff401792` 与冻结值一致；SH 交易日历解析最近完整交易日 `20260908`。
-- 正式入口因 ACTIVE trading rule dataset 为 `COMPILED` 在 `SpikeRun` 创建前拒绝；没有 run ID、B1-B7 结果或 verdict，正式单次 attempt 未消耗。这不是 Provider `FAILED` 或 `NO-GO`。
-- 已准备 14-rule H1 evidence input：19 个唯一 raw artifact，16 个 direct HTTP 200，3 个 BSE 页面为直连 302/WAF 后的隔离 Chrome browser-resolved DOM；bundle SHA256 为 `a63b652ab08dda4cc12bd20716131ed3eff3b6f7845ddb6b1fa3af3462c33aa`。
+- Issue #34 已禁止在 H1 阶段启动 Formal Production，但此前仍误调用正式入口；它在 `SpikeRun` 创建前因 ACTIVE trading rule dataset 为 `COMPILED` 拒绝，没有 run ID、B1-B7 结果或 verdict，正式单次 attempt 未消耗。这不是 Provider `FAILED` 或 `NO-GO`，但属于程序性偏差，禁止重复。
+- 首次 intake 的 14-rule evidence input 后续已改正：当前为 21 个唯一 raw artifact（16 个直接 HTTP 200 HTML/PDF、5 个官方链接附件），不再使用 3 个 BSE browser-resolved DOM；当前 bytes、bundle hash 和 source identity 以新的 H1 source replacement 记录为准。
 
 **治理边界**
 
 - H1 输入文件与 source catalog 已落在 `docs/provider_verification/`，但不代表人工 APPROVE、REVIEWED seal 或 ACTIVE 切换；当前候选/ACTIVE/Golden v7 均未改写。
-- BSE 三份浏览器归档必须由 Reviewer 确认原文资格；若不接受，管理者需提供浏览器下载的原始 HTML/PDF/DOCX 并重算 hash。
+- 初次 BSE 浏览器归档不再作为当前证据；其对应的官方链接原始 DOCX 已在后续 intake 中替换并重算 hash。
 - 14 条人工审阅、独立 Reviewer closure、H1 REVIEWED 合并之前，禁止切 ACTIVE、创建 Formal run、计算 verdict、批准 Provider/Data Sufficiency 或运行 backfill。
 
 **项目文件**
@@ -23,6 +25,21 @@
 - [`trading_rule_h1_evidence_intake_20260909.md`](../provider_verification/trading_rule_h1_evidence_intake_20260909.md)
 - [`trading_rule_h1_evidence_input.json`](../provider_verification/trading_rule_h1_evidence_input.json)
 - [`trading_rule_h1_source_catalog.json`](../provider_verification/trading_rule_h1_source_catalog.json)
+
+## DM-20260909-TRADING-RULE-H1-005 · H1 original-attachment replacement and procedural deviation record
+
+**Type**：C1 — evidence provenance correction and formal-entry governance
+**Date**：2026-09-09
+**Status**：IMPLEMENTED / LOCAL FULL TEST GREEN / CI VALIDATION PENDING / HUMAN REVIEW PENDING / FORMAL ENTRY PROHIBITED
+**Evidence**：PR #35；`docs/provider_verification/trading_rule_h1_evidence_input.json`；`docs/provider_verification/trading_rule_h1_source_catalog.json`；`docs/provider_verification/trading_rule_h1_evidence_intake_20260909.md`。
+
+- 外部独立审阅指出：BSE 的 `browser_resolved_dom` 不是原始下载字节；现已删除 3 份 DOM，改存 BSE 官方发布页链接的 3 份原始 DOCX，附件响应均为 HTTP 200，catalog 保存发布页 URL、附件 URL、状态、大小与 SHA-256。
+- SSE 2026 交易规则和 SZSE 2020 创业板特别规定的 locator/notice page 不再被当作规则正文；分别改存官方链接的原始 DOCX/PDF。所有 `RULE` artifact 仍须由 Reviewer 实际打开确认条款。
+- 原 SSE `direct_05` 页面正文只涉及低价风险警示股票的最小变动单位，不能直接证明 5% 条款；候选已改绑官方《风险警示板股票交易暂行办法》原文。该原文写明 5% 和 2013-01-01 施行，但不能单独把法律生效日回推到候选的 1998 历史起点，SH/SZ 起点仍是人审阻塞项。
+- 当前候选因 source contract 修正重算为 manifest-style SHA-256 `8645d39aa73322ba2a25cae3f852b58a34b862f8702ebd09422257e96fc554a1`；input bundle 为 21 个 raw artifact、2,697,916 bytes、16,280 bytes、SHA-256 `e57906370cc941ca3527ad6af1510cec73542bc4466835dd36e8eea869ebda00`。这些只是未封印的 candidate/intake 校验值。
+- 本地 `uv run pytest -q` 在移除一次性来源抓取用 Playwright 包后退出码为 0，完成 100% 回归；CI 仍需以本次提交的新 head 结果为准。
+- Issue #34 明确要求 H1 阶段不得启动、重试或消耗 Formal Production B1-B7。此前一次误调用在 `SpikeRun` 创建前因 ACTIVE 为 `COMPILED` fail closed，未创建 run、未消耗 attempt；该调用仍是不合规的程序性偏差，必须保留记录且不得重复。
+- 当前仍禁止人工结果代填、H1 seal、REVIEWED/ACTIVE 切换和任何 Formal Production 入口；必须先完成 14/14 原文条款与边界审阅、独立 Reviewer closure，并在审阅合并后从最新 clean main 重新执行下游流程。
 
 
 ## DM-20260909-007 · H1 Seal 生命周期独立审阅阻断项修复

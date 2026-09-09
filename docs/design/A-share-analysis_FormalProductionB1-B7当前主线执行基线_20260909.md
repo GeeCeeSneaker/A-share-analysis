@@ -31,11 +31,9 @@
 
 停止继续扩展非必要 Golden / receipt / verifier hardening。
 
-当前唯一主任务是：
+当前唯一主任务是完成 Trading Rule H1 的第一方原文留存、14 条逐条人工审阅和独立 Reviewer closure。Formal Production B1-B7 是其后的下游动作，在 H1 evidence/seal PR 独立审阅并合并前明确禁止启动、重试或消耗。
 
-> 在具备 AmazingData SDK/runtime 与正式账号环境的 Windows operator 上，准备一个执行时 current main 的完整、干净、可核验 checkout，并启动唯一一次受控 Formal Production B1-B7。
-
-本任务不是“再做一次预检文档”，也不是 CI dry-run；目标是产生真实 `RunKind.PRODUCTION` run ID、完整 B1-B7 run-bound evidence 和同一 run 的最终 verdict（若 lifecycle 为 CLOSED）。
+本阶段不是 Formal Production 运行，也不是通过增加预检文档替代 H1 门禁；只有 H1 REVIEWED 版本进入 main 后，才可在届时最新 clean checkout 中重新做 preflight，并产生真实 `RunKind.PRODUCTION` run ID、完整 B1-B7 run-bound evidence 和同一 run 的最终 verdict（若 lifecycle 为 CLOSED）。
 
 ## 4. Clean checkout 强制要求
 
@@ -160,10 +158,10 @@ uv run python scripts/spike/spike_runner.py --verdict --run-id <run-id>
 - GT-H3B：CLOSED；
 - reviewed Golden v7：ACTIVE / REVIEWED 125/125；
 - real-corpus offline verifier：三平台集成回归已建立；
-- H1 trading-rule prerequisite：`v20260909-h1-compiled` 已完成来源 intake，但 14 条人工审阅、独立 Reviewer closure 和 REVIEWED seal 尚未完成；ACTIVE 仍为 `v20260824-compiled` / `COMPILED`；
-- Formal Production B1-B7：AUTHORIZED FOR ONE CONTROLLED ATTEMPT / BLOCKED BEFORE RUN CREATION BY ACTIVE COMPILED RULES；
+- H1 trading-rule prerequisite：`v20260909-h1-compiled` 已完成第一方附件 intake，但 14 条人工审阅、独立 Reviewer closure 和 REVIEWED seal 尚未完成；ACTIVE 仍为 `v20260824-compiled` / `COMPILED`；
+- Formal Production B1-B7：PROCEDURALLY PROHIBITED DURING H1 / NO RUN CREATED / NO ATTEMPT CONSUMED；
 - Provider verdict：PENDING；
 - Data Sufficiency Matrix：BLOCKED pending accepted Formal Production evidence；
 - 2020+ backfill：BLOCKED。
 
-本文件原定的唯一 Formal Production 动作已在执行时被 H1 ACTIVE `COMPILED` 硬门诚实拒绝；当前应先完成 H1 人工审阅和独立封印，不得用继续增加无关治理文档或 Golden hardening 替代该前置工作。H1 seal 合并后，必须从届时最新 main 重新做本文件第 4-6 节 preflight，再执行唯一正式 attempt。
+Issue #34 已明确禁止在 H1 阶段进入 Formal Production；此前一次误调用在创建 `SpikeRun` 前被 H1 ACTIVE `COMPILED` 硬门拒绝，没有 run ID、没有结果、没有 verdict，也未消耗正式 attempt，但该调用属于程序性偏差，不得重复。当前必须先完成 H1 人工审阅和独立封印，不得用继续增加无关治理文档或 Golden hardening 替代该前置工作。H1 seal 合并后，必须从届时最新 main 重新做本文件第 4-6 节 preflight，再执行唯一正式 attempt。

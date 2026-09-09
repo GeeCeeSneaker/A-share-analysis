@@ -1,12 +1,14 @@
 ## 2026-09-09 · H1 证据接收与 Formal Production 前置拒绝
 
-> 状态：**H1 EVIDENCE INTAKE PREPARED / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ATTEMPT NOT CONSUMED**
+> 状态：**H1 EVIDENCE INTAKE PREPARED / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED / NO ATTEMPT CONSUMED**
 
 - PR #33 已由独立 Reviewer 通过并合并，当前 clean current-main 为 `a797f1186209e7548167e2fa652ce78715f24180`；本次新建 detached checkout，`git status --porcelain` 为空。
 - 本次在线预检重新确认 SDK/runtime、网络、认证、查询就绪和脱敏身份 `UNKNOWN_24e2ff401792`；SH 交易日历实际解析的最近完整交易日为 `20260908`。
-- 按唯一入口尝试 `uv run python scripts/spike/spike_runner.py --production --date 20260908`，在 `SpikeRun` 创建前因 ACTIVE `v20260824-compiled` 仍为 `COMPILED` fail closed；无 run ID、无 B1-B7 结果、无 verdict、未消耗正式 attempt。
-- 已获取 H1 候选声明的 19 个唯一来源：16 个直接 HTTP 200 原始 HTML/PDF，3 个 BSE 页面直连为 302/WAF 后使用隔离 Chrome 得到浏览器解析 DOM；后 3 个已明确标注，待 Reviewer 确认是否满足原文/原始字节要求。
-- `trading_rule_h1_evidence_input.json` 已按 14 个 rule_id 生成并通过纯 prepare 校验：bundle SHA256 `a63b652ab08dda4cc12bd20716131ed3eff3b6f7845ddb6b1fa3af3462c33aa`，19 个去重 raw artifacts，合计 3,232,349 bytes。未执行 seal，未写入 REVIEWED 或 ACTIVE。
+- **程序性偏差**：Issue #34 已明确要求 H1 阶段不得启动 Formal Production，但此前仍误调用 `uv run python scripts/spike/spike_runner.py --production --date 20260908`；运行器在 `SpikeRun` 创建前因 ACTIVE `v20260824-compiled` 仍为 `COMPILED` fail closed。因此无 run ID、无 B1-B7 结果、无 verdict、未消耗正式 attempt；该调用不符合流程，禁止重复。
+- 已获取 H1 候选声明的 21 个唯一来源：16 个直接 HTTP 200 原始 HTML/PDF，SSE 2026 规则与 SZSE 2020 创业板规则改用发布页链接的原始 DOCX/PDF 附件，3 个 BSE 页面改用官方链接的原始 DOCX 附件；不再使用浏览器解析 DOM。source catalog 记录发布页、附件 URL、HTTP 状态、字节数与 hash。
+- SSE 历史 ST 来源已从不含 5% 条款的低价申报通知改为官方《风险警示板股票交易暂行办法》原文；其 2013-01-01 生效日不能自动证明候选的 1998 历史起点，该边界仍待独立 Reviewer 裁决。
+- `trading_rule_h1_evidence_input.json` 已按 14 个 rule_id 重新生成并通过纯 prepare 校验：21 个去重 raw artifact、2,697,916 bytes；bundle 16,280 bytes，SHA256 为 `e57906370cc941ca3527ad6af1510cec73542bc4466835dd36e8eea869ebda00`。候选 manifest-style SHA256 为 `8645d39aa73322ba2a25cae3f852b58a34b862f8702ebd09422257e96fc554a1`。未执行 seal，未写入 REVIEWED 或 ACTIVE。
+- 本地 `uv run pytest -q` 在移除为一次性来源抓取临时安装的 Playwright 包后以退出码 0 完成 100% 回归；此前唯一失败是本地缺失 Playwright 浏览器二进制的环境分支，非本轮 H1 文件或生产代码失败。
 - 账号、密码、真实 endpoint、Token、Cookie、raw profile、原始 SDK 输出和专有 wheel 均未进入 GitHub。
 
 下一步：项目管理者/独立 Reviewer 按 `TradingRule_H1_人工审阅操作表_20260909.md` 实际打开 14 条所需原文并填写结果；只有 14/14 APPROVE、独立关闭边界/来源/不可变性审阅后，才可运行 H1 candidate seal，随后再从最新 main 重做 Formal B1-B7。

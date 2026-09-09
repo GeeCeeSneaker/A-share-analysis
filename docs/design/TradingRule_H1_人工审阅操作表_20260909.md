@@ -17,10 +17,10 @@
 | 序号 | rule_id | 需要确认的具体事实 | 对照的官方原文 | 结果（APPROVE/REJECT） | 原文页码/条款与简短备注 |
 |---:|---|---|---|---|---|
 | 1 | `MAIN_BOARD_NORMAL` | 沪深主板普通股票日涨跌幅为 10%；代码范围、长期生效语义与 `st_state=false` 一致；当前区间不能只依赖历史规则 | [SSE 历史主板规则](https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml)；[SZSE 历史交易规则](https://www.szse.cn/disclosure/notice/general/t20060515_499577.html)；[SSE 2026 现行交易规则](https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml)；[SZSE 2026 现行交易规则 PDF](https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf) | 待填 |  |
-| 2 | `MAIN_BOARD_ST_HISTORICAL_SH` | 沪市主板风险警示股票在 `19980422`—`20260705` 为 5%；官方沪市历史记录的首次特别处理日期为 1998-04-22；`st_state=true`、SH/60xxxx 适用范围成立 | [SSE 历史风险警示板办法](https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml)；[SSE 官方市场史](https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf) | 待填 | 需同时确认 1998-04-22 起点与 2026-07-05 终点 |
+| 2 | `MAIN_BOARD_ST_HISTORICAL_SH` | 沪市主板风险警示股票在 `19980422`—`20260705` 为 5%；官方沪市历史记录的首次特别处理日期为 1998-04-22；`st_state=true`、SH/60xxxx 适用范围成立 | [SSE 历史风险警示板办法](https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/c_20121216_10785153.shtml)；[SSE 官方市场史](https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf) | 待填 | 需同时确认 1998-04-22 起点与 2026-07-05 终点；不得把办法的 2013-01-01 施行日自动回推到 1998 |
 | 3 | `MAIN_BOARD_ST_HISTORICAL_SZ` | 深市主板风险警示股票在 `19980428`—`20260705` 为 5%；官方深市历史记录的首次特别处理日期为 1998-04-28；`st_state=true`、SZ/000xxx、001xxx、002xxx、003xxx 适用范围成立 | [SZSE 历史交易规则](https://www.szse.cn/disclosure/notice/general/t20060515_499577.html)；[SZSE 官方 1998 年大事记](https://www.szse.cn/aboutus/sse/events/t20070328_497832.html) | 待填 | 需同时确认 1998-04-28 起点与 2026-07-05 终点 |
 | 4 | `MAIN_BOARD_ST_CURRENT` | 沪深主板风险警示股票自 `20260706` 起为 10%；当前 `20260908` 必须命中 10%，不能命中旧 5% | [SSE 2026 现行交易规则](https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml)；[SSE 2026 风险警示调整公告](https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20260424_10816474.shtml)；[SZSE 2026 现行交易规则 PDF](https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf)；[SZSE 2026 风险警示业务指南公告](https://www.szse.cn/lawrules/service/member/t20260630_621404.html) | 待填 | 必须记录 2026-07-06 生效条款与 10%数值 |
-| 5 | `MAIN_BOARD_IPO_DAY` | 旧制度上市首日上限 +44%、下限 −36%；`effective_to=20230409` 是否由官方过渡条款和首批注册制主板上市日直接证明 | [SSE 主板规则](https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml)；[SSE 过渡说明](https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230217_5716420.shtml)；[SZSE 首批注册制主板上市](https://www.szse.cn/aboutus/trends/news/t20230404_599697.html) | 待填 |  |
+| 5 | `MAIN_BOARD_IPO_DAY` | 旧制度上市首日上限 +44%、下限 −36%；`effective_to=20230409` 是否由官方过渡条款和首批注册制主板上市日直接证明 | [SSE 2014 新股上市初期交易监管通知](https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20150912_3988761.shtml)；[SZSE 2014 新股上市首日问答](https://www.szse.cn/aboutus/trends/news/t20140613_518480.html)；[SSE 过渡说明](https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230217_5716420.shtml)；[SZSE 首批注册制主板上市](https://www.szse.cn/aboutus/trends/news/t20230404_599697.html) | 待填 | 需分别确认两交易所的 144%/64% 原文，并单独裁决 2023-04-09 终止边界 |
 | 6 | `MAIN_BOARD_FIRST5_NO_LIMIT` | 注册制主板 IPO 上市后前 5 个交易日不限价，第 6 个交易日回到普通 10%；2023-04-10 的生效语义成立；同一条规则对 `is_st=false/true` 均可解析 | [SSE 首 5 个交易日说明](https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230201_5715605.shtml)；[SZSE 主板 IPO 问答](https://investor.szse.cn/knowledge/qa/t20230306_599093.html)；[首批上市](https://www.szse.cn/aboutus/trends/news/t20230404_599697.html)；[SSE 2026 现行交易规则](https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml)；[SZSE 2026 现行交易规则 PDF](https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf) | 待填 | 分别记录普通/ST 两次解析结果；不再要求来源证明不存在的独立 ST FIRST5 规则 |
 | 7 | `CHINEXT_PRE_REGISTRATION_NORMAL` | 创业板改革前普通股票为 10%，有效期至 2020-08-23；不得误套改革后的 20% | [SZSE 历史交易规则](https://www.szse.cn/disclosure/notice/general/t20060515_499577.html)；[2020-07-10 改革通知](https://www.szse.cn/disclosure/notice/general/t20200710_579459.html) | 待填 |  |
 | 8 | `CHINEXT_PRE_REGISTRATION_ST` | 创业板改革前 ST/*ST 为 5%，不是 10%；有效期至 2020-08-23 | [SZSE 2020-07-10 改革通知](https://www.szse.cn/disclosure/notice/general/t20200710_579459.html) | 待填 |  |
@@ -42,7 +42,7 @@
 
 ## 四、证据包输入格式
 
-`--evidence-bundle` 接受一个本地 JSON 输入文件。`artifact_path` 相对该 JSON 文件所在目录；原始 HTML/PDF 必须先完整保存到本地。工具会自行计算 SHA-256、字节数，并把发布证据存到 `configs/trading_rules/evidence/sha256/`，不会把本地路径写入发布 bundle。
+`--evidence-bundle` 接受一个本地 JSON 输入文件。`artifact_path` 相对该 JSON 文件所在目录；原始 HTML/PDF/DOCX 必须先完整保存到本地。若官方发布页只是 locator/notice page，`source_url` 仍填写候选声明的官方发布页，实际附件下载 URL、HTTP 状态和附件 hash 另在 `trading_rule_h1_source_catalog.json` 中确定性记录。工具会自行计算 SHA-256、字节数，并把发布证据存到 `configs/trading_rules/evidence/sha256/`，不会把本地路径写入发布 bundle。
 
 ```json
 {
@@ -93,8 +93,8 @@ uv run python scripts/rules/review.py \
 
 ## 七、原文获取状态与堵点
 
-2026-09-09 在当前本地环境完成了来源接收：SSE、SZSE 页面和 PDF 直接请求返回 HTTP 200；BSE 三个必需页面的直接请求返回自指向 302/WAF challenge，不能把 challenge 响应当作证据。随后使用隔离 Chrome profile 完成页面 challenge，保存了三个浏览器解析后的官方页面 DOM，并在 [`trading_rule_h1_source_catalog.json`](../provider_verification/trading_rule_h1_source_catalog.json) 中标明 `browser_resolved_dom`、原始直连状态、字节数和 SHA-256。
+2026-09-09 在当前本地环境完成了来源接收：14 个来源材料直接保存为 HTTP 200 原始 HTML/PDF；SSE 2026 交易规则和 SZSE 2020 创业板特别规定的发布页分别有官方 DOCX/PDF 附件，已保存附件原始字节。BSE 三个必需页面的直连请求返回自指向 302/WAF challenge，未把 challenge 响应或渲染 DOM 当作证据；已通过官方页面下载对应的三份原始 DOCX 附件。详情见 [`trading_rule_h1_source_catalog.json`](../provider_verification/trading_rule_h1_source_catalog.json)，其中记录发布页、附件 URL、HTTP 状态、字节数和 SHA-256。
 
-BSE 三份浏览器归档仍需项目管理者或独立 Reviewer 实际打开并确认是否满足“官方原文/原始字节”要求；如果不接受，需提供从 BSE 官方页面下载的原始 HTML/PDF/DOCX 并替换文件后重算 SHA-256。任何情况下都不能用截图、搜索摘要或手工摘录替代 raw artifact。其余来源也必须由 Reviewer 实际打开并确认条款后，才算 `APPROVE`。
+当前不再使用 `browser_resolved_dom`。任何情况下都不能用截图、搜索摘要或手工摘录替代 raw artifact。其余来源也必须由 Reviewer 实际打开并确认条款后，才算 `APPROVE`。特别注意：SH/SZ 历史 ST 候选的 1998 起点由历史记录与 5% 规则的时间关系组成，现有原文尚未单独证明完整法律生效语义，需在第 2、3 行明确裁决。
 
 补充边界：当前 main 已有 GT-H3B Golden v7 的历史 BSE evidence，但它属于 Golden 证据域；按本表第三节的项目约束，不能直接充当 Trading Rule H1 evidence。它的存在不等于 H1 两条 BSE 规则已经完成独立原文留存与裁决。

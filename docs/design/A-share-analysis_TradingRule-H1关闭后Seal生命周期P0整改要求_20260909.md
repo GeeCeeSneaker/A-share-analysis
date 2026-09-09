@@ -192,10 +192,10 @@ Golden v7 / GT-H3B               CLOSED / ACTIVE / REVIEWED 125/125
 Trading Rule H1R truth           CLOSED
 PR #32 candidate + contract      MERGED
 H1 Seal lifecycle P0             OPEN / CURRENT TASK
-H1 real evidence materialization BLOCKED
+H1 publishable evidence materialization BLOCKED (reviewer intake raw bytes are present)
 H1 REVIEWED seal                 BLOCKED
 Trading Rule ACTIVE              old COMPILED remains
-Formal Production B1-B7          AUTHORIZED / NOT STARTED
+Formal Production B1-B7          PROHIBITED UNTIL H1 REVIEWED PR IS INDEPENDENTLY CLOSED / NOT STARTED
 Formal attempt                    NOT CONSUMED
 Provider verdict                  PENDING
 Data Sufficiency                  BLOCKED
