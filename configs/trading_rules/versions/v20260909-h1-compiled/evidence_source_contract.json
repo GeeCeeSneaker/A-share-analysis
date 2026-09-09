@@ -1,0 +1,223 @@
+{
+  "schema_version": "RULE_EVIDENCE_SOURCE_CONTRACT_V0.1",
+  "candidate_version": "v20260909-h1-compiled",
+  "dataset_version": "2026-09-09.h1",
+  "stage": "SOURCE_CONTRACT_ONLY_NOT_REVIEW_SEAL",
+  "retrieved_on": "2026-09-09",
+  "policy": {
+    "first_party_required": true,
+    "raw_artifact_hash_required_for_reviewed_seal": true,
+    "raw_artifact_size_required_for_reviewed_seal": true,
+    "implementer_may_self_seal": false,
+    "allowed_hosts": [
+      "www.sse.com.cn",
+      "big5.sse.com.cn",
+      "edu.sse.com.cn",
+      "star.sse.com.cn",
+      "www.szse.cn",
+      "investor.szse.cn",
+      "docs.static.szse.cn",
+      "www.bse.cn"
+    ],
+    "allowed_roles": ["RULE", "TRANSITION", "APPLICABILITY", "HISTORY"]
+  },
+  "sources": {
+    "SZSE_1996_LIMIT_HISTORY": {
+      "url": "https://www.szse.cn/aboutus/research/secuities/documents/t20051123_530823.html",
+      "kind": "EXCHANGE_HISTORY",
+      "role": "HISTORY",
+      "locator": "1996-12-16: SH/SZ exchanges imposed +/-10% price limits except listing day",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SSE_1998_ST_START": {
+      "url": "https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170572/files/36d0635dee474838943e931bcc04c3df.pdf",
+      "kind": "EXCHANGE_FACTBOOK",
+      "role": "TRANSITION",
+      "locator": "1998 chronology: 1998-04-22 SSE implemented special treatment for financially abnormal listed companies",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SZSE_1998_ST_FIRST": {
+      "url": "https://www.szse.cn/aboutus/sse/events/t20070328_497832.html",
+      "kind": "EXCHANGE_HISTORY",
+      "role": "TRANSITION",
+      "locator": "1998-04-28: SZSE first applied special treatment to a listed stock",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SSE_PRE2026_ST_5": {
+      "url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20150912_3988629.shtml",
+      "kind": "EXCHANGE_RULE",
+      "role": "RULE",
+      "locator": "Article 7: risk-warning stocks price-limit ratio 5%",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SZSE_PRE2026_ST_5": {
+      "url": "https://www.szse.cn/lawrules/rule/fund/trade/t20210331_585336.html",
+      "kind": "EXCHANGE_RULE",
+      "role": "RULE",
+      "locator": "2021 trading-rule amendment: main-board risk-warning stocks 5%",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SSE_2026_ST_10": {
+      "url": "https://star.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20260424_10816474.shtml",
+      "kind": "EXCHANGE_RULE_NOTICE",
+      "role": "TRANSITION",
+      "locator": "2026 trading-rule revision changes main-board risk-warning stocks from 5% to 10%; effective 2026-07-06",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SZSE_2026_ST_10": {
+      "url": "https://docs.static.szse.cn/www/lawrules/rule/allrules/bussiness/W020260424690713346617.pdf",
+      "kind": "EXCHANGE_RULE",
+      "role": "RULE",
+      "locator": "2026 trading-rule revision explanation: main-board risk-warning ratio changes 5% -> 10%",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SZSE_2026_ST_EFFECTIVE": {
+      "url": "https://www.szse.cn/lawrules/service/member/t20260630_621404.html",
+      "kind": "EXCHANGE_RULE_NOTICE",
+      "role": "TRANSITION",
+      "locator": "2026 risk-warning trading guide effective 2026-07-06",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SSE_2014_IPO": {
+      "url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20150912_3988762.shtml",
+      "kind": "EXCHANGE_NOTICE",
+      "role": "RULE",
+      "locator": "2014 IPO first-day mechanism: continuous-auction effective range up to 144% and down to 64% of issue price",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SZSE_2014_IPO": {
+      "url": "https://www.szse.cn/www/disclosure/notice/company/t20140613_508770.html",
+      "kind": "EXCHANGE_NOTICE",
+      "role": "RULE",
+      "locator": "2014-06-13: IPO listing-day valid order range 144% / 64%",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SSE_MAIN_REG_FIRST5": {
+      "url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230201_5715605.shtml",
+      "kind": "EXCHANGE_RULE_NOTICE",
+      "role": "RULE",
+      "locator": "main-board IPO shares: first five trading days have no price-limit restriction",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SSE_MAIN_REG_START": {
+      "url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230404_5719112.shtml",
+      "kind": "EXCHANGE_NOTICE",
+      "role": "TRANSITION",
+      "locator": "first batch of registration-system main-board companies listed 2023-04-10",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SZSE_MAIN_REG_RULE": {
+      "url": "https://investor.szse.cn/knowledge/qa/t20230306_599093.html",
+      "kind": "EXCHANGE_RULE_GUIDE",
+      "role": "RULE",
+      "locator": "2023 main-board trading: first five IPO trading days no limit, then 10%; risk-warning 5% at that time",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SZSE_MAIN_REG_START": {
+      "url": "https://docs.static.szse.cn/www/marketServices/technicalservice/doc/P020230724535729507237.pdf",
+      "kind": "EXCHANGE_TECHNICAL_RECORD",
+      "role": "TRANSITION",
+      "locator": "2023-04-10: comprehensive registration reform landed and SZSE 2023 trading rules became effective",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SZSE_CHINEXT_2020": {
+      "url": "https://investor.szse.cn/institute/rules/t20200807_580310.html",
+      "kind": "EXCHANGE_RULE_GUIDE",
+      "role": "RULE",
+      "locator": "pre-reform ChiNext ST/*ST 5%; post-reform risk-warning 20%; IPO first five days no limit then 20%",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SZSE_CHINEXT_EFFECTIVE": {
+      "url": "https://www.szse.cn/aboutus/trends/news/t20200821_580924.html",
+      "kind": "EXCHANGE_NOTICE",
+      "role": "TRANSITION",
+      "locator": "2020-08-24: ChiNext existing shares adjusted to 20%; registration IPO first five days no limit",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SSE_STAR_RULE": {
+      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml",
+      "kind": "EXCHANGE_RULE",
+      "role": "RULE",
+      "locator": "Science and Technology Innovation Board: 20% limit; IPO first five trading days no price limit",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "SSE_STAR_ORIGIN": {
+      "url": "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20190129_4717061.shtml",
+      "kind": "EXCHANGE_RULE_NOTICE",
+      "role": "RULE",
+      "locator": "STAR design: 20% normal limit and no price limit in the first five IPO trading days",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "BSE_TRADING_RULE_2021": {
+      "url": "https://www.bse.cn/jygl_list/200010919.html",
+      "kind": "EXCHANGE_RULE",
+      "role": "RULE",
+      "locator": "BSE trading rules effective 2021-11-15; Selected Layer companies migrated with 30% limit on migration day",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "BSE_LISTING_RULE_2021": {
+      "url": "https://www.bse.cn/cxjg_list/200010908.html",
+      "kind": "EXCHANGE_RULE",
+      "role": "TRANSITION",
+      "locator": "BSE listing rules effective 2021-11-15; Selected Layer companies migrated to BSE",
+      "artifact_sha256": null,
+      "artifact_size": null
+    },
+    "BSE_NO_LIMIT_CURRENT": {
+      "url": "https://www.bse.cn/jygl_list/200010919.html",
+      "kind": "EXCHANGE_RULE",
+      "role": "RULE",
+      "locator": "BSE trading-rule no-price-limit cases include public-offering listing day; ordinary price-limit regime is 30%",
+      "artifact_sha256": null,
+      "artifact_size": null
+    }
+  },
+  "rule_sources": {
+    "MAIN_BOARD_NORMAL": ["SZSE_1996_LIMIT_HISTORY"],
+    "MAIN_BOARD_ST_SH_5": ["SSE_1998_ST_START", "SSE_PRE2026_ST_5"],
+    "MAIN_BOARD_ST_SZ_5": ["SZSE_1998_ST_FIRST", "SZSE_PRE2026_ST_5"],
+    "MAIN_BOARD_ST_10_FROM_20260706": ["SSE_2026_ST_10", "SZSE_2026_ST_10", "SZSE_2026_ST_EFFECTIVE"],
+    "MAIN_BOARD_IPO_DAY": ["SSE_2014_IPO", "SZSE_2014_IPO", "SSE_MAIN_REG_START", "SZSE_MAIN_REG_START"],
+    "MAIN_BOARD_REGISTRATION_FIRST5": ["SSE_MAIN_REG_FIRST5", "SSE_MAIN_REG_START", "SZSE_MAIN_REG_RULE", "SZSE_MAIN_REG_START"],
+    "CHINEXT_PRE_REGISTRATION_NORMAL": ["SZSE_CHINEXT_2020"],
+    "CHINEXT_PRE_REGISTRATION_ST": ["SZSE_CHINEXT_2020"],
+    "CHINEXT_REGISTRATION": ["SZSE_CHINEXT_2020", "SZSE_CHINEXT_EFFECTIVE"],
+    "CHINEXT_REGISTRATION_FIRST5": ["SZSE_CHINEXT_2020", "SZSE_CHINEXT_EFFECTIVE"],
+    "STAR_MARKET": ["SSE_STAR_RULE", "SSE_STAR_ORIGIN"],
+    "STAR_MARKET_FIRST5": ["SSE_STAR_RULE", "SSE_STAR_ORIGIN"],
+    "BSE_LIMIT": ["BSE_TRADING_RULE_2021", "BSE_LISTING_RULE_2021"],
+    "BSE_LISTING_DAY_NO_LIMIT": ["BSE_NO_LIMIT_CURRENT", "BSE_LISTING_RULE_2021"]
+  },
+  "review_seal_requirements": {
+    "source_contract_rule_set_must_exactly_match_candidate_rule_set": true,
+    "every_referenced_source_must_be_first_party": true,
+    "reviewer_must_capture_exact_raw_artifact_bytes": true,
+    "sealed_bundle_must_record_each_raw_artifact_sha256_and_size": true,
+    "sealed_bundle_must_preserve_rule_to_source_mapping": true,
+    "independent_reviewer_must_close_transition_boundaries": true
+  },
+  "open_review_questions": [
+    "Confirm whether using 1998-04-28 as the SZSE practical ST rule boundary is the best formal representation; the exchange event record identifies first actual special treatment on that date while other exchange-hosted historical research describes the institutional change at month/day-level differently.",
+    "Confirm the legacy resolver discriminator IPO_DAY_44_36 may temporarily represent a generic listing-day-only special rule for BSE because rates are data-driven; otherwise require a narrow schema rename before seal.",
+    "Confirm the old main-board IPO 44%/36% candidate should end 2023-04-09 as the new 2023 trading rules became operational with the first registration-system main-board listings on 2023-04-10."
+  ]
+}
