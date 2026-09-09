@@ -236,3 +236,22 @@ Trading Rule H1 REVIEWED seal 被独立 Reviewer 接受并合并后：
 - Provider verdict：PENDING
 - Data Sufficiency：BLOCKED
 - 2020+ backfill：BLOCKED
+
+## 8. 2026-09-09 实施进度与剩余门禁
+
+本轮已在独立分支实现并测试以下内容：
+
+- 新建非 ACTIVE 的 `v20260909-h1-compiled` 候选，规则数从 9 条扩为 13 条，覆盖主板 IPO 前 5 日、创业板改革前 ST、BSE 生效边界与上市首日不限价；
+- 新增 `RULE_EVIDENCE_BUNDLE.v1`，要求每个 `rule_id` 精确对应官方来源，校验来源域名、角色、文件路径、原始字节 SHA-256 和字节数；
+- `scripts/rules/review.py` 新增 `--evidence-bundle` 封印路径；旧 `--artifact` 仅保留兼容性用途；
+- Production 的 run 创建和 verdict 路径均强制 bundle 复核；
+- 新增 H1 边界、证据篡改、缺失/多余 rule_id、完整 bundle 发布流程测试；旧审阅测试夹具已同步升级为 bundle 契约。
+
+当前仍未完成、不能绕过的事项：
+
+1. 由项目管理者/独立 Reviewer 实际打开并留存 13 条规则所需的每份官方 HTML/PDF 原文；
+2. 按《TradingRule H1 人工审阅操作表》逐条填出 13 个 `APPROVE`，并对旧 IPO 44/36 终止边界、主板 ST 首 5 日适用性、BSE venue 历史语义作明确裁决；
+3. 用真实原文生成输入 bundle 并通过 `scripts/rules/review.py` 发布 NEW `REVIEWED` 版本；
+4. 独立 Reviewer 接受后，才可推进 ACTIVE，再从最新 main 做 Formal Production preflight 和 B1-B7。
+
+在上述事项完成前，旧 ACTIVE `v20260824-compiled` 继续保持原样，Formal Production 继续保持 NOT STARTED；没有生成 run_id，也没有消耗正式 attempt。

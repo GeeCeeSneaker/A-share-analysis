@@ -3536,3 +3536,12 @@
 
 - Ruff 指出真实 v7 集成测试顶层定义前缺少一个空行；仅修正 `tests/integration/test_gt_h3b_execution.py:412` 的格式。
 - 业务逻辑、Golden/evidence/receipt、运行边界均未改变；本条修复不联网、不登录 Provider。
+
+## 2026-09-09 · Trading Rule H1 evidence contract implementation
+
+> 状态：IMPLEMENTED / INDEPENDENT HUMAN REVIEW PENDING / FORMAL BLOCKED
+
+- 按 Trading Rule H1 整改要求新增非 ACTIVE 的 `v20260909-h1-compiled` 候选，规则从 9 条扩为 13 条，补齐主板注册制 IPO 前 5 日、创业板改革前 ST、BSE 生效边界和 BSE 上市首日不限价等候选分支；旧 ACTIVE `v20260824-compiled`、Golden v7 和已有证据字节未改。
+- 新增 `RULE_EVIDENCE_BUNDLE.v1` 及严格校验：每个 `rule_id` 必须有官方来源，验证来源域名、kind/role、bundle 与 raw artifact 的路径、字节数和 SHA-256；Production run 创建与 verdict 均要求 bundle gate。`--artifact` 仅保留兼容旧测试和非生产工具。
+- 新增逐条人工审阅表和 13 条输入模板；实际官方原文留存、13 条独立人工裁决、REVIEWED seal 和 ACTIVE 推进仍未完成。当前本地环境对 BSE 页面/PDF 返回 403 或重定向循环，响应体未被当作证据，获取堵点已记录在 H1 文档。
+- 本提交本地验证：`uv run pytest` 为 `1633 passed, 2 skipped`；Ruff lint/format、mypy、`uv pip check` 均通过。未登录 Provider、未创建 run_id、未执行 B1-B7、未消耗正式 attempt，未提交任何运行凭据。

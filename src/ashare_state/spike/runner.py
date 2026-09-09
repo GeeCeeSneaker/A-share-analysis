@@ -406,7 +406,10 @@ def new_run(
         # re-verified here (ACTIVE tamper blocks new_run, audit 3.2)
         rule_book, rule_manifest = load_active_rules()
         if run_kind is RunKind.PRODUCTION:
-            rule_problems = trading_rule_review_gate(rule_book)
+            rule_problems = trading_rule_review_gate(
+                rule_book,
+                require_evidence_bundle=True,
+            )
             if rule_problems:
                 msg = (
                     "PRODUCTION run refused: trading rule dataset not "
@@ -631,7 +634,10 @@ def compute_verdict(store: RunStore, run: SpikeRun) -> SpikeVerdict:
                 review_status=run.trading_rule_review_status,
             )
             if run.run_kind == RunKind.PRODUCTION:
-                rule_problems = trading_rule_review_gate(bound_book)
+                rule_problems = trading_rule_review_gate(
+                    bound_book,
+                    require_evidence_bundle=True,
+                )
                 for problem in rule_problems:
                     blocking.append(f"trading rule review gate: {problem}")
         except Exception as exc:  # noqa: BLE001 - integrity error blocks the verdict
