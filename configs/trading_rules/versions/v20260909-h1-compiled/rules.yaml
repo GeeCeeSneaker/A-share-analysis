@@ -27,11 +27,11 @@ rules:
     rounding_mode: ROUND_HALF_UP
     source_ref: "SSE historical main-board trading rules (10% clause): https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml | SZSE historical trading rules: https://www.szse.cn/disclosure/notice/general/t20060515_499577.html | SSE current trading rules (effective 2026-07-06): https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml | SZSE current trading rules (effective 2026-07-06): https://docs.static.szse.cn/www/lawrules/rule/trade/W020260424690713155663.pdf"
 
-  - rule_id: MAIN_BOARD_ST_HISTORICAL
+  - rule_id: MAIN_BOARD_ST_HISTORICAL_SH
     board: MAIN
-    exchanges: [SH, SZ]
-    code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
-    effective_from: "19980401"
+    exchanges: [SH]
+    code_patterns: ["60xxxx"]
+    effective_from: "19980422"
     effective_to: "20260705"
     st_state: true
     listing_age_rule: NONE
@@ -39,7 +39,21 @@ rules:
     down_rate: 0.05
     tick_size: "0.01"
     rounding_mode: ROUND_HALF_UP
-    source_ref: "SSE historical risk-warning board trading measures (5% clause): https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml | SZSE historical trading rules: https://www.szse.cn/disclosure/notice/general/t20060515_499577.html"
+    source_ref: "SSE historical risk-warning board trading measures (5% clause): https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20210531_5478105.shtml | SSE official market history (first special treatment recorded 1998-04-22): https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf"
+
+  - rule_id: MAIN_BOARD_ST_HISTORICAL_SZ
+    board: MAIN
+    exchanges: [SZ]
+    code_patterns: ["000xxx", "001xxx", "002xxx", "003xxx"]
+    effective_from: "19980428"
+    effective_to: "20260705"
+    st_state: true
+    listing_age_rule: NONE
+    up_rate: 0.05
+    down_rate: 0.05
+    tick_size: "0.01"
+    rounding_mode: ROUND_HALF_UP
+    source_ref: "SZSE historical trading rules (5% risk-warning clause): https://www.szse.cn/disclosure/notice/general/t20060515_499577.html | SZSE official 1998 chronology (first special treatment recorded 1998-04-28): https://www.szse.cn/aboutus/sse/events/t20070328_497832.html"
 
   - rule_id: MAIN_BOARD_ST_CURRENT
     board: MAIN
@@ -75,7 +89,6 @@ rules:
     code_patterns: ["60xxxx", "000xxx", "001xxx", "002xxx", "003xxx"]
     effective_from: "20230410"
     effective_to: "20991231"
-    st_state: false
     listing_age_rule: FIRST_5_DAYS_NO_LIMIT
     up_rate: 0.0
     down_rate: 0.0

@@ -3564,3 +3564,13 @@
 - 为所有延续到 2026-09 的候选规则补记官方 2026 current-effective locator；这些只是 required contract，未下载、未写入或伪造 H1 原始证据。candidate 仍 `COMPILED`、非 ACTIVE；旧 compiled、ACTIVE、Golden v7/evidence/receipt 未改。
 - 本地定向验证：H1 candidate `15 passed`；evidence contract `20 passed`；Ruff check/format passed。等待将合并后的分支推送后由三平台 CI 验证；独立 Reviewer 关闭 P0 前仍不得 materialize evidence、seal REVIEWED、推进 ACTIVE 或执行 B1-B7。
 - CI run `34306959611`（#488）已验证 Windows 3.12、Windows 3.14、Ubuntu 3.14 三个矩阵全部成功；包括 full pytest、Ruff、mypy、Spike、SDK-absent、DEVLOG 和 Management gates。该结果不等于人工证据裁决，也不解除 H1 evidence/ACTIVE/B1-B7 门槛。
+
+## 2026-09-09 · Trading Rule H1R historical venue-boundary tightening
+
+> 状态：**IMPLEMENTED / CI VALIDATION PENDING / INDEPENDENT HUMAN REVIEW PENDING**
+
+- 复核 PR #32 时间线中的额外历史边界意见，并对照交易所第一方历史材料：SSE 官方市场史记载 1998-04-22 实施特别处理，SZSE 官方 1998 年大事记记载 1998-04-28 首次实行特别处理。
+- 将候选的共享 `MAIN_BOARD_ST_HISTORICAL` 拆为 `MAIN_BOARD_ST_HISTORICAL_SH`（SH/60xxxx，19980422—20260705，5%）和 `MAIN_BOARD_ST_HISTORICAL_SZ`（SZ/000xxx、001xxx、002xxx、003xxx，19980428—20260705，5%）；`MAIN_BOARD_ST_CURRENT` 仍自 20260706 起为 10%。这是候选 PIT 下界收紧，不代表已完成法律生效日的人审确认。
+- 新增起点前一日 fail-closed 与起点当日命中 5% 的回归测试；候选数量更新为 14 条，人工审阅表和 evidence input template 的 rule_id/source URL 集同步更新。清理主板 FIRST5 YAML 中重复的 `st_state` 键，保留唯一 `null`（状态无关）表达。
+- 该项登记为补充 P0 `P0-TR-H1-08`：独立 Reviewer 必须实际打开并保存 SSE/SZSE 历史材料，确认“首次实施日期”是否足以支撑候选 effective_from；确认前不得生成 H1 evidence、REVIEWED、ACTIVE、run_id 或执行 B1-B7。
+- 旧 `v20260824-compiled`、ACTIVE pointer、Golden v7 及其 evidence/receipt 未修改；账号、密码、IP、端口、Token 未写入仓库。CI 和全量本地验证将在本提交后补记。

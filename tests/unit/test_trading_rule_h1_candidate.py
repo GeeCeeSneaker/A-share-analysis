@@ -21,7 +21,7 @@ def test_candidate_is_compiled_and_not_active(h1_book: TradingRuleBook):
     assert h1_book.version == "2026-09-09.1"
     assert h1_book.review_status == "COMPILED"
     assert h1_book.evidence_contract == "RULE_EVIDENCE_BUNDLE.v1"
-    assert len(h1_book.rules) == 13
+    assert len(h1_book.rules) == 14
 
 
 def test_candidate_source_refs_have_no_unresolved_review_markers(h1_book: TradingRuleBook):
@@ -89,16 +89,22 @@ def test_main_board_first_five_is_st_state_agnostic(h1_book: TradingRuleBook):
     )
     assert first_normal.rule_id == first_st.rule_id == "MAIN_BOARD_FIRST5_NO_LIMIT"
     assert first_normal.is_no_limit and first_st.is_no_limit
-    assert sixth.rule_id == "MAIN_BOARD_ST_HISTORICAL"
+    assert sixth.rule_id == "MAIN_BOARD_ST_HISTORICAL_SZ"
     assert sixth.up_rate == Decimal("0.05")
 
 
 @pytest.mark.parametrize(
-    ("exchange", "code"),
-    [("SH", "600001.SH"), ("SZ", "000001.SZ")],
+    ("exchange", "code", "historical_rule_id"),
+    [
+        ("SH", "600001.SH", "MAIN_BOARD_ST_HISTORICAL_SH"),
+        ("SZ", "000001.SZ", "MAIN_BOARD_ST_HISTORICAL_SZ"),
+    ],
 )
 def test_main_board_st_pit_transition_for_both_venues(
-    h1_book: TradingRuleBook, exchange: str, code: str
+    h1_book: TradingRuleBook,
+    exchange: str,
+    code: str,
+    historical_rule_id: str,
 ):
     historical = h1_book.resolve_limit_regime(
         exchange=exchange,
@@ -118,10 +124,42 @@ def test_main_board_st_pit_transition_for_both_venues(
         trade_date="20260908",
         is_st=True,
     )
-    assert historical.rule_id == "MAIN_BOARD_ST_HISTORICAL"
+    assert historical.rule_id == historical_rule_id
     assert historical.up_rate == Decimal("0.05")
     assert current.rule_id == as_of.rule_id == "MAIN_BOARD_ST_CURRENT"
     assert current.up_rate == as_of.up_rate == Decimal("0.10")
+
+
+@pytest.mark.parametrize(
+    ("exchange", "code", "before_date", "start_date", "historical_rule_id"),
+    [
+        ("SH", "600001.SH", "19980421", "19980422", "MAIN_BOARD_ST_HISTORICAL_SH"),
+        ("SZ", "000001.SZ", "19980427", "19980428", "MAIN_BOARD_ST_HISTORICAL_SZ"),
+    ],
+)
+def test_main_board_st_historical_venue_start_boundaries(
+    h1_book: TradingRuleBook,
+    exchange: str,
+    code: str,
+    before_date: str,
+    start_date: str,
+    historical_rule_id: str,
+):
+    with pytest.raises(RuleUnresolvedError, match="no applicable rule"):
+        h1_book.resolve_limit_regime(
+            exchange=exchange,
+            code=code,
+            trade_date=before_date,
+            is_st=True,
+        )
+    first_day = h1_book.resolve_limit_regime(
+        exchange=exchange,
+        code=code,
+        trade_date=start_date,
+        is_st=True,
+    )
+    assert first_day.rule_id == historical_rule_id
+    assert first_day.up_rate == Decimal("0.05")
 
 
 @pytest.mark.parametrize("trade_date", ["20260703", "20260706", "20260908"])

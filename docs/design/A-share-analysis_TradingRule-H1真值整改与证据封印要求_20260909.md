@@ -241,7 +241,7 @@ Trading Rule H1 REVIEWED seal 被独立 Reviewer 接受并合并后：
 
 本轮已在独立分支实现并测试以下内容：
 
-- 新建非 ACTIVE 的 `v20260909-h1-compiled` 候选，规则数从 9 条扩为 13 条，覆盖主板 IPO 前 5 日、创业板改革前 ST、BSE 生效边界与上市首日不限价；
+- 新建非 ACTIVE 的 `v20260909-h1-compiled` 候选，规则数从 9 条扩为 14 条，覆盖主板 IPO 前 5 日、主板 ST venue 历史起点、创业板改革前 ST、BSE 生效边界与上市首日不限价；
 - 新增 `RULE_EVIDENCE_BUNDLE.v1`，要求每个 `rule_id` 精确对应官方来源，校验来源域名、角色、文件路径、原始字节 SHA-256 和字节数；
 - bundle 输入中的 `source_url` 还必须精确命中对应候选 `rule_id` 的 `source_ref`；bundle/raw 引用必须按 `sha256/<hash>` 内容寻址，避免用另一条规则的官方文件或非内容寻址别名绕过来源绑定；
 - `scripts/rules/review.py` 新增 `--evidence-bundle` 封印路径；旧 `--artifact` 仅保留兼容性用途；
@@ -250,8 +250,8 @@ Trading Rule H1 REVIEWED seal 被独立 Reviewer 接受并合并后：
 
 当前仍未完成、不能绕过的事项：
 
-1. 由项目管理者/独立 Reviewer 实际打开并留存 13 条规则所需的每份官方 HTML/PDF 原文；
-2. 按《TradingRule H1 人工审阅操作表》逐条填出 13 个 `APPROVE`，并对旧 IPO 44/36 终止边界、主板 ST 首 5 日适用性、BSE venue 历史语义作明确裁决；
+1. 由项目管理者/独立 Reviewer 实际打开并留存 14 条规则所需的每份官方 HTML/PDF 原文；
+2. 按《TradingRule H1 人工审阅操作表》逐条填出 14 个 `APPROVE`，并对旧 IPO 44/36 终止边界、主板 ST 首 5 日适用性、主板 ST venue 历史起点、BSE venue 历史语义作明确裁决；
 3. 用真实原文生成输入 bundle 并通过 `scripts/rules/review.py` 发布 NEW `REVIEWED` 版本；
 4. 独立 Reviewer 接受后，才可推进 ACTIVE，再从最新 main 做 Formal Production preflight 和 B1-B7。
 
@@ -263,12 +263,13 @@ Trading Rule H1 REVIEWED seal 被独立 Reviewer 接受并合并后：
 
 ### 9.1 主板 ST 的 PIT 分段
 
-候选 `2026-09-09.1` 仍为 13 条，但主板 ST 已改为两个时间片：
+候选 `2026-09-09.1` 现为 14 条。主板 ST 的历史片段进一步按交易场所拆分，当前片段仍按同一制度边界覆盖沪深两市：
 
-- `MAIN_BOARD_ST_HISTORICAL`：`19980401`—`20260705`，5%；
+- `MAIN_BOARD_ST_HISTORICAL_SH`：SH、`60xxxx`，`19980422`—`20260705`，5%；
+- `MAIN_BOARD_ST_HISTORICAL_SZ`：SZ、`000xxx/001xxx/002xxx/003xxx`，`19980428`—`20260705`，5%；
 - `MAIN_BOARD_ST_CURRENT`：自 `20260706` 起，10%。
 
-SH/SZ 在候选中共用相同时间边界；解析依赖规则数据，不使用运行时日期特判。已加入 SH、SZ 的 2026-07-03、2026-07-06、2026-09-08 边界测试，普通主板同期仍必须为 10%。
+历史起点来自交易所官方历史材料：[SSE 官方市场史](https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf)记载 1998-04-22 实施特别处理，[SZSE 官方 1998 年大事记](https://www.szse.cn/aboutus/sse/events/t20070328_497832.html)记载 1998-04-28 首次实行特别处理。这里将该首次实施记录作为候选 PIT 下界，完整法律生效语义仍需独立 Reviewer 逐条打开原文确认；起点前一日不静默回退到普通规则，而是 fail closed。解析依赖规则数据，不使用运行时日期特判。已加入 SH、SZ 的起点前/起点日测试以及 2026-07-03、2026-07-06、2026-09-08 边界测试，普通主板同期仍必须为 10%。
 
 ### 9.2 主板首五日语义收口
 
@@ -280,7 +281,7 @@ SH/SZ 在候选中共用相同时间边界；解析依赖规则数据，不使�
 
 `RULE_EVIDENCE_BUNDLE.v1` 的 prepare 与 runtime validator 现在都要求：对每个 `rule_id`，bundle 实际 `source_url` 列表与候选 `source_ref` 中的 required URL set 完全相等；缺失、额外或重复 URL 均拒绝，同时保留官方 host、kind/role、路径、SHA-256、字节数和 `sha256/<hash>` 内容寻址校验。
 
-新增反例测试覆盖：两条声明只提交一条、两条全部提交、同一 URL 重复、增加第三条官方 URL。模板已同步到 13 个新 rule_id，并为所有延续至 2026-09 的规则加入当前第一方来源 locator：
+新增反例测试覆盖：两条声明只提交一条、两条全部提交、同一 URL 重复、增加第三条官方 URL。模板已同步到 14 个新 rule_id，并为所有延续至 2026-09 的规则加入当前第一方来源 locator：
 
 - [SSE 2026 年修订交易规则](https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml)；
 - [SSE 2026 风险警示调整公告](https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20260424_10816474.shtml)；
@@ -292,4 +293,4 @@ SH/SZ 在候选中共用相同时间边界；解析依赖规则数据，不使�
 
 ### 9.4 当前放行状态
 
-本轮实现已达到 `H1R IMPLEMENTED / CI VERIFIED GREEN / HUMAN REVIEW REQUIRED`（CI run `34306959611` / #488，Windows 3.12、Windows 3.14、Ubuntu 3.14 全部成功）。旧 `v20260824-compiled`、ACTIVE pointer、Golden v7 及其 evidence/receipt 未修改；真实 13 条（按 required URL 集合展开后的全部原文）仍须由项目管理者/独立 Reviewer 实际打开、留存并逐条裁决。Reviewer 未明确关闭本文件的 P0 前，不得生成真实 REVIEWED seal、切换 ACTIVE、创建 run_id 或执行 Formal Production B1-B7。
+本轮实现已达到 `H1R IMPLEMENTED / CI VALIDATION PENDING / HUMAN REVIEW REQUIRED`。旧 `v20260824-compiled`、ACTIVE pointer、Golden v7 及其 evidence/receipt 未修改；真实 14 条（按 required URL 集合展开后的全部原文）仍须由项目管理者/独立 Reviewer 实际打开、留存并逐条裁决。Reviewer 未明确关闭本文件的全部 P0（包括历史 ST venue 起点）前，不得生成真实 REVIEWED seal、切换 ACTIVE、创建 run_id 或执行 Formal Production B1-B7。

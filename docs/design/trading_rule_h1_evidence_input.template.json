@@ -32,7 +32,7 @@
       ]
     },
     {
-      "rule_id": "MAIN_BOARD_ST_HISTORICAL",
+      "rule_id": "MAIN_BOARD_ST_HISTORICAL_SH",
       "sources": [
         {
           "artifact_path": "sources/main_board_st_sse.html",
@@ -41,10 +41,27 @@
           "role": "RULE"
         },
         {
+          "artifact_path": "sources/main_board_st_sse_history_1998.pdf",
+          "source_url": "https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf",
+          "artifact_kind": "OTHER_OFFICIAL",
+          "role": "TRANSITION"
+        }
+      ]
+    },
+    {
+      "rule_id": "MAIN_BOARD_ST_HISTORICAL_SZ",
+      "sources": [
+        {
           "artifact_path": "sources/main_board_st_szse.html",
           "source_url": "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
           "artifact_kind": "EXCHANGE_RULEBOOK",
           "role": "RULE"
+        },
+        {
+          "artifact_path": "sources/main_board_st_szse_history_1998.html",
+          "source_url": "https://www.szse.cn/aboutus/sse/events/t20070328_497832.html",
+          "artifact_kind": "OTHER_OFFICIAL",
+          "role": "TRANSITION"
         }
       ]
     },

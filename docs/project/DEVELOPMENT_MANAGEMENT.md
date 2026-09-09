@@ -5719,3 +5719,15 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - `MAIN_BOARD_NORMAL/FIRST5/ST_CURRENT`、ChiNext 20%/FIRST5、STAR 20%/FIRST5、BSE 30% 的长期有效候选均已补充 2026 第一方 current-effective locator。URL contract 不等于 evidence：原始网页/PDF 尚未留存，且 BSE 当前获取问题仍未解除。
 - 本地定向测试：15 个候选测试、20 个 evidence contract 测试全部通过，Ruff 已通过；CI run `34306959611`（#488）已确认 current-main 三平台全部成功。old compiled、ACTIVE pointer、Golden v7/evidence/receipt 不得改动。
 - 管理门槛：独立 Reviewer 未关闭 `P0-TR-H1-06/07` 前，不生成真实 H1 evidence bundle、不发布 REVIEWED、不切换 ACTIVE、不创建 run_id、不启动 Formal Production B1-B7。
+
+## DM-20260909-TRADING-RULE-H1-004 · H1R 历史 ST venue 起点收紧
+
+**Type**：C1 — additional second-review truth boundary
+**Date**：2026-09-09
+**Status**：IMPLEMENTED / CI VALIDATION PENDING / INDEPENDENT HUMAN REVIEW PENDING
+**Evidence**：`configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml`；`tests/unit/test_trading_rule_h1_candidate.py`；`docs/design/TradingRule_H1_人工审阅操作表_20260909.md`。
+
+- PR #32 时间线中的独立审阅指出，共用 `19980401` 作为沪深 ST 历史起点缺少第一方历史依据；对照交易所官方历史材料后，候选改为 SH `19980422` 起、SZ `19980428` 起，均至 `20260705` 为 5%，并保留 `20260706` 起 10% 的当前片段。
+- 候选由 13 条变为 14 条：新增 `MAIN_BOARD_ST_HISTORICAL_SH` 与 `MAIN_BOARD_ST_HISTORICAL_SZ`，按 venue/code pattern 限定适用范围；起点前一日必须 `RuleUnresolvedError`，不回退到普通主板规则。
+- SSE 官方市场史：[链接](https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf)；SZSE 官方 1998 年大事记：[链接](https://www.szse.cn/aboutus/sse/events/t20070328_497832.html)。这些来源已进入候选 required URL contract，但原始 bytes 尚未纳入 H1 evidence，完整法律生效日仍须独立 Reviewer 实际核验。
+- 人工审阅表和 template 已同步为 14 条；旧 compiled、ACTIVE pointer、Golden v7/evidence/receipt 不变。确认该 P0 前仍禁止 REVIEWED、ACTIVE、run_id 和 B1-B7。
