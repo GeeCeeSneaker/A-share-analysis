@@ -354,7 +354,31 @@ def _build_reviewed_text(
     )
     reviewed: list[str] = []
     inserted = False
+    skipping_review_note = False
+    final_review_note_inserted = False
     for line in lines:
+        # A COMPILED candidate may carry a multiline review_note explaining
+        # that it is not yet reviewed.  That note is stale in the REVIEWED
+        # copy, so consume the complete YAML scalar instead of leaking its
+        # candidate-only provenance into the sealed artifact.
+        if skipping_review_note:
+            if not line.strip() or line[:1].isspace():
+                continue
+            skipping_review_note = False
+        if line.startswith("review_note:"):
+            if reviewer == "owner-authorized-ai-reviewer" and not final_review_note_inserted:
+                reviewed.extend(
+                    [
+                        "review_note: >\n",
+                        (
+                            "  Evidence was sealed under the owner-authorized AI reviewer "
+                            "provenance marker.\n"
+                        ),
+                    ]
+                )
+                final_review_note_inserted = True
+            skipping_review_note = True
+            continue
         if line.startswith("review_status:") and not inserted:
             reviewed.append("review_status: REVIEWED\n")
             reviewed.extend(

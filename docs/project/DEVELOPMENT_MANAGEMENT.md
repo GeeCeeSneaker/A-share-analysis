@@ -1,3 +1,31 @@
+## DM-20260910-TRADING-RULE-H1R4-010 · H1R4 14 条授权 AI 审阅封存
+
+**Type**：C1 — reviewed evidence seal and ACTIVE transition
+**Date**：2026-09-10
+**Status**：`H1R4 REVIEWED SEALED / ACTIVE MOVED ATOMICALLY / FINAL PR INDEPENDENT REVIEW AND CI PENDING / FORMAL ENTRY PROHIBITED`
+
+**已确认事实**
+
+- 本轮从合并后的 clean `main@1af86215312b088859300521e4bb164f149e3717` 开始。封存前只提交了 reviewed-copy 生命周期修正及回归测试（`6a8c0f562169c6543e0bced0a381548432f03523`），没有修改 H1R4 候选内容、H1R3、旧 ACTIVE 或 Golden 数据。
+- 修正 `_build_reviewed_text()`：候选版的多行 `review_note` 会被完整跳过，授权 AI 审阅输出改为 `owner-authorized-ai-reviewer` 及明确的最终封存说明；回归断言确认 REVIEWED YAML 不含 `Candidate only` / `human-reviewed`。
+- 封存前质量门禁为 Ruff check、format、mypy 和全量 pytest `1687 passed, 3 skipped`；封存前只读身份断言确认 ACTIVE `v20260824-compiled` / `COMPILED` / `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8`、H1R4 candidate `ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68`、证据 bundle/raw 与旧候选均符合固定值。
+- 按 Issue #34 固定参数仅执行一次 candidate seal：
+
+```text
+uv run python scripts/rules/review.py --candidate configs/trading_rules/versions/v20260910-h1r4-compiled/rules.yaml --candidate-version v20260910-h1r4-compiled --expected-candidate-hash ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68 --evidence-bundle docs/provider_verification/trading_rule_h1r4_evidence_input_20260910.json --reviewer owner-authorized-ai-reviewer --version v20260910-h1r4-reviewed --from-version v20260824-compiled
+```
+
+- 封存提交为 `6a01414cf00d0093e17771447ea4660a757f60ea`；生成 `v20260910-h1r4-reviewed`，14 条 `REVIEWED`，dataset hash `b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b`。ACTIVE manifest 已指向该版本，`reviewed_by` 为 `owner-authorized-ai-reviewer`。
+- REVIEWED evidence provenance 为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`；canonical bundle 18,606 bytes，20 个唯一 raw artifact，raw 总字节 1,736,924。封存后完整 `trading_rule_review_gate` 返回空问题，bundle/raw 重算、旧 ACTIVE/旧 H1/H1R2/H1R3/H1R4 candidate 字节比较和临时文件清理均通过。
+- 该 H1R4 只覆盖项目确定的 2020+ 研究范围；授权 AI provenance 不等同于项目 Owner 亲自阅读或人工签署。当前不宣称 Formal Production、B1-B7、Provider capability 或 backfill 已完成。
+
+**待完成闸门**
+
+- 将上述提交作为一个独立 final reviewed-seal PR 请求 GitHub CI 和独立 Reviewer 复核；在 PASS 与 required CI 全绿前不离开 Draft、不合并。
+- PR 合并后从最新 clean main 再验证 ACTIVE、review gate、evidence identity 和旧版本不可变性；只有 H1 reviewed-seal 真正确认后，才重新评估 Formal B1-B7。Formal 入口在此之前继续禁止。
+
+账号、密码、IP、端口、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+
 ## DM-20260910-TRADING-RULE-H1R4-009 · BSE 第 14 条来源绑定修正与授权 AI 审阅
 
 **Type**：C1 — immutable H1 evidence-contract correction

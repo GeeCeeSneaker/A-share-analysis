@@ -13,6 +13,7 @@ crossing / 5th-vs-6th session / missing calendar row.
 from __future__ import annotations
 
 import copy
+import json
 from decimal import Decimal
 from pathlib import Path
 
@@ -43,9 +44,10 @@ def book_docs() -> dict:
 class TestRuleDataLayer:
     def test_loads_versioned_dataset(self, book: TradingRuleBook, book_docs: dict):
         assert len(book.rules) >= 9
-        assert book.version == str(book_docs["version"])
+        active_manifest = json.loads((RULES_DIR / "rule_manifest.json").read_text(encoding="utf-8"))
+        assert book.version == str(active_manifest["dataset_version"])
         assert book.source_version
-        assert book.review_status == "COMPILED"
+        assert book.review_status == str(active_manifest["review_status"])
 
     def test_no_hardcoded_rates_in_python(self):
         """P0-06 + R4-A2.4 P0-06: institutional rates must NOT live in ANY
@@ -96,7 +98,7 @@ class TestRuleDataLayer:
         st = book.resolve_limit_regime(
             exchange="SH", code="600518.SH", trade_date="20230601", is_st=True
         )
-        assert st.rule_id == "MAIN_BOARD_ST"
+        assert st.rule_id == "MAIN_BOARD_ST_HISTORICAL_SH"
         assert st.up_rate == Decimal("0.05")
         # ChiNext pre/post registration reform (PIT date-driven)
         pre = book.resolve_limit_regime(exchange="SZ", code="300001.SZ", trade_date="20200821")

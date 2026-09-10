@@ -259,6 +259,16 @@ class TestH1CandidateSealHappyPath:
         manifest = load_rule_manifest(root)
         assert manifest.rule_version == REVIEWED_VERSION
         assert manifest.review_status == "REVIEWED"
+        reviewed_text = (root / "versions" / REVIEWED_VERSION / "rules.yaml").read_text(
+            encoding="utf-8"
+        )
+        assert "reviewed_by: owner-authorized-ai-reviewer" in reviewed_text
+        assert "Candidate only" not in reviewed_text
+        assert "human-reviewed" not in reviewed_text
+        assert (
+            "Evidence was sealed under the owner-authorized AI reviewer provenance marker."
+            in reviewed_text
+        )
 
     def test_post_snapshot_candidate_mutation_fails_closed(self, tmp_path, monkeypatch, capsys):
         root = _make_root(tmp_path)
