@@ -38,6 +38,7 @@ from ashare_state.providers.exchange import ProviderExchange, synthetic_failure_
 from ashare_state.spike import validators
 from ashare_state.spike.catalog import CaseCatalog
 from ashare_state.spike.model import CaseResult, RunFailureReason, SpikeCase, SpikeRun
+from ashare_state.spike.row_adapter import first_present, row_date
 from ashare_state.spike.run_store import RunStore
 from ashare_state.spike.target import SpikeTarget
 
@@ -423,9 +424,9 @@ def _observe_units(bar_rows: list[dict[str, Any]]) -> dict[str, str]:
     checked = consistent = 0
     for row in bar_rows:
         try:
-            close_f = float(row.get("CLOSE_PRICE") or row.get("CLOSE") or 0)
-            volume_f = float(row.get("VOLUME") or 0)
-            amount_f = float(row.get("AMOUNT") or 0)
+            close_f = float(first_present(row, "CLOSE_PRICE", "CLOSE", "close") or 0)
+            volume_f = float(first_present(row, "VOLUME", "volume") or 0)
+            amount_f = float(first_present(row, "AMOUNT", "amount") or 0)
         except (TypeError, ValueError):
             continue
         if close_f > 0 and volume_f > 0 and amount_f > 0:
@@ -761,7 +762,9 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
             cov = validators.validate_history_coverage(earliest)
     else:
         rows = _to_plain(_rows_of(bars))
-        earliest = min((str(r.get("KLINE_TIME", "99991231")) for r in rows), default="")
+        dates = [row_date(r, "KLINE_TIME", "kline_time", "TRADE_DATE", "trade_date") for r in rows]
+        dates = [d for d in dates if d]
+        earliest = min(dates, default="")
         cov = validators.validate_history_coverage(earliest)
     if cov is not None:
         ctx.outcome_case("history_start_2020", "FIXTURES", str(sample_date), bar_meta, cov)

@@ -5996,6 +5996,7 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 必须先完成 14/14 人工原文裁决，再由独立 Reviewer 复核来源、hash lineage、两个 COMPILED candidate 和旧 ACTIVE 不可变性；之后才允许运行一次性 seal。
 
 **下一步**：将本记录、bundle、raw artifact 和人工审阅表提交为独立 evidence/seal PR；审阅与后续 seal 完成并独立合并前，Formal Production B1-B7 继续禁止。账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+
 ## DM-20260910-FORMAL-B1B7-012 · 唯一正式运行失败与 B7 raw writer 整改
 
 **Type**：C1 — Formal Production failure evidence and framework remediation
@@ -6053,3 +6054,31 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 - 没有 Production 重跑、resume、Golden/rule/expectation/provider 配置修改、backfill、策略扩展或 raw/凭证上传。
 - 若独立 Reviewer 接受归因，另开 remediation PR 修复 canonical field/shape/date handling 并补回归测试；任何未来 Production run 都须取得新的 scheduler authorization。
+## DM-20260910-TRADING-RULE-H1R4-011 · H1R4 REVIEWED 头部声明修正与最终重封存
+
+## DM-20260911-FORMAL-B1B7-015 · 失败归因后的 provider 行适配整改
+
+**Type**：C1 — framework/validator remediation after read-only Formal attribution
+**Date**：2026-09-11
+**Status**：`IMPLEMENTED / LOCAL VERIFIED / SEPARATE REVIEW REQUIRED / NO FORMAL RERUN`
+**Evidence**：`docs/provider_verification/formal_b1_b7_framework_remediation_20260911.md`；分支 `fix/provider-canonicalization-diagnostics-20260911`。
+
+**已完成**
+
+- 从 `main@8dfb8a5cf1f03c5c974ea435bf04f13deac9fc65` 建立独立整改分支；针对 PR #42 已封存 Formal run 的只读归因，新增统一 provider 行身份/日期适配器。
+- 已接入完整 `MARKET_CODE`、数字/文本市场码、明确单字段 scalar `value`、大小写字段和时间戳日期；冲突、未知市场和多字段 scalar 形状不被猜测，继续 fail closed。
+- Golden router、ST/停牌、涨跌停、复权、B5 日线单位和历史日期消费层已覆盖；新增 13 条回归测试。
+
+**明确未完成**
+
+- 旧 Formal run、sealed catalog 与 `SPIKE_INCOMPLETE` 不变；没有重新 Production、resume 或 verdict。
+- B2 真实退市语义、代码列表 mapping endpoint/权限、BSE 空响应、历史覆盖和公司行为事件语义仍未获得新的外部证明；没有把适配成功写成 Provider capability approval。
+
+**验证**
+
+- `uv run pytest -q`：1706 项收集，退出码 0，2 个既有 skip；Ruff check/format、mypy、`uv pip check`、`git diff --check` 均通过。
+
+**下一步**
+
+- 独立 Reviewer 审阅本整改 PR 的 diff，确认没有绕过语义门禁或修改 Golden/规则/Provider 配置；接受并合并后仍不自动获得 Formal 授权。
+- 如需新的 Formal 结论，必须由调度者针对合并后的 clean main 另行授权；不得使用 PR #42 的旧授权创建第三次 run，并须对比旧归因 artifact 保存新的 run-bound receipt。

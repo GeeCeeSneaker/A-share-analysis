@@ -27,6 +27,8 @@ from typing import Any
 from ashare_state.providers.amazingdata.mapper import normalize_provider_symbol
 from ashare_state.providers.errors import MappingValidationError
 from ashare_state.spike.model import CaseResult
+from ashare_state.spike.row_adapter import date_key, row_date
+from ashare_state.spike.row_adapter import provider_symbol as _provider_symbol
 
 __all__ = [
     "GoldenCase",
@@ -91,7 +93,10 @@ def validate_security_master_delisted(
     if not entries:
         return _outcome(vid, CaseResult.MISSING, ">=1 delisted security", "no rows")
     delisted = [
-        e for e in entries if str(e.get("IS_LISTED", "")).strip() == "3" or e.get("DELISTING_DATE")
+        e
+        for e in entries
+        if str(_first(e, "IS_LISTED", "is_listed") or "").strip() == "3"
+        or _first(e, "DELISTING_DATE", "delisting_date")
     ]
     if not delisted:
         return _outcome(
@@ -217,8 +222,11 @@ def validate_st_suspend_flags(
         return _outcome(vid, CaseResult.MISSING, "status rows", "no rows")
     bad: list[str] = []
     for source_row in rows:
-        for flag_name in ("IS_ST_SEC", "IS_SUSP_SEC"):
-            value = source_row.get(flag_name)
+        for flag_name, aliases in (
+            ("IS_ST_SEC", ("IS_ST_SEC", "is_st_sec")),
+            ("IS_SUSP_SEC", ("IS_SUSP_SEC", "is_susp_sec")),
+        ):
+            value = _first(source_row, *aliases)
             if value is not None and str(value) not in ("0", "1", "0.0", "1.0"):
                 bad.append(f"{flag_name}={value!r}")
     if bad:
@@ -231,16 +239,17 @@ def validate_st_suspend_flags(
             "domain valid; no golden facts supplied - semantic verdict deferred",
         )
     by_key = {
-        (str(r.get("SECURITY_CODE", "")) + _suffix_of(r), str(r.get("TRADE_DATE", ""))): r
+        (_provider_symbol(r), row_date(r, "TRADE_DATE", "trade_date")): r
         for r in rows
+        if _provider_symbol(r) and row_date(r, "TRADE_DATE", "trade_date")
     }
     mismatches: list[str] = []
     checked = 0
     for fact in golden_facts:
         row: dict[str, Any] | None = by_key.get(
             (
-                fact.provider_symbol.split(".")[0] + _suffix_for(fact.provider_symbol),
-                fact.trade_date,
+                fact.provider_symbol,
+                date_key(fact.trade_date),
             )
         )
         if row is None:
@@ -249,8 +258,8 @@ def validate_st_suspend_flags(
                 (
                     r
                     for r in rows
-                    if str(r.get("SECURITY_CODE")) == fact.provider_symbol.split(".")[0]
-                    and str(r.get("TRADE_DATE")) == fact.trade_date
+                    if _provider_symbol(r).split(".", 1)[0] == fact.provider_symbol.split(".", 1)[0]
+                    and row_date(r, "TRADE_DATE", "trade_date") == date_key(fact.trade_date)
                 ),
                 None,
             )
@@ -258,14 +267,17 @@ def validate_st_suspend_flags(
             mismatches.append(f"{fact.provider_symbol}@{fact.trade_date}: no provider row")
             continue
         checked += 1
-        actual_st = str(row.get("IS_ST_SEC", "0")) in ("1", "1.0")
+        actual_st = str(_first(row, "IS_ST_SEC", "is_st_sec") or "0") in ("1", "1.0")
         if actual_st != fact.expected_is_st:
             mismatches.append(
                 f"{fact.provider_symbol}@{fact.trade_date}: ST expected "
                 f"{fact.expected_is_st}, got {actual_st}"
             )
         if fact.expected_is_suspended is not None:
-            actual_susp = str(row.get("IS_SUSP_SEC", "0")) in ("1", "1.0")
+            actual_susp = str(_first(row, "IS_SUSP_SEC", "is_susp_sec") or "0") in (
+                "1",
+                "1.0",
+            )
             if actual_susp != fact.expected_is_suspended:
                 mismatches.append(
                     f"{fact.provider_symbol}@{fact.trade_date}: SUSP expected "
@@ -284,8 +296,8 @@ def validate_st_suspend_flags(
 
 
 def _suffix_of(row: dict[str, Any]) -> str:
-    market = str(row.get("MARKET_CODE", ""))
-    return {"1": ".SH", "2": ".SZ", "3": ".BJ"}.get(market, "")
+    symbol = _provider_symbol(row)
+    return "." + symbol.split(".", 1)[1] if "." in symbol else ""
 
 
 def _suffix_for(symbol: str) -> str:
@@ -338,7 +350,7 @@ def validate_limit_rule(
         )
     if not rows:
         return _outcome(vid, CaseResult.MISSING, "status rows with limits", "no rows")
-    rows_with_limits = [r for r in rows if r.get("HIGH_LIMITED") is not None]
+    rows_with_limits = [r for r in rows if _first(r, "HIGH_LIMITED", "high_limited") is not None]
     if not rows_with_limits:
         if require_any_limit:
             return _outcome(
@@ -351,14 +363,17 @@ def validate_limit_rule(
     violations: list[str] = []
     checked = 0
     for row in rows_with_limits:
-        pre = _to_float(row.get("PRECLOSE"))
-        up = _to_float(row.get("HIGH_LIMITED"))
-        down = _to_float(row.get("LOW_LIMITED"))
-        code = str(row.get("SECURITY_CODE", ""))
-        market = str(row.get("MARKET_CODE", ""))
-        symbol = code + {"1": ".SH", "2": ".SZ", "3": ".BJ"}.get(market, "")
-        is_st = str(row.get("IS_ST_SEC", "0")) in ("1", "1.0")
-        trade_date = str(row.get("TRADE_DATE", "") or "")
+        pre = _to_float(_first(row, "PRECLOSE", "pre_close"))
+        up = _to_float(_first(row, "HIGH_LIMITED", "high_limited"))
+        down = _to_float(_first(row, "LOW_LIMITED", "low_limited"))
+        symbol = _provider_symbol(row)
+        is_st = str(_first(row, "IS_ST_SEC", "is_st_sec") or "0") in (
+            "1",
+            "1.0",
+            "true",
+            "True",
+        )
+        trade_date = row_date(row, "TRADE_DATE", "trade_date")
         if pre is None or up is None or down is None:
             continue
         if not trade_date or len(trade_date) < 8:
@@ -393,7 +408,7 @@ def validate_limit_rule(
             violations.append(
                 f"{symbol}: down {down} != expected {exp_down:.2f} (pre {pre}, rule {rule.rule_id})"
             )
-        close = _to_float(_first(row, "CLOSE_PRICE", "CLOSE"))
+        close = _to_float(_first(row, "CLOSE_PRICE", "CLOSE", "close"))
         if close is not None and not (down - 1e-9 <= close <= up + 1e-9):
             violations.append(f"{symbol}: close {close} outside [{down}, {up}]")
     if checked == 0:
@@ -437,10 +452,10 @@ def validate_adj_continuity(
     bad: list[str] = []
     prev_date: str | None = None
     for ev in events:
-        factor = _to_float(ev.get("EX_FACTOR"))
+        factor = _to_float(_first(ev, "EX_FACTOR", "ex_factor"))
         if factor is not None and factor < 0:
             bad.append(f"negative factor {factor}")
-        ex = str(ev.get("EX_DATE", ""))
+        ex = row_date(ev, "EX_DATE", "ex_date")
         if ex and prev_date is not None and ex < prev_date:
             bad.append(f"ex-date order break at {ex}")
         if ex:
@@ -457,18 +472,20 @@ def validate_adj_continuity(
     # continuity: around each ex date, adjusted close must be continuous
     by_code: dict[str, list[tuple[str, float]]] = {}
     for price_row in price_context:
-        code = str(price_row.get("SECURITY_CODE", ""))
-        close = _to_float(_first(price_row, "CLOSE_PRICE", "CLOSE"))
-        date = str(price_row.get("TRADE_DATE", price_row.get("KLINE_TIME", "")))
+        price_symbol = _provider_symbol(price_row)
+        code = price_symbol.split(".", 1)[0] if price_symbol else ""
+        close = _to_float(_first(price_row, "CLOSE_PRICE", "CLOSE", "close"))
+        date = row_date(price_row)
         if code and close is not None:
             by_code.setdefault(code, []).append((date, close))
     for price_series in by_code.values():
         price_series.sort()
     checked = 0
     for ev in events:
-        code = str(ev.get("SECURITY_CODE", ""))
-        ex = str(ev.get("EX_DATE", ""))
-        factor = _to_float(ev.get("EX_FACTOR"))
+        event_symbol = _provider_symbol(ev)
+        code = event_symbol.split(".", 1)[0] if event_symbol else ""
+        ex = row_date(ev, "EX_DATE", "ex_date")
+        factor = _to_float(_first(ev, "EX_FACTOR", "ex_factor"))
         series: list[tuple[str, float]] | None = by_code.get(code)
         if not series or factor is None or not ex:
             continue
@@ -665,15 +682,21 @@ def validate_golden_cases(
     outcomes: list[ValidationOutcome] = []
     index: dict[tuple[str, str], dict[str, Any]] = {}
     for provider_row in provider_rows:
-        code = str(provider_row.get(row_key, ""))
-        market = str(provider_row.get("MARKET_CODE", ""))
-        symbol = code + {"1": ".SH", "2": ".SZ", "3": ".BJ"}.get(market, "")
-        date = str(provider_row.get("TRADE_DATE", ""))
+        identity_row = provider_row
+        if row_key != "SECURITY_CODE" and provider_row.get(row_key) is not None:
+            identity_row = {**provider_row, "SECURITY_CODE": provider_row[row_key]}
+        symbol = _provider_symbol(identity_row)
+        date = row_date(provider_row, "TRADE_DATE", "trade_date")
+        if not symbol or not date:
+            continue
         index[(symbol, date)] = provider_row
-        index.setdefault((code, date), provider_row)
+        index.setdefault((symbol.split(".", 1)[0], date), provider_row)
     for case in cases:
         vid = f"golden_{case.case_type}_v1"
-        row: dict[str, Any] | None = index.get((case.provider_symbol, case.trade_date))
+        case_date = date_key(case.trade_date)
+        row: dict[str, Any] | None = index.get((case.provider_symbol, case_date))
+        if row is None:
+            row = index.get((case.provider_symbol.split(".", 1)[0], case_date))
         if row is None:
             outcomes.append(
                 _outcome(
@@ -686,7 +709,7 @@ def validate_golden_cases(
             continue
         mismatches = []
         for field_name, expected in case.expected_fields.items():
-            actual = row.get(field_name)
+            actual = _first(row, field_name, field_name.lower())
             # normalize 1/1.0/True style flags
             if isinstance(expected, bool):
                 actual_flag = str(actual) in ("1", "1.0", "True", "true")

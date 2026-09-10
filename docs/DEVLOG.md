@@ -3736,3 +3736,12 @@
 - 只读重算将 B4 的 125 条 `VALIDATED_FAIL` 分为：103 条 status canonical key 不匹配（ST 50、非 BSE 限价 28、公司行为 25）、20 条退市 `value` 标量 shape 与 validator 预期不匹配、2 条 BSE 空响应且归因保持 uncertain。该材料只记录可证实的框架症状，不把未到达的语义检查改写为 PASS，也不强行归因 Provider。
 - 6 项 FAILED core 与 1 项 MISSING core 已逐项给出 primary classification：字段名/规范化/shape/date handling 的框架或 validator defect，以及 BJ mapping endpoint limitation/uncertain；原 run、catalog、Golden、trading rules、verdict 均未修改，没有重跑 Production、resume、backfill 或上传 raw/凭证。
 - 下一步是独立 remediation PR 修复 canonical field/shape/date handling 并补测试；在归因审阅和后续治理决定前，不得重新执行本 Formal run。
+## 2026-09-11 · Formal B1-B7 失败归因后的 provider 行适配整改
+
+> 状态：**IMPLEMENTED / LOCAL VERIFIED / SEPARATE REVIEW REQUIRED / NO FORMAL RERUN**
+
+- 按 PR #42 独立审阅对已封存 Formal run 的只读归因要求，基于 clean `main@8dfb8a5cf1f03c5c974ea435bf04f13deac9fc65` 建立独立分支 `fix/provider-canonicalization-diagnostics-20260911`；旧 run、sealed catalog、`SPIKE_INCOMPLETE` verdict、Golden、交易规则和 Provider 配置均未修改。
+- 新增 `src/ashare_state/spike/row_adapter.py`，在内存中统一原生完整 `MARKET_CODE`、数字/文本市场码、明确的单字段 scalar `value`、大小写字段和时间戳日期；冲突/未知市场/多字段 scalar 行 fail closed，不从 raw evidence 重建或改写数据。
+- Golden router、ST/停牌、涨跌停、复权、B5 日线单位与历史覆盖消费层已接入该适配器；新增 13 条回归测试，覆盖 103 条 canonical-key mismatch 和 20 条 scalar-list shape mismatch 所对应的框架症状。BSE 空响应、真实退市语义、代码列表 endpoint/权限和历史覆盖仍未被冒充为已解决。
+- 本分支 `uv run pytest -q` 收集 1706 项并以退出码 0 完成（2 个既有 skip）；Ruff check/format、mypy、`uv pip check`、`git diff --check` 均通过。未登录 Provider、未创建 run_id、未执行 Production/`--resume`/`--verdict`。
+- 详细范围、未解决边界和后续授权要求见 [`formal_b1_b7_framework_remediation_20260911.md`](provider_verification/formal_b1_b7_framework_remediation_20260911.md)。下一步为独立审阅本整改 PR；任何未来 Formal run 都必须取得新的调度授权。

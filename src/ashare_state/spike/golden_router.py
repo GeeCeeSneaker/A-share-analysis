@@ -40,6 +40,12 @@ from ashare_state.providers.errors import (
 )
 from ashare_state.spike import validators
 from ashare_state.spike.model import CaseResult
+from ashare_state.spike.row_adapter import (
+    date_key,
+    first_present,
+    provider_symbol,
+    row_date,
+)
 from ashare_state.spike.trading_rule import (
     RuleUnresolvedError,
     resolve_limit_regime,
@@ -198,13 +204,15 @@ def _ca_provider_view(
     event_type = "DIVIDEND" if stream == "dividend" else "RIGHT_ISSUE"
     view: list[dict[str, Any]] = []
     for row in rows:
-        code = str(row.get(contract["code"], "") or "").strip()
-        ex_date = str(row.get(contract["ex_date"], "") or "").strip()
+        raw_code = first_present(row, contract["code"])
+        raw_ex_date = first_present(row, contract["ex_date"])
+        code = provider_symbol({"MARKET_CODE": raw_code}).split(".", 1)[0]
+        ex_date = date_key(raw_ex_date)
         if not code or not ex_date:
             msg = (
                 f"provider {stream} payload row missing documented contract "
                 f"fields ({contract['code']}={code!r}, "
-                f"{contract['ex_date']}={ex_date!r}) - row={row}"
+                f"{contract['ex_date']}={raw_ex_date!r}) - row={row}"
             )
             raise CAProviderShapeError(msg)
         view.append(
@@ -505,8 +513,8 @@ def _validate_delisted(case: GoldenCase, data: DomainData) -> validators.Validat
     basic_rows = data.stock_basic_rows or []
     hist_rows = data.hist_code_rows or []
     bare = case.provider_symbol.split(".")[0]
-    in_basic = any(str(r.get("SECURITY_CODE", "")) == bare for r in basic_rows)
-    in_hist = any(str(r.get("SECURITY_CODE", "")) == bare for r in hist_rows)
+    in_basic = any(provider_symbol(r).split(".", 1)[0] == bare for r in basic_rows)
+    in_hist = any(provider_symbol(r).split(".", 1)[0] == bare for r in hist_rows)
     expected = case.expected_fields.get("IS_LISTED")
     if expected == "3":
         # post-delisting: master may drop it, but HISTORICAL code list must
@@ -545,7 +553,8 @@ def _status_row_exact(
     matches = [
         r
         for r in status_rows
-        if str(r.get("SECURITY_CODE", "")) == bare and str(r.get("TRADE_DATE", "")) == trade_date
+        if provider_symbol(r).split(".", 1)[0] == bare
+        and row_date(r, "TRADE_DATE", "trade_date") == date_key(trade_date)
     ]
     problem = ""
     if not matches:
@@ -575,10 +584,10 @@ def _validate_limit_pit(
         )
     row = matches[0]
     hist_row = next(
-        (r for r in (data.hist_code_rows or []) if str(r.get("SECURITY_CODE", "")) == bare),
+        (r for r in (data.hist_code_rows or []) if provider_symbol(r).split(".", 1)[0] == bare),
         None,
     )
-    listing_date = str((hist_row or {}).get("LISTING_DATE", "") or "")
+    listing_date = str(first_present(hist_row or {}, "LISTING_DATE", "listing_date") or "")
     if not listing_date:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -601,7 +610,12 @@ def _validate_limit_pit(
             validator_id="limit_pit_rule_v2",
             validator_version="2",
         )
-    is_st = str(row.get("IS_ST_SEC", "0")) in ("1", "1.0", "true", "True")
+    is_st = str(first_present(row, "IS_ST_SEC", "is_st_sec") or "0") in (
+        "1",
+        "1.0",
+        "true",
+        "True",
+    )
     try:
         rule = resolve_trading_rule(
             exchange=suffix,
@@ -623,7 +637,7 @@ def _validate_limit_pit(
         )
     # no-limit expectation (first-N sessions etc.)
     if rule.is_no_limit:
-        provider_high = row.get("HIGH_LIMITED")
+        provider_high = first_present(row, "HIGH_LIMITED", "high_limited")
         if provider_high not in (None, "", "0", 0, "0.0", 0.0):
             return ValidationOutcome(
                 result=CaseResult.VALIDATED_FAIL,
@@ -659,9 +673,9 @@ def _validate_limit_pit(
             validator_version="2",
         )
     # price consistency vs the rule's Decimal limit prices (1-tick tolerance)
-    pre_close = row.get("PRECLOSE")
-    provider_high = row.get("HIGH_LIMITED")
-    provider_low = row.get("LOW_LIMITED")
+    pre_close = first_present(row, "PRECLOSE", "pre_close")
+    provider_high = first_present(row, "HIGH_LIMITED", "high_limited")
+    provider_low = first_present(row, "LOW_LIMITED", "low_limited")
     price_problem = ""
     if pre_close not in (None, "", 0, "0"):
         try:
@@ -699,7 +713,7 @@ def _validate_limit_pit(
         expected=case.truth_source,
         actual=(
             f"rate + price consistent (rule={rule.rule_id}, "
-            f"preclose {pre_close} -> [{row.get('LOW_LIMITED')}, {row.get('HIGH_LIMITED')}])"
+            f"preclose {pre_close} -> [{provider_low}, {provider_high}])"
         ),
         validator_id="limit_pit_rule_v2",
         validator_version="2",
@@ -722,7 +736,7 @@ def _validate_corp_action_context(
         NOT_TESTABLE_TIME(SUSPENSION), never a silent PASS
     """
     bare = case.provider_symbol.split(".")[0]
-    t_day = case.trade_date
+    t_day = date_key(case.trade_date)
     calendar = sorted(int(d) for d in (data.calendar_days or []))
     if not calendar or int(t_day) not in calendar:
         return ValidationOutcome(
@@ -760,7 +774,7 @@ def _validate_corp_action_context(
         )
     status_out = validators.validate_golden_cases(
         [status_case],
-        [r for r in (data.status_rows or []) if str(r.get("TRADE_DATE", "")) == t_day],
+        [r for r in (data.status_rows or []) if row_date(r, "TRADE_DATE", "trade_date") == t_day],
     )[0]
     if status_out.result is CaseResult.VALIDATED_FAIL:
         return status_out
@@ -769,18 +783,22 @@ def _validate_corp_action_context(
     status_t_rows = [
         r
         for r in (data.status_rows or [])
-        if str(r.get("SECURITY_CODE", "")) == bare and str(r.get("TRADE_DATE", "")) == t_day
+        if provider_symbol(r).split(".", 1)[0] == bare
+        and row_date(r, "TRADE_DATE", "trade_date") == t_day
     ]
     suspended_t = any(
-        str(r.get("IS_SUSP_SEC", "0")) in ("1", "1.0", "true", "True") for r in status_t_rows
+        str(first_present(r, "IS_SUSP_SEC", "is_susp_sec") or "0") in ("1", "1.0", "true", "True")
+        for r in status_t_rows
     )
 
     # kline T-1/T/T+1 (exact-date rows for this symbol)
     kline_by_day: dict[str, dict[str, Any]] = {}
     for row in data.kline_rows or []:
-        code = str(row.get("SECURITY_CODE", ""))
-        if code == bare or code == case.provider_symbol:
-            kline_by_day[str(row.get("KLINE_TIME", row.get("TRADE_DATE", "")))] = row
+        symbol = provider_symbol(row)
+        if symbol.split(".", 1)[0] == bare:
+            day = row_date(row, "KLINE_TIME", "kline_time", "TRADE_DATE", "trade_date")
+            if day:
+                kline_by_day[day] = row
     missing = [d for d in (t_prev, int(t_day), t_next) if str(d) not in kline_by_day]
     if missing:
         if suspended_t:
@@ -822,10 +840,14 @@ def _validate_corp_action_context(
     # (security_code / ex_date / event_type + endpoint/request lineage) -
     # see _ca_provider_view. No canonical-like field access here.
     dividend_rows = [
-        r for r in (data.dividend_rows or []) if str(r.get("security_code", "")) == bare
+        r
+        for r in (data.dividend_rows or [])
+        if str(first_present(r, "security_code", "SECURITY_CODE") or "").split(".", 1)[0] == bare
     ]
     right_rows = [
-        r for r in (data.right_issue_rows or []) if str(r.get("security_code", "")) == bare
+        r
+        for r in (data.right_issue_rows or [])
+        if str(first_present(r, "security_code", "SECURITY_CODE") or "").split(".", 1)[0] == bare
     ]
     all_event_rows = [*dividend_rows, *right_rows]
     if not all_event_rows:
@@ -840,15 +862,19 @@ def _validate_corp_action_context(
             validator_id="corp_action_context_v2",
             validator_version="6",
         )
-    events_at_t = [r for r in all_event_rows if str(r.get("ex_date", "")) == t_day]
+    events_at_t = [
+        r for r in all_event_rows if date_key(first_present(r, "ex_date", "EX_DATE")) == t_day
+    ]
     if not events_at_t:
+        found_ex_dates = sorted(
+            {date_key(first_present(r, "ex_date", "EX_DATE")) for r in all_event_rows}
+        )[:5]
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
             expected=f"{case.truth_source} (event record ex_date == {t_day})",
             actual=(
                 "provider event records exist but none matches the case's exact "
-                f"event date (found ex_dates: "
-                f"{sorted({str(r.get('ex_date')) for r in all_event_rows})[:5]})"
+                f"event date (found ex_dates: {found_ex_dates})"
             ),
             reason_code="EVENT_DATE_MISMATCH",
             validator_id="corp_action_context_v2",
@@ -876,11 +902,11 @@ def _validate_corp_action_context(
         (
             r
             for r in (data.adj_rows or [])
-            if str(r.get("SECURITY_CODE", "")) == bare and str(r.get("EX_DATE", "")).strip() != ""
+            if provider_symbol(r).split(".", 1)[0] == bare and row_date(r, "EX_DATE", "ex_date")
         ),
-        key=lambda r: str(r.get("EX_DATE", "")),
+        key=lambda r: row_date(r, "EX_DATE", "ex_date"),
     )
-    adj_at_t = [r for r in adj_rows if str(r.get("EX_DATE", "")) == t_day]
+    adj_at_t = [r for r in adj_rows if row_date(r, "EX_DATE", "ex_date") == t_day]
     if not adj_at_t:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -890,9 +916,9 @@ def _validate_corp_action_context(
             validator_id="corp_action_context_v2",
             validator_version="2",
         )
-    factor_t = float(adj_at_t[0].get("EX_FACTOR", 0) or 0)
-    before = [r for r in adj_rows if str(r.get("EX_DATE", "")) < t_day]
-    factor_prev = float(before[-1].get("EX_FACTOR", 1) or 1) if before else 1.0
+    factor_t = float(first_present(adj_at_t[0], "EX_FACTOR", "ex_factor") or 0)
+    before = [r for r in adj_rows if row_date(r, "EX_DATE", "ex_date") < t_day]
+    factor_prev = float(first_present(before[-1], "EX_FACTOR", "ex_factor") or 1) if before else 1.0
     if factor_t <= 0:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -914,8 +940,12 @@ def _validate_corp_action_context(
 
     # raw discontinuity + adjusted continuity
     try:
-        close_prev = float(kline_by_day[str(t_prev)].get("CLOSE_PRICE", 0) or 0)
-        close_t = float(kline_by_day[str(t_day)].get("CLOSE_PRICE", 0) or 0)
+        close_prev = float(
+            first_present(kline_by_day[str(t_prev)], "CLOSE_PRICE", "CLOSE", "close") or 0
+        )
+        close_t = float(
+            first_present(kline_by_day[str(t_day)], "CLOSE_PRICE", "CLOSE", "close") or 0
+        )
     except (TypeError, ValueError):
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -983,7 +1013,9 @@ def _validate_bj_mapping(
     """
     bare = case.provider_symbol.split(".")[0]
     suffix = case.provider_symbol.split(".")[1] if "." in case.provider_symbol else "BJ"
-    hist_rows = [r for r in (data.hist_code_rows or []) if str(r.get("SECURITY_CODE", "")) == bare]
+    hist_rows = [
+        r for r in (data.hist_code_rows or []) if provider_symbol(r).split(".", 1)[0] == bare
+    ]
     if not hist_rows:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -1004,7 +1036,7 @@ def _validate_bj_mapping(
             validator_version="2",
         )
     row = matches[0]
-    provider_high = row.get("HIGH_LIMITED")
+    provider_high = first_present(row, "HIGH_LIMITED", "high_limited")
     if provider_high in (None, "", 0, "0", "0.0", 0.0):
         return ValidationOutcome(
             result=CaseResult.NOT_TESTABLE_TIME,
@@ -1014,7 +1046,12 @@ def _validate_bj_mapping(
             validator_id="bj_mapping_v2",
             validator_version="2",
         )
-    is_st = str(row.get("IS_ST_SEC", "0")) in ("1", "1.0", "true", "True")
+    is_st = str(first_present(row, "IS_ST_SEC", "is_st_sec") or "0") in (
+        "1",
+        "1.0",
+        "true",
+        "True",
+    )
     try:
         rule = resolve_limit_regime(
             exchange=suffix,
@@ -1055,7 +1092,7 @@ def _validate_bj_mapping(
             validator_id="bj_mapping_v2",
             validator_version="2",
         )
-    pre_close = row.get("PRECLOSE")
+    pre_close = first_present(row, "PRECLOSE", "pre_close")
     price_problem = ""
     if pre_close not in (None, "", 0, "0"):
         try:
