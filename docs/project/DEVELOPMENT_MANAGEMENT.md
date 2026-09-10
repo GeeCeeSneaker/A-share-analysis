@@ -6000,7 +6000,7 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 
 **Type**：C1 — Formal Production failure evidence and framework remediation
 **Date**：2026-09-10
-**Status**：`FORMAL ATTEMPT FAILED / SCHEDULER AS-OF DEVIATION RECORDED / FRAMEWORK ERROR RETAINED / VERDICT NOT RUN / WRITER FIX IN REVIEW / NEW ATTEMPT AUTHORIZATION REQUIRED`
+**Status**：`FORMAL ATTEMPT FAILED / SCHEDULER AS-OF DEVIATION RECORDED / FRAMEWORK ERROR RETAINED / VERDICT NOT RUN / WRITER FIX MERGED / NEW ATTEMPT AUTHORIZATION REQUIRED`
 
 **已确认事实**
 
@@ -6014,6 +6014,6 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 
 - RawWriter shape 回归、B7 exchange completeness、probe exchange enforcement 和 Spike framework 聚焦测试通过；最终 diff 的 `uv run ruff check src tests scripts/spike`、`uv run ruff format --check src tests scripts/spike`、`uv run mypy src`、`uv pip check` 和 `uv run pytest -q` 均以退出码 0 完成；pytest 仅保留仓库既有环境相关 skip。
 - 本次 run 为 `FAILED` 而非 `RUNNING`，因此不得 resume；没有 `CLOSED`，因此不得执行 verdict；本次一次性授权已经消耗，不得用第二次生产 run 覆盖失败。
-- 下一出口是独立 Reviewer 审阅 writer 修复和失败证据；合并后若项目仍要求 Provider 正式结论，必须新增明确的一次性授权，并从最新 clean main 重新完成 preflight、as-of 解析和全量 B1-B7。
+- 独立 Reviewer 已审阅 writer 修复和失败证据，PR #40 已合并到 `main@7d7fbfacf707c797ba5445996c2e291dcf9ebb9d`；若项目仍要求 Provider 正式结论，必须新增明确的一次性授权，并从最新 clean main 重新完成 preflight、as-of 解析和全量 B1-B7。
 
 ## DM-20260910-TRADING-RULE-H1R4-011 · H1R4 REVIEWED 头部声明修正与最终重封存
