@@ -120,9 +120,10 @@ production/c3dc1f43-7678-461d-8824-e7b44186e0ac/raw/provider=amazingdata/dataset
 1. 不执行 `--resume`；resume 只适用于真实硬中断且原 run 仍为 `RUNNING`。
 2. 不执行 `--verdict`；verdict 只适用于同一 run 合法进入 `CLOSED`。
 3. 不再启动第二次 Formal Production 来覆盖本次失败；本次授权已经消耗。
-4. 先由独立 Reviewer 审阅本记录和修复 diff；合并修复后，若仍需 Formal Provider
-   结论，必须由项目管理者提供新的、明确的一次性正式运行授权，并从新的 clean
-   main 重新做 preflight、as-of 解析和全量 B1-B7。
+4. 独立 Reviewer 已审阅本记录和修复 diff，PR #40 已合并到
+   `main@7d7fbfacf707c797ba5445996c2e291dcf9ebb9d`；若仍需 Formal Provider 结论，
+   必须由项目管理者提供新的、明确的一次性正式运行授权，并从新的 clean main
+   重新做 preflight、as-of 解析和全量 B1-B7。
 
 本记录的状态是：`FORMAL ATTEMPT FAILED / EVIDENCE RETAINED / VERDICT NOT RUN /
-WRITER FIX IN REVIEW / NEW ATTEMPT AUTHORIZATION REQUIRED`。
+WRITER FIX MERGED / NEW ATTEMPT AUTHORIZATION REQUIRED`。
