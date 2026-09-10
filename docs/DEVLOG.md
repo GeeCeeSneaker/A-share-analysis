@@ -2,9 +2,9 @@
 
 > 状态：**H1R4 REVIEWED SEALED / ACTIVE MOVED ATOMICALLY / FINAL PR INDEPENDENT REVIEW AND CI PENDING / FORMAL ENTRY PROHIBITED**
 
-- 从合并后的 clean `main@1af86215312b088859300521e4bb164f149e3717` 建立独立 reviewed-seal 分支；封存前先修复 `_build_reviewed_text()` 的生命周期缺陷：候选版多行 `review_note` 不再泄漏到 REVIEWED 副本，并为 `owner-authorized-ai-reviewer` 写入真实的最终封存说明。对应代码/回归提交为 `6a8c0f562169c6543e0bced0a381548432f03523`。
+- 从合并后的 clean `main@1af86215312b088859300521e4bb164f149e3717` 建立独立 reviewed-seal 分支；封存前先修复 `_build_reviewed_text()` 的生命周期缺陷：候选版多行 `review_note` 不再泄漏到 REVIEWED 副本，并为 `owner-authorized-ai-reviewer` 写入真实的最终封存说明。代码、测试、封存树和本条记录已收敛进最终原子提交 `0756ddccee4256f982c42ba60f17470804337c57`。
 - 封存前完整质量门禁通过：Ruff check、format、mypy，以及 `uv run pytest` 为 `1687 passed, 3 skipped`。封存前只读断言确认 ACTIVE 仍为 `v20260824-compiled`、候选 hash 与 H1R4 证据身份均精确匹配，未发现 REVIEWED 目录或旧候选漂移。
-- 按 Issue #34 固定参数仅执行一次 `scripts/rules/review.py --candidate`，封存提交为 `6a01414cf00d0093e17771447ea4660a757f60ea`。新建 `v20260910-h1r4-reviewed`，14 条、`REVIEWED`，manifest-style dataset hash 为 `b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b`，ACTIVE selector 已原子指向该版本。
+- 按 Issue #34 固定参数仅执行一次 `scripts/rules/review.py --candidate`；该一次性封存结果纳入原子提交 `0756ddccee4256f982c42ba60f17470804337c57`。新建 `v20260910-h1r4-reviewed`，14 条、`REVIEWED`，manifest-style dataset hash 为 `b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b`，ACTIVE selector 已原子指向该版本。
 - REVIEWED provenance 为 `owner-authorized-ai-reviewer`；canonical evidence bundle 为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`（18,606 bytes），20 个唯一官方 URL/raw artifact、raw 总字节 1,736,924。封存后 `trading_rule_review_gate(..., require_evidence_bundle=True)` 与独立证据重算均为空问题；候选、旧 ACTIVE 和旧 COMPILED 版本字节不变。
 - 封存后 H1 生命周期/证据完整性/精确字节聚焦回归通过；未启动生产入口、未创建或消耗 Formal Production run，B1-B7 继续禁止。最终 reviewed-seal PR 仍需 GitHub CI 全绿和独立 Reviewer PASS 后才能合并。
 

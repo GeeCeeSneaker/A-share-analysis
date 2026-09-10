@@ -50,7 +50,7 @@ Canonical bundle：`sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6b
 
 ## 4. 封存执行与当前硬边界
 
-- 从合并后的 clean `main@1af86215312b088859300521e4bb164f149e3717` 建立独立 final reviewed-seal 分支；封存前生命周期修正提交为 `6a8c0f562169c6543e0bced0a381548432f03523`，封存提交为 `6a01414cf00d0093e17771447ea4660a757f60ea`。
+- 从合并后的 clean `main@1af86215312b088859300521e4bb164f149e3717` 建立独立 final reviewed-seal 分支；生命周期修正、测试、封存树和记录已收敛在最终原子提交 `0756ddccee4256f982c42ba60f17470804337c57`。
 - `scripts/rules/review.py --candidate` 已按 Issue #34 固定参数仅执行一次，生成 `v20260910-h1r4-reviewed` 并将 ACTIVE 指向该版本；候选 `v20260910-h1r4-compiled` 保持 `COMPILED`、非 ACTIVE。
 - REVIEWED dataset hash 为 `b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b`，`reviewed_by` 为 `owner-authorized-ai-reviewer`；canonical evidence bundle 为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`（18,606 bytes），20 个唯一 raw artifact、1,736,924 bytes。封存后 review/evidence gate 均为空问题，候选、旧 ACTIVE 和旧 COMPILED 版本字节不变。
 - 未运行或消耗 Formal Production/B1-B7；未执行生产入口、Data Sufficiency、Provider capability、backfill、策略/回测或交易。
