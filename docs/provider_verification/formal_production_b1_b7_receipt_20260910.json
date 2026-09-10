@@ -1,0 +1,202 @@
+{
+  "receipt_type": "GT-H3B-FORMAL-RUN-SANITIZED-RECEIPT",
+  "schema_version": 1,
+  "purpose": "Governance-safe durable anchor for the local artifacts of one failed Formal Production attempt; not a Provider verdict.",
+  "source_scope": {
+    "derived_from": "local run metadata, gate JSON files, and the flushed case catalog",
+    "raw_provider_data_included": false,
+    "credentials_included": false,
+    "published_artifact_scope": "sanitized receipt only; raw Provider files remain local"
+  },
+  "run": {
+    "run_id": "c3dc1f43-7678-461d-8824-e7b44186e0ac",
+    "run_kind": "PRODUCTION",
+    "executed_command": "uv run python scripts/spike/spike_runner.py --production --date 20260909",
+    "source_head": "3082491b5af2affdba92b1992407452f6c8ccb2c",
+    "clean_checkout_assertion": true,
+    "as_of_date": "20260909",
+    "started_at": "2026-09-10T09:37:43.756184+00:00",
+    "ended_at": "2026-09-10T10:39:59.913074+00:00",
+    "terminal_status": "FAILED",
+    "failure_reason": "FRAMEWORK_ERROR",
+    "failure_boundary": "B7 first full-universe single-day K-line exchange raw-evidence write",
+    "b7_phase_result_present": false,
+    "verdict_present": false,
+    "verdict_command_executed": false
+  },
+  "scheduler_authorization": {
+    "governing_issue": 39,
+    "source_issue_url": "https://github.com/GeeCeeSneaker/A-share-analysis/issues/39",
+    "authorized_as_of_date": "20260908",
+    "authorized_command": "uv run python scripts/spike/spike_runner.py --production --date 20260908",
+    "actual_as_of_date": "20260909",
+    "actual_command_differs_from_authorized_command": true,
+    "conformance": "DEVIATED_AS_OF_DATE",
+    "real_production_run_created": true,
+    "one_attempt_authorization_consumed": true,
+    "rerun_under_old_authorization": false
+  },
+  "runtime_identity": {
+    "provider": "amazingdata",
+    "account_profile_id": "UNKNOWN_24e2ff401792",
+    "sdk_version": "1.1.9",
+    "runtime_version": "V4.3.0.260626-rc2.0-YHZQ",
+    "environment_lock_sha256": "03f61918aed5caec38359e96ed0804b556551a53ebbad07eabb6a02e4533c3bd",
+    "production_config_sha256": "a65d07584f7ed93c6d5ec23cf4d3ca5f1427b89bef3a17b0487b5b61c00c2c14"
+  },
+  "dataset_identity": {
+    "golden_truth_version": "v7-reviewed-20260908",
+    "golden_dataset_file": "golden_cases_v7.jsonl",
+    "golden_dataset_sha256": "a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e",
+    "trading_rule_version": "v20260910-h1r4-reviewed",
+    "trading_rule_dataset_version": "2026-09-10.2",
+    "trading_rule_review_status": "REVIEWED",
+    "trading_rule_dataset_sha256": "b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed"
+  },
+  "phase_summary": {
+    "B1": {
+      "gate_file_count": 10,
+      "capabilities_pass": [
+        "trade_calendar",
+        "security_master",
+        "daily_bar",
+        "index_daily"
+      ],
+      "capabilities_blocked_by_endpoint_available": [
+        "code_mapping_bj",
+        "security_status_history",
+        "adj_factor",
+        "corporate_action",
+        "equity_structure",
+        "industry_taxonomy"
+      ]
+    },
+    "B2": {
+      "result": "VALIDATED_FAIL",
+      "security_master_rows": 5442,
+      "delisted_observed": 0,
+      "summary": "security_master_with_delisted required at least one delisted security; none was observed"
+    },
+    "B3": {
+      "daily_bar": "VALIDATED_FAIL",
+      "st_suspend": "NOT_TESTABLE",
+      "limit": "NOT_TESTABLE",
+      "adj": "NOT_TESTABLE"
+    },
+    "B4": {
+      "golden_case_count": 125,
+      "result_counts": {
+        "MISSING": 105,
+        "VALIDATED_FAIL": 20
+      }
+    },
+    "B5": {
+      "calendar_rows": 8723,
+      "symbols": 5562,
+      "bse_evidence_rows": 0,
+      "observed_earliest_output": "99991231",
+      "earliest_output_is_accepted_history_claim": false
+    },
+    "B6": {
+      "result": "OBSERVED",
+      "observed_case_count": 3,
+      "observed_cases": [
+        "B6-FREEFLOAT-SEMANTICS-20260909",
+        "B6-TAXONOMY-OWNER-20260909",
+        "B6-BENCHMARK-INDEX-20260909"
+      ]
+    },
+    "B7": {
+      "phase_result_present": false,
+      "failure_reason": "FRAMEWORK_ERROR",
+      "failure_boundary": "RawWriter rejected a dict containing both DataFrame and None members",
+      "verdict_present": false
+    }
+  },
+  "case_catalog": {
+    "jsonl_path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/cases/spike_case_catalog.jsonl",
+    "csv_path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/cases/spike_case_catalog.csv",
+    "jsonl_record_count": 172,
+    "csv_data_row_count": 172,
+    "golden_record_count": 125,
+    "runtime_gate_record_count": 36,
+    "other_record_count": 11,
+    "result_counts": {
+      "MISSING": 108,
+      "NOT_TESTABLE_PERMISSION": 6,
+      "OBSERVED": 3,
+      "VALIDATED_FAIL": 29,
+      "VALIDATED_PASS": 26
+    },
+    "case_catalog_hash_in_spike_run": "",
+    "sealed": false,
+    "state": "BEST_EFFORT_FLUSHED_UNSEALED"
+  },
+  "artifact_inventory": [
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/spike_run.json",
+      "bytes": 1388,
+      "sha256": "17cb2128bc3bc9007b408777f2669f9a2b0d3ab47e370a1b3c577d534f422d45"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/adj_factor.json",
+      "bytes": 3144,
+      "sha256": "02d3242074cd7ac8bac06f70eb89758705bf98667932ac887ceb80255ec738bf"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/code_mapping_bj.json",
+      "bytes": 3214,
+      "sha256": "bead77802bb56687b8f00895f45f4b7961a8cab8a33e26100a443070d5606332"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/corporate_action.json",
+      "bytes": 3969,
+      "sha256": "5525e09d11f0b286f490ddc0011e606fb25a7c096aae61da4f51e483d10ef038"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/daily_bar.json",
+      "bytes": 3155,
+      "sha256": "e6ebf018cee4b1e8b41e7043b3b46ca72cae4ae36b2a519c3defcddbf15ceec6"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/equity_structure.json",
+      "bytes": 3228,
+      "sha256": "d32621982c665bb9901309863c997b11836420149a64516df15216649e504e22"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/index_daily.json",
+      "bytes": 3163,
+      "sha256": "5c85079bc837853c64e1d46c13b53bc9e6af30c11a0f749e274d6f92add953c6"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/industry_taxonomy.json",
+      "bytes": 4078,
+      "sha256": "edb8822d6f9293815e5e7bcb59a701370448618b432770fd0d4e769fce0e5b80"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/security_master.json",
+      "bytes": 3236,
+      "sha256": "4fef49bebc38705922ec428967739918cf7cbfba85edbf4871edeb75c2f7a3ab"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/security_status_history.json",
+      "bytes": 3296,
+      "sha256": "abd3819982bb99f5d4bf40310d73e7dd0c0cf822743b68fdd8bd7711208e88c4"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/gates/trade_calendar.json",
+      "bytes": 3196,
+      "sha256": "2698d559c2d8f43674c3e7b49c41e229f5afbc76ccb422d1272ae79c71655e5f"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/cases/spike_case_catalog.csv",
+      "bytes": 109651,
+      "sha256": "b97dca040ee18e30c5f6e7370bfcf4feef69b558b59043a842a738c4294ad464"
+    },
+    {
+      "path": "data/spike/production/c3dc1f43-7678-461d-8824-e7b44186e0ac/cases/spike_case_catalog.jsonl",
+      "bytes": 163395,
+      "sha256": "43bc4f08412853fbbab09c91ce1f6ae2be97782186c1f3650a8e908095151876"
+    }
+  ]
+}

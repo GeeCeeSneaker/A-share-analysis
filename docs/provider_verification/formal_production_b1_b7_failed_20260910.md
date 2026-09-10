@@ -4,10 +4,12 @@
 
 ## 1. 结论先行
 
-本次唯一获授权的 Formal Production B1-B7 attempt 已真实启动，但 lifecycle 以
-`FAILED` 结束，`failure_reason=FRAMEWORK_ERROR`。失败发生在 B7 首个全市场、单日
-K 线 exchange 的 raw evidence 持久化边界，B7 没有产出 phase result；因此没有运行
-`--verdict`，也没有把该 run 改写为 `CLOSED`。
+Issue #39 只授权了一次、且明确冻结为 `--production --date 20260908`；本次真实
+Production attempt 实际使用了 `--date 20260909`，因此是**偏离调度授权 as-of 的真实
+运行**，不能描述为按授权命令执行。由于它确实创建了 `SpikeRun`，一次性 attempt
+额度按已消耗处理。该 run 以 `FAILED` 结束，`failure_reason=FRAMEWORK_ERROR`；失败
+发生在 B7 首个全市场、单日 K 线 exchange 的 raw evidence 持久化边界，B7 没有产出
+phase result；因此没有运行 `--verdict`，也没有把该 run 改写为 `CLOSED`。
 
 失败不是账号未登录或网络不可达的推断：本次在线 preflight 已确认
 `NETWORK_REACHABLE=REACHABLE`、`AUTHENTICATED=YES`、`QUERY_READY=YES`。这也不代表
@@ -22,6 +24,9 @@ Provider 数据能力已经通过；B2-B6 的真实结果仍需由 Reviewer 按 
 | clean checkout | 运行前 `git status --porcelain` 为空；从该 HEAD 建立独立 worktree |
 | run id | `c3dc1f43-7678-461d-8824-e7b44186e0ac` |
 | run kind | `PRODUCTION` |
+| governing authorization | Issue #39；只允许 `--production --date 20260908` 一次 |
+| actual command | `uv run python scripts/spike/spike_runner.py --production --date 20260909` |
+| authorization conformance | `DEVIATED_AS_OF_DATE`；真实 run 已创建，旧授权不得重跑 |
 | started | `2026-09-10T09:37:43.756184+00:00` |
 | ended | `2026-09-10T10:39:59.913074+00:00` |
 | as-of date | `20260909` |
@@ -49,7 +54,8 @@ Provider 数据能力已经通过；B2-B6 的真实结果仍需由 Reviewer 按 
 | B6 | `OBSERVED` | 只记录观察结果，不升级为能力通过 |
 | B7 | 未产出 phase result；在首个全市场单日 K 线 exchange 的 raw 写入处触发 `RawWriterError` | 失败边界明确，未进行静默重试或另起 run |
 
-截至失败边界，run-scoped case catalog 已 best-effort flush；共 166 条 case 记录，
+截至失败边界，run-scoped case catalog 已 best-effort flush；按本地 JSONL/CSV 实际
+重算共 172 条记录（125 条 Golden、36 条 runtime gate、11 条其他 B2-B6 记录），
 catalog 未封印，`case_catalog_hash` 为空。它不能替代完整的 B7 evidence closure。
 
 ## 4. 根因与整改
@@ -99,6 +105,13 @@ production/c3dc1f43-7678-461d-8824-e7b44186e0ac/raw/provider=amazingdata/dataset
 链的来源；case catalog 是截至失败边界的 best-effort case 记录；raw meta/Parquet
 是已成功写入 exchange 的本地证据。失败的那个 B7 exchange 没有获得 meta anchor，
 这正是本次框架问题的一部分，不能伪称已闭合。
+
+为使独立 Reviewer 不必访问执行 worktree，本次新增了脱敏、可提交的 durable receipt：
+[`formal_production_b1_b7_receipt_20260910.json`](formal_production_b1_b7_receipt_20260910.json)。
+它只保存 lifecycle/dataset identity、B1-B6 摘要、B7 缺失声明以及 `spike_run.json`、
+10 个 gate JSON 和两种 case catalog 导出的字节数与 SHA-256；不包含 Provider 原始
+数据、账号凭据或专有运行时文件。receipt 中的 catalog 计数以实际文件为准，覆盖早先
+记录中的错误 `166` 计数。
 
 ## 6. 禁止动作与下一步出口
 

@@ -6000,14 +6000,15 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 
 **Type**：C1 — Formal Production failure evidence and framework remediation
 **Date**：2026-09-10
-**Status**：`FORMAL ATTEMPT FAILED / FRAMEWORK ERROR RETAINED / VERDICT NOT RUN / WRITER FIX IN REVIEW / NEW ATTEMPT AUTHORIZATION REQUIRED`
+**Status**：`FORMAL ATTEMPT FAILED / SCHEDULER AS-OF DEVIATION RECORDED / FRAMEWORK ERROR RETAINED / VERDICT NOT RUN / WRITER FIX IN REVIEW / NEW ATTEMPT AUTHORIZATION REQUIRED`
 
 **已确认事实**
 
-- 按 Issue #34 最新授权，从 clean `main@3082491b5af2affdba92b1992407452f6c8ccb2c` 建立独立执行 worktree；在线 preflight 重新确认 SDK/runtime、网络/认证/查询就绪和 provider 交易日历，as-of 为 `20260909`。未把账号密码、真实 endpoint、Token、Cookie、原始 profile、Provider 原始输出或专有 SDK/runtime 写入 GitHub。
+- Issue #39 才是本次 Formal 阶段的 governing authorization；它只冻结一次 `uv run python scripts/spike/spike_runner.py --production --date 20260908`。实际运行使用 provider 日历推导出的 `--date 20260909`，属于 `DEVIATED_AS_OF_DATE`，不能描述为按授权命令执行；由于真实 `SpikeRun` 已创建，一次性 attempt 额度按已消耗处理。
+- 从 clean `main@3082491b5af2affdba92b1992407452f6c8ccb2c` 建立独立执行 worktree；在线 preflight 重新确认 SDK/runtime、网络/认证/查询就绪和 provider 交易日历，实际 as-of 为 `20260909`。未把账号密码、真实 endpoint、Token、Cookie、原始 profile、Provider 原始输出或专有 SDK/runtime 写入 GitHub。
 - 唯一一次全量命令 `uv run python scripts/spike/spike_runner.py --production --date 20260909` 的 run ID 为 `c3dc1f43-7678-461d-8824-e7b44186e0ac`，最终 `FAILED / FRAMEWORK_ERROR`。B1-B6 已运行并保留真实输出；B7 在首个全市场单日 K 线 exchange 的 RawWriter 边界失败，没有 phase result。
 - 根因是 AmazingData K 线返回 `dict[security_code, DataFrame | None]`，旧 writer 将其中 `None` 误判为非法混合形状。`“禁止取第一个字典值”`的审计保护没有撤销；当前整改显式保留 `null_tables`，并由 read-back 还原 `None`。其他任意混合形状仍 fail loud。
-- 运行、失败状态、B1-B7 矩阵、case catalog 边界和本地 artifact 引用见 [`Formal Production B1-B7 失败证据与整改记录`](../provider_verification/formal_production_b1_b7_failed_20260910.md)。
+- 运行、失败状态、B1-B7 矩阵、172 条 case catalog 边界和本地 artifact 引用见 [`Formal Production B1-B7 失败证据与整改记录`](../provider_verification/formal_production_b1_b7_failed_20260910.md)；独立复核可用的脱敏 receipt 见 [`formal_production_b1_b7_receipt_20260910.json`](../provider_verification/formal_production_b1_b7_receipt_20260910.json)。
 
 **验证与闸门**
 

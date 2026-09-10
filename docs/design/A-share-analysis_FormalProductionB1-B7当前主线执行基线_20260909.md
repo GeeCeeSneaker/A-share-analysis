@@ -172,7 +172,8 @@ uv run python scripts/spike/spike_runner.py --verdict --run-id <run-id>
 本节覆盖第 11 节中“NOT YET EXECUTED”的历史状态：该状态在本次运行前成立，
 不再是当前状态。
 
-- 唯一获授权的 Formal Production B1-B7 attempt 已从 clean `main@3082491b5af2affdba92b1992407452f6c8ccb2c` 启动，run ID 为 `c3dc1f43-7678-461d-8824-e7b44186e0ac`。
+- Issue #39 只冻结并授权一次 `--production --date 20260908`；实际 attempt 从 clean `main@3082491b5af2affdba92b1992407452f6c8ccb2c` 启动，但运行命令使用了 provider 日历推导的 `--date 20260909`。因此该 attempt 记录为真实 Production run 的 `DEVIATED_AS_OF_DATE`，不能表述为按授权命令执行；run ID 为 `c3dc1f43-7678-461d-8824-e7b44186e0ac`，一次性额度已消耗。
 - 该 run 最终为 `FAILED / FRAMEWORK_ERROR`，失败点是 B7 首个全市场单日 K 线 exchange 的 raw writer 对 `DataFrame | None` 映射处理不完整；B7 未产出 phase result，未生成 verdict。详细脱敏证据见 [`formal_production_b1_b7_failed_20260910.md`](../provider_verification/formal_production_b1_b7_failed_20260910.md)。
 - 当前整改只扩展 raw evidence 对该明确 SDK 返回形状的保真持久化，不修改 Golden、交易规则、Provider 事实或 FAILED run 的生命周期。
+- 独立复核所需的运行锚点见 [`formal_production_b1_b7_receipt_20260910.json`](../provider_verification/formal_production_b1_b7_receipt_20260910.json)；其中明确列出 B1-B6 摘要、B7 phase result/verdict 缺失和本地 run JSON/gate/catalog 的 SHA-256 与字节数。receipt 不包含 Provider 原始数据或凭据。
 - 本次授权已消耗：不 resume、不 verdict、不另起第二次正式 run。修复合并并经独立 Reviewer 接受后，如仍需正式 Provider 结论，必须重新获得一次性授权，再从最新 clean main 做全量 B1-B7。
