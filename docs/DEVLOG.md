@@ -8,6 +8,7 @@
 - 本轮完整读取 evidence input 声明的 20 个原始 HTML/PDF/DOCX，并将逐条定位和边界提醒整理为 [`TradingRule_H1R3_AI原文核验草案_20260910.md`](design/TradingRule_H1R3_AI原文核验草案_20260910.md)。这是 AI 辅助材料，不是人工 `APPROVE`，也没有改写正式 14 行人审表。
 - 特别标出第 14 条 BSE 规则的来源绑定不对称：当前 DOCX 支持上市首日不限价/后续 30%，但历史 `20211115` 起点的直接依据绑定在第 13 条历史交易规则来源；须由人工 Reviewer/项目管理者决定是否接受共享来源或补强合同。
 - DOCX 已完成完整文本读取；当前环境没有可用 `soffice`，因此没有虚报 DOCX 的视觉渲染通过。人工审阅仍必须实际打开官方原文。
+- 文档提交 `5e4a4d9` 完成后运行全量 `uv run pytest -q`，进度到 100%，退出码为 0；该结果只证明当前代码/测试回归通过，不代表 14 条人工审阅已完成。
 
 下一步：人工 Reviewer 完成正式表 14/14；若全部 `APPROVE` 且无 2020+ truth blocker，再按固定参数只执行一次 candidate seal。此前不创建 REVIEWED、不切 ACTIVE、不启动 Formal Production/B1-B7。
 

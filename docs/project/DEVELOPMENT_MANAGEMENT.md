@@ -16,6 +16,7 @@
 - 从合并后的 clean main 建立新的最终证据通道工作分支，未复用 PR #36 的旧 head。
 - 对 H1R3 evidence input 声明的 20 个原始 artifact 做完整字节、hash/size、HTML/PDF/DOCX 内容读取核验；结果整理为 [`TradingRule_H1R3_AI原文核验草案_20260910.md`](../design/TradingRule_H1R3_AI原文核验草案_20260910.md)。
 - 草案只作原文定位辅助，不写入人工 `APPROVE`，不产生 `reviewed_by` 或 seal；正式 14 行人工表仍保持 `待填`。
+- 文档提交 `5e4a4d9` 后全量 `uv run pytest -q` 已到 100%，退出码 0；该回归结果不等于人工审阅或 seal 放行。
 
 **未完成与硬边界**
 
