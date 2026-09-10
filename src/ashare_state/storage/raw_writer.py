@@ -39,11 +39,14 @@ Payload shapes (audit section 5.2 - MANDATORY support):
     pyarrow.Table                  -> single table
     dict[str, list[dict]]          -> one Parquet per logical table
     dict[str, pandas.DataFrame]    -> one Parquet per logical table
+    dict[str, DataFrame | None]    -> one Parquet per present table; explicit
+                                      null members are listed in the meta
 
-dict-of-tables uses scheme A (audit section 5.2): every logical table
-gets its own Parquet file; the meta records the table list with each
-table's hash/schema/row-count. "Take the first dict value" is FORBIDDEN
-- mixed/unsupported shapes raise instead of silently picking a table.
+dict-of-tables uses scheme A (audit section 5.2): every present logical table
+gets its own Parquet file; the meta records the table list with each table's
+hash/schema/row-count and records explicit None members separately.
+"Take the first dict value" is FORBIDDEN - mixed/unsupported shapes raise
+instead of silently picking a table.
 
 Layout:
     raw/provider=<P>/dataset=<D>/<request_id>.parquet          (single table)
@@ -122,6 +125,9 @@ class RawWriteResult:
     #: CR-1.2 section 3.1: explicit artifact split
     payload_artifacts: tuple[ArtifactRef, ...] = field(default_factory=tuple)
     meta_artifact: ArtifactRef | None = None
+    #: Logical tables whose provider value was explicitly None. They have no
+    #: Parquet artifact, but remain part of the lossless mapping contract.
+    null_tables: tuple[str, ...] = field(default_factory=tuple)
 
 
 def _scrub(params: dict[str, Any] | None) -> dict[str, Any]:
@@ -208,25 +214,42 @@ def _safe_table_name(name: str) -> str:
     return _TABLE_NAME_SAFE.sub("_", name) or "table"
 
 
-def normalize_payload(payload: Any) -> tuple[str, list[tuple[str | None, Any]]]:
-    """Classify + normalize a payload into (payload_kind, tables).
+def _is_rows_table(value: Any) -> bool:
+    """Return whether *value* is an explicitly supported rows table.
+
+    ``None`` is handled by the mapping normalizer, not here. Keeping the
+    predicate strict prevents a scalar or a nested provider envelope from
+    being silently treated as a table.
+    """
+    return isinstance(value, list) and all(isinstance(row, dict) for row in value)
+
+
+def _normalize_payload(
+    payload: Any,
+) -> tuple[str, list[tuple[str | None, Any]], tuple[str, ...]]:
+    """Classify + normalize a payload into kind, tables, and null tables.
 
     tables is a list of (table_name, arrow_table); table_name is None for
-    single-table payloads. Raises RawWriterError for unsupported/mixed
-    shapes - never silently picks a dict value (audit section 5.2).
+    single-table payloads. The third item contains the names of explicit
+    ``None`` members in a provider dict-of-tables response. Those members are
+    recorded in the meta document and restored by ``read``; they are not
+    silently dropped or converted into a fake data row.
+
+    Raises RawWriterError for unsupported/mixed shapes - never silently picks
+    a dict value (audit section 5.2).
     """
     if payload is None:
-        return KIND_EMPTY, [(None, _empty_table())]
+        return KIND_EMPTY, [(None, _empty_table())], ()
     if isinstance(payload, _pa_table_type()):
-        return KIND_ARROW_TABLE, [(None, payload)]
+        return KIND_ARROW_TABLE, [(None, payload)], ()
     arrow = _to_arrow_table(payload)
     if arrow is not None:
-        return KIND_DATAFRAME, [(None, arrow)]
+        return KIND_DATAFRAME, [(None, arrow)], ()
     if isinstance(payload, list):
         if not payload:
-            return KIND_EMPTY, [(None, _empty_table())]
+            return KIND_EMPTY, [(None, _empty_table())], ()
         if all(isinstance(r, dict) for r in payload):
-            return KIND_ROWS, [(None, _rows_to_table(payload))]
+            return KIND_ROWS, [(None, _rows_to_table(payload))], ()
         if any(isinstance(r, dict) for r in payload):
             # mixed dict/scalar rows are a malformed payload - fail loud
             raise RawWriterError(
@@ -235,25 +258,60 @@ def normalize_payload(payload: Any) -> tuple[str, list[tuple[str | None, Any]]]:
                 "convert to list[dict] / DataFrame / dict-of-tables explicitly"
             )
         # scalar list (e.g. trade calendar days) -> single 'value' column
-        return KIND_ROWS, [(None, _rows_to_table([{"value": r} for r in payload]))]
+        return KIND_ROWS, [(None, _rows_to_table([{"value": r} for r in payload]))], ()
     if isinstance(payload, dict):
         if not payload:
-            return KIND_EMPTY, [(None, _empty_table())]
+            return KIND_EMPTY, [(None, _empty_table())], ()
         values = list(payload.values())
-        if all(_is_dataframe_like(v) for v in values):
-            converted = [(str(k), _to_arrow_table(v)) for k, v in payload.items()]
-            return KIND_MULTI_FRAMES, [(k, t) for k, t in converted if t is not None]
-        if all(isinstance(v, list) and all(isinstance(r, dict) for r in v) for v in values):
-            return KIND_MULTI_ROWS, [(str(k), _rows_to_table(v)) for k, v in payload.items()]
+        # AmazingData's full-universe K-line response is a mapping from code
+        # to a frame, with None for codes that have no rows in the requested
+        # day. None is a real provider result and must remain inspectable.
+        if all(v is None or _is_dataframe_like(v) for v in values):
+            converted: list[tuple[str | None, Any]] = []
+            null_tables: list[str] = []
+            for key, value in payload.items():
+                name = str(key)
+                if value is None:
+                    null_tables.append(name)
+                    continue
+                table = _to_arrow_table(value)
+                if table is None:  # pragma: no cover - guarded above
+                    raise RawWriterError(
+                        f"unsupported DataFrame-like table for logical table {name!r}"
+                    )
+                converted.append((name, table))
+            return KIND_MULTI_FRAMES, converted, tuple(null_tables)
+        if all(v is None or _is_rows_table(v) for v in values):
+            converted_rows: list[tuple[str | None, Any]] = []
+            null_tables = []
+            for key, value in payload.items():
+                name = str(key)
+                if value is None:
+                    null_tables.append(name)
+                    continue
+                converted_rows.append((name, _rows_to_table(value)))
+            return KIND_MULTI_ROWS, converted_rows, tuple(null_tables)
         raise RawWriterError(
             "unsupported payload shape: dict values must ALL be DataFrames or "
-            f"ALL be list[dict] (got value types: {sorted({type(v).__name__ for v in values})}); "
+            "ALL be list[dict], optionally with explicit None values (got value "
+            f"types: {sorted({type(v).__name__ for v in values})}); "
             "silently taking one dict value is forbidden (audit R4-A2.3 section 5.2)"
         )
     raise RawWriterError(
         f"unsupported payload shape {type(payload).__name__}: convert to "
         "list[dict] / DataFrame / pyarrow.Table / dict-of-tables explicitly"
     )
+
+
+def normalize_payload(payload: Any) -> tuple[str, list[tuple[str | None, Any]]]:
+    """Backward-compatible two-item view of ``_normalize_payload``.
+
+    The writer uses the detailed form so that explicit null members can be
+    recorded in the raw meta. Existing callers that only need the kind and
+    physical tables retain the original return shape.
+    """
+    kind, tables, _null_tables = _normalize_payload(payload)
+    return kind, tables
 
 
 class RawWriter:
@@ -354,12 +412,14 @@ class RawWriter:
     def _write_success(self, provider: str, dataset: str, exchange: Any) -> RawWriteResult:
         envelope = exchange.envelope
         request_id = str(envelope.request_id)
-        payload_kind, tables = normalize_payload(exchange.payload)
+        payload_kind, tables, null_tables = _normalize_payload(exchange.payload)
 
         dataset_dir = self._dir_for(provider, dataset)
         dataset_dir.mkdir(parents=True, exist_ok=True)
 
-        multi = len(tables) > 1 or (len(tables) == 1 and tables[0][0] is not None)
+        multi = (
+            bool(null_tables) or len(tables) > 1 or (len(tables) == 1 and tables[0][0] is not None)
+        )
         records: list[TableRecord] = []
         table_files: list[tuple[str | None, Path, bytes]] = []
         if multi:
@@ -409,6 +469,7 @@ class RawWriter:
             row_count=row_count,
             payload_kind=payload_kind,
             tables=records,
+            null_tables=null_tables,
         )
 
         idem = self._check_idempotent(request_id, records, meta_path, meta_bytes, table_files)
@@ -470,6 +531,7 @@ class RawWriter:
             evidence_hash=meta_hash,
             payload_artifacts=payload_artifacts,
             meta_artifact=meta_artifact,
+            null_tables=tuple(null_tables),
         )
 
     def _commit_files(
@@ -596,6 +658,8 @@ class RawWriter:
             for table in doc.get("tables", []):
                 path = dataset_dir / str(table.get("file", ""))
                 frames[str(table.get("name", ""))] = pl.read_parquet(path)
+            for name in doc.get("null_tables", []) or []:
+                frames[str(name)] = None
             return frames
         if kind == KIND_EMPTY:
             return pl.DataFrame()
@@ -751,6 +815,7 @@ class RawWriter:
         row_count: int,
         payload_kind: str,
         tables: tuple[TableRecord, ...] | list[TableRecord],
+        null_tables: tuple[str, ...] | list[str] = (),
     ) -> bytes:
         doc = {
             "request_id": getattr(envelope, "request_id", ""),
@@ -795,6 +860,11 @@ class RawWriter:
                 }
                 for t in tables
             ],
+            # Some AmazingData dict-of-tables responses use None to represent
+            # an explicitly empty/missing logical table. Preserve that
+            # distinction without fabricating a row or silently dropping the
+            # table.
+            "null_tables": list(null_tables),
         }
         return json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=1).encode("utf-8")
 
@@ -855,6 +925,15 @@ def verify_meta_closure(raw_root: Path | str, meta_doc: dict[str, Any]) -> list[
     root = Path(raw_root)
     problems: list[str] = []
     tables = meta_doc.get("tables") or []
+    null_tables = meta_doc.get("null_tables", [])
+    if not isinstance(null_tables, list) or any(not isinstance(name, str) for name in null_tables):
+        problems.append("null_tables must be a list of logical table names")
+        null_tables = []
+    table_names = [str(table.get("name", "")) for table in tables]
+    if len(set(null_tables)) != len(null_tables):
+        problems.append("null_tables contains duplicate logical table names")
+    if set(null_tables).intersection(table_names):
+        problems.append("null_tables overlaps a materialized table")
     for table in tables:
         rel = str(table.get("file", ""))
         path = root / rel
