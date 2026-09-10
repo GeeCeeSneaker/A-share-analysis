@@ -4,7 +4,9 @@
 候选版本：`2026-09-10.1`，共 14 条，当前 `COMPILED`、非 `ACTIVE`。
 目的：作为独立 evidence/seal PR 的审阅清单，在不修改候选 YAML 的前提下逐条打开官方原文，确认规则事实、适用范围和制度切换边界。本表不是当前来源合同 checkpoint PR #36 的合并前置条件。
 
-本次执行基线：`main@e096b0364d3dc5a00e21879fe5bd8fc4a758b07f`；candidate hash：`f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`；已物化 bundle：`sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`（18,181 bytes），raw artifact 20 个（1,736,924 bytes）。每行结果仍必须由人工实际打开对应原文后填写，当前不得视为已审阅。
+本次执行基线：`main@f0bf1f8233fedfeea4fa3010237589938f6a5daf`（PR #36 合并后的 clean main）；candidate hash：`f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`；已物化 bundle：`sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`（18,181 bytes），raw artifact 20 个（1,736,924 bytes）。每行结果仍必须由人工实际打开对应原文后填写，当前不得视为已审阅。
+
+PR #36 已作为 H1R3 source-contract/materialization checkpoint 独立审阅并合并；本表现在用于合并后的最终 evidence/seal 通道。AI 辅助定位草案见 [`TradingRule_H1R3_AI原文核验草案_20260910.md`](TradingRule_H1R3_AI原文核验草案_20260910.md)，只能帮助查找原文，不能替代人工裁决。
 
 ## 一、审阅原则
 
@@ -92,6 +94,7 @@ uv run python scripts/rules/review.py \
 ## 六、当前项目状态
 
 - 已完成：H1R3 候选 14 条、`RULE_EVIDENCE_BUNDLE.v1` 校验器、review CLI bundle 模式、生产严格门禁、2020+ 边界测试输入和创业板 2020-08-24 一手日期来源接收。
+- 已完成：PR #36 source-contract checkpoint 已独立复审并合并；当前基线为 `main@f0bf1f8233fedfeea4fa3010237589938f6a5daf`。
 - 已保持：旧 `v20260824-compiled` 与当前 ACTIVE pointer 未改动；Golden v7 未改动；凭据未进入仓库。
 - 当前阻塞：H1R3 的 14 条官方原文实际留存与独立人工逐条裁决尚未完成；因此不能切换 ACTIVE、不能生成 REVIEWED seal，也不能运行 B1-B7。旧 H1、H1R2 和 H1R3 均保持 `COMPILED`、非 ACTIVE。
 

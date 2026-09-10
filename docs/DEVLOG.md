@@ -1,3 +1,16 @@
+## 2026-09-10 · H1R3 合并后开启最终证据审阅通道
+
+> 状态：**SOURCE-CONTRACT CHECKPOINT MERGED / AI SOURCE AUDIT PREPARED / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**
+
+- PR #36 已通过独立 re-review 并合并；审阅 head 为 `d7843a083ef1f088c3682ab1156185d28a121463`，当前 clean main 为 `f0bf1f8233fedfeea4fa3010237589938f6a5daf`。
+- 重新确认当前 ACTIVE 仍为 `v20260824-compiled` / `COMPILED`，H1R3 `v20260910-h1r3-compiled` 仍为 14 条 `COMPILED` 非 ACTIVE，候选 manifest-style hash 为 `f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`。
+- 冻结 H1R3 evidence contract 未变：20 个唯一官方 URL、20 个 raw artifact、1,736,924 bytes；canonical bundle `sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`，18,181 bytes。
+- 本轮完整读取 evidence input 声明的 20 个原始 HTML/PDF/DOCX，并将逐条定位和边界提醒整理为 [`TradingRule_H1R3_AI原文核验草案_20260910.md`](design/TradingRule_H1R3_AI原文核验草案_20260910.md)。这是 AI 辅助材料，不是人工 `APPROVE`，也没有改写正式 14 行人审表。
+- 特别标出第 14 条 BSE 规则的来源绑定不对称：当前 DOCX 支持上市首日不限价/后续 30%，但历史 `20211115` 起点的直接依据绑定在第 13 条历史交易规则来源；须由人工 Reviewer/项目管理者决定是否接受共享来源或补强合同。
+- DOCX 已完成完整文本读取；当前环境没有可用 `soffice`，因此没有虚报 DOCX 的视觉渲染通过。人工审阅仍必须实际打开官方原文。
+
+下一步：人工 Reviewer 完成正式表 14/14；若全部 `APPROVE` 且无 2020+ truth blocker，再按固定参数只执行一次 candidate seal。此前不创建 REVIEWED、不切 ACTIVE、不启动 Formal Production/B1-B7。
+
 ## 2026-09-10 · H1R3 补齐创业板 2020-08-24 日期来源合同
 
 > 状态：**H1R3 CANDIDATE STAGED / P0 SOURCE GAP CLOSED / BUNDLE VERIFIED / LOCAL REGRESSION GREEN / INDEPENDENT REVIEW RETRY PENDING / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**

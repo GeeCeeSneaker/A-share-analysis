@@ -3,6 +3,8 @@
 日期：2026-09-10（Asia/Shanghai）
 状态：`H1R3 CANDIDATE STAGED / SOURCE CONTRACT CLOSED FOR 2020-08-24 / BUNDLE VERIFIED / HUMAN REVIEW PENDING / NOT SEALED`
 
+> **后续状态（2026-09-10）**：PR #36 已通过独立 re-review 并合并到 `main@f0bf1f8233fedfeea4fa3010237589938f6a5daf`。H1R3 已从 source-contract checkpoint 进入最终 evidence/seal 通道；候选、证据包和旧版本身份继续冻结，14 行正式人工表仍待真实 Reviewer 填写。AI 辅助原文定位见 [`TradingRule_H1R3_AI原文核验草案_20260910.md`](TradingRule_H1R3_AI原文核验草案_20260910.md)，不构成人工批准。
+
 ## 1. 修正原因与范围
 
 独立实质审阅指出，H1R2 已有的两份创业板来源能够证明改革前后规则语义和 20% 数值，但不能单独证明 `2020-08-24` 这个精确切换日期。该缺口影响以下四条规则：
