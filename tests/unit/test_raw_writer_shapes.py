@@ -2,13 +2,15 @@
 
 MANDATORY shapes: list[dict] / dict[str, list[dict]] / DataFrame /
 dict[str, DataFrame] / pyarrow.Table. dict-of-tables uses scheme A (one
-Parquet per logical table); "take the first dict value" is forbidden.
+Parquet per present logical table); explicit None members are retained in
+meta and round-trip as None; "take the first dict value" is forbidden.
 Round-trips are verified FIELD BY FIELD (values, nullable types, Chinese
 text, NaN/None), not just by row counts.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -255,6 +257,43 @@ class TestPayloadShapes:
         back = writer.read(provider="amazingdata", dataset="multi_ds", request_id="m2")
         assert back["kline"].get_column("close").to_list() == [10.0, 10.5]
         assert back["status"].get_column("is_st").to_list() == [0]
+
+    def test_dict_of_dataframes_and_none_preserves_missing_members(self, tmp_path: Path):
+        """AmazingData full-universe K-lines map no-row symbols to None.
+
+        The None member is a real part of the response shape, not a reason to
+        select one DataFrame or to manufacture a row.
+        """
+        polars = pytest.importorskip("polars")
+        writer = RawWriter(tmp_path)
+        payload = {
+            "600519.SH": polars.DataFrame({"close": [1700.0]}),
+            "000001.SZ": None,
+        }
+
+        result = writer.write(_exchange("m2-null", "daily_bar", payload))
+
+        assert result.payload_kind == "multi_table_frames"
+        assert result.null_tables == ("000001.SZ",)
+        meta_path = tmp_path / "provider=amazingdata" / "dataset=daily_bar" / "m2-null.meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        assert meta["null_tables"] == ["000001.SZ"]
+        back = writer.read(provider="amazingdata", dataset="daily_bar", request_id="m2-null")
+        assert back["600519.SH"].get_column("close").to_list() == [1700.0]
+        assert back["000001.SZ"] is None
+
+    def test_dict_of_only_none_values_keeps_an_empty_mapping(self, tmp_path: Path):
+        writer = RawWriter(tmp_path)
+
+        result = writer.write(
+            _exchange("all-null", "daily_bar", {"600519.SH": None, "000001.SZ": None})
+        )
+
+        assert result.payload_kind == "multi_table_frames"
+        assert result.row_count == 0
+        assert result.null_tables == ("600519.SH", "000001.SZ")
+        back = writer.read(provider="amazingdata", dataset="daily_bar", request_id="all-null")
+        assert back == {"600519.SH": None, "000001.SZ": None}
 
     def test_scalar_list_round_trips_as_value_column(self, tmp_path: Path):
         writer = RawWriter(tmp_path)

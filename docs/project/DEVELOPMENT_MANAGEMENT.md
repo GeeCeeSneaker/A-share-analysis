@@ -5996,3 +5996,23 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 必须先完成 14/14 人工原文裁决，再由独立 Reviewer 复核来源、hash lineage、两个 COMPILED candidate 和旧 ACTIVE 不可变性；之后才允许运行一次性 seal。
 
 **下一步**：将本记录、bundle、raw artifact 和人工审阅表提交为独立 evidence/seal PR；审阅与后续 seal 完成并独立合并前，Formal Production B1-B7 继续禁止。账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+## DM-20260910-FORMAL-B1B7-012 · 唯一正式运行失败与 B7 raw writer 整改
+
+**Type**：C1 — Formal Production failure evidence and framework remediation
+**Date**：2026-09-10
+**Status**：`FORMAL ATTEMPT FAILED / FRAMEWORK ERROR RETAINED / VERDICT NOT RUN / WRITER FIX IN REVIEW / NEW ATTEMPT AUTHORIZATION REQUIRED`
+
+**已确认事实**
+
+- 按 Issue #34 最新授权，从 clean `main@3082491b5af2affdba92b1992407452f6c8ccb2c` 建立独立执行 worktree；在线 preflight 重新确认 SDK/runtime、网络/认证/查询就绪和 provider 交易日历，as-of 为 `20260909`。未把账号密码、真实 endpoint、Token、Cookie、原始 profile、Provider 原始输出或专有 SDK/runtime 写入 GitHub。
+- 唯一一次全量命令 `uv run python scripts/spike/spike_runner.py --production --date 20260909` 的 run ID 为 `c3dc1f43-7678-461d-8824-e7b44186e0ac`，最终 `FAILED / FRAMEWORK_ERROR`。B1-B6 已运行并保留真实输出；B7 在首个全市场单日 K 线 exchange 的 RawWriter 边界失败，没有 phase result。
+- 根因是 AmazingData K 线返回 `dict[security_code, DataFrame | None]`，旧 writer 将其中 `None` 误判为非法混合形状。`“禁止取第一个字典值”`的审计保护没有撤销；当前整改显式保留 `null_tables`，并由 read-back 还原 `None`。其他任意混合形状仍 fail loud。
+- 运行、失败状态、B1-B7 矩阵、case catalog 边界和本地 artifact 引用见 [`Formal Production B1-B7 失败证据与整改记录`](../provider_verification/formal_production_b1_b7_failed_20260910.md)。
+
+**验证与闸门**
+
+- RawWriter shape 回归、B7 exchange completeness、probe exchange enforcement 和 Spike framework 聚焦测试通过；最终 diff 的 `uv run ruff check src tests scripts/spike`、`uv run ruff format --check src tests scripts/spike`、`uv run mypy src`、`uv pip check` 和 `uv run pytest -q` 均以退出码 0 完成；pytest 仅保留仓库既有环境相关 skip。
+- 本次 run 为 `FAILED` 而非 `RUNNING`，因此不得 resume；没有 `CLOSED`，因此不得执行 verdict；本次一次性授权已经消耗，不得用第二次生产 run 覆盖失败。
+- 下一出口是独立 Reviewer 审阅 writer 修复和失败证据；合并后若项目仍要求 Provider 正式结论，必须新增明确的一次性授权，并从最新 clean main 重新完成 preflight、as-of 解析和全量 B1-B7。
+
+## DM-20260910-TRADING-RULE-H1R4-011 · H1R4 REVIEWED 头部声明修正与最终重封存

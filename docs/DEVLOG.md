@@ -1,3 +1,13 @@
+## 2026-09-10 · Formal Production B1-B7 唯一正式运行失败与 B7 raw writer 整改
+
+> 状态：**FORMAL ATTEMPT FAILED / FRAMEWORK ERROR RETAINED / VERDICT NOT RUN / WRITER FIX IN REVIEW / NEW ATTEMPT AUTHORIZATION REQUIRED**
+
+- 按 Issue #34 最新授权，从 clean `main@3082491b5af2affdba92b1992407452f6c8ccb2c` 独立建立 Windows worktree，重新完成 SDK/runtime、在线网络/认证/查询和交易日历 preflight；实际使用 `AmazingData 1.1.9`、`tgw 1.0.9.2`、runtime `V4.3.0.260626-rc2.0-YHZQ`、伪匿名 profile `UNKNOWN_24e2ff401792`，解析 provider as-of `20260909`。
+- 唯一一次 `uv run python scripts/spike/spike_runner.py --production --date 20260909` 运行 ID 为 `c3dc1f43-7678-461d-8824-e7b44186e0ac`，于 `2026-09-10T10:39:59.913074+00:00` 以 `FAILED / FRAMEWORK_ERROR` 结束。B7 在全市场单日 `MarketData.query_kline` exchange 的 raw 持久化处发现 Provider 返回 `dict[security_code, DataFrame | None]`，旧 writer 将其拒绝为混合形状；B7 没有 phase result，不能生成 verdict。
+- B1-B6 的真实输出、166 条截至失败边界的 case catalog、已写入的 gates/raw meta 和未闭合 B7 边界均记录在 [`formal_production_b1_b7_failed_20260910.md`](provider_verification/formal_production_b1_b7_failed_20260910.md)。原始 Provider 数据仍只留在本地 run artifact，不上传 GitHub；账号密码、真实 endpoint、Token、Cookie 和专有 SDK/runtime 未进入仓库。
+- 当前分支修复 RawWriter：显式保存 `null_tables` 并在 read-back 还原 `None`，仍拒绝其他混合/不明确形状；新增回归测试。该修复不修改 Golden、交易规则、能力判定或本次 FAILED run 的状态。
+- 严格遵守失败出口：未执行 `--resume`、未执行 `--verdict`、未启动第二次正式 run。修复需独立 Reviewer 审阅并合并；后续若需要新的 Provider 结论，必须获得新的明确一次性 Formal Production 授权并从最新 clean main 重跑全量 B1-B7。
+
 ## 2026-09-10 · H1R4 REVIEWED 头部声明修正与最终重封存
 
 > 状态：**H1R4 REVIEWED REBUILT / ACTIVE MOVED ATOMICALLY / FINAL PR INDEPENDENT REVIEW AND CI PENDING / FORMAL ENTRY PROHIBITED**
