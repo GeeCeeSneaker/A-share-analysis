@@ -177,3 +177,15 @@ uv run python scripts/spike/spike_runner.py --verdict --run-id <run-id>
 - 当前整改只扩展 raw evidence 对该明确 SDK 返回形状的保真持久化，不修改 Golden、交易规则、Provider 事实或 FAILED run 的生命周期。
 - 独立复核所需的运行锚点见 [`formal_production_b1_b7_receipt_20260910.json`](../provider_verification/formal_production_b1_b7_receipt_20260910.json)；其中明确列出 B1-B6 摘要、B7 phase result/verdict 缺失和本地 run JSON/gate/catalog 的 SHA-256 与字节数。receipt 不包含 Provider 原始数据或凭据。
 - 本次授权已消耗：不 resume、不 verdict、不另起第二次正式 run。PR #40 已经独立审阅并合并到 `main@7d7fbfacf707c797ba5445996c2e291dcf9ebb9d`；如仍需正式 Provider 结论，必须重新获得一次性授权，再从最新 clean main 做全量 B1-B7。
+
+## 13. 2026-09-10 新授权正式运行结果
+
+本节覆盖第 12 节末尾“需要重新获得一次性授权”的历史状态。Issue #39 最新授权评论 5619810170 已在 PR #40/#41 合并后新增一次受控 attempt；本次执行已完成，旧失败 run 仍保持不可变历史。
+
+- 从 clean main@fba18153a986cc1283a8c082e5d5629902d774cf 建立独立 Windows worktree；运行前后工作树均为空，ACTIVE、Golden v7、H1R4、SDK/runtime 和在线账户/查询 readiness 已重新核验。
+- 严格执行一次：uv run python scripts/spike/spike_runner.py --production --date 20260909。新 run id 为 dad1e1b8-0c34-4031-8e94-cc87a03dbbf4，as-of 为 20260909，生命周期为 CLOSED；没有 resume，没有第二个 Production run。
+- B1-B7 均产出同一 run 的终态记录。B7 完整完成 5 日、5,562 symbols、6,662,216 rows、0 failures；前一 run 的 RawWriter framework failure 未重现。
+- 同一 run 的 verdict 命令只执行一次，结果为 SPIKE_INCOMPLETE。core FAILED 为 6 项，core MISSING 为 symbol_mapping_unambiguous；p0a、p0b 和历史 backfill 均不可用。CLOSED 不等于 GO。
+- 本次 catalog 为 178 条，case_catalog_hash 已封存并与 JSONL SHA-256 一致；脱敏结果文档和 receipt 见 formal_production_b1_b7_result_20260910.md 与 formal_production_b1_b7_result_receipt_20260910.json。raw Provider 文件只保留本地，不进入 GitHub。
+
+当前状态：FORMAL B1-B7 CLOSED / SAME-RUN VERDICT SPIKE_INCOMPLETE / INDEPENDENT REVIEW REQUIRED。独立 Reviewer 接受前不启动 backfill、策略扩展、生产化或新的 Formal Production run；任何能力整改需另行形成方案并获得授权。

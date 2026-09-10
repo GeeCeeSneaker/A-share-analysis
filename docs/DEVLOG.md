@@ -1,3 +1,14 @@
+## 2026-09-10 · Formal Production B1-B7 完整运行与同 run verdict
+
+> 状态：FORMAL B1-B7 CLOSED / VERDICT SPIKE_INCOMPLETE / EVIDENCE PR PENDING INDEPENDENT REVIEW
+
+- Issue #39 最新授权评论 5619810170 在 PR #40/#41 合并后授权一次新的受控 Formal attempt，固定 as-of 为 20260909。以 clean main@fba18153a986cc1283a8c082e5d5629902d774cf 建立独立 Windows worktree，运行前后均为空工作树。
+- 严格执行一次 uv run python scripts/spike/spike_runner.py --production --date 20260909，run id 为 dad1e1b8-0c34-4031-8e94-cc87a03dbbf4；B1-B7 全部完成，生命周期 CLOSED。B7 产出 5 日、5,562 symbols、6,662,216 rows、1,031,721,881 bytes、5 requests、0 retries、0 failures 的 phase result，前一 run 的 RawWriter nullable-shape framework failure 未重现。
+- 对同一 run 仅执行一次 verdict 命令，结果为 SPIKE_INCOMPLETE：core FAILED 为 security_master_with_delisted、daily_bar_units、historical_st_suspend、limit_price_and_no_limit_days、adj_factor_corporate_action_continuity、history_start_2020；core MISSING 为 symbol_mapping_unambiguous；optional 四项仍为 SPIKE_INCOMPLETE。p0a/p0b 与历史 backfill 资格均为不可用。
+- 新 catalog 共 178 条，全部绑定新 run；JSONL SHA-256 bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53 与 run 的 case_catalog_hash 一致。完整脱敏矩阵、artifact hash/size 与本地 raw inventory 摘要见 [formal_production_b1_b7_result_20260910.md](provider_verification/formal_production_b1_b7_result_20260910.md) 和 [formal_production_b1_b7_result_receipt_20260910.json](provider_verification/formal_production_b1_b7_result_receipt_20260910.json)。
+- 本次没有修改 Golden、trading rules、capability expectations 或 provider configuration，没有从旧失败 run 拼接结果，没有启动 backfill/策略扩展，也没有上传 raw Provider payload、账号、密码、真实 endpoint、Token、Cookie 或专有 SDK/runtime。
+- 结论边界：CLOSED 不等于 GO；本次 dedicated evidence PR 需独立 Reviewer 对 B2-B7、catalog seal 和 fail-closed verdict 复核后，才能决定整改路线。独立接受前不启动新的 Formal run 或生产化。
+
 ## 2026-09-10 · Formal Production B1-B7 唯一正式运行失败与 B7 raw writer 整改
 
 > 状态：**FORMAL ATTEMPT FAILED / SCHEDULER AS-OF DEVIATION RECORDED / FRAMEWORK ERROR RETAINED / VERDICT NOT RUN / WRITER FIX MERGED / NEW ATTEMPT AUTHORIZATION REQUIRED**

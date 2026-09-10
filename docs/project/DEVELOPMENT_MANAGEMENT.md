@@ -6016,4 +6016,23 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 本次 run 为 `FAILED` 而非 `RUNNING`，因此不得 resume；没有 `CLOSED`，因此不得执行 verdict；本次一次性授权已经消耗，不得用第二次生产 run 覆盖失败。
 - 独立 Reviewer 已审阅 writer 修复和失败证据，PR #40 已合并到 `main@7d7fbfacf707c797ba5445996c2e291dcf9ebb9d`；若项目仍要求 Provider 正式结论，必须新增明确的一次性授权，并从最新 clean main 重新完成 preflight、as-of 解析和全量 B1-B7。
 
-## DM-20260910-TRADING-RULE-H1R4-011 · H1R4 REVIEWED 头部声明修正与最终重封存
+## DM-20260910-FORMAL-B1B7-013 · 新授权 Formal B1-B7 完整运行与 fail-closed verdict
+
+Type：C1 — Formal Production result evidence and independent-review handoff
+Date：2026-09-10
+Status：FORMAL B1-B7 CLOSED / VERDICT SPIKE_INCOMPLETE / INDEPENDENT REVIEW REQUIRED
+Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_result_receipt_20260910.json；governing Issue #39 comment 5619810170。
+
+已确认事实
+
+- PR #40（B7 RawWriter remediation/evidence）和 PR #41（post-merge status sync）已合并，current main 为 fba18153a986cc1283a8c082e5d5629902d774cf；Issue #39 随后只授权一次、as-of 固定为 20260909 的新 Formal attempt。
+- 从 clean Windows worktree 严格执行一次 uv run python scripts/spike/spike_runner.py --production --date 20260909，run id 为 dad1e1b8-0c34-4031-8e94-cc87a03dbbf4。运行前后工作树为空，未复用旧失败 run，未 resume，未创建第二个 Production run。
+- B1-B7 全部完成并进入 CLOSED。B7 phase result 显示 5 个交易日、5,562 symbols、6,662,216 rows、1,031,721,881 bytes、5 requests、0 retries、0 failures；前一 run 的 DataFrame/None RawWriter framework failure 未再次出现。
+- 对同一 CLOSED run 仅执行一次 verdict，结果为 SPIKE_INCOMPLETE。core FAILED 六项，core MISSING 一项 symbol_mapping_unambiguous，optional 四项仍 incomplete；sdk_permission_cache_freshness 为 PASS；p0a/p0b 与历史 backfill 资格均不可用。
+- catalog 共 178 条（Golden 125、runtime gate 40、其他 13），所有记录绑定新 run；catalog hash 与 JSONL SHA-256 一致。receipt 绑定 run/runtime/Golden/rule identity、10 个 gate 文件、两份 catalog 和 raw inventory 摘要。
+
+安全边界与后续门槛
+
+- Golden、trading rules、capability expectations、provider configuration 均未修改；没有修改期望值制造结果，没有从旧 run 拼接 phase/case/verdict，没有启动 backfill、策略扩展或生产化。
+- raw Provider 文件、原始 payload、账号、密码、真实 endpoint、Token、Cookie、profile 原文和专有 SDK/runtime 不进入 GitHub；本 PR 只提交脱敏结果与可校验锚点。
+- CLOSED 不等于 GO。独立 Reviewer 必须基于 run-bound evidence 复核 B2/B3/B4/B5、B7 完整性、catalog seal 和 fail-closed verdict；在接受前，Formal 新 run、backfill、策略扩展和生产化均保持禁止。
