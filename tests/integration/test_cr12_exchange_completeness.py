@@ -65,6 +65,34 @@ class _CalendarDeniedTarget(FakeTarget):
         raise error
 
 
+class _NullableKlineTarget(FakeTarget):
+    """Fake the full-universe SDK shape seen by the formal B7 run."""
+
+    def query_kline_exchange(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        kline_type: str,
+        trading_days: list[int] | None = None,
+    ) -> ProviderExchange:
+        import polars as pl
+
+        exchange = super().query_kline_exchange(
+            code_list,
+            begin_date=begin_date,
+            end_date=end_date,
+            kline_type=kline_type,
+            trading_days=trading_days,
+        )
+        payload = {
+            code: pl.DataFrame({"close": [10.0]}) if index == 0 else None
+            for index, code in enumerate(code_list)
+        }
+        return ProviderExchange(envelope=exchange.envelope, payload=payload)
+
+
 def _ctx(tmp_path: Path, target=None) -> ProbeContext:
     run, store = new_run(
         run_kind=RunKind.DRY_RUN,
@@ -148,6 +176,16 @@ class TestPrerequisiteExchanges:
         target: FakeTarget = ctx.target
         marks = target._call_log
         assert marks.count("kline_used_explicit_calendar") == len(kline_metas)
+
+    def test_b7_nullable_kline_members_are_persisted_without_framework_error(self, tmp_path: Path):
+        ctx = _ctx(tmp_path, target=_NullableKlineTarget())
+
+        metrics = probe_b7_capacity(ctx, 20230601)
+
+        assert metrics["failure_count"] == 0
+        kline_metas = [m for m in _metas(ctx) if m["endpoint"] == "MarketData.query_kline"]
+        assert len(kline_metas) == len(metrics["day_window"])
+        assert all(meta["null_tables"] for meta in kline_metas)
 
     def test_b3_symbol_list_is_persisted_exchange(self, tmp_path: Path):
         ctx = _ctx(tmp_path)
