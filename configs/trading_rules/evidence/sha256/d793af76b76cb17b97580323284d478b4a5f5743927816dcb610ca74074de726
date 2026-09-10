@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+    <meta charset="utf-8">
+<title>深交所调整新股上市首日交易机制等相关制度的问答</title>
+<script>
+  if(location.protocol == 'https:'){
+    document.write('<link href="https://res.szse.cn/common/images/favicon.ico" rel="shortcut icon" type="image/x-icon" />');
+  }else{
+    document.write('<link href="http://res.static.szse.cn/common/images/favicon.ico" rel="shortcut icon" type="image/x-icon" />');
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0" />
+<meta http-equiv="cache-control" content="max-age=0">
+<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="expires" content="0">
+<meta http-equiv="expires" content="Web, 26 Feb 1997 08:21:57 GMT">
+<meta http-equiv="pragma" content="no-cache">
+<meta name="author" content="www.szse.cn">
+<meta name="description" content="深交所官网">
+<meta name="keywords" content="深交所,深交所官网,深圳证券交易所,交易所,交易所官网,深圳证券交易所官网">
+<meta name="renderer" content=webkit>
+<meta name="X-UA-Compatible" content="IE=edge">
+<meta name="google" value="notranslate"> 
+<meta name="format-detection" content="telephone=no">
+<meta name="format-detection" content="email=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="screen-orientation" content="portrait">
+<meta name="full-screen" content="yes">
+<meta name="browermode" content="application">
+<meta name="x5-orientation" content="portrait">
+<meta name="HandheldFriendly" content="true">
+<script type="text/javascript">
+	var u = navigator.userAgent;
+	var isAndroid = u.indexOf('Android') > -1 || u.indexOf('Adr') > -1;//android终端
+
+	function addElementMeta(name,  content) {
+		var head = document.getElementsByTagName('head')[0];
+		var meta = document.createElement('meta');
+
+		meta.setAttribute('name', name);
+		meta.setAttribute('content', content);
+		head.appendChild(meta);
+	}
+	if(isAndroid) {
+		addElementMeta('x5-fullscreen', 'true');
+		addElementMeta('x5-page-mode', 'app');
+	}
+</script> 
+    <script>
+  (function () {
+    var _versionDate = new Date().getTime();
+    if (location.protocol == 'https:') {
+      var _path = 'https://res.szse.cn';
+    } else {
+      var _path = 'http://res.static.szse.cn';
+    }
+    // _path = _path.replace(".static.", ".");
+    //var _path = 'http://res.szse.cn';
+    //document.write( " <script src='" + _path + "/common/js/first.js?random=" + _versionDate + "'> <\/script> ");
+    var _host = 'http://www.szse.cn';
+    if (location.protocol == 'https:') {
+      _host = 'https://www.szse.cn';
+    }
+
+
+    var backDomain = 'http://www.sse.org.cn'
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    if (backDomain && window.location.host.match(reg)[2] === backDomain.match(reg)[2]) {
+      _host = 'http://www.sse.org.cn';
+      _path = 'http://res.static.sse.org.cn';
+      if (location.protocol == 'https:') {
+        _host = 'https://www.sse.org.cn';
+        _path = 'https://res.static.sse.org.cn';
+      }
+
+    }
+
+    _path = _path.replace(".static.", ".");
+
+    document.write(" <script src='" + _host + "/szsePath.js?random=" + _versionDate + "'> <\/script> "
+      + " <script src='" + _path + "/common/js/concatversion.js?random=" + _versionDate + "'> <\/script> ");
+  }());
+</script>
+
+<script>
+
+  function backDomainLinkSwitch(value, type) {
+    var _port = location.port ? (":" + location.port) : "";
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    var urlRegx = /(.*)(http:|https:)(\/\/)(([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+))\.?(:\d+)?(.*)/;
+
+    // html字符串替换
+    if (type == 'str') {
+      var strArr = value.split("=");
+      strArr = strArr.map(function (v) {
+        var host = reg.test(v) ? v.match(reg)[0] : null;
+        if (pathObj.szseHosts.indexOf(host) > -1) {
+          if (window.location.protocol == 'https:' && urlRegx.test(v)) {
+            v = v.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+          };
+          if (pathObj.current_host === pathObj.back_host) {
+            v = v.replace(pathObj.main_host, pathObj.back_host);
+          }
+        }
+        return v
+      });
+      value = strArr.join("=");
+      return value;
+    }
+
+    // a标签地址替换
+    if (type === 'A') {
+      var eleA = document.querySelectorAll(value);
+      for (var i = 0; i < eleA.length; i++) {
+        var href = eleA[i].getAttribute("href");
+        var host = reg.test(href) ? href.match(reg)[0] : null;
+        if (href && pathObj.szseHosts.indexOf(host) > -1) {
+          if (window.location.protocol == 'https:') {
+            href = href.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+          };
+          if (pathObj.current_host === pathObj.back_host) {
+            href = href.replace(pathObj.main_host, pathObj.back_host);
+          }
+          eleA[i].setAttribute('href', href);
+        }
+      }
+    }
+
+    // 单链接替换
+    if (type === "link") {
+      if (window.location.protocol == 'https:' && !!value) {
+        value = value.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+      };
+      if (pathObj.current_host === pathObj.back_host) {
+        var host = reg.test(value) ? value.match(reg)[0] : null;
+        if (value && pathObj.szseHosts.indexOf(host) > -1) {
+          value = value.replace(pathObj.main_host, pathObj.back_host);
+        }
+      }
+      return value;
+    }
+
+    // 背景图地址更换
+    if (type === "background") {
+      var eleBg = document.querySelectorAll(value);
+      for (var i = 0; i < eleBg.length; i++) {
+        var href = eleBg[i].style.backgroundImage;
+        if (window.location.protocol == 'https:' && !!href) {
+          href = href.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+        };
+        var host = reg.test(href) ? href.match(reg)[0] : null;
+        if (href && pathObj.szseHosts.indexOf(host) > -1) {
+          if (pathObj.current_host === pathObj.back_host) {
+            href = href.replace(pathObj.main_host, pathObj.back_host);
+          }
+          eleBg[i].style.backgroundImage = href;
+        }
+      }
+    }
+
+  }
+
+</script>
+
+<script>
+   if(document.cookie.indexOf('ft_language=1')>-1){
+    var style = document.createElement('style');
+    style.textContent='body{visibility:hidden;}';
+    document.head.appendChild(style);
+  }
+</script>
+<script>
+    addComCssFile()
+</script>
+<script>
+        changeVertion('/modules/report/css/report.css', 'css');
+        changeVertion('/modules/aboutus_column/introduction/css/journal.css', 'css');
+    </script>
+    <script>
+  changeVertion('/lib/validator/validator.min.css', 'css');
+  changeVertion('/common/plugins/css/index.min.css', 'css');
+  changeVertion('/common/css/form.css', 'css');
+  changeVertion('/common/css/articleDetailUtil.css','css');
+</script>
+</head>
+  <body class="article-body">
+    <script>
+  navMenuAJAX('/application/publicindex/header/index.html', '/application/publicindex/header/index.html', 'header', 'www');
+</script>
+<div class="g-locationnav">
+    <div class="banner-wrap">
+      <img src="http://res.static.szse.cn/common/images/legalrules-banner.jpg" />
+    </div>
+    <div class="g-container">
+      <div class="g-banner-txt">
+            <h2 class="hidden-xs">本所要闻</h2>
+            <p>
+              <img src="http://res.static.szse.cn/common/icon/er-banneradr.png" />位置：<a href="../../" class="CurrChnlCls">关于本所</a>/<a href="../" class="CurrChnlCls">本所动态</a>/<a href="./" class="CurrChnlCls">本所要闻</a>
+            </p>
+          </div>
+    </div>
+</div>
+  
+      <div class="g-container-wrap">
+            <div class="g-container">
+<!--startprint-->
+                <div class="news-detail-con g-conbox"> 
+                	<div class="des-header">
+                  <h2 class="title">深交所调整新股上市首日交易机制等相关制度的问答</h2>
+                  		<script>
+                  			var curSubTitle ='';
+                  			if(curSubTitle != ''){
+                  				document.write('<h4 style="text-align: center;" class="sub-title"><i class=""></i><span class="">'+curSubTitle+'</span></h4>')
+                  			}                  		
+                  		</script>
+              <div class="time">时间：<span>2014-06-13</span></div>
+              <div class="des-switchsize">
+                字体：
+                <span class="bigger">大</span>
+                <span class="medium">中</span>
+                <span class="smaller">小</span>
+              </div>
+    					
+        	</div>
+    				 <div class="des-content" id="desContent">
+                       <P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt; mso-char-indent-count: 2.0" class=MsoNormal><A name=_GoBack></A><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">1、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问：<?xml:namespace prefix = st1 ns = "urn:schemas-microsoft-com:office:smarttags" /><st1:chsdate w:st="on" IsROCDate="False" IsLunarDate="False" Day="13" Month="6" Year="2014"><SPAN lang=EN-US>6</SPAN>月<SPAN lang=EN-US>13</SPAN>日</st1:chsdate>，深交所发布了《关于完善首次公开发行股票上市首日交易机制有关事项的通知》（以下简称“《通知》”），《通知》对于新股上市首日交易机制主要在哪些方面做了调整？<SPAN lang=EN-US><?xml:namespace prefix = o ns = "urn:schemas-microsoft-com:office:office" /><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：为切实防范新股上市首日交易风险，维护证券市场秩序，保护投资者的合法权益，根据《中国证监会关于进一步推进新股发行体制改革的意见》和本所《交易规则》等有关规定，经中国证监会批准，本所于<st1:chsdate w:st="on" IsROCDate="False" IsLunarDate="False" Day="13" Month="6" Year="2014"><SPAN lang=EN-US>2014</SPAN>年<SPAN lang=EN-US>6</SPAN>月<SPAN lang=EN-US>13</SPAN>日</st1:chsdate>发布了《通知》，对新股上市首日交易机制进一步完善。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">本次对新股上市首日交易机制主要做了三方面的调整：一是全日设立不高于发行价<SPAN lang=EN-US>144%</SPAN>且不低于发行价<SPAN lang=EN-US>64%</SPAN>的有效申报价格范围限制，超出有效申报价格范围的申报为无效申报；二是取消盘中成交价首次达到或超过开盘价上下<SPAN lang=EN-US>20%</SPAN>的盘中临时停牌阈值，并将<SPAN lang=EN-US>10%</SPAN>停牌阈值的临时停牌时间，由原来的<SPAN lang=EN-US>1</SPAN>小时调整为<SPAN lang=EN-US>30</SPAN>分钟；三是盘中临时停牌结束复牌时以及收盘阶段，调整集合定价为集合竞价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">2、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问： 什么是有效申报价格范围？超过有效申报价格范围的买卖申报可以参与新股首日交易吗？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：有效申报价格范围是指可以参与新股首日交易的价格区间。在新股上市首日全天，投资者的买卖申报价格不能超过发行价的<SPAN lang=EN-US>144%</SPAN>，也不能低于发行价的<SPAN lang=EN-US>64%</SPAN>，超过有效申报价格范围的买卖申报是无效的，不能参与新股首日交易。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">有效申报价格范围的计算结果按照四舍五入的原则取至价格最小变动单位，即<SPAN lang=EN-US>0.01</SPAN>元。例如，某新股发行价为<SPAN lang=EN-US>10.01</SPAN>元，那么投资者提交的买卖申报价格应该低于等于<SPAN lang=EN-US>14.41</SPAN>元（<SPAN lang=EN-US>10.01</SPAN>×<SPAN lang=EN-US>144%=14.4144</SPAN>元<SPAN lang=EN-US>,</SPAN>并四舍五入），并且高于等于<SPAN lang=EN-US>6.41</SPAN>元（<SPAN lang=EN-US>10.01</SPAN>×<SPAN lang=EN-US>64%=6.4064</SPAN>元<SPAN lang=EN-US>,</SPAN>并四舍五入）。高于<SPAN lang=EN-US>14.41</SPAN>元或低于<SPAN lang=EN-US>6.41</SPAN>元的买卖申报是无效申报，不能参与新股首日交易。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">3、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问：什么是有效竞价范围？超过有效竞价范围的买卖申报可以参与新股首日交易吗？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：</SPAN></B><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">有效竞价范围是当前参与竞价的申报价格范围。价格超过有效竞价范围，但未超过有效申报价格范围的买卖申报，不能参与当前竞价，将暂时保留在交易主机中；当成交价波动使其进入有效竞价范围时，交易主机自动取出申报，参加竞价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></B></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">4、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问：什么申报价格可以参与新股上市首日的开盘集合竞价？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：按照《通知》的规定，新股上市首日开盘集合竞价的有效竞价范围为发行价的上下<SPAN lang=EN-US>20%</SPAN>，即较发行价上涨<SPAN lang=EN-US>20%</SPAN>、下跌<SPAN lang=EN-US>20%</SPAN>范围内的申报价格可以参与开盘集合竞价。有效竞价范围的计算结果按照四舍五入原则取至价格最小变动单位，即<SPAN lang=EN-US>0.01</SPAN>元。假设某只新股的发行价是<SPAN lang=EN-US>11.00</SPAN>元，则开盘集合竞价的有效竞价范围上限为<SPAN lang=EN-US>11.00</SPAN>×<SPAN lang=EN-US>(1+20%)=13.20</SPAN>元，下限为<SPAN lang=EN-US>11.00</SPAN>×<SPAN lang=EN-US>(1-20%)=8.80</SPAN>元。投资者在开盘集合竞价期间，提交价格在<SPAN lang=EN-US>8.80</SPAN>元至<SPAN lang=EN-US>13.20</SPAN>元之间（含本数）的买卖申报，才能参与开盘集合竞价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">如果投资者在开盘集合竞价期间提交<SPAN lang=EN-US>14.00</SPAN>元的买入申报，因为超过了发行价上下<SPAN lang=EN-US>20%</SPAN>的有效竞价范围，因此不能参与开盘集合竞价，但由于此价格处于全日有效申报价格范围的<SPAN lang=EN-US>7.04</SPAN>元（<SPAN lang=EN-US>11</SPAN>元×<SPAN lang=EN-US>64%</SPAN>））至<SPAN lang=EN-US>15.84</SPAN>元（<SPAN lang=EN-US>11</SPAN>元×<SPAN lang=EN-US>144%</SPAN>）之间，所以暂时保留在交易主机中。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">需要提醒投资者注意的是，若集合竞价阶段没有产生开盘价，则以当日第一笔成交价作为开盘价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph></SPAN><SPAN style="FONT-FAMILY: 宋体; FONT-SIZE: 9pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">5、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问： 连续竞价、复牌集合竞价、收盘集合竞价的有效竞价范围是多少？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：连续竞价、复牌集合竞价、收盘集合竞价的有效竞价范围是最近成交价的上下<SPAN lang=EN-US>10%</SPAN>。与开盘集合竞价有效竞价范围不同，连续竞价、复牌集合竞价、收盘集合竞价的有效竞价范围是随最近成交价的变化而动态变化的，但同样不得超过全日有效申报价格范围。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">例如，某新股发行价为<SPAN lang=EN-US>11.00</SPAN>元，投资者提交<SPAN lang=EN-US>14.00</SPAN>元的买入申报，将无法参与开盘集合竞价，暂时保留在交易主机中。若该新股开盘价为<SPAN lang=EN-US>13.00</SPAN>元，连续竞价开始时，该新股有效竞价范围调整为<SPAN lang=EN-US>11.70</SPAN>元到<SPAN lang=EN-US>14.30</SPAN>元（开盘价<SPAN lang=EN-US>13.00</SPAN>元的上下<SPAN lang=EN-US>10%</SPAN>），则<SPAN lang=EN-US>14.00</SPAN>元的买入申报进入有效竞价范围内，将参与连续竞价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">6、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问： 新股上市首日交易过程中，出现什么情形将导致盘中临时停牌？临时停牌时间为多长？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：连续竞价开始后，当新股盘中成交价较当日开盘价首次上涨或下跌达到或超过<SPAN lang=EN-US>10%</SPAN>时，将实施盘中临时停牌<SPAN lang=EN-US>30</SPAN>分钟。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">投资者需要注意的是，盘中临时停牌仅在成交价第一次达到或超过停牌阈值时触发。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; FONT-SIZE: 9pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">7、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问： 盘中临时停牌的停牌阈值是如何计算出来的？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：根据《通知》的规定，当新股盘中成交价较当日开盘价首次上涨或下跌达到或超过<SPAN lang=EN-US>10%</SPAN>时，实施盘中临时停牌。因此，新股的停牌阈值等于开盘价×（<SPAN lang=EN-US>1</SPAN>±<SPAN lang=EN-US>10%</SPAN>），由于计算结果可能到厘位，为确保实际停牌阈值达到或超过<SPAN lang=EN-US>10%</SPAN>的幅度，停牌阈值将根据计算结果取整至分位，即当新股盘中成交价较当日开盘价上涨时，停牌阈值将向上取整至<SPAN lang=EN-US>0.01</SPAN>元；下跌时，停牌阈值将向下取整至<SPAN lang=EN-US>0.01</SPAN>元。例如，某新股开盘价为<SPAN lang=EN-US>10.01</SPAN>元，那么理论停牌阈值为<SPAN lang=EN-US>11.011</SPAN>元（<SPAN lang=EN-US>10.01</SPAN>×<SPAN lang=EN-US>110%</SPAN>）或<SPAN lang=EN-US>9.009 </SPAN>元（<SPAN lang=EN-US>10.01</SPAN>×<SPAN lang=EN-US>90%</SPAN>）。根据上述取整原则，实际停牌阈值应为<SPAN lang=EN-US>11.02</SPAN>元（<SPAN lang=EN-US>11.011</SPAN>元向上取整）或<SPAN lang=EN-US>9.00</SPAN>元（<SPAN lang=EN-US>9.009</SPAN>向下取整）。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">8、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问： 新股上市首日临时停牌期间，投资者能否提交申报或撤销申报？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：新股上市首日临时停牌期间，投资者可以提交申报，也可以撤销申报。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">9、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问：新股上市首日临时停牌时间如跨越<SPAN lang=EN-US>14:57</SPAN>，按什么方式进行处理？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：《通知》规定，临时停牌时间跨越<SPAN lang=EN-US>14</SPAN>：<SPAN lang=EN-US>57</SPAN>的，于<SPAN lang=EN-US>14</SPAN>：<SPAN lang=EN-US>57</SPAN>复牌并对已接受的申报进行复牌集合竞价，再进行收盘集合竞价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">例如，某新股盘中成交价在<SPAN lang=EN-US>14</SPAN>：<SPAN lang=EN-US>30</SPAN>时触发停牌条件，在<SPAN lang=EN-US>14</SPAN>：<SPAN lang=EN-US>57</SPAN>时，该新股交易将先后进入两个程序：一是<SPAN lang=EN-US>14</SPAN>：<SPAN lang=EN-US>57</SPAN>时进行复牌集合竞价，二是<SPAN lang=EN-US>14</SPAN>：<SPAN lang=EN-US>57</SPAN>至<SPAN lang=EN-US>15</SPAN>：<SPAN lang=EN-US>00</SPAN>进行收盘集合竞价。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt; mso-char-indent-count: 2.0" class=MsoNormal><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">10、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问： 新股上市首日盘中临时停牌公告中的停牌开始时间为什么可以为<SPAN lang=EN-US>0</SPAN>秒，如“自<SPAN lang=EN-US>09</SPAN>时<SPAN lang=EN-US>30</SPAN>分<SPAN lang=EN-US>00</SPAN>秒起对该股实施停牌”？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：交易主机处理申报的时间精确到微秒级，而停牌公告时间只到秒级，所以会出现停牌开始时间为<SPAN lang=EN-US>09:30:00</SPAN>的情况。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">例如，某新股开盘价为<SPAN lang=EN-US>10.00</SPAN>元，<SPAN lang=EN-US>09</SPAN>：<SPAN lang=EN-US>30</SPAN>开盘后，瞬间可能产生多笔成交，成交价格变化到<SPAN lang=EN-US>11.00</SPAN>元（开盘涨幅首次超过<SPAN lang=EN-US>10%</SPAN>），触发临时停牌<SPAN lang=EN-US>30</SPAN>分钟。若上述成交均在<SPAN lang=EN-US>09</SPAN>：<SPAN lang=EN-US>30</SPAN>微秒级别内产生，那么停牌时间将显示为<SPAN lang=EN-US>09</SPAN>：<SPAN lang=EN-US>30</SPAN>：<SPAN lang=EN-US>00</SPAN>。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">11、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问： 新股上市首日的收盘价确定方式与其在其他交易日收盘价确定方式有无区别？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：没有区别。此次新股上市首日收盘阶段交易机制调整为集合竞价，即对集中申报簿中的买卖申报进行一次性集中撮合。收盘价通过集合竞价方式产生，与其他交易日的收盘价产生方式没有区别。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">需要提醒投资者注意的是，收盘集合竞价阶段，投资者不可以撤销申报。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt; mso-char-indent-count: 2.0" class=MsoNormal><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">12、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问：新股上市首日接受市价申报吗？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：新股上市首日不接受市价申报。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">13、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问：深交所同时也发布了《深圳证券交易所新股上市初期异常交易行为监控指引（<SPAN lang=EN-US>2014</SPAN>年修订）》（以下简称“《监控指引》”），本次《监控指引》修订的主要思路是什么？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt; mso-char-indent-count: 2.0" class=MsoNormal><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：为贯彻监管转型，适应新股发行和交易机制变化，本所遵循“目标精确、标准透明、递进监管”的总体原则，发布了新修订的《监控指引》，落实以下监管思路：一是进一步推动监管市场化，尊重市场运行规律，重点监管利用资金优势、持股优势严重影响新股价量的异常交易行为，实行精确打击，提高监管针对性；二是进一步提高监管透明度，明确列举异常交易行为的各种情形、并逐条量化相关监管指标，提高会员客户管理和投资者合规交易的操作性；三是进一步梳理递进式监管流程，规范监管措施，强化会员、投资者等市场主体对监管的预期。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt; mso-char-indent-count: 2.0" class=MsoNormal><SPAN style="FONT-FAMILY: 宋体; FONT-SIZE: 9pt" lang=EN-US><o:p>&nbsp;</o:p></SPAN></P>
+<P style="TEXT-INDENT: 18.05pt; MARGIN: 0cm 0cm 0pt; mso-list: l0 level1 lfo1" class=ListParagraph><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: 宋体; mso-font-kerning: 0pt" lang=EN-US><SPAN style="mso-list: Ignore">14、<SPAN style="FONT: 7pt 'Times New Roman'">&nbsp;&nbsp; </SPAN></SPAN></SPAN></B><B style="mso-bidi-font-weight: normal"><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">问：本次《监控指引》修订主要做了哪些调整和完善？<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></B></P>
+<P style="TEXT-INDENT: 18pt; MARGIN: 0cm 0cm 0pt" class=ListParagraph><SPAN style="FONT-FAMILY: 宋体; COLOR: black; FONT-SIZE: 9pt; mso-bidi-font-family: Meiryo; mso-font-kerning: 0pt">答：修订后的《监控指引》主要做出了以下调整和完善：一是对新股异常交易行为的认定和监管标准，不再做首日交易和后续交易的区分；二是列举了新股上市初期交易中重点监管的<SPAN lang=EN-US>5</SPAN>种异常情形，较原《监控指引》的<SPAN lang=EN-US>14</SPAN>种情形大幅简化；三是全面优化了异常交易行为的指标阈值，修订后的《监控指引》第三条中根据第二条的定性式描述逐条给出了定量标准，提高可操作性；四是梳理形成递进式监管流程，明确异常交易情形及对应监管措施，并对限制交易的情形和程序进一步细化。<SPAN lang=EN-US><o:p></o:p></SPAN></SPAN></P>
+                    </div>
+                    <script>
+                        var oldCon = document.getElementById("desContent").innerHTML;
+                        oldCon = oldCon.replace(/(o:p)|(u:p)/gi,'span');
+                        oldCon = oldCon.replace(/&lt;!--\[endif\]--&gt;/g,"");
+                        document.getElementById("desContent").innerHTML = oldCon;
+                    </script>
+<!--endprint-->
+    				<div class="des-footer">
+    					<div class="article-page display-none">
+                   
+    						
+    					</div>
+    					<div class="article-btn">
+    						<a href="javascript:void(0);" class="btn btn-gray art-print">打印</a>
+        						<a href="javascript:void(0);" target="_blank" class="btn btn-gray ml10 art-collect">收藏</a>
+        						<a href="javascript:void(0);" class="btn btn-gray ml10 art-close">关闭</a>
+    					</div>
+    				</div>  
+				</div>
+     
+            </div>
+      </div>
+
+    <script>
+  changeVertion('/common/js/toggleBig5.js', 'js');
+  navMenuAJAX('/application/publicindex/footer/index.html','/application/publicindex/footer/index.html', 'footer','www');
+  addComJsFile();
+</script>
+    <script>
+  (function () {
+    var _versionDate = new Date().getTime();
+
+    var _host = 'http://www.szse.cn';
+    if (location.protocol == 'https:') {
+      _host = 'https://www.szse.cn';
+    }
+
+    var backDomain = 'http://www.sse.org.cn'
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    if (backDomain && window.location.host.match(reg)[2] === backDomain.match(reg)[2]) {
+      _host = 'http://www.sse.org.cn';
+      if (location.protocol == 'https:') {
+        _host = 'https://www.sse.org.cn';
+      }
+
+    }
+    document.write(" <script src='" + _host + "/dynamicmodule/index/sysconfig.js?random=" + _versionDate + "'> <\/script> ");
+
+  }());
+</script>
+    <script>
+    	var articleDetail = {
+    		docTitle:'深交所调整新股上市首日交易机制等相关制度的问答',
+    		subDocTitle:'',
+    		docAbstract:'',
+                articleId:'518480',
+		channelCode:'newstroduction_news',
+    channelId : '469'
+    	}
+    </script>
+    <script>
+    	changeVertion('/common/js/articleDetail.js','js');
+    </script>
+    <script>
+  changeVertion('/lib/validator/jquery.validate.js', 'js');
+  changeVertion('/common/js/jquery.validate_extend.js', 'js');
+  changeVertion('/lib/webuploader-0.1.5/webuploader.js', 'js');
+  changeVertion('/common/plugins/index.min.js', 'js');
+  changeVertion('/common/js/articleDetailUtil.js','js');
+</script>
+  </body>
+</html>
+
+
+

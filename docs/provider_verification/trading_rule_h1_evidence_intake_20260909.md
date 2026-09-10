@@ -1,9 +1,31 @@
+# H1R3 补充：创业板 2020-08-24 日期来源合同修正（2026-09-10）
+
+> 本节是当前 PR #36 的最新执行状态；下方 H1R2 内容保留为前一 checkpoint 的历史记录，不再作为当前 candidate/source set 的目标。
+
+- **基线**：clean `main@e096b0364d3dc5a00e21879fe5bd8fc4a758b07f`；旧 ACTIVE、旧 H1 和 H1R2 candidate 均未改写。
+- **当前候选**：[`v20260910-h1r3-compiled/rules.yaml`](../../configs/trading_rules/versions/v20260910-h1r3-compiled/rules.yaml)，dataset version `2026-09-10.1`，14 条，`COMPILED`、非 `ACTIVE`；manifest-style hash `f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`。
+- **修正内容**：仅向四条创业板边界规则的 `source_ref` 增加一手日期来源 `https://www.szse.cn/aboutus/trends/news/t20200821_580924.html`；规则数值、适用范围和边界日期字段不变。
+- **原始来源**：HTTP 200、最终 URL 未跳转；[`direct_17.html`](trading_rule_h1_sources/direct_17.html) 为 34,508 bytes，SHA-256 `cba74610a5c582e2ac94f3bb21a04f2e5fa1fa175131b0cd287f9bbfc311b1ae`。正文明确写出《特别规定》自 2020-08-24 起正式施行，并说明创业板存量股票涨跌幅限制在该日调整为 20%。
+- **当前证据集**：[`trading_rule_h1r3_evidence_input_20260910.json`](trading_rule_h1r3_evidence_input_20260910.json) 与 [`trading_rule_h1r3_source_catalog_20260910.json`](trading_rule_h1r3_source_catalog_20260910.json)；20 个唯一 URL、20 个去重 raw artifact、1,736,924 bytes；canonical bundle 18,181 bytes，ref/hash `sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`。
+- **审阅表**：[`TradingRule_H1R3_人工审阅操作表_20260910.md`](../design/TradingRule_H1R3_人工审阅操作表_20260910.md)，14 行仍待人工实际打开原文后填写；机器 prepare/validate 通过不等于 `APPROVE`。
+- **硬边界**：未运行 seal，未创建 REVIEWED，未切换 ACTIVE，未运行或消耗 Formal Production/B1-B7；账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 未进入 GitHub。
+
+后续由独立 Reviewer 重新接受 H1R3 四条创业板日期覆盖、20-source exact set、candidate/bundle/raw 不可变性和 CI；本 checkpoint 合并后再做 14/14 人工审阅及最终 evidence/seal PR。
+
 # Trading Rule H1R2 证据接收与 Formal 预检记录
 
 日期：2026-09-09（Asia/Shanghai）
-源码基线：`main@a797f1186209e7548167e2fa652ce78715f24180`
+源码基线（原始接收记录）：`main@a797f1186209e7548167e2fa652ce78715f24180`
 候选：`v20260909-h1r2-compiled` / dataset version `2026-09-09.2`
 候选 manifest-style SHA-256：`6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`
+
+## 0. 合并后独立 evidence/seal lane
+
+PR #35 已合并，当前独立执行基线为 clean `main@e096b0364d3dc5a00e21879fe5bd8fc4a758b07f`。合并后重新验证 ACTIVE 仍为 `v20260824-compiled` / `COMPILED`，旧 ACTIVE dataset hash 为 `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8`。
+
+当前 H1R2 candidate hash 未变，仍为 `6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`。已按 candidate `source_ref` 精确派生 19 个 required URL，并将 19 个 raw artifact（1,702,416 bytes）和 canonical bundle（16,557 bytes）物化到 `configs/trading_rules/evidence/sha256/`；bundle ref/hash 为 `sha256/14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`。
+
+本段是合并后的当前执行事实；下方第 1、2 节保留原始 intake 的历史接收与前置拒绝记录。14 条人工审阅尚未开始，未运行 seal、未创建 REVIEWED、未切换 ACTIVE，也未启动 Formal Production。
 
 本记录已由 H1R2 来源合同整改更新。此前 H1R1 intake 的候选字节、1998 起点材料和旧 bundle 数字仅作为本 PR 的历史接收事实；它们不再是当前候选的放行依据。旧 `v20260909-h1-compiled/rules.yaml` 已恢复并保持与 `main` 字节一致，H1R2 使用独立目录。
 

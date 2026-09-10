@@ -1,0 +1,560 @@
+<!doctype html>
+<html>
+
+<head>
+    <!--获取栏目id页-->
+    <!-- 站点属性 -->
+    
+<meta name="others" content="页面生成时间 2025-10-10 19:16:00">
+<meta name="template,templategroup,version" content="877,default,2.6">
+<title>【失效】上海证券交易所风险警示板股票交易暂行办法 | 上海证券交易所</title>
+      <!-- 站点属性 -->
+<meta charset="utf-8">
+<meta name="description" content="">
+<meta name="author" content="上海证券交易所">
+<meta name="renderer" content="webkit">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+<meta name="apple-mobile-web-app-title" content="上海证券交易所">
+<link rel="shortcut icon" href="/xhtml/images/favicon.ico">
+<meta name="keywords" content="本所业务规则"> 
+<meta name="description" content=""> 
+
+<meta name="others" content="页面生成时间 2025-10-10 19:16:00">
+<meta name="template,templategroup,version" content="877,default,2.6">
+<title>已废止规则文本  | 上海证券交易所</title>
+<script>
+
+    var channelCode = "rules2025yfzyfzgzwb";
+   var websiteid = "28";
+
+    var col_id = "20702";
+    var pageTitle ="已废止规则文本";
+
+
+
+</script>
+
+
+<!-- CSS -->
+<link href="/xhtml/css/lib/2021/bootstrap-v4.5.0.css" rel="stylesheet" type="text/css" charset="utf-8">
+<link href="/xhtml/css/sse_inside_2021.css?v=ssesite_20260814" rel="stylesheet" type="text/css" charset="utf-8">
+
+<!-- Favicons -->
+<!-- <link rel="shortcut icon" href="/xhtml/images/favicon.ico" >-->
+<!-- IOS / Android 主屏图标 -->
+<link href="/xhtml/images/webappicon/apple-touch-icon.png" rel="apple-touch-icon"/>
+<link href="/xhtml/images/webappicon/apple-touch-icon-76x76.png" rel="apple-touch-icon" sizes="76x76"/>
+<link href="/xhtml/images/webappicon/apple-touch-icon-120x120.png" rel="apple-touch-icon" sizes="120x120"/>
+<link href="/xhtml/images/webappicon/apple-touch-icon-152x152.png" rel="apple-touch-icon" sizes="152x152"/>
+<link href="/xhtml/images/webappicon/apple-touch-icon-180x180.png" rel="apple-touch-icon" sizes="180x180"/>
+<link href="/xhtml/images/webappicon/icon-hires.png" rel="icon" sizes="192x192"/>
+<link href="/xhtml/images/webappicon/icon-normal.png" rel="icon" sizes="128x128"/>
+
+<!-- Tile icon for Win8 (144x144 + tile color) -->
+<!-- win 8 磁贴标题 -->
+<meta name="application-name" content="上海证券交易所">
+<!-- win 8 磁贴颜色 -->
+<meta name="msapplication-TileColor" content="#ffffff">
+<!-- win 8 磁贴图标 -->
+<meta name="msapplication-TileImage" content="/xhtml/images/webappicon/apple-touch-icon-120x120.png">
+<meta name="msapplication-tooltip" content="Tooltip">
+
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+<!--调试阶段禁止缓存,例如微信，QQ浏览器缓存-->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="format-detection" content="telephone=no"/>
+
+<script type="text/javascript">
+    var _date_ = new Date();
+    var _y_ = _date_.getFullYear();
+    var _m_ = (_date_.getMonth() + 1);
+    var _d_ = _date_.getDate();
+    var _h_ = _date_.getHours();
+    var _v_ = _y_ + '' + _m_ + '' + _d_ + '' + _h_;
+    document.write('<script src="/js/common/ssesuggestdata.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/ssesuggestfunddata.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/ssesuggestEbonddata.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/ssesuggestTbonddata.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/ssesuggestdataAll.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/systemDate_global.js?v=' + _v_ + '"><\/script>');
+</script>
+<script type="text/javascript">
+    var siteId = 28;
+    var tableFun = {};
+    var tableData = {};
+    var searchUrl = "/home/search/";
+
+    var bizUrl = "//biz.sse.com.cn/";
+    var staticUrl = "//static.sse.com.cn/";
+    var staticBulletinUrl = "//static.sse.com.cn";
+    var sseQueryURL = "//query.sse.com.cn/";
+
+    var hq_queryUrl;
+    if (location.protocol == "http:") {
+        hq_queryUrl = "//yunhq.sse.com.cn:32041/";
+    } else {
+        hq_queryUrl = "//yunhq.sse.com.cn:32042/";
+    }
+    var bondUrl = "//bond.sse.com.cn/";
+    var myUrl = "//my.sse.com.cn/";
+    var infoUrl = "//www.sseinfo.com/";
+
+    var siteUrl = "//www.sse.com.cn/";
+    var ENGLISH_HOME = '//english.sse.com.cn/';
+    var channelDataUrl = '//www.sse.com.cn/home/translatejson/s_translateurl.shtml';
+    
+    var staticBondUrl = "//static.sse.com.cn";
+</script>
+
+<script src="/js/lib/gdp-full.js?v=20250916"></script>
+<!-- 下方为生产环境配置 -->
+<script type='text/javascript'>
+    gdp('init', 'ba17301551dcbaf9', '92177a53b3e054c2', {
+        host: 'prod-ua.sseinfo.com',
+        version: '1.0.0',
+        scheme: 'https',
+    });
+    gdp('send');
+</script>
+
+</head>
+
+<body>
+
+<!--头部-->
+<script src="/xhtml/js/sse_full.js?v=3.8.1_20260901"></script>
+<script src="/xhtml/js/app/sse_menufun_2021.js"></script>
+<div class="sse_topBar">
+    <div class="container">
+      <div class="topBarInfo">
+        <!--<a class="bar_word" href="https://one.sse.com.cn/investor/#/personCenter/personHome" target="_blank">投资者服务中心</a>-->
+        <span class="bar_word">上海证券交易所服务热线：<b class="word_phone">400-8888-400</b> </span>
+        <a href="/home/app/update/" class="bar_word" target="_blank">APP下载</a>
+        <a href="/home/weixin/" class="bar_word" target="_blank">微博微信</a>        
+        <a class="bar_word enLink" href="http://english.sse.com.cn/">English</a><a
+          class="bar_word ftLink" id="js_link_change" href="http://big5.sse.com.cn/site/cht/www.sse.com.cn/"
+          target="_blank">繁</a>
+      </div>
+    </div>
+  </div>
+<div class="mobile_top d-md-none">
+  <div class="container">
+      <div class="row">
+        <div class="col-9"><a href="//one.sse.com.cn/" class="mobile_top_link" target="_blank">一网通办</a><a href="//www.sse.com.cn/transparency/home/" class="mobile_top_link mobile_top_link_line" target="_blank">“三开门”专栏</a></div>
+        <div class="col-3 text-right"><a href="//english.sse.com.cn/" target="_blank" class="transfer_cnen"><span class="transfer_cn">简中</span><span class="transfer_en">EN</span></a></div>
+      </div>
+    </div>
+  </div>
+<div class="sse_header clearfix">
+    <div class="container">
+      <div class="row">
+        <!-- logo -->
+        <div class="col-5 col-md-3 col-xl-3 col-xxl-4 mobile_logo">
+          <a href="/"><img class="sse_logo" src="/xhtml/images/logo.png" alt=""></a>
+        </div>
+        <div class="col-7 col-md-9 col-xl-9 col-xxl-8 mobile_user">
+          <!-- 顶部导航 -->
+          <div class="top_nav row">
+            <div class="col-md-8 col-lg-8 col-xxl-8 d-none d-md-flex">
+              <div class="navbar navbar-collapse collapse">
+                <script>document.write(sseMenuObj.menu_tab_text);</script>
+              </div>
+            </div>
+            <div class="col-md-4 col-lg-4 col-xxl-4 user_enter js_user_enter" style="padding-left: 0;padding-right: 0;">
+              <!--<i></i>-->
+              <a href="https://one.sse.com.cn/" class="userenter_link" target="_blank">
+               一网通办
+              </a>
+              <a class="link_transparency" href="/transparency/home/" target="_blank">
+              “三开门”专栏
+              </a>
+            </div>
+            <div class="menu-btn d-flex flex-column justify-content-center d-md-none">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- pc菜单 -->
+  <div class="nav-side-show " sidshowclass="nsshow">
+    <div class="container">
+      <div class="inner menu_con" id="menu_con">
+        <script>document.write(sseMenuObj.menu_con_text);</script>
+      </div>
+    </div>
+  </div>
+
+  <!-- mobile菜单 -->
+  <div class="dl-menuwrapper d-md-none" id="dl-menu">
+    <button id="dl-menu-button" class="btn"></button>
+    <ul class="dl-menu" id="mobile_menu">
+      <script type="text/javascript">document.write(sseMenuObj.mobile_menu_text);</script>
+    </ul>
+  </div>
+  <!-- 用户入口 -->
+  <div class="user-enter-content user-enter-content-bg js_user_content">
+    <div class="container">
+      <div class="d-flex user-block">
+        <div class="block_area">
+        	<dl>
+        		<dt>用户入口</dt>
+        		<dd><a href="//one.sse.com.cn/investor/" target="_blank"><img src="/xhtml/images/ui_home_enter_edu_2024.png">投资者</a></dd>
+        		<dd><a href="//one.sse.com.cn/member/" target="_blank"><img src="/xhtml/images/ui_home_enter_member_2024.png">会员机构</a></dd> 
+        		<dd><a href="//one.sse.com.cn/to-be-listed/" target="_blank"><img src="/xhtml/images/ui_home_enter_nss_2024.png">拟上市公司</a></dd>
+        		<dd><a href="//one.sse.com.cn/bond/" target="_blank"><img src="/xhtml/images/ui_home_enter_bond_2024.png">债券机构</a></dd>
+        		<dd><a href="//one.sse.com.cn/list/" target="_blank"><img src="/xhtml/images/ui_home_enter_company_2024.png">上市公司</a></dd>
+            <dd><a href="//one.sse.com.cn/fund/" target="_blank"><img src="/xhtml/images/ui_home_enter_fund_2024.png">基金公司</a></dd>
+        	</dl>
+        </div>
+        <div class="block_area">
+        	<dl>
+        		<dt>高效办成一件事</dt>
+        		<dd><a href="//one.sse.com.cn/onething/gptz/" target="_blank"><img src="/xhtml/images/ui_onething_gp.png">股票投资一件事</a></dd>
+        		<dd><a href="//one.sse.com.cn/onething/zqfx/" target="_blank"><img src="/xhtml/images/ui_onething_bond.png">债券发行上市一件事</a></dd>
+            <dd class="onethingNew"><a href="//one.sse.com.cn/onething/qqtz/" target="_blank"><img src="/xhtml/images/ui_onething_qqtz.png">期权投资一件事</a></dd>
+        		<dd><a href="//one.sse.com.cn/onething/reits/" target="_blank"><img src="/xhtml/images/ui_onething_reits.png">REITs发行上市一件事</a></dd>
+            <dd><a href="//one.sse.com.cn/onething/qyss/" target="_blank"><img src="/xhtml/images/ui_onething_qyss.png">企业上市一件事</a></dd>
+            <dd><a href="//one.sse.com.cn/onething/fwyy/" target="_blank"><img src="/xhtml/images/ui_onething_fwyy.png">服务预约一件事</a></dd>
+            <dd><a href="//one.sse.com.cn/onething/xxpl/" target="_blank"><img src="/xhtml/images/ui_onething_xxpl.png">信息披露一件事</a></dd>
+        	</dl>
+        </div>
+        <div class="block_area">
+        	<dl>
+        		<dt>一网通办移动端<h2>上交所APP"通办"栏目</h2></dt>
+        		<div class="ones_qrcode_block">
+                  <img src="/xhtml/images/ones_qrcode.png">
+                  <em>- 欢迎扫码安装 -</em>
+                </div> 
+        	</dl>
+        </div>       
+      </div>
+    </div>
+  </div>
+  <!-- 业务专区 -->
+<!--   <div class="user-enter-content  js_bizzone_content">
+    <div class="container">
+      <div class="d-flex justify-content-around user-block biz_block_padding">
+        <div class="block">
+          <a class="d-flex flex-column align-items-center" href="https://cbm.uap.sse.com.cn/" target="_blank">
+            <img src="/images/bizzone_list.png" alt="">
+            <span>股票业务专区</span>
+          </a>
+        </div>
+        <div class="block">
+          <a class="d-flex flex-column align-items-center" href="http://www.sse.com.cn/home/enter/bond/" target="_blank">
+            <img src="/images/bizzone_bond.png" alt="">
+            <span>债券业务专区</span>
+          </a>
+        </div>
+        <div class="block">
+          <a class="d-flex flex-column align-items-center" href="http://www.sse.com.cn/home/biz/fund/" target="_blank">
+            <img src="/images/bizzone_fund.png" alt="">
+            <span>衍生品与基金业务专区</span>
+          </a>
+        </div>        
+      </div>
+    </div>
+  </div>
+ -->
+<div class="sse-breadcrumb">
+    <div class="container">
+        <ul class="d-none d-md-flex breadcrumb-ul" id="breadcrumb-ul">
+          <script>
+              if(col_id=='13174'){
+                document.getElementById("breadcrumb-ul").classList.remove("d-md-flex")
+              }
+              
+          </script>
+            <script>
+              document.write(sseMenuObj.initBreadMenu())
+          </script>
+          
+        </ul>
+        <h1 class="page-title js_page-title"></h1>
+    </div>
+</div>
+<!-- 全局检索框 -->
+<div class="searchHeight">
+    <div class="sse_searchContainer">
+        <div class="container sse_searchMain">
+            <img src="/xhtml/images/logo.png" alt=" ">
+            <div class="sse_searchVal">
+                <div class="sse_searchBorder">
+                    <input class="globalSearch js_globalSearch" id="serinpt" type="search" autocomplete="off"
+                           maxlength="35" placeholder="代码 / 简称 / 关键词">
+                    <input type="button" class="search_btn js_searchBtn">
+                </div>
+                <div class="bdsug" id="desksearhInput">
+                    <ul class="search-history" id="desksearchHist"></ul>
+                    <ul id="desksearhTable"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<p style="display:none">
+    <fjtignoreurl>
+        <span id="searchTitle">【失效】上海证券交易所风险警示板股票交易暂行办法</span>
+        <span id="keywords"></span>
+    </fjtignoreurl>
+</p>
+<div class="page_content container sse_content ">
+    <div class="row">
+        <div class="col-12">
+            <div class="sse_colContent">
+                <div class="article-infor ">
+                    <h2>
+                        【失效】上海证券交易所风险警示板股票交易暂行办法
+                    </h2>
+                    <div class="article_opt">
+					<span>
+                      <a href="##" class="mobile_hide sseicon-icon_print"></a>
+                      <a href="##" class="zoom sseicon-icon_fontSizeUp" data-type="zoom_in"></a>
+                      <a href="##" class="zoom sseicon-icon_fontSizeDown" data-type="zoom_out"></a>
+                    </span>
+                        <i>
+                            2012-12-14
+                        </i>
+                    </div>
+                    <div class="allZoom">
+                                <span style="font-size:12.0pt;font-family:宋体">发文：上海证券交易所</span><p class="MsoNormal" style="layout-grid-mode:char"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体">&nbsp;</span></p><p class="MsoNormal"><span style="font-size:12.0pt;font-family:宋体">文号：<span style="color:black">上证公字〔<span lang="EN-US">2012</span>〕<span lang="EN-US">72</span>号</span></span></p><p class="MsoNormal" style="layout-grid-mode:char"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体">&nbsp;</span></p><p class="MsoNormal" style="layout-grid-mode:char"><span style="font-size:12.0pt;font-family:宋体">日期：<span lang="EN-US">2012-12-14</span></span></p><p align="center" class="MsoNormal" style="text-align:center;line-height:24.5pt"><b><span lang="EN-US" style="font-size:16.0pt;font-family:宋体;color:black">&nbsp;</span></b></p><p align="center" class="MsoNormal" style="text-align:center;line-height:24.5pt"><b><span style="font-size:16.0pt;font-family:宋体;color:black">关于发布退市配套业务规则的通知</span></b></p><p class="MsoNormal" style="line-height:30.0pt"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体">&nbsp;</span></p><p class="MsoNormal" style="line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">各市场参与人：</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体;color:black">为落实退市配套制度，平稳推进退市制度改革，上海证券交易所（以下简称“本所”）制定了</span><span style="font-size:12.0pt;font-family:宋体">《上海证券交易所风险警示板股票交易暂行办法》、<span style="color:black">《上海证券交易所退市整理期业务实施细则》、《上海证券交易所退市公司股份转让系统股份转让暂行办法》和《上海证券交易所退市公司重新上市实施办法》等<span lang="EN-US">4</span>项退市配套业务规则（详见附件）。</span></span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">前述<span lang="EN-US">4</span>项规则已经本所理事会审议通过并报经中国证监会批准，现予以发布。其中，《上海证券交易所风险警示板股票交易暂行办法》自<span lang="EN-US">2013</span>年<span lang="EN-US">1</span>月<span lang="EN-US">1</span>日起施行，其他<span lang="EN-US">3</span>项<span style="color:black">业务规则自发布之日起施行。</span></span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">特此通知。</span></p><p class="MsoNormal" style="line-height:30.0pt"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体;color:black">&nbsp;</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体;color:black">附件：<span lang="EN-US">1.</span>上海证券交易所风险警示板股票交易暂行办法</span></p><p class="MsoNormal" style="text-indent:60.0pt;line-height:30.0pt"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体">2.</span><span style="font-size:12.0pt;font-family:宋体">上海证券交易所退市整理期业务实施细则</span></p><p class="MsoNormal" style="text-indent:60.0pt;line-height:30.0pt"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体">3.</span><span style="font-size:12.0pt;font-family:宋体;color:black">上海证券交易所退市公司股份转让系统股份转让</span></p><p class="MsoNormal" style="text-indent:60.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体;color:black">暂行办法</span></p><p class="MsoNormal" style="text-indent:60.0pt;line-height:30.0pt"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体">4.</span><span style="font-size:12.0pt;font-family:宋体">上海证券交易所退市公司重新上市实施办法</span></p><p class="MsoNormal" style="line-height:30.0pt"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体;color:black">&nbsp;</span></p><p class="MsoNormal" style="line-height:30.0pt"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体;color:black">&nbsp; <span style="mso-spacerun:yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="mso-spacerun:yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="mso-spacerun:yes">&nbsp;</span></span><span style="font-size:12.0pt;font-family:宋体;color:black">上海证券交易所</span></p><p class="MsoNormal" style="text-indent:438.0pt;mso-char-indent-count:36.5;line-height:28.0pt"><span style="font-size:12.0pt;font-family:宋体;color:black">二○一二年十二月十四日</span></p><span lang="EN-US" style="font-size:12.0pt;font-family:宋体;mso-bidi-font-family:宋体;color:black;mso-ansi-language:EN-US;mso-fareast-language:ZH-CN;mso-bidi-language:AR-SA"><br clear="all" style="page-break-before:always"></span><p class="MsoNormal" style="line-height:30.0pt"><b><span style="font-size:12.0pt;font-family:宋体">附件<span lang="EN-US">1</span></span></b></p><p class="MsoNormal" style="line-height:30.0pt"><b><span lang="EN-US" style="font-size:12.0pt;font-family:宋体">&nbsp;</span></b></p><p align="center" class="MsoNormal" style="text-align:center;line-height:30.0pt"><b><span style="font-size:16.0pt;font-family:宋体">上海证券交易所风险警示板股票交易暂行办法</span></b></p><p class="MsoNormal" style="line-height:30.0pt"><span lang="EN-US" style="font-size:12.0pt;font-family:宋体">&nbsp;</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第 一条  为了防范上海证券交易所（以下简称“本所”）上市公司股票的交易风险，保障上市公司退市制度的切实执行，保护投资者的合法利益，根据《上海证券交易所股票 上市规则》（以下简称“《上市规则》”）、《上海证券交易所交易规则》（以下简称“《交易规则》”）和《上海证券交易所会员管理规则》（以下简称“《会员 管理规则》”），制定本办法。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第 二条  本所设立上市公司股票风险警示板（以下简称“风险警示板”）。按照本所《上市规则》被实施风险警示的股票（以下简称“风险警示股票”）、被本所作出终止上 市决定但处于退市整理期尚未摘牌的股票（以下简称“退市整理股票”），在该板进行的交易，适用本办法；本办法未作规定的，适用本所其他有关规定。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">股票进入退市整理期，其相关衍生品种可以同时进入风险警示板交易，具体事项由本所另行规定，并报证监会批准。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第三条 上市公司股票存在下列情形之一的，自被实施风险警示措施之日起，至该措施被撤销之日的前一交易日止，在风险警示板进行交易：</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">（一）被实施退市风险警示；</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">（二）因暂停上市后恢复上市被实施其他风险警示；</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">（三）因退市后重新上市被实施其他风险警示；</span></p><p align="left" class="MsoNormal" style="text-align:left;text-indent:30.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">（四）因其他情形被实施其他风险警示。</span></p><p class="MsoNormal" style="text-indent:30.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">出现前款第（一）项情形的，股票简称前冠以“<span lang="EN-US">*ST</span>”标识，出现前款规定的其他情形的，股票简称前冠以“<span lang="EN-US">ST</span>”标识。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第四条 退市整理股票的简称前冠以“退市”标识，自退市整理期开始之日起，在风险警示板交易<span lang="EN-US">30</span>个交易日，该期限届满后的次日终止上市，本所对其予以摘牌。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">退市整理股票在风险警示板交易期间全天停牌的，停牌期间不计入前款规定的<span lang="EN-US">30</span>个退市整理交易日。全天停牌的天数累计不得超过<span lang="EN-US">5</span>个交易日。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第五条 风险警示股票和退市整理股票的交易信息独立于其他股票的交易信息，予以分别揭示，会员应当对两类股票的交易信息予以相应独立显示。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第六条 投资者买卖风险警示股票和退市整理股票，应当采用限价委托方式。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第七条 风险警示股票价格的涨跌幅限制为<span lang="EN-US">5%</span>，但<span lang="EN-US">A</span>股前收盘价格低于<span lang="EN-US">0.1</span>元人民币的，其涨跌幅限制为<span lang="EN-US">0.01</span>元人民币，<span lang="EN-US">B</span>股前收盘价格低于<span lang="EN-US">0.01</span>美元的，其涨跌幅限制为<span lang="EN-US">0.001</span>美元。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">退市整理股票价格的涨跌幅限制为<span lang="EN-US">10%</span>，但<span lang="EN-US">A</span>股前收盘价格低于<span lang="EN-US">0.05</span>元人民币的，其涨跌幅限制为<span lang="EN-US">0.01</span>元人民币，<span lang="EN-US">B</span>股前收盘价格低于<span lang="EN-US">0.005</span>美元的，其涨跌幅限制为<span lang="EN-US">0.001</span>美元。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">涨跌幅价格的计算公式为：涨幅价格＝前收盘价格×（<span lang="EN-US">1</span>＋涨幅比例），跌幅价格＝前收盘价格×（<span lang="EN-US">1</span>－跌幅比例）。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第八条 风险警示股票连续<span lang="EN-US">3</span>个交易日内日收盘价格涨跌幅偏离值累计达到±<span lang="EN-US">15%</span>的，属于异常波动，本所分别公告该股票交易异常波动期间累计买入、卖出金额最大的<span lang="EN-US">5</span>家会员营业部的名称及其买入、卖出金额。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">风险警示股票盘中换手率达到或超过<span lang="EN-US">30%</span>的，属于异常波动，本所可以根据市场需要，对其实施盘中临时停牌，停牌时间持续至当日<span lang="EN-US">14:55</span>。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">换手率的计算公式为：换手率＝成交量÷当日实际流通量。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第九条 暂停上市后恢复上市、退市后重新上市的股票，恢复上市或重新上市首日不设涨跌幅限制，当日盘中临时停牌事宜按照本所关于新股上市首日盘中临时停牌的规定执行。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第十条 单一账户当日累计买入的单只风险警示股票，数量不得超过<span lang="EN-US">50</span>万股。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">会员发现客户违反前款规定的，应当予以警示和劝阻，并及时向本所报告。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第十一条 股票退市整理期间，本所公布其当日买入、卖出金额最大的<span lang="EN-US">5</span>家会员证券营业部的名称及其各自的买入、卖出金额。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第十二条 股票退市整理期间交易不纳入本所指数的计算，成交量计入当日市场成交总量。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第十三条 会员应当要求首次委托买入风险警示股票或者退市整理股票的客户，以书面或电子形式分别签署《风险警示股票风险揭示书》和《退市整理股票风险揭示书》。客户未签署《风险揭示书》的，会员不得接受其买入委托。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">客户提交买入退市整理股票的委托时，会员应当采取有效方式向其充分提示风险，经客户确认后方可接受其委托。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第十四条 会员应当通过其营业场所、公司网站、交易系统等多种渠道，重点揭示风险警示股票、退市整理股票的交易风险；对于退市整理股票，还应当在每个交易日的开市前向客户提示相关股票的剩余交易日等信息。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第十五条 会员违反本办法，本所将依据《会员管理规则》及其他有关规则，对其采取相应监管措施或者给予纪律处分。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">投资者违反本办法，本所将依据《交易规则》及其他有关规则，对其采取相应监管措施或者给予纪律处分。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第十六条 本办法经本所理事会通过，报中国证监会批准后生效。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第十七条 本办法由本所负责解释。</span></p><p class="MsoNormal" style="text-indent:24.0pt;line-height:30.0pt"><span style="font-size:12.0pt;font-family:宋体">第十八条 本办法自<span lang="EN-US">2013</span>年<span lang="EN-US">1</span>月<span lang="EN-US">1</span>日起施行<a name="FUND_NAME1" title=""></a><a name="FUND_NAME2" title=""></a><a name="FMARKETDATE_YEAR" title=""></a><a name="FMARKETDATE_MONTH" title=""></a><a name="FMARKETDATE_DAY" title=""></a><a name="FCompanyName" title=""></a><a name="FUND_NAME4" title=""></a><a name="BUYBACK_RATE" title=""></a><a name="BOND_CODE2" title=""></a>。</span></p>
+                    </div>
+                   <div class="share">分享：
+  <span>
+    <a href="##" class="sinaico"> </a>
+    <a href="##" class="wechatico">
+      <div class="feedback_slide" id="article_qrcode">
+        <s></s>
+        <span class="qrcode_details">微信扫一扫，分享好友</span>
+      </div>
+    </a>
+    <a href="##" class="tencentico"> </a>
+  </span>
+</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!--底部-->
+<footer>
+    <div class="container">
+        <div class="row el-link">
+            <div class="col-lg-7">
+                <a href="/aboutus/contactus/" target="_blank" title="">联系我们</a>
+                <a href="/home/map/" target="_blank" title="">网站地图</a>
+                <a href="/home/links/" target="_blank" title="">相关链接</a>
+                <a href="/home/legal/" target="_blank" title="">法律声明</a>
+                <a href="/aboutus/sseintroduction/trademark/" target="_blank" title="">注册商标</a>
+                <a href="/home/grxxbhs/" target="_blank" title="">个人信息保护告知书</a>
+            </div>
+            <div class="col-lg-5 d-flex align-items-center">
+                <p class="d-flex flex-column align-items-center icon_wb">
+                    <img src="/xhtml/images/ewm_wb.png"/><span>官方微博</span>
+                </p>
+                <p class="d-flex flex-column align-items-center icon_wx">
+                    <img src="/xhtml/images/ewm_wx.png"/><span>官方微信</span>
+                </p>
+                <p class="d-flex flex-column align-items-center icon_app">
+                    <img src="/xhtml/images/ewm_app.png"/><span>APP下载</span>
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="sse_footer_bg">
+        <style type="text/css">@media (max-width: 1199px){footer .sse_footer_bg>.container ul li a {    font-size: 12px;}}</style>
+<div class="container">
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">党建</a></p>
+<ul>
+  <li><a target="_blank" href="/cpc/news/" title="">党建动态</a></li>
+  <li><a target="_blank" href="/cpc/study/" title="">学习园地</a></li>
+  <li><a target="_blank" href="/cpc/pic/" title="">图文播报</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">发行上市</a></p>
+<ul>
+  <li><a target="_blank" href="/listing/announcement/notification/" title="">审核公告通知</a></li>
+  <li><a target="_blank" href="/listing/disclosure/ipo/" title="">审核信息披露</a></li>
+  <li><a target="_blank" href="/listing/renewal/ipo/" title="">审核项目动态</a></li>
+  <li><a target="_blank" href="/listing/aboutus/home/" title="">关于上市审核中心</a></li>
+  <li><a target="_blank" href="/listing/strategy/" title="">科创战略</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">披露</a></p>
+<ul>
+  <li><a target="_blank" href="/disclosure/dealinstruc/suspension/stock/" title="">交易提示</a></li>
+  <li><a target="_blank" href="/disclosure/announcement/general/" title="">上交所公告</a></li>
+  <li><a target="_blank" href="/disclosure/listedinfo/announcement/" title="">上市公司信息</a></li>
+  <li><a target="_blank" href="/disclosure/magin/announcement/" title="">融资融券信息</a></li>
+  <li><a target="_blank" href="/disclosure/fund/announcement/" title="">基金信息</a></li>
+  <li><a target="_blank" href="/reits/announcements/info/" title="">公募REITs信息</a></li>
+  <li><a target="_blank" href="/disclosure/diclosure/public/dailydata/" title="">交易信息披露</a></li>
+  <li><a target="_blank" href="/disclosure/bond/announcement/bookentry/" title="">债券信息</a></li>
+  <li><a target="_blank" href="/disclosure/optioninfo/update/" title="">股票期权信息</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">监管</a></p>
+<ul>
+  <li><a target="_blank" href="/regulation/supervision/dynamic/" title="">上市公司监管</a></li>
+  <li><a target="_blank" href="/regulation/listing/measures/" title="">发行上市审核监管</a></li>
+  <li><a target="_blank" href="/regulation/bonds/jgdt/" title="">债券监管</a></li>
+  <li><a target="_blank" href="/regulation/trading/dynamic/" title="">交易监管</a></li>
+  <li><a target="_blank" href="/regulation/members/measures/" title="">会员及其他交易参与人监管</a></li>
+  <li><a target="_blank" href="/regulation/review/" title="">自律管理复核</a></li>
+  <li><a target="_blank" href="/regulation/ma/" title="">自律监管与市场服务事项</a></li>
+  <li><a target="_blank" href="/home/sqslzxnew/sqslzxnewsy/" title="">诉求受理中心</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">数据</a></p>
+<ul>
+  <li><a target="_blank" href="/market/stockdata/statistic/" title="">股票数据</a></li>
+  <li><a target="_blank" href="/market/bonddata/overview/day/" title="">债券数据</a></li>
+  <li><a target="_blank" href="/market/funddata/overview/day/" title="">基金数据</a></li>
+  <li><a target="_blank" href="/market/reits/overview/day/" title="">公募REITs数据</a></li>
+  <li><a target="_blank" href="/market/othersdata/margin/sum/" title="">其他数据</a></li>
+  <li><a target="_blank" href="/market/price/trends/" title="">行情信息</a></li>
+  <li><a target="_blank" href="/market/sseindex/overview/" title="">上证系列指数</a></li>
+  <li><a target="_blank" href="http://www.csindex.com.cn/zh-CN/indices/index" title="">中证系列指数</a></li>
+  <li><a target="_blank" href="https://www.cesc.com/sc/index.html" title="">中华系列指数</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">产品</a></p>
+<ul>
+  <li><a target="_blank" href="/assortment/stock/home/" title="">股票与存托凭证</a></li>
+  <li><a target="_blank" href="/assortment/fund/home/" title="">基金</a></li>
+  <li><a target="_blank" href="/assortment/bonds/home/" title="">债券</a></li>
+  <li><a target="_blank" href="/assortment/options/home/" title="">股票期权</a></li>
+  <li><a target="_blank" href="/reits/home/" title="">公募REITs</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">服务</a></p>
+<ul>
+  <li><a target="_blank" href="/services/listingwithsse/home/" title="企业上市服务">企业上市服务</a></li>
+  <li><a target="_blank" href="/ipo/home/" title="">IPO业务专栏</a></li>
+  <li><a target="_blank" href="/services/hkexsc/home/" title="">沪港通</a></li>
+  <li><a target="_blank" href="/services/greensecurities/home/" title="">绿色证券专栏</a></li>
+  <li><a target="_blank" href="/services/tradingservice/process/" title="">交易服务</a></li>
+  <li><a target="_blank" href="/services/tradingtech/notice/" title="">交易技术支持专区</a></li>
+  <li><a target="_blank" href="/services/tradingservice/charge/ssecharge/" title="">收费及代收税费</a></li>
+  <li><a target="_blank" href="/services/investors/designatedtxn/" title="">投资者服务</a></li>
+  <li><a target="_blank" href="/services/listing/xyzr/" title="">上市公司服务</a></li>
+  <li><a target="_blank" href="//roadshow.sseinfo.com/" title="">路演服务</a></li>
+  <li><a target="_blank" href="/home/biz/cnsca/" title="">技术服务</a></li>
+  <li><a target="_blank" href="/services/information/delisting/" title="">信息服务</a></li>
+  <li><a target="_blank" href="//pujiang.sse.com.cn/" title="">培训服务</a></li>
+  <li><a target="_blank" href="/services/judicia/" title="">司法服务</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">规则</a></p>
+<ul>
+  <li><a target="_blank" href="/lawandrules/rules/law/securities/" title="">法律法规</a></li>
+  <li><a target="_blank" href="/lawandrules/regulations/csrcorder/" title="">部门规章</a></li>
+  <li><a target="_blank" href="/lawandrules/sselawsrules2025/overview/" title="">本所业务规则</a></li>
+  <li><a target="_blank" href="/lawandrules/guide/latest/" title="本所业务指南与流程">本所业务指南与流程</a></li>
+  <li><a target="_blank" href="/lawandrules/publicadvice/" title="">公开征求意见</a></li>
+  <li><a target="_blank" href="/lawandrules/assemble/" title="">制度规则汇编</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">关于</a></p>
+<ul>
+  <li><a target="_blank" href="/aboutus/sseintroduction/introduction/" title="">本所介绍</a></li>
+  <li><a target="_blank" href="/aboutus/mediacenter/hotandd/" title="">媒体中心</a></li>
+  <li><a target="_blank" href="/aboutus/cooperation/siccce/info/" title="">国际交流与合作</a></li>
+  <li><a target="_blank" href="/aboutus/recruitment/sse/" title="">招聘信息</a></li>
+  <li><a target="_blank" href="/aboutus/contactus/" title="">联系我们</a></li>
+  <li><a target="_blank" href="/aboutus/research/latest/" title="">研究</a></li>
+  <li><a target="_blank" href="/aboutus/socialresponsibility/" title="">社会责任</a></li>
+  <li><a target="_blank" href="//foundation.sse.com.cn/" title="">公益慈善</a></li>
+  <li><a target="_blank" href="//csm.sse.com.cn/" title="">中国证券博物馆</a></li>
+  <li><a target="_blank" href="/aboutus/publication/monthly/overview/" title="">刊物</a></li>
+</ul>
+</div>
+</div>
+
+        <div class="sse_foot_oth_main">
+            <div class="container sse_foot_oth" style="align-items: center;">
+                <p class="sse_oth_l">400投资者服务热线： 400-8888-400</p>
+                <div class="sse_oth_r" style="text-align: center;">
+                    <p class="jian_yi"></p>
+                    <p>
+                        <span class="supipv">上海证券交易所官网现已支持 <i>IPV<em>6</em></i></span><span>
+                            ©上海证券交易所版权所有 2020
+                            <a target="_blank" href="https://beian.miit.gov.cn/">沪ICP备05004045号-2</a>
+                            <a target="_blank" href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31011502016333"
+                                style="display: inline-block; text-decoration: none">
+                                <span style="margin: 0px 0px 0px 5px"><img src="/xhtml/images/beian.png" /> 沪公网安备 31011502016333号</span>
+                            </a>
+                            <a href="https://bszs.conac.cn/sitename?method=show&id=273B49C66A3F20DDE06310291AACA667" target="_blank"><img id="imgConac" vspace="0" hspace="0" border="0" height="25" src="/xhtml/images/conacb.png" data-bd-imgshare-binded="1"></a>
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
+<div class="js_footer">
+    <script type="text/javascript">
+        var require = {
+            //js file version,pls change it with any updating
+            urlArgs: "v=ssesite_V3.8.0_20260828",
+        };
+        var webVersion = require.urlArgs;
+        var inspectMgr = (function () {
+            //wait for static inspect timeout
+            var staticIndex = 1; /*index=0 use the static,otherwise use the local site file*/
+            var waitMilliSeconds = 300;
+            var isIE = document.all && !window.atob;
+            if (isIE) {
+                var isIE8 = "\v" == "v";
+                if (isIE8) {
+                    waitMilliSeconds = 400;
+                } else {
+                    waitMilliSeconds = 350;
+                }
+            } else {
+                waitMilliSeconds = 300;
+            }
+            return {
+                getWaitMilliSeconds: function () {
+                    return waitMilliSeconds;
+                },
+                getStaticIndex: function () {
+                    return staticIndex;
+                }
+            };
+        })();
+    </script>
+    <script src="/xhtml/js/lib/require.js" data-main="/xhtml/js/app/main_2021"></script>
+</div>
+  
+  <div style="display:none;">
+      </div>
+</body>
+
+</html>

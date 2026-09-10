@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+    <meta charset="utf-8">
+<title>深交所新闻发言人就创业板改革并试点注册制相关问题答记者问</title>
+<script>
+  if(location.protocol == 'https:'){
+    document.write('<link href="https://res.szse.cn/common/images/favicon.ico" rel="shortcut icon" type="image/x-icon" />');
+  }else{
+    document.write('<link href="http://res.static.szse.cn/common/images/favicon.ico" rel="shortcut icon" type="image/x-icon" />');
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0" />
+<meta http-equiv="cache-control" content="max-age=0">
+<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="expires" content="0">
+<meta http-equiv="expires" content="Web, 26 Feb 1997 08:21:57 GMT">
+<meta http-equiv="pragma" content="no-cache">
+<meta name="author" content="www.szse.cn">
+<meta name="description" content="深交所官网">
+<meta name="keywords" content="深交所,深交所官网,深圳证券交易所,交易所,交易所官网,深圳证券交易所官网">
+<meta name="renderer" content=webkit>
+<meta name="X-UA-Compatible" content="IE=edge">
+<meta name="google" value="notranslate"> 
+<meta name="format-detection" content="telephone=no">
+<meta name="format-detection" content="email=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="screen-orientation" content="portrait">
+<meta name="full-screen" content="yes">
+<meta name="browermode" content="application">
+<meta name="x5-orientation" content="portrait">
+<meta name="HandheldFriendly" content="true">
+<script type="text/javascript">
+	var u = navigator.userAgent;
+	var isAndroid = u.indexOf('Android') > -1 || u.indexOf('Adr') > -1;//android终端
+
+	function addElementMeta(name,  content) {
+		var head = document.getElementsByTagName('head')[0];
+		var meta = document.createElement('meta');
+
+		meta.setAttribute('name', name);
+		meta.setAttribute('content', content);
+		head.appendChild(meta);
+	}
+	if(isAndroid) {
+		addElementMeta('x5-fullscreen', 'true');
+		addElementMeta('x5-page-mode', 'app');
+	}
+</script> 
+    <script>
+  (function () {
+    var _versionDate = new Date().getTime();
+    if (location.protocol == 'https:') {
+      var _path = 'https://res.szse.cn';
+    } else {
+      var _path = 'http://res.static.szse.cn';
+    }
+    // _path = _path.replace(".static.", ".");
+    //var _path = 'http://res.szse.cn';
+    //document.write( " <script src='" + _path + "/common/js/first.js?random=" + _versionDate + "'> <\/script> ");
+    var _host = 'http://www.szse.cn';
+    if (location.protocol == 'https:') {
+      _host = 'https://www.szse.cn';
+    }
+
+
+    var backDomain = 'http://www.sse.org.cn'
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    if (backDomain && window.location.host.match(reg)[2] === backDomain.match(reg)[2]) {
+      _host = 'http://www.sse.org.cn';
+      _path = 'http://res.static.sse.org.cn';
+      if (location.protocol == 'https:') {
+        _host = 'https://www.sse.org.cn';
+        _path = 'https://res.static.sse.org.cn';
+      }
+
+    }
+
+    _path = _path.replace(".static.", ".");
+
+    document.write(" <script src='" + _host + "/szsePath.js?random=" + _versionDate + "'> <\/script> "
+      + " <script src='" + _path + "/common/js/concatversion.js?random=" + _versionDate + "'> <\/script> ");
+  }());
+</script>
+
+<script>
+
+  function backDomainLinkSwitch(value, type) {
+    var _port = location.port ? (":" + location.port) : "";
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    var urlRegx = /(.*)(http:|https:)(\/\/)(([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+))\.?(:\d+)?(.*)/;
+
+    // html字符串替换
+    if (type == 'str') {
+      var strArr = value.split("=");
+      strArr = strArr.map(function (v) {
+        var host = reg.test(v) ? v.match(reg)[0] : null;
+        if (pathObj.szseHosts.indexOf(host) > -1) {
+          if (window.location.protocol == 'https:' && urlRegx.test(v)) {
+            v = v.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+          };
+          if (pathObj.current_host === pathObj.back_host) {
+            v = v.replace(pathObj.main_host, pathObj.back_host);
+          }
+        }
+        return v
+      });
+      value = strArr.join("=");
+      return value;
+    }
+
+    // a标签地址替换
+    if (type === 'A') {
+      var eleA = document.querySelectorAll(value);
+      for (var i = 0; i < eleA.length; i++) {
+        var href = eleA[i].getAttribute("href");
+        var host = reg.test(href) ? href.match(reg)[0] : null;
+        if (href && pathObj.szseHosts.indexOf(host) > -1) {
+          if (window.location.protocol == 'https:') {
+            href = href.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+          };
+          if (pathObj.current_host === pathObj.back_host) {
+            href = href.replace(pathObj.main_host, pathObj.back_host);
+          }
+          eleA[i].setAttribute('href', href);
+        }
+      }
+    }
+
+    // 单链接替换
+    if (type === "link") {
+      if (window.location.protocol == 'https:' && !!value) {
+        value = value.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+      };
+      if (pathObj.current_host === pathObj.back_host) {
+        var host = reg.test(value) ? value.match(reg)[0] : null;
+        if (value && pathObj.szseHosts.indexOf(host) > -1) {
+          value = value.replace(pathObj.main_host, pathObj.back_host);
+        }
+      }
+      return value;
+    }
+
+    // 背景图地址更换
+    if (type === "background") {
+      var eleBg = document.querySelectorAll(value);
+      for (var i = 0; i < eleBg.length; i++) {
+        var href = eleBg[i].style.backgroundImage;
+        if (window.location.protocol == 'https:' && !!href) {
+          href = href.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+        };
+        var host = reg.test(href) ? href.match(reg)[0] : null;
+        if (href && pathObj.szseHosts.indexOf(host) > -1) {
+          if (pathObj.current_host === pathObj.back_host) {
+            href = href.replace(pathObj.main_host, pathObj.back_host);
+          }
+          eleBg[i].style.backgroundImage = href;
+        }
+      }
+    }
+
+  }
+
+</script>
+
+<script>
+   if(document.cookie.indexOf('ft_language=1')>-1){
+    var style = document.createElement('style');
+    style.textContent='body{visibility:hidden;}';
+    document.head.appendChild(style);
+  }
+</script>
+<script>
+    addComCssFile()
+</script>
+<script>
+        changeVertion('/modules/report/css/report.css', 'css');
+        changeVertion('/modules/aboutus_column/introduction/css/journal.css', 'css');
+    </script>
+    <script>
+  changeVertion('/lib/validator/validator.min.css', 'css');
+  changeVertion('/common/plugins/css/index.min.css', 'css');
+  changeVertion('/common/css/form.css', 'css');
+  changeVertion('/common/css/articleDetailUtil.css','css');
+</script>
+</head>
+  <body class="article-body">
+    <script>
+  navMenuAJAX('/application/publicindex/header/index.html', '/application/publicindex/header/index.html', 'header', 'www');
+</script>
+<div class="g-locationnav">
+    <div class="banner-wrap">
+      <img src="http://res.static.szse.cn/common/images/legalrules-banner.jpg" />
+    </div>
+    <div class="g-container">
+      <div class="g-banner-txt">
+            <h2 class="hidden-xs">本所要闻</h2>
+            <p>
+              <img src="http://res.static.szse.cn/common/icon/er-banneradr.png" />位置：<a href="../../" class="CurrChnlCls">关于本所</a>/<a href="../" class="CurrChnlCls">本所动态</a>/<a href="./" class="CurrChnlCls">本所要闻</a>
+            </p>
+          </div>
+    </div>
+</div>
+  
+      <div class="g-container-wrap">
+            <div class="g-container">
+<!--startprint-->
+                <div class="news-detail-con g-conbox"> 
+                	<div class="des-header">
+                  <h2 class="title">深交所新闻发言人就创业板改革并试点注册制相关问题答记者问</h2>
+                  		<script>
+                  			var curSubTitle ='';
+                  			if(curSubTitle != ''){
+                  				document.write('<h4 style="text-align: center;" class="sub-title"><i class=""></i><span class="">'+curSubTitle+'</span></h4>')
+                  			}                  		
+                  		</script>
+              <div class="time">时间：<span>2020-08-21</span></div>
+              <div class="des-switchsize">
+                字体：
+                <span class="bigger">大</span>
+                <span class="medium">中</span>
+                <span class="smaller">小</span>
+              </div>
+    					
+        	</div>
+    				 <div class="des-content" id="desContent">
+                       <p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">自<span lang="EN-US">4</span>月<span lang="EN-US">27</span>日中央深改委审议通过《创业板改革并试点注册制总体实施方案》以来，按照中国证监会统一部署，经市场各方共同努力，目前各项准备工作均已就绪，创业板注册制首批<span lang="EN-US">18</span>家企业将于<span lang="EN-US">8</span>月<span lang="EN-US">24</span>日上市。深交所新闻发言人就近期市场关注的创业板注册制审核、发行、上市、交易等问题回答了记者提问。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">一、深交所在推进创业板注册制发行上市审核工作过程中有哪些特色做法？</span></b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;"><o:p></o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">答：深交所坚持“以信息披露为核心”的注册制审核理念，始终将提升审核工作规范性和透明度作为工作的重中之重，认真执行审核工作流程和审核时限规定，坚持质量第一、兼顾效率，将合规要求全面嵌入审核业务系统，持续优化完善审核工作机制，努力做到“开明、透明、廉明、严明”，高效有序开展受理审核工作，真正把选择权交给市场，增强市场各方改革获得感。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">一是审核流程公开透明。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">自主开发创业板注册制发行上市审核业务系统、信息公开网站和深证服<span lang="EN-US">APP</span>，实现审核业务操作电子化，有效推进审核标准、审核进程、审核结果、监管措施“四个公开”，切实提升审核工作透明度。将科技监管贯穿发行上市审核全过程，引入“企业画像”等技术手段，实现智能化审核，全面提高审核质效。业务系统<span lang="EN-US">24</span>小时在线运行，保荐机构可随时提交申请材料，方便发行人做好申报工作。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">二是审核要点公开发布。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">在系统梳理相关<span lang="EN-US">IPO</span>审核问询反馈意见和相关案例的基础上，研究形成创业板首发审核关注要点并及时向保荐机构公开，推动提高审核问询精准度，降低审核问题数量和轮次，避免“撒胡椒面”式提问，提升审核工作质效，引导中介机构更好履职尽责，引导发行人充分履行信息披露义务，进一步提高申报质量。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">三是审核沟通顺畅高效。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">畅通与市场主体的沟通渠道，发行人及保荐机构可就涉及业务规则理解与适用的重大疑难、无先例事项，通过审核业务系统或现场约谈等方式与深交所进行预沟通，提高发行上市审核效率。截至<span lang="EN-US">8</span>月<span lang="EN-US">20</span>日，深交所共收到<span lang="EN-US">149</span>个预沟通问题，均在规定期限内予以回复。审核过程中对审核问询存在疑问的，在首轮审核问询发出后也可以预约沟通。整理编制创业板注册制发行上市审核工作动态，定期向保荐人发布，通过问题解答、案例分析等方式传递审核动态，明确市场预期。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">二、请介绍一下创业板注册制首批企业新股发行的整体情况。<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">答：发行承销是保障创业板注册制平稳落地实施的重要环节之一。深交所及时发布相关业务规则，组建创业板股票发行规范委员会，促进形成公平合理有效的市场化发行定价机制，健全完善发行业务流程，严防各环节操作风险，引导承销商和发行人高质高效完成发行承销工作。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">从创业板注册制首批上市<span lang="EN-US">18</span>家企业新股发行情况看，市场化的发行定价机制有效发挥作用。据统计，<span lang="EN-US">18</span>家企业发行市盈率在<span lang="EN-US">19.1-59.7</span>倍之间，平均值<span lang="EN-US">39.3</span>倍，中位数<span lang="EN-US">37.9</span>倍，企业融资额在<span lang="EN-US">2.6-27.2</span>亿元之间，平均值<span lang="EN-US">11.2</span>亿元，中位数<span lang="EN-US">9.8</span>亿元，融资总额<span lang="EN-US">200.6</span>亿元。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">三、深交所对新股发行摇号抽签环节进行哪些优化？<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">答：为持续优化发行上市服务，增强市场主体获得感，深交所对摇号抽签业务承办主体、服务费用和服务内容做出调整。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">一是由深证信息免费承办摇号抽签业务。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">为完善市场服务，强化风险防控，进一步做好摇号抽签业务，深交所决定自创业板注册制首批企业启动发行，由深交所下属全资子公司深圳证券信息有限公司（以下简称深证信息）全面承接企业新股发行摇号抽签业务，不收取任何费用，切实降低企业新股发行成本。截至<span lang="EN-US">8</span>月<span lang="EN-US">21</span>日，深证信息已提供了<span lang="EN-US">27</span>场摇号抽签服务，业务运行平稳，市场反响良好。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">二是优化市场服务体验。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">深证信息不仅提供新股网上发行、可转债网上发行摇号抽签服务，还提供网下配售摇号和网下限售摇号等服务，更好满足主承销商和发行人需求，并增加在巨潮资讯网播出摇号抽签视频等增值服务，提高新股发行透明度，优化摇号抽签业务服务体验。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">四、创业板注册制首批企业上市首日起交易机制将发生变化，投资者需要重点注意哪些方面？<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 1.0cm;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">答：创业板交易制度改革坚持市场化、法治化方向，兼顾创业板现有市场特点和投资者结构，引入创新机制安排。<span lang="EN-US">2020</span>年<span lang="EN-US">8</span>月<span lang="EN-US">24</span>日起，《深圳证券交易所创业板交易特别规定》正式施行，投资者需要特别注意以下几点。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">一是调整涨跌幅限制。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">创业板注册制新股上市首五日不设涨跌幅限制，之后涨跌幅限制比例为<span lang="EN-US">20%</span>；创业板存量股票、相关基金涨跌幅限制<span lang="EN-US">8</span>月<span lang="EN-US">24</span>日调整为<span lang="EN-US">20%</span>（基金名单详见附件，后续可通过深交所官网查询）。需要注意的是，创业板股票千山退（<span lang="EN-US">300216</span>）、神雾退（<span lang="EN-US">300156</span>）、盛运退（<span lang="EN-US">300090</span>）<span lang="EN-US">8</span>月<span lang="EN-US">24</span>日前已进入且仍处于退市整理期，期间交易机制不作调整，价格涨跌幅限制比例仍为<span lang="EN-US">10%</span>。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">二是引入申报价格范围限制。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">创业板股票连续竞价阶段限价申报的买入申报价格不得高于买入基准价格的<span lang="EN-US">102%</span>，卖出申报价格不得低于卖出基准价格的<span lang="EN-US">98%</span>。需要注意的是，超过上述申报价格范围的订单，将暂存于交易主机，此时订单不在行情中显示，也不会撮合成交，待价格波动使该笔订单进入申报价格范围时，会自动参与竞价，成交前投资者可随时撤单。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">三是优化盘中临时停牌机制。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">创业板无价格涨跌幅限制股票盘中临时停牌的触发阈值为涨跌<span lang="EN-US">30%</span>和<span lang="EN-US">60%</span>，停牌持续时间为<span lang="EN-US">10</span>分钟，在警示交易风险的同时，保障交易连续性和市场价格发现功能。在盘中临时停牌期间，投资者可继续申报或撤销申报。复牌时，交易所对已接受的申报进行复牌集合竞价。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">四是调整单笔最高申报数量。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">创业板股票限价申报的单笔买卖申报数量不得超过<span lang="EN-US">30</span>万股，市价申报的单笔买卖申报数量不得超过<span lang="EN-US">15</span>万股。如投资者提交的单笔申报数量超过要求，交易系统将直接拒单。需要注意的是，创业板单笔最小申报数量及变动单位没有变化，仍为<span lang="EN-US">100</span>股或其整数倍，卖出时余额不足<span lang="EN-US">100</span>股的，应一次性卖出。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">五是新增股票及存托凭证特殊标识。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">除沿用新股上市首日证券简称首位字母“<span lang="EN-US">N”</span>标识外，创业板注册制新股上市后次日至第五日，证券简称首位将标识字母“<span lang="EN-US">C</span>”，以提示不设涨跌幅限制的特别安排；上市时尚未盈利、具有表决权差异安排，及具有协议控制架构或类似特殊安排的创业板股票或存托凭证，将新增“<span lang="EN-US">U</span>”“<span lang="EN-US">W</span>”“<span lang="EN-US">V</span>”特殊标识。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">六是优化两融及转融通机制。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">创业板注册制首发股票自首个交易日起可作为融资融券标的；转融通出借券源扩大，战略投资者可出借配售获得的股票；新推出转融通市场化约定申报方式，增加交易灵活性，提升交易效率，证券公司借入证券当日可供投资者融券卖出。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">此外，创业板还引入盘后定价交易机制，调整交易公开信息披露指标等，投资者应予以关注。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">五、请问创业板交易监管方面有哪些安排？<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">答：深交所基于创业板市场特点，持续优化交易监管，着力增强监管针对性和有效性，筑牢市场交易风险防线，保障创业板改革并试点注册制平稳实施。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">一是强化交易制度建设，保障交易监管规范透明。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">发布《创业板股票异常交易实时监控细则（试行）》，立足创业板市场特点，构建创业板异常交易行为监管体系，明确虚假申报、拉抬打压股价、维持涨（跌）幅限制价格、自买自卖或者互为对手方交易、严重异常波动股票申报速率异常等<span lang="EN-US">5</span>类异常交易监控指标，引导投资者合规交易创业板股票。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">二是充分尊重交易自由，切实保护合法交易权。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">坚持市场化、法治化方向，充分考虑深市中小市值公司多、交易活跃特点，把握好监管尺度，提高监管适应性，对不存在明显异常、不涉嫌违法违规的交易行为不干预，实施有弹性、有温度的监管。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">三是严守自律监管底线，精准打击违法违规行为。</span></b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">加大重点领域监管力度，强化重点监控账户管理，利用大数据、人工智能等技术快速定位异动账户，有效挖掘证券违法违规线索，坚决打击扰乱市场的异常交易及违法违规行为，切实维护市场正常运行秩序。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">六、请介绍一下创业板投资者适当性管理新规落地执行情况。<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">答：创业板投资者适当性管理新规发布并实施后，深交所采取系列措施，确保新规平稳执行。<b>一是</b>指导证券公司全力做好业务和技术相关实施准备，有序推进市场组织工作。<b>二是</b>及时配套发布相关业务和技术通知，持续更新有关问答，确保市场准确理解并执行创业板适当性要求。<b>三是</b>组织开展宣传培训等活动，全面、深入、持续做好投资者教育。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">各证券公司高度重视，积极履行适当性管理职责。<b>一是</b>制定新版《创业板投资风险揭示书》，修订相关业务办理流程，及时为符合条件的投资者开通创业板交易权限。<b>二是</b>完成相关技术系统改造，参与深交所、中国结算和中证金融等联合组织的相关测试。<b>三是</b>采取多渠道、多方式开展投资者教育，突出规则制度解读，强化风险提示，主动提醒存量投资者签署新版风险揭示书。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">目前，各项工作进展顺利，广大投资者积极参与，市场组织取得良好效果。下一步，深交所将严格落实投资者适当性管理制度要求，做好投资者保护工作，护航创业板改革并试点注册制稳起步、开好局。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;"><o:p>&nbsp;</o:p></span></p>
+<p></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%;"><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-font-kerning: 0pt;">附件：<a href="http://docs.static.szse.cn/www/aboutus/trends/news/W020200821764606607644.pdf" target="_blank" rel="noopener" oldsrc="W020200821764606607644.pdf">2020年8月24日涨跌幅限制比例提高至20%的基金名单<i class="arror-icon"></i></a></span></b></p>
+                    </div>
+                    <script>
+                        var oldCon = document.getElementById("desContent").innerHTML;
+                        oldCon = oldCon.replace(/(o:p)|(u:p)/gi,'span');
+                        oldCon = oldCon.replace(/&lt;!--\[endif\]--&gt;/g,"");
+                        document.getElementById("desContent").innerHTML = oldCon;
+                    </script>
+<!--endprint-->
+    				<div class="des-footer">
+    					<div class="article-page display-none">
+                   
+    						
+    					</div>
+    					<div class="article-btn">
+    						<a href="javascript:void(0);" class="btn btn-gray art-print">打印</a>
+        						<a href="javascript:void(0);" target="_blank" class="btn btn-gray ml10 art-collect">收藏</a>
+        						<a href="javascript:void(0);" class="btn btn-gray ml10 art-close">关闭</a>
+    					</div>
+    				</div>  
+				</div>
+     
+            </div>
+      </div>
+
+    <script>
+  changeVertion('/common/js/toggleBig5.js', 'js');
+  navMenuAJAX('/application/publicindex/footer/index.html','/application/publicindex/footer/index.html', 'footer','www');
+  addComJsFile();
+</script>
+    <script>
+  (function () {
+    var _versionDate = new Date().getTime();
+
+    var _host = 'http://www.szse.cn';
+    if (location.protocol == 'https:') {
+      _host = 'https://www.szse.cn';
+    }
+
+    var backDomain = 'http://www.sse.org.cn'
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    if (backDomain && window.location.host.match(reg)[2] === backDomain.match(reg)[2]) {
+      _host = 'http://www.sse.org.cn';
+      if (location.protocol == 'https:') {
+        _host = 'https://www.sse.org.cn';
+      }
+
+    }
+    document.write(" <script src='" + _host + "/dynamicmodule/index/sysconfig.js?random=" + _versionDate + "'> <\/script> ");
+
+  }());
+</script>
+    <script>
+    	var articleDetail = {
+    		docTitle:'深交所新闻发言人就创业板改革并试点注册制相关问题答记者问',
+    		subDocTitle:'',
+    		docAbstract:'创业板注册制首批18家企业将于8月24日上市',
+                articleId:'580924',
+		channelCode:'newstroduction_news',
+    channelId : '469'
+    	}
+    </script>
+    <script>
+    	changeVertion('/common/js/articleDetail.js','js');
+    </script>
+    <script>
+  changeVertion('/lib/validator/jquery.validate.js', 'js');
+  changeVertion('/common/js/jquery.validate_extend.js', 'js');
+  changeVertion('/lib/webuploader-0.1.5/webuploader.js', 'js');
+  changeVertion('/common/plugins/index.min.js', 'js');
+  changeVertion('/common/js/articleDetailUtil.js','js');
+</script>
+  </body>
+</html>
+
+
+

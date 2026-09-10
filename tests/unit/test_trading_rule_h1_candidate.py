@@ -14,8 +14,17 @@ from ashare_state.spike.trading_rule import RuleUnresolvedError, TradingRuleBook
 
 CANDIDATE = Path("configs/trading_rules/versions/v20260909-h1-compiled/rules.yaml")
 H1R2_CANDIDATE = Path("configs/trading_rules/versions/v20260909-h1r2-compiled/rules.yaml")
+H1R3_CANDIDATE = Path("configs/trading_rules/versions/v20260910-h1r3-compiled/rules.yaml")
+H1R3_EVIDENCE_INPUT = Path(
+    "docs/provider_verification/trading_rule_h1r3_evidence_input_20260910.json"
+)
+H1R3_SOURCE_CATALOG = Path(
+    "docs/provider_verification/trading_rule_h1r3_source_catalog_20260910.json"
+)
 OLD_CANDIDATE_HASH = "75d21777f1f135c47b963868641dfffc5428c5c5d897e17480a91ebaec1edd51"
 H1R2_CANDIDATE_HASH = "6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f"
+H1R3_CANDIDATE_HASH = "f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9"
+CHINEXT_IMPLEMENTATION_DATE_URL = "https://www.szse.cn/aboutus/trends/news/t20200821_580924.html"
 
 
 def _candidate_hash(path: Path, version: str) -> str:
@@ -42,6 +51,11 @@ def h1_book() -> TradingRuleBook:
 @pytest.fixture(scope="module")
 def h1r2_book() -> TradingRuleBook:
     return TradingRuleBook.load(H1R2_CANDIDATE)
+
+
+@pytest.fixture(scope="module")
+def h1r3_book() -> TradingRuleBook:
+    return TradingRuleBook.load(H1R3_CANDIDATE)
 
 
 def test_candidate_is_compiled_and_not_active(h1_book: TradingRuleBook):
@@ -280,6 +294,71 @@ def test_h1r2_candidate_is_scoped_and_keeps_old_candidate_separate(
     assert not h1r2_book.rules[0].source_ref.startswith("SSE/SZSE")
 
 
+def test_h1r3_candidate_is_source_contract_correction_only(
+    h1r2_book: TradingRuleBook,
+    h1r3_book: TradingRuleBook,
+):
+    assert h1r3_book.version == "2026-09-10.1"
+    assert h1r3_book.review_status == "COMPILED"
+    assert h1r3_book.evidence_contract == "RULE_EVIDENCE_BUNDLE.v1"
+    assert len(h1r3_book.rules) == 14
+    assert _candidate_hash(H1R3_CANDIDATE, "v20260910-h1r3-compiled") == H1R3_CANDIDATE_HASH
+
+    previous = {rule.rule_id: rule for rule in h1r2_book.rules}
+    corrected_rule_ids = {
+        "CHINEXT_PRE_REGISTRATION_NORMAL",
+        "CHINEXT_PRE_REGISTRATION_ST",
+        "CHINEXT_REGISTRATION",
+        "CHINEXT_REGISTRATION_FIRST5",
+    }
+    semantic_fields = (
+        "rule_id",
+        "board",
+        "exchanges",
+        "code_patterns",
+        "effective_from",
+        "effective_to",
+        "st_state",
+        "listing_age_rule",
+        "up_rate",
+        "down_rate",
+        "tick_size",
+        "rounding_mode",
+    )
+    for rule in h1r3_book.rules:
+        old_rule = previous[rule.rule_id]
+        assert all(getattr(rule, field) == getattr(old_rule, field) for field in semantic_fields)
+        old_urls = set(source_urls_from_ref(old_rule.source_ref))
+        new_urls = set(source_urls_from_ref(rule.source_ref))
+        if rule.rule_id in corrected_rule_ids:
+            assert new_urls - old_urls == {CHINEXT_IMPLEMENTATION_DATE_URL}
+        else:
+            assert new_urls == old_urls
+
+
+def test_h1r3_implementation_date_source_is_archived_and_cataloged():
+    source_path = Path("docs/provider_verification/trading_rule_h1_sources/direct_17.html")
+    content = source_path.read_bytes()
+    assert len(content) == 34508
+    assert hashlib.sha256(content).hexdigest() == (
+        "cba74610a5c582e2ac94f3bb21a04f2e5fa1fa175131b0cd287f9bbfc311b1ae"
+    )
+    text = content.decode("utf-8")
+    assert "深交所新闻发言人就创业板改革并试点注册制相关问题答记者问" in text
+    assert '2020</span>年<span lang="EN-US">8</span>月<span lang="EN-US">24</span>日起' in text
+
+    catalog = json.loads(H1R3_SOURCE_CATALOG.read_text(encoding="utf-8"))
+    assert catalog["source_count"] == len(catalog["catalog"]) == 20
+    entry = next(
+        item for item in catalog["catalog"] if item["url"] == CHINEXT_IMPLEMENTATION_DATE_URL
+    )
+    assert entry["initial_http_status"] == 200
+    assert entry["final_url"] == CHINEXT_IMPLEMENTATION_DATE_URL
+    assert entry["artifact_path"].endswith("direct_17.html")
+    assert entry["byte_size"] == len(content)
+    assert entry["sha256"] == hashlib.sha256(content).hexdigest()
+
+
 @pytest.mark.parametrize(
     ("exchange", "code", "historical_rule_id"),
     [
@@ -329,20 +408,22 @@ def test_h1r2_st_transition_remains_2026_pit_exact(h1r2_book: TradingRuleBook):
     assert current.up_rate == Decimal("0.10")
 
 
-def test_h1r2_evidence_input_has_no_duplicate_json_keys():
-    path = Path("docs/provider_verification/trading_rule_h1_evidence_input.json")
+@pytest.mark.parametrize(
+    "path",
+    [
+        Path("docs/provider_verification/trading_rule_h1_evidence_input.json"),
+        H1R3_EVIDENCE_INPUT,
+    ],
+)
+def test_h1_evidence_inputs_have_no_duplicate_json_keys(path: Path):
     json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_json_keys)
 
 
-def test_h1r2_source_contract_matches_candidate_source_refs(h1r2_book: TradingRuleBook):
-    document = json.loads(
-        Path("docs/provider_verification/trading_rule_h1_evidence_input.json").read_text(
-            encoding="utf-8"
-        )
-    )
+def _assert_source_contract_matches_candidate_source_refs(book: TradingRuleBook, path: Path):
+    document = json.loads(path.read_text(encoding="utf-8"))
     entries = {str(entry["rule_id"]): entry for entry in document["entries"]}
-    assert set(entries) == {rule.rule_id for rule in h1r2_book.rules}
-    for rule in h1r2_book.rules:
+    assert set(entries) == {rule.rule_id for rule in book.rules}
+    for rule in book.rules:
         declared = tuple(source_urls_from_ref(rule.source_ref))
         supplied = tuple(str(source["source_url"]) for source in entries[rule.rule_id]["sources"])
         assert set(supplied) == set(declared)
@@ -356,3 +437,13 @@ def test_h1r2_source_contract_matches_candidate_source_refs(h1r2_book: TradingRu
         "https://www.bse.cn/uploads/6/file/public/202209/20220924123627_d6405jicv9.docx",
         "https://www.bse.cn/uploads/6/file/public/202604/20260424170528_52kqyhc7p9.docx",
     } <= all_source_urls
+
+
+def test_h1r2_source_contract_matches_candidate_source_refs(h1r2_book: TradingRuleBook):
+    _assert_source_contract_matches_candidate_source_refs(
+        h1r2_book, Path("docs/provider_verification/trading_rule_h1_evidence_input.json")
+    )
+
+
+def test_h1r3_source_contract_matches_candidate_source_refs(h1r3_book: TradingRuleBook):
+    _assert_source_contract_matches_candidate_source_refs(h1r3_book, H1R3_EVIDENCE_INPUT)

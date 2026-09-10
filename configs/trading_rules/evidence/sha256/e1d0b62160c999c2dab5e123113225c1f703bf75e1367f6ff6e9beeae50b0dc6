@@ -1,0 +1,561 @@
+<!doctype html>
+<html>
+
+	<head>
+		<!--获取栏目id页-->
+		<!-- 站点属性 -->
+		
+<meta name="others" content="页面生成时间 2024-03-08 19:18:41">
+<meta name="template,templategroup,version" content="2374,default,1.5">
+<title>
+			上交所就全面实行股票发行注册制配套业务规则正式发布答记者问 | 上海证券交易所
+		</title>
+		<!-- 站点属性 -->
+<meta charset="utf-8">
+<meta name="description" content="">
+<meta name="author" content="上海证券交易所">
+<meta name="renderer" content="webkit">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+<meta name="apple-mobile-web-app-title" content="上海证券交易所">
+<link rel="shortcut icon" href="/xhtml/images/favicon.ico">
+
+<meta name="others" content="页面生成时间 2024-03-08 19:18:41">
+<meta name="template,templategroup,version" content="2374,default,1.5">
+<title>上交所动态  | 上海证券交易所</title>
+<script>
+
+    var channelCode = "hotandd";
+   var websiteid = "28";
+
+    var col_id = "8875";
+    var pageTitle ="上交所动态";
+
+
+
+</script>
+
+
+<!-- CSS -->
+<link href="/xhtml/css/lib/2021/bootstrap-v4.5.0.css" rel="stylesheet" type="text/css" charset="utf-8">
+<link href="/xhtml/css/sse_inside_2021.css?v=ssesite_20260814" rel="stylesheet" type="text/css" charset="utf-8">
+
+<!-- Favicons -->
+<!-- <link rel="shortcut icon" href="/xhtml/images/favicon.ico" >-->
+<!-- IOS / Android 主屏图标 -->
+<link href="/xhtml/images/webappicon/apple-touch-icon.png" rel="apple-touch-icon"/>
+<link href="/xhtml/images/webappicon/apple-touch-icon-76x76.png" rel="apple-touch-icon" sizes="76x76"/>
+<link href="/xhtml/images/webappicon/apple-touch-icon-120x120.png" rel="apple-touch-icon" sizes="120x120"/>
+<link href="/xhtml/images/webappicon/apple-touch-icon-152x152.png" rel="apple-touch-icon" sizes="152x152"/>
+<link href="/xhtml/images/webappicon/apple-touch-icon-180x180.png" rel="apple-touch-icon" sizes="180x180"/>
+<link href="/xhtml/images/webappicon/icon-hires.png" rel="icon" sizes="192x192"/>
+<link href="/xhtml/images/webappicon/icon-normal.png" rel="icon" sizes="128x128"/>
+
+<!-- Tile icon for Win8 (144x144 + tile color) -->
+<!-- win 8 磁贴标题 -->
+<meta name="application-name" content="上海证券交易所">
+<!-- win 8 磁贴颜色 -->
+<meta name="msapplication-TileColor" content="#ffffff">
+<!-- win 8 磁贴图标 -->
+<meta name="msapplication-TileImage" content="/xhtml/images/webappicon/apple-touch-icon-120x120.png">
+<meta name="msapplication-tooltip" content="Tooltip">
+
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+<!--调试阶段禁止缓存,例如微信，QQ浏览器缓存-->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="format-detection" content="telephone=no"/>
+
+<script type="text/javascript">
+    var _date_ = new Date();
+    var _y_ = _date_.getFullYear();
+    var _m_ = (_date_.getMonth() + 1);
+    var _d_ = _date_.getDate();
+    var _h_ = _date_.getHours();
+    var _v_ = _y_ + '' + _m_ + '' + _d_ + '' + _h_;
+    document.write('<script src="/js/common/ssesuggestdata.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/ssesuggestfunddata.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/ssesuggestEbonddata.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/ssesuggestTbonddata.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/ssesuggestdataAll.js?v=' + _v_ + '"><\/script>');
+    document.write('<script src="/js/common/systemDate_global.js?v=' + _v_ + '"><\/script>');
+</script>
+<script type="text/javascript">
+    var siteId = 28;
+    var tableFun = {};
+    var tableData = {};
+    var searchUrl = "/home/search/";
+
+    var bizUrl = "//biz.sse.com.cn/";
+    var staticUrl = "//static.sse.com.cn/";
+    var staticBulletinUrl = "//static.sse.com.cn";
+    var sseQueryURL = "//query.sse.com.cn/";
+
+    var hq_queryUrl;
+    if (location.protocol == "http:") {
+        hq_queryUrl = "//yunhq.sse.com.cn:32041/";
+    } else {
+        hq_queryUrl = "//yunhq.sse.com.cn:32042/";
+    }
+    var bondUrl = "//bond.sse.com.cn/";
+    var myUrl = "//my.sse.com.cn/";
+    var infoUrl = "//www.sseinfo.com/";
+
+    var siteUrl = "//www.sse.com.cn/";
+    var ENGLISH_HOME = '//english.sse.com.cn/';
+    var channelDataUrl = '//www.sse.com.cn/home/translatejson/s_translateurl.shtml';
+    
+    var staticBondUrl = "//static.sse.com.cn";
+</script>
+
+<script src="/js/lib/gdp-full.js?v=20250916"></script>
+<!-- 下方为生产环境配置 -->
+<script type='text/javascript'>
+    gdp('init', 'ba17301551dcbaf9', '92177a53b3e054c2', {
+        host: 'prod-ua.sseinfo.com',
+        version: '1.0.0',
+        scheme: 'https',
+    });
+    gdp('send');
+</script>
+
+	</head>
+
+	<body>
+		<script type="text/javascript">
+			pageTitle = "热点动态";
+		</script>
+		<!--头部-->
+		<script src="/xhtml/js/sse_full.js?v=3.8.1_20260901"></script>
+<script src="/xhtml/js/app/sse_menufun_2021.js"></script>
+<div class="sse_topBar">
+    <div class="container">
+      <div class="topBarInfo">
+        <!--<a class="bar_word" href="https://one.sse.com.cn/investor/#/personCenter/personHome" target="_blank">投资者服务中心</a>-->
+        <span class="bar_word">上海证券交易所服务热线：<b class="word_phone">400-8888-400</b> </span>
+        <a href="/home/app/update/" class="bar_word" target="_blank">APP下载</a>
+        <a href="/home/weixin/" class="bar_word" target="_blank">微博微信</a>        
+        <a class="bar_word enLink" href="http://english.sse.com.cn/">English</a><a
+          class="bar_word ftLink" id="js_link_change" href="http://big5.sse.com.cn/site/cht/www.sse.com.cn/"
+          target="_blank">繁</a>
+      </div>
+    </div>
+  </div>
+<div class="mobile_top d-md-none">
+  <div class="container">
+      <div class="row">
+        <div class="col-9"><a href="//one.sse.com.cn/" class="mobile_top_link" target="_blank">一网通办</a><a href="//www.sse.com.cn/transparency/home/" class="mobile_top_link mobile_top_link_line" target="_blank">“三开门”专栏</a></div>
+        <div class="col-3 text-right"><a href="//english.sse.com.cn/" target="_blank" class="transfer_cnen"><span class="transfer_cn">简中</span><span class="transfer_en">EN</span></a></div>
+      </div>
+    </div>
+  </div>
+<div class="sse_header clearfix">
+    <div class="container">
+      <div class="row">
+        <!-- logo -->
+        <div class="col-5 col-md-3 col-xl-3 col-xxl-4 mobile_logo">
+          <a href="/"><img class="sse_logo" src="/xhtml/images/logo.png" alt=""></a>
+        </div>
+        <div class="col-7 col-md-9 col-xl-9 col-xxl-8 mobile_user">
+          <!-- 顶部导航 -->
+          <div class="top_nav row">
+            <div class="col-md-8 col-lg-8 col-xxl-8 d-none d-md-flex">
+              <div class="navbar navbar-collapse collapse">
+                <script>document.write(sseMenuObj.menu_tab_text);</script>
+              </div>
+            </div>
+            <div class="col-md-4 col-lg-4 col-xxl-4 user_enter js_user_enter" style="padding-left: 0;padding-right: 0;">
+              <!--<i></i>-->
+              <a href="https://one.sse.com.cn/" class="userenter_link" target="_blank">
+               一网通办
+              </a>
+              <a class="link_transparency" href="/transparency/home/" target="_blank">
+              “三开门”专栏
+              </a>
+            </div>
+            <div class="menu-btn d-flex flex-column justify-content-center d-md-none">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- pc菜单 -->
+  <div class="nav-side-show " sidshowclass="nsshow">
+    <div class="container">
+      <div class="inner menu_con" id="menu_con">
+        <script>document.write(sseMenuObj.menu_con_text);</script>
+      </div>
+    </div>
+  </div>
+
+  <!-- mobile菜单 -->
+  <div class="dl-menuwrapper d-md-none" id="dl-menu">
+    <button id="dl-menu-button" class="btn"></button>
+    <ul class="dl-menu" id="mobile_menu">
+      <script type="text/javascript">document.write(sseMenuObj.mobile_menu_text);</script>
+    </ul>
+  </div>
+  <!-- 用户入口 -->
+  <div class="user-enter-content user-enter-content-bg js_user_content">
+    <div class="container">
+      <div class="d-flex user-block">
+        <div class="block_area">
+        	<dl>
+        		<dt>用户入口</dt>
+        		<dd><a href="//one.sse.com.cn/investor/" target="_blank"><img src="/xhtml/images/ui_home_enter_edu_2024.png">投资者</a></dd>
+        		<dd><a href="//one.sse.com.cn/member/" target="_blank"><img src="/xhtml/images/ui_home_enter_member_2024.png">会员机构</a></dd> 
+        		<dd><a href="//one.sse.com.cn/to-be-listed/" target="_blank"><img src="/xhtml/images/ui_home_enter_nss_2024.png">拟上市公司</a></dd>
+        		<dd><a href="//one.sse.com.cn/bond/" target="_blank"><img src="/xhtml/images/ui_home_enter_bond_2024.png">债券机构</a></dd>
+        		<dd><a href="//one.sse.com.cn/list/" target="_blank"><img src="/xhtml/images/ui_home_enter_company_2024.png">上市公司</a></dd>
+            <dd><a href="//one.sse.com.cn/fund/" target="_blank"><img src="/xhtml/images/ui_home_enter_fund_2024.png">基金公司</a></dd>
+        	</dl>
+        </div>
+        <div class="block_area">
+        	<dl>
+        		<dt>高效办成一件事</dt>
+        		<dd><a href="//one.sse.com.cn/onething/gptz/" target="_blank"><img src="/xhtml/images/ui_onething_gp.png">股票投资一件事</a></dd>
+        		<dd><a href="//one.sse.com.cn/onething/zqfx/" target="_blank"><img src="/xhtml/images/ui_onething_bond.png">债券发行上市一件事</a></dd>
+            <dd class="onethingNew"><a href="//one.sse.com.cn/onething/qqtz/" target="_blank"><img src="/xhtml/images/ui_onething_qqtz.png">期权投资一件事</a></dd>
+        		<dd><a href="//one.sse.com.cn/onething/reits/" target="_blank"><img src="/xhtml/images/ui_onething_reits.png">REITs发行上市一件事</a></dd>
+            <dd><a href="//one.sse.com.cn/onething/qyss/" target="_blank"><img src="/xhtml/images/ui_onething_qyss.png">企业上市一件事</a></dd>
+            <dd><a href="//one.sse.com.cn/onething/fwyy/" target="_blank"><img src="/xhtml/images/ui_onething_fwyy.png">服务预约一件事</a></dd>
+            <dd><a href="//one.sse.com.cn/onething/xxpl/" target="_blank"><img src="/xhtml/images/ui_onething_xxpl.png">信息披露一件事</a></dd>
+        	</dl>
+        </div>
+        <div class="block_area">
+        	<dl>
+        		<dt>一网通办移动端<h2>上交所APP"通办"栏目</h2></dt>
+        		<div class="ones_qrcode_block">
+                  <img src="/xhtml/images/ones_qrcode.png">
+                  <em>- 欢迎扫码安装 -</em>
+                </div> 
+        	</dl>
+        </div>       
+      </div>
+    </div>
+  </div>
+  <!-- 业务专区 -->
+<!--   <div class="user-enter-content  js_bizzone_content">
+    <div class="container">
+      <div class="d-flex justify-content-around user-block biz_block_padding">
+        <div class="block">
+          <a class="d-flex flex-column align-items-center" href="https://cbm.uap.sse.com.cn/" target="_blank">
+            <img src="/images/bizzone_list.png" alt="">
+            <span>股票业务专区</span>
+          </a>
+        </div>
+        <div class="block">
+          <a class="d-flex flex-column align-items-center" href="http://www.sse.com.cn/home/enter/bond/" target="_blank">
+            <img src="/images/bizzone_bond.png" alt="">
+            <span>债券业务专区</span>
+          </a>
+        </div>
+        <div class="block">
+          <a class="d-flex flex-column align-items-center" href="http://www.sse.com.cn/home/biz/fund/" target="_blank">
+            <img src="/images/bizzone_fund.png" alt="">
+            <span>衍生品与基金业务专区</span>
+          </a>
+        </div>        
+      </div>
+    </div>
+  </div>
+ -->
+<div class="sse-breadcrumb">
+    <div class="container">
+        <ul class="d-none d-md-flex breadcrumb-ul" id="breadcrumb-ul">
+          <script>
+              if(col_id=='13174'){
+                document.getElementById("breadcrumb-ul").classList.remove("d-md-flex")
+              }
+              
+          </script>
+            <script>
+              document.write(sseMenuObj.initBreadMenu())
+          </script>
+          
+        </ul>
+        <h1 class="page-title js_page-title"></h1>
+    </div>
+</div>
+<!-- 全局检索框 -->
+<div class="searchHeight">
+    <div class="sse_searchContainer">
+        <div class="container sse_searchMain">
+            <img src="/xhtml/images/logo.png" alt=" ">
+            <div class="sse_searchVal">
+                <div class="sse_searchBorder">
+                    <input class="globalSearch js_globalSearch" id="serinpt" type="search" autocomplete="off"
+                           maxlength="35" placeholder="代码 / 简称 / 关键词">
+                    <input type="button" class="search_btn js_searchBtn">
+                </div>
+                <div class="bdsug" id="desksearhInput">
+                    <ul class="search-history" id="desksearchHist"></ul>
+                    <ul id="desksearhTable"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+		<p style="display:none">
+			<fjtignoreurl>
+				<span id="searchTitle">
+					上交所就全面实行股票发行注册制配套业务规则正式发布答记者问
+				</span>
+				<span id="keywords">
+					
+				</span>
+			</fjtignoreurl>
+		</p>
+		<div class="page_content container sse_content ">
+			<div class="row">
+				<div class="col-12">
+					<div class="sse_colContent">
+						<div class="article-infor ">
+							<h2>
+								上交所就全面实行股票发行注册制配套业务规则正式发布答记者问
+							</h2>
+							<div class="article_opt">
+								<span>
+									<a href="##" class="mobile_hide sseicon-icon_print"></a>
+									<a href="##" class="zoom sseicon-icon_fontSizeUp" data-type="zoom_in"></a>
+									<a href="##" class="zoom sseicon-icon_fontSizeDown" data-type="zoom_out"></a>
+								</span>
+								<i>
+									2023-02-17
+								</i>
+							</div>
+							<div class="allZoom">
+									<p>　　全面实行注册制是涉及资本市场全局的重大改革。全面实行注册制制度规则的发布实施，标志着注册制的制度安排基本定型，标志着注册制推广到全市场和各类公开发行股票行为，在中国资本市场改革发展进程中具有里程碑意义。2023年2月17日，按照中国证监会统一部署，上海证券交易所正式发布26部与全面实行股票发行注册制相配套的业务规则、指引及指南。上交所相关负责人就市场关切的问题回答了记者的提问。</p><p>　　<strong>一、请介绍一下本次发布业务规则的总体情况。</strong></p><p>　　<strong>答：</strong>为了贯彻落实党中央、国务院关于全面实行注册制的决策部署，在中国证监会的统一领导下，上交所制定或修订全面实行注册制配套业务规则，经中国证监会批准，正式向市场发布实施。</p><p>　　本次上交所集中发布了26部业务规则，包括已公开征求意见的《上海证券交易所股票发行上市审核规则》等9部主要业务规则，还包括17部配套业务细则、指引和业务指南。这26部规则与本所其他规则共同构建了保障全面实行注册制在上交所顺利实施的业务规则体系。</p><p>　　这26部业务规则，涵盖了全面实行注册制下发行上市审核、发行承销、持续监管、交易组织管理和投资者保护等环节的主要制度安排。具体包括4大类别：（1）11部发行上市审核类规则，分别为首发、再融资、并购重组、优先股等发行上市审核规则，以及与发行上市审核配套的申请文件受理、现场督导、业务咨询沟通等指引和指南。（2）6部发行承销类规则，包括首发和再融资发行承销业务细则，以及网上网下发行业务细则、自律委员会工作规则和上市公告书指引。（3）2部持续监管类规则，即主板股票上市规则和重大资产重组指引。（4）7部交易组织和管理类规则，分别是交易规则、融资融券交易细则、转融通证券出借交易办法、主板和科创板异常交易监控细则、注册制下股票和存托凭证暂不作为股票质押回购和约定购回交易标的证券的通知以及主板风险揭示书必备条款指南。</p><p>　　全面实行注册制配套业务规则集中发布后，上交所将抓紧对其他业务规则进行整合清理，强化适应性、集成性和协同性，深入推进“简明友好型”规则体系建设。</p><p>　　<strong>二、前期上交所就股票发行上市审核规则等9部配套业务规则向社会公开征求意见。请简要介绍一下相关情况。</strong></p><p>　　<strong>答：</strong>2023年2月1日至2月8日，上交所通过官方网站、邮件、400热线、召开座谈会等渠道和方式，就9部主要业务规则向市场公开征求意见；就4部业务细则定向征求了会员及相关市场机构、自律组织的意见。发放调查问卷，广泛了解投资者、市场从业人员等对改革的评价和对上交所工作的意见。</p><p>　　总的看，各方面对全面实行注册制高度认同。普遍认为，全面实行注册制对于完善多层次资本市场体系、提升资本市场服务实体经济能力、助力经济高质量发展具有重要意义，标志着资本市场进入了新的历史发展阶段。对征求意见的配套业务规则，市场各方予以充分肯定，认为体现了注册制改革的目标和要求。</p><p>　　截至2月8日，上交所共收到各类市场主体提出与规则相关的具体意见建议128条。上交所对社会各界的意见建议高度重视，逐一认真研究。其中，采纳30余条，主要涉及延长再融资、重组中介机构工作底稿报送时间、优化主板回拨机制和网下投资者报价行为规范等方面。未采纳意见，有的属于执行层面问题，将在规则实施中予以落实；有的属于理解层面问题，后续将通过加大培训宣传力度等方式予以明确；有的仍存在较大争议，后续将深入研究论证。</p><p>　　<strong>三、请简要介绍《上海证券交易所主板股票异常交易实时监控细则》和《上海证券交易所科创板股票异常交易实时监控细则》相关情况。</strong></p><p>　　<strong>答：</strong>为了提升全面实行注册制下的股票异常交易监管透明度和规范性，上交所在坚持监管规则的连续性、稳定性和可预期性的基础上，总结监管实践经验，结合市场机构的意见建议，制定了《上海证券交易所主板股票异常交易实时监控细则》（以下简称《主板股票监控细则》）。主要内容：一是公开主板股票典型异常交易行为的定性描述和定量指标，规定了5大类14种典型股票异常交易行为的监控标准，进一步明确市场预期。二是优化完善部分监控指标，提升监管精准度，减少对交易的不必要干预。三是将严重异常波动股票、风险警示股票、退市整理股票等纳入重点监控范围，可从严认定异常交易、从重采取监管措施，着力防范交易风险。</p><p>　　同时，上交所修订了《上海证券交易所科创板股票异常交易实时监控细则》（以下简称《科创板股票监控细则》），以适应《上海证券交易所交易规则》（以下简称《交易规则》）等上位规则调整，并进一步完善监控标准，与《主板股票监控细则》保持基本一致。《主板股票监控细则》和《科创板股票监控细则》定位为《交易规则》的下位规则。《主板股票监控细则》和《科创板股票监控细则》未作规定的，适用《交易规则》及其他有关规定。</p><p>　　<strong>四、请介绍全面实行注册制下主板首发发行承销机制较以往的主要差异。</strong></p><p>　　<strong>答：</strong>本次发布实施的《上海证券交易所首次公开发行证券发行与承销业务实施细则》，一体适用于主板和科创板。按照市场化、法治化的改革方向，结合存量板块的特点，改革完善了主板发行承销制度，复制推广了前期试点注册制实践经验，调整优化了定价配售等机制安排；在提升包容性、适应性的同时，基于兼顾存量、防控风险、保护中小投资者权益等方面考虑，强化了市场约束。与改革前相比，主板首发发行承销机制主要差异如下：</p><p>　　<strong>一是定价机制方面。</strong>明确新股发行价格、规模主要通过市场化方式决定。发行规模较小的企业，继续保留直接定价，新增定价参考上限。进一步完善询价定价，优化网下投资者填报价格、最高报价剔除比例上限、报价信息披露、定价参考值、发布投资风险特别公告等机制。明确可以对网下发行采取摇号限售或比例限售，进一步加大网下投资者报价约束。</p><p>　　<strong>二是申购配售方面。</strong>将主板网上投资者新股申购单位由1000股调整为500股，与科创板保持一致。明确在网上申购倍数较高时，在确保较大比例新股向网上投资者发行基础上，将主板回拨后比例上限从90%调至80%。根据发行数量差异，明确战略配售规模与参与投资者家数安排。</p><p>　　<strong>三是风险防控方面。</strong>完善超额配售选择权实施机制。新增市场重大变化情况下应对机制，允许发行人和主承销商要求网下投资者缴纳一定数量保证金，明确投资者弃购数量较大可以二次配售。</p><p>　　<strong>五、在前期推进“开门办审核”的基础上，请问上交所如何进一步加强审核工作的公开、透明、可预期，强化廉政监督机制。</strong></p><p>　　<strong>答：</strong>上交所高度重视廉政监督，自觉接受中国证监会对交易所股票发行工作的监督检查、驻证监会纪检监察组的监督，密切配合驻证监会纪检监察组上交所工作小组的驻点监督，坚持将廉政建设与业务工作同部署、同落实，持续完善发行上市审核权力运行的制约监督机制，把各项监督要求嵌入到注册制改革全流程。加强监督和执纪问责，坚持一体推进不敢腐、不能腐、不想腐，紧盯关键人员、重点岗位和关键环节加强管理监督，对违法违规行为严肃执纪问责，保障注册制改革行稳致远。同时，进一步强化审核公开、透明和可预期性，加大“开门办审核”力度。</p><p>　　<strong>一是强化发行上市审核工作的监督制衡。</strong>进一步完善审核工作规程，优化发行上市审核部门的审核和决策机制，做到“职责明确、责任到岗、分级把关、集体决策、有效制衡”。保障两委委员独立履职，充分发挥委员独立履职和专业把关作用。全面梳理发行审核公权力运行流程，明确行使公权力的岗位、廉洁风险点和防控措施，建立健全覆盖各环节全流程的监督制约机制。</p><p>　　<strong>二是深化全链条嵌入式监督机制。</strong>丰富监督方式方法，聚焦股票发行审核权力运行重点岗位、关键环节，开展全链条、全流程、全方位监督。推动纪检监督和组织监督、审计监督、财务监督等其他各类监督有机贯通，形成监督合力。主动接受社会监督，定期开展廉政监督回访、廉政评议、专题调研，广泛听取发行人、上市公司、中介机构等市场主体和相关部门意见建议。</p><p>　　<strong>三是持续推进“阳光用权”。</strong>通过发布业务指引、业务指南、市场培训等方式，强化审核标准公开。加快典型案例梳理，丰富审核动态内容，加强政策解读，更好保障市场主体知情权、参与权、监督权，最大限度减少自由裁量空间。强化审核信息公开，依托发行上市审核网站和发行上市审核系统，将审核流程、审核过程、审核结果等全程公开。</p><p>　　<strong>四是建立健全全覆盖全流程咨询沟通机制。</strong>修订业务咨询沟通指南，将IPO业务咨询沟通扩展到再融资、并购重组、转板，适当拓宽项目申报前的咨询沟通参与主体。优化申报前、审核中及会后沟通渠道，提高咨询接待层级，切实提升咨询服务质效。要求对咨询问题回复明确意见，切实解决问题；难以直接答复的，明确审核关注及完善建议。</p><p>　　<strong>五是营造良好的廉洁从业环境。</strong>企业向上交所提交发行上市申请后，上交所将第一时间向企业董事长、总经理和董事会秘书等发送共同推进“开门办审核”倡议信，介绍审核必经的流程、提供便利的沟通渠道，重申不需要请托、找“门路”，明确廉洁从业纪律及廉政相关要求，便于发行人更好地监督审核工作。完善发行人、保荐人及相关主体廉洁承诺制度，要求相关市场主体在企业申报时提交廉洁承诺函。上交所将会同各方共同营造阳光、廉洁、干净的发行上市审核环境，减少与申报企业之间的“温差”与“隔阂”。对违反廉洁从业要求、围猎审核工作人员等不法行为，从严采取监管处罚措施，持续推动行业生态净化，共同营造风清气正的市场环境。</p><p>　　<strong>六、请简要介绍相关规则及业务新老衔接的过渡安排。</strong></p><p>　　<strong>答：</strong>为稳妥推进全面实行注册制的改革落地，正式发布的配套规则对实施安排做了衔接。26部规则除以下安排外，均自发布之日起施行。（1）自6部发行承销类规则发布之日起，主板企业首次公开发行证券取得注册批文且尚未启动发行的，科创板企业首次公开发行证券、主板和科创板上市公司发行证券尚未启动发行的，适用发布后的相关规则，由交易所履行发行承销监管程序。其他情形按照原有规则开展发行承销工作。（2）《交易规则》《主板股票监控细则》和《科创板股票监控细则》《上海证券交易所融资融券交易实施细则》《上海证券交易所转融通证券出借交易实施办法（试行）》等5部交易组织与管理类规则，自按照《首次公开发行股票注册管理办法》发行的首只主板股票上市首日起施行。（3）风险揭示书必备条款指南自发布之日起施行，自按照《首次公开发行股票注册管理办法》发行的首只主板股票发行首日起，新开户的普通投资者首次参与主板股票的申购、交易前签署主板投资风险揭示书。</p><p>　　为做好发行上市审核工作有序衔接、平稳过渡，上交所于2月1日发布了《关于全面实行股票发行注册制相关审核工作衔接安排的通知》。按照这一通知，上交所将于2023年2月20日至3月3日，接收主板首发、再融资、并购重组在审企业申请，并按在中国证监会的审核和受理顺序接续审核。自2023年3月4日始接收主板新申报企业申请。科创板申报受理和审核工作正常推进，在审企业应于2023年3月10日前提交符合新规的专项说明和核查意见，并在下一次问询回复或者更新财报时提交更新版申请文件。</p><br><p>　　<a href="/home/theme/zczgzhb/" target="_blank" name="14640" lang="channel" title="全面实行股票发行注册制配套业务规则发布专栏">全面实行股票发行注册制配套业务规则发布专栏</a></p>
+							</div>
+							<div class="share">分享：
+  <span>
+    <a href="##" class="sinaico"> </a>
+    <a href="##" class="wechatico">
+      <div class="feedback_slide" id="article_qrcode">
+        <s></s>
+        <span class="qrcode_details">微信扫一扫，分享好友</span>
+      </div>
+    </a>
+    <a href="##" class="tencentico"> </a>
+  </span>
+</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!--底部-->
+		<footer>
+    <div class="container">
+        <div class="row el-link">
+            <div class="col-lg-7">
+                <a href="/aboutus/contactus/" target="_blank" title="">联系我们</a>
+                <a href="/home/map/" target="_blank" title="">网站地图</a>
+                <a href="/home/links/" target="_blank" title="">相关链接</a>
+                <a href="/home/legal/" target="_blank" title="">法律声明</a>
+                <a href="/aboutus/sseintroduction/trademark/" target="_blank" title="">注册商标</a>
+                <a href="/home/grxxbhs/" target="_blank" title="">个人信息保护告知书</a>
+            </div>
+            <div class="col-lg-5 d-flex align-items-center">
+                <p class="d-flex flex-column align-items-center icon_wb">
+                    <img src="/xhtml/images/ewm_wb.png"/><span>官方微博</span>
+                </p>
+                <p class="d-flex flex-column align-items-center icon_wx">
+                    <img src="/xhtml/images/ewm_wx.png"/><span>官方微信</span>
+                </p>
+                <p class="d-flex flex-column align-items-center icon_app">
+                    <img src="/xhtml/images/ewm_app.png"/><span>APP下载</span>
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="sse_footer_bg">
+        <style type="text/css">@media (max-width: 1199px){footer .sse_footer_bg>.container ul li a {    font-size: 12px;}}</style>
+<div class="container">
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">党建</a></p>
+<ul>
+  <li><a target="_blank" href="/cpc/news/" title="">党建动态</a></li>
+  <li><a target="_blank" href="/cpc/study/" title="">学习园地</a></li>
+  <li><a target="_blank" href="/cpc/pic/" title="">图文播报</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">发行上市</a></p>
+<ul>
+  <li><a target="_blank" href="/listing/announcement/notification/" title="">审核公告通知</a></li>
+  <li><a target="_blank" href="/listing/disclosure/ipo/" title="">审核信息披露</a></li>
+  <li><a target="_blank" href="/listing/renewal/ipo/" title="">审核项目动态</a></li>
+  <li><a target="_blank" href="/listing/aboutus/home/" title="">关于上市审核中心</a></li>
+  <li><a target="_blank" href="/listing/strategy/" title="">科创战略</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">披露</a></p>
+<ul>
+  <li><a target="_blank" href="/disclosure/dealinstruc/suspension/stock/" title="">交易提示</a></li>
+  <li><a target="_blank" href="/disclosure/announcement/general/" title="">上交所公告</a></li>
+  <li><a target="_blank" href="/disclosure/listedinfo/announcement/" title="">上市公司信息</a></li>
+  <li><a target="_blank" href="/disclosure/magin/announcement/" title="">融资融券信息</a></li>
+  <li><a target="_blank" href="/disclosure/fund/announcement/" title="">基金信息</a></li>
+  <li><a target="_blank" href="/reits/announcements/info/" title="">公募REITs信息</a></li>
+  <li><a target="_blank" href="/disclosure/diclosure/public/dailydata/" title="">交易信息披露</a></li>
+  <li><a target="_blank" href="/disclosure/bond/announcement/bookentry/" title="">债券信息</a></li>
+  <li><a target="_blank" href="/disclosure/optioninfo/update/" title="">股票期权信息</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">监管</a></p>
+<ul>
+  <li><a target="_blank" href="/regulation/supervision/dynamic/" title="">上市公司监管</a></li>
+  <li><a target="_blank" href="/regulation/listing/measures/" title="">发行上市审核监管</a></li>
+  <li><a target="_blank" href="/regulation/bonds/jgdt/" title="">债券监管</a></li>
+  <li><a target="_blank" href="/regulation/trading/dynamic/" title="">交易监管</a></li>
+  <li><a target="_blank" href="/regulation/members/measures/" title="">会员及其他交易参与人监管</a></li>
+  <li><a target="_blank" href="/regulation/review/" title="">自律管理复核</a></li>
+  <li><a target="_blank" href="/regulation/ma/" title="">自律监管与市场服务事项</a></li>
+  <li><a target="_blank" href="/home/sqslzxnew/sqslzxnewsy/" title="">诉求受理中心</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">数据</a></p>
+<ul>
+  <li><a target="_blank" href="/market/stockdata/statistic/" title="">股票数据</a></li>
+  <li><a target="_blank" href="/market/bonddata/overview/day/" title="">债券数据</a></li>
+  <li><a target="_blank" href="/market/funddata/overview/day/" title="">基金数据</a></li>
+  <li><a target="_blank" href="/market/reits/overview/day/" title="">公募REITs数据</a></li>
+  <li><a target="_blank" href="/market/othersdata/margin/sum/" title="">其他数据</a></li>
+  <li><a target="_blank" href="/market/price/trends/" title="">行情信息</a></li>
+  <li><a target="_blank" href="/market/sseindex/overview/" title="">上证系列指数</a></li>
+  <li><a target="_blank" href="http://www.csindex.com.cn/zh-CN/indices/index" title="">中证系列指数</a></li>
+  <li><a target="_blank" href="https://www.cesc.com/sc/index.html" title="">中华系列指数</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">产品</a></p>
+<ul>
+  <li><a target="_blank" href="/assortment/stock/home/" title="">股票与存托凭证</a></li>
+  <li><a target="_blank" href="/assortment/fund/home/" title="">基金</a></li>
+  <li><a target="_blank" href="/assortment/bonds/home/" title="">债券</a></li>
+  <li><a target="_blank" href="/assortment/options/home/" title="">股票期权</a></li>
+  <li><a target="_blank" href="/reits/home/" title="">公募REITs</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">服务</a></p>
+<ul>
+  <li><a target="_blank" href="/services/listingwithsse/home/" title="企业上市服务">企业上市服务</a></li>
+  <li><a target="_blank" href="/ipo/home/" title="">IPO业务专栏</a></li>
+  <li><a target="_blank" href="/services/hkexsc/home/" title="">沪港通</a></li>
+  <li><a target="_blank" href="/services/greensecurities/home/" title="">绿色证券专栏</a></li>
+  <li><a target="_blank" href="/services/tradingservice/process/" title="">交易服务</a></li>
+  <li><a target="_blank" href="/services/tradingtech/notice/" title="">交易技术支持专区</a></li>
+  <li><a target="_blank" href="/services/tradingservice/charge/ssecharge/" title="">收费及代收税费</a></li>
+  <li><a target="_blank" href="/services/investors/designatedtxn/" title="">投资者服务</a></li>
+  <li><a target="_blank" href="/services/listing/xyzr/" title="">上市公司服务</a></li>
+  <li><a target="_blank" href="//roadshow.sseinfo.com/" title="">路演服务</a></li>
+  <li><a target="_blank" href="/home/biz/cnsca/" title="">技术服务</a></li>
+  <li><a target="_blank" href="/services/information/delisting/" title="">信息服务</a></li>
+  <li><a target="_blank" href="//pujiang.sse.com.cn/" title="">培训服务</a></li>
+  <li><a target="_blank" href="/services/judicia/" title="">司法服务</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">规则</a></p>
+<ul>
+  <li><a target="_blank" href="/lawandrules/rules/law/securities/" title="">法律法规</a></li>
+  <li><a target="_blank" href="/lawandrules/regulations/csrcorder/" title="">部门规章</a></li>
+  <li><a target="_blank" href="/lawandrules/sselawsrules2025/overview/" title="">本所业务规则</a></li>
+  <li><a target="_blank" href="/lawandrules/guide/latest/" title="本所业务指南与流程">本所业务指南与流程</a></li>
+  <li><a target="_blank" href="/lawandrules/publicadvice/" title="">公开征求意见</a></li>
+  <li><a target="_blank" href="/lawandrules/assemble/" title="">制度规则汇编</a></li>
+</ul>
+</div>
+<div class="foot_nav">
+<p class="foot_nav_t"><a title="">关于</a></p>
+<ul>
+  <li><a target="_blank" href="/aboutus/sseintroduction/introduction/" title="">本所介绍</a></li>
+  <li><a target="_blank" href="/aboutus/mediacenter/hotandd/" title="">媒体中心</a></li>
+  <li><a target="_blank" href="/aboutus/cooperation/siccce/info/" title="">国际交流与合作</a></li>
+  <li><a target="_blank" href="/aboutus/recruitment/sse/" title="">招聘信息</a></li>
+  <li><a target="_blank" href="/aboutus/contactus/" title="">联系我们</a></li>
+  <li><a target="_blank" href="/aboutus/research/latest/" title="">研究</a></li>
+  <li><a target="_blank" href="/aboutus/socialresponsibility/" title="">社会责任</a></li>
+  <li><a target="_blank" href="//foundation.sse.com.cn/" title="">公益慈善</a></li>
+  <li><a target="_blank" href="//csm.sse.com.cn/" title="">中国证券博物馆</a></li>
+  <li><a target="_blank" href="/aboutus/publication/monthly/overview/" title="">刊物</a></li>
+</ul>
+</div>
+</div>
+
+        <div class="sse_foot_oth_main">
+            <div class="container sse_foot_oth" style="align-items: center;">
+                <p class="sse_oth_l">400投资者服务热线： 400-8888-400</p>
+                <div class="sse_oth_r" style="text-align: center;">
+                    <p class="jian_yi"></p>
+                    <p>
+                        <span class="supipv">上海证券交易所官网现已支持 <i>IPV<em>6</em></i></span><span>
+                            ©上海证券交易所版权所有 2020
+                            <a target="_blank" href="https://beian.miit.gov.cn/">沪ICP备05004045号-2</a>
+                            <a target="_blank" href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31011502016333"
+                                style="display: inline-block; text-decoration: none">
+                                <span style="margin: 0px 0px 0px 5px"><img src="/xhtml/images/beian.png" /> 沪公网安备 31011502016333号</span>
+                            </a>
+                            <a href="https://bszs.conac.cn/sitename?method=show&id=273B49C66A3F20DDE06310291AACA667" target="_blank"><img id="imgConac" vspace="0" hspace="0" border="0" height="25" src="/xhtml/images/conacb.png" data-bd-imgshare-binded="1"></a>
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
+<div class="js_footer">
+    <script type="text/javascript">
+        var require = {
+            //js file version,pls change it with any updating
+            urlArgs: "v=ssesite_V3.8.0_20260828",
+        };
+        var webVersion = require.urlArgs;
+        var inspectMgr = (function () {
+            //wait for static inspect timeout
+            var staticIndex = 1; /*index=0 use the static,otherwise use the local site file*/
+            var waitMilliSeconds = 300;
+            var isIE = document.all && !window.atob;
+            if (isIE) {
+                var isIE8 = "\v" == "v";
+                if (isIE8) {
+                    waitMilliSeconds = 400;
+                } else {
+                    waitMilliSeconds = 350;
+                }
+            } else {
+                waitMilliSeconds = 300;
+            }
+            return {
+                getWaitMilliSeconds: function () {
+                    return waitMilliSeconds;
+                },
+                getStaticIndex: function () {
+                    return staticIndex;
+                }
+            };
+        })();
+    </script>
+    <script src="/xhtml/js/lib/require.js" data-main="/xhtml/js/app/main_2021"></script>
+</div>
+	</body>
+
+</html>

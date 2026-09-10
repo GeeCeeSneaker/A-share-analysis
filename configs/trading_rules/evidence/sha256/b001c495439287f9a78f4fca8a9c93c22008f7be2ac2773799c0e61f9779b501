@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+    <meta charset="utf-8">
+<!--   <title>深交所主页</title>   -->
+<title>深交所投教丨投资者服务热线问答（2023年第2期）关于主板股票交易（上）</title>
+<script>
+  if(location.protocol == 'https:'){
+    document.write('<link href="https://res.szse.cn/common/images/favicon.ico" rel="shortcut icon" type="image/x-icon" />');
+  }else{
+    document.write('<link href="http://res.static.szse.cn/common/images/favicon.ico" rel="shortcut icon" type="image/x-icon" />');
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0" />
+<meta http-equiv="cache-control" content="max-age=0">
+<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="expires" content="0">
+<meta http-equiv="expires" content="Web, 26 Feb 1997 08:21:57 GMT">
+<meta http-equiv="pragma" content="no-cache">
+<meta name="author" content="inverstor.szse.cn">
+<meta name="description" content="投资者教育">
+<meta name="keywords" content="投资者教育,投教,深交所">
+<meta name="renderer" content="webkit">
+<meta name="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="google" value="notranslate">
+<meta name="format-detection" content="telephone=no">
+<meta name="format-detection" content="email=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="screen-orientation" content="portrait">
+<meta name="full-screen" content="yes">
+<meta name="browermode" content="application">
+<meta name="x5-orientation" content="portrait">
+<meta name="HandheldFriendly" content="true">
+<script type="text/javascript">
+	var u = navigator.userAgent;
+	var isAndroid = u.indexOf('Android') > -1 || u.indexOf('Adr') > -1;//android终端
+
+	function addElementMeta(name,  content) {
+		var head = document.getElementsByTagName('head')[0];
+		var meta = document.createElement('meta');
+
+		meta.setAttribute('name', name);
+		meta.setAttribute('content', content);
+		head.appendChild(meta);
+	}
+	if(isAndroid) {
+		addElementMeta('x5-fullscreen', 'true');
+		addElementMeta('x5-page-mode', 'app');
+	}
+</script>
+<script>
+  (function () {
+    var _versionDate = new Date().getTime();
+    if (location.protocol == 'https:') {
+      var _path = 'https://res.szse.cn';
+    } else {
+      var _path = 'http://res.static.szse.cn';
+    }
+    // _path = _path.replace(".static.", ".");
+    //var _path = 'http://res.szse.cn';
+    //document.write( " <script src='" + _path + "/common/js/first.js?random=" + _versionDate + "'> <\/script> ");
+    var _host = 'http://www.szse.cn';
+    if (location.protocol == 'https:') {
+      _host = 'https://www.szse.cn';
+    }
+
+
+    var backDomain = 'http://www.sse.org.cn'
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    if (backDomain && window.location.host.match(reg)[2] === backDomain.match(reg)[2]) {
+      _host = 'http://www.sse.org.cn';
+      _path = 'http://res.static.sse.org.cn';
+      if (location.protocol == 'https:') {
+        _host = 'https://www.sse.org.cn';
+        _path = 'https://res.static.sse.org.cn';
+      }
+
+    }
+
+    _path = _path.replace(".static.", ".");
+
+    document.write(" <script src='" + _host + "/szsePath.js?random=" + _versionDate + "'> <\/script> "
+      + " <script src='" + _path + "/common/js/concatversion.js?random=" + _versionDate + "'> <\/script> ");
+  }());
+</script>
+
+<script>
+
+  function backDomainLinkSwitch(value, type) {
+    var _port = location.port ? (":" + location.port) : "";
+    var reg = /([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+)\.?(:\d+)?/;
+    var urlRegx = /(.*)(http:|https:)(\/\/)(([a-zA-Z0-9][-a-zA-Z0-9]{0,62})((\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+))\.?(:\d+)?(.*)/;
+
+    // html字符串替换
+    if (type == 'str') {
+      var strArr = value.split("=");
+      strArr = strArr.map(function (v) {
+        var host = reg.test(v) ? v.match(reg)[0] : null;
+        if (pathObj.szseHosts.indexOf(host) > -1) {
+          if (window.location.protocol == 'https:' && urlRegx.test(v)) {
+            v = v.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+          };
+          if (pathObj.current_host === pathObj.back_host) {
+            v = v.replace(pathObj.main_host, pathObj.back_host);
+          }
+        }
+        return v
+      });
+      value = strArr.join("=");
+      return value;
+    }
+
+    // a标签地址替换
+    if (type === 'A') {
+      var eleA = document.querySelectorAll(value);
+      for (var i = 0; i < eleA.length; i++) {
+        var href = eleA[i].getAttribute("href");
+        var host = reg.test(href) ? href.match(reg)[0] : null;
+        if (href && pathObj.szseHosts.indexOf(host) > -1) {
+          if (window.location.protocol == 'https:') {
+            href = href.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+          };
+          if (pathObj.current_host === pathObj.back_host) {
+            href = href.replace(pathObj.main_host, pathObj.back_host);
+          }
+          eleA[i].setAttribute('href', href);
+        }
+      }
+    }
+
+    // 单链接替换
+    if (type === "link") {
+      if (window.location.protocol == 'https:' && !!value) {
+        value = value.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+      };
+      if (pathObj.current_host === pathObj.back_host) {
+        var host = reg.test(value) ? value.match(reg)[0] : null;
+        if (value && pathObj.szseHosts.indexOf(host) > -1) {
+          value = value.replace(pathObj.main_host, pathObj.back_host);
+        }
+      }
+      return value;
+    }
+
+    // 背景图地址更换
+    if (type === "background") {
+      var eleBg = document.querySelectorAll(value);
+      for (var i = 0; i < eleBg.length; i++) {
+        var href = eleBg[i].style.backgroundImage;
+        if (window.location.protocol == 'https:' && !!href) {
+          href = href.replace(urlRegx, '$1https:$3$4' + _port + '$9');
+        };
+        var host = reg.test(href) ? href.match(reg)[0] : null;
+        if (href && pathObj.szseHosts.indexOf(host) > -1) {
+          if (pathObj.current_host === pathObj.back_host) {
+            href = href.replace(pathObj.main_host, pathObj.back_host);
+          }
+          eleBg[i].style.backgroundImage = href;
+        }
+      }
+    }
+
+  }
+
+</script>
+
+<script>
+   if(document.cookie.indexOf('ft_language=1')>-1){
+    var style = document.createElement('style');
+    style.textContent='body{visibility:hidden;}';
+    document.head.appendChild(style);
+  }
+</script>
+<script>
+    addComCssFile();
+    changeVertion('/investor/common/css/common.css', 'css');
+</script>
+<script>
+        changeVertion('/modules/report/css/report.css', 'css');
+        changeVertion('/modules/aboutus_column/introduction/css/journal.css', 'css');
+    </script>
+
+   <style>
+.audio-container audio{ width:100%;}
+</style>
+</head>
+  <body class="article-body">
+   <script>
+  navMenuAJAX('/application/publicindex/header/index.html', '/application/publicindex/header/index.html', 'header', 'investor');
+</script>
+<div class="g-locationnav">
+    <div class="banner-wrap">
+      <img src="http://res.static.szse.cn/investor/common/images/investlocation-banner.jpg" />
+    </div>
+    <div class="g-container">
+      <div class="g-banner-txt">
+            <h2 class="hidden-xs">专题问答</h2>
+            <p>
+              <span class="glyphicon glyphicon-map-marker"></span>位置：<a href="../../" class="CurrChnlCls">投资者教育</a>/<a href="../" class="CurrChnlCls">投资者问答</a>/<a href="./" class="CurrChnlCls">专题问答</a>
+            </p>
+          </div>
+    </div>
+</div>
+   
+  
+      <div class="g-container-wrap">
+            <div class="g-container">
+<!--startprint-->
+                <div class="news-detail-con g-conbox"> 
+                    <div class="des-header">
+                        <h2 class="title">深交所投教丨投资者服务热线问答（2023年第2期）关于主板股票交易（上）</h2>
+                        <script>
+                            var curSubTitle ='';
+                            if(curSubTitle != ''){
+                                document.write('<h4 class="sub-title text-center"><span class="">'+curSubTitle+'</span></h4>')
+                            }                       
+                        </script>
+                        <div class="time">时间：<span>2023-03-06</span></div>
+                        <div class="des-switchsize">
+                          字体：
+                          <span class="bigger">大</span>
+                          <span class="medium">中</span>
+                          <span class="smaller">小</span>
+                        </div>                        
+                        
+            </div>
+                     <div class="des-content" id="desContent">
+                       <p class="MsoNormal" align="center" style="margin: 15.6pt 0cm; line-height: 200%; text-align: left; font-size: 16px; text-indent: 2em;"><span style="font-family: 宋体; font-size: 12pt; text-indent: 24pt;">编者按：近期，较多投资者通过深交所投资者服务热线（</span><span lang="EN-US" style="font-family: 宋体; font-size: 12pt; text-indent: 24pt;">400-808-9999</span><span style="font-family: 宋体; font-size: 12pt; text-indent: 24pt;">）咨询关于注册制下主板股票交易的相关事宜。为帮助投资者进一步了解相关规则，我们整理了近期投资者关注的问题，供投资者参考。</span></p>
+<p class="MsoNormal" style="line-height: 200%; layout-grid-mode: char; mso-layout-grid-align: none;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%; layout-grid-mode: char; mso-layout-grid-align: none;"><b style="mso-bidi-font-weight: normal;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">1. </span></b><b style="mso-bidi-font-weight: normal;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">《深圳证券交易所交易规则（<span lang="EN-US">2023</span>年修订）》何时起施行？<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;">答：《深圳证券交易所交易规则（<span lang="EN-US">2023</span>年修订）》自按照《首次公开发行股票注册管理办法》发行的首只主板股票上市首日起施行。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%; layout-grid-mode: char; mso-layout-grid-align: none;"><b style="mso-bidi-font-weight: normal;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;"><o:p>&nbsp;</o:p></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%; layout-grid-mode: char; mso-layout-grid-align: none;"><b style="mso-bidi-font-weight: normal;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">2. </span></b><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">主板股票的涨跌幅比例是多少？</span></b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;"><o:p></o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;">答：首次公开发行上市的主板股票，上市后的前<span lang="EN-US">5</span>个交易日不设价格涨跌幅限制，此后价格涨跌幅限制比例为<span lang="EN-US">10%</span>。主板退市整理股票价格涨跌幅限制比例为<span lang="EN-US">10%</span>，主板风险警示股票价格涨跌幅限制比例为<span lang="EN-US">5%</span>。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="margin-left: 10.5pt; mso-para-margin-left: 1.0gd; text-indent: 12.0pt; mso-char-indent-count: 1.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">3.</span></b><b style="mso-bidi-font-weight: normal;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;"> </span></b><b style="mso-bidi-font-weight: normal;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">投资者通过竞价交易<span style="mso-bidi-font-weight: bold;">方式参与主板股票交易</span>，在申报数量方面有何规定？<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">答：投资者通过竞价交易买卖主板股票的，</span><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">单笔申报数量不得超过<span lang="EN-US">100</span>万股。</span><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;"><o:p></o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;">投资者</span><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">通过<span style="mso-bidi-font-weight: bold;">竞价交易</span>买入主板股票时，申报数量仍为<span lang="EN-US">100</span>股或其整数倍。卖出时余额不足<span lang="EN-US">100</span>股的部分，应当一次性申报卖出。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">4.</span></b><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">主板股票集合竞价期间的有效申报价格范围是如何规定的？<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;">答：投资者通过竞价交易方式</span><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">买卖无价格涨跌幅限制的主板股票，开盘集合竞价期间的有效申报价格范围为即时行情显示的前收盘价的<span lang="EN-US">900%</span>以内，盘中临时停牌期间、收盘集合竞价期间的有效申报价格范围为最近成交价的上下<span lang="EN-US">10%</span>，收盘集合竞价在有效申报价格范围内进行撮合。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">（温馨提示：即时行情显示的前收盘价为该证券上一交易日的收盘价；首次公开发行股票上市首日，其即时行情显示的前收盘价为其发行价。）</span><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;"><o:p></o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">投资者通过竞价交易方式买卖有价格涨跌幅限制的主板股票，集合竞价期间的有效申报价格范围与涨跌幅限制范围一致，在价格涨跌幅限制以内的申报为有效申报，超过涨跌幅限制的申报为无效申报。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">5.</span></b><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">主板股票连续竞价阶段限价申报的有效申报价格范围是如何规定的？<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;">答：</span><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">投资者通过竞价交易方式买卖主板股票，连续竞价阶段限价申报的有效竞价范围，应当符合下列要求：<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">（一）买入申报价格不得高于买入基准价格的<span lang="EN-US">102%</span>和买入基准价格以上十个申报价格最小变动单位的孰高值；<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">（二）卖出申报价格不得低于卖出基准价格的<span lang="EN-US">98%</span>和卖出基准价格以下十个申报价格最小变动单位的孰低值。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">买入（卖出）基准价格，为即时揭示的最低卖出（最高买入）申报价格；无即时揭示的最低卖出（最高买入）申报价格的，为即时揭示的最高买入（最低卖出）申报价格；无即时揭示的最高买入（最低卖出）申报价格的，为最近成交价；当日无成交的，为前收盘价。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">开市期间临时停牌阶段的限价申报，不适用前两款规定。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="line-height: 200%; mso-pagination: widow-orphan; background: white;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">6. </span></b><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">如何理解</span></b><b style="mso-bidi-font-weight: normal;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">“买入申报价格不得高于买入基准价格的<span lang="EN-US">102%</span>和买入基准价格以上十个申报价格最小变动单位的孰高值”？ <span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">答：“买入基准价格”是指即时揭示的最低卖出申报价格；如无即时揭示的最低卖出申报价格，则是即时揭示的最高买入申报价格；如无即时揭示的最高买入申报价格，则是最近成交价；如当日无成交的，则是前收盘价。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">“十个申报价格最小变动单位”是指<span lang="EN-US">10</span>×<span lang="EN-US">0.01</span>元<span lang="EN-US">=0.1</span>元，股票申报价格最小变动单位为<span lang="EN-US">0.01</span>元。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">举个例子，在连续竞价阶段，投资者计划买入主板股票<span lang="EN-US">X</span>，若此时即时揭示的最低卖出申报价格为<span lang="EN-US">10</span>元<span lang="EN-US">/</span>股，那么，“买入基准价格”为<span lang="EN-US">10</span>元<span lang="EN-US">/</span>股，“买入基准价格的<span lang="EN-US">102% </span>”为<span lang="EN-US">10</span>×<span lang="EN-US">102%=10.2 </span>元<span lang="EN-US">/</span>股，“买入基准价格以上十个申报价格最小变动单位<span lang="EN-US">”</span>为<span lang="EN-US">10+10</span>×<span lang="EN-US">0.01=10.1</span>元<span lang="EN-US">/</span>股，<span lang="EN-US">10.2</span>＞<span lang="EN-US">10.1</span>，故投资者的买入申报价格就不得高于<span lang="EN-US">10.2</span>元<span lang="EN-US">/</span>股。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%; tab-stops: 57.75pt;"><b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">7. </span></b><b style="mso-bidi-font-weight: normal;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">如何理解“卖出申报价格不得低于卖出基准价格的<span lang="EN-US">98%</span>和卖出基准价格以下十个申报价格最小变动单位的孰低值”？ <span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">答：</span><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;">“卖出基准价格”是指即时揭示的最高买入申报价格；如无即时揭示的最高买入申报价格，则是即时揭示的最低卖出申报价格；如无即时揭示的最低卖出申报价格，则是最近成交价；如当日无成交的，则是前收盘价。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">“十个申报价格最小变动单位”是指<span lang="EN-US">10</span>×<span lang="EN-US">0.01</span>元<span lang="EN-US">=0.1</span>元，股票申报价格最小变动单位为<span lang="EN-US">0.01</span>元。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;">举个例子，在连续竞价阶段，投资者计划卖出所持有的主板股票<span lang="EN-US">X</span>，若此时无即时揭示的最高买入申报价格，也无即时揭示的最低卖出申报价格，而股票<span lang="EN-US">X</span>最新成交价为<span lang="EN-US">10</span>元<span lang="EN-US">/</span>股，那么，“卖出基准价格”为<span lang="EN-US">10</span>元<span lang="EN-US">/</span>股，“卖出基准价格的<span lang="EN-US">98%</span>”为<span lang="EN-US">10</span>×<span lang="EN-US">98%=9.8</span>元<span lang="EN-US">/</span>股，“卖出基准价格以下十个申报价格最小变动单位<span lang="EN-US">”</span>为<span lang="EN-US">10-10</span>×<span lang="EN-US">0.01=9.9</span>元<span lang="EN-US">/</span>股，<span lang="EN-US">9.8</span>＜</span><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">9.9</span><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast;">，故投资者的卖出申报价格就不得低于<span lang="EN-US">9.8</span>元<span lang="EN-US">/</span>股。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="line-height: 200%; mso-pagination: widow-orphan; background: white;"><b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;"><o:p>&nbsp;</o:p></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.1pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">8. </span></b><b><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">投资者参与主板股票竞价交易，提交的申报超出有效申报价格范围，是无效申报还是暂存交易主机？<span lang="EN-US"><o:p></o:p></span></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;">答：超过涨跌幅限制价格或有效申报价格范围的申报为无效申报，即该笔申报将会被交易系统自动拒单。<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="line-height: 200%; mso-pagination: widow-orphan; background: white;"><b><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;"><o:p>&nbsp;</o:p></span></b></p>
+<p class="MsoNormal" style="text-indent: 24.0pt; mso-char-indent-count: 2.0; line-height: 200%; mso-pagination: widow-orphan; background: white;"><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR; mso-bidi-font-weight: bold;">（免责声明：本栏目问答仅为投资</span><span style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;">者教育之目的而发布，不构成投资建议。投资者据此操作，风险自担。深圳证券交易所力求本栏目问答所涉及信息准确可靠，但并不对其准确性、完整性和及时性作出任何保证，对因使用本栏目问答引发的损失不承担责任。）<span lang="EN-US"><o:p></o:p></span></span></p>
+<p class="MsoNormal" style="line-height: 200%; mso-pagination: widow-orphan; background: white;"><b style="mso-bidi-font-weight: normal;"><span lang="EN-US" style="font-size: 12.0pt; line-height: 200%; font-family: 宋体; mso-ascii-theme-font: minor-fareast; mso-fareast-theme-font: minor-fareast; mso-hansi-theme-font: minor-fareast; mso-bidi-font-family: 仿宋; color: black; mso-themecolor: text1; background: white; mso-font-kerning: 0pt; mso-bidi-language: AR;"><o:p>&nbsp;</o:p></span></b></p>
+                    </div>
+                    <script>
+                        var oldCon = document.getElementById("desContent").innerHTML;
+                        oldCon = oldCon.replace(/(o:p)|(u:p)/gi,'span');
+                        oldCon = oldCon.replace(/&lt;!--\[endif\]--&gt;/g,"");
+                        document.getElementById("desContent").innerHTML = oldCon;
+                    </script>
+<!--endprint-->
+                    <div class="des-footer">
+                        <div class="article-page display-none">
+                    
+
+                        </div>
+                        <div class="article-btn">
+                            <a href="javascript:void(0);" class="btn btn-gray art-print">打印</a>
+                            <a href="javascript:void(0);" target="_blank" class="btn btn-gray ml10 art-collect">收藏</a>
+                            <a href="javascript:void(0);" class="btn btn-gray ml10 art-close">关闭</a>
+                        </div>
+                    </div>  
+                </div>
+     
+            </div>
+      </div>
+
+    <script>
+  changeVertion('/common/js/toggleBig5.js', 'js');
+  navMenuAJAX('/application/publicindex/footer/index.html', '/application/publicindex/footer/index.html', 'footer', 'investor');
+  addComJsFile();
+  changeVertion('/investor/common/js/common.js', 'js');
+</script>
+ 
+   <script>
+        var articleDetail = {
+            docTitle:'深交所投教丨投资者服务热线问答（2023年第2期）关于主板股票交易（上）',
+            subDocTitle:'',
+            docAbstract:'',
+            articleId:'599093',
+            channelCode:'rxwd_ztwd_news',
+            channelId : '13086'
+        }
+    </script>
+    <script>
+        changeVertion('/common/js/articleDetail.js','js');
+    </script>
+  </body>
+</html>

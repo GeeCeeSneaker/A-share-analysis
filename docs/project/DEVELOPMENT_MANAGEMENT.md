@@ -1,3 +1,29 @@
+## DM-20260910-TRADING-RULE-H1R3-007 · 补齐创业板 2020-08-24 日期来源合同
+
+**Type**：C1 — immutable candidate/source-contract correction
+**Date**：2026-09-10
+**Status**：`H1R3 CANDIDATE STAGED / 20-SOURCE EXACT SET / BUNDLE VERIFIED / INDEPENDENT REVIEW RETRY PENDING / HUMAN REVIEW PENDING / FORMAL ENTRY PROHIBITED`
+
+**依据**：PR #36 独立实质审阅确认 H1R2 的工程执行面已通过，但指出 H1R2 的创业板来源没有一手原文直接证明 `2020-08-24` 这个精确切换日。该日期同时是四条 CHINEXT 规则的边界，不能只由“改革前后”语义推导。
+
+**已完成**
+
+- 从 clean `main@e096b0364d3dc5a00e21879fe5bd8fc4a758b07f` 新建 `v20260910-h1r3-compiled`；dataset version `2026-09-10.1`，14 条，`COMPILED`、非 `ACTIVE`，manifest-style hash `f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`。
+- 仅向 `CHINEXT_PRE_REGISTRATION_NORMAL`、`CHINEXT_PRE_REGISTRATION_ST`、`CHINEXT_REGISTRATION`、`CHINEXT_REGISTRATION_FIRST5` 的 `source_ref` 增加深交所 2020-08-21 官方问答；规则数值、适用范围、effective dates 和解析语义不变。
+- 新增来源原始 HTML `direct_17.html`：官方 URL `https://www.szse.cn/aboutus/trends/news/t20200821_580924.html`，HTTP 200，34,508 bytes，SHA-256 `cba74610a5c582e2ac94f3bb21a04f2e5fa1fa175131b0cd287f9bbfc311b1ae`。原文明确写出《特别规定》自 2020-08-24 起正式施行及创业板存量股票涨跌幅调整为 20%。
+- H1R3 input/catalog 和证据发布载荷已重建：20 个唯一来源、20 个去重 raw artifact、1,736,924 bytes；canonical bundle 18,181 bytes，ref/hash `sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`。H1R2 旧 canonical bundle 未在当前 checkpoint 保留为孤立输出，原有 raw 仅按字节复用。
+- `prepare_rule_evidence_bundle()`、`validate_rule_evidence_bundle()`、H1R3 source-contract 回归和原有测试均通过；执行记录、来源目录和 H1R3 人工审阅表已写入仓库。
+
+**未完成与硬边界**
+
+- H1R3 的 14 条人工原文审阅仍为 `待填`；机器校验不等于人工 `APPROVE`。
+- 未运行 `scripts/rules/review.py --candidate`，未创建 REVIEWED，未切换 ACTIVE，未启动或消耗 Formal Production；B1-B7 继续禁止。
+- 账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+
+**项目文件**：[`TradingRule_H1R3 来源合同修正执行记录`](../design/TradingRule_H1R3来源合同修正执行记录_20260910.md)、[`H1R3 人工审阅操作表`](../design/TradingRule_H1R3_人工审阅操作表_20260910.md)、[`H1R3 evidence input`](../provider_verification/trading_rule_h1r3_evidence_input_20260910.json)、[`H1R3 source catalog`](../provider_verification/trading_rule_h1r3_source_catalog_20260910.json)。
+
+**下一步**：将 PR #36 重述为 H1R3 source-contract checkpoint，等待独立 Reviewer 接受四条创业板日期覆盖、20-source exact set、candidate/bundle/raw 不可变性和 CI；合并后再进行 14/14 人工审阅并另开最终 evidence/seal PR。Formal 入口只能在 REVIEWED 合并且从届时最新 clean main 完成 preflight 后重新评估。
+
 ## DM-20260909-TRADING-RULE-H1R2-006 · H1R2 来源合同与范围收缩整改
 
 **Type**：C1 — immutable candidate/source-contract correction
@@ -5845,3 +5871,25 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - SSE 官方市场史：[链接](https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170577/files/ae3c4a6d91b74aacbddc96a4d600f06f.pdf)；SZSE 官方 1998 年大事记：[链接](https://www.szse.cn/aboutus/sse/events/t20070328_497832.html)。这些来源已进入候选 required URL contract，但原始 bytes 尚未纳入 H1 evidence，完整法律生效日仍须独立 Reviewer 实际核验。
 - 人工审阅表和 template 已同步为 14 条；旧 compiled、ACTIVE pointer、Golden v7/evidence/receipt 不变。确认该 P0 前仍禁止 REVIEWED、ACTIVE、run_id 和 B1-B7。
 - 本地全量 `uv run pytest -q` 退出码为 0（1,654 项收集、2 项既有跳过、无失败）；Ruff、format、mypy、`uv pip check` 和 `git diff --check` 均通过。GitHub Actions CI run `34310188331` / #490 的 Ubuntu 3.14、Windows 3.14、Windows 3.12 全部成功。
+## DM-20260909-TRADING-RULE-H1R2-007 · 合并后独立 evidence/seal 执行准备
+
+**Type**：C2 — real first-party evidence materialization and review preparation
+**Date**：2026-09-09
+**Status**：`EVIDENCE MATERIALIZED / BASELINE VERIFIED / BUNDLE VERIFIED / HUMAN REVIEW PENDING / NOT SEALED / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED`
+
+**执行基线**：PR #35 已合并，clean `main` 为 `e096b0364d3dc5a00e21879fe5bd8fc4a758b07f`。重新运行 `load_active_rules()` 后，ACTIVE 仍为 `v20260824-compiled` / `COMPILED`，dataset hash 为 `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8`。
+
+**已完成**
+
+- H1R2 `v20260909-h1r2-compiled` 保持非 ACTIVE、`COMPILED`、14 条，候选 manifest-style hash 为 `6cb355fdaf5f9cc5fe2da09d9d0ecce18ee1e04378a42a25515364fd4019c55f`。
+- 从候选 `source_ref` 精确派生 19 个 required official URL；canonical `RULE_EVIDENCE_BUNDLE.v1` 与 19 个 raw artifact 已写入 `configs/trading_rules/evidence/sha256/`。
+- bundle 为 16,557 bytes，ref/hash 为 `sha256/14f09ed0707b0ef1d84ae2dbe880f87bdd186d0c21e61e6387f26fa41bd403d0`；raw artifact 合计 1,702,416 bytes。`validate_rule_evidence_bundle()` 已通过。
+- 完整 artifact/ref/bytes/规则映射见 [`TradingRule_H1R2证据封印执行记录_20260909.md`](../design/TradingRule_H1R2证据封印执行记录_20260909.md)。
+
+**未完成与硬边界**
+
+- 14 行人工审阅表仍待实际打开 raw artifact 后填写；当前没有伪造的 `APPROVE`/`REJECT`、reviewer marker 或 `REVIEWED` provenance。
+- 未运行 `scripts/rules/review.py --candidate`，未创建 REVIEWED、未切换 ACTIVE，未启动/重试/消耗 Formal Production；Golden v7 和旧 parent/candidate 未修改。
+- 必须先完成 14/14 人工原文裁决，再由独立 Reviewer 复核来源、hash lineage、两个 COMPILED candidate 和旧 ACTIVE 不可变性；之后才允许运行一次性 seal。
+
+**下一步**：将本记录、bundle、raw artifact 和人工审阅表提交为独立 evidence/seal PR；审阅与后续 seal 完成并独立合并前，Formal Production B1-B7 继续禁止。账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
