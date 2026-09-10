@@ -1,3 +1,26 @@
+## 2026-09-10 · H1R4 REVIEWED 头部声明修正与最终重封存
+
+> 状态：**H1R4 REVIEWED REBUILT / ACTIVE MOVED ATOMICALLY / FINAL PR INDEPENDENT REVIEW AND CI PENDING / FORMAL ENTRY PROHIBITED**
+
+- 独立 Reviewer review `5164029288`（针对 PR #38 head `6440f595516fe20d7013d0dac1728a19bb1157a0`）发现一个非业务语义阻断：此前未合并 REVIEWED 文件仍保留候选版开头的 `candidate` / `not ACTIVE` 状态注释。该旧产物只存在于未合并分支，未改动 `main`；旧 reviewed dataset hash `b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b` 已明确视为被替换的 pre-merge 产物。
+- `_build_reviewed_text()` 现在先识别候选文件的 leading comment block；仅当其中含候选状态声明时，替换为不绑定具体 H1 版本的真实头部：`Trading Rule REVIEWED artifact. ACTIVE selection is controlled by rule_manifest.json.`，其余 YAML 字段、规则身份、source contract 和证据字段均来自同一候选 snapshot。新增生命周期回归断言，禁止 REVIEWED 头部再次出现 `candidate` 或 `not ACTIVE`，同时保留 `owner-authorized-ai-reviewer` marker。
+- 按独立 Reviewer 要求，先将未合并旧 manifest 恢复到 clean `main@1af86215312b088859300521e4bb164f149e3717` 的 COMPILED 父版本并移除旧 reviewed 文件，再从未改动的 H1R4 candidate/evidence 重新构建；固定 candidate seal 命令在修正后仅执行一次。候选 manifest-style hash 仍为 `ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68`，证据身份未变。
+- 新生成 `v20260910-h1r4-reviewed`：14 条、`REVIEWED`，reviewed dataset manifest-style SHA-256 为 `b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed`，生成时间 `2026-09-10T07:39:01.623838+00:00`；ACTIVE selector 已原子指向该版本。canonical evidence bundle 仍为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`（18,606 bytes），20 个唯一官方 URL/raw artifact、raw 总字节 1,736,924。
+- 独立只读验证确认新头部无候选状态残留，14 条规则与候选逐条相同，`trading_rule_review_gate(..., require_evidence_bundle=True)` 返回空问题；Ruff check、format、mypy 和聚焦 seal/publish/evidence 回归（27 passed、1 个环境权限相关 skip）通过。新 head 尚未获得最终 CI/独立 Reviewer 结论，不能借用旧 head 的 CI 结果。
+- 未启动或消耗 Formal Production/B1-B7；未运行生产入口。账号、密码、真实 endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 仍未进入 GitHub。
+
+下一步：推送修正后的 PR #38 head，等待三矩阵 required CI 和独立 Reviewer 仅复核本次 transformer/output/manifest delta；在 PASS 与 CI 全绿前保持 Draft，不合并、不进入 Formal。
+
+## 2026-09-10 · H1R4 首次授权 AI 审阅封存（未合并，已被替换）
+
+> 状态：**SUPERSEDED PRE-MERGE ARTIFACT / RETAINED ONLY AS AUDIT HISTORY / NOT THE CURRENT REVIEWED OUTPUT**
+
+- 从合并后的 clean `main@1af86215312b088859300521e4bb164f149e3717` 建立独立 reviewed-seal 分支；封存前先修复 `_build_reviewed_text()` 的生命周期缺陷：候选版多行 `review_note` 不再泄漏到 REVIEWED 副本，并为 `owner-authorized-ai-reviewer` 写入真实的最终封存说明。代码、测试、封存树和本条记录已收敛进最终原子提交 `0756ddccee4256f982c42ba60f17470804337c57`。
+- 封存前完整质量门禁通过：Ruff check、format、mypy，以及 `uv run pytest` 为 `1687 passed, 3 skipped`。封存前只读断言确认 ACTIVE 仍为 `v20260824-compiled`、候选 hash 与 H1R4 证据身份均精确匹配，未发现 REVIEWED 目录或旧候选漂移。
+- 按 Issue #34 固定参数仅执行一次 `scripts/rules/review.py --candidate`；该一次性封存结果纳入原子提交 `0756ddccee4256f982c42ba60f17470804337c57`。新建 `v20260910-h1r4-reviewed`，14 条、`REVIEWED`，manifest-style dataset hash 为 `b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b`，ACTIVE selector 已原子指向该版本。
+- REVIEWED provenance 为 `owner-authorized-ai-reviewer`；canonical evidence bundle 为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`（18,606 bytes），20 个唯一官方 URL/raw artifact、raw 总字节 1,736,924。封存后 `trading_rule_review_gate(..., require_evidence_bundle=True)` 与独立证据重算均为空问题；候选、旧 ACTIVE 和旧 COMPILED 版本字节不变。
+- 封存后 H1 生命周期/证据完整性/精确字节聚焦回归通过；未启动生产入口、未创建或消耗 Formal Production run，B1-B7 继续禁止。最终 reviewed-seal PR 仍需 GitHub CI 全绿和独立 Reviewer PASS 后才能合并。
+
 ## 2026-09-10 · H1R4 补齐 BSE IPO 日规则逐条来源绑定
 
 > 状态：**H1R4 CANDIDATE STAGED / SOURCE-BINDING DELTA CLOSED LOCALLY / 14-OF-14 OWNER-AUTHORIZED-AI PASS / INDEPENDENT DELTA REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**

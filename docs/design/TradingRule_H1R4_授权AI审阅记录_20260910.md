@@ -11,10 +11,10 @@ Canonical bundle：`sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6b
 
 - **审阅身份**：`owner-authorized-ai-reviewer`。
 - **授权依据**：项目 Owner 在 Issue #34 comment `5612090090` 明确授权助手完成 H1 14 条独立实质核验，并要求仓库 provenance 如实标记为 AI；这不表示项目 Owner 亲自阅读或签署了结果。
-- **实质审阅依据**：PR #37 review `5162234439`，锚定 head `09346df739b8cab756f8b096f75e681495b59f11`，结论为 2020+ 范围 14/14 PASS。
-- **当前状态**：`14/14 SUBSTANTIVE AI PASS / H1R4 BSE-BINDING DELTA INDEPENDENT REVIEW PENDING / NOT SEALED`。
+- **实质审阅依据**：PR #37 review `5162234439` 的 2020+ 14/14 PASS，以及合并前独立 delta re-review `5162769985` 的 PASS/MERGE AUTHORIZED；后者确认 H1R4 BSE binding blocker 已关闭。
+- **当前状态**：`14/14 SUBSTANTIVE AI PASS / REVIEWED REBUILT AFTER INDEPENDENT HEADER FIX / ACTIVE MOVED / FINAL PR INDEPENDENT REVIEW AND CI PENDING`。
 
-本记录是 Owner 授权下的 AI 审阅 provenance，不是“人工审阅”或项目 Owner 本人签署。H1R4 相比 H1R3 只向 `BSE_IPO_DAY_NO_LIMIT.source_ref` 增加既有历史 BSE Trading Rules URL；其他交易语义字段保持一致。因此，在独立 Reviewer 接受该单一 binding delta 前，不把本记录解释为已完成最终 seal。
+本记录是 Owner 授权下的 AI 审阅 provenance，不是“人工审阅”或项目 Owner 本人签署。H1R4 相比 H1R3 只向 `BSE_IPO_DAY_NO_LIMIT.source_ref` 增加既有历史 BSE Trading Rules URL；其他交易语义字段保持一致。独立 Reviewer 已接受该单一 binding delta；最终 seal 仅在本记录所述固定参数和封存后门禁通过后完成，仍需 final reviewed-seal PR 的独立复核与 CI 才能合并。
 
 ## 2. 14 条实质核验结果
 
@@ -33,23 +33,32 @@ Canonical bundle：`sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6b
 | 11 | `STAR_MARKET` | `PASS (AI)` | 《科创板股票交易特别规定》第十八条支持前 5 个交易日后普通交易日涨跌幅 20%；科创板代码/venue mapping 与现行 SSE 规则覆盖相容。 |
 | 12 | `STAR_MARKET_FIRST5` | `PASS (AI)` | 同一规定第十八条支持科创板 IPO 上市后前 5 个交易日不限价，第 6 个交易日为 20%；按交易日计数。 |
 | 13 | `BSE_LIMIT` | `PASS (AI)` | BSE 2021 Trading Rules §3.3.11、§10.6 与 2026 现行规则支持北交所普通交易日 30%，历史起点为 2021-11-15；上市首日由单独规则优先处理。 |
-| 14 | `BSE_IPO_DAY_NO_LIMIT` | `PASS (AI)` | BSE 2021 Trading Rules §3.3.12(a)、§10.6 与 2026 现行规则支持公开发行股票上市首日不限价、后续交易日 30%；H1R4 已将历史 URL 直接加入本行 source contract。该新增 binding 仍待独立 Reviewer 做 delta acceptance。 |
+| 14 | `BSE_IPO_DAY_NO_LIMIT` | `PASS (AI)` | BSE 2021 Trading Rules §3.3.12(a)、§10.6 与 2026 现行规则支持公开发行股票上市首日不限价、后续交易日 30%；H1R4 已将历史 URL 直接加入本行 source contract。独立 delta re-review `5162769985` 已确认该 binding blocker 关闭。 |
 
 以上结果只覆盖项目已经确定的 2020+ 研究范围；不扩展为 1998 年以前的历史法律真值，也不把代码前缀 mapping 误写成交易所正文逐字列举的事实。
 
-## 3. H1R4 单一 delta 的独立复核清单
+## 3. H1R4 单一 delta 的独立复核清单（已完成）
 
-独立 Reviewer 只需复核以下 H1R3→H1R4 变化，不必重新打开其他 13 条已通过的实质材料：
+独立 Reviewer 已按以下范围复核 H1R3→H1R4 变化，不必重新打开其他 13 条已通过的实质材料：
 
 1. `BSE_IPO_DAY_NO_LIMIT.source_ref` 新增且仅新增 `https://www.bse.cn/uploads/6/file/public/202209/20220924123627_d6405jicv9.docx`；
 2. H1R4 evidence input 的第 14 条包含同一 URL 与 `trading_rule_h1_sources/bse_200010919.docx`；
 3. source catalog 将该 byte-identical artifact 绑定到 `BSE_LIMIT` 与 `BSE_IPO_DAY_NO_LIMIT`，其 SHA-256 为 `c63dd4af0f21f13cca0edb9959874e2c909aabbc164fceda1321c57c44725919`；
 4. canonical bundle exact coverage、hash、路径约束和唯一来源计数仍通过，未新增 raw artifact；
-5. H1R3 与 H1R4 的 14 条交易语义字段完全相同，H1R3、ACTIVE、Golden、REVIEWED 和 Formal 状态未被改写；
+5. H1R3 与 H1R4 的 14 条交易语义字段完全相同；H1R3、Golden 和 Formal 状态未被改写，ACTIVE 仅在后述一次性 seal 中从旧 COMPILED 父版本迁移到新 REVIEWED 版本；
 6. 本记录和 CLI 使用 `owner-authorized-ai-reviewer`，没有声称 human reviewer 或 Owner 本人完成阅读。
 
-## 4. 硬边界
+## 4. 封存执行与当前硬边界
 
-- 当前未运行 `scripts/rules/review.py --candidate`，未创建 REVIEWED，未切换 ACTIVE，未运行或消耗 Formal Production/B1-B7。
-- 独立 delta review 未接受前，不得把本记录改成最终 seal 授权；接受后才可从最新 clean main 开立单独 reviewed-seal PR，并按一次性参数运行候选 seal。
+- 独立 Reviewer review `5164029288` 对此前未合并的 PR #38 head `6440f595516fe20d7013d0dac1728a19bb1157a0` 指出 REVIEWED YAML leading comment 仍含 `candidate` / `not ACTIVE`。该旧结果未进入 `main`，旧 dataset hash `b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b` 已标记为 superseded pre-merge artifact。
+- 按 delta 要求，保留 clean `main@1af86215312b088859300521e4bb164f149e3717` 父基线，先去除旧未合并 REVIEWED/manifest 状态；修正 `_build_reviewed_text()` 以泛化替换候选状态 leading comments，并添加禁止 stale header 的生命周期回归。固定 `scripts/rules/review.py --candidate` 命令在修正后仅重新执行一次；候选 `v20260910-h1r4-compiled` 保持 `COMPILED`、非 ACTIVE。
+- 新的 REVIEWED dataset hash 为 `b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed`，生成时间 `2026-09-10T07:39:01.623838+00:00`，`reviewed_by` 为 `owner-authorized-ai-reviewer`；canonical evidence bundle 仍为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`（18,606 bytes），20 个唯一 raw artifact、1,736,924 bytes。候选 hash、规则身份、证据 bundle/raw 和旧父版本均未变。
+- 新 REVIEWED 头部仅为 `Trading Rule REVIEWED artifact. ACTIVE selection is controlled by rule_manifest.json.`；独立读取、14 条规则身份比较、review/evidence gate 均通过。新产物尚未获得最终 PR required CI 与独立 Reviewer PASS。
+- 未运行或消耗 Formal Production/B1-B7；未执行生产入口、Data Sufficiency、Provider capability、backfill、策略/回测或交易。
 - 不包含账号、密码、IP、端口、Token、Cookie、profile、Provider 原始输出或专有 SDK/runtime 文件。
+
+## 5. 最终封存审计摘要
+
+- 修正后封存前/后聚焦质量门禁：Ruff check、format、mypy 通过；H1 lifecycle、publish integrity、exactness 回归 `27 passed`，保留 1 个 Windows symlink 权限相关 skip。旧 head 的全量 CI #516 不作为新 head 的通过证据。
+- 新封存验证：ACTIVE 为 `v20260910-h1r4-reviewed` / `REVIEWED` / 14 条；`trading_rule_review_gate(..., require_evidence_bundle=True)` 返回空问题；REVIEWED YAML 不含候选版 `candidate` / `not ACTIVE` / `Candidate only` / `human-reviewed` 文本，并含最终授权 AI provenance 说明。
+- 当前待完成项仅是 corrected reviewed-seal PR 的 required CI 与独立 Reviewer PASS；在其通过和合并前，Formal B1-B7 仍禁止。

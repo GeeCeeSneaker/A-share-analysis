@@ -1,13 +1,21 @@
 {
-  "rule_version": "v20260824-compiled",
-  "review_status": "COMPILED",
+  "rule_version": "v20260910-h1r4-reviewed",
+  "review_status": "REVIEWED",
   "dataset_files": [
-    "versions/v20260824-compiled/rules.yaml"
+    "versions/v20260910-h1r4-reviewed/rules.yaml"
   ],
-  "dataset_hash": "dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8",
-  "source_version": "SSE/SZSE/BSE public trading rules, consolidated 2026-08",
+  "dataset_hash": "b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed",
+  "source_version": "SSE/SZSE/BSE public trading rules, H1R4 2020+ scoped candidate with exact attachment URL bindings",
+  "dataset_version": "2026-09-10.2",
   "review_provenance": {
-    "source_retrieved_at": "2026-08-24"
+    "reviewed_by": "owner-authorized-ai-reviewer",
+    "reviewed_at": "2026-09-10T07:39:01.623838+00:00",
+    "source_artifact_ref": "sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4",
+    "source_artifact_hash": "115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4",
+    "source_artifact_kind": "EVIDENCE_BUNDLE",
+    "source_retrieved_at": "2026-09-10T07:39:01.623838+00:00",
+    "rule_evidence_bundle_ref": "sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4",
+    "rule_evidence_bundle_hash": "115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4"
   },
-  "dataset_version": "2026-08-24.1"
+  "evidence_contract": "RULE_EVIDENCE_BUNDLE.v1"
 }

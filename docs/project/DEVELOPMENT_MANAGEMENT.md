@@ -1,3 +1,52 @@
+## DM-20260910-TRADING-RULE-H1R4-011 · H1R4 REVIEWED 头部声明修正与最终重封存
+
+**Type**：C1 — corrected reviewed evidence seal and ACTIVE transition
+**Date**：2026-09-10
+**Status**：`H1R4 REVIEWED REBUILT / ACTIVE MOVED ATOMICALLY / FINAL PR INDEPENDENT REVIEW AND CI PENDING / FORMAL ENTRY PROHIBITED`
+
+**已确认事实**
+
+- 独立 Reviewer review `5164029288` 对 PR #38 head `6440f595516fe20d7013d0dac1728a19bb1157a0` 的唯一阻断是 REVIEWED YAML 仍有候选版 leading comments：`candidate` / `not ACTIVE`。旧文件未合并到 `main`，旧 reviewed hash `b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b` 仅作为 superseded pre-merge 记录，不是当前权威产物。
+- `_build_reviewed_text()` 已泛化为：识别并消费候选状态 leading comment block，写入不绑定 H1 版本的 truthful REVIEWED header；规则 YAML、14 条 rule identity、source contract、review provenance 和 evidence bundle 均从同一 hash-checked candidate snapshot 派生。新增回归断言拒绝 REVIEWED 头部的 `candidate` / `not ACTIVE`，保留 `owner-authorized-ai-reviewer`。
+- 重新构建前已将未合并 manifest 恢复到 clean `main@1af86215312b088859300521e4bb164f149e3717` 的 COMPILED 父版本，并只移除旧未合并 reviewed 文件；H1R4 candidate hash `ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68`、旧父版本、evidence input/catalog/raw 和 canonical bundle 未变。修正后固定 candidate seal 命令仅执行一次。
+- 当前 `v20260910-h1r4-reviewed` 为 14 条、`REVIEWED`，manifest-style reviewed dataset hash 为 `b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed`，生成时间 `2026-09-10T07:39:01.623838+00:00`；ACTIVE manifest 已原子指向它。bundle 为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`（18,606 bytes），20 个唯一官方 URL/raw artifact，raw 总字节 1,736,924。
+- 新产物独立读取、候选/REVIEWED 规则身份比较和 `trading_rule_review_gate(..., require_evidence_bundle=True)` 均通过；Ruff、format、mypy 和聚焦 lifecycle/publish/exactness 回归为 27 passed、1 个环境权限相关 skip。旧 PR head 的 CI #516 不作为新 head 的通过证据。
+
+**待完成闸门**
+
+- 将修正后的树推送到 PR #38，等待新 head 对应的 Ubuntu 3.14、Windows 3.12、Windows 3.14 required CI 和独立 Reviewer delta PASS；在两者完成前保持 Draft，不合并。
+- 仍不得启动或消耗 Formal Production/B1-B7；只有 H1 reviewed-seal PR 在最新 main 上通过最终审阅并合并后，才重新评估 Formal 入口。
+
+账号、密码、IP、端口、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+
+## DM-20260910-TRADING-RULE-H1R4-010 · H1R4 首次授权 AI 审阅封存（未合并，已被替换）
+
+**Type**：C1 — reviewed evidence seal and ACTIVE transition
+**Date**：2026-09-10
+**Status**：`SUPERSEDED PRE-MERGE ARTIFACT / RETAINED ONLY AS AUDIT HISTORY / NOT THE CURRENT REVIEWED OUTPUT`
+
+**已确认事实**
+
+- 本轮从合并后的 clean `main@1af86215312b088859300521e4bb164f149e3717` 开始。封存前只提交了 reviewed-copy 生命周期修正及回归测试；最终代码、测试、封存树和记录收敛在原子提交 `0756ddccee4256f982c42ba60f17470804337c57`，没有修改 H1R4 候选内容、H1R3、旧 ACTIVE 或 Golden 数据。
+- 修正 `_build_reviewed_text()`：候选版的多行 `review_note` 会被完整跳过，授权 AI 审阅输出改为 `owner-authorized-ai-reviewer` 及明确的最终封存说明；回归断言确认 REVIEWED YAML 不含 `Candidate only` / `human-reviewed`。
+- 封存前质量门禁为 Ruff check、format、mypy 和全量 pytest `1687 passed, 3 skipped`；封存前只读身份断言确认 ACTIVE `v20260824-compiled` / `COMPILED` / `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8`、H1R4 candidate `ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68`、证据 bundle/raw 与旧候选均符合固定值。
+- 按 Issue #34 固定参数仅执行一次 candidate seal：
+
+```text
+uv run python scripts/rules/review.py --candidate configs/trading_rules/versions/v20260910-h1r4-compiled/rules.yaml --candidate-version v20260910-h1r4-compiled --expected-candidate-hash ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68 --evidence-bundle docs/provider_verification/trading_rule_h1r4_evidence_input_20260910.json --reviewer owner-authorized-ai-reviewer --version v20260910-h1r4-reviewed --from-version v20260824-compiled
+```
+
+- 一次性 seal 的持久化结果已纳入原子提交 `0756ddccee4256f982c42ba60f17470804337c57`；生成 `v20260910-h1r4-reviewed`，14 条 `REVIEWED`，dataset hash `b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b`。ACTIVE manifest 已指向该版本，`reviewed_by` 为 `owner-authorized-ai-reviewer`。
+- REVIEWED evidence provenance 为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`；canonical bundle 18,606 bytes，20 个唯一 raw artifact，raw 总字节 1,736,924。封存后完整 `trading_rule_review_gate` 返回空问题，bundle/raw 重算、旧 ACTIVE/旧 H1/H1R2/H1R3/H1R4 candidate 字节比较和临时文件清理均通过。
+- 该 H1R4 只覆盖项目确定的 2020+ 研究范围；授权 AI provenance 不等同于项目 Owner 亲自阅读或人工签署。当前不宣称 Formal Production、B1-B7、Provider capability 或 backfill 已完成。
+
+**待完成闸门**
+
+- 将上述提交作为一个独立 final reviewed-seal PR 请求 GitHub CI 和独立 Reviewer 复核；在 PASS 与 required CI 全绿前不离开 Draft、不合并。
+- PR 合并后从最新 clean main 再验证 ACTIVE、review gate、evidence identity 和旧版本不可变性；只有 H1 reviewed-seal 真正确认后，才重新评估 Formal B1-B7。Formal 入口在此之前继续禁止。
+
+账号、密码、IP、端口、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+
 ## DM-20260910-TRADING-RULE-H1R4-009 · BSE 第 14 条来源绑定修正与授权 AI 审阅
 
 **Type**：C1 — immutable H1 evidence-contract correction

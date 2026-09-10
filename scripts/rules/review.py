@@ -352,9 +352,54 @@ def _build_reviewed_text(
         RULE_EVIDENCE_BUNDLE_HASH + ":",
         "evidence_contract:",
     )
+    # Candidate files may carry a leading comment block that is truthful only
+    # while the file is COMPILED and non-ACTIVE.  Capture that block before
+    # processing YAML fields so the REVIEWED copy can replace it generically;
+    # do not hard-code a particular H1 candidate name into the transform.
+    leading_end = 0
+    while leading_end < len(lines):
+        stripped = lines[leading_end].strip()
+        if not stripped or stripped.startswith("#"):
+            leading_end += 1
+            continue
+        break
+    leading_lines = lines[:leading_end]
+    leading_text = "".join(leading_lines).casefold()
+
     reviewed: list[str] = []
+    if "candidate" in leading_text or "not active" in leading_text:
+        reviewed.append(
+            "# Trading Rule REVIEWED artifact. ACTIVE selection is controlled by "
+            "rule_manifest.json.\n"
+        )
+    else:
+        reviewed.extend(leading_lines)
     inserted = False
-    for line in lines:
+    skipping_review_note = False
+    final_review_note_inserted = False
+    for line in lines[leading_end:]:
+        # A COMPILED candidate may carry a multiline review_note explaining
+        # that it is not yet reviewed.  That note is stale in the REVIEWED
+        # copy, so consume the complete YAML scalar instead of leaking its
+        # candidate-only provenance into the sealed artifact.
+        if skipping_review_note:
+            if not line.strip() or line[:1].isspace():
+                continue
+            skipping_review_note = False
+        if line.startswith("review_note:"):
+            if reviewer == "owner-authorized-ai-reviewer" and not final_review_note_inserted:
+                reviewed.extend(
+                    [
+                        "review_note: >\n",
+                        (
+                            "  Evidence was sealed under the owner-authorized AI reviewer "
+                            "provenance marker.\n"
+                        ),
+                    ]
+                )
+                final_review_note_inserted = True
+            skipping_review_note = True
+            continue
         if line.startswith("review_status:") and not inserted:
             reviewed.append("review_status: REVIEWED\n")
             reviewed.extend(

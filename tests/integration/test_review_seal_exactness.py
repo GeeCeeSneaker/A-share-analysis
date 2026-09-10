@@ -133,7 +133,7 @@ class TestExactByteSeal:
         """The REVIEWED yaml is a pure provenance-transform of the EXACT
         hash-checked ACTIVE bytes: stripping the inserted seal block from
         the REVIEWED copy equals the ACTIVE bytes with the placeholder
-        provenance lines removed."""
+        provenance lines and candidate-only review note removed."""
         root = _make_root(tmp_path)
         artifact = tmp_path / "notice.txt"
         artifact.write_text("official notice", encoding="utf-8")
@@ -157,11 +157,18 @@ class TestExactByteSeal:
             "source_artifact_kind:",
             "source_retrieved_at:",
         )
-        active_body = [
-            line
-            for line in active_lines
-            if not line.startswith(placeholder_keys) and not line.startswith("review_status:")
-        ]
+        active_body = []
+        skipping_review_note = False
+        for line in active_lines:
+            if skipping_review_note:
+                if not line.strip() or line[:1].isspace():
+                    continue
+                skipping_review_note = False
+            if line.startswith("review_note:"):
+                skipping_review_note = True
+                continue
+            if not line.startswith(placeholder_keys) and not line.startswith("review_status:"):
+                active_body.append(line)
         seal_keys = ("review_status:", *placeholder_keys)
         reviewed_body = [line for line in reviewed_lines if not line.startswith(seal_keys)]
         assert reviewed_body == active_body
