@@ -1,3 +1,57 @@
+## DM-20260910-TRADING-RULE-H1R4-009 · BSE 第 14 条来源绑定修正与授权 AI 审阅
+
+**Type**：C1 — immutable H1 evidence-contract correction
+**Date**：2026-09-10
+**Status**：`H1R4 CANDIDATE STAGED / 14-OF-14 OWNER-AUTHORIZED-AI PASS / DELTA INDEPENDENT REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED`
+
+**已确认事实**
+
+- 在 H1R3 的唯一阻塞项上按 Issue #34 comment `5612090090` 做最小修正：新建 `v20260910-h1r4-compiled`，不修改 H1R3 或任何旧版本。
+- H1R4 仍为 14 条、`COMPILED`、非 `ACTIVE`；dataset version `2026-09-10.2`，manifest-style candidate hash 为 `ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68`。
+- 仅 `BSE_IPO_DAY_NO_LIMIT.source_ref` 增加已冻结的历史 BSE Trading Rules 原始 URL；H1R4 evidence input 第 14 条同步加入同一 URL 和既有 raw artifact。H1R3→H1R4 14 条交易语义字段回归一致，只有该 source URL 集增加一项。
+- H1R4 canonical bundle 为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`（18,606 bytes）；唯一官方 URL/raw artifact 仍为 20 个，raw 总字节仍为 1,736,924，输入来源行 41 条。原始 BSE 文件按内容 hash `c63dd4af...725919` 复用，没有新增 raw 文件。
+- Owner 已明确授权助手作为 `owner-authorized-ai-reviewer` 完成 H1 14 条 2020+ 实质核验；PR #37 review `5162234439` 给出 14/14 PASS。仓库不宣称人工 Reviewer 或 Owner 本人完成阅读；详细记录见 [`TradingRule_H1R4_授权AI审阅记录_20260910.md`](../design/TradingRule_H1R4_授权AI审阅记录_20260910.md)。
+
+**当前未完成与闸门**
+
+- 只剩 H1R4 的单一 binding delta 待独立 Reviewer 接受：第 14 条必须逐行拥有历史 2021 BSE URL，且 bundle/catalog/input 三者 exact coverage 一致。其他 13 条不因该来源合同修正重新开放。
+- 在独立 delta review 接受并合并本来源合同 PR 前，不运行 `scripts/rules/review.py --candidate`，不创建 REVIEWED，不切 ACTIVE，不启动或消耗 Formal Production/B1-B7。
+- 接受后，按顺序从最新 clean main 开立单独 reviewed-seal PR；candidate seal 使用 truthful marker `owner-authorized-ai-reviewer`，不使用暗示 Owner 亲自审阅的伪造标记。
+
+**项目文件**：[`TradingRule_H1R4 授权 AI 审阅记录`](../design/TradingRule_H1R4_授权AI审阅记录_20260910.md)、[`H1R4 evidence input`](../provider_verification/trading_rule_h1r4_evidence_input_20260910.json)、[`H1R4 source catalog`](../provider_verification/trading_rule_h1r4_source_catalog_20260910.json)。
+
+## DM-20260910-TRADING-RULE-H1R3-008 · PR #36 合并后的最终证据/封印通道
+
+**Type**：C1 — post-merge evidence/seal lane preparation
+**Date**：2026-09-10
+**Status**：`H1R3 SOURCE-CONTRACT CHECKPOINT MERGED / FINAL EVIDENCE-SEAL LANE OPEN / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED`
+
+**已确认事实**
+
+- GitHub PR #36 已在独立复审通过后合并：审阅的精确 head 为 `d7843a083ef1f088c3682ab1156185d28a121463`，合并提交为 `f0bf1f8233fedfeea4fa3010237589938f6a5daf`。
+- 当前执行基线为 clean `main@f0bf1f8233fedfeea4fa3010237589938f6a5daf`；旧 ACTIVE 仍为 `v20260824-compiled` / `COMPILED`，dataset hash 仍为 `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8`。
+- H1R3 `v20260910-h1r3-compiled` 仍是 14 条、`COMPILED`、非 `ACTIVE`；候选 hash 为 `f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`。
+- H1R3 冻结证据合同为 20 个唯一官方 URL、20 个 raw artifact、1,736,924 bytes；canonical bundle 为 `sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`（18,181 bytes）。PR #36 的独立复审已确认 2020-08-24 创业板日期来源合同闭合；不再扩大到 H1R4 或 pre-2020 研究。
+
+**本轮推进**
+
+- 从合并后的 clean main 建立新的最终证据通道工作分支，未复用 PR #36 的旧 head。
+- 对 H1R3 evidence input 声明的 20 个原始 artifact 做完整字节、hash/size、HTML/PDF/DOCX 内容读取核验；结果整理为 [`TradingRule_H1R3_AI原文核验草案_20260910.md`](../design/TradingRule_H1R3_AI原文核验草案_20260910.md)。
+- 草案只作原文定位辅助，不写入人工 `APPROVE`，不产生 `reviewed_by` 或 seal；正式 14 行人工表仍保持 `待填`。
+- 文档提交 `5e4a4d9` 后全量 `uv run pytest -q` 已到 100%，退出码 0；该回归结果不等于人工审阅或 seal 放行。
+
+**未完成与硬边界**
+
+- 真实 Owner/人工 Reviewer 尚未在正式表中完成 14/14 条逐案裁决；AI 读取、hash 校验和来源定位不能替代人工签署。
+- 第 14 条 `BSE_IPO_DAY_NO_LIMIT` 的当前 evidence input 绑定了 BSE 2026 DOCX，条款能支持“上市首日不限价、后续 30%”，但 `effective_from=20211115` 的历史直接依据位于第 13 条共享的历史 BSE 交易规则来源中，必须由人工 Reviewer/项目管理者按 source-contract 规则裁决。
+- 在 14/14 人工 `APPROVE` 且上述边界无阻断前，不运行 `scripts/rules/review.py --candidate`，不创建 REVIEWED，不切换 ACTIVE，不启动或消耗 Formal Production/B1-B7。
+
+**下一步要求**
+
+项目 Owner/真实人工 Reviewer 按 [`TradingRule_H1R3_人工审阅操作表_20260910.md`](../design/TradingRule_H1R3_人工审阅操作表_20260910.md) 实际打开每一份官方原文，填写 `APPROVE`/`REJECT`、精确条款/页码/定位和简短理由。仅在 14 行全部 `APPROVE`、无 2020+ truth blocker 且独立审阅授权后，才从届时最新 clean main 按文档固定参数执行一次 candidate seal；随后再开 REVIEWED/ACTIVE 迁移 PR，最终独立审阅合并后才能重新评估 Formal B1-B7。
+
+账号、密码、IP、端口、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+
 ## DM-20260910-TRADING-RULE-H1R3-007 · 补齐创业板 2020-08-24 日期来源合同
 
 **Type**：C1 — immutable candidate/source-contract correction

@@ -1,3 +1,28 @@
+## H1R4 第 14 条 BSE 来源绑定修正（2026-09-10）
+
+> 状态：`H1R4 COMPILED CANDIDATE STAGED / 14-OF-14 OWNER-AUTHORIZED-AI PASS / INDEPENDENT DELTA REVIEW PENDING / NOT SEALED`
+
+- H1R3 的唯一阻塞是 `BSE_IPO_DAY_NO_LIMIT.effective_from=20211115` 的历史直接来源只绑定在 `BSE_LIMIT`。H1R4 仅将已冻结的历史 BSE Trading Rules 附件 URL `https://www.bse.cn/uploads/6/file/public/202209/20220924123627_d6405jicv9.docx` 加入第 14 条 `source_ref` 和 evidence input；不新增事实、不扩展历史研究。
+- H1R4 candidate：`v20260910-h1r4-compiled`，dataset `2026-09-10.2`，14 条，`COMPILED`、非 `ACTIVE`；candidate hash `ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68`。
+- H1R4 证据合同：20 个唯一官方 URL、20 个去重 raw artifact、1,736,924 bytes、41 条 input source rows；canonical bundle `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`，18,606 bytes。历史 BSE raw 以既有 SHA-256 `c63dd4af...725919` 复用。
+- H1R3→H1R4 窄回归、候选 loader、bundle exact coverage 和 source catalog 绑定校验已通过；详细授权 AI 结果见 [`TradingRule_H1R4_授权AI审阅记录_20260910.md`](../design/TradingRule_H1R4_授权AI审阅记录_20260910.md)，身份为 `owner-authorized-ai-reviewer`，不宣称人工/Owner 本人审阅。
+
+独立 Reviewer 只需复核上述单一 binding delta。接受并合并本来源合同修正前，不运行 candidate seal、不创建 REVIEWED、不切 ACTIVE、不启动 Formal Production/B1-B7。
+
+## H1R3 合并后最终证据/封印通道（2026-09-10）
+
+> 本节记录 PR #36 合并后的最新状态；其下 H1R3 source-contract checkpoint 与 H1R2/H1 历史记录保留为当时的事实，不回写历史基线。
+
+- **最新 clean 基线**：`main@f0bf1f8233fedfeea4fa3010237589938f6a5daf`；PR #36 已在独立 re-review 通过后合并。
+- **当前 ACTIVE**：`v20260824-compiled` / `COMPILED`；dataset hash `dd2219d2383b01d2b8a5019ddf713d36a04f1badbeabe1aeffc7e20fa91ef2d8` 未变。
+- **最终候选**：`v20260910-h1r3-compiled`，dataset `2026-09-10.1`，14 条，`COMPILED`、非 `ACTIVE`；candidate hash `f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`。
+- **冻结证据集**：20 个唯一官方 URL、20 个 raw artifact、1,736,924 bytes；canonical bundle `sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`，18,181 bytes。
+- **当前进展**：已完成 20 个 artifact 的完整字节与内容核验，并生成 [`TradingRule_H1R3_AI原文核验草案_20260910.md`](../design/TradingRule_H1R3_AI原文核验草案_20260910.md)；草案只供人工定位，不能代替正式人工表。
+- **仍然阻塞**：正式 H1R3 人工表 14 行仍为 `待填`。特别是 `BSE_IPO_DAY_NO_LIMIT` 的当前条款与历史 `effective_from=20211115` 来源绑定关系须由人工/项目管理者裁决。
+- **硬边界**：未运行 seal，未创建 REVIEWED，未切换 ACTIVE，未运行或消耗 Formal Production/B1-B7；凭据、Provider 原始输出和专有 SDK/runtime 未进入 GitHub。
+
+后续顺序：人工完成 14/14 并解决上述边界后，才可按固定参数执行一次 candidate seal；随后由独立 Reviewer 审阅并合并 REVIEWED/ACTIVE 迁移，最后才重新评估 Formal B1-B7。
+
 # H1R3 补充：创业板 2020-08-24 日期来源合同修正（2026-09-10）
 
 > 本节是当前 PR #36 的最新执行状态；下方 H1R2 内容保留为前一 checkpoint 的历史记录，不再作为当前 candidate/source set 的目标。
