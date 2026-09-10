@@ -4,16 +4,16 @@
   "dataset_files": [
     "versions/v20260910-h1r4-reviewed/rules.yaml"
   ],
-  "dataset_hash": "b8f3b94f6492a4ad5d5186ee4d26232bfffc92074e26ea7641eb794bb63e186b",
+  "dataset_hash": "b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed",
   "source_version": "SSE/SZSE/BSE public trading rules, H1R4 2020+ scoped candidate with exact attachment URL bindings",
   "dataset_version": "2026-09-10.2",
   "review_provenance": {
     "reviewed_by": "owner-authorized-ai-reviewer",
-    "reviewed_at": "2026-09-10T05:58:10.617777+00:00",
+    "reviewed_at": "2026-09-10T07:39:01.623838+00:00",
     "source_artifact_ref": "sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4",
     "source_artifact_hash": "115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4",
     "source_artifact_kind": "EVIDENCE_BUNDLE",
-    "source_retrieved_at": "2026-09-10T05:58:10.617777+00:00",
+    "source_retrieved_at": "2026-09-10T07:39:01.623838+00:00",
     "rule_evidence_bundle_ref": "sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4",
     "rule_evidence_bundle_hash": "115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4"
   },

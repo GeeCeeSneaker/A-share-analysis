@@ -1,16 +1,13 @@
-# Trading Rule H1R4 candidate. This version is immutable and is not ACTIVE.
-# H1R4 is a source-contract-only correction to the H1R3 research candidate requested in the
-# latest project-management correction: 2020-01-01 onward, plus no broader
-# historical assertions than are needed to initialize that baseline.
+# Trading Rule REVIEWED artifact. ACTIVE selection is controlled by rule_manifest.json.
 version: "2026-09-10.2"
 source_version: "SSE/SZSE/BSE public trading rules, H1R4 2020+ scoped candidate with exact attachment URL bindings"
 review_status: REVIEWED
 reviewed_by: owner-authorized-ai-reviewer
-reviewed_at: 2026-09-10T05:58:10.617777+00:00
+reviewed_at: 2026-09-10T07:39:01.623838+00:00
 source_artifact_ref: sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4
 source_artifact_hash: 115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4
 source_artifact_kind: EVIDENCE_BUNDLE
-source_retrieved_at: 2026-09-10T05:58:10.617777+00:00
+source_retrieved_at: 2026-09-10T07:39:01.623838+00:00
 evidence_contract: RULE_EVIDENCE_BUNDLE.v1
 rule_evidence_bundle_ref: sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4
 rule_evidence_bundle_hash: 115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4

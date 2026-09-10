@@ -262,6 +262,13 @@ class TestH1CandidateSealHappyPath:
         reviewed_text = (root / "versions" / REVIEWED_VERSION / "rules.yaml").read_text(
             encoding="utf-8"
         )
+        reviewed_header = reviewed_text.split("version:", 1)[0].casefold()
+        assert "candidate" not in reviewed_header
+        assert "not active" not in reviewed_header
+        assert (
+            "trading rule reviewed artifact. active selection is controlled by rule_manifest.json."
+            in reviewed_header
+        )
         assert "reviewed_by: owner-authorized-ai-reviewer" in reviewed_text
         assert "Candidate only" not in reviewed_text
         assert "human-reviewed" not in reviewed_text
