@@ -1,3 +1,29 @@
+## DM-20260910-TRADING-RULE-H1R3-007 · 补齐创业板 2020-08-24 日期来源合同
+
+**Type**：C1 — immutable candidate/source-contract correction
+**Date**：2026-09-10
+**Status**：`H1R3 CANDIDATE STAGED / 20-SOURCE EXACT SET / BUNDLE VERIFIED / INDEPENDENT REVIEW RETRY PENDING / HUMAN REVIEW PENDING / FORMAL ENTRY PROHIBITED`
+
+**依据**：PR #36 独立实质审阅确认 H1R2 的工程执行面已通过，但指出 H1R2 的创业板来源没有一手原文直接证明 `2020-08-24` 这个精确切换日。该日期同时是四条 CHINEXT 规则的边界，不能只由“改革前后”语义推导。
+
+**已完成**
+
+- 从 clean `main@e096b0364d3dc5a00e21879fe5bd8fc4a758b07f` 新建 `v20260910-h1r3-compiled`；dataset version `2026-09-10.1`，14 条，`COMPILED`、非 `ACTIVE`，manifest-style hash `f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`。
+- 仅向 `CHINEXT_PRE_REGISTRATION_NORMAL`、`CHINEXT_PRE_REGISTRATION_ST`、`CHINEXT_REGISTRATION`、`CHINEXT_REGISTRATION_FIRST5` 的 `source_ref` 增加深交所 2020-08-21 官方问答；规则数值、适用范围、effective dates 和解析语义不变。
+- 新增来源原始 HTML `direct_17.html`：官方 URL `https://www.szse.cn/aboutus/trends/news/t20200821_580924.html`，HTTP 200，34,508 bytes，SHA-256 `cba74610a5c582e2ac94f3bb21a04f2e5fa1fa175131b0cd287f9bbfc311b1ae`。原文明确写出《特别规定》自 2020-08-24 起正式施行及创业板存量股票涨跌幅调整为 20%。
+- H1R3 input/catalog 和证据发布载荷已重建：20 个唯一来源、20 个去重 raw artifact、1,736,924 bytes；canonical bundle 18,181 bytes，ref/hash `sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`。H1R2 旧 canonical bundle 未在当前 checkpoint 保留为孤立输出，原有 raw 仅按字节复用。
+- `prepare_rule_evidence_bundle()`、`validate_rule_evidence_bundle()`、H1R3 source-contract 回归和原有测试均通过；执行记录、来源目录和 H1R3 人工审阅表已写入仓库。
+
+**未完成与硬边界**
+
+- H1R3 的 14 条人工原文审阅仍为 `待填`；机器校验不等于人工 `APPROVE`。
+- 未运行 `scripts/rules/review.py --candidate`，未创建 REVIEWED，未切换 ACTIVE，未启动或消耗 Formal Production；B1-B7 继续禁止。
+- 账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+
+**项目文件**：[`TradingRule_H1R3 来源合同修正执行记录`](../design/TradingRule_H1R3来源合同修正执行记录_20260910.md)、[`H1R3 人工审阅操作表`](../design/TradingRule_H1R3_人工审阅操作表_20260910.md)、[`H1R3 evidence input`](../provider_verification/trading_rule_h1r3_evidence_input_20260910.json)、[`H1R3 source catalog`](../provider_verification/trading_rule_h1r3_source_catalog_20260910.json)。
+
+**下一步**：将 PR #36 重述为 H1R3 source-contract checkpoint，等待独立 Reviewer 接受四条创业板日期覆盖、20-source exact set、candidate/bundle/raw 不可变性和 CI；合并后再进行 14/14 人工审阅并另开最终 evidence/seal PR。Formal 入口只能在 REVIEWED 合并且从届时最新 clean main 完成 preflight 后重新评估。
+
 ## DM-20260909-TRADING-RULE-H1R2-006 · H1R2 来源合同与范围收缩整改
 
 **Type**：C1 — immutable candidate/source-contract correction

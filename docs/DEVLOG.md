@@ -1,3 +1,16 @@
+## 2026-09-10 · H1R3 补齐创业板 2020-08-24 日期来源合同
+
+> 状态：**H1R3 CANDIDATE STAGED / P0 SOURCE GAP CLOSED / BUNDLE VERIFIED / LOCAL REGRESSION GREEN / INDEPENDENT REVIEW RETRY PENDING / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**
+
+- PR #36 的独立实质审阅确认 H1R2 的执行材料、旧版本不可变性和 CI 均正常，但指出创业板四条边界规则缺少直接证明 `2020-08-24` 的一手来源。本轮按最小范围修正，只增加深交所 2020-08-21 官方问答，不改交易语义、不做其他历史研究。
+- 新建非 ACTIVE `configs/trading_rules/versions/v20260910-h1r3-compiled/rules.yaml`，dataset version `2026-09-10.1`，14 条，manifest-style SHA-256 为 `f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`。逐条比较确认 H1R2 的规则语义字段未变，仅四个 CHINEXT `source_ref` 增加日期来源。
+- 新来源 `https://www.szse.cn/aboutus/trends/news/t20200821_580924.html` 直连 HTTP 200，原始 HTML `direct_17.html` 为 34,508 bytes，SHA-256 `cba74610a5c582e2ac94f3bb21a04f2e5fa1fa175131b0cd287f9bbfc311b1ae`；正文明确写出《特别规定》自 2020-08-24 起正式施行，并说明创业板存量股票涨跌幅限制在该日调整为 20%。
+- H1R3 input/catalog 已落盘，当前为 20 个唯一官方 URL、20 个去重 raw artifact、1,736,924 bytes；canonical bundle 为 18,181 bytes，ref/hash 为 `sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`。H1R2 旧 canonical bundle 未作为过期孤立输出保留在本 checkpoint 分支，旧 raw artifact 仅按字节复用。
+- 通过 `prepare_rule_evidence_bundle()`、`validate_rule_evidence_bundle()` 和 H1R3 source-contract 回归测试；旧 ACTIVE、旧 H1、H1R2、Golden v7、ACTIVE selector、reviewed 输出均未改动。
+- 新的人审表为 [`TradingRule_H1R3_人工审阅操作表_20260910.md`](design/TradingRule_H1R3_人工审阅操作表_20260910.md)，14 行仍为 `待填`。未运行 seal、未写入 REVIEWED、未切换 ACTIVE、未启动或消耗 Formal Production；账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 未进入 GitHub。
+
+下一步：更新 PR #36 为 H1R3 source-contract checkpoint，等待独立 Reviewer 接受本次四条创业板日期补证、20-source exact set 和 CI；合并后再按 H1R3 表完成 14/14 人工原文审阅，另开最终 evidence/seal PR。Formal B1-B7 继续禁止。
+
 ## 2026-09-09 · H1R2 来源合同修正与 2020+ 范围收缩
 
 > 状态：**H1R2 CANDIDATE STAGED / SOURCE URL EXACTLY BOUND / 2020+ SCOPED / LOCAL PREPARE GREEN / REVIEW CHECKLIST PREPARED / HUMAN REVIEW DEFERRED TO SEPARATE SEAL PR / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**

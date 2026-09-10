@@ -1,3 +1,17 @@
+# H1R3 补充：创业板 2020-08-24 日期来源合同修正（2026-09-10）
+
+> 本节是当前 PR #36 的最新执行状态；下方 H1R2 内容保留为前一 checkpoint 的历史记录，不再作为当前 candidate/source set 的目标。
+
+- **基线**：clean `main@e096b0364d3dc5a00e21879fe5bd8fc4a758b07f`；旧 ACTIVE、旧 H1 和 H1R2 candidate 均未改写。
+- **当前候选**：[`v20260910-h1r3-compiled/rules.yaml`](../../configs/trading_rules/versions/v20260910-h1r3-compiled/rules.yaml)，dataset version `2026-09-10.1`，14 条，`COMPILED`、非 `ACTIVE`；manifest-style hash `f2ca5504f8282cc25941b910593b8548160b1dabdffe5e9666093b6a3807ebf9`。
+- **修正内容**：仅向四条创业板边界规则的 `source_ref` 增加一手日期来源 `https://www.szse.cn/aboutus/trends/news/t20200821_580924.html`；规则数值、适用范围和边界日期字段不变。
+- **原始来源**：HTTP 200、最终 URL 未跳转；[`direct_17.html`](trading_rule_h1_sources/direct_17.html) 为 34,508 bytes，SHA-256 `cba74610a5c582e2ac94f3bb21a04f2e5fa1fa175131b0cd287f9bbfc311b1ae`。正文明确写出《特别规定》自 2020-08-24 起正式施行，并说明创业板存量股票涨跌幅限制在该日调整为 20%。
+- **当前证据集**：[`trading_rule_h1r3_evidence_input_20260910.json`](trading_rule_h1r3_evidence_input_20260910.json) 与 [`trading_rule_h1r3_source_catalog_20260910.json`](trading_rule_h1r3_source_catalog_20260910.json)；20 个唯一 URL、20 个去重 raw artifact、1,736,924 bytes；canonical bundle 18,181 bytes，ref/hash `sha256/41600f428076024c81e72372a15be738cce592aba8cbd424c9b404448eaa9cee`。
+- **审阅表**：[`TradingRule_H1R3_人工审阅操作表_20260910.md`](../design/TradingRule_H1R3_人工审阅操作表_20260910.md)，14 行仍待人工实际打开原文后填写；机器 prepare/validate 通过不等于 `APPROVE`。
+- **硬边界**：未运行 seal，未创建 REVIEWED，未切换 ACTIVE，未运行或消耗 Formal Production/B1-B7；账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 未进入 GitHub。
+
+后续由独立 Reviewer 重新接受 H1R3 四条创业板日期覆盖、20-source exact set、candidate/bundle/raw 不可变性和 CI；本 checkpoint 合并后再做 14/14 人工审阅及最终 evidence/seal PR。
+
 # Trading Rule H1R2 证据接收与 Formal 预检记录
 
 日期：2026-09-09（Asia/Shanghai）
