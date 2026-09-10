@@ -1,3 +1,15 @@
+## 2026-09-10 · H1R4 补齐 BSE IPO 日规则逐条来源绑定
+
+> 状态：**H1R4 CANDIDATE STAGED / SOURCE-BINDING DELTA CLOSED LOCALLY / 14-OF-14 OWNER-AUTHORIZED-AI PASS / INDEPENDENT DELTA REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**
+
+- 针对 H1R3 唯一阻塞项，新建 `v20260910-h1r4-compiled`，dataset `2026-09-10.2`，14 条 `COMPILED`、非 `ACTIVE`；manifest-style hash 为 `ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68`。
+- 仅向 `BSE_IPO_DAY_NO_LIMIT.source_ref` 增加已冻结的历史 BSE Trading Rules URL `https://www.bse.cn/uploads/6/file/public/202209/20220924123627_d6405jicv9.docx`；同一 byte-identical raw artifact 同步进入 H1R4 input 第 14 条，source catalog 标记同时绑定 `BSE_LIMIT` 和 `BSE_IPO_DAY_NO_LIMIT`。
+- H1R3→H1R4 窄回归确认 14 条交易语义字段完全一致，只有第 14 条 source URL 集新增一项；H1R4 bundle exact validation 通过。唯一官方 URL/raw artifact 仍为 20 个，raw 总字节仍为 1,736,924；canonical bundle 为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`，18,606 bytes。
+- Owner 授权的 AI 实质核验记录为 `owner-authorized-ai-reviewer`，PR #37 review `5162234439` 对 2020+ 范围给出 14/14 PASS；详细表见 [`TradingRule_H1R4_授权AI审阅记录_20260910.md`](design/TradingRule_H1R4_授权AI审阅记录_20260910.md)。这不是人工或 Owner 本人签署。
+- 新增候选生命周期 marker 回归；`uv run pytest -q tests/unit/test_trading_rule_h1_candidate.py` 与 `uv run pytest -q tests/integration/test_h1_rule_seal_lifecycle.py` 均通过（生命周期测试保留 1 个环境相关 skip）；ruff check/format 和 `git diff --check` 通过。
+
+下一步：将 H1R4 及窄回归推送到 PR #37，等待独立 Reviewer 只复核 BSE 第 14 条 binding delta。接受并合并前不运行 candidate seal、不创建 REVIEWED、不切 ACTIVE、不启动或消耗 Formal B1-B7。
+
 ## 2026-09-10 · H1R3 合并后开启最终证据审阅通道
 
 > 状态：**SOURCE-CONTRACT CHECKPOINT MERGED / AI SOURCE AUDIT PREPARED / HUMAN REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED**

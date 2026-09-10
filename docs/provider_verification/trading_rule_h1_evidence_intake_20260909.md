@@ -1,3 +1,14 @@
+## H1R4 第 14 条 BSE 来源绑定修正（2026-09-10）
+
+> 状态：`H1R4 COMPILED CANDIDATE STAGED / 14-OF-14 OWNER-AUTHORIZED-AI PASS / INDEPENDENT DELTA REVIEW PENDING / NOT SEALED`
+
+- H1R3 的唯一阻塞是 `BSE_IPO_DAY_NO_LIMIT.effective_from=20211115` 的历史直接来源只绑定在 `BSE_LIMIT`。H1R4 仅将已冻结的历史 BSE Trading Rules 附件 URL `https://www.bse.cn/uploads/6/file/public/202209/20220924123627_d6405jicv9.docx` 加入第 14 条 `source_ref` 和 evidence input；不新增事实、不扩展历史研究。
+- H1R4 candidate：`v20260910-h1r4-compiled`，dataset `2026-09-10.2`，14 条，`COMPILED`、非 `ACTIVE`；candidate hash `ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68`。
+- H1R4 证据合同：20 个唯一官方 URL、20 个去重 raw artifact、1,736,924 bytes、41 条 input source rows；canonical bundle `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`，18,606 bytes。历史 BSE raw 以既有 SHA-256 `c63dd4af...725919` 复用。
+- H1R3→H1R4 窄回归、候选 loader、bundle exact coverage 和 source catalog 绑定校验已通过；详细授权 AI 结果见 [`TradingRule_H1R4_授权AI审阅记录_20260910.md`](../design/TradingRule_H1R4_授权AI审阅记录_20260910.md)，身份为 `owner-authorized-ai-reviewer`，不宣称人工/Owner 本人审阅。
+
+独立 Reviewer 只需复核上述单一 binding delta。接受并合并本来源合同修正前，不运行 candidate seal、不创建 REVIEWED、不切 ACTIVE、不启动 Formal Production/B1-B7。
+
 ## H1R3 合并后最终证据/封印通道（2026-09-10）
 
 > 本节记录 PR #36 合并后的最新状态；其下 H1R3 source-contract checkpoint 与 H1R2/H1 历史记录保留为当时的事实，不回写历史基线。

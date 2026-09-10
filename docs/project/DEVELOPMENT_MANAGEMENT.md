@@ -1,3 +1,25 @@
+## DM-20260910-TRADING-RULE-H1R4-009 · BSE 第 14 条来源绑定修正与授权 AI 审阅
+
+**Type**：C1 — immutable H1 evidence-contract correction
+**Date**：2026-09-10
+**Status**：`H1R4 CANDIDATE STAGED / 14-OF-14 OWNER-AUTHORIZED-AI PASS / DELTA INDEPENDENT REVIEW PENDING / ACTIVE STILL COMPILED / FORMAL ENTRY PROHIBITED`
+
+**已确认事实**
+
+- 在 H1R3 的唯一阻塞项上按 Issue #34 comment `5612090090` 做最小修正：新建 `v20260910-h1r4-compiled`，不修改 H1R3 或任何旧版本。
+- H1R4 仍为 14 条、`COMPILED`、非 `ACTIVE`；dataset version `2026-09-10.2`，manifest-style candidate hash 为 `ed17a49745291a7729650e1fa8b783cb6ae6c187aee68d68aca47aafb24f4d68`。
+- 仅 `BSE_IPO_DAY_NO_LIMIT.source_ref` 增加已冻结的历史 BSE Trading Rules 原始 URL；H1R4 evidence input 第 14 条同步加入同一 URL 和既有 raw artifact。H1R3→H1R4 14 条交易语义字段回归一致，只有该 source URL 集增加一项。
+- H1R4 canonical bundle 为 `sha256/115971e9ecb35c34d364c708ca74f8db9fcb233d03d5d7e5f6c6bef02f02d0f4`（18,606 bytes）；唯一官方 URL/raw artifact 仍为 20 个，raw 总字节仍为 1,736,924，输入来源行 41 条。原始 BSE 文件按内容 hash `c63dd4af...725919` 复用，没有新增 raw 文件。
+- Owner 已明确授权助手作为 `owner-authorized-ai-reviewer` 完成 H1 14 条 2020+ 实质核验；PR #37 review `5162234439` 给出 14/14 PASS。仓库不宣称人工 Reviewer 或 Owner 本人完成阅读；详细记录见 [`TradingRule_H1R4_授权AI审阅记录_20260910.md`](../design/TradingRule_H1R4_授权AI审阅记录_20260910.md)。
+
+**当前未完成与闸门**
+
+- 只剩 H1R4 的单一 binding delta 待独立 Reviewer 接受：第 14 条必须逐行拥有历史 2021 BSE URL，且 bundle/catalog/input 三者 exact coverage 一致。其他 13 条不因该来源合同修正重新开放。
+- 在独立 delta review 接受并合并本来源合同 PR 前，不运行 `scripts/rules/review.py --candidate`，不创建 REVIEWED，不切 ACTIVE，不启动或消耗 Formal Production/B1-B7。
+- 接受后，按顺序从最新 clean main 开立单独 reviewed-seal PR；candidate seal 使用 truthful marker `owner-authorized-ai-reviewer`，不使用暗示 Owner 亲自审阅的伪造标记。
+
+**项目文件**：[`TradingRule_H1R4 授权 AI 审阅记录`](../design/TradingRule_H1R4_授权AI审阅记录_20260910.md)、[`H1R4 evidence input`](../provider_verification/trading_rule_h1r4_evidence_input_20260910.json)、[`H1R4 source catalog`](../provider_verification/trading_rule_h1r4_source_catalog_20260910.json)。
+
 ## DM-20260910-TRADING-RULE-H1R3-008 · PR #36 合并后的最终证据/封印通道
 
 **Type**：C1 — post-merge evidence/seal lane preparation

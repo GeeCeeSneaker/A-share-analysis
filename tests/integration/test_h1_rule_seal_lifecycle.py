@@ -165,6 +165,7 @@ def _argv(
     expected_candidate_hash: str | None = None,
     expected_active_version: str = PARENT_VERSION,
     reviewed_version: str = REVIEWED_VERSION,
+    reviewer: str = "project-owner",
 ) -> list[str]:
     candidate = candidate or _candidate_path(root)
     expected_candidate_hash = expected_candidate_hash or _candidate_hash(root)
@@ -179,7 +180,7 @@ def _argv(
         "--evidence-bundle",
         str(bundle),
         "--reviewer",
-        "project-owner",
+        reviewer,
         "--version",
         reviewed_version,
         "--from-version",
@@ -241,6 +242,23 @@ class TestH1CandidateSealHappyPath:
             == []
         )
         assert CANDIDATE_VERSION not in (root / "rule_manifest.json").read_text(encoding="utf-8")
+
+    def test_owner_authorized_ai_reviewer_marker_is_accepted(self, tmp_path, capsys):
+        root = _make_root(tmp_path)
+        bundle = _make_bundle(tmp_path, root)
+        module = _load_review_module()
+
+        assert (
+            _run(
+                module,
+                _argv(root, bundle, reviewer="owner-authorized-ai-reviewer"),
+            )
+            == 0
+        )
+        capsys.readouterr()
+        manifest = load_rule_manifest(root)
+        assert manifest.rule_version == REVIEWED_VERSION
+        assert manifest.review_status == "REVIEWED"
 
     def test_post_snapshot_candidate_mutation_fails_closed(self, tmp_path, monkeypatch, capsys):
         root = _make_root(tmp_path)

@@ -58,7 +58,7 @@ candidate ACTIVE first:
         --candidate-version v20260909-h1-compiled \
         --expected-candidate-hash <manifest-style-sha256> \
         --evidence-bundle <prepared-bundle.json> \
-        --reviewer project-owner \
+        --reviewer owner-authorized-ai-reviewer \
         --version v20260909-h1-reviewed \
         --from-version v20260824-compiled
 
@@ -112,6 +112,11 @@ _KINDS = (
     "DATASET_DOC",
     RULE_EVIDENCE_BUNDLE_KIND,
 )
+
+# Candidate sealing records the actor's truthful provenance.  The
+# owner-authorized AI marker is intentionally explicit: it is not a claim
+# that the project owner personally performed the evidence review.
+_CANDIDATE_REVIEWER_MARKERS = frozenset({"project-owner", "owner-authorized-ai-reviewer"})
 
 #: R4-A2.9 P0-02 (audit 20260825 #5 section 3.2): a version id is ONE
 #: single path component - starts alphanumeric, then alnum/./_/- only.
@@ -458,7 +463,14 @@ def main() -> int:
         choices=_KINDS[:-1],
         help="artifact kind for legacy --artifact mode",
     )
-    parser.add_argument("--reviewer", required=True, help="human reviewer identity")
+    parser.add_argument(
+        "--reviewer",
+        required=True,
+        help=(
+            "reviewer identity or truthful provenance marker; --candidate "
+            "allows 'project-owner' or 'owner-authorized-ai-reviewer'"
+        ),
+    )
     parser.add_argument(
         "--version",
         required=True,
@@ -504,8 +516,11 @@ def main() -> int:
         parser.error("--kind is only valid with --artifact")
     if args.candidate and args.artifact:
         parser.error("--candidate requires --evidence-bundle, not legacy --artifact")
-    if args.candidate and args.reviewer != "project-owner":
-        parser.error("--candidate requires the reviewer marker 'project-owner'")
+    if args.candidate and args.reviewer not in _CANDIDATE_REVIEWER_MARKERS:
+        parser.error(
+            "--candidate requires reviewer marker one of: "
+            "'project-owner', 'owner-authorized-ai-reviewer'"
+        )
     if args.candidate and not args.from_version:
         parser.error("--candidate requires --from-version/--expected-active-version")
     if args.candidate and not args.candidate_version:
@@ -602,8 +617,11 @@ def _candidate_review_workflow_locked(
     checks use that snapshot. ACTIVE is not changed until the shared staged
     workflow has passed every gate.
     """
-    if reviewer != "project-owner":
-        return _fail("H1 candidate seal requires reviewer marker 'project-owner'")
+    if reviewer not in _CANDIDATE_REVIEWER_MARKERS:
+        return _fail(
+            "H1 candidate seal requires reviewer marker one of: "
+            "'project-owner', 'owner-authorized-ai-reviewer'"
+        )
     if not expected_active_version:
         return _fail("H1 candidate seal requires an explicit expected ACTIVE parent")
     if not re.fullmatch(r"[0-9a-f]{64}", expected_candidate_hash):
