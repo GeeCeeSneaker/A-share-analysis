@@ -3727,3 +3727,12 @@
 - 14 条人工表仍为 `待填`：尚未写入任何 `APPROVE`/`REJECT`、reviewer marker 或 `REVIEWED` provenance；未运行 `scripts/rules/review.py --candidate`，未切换 ACTIVE，未启动/重试/消耗 Formal Production。
 
 下一步：在本独立 evidence/seal PR 中由项目 Owner/人工 Reviewer 实际打开每一份 raw artifact，完成 14 行条款、页码和 2020+ 边界裁决；再由独立 Reviewer 核验原文、来源 URL、hash lineage、候选/旧 parent 不可变性和最终迁移计划。两类审阅均关闭前不得 seal、切 ACTIVE 或进入 Formal B1-B7。
+
+## 2026-09-11 · Formal B1-B7 failure attribution follow-up
+
+> 状态：**READ-ONLY ATTRIBUTION ADDED / ORIGINAL VERDICT PRESERVED / REMEDIATION PR REQUIRED**
+
+- 针对独立 Reviewer 对 PR #42 提出的审计阻断，基于已封存 run `dad1e1b8-0c34-4031-8e94-cc87a03dbbf4` 和 catalog SHA-256 `bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53` 生成脱敏失败归因工件 [`formal_production_b1_b7_failure_attribution_20260910.json`](provider_verification/formal_production_b1_b7_failure_attribution_20260910.json)。工件 18,698 bytes，SHA-256 为 `1e193fcbc8abbeaadba0896219f98385e9ef3447e82ac2f9367d5cb96f34275b`，已绑定到 receipt。
+- 只读重算将 B4 的 125 条 `VALIDATED_FAIL` 分为：103 条 status canonical key 不匹配（ST 50、非 BSE 限价 28、公司行为 25）、20 条退市 `value` 标量 shape 与 validator 预期不匹配、2 条 BSE 空响应且归因保持 uncertain。该材料只记录可证实的框架症状，不把未到达的语义检查改写为 PASS，也不强行归因 Provider。
+- 6 项 FAILED core 与 1 项 MISSING core 已逐项给出 primary classification：字段名/规范化/shape/date handling 的框架或 validator defect，以及 BJ mapping endpoint limitation/uncertain；原 run、catalog、Golden、trading rules、verdict 均未修改，没有重跑 Production、resume、backfill 或上传 raw/凭证。
+- 下一步是独立 remediation PR 修复 canonical field/shape/date handling 并补测试；在归因审阅和后续治理决定前，不得重新执行本 Formal run。

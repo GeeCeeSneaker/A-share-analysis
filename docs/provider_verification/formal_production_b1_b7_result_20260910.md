@@ -75,23 +75,37 @@ uv run python scripts/spike/spike_runner.py --verdict --run-id dad1e1b8-0c34-403
 
 脱敏 receipt 及 spike_run.json、verdict.json、10 个 gate JSON、两份 catalog 的 SHA-256/字节数清单见 [formal_production_b1_b7_result_receipt_20260910.json](formal_production_b1_b7_result_receipt_20260910.json)。
 
-## 6. 供独立 Reviewer 的下一道门
+## 6. 失败归因（只读诊断）
 
-本 PR 只提交运行结果和审计锚点，不提交修复性 Provider 结论。Reviewer 应基于同一 run 的本地证据逐项复核：
+针对 Reviewer 指出的“131 条 VALIDATED_FAIL 缺少可审计原因”问题，已基于同一份已封存 catalog 和本地 raw 文件的字段/行数/哈希信息生成 [formal_production_b1_b7_failure_attribution_20260910.json](formal_production_b1_b7_failure_attribution_20260910.json)。该工件不是新运行结果：bytes=18,698，SHA-256=`1e193fcbc8abbeaadba0896219f98385e9ef3447e82ac2f9367d5cb96f34275b`，来源 catalog SHA-256 仍为 `bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53`。
+
+| 范围 | 数量 | 已确认的直接症状 | 当前归因 | 尚未证明的部分 |
+|---|---:|---|---|---|
+| B4 ST、非 BSE 限价、公司行为 | 103 | raw status 有 `MARKET_CODE+TRADE_DATE` 目标行，但校验器按 `SECURITY_CODE` 查找 | framework/validator defect | 字段规范化后，ST/限价/公司行为语义仍需重新验证 |
+| B4 退市 | 20 | `hist_code_list` 为 `value` 标量列，20/20 目标代码存在；校验器只读 row 字段 | framework/validator defect | `IS_LISTED=3` / `DELISTING_DATE` 仍未由该响应证明 |
+| B4 BSE 限价 | 2 | `835185.BJ` 请求成功但返回 0 行、空 schema | uncertain | 是历史覆盖/Provider 数据问题还是空响应适配问题 |
+
+对 6 个 FAILED core 和 1 个 MISSING core 的逐项分类也已写入同一工件：前 6 项当前主要暴露为字段名、canonical key、标量 shape 或日期字段读取问题；`symbol_mapping_unambiguous` 的 standalone parser case 为 PASS，但所需 `golden_bj_mapping` 因 endpoint gate 未生成，端点根因暂定 uncertain，不能用 standalone PASS 替代语义证明。B3 的 ST 与复权案例仍保持 OBSERVED；公司行为 exact-date 的 raw-only presence（股利 2/20、配股 5/5）不被升级为语义 PASS。
+
+以上归因不改写原 catalog、run 或 verdict；raw Provider 文件仍不提交。若归因被接受，框架缺陷应通过独立 remediation PR 修复并补测试，未来 Production run 仍需新的 scheduler authorization。
+
+## 7. 供独立 Reviewer 的下一道门
+
+本 PR 只提交运行结果、脱敏失败归因和审计锚点，不提交修复性 Provider 结论。Reviewer 应基于同一 run 的本地证据逐项复核：
 
 1. B2 的退市覆盖为何为 VALIDATED_FAIL，以及 hist_code_list 的实际语义能否满足项目定义；
 2. B3 daily-bar 单位、限价与 no-limit、历史 ST suspend、复权连续性的失败/观察边界；
-3. B4 125 条 Golden 全部失败的逐案原因，确认没有因数据缺失而被误判成通过；
+3. [失败归因工件](formal_production_b1_b7_failure_attribution_20260910.json)中的 B4 125 条分组、代表样本及 6+1 项 core 分类，确认框架症状与 Provider 未决问题没有被混为一谈；
 4. B5 99991231 sentinel、2020 起始覆盖与 BSE evidence=0 的关系；
 5. B7 五日全市场 evidence 的完整性、run-bound lineage 和 RawWriter nullable-shape 修复后的 read-back；
 6. verdict 的 fail-closed 逻辑与 CLOSED != GO 口径。
 
 在独立 Reviewer 接受本结果前，不启动 backfill、策略扩展、生产化或新的 Formal Production run；如需修复能力，必须先形成新的整改方案与授权，不得用修改期望值或重写历史 evidence 规避本次失败。
 
-## 7. 变更与验证声明
+## 8. 变更与验证声明
 
 - 本次运行没有修改 Golden、trading rules、capability expectations 或 provider configuration；
 - 没有从旧失败 run 拼接 phase/case/verdict；
 - 没有启动 backfill 或策略扩展；
 - 旧失败 run c3dc1f43-7678-461d-8824-e7b44186e0ac 的记录保持不可变历史；
-- 本文件和 receipt 是唯一新增的治理安全结果材料，raw evidence 保留在本地供受控复核。
+- 本文件、receipt 和失败归因工件是新增的治理安全结果材料，raw evidence 保留在本地供受控复核。

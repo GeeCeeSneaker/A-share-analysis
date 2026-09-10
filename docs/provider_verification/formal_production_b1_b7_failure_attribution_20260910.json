@@ -1,0 +1,364 @@
+{
+  "artifact_type": "GT-H3B-FORMAL-FAILURE-ATTRIBUTION",
+  "schema_version": 1,
+  "status": "READ_ONLY_DIAGNOSIS",
+  "purpose": "脱敏地解释同一已封存 Formal run 的失败/缺失原因，区分框架校验问题、历史覆盖问题和端点可用性问题；不改变 run、catalog、verdict 或任何 Golden/规则/期望值。",
+  "source_run": {
+    "run_id": "dad1e1b8-0c34-4031-8e94-cc87a03dbbf4",
+    "run_kind": "PRODUCTION",
+    "source_head": "fba18153a986cc1283a8c082e5d5629902d774cf",
+    "as_of_date": "20260909",
+    "terminal_status": "CLOSED",
+    "verdict": "SPIKE_INCOMPLETE",
+    "catalog_path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/cases/spike_case_catalog.jsonl",
+    "catalog_sha256": "bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53",
+    "catalog_record_count": 178
+  },
+  "derivation": {
+    "method": [
+      "对已封存 catalog 按 case_type、result、reason_code、validator_id 和 expected_fields 做确定性计数。",
+      "只读检查本地 run-bound gate/bundle 元数据及原始 Parquet 的 schema、行数、目标代码/日期存在性和数值一致性；不把原始 Provider payload 复制进本工件。",
+      "将运行时记录的 immediate failure cause 与 raw-only sanity check 分开记录；raw-only 检查不回写 case result，也不替代原 verdict。"
+    ],
+    "input_artifact_anchors": [
+      {
+        "scope": "B4 ST_STATUS",
+        "evidence_ref": "production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/raw/bundles/st_status-773ff1c2.json",
+        "evidence_sha256": "7d0bea12f72f7204322462c968d6336014889e4db6cd0f82947000e4ce627955"
+      },
+      {
+        "scope": "B4 DELISTED_MASTER",
+        "evidence_ref": "production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/raw/bundles/delisted_master-5dfa186b.json",
+        "evidence_sha256": "12a29b5af6440f86a4f6a97d412012e90942fbccf19967585c985e55ba3b0e10"
+      },
+      {
+        "scope": "B4 LIMIT_PIT_RULE",
+        "evidence_ref": "production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/raw/bundles/limit_pit_rule-c7cd2ddc.json",
+        "evidence_sha256": "4dde45fa7bfa79bdbfcf7ac884a707fd88eb48f0ae65bf052b072d360b6f6f21"
+      },
+      {
+        "scope": "B4 CORP_ACTION_CONTEXT",
+        "evidence_ref": "production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/raw/bundles/corp_action_context-ce7d64e1.json",
+        "evidence_sha256": "ef0b40c3df90b4c37977d79ba7c0557d0377e52afccb7621433b83fe64b2dea7"
+      },
+      {
+        "scope": "B3 daily_bar sample metadata",
+        "evidence_ref": "production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/raw/provider=amazingdata/dataset=daily_bar/fe2c5cb7-a959-459b-96bb-2ece1634776a.meta.json",
+        "content_hash": "6246dcd5f24a61921deda290641ba85ff19cf09eaa4d7450fcdd258732e975b4"
+      },
+      {
+        "scope": "B5 history fixture metadata",
+        "evidence_ref": "production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/raw/provider=amazingdata/dataset=daily_bar/018f0f8b-58e7-4ef5-aa2c-26abe859394d.meta.json",
+        "content_hash": "73c1caed6063af320a0a082a5a39545e13f565a650aad555017b0f2a886b17e5"
+      }
+    ],
+    "new_production_run_created": false,
+    "verdict_recomputed": false,
+    "closed_run_or_catalog_modified": false,
+    "raw_provider_payloads_committed": false
+  },
+  "catalog_totals": {
+    "record_count": 178,
+    "result_counts": {
+      "VALIDATED_PASS": 38,
+      "VALIDATED_FAIL": 131,
+      "OBSERVED": 6,
+      "MISSING": 1,
+      "NOT_TESTABLE_PERMISSION": 2
+    },
+    "all_records_bound_to_source_run": true
+  },
+  "b4": {
+    "golden_case_count": 125,
+    "recorded_result_counts": {
+      "VALIDATED_FAIL": 125
+    },
+    "recorded_reason_code_counts": {
+      "EMPTY": 95,
+      "STATUS_EXACT_MATCH_FAILURE": 30
+    },
+    "case_type_counts": {
+      "golden_st_transition": 50,
+      "golden_delisted": 20,
+      "golden_limit_regime": 30,
+      "golden_corporate_action": 25
+    },
+    "expected_semantic_category_counts": {
+      "IS_ST_SEC=true": 38,
+      "IS_ST_SEC=false": 12,
+      "IS_LISTED=3": 20,
+      "PRICE_HIGH_LMT_RATE+PRICE_LOW_LMT_RATE": 17,
+      "PRICE_HIGH_LMT_RATE": 12,
+      "HIGH_LIMITED+LOW_LIMITED": 1,
+      "IS_WD_SEC": 20,
+      "IS_WD_SEC+event_type=RIGHT_ISSUE": 5
+    },
+    "derived_failure_attribution_counts": {
+      "STATUS_LOOKUP_CANONICAL_KEY_MISMATCH": 103,
+      "DELISTED_MASTER_SCALAR_VALUE_SHAPE_MISMATCH": 20,
+      "BSE_STATUS_EMPTY_RESPONSE": 2
+    },
+    "failure_attributions": [
+      {
+        "reason_id": "STATUS_LOOKUP_CANONICAL_KEY_MISMATCH",
+        "count": 103,
+        "case_type_counts": {
+          "golden_st_transition": 50,
+          "golden_limit_regime_with_native_status_match": 28,
+          "golden_corporate_action": 25
+        },
+        "recorded_validator_symptom": "status-row lookup reports no provider row, or exact-match limit validation fails before semantic comparison",
+        "raw_sanity_check": {
+          "native_status_columns": [
+            "MARKET_CODE",
+            "TRADE_DATE",
+            "PRECLOSE",
+            "HIGH_LIMITED",
+            "LOW_LIMITED",
+            "PRICE_HIGH_LMT_RATE",
+            "PRICE_LOW_LMT_RATE",
+            "IS_ST_SEC",
+            "IS_SUSP_SEC",
+            "IS_WD_SEC",
+            "IS_XR_SEC"
+          ],
+          "target_pairs_present_under_MARKET_CODE": {
+            "golden_st_transition": "50/50",
+            "golden_limit_regime_non_bse": "28/28",
+            "golden_corporate_action": "25/25"
+          },
+          "canonical_SECURITY_CODE_column_present": false
+        },
+        "immediate_attribution": "framework/validator defect",
+        "confidence": "HIGH",
+        "limitation": "Native target-row presence does not by itself prove every expected field or price rule; those checks were not reached for these cases."
+      },
+      {
+        "reason_id": "DELISTED_MASTER_SCALAR_VALUE_SHAPE_MISMATCH",
+        "count": 20,
+        "case_type_counts": {
+          "golden_delisted": 20
+        },
+        "recorded_validator_symptom": "absent from historical code list (survivorship bias)",
+        "raw_sanity_check": {
+          "native_hist_code_list_columns": [
+            "value"
+          ],
+          "target_delisted_case_codes_present_in_value_column": "20/20",
+          "validator_lookup_key": "SECURITY_CODE",
+          "validator_listing_state_keys": [
+            "IS_LISTED",
+            "DELISTING_DATE"
+          ]
+        },
+        "immediate_attribution": "framework/validator defect",
+        "confidence": "HIGH",
+        "limitation": "A scalar code-list value does not carry IS_LISTED=3 or DELISTING_DATE, so the provider's delisted-state semantics remain unproven even though the codes are present."
+      },
+      {
+        "reason_id": "BSE_STATUS_EMPTY_RESPONSE",
+        "count": 2,
+        "case_type_counts": {
+          "golden_limit_regime": 2
+        },
+        "case_ids": [
+          "GT-LIMIT-BSE30-20220104",
+          "GT-LIMIT-BSE30-20220601"
+        ],
+        "recorded_validator_symptom": "STATUS_EXACT_MATCH_FAILURE: no status row",
+        "raw_sanity_check": {
+          "provider_symbol": "835185.BJ",
+          "requested_range": "20220101..20221231",
+          "returned_rows": 0,
+          "returned_parquet_columns": []
+        },
+        "immediate_attribution": "uncertain",
+        "confidence": "MEDIUM",
+        "limitation": "The successful empty response is consistent with a Provider historical-coverage/data gap, but the empty schema also prevents ruling out an adapter/shape issue. It is not treated as a Provider-only conclusion."
+      }
+    ],
+    "representative_samples": [
+      {
+        "case_id": "GT-H2-ST-ST_ADD-300965-20240426",
+        "route": "ST_STATUS",
+        "capability": "historical_st_suspend",
+        "recorded_result": "VALIDATED_FAIL",
+        "recorded_reason_code": "EMPTY",
+        "recorded_validator": "golden_golden_st_transition_v1",
+        "expected_summary": "IS_ST_SEC=true on 20240426",
+        "observed_summary": "catalog says no provider row; local raw status has MARKET_CODE=300965.SZ and TRADE_DATE=20240426 (one row), but no SECURITY_CODE key",
+        "attribution": "framework/validator defect"
+      },
+      {
+        "case_id": "GT-LIMIT-ST5-600518-20190603",
+        "route": "LIMIT_PIT_RULE",
+        "capability": "limit_price_and_no_limit_days",
+        "recorded_result": "VALIDATED_FAIL",
+        "recorded_reason_code": "STATUS_EXACT_MATCH_FAILURE",
+        "recorded_validator": "limit_pit_rule_v2",
+        "expected_summary": "PRICE_HIGH_LMT_RATE=0.05 and PRICE_LOW_LMT_RATE=0.05",
+        "observed_summary": "local raw status has MARKET_CODE=600518.SH and TRADE_DATE=20190603 (one row); exact lookup uses SECURITY_CODE and stops before rule resolution",
+        "attribution": "framework/validator defect"
+      },
+      {
+        "case_id": "GT-LIMIT-BSE30-20220601",
+        "route": "LIMIT_PIT_RULE",
+        "capability": "limit_price_and_no_limit_days",
+        "recorded_result": "VALIDATED_FAIL",
+        "recorded_reason_code": "STATUS_EXACT_MATCH_FAILURE",
+        "recorded_validator": "limit_pit_rule_v2",
+        "expected_summary": "PRICE_HIGH_LMT_RATE=0.3",
+        "observed_summary": "native status response for 835185.BJ over 2022 has zero rows and an empty schema",
+        "attribution": "uncertain"
+      },
+      {
+        "case_id": "GT-CA-000002-20220825",
+        "route": "CORP_ACTION_CONTEXT",
+        "capability": "adj_factor_corporate_action_continuity",
+        "recorded_result": "VALIDATED_FAIL",
+        "recorded_reason_code": "EMPTY",
+        "recorded_validator": "golden_golden_corporate_action_v1",
+        "expected_summary": "IS_WD_SEC=true on 20220825",
+        "observed_summary": "local raw status has MARKET_CODE=000002.SZ and TRADE_DATE=20220825; status pre-check fails before event/price continuity checks",
+        "attribution": "framework/validator defect"
+      },
+      {
+        "case_id": "GT-H2-DELIST-000540-20230630",
+        "route": "DELISTED_MASTER",
+        "capability": "security_master_with_delisted",
+        "recorded_result": "VALIDATED_FAIL",
+        "recorded_reason_code": "EMPTY",
+        "recorded_validator": "delisted_master_v1",
+        "expected_summary": "IS_LISTED=3 for 000540.SZ on 20230630",
+        "observed_summary": "local hist_code_list payload is a scalar value column and contains 000540.SZ; validator only inspects SECURITY_CODE/IS_LISTED/DELISTING_DATE row fields",
+        "attribution": "framework/validator defect"
+      }
+    ],
+    "deferred_corporate_action_raw_check": {
+      "purpose": "仅说明当前 status-key 阻断之后还有哪些问题未被本次运行时 validator 评估；不改写 25 条 catalog 结果。",
+      "golden_event_class_counts": {
+        "DIVIDEND_EX_DATE": 20,
+        "RIGHT_ISSUE_EX_DATE": 5
+      },
+      "native_event_exact_date_presence": {
+        "dividend": "2/20",
+        "right_issue": "5/5"
+      },
+      "interpretation": "这是 Provider/data coverage 与框架修复后需重新验证的未决问题；本次不把它强行归因给 Provider，也不把 raw-only presence 当作语义 PASS。"
+    }
+  },
+  "core_capability_attribution": [
+    {
+      "capability_id": "security_master_with_delisted",
+      "verdict_status": "FAILED",
+      "primary_classification": "framework/validator defect",
+      "decisive_records": [
+        "SECURITY-SECURITY_MASTER_WITH_DELISTED-MARKET-20260909",
+        "20 golden_delisted records"
+      ],
+      "reason": "B2 输入是 value-only scalar list，validator 只读取 row 的 IS_LISTED/DELISTING_DATE；B4 20 个目标代码在 value 列均存在。因此当前 0 delisted 不能作为 Provider 没有退市数据的证据。",
+      "remaining_provider_question": "需要先修复/明确 scalar-list 到 canonical security rows 的转换，并取得可证明 IS_LISTED/DELISTING_DATE 的字段后再判定 Provider 能力。"
+    },
+    {
+      "capability_id": "daily_bar_units",
+      "verdict_status": "FAILED",
+      "primary_classification": "framework/validator defect",
+      "decisive_records": [
+        "DAILY-DAILY_BAR_UNITS-SAMPLE-20260909"
+      ],
+      "reason": "raw daily_bar schema 使用 close/volume/amount；_observe_units 只读取 CLOSE_PRICE/CLOSE、VOLUME、AMOUNT，导致 observed_units=UNDETERMINED。对本地 sample 的 lower-case 数值列，238/238 行通过 amount/volume 与 close 的 15% 一致性检查。",
+      "remaining_provider_question": "字段名修复后仍需独立确认单位契约；当前 FAIL 不能直接归因于 Provider 单位错误。"
+    },
+    {
+      "capability_id": "historical_st_suspend",
+      "verdict_status": "FAILED",
+      "primary_classification": "framework/validator defect",
+      "decisive_records": [
+        "HISTORICAL-HISTORICAL_ST_SUSPEND-SAMPLE-20260909",
+        "50 golden_st_transition records"
+      ],
+      "reason": "B3 自身是 OBSERVED（结构合法但按设计没有 Golden facts）；使 capability 失败的是 B4。50 个目标代码/日期在 raw MARKET_CODE/TRADE_DATE 下均有行，golden validator 却按 SECURITY_CODE 做索引，当前 no provider row 是 canonicalization 缺失的直接症状。",
+      "remaining_provider_question": "canonical field mapping 修复后才可评估 ST_ADD/ST_REMOVE 的字段语义；本次不把当前失败当作 Provider 的 ST 能力结论。"
+    },
+    {
+      "capability_id": "limit_price_and_no_limit_days",
+      "verdict_status": "FAILED",
+      "primary_classification": "framework/validator defect",
+      "decisive_records": [
+        "LIMIT-LIMIT_PRICE_AND_NO_LIMIT_DAYS-SAMPLE-20260909",
+        "30 golden_limit_regime records",
+        "LIMIT-LIMIT_PRICE_AND_NO_LIMIT_DAYS-BSE-20220601"
+      ],
+      "reason": "B3 limit validator 从 raw status 的 MARKET_CODE 取不到 code，产生空 symbol 和 RULE_UNRESOLVED；B4 非 BSE 的 28/28 目标日期在 native key 下存在，仍在 status exact lookup 处失败。另有 2 个 BSE Golden 和 B5 BSE sample 返回空响应。",
+      "secondary_unresolved_classification": "uncertain",
+      "remaining_provider_question": "先修复 status canonicalization，再单独决定 835185.BJ 空响应是历史覆盖/Provider 数据限制还是空 schema 适配问题；当前没有合法的限价语义结论。"
+    },
+    {
+      "capability_id": "adj_factor_corporate_action_continuity",
+      "verdict_status": "FAILED",
+      "primary_classification": "framework/validator defect",
+      "decisive_records": [
+        "ADJ-ADJ_FACTOR_CORPORATE_ACTION_CONTINUITY-SAMPLE-20260909",
+        "25 golden_corporate_action records"
+      ],
+      "reason": "B3 adj case 是 OBSERVED，因为没有 price context，按 validator 契约不能升级；B4 25 条 CA case 在 status pre-check 读取 SECURITY_CODE 失败，尚未执行 event source、ex-date、kline 或 factor continuity 语义检查。",
+      "remaining_provider_question": "status canonicalization 修复后必须重新审阅 event/price continuity；raw-only dividend 2/20、right-issue 5/5 的存在性检查不等于当前语义 PASS。"
+    },
+    {
+      "capability_id": "history_start_2020",
+      "verdict_status": "FAILED",
+      "primary_classification": "framework/validator defect",
+      "decisive_records": [
+        "HISTORY-HISTORY_START_2020-FIXTURES-20260909"
+      ],
+      "reason": "raw daily_bar 使用小写 kline_time；probe 只读取 KLINE_TIME，找不到字段时用 99991231 sentinel，因此 catalog 的 earliest=99991231 不是 raw 的实际最早日期。raw fixture 的最早日期为 600519.SH/000001.SZ=20200102、835185.BJ=20211115、300104.SZ=20200605。",
+      "remaining_provider_question": "修复日期字段读取后，还需明确 20200101 非交易日与 earliest<=20200101 门槛的契约；当前 sentinel 失败不支持 Provider 历史覆盖结论。"
+    },
+    {
+      "capability_id": "symbol_mapping_unambiguous",
+      "verdict_status": "SPIKE_INCOMPLETE",
+      "primary_classification": "permission/endpoint limitation",
+      "decisive_records": [
+        "SYMBOL-SYMBOL_MAPPING_UNAMBIGUOUS-MARKET-",
+        "GATE-code_mapping_bj-InfoData.get_bj_code_mapping",
+        "GATE-code_mapping_bj-REPORT"
+      ],
+      "reason": "standalone symbol_mapping_unambiguous case 是 VALIDATED_PASS（5562 symbols ok），但 capability definition 还要求 1 个 golden_bj_mapping；该 case type 没有生成，因为 code_mapping_bj endpoint gate 为 GATE_ENDPOINT_FAIL，report 为 NOT_TESTABLE_PERMISSION/ENDPOINT_AVAILABLE blocked。",
+      "endpoint_root_cause": "uncertain",
+      "remaining_provider_question": "需在端点可证明可用后生成并评估 golden_bj_mapping；不能用 standalone parser PASS 替代 BJ historical semantic proof。"
+    }
+  ],
+  "non_failure_context": [
+    {
+      "case_id": "HISTORICAL-HISTORICAL_ST_SUSPEND-SAMPLE-20260909",
+      "result": "OBSERVED",
+      "meaning": "B3 只证明状态域结构合法；没有 Golden facts，不能判定 ST/suspension 语义。"
+    },
+    {
+      "case_id": "ADJ-ADJ_FACTOR_CORPORATE_ACTION_CONTINUITY-SAMPLE-20260909",
+      "result": "OBSERVED",
+      "meaning": "没有价格上下文，不能判定复权连续性；不是 Provider FAIL。"
+    },
+    {
+      "case_id": "SYMBOL-SYMBOL_MAPPING_UNAMBIGUOUS-MARKET-",
+      "result": "VALIDATED_PASS",
+      "meaning": "通用 symbol parser/uniqueness 这一层通过；BJ historical semantic 子门仍缺失。"
+    }
+  ],
+  "review_conclusion": {
+    "confirmed_framework_or_validator_signals": [
+      "status payload native MARKET_CODE 未被 golden/limit validator canonicalize 到 SECURITY_CODE",
+      "hist_code_list 的 value-only scalar shape 未被 delisted validator 转为可判定 row",
+      "daily_bar lower-case field names 未被 units observer 与 history coverage probe 一致读取"
+    ],
+    "provider_or_history_questions_left_open": [
+      "BSE 835185.BJ 的成功空响应及 empty schema",
+      "CA event endpoint 的 exact-date coverage 在 status pre-check 修复后的真实语义",
+      "BJ mapping endpoint 的可用性/权限根因",
+      "history coverage 门槛对 20200101 非交易日的契约解释"
+    ],
+    "preserve_original_verdict": true,
+    "original_verdict_interpretation": "SPIKE_INCOMPLETE 保持不变；本工件证明了若干当前 harness attribution defect，但不把 Provider 或框架修复后的未执行语义检查改写成 PASS。",
+    "next_governed_action": "在独立 review 接受本归因后，另开 remediation PR 修复 canonical field/shape/date handling 与测试；不得重跑本次已授权 Formal，未来 Production run 需新的 scheduler authorization。"
+  }
+}

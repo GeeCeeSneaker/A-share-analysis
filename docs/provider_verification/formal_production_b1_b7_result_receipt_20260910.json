@@ -176,6 +176,16 @@
     "sealed": true,
     "state": "CLOSED_RUN_CATALOG"
   },
+  "failure_attribution": {
+    "path": "docs/provider_verification/formal_production_b1_b7_failure_attribution_20260910.json",
+    "bytes": 18698,
+    "sha256": "1e193fcbc8abbeaadba0896219f98385e9ef3447e82ac2f9367d5cb96f34275b",
+    "status": "READ_ONLY_DIAGNOSIS",
+    "derived_from_run_id": "dad1e1b8-0c34-4031-8e94-cc87a03dbbf4",
+    "derived_from_case_catalog_sha256": "bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53",
+    "raw_provider_data_included": false,
+    "run_or_verdict_modified": false
+  },
   "raw_inventory": {
     "published": false,
     "local_file_count": 27974,
@@ -252,6 +262,11 @@
       "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/cases/spike_case_catalog.jsonl",
       "bytes": 155331,
       "sha256": "bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53"
+    },
+    {
+      "path": "docs/provider_verification/formal_production_b1_b7_failure_attribution_20260910.json",
+      "bytes": 18698,
+      "sha256": "1e193fcbc8abbeaadba0896219f98385e9ef3447e82ac2f9367d5cb96f34275b"
     }
   ],
   "governance": {

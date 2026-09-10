@@ -6036,3 +6036,20 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 - Golden、trading rules、capability expectations、provider configuration 均未修改；没有修改期望值制造结果，没有从旧 run 拼接 phase/case/verdict，没有启动 backfill、策略扩展或生产化。
 - raw Provider 文件、原始 payload、账号、密码、真实 endpoint、Token、Cookie、profile 原文和专有 SDK/runtime 不进入 GitHub；本 PR 只提交脱敏结果与可校验锚点。
 - CLOSED 不等于 GO。独立 Reviewer 必须基于 run-bound evidence 复核 B2/B3/B4/B5、B7 完整性、catalog seal 和 fail-closed verdict；在接受前，Formal 新 run、backfill、策略扩展和生产化均保持禁止。
+
+## DM-20260911-FORMAL-B1B7-014 · 独立审阅要求的失败归因补充
+
+**Type**：C1 — read-only formal-result attribution and remediation handoff
+**Date**：2026-09-11
+**Status**：`ATTRIBUTION ADDED / ORIGINAL RUN AND VERDICT PRESERVED / REMEDIATION PR REQUIRED`
+
+**已完成**
+
+- 针对 PR #42 独立审阅意见，使用已封存 run `dad1e1b8-0c34-4031-8e94-cc87a03dbbf4`、catalog SHA-256 `bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53` 及本地 raw 的字段/行数/哈希摘要，新增 [`formal_production_b1_b7_failure_attribution_20260910.json`](../provider_verification/formal_production_b1_b7_failure_attribution_20260910.json)。该工件为 18,698 bytes，SHA-256 为 `1e193fcbc8abbeaadba0896219f98385e9ef3447e82ac2f9367d5cb96f34275b`，并已写入正式 receipt 的 artifact inventory。
+- B4 125 条失败的确定性分组为 103 条 status canonical-key mismatch、20 条 hist code-list scalar-value shape mismatch、2 条 BSE empty response（uncertain）。代表样本和 B2/B3/B5 对应的 6+1 core attribution 均在工件中记录。
+- 归因将当前可证明的字段/规范化/shape/date 处理缺陷与 Provider/data、权限/端点、历史覆盖等未决问题分开；不把 raw-only presence 当语义 PASS，不改写 catalog 或 `SPIKE_INCOMPLETE` verdict。
+
+**硬边界与下一步**
+
+- 没有 Production 重跑、resume、Golden/rule/expectation/provider 配置修改、backfill、策略扩展或 raw/凭证上传。
+- 若独立 Reviewer 接受归因，另开 remediation PR 修复 canonical field/shape/date handling 并补回归测试；任何未来 Production run 都须取得新的 scheduler authorization。
