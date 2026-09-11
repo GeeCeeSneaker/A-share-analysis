@@ -3829,3 +3829,13 @@
 - `history_start_2020` 的三个明确 fixture 仍为当前代码 replay PASS，但因 `300104.SZ` deferred，`core_capability_projection` 现在明确为 `REPLAY_CORE_UNRESOLVED`，reason 为 `HISTORICAL_DELISTED_FIXTURE_DEFERRED`。
 - v3 artifact [`formal_readonly_replay_20260911.json`](provider_verification/formal_readonly_replay_20260911.json) 绑定精确提交 `80df040f85158281d8382e9b2ea8dcf914a28d16`，大小 51,421 bytes，SHA-256 `f9c2560996ae72db642d858d115e078cf51c93cc6fa9ad738bb1d35ceb1b3631`；封存 evidence tree 仍为 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`，`provider_calls=0`，所有 writer call 为 0。
 - 本地验证：全量 `uv run pytest -q -r fEs` 为 `1721 collected, 1718 passed, 3 skipped`；Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。CI 与精确 head 上的独立 follow-up review 仍待 GitHub 侧完成；PR #44 必须保持 Draft。
+
+## 2026-09-12 — Targeted AmazingData capability-closure implementation
+
+> Status: `TARGETED NON-PRODUCTION PROBES / FRAMEWORK REMEDIATION IN PROGRESS / NO FORMAL RUN`
+
+- Started from clean `main@f33997ed2c5a5e1ab66eb12f754e77a8a65c8ab4`, following Issue #39 comment `5636256765`. No Golden, H1 rule, 2020 baseline, sealed Formal artifact, catalog, or verdict was changed.
+- Corrected the verified AmazingData 1.1.9 contracts in the exchange facade: history status now sends `begin_date`/`end_date` and `is_local=False`; BJ mapping uses the complete-table endpoint without an unsupported `code_list`; daily K-line calls pass SDK `period=10008` explicitly; corporate-action probes can carry an explicit date window.
+- Added narrow provider-shape handling: status rows are filtered only when known status markers coexist with missing identity and date; dividend rows are filtered only for the observed non-final progress codes `1`, `2`, and `12`. Partial or unknown malformed observations remain fail-closed. Added provider-shaped regression tests.
+- Added `scripts/spike/capability_closure_probe.py`, which performs only the six authorized non-Production probes, stores raw exchanges under ignored local data, and emits sanitized counts/schema/hashes/classifications without credentials or raw payloads.
+- Local verification passed: full `uv run pytest -q`, targeted Ruff, bytecode compilation, `uv run mypy`, `uv pip check`, and `git diff --check`. The final online receipt and compact capability matrix will be added after the source commit is fixed.

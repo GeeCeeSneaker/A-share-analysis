@@ -106,6 +106,24 @@ class TestProviderRowAdapter:
         with pytest.raises(ProviderRowShapeError, match="exchange-qualified identity"):
             canonical_status_view([{"SECURITY_CODE": "600000", "TRADE_DATE": "20240102"}])
 
+    def test_status_view_skips_identity_and_date_free_non_observation_row(self):
+        row = {
+            "MARKET_CODE": None,
+            "TRADE_DATE": None,
+            "PRICE_HIGH_LMT_RATE": 0.1,
+            "PRICE_LOW_LMT_RATE": 0.1,
+            "IS_ST_SEC": "0",
+        }
+        assert canonical_status_view([row]) == []
+
+    def test_status_view_does_not_skip_partial_observation_shape(self):
+        with pytest.raises(ProviderRowShapeError, match="missing or invalid TRADE_DATE"):
+            canonical_status_view([{"MARKET_CODE": "600000.SH", "TRADE_DATE": None}])
+
+    def test_status_view_does_not_skip_unrecognized_empty_shape(self):
+        with pytest.raises(ProviderRowShapeError, match="exchange-qualified identity"):
+            canonical_status_view([{}])
+
 
 class TestNativeRowsReachValidators:
     def test_golden_comparison_accepts_full_market_code(self):

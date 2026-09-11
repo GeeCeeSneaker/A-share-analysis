@@ -9,8 +9,9 @@ Every public method:
 - records a RawEnvelope for EVERY exchange, success OR failure
   (audit P1-04: failed calls are auditable evidence too).
 
-Method signatures follow the SDK manual; parameter corrections happen in
-Spike B2-B7 (real-account evidence) - never silently.
+Method signatures follow the SDK manual.  The small set of SDK keyword
+differences verified during the capability-closure preflight is normalized
+here, with the effective provider parameters retained on every envelope.
 """
 
 from __future__ import annotations
@@ -318,16 +319,26 @@ class AmazingDataProvider:
     def get_history_stock_status_exchange(
         self, start_date: int, end_date: int, code_list: list[str]
     ) -> Any:
+        # AmazingData 1.1.9 calls these bounds ``begin_date``/``end_date``
+        # and uses ``is_local`` to select the broker endpoint.  Passing the
+        # facade's historical ``start_date`` name is silently ignored by the
+        # SDK's kwargs branch, so it can return an unbounded local cache.
+        # Evidence probes must always use the requested live window.
+        effective_params = {
+            "begin_date": start_date,
+            "end_date": end_date,
+            "code_list": list(code_list),
+            "is_local": False,
+        }
         return self._execute_exchange(
             HISTORY_STOCK_STATUS,
             lambda: self._info().get_history_stock_status(
-                start_date=start_date, end_date=end_date, code_list=code_list
+                code_list=code_list,
+                begin_date=start_date,
+                end_date=end_date,
+                is_local=False,
             ),
-            params={
-                "start_date": start_date,
-                "end_date": end_date,
-                "code_list": list(code_list),
-            },
+            params=effective_params,
         )
 
     def get_history_stock_status(self, start_date: int, end_date: int, code_list: list[str]) -> Any:
@@ -353,7 +364,13 @@ class AmazingDataProvider:
     def get_backward_factor(self, code_list: list[str]) -> Any:
         return self.get_backward_factor_exchange(code_list).payload
 
-    def get_dividend_exchange(self, code_list: list[str]) -> Any:
+    def get_dividend_exchange(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int | None = None,
+        end_date: int | None = None,
+    ) -> Any:
         """Corporate-action event records (dividend/right issue).
 
         R4-A2.4 P0-05: the CA validator needs an EVENT FACT SOURCE (exact
@@ -361,13 +378,21 @@ class AmazingDataProvider:
         endpoint is the provider-side event SoR (capability
         ``corporate_action`` -> InfoData.get_dividend).
         """
+        date_params = _optional_date_params(begin_date, end_date)
+        effective_params = {"code_list": list(code_list), "is_local": False, **date_params}
         return self._execute_exchange(
             DIVIDEND,
-            lambda: self._info().get_dividend(code_list=code_list),
-            params={"code_list": list(code_list)},
+            lambda: self._info().get_dividend(code_list=code_list, is_local=False, **date_params),
+            params=effective_params,
         )
 
-    def get_right_issue_exchange(self, code_list: list[str]) -> Any:
+    def get_right_issue_exchange(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int | None = None,
+        end_date: int | None = None,
+    ) -> Any:
         """Right-issue event records (R4-A2.5 P0-04).
 
         Dividend and right-issue are SEPARATE event streams in the
@@ -375,10 +400,14 @@ class AmazingDataProvider:
         record can never substitute a RIGHT_ISSUE expectation in the CA
         golden validation.
         """
+        date_params = _optional_date_params(begin_date, end_date)
+        effective_params = {"code_list": list(code_list), "is_local": False, **date_params}
         return self._execute_exchange(
             RIGHT_ISSUE,
-            lambda: self._info().get_right_issue(code_list=code_list),
-            params={"code_list": list(code_list)},
+            lambda: self._info().get_right_issue(
+                code_list=code_list, is_local=False, **date_params
+            ),
+            params=effective_params,
         )
 
     def get_right_issue(self, code_list: list[str]) -> Any:
@@ -389,10 +418,16 @@ class AmazingDataProvider:
         (R4-B1 B1-02, audit 20260828): capability ``code_mapping_bj`` ->
         InfoData.get_bj_code_mapping. A generic stock-code list is a
         stand-in and can NEVER prove this endpoint."""
+        # The 1.1.9 SDK signature is ``get_bj_code_mapping(local_path=...,
+        # is_local=True)``: it has no ``code_list`` argument and returns the
+        # complete mapping table.  Keep the requested list in the envelope
+        # as a client-side assertion for the gate, but never send it as an
+        # unsupported SDK keyword (which otherwise raises TypeError before
+        # the endpoint can be tested).
         return self._execute_exchange(
             BJ_CODE_MAPPING,
-            lambda: self._info().get_bj_code_mapping(code_list=code_list),
-            params={"code_list": list(code_list)},
+            lambda: self._info().get_bj_code_mapping(is_local=False),
+            params={"code_list_filter": list(code_list), "is_local": False},
         )
 
     def get_bj_code_mapping(self, code_list: list[str]) -> Any:
@@ -490,7 +525,13 @@ class AmazingDataProvider:
         internally and is FORBIDDEN on spike/formal evidence paths (static
         AST test). The calendar exchange of the convenience path never
         reaches formal evidence.
+
+        AmazingData 1.1.9 names the frequency argument ``period``.  Its
+        default is ``10000`` (1-minute), while the SDK's daily value is
+        ``10008``; pass the effective period explicitly so ``DAY`` cannot
+        silently become minute data.
         """
+        period = _period_for_kline_type(kline_type)
         days = trading_days
         if days is None:
             calendar = self.get_calendar()
@@ -501,6 +542,7 @@ class AmazingDataProvider:
                 code_list=code_list,
                 begin_date=begin_date,
                 end_date=end_date,
+                period=period,
                 kline_type=kline_type,
             ),
             params={
@@ -508,6 +550,7 @@ class AmazingDataProvider:
                 "begin_date": begin_date,
                 "end_date": end_date,
                 "kline_type": kline_type,
+                "period": period,
                 "trading_days": list(days),
             },
         )
@@ -546,6 +589,7 @@ class AmazingDataProvider:
         forbidden; consumers MUST call this wrapper (not
         ``query_kline_exchange``) for index klines.
         """
+        period = _period_for_kline_type(kline_type)
         days = trading_days
         if days is None:
             calendar = self.get_calendar()
@@ -556,6 +600,7 @@ class AmazingDataProvider:
                 code_list=code_list,
                 begin_date=begin_date,
                 end_date=end_date,
+                period=period,
                 kline_type=kline_type,
             ),
             params={
@@ -563,6 +608,7 @@ class AmazingDataProvider:
                 "begin_date": begin_date,
                 "end_date": end_date,
                 "kline_type": kline_type,
+                "period": period,
                 "trading_days": list(days),
             },
         )
@@ -591,6 +637,32 @@ class AmazingDataProvider:
         exchange on the explicit path.
         """
         return self.session.sdk.MarketData(list(trading_days))
+
+
+def _optional_date_params(begin_date: int | None, end_date: int | None) -> dict[str, int]:
+    """Build a complete SDK date window or no date window.
+
+    AmazingData's InfoData event methods use the presence of ``begin_date``
+    to select their kwargs/download branch.  Rejecting a half-open window
+    avoids accidentally sending a request whose effective range differs from
+    the range recorded on the envelope.
+    """
+    if (begin_date is None) != (end_date is None):
+        raise ValueError("begin_date and end_date must be supplied together")
+    if begin_date is None or end_date is None:
+        return {}
+    if begin_date > end_date:
+        raise ValueError("begin_date must be <= end_date")
+    return {"begin_date": begin_date, "end_date": end_date}
+
+
+def _period_for_kline_type(kline_type: str) -> int:
+    """Translate the supported facade frequency to the SDK period value."""
+    if kline_type.upper() == "DAY":
+        return 10008  # AmazingData Period.day.value (verified in 1.1.9)
+    raise ValueError(
+        f"unsupported kline_type {kline_type!r}; the evidence facade supports DAY only"
+    )
 
 
 def _count_rows(result: Any) -> int:

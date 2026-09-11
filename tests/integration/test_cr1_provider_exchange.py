@@ -195,6 +195,42 @@ class TestProviderExchangeContract:
         assert params["code_list"] == ["600000.SH"]
         assert params["trading_days"] == [20260813, 20260814]
 
+    def test_daily_kline_passes_the_sdk_daily_period(self):
+        """DAY must map to AmazingData Period.day.value, not its min1 default."""
+        provider = _provider()
+        calls: list[dict[str, object]] = []
+
+        class FakeMarket:
+            def __init__(self, days: list[int]) -> None:
+                self.days = days
+
+            def query_kline(self, **kwargs: object):
+                calls.append(dict(kwargs))
+                return [{"KLINE_TIME": 20260813}]
+
+        class FakeSdk:
+            MarketData = FakeMarket
+
+        provider.session.__dict__["sdk"] = FakeSdk()
+        exchange = provider.query_kline_exchange(
+            ["300104.SZ"],
+            begin_date=20260813,
+            end_date=20260813,
+            kline_type="DAY",
+            trading_days=[20260813],
+        )
+
+        assert calls == [
+            {
+                "code_list": ["300104.SZ"],
+                "begin_date": 20260813,
+                "end_date": 20260813,
+                "period": 10008,
+                "kline_type": "DAY",
+            }
+        ]
+        assert exchange.envelope.request_params["period"] == 10008
+
     def test_request_params_full_and_hashed(self):
         """CR-1.2 (audit R4-A2.4 section 3.3): FULL params persisted + full
         params hash; same size over DIFFERENT symbols hashes differently."""
@@ -218,15 +254,89 @@ class TestProviderExchangeContract:
             20220101, 20220102, ["600000.SH", "000001.SZ"]
         )
         assert first.envelope.request_params == {
-            "start_date": 20220101,
+            "begin_date": 20220101,
             "end_date": 20220102,
             "code_list": ["600000.SH", "000001.SZ"],
+            "is_local": False,
         }
         # equal size, different symbols -> different params AND hash
         assert first.envelope.request_params != second.envelope.request_params
         assert first.envelope.request_params_hash != second.envelope.request_params_hash
         # same request -> same hash (reconstruction-stable)
         assert third.envelope.request_params_hash == first.envelope.request_params_hash
+
+    def test_history_status_uses_the_sdk_date_contract(self):
+        """The facade must not pass its legacy start_date name to the SDK.
+
+        AmazingData 1.1.9 selects the live download branch only when
+        begin_date is present; this test models that concrete signature and
+        makes the effective request auditable on the exchange envelope.
+        """
+        provider = _provider()
+        calls: list[dict[str, object]] = []
+
+        class FakeInfo:
+            def get_history_stock_status(
+                self,
+                code_list: list[str],
+                *,
+                begin_date: int,
+                end_date: int,
+                is_local: bool,
+            ) -> list[dict[str, object]]:
+                calls.append(
+                    {
+                        "code_list": code_list,
+                        "begin_date": begin_date,
+                        "end_date": end_date,
+                        "is_local": is_local,
+                    }
+                )
+                return []
+
+        class FakeSdk:
+            InfoData = FakeInfo
+
+        provider.session.__dict__["sdk"] = FakeSdk()
+        exchange = provider.get_history_stock_status_exchange(20220101, 20220102, ["600000.SH"])
+
+        assert calls == [
+            {
+                "code_list": ["600000.SH"],
+                "begin_date": 20220101,
+                "end_date": 20220102,
+                "is_local": False,
+            }
+        ]
+        assert exchange.envelope.request_params == {
+            "begin_date": 20220101,
+            "end_date": 20220102,
+            "code_list": ["600000.SH"],
+            "is_local": False,
+        }
+
+    def test_bj_mapping_uses_unfiltered_sdk_signature(self):
+        """BJ mapping is a complete-table endpoint, not a code-list query."""
+        provider = _provider()
+        calls: list[dict[str, object]] = []
+
+        class FakeInfo:
+            def get_bj_code_mapping(self, *, is_local: bool) -> list[dict[str, str]]:
+                calls.append({"is_local": is_local})
+                return [{"STOCK_CODE": "430047", "BJ_CODE": "430047"}]
+
+        class FakeSdk:
+            InfoData = FakeInfo
+
+        provider.session.__dict__["sdk"] = FakeSdk()
+        exchange = provider.get_bj_code_mapping_exchange(["430047.BJ"])
+
+        assert calls == [{"is_local": False}]
+        assert exchange.payload == [{"STOCK_CODE": "430047", "BJ_CODE": "430047"}]
+        assert exchange.envelope.request_params == {
+            "code_list_filter": ["430047.BJ"],
+            "is_local": False,
+        }
 
 
 class TestRawWriterContract:

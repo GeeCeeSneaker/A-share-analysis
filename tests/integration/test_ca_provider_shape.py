@@ -112,6 +112,26 @@ class TestProviderView:
         with pytest.raises(CAProviderShapeError, match="DATE_EX"):
             _ca_provider_view("dividend", [{"MARKET_CODE": "600519"}])
 
+    def test_incomplete_dividend_rows_without_ex_date_are_filtered(self):
+        """The live endpoint mixes pending records with completed events.
+
+        Only the observed explicit non-final progress codes may be filtered;
+        a completed row still missing DATE_EX must fail closed below.
+        """
+        rows = [
+            {"MARKET_CODE": "600519", "DIV_PROGRESS": "1"},
+            {"MARKET_CODE": "600519", "DIV_PROGRESS": "2"},
+            {"MARKET_CODE": "600519", "DIV_PROGRESS": "12"},
+            {"MARKET_CODE": "600519", "DIV_PROGRESS": "3", "DATE_EX": "20220630"},
+        ]
+        view = _ca_provider_view("dividend", rows)
+        assert len(view) == 1
+        assert view[0]["ex_date"] == "20220630"
+
+    def test_completed_dividend_row_without_ex_date_still_fails(self):
+        with pytest.raises(CAProviderShapeError, match="DATE_EX"):
+            _ca_provider_view("dividend", [{"MARKET_CODE": "600519", "DIV_PROGRESS": "3"}])
+
     def test_right_issue_missing_ex_dividend_date_fails_loud(self):
         with pytest.raises(CAProviderShapeError, match="EX_DIVIDEND_DATE"):
             _ca_provider_view("right_issue", [{"MARKET_CODE": "600036"}])
