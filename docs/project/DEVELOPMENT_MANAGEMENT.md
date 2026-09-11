@@ -6083,3 +6083,42 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 - 独立 Reviewer 审阅本整改 PR 的 diff，确认没有绕过语义门禁或修改 Golden/规则/Provider 配置；接受并合并后仍不自动获得 Formal 授权。
 - 如需新的 Formal 结论，必须由调度者针对合并后的 clean main 另行授权；不得使用 PR #42 的旧授权创建第三次 run，并须对比旧归因 artifact 保存新的 run-bound receipt。
+
+## DM-20260911-FORMAL-B1B7-016 · P0 语义门与 keyed K-line 身份整改
+
+**Type**：C1 — independent-review P0 remediation after read-only Formal attribution
+**Date**：2026-09-11
+**Status**：`IMPLEMENTED / FULLY LOCAL VERIFIED / CI REVIEW PENDING / NO FORMAL RERUN`
+**Evidence**：`docs/provider_verification/formal_b1_b7_framework_remediation_20260911.md`；分支 `fix/provider-canonicalization-diagnostics-20260911`。
+
+**已完成**
+
+- Golden `golden_delisted` 不再把历史代码表 scalar membership 当作 `IS_LISTED=3`：匹配
+  Provider 行必须真实携带 `IS_LISTED=3` 或非空 `DELISTING_DATE` 才能通过；否则为
+  `MISSING / DELISTED_SEMANTIC_FIELD_MISSING`，实际语义冲突则结构化 FAIL。没有修改
+  Golden 期望值或旧 Formal run。
+- 新增 `key_preserving_table_rows()` ephemeral boundary，处理
+  `dict[provider_symbol, DataFrame | None]`；无证券列的行注入映射键，`None`/空表保留带
+  身份 marker，行内身份冲突 fail closed。B3、B5 和 Golden CA K-line 已接入，raw payload
+  仍保持 provider 原样。
+- B5 暂不把 `300104.SZ` 当作通用 2020+ history coverage fixture。现有首条 bar 观察不足
+  以证明首个可交易日，且该标的存在停牌/退市解释空间；待独立 applicability/tradability
+  事实绑定后再纳入。其 Golden 退市 fixture 身份不变。
+- 新增退市语义、无证券列 keyed DataFrame、`None` 成员、空表和冲突身份回归测试；未登录
+  Provider、未创建新 run、未执行 Production、`--resume` 或 `--verdict`。
+
+**明确未完成**
+
+- 完整本地 pytest：`1721 collected, 1718 passed, 3 skipped`；mypy、依赖检查、Ruff
+  check/format 和 diff 检查均通过；远端 CI 需在提交后更新。
+- 真实 SDK 的完整 keyed mapping、B2 真实退市语义、BSE 空响应、历史覆盖和公司行为
+  事件语义仍没有新的 Provider capability 结论；不得据此批准 Formal、backfill、策略
+  扩展或生产化。
+
+**下一步**
+
+- 独立 Reviewer 逐项复核：membership 与 semantic delisted 是否严格分离；K-line key/None
+  lineage 是否完整；冲突是否 fail closed；以及 Golden、交易规则、Provider 配置和旧
+  evidence 是否保持不变。
+- 审阅关闭前保持 PR #43 Draft；不启动第三次 Formal run。若未来确需 Formal 结论，必须
+  由调度者在合并后的 clean main 上给出新的、一次性授权。

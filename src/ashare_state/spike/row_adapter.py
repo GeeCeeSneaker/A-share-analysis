@@ -29,6 +29,7 @@ __all__ = [
     "date_key",
     "first_case_insensitive",
     "first_present",
+    "key_preserving_table_rows",
     "provider_symbol",
     "row_date",
 ]
@@ -55,6 +56,10 @@ class ProviderRowShapeError(ValueError):
     the successful raw exchange and turn this into a structured fail-closed
     outcome; they must not guess a symbol or silently drop the row.
     """
+
+    def __init__(self, message: str, *, view: str = "provider_row") -> None:
+        super().__init__(message)
+        self.view = view
 
 
 def first_present(row: dict[str, Any], *names: str) -> Any:
@@ -124,7 +129,8 @@ def provider_symbol(row: dict[str, Any]) -> str:
 
     Accepted identity forms are:
 
-    * ``SECURITY_CODE``/``code`` plus numeric or textual market code;
+    * ``PROVIDER_SYMBOL`` or ``SECURITY_CODE``/``code`` plus numeric or
+      textual market code;
     * a full suffixed symbol in ``SECURITY_CODE`` or ``MARKET_CODE``; and
     * a sole ``value`` field containing a full suffixed symbol, which is the
       explicit scalar-list shape of ``get_hist_code_list``.
@@ -132,7 +138,14 @@ def provider_symbol(row: dict[str, Any]) -> str:
     If both code and full-symbol fields are present but disagree, the result
     is empty so a caller cannot validate against the wrong security.
     """
-    code_fields = _present_values(row, "SECURITY_CODE", "security_code", "code")
+    code_fields = _present_values(
+        row,
+        "PROVIDER_SYMBOL",
+        "provider_symbol",
+        "SECURITY_CODE",
+        "security_code",
+        "code",
+    )
     market_fields = _present_values(row, "MARKET_CODE", "market_code", "market")
     if _identity_fields_conflict(code_fields, kind="code") or _identity_fields_conflict(
         market_fields, kind="market"
@@ -143,7 +156,10 @@ def provider_symbol(row: dict[str, Any]) -> str:
     code_text = str(code_raw or "").strip()
     market_text = str(market_raw or "").strip().upper()
 
-    code_full = _full_symbol(code_text)
+    # Prefer an exchange-qualified alias if one is present.  This lets the
+    # ephemeral keyed-table view add PROVIDER_SYMBOL while retaining a bare
+    # SECURITY_CODE from the provider, without losing the qualified identity.
+    code_full = next((_full_symbol(value) for value in code_fields), "")
     market_full = _full_symbol(market_text)
     if code_full and market_full and code_full != market_full:
         return ""
@@ -234,6 +250,169 @@ def _identity_fields_conflict(values: list[Any], *, kind: str) -> bool:
     return False
 
 
+_TABLE_KEY_FIELD = "_TABLE_KEY"
+_TABLE_NONE_FIELD = "_TABLE_NONE"
+_TABLE_EMPTY_FIELD = "_TABLE_EMPTY"
+_ROW_FIELD_NAMES = {
+    "amount",
+    "close",
+    "close_price",
+    "date",
+    "high",
+    "high_limited",
+    "is_listed",
+    "is_st_sec",
+    "is_susp_sec",
+    "kline_time",
+    "low",
+    "low_limited",
+    "market_code",
+    "open",
+    "pre_close",
+    "preclose",
+    "security_code",
+    "trade_date",
+    "value",
+    "volume",
+}
+
+
+def _looks_like_row_mapping(payload: dict[Any, Any]) -> bool:
+    return any(str(key).casefold() in _ROW_FIELD_NAMES for key in payload)
+
+
+def _rows_from_table_member(payload: Any) -> list[dict[str, Any]]:
+    """Flatten one table value without interpreting a mapping as a table map."""
+    if payload is None:
+        return []
+    if isinstance(payload, list):
+        return [dict(row) if isinstance(row, dict) else {"value": row} for row in payload]
+    if isinstance(payload, dict):
+        if not _looks_like_row_mapping(payload):
+            raise ProviderRowShapeError(
+                "keyed kline table member is not a row mapping",
+                view="key_preserving_table_rows",
+            )
+        return [dict(payload)]
+    rows_method = getattr(payload, "rows", None)
+    if callable(rows_method) and hasattr(payload, "columns"):
+        return [dict(zip(payload.columns, row, strict=True)) for row in rows_method()]
+    to_dict = getattr(payload, "to_dict", None)
+    if callable(to_dict):
+        try:
+            records = to_dict(orient="records")
+        except TypeError:
+            records = None
+        if records is not None:
+            return [dict(row) for row in records]
+    raise ProviderRowShapeError(
+        f"keyed kline table member has unsupported type {type(payload).__name__}",
+        view="key_preserving_table_rows",
+    )
+
+
+def _has_identity_field(row: dict[str, Any]) -> bool:
+    identity_names = {
+        "provider_symbol",
+        "security_code",
+        "market_code",
+        "code",
+        "market",
+        "value",
+    }
+    return any(str(key).casefold() in identity_names for key in row)
+
+
+def _attach_table_identity(row: dict[str, Any], symbol: str) -> dict[str, Any]:
+    """Attach a mapping key only when any embedded identity agrees with it."""
+    embedded = provider_symbol(row)
+    bare = symbol.split(".", 1)[0]
+    if embedded:
+        if "." in embedded:
+            compatible = embedded == symbol
+        else:
+            compatible = embedded == bare
+        if not compatible:
+            raise ProviderRowShapeError(
+                f"keyed kline table identity conflict: key={symbol}, row={embedded}",
+                view="key_preserving_table_rows",
+            )
+    elif _has_identity_field(row):
+        raise ProviderRowShapeError(
+            f"keyed kline table row has ambiguous identity for key={symbol}",
+            view="key_preserving_table_rows",
+        )
+    canonical = dict(row)
+    canonical["PROVIDER_SYMBOL"] = symbol
+    canonical[_TABLE_KEY_FIELD] = symbol
+    return canonical
+
+
+def key_preserving_table_rows(payload: Any) -> list[dict[str, Any]]:
+    """Create an ephemeral row view that preserves keyed-table lineage.
+
+    Live K-line responses are allowed to be ``dict[symbol, DataFrame | None]``.
+    A plain ``dict.values()`` flatten loses which security owns each bar and
+    drops explicit ``None`` members.  This boundary injects the qualified map
+    key into each cloned row, emits a marker for ``None``/empty members, and
+    rejects a conflicting embedded row identity.  The provider payload itself
+    is never modified or persisted through this helper.
+    """
+    if payload is None:
+        return []
+    if isinstance(payload, dict):
+        if _looks_like_row_mapping(payload):
+            return [dict(payload)]
+        if not payload:
+            return []
+        keyed: list[tuple[str, Any]] = []
+        for raw_key, member in payload.items():
+            symbol = _full_symbol(raw_key)
+            if not symbol:
+                raise ProviderRowShapeError(
+                    "keyed kline mapping key is not an exchange-qualified provider symbol",
+                    view="key_preserving_table_rows",
+                )
+            keyed.append((symbol, member))
+        rows: list[dict[str, Any]] = []
+        for symbol, member in keyed:
+            if member is None:
+                rows.append(
+                    {
+                        "PROVIDER_SYMBOL": symbol,
+                        _TABLE_KEY_FIELD: symbol,
+                        _TABLE_NONE_FIELD: True,
+                    }
+                )
+                continue
+            member_rows = _rows_from_table_member(member)
+            if not member_rows:
+                rows.append(
+                    {
+                        "PROVIDER_SYMBOL": symbol,
+                        _TABLE_KEY_FIELD: symbol,
+                        _TABLE_EMPTY_FIELD: True,
+                    }
+                )
+                continue
+            rows.extend(_attach_table_identity(row, symbol) for row in member_rows)
+        return rows
+    if isinstance(payload, list):
+        return [dict(row) if isinstance(row, dict) else {"value": row} for row in payload]
+    rows_method = getattr(payload, "rows", None)
+    if callable(rows_method) and hasattr(payload, "columns"):
+        return [dict(zip(payload.columns, row, strict=True)) for row in rows_method()]
+    to_dict = getattr(payload, "to_dict", None)
+    if callable(to_dict):
+        try:
+            records = to_dict(orient="records")
+        except TypeError:
+            records = None
+        if records is not None:
+            return [dict(row) for row in records]
+    return [{"value": payload}]
+
+
 _STATUS_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "TRADE_DATE": ("TRADE_DATE", "trade_date"),
     "PRECLOSE": ("PRECLOSE", "pre_close"),
@@ -260,16 +439,23 @@ def canonical_status_view(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     view: list[dict[str, Any]] = []
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
-            raise ProviderRowShapeError(f"status row {index} is not a mapping")
+            raise ProviderRowShapeError(
+                f"status row {index} is not a mapping",
+                view="canonical_status_view",
+            )
         symbol = provider_symbol(row)
         if "." not in symbol:
             raise ProviderRowShapeError(
-                f"status row {index} has ambiguous or missing exchange-qualified identity"
+                f"status row {index} has ambiguous or missing exchange-qualified identity",
+                view="canonical_status_view",
             )
         code, suffix = symbol.rsplit(".", 1)
         trade_date = row_date(row, "TRADE_DATE", "trade_date")
         if not trade_date:
-            raise ProviderRowShapeError(f"status row {index} has missing or invalid TRADE_DATE")
+            raise ProviderRowShapeError(
+                f"status row {index} has missing or invalid TRADE_DATE",
+                view="canonical_status_view",
+            )
         canonical = dict(row)
         canonical["SECURITY_CODE"] = code
         canonical["MARKET_CODE"] = _SUFFIX_MARKET[suffix]

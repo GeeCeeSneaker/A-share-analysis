@@ -13,6 +13,7 @@ from ashare_state.spike.row_adapter import (
     canonical_daily_bar_view,
     canonical_status_view,
     date_key,
+    key_preserving_table_rows,
     provider_symbol,
     row_date,
 )
@@ -144,11 +145,80 @@ class TestNativeRowsReachValidators:
         out = validate_case_in_domain(case, data, rule_book=book)
         assert out.result is CaseResult.VALIDATED_PASS
 
-    def test_delisted_golden_accepts_scalar_code_list(self):
+    def test_delisted_golden_keeps_scalar_code_list_nonsemantic(self):
         case = _case("golden_delisted", "000540.SZ", "20230630", {"IS_LISTED": "3"})
         data = DomainData(domain="DELISTED_MASTER", hist_code_rows=[{"value": "000540.SZ"}])
         out = validate_case_in_domain(case, data)
+        assert out.result is CaseResult.MISSING
+        assert out.reason_code == "DELISTED_SEMANTIC_FIELD_MISSING"
+
+    def test_delisted_golden_accepts_provider_semantic_field(self):
+        case = _case("golden_delisted", "000540.SZ", "20230630", {"IS_LISTED": "3"})
+        data = DomainData(
+            domain="DELISTED_MASTER",
+            hist_code_rows=[{"SECURITY_CODE": "000540", "MARKET_CODE": "2", "IS_LISTED": "3"}],
+        )
+        out = validate_case_in_domain(case, data)
         assert out.result is CaseResult.VALIDATED_PASS
+
+    def test_keyed_kline_view_preserves_symbol_and_none_member(self):
+        polars = pytest.importorskip("polars")
+        payload = {
+            "600519.SH": polars.DataFrame(
+                {
+                    "kline_time": ["2020-01-02 00:00:00"],
+                    "close": [100.0],
+                    "volume": [10.0],
+                    "amount": [1000.0],
+                }
+            ),
+            "000001.SZ": polars.DataFrame(
+                {
+                    "kline_time": ["2020-01-03 00:00:00"],
+                    "close": [20.0],
+                    "volume": [5.0],
+                    "amount": [100.0],
+                }
+            ),
+            "835185.BJ": None,
+            "300000.SZ": polars.DataFrame(
+                {"kline_time": [], "close": [], "volume": [], "amount": []}
+            ),
+        }
+        rows = key_preserving_table_rows(payload)
+        assert {row["PROVIDER_SYMBOL"] for row in rows} == {
+            "600519.SH",
+            "000001.SZ",
+            "835185.BJ",
+            "300000.SZ",
+        }
+        assert (
+            next(row for row in rows if row["PROVIDER_SYMBOL"] == "835185.BJ")["_TABLE_NONE"]
+            is True
+        )
+        assert (
+            next(row for row in rows if row["PROVIDER_SYMBOL"] == "300000.SZ")["_TABLE_EMPTY"]
+            is True
+        )
+        bars = canonical_daily_bar_view(rows)
+        assert {row["PROVIDER_SYMBOL"] for row in bars if row.get("TRADE_DATE")} == {
+            "600519.SH",
+            "000001.SZ",
+        }
+
+    def test_keyed_kline_view_rejects_conflicting_embedded_identity(self):
+        polars = pytest.importorskip("polars")
+        payload = {
+            "600519.SH": polars.DataFrame(
+                {
+                    "security_code": ["000001.SZ"],
+                    "kline_time": ["2020-01-02"],
+                    "close": [100.0],
+                }
+            )
+        }
+        with pytest.raises(ProviderRowShapeError, match="identity conflict"):
+            key_preserving_table_rows(payload)
 
     def test_lowercase_daily_bar_fields_are_observed(self):
         rows = [{"close": 10.0, "volume": 100.0, "amount": 1000.0}]

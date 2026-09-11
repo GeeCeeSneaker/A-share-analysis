@@ -3746,3 +3746,28 @@
 - Golden router、ST/停牌、涨跌停、复权、B5 日线单位与历史日期消费层已接入；新增回归测试覆盖 103 条 canonical-key mismatch、20 条 scalar-list shape mismatch 和四类字段/日期框架症状。BSE 空响应、真实退市语义、代码列表 endpoint/权限、真实历史覆盖和公司行为语义仍未被冒充为已解决。
 - 定向测试以及全量 pytest（`1717 collected, 1714 passed, 3 skipped`，退出码 0）通过；Ruff check/format、mypy、`uv pip check`、`git diff --check` 均通过。3 个 skip 为仓库既有的环境条件分支，不代表 Provider 或 Formal 结论。未登录 Provider、未创建 run_id、未执行 Production/`--resume`/`--verdict`。
 - 详细范围、未解决边界和后续授权要求见 [`formal_b1_b7_framework_remediation_20260911.md`](provider_verification/formal_b1_b7_framework_remediation_20260911.md)。下一步为独立审阅本整改 PR；任何未来 Formal run 都必须取得新的调度授权。
+
+## 2026-09-11 · Independent review P0 follow-up: semantic delisted gate and keyed K-line lineage
+
+> 状态：**IMPLEMENTED / FULLY LOCAL VERIFIED / CI REVIEW PENDING / NO FORMAL RERUN**
+
+- 修正 Golden `golden_delisted` 的语义边界：历史代码表的 `{"value": "<symbol>"}` 只证明
+  membership/continuity；当期望为 `IS_LISTED=3` 时，只有匹配 Provider 行实际携带
+  `IS_LISTED=3` 或非空 `DELISTING_DATE` 才能 `VALIDATED_PASS`，否则返回
+  `MISSING / DELISTED_SEMANTIC_FIELD_MISSING`（或对真实冲突返回结构化 FAIL）。Golden
+  退市 validator 版本升至 3；没有修改 Golden 期望值或旧 run。
+- 新增 `key_preserving_table_rows()` ephemeral table boundary，处理实际允许的
+  `dict[provider_symbol, DataFrame | None]`。每条无证券列 DataFrame 行带上映射键，`None`
+  和空表保留带身份 marker，行内身份与映射键冲突则 `ProviderRowShapeError`；B3/B5 和
+  Golden CA K-line 均使用该边界，raw payload 仍保持 provider 原样。
+- B5 不再把 `300104.SZ` 当作通用 2020+ history coverage fixture：现有首条 bar 观察不足以
+  证明其首个可交易日，且该标的有停牌/退市解释空间；它仍是 Golden 退市 fixture，待独立
+  applicability/tradability 事实绑定后再纳入。`600519.SH`、`000001.SZ`、`835185.BJ`
+  的适用起点规则保持明确。
+- 新增回归覆盖：纯 scalar membership 不得通过 Golden 退市语义；Provider 语义字段可以
+  通过；无证券列的 keyed DataFrame、`None` 成员、空表 marker 和行内冲突身份均按预期处理。
+  定向回归、完整 pytest（`1721 collected, 1718 passed, 3 skipped`）、mypy、Ruff
+  check/format、依赖检查和 diff 检查均已通过；CI 待本次提交后更新。未登录 Provider、
+  未创建新 run、未执行 Production/`--resume`/`--verdict`。
+- 详细范围、审阅重点和下一步授权边界见 [`formal_b1_b7_framework_remediation_20260911.md`](provider_verification/formal_b1_b7_framework_remediation_20260911.md)。当前仍需独立 Reviewer
+  复核 P0 修复；在接受前不得将任何 Provider capability、历史覆盖或 Formal 结论写成已批准。

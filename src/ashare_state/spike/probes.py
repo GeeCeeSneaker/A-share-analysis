@@ -43,6 +43,7 @@ from ashare_state.spike.row_adapter import (
     canonical_daily_bar_view,
     canonical_status_view,
     date_key,
+    key_preserving_table_rows,
     provider_symbol,
 )
 from ashare_state.spike.run_store import RunStore
@@ -50,6 +51,27 @@ from ashare_state.spike.target import SpikeTarget
 
 # documented unit map placeholder - B5 live evidence finalizes it
 DOCUMENTED_UNITS = {"volume": "shares", "amount": "CNY"}
+
+
+def _provider_shape_outcome(
+    exc: ProviderRowShapeError, *, expected: str
+) -> validators.ValidationOutcome:
+    """Turn a native->semantic view failure into a structured fail-closed case."""
+    view = getattr(exc, "view", "provider_row")
+    if view == "canonical_status_view":
+        reason_code = "PROVIDER_STATUS_SHAPE"
+    elif view == "key_preserving_table_rows":
+        reason_code = "PROVIDER_KLINE_SHAPE"
+    else:
+        reason_code = "PROVIDER_ROW_SHAPE"
+    return validators.ValidationOutcome(
+        result=CaseResult.VALIDATED_FAIL,
+        expected=expected,
+        actual=f"{view} rejected provider rows: {exc}",
+        reason_code=reason_code,
+        validator_id=view,
+        validator_version="1",
+    )
 
 
 def _rows_of(payload: Any) -> list[dict[str, Any]]:
@@ -577,16 +599,23 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         if bars is None:
             results["daily_bar"] = "NOT_TESTABLE"
         else:
-            bar_rows = canonical_daily_bar_view(_to_plain(_rows_of(bars)))
-            # R3-P0-07: observed units derive from live scale analysis of this
-            # payload (amount/volume ~ close proves shares+CNY) - INDEPENDENT
-            # of the documented constant
-            observed_units = _observe_units(bar_rows)
-            out = validators.validate_daily_bar_units(
-                bar_rows,
-                documented_units=DOCUMENTED_UNITS,
-                observed_units=observed_units,
-            )
+            try:
+                bar_rows = canonical_daily_bar_view(_to_plain(key_preserving_table_rows(bars)))
+            except ProviderRowShapeError as exc:
+                out = _provider_shape_outcome(
+                    exc,
+                    expected="canonical daily-bar table identity contract",
+                )
+            else:
+                # R3-P0-07: observed units derive from live scale analysis of
+                # this payload (amount/volume ~ close proves shares+CNY) -
+                # INDEPENDENT of the documented constant
+                observed_units = _observe_units(bar_rows)
+                out = validators.validate_daily_bar_units(
+                    bar_rows,
+                    documented_units=DOCUMENTED_UNITS,
+                    observed_units=observed_units,
+                )
             ctx.outcome_case("daily_bar_units", "SAMPLE", str(sample_date), bar_meta, out)
             results["daily_bar"] = str(out.result)
 
@@ -747,7 +776,9 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         "600519.SH",  # long-listed SH main board (1999)
         "000001.SZ",  # long-listed SZ main board (1991)
         "835185.BJ",  # BSE migrated listing (2021 opening)
-        "300104.SZ",  # historical delisting (LeEco, delisted 2020)
+        # 300104.SZ remains a Golden delisting fixture, but is deliberately
+        # not a generic history-coverage fixture until its suspension/trading
+        # applicability boundary is bound to an independent source.
     ]
     # CR-1.2: reuse the ALREADY-persisted calendar exchange above (single
     # fetch per probe) and pass its windowed days explicitly to kline.
@@ -795,25 +826,33 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
                 applicable_from_by_symbol={"835185.BJ": "20211115"},
             )
     else:
-        rows = canonical_daily_bar_view(_to_plain(_rows_of(bars)))
-        earliest_by_symbol: dict[str, str] = {}
-        for row in rows:
-            symbol = str(row.get("PROVIDER_SYMBOL") or provider_symbol(row)).upper()
-            day = date_key(row.get("TRADE_DATE"))
-            if not symbol or not day:
-                continue
-            previous = earliest_by_symbol.get(symbol)
-            if previous is None or day < previous:
-                earliest_by_symbol[symbol] = day
-        earliest = min(earliest_by_symbol.values(), default="")
-        cov = validators.validate_history_coverage_by_symbol(
-            earliest_by_symbol,
-            expected_symbols=fixtures,
-            calendar_days=cal_all_days,
-            # This is fixture applicability metadata, not a Provider-derived
-            # delisting/listing semantic.  BSE opened after the 2020 baseline.
-            applicable_from_by_symbol={"835185.BJ": "20211115"},
-        )
+        try:
+            rows = canonical_daily_bar_view(_to_plain(key_preserving_table_rows(bars)))
+        except ProviderRowShapeError as exc:
+            earliest = ""
+            cov = _provider_shape_outcome(
+                exc,
+                expected="per-symbol canonical daily-bar table identity contract",
+            )
+        else:
+            earliest_by_symbol: dict[str, str] = {}
+            for row in rows:
+                symbol = str(row.get("PROVIDER_SYMBOL") or provider_symbol(row)).upper()
+                day = date_key(row.get("TRADE_DATE"))
+                if not symbol or not day:
+                    continue
+                previous = earliest_by_symbol.get(symbol)
+                if previous is None or day < previous:
+                    earliest_by_symbol[symbol] = day
+            earliest = min(earliest_by_symbol.values(), default="")
+            cov = validators.validate_history_coverage_by_symbol(
+                earliest_by_symbol,
+                expected_symbols=fixtures,
+                calendar_days=cal_all_days,
+                # This is fixture applicability metadata, not a Provider-derived
+                # delisting/listing semantic.  BSE opened after the 2020 baseline.
+                applicable_from_by_symbol={"835185.BJ": "20211115"},
+            )
     if cov is not None:
         ctx.outcome_case("history_start_2020", "FIXTURES", str(sample_date), bar_meta, cov)
     # symbol mapping core gate - APPROVED exchange execution boundary

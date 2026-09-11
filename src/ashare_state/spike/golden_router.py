@@ -45,7 +45,9 @@ from ashare_state.spike.row_adapter import (
     canonical_daily_bar_view,
     canonical_status_view,
     date_key,
+    first_case_insensitive,
     first_present,
+    key_preserving_table_rows,
     provider_symbol,
     row_date,
 )
@@ -462,7 +464,10 @@ def fetch_domain_data(
                 raw_request_id=right_issue.request_id,
                 payload_columns=_payload_columns(right_issue.payload),
             ),
-            kline_rows=_rows(kline.payload),
+            # Live K-line may be dict[symbol, DataFrame | None].  Preserve
+            # that table-key lineage in the ephemeral semantic view; raw
+            # provider bytes remain persisted unchanged by the collector.
+            kline_rows=key_preserving_table_rows(kline.payload),
             calendar_days=cal_days,
         )
     if domain == "BJ_MAPPING":
@@ -516,26 +521,79 @@ def _validate_delisted(case: GoldenCase, data: DomainData) -> validators.Validat
     basic_rows = data.stock_basic_rows or []
     hist_rows = data.hist_code_rows or []
     bare = case.provider_symbol.split(".")[0]
+    matching_rows = [
+        row for row in [*basic_rows, *hist_rows] if provider_symbol(row).split(".", 1)[0] == bare
+    ]
     in_basic = any(provider_symbol(r).split(".", 1)[0] == bare for r in basic_rows)
     in_hist = any(provider_symbol(r).split(".", 1)[0] == bare for r in hist_rows)
     expected = case.expected_fields.get("IS_LISTED")
     if expected == "3":
-        # post-delisting: master may drop it, but HISTORICAL code list must
-        # contain it (survivorship proof)
-        if in_hist:
+        # A historical-code-list membership row is only continuity evidence;
+        # it does not prove the requested delisted semantic.  Require an
+        # actual IS_LISTED=3 or non-empty DELISTING_DATE field in a matching
+        # provider row before returning PASS.
+        listed_values = [
+            str(first_case_insensitive(row, "IS_LISTED", "is_listed")).strip()
+            for row in matching_rows
+            if first_case_insensitive(row, "IS_LISTED", "is_listed") is not None
+        ]
+        delisting_dates = [
+            first_case_insensitive(row, "DELISTING_DATE", "delisting_date")
+            for row in matching_rows
+            if str(first_case_insensitive(row, "DELISTING_DATE", "delisting_date") or "").strip()
+        ]
+        if listed_values and all(value in {"3", "3.0"} for value in listed_values):
             return ValidationOutcome(
                 result=CaseResult.VALIDATED_PASS,
                 expected=f"{case.truth_source}",
-                actual="present in historical code list",
+                actual="matching provider row carries IS_LISTED=3",
                 validator_id="delisted_master_v1",
-                validator_version="2",
+                validator_version="3",
+            )
+        if not listed_values and delisting_dates:
+            return ValidationOutcome(
+                result=CaseResult.VALIDATED_PASS,
+                expected=f"{case.truth_source}",
+                actual="matching provider row carries non-empty DELISTING_DATE",
+                validator_id="delisted_master_v1",
+                validator_version="3",
+            )
+        if listed_values:
+            return ValidationOutcome(
+                result=CaseResult.VALIDATED_FAIL,
+                expected=f"{case.truth_source}",
+                actual=f"matching provider IS_LISTED values are {listed_values}, not 3",
+                reason_code="DELISTED_SEMANTIC_MISMATCH",
+                validator_id="delisted_master_v1",
+                validator_version="3",
+            )
+        if delisting_dates:
+            return ValidationOutcome(
+                result=CaseResult.VALIDATED_FAIL,
+                expected=f"{case.truth_source}",
+                actual="matching provider IS_LISTED field is not 3 despite DELISTING_DATE",
+                reason_code="DELISTED_SEMANTIC_MISMATCH",
+                validator_id="delisted_master_v1",
+                validator_version="3",
+            )
+        if in_basic or in_hist:
+            return ValidationOutcome(
+                result=CaseResult.MISSING,
+                expected=f"{case.truth_source} (IS_LISTED=3 or DELISTING_DATE)",
+                actual=(
+                    "matching code-list membership is present, but no provider "
+                    "delisted semantic field proves the state"
+                ),
+                reason_code="DELISTED_SEMANTIC_FIELD_MISSING",
+                validator_id="delisted_master_v1",
+                validator_version="3",
             )
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
             expected=f"{case.truth_source}",
             actual="absent from historical code list (survivorship bias)",
             validator_id="delisted_master_v1",
-            validator_version="2",
+            validator_version="3",
         )
     _ = in_basic
     return ValidationOutcome(
@@ -543,7 +601,7 @@ def _validate_delisted(case: GoldenCase, data: DomainData) -> validators.Validat
         expected=f"{case.truth_source}",
         actual="listing-state expectation not 3; structural only",
         validator_id="delisted_master_v1",
-        validator_version="2",
+        validator_version="3",
     )
 
 
@@ -1382,9 +1440,23 @@ def route_all(
             continue
         except ProviderRowShapeError as exc:
             # The provider exchange succeeded and is already in the domain
-            # evidence bundle.  A native status identity/date that cannot be
+            # evidence bundle.  A native row/table identity that cannot be
             # canonicalized is a framework boundary failure, not a reason to
-            # discard the raw exchange or guess a security.
+            # discard the raw exchange or guess a security.  Keep status and
+            # K-line shape failures distinguishable in the catalog.
+            view = getattr(exc, "view", "provider_row")
+            if view == "canonical_status_view":
+                reason_code = "PROVIDER_STATUS_SHAPE"
+                validator_id = "canonical_status_view"
+                expected_suffix = "canonical status row contract"
+            elif view == "key_preserving_table_rows":
+                reason_code = "PROVIDER_KLINE_SHAPE"
+                validator_id = "key_preserving_table_rows"
+                expected_suffix = "key-preserving K-line table contract"
+            else:
+                reason_code = "PROVIDER_ROW_SHAPE"
+                validator_id = view
+                expected_suffix = "provider row contract"
             evidence = collector.bundle_evidence()
             for case in domain_cases:
                 outcomes.append(
@@ -1392,10 +1464,10 @@ def route_all(
                         case,
                         ValidationOutcome(
                             result=CaseResult.VALIDATED_FAIL,
-                            expected=f"{case.truth_source} (canonical status row contract)",
-                            actual=f"canonical status view rejected provider rows: {exc}",
-                            reason_code="PROVIDER_STATUS_SHAPE",
-                            validator_id="canonical_status_view",
+                            expected=f"{case.truth_source} ({expected_suffix})",
+                            actual=f"{view} rejected provider rows: {exc}",
+                            reason_code=reason_code,
+                            validator_id=validator_id,
                             validator_version="1",
                         ),
                         evidence,

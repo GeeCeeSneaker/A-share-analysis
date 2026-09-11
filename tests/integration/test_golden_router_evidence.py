@@ -339,6 +339,47 @@ class TestCorpActionContext:
         assert outcome.result is CaseResult.NOT_TESTABLE_TIME
         assert outcome.reason_code == "CALENDAR_MISSING_EVENT_DAY"
 
+    def test_event_context_consumes_keyed_kline_without_symbol_column(self, tmp_path: Path):
+        """The CA consumer must retain the actual keyed-table identity."""
+        from ashare_state.providers.exchange import ProviderExchange
+
+        class _KeyedKlineTarget(FakeTarget):
+            def query_kline_exchange(
+                self, code_list, *, begin_date, end_date, kline_type, trading_days=None
+            ):
+                exchange = super().query_kline_exchange(
+                    code_list,
+                    begin_date=begin_date,
+                    end_date=end_date,
+                    kline_type=kline_type,
+                    trading_days=trading_days,
+                )
+                rows = [
+                    {
+                        key: value
+                        for key, value in row.items()
+                        if key not in {"SECURITY_CODE", "MARKET_CODE"}
+                    }
+                    for row in exchange.payload
+                ]
+                return ProviderExchange(
+                    envelope=exchange.envelope,
+                    payload={"600519.SH": rows},
+                )
+
+        ctx, _ = _ctx(tmp_path, target=_KeyedKlineTarget())
+        cases = [
+            _case(
+                "GT-CA-KEYED",
+                "golden_corporate_action",
+                "600519.SH",
+                "20220630",
+                {"IS_WD_SEC": True},
+            ),
+        ]
+        _case_obj, outcome, _evidence = route_all(ctx, cases)[0]
+        assert outcome.result is CaseResult.VALIDATED_PASS
+
 
 class TestBJSemanticProof:
     def test_bj_code_continuity_and_30pct_regime(self, tmp_path: Path):
