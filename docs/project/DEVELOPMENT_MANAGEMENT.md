@@ -6249,4 +6249,4 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 | 公司行为 | dividend 123 行/50 行缺 `DATE_EX`，集中于进度 1/2/12；right issue 6 行均有日期 | dividend 进度码正式语义、历史 right-issue 缺失未复现 |
 | `300104.SZ` | code-list 包含目标；目标日线 0 行，`600519.SH` 同窗口控制 7 行；`PROVIDER_CONFIRMED` | 目标 fixture 仍不可用，适用性/可交易性或替换 fixture 未定 |
 
-**质量门**：本地全量 pytest、Ruff check/format、mypy、py_compile、`uv pip check`、`git diff --check` 已通过。下一步仅为 GitHub 精确 head CI 与独立 Review/merge；在此之前不启动第三次 Formal Production。
+**质量门**：本地全量 pytest、Ruff check/format、mypy、py_compile、`uv pip check`、`git diff --check` 已通过；GitHub Actions CI `#545` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三个矩阵均成功，GT-H3B `#93` 按策略 skipped。当前仅待 PR #45 的独立 Review/merge；在此之前不启动第三次 Formal Production。
