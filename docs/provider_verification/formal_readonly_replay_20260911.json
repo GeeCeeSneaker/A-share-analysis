@@ -1,9 +1,12 @@
 {
   "artifact_kind": "REPLAY_DIAGNOSTIC",
-  "artifact_schema": "formal-readonly-replay-v1",
+  "artifact_schema": "formal-readonly-replay-v2",
   "capabilities": [
     {
       "capability": "formal_runtime_gate",
+      "case_types": [
+        "formal_runtime_gate"
+      ],
       "evidence": [],
       "note": "B1 is recorded from the sealed catalog; this lane does not re-run SDK/runtime/account gates.",
       "old_recorded": {
@@ -32,6 +35,9 @@
     },
     {
       "capability": "security_master_with_delisted",
+      "case_types": [
+        "security_master_with_delisted"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=hist_code_list/0f726f75-eb4c-4679-a719-940a05c31943.meta.json"
       ],
@@ -47,16 +53,25 @@
       },
       "replay": {
         "classification": "REPLAY_SEMANTIC_MISSING",
+        "declared_table_count": 1,
         "reason_codes": [
           "DELISTED_SEMANTIC_FIELD_MISSING"
         ],
+        "required_delisted_semantic_fields": [
+          "IS_LISTED",
+          "DELISTING_DATE"
+        ],
         "result": "MISSING",
+        "rows_without_delisted_semantic_fields": 5442,
         "value_only_rows": 5442
       },
       "stage": "B2"
     },
     {
       "capability": "daily_bar_units",
+      "case_types": [
+        "daily_bar_units"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=daily_bar/fe2c5cb7-a959-459b-96bb-2ece1634776a.meta.json"
       ],
@@ -82,10 +97,13 @@
     },
     {
       "capability": "historical_st_suspend",
+      "case_types": [
+        "historical_st_suspend"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=history_stock_status/ca20098a-9a9c-4e88-9916-5e40f4b1cf20.meta.json"
       ],
-      "note": "A malformed status row remains a fail-closed shape block; no ST semantic verdict is inferred.",
+      "note": "Status table keys are preserved before canonicalization; any remaining shape failure is reported with value-free identity/date subreasons.",
       "old_recorded": {
         "case_count": 1,
         "reason_counts": {
@@ -101,17 +119,32 @@
           "PROVIDER_STATUS_SHAPE"
         ],
         "result": "VALIDATED_FAIL",
-        "row_ordinal": 6801,
-        "view": "canonical_status_view"
+        "shape_diagnostics": {
+          "affected_row_count": 1,
+          "affected_table_count": 1,
+          "declared_row_count": 11332,
+          "declared_table_count": 5,
+          "subreasons": [
+            {
+              "affected_row_count": 1,
+              "affected_table_count": 1,
+              "code": "STATUS_IDENTITY_MISSING_OR_AMBIGUOUS"
+            }
+          ]
+        },
+        "view": "key_preserving_table_rows"
       },
       "stage": "B3"
     },
     {
       "capability": "limit_price_and_no_limit_days.sample",
+      "case_types": [
+        "limit_price_and_no_limit_days"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=history_stock_status/ca20098a-9a9c-4e88-9916-5e40f4b1cf20.meta.json"
       ],
-      "note": "The sample status exchange is blocked before rule arithmetic by the malformed native row.",
+      "note": "Status table keys are preserved before rule arithmetic; any remaining shape failure is reported with value-free identity/date subreasons.",
       "old_recorded": {
         "case_count": 1,
         "reason_counts": {
@@ -127,13 +160,28 @@
           "PROVIDER_STATUS_SHAPE"
         ],
         "result": "VALIDATED_FAIL",
-        "row_ordinal": 6801,
-        "view": "canonical_status_view"
+        "shape_diagnostics": {
+          "affected_row_count": 1,
+          "affected_table_count": 1,
+          "declared_row_count": 11332,
+          "declared_table_count": 5,
+          "subreasons": [
+            {
+              "affected_row_count": 1,
+              "affected_table_count": 1,
+              "code": "STATUS_IDENTITY_MISSING_OR_AMBIGUOUS"
+            }
+          ]
+        },
+        "view": "key_preserving_table_rows"
       },
       "stage": "B3"
     },
     {
       "capability": "limit_price_and_no_limit_days.BSE",
+      "case_types": [
+        "limit_price_and_no_limit_days"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=history_stock_status/e281014d-2b75-40e6-9eff-d5331f21ea87.meta.json"
       ],
@@ -149,6 +197,8 @@
       },
       "replay": {
         "classification": "REPLAY_UNRESOLVED_PROVIDER_SEMANTICS",
+        "declared_row_count": 0,
+        "declared_table_count": 1,
         "empty_status": true,
         "reason_codes": [
           "PROVIDER_EMPTY_STATUS_UNRESOLVED"
@@ -159,6 +209,9 @@
     },
     {
       "capability": "adj_factor_corporate_action_continuity",
+      "case_types": [
+        "adj_factor_corporate_action_continuity"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=adj_factor/d1369739-7a40-4163-8dee-16c32b04c3e0.meta.json"
       ],
@@ -182,6 +235,9 @@
     },
     {
       "capability": "sdk_permission_cache_freshness",
+      "case_types": [
+        "sdk_permission_cache_freshness"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=trade_calendar/fd7efe46-b0b5-4747-967a-4099936f42dc.meta.json"
       ],
@@ -207,6 +263,9 @@
     },
     {
       "capability": "history_start_2020",
+      "case_types": [
+        "history_start_2020"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=daily_bar/018f0f8b-58e7-4ef5-aa2c-26abe859394d.meta.json",
         "raw/provider=amazingdata/dataset=trade_calendar/fd7efe46-b0b5-4747-967a-4099936f42dc.meta.json"
@@ -232,6 +291,9 @@
     },
     {
       "capability": "symbol_mapping_unambiguous",
+      "case_types": [
+        "symbol_mapping_unambiguous"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=code_list/c710216e-7b53-487e-af77-873bab7a82d5.meta.json"
       ],
@@ -254,6 +316,9 @@
     },
     {
       "capability": "free_float_equivalence",
+      "case_types": [
+        "free_float_equivalence"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=stock_basic/bcbcbe53-18da-4de5-8005-b7c2f6eb6fd7.meta.json"
       ],
@@ -279,6 +344,9 @@
     },
     {
       "capability": "sw_taxonomy",
+      "case_types": [
+        "sw_taxonomy"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=stock_basic/bcbcbe53-18da-4de5-8005-b7c2f6eb6fd7.meta.json"
       ],
@@ -304,6 +372,9 @@
     },
     {
       "capability": "benchmark_index_availability",
+      "case_types": [
+        "benchmark_index_availability"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=daily_bar/73817f8d-6d75-4291-a956-1306f321be37.meta.json"
       ],
@@ -328,6 +399,9 @@
     },
     {
       "capability": "capacity_backfill",
+      "case_types": [
+        "capacity_backfill"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=daily_bar/6e9d1468-4676-4263-bb80-417865864526.meta.json"
       ],
@@ -354,10 +428,13 @@
     },
     {
       "capability": "golden_st_transition",
+      "case_types": [
+        "golden_st_transition"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=history_stock_status/14db965e-d080-45b2-ba26-652b8ed7d9d5.meta.json"
       ],
-      "note": "Canonical provider view rejected a native row before semantic comparison.",
+      "note": "Key-preserving status identity was retained before canonicalization, but the sealed rows still fail closed on the reported shape subreason.",
       "old_recorded": {
         "case_count": 50,
         "reason_counts": {
@@ -379,13 +456,28 @@
         "result_counts": {
           "VALIDATED_FAIL": 50
         },
-        "row_ordinal": 22502,
-        "view": "canonical_status_view"
+        "shape_diagnostics": {
+          "affected_row_count": 6,
+          "affected_table_count": 6,
+          "declared_row_count": 118878,
+          "declared_table_count": 47,
+          "subreasons": [
+            {
+              "affected_row_count": 6,
+              "affected_table_count": 6,
+              "code": "STATUS_IDENTITY_MISSING_OR_AMBIGUOUS"
+            }
+          ]
+        },
+        "view": "key_preserving_table_rows"
       },
       "stage": "B4"
     },
     {
       "capability": "golden_delisted",
+      "case_types": [
+        "golden_delisted"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=hist_code_list/bd7449e8-3c64-40b4-9fdb-3610d3ab217c.meta.json",
         "raw/provider=amazingdata/dataset=stock_basic/18f32f80-6ad0-4b71-8093-31393f8f1ce7.meta.json"
@@ -415,12 +507,15 @@
     },
     {
       "capability": "golden_limit_regime",
+      "case_types": [
+        "golden_limit_regime"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=hist_code_list/f90e48e4-ad88-4bc3-8ad8-83653fb559d8.meta.json",
         "raw/provider=amazingdata/dataset=history_stock_status/38103311-94cd-4e51-bbc0-8cb07667859b.meta.json",
         "raw/provider=amazingdata/dataset=trade_calendar/0f7cef2e-fc33-44af-8056-508b8451e482.meta.json"
       ],
-      "note": "Canonical provider view rejected a native row before semantic comparison.",
+      "note": "Key-preserving status identity was retained before canonicalization, but the sealed rows still fail closed on the reported shape subreason.",
       "old_recorded": {
         "case_count": 30,
         "reason_counts": {
@@ -442,13 +537,33 @@
         "result_counts": {
           "VALIDATED_FAIL": 30
         },
-        "row_ordinal": 43376,
-        "view": "canonical_status_view"
+        "shape_diagnostics": {
+          "affected_row_count": 2,
+          "affected_table_count": 2,
+          "declared_row_count": 51465,
+          "declared_table_count": 22,
+          "subreasons": [
+            {
+              "affected_row_count": 1,
+              "affected_table_count": 1,
+              "code": "STATUS_DATE_MISSING_OR_INVALID"
+            },
+            {
+              "affected_row_count": 1,
+              "affected_table_count": 1,
+              "code": "STATUS_IDENTITY_MISSING_OR_AMBIGUOUS"
+            }
+          ]
+        },
+        "view": "key_preserving_table_rows"
       },
       "stage": "B4"
     },
     {
       "capability": "golden_corporate_action",
+      "case_types": [
+        "golden_corporate_action"
+      ],
       "evidence": [
         "raw/provider=amazingdata/dataset=adj_factor/c17343af-7e08-42cb-a96b-d0d7e2efccf4.meta.json",
         "raw/provider=amazingdata/dataset=corporate_action/805aaf3b-2c80-4613-b4f1-be71d17722a3.meta.json",
@@ -469,7 +584,7 @@
       },
       "replay": {
         "classification": "REPLAY_PROVIDER_SCHEMA_BLOCKED",
-        "failed_stream": "dividend",
+        "failed_stream": "right_issue",
         "reason_codes": [
           "PROVIDER_SCHEMA"
         ],
@@ -479,11 +594,471 @@
         "result": "VALIDATED_FAIL",
         "result_counts": {
           "VALIDATED_FAIL": 25
-        }
+        },
+        "schema_subreasons": [
+          {
+            "affected_row_count": 25,
+            "affected_table_count": 1,
+            "declared_row_count": 55,
+            "declared_table_count": 1,
+            "documented_contract_fields": [
+              "DATE_EX",
+              "MARKET_CODE"
+            ],
+            "invalid_documented_fields": [],
+            "invalid_field_row_counts": {},
+            "missing_documented_fields": [
+              "DATE_EX"
+            ],
+            "missing_field_row_counts": {
+              "DATE_EX": 25
+            },
+            "stream": "dividend"
+          },
+          {
+            "affected_row_count": 1,
+            "affected_table_count": 1,
+            "declared_row_count": 18,
+            "declared_table_count": 1,
+            "documented_contract_fields": [
+              "EX_DIVIDEND_DATE",
+              "MARKET_CODE"
+            ],
+            "invalid_documented_fields": [],
+            "invalid_field_row_counts": {},
+            "missing_documented_fields": [
+              "EX_DIVIDEND_DATE"
+            ],
+            "missing_field_row_counts": {
+              "EX_DIVIDEND_DATE": 1
+            },
+            "stream": "right_issue"
+          }
+        ]
       },
       "stage": "B4"
     }
   ],
+  "core_capability_projection": {
+    "capabilities": [
+      {
+        "absent_case_types": [],
+        "capability_id": "security_master_with_delisted",
+        "case_type_details": [
+          {
+            "case_type": "security_master_with_delisted",
+            "presence": "REPLAYED",
+            "reason_codes": [
+              "DELISTED_SEMANTIC_FIELD_MISSING"
+            ],
+            "replay_case_count": 1,
+            "replay_classifications": [
+              "REPLAY_SEMANTIC_MISSING"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "MISSING": 1
+            },
+            "replay_valid_count": 0,
+            "required_minimum": 1
+          },
+          {
+            "case_type": "golden_delisted",
+            "presence": "REPLAYED",
+            "reason_codes": [
+              "DELISTED_SEMANTIC_MISMATCH"
+            ],
+            "replay_case_count": 20,
+            "replay_classifications": [
+              "REPLAY_SEMANTIC_MISMATCH"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "VALIDATED_FAIL": 20
+            },
+            "replay_valid_count": 0,
+            "required_minimum": 20
+          }
+        ],
+        "reason_codes": [
+          "DELISTED_SEMANTIC_FIELD_MISSING",
+          "DELISTED_SEMANTIC_MISMATCH"
+        ],
+        "replay_classification": "REPLAY_CORE_FAILED",
+        "replay_result_counts": {
+          "MISSING": 1,
+          "VALIDATED_FAIL": 20
+        },
+        "replay_status": "FAILED",
+        "replayed_case_types": [
+          "security_master_with_delisted",
+          "golden_delisted"
+        ],
+        "required_case_counts": {
+          "golden_delisted": 20,
+          "security_master_with_delisted": 1
+        },
+        "required_case_types": [
+          "security_master_with_delisted",
+          "golden_delisted"
+        ]
+      },
+      {
+        "absent_case_types": [],
+        "capability_id": "daily_bar_units",
+        "case_type_details": [
+          {
+            "case_type": "daily_bar_units",
+            "presence": "REPLAYED",
+            "reason_codes": [],
+            "replay_case_count": 1,
+            "replay_classifications": [
+              "REPLAY_VALIDATED_PASS"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "VALIDATED_PASS": 1
+            },
+            "replay_valid_count": 1,
+            "required_minimum": 1
+          }
+        ],
+        "reason_codes": [],
+        "replay_classification": "REPLAY_CORE_PASS",
+        "replay_result_counts": {
+          "VALIDATED_PASS": 1
+        },
+        "replay_status": "PASS",
+        "replayed_case_types": [
+          "daily_bar_units"
+        ],
+        "required_case_counts": {
+          "daily_bar_units": 1
+        },
+        "required_case_types": [
+          "daily_bar_units"
+        ]
+      },
+      {
+        "absent_case_types": [],
+        "capability_id": "historical_st_suspend",
+        "case_type_details": [
+          {
+            "case_type": "historical_st_suspend",
+            "presence": "REPLAYED",
+            "reason_codes": [
+              "PROVIDER_STATUS_SHAPE"
+            ],
+            "replay_case_count": 1,
+            "replay_classifications": [
+              "REPLAY_PROVIDER_SHAPE_BLOCKED"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "VALIDATED_FAIL": 1
+            },
+            "replay_valid_count": 0,
+            "required_minimum": 1
+          },
+          {
+            "case_type": "golden_st_transition",
+            "presence": "REPLAYED",
+            "reason_codes": [
+              "PROVIDER_STATUS_SHAPE"
+            ],
+            "replay_case_count": 50,
+            "replay_classifications": [
+              "REPLAY_PROVIDER_SHAPE_BLOCKED"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "VALIDATED_FAIL": 50
+            },
+            "replay_valid_count": 0,
+            "required_minimum": 50
+          }
+        ],
+        "reason_codes": [
+          "PROVIDER_STATUS_SHAPE"
+        ],
+        "replay_classification": "REPLAY_CORE_FAILED",
+        "replay_result_counts": {
+          "VALIDATED_FAIL": 51
+        },
+        "replay_status": "FAILED",
+        "replayed_case_types": [
+          "historical_st_suspend",
+          "golden_st_transition"
+        ],
+        "required_case_counts": {
+          "golden_st_transition": 50,
+          "historical_st_suspend": 1
+        },
+        "required_case_types": [
+          "historical_st_suspend",
+          "golden_st_transition"
+        ]
+      },
+      {
+        "absent_case_types": [],
+        "capability_id": "limit_price_and_no_limit_days",
+        "case_type_details": [
+          {
+            "case_type": "limit_price_and_no_limit_days",
+            "presence": "REPLAYED",
+            "reason_codes": [
+              "PROVIDER_EMPTY_STATUS_UNRESOLVED",
+              "PROVIDER_STATUS_SHAPE"
+            ],
+            "replay_case_count": 2,
+            "replay_classifications": [
+              "REPLAY_PROVIDER_SHAPE_BLOCKED",
+              "REPLAY_UNRESOLVED_PROVIDER_SEMANTICS"
+            ],
+            "replay_record_count": 2,
+            "replay_result_counts": {
+              "MISSING": 1,
+              "VALIDATED_FAIL": 1
+            },
+            "replay_valid_count": 0,
+            "required_minimum": 1
+          },
+          {
+            "case_type": "golden_limit_regime",
+            "presence": "REPLAYED",
+            "reason_codes": [
+              "PROVIDER_STATUS_SHAPE"
+            ],
+            "replay_case_count": 30,
+            "replay_classifications": [
+              "REPLAY_PROVIDER_SHAPE_BLOCKED"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "VALIDATED_FAIL": 30
+            },
+            "replay_valid_count": 0,
+            "required_minimum": 30
+          }
+        ],
+        "reason_codes": [
+          "PROVIDER_EMPTY_STATUS_UNRESOLVED",
+          "PROVIDER_STATUS_SHAPE"
+        ],
+        "replay_classification": "REPLAY_CORE_FAILED",
+        "replay_result_counts": {
+          "MISSING": 1,
+          "VALIDATED_FAIL": 31
+        },
+        "replay_status": "FAILED",
+        "replayed_case_types": [
+          "limit_price_and_no_limit_days",
+          "golden_limit_regime"
+        ],
+        "required_case_counts": {
+          "golden_limit_regime": 30,
+          "limit_price_and_no_limit_days": 1
+        },
+        "required_case_types": [
+          "limit_price_and_no_limit_days",
+          "golden_limit_regime"
+        ]
+      },
+      {
+        "absent_case_types": [],
+        "capability_id": "adj_factor_corporate_action_continuity",
+        "case_type_details": [
+          {
+            "case_type": "adj_factor_corporate_action_continuity",
+            "presence": "REPLAYED",
+            "reason_codes": [],
+            "replay_case_count": 1,
+            "replay_classifications": [
+              "REPLAY_STRUCTURAL_ONLY"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "OBSERVED": 1
+            },
+            "replay_valid_count": 0,
+            "required_minimum": 1
+          },
+          {
+            "case_type": "golden_corporate_action",
+            "presence": "REPLAYED",
+            "reason_codes": [
+              "PROVIDER_SCHEMA"
+            ],
+            "replay_case_count": 25,
+            "replay_classifications": [
+              "REPLAY_PROVIDER_SCHEMA_BLOCKED"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "VALIDATED_FAIL": 25
+            },
+            "replay_valid_count": 0,
+            "required_minimum": 20
+          }
+        ],
+        "reason_codes": [
+          "PROVIDER_SCHEMA"
+        ],
+        "replay_classification": "REPLAY_CORE_FAILED",
+        "replay_result_counts": {
+          "OBSERVED": 1,
+          "VALIDATED_FAIL": 25
+        },
+        "replay_status": "FAILED",
+        "replayed_case_types": [
+          "adj_factor_corporate_action_continuity",
+          "golden_corporate_action"
+        ],
+        "required_case_counts": {
+          "adj_factor_corporate_action_continuity": 1,
+          "golden_corporate_action": 20
+        },
+        "required_case_types": [
+          "adj_factor_corporate_action_continuity",
+          "golden_corporate_action"
+        ]
+      },
+      {
+        "absent_case_types": [],
+        "capability_id": "history_start_2020",
+        "case_type_details": [
+          {
+            "case_type": "history_start_2020",
+            "presence": "REPLAYED",
+            "reason_codes": [],
+            "replay_case_count": 1,
+            "replay_classifications": [
+              "REPLAY_VALIDATED_PASS"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "VALIDATED_PASS": 1
+            },
+            "replay_valid_count": 1,
+            "required_minimum": 1
+          }
+        ],
+        "reason_codes": [],
+        "replay_classification": "REPLAY_CORE_PASS",
+        "replay_result_counts": {
+          "VALIDATED_PASS": 1
+        },
+        "replay_status": "PASS",
+        "replayed_case_types": [
+          "history_start_2020"
+        ],
+        "required_case_counts": {
+          "history_start_2020": 1
+        },
+        "required_case_types": [
+          "history_start_2020"
+        ]
+      },
+      {
+        "absent_case_types": [
+          "golden_bj_mapping"
+        ],
+        "capability_id": "symbol_mapping_unambiguous",
+        "case_type_details": [
+          {
+            "case_type": "symbol_mapping_unambiguous",
+            "presence": "REPLAYED",
+            "reason_codes": [],
+            "replay_case_count": 1,
+            "replay_classifications": [
+              "REPLAY_VALIDATED_PASS"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "VALIDATED_PASS": 1
+            },
+            "replay_valid_count": 1,
+            "required_minimum": 1
+          },
+          {
+            "case_type": "golden_bj_mapping",
+            "presence": "ABSENT",
+            "reason_codes": [
+              "REPLAY_REQUIRED_CASE_TYPE_ABSENT"
+            ],
+            "replay_case_count": 0,
+            "replay_classifications": [],
+            "replay_record_count": 0,
+            "replay_result_counts": {},
+            "replay_valid_count": 0,
+            "required_minimum": 1
+          }
+        ],
+        "reason_codes": [
+          "BJ_SEMANTIC_MAPPING_NOT_PROVEN",
+          "REPLAY_REQUIRED_CASE_TYPE_ABSENT"
+        ],
+        "replay_classification": "REPLAY_CORE_MISSING",
+        "replay_result_counts": {
+          "VALIDATED_PASS": 1
+        },
+        "replay_status": "MISSING",
+        "replayed_case_types": [
+          "symbol_mapping_unambiguous"
+        ],
+        "required_case_counts": {
+          "golden_bj_mapping": 1,
+          "symbol_mapping_unambiguous": 1
+        },
+        "required_case_types": [
+          "symbol_mapping_unambiguous",
+          "golden_bj_mapping"
+        ]
+      },
+      {
+        "absent_case_types": [],
+        "capability_id": "sdk_permission_cache_freshness",
+        "case_type_details": [
+          {
+            "case_type": "sdk_permission_cache_freshness",
+            "presence": "REPLAYED",
+            "reason_codes": [
+              "ACCOUNT_PERMISSION_IDENTITY_NOT_REEXECUTED"
+            ],
+            "replay_case_count": 1,
+            "replay_classifications": [
+              "REPLAY_NOT_APPLICABLE_OFFLINE"
+            ],
+            "replay_record_count": 1,
+            "replay_result_counts": {
+              "NOT_RUN_OFFLINE": 1
+            },
+            "replay_valid_count": 0,
+            "required_minimum": 1
+          }
+        ],
+        "reason_codes": [
+          "ACCOUNT_PERMISSION_IDENTITY_NOT_REEXECUTED"
+        ],
+        "replay_classification": "REPLAY_CORE_UNRESOLVED",
+        "replay_result_counts": {
+          "NOT_RUN_OFFLINE": 1
+        },
+        "replay_status": "UNRESOLVED",
+        "replayed_case_types": [
+          "sdk_permission_cache_freshness"
+        ],
+        "required_case_counts": {
+          "sdk_permission_cache_freshness": 1
+        },
+        "required_case_types": [
+          "sdk_permission_cache_freshness"
+        ]
+      }
+    ],
+    "contract_source": "ashare_state.spike.capabilities.CORE_CAPABILITIES",
+    "diagnostic_only": true
+  },
   "evidence_anchors": [
     {
       "bytes": 17368,

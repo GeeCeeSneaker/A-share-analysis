@@ -6179,3 +6179,23 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 - 独立 Reviewer 单独审阅 [replay PR #44](https://github.com/GeeCeeSneaker/A-share-analysis/pull/44)：核对旧 run/catalog/Golden/rule hash、证据逻辑路径、前后树锚定、每个 stage 的 result/classification/reason code 和无 Provider/no mutation 控制。连续提交 `6f5f49a`、`2501a41`、`17282fd` 对应的 CI run #536、#537、#538 均三平台成功，H3B run #85、#86、#87 均按边界 skipped；独立 review 尚未提交，PR 继续 Draft。
 - 审阅关闭前保持 Draft；不得启动第三次 Formal、`--resume`、`--verdict`、backfill、策略扩展或生产化。若未来需要 Formal 结论，须由调度者针对合并后的 clean main 另行给出一次性授权，并重新生成 run-bound receipt。
+
+## DM-20260911-FORMAL-B1B7-019 · Replay v2 审阅阻断整改
+
+**Type**：C2 — independent-review follow-up / sealed-evidence read-only replay
+**Date**：2026-09-11
+**Status**：`P0 BLOCKERS ADDRESSED / REPLAY V2 REGENERATED / CI AND FOLLOW-UP REVIEW PENDING / KEEP DRAFT / NO FORMAL AUTHORIZATION`
+**Evidence**：[`formal_readonly_replay_20260911.md`](../provider_verification/formal_readonly_replay_20260911.md)、[`formal_readonly_replay_20260911.json`](../provider_verification/formal_readonly_replay_20260911.json)、[`formal_readonly_replay.py`](../../scripts/spike/formal_readonly_replay.py)。
+
+**审阅意见与处理**
+
+- PR #44 独立 review `5177170991` 指出的 status identity-loss 已修复：所有 `history_stock_status` core/Golden 路径都先通过 `key_preserving_table_rows()`，不再使用 `_rows(...values())` 丢弃多表键；身份冲突/缺失仍 fail closed。回放结果显示剩余异常是封存字节中的真实可定位 shape 问题：core status 为 1 行/1 表，Golden ST 为 6 行/6 表，Golden limit 为 1 行日期异常和 1 行身份异常。
+- 新增 `core_capability_projection`，直接按 `CORE_CAPABILITIES` 合并 required case types 与 minimum；`symbol_mapping_unambiguous` 因缺 `golden_bj_mapping` 保持 `REPLAY_CORE_MISSING`，不会把 standalone parser PASS 当成能力 PASS。其余多 case core 也按同一合同投影，避免 B3/B4 分组结果冒充能力结论。
+- 新增脱敏、确定性的失败子归因：status 输出 identity/date/other 分类及受影响行/表数；corporate-action 输出 `DATE_EX` 缺失 25 行、`EX_DIVIDEND_DATE` 缺失 1 行；B2 明确 5,442 行 value-only 且缺退市语义字段，BSE 明确 0 行/1 表。raw 值、账号、密码、IP、端口、Token、Cookie 和专有 SDK/runtime 均未写入。
+- artifact schema 升为 `formal-readonly-replay-v2`；大小 51,100 bytes，SHA-256 `78b07b9b3251b2abef5bd6ab2e0d191f84876e20e758e7248d0e33618b13927d`。旧 run `dad1e1b8-0c34-4031-8e94-cc87a03dbbf4`、catalog hash `bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53`、Golden/rule bindings 和 evidence tree 未改变。
+
+**验证与当前门槛**
+
+- 回放重新完成：`provider_calls=0`、`spike_run_created=false`、`raw_writer_write_calls=0`、`catalog_write_calls=0`、`verdict_write_calls=0`；evidence tree 前后均 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`。
+- 本地验证已通过：全量 `uv run pytest -q`（`1721 collected, 1718 passed, 3 skipped`）、Ruff check、Ruff format、py_compile、mypy、`uv pip check` 和 `git diff --check`；最新提交对应 CI 三矩阵和 independent follow-up review 仍是推送后的门槛。
+- 保持 PR #44 Draft。`300104.SZ` applicability/tradability 仍 deferred，全局 2020 baseline 不得放宽；没有第三次 Formal、Provider call、Production、`--resume`、`--verdict`、backfill、策略扩展或生产化授权。

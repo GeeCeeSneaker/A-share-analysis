@@ -3805,3 +3805,16 @@
 - 验证通过：全量 `uv run pytest -q` 为 `1721 collected, 1718 passed, 3 skipped`；replay 脚本 Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。未调用 Provider，未创建新 run，未执行 Production、`--resume` 或 `--verdict`。
 
 下一步：独立 Draft PR [#44](https://github.com/GeeCeeSneaker/A-share-analysis/pull/44) 已创建；其连续提交 `6f5f49a`、`2501a41`、`17282fd` 对应的 GitHub Actions CI run #536、#537、#538 均三平台成功，H3B run #85、#86、#87 均按边界 skipped。独立 Reviewer 尚未提交 review，PR 继续保持 Draft；审阅关闭前不得启动第三次 Formal。`300104.SZ` applicability/tradability、B2/B3/B4 未决语义和未来 Formal 授权边界见上述交接记录。
+
+## 2026-09-11 · Replay v2 follow-up：status identity、core projection 与脱敏归因
+
+> 状态：**P0 REVIEW BLOCKERS ADDRESSED / REPLAY v2 REGENERATED / LOCAL VERIFIED / CI AND FOLLOW-UP REVIEW REQUIRED / NO FORMAL RERUN**
+
+- 吸收 Issue #39 最新调度 checkpoint 和 PR #44 review `5177170991`：不启动第三次 Formal，不调用 Provider，不使用 `--resume`/`--verdict`，不改变 Golden、交易规则、Provider 配置或封存 run。
+- 修正只读 replay 的 status 边界：`history_stock_status` 的所有 core/Golden 路径先经过 `key_preserving_table_rows()`，保留 `dict[qualified_symbol, table]` 身份，再进入 `canonical_status_view()`；键/行冲突或无法证明时仍 fail closed。
+- 从现有 `CORE_CAPABILITIES` 派生 `core_capability_projection`，逐项合并合同要求的 case types 和 minimum。`symbol_mapping_unambiguous` 明确为 `REPLAY_CORE_MISSING`，因为 `golden_bj_mapping` 在封存 catalog 中不存在；standalone 5,562-value parser PASS 不再冒充核心能力 PASS。
+- 为剩余阻断增加脱敏、可重算归因：status 形状按 identity/date/other 分类并带受影响行/表数；公司行为 schema 明确 `DATE_EX` 缺失 25 行、`EX_DIVIDEND_DATE` 缺失 1 行；B2/BSE 也补充声明行/表和语义字段边界。没有输出 raw 值。
+- v2 artifact [`formal_readonly_replay_20260911.json`](provider_verification/formal_readonly_replay_20260911.json) 为 51,100 bytes，SHA-256 `78b07b9b3251b2abef5bd6ab2e0d191f84876e20e758e7248d0e33618b13927d`；封存 evidence tree 前后仍为 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`，`provider_calls=0`，所有 writer call 为 0。
+- 当前诊断投影：`daily_bar_units`、3 个明确 history fixture 为 replay PASS；`security_master_with_delisted`、`historical_st_suspend`、`limit_price_and_no_limit_days`、`adj_factor_corporate_action_continuity` 为 replay FAILED；`symbol_mapping_unambiguous` 为 replay MISSING；`sdk_permission_cache_freshness` 为 replay UNRESOLVED。它们都不是 Formal verdict。
+- `300104.SZ` applicability/tradability 仍 deferred；全局 2020 baseline 不变。下一道门是最新提交上的三平台 CI 与独立 follow-up review；PR #44 继续 Draft，审阅关闭前不得启动 Formal。
+- 提交前验证：全量 `uv run pytest -q` 通过（`1721 collected, 1718 passed, 3 skipped`）；Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 也通过。CI 仍须在推送后的精确提交上重新确认。

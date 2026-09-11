@@ -18,7 +18,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ashare_state.spike.capabilities import CORE_CAPABILITIES
 from ashare_state.spike.golden_router import (
+    CA_PROVIDER_FIELD_CONTRACT,
     CAProviderShapeError,
     DomainData,
     _ca_provider_view,
@@ -34,6 +36,7 @@ from ashare_state.spike.row_adapter import (
     canonical_status_view,
     date_key,
     key_preserving_table_rows,
+    provider_symbol,
 )
 from ashare_state.spike.trading_rule import load_bound_rule_book
 from ashare_state.spike.validators import (
@@ -274,6 +277,165 @@ def _rows(payload: Any) -> list[dict[str, Any]]:
     return []
 
 
+_STATUS_ROW_FIELDS = {
+    "market_code",
+    "trade_date",
+    "preclose",
+    "high_limited",
+    "low_limited",
+    "price_high_lmt_rate",
+    "price_low_lmt_rate",
+    "is_st_sec",
+    "is_susp_sec",
+    "is_wd_sec",
+    "is_xr_sec",
+}
+
+
+def _status_table_members(payload: Any) -> list[tuple[Any | None, Any]]:
+    """Return status payload members without exposing table keys."""
+
+    if isinstance(payload, dict) and not any(
+        str(key).casefold() in _STATUS_ROW_FIELDS for key in payload
+    ):
+        return list(payload.items())
+    return [(None, payload)]
+
+
+def _status_shape_code(error_text: str) -> str:
+    """Map a shape exception to a stable, value-free diagnostic code."""
+
+    folded = error_text.casefold()
+    if "conflict" in folded:
+        return "STATUS_IDENTITY_CONFLICT"
+    if "identity" in folded or "mapping key" in folded or "ambiguous" in folded:
+        return "STATUS_IDENTITY_MISSING_OR_AMBIGUOUS"
+    if "trade_date" in folded or "date" in folded:
+        return "STATUS_DATE_MISSING_OR_INVALID"
+    return "STATUS_OTHER_SHAPE"
+
+
+def _status_shape_diagnostics(
+    payload: Any,
+    *,
+    declared_rows: int,
+    declared_table_count: int,
+) -> dict[str, Any]:
+    """Count status shape failures from sealed bytes without emitting values."""
+
+    counts: collections.Counter[str] = collections.Counter()
+    affected_tables: dict[str, set[int]] = collections.defaultdict(set)
+
+    def record_failure(error_text: str, table_index: int, row_count: int = 1) -> None:
+        code = _status_shape_code(error_text)
+        counts[code] += row_count
+        affected_tables[code].add(table_index)
+
+    def inspect_rows(rows: list[dict[str, Any]], table_index: int) -> None:
+        for row in rows:
+            try:
+                canonical_status_view([row])
+            except ProviderRowShapeError as exc:
+                record_failure(str(exc), table_index)
+
+    for table_index, (table_key, member) in enumerate(_status_table_members(payload)):
+        try:
+            preserved_rows = key_preserving_table_rows(
+                {table_key: member} if table_key is not None else member
+            )
+        except ProviderRowShapeError as exc:
+            raw_rows = _rows(member)
+            if not raw_rows:
+                record_failure(str(exc), table_index)
+                continue
+            # Re-run one member at a time so one conflicting row does not hide
+            # the deterministic count of other rows in the same table.
+            for raw_row in raw_rows:
+                one_row_payload = {table_key: [raw_row]} if table_key is not None else raw_row
+                try:
+                    one_row = key_preserving_table_rows(one_row_payload)
+                except ProviderRowShapeError as row_exc:
+                    record_failure(str(row_exc), table_index)
+                else:
+                    inspect_rows(one_row, table_index)
+        else:
+            inspect_rows(preserved_rows, table_index)
+
+    subreasons = [
+        {
+            "code": code,
+            "affected_row_count": counts[code],
+            "affected_table_count": len(affected_tables[code]),
+        }
+        for code in sorted(counts)
+    ]
+    return {
+        "shape_diagnostics": {
+            "declared_row_count": declared_rows,
+            "declared_table_count": declared_table_count,
+            "affected_row_count": sum(counts.values()),
+            "affected_table_count": len(
+                {index for indexes in affected_tables.values() for index in indexes}
+            ),
+            "subreasons": subreasons,
+        }
+    }
+
+
+def _ca_schema_diagnostics(
+    stream: str,
+    payload: Any,
+    *,
+    declared_rows: int,
+    declared_table_count: int,
+) -> dict[str, Any]:
+    """Describe a CA contract failure using field names and counts only."""
+
+    contract = CA_PROVIDER_FIELD_CONTRACT[stream]
+    required_fields = [contract["code"], contract["ex_date"]]
+    rows = _rows(payload)
+    columns = _payload_columns(payload)
+    missing_field_rows: collections.Counter[str] = collections.Counter()
+    invalid_field_rows: collections.Counter[str] = collections.Counter()
+    affected_rows = 0
+
+    for row in rows:
+        missing = {field for field in required_fields if row.get(field) is None}
+        invalid: set[str] = set()
+        for field in required_fields:
+            raw_value = row.get(field)
+            if field in missing:
+                continue
+            if field == contract["code"]:
+                if not provider_symbol({"MARKET_CODE": raw_value}).split(".", 1)[0]:
+                    invalid.add(field)
+            elif not date_key(raw_value):
+                invalid.add(field)
+        for field in missing:
+            missing_field_rows[field] += 1
+        for field in invalid:
+            invalid_field_rows[field] += 1
+        if missing or invalid:
+            affected_rows += 1
+
+    missing_columns = set(required_fields) - columns if columns is not None and not rows else set()
+    missing_fields = sorted(set(missing_field_rows) | missing_columns)
+    invalid_fields = sorted(set(invalid_field_rows) - set(missing_fields))
+    affected_table_count = declared_table_count if missing_columns else (1 if affected_rows else 0)
+    return {
+        "stream": stream,
+        "documented_contract_fields": sorted(required_fields),
+        "missing_documented_fields": missing_fields,
+        "invalid_documented_fields": invalid_fields,
+        "missing_field_row_counts": dict(sorted(missing_field_rows.items())),
+        "invalid_field_row_counts": dict(sorted(invalid_field_rows.items())),
+        "affected_row_count": affected_rows,
+        "affected_table_count": affected_table_count,
+        "declared_row_count": declared_rows,
+        "declared_table_count": declared_table_count,
+    }
+
+
 def _scalar_values(payload: Any) -> list[Any]:
     return [row["value"] for row in _rows(payload) if set(row) == {"value"}]
 
@@ -325,6 +487,8 @@ def _shape_replay(
     view: str,
     reason_code: str,
     error_text: str,
+    *,
+    details: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     replay = {
         "classification": "REPLAY_PROVIDER_SHAPE_BLOCKED",
@@ -335,6 +499,8 @@ def _shape_replay(
     match = re.search(r"(?:row|index)\s+(\d+)", error_text)
     if match:
         replay["row_ordinal"] = int(match.group(1))
+    if details:
+        replay.update(details)
     return replay
 
 
@@ -374,6 +540,9 @@ def _add_capability(
     record: dict[str, Any] = {
         "stage": stage,
         "capability": capability,
+        "case_types": sorted(
+            {str(row.get("case_type", "")) for row in old_rows if str(row.get("case_type", ""))}
+        ),
         "old_recorded": _old_summary(old_rows),
         "replay": replay,
         "evidence": sorted(set(evidence or [])),
@@ -381,6 +550,144 @@ def _add_capability(
     if note:
         record["note"] = note
     records.append(record)
+
+
+def _replay_result_counts(replay: dict[str, Any]) -> collections.Counter[str]:
+    counts: collections.Counter[str] = collections.Counter()
+    raw_counts = replay.get("result_counts")
+    if isinstance(raw_counts, dict):
+        for result, count in raw_counts.items():
+            try:
+                counts[str(result)] += int(count)
+            except (TypeError, ValueError):
+                continue
+    if not counts and replay.get("result"):
+        counts[str(replay["result"])] = 1
+    return counts
+
+
+def _core_capability_projection(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Project replay records onto the frozen multi-case core contract."""
+
+    records_by_case_type: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+    for record in records:
+        for case_type in record.get("case_types", []):
+            records_by_case_type[str(case_type)].append(record)
+
+    unresolved_results = {
+        "MISSING",
+        "NOT_RUN_OFFLINE",
+        "NOT_TESTABLE_PERMISSION",
+        "OBSERVED",
+        "OBSERVED_ONLY",
+    }
+    valid_results = {"VALIDATED_PASS", "DIFF_EXPLAINED"}
+    projected: list[dict[str, Any]] = []
+
+    for definition in CORE_CAPABILITIES:
+        required: list[dict[str, Any]] = []
+        replayed_case_types: list[str] = []
+        absent_case_types: list[str] = []
+        capability_results: collections.Counter[str] = collections.Counter()
+        capability_reasons: set[str] = set()
+        has_failed = False
+        all_minimums_met = True
+
+        for case_type in definition.required_case_types:
+            case_records = records_by_case_type.get(case_type, [])
+            minimum = int(definition.required_case_counts[case_type])
+            if not case_records:
+                absent_case_types.append(case_type)
+                all_minimums_met = False
+                required.append(
+                    {
+                        "case_type": case_type,
+                        "required_minimum": minimum,
+                        "presence": "ABSENT",
+                        "replay_record_count": 0,
+                        "replay_case_count": 0,
+                        "replay_valid_count": 0,
+                        "replay_result_counts": {},
+                        "replay_classifications": [],
+                        "reason_codes": ["REPLAY_REQUIRED_CASE_TYPE_ABSENT"],
+                    }
+                )
+                capability_reasons.add("REPLAY_REQUIRED_CASE_TYPE_ABSENT")
+                continue
+
+            replayed_case_types.append(case_type)
+            case_counts: collections.Counter[str] = collections.Counter()
+            classifications: set[str] = set()
+            reasons: set[str] = set()
+            for record in case_records:
+                replay = record.get("replay", {})
+                case_counts.update(_replay_result_counts(replay))
+                classification = str(replay.get("classification", ""))
+                if classification:
+                    classifications.add(classification)
+                reasons.update(str(code) for code in replay.get("reason_codes", []) if code)
+                reason_counts = replay.get("reason_counts")
+                if isinstance(reason_counts, dict):
+                    reasons.update(str(code) for code in reason_counts if code)
+            valid_count = sum(case_counts[result] for result in valid_results)
+            capability_results.update(case_counts)
+            has_failed |= "VALIDATED_FAIL" in case_counts
+            if valid_count < minimum:
+                all_minimums_met = False
+            capability_reasons.update(reasons)
+            required.append(
+                {
+                    "case_type": case_type,
+                    "required_minimum": minimum,
+                    "presence": "REPLAYED",
+                    "replay_record_count": len(case_records),
+                    "replay_case_count": sum(case_counts.values()),
+                    "replay_valid_count": valid_count,
+                    "replay_result_counts": dict(sorted(case_counts.items())),
+                    "replay_classifications": sorted(classifications),
+                    "reason_codes": sorted(reasons),
+                }
+            )
+
+        if absent_case_types:
+            status = "MISSING"
+        elif has_failed:
+            status = "FAILED"
+        elif (
+            any(result in unresolved_results for result in capability_results)
+            or not all_minimums_met
+        ):
+            status = "UNRESOLVED"
+        else:
+            status = "PASS"
+
+        if definition.capability_id == "symbol_mapping_unambiguous" and "golden_bj_mapping" in (
+            absent_case_types
+        ):
+            capability_reasons.add("BJ_SEMANTIC_MAPPING_NOT_PROVEN")
+        projected.append(
+            {
+                "capability_id": definition.capability_id,
+                "required_case_types": list(definition.required_case_types),
+                "required_case_counts": {
+                    case_type: int(definition.required_case_counts[case_type])
+                    for case_type in definition.required_case_types
+                },
+                "replayed_case_types": replayed_case_types,
+                "absent_case_types": absent_case_types,
+                "case_type_details": required,
+                "replay_result_counts": dict(sorted(capability_results.items())),
+                "replay_status": status,
+                "replay_classification": f"REPLAY_CORE_{status}",
+                "reason_codes": sorted(capability_reasons),
+            }
+        )
+
+    return {
+        "diagnostic_only": True,
+        "contract_source": "ashare_state.spike.capabilities.CORE_CAPABILITIES",
+        "capabilities": projected,
+    }
 
 
 def _observe_units(rows: list[dict[str, Any]]) -> tuple[dict[str, str], int, int]:
@@ -437,7 +744,12 @@ def _replay_core(
         replay=_outcome_replay(
             security_outcome,
             "REPLAY_SEMANTIC_MISSING",
-            facts={"value_only_rows": sum(set(row) == {"value"} for row in security_rows)},
+            facts={
+                "value_only_rows": sum(set(row) == {"value"} for row in security_rows),
+                "rows_without_delisted_semantic_fields": len(security_rows),
+                "required_delisted_semantic_fields": ["IS_LISTED", "DELISTING_DATE"],
+                "declared_table_count": int(security.anchor["table_count"]),
+            },
         ),
         evidence=[security.anchor["logical_path"]],
         note="Historical-code membership does not prove IS_LISTED=3 or DELISTING_DATE.",
@@ -486,14 +798,19 @@ def _replay_core(
 
     status_case = _one_case(grouped, "historical_st_suspend")
     status = reader.read_ref(str(status_case["evidence_ref"]))
-    status_rows = _rows(status.payload)
     try:
+        status_rows = key_preserving_table_rows(status.payload)
         canonical_status_rows = canonical_status_view(status_rows)
     except ProviderRowShapeError as exc:
         status_replay = _shape_replay(
-            "canonical_status_view",
+            exc.view,
             "PROVIDER_STATUS_SHAPE",
             str(exc),
+            details=_status_shape_diagnostics(
+                status.payload,
+                declared_rows=int(status.anchor["declared_rows"]),
+                declared_table_count=int(status.anchor["table_count"]),
+            ),
         )
     else:
         status_outcome = validate_st_suspend_flags(canonical_status_rows, golden_facts=[])
@@ -510,8 +827,8 @@ def _replay_core(
         replay=status_replay,
         evidence=[status.anchor["logical_path"]],
         note=(
-            "A malformed status row remains a fail-closed shape block; no ST "
-            "semantic verdict is inferred."
+            "Status table keys are preserved before canonicalization; any remaining "
+            "shape failure is reported with value-free identity/date subreasons."
         ),
     )
 
@@ -522,12 +839,17 @@ def _replay_core(
     )
     limit_status = reader.read_ref(str(limit_sample["evidence_ref"]))
     try:
-        limit_rows = canonical_status_view(_rows(limit_status.payload))
+        limit_rows = canonical_status_view(key_preserving_table_rows(limit_status.payload))
     except ProviderRowShapeError as exc:
         limit_replay = _shape_replay(
-            "canonical_status_view",
+            exc.view,
             "PROVIDER_STATUS_SHAPE",
             str(exc),
+            details=_status_shape_diagnostics(
+                limit_status.payload,
+                declared_rows=int(limit_status.anchor["declared_rows"]),
+                declared_table_count=int(limit_status.anchor["table_count"]),
+            ),
         )
     else:
         from ashare_state.spike.validators import validate_limit_rule
@@ -548,8 +870,8 @@ def _replay_core(
         replay=limit_replay,
         evidence=[limit_status.anchor["logical_path"]],
         note=(
-            "The sample status exchange is blocked before rule arithmetic by "
-            "the malformed native row."
+            "Status table keys are preserved before rule arithmetic; any remaining "
+            "shape failure is reported with value-free identity/date subreasons."
         ),
     )
 
@@ -566,6 +888,8 @@ def _replay_core(
             "result": _result_name(CaseResult.MISSING),
             "reason_codes": ["PROVIDER_EMPTY_STATUS_UNRESOLVED"],
             "empty_status": True,
+            "declared_row_count": int(bse.anchor["declared_rows"]),
+            "declared_table_count": int(bse.anchor["table_count"]),
         }
     else:
         bse_replay = {
@@ -781,8 +1105,12 @@ def _replay_golden(
         cases = cases_by_type[case_type]
         evidence = [item.anchor["logical_path"] for item in loaded]
         shape_failure: ProviderRowShapeError | None = None
+        shape_source = ""
+        shape_payload: Any = None
+        shape_anchor: dict[str, Any] | None = None
         ca_failure = False
         ca_stream = ""
+        ca_schema_details: list[dict[str, Any]] = []
         data: DomainData | None = None
 
         if case_type == "golden_st_transition":
@@ -792,9 +1120,16 @@ def _replay_golden(
                 if item.meta.get("provider_dataset") == "history_stock_status"
             )
             try:
+                shape_source = "status"
+                shape_payload = status
+                shape_anchor = next(
+                    item.anchor
+                    for item in loaded
+                    if item.meta.get("provider_dataset") == "history_stock_status"
+                )
                 data = DomainData(
                     domain="ST_STATUS",
-                    status_rows=canonical_status_view(_rows(status)),
+                    status_rows=canonical_status_view(key_preserving_table_rows(status)),
                 )
             except ProviderRowShapeError as exc:
                 shape_failure = exc
@@ -833,9 +1168,16 @@ def _replay_golden(
                 if item.meta.get("provider_dataset") == "trade_calendar"
             )
             try:
+                shape_source = "status"
+                shape_payload = status
+                shape_anchor = next(
+                    item.anchor
+                    for item in loaded
+                    if item.meta.get("provider_dataset") == "history_stock_status"
+                )
                 data = DomainData(
                     domain="LIMIT_PIT_RULE",
-                    status_rows=canonical_status_view(_rows(status)),
+                    status_rows=canonical_status_view(key_preserving_table_rows(status)),
                     hist_code_rows=_rows(hist),
                     calendar_days=_calendar_days(calendar),
                 )
@@ -860,7 +1202,14 @@ def _replay_golden(
                 item.payload for item in loaded if item.meta.get("provider_dataset") == "daily_bar"
             )
             try:
-                status_rows = canonical_status_view(_rows(status))
+                shape_source = "status"
+                shape_payload = status
+                shape_anchor = next(
+                    item.anchor
+                    for item in loaded
+                    if item.meta.get("provider_dataset") == "history_stock_status"
+                )
+                status_rows = canonical_status_view(key_preserving_table_rows(status))
                 dividend_rows: list[dict[str, Any]] = []
                 right_issue_rows: list[dict[str, Any]] = []
                 for item in loaded:
@@ -877,44 +1226,70 @@ def _replay_golden(
                     if not stream:
                         raise RuntimeError("corporate-action endpoint stream is unresolved")
                     ca_stream = stream
-                    view = _ca_provider_view(
-                        stream,
-                        _rows(item.payload),
-                        source_endpoint=endpoint,
-                        raw_request_id=str(item.meta["request_id"]),
-                        payload_columns=_payload_columns(item.payload),
-                    )
+                    try:
+                        view = _ca_provider_view(
+                            stream,
+                            _rows(item.payload),
+                            source_endpoint=endpoint,
+                            raw_request_id=str(item.meta["request_id"]),
+                            payload_columns=_payload_columns(item.payload),
+                        )
+                    except CAProviderShapeError:
+                        ca_schema_details.append(
+                            _ca_schema_diagnostics(
+                                stream,
+                                item.payload,
+                                declared_rows=int(item.anchor["declared_rows"]),
+                                declared_table_count=int(item.anchor["table_count"]),
+                            )
+                        )
+                        continue
                     if stream == "right_issue":
                         right_issue_rows.extend(view)
                     else:
                         dividend_rows.extend(view)
-                data = DomainData(
-                    domain="CORP_ACTION_CONTEXT",
-                    status_rows=status_rows,
-                    adj_rows=_rows(adj),
-                    dividend_rows=dividend_rows,
-                    right_issue_rows=right_issue_rows,
-                    kline_rows=key_preserving_table_rows(kline),
-                    calendar_days=_calendar_days(calendar),
-                )
+                if not ca_schema_details:
+                    shape_source = "kline"
+                    shape_payload = kline
+                    data = DomainData(
+                        domain="CORP_ACTION_CONTEXT",
+                        status_rows=status_rows,
+                        adj_rows=_rows(adj),
+                        dividend_rows=dividend_rows,
+                        right_issue_rows=right_issue_rows,
+                        kline_rows=key_preserving_table_rows(kline),
+                        calendar_days=_calendar_days(calendar),
+                    )
+                else:
+                    ca_failure = True
             except ProviderRowShapeError as exc:
                 shape_failure = exc
-            except CAProviderShapeError:
-                ca_failure = True
 
         if shape_failure is not None:
             view = getattr(shape_failure, "view", "provider_row")
-            reason = (
-                "PROVIDER_STATUS_SHAPE"
-                if view == "canonical_status_view"
-                else "PROVIDER_KLINE_SHAPE"
-                if view == "key_preserving_table_rows"
-                else "PROVIDER_ROW_SHAPE"
-            )
-            replay = _shape_replay(view, reason, str(shape_failure))
+            if shape_source == "status":
+                reason = "PROVIDER_STATUS_SHAPE"
+                details = _status_shape_diagnostics(
+                    shape_payload,
+                    declared_rows=int((shape_anchor or {}).get("declared_rows", 0)),
+                    declared_table_count=int((shape_anchor or {}).get("table_count", 0)),
+                )
+            else:
+                reason = (
+                    "PROVIDER_KLINE_SHAPE"
+                    if view == "key_preserving_table_rows"
+                    else "PROVIDER_ROW_SHAPE"
+                )
+                details = None
+            replay = _shape_replay(view, reason, str(shape_failure), details=details)
             replay["result_counts"] = {"VALIDATED_FAIL": len(cases)}
             replay["reason_counts"] = {reason: len(cases)}
-            note = "Canonical provider view rejected a native row before semantic comparison."
+            note = (
+                "Key-preserving status identity was retained before canonicalization, but "
+                "the sealed rows still fail closed on the reported shape subreason."
+                if shape_source == "status"
+                else "Canonical provider view rejected a native row before semantic comparison."
+            )
         elif ca_failure:
             replay = {
                 "classification": "REPLAY_PROVIDER_SCHEMA_BLOCKED",
@@ -923,6 +1298,7 @@ def _replay_golden(
                 "failed_stream": ca_stream or "dividend_or_right_issue",
                 "result_counts": {"VALIDATED_FAIL": len(cases)},
                 "reason_counts": {"PROVIDER_SCHEMA": len(cases)},
+                "schema_subreasons": ca_schema_details,
             }
             note = (
                 "A corporate-action stream row lacks a documented contract field; "
@@ -1034,13 +1410,14 @@ def _build_artifact(
 
     capabilities = _replay_core(reader, grouped, rule_book)
     capabilities.extend(_replay_golden(reader, grouped, rule_book, golden_cases))
+    core_projection = _core_capability_projection(capabilities)
     after = _tree_anchor(evidence_root)
     if before != after:
         raise RuntimeError("sealed evidence tree changed during read-only replay")
 
     return {
         "artifact_kind": "REPLAY_DIAGNOSTIC",
-        "artifact_schema": "formal-readonly-replay-v1",
+        "artifact_schema": "formal-readonly-replay-v2",
         "source": {
             "sealed_run_id": SEALED_RUN_ID,
             "sealed_run_status": str(old_run.get("status", "")),
@@ -1097,6 +1474,7 @@ def _build_artifact(
             key=lambda anchor: str(anchor["logical_path"]),
         ),
         "capabilities": capabilities,
+        "core_capability_projection": core_projection,
     }
 
 
