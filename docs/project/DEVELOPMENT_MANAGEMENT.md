@@ -6155,3 +6155,67 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 - 没有修改 Golden 期望、交易规则、Provider 配置、旧 Formal run/catalog/verdict；没有
   Production、`--resume` 或 `--verdict`，没有上传凭据或 raw Provider payload。
+
+## DM-20260911-FORMAL-B1B7-018 · 封存 Formal 证据只读 replay 诊断
+
+**Type**：C2 — sealed-evidence read-only replay / handoff diagnostic
+**Date**：2026-09-11
+**Status**：`REPLAY_DIAGNOSTIC ADDED / ORIGINAL RUN PRESERVED / INDEPENDENT REVIEW REQUIRED / NO FORMAL AUTHORIZATION`
+**Evidence**：[`formal_readonly_replay_20260911.md`](../provider_verification/formal_readonly_replay_20260911.md)、[`formal_readonly_replay_20260911.json`](../provider_verification/formal_readonly_replay_20260911.json)、[`formal_readonly_replay.py`](../../scripts/spike/formal_readonly_replay.py)。
+
+**已完成**
+
+- 按 Issue #39 最新调度边界，在 `main@b7c9b1b2986e5cbd5415ef44826acbc7d008cfc5` 上对旧封存 run `dad1e1b8-0c34-4031-8e94-cc87a03dbbf4` 执行离线只读 replay；sealed catalog 178 条，SHA-256 为 `bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53`，Golden v7 与 H1R4 规则绑定均保留。
+- 复现脚本只读取并校验 meta/payload 闭包，前后 evidence tree inventory 完全一致；`provider_calls=0`、`spike_run_created=false`，没有调用 Provider、创建新 run、写 catalog 或写 verdict。
+- 诊断明确记录了当前代码可达到的边界：daily-bar 单位检查通过；3 个明确 history fixture 通过；状态 shape、退市语义、BSE 空 status、公司行为字段和离线账户 gate 仍分别保持阻断或未运行。
+- `300104.SZ` 继续 deferred；没有修改 Golden、全局 2020 baseline、旧 verdict 或 Provider 配置。
+
+**明确未完成**
+
+- 该产物是 `REPLAY_DIAGNOSTIC`，不是 Formal verdict，也不构成 Provider capability approval；B1、B5 account gate 和 B7 capacity timing 未在离线环境重跑。
+- B2 真实退市语义、B3 status/BSE、B4 公司行为 schema/语义、B6 optional semantic checks 仍需新的可复核证明；不得将结构观察或 adapter replay 当作通过。
+
+**下一步**
+
+- 独立 Reviewer 单独审阅 [replay PR #44](https://github.com/GeeCeeSneaker/A-share-analysis/pull/44)：核对旧 run/catalog/Golden/rule hash、证据逻辑路径、前后树锚定、每个 stage 的 result/classification/reason code 和无 Provider/no mutation 控制。连续提交 `6f5f49a`、`2501a41`、`17282fd` 对应的 CI run #536、#537、#538 均三平台成功，H3B run #85、#86、#87 均按边界 skipped；独立 review 尚未提交，PR 继续 Draft。
+- 审阅关闭前保持 Draft；不得启动第三次 Formal、`--resume`、`--verdict`、backfill、策略扩展或生产化。若未来需要 Formal 结论，须由调度者针对合并后的 clean main 另行给出一次性授权，并重新生成 run-bound receipt。
+
+## DM-20260911-FORMAL-B1B7-019 · Replay v2 审阅阻断整改
+
+**Type**：C2 — independent-review follow-up / sealed-evidence read-only replay
+**Date**：2026-09-11
+**Status**：`P0 BLOCKERS ADDRESSED / REPLAY V2 REGENERATED / CI AND FOLLOW-UP REVIEW PENDING / KEEP DRAFT / NO FORMAL AUTHORIZATION`
+**Evidence**：[`formal_readonly_replay_20260911.md`](../provider_verification/formal_readonly_replay_20260911.md)、[`formal_readonly_replay_20260911.json`](../provider_verification/formal_readonly_replay_20260911.json)、[`formal_readonly_replay.py`](../../scripts/spike/formal_readonly_replay.py)。
+
+**审阅意见与处理**
+
+- PR #44 独立 review `5177170991` 指出的 status identity-loss 已修复：所有 `history_stock_status` core/Golden 路径都先通过 `key_preserving_table_rows()`，不再使用 `_rows(...values())` 丢弃多表键；身份冲突/缺失仍 fail closed。回放结果显示剩余异常是封存字节中的真实可定位 shape 问题：core status 为 1 行/1 表，Golden ST 为 6 行/6 表，Golden limit 为 1 行日期异常和 1 行身份异常。
+- 新增 `core_capability_projection`，直接按 `CORE_CAPABILITIES` 合并 required case types 与 minimum；`symbol_mapping_unambiguous` 因缺 `golden_bj_mapping` 保持 `REPLAY_CORE_MISSING`，不会把 standalone parser PASS 当成能力 PASS。其余多 case core 也按同一合同投影，避免 B3/B4 分组结果冒充能力结论。
+- 新增脱敏、确定性的失败子归因：status 输出 identity/date/other 分类及受影响行/表数；corporate-action 输出 `DATE_EX` 缺失 25 行、`EX_DIVIDEND_DATE` 缺失 1 行；B2 明确 5,442 行 value-only 且缺退市语义字段，BSE 明确 0 行/1 表。raw 值、账号、密码、IP、端口、Token、Cookie 和专有 SDK/runtime 均未写入。
+- artifact schema 升为 `formal-readonly-replay-v2`；大小 51,100 bytes，SHA-256 `78b07b9b3251b2abef5bd6ab2e0d191f84876e20e758e7248d0e33618b13927d`。旧 run `dad1e1b8-0c34-4031-8e94-cc87a03dbbf4`、catalog hash `bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53`、Golden/rule bindings 和 evidence tree 未改变。
+
+**验证与当前门槛**
+
+- 回放重新完成：`provider_calls=0`、`spike_run_created=false`、`raw_writer_write_calls=0`、`catalog_write_calls=0`、`verdict_write_calls=0`；evidence tree 前后均 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`。
+- 本地验证已通过：全量 `uv run pytest -q`（`1721 collected, 1718 passed, 3 skipped`）、Ruff check、Ruff format、py_compile、mypy、`uv pip check` 和 `git diff --check`；最新提交对应 CI 三矩阵和 independent follow-up review 仍是推送后的门槛。
+- 保持 PR #44 Draft。`300104.SZ` applicability/tradability 仍 deferred，全局 2020 baseline 不得放宽；没有第三次 Formal、Provider call、Production、`--resume`、`--verdict`、backfill、策略扩展或生产化授权。
+
+## DM-20260911-FORMAL-B1B7-020 · Replay v3 status 边界与延期夹具投影整改
+
+**Type**：C2 — independent-review delta remediation / sealed-evidence read-only replay
+**Date**：2026-09-11
+**Status**：`P0 DELTA FIX IMPLEMENTED / REPLAY V3 REGENERATED / LOCAL VERIFIED / FOLLOW-UP REVIEW REQUIRED / KEEP DRAFT / NO FORMAL AUTHORIZATION`
+**Evidence**：[`formal_readonly_replay_20260911.md`](../provider_verification/formal_readonly_replay_20260911.md)、[`formal_readonly_replay_20260911.json`](../provider_verification/formal_readonly_replay_20260911.json)、[`formal_readonly_replay.py`](../../scripts/spike/formal_readonly_replay.py)、分支 `feat/formal-readonly-replay-20260911`。
+
+**审阅意见与处理**
+
+- 针对 PR #44 delta review `5178916747` 的 P0-1，status replay 不再复用 K-line 的 qualified outer-key contract：合格外层 symbol 只传播并校验行内身份冲突；非合格 outer key 被忽略，行内 `MARKET_CODE`/日期交由 `canonical_status_view()` 判定；无合格 key 的空/null member 单独记录为 structural unresolved，不生成伪造 status row。该边界仅存在于只读 replay 脚本，主运行时未改动。
+- P0-1 修复后的剩余 status 归因为封存字节中的真实日期问题，而非外层 key 误报：B3 core 1 行/1 表、Golden ST 6 行/6 表、Golden limit 2 行/2 表为 `STATUS_DATE_MISSING_OR_INVALID`；v3 没有把它们降级为 PASS。
+- 针对 P0-2，`history_start_2020` 在三个明确 fixture 当前 replay PASS 的同时，因 `300104.SZ` 仍 deferred，核心投影改为 `REPLAY_CORE_UNRESOLVED`，并记录 `HISTORICAL_DELISTED_FIXTURE_DEFERRED`；不得据此放宽全局 2020 baseline。
+- 新增 5 条 replay boundary 回归测试；v3 artifact 绑定精确提交 `80df040f85158281d8382e9b2ea8dcf914a28d16`，大小 51,421 bytes，SHA-256 `f9c2560996ae72db642d858d115e078cf51c93cc6fa9ad738bb1d35ceb1b3631`。旧 Formal run/catalog/verdict、Golden、交易规则、Provider 配置和 evidence tree 未改变。
+
+**验证与门槛**
+
+- 全量本地 `uv run pytest -q -r fEs`：`1721 collected, 1718 passed, 3 skipped`；Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。
+- v3 只读控制仍为 `provider_calls=0`、`spike_run_created=false`、`raw_writer_write_calls=0`、`catalog_write_calls=0`、`verdict_write_calls=0`；evidence tree 前后均为 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`。
+- 当前 head 已推送到 PR #44 所在分支；CI 和该精确 head 的独立 follow-up review 仍是合并前门槛。保持 PR #44 Draft；不得启动第三次 Formal、Provider call、Production、`--resume`、`--verdict`、backfill、策略扩展或生产化。
