@@ -302,6 +302,120 @@ def _status_table_members(payload: Any) -> list[tuple[Any | None, Any]]:
     return [(None, payload)]
 
 
+_STATUS_IDENTITY_FIELDS = {
+    "provider_symbol",
+    "security_code",
+    "market_code",
+    "code",
+    "market",
+    "value",
+}
+_STATUS_EMPTY_MEMBER_UNRESOLVED = "STATUS_MEMBER_EMPTY_OR_NULL_WITHOUT_QUALIFIED_KEY"
+
+
+def _status_outer_symbol(table_key: Any) -> str:
+    """Return a qualified outer key only when the key proves a symbol."""
+
+    raw_key = str(table_key or "").strip()
+    if "." not in raw_key:
+        return ""
+    symbol = provider_symbol({"MARKET_CODE": raw_key})
+    return symbol if "." in symbol else ""
+
+
+def _status_identity_value_present(value: Any) -> bool:
+    """Treat null-like identity cells as absent without normalizing values."""
+
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    return not (isinstance(value, float) and value != value)  # NaN from a frame cell
+
+
+def _status_row_has_identity_value(row: dict[str, Any]) -> bool:
+    return any(
+        str(key).casefold() in _STATUS_IDENTITY_FIELDS and _status_identity_value_present(value)
+        for key, value in row.items()
+    )
+
+
+def _status_member_rows(member: Any) -> list[dict[str, Any]]:
+    """Flatten one status member without interpreting its outer table key."""
+
+    try:
+        return key_preserving_table_rows(member)
+    except ProviderRowShapeError as exc:
+        raise ProviderRowShapeError(str(exc), view="status_keyed_table_rows") from exc
+
+
+def _status_attach_table_identity(row: dict[str, Any], symbol: str) -> dict[str, Any]:
+    """Use a valid status table key while checking any embedded identity."""
+
+    embedded = provider_symbol(row)
+    if embedded:
+        embedded_code = embedded.split(".", 1)[0]
+        if embedded != symbol and embedded_code != symbol.split(".", 1)[0]:
+            raise ProviderRowShapeError(
+                "status keyed table identity conflict between outer key and row",
+                view="status_keyed_table_rows",
+            )
+    elif _status_row_has_identity_value(row):
+        raise ProviderRowShapeError(
+            "status keyed table row has ambiguous embedded identity",
+            view="status_keyed_table_rows",
+        )
+    canonical = dict(row)
+    canonical["PROVIDER_SYMBOL"] = symbol
+    canonical["_TABLE_KEY"] = symbol
+    return canonical
+
+
+def _status_table_member_rows(
+    table_key: Any | None,
+    member: Any,
+) -> tuple[list[dict[str, Any]], collections.Counter[str]]:
+    """Materialize a status member with a status-specific key boundary."""
+
+    symbol = _status_outer_symbol(table_key)
+    member_rows = _status_member_rows(member)
+    if not symbol:
+        if not member_rows:
+            return [], collections.Counter({_STATUS_EMPTY_MEMBER_UNRESOLVED: 1})
+        # A non-qualified outer key is deliberately ignored.  Native row
+        # identity/date fields must be adjudicated by canonical_status_view.
+        return member_rows, collections.Counter()
+    if not member_rows:
+        return [
+            {
+                "PROVIDER_SYMBOL": symbol,
+                "_TABLE_KEY": symbol,
+                "_TABLE_NONE": member is None,
+                "_TABLE_EMPTY": member is not None,
+            }
+        ], collections.Counter()
+    return [
+        _status_attach_table_identity(row, symbol) for row in member_rows
+    ], collections.Counter()
+
+
+def _status_keyed_table_rows(
+    payload: Any,
+) -> tuple[list[dict[str, Any]], collections.Counter[str]]:
+    """Flatten status tables without applying the K-line outer-key contract."""
+
+    members = _status_table_members(payload)
+    if not members:
+        return [], collections.Counter({_STATUS_EMPTY_MEMBER_UNRESOLVED: 1})
+    rows: list[dict[str, Any]] = []
+    unresolved: collections.Counter[str] = collections.Counter()
+    for table_key, member in members:
+        member_rows, member_unresolved = _status_table_member_rows(table_key, member)
+        rows.extend(member_rows)
+        unresolved.update(member_unresolved)
+    return rows, unresolved
+
+
 def _status_shape_code(error_text: str) -> str:
     """Map a shape exception to a stable, value-free diagnostic code."""
 
@@ -324,11 +438,16 @@ def _status_shape_diagnostics(
     """Count status shape failures from sealed bytes without emitting values."""
 
     counts: collections.Counter[str] = collections.Counter()
+    unresolved_counts: collections.Counter[str] = collections.Counter()
     affected_tables: dict[str, set[int]] = collections.defaultdict(set)
 
     def record_failure(error_text: str, table_index: int, row_count: int = 1) -> None:
         code = _status_shape_code(error_text)
         counts[code] += row_count
+        affected_tables[code].add(table_index)
+
+    def record_unresolved(code: str, table_index: int, member_count: int = 1) -> None:
+        unresolved_counts[code] += member_count
         affected_tables[code].add(table_index)
 
     def inspect_rows(rows: list[dict[str, Any]], table_index: int) -> None:
@@ -338,42 +457,53 @@ def _status_shape_diagnostics(
             except ProviderRowShapeError as exc:
                 record_failure(str(exc), table_index)
 
-    for table_index, (table_key, member) in enumerate(_status_table_members(payload)):
+    members = _status_table_members(payload)
+    if not members:
+        record_unresolved(_STATUS_EMPTY_MEMBER_UNRESOLVED, 0)
+    for table_index, (table_key, member) in enumerate(members):
         try:
-            preserved_rows = key_preserving_table_rows(
-                {table_key: member} if table_key is not None else member
-            )
+            preserved_rows, member_unresolved = _status_table_member_rows(table_key, member)
         except ProviderRowShapeError as exc:
-            raw_rows = _rows(member)
+            try:
+                raw_rows = _status_member_rows(member)
+            except ProviderRowShapeError:
+                raw_rows = []
             if not raw_rows:
                 record_failure(str(exc), table_index)
                 continue
             # Re-run one member at a time so one conflicting row does not hide
             # the deterministic count of other rows in the same table.
             for raw_row in raw_rows:
-                one_row_payload = {table_key: [raw_row]} if table_key is not None else raw_row
                 try:
-                    one_row = key_preserving_table_rows(one_row_payload)
+                    one_row, one_unresolved = _status_table_member_rows(table_key, [raw_row])
                 except ProviderRowShapeError as row_exc:
                     record_failure(str(row_exc), table_index)
                 else:
+                    for code, count in one_unresolved.items():
+                        record_unresolved(code, table_index, count)
                     inspect_rows(one_row, table_index)
         else:
+            for code, count in member_unresolved.items():
+                record_unresolved(code, table_index, count)
             inspect_rows(preserved_rows, table_index)
 
+    all_subreason_counts = collections.Counter(counts)
+    all_subreason_counts.update(unresolved_counts)
     subreasons = [
         {
             "code": code,
             "affected_row_count": counts[code],
+            "affected_member_count": unresolved_counts[code],
             "affected_table_count": len(affected_tables[code]),
         }
-        for code in sorted(counts)
+        for code in sorted(all_subreason_counts)
     ]
     return {
         "shape_diagnostics": {
             "declared_row_count": declared_rows,
             "declared_table_count": declared_table_count,
             "affected_row_count": sum(counts.values()),
+            "unresolved_member_count": sum(unresolved_counts.values()),
             "affected_table_count": len(
                 {index for indexes in affected_tables.values() for index in indexes}
             ),
@@ -504,6 +634,28 @@ def _shape_replay(
     return replay
 
 
+def _status_unresolved_replay(
+    payload: Any,
+    *,
+    declared_rows: int,
+    declared_table_count: int,
+    unresolved: collections.Counter[str],
+) -> dict[str, Any]:
+    """Keep unkeyed empty status members unresolved instead of fabricating rows."""
+
+    return {
+        "classification": "REPLAY_UNRESOLVED_PROVIDER_SHAPE",
+        "result": _result_name(CaseResult.MISSING),
+        "reason_codes": sorted(unresolved),
+        "view": "status_keyed_table_rows",
+        **_status_shape_diagnostics(
+            payload,
+            declared_rows=declared_rows,
+            declared_table_count=declared_table_count,
+        ),
+    }
+
+
 def _case_rows_by_type(
     catalog_rows: list[dict[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
@@ -591,6 +743,7 @@ def _core_capability_projection(records: list[dict[str, Any]]) -> dict[str, Any]
         capability_results: collections.Counter[str] = collections.Counter()
         capability_reasons: set[str] = set()
         has_failed = False
+        has_deferred_fixture = False
         all_minimums_met = True
 
         for case_type in definition.required_case_types:
@@ -629,6 +782,7 @@ def _core_capability_projection(records: list[dict[str, Any]]) -> dict[str, Any]
                 reason_counts = replay.get("reason_counts")
                 if isinstance(reason_counts, dict):
                     reasons.update(str(code) for code in reason_counts if code)
+                has_deferred_fixture |= bool(replay.get("deferred_fixture"))
             valid_count = sum(case_counts[result] for result in valid_results)
             capability_results.update(case_counts)
             has_failed |= "VALIDATED_FAIL" in case_counts
@@ -653,6 +807,9 @@ def _core_capability_projection(records: list[dict[str, Any]]) -> dict[str, Any]
             status = "MISSING"
         elif has_failed:
             status = "FAILED"
+        elif definition.capability_id == "history_start_2020" and has_deferred_fixture:
+            capability_reasons.add("HISTORICAL_DELISTED_FIXTURE_DEFERRED")
+            status = "UNRESOLVED"
         elif (
             any(result in unresolved_results for result in capability_results)
             or not all_minimums_met
@@ -799,8 +956,16 @@ def _replay_core(
     status_case = _one_case(grouped, "historical_st_suspend")
     status = reader.read_ref(str(status_case["evidence_ref"]))
     try:
-        status_rows = key_preserving_table_rows(status.payload)
-        canonical_status_rows = canonical_status_view(status_rows)
+        status_rows, status_unresolved = _status_keyed_table_rows(status.payload)
+        if status_unresolved:
+            status_replay = _status_unresolved_replay(
+                status.payload,
+                declared_rows=int(status.anchor["declared_rows"]),
+                declared_table_count=int(status.anchor["table_count"]),
+                unresolved=status_unresolved,
+            )
+        else:
+            canonical_status_rows = canonical_status_view(status_rows)
     except ProviderRowShapeError as exc:
         status_replay = _shape_replay(
             exc.view,
@@ -813,12 +978,13 @@ def _replay_core(
             ),
         )
     else:
-        status_outcome = validate_st_suspend_flags(canonical_status_rows, golden_facts=[])
-        status_replay = _outcome_replay(
-            status_outcome,
-            "REPLAY_STRUCTURAL_ONLY",
-            facts={"canonical_rows": len(canonical_status_rows)},
-        )
+        if not status_unresolved:
+            status_outcome = validate_st_suspend_flags(canonical_status_rows, golden_facts=[])
+            status_replay = _outcome_replay(
+                status_outcome,
+                "REPLAY_STRUCTURAL_ONLY",
+                facts={"canonical_rows": len(canonical_status_rows)},
+            )
     _add_capability(
         records,
         stage="B3",
@@ -839,7 +1005,16 @@ def _replay_core(
     )
     limit_status = reader.read_ref(str(limit_sample["evidence_ref"]))
     try:
-        limit_rows = canonical_status_view(key_preserving_table_rows(limit_status.payload))
+        limit_rows, limit_unresolved = _status_keyed_table_rows(limit_status.payload)
+        if limit_unresolved:
+            limit_replay = _status_unresolved_replay(
+                limit_status.payload,
+                declared_rows=int(limit_status.anchor["declared_rows"]),
+                declared_table_count=int(limit_status.anchor["table_count"]),
+                unresolved=limit_unresolved,
+            )
+        else:
+            limit_rows = canonical_status_view(limit_rows)
     except ProviderRowShapeError as exc:
         limit_replay = _shape_replay(
             exc.view,
@@ -852,16 +1027,17 @@ def _replay_core(
             ),
         )
     else:
-        from ashare_state.spike.validators import validate_limit_rule
+        if not limit_unresolved:
+            from ashare_state.spike.validators import validate_limit_rule
 
-        limit_outcome = validate_limit_rule(limit_rows, book=rule_book)
-        limit_replay = _outcome_replay(
-            limit_outcome,
-            "REPLAY_VALIDATED_PASS"
-            if _result_name(limit_outcome.result) == "VALIDATED_PASS"
-            else "REPLAY_SEMANTIC_MISMATCH",
-            facts={"canonical_rows": len(limit_rows)},
-        )
+            limit_outcome = validate_limit_rule(limit_rows, book=rule_book)
+            limit_replay = _outcome_replay(
+                limit_outcome,
+                "REPLAY_VALIDATED_PASS"
+                if _result_name(limit_outcome.result) == "VALIDATED_PASS"
+                else "REPLAY_SEMANTIC_MISMATCH",
+                facts={"canonical_rows": len(limit_rows)},
+            )
     _add_capability(
         records,
         stage="B3",
@@ -1108,6 +1284,7 @@ def _replay_golden(
         shape_source = ""
         shape_payload: Any = None
         shape_anchor: dict[str, Any] | None = None
+        status_unresolved: collections.Counter[str] = collections.Counter()
         ca_failure = False
         ca_stream = ""
         ca_schema_details: list[dict[str, Any]] = []
@@ -1127,10 +1304,12 @@ def _replay_golden(
                     for item in loaded
                     if item.meta.get("provider_dataset") == "history_stock_status"
                 )
-                data = DomainData(
-                    domain="ST_STATUS",
-                    status_rows=canonical_status_view(key_preserving_table_rows(status)),
-                )
+                status_rows, status_unresolved = _status_keyed_table_rows(status)
+                if not status_unresolved:
+                    data = DomainData(
+                        domain="ST_STATUS",
+                        status_rows=canonical_status_view(status_rows),
+                    )
             except ProviderRowShapeError as exc:
                 shape_failure = exc
 
@@ -1175,12 +1354,14 @@ def _replay_golden(
                     for item in loaded
                     if item.meta.get("provider_dataset") == "history_stock_status"
                 )
-                data = DomainData(
-                    domain="LIMIT_PIT_RULE",
-                    status_rows=canonical_status_view(key_preserving_table_rows(status)),
-                    hist_code_rows=_rows(hist),
-                    calendar_days=_calendar_days(calendar),
-                )
+                status_rows, status_unresolved = _status_keyed_table_rows(status)
+                if not status_unresolved:
+                    data = DomainData(
+                        domain="LIMIT_PIT_RULE",
+                        status_rows=canonical_status_view(status_rows),
+                        hist_code_rows=_rows(hist),
+                        calendar_days=_calendar_days(calendar),
+                    )
             except ProviderRowShapeError as exc:
                 shape_failure = exc
 
@@ -1209,7 +1390,9 @@ def _replay_golden(
                     for item in loaded
                     if item.meta.get("provider_dataset") == "history_stock_status"
                 )
-                status_rows = canonical_status_view(key_preserving_table_rows(status))
+                status_rows, status_unresolved = _status_keyed_table_rows(status)
+                if not status_unresolved:
+                    status_rows = canonical_status_view(status_rows)
                 dividend_rows: list[dict[str, Any]] = []
                 right_issue_rows: list[dict[str, Any]] = []
                 for item in loaded:
@@ -1248,7 +1431,7 @@ def _replay_golden(
                         right_issue_rows.extend(view)
                     else:
                         dividend_rows.extend(view)
-                if not ca_schema_details:
+                if not ca_schema_details and not status_unresolved:
                     shape_source = "kline"
                     shape_payload = kline
                     data = DomainData(
@@ -1265,7 +1448,20 @@ def _replay_golden(
             except ProviderRowShapeError as exc:
                 shape_failure = exc
 
-        if shape_failure is not None:
+        if status_unresolved:
+            replay = _status_unresolved_replay(
+                shape_payload,
+                declared_rows=int((shape_anchor or {}).get("declared_rows", 0)),
+                declared_table_count=int((shape_anchor or {}).get("table_count", 0)),
+                unresolved=status_unresolved,
+            )
+            replay["result_counts"] = {"MISSING": len(cases)}
+            replay["reason_counts"] = {code: len(cases) for code in sorted(status_unresolved)}
+            note = (
+                "An empty/null status member without a qualified key remains unresolved; "
+                "no status row is fabricated."
+            )
+        elif shape_failure is not None:
             view = getattr(shape_failure, "view", "provider_row")
             if shape_source == "status":
                 reason = "PROVIDER_STATUS_SHAPE"
@@ -1417,7 +1613,7 @@ def _build_artifact(
 
     return {
         "artifact_kind": "REPLAY_DIAGNOSTIC",
-        "artifact_schema": "formal-readonly-replay-v2",
+        "artifact_schema": "formal-readonly-replay-v3",
         "source": {
             "sealed_run_id": SEALED_RUN_ID,
             "sealed_run_status": str(old_run.get("status", "")),

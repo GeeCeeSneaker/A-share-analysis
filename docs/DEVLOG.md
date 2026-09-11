@@ -3818,3 +3818,14 @@
 - 当前诊断投影：`daily_bar_units`、3 个明确 history fixture 为 replay PASS；`security_master_with_delisted`、`historical_st_suspend`、`limit_price_and_no_limit_days`、`adj_factor_corporate_action_continuity` 为 replay FAILED；`symbol_mapping_unambiguous` 为 replay MISSING；`sdk_permission_cache_freshness` 为 replay UNRESOLVED。它们都不是 Formal verdict。
 - `300104.SZ` applicability/tradability 仍 deferred；全局 2020 baseline 不变。下一道门是最新提交上的三平台 CI 与独立 follow-up review；PR #44 继续 Draft，审阅关闭前不得启动 Formal。
 - 提交前验证：全量 `uv run pytest -q` 通过（`1721 collected, 1718 passed, 3 skipped`）；Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 也通过。CI 仍须在推送后的精确提交上重新确认。
+
+## 2026-09-11 · Replay v3 follow-up：status-specific boundary 与 deferred projection
+
+> 状态：**P0 DELTA FIX IMPLEMENTED / REPLAY V3 REGENERATED / LOCAL VERIFIED / FOLLOW-UP REVIEW REQUIRED / NO FORMAL RERUN**
+
+- 吸收 PR #44 delta review `5178916747` 和 Issue #39 最新 checkpoint：不启动第三次 Formal，不调用 Provider，不使用 `--resume`/`--verdict`，不修改 Golden、规则、Provider 配置或旧封存 run。
+- 在 replay 脚本内新增窄化的 status-specific keyed flatten boundary：合格外层 symbol 只用于传播并校验身份冲突；非合格 outer key 不参与身份推断，行内 `MARKET_CODE`/日期交由 `canonical_status_view()` 判定；无合格 key 的空/null member 保持 structural unresolved，不伪造 status row。新增 5 条回归测试，主运行时语义未改动。
+- v3 replay 的剩余 status shape 已由此前的身份误归因收敛为日期问题：B3 core 1 行/1 表、Golden ST 6 行/6 表、Golden limit 2 行/2 表均为 `STATUS_DATE_MISSING_OR_INVALID`；没有把这些异常改写为通过。
+- `history_start_2020` 的三个明确 fixture 仍为当前代码 replay PASS，但因 `300104.SZ` deferred，`core_capability_projection` 现在明确为 `REPLAY_CORE_UNRESOLVED`，reason 为 `HISTORICAL_DELISTED_FIXTURE_DEFERRED`。
+- v3 artifact [`formal_readonly_replay_20260911.json`](provider_verification/formal_readonly_replay_20260911.json) 绑定精确提交 `0c8dc076b11d02251a7ee2f572d78a1dbc634dc1`，大小 51,421 bytes，SHA-256 `6e42506b9a6b2886c70fa8eed07edded3ad06b8835ebd082523870fbca035dae`；封存 evidence tree 仍为 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`，`provider_calls=0`，所有 writer call 为 0。
+- 本地验证：全量 `uv run pytest -q -r fEs` 为 `1721 collected, 1718 passed, 3 skipped`；Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。CI 与精确 head 上的独立 follow-up review 仍待 GitHub 侧完成；PR #44 必须保持 Draft。

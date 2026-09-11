@@ -6199,3 +6199,23 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 - 回放重新完成：`provider_calls=0`、`spike_run_created=false`、`raw_writer_write_calls=0`、`catalog_write_calls=0`、`verdict_write_calls=0`；evidence tree 前后均 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`。
 - 本地验证已通过：全量 `uv run pytest -q`（`1721 collected, 1718 passed, 3 skipped`）、Ruff check、Ruff format、py_compile、mypy、`uv pip check` 和 `git diff --check`；最新提交对应 CI 三矩阵和 independent follow-up review 仍是推送后的门槛。
 - 保持 PR #44 Draft。`300104.SZ` applicability/tradability 仍 deferred，全局 2020 baseline 不得放宽；没有第三次 Formal、Provider call、Production、`--resume`、`--verdict`、backfill、策略扩展或生产化授权。
+
+## DM-20260911-FORMAL-B1B7-020 · Replay v3 status 边界与延期夹具投影整改
+
+**Type**：C2 — independent-review delta remediation / sealed-evidence read-only replay
+**Date**：2026-09-11
+**Status**：`P0 DELTA FIX IMPLEMENTED / REPLAY V3 REGENERATED / LOCAL VERIFIED / FOLLOW-UP REVIEW REQUIRED / KEEP DRAFT / NO FORMAL AUTHORIZATION`
+**Evidence**：[`formal_readonly_replay_20260911.md`](../provider_verification/formal_readonly_replay_20260911.md)、[`formal_readonly_replay_20260911.json`](../provider_verification/formal_readonly_replay_20260911.json)、[`formal_readonly_replay.py`](../../scripts/spike/formal_readonly_replay.py)、分支 `feat/formal-readonly-replay-20260911`。
+
+**审阅意见与处理**
+
+- 针对 PR #44 delta review `5178916747` 的 P0-1，status replay 不再复用 K-line 的 qualified outer-key contract：合格外层 symbol 只传播并校验行内身份冲突；非合格 outer key 被忽略，行内 `MARKET_CODE`/日期交由 `canonical_status_view()` 判定；无合格 key 的空/null member 单独记录为 structural unresolved，不生成伪造 status row。该边界仅存在于只读 replay 脚本，主运行时未改动。
+- P0-1 修复后的剩余 status 归因为封存字节中的真实日期问题，而非外层 key 误报：B3 core 1 行/1 表、Golden ST 6 行/6 表、Golden limit 2 行/2 表为 `STATUS_DATE_MISSING_OR_INVALID`；v3 没有把它们降级为 PASS。
+- 针对 P0-2，`history_start_2020` 在三个明确 fixture 当前 replay PASS 的同时，因 `300104.SZ` 仍 deferred，核心投影改为 `REPLAY_CORE_UNRESOLVED`，并记录 `HISTORICAL_DELISTED_FIXTURE_DEFERRED`；不得据此放宽全局 2020 baseline。
+- 新增 5 条 replay boundary 回归测试；v3 artifact 绑定精确提交 `0c8dc076b11d02251a7ee2f572d78a1dbc634dc1`，大小 51,421 bytes，SHA-256 `6e42506b9a6b2886c70fa8eed07edded3ad06b8835ebd082523870fbca035dae`。旧 Formal run/catalog/verdict、Golden、交易规则、Provider 配置和 evidence tree 未改变。
+
+**验证与门槛**
+
+- 全量本地 `uv run pytest -q -r fEs`：`1721 collected, 1718 passed, 3 skipped`；Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。
+- v3 只读控制仍为 `provider_calls=0`、`spike_run_created=false`、`raw_writer_write_calls=0`、`catalog_write_calls=0`、`verdict_write_calls=0`；evidence tree 前后均为 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`。
+- 当前 head 已推送到 PR #44 所在分支；CI 和该精确 head 的独立 follow-up review 仍是合并前门槛。保持 PR #44 Draft；不得启动第三次 Formal、Provider call、Production、`--resume`、`--verdict`、backfill、策略扩展或生产化。

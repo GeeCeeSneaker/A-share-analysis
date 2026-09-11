@@ -1,6 +1,6 @@
 {
   "artifact_kind": "REPLAY_DIAGNOSTIC",
-  "artifact_schema": "formal-readonly-replay-v2",
+  "artifact_schema": "formal-readonly-replay-v3",
   "capabilities": [
     {
       "capability": "formal_runtime_gate",
@@ -119,6 +119,7 @@
           "PROVIDER_STATUS_SHAPE"
         ],
         "result": "VALIDATED_FAIL",
+        "row_ordinal": 6801,
         "shape_diagnostics": {
           "affected_row_count": 1,
           "affected_table_count": 1,
@@ -126,13 +127,15 @@
           "declared_table_count": 5,
           "subreasons": [
             {
+              "affected_member_count": 0,
               "affected_row_count": 1,
               "affected_table_count": 1,
-              "code": "STATUS_IDENTITY_MISSING_OR_AMBIGUOUS"
+              "code": "STATUS_DATE_MISSING_OR_INVALID"
             }
-          ]
+          ],
+          "unresolved_member_count": 0
         },
-        "view": "key_preserving_table_rows"
+        "view": "canonical_status_view"
       },
       "stage": "B3"
     },
@@ -160,6 +163,7 @@
           "PROVIDER_STATUS_SHAPE"
         ],
         "result": "VALIDATED_FAIL",
+        "row_ordinal": 6801,
         "shape_diagnostics": {
           "affected_row_count": 1,
           "affected_table_count": 1,
@@ -167,13 +171,15 @@
           "declared_table_count": 5,
           "subreasons": [
             {
+              "affected_member_count": 0,
               "affected_row_count": 1,
               "affected_table_count": 1,
-              "code": "STATUS_IDENTITY_MISSING_OR_AMBIGUOUS"
+              "code": "STATUS_DATE_MISSING_OR_INVALID"
             }
-          ]
+          ],
+          "unresolved_member_count": 0
         },
-        "view": "key_preserving_table_rows"
+        "view": "canonical_status_view"
       },
       "stage": "B3"
     },
@@ -456,6 +462,7 @@
         "result_counts": {
           "VALIDATED_FAIL": 50
         },
+        "row_ordinal": 22502,
         "shape_diagnostics": {
           "affected_row_count": 6,
           "affected_table_count": 6,
@@ -463,13 +470,15 @@
           "declared_table_count": 47,
           "subreasons": [
             {
+              "affected_member_count": 0,
               "affected_row_count": 6,
               "affected_table_count": 6,
-              "code": "STATUS_IDENTITY_MISSING_OR_AMBIGUOUS"
+              "code": "STATUS_DATE_MISSING_OR_INVALID"
             }
-          ]
+          ],
+          "unresolved_member_count": 0
         },
-        "view": "key_preserving_table_rows"
+        "view": "canonical_status_view"
       },
       "stage": "B4"
     },
@@ -537,6 +546,7 @@
         "result_counts": {
           "VALIDATED_FAIL": 30
         },
+        "row_ordinal": 43376,
         "shape_diagnostics": {
           "affected_row_count": 2,
           "affected_table_count": 2,
@@ -544,18 +554,15 @@
           "declared_table_count": 22,
           "subreasons": [
             {
-              "affected_row_count": 1,
-              "affected_table_count": 1,
+              "affected_member_count": 0,
+              "affected_row_count": 2,
+              "affected_table_count": 2,
               "code": "STATUS_DATE_MISSING_OR_INVALID"
-            },
-            {
-              "affected_row_count": 1,
-              "affected_table_count": 1,
-              "code": "STATUS_IDENTITY_MISSING_OR_AMBIGUOUS"
             }
-          ]
+          ],
+          "unresolved_member_count": 0
         },
-        "view": "key_preserving_table_rows"
+        "view": "canonical_status_view"
       },
       "stage": "B4"
     },
@@ -943,12 +950,14 @@
             "required_minimum": 1
           }
         ],
-        "reason_codes": [],
-        "replay_classification": "REPLAY_CORE_PASS",
+        "reason_codes": [
+          "HISTORICAL_DELISTED_FIXTURE_DEFERRED"
+        ],
+        "replay_classification": "REPLAY_CORE_UNRESOLVED",
         "replay_result_counts": {
           "VALIDATED_PASS": 1
         },
-        "replay_status": "PASS",
+        "replay_status": "UNRESOLVED",
         "replayed_case_types": [
           "history_start_2020"
         ],
@@ -1367,7 +1376,7 @@
     "golden_dataset_file": "golden_cases_v7.jsonl",
     "golden_dataset_sha256": "a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e",
     "golden_truth_version": "v7-reviewed-20260908",
-    "replay_code_head": "b7c9b1b2986e5cbd5415ef44826acbc7d008cfc5",
+    "replay_code_head": "0c8dc076b11d02251a7ee2f572d78a1dbc634dc1",
     "trading_rule_dataset_sha256": "b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed",
     "trading_rule_dataset_version": "2026-09-10.2",
     "trading_rule_review_status": "REVIEWED",
