@@ -166,6 +166,7 @@ class TestNativeRowsReachValidators:
         payload = {
             "600519.SH": polars.DataFrame(
                 {
+                    "security_code": ["600519"],
                     "kline_time": ["2020-01-02 00:00:00"],
                     "close": [100.0],
                     "volume": [10.0],
@@ -205,6 +206,8 @@ class TestNativeRowsReachValidators:
             "600519.SH",
             "000001.SZ",
         }
+        keyed_bare_row = next(row for row in bars if row.get("TRADE_DATE") == "20200102")
+        assert keyed_bare_row["PROVIDER_SYMBOL"] == "600519.SH"
 
     def test_keyed_kline_view_rejects_conflicting_embedded_identity(self):
         polars = pytest.importorskip("polars")

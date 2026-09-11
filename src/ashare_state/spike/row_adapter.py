@@ -159,7 +159,10 @@ def provider_symbol(row: dict[str, Any]) -> str:
     # Prefer an exchange-qualified alias if one is present.  This lets the
     # ephemeral keyed-table view add PROVIDER_SYMBOL while retaining a bare
     # SECURITY_CODE from the provider, without losing the qualified identity.
-    code_full = next((_full_symbol(value) for value in code_fields), "")
+    code_full = next(
+        (full for value in code_fields if (full := _full_symbol(value))),
+        "",
+    )
     market_full = _full_symbol(market_text)
     if code_full and market_full and code_full != market_full:
         return ""

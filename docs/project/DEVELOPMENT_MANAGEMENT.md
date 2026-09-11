@@ -6125,3 +6125,31 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 - 本次代码提交已通过 Git remote 推送并可由远端 ref 核对；GitHub connector 的 API/PR/Actions
   读取返回 `401 Bad credentials`，所以推送后的 CI 状态和 PR 描述暂不能由本地独立确认。
   项目管理者需修复 connector 认证后补做该核对；在此之前不能把 CI 写成已通过。
+
+## DM-20260911-FORMAL-B1B7-017 · qualified identity precedence P0 修复
+
+**Type**：C1 — independent-review P0 follow-up
+**Date**：2026-09-11
+**Status**：`P0 FIX IMPLEMENTED / LOCAL VERIFIED / EXACT-HEAD CI PENDING / NO FORMAL RERUN`
+**Evidence**：`docs/provider_verification/formal_b1_b7_framework_remediation_20260911.md`；分支 `fix/provider-canonicalization-diagnostics-20260911`。
+
+**已完成**
+
+- 修正 `provider_symbol()` 的身份优先级：表键视图已附加 qualified
+  `PROVIDER_SYMBOL` 时，不会再被前置裸 `security_code` 的空转换结果覆盖；完整/裸
+  身份冲突检查保持不变。
+- 回归覆盖真实顺序：`key_preserving_table_rows()` →
+  `canonical_daily_bar_view()` 后仍保留 `600519.SH`，冲突完整身份仍 fail closed。
+- 本地完整 pytest：`1721 collected, 1718 passed, 3 skipped`；定向回归、Ruff、format、
+  mypy、依赖检查和 diff 检查通过。
+
+**明确未完成**
+
+- 新 head 的 exact-head CI 和独立 Reviewer delta review 尚待完成；PR #43 继续 Draft。
+- `300104.SZ` applicability/tradability、B2 退市语义、BSE/BJ mapping、真实历史覆盖和
+  公司行为语义仍没有新的 Provider capability 结论；没有新的 Formal 授权。
+
+**硬边界**
+
+- 没有修改 Golden 期望、交易规则、Provider 配置、旧 Formal run/catalog/verdict；没有
+  Production、`--resume` 或 `--verdict`，没有上传凭据或 raw Provider payload。

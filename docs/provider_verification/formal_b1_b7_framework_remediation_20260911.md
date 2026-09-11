@@ -73,7 +73,16 @@ PR #42 的只读归因 artifact 将 B4 的 125 条失败分为：
   K-line 消费均使用该视图。原始 Provider payload 不被改写，测试覆盖无证券列的
   DataFrame、`None` 成员和冲突身份。
 
-### 5. 历史起点与交易日历
+### 5. 表键视图后的 qualified identity 优先级
+
+独立 Reviewer 发现一个二次 canonicalization 边界：表键视图为行补上
+`PROVIDER_SYMBOL=600519.SH` 后，若原始行仍有排在前面的裸 `security_code=600519`，
+旧实现会因取到第一个空的 `_full_symbol()` 结果而把交易所后缀丢掉。现已改为在保留
+冲突检查的前提下选择第一个非空的 exchange-qualified identity；兼容的裸代码仍可与
+表键合并，冲突的完整/裸身份仍 fail closed。回归测试覆盖
+`key_preserving_table_rows()` → `canonical_daily_bar_view()` 的真实顺序。
+
+### 6. 历史起点与交易日历
 
 - `first_applicable_trading_day()` 从 run-bound trading calendar 选择 baseline（默认
   `20200101`）之后的第一个交易日，因此不要求在元旦这个非交易日有记录。
@@ -98,7 +107,7 @@ PR #42 的只读归因 artifact 将 B4 的 125 条失败分为：
 | 20 条 scalar history-code shape mismatch | value-only 仅进入 membership/continuity；B2 不合成退市字段 | scalar 成员 Golden 连续性；B2 semantic-field 缺失测试；多字段 scalar fail closed | 真实代码列表 endpoint、权限和可证明的 `IS_LISTED`/退市日期字段 |
 | lower-case daily-bar fields | `canonical_daily_bar_view()` 接入 `_observe_units()` 与日线数量级校验 | lower-case `close/volume/amount` 与 uppercase `CLOSE_PRICE/VOLUME/AMOUNT` 双路径 | Provider 单位语义仍需真实数据独立确认，不能仅凭字段可读性批准 |
 | `kline_time` 被读成 sentinel | canonical bar date extraction；按 persisted calendar 选首个适用 session；按固定标的分别核验 | lower-case timestamp；2020-01-01 holiday；BSE applicability boundary | 真实 Formal 数据的逐标的 2020+ 覆盖仍未重跑/批准 |
-| keyed K-line 映射键被 `_rows()` 丢弃 | `key_preserving_table_rows()`；B3/B5/CA K-line 接入；冲突和 `None`/空表 marker fail closed | 无证券列 DataFrame、`None` 成员、行内冲突身份 | 真实 SDK 的完整 keyed mapping 仍需在授权的单独验证中确认 |
+| keyed K-line 映射键被 `_rows()` 丢弃 | `key_preserving_table_rows()`；B3/B5/CA K-line 接入；冲突和 `None`/空表 marker fail closed | 无证券列 DataFrame、`None` 成员、行内冲突身份；二次 canonicalization 保留 qualified symbol | 真实 SDK 的完整 keyed mapping 仍需在授权的单独验证中确认 |
 | status 阻断后的公司行为误读风险 | 公司行为 status gate 只接受 canonical view；raw-only event presence 不改变语义门 | 既有 CA SOR、event type、缺 bar/停牌和 provider schema 测试 | dividend 2/20、right_issue 5/5 的 raw-only 观察仍是 diagnostic，不是 PASS |
 
 ## 未解决的边界
@@ -144,8 +153,9 @@ Provider capability 或 Formal 结论。远端仍以当前提交的三平台 CI 
 ## 下一步工作要求
 
 1. 由独立 Reviewer 审阅本分支 diff，重点确认退市 membership 没有被当成语义 PASS，
-   keyed K-line 行身份没有丢失、`None` 没有被静默删除，且适配器没有绕过字段语义或
-   放宽 `MISSING`/`FAIL` 到 `PASS`，没有改动 Golden/规则/Provider 配置。
+   keyed K-line 行身份在二次 canonicalization 后没有丢失、`None` 没有被静默删除，
+   且适配器没有绕过字段语义或放宽 `MISSING`/`FAIL` 到 `PASS`，没有改动 Golden/规则/
+   Provider 配置。
 2. 独立 Reviewer 接受后，合并本整改 PR；合并本身不等于 Provider capability approval。
 3. 若项目仍需新的 Formal 结论，必须由调度者针对合并后的 clean main 重新给出一次性
    授权；PR #42 的旧授权不产生第三次 Formal run 权限。新 run（若获授权）须对比旧

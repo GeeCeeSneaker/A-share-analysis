@@ -3775,3 +3775,19 @@
   GitHub connector 的 API/PR/Actions 读取返回 `401 Bad credentials`，因此本地无法独立确认
   推送后 CI 状态或更新 PR 描述。该连接器认证问题不影响已完成的 Git push，但需项目管理者
   重新连接/修复后补做 PR/Actions 核对；在此之前 CI 状态按 `PENDING` 记录，不冒充成功。
+
+## 2026-09-11 · Independent review follow-up: qualified identity precedence
+
+> 状态：**P0 FIX IMPLEMENTED / LOCAL VERIFIED / EXACT-HEAD CI PENDING / NO FORMAL RERUN**
+
+- 修正 `provider_symbol()` 在 keyed K-line 行二次 canonicalization 时取到前置裸
+  `security_code` 的空转换结果、从而丢失表键交易所后缀的问题；现在选择第一个非空的
+  exchange-qualified identity，同时保留已有完整/裸身份冲突检查。
+- 新增回归：无证券列或带兼容裸 `security_code` 的 keyed DataFrame 经过
+  `key_preserving_table_rows()` 和 `canonical_daily_bar_view()` 后仍保留精确
+  `600519.SH`；冲突完整身份仍拒绝。该修复只影响 ephemeral view，不改 raw payload。
+- 本地完整 pytest 为 `1721 collected, 1718 passed, 3 skipped`，定向 keyed K-line、Golden、
+  B5、Ruff、format、mypy、依赖和 diff 检查均通过。未登录 Provider、未创建新 run、未执行
+  Production/`--resume`/`--verdict`。
+- 该修复提交后需要新的 exact-head CI 和独立 Reviewer delta review；PR #43 继续保持 Draft。
+  `300104.SZ` 的 applicability/tradability 仍按 P1 延后，不得借此放宽通用 2020 baseline。
