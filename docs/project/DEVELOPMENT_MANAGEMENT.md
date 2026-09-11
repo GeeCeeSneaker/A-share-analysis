@@ -6122,3 +6122,6 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
   evidence 是否保持不变。
 - 审阅关闭前保持 PR #43 Draft；不启动第三次 Formal run。若未来确需 Formal 结论，必须
   由调度者在合并后的 clean main 上给出新的、一次性授权。
+- 本次代码提交已通过 Git remote 推送并可由远端 ref 核对；GitHub connector 的 API/PR/Actions
+  读取返回 `401 Bad credentials`，所以推送后的 CI 状态和 PR 描述暂不能由本地独立确认。
+  项目管理者需修复 connector 认证后补做该核对；在此之前不能把 CI 写成已通过。

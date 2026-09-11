@@ -3771,3 +3771,7 @@
   未创建新 run、未执行 Production/`--resume`/`--verdict`。
 - 详细范围、审阅重点和下一步授权边界见 [`formal_b1_b7_framework_remediation_20260911.md`](provider_verification/formal_b1_b7_framework_remediation_20260911.md)。当前仍需独立 Reviewer
   复核 P0 修复；在接受前不得将任何 Provider capability、历史覆盖或 Formal 结论写成已批准。
+- 本次提交前通过 Git remote 只读核对并成功推送 `aa95137e7073fcdffe83a5cd0c0e1108f768587c`；
+  GitHub connector 的 API/PR/Actions 读取返回 `401 Bad credentials`，因此本地无法独立确认
+  推送后 CI 状态或更新 PR 描述。该连接器认证问题不影响已完成的 Git push，但需项目管理者
+  重新连接/修复后补做 PR/Actions 核对；在此之前 CI 状态按 `PENDING` 记录，不冒充成功。
