@@ -6212,7 +6212,7 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 - 针对 PR #44 delta review `5178916747` 的 P0-1，status replay 不再复用 K-line 的 qualified outer-key contract：合格外层 symbol 只传播并校验行内身份冲突；非合格 outer key 被忽略，行内 `MARKET_CODE`/日期交由 `canonical_status_view()` 判定；无合格 key 的空/null member 单独记录为 structural unresolved，不生成伪造 status row。该边界仅存在于只读 replay 脚本，主运行时未改动。
 - P0-1 修复后的剩余 status 归因为封存字节中的真实日期问题，而非外层 key 误报：B3 core 1 行/1 表、Golden ST 6 行/6 表、Golden limit 2 行/2 表为 `STATUS_DATE_MISSING_OR_INVALID`；v3 没有把它们降级为 PASS。
 - 针对 P0-2，`history_start_2020` 在三个明确 fixture 当前 replay PASS 的同时，因 `300104.SZ` 仍 deferred，核心投影改为 `REPLAY_CORE_UNRESOLVED`，并记录 `HISTORICAL_DELISTED_FIXTURE_DEFERRED`；不得据此放宽全局 2020 baseline。
-- 新增 5 条 replay boundary 回归测试；v3 artifact 绑定精确提交 `0c8dc076b11d02251a7ee2f572d78a1dbc634dc1`，大小 51,421 bytes，SHA-256 `6e42506b9a6b2886c70fa8eed07edded3ad06b8835ebd082523870fbca035dae`。旧 Formal run/catalog/verdict、Golden、交易规则、Provider 配置和 evidence tree 未改变。
+- 新增 5 条 replay boundary 回归测试；v3 artifact 绑定精确提交 `80df040f85158281d8382e9b2ea8dcf914a28d16`，大小 51,421 bytes，SHA-256 `f9c2560996ae72db642d858d115e078cf51c93cc6fa9ad738bb1d35ceb1b3631`。旧 Formal run/catalog/verdict、Golden、交易规则、Provider 配置和 evidence tree 未改变。
 
 **验证与门槛**
 

@@ -1376,7 +1376,7 @@
     "golden_dataset_file": "golden_cases_v7.jsonl",
     "golden_dataset_sha256": "a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e",
     "golden_truth_version": "v7-reviewed-20260908",
-    "replay_code_head": "0c8dc076b11d02251a7ee2f572d78a1dbc634dc1",
+    "replay_code_head": "80df040f85158281d8382e9b2ea8dcf914a28d16",
     "trading_rule_dataset_sha256": "b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed",
     "trading_rule_dataset_version": "2026-09-10.2",
     "trading_rule_review_status": "REVIEWED",

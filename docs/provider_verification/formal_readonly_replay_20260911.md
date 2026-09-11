@@ -8,7 +8,7 @@
 
 - 旧封存 run：`dad1e1b8-0c34-4031-8e94-cc87a03dbbf4`，状态 `CLOSED`，旧 verdict `SPIKE_INCOMPLETE`。
 - 旧 sealed catalog：178 条，SHA-256 `bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53`；旧 run 文件未修改。
-- replay 代码绑定：`0c8dc076b11d02251a7ee2f572d78a1dbc634dc1`（基于 `main@b7c9b1b2986e5cbd5415ef44826acbc7d008cfc5` 的分支提交）。
+- replay 代码绑定：`80df040f85158281d8382e9b2ea8dcf914a28d16`（基于 `main@b7c9b1b2986e5cbd5415ef44826acbc7d008cfc5` 的分支提交）。
 - Golden 绑定：`v7-reviewed-20260908`、125 条、SHA-256 `a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e`。
 - 交易规则绑定：`v20260910-h1r4-reviewed`、`REVIEWED`、dataset SHA-256 `b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed`。
 
@@ -61,7 +61,7 @@ v3 延续从仓库现有 [`CORE_CAPABILITIES`](../../src/ashare_state/spike/capa
 
 ## 只读性与证据闭包
 
-本次 v3 产物 [`formal_readonly_replay_20260911.json`](formal_readonly_replay_20260911.json) 的 SHA-256 为 `6e42506b9a6b2886c70fa8eed07edded3ad06b8835ebd082523870fbca035dae`，大小 51,421 bytes。
+本次 v3 产物 [`formal_readonly_replay_20260911.json`](formal_readonly_replay_20260911.json) 的 SHA-256 为 `f9c2560996ae72db642d858d115e078cf51c93cc6fa9ad738bb1d35ceb1b3631`，大小 51,421 bytes。
 
 - 读取并验证 23 个 meta 文档，materialize 22 个 payload，发出 27 个脱敏证据 anchor。
 - 封存 evidence tree 前后均为 27,988 个文件、370,227,555 bytes，inventory SHA-256 均为 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`。
@@ -70,7 +70,7 @@ v3 延续从仓库现有 [`CORE_CAPABILITIES`](../../src/ashare_state/spike/capa
 
 ## 后续门槛
 
-1. 由独立 Reviewer 在最新提交 `0c8dc076b11d02251a7ee2f572d78a1dbc634dc1` 上复核 status-specific 键边界、CORE_CAPABILITY 聚合、脱敏子归因、绑定 hash 和只读控制；当前 PR 仍保持 Draft，CI 及 follow-up review 尚未完成。
+1. 由独立 Reviewer 在最新提交 `80df040f85158281d8382e9b2ea8dcf914a28d16` 上复核 status-specific 键边界、CORE_CAPABILITY 聚合、脱敏子归因、绑定 hash 和只读控制；当前 PR 仍保持 Draft，CI 及 follow-up review 尚未完成。
 2. B2 退市语义、status canonical shape、BSE 空响应、公司行为 dividend contract 仍需获得新的可复核证明；不得以 replay 的 PASS 或结构观察替代这些证明。
 3. `300104.SZ` 在纳入通用历史覆盖前必须绑定 applicability/tradability 事实；不得为它削弱全局 2020 起始日基线。
 4. 若要形成新的 Formal 结论，必须由调度者针对合并后的 clean main 另行一次性授权；在此之前禁止 Production、`--resume`、`--verdict`、backfill、策略扩展或生产化。
