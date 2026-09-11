@@ -167,3 +167,28 @@ uv run python scripts/spike/production_account_bootstrap.py --output data/spike/
 - **2026-08-21（1）**：C++ SDK 摸底完成，test_tool 配置 bug 确认
 - **2026-08-21（2）**：Python SDK（AmazingData 1.1.9 + tgw 1.0.9.2）受控安装 + import/API 面验证通过；发现仿真账号权限限制（仅 Level-1 快照），B2-B7 正式 Spike 顺延至正式账号
 - **2026-08-21（3）**：**B1 连通性测试完成**（仿真账号 `330800****81`，掩码处理——审计 P1-18：真实账号编号不入版本库）：login/认证/代码表 PASS；calendar/hist_code_list/adj_factor/snapshot 服务端拒绝（PermissionCode 3|4|32|33 仅覆盖代码表）。SDK 行为观察 4 条入档 §2.2。证据：`data/spike/results/connectivity.json`（本地保存，gitignored）
+## 6. 2026-09-12 定向能力闭环预检（当前状态）
+
+本节覆盖 Issue #39 comment `5636256765` 指定的六个问题。它是**非 Production capability probe**，不是 Formal B1-B7，也没有创建 `SpikeRun`、写入 catalog/verdict 或修改 Golden/H1/2020 基线。完整脱敏收据见 [`capability_closure_20260911.json`](capability_closure_20260911.json)，逐项矩阵见 [`capability_closure_20260911.md`](capability_closure_20260911.md)。
+
+### 6.1 已确认的 SDK 契约
+
+- AmazingData `1.1.9` 的 `InfoData.get_history_stock_status`、`get_dividend`、`get_right_issue` 在传入日期窗口时使用 `begin_date`/`end_date`；`is_local=False` 才明确走远端下载分支。facade 已记录实际生效参数。
+- `InfoData.get_bj_code_mapping` 是无 `code_list` 参数的完整表端点；facade 不再向 SDK 传入不支持的参数，调用时保留客户端过滤声明。
+- `MarketData.query_kline` 的 SDK 默认 period 为分钟值 `10000`；日线值为 `10008`。`DAY` facade 现在显式传 `period=10008`，避免表面上请求日线而实际落到分钟默认值。
+- BJ mapping 预检此前被本地运行时缺少 `PyTables` 阻断；当前工作区已补存并安装 `tables==3.11.1` 及其直接依赖 wheel。该依赖只在本地 `vendor/`，不进入 Git。
+
+### 6.2 预检结论
+
+| 能力/问题 | 结果 | 当前边界 |
+|---|---|---|
+| 状态日期 shape | 20,638 行中 8 行同时缺身份与 `TRADE_DATE`，`PROVIDER_CONFIRMED` | 仅对带已知状态 marker 的身份/日期双缺失行做非观测过滤；部分缺失仍失败；“汇总行”语义仍需独立确认 |
+| 退市字段 | 4 个请求返回 3 行，含 `IS_LISTED`/`LISTDATE`/`DELISTDATE`，`PROVIDER_CONFIRMED` | 历史 PIT 退市语义仍 `STILL_UNRESOLVED`；`hist_code_list` 只作连续性证据 |
+| BJ mapping | 原生端点返回 248 行，`PROVIDER_CONFIRMED` | `golden_bj_mapping` 仍未建设；接口可用不等于 mapping gate PASS |
+| BSE 历史状态 | `835185.BJ` 精确 2022 年请求返回 0 行空表，`PROVIDER_CONFIRMED` | 空响应的历史覆盖/适用性语义 `STILL_UNRESOLVED` |
+| 公司行为 | Dividend 123 行，其中 50 行 `DATE_EX` 缺失且集中在观察到的进度 1/2/12；Right issue 6 行均有 `EX_DIVIDEND_DATE` | Dividend 为 `FRAMEWORK_REMEDIATION_REQUIRED`；Right issue 因旧缺失未复现仍 `STILL_UNRESOLVED` |
+| `300104.SZ` fixture | code-list 3,907 行包含目标；目标日线 0 行，同窗口 `600519.SH` 控制为 7 行，`PROVIDER_CONFIRMED` | 目标 fixture 当前不可用；替代候选仅提出未应用；适用性/可交易性 `STILL_UNRESOLVED` |
+
+### 6.3 复核与下一道门
+
+代码提交为 `258489bc29359a1212cd33528ac5764ceb97e110`。本地全量 pytest、Ruff、mypy、py_compile、`uv pip check`、`git diff --check` 已通过；仍需 GitHub 精确 head CI 和独立 Reviewer。未决项不得通过新建 Formal run、修改 Golden、放宽基线或重跑旧 verdict 来掩盖。

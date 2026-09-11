@@ -3832,10 +3832,12 @@
 
 ## 2026-09-12 — Targeted AmazingData capability-closure implementation
 
-> Status: `TARGETED NON-PRODUCTION PROBES / FRAMEWORK REMEDIATION IN PROGRESS / NO FORMAL RUN`
+> Status: `TARGETED NON-PRODUCTION PROBES COMPLETED / FRAMEWORK REMEDIATION COMMITTED / INDEPENDENT REVIEW REQUIRED / NO FORMAL RUN`
 
 - Started from clean `main@f33997ed2c5a5e1ab66eb12f754e77a8a65c8ab4`, following Issue #39 comment `5636256765`. No Golden, H1 rule, 2020 baseline, sealed Formal artifact, catalog, or verdict was changed.
 - Corrected the verified AmazingData 1.1.9 contracts in the exchange facade: history status now sends `begin_date`/`end_date` and `is_local=False`; BJ mapping uses the complete-table endpoint without an unsupported `code_list`; daily K-line calls pass SDK `period=10008` explicitly; corporate-action probes can carry an explicit date window.
 - Added narrow provider-shape handling: status rows are filtered only when known status markers coexist with missing identity and date; dividend rows are filtered only for the observed non-final progress codes `1`, `2`, and `12`. Partial or unknown malformed observations remain fail-closed. Added provider-shaped regression tests.
 - Added `scripts/spike/capability_closure_probe.py`, which performs only the six authorized non-Production probes, stores raw exchanges under ignored local data, and emits sanitized counts/schema/hashes/classifications without credentials or raw payloads.
-- Local verification passed: full `uv run pytest -q`, targeted Ruff, bytecode compilation, `uv run mypy`, `uv pip check`, and `git diff --check`. The final online receipt and compact capability matrix will be added after the source commit is fixed.
+- Local verification passed: full `uv run pytest -q`, Ruff check/format, bytecode compilation, `uv run mypy`, `uv pip check`, and `git diff --check`.
+- Final online probe completed against code head `258489bc29359a1212cd33528ac5764ceb97e110`; the sanitized receipt is [`capability_closure_20260911.json`](provider_verification/capability_closure_20260911.json), 44,794 bytes, SHA-256 `bd2294ec4836446bb819a66b91f0def2392be463834d5da2fa61df1f8f71eb51`. It recorded 10 successful targeted exchanges, `formal_run_created=false`, `catalog_mutated=false`, and `verdict_mutated=false`.
+- The compact matrix is [`capability_closure_20260911.md`](provider_verification/capability_closure_20260911.md). It records status-shape remediation, BJ endpoint availability, delisted/BSE/Corporate Action/`300104.SZ` findings and their remaining `STILL_UNRESOLVED` boundaries without uploading raw Provider payloads or credentials.

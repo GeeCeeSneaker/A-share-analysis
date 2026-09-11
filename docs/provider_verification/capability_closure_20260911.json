@@ -1,0 +1,1370 @@
+{
+  "account_profile_id": "UNKNOWN_24e2ff401792",
+  "calls": [
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "InfoData.get_history_stock_status",
+        "provider_dataset": "history_stock_status",
+        "request_id": "3692c492-c5fc-431e-a8ec-6e7dcd69d0d0",
+        "request_params_hash": "3c12a640ead34886a6b8e020d61a683bfe17c922bed0eaa59349ef09d78e6a40",
+        "row_count": 20638,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [
+          "HIGH_LIMITED",
+          "IS_ST_SEC",
+          "IS_SUSP_SEC",
+          "IS_WD_SEC",
+          "IS_XR_SEC",
+          "LOW_LIMITED",
+          "MARKET_CODE",
+          "PRECLOSE",
+          "PRICE_HIGH_LMT_RATE",
+          "PRICE_LOW_LMT_RATE",
+          "TRADE_DATE"
+        ],
+        "dividend_progress_missing_date_rows": {},
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 20630,
+            "null_count": 8,
+            "row_count": 20638,
+            "table_count": 8
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 8,
+            "nonnull_count": 20630,
+            "null_count": 8,
+            "row_count": 20638,
+            "table_count": 8
+          }
+        },
+        "null_table_count": 0,
+        "payload_type": "dict",
+        "row_count": 20638,
+        "table_count": 8,
+        "table_names": [
+          "002058.SZ",
+          "002217.SZ",
+          "002313.SZ",
+          "002366.SZ",
+          "600382.SH",
+          "688500.SH",
+          "605499.SH",
+          "603887.SH"
+        ],
+        "table_row_counts": {
+          "002058.SZ": 3088,
+          "002217.SZ": 3088,
+          "002313.SZ": 3088,
+          "002366.SZ": 3088,
+          "600382.SH": 3088,
+          "603887.SH": 2415,
+          "605499.SH": 1287,
+          "688500.SH": 1496
+        },
+        "unsupported_member_type": null
+      },
+      "probe_id": "status_date_shape",
+      "raw_artifact": {
+        "evidence_hash": "0bba402dddd67b247c529d62c4d2410e90bbbf3fb4f206afd410f72387ad2731",
+        "meta_uri": "provider=amazingdata/dataset=history_stock_status/3692c492-c5fc-431e-a8ec-6e7dcd69d0d0.meta.json",
+        "null_tables": [],
+        "payload_artifacts": [
+          {
+            "content_hash": "21b47f8785b3e23939c243764882de78a79e94d3fdf7a5b031dbc94bcd235a50",
+            "row_count": 3088,
+            "schema_hash": "67ca6b4314531d426ea279c59753a419e58729df7a414b14c61a8298d28e0f87",
+            "uri": "provider=amazingdata/dataset=history_stock_status/3692c492-c5fc-431e-a8ec-6e7dcd69d0d0/002058_SZ.parquet"
+          },
+          {
+            "content_hash": "d2af1a3d3bf0f6e1da87ed7fdadfed43c2b18574fab1969b4eb704fa119d2f82",
+            "row_count": 3088,
+            "schema_hash": "67ca6b4314531d426ea279c59753a419e58729df7a414b14c61a8298d28e0f87",
+            "uri": "provider=amazingdata/dataset=history_stock_status/3692c492-c5fc-431e-a8ec-6e7dcd69d0d0/002217_SZ.parquet"
+          },
+          {
+            "content_hash": "f7ac1a9475f044ee3cf1c7b33067a05b9f765331638b0180f80eb30f50c5b13e",
+            "row_count": 3088,
+            "schema_hash": "67ca6b4314531d426ea279c59753a419e58729df7a414b14c61a8298d28e0f87",
+            "uri": "provider=amazingdata/dataset=history_stock_status/3692c492-c5fc-431e-a8ec-6e7dcd69d0d0/002313_SZ.parquet"
+          },
+          {
+            "content_hash": "129491e0602fa25887c1a8e3ac1193750bb50aca55fef49c764474e13649e3d1",
+            "row_count": 3088,
+            "schema_hash": "67ca6b4314531d426ea279c59753a419e58729df7a414b14c61a8298d28e0f87",
+            "uri": "provider=amazingdata/dataset=history_stock_status/3692c492-c5fc-431e-a8ec-6e7dcd69d0d0/002366_SZ.parquet"
+          },
+          {
+            "content_hash": "d990fec880a04da5e6c6168b623eee0cb0b37de1afe8f1b0fd227e012a502c37",
+            "row_count": 3088,
+            "schema_hash": "67ca6b4314531d426ea279c59753a419e58729df7a414b14c61a8298d28e0f87",
+            "uri": "provider=amazingdata/dataset=history_stock_status/3692c492-c5fc-431e-a8ec-6e7dcd69d0d0/600382_SH.parquet"
+          },
+          {
+            "content_hash": "affdc7dd39d1d5339bfcf081f4b2d95b4dd9c87bb20633f292b7824908164392",
+            "row_count": 1496,
+            "schema_hash": "67ca6b4314531d426ea279c59753a419e58729df7a414b14c61a8298d28e0f87",
+            "uri": "provider=amazingdata/dataset=history_stock_status/3692c492-c5fc-431e-a8ec-6e7dcd69d0d0/688500_SH.parquet"
+          },
+          {
+            "content_hash": "107995d14f605eb8b7239ddbf378641a23adf06e1003aa5c7c4a2550dd15081f",
+            "row_count": 1287,
+            "schema_hash": "67ca6b4314531d426ea279c59753a419e58729df7a414b14c61a8298d28e0f87",
+            "uri": "provider=amazingdata/dataset=history_stock_status/3692c492-c5fc-431e-a8ec-6e7dcd69d0d0/605499_SH.parquet"
+          },
+          {
+            "content_hash": "7fd68baa8be33e1a3cb19cf15d86a10370852d5799e474fe00caaa010b48808f",
+            "row_count": 2415,
+            "schema_hash": "67ca6b4314531d426ea279c59753a419e58729df7a414b14c61a8298d28e0f87",
+            "uri": "provider=amazingdata/dataset=history_stock_status/3692c492-c5fc-431e-a8ec-6e7dcd69d0d0/603887_SH.parquet"
+          }
+        ],
+        "payload_kind": "multi_table_frames",
+        "row_count": 20638
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "begin_date": 19900101,
+        "end_date": 20991231,
+        "symbol_count": 8,
+        "symbol_set_sha256": "2ce67eb765329a513d6611fcd819dd067be0ec9c48d3fc8c0064f51aed5236bd"
+      },
+      "status": "OK"
+    },
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "InfoData.get_history_stock_status",
+        "provider_dataset": "history_stock_status",
+        "request_id": "86d2e9dc-c731-4104-b490-7ee3183dee3b",
+        "request_params_hash": "3fee8333c72dffaa5f7b991235defe1681728f20952aaad94ddd5919ebd3f0e7",
+        "row_count": 0,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [],
+        "dividend_progress_missing_date_rows": {},
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          }
+        },
+        "null_table_count": 0,
+        "payload_type": "dict",
+        "row_count": 0,
+        "table_count": 1,
+        "table_names": [
+          "835185.BJ"
+        ],
+        "table_row_counts": {
+          "835185.BJ": 0
+        },
+        "unsupported_member_type": null
+      },
+      "probe_id": "bse_historical_status",
+      "raw_artifact": {
+        "evidence_hash": "c024ff9fecf3c6302e06672ab41888b1a4225306b0a9f80f11d7f343a2a8179e",
+        "meta_uri": "provider=amazingdata/dataset=history_stock_status/86d2e9dc-c731-4104-b490-7ee3183dee3b.meta.json",
+        "null_tables": [],
+        "payload_artifacts": [
+          {
+            "content_hash": "cd9225d1c4474875f27908d757a422d710e90f3321b3cb30aaa3d94e77f5e4ed",
+            "row_count": 0,
+            "schema_hash": "ede0b4846684d2e7e74187a188c2880d54b890c9bb7857b7ac5ae83003760f8d",
+            "uri": "provider=amazingdata/dataset=history_stock_status/86d2e9dc-c731-4104-b490-7ee3183dee3b/835185_BJ.parquet"
+          }
+        ],
+        "payload_kind": "multi_table_frames",
+        "row_count": 0
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "begin_date": 20220101,
+        "end_date": 20221231,
+        "symbol_count": 1,
+        "symbol_set_sha256": "25acc5b3110b9be2cff010608bc3228b131d641dcaac78bb78716d185ea3e061"
+      },
+      "status": "OK"
+    },
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "InfoData.get_stock_basic",
+        "provider_dataset": "stock_basic",
+        "request_id": "e49dac1a-bbe1-48aa-9da4-ef6d098938f5",
+        "request_params_hash": "7c7d54809a9243b4c20f96b819f1a02405cb7416a41257f00366d99e1cc160ec",
+        "row_count": 3,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [
+          "COMP_NAME",
+          "COMP_NAME_ENG",
+          "COMP_SNAME_ENG",
+          "DELISTDATE",
+          "IS_LISTED",
+          "LISTDATE",
+          "LISTPLATE_NAME",
+          "MARKET_CODE",
+          "PINYIN",
+          "SECURITY_NAME"
+        ],
+        "dividend_progress_missing_date_rows": {},
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 3,
+            "null_count": 0,
+            "row_count": 3,
+            "table_count": 1
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 3,
+            "null_count": 0,
+            "row_count": 3,
+            "table_count": 1
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 3,
+            "null_count": 0,
+            "row_count": 3,
+            "table_count": 1
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 3,
+            "null_count": 0,
+            "row_count": 3,
+            "table_count": 1
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          }
+        },
+        "null_table_count": 0,
+        "payload_type": "DataFrame",
+        "row_count": 3,
+        "table_count": 1,
+        "table_names": [
+          "table"
+        ],
+        "table_row_counts": {
+          "table": 3
+        },
+        "unsupported_member_type": null
+      },
+      "probe_id": "delisted_stock_basic",
+      "raw_artifact": {
+        "evidence_hash": "91758f3f2ff6855040351939c37bd20a86390ee2c8a070c52bb792b7cbb560c3",
+        "meta_uri": "provider=amazingdata/dataset=stock_basic/e49dac1a-bbe1-48aa-9da4-ef6d098938f5.meta.json",
+        "null_tables": [],
+        "payload_artifacts": [
+          {
+            "content_hash": "996dfbd56192f764a67e67bda9a8069f95dbf5fdc803d61a8706e8bfc65749c2",
+            "row_count": 3,
+            "schema_hash": "34a6024089c4ad2e7da9196df23826972ca8c405cd7ba524baa6aad866c558ac",
+            "uri": "provider=amazingdata/dataset=stock_basic/e49dac1a-bbe1-48aa-9da4-ef6d098938f5.parquet"
+          }
+        ],
+        "payload_kind": "dataframe",
+        "row_count": 3
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "symbol_count": 4,
+        "symbol_set_sha256": "dd50e4b59804ea234e4ea7675297b29c8a0231e0abd9db9a67a584092f4c2cdd"
+      },
+      "status": "OK"
+    },
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "BaseData.get_hist_code_list",
+        "provider_dataset": "hist_code_list",
+        "request_id": "96ecc3b4-e909-4ffd-8843-d845eea043b6",
+        "request_params_hash": "4d84513a7b14950501f785c08a5d684a1c76dd319be1dbcea9f04b9e46c1fc8e",
+        "row_count": 3907,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [
+          "value"
+        ],
+        "dividend_progress_missing_date_rows": {},
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          }
+        },
+        "null_table_count": 0,
+        "payload_type": "list",
+        "row_count": 3907,
+        "table_count": 1,
+        "table_names": [
+          "table"
+        ],
+        "table_row_counts": {
+          "table": 3907
+        },
+        "unsupported_member_type": null
+      },
+      "probe_id": "fixture_300104_history_code_list",
+      "raw_artifact": {
+        "evidence_hash": "f1c382e4dac2cb7713b5c756a1923c55cc53eb58da134ce5b4018bff2acdfbb6",
+        "meta_uri": "provider=amazingdata/dataset=hist_code_list/96ecc3b4-e909-4ffd-8843-d845eea043b6.meta.json",
+        "null_tables": [],
+        "payload_artifacts": [
+          {
+            "content_hash": "02f13032f5df0f34ddf13de852980d8769c7ade0d1efdf39348d7dbd6dc16ac2",
+            "row_count": 3907,
+            "schema_hash": "eff3a5295e6d198f3a13fe4d461c3edcbd74487481da752a9cf23f166b5d7fcb",
+            "uri": "provider=amazingdata/dataset=hist_code_list/96ecc3b4-e909-4ffd-8843-d845eea043b6.parquet"
+          }
+        ],
+        "payload_kind": "rows",
+        "row_count": 3907
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "begin_date": 20200101,
+        "end_date": 20200720,
+        "security_type": "EXTRA_STOCK_A_SH_SZ"
+      },
+      "status": "OK"
+    },
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "InfoData.get_bj_code_mapping",
+        "provider_dataset": "code_mapping_bj",
+        "request_id": "4b945141-8d89-4922-a210-054e394c21a0",
+        "request_params_hash": "fe435f568bb8ceda20aa6e78d8e27690e4a807604bbf40260eac59c5f7b37271",
+        "row_count": 248,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [
+          "LISTING_DATE",
+          "NEW_CODE",
+          "OLD_CODE",
+          "SECURITY_NAME"
+        ],
+        "dividend_progress_missing_date_rows": {},
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          }
+        },
+        "null_table_count": 0,
+        "payload_type": "DataFrame",
+        "row_count": 248,
+        "table_count": 1,
+        "table_names": [
+          "table"
+        ],
+        "table_row_counts": {
+          "table": 248
+        },
+        "unsupported_member_type": null
+      },
+      "probe_id": "bj_mapping_endpoint",
+      "raw_artifact": {
+        "evidence_hash": "fef835fc6264ee786f03cc64e69633d6a77905f750f5e44687453029dc75cbdd",
+        "meta_uri": "provider=amazingdata/dataset=code_mapping_bj/4b945141-8d89-4922-a210-054e394c21a0.meta.json",
+        "null_tables": [],
+        "payload_artifacts": [
+          {
+            "content_hash": "3ad8165127c27c4167cf35d12ef788391d36ace09c2f751dfd040a10bf0a5835",
+            "row_count": 248,
+            "schema_hash": "6b4e14f387079cfc432517cca4256a9ecd2d562b2da40270f596d16856730f5a",
+            "uri": "provider=amazingdata/dataset=code_mapping_bj/4b945141-8d89-4922-a210-054e394c21a0.parquet"
+          }
+        ],
+        "payload_kind": "dataframe",
+        "row_count": 248
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "symbol_count": 1,
+        "symbol_set_sha256": "8542a7ed102c0006bdc09b58358f1e0d42ea537e628a66c6e2c979d409efbc5e"
+      },
+      "status": "OK"
+    },
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "InfoData.get_dividend",
+        "provider_dataset": "corporate_action",
+        "request_id": "22d88f89-d313-4d6c-ac4b-af6c371a28a5",
+        "request_params_hash": "dfed075b03d6094dd2d8566526f4580bb8ceae43d3904a2ecacc5b15fed5bbd5",
+        "row_count": 123,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [
+          "ANN_DATE",
+          "CURRENCY_CODE",
+          "DATE_DVD_ANN",
+          "DATE_DVD_PAYOUT",
+          "DATE_EQY_RECORD",
+          "DATE_EX",
+          "DIV_BASEDATE",
+          "DIV_BASESHARE",
+          "DIV_BONUSRATE",
+          "DIV_CHANGE",
+          "DIV_CONVERSEDRATE",
+          "DIV_PREANN_DATE",
+          "DIV_PRELANDATE",
+          "DIV_PROGRESS",
+          "DIV_SMTGDATE",
+          "DIV_TARGET",
+          "DVD_PER_SHARE_AFTER_TAX_CASH",
+          "DVD_PER_SHARE_PRE_TAX_CASH",
+          "DVD_PER_SHARE_STK",
+          "IS_CHANGED",
+          "LISTINGDATE_OF_DVD_SHR",
+          "MARKET_CODE",
+          "REMARK",
+          "REPORT_PERIOD"
+        ],
+        "dividend_progress_missing_date_rows": {
+          "1": 48,
+          "12": 1,
+          "2": 1,
+          "3": 0
+        },
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 50,
+            "nonnull_count": 73,
+            "null_count": 50,
+            "row_count": 123,
+            "table_count": 1
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 123,
+            "null_count": 0,
+            "row_count": 123,
+            "table_count": 1
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          }
+        },
+        "null_table_count": 0,
+        "payload_type": "DataFrame",
+        "row_count": 123,
+        "table_count": 1,
+        "table_names": [
+          "table"
+        ],
+        "table_row_counts": {
+          "table": 123
+        },
+        "unsupported_member_type": null
+      },
+      "probe_id": "dividend_event_shape",
+      "raw_artifact": {
+        "evidence_hash": "9cd09a92e649e8d10901e0595d7cc5e3a5ba01118069ebe2c611c406e1067c9c",
+        "meta_uri": "provider=amazingdata/dataset=corporate_action/22d88f89-d313-4d6c-ac4b-af6c371a28a5.meta.json",
+        "null_tables": [],
+        "payload_artifacts": [
+          {
+            "content_hash": "53234a710f5f7f74d7edf263e06f76282a802492f14ba35e89485d3dd7596739",
+            "row_count": 123,
+            "schema_hash": "6792c6f656b912b8051f62b5f570fafcf4d66315d37b12d92be3ce944d5a7b26",
+            "uri": "provider=amazingdata/dataset=corporate_action/22d88f89-d313-4d6c-ac4b-af6c371a28a5.parquet"
+          }
+        ],
+        "payload_kind": "dataframe",
+        "row_count": 123
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "begin_date": 20190101,
+        "end_date": 20241231,
+        "symbol_count": 10,
+        "symbol_set_sha256": "540e84320fe0b01821fe3e542273975b07fea598a5252b3d2d309e13daeea409"
+      },
+      "status": "OK"
+    },
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "InfoData.get_right_issue",
+        "provider_dataset": "corporate_action",
+        "request_id": "d1edfa73-ef3d-40c6-b926-37cc49ab90a8",
+        "request_params_hash": "dc1b03bf4e03cf06bf005e8dcb535a7b6105672435117b8e7dae3e9d3f362ab2",
+        "row_count": 6,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [
+          "AMT_PLAN",
+          "AMT_REAL",
+          "ANN_DATE",
+          "APPROVED_DATE",
+          "COLLECTION_FUND",
+          "EXECUTE_DATE",
+          "EXPECTED_FUND_RAISING",
+          "EX_DIVIDEND_DATE",
+          "GUARANTOR",
+          "GUARTYPE",
+          "LISTED_DATE",
+          "LIST_ANN_DATE",
+          "MARKET_CODE",
+          "PASS_DATE",
+          "PAY_END_DATE",
+          "PAY_START_DATE",
+          "PREPLAN_DATE",
+          "PRICE",
+          "PROGRESS",
+          "RATIO",
+          "RATIO_DENOMINATOR",
+          "RATIO_MOLECULAR",
+          "RESULT_DATE",
+          "RIGHTSISSUE_CODE",
+          "RIGHTSISSUE_DESC",
+          "RIGHTSISSUE_NAME",
+          "RIGHTSISSUE_YEAR",
+          "SHAREB_REG_DATE",
+          "SMTG_ANN_DATE",
+          "SUBS_METHOD"
+        ],
+        "dividend_progress_missing_date_rows": {},
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 6,
+            "null_count": 0,
+            "row_count": 6,
+            "table_count": 1
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 6,
+            "null_count": 0,
+            "row_count": 6,
+            "table_count": 1
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          }
+        },
+        "null_table_count": 0,
+        "payload_type": "DataFrame",
+        "row_count": 6,
+        "table_count": 1,
+        "table_names": [
+          "table"
+        ],
+        "table_row_counts": {
+          "table": 6
+        },
+        "unsupported_member_type": null
+      },
+      "probe_id": "right_issue_event_shape",
+      "raw_artifact": {
+        "evidence_hash": "b644fd46929e985d5366439d7b625df8f6d599149da9970827761a20799926bf",
+        "meta_uri": "provider=amazingdata/dataset=corporate_action/d1edfa73-ef3d-40c6-b926-37cc49ab90a8.meta.json",
+        "null_tables": [],
+        "payload_artifacts": [
+          {
+            "content_hash": "312f7de178647b25f7623cb0765b933b19aa7071a420a22b18a03e6f9bd94fed",
+            "row_count": 6,
+            "schema_hash": "127499edb04c530a3fe48770301ecac3ac6ff9e8468d6eced5919e4699d49350",
+            "uri": "provider=amazingdata/dataset=corporate_action/d1edfa73-ef3d-40c6-b926-37cc49ab90a8.parquet"
+          }
+        ],
+        "payload_kind": "dataframe",
+        "row_count": 6
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "begin_date": 20190101,
+        "end_date": 20241231,
+        "symbol_count": 5,
+        "symbol_set_sha256": "1cdd247b0510b6ce0c74d00160c181b37440a123133751c8a625ec63029c4e1b"
+      },
+      "status": "OK"
+    },
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "BaseData.get_calendar",
+        "provider_dataset": "trade_calendar",
+        "request_id": "7c849601-6d54-4fbb-80b0-fe2a8b9cb0a1",
+        "request_params_hash": "8fb88255eb44cd1e826778a20d2e26ea574391417ce2c2ab2bd15fabbf51a9bd",
+        "row_count": 8716,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [
+          "value"
+        ],
+        "dividend_progress_missing_date_rows": {},
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          }
+        },
+        "null_table_count": 0,
+        "payload_type": "list",
+        "row_count": 8716,
+        "table_count": 1,
+        "table_names": [
+          "table"
+        ],
+        "table_row_counts": {
+          "table": 8716
+        },
+        "unsupported_member_type": null
+      },
+      "probe_id": "fixture_sz_calendar",
+      "raw_artifact": {
+        "evidence_hash": "d7358e8de804bec505dc6b565e7b66b65533c83184c92f9eed003c5fb0ca952b",
+        "meta_uri": "provider=amazingdata/dataset=trade_calendar/7c849601-6d54-4fbb-80b0-fe2a8b9cb0a1.meta.json",
+        "null_tables": [],
+        "payload_artifacts": [
+          {
+            "content_hash": "f4ddec216b59c31b628cc8d36446d1b1c60e4411228ae4b3679d4ac46509ba60",
+            "row_count": 8716,
+            "schema_hash": "d52a4d7ab2ed31a999b43b936675cc275645d56e59de0cf79aad8e3490ebc7a5",
+            "uri": "provider=amazingdata/dataset=trade_calendar/7c849601-6d54-4fbb-80b0-fe2a8b9cb0a1.parquet"
+          }
+        ],
+        "payload_kind": "rows",
+        "row_count": 8716
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "market": "SZ"
+      },
+      "status": "OK"
+    },
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "MarketData.query_kline",
+        "provider_dataset": "daily_bar",
+        "request_id": "c4374f5c-a44d-4fe8-8fbc-cacec511a53b",
+        "request_params_hash": "d8517b322a96954adb115f06ccf2702fc70a6467efd1c092a96df81b8832bbfe",
+        "row_count": 0,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [],
+        "dividend_progress_missing_date_rows": {},
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          }
+        },
+        "null_table_count": 1,
+        "payload_type": "dict",
+        "row_count": 0,
+        "table_count": 0,
+        "table_names": [],
+        "table_row_counts": {},
+        "unsupported_member_type": null
+      },
+      "probe_id": "fixture_300104_daily_kline",
+      "raw_artifact": {
+        "evidence_hash": "5d1d4cceb61f185bfaf745311f6db1e7da93b49953b54da4c42925a2183e470a",
+        "meta_uri": "provider=amazingdata/dataset=daily_bar/c4374f5c-a44d-4fe8-8fbc-cacec511a53b.meta.json",
+        "null_tables": [
+          "300104.SZ"
+        ],
+        "payload_artifacts": [],
+        "payload_kind": "multi_table_frames",
+        "row_count": 0
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "begin_date": 20200101,
+        "end_date": 20200110,
+        "symbol_count": 1,
+        "symbol_set_sha256": "a466ea973fddc4cc66b9246d14738275f6068672865bff06ffdc4dbafda5b506",
+        "trading_day_count": 7,
+        "trading_days_sha256": "4054ecf19f8f22007b4a3fe2e89e5bed2a862984ecc362e9ac9557105997ec1c"
+      },
+      "status": "OK"
+    },
+    {
+      "exchange": {
+        "capability_status": "CANDIDATE",
+        "endpoint": "MarketData.query_kline",
+        "provider_dataset": "daily_bar",
+        "request_id": "7da69346-2c1e-4dfd-b757-1817814ba88c",
+        "request_params_hash": "c895843077f6d4da2a5117355df80922211d97a3673972fd2e983d7df61f15f0",
+        "row_count": 7,
+        "status": "OK"
+      },
+      "payload_summary": {
+        "columns": [
+          "amount",
+          "close",
+          "code",
+          "high",
+          "kline_time",
+          "low",
+          "open",
+          "volume"
+        ],
+        "dividend_progress_missing_date_rows": {},
+        "field_stats": {
+          "DATE_EX": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "DELISTING_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "EX_DIVIDEND_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "IS_LISTED": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "LISTDATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "MARKET_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "SECURITY_CODE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          },
+          "TRADE_DATE": {
+            "invalid_count": 0,
+            "nonnull_count": 0,
+            "null_count": 0,
+            "row_count": 0,
+            "table_count": 0
+          }
+        },
+        "null_table_count": 0,
+        "payload_type": "dict",
+        "row_count": 7,
+        "table_count": 1,
+        "table_names": [
+          "600519.SH"
+        ],
+        "table_row_counts": {
+          "600519.SH": 7
+        },
+        "unsupported_member_type": null
+      },
+      "probe_id": "fixture_600519_control_daily_kline",
+      "raw_artifact": {
+        "evidence_hash": "eade2dc231d78d6225682ae7ecb13b7a748ca02ee862f002cb661fcfb545c6f2",
+        "meta_uri": "provider=amazingdata/dataset=daily_bar/7da69346-2c1e-4dfd-b757-1817814ba88c.meta.json",
+        "null_tables": [],
+        "payload_artifacts": [
+          {
+            "content_hash": "52695d4824a455419ebbcadc061b651c61f54f807ef334d756e58985ea5b05e2",
+            "row_count": 7,
+            "schema_hash": "4c92a4ab4ba1d8d741778699f88c7530d9327b6e5f196bbe80b20bd1590f7d05",
+            "uri": "provider=amazingdata/dataset=daily_bar/7da69346-2c1e-4dfd-b757-1817814ba88c/600519_SH.parquet"
+          }
+        ],
+        "payload_kind": "multi_table_frames",
+        "row_count": 7
+      },
+      "raw_write_status": "OK",
+      "request": {
+        "begin_date": 20200101,
+        "end_date": 20200110,
+        "symbol_count": 1,
+        "symbol_set_sha256": "a2bfc0f3183333c8551bb1cbc8065d577e9cc86d3d30189a89c9a5eec2898cc9",
+        "trading_day_count": 7
+      },
+      "status": "OK"
+    }
+  ],
+  "capability_closure": {
+    "bj_mapping_endpoint": {
+      "classification": "PROVIDER_CONFIRMED",
+      "finding": "dedicated endpoint returned a non-empty mapping table",
+      "row_count": 248
+    },
+    "bse_historical_status": {
+      "classification": "PROVIDER_CONFIRMED",
+      "finding": "exact native request returned an empty result",
+      "row_count": 0,
+      "semantic_status": "STILL_UNRESOLVED"
+    },
+    "corporate_actions": {
+      "dividend": {
+        "classification": "FRAMEWORK_REMEDIATION_REQUIRED",
+        "finding": "provider returned heterogeneous dividend rows; missing DATE_EX is confined to observed non-final progress codes and requires an ephemeral adapter filter",
+        "missing_or_invalid_rows": 50,
+        "non_event_progress_missing_rows": 50,
+        "row_count": 123
+      },
+      "right_issue": {
+        "classification": "STILL_UNRESOLVED",
+        "finding": "native event response contains the required EX_DIVIDEND_DATE field",
+        "missing_or_invalid_rows": 0,
+        "row_count": 6,
+        "unexpected_missing_or_invalid_rows": 0
+      }
+    },
+    "delisted_semantics": {
+      "classification": "PROVIDER_CONFIRMED",
+      "fields": [
+        "IS_LISTED",
+        "DELISTDATE",
+        "LISTDATE"
+      ],
+      "finding": "stock-basic response exposes delisting-related fields",
+      "requested_symbol_count": 4,
+      "row_count": 3,
+      "semantic_status": "STILL_UNRESOLVED"
+    },
+    "history_fixture_300104": {
+      "applicability_status": "STILL_UNRESOLVED",
+      "bar_row_count": 0,
+      "classification": "PROVIDER_CONFIRMED",
+      "control_bar_row_count": 7,
+      "finding": "daily-kline adapter returned a control symbol but no 300104.SZ bars; the fixture is not currently usable for historical tradability",
+      "historical_code_list_contains_target": true,
+      "replacement_candidate": "600519.SH"
+    },
+    "status_date_shape": {
+      "classification": "PROVIDER_CONFIRMED",
+      "finding": "native response contains missing or unparseable TRADE_DATE rows",
+      "invalid_trade_date_rows": 8
+    }
+  },
+  "catalog_mutated": false,
+  "checked_at": "2026-09-11T16:10:01.039418+00:00",
+  "code_head": "258489bc29359a1212cd33528ac5764ceb97e110",
+  "formal_run_created": false,
+  "open_semantics": [
+    "delisted continuity still requires reconciliation of stock-basic status with historical code-list semantics",
+    "835185.BJ empty/non-empty result does not by itself establish historical listing status",
+    "300104.SZ provider bars do not replace independent listing/applicability evidence",
+    "no result here approves a Production capability or authorizes a new Formal run"
+  ],
+  "probe_mode": "TARGETED_NON_PRODUCTION",
+  "runtime_version": "V4.3.0.260626-rc2.0-YHZQ",
+  "schema": "amazingdata.capability_closure_preflight.v1",
+  "sdk_version": "1.1.9",
+  "status": "COMPLETED",
+  "verdict_mutated": false
+}
