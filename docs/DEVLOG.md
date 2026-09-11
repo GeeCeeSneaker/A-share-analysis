@@ -3793,3 +3793,15 @@
   `34566813036`（#532）已通过 Windows 3.12、Windows 3.14 和 Ubuntu 3.14 三个平台；
   独立 Reviewer delta review 仍待完成，PR #43 继续保持 Draft。
   `300104.SZ` 的 applicability/tradability 仍按 P1 延后，不得借此放宽通用 2020 baseline。
+
+## 2026-09-11 · Sealed Formal evidence read-only replay diagnostic
+
+> 状态：**REPLAY_DIAGNOSTIC GENERATED / ORIGINAL RUN PRESERVED / LOCAL VERIFIED / INDEPENDENT REVIEW REQUIRED / NO FORMAL AUTHORIZATION**
+
+- 按 Issue #39 最新调度边界，从 `main@b7c9b1b2986e5cbd5415ef44826acbc7d008cfc5` 对旧封存 run `dad1e1b8-0c34-4031-8e94-cc87a03dbbf4` 做了一次离线只读 replay；旧 sealed catalog 178 条、SHA-256 `bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53`，旧 `SPIKE_INCOMPLETE` verdict 未改动。
+- 新增 [`formal_readonly_replay.py`](../scripts/spike/formal_readonly_replay.py)、[`formal_readonly_replay_20260911.json`](provider_verification/formal_readonly_replay_20260911.json) 和 [`formal_readonly_replay_20260911.md`](provider_verification/formal_readonly_replay_20260911.md)。artifact 为 32,524 bytes，SHA-256 `94e7309a00ba7d041b8dd71b989d7bb80009e98e77b7c9494b1980da17fa406d`，只含脱敏锚点、结果分类和 reason code，不含 raw payload、账号或凭证。
+- 只读控制通过：23 个 meta 闭包验证、22 个 payload materialize、27 个 evidence anchor；封存 evidence tree 前后均为 27,988 文件/370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`；`provider_calls=0`、`spike_run_created=false`、所有 writer call 为 0。
+- replay 结果保留边界：daily-bar 单位检查 `VALIDATED_PASS`，三个明确 history fixture 通过；B2 退市语义仍 `MISSING`，ST/限价状态 shape、BSE 空 status、Golden 公司行为 contract 仍阻断或未决，B1/B5 account gate、B7 timing 和 B6 optional semantic checks 未在离线环境冒充重跑；`300104.SZ` 继续 deferred。
+- 验证通过：全量 `uv run pytest -q` 为 `1721 collected, 1718 passed, 3 skipped`；replay 脚本 Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。未调用 Provider，未创建新 run，未执行 Production、`--resume` 或 `--verdict`。
+
+下一步：将该诊断作为独立 Draft PR 交由 Reviewer 核对旧 run/catalog/Golden/rule 绑定、证据锚定、逐项 classification/reason code 与 no-mutation 控制；审阅关闭前不得启动第三次 Formal。`300104.SZ` applicability/tradability、B2/B3/B4 未决语义和未来 Formal 授权边界见上述交接记录。

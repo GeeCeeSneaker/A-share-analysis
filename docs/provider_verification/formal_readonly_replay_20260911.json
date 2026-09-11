@@ -1,0 +1,848 @@
+{
+  "artifact_kind": "REPLAY_DIAGNOSTIC",
+  "artifact_schema": "formal-readonly-replay-v1",
+  "capabilities": [
+    {
+      "capability": "formal_runtime_gate",
+      "evidence": [],
+      "note": "B1 is recorded from the sealed catalog; this lane does not re-run SDK/runtime/account gates.",
+      "old_recorded": {
+        "case_count": 40,
+        "reason_counts": {
+          "GATE_ALL_PASS": 8,
+          "GATE_CHAIN_BLOCKED": 2,
+          "GATE_ENDPOINT_FAIL": 2,
+          "GATE_ENDPOINT_PASS": 10,
+          "GATE_PASS": 18
+        },
+        "result_counts": {
+          "NOT_TESTABLE_PERMISSION": 2,
+          "VALIDATED_FAIL": 2,
+          "VALIDATED_PASS": 36
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_NOT_APPLICABLE_OFFLINE",
+        "reason_codes": [
+          "SDK_RUNTIME_ACCOUNT_GATE_NOT_REEXECUTED"
+        ],
+        "result": "NOT_RUN_OFFLINE"
+      },
+      "stage": "B1"
+    },
+    {
+      "capability": "security_master_with_delisted",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=hist_code_list/0f726f75-eb4c-4679-a719-940a05c31943.meta.json"
+      ],
+      "note": "Historical-code membership does not prove IS_LISTED=3 or DELISTING_DATE.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "VALIDATED_FAIL": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_SEMANTIC_MISSING",
+        "reason_codes": [
+          "DELISTED_SEMANTIC_FIELD_MISSING"
+        ],
+        "result": "MISSING",
+        "value_only_rows": 5442
+      },
+      "stage": "B2"
+    },
+    {
+      "capability": "daily_bar_units",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=daily_bar/fe2c5cb7-a959-459b-96bb-2ece1634776a.meta.json"
+      ],
+      "note": "The repaired keyed-table and lowercase-field path reaches the independent amount/volume check.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "VALIDATED_FAIL": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_VALIDATED_PASS",
+        "reason_codes": [],
+        "result": "VALIDATED_PASS",
+        "rows_after_key_preserving_view": 1200,
+        "unit_checked_rows": 1155,
+        "unit_consistent_rows": 1155
+      },
+      "stage": "B3"
+    },
+    {
+      "capability": "historical_st_suspend",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=history_stock_status/ca20098a-9a9c-4e88-9916-5e40f4b1cf20.meta.json"
+      ],
+      "note": "A malformed status row remains a fail-closed shape block; no ST semantic verdict is inferred.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "OBSERVED": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_PROVIDER_SHAPE_BLOCKED",
+        "reason_codes": [
+          "PROVIDER_STATUS_SHAPE"
+        ],
+        "result": "VALIDATED_FAIL",
+        "row_ordinal": 6801,
+        "view": "canonical_status_view"
+      },
+      "stage": "B3"
+    },
+    {
+      "capability": "limit_price_and_no_limit_days.sample",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=history_stock_status/ca20098a-9a9c-4e88-9916-5e40f4b1cf20.meta.json"
+      ],
+      "note": "The sample status exchange is blocked before rule arithmetic by the malformed native row.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "VALIDATED_FAIL": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_PROVIDER_SHAPE_BLOCKED",
+        "reason_codes": [
+          "PROVIDER_STATUS_SHAPE"
+        ],
+        "result": "VALIDATED_FAIL",
+        "row_ordinal": 6801,
+        "view": "canonical_status_view"
+      },
+      "stage": "B3"
+    },
+    {
+      "capability": "limit_price_and_no_limit_days.BSE",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=history_stock_status/e281014d-2b75-40e6-9eff-d5331f21ea87.meta.json"
+      ],
+      "note": "Successful empty BSE status is intentionally not upgraded to a capability result.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "MISSING": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_UNRESOLVED_PROVIDER_SEMANTICS",
+        "empty_status": true,
+        "reason_codes": [
+          "PROVIDER_EMPTY_STATUS_UNRESOLVED"
+        ],
+        "result": "MISSING"
+      },
+      "stage": "B3"
+    },
+    {
+      "capability": "adj_factor_corporate_action_continuity",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=adj_factor/d1369739-7a40-4163-8dee-16c32b04c3e0.meta.json"
+      ],
+      "note": "The old evidence contains adjustment rows but no price context; continuity stays deferred.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "OBSERVED": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_STRUCTURAL_ONLY",
+        "price_context_supplied": false,
+        "reason_codes": [],
+        "result": "OBSERVED"
+      },
+      "stage": "B3"
+    },
+    {
+      "capability": "sdk_permission_cache_freshness",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=trade_calendar/fd7efe46-b0b5-4747-967a-4099936f42dc.meta.json"
+      ],
+      "note": "Calendar bytes are readable, but account permission/cache behavior requires the live target.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "VALIDATED_PASS": 1
+        }
+      },
+      "replay": {
+        "calendar_days_read": 8723,
+        "classification": "REPLAY_NOT_APPLICABLE_OFFLINE",
+        "reason_codes": [
+          "ACCOUNT_PERMISSION_IDENTITY_NOT_REEXECUTED"
+        ],
+        "result": "NOT_RUN_OFFLINE"
+      },
+      "stage": "B5"
+    },
+    {
+      "capability": "history_start_2020",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=daily_bar/018f0f8b-58e7-4ef5-aa2c-26abe859394d.meta.json",
+        "raw/provider=amazingdata/dataset=trade_calendar/fd7efe46-b0b5-4747-967a-4099936f42dc.meta.json"
+      ],
+      "note": "Three explicit fixtures pass at their first applicable session; 300104.SZ remains deferred.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "VALIDATED_FAIL": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_VALIDATED_PASS",
+        "covered_fixture_count": 3,
+        "deferred_fixture": "300104.SZ",
+        "reason_codes": [],
+        "result": "VALIDATED_PASS"
+      },
+      "stage": "B5"
+    },
+    {
+      "capability": "symbol_mapping_unambiguous",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=code_list/c710216e-7b53-487e-af77-873bab7a82d5.meta.json"
+      ],
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "VALIDATED_PASS": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_VALIDATED_PASS",
+        "reason_codes": [],
+        "result": "VALIDATED_PASS",
+        "scalar_values_read": 5562
+      },
+      "stage": "B5"
+    },
+    {
+      "capability": "free_float_equivalence",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=stock_basic/bcbcbe53-18da-4de5-8005-b7c2f6eb6fd7.meta.json"
+      ],
+      "note": "The old B6 path recorded shape only; no offline equivalence claim is added.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "OBSERVED": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_STRUCTURAL_ONLY",
+        "reason_codes": [
+          "OPTIONAL_SEMANTIC_CHECK_NOT_REEXECUTED"
+        ],
+        "result": "OBSERVED_ONLY",
+        "rows_read": 3
+      },
+      "stage": "B6"
+    },
+    {
+      "capability": "sw_taxonomy",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=stock_basic/bcbcbe53-18da-4de5-8005-b7c2f6eb6fd7.meta.json"
+      ],
+      "note": "Taxonomy owner still requires live endpoint/semantic review.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "OBSERVED": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_STRUCTURAL_ONLY",
+        "reason_codes": [
+          "OPTIONAL_SEMANTIC_CHECK_NOT_REEXECUTED"
+        ],
+        "result": "OBSERVED_ONLY",
+        "rows_read": 3
+      },
+      "stage": "B6"
+    },
+    {
+      "capability": "benchmark_index_availability",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=daily_bar/73817f8d-6d75-4291-a956-1306f321be37.meta.json"
+      ],
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "OBSERVED": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_STRUCTURAL_ONLY",
+        "reason_codes": [
+          "INDEX_SEMANTIC_CHECK_NOT_REEXECUTED"
+        ],
+        "result": "OBSERVED_ONLY",
+        "rows_read": 240
+      },
+      "stage": "B6"
+    },
+    {
+      "capability": "capacity_backfill",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=daily_bar/6e9d1468-4676-4263-bb80-417865864526.meta.json"
+      ],
+      "note": "Only immutable raw metadata was checked; no backfill loop or timing measurement was run.",
+      "old_recorded": {
+        "case_count": 1,
+        "reason_counts": {
+          "": 1
+        },
+        "result_counts": {
+          "OBSERVED": 1
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_NOT_APPLICABLE_OFFLINE",
+        "declared_rows": 1332686,
+        "declared_table_count": 5550,
+        "reason_codes": [
+          "CAPACITY_TIMING_METRICS_NOT_IN_RAW_PAYLOAD"
+        ],
+        "result": "NOT_RUN_OFFLINE"
+      },
+      "stage": "B7"
+    },
+    {
+      "capability": "golden_st_transition",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=history_stock_status/14db965e-d080-45b2-ba26-652b8ed7d9d5.meta.json"
+      ],
+      "note": "Canonical provider view rejected a native row before semantic comparison.",
+      "old_recorded": {
+        "case_count": 50,
+        "reason_counts": {
+          "": 50
+        },
+        "result_counts": {
+          "VALIDATED_FAIL": 50
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_PROVIDER_SHAPE_BLOCKED",
+        "reason_codes": [
+          "PROVIDER_STATUS_SHAPE"
+        ],
+        "reason_counts": {
+          "PROVIDER_STATUS_SHAPE": 50
+        },
+        "result": "VALIDATED_FAIL",
+        "result_counts": {
+          "VALIDATED_FAIL": 50
+        },
+        "row_ordinal": 22502,
+        "view": "canonical_status_view"
+      },
+      "stage": "B4"
+    },
+    {
+      "capability": "golden_delisted",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=hist_code_list/bd7449e8-3c64-40b4-9fdb-3610d3ab217c.meta.json",
+        "raw/provider=amazingdata/dataset=stock_basic/18f32f80-6ad0-4b71-8093-31393f8f1ce7.meta.json"
+      ],
+      "note": "Current merged validator path was reached for every case in this bundle.",
+      "old_recorded": {
+        "case_count": 20,
+        "reason_counts": {
+          "": 20
+        },
+        "result_counts": {
+          "VALIDATED_FAIL": 20
+        }
+      },
+      "replay": {
+        "case_count": 20,
+        "classification": "REPLAY_SEMANTIC_MISMATCH",
+        "reason_counts": {
+          "DELISTED_SEMANTIC_MISMATCH": 20
+        },
+        "result": "VALIDATED_FAIL",
+        "result_counts": {
+          "VALIDATED_FAIL": 20
+        }
+      },
+      "stage": "B4"
+    },
+    {
+      "capability": "golden_limit_regime",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=hist_code_list/f90e48e4-ad88-4bc3-8ad8-83653fb559d8.meta.json",
+        "raw/provider=amazingdata/dataset=history_stock_status/38103311-94cd-4e51-bbc0-8cb07667859b.meta.json",
+        "raw/provider=amazingdata/dataset=trade_calendar/0f7cef2e-fc33-44af-8056-508b8451e482.meta.json"
+      ],
+      "note": "Canonical provider view rejected a native row before semantic comparison.",
+      "old_recorded": {
+        "case_count": 30,
+        "reason_counts": {
+          "STATUS_EXACT_MATCH_FAILURE": 30
+        },
+        "result_counts": {
+          "VALIDATED_FAIL": 30
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_PROVIDER_SHAPE_BLOCKED",
+        "reason_codes": [
+          "PROVIDER_STATUS_SHAPE"
+        ],
+        "reason_counts": {
+          "PROVIDER_STATUS_SHAPE": 30
+        },
+        "result": "VALIDATED_FAIL",
+        "result_counts": {
+          "VALIDATED_FAIL": 30
+        },
+        "row_ordinal": 43376,
+        "view": "canonical_status_view"
+      },
+      "stage": "B4"
+    },
+    {
+      "capability": "golden_corporate_action",
+      "evidence": [
+        "raw/provider=amazingdata/dataset=adj_factor/c17343af-7e08-42cb-a96b-d0d7e2efccf4.meta.json",
+        "raw/provider=amazingdata/dataset=corporate_action/805aaf3b-2c80-4613-b4f1-be71d17722a3.meta.json",
+        "raw/provider=amazingdata/dataset=corporate_action/b1f3f403-e329-4402-95d4-5de5f71a31a9.meta.json",
+        "raw/provider=amazingdata/dataset=daily_bar/2917fd4e-cf5c-4f7d-8082-075431641d76.meta.json",
+        "raw/provider=amazingdata/dataset=history_stock_status/1c26b090-c75c-4a81-a150-0a7bbddd3f4e.meta.json",
+        "raw/provider=amazingdata/dataset=trade_calendar/b4980c92-5d8b-4677-9b7c-2ee34491222a.meta.json"
+      ],
+      "note": "A corporate-action stream row lacks a documented contract field; raw content is intentionally omitted.",
+      "old_recorded": {
+        "case_count": 25,
+        "reason_counts": {
+          "": 25
+        },
+        "result_counts": {
+          "VALIDATED_FAIL": 25
+        }
+      },
+      "replay": {
+        "classification": "REPLAY_PROVIDER_SCHEMA_BLOCKED",
+        "failed_stream": "dividend",
+        "reason_codes": [
+          "PROVIDER_SCHEMA"
+        ],
+        "reason_counts": {
+          "PROVIDER_SCHEMA": 25
+        },
+        "result": "VALIDATED_FAIL",
+        "result_counts": {
+          "VALIDATED_FAIL": 25
+        }
+      },
+      "stage": "B4"
+    }
+  ],
+  "evidence_anchors": [
+    {
+      "bytes": 17368,
+      "exchange_count": 6,
+      "logical_path": "raw/bundles/corp_action_context-ce7d64e1.json",
+      "sha256": "ef0b40c3df90b4c37977d79ba7c0557d0377e52afccb7621433b83fe64b2dea7"
+    },
+    {
+      "bytes": 2317,
+      "exchange_count": 2,
+      "logical_path": "raw/bundles/delisted_master-5dfa186b.json",
+      "sha256": "12a29b5af6440f86a4f6a97d412012e90942fbccf19967585c985e55ba3b0e10"
+    },
+    {
+      "bytes": 11540,
+      "exchange_count": 3,
+      "logical_path": "raw/bundles/limit_pit_rule-c7cd2ddc.json",
+      "sha256": "4dde45fa7bfa79bdbfcf7ac884a707fd88eb48f0ae65bf052b072d360b6f6f21"
+    },
+    {
+      "bytes": 18979,
+      "exchange_count": 1,
+      "logical_path": "raw/bundles/st_status-773ff1c2.json",
+      "sha256": "7d0bea12f72f7204322462c968d6336014889e4db6cd0f82947000e4ce627955"
+    },
+    {
+      "declared_payload_anchor_sha256": "31a884c5dd947457db5a2f24dc8b6527be7f34444730cf50b4ab8c9ac340f581",
+      "declared_payload_content_hash": "6c57ad41b0d16b534f6f75346a75f436838dedc67fac923d2189632f483cc2c5",
+      "declared_rows": 8723,
+      "logical_path": "raw/provider=amazingdata/dataset=adj_factor/c17343af-7e08-42cb-a96b-d0d7e2efccf4.meta.json",
+      "meta_sha256": "f24149a6e0c5f3b69b44623f4fe77ff4397262a5ba8dbd22fcf6a27aa449c5e5",
+      "null_table_count": 0,
+      "payload_kind": "dataframe",
+      "provider_dataset": "adj_factor",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "0339854d899db7a62d5bfa439735531e34c168771950205253423df2d265fe80",
+      "declared_payload_content_hash": "d8f92cc773c1ba6f366fd27f6b271166c4be175ccee07804300872608c31767a",
+      "declared_rows": 8723,
+      "logical_path": "raw/provider=amazingdata/dataset=adj_factor/d1369739-7a40-4163-8dee-16c32b04c3e0.meta.json",
+      "meta_sha256": "0bb26c9ecab1c0ee2eb8b61f8eaa3f60f4bd35795ca0bbdc6dcadf9fa48fafee",
+      "null_table_count": 0,
+      "payload_kind": "dataframe",
+      "provider_dataset": "adj_factor",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "dcb1d71e3de6ceeeaa6e039001af49ff93d6b220a99b40af9cc8b3682b6fa038",
+      "declared_payload_content_hash": "e55b1eeaa62928f3de737a5e46f2b87df0267112fe6e7d7528a573867e3b1690",
+      "declared_rows": 5562,
+      "logical_path": "raw/provider=amazingdata/dataset=code_list/c710216e-7b53-487e-af77-873bab7a82d5.meta.json",
+      "meta_sha256": "5c7a1b16213c9d66af76120357e3647d8a38d70f4146be7ed04b10c973883402",
+      "null_table_count": 0,
+      "payload_kind": "rows",
+      "provider_dataset": "code_list",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "3a51b6013fc51495f3e3b66379ac00b55d97ec0bb974ba446216a638a872ea97",
+      "declared_payload_content_hash": "6bbf3db58f07e4446c035ae0b263540ef8664df3cf82f6170fada34dd4bc22ea",
+      "declared_rows": 55,
+      "logical_path": "raw/provider=amazingdata/dataset=corporate_action/805aaf3b-2c80-4613-b4f1-be71d17722a3.meta.json",
+      "meta_sha256": "2bb11ebf9977b071417aa8987e3442beba6f0a3727d70f583faf06631e8a6a43",
+      "null_table_count": 0,
+      "payload_kind": "dataframe",
+      "provider_dataset": "corporate_action",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "abd04a1c483d1ebd0d1815fe3a8f3a1b4aa8654aaa9b8e7db574a15abc764aa6",
+      "declared_payload_content_hash": "d6079938b13db834dc2e45e487f7dcc57903be78e26e6d6f27bf7ab174c5d197",
+      "declared_rows": 18,
+      "logical_path": "raw/provider=amazingdata/dataset=corporate_action/b1f3f403-e329-4402-95d4-5de5f71a31a9.meta.json",
+      "meta_sha256": "b2df67f1aa19a4158d37671e997edbf8989ca56f5ee6fa8f232fa661348b3309",
+      "null_table_count": 0,
+      "payload_kind": "dataframe",
+      "provider_dataset": "corporate_action",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "891882e518cc3ccab2a35dde5dc32ef68922474639acad7261392ff50a44260c",
+      "declared_payload_content_hash": "73c1caed6063af320a0a082a5a39545e13f565a650aad555017b0f2a886b17e5",
+      "declared_rows": 1014208,
+      "logical_path": "raw/provider=amazingdata/dataset=daily_bar/018f0f8b-58e7-4ef5-aa2c-26abe859394d.meta.json",
+      "meta_sha256": "8f00931bc762b9119b9959bfbfee4c74b85cc6a0a0e0f42e3d7843c42e1220a3",
+      "null_table_count": 0,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "daily_bar",
+      "table_count": 4
+    },
+    {
+      "declared_payload_anchor_sha256": "40c41b6c646608ed8329e567209dd9a25de689e1b84e8e27e4dd0eac10ad1c14",
+      "declared_payload_content_hash": "0913a3b0efd8d317faa84fb145026f340411803bea66e3968f3a4efb9d9fd3f2",
+      "declared_rows": 3221040,
+      "logical_path": "raw/provider=amazingdata/dataset=daily_bar/2917fd4e-cf5c-4f7d-8082-075431641d76.meta.json",
+      "meta_sha256": "abd519c570a0cf890033aebe8579b75390b798ad18fb7ca6df35068a7b2c0a79",
+      "null_table_count": 0,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "daily_bar",
+      "table_count": 15
+    },
+    {
+      "declared_payload_anchor_sha256": "2a0ba6eadecec95efa5ce0b375ed6a6ce9eeb1d6d377c75d7c887dfb434d6109",
+      "declared_payload_content_hash": "e017d7156a272b58829ae335d926d48848d2d76e272316e7137019a269f3a813",
+      "declared_rows": 1332686,
+      "logical_path": "raw/provider=amazingdata/dataset=daily_bar/6e9d1468-4676-4263-bb80-417865864526.meta.json",
+      "meta_sha256": "b546c11fe7ddcdac277d43646354e6f31383769f4ca43d4c2a685ab7995d3945",
+      "null_table_count": 12,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "daily_bar",
+      "table_count": 5550
+    },
+    {
+      "declared_payload_anchor_sha256": "b84ce2f54f3f2f2e3cdf0a0604638a54ee50111f68a4c69d125f9288591c1dda",
+      "declared_payload_content_hash": "b350933dbfe66d7917e9e802ec661103afc8b0971e8e5dfc310b869f2c1f4811",
+      "declared_rows": 240,
+      "logical_path": "raw/provider=amazingdata/dataset=daily_bar/73817f8d-6d75-4291-a956-1306f321be37.meta.json",
+      "meta_sha256": "48b3f13728c257cdea31da4cd7c680978f428b3596c205f95dc2eea5894f8d0c",
+      "null_table_count": 0,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "daily_bar",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "d17607c67cea0a28ad1fcad234331758987aed1058d824da398e8ff63f1448e9",
+      "declared_payload_content_hash": "6246dcd5f24a61921deda290641ba85ff19cf09eaa4d7450fcdd258732e975b4",
+      "declared_rows": 1200,
+      "logical_path": "raw/provider=amazingdata/dataset=daily_bar/fe2c5cb7-a959-459b-96bb-2ece1634776a.meta.json",
+      "meta_sha256": "d48b6e9ede0132bdd28a1c73b62b99cbdc3eb9f59f4a701ea073f33979fcf8d1",
+      "null_table_count": 0,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "daily_bar",
+      "table_count": 5
+    },
+    {
+      "declared_payload_anchor_sha256": "94df07e4a20c3c33c24a78438a0de79e818da525ac38ca596ab93fece03e74a8",
+      "declared_payload_content_hash": "98cf72e6cdd191329f05fbd4a551ad102dd8701eef0370f3b65b2e64b8113344",
+      "declared_rows": 5442,
+      "logical_path": "raw/provider=amazingdata/dataset=hist_code_list/0f726f75-eb4c-4679-a719-940a05c31943.meta.json",
+      "meta_sha256": "405de02df4fa2628e45816c75149650b2e732fa731ee247786077d7bba23347e",
+      "null_table_count": 0,
+      "payload_kind": "rows",
+      "provider_dataset": "hist_code_list",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "6ff27acf719a3e37fadbf17b44923fb5f264510dae04b004b0f95ad0c337e6b1",
+      "declared_payload_content_hash": "9c39b37e7f1dd418996e066d7c3d86e0c17619a6867152b4240b3adea9f94a5e",
+      "declared_rows": 5479,
+      "logical_path": "raw/provider=amazingdata/dataset=hist_code_list/bd7449e8-3c64-40b4-9fdb-3610d3ab217c.meta.json",
+      "meta_sha256": "e64104a82c9477b592f6a044d4de4340b59af29a68e92fd3aced9df600f530a9",
+      "null_table_count": 0,
+      "payload_kind": "rows",
+      "provider_dataset": "hist_code_list",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "f8ed8fcc127b623896a83d224a30f02b6542dc45a36778468ce7d36b3d0e9716",
+      "declared_payload_content_hash": "9c39b37e7f1dd418996e066d7c3d86e0c17619a6867152b4240b3adea9f94a5e",
+      "declared_rows": 5479,
+      "logical_path": "raw/provider=amazingdata/dataset=hist_code_list/f90e48e4-ad88-4bc3-8ad8-83653fb559d8.meta.json",
+      "meta_sha256": "2f8a445400a2ec52aef29920a5de8d813e354fc88f554829dbe603f71c2ff60e",
+      "null_table_count": 0,
+      "payload_kind": "rows",
+      "provider_dataset": "hist_code_list",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "1782c5382273ae0e713a37403319b0b3609469cf100940a16fa25e7b47fe6421",
+      "declared_payload_content_hash": "628ae5d961800f16fe2b364af10079c4967c9802c140853acee2e883823a7790",
+      "declared_rows": 118878,
+      "logical_path": "raw/provider=amazingdata/dataset=history_stock_status/14db965e-d080-45b2-ba26-652b8ed7d9d5.meta.json",
+      "meta_sha256": "e5866741df1f27cadb38eedb1ac621aea776cd48238e9c7cfbbb2dd42b43ca73",
+      "null_table_count": 0,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "history_stock_status",
+      "table_count": 47
+    },
+    {
+      "declared_payload_anchor_sha256": "97d9e1ceb612df6a48da4a2a0c395b80191bd0ffc2864b637aab60b2b1f82f04",
+      "declared_payload_content_hash": "36bf43a8d8aad824cef5decd94bdbe79c57f2998615c5beb611aec993b62903c",
+      "declared_rows": 45438,
+      "logical_path": "raw/provider=amazingdata/dataset=history_stock_status/1c26b090-c75c-4a81-a150-0a7bbddd3f4e.meta.json",
+      "meta_sha256": "9df5ba558dcb93bcbf6689be3678dbdfef5ec26b149808004f19fa9d2130a790",
+      "null_table_count": 0,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "history_stock_status",
+      "table_count": 15
+    },
+    {
+      "declared_payload_anchor_sha256": "499f41588d57894e78290fb06a1cc47e932b62e44243dc33c2601b10610ad1bb",
+      "declared_payload_content_hash": "c99f5f839bae68bc80fb7cd20406b6e11ee9d08bb9a08849447aca062a777e5f",
+      "declared_rows": 51465,
+      "logical_path": "raw/provider=amazingdata/dataset=history_stock_status/38103311-94cd-4e51-bbc0-8cb07667859b.meta.json",
+      "meta_sha256": "ab2fad6f05d45f21284e6d15267736dbec25c0fd266b00acdaba6536642b4540",
+      "null_table_count": 0,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "history_stock_status",
+      "table_count": 22
+    },
+    {
+      "declared_payload_anchor_sha256": "55feadbb59a4d4c78776b6b6a300d7d73b2a828393d24c9dc6ee53f4673dff94",
+      "declared_payload_content_hash": "b741c4c10763fa7ca7bc55bc521960928699ea74a472becfa2516f281af3c185",
+      "declared_rows": 11332,
+      "logical_path": "raw/provider=amazingdata/dataset=history_stock_status/ca20098a-9a9c-4e88-9916-5e40f4b1cf20.meta.json",
+      "meta_sha256": "88f18e727830ffce5e06b4ea03043f83f2fddfd2e357203121e53560d88d8b63",
+      "null_table_count": 0,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "history_stock_status",
+      "table_count": 5
+    },
+    {
+      "declared_payload_anchor_sha256": "1ec2b6c2db97287bbd8d5c0a90d8177f1c5b677a1242d591aa592e23fd344c23",
+      "declared_payload_content_hash": "5433c59f0c7957517f3c0acc1de402f9c72b64eeb318b227205093e390d78588",
+      "declared_rows": 0,
+      "logical_path": "raw/provider=amazingdata/dataset=history_stock_status/e281014d-2b75-40e6-9eff-d5331f21ea87.meta.json",
+      "meta_sha256": "ad5044464a6444d18c6c0b1a14c24f032fda8dce2e5f9ff757b67058ceccda8c",
+      "null_table_count": 0,
+      "payload_kind": "multi_table_frames",
+      "provider_dataset": "history_stock_status",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "e410d303ffd09713e03aa9ccb59bcf00fe9d25ce38f7fd46c88aacc5f3a6aa8e",
+      "declared_payload_content_hash": "dd194a53044ebc62e7758abf2bb8b0c5801d8e2182b7b1f9f0c3ec17af009d86",
+      "declared_rows": 20,
+      "logical_path": "raw/provider=amazingdata/dataset=stock_basic/18f32f80-6ad0-4b71-8093-31393f8f1ce7.meta.json",
+      "meta_sha256": "34b232c2f70bb97a00c47ca2153a5ee9d3c78d710ff08c474b1968b2c3448f72",
+      "null_table_count": 0,
+      "payload_kind": "dataframe",
+      "provider_dataset": "stock_basic",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "a7709669dfaa18afef588a953e24dae8e81aa9abfcf9ce820a62ef9648250e46",
+      "declared_payload_content_hash": "7dbad907abdb2ede2432733b1352a338ba33b78e94dc9e8ee170e706b27da00f",
+      "declared_rows": 3,
+      "logical_path": "raw/provider=amazingdata/dataset=stock_basic/bcbcbe53-18da-4de5-8005-b7c2f6eb6fd7.meta.json",
+      "meta_sha256": "c9bc4689cced9d6c18eb64a4034a81ac7b106eefae1a12aafb888898fc034689",
+      "null_table_count": 0,
+      "payload_kind": "dataframe",
+      "provider_dataset": "stock_basic",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "b1ed3f28b5b668bff3f3af02318494f3075cd75113ee11d9f54eea303f22000b",
+      "declared_payload_content_hash": "2543c025fd44a96f12af0ab6776c03aa7f62896d40f78eda5583034a1b84d6c3",
+      "declared_rows": 8723,
+      "logical_path": "raw/provider=amazingdata/dataset=trade_calendar/0f7cef2e-fc33-44af-8056-508b8451e482.meta.json",
+      "meta_sha256": "cf371dc70210869303cd4a6ba004a0c9ed6ab222209b1d9256fd0dc00e6bd2a2",
+      "null_table_count": 0,
+      "payload_kind": "rows",
+      "provider_dataset": "trade_calendar",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "339930f6ee9e4a088a247b85213f56b77ba405a66d0b62c6328b838aebbd0949",
+      "declared_payload_content_hash": "2543c025fd44a96f12af0ab6776c03aa7f62896d40f78eda5583034a1b84d6c3",
+      "declared_rows": 8723,
+      "logical_path": "raw/provider=amazingdata/dataset=trade_calendar/b4980c92-5d8b-4677-9b7c-2ee34491222a.meta.json",
+      "meta_sha256": "c5d97474d4d23504e7dc83acf818f3f22121821c3cb48fc8fd823c58503df256",
+      "null_table_count": 0,
+      "payload_kind": "rows",
+      "provider_dataset": "trade_calendar",
+      "table_count": 1
+    },
+    {
+      "declared_payload_anchor_sha256": "ef178abf20a44814ee6c73e916397ec11446bd25cf3414ff2f9be47563de73f9",
+      "declared_payload_content_hash": "2543c025fd44a96f12af0ab6776c03aa7f62896d40f78eda5583034a1b84d6c3",
+      "declared_rows": 8723,
+      "logical_path": "raw/provider=amazingdata/dataset=trade_calendar/fd7efe46-b0b5-4747-967a-4099936f42dc.meta.json",
+      "meta_sha256": "dbf2eb9799c346dd6e1040b46cb96bfbebf4e12f5ddd268ab86f1dbaea7584ef",
+      "null_table_count": 0,
+      "payload_kind": "rows",
+      "provider_dataset": "trade_calendar",
+      "table_count": 1
+    }
+  ],
+  "read_counts": {
+    "anchors_emitted": 27,
+    "materialized_payloads": 22,
+    "verified_meta_documents": 23
+  },
+  "read_only_controls": {
+    "catalog_write_calls": 0,
+    "provider_calls": 0,
+    "provider_sdk_target_constructed": false,
+    "raw_writer_write_calls": 0,
+    "sealed_evidence_tree_after": {
+      "bytes": 370227555,
+      "file_count": 27988,
+      "inventory_sha256": "49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a"
+    },
+    "sealed_evidence_tree_before": {
+      "bytes": 370227555,
+      "file_count": 27988,
+      "inventory_sha256": "49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a"
+    },
+    "sealed_evidence_tree_unchanged": true,
+    "spike_run_created": false,
+    "verdict_write_calls": 0
+  },
+  "replay_binding": {
+    "golden_case_count": 125,
+    "golden_dataset_file": "golden_cases_v7.jsonl",
+    "golden_dataset_sha256": "a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e",
+    "golden_truth_version": "v7-reviewed-20260908",
+    "replay_code_head": "b7c9b1b2986e5cbd5415ef44826acbc7d008cfc5",
+    "trading_rule_dataset_sha256": "b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed",
+    "trading_rule_dataset_version": "2026-09-10.2",
+    "trading_rule_review_status": "REVIEWED",
+    "trading_rule_version": "v20260910-h1r4-reviewed"
+  },
+  "repo_binding_anchors": {
+    "golden_dataset": {
+      "bytes": 168539,
+      "expected_sha256": "a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e",
+      "logical_path": "data/golden/provider/amazingdata/golden_cases_v7.jsonl",
+      "sha256": "a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e"
+    },
+    "golden_manifest": {
+      "bytes": 2649,
+      "logical_path": "data/golden/provider/amazingdata/truth_manifest_v7.json",
+      "sha256": "f2f4411a9c03616c9e1e0020fb78bc4fccb7c9f2d8601bd9ce8dbecee741a187"
+    },
+    "trading_rule_dataset_file": {
+      "bytes": 11652,
+      "expected_manifest_hash": "b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed",
+      "logical_path": "configs/trading_rules/versions/v20260910-h1r4-reviewed/rules.yaml",
+      "sha256": "ab32ba2f8069fef613e425dad32697e79bfd765c11eac668562753d451f5df34"
+    },
+    "trading_rule_manifest": {
+      "bytes": 1100,
+      "logical_path": "configs/trading_rules/rule_manifest.json",
+      "sha256": "fda01c3d50b20b2b7ccf88927b0aabc3bcb0fbd347ccc538ea2e91c7244beb36"
+    }
+  },
+  "sealed_run_file_anchors": {
+    "cases/spike_case_catalog.jsonl": {
+      "bytes": 155331,
+      "sha256": "bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53"
+    },
+    "spike_run.json": {
+      "bytes": 1439,
+      "sha256": "7793ea46b3574e60683f52335fa41718ba30d333fb648a6fd34d1c675c1627cf"
+    },
+    "verdict.json": {
+      "bytes": 2552,
+      "sha256": "576008c71082f05915eb44bdf74f5fce7a771814dca51b317a5ee63b62dde7a1"
+    }
+  },
+  "source": {
+    "catalog_case_count": 178,
+    "catalog_sha256": "bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53",
+    "sealed_run_as_of_date": "20260909",
+    "sealed_run_code_commit": "fba18153a986cc1283a8c082e5d5629902d774cf",
+    "sealed_run_id": "dad1e1b8-0c34-4031-8e94-cc87a03dbbf4",
+    "sealed_run_status": "CLOSED",
+    "sealed_verdict": "SPIKE_INCOMPLETE"
+  }
+}

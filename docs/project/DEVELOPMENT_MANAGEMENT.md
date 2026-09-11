@@ -6155,3 +6155,27 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 - 没有修改 Golden 期望、交易规则、Provider 配置、旧 Formal run/catalog/verdict；没有
   Production、`--resume` 或 `--verdict`，没有上传凭据或 raw Provider payload。
+
+## DM-20260911-FORMAL-B1B7-018 · 封存 Formal 证据只读 replay 诊断
+
+**Type**：C2 — sealed-evidence read-only replay / handoff diagnostic
+**Date**：2026-09-11
+**Status**：`REPLAY_DIAGNOSTIC ADDED / ORIGINAL RUN PRESERVED / INDEPENDENT REVIEW REQUIRED / NO FORMAL AUTHORIZATION`
+**Evidence**：[`formal_readonly_replay_20260911.md`](../provider_verification/formal_readonly_replay_20260911.md)、[`formal_readonly_replay_20260911.json`](../provider_verification/formal_readonly_replay_20260911.json)、[`formal_readonly_replay.py`](../../scripts/spike/formal_readonly_replay.py)。
+
+**已完成**
+
+- 按 Issue #39 最新调度边界，在 `main@b7c9b1b2986e5cbd5415ef44826acbc7d008cfc5` 上对旧封存 run `dad1e1b8-0c34-4031-8e94-cc87a03dbbf4` 执行离线只读 replay；sealed catalog 178 条，SHA-256 为 `bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53`，Golden v7 与 H1R4 规则绑定均保留。
+- 复现脚本只读取并校验 meta/payload 闭包，前后 evidence tree inventory 完全一致；`provider_calls=0`、`spike_run_created=false`，没有调用 Provider、创建新 run、写 catalog 或写 verdict。
+- 诊断明确记录了当前代码可达到的边界：daily-bar 单位检查通过；3 个明确 history fixture 通过；状态 shape、退市语义、BSE 空 status、公司行为字段和离线账户 gate 仍分别保持阻断或未运行。
+- `300104.SZ` 继续 deferred；没有修改 Golden、全局 2020 baseline、旧 verdict 或 Provider 配置。
+
+**明确未完成**
+
+- 该产物是 `REPLAY_DIAGNOSTIC`，不是 Formal verdict，也不构成 Provider capability approval；B1、B5 account gate 和 B7 capacity timing 未在离线环境重跑。
+- B2 真实退市语义、B3 status/BSE、B4 公司行为 schema/语义、B6 optional semantic checks 仍需新的可复核证明；不得将结构观察或 adapter replay 当作通过。
+
+**下一步**
+
+- 独立 Reviewer 单独审阅 replay PR：核对旧 run/catalog/Golden/rule hash、证据逻辑路径、前后树锚定、每个 stage 的 result/classification/reason code 和无 Provider/no mutation 控制。
+- 审阅关闭前保持 Draft；不得启动第三次 Formal、`--resume`、`--verdict`、backfill、策略扩展或生产化。若未来需要 Formal 结论，须由调度者针对合并后的 clean main 另行给出一次性授权，并重新生成 run-bound receipt。
