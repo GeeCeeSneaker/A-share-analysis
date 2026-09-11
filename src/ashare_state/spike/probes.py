@@ -38,7 +38,13 @@ from ashare_state.providers.exchange import ProviderExchange, synthetic_failure_
 from ashare_state.spike import validators
 from ashare_state.spike.catalog import CaseCatalog
 from ashare_state.spike.model import CaseResult, RunFailureReason, SpikeCase, SpikeRun
-from ashare_state.spike.row_adapter import first_present, row_date
+from ashare_state.spike.row_adapter import (
+    ProviderRowShapeError,
+    canonical_daily_bar_view,
+    canonical_status_view,
+    date_key,
+    provider_symbol,
+)
 from ashare_state.spike.run_store import RunStore
 from ashare_state.spike.target import SpikeTarget
 
@@ -422,11 +428,11 @@ def _observe_units(bar_rows: list[dict[str, Any]]) -> dict[str, str]:
     amount/volume ~ price proves (shares, CNY). Independent of the
     documented constant."""
     checked = consistent = 0
-    for row in bar_rows:
+    for row in canonical_daily_bar_view(bar_rows):
         try:
-            close_f = float(first_present(row, "CLOSE_PRICE", "CLOSE", "close") or 0)
-            volume_f = float(first_present(row, "VOLUME", "volume") or 0)
-            amount_f = float(first_present(row, "AMOUNT", "amount") or 0)
+            close_f = float(row.get("CLOSE_PRICE") or 0)
+            volume_f = float(row.get("VOLUME") or 0)
+            amount_f = float(row.get("AMOUNT") or 0)
         except (TypeError, ValueError):
             continue
         if close_f > 0 and volume_f > 0 and amount_f > 0:
@@ -571,7 +577,7 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         if bars is None:
             results["daily_bar"] = "NOT_TESTABLE"
         else:
-            bar_rows = _to_plain(_rows_of(bars))
+            bar_rows = canonical_daily_bar_view(_to_plain(_rows_of(bars)))
             # R3-P0-07: observed units derive from live scale analysis of this
             # payload (amount/volume ~ close proves shares+CNY) - INDEPENDENT
             # of the documented constant
@@ -596,15 +602,38 @@ def probe_b3_core_facts(ctx: ProbeContext, sample_date: int) -> dict[str, Any]:
         results["st_suspend"] = "NOT_TESTABLE"
         results["limit"] = "NOT_TESTABLE"
     else:
-        status_rows = _to_plain(_rows_of(status))
-        # R4-A2.2a (audit section 36): B3 is STRUCTURAL validation only -
-        # semantic ST truth belongs exclusively to the B4 reviewed golden
-        # router. No fabricated expected_is_st here, ever.
-        st_out = validators.validate_st_suspend_flags(status_rows, golden_facts=[])
+        raw_status_rows = _to_plain(_rows_of(status))
+        try:
+            # All status consumers share this one ephemeral native->canonical
+            # view.  The persisted exchange remains raw and untouched.
+            status_rows = canonical_status_view(raw_status_rows)
+        except ProviderRowShapeError as exc:
+            actual = f"canonical status view rejected provider rows: {exc}"
+            st_out = validators.ValidationOutcome(
+                result=CaseResult.VALIDATED_FAIL,
+                expected="canonical status identity/date contract",
+                actual=actual,
+                reason_code="PROVIDER_STATUS_SHAPE",
+                validator_id="canonical_status_view",
+                validator_version="1",
+            )
+            limit_out = validators.ValidationOutcome(
+                result=CaseResult.VALIDATED_FAIL,
+                expected="canonical status identity/date contract",
+                actual=actual,
+                reason_code="PROVIDER_STATUS_SHAPE",
+                validator_id="canonical_status_view",
+                validator_version="1",
+            )
+        else:
+            # R4-A2.2a (audit section 36): B3 is STRUCTURAL validation only -
+            # semantic ST truth belongs exclusively to the B4 reviewed golden
+            # router. No fabricated expected_is_st here, ever.
+            st_out = validators.validate_st_suspend_flags(status_rows, golden_facts=[])
+            # R4-A2.5 P0-01: EVERY formal limit consumer resolves rules through
+            # the RUN-BOUND book (ctx.rule_book) - never the working tree
+            limit_out = validators.validate_limit_rule(status_rows, book=ctx.rule_book)
         ctx.outcome_case("historical_st_suspend", "SAMPLE", str(sample_date), status_meta, st_out)
-        # R4-A2.5 P0-01: EVERY formal limit consumer resolves rules through
-        # the RUN-BOUND book (ctx.rule_book) - never the working tree
-        limit_out = validators.validate_limit_rule(status_rows, book=ctx.rule_book)
         ctx.outcome_case(
             "limit_price_and_no_limit_days",
             "SAMPLE",
@@ -759,13 +788,32 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
             )
             cov = None
         else:
-            cov = validators.validate_history_coverage(earliest)
+            cov = validators.validate_history_coverage_by_symbol(
+                {},
+                expected_symbols=fixtures,
+                calendar_days=cal_all_days,
+                applicable_from_by_symbol={"835185.BJ": "20211115"},
+            )
     else:
-        rows = _to_plain(_rows_of(bars))
-        dates = [row_date(r, "KLINE_TIME", "kline_time", "TRADE_DATE", "trade_date") for r in rows]
-        dates = [d for d in dates if d]
-        earliest = min(dates, default="")
-        cov = validators.validate_history_coverage(earliest)
+        rows = canonical_daily_bar_view(_to_plain(_rows_of(bars)))
+        earliest_by_symbol: dict[str, str] = {}
+        for row in rows:
+            symbol = str(row.get("PROVIDER_SYMBOL") or provider_symbol(row)).upper()
+            day = date_key(row.get("TRADE_DATE"))
+            if not symbol or not day:
+                continue
+            previous = earliest_by_symbol.get(symbol)
+            if previous is None or day < previous:
+                earliest_by_symbol[symbol] = day
+        earliest = min(earliest_by_symbol.values(), default="")
+        cov = validators.validate_history_coverage_by_symbol(
+            earliest_by_symbol,
+            expected_symbols=fixtures,
+            calendar_days=cal_all_days,
+            # This is fixture applicability metadata, not a Provider-derived
+            # delisting/listing semantic.  BSE opened after the 2020 baseline.
+            applicable_from_by_symbol={"835185.BJ": "20211115"},
+        )
     if cov is not None:
         ctx.outcome_case("history_start_2020", "FIXTURES", str(sample_date), bar_meta, cov)
     # symbol mapping core gate - APPROVED exchange execution boundary
@@ -796,9 +844,40 @@ def probe_b5_units_pit_freshness(ctx: ProbeContext, sample_date: int) -> dict[st
         trade_date="20220601",
         symbol="835185.BJ",
     )
-    bse_rows = _to_plain(_rows_of(bse_status)) if bse_status is not None else []
-    # R4-A2.5 P0-01: B5 BSE limit validation uses the run-bound book too
-    bse_out = validators.validate_limit_rule(bse_rows, book=ctx.rule_book)
+    if bse_status is None:
+        bse_rows: list[dict[str, Any]] = []
+        bse_out = validators.validate_limit_rule(bse_rows, book=ctx.rule_book)
+    else:
+        try:
+            bse_rows = canonical_status_view(_to_plain(_rows_of(bse_status)))
+        except ProviderRowShapeError as exc:
+            bse_rows = []
+            bse_out = validators.ValidationOutcome(
+                result=CaseResult.VALIDATED_FAIL,
+                expected="canonical BSE status identity/date contract",
+                actual=f"canonical status view rejected provider rows: {exc}",
+                reason_code="PROVIDER_STATUS_SHAPE",
+                validator_id="canonical_status_view",
+                validator_version="1",
+            )
+        else:
+            if not bse_rows:
+                # A successful empty BSE response is an unresolved provider
+                # endpoint/schema question, not a generic no-row PASS/FAIL.
+                bse_out = validators.ValidationOutcome(
+                    result=CaseResult.MISSING,
+                    expected="canonical BSE status rows with limits",
+                    actual=(
+                        "successful empty BSE status response; endpoint/schema semantics "
+                        "remain unresolved, so no semantic verdict is issued"
+                    ),
+                    reason_code="PROVIDER_EMPTY_STATUS_UNRESOLVED",
+                    validator_id="canonical_status_view",
+                    validator_version="1",
+                )
+            else:
+                # R4-A2.5 P0-01: B5 BSE limit validation uses the run-bound book too
+                bse_out = validators.validate_limit_rule(bse_rows, book=ctx.rule_book)
     ctx.outcome_case("limit_price_and_no_limit_days", "BSE", "20220601", bse_meta, bse_out)
     return {
         "calendar_rows": record["calendar_rows"],

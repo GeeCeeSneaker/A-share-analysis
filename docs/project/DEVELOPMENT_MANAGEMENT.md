@@ -6065,9 +6065,10 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 **已完成**
 
-- 从 `main@8dfb8a5cf1f03c5c974ea435bf04f13deac9fc65` 建立独立整改分支；针对 PR #42 已封存 Formal run 的只读归因，新增统一 provider 行身份/日期适配器。
-- 已接入完整 `MARKET_CODE`、数字/文本市场码、明确单字段 scalar `value`、大小写字段和时间戳日期；冲突、未知市场和多字段 scalar 形状不被猜测，继续 fail closed。
-- Golden router、ST/停牌、涨跌停、复权、B5 日线单位和历史日期消费层已覆盖；新增 13 条回归测试。
+- 从 `main@8dfb8a5cf1f03c5c974ea435bf04f13deac9fc65` 建立独立整改分支；针对 PR #42 已封存 Formal run 的只读归因，新增单一 ephemeral `canonical_status_view()` 与日线 canonical field view。
+- 状态入口统一处理完整 `MARKET_CODE`、数字/文本市场码、大小写字段和日期；冲突、未知市场、缺失日期和多字段 scalar 形状不被猜测，继续 fail closed。成功但 0 行的 BSE 状态保留为 unresolved/missing。
+- Golden router、ST/停牌、涨跌停、复权、B5 日线单位和历史日期消费层已覆盖；value-only 代码列表只用于 membership/continuity，B2 不合成退市语义；B5 按 run-bound calendar 的首个适用交易日逐标的核验。
+- 新增集中状态/日线/标的适用起点回归测试和整改矩阵，具体映射见 `formal_b1_b7_framework_remediation_20260911.md`。
 
 **明确未完成**
 
@@ -6076,7 +6077,7 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 **验证**
 
-- `uv run pytest -q`：1706 项收集，退出码 0，2 个既有 skip；Ruff check/format、mypy、`uv pip check`、`git diff --check` 均通过。
+- 定向测试及全量 `uv run pytest -q`：`1717 collected, 1714 passed, 3 skipped`，退出码为 0；Ruff check/format、mypy、`uv pip check`、`git diff --check` 均通过。3 个 skip 为仓库既有的环境条件分支，不代表 Provider capability 或 Formal 结论。
 
 **下一步**
 

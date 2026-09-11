@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import pytest
+
 from ashare_state.spike import validators
 from ashare_state.spike.golden_router import DomainData, validate_case_in_domain
 from ashare_state.spike.model import CaseResult
 from ashare_state.spike.probes import _observe_units
-from ashare_state.spike.row_adapter import date_key, provider_symbol, row_date
+from ashare_state.spike.row_adapter import (
+    ProviderRowShapeError,
+    canonical_daily_bar_view,
+    canonical_status_view,
+    date_key,
+    provider_symbol,
+    row_date,
+)
+from ashare_state.spike.validators import first_applicable_trading_day
 
 
 def _case(case_type: str, symbol: str, trade_date: str, expected: dict):
@@ -52,16 +62,54 @@ class TestProviderRowAdapter:
     def test_unknown_market_with_bare_code_is_rejected(self):
         assert provider_symbol({"SECURITY_CODE": "600518", "MARKET_CODE": "9"}) == ""
 
+    def test_numeric_and_text_market_aliases_are_consistent(self):
+        assert (
+            provider_symbol({"SECURITY_CODE": "600518", "MARKET_CODE": "1", "market": "SH"})
+            == "600518.SH"
+        )
+
     def test_timestamp_and_date_keys_normalize_to_yyyymmdd(self):
         row = {"kline_time": "2020-01-02 09:30:00"}
         assert date_key(row["kline_time"]) == "20200102"
         assert row_date(row, "KLINE_TIME", "kline_time") == "20200102"
 
+    def test_status_view_normalizes_sh_and_preserves_native_row(self):
+        native = _native_status()
+        view = canonical_status_view([native])
+        assert view[0]["SECURITY_CODE"] == "600000"
+        assert view[0]["MARKET_CODE"] == "1"
+        assert view[0]["EXCHANGE_CODE"] == "SH"
+        assert view[0]["PROVIDER_SYMBOL"] == "600000.SH"
+        assert view[0]["TRADE_DATE"] == "20240102"
+        assert "SECURITY_CODE" not in native
+
+    @pytest.mark.parametrize(
+        ("native_symbol", "exchange", "market"),
+        [("000001.SZ", "SZ", "2"), ("835185.BJ", "BJ", "3")],
+    )
+    def test_status_view_covers_sz_and_bj(self, native_symbol, exchange, market):
+        row = {
+            "market_code": native_symbol,
+            "trade_date": "2024-01-02",
+            "pre_close": 10.0,
+            "high_limited": 11.0,
+            "low_limited": 9.0,
+        }
+        canonical = canonical_status_view([row])[0]
+        assert canonical["SECURITY_CODE"] == native_symbol.split(".")[0]
+        assert canonical["MARKET_CODE"] == market
+        assert canonical["EXCHANGE_CODE"] == exchange
+        assert canonical["PROVIDER_SYMBOL"] == native_symbol
+
+    def test_status_view_rejects_bare_identity_without_exchange(self):
+        with pytest.raises(ProviderRowShapeError, match="exchange-qualified identity"):
+            canonical_status_view([{"SECURITY_CODE": "600000", "TRADE_DATE": "20240102"}])
+
 
 class TestNativeRowsReachValidators:
     def test_golden_comparison_accepts_full_market_code(self):
         case = _case("golden_st_transition", "600000.SH", "20240102", {"IS_ST_SEC": False})
-        out = validators.validate_golden_cases([case], [_native_status()])[0]
+        out = validators.validate_golden_cases([case], canonical_status_view([_native_status()]))[0]
         assert out.result is CaseResult.VALIDATED_PASS
 
     def test_st_facts_accept_full_market_code(self):
@@ -72,14 +120,14 @@ class TestNativeRowsReachValidators:
             "IS_ST_SEC": 1,
             "IS_SUSP_SEC": 0,
         }
-        out = validators.validate_st_suspend_flags([row], golden_facts=facts)
+        out = validators.validate_st_suspend_flags(canonical_status_view([row]), golden_facts=facts)
         assert out.result is CaseResult.VALIDATED_PASS
 
     def test_limit_validation_accepts_full_market_code(self):
         from ashare_state.spike.trading_rule import load_active_rules
 
         book, _manifest = load_active_rules()
-        out = validators.validate_limit_rule([_native_status()], book=book)
+        out = validators.validate_limit_rule(canonical_status_view([_native_status()]), book=book)
         assert out.result is CaseResult.VALIDATED_PASS
 
     def test_router_exact_status_match_accepts_native_market_code(self):
@@ -88,7 +136,7 @@ class TestNativeRowsReachValidators:
         case = _case("golden_limit_regime", "600000.SH", "20240102", {"PRICE_HIGH_LMT_RATE": 0.1})
         data = DomainData(
             domain="LIMIT_PIT_RULE",
-            status_rows=[_native_status()],
+            status_rows=canonical_status_view([_native_status()]),
             hist_code_rows=[{"SECURITY_CODE": "600000", "LISTING_DATE": "19991110"}],
             calendar_days=[20240102],
         )
@@ -105,3 +153,54 @@ class TestNativeRowsReachValidators:
     def test_lowercase_daily_bar_fields_are_observed(self):
         rows = [{"close": 10.0, "volume": 100.0, "amount": 1000.0}]
         assert _observe_units(rows) == {"volume": "shares", "amount": "CNY"}
+
+    def test_uppercase_daily_bar_fields_are_observed(self):
+        rows = [{"CLOSE_PRICE": 10.0, "VOLUME": 100.0, "AMOUNT": 1000.0}]
+        assert _observe_units(rows) == {"volume": "shares", "amount": "CNY"}
+
+    def test_lowercase_kline_time_reaches_canonical_history_date(self):
+        view = canonical_daily_bar_view(
+            [{"security_code": "600000.SH", "kline_time": "2020-01-02 09:30:00"}]
+        )
+        assert view[0]["TRADE_DATE"] == "20200102"
+        assert view[0]["PROVIDER_SYMBOL"] == "600000.SH"
+
+    def test_scalar_history_membership_does_not_prove_delisted_state(self):
+        out = validators.validate_security_master_delisted([{"value": "000540.SZ"}])
+        assert out.result is CaseResult.MISSING
+        assert out.reason_code == "DELISTED_SEMANTIC_FIELD_MISSING"
+
+    def test_history_baseline_uses_first_trading_session_after_new_year_holiday(self):
+        calendar = [20200102, 20200103, 20200106]
+        assert first_applicable_trading_day(calendar) == "20200102"
+        assert (
+            validators.validate_history_coverage("20200102", calendar_days=calendar).result
+            is CaseResult.VALIDATED_PASS
+        )
+        assert (
+            validators.validate_history_coverage("20200103", calendar_days=calendar).result
+            is CaseResult.VALIDATED_FAIL
+        )
+
+    def test_history_fixture_can_start_at_its_market_applicability_boundary(self):
+        out = validators.validate_history_coverage_by_symbol(
+            {"600000.SH": "20200102", "835185.BJ": "20211115"},
+            expected_symbols=["600000.SH", "835185.BJ"],
+            calendar_days=[20200102, 20200103, 20211115, 20211116],
+            applicable_from_by_symbol={"835185.BJ": "20211115"},
+        )
+        assert out.result is CaseResult.VALIDATED_PASS
+
+    def test_empty_bse_status_stays_an_unresolved_missing_case(self):
+        case = _case(
+            "golden_limit_regime",
+            "835185.BJ",
+            "20220601",
+            {"PRICE_HIGH_LMT_RATE": 0.3},
+        )
+        out = validate_case_in_domain(
+            case,
+            DomainData(domain="LIMIT_PIT_RULE", status_rows=[]),
+        )
+        assert out.result is CaseResult.MISSING
+        assert out.reason_code == "PROVIDER_EMPTY_STATUS_UNRESOLVED"

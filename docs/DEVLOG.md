@@ -3741,7 +3741,8 @@
 > 状态：**IMPLEMENTED / LOCAL VERIFIED / SEPARATE REVIEW REQUIRED / NO FORMAL RERUN**
 
 - 按 PR #42 独立审阅对已封存 Formal run 的只读归因要求，基于 clean `main@8dfb8a5cf1f03c5c974ea435bf04f13deac9fc65` 建立独立分支 `fix/provider-canonicalization-diagnostics-20260911`；旧 run、sealed catalog、`SPIKE_INCOMPLETE` verdict、Golden、交易规则和 Provider 配置均未修改。
-- 新增 `src/ashare_state/spike/row_adapter.py`，在内存中统一原生完整 `MARKET_CODE`、数字/文本市场码、明确的单字段 scalar `value`、大小写字段和时间戳日期；冲突/未知市场/多字段 scalar 行 fail closed，不从 raw evidence 重建或改写数据。
-- Golden router、ST/停牌、涨跌停、复权、B5 日线单位与历史覆盖消费层已接入该适配器；新增 13 条回归测试，覆盖 103 条 canonical-key mismatch 和 20 条 scalar-list shape mismatch 所对应的框架症状。BSE 空响应、真实退市语义、代码列表 endpoint/权限和历史覆盖仍未被冒充为已解决。
-- 本分支 `uv run pytest -q` 收集 1706 项并以退出码 0 完成（2 个既有 skip）；Ruff check/format、mypy、`uv pip check`、`git diff --check` 均通过。未登录 Provider、未创建 run_id、未执行 Production/`--resume`/`--verdict`。
+- 新增 `src/ashare_state/spike/row_adapter.py`，以单一 ephemeral `canonical_status_view()` 统一原生完整 `MARKET_CODE`、数字/文本市场码、大小写字段和时间戳日期；冲突/未知市场/多字段 scalar 行 fail closed，不从 raw evidence 重建或改写数据。状态 validator 不再各自维护 native alias。
+- 新增 `canonical_daily_bar_view()` 和按 run-bound trading calendar 的 `first_applicable_trading_day()`；B5 按固定标的逐项校验历史覆盖，元旦非交易日不再被当作必须存在的记录日，BSE 夹具保留自身适用起点。value-only 历史代码只证明 membership/continuity，B2 不合成 `IS_LISTED=3` 或 `DELISTING_DATE`。
+- Golden router、ST/停牌、涨跌停、复权、B5 日线单位与历史日期消费层已接入；新增回归测试覆盖 103 条 canonical-key mismatch、20 条 scalar-list shape mismatch 和四类字段/日期框架症状。BSE 空响应、真实退市语义、代码列表 endpoint/权限、真实历史覆盖和公司行为语义仍未被冒充为已解决。
+- 定向测试以及全量 pytest（`1717 collected, 1714 passed, 3 skipped`，退出码 0）通过；Ruff check/format、mypy、`uv pip check`、`git diff --check` 均通过。3 个 skip 为仓库既有的环境条件分支，不代表 Provider 或 Formal 结论。未登录 Provider、未创建 run_id、未执行 Production/`--resume`/`--verdict`。
 - 详细范围、未解决边界和后续授权要求见 [`formal_b1_b7_framework_remediation_20260911.md`](provider_verification/formal_b1_b7_framework_remediation_20260911.md)。下一步为独立审阅本整改 PR；任何未来 Formal run 都必须取得新的调度授权。

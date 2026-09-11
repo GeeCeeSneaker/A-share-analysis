@@ -41,6 +41,9 @@ from ashare_state.providers.errors import (
 from ashare_state.spike import validators
 from ashare_state.spike.model import CaseResult
 from ashare_state.spike.row_adapter import (
+    ProviderRowShapeError,
+    canonical_daily_bar_view,
+    canonical_status_view,
     date_key,
     first_present,
     provider_symbol,
@@ -374,7 +377,7 @@ def fetch_domain_data(
         status = collector.call(
             lambda: ctx.target.get_history_stock_status_exchange(19900101, 20991231, symbols)
         )
-        return DomainData(domain=domain, status_rows=_rows(status.payload))
+        return DomainData(domain=domain, status_rows=canonical_status_view(_rows(status.payload)))
     if domain == "DELISTED_MASTER":
         hist = collector.call(
             lambda: ctx.target.get_hist_code_list_exchange(
@@ -401,7 +404,7 @@ def fetch_domain_data(
         calendar = collector.call(lambda: ctx.target.get_calendar_exchange())
         return DomainData(
             domain=domain,
-            status_rows=_rows(status.payload),
+            status_rows=canonical_status_view(_rows(status.payload)),
             hist_code_rows=_rows(hist.payload),
             calendar_days=_calendar_days(calendar.payload),
         )
@@ -438,7 +441,7 @@ def fetch_domain_data(
         )
         return DomainData(
             domain=domain,
-            status_rows=_rows(status.payload),
+            status_rows=canonical_status_view(_rows(status.payload)),
             adj_rows=_rows(adj.payload),
             # R4-A2.7 P0-04: the validator consumes the NORMALIZED view of
             # the provider-native payload (documented field contract); the
@@ -477,7 +480,7 @@ def fetch_domain_data(
         return DomainData(
             domain=domain,
             hist_code_rows=_rows(hist.payload),
-            status_rows=_rows(status.payload),
+            status_rows=canonical_status_view(_rows(status.payload)),
         )
     msg = f"unknown domain {domain!r}"
     raise GoldenRoutingError(msg)
@@ -545,7 +548,11 @@ def _validate_delisted(case: GoldenCase, data: DomainData) -> validators.Validat
 
 
 def _status_row_exact(
-    status_rows: list[dict[str, Any]], bare: str, trade_date: str
+    status_rows: list[dict[str, Any]],
+    bare: str,
+    trade_date: str,
+    *,
+    exchange: str = "",
 ) -> tuple[list[dict[str, Any]], str]:
     """P0-08 (audit section 9.2): match status rows by (SECURITY_CODE,
     TRADE_DATE) EXACTLY. 0 rows and >1 rows are both structural failures
@@ -553,8 +560,9 @@ def _status_row_exact(
     matches = [
         r
         for r in status_rows
-        if provider_symbol(r).split(".", 1)[0] == bare
-        and row_date(r, "TRADE_DATE", "trade_date") == date_key(trade_date)
+        if str(r.get("SECURITY_CODE", "")) == bare
+        and (not exchange or str(r.get("EXCHANGE_CODE", "")) == exchange)
+        and date_key(r.get("TRADE_DATE")) == date_key(trade_date)
     ]
     problem = ""
     if not matches:
@@ -572,8 +580,22 @@ def _validate_limit_pit(
     The rule book is the RUN-BOUND dataset (R4-A2.4 section 4.1-C)."""
     bare = case.provider_symbol.split(".")[0]
     suffix = case.provider_symbol.split(".")[1] if "." in case.provider_symbol else "SH"
-    matches, problem = _status_row_exact(data.status_rows or [], bare, case.trade_date)
+    matches, problem = _status_row_exact(
+        data.status_rows or [], bare, case.trade_date, exchange=suffix
+    )
     if problem:
+        if not data.status_rows and suffix == "BJ":
+            return ValidationOutcome(
+                result=CaseResult.MISSING,
+                expected=case.truth_source,
+                actual=(
+                    "successful empty BSE status response; endpoint/schema semantics "
+                    "remain unresolved, so no semantic verdict is issued"
+                ),
+                reason_code="PROVIDER_EMPTY_STATUS_UNRESOLVED",
+                validator_id="limit_pit_rule_v2",
+                validator_version="2",
+            )
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
             expected=case.truth_source,
@@ -610,7 +632,7 @@ def _validate_limit_pit(
             validator_id="limit_pit_rule_v2",
             validator_version="2",
         )
-    is_st = str(first_present(row, "IS_ST_SEC", "is_st_sec") or "0") in (
+    is_st = str(row.get("IS_ST_SEC") or "0") in (
         "1",
         "1.0",
         "true",
@@ -637,7 +659,7 @@ def _validate_limit_pit(
         )
     # no-limit expectation (first-N sessions etc.)
     if rule.is_no_limit:
-        provider_high = first_present(row, "HIGH_LIMITED", "high_limited")
+        provider_high = row.get("HIGH_LIMITED")
         if provider_high not in (None, "", "0", 0, "0.0", 0.0):
             return ValidationOutcome(
                 result=CaseResult.VALIDATED_FAIL,
@@ -673,9 +695,9 @@ def _validate_limit_pit(
             validator_version="2",
         )
     # price consistency vs the rule's Decimal limit prices (1-tick tolerance)
-    pre_close = first_present(row, "PRECLOSE", "pre_close")
-    provider_high = first_present(row, "HIGH_LIMITED", "high_limited")
-    provider_low = first_present(row, "LOW_LIMITED", "low_limited")
+    pre_close = row.get("PRECLOSE")
+    provider_high = row.get("HIGH_LIMITED")
+    provider_low = row.get("LOW_LIMITED")
     price_problem = ""
     if pre_close not in (None, "", 0, "0"):
         try:
@@ -736,6 +758,7 @@ def _validate_corp_action_context(
         NOT_TESTABLE_TIME(SUSPENSION), never a silent PASS
     """
     bare = case.provider_symbol.split(".")[0]
+    suffix = case.provider_symbol.split(".")[1] if "." in case.provider_symbol else ""
     t_day = date_key(case.trade_date)
     calendar = sorted(int(d) for d in (data.calendar_days or []))
     if not calendar or int(t_day) not in calendar:
@@ -774,7 +797,13 @@ def _validate_corp_action_context(
         )
     status_out = validators.validate_golden_cases(
         [status_case],
-        [r for r in (data.status_rows or []) if row_date(r, "TRADE_DATE", "trade_date") == t_day],
+        [
+            r
+            for r in (data.status_rows or [])
+            if str(r.get("SECURITY_CODE", "")) == bare
+            and (not suffix or str(r.get("EXCHANGE_CODE", "")) == suffix)
+            and date_key(r.get("TRADE_DATE")) == t_day
+        ],
     )[0]
     if status_out.result is CaseResult.VALIDATED_FAIL:
         return status_out
@@ -783,20 +812,20 @@ def _validate_corp_action_context(
     status_t_rows = [
         r
         for r in (data.status_rows or [])
-        if provider_symbol(r).split(".", 1)[0] == bare
-        and row_date(r, "TRADE_DATE", "trade_date") == t_day
+        if str(r.get("SECURITY_CODE", "")) == bare
+        and (not suffix or str(r.get("EXCHANGE_CODE", "")) == suffix)
+        and date_key(r.get("TRADE_DATE")) == t_day
     ]
     suspended_t = any(
-        str(first_present(r, "IS_SUSP_SEC", "is_susp_sec") or "0") in ("1", "1.0", "true", "True")
-        for r in status_t_rows
+        str(r.get("IS_SUSP_SEC") or "0") in ("1", "1.0", "true", "True") for r in status_t_rows
     )
 
     # kline T-1/T/T+1 (exact-date rows for this symbol)
     kline_by_day: dict[str, dict[str, Any]] = {}
-    for row in data.kline_rows or []:
-        symbol = provider_symbol(row)
-        if symbol.split(".", 1)[0] == bare:
-            day = row_date(row, "KLINE_TIME", "kline_time", "TRADE_DATE", "trade_date")
+    for row in canonical_daily_bar_view(data.kline_rows or []):
+        symbol = str(row.get("PROVIDER_SYMBOL") or provider_symbol(row))
+        if symbol.split(".", 1)[0] == bare and (not suffix or symbol.endswith(f".{suffix}")):
+            day = date_key(row.get("TRADE_DATE"))
             if day:
                 kline_by_day[day] = row
     missing = [d for d in (t_prev, int(t_day), t_next) if str(d) not in kline_by_day]
@@ -940,12 +969,8 @@ def _validate_corp_action_context(
 
     # raw discontinuity + adjusted continuity
     try:
-        close_prev = float(
-            first_present(kline_by_day[str(t_prev)], "CLOSE_PRICE", "CLOSE", "close") or 0
-        )
-        close_t = float(
-            first_present(kline_by_day[str(t_day)], "CLOSE_PRICE", "CLOSE", "close") or 0
-        )
+        close_prev = float(kline_by_day[str(t_prev)].get("CLOSE_PRICE") or 0)
+        close_t = float(kline_by_day[str(t_day)].get("CLOSE_PRICE") or 0)
     except (TypeError, ValueError):
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
@@ -1025,8 +1050,22 @@ def _validate_bj_mapping(
             validator_id="bj_mapping_v2",
             validator_version="2",
         )
-    matches, problem = _status_row_exact(data.status_rows or [], bare, case.trade_date)
+    matches, problem = _status_row_exact(
+        data.status_rows or [], bare, case.trade_date, exchange=suffix
+    )
     if problem:
+        if not data.status_rows and suffix == "BJ":
+            return ValidationOutcome(
+                result=CaseResult.MISSING,
+                expected=case.truth_source,
+                actual=(
+                    "successful empty BSE status response; endpoint/schema semantics "
+                    "remain unresolved, so no semantic verdict is issued"
+                ),
+                reason_code="PROVIDER_EMPTY_STATUS_UNRESOLVED",
+                validator_id="bj_mapping_v2",
+                validator_version="2",
+            )
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
             expected=case.truth_source,
@@ -1036,7 +1075,7 @@ def _validate_bj_mapping(
             validator_version="2",
         )
     row = matches[0]
-    provider_high = first_present(row, "HIGH_LIMITED", "high_limited")
+    provider_high = row.get("HIGH_LIMITED")
     if provider_high in (None, "", 0, "0", "0.0", 0.0):
         return ValidationOutcome(
             result=CaseResult.NOT_TESTABLE_TIME,
@@ -1046,7 +1085,7 @@ def _validate_bj_mapping(
             validator_id="bj_mapping_v2",
             validator_version="2",
         )
-    is_st = str(first_present(row, "IS_ST_SEC", "is_st_sec") or "0") in (
+    is_st = str(row.get("IS_ST_SEC") or "0") in (
         "1",
         "1.0",
         "true",
@@ -1092,7 +1131,7 @@ def _validate_bj_mapping(
             validator_id="bj_mapping_v2",
             validator_version="2",
         )
-    pre_close = first_present(row, "PRECLOSE", "pre_close")
+    pre_close = row.get("PRECLOSE")
     price_problem = ""
     if pre_close not in (None, "", 0, "0"):
         try:
@@ -1335,6 +1374,28 @@ def route_all(
                             f"contract: {exc}",
                             reason_code="PROVIDER_SCHEMA",
                             validator_id="ca_provider_view",
+                            validator_version="1",
+                        ),
+                        evidence,
+                    )
+                )
+            continue
+        except ProviderRowShapeError as exc:
+            # The provider exchange succeeded and is already in the domain
+            # evidence bundle.  A native status identity/date that cannot be
+            # canonicalized is a framework boundary failure, not a reason to
+            # discard the raw exchange or guess a security.
+            evidence = collector.bundle_evidence()
+            for case in domain_cases:
+                outcomes.append(
+                    (
+                        case,
+                        ValidationOutcome(
+                            result=CaseResult.VALIDATED_FAIL,
+                            expected=f"{case.truth_source} (canonical status row contract)",
+                            actual=f"canonical status view rejected provider rows: {exc}",
+                            reason_code="PROVIDER_STATUS_SHAPE",
+                            validator_id="canonical_status_view",
                             validator_version="1",
                         ),
                         evidence,
