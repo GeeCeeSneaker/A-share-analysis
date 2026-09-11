@@ -6177,5 +6177,5 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 **下一步**
 
-- 独立 Reviewer 单独审阅 replay PR：核对旧 run/catalog/Golden/rule hash、证据逻辑路径、前后树锚定、每个 stage 的 result/classification/reason code 和无 Provider/no mutation 控制。
+- 独立 Reviewer 单独审阅 [replay PR #44](https://github.com/GeeCeeSneaker/A-share-analysis/pull/44)：核对旧 run/catalog/Golden/rule hash、证据逻辑路径、前后树锚定、每个 stage 的 result/classification/reason code 和无 Provider/no mutation 控制。
 - 审阅关闭前保持 Draft；不得启动第三次 Formal、`--resume`、`--verdict`、backfill、策略扩展或生产化。若未来需要 Formal 结论，须由调度者针对合并后的 clean main 另行给出一次性授权，并重新生成 run-bound receipt。

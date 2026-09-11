@@ -3804,4 +3804,4 @@
 - replay 结果保留边界：daily-bar 单位检查 `VALIDATED_PASS`，三个明确 history fixture 通过；B2 退市语义仍 `MISSING`，ST/限价状态 shape、BSE 空 status、Golden 公司行为 contract 仍阻断或未决，B1/B5 account gate、B7 timing 和 B6 optional semantic checks 未在离线环境冒充重跑；`300104.SZ` 继续 deferred。
 - 验证通过：全量 `uv run pytest -q` 为 `1721 collected, 1718 passed, 3 skipped`；replay 脚本 Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。未调用 Provider，未创建新 run，未执行 Production、`--resume` 或 `--verdict`。
 
-下一步：将该诊断作为独立 Draft PR 交由 Reviewer 核对旧 run/catalog/Golden/rule 绑定、证据锚定、逐项 classification/reason code 与 no-mutation 控制；审阅关闭前不得启动第三次 Formal。`300104.SZ` applicability/tradability、B2/B3/B4 未决语义和未来 Formal 授权边界见上述交接记录。
+下一步：独立 Draft PR [#44](https://github.com/GeeCeeSneaker/A-share-analysis/pull/44) 已创建，交由 Reviewer 核对旧 run/catalog/Golden/rule 绑定、证据锚定、逐项 classification/reason code 与 no-mutation 控制；CI 和独立审阅待完成，审阅关闭前不得启动第三次 Formal。`300104.SZ` applicability/tradability、B2/B3/B4 未决语义和未来 Formal 授权边界见上述交接记录。
