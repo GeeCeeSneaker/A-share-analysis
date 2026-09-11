@@ -3736,3 +3736,60 @@
 - 只读重算将 B4 的 125 条 `VALIDATED_FAIL` 分为：103 条 status canonical key 不匹配（ST 50、非 BSE 限价 28、公司行为 25）、20 条退市 `value` 标量 shape 与 validator 预期不匹配、2 条 BSE 空响应且归因保持 uncertain。该材料只记录可证实的框架症状，不把未到达的语义检查改写为 PASS，也不强行归因 Provider。
 - 6 项 FAILED core 与 1 项 MISSING core 已逐项给出 primary classification：字段名/规范化/shape/date handling 的框架或 validator defect，以及 BJ mapping endpoint limitation/uncertain；原 run、catalog、Golden、trading rules、verdict 均未修改，没有重跑 Production、resume、backfill 或上传 raw/凭证。
 - 下一步是独立 remediation PR 修复 canonical field/shape/date handling 并补测试；在归因审阅和后续治理决定前，不得重新执行本 Formal run。
+## 2026-09-11 · Formal B1-B7 失败归因后的 provider 行适配整改
+
+> 状态：**IMPLEMENTED / LOCAL VERIFIED / SEPARATE REVIEW REQUIRED / NO FORMAL RERUN**
+
+- 按 PR #42 独立审阅对已封存 Formal run 的只读归因要求，基于 clean `main@8dfb8a5cf1f03c5c974ea435bf04f13deac9fc65` 建立独立分支 `fix/provider-canonicalization-diagnostics-20260911`；旧 run、sealed catalog、`SPIKE_INCOMPLETE` verdict、Golden、交易规则和 Provider 配置均未修改。
+- 新增 `src/ashare_state/spike/row_adapter.py`，以单一 ephemeral `canonical_status_view()` 统一原生完整 `MARKET_CODE`、数字/文本市场码、大小写字段和时间戳日期；冲突/未知市场/多字段 scalar 行 fail closed，不从 raw evidence 重建或改写数据。状态 validator 不再各自维护 native alias。
+- 新增 `canonical_daily_bar_view()` 和按 run-bound trading calendar 的 `first_applicable_trading_day()`；B5 按固定标的逐项校验历史覆盖，元旦非交易日不再被当作必须存在的记录日，BSE 夹具保留自身适用起点。value-only 历史代码只证明 membership/continuity，B2 不合成 `IS_LISTED=3` 或 `DELISTING_DATE`。
+- Golden router、ST/停牌、涨跌停、复权、B5 日线单位与历史日期消费层已接入；新增回归测试覆盖 103 条 canonical-key mismatch、20 条 scalar-list shape mismatch 和四类字段/日期框架症状。BSE 空响应、真实退市语义、代码列表 endpoint/权限、真实历史覆盖和公司行为语义仍未被冒充为已解决。
+- 定向测试以及全量 pytest（`1717 collected, 1714 passed, 3 skipped`，退出码 0）通过；Ruff check/format、mypy、`uv pip check`、`git diff --check` 均通过。3 个 skip 为仓库既有的环境条件分支，不代表 Provider 或 Formal 结论。未登录 Provider、未创建 run_id、未执行 Production/`--resume`/`--verdict`。
+- 详细范围、未解决边界和后续授权要求见 [`formal_b1_b7_framework_remediation_20260911.md`](provider_verification/formal_b1_b7_framework_remediation_20260911.md)。下一步为独立审阅本整改 PR；任何未来 Formal run 都必须取得新的调度授权。
+
+## 2026-09-11 · Independent review P0 follow-up: semantic delisted gate and keyed K-line lineage
+
+> 状态：**IMPLEMENTED / FULLY LOCAL VERIFIED / CI REVIEW PENDING / NO FORMAL RERUN**
+
+- 修正 Golden `golden_delisted` 的语义边界：历史代码表的 `{"value": "<symbol>"}` 只证明
+  membership/continuity；当期望为 `IS_LISTED=3` 时，只有匹配 Provider 行实际携带
+  `IS_LISTED=3` 或非空 `DELISTING_DATE` 才能 `VALIDATED_PASS`，否则返回
+  `MISSING / DELISTED_SEMANTIC_FIELD_MISSING`（或对真实冲突返回结构化 FAIL）。Golden
+  退市 validator 版本升至 3；没有修改 Golden 期望值或旧 run。
+- 新增 `key_preserving_table_rows()` ephemeral table boundary，处理实际允许的
+  `dict[provider_symbol, DataFrame | None]`。每条无证券列 DataFrame 行带上映射键，`None`
+  和空表保留带身份 marker，行内身份与映射键冲突则 `ProviderRowShapeError`；B3/B5 和
+  Golden CA K-line 均使用该边界，raw payload 仍保持 provider 原样。
+- B5 不再把 `300104.SZ` 当作通用 2020+ history coverage fixture：现有首条 bar 观察不足以
+  证明其首个可交易日，且该标的有停牌/退市解释空间；它仍是 Golden 退市 fixture，待独立
+  applicability/tradability 事实绑定后再纳入。`600519.SH`、`000001.SZ`、`835185.BJ`
+  的适用起点规则保持明确。
+- 新增回归覆盖：纯 scalar membership 不得通过 Golden 退市语义；Provider 语义字段可以
+  通过；无证券列的 keyed DataFrame、`None` 成员、空表 marker 和行内冲突身份均按预期处理。
+  定向回归、完整 pytest（`1721 collected, 1718 passed, 3 skipped`）、mypy、Ruff
+  check/format、依赖检查和 diff 检查均已通过；CI 待本次提交后更新。未登录 Provider、
+  未创建新 run、未执行 Production/`--resume`/`--verdict`。
+- 详细范围、审阅重点和下一步授权边界见 [`formal_b1_b7_framework_remediation_20260911.md`](provider_verification/formal_b1_b7_framework_remediation_20260911.md)。当前仍需独立 Reviewer
+  复核 P0 修复；在接受前不得将任何 Provider capability、历史覆盖或 Formal 结论写成已批准。
+- 本次提交前通过 Git remote 只读核对并成功推送 `aa95137e7073fcdffe83a5cd0c0e1108f768587c`；
+  GitHub connector 的 API/PR/Actions 读取返回 `401 Bad credentials`，因此本地无法独立确认
+  推送后 CI 状态或更新 PR 描述。该连接器认证问题不影响已完成的 Git push，但需项目管理者
+  重新连接/修复后补做 PR/Actions 核对；在此之前 CI 状态按 `PENDING` 记录，不冒充成功。
+
+## 2026-09-11 · Independent review follow-up: qualified identity precedence
+
+> 状态：**P0 FIX IMPLEMENTED / LOCAL VERIFIED / CI VERIFIED GREEN / INDEPENDENT DELTA REVIEW PENDING / NO FORMAL RERUN**
+
+- 修正 `provider_symbol()` 在 keyed K-line 行二次 canonicalization 时取到前置裸
+  `security_code` 的空转换结果、从而丢失表键交易所后缀的问题；现在选择第一个非空的
+  exchange-qualified identity，同时保留已有完整/裸身份冲突检查。
+- 新增回归：无证券列或带兼容裸 `security_code` 的 keyed DataFrame 经过
+  `key_preserving_table_rows()` 和 `canonical_daily_bar_view()` 后仍保留精确
+  `600519.SH`；冲突完整身份仍拒绝。该修复只影响 ephemeral view，不改 raw payload。
+- 本地完整 pytest 为 `1721 collected, 1718 passed, 3 skipped`，定向 keyed K-line、Golden、
+  B5、Ruff、format、mypy、依赖和 diff 检查均通过。未登录 Provider、未创建新 run、未执行
+  Production/`--resume`/`--verdict`。
+- 精确提交 `bd5a323f7f47e75f3e40a7786e5b631ee5f06655` 的 GitHub Actions CI run
+  `34566813036`（#532）已通过 Windows 3.12、Windows 3.14 和 Ubuntu 3.14 三个平台；
+  独立 Reviewer delta review 仍待完成，PR #43 继续保持 Draft。
+  `300104.SZ` 的 applicability/tradability 仍按 P1 延后，不得借此放宽通用 2020 baseline。

@@ -27,6 +27,8 @@ from typing import Any
 from ashare_state.providers.amazingdata.mapper import normalize_provider_symbol
 from ashare_state.providers.errors import MappingValidationError
 from ashare_state.spike.model import CaseResult
+from ashare_state.spike.row_adapter import canonical_daily_bar_view, date_key, row_date
+from ashare_state.spike.row_adapter import provider_symbol as _provider_symbol
 
 __all__ = [
     "GoldenCase",
@@ -35,6 +37,8 @@ __all__ = [
     "validate_daily_bar_units",
     "validate_golden_cases",
     "validate_history_coverage",
+    "validate_history_coverage_by_symbol",
+    "first_applicable_trading_day",
     "validate_limit_rule",
     "validate_security_master_delisted",
     "validate_st_suspend_flags",
@@ -91,9 +95,22 @@ def validate_security_master_delisted(
     if not entries:
         return _outcome(vid, CaseResult.MISSING, ">=1 delisted security", "no rows")
     delisted = [
-        e for e in entries if str(e.get("IS_LISTED", "")).strip() == "3" or e.get("DELISTING_DATE")
+        e
+        for e in entries
+        if str(_first(e, "IS_LISTED", "is_listed") or "").strip() == "3"
+        or _first(e, "DELISTING_DATE", "delisting_date")
     ]
     if not delisted:
+        if entries and all(
+            len(entry) == 1 and str(next(iter(entry))).casefold() == "value" for entry in entries
+        ):
+            return _outcome(
+                vid,
+                CaseResult.MISSING,
+                "delisted semantic field (IS_LISTED=3 or DELISTING_DATE)",
+                "value-only historical code membership cannot prove delisted state",
+                reason_code="DELISTED_SEMANTIC_FIELD_MISSING",
+            )
         return _outcome(
             vid,
             CaseResult.VALIDATED_FAIL,
@@ -143,10 +160,10 @@ def validate_daily_bar_units(
     # BOTH sides describe the same physical quantity)
     checked = 0
     consistent = 0
-    for row in rows:
-        close = _to_float(_first(row, "CLOSE_PRICE", "CLOSE", "close"))
-        volume = _to_float(_first(row, "VOLUME", "volume"))
-        amount = _to_float(_first(row, "AMOUNT", "amount"))
+    for row in canonical_daily_bar_view(rows):
+        close = _to_float(row.get("CLOSE_PRICE"))
+        volume = _to_float(row.get("VOLUME"))
+        amount = _to_float(row.get("AMOUNT"))
         if close is not None and volume and amount:
             checked += 1
             implied = amount / volume
@@ -218,6 +235,7 @@ def validate_st_suspend_flags(
     bad: list[str] = []
     for source_row in rows:
         for flag_name in ("IS_ST_SEC", "IS_SUSP_SEC"):
+            # Native aliases are resolved once by canonical_status_view.
             value = source_row.get(flag_name)
             if value is not None and str(value) not in ("0", "1", "0.0", "1.0"):
                 bad.append(f"{flag_name}={value!r}")
@@ -231,16 +249,17 @@ def validate_st_suspend_flags(
             "domain valid; no golden facts supplied - semantic verdict deferred",
         )
     by_key = {
-        (str(r.get("SECURITY_CODE", "")) + _suffix_of(r), str(r.get("TRADE_DATE", ""))): r
+        (_provider_symbol(r), date_key(r.get("TRADE_DATE"))): r
         for r in rows
+        if _provider_symbol(r) and date_key(r.get("TRADE_DATE"))
     }
     mismatches: list[str] = []
     checked = 0
     for fact in golden_facts:
         row: dict[str, Any] | None = by_key.get(
             (
-                fact.provider_symbol.split(".")[0] + _suffix_for(fact.provider_symbol),
-                fact.trade_date,
+                fact.provider_symbol,
+                date_key(fact.trade_date),
             )
         )
         if row is None:
@@ -249,8 +268,8 @@ def validate_st_suspend_flags(
                 (
                     r
                     for r in rows
-                    if str(r.get("SECURITY_CODE")) == fact.provider_symbol.split(".")[0]
-                    and str(r.get("TRADE_DATE")) == fact.trade_date
+                    if _provider_symbol(r).split(".", 1)[0] == fact.provider_symbol.split(".", 1)[0]
+                    and date_key(r.get("TRADE_DATE")) == date_key(fact.trade_date)
                 ),
                 None,
             )
@@ -258,14 +277,27 @@ def validate_st_suspend_flags(
             mismatches.append(f"{fact.provider_symbol}@{fact.trade_date}: no provider row")
             continue
         checked += 1
-        actual_st = str(row.get("IS_ST_SEC", "0")) in ("1", "1.0")
+        actual_st_value = row.get("IS_ST_SEC")
+        if actual_st_value is None:
+            mismatches.append(f"{fact.provider_symbol}@{fact.trade_date}: IS_ST_SEC missing")
+            continue
+        actual_st = str(actual_st_value) in ("1", "1.0", "true", "True")
         if actual_st != fact.expected_is_st:
             mismatches.append(
                 f"{fact.provider_symbol}@{fact.trade_date}: ST expected "
                 f"{fact.expected_is_st}, got {actual_st}"
             )
         if fact.expected_is_suspended is not None:
-            actual_susp = str(row.get("IS_SUSP_SEC", "0")) in ("1", "1.0")
+            actual_susp_value = row.get("IS_SUSP_SEC")
+            if actual_susp_value is None:
+                mismatches.append(f"{fact.provider_symbol}@{fact.trade_date}: IS_SUSP_SEC missing")
+                continue
+            actual_susp = str(actual_susp_value) in (
+                "1",
+                "1.0",
+                "true",
+                "True",
+            )
             if actual_susp != fact.expected_is_suspended:
                 mismatches.append(
                     f"{fact.provider_symbol}@{fact.trade_date}: SUSP expected "
@@ -284,8 +316,8 @@ def validate_st_suspend_flags(
 
 
 def _suffix_of(row: dict[str, Any]) -> str:
-    market = str(row.get("MARKET_CODE", ""))
-    return {"1": ".SH", "2": ".SZ", "3": ".BJ"}.get(market, "")
+    symbol = _provider_symbol(row)
+    return "." + symbol.split(".", 1)[1] if "." in symbol else ""
 
 
 def _suffix_for(symbol: str) -> str:
@@ -338,6 +370,8 @@ def validate_limit_rule(
         )
     if not rows:
         return _outcome(vid, CaseResult.MISSING, "status rows with limits", "no rows")
+    # Status rows have already crossed canonical_status_view.  Native field
+    # aliases are not resolved in this semantic validator.
     rows_with_limits = [r for r in rows if r.get("HIGH_LIMITED") is not None]
     if not rows_with_limits:
         if require_any_limit:
@@ -354,11 +388,14 @@ def validate_limit_rule(
         pre = _to_float(row.get("PRECLOSE"))
         up = _to_float(row.get("HIGH_LIMITED"))
         down = _to_float(row.get("LOW_LIMITED"))
-        code = str(row.get("SECURITY_CODE", ""))
-        market = str(row.get("MARKET_CODE", ""))
-        symbol = code + {"1": ".SH", "2": ".SZ", "3": ".BJ"}.get(market, "")
-        is_st = str(row.get("IS_ST_SEC", "0")) in ("1", "1.0")
-        trade_date = str(row.get("TRADE_DATE", "") or "")
+        symbol = str(row.get("PROVIDER_SYMBOL") or _provider_symbol(row))
+        is_st = str(row.get("IS_ST_SEC") or "0") in (
+            "1",
+            "1.0",
+            "true",
+            "True",
+        )
+        trade_date = date_key(row.get("TRADE_DATE"))
         if pre is None or up is None or down is None:
             continue
         if not trade_date or len(trade_date) < 8:
@@ -393,7 +430,7 @@ def validate_limit_rule(
             violations.append(
                 f"{symbol}: down {down} != expected {exp_down:.2f} (pre {pre}, rule {rule.rule_id})"
             )
-        close = _to_float(_first(row, "CLOSE_PRICE", "CLOSE"))
+        close = _to_float(row.get("CLOSE_PRICE"))
         if close is not None and not (down - 1e-9 <= close <= up + 1e-9):
             violations.append(f"{symbol}: close {close} outside [{down}, {up}]")
     if checked == 0:
@@ -437,10 +474,10 @@ def validate_adj_continuity(
     bad: list[str] = []
     prev_date: str | None = None
     for ev in events:
-        factor = _to_float(ev.get("EX_FACTOR"))
+        factor = _to_float(_first(ev, "EX_FACTOR", "ex_factor"))
         if factor is not None and factor < 0:
             bad.append(f"negative factor {factor}")
-        ex = str(ev.get("EX_DATE", ""))
+        ex = row_date(ev, "EX_DATE", "ex_date")
         if ex and prev_date is not None and ex < prev_date:
             bad.append(f"ex-date order break at {ex}")
         if ex:
@@ -457,18 +494,20 @@ def validate_adj_continuity(
     # continuity: around each ex date, adjusted close must be continuous
     by_code: dict[str, list[tuple[str, float]]] = {}
     for price_row in price_context:
-        code = str(price_row.get("SECURITY_CODE", ""))
-        close = _to_float(_first(price_row, "CLOSE_PRICE", "CLOSE"))
-        date = str(price_row.get("TRADE_DATE", price_row.get("KLINE_TIME", "")))
+        price_symbol = _provider_symbol(price_row)
+        code = price_symbol.split(".", 1)[0] if price_symbol else ""
+        close = _to_float(_first(price_row, "CLOSE_PRICE", "CLOSE", "close"))
+        date = row_date(price_row)
         if code and close is not None:
             by_code.setdefault(code, []).append((date, close))
     for price_series in by_code.values():
         price_series.sort()
     checked = 0
     for ev in events:
-        code = str(ev.get("SECURITY_CODE", ""))
-        ex = str(ev.get("EX_DATE", ""))
-        factor = _to_float(ev.get("EX_FACTOR"))
+        event_symbol = _provider_symbol(ev)
+        code = event_symbol.split(".", 1)[0] if event_symbol else ""
+        ex = row_date(ev, "EX_DATE", "ex_date")
+        factor = _to_float(_first(ev, "EX_FACTOR", "ex_factor"))
         series: list[tuple[str, float]] | None = by_code.get(code)
         if not series or factor is None or not ex:
             continue
@@ -508,30 +547,164 @@ def validate_adj_continuity(
 # ------------------------------------------------------------- history coverage
 
 
+def first_applicable_trading_day(
+    calendar_days: list[Any],
+    baseline: str = "20200101",
+    *,
+    applicable_from: str | None = None,
+) -> str:
+    """Return the first run-calendar session at or after an applicability
+    lower bound.
+
+    ``baseline`` is the project research boundary, not a demand for a row on
+    that civil date.  ``applicable_from`` allows a fixed fixture to begin at
+    its own listing/market-inception boundary (for example the BSE fixture),
+    without weakening the baseline for older securities.  No date sentinel
+    or calendar-day fabrication is used.
+    """
+    baseline_key = date_key(baseline)
+    from_key = date_key(applicable_from) if applicable_from else baseline_key
+    if not baseline_key or not from_key:
+        return ""
+    lower_bound = max(baseline_key, from_key)
+    candidates = sorted(
+        {date_key(day) for day in calendar_days if date_key(day) and date_key(day) >= lower_bound}
+    )
+    return candidates[0] if candidates else ""
+
+
 def validate_history_coverage(
-    earliest: str | None, required_earliest: str = "20200101"
+    earliest: str | None,
+    required_earliest: str = "20200101",
+    *,
+    calendar_days: list[Any] | None = None,
+    applicable_from: str | None = None,
 ) -> ValidationOutcome:
-    """History coverage must support 2020-01-01 onward; earlier data is optional."""
+    """Validate history against the first applicable run-calendar session.
+
+    The no-calendar form is retained for the existing small unit contract:
+    it compares against the supplied baseline directly.  The production
+    probe supplies its persisted trading calendar, which correctly handles a
+    baseline that falls on a holiday.
+    """
     vid = "history_coverage_2020_v1"
     if not earliest:
         return _outcome(vid, CaseResult.MISSING, f"earliest <= {required_earliest}", "no data")
-    digits = "".join(ch for ch in str(earliest) if ch.isdigit())[:8]
+    digits = date_key(earliest)
     if not digits or len(digits) < 8:
         return _outcome(
             vid, CaseResult.VALIDATED_FAIL, "parsable earliest date", f"got {earliest!r}"
         )
-    if digits > required_earliest:
+    if calendar_days is None:
+        target = date_key(required_earliest)
+    else:
+        target = first_applicable_trading_day(
+            calendar_days, required_earliest, applicable_from=applicable_from
+        )
+        if not target:
+            return _outcome(
+                vid,
+                CaseResult.MISSING,
+                "first applicable trading-calendar session",
+                "no applicable session in the run-bound calendar",
+                reason_code="TRADING_CALENDAR_APPLICABLE_DAY_MISSING",
+            )
+    if not target:
         return _outcome(
             vid,
             CaseResult.VALIDATED_FAIL,
-            f"earliest <= {required_earliest} (2020+ required)",
-            f"earliest {digits}",
+            "parsable required baseline",
+            f"got {required_earliest!r}",
+        )
+    if digits > target:
+        return _outcome(
+            vid,
+            CaseResult.VALIDATED_FAIL,
+            f"earliest <= first applicable session {target}",
+            f"earliest {digits} (calendar target {target})",
         )
     return _outcome(
         vid,
         CaseResult.VALIDATED_PASS,
-        f"earliest <= {required_earliest}",
-        f"earliest {digits}",
+        f"earliest <= first applicable session {target}",
+        f"earliest {digits} (calendar target {target})",
+    )
+
+
+def validate_history_coverage_by_symbol(
+    earliest_by_symbol: dict[str, str],
+    *,
+    expected_symbols: list[str],
+    calendar_days: list[Any] | None,
+    required_earliest: str = "20200101",
+    applicable_from_by_symbol: dict[str, str] | None = None,
+) -> ValidationOutcome:
+    """Validate every fixed history fixture against its own applicable day.
+
+    This prevents one well-covered security from masking another missing
+    series.  The fixture applicability map is explicit run/probe metadata;
+    it does not claim a Provider delisting/listing semantic field.
+    """
+    vid = "history_coverage_2020_by_symbol_v1"
+    if not expected_symbols:
+        return _outcome(vid, CaseResult.MISSING, "history fixtures", "no fixtures")
+    if calendar_days is None:
+        return _outcome(
+            vid,
+            CaseResult.MISSING,
+            "run-bound trading calendar",
+            "calendar not available",
+            reason_code="TRADING_CALENDAR_MISSING",
+        )
+    if not calendar_days:
+        return _outcome(
+            vid,
+            CaseResult.MISSING,
+            "run-bound trading calendar",
+            "calendar has no trading sessions",
+            reason_code="TRADING_CALENDAR_MISSING",
+        )
+    supplied = {str(symbol).strip().upper(): value for symbol, value in earliest_by_symbol.items()}
+    applicability = {
+        str(symbol).strip().upper(): value
+        for symbol, value in (applicable_from_by_symbol or {}).items()
+    }
+    problems: list[str] = []
+    checked = 0
+    for symbol in expected_symbols:
+        key = str(symbol).strip().upper()
+        target = first_applicable_trading_day(
+            calendar_days,
+            required_earliest,
+            applicable_from=applicability.get(key),
+        )
+        if not target:
+            problems.append(f"{key}: no applicable session in run calendar")
+            continue
+        raw_earliest = supplied.get(key)
+        if not raw_earliest:
+            problems.append(f"{key}: no kline row with a canonical date")
+            continue
+        earliest = date_key(raw_earliest)
+        if not earliest:
+            problems.append(f"{key}: invalid earliest date {raw_earliest!r}")
+            continue
+        checked += 1
+        if earliest > target:
+            problems.append(f"{key}: earliest {earliest} > calendar target {target}")
+    if problems:
+        return _outcome(
+            vid,
+            CaseResult.VALIDATED_FAIL,
+            f"all {len(expected_symbols)} fixtures cover their first applicable session",
+            "; ".join(problems[:6]),
+            reason_code="HISTORY_FIXTURE_COVERAGE_GAP",
+        )
+    return _outcome(
+        vid,
+        CaseResult.VALIDATED_PASS,
+        f"all {len(expected_symbols)} fixtures cover their first applicable session",
+        f"{checked}/{len(expected_symbols)} fixtures covered",
     )
 
 
@@ -665,15 +838,21 @@ def validate_golden_cases(
     outcomes: list[ValidationOutcome] = []
     index: dict[tuple[str, str], dict[str, Any]] = {}
     for provider_row in provider_rows:
-        code = str(provider_row.get(row_key, ""))
-        market = str(provider_row.get("MARKET_CODE", ""))
-        symbol = code + {"1": ".SH", "2": ".SZ", "3": ".BJ"}.get(market, "")
-        date = str(provider_row.get("TRADE_DATE", ""))
+        identity_row = provider_row
+        if row_key != "SECURITY_CODE" and provider_row.get(row_key) is not None:
+            identity_row = {**provider_row, "SECURITY_CODE": provider_row[row_key]}
+        symbol = str(provider_row.get("PROVIDER_SYMBOL") or _provider_symbol(identity_row))
+        date = date_key(provider_row.get("TRADE_DATE"))
+        if not symbol or not date:
+            continue
         index[(symbol, date)] = provider_row
-        index.setdefault((code, date), provider_row)
+        index.setdefault((symbol.split(".", 1)[0], date), provider_row)
     for case in cases:
         vid = f"golden_{case.case_type}_v1"
-        row: dict[str, Any] | None = index.get((case.provider_symbol, case.trade_date))
+        case_date = date_key(case.trade_date)
+        row: dict[str, Any] | None = index.get((case.provider_symbol, case_date))
+        if row is None:
+            row = index.get((case.provider_symbol.split(".", 1)[0], case_date))
         if row is None:
             outcomes.append(
                 _outcome(
@@ -686,6 +865,8 @@ def validate_golden_cases(
             continue
         mismatches = []
         for field_name, expected in case.expected_fields.items():
+            # provider_rows are the canonical status view.  Native aliases
+            # belong in row_adapter, never in this semantic comparator.
             actual = row.get(field_name)
             # normalize 1/1.0/True style flags
             if isinstance(expected, bool):

@@ -5996,6 +5996,7 @@ dataset SHA256 a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e�
 - 必须先完成 14/14 人工原文裁决，再由独立 Reviewer 复核来源、hash lineage、两个 COMPILED candidate 和旧 ACTIVE 不可变性；之后才允许运行一次性 seal。
 
 **下一步**：将本记录、bundle、raw artifact 和人工审阅表提交为独立 evidence/seal PR；审阅与后续 seal 完成并独立合并前，Formal Production B1-B7 继续禁止。账号、密码、endpoint、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+
 ## DM-20260910-FORMAL-B1B7-012 · 唯一正式运行失败与 B7 raw writer 整改
 
 **Type**：C1 — Formal Production failure evidence and framework remediation
@@ -6053,3 +6054,104 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 - 没有 Production 重跑、resume、Golden/rule/expectation/provider 配置修改、backfill、策略扩展或 raw/凭证上传。
 - 若独立 Reviewer 接受归因，另开 remediation PR 修复 canonical field/shape/date handling 并补回归测试；任何未来 Production run 都须取得新的 scheduler authorization。
+## DM-20260910-TRADING-RULE-H1R4-011 · H1R4 REVIEWED 头部声明修正与最终重封存
+
+## DM-20260911-FORMAL-B1B7-015 · 失败归因后的 provider 行适配整改
+
+**Type**：C1 — framework/validator remediation after read-only Formal attribution
+**Date**：2026-09-11
+**Status**：`IMPLEMENTED / LOCAL VERIFIED / SEPARATE REVIEW REQUIRED / NO FORMAL RERUN`
+**Evidence**：`docs/provider_verification/formal_b1_b7_framework_remediation_20260911.md`；分支 `fix/provider-canonicalization-diagnostics-20260911`。
+
+**已完成**
+
+- 从 `main@8dfb8a5cf1f03c5c974ea435bf04f13deac9fc65` 建立独立整改分支；针对 PR #42 已封存 Formal run 的只读归因，新增单一 ephemeral `canonical_status_view()` 与日线 canonical field view。
+- 状态入口统一处理完整 `MARKET_CODE`、数字/文本市场码、大小写字段和日期；冲突、未知市场、缺失日期和多字段 scalar 形状不被猜测，继续 fail closed。成功但 0 行的 BSE 状态保留为 unresolved/missing。
+- Golden router、ST/停牌、涨跌停、复权、B5 日线单位和历史日期消费层已覆盖；value-only 代码列表只用于 membership/continuity，B2 不合成退市语义；B5 按 run-bound calendar 的首个适用交易日逐标的核验。
+- 新增集中状态/日线/标的适用起点回归测试和整改矩阵，具体映射见 `formal_b1_b7_framework_remediation_20260911.md`。
+
+**明确未完成**
+
+- 旧 Formal run、sealed catalog 与 `SPIKE_INCOMPLETE` 不变；没有重新 Production、resume 或 verdict。
+- B2 真实退市语义、代码列表 mapping endpoint/权限、BSE 空响应、历史覆盖和公司行为事件语义仍未获得新的外部证明；没有把适配成功写成 Provider capability approval。
+
+**验证**
+
+- 定向测试及全量 `uv run pytest -q`：`1717 collected, 1714 passed, 3 skipped`，退出码为 0；Ruff check/format、mypy、`uv pip check`、`git diff --check` 均通过。3 个 skip 为仓库既有的环境条件分支，不代表 Provider capability 或 Formal 结论。
+
+**下一步**
+
+- 独立 Reviewer 审阅本整改 PR 的 diff，确认没有绕过语义门禁或修改 Golden/规则/Provider 配置；接受并合并后仍不自动获得 Formal 授权。
+- 如需新的 Formal 结论，必须由调度者针对合并后的 clean main 另行授权；不得使用 PR #42 的旧授权创建第三次 run，并须对比旧归因 artifact 保存新的 run-bound receipt。
+
+## DM-20260911-FORMAL-B1B7-016 · P0 语义门与 keyed K-line 身份整改
+
+**Type**：C1 — independent-review P0 remediation after read-only Formal attribution
+**Date**：2026-09-11
+**Status**：`IMPLEMENTED / FULLY LOCAL VERIFIED / CI REVIEW PENDING / NO FORMAL RERUN`
+**Evidence**：`docs/provider_verification/formal_b1_b7_framework_remediation_20260911.md`；分支 `fix/provider-canonicalization-diagnostics-20260911`。
+
+**已完成**
+
+- Golden `golden_delisted` 不再把历史代码表 scalar membership 当作 `IS_LISTED=3`：匹配
+  Provider 行必须真实携带 `IS_LISTED=3` 或非空 `DELISTING_DATE` 才能通过；否则为
+  `MISSING / DELISTED_SEMANTIC_FIELD_MISSING`，实际语义冲突则结构化 FAIL。没有修改
+  Golden 期望值或旧 Formal run。
+- 新增 `key_preserving_table_rows()` ephemeral boundary，处理
+  `dict[provider_symbol, DataFrame | None]`；无证券列的行注入映射键，`None`/空表保留带
+  身份 marker，行内身份冲突 fail closed。B3、B5 和 Golden CA K-line 已接入，raw payload
+  仍保持 provider 原样。
+- B5 暂不把 `300104.SZ` 当作通用 2020+ history coverage fixture。现有首条 bar 观察不足
+  以证明首个可交易日，且该标的存在停牌/退市解释空间；待独立 applicability/tradability
+  事实绑定后再纳入。其 Golden 退市 fixture 身份不变。
+- 新增退市语义、无证券列 keyed DataFrame、`None` 成员、空表和冲突身份回归测试；未登录
+  Provider、未创建新 run、未执行 Production、`--resume` 或 `--verdict`。
+
+**明确未完成**
+
+- 完整本地 pytest：`1721 collected, 1718 passed, 3 skipped`；mypy、依赖检查、Ruff
+  check/format 和 diff 检查均通过；远端 CI 需在提交后更新。
+- 真实 SDK 的完整 keyed mapping、B2 真实退市语义、BSE 空响应、历史覆盖和公司行为
+  事件语义仍没有新的 Provider capability 结论；不得据此批准 Formal、backfill、策略
+  扩展或生产化。
+
+**下一步**
+
+- 独立 Reviewer 逐项复核：membership 与 semantic delisted 是否严格分离；K-line key/None
+  lineage 是否完整；冲突是否 fail closed；以及 Golden、交易规则、Provider 配置和旧
+  evidence 是否保持不变。
+- 审阅关闭前保持 PR #43 Draft；不启动第三次 Formal run。若未来确需 Formal 结论，必须
+  由调度者在合并后的 clean main 上给出新的、一次性授权。
+- 本次代码提交已通过 Git remote 推送并可由远端 ref 核对；GitHub connector 的 API/PR/Actions
+  读取返回 `401 Bad credentials`，所以推送后的 CI 状态和 PR 描述暂不能由本地独立确认。
+  项目管理者需修复 connector 认证后补做该核对；在此之前不能把 CI 写成已通过。
+
+## DM-20260911-FORMAL-B1B7-017 · qualified identity precedence P0 修复
+
+**Type**：C1 — independent-review P0 follow-up
+**Date**：2026-09-11
+**Status**：`P0 FIX IMPLEMENTED / LOCAL VERIFIED / CI VERIFIED GREEN / INDEPENDENT DELTA REVIEW PENDING / NO FORMAL RERUN`
+**Evidence**：`docs/provider_verification/formal_b1_b7_framework_remediation_20260911.md`；分支 `fix/provider-canonicalization-diagnostics-20260911`。
+
+**已完成**
+
+- 修正 `provider_symbol()` 的身份优先级：表键视图已附加 qualified
+  `PROVIDER_SYMBOL` 时，不会再被前置裸 `security_code` 的空转换结果覆盖；完整/裸
+  身份冲突检查保持不变。
+- 回归覆盖真实顺序：`key_preserving_table_rows()` →
+  `canonical_daily_bar_view()` 后仍保留 `600519.SH`，冲突完整身份仍 fail closed。
+- 本地完整 pytest：`1721 collected, 1718 passed, 3 skipped`；定向回归、Ruff、format、
+  mypy、依赖检查和 diff 检查通过。
+
+**明确未完成**
+
+- 精确提交 `bd5a323f7f47e75f3e40a7786e5b631ee5f06655` 的 GitHub Actions CI run
+  `34566813036`（#532）已通过 Windows 3.12、Windows 3.14 和 Ubuntu 3.14 三个平台；
+  独立 Reviewer delta review 尚待完成，PR #43 继续 Draft。
+- `300104.SZ` applicability/tradability、B2 退市语义、BSE/BJ mapping、真实历史覆盖和
+  公司行为语义仍没有新的 Provider capability 结论；没有新的 Formal 授权。
+
+**硬边界**
+
+- 没有修改 Golden 期望、交易规则、Provider 配置、旧 Formal run/catalog/verdict；没有
+  Production、`--resume` 或 `--verdict`，没有上传凭据或 raw Provider payload。
