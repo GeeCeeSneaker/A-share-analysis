@@ -6130,7 +6130,7 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 **Type**：C1 — independent-review P0 follow-up
 **Date**：2026-09-11
-**Status**：`P0 FIX IMPLEMENTED / LOCAL VERIFIED / EXACT-HEAD CI PENDING / NO FORMAL RERUN`
+**Status**：`P0 FIX IMPLEMENTED / LOCAL VERIFIED / CI VERIFIED GREEN / INDEPENDENT DELTA REVIEW PENDING / NO FORMAL RERUN`
 **Evidence**：`docs/provider_verification/formal_b1_b7_framework_remediation_20260911.md`；分支 `fix/provider-canonicalization-diagnostics-20260911`。
 
 **已完成**
@@ -6145,7 +6145,9 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 **明确未完成**
 
-- 新 head 的 exact-head CI 和独立 Reviewer delta review 尚待完成；PR #43 继续 Draft。
+- 精确提交 `bd5a323f7f47e75f3e40a7786e5b631ee5f06655` 的 GitHub Actions CI run
+  `34566813036`（#532）已通过 Windows 3.12、Windows 3.14 和 Ubuntu 3.14 三个平台；
+  独立 Reviewer delta review 尚待完成，PR #43 继续 Draft。
 - `300104.SZ` applicability/tradability、B2 退市语义、BSE/BJ mapping、真实历史覆盖和
   公司行为语义仍没有新的 Provider capability 结论；没有新的 Formal 授权。
 

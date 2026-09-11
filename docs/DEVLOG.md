@@ -3778,7 +3778,7 @@
 
 ## 2026-09-11 · Independent review follow-up: qualified identity precedence
 
-> 状态：**P0 FIX IMPLEMENTED / LOCAL VERIFIED / EXACT-HEAD CI PENDING / NO FORMAL RERUN**
+> 状态：**P0 FIX IMPLEMENTED / LOCAL VERIFIED / CI VERIFIED GREEN / INDEPENDENT DELTA REVIEW PENDING / NO FORMAL RERUN**
 
 - 修正 `provider_symbol()` 在 keyed K-line 行二次 canonicalization 时取到前置裸
   `security_code` 的空转换结果、从而丢失表键交易所后缀的问题；现在选择第一个非空的
@@ -3789,5 +3789,7 @@
 - 本地完整 pytest 为 `1721 collected, 1718 passed, 3 skipped`，定向 keyed K-line、Golden、
   B5、Ruff、format、mypy、依赖和 diff 检查均通过。未登录 Provider、未创建新 run、未执行
   Production/`--resume`/`--verdict`。
-- 该修复提交后需要新的 exact-head CI 和独立 Reviewer delta review；PR #43 继续保持 Draft。
+- 精确提交 `bd5a323f7f47e75f3e40a7786e5b631ee5f06655` 的 GitHub Actions CI run
+  `34566813036`（#532）已通过 Windows 3.12、Windows 3.14 和 Ubuntu 3.14 三个平台；
+  独立 Reviewer delta review 仍待完成，PR #43 继续保持 Draft。
   `300104.SZ` 的 applicability/tradability 仍按 P1 延后，不得借此放宽通用 2020 baseline。
