@@ -3804,4 +3804,4 @@
 - replay 结果保留边界：daily-bar 单位检查 `VALIDATED_PASS`，三个明确 history fixture 通过；B2 退市语义仍 `MISSING`，ST/限价状态 shape、BSE 空 status、Golden 公司行为 contract 仍阻断或未决，B1/B5 account gate、B7 timing 和 B6 optional semantic checks 未在离线环境冒充重跑；`300104.SZ` 继续 deferred。
 - 验证通过：全量 `uv run pytest -q` 为 `1721 collected, 1718 passed, 3 skipped`；replay 脚本 Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。未调用 Provider，未创建新 run，未执行 Production、`--resume` 或 `--verdict`。
 
-下一步：独立 Draft PR [#44](https://github.com/GeeCeeSneaker/A-share-analysis/pull/44) 已创建；其当前精确 head `2501a416e1090be9796a789f436e6a2a8390472b` 的 GitHub Actions CI run `34579960963`（#537）三平台成功，H3B run #86 按边界 skipped。独立 Reviewer 尚未提交 review，PR 继续保持 Draft；审阅关闭前不得启动第三次 Formal。`300104.SZ` applicability/tradability、B2/B3/B4 未决语义和未来 Formal 授权边界见上述交接记录。
+下一步：独立 Draft PR [#44](https://github.com/GeeCeeSneaker/A-share-analysis/pull/44) 已创建；其连续提交 `6f5f49a`、`2501a41`、`17282fd` 对应的 GitHub Actions CI run #536、#537、#538 均三平台成功，H3B run #85、#86、#87 均按边界 skipped。独立 Reviewer 尚未提交 review，PR 继续保持 Draft；审阅关闭前不得启动第三次 Formal。`300104.SZ` applicability/tradability、B2/B3/B4 未决语义和未来 Formal 授权边界见上述交接记录。
