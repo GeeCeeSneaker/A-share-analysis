@@ -1,0 +1,280 @@
+{
+  "receipt_type": "GT-H3B-FORMAL-RUN-SANITIZED-RESULT-RECEIPT",
+  "schema_version": 1,
+  "purpose": "Governance-safe durable anchor for one complete Formal Production B1-B7 attempt and its same-run verdict; not an independent Provider approval.",
+  "source_scope": {
+    "derived_from": "local run metadata, gate JSON files, verdict JSON, flushed case catalog, and local raw-file inventory",
+    "raw_provider_data_included": false,
+    "credentials_included": false,
+    "published_artifact_scope": "sanitized receipt and result summary only; raw Provider files remain local and are not committed"
+  },
+  "scheduler_authorization": {
+    "governing_issue": 39,
+    "authorization_comment_id": 5619810170,
+    "source_issue_url": "https://github.com/GeeCeeSneaker/A-share-analysis/issues/39",
+    "authorized_as_of_date": "20260909",
+    "authorized_command": "uv run python scripts/spike/spike_runner.py --production --date 20260909",
+    "actual_as_of_date": "20260909",
+    "actual_command": "uv run python scripts/spike/spike_runner.py --production --date 20260909",
+    "conformance": "AUTHORIZED_EXACT_AS_OF",
+    "one_attempt_authorization_consumed": true,
+    "old_failed_run_reused": false
+  },
+  "run": {
+    "run_id": "dad1e1b8-0c34-4031-8e94-cc87a03dbbf4",
+    "run_kind": "PRODUCTION",
+    "source_head": "fba18153a986cc1283a8c082e5d5629902d774cf",
+    "clean_checkout_assertion": true,
+    "main_ref_verified_after_run": "fba18153a986cc1283a8c082e5d5629902d774cf",
+    "as_of_date": "20260909",
+    "started_at": "2026-09-10T22:03:02.372698+08:00",
+    "ended_at": "2026-09-10T23:09:53.298994+08:00",
+    "terminal_status": "CLOSED",
+    "failure_reason": null,
+    "resume_executed": false,
+    "additional_production_runs_created": 0
+  },
+  "runtime_identity": {
+    "provider": "amazingdata",
+    "account_profile_id": "UNKNOWN_24e2ff401792",
+    "sdk_version": "1.1.9",
+    "runtime_version": "V4.3.0.260626-rc2.0-YHZQ",
+    "environment_lock_sha256": "03f61918aed5caec38359e96ed0804b556551a53ebbad07eabb6a02e4533c3bd",
+    "production_config_sha256": "a65d07584f7ed93c6d5ec23cf4d3ca5f1427b89bef3a17b0487b5b61c00c2c14"
+  },
+  "dataset_identity": {
+    "golden_truth_version": "v7-reviewed-20260908",
+    "golden_dataset_file": "golden_cases_v7.jsonl",
+    "golden_dataset_sha256": "a51013f8fbfb2e9addceb4b75c2213d35a30c3b65459928164b77597aecb983e",
+    "trading_rule_version": "v20260910-h1r4-reviewed",
+    "trading_rule_dataset_version": "2026-09-10.2",
+    "trading_rule_review_status": "REVIEWED",
+    "trading_rule_dataset_sha256": "b8b77ef83f5741c12a2effef988f793c0827f737ea471494814c1b0b6d7f9aed"
+  },
+  "phase_summary": {
+    "B1": {
+      "gate_file_count": 10,
+      "capabilities_pass": [
+        "trade_calendar",
+        "security_master",
+        "daily_bar",
+        "security_status_history",
+        "adj_factor",
+        "corporate_action",
+        "equity_structure",
+        "index_daily"
+      ],
+      "capabilities_blocked_by_endpoint_available": [
+        "code_mapping_bj",
+        "industry_taxonomy"
+      ],
+      "note": "B1 API/capability gate readiness is not the same as B2-B5 semantic validation."
+    },
+    "B2": {
+      "result": "VALIDATED_FAIL",
+      "security_master_rows": 5442,
+      "case_type": "security_master_with_delisted"
+    },
+    "B3": {
+      "daily_bar": "VALIDATED_FAIL",
+      "st_suspend": "OBSERVED",
+      "limit": "VALIDATED_FAIL",
+      "adj": "OBSERVED"
+    },
+    "B4": {
+      "golden_case_count": 125,
+      "golden_truth_version": "v7-reviewed-20260908",
+      "golden_dataset_sha256_prefix": "a51013f8fbfb2e9a",
+      "result_counts": {
+        "VALIDATED_FAIL": 125
+      }
+    },
+    "B5": {
+      "calendar_rows": 8723,
+      "symbols": 5562,
+      "bse_evidence_rows": 0,
+      "observed_earliest_output": "99991231",
+      "earliest_output_is_accepted_history_claim": false
+    },
+    "B6": {
+      "result": "OBSERVED",
+      "observed_case_count": 3,
+      "observed_cases": [
+        "B6-FREEFLOAT-SEMANTICS-20260909",
+        "B6-TAXONOMY-OWNER-20260909",
+        "B6-BENCHMARK-INDEX-20260909"
+      ]
+    },
+    "B7": {
+      "phase_result_present": true,
+      "symbol_count": 5562,
+      "day_window": [
+        "20260903",
+        "20260904",
+        "20260907",
+        "20260908",
+        "20260909"
+      ],
+      "row_count": 6662216,
+      "bytes_received": 1031721881,
+      "request_count": 5,
+      "retry_count": 0,
+      "failure_count": 0,
+      "failure_rate": 0.0,
+      "wall_clock_seconds": 1106.462,
+      "throughput_rows_per_second": 6021.19,
+      "peak_rss_mb": null,
+      "note": "The prior RawWriter framework failure did not recur; this is evidence of completed B7 execution, not a Provider capability approval."
+    }
+  },
+  "verdict": {
+    "verdict_file_present": true,
+    "verdict_command": "uv run python scripts/spike/spike_runner.py --verdict --run-id dad1e1b8-0c34-4031-8e94-cc87a03dbbf4",
+    "verdict_command_executed_once": true,
+    "verdict": "SPIKE_INCOMPLETE",
+    "missing_core": [
+      "symbol_mapping_unambiguous"
+    ],
+    "failed_core": [
+      "security_master_with_delisted",
+      "daily_bar_units",
+      "historical_st_suspend",
+      "limit_price_and_no_limit_days",
+      "adj_factor_corporate_action_continuity",
+      "history_start_2020"
+    ],
+    "missing_optional": [
+      "free_float_equivalence",
+      "sw_taxonomy",
+      "benchmark_index_availability",
+      "capacity_backfill"
+    ],
+    "milestone_eligibility": {
+      "p0a_eligible": false,
+      "p0b_eligible": false,
+      "historical_backfill_eligible": "NO"
+    },
+    "interpretation": "CLOSED means all phases produced a terminal run record; SPIKE_INCOMPLETE is fail-closed and is not GO."
+  },
+  "case_catalog": {
+    "jsonl_path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/cases/spike_case_catalog.jsonl",
+    "csv_path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/cases/spike_case_catalog.csv",
+    "jsonl_record_count": 178,
+    "csv_data_row_count": 178,
+    "golden_record_count": 125,
+    "runtime_gate_record_count": 40,
+    "other_record_count": 13,
+    "all_records_bound_to_run_id": true,
+    "result_counts": {
+      "VALIDATED_PASS": 38,
+      "VALIDATED_FAIL": 131,
+      "OBSERVED": 6,
+      "MISSING": 1,
+      "NOT_TESTABLE_PERMISSION": 2
+    },
+    "case_catalog_sha256": "bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53",
+    "sealed": true,
+    "state": "CLOSED_RUN_CATALOG"
+  },
+  "failure_attribution": {
+    "path": "docs/provider_verification/formal_production_b1_b7_failure_attribution_20260910.json",
+    "bytes": 18698,
+    "sha256": "1e193fcbc8abbeaadba0896219f98385e9ef3447e82ac2f9367d5cb96f34275b",
+    "status": "READ_ONLY_DIAGNOSIS",
+    "derived_from_run_id": "dad1e1b8-0c34-4031-8e94-cc87a03dbbf4",
+    "derived_from_case_catalog_sha256": "bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53",
+    "raw_provider_data_included": false,
+    "run_or_verdict_modified": false
+  },
+  "raw_inventory": {
+    "published": false,
+    "local_file_count": 27974,
+    "local_bytes": 369934607,
+    "path_and_size_inventory_sha256": "86baae3fd3cd448ceeb05cae5a13e3f4b08afdc37d6015b320fa3f889f9bca77"
+  },
+  "artifact_inventory": [
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/spike_run.json",
+      "bytes": 1439,
+      "sha256": "7793ea46b3574e60683f52335fa41718ba30d333fb648a6fd34d1c675c1627cf"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/verdict.json",
+      "bytes": 2552,
+      "sha256": "576008c71082f05915eb44bdf74f5fce7a771814dca51b317a5ee63b62dde7a1"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/adj_factor.json",
+      "bytes": 3172,
+      "sha256": "a7e8d207dfb3be6fe0b4c0f6c38cbf5ff1ab5ade17f4bc0849f057cf022f147e"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/code_mapping_bj.json",
+      "bytes": 3214,
+      "sha256": "d03f66d48d7ad4d4ab348fbe132d7a40fcbea3d6d21fa5a7f6b8eac2425fb465"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/corporate_action.json",
+      "bytes": 4048,
+      "sha256": "244d94449556f0eca43f8925e7c398443d8366d2938ea872ee564a93c0a9be0f"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/daily_bar.json",
+      "bytes": 3155,
+      "sha256": "f229296b71f63da7c3b4f9092ce47bfa8ceb1806cf05cf7da8ea57b788c92259"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/equity_structure.json",
+      "bytes": 3258,
+      "sha256": "061e851a2b320c841b056be7e552c00fdbbe299d70dfea0086a265ff683c0c5e"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/index_daily.json",
+      "bytes": 3163,
+      "sha256": "6ceff95ffbde81610776117411c370a95860010514f564d6dfc50c3db3c8e549"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/industry_taxonomy.json",
+      "bytes": 4078,
+      "sha256": "2fa8182cc7ffd990f84a6b71eb455f2b5cf78ac2e2f8de51bb6fffb286e88e15"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/security_master.json",
+      "bytes": 3236,
+      "sha256": "60b961a350404a43dd48693e721d1144dff7ecef1643f3ffbcbdf67a250f5781"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/security_status_history.json",
+      "bytes": 3343,
+      "sha256": "c714d612dba2b81c1ad5926ad5a6f92cb2131f8c78eab9fa1de5603c43a5b81d"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/gates/trade_calendar.json",
+      "bytes": 3196,
+      "sha256": "8fdcc3e9bc28b645a61ec22521e4595113cf5ee463211155e10f1911ac859f50"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/cases/spike_case_catalog.csv",
+      "bytes": 99763,
+      "sha256": "e191d735f98daf35512799be92bb248c916032730128ea730ec198d43a371d2c"
+    },
+    {
+      "path": "data/spike/production/dad1e1b8-0c34-4031-8e94-cc87a03dbbf4/cases/spike_case_catalog.jsonl",
+      "bytes": 155331,
+      "sha256": "bad92a04ae6008cc094d72a213f670f0ccdf9ab5befc285b29e46d0a7a9dee53"
+    },
+    {
+      "path": "docs/provider_verification/formal_production_b1_b7_failure_attribution_20260910.json",
+      "bytes": 18698,
+      "sha256": "1e193fcbc8abbeaadba0896219f98385e9ef3447e82ac2f9367d5cb96f34275b"
+    }
+  ],
+  "governance": {
+    "golden_or_rule_files_modified": false,
+    "provider_configuration_modified_after_preflight": false,
+    "backfill_started": false,
+    "strategy_expansion_started": false,
+    "productionization_authorized": false,
+    "independent_review_required": true
+  }
+}
