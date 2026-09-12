@@ -112,6 +112,19 @@ class TestProviderView:
         with pytest.raises(CAProviderShapeError, match="DATE_EX"):
             _ca_provider_view("dividend", [{"MARKET_CODE": "600519"}])
 
+    @pytest.mark.parametrize("progress", ["1", "2", "12"])
+    def test_incomplete_dividend_rows_without_ex_date_fail_closed(self, progress):
+        """Observed progress/date correlation is not a production contract."""
+        with pytest.raises(CAProviderShapeError, match="DATE_EX"):
+            _ca_provider_view(
+                "dividend",
+                [{"MARKET_CODE": "600519", "DIV_PROGRESS": progress}],
+            )
+
+    def test_completed_dividend_row_without_ex_date_still_fails(self):
+        with pytest.raises(CAProviderShapeError, match="DATE_EX"):
+            _ca_provider_view("dividend", [{"MARKET_CODE": "600519", "DIV_PROGRESS": "3"}])
+
     def test_right_issue_missing_ex_dividend_date_fails_loud(self):
         with pytest.raises(CAProviderShapeError, match="EX_DIVIDEND_DATE"):
             _ca_provider_view("right_issue", [{"MARKET_CODE": "600036"}])

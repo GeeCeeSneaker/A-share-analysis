@@ -447,13 +447,13 @@ def canonical_status_view(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 view="canonical_status_view",
             )
         symbol = provider_symbol(row)
+        trade_date = row_date(row, "TRADE_DATE", "trade_date")
         if "." not in symbol:
             raise ProviderRowShapeError(
                 f"status row {index} has ambiguous or missing exchange-qualified identity",
                 view="canonical_status_view",
             )
         code, suffix = symbol.rsplit(".", 1)
-        trade_date = row_date(row, "TRADE_DATE", "trade_date")
         if not trade_date:
             raise ProviderRowShapeError(
                 f"status row {index} has missing or invalid TRADE_DATE",

@@ -6219,3 +6219,54 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 - 全量本地 `uv run pytest -q -r fEs`：`1721 collected, 1718 passed, 3 skipped`；Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。
 - v3 只读控制仍为 `provider_calls=0`、`spike_run_created=false`、`raw_writer_write_calls=0`、`catalog_write_calls=0`、`verdict_write_calls=0`；evidence tree 前后均为 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`。
 - 当前 head 已推送到 PR #44 所在分支；CI 和该精确 head 的独立 follow-up review 仍是合并前门槛。保持 PR #44 Draft；不得启动第三次 Formal、Provider call、Production、`--resume`、`--verdict`、backfill、策略扩展或生产化。
+
+## DM-20260912-FORMAL-B1B7-021 — 定向 AmazingData 能力闭环预检
+
+**Type**：C1 provider-contract clarification / bounded framework remediation
+**Date**：2026-09-12
+**Status**：`TARGETED NON-PRODUCTION PROBE COMPLETED / LOCAL QA GREEN / INDEPENDENT REVIEW REQUIRED / NO THIRD FORMAL`
+
+**范围与绑定**：
+
+- 按 Issue #39 comment `5636256765` 的最新调度要求，从 clean `main@f33997ed2c5a5e1ab66eb12f754e77a8a65c8ab4` 开始；代码提交为 `258489bc29359a1212cd33528ac5764ceb97e110`。
+- 仅执行六项定向 capability probe；没有调用 `spike_runner.py --production`、`--resume` 或 `--verdict`，没有创建新的 `SpikeRun`，没有修改 Golden/H1/2020 baseline、sealed artifact、catalog 或 verdict。
+- 脱敏收据为 [`capability_closure_20260911.json`](../provider_verification/capability_closure_20260911.json)，矩阵为 [`capability_closure_20260911.md`](../provider_verification/capability_closure_20260911.md)。收据 `code_head` 精确绑定上述代码提交，原始返回只保存在本地 ignored raw 目录。
+
+**已完成的实现**：
+
+- AmazingData 1.1.9 facade 使用实际生效的 `begin_date`/`end_date`、`is_local=False`；BJ mapping 使用无 `code_list` 的完整表端点；日线明确传 SDK `period=10008`。
+- 状态适配只跳过已知状态 marker 与身份/日期同时缺失的非观测行；公司行为适配只过滤本次观察到的 dividend 非最终进度码 `1/2/12` 缺日期记录。只缺一侧、未知进度码或完成记录缺日期仍 fail-closed。
+- BJ mapping 的本地运行时缺口已用 `tables==3.11.1` 补齐；专有 SDK wheel 和依赖 wheel 保存在本地 ignored `vendor/amazingdata/`，不进入 Git。
+
+**六项结果**：
+
+| 项目 | 结果 | 仍未闭合的语义 |
+|---|---|---|
+| 状态日期 shape | 20,638 行中 8 行原生双缺身份/日期；`PROVIDER_CONFIRMED`，窄框架修复已提交 | 非观测行官方语义及独立 Reviewer 确认 |
+| 退市 | stock-basic 返回 3/4 行并含 `IS_LISTED`/`LISTDATE`/`DELISTDATE`；`PROVIDER_CONFIRMED` | 历史 PIT 退市语义；code-list 仍只作 continuity |
+| BJ mapping | 原生端点 248 行；`PROVIDER_CONFIRMED` | `golden_bj_mapping` 尚未建设，不能据此宣称 mapping gate PASS |
+| BSE 历史状态 | `835185.BJ` 精确 2022 年请求 0 行；`PROVIDER_CONFIRMED` | 空响应究竟是历史覆盖、适用性还是请求/适配问题 |
+| 公司行为 | dividend 123 行/50 行缺 `DATE_EX`，集中于进度 1/2/12；right issue 6 行均有日期 | dividend 进度码正式语义、历史 right-issue 缺失未复现 |
+| `300104.SZ` | code-list 包含目标；目标日线 0 行，`600519.SH` 同窗口控制 7 行；`PROVIDER_CONFIRMED` | 目标 fixture 仍不可用，适用性/可交易性或替换 fixture 未定 |
+
+**质量门**：本地全量 pytest、Ruff check/format、mypy、py_compile、`uv pip check`、`git diff --check` 已通过；GitHub Actions CI `#545` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三个矩阵均成功，GT-H3B `#93` 按策略 skipped。当前仅待 PR #45 的独立 Review/merge；在此之前不启动第三次 Formal Production。
+
+## DM-20260912-FORMAL-B1B7-022 — PR #45 语义越界整改
+
+**Type**：C1 — independent-review semantic-boundary remediation
+**Date**：2026-09-12
+**Status**：`P0 BLOCKERS ADDRESSED / FAIL-CLOSED RESTORED / LOCAL QA GREEN / CI VERIFIED GREEN / KEEP DRAFT / NO THIRD FORMAL`
+**Evidence**：PR #45 exact-head review `PRR_kwDOT_lhrs8AAAABNQI_5g`；整改代码提交 `de411142bd3a80a998418ce2c48ae8e134993012`；[`capability_closure_20260911.md`](../provider_verification/capability_closure_20260911.md)。
+
+**审阅阻断与处理**：
+
+- 状态预检观察到 8 行同时缺身份和 `TRADE_DATE`，但仓库没有权威契约证明它们是汇总/非观测行。删除 `canonical_status_view()` 的生产 skip；现在该形状进入缺失交换所限定身份的 `ProviderRowShapeError`，不会静默消失。
+- Dividend 预检观察到 50 行缺 `DATE_EX` 且集中于 `DIV_PROGRESS=1/2/12`，但进度码语义未被独立证明。删除 `_ca_provider_view()` 的进度码过滤；所有缺 `DATE_EX` 的 dividend 行都触发 `CAProviderShapeError`，语义保持 `STILL_UNRESOLVED`。
+- `capability_closure_probe.py` 的对应报告分类改为 `STILL_UNRESOLVED`，并明确“观察相关性不是契约、没有生产过滤”。原始脱敏 receipt 保持冻结，不重写其历史观察字段，也没有重新调用 Provider。
+
+**范围与验证**：
+
+- 新增/更新回归测试锁定两类原先被过滤的形状必须失败关闭；本地全量 pytest、Ruff check/format、项目配置下 mypy、py_compile、`uv pip check`、`git diff --check` 均通过。3 个 symlink 测试因 Windows 权限按既有规则跳过。精确 head `5680d9365794872be4e8767b7aa379be7e534406` 的 GitHub Actions CI `#547` 三个平台均成功，GT-H3B `#95` 按策略 skipped。
+- 未修改 Golden、H1 规则、2020 baseline、Provider 配置、旧 Formal run、sealed catalog 或 verdict；未执行新在线预检、Production、`--resume`、`--verdict`、backfill 或策略扩展。
+
+**下一步**：普通 GitHub CI 已完成；将精确 head `5680d9365794872be4e8767b7aa379be7e534406` 交由独立 Reviewer 做 delta review。PR #45 保持 Draft；只有新增权威 Provider/SDK 契约并经独立审阅接受后，才可讨论任何语义归一化或新的 Formal 授权。

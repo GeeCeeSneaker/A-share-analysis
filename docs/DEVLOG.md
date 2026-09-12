@@ -3829,3 +3829,38 @@
 - `history_start_2020` 的三个明确 fixture 仍为当前代码 replay PASS，但因 `300104.SZ` deferred，`core_capability_projection` 现在明确为 `REPLAY_CORE_UNRESOLVED`，reason 为 `HISTORICAL_DELISTED_FIXTURE_DEFERRED`。
 - v3 artifact [`formal_readonly_replay_20260911.json`](provider_verification/formal_readonly_replay_20260911.json) 绑定精确提交 `80df040f85158281d8382e9b2ea8dcf914a28d16`，大小 51,421 bytes，SHA-256 `f9c2560996ae72db642d858d115e078cf51c93cc6fa9ad738bb1d35ceb1b3631`；封存 evidence tree 仍为 27,988 文件、370,227,555 bytes，inventory SHA-256 `49318037cb609c6cf764e1863c0025f1ad6980ff2ac9593092544f0943f8113a`，`provider_calls=0`，所有 writer call 为 0。
 - 本地验证：全量 `uv run pytest -q -r fEs` 为 `1721 collected, 1718 passed, 3 skipped`；Ruff check/format、py_compile、mypy、`uv pip check` 和 `git diff --check` 均通过。CI 与精确 head 上的独立 follow-up review 仍待 GitHub 侧完成；PR #44 必须保持 Draft。
+
+## 2026-09-12 — Targeted AmazingData capability-closure implementation
+
+> Status: `TARGETED NON-PRODUCTION PROBES COMPLETED / FRAMEWORK REMEDIATION COMMITTED / INDEPENDENT REVIEW REQUIRED / NO FORMAL RUN`
+
+- Started from clean `main@f33997ed2c5a5e1ab66eb12f754e77a8a65c8ab4`, following Issue #39 comment `5636256765`. No Golden, H1 rule, 2020 baseline, sealed Formal artifact, catalog, or verdict was changed.
+- Corrected the verified AmazingData 1.1.9 contracts in the exchange facade: history status now sends `begin_date`/`end_date` and `is_local=False`; BJ mapping uses the complete-table endpoint without an unsupported `code_list`; daily K-line calls pass SDK `period=10008` explicitly; corporate-action probes can carry an explicit date window.
+- Added narrow provider-shape handling: status rows are filtered only when known status markers coexist with missing identity and date; dividend rows are filtered only for the observed non-final progress codes `1`, `2`, and `12`. Partial or unknown malformed observations remain fail-closed. Added provider-shaped regression tests.
+- Added `scripts/spike/capability_closure_probe.py`, which performs only the six authorized non-Production probes, stores raw exchanges under ignored local data, and emits sanitized counts/schema/hashes/classifications without credentials or raw payloads.
+- Local verification passed: full `uv run pytest -q`, Ruff check/format, bytecode compilation, `uv run mypy`, `uv pip check`, and `git diff --check`.
+- Final online probe completed against code head `258489bc29359a1212cd33528ac5764ceb97e110`; the sanitized receipt is [`capability_closure_20260911.json`](provider_verification/capability_closure_20260911.json), 44,794 bytes, SHA-256 `bd2294ec4836446bb819a66b91f0def2392be463834d5da2fa61df1f8f71eb51`. It recorded 10 successful targeted exchanges, `formal_run_created=false`, `catalog_mutated=false`, and `verdict_mutated=false`.
+- The compact matrix is [`capability_closure_20260911.md`](provider_verification/capability_closure_20260911.md). It records status-shape remediation, BJ endpoint availability, delisted/BSE/Corporate Action/`300104.SZ` findings and their remaining `STILL_UNRESOLVED` boundaries without uploading raw Provider payloads or credentials.
+- GitHub Actions CI run `#545` passed all three required matrices (Ubuntu 3.14, Windows 3.12, Windows 3.14); GT-H3B run `#93` was skipped by policy. PR #45 remains Draft with independent review and merge still pending.
+
+## 2026-09-12 — Independent-review semantic-overreach remediation
+
+> Status: `P0 BLOCKERS ADDRESSED / FAIL-CLOSED RESTORED / LOCAL QA GREEN / CI VERIFIED GREEN / NO THIRD FORMAL`
+
+- Remediation source commit: `de411142bd3a80a998418ce2c48ae8e134993012`.
+- Exact remediation/documentation head `5680d9365794872be4e8767b7aa379be7e534406` passed GitHub Actions CI `#547` on Ubuntu 3.14, Windows 3.12, and Windows 3.14; GT-H3B `#95` was skipped by policy.
+- Absorbed the exact-head review of PR #45: the observed status rows with both
+  identity and date missing, and the dividend `DIV_PROGRESS`/`DATE_EX`
+  correlation, do not by themselves establish provider semantics.
+- Removed both production discard rules. `canonical_status_view()` now raises
+  on the double-missing status shape, and `_ca_provider_view()` raises on every
+  dividend row missing `DATE_EX`, including progress codes `1`, `2`, and `12`.
+  The bounded probe now reports these observations as `STILL_UNRESOLVED`.
+- Retained the existing sanitized receipt as frozen observational evidence; it
+  is not being rewritten into an authorization for runtime normalization. No
+  Golden, H1, 2020 baseline, sealed Formal artifact, catalog, verdict, or
+  Provider configuration was changed, and no new live probe or Formal run was
+  started.
+- Added regression coverage proving both formerly filtered shapes fail closed;
+  local QA and the ordinary GitHub Actions CI are the next gates. PR #45 must
+  remain Draft pending independent delta review.
