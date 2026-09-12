@@ -1,0 +1,126 @@
+{
+  "contract_version": "research-v1",
+  "dataset_name": "research_security_daily",
+  "dataset_version": "research-security-daily-v1",
+  "schema_version": "research-security-daily-v1",
+  "publication_modes": {
+    "AUTHORITATIVE_READMODEL": {
+      "dataset_name": "research_security_daily",
+      "reader_default": true,
+      "publisher": "ResearchPanelBuilder.build_from_readmodel"
+    },
+    "TEST_ONLY_ROWS": {
+      "dataset_name": "research_security_daily_fixture",
+      "reader_default": false,
+      "publisher": "private test fixture helper only"
+    }
+  },
+  "identity_source": {
+    "authoritative_kind": "VERIFIED_CR2_SECURITY_MASTER",
+    "no_source_kind": "NO_VERIFIED_SECURITY_MASTER",
+    "caller_rows_allowed_only_in": "TEST_ONLY_ROWS",
+    "required_lineage_fields": [
+      "canonical_run_id",
+      "canonical_as_of",
+      "normalization_run_id",
+      "normalized_manifest_uri",
+      "normalized_manifest_hash",
+      "normalized_output_uri",
+      "normalized_output_hash",
+      "normalized_output_schema_hash",
+      "normalized_output_row_count",
+      "normalized_output_set_hash",
+      "normalized_semantic_hash",
+      "verification",
+      "pit_available"
+    ]
+  },
+  "typed_readmodel_validation": {
+    "invalid_numeric_or_non_finite": "WHOLE_BUILD_FAIL_CLOSED",
+    "typed_semantic_invalid_rows": "PRESERVED_IN_DISABLED"
+  },
+  "eligibility": {
+    "RESEARCH_ENABLED": {
+      "default_reader": true,
+      "preserved": true,
+      "exclusion_reason": null
+    },
+    "RESEARCH_DISABLED_UNRESOLVED": {
+      "default_reader": false,
+      "preserved": true,
+      "exclusion_reason": "required"
+    },
+    "RESEARCH_EXPERIMENTAL": {
+      "default_reader": false,
+      "preserved": true,
+      "exclusion_reason": "required"
+    }
+  },
+  "exclusion_reasons": [
+    "outside_research_window",
+    "identity_unresolved",
+    "identity_conflict",
+    "upstream_unresolved",
+    "missing_required_value",
+    "non_finite_value",
+    "invalid_ohlc"
+  ],
+  "split_windows_inclusive": {
+    "development": ["2020-01-01", "2023-12-31"],
+    "validation_a": ["2024-01-01", "2025-12-31"],
+    "holdout": ["2026-01-01", "2026-06-30"]
+  },
+  "semantic_constraints": {
+    "price_basis": "UNADJUSTED_CANONICAL",
+    "universe_basis": "OBSERVED_DAILY_BAR_UNIVERSE",
+    "coverage_state_allowed": [
+      "OBSERVED_DAILY_BAR_COVERAGE",
+      "PARTIAL_OBSERVED_DAILY_BAR_COVERAGE",
+      "UNRESOLVED_NOT_FOR_RESEARCH"
+    ],
+    "default_reader_coverage_state": "OBSERVED_DAILY_BAR_COVERAGE",
+    "forbidden_widening": [
+      "ADJUSTED",
+      "TOTAL_RETURN",
+      "CORPORATE_ACTION_NEUTRALIZED",
+      "ALL_A_SHARES"
+    ]
+  },
+  "index_panel": {
+    "state": "DISABLED_UNVERIFIED_INDEX_IDENTITY",
+    "dataset_name": "research_index_daily"
+  },
+  "feature_join": {
+    "state": "NOT_EXPOSED_IN_R1",
+    "feature_run_id": null,
+    "feature_registry_version": null
+  },
+  "manifest_required_fields": [
+    "dataset_name",
+    "publication_mode",
+    "research_contract_version",
+    "research_dataset_version",
+    "schema_version",
+    "source_snapshot_id",
+    "source_snapshot_as_of",
+    "source_snapshot_manifest_hash",
+    "source_snapshot_semantic_hash",
+    "source_canonical_run_id",
+    "source_readmodel_contract_version",
+    "identity_view_version",
+    "identity_view_hash",
+    "identity_source_kind",
+    "identity_source_lineage_hash",
+    "identity_sources",
+    "feature_run_id",
+    "feature_registry_version",
+    "price_basis",
+    "universe_basis",
+    "coverage_state",
+    "index_panel_state",
+    "build_timestamp",
+    "content_hash",
+    "artifact_set_hash",
+    "artifacts"
+  ]
+}
