@@ -6309,3 +6309,35 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 - PIT 退市语义、异常 status shape、公司行为字段语义仍 unresolved/fail-closed；`COMPOSITE/FALLBACK_SOURCE_REQUIRED` 仅为诊断建议。未修改 Golden、H1、全局 2020 baseline、旧 Formal/run/catalog/verdict 或 Provider 配置。
 - 本地全量 pytest、Ruff check/format、mypy、compileall、`uv pip check` 和 `git diff --check` 已通过；3 个既有 Windows symlink 测试按环境跳过。
 - 当前分支保持 Draft；待本次精确 head 的三平台 CI 和独立 delta review。没有第三次 Formal、Production、`--resume`、`--verdict`、backfill 或策略扩展授权。
+
+## DM-20260912-FORMAL-B1B7-025 · 复合 / 兜底来源记录契约设计闸门
+
+**Type**：C1 — source-selection/design gate after accepted BSE routing delta
+**Date**：2026-09-12
+**Status**：`DESIGN-ONLY SOURCE CONTRACT / SOURCE SELECTION STILL UNRESOLVED / KEEP DRAFT / NO THIRD FORMAL`
+
+**基线与范围**：
+
+- Issue #39 最新 scheduler checkpoint 已确认 PR #46 合并，当前基线为 `main@661dddfe7bba2f8ff13a3f7512bde4e1a15db383`。本条记录对应一个窄范围来源选择 PR，只覆盖 security lifecycle/PIT、historical status、corporate actions、BJ identity mapping 和 history fixture 五项未闭合领域。
+- 交付物为 [`composite_fallback_source_contract_20260912.md`](../provider_verification/composite_fallback_source_contract_20260912.md) 与 [`composite_fallback_source_contract_20260912.json`](../provider_verification/composite_fallback_source_contract_20260912.json)。两者逐项给出 primary source、fallback/first-party source、exact fields/facts、PIT rule、conflict precedence、evidence contract 和 implementation impact。
+- 本 PR 是设计闸门，不是实现 PR：不修改 `source-policy-v1`、Provider facade、Golden/H1、全局 2020 baseline、旧 Formal/run/catalog/verdict；不运行 Production、Formal SpikeRun、`--resume`、`--verdict`、backfill、universe sweep 或策略工作。
+
+**来源选择结果**：
+
+- 交易所一手事件/处理记录被定义为生命周期与公司行为的优先来源；合格 AmazingData 只在明确分区内承担数值观察；CNINFO 只作为可追溯的发行人原文 transport，不能提升为独立语义裁判。
+- BSE mapping、cutover notice、SSE/SZSE 生命周期与公司行为入口已列入矩阵；BSE old/new mapping 的 caller/ingest 边界解析、版本化缓存、原始逻辑 symbol 与解析 symbol 的 lineage 也已写入合同，禁止 facade 内隐式改写请求。
+- 统一证据合同要求 `available_at <= as_of`、内容寻址 raw/provenance、稳定公告/记录 ID、原文定位、表示形式和许可决定；`rendered_dom` 不得冒充 raw bytes，缺失/畸形/歧义/冲突一律 fail-closed。
+- 当前网页研究仍未证明完整 2020+ 历史覆盖、动态表和 BSE WAF 场景的稳定机器检索，也未取得 SSE/SZSE/BSE 自动下载/存储/解析/派生使用的项目许可决定。因此调度建议只能为 `SOURCE_SELECTION_STILL_UNRESOLVED`，不是 `COMPOSITE_CONTRACT_READY_FOR_IMPLEMENTATION`。
+
+**夹具与未决项**：
+
+- `300104.SZ` 继续标记为 `INAPPLICABLE_FOR_2020_BASELINE`；`601558.SH` 继续 `PROPOSED_NOT_ACTIVATED`，`600068.SH` 只作为备用候选。只有精确首个适用 session 和最小 bar 证据均绑定后才能另开夹具实现 PR，且不得削弱全局 2020-01-01 baseline。
+- 当前状态双缺失、退市 PIT、公司行为进度/日期语义仍保持异常隔离和 fail-closed；本 PR 不以相关性过滤、不重写旧收据、不制造 Provider approval。
+
+**审阅与下一步门槛**：
+
+- 独立 Reviewer 需逐项核对五行矩阵、来源层级、available-at 规则、冲突优先级、证据表示形式、许可闸门和 601558/600068 deferred 边界。PR 保持 Draft，须按 exact head 审阅。
+- 项目管理者需先给出各交易所自动检索、留存、解析和衍生使用的明确许可/合规决定，并冻结每个 venue 的可重复 retrieval contract。只有来源合同接受后，才允许另开窄 adapter + 新 source-policy 版本 + lineage/回归测试实现 PR。
+
+**Implementation Status**：矩阵、机器契约和聚焦回归已提交，候选来源未激活。
+**Review Status**：`SOURCE_SELECTION_STILL_UNRESOLVED / INDEPENDENT REVIEW REQUIRED / KEEP DRAFT`；无第三次 Formal 或 Production 授权。

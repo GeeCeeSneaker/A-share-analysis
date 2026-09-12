@@ -1,3 +1,17 @@
+## 2026-09-12 · 复合 / 兜底来源记录契约设计闸门
+
+> 状态：DESIGN-ONLY SOURCE CONTRACT / SOURCE SELECTION STILL UNRESOLVED / NO RUNTIME ACTIVATION / NO THIRD FORMAL
+
+- 按 Issue #39 最新 scheduler checkpoint，从 clean `main@661dddfe7bba2f8ff13a3f7512bde4e1a15db383` 开始，只处理五个未闭合领域：security lifecycle/PIT、historical status、corporate actions、BJ old/new mapping、2020 history fixture。没有启动 Production、新 Formal SpikeRun、backfill、universe sweep 或策略工作。
+- 新增 [`composite_fallback_source_contract_20260912.md`](provider_verification/composite_fallback_source_contract_20260912.md) 与机器可校验的 [`composite_fallback_source_contract_20260912.json`](provider_verification/composite_fallback_source_contract_20260912.json)。矩阵固定 primary source、fallback/first-party source、精确字段、PIT、冲突优先级、证据合同和实现影响，并把未来 fallback 限定为显式的新 source-policy 版本；本 PR 不改 `source-policy-v1`、Provider facade、Golden/H1 或全局 2020 baseline。
+- 来源研究确认 SSE/SZSE/BSE 有相应一手公告、停复牌/退市、公司行为或 mapping 入口，且 CNINFO 可作为发行人原文 transport；但 SSE/SZSE 部分表格动态、BSE 当前环境直接抓取受 403/WAF 影响，完整历史覆盖、稳定机器检索和自动化留存/使用许可均未证实。BSE 渲染 DOM 继续与 raw bytes 严格区分。
+- 统一合同要求 `available_at <= as_of`、缺失/畸形/冲突 fail-closed、官方更正以新版本进入 lineage；不允许用当前 snapshot/code-list 推断历史 PIT，不允许在 Provider facade 内隐式改写 BJ symbol，不允许按 AmazingData 进度码相关性过滤异常公司行为行。
+- `601558.SH` 保持 `PROPOSED_NOT_ACTIVATED`，`600068.SH` 只作为同等明确的备用候选；二者均须先绑定精确首个适用 2020 session 和最小 bar 证据，不得放宽全局基线。BSE mapping 真值仍不是 `golden_bj_mapping` PASS。
+
+**Implementation Status**：来源矩阵、JSON schema 约束和聚焦回归已完成；候选来源尚未激活，等待许可/使用决策、稳定 retrieval contract 和独立审阅。
+
+**Review Status**：保持 Draft，返回本 PR exact head 供独立 Reviewer 审查；推荐为 `SOURCE_SELECTION_STILL_UNRESOLVED`。未授权第三次 Formal、Production、回填或策略工作。
+
 ## 2026-09-12 · 剩余六项 Provider 能力/契约闭环
 
 > 状态：TARGETED NON-PRODUCTION CLOSURE / LOCAL QA GREEN / INDEPENDENT REVIEW REQUIRED / NO THIRD FORMAL
