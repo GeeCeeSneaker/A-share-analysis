@@ -1,0 +1,738 @@
+{
+  "contract_id": "source-selection-retrieval-closure-20260912-v1",
+  "schema": "source-selection-retrieval-closure-v1",
+  "date": "2026-09-12",
+  "base_main_commit": "538bf8ea1f62cac4461215ac316484acf078b09a",
+  "status": "CLOSURE_DESIGN_ONLY_NOT_ACTIVE",
+  "recommendation": "SOURCE_SELECTION_STILL_UNRESOLVED",
+  "recommendation_is_scheduler_facing": true,
+  "formal_run_authorized": false,
+  "production_authorized": false,
+  "runtime_policy_changed": false,
+  "provider_calls_in_this_closure": 0,
+  "scope": [
+    "security lifecycle and point-in-time listing state",
+    "historical status semantics",
+    "corporate-action event and ex-date semantics",
+    "Beijing Stock Exchange old/new identity mapping",
+    "the deferred 2020 historical-coverage fixture"
+  ],
+  "out_of_scope": [
+    "a new Production or Formal SpikeRun",
+    "provider sweep, backfill, or universe sweep",
+    "Golden, H1, or global 2020 baseline changes",
+    "strategy work",
+    "a generic multi-provider abstraction",
+    "changing source-policy-v1 or the provider facade",
+    "direct exchange quotation or processed-price fallback selection"
+  ],
+  "selection_principles": [
+    "Select the smallest set of sources that supplies semantic events plus the already accepted AmazingData numeric/bar observations.",
+    "Do not select direct exchange quotation or processed-market-data fallback merely because an official endpoint exists.",
+    "Treat CNINFO as optional issuer-document transport; this phase fails closed when the exchange source is insufficient rather than selecting a second transport class.",
+    "A public URL, HTTP 200, or successful SDK call is not a project permission for automated retrieval, retention, parsing, redistribution, or derived use.",
+    "Every selected source record is point-in-time eligible only when available_at <= as_of; missing, malformed, blocked, or conflicting evidence fails closed."
+  ],
+  "source_classes": [
+    {
+      "id": "exchange_announcement_disclosure_document",
+      "selection_status": "SELECTED_PRIMARY",
+      "required_for_capabilities": [
+        "security_lifecycle_pit",
+        "historical_status_by_day",
+        "history_fixture"
+      ],
+      "exact_project_use": {
+        "retrieval": "Retrieve only official lifecycle/event documents or their official index-to-document links for listing, suspension, resumption, risk-warning, delisting, and relisting facts.",
+        "local_retention": "Retain extracted event facts plus a provenance manifest and content hash. Retain full source bytes only after the class-specific project decision allows it.",
+        "parsing": "Parse event identity, event type, disclosure date, effective date/session, reason, and official announcement/record identity. Do not infer a missing effective date.",
+        "derived_facts": [
+          "point-in-time lifecycle intervals",
+          "listing/suspension/risk-warning applicability for a target session"
+        ],
+        "redistribution": "NONE_PLANNED; no external redistribution of source content or derived market-data artifacts in this phase."
+      },
+      "terms_or_authorization_basis": {
+        "first_party_basis": [
+          "https://www.sse.com.cn/home/legal/",
+          "https://www.szse.cn/application/laws/",
+          "https://www.bse.cn/disclosure/announcement.html"
+        ],
+        "project_decision_status": "STILL_UNRESOLVED",
+        "missing_decision": "Authorize or reject automated retrieval, local retention, parsing, internal research use, and derived event facts separately for the intended SSE, SZSE, and BSE document uses. BSE document access is not a market-data license."
+      },
+      "retrieval_contract": {
+        "canonical_locators": [
+          {
+            "venue": "SSE",
+            "locators": [
+              "https://www.sse.com.cn/assortment/stock/list/info/announcement/",
+              "https://www.sse.com.cn/disclosure/dealinstruc/suspension/",
+              "https://www.sse.com.cn/assortment/stock/list/delisting/"
+            ],
+            "record_locator": "Follow the official document link and record its announcement/document identity; the list page is not a substitute for the document."
+          },
+          {
+            "venue": "SZSE",
+            "locators": [
+              "https://www.szse.cn/disclosure/notice/company/"
+            ],
+            "record_locator": "Record the official notice identity, canonical document URL, and the issuer/code/date locator exposed by the notice."
+          },
+          {
+            "venue": "BSE",
+            "locators": [
+              "https://www.bse.cn/disclosure/announcement.html"
+            ],
+            "record_locator": "Record the official announcement identity and document URL. A browser-rendered index may locate a document but cannot be relabelled as raw bytes."
+          }
+        ],
+        "request_identity": "venue + canonical locator + normalized request/pagination parameters when a list request is used; store a request-parameters hash.",
+        "stable_record_identity": "Official announcement/record ID is required. If the venue exposes no ID, use the canonical official document URL plus immutable content hash and exact source locator; do not invent an event ID.",
+        "representation": {
+          "allowed": [
+            "raw_bytes",
+            "official_pdf",
+            "rendered_dom_index_only"
+          ],
+          "rule": "Raw bytes and official PDF are distinct representations. rendered_dom may locate a source or preserve a browser observation, but it must remain labelled rendered_dom and cannot be claimed as raw bytes."
+        },
+        "cache_and_version": "Each retrieval gets a retrieval_id and content-addressed manifest. Never overwrite a prior retrieval; a changed document creates a new version and preserves the old hash.",
+        "availability_and_pit": "Record retrieved_at_utc and evidence available_at. Select an event only when its effective interval covers the target session and available_at <= as_of.",
+        "fail_closed": [
+          "HTTP failure, WAF/challenge, incomplete dynamic response, or an official document that cannot be identified",
+          "missing effective date/session, ambiguous security identity, or missing event type",
+          "same-event conflict at the same source tier"
+        ]
+      },
+      "minimum_retained_artifact": [
+        "venue, security_code, security_name_at_event, event_type",
+        "disclosure_date, effective_date/session, reason, official announcement/record identity",
+        "canonical_url, source_locator, representation, retrieved_at_utc, available_at",
+        "content byte length and SHA-256, parser fingerprint, class-specific license decision"
+      ],
+      "capability_impact": "Required as the semantic primary for lifecycle/PIT. It is not yet activatable because historical coverage, stable machine retrieval, and the project use decision are unresolved."
+    },
+    {
+      "id": "exchange_corporate_action_record",
+      "selection_status": "SELECTED_PRIMARY",
+      "required_for_capabilities": [
+        "corporate_actions"
+      ],
+      "exact_project_use": {
+        "retrieval": "Retrieve official exchange corporate-action records or official record pages for dividend, bonus-share, capitalization, and rights-issue events.",
+        "local_retention": "Prefer extracted event facts plus provenance/hash. Retain full records only after the class-specific decision permits it.",
+        "parsing": "Parse event type, security identity, record/ex/effective dates, payment/listing date, ratios, cash values, rights price, and funds raised when explicitly present.",
+        "derived_facts": [
+          "corporate-action event intervals",
+          "ex-date and adjustment-input facts"
+        ],
+        "redistribution": "NONE_PLANNED; adjusted/reference prices are not selected from this class in the minimal phase."
+      },
+      "terms_or_authorization_basis": {
+        "first_party_basis": [
+          "https://www.sse.com.cn/home/legal/",
+          "https://www.sse.com.cn/market/stockdata/dividends/dividend/",
+          "https://www.szse.cn/application/laws/",
+          "https://www.szse.cn/market/periodical/documents/t20041229_521990.html",
+          "https://www.bse.cn/disclosure/announcement.html"
+        ],
+        "project_decision_status": "STILL_UNRESOLVED",
+        "missing_decision": "Decide whether each venue's corporate-action record may be automatically retrieved, retained, parsed, and used for internal/derived event facts. If a record contains quotation or processed-price fields, that artifact also needs the separate market-data class decision."
+      },
+      "retrieval_contract": {
+        "canonical_locators": [
+          {
+            "venue": "SSE",
+            "locator": "https://www.sse.com.cn/market/stockdata/dividends/dividend/",
+            "record_locator": "Official record/page identity plus security, event, and date locator; dynamic table parameters must be recorded when frozen."
+          },
+          {
+            "venue": "SZSE",
+            "locator": "https://www.szse.cn/market/periodical/documents/t20041229_521990.html",
+            "record_locator": "Official month/table identity plus row locator and security/event/date fields."
+          },
+          {
+            "venue": "BSE",
+            "locator": "https://www.bse.cn/disclosure/announcement.html",
+            "record_locator": "Official announcement/document identity and exact event locator."
+          }
+        ],
+        "request_identity": "venue + canonical page/document locator + normalized month/security/event parameters when present; store a request-parameters hash.",
+        "stable_record_identity": "Prefer official record/announcement ID. A table row without an official ID must retain table version, row locator, and row hash; it remains unresolved if that composite cannot be proven stable.",
+        "representation": {
+          "allowed": [
+            "raw_bytes",
+            "official_pdf",
+            "rendered_dom_index_only"
+          ],
+          "rule": "A rendered dynamic table is not raw evidence. If only a rendered table is available, retain its representation honestly and keep the dependent fact blocked until the evidence contract accepts it."
+        },
+        "cache_and_version": "Version by retrieval_id, table/document identity, and content hash. Do not overwrite a prior event record when the exchange corrects or republishes it.",
+        "availability_and_pit": "Record available_at independently of record_date/ex_date. Join T-1/T/T+1 by adjacent exchange sessions, never by natural-day arithmetic.",
+        "fail_closed": [
+          "missing required dates or event type",
+          "unstable row/record identity, blocked dynamic retrieval, or same-event conflict",
+          "an adjusted/reference-price field without a separately accepted market-data decision"
+        ]
+      },
+      "minimum_retained_artifact": [
+        "event_type, venue, security_code, official record/announcement identity",
+        "record_date, ex_date, effective session, payment/new-share-listing date where applicable",
+        "all values used in adjustment arithmetic, source locator, representation, content hash",
+        "retrieved_at_utc, available_at, parser fingerprint, class-specific license decision"
+      ],
+      "capability_impact": "Required as the semantic primary for corporate-action events and dates. It does not by itself authorize adjusted prices or close the current field-semantics gap."
+    },
+    {
+      "id": "bse_mapping_cutover_document",
+      "selection_status": "SELECTED_PRIMARY",
+      "required_for_capabilities": [
+        "bj_identity_mapping"
+      ],
+      "exact_project_use": {
+        "retrieval": "Retrieve the official BSE old/new mapping and code-cutover documents for identity resolution and request routing.",
+        "local_retention": "Retain the minimum mapping facts and a versioned provenance/hash manifest; retain full documents only after the document-class decision permits it.",
+        "parsing": "Parse old_code, new_code, security name, former listing date, explicit mapping validity, and cutover effective date when the document states them.",
+        "derived_facts": [
+          "caller/ingest logical-symbol to provider-symbol resolution",
+          "current-code routing eligibility for the documented cutover interval"
+        ],
+        "redistribution": "NONE_PLANNED; no BSE quotation or processed-price data is selected."
+      },
+      "terms_or_authorization_basis": {
+        "first_party_basis": [
+          "https://www.bse.cn/service/code_mapping.html",
+          "https://www.bse.cn/important_news/200026735.html",
+          "https://www.bse.cn/important_news/200024115.html"
+        ],
+        "project_decision_status": "STILL_UNRESOLVED",
+        "missing_decision": "Authorize or reject automated retrieval, versioned local mapping retention, parsing, and internal routing use. This decision is separate from any BSE 行情信息 license."
+      },
+      "retrieval_contract": {
+        "canonical_locators": [
+          {
+            "venue": "BSE",
+            "locator": "https://www.bse.cn/service/code_mapping.html",
+            "record_locator": "Mapping table snapshot plus exact row locator; record old/new code, name, and former listing date."
+          },
+          {
+            "venue": "BSE",
+            "locator": "https://www.bse.cn/important_news/200026735.html",
+            "record_locator": "Official notice number/date and the stated 2025-10-09 cutover rule."
+          },
+          {
+            "venue": "BSE",
+            "locator": "https://www.bse.cn/important_news/200024115.html",
+            "record_locator": "Official preparation notice identity and its old/new continuity statement."
+          }
+        ],
+        "request_identity": "canonical locator + retrieval timestamp + representation; mapping table filtering is a local projection recorded separately from the source snapshot.",
+        "stable_record_identity": "old_code + new_code + official table/notice identity + exact row/paragraph locator. Former listing date and mapping validity are separate fields.",
+        "representation": {
+          "allowed": [
+            "raw_bytes",
+            "official_pdf",
+            "rendered_dom"
+          ],
+          "rule": "Direct BSE retrieval may be WAF-blocked. A rendered DOM is acceptable only as rendered_dom evidence; it must not be presented as raw bytes or used to imply market-data authorization."
+        },
+        "cache_and_version": "Store immutable mapping snapshots by retrieval_id/content hash and a separately versioned mapping policy. Never silently update a caller's request identity.",
+        "availability_and_pit": "A mapping is eligible only when its snapshot available_at <= as_of and the validity interval is explicitly supported. The documented 2025-10-09 cutover is not a blanket historical interval.",
+        "fail_closed": [
+          "blocked or incomplete page, missing old/new pair, or conflicting row",
+          "validity interval absent or inferred only from listing date",
+          "attempt to map inside the Provider facade or to fall back implicitly to the old code"
+        ]
+      },
+      "minimum_retained_artifact": [
+        "old_code, new_code, security_name, former_listing_date when explicit",
+        "mapping_valid_from/to only when explicit, exchange, row/paragraph locator",
+        "canonical_url, representation, retrieval/available timestamps, content hash",
+        "mapping policy version and class-specific license decision"
+      ],
+      "capability_impact": "Required for BJ identity resolution at the caller/ingest boundary. It does not create a Golden mapping PASS and does not authorize BSE market data."
+    },
+    {
+      "id": "exchange_calendar_or_statistics_document",
+      "selection_status": "SELECTED_SUPPORTING",
+      "required_for_capabilities": [
+        "history_fixture"
+      ],
+      "selection_scope": "SSE 601558.SH evaluation first; do not generalize to other venues/candidates in this phase.",
+      "exact_project_use": {
+        "retrieval": "Retrieve the minimum official exchange-session calendar and listing/statistics facts needed to assess the 601558.SH fixture.",
+        "local_retention": "Retain exact first-applicable-session facts with source locator/hash; retain the full calendar/yearbook only after the class decision permits it.",
+        "parsing": "Parse exchange session dates and the candidate's historical statistics identity. Listing, suspension, and delisting events remain facts from the separately selected lifecycle-document class.",
+        "derived_facts": [
+          "first_applicable_session for the candidate fixture",
+          "calendar adjacency used by the fixture validator"
+        ],
+        "redistribution": "NONE_PLANNED; no quotation or processed-price artifact is selected from this class."
+      },
+      "terms_or_authorization_basis": {
+        "first_party_basis": [
+          "https://www.sse.com.cn/disclosure/announcement/general/c/c_20191220_4969627.shtml",
+          "https://www.sse.com.cn/aboutus/publication/yearly/",
+          "https://www.sse.com.cn/home/legal/"
+        ],
+        "project_decision_status": "STILL_UNRESOLVED",
+        "missing_decision": "Authorize or reject the minimum automated calendar/statistics retrieval, retention, parsing, and internal fixture-use scope for the SSE candidate."
+      },
+      "retrieval_contract": {
+        "canonical_locators": [
+          {
+            "venue": "SSE",
+            "locators": [
+              "https://www.sse.com.cn/disclosure/announcement/general/c/c_20191220_4969627.shtml",
+              "https://www.sse.com.cn/aboutus/publication/yearly/"
+            ],
+            "record_locator": "Official calendar publication/document identity, year/session locator, and yearbook page/document locator."
+          }
+        ],
+        "request_identity": "official calendar/statistics document URL + publication/year identity + retrieval timestamp; no hard-coded market-open date.",
+        "stable_record_identity": "calendar publication/document identity + session date, or yearbook document identity + page/table/row locator.",
+        "representation": {
+          "allowed": [
+            "raw_bytes",
+            "official_pdf",
+            "rendered_dom_index_only"
+          ],
+          "rule": "A rendered index may locate an official attachment, but the session/date fact must retain its actual representation and locator."
+        },
+        "cache_and_version": "Version each calendar/statistics publication by official identity and content hash. Corrections are new versions, never in-place edits.",
+        "availability_and_pit": "The publication and session evidence must be available_at <= as_of. Candidate lifecycle intervals and the calendar are joined before computing first_applicable_session.",
+        "fail_closed": [
+          "no exact session identity, missing lifecycle applicability, or ambiguous candidate code",
+          "blocked/dynamic source without a reproducible official artifact",
+          "any attempt to infer a bar or tradability fact from a calendar/yearbook alone"
+        ]
+      },
+      "minimum_retained_artifact": [
+        "candidate exchange/code, lifecycle evidence reference, calendar session evidence reference",
+        "exact first_applicable_session only after the formula is evaluated",
+        "official document/page/table locator, representation, content hash",
+        "retrieved_at_utc, available_at, fixture decision/reason, class-specific license decision"
+      ],
+      "capability_impact": "Required only for the deferred 601558.SH applicability check. It cannot activate the fixture without separate minimum AmazingData bar evidence."
+    },
+    {
+      "id": "amazingdata_provider_observation",
+      "selection_status": "SELECTED_SUPPORTING",
+      "required_for_capabilities": [
+        "historical_status_by_day",
+        "history_fixture"
+      ],
+      "exact_project_use": {
+        "retrieval": "Keep the already accepted AmazingData surface as the numeric limit-state and daily-bar observation source: history status with effective date window and is_local=false; daily bars with explicit period=10008.",
+        "local_retention": "Retain only approved normalized observations plus request/evidence hashes in repository-facing artifacts. Raw provider payloads remain local ignored evidence and are not uploaded.",
+        "parsing": "Validate provider identity/date/row shape before accepting numeric limit fields or daily bars. Do not infer PIT semantics, progress-code semantics, or event semantics from shape/correlation.",
+        "derived_facts": [
+          "numeric high/low limit observations when row shape is valid",
+          "minimum daily-bar evidence for a candidate fixture"
+        ],
+        "redistribution": "NONE_PLANNED; no raw provider payload or external redistribution."
+      },
+      "terms_or_authorization_basis": {
+        "first_party_basis": [
+          "local AmazingData 1.1.9 SDK surface and the project's accepted provider facade contract"
+        ],
+        "project_decision_status": "STILL_UNRESOLVED",
+        "missing_decision": "Record the vendor terms/entitlement and project decision for the exact internal retrieval, local retention, parsing, and derived-use scope. An account or successful call alone is not a semantic or licensing decision."
+      },
+      "retrieval_contract": {
+        "canonical_locators": [
+          {
+            "provider": "AmazingData",
+            "method": "InfoData.get_history_stock_status",
+            "locator": "facade request manifest with code_list, begin_date, end_date, is_local=false"
+          },
+          {
+            "provider": "AmazingData",
+            "method": "MarketData.query_kline",
+            "locator": "facade request manifest with provider symbol, date window, and period=10008"
+          }
+        ],
+        "request_identity": "provider + method + normalized code/symbol + date window + relevant SDK arguments + request-parameters hash.",
+        "stable_record_identity": "provider request identity plus returned table/key identity, schema hash, payload hash, and normalized row identity. No row is accepted when exchange-qualified identity/date is missing.",
+        "representation": {
+          "allowed": [
+            "provider_raw_local_only",
+            "normalized_observation"
+          ],
+          "rule": "Repository-facing evidence stores sanitized facts and hashes; raw provider output, credentials, tokens, endpoint, and profile remain outside GitHub."
+        },
+        "cache_and_version": "Use immutable request/evidence identities. A later response is a new observation; it cannot overwrite a sealed observation or silently change its semantic classification.",
+        "availability_and_pit": "Record provider retrieval/available timestamps and query window. A provider response is not historical PIT proof merely because it contains a historical date.",
+        "fail_closed": [
+          "SDK unavailable, authentication/transport failure, timeout, empty/ambiguous result when a row is required",
+          "missing identity/date, unknown status progress, malformed row shape, or conflicting normalized values",
+          "using provider observations to replace missing first-party lifecycle or corporate-action semantics"
+        ]
+      },
+      "minimum_retained_artifact": [
+        "provider/method, normalized request identity, date window, symbol/code",
+        "accepted fields/rows or quarantine classification, row-shape result",
+        "schema/payload/evidence hashes, retrieval/available timestamps, SDK/runtime version",
+        "vendor/project license decision and explicit semantic limitation"
+      ],
+      "capability_impact": "Required only for numeric status observations and the candidate's minimum bar check. It does not close PIT listing, status progress-code, or corporate-action field semantics."
+    },
+    {
+      "id": "cninfo_original_issuer_document_transport",
+      "selection_status": "NOT_SELECTED",
+      "required_for_capabilities": [],
+      "selection_scope": "Not selected in the minimal phase.",
+      "exact_project_use": {
+        "retrieval": "No automated retrieval in this phase.",
+        "local_retention": "No CNINFO content retention in this phase.",
+        "parsing": "No CNINFO parsing in this phase.",
+        "derived_facts": [],
+        "redistribution": "NONE"
+      },
+      "terms_or_authorization_basis": {
+        "first_party_basis": [
+          "https://www.cninfo.com.cn/new/commonUrl?url=data%2Fgongkai",
+          "https://webapi.cninfo.com.cn/notice.html"
+        ],
+        "project_decision_status": "NOT_SELECTED",
+        "missing_decision": "If an issuer document is later required, make a separate transport-class decision before adding it."
+      },
+      "retrieval_contract": {
+        "canonical_locators": [],
+        "request_identity": "NOT_APPLICABLE",
+        "stable_record_identity": "NOT_APPLICABLE",
+        "representation": {
+          "allowed": [],
+          "rule": "Do not use a CNINFO index/API as an independent semantic fallback in this phase."
+        },
+        "cache_and_version": "NOT_APPLICABLE",
+        "availability_and_pit": "NOT_APPLICABLE",
+        "fail_closed": [
+          "If the selected exchange source is insufficient, leave the fact UNKNOWN rather than silently adding CNINFO."
+        ]
+      },
+      "minimum_retained_artifact": [
+        "None in this phase."
+      ],
+      "capability_impact": "Not required for the minimal composite. A future selection would require a new class-specific decision and review."
+    },
+    {
+      "id": "exchange_quotation_or_processed_market_data",
+      "selection_status": "NOT_SELECTED",
+      "required_for_capabilities": [],
+      "selection_scope": "Not selected in the minimal phase.",
+      "exact_project_use": {
+        "retrieval": "No direct SSE, SZSE, or BSE quotation/processed-price retrieval.",
+        "local_retention": "No exchange market-data artifact retention.",
+        "parsing": "No exchange quotation/processed-price parsing.",
+        "derived_facts": [],
+        "redistribution": "NONE"
+      },
+      "terms_or_authorization_basis": {
+        "first_party_basis": [
+          "https://www.bse.cn/important_news/200011008.html",
+          "https://www.bse.cn/application/guide.html",
+          "https://www.sse.com.cn/home/legal/",
+          "https://www.szse.cn/application/laws/"
+        ],
+        "project_decision_status": "NOT_SELECTED",
+        "missing_decision": "No decision is requested for this phase. If a future capability genuinely requires this class, obtain a venue-specific terms/license decision first; BSE 行情信息 remains license-controlled."
+      },
+      "retrieval_contract": {
+        "canonical_locators": [],
+        "request_identity": "NOT_APPLICABLE",
+        "stable_record_identity": "NOT_APPLICABLE",
+        "representation": {
+          "allowed": [],
+          "rule": "Do not infer authorization from public pages, mapping, calendar, or statistics documents."
+        },
+        "cache_and_version": "NOT_APPLICABLE",
+        "availability_and_pit": "NOT_APPLICABLE",
+        "fail_closed": [
+          "If a required adjusted/reference price or bar fact cannot be supplied by the selected sources, keep the dependent capability blocked."
+        ]
+      },
+      "minimum_retained_artifact": [
+        "None in this phase."
+      ],
+      "capability_impact": "Not required because AmazingData numeric/bar observations and first-party semantic documents are the intended minimal composite. Adjusted/reference-price or exchange-bar requirements remain future blocked requirements."
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "security_lifecycle_pit",
+      "status": "BLOCKED",
+      "selected_source_classes": [
+        "exchange_announcement_disclosure_document"
+      ],
+      "supporting_source_classes": [],
+      "exact_fields_or_facts": [
+        "exchange",
+        "security_code",
+        "security_name_at_event",
+        "event_type",
+        "disclosure_date",
+        "effective_date",
+        "effective_session",
+        "reason",
+        "announcement_id",
+        "document_url",
+        "source_document_sha256"
+      ],
+      "pit_rule": "Build versioned event intervals. Select a state only when the effective session/interval covers the target date and available_at <= as_of; current snapshots, code-list membership, and event absence are never negative PIT evidence.",
+      "conflict_precedence": [
+        "exchange decision/processed event record when available",
+        "exchange announcement/disclosure document",
+        "AmazingData only as corroboration",
+        "same-tier conflict => SOURCE_CONFLICT and block"
+      ],
+      "retrieval_contract_refs": [
+        "exchange_announcement_disclosure_document"
+      ],
+      "minimum_artifact_refs": [
+        "exchange_announcement_disclosure_document"
+      ],
+      "implementation_required_after_acceptance": "A narrow lifecycle evidence adapter and interval builder; no source-policy-v1 change in this closure.",
+      "remaining_blockers": [
+        "class-specific project use decision",
+        "complete 2020+ archive coverage and stable retrieval across dynamic/WAF cases"
+      ]
+    },
+    {
+      "id": "historical_status_by_day",
+      "status": "BLOCKED",
+      "selected_source_classes": [
+        "exchange_announcement_disclosure_document",
+        "amazingdata_provider_observation"
+      ],
+      "supporting_source_classes": [],
+      "existing_repository_inputs": [
+        "versioned trading-rule source of record"
+      ],
+      "exact_fields_or_facts": [
+        "MARKET_CODE",
+        "TRADE_DATE",
+        "IS_ST_SEC",
+        "IS_SUSP_SEC",
+        "HIGH_LIMITED",
+        "LOW_LIMITED",
+        "PRICE_HIGH_LMT_RATE",
+        "PRICE_LOW_LMT_RATE",
+        "lifecycle_event_type",
+        "lifecycle_effective_session",
+        "trading_rule_id",
+        "trading_rule_version"
+      ],
+      "pit_rule": "Use first-party lifecycle intervals for ST/risk-warning and suspension/resumption; use only shape-valid AmazingData numeric limit observations with the rule version applicable to trade_date. Double-missing identity/date, unknown progress, and rule mismatch remain quarantine/fail-closed.",
+      "conflict_precedence": [
+        "first-party lifecycle/processed decision",
+        "first-party event document",
+        "valid AmazingData numeric observation",
+        "same-fact conflict => SOURCE_CONFLICT and block"
+      ],
+      "retrieval_contract_refs": [
+        "exchange_announcement_disclosure_document",
+        "amazingdata_provider_observation"
+      ],
+      "minimum_artifact_refs": [
+        "exchange_announcement_disclosure_document",
+        "amazingdata_provider_observation"
+      ],
+      "implementation_required_after_acceptance": "A narrow status partition adapter that preserves existing row-shape quarantine and does not select exchange market data.",
+      "remaining_blockers": [
+        "document and provider class-specific use decisions",
+        "historical first-party coverage and the accepted provider/vendor semantic boundary"
+      ]
+    },
+    {
+      "id": "corporate_actions",
+      "status": "BLOCKED",
+      "selected_source_classes": [
+        "exchange_corporate_action_record"
+      ],
+      "supporting_source_classes": [],
+      "exact_fields_or_facts": [
+        "event_type",
+        "exchange",
+        "security_code",
+        "announcement_id",
+        "record_date",
+        "ex_date",
+        "payment_date",
+        "new_shares_listing_date",
+        "cash_dividend_per_share",
+        "bonus_ratio",
+        "rights_ratio",
+        "rights_price",
+        "funds_raised"
+      ],
+      "explicitly_deferred_fields": [
+        "adjusted_reference_price",
+        "any quotation/processed-price field"
+      ],
+      "pit_rule": "Require available_at <= as_of and explicit record/ex/effective session. Adjacent-session relations are not natural-day arithmetic. Missing required dates or unknown event type is UNKNOWN.",
+      "conflict_precedence": [
+        "exchange corporate-action record",
+        "official event document if separately accepted",
+        "AmazingData only as corroboration, never semantic repair",
+        "same-event conflict => SOURCE_CONFLICT and block"
+      ],
+      "retrieval_contract_refs": [
+        "exchange_corporate_action_record"
+      ],
+      "minimum_artifact_refs": [
+        "exchange_corporate_action_record"
+      ],
+      "implementation_required_after_acceptance": "A narrow corporate-action parser plus explicit session-calendar join; no progress-code correlation filter.",
+      "remaining_blockers": [
+        "corporate-action record use decision and stable historical record coverage",
+        "separate market-data decision if a future requirement reinstates adjusted/reference prices"
+      ]
+    },
+    {
+      "id": "bj_identity_mapping",
+      "status": "BLOCKED",
+      "selected_source_classes": [
+        "bse_mapping_cutover_document"
+      ],
+      "supporting_source_classes": [],
+      "exact_fields_or_facts": [
+        "old_code",
+        "new_code",
+        "security_name",
+        "former_listing_date",
+        "mapping_valid_from",
+        "mapping_valid_to",
+        "exchange",
+        "source_row_locator",
+        "source_url",
+        "artifact_sha256",
+        "retrieved_at"
+      ],
+      "pit_rule": "Keep former listing date separate from mapping validity. Use the documented 2025-10-09 cutover only when the versioned mapping snapshot is available_at <= as_of; unknown intervals block.",
+      "conflict_precedence": [
+        "BSE official mapping plus cutover notice",
+        "BSE official listing/announcement",
+        "AmazingData mapping only as corroboration",
+        "missing/conflicting interval => block"
+      ],
+      "retrieval_contract_refs": [
+        "bse_mapping_cutover_document"
+      ],
+      "minimum_artifact_refs": [
+        "bse_mapping_cutover_document"
+      ],
+      "implementation_required_after_acceptance": "A caller/ingest mapping resolver with request lineage; the Provider facade remains request-faithful and is not changed here.",
+      "remaining_blockers": [
+        "BSE mapping document use decision",
+        "reproducible BSE retrieval/representation contract and valid interval acceptance"
+      ]
+    },
+    {
+      "id": "history_fixture",
+      "status": "BLOCKED",
+      "selected_source_classes": [
+        "exchange_announcement_disclosure_document",
+        "exchange_calendar_or_statistics_document",
+        "amazingdata_provider_observation"
+      ],
+      "supporting_source_classes": [],
+      "exact_fields_or_facts": [
+        "exchange",
+        "security_code",
+        "provider_symbol",
+        "listing_date",
+        "suspension_intervals",
+        "delisting_date",
+        "calendar_session",
+        "first_applicable_session",
+        "bar_trade_date",
+        "minimum_bar_fields",
+        "bar_source_identity"
+      ],
+      "pit_rule": "first_applicable_session = min(exchange session >= 2020-01-01 where the security is listed and outside official suspension intervals). Bind that session first, then require minimum valid AmazingData daily-bar evidence.",
+      "conflict_precedence": [
+        "official exchange calendar/lifecycle decision",
+        "valid AmazingData bar observation",
+        "no direct exchange market-data fallback selected in this phase"
+      ],
+      "retrieval_contract_refs": [
+        "exchange_calendar_or_statistics_document",
+        "amazingdata_provider_observation"
+      ],
+      "minimum_artifact_refs": [
+        "exchange_calendar_or_statistics_document",
+        "amazingdata_provider_observation"
+      ],
+      "implementation_required_after_acceptance": "A fixture evidence validator only after exact session and minimum bar evidence are bound.",
+      "current_fixture_decision": {
+        "300104.SZ": "INAPPLICABLE_FOR_2020_BASELINE",
+        "601558.SH": "PROPOSED_NOT_ACTIVATED",
+        "600068.SH": "UNACTIVATED_ALTERNATIVE_ONLY"
+      },
+      "remaining_blockers": [
+        "SSE calendar/statistics class use decision",
+        "601558 exact first applicable session plus minimum valid AmazingData bar evidence"
+      ]
+    }
+  ],
+  "not_selected_classes": [
+    {
+      "id": "cninfo_original_issuer_document_transport",
+      "reason": "The minimal phase uses exchange-published semantic documents and fails closed when they are insufficient; adding CNINFO would create another transport/terms decision without being necessary to select the five capability inputs."
+    },
+    {
+      "id": "exchange_quotation_or_processed_market_data",
+      "reason": "The minimal phase uses AmazingData numeric/bar observations and first-party semantic documents. Direct exchange quotation/processed-price fallback is not necessary; BSE market-data licensing remains out of scope and blocked."
+    }
+  ],
+  "global_invariants": [
+    "Do not modify source-policy-v1, the Provider facade, Golden/H1, the global 2020 baseline, sealed artifacts, or prior run/catalog/verdict records.",
+    "Every selected record has available_at <= as_of; do not fabricate availability from trade date or publication midnight.",
+    "Unknown, malformed, missing-required-field, ambiguous, blocked, and same-tier conflicting inputs fail closed.",
+    "Rendered DOM, official PDF, raw bytes, and normalized provider observation remain distinct representations.",
+    "Content-addressed evidence is immutable; corrections are new versions, never silent overwrites.",
+    "Credentials, tokens, cookies, private endpoints, SDK wheels, raw provider payloads, and local profiles stay outside GitHub.",
+    "No selected fallback can enter runtime until a new explicit source-policy version and independent review exist."
+  ],
+  "remaining_external_decisions": [
+    {
+      "id": "selected_document_class_use",
+      "decision_needed": "For exchange announcement/disclosure documents, exchange corporate-action records, BSE mapping/cutover documents, and SSE calendar/statistics documents, explicitly approve or reject automated retrieval, local retention, parsing, internal use, derived facts, and redistribution status for the exact scope above.",
+      "blocks": [
+        "security_lifecycle_pit",
+        "historical_status_by_day",
+        "corporate_actions",
+        "bj_identity_mapping",
+        "history_fixture"
+      ]
+    },
+    {
+      "id": "amazingdata_vendor_use",
+      "decision_needed": "Provide the applicable vendor terms/entitlement and project decision for the selected AmazingData status-numeric and daily-bar observation scope, including local evidence retention and derived internal facts.",
+      "blocks": [
+        "historical_status_by_day",
+        "history_fixture"
+      ]
+    },
+    {
+      "id": "reproducible_first_party_retrieval",
+      "decision_needed": "Accept frozen per-venue retrieval tests for stable IDs, dynamic-table parameters, raw/PDF/rendered-DOM representation, cache/version behavior, HTTP/WAF failure handling, and historical coverage. BSE direct retrieval must not be treated as raw when only a browser-rendered DOM is available.",
+      "blocks": [
+        "security_lifecycle_pit",
+        "historical_status_by_day",
+        "corporate_actions",
+        "bj_identity_mapping"
+      ]
+    },
+    {
+      "id": "history_fixture_evidence",
+      "decision_needed": "Bind 601558.SH's exact first applicable 2020 session and minimum valid AmazingData daily-bar evidence. If that proof fails, evaluate 600068.SH under the same contract; do not modify the global baseline.",
+      "blocks": [
+        "history_fixture"
+      ]
+    }
+  ],
+  "next_authorized_step_if_accepted": "Open a separate narrow implementation PR for only the accepted adapters, a new source-policy version, lineage, and focused regression tests. This closure PR itself performs no implementation or activation."
+}
