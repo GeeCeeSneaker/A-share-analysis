@@ -30,7 +30,7 @@
 - 定向预检脚本：`scripts/spike/capability_closure_probe.py`
 - 回归测试：`tests/integration/test_cr1_provider_exchange.py`、`tests/integration/test_ca_provider_shape.py`、`tests/unit/test_spike_row_adapter.py`
 
-本地全量 `pytest`、Ruff check/format、mypy、py_compile、`uv pip check` 和 `git diff --check` 均通过。当前整改未重新调用 Provider 或重跑在线预检；下一道门是新精确 head 的 GitHub CI 与独立 delta review。PR #45 继续保持 Draft，在 Review/merge 前不创建第三次 Formal Production run。
+本地全量 `pytest`、Ruff check/format、mypy、py_compile、`uv pip check` 和 `git diff --check` 均通过。整改精确 head `5680d9365794872be4e8767b7aa379be7e534406` 的 GitHub Actions CI `#547` 三个平台均成功，GT-H3B `#95` 按策略 skipped。当前整改未重新调用 Provider 或重跑在线预检；下一道门是独立 delta review。PR #45 继续保持 Draft，在 Review/merge 前不创建第三次 Formal Production run。
 
 ## 独立审阅整改对照
 

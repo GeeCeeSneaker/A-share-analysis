@@ -193,4 +193,4 @@ uv run python scripts/spike/production_account_bootstrap.py --output data/spike/
 
 ### 6.3 复核与下一道门
 
-原始收据绑定代码提交为 `258489bc29359a1212cd33528ac5764ceb97e110`；本次语义整改代码提交为 `de411142bd3a80a998418ce2c48ae8e134993012`。本地全量 pytest、Ruff、mypy、py_compile、`uv pip check`、`git diff --check` 已通过；当前未重新调用 Provider 或重跑在线预检，仍需 GitHub 精确 head CI 和独立 delta review。未决项不得通过新建 Formal run、修改 Golden、放宽基线或重跑旧 verdict 来掩盖。
+原始收据绑定代码提交为 `258489bc29359a1212cd33528ac5764ceb97e110`；本次语义整改代码提交为 `de411142bd3a80a998418ce2c48ae8e134993012`。本地全量 pytest、Ruff、mypy、py_compile、`uv pip check`、`git diff --check` 已通过；整改精确 head `5680d9365794872be4e8767b7aa379be7e534406` 的 GitHub Actions CI `#547` 三个平台均成功，GT-H3B `#95` 按策略 skipped。当前未重新调用 Provider 或重跑在线预检，仍需独立 delta review。未决项不得通过新建 Formal run、修改 Golden、放宽基线或重跑旧 verdict 来掩盖。

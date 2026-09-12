@@ -3845,9 +3845,10 @@
 
 ## 2026-09-12 — Independent-review semantic-overreach remediation
 
-> Status: `P0 BLOCKERS ADDRESSED / FAIL-CLOSED RESTORED / LOCAL QA PENDING / NO THIRD FORMAL`
+> Status: `P0 BLOCKERS ADDRESSED / FAIL-CLOSED RESTORED / LOCAL QA GREEN / CI VERIFIED GREEN / NO THIRD FORMAL`
 
 - Remediation source commit: `de411142bd3a80a998418ce2c48ae8e134993012`.
+- Exact remediation/documentation head `5680d9365794872be4e8767b7aa379be7e534406` passed GitHub Actions CI `#547` on Ubuntu 3.14, Windows 3.12, and Windows 3.14; GT-H3B `#95` was skipped by policy.
 - Absorbed the exact-head review of PR #45: the observed status rows with both
   identity and date missing, and the dividend `DIV_PROGRESS`/`DATE_EX`
   correlation, do not by themselves establish provider semantics.

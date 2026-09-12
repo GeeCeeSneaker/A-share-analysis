@@ -6255,7 +6255,7 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 **Type**：C1 — independent-review semantic-boundary remediation
 **Date**：2026-09-12
-**Status**：`P0 BLOCKERS ADDRESSED / FAIL-CLOSED RESTORED / LOCAL QA GREEN / CI PENDING / KEEP DRAFT / NO THIRD FORMAL`
+**Status**：`P0 BLOCKERS ADDRESSED / FAIL-CLOSED RESTORED / LOCAL QA GREEN / CI VERIFIED GREEN / KEEP DRAFT / NO THIRD FORMAL`
 **Evidence**：PR #45 exact-head review `PRR_kwDOT_lhrs8AAAABNQI_5g`；整改代码提交 `de411142bd3a80a998418ce2c48ae8e134993012`；[`capability_closure_20260911.md`](../provider_verification/capability_closure_20260911.md)。
 
 **审阅阻断与处理**：
@@ -6266,7 +6266,7 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 **范围与验证**：
 
-- 新增/更新回归测试锁定两类原先被过滤的形状必须失败关闭；本地全量 pytest、Ruff check/format、项目配置下 mypy、py_compile、`uv pip check`、`git diff --check` 均通过。3 个 symlink 测试因 Windows 权限按既有规则跳过。
+- 新增/更新回归测试锁定两类原先被过滤的形状必须失败关闭；本地全量 pytest、Ruff check/format、项目配置下 mypy、py_compile、`uv pip check`、`git diff --check` 均通过。3 个 symlink 测试因 Windows 权限按既有规则跳过。精确 head `5680d9365794872be4e8767b7aa379be7e534406` 的 GitHub Actions CI `#547` 三个平台均成功，GT-H3B `#95` 按策略 skipped。
 - 未修改 Golden、H1 规则、2020 baseline、Provider 配置、旧 Formal run、sealed catalog 或 verdict；未执行新在线预检、Production、`--resume`、`--verdict`、backfill 或策略扩展。
 
-**下一步**：推送整改提交后只运行普通 GitHub CI，并将新精确 head 交由独立 Reviewer 做 delta review。PR #45 保持 Draft；只有新增权威 Provider/SDK 契约并经独立审阅接受后，才可讨论任何语义归一化或新的 Formal 授权。
+**下一步**：普通 GitHub CI 已完成；将精确 head `5680d9365794872be4e8767b7aa379be7e534406` 交由独立 Reviewer 做 delta review。PR #45 保持 Draft；只有新增权威 Provider/SDK 契约并经独立审阅接受后，才可讨论任何语义归一化或新的 Formal 授权。
