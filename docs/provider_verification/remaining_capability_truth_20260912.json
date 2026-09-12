@@ -1,0 +1,233 @@
+{
+  "schema": "remaining-capability-truth-v1",
+  "as_of_date": "2026-09-12",
+  "base_main_commit": "6ad53a84111fa9b8cc86276d4ed78c9b08f8e469",
+  "scope": "Issue #39 six-item non-Production capability and contract closure",
+  "recommendation": "COMPOSITE/FALLBACK_SOURCE_REQUIRED",
+  "recommendation_is_diagnostic_only": true,
+  "formal_run_authorized": false,
+  "provider_calls_in_this_closure": 0,
+  "golden_h1_baseline_mutated": false,
+  "sources": [
+    {
+      "id": "sealed-capability-receipt",
+      "kind": "SEALED_PROVIDER_OBSERVATION",
+      "path": "docs/provider_verification/capability_closure_20260911.json",
+      "sha256": "bd2294ec4836446bb819a66b91f0def2392be463834d5da2fa61df1f8f71eb51",
+      "authority": "sealed repository receipt; observations only"
+    },
+    {
+      "id": "sdk-surface-1.1.9",
+      "kind": "LOCAL_SDK_SURFACE_INSPECTION",
+      "package": "AmazingData 1.1.9",
+      "methods": {
+        "get_history_stock_status": "(self, code_list, local_path=..., is_local=True, **kwargs)",
+        "get_stock_basic": "(self, code_list)",
+        "get_bj_code_mapping": "(self, local_path=..., is_local=True)",
+        "get_dividend": "(self, code_list, local_path=..., is_local=True, **kwargs)",
+        "get_right_issue": "(self, code_list, local_path=..., is_local=True, **kwargs)"
+      },
+      "semantic_docstrings_present": false,
+      "authority": "interface observation only; not a semantic contract"
+    },
+    {
+      "id": "bse-code-mapping",
+      "kind": "FIRST_PARTY_EXCHANGE_PAGE",
+      "url": "https://www.bse.cn/service/code_mapping.html",
+      "retrieved_at": "2026-09-12",
+      "http_status": 200,
+      "bytes": 459945,
+      "sha256": "95d43bba3b5ca2d6e5a2654755ea732ef52fa8d2c39fe667b5d4eab533a3b877",
+      "location": "table row 242",
+      "excerpt": "242 贝特瑞 2020/7/27 835185 920185",
+      "note": "the page note says migrated former Selected Layer companies use their former-layer listing date"
+    },
+    {
+      "id": "bse-listing-rule-migration",
+      "kind": "FIRST_PARTY_EXCHANGE_PAGE",
+      "url": "https://www.bse.cn/important_news/200010914.html",
+      "retrieved_at": "2026-09-12",
+      "http_status": 200,
+      "bytes": 19760,
+      "sha256": "dbb5b7536a528afb3602fb34c9a9b7e06b172dad9f8d9c2bf6323b0ea749a5e2",
+      "excerpt": "自2021年11月15日起施行；精选层挂牌公司平移为本所上市公司，上市时间自其在精选层挂牌之日起连续计算。"
+    },
+    {
+      "id": "bse-835185-2022-report",
+      "kind": "FIRST_PARTY_ISSUER_DISCLOSURE",
+      "url": "https://www.bse.cn/disclosure/2023/2023-04-14/0bccaa00f4174ac7acc677d0b9db89e7.pdf",
+      "retrieved_at": "2026-09-12",
+      "http_status": 200,
+      "bytes": 850727,
+      "sha256": "f10bd556b8c95185eff20b09957142681e42eebe2d0452d69551878e7992a944",
+      "location": "pages 1-2",
+      "excerpt": "贝特瑞 835185；贝特瑞新材料集团股份有限公司；年度报告摘要 2022"
+    },
+    {
+      "id": "szse-300104-termination",
+      "kind": "FIRST_PARTY_EXCHANGE_PAGE",
+      "url": "https://www.szse.cn/disclosure/notice/company/t20200514_577126.html",
+      "retrieved_at": "2026-09-12",
+      "http_status": 200,
+      "bytes": 16588,
+      "sha256": "49ef8794e407370537f45c297a04c34739a917345dda374c90bc6f25970b5b29",
+      "excerpt": "公司股票自2019年5月13日起暂停上市；2020年5月14日，本所决定乐视网股票终止上市；即2020年6月5日起进入退市整理期。"
+    },
+    {
+      "id": "sse-601558-delisting",
+      "kind": "FIRST_PARTY_EXCHANGE_PAGE",
+      "url": "https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20200623_78480676.shtml",
+      "retrieved_at": "2026-09-12",
+      "http_status": 200,
+      "bytes": 27536,
+      "sha256": "23be26223b00983ecbf141ff70000f49f1b2019e0cc40c3dbdce5dc28dc0e869",
+      "excerpt": "证券代码为601558；退市整理期于2020年6月23日届满；本所于2020年7月2日对其予以摘牌。"
+    },
+    {
+      "id": "sse-2021-yearbook-2020-stats",
+      "kind": "FIRST_PARTY_EXCHANGE_STATISTICS",
+      "url": "https://star.sse.com.cn/aboutus/publication/yearly/documents/c/10061073/files/3434d1799d1145dc826c16c34bd097bf.pdf",
+      "retrieved_at": "2026-09-12",
+      "http_status": 200,
+      "bytes": 20710147,
+      "sha256": "3d21126e80bc84c10313cd8fdb916afea6479a2eb186dedfc82fe554036ae6b4",
+      "location": "2021 volume, 2020 statistics, p.102",
+      "excerpt": "主板A股十大跌幅股票：601558 退市锐电，上年收盘1.09、本年收盘0.25、跌幅-77.06%。"
+    },
+    {
+      "id": "sealed-bse-rule-artifacts",
+      "kind": "SEALED_FIRST_PARTY_RULE_ARTIFACT",
+      "artifacts": [
+        {
+          "path": "docs/provider_verification/trading_rule_h1_sources/bse_200010908.docx",
+          "bytes": 110291,
+          "sha256": "6617761b2bcc369d1f6a766b47cd91b0e4b3f99dd2024325b27c13c82f20da10"
+        },
+        {
+          "path": "docs/provider_verification/trading_rule_h1_sources/bse_200010919.docx",
+          "bytes": 72236,
+          "sha256": "c63dd4af0f21f13cca0edb9959874e2c909aabbc164fceda1321c57c44725919"
+        }
+      ],
+      "authority": "existing first-party artifacts; not changed in this closure"
+    }
+  ],
+  "blockers": [
+    {
+      "id": "status-double-missing-shape",
+      "provider_observation": {
+        "probe": "status_date_shape",
+        "request_id": "3692c492-c5fc-431e-a8ec-6e7dcd69d0d0",
+        "evidence_hash": "0bba402dddd67b247c529d62c4d2410e90bbbf3fb4f206afd410f72387ad2731",
+        "row_count": 20638,
+        "double_missing_identity_and_date_rows": 8
+      },
+      "fact": "The native response contains eight rows with both exchange-qualified identity and TRADE_DATE missing while status/limit fields are present.",
+      "classification": "PROVIDER_CAPABILITY_LIMITATION_STILL_UNRESOLVED",
+      "runtime_boundary": "canonical_status_view fails closed with ProviderRowShapeError; no correlation-based skip",
+      "formal_impact": "historical status semantics remain blocked"
+    },
+    {
+      "id": "delisted-pit-semantics",
+      "provider_observation": {
+        "probe": "delisted_stock_basic",
+        "request_id": "e49dac1a-bbe1-48aa-9da4-ef6d098938f5",
+        "evidence_hash": "91758f3f2ff6855040351939c37bd20a86390ee2c8a070c52bb792b7cbb560c3",
+        "rows": 3,
+        "fields": ["IS_LISTED", "LISTDATE", "DELISTDATE"]
+      },
+      "fact": "The method returns current-looking listing fields, but its signature has no as-of/PIT argument and the package exposes no semantic documentation; hist_code_list only proves code-list membership.",
+      "classification": "PROVIDER_PIT_SEMANTICS_UNRESOLVED",
+      "runtime_boundary": "do not synthesize historical IS_LISTED or delisting date from membership",
+      "formal_impact": "B2/delisted Golden semantics remain blocked"
+    },
+    {
+      "id": "bj-mapping-truth",
+      "provider_observation": {
+        "probe": "bj_mapping_endpoint",
+        "request_id": "4b945141-8d89-4922-a210-054e394c21a0",
+        "evidence_hash": "fef835fc6264ee786f03cc64e69633d6a77905f750f5e44687453029dc75cbdd",
+        "rows": 248,
+        "columns": ["OLD_CODE", "NEW_CODE", "LISTING_DATE", "SECURITY_NAME"]
+      },
+      "independent_truth": {
+        "security_name": "贝特瑞",
+        "listing_date": "2020-07-27",
+        "old_code": "835185",
+        "new_code": "920185",
+        "source_id": "bse-code-mapping"
+      },
+      "fact": "A first-party BSE mapping row independently binds the old/new code pair and former Selected Layer listing date.",
+      "classification": "FIRST_PARTY_MAPPING_FACT_BOUND_BUT_GOLDEN_CONTRACT_NOT_MET",
+      "runtime_boundary": "truth bundle only; no golden_bj_mapping case or Golden artifact changed",
+      "formal_impact": "mapping gate remains not ready until the project review/evidence contract accepts a case"
+    },
+    {
+      "id": "bse-historical-status",
+      "provider_observation": {
+        "probe": "bse_historical_status",
+        "request_id": "86d2e9dc-c731-4104-b490-7ee3183dee3b",
+        "evidence_hash": "c024ff9fecf3c6302e06672ab41888b1a4225306b0a9f80f11d7f343a2a8179e",
+        "symbol": "835185.BJ",
+        "window": "2022-01-01/2022-12-31",
+        "rows": 0,
+        "table_names": ["835185.BJ"]
+      },
+      "independent_facts": [
+        "BSE migration/listing rules were effective from 2021-11-15 and preserve former Selected Layer listing time",
+        "BSE official 2022 report is headed 835185 and identifies the issuer"
+      ],
+      "classification": "NOT_INAPPLICABLE_PROVIDER_HISTORICAL_STATUS_COVERAGE_OR_SEMANTICS_LIMITATION",
+      "runtime_boundary": "an empty Provider response cannot be converted into inapplicability or PASS",
+      "formal_impact": "BSE historical status remains blocked; a composite/fallback source is required"
+    },
+    {
+      "id": "corporate-action-semantics",
+      "provider_observation": {
+        "dividend": {
+          "probe": "dividend_event_shape",
+          "request_id": "22d88f89-d313-4d6c-ac4b-af6c371a28a5",
+          "evidence_hash": "9cd09a92e649e8d10901e0595d7cc5e3a5ba01118069ebe2c611c406e1067c9c",
+          "rows": 123,
+          "missing_date_ex": 50,
+          "missing_by_progress": {"1": 48, "2": 1, "12": 1, "3": 0}
+        },
+        "right_issue": {
+          "probe": "right_issue_event_shape",
+          "request_id": "d1edfa73-ef3d-40c6-b926-37cc49ab90a8",
+          "evidence_hash": "b644fd46929e985d5366439d7b625df8f6d599149da9970827761a20799926bf",
+          "rows": 6,
+          "missing_ex_dividend_date_in_current_probe": 0
+        }
+      },
+      "fact": "Observed progress/date correlation and current right-issue shape do not establish SDK field semantics; the prior sealed material's historical missing-date right-issue observation remains unresolved.",
+      "classification": "PROVIDER_CORPORATE_ACTION_FIELD_SEMANTICS_UNRESOLVED",
+      "runtime_boundary": "all missing required event dates fail closed; raw event presence is not continuity PASS",
+      "formal_impact": "corporate-action continuity remains blocked"
+    },
+    {
+      "id": "history-fixture-300104",
+      "provider_observation": {
+        "target_probe": "fixture_300104_daily_kline",
+        "target_request_id": "c4374f5c-a44d-4fe8-8fbc-cacec511a53b",
+        "target_evidence_hash": "5d1d4cceb61f185bfaf745311f6db1e7da93b49953b54da4c42925a2183e470a",
+        "target_rows": 0,
+        "control_symbol": "600519.SH",
+        "control_rows": 7,
+        "historical_code_list_contains_target": true
+      },
+      "independent_fact": "SZSE's 2020-05-14 official notice says 300104 was suspended from 2019-05-13, so it cannot be treated as an actively tradable fixture at the 2020 baseline.",
+      "classification": "INAPPLICABLE_FOR_2020_BASELINE",
+      "runtime_boundary": "do not report the target's empty bars as a Provider coverage failure and do not relax the global 2020-01-01 baseline",
+      "formal_impact": "the target fixture is deferred and history_start_2020 remains unresolved",
+      "replacement_candidate": {
+        "provider_symbol": "601558.SH",
+        "status": "PROPOSED_NOT_ACTIVATED",
+        "official_delisting_date": "2020-07-02",
+        "evidence": ["sse-601558-delisting", "sse-2021-yearbook-2020-stats"],
+        "justification": "SSE identifies 601558 and its 2020-07-02 delisting; the official 2021 volume's 2020 statistics contain its 2020 annual quote row.",
+        "remaining_check": "bind the exact first applicable 2020 session and provider bar coverage before changing any generic fixture"
+      }
+    }
+  ]
+}

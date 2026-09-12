@@ -6270,3 +6270,23 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 - 未修改 Golden、H1 规则、2020 baseline、Provider 配置、旧 Formal run、sealed catalog 或 verdict；未执行新在线预检、Production、`--resume`、`--verdict`、backfill 或策略扩展。
 
 **下一步**：普通 GitHub CI 已完成；将精确 head `5680d9365794872be4e8767b7aa379be7e534406` 交由独立 Reviewer 做 delta review。PR #45 保持 Draft；只有新增权威 Provider/SDK 契约并经独立审阅接受后，才可讨论任何语义归一化或新的 Formal 授权。
+
+## DM-20260912-FORMAL-B1B7-023 · 剩余六项 Provider 能力/契约闭环
+
+**Type**：C1 — bounded provider-contract clarification / first-party truth bundle
+**Date**：2026-09-12
+**Status**：`TARGETED NON-PRODUCTION CLOSURE / LOCAL QA GREEN / INDEPENDENT REVIEW REQUIRED / NO THIRD FORMAL`
+**Evidence**：[`remaining_capability_closure_20260912.md`](../provider_verification/remaining_capability_closure_20260912.md)、[`remaining_capability_truth_20260912.json`](../provider_verification/remaining_capability_truth_20260912.json)。
+
+**范围与事实**
+
+- 从 clean `main@6ad53a84111fa9b8cc86276d4ed78c9b08f8e469` 开始，按 Issue #39 最新调度只处理六项剩余能力边界；本轮 Provider 调用数为 0，没有创建 `SpikeRun`、运行 Production/resume/verdict 或改写旧封存结果。
+- BSE 官方新旧代码表第 242 行直接绑定贝特瑞 `835185 → 920185`、原精选层挂牌日期 2020-07-27；BSE 官方上市规则和 2022 年报告进一步绑定其 BSE/2022 上市事实。由此，Provider 对 `835185.BJ` 的 2022 空历史响应不能分类为“不适用”，只能保留为 Provider 历史状态覆盖/语义限制。
+- 深交所 2020-05-14 官方公告明确 `300104` 自 2019-05-13 暂停上市；其 code-list membership 和 0 bars 不能证明 2020 基线可交易，因此该 Golden/历史夹具分类为 `INAPPLICABLE_FOR_2020_BASELINE`。`601558.SH` 有上交所摘牌公告和 2020 官方统计年鉴依据，作为 `PROPOSED_NOT_ACTIVATED` 替代候选；精确首个适用交易日和 Provider bar 复核完成前不激活。
+- 状态双缺失、退市 PIT、Dividend/Right issue 字段/进度语义仍无权威 AmazingData 契约，运行时继续 fail-closed；BJ 只新增最小 truth bundle，不新增 `golden_bj_mapping` case，不改变 Golden/H1/2020 baseline。
+
+**调度侧推荐与下一步**
+
+- 诊断推荐：`COMPOSITE/FALLBACK_SOURCE_REQUIRED`。该推荐不代表 Provider capability approval，不是第三次 Formal 授权。
+- 独立 Reviewer 应核对 JSON 中官方来源的 HTTP 200、下载字节哈希、摘录定位，以及 BSE 空响应与 300104 不适用这两个相反分类；PR 保持 Draft，等待精确 head 的 CI 和独立审阅。
+- 后续只有在取得 Provider/SDK 语义契约或获批准的 composite/fallback 来源后，才可讨论状态、PIT、公司行为和历史夹具的正式能力判定；不得用重复探测、相关性过滤或修改期望值绕过。

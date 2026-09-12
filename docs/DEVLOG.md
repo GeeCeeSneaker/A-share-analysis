@@ -1,3 +1,13 @@
+## 2026-09-12 · 剩余六项 Provider 能力/契约闭环
+
+> 状态：TARGETED NON-PRODUCTION CLOSURE / LOCAL QA GREEN / INDEPENDENT REVIEW REQUIRED / NO THIRD FORMAL
+
+- 从 clean `main@6ad53a84111fa9b8cc86276d4ed78c9b08f8e469` 建立窄范围分支，按 Issue #39 最新调度只处理状态 shape、退市 PIT、BJ mapping、BSE 空历史状态、公司行为语义和 2020 历史夹具六项；本轮 Provider 调用数为 0，没有创建 `SpikeRun`、Production、resume 或 verdict。
+- 新增 [remaining capability closure matrix](provider_verification/remaining_capability_closure_20260912.md) 与机器可校验 [truth bundle](provider_verification/remaining_capability_truth_20260912.json)，绑定封存收据和实际直连读取的一手 BSE/SSE/SZSE 材料的 HTTP 状态、下载字节哈希、摘录定位及 Formal 影响。
+- BSE 官方 mapping 第 242 行绑定贝特瑞 `835185 → 920185`、原精选层挂牌日期 2020-07-27；BSE 官方上市规则和 2022 报告支持 835185 的 2022 上市事实。因此 Provider 对 `835185.BJ` 的空历史响应分类为“非不适用、Provider 历史状态覆盖/语义限制”，不作 PASS。
+- 深交所官方公告证明 `300104.SZ` 自 2019-05-13 已暂停上市，故将其分类为 2020 基线不适用；提出 `601558.SH` 作为有上交所退市公告和 2020 年统计年鉴依据的替代候选，但在精确首个适用交易日与 Provider bar 复核前不激活、不改 Golden/通用夹具。
+- 对无权威 SDK 语义契约的状态双缺失、退市 PIT、Dividend/Right issue 字段语义继续保持 fail-closed；BJ 仅形成最小 truth bundle，不新增 `golden_bj_mapping` case。调度侧诊断推荐为 `COMPOSITE/FALLBACK_SOURCE_REQUIRED`，不构成 Production 授权。
+
 ## 2026-09-10 · Formal Production B1-B7 完整运行与同 run verdict
 
 > 状态：FORMAL B1-B7 CLOSED / VERDICT SPIKE_INCOMPLETE / EVIDENCE PR PENDING INDEPENDENT REVIEW

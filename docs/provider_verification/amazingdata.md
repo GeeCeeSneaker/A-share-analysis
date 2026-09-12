@@ -194,3 +194,20 @@ uv run python scripts/spike/production_account_bootstrap.py --output data/spike/
 ### 6.3 复核与下一道门
 
 原始收据绑定代码提交为 `258489bc29359a1212cd33528ac5764ceb97e110`；本次语义整改代码提交为 `de411142bd3a80a998418ce2c48ae8e134993012`。本地全量 pytest、Ruff、mypy、py_compile、`uv pip check`、`git diff --check` 已通过；整改精确 head `5680d9365794872be4e8767b7aa379be7e534406` 的 GitHub Actions CI `#547` 三个平台均成功，GT-H3B `#95` 按策略 skipped。当前未重新调用 Provider 或重跑在线预检，仍需独立 delta review。未决项不得通过新建 Formal run、修改 Golden、放宽基线或重跑旧 verdict 来掩盖。
+
+## 7. 2026-09-12 剩余六项能力闭环（当前交接）
+
+独立 Reviewer 接受 PR #45 后，调度要求只允许再做一次窄范围能力/契约闭环。详细的
+“证据来源 → 已确认事实 → 分类 → Formal 影响”矩阵见
+[`remaining_capability_closure_20260912.md`](remaining_capability_closure_20260912.md)，
+机器可校验 truth bundle 见
+[`remaining_capability_truth_20260912.json`](remaining_capability_truth_20260912.json)。
+
+本轮没有新增 Provider 调用或 Formal run。BSE 一手材料把 `835185.BJ` 的空历史响应
+排除了“不适用”的解释，但不能把 Provider 空响应升级成历史状态 PASS；深交所一手公告
+则证明 `300104.SZ` 自 2019-05-13 已暂停上市，因此它被分类为 2020 基线不适用。
+`601558.SH` 仅作为有一手退市与 2020 统计依据的替代候选，尚未激活。
+
+调度侧推荐为 `COMPOSITE/FALLBACK_SOURCE_REQUIRED`（仅诊断，不是 Production 授权）。
+在 PIT 状态、状态异常行、公司行为字段语义取得权威契约前，运行时继续失败关闭，不改
+Golden、H1、全局 baseline 或旧封存结果。
