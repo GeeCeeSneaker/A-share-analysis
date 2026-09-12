@@ -1,3 +1,17 @@
+## 2026-09-12 · 最小来源选择 / 检索闭环合同
+
+> 状态：SOURCE-SELECTION CLOSURE DESIGN / SOURCE SELECTION STILL UNRESOLVED / NO RUNTIME ACTIVATION
+
+- 按 Issue #39 合并 PR #47 后的最新调度要求，从 clean main@538bf8ea1f62cac4461215ac316484acf078b09a 建立本窄范围闭环；本轮只写来源选择、检索、留存和外部决策合同，不运行 Provider、Production、Formal、backfill 或 universe sweep。
+- 新增 source_selection_retrieval_closure_20260912.md 与机器可校验的 source_selection_retrieval_closure_20260912.json。合同绑定五项能力的最小组合：交易所事件文档、交易所公司行为记录、BSE mapping/cutover 文档、SSE 601558 日历/统计文档和已接受的 AmazingData 数值/日线观察。
+- 本阶段明确将 cninfo_original_issuer_document_transport 与 exchange_quotation_or_processed_market_data 标为 NOT_SELECTED，避免把 CNINFO 或交易所行情数据作为不必要的 fallback；若一手来源或 AmazingData 观察不足，继续 UNKNOWN/deferred。BSE 公共文档/mapping 不继承 BSE 行情信息许可。
+- 每个来源类别均绑定精确项目用途、条款/授权依据和项目决策状态、canonical locator、稳定身份、raw/PDF/rendered-DOM 表示、缓存版本、available_at <= as_of、fail-closed 和最小留存物；选中类别仍为 STILL_UNRESOLVED，五项 capability 全部保持 BLOCKED。
+- 300104.SZ 继续 INAPPLICABLE_FOR_2020_BASELINE；601558.SH 为 PROPOSED_NOT_ACTIVATED，600068.SH 仅为备用候选；未改全局 2020 baseline。新测试锁定来源引用、未选 market-data/CNINFO 和无执行授权边界。
+
+Implementation Status：最小来源选择与检索闭环合同已记录；未激活 source-policy、Provider facade、fallback、Golden/H1、baseline 或任何 Formal/Production 运行。
+
+Review Status：等待 exact-head 独立 Reviewer；只有来源类别用途决定、可重放检索合同和 601558 首 session/最小 bar 证据接受后，才可另开窄实现 PR。调度推荐保持 SOURCE_SELECTION_STILL_UNRESOLVED。
+
 ## 2026-09-12 · PR #47 许可 / 来源类别归因整改
 
 > 状态：P0 LICENSING/SOURCE-CLASS BLOCKER ADDRESSED / DESIGN-ONLY / SOURCE SELECTION STILL UNRESOLVED / NO RUNTIME ACTIVATION

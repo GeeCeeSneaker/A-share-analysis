@@ -1,3 +1,40 @@
+## DM-20260912-FORMAL-B1B7-027 · 最小来源选择 / 检索闭环合同
+
+Type：C1 — source-selection/retrieval closure design
+Date：2026-09-12
+Status：DESIGN-ONLY / SOURCE SELECTION STILL UNRESOLVED / KEEP DRAFT / NO RUNTIME ACTIVATION
+Evidence：source_selection_retrieval_closure_20260912.md、source_selection_retrieval_closure_20260912.json、分支 feat/source-selection-retrieval-closure-20260912。
+
+触发与基线：
+
+- PR #47 已通过 exact-head review 5185409303 并合并；当前 clean main 为 538bf8ea1f62cac4461215ac316484acf078b09a。Issue #39 随后只授权一次最小来源选择/检索闭环，不授权实现、fallback 激活或第三次 Formal。
+- 本 PR 不调用 Provider、不创建 SpikeRun，不运行 Production、resume 或 verdict，不修改 Golden、H1、全局 2020 baseline、历史封存 artifact、catalog、verdict、Provider 配置或 source-policy-v1。
+
+最小来源选择：
+
+- 选中并分别决策：交易所公告/披露文档（lifecycle/PIT）、交易所公司行为记录、BSE mapping/cutover 文档、SSE 601558 日历/统计文档、AmazingData status 数值和 daily-bar 观察。
+- 明确 NOT_SELECTED：CNINFO 原始发行人文档 transport；SSE/SZSE/BSE 直接行情/处理后市场数据。这样五项能力可以优先用语义一手文档 + 已接受的 AmazingData 数值/日线表面，避免无必要地引入交易所市场数据许可依赖；来源不足时 fail closed。
+- BSE 公告、mapping、cutover 文档只作文档/身份/路由证据，不能推导 BSE 行情信息许可；未选择的交易所行情类保持不适用本阶段。
+
+合同内容：
+
+- 对每类来源绑定 exact project use（retrieval、local retention、parsing、derived facts、redistribution）、一手/vendor terms basis 与 STILL_UNRESOLVED/NOT_SELECTED 项目状态。
+- 对已选来源绑定 canonical locator、稳定公告/记录/请求身份、raw bytes / official PDF / rendered DOM 或 normalized observation 表示、内容寻址缓存/版本、retrieved_at/available_at、WAF/动态响应失败关闭和最小“事实 + provenance/hash”留存。rendered_dom 不得冒充 raw bytes。
+- 五行 capability matrix 继续执行 available_at <= as_of、缺失/畸形/冲突 fail-closed、BSE caller-side mapping、调整参考价延期和 601558/600068 deferred；不按 Provider 进度码相关性过滤异常行。
+
+待外部决定与下一步：
+
+1. 项目管理者按 source class/venue 明确自动读取、留存、解析、内部/派生使用和再分发状态。
+2. 项目管理者提供 AmazingData vendor terms/entitlement 与 status 数值、daily-bar 观察的精确用途决定。
+3. 独立 Reviewer 接受稳定 ID、动态/WAF、representation、cache/version、coverage 的 retrieval contract。
+4. 绑定 601558.SH 首个适用 2020 session + 最小有效 bar；失败后才按同一合同评估 600068，不改全局 baseline。
+
+上述门槛全部接受后，才可另开窄 implementation PR（适配器、新 source-policy 版本、lineage、回归测试）；本 PR 不实现、不激活。
+
+Implementation Status：机器合同、五项矩阵和 focused regression 已添加；selected source class 全部未决，capability 全部 BLOCKED。
+
+Review Status：SOURCE_SELECTION_STILL_UNRESOLVED / INDEPENDENT REVIEW REQUIRED / KEEP DRAFT；没有第三次 Formal、Production、Provider sweep、backfill 或策略工作授权。
+
 ## DM-20260910-TRADING-RULE-H1R4-011 · H1R4 REVIEWED 头部声明修正与最终重封存
 
 **Type**：C1 — corrected reviewed evidence seal and ACTIVE transition
