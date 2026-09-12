@@ -6250,3 +6250,23 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 | `300104.SZ` | code-list 包含目标；目标日线 0 行，`600519.SH` 同窗口控制 7 行；`PROVIDER_CONFIRMED` | 目标 fixture 仍不可用，适用性/可交易性或替换 fixture 未定 |
 
 **质量门**：本地全量 pytest、Ruff check/format、mypy、py_compile、`uv pip check`、`git diff --check` 已通过；GitHub Actions CI `#545` 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三个矩阵均成功，GT-H3B `#93` 按策略 skipped。当前仅待 PR #45 的独立 Review/merge；在此之前不启动第三次 Formal Production。
+
+## DM-20260912-FORMAL-B1B7-022 — PR #45 语义越界整改
+
+**Type**：C1 — independent-review semantic-boundary remediation
+**Date**：2026-09-12
+**Status**：`P0 BLOCKERS ADDRESSED / FAIL-CLOSED RESTORED / LOCAL QA GREEN / CI PENDING / KEEP DRAFT / NO THIRD FORMAL`
+**Evidence**：PR #45 exact-head review `PRR_kwDOT_lhrs8AAAABNQI_5g`；整改代码提交 `de411142bd3a80a998418ce2c48ae8e134993012`；[`capability_closure_20260911.md`](../provider_verification/capability_closure_20260911.md)。
+
+**审阅阻断与处理**：
+
+- 状态预检观察到 8 行同时缺身份和 `TRADE_DATE`，但仓库没有权威契约证明它们是汇总/非观测行。删除 `canonical_status_view()` 的生产 skip；现在该形状进入缺失交换所限定身份的 `ProviderRowShapeError`，不会静默消失。
+- Dividend 预检观察到 50 行缺 `DATE_EX` 且集中于 `DIV_PROGRESS=1/2/12`，但进度码语义未被独立证明。删除 `_ca_provider_view()` 的进度码过滤；所有缺 `DATE_EX` 的 dividend 行都触发 `CAProviderShapeError`，语义保持 `STILL_UNRESOLVED`。
+- `capability_closure_probe.py` 的对应报告分类改为 `STILL_UNRESOLVED`，并明确“观察相关性不是契约、没有生产过滤”。原始脱敏 receipt 保持冻结，不重写其历史观察字段，也没有重新调用 Provider。
+
+**范围与验证**：
+
+- 新增/更新回归测试锁定两类原先被过滤的形状必须失败关闭；本地全量 pytest、Ruff check/format、项目配置下 mypy、py_compile、`uv pip check`、`git diff --check` 均通过。3 个 symlink 测试因 Windows 权限按既有规则跳过。
+- 未修改 Golden、H1 规则、2020 baseline、Provider 配置、旧 Formal run、sealed catalog 或 verdict；未执行新在线预检、Production、`--resume`、`--verdict`、backfill 或策略扩展。
+
+**下一步**：推送整改提交后只运行普通 GitHub CI，并将新精确 head 交由独立 Reviewer 做 delta review。PR #45 保持 Draft；只有新增权威 Provider/SDK 契约并经独立审阅接受后，才可讨论任何语义归一化或新的 Formal 授权。

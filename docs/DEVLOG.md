@@ -3847,6 +3847,7 @@
 
 > Status: `P0 BLOCKERS ADDRESSED / FAIL-CLOSED RESTORED / LOCAL QA PENDING / NO THIRD FORMAL`
 
+- Remediation source commit: `de411142bd3a80a998418ce2c48ae8e134993012`.
 - Absorbed the exact-head review of PR #45: the observed status rows with both
   identity and date missing, and the dividend `DIV_PROGRESS`/`DATE_EX`
   correlation, do not by themselves establish provider semantics.
