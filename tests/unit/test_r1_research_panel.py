@@ -99,7 +99,7 @@ def _build(tmp_path: Path):
             eligibility=ResearchEligibility.EXPERIMENTAL.value,
         ),
     ]
-    result = builder.build_from_verified_rows(
+    result = builder._build_fixture_from_rows(  # noqa: SLF001 - explicit test-only fixture
         rows,
         source_snapshot_id=SNAPSHOT_ID,
         source_snapshot_as_of="2026-09-01T00:00:00+00:00",
@@ -116,7 +116,7 @@ def _build(tmp_path: Path):
 def test_boundaries_disabled_rows_and_replay_are_deterministic(tmp_path: Path) -> None:
     builder, first, _ = _build(tmp_path)
     manifest_path = tmp_path / "research" / first.manifest_uri
-    reader = ResearchPanelReader.from_manifest(manifest_path)
+    reader = ResearchPanelReader.from_manifest(manifest_path, allow_test_fixture=True)
 
     development = reader.load_security_daily(split=ResearchSplit.DEVELOPMENT)
     validation = reader.load_security_daily(split="validation_a")
@@ -142,7 +142,7 @@ def test_boundaries_disabled_rows_and_replay_are_deterministic(tmp_path: Path) -
     assert development.get_column("pre_close").null_count() == development.height
     assert "holdout" not in development.get_column("research_split").to_list()
 
-    replay = builder.build_from_verified_rows(
+    replay = builder._build_fixture_from_rows(  # noqa: SLF001 - explicit test-only fixture
         _build(tmp_path)[2],
         source_snapshot_id=SNAPSHOT_ID,
         source_snapshot_as_of="2026-09-01T00:00:00+00:00",
@@ -169,15 +169,15 @@ def test_reader_requires_explicit_split_and_rejects_cross_split_range(tmp_path: 
 
     with pytest.raises(TypeError):
         load_research_security_daily(manifest_path)  # type: ignore[call-arg]
+
+    with pytest.raises(ResearchManifestError, match="test-only"):
+        load_research_security_daily(manifest_path, split="development")
+
+    reader = ResearchPanelReader.from_manifest(manifest_path, allow_test_fixture=True)
     with pytest.raises(ResearchReaderError, match="crosses"):
-        load_research_security_daily(
-            manifest_path,
-            split="development",
-            start="2019-12-31",
-        )
+        reader.load_security_daily(split="development", start="2019-12-31")
     with pytest.raises(ResearchReaderError, match="unknown research fields"):
-        load_research_security_daily(
-            manifest_path,
+        reader.load_security_daily(
             split="development",
             columns=["close", "ALL_A_SHARES"],
         )
@@ -203,12 +203,12 @@ def test_reader_fails_closed_on_semantic_widening(
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
 
     if field == "coverage_state":
-        reader = ResearchPanelReader.from_manifest(manifest_path)
+        reader = ResearchPanelReader.from_manifest(manifest_path, allow_test_fixture=True)
         with pytest.raises(ResearchReaderError, match="coverage_state"):
             reader.load_security_daily(split="development")
     else:
         with pytest.raises(ResearchManifestError):
-            ResearchPanelReader.from_manifest(manifest_path)
+            ResearchPanelReader.from_manifest(manifest_path, allow_test_fixture=True)
 
 
 def test_split_boundaries_and_identity_overlap_fail_closed() -> None:
@@ -260,13 +260,13 @@ def test_builder_rejects_pit_violation_and_duplicate_primary_key(tmp_path: Path)
         "build_timestamp": "2026-09-12T00:00:00+00:00",
     }
     with pytest.raises(ResearchPanelError, match="PIT"):
-        builder.build_from_verified_rows(
+        builder._build_fixture_from_rows(  # noqa: SLF001 - explicit test-only fixture
             [row],
             source_snapshot_as_of="2026-06-01T00:00:00+00:00",
             **common,
         )
     with pytest.raises(ResearchPanelError, match="duplicate research primary key"):
-        builder.build_from_verified_rows(
+        builder._build_fixture_from_rows(  # noqa: SLF001 - explicit test-only fixture
             [row, dict(row)],
             source_snapshot_as_of="2026-09-01T00:00:00+00:00",
             **common,
@@ -288,3 +288,60 @@ def test_published_machine_contract_matches_python_contract() -> None:
     assert contract["semantic_constraints"]["universe_basis"] == "OBSERVED_DAILY_BAR_UNIVERSE"
     assert contract["index_panel"]["state"] == "DISABLED_UNVERIFIED_INDEX_IDENTITY"
     assert "source_snapshot_as_of" in contract["manifest_required_fields"]
+
+
+def test_unverified_rows_cannot_mint_authoritative_manifest(tmp_path: Path) -> None:
+    builder = ResearchPanelBuilder(
+        None,
+        raw_root=tmp_path / "raw",
+        normalized_root=tmp_path / "normalized",
+        research_root=tmp_path / "research",
+    )
+    identity_view = _identity_view()
+    projected = builder._project_rows(  # noqa: SLF001 - inspect publication boundary
+        [_row(date(2022, 5, 5), "security-sse")],
+        source_snapshot_id=SNAPSHOT_ID,
+        source_snapshot_as_of=AVAILABLE_AT,
+        source_canonical_run_id=CANONICAL_RUN_ID,
+        source_readmodel_contract_version="readmodel-v1",
+        identity_view=identity_view,
+    )
+    with pytest.raises(ResearchPanelError, match="verified identity"):
+        builder._publish(  # noqa: SLF001 - inspect publication boundary
+            projected,
+            source_snapshot_id=SNAPSHOT_ID,
+            source_snapshot_as_of=AVAILABLE_AT,
+            source_canonical_run_id=CANONICAL_RUN_ID,
+            source_readmodel_contract_version="readmodel-v1",
+            source_snapshot_manifest_hash="a" * 64,
+            source_snapshot_semantic_hash="b" * 64,
+            identity_view=identity_view,
+            build_timestamp=AVAILABLE_AT,
+            coverage_state=CoverageState.OBSERVED_DAILY_BAR_COVERAGE,
+        )
+    assert not (tmp_path / "research").exists()
+    assert not hasattr(builder, "build_from_verified_rows")
+
+
+def test_typed_numeric_violation_blocks_the_whole_fixture_build(tmp_path: Path) -> None:
+    builder = ResearchPanelBuilder(
+        None,
+        raw_root=tmp_path / "raw",
+        normalized_root=tmp_path / "normalized",
+        research_root=tmp_path / "research",
+    )
+    row = _row(date(2022, 5, 5), "security-sse")
+    row["open"] = "10.0"
+    with pytest.raises(ResearchPanelError, match="typed numeric"):
+        builder._build_fixture_from_rows(  # noqa: SLF001 - explicit test-only fixture
+            [row],
+            source_snapshot_id=SNAPSHOT_ID,
+            source_snapshot_as_of="2026-09-01T00:00:00+00:00",
+            source_canonical_run_id=CANONICAL_RUN_ID,
+            source_readmodel_contract_version="readmodel-v1",
+            source_snapshot_manifest_hash="a" * 64,
+            source_snapshot_semantic_hash="b" * 64,
+            identity_view=_identity_view(),
+            build_timestamp="2026-09-12T00:00:00+00:00",
+        )
+    assert not (tmp_path / "research").exists()

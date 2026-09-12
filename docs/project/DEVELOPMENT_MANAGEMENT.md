@@ -1,3 +1,27 @@
+## DM-20260912-CR7-R1-029 · R1 发布边界整改
+
+**Type**：C1 — CR-7 R1 publication and identity provenance remediation
+
+**Status**：`P0 REMEDIATION IMPLEMENTED / LOCAL QA GREEN / KEEP DRAFT / INDEPENDENT DELTA REVIEW REQUIRED`
+
+**触发与范围**
+
+- Issue #39 scheduler checkpoint `5645369740` 与独立 review `5186164522` 针对 PR #50 原 head `c69c141da4f1cb0d01271af85f5c187e097b0f72` 给出三项窄整改。本批只修复 R1 发布边界、身份来源 lineage 和 typed numeric 行为，不重开 AmazingData/source-contract、Provider、Formal 或 Production 工作。
+- 权威输入仍是已验证 CR-4 ReadModel snapshot；`research_security_daily` 仍为 security daily 小样本研究入口。index 继续 `DISABLED_UNVERIFIED_INDEX_IDENTITY`，CR-5 feature join 不暴露，price/universe 继续 unadjusted/observed-universe。
+
+**已实现的合同收口**
+
+- `ResearchPanelBuilder.build_from_readmodel()` 移除 caller identity 参数，并从已验证 canonical run 的 `security_master` normalized main output 重读精确字节；manifest 记录 canonical/normalization run、normalized manifest/output URI、hash、schema、row count、set/semantic seal、verification、PIT 和 source-lineage hash。
+- caller rows/claimed snapshot hashes 只能用于私有 test-only fixture helper；该产物固定为 `research_security_daily_fixture` + `TEST_ONLY_ROWS`，默认 reader 拒绝，不能伪装成普通 `research_security_daily`。无已验证身份源时保留 null display identity，相关 bar 进入 disabled，不做 code-prefix 或其他推断。
+- 正确类型但语义不合格的行继续写入 disabled；错误类型或非有限数值属于 ReadModel typed-input violation，整批构建 fail-closed，不声称已保留该错误行。
+- 机器合同同步加入 publication mode、identity source lineage 和 typed-input 行为；回归覆盖绕过发布、test-only reader 隔离、verified identity lineage 与 numeric whole-build fail-closed。
+- 本地门禁已完成：R1 focused tests `11 passed`，全量 pytest 退出码为 0（仅既有 3 个 Windows symlink-privilege skips）；Ruff check/format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 通过。全库 `mypy src tests` 的历史测试类型问题未纳入本批源码门禁。
+
+**待完成闸门**
+
+- 提交一个最小 remediation commit，推送 PR #50 新 head；只等待该 exact head 的 required CI 与独立 delta review。保持 Draft，不自行批准、Ready 或合并。
+- 本批没有 Provider/生产账号调用、Production、Formal、resume、verdict、backfill、universe sweep、Golden/H1/CR-5/index/source-policy 修改；账号密码、真实 endpoint、Token、Cookie、专有 SDK/runtime 和原始 Provider payload 不进入仓库。
+
 ## DM-20260912-FORMAL-B1B7-027 · 最小来源选择 / 检索闭环合同
 
 Type：C1 — source-selection/retrieval closure design
@@ -6412,8 +6436,8 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 **范围与已完成项**
 
 - 执行基线固定为已合并主线 `main@9cc8ca1e699ee80b52a9b59200306dd77ec7f4b6`。本实现只消费经过 CR-4 snapshot/readmodel 验证的 `rm_daily_bar`，不接 Provider、不读 Raw、不修改 Canonical、ReadModel 或 CR-5 artifact。
-- 已实现 `research_security_daily` R1 schema、机器可读 eligibility/exclusion contract、版本化 identity view（显式 `security_id → symbol/exchange` PIT join）、三段时间 split、PIT/lineage/主键/OHLC 基础校验，以及 immutable/versioned Parquet + manifest publisher。
-- unresolved/invalid/out-of-window 行保存在单独 `disabled.parquet`，默认 `load_research_security_daily(..., split=...)` 只返回 `RESEARCH_ENABLED`；诊断读取必须调用单独的 disabled API，不会从默认输出泄漏。
+- 已实现 `research_security_daily` R1 schema、机器可读 eligibility/exclusion contract、从已验证 `security_master` 派生并带 lineage 的版本化 identity view（显式 `security_id → symbol/exchange` PIT join）、三段时间 split、PIT/lineage/主键/OHLC 基础校验，以及 immutable/versioned Parquet + manifest publisher。
+- 正确类型但语义不合格或超出研究窗口的行保存在单独 `disabled.parquet`，默认 `load_research_security_daily(..., split=...)` 只返回 `RESEARCH_ENABLED`；错误类型或非有限数值属于整批 typed-input violation，直接 fail-closed，不声称写入 disabled。诊断读取必须调用单独的 disabled API，不会从默认输出泄漏。
 - manifest 强制 `UNADJUSTED_CANONICAL`、`OBSERVED_DAILY_BAR_UNIVERSE` 和显式 coverage；reader 拒绝 adjusted/total-return/`ALL_A_SHARES` 语义或非完整观察覆盖。内容 hash、artifact byte hash、schema hash、source snapshot/readmodel/canonical lineage、identity view lineage 和 build timestamp 均落盘。
 - 固定 integration fixture 已证明 Canonical SUCCESS → SnapshotBuilder → hash-verified DuckDB ReadModel → R1 panel → reader 的可复现闭环；第二次相同输入为 immutable idempotent replay。
 

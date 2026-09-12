@@ -13,6 +13,11 @@ from typing import Any
 
 import polars as pl
 
+from ashare_state.canonical.verifier import (
+    CanonicalConsumptionError,
+    verify_canonical_run_for_consumption,
+)
+from ashare_state.identity import resolve_security_identity
 from ashare_state.readmodel import (
     READMODEL_CONTRACT_VERSION,
     DuckDBReadModel,
@@ -21,15 +26,21 @@ from ashare_state.readmodel import (
 )
 from ashare_state.research.eligibility import evaluate_daily_bar
 from ashare_state.research.models import (
+    AUTHORITATIVE_READMODEL_PUBLICATION,
     INDEX_PANEL_STATE,
     PRICE_BASIS,
     RESEARCH_CONTRACT_VERSION,
     RESEARCH_DATASET_VERSION,
     RESEARCH_SECURITY_DAILY_DATASET,
+    RESEARCH_SECURITY_DAILY_FIXTURE_DATASET,
     RESEARCH_SECURITY_DAILY_SCHEMA_VERSION,
+    TEST_ONLY_ROWS_PUBLICATION,
     UNIVERSE_BASIS,
+    VERIFIED_SECURITY_MASTER_SOURCE,
     ArtifactMetadata,
     CoverageState,
+    IdentityRecord,
+    IdentitySource,
     IdentityView,
     ResearchEligibility,
     ResearchManifest,
@@ -37,6 +48,7 @@ from ashare_state.research.models import (
     ResearchSplit,
     canonical_json,
     ensure_utc_timestamp,
+    parse_date_value,
     research_code_fingerprint,
     research_security_daily_schema,
     sha256_hex,
@@ -44,6 +56,7 @@ from ashare_state.research.models import (
 from ashare_state.research.splits import assign_research_split
 from ashare_state.snapshot import verify_snapshot
 from ashare_state.storage.atomic_files import write_file_atomic
+from ashare_state.storage.paths import physical_from_logical_uri
 
 __all__ = ["ResearchBuildResult", "ResearchPanelBuilder"]
 
@@ -65,6 +78,7 @@ _ARTIFACT_NAMES = (
     ResearchSplit.HOLDOUT.value,
     "disabled",
 )
+_IDENTITY_SUFFIX_TO_EXCHANGE = {".SH": "SSE", ".SZ": "SZSE", ".BJ": "BSE"}
 
 
 @dataclass(frozen=True)
@@ -100,11 +114,15 @@ class ResearchPanelBuilder:
         self,
         snapshot_id: str,
         *,
-        identity_view: IdentityView,
         build_timestamp: datetime | str,
         coverage_state: CoverageState | str = CoverageState.OBSERVED_DAILY_BAR_COVERAGE,
     ) -> ResearchBuildResult:
-        """Read one hash-verified ReadModel snapshot and publish R1 artifacts."""
+        """Read one hash-verified ReadModel snapshot and publish R1 artifacts.
+
+        The identity join is derived from the verified canonical run's sealed
+        ``security_master`` output.  Callers cannot inject display identity
+        rows into the authoritative publication path.
+        """
         model = DuckDBReadModel(
             self.conn,
             raw_root=self.raw_root,
@@ -168,9 +186,36 @@ class ResearchPanelBuilder:
             ) from exc
         if canonical_run_id != verified_snapshot.canonical_run_id:
             raise ResearchPanelError("ReadModel canonical_run_id does not match its snapshot")
+        try:
+            verified_canonical = verify_canonical_run_for_consumption(
+                self.conn,
+                canonical_run_id,
+                raw_root=self.raw_root,
+                normalized_root=self.normalized_root,
+            )
+        except CanonicalConsumptionError as exc:
+            raise ResearchPanelError(
+                f"canonical run {canonical_run_id} is not a verified identity source: {exc}"
+            ) from exc
+        if verified_canonical.as_of != verified_snapshot.as_of:
+            raise ResearchPanelError("ReadModel and canonical run as_of values do not match")
+        identity_view = self._identity_view_from_verified_canonical(verified_canonical)
         record = verified_snapshot.ledger_record
-        return self.build_from_verified_rows(
+        try:
+            coverage = CoverageState(coverage_state)
+        except ValueError as exc:
+            raise ResearchPanelError(f"unknown coverage_state {coverage_state!r}") from exc
+        built_at = ensure_utc_timestamp(build_timestamp)
+        projected = self._project_rows(
             rows,
+            source_snapshot_id=snapshot_id,
+            source_snapshot_as_of=verified_snapshot.as_of,
+            source_canonical_run_id=canonical_run_id,
+            source_readmodel_contract_version=READMODEL_CONTRACT_VERSION,
+            identity_view=identity_view,
+        )
+        return self._publish(
+            projected,
             source_snapshot_id=snapshot_id,
             source_snapshot_as_of=verified_snapshot.as_of,
             source_canonical_run_id=canonical_run_id,
@@ -178,11 +223,12 @@ class ResearchPanelBuilder:
             source_snapshot_manifest_hash=str(record["manifest_hash"]),
             source_snapshot_semantic_hash=str(record["snapshot_semantic_hash"]),
             identity_view=identity_view,
-            build_timestamp=build_timestamp,
-            coverage_state=coverage_state,
+            build_timestamp=built_at,
+            coverage_state=coverage,
+            publication_mode=AUTHORITATIVE_READMODEL_PUBLICATION,
         )
 
-    def build_from_verified_rows(
+    def _build_fixture_from_rows(
         self,
         rows: Sequence[Mapping[str, Any]],
         *,
@@ -196,11 +242,12 @@ class ResearchPanelBuilder:
         build_timestamp: datetime | str,
         coverage_state: CoverageState | str = CoverageState.OBSERVED_DAILY_BAR_COVERAGE,
     ) -> ResearchBuildResult:
-        """Publish from rows already obtained through the verified boundary.
+        """Build a visibly test-only fixture from caller-supplied rows.
 
-        This method is useful for a fixed offline fixture, but callers must
-        provide the same lineage fields that ``build_from_readmodel`` obtains.
-        It does not accept Provider, Raw, or unversioned identity inputs.
+        This private helper is intentionally not an authoritative publisher.
+        Its manifest uses ``TEST_ONLY_ROWS`` and a distinct dataset name that
+        the ordinary R1 reader rejects.  Authoritative publication is only
+        reachable through ``build_from_readmodel``.
         """
         if not source_snapshot_id or not source_canonical_run_id:
             raise ResearchPanelError("source snapshot and canonical run IDs are required")
@@ -231,6 +278,155 @@ class ResearchPanelBuilder:
             identity_view=identity_view,
             build_timestamp=built_at,
             coverage_state=coverage,
+            publication_mode=TEST_ONLY_ROWS_PUBLICATION,
+        )
+
+    def _identity_view_from_verified_canonical(self, canonical: Any) -> IdentityView:
+        """Materialize identity only from verified CR-2 security-master outputs."""
+        entries = canonical.manifest.get("input_normalized_runs")
+        if not isinstance(entries, list):
+            raise ResearchPanelError("verified canonical manifest has no input lineage")
+        records_by_key: dict[tuple[str, date, str, str], IdentityRecord] = {}
+        sources: list[IdentitySource] = []
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                raise ResearchPanelError("verified canonical input lineage is malformed")
+            if entry.get("role") != "identity_master":
+                continue
+            if entry.get("normalization_surface") != "security_master":
+                continue
+            if entry.get("verification") != "HEALTHY" or entry.get("pit_available") is not True:
+                continue
+            source, rows = self._read_verified_identity_output(
+                entry,
+                canonical_run_id=canonical.canonical_run_id,
+                canonical_as_of=canonical.as_of,
+            )
+            sources.append(source)
+            for ordinal, row in enumerate(rows):
+                record = self._identity_record_from_master_row(row, ordinal=ordinal)
+                if record is None:
+                    continue
+                key = (record.security_id, record.valid_from, record.symbol, record.exchange)
+                existing = records_by_key.get(key)
+                if existing is not None and existing != record:
+                    raise ResearchPanelError(
+                        "verified identity sources disagree for "
+                        f"{record.security_id} at {record.valid_from}"
+                    )
+                records_by_key[key] = record
+        if not sources:
+            return IdentityView._without_verified_source()  # noqa: SLF001 - fail-closed state
+        return IdentityView._from_verified_security_master(  # noqa: SLF001 - verified boundary
+            tuple(records_by_key.values()),
+            sources=tuple(sources),
+        )
+
+    def _read_verified_identity_output(
+        self,
+        entry: Mapping[str, Any],
+        *,
+        canonical_run_id: str,
+        canonical_as_of: datetime,
+    ) -> tuple[IdentitySource, list[dict[str, Any]]]:
+        """Read the exact bytes already verified by the canonical consumer."""
+        try:
+            manifest_uri = str(entry["normalized_manifest_uri"])
+            manifest_hash = str(entry["normalized_manifest_hash"])
+            manifest_path = physical_from_logical_uri(self.normalized_root, manifest_uri)
+            if not manifest_path.is_file():
+                raise ResearchPanelError(f"identity source manifest is missing: {manifest_uri}")
+            manifest_bytes = manifest_path.read_bytes()
+            if sha256_hex(manifest_bytes) != manifest_hash:
+                raise ResearchPanelError("identity source manifest hash changed after verification")
+            manifest = json.loads(manifest_bytes.decode("utf-8"))
+            if not isinstance(manifest, Mapping):
+                raise ResearchPanelError("identity source manifest root is not an object")
+            outputs = manifest.get("outputs")
+            if not isinstance(outputs, list):
+                raise ResearchPanelError("identity source manifest has no output list")
+            if any(not isinstance(output, Mapping) for output in outputs):
+                raise ResearchPanelError("identity source output metadata is malformed")
+            main_outputs = [output for output in outputs if output.get("output_name") == "main"]
+            if len(main_outputs) != 1:
+                raise ResearchPanelError("identity source must have exactly one main output")
+            output = main_outputs[0]
+            output_uri = str(output["uri"])
+            output_path = physical_from_logical_uri(self.normalized_root, output_uri)
+            if not output_path.is_file():
+                raise ResearchPanelError(f"identity source output is missing: {output_uri}")
+            output_bytes = output_path.read_bytes()
+            output_hash = sha256_hex(output_bytes)
+            if output_hash != str(output["content_hash"]):
+                raise ResearchPanelError("identity source output hash changed after verification")
+            frame = pl.read_parquet(io.BytesIO(output_bytes))
+            output_schema_hash = sha256_hex(str(frame.schema))
+            if output_schema_hash != str(output["schema_hash"]):
+                raise ResearchPanelError("identity source output schema changed after verification")
+            if frame.height != int(output["row_count"]):
+                raise ResearchPanelError(
+                    "identity source output row count changed after verification"
+                )
+            source = IdentitySource.from_mapping(
+                {
+                    "source_kind": VERIFIED_SECURITY_MASTER_SOURCE,
+                    "canonical_run_id": canonical_run_id,
+                    "canonical_as_of": canonical_as_of.isoformat(),
+                    "normalization_run_id": str(entry["run_id"]),
+                    "provider": str(entry["provider"]),
+                    "normalization_surface": str(entry["normalization_surface"]),
+                    "provider_dataset": str(entry["provider_dataset"]),
+                    "endpoint": str(entry["endpoint"]),
+                    "normalized_manifest_uri": manifest_uri,
+                    "normalized_manifest_hash": manifest_hash,
+                    "normalized_output_name": "main",
+                    "normalized_output_uri": output_uri,
+                    "normalized_output_hash": output_hash,
+                    "normalized_output_schema_hash": output_schema_hash,
+                    "normalized_output_row_count": frame.height,
+                    "normalized_output_set_hash": str(entry["normalized_output_set_hash"]),
+                    "normalized_semantic_hash": str(entry["normalized_semantic_hash"]),
+                    "verification": "HEALTHY",
+                    "pit_available": True,
+                }
+            )
+            return source, frame.to_dicts()
+        except ResearchPanelError:
+            raise
+        except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError) as exc:
+            raise ResearchPanelError(f"identity source output is malformed: {exc}") from exc
+
+    @staticmethod
+    def _identity_record_from_master_row(
+        row: Mapping[str, Any], *, ordinal: int
+    ) -> IdentityRecord | None:
+        provider_symbol = row.get("provider_symbol")
+        if provider_symbol is None or not isinstance(provider_symbol, str):
+            raise ResearchPanelError(f"verified identity row {ordinal} has no provider_symbol")
+        provider_symbol = provider_symbol.strip().upper()
+        if "." not in provider_symbol:
+            raise ResearchPanelError(
+                f"verified identity row {ordinal} has no exchange suffix; identity is disabled"
+            )
+        symbol, suffix = provider_symbol.rsplit(".", 1)
+        suffix = f".{suffix}"
+        exchange = _IDENTITY_SUFFIX_TO_EXCHANGE.get(suffix)
+        if exchange is None:
+            raise ResearchPanelError(
+                f"verified identity row {ordinal} has an unknown exchange suffix"
+            )
+        raw_list_date = row.get("list_date")
+        if raw_list_date is None:
+            # Match the existing governed bridge: no list date cannot produce
+            # a publishable identity; the corresponding bar remains unresolved.
+            return None
+        list_date = parse_date_value(raw_list_date)
+        resolved = resolve_security_identity(exchange, "STOCK", symbol, list_date)
+        return IdentityRecord(
+            security_id=str(resolved.security_id),
+            symbol=symbol,
+            exchange=exchange,
+            valid_from=list_date,
         )
 
     @staticmethod
@@ -387,7 +583,19 @@ class ResearchPanelBuilder:
         identity_view: IdentityView,
         build_timestamp: datetime,
         coverage_state: CoverageState,
+        publication_mode: str = AUTHORITATIVE_READMODEL_PUBLICATION,
     ) -> ResearchBuildResult:
+        if publication_mode == AUTHORITATIVE_READMODEL_PUBLICATION:
+            if not identity_view.can_publish_authoritatively:
+                raise ResearchPanelError(
+                    "authoritative R1 publication requires a verified identity source or "
+                    "an explicit no-source disabled view"
+                )
+            dataset_name = RESEARCH_SECURITY_DAILY_DATASET
+        elif publication_mode == TEST_ONLY_ROWS_PUBLICATION:
+            dataset_name = RESEARCH_SECURITY_DAILY_FIXTURE_DATASET
+        else:
+            raise ResearchPanelError(f"unsupported research publication_mode {publication_mode!r}")
         code_fingerprint = research_code_fingerprint()
         schema = research_security_daily_schema()
         schema_descriptor = [(name, str(schema[name])) for name in schema]
@@ -398,6 +606,8 @@ class ResearchPanelBuilder:
             "feature_run_id": None,
             "feature_registry_version": None,
             "index_panel_state": INDEX_PANEL_STATE,
+            "publication_mode": publication_mode,
+            "dataset_name": dataset_name,
         }
         config_hash = sha256_hex(canonical_json(config))
         build_identity = {
@@ -414,6 +624,8 @@ class ResearchPanelBuilder:
             "source_readmodel_contract_version": source_readmodel_contract_version,
             "identity_view_version": identity_view.version,
             "identity_view_hash": identity_view.content_hash,
+            "identity_source_kind": identity_view.source_kind,
+            "identity_source_lineage_hash": identity_view.source_lineage_hash,
             "price_basis": PRICE_BASIS,
             "universe_basis": UNIVERSE_BASIS,
             "config_hash": config_hash,
@@ -422,7 +634,7 @@ class ResearchPanelBuilder:
         base_dir = (
             Path("research")
             / f"contract={RESEARCH_CONTRACT_VERSION}"
-            / f"dataset={RESEARCH_SECURITY_DAILY_DATASET}"
+            / f"dataset={dataset_name}"
             / f"version={RESEARCH_DATASET_VERSION}"
             / f"build={dataset_id}"
         )
@@ -494,7 +706,8 @@ class ResearchPanelBuilder:
             artifact.row_count for artifact in artifacts if artifact.name == "disabled"
         )
         manifest = ResearchManifest(
-            dataset_name=RESEARCH_SECURITY_DAILY_DATASET,
+            dataset_name=dataset_name,
+            publication_mode=publication_mode,
             research_contract_version=RESEARCH_CONTRACT_VERSION,
             research_dataset_version=RESEARCH_DATASET_VERSION,
             dataset_id=dataset_id,
@@ -510,6 +723,9 @@ class ResearchPanelBuilder:
             source_readmodel_contract_version=source_readmodel_contract_version,
             identity_view_version=identity_view.version,
             identity_view_hash=identity_view.content_hash,
+            identity_source_kind=identity_view.source_kind,
+            identity_source_lineage_hash=identity_view.source_lineage_hash,
+            identity_sources=identity_view.sources,
             feature_run_id=None,
             feature_registry_version=None,
             price_basis=PRICE_BASIS,

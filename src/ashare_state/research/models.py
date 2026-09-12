@@ -24,6 +24,7 @@ __all__ = [
     "DataQualityState",
     "ExclusionReason",
     "IdentityRecord",
+    "IdentitySource",
     "IdentityView",
     "INDEX_PANEL_STATE",
     "IndexPanelState",
@@ -31,8 +32,11 @@ __all__ = [
     "RESEARCH_CONTRACT_VERSION",
     "RESEARCH_DATASET_VERSION",
     "RESEARCH_SECURITY_DAILY_DATASET",
+    "RESEARCH_SECURITY_DAILY_FIXTURE_DATASET",
     "RESEARCH_SECURITY_DAILY_FIELDS",
     "RESEARCH_SECURITY_DAILY_SCHEMA_VERSION",
+    "AUTHORITATIVE_READMODEL_PUBLICATION",
+    "TEST_ONLY_ROWS_PUBLICATION",
     "ResearchEligibility",
     "ResearchManifest",
     "ResearchManifestError",
@@ -53,8 +57,16 @@ __all__ = [
 
 RESEARCH_CONTRACT_VERSION = "research-v1"
 RESEARCH_SECURITY_DAILY_DATASET = "research_security_daily"
+RESEARCH_SECURITY_DAILY_FIXTURE_DATASET = "research_security_daily_fixture"
 RESEARCH_DATASET_VERSION = "research-security-daily-v1"
 RESEARCH_SECURITY_DAILY_SCHEMA_VERSION = "research-security-daily-v1"
+
+AUTHORITATIVE_READMODEL_PUBLICATION = "AUTHORITATIVE_READMODEL"
+TEST_ONLY_ROWS_PUBLICATION = "TEST_ONLY_ROWS"
+
+VERIFIED_SECURITY_MASTER_SOURCE = "VERIFIED_CR2_SECURITY_MASTER"
+NO_VERIFIED_SECURITY_MASTER_SOURCE = "NO_VERIFIED_SECURITY_MASTER"
+UNVERIFIED_CALLER_IDENTITY_SOURCE = "UNVERIFIED_CALLER_ROWS"
 
 # These are contract values, not display labels.  Do not broaden them in a
 # reader: changing either semantic requires a new research contract/version.
@@ -275,12 +287,182 @@ class IdentityRecord:
 
 
 @dataclass(frozen=True)
+class IdentitySource:
+    """One concrete, verified security-master output behind an identity view."""
+
+    source_kind: str
+    canonical_run_id: str
+    canonical_as_of: str
+    normalization_run_id: str
+    provider: str
+    normalization_surface: str
+    provider_dataset: str
+    endpoint: str
+    normalized_manifest_uri: str
+    normalized_manifest_hash: str
+    normalized_output_name: str
+    normalized_output_uri: str
+    normalized_output_hash: str
+    normalized_output_schema_hash: str
+    normalized_output_row_count: int
+    normalized_output_set_hash: str
+    normalized_semantic_hash: str
+    verification: str
+    pit_available: bool
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "source_kind": self.source_kind,
+            "canonical_run_id": self.canonical_run_id,
+            "canonical_as_of": self.canonical_as_of,
+            "normalization_run_id": self.normalization_run_id,
+            "provider": self.provider,
+            "normalization_surface": self.normalization_surface,
+            "provider_dataset": self.provider_dataset,
+            "endpoint": self.endpoint,
+            "normalized_manifest_uri": self.normalized_manifest_uri,
+            "normalized_manifest_hash": self.normalized_manifest_hash,
+            "normalized_output_name": self.normalized_output_name,
+            "normalized_output_uri": self.normalized_output_uri,
+            "normalized_output_hash": self.normalized_output_hash,
+            "normalized_output_schema_hash": self.normalized_output_schema_hash,
+            "normalized_output_row_count": self.normalized_output_row_count,
+            "normalized_output_set_hash": self.normalized_output_set_hash,
+            "normalized_semantic_hash": self.normalized_semantic_hash,
+            "verification": self.verification,
+            "pit_available": self.pit_available,
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> IdentitySource:
+        if not isinstance(payload, Mapping):
+            raise ResearchManifestError("identity source must be an object")
+        required = {
+            "source_kind",
+            "canonical_run_id",
+            "canonical_as_of",
+            "normalization_run_id",
+            "provider",
+            "normalization_surface",
+            "provider_dataset",
+            "endpoint",
+            "normalized_manifest_uri",
+            "normalized_manifest_hash",
+            "normalized_output_name",
+            "normalized_output_uri",
+            "normalized_output_hash",
+            "normalized_output_schema_hash",
+            "normalized_output_row_count",
+            "normalized_output_set_hash",
+            "normalized_semantic_hash",
+            "verification",
+            "pit_available",
+        }
+        missing = sorted(required.difference(payload))
+        if missing:
+            raise ResearchManifestError(f"identity source is missing fields: {missing}")
+        string_fields = (
+            "source_kind",
+            "canonical_run_id",
+            "canonical_as_of",
+            "normalization_run_id",
+            "provider",
+            "normalization_surface",
+            "provider_dataset",
+            "endpoint",
+            "normalized_manifest_uri",
+            "normalized_manifest_hash",
+            "normalized_output_name",
+            "normalized_output_uri",
+            "normalized_output_hash",
+            "normalized_output_schema_hash",
+            "normalized_output_set_hash",
+            "normalized_semantic_hash",
+            "verification",
+        )
+        if any(
+            not isinstance(payload[field], str) or not payload[field].strip()
+            for field in string_fields
+        ):
+            raise ResearchManifestError("identity source string fields must be non-empty strings")
+        if payload["source_kind"] != VERIFIED_SECURITY_MASTER_SOURCE:
+            raise ResearchManifestError("identity source is not a verified security-master source")
+        if payload["normalization_surface"] != "security_master":
+            raise ResearchManifestError("identity source surface must be security_master")
+        if payload["normalized_output_name"] != "main":
+            raise ResearchManifestError("identity source output must be the main table")
+        if payload["verification"] != "HEALTHY" or payload["pit_available"] is not True:
+            raise ResearchManifestError("identity source must be HEALTHY and PIT-available")
+        row_count = payload["normalized_output_row_count"]
+        if isinstance(row_count, bool) or not isinstance(row_count, int) or row_count < 0:
+            raise ResearchManifestError("identity source row count must be a non-negative integer")
+        hash_fields = (
+            "normalized_manifest_hash",
+            "normalized_output_hash",
+            "normalized_output_schema_hash",
+            "normalized_output_set_hash",
+            "normalized_semantic_hash",
+        )
+        if any(
+            len(payload[field]) != 64
+            or any(character not in "0123456789abcdef" for character in payload[field])
+            for field in hash_fields
+        ):
+            raise ResearchManifestError("identity source hashes must be lower-case SHA-256 hex")
+        return cls(
+            source_kind=str(payload["source_kind"]),
+            canonical_run_id=str(payload["canonical_run_id"]),
+            canonical_as_of=str(payload["canonical_as_of"]),
+            normalization_run_id=str(payload["normalization_run_id"]),
+            provider=str(payload["provider"]),
+            normalization_surface=str(payload["normalization_surface"]),
+            provider_dataset=str(payload["provider_dataset"]),
+            endpoint=str(payload["endpoint"]),
+            normalized_manifest_uri=str(payload["normalized_manifest_uri"]),
+            normalized_manifest_hash=str(payload["normalized_manifest_hash"]),
+            normalized_output_name=str(payload["normalized_output_name"]),
+            normalized_output_uri=str(payload["normalized_output_uri"]),
+            normalized_output_hash=str(payload["normalized_output_hash"]),
+            normalized_output_schema_hash=str(payload["normalized_output_schema_hash"]),
+            normalized_output_row_count=row_count,
+            normalized_output_set_hash=str(payload["normalized_output_set_hash"]),
+            normalized_semantic_hash=str(payload["normalized_semantic_hash"]),
+            verification=str(payload["verification"]),
+            pit_available=True,
+        )
+
+
+@dataclass(frozen=True)
 class IdentityView:
-    """Immutable version/hash wrapper around identity join rows."""
+    """Immutable version/hash wrapper around identity join rows.
+
+    ``from_rows`` deliberately creates an unverified fixture view.  Only the
+    private verified constructor used by the ReadModel path can carry a
+    trusted source lineage into an authoritative manifest.
+    """
 
     version: str
     content_hash: str
     records: tuple[IdentityRecord, ...]
+    sources: tuple[IdentitySource, ...] = ()
+    source_kind_override: str | None = None
+
+    @property
+    def source_kind(self) -> str:
+        if self.source_kind_override is not None:
+            return self.source_kind_override
+        if self.sources:
+            return VERIFIED_SECURITY_MASTER_SOURCE
+        return UNVERIFIED_CALLER_IDENTITY_SOURCE
+
+    @property
+    def source_lineage_hash(self) -> str:
+        return sha256_hex(canonical_json([source.as_dict() for source in self.sources]))
+
+    @property
+    def can_publish_authoritatively(self) -> bool:
+        """Allow a verified source or an explicit no-source disabled view."""
+        return bool(self.sources) or self.source_kind == NO_VERIFIED_SECURITY_MASTER_SOURCE
 
     @classmethod
     def from_rows(
@@ -347,8 +529,76 @@ class IdentityView:
                     "identity view contains overlapping validity intervals for "
                     f"security_id {current.security_id}"
                 )
-        content_hash = sha256_hex(canonical_json([record.as_dict() for record in records]))
+        content_hash = sha256_hex(
+            canonical_json(
+                {
+                    "records": [record.as_dict() for record in records],
+                    "sources": [],
+                }
+            )
+        )
         return cls(version=version.strip(), content_hash=content_hash, records=tuple(records))
+
+    @classmethod
+    def _from_verified_security_master(
+        cls,
+        records: Sequence[IdentityRecord],
+        *,
+        sources: Sequence[IdentitySource],
+    ) -> IdentityView:
+        source_tuple = tuple(sorted(sources, key=lambda source: source.normalization_run_id))
+        if not source_tuple:
+            raise ResearchPanelError("verified identity view requires at least one source")
+        if any(source.source_kind != VERIFIED_SECURITY_MASTER_SOURCE for source in source_tuple):
+            raise ResearchPanelError("identity view received an unverified source")
+        record_list = sorted(
+            records,
+            key=lambda record: (
+                record.security_id,
+                record.valid_from,
+                record.valid_to or date.max,
+                record.symbol,
+                record.exchange,
+            ),
+        )
+        for previous, current in zip(record_list, record_list[1:], strict=False):
+            if previous.security_id != current.security_id:
+                continue
+            if previous.valid_to is None or current.valid_from < previous.valid_to:
+                raise ResearchPanelError(
+                    "verified identity view contains overlapping validity intervals for "
+                    f"security_id {current.security_id}"
+                )
+        source_payload = [source.as_dict() for source in source_tuple]
+        source_hash = sha256_hex(canonical_json(source_payload))
+        version = f"identity-master-v1-{source_hash[:24]}"
+        content_hash = sha256_hex(
+            canonical_json(
+                {
+                    "records": [record.as_dict() for record in record_list],
+                    "sources": source_payload,
+                }
+            )
+        )
+        return cls(
+            version=version,
+            content_hash=content_hash,
+            records=tuple(record_list),
+            sources=source_tuple,
+        )
+
+    @classmethod
+    def _without_verified_source(cls) -> IdentityView:
+        """Create an explicit no-source view; all display identity stays disabled."""
+        source_payload: list[dict[str, Any]] = []
+        source_hash = sha256_hex(canonical_json(source_payload))
+        return cls(
+            version=f"identity-unavailable-v1-{source_hash[:24]}",
+            content_hash=sha256_hex(canonical_json({"records": [], "sources": source_payload})),
+            records=(),
+            sources=(),
+            source_kind_override=NO_VERIFIED_SECURITY_MASTER_SOURCE,
+        )
 
     def resolve(self, security_id: str, trade_date: date) -> IdentityRecord | None:
         """Resolve exactly one identity at a date, or return unresolved."""
@@ -396,6 +646,7 @@ class ResearchManifest:
     """Typed view of the immutable R1 manifest."""
 
     dataset_name: str
+    publication_mode: str
     research_contract_version: str
     research_dataset_version: str
     dataset_id: str
@@ -411,6 +662,9 @@ class ResearchManifest:
     source_readmodel_contract_version: str
     identity_view_version: str
     identity_view_hash: str
+    identity_source_kind: str
+    identity_source_lineage_hash: str
+    identity_sources: tuple[IdentitySource, ...]
     feature_run_id: str | None
     feature_registry_version: str | None
     price_basis: str
@@ -427,8 +681,13 @@ class ResearchManifest:
     artifacts: tuple[ArtifactMetadata, ...]
 
     @classmethod
-    def from_mapping(cls, payload: Mapping[str, Any]) -> ResearchManifest:
-        validate_manifest_semantics(payload)
+    def from_mapping(
+        cls,
+        payload: Mapping[str, Any],
+        *,
+        allow_test_fixture: bool = False,
+    ) -> ResearchManifest:
+        validate_manifest_semantics(payload, allow_test_fixture=allow_test_fixture)
         try:
             artifact_payload = payload["artifacts"]
             if not isinstance(artifact_payload, Mapping):
@@ -447,10 +706,17 @@ class ResearchManifest:
                 )
                 for name, value in sorted(artifact_payload.items())
             )
+            identity_source_payload = payload["identity_sources"]
+            if not isinstance(identity_source_payload, list):
+                raise TypeError("identity_sources must be an array")
+            identity_sources = tuple(
+                IdentitySource.from_mapping(value) for value in identity_source_payload
+            )
             build_timestamp = ensure_utc_timestamp(str(payload["build_timestamp"])).isoformat()
             default_read_splits = tuple(str(item) for item in payload["default_read_splits"])
             result = cls(
                 dataset_name=str(payload["dataset_name"]),
+                publication_mode=str(payload["publication_mode"]),
                 research_contract_version=str(payload["research_contract_version"]),
                 research_dataset_version=str(payload["research_dataset_version"]),
                 dataset_id=str(payload["dataset_id"]),
@@ -468,6 +734,9 @@ class ResearchManifest:
                 source_readmodel_contract_version=str(payload["source_readmodel_contract_version"]),
                 identity_view_version=str(payload["identity_view_version"]),
                 identity_view_hash=str(payload["identity_view_hash"]),
+                identity_source_kind=str(payload["identity_source_kind"]),
+                identity_source_lineage_hash=str(payload["identity_source_lineage_hash"]),
+                identity_sources=identity_sources,
                 feature_run_id=(
                     None
                     if payload.get("feature_run_id") is None
@@ -501,6 +770,7 @@ class ResearchManifest:
     def as_dict(self) -> dict[str, Any]:
         return {
             "dataset_name": self.dataset_name,
+            "publication_mode": self.publication_mode,
             "research_contract_version": self.research_contract_version,
             "research_dataset_version": self.research_dataset_version,
             "dataset_id": self.dataset_id,
@@ -516,6 +786,9 @@ class ResearchManifest:
             "source_readmodel_contract_version": self.source_readmodel_contract_version,
             "identity_view_version": self.identity_view_version,
             "identity_view_hash": self.identity_view_hash,
+            "identity_source_kind": self.identity_source_kind,
+            "identity_source_lineage_hash": self.identity_source_lineage_hash,
+            "identity_sources": [source.as_dict() for source in self.identity_sources],
             "feature_run_id": self.feature_run_id,
             "feature_registry_version": self.feature_registry_version,
             "price_basis": self.price_basis,
@@ -543,10 +816,12 @@ def validate_manifest_semantics(
     payload: Mapping[str, Any],
     *,
     allow_non_observed_coverage: bool = True,
+    allow_test_fixture: bool = False,
 ) -> None:
     """Reject semantic widening before any research rows are returned."""
     required = {
         "dataset_name",
+        "publication_mode",
         "research_contract_version",
         "research_dataset_version",
         "dataset_id",
@@ -562,6 +837,9 @@ def validate_manifest_semantics(
         "source_readmodel_contract_version",
         "identity_view_version",
         "identity_view_hash",
+        "identity_source_kind",
+        "identity_source_lineage_hash",
+        "identity_sources",
         "feature_run_id",
         "feature_registry_version",
         "price_basis",
@@ -580,8 +858,19 @@ def validate_manifest_semantics(
     missing = sorted(required.difference(payload))
     if missing:
         raise ResearchManifestError(f"research manifest is missing fields: {missing}")
-    if payload["dataset_name"] != RESEARCH_SECURITY_DAILY_DATASET:
-        raise ResearchManifestError("R1 reader accepts only research_security_daily")
+    publication_mode = payload["publication_mode"]
+    if publication_mode == AUTHORITATIVE_READMODEL_PUBLICATION:
+        if payload["dataset_name"] != RESEARCH_SECURITY_DAILY_DATASET:
+            raise ResearchManifestError(
+                "authoritative R1 reader accepts only research_security_daily"
+            )
+    elif publication_mode == TEST_ONLY_ROWS_PUBLICATION:
+        if not allow_test_fixture:
+            raise ResearchManifestError("test-only row fixture is not an authoritative R1 dataset")
+        if payload["dataset_name"] != RESEARCH_SECURITY_DAILY_FIXTURE_DATASET:
+            raise ResearchManifestError("test-only fixture has an invalid dataset name")
+    else:
+        raise ResearchManifestError(f"unsupported research publication_mode {publication_mode!r}")
     if payload["research_contract_version"] != RESEARCH_CONTRACT_VERSION:
         raise ResearchManifestError("unsupported research contract version")
     if payload["research_dataset_version"] != RESEARCH_DATASET_VERSION:
@@ -598,6 +887,35 @@ def validate_manifest_semantics(
             "research universe_basis must remain OBSERVED_DAILY_BAR_UNIVERSE; "
             "ALL_A_SHARES is not accepted"
         )
+    identity_source_kind = payload["identity_source_kind"]
+    identity_sources = payload["identity_sources"]
+    if not isinstance(identity_sources, list):
+        raise ResearchManifestError("identity_sources must be an array")
+    if identity_source_kind == VERIFIED_SECURITY_MASTER_SOURCE:
+        if not identity_sources:
+            raise ResearchManifestError("verified identity source lineage must not be empty")
+        parsed_sources = [IdentitySource.from_mapping(source) for source in identity_sources]
+    elif identity_source_kind == NO_VERIFIED_SECURITY_MASTER_SOURCE:
+        if identity_sources:
+            raise ResearchManifestError("no-source identity declaration cannot carry sources")
+        parsed_sources = []
+    elif identity_source_kind == UNVERIFIED_CALLER_IDENTITY_SOURCE:
+        if publication_mode != TEST_ONLY_ROWS_PUBLICATION:
+            raise ResearchManifestError(
+                "unverified caller identity rows cannot enter an authoritative manifest"
+            )
+        if identity_sources:
+            raise ResearchManifestError(
+                "unverified caller identity declaration cannot carry sources"
+            )
+        parsed_sources = []
+    else:
+        raise ResearchManifestError(f"unsupported identity_source_kind {identity_source_kind!r}")
+    expected_source_hash = sha256_hex(
+        canonical_json([source.as_dict() for source in parsed_sources])
+    )
+    if payload["identity_source_lineage_hash"] != expected_source_hash:
+        raise ResearchManifestError("identity source lineage hash is inconsistent")
     try:
         coverage = CoverageState(str(payload["coverage_state"]))
     except ValueError as exc:

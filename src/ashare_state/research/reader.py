@@ -33,12 +33,24 @@ __all__ = [
 class ResearchPanelReader:
     """Read one immutable manifest without exposing disabled rows by default."""
 
-    def __init__(self, manifest_path: Path, manifest: ResearchManifest) -> None:
+    def __init__(
+        self,
+        manifest_path: Path,
+        manifest: ResearchManifest,
+        *,
+        allow_test_fixture: bool = False,
+    ) -> None:
         self.manifest_path = manifest_path
         self.manifest = manifest
+        self._allow_test_fixture = allow_test_fixture
 
     @classmethod
-    def from_manifest(cls, manifest_path: str | Path) -> ResearchPanelReader:
+    def from_manifest(
+        cls,
+        manifest_path: str | Path,
+        *,
+        allow_test_fixture: bool = False,
+    ) -> ResearchPanelReader:
         path = Path(manifest_path)
         if not path.is_file():
             raise ResearchReaderError(f"research manifest does not exist: {path}")
@@ -46,15 +58,22 @@ class ResearchPanelReader:
             payload = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(payload, dict):
                 raise TypeError("manifest root must be an object")
-            validate_manifest_semantics(payload, allow_non_observed_coverage=True)
-            manifest = ResearchManifest.from_mapping(payload)
+            validate_manifest_semantics(
+                payload,
+                allow_non_observed_coverage=True,
+                allow_test_fixture=allow_test_fixture,
+            )
+            manifest = ResearchManifest.from_mapping(
+                payload,
+                allow_test_fixture=allow_test_fixture,
+            )
         except ResearchReaderError:
             raise
         except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
             raise ResearchReaderError(f"cannot parse research manifest {path}: {exc}") from exc
         if Path(manifest.manifest_uri).name != path.name:
             raise ResearchReaderError("manifest_uri does not identify the supplied manifest")
-        return cls(path, manifest)
+        return cls(path, manifest, allow_test_fixture=allow_test_fixture)
 
     def load_security_daily(
         self,
@@ -68,6 +87,7 @@ class ResearchPanelReader:
         validate_manifest_semantics(
             self.manifest.as_dict(),
             allow_non_observed_coverage=False,
+            allow_test_fixture=self._allow_test_fixture,
         )
         self._verify_aggregate_seals()
         try:
@@ -102,6 +122,7 @@ class ResearchPanelReader:
         validate_manifest_semantics(
             self.manifest.as_dict(),
             allow_non_observed_coverage=True,
+            allow_test_fixture=self._allow_test_fixture,
         )
         self._verify_aggregate_seals()
         frame = self._read_verified_artifact("disabled")

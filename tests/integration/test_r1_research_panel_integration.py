@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import date
 from pathlib import Path
 
 import pytest
 from test_snapshot import AS_OF_LATE, _canonical, _persist_raw, _seed_base
 
-from ashare_state.identity import resolve_security_identity
 from ashare_state.readmodel import DuckDBReadModel
 from ashare_state.research import (
-    IdentityView,
     ResearchPanelBuilder,
+    ResearchPanelReader,
     ResearchSplit,
     load_research_security_daily,
 )
@@ -127,27 +125,6 @@ def test_verified_readmodel_research_panel_reader_replay(
         normalized_root=env_root["normalized"],
     ).rebuild(snapshot.snapshot_id)
 
-    sse_id = str(resolve_security_identity("SSE", "STOCK", "600000", date(1999, 1, 1)).security_id)
-    szse_id = str(
-        resolve_security_identity("SZSE", "STOCK", "000001", date(1991, 4, 3)).security_id
-    )
-    identity_view = IdentityView.from_rows(
-        [
-            {
-                "security_id": sse_id,
-                "symbol": "600000",
-                "exchange": "SSE",
-                "valid_from": "1999-01-01",
-            },
-            {
-                "security_id": szse_id,
-                "symbol": "000001",
-                "exchange": "SZSE",
-                "valid_from": "1991-04-03",
-            },
-        ],
-        version="r1-fixed-identity-v1",
-    )
     builder = ResearchPanelBuilder(
         conn,
         raw_root=env_root["raw"],
@@ -156,7 +133,6 @@ def test_verified_readmodel_research_panel_reader_replay(
     )
     result = builder.build_from_readmodel(
         snapshot.snapshot_id,
-        identity_view=identity_view,
         build_timestamp="2026-09-12T00:00:00+00:00",
     )
     manifest_path = tmp_path / "research" / result.manifest_uri
@@ -175,9 +151,19 @@ def test_verified_readmodel_research_panel_reader_replay(
     assert set(development.get_column("source_snapshot_id").to_list()) == {snapshot.snapshot_id}
     assert builder.index_panel_status() == "DISABLED_UNVERIFIED_INDEX_IDENTITY"
 
+    manifest = ResearchPanelReader.from_manifest(manifest_path).manifest
+    assert manifest.publication_mode == "AUTHORITATIVE_READMODEL"
+    assert manifest.identity_source_kind == "VERIFIED_CR2_SECURITY_MASTER"
+    assert len(manifest.identity_sources) == 1
+    identity_source = manifest.identity_sources[0]
+    assert identity_source.canonical_run_id == canonical.canonical_run_id
+    assert identity_source.normalization_run_id
+    assert identity_source.normalized_manifest_hash
+    assert identity_source.normalized_output_hash
+    assert identity_source.normalized_output_uri
+
     replay = builder.build_from_readmodel(
         snapshot.snapshot_id,
-        identity_view=identity_view,
         build_timestamp="2026-09-12T00:00:00+00:00",
     )
     assert replay.content_hash == result.content_hash
