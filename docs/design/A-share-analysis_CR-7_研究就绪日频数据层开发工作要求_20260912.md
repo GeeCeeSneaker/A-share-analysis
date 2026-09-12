@@ -139,6 +139,38 @@ CR-7 必须把数据分成至少三类，分类应机器可读，不得只写在
 - 输出中明确 `experimental=true`；
 - 不得被正式 baseline、正式因子或策略报告误认为已验证平台字段。
 
+### 4.1 R1 研究语义元数据（必须进入机器可读 manifest）
+
+R1 的每个研究数据集 manifest 必须携带以下字段；它们是研究数据的
+**语义边界**，不是可由下游自行改写的展示标签：
+
+```json
+{
+  "price_basis": "UNADJUSTED_CANONICAL",
+  "universe_basis": "OBSERVED_DAILY_BAR_UNIVERSE",
+  "coverage_state": "OBSERVED_DAILY_BAR_COVERAGE"
+}
+```
+
+字段约束：
+
+- `price_basis` 第一版固定为 `UNADJUSTED_CANONICAL`，与 CR-5 当前正式
+  Registry 一致；不得写成 `ADJUSTED`、`TOTAL_RETURN` 或
+  `CORPORATE_ACTION_NEUTRALIZED`；
+- `universe_basis` 第一版固定为 `OBSERVED_DAILY_BAR_UNIVERSE`，表示
+  分母/样本是当日实际存在并通过资格门的数据行，不代表全 A 股；
+- `coverage_state` 至少区分
+  `OBSERVED_DAILY_BAR_COVERAGE`、
+  `PARTIAL_OBSERVED_DAILY_BAR_COVERAGE` 和
+  `UNRESOLVED_NOT_FOR_RESEARCH`。默认 loader 只能自动加载第一种；后两种
+  必须显式处理，不能被伪装成完整研究覆盖；
+- manifest、reader 和回归测试必须拒绝语义字段缺失、互相矛盾或试图把
+  观察样本提升为复权价格、总回报或 `ALL_A_SHARES` 分母的输入。
+
+因此，R1 的研究资格与覆盖状态是两件事：一行可以因可靠的 OHLCV 输入
+进入研究，但整个数据集仍必须如实声明其观察样本覆盖边界；任何未确认的
+状态字段继续按 `RESEARCH_DISABLED_UNRESOLVED` 保留和隔离。
+
 ---
 
 ## 5. 第一版 Research Daily Panel
@@ -182,6 +214,12 @@ CR-7 必须把数据分成至少三类，分类应机器可读，不得只写在
 - 可由现有可靠字段确定性计算的波动类指标。
 
 这里的目标不是一次把所有因子做完，而是提供可以高效探索的基础积木。
+
+上述收益、趋势和波动输出都继承 R1 manifest 的
+`price_basis=UNADJUSTED_CANONICAL`。因此 CR-5 的 raw/multi-period price
+returns 是未复权、原始价格口径下的观察收益；在公司行为、复权或总回报
+语义重新获得明确授权前，不得将它们命名或解释为 adjusted return、total
+return 或 corporate-action-neutralized return。
 
 #### 研究资格字段
 
@@ -307,6 +345,10 @@ CR-7 建成后的第一批研究重点围绕“从数据发现规律”，而不
 - 不同波动/成交特征下的未来收益分布；
 - 极端强弱分位的持续/反转。
 
+横截面排名和分位数的分母必须标记为当日
+`OBSERVED_DAILY_BAR_UNIVERSE`，并随结果保留有效观测数/覆盖状态；不得
+解释为全 A 股横截面，也不得用缺失行推导“未进入排名”。
+
 ### 8.4 市场宽度与市场状态
 
 在不依赖未确认生命周期字段的前提下，先基于当日实际可观察股票集合研究：
@@ -320,6 +362,11 @@ CR-7 建成后的第一批研究重点围绕“从数据发现规律”，而不
 - CR-6 市场状态与策略表现的条件关系。
 
 市场宽度必须记录当日有效样本数，不能把“缺数据”直接当作“未上涨/未创新高”。
+
+市场宽度、强弱排名和相关 CR-6 输入均属于观察样本统计：聚合结果必须
+带有 `observed_security_count`、相应的有效值计数和 `coverage_state`，其
+分母固定受 `OBSERVED_DAILY_BAR_UNIVERSE` 约束。没有额外正式语义批准时，
+任何输出都不得声明 `ALL_A_SHARES` 覆盖或 survivorship-bias-free universe。
 
 ### 8.5 行业/板块轮动
 
@@ -394,11 +441,19 @@ R1 只有同时满足以下条件才算完成。
 ### 10.1 数据正确性
 
 - 股票/指数研究表只包含允许字段；
+- 每个数据集 manifest 都有 `price_basis`、`universe_basis` 和
+  `coverage_state`，并且第一版值分别符合
+  `UNADJUSTED_CANONICAL`、`OBSERVED_DAILY_BAR_UNIVERSE` 及允许的覆盖枚举；
 - `RESEARCH_DISABLED_UNRESOLVED` 不会从默认 loader 泄漏；
 - 不对 unresolved 状态做隐式补值；
 - 日期、symbol/security_id 主键无静默重复；
 - OHLC 基本约束和数值字段基础校验通过；
 - 缺失值有明确处理规则，不用 0 替代“未知”。
+- 任何试图把 raw/unadjusted return、观察样本分母或观察宽度统计提升为
+  adjusted/total/corporate-action-neutralized return 或 `ALL_A_SHARES`
+  研究的 manifest、reader 和回归测试均失败关闭；
+- 横截面/市场宽度输出保留观察样本数、有效值计数和覆盖状态，缺失行不被
+  当作负向或零值事件。
 
 ### 10.2 确定性
 
@@ -407,6 +462,7 @@ R1 只有同时满足以下条件才算完成。
 - source/readmodel snapshot；
 - 代码版本；
 - feature registry/version；
+- `price_basis`、`universe_basis`、`coverage_state`；
 - 配置；
 
 必须生成相同的研究输出内容哈希。
@@ -516,6 +572,9 @@ Research Layer 可以引用 CR-5 的 verified feature artifacts，但不得反�
 - unit tests；
 - 至少一个小规模固定 fixture/integration test，证明从已验证输入 → research panel → reader 全链路可复现；
 - 对 disabled unresolved 数据“不进入默认研究输出”的回归测试；
+- 对 raw/unadjusted price basis、observed-universe denominator 和 coverage
+  metadata 的回归测试，证明它们不能被静默提升为 adjusted/total-return 或
+  `ALL_A_SHARES` 语义；
 - 文档中的最小下游使用示例。
 
 第一张实现 PR **不做全历史大规模回填**。先证明接口、口径、确定性和研究可用性，再单独安排历史物化。
