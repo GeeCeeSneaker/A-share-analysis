@@ -2,20 +2,22 @@
 
 ## 状态与范围
 
-本文件是 Issue #39 最新调度要求的**一次窄范围、非 Production 闭环 PR**。基线为
-`main@6ad53a84111fa9b8cc86276d4ed78c9b08f8e469`。本轮没有重新调用 Provider，没有创建
-`SpikeRun`，没有运行 `--production`、`--resume` 或 `--verdict`，没有改 Golden、H1、
-2020-01-01 基线、旧 run/catalog/verdict 或 Provider 配置。
+本文件是 Issue #39 最新调度要求的**一次窄范围、非 Production 闭环 PR**，并包含审阅者
+授权的 BSE 当前代码归因 delta。基线为
+`main@6ad53a84111fa9b8cc86276d4ed78c9b08f8e469`。本轮仅新增 1 次单证券、无重试的
+`920185.BJ` 历史状态调用；没有创建 `SpikeRun`，没有运行 `--production`、`--resume` 或
+`--verdict`，没有改 Golden、H1、2020-01-01 基线、旧 run/catalog/verdict 或 Provider 配置。
 
-证据优先使用仓库已有封存字节和本轮实际直连读取的一手交易所/发行人页面。官方页面的
-下载字节、HTTP 状态和 SHA-256 见同目录的
+证据优先使用仓库已有封存字节和本轮实际读取的一手交易所/发行人页面。官方页面的
+HTTP 状态、表示形式、字节数和 SHA-256 见同目录的
 [`remaining_capability_truth_20260912.json`](remaining_capability_truth_20260912.json)。
 一手页面只提交定位信息和哈希，不把原始网页/PDF重新复制进仓库；Provider 原始返回仍只
 留在本地 ignored raw 目录。
 
 调度侧建议为 `COMPOSITE/FALLBACK_SOURCE_REQUIRED`，仅是诊断结论，不是 Provider approval，
 也不是新的 Formal 授权。原因是 BJ 映射和 BSE/历史夹具事实已能由一手材料收窄，但
-历史 PIT 状态、状态异常行、公司行为字段语义仍没有可授权的 AmazingData 契约。
+旧 BSE 空结果已被当前代码路由问题重新归因；历史 PIT 状态、状态异常行、公司行为字段
+语义仍没有可授权的 AmazingData 契约。
 
 ## 阻断闭环矩阵
 
@@ -24,7 +26,7 @@
 | 状态双缺失行 | 封存收据 `status_date_shape`：20,638 行中 8 行同时缺身份和 `TRADE_DATE`，仍带状态/限价字段 | `PROVIDER_CAPABILITY_LIMITATION_STILL_UNRESOLVED` | `canonical_status_view()` 遇该形状失败关闭；不依据相关性跳过 | 历史状态语义仍阻断 |
 | 退市 PIT 语义 | `get_stock_basic` 返回 `IS_LISTED/LISTDATE/DELISTDATE`；SDK 签名没有 as-of 参数，也没有语义文档；`hist_code_list` 只有 membership | `PROVIDER_PIT_SEMANTICS_UNRESOLVED` | 不从 code-list 合成 `IS_LISTED` 或退市日期 | B2/退市 Golden 仍阻断 |
 | BJ old/new mapping | Provider 封存观察为 248 行；BSE 官方 mapping 表第 242 行为“贝特瑞 / 2020/7/27 / 835185 / 920185”，并说明平移公司的日期是原精选层挂牌日期 | `FIRST_PARTY_MAPPING_FACT_BOUND_BUT_GOLDEN_CONTRACT_NOT_MET` | 仅新增脱敏 truth bundle；不新增 Golden case，不改期望值 | mapping gate 仍未 ready |
-| BSE `835185.BJ` 状态 | Provider 对 2022 全年返回 0 行、1 个空表；BSE 官方规则说明 2021-11-15 生效且精选层公司上市时间连续计算；官方 2022 报告使用代码 835185 | `NOT_INAPPLICABLE_PROVIDER_HISTORICAL_STATUS_COVERAGE_OR_SEMANTICS_LIMITATION` | 空响应不能变成“不适用”或 PASS | BSE 历史状态仍阻断，需 composite/fallback |
+| BSE 旧代码状态 | 封存的 `835185.BJ` 请求为 0 行；BSE 2025 代码切换公告要求 2025-10-09 起查询/业务使用新代码；同窗口单次 `920185.BJ` 请求返回 242 行 | `CODE_MIGRATION_REQUEST_ROUTING_REMEDIATION_REQUIRED` | facade 按输入原样传递；当前运行时调用方必须先解析官方 old/new mapping；旧收据保持不可变 | 不是 Provider 历史覆盖失败的证据；当前代码路由回归需先收口，PIT/状态语义仍阻断 Formal |
 | 公司行为 | Dividend 123 行/50 行缺 `DATE_EX`，相关性集中在进度 1/2/12；Right issue 当前 6 行全有日期，但旧封存材料有历史缺失观察；SDK 无字段语义文档 | `PROVIDER_CORPORATE_ACTION_FIELD_SEMANTICS_UNRESOLVED` | 任一必需日期缺失均失败关闭；事件存在不等于连续性 PASS | 公司行为连续性仍阻断 |
 | `300104.SZ` fixture | 深交所 2020-05-14 原文明确：300104 自 2019-05-13 暂停上市，2020-05-14 决定终止上市，2020-06-05 进入退市整理期；Provider 目标窗口 0 bars、600519 控制 7 bars | `INAPPLICABLE_FOR_2020_BASELINE` | 不把目标空 bars 归因成 Provider 覆盖失败，不放宽全局基线 | 目标夹具延期，history_start_2020 仍未闭合 |
 
@@ -41,16 +43,28 @@ source: https://www.bse.cn/service/code_mapping.html, table row 242
 Golden case、人工审阅和 evidence-contract 要求。现有 Golden/H2 文档已经把该类行标记为
 延后；因此本轮不修改 `golden_cases`、manifest、阈值或期望值。
 
-## BSE 空历史响应的归因
+## BSE 旧代码结果的归因与当前代码 delta
 
-结论不是“835185 在 2022 不适用”。一手 BSE 规则和 2022 发行人报告至少绑定了：
+上一版封存收据中的 `835185.BJ` 结果保持原样：请求窗口为 2022 全年，返回 0 行、1 个
+空表，request/evidence hash 也不改写。审阅者授权的唯一 delta 是用同一窗口、同一端点、
+无重试查询 `920185.BJ`；结果只写入脱敏锚点，raw 仍留在本地 ignored 目录：
 
-1. BSE 自 2021-11-15 起承接精选层平移公司，并连续计算上市时间；
-2. 贝特瑞的 old code、new code、原精选层挂牌日期以及 2022 年 BSE 报告代码。
+| 请求 | request id | rows / table | evidence hash |
+|---|---|---:|---|
+| 封存旧代码 `835185.BJ` | `86d2e9dc-c731-4104-b490-7ee3183dee3b` | 0 / `835185.BJ` | `c024ff9f…a2a8179e` |
+| 当前代码 `920185.BJ` | `67f449d0-4c66-4bb2-bafe-e0cddaf8dcab` | 242 / `920185.BJ` | `cb756dc0…ed619a81` |
 
-因此，Provider 对 `835185.BJ` 的成功空表不能被解释为不适用；它最多说明该 Provider
-历史状态端点的覆盖、路由或语义仍不足以支撑 Formal。没有 Provider 契约证明空表语义前，
-运行时继续把它作为 unresolved/fail-closed。
+BSE [官方 mapping 表](https://www.bse.cn/service/code_mapping.html) 将贝特瑞的 `835185`
+绑定到 `920185`；[2025-09-12 代码切换公告](https://www.bse.cn/important_news/200026735.html)
+进一步说明，自 2025-10-09 起存量股票的交易委托、行情查询和业务办理使用切换后的新代码。
+因此，旧空表应分类为**代码迁移/请求路由整改所需**，不能再作为 Provider 历史覆盖不足的
+证据，也不能回写成“不适用”或 PASS。
+
+本次最小运行时防回归措施是：定向 capability probe 的 BSE 状态请求改用 `920185.BJ`，
+并以单元测试锁住该当前代码。`get_history_stock_status_exchange()` 继续保持透明的
+request-faithful 行为，不在 facade 内隐式调用 mapping 端点或偷偷改写请求；需要查询旧代码
+的调用方必须先取得并应用官方 mapping，再把当前代码传入 facade。当前 242 行只证明请求
+路由得到非空结构化返回，不证明 status 字段的历史 PIT/业务语义已获 Provider approval。
 
 ## 2020 历史夹具处置
 
@@ -70,10 +84,10 @@ Golden case、人工审阅和 evidence-contract 要求。现有 Golden/H2 文档
 
 ## 下一道门
 
-- 独立 Reviewer 逐项核对 JSON 中的官方 URL、下载状态、字节哈希、摘录定位和分类；特别核对“BSE 空表不是不适用”和“300104 是夹具不适用”这两个方向相反的结论。
+- 独立 Reviewer 逐项核对 JSON 中的官方 URL、HTTP 状态、表示形式、字节哈希、摘要定位和分类；特别核对“旧 BSE 空表是代码路由问题”和“300104 是夹具不适用”这两个方向相反的结论。
 - 如需把 `835185/920185` 加入 `golden_bj_mapping`，项目管理者必须另开符合现有 Golden/evidence/human-review 合同的变更；本 PR 不代替人工审阅。
 - 如需激活 `601558.SH`，先补精确首个适用交易日和 Provider bar 证据；失败则继续保持 deferred，不放宽基线。
-- 未解决的 PIT、状态 shape、公司行为语义需 composite/fallback source 或正式 SDK 契约；不能靠再次观察相同返回、相关性过滤或新建 Formal run 绕过。
+- 未解决的 PIT、状态 shape、公司行为语义需 composite/fallback source 或正式 SDK 契约；不能靠再次观察相同返回、相关性过滤或新建 Formal run 绕过。若需扩大 BJ 代码解析到生产入口，必须另行设计可审计的 mapping 输入/缓存与回归合同。
 
 ### 调度侧推荐
 

@@ -10,7 +10,7 @@ schemas, hashes, and fixed taxonomy labels.
 Usage::
 
     uv run python scripts/spike/capability_closure_probe.py \
-      --output data/spike/capability-closure-20260911/report.json
+      --output data/spike/capability-closure-20260912/report.json
 
 The exact symbol lists are retained in the local raw envelope parameters and
 are represented in the report by a count and a deterministic set hash.
@@ -43,7 +43,7 @@ _ENV_KEYS = (
     "TGW_SERVER_VIP",
     "TGW_SERVER_PORT",
 )
-_RAW_INGEST_ID = "capability-closure-preflight-20260911"
+_RAW_INGEST_ID = "capability-closure-preflight-20260912"
 _STATUS_SYMBOLS = [
     "002058.SZ",
     "002217.SZ",
@@ -54,7 +54,10 @@ _STATUS_SYMBOLS = [
     "605499.SH",
     "603887.SH",
 ]
-_BSE_SYMBOLS = ["835185.BJ"]
+# BSE's 2025 code-cutover notice requires the new code for current-runtime
+# market queries and business handling from 2025-10-09.  Keep the legacy code
+# only in the sealed historical receipt; never use it for a new status call.
+_BSE_SYMBOLS = ["920185.BJ"]
 _BASIC_SYMBOLS = ["601558.SH", "600068.SH", "300104.SZ", "835185.BJ"]
 _DIVIDEND_SYMBOLS = [
     "600519.SH",
@@ -605,7 +608,7 @@ def main() -> int:
     parser.add_argument(
         "--raw-root",
         type=Path,
-        default=Path("data/spike/capability-closure-20260911/raw"),
+        default=Path("data/spike/capability-closure-20260912/raw"),
     )
     parser.add_argument("--output", type=Path)
     parser.add_argument(

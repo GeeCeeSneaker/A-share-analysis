@@ -2,11 +2,13 @@
   "schema": "remaining-capability-truth-v1",
   "as_of_date": "2026-09-12",
   "base_main_commit": "6ad53a84111fa9b8cc86276d4ed78c9b08f8e469",
-  "scope": "Issue #39 six-item non-Production capability and contract closure",
+  "scope": "Issue #39 six-item non-Production capability and contract closure plus the reviewer-authorized BSE current-code attribution delta",
   "recommendation": "COMPOSITE/FALLBACK_SOURCE_REQUIRED",
   "recommendation_is_diagnostic_only": true,
   "formal_run_authorized": false,
-  "provider_calls_in_this_closure": 0,
+  "provider_calls_in_this_closure": 1,
+  "provider_call_scope": "Exactly one reviewer-authorized single-symbol BSE history-status call for 920185.BJ over 2022-01-01/2022-12-31; no retry and no Production/Formal call",
+  "old_sealed_result_immutable": true,
   "golden_h1_baseline_mutated": false,
   "sources": [
     {
@@ -51,6 +53,36 @@
       "bytes": 19760,
       "sha256": "dbb5b7536a528afb3602fb34c9a9b7e06b172dad9f8d9c2bf6323b0ea749a5e2",
       "excerpt": "自2021年11月15日起施行；精选层挂牌公司平移为本所上市公司，上市时间自其在精选层挂牌之日起连续计算。"
+    },
+    {
+      "id": "bse-code-cutover-2025",
+      "kind": "FIRST_PARTY_EXCHANGE_PAGE",
+      "url": "https://www.bse.cn/important_news/200026735.html",
+      "retrieved_at": "2026-09-12",
+      "published_at": "2025-09-12",
+      "http_status": 200,
+      "retrieval_method": "chrome_headless_rendered_dom",
+      "artifact_representation": "rendered_dom",
+      "bytes": 178589,
+      "sha256": "d3bd5b44eb8cda078201763e4f53ed8491f5e068cc62490cf77c1f3ab7256dd6",
+      "location": "北证公告〔2025〕46号，官方发布页正文",
+      "summary": "公告要求自2025年10月9日起，存量股票的交易委托、行情查询和业务办理均使用切换后的新证券代码。",
+      "note": "HTTP 200 和 SHA-256 针对官方页面经浏览器渲染后的 DOM；直接非浏览器抓取受 WAF 挑战，不将其当作原始下载字节。"
+    },
+    {
+      "id": "bse-code-cutover-preparation-2024",
+      "kind": "FIRST_PARTY_EXCHANGE_PAGE",
+      "url": "https://www.bse.cn/important_news/200024115.html",
+      "retrieved_at": "2026-09-12",
+      "published_at": "2024-12-13",
+      "http_status": 200,
+      "retrieval_method": "chrome_headless_rendered_dom",
+      "artifact_representation": "rendered_dom",
+      "bytes": 182085,
+      "sha256": "202adbb51ed9fc9cb736c5a67845ab3f64f751314fb12d3841f9b2696c1ccec4",
+      "location": "官方发布页正文",
+      "summary": "公告说明代码切换工作以行情、持股收益、税收计算和数据报送等连续性为目标，并支持新旧代码关联。",
+      "note": "HTTP 200 和 SHA-256 针对官方页面经浏览器渲染后的 DOM，不替代对 SDK 字段语义的证明。"
     },
     {
       "id": "bse-835185-2022-report",
@@ -171,15 +203,31 @@
         "symbol": "835185.BJ",
         "window": "2022-01-01/2022-12-31",
         "rows": 0,
-        "table_names": ["835185.BJ"]
+        "table_names": ["835185.BJ"],
+        "request_params_hash": "3fee8333c72dffaa5f7b991235defe1681728f20952aaad94ddd5919ebd3f0e7",
+        "legacy_result_status": "SEALED_IMMUTABLE",
+        "current_code_probe": {
+          "probe": "bse_current_code_historical_status",
+          "request_id": "67f449d0-4c66-4bb2-bafe-e0cddaf8dcab",
+          "evidence_hash": "cb756dc08d3b43fa9ae5c160989244fc518b145803d1945b21637447ed619a81",
+          "request_params_hash": "626d60430181ff0dd34c739e0e33e2ad0ef998ae10c31bd1dcee8ea6b1a056ca",
+          "symbol": "920185.BJ",
+          "window": "2022-01-01/2022-12-31",
+          "rows": 242,
+          "table_names": ["920185.BJ"],
+          "schema_hash": "67ca6b4314531d426ea279c59753a419e58729df7a414b14c61a8298d28e0f87",
+          "payload_hash": "1a038105456ee90061bd21a56afdcf51f02a3cbeca3d187447679b39c4c6eefc"
+        }
       },
       "independent_facts": [
         "BSE migration/listing rules were effective from 2021-11-15 and preserve former Selected Layer listing time",
-        "BSE official 2022 report is headed 835185 and identifies the issuer"
+        "BSE official 2022 report is headed 835185 and identifies the issuer",
+        "BSE's 2025 code-cutover notice requires the new code for market queries and business handling from 2025-10-09",
+        "The reviewer-authorized current-code request for 920185.BJ returned 242 rows in the same 2022 window"
       ],
-      "classification": "NOT_INAPPLICABLE_PROVIDER_HISTORICAL_STATUS_COVERAGE_OR_SEMANTICS_LIMITATION",
-      "runtime_boundary": "an empty Provider response cannot be converted into inapplicability or PASS",
-      "formal_impact": "BSE historical status remains blocked; a composite/fallback source is required"
+      "classification": "CODE_MIGRATION_REQUEST_ROUTING_REMEDIATION_REQUIRED",
+      "runtime_boundary": "the facade remains request-faithful and passes code_list verbatim; current-runtime BSE callers must resolve first-party old/new mapping before sending a status request, while the legacy empty receipt remains immutable and is never reinterpreted as a current-code capability test",
+      "formal_impact": "the old empty response is not evidence of a Provider historical-coverage limitation; the current-code request path needs the focused regression, while PIT/status-shape/corporate-action semantics still block Formal"
     },
     {
       "id": "corporate-action-semantics",

@@ -6290,3 +6290,22 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 - 诊断推荐：`COMPOSITE/FALLBACK_SOURCE_REQUIRED`。该推荐不代表 Provider capability approval，不是第三次 Formal 授权。
 - 独立 Reviewer 应核对 JSON 中官方来源的 HTTP 200、下载字节哈希、摘录定位，以及 BSE 空响应与 300104 不适用这两个相反分类；PR 保持 Draft，等待精确 head 的 CI 和独立审阅。
 - 后续只有在取得 Provider/SDK 语义契约或获批准的 composite/fallback 来源后，才可讨论状态、PIT、公司行为和历史夹具的正式能力判定；不得用重复探测、相关性过滤或修改期望值绕过。
+
+## DM-20260912-FORMAL-B1B7-024 · BSE 当前代码请求身份归因整改
+
+**Type**：C1 — reviewer-authorized bounded provider-routing clarification
+**Date**：2026-09-12
+**Status**：`SINGLE NON-PRODUCTION DELTA COMPLETED / OLD SEALED RESULT PRESERVED / LOCAL QA GREEN / CI AND INDEPENDENT DELTA REVIEW REQUIRED / KEEP DRAFT`
+**Evidence**：[`remaining_capability_closure_20260912.md`](../provider_verification/remaining_capability_closure_20260912.md)、[`remaining_capability_truth_20260912.json`](../provider_verification/remaining_capability_truth_20260912.json)、`scripts/spike/capability_closure_probe.py`、`tests/unit/test_remaining_capability_truth.py`。
+
+**审阅要求与执行**：
+
+- 按 Issue #39 最新审阅要求，仅执行一次 `920185.BJ` 单证券历史 status 调用，窗口为 `2022-01-01/2022-12-31`，不重试，不创建 SpikeRun，不进入 Production。返回 242 行；request identity/hash、schema/payload/evidence hash 和 table identity 已脱敏记录。
+- 旧封存 `835185.BJ` 0 行结果保持不可变。BSE 一手 mapping 与 2025-10-09 代码切换公告证明当前运行时查询应使用 `920185`；因此旧空结果归因为 `CODE_MIGRATION_REQUEST_ROUTING_REMEDIATION_REQUIRED`，不再作为 Provider 历史覆盖限制的依据。
+- 定向 capability probe 改用 `920185.BJ`，新增回归测试锁定当前代码。facade 仍透明传递调用方 `code_list`，避免隐藏 mapping 请求、改变原始 request identity 或制造不可审计的跨交换所证据链。
+
+**不变边界与后续门槛**：
+
+- PIT 退市语义、异常 status shape、公司行为字段语义仍 unresolved/fail-closed；`COMPOSITE/FALLBACK_SOURCE_REQUIRED` 仅为诊断建议。未修改 Golden、H1、全局 2020 baseline、旧 Formal/run/catalog/verdict 或 Provider 配置。
+- 本地全量 pytest、Ruff check/format、mypy、compileall、`uv pip check` 和 `git diff --check` 已通过；3 个既有 Windows symlink 测试按环境跳过。
+- 当前分支保持 Draft；待本次精确 head 的三平台 CI 和独立 delta review。没有第三次 Formal、Production、`--resume`、`--verdict`、backfill 或策略扩展授权。

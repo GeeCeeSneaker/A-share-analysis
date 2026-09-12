@@ -3874,3 +3874,12 @@
 - Added regression coverage proving both formerly filtered shapes fail closed;
   local QA and the ordinary GitHub Actions CI are the next gates. PR #45 must
   remain Draft pending independent delta review.
+
+## 2026-09-12 · BSE current-code attribution delta
+
+> Status: **REVIEWER-AUTHORIZED SINGLE PROBE COMPLETED / OLD RECEIPT PRESERVED / LOCAL REGRESSION ADDED / INDEPENDENT DELTA REVIEW REQUIRED / NO THIRD FORMAL**
+
+- Absorbed Issue #39 scheduler/reviewer instruction to perform exactly one narrow, non-Production BSE status call. The call used `920185.BJ`, `2022-01-01/2022-12-31`, the existing `InfoData.get_history_stock_status` facade, and zero retries; it returned 242 rows. Only sanitized request identity/hash, schema/payload/evidence hashes, row count and table identity were recorded in the truth bundle; raw output remains local and ignored.
+- Kept the prior sealed `835185.BJ` empty result immutable. BSE's first-party mapping and 2025 code-cutover notice bind the old/new identity and require the new code for current-runtime queries/business from 2025-10-09. The old result is therefore classified as `CODE_MIGRATION_REQUEST_ROUTING_REMEDIATION_REQUIRED`, not as a Provider historical-coverage limitation and not as inapplicability/PASS.
+- Changed the targeted capability probe to use `920185.BJ` and added a focused regression. The provider facade remains request-faithful and does not hide a mapping SDK call or rewrite caller input; current-runtime callers must resolve the first-party mapping before invoking it.
+- No Golden, H1, 2020 baseline, sealed Formal artifact, catalog, verdict or Provider configuration changed. No Production, `SpikeRun`, `--resume`, `--verdict`, backfill, strategy expansion or third Formal was run. Remaining PIT/status-shape/corporate-action semantics stay fail-closed and the PR remains Draft pending exact-head CI and independent delta review.
