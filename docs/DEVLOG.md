@@ -3925,3 +3925,16 @@ Review Status：等待 exact-head 独立 Reviewer；只有来源类别用途决�
 - Kept the prior sealed `835185.BJ` empty result immutable. BSE's first-party mapping and 2025 code-cutover notice bind the old/new identity and require the new code for current-runtime queries/business from 2025-10-09. The old result is therefore classified as `CODE_MIGRATION_REQUEST_ROUTING_REMEDIATION_REQUIRED`, not as a Provider historical-coverage limitation and not as inapplicability/PASS.
 - Changed the targeted capability probe to use `920185.BJ` and added a focused regression. The provider facade remains request-faithful and does not hide a mapping SDK call or rewrite caller input; current-runtime callers must resolve the first-party mapping before invoking it.
 - No Golden, H1, 2020 baseline, sealed Formal artifact, catalog, verdict or Provider configuration changed. No Production, `SpikeRun`, `--resume`, `--verdict`, backfill, strategy expansion or third Formal was run. Remaining PIT/status-shape/corporate-action semantics stay fail-closed and the PR remains Draft pending exact-head CI and independent delta review.
+## 2026-09-12 · CR-7 R1 research panel v1 小样本实现
+
+> 状态：R1 SMALL-FIXTURE IMPLEMENTED / LOCAL FOCUSED QA GREEN / DRAFT PR / INDEPENDENT REVIEW AND CI PENDING
+
+- 按 Issue #39 最新 scheduler checkpoint，从已合并的 clean `main@9cc8ca1e699ee80b52a9b59200306dd77ec7f4b6` 建立窄范围实现分支。本轮只实现 R1 security daily 小样本闭环：已验证 CR-4 ReadModel → `research_security_daily` → immutable Parquet manifest → stable reader；未调用 Provider，不运行 Production、Formal、resume、verdict、backfill 或 universe sweep。
+- 新增 `src/ashare_state/research/`：机器可读 eligibility/exclusion contract、严格的 Development（2020-01-01～2023-12-31）/Validation A（2024-01-01～2025-12-31）/Holdout（2026-01-01～2026-06-30）分区、OHLC/缺失值/主键/lineage/PIT 校验、版本化 identity view join、默认排除但独立保存的 `RESEARCH_DISABLED_UNRESOLVED` 行，以及 Python/Parquet 读取 API。
+- manifest 固定声明 `price_basis=UNADJUSTED_CANONICAL`、`universe_basis=OBSERVED_DAILY_BAR_UNIVERSE` 和显式 `coverage_state`；内容哈希使用确定性语义行集，Parquet 文件另有字节 hash，文件与 manifest 通过 immutable atomic writer 发布。默认 reader 只接受 `OBSERVED_DAILY_BAR_COVERAGE`，不接受 partial/unresolved coverage。
+- R1 不暴露 CR-5 feature columns，因此不制造第二套同名公式；`research_index_daily` 以 `DISABLED_UNVERIFIED_INDEX_IDENTITY` 固定禁用，等待 index identity/read-model 语义被验证后再单独授权。完整机器合同和最小下游示例见 `docs/research/`。
+- 固定 fixture 覆盖三段边界、禁用/异常行隔离、重复主键、身份有效期重叠、PIT 超时、manifest 语义提升（adjusted/total-return/ALL_A_SHARES）和确定性 replay；真实 integration fixture 从 Canonical SUCCESS、SnapshotBuilder 和 hash-verified ReadModel 进入 panel，再由 reader 复现。
+
+Implementation Status：R1 security daily small-fixture implementation and focused regression completed locally; index panel and CR-5 feature join remain explicitly disabled/deferred by the scheduler boundary. No production materialization or strategy work.
+
+Review Status：KEEP DRAFT / EXACT-HEAD INDEPENDENT REVIEW REQUIRED / REQUIRED CI PENDING；未获得 wider historical materialization 或 Formal/Production 授权。

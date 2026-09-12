@@ -6403,3 +6403,34 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 **Implementation Status**：来源类别矩阵和 machine contract 已修订，候选来源未激活。
 **Review Status**：`SOURCE_SELECTION_STILL_UNRESOLVED / DELTA REVIEW REQUIRED / KEEP DRAFT`；没有第三次 Formal 或 Production 授权。
+## DM-20260912-CR7-R1-028 · R1 research panel v1 小样本实现
+
+**Type**：C1 — CR-7 research-ready daily implementation slice
+**Date**：2026-09-12
+**Status**：`R1 SECURITY DAILY SMALL-FIXTURE IMPLEMENTED / LOCAL FOCUSED QA GREEN / KEEP DRAFT / INDEPENDENT REVIEW AND CI PENDING`
+
+**范围与已完成项**
+
+- 执行基线固定为已合并主线 `main@9cc8ca1e699ee80b52a9b59200306dd77ec7f4b6`。本实现只消费经过 CR-4 snapshot/readmodel 验证的 `rm_daily_bar`，不接 Provider、不读 Raw、不修改 Canonical、ReadModel 或 CR-5 artifact。
+- 已实现 `research_security_daily` R1 schema、机器可读 eligibility/exclusion contract、版本化 identity view（显式 `security_id → symbol/exchange` PIT join）、三段时间 split、PIT/lineage/主键/OHLC 基础校验，以及 immutable/versioned Parquet + manifest publisher。
+- unresolved/invalid/out-of-window 行保存在单独 `disabled.parquet`，默认 `load_research_security_daily(..., split=...)` 只返回 `RESEARCH_ENABLED`；诊断读取必须调用单独的 disabled API，不会从默认输出泄漏。
+- manifest 强制 `UNADJUSTED_CANONICAL`、`OBSERVED_DAILY_BAR_UNIVERSE` 和显式 coverage；reader 拒绝 adjusted/total-return/`ALL_A_SHARES` 语义或非完整观察覆盖。内容 hash、artifact byte hash、schema hash、source snapshot/readmodel/canonical lineage、identity view lineage 和 build timestamp 均落盘。
+- 固定 integration fixture 已证明 Canonical SUCCESS → SnapshotBuilder → hash-verified DuckDB ReadModel → R1 panel → reader 的可复现闭环；第二次相同输入为 immutable idempotent replay。
+
+**明确边界**
+
+- `research_index_daily` 当前返回 `DISABLED_UNVERIFIED_INDEX_IDENTITY`，没有用代码前缀、未验证 index code 或 Provider 直连猜测指数身份；待 index semantics/path 和 versioned identity/read-model join 获得明确验证后再单独开任务。
+- R1 不公开 CR-5 feature columns/feature run join；避免复制同名公式，feature join、market breadth 和 index state 留到 R2。
+- 本轮没有历史大规模物化/backfill、Provider sweep、第三次 Formal、Production、Golden/H1/global baseline、source-policy/fallback 或 strategy work。
+
+**验收与闸门**
+
+- 本地 focused tests：`tests/unit/test_r1_research_panel.py` 与 `tests/integration/test_r1_research_panel_integration.py`；提交前还需执行仓库质量门禁。
+- 合并前必须由独立 Reviewer 对 exact head 核验 contract、默认排除、语义 fail-closed、PIT/lineage、immutable replay 和 index disabled 声明，并等待 Ubuntu 3.14、Windows 3.12、Windows 3.14 required CI 全绿。
+- 在 scheduler 明确扩大范围前保持 Draft；不将本 PR 解释为全历史研究数据已完成，也不因此启动正式账号测试或生产物化。
+
+账号、密码、IP、端口、Token、Cookie、profile、Provider 原始输出和专有 SDK/runtime 文件不得进入 GitHub。
+
+Implementation Status：R1 security daily small-fixture 已实现，focused QA 已通过；指数 panel、CR-5 join、全历史物化和正式运行按授权边界暂不激活。
+
+Review Status：`KEEP DRAFT / EXACT-HEAD INDEPENDENT REVIEW REQUIRED / REQUIRED CI PENDING`。
