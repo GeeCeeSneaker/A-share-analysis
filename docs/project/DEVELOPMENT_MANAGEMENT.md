@@ -6309,3 +6309,60 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 - PIT 退市语义、异常 status shape、公司行为字段语义仍 unresolved/fail-closed；`COMPOSITE/FALLBACK_SOURCE_REQUIRED` 仅为诊断建议。未修改 Golden、H1、全局 2020 baseline、旧 Formal/run/catalog/verdict 或 Provider 配置。
 - 本地全量 pytest、Ruff check/format、mypy、compileall、`uv pip check` 和 `git diff --check` 已通过；3 个既有 Windows symlink 测试按环境跳过。
 - 当前分支保持 Draft；待本次精确 head 的三平台 CI 和独立 delta review。没有第三次 Formal、Production、`--resume`、`--verdict`、backfill 或策略扩展授权。
+
+## DM-20260912-FORMAL-B1B7-025 · 复合 / 兜底来源记录契约设计闸门
+
+**Type**：C1 — source-selection/design gate after accepted BSE routing delta
+**Date**：2026-09-12
+**Status**：`DESIGN-ONLY SOURCE CONTRACT / SOURCE SELECTION STILL UNRESOLVED / KEEP DRAFT / NO THIRD FORMAL`
+
+**基线与范围**：
+
+- Issue #39 最新 scheduler checkpoint 已确认 PR #46 合并，当前基线为 `main@661dddfe7bba2f8ff13a3f7512bde4e1a15db383`。本条记录对应一个窄范围来源选择 PR，只覆盖 security lifecycle/PIT、historical status、corporate actions、BJ identity mapping 和 history fixture 五项未闭合领域。
+- 交付物为 [`composite_fallback_source_contract_20260912.md`](../provider_verification/composite_fallback_source_contract_20260912.md) 与 [`composite_fallback_source_contract_20260912.json`](../provider_verification/composite_fallback_source_contract_20260912.json)。两者逐项给出 primary source、fallback/first-party source、exact fields/facts、PIT rule、conflict precedence、evidence contract 和 implementation impact。
+- 本 PR 是设计闸门，不是实现 PR：不修改 `source-policy-v1`、Provider facade、Golden/H1、全局 2020 baseline、旧 Formal/run/catalog/verdict；不运行 Production、Formal SpikeRun、`--resume`、`--verdict`、backfill、universe sweep 或策略工作。
+
+**来源选择结果**：
+
+- 交易所一手事件/处理记录被定义为生命周期与公司行为的优先来源；合格 AmazingData 只在明确分区内承担数值观察；CNINFO 只作为可追溯的发行人原文 transport，不能提升为独立语义裁判。
+- BSE mapping、cutover notice、SSE/SZSE 生命周期与公司行为入口已列入矩阵；BSE old/new mapping 的 caller/ingest 边界解析、版本化缓存、原始逻辑 symbol 与解析 symbol 的 lineage 也已写入合同，禁止 facade 内隐式改写请求。
+- 统一证据合同要求 `available_at <= as_of`、内容寻址 raw/provenance、稳定公告/记录 ID、原文定位、表示形式和许可决定；`rendered_dom` 不得冒充 raw bytes，缺失/畸形/歧义/冲突一律 fail-closed。
+- 当前网页研究仍未证明完整 2020+ 历史覆盖、动态表和 BSE WAF 场景的稳定机器检索，也未取得 SSE/SZSE/BSE 自动下载/存储/解析/派生使用的项目许可决定。因此调度建议只能为 `SOURCE_SELECTION_STILL_UNRESOLVED`，不是 `COMPOSITE_CONTRACT_READY_FOR_IMPLEMENTATION`。
+
+**夹具与未决项**：
+
+- `300104.SZ` 继续标记为 `INAPPLICABLE_FOR_2020_BASELINE`；`601558.SH` 继续 `PROPOSED_NOT_ACTIVATED`，`600068.SH` 只作为备用候选。只有精确首个适用 session 和最小 bar 证据均绑定后才能另开夹具实现 PR，且不得削弱全局 2020-01-01 baseline。
+- 当前状态双缺失、退市 PIT、公司行为进度/日期语义仍保持异常隔离和 fail-closed；本 PR 不以相关性过滤、不重写旧收据、不制造 Provider approval。
+
+**审阅与下一步门槛**：
+
+- 独立 Reviewer 需逐项核对五行矩阵、来源层级、available-at 规则、冲突优先级、证据表示形式、许可闸门和 601558/600068 deferred 边界。PR 保持 Draft，须按 exact head 审阅。
+- 项目管理者需先给出各交易所自动检索、留存、解析和衍生使用的明确许可/合规决定，并冻结每个 venue 的可重复 retrieval contract。只有来源合同接受后，才允许另开窄 adapter + 新 source-policy 版本 + lineage/回归测试实现 PR。
+
+**Implementation Status**：矩阵、机器契约和聚焦回归已提交，候选来源未激活。
+**Review Status**：`SOURCE_SELECTION_STILL_UNRESOLVED / INDEPENDENT REVIEW REQUIRED / KEEP DRAFT`；无第三次 Formal 或 Production 授权。
+
+## DM-20260912-FORMAL-B1B7-026 · PR #47 许可 / 来源类别归因整改
+
+**Type**：C1 — exact-head review delta / source-class licensing clarification
+**Date**：2026-09-12
+**Status**：`P0 SOURCE-CLASS LICENSING BLOCKER ADDRESSED / DESIGN-ONLY / SOURCE SELECTION STILL UNRESOLVED / KEEP DRAFT`
+
+**触发与范围**：
+
+- PR #47 exact-head review `5185243746` 指出，原契约把 SSE、SZSE、BSE 的许可/使用边界概括成一个 venue 级陈述，尤其没有区分 BSE 公告文档与 BSE `行情信息`。Issue #39 scheduler checkpoint `5643546879` 授权一次极小的文档/契约 delta，仅修正来源类别归因。
+- 本次仍基于 clean `main@661dddfe7bba2f8ff13a3f7512bde4e1a15db383`，不新增 Provider 调用，不启动 Formal/Production，不改变 Golden/H1/全局 2020 baseline、旧 evidence、run/catalog/verdict 或 source-policy。
+
+**修正内容**：
+
+- `license_and_usage_compatibility` 现在按实际 source class 拆分：`exchange_announcement_disclosure_document`、`bse_mapping_cutover_document`、`exchange_corporate_action_record`、`exchange_quotation_or_processed_market_data`、`cninfo_original_issuer_document_transport`、`amazingdata_provider_observation` 和 `exchange_calendar_or_statistics_document`。
+- BSE 公告 / mapping / cutover 文档只作为身份、事件和路由证据；根据 [BSE 行情许可通知](https://www.bse.cn/important_news/200011008.html) 与 [境内行情授权指南](https://www.bse.cn/application/guide.html)，BSE `行情信息` 是单独的许可控制类别，机构使用需申请，未经授权不得使用、发布或传播。文档类决定不得继承为行情/处理价授权。
+- SSE/SZSE 仍按 [SSE 法律声明](https://www.sse.com.cn/home/legal/) 与 [SZSE 法律声明](https://www.szse.cn/application/laws/) 的具体条款处理非商业浏览/下载和牟利型复制、存储、电子抓取、转载等边界；这也不等于项目自动化生产使用已获批准。CNINFO 继续作为原始发行人文档 transport，不提升为独立语义来源。
+- 每个 source 对象新增 `source_class`、`license_decision` 和类别化 `activation_gate`；五项 capability 的 evidence contract 新增对应 license class/rule；Markdown 五行矩阵新增 license/usage boundary 列。推荐明确保持 `SOURCE_SELECTION_STILL_UNRESOLVED`。
+
+**不变边界**：PIT `available_at <= as_of`、source conflict fail-closed、rendered-DOM/raw-byte 区分、BSE caller/ingest mapping、601558/600068 deferred 和所有已接受层级不变；不做实现、不激活 fallback、不修改 facade 或历史封存事实。
+
+**验证与下一步**：聚焦 JSON parse、7 条来源契约回归、Ruff check/format、`git diff --check` 已通过；提交前再跑全量 pytest 和静态门禁。随后将 PR #47 新 exact head 返回独立 Reviewer 做 delta review；项目管理者需按 source class 给出自动读取、原始留存、解析、内部/派生使用的许可/合规决定。
+
+**Implementation Status**：来源类别矩阵和 machine contract 已修订，候选来源未激活。
+**Review Status**：`SOURCE_SELECTION_STILL_UNRESOLVED / DELTA REVIEW REQUIRED / KEEP DRAFT`；没有第三次 Formal 或 Production 授权。

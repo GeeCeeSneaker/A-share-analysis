@@ -1,3 +1,31 @@
+## 2026-09-12 · PR #47 许可 / 来源类别归因整改
+
+> 状态：P0 LICENSING/SOURCE-CLASS BLOCKER ADDRESSED / DESIGN-ONLY / SOURCE SELECTION STILL UNRESOLVED / NO RUNTIME ACTIVATION
+
+- 针对 PR #47 exact-head independent review `5185243746` 和 Issue #39 scheduler checkpoint `5643546879`，修正此前把 SSE、SZSE、BSE 许可边界概括为一个 venue 级结论的问题。变更仍基于 `main@661dddfe7bba2f8ff13a3f7512bde4e1a15db383`，当前工作 head 从 `1d85c8fb2a39fc548271f633fdd76c4b47c445aa` 继续推进。
+- `composite_fallback_source_contract_20260912.json` 新增 `license_and_usage_compatibility` 类别矩阵，至少区分：交易所公告/披露文档、BSE mapping/cutover 文档、交易所公司行为记录、交易所行情/处理后市场数据、CNINFO 原始发行人文档 transport、AmazingData 观察和交易所日历/统计文档；每类都有独立 `license_decision`、适用范围和激活规则。
+- 根据 [BSE 行情许可通知](https://www.bse.cn/important_news/200011008.html) 与 [境内行情授权指南](https://www.bse.cn/application/guide.html) 的原文，BSE `行情信息` 采用许可使用模式，未经许可不得使用、发布或传播。BSE 公告、mapping、cutover 文档单独归类为文档类证据，不能继承行情许可。SSE/SZSE 仍按各自法律声明处理非商业浏览/下载与牟利型复制、存储、抓取等边界，不能自动推导项目生产化授权。
+- Markdown 矩阵新增 license/usage boundary 列；每个 source 和 capability evidence contract 均绑定 source class。BSE market/processed-price 类别为 `LICENSE_REQUIRED` / `BLOCKED_PENDING_PER_VENUE_LICENSE_DECISION`；其余类别保持项目级待决，推荐仍为 `SOURCE_SELECTION_STILL_UNRESOLVED`。
+- 保持已接受的 PIT `available_at <= as_of`、冲突 fail-closed、rendered-DOM/raw-byte 区分、BSE caller-side mapping、601558/600068 deferred 等边界不变；未修改 `source-policy-v1`、Provider facade、Golden/H1/2020 baseline、封存产物或 Formal/Production 状态。
+
+**Implementation Status**：来源类别许可矩阵、source/license 字段和回归约束已修订；候选来源仍未激活，等待按类别作出项目许可/合规决定。
+
+**Review Status**：PR #47 保持 Draft；本次修订完成后返回 exact new head 做 delta review。无实现、第三次 Formal、Production、回填或策略授权。
+
+## 2026-09-12 · 复合 / 兜底来源记录契约设计闸门
+
+> 状态：DESIGN-ONLY SOURCE CONTRACT / SOURCE SELECTION STILL UNRESOLVED / NO RUNTIME ACTIVATION / NO THIRD FORMAL
+
+- 按 Issue #39 最新 scheduler checkpoint，从 clean `main@661dddfe7bba2f8ff13a3f7512bde4e1a15db383` 开始，只处理五个未闭合领域：security lifecycle/PIT、historical status、corporate actions、BJ old/new mapping、2020 history fixture。没有启动 Production、新 Formal SpikeRun、backfill、universe sweep 或策略工作。
+- 新增 [`composite_fallback_source_contract_20260912.md`](provider_verification/composite_fallback_source_contract_20260912.md) 与机器可校验的 [`composite_fallback_source_contract_20260912.json`](provider_verification/composite_fallback_source_contract_20260912.json)。矩阵固定 primary source、fallback/first-party source、精确字段、PIT、冲突优先级、证据合同和实现影响，并把未来 fallback 限定为显式的新 source-policy 版本；本 PR 不改 `source-policy-v1`、Provider facade、Golden/H1 或全局 2020 baseline。
+- 来源研究确认 SSE/SZSE/BSE 有相应一手公告、停复牌/退市、公司行为或 mapping 入口，且 CNINFO 可作为发行人原文 transport；但 SSE/SZSE 部分表格动态、BSE 当前环境直接抓取受 403/WAF 影响，完整历史覆盖、稳定机器检索和自动化留存/使用许可均未证实。BSE 渲染 DOM 继续与 raw bytes 严格区分。
+- 统一合同要求 `available_at <= as_of`、缺失/畸形/冲突 fail-closed、官方更正以新版本进入 lineage；不允许用当前 snapshot/code-list 推断历史 PIT，不允许在 Provider facade 内隐式改写 BJ symbol，不允许按 AmazingData 进度码相关性过滤异常公司行为行。
+- `601558.SH` 保持 `PROPOSED_NOT_ACTIVATED`，`600068.SH` 只作为同等明确的备用候选；二者均须先绑定精确首个适用 2020 session 和最小 bar 证据，不得放宽全局基线。BSE mapping 真值仍不是 `golden_bj_mapping` PASS。
+
+**Implementation Status**：来源矩阵、JSON schema 约束和聚焦回归已完成；候选来源尚未激活，等待许可/使用决策、稳定 retrieval contract 和独立审阅。
+
+**Review Status**：保持 Draft，返回本 PR exact head 供独立 Reviewer 审查；推荐为 `SOURCE_SELECTION_STILL_UNRESOLVED`。未授权第三次 Formal、Production、回填或策略工作。
+
 ## 2026-09-12 · 剩余六项 Provider 能力/契约闭环
 
 > 状态：TARGETED NON-PRODUCTION CLOSURE / LOCAL QA GREEN / INDEPENDENT REVIEW REQUIRED / NO THIRD FORMAL
