@@ -99,3 +99,46 @@ def test_history_fixture_is_deferred_and_does_not_relax_global_baseline():
     assert "600068.SH is an equally explicit alternative candidate" in decision
     assert "300104.SZ remains INAPPLICABLE_FOR_2020_BASELINE" in decision
     assert "do not modify the global 2020-01-01 baseline" in failure_rule
+
+
+def test_license_compatibility_is_split_by_source_class():
+    contract = _load_contract()
+    compatibility = contract["license_and_usage_compatibility"]
+    classes = {item["id"]: item for item in compatibility["source_classes"]}
+
+    assert compatibility["status"] == "UNRESOLVED_PER_SOURCE_CLASS"
+    assert {
+        "exchange_announcement_disclosure_document",
+        "bse_mapping_cutover_document",
+        "exchange_corporate_action_record",
+        "exchange_quotation_or_processed_market_data",
+        "cninfo_original_issuer_document_transport",
+    } <= classes.keys()
+    assert classes["bse_mapping_cutover_document"]["license_decision"] == (
+        "PROJECT_DECISION_REQUIRED"
+    )
+    market_data = classes["exchange_quotation_or_processed_market_data"]
+    assert market_data["venue_decisions"]["BSE"] == "LICENSE_REQUIRED"
+    assert (
+        "must not be classified as licensed BSE 行情信息"
+        in classes["bse_mapping_cutover_document"]["not_market_data_authority"]
+    )
+
+
+def test_sources_and_capability_rows_bind_class_specific_license_fields():
+    contract = _load_contract()
+    sources = {source["id"]: source for source in contract["sources"]}
+
+    assert sources["exchange_lifecycle_events"]["source_class"] == (
+        "exchange_announcement_disclosure_document"
+    )
+    assert sources["bse_code_mapping"]["source_class"] == "bse_mapping_cutover_document"
+    assert sources["exchange_quotation_or_processed_market_data"]["license_decision"] == (
+        "BLOCKED_PENDING_PER_VENUE_LICENSE_DECISION"
+    )
+    assert all("license_decision" in source for source in sources.values())
+    assert all(
+        "license_decision_class" in capability["evidence_contract"]
+        or "license_decision_classes" in capability["evidence_contract"]
+        for capability in contract["capabilities"]
+    )

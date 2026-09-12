@@ -6341,3 +6341,28 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 
 **Implementation Status**：矩阵、机器契约和聚焦回归已提交，候选来源未激活。
 **Review Status**：`SOURCE_SELECTION_STILL_UNRESOLVED / INDEPENDENT REVIEW REQUIRED / KEEP DRAFT`；无第三次 Formal 或 Production 授权。
+
+## DM-20260912-FORMAL-B1B7-026 · PR #47 许可 / 来源类别归因整改
+
+**Type**：C1 — exact-head review delta / source-class licensing clarification
+**Date**：2026-09-12
+**Status**：`P0 SOURCE-CLASS LICENSING BLOCKER ADDRESSED / DESIGN-ONLY / SOURCE SELECTION STILL UNRESOLVED / KEEP DRAFT`
+
+**触发与范围**：
+
+- PR #47 exact-head review `5185243746` 指出，原契约把 SSE、SZSE、BSE 的许可/使用边界概括成一个 venue 级陈述，尤其没有区分 BSE 公告文档与 BSE `行情信息`。Issue #39 scheduler checkpoint `5643546879` 授权一次极小的文档/契约 delta，仅修正来源类别归因。
+- 本次仍基于 clean `main@661dddfe7bba2f8ff13a3f7512bde4e1a15db383`，不新增 Provider 调用，不启动 Formal/Production，不改变 Golden/H1/全局 2020 baseline、旧 evidence、run/catalog/verdict 或 source-policy。
+
+**修正内容**：
+
+- `license_and_usage_compatibility` 现在按实际 source class 拆分：`exchange_announcement_disclosure_document`、`bse_mapping_cutover_document`、`exchange_corporate_action_record`、`exchange_quotation_or_processed_market_data`、`cninfo_original_issuer_document_transport`、`amazingdata_provider_observation` 和 `exchange_calendar_or_statistics_document`。
+- BSE 公告 / mapping / cutover 文档只作为身份、事件和路由证据；根据 [BSE 行情许可通知](https://www.bse.cn/important_news/200011008.html) 与 [境内行情授权指南](https://www.bse.cn/application/guide.html)，BSE `行情信息` 是单独的许可控制类别，机构使用需申请，未经授权不得使用、发布或传播。文档类决定不得继承为行情/处理价授权。
+- SSE/SZSE 仍按 [SSE 法律声明](https://www.sse.com.cn/home/legal/) 与 [SZSE 法律声明](https://www.szse.cn/application/laws/) 的具体条款处理非商业浏览/下载和牟利型复制、存储、电子抓取、转载等边界；这也不等于项目自动化生产使用已获批准。CNINFO 继续作为原始发行人文档 transport，不提升为独立语义来源。
+- 每个 source 对象新增 `source_class`、`license_decision` 和类别化 `activation_gate`；五项 capability 的 evidence contract 新增对应 license class/rule；Markdown 五行矩阵新增 license/usage boundary 列。推荐明确保持 `SOURCE_SELECTION_STILL_UNRESOLVED`。
+
+**不变边界**：PIT `available_at <= as_of`、source conflict fail-closed、rendered-DOM/raw-byte 区分、BSE caller/ingest mapping、601558/600068 deferred 和所有已接受层级不变；不做实现、不激活 fallback、不修改 facade 或历史封存事实。
+
+**验证与下一步**：聚焦 JSON parse、7 条来源契约回归、Ruff check/format、`git diff --check` 已通过；提交前再跑全量 pytest 和静态门禁。随后将 PR #47 新 exact head 返回独立 Reviewer 做 delta review；项目管理者需按 source class 给出自动读取、原始留存、解析、内部/派生使用的许可/合规决定。
+
+**Implementation Status**：来源类别矩阵和 machine contract 已修订，候选来源未激活。
+**Review Status**：`SOURCE_SELECTION_STILL_UNRESOLVED / DELTA REVIEW REQUIRED / KEEP DRAFT`；没有第三次 Formal 或 Production 授权。

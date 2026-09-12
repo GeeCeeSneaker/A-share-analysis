@@ -46,10 +46,109 @@
       "meaning": "A retrieval channel for the issuer's original disclosure, not an independent semantic authority."
     }
   ],
+  "license_and_usage_compatibility": {
+    "status": "UNRESOLVED_PER_SOURCE_CLASS",
+    "global_rule": "A public URL or successful retrieval does not grant the project permission to automate retrieval, retain source content, publish it, or create derived market-data artifacts. Every selected source class requires a documented project decision for its intended use.",
+    "source_classes": [
+      {
+        "id": "exchange_announcement_disclosure_document",
+        "applies_to": ["SSE", "SZSE", "BSE"],
+        "public_access": "Official announcement and disclosure pages/documents are publicly viewable subject to each venue's terms.",
+        "usage_boundary": "SSE and SZSE legal statements describe non-commercial browsing/download under their terms and restrict profit-oriented copying, storage, scraping, redistribution, or similar reuse without written permission. Public BSE document access is not treated as a blanket automated-retention or reuse grant.",
+        "bse_distinction": "This class covers public announcement/document retrieval only. It does not authorize use of BSE 行情信息 or processed market-data products.",
+        "license_decision": "PROJECT_DECISION_REQUIRED",
+        "evidence_sources": [
+          "https://www.sse.com.cn/home/legal/",
+          "https://www.szse.cn/application/laws/",
+          "https://www.bse.cn/disclosure/announcement.html"
+        ]
+      },
+      {
+        "id": "bse_mapping_cutover_document",
+        "applies_to": ["BSE"],
+        "public_access": "The BSE mapping and code-cutover documents are official public documents used to resolve identity and routing provenance.",
+        "usage_boundary": "Public visibility supports source identification, not an automatic right to store, redistribute, or use the document in an operational data product. Apply a separate document-use decision.",
+        "not_market_data_authority": "A mapping/cutover document must not be classified as licensed BSE 行情信息, and it must not be used to infer that a separate BSE quotation or processed-price feed is licensed.",
+        "license_decision": "PROJECT_DECISION_REQUIRED",
+        "evidence_sources": [
+          "https://www.bse.cn/service/code_mapping.html",
+          "https://www.bse.cn/important_news/200026735.html",
+          "https://www.bse.cn/application/guide.html"
+        ]
+      },
+      {
+        "id": "exchange_corporate_action_record",
+        "applies_to": ["SSE", "SZSE", "BSE"],
+        "public_access": "An exchange corporate-action page or processed record may be publicly viewable subject to the venue's terms.",
+        "usage_boundary": "A corporate-action record is tracked as its own document/processed-record class. Do not silently reclassify it as licensed quotation data; if an artifact contains quotation or processed-price data, apply the separate market-data class decision.",
+        "venue_decisions": {
+          "SSE": "TERMS_REVIEW_REQUIRED",
+          "SZSE": "TERMS_REVIEW_REQUIRED",
+          "BSE": "PROJECT_DECISION_REQUIRED"
+        },
+        "license_decision": "PROJECT_DECISION_REQUIRED",
+        "evidence_sources": [
+          "https://www.sse.com.cn/market/stockdata/dividends/dividend/",
+          "https://www.szse.cn/market/periodical/documents/t20041229_521990.html",
+          "https://www.bse.cn/disclosure/announcement.html"
+        ]
+      },
+      {
+        "id": "exchange_quotation_or_processed_market_data",
+        "applies_to": ["SSE", "SZSE", "BSE"],
+        "public_access": "A quotation or processed market-data artifact may be publicly displayed or downloadable, but access alone is not permission for project ingestion or derivation.",
+        "venue_decisions": {
+          "SSE": "TERMS_REVIEW_REQUIRED",
+          "SZSE": "TERMS_REVIEW_REQUIRED",
+          "BSE": "LICENSE_REQUIRED"
+        },
+        "bse_rule": "BSE's first-party authorization notice and guide describe market information as license-controlled, require institutions wishing to use it to apply, and prohibit use, publication, or dissemination without authorization.",
+        "license_decision": "BLOCKED_PENDING_PER_VENUE_LICENSE_DECISION",
+        "evidence_sources": [
+          "https://www.bse.cn/important_news/200011008.html",
+          "https://www.bse.cn/application/guide.html",
+          "https://www.sse.com.cn/home/legal/",
+          "https://www.szse.cn/application/laws/"
+        ]
+      },
+      {
+        "id": "exchange_calendar_or_statistics_document",
+        "applies_to": ["SSE", "SZSE", "BSE"],
+        "public_access": "Official calendar, yearbook, and statistics pages/documents may be publicly viewable subject to the venue's terms.",
+        "usage_boundary": "Use only the minimum calendar/statistics facts needed for fixture applicability. Do not infer a license for quotation or processed market-data artifacts from a calendar or yearbook page.",
+        "license_decision": "PROJECT_DECISION_REQUIRED",
+        "evidence_sources": [
+          "https://www.sse.com.cn/disclosure/announcement/general/c/c_20191220_4969627.shtml",
+          "https://www.sse.com.cn/aboutus/publication/yearly/"
+        ]
+      },
+      {
+        "id": "cninfo_original_issuer_document_transport",
+        "applies_to": ["CNINFO"],
+        "public_access": "CNINFO provides public disclosure and data-service entry points subject to its own service terms; the project's exact automated retrieval and retention use remains undecided.",
+        "usage_boundary": "Use only to locate or transport the issuer's original document while preserving original issuer identity, date, content hash, and locator. Do not treat a CNINFO index or API response as an independent completeness or semantic guarantee.",
+        "license_decision": "PROJECT_DECISION_REQUIRED",
+        "evidence_sources": [
+          "https://www.cninfo.com.cn/new/commonUrl?url=data%2Fgongkai",
+          "https://webapi.cninfo.com.cn/notice.html"
+        ]
+      },
+      {
+        "id": "amazingdata_provider_observation",
+        "applies_to": ["AmazingData SDK"],
+        "public_access": "Not a public exchange-source license class; local SDK and vendor data use must follow the applicable vendor and project terms.",
+        "usage_boundary": "A valid row shape proves only that the observation can be retained for the approved provider surface; it does not supply first-party licensing or unresolved semantic authority.",
+        "license_decision": "VENDOR_TERMS_AND_PROJECT_DECISION_REQUIRED",
+        "evidence_sources": []
+      }
+    ],
+    "activation_rule": "No source class may be selected by a future source-policy until its class-specific license_decision is resolved for the exact retrieval, local retention, parsing, and derived-artifact use. In particular, a decision for BSE public documents never substitutes for a BSE market-data license."
+  },
   "sources": [
     {
       "id": "exchange_lifecycle_events",
       "class": "FIRST_PARTY_EXCHANGE_EVENT_DOCUMENTS",
+      "source_class": "exchange_announcement_disclosure_document",
       "venues": ["SSE", "SZSE", "BSE"],
       "urls": [
         "https://www.sse.com.cn/assortment/stock/list/info/announcement/",
@@ -60,11 +159,13 @@
       ],
       "semantic_role": "Source of record for listing, suspension, resumption, risk-warning, delisting, and relisting facts when the official document states the event and effective applicability.",
       "retrieval_observation": "SSE and SZSE pages returned HTTP 200 in the 2026-09-12 public-source check. Their searchable tables are partly dynamic. The BSE page is officially published but direct non-browser retrieval returned HTTP 403 in this environment; an earlier browser-rendered DOM artifact exists and must be labelled rendered_dom, not raw bytes.",
-      "activation_gate": "Complete historical coverage, reproducible retrieval, and permitted automated retention/use are not yet proven."
+      "license_decision": "PROJECT_DECISION_REQUIRED",
+      "activation_gate": "Complete historical coverage, reproducible retrieval, and the class-specific decision for automated document retrieval, retention, parsing, and derived use are not yet proven. For BSE, this document class does not grant a market-data license."
     },
     {
       "id": "exchange_corporate_action_records",
       "class": "FIRST_PARTY_EXCHANGE_PROCESSED_RECORDS",
+      "source_class": "exchange_corporate_action_record",
       "venues": ["SSE", "SZSE", "BSE"],
       "urls": [
         "https://www.sse.com.cn/market/stockdata/dividends/dividend/",
@@ -73,11 +174,29 @@
       ],
       "semantic_role": "Source of record for processed dividend, bonus-share, capitalization, rights-issue, record-date, ex-date, and adjusted-reference-price facts where the exchange publishes them.",
       "retrieval_observation": "SSE dividend data and history are exposed through an official page but the visible table is dynamic. SZSE publishes a first-party monthly corporate-action table with dividend/bonus/rights fields. BSE event retrieval remains subject to the same browser/WAF and licensing gate.",
-      "activation_gate": "Field-level historical completeness, stable record identifiers, and permitted automated retention/use are not yet proven."
+      "license_decision": "PROJECT_DECISION_REQUIRED",
+      "activation_gate": "Field-level historical completeness, stable record identifiers, and the class-specific decision for automated retrieval, retention, parsing, and derived use are not yet proven; a quotation/processed-price field must also pass the separate market-data license gate."
+    },
+    {
+      "id": "exchange_quotation_or_processed_market_data",
+      "class": "FIRST_PARTY_EXCHANGE_MARKET_DATA",
+      "source_class": "exchange_quotation_or_processed_market_data",
+      "venues": ["SSE", "SZSE", "BSE"],
+      "urls": [
+        "https://www.bse.cn/important_news/200011008.html",
+        "https://www.bse.cn/application/guide.html",
+        "https://www.sse.com.cn/home/legal/",
+        "https://www.szse.cn/application/laws/"
+      ],
+      "semantic_role": "Potential source of quotation, processed-price, or official daily market-data artifacts used for bars or adjusted-reference-price verification.",
+      "retrieval_observation": "No market-data artifact is activated by this PR. BSE's first-party authorization notice and guide make the BSE market-information class license-controlled; SSE/SZSE use remains subject to their own terms and the project's use-case decision.",
+      "license_decision": "BLOCKED_PENDING_PER_VENUE_LICENSE_DECISION",
+      "activation_gate": "Never infer a market-data license from a public announcement, mapping, calendar, or statistics page. BSE requires the applicable market-information authorization; SSE/SZSE require a per-use-case terms/licensing decision."
     },
     {
       "id": "bse_code_mapping",
       "class": "FIRST_PARTY_BSE_IDENTITY_RESOLUTION",
+      "source_class": "bse_mapping_cutover_document",
       "venues": ["BSE"],
       "urls": [
         "https://www.bse.cn/service/code_mapping.html",
@@ -86,11 +205,13 @@
       ],
       "semantic_role": "Auditable old/new BSE identity input. The mapping table and cutover notice must be versioned together; neither is permission to rewrite a provider request inside the facade.",
       "retrieval_observation": "The existing truth bundle records the official mapping row 242 and the rendered cutover notice. Direct BSE retrieval is not stable in this environment, and mapping validity outside the documented cutover interval still needs an explicit version contract.",
-      "activation_gate": "A versioned snapshot/cache policy, validity interval, and licensing decision are still required."
+      "license_decision": "PROJECT_DECISION_REQUIRED",
+      "activation_gate": "A versioned snapshot/cache policy, validity interval, and document-class licensing decision are still required. Public mapping/cutover visibility is not treated as authorization for BSE 行情信息 or processed-price data."
     },
     {
       "id": "cninfo_original_disclosure_transport",
       "class": "OFFICIAL_DISCLOSURE_TRANSPORT",
+      "source_class": "cninfo_original_issuer_document_transport",
       "venues": ["CNINFO"],
       "urls": [
         "https://www.cninfo.com.cn/new/commonUrl?url=data%2Fgongkai",
@@ -98,20 +219,24 @@
       ],
       "semantic_role": "Transport and locator for the issuer's original disclosure when the original document identity, issuer, announcement date, and content remain verifiable.",
       "retrieval_observation": "The public data-service page returned HTTP 200 in the 2026-09-12 check, but its own service terms do not make it an independent guarantee of completeness or timeliness.",
-      "activation_gate": "Use only as transport; do not let a CNINFO index outrank an exchange processed result or the original issuer document."
+      "license_decision": "PROJECT_DECISION_REQUIRED",
+      "activation_gate": "Use only as transport; resolve the CNINFO class-specific retrieval/retention decision and do not let a CNINFO index outrank an exchange processed result or the original issuer document."
     },
     {
       "id": "amazingdata_normalized_observation",
       "class": "PROVIDER_OBSERVATION",
+      "source_class": "amazingdata_provider_observation",
       "venues": ["SSE", "SZSE", "BSE", "OTHER_PROVIDER_MARKETS"],
       "urls": [],
       "semantic_role": "Retain valid provider rows for numeric status fields and daily bars where the requested fact is within the documented provider surface; preserve malformed rows as quarantine/fail-closed evidence.",
       "retrieval_observation": "The project has an installed SDK surface but no authoritative semantic documentation for PIT listing state, status progress codes, or corporate-action fields.",
+      "license_decision": "VENDOR_TERMS_AND_PROJECT_DECISION_REQUIRED",
       "activation_gate": "A documented provider/SDK semantic contract or an accepted first-party composite contract is required before any unresolved field is treated as confirmed."
     },
     {
       "id": "exchange_calendar_and_history_fixture",
       "class": "FIRST_PARTY_CALENDAR_PLUS_BAR_EVIDENCE",
+      "source_class": "exchange_calendar_or_statistics_document",
       "venues": ["SSE", "SZSE", "BSE"],
       "urls": [
         "https://www.sse.com.cn/disclosure/announcement/general/c/c_20191220_4969627.shtml",
@@ -121,7 +246,8 @@
       ],
       "semantic_role": "Bind exchange sessions and lifecycle applicability; daily-bar existence must then be proven by a valid provider row or an approved official market-data artifact.",
       "retrieval_observation": "Official SSE calendar, 601558 delisting, yearbook, and 600068 termination materials provide candidate facts. They do not by themselves prove the first applicable session plus the minimum bar shape required by the project fixture.",
-      "activation_gate": "601558 remains deferred; 600068 is an unactivated alternative candidate."
+      "license_decision": "PROJECT_DECISION_REQUIRED",
+      "activation_gate": "601558 remains deferred; 600068 is an unactivated alternative candidate. Calendar/statistics document use and any separate quotation/processed-market-data bar source require their own class-specific decisions."
     }
   ],
   "capabilities": [
@@ -170,6 +296,8 @@
           "source_locator",
           "license_decision"
         ],
+        "license_decision_class": "exchange_announcement_disclosure_document",
+        "license_rule": "Resolve document retrieval, local retention, parsing, and derived-use terms for the venue; BSE document access does not authorize BSE market-data use.",
         "representation_rule": "Use raw_bytes or official_pdf only when the downloaded bytes are retained; use rendered_dom for browser output and never relabel it as raw bytes.",
         "failure_rule": "Missing effective applicability, ambiguous event identity, or same-tier conflict produces UNKNOWN/SOURCE_CONFLICT and blocks the dependent gate."
       },
@@ -216,8 +344,15 @@
           "source availability timestamp",
           "raw/provenance hash",
           "rule version used for limit interpretation",
-          "row-shape validation result"
+          "row-shape validation result",
+          "class-specific license decisions for lifecycle documents and provider observations"
         ],
+        "license_decision_classes": [
+          "exchange_announcement_disclosure_document",
+          "amazingdata_provider_observation",
+          "exchange_quotation_or_processed_market_data when a processed limit artifact is selected"
+        ],
+        "license_rule": "Do not use a public BSE document decision as a license for BSE quotation/processed market data; resolve each selected class separately.",
         "failure_rule": "Do not skip a row because status fields look like a non-observation row without an accepted provider contract. Missing identity/date, unknown status progress, or rule mismatch blocks the row.",
         "conflict_rule": "An official lifecycle mismatch with AmazingData blocks the derived day until a versioned correction is recorded; no last-write-wins."
       },
@@ -270,8 +405,15 @@
           "all values used in adjustment arithmetic",
           "source locator and content hash",
           "availability timestamp",
-          "license decision"
+          "license decision by source class"
         ],
+        "license_decision_classes": [
+          "exchange_corporate_action_record",
+          "exchange_announcement_disclosure_document",
+          "exchange_quotation_or_processed_market_data if an adjusted/reference-price artifact is sourced",
+          "cninfo_original_issuer_document_transport"
+        ],
+        "license_rule": "The source class must match the actual artifact content. A public BSE corporate-action or announcement page does not imply a BSE market-data license.",
         "failure_rule": "Missing required dates, ambiguous progress semantics, same-event source conflict, or unproven T-1/T/T+1 calendar mapping blocks continuity; raw event presence alone is insufficient."
       },
       "implementation_impact": [
@@ -317,8 +459,11 @@
           "artifact hash",
           "retrieval timestamp",
           "availability timestamp",
-          "mapping policy version"
+          "mapping policy version",
+          "license decision for the BSE mapping/cutover document class"
         ],
+        "license_decision_class": "bse_mapping_cutover_document",
+        "license_rule": "Resolve document-class use separately; mapping/cutover evidence does not grant authorization for BSE 行情信息 or processed-price data.",
         "request_identity_rule": "The caller records the original logical symbol and the resolved provider symbol. The provider facade receives the resolved value verbatim and never hides a mapping request or silently rewrites code_list.",
         "failure_rule": "Missing or conflicting mapping interval blocks the request; no fallback to the old code is implicit."
       },
@@ -363,8 +508,15 @@
           "minimum bar count and fields",
           "bar row identity/hash",
           "available_at timestamp",
-          "fixture decision and reason"
+          "fixture decision and reason",
+          "license decision for calendar/statistics and bar source classes"
         ],
+        "license_decision_classes": [
+          "exchange_calendar_or_statistics_document",
+          "exchange_quotation_or_processed_market_data",
+          "amazingdata_provider_observation"
+        ],
+        "license_rule": "Resolve the calendar/statistics document class and any quotation/processed-market-data or AmazingData bar class independently; one decision never grants the others.",
         "current_decision": "601558.SH remains PROPOSED_NOT_ACTIVATED. 600068.SH is an equally explicit alternative candidate, also not activated. 300104.SZ remains INAPPLICABLE_FOR_2020_BASELINE.",
         "failure_rule": "If the first session or minimum bar evidence cannot be bound, leave the fixture deferred and do not modify the global 2020-01-01 baseline."
       },
@@ -396,7 +548,7 @@
     },
     {
       "id": "license_and_usage_compatibility",
-      "statement": "SSE, SZSE, and BSE public legal/data notices distinguish non-commercial browsing from commercial copying, storage, scraping, or redistribution. The project's automated retention and operational use have not received a written compatibility decision."
+      "statement": "The class-specific license matrix is unresolved: SSE/SZSE website documents describe non-commercial browsing/download and profit-oriented reuse limits; BSE first-party notices require authorization for 行情信息; BSE public announcement/mapping documents are tracked separately; CNINFO transport has its own terms. The project's automated retention and operational/derived use has no written compatibility decision for any selected class."
     },
     {
       "id": "amazingdata_semantics",
@@ -408,7 +560,8 @@
     }
   ],
   "next_work": [
-    "Obtain an explicit licensing/usage decision for automated retrieval, local retention, and derived artifacts from each proposed first-party source.",
+    "Obtain explicit per-class licensing/usage decisions for exchange announcement/disclosure documents, BSE mapping/cutover documents, exchange corporate-action records, exchange quotation/processed market data, CNINFO original-document transport, and AmazingData observations.",
+    "For BSE, obtain the applicable authorization before selecting any 行情信息 or processed-price artifact; do not reuse a public document/mapping decision as a market-data license.",
     "Freeze one reproducible retrieval contract per venue, including browser/rendered-DOM handling where required, stable identifiers, and archive coverage tests.",
     "Have an independent reviewer accept this matrix and the exact source/provenance fields before implementing any adapter.",
     "After acceptance, implement only the narrow adapters required by the accepted capability rows, with a new versioned source policy and focused tests.",

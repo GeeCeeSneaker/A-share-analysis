@@ -1,3 +1,17 @@
+## 2026-09-12 · PR #47 许可 / 来源类别归因整改
+
+> 状态：P0 LICENSING/SOURCE-CLASS BLOCKER ADDRESSED / DESIGN-ONLY / SOURCE SELECTION STILL UNRESOLVED / NO RUNTIME ACTIVATION
+
+- 针对 PR #47 exact-head independent review `5185243746` 和 Issue #39 scheduler checkpoint `5643546879`，修正此前把 SSE、SZSE、BSE 许可边界概括为一个 venue 级结论的问题。变更仍基于 `main@661dddfe7bba2f8ff13a3f7512bde4e1a15db383`，当前工作 head 从 `1d85c8fb2a39fc548271f633fdd76c4b47c445aa` 继续推进。
+- `composite_fallback_source_contract_20260912.json` 新增 `license_and_usage_compatibility` 类别矩阵，至少区分：交易所公告/披露文档、BSE mapping/cutover 文档、交易所公司行为记录、交易所行情/处理后市场数据、CNINFO 原始发行人文档 transport、AmazingData 观察和交易所日历/统计文档；每类都有独立 `license_decision`、适用范围和激活规则。
+- 根据 [BSE 行情许可通知](https://www.bse.cn/important_news/200011008.html) 与 [境内行情授权指南](https://www.bse.cn/application/guide.html) 的原文，BSE `行情信息` 采用许可使用模式，未经许可不得使用、发布或传播。BSE 公告、mapping、cutover 文档单独归类为文档类证据，不能继承行情许可。SSE/SZSE 仍按各自法律声明处理非商业浏览/下载与牟利型复制、存储、抓取等边界，不能自动推导项目生产化授权。
+- Markdown 矩阵新增 license/usage boundary 列；每个 source 和 capability evidence contract 均绑定 source class。BSE market/processed-price 类别为 `LICENSE_REQUIRED` / `BLOCKED_PENDING_PER_VENUE_LICENSE_DECISION`；其余类别保持项目级待决，推荐仍为 `SOURCE_SELECTION_STILL_UNRESOLVED`。
+- 保持已接受的 PIT `available_at <= as_of`、冲突 fail-closed、rendered-DOM/raw-byte 区分、BSE caller-side mapping、601558/600068 deferred 等边界不变；未修改 `source-policy-v1`、Provider facade、Golden/H1/2020 baseline、封存产物或 Formal/Production 状态。
+
+**Implementation Status**：来源类别许可矩阵、source/license 字段和回归约束已修订；候选来源仍未激活，等待按类别作出项目许可/合规决定。
+
+**Review Status**：PR #47 保持 Draft；本次修订完成后返回 exact new head 做 delta review。无实现、第三次 Formal、Production、回填或策略授权。
+
 ## 2026-09-12 · 复合 / 兜底来源记录契约设计闸门
 
 > 状态：DESIGN-ONLY SOURCE CONTRACT / SOURCE SELECTION STILL UNRESOLVED / NO RUNTIME ACTIVATION / NO THIRD FORMAL
