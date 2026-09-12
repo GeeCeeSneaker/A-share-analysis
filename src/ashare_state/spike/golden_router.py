@@ -124,13 +124,6 @@ CA_STREAM_ENDPOINTS = {
     "right_issue": "InfoData.get_right_issue",
 }
 
-# The live 1.1.9 response contains heterogeneous dividend records.  In the
-# targeted closure response, DATE_EX is absent only on the observed
-# non-final progress codes; completed (code 3) rows carry an ex-date.  These
-# codes are an adapter filter, not a market-truth assertion: an unknown
-# progress code with a missing DATE_EX remains a loud schema failure.
-_OBSERVED_NON_EVENT_DIVIDEND_PROGRESS = frozenset({"1", "2", "12"})
-
 
 def _payload_columns(payload: Any) -> set[str] | None:
     """R4-A2.8 P1-02: the payload's column set (for empty-frame schema
@@ -218,16 +211,6 @@ def _ca_provider_view(
     for row in rows:
         raw_code = first_present(row, contract["code"])
         raw_ex_date = first_present(row, contract["ex_date"])
-        if (
-            stream == "dividend"
-            and not date_key(raw_ex_date)
-            and str(row.get("DIV_PROGRESS", "")).strip() in _OBSERVED_NON_EVENT_DIVIDEND_PROGRESS
-        ):
-            # A pending/unfinished dividend record is not an ex-date event.
-            # Drop it only when the provider supplies one of the observed
-            # explicit progress codes; do not turn arbitrary malformed rows
-            # into an empty event stream.
-            continue
         code = provider_symbol({"MARKET_CODE": raw_code}).split(".", 1)[0]
         ex_date = date_key(raw_ex_date)
         if not code or not ex_date:

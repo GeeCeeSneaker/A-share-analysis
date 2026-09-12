@@ -112,21 +112,14 @@ class TestProviderView:
         with pytest.raises(CAProviderShapeError, match="DATE_EX"):
             _ca_provider_view("dividend", [{"MARKET_CODE": "600519"}])
 
-    def test_incomplete_dividend_rows_without_ex_date_are_filtered(self):
-        """The live endpoint mixes pending records with completed events.
-
-        Only the observed explicit non-final progress codes may be filtered;
-        a completed row still missing DATE_EX must fail closed below.
-        """
-        rows = [
-            {"MARKET_CODE": "600519", "DIV_PROGRESS": "1"},
-            {"MARKET_CODE": "600519", "DIV_PROGRESS": "2"},
-            {"MARKET_CODE": "600519", "DIV_PROGRESS": "12"},
-            {"MARKET_CODE": "600519", "DIV_PROGRESS": "3", "DATE_EX": "20220630"},
-        ]
-        view = _ca_provider_view("dividend", rows)
-        assert len(view) == 1
-        assert view[0]["ex_date"] == "20220630"
+    @pytest.mark.parametrize("progress", ["1", "2", "12"])
+    def test_incomplete_dividend_rows_without_ex_date_fail_closed(self, progress):
+        """Observed progress/date correlation is not a production contract."""
+        with pytest.raises(CAProviderShapeError, match="DATE_EX"):
+            _ca_provider_view(
+                "dividend",
+                [{"MARKET_CODE": "600519", "DIV_PROGRESS": progress}],
+            )
 
     def test_completed_dividend_row_without_ex_date_still_fails(self):
         with pytest.raises(CAProviderShapeError, match="DATE_EX"):

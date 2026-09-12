@@ -427,15 +427,6 @@ _STATUS_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "IS_WD_SEC": ("IS_WD_SEC",),
 }
 
-_STATUS_NON_OBSERVATION_FIELDS = (
-    "PRICE_HIGH_LMT_RATE",
-    "PRICE_LOW_LMT_RATE",
-    "IS_ST_SEC",
-    "IS_SUSP_SEC",
-    "IS_WD_SEC",
-    "IS_XR_SEC",
-)
-
 
 def canonical_status_view(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Create the one canonical status view consumed by semantic validators.
@@ -457,17 +448,6 @@ def canonical_status_view(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             )
         symbol = provider_symbol(row)
         trade_date = row_date(row, "TRADE_DATE", "trade_date")
-        # AmazingData 1.1.9 can append a summary/non-observation row carrying
-        # status-rate defaults but no identity and no observation date.  It
-        # cannot safely participate in any semantic comparison.  Filter only
-        # this explicit shape; a row missing just one side remains a loud
-        # shape error so malformed observations are never laundered.
-        row_keys = {str(key).casefold() for key in row}
-        has_status_marker = any(
-            field.casefold() in row_keys for field in _STATUS_NON_OBSERVATION_FIELDS
-        )
-        if not symbol and not trade_date and has_status_marker:
-            continue
         if "." not in symbol:
             raise ProviderRowShapeError(
                 f"status row {index} has ambiguous or missing exchange-qualified identity",

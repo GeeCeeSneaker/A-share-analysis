@@ -3842,3 +3842,23 @@
 - Final online probe completed against code head `258489bc29359a1212cd33528ac5764ceb97e110`; the sanitized receipt is [`capability_closure_20260911.json`](provider_verification/capability_closure_20260911.json), 44,794 bytes, SHA-256 `bd2294ec4836446bb819a66b91f0def2392be463834d5da2fa61df1f8f71eb51`. It recorded 10 successful targeted exchanges, `formal_run_created=false`, `catalog_mutated=false`, and `verdict_mutated=false`.
 - The compact matrix is [`capability_closure_20260911.md`](provider_verification/capability_closure_20260911.md). It records status-shape remediation, BJ endpoint availability, delisted/BSE/Corporate Action/`300104.SZ` findings and their remaining `STILL_UNRESOLVED` boundaries without uploading raw Provider payloads or credentials.
 - GitHub Actions CI run `#545` passed all three required matrices (Ubuntu 3.14, Windows 3.12, Windows 3.14); GT-H3B run `#93` was skipped by policy. PR #45 remains Draft with independent review and merge still pending.
+
+## 2026-09-12 — Independent-review semantic-overreach remediation
+
+> Status: `P0 BLOCKERS ADDRESSED / FAIL-CLOSED RESTORED / LOCAL QA PENDING / NO THIRD FORMAL`
+
+- Absorbed the exact-head review of PR #45: the observed status rows with both
+  identity and date missing, and the dividend `DIV_PROGRESS`/`DATE_EX`
+  correlation, do not by themselves establish provider semantics.
+- Removed both production discard rules. `canonical_status_view()` now raises
+  on the double-missing status shape, and `_ca_provider_view()` raises on every
+  dividend row missing `DATE_EX`, including progress codes `1`, `2`, and `12`.
+  The bounded probe now reports these observations as `STILL_UNRESOLVED`.
+- Retained the existing sanitized receipt as frozen observational evidence; it
+  is not being rewritten into an authorization for runtime normalization. No
+  Golden, H1, 2020 baseline, sealed Formal artifact, catalog, verdict, or
+  Provider configuration was changed, and no new live probe or Formal run was
+  started.
+- Added regression coverage proving both formerly filtered shapes fail closed;
+  local QA and the ordinary GitHub Actions CI are the next gates. PR #45 must
+  remain Draft pending independent delta review.

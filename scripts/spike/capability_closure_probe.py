@@ -387,8 +387,12 @@ def _status_finding(record: dict[str, Any]) -> dict[str, Any]:
     invalid = int(stats.get("invalid_count", 0))
     if invalid:
         return {
-            "classification": "PROVIDER_CONFIRMED",
-            "finding": "native response contains missing or unparseable TRADE_DATE rows",
+            "classification": "STILL_UNRESOLVED",
+            "finding": (
+                "native response contains missing or unparseable TRADE_DATE rows; "
+                "the observed shape is recorded, but no production non-observation "
+                "discard rule is authorized without a provider contract"
+            ),
             "invalid_trade_date_rows": invalid,
         }
     return {
@@ -497,17 +501,18 @@ def _ca_finding(record: dict[str, Any], field: str) -> dict[str, Any]:
         int(progress_missing.get(code, 0)) for code in ("1", "2", "12")
     )
     unexpected_missing = max(0, missing - observed_non_event_missing)
-    if field == "DATE_EX" and missing and unexpected_missing == 0:
+    if field == "DATE_EX" and missing:
         return {
-            "classification": "FRAMEWORK_REMEDIATION_REQUIRED",
+            "classification": "STILL_UNRESOLVED",
             "finding": (
-                "provider returned heterogeneous dividend rows; missing DATE_EX is "
-                "confined to observed non-final progress codes and requires an "
-                "ephemeral adapter filter"
+                "native dividend response contains missing DATE_EX values; the "
+                "observed progress-code correlation is not a semantic contract "
+                "and no production filter is applied"
             ),
             "row_count": rows,
             "missing_or_invalid_rows": missing,
-            "non_event_progress_missing_rows": observed_non_event_missing,
+            "observed_progress_missing_rows": observed_non_event_missing,
+            "unexpected_missing_or_invalid_rows": unexpected_missing,
         }
     return {
         "classification": "PROVIDER_CONFIRMED" if unexpected_missing else "STILL_UNRESOLVED",
