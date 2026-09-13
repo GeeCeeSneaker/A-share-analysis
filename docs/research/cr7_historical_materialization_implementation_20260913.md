@@ -59,8 +59,9 @@
 
 已执行最终门禁：全量 `pytest` 为 `1790 collected, 1787 passed, 3 skipped`；3 个 skip 均为既有
 Windows symlink 权限限制。Ruff check/format、`mypy src`、`compileall`、`uv pip check`、合同 JSON
-parse 和 `git diff --check` 均通过。代码提交后必须保持 Draft，由独立 Reviewer 对 exact head 复核并等待
-Ubuntu 3.14、Windows 3.12、Windows 3.14 required CI 全绿；在新的 scheduler 决策前，不得把本切片
-扩大成真实历史物化或生产执行。
+parse 和 `git diff --check` 均通过。PR #53 初始实现 head `9423625bbcbb386300765809276058995ff2e849`
+对应 GitHub Actions CI #572，Ubuntu 3.14、Windows 3.12、Windows 3.14 均为 `success`，GT-H3B #110
+按策略 `skipped`。PR 仍保持 Draft，当前待独立 Reviewer 对 exact head 复核；在新的 scheduler 决策前，
+不得把本切片扩大成真实历史物化或生产执行。
 
 账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime 和 Provider 原始 payload 不得进入 GitHub。
