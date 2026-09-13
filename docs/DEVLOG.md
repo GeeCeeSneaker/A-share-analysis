@@ -1,3 +1,17 @@
+## 2026-09-13 · CR-7 2020–2026H1 历史研究物化合同设计 / 离线预检
+
+> 状态：**DESIGN-ONLY / OFFLINE REMEDIATION GREEN / MATERIALIZATION NOT AUTHORIZED / EXACT-HEAD DELTA REVIEW REQUIRED**
+
+- Issue #39 scheduler checkpoint 5651424650 在 PR #51 接受并合并后，按 CR-7 §15 授权的下一项是先设计历史物化合同，不是直接执行历史物化。基线为合并后的 clean main@53257c36e8ada5576f5d2dfce0947710ee24694c。
+- 新增 docs/research/cr7_historical_materialization_contract_20260913.md 和同名 JSON 合同，限定目标为 research_security_daily 的 2020-01-01 至 2026-06-30；明确 verified CR-4 ReadModel 单 snapshot 输入、PIT/identity lineage、Development/Validation A/Holdout 分区、78 个日期逻辑月份、enabled/disabled route 隔离、覆盖状态、幂等重放、staging/原子发布、inventory/hash 证据和有界离线夹具。
+- 针对独立 exact-head review 5189939092 的 P0/P1 阻断完成一个窄 remediation：历史物化入口改为待实现的非发布型 verified ReadModel projection/input stage，明确禁止调用当前会先写普通 R1 artifacts 的 `ResearchPanelBuilder.build_from_readmodel()` / `_publish()`；离线回归用源码检查锁定该发布边界，禁止在历史物化自己的 atomic commit 前产生 authoritative side effect。
+- 新增每个 enabled logical partition 必须具备的 sealed coverage-basis descriptor：绑定 source snapshot/domain/日期 scope/source selection/completeness claim 及 basis hash；coverage-basis set hash 同时进入 materialization identity/manifest。新增稀疏但 verified bytes 完整、缺 basis 时即使 caller 请求 OBSERVED 也只能 unresolved/partial 的回归约束。
+- 幂等 identity 新增 coverage-basis set hash 和 writer/runtime lock hash；后者绑定 dependency lock、Python runtime、Parquet writer engine 与 writer configuration identity，排除主机、路径、mtime、时钟和凭证，避免依赖变化被误判为同 identity 字节损坏。
+- 设计明确区分日期逻辑分区与 route 物理 artifact；disabled/experimental 的 unresolved 状态按 route 单独聚合，不会污染可靠的 enabled route，但 enabled 覆盖缺口也不能由 disabled 行数抵消。BSE 继续 DISABLE_ALL_BSE_ROWS_IN_R1，index、CR-5/R2、Golden/H1/baseline 和策略范围不变。
+- 新增/扩展 tests/unit/test_cr7_historical_materialization_contract.py，只读取机器合同和当前发布器源码并验证边界日期、78 个月、coverage basis fail-closed、幂等公式、原子发布顺序、证据字段和无执行授权；无 Provider 调用、无历史数据物化。
+
+离线聚焦回归：11 passed；JSON 解析和 `git diff --check` 通过。当前仍需 exact-head delta review 接受设计合同，并由新的 scheduler checkpoint 明确授权后，才可另开物化实现或执行 PR；本轮不运行 Provider、Production、Formal、backfill、BSE mapping、index、CR-5/R2、Golden/H1 或 baseline。
+
 ## 2026-09-13 · PR #50 BSE 身份连续性边界整改（已合并）
 
 > 状态：**P0 BSE RESEARCH LEAK CLOSED / R1 FAIL-CLOSED / EXACT-HEAD REVIEW PASS / REQUIRED CI GREEN / MERGED TO MAIN**
@@ -14,7 +28,7 @@
 
 ## 2026-09-12 · CR-7 R1 合并后研究消费筛选切片
 
-> 状态：**R1 ACCEPTED ON MAIN / CONSUMPTION SLICE IMPLEMENTED / FOCUSED QA GREEN / PR AND INDEPENDENT REVIEW PENDING**
+> 状态：**R1 ACCEPTED ON MAIN / CONSUMPTION SLICE MERGED / EXACT-HEAD REVIEW PASS / REQUIRED CI GREEN**
 
 - 以已合并主线 `main@401e9a8527083af777275d8da490163d2af10f2e` 为基线，继续执行 CR-7 §15 第 3 项“小范围 research dataset build，验证真实研究消费”。本批只扩展现有 ReadModel-only R1 reader，不引入新的 Provider、数据源、指数语义、CR-5 feature join 或历史物化。
 - `ResearchPanelReader.load_security_daily()`、`load_research_security_daily()` 以及显式 disabled 诊断入口现在支持 `security_ids` 精确过滤；过滤键是 canonical `security_id`，不接受 symbol/code-prefix 推断。日期区间仍为所选 split 内的闭区间；空选择返回空表，字符串、空白 ID、重复 ID 直接 fail-closed。
@@ -22,7 +36,7 @@
 - 本批不执行 Provider/Production/Formal、backfill、BSE mapping activation、index/CR-5/R2 语义扩展、Golden/H1/global baseline 或策略工作；账号、密码、endpoint、Token、Cookie、专有 SDK/runtime 和原始 Provider payload 不进入 GitHub。
 - 首轮全量回归暴露仓库既有的时区敏感断言：DuckDB 在 `America/Los_Angeles` 会把同一 UTC 瞬时显示为前一日；已将该测试改为解析带时区值并统一按 UTC 比较，不改变生产代码或数据口径。
 
-本地验证：R1 单元/集成聚焦套件通过（14 passed）；第二轮全量 `pytest -q` 退出码为 0（收集 1770 项，既有环境跳过保持不变）；Ruff check/format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 均通过。下一闸门是提交 exact head，等待 required CI 与独立审阅；不自行批准、Ready 或合并。
+本地验证：R1 单元/集成聚焦套件通过（14 passed）；第二轮全量 pytest -q 退出码为 0（收集 1770 项，既有环境跳过保持不变）；Ruff check/format、mypy src、compileall、uv pip check 和 git diff --check 均通过。PR #51 exact head f0f64da0822d1f016ffe77be198e2ffe126852a0 获独立审阅 5189671642 的 PASS / MERGE AUTHORIZED，required CI #567 三个平台均成功，并以 merge commit 53257c36e8ada5576f5d2dfce0947710ee24694c 合并到 main。
 
 ## 2026-09-12 · PR #50 R1 发布边界整改
 
