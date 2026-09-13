@@ -5,7 +5,7 @@ Issue：#55  `P0: CR-7 authoritative historical evidence and bounded real-source
 基线：`main@2e9bdc36544c5320072969a2888180b6dfec2c7a`
 实现提交：`624595f1d246597a9119959af975aa5f8eafd6ff`
 机器收据：[`cr7_authoritative_history_preflight_20260913.json`](cr7_authoritative_history_preflight_20260913.json)
-收据 SHA-256：`1d85ebe85bb9853a2158f1ed98f3070726fca0e622ffd9b72212bd3ba823f5cc`
+GitHub 提交字节 SHA-256：`364cee560ae69e1651e619060308741398170414b49de878e5405fba1a8c9449`
 
 ## 结论
 
