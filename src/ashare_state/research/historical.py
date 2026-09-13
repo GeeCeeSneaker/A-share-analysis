@@ -18,6 +18,7 @@ from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
@@ -47,6 +48,7 @@ from ashare_state.storage.atomic_files import ImmutableFileExistsError, write_fi
 
 __all__ = [
     "COMPLETE_OBSERVED_DAILY_BAR_SCOPE",
+    "CoverageEvidenceClass",
     "CoverageBasisDescriptor",
     "CoverageBasisError",
     "CoverageEvaluation",
@@ -86,9 +88,38 @@ PARTITION_POLICY_VERSION = "monthly-route-v1"
 WRITER_CONFIGURATION_VERSION = "cr7-writer-v1"
 OFFLINE_FIXTURE_COMPLETE_METHOD = "OFFLINE_FIXTURE_COMPLETE_SCOPE_V1"
 OFFLINE_FIXTURE_PARTIAL_METHOD = "OFFLINE_FIXTURE_PARTIAL_SCOPE_V1"
+
+
+class CoverageEvidenceClass(StrEnum):
+    """Authority class attached to a recognized coverage method.
+
+    Fixture methods can exercise the planner and storage protocol, but they
+    must never satisfy the ordinary historical-reader publication boundary.
+    The authoritative value is intentionally not registered by this offline
+    implementation; a future upstream method must be added through a reviewed
+    contract change.
+    """
+
+    TEST_FIXTURE_ONLY = "TEST_FIXTURE_ONLY"
+    AUTHORITATIVE_UPSTREAM = "AUTHORITATIVE_UPSTREAM"
+    UNRESOLVED = "UNRESOLVED"
+
+
+@dataclass(frozen=True)
+class _CompletenessMethodSpec:
+    state: CoverageState
+    evidence_class: CoverageEvidenceClass
+
+
 _RECOGNIZED_COMPLETENESS_METHODS = {
-    OFFLINE_FIXTURE_COMPLETE_METHOD: CoverageState.OBSERVED_DAILY_BAR_COVERAGE,
-    OFFLINE_FIXTURE_PARTIAL_METHOD: CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE,
+    OFFLINE_FIXTURE_COMPLETE_METHOD: _CompletenessMethodSpec(
+        CoverageState.OBSERVED_DAILY_BAR_COVERAGE,
+        CoverageEvidenceClass.TEST_FIXTURE_ONLY,
+    ),
+    OFFLINE_FIXTURE_PARTIAL_METHOD: _CompletenessMethodSpec(
+        CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE,
+        CoverageEvidenceClass.TEST_FIXTURE_ONLY,
+    ),
 }
 _ROUTES = ("research_enabled", "disabled", "experimental")
 _EXPECTED_IDENTITY_FIELDS = (
@@ -421,7 +452,9 @@ class CoverageBasisDescriptor:
         if values["source_domain"] != "daily_bar":
             raise CoverageBasisError("coverage basis source_domain must be daily_bar")
         try:
-            completeness_state = _RECOGNIZED_COMPLETENESS_METHODS[values["completeness_method"]]
+            completeness_state = _RECOGNIZED_COMPLETENESS_METHODS[
+                values["completeness_method"]
+            ].state
         except KeyError as exc:
             raise CoverageBasisError(
                 f"unknown versioned completeness_method {values['completeness_method']!r}"
@@ -480,7 +513,11 @@ class CoverageBasisDescriptor:
 
     @property
     def state(self) -> CoverageState:
-        return _RECOGNIZED_COMPLETENESS_METHODS[self.completeness_method]
+        return _RECOGNIZED_COMPLETENESS_METHODS[self.completeness_method].state
+
+    @property
+    def evidence_class(self) -> CoverageEvidenceClass:
+        return _RECOGNIZED_COMPLETENESS_METHODS[self.completeness_method].evidence_class
 
     @property
     def sort_key(self) -> tuple[str, int, int, str]:
@@ -557,6 +594,7 @@ def build_fixture_coverage_basis_descriptor(
 class CoverageEvaluation:
     partition: PartitionKey
     state: CoverageState
+    evidence_class: CoverageEvidenceClass
     descriptor: CoverageBasisDescriptor | None
     reason: str
 
@@ -611,6 +649,7 @@ def verify_coverage_basis(
                 CoverageEvaluation(
                     partition=key,
                     state=CoverageState.UNRESOLVED_NOT_FOR_RESEARCH,
+                    evidence_class=CoverageEvidenceClass.UNRESOLVED,
                     descriptor=None,
                     reason="no_enabled_rows_in_partition",
                 )
@@ -620,6 +659,7 @@ def verify_coverage_basis(
                 CoverageEvaluation(
                     partition=key,
                     state=CoverageState.UNRESOLVED_NOT_FOR_RESEARCH,
+                    evidence_class=CoverageEvidenceClass.UNRESOLVED,
                     descriptor=None,
                     reason="missing_coverage_basis_descriptor",
                 )
@@ -628,12 +668,31 @@ def verify_coverage_basis(
             evaluations.append(
                 CoverageEvaluation(
                     partition=key,
-                    state=descriptor.state,
+                    state=matched_descriptor.state,
+                    evidence_class=matched_descriptor.evidence_class,
                     descriptor=matched_descriptor,
                     reason="verified_versioned_coverage_basis",
                 )
             )
     return tuple(evaluations)
+
+
+def _aggregate_coverage_evidence(
+    evaluations: Sequence[CoverageEvaluation],
+) -> CoverageEvidenceClass:
+    """Classify the complete target window, failing closed for any gap."""
+    if len(evaluations) != len(expected_partition_keys()):
+        return CoverageEvidenceClass.UNRESOLVED
+    if any(
+        evaluation.state is CoverageState.UNRESOLVED_NOT_FOR_RESEARCH
+        or evaluation.evidence_class is CoverageEvidenceClass.UNRESOLVED
+        for evaluation in evaluations
+    ):
+        return CoverageEvidenceClass.UNRESOLVED
+    evidence_classes = {evaluation.evidence_class for evaluation in evaluations}
+    if len(evidence_classes) != 1:
+        return CoverageEvidenceClass.UNRESOLVED
+    return next(iter(evidence_classes))
 
 
 def compute_coverage_basis_set_hash(
@@ -950,7 +1009,28 @@ class HistoricalArtifact:
 def _route_inventory_entry(
     route: str,
     artifact: HistoricalArtifact | None,
+    *,
+    coverage_evaluation: CoverageEvaluation | None = None,
 ) -> dict[str, Any]:
+    if route == "research_enabled" and coverage_evaluation is None:
+        raise HistoricalMaterializationError(
+            "research_enabled inventory requires an explicit coverage evaluation"
+        )
+    evaluation_state = (
+        coverage_evaluation.state.value
+        if route == "research_enabled" and coverage_evaluation is not None
+        else None
+    )
+    evaluation_evidence_class = (
+        coverage_evaluation.evidence_class.value
+        if route == "research_enabled" and coverage_evaluation is not None
+        else None
+    )
+    evaluation_reason = (
+        coverage_evaluation.reason
+        if route == "research_enabled" and coverage_evaluation is not None
+        else None
+    )
     if artifact is None:
         return {
             "row_count": 0,
@@ -961,10 +1041,21 @@ def _route_inventory_entry(
             "semantic_hash": None,
             "schema_hash": None,
             "byte_size": 0,
-            "coverage_state": None,
+            "coverage_state": evaluation_state,
+            "coverage_evidence_class": evaluation_evidence_class,
+            "coverage_reason": evaluation_reason,
             "coverage_basis_id": None,
             "coverage_basis_artifact_hash": None,
         }
+    if route == "research_enabled":
+        if coverage_evaluation is None:  # pragma: no cover - guarded above
+            raise HistoricalMaterializationError(
+                "research_enabled inventory requires an explicit coverage evaluation"
+            )
+        if artifact.coverage_state is not coverage_evaluation.state:
+            raise HistoricalMaterializationError(
+                "research_enabled artifact coverage disagrees with its partition evaluation"
+            )
     return {
         "row_count": artifact.row_count,
         "artifact_present": True,
@@ -975,6 +1066,8 @@ def _route_inventory_entry(
         "schema_hash": artifact.schema_hash,
         "byte_size": artifact.byte_size,
         "coverage_state": artifact.coverage_state.value if artifact.coverage_state else None,
+        "coverage_evidence_class": evaluation_evidence_class,
+        "coverage_reason": evaluation_reason,
         "coverage_basis_id": artifact.coverage_basis_id,
         "coverage_basis_artifact_hash": artifact.coverage_basis_artifact_hash,
     }
@@ -1006,6 +1099,7 @@ class HistoricalMaterializationPlan:
     idempotency_key: str
     materialization_id: str
     coverage_state: CoverageState
+    coverage_evidence_class: CoverageEvidenceClass
     coverage_basis_descriptors: tuple[CoverageBasisDescriptor, ...]
     coverage_evaluations: tuple[CoverageEvaluation, ...]
     identity_sources: tuple[dict[str, Any], ...]
@@ -1047,6 +1141,7 @@ class HistoricalMaterializationPlan:
             "price_basis": PRICE_BASIS,
             "universe_basis": UNIVERSE_BASIS,
             "coverage_state": self.coverage_state.value,
+            "coverage_evidence_class": self.coverage_evidence_class.value,
             "coverage_policy_version": COVERAGE_POLICY_VERSION,
             "coverage_basis_set_hash": self.materialization_identity["coverage_basis_set_hash"],
             "coverage_basis_descriptors": [
@@ -1069,6 +1164,9 @@ class HistoricalMaterializationPlan:
             "index_panel_state": INDEX_PANEL_STATE,
             "read_policy": {
                 "ordinary_read_requires": CoverageState.OBSERVED_DAILY_BAR_COVERAGE.value,
+                "ordinary_read_requires_evidence_class": (
+                    CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM.value
+                ),
                 "partial_or_unresolved": "BLOCKED",
             },
             "logical_partition_count": len(self.logical_partition_inventory),
@@ -1247,8 +1345,13 @@ class OfflineHistoricalMaterializer:
 
         logical_inventory: list[dict[str, Any]] = []
         for key in expected_partition_keys():
+            evaluation = evaluation_by_key[key]
             routes = {
-                route: _route_inventory_entry(route, artifact_by_key.get((key, route)))
+                route: _route_inventory_entry(
+                    route,
+                    artifact_by_key.get((key, route)),
+                    coverage_evaluation=evaluation if route == "research_enabled" else None,
+                )
                 for route in _ROUTES
             }
             logical_inventory.append(
@@ -1297,24 +1400,17 @@ class OfflineHistoricalMaterializer:
                 }
             )
         )
-        enabled_states = [
-            evaluation.state
-            for evaluation in evaluations
-            if any(
-                artifact.partition == evaluation.partition and artifact.route == "research_enabled"
-                for artifact in ordered_artifacts
-            )
-        ]
-        coverage_state = (
-            max(enabled_states, key=_coverage_rank)
-            if enabled_states
-            else CoverageState.UNRESOLVED_NOT_FOR_RESEARCH
+        coverage_state = max(
+            (evaluation.state for evaluation in evaluations),
+            key=_coverage_rank,
         )
+        coverage_evidence_class = _aggregate_coverage_evidence(evaluations)
         return HistoricalMaterializationPlan(
             materialization_identity=identity,
             idempotency_key=idempotency_key,
             materialization_id=materialization_id,
             coverage_state=coverage_state,
+            coverage_evidence_class=coverage_evidence_class,
             coverage_basis_descriptors=tuple(sorted(descriptors, key=lambda item: item.sort_key)),
             coverage_evaluations=evaluations,
             identity_sources=tuple(source.as_dict() for source in projection.identity_view.sources),
@@ -1586,6 +1682,8 @@ def _assert_manifest_identity(
         raise MaterializationConflictError("materialization identity changed")
     if manifest.get("coverage_state") != plan.coverage_state.value:
         raise MaterializationConflictError("materialization coverage_state changed")
+    if manifest.get("coverage_evidence_class") != plan.coverage_evidence_class.value:
+        raise MaterializationConflictError("materialization coverage evidence class changed")
     if manifest.get("coverage_basis_descriptors") != [
         descriptor.as_dict() for descriptor in plan.coverage_basis_descriptors
     ]:
@@ -1710,6 +1808,19 @@ class HistoricalMaterializationReader:
             raise HistoricalReadError(
                 "ordinary historical reader refuses partial or unresolved coverage"
             )
+        if (
+            manifest.get("coverage_evidence_class")
+            != CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM.value
+        ):
+            raise HistoricalReadError(
+                "ordinary historical reader refuses non-authoritative coverage evidence"
+            )
+        read_policy = manifest.get("read_policy")
+        if not isinstance(read_policy, Mapping) or (
+            read_policy.get("ordinary_read_requires_evidence_class")
+            != CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM.value
+        ):
+            raise HistoricalReadError("historical reader authority policy is missing or changed")
         marker_path = path.parent / "_SUCCESS.json"
         if not marker_path.is_file():
             raise HistoricalReadError("committed historical materialization lacks _SUCCESS.json")
@@ -1740,6 +1851,40 @@ class HistoricalMaterializationReader:
             raise HistoricalReadError("historical logical partition inventory changed")
         if sha256_hex(canonical_json(inventory)) != manifest.get("partition_inventory_hash"):
             raise HistoricalReadError("historical partition inventory hash changed")
+        expected_keys = set(expected_partition_keys())
+        inventory_keys: set[PartitionKey] = set()
+        for raw_inventory in inventory:
+            if not isinstance(raw_inventory, Mapping):
+                raise HistoricalReadError("historical logical partition inventory is malformed")
+            try:
+                inventory_key = PartitionKey(
+                    ResearchSplit(str(raw_inventory["research_split"])),
+                    raw_inventory["calendar_year"],
+                    raw_inventory["calendar_month"],
+                )
+            except (KeyError, TypeError, ValueError, HistoricalMaterializationError) as exc:
+                raise HistoricalReadError(
+                    "historical logical partition inventory has an invalid partition"
+                ) from exc
+            inventory_keys.add(inventory_key)
+            routes = raw_inventory.get("routes")
+            enabled_route = routes.get("research_enabled") if isinstance(routes, Mapping) else None
+            if not isinstance(enabled_route, Mapping):
+                raise HistoricalReadError(
+                    "historical logical partition inventory lacks research_enabled coverage"
+                )
+            if (
+                enabled_route.get("coverage_state")
+                != CoverageState.OBSERVED_DAILY_BAR_COVERAGE.value
+                or enabled_route.get("coverage_evidence_class")
+                != CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM.value
+                or enabled_route.get("artifact_present") is not True
+            ):
+                raise HistoricalReadError(
+                    "ordinary historical reader requires complete enabled-route inventory"
+                )
+        if inventory_keys != expected_keys:
+            raise HistoricalReadError("historical logical partition inventory has wrong scope")
         artifacts = manifest.get("artifacts")
         if not isinstance(artifacts, list):
             raise HistoricalReadError("historical manifest has no artifact inventory")
@@ -1767,7 +1912,16 @@ class HistoricalMaterializationReader:
                 raise HistoricalReadError("historical coverage-basis artifact is invalid") from exc
             if dict(raw_file) != _coverage_basis_file_entry(descriptor):
                 raise HistoricalReadError("historical coverage-basis inventory changed")
+            if descriptor.evidence_class is not CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM:
+                raise HistoricalReadError(
+                    "ordinary historical reader refuses fixture-only coverage evidence"
+                )
             parsed_bases.append(descriptor)
+        if (
+            len(parsed_bases) != len(expected_keys)
+            or {descriptor.partition_key for descriptor in parsed_bases} != expected_keys
+        ):
+            raise HistoricalReadError("historical coverage-basis scope is incomplete")
         if compute_coverage_basis_set_hash(tuple(parsed_bases)) != manifest.get(
             "coverage_basis_set_hash"
         ):

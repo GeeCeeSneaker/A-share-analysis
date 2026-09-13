@@ -14,6 +14,7 @@ from ashare_state.research import (
     COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
     CoverageBasisDescriptor,
     CoverageBasisError,
+    CoverageEvidenceClass,
     CoverageState,
     HistoricalMaterializationError,
     HistoricalMaterializationReader,
@@ -188,6 +189,25 @@ def _january_basis() -> Any:
     )
 
 
+def _full_window_fixture_projection() -> VerifiedResearchProjection:
+    return _projection(
+        [_row(partition.scope_start, "security-sse") for partition in expected_partition_keys()]
+    )
+
+
+def _full_window_fixture_bases(*, partial: bool = False) -> tuple[CoverageBasisDescriptor, ...]:
+    return tuple(
+        build_fixture_coverage_basis_descriptor(
+            partition,
+            source_snapshot_id=SNAPSHOT_ID,
+            source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
+            source_selection_fingerprint=f"selection-{partition.logical_key}",
+            partial=partial,
+        )
+        for partition in expected_partition_keys()
+    )
+
+
 def test_plan_has_78_months_and_keeps_bse_out_of_enabled_route(tmp_path: Path) -> None:
     projection = _fixture_projection()
     materializer = OfflineHistoricalMaterializer(
@@ -199,7 +219,8 @@ def test_plan_has_78_months_and_keeps_bse_out_of_enabled_route(tmp_path: Path) -
 
     assert len(expected_partition_keys()) == 78
     assert len(plan.logical_partition_inventory) == 78
-    assert plan.coverage_state is CoverageState.OBSERVED_DAILY_BAR_COVERAGE
+    assert plan.coverage_state is CoverageState.UNRESOLVED_NOT_FOR_RESEARCH
+    assert plan.coverage_evidence_class is CoverageEvidenceClass.UNRESOLVED
     assert plan.excluded_row_count == 1
     assert {artifact.route for artifact in plan.artifacts} == {"research_enabled", "disabled"}
     assert all(
@@ -218,16 +239,55 @@ def test_plan_has_78_months_and_keeps_bse_out_of_enabled_route(tmp_path: Path) -
     assert january["routes"]["research_enabled"]["coverage_state"] == (
         CoverageState.OBSERVED_DAILY_BAR_COVERAGE.value
     )
+    enabled_routes = [
+        item["routes"]["research_enabled"] for item in plan.logical_partition_inventory
+    ]
+    assert (
+        sum(
+            entry["coverage_state"] == CoverageState.OBSERVED_DAILY_BAR_COVERAGE.value
+            for entry in enabled_routes
+        )
+        == 1
+    )
+    assert (
+        sum(
+            entry["coverage_state"] == CoverageState.UNRESOLVED_NOT_FOR_RESEARCH.value
+            for entry in enabled_routes
+        )
+        == 77
+    )
     result = materializer.materialize(
         projection,
         coverage_bases=(_january_basis(),),
         build_timestamp="2026-09-13T00:00:00+00:00",
     )
-    reader = HistoricalMaterializationReader.from_manifest(tmp_path / result.manifest_uri)
-    loaded = reader.load_security_daily(split=ResearchSplit.DEVELOPMENT)
-    assert loaded.select(["trade_date", "security_id"]).to_dicts() == [
-        {"trade_date": date(2020, 1, 1), "security_id": "security-sse"}
-    ]
+    with pytest.raises(HistoricalReadError, match="partial or unresolved"):
+        HistoricalMaterializationReader.from_manifest(tmp_path / result.manifest_uri)
+
+
+def test_fixture_complete_never_unlocks_ordinary_historical_reader(tmp_path: Path) -> None:
+    projection = _full_window_fixture_projection()
+    bases = _full_window_fixture_bases()
+    materializer = OfflineHistoricalMaterializer(
+        tmp_path,
+        writer_runtime_lock_hash=_writer_hash(),
+        build_code_fingerprint=BUILD_FINGERPRINT,
+    )
+    plan = materializer.plan(projection, coverage_bases=bases)
+    assert plan.coverage_state is CoverageState.OBSERVED_DAILY_BAR_COVERAGE
+    assert plan.coverage_evidence_class is CoverageEvidenceClass.TEST_FIXTURE_ONLY
+    assert all(
+        item["routes"]["research_enabled"]["coverage_state"]
+        == CoverageState.OBSERVED_DAILY_BAR_COVERAGE.value
+        for item in plan.logical_partition_inventory
+    )
+    result = materializer.materialize(
+        projection,
+        coverage_bases=bases,
+        build_timestamp="2026-09-13T00:00:00+00:00",
+    )
+    with pytest.raises(HistoricalReadError, match="non-authoritative|fixture-only"):
+        HistoricalMaterializationReader.from_manifest(tmp_path / result.manifest_uri)
 
 
 def test_historical_boundary_does_not_use_r1_publisher_or_unverified_identity() -> None:
@@ -271,11 +331,43 @@ def test_sparse_verified_projection_without_basis_is_not_observed(tmp_path: Path
 
 
 def test_partial_basis_is_explicit_but_reader_stays_blocked(tmp_path: Path) -> None:
-    partial_basis = build_fixture_coverage_basis_descriptor(
+    projection = _full_window_fixture_projection()
+    partial_bases = _full_window_fixture_bases(partial=True)
+    materializer = OfflineHistoricalMaterializer(
+        tmp_path,
+        writer_runtime_lock_hash=_writer_hash(),
+        build_code_fingerprint=BUILD_FINGERPRINT,
+    )
+    plan = materializer.plan(projection, coverage_bases=partial_bases)
+    assert plan.coverage_state is CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE
+    assert plan.coverage_evidence_class is CoverageEvidenceClass.TEST_FIXTURE_ONLY
+    result = materializer.materialize(
+        projection,
+        coverage_bases=partial_bases,
+        build_timestamp="2026-09-13T00:00:00+00:00",
+    )
+    with pytest.raises(HistoricalReadError, match="partial or unresolved"):
+        HistoricalMaterializationReader.from_manifest(tmp_path / result.manifest_uri)
+
+
+def test_mixed_complete_partial_basis_is_order_independent(tmp_path: Path) -> None:
+    projection = _projection(
+        [
+            _row(date(2020, 1, 1), "security-sse"),
+            _row(date(2020, 2, 3), "security-sse"),
+        ]
+    )
+    complete = build_fixture_coverage_basis_descriptor(
         PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1),
         source_snapshot_id=SNAPSHOT_ID,
         source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
-        source_selection_fingerprint="selection-fixture-partial",
+        source_selection_fingerprint="selection-complete",
+    )
+    partial = build_fixture_coverage_basis_descriptor(
+        PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 2),
+        source_snapshot_id=SNAPSHOT_ID,
+        source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
+        source_selection_fingerprint="selection-partial",
         partial=True,
     )
     materializer = OfflineHistoricalMaterializer(
@@ -283,15 +375,27 @@ def test_partial_basis_is_explicit_but_reader_stays_blocked(tmp_path: Path) -> N
         writer_runtime_lock_hash=_writer_hash(),
         build_code_fingerprint=BUILD_FINGERPRINT,
     )
-    plan = materializer.plan(_fixture_projection(), coverage_bases=(partial_basis,))
-    assert plan.coverage_state is CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE
-    result = materializer.materialize(
-        _fixture_projection(),
-        coverage_bases=(partial_basis,),
-        build_timestamp="2026-09-13T00:00:00+00:00",
-    )
-    with pytest.raises(HistoricalReadError, match="partial or unresolved"):
-        HistoricalMaterializationReader.from_manifest(tmp_path / result.manifest_uri)
+    states_by_order: list[dict[str, CoverageState]] = []
+    for descriptors in ((complete, partial), (partial, complete)):
+        plan = materializer.plan(projection, coverage_bases=descriptors)
+        states_by_order.append(
+            {
+                evaluation.partition.logical_key: evaluation.state
+                for evaluation in plan.coverage_evaluations
+                if evaluation.partition in {complete.partition_key, partial.partition_key}
+            }
+        )
+        assert plan.coverage_state is CoverageState.UNRESOLVED_NOT_FOR_RESEARCH
+    assert states_by_order == [
+        {
+            complete.partition_key.logical_key: CoverageState.OBSERVED_DAILY_BAR_COVERAGE,
+            partial.partition_key.logical_key: CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE,
+        },
+        {
+            complete.partition_key.logical_key: CoverageState.OBSERVED_DAILY_BAR_COVERAGE,
+            partial.partition_key.logical_key: CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE,
+        },
+    ]
 
 
 def test_coverage_basis_rejects_forged_method_and_exact_bytes_are_bound() -> None:

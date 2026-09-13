@@ -3,7 +3,7 @@
 日期：2026-09-13
 基线：`main@6d94a196089901b92a5b7a085922a1f7c4ffaaa2`
 对应合同：[`cr7_historical_materialization_contract_20260913.json`](cr7_historical_materialization_contract_20260913.json)
-状态：`LOCAL IMPLEMENTATION / OFFLINE FIXTURE ONLY / DRAFT PR / INDEPENDENT REVIEW REQUIRED`
+状态：`REVIEW REMEDIATION / OFFLINE FIXTURE ONLY / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
 
 ## 1. 本切片做了什么
 
@@ -18,7 +18,8 @@
   daily-bar 域、月度范围、source-selection fingerprint，以及不含自身 hash 引用的精确 canonical
   UTF-8 artifact bytes/hash。当前只注册离线夹具方法；没有权威上游 completeness evidence 时，
   缺少 basis 的 enabled 月份只能得到 `UNRESOLVED_NOT_FOR_RESEARCH`，不能由 caller label、row count、
-  月份连续性或已验证字节提升为 OBSERVED。
+  月份连续性或已验证字节提升为 OBSERVED。夹具方法明确标记为 `TEST_FIXTURE_ONLY`，不具备普通
+  历史 reader 的发布权限；普通 reader 只接受显式 `AUTHORITATIVE_UPSTREAM` 证据等级。
 - writer/runtime lock 只包含 dependency-lock content hash、Python runtime、Parquet writer engine、
   writer configuration version；materialization identity 按合同固定 23 个字段，并将 basis-set hash
   与 writer-lock hash 纳入 idempotency key。主机名、绝对路径、文件 mtime、墙上时间和凭证不进入身份。
@@ -30,8 +31,12 @@
   原子 rename。失败时不出现可读 committed materialization；相同 identity 只允许经完整复核的
   idempotent replay，identity 相同但 bytes/inventory 改变则冲突，不使用 last-write-wins。
 - `HistoricalMaterializationReader` 是独立的历史合同 reader：必须存在合法 committed `_SUCCESS.json`、
-  78 月 inventory、basis evidence 和完整 hash 校验；`PARTIAL`/`UNRESOLVED` 自动读取一律阻断，
-  不改变现有 R1 reader。
+  78 月 inventory、每个月 `research_enabled` 的显式覆盖状态、basis evidence 和完整 hash 校验；
+  `PARTIAL`/`UNRESOLVED` 以及 `TEST_FIXTURE_ONLY` 证据自动读取一律阻断，不改变现有 R1 reader。
+
+本轮针对独立审阅的窄修复保留并强化了三项边界：覆盖状态按完整 78 个月聚合，稀疏来源不能得到
+整体 OBSERVED；每个月的 `research_enabled` inventory 即使没有物理 artifact 也记录状态和原因；
+覆盖验证使用匹配分区的 descriptor，并用 COMPLETE/PARTIAL 反转输入顺序回归验证确定性。
 
 ## 2. 当前明确没有完成的事项
 
@@ -57,11 +62,11 @@
 
 ## 4. 本地验证与下一道门
 
-已执行最终门禁：全量 `pytest` 为 `1790 collected, 1787 passed, 3 skipped`；3 个 skip 均为既有
+已执行本轮本地门禁：全量 `pytest` 为 `1792 collected, 1789 passed, 3 skipped`；3 个 skip 均为既有
 Windows symlink 权限限制。Ruff check/format、`mypy src`、`compileall`、`uv pip check`、合同 JSON
-parse 和 `git diff --check` 均通过。PR #53 初始实现 head `9423625bbcbb386300765809276058995ff2e849`
-对应 GitHub Actions CI #572，Ubuntu 3.14、Windows 3.12、Windows 3.14 均为 `success`，GT-H3B #110
-按策略 `skipped`。PR 仍保持 Draft，当前待独立 Reviewer 对 exact head 复核；在新的 scheduler 决策前，
-不得把本切片扩大成真实历史物化或生产执行。
+parse 和 `git diff --check` 均通过。此前实现 head `9423625bbcbb386300765809276058995ff2e849`
+对应的 GitHub Actions CI #572 三平台均为 `success`；本轮 remediation 会产生新的 exact head，
+必须由新的 CI 和独立 delta review 重新核验。PR 仍保持 Draft；在新的 scheduler 决策前，不得把本
+切片扩大成真实历史物化或生产执行。
 
 账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime 和 Provider 原始 payload 不得进入 GitHub。

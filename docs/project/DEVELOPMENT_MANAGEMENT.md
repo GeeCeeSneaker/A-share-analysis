@@ -6578,3 +6578,31 @@ PR #53 已保持 Draft；实现 head `9423625bbcbb386300765809276058995ff2e849` 
 Ubuntu 3.14、Windows 3.12、Windows 3.14 均 `success`，GT-H3B #110 按策略 `skipped`。下一道门是独立
 Reviewer 对 exact head 做 focused/full review。除非 scheduler 另行授权，不得据此执行真实历史物化、
 Provider/Production 或第三次 Formal；任何真实上游 completeness method 也必须先有新的可核验证据和调度决策。
+
+## DM-20260913-CR7-HISTORY-030 · 独立审阅阻断后的覆盖/可读性窄修复
+
+**Type**：C1 — CR-7 independent-review remediation
+**Date**：2026-09-13
+**Remediation base**：PR #53 pre-remediation head `2bb117179e5d4d938bd159a60866b35f3d560877`
+**Status**：`REMEDIATION IMPLEMENTED / LOCAL QA GREEN / DRAFT / INDEPENDENT DELTA REVIEW REQUIRED`
+
+**审阅意见与处理**
+
+- scheduler checkpoint `5653147431` 的三个阻断项已逐项落地：夹具 completeness 与普通 reader 的权限等级
+  分离；78 个月 `research_enabled` coverage state 全量进入 aggregate 和 inventory；coverage verifier
+  使用匹配 descriptor 的 state，并加入 COMPLETE/PARTIAL 输入顺序反转回归。
+- 新增 `CoverageEvidenceClass`：离线 method 仅能产生 `TEST_FIXTURE_ONLY`，普通历史 reader 必须同时
+  看到完整 78 月 enabled inventory、`OBSERVED_DAILY_BAR_COVERAGE` 和 `AUTHORITATIVE_UPSTREAM`，因此
+  夹具 COMPLETE 不会生成普通可读研究历史。
+- 未改变 R1 reader、R1 非发布投影、writer/runtime lock、staging/atomic marker、replay/conflict、BSE
+  隔离和 no-Provider/no-Formal 边界；未执行真实历史物化或任何正式运行。
+
+**验证与下一道门**
+
+- 本地全量 pytest：`1792 collected, 1789 passed, 3 skipped`；3 个 skip 为既有 Windows symlink 权限限制。
+- Ruff check/format、`mypy src`、compileall、`uv pip check`、合同 JSON parse、`git diff --check` 和聚焦
+  CR-7/R1 回归通过。
+- 上一 exact head 的 CI #573 不作为本修复 head 的证据；推送后须取得新的 Ubuntu 3.14、Windows 3.12、
+  Windows 3.14 CI，并由独立 Reviewer 做 exact-head delta review。PR #53 必须保持 Draft。
+- 除非 scheduler 另行授权，不得执行真实 2020-01-01～2026-06-30 历史物化、Provider/Production、第三次
+  Formal/B1-B7、BSE/index 激活、CR-5/R2、Golden/H1 或策略工作。

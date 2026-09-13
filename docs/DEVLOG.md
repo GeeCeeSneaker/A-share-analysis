@@ -4024,3 +4024,27 @@ Implementation Status：R1 security daily small-fixture implementation and focus
 不得执行真实历史物化、Provider/Production 或第三次 Formal。
 
 Review Status：KEEP DRAFT / EXACT-HEAD INDEPENDENT REVIEW REQUIRED / REQUIRED CI PENDING；未获得 wider historical materialization 或 Formal/Production 授权。
+
+## 2026-09-13 · CR-7 independent-review remediation: coverage authority and full-window aggregation
+
+> 状态：`REMEDIATION IMPLEMENTED / LOCAL QA GREEN / DRAFT / DELTA REVIEW REQUIRED`
+
+- Issue #39 最新 scheduler checkpoint `5653147431` 将 PR #53 标为 BLOCKED，并限定只允许一轮覆盖/可读性
+  窄修复；本轮未扩大授权，未调用 Provider/AmazingData、正式账号、Production、Formal/B1-B7，也未物化
+  真实 2020-01-01～2026-06-30 历史。
+- 引入显式 `CoverageEvidenceClass`：离线 COMPLETE/PARTIAL method 只能是 `TEST_FIXTURE_ONLY`；普通
+  `HistoricalMaterializationReader` 要求 `AUTHORITATIVE_UPSTREAM`，并逐 descriptor、逐 78 月
+  `research_enabled` inventory 校验，夹具 COMPLETE 即使全窗口齐全也不能解锁普通读取。
+- `OfflineHistoricalMaterializer.plan()` 现在对完整 78 个逻辑月聚合 coverage state；缺行月份保留
+  `UNRESOLVED_NOT_FOR_RESEARCH`，稀疏输入不会再被已有 artifact 子集的 `OBSERVED` 结果掩盖；inventory
+  对每个月的 enabled route 显式记录 coverage state/evidence/reason。
+- 修正 coverage verifier 使用 `matched_descriptor.state`，并新增 COMPLETE/PARTIAL descriptor 输入顺序
+  反转回归；既有 R1 非发布投影、staging、replay、冲突、BSE 隔离和 no-execution 边界保持不变。
+- 本地本轮全量门禁：`1792 collected, 1789 passed, 3 skipped`；3 个 skip 均为既有 Windows symlink 权限
+  限制。Ruff check/format、`mypy src`、compileall、`uv pip check`、合同 JSON parse、`git diff --check`
+  和 focused CR-7/R1 回归均通过。
+- 旧 exact head 的 CI #573 只证明此前文档同步提交；本轮修复提交推送后必须重新取得三平台 CI，并交由独立
+  Reviewer 做 exact-head delta review。PR #53 继续保持 Draft；在新的 scheduler 决策前不得执行真实历史
+  物化、Provider/Production 或第三次 Formal。
+
+Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI AND INDEPENDENT DELTA REVIEW REQUIRED`。
