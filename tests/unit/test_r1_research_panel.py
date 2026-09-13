@@ -11,6 +11,7 @@ import polars as pl
 import pytest
 
 from ashare_state.research import (
+    BSE_IDENTITY_BOUNDARY_STATE,
     CoverageState,
     IdentityView,
     ResearchEligibility,
@@ -288,6 +289,11 @@ def test_published_machine_contract_matches_python_contract() -> None:
     assert contract["semantic_constraints"]["universe_basis"] == "OBSERVED_DAILY_BAR_UNIVERSE"
     assert contract["index_panel"]["state"] == "DISABLED_UNVERIFIED_INDEX_IDENTITY"
     assert "source_snapshot_as_of" in contract["manifest_required_fields"]
+    assert contract["identity_boundaries"]["BSE"]["state"] == BSE_IDENTITY_BOUNDARY_STATE
+    assert (
+        contract["identity_boundaries"]["BSE"]["exclusion_reason"]
+        == "bse_identity_boundary_unresolved"
+    )
 
 
 def test_unverified_rows_cannot_mint_authoritative_manifest(tmp_path: Path) -> None:
@@ -345,3 +351,46 @@ def test_typed_numeric_violation_blocks_the_whole_fixture_build(tmp_path: Path) 
             build_timestamp="2026-09-12T00:00:00+00:00",
         )
     assert not (tmp_path / "research").exists()
+
+
+def test_resolved_bse_identity_stays_in_disabled_artifact(tmp_path: Path) -> None:
+    builder = ResearchPanelBuilder(
+        None,
+        raw_root=tmp_path / "raw",
+        normalized_root=tmp_path / "normalized",
+        research_root=tmp_path / "research",
+    )
+    result = builder._build_fixture_from_rows(  # noqa: SLF001 - explicit test-only fixture
+        [_row(date(2022, 5, 5), "security-bse")],
+        source_snapshot_id=SNAPSHOT_ID,
+        source_snapshot_as_of="2026-09-01T00:00:00+00:00",
+        source_canonical_run_id=CANONICAL_RUN_ID,
+        source_readmodel_contract_version="readmodel-v1",
+        source_snapshot_manifest_hash="a" * 64,
+        source_snapshot_semantic_hash="b" * 64,
+        identity_view=IdentityView.from_rows(
+            [
+                {
+                    "security_id": "security-bse",
+                    "symbol": "835185",
+                    "exchange": "BSE",
+                    "valid_from": "2020-07-27",
+                }
+            ],
+            version="identity-bse-fixture-v1",
+        ),
+        build_timestamp="2026-09-12T00:00:00+00:00",
+    )
+    manifest_path = tmp_path / "research" / result.manifest_uri
+    reader = ResearchPanelReader.from_manifest(manifest_path, allow_test_fixture=True)
+
+    assert reader.load_security_daily(split=ResearchSplit.DEVELOPMENT).height == 0
+    disabled = reader.load_disabled_security_daily()
+    assert disabled.height == 1
+    assert disabled.get_column("symbol").to_list() == ["835185"]
+    assert disabled.get_column("exchange").to_list() == ["BSE"]
+    assert disabled.get_column("research_exclusion_reason").to_list() == [
+        "bse_identity_boundary_unresolved"
+    ]
+    with pytest.raises(ResearchManifestError, match="test-only"):
+        load_research_security_daily(manifest_path, split=ResearchSplit.DEVELOPMENT)

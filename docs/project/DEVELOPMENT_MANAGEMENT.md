@@ -1,3 +1,25 @@
+## DM-20260913-CR7-R1-030 · BSE 研究资格边界整改
+
+**Type**：C1 — CR-7 R1 semantic eligibility remediation
+
+**Status**：`P0 BSE RESEARCH LEAK CLOSED LOCALLY / R1 FAIL-CLOSED / FOCUSED QA GREEN / FINAL DELTA REVIEW REQUIRED / KEEP DRAFT`
+
+**触发与最小范围**
+
+- PR #50 最新 exact-head review `5186380038` 发现：BSE 历史旧/新代码连续性尚未激活时，结构有效且身份已解析的 BSE 日线仍可能进入 `RESEARCH_ENABLED`。
+- 本批只在 R1 研究资格边界 fail-closed；不重开 Provider/source-contract，不解决、不激活 BSE mapping，不做 Formal/Production/backfill/universe sweep，也不改变 index、CR-5 feature join 或 source-policy。
+
+**已实现**
+
+- 增加 `bse_identity_boundary_unresolved` 原因码和机器合同中的 BSE `UNRESOLVED_NOT_FOR_RESEARCH` 边界声明；R1 暂定 `DISABLE_ALL_BSE_ROWS_IN_R1`，激活前必须存在单独审阅的 identity-continuity artifact。
+- `evaluate_daily_bar()` 在 OHLCV 结构有效、身份已解析后仍将 `exchange=BSE` 行标为 `RESEARCH_DISABLED_UNRESOLVED`，原因码为 `bse_identity_boundary_unresolved`；行进入 `disabled.parquet`，身份和 source lineage 不被删除或推断改写。
+- 新增 test-only fixture 回归和 verified ReadModel 全链路集成回归；确认 BSE `835185.BJ` 样例不出现在普通研究 split，且在 disabled artifact 中可诊断。
+
+**验证与交接闸门**
+
+- R1 单元/集成聚焦套件：`13 passed`。
+- 下一步必须执行完整本地质量门禁并推送新 head；等待新 head 的 required CI 和最终 delta review。PR #50 继续 Draft；未经独立审阅与项目维护者接受，不自行批准、Ready 或合并。
+
 ## DM-20260912-CR7-R1-029 · R1 发布边界整改
 
 **Type**：C1 — CR-7 R1 publication and identity provenance remediation

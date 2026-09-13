@@ -8,6 +8,7 @@ identity/read-model contract.
 
 from ashare_state.research.eligibility import EligibilityDecision, evaluate_daily_bar
 from ashare_state.research.models import (
+    BSE_IDENTITY_BOUNDARY_STATE,
     INDEX_PANEL_STATE,
     PRICE_BASIS,
     RESEARCH_CONTRACT_VERSION,
@@ -45,6 +46,7 @@ from ashare_state.research.splits import (
 )
 
 __all__ = [
+    "BSE_IDENTITY_BOUNDARY_STATE",
     "CoverageState",
     "DataQualityState",
     "EligibilityDecision",

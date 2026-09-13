@@ -101,6 +101,13 @@ def evaluate_daily_bar(
     ):
         return _disabled(ExclusionReason.INVALID_OHLC, invalid=True)
 
+    # CR-7 keeps the unresolved BSE historical old/new-code continuity
+    # boundary out of the default research panel.  The identity is still
+    # retained exactly as resolved by the verified master; only eligibility
+    # is disabled until a separately reviewed continuity artifact is active.
+    if identity.exchange == "BSE":
+        return _disabled(ExclusionReason.BSE_IDENTITY_BOUNDARY_UNRESOLVED)
+
     return EligibilityDecision(
         eligibility=ResearchEligibility.ENABLED,
         exclusion_reason=None,

@@ -12,6 +12,7 @@ from ashare_state.research import (
     ResearchPanelBuilder,
     ResearchPanelReader,
     ResearchSplit,
+    load_disabled_research_security_daily,
     load_research_security_daily,
 )
 from ashare_state.snapshot import SnapshotBuilder
@@ -169,3 +170,94 @@ def test_verified_readmodel_research_panel_reader_replay(
     assert replay.content_hash == result.content_hash
     assert replay.manifest_hash == result.manifest_hash
     assert replay.idempotent_replay is True
+
+
+@pytest.mark.integration
+def test_verified_bse_daily_bar_is_disabled_until_identity_continuity_is_reviewed(
+    conn,
+    env_root,
+    tmp_path: Path,
+) -> None:
+    """A resolved BSE bar is retained but cannot enter the default panel."""
+    _seed_base(conn, env_root)
+    _persist_raw(
+        conn,
+        env_root,
+        dataset="code_list",
+        endpoint="BaseData.get_code_list",
+        surface="security_master",
+        request_id="req-r1-bse-master",
+        payload=[
+            {
+                "SECURITY_CODE": "835185",
+                "MARKET_CODE": "3",
+                "LISTING_DATE": "20200727",
+                "IS_LISTED": "1",
+            }
+        ],
+    )
+    _persist_raw(
+        conn,
+        env_root,
+        dataset="daily_bar",
+        endpoint="MarketData.query_kline",
+        surface="daily_bar",
+        request_id="req-r1-bse-bars",
+        payload=[
+            {
+                "SECURITY_CODE": "835185",
+                "MARKET_CODE": "3",
+                "KLINE_TIME": 20220104,
+                "KLINE_TYPE": "DAY",
+                "OPEN_PRICE": "10.0",
+                "HIGH_PRICE": "11.0",
+                "LOW_PRICE": "9.0",
+                "CLOSE_PRICE": "10.5",
+                "VOLUME": "100",
+                "AMOUNT": "2000.0",
+            }
+        ],
+    )
+    canonical = _canonical(
+        conn,
+        env_root,
+        AS_OF_LATE,
+        domains=("daily_bar",),
+    )
+    assert canonical.status == "SUCCESS"
+    snapshot = SnapshotBuilder(
+        conn,
+        raw_root=env_root["raw"],
+        normalized_root=env_root["normalized"],
+    ).build(canonical.canonical_run_id)
+    DuckDBReadModel(
+        conn,
+        raw_root=env_root["raw"],
+        normalized_root=env_root["normalized"],
+    ).rebuild(snapshot.snapshot_id)
+
+    result = ResearchPanelBuilder(
+        conn,
+        raw_root=env_root["raw"],
+        normalized_root=env_root["normalized"],
+        research_root=tmp_path / "research",
+    ).build_from_readmodel(
+        snapshot.snapshot_id,
+        build_timestamp="2026-09-12T00:00:00+00:00",
+    )
+    manifest_path = tmp_path / "research" / result.manifest_uri
+
+    assert (
+        load_research_security_daily(
+            manifest_path,
+            split=ResearchSplit.DEVELOPMENT,
+        ).height
+        == 0
+    )
+    disabled = load_disabled_research_security_daily(manifest_path)
+    assert disabled.height == 1
+    assert disabled.get_column("symbol").to_list() == ["835185"]
+    assert disabled.get_column("exchange").to_list() == ["BSE"]
+    assert disabled.get_column("research_exclusion_reason").to_list() == [
+        "bse_identity_boundary_unresolved"
+    ]

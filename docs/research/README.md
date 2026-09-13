@@ -50,6 +50,13 @@ diagnostic disabled artifact. A malformed or non-finite numeric ReadModel value
 is a typed-input violation: the entire build fails closed and no partial
 disabled artifact is published.
 
+R1 also fails closed for the unresolved BSE historical old/new-code continuity
+boundary. A BSE row may have a valid, verified security-master identity and
+valid OHLCV, but it is still written to the disabled artifact with
+`research_exclusion_reason=bse_identity_boundary_unresolved`; R1 disables all
+BSE rows until a separately reviewed identity-continuity artifact is activated.
+The panel does not infer or repair the `835185 -> 920185` mapping in this slice.
+
 R1 fixes `price_basis=UNADJUSTED_CANONICAL` and
 `universe_basis=OBSERVED_DAILY_BAR_UNIVERSE`. The latter is the observed daily
 bar sample after the eligibility gate, not `ALL_A_SHARES`. Partial or

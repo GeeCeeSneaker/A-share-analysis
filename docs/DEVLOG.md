@@ -1,3 +1,15 @@
+## 2026-09-13 · PR #50 BSE 身份连续性边界整改
+
+> 状态：**P0 BSE RESEARCH LEAK CLOSED LOCALLY / R1 FAIL-CLOSED / FOCUSED QA GREEN / FINAL DELTA REVIEW REQUIRED / KEEP DRAFT**
+
+- 针对 PR #50 最新 exact-head review `5186380038` 指出的 BSE 历史新旧代码连续性泄漏，在现有 R1 窄范围内完成最小整改：不尝试解决或激活 `835185 -> 920185` 映射，只在研究资格边界全量关闭 BSE 行。
+- `ExclusionReason.BSE_IDENTITY_BOUNDARY_UNRESOLVED`（`bse_identity_boundary_unresolved`）现为机器可读原因码；合同新增 BSE `UNRESOLVED_NOT_FOR_RESEARCH`、`RESEARCH_DISABLED_UNRESOLVED`、`DISABLE_ALL_BSE_ROWS_IN_R1` 和单独连续性 artifact 激活要求。
+- 即使 BSE 行已经从 verified `security_master` 解析出身份且 OHLCV 结构有效，也只能进入 `disabled.parquet`，不得进入 `RESEARCH_ENABLED`；symbol/exchange 和完整 lineage 仍原样保留，未删除、未静默改写、未猜测映射。
+- 新增单元回归与真实离线 `Canonical -> Snapshot -> verified ReadModel -> research panel -> ordinary reader` 集成回归，确认 `835185.BJ` 样例默认研究读取为空、disabled artifact 保留 BSE 行及原因码。
+- 本轮未调用 Provider/Production/Formal，未执行 backfill、universe sweep，未激活 index、CR-5 feature join、source-policy 或 BSE mapping；账号、密码、endpoint、Token、Cookie、专有 SDK/runtime 和原始 Provider payload 不进入 GitHub。
+
+本地验证：R1 单元/集成聚焦套件通过（13 passed）。待完成闸门：运行完整本地质量门禁，提交并推送 PR #50 新 head，等待该 exact head 的 required CI 与最终 delta review；继续保持 Draft，不自行批准、Ready 或合并。
+
 ## 2026-09-12 · PR #50 R1 发布边界整改
 
 > 状态：**P0 REMEDIATION IMPLEMENTED / LOCAL QA GREEN / KEEP DRAFT / INDEPENDENT DELTA REVIEW REQUIRED**
