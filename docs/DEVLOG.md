@@ -8,7 +8,7 @@
 - 新增单元回归与真实离线 `Canonical -> Snapshot -> verified ReadModel -> research panel -> ordinary reader` 集成回归，确认 `835185.BJ` 样例默认研究读取为空、disabled artifact 保留 BSE 行及原因码。
 - 本轮未调用 Provider/Production/Formal，未执行 backfill、universe sweep，未激活 index、CR-5 feature join、source-policy 或 BSE mapping；账号、密码、endpoint、Token、Cookie、专有 SDK/runtime 和原始 Provider payload 不进入 GitHub。
 
-本地验证：R1 单元/集成聚焦套件通过（13 passed）。待完成闸门：运行完整本地质量门禁，提交并推送 PR #50 新 head，等待该 exact head 的 required CI 与最终 delta review；继续保持 Draft，不自行批准、Ready 或合并。
+本地验证：R1 单元/集成聚焦套件通过（13 passed），全量 `pytest -q` 退出码为 0；Ruff、format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 通过。整改已提交并推送到 PR #50，exact head 为 `1f57ce99d000e04f1f77eea7b8b40a30531da4a1`；当前只等待该 exact head 的 required CI 与最终 delta review，继续保持 Draft，不自行批准、Ready 或合并。
 
 ## 2026-09-12 · PR #50 R1 发布边界整改
 

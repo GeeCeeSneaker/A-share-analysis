@@ -18,7 +18,7 @@
 **验证与交接闸门**
 
 - R1 单元/集成聚焦套件：`13 passed`。
-- 下一步必须执行完整本地质量门禁并推送新 head；等待新 head 的 required CI 和最终 delta review。PR #50 继续 Draft；未经独立审阅与项目维护者接受，不自行批准、Ready 或合并。
+- 完整本地质量门禁已执行：全量 `pytest -q` 退出码为 0，Ruff、format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 均通过。整改已推送到 PR #50，exact head 为 `1f57ce99d000e04f1f77eea7b8b40a30531da4a1`；等待该 exact head 的 required CI 和最终 delta review。PR #50 继续 Draft；未经独立审阅与项目维护者接受，不自行批准、Ready 或合并。
 
 ## DM-20260912-CR7-R1-029 · R1 发布边界整改
 
