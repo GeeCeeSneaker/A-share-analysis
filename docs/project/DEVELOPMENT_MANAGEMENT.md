@@ -2,7 +2,7 @@
 
 **Type**：C1 — CR-7 historical materialization design / offline preflight
 **Date**：2026-09-13
-**Status**：DESIGN-ONLY / OFFLINE PRECHECK GREEN / MATERIALIZATION NOT AUTHORIZED / INDEPENDENT REVIEW REQUIRED
+**Status**：DESIGN-ONLY / OFFLINE REMEDIATION GREEN / MATERIALIZATION NOT AUTHORIZED / EXACT-HEAD DELTA REVIEW REQUIRED
 **Trigger**：Issue #39 scheduler checkpoint 5651424650，PR #51 已接受并合并后按 CR-7 §15 进入历史物化方式设计阶段。
 **Base**：main@53257c36e8ada5576f5d2dfce0947710ee24694c
 **Evidence**：docs/research/cr7_historical_materialization_contract_20260913.md、docs/research/cr7_historical_materialization_contract_20260913.json、tests/unit/test_cr7_historical_materialization_contract.py。
@@ -14,15 +14,18 @@
 - 固化 enabled、disabled、experimental route 的物理隔离；BSE 继续 DISABLE_ALL_BSE_ROWS_IN_R1，不激活 835185/920185 mapping。disabled/experimental 的 unresolved 覆盖状态独立诊断，不污染可靠 enabled route；enabled 覆盖缺口也不能被 disabled 行抵消。
 - 固化 coverage state、观察样本分母、分区与 manifest hash/inventory、确定性 materialization identity、相同 identity 幂等重放、冲突拒绝、staging/resume/原子发布和失败不可见规则。
 - 绑定六个边界日期、窗口外行、BSE disabled 行、identity unresolved 行、稀疏 78 月 inventory、coverage 聚合和无 Provider 调用的离线验收夹具。
+- 针对 exact-head independent review `5189939092` 和 scheduler checkpoint `5651835853` 的窄整改：历史物化不再把当前会发布普通 R1 artifacts 的 `ResearchPanelBuilder.build_from_readmodel()` 当作入口，改为待实现的非发布型 verified projection/input stage；在历史物化自己的 atomic commit 前禁止 ordinary R1 manifest、`_SUCCESS` 或其他 authoritative publication side effect。
+- 为每个 enabled logical partition 增加 sealed coverage-basis descriptor，绑定 snapshot/domain/日期 scope/source selection/completeness claim/hash，并把 sorted basis set hash 纳入 identity 与 manifest；verified bytes 但缺 basis 的 sparse snapshot 即使 caller 要求 OBSERVED 也必须 fail closed 为 unresolved/partial。
+- 为 exact-byte replay identity 增加 writer/runtime lock hash，绑定 dependency lock、Python runtime、Parquet writer engine 和 writer configuration，排除主机、路径、mtime、时钟和凭证。
 
 **验证与硬边界**：
 
-- 新增离线合同回归 10 passed；只读取 JSON 和既有 R1 split 定义，不创建 Provider 请求、不物化历史数据。
+- 新增离线合同回归 11 passed；只读取 JSON、既有 R1 split 定义和当前发布器源码边界，不创建 Provider 请求、不物化历史数据。
 - 本轮不运行 Provider、Production、Formal、backfill、universe sweep、BSE mapping、index、CR-5/R2、Golden/H1、global baseline 或策略工作；凭证、endpoint、Token、Cookie、专有 SDK/runtime 和原始 Provider payload 不进入 GitHub。
 
 **待完成闸门**：
 
-1. 独立 Reviewer 接受输入、分区、coverage、幂等、原子发布、证据和夹具合同；
+1. 对 exact new head 完成独立 delta review，接受非发布入口、sealed coverage basis、writer/runtime lock 及其离线断言；
 2. 新的 scheduler checkpoint 明确授权后，才可另开历史物化实现或执行 PR；
 3. 在此之前不宣称 2020–2026H1 已物化、全覆盖或 R2/Formal 就绪。
 

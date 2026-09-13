@@ -1,13 +1,16 @@
 ## 2026-09-13 · CR-7 2020–2026H1 历史研究物化合同设计 / 离线预检
 
-> 状态：**DESIGN-ONLY / OFFLINE PRECHECK GREEN / MATERIALIZATION NOT AUTHORIZED / INDEPENDENT REVIEW REQUIRED**
+> 状态：**DESIGN-ONLY / OFFLINE REMEDIATION GREEN / MATERIALIZATION NOT AUTHORIZED / EXACT-HEAD DELTA REVIEW REQUIRED**
 
 - Issue #39 scheduler checkpoint 5651424650 在 PR #51 接受并合并后，按 CR-7 §15 授权的下一项是先设计历史物化合同，不是直接执行历史物化。基线为合并后的 clean main@53257c36e8ada5576f5d2dfce0947710ee24694c。
 - 新增 docs/research/cr7_historical_materialization_contract_20260913.md 和同名 JSON 合同，限定目标为 research_security_daily 的 2020-01-01 至 2026-06-30；明确 verified CR-4 ReadModel 单 snapshot 输入、PIT/identity lineage、Development/Validation A/Holdout 分区、78 个日期逻辑月份、enabled/disabled route 隔离、覆盖状态、幂等重放、staging/原子发布、inventory/hash 证据和有界离线夹具。
+- 针对独立 exact-head review 5189939092 的 P0/P1 阻断完成一个窄 remediation：历史物化入口改为待实现的非发布型 verified ReadModel projection/input stage，明确禁止调用当前会先写普通 R1 artifacts 的 `ResearchPanelBuilder.build_from_readmodel()` / `_publish()`；离线回归用源码检查锁定该发布边界，禁止在历史物化自己的 atomic commit 前产生 authoritative side effect。
+- 新增每个 enabled logical partition 必须具备的 sealed coverage-basis descriptor：绑定 source snapshot/domain/日期 scope/source selection/completeness claim 及 basis hash；coverage-basis set hash 同时进入 materialization identity/manifest。新增稀疏但 verified bytes 完整、缺 basis 时即使 caller 请求 OBSERVED 也只能 unresolved/partial 的回归约束。
+- 幂等 identity 新增 coverage-basis set hash 和 writer/runtime lock hash；后者绑定 dependency lock、Python runtime、Parquet writer engine 与 writer configuration identity，排除主机、路径、mtime、时钟和凭证，避免依赖变化被误判为同 identity 字节损坏。
 - 设计明确区分日期逻辑分区与 route 物理 artifact；disabled/experimental 的 unresolved 状态按 route 单独聚合，不会污染可靠的 enabled route，但 enabled 覆盖缺口也不能由 disabled 行数抵消。BSE 继续 DISABLE_ALL_BSE_ROWS_IN_R1，index、CR-5/R2、Golden/H1/baseline 和策略范围不变。
-- 新增 tests/unit/test_cr7_historical_materialization_contract.py，只读取机器合同并验证边界日期、78 个月、coverage fail-closed、幂等公式、原子发布顺序、证据字段和无执行授权；无 Provider 调用、无历史数据物化。
+- 新增/扩展 tests/unit/test_cr7_historical_materialization_contract.py，只读取机器合同和当前发布器源码并验证边界日期、78 个月、coverage basis fail-closed、幂等公式、原子发布顺序、证据字段和无执行授权；无 Provider 调用、无历史数据物化。
 
-离线聚焦回归：10 passed。当前仍需独立 Reviewer 接受设计合同，并由新的 scheduler checkpoint 明确授权后，才可另开物化实现或执行 PR；本轮不运行 Provider、Production、Formal、backfill、BSE mapping、index、CR-5/R2、Golden/H1 或 baseline。
+离线聚焦回归：11 passed；JSON 解析和 `git diff --check` 通过。当前仍需 exact-head delta review 接受设计合同，并由新的 scheduler checkpoint 明确授权后，才可另开物化实现或执行 PR；本轮不运行 Provider、Production、Formal、backfill、BSE mapping、index、CR-5/R2、Golden/H1 或 baseline。
 
 ## 2026-09-13 · PR #50 BSE 身份连续性边界整改（已合并）
 

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 from datetime import date
 from pathlib import Path
 
 from ashare_state.research import ResearchSplit, assign_research_split
+from ashare_state.research.panel import ResearchPanelBuilder
 
 _ROOT = Path(__file__).parents[2]
 _CONTRACT_PATH = (
@@ -124,7 +126,29 @@ def test_fixture_covers_boundaries_and_keeps_unresolved_rows_disabled() -> None:
 
 def test_input_contract_requires_one_verified_snapshot_and_forbids_provider_bypass() -> None:
     contract = _load_contract()["input_contract"]
-    assert contract["required_entrypoint"] == "ResearchPanelBuilder.build_from_readmodel"
+    assert (
+        contract["required_entrypoint"]
+        == "FUTURE_NON_PUBLISHING_VERIFIED_READMODEL_PROJECTION_STAGE"
+    )
+    assert contract["entrypoint_status"] == "DESIGN_BOUNDARY_IMPLEMENTATION_NAME_TBD"
+    assert {
+        "ResearchPanelBuilder.build_from_readmodel",
+        "ResearchPanelBuilder._publish",
+    } <= set(contract["entrypoint_must_not_be"])
+    boundary = contract["non_publishing_boundary"]
+    assert {
+        "authoritative_research_security_daily_partition_artifacts",
+        "ordinary_R1_manifest",
+        "_SUCCESS_or_any_publication_marker",
+        "committed_materialization_pointer",
+    } <= set(boundary["must_not_write"])
+    assert "before_its_own_commit" in boundary["publisher_separation_rule"]
+    # The current R1 entrypoint is intentionally a publisher.  This assertion
+    # prevents a design-only history materializer from treating it as a pure
+    # verified-input stage before that stage is explicitly extracted.
+    current_publisher = inspect.getsource(ResearchPanelBuilder.build_from_readmodel)
+    assert "return self._publish(" in current_publisher
+    assert "AUTHORITATIVE_READMODEL_PUBLICATION" in current_publisher
     assert contract["source_kind"] == "VERIFIED_CR4_READMODEL"
     assert contract["single_snapshot_rule"] == "ONE_VERIFIED_READMODEL_SNAPSHOT_PER_MATERIALIZATION"
     assert {
@@ -139,6 +163,8 @@ def test_input_contract_requires_one_verified_snapshot_and_forbids_provider_bypa
         "direct_provider_calls",
         "provider_credentials_or_sdk",
         "caller_claimed_snapshot_hashes",
+        "caller_claimed_coverage_state",
+        "caller_claimed_coverage_basis",
         "symbol_or_exchange_inference_from_security_id",
     } <= set(contract["forbidden_inputs"])
 
@@ -168,12 +194,56 @@ def test_coverage_scenarios_aggregate_fail_closed() -> None:
     )
 
 
-def test_idempotency_identity_excludes_wall_clock_and_has_deterministic_formula() -> None:
+def test_observed_coverage_requires_a_sealed_basis_and_sparse_input_fails_closed() -> None:
+    contract = _load_contract()
+    coverage = contract["coverage_contract"]
+    basis = coverage["coverage_basis_contract"]
+    assert basis["basis_required_for_observed"] is True
+    assert {
+        "coverage_basis_id",
+        "coverage_basis_version",
+        "research_split",
+        "calendar_year",
+        "calendar_month",
+        "source_snapshot_id",
+        "source_snapshot_manifest_hash",
+        "source_domain",
+        "claimed_scope_start",
+        "claimed_scope_end",
+        "source_selection_fingerprint",
+        "completeness_method",
+        "completeness_claim",
+        "coverage_basis_artifact_uri",
+        "coverage_basis_artifact_hash",
+    } <= set(basis["descriptor_fields"])
+    assert "COMPLETE_OBSERVED_DAILY_BAR_SCOPE" in basis["observed_promotion_rule"]
+    assert "row_count" in basis["missing_or_invalid_basis_rule"]
+    sparse = contract["bounded_acceptance_fixture"]["sparse_verified_snapshot_without_basis"]
+    assert sparse["caller_requested_state"] == "OBSERVED_DAILY_BAR_COVERAGE"
+    assert sparse["coverage_basis"] is None
+    assert sparse["expected_state"] == "UNRESOLVED_NOT_FOR_RESEARCH"
+    assert sparse["reason"] == "missing_coverage_basis_descriptor"
+
+
+def test_idempotency_identity_includes_basis_and_writer_lock_but_excludes_wall_clock() -> None:
     contract = _load_contract()["replay_and_idempotency_contract"]
     fields = contract["identity_fields"]
     assert "build_timestamp" not in fields
     assert "source_snapshot_manifest_hash" in fields
     assert "identity_view_hash" in fields
+    assert "coverage_basis_set_hash" in fields
+    assert "writer_runtime_lock_hash" in fields
+    writer_lock = contract["writer_runtime_lock_contract"]
+    assert writer_lock["required"] is True
+    assert {
+        "dependency_lock_content_hash",
+        "python_runtime_identity",
+        "parquet_writer_engine_identity",
+        "writer_configuration_version",
+    } <= set(writer_lock["identity_includes"])
+    assert {"host_name", "absolute_paths", "filesystem_mtime", "credentials"} <= set(
+        writer_lock["identity_excludes"]
+    )
     assert contract["canonical_json_rule"].startswith("UTF-8 JSON with sorted keys")
     assert contract["idempotency_key_formula"] == "sha256(canonical_json(materialization_identity))"
     assert contract["materialization_id_formula"] == "rhm-<full_lowercase_idempotency_key>"
@@ -184,6 +254,14 @@ def test_idempotency_identity_excludes_wall_clock_and_has_deterministic_formula(
     second = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     assert first == second
     assert first == first.lower()
+
+    for field in ("coverage_basis_set_hash", "writer_runtime_lock_hash"):
+        mutated = dict(identity)
+        mutated[field] = f"mutated-{field}"
+        mutated_payload = json.dumps(
+            mutated, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        )
+        assert hashlib.sha256(mutated_payload.encode("utf-8")).hexdigest() != first
 
     assert "IDEMPOTENT_REPLAY" in contract["same_identity_rule"]
     assert "never last-write-wins" in contract["same_id_different_bytes_rule"]
@@ -218,6 +296,9 @@ def test_evidence_contract_is_recomputable_and_raw_payload_stays_local() -> None
         "artifact_set_hash",
         "content_hash",
         "publication_state",
+        "coverage_basis_set_hash",
+        "coverage_basis_descriptors",
+        "writer_runtime_lock_hash",
     }
     assert required_manifest <= set(evidence["manifest_required_fields"])
     assert {
@@ -228,6 +309,8 @@ def test_evidence_contract_is_recomputable_and_raw_payload_stays_local() -> None
         "semantic_hash",
         "schema_hash",
         "coverage_state",
+        "coverage_basis_id",
+        "coverage_basis_artifact_hash",
     } <= set(evidence["partition_inventory_fields"])
     assert {
         "research_split",

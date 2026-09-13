@@ -45,7 +45,34 @@
     "strategy_work_authorized": false
   },
   "input_contract": {
-    "required_entrypoint": "ResearchPanelBuilder.build_from_readmodel",
+    "required_entrypoint": "FUTURE_NON_PUBLISHING_VERIFIED_READMODEL_PROJECTION_STAGE",
+    "entrypoint_status": "DESIGN_BOUNDARY_IMPLEMENTATION_NAME_TBD",
+    "entrypoint_must_not_be": [
+      "ResearchPanelBuilder.build_from_readmodel",
+      "ResearchPanelBuilder._publish"
+    ],
+    "non_publishing_boundary": {
+      "purpose": "verify_the_single_ReadModel_snapshot_canonical_identity_and_lineage_then_return_an_in_memory_projection_for_the_historical_materializer",
+      "must_verify_before_return": [
+        "verified_ReadModel_snapshot_metadata_and_bytes",
+        "verified_canonical_identity_source_and_lineage",
+        "row_lineage_PIT_and_typed_daily_bar_invariants",
+        "coverage_basis_descriptor_hashes_and_partition_bindings"
+      ],
+      "returns": [
+        "verified_projected_rows",
+        "source_provenance",
+        "sealed_coverage_basis_descriptors"
+      ],
+      "must_not_write": [
+        "authoritative_research_security_daily_partition_artifacts",
+        "ordinary_R1_manifest",
+        "_SUCCESS_or_any_publication_marker",
+        "committed_materialization_pointer"
+      ],
+      "publisher_separation_rule": "the_historical_materializer_owns_partition_staging_inventory_hashing_and_atomic_commit;_it_must_not_invoke_any_entrypoint_that_publishes_ordinary_R1_artifacts_before_its_own_commit",
+      "offline_regression_rule": "the_current_ResearchPanelBuilder_build_from_readmodel_is_proven_to_be_a_publisher_and_is_forbidden_as_the_historical_entrypoint_until_a_non_publishing_stage_is_extracted"
+    },
     "source_kind": "VERIFIED_CR4_READMODEL",
     "source_readmodel_contract_version": "readmodel-v1",
     "single_snapshot_rule": "ONE_VERIFIED_READMODEL_SNAPSHOT_PER_MATERIALIZATION",
@@ -69,6 +96,8 @@
       "provider_credentials_or_sdk",
       "raw_provider_payload_as_a_replacement_for_readmodel",
       "caller_claimed_snapshot_hashes",
+      "caller_claimed_coverage_state",
+      "caller_claimed_coverage_basis",
       "symbol_or_exchange_inference_from_security_id",
       "implicit_multi_snapshot_union",
       "current_code_list_as_historical_trading_truth"
@@ -140,9 +169,36 @@
       "UNRESOLVED_NOT_FOR_RESEARCH"
     ],
     "partition_state_rule": {
-      "observed": "the_verified_input_scope and its integrity evidence cover the partition; counts describe observed daily-bar rows only",
+      "observed": "a_sealed_coverage_basis_descriptor proves the_verified_input_scope_domain_and_partition_date_scope_are_complete_enough_for_observed_daily_bar_coverage; counts describe observed daily-bar rows only",
       "partial": "the partition is readable but the verified input scope is explicitly incomplete or only partial",
       "unresolved": "coverage, identity, date applicability, or source integrity cannot be established without inference"
+    },
+    "coverage_basis_contract": {
+      "basis_required_for_observed": true,
+      "basis_artifact_or_descriptor": "SEALED_COVERAGE_BASIS_DESCRIPTOR_PER_ENABLED_LOGICAL_PARTITION",
+      "descriptor_fields": [
+        "coverage_basis_id",
+        "coverage_basis_version",
+        "research_split",
+        "calendar_year",
+        "calendar_month",
+        "source_snapshot_id",
+        "source_snapshot_manifest_hash",
+        "source_domain",
+        "claimed_scope_start",
+        "claimed_scope_end",
+        "source_selection_fingerprint",
+        "completeness_method",
+        "completeness_claim",
+        "coverage_basis_artifact_uri",
+        "coverage_basis_artifact_hash"
+      ],
+      "required_source_scope": "the_descriptor_must_name_the_source_snapshot_domain_inclusive_date_bounds_and_applicable_source_selection_or_equivalent_scope_fingerprint_for_that_logical_partition",
+      "observed_promotion_rule": "OBSERVED_DAILY_BAR_COVERAGE_is_allowed_only_when_the_descriptor_is_present_hash_verified_bound_to_the_same_snapshot_and_partition_and_its_completeness_claim_is_COMPLETE_OBSERVED_DAILY_BAR_SCOPE",
+      "missing_or_invalid_basis_rule": "missing_unhashable_mismatched_or_non_complete_basis_must_yield_PARTIAL_OBSERVED_DAILY_BAR_COVERAGE_or_UNRESOLVED_NOT_FOR_RESEARCH_and_must_never_be_promoted_by_caller_choice_row_count_month_continuity_or_verified_bytes",
+      "basis_hash_rule": "coverage_basis_artifact_hash_is_sha256_of_exact_canonical_basis_artifact_bytes_with_the_manifest_hash_reference_excluded_from_those_bytes_and_coverage_basis_set_hash_is_sha256_of_canonical_json_of_descriptors_sorted_by_split_year_month_route",
+      "identity_binding_rule": "the_sorted_coverage_basis_descriptors_and_coverage_basis_set_hash_are_inputs_to_materialization_identity_and_manifest; any_descriptor_scope_hash_or_completeness_change_changes_the_idempotency_key_or_fails_closed",
+      "sparse_verified_snapshot_regression": "a_verified_snapshot_with_exact_bytes_schema_and_rows_but_without_a_complete_coverage_basis_cannot_become_OBSERVED_DAILY_BAR_COVERAGE_even_if_the_caller_requests_observed"
     },
     "route_scope_rule": "coverage_is_aggregated_separately_for_each_route; disabled_or_experimental_diagnostics_do_not_downgrade_the_enabled_route_state",
     "dataset_aggregation_rule": "the_enabled_route_materialization_state_is_the_worst_state_among_enabled_route_partitions; diagnostic_route_states_are_reported_separately",
@@ -173,8 +229,29 @@
       "universe_basis",
       "coverage_policy_version",
       "partition_policy_version",
-      "build_code_fingerprint"
+      "build_code_fingerprint",
+      "writer_runtime_lock_hash",
+      "coverage_basis_set_hash"
     ],
+    "writer_runtime_lock_contract": {
+      "field": "writer_runtime_lock_hash",
+      "required": true,
+      "derivation": "sha256_of_canonical_writer_runtime_lock_identity",
+      "identity_includes": [
+        "dependency_lock_content_hash",
+        "python_runtime_identity",
+        "parquet_writer_engine_identity",
+        "writer_configuration_version"
+      ],
+      "identity_excludes": [
+        "host_name",
+        "absolute_paths",
+        "filesystem_mtime",
+        "wall_clock_time",
+        "credentials"
+      ],
+      "change_rule": "a_writer_or_dependency_lock_change_produces_a_distinct_materialization_identity_and_must_not_be_misclassified_as_same_identity_byte_corruption"
+    },
     "canonical_json_rule": "UTF-8 JSON with sorted keys, compact separators, and no wall-clock fields",
     "idempotency_key_formula": "sha256(canonical_json(materialization_identity))",
     "materialization_id_formula": "rhm-<full_lowercase_idempotency_key>",
@@ -221,6 +298,7 @@
       "identity_view_hash",
       "identity_source_kind",
       "identity_source_lineage_hash",
+      "coverage_basis_set_hash",
       "schema_version",
       "price_basis",
       "universe_basis",
@@ -228,7 +306,9 @@
       "partition_policy_version",
       "coverage_policy_version",
       "build_code_fingerprint",
+      "writer_runtime_lock_hash",
       "build_timestamp",
+      "coverage_basis_descriptors",
       "partition_inventory",
       "partition_inventory_hash",
       "artifact_set_hash",
@@ -251,7 +331,9 @@
       "min_trade_date",
       "max_trade_date",
       "source_snapshot_id",
-      "coverage_state"
+      "coverage_state",
+      "coverage_basis_id",
+      "coverage_basis_artifact_hash"
     ],
     "logical_partition_inventory_fields": [
       "research_split",
@@ -259,14 +341,17 @@
       "calendar_month",
       "route_descriptors",
       "enabled_route_coverage_state",
-      "diagnostic_route_coverage_states"
+      "diagnostic_route_coverage_states",
+      "enabled_route_coverage_basis_ids",
+      "enabled_route_coverage_basis_hashes"
     ],
     "hash_rules": {
       "partition_content_hash": "sha256_of_exact_parquet_bytes",
       "partition_semantic_hash": "sha256(canonical_json(sorted_physical_rows))",
+      "coverage_basis_set_hash": "sha256(canonical_json(sorted_coverage_basis_descriptors))",
       "partition_inventory_hash": "sha256(canonical_json(inventory_sorted_by_route_split_year_month))",
       "artifact_set_hash": "sha256(canonical_json(all_published_artifact_descriptors_sorted_by_uri))",
-      "content_hash": "sha256(canonical_json(schema_hash_partition_inventory_hash_artifact_set_hash_coverage_and_semantic_metadata))",
+      "content_hash": "sha256(canonical_json(schema_hash_partition_inventory_hash_artifact_set_hash_coverage_basis_set_hash_writer_runtime_lock_hash_and_semantic_metadata))",
       "hash_inputs_must_exclude": [
         "retrieval_time",
         "filesystem_mtime",
@@ -370,6 +455,10 @@
       "expected_logical_partition_inventory_has_78_entries_even_when_fixture_is_sparse",
       "same_materialization_identity_recomputes_the_same_idempotency_key_and_inventory_hash",
       "mutating_a_row_or_source_snapshot_hash_changes_identity_or_fails_closed",
+      "current_r1_publisher_is_not_accepted_as_the_historical_entrypoint",
+      "no_authoritative_r1_publication_side_effect_occurs_before_historical_atomic_commit",
+      "verified_sparse_snapshot_without_coverage_basis_cannot_become_observed_by_caller_choice",
+      "mutating_coverage_basis_or_writer_runtime_lock_changes_identity_or_fails_closed",
       "partial_or_unresolved_coverage_never_becomes_observed_by_row_count",
       "no_provider_import_or_provider_call_is_needed"
     ],
@@ -379,6 +468,7 @@
         "partition_states": [
           "OBSERVED_DAILY_BAR_COVERAGE"
         ],
+        "coverage_basis": "COMPLETE_OBSERVED_DAILY_BAR_SCOPE",
         "aggregate_state": "OBSERVED_DAILY_BAR_COVERAGE",
         "ordinary_read": "allowed_after_commit"
       },
@@ -388,6 +478,7 @@
           "OBSERVED_DAILY_BAR_COVERAGE",
           "PARTIAL_OBSERVED_DAILY_BAR_COVERAGE"
         ],
+        "coverage_basis": "PARTIAL_OR_INCOMPLETE_SCOPE",
         "aggregate_state": "PARTIAL_OBSERVED_DAILY_BAR_COVERAGE",
         "ordinary_read": "blocked_without_explicit_partition_contract"
       },
@@ -397,10 +488,18 @@
           "OBSERVED_DAILY_BAR_COVERAGE",
           "UNRESOLVED_NOT_FOR_RESEARCH"
         ],
+        "coverage_basis": "MISSING_OR_UNRESOLVED_SCOPE",
         "aggregate_state": "UNRESOLVED_NOT_FOR_RESEARCH",
         "ordinary_read": "blocked"
       }
-    ]
+    ],
+    "sparse_verified_snapshot_without_basis": {
+      "snapshot_integrity": "VERIFIED_CR4_BYTES_SCHEMA_AND_SELECTED_ROWS_ONLY",
+      "caller_requested_state": "OBSERVED_DAILY_BAR_COVERAGE",
+      "coverage_basis": null,
+      "expected_state": "UNRESOLVED_NOT_FOR_RESEARCH",
+      "reason": "missing_coverage_basis_descriptor"
+    }
   },
   "acceptance_gates": [
     {
@@ -415,12 +514,12 @@
     },
     {
       "id": "HM-COVERAGE-03",
-      "requirement": "coverage_state_is_explicit_and_aggregate_is_fail_closed",
+      "requirement": "coverage_state_requires_a_sealed_partition_basis_and_aggregate_is_fail_closed",
       "status": "OFFLINE_TEST_REQUIRED"
     },
     {
       "id": "HM-REPLAY-04",
-      "requirement": "same_identity_is_idempotent_and_conflict_never_overwrites",
+      "requirement": "same_identity_includes_writer_runtime_and_coverage_basis_and_conflict_never_overwrites",
       "status": "OFFLINE_TEST_REQUIRED"
     },
     {
@@ -448,6 +547,9 @@
     "observed_daily_bar_universe_is_not_all_a_shares",
     "raw_unadjusted_price_basis_is_not_adjusted_or_total_return",
     "missing_data_is_not_a_zero_or_negative_event",
+    "historical_materializer_does_not_call_a_pre_publishing_r1_builder",
+    "observed_coverage_requires_a_sealed_complete_partition_basis",
+    "writer_runtime_lock_is_part_of_materialization_identity",
     "historical_artifacts_are_append_only_and_never_last_write_wins",
     "credentials_endpoints_tokens_cookies_and_raw_provider_payloads_stay_out_of_github"
   ]

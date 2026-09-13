@@ -36,9 +36,19 @@ Cookie、专有 SDK/runtime 和原始 Provider payload 不能进入 GitHub。
 
 ## 3. 输入资格与 PIT
 
-未来实现必须从现有 ResearchPanelBuilder.build_from_readmodel 入口开始，只接受一个
-已经通过 CR-4 完整验证的 ReadModel snapshot。一次物化不得把多个 snapshot、不同
-canonical run 或未经验证的 caller rows 拼在一起。
+未来实现必须从一个“非发布型 verified ReadModel projection/input stage”开始，只接受
+一个已经通过 CR-4 完整验证的 ReadModel snapshot。该 stage 的实现名称待实现 PR
+确定；它不是现有 `ResearchPanelBuilder.build_from_readmodel()` 的别名。现有方法在
+完成验证和身份 join 后会直接发布普通 R1 artifacts，因此历史物化不得调用它，也不得
+调用其 `_publish()` 路径。一次物化不得把多个 snapshot、不同 canonical run 或未经验证
+的 caller rows 拼在一起。
+
+这个非发布边界必须在返回内存 projection 前完成 ReadModel、snapshot、canonical
+identity/lineage、行级 PIT 和 typed daily-bar 校验，并返回 projection、source
+provenance 及已封存的 coverage-basis descriptors；在历史物化自己的 staging 和原子
+commit 之前，不得写 authoritative `research_security_daily` artifacts、普通 R1
+manifest、`_SUCCESS`/其他 publication marker 或 committed pointer。这样可以保证
+后续分区或 hash 失败时，不会先留下可读的普通 R1 发布物。
 
 最小输入身份必须包含：
 
@@ -52,7 +62,8 @@ canonical run 或未经验证的 caller rows 拼在一起。
 
 Snapshot、ReadModel、identity lineage 和物理 artifact 的完整性验证必须发生在行筛选、
 分区和任何输出 hash 之前。不能使用当前 code-list 反推出历史可交易性，也不能从
-security_id 猜 symbol 或 exchange。
+security_id 猜 symbol 或 exchange。caller 不能用自己声明的 snapshot hash、coverage
+state 或 coverage basis 覆盖验证结果。
 
 ## 4. 目标窗口与分区
 
@@ -113,9 +124,34 @@ bse_identity_boundary_unresolved。本合同不激活 835185/920185 mapping，�
   继续隔离。
 
 对每个 route 独立聚合状态；enabled route 的整体状态取其声明分区中最差状态，顺序为
-OBSERVED < PARTIAL < UNRESOLVED。不能因为有很多行、月份连续或 row count
-看起来合理，就把 PARTIAL / UNRESOLVED 提升为 OBSERVED。缺失 bar 也不能转成
-零值、下跌、未发生事件或排名中的负向样本。
+OBSERVED < PARTIAL < UNRESOLVED。不能因为有很多行、月份连续、row count 看起来合理
+或 snapshot bytes 已验证，就把 PARTIAL / UNRESOLVED 提升为 OBSERVED。缺失 bar 也不能
+转成零值、下跌、未发生事件或排名中的负向样本。
+
+### 6.1 OBSERVED 必须有 sealed coverage basis
+
+每个 enabled logical partition 必须有一个独立的、hash 可验证的 coverage-basis
+artifact/descriptor。它至少声明：`coverage_basis_id/version`、split 和年月、绑定的
+source snapshot id/manifest hash、source domain、inclusive claimed scope start/end、
+applicable source selection（或等价 fingerprint）、completeness method/claim，以及
+basis artifact URI/hash（artifact bytes 不包含其自身在 manifest 中的 hash reference）。
+`completeness_claim` 只有在明确表示
+`COMPLETE_OBSERVED_DAILY_BAR_SCOPE`，并且该 scope 足以覆盖该 logical partition 时，
+才允许生成 `OBSERVED_DAILY_BAR_COVERAGE`。
+
+coverage basis 不是 snapshot 完整性 hash 的同义词：CR-4 验证可以证明选取的 snapshot
+bytes/schema/rows 没被篡改，但不能单独证明 2020–2026 每个年月的历史范围完整。没有
+basis、basis 无法验 hash、scope 与 snapshot/分区不一致，或 completeness claim 不是
+complete 时，状态只能是 `PARTIAL_OBSERVED_DAILY_BAR_COVERAGE` 或
+`UNRESOLVED_NOT_FOR_RESEARCH`；绝不能靠 caller 参数、row count、月份连续性或“已验证
+bytes”晋升为 OBSERVED。
+
+`coverage_basis_artifact_hash` 是 basis canonical artifact 的精确字节 SHA-256；manifest
+中的 hash reference 不写入被 hash 的 basis bytes，避免自引用。所有按分区排序的 basis
+descriptors 及其 `coverage_basis_set_hash` 都必须进入物化
+identity 和 manifest。任何 scope、source selection、hash 或 completeness 变化都必须
+改变幂等 key 或 fail closed。稀疏但字节完整的 verified snapshot 若没有 complete basis，
+即使 caller 请求 OBSERVED，也必须保持 unresolved/partial。
 
 disabled / experimental route 的覆盖状态单独留在诊断 inventory 中，不会因为已知
 被排除的 BSE 或其他 unresolved 行而把可靠的 enabled route 降级；反过来，enabled
@@ -139,7 +175,14 @@ OBSERVED_DAILY_BAR_COVERAGE 时才能读取。PARTIAL 或 UNRESOLVED 必须由�
 - 唯一 source snapshot / canonical / ReadModel 身份及所有 hash；
 - identity view 和 source lineage 身份；
 - UNADJUSTED_CANONICAL 与 OBSERVED_DAILY_BAR_UNIVERSE；
-- build code fingerprint。
+- build code fingerprint；
+- sorted coverage-basis descriptors 的 set hash；
+- writer/runtime lock hash。
+
+writer/runtime lock hash 由确定性的 dependency lock 内容 hash、Python runtime identity、
+Parquet writer engine identity 和 writer configuration version 组成；不包含主机名、绝对
+路径、mtime、墙上时钟或凭证。这样同一 source/code 在 writer 依赖变更后会得到新的
+物化 identity，而不会把合法的字节差异误报成同 identity 损坏。
 
 build_timestamp 是审计字段，不能进入 identity 或输出内容 hash。合同固定：
 
@@ -161,14 +204,19 @@ last-write-wins。不同 identity 必须进入不同确定性 materialization �
 staging 中的分区文件、排序 inventory 和 manifest 都不能被普通 reader 发现。只有
 所有分区完成以下检查后，才能生成 _SUCCESS.json：
 
-1. source snapshot / ReadModel / identity lineage 已验证；
+1. 非发布型 verified projection 已完成 source snapshot / ReadModel / identity
+   lineage 验证；此阶段不得先调用现有 R1 publisher 或产生 authoritative publication
+   side effect；
 2. 每个 route artifact 的 schema、字节 hash、semantic hash、row count、主键和日期
    范围已重算；
 3. inventory 与 78 个预期日期逻辑分区集合精确一致，且每个嵌套 route artifact
    descriptor 与实际非空 artifact 精确一致；
-4. aggregate partition_inventory_hash、artifact_set_hash 和 content_hash 已
+4. 每个 enabled logical partition 的 coverage basis 已验 hash、scope、snapshot 绑定
+   和 completeness claim；coverage-basis set hash 与 manifest 一致；
+5. aggregate partition_inventory_hash、artifact_set_hash 和 content_hash 已
    从实际内容重算；
-5. manifest 中 publication_state、coverage 和 lineage 与上述结果一致。
+6. manifest 中 publication_state、coverage、coverage basis、writer/runtime lock 和
+   lineage 与上述结果一致。
 
 _SUCCESS.json 记录已提交 manifest hash，只能在以上检查全部成功后写入。reader 只认
 有效 marker 和 COMMITTED manifest；缺 marker、缺分区、旧 staging 或失败临时文件
@@ -187,12 +235,15 @@ code identity。任意失败都不能改变旧的 committed materialization，�
 - row count、enabled/disabled count、min/max trade date；
 - Parquet 精确字节数与 SHA-256；
 - schema hash、canonical-row semantic hash；
-- source snapshot id 和 coverage state。
+- source snapshot id 和 coverage state；
+- enabled logical partition 的 coverage-basis id、scope、completeness claim 和 basis
+  artifact hash。
 
 整体 manifest 还要绑定 target window、split windows、78 个日期逻辑分区及其 route
 descriptor、所有 source/readmodel/identity
-lineage、policy/schema/code 版本、分区 inventory、inventory hash、artifact set hash、
-aggregate content hash、build timestamp 和 publication state。
+lineage、policy/schema/code 版本、coverage-basis descriptors/set hash、writer/runtime
+lock hash、分区 inventory、inventory hash、artifact set hash、aggregate content hash、
+build timestamp 和 publication state。
 
 哈希输入不能包含 retrieval time、filesystem mtime、temporary path、credentials 或
 raw Provider payload。原始 Provider 返回若未来确有合法留存需求，仍必须遵守既有本地
@@ -209,6 +260,8 @@ ReadModel 形状，不访问 Provider。夹具覆盖：
 - 2019-12-31 和 2026-07-01 两个窗口外行，必须不被物化；
 - sparse fixture 下仍要求 inventory 声明 78 个日期逻辑月份，route 子项单独计数；
 - all-observed、partial-input、unresolved-input 三种 coverage 聚合场景；
+- 一个“verified bytes 但缺 coverage basis”的稀疏 snapshot，必须不能被 caller 的
+  OBSERVED 参数提升；coverage basis 或 writer/runtime lock 变化必须改变 identity；
 - 相同 identity 重放、变更行或 source hash、冲突覆盖和无 Provider 调用。
 
 该夹具不提供真实市场覆盖结论，不替换 2020 baseline，不把 601558 或 600068 激活为
@@ -218,13 +271,16 @@ ReadModel 形状，不访问 Provider。夹具覆盖：
 
 本设计完成后，项目管理者和独立 Reviewer 仍需先接受：
 
-1. 输入 snapshot / ReadModel / identity lineage 的绑定字段；
-2. 78 逻辑月份的分区与 exact inventory 规则；
-3. coverage 聚合与普通 reader fail-closed 规则；
-4. identity、row、snapshot 变化下的幂等和冲突行为；
-5. staging / resume / atomic publication 规则；
-6. 分区与 manifest hash 的可重算性；
-7. 有界夹具的离线断言。
+1. 非发布型 verified projection 边界，以及禁止现有 R1 publisher 在原子 commit 前
+   产生副作用；
+2. 输入 snapshot / ReadModel / identity lineage 的绑定字段；
+3. 78 逻辑月份的分区与 exact inventory 规则；
+4. sealed coverage basis、coverage 聚合与普通 reader fail-closed 规则；
+5. identity、row、snapshot、coverage basis 和 writer/runtime lock 变化下的幂等和
+   冲突行为；
+6. staging / resume / atomic publication 规则；
+7. 分区与 manifest hash 的可重算性；
+8. 有界夹具的离线断言。
 
 只有这些设计闸门接受后，才能另开实现 PR；还需要新的明确调度授权，才能执行
 2020–2026H1 物化。当前不宣称历史已物化、不宣称全覆盖、不宣称 R2 或 Formal 已就绪。
