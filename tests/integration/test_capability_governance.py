@@ -8,6 +8,7 @@ fresh-process view without stale-boundary pollution.
 from __future__ import annotations
 
 import importlib
+from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
@@ -178,8 +179,12 @@ class TestCapabilityGovernance:
         capability_module.load_approvals(conn)
         cap = capability_module.CAPABILITY_REGISTRY["daily_bar"]
         assert cap.account_profile_id == EVIDENCE_KWARGS["account_profile_id"]
-        # DuckDB normalizes the timestamptz to the session zone; compare dates
-        assert cap.verified_at and cap.verified_at.startswith("2026-09-01")
+        # DuckDB normalizes the timestamptz to the session zone; compare its
+        # instant in UTC rather than assuming the local calendar date.
+        assert cap.verified_at
+        assert datetime.fromisoformat(cap.verified_at).astimezone(UTC).date().isoformat() == (
+            "2026-09-01"
+        )
 
     def test_unknown_db_status_fails_safe_to_candidate(self, conn):
         conn.execute(

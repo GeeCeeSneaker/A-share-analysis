@@ -1,6 +1,6 @@
-## 2026-09-13 · PR #50 BSE 身份连续性边界整改
+## 2026-09-13 · PR #50 BSE 身份连续性边界整改（已合并）
 
-> 状态：**P0 BSE RESEARCH LEAK CLOSED LOCALLY / R1 FAIL-CLOSED / FOCUSED QA GREEN / FINAL DELTA REVIEW REQUIRED / KEEP DRAFT**
+> 状态：**P0 BSE RESEARCH LEAK CLOSED / R1 FAIL-CLOSED / EXACT-HEAD REVIEW PASS / REQUIRED CI GREEN / MERGED TO MAIN**
 
 - 针对 PR #50 最新 exact-head review `5186380038` 指出的 BSE 历史新旧代码连续性泄漏，在现有 R1 窄范围内完成最小整改：不尝试解决或激活 `835185 -> 920185` 映射，只在研究资格边界全量关闭 BSE 行。
 - `ExclusionReason.BSE_IDENTITY_BOUNDARY_UNRESOLVED`（`bse_identity_boundary_unresolved`）现为机器可读原因码；合同新增 BSE `UNRESOLVED_NOT_FOR_RESEARCH`、`RESEARCH_DISABLED_UNRESOLVED`、`DISABLE_ALL_BSE_ROWS_IN_R1` 和单独连续性 artifact 激活要求。
@@ -8,7 +8,21 @@
 - 新增单元回归与真实离线 `Canonical -> Snapshot -> verified ReadModel -> research panel -> ordinary reader` 集成回归，确认 `835185.BJ` 样例默认研究读取为空、disabled artifact 保留 BSE 行及原因码。
 - 本轮未调用 Provider/Production/Formal，未执行 backfill、universe sweep，未激活 index、CR-5 feature join、source-policy 或 BSE mapping；账号、密码、endpoint、Token、Cookie、专有 SDK/runtime 和原始 Provider payload 不进入 GitHub。
 
-本地验证：R1 单元/集成聚焦套件通过（13 passed），全量 `pytest -q` 退出码为 0；Ruff、format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 通过。整改已提交并推送到 PR #50，exact head 为 `1f57ce99d000e04f1f77eea7b8b40a30531da4a1`；当前只等待该 exact head 的 required CI 与最终 delta review，继续保持 Draft，不自行批准、Ready 或合并。
+本地验证：R1 单元/集成聚焦套件通过（13 passed），全量 `pytest -q` 退出码为 0；Ruff、format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 通过。后续追加的最小文档交接提交将 PR #50 exact head 收敛为 `dc30704107204de5938460ba6e51bc7917610b79`。
+
+独立审阅 `5189377380` 对 exact head 给出 `PASS / MERGE AUTHORIZED`，required CI #564 三个平台均成功；PR #50 已以 merge commit `401e9a8527083af777275d8da490163d2af10f2e` 合并到 `main`。该接受结论只覆盖 R1 security-daily 小夹具发布，不授权第三次 Formal、Provider 探测、回填、BSE 映射启用、Golden/H1/baseline 变更或全历史物化。
+
+## 2026-09-12 · CR-7 R1 合并后研究消费筛选切片
+
+> 状态：**R1 ACCEPTED ON MAIN / CONSUMPTION SLICE IMPLEMENTED / FOCUSED QA GREEN / PR AND INDEPENDENT REVIEW PENDING**
+
+- 以已合并主线 `main@401e9a8527083af777275d8da490163d2af10f2e` 为基线，继续执行 CR-7 §15 第 3 项“小范围 research dataset build，验证真实研究消费”。本批只扩展现有 ReadModel-only R1 reader，不引入新的 Provider、数据源、指数语义、CR-5 feature join 或历史物化。
+- `ResearchPanelReader.load_security_daily()`、`load_research_security_daily()` 以及显式 disabled 诊断入口现在支持 `security_ids` 精确过滤；过滤键是 canonical `security_id`，不接受 symbol/code-prefix 推断。日期区间仍为所选 split 内的闭区间；空选择返回空表，字符串、空白 ID、重复 ID 直接 fail-closed。
+- integration 回归已把 verified `Canonical → Snapshot → ReadModel → R1 panel → ordinary reader` 链路扩展到“按 canonical security_id + 日期筛选 + 列选择”的真实离线消费；unit 回归同时确认 disabled 诊断入口可按同一身份键读取，manifest 的 `research_dataset_version` 与 `dataset_id` 仍由 reader 暴露，disabled 行不会从普通入口泄漏。
+- 本批不执行 Provider/Production/Formal、backfill、BSE mapping activation、index/CR-5/R2 语义扩展、Golden/H1/global baseline 或策略工作；账号、密码、endpoint、Token、Cookie、专有 SDK/runtime 和原始 Provider payload 不进入 GitHub。
+- 首轮全量回归暴露仓库既有的时区敏感断言：DuckDB 在 `America/Los_Angeles` 会把同一 UTC 瞬时显示为前一日；已将该测试改为解析带时区值并统一按 UTC 比较，不改变生产代码或数据口径。
+
+本地验证：R1 单元/集成聚焦套件通过（14 passed）；第二轮全量 `pytest -q` 退出码为 0（收集 1770 项，既有环境跳过保持不变）；Ruff check/format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 均通过。下一闸门是提交 exact head，等待 required CI 与独立审阅；不自行批准、Ready 或合并。
 
 ## 2026-09-12 · PR #50 R1 发布边界整改
 

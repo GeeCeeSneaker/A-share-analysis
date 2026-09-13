@@ -82,8 +82,14 @@ class ResearchPanelReader:
         start: date | str | None = None,
         end: date | str | None = None,
         columns: Sequence[str] | None = None,
+        security_ids: Sequence[str] | None = None,
     ) -> pl.DataFrame:
-        """Load one explicit split; holdout is never an implicit default."""
+        """Load one explicit split with optional exact identity filtering.
+
+        ``security_ids`` matches the canonical ``security_id`` column exactly;
+        it never interprets symbols or code prefixes.  An empty selection is
+        a valid request and returns an empty frame with the artifact schema.
+        """
         validate_manifest_semantics(
             self.manifest.as_dict(),
             allow_non_observed_coverage=False,
@@ -107,12 +113,14 @@ class ResearchPanelReader:
             (pl.col("trade_date") >= pl.lit(start_date))
             & (pl.col("trade_date") <= pl.lit(end_date))
         )
+        frame = self._filter_security_ids(frame, security_ids)
         return self._select_columns(frame, columns)
 
     def load_disabled_security_daily(
         self,
         *,
         columns: Sequence[str] | None = None,
+        security_ids: Sequence[str] | None = None,
     ) -> pl.DataFrame:
         """Explicit diagnostic access to preserved disabled rows.
 
@@ -126,6 +134,7 @@ class ResearchPanelReader:
         )
         self._verify_aggregate_seals()
         frame = self._read_verified_artifact("disabled")
+        frame = self._filter_security_ids(frame, security_ids)
         return self._select_columns(frame, columns)
 
     def _requested_range(
@@ -234,6 +243,27 @@ class ResearchPanelReader:
             raise ResearchReaderError("research field selection contains duplicates")
         return frame.select(list(requested))
 
+    @staticmethod
+    def _filter_security_ids(
+        frame: pl.DataFrame,
+        security_ids: Sequence[str] | None,
+    ) -> pl.DataFrame:
+        """Apply an exact canonical-identity filter without symbol inference."""
+        if security_ids is None:
+            return frame
+        if isinstance(security_ids, str):
+            raise ResearchReaderError("security_ids must be a sequence of non-empty strings")
+        requested = tuple(security_ids)
+        if any(
+            not isinstance(security_id, str) or not security_id.strip() for security_id in requested
+        ):
+            raise ResearchReaderError("security_ids must contain non-empty strings")
+        if len(set(requested)) != len(requested):
+            raise ResearchReaderError("security id selection contains duplicates")
+        if not requested:
+            return frame.head(0)
+        return frame.filter(pl.col("security_id").is_in(list(requested)))
+
 
 def load_research_security_daily(
     manifest_path: str | Path,
@@ -242,6 +272,7 @@ def load_research_security_daily(
     start: date | str | None = None,
     end: date | str | None = None,
     columns: Sequence[str] | None = None,
+    security_ids: Sequence[str] | None = None,
 ) -> pl.DataFrame:
     """Load a selected, verified R1 split; ``split`` is intentionally required."""
     return ResearchPanelReader.from_manifest(manifest_path).load_security_daily(
@@ -249,6 +280,7 @@ def load_research_security_daily(
         start=start,
         end=end,
         columns=columns,
+        security_ids=security_ids,
     )
 
 
@@ -256,8 +288,10 @@ def load_disabled_research_security_daily(
     manifest_path: str | Path,
     *,
     columns: Sequence[str] | None = None,
+    security_ids: Sequence[str] | None = None,
 ) -> pl.DataFrame:
     """Load preserved disabled rows only for explicit diagnostics."""
     return ResearchPanelReader.from_manifest(manifest_path).load_disabled_security_daily(
-        columns=columns
+        columns=columns,
+        security_ids=security_ids,
     )

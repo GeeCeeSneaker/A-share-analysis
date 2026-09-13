@@ -184,6 +184,51 @@ def test_reader_requires_explicit_split_and_rejects_cross_split_range(tmp_path: 
         )
 
 
+def test_reader_filters_exact_security_ids_and_rejects_ambiguous_selection(
+    tmp_path: Path,
+) -> None:
+    _, result, _ = _build(tmp_path)
+    manifest_path = tmp_path / "research" / result.manifest_uri
+    reader = ResearchPanelReader.from_manifest(manifest_path, allow_test_fixture=True)
+
+    selected = reader.load_security_daily(
+        split="development",
+        start="2020-01-01",
+        end="2023-12-31",
+        security_ids=["security-sse"],
+        columns=["trade_date", "security_id", "symbol", "close"],
+    )
+    assert selected.to_dicts() == [
+        {
+            "trade_date": date(2020, 1, 1),
+            "security_id": "security-sse",
+            "symbol": "600000",
+            "close": 10.5,
+        }
+    ]
+    assert reader.load_security_daily(split="development", security_ids=[]).height == 0
+    disabled = reader.load_disabled_security_daily(
+        security_ids=["security-missing"],
+        columns=["security_id", "research_exclusion_reason"],
+    )
+    assert disabled.to_dicts() == [
+        {
+            "security_id": "security-missing",
+            "research_exclusion_reason": "identity_unresolved",
+        }
+    ]
+
+    with pytest.raises(ResearchReaderError, match="sequence"):
+        reader.load_security_daily(split="development", security_ids="security-sse")  # type: ignore[arg-type]
+    with pytest.raises(ResearchReaderError, match="non-empty"):
+        reader.load_security_daily(split="development", security_ids=[" "])
+    with pytest.raises(ResearchReaderError, match="duplicates"):
+        reader.load_security_daily(
+            split="development",
+            security_ids=["security-sse", "security-sse"],
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "replacement"),
     [
