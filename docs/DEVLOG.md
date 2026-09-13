@@ -4048,3 +4048,16 @@ Review Status：KEEP DRAFT / EXACT-HEAD INDEPENDENT REVIEW REQUIRED / REQUIRED C
   物化、Provider/Production 或第三次 Formal。
 
 Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI AND INDEPENDENT DELTA REVIEW REQUIRED`。
+## 2026-09-13 · CR-7 authoritative evidence adapter / bounded real-source preflight
+
+> 状态：**IMPLEMENTATION COMPLETE LOCALLY / REAL-SOURCE PREFLIGHT PENDING / FAIL-CLOSED BY DEFAULT / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED**
+
+- 按 Issue #55 scheduler comment `5653953863`，从最新 clean `main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 开始；已确认 runtime baseline `d2fa53371937d59ea0a118b79df1554d518f575f` 是该 main 的祖先。本任务分支只处理 CR-7 authoritative coverage evidence，不扩大到第三次 Formal、Production resume/verdict、78 月 backfill、universe sweep、BSE/index 激活、CR-5/R2、Golden/H1/baseline 或策略。
+- 新增 `AuthoritativeSourceSelection`、`AuthoritativeCoverageEvidence` 和窄 `AuthoritativeCoverageBasisAdapter`。唯一登记的方法是 `AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1`；它要求 reviewed AmazingData history surface、独立的上游 inventory/range statement 原文 hash、inclusive 月份范围、source snapshot/domain、available/PIT 时间链和 canonical sidecar bytes/hash。返回行数、日期连续性或成功响应不能升级为 COMPLETE。
+- historical materializer/reader 现在写入并重新验证 authoritative evidence sidecar；sidecar hash 进入 coverage-basis set hash 和 materialization identity。fixture-only evidence 仍不能解锁 ordinary reader；reader 另行核对 sidecar 与 materialization identity 的 snapshot id/hash/as-of。
+- 新增 bounded `scripts/spike/cr7_authoritative_history_preflight.py`：固定只检查 Development `2020-01`、Validation A `2024-01`、Holdout `2026-01`，每月最多一个日线哨兵；真实 Provider raw 只写本地 ignored 目录，提交报告不含凭证、账号 profile、endpoint、证券值或 raw payload。若上游没有可审计完整性声明，报告固定为 `FAIL_CLOSED_BLOCKED`，不生成 authoritative sidecar、不进入物化。
+- 新增 authoritative adapter/sidecar、tamper、wrong scope/PIT/source binding、downgrade/escalation、reader replay/conflict、预检脱敏与固定范围回归；当前 focused suite 已通过（30 tests）。
+
+当前阻断：AmazingData 已审阅的接口形态能提供 code-list、calendar 和日线 observation，但现有来源闭环/本地手册没有 provider-owned 完整库存或历史范围保证，也没有可绑定的 available-at/PIT 完整性声明。真实预检仍需在本地授权环境运行；无此声明时必须保留 blocker，不能提交伪造 `COMPLETE_OBSERVED_DAILY_BAR_SCOPE`。
+
+账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime、原始 Provider payload 和本地 raw 路径均不得进入 GitHub。实现提交后还必须补入真实预检脱敏 receipt、实际 exact head、CI 结果和项目管理文档更新。

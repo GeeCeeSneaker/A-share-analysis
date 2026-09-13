@@ -218,6 +218,18 @@ def test_observed_coverage_requires_a_sealed_basis_and_sparse_input_fails_closed
     } <= set(basis["descriptor_fields"])
     assert "COMPLETE_OBSERVED_DAILY_BAR_SCOPE" in basis["observed_promotion_rule"]
     assert "row_count" in basis["missing_or_invalid_basis_rule"]
+    authoritative = basis["authoritative_evidence_contract"]
+    assert authoritative["required_for_evidence_class"] == "AUTHORITATIVE_UPSTREAM"
+    assert authoritative["completeness_method"] == "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1"
+    assert authoritative["statement_kind"] == "UPSTREAM_INVENTORY_RANGE_STATEMENT"
+    assert {
+        "source_selection",
+        "upstream_statement_hash",
+        "upstream_inventory_hash",
+        "available_at",
+        "pit_as_of",
+    } <= set(authoritative["sidecar_fields_without_self_hash"])
+    assert "row_counts_date_continuity_HTTP_success" in authoritative["completeness_rule"]
     sparse = contract["bounded_acceptance_fixture"]["sparse_verified_snapshot_without_basis"]
     assert sparse["caller_requested_state"] == "OBSERVED_DAILY_BAR_COVERAGE"
     assert sparse["coverage_basis"] is None
@@ -298,6 +310,7 @@ def test_evidence_contract_is_recomputable_and_raw_payload_stays_local() -> None
         "publication_state",
         "coverage_basis_set_hash",
         "coverage_basis_descriptors",
+        "coverage_basis_evidence",
         "writer_runtime_lock_hash",
     }
     assert required_manifest <= set(evidence["manifest_required_fields"])
@@ -323,6 +336,11 @@ def test_evidence_contract_is_recomputable_and_raw_payload_stays_local() -> None
     assert evidence["hash_rules"]["partition_content_hash"].startswith(
         "sha256_of_exact_parquet_bytes"
     )
+    assert set(evidence["coverage_basis_evidence_fields"]) == {
+        "declared_uri",
+        "relative_path",
+        "content_hash",
+    }
     assert "raw_provider_payload" in evidence["hash_rules"]["hash_inputs_must_exclude"]
     assert evidence["local_evidence_only"].startswith("the design stores hashes")
 

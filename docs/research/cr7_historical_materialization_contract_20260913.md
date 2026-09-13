@@ -153,6 +153,26 @@ identity 和 manifest。任何 scope、source selection、hash 或 completeness 
 改变幂等 key 或 fail closed。稀疏但字节完整的 verified snapshot 若没有 complete basis，
 即使 caller 请求 OBSERVED，也必须保持 unresolved/partial。
 
+### 6.2 AUTHORITATIVE_UPSTREAM 必须有独立的 typed evidence sidecar
+
+`AUTHORITATIVE_UPSTREAM` 不是 caller 可以填写的标签。当前唯一注册的方法是
+`AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1`，并且每个 enabled 月份必须同时拥有：
+
+- 由 reviewed source-selection binding 产生的固定 fingerprint（当前绑定为
+  AmazingData 的 `get_hist_code_list`、`get_calendar` 和 `query_kline` history surface）；
+- 明确的 `UPSTREAM_INVENTORY_RANGE_STATEMENT` 或等价可审计上游证据，以及该原文/字节的
+  SHA-256；
+- 上游 inventory 的 inclusive 月份范围、security/session 计数和 inventory 字节 hash；
+- 与 source snapshot、domain、basis scope 一致的 typed sidecar；
+- `available_at <= pit_as_of <= source_snapshot_as_of` 且
+  `retrieved_at_utc >= available_at` 的时间链。
+
+sidecar 文件是去掉自身 hash 字段后的 canonical UTF-8 JSON；其精确字节 SHA-256 只放在
+manifest 的 `coverage_basis_evidence` 条目中，避免自引用。writer 在 staging 校验时、
+reader 在普通读取前都会重新加载、重算和核对 sidecar。SDK/HTTP 成功、返回行数、日期连续性、
+历史请求日期或单个哨兵证券的日线结果都不能代替上游完整性声明；缺少该声明时必须在进入
+authoritative materializer 前 fail closed，不产生 `COMPLETE_OBSERVED_DAILY_BAR_SCOPE`。
+
 disabled / experimental route 的覆盖状态单独留在诊断 inventory 中，不会因为已知
 被排除的 BSE 或其他 unresolved 行而把可靠的 enabled route 降级；反过来，enabled
 route 的覆盖缺口也不能被 disabled 行数抵消。
@@ -212,7 +232,9 @@ staging 中的分区文件、排序 inventory 和 manifest 都不能被普通 re
 3. inventory 与 78 个预期日期逻辑分区集合精确一致，且每个嵌套 route artifact
    descriptor 与实际非空 artifact 精确一致；
 4. 每个 enabled logical partition 的 coverage basis 已验 hash、scope、snapshot 绑定
-   和 completeness claim；coverage-basis set hash 与 manifest 一致；
+   和 completeness claim；若为 `AUTHORITATIVE_UPSTREAM`，其 typed evidence sidecar 也已
+   验 hash、source-selection、inventory/range statement 和 PIT；coverage-basis set hash
+   与 manifest 一致；
 5. aggregate partition_inventory_hash、artifact_set_hash 和 content_hash 已
    从实际内容重算；
 6. manifest 中 publication_state、coverage、coverage basis、writer/runtime lock 和
@@ -239,6 +261,10 @@ code identity。任意失败都不能改变旧的 committed materialization，�
 - enabled logical partition 的 coverage-basis id、scope、completeness claim 和 basis
   artifact hash。
 
+对 `AUTHORITATIVE_UPSTREAM` 分区还必须留下 sidecar 的 `declared_uri`、相对路径和精确
+content hash，以及 sidecar 中的 source-selection、上游 statement/inventory hash 和
+available/PIT 时间链。sidecar 只保存这些证明元数据与 hash，不嵌入原始 Provider 返回。
+
 整体 manifest 还要绑定 target window、split windows、78 个日期逻辑分区及其 route
 descriptor、所有 source/readmodel/identity
 lineage、policy/schema/code 版本、coverage-basis descriptors/set hash、writer/runtime
@@ -249,7 +275,7 @@ build timestamp 和 publication state。
 raw Provider payload。原始 Provider 返回若未来确有合法留存需求，仍必须遵守既有本地
 ignored/raw 规则；本合同不授权将其上传仓库。
 
-## 10. 有界离线验收夹具
+## 10. 有界离线验收夹具与三个月真实源预检
 
 机器合同附带 cr7-history-materialization-boundary-fixture-v1，只描述 verified
 ReadModel 形状，不访问 Provider。夹具覆盖：
@@ -267,6 +293,13 @@ ReadModel 形状，不访问 Provider。夹具覆盖：
 该夹具不提供真实市场覆盖结论，不替换 2020 baseline，不把 601558 或 600068 激活为
 历史 fixture，也不产生任何 Golden/H1 或 Formal 结果。
 
+Issue #55 另外规定一个固定范围的真实源预检：Development `2020-01`、Validation A
+`2024-01`、Holdout `2026-01`。预检只调用已审阅的 AmazingData history surface，最多每月
+读取一个日线哨兵，不执行 78 月物化、universe sweep、Production 或 Formal。真实接口的
+返回只作为观察和本地 ignored raw evidence；只有另行获得的上游 inventory/range statement
+才能进入上述 sidecar。任一月份无法证明完整性，报告必须写明具体 upstream blocker，
+`AUTHORITATIVE_UPSTREAM` 和普通 reader 均保持关闭。
+
 ## 11. 后续实现前必须满足的闸门
 
 本设计完成后，项目管理者和独立 Reviewer 仍需先接受：
@@ -280,7 +313,8 @@ ReadModel 形状，不访问 Provider。夹具覆盖：
    冲突行为；
 6. staging / resume / atomic publication 规则；
 7. 分区与 manifest hash 的可重算性；
-8. 有界夹具的离线断言。
+8. 有界夹具的离线断言；
+9. typed authoritative sidecar 的上游完整性声明、PIT 链和 reader 重验。
 
 只有这些设计闸门接受后，才能另开实现 PR；还需要新的明确调度授权，才能执行
 2020–2026H1 物化。当前不宣称历史已物化、不宣称全覆盖、不宣称 R2 或 Formal 已就绪。

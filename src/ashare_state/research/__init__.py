@@ -6,10 +6,18 @@ index panel remains disabled until the repository has a verified index
 identity/read-model contract.
 """
 
+from ashare_state.research.authoritative import (
+    AuthoritativeCoverageBasisAdapter,
+    build_authoritative_coverage_basis_descriptor,
+)
 from ashare_state.research.eligibility import EligibilityDecision, evaluate_daily_bar
 from ashare_state.research.historical import (
+    AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION,
+    AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
     COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
     PARTIAL_OBSERVED_DAILY_BAR_SCOPE,
+    AuthoritativeCoverageEvidence,
+    AuthoritativeSourceSelection,
     CoverageBasisDescriptor,
     CoverageBasisError,
     CoverageEvaluation,
@@ -24,6 +32,7 @@ from ashare_state.research.historical import (
     OfflineHistoricalMaterializer,
     PartitionKey,
     WriterRuntimeLock,
+    build_authoritative_coverage_evidence,
     build_fixture_coverage_basis_descriptor,
     build_materialization_identity,
     build_writer_runtime_lock_identity,
@@ -79,6 +88,11 @@ from ashare_state.research.splits import (
 
 __all__ = [
     "BSE_IDENTITY_BOUNDARY_STATE",
+    "AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION",
+    "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD",
+    "AuthoritativeCoverageBasisAdapter",
+    "AuthoritativeCoverageEvidence",
+    "AuthoritativeSourceSelection",
     "COMPLETE_OBSERVED_DAILY_BAR_SCOPE",
     "CoverageState",
     "CoverageBasisDescriptor",
@@ -126,6 +140,8 @@ __all__ = [
     "assert_research_split_date",
     "evaluate_daily_bar",
     "build_fixture_coverage_basis_descriptor",
+    "build_authoritative_coverage_evidence",
+    "build_authoritative_coverage_basis_descriptor",
     "build_materialization_identity",
     "build_writer_runtime_lock_identity",
     "compute_coverage_basis_set_hash",

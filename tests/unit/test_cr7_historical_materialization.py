@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,11 @@ from typing import Any
 import pytest
 
 from ashare_state.research import (
+    AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
     COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
+    AuthoritativeCoverageBasisAdapter,
+    AuthoritativeCoverageEvidence,
+    AuthoritativeSourceSelection,
     CoverageBasisDescriptor,
     CoverageBasisError,
     CoverageEvidenceClass,
@@ -28,6 +33,8 @@ from ashare_state.research import (
     ResearchEligibility,
     ResearchSplit,
     VerifiedResearchProjection,
+    build_authoritative_coverage_basis_descriptor,
+    build_authoritative_coverage_evidence,
     build_fixture_coverage_basis_descriptor,
     compute_coverage_basis_set_hash,
     compute_writer_runtime_lock_hash,
@@ -204,6 +211,50 @@ def _full_window_fixture_bases(*, partial: bool = False) -> tuple[CoverageBasisD
             source_selection_fingerprint=f"selection-{partition.logical_key}",
             partial=partial,
         )
+        for partition in expected_partition_keys()
+    )
+
+
+def _authoritative_evidence(
+    partition: PartitionKey,
+    *,
+    source_snapshot_id: str = SNAPSHOT_ID,
+    source_snapshot_manifest_hash: str = SNAPSHOT_MANIFEST_HASH,
+    source_snapshot_as_of: datetime = datetime(2026, 9, 1, tzinfo=UTC),
+    pit_as_of: datetime = datetime(2026, 9, 1, tzinfo=UTC),
+    source_selection: AuthoritativeSourceSelection | None = None,
+    suffix: str = "v1",
+) -> AuthoritativeCoverageEvidence:
+    selection = source_selection or AuthoritativeSourceSelection.reviewed_amazingdata_history()
+    return build_authoritative_coverage_evidence(
+        partition,
+        evidence_id=f"authoritative-evidence-{partition.logical_key}-{suffix}",
+        coverage_basis_id=f"authoritative-basis-{partition.logical_key}-{suffix}",
+        source_snapshot_id=source_snapshot_id,
+        source_snapshot_manifest_hash=source_snapshot_manifest_hash,
+        source_snapshot_as_of=source_snapshot_as_of,
+        source_selection=selection,
+        upstream_statement_id=f"statement-{partition.logical_key}-{suffix}",
+        upstream_statement_locator="AmazingData.BaseData.get_hist_code_list",
+        upstream_statement_bytes=f"statement:{partition.logical_key}:{suffix}".encode(),
+        upstream_inventory_id=f"inventory-{partition.logical_key}-{suffix}",
+        upstream_inventory_bytes=f"inventory:{partition.logical_key}:{suffix}".encode(),
+        upstream_security_count=1,
+        upstream_session_count=1,
+        retrieved_at_utc=datetime(2026, 9, 13, tzinfo=UTC),
+        available_at=datetime(2026, 8, 1, tzinfo=UTC),
+        pit_as_of=pit_as_of,
+        coverage_basis_evidence_uri=(
+            f"coverage_basis_evidence/{partition.research_split.value}/"
+            f"{partition.calendar_year:04d}-{partition.calendar_month:02d}.json"
+        ),
+    )
+
+
+def _full_window_authoritative_bases() -> tuple[CoverageBasisDescriptor, ...]:
+    adapter = AuthoritativeCoverageBasisAdapter.reviewed_amazingdata_history()
+    return tuple(
+        adapter.build_descriptor(partition, _authoritative_evidence(partition))
         for partition in expected_partition_keys()
     )
 
@@ -415,6 +466,151 @@ def test_coverage_basis_rejects_forged_method_and_exact_bytes_are_bound() -> Non
     with pytest.raises(CoverageBasisError, match="exact canonical"):
         CoverageBasisDescriptor.from_mapping(basis.as_dict(), artifact_bytes=wrong_bytes)
     assert partition == basis.partition_key
+
+
+def test_authoritative_adapter_emits_only_with_sealed_upstream_evidence() -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    evidence = _authoritative_evidence(partition)
+    descriptor = build_authoritative_coverage_basis_descriptor(partition, evidence)
+
+    assert descriptor.completeness_method == AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD
+    assert descriptor.evidence_class is CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM
+    assert descriptor.authoritative_evidence is evidence
+    assert descriptor.authoritative_evidence.coverage_basis_evidence_hash
+
+    forged = descriptor.as_dict()
+    forged["completeness_method"] = AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD
+    forged_bytes = canonical_json(
+        {key: forged[key] for key in forged if key != "coverage_basis_artifact_hash"}
+    ).encode()
+    forged["coverage_basis_artifact_hash"] = sha256_hex(forged_bytes)
+    with pytest.raises(CoverageBasisError, match="typed evidence sidecar"):
+        CoverageBasisDescriptor.from_mapping(forged, artifact_bytes=forged_bytes)
+
+
+def test_authoritative_evidence_rejects_wrong_selection_scope_and_pit() -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    evidence = _authoritative_evidence(partition)
+
+    wrong_selection = evidence.as_dict(include_artifact_hash=False)
+    wrong_selection["source_selection_fingerprint"] = "0" * 64
+    wrong_selection_bytes = canonical_json(wrong_selection).encode()
+    with pytest.raises(CoverageBasisError, match="typed binding"):
+        AuthoritativeCoverageEvidence.from_mapping(
+            wrong_selection,
+            artifact_bytes=wrong_selection_bytes,
+            artifact_hash=sha256_hex(wrong_selection_bytes),
+        )
+
+    wrong_scope = evidence.as_dict(include_artifact_hash=False)
+    wrong_scope["claimed_scope_start"] = "2020-02-01"
+    wrong_scope["claimed_scope_end"] = "2020-02-29"
+    wrong_scope["upstream_inventory_scope_start"] = "2020-02-01"
+    wrong_scope["upstream_inventory_scope_end"] = "2020-02-29"
+    wrong_scope_bytes = canonical_json(wrong_scope).encode()
+    changed_scope = AuthoritativeCoverageEvidence.from_mapping(
+        wrong_scope,
+        artifact_bytes=wrong_scope_bytes,
+        artifact_hash=sha256_hex(wrong_scope_bytes),
+    )
+    with pytest.raises(CoverageBasisError, match="scope"):
+        AuthoritativeCoverageBasisAdapter.reviewed_amazingdata_history().build_descriptor(
+            partition, changed_scope
+        )
+
+    stale = _authoritative_evidence(
+        partition,
+        source_snapshot_as_of=datetime(2026, 8, 1, tzinfo=UTC),
+        pit_as_of=datetime(2026, 8, 1, tzinfo=UTC),
+    )
+    with pytest.raises(CoverageBasisError, match="stale|PIT"):
+        AuthoritativeCoverageBasisAdapter.reviewed_amazingdata_history().verify_descriptor(
+            build_authoritative_coverage_basis_descriptor(partition, stale),
+            source_snapshot_id=SNAPSHOT_ID,
+            source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
+            source_snapshot_as_of=datetime(2026, 9, 1, tzinfo=UTC),
+        )
+
+
+def test_authoritative_evidence_rejects_tampered_bytes_and_downgrade() -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    evidence = _authoritative_evidence(partition)
+    payload = evidence.as_dict(include_artifact_hash=False)
+    with pytest.raises(CoverageBasisError, match="not canonical|does not match bytes"):
+        AuthoritativeCoverageEvidence.from_mapping(
+            payload,
+            artifact_bytes=evidence.artifact_bytes + b"tampered",
+            artifact_hash=evidence.coverage_basis_evidence_hash,
+        )
+
+    with pytest.raises(CoverageBasisError, match="explicitly claim complete"):
+        replace(evidence, completeness_claim="PARTIAL_OBSERVED_DAILY_BAR_SCOPE")
+
+    partial = build_fixture_coverage_basis_descriptor(
+        partition,
+        source_snapshot_id=SNAPSHOT_ID,
+        source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
+        source_selection_fingerprint="selection-fixture-v1",
+        partial=True,
+    )
+    escalated = partial.as_dict()
+    escalated["completeness_method"] = AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD
+    escalated["completeness_claim"] = COMPLETE_OBSERVED_DAILY_BAR_SCOPE
+    escalated_bytes = canonical_json(
+        {key: escalated[key] for key in escalated if key != "coverage_basis_artifact_hash"}
+    ).encode()
+    escalated["coverage_basis_artifact_hash"] = sha256_hex(escalated_bytes)
+    with pytest.raises(CoverageBasisError, match="typed evidence sidecar"):
+        CoverageBasisDescriptor.from_mapping(
+            escalated,
+            artifact_bytes=escalated_bytes,
+        )
+
+
+def test_authoritative_reader_accepts_only_sealed_full_window_and_conflicts_on_tamper(
+    tmp_path: Path,
+) -> None:
+    projection = _full_window_fixture_projection()
+    bases = _full_window_authoritative_bases()
+    materializer = OfflineHistoricalMaterializer(
+        tmp_path,
+        writer_runtime_lock_hash=_writer_hash(),
+        build_code_fingerprint=BUILD_FINGERPRINT,
+    )
+    first = materializer.materialize(
+        projection,
+        coverage_bases=bases,
+        build_timestamp="2026-09-13T00:00:00+00:00",
+    )
+    assert materializer.plan(projection, coverage_bases=bases).coverage_evidence_class is (
+        CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM
+    )
+    reader = HistoricalMaterializationReader.from_manifest(tmp_path / first.manifest_uri)
+    assert reader.load_security_daily(split=ResearchSplit.DEVELOPMENT).height == 48
+    replay = materializer.materialize(
+        projection,
+        coverage_bases=bases,
+        build_timestamp="2026-09-14T00:00:00+00:00",
+    )
+    assert replay.idempotent_replay is True
+
+    evidence = bases[0].authoritative_evidence
+    assert evidence is not None
+    evidence_path = tmp_path / first.manifest_uri
+    evidence_path = evidence_path.parent / _coverage_evidence_relative_path_for_test(evidence)
+    evidence_path.write_bytes(evidence.artifact_bytes + b"tampered")
+    with pytest.raises(MaterializationConflictError, match="evidence bytes changed"):
+        materializer.materialize(
+            projection,
+            coverage_bases=bases,
+            build_timestamp="2026-09-15T00:00:00+00:00",
+        )
+
+
+def _coverage_evidence_relative_path_for_test(
+    evidence: AuthoritativeCoverageEvidence,
+) -> str:
+    return f"coverage_basis_evidence/{evidence.coverage_basis_evidence_hash}.json"
 
 
 def test_writer_lock_and_basis_change_identity() -> None:

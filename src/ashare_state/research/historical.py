@@ -17,6 +17,7 @@ from calendar import monthrange
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -47,8 +48,12 @@ from ashare_state.research.splits import assign_research_split, split_windows
 from ashare_state.storage.atomic_files import ImmutableFileExistsError, write_file_atomic
 
 __all__ = [
+    "AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION",
+    "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD",
     "COMPLETE_OBSERVED_DAILY_BAR_SCOPE",
     "CoverageEvidenceClass",
+    "AuthoritativeCoverageEvidence",
+    "AuthoritativeSourceSelection",
     "CoverageBasisDescriptor",
     "CoverageBasisError",
     "CoverageEvaluation",
@@ -63,6 +68,7 @@ __all__ = [
     "PartitionKey",
     "PARTIAL_OBSERVED_DAILY_BAR_SCOPE",
     "WriterRuntimeLock",
+    "build_authoritative_coverage_evidence",
     "build_fixture_coverage_basis_descriptor",
     "build_materialization_identity",
     "build_writer_runtime_lock_identity",
@@ -88,6 +94,18 @@ PARTITION_POLICY_VERSION = "monthly-route-v1"
 WRITER_CONFIGURATION_VERSION = "cr7-writer-v1"
 OFFLINE_FIXTURE_COMPLETE_METHOD = "OFFLINE_FIXTURE_COMPLETE_SCOPE_V1"
 OFFLINE_FIXTURE_PARTIAL_METHOD = "OFFLINE_FIXTURE_PARTIAL_SCOPE_V1"
+AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION = "authoritative-coverage-evidence-v1"
+AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD = "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1"
+AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "UPSTREAM_INVENTORY_RANGE_STATEMENT"
+AUTHORITATIVE_SOURCE_SELECTION_VERSION = "source-selection-retrieval-closure-20260912"
+AUTHORITATIVE_SOURCE_CLASS = "amazingdata_provider_observation"
+AUTHORITATIVE_PROVIDER = "amazingdata"
+AUTHORITATIVE_RETRIEVAL_SURFACE = "history_fixture"
+AUTHORITATIVE_SOURCE_METHODS = (
+    "BaseData.get_hist_code_list",
+    "BaseData.get_calendar",
+    "MarketData.query_kline",
+)
 
 
 class CoverageEvidenceClass(StrEnum):
@@ -95,9 +113,9 @@ class CoverageEvidenceClass(StrEnum):
 
     Fixture methods can exercise the planner and storage protocol, but they
     must never satisfy the ordinary historical-reader publication boundary.
-    The authoritative value is intentionally not registered by this offline
-    implementation; a future upstream method must be added through a reviewed
-    contract change.
+    The authoritative value is registered only for the reviewed typed
+    evidence-sidecar method below.  A provider observation without that
+    sidecar remains non-authoritative.
     """
 
     TEST_FIXTURE_ONLY = "TEST_FIXTURE_ONLY"
@@ -119,6 +137,10 @@ _RECOGNIZED_COMPLETENESS_METHODS = {
     OFFLINE_FIXTURE_PARTIAL_METHOD: _CompletenessMethodSpec(
         CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE,
         CoverageEvidenceClass.TEST_FIXTURE_ONLY,
+    ),
+    AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD: _CompletenessMethodSpec(
+        CoverageState.OBSERVED_DAILY_BAR_COVERAGE,
+        CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM,
     ),
 }
 _ROUTES = ("research_enabled", "disabled", "experimental")
@@ -166,6 +188,36 @@ _BASIS_FIELDS = (
 )
 _BASIS_FIELDS_WITHOUT_HASH = tuple(
     field for field in _BASIS_FIELDS if field != "coverage_basis_artifact_hash"
+)
+_AUTHORITATIVE_EVIDENCE_FIELDS = (
+    "evidence_id",
+    "evidence_version",
+    "coverage_basis_id",
+    "source_snapshot_id",
+    "source_snapshot_manifest_hash",
+    "source_snapshot_as_of",
+    "source_domain",
+    "claimed_scope_start",
+    "claimed_scope_end",
+    "source_selection_fingerprint",
+    "completeness_method",
+    "completeness_claim",
+    "source_selection",
+    "upstream_source",
+    "upstream_statement_kind",
+    "upstream_statement_id",
+    "upstream_statement_locator",
+    "upstream_statement_hash",
+    "upstream_inventory_id",
+    "upstream_inventory_scope_start",
+    "upstream_inventory_scope_end",
+    "upstream_inventory_hash",
+    "upstream_security_count",
+    "upstream_session_count",
+    "retrieved_at_utc",
+    "available_at",
+    "pit_as_of",
+    "coverage_basis_evidence_uri",
 )
 _HASH_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _MAX_OFFLINE_FIXTURE_ROWS = 10_000
@@ -231,6 +283,517 @@ def _coverage_rank(state: CoverageState) -> int:
         CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE: 1,
         CoverageState.UNRESOLVED_NOT_FOR_RESEARCH: 2,
     }[state]
+
+
+@dataclass(frozen=True)
+class AuthoritativeSourceSelection:
+    """The reviewed source-selection binding for the CR-7 evidence path.
+
+    A source-selection fingerprint is not an arbitrary caller label.  It is
+    the hash of this exact, intentionally narrow binding.  The binding is
+    still only a routing identity: it does not turn a provider response into
+    completeness evidence without the separate upstream statement below.
+    """
+
+    selection_version: str
+    source_class: str
+    provider: str
+    retrieval_surface: str
+    methods: tuple[str, ...]
+    source_domain: str
+    selection_fingerprint: str
+
+    def __post_init__(self) -> None:
+        try:
+            for field_name in (
+                "selection_version",
+                "source_class",
+                "provider",
+                "retrieval_surface",
+                "source_domain",
+            ):
+                _require_non_empty_string(getattr(self, field_name), field_name)
+            if not self.methods or any(
+                not isinstance(method, str) or not method.strip() for method in self.methods
+            ):
+                raise CoverageBasisError("authoritative source-selection methods are malformed")
+            if len(self.methods) != len(set(self.methods)):
+                raise CoverageBasisError("authoritative source-selection methods are duplicated")
+            fingerprint = _require_sha256(
+                self.selection_fingerprint, "source_selection_fingerprint"
+            )
+        except HistoricalMaterializationError as exc:
+            raise CoverageBasisError(str(exc)) from exc
+        if self.source_domain != "daily_bar":
+            raise CoverageBasisError("authoritative source-selection domain must be daily_bar")
+        expected_binding = {
+            "selection_version": AUTHORITATIVE_SOURCE_SELECTION_VERSION,
+            "source_class": AUTHORITATIVE_SOURCE_CLASS,
+            "provider": AUTHORITATIVE_PROVIDER,
+            "retrieval_surface": AUTHORITATIVE_RETRIEVAL_SURFACE,
+            "methods": list(AUTHORITATIVE_SOURCE_METHODS),
+            "source_domain": "daily_bar",
+        }
+        if self.as_dict(include_fingerprint=False) != expected_binding:
+            raise CoverageBasisError(
+                "authoritative source-selection binding is not the reviewed "
+                "AmazingData history path"
+            )
+        if fingerprint != sha256_hex(canonical_json(expected_binding)):
+            raise CoverageBasisError("source_selection_fingerprint does not match its binding")
+
+    @classmethod
+    def reviewed_amazingdata_history(cls) -> AuthoritativeSourceSelection:
+        """Return the only source-selection binding accepted by this adapter."""
+        binding: dict[str, Any] = {
+            "selection_version": AUTHORITATIVE_SOURCE_SELECTION_VERSION,
+            "source_class": AUTHORITATIVE_SOURCE_CLASS,
+            "provider": AUTHORITATIVE_PROVIDER,
+            "retrieval_surface": AUTHORITATIVE_RETRIEVAL_SURFACE,
+            "methods": list(AUTHORITATIVE_SOURCE_METHODS),
+            "source_domain": "daily_bar",
+        }
+        return cls(
+            selection_version=binding["selection_version"],
+            source_class=binding["source_class"],
+            provider=binding["provider"],
+            retrieval_surface=binding["retrieval_surface"],
+            methods=tuple(binding["methods"]),
+            source_domain=binding["source_domain"],
+            selection_fingerprint=sha256_hex(canonical_json(binding)),
+        )
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> AuthoritativeSourceSelection:
+        fields = {
+            "selection_version",
+            "source_class",
+            "provider",
+            "retrieval_surface",
+            "methods",
+            "source_domain",
+            "selection_fingerprint",
+        }
+        if not isinstance(payload, Mapping) or set(payload) != fields:
+            raise CoverageBasisError("authoritative source-selection fields are not exact")
+        methods = payload["methods"]
+        if not isinstance(methods, list):
+            raise CoverageBasisError("authoritative source-selection methods must be a list")
+        try:
+            return cls(
+                selection_version=_require_non_empty_string(
+                    payload["selection_version"], "selection_version"
+                ),
+                source_class=_require_non_empty_string(payload["source_class"], "source_class"),
+                provider=_require_non_empty_string(payload["provider"], "provider"),
+                retrieval_surface=_require_non_empty_string(
+                    payload["retrieval_surface"], "retrieval_surface"
+                ),
+                methods=tuple(
+                    _require_non_empty_string(method, "source-selection method")
+                    for method in methods
+                ),
+                source_domain=_require_non_empty_string(payload["source_domain"], "source_domain"),
+                selection_fingerprint=_require_sha256(
+                    payload["selection_fingerprint"], "selection_fingerprint"
+                ),
+            )
+        except HistoricalMaterializationError as exc:
+            raise CoverageBasisError(str(exc)) from exc
+
+    def as_dict(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "selection_version": self.selection_version,
+            "source_class": self.source_class,
+            "provider": self.provider,
+            "retrieval_surface": self.retrieval_surface,
+            "methods": list(self.methods),
+            "source_domain": self.source_domain,
+        }
+        if include_fingerprint:
+            payload["selection_fingerprint"] = self.selection_fingerprint
+        return payload
+
+
+@dataclass(frozen=True)
+class AuthoritativeCoverageEvidence:
+    """Sealed, non-fixture proof package for one complete logical month.
+
+    The provider payload is never embedded here.  The sidecar records the
+    exact hashes of the upstream statement and inventory bytes, while its own
+    canonical bytes/hash and PIT timestamps are persisted by the historical
+    materializer.  The explicit statement kind and complete claim are
+    required; response row counts and date continuity are deliberately not
+    sufficient.
+    """
+
+    evidence_id: str
+    evidence_version: str
+    coverage_basis_id: str
+    source_snapshot_id: str
+    source_snapshot_manifest_hash: str
+    source_snapshot_as_of: datetime
+    source_domain: str
+    claimed_scope_start: date
+    claimed_scope_end: date
+    source_selection_fingerprint: str
+    completeness_method: str
+    completeness_claim: str
+    source_selection: AuthoritativeSourceSelection
+    upstream_source: str
+    upstream_statement_kind: str
+    upstream_statement_id: str
+    upstream_statement_locator: str
+    upstream_statement_hash: str
+    upstream_inventory_id: str
+    upstream_inventory_scope_start: date
+    upstream_inventory_scope_end: date
+    upstream_inventory_hash: str
+    upstream_security_count: int
+    upstream_session_count: int
+    retrieved_at_utc: datetime
+    available_at: datetime
+    pit_as_of: datetime
+    coverage_basis_evidence_uri: str
+    coverage_basis_evidence_hash: str
+    artifact_bytes: bytes
+
+    def __post_init__(self) -> None:
+        try:
+            for field_name in (
+                "evidence_id",
+                "evidence_version",
+                "coverage_basis_id",
+                "source_snapshot_id",
+                "source_domain",
+                "source_selection_fingerprint",
+                "completeness_method",
+                "completeness_claim",
+                "upstream_source",
+                "upstream_statement_kind",
+                "upstream_statement_id",
+                "upstream_statement_locator",
+                "upstream_inventory_id",
+                "coverage_basis_evidence_uri",
+            ):
+                _require_non_empty_string(getattr(self, field_name), field_name)
+            _require_sha256(self.source_snapshot_manifest_hash, "source_snapshot_manifest_hash")
+            _require_sha256(self.source_selection_fingerprint, "source_selection_fingerprint")
+            _require_sha256(self.upstream_statement_hash, "upstream_statement_hash")
+            _require_sha256(self.upstream_inventory_hash, "upstream_inventory_hash")
+            _require_sha256(self.coverage_basis_evidence_hash, "coverage_basis_evidence_hash")
+            _safe_relative_uri(self.coverage_basis_evidence_uri, "coverage_basis_evidence_uri")
+        except HistoricalMaterializationError as exc:
+            raise CoverageBasisError(str(exc)) from exc
+        if self.evidence_version != AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION:
+            raise CoverageBasisError("unknown authoritative coverage evidence version")
+        if self.source_domain != "daily_bar":
+            raise CoverageBasisError(
+                "authoritative coverage evidence source_domain must be daily_bar"
+            )
+        if self.completeness_method != AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD:
+            raise CoverageBasisError("authoritative coverage evidence uses an unknown method")
+        if self.completeness_claim != COMPLETE_OBSERVED_DAILY_BAR_SCOPE:
+            raise CoverageBasisError(
+                "authoritative coverage evidence must explicitly claim complete daily-bar scope"
+            )
+        if self.upstream_source != AUTHORITATIVE_PROVIDER:
+            raise CoverageBasisError("authoritative coverage evidence names an unreviewed provider")
+        if self.upstream_statement_kind != AUTHORITATIVE_UPSTREAM_STATEMENT_KIND:
+            raise CoverageBasisError("authoritative inventory/range statement kind is missing")
+        if not isinstance(self.source_selection, AuthoritativeSourceSelection):
+            raise CoverageBasisError(
+                "authoritative coverage evidence needs a typed source selection"
+            )
+        if self.source_selection_fingerprint != self.source_selection.selection_fingerprint:
+            raise CoverageBasisError(
+                "source-selection fingerprint does not match the typed binding"
+            )
+        if any(
+            token in self.upstream_statement_locator.lower()
+            for token in ("password", "token", "cookie", "secret", "authorization")
+        ):
+            raise CoverageBasisError("upstream statement locator contains a sensitive token")
+        for field_name in (
+            "claimed_scope_start",
+            "claimed_scope_end",
+            "upstream_inventory_scope_start",
+            "upstream_inventory_scope_end",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, date) or isinstance(value, datetime):
+                raise CoverageBasisError(f"{field_name} must be a date")
+        if (self.claimed_scope_start, self.claimed_scope_end) != (
+            self.upstream_inventory_scope_start,
+            self.upstream_inventory_scope_end,
+        ):
+            raise CoverageBasisError("upstream inventory scope does not match claimed scope")
+        for field_name in (
+            "source_snapshot_as_of",
+            "retrieved_at_utc",
+            "available_at",
+            "pit_as_of",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, datetime) or value.tzinfo is None:
+                raise CoverageBasisError(f"{field_name} must be timezone-aware")
+            try:
+                object.__setattr__(self, field_name, ensure_utc_timestamp(value))
+            except ResearchPanelError as exc:
+                raise CoverageBasisError(f"{field_name} is not a valid UTC timestamp") from exc
+        if self.available_at > self.pit_as_of:
+            raise CoverageBasisError("authoritative evidence is not available at its PIT as_of")
+        if self.pit_as_of > self.source_snapshot_as_of:
+            raise CoverageBasisError(
+                "authoritative evidence PIT as_of is after the source snapshot"
+            )
+        if self.retrieved_at_utc < self.available_at:
+            raise CoverageBasisError("authoritative evidence was retrieved before it was available")
+        for field_name in ("upstream_security_count", "upstream_session_count"):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise CoverageBasisError(f"{field_name} must be a positive integer")
+        if not isinstance(self.artifact_bytes, bytes):
+            raise CoverageBasisError("authoritative coverage evidence artifact_bytes must be bytes")
+        expected_bytes = canonical_json(self.as_dict(include_artifact_hash=False)).encode("utf-8")
+        if self.artifact_bytes != expected_bytes:
+            raise CoverageBasisError("authoritative coverage evidence bytes are not canonical")
+        if sha256_hex(self.artifact_bytes) != self.coverage_basis_evidence_hash:
+            raise CoverageBasisError("authoritative coverage evidence hash does not match bytes")
+
+    @classmethod
+    def from_mapping(
+        cls,
+        payload: Mapping[str, Any],
+        *,
+        artifact_bytes: bytes,
+        artifact_hash: str,
+    ) -> AuthoritativeCoverageEvidence:
+        if not isinstance(payload, Mapping) or set(payload) != set(_AUTHORITATIVE_EVIDENCE_FIELDS):
+            raise CoverageBasisError("authoritative coverage evidence fields are not exact")
+        if not isinstance(artifact_bytes, bytes):
+            raise CoverageBasisError("authoritative coverage evidence artifact_bytes must be bytes")
+        try:
+            parsed = {
+                field_name: _require_non_empty_string(payload[field_name], field_name)
+                for field_name in (
+                    "evidence_id",
+                    "evidence_version",
+                    "coverage_basis_id",
+                    "source_snapshot_id",
+                    "source_domain",
+                    "source_selection_fingerprint",
+                    "completeness_method",
+                    "completeness_claim",
+                    "upstream_source",
+                    "upstream_statement_kind",
+                    "upstream_statement_id",
+                    "upstream_statement_locator",
+                    "upstream_inventory_id",
+                    "coverage_basis_evidence_uri",
+                )
+            }
+            dates = {
+                field_name: parse_date_value(payload[field_name])
+                for field_name in (
+                    "claimed_scope_start",
+                    "claimed_scope_end",
+                    "upstream_inventory_scope_start",
+                    "upstream_inventory_scope_end",
+                )
+            }
+            timestamps = {
+                field_name: ensure_utc_timestamp(payload[field_name])
+                for field_name in (
+                    "source_snapshot_as_of",
+                    "retrieved_at_utc",
+                    "available_at",
+                    "pit_as_of",
+                )
+            }
+            selection = AuthoritativeSourceSelection.from_mapping(payload["source_selection"])
+            snapshot_hash = _require_sha256(
+                payload["source_snapshot_manifest_hash"], "source_snapshot_manifest_hash"
+            )
+            _require_sha256(parsed["source_selection_fingerprint"], "source_selection_fingerprint")
+            statement_hash = _require_sha256(
+                payload["upstream_statement_hash"], "upstream_statement_hash"
+            )
+            inventory_hash = _require_sha256(
+                payload["upstream_inventory_hash"], "upstream_inventory_hash"
+            )
+            evidence_hash = _require_sha256(artifact_hash, "coverage_basis_evidence_hash")
+        except (HistoricalMaterializationError, ResearchPanelError, KeyError, TypeError) as exc:
+            raise CoverageBasisError("authoritative coverage evidence is malformed") from exc
+        return cls(
+            evidence_id=parsed["evidence_id"],
+            evidence_version=parsed["evidence_version"],
+            coverage_basis_id=parsed["coverage_basis_id"],
+            source_snapshot_id=parsed["source_snapshot_id"],
+            source_snapshot_manifest_hash=snapshot_hash,
+            source_snapshot_as_of=timestamps["source_snapshot_as_of"],
+            source_domain=parsed["source_domain"],
+            claimed_scope_start=dates["claimed_scope_start"],
+            claimed_scope_end=dates["claimed_scope_end"],
+            source_selection_fingerprint=parsed["source_selection_fingerprint"],
+            completeness_method=parsed["completeness_method"],
+            completeness_claim=parsed["completeness_claim"],
+            source_selection=selection,
+            upstream_source=parsed["upstream_source"],
+            upstream_statement_kind=parsed["upstream_statement_kind"],
+            upstream_statement_id=parsed["upstream_statement_id"],
+            upstream_statement_locator=parsed["upstream_statement_locator"],
+            upstream_statement_hash=statement_hash,
+            upstream_inventory_id=parsed["upstream_inventory_id"],
+            upstream_inventory_scope_start=dates["upstream_inventory_scope_start"],
+            upstream_inventory_scope_end=dates["upstream_inventory_scope_end"],
+            upstream_inventory_hash=inventory_hash,
+            upstream_security_count=payload["upstream_security_count"],
+            upstream_session_count=payload["upstream_session_count"],
+            retrieved_at_utc=timestamps["retrieved_at_utc"],
+            available_at=timestamps["available_at"],
+            pit_as_of=timestamps["pit_as_of"],
+            coverage_basis_evidence_uri=parsed["coverage_basis_evidence_uri"],
+            coverage_basis_evidence_hash=evidence_hash,
+            artifact_bytes=artifact_bytes,
+        )
+
+    def as_dict(self, *, include_artifact_hash: bool = True) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "evidence_id": self.evidence_id,
+            "evidence_version": self.evidence_version,
+            "coverage_basis_id": self.coverage_basis_id,
+            "source_snapshot_id": self.source_snapshot_id,
+            "source_snapshot_manifest_hash": self.source_snapshot_manifest_hash,
+            "source_snapshot_as_of": self.source_snapshot_as_of,
+            "source_domain": self.source_domain,
+            "claimed_scope_start": self.claimed_scope_start,
+            "claimed_scope_end": self.claimed_scope_end,
+            "source_selection_fingerprint": self.source_selection_fingerprint,
+            "completeness_method": self.completeness_method,
+            "completeness_claim": self.completeness_claim,
+            "source_selection": self.source_selection.as_dict(),
+            "upstream_source": self.upstream_source,
+            "upstream_statement_kind": self.upstream_statement_kind,
+            "upstream_statement_id": self.upstream_statement_id,
+            "upstream_statement_locator": self.upstream_statement_locator,
+            "upstream_statement_hash": self.upstream_statement_hash,
+            "upstream_inventory_id": self.upstream_inventory_id,
+            "upstream_inventory_scope_start": self.upstream_inventory_scope_start,
+            "upstream_inventory_scope_end": self.upstream_inventory_scope_end,
+            "upstream_inventory_hash": self.upstream_inventory_hash,
+            "upstream_security_count": self.upstream_security_count,
+            "upstream_session_count": self.upstream_session_count,
+            "retrieved_at_utc": self.retrieved_at_utc,
+            "available_at": self.available_at,
+            "pit_as_of": self.pit_as_of,
+            "coverage_basis_evidence_uri": self.coverage_basis_evidence_uri,
+        }
+        if include_artifact_hash:
+            payload["coverage_basis_evidence_hash"] = self.coverage_basis_evidence_hash
+        return payload
+
+
+def build_authoritative_coverage_evidence(
+    partition: PartitionKey,
+    *,
+    evidence_id: str,
+    coverage_basis_id: str,
+    source_snapshot_id: str,
+    source_snapshot_manifest_hash: str,
+    source_snapshot_as_of: datetime,
+    source_selection: AuthoritativeSourceSelection,
+    upstream_statement_id: str,
+    upstream_statement_locator: str,
+    upstream_statement_bytes: bytes,
+    upstream_inventory_id: str,
+    upstream_inventory_bytes: bytes,
+    upstream_security_count: int,
+    upstream_session_count: int,
+    retrieved_at_utc: datetime,
+    available_at: datetime,
+    pit_as_of: datetime,
+    coverage_basis_evidence_uri: str,
+) -> AuthoritativeCoverageEvidence:
+    """Seal a real upstream statement and inventory into a typed sidecar.
+
+    Only hashes of the supplied source bytes are retained.  The caller must
+    supply the actual upstream statement and inventory bytes; a count or a
+    list of dates cannot be passed as a substitute for either artifact.
+    """
+    if not isinstance(source_selection, AuthoritativeSourceSelection):
+        raise CoverageBasisError("authoritative evidence needs a typed source selection")
+    if not isinstance(upstream_statement_bytes, bytes) or not upstream_statement_bytes:
+        raise CoverageBasisError("upstream statement bytes are required")
+    if not isinstance(upstream_inventory_bytes, bytes) or not upstream_inventory_bytes:
+        raise CoverageBasisError("upstream inventory bytes are required")
+    normalized_snapshot_as_of = ensure_utc_timestamp(source_snapshot_as_of)
+    normalized_retrieved_at = ensure_utc_timestamp(retrieved_at_utc)
+    normalized_available_at = ensure_utc_timestamp(available_at)
+    normalized_pit_as_of = ensure_utc_timestamp(pit_as_of)
+    base: dict[str, Any] = {
+        "evidence_id": evidence_id,
+        "evidence_version": AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION,
+        "coverage_basis_id": coverage_basis_id,
+        "source_snapshot_id": source_snapshot_id,
+        "source_snapshot_manifest_hash": source_snapshot_manifest_hash,
+        "source_snapshot_as_of": normalized_snapshot_as_of,
+        "source_domain": "daily_bar",
+        "claimed_scope_start": partition.scope_start,
+        "claimed_scope_end": partition.scope_end,
+        "source_selection_fingerprint": source_selection.selection_fingerprint,
+        "completeness_method": AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
+        "completeness_claim": COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
+        "source_selection": source_selection.as_dict(),
+        "upstream_source": AUTHORITATIVE_PROVIDER,
+        "upstream_statement_kind": AUTHORITATIVE_UPSTREAM_STATEMENT_KIND,
+        "upstream_statement_id": upstream_statement_id,
+        "upstream_statement_locator": upstream_statement_locator,
+        "upstream_statement_hash": sha256_hex(upstream_statement_bytes),
+        "upstream_inventory_id": upstream_inventory_id,
+        "upstream_inventory_scope_start": partition.scope_start,
+        "upstream_inventory_scope_end": partition.scope_end,
+        "upstream_inventory_hash": sha256_hex(upstream_inventory_bytes),
+        "upstream_security_count": upstream_security_count,
+        "upstream_session_count": upstream_session_count,
+        "retrieved_at_utc": normalized_retrieved_at,
+        "available_at": normalized_available_at,
+        "pit_as_of": normalized_pit_as_of,
+        "coverage_basis_evidence_uri": coverage_basis_evidence_uri,
+    }
+    artifact_bytes = canonical_json(base).encode("utf-8")
+    return AuthoritativeCoverageEvidence(
+        evidence_id=evidence_id,
+        evidence_version=AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION,
+        coverage_basis_id=coverage_basis_id,
+        source_snapshot_id=source_snapshot_id,
+        source_snapshot_manifest_hash=source_snapshot_manifest_hash,
+        source_snapshot_as_of=normalized_snapshot_as_of,
+        source_domain="daily_bar",
+        claimed_scope_start=partition.scope_start,
+        claimed_scope_end=partition.scope_end,
+        source_selection_fingerprint=source_selection.selection_fingerprint,
+        completeness_method=AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
+        completeness_claim=COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
+        source_selection=source_selection,
+        upstream_source=AUTHORITATIVE_PROVIDER,
+        upstream_statement_kind=AUTHORITATIVE_UPSTREAM_STATEMENT_KIND,
+        upstream_statement_id=upstream_statement_id,
+        upstream_statement_locator=upstream_statement_locator,
+        upstream_statement_hash=sha256_hex(upstream_statement_bytes),
+        upstream_inventory_id=upstream_inventory_id,
+        upstream_inventory_scope_start=partition.scope_start,
+        upstream_inventory_scope_end=partition.scope_end,
+        upstream_inventory_hash=sha256_hex(upstream_inventory_bytes),
+        upstream_security_count=upstream_security_count,
+        upstream_session_count=upstream_session_count,
+        retrieved_at_utc=normalized_retrieved_at,
+        available_at=normalized_available_at,
+        pit_as_of=normalized_pit_as_of,
+        coverage_basis_evidence_uri=coverage_basis_evidence_uri,
+        coverage_basis_evidence_hash=sha256_hex(artifact_bytes),
+        artifact_bytes=artifact_bytes,
+    )
 
 
 @dataclass(frozen=True, order=True)
@@ -319,6 +882,9 @@ class CoverageBasisDescriptor:
     coverage_basis_artifact_uri: str
     coverage_basis_artifact_hash: str
     artifact_bytes: bytes
+    authoritative_evidence: AuthoritativeCoverageEvidence | None = dataclass_field(
+        default=None, repr=False
+    )
 
     def __post_init__(self) -> None:
         """Keep direct dataclass construction subject to the same seal checks."""
@@ -361,6 +927,29 @@ class CoverageBasisDescriptor:
             raise CoverageBasisError("coverage basis scope is not the logical calendar month")
         if self.completeness_method not in _RECOGNIZED_COMPLETENESS_METHODS:
             raise CoverageBasisError("unknown versioned completeness_method")
+        method_spec = _RECOGNIZED_COMPLETENESS_METHODS[self.completeness_method]
+        if method_spec.evidence_class is CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM:
+            evidence = self.authoritative_evidence
+            if not isinstance(evidence, AuthoritativeCoverageEvidence):
+                raise CoverageBasisError(
+                    "authoritative completeness method requires a typed evidence sidecar"
+                )
+            if (
+                evidence.coverage_basis_id != self.coverage_basis_id
+                or evidence.source_snapshot_id != self.source_snapshot_id
+                or evidence.source_snapshot_manifest_hash != self.source_snapshot_manifest_hash
+                or evidence.source_domain != self.source_domain
+                or evidence.claimed_scope_start != self.claimed_scope_start
+                or evidence.claimed_scope_end != self.claimed_scope_end
+                or evidence.source_selection_fingerprint != self.source_selection_fingerprint
+                or evidence.completeness_method != self.completeness_method
+                or evidence.completeness_claim != self.completeness_claim
+            ):
+                raise CoverageBasisError("authoritative coverage evidence binding changed")
+        elif self.authoritative_evidence is not None:
+            raise CoverageBasisError(
+                "fixture or unresolved completeness cannot carry authoritative evidence"
+            )
         expected_claim = (
             COMPLETE_OBSERVED_DAILY_BAR_SCOPE
             if self.state is CoverageState.OBSERVED_DAILY_BAR_COVERAGE
@@ -388,6 +977,7 @@ class CoverageBasisDescriptor:
         payload: Mapping[str, Any],
         *,
         artifact_bytes: bytes,
+        authoritative_evidence: AuthoritativeCoverageEvidence | None = None,
     ) -> CoverageBasisDescriptor:
         if not isinstance(payload, Mapping):
             raise CoverageBasisError("coverage basis must be an object")
@@ -505,6 +1095,7 @@ class CoverageBasisDescriptor:
             **normalized,
             coverage_basis_artifact_hash=artifact_hash,
             artifact_bytes=artifact_bytes,
+            authoritative_evidence=authoritative_evidence,
         )
 
     @property
@@ -618,6 +1209,13 @@ def verify_coverage_basis(
             raise CoverageBasisError(
                 "coverage basis source_snapshot_manifest_hash does not match projection"
             )
+        if descriptor.authoritative_evidence is not None and (
+            descriptor.authoritative_evidence.source_snapshot_as_of
+            != ensure_utc_timestamp(projection.source_snapshot_as_of)
+        ):
+            raise CoverageBasisError(
+                "authoritative coverage evidence source snapshot PIT does not match projection"
+            )
 
     enabled_keys: set[PartitionKey] = set()
     for ordinal, row in enumerate(projection.rows):
@@ -698,11 +1296,16 @@ def _aggregate_coverage_evidence(
 def compute_coverage_basis_set_hash(
     descriptors: Sequence[CoverageBasisDescriptor],
 ) -> str:
-    """Hash sorted enabled-route basis descriptors, including exact scope hashes."""
+    """Hash sorted basis descriptors and any authoritative sidecar hashes."""
     ordered = sorted(descriptors, key=lambda descriptor: descriptor.sort_key)
-    payload = [
-        {"research_route": "research_enabled", **descriptor.as_dict()} for descriptor in ordered
-    ]
+    payload: list[dict[str, Any]] = []
+    for descriptor in ordered:
+        item = {"research_route": "research_enabled", **descriptor.as_dict()}
+        if descriptor.authoritative_evidence is not None:
+            item["authoritative_evidence_hash"] = (
+                descriptor.authoritative_evidence.coverage_basis_evidence_hash
+            )
+        payload.append(item)
     return sha256_hex(canonical_json(payload))
 
 
@@ -1091,6 +1694,24 @@ def _coverage_basis_file_entry(descriptor: CoverageBasisDescriptor) -> dict[str,
     }
 
 
+def _coverage_basis_evidence_relative_path(
+    evidence: AuthoritativeCoverageEvidence,
+) -> str:
+    return f"coverage_basis_evidence/{evidence.coverage_basis_evidence_hash}.json"
+
+
+def _coverage_basis_evidence_file_entry(
+    evidence: AuthoritativeCoverageEvidence,
+) -> dict[str, Any]:
+    return {
+        "coverage_basis_id": evidence.coverage_basis_id,
+        "declared_uri": evidence.coverage_basis_evidence_uri,
+        "relative_path": _coverage_basis_evidence_relative_path(evidence),
+        "content_hash": evidence.coverage_basis_evidence_hash,
+        "byte_size": len(evidence.artifact_bytes),
+    }
+
+
 @dataclass(frozen=True)
 class HistoricalMaterializationPlan:
     """Fully computed, but not yet published, historical materialization."""
@@ -1150,6 +1771,11 @@ class HistoricalMaterializationPlan:
             "coverage_basis_artifacts": [
                 _coverage_basis_file_entry(descriptor)
                 for descriptor in self.coverage_basis_descriptors
+            ],
+            "coverage_basis_evidence": [
+                _coverage_basis_evidence_file_entry(descriptor.authoritative_evidence)
+                for descriptor in self.coverage_basis_descriptors
+                if descriptor.authoritative_evidence is not None
             ],
             "partition_policy_version": PARTITION_POLICY_VERSION,
             "research_split_windows": self.materialization_identity["research_split_windows"],
@@ -1396,6 +2022,8 @@ class OfflineHistoricalMaterializer:
                         for artifact in ordered_artifacts
                     ],
                     "partition_inventory_hash": partition_inventory_hash,
+                    "coverage_basis_set_hash": basis_hash,
+                    "writer_runtime_lock_hash": self.writer_runtime_lock_hash,
                     "excluded_row_count": sum(excluded_reasons.values()),
                 }
             )
@@ -1458,6 +2086,12 @@ class OfflineHistoricalMaterializer:
                     stage_dir / _coverage_basis_relative_path(descriptor),
                     descriptor.artifact_bytes,
                 )
+                if descriptor.authoritative_evidence is not None:
+                    self._write_staged_file(
+                        stage_dir
+                        / _coverage_basis_evidence_relative_path(descriptor.authoritative_evidence),
+                        descriptor.authoritative_evidence.artifact_bytes,
+                    )
             self._write_staged_file(stage_dir / "partition_inventory.json", inventory_bytes)
             stage_manifest = stage_dir / "manifest.json"
             if stage_manifest.exists():
@@ -1511,6 +2145,11 @@ class OfflineHistoricalMaterializer:
             _coverage_basis_relative_path(descriptor)
             for descriptor in plan.coverage_basis_descriptors
         )
+        expected.update(
+            _coverage_basis_evidence_relative_path(descriptor.authoritative_evidence)
+            for descriptor in plan.coverage_basis_descriptors
+            if descriptor.authoritative_evidence is not None
+        )
         expected.update({"partition_inventory.json", "manifest.json", "_SUCCESS.json"})
         for path in stage_dir.rglob("*"):
             if path.is_file():
@@ -1534,6 +2173,19 @@ class OfflineHistoricalMaterializer:
                 raise MaterializationConflictError(
                     f"coverage basis bytes changed for {descriptor.coverage_basis_id}"
                 )
+            if descriptor.authoritative_evidence is not None:
+                evidence_path = stage_dir / _coverage_basis_evidence_relative_path(
+                    descriptor.authoritative_evidence
+                )
+                if (
+                    not evidence_path.is_file()
+                    or evidence_path.read_bytes()
+                    != descriptor.authoritative_evidence.artifact_bytes
+                ):
+                    raise MaterializationConflictError(
+                        "authoritative coverage evidence bytes changed for "
+                        f"{descriptor.coverage_basis_id}"
+                    )
         inventory_path = stage_dir / "partition_inventory.json"
         inventory_bytes = inventory_path.read_bytes()
         inventory = _load_json_list(inventory_bytes, "staged partition inventory")
@@ -1692,6 +2344,12 @@ def _assert_manifest_identity(
         _coverage_basis_file_entry(descriptor) for descriptor in plan.coverage_basis_descriptors
     ]:
         raise MaterializationConflictError("coverage basis artifact inventory changed")
+    if manifest.get("coverage_basis_evidence") != [
+        _coverage_basis_evidence_file_entry(descriptor.authoritative_evidence)
+        for descriptor in plan.coverage_basis_descriptors
+        if descriptor.authoritative_evidence is not None
+    ]:
+        raise MaterializationConflictError("authoritative coverage evidence inventory changed")
     if manifest.get("partition_inventory_hash") != plan.partition_inventory_hash:
         raise MaterializationConflictError("partition inventory hash changed")
     if manifest.get("artifact_set_hash") != plan.artifact_set_hash:
@@ -1892,21 +2550,79 @@ class HistoricalMaterializationReader:
             raise HistoricalReadError("historical artifact set hash changed")
         basis_descriptors = manifest.get("coverage_basis_descriptors")
         basis_files = manifest.get("coverage_basis_artifacts")
-        if not isinstance(basis_descriptors, list) or not isinstance(basis_files, list):
+        evidence_files = manifest.get("coverage_basis_evidence")
+        if (
+            not isinstance(basis_descriptors, list)
+            or not isinstance(basis_files, list)
+            or not isinstance(evidence_files, list)
+        ):
             raise HistoricalReadError("historical coverage-basis evidence is missing")
         if len(basis_descriptors) != len(basis_files):
             raise HistoricalReadError("historical coverage-basis evidence is incomplete")
+        if len(evidence_files) != len(basis_descriptors):
+            raise HistoricalReadError(
+                "ordinary historical reader requires one authoritative evidence sidecar per basis"
+            )
         parsed_bases: list[CoverageBasisDescriptor] = []
-        for raw_descriptor, raw_file in zip(basis_descriptors, basis_files, strict=True):
-            if not isinstance(raw_descriptor, Mapping) or not isinstance(raw_file, Mapping):
+        try:
+            expected_snapshot_as_of = ensure_utc_timestamp(str(identity["source_snapshot_as_of"]))
+        except (HistoricalMaterializationError, ResearchPanelError) as exc:
+            raise HistoricalReadError("historical materialization snapshot PIT is invalid") from exc
+        expected_snapshot_id = identity.get("source_snapshot_id")
+        expected_snapshot_hash = identity.get("source_snapshot_manifest_hash")
+        if not isinstance(expected_snapshot_id, str) or not expected_snapshot_id:
+            raise HistoricalReadError("historical materialization source snapshot id is invalid")
+        try:
+            expected_snapshot_hash = _require_sha256(
+                expected_snapshot_hash, "source_snapshot_manifest_hash"
+            )
+        except HistoricalMaterializationError as exc:
+            raise HistoricalReadError(
+                "historical materialization source snapshot hash is invalid"
+            ) from exc
+        for raw_descriptor, raw_file, raw_evidence_file in zip(
+            basis_descriptors, basis_files, evidence_files, strict=True
+        ):
+            if (
+                not isinstance(raw_descriptor, Mapping)
+                or not isinstance(raw_file, Mapping)
+                or not isinstance(raw_evidence_file, Mapping)
+            ):
                 raise HistoricalReadError("historical coverage-basis evidence is malformed")
             basis_path = _resolve_relative_file(path.parent, str(raw_file.get("relative_path")))
             if not basis_path.is_file():
                 raise HistoricalReadError("historical coverage-basis artifact is missing")
             basis_bytes = basis_path.read_bytes()
+            evidence_path = _resolve_relative_file(
+                path.parent, str(raw_evidence_file.get("relative_path"))
+            )
+            if not evidence_path.is_file():
+                raise HistoricalReadError("authoritative coverage evidence sidecar is missing")
+            evidence_bytes = evidence_path.read_bytes()
+            try:
+                evidence = AuthoritativeCoverageEvidence.from_mapping(
+                    _load_json_object(evidence_bytes, "authoritative coverage evidence"),
+                    artifact_bytes=evidence_bytes,
+                    artifact_hash=str(raw_evidence_file.get("content_hash")),
+                )
+            except (CoverageBasisError, HistoricalMaterializationError) as exc:
+                raise HistoricalReadError(
+                    "authoritative coverage evidence sidecar is invalid"
+                ) from exc
+            if dict(raw_evidence_file) != _coverage_basis_evidence_file_entry(evidence):
+                raise HistoricalReadError("authoritative coverage evidence inventory changed")
+            if (
+                evidence.source_snapshot_id != expected_snapshot_id
+                or evidence.source_snapshot_manifest_hash != expected_snapshot_hash
+            ):
+                raise HistoricalReadError("authoritative coverage evidence source snapshot changed")
+            if evidence.source_snapshot_as_of != expected_snapshot_as_of:
+                raise HistoricalReadError("authoritative coverage evidence snapshot PIT changed")
             try:
                 descriptor = CoverageBasisDescriptor.from_mapping(
-                    raw_descriptor, artifact_bytes=basis_bytes
+                    raw_descriptor,
+                    artifact_bytes=basis_bytes,
+                    authoritative_evidence=evidence,
                 )
             except CoverageBasisError as exc:
                 raise HistoricalReadError("historical coverage-basis artifact is invalid") from exc
