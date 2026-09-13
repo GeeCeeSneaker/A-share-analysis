@@ -1,3 +1,40 @@
+## DM-20260913-CR7-AUTH-033 · 权威覆盖证据适配器与三个月真实源预检
+
+**Type**：C1 — CR-7 authoritative coverage evidence / bounded real-source preflight  
+**Date**：2026-09-13  
+**Status**：`IMPLEMENTED / PREFLIGHT FAIL-CLOSED / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`  
+**Trigger**：Issue #55 scheduler comment `5653953863`；基线为最新 clean `main@2e9bdc36544c5320072969a2888180b6dfec2c7a`。
+
+**已实现**：
+
+- 在既有 typed coverage-basis contract 上增加 `AuthoritativeCoverageEvidence` 和窄
+  `AuthoritativeCoverageBasisAdapter`。唯一登记的 completeness method 为
+  `AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1`，要求固定 reviewed source-selection fingerprint、
+  上游 inventory/range statement、inventory 范围/计数/hash、source snapshot/domain、sidecar
+  canonical bytes/hash 和 `available_at <= pit_as_of <= source_snapshot_as_of` 的时间链。
+- writer staging 和 ordinary historical reader 均重新加载、重算并核对 sidecar；fixture-only、
+  缺失、过期、错误 scope/source binding、篡改、PIT 不合格和 identity conflict 不能解锁普通 reader。
+- 新增固定范围的 `scripts/spike/cr7_authoritative_history_preflight.py`，只检查 Development
+  `2020-01`、Validation A `2024-01`、Holdout `2026-01`，每月调用 calendar、historical code-list
+  和一个 daily-bar sentinel；原始交换只写本地 ignored raw 目录，GitHub 只保存脱敏收据。
+
+**真实预检结论**：三个月共九次调用均返回 `OK`，但当前 source contract 没有上游
+completeness statement，不能把观察结果当作完整覆盖证明。收据固定记录：
+`FAIL_CLOSED_BLOCKED`、`UPSTREAM_COMPLETENESS_STATEMENT_MISSING`、
+`authoritative_evidence=NOT_PRODUCED`、`materializer=NOT_ENTERED_FAIL_CLOSED`。收据路径为
+`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`，摘要路径为
+`docs/provider_verification/cr7_authoritative_history_preflight_20260913.md`。
+
+**验证与硬边界**：CR-7 focused 30 passed；全量 `pytest -q` 退出码为 0，3 个既有 Windows
+symlink 权限 skip；Ruff、format、`mypy src`、compileall、`uv pip check`、JSON parse 和
+`git diff --check` 均通过。未执行 78 月物化、broad backfill、universe sweep、第三次 Formal/B1-B7、
+Production/resume/verdict、BSE/index 激活、CR-5/R2、Golden/H1/baseline 或策略工作；凭证、私有
+endpoint、专有 SDK/runtime 和原始 Provider payload 不进入仓库。
+
+**待完成闸门**：PR #58 保持 Draft，需以最新 exact head 重核 required CI 和独立 delta review。
+在项目管理者取得可审计的上游 inventory/range completeness statement 及 PIT/available-at 语义前，
+不得生成 authoritative sidecar、进入 materializer 或启动全历史物化。
+
 ## DM-20260913-CR7-HISTORY-MATERIALIZATION-032 · 2020–2026H1 历史物化合同设计
 
 **Type**：C1 — CR-7 historical materialization design / offline preflight
