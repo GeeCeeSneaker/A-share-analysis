@@ -58,10 +58,11 @@ uv run ashare self-test          # 快速自检
 
 ```text
 docs/design/                  冻结设计文档（只读）
+docs/research/                CR-7 R1 研究面板合同与下游读取说明
 docs/adr/                     架构决策记录（ADR-007 Tushare 缺位、ADR-008 DuckDB 进程模型…）
 docs/provider_verification/   Provider 联调验证记录
 migrations/                   DuckDB 顺序迁移（001-004）
-src/ashare_state/             核心包（identity / providers / storage / cli）
+src/ashare_state/             核心包（identity / providers / storage / research / cli）
 scripts/spike/                P0-M-1 AmazingData Spike 脚本（真实账号，输出隔离 data/spike/）
 tests/                        unit / integration / fixtures
 data/                         本地数据（gitignored，非 git 记录对象）
