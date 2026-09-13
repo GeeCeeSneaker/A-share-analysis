@@ -1,3 +1,13 @@
+## 2026-09-13 · CR-7 authoritative evidence边界与三个月真实源预检
+
+> 状态：**IMPLEMENTED / PREFLIGHT FAIL-CLOSED / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED**
+
+- 以最新 clean `main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 为基线，完成 Issue #55 的最窄实现切片。提交 `624595f1d246597a9119959af975aa5f8eafd6ff` 新增 typed `AuthoritativeCoverageEvidence`、固定 AmazingData history source-selection binding、`AuthoritativeCoverageBasisAdapter`，并让 writer 与 ordinary reader 对 sidecar、scope、inventory/hash、source snapshot 和 PIT/available-at 链重复校验。
+- 按授权仅执行 Development `2020-01`、Validation A `2024-01`、Holdout `2026-01` 三个月预检；每月固定调用 calendar、historical code-list 和一个 daily-bar sentinel。三个月的九次调用均返回 `OK`，但这只是 source observation，不是完整覆盖证明。
+- 预检明确记录 `UPSTREAM_COMPLETENESS_STATEMENT_MISSING`：当前 source contract 没有明确声明 inclusive month 的 daily_bar inventory/range 完整性及历史可用性/PIT 语义，因此 authoritative evidence 为 `NOT_PRODUCED`，materializer 为 `NOT_ENTERED_FAIL_CLOSED`。没有使用 row count、日期连续性、SDK 成功或 sentinel 结果替代该声明。
+- 脱敏收据为 [`cr7_authoritative_history_preflight_20260913.json`](provider_verification/cr7_authoritative_history_preflight_20260913.json)，SHA-256 为 `1d85ebe85bb9853a2158f1ed98f3070726fca0e622ffd9b72212bd3ba823f5cc`。原始交换仅保留在本地 ignored raw 目录；账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime 和 raw payload 未进入 GitHub。
+- 本轮未执行 materialization、78 月回填、universe sweep、第三次 Formal/B1-B7、Production、resume/verdict、BSE/index 激活、CR-5/R2、Golden/H1、baseline 或策略工作。待最终本地门禁、exact-head CI 和独立 delta review。
+
 ## 2026-09-13 · CR-7 2020–2026H1 历史研究物化合同设计 / 离线预检
 
 > 状态：**DESIGN-ONLY / OFFLINE REMEDIATION GREEN / MATERIALIZATION NOT AUTHORIZED / EXACT-HEAD DELTA REVIEW REQUIRED**

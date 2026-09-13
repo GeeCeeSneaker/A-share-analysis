@@ -595,12 +595,12 @@
     {
       "id": "HM-AUTH-08",
       "requirement": "authoritative_sidecar_requires_explicit_upstream_completeness_statement_and_is_revalidated_by_writer_and_reader",
-      "status": "IMPLEMENTED_OFFLINE_TEST_REQUIRED"
+      "status": "IMPLEMENTED_TESTED"
     },
     {
       "id": "HM-PREFLIGHT-09",
       "requirement": "three_fixed_month_real_source_preflight_is_bounded_and_fail_closed_when_completeness_is_unproven",
-      "status": "REAL_SOURCE_PREFLIGHT_PENDING"
+      "status": "REAL_SOURCE_PREFLIGHT_FAIL_CLOSED_BLOCKED"
     }
   ],
   "global_invariants": [

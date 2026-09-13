@@ -300,6 +300,11 @@ Issue #55 另外规定一个固定范围的真实源预检：Development `2020-0
 才能进入上述 sidecar。任一月份无法证明完整性，报告必须写明具体 upstream blocker，
 `AUTHORITATIVE_UPSTREAM` 和普通 reader 均保持关闭。
 
+本次预检的脱敏收据见
+`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`：三个固定月份的
+观察调用均成功，但最终确认为 `FAIL_CLOSED_BLOCKED`，原因码为
+`UPSTREAM_COMPLETENESS_STATEMENT_MISSING`，没有生成 authoritative sidecar 或物化产物。
+
 ## 11. 后续实现前必须满足的闸门
 
 本设计完成后，项目管理者和独立 Reviewer 仍需先接受：

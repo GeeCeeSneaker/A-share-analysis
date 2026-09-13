@@ -43,6 +43,11 @@
 
 **重要事实**：当前只完成了可信历史物化框架，尚未证明 2020-01 至 2026-06 的真实市场历史覆盖，也尚未完成全 78 月真实历史物化。
 
+**当前分支进展**：以最新 `main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 建立的
+`feat/cr7-authoritative-evidence-preflight-20260913` 已实现 typed authoritative sidecar、
+固定来源选择绑定、writer/reader 双重重验和三个月真实源预检脚本；这些变更尚未合并到
+`main`，须以该分支最终 exact head 进行 CI 和独立审阅。
+
 ## 4. 当前唯一 P0 开发任务
 
 **Issue #55 — `P0: CR-7 authoritative historical evidence and bounded real-source preflight`**
@@ -65,6 +70,11 @@
 4. ordinary reader 继续只允许 committed + verified `AUTHORITATIVE_UPSTREAM` + `OBSERVED_DAILY_BAR_COVERAGE`。
 5. 增加对 missing/stale/wrong-scope/tampered basis、fixture escalation、PARTIAL/UNRESOLVED、replay/conflict 的对抗测试。
 
+本分支已完成以上代码和离线对抗测试：`AuthoritativeCoverageEvidence` 要求独立上游
+inventory/range statement、source-selection fingerprint、inventory hash 与 PIT/available-at
+链；仅有 SDK 成功、返回行数、日历连续性或 sentinel 日线时，adapter 不产生权威 sidecar，
+writer 与 ordinary reader 均保持 fail-closed。
+
 ### 4.2 三个月代表性真实源预检
 
 实现和本地质量门禁通过后，仅执行以下三个月：
@@ -76,6 +86,12 @@
 目的不是形成研究数据集，而是尽早证明 authoritative evidence path 在三个 split 都真实可行。
 
 如果任何一个月无法证明 authoritative completeness：**立即 fail closed**，记录缺口并返回审阅；禁止用 fixture、row count、月份连续性或人为声明升级为 COMPLETE。
+
+本分支已执行该预检：Development `2020-01`、Validation A `2024-01`、Holdout `2026-01` 的
+三组固定调用均成功返回观察结果，但 source contract 没有上游 completeness statement，三个月
+统一记录 `UPSTREAM_COMPLETENESS_STATEMENT_MISSING`；authoritative evidence 为
+`NOT_PRODUCED`，materializer 为 `NOT_ENTERED_FAIL_CLOSED`。脱敏收据：
+`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`。
 
 ### 4.3 明确禁止
 
@@ -99,9 +115,9 @@
 - exact base/head SHA 可复核；
 - focused tests 通过；
 - 全量项目质量门禁通过；
-- CI 对 exact head 绿色；
+- CI 对最终 exact head 绿色（提交 PR 后复核）；
 - fixture evidence 无法解锁普通 historical reader；
-- 三个月真实源预检全部可复现成功，或明确 fail-closed 到具体 upstream completeness blocker；
+- 三个月真实源预检已完成，并明确 fail-closed 到具体 upstream completeness blocker；
 - 没有 scope creep。
 
 ## 6. 审阅后的调度规则
@@ -161,7 +177,7 @@ B. path 本身可靠，但某个 source/completeness 边界仍不足 → 先发�
 
 ---
 
-**Last scheduler update**：2026-09-13
+**Last scheduler update**：2026-09-13；Issue #55 当前实现分支已完成本地 bounded preflight，结果为具体上游完整性阻断，等待 exact-head CI 与独立审阅。
 
 **Current task**：Issue #55
 
