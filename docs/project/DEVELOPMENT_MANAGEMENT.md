@@ -1,8 +1,8 @@
 ## DM-20260913-CR7-AUTH-033 · 权威覆盖证据适配器与三个月真实源预检
 
-**Type**：C1 — CR-7 authoritative coverage evidence / bounded real-source preflight  
-**Date**：2026-09-13  
-**Status**：`IMPLEMENTED / PREFLIGHT FAIL-CLOSED / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`  
+**Type**：C1 — CR-7 authoritative coverage evidence / bounded real-source preflight
+**Date**：2026-09-13
+**Status**：`IMPLEMENTED / PREFLIGHT FAIL-CLOSED / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
 **Trigger**：Issue #55 scheduler comment `5653953863`；基线为最新 clean `main@2e9bdc36544c5320072969a2888180b6dfec2c7a`。
 
 **已实现**：
