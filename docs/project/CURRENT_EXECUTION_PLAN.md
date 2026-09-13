@@ -25,11 +25,11 @@
 
 **阶段**：Phase 0 / CR-7 historical research data foundation
 
-**当前 `main` 基线**：
+**运行时代码基线（必须是开发起点 `main` 的祖先）**：
 
 `d2fa53371937d59ea0a118b79df1554d518f575f`
 
-该基线已合并 PR #53，具备：
+该代码基线已合并 PR #53，具备：
 
 - 非发布型 verified projection；
 - coverage-basis typed/fail-closed 验证；
@@ -39,6 +39,8 @@
 - idempotent replay / identity conflict rejection；
 - ordinary historical reader 对 PARTIAL / UNRESOLVED / fixture-only 的 fail-closed gate。
 
+开发人员**不得直接从这个历史 SHA 新建分支**。开始任务时必须先 `fetch`，从包含本文件最新版本的最新 `main` 建立 clean worktree，并确认上述 runtime baseline 是该 `main` 的祖先。这样治理文档更新不会被误判为运行时代码漂移。
+
 **重要事实**：当前只完成了可信历史物化框架，尚未证明 2020-01 至 2026-06 的真实市场历史覆盖，也尚未完成全 78 月真实历史物化。
 
 ## 4. 当前唯一 P0 开发任务
@@ -47,11 +49,13 @@
 
 目标：从 merged offline framework 推进到首个真实、可审计、非 fixture 的 `AUTHORITATIVE_UPSTREAM` coverage evidence，并用真实上游证据验证 materializer 的 fail-closed 路径。
 
-开发人员必须从 clean local worktree 同步到：
+开发人员开工前必须：
 
-`main@d2fa53371937d59ea0a118b79df1554d518f575f`
-
-然后建立独立分支执行 Issue #55。
+1. 在本地 `git fetch`；
+2. 以**最新 `main`** 创建 clean worktree；
+3. 确认最新 `main` 包含本文件当前版本，并且 `d2fa53371937d59ea0a118b79df1554d518f575f` 是其祖先；
+4. 记录实际 base SHA；
+5. 再建立独立任务分支执行 Issue #55。
 
 ### 4.1 必须完成
 
@@ -161,4 +165,4 @@ B. path 本身可靠，但某个 source/completeness 边界仍不足 → 先发�
 
 **Current task**：Issue #55
 
-**Current main baseline**：`d2fa53371937d59ea0a118b79df1554d518f575f`
+**Runtime code baseline**：`d2fa53371937d59ea0a118b79df1554d518f575f`；实际开发 base 必须取包含本文件最新版本的最新 `main` 并记录 exact SHA。
