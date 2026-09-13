@@ -14,6 +14,19 @@ That account continues to use the repository in the same way as before for norma
 
 No other GitHub user should be granted Write / Maintain / Admin permission unless the project owner explicitly changes this policy in the future.
 
+## Repository operation principle: local Git first
+
+For Codex, agents, automation, and normal maintainer work, the local clone / worktree is the **primary repository operation path and day-to-day code source of truth**.
+
+- Prefer local `git` for repository reads, diff inspection, branch/worktree management, commits, history inspection, `fetch`, `pull`/rebase where appropriate, `push`, and exact-SHA verification.
+- GitHub Connector / API is a **secondary and fallback path**. Use it when local Git access is unavailable or degraded, or for API-native operations such as PR/Issue metadata, review comments, and Actions/CI status that are not naturally represented by local Git.
+- Do not use Connector availability as a reason to bypass a healthy local repository workflow or to treat Connector-returned repository content as more authoritative than the checked and synchronized Git refs.
+- Before any remote write, review acceptance, or merge, reconcile the relevant local and remote refs and pin the exact base/head SHA. If local Git and Connector/API views disagree, **BLOCK the write/merge until the discrepancy is explained and the refs are synchronized**.
+- A Connector outage or local-network problem does not by itself justify direct changes to `main`; normal branch, commit, review, and merge discipline remains in force unless the project owner explicitly authorizes an exception.
+- When Connector fallback is used for a repository-content action, record or verify the resulting commit SHA and reconcile it back into the local Git view as soon as local access is restored.
+
+The intent is reliability and recoverability: ordinary repository state should remain inspectable and reproducible with standard Git even when an external connector is slow, unavailable, or inconsistent.
+
 ## External contributors
 
 Public users may:
