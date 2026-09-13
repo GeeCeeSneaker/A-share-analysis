@@ -70,6 +70,7 @@ data/                         本地数据（gitignored，非 git 记录对象�
 
 ## 关键工程纪律（摘自设计裁决）
 
+- **仓库操作本地 Git 优先**：Codex / Agent 默认在本地 clone / worktree 中完成仓库读取、diff、分支、提交、fetch/push 与 SHA 核对；GitHub Connector / API 仅作为故障回退或 PR / Issue / Actions 等 API 原生动作的辅助路径，不替代本地仓库作为日常代码事实源。远端写入或合并前必须核对 exact base/head SHA；本地与 Connector 视图不一致时 BLOCK，先完成同步与对账。
 - DuckDB 采用**进程级独占所有权**：任一时刻整个库只由一个进程持有，不承诺跨进程读写并存
 - Manifest `file_uri` 为逻辑 URI（相对 `data_root`、统一 `/`、无盘符），**精确比较**；仅大小写不同 → BLOCK
 - Manifest 身份 Hash 只由逻辑字段生成，与机器路径 / run_id / 时间戳无关
