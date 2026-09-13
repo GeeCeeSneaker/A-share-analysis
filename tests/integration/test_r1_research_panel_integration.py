@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -140,12 +141,31 @@ def test_verified_readmodel_research_panel_reader_replay(
     development = load_research_security_daily(
         manifest_path,
         split=ResearchSplit.DEVELOPMENT,
-        columns=["trade_date", "symbol", "close", "source_snapshot_id"],
+        columns=["trade_date", "security_id", "symbol", "close", "source_snapshot_id"],
+    )
+    sse_security_id = next(
+        row["security_id"] for row in development.to_dicts() if row["symbol"] == "600000"
+    )
+    filtered_development = load_research_security_daily(
+        manifest_path,
+        split=ResearchSplit.DEVELOPMENT,
+        start="2020-01-01",
+        end="2020-01-01",
+        security_ids=[sse_security_id],
+        columns=["trade_date", "security_id", "symbol", "close"],
     )
     validation = load_research_security_daily(manifest_path, split="validation_a")
     holdout = load_research_security_daily(manifest_path, split="holdout")
 
     assert development.height == 2
+    assert filtered_development.to_dicts() == [
+        {
+            "trade_date": date(2020, 1, 1),
+            "security_id": sse_security_id,
+            "symbol": "600000",
+            "close": 10.5,
+        }
+    ]
     assert validation.height == 2
     assert holdout.height == 2
     assert set(development.get_column("symbol").to_list()) == {"600000", "000001"}

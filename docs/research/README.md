@@ -22,7 +22,26 @@ panel = load_research_security_daily(
     split="development",
     start="2020-01-01",
     end="2023-12-31",
+    security_ids=["<canonical-security-id>"],
     columns=["trade_date", "security_id", "symbol", "close"],
+)
+```
+
+`start`/`end` are inclusive and must stay inside the selected split. The
+optional `security_ids` filter matches exact canonical `security_id` values;
+it does not accept symbol prefixes or infer an exchange from a code. An empty
+list deliberately returns no rows. The selected dataset version and source
+lineage are available before the read:
+
+```python
+from ashare_state.research import ResearchPanelReader
+
+reader = ResearchPanelReader.from_manifest(manifest)
+print(reader.manifest.research_dataset_version, reader.manifest.dataset_id)
+panel = reader.load_security_daily(
+    split="development",
+    security_ids=["<canonical-security-id>"],
+    columns=["trade_date", "security_id", "close"],
 )
 ```
 

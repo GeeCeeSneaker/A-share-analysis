@@ -1,8 +1,8 @@
-## DM-20260913-CR7-R1-030 · BSE 研究资格边界整改
+## DM-20260913-CR7-R1-030 · BSE 研究资格边界整改（已合并）
 
 **Type**：C1 — CR-7 R1 semantic eligibility remediation
 
-**Status**：`P0 BSE RESEARCH LEAK CLOSED LOCALLY / R1 FAIL-CLOSED / FOCUSED QA GREEN / FINAL DELTA REVIEW REQUIRED / KEEP DRAFT`
+**Status**：`P0 BSE RESEARCH LEAK CLOSED / R1 FAIL-CLOSED / EXACT-HEAD REVIEW PASS / REQUIRED CI GREEN / MERGED TO MAIN`
 
 **触发与最小范围**
 
@@ -18,7 +18,29 @@
 **验证与交接闸门**
 
 - R1 单元/集成聚焦套件：`13 passed`。
-- 完整本地质量门禁已执行：全量 `pytest -q` 退出码为 0，Ruff、format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 均通过。整改已推送到 PR #50，exact head 为 `1f57ce99d000e04f1f77eea7b8b40a30531da4a1`；等待该 exact head 的 required CI 和最终 delta review。PR #50 继续 Draft；未经独立审阅与项目维护者接受，不自行批准、Ready 或合并。
+- 完整本地质量门禁已执行：全量 `pytest -q` 退出码为 0，Ruff、format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 均通过；3 个既有 Windows symlink 测试按环境跳过。PR #50 exact head `dc30704107204de5938460ba6e51bc7917610b79` 获独立审阅 `5189377380` 的 `PASS / MERGE AUTHORIZED`，required CI #564 全部成功，并以 merge commit `401e9a8527083af777275d8da490163d2af10f2e` 合并到 `main`。
+
+接受范围仅为 R1 security-daily 小夹具的 BSE fail-closed 发布；没有第三次 Formal、Production、`--resume`、`--verdict`、backfill、BSE mapping activation、Golden/H1/baseline 或策略扩展授权。下一项按 CR-7 §15 转入窄范围研究消费验证。
+
+## DM-20260912-CR7-R1-031 · R1 合并后研究消费筛选切片
+
+**Type**：C1 — CR-7 research-consumption API completion
+**Date**：2026-09-12
+**Status**：`R1 ACCEPTED ON MAIN / CONSUMPTION SLICE IMPLEMENTED / FOCUSED QA GREEN / PR AND INDEPENDENT REVIEW PENDING`
+**Evidence**：`src/ashare_state/research/reader.py`、`tests/unit/test_r1_research_panel.py`、`tests/integration/test_r1_research_panel_integration.py`、`tests/integration/test_capability_governance.py`、`docs/research/README.md`。
+
+**本批目标与实现**：
+
+- 以已合并主线 `main@401e9a8527083af777275d8da490163d2af10f2e` 为基线，执行 CR-7 §15 第 3 项的小范围研究消费验证；只扩展现有 ReadModel-only R1 reader，不启动 Provider、Production、Formal、backfill 或全历史物化。
+- reader 的普通研究入口和显式 disabled 诊断入口均支持 `security_ids` 精确过滤。过滤只匹配 canonical `security_id`，不做 symbol/code-prefix 或 exchange 推断；空列表返回空表，字符串、空白 ID 和重复 ID fail-closed。
+- verified `Canonical → Snapshot → ReadModel → R1 panel → ordinary reader` integration 回归覆盖 canonical security_id、split 内闭区间日期和列选择；unit 回归同时确认 disabled 诊断入口可按同一身份键读取；reader manifest 继续提供 `research_dataset_version`、`dataset_id` 及 lineage，默认入口不返回 disabled 行。
+- README 增加最小下游示例，并明确日期区间、身份键、版本读取和不允许的代码推断。
+- 首轮全量回归暴露仓库既有的时区敏感测试断言：DuckDB 在 `America/Los_Angeles` 会将同一 UTC 瞬时显示为前一日；已改为解析带时区值后统一按 UTC 比较，不改变生产代码或数据口径。
+
+**验证与下一闸门**：
+
+- 聚焦 R1 单元/集成套件：`14 passed`；第二轮全量 `pytest -q` 退出码为 0（收集 1770 项，既有环境跳过保持不变）；Ruff check/format、`mypy src`、compileall、`uv pip check` 和 `git diff --check` 均通过。
+- 完成后推送独立 PR，等待 exact-head required CI 和独立审阅；不自行批准、Ready 或合并。index panel、CR-5 feature join、R2 market-state 语义、BSE mapping、第三次 Formal、Golden/H1/global baseline 和策略工作仍不在授权范围内。
 
 ## DM-20260912-CR7-R1-029 · R1 发布边界整改
 
