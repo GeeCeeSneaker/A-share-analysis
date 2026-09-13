@@ -6533,3 +6533,76 @@ Evidence：formal_production_b1_b7_result_20260910.md；formal_production_b1_b7_
 Implementation Status：R1 security daily small-fixture 已实现，focused QA 已通过；指数 panel、CR-5 join、全历史物化和正式运行按授权边界暂不激活。
 
 Review Status：`KEEP DRAFT / EXACT-HEAD INDEPENDENT REVIEW REQUIRED / REQUIRED CI PENDING`。
+
+## DM-20260913-CR7-HISTORY-029 · 有界离线历史物化实现切片
+
+**Type**：C1 — CR-7 historical materialization implementation/preflight boundary
+**Date**：2026-09-13
+**Baseline**：`main@6d94a196089901b92a5b7a085922a1f7c4ffaaa2`
+**Status**：`OFFLINE IMPLEMENTATION COMPLETE / LOCAL QA GREEN / DRAFT / INDEPENDENT EXACT-HEAD REVIEW REQUIRED`
+
+**已完成**
+
+- 仅按 Issue #39 scheduler checkpoint 做一次窄范围离线实现；没有 Provider/AmazingData、正式账号、
+  Production、Formal/B1-B7、真实历史回填、universe sweep、BSE mapping/index 激活或 Golden/H1
+  修改。
+- `ResearchPanelBuilder.prepare_verified_projection()` 将 ReadModel、snapshot、canonical identity/
+  lineage、PIT 和 typed daily-bar 验证停在内存投影边界；R1 原 `build_from_readmodel()` 的发布路径
+  保持原语义，历史模块不调用 R1 publisher。
+- `CoverageBasisDescriptor` 对合同 15 字段、source snapshot/domain/月度范围/source-selection、
+  versioned completeness method 和不含自身 hash 引用的精确 canonical bytes/hash 做 fail-closed
+  校验。当前只认可离线夹具 method；没有权威上游 completeness evidence 时不生成 OBSERVED。
+- writer/runtime lock 和合同 23 字段 materialization identity 已实现；basis-set hash、writer-lock
+  hash、source/identity/schema/split/route 约束均参与 deterministic idempotency。78 个逻辑月明确
+  记录三 route，BSE 禁止进入 enabled route。
+- 独立 staging state machine 已实现：分区/basis evidence/inventory/manifest 先在
+  `research_security_daily/.staging/<materialization_id>` 写入，复核 Parquet bytes/schema/row count/
+  semantic hash/primary key 后写 `_SUCCESS.json`，再同卷原子目录发布；同 identity replay 不覆盖，
+  changed bytes/inventory 冲突，失败不产生新可读提交物。历史 reader 单独阻断 PARTIAL/UNRESOLVED，
+  没有放宽 R1 reader。
+
+**证据与边界**
+
+- 实现说明：[`cr7_historical_materialization_implementation_20260913.md`](../research/cr7_historical_materialization_implementation_20260913.md)。
+- 变更位置：`src/ashare_state/research/panel.py`、`src/ashare_state/research/historical.py`、
+  `src/ashare_state/research/__init__.py`，以及 R1 零写入集成断言和历史对抗测试。
+- 本地最终门禁：`1790 collected, 1787 passed, 3 skipped`；3 个 skip 均为既有 Windows symlink
+  权限限制。Ruff check/format、`mypy src`、`compileall`、`uv pip check`、合同 JSON parse 和
+  `git diff --check` 通过。
+- 不将夹具 COMPLETE 解释为市场覆盖真值，不将本实现解释为真实历史已物化；不将账号、密码、IP、
+  端口、Token、Cookie、专有 SDK/runtime 或 Provider raw payload 写入仓库。
+
+**下一道闸门**
+
+PR #53 已保持 Draft；实现 head `9423625bbcbb386300765809276058995ff2e849` 对应 GitHub Actions CI #572，
+Ubuntu 3.14、Windows 3.12、Windows 3.14 均 `success`，GT-H3B #110 按策略 `skipped`。下一道门是独立
+Reviewer 对 exact head 做 focused/full review。除非 scheduler 另行授权，不得据此执行真实历史物化、
+Provider/Production 或第三次 Formal；任何真实上游 completeness method 也必须先有新的可核验证据和调度决策。
+
+## DM-20260913-CR7-HISTORY-030 · 独立审阅阻断后的覆盖/可读性窄修复
+
+**Type**：C1 — CR-7 independent-review remediation
+**Date**：2026-09-13
+**Remediation base**：PR #53 pre-remediation head `2bb117179e5d4d938bd159a60866b35f3d560877`
+**Status**：`REMEDIATION IMPLEMENTED / LOCAL QA GREEN / DRAFT / INDEPENDENT DELTA REVIEW REQUIRED`
+
+**审阅意见与处理**
+
+- scheduler checkpoint `5653147431` 的三个阻断项已逐项落地：夹具 completeness 与普通 reader 的权限等级
+  分离；78 个月 `research_enabled` coverage state 全量进入 aggregate 和 inventory；coverage verifier
+  使用匹配 descriptor 的 state，并加入 COMPLETE/PARTIAL 输入顺序反转回归。
+- 新增 `CoverageEvidenceClass`：离线 method 仅能产生 `TEST_FIXTURE_ONLY`，普通历史 reader 必须同时
+  看到完整 78 月 enabled inventory、`OBSERVED_DAILY_BAR_COVERAGE` 和 `AUTHORITATIVE_UPSTREAM`，因此
+  夹具 COMPLETE 不会生成普通可读研究历史。
+- 未改变 R1 reader、R1 非发布投影、writer/runtime lock、staging/atomic marker、replay/conflict、BSE
+  隔离和 no-Provider/no-Formal 边界；未执行真实历史物化或任何正式运行。
+
+**验证与下一道门**
+
+- 本地全量 pytest：`1792 collected, 1789 passed, 3 skipped`；3 个 skip 为既有 Windows symlink 权限限制。
+- Ruff check/format、`mypy src`、compileall、`uv pip check`、合同 JSON parse、`git diff --check` 和聚焦
+  CR-7/R1 回归通过。
+- 上一 exact head 的 CI #573 不作为本修复 head 的证据；推送后须取得新的 Ubuntu 3.14、Windows 3.12、
+  Windows 3.14 CI，并由独立 Reviewer 做 exact-head delta review。PR #53 必须保持 Draft。
+- 除非 scheduler 另行授权，不得执行真实 2020-01-01～2026-06-30 历史物化、Provider/Production、第三次
+  Formal/B1-B7、BSE/index 激活、CR-5/R2、Golden/H1 或策略工作。

@@ -3989,4 +3989,62 @@ Review Status：等待 exact-head 独立 Reviewer；只有来源类别用途决�
 
 Implementation Status：R1 security daily small-fixture implementation and focused regression completed locally; index panel and CR-5 feature join remain explicitly disabled/deferred by the scheduler boundary. No production materialization or strategy work.
 
+## 2026-09-13 · CR-7 bounded offline historical-materialization implementation
+
+> 状态：`OFFLINE IMPLEMENTATION COMPLETE / LOCAL QA GREEN / NO PROVIDER / DRAFT PR / INDEPENDENT REVIEW REQUIRED`
+
+- 按 Issue #39 最新 scheduler checkpoint，从干净 `main@6d94a196089901b92a5b7a085922a1f7c4ffaaa2`
+  建立 `feat/cr7-history-materialization-offline-implementation-20260913`。本切片只实现
+  临时路径/离线夹具所需的边界，不物化真实 2020-01-01～2026-06-30 历史，不调用 Provider、
+  AmazingData、正式账号、Production、Formal/B1-B7、backfill 或 universe sweep。
+- 在 R1 builder 中提取 `prepare_verified_projection()`：完成 ReadModel、snapshot、canonical
+  identity/lineage、PIT 和 typed daily-bar 校验后只返回 `VerifiedResearchProjection`；该 stage
+  不写 R1 artifact、普通 manifest、`_SUCCESS` 或 committed pointer，`build_from_readmodel()`
+  的既有 R1 发布行为保持不变。
+- 新增 `research.historical`：typed `CoverageBasisDescriptor`/verifier、精确 canonical basis
+  bytes/hash、版本化且仅离线夹具认可的 completeness method、writer/runtime lock 和合同 23 字段
+  materialization identity；缺 basis、未知 method、scope/snapshot/hash 不一致均不能提升为 OBSERVED。
+  当前没有注册权威上游 completeness method，因此真实生产来源仍只能 PARTIAL/UNRESOLVED，
+  夹具 COMPLETE 不代表市场覆盖真值。
+- 新增 78 月 planner 与独立 `research_enabled`/`disabled`/`experimental` route inventory；
+  BSE 不进入 enabled route，重复主键、split/window 混淆、非法 schema 直接 fail closed。分区、
+  basis evidence、inventory 和 manifest 先写非可读 staging，全部 hash/schema/row-count/semantic/
+  primary-key 检验及 `_SUCCESS.json` 后才同卷目录原子发布；相同 identity 重放不覆盖，bytes
+  改变产生冲突，失败不会产生新可读 committed materialization。
+- 新增独立 historical reader gate：只接受合法 `_SUCCESS`、78 月 inventory、basis evidence 和
+  `OBSERVED_DAILY_BAR_COVERAGE`；PARTIAL/UNRESOLVED 不自动读取，现有 R1 reader 未放宽。
+- 本地最终门禁：`1790 collected, 1787 passed, 3 skipped`（3 个 skip 均为既有 Windows symlink
+  权限限制）；Ruff check/format、`mypy src`、`compileall`、`uv pip check`、合同 JSON parse、
+  `git diff --check` 均通过。未写入账号密码/IP/端口、Token、Cookie、专有 SDK/runtime、raw
+  Provider payload 或真实历史数据。
+
+远端状态：实现 head `9423625bbcbb386300765809276058995ff2e849` 已推送为 Draft PR #53；GitHub Actions CI
+#572 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 三个平台均 `success`，GT-H3B #110 按策略 skipped。
+下一步：保持 PR #53 Draft，等待独立 Reviewer 对 exact head 做 focused/full review；在新的 scheduler 决策前，
+不得执行真实历史物化、Provider/Production 或第三次 Formal。
+
 Review Status：KEEP DRAFT / EXACT-HEAD INDEPENDENT REVIEW REQUIRED / REQUIRED CI PENDING；未获得 wider historical materialization 或 Formal/Production 授权。
+
+## 2026-09-13 · CR-7 independent-review remediation: coverage authority and full-window aggregation
+
+> 状态：`REMEDIATION IMPLEMENTED / LOCAL QA GREEN / DRAFT / DELTA REVIEW REQUIRED`
+
+- Issue #39 最新 scheduler checkpoint `5653147431` 将 PR #53 标为 BLOCKED，并限定只允许一轮覆盖/可读性
+  窄修复；本轮未扩大授权，未调用 Provider/AmazingData、正式账号、Production、Formal/B1-B7，也未物化
+  真实 2020-01-01～2026-06-30 历史。
+- 引入显式 `CoverageEvidenceClass`：离线 COMPLETE/PARTIAL method 只能是 `TEST_FIXTURE_ONLY`；普通
+  `HistoricalMaterializationReader` 要求 `AUTHORITATIVE_UPSTREAM`，并逐 descriptor、逐 78 月
+  `research_enabled` inventory 校验，夹具 COMPLETE 即使全窗口齐全也不能解锁普通读取。
+- `OfflineHistoricalMaterializer.plan()` 现在对完整 78 个逻辑月聚合 coverage state；缺行月份保留
+  `UNRESOLVED_NOT_FOR_RESEARCH`，稀疏输入不会再被已有 artifact 子集的 `OBSERVED` 结果掩盖；inventory
+  对每个月的 enabled route 显式记录 coverage state/evidence/reason。
+- 修正 coverage verifier 使用 `matched_descriptor.state`，并新增 COMPLETE/PARTIAL descriptor 输入顺序
+  反转回归；既有 R1 非发布投影、staging、replay、冲突、BSE 隔离和 no-execution 边界保持不变。
+- 本地本轮全量门禁：`1792 collected, 1789 passed, 3 skipped`；3 个 skip 均为既有 Windows symlink 权限
+  限制。Ruff check/format、`mypy src`、compileall、`uv pip check`、合同 JSON parse、`git diff --check`
+  和 focused CR-7/R1 回归均通过。
+- 旧 exact head 的 CI #573 只证明此前文档同步提交；本轮修复提交推送后必须重新取得三平台 CI，并交由独立
+  Reviewer 做 exact-head delta review。PR #53 继续保持 Draft；在新的 scheduler 决策前不得执行真实历史
+  物化、Provider/Production 或第三次 Formal。
+
+Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI AND INDEPENDENT DELTA REVIEW REQUIRED`。

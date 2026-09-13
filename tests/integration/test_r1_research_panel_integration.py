@@ -133,6 +133,9 @@ def test_verified_readmodel_research_panel_reader_replay(
         normalized_root=env_root["normalized"],
         research_root=tmp_path / "research",
     )
+    projection = builder.prepare_verified_projection(snapshot.snapshot_id)
+    assert projection.rows
+    assert not (tmp_path / "research").exists()
     result = builder.build_from_readmodel(
         snapshot.snapshot_id,
         build_timestamp="2026-09-12T00:00:00+00:00",

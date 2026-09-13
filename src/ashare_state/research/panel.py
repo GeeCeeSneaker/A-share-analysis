@@ -58,7 +58,7 @@ from ashare_state.snapshot import verify_snapshot
 from ashare_state.storage.atomic_files import write_file_atomic
 from ashare_state.storage.paths import physical_from_logical_uri
 
-__all__ = ["ResearchBuildResult", "ResearchPanelBuilder"]
+__all__ = ["ResearchBuildResult", "ResearchPanelBuilder", "VerifiedResearchProjection"]
 
 
 _NUMERIC_FIELDS = ("open", "high", "low", "close", "pre_close", "volume", "amount")
@@ -92,6 +92,27 @@ class ResearchBuildResult:
     idempotent_replay: bool
 
 
+@dataclass(frozen=True)
+class VerifiedResearchProjection:
+    """Verified, non-publishing R1 projection handed to a later materializer.
+
+    This object contains only in-memory rows and source provenance.  Creating
+    it never writes an R1 artifact, manifest, publication marker, or pointer.
+    The historical materializer can therefore validate coverage and construct
+    its own staging transaction without crossing the ordinary R1 publication
+    boundary.
+    """
+
+    rows: tuple[dict[str, Any], ...]
+    source_snapshot_id: str
+    source_snapshot_as_of: datetime
+    source_canonical_run_id: str
+    source_readmodel_contract_version: str
+    source_snapshot_manifest_hash: str
+    source_snapshot_semantic_hash: str
+    identity_view: IdentityView
+
+
 class ResearchPanelBuilder:
     """Thin R1 publisher with a verified ReadModel-only input boundary."""
 
@@ -122,6 +143,34 @@ class ResearchPanelBuilder:
         The identity join is derived from the verified canonical run's sealed
         ``security_master`` output.  Callers cannot inject display identity
         rows into the authoritative publication path.
+        """
+        projection = self.prepare_verified_projection(snapshot_id)
+        try:
+            coverage = CoverageState(coverage_state)
+        except ValueError as exc:
+            raise ResearchPanelError(f"unknown coverage_state {coverage_state!r}") from exc
+        built_at = ensure_utc_timestamp(build_timestamp)
+        return self._publish(
+            projection.rows,
+            source_snapshot_id=projection.source_snapshot_id,
+            source_snapshot_as_of=projection.source_snapshot_as_of,
+            source_canonical_run_id=projection.source_canonical_run_id,
+            source_readmodel_contract_version=projection.source_readmodel_contract_version,
+            source_snapshot_manifest_hash=projection.source_snapshot_manifest_hash,
+            source_snapshot_semantic_hash=projection.source_snapshot_semantic_hash,
+            identity_view=projection.identity_view,
+            build_timestamp=built_at,
+            coverage_state=coverage,
+            publication_mode=AUTHORITATIVE_READMODEL_PUBLICATION,
+        )
+
+    def prepare_verified_projection(self, snapshot_id: str) -> VerifiedResearchProjection:
+        """Verify one ReadModel snapshot and return rows without publishing.
+
+        The method deliberately stops immediately before the existing R1
+        ``_publish`` boundary.  It is the only boundary a future historical
+        materializer may consume: no coverage label, caller identity, or
+        publication side effect is accepted here.
         """
         model = DuckDBReadModel(
             self.conn,
@@ -201,11 +250,6 @@ class ResearchPanelBuilder:
             raise ResearchPanelError("ReadModel and canonical run as_of values do not match")
         identity_view = self._identity_view_from_verified_canonical(verified_canonical)
         record = verified_snapshot.ledger_record
-        try:
-            coverage = CoverageState(coverage_state)
-        except ValueError as exc:
-            raise ResearchPanelError(f"unknown coverage_state {coverage_state!r}") from exc
-        built_at = ensure_utc_timestamp(build_timestamp)
         projected = self._project_rows(
             rows,
             source_snapshot_id=snapshot_id,
@@ -214,8 +258,8 @@ class ResearchPanelBuilder:
             source_readmodel_contract_version=READMODEL_CONTRACT_VERSION,
             identity_view=identity_view,
         )
-        return self._publish(
-            projected,
+        return VerifiedResearchProjection(
+            rows=tuple(projected),
             source_snapshot_id=snapshot_id,
             source_snapshot_as_of=verified_snapshot.as_of,
             source_canonical_run_id=canonical_run_id,
@@ -223,9 +267,6 @@ class ResearchPanelBuilder:
             source_snapshot_manifest_hash=str(record["manifest_hash"]),
             source_snapshot_semantic_hash=str(record["snapshot_semantic_hash"]),
             identity_view=identity_view,
-            build_timestamp=built_at,
-            coverage_state=coverage,
-            publication_mode=AUTHORITATIVE_READMODEL_PUBLICATION,
         )
 
     def _build_fixture_from_rows(
