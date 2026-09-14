@@ -1,201 +1,169 @@
 # Current Execution Plan
 
-> 本文件是项目**当前执行控制面**。它回答开发人员最重要的四个问题：现在做到哪里、唯一主线任务是什么、做到什么算完成、完成后下一步由谁决定。
+> 本文件是项目**当前执行控制面**。开发人员用它确认：当前主线做到哪里、唯一 P0 是什么、允许做什么、做到什么算完成、完成后由谁决定下一步。
 >
-> 历史决策和详细审计记录继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；开发人员日常接任务优先读取本文件和这里引用的当前 Issue。
+> 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
 ## 1. 项目管理责任
 
-从 2026-09-13 起，项目按以下职责运行：
+- **项目 Owner**：决定总体方向、数据源是否可信、例外授权和最终业务取舍。
+- **项目经理 / 审计负责人**：读取最新 `main`、Issue、PR、CI 与开发证据；选择唯一主线；对 exact head 给出 `PASS / REMEDIATE / STOP(BLOCKED)`；每次审阅后更新本文件和对应 Issue 的下一任务、验收、依赖与禁止项。
+- **开发执行者（Codex / Agent / 本地开发人员）**：只执行当前授权任务，不自行扩大范围；完成后提交 branch/PR、测试、CI 与证据，等待下一次调度。
 
-- **项目经理 / 审计负责人**：负责读取最新 `main`、Issue、PR、CI 和开发证据；决定当前唯一主线；审阅 exact head；给出 `PASS / REMEDIATE / STOP`；并在每次进展审阅后更新本文件与对应 Issue 的下一任务、验收标准、依赖和禁止项。
-- **开发执行者（Codex / Agent / 本地开发人员）**：只执行当前已授权任务，不自行扩大范围；完成后提交 branch/PR、测试与证据，并等待下一次调度。
-- **项目 Owner**：保留最终方向调整和例外授权权力。
+审阅结束不能只写“等待下一步”。PASS 必须产生下一任务；REMEDIATE 必须产生可执行整改；BLOCKED 必须写清解除阻断所需最小证据。
 
-原则：**审阅结束不能以“等待下一步”为终点。每次审阅必须产生明确下一动作；若 PASS，则立即进入下一任务；若 REMEDIATE，则给出可执行整改清单；若 STOP/BLOCKED，则给出解除阻断所需证据。**
+## 2. 仓库与数据源治理原则
 
-## 2. 仓库操作原则
+### 2.1 仓库操作
 
-- 本地 clone / worktree 是日常仓库内容操作的首选路径；GitHub Connector/API 主要用于 Issue、PR、review、Actions/CI 等控制面操作或本地不可用时的回退。
-- 任何远端写入、review 接受或 merge 前必须核对 exact base/head SHA。
-- 如果本地 Git 与 Connector/API 视图不一致，停止写入和合并，先完成同步与解释。
-- 通过 Connector 回退产生的仓库内容提交，开发人员下次接单前必须在本地 `fetch` 后核对并同步。
+- 本地 clone / worktree 是代码内容操作的首选路径；GitHub Connector/API 主要用于 Issue、PR、review、Actions/CI 等控制面操作或回退。
+- 远端写入、review 接受或 merge 前必须核对 exact base/head SHA。
+- 本地 Git 与 Connector/API 不一致时先停止写入并完成同步解释。
+
+### 2.2 数据源信任模型
+
+- **数据源是否可信由 Owner 判定，不要求代码证明。**
+- 当前 AmazingData 是 Owner 指定的可信数据源。
+- 代码负责验证的是我们自己的工程正确性：调用方法和参数、请求范围、返回格式/schema、缺失/部分数据、PIT/available-at、适配、持久化、重放与物化完整性。
+- 不要求 AmazingData 提供签名、证书或第三方 attestation 才能成为当前数据源。
+- 不预先建设多源仲裁框架。只有未来 Owner 指定多个可信源，且它们对同一事实实际出现不一致时，才单独研究冲突处理规则。
 
 ## 3. 当前主线状态
 
 **阶段**：Phase 0 / CR-7 historical research data foundation
 
-**运行时代码基线（必须是开发起点 `main` 的祖先）**：
+PR #58 已通过项目经理 exact-head 审阅并合并：
 
-`d2fa53371937d59ea0a118b79df1554d518f575f`
+- reviewed head：`3712c7fed165eb3e83625b023b68a47aefdf0332`
+- merge commit：`31515992021e34517de0b764dd1ebb7f9e7ef35b`
+- Issue #55：已完成并关闭
 
-该代码基线已合并 PR #53，具备：
+当前主线已经具备：
 
-- 非发布型 verified projection；
-- coverage-basis typed/fail-closed 验证；
-- `TEST_FIXTURE_ONLY` 与 `AUTHORITATIVE_UPSTREAM` 证据类别隔离；
-- 78 月 inventory；
-- staging / verification / atomic publication；
-- idempotent replay / identity conflict rejection；
-- ordinary historical reader 对 PARTIAL / UNRESOLVED / fixture-only 的 fail-closed gate。
+- verified historical projection / typed coverage basis；
+- `TEST_FIXTURE_ONLY` 与 `AUTHORITATIVE_UPSTREAM` 隔离；
+- Owner-approved AmazingData typed acquisition receipt；
+- exact calendar / historical code-list / daily-bar request identity binding；
+- AnchoredRawEvidenceWriter + immutable capture catalog；
+- raw evidence / catalog replay verification；
+- sidecar、materializer、ordinary reader fail-closed gates；
+- fixture / arbitrary caller bytes 无法直接铸造 authoritative evidence；
+- 78 个逻辑月份 inventory、staging、atomic publication、idempotent replay / conflict rejection。
 
-开发人员**不得直接从这个历史 SHA 新建分支**。开始任务时必须先 `fetch`，从包含本文件最新版本的最新 `main` 建立 clean worktree，并确认上述 runtime baseline 是该 `main` 的祖先。这样治理文档更新不会被误判为运行时代码漂移。
+**尚未完成**：真实 2020-01 至 2026-06 的 78 月 authoritative historical materialization。
 
-**重要事实**：当前只完成了可信历史物化框架，尚未证明 2020-01 至 2026-06 的真实市场历史覆盖，也尚未完成全 78 月真实历史物化。
+当前阻断不再是“数据源是否可信”，而是我们尚未证明**真实 A 股月度完整性的工程判定规则**。PR #58 中的实现为了安全采用保守规则：月度历史代码表中的每只证券都必须在该月每个交易日存在 daily bar。该规则在真实市场上可能把停牌、月中上市/退市等合法无 bar 情况误判为数据缺失，因此在 broad backfill 前必须用 AmazingData 自身语义验证并修正。
 
-**当前分支进展**：以最新 `main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 建立的
-`feat/cr7-authoritative-evidence-preflight-20260913` 已实现 typed authoritative sidecar、
-固定来源选择绑定、writer/reader 双重重验和三个月真实源预检脚本；这些变更尚未合并到
-`main`，须以该分支最终 exact head 进行 CI 和独立审阅。
+## 4. 当前唯一 P0
 
-当前实现 exact head 为 `8ce680c2821b8bdf3c1459c7285ebe9265dc1b60`，base 为
-`main@2e9bdc36544c5320072969a2888180b6dfec2c7a`；required CI `#590`（run
-`34799945484`）三矩阵全部成功，GT-H3B `#117` 按边界 skipped。此前 `89ae...` 的
-CI #589 仅因同批 DEVLOG 缺失而失败，已通过将管理记录并入实现提交修正；本段不把
-`89ae...` 的结果当作当前 head 证据。
+**Issue #59 — `P0: validate AmazingData month-completeness semantics and bounded full-scope receipts`**
 
-**最新整改要求**：PR #58 exact-head review `5192511594` 给出 `REMEDIATE`，指出旧的
-通用 builder 可用任意 statement/inventory bytes、计数和时间戳铸造
-`AUTHORITATIVE_UPSTREAM`。本分支已按 Owner 后续政策将信任锚收敛为
-`OWNER_APPROVED_AMAZINGDATA_ACQUISITION_PATH`：不要求供应商签名或第三方 attestation，
-但只允许经 typed AmazingData 三步取数、严格月份/Universe/响应形状范围校验和 retained
-RawWriter/catalog 重放后生成 receipt；receipt 之外的 caller bytes/counts/timestamps 和
-fixture 不能铸造权威证据。完整交接中的 exact head、CI run 和本地门禁结果在本文件和
-`DEVELOPMENT_MANAGEMENT.md`、`DEVLOG.md` 的最新条目中补录。
+开发起点：先本地 `git fetch`，从包含本文件最新版本的最新 clean `main` 建立 worktree；记录实际 base SHA，并确认 PR #58 merge `31515992021e34517de0b764dd1ebb7f9e7ef35b` 是该 base 的祖先。
 
-## 4. 当前唯一 P0 开发任务
+### 4.1 Stage A — 2024-01 真实全量诊断
 
-**Issue #55 — `P0: CR-7 authoritative historical evidence and bounded real-source preflight`**
+本任务明确授权对 **2024-01** 做一个 bounded、Universe-complete 的真实诊断：
 
-目标：从 merged offline framework 推进到首个真实、可审计、非 fixture 的 `AUTHORITATIVE_UPSTREAM` coverage evidence，并用真实上游证据验证 materializer 的 fail-closed 路径。
+1. 通过 reviewed AmazingData path 获取该月 historical universe、交易日历和 full daily-bar response；
+2. 使用最小必要的 AmazingData 语义接口解释缺失 security-date pair，例如历史证券状态 / 停牌状态或精确日期的历史代码适用性；
+3. 只提交脱敏后的计数、分类、hash 和结论；raw payload、凭证、私有 endpoint、专有 SDK/runtime 不进入 GitHub；
+4. 缺失 pair 至少分成：
+   - AmazingData 支持的停牌 / 合法不交易；
+   - 证券在该 session 不适用（上市/退市或等价 applicability）；
+   - API/请求/shape mismatch；
+   - 无法解释的 missing pair。
 
-开发人员开工前必须：
+禁止从“没有 bar”本身反推停牌、未上市或退市。无法由 AmazingData 已有语义解释的情况保持 `UNRESOLVED` 并 fail closed。
 
-1. 在本地 `git fetch`；
-2. 以**最新 `main`** 创建 clean worktree；
-3. 确认最新 `main` 包含本文件当前版本，并且 `d2fa53371937d59ea0a118b79df1554d518f575f` 是其祖先；
-4. 记录实际 base SHA；
-5. 再建立独立任务分支执行 Issue #55。
+### 4.2 完整性规则整改
 
-### 4.1 必须完成
+Stage A 证据出来后，定义 versioned deterministic expected-bar set：
 
-1. 实现最窄的 authoritative coverage-evidence adapter，复用现有 typed coverage-basis contract，不另造旁路。
-2. completeness method 必须来自 Owner-approved AmazingData acquisition receipt；该路径必须执行精确的月份/日期/Universe 请求并验证返回语义。连续日期、row count、snapshot bytes 本身都不能证明 COMPLETE，也不额外要求供应商签名。
-3. coverage basis 必须绑定 source snapshot/domain、日期闭区间、source-selection fingerprint、artifact bytes/hash、PIT/available-at 证据。
-4. ordinary reader 继续只允许 committed + verified `AUTHORITATIVE_UPSTREAM` + `OBSERVED_DAILY_BAR_COVERAGE`。
-5. 增加对 missing/stale/wrong-scope/tampered basis、fixture escalation、PARTIAL/UNRESOLVED、replay/conflict 的对抗测试。
+- 每个交易日哪些证券应适用；
+- 哪些适用 session 因合法停牌等原因不要求 bar；
+- 哪些 security-date pair 必须有 bar；
+- extra/missing rows 的判定；
+- schema/range/request/PIT 漂移的 fail-closed 行为。
 
-本分支已完成以上代码和离线对抗测试：`AuthoritativeCoverageEvidence` 只能消费
-Owner-approved AmazingData typed receipt；receipt 绑定 source-selection fingerprint、
-月份/日期/Universe、日历和全量日线返回的 schema/range/row/hash、retained evidence、
-source snapshot 与 PIT/available-at 链。仅有 SDK 成功、返回行数、日历连续性或 sentinel
-日线时，adapter 不产生权威 sidecar，writer 与 ordinary reader 均保持 fail-closed。
+除非 Stage A 真实证据证明它正确，否则不得继续使用 `month_code_list × all trading days` 作为完整性定义。
 
-### 4.2 三个月代表性真实源预检
+该规则必须进入 receipt identity / replay contract，保证首次取数与后续重放使用同一版本语义。
 
-实现和本地质量门禁通过后，仅执行以下三个月：
+### 4.3 Stage B — 2020-01 与 2026-01
 
-- Development：2020-01
-- Validation A：2024-01
-- Holdout：2026-01
+只有 Stage A 规则闭合、focused/full QA 通过后，才授权同一 bounded full-scope path 再执行：
 
-目的不是形成研究数据集，而是尽早证明 authoritative evidence path 在三个 split 都真实可行。
+- Development：`2020-01`
+- Holdout：`2026-01`
 
-如果任何一个月没有完成该 full-scope receipt：**立即 fail closed**，记录缺口并返回审阅；禁止用 fixture、row count、月份连续性、sentinel 或人为声明升级为 COMPLETE。
+三个代表月分别必须得到以下二者之一：
 
-本分支已执行该预检：Development `2020-01`、Validation A `2024-01`、Holdout `2026-01` 的
-三组固定 sentinel 调用均成功返回观察结果，但它们没有生成 full-scope receipt；当前等价
-阻断码为 `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`，authoritative evidence 为
-`NOT_PRODUCED`，materializer 为 `NOT_ENTERED_FAIL_CLOSED`。整改前脱敏收据仍保留为历史记录：
-`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`。
+A. 可重现的 `AUTHORITATIVE_UPSTREAM` full-scope receipt，并证明 materializer/reader 能正确消费；或
 
-### 4.3 明确禁止
+B. 精确、可审计的 fail-closed semantic/API blocker。
 
-本任务不授权：
+## 5. 当前明确禁止
 
+Issue #59 **不授权**：
+
+- 2020-01 至 2026-06 的 78 月 broad backfill / materialization；
 - 第三次 Formal B1-B7；
 - Production `--resume` / `--verdict`；
-- 全 78 月 broad backfill；
-- universe sweep；
-- BSE mapping 激活；
-- index 激活；
+- BSE mapping 或 index 激活；
 - CR-5/R2 feature export；
-- Golden/H1/global baseline 改动；
+- Golden/H1/global baseline 修改；
 - 策略实现或参数优化；
-- 任何密钥、凭证、私有 endpoint、专有 SDK/runtime、无限制 raw Provider payload 入库。
+- 外部 source-trust 证明机制；
+- 没有真实多源冲突时建设 multi-source arbitration。
 
-## 5. 当前任务验收标准
+**例外授权**：仅 Issue #59 指定的 `2024-01`、`2020-01`、`2026-01` 可以进行 bounded universe-complete diagnostic；这不构成 78 月 universe sweep 授权。
+
+## 6. Issue #59 验收标准
 
 开发 PR 进入最终审阅前必须同时满足：
 
 - exact base/head SHA 可复核；
 - focused tests 通过；
-- 全量项目质量门禁通过；
-- CI 对最终 exact head 绿色（提交 PR 后复核）；
-- fixture evidence 无法解锁普通 historical reader；
-- 三个月固定范围观察已完成；若 full-scope receipt 未产生，必须明确 fail-closed 到 `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`；
-- 没有 scope creep。
+- 全量 repository QA 通过；
+- exact-head CI 绿色；
+- AmazingData 信任模型未被重新复杂化；
+- fixture/caller 仍不能绕过 AmazingData acquisition path；
+- 合法 suspension/applicability gap 不被误判为数据损坏；
+- unexplained missing/extra row、malformed shape、scope/request drift、PIT violation 仍 fail closed；
+- Stage A `2024-01` 有真实 full-scope 脱敏诊断；
+- Stage B 只在 Stage A 规则闭合后执行；
+- 三个月分别有 authoritative receipt/materializer proof 或具体 fail-closed blocker；
+- 没有扩大到 78 月 backfill。
 
-## 6. 审阅后的调度规则
+## 7. 审阅后的调度
 
-### 若 Issue #55 / 对应 PR PASS
+### PASS
 
-项目经理立即决定并记录以下二选一：
+如果三个代表月都稳定产生 authoritative receipts，且 materializer / ordinary reader 的 replay、corruption、identity gates 全部通过：项目经理下一步可授权**受控 78 月 historical materialization**。
 
-A. authoritative evidence path 完整可靠 → 授权完整 78 月 historical materialization；
+### REMEDIATE
 
-B. path 本身可靠，但某个 source/completeness 边界仍不足 → 先发一个最窄 source-evidence remediation 任务，不允许开发人员自行绕过。
+若问题属于我们自己的 completeness semantics / adapter / request / format / PIT 实现，发最小整改任务；不得用 heuristic 掩盖缺口，也不得自行换数据源。
 
-### 若 REMEDIATE
+### STOP / BLOCKED
 
-项目经理必须在 PR review + Issue 中写出：
+若 AmazingData 当前接口无法给出解释某类缺 bar 所需的语义事实，记录具体 blocker 并停止相应范围；是否增加其他数据源由 Owner 决定。
 
-- exact head；
-- 阻断项及优先级；
-- 每项整改的文件/模块边界；
-- 必测回归；
-- 不允许顺手修改的范围；
-- 完成后返回哪一个 gate。
+## 8. 后续路线（非当前授权）
 
-### 若 BLOCKED
+1. Issue #59 三个月 completeness closure；
+2. controlled 78-month authoritative historical materialization；
+3. 全量 coverage / artifact lineage / replay / corruption E2E；
+4. 数据基座 Freeze Gate；
+5. CR-5/R2 与研究特征层；
+6. `Quantitative-Strategy-Research` 等策略项目正式消费本数据基座。
 
-项目经理必须明确：
-
-- blocker 是代码、上游语义、账号能力、来源完整性还是治理问题；
-- 解除 blocker 所需最小证据；
-- 哪些并行工作可以继续、哪些必须冻结。
-
-## 7. 后续路线（非当前授权）
-
-只有当前 P0 完成后，才按顺序考虑：
-
-1. 完整 78 月 2020-01 至 2026-06 authoritative historical materialization；
-2. 全量 coverage / artifact lineage / replay / corruption E2E 验证；
-3. 数据基座 Freeze Gate；
-4. CR-5/R2 与研究特征层；
-5. `Quantitative-Strategy-Research` 等策略项目正式将本仓库作为首选数据基座。
-
-策略研究不得反过来驱动数据口径；参数优化不得用于弥补数据或交易逻辑缺陷。
-
-## 8. 开发人员交接格式
-
-开发人员完成当前任务时，PR/Issue 至少报告：
-
-- base SHA / head SHA；
-- 实际修改范围；
-- 本地 focused/full QA；
-- CI run；
-- 三个月 preflight 结果；
-- evidence/receipt 路径；
-- blockers / unresolved；
-- 明确声明未执行的禁止项；
-- 建议的下一步，但**下一任务由项目经理审阅后最终调度**。
+策略研究不得反向改变数据口径；参数优化不得补偿数据或交易逻辑缺陷。
 
 ---
 
-**Last scheduler update**：2026-09-13；Issue #55 当前实现分支已完成本地 bounded preflight，
-required CI #590 已通过，仍等待项目经理/独立 Reviewer 对 exact head 作 delta review。
+**Last scheduler update**：2026-09-14
 
-**Current task**：Issue #55
+**Current task**：Issue #59
 
-**Runtime code baseline**：`d2fa53371937d59ea0a118b79df1554d518f575f`；实际开发 base 必须取包含本文件最新版本的最新 `main` 并记录 exact SHA。
+**Required ancestor**：PR #58 merge `31515992021e34517de0b764dd1ebb7f9e7ef35b`；实际开发 base 必须是包含本文件最新版本的最新 clean `main`，并记录 exact SHA。
