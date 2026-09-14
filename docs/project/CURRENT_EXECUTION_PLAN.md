@@ -102,6 +102,56 @@ A. 可重现的 `AUTHORITATIVE_UPSTREAM` full-scope receipt，并证明 material
 
 B. 精确、可审计的 fail-closed semantic/API blocker。
 
+### 4.4 当前执行记录（2026-09-14）
+
+Issue #59 的实际开发 base 为 `67f37d7ef7a084d775d14dbd0d474e1604e96d25`，且已确认
+PR #58 merge `31515992021e34517de0b764dd1ebb7f9e7ef35b` 是其祖先。Stage A 已通过同一
+AmazingData SPIKE 路径取得并在本地 ignored raw 中保留完整的 2024-01 观察：22 个交易日、
+5,106 个月度证券、22 个精确日历史代码表、全量历史状态和全量日线，共 26 个成功交换。
+
+Stage A 的版本化规则已经替换旧的 `month_universe × all_sessions` 交叉乘积：精确日代码表
+定义 session applicability，`IS_SUSP_SEC=1` 定义合法非交易，只有 `IS_SUSP_SEC=0` 的
+适用 pair 进入必需 bar 集合；未知状态不转成“不适用”。离线重放结果为：132 个
+`SUSPENSION_NON_TRADING`、115 个 `NOT_APPLICABLE_SESSION`、0 个必需 bar 缺失，说明这些
+合法 gap 未被误报为数据损失；但供应商状态响应有 1 个无列成员和共 32 个适用 pair 无状态
+覆盖，另有 22 个返回行落在尚未证明必需的 pair 上，因此整体仍为 `FAIL_CLOSED`，不是
+authoritative receipt。
+
+实测重取时供应商在第 10 个精确日窗口返回 `ProviderPermissionError`；该次只写了本地
+忽略证据且未覆盖既有完整观察。Stage B 已按固定的 `2020-01` Development 与
+`2026-01` Holdout 进程隔离执行；两个 worker 均完整跑完（分别 20、24 个成功交换），
+没有超时，也没有把一个月份的原始证据或状态带入另一个月份。单月原生 SDK 卡住时由父进程
+以固定 900 秒 OS 边界收口；这不是把 SDK 的 `TimeBudget` 宣称为硬超时。
+
+Stage B 的脱敏结果见
+[`cr7_month_completeness_stage_b_20260914.json`](../provider_verification/cr7_month_completeness_stage_b_20260914.json)：
+两个月均为 `FAIL_CLOSED`，没有产生 authoritative receipt，也没有进入 materializer。
+`2020-01` 的 3 个状态成员为不可读/零列表，触发 `STATUS_SCHEMA_MISMATCH`，并留下 36 个
+`UNRESOLVED` pair；返回但尚未被状态证明为必需的 16 个 pair 也不作通过依据。`2026-01`
+没有结构错误，但仍有 4 个 `UNRESOLVED` pair。两个月的必需 bar 缺失均为 0；这只说明
+已判定为必需的集合没有观察到缺 bar，不能覆盖未决状态问题。
+
+因此当前最小下一任务是要求 AmazingData 状态接口/适配层明确并稳定提供：每个返回成员的
+可读 schema，以及足以区分“状态未变化”与“状态数据缺失”的完整月内语义。禁止用“无状态
+行即未变化”、跨源补齐或额外 heuristic 清除 2020 的 36 个或 2026 的 4 个未决 pair。
+整改后只重跑本 Issue 授权的三个代表月并重新核对 receipt/materializer gate；在此之前不做
+78 月回补。
+
+本地复现入口固定为（需要本地未跟踪的 `.env`，输出目录均已忽略）：
+
+```text
+uv run python scripts/spike/cr7_month_completeness_semantics.py --env-file .env --output data/spike/cr7-month-completeness-semantics-stage-a-20260914/report.json
+uv run python scripts/spike/cr7_month_completeness_semantics.py --stage-b --env-file .env --stage-a-report docs/provider_verification/cr7_month_completeness_stage_a_20260914.json --output data/spike/cr7-month-completeness-semantics-stage-b-20260914/report-process-isolated.json
+```
+
+第二条命令只接受脚本内固定的两个 Stage B 月份，不接受自由日期、Universe、resume 或
+production 参数；worker 输出会保留在本地 ignored raw 目录，提交的 JSON 仅为脱敏摘要。
+
+当前源码及聚焦回归已通过；全量 pytest 已通过（退出码 0，3 个既有 Windows symlink
+权限 skip）。本阶段仍保持 `CLOSURE_DESIGN_ONLY_NOT_ACTIVE`，不铸造 authoritative receipt、
+不进入 materializer、不做 78 月回补，也不执行 Formal B1-B7、Production、BSE/index、
+CR-5/R2、Golden/H1、baseline 或策略工作。
+
 ## 5. 当前明确禁止
 
 Issue #59 **不授权**：

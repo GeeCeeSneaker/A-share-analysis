@@ -975,6 +975,28 @@ def _with_request_id(
     )
 
 
+def read_raw_payload(
+    raw_root: Path | str,
+    *,
+    provider: str,
+    dataset: str,
+    request_id: str,
+    verify: bool = True,
+) -> Any:
+    """Read an immutable raw payload through the read-only RawWriter API.
+
+    Keeping construction in this storage module preserves the repository's
+    anti-bypass guard: production readers can replay retained evidence without
+    acquiring a write-capable writer outside the anchored ingestion boundary.
+    """
+    return RawWriter(raw_root).read(
+        provider=provider,
+        dataset=dataset,
+        request_id=request_id,
+        verify=verify,
+    )
+
+
 def _combined_hash(records: list[TableRecord]) -> str:
     """Single-table payloads keep the classic content-hash semantics (the
     sha256 of the payload artifact bytes); multi-table payloads hash the
@@ -998,5 +1020,6 @@ __all__ = [
     "RawWriterError",
     "TableRecord",
     "list_orphan_payloads",
+    "read_raw_payload",
     "verify_meta_closure",
 ]

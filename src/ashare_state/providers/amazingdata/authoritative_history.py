@@ -12,16 +12,16 @@ snapshot id/hash/timestamp or completeness label is accepted here.
 
 from __future__ import annotations
 
-import math
 import re
-from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, timedelta
 from typing import Any
 
+from ashare_state.providers.amazingdata.month_completeness import evaluate_month_completeness
 from ashare_state.providers.amazingdata.operations import (
     DAILY_BAR_KLINE,
     HIST_CODE_LIST,
+    HISTORY_STOCK_STATUS,
     TRADE_CALENDAR,
 )
 from ashare_state.providers.amazingdata.provider import AmazingDataProvider, RawEnvelope
@@ -54,22 +54,14 @@ _PERIOD_DAY = 10008
 _METHOD_SPECS = {
     "BaseData.get_calendar": TRADE_CALENDAR,
     "BaseData.get_hist_code_list": HIST_CODE_LIST,
+    "InfoData.get_history_stock_status": HISTORY_STOCK_STATUS,
     "MarketData.query_kline": DAILY_BAR_KLINE,
 }
 _RESPONSE_SHAPES = {
     "BaseData.get_calendar": "list[int]",
     "BaseData.get_hist_code_list": "list[str]",
-    "MarketData.query_kline": "dict[str,dataframe]",
-}
-_DAILY_BAR_COLUMN_ALIASES = {
-    "symbol": ("code", "CODE"),
-    "date": ("KLINE_TIME", "kline_time", "TRADE_DATE", "trade_date"),
-    "open": ("OPEN_PRICE", "open"),
-    "high": ("HIGH_PRICE", "high"),
-    "low": ("LOW_PRICE", "low"),
-    "close": ("CLOSE_PRICE", "close"),
-    "volume": ("VOLUME", "volume"),
-    "amount": ("AMOUNT", "amount"),
+    "InfoData.get_history_stock_status": "dict[str,dataframe|None]",
+    "MarketData.query_kline": "dict[str,dataframe|None]",
 }
 
 
@@ -92,7 +84,7 @@ class AmazingDataHistoryAcquisition:
             raise AmazingDataAcquisitionError("acquisition requires a verified source snapshot")
 
     def acquire_month(self, partition: PartitionKey) -> AmazingDataAcquisitionReceipt:
-        """Return a receipt only after all three complete-scope checks pass."""
+        """Return a receipt only after the semantic expected-bar set passes."""
         if not isinstance(partition, PartitionKey):
             raise AmazingDataAcquisitionError("acquisition requires a typed historical partition")
         start = partition.scope_start
@@ -118,6 +110,38 @@ class AmazingDataHistoryAcquisition:
         )
         symbols = _validate_security_universe(code_exchange.payload)
 
+        status_exchange, status_receipt = self._exchange(
+            "InfoData.get_history_stock_status",
+            lambda: self.provider.get_history_stock_status_exchange(begin, finish, symbols),
+            expected_params={
+                "begin_date": begin,
+                "end_date": finish,
+                "code_list": symbols,
+                "is_local": False,
+            },
+        )
+
+        exact_day_universes: dict[int, list[str]] = {}
+        exact_day_exchanges: list[ProviderExchange] = []
+        semantic_receipts: list[AmazingDataExchangeReceipt] = []
+        for trading_day in trading_days:
+            exact_day = _day_to_date(trading_day)
+            exact_day_end = _yyyymmdd(exact_day + timedelta(days=1))
+            exact_exchange, exact_receipt = self._exchange(
+                "BaseData.get_hist_code_list",
+                lambda start_day=trading_day, end_day=exact_day_end: (
+                    self.provider.get_hist_code_list_exchange(_SECURITY_TYPE, start_day, end_day)
+                ),
+                expected_params={
+                    "security_type": _SECURITY_TYPE,
+                    "start_date": trading_day,
+                    "end_date": exact_day_end,
+                },
+            )
+            exact_day_universes[trading_day] = _validate_security_universe(exact_exchange.payload)
+            exact_day_exchanges.append(exact_exchange)
+            semantic_receipts.append(exact_receipt)
+
         kline_exchange, kline_receipt = self._exchange(
             "MarketData.query_kline",
             lambda: self.provider.query_kline_exchange(
@@ -136,17 +160,38 @@ class AmazingDataHistoryAcquisition:
                 "trading_days": trading_days,
             },
         )
-        returned = _validate_daily_bars(
-            kline_exchange.payload,
-            symbols=symbols,
+        evaluation = evaluate_month_completeness(
+            monthly_symbols=symbols,
             trading_days=trading_days,
-            start=start,
-            end=end,
+            exact_day_universes=exact_day_universes,
+            status_payload=status_exchange.payload,
+            daily_bar_payload=kline_exchange.payload,
         )
-        operations = (calendar_receipt, code_receipt, kline_receipt)
+        try:
+            evaluation.require_accepted()
+        except ValueError as exc:
+            raise AmazingDataAcquisitionError(
+                "AmazingData month completeness is unresolved; authoritative acquisition is blocked"
+            ) from exc
+        returned_first_date = evaluation.returned_first_date
+        returned_last_date = evaluation.returned_last_date
+        returned_trading_day_count = evaluation.returned_trading_day_count
+        returned_trading_days_hash = evaluation.returned_trading_days_hash
+        returned_row_count = evaluation.returned_row_count
+        if returned_first_date is None or returned_last_date is None:
+            raise AmazingDataAcquisitionError(
+                "AmazingData daily-bar response has no returned date range"
+            )
+        operations = (calendar_receipt, code_receipt, status_receipt, kline_receipt)
         retrieved_at = max(
             ensure_utc_timestamp(str(getattr(exchange.envelope, "received_at", "")))
-            for exchange in (calendar_exchange, code_exchange, kline_exchange)
+            for exchange in (
+                calendar_exchange,
+                code_exchange,
+                status_exchange,
+                kline_exchange,
+                *exact_day_exchanges,
+            )
         )
         capture = _VerifiedAmazingDataCapture._from_provider(  # noqa: SLF001
             requested_scope_start=start,
@@ -155,12 +200,14 @@ class AmazingDataHistoryAcquisition:
             security_universe_hash=_hash_values(symbols),
             calendar_trading_day_count=len(trading_days),
             calendar_trading_days_hash=_hash_values(trading_days),
-            returned_first_date=returned["first_date"],
-            returned_last_date=returned["last_date"],
-            returned_trading_day_count=returned["trading_day_count"],
-            returned_trading_days_hash=returned["trading_days_hash"],
-            returned_row_count=returned["row_count"],
+            returned_first_date=returned_first_date,
+            returned_last_date=returned_last_date,
+            returned_trading_day_count=returned_trading_day_count,
+            returned_trading_days_hash=returned_trading_days_hash,
+            returned_row_count=returned_row_count,
             operations=operations,
+            semantic_operations=tuple(semantic_receipts),
+            completeness_evaluation=evaluation,
             retrieved_at_utc=retrieved_at,
         )
         receipt = _issue_amazingdata_acquisition_receipt(
@@ -313,139 +360,6 @@ def _validate_calendar(payload: Any, *, start: date, end: date) -> list[int]:
     if not values:
         raise AmazingDataAcquisitionError("calendar response has no requested-month trading days")
     return values
-
-
-def _validate_daily_bars(
-    payload: Any,
-    *,
-    symbols: list[str],
-    trading_days: list[int],
-    start: date,
-    end: date,
-) -> dict[str, Any]:
-    if not isinstance(payload, Mapping) or set(payload) != set(symbols):
-        raise AmazingDataAcquisitionError(
-            "daily-bar response security keys do not exactly match the requested universe"
-        )
-    returned_days: set[int] = set()
-    row_count = 0
-    for symbol in symbols:
-        frame = payload[symbol]
-        if frame is None or not hasattr(frame, "columns"):
-            raise AmazingDataAcquisitionError(
-                "daily-bar response is partial or has an unexpected table shape"
-            )
-        columns = {str(column) for column in frame.columns}
-        selected_columns = {
-            name: next((candidate for candidate in aliases if candidate in columns), None)
-            for name, aliases in _DAILY_BAR_COLUMN_ALIASES.items()
-        }
-        if any(value is None for value in selected_columns.values()):
-            raise AmazingDataAcquisitionError(
-                "daily-bar response is missing a required symbol or OHLCV column"
-            )
-        symbol_column = selected_columns["symbol"]
-        if symbol_column is None:
-            raise AmazingDataAcquisitionError("daily-bar response has no validated symbol column")
-        symbol_values = _frame_column(frame, symbol_column)
-        if not symbol_values or any(str(value).strip() != symbol for value in symbol_values):
-            raise AmazingDataAcquisitionError(
-                "daily-bar response security identity does not match its response key"
-            )
-        date_column = selected_columns["date"]
-        if date_column is None:
-            raise AmazingDataAcquisitionError("daily-bar response has no validated date column")
-        values = _frame_column(frame, date_column)
-        if not values:
-            raise AmazingDataAcquisitionError("daily-bar response contains an empty security table")
-        numeric_columns = {
-            name: selected_columns[name]
-            for name in ("open", "high", "low", "close", "volume", "amount")
-        }
-        for name, column in numeric_columns.items():
-            if column is None:
-                raise AmazingDataAcquisitionError(
-                    f"daily-bar response is missing the {name} column"
-                )
-            numeric_values = _frame_column(frame, column)
-            if len(numeric_values) != len(values) or any(
-                not _is_finite_number(value) for value in numeric_values
-            ):
-                raise AmazingDataAcquisitionError(
-                    f"daily-bar response contains invalid {name} values"
-                )
-        normalized: list[int] = []
-        for value in values:
-            day = _normalize_day(value)
-            if day is None:
-                raise AmazingDataAcquisitionError("daily-bar response contains an invalid date")
-            try:
-                parsed = date(day // 10000, (day // 100) % 100, day % 100)
-            except ValueError as exc:
-                raise AmazingDataAcquisitionError(
-                    "daily-bar response contains an invalid date"
-                ) from exc
-            if parsed < start or parsed > end:
-                raise AmazingDataAcquisitionError(
-                    "daily-bar response returned a date outside scope"
-                )
-            normalized.append(day)
-        if len(normalized) != len(set(normalized)):
-            raise AmazingDataAcquisitionError(
-                "daily-bar response contains duplicate security dates"
-            )
-        if set(normalized) != set(trading_days):
-            raise AmazingDataAcquisitionError(
-                "daily-bar response is partial for one or more securities"
-            )
-        returned_days.update(normalized)
-        row_count += len(normalized)
-    expected_days = set(trading_days)
-    if returned_days != expected_days:
-        raise AmazingDataAcquisitionError(
-            "daily-bar response date range is partial or differs from the calendar"
-        )
-    return {
-        "first_date": _day_to_date(min(returned_days)),
-        "last_date": _day_to_date(max(returned_days)),
-        "trading_day_count": len(returned_days),
-        "trading_days_hash": _hash_values(sorted(returned_days)),
-        "row_count": row_count,
-    }
-
-
-def _frame_column(frame: Any, name: str) -> list[Any]:
-    try:
-        column = frame.get_column(name) if hasattr(frame, "get_column") else frame[name]
-        values = column.to_list() if hasattr(column, "to_list") else column.tolist()
-    except (AttributeError, KeyError, TypeError, ValueError) as exc:
-        raise AmazingDataAcquisitionError("daily-bar response date column is unreadable") from exc
-    return list(values)
-
-
-def _normalize_day(value: Any) -> int | None:
-    if isinstance(value, datetime):
-        return _yyyymmdd(value.date())
-    if isinstance(value, date):
-        return _yyyymmdd(value)
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int) and len(str(value)) == 8:
-        return value
-    if isinstance(value, str):
-        digits = "".join(char for char in value if char.isdigit())
-        if len(digits) >= 8:
-            return int(digits[:8])
-    return None
-
-
-def _is_finite_number(value: Any) -> bool:
-    if isinstance(value, bool) or value is None:
-        return False
-    try:
-        return math.isfinite(float(value))
-    except (TypeError, ValueError, OverflowError):
-        return False
 
 
 def _day_to_date(value: int) -> date:

@@ -6698,3 +6698,109 @@ Provider/Production 或第三次 Formal；任何真实上游 completeness method
   Windows 3.14 CI，并由独立 Reviewer 做 exact-head delta review。PR #53 必须保持 Draft。
 - 除非 scheduler 另行授权，不得执行真实 2020-01-01～2026-06-30 历史物化、Provider/Production、第三次
   Formal/B1-B7、BSE/index 激活、CR-5/R2、Golden/H1 或策略工作。
+## DM-20260914-CR7-COMPLETENESS-035 · AmazingData 月度完整性语义与 bounded Stage A/B
+
+**Type**：P0 — CR-7 bounded real-source semantic validation
+**Date**：2026-09-14
+**Status**：`IMPLEMENTED / STAGE-A FAIL-CLOSED / STAGE-B IN PROGRESS / NO AUTHORITATIVE RECEIPT / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+**Issue**：#59 `P0: validate AmazingData month-completeness semantics and bounded full-scope receipts`
+
+**精确基线**：实际开发 base 为 `main@67f37d7ef7a084d775d14dbd0d474e1604e96d25`；已确认
+PR #58 merge `31515992021e34517de0b764dd1ebb7f9e7ef35b` 为祖先。当前工作只覆盖 Issue #59
+明确授权的 `2024-01`、`2020-01`、`2026-01`，不构成 78 月 backfill 授权。
+
+**Stage A 真实观察**：
+
+- 通过 reviewed AmazingData SPIKE facade 完成 2024-01 的 calendar、月度历史代码表、
+  22 个交易日 exact-session 历史代码表、全量历史状态和全量 daily-bar 观察；成功交换数
+  为 26，原始证据只保留在本地 ignored raw 目录，GitHub 只保留脱敏报告。
+- 新规则版本为 `amazingdata-month-completeness-rule-v1`，适用性版本为
+  `amazingdata-hist-code-list-exact-session-v1`。精确日代码表是正向 applicability 观察；
+  `IS_SUSP_SEC=1` 才可把适用 pair 排除出必需 bar 集合；未知状态、形状漂移和 scope/request
+  不一致均 fail-closed。
+- 重放统计：`SUSPENSION_NON_TRADING=132`、`NOT_APPLICABLE_SESSION=115`、
+  `required_bar_pair_count=112053`、`missing_required_pair_count=0`；3 个 `None` 日线成员
+  均对应整月已证明停牌，现作为显式零行观察，不误报为数据损失。状态响应仍有 1 个无列
+  成员，导致 32 个适用 pair `UNRESOLVED`；22 个返回 pair 未被证明为必需，整体结果为
+  `FAIL_CLOSED`。报告见 `docs/provider_verification/cr7_month_completeness_stage_a_20260914.json`。
+- 一次重取在第 10 个 exact-session 请求返回 `ProviderPermissionError`；未覆盖既有完整
+  本地观察，未把部分请求当作通过。该问题及完整重放的计数/哈希已写入脱敏报告。
+
+**本轮实现**：
+
+- `month_completeness.py` 提供版本化、可 receipt-bound replay 的 expected-bar evaluator；
+  明确区分 suspension、session 不适用、API/shape mismatch、unexplained missing、
+  unresolved 与 returned extra。非适用仅来自精确日历史代码表，不能由 bar 缺失倒推。
+- AmazingData acquisition receipt v2 新增历史状态与 exact-session code-list exchanges，
+  首次取数和 retained-capture replay 使用相同规则；`dict[str,dataframe|None]` 的显式 null
+  只在没有必需 pair 时允许，必需证券为 null 时仍结构错误并 fail-closed。
+- Stage B 采用固定月份的进程隔离 worker；单月原生 SDK 阻塞不会阻塞另一月，超时只表示
+  `SDK_NATIVE_CALL_PROCESS_TIMEOUT`，不伪装成 provider 的硬查询预算。没有新增 provider
+  信任、签名、第三方 attestation 或多源仲裁。
+
+**验证与下一闸门**：
+
+- 聚焦语义/历史物化/RawWriter guard 回归通过；Ruff、`mypy src`、compileall、`uv pip check`
+  通过；全量 pytest 退出码 0，保留 3 个既有 Windows symlink 权限 skip。
+- Stage B 尚待实际运行；两个代表月必须分别得到可重放 authoritative receipt/materializer
+  proof 或 sanitized exact blocker。当前 source-selection closure 仍为
+  `CLOSURE_DESIGN_ONLY_NOT_ACTIVE`，所以即使数值语义通过，本 PR 也不自行铸造 receipt 或
+  进入 materializer。
+- 账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime、原始 provider payload 和本地
+  ignored 依赖不进入 GitHub；不执行 78 月物化、Formal B1-B7、Production、resume/verdict、
+  BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。提交后保持 Draft，等待 exact-head
+  CI 与独立 delta review，项目管理者决定 PASS / REMEDIATE / BLOCKED。
+## DM-20260914-CR7-COMPLETENESS-035 · AmazingData 月度完整性语义与 bounded Stage A/B
+
+**Type**：C1 — CR-7 bounded real-source completeness semantics / fail-closed remediation
+**Date**：2026-09-14
+**Status**：`IMPLEMENTED / STAGE A+B FAIL-CLOSED / LOCAL QA GREEN / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+**Trigger**：Issue #59；按 scheduler 规则先完成 `2024-01` Stage A，再运行固定的 `2020-01` 与 `2026-01` Stage B。
+
+**精确交接**：本轮从 clean `main@67f37d7ef7a084d775d14dbd0d474e1604e96d25` 开始；
+PR #58 merge `31515992021e34517de0b764dd1ebb7f9e7ef35b` 已核实为该 base 的祖先。最终
+branch/commit/required CI 和独立 delta review 待本提交推送后补录，不沿用旧 head 的结果。
+
+**本轮实现**：
+
+- 新增 versioned `amazingdata-month-completeness-rule-v1` 与
+  `amazingdata-hist-code-list-exact-session-v1`。精确日历史 code list 定义 session
+  applicability，历史状态 `IS_SUSP_SEC=1` 定义合法 suspension/non-trading；只有可读且
+  `IS_SUSP_SEC=0` 的适用 pair 进入必需 bar 集合。未知、畸形、范围漂移、缺状态和返回
+  extra 均不被 heuristic 吞掉，并保持 fail-closed。
+- 把状态、精确日适用性和全量 daily-bar 交换绑定进 `AmazingDataAcquisitionReceipt` v2
+  的验证/重放路径；`None` daily member 仅在该证券没有任何必需 pair 时可解释为合法空观测，
+  对仍有必需 pair 的 `None` 仍 fail-closed。移除不成立的月度 Universe 全交叉积前提，
+  保留 exact-session applicability 与状态范围一致性检查。
+- Stage A 固定为 `2024-01`；Stage B 只允许固定 `2020-01` Development、`2026-01`
+  Holdout。Stage B 使用每月独立 Python worker 和 900 秒父进程 OS 边界，单月 SDK 卡住
+  不会阻止另一月，也不会把跨月 evidence 混用。
+
+**真实观察与结论**：
+
+- Stage A 的完整本地 raw replay 包含 22 个交易日、5,106 个月度证券、22 个精确日 code
+  list、状态和 daily bar，共 26 个成功交换。离线评估得到 132 个
+  `SUSPENSION_NON_TRADING`、115 个 `NOT_APPLICABLE_SESSION`、0 个必需 bar 缺失，但有
+  1 个无列状态成员、32 个状态未决 pair 和 22 个尚未被状态证明为必需的返回 pair，故
+  `FAIL_CLOSED`。在线重取在第 10 个精确日窗口遇到 `ProviderPermissionError`，未覆盖
+  既有完整观察。
+- Stage B 的脱敏报告为
+  [`cr7_month_completeness_stage_b_20260914.json`](../provider_verification/cr7_month_completeness_stage_b_20260914.json)。
+  `2020-01` 完成 20 个交换：3 个不可读/零列状态成员触发 `STATUS_SCHEMA_MISMATCH`，
+  36 个 pair 为 `UNRESOLVED`，另有 16 个返回但尚未证明必需的 pair；
+  `2026-01` 完成 24 个交换：结构检查通过但仍有 4 个 `UNRESOLVED` pair。两个月必需
+  bar 缺失均为 0，但两个月均不能签发 receipt。
+- 三个月仍没有 `AUTHORITATIVE_UPSTREAM` receipt、materializer proof 或历史物化输入；
+  source-selection closure 仍为 `CLOSURE_DESIGN_ONLY_NOT_ACTIVE`。下一项应是最小化解决
+  状态接口的可读 schema 与完整月内语义，再仅重跑 Issue #59 授权的三个代表月。不得用
+  缺失即未变化、另一数据源或推测性多源仲裁掩盖未决状态。
+
+**验证与治理边界**：
+
+- focused completeness/materialization tests、full pytest、Ruff、mypy、compileall、
+  `uv pip check`、JSON parse 和 `git diff --check` 均须以本轮 exact head 重新核对；
+  CI 和独立 delta review 未完成前保持 Draft，不自行批准、Ready 或合并。
+- 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw
+  payload 和本地 vendor wheels 不进入 GitHub；不执行 78 月 backfill/materialization、
+  Formal B1-B7、Production、resume/verdict、BSE/index、CR-5/R2、Golden/H1、baseline
+  或策略工作。
