@@ -4256,12 +4256,14 @@ Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略
 
 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、原始 Provider payload 和本地
 vendor wheels 不进入 GitHub。
-## 2026-09-14 · CR-7 版本化正交易数 fallback 实现（Stage A 待重跑）
+## 2026-09-14 · CR-7 版本化正交易数 fallback 与 Stage A 结果
 
 **Implementation Status**：已完成 Issue #59 最新 scheduler checkpoint 要求的最小实现，基线为
-clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f`；实现提交的最终 SHA 和 exact-head CI
-结果待本轮提交后补记。当前没有重跑 Stage A、没有生成 authoritative receipt，也没有进入
-Stage B 或 78 月物化。
+clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f`；实现提交为
+`aeaf10acf3d3512ee63cfc03bcfa4f170002a8d3`。exact-head CI #610 在 Ubuntu 3.14、Windows
+3.12、Windows 3.14 全部 `success`，GT-H3B #131 按策略 skipped。随后已从该 exact head
+完成唯一获准的 `2024-01` Stage A；没有生成 authoritative receipt，也没有进入 Stage B 或
+78 月物化。
 
 - `month_completeness` 升级到 rule v2，并新增 `amazingdata-positive-trade-count-fallback-v1`。
   仅 status 成员明确为零行零列 DataFrame 时可触发 exact-session fallback；普通空列表、
@@ -4274,8 +4276,15 @@ Stage B 或 78 月物化。
   普通 snapshot normalization 保持 blocked。
 - 新增离线对抗回归覆盖正向/零值/缺失/空表、部分 schema、错误日期/证券、调用方伪造、
   篡改 replay 和旧版本拒绝；本地 full pytest、Ruff、mypy、compileall、uv pip check 通过。
+- Stage A 脱敏结果：22 个交易日、5,106 个月度证券、112,075 个 required/returned 日×证券对；
+  22 个 fallback 候选全部由 exact `[D,D]` snapshot 的正 `num_trades` 归类为 active，
+  `unresolved=0`、`missing=0`、`extra=0`、结构错误为 0，报告和月份状态均为 `PASS`。报告为
+  [`cr7_month_completeness_stage_a_20260914.json`](provider_verification/cr7_month_completeness_stage_a_20260914.json)，
+  摘要为 [`cr7_month_completeness_stage_a_20260914.md`](provider_verification/cr7_month_completeness_stage_a_20260914.md)；
+  旧未闭合结果保留为
+  [`cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json`](provider_verification/cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json)。
 
-**Review Status**：实现待 exact-head CI 与仅 `2024-01` 的 Stage A 重跑。若仍有 unresolved、
-missing、extra 或 structural blocker，记录精确阻断；Stage B、78 月物化、Formal/Production、
-BSE/index、CR-5/R2、Golden/H1、baseline 和策略继续禁止。凭证、私有 endpoint、专有
-SDK/runtime 与原始 payload 不进入 GitHub。
+**Review Status**：实现和本轮 Stage A 已达到 `PASS`，当前返回 scheduler 独立 delta review；
+Stage A 报告仍是 `SPIKE` 诊断，未签发 authoritative receipt，materializer 未进入。Stage B、
+78 月物化、Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline 和策略继续禁止，
+除非得到单独授权。凭证、私有 endpoint、专有 SDK/runtime 与原始 payload 不进入 GitHub。

@@ -52,7 +52,11 @@ PR #58 已通过项目经理 exact-head 审阅并合并：
 
 **尚未完成**：真实 2020-01 至 2026-06 的 78 月 authoritative historical materialization。
 
-当前阻断不再是“数据源是否可信”，而是我们尚未证明**真实 A 股月度完整性的工程判定规则**。PR #58 中的实现为了安全采用保守规则：月度历史代码表中的每只证券都必须在该月每个交易日存在 daily bar。该规则在真实市场上可能把停牌、月中上市/退市等合法无 bar 情况误判为数据缺失，因此在 broad backfill 前必须用 AmazingData 自身语义验证并修正。
+`2024-01` 的单月工程判定规则已在 exact head `aeaf10acf3d3512ee63cfc03bcfa4f170002a8d3`
+完成版本化实现并通过 bounded Stage A：22 个交易日、5,106 个证券、112,075 个 required
+日×证券对全部闭合，unresolved/missing/extra/structural error 均为 0。当前剩余门是 scheduler
+对该 exact head 的独立 delta review，以及在得到明确授权后用 `2020-01`/`2026-01` 做 Stage B
+验证并证明 authoritative receipt/materializer 链路；Stage A PASS 不等于 78 月物化授权。
 
 ## 4. 当前唯一 P0
 
@@ -272,11 +276,13 @@ authoritative receipt/materializer。PR #63 的 exact-head CI #607 已在 Ubuntu
 Windows 3.14 全部成功，GT-H3B #129 按策略 skipped。下一道门是 exact head、报告、请求边界和候选
 语义的独立审阅。
 
-### 4.10 版本化正交易数 fallback 实现（2026-09-14，Stage A 待重跑）
+### 4.10 版本化正交易数 fallback 与 Stage A 结果（2026-09-14）
 
-以最新 clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f` 为基线，本轮按 Issue #59
-最新 checkpoint 把已审阅的同源正向事实收敛为工程规则。实现仍在开发分支，尚未用新代码
-重跑 Stage A，也没有生成 authoritative receipt。
+以 clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f` 为基线，本轮按 Issue #59
+最新 checkpoint 把已审阅的同源正向事实收敛为工程规则，并在 exact committed head
+`aeaf10acf3d3512ee63cfc03bcfa4f170002a8d3` 完成唯一获准的 `2024-01` Stage A。实现提交的
+exact-head CI #610 在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部 `success`；GT-H3B #131
+按策略 `skipped`。
 
 - 月度完整性规则升级为 `amazingdata-month-completeness-rule-v2`；fallback 单独版本为
   `amazingdata-positive-trade-count-fallback-v1`。只有状态响应中明确表现为零行、零列的
@@ -292,11 +298,20 @@ Windows 3.14 全部成功，GT-H3B #129 按策略 skipped。下一道门是 exac
   raw evidence closure、SDK/runtime envelope 和 fallback 版本均进入可重放链；旧评价/旧
   receipt 版本不能按新规则回放。快照只作为语义证据留存，不开放 canonical normalization。
 - 已补齐正向、零值、缺失、空表、错误日期/证券、部分 schema、调用方伪造、篡改回放和
-  旧版本拒绝的离线回归；Stage B 仍必须等本轮 Stage A 达到 PASS 并经 scheduler review
-  后才能考虑授权。
+  旧版本拒绝的离线回归；普通 snapshot normalization 仍保持 `BLOCKED_PENDING_MAPPER`。
 
-下一步是提交实现、完成 exact-head CI，然后只重跑 `2024-01` Stage A 并把脱敏报告的
-`code_head` 绑定到实际提交；不运行 Stage B、78 月物化或其他非授权范围。
+**Stage A 脱敏结果**：22 个交易日、5,106 个月度证券、112,075 个 required 日×证券对全部闭合；
+22 个 fallback eligible pair 全部完成精确 `[D,D]` snapshot 查询并以 `num_trades > 0` 归类为
+`POSITIVE_TRADE_COUNT_ACTIVE`。评价分类为 active 22、suspension/non-trading 132、
+not-applicable 125、unresolved 0、extra 0、structural error 0，报告和月份状态均为 `PASS`。
+报告见 [`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)，
+人工可读摘要见 [`cr7_month_completeness_stage_a_20260914.md`](../provider_verification/cr7_month_completeness_stage_a_20260914.md)。
+旧的未闭合报告已保留为
+[`cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json)。
+
+该报告仍是 `SPIKE` 诊断：未创建 authoritative receipt，materializer 未进入，未运行 Stage B 或
+78 月物化。下一道门是 scheduler 独立 delta review；在得到后续明确授权前，不运行 Stage B、
+78 月物化、Formal/Production 或其他禁止范围。
 
 ## 5. 当前明确禁止
 

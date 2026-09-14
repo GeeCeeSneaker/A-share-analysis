@@ -299,9 +299,16 @@ Issue #59 最新 scheduler checkpoint 已接受正式工程语义：同一 Owner
 
 为防止证据降级，receipt/capture catalog 已升级为 v3，snapshot method、精确请求哈希、
 raw evidence/schema/content closure、SDK/runtime envelope 和 fallback 版本均进入 replay；
-普通 normalization 仍 `BLOCKED_PENDING_MAPPER`，快照不成为 canonical dataset。新实现尚未
-重跑 Stage A；下一步只允许从 exact committed head 运行 `2024-01` Stage A，Stage B 和
-78 月物化继续禁止，直到 scheduler 再次审阅。
+普通 normalization 仍 `BLOCKED_PENDING_MAPPER`，快照不成为 canonical dataset。
+
+exact committed head `aeaf10acf3d3512ee63cfc03bcfa4f170002a8d3` 的 `2024-01` Stage A 已完成，
+脱敏报告见 [`cr7_month_completeness_stage_a_20260914.json`](cr7_month_completeness_stage_a_20260914.json)，
+可读摘要见 [`cr7_month_completeness_stage_a_20260914.md`](cr7_month_completeness_stage_a_20260914.md)。
+22 个交易日、5,106 个月度证券和 112,075 个必需日×证券对全部闭合；22 个 fallback 候选全部由
+精确快照的正 `num_trades` 归类为 active，unresolved、missing、extra 和 structural error 均为 0，
+报告状态为 `PASS`。该报告仍是 `SPIKE` 诊断，未签发 authoritative receipt，也未进入 materializer。
+
+Stage B、78 月物化及其他非本范围工作继续禁止，等待 scheduler 的独立 delta review 和后续明确授权。
 
 ## 8. 2026-09-12 BSE 当前代码归因 delta
 

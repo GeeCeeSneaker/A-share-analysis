@@ -5,8 +5,8 @@
     "production_activity": false,
     "stage_b_started": false
   },
-  "checked_at": "2026-09-14T09:54:53.834777+00:00",
-  "code_head": "99cf9c61d60108b35bf200486222ab55926ce389",
+  "checked_at": "2026-09-14T15:18:51.325677+00:00",
+  "code_head": "aeaf10acf3d3512ee63cfc03bcfa4f170002a8d3",
   "month": {
     "applicability_semantics_version": "amazingdata-hist-code-list-exact-session-v2",
     "authoritative_receipt": {
@@ -23,7 +23,7 @@
         "method": "BaseData.get_calendar",
         "raw_persist": {
           "content_hash": "ebd2bfa29f1a32728d51e9be84ed1e7051604661a677fd2d2037c45557d1651f",
-          "evidence_hash": "bb6e08f84a41d709e6b3227929c2f36d541da7f4de9367c398fbba15370bd0d9",
+          "evidence_hash": "a6622ffc16c36d17d277a4400519d2b0f9065bc202b42f464633f9a65cc88af3",
           "null_table_count": 0,
           "row_count": 8725,
           "schema_hash": "17011899667fce6e575dd756fea6f8a7ea0c27cb5f40ed50fe31ee34831c42cc",
@@ -37,8 +37,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "5f97fe4d3c24efe6aec60d5797aa5a81a1ea3bc16443d1f24b33e2f042e11cc4",
-          "evidence_hash": "7af641265b4b950d351ae9b9fea914a9d7ee843e81d61bb75c784cda33bcd82c",
+          "content_hash": "5a10407f4c8611898c8d6a94e685e5c99803e0fb422da0e9e872145e174d65fc",
+          "evidence_hash": "aa137458cd6bf40e3f2f33c1cbd81fa61d722ca336de2cda7b0f175308efbe2f",
           "null_table_count": 0,
           "row_count": 5106,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -52,8 +52,8 @@
       {
         "method": "InfoData.get_history_stock_status",
         "raw_persist": {
-          "content_hash": "4aa3ed25db990599c5f8399fb5b8906c4df5f1ba74adaff1f86b8e51e0111a9a",
-          "evidence_hash": "a86667cb37b58cd86def0c591c031347b8a65a445c1696e2e5648d53594a3ae6",
+          "content_hash": "ca30d87fbcd1b9dd066446ad130bd6517950c1a8666c8ea588f260fa32153499",
+          "evidence_hash": "bfa02b8291edca222ad13094b84560ebbf237b4272e829fa648fabd6d9cb4909",
           "null_table_count": 0,
           "row_count": 112185,
           "schema_hash": "2b8f825bc4d96a12e23927f2ccf7bfc220e47aa623cdb5b9ffe93589c3636323",
@@ -67,8 +67,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "353dc8ebb8894b78f0cf2f6bea4741a11b8762caa8420aaf96ae35b37c61f5f8",
-          "evidence_hash": "feddf168193eaa535192e34077b5085c6819f6d45e2b188656716d6732683d15",
+          "content_hash": "1dda58ecadd09db45ef6f78b20b8775527b932927e526307c1901f5c7d823294",
+          "evidence_hash": "69675e8304e574dd2a9f72290f07591e380b8bbdf86e2c723a58a6dd63379faf",
           "null_table_count": 0,
           "row_count": 5096,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -82,8 +82,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "20e9418b3ae686555b85a55be2ce5699055a354a4baea0310219857f18a1b40d",
-          "evidence_hash": "8a37cf6e936582309b418c9c9803a8364384a233d3e0c17e4d5e261f0f7bc35b",
+          "content_hash": "c0ec754e83d4d1ca5dac8cf65733172fb7c6eb61d438ac9977fce55d591b2932",
+          "evidence_hash": "0f98a8c1f451bd1dbdd8195594730625c87ef5a4dd5dac85472465d4cda09dbd",
           "null_table_count": 0,
           "row_count": 5097,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -97,8 +97,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "2961da887b6ba1e89ef599ff129fdaeea397eac1528a63b89fa5f4ae9b5f9e45",
-          "evidence_hash": "579cd1b8f0a3a5b72c1b05a5507e1cc7ca5698640d7df35a094f134ff5d95d94",
+          "content_hash": "ddbedee01bd2f5a4a1f27b0a5823e525b42b3998f7ae8ab5f421cc8a161b8a21",
+          "evidence_hash": "bf949a649fcceb466466f87ab029c396d872e82e72ca16f95e5423e5e8e8dfc8",
           "null_table_count": 0,
           "row_count": 5097,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -112,8 +112,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "20e9418b3ae686555b85a55be2ce5699055a354a4baea0310219857f18a1b40d",
-          "evidence_hash": "cdff188795b069df803ab1c5f8c185afe5ed0c2d0a9197a20873b8a57b96c9e4",
+          "content_hash": "66ea3b3b5da60221bc7fb61af7303db1f92672c7a1dcc14deda9256b6e649697",
+          "evidence_hash": "b515c700124b021585202c27cc3c27e9cf63b93667d553d45ee2f1a085335be3",
           "null_table_count": 0,
           "row_count": 5097,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -127,8 +127,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "5af863a33ff5158e8ae721ec7e5ece9a0ec4e869469ec0b762f67924ad9f9f41",
-          "evidence_hash": "4cba0d4da0b7519e5ebd4a673218dc29df0a0f97595168eec9c810280cbf4c0f",
+          "content_hash": "73d07f76872a25ac370c05c58d463f1760b7f3c58e0cf075441e99b4e49d3e90",
+          "evidence_hash": "c6ec744264191788e4107f06a6b7fab2d91eb8459dacd5ee808faa4b871a353d",
           "null_table_count": 0,
           "row_count": 5097,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -142,8 +142,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "99d6e5adc96aed6fa499a9a6d43fde60da61d4130920c6fb7bc01446d9d3ed27",
-          "evidence_hash": "acfdf9ce769196a8ec8e98e7305cbfc96068bac618b51b0103bbde596a2c2478",
+          "content_hash": "cb5c8bb67e49e584b135d1d8a4726cf885a35f0ab9fe347684de07ad24d90709",
+          "evidence_hash": "d25cefdcca537e2a551603f56cc945434590bb168974dee51ea9c76614ce7a35",
           "null_table_count": 0,
           "row_count": 5097,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -157,8 +157,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "fd610c309395ea5f971bd87373951c661670d16b6aee53dced5f55d0b997d5d1",
-          "evidence_hash": "56c71e853a6e8bac7b3077c78c49ea8d77d7c423eeb950b215fc0e941e016c53",
+          "content_hash": "186c28e49b3ff3c1f98f75dd9d673d573e09d3ef03600072c3d6746660368390",
+          "evidence_hash": "5335429d094d1550092df278806cf4dacc9b8058447abce46dcad163cd634e73",
           "null_table_count": 0,
           "row_count": 5098,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -172,8 +172,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "e0ebb749355adbad512c6e49ce4a9455d61b36a83164cbd4ce1c1889563fa193",
-          "evidence_hash": "028818fa9ba418d54567a5856333677715ca0d1fa93d77beec0494f366f25950",
+          "content_hash": "dcbe1525417685dea7e33f32d659eb528682ccf0d0fb1935557930b242829037",
+          "evidence_hash": "a9756660bb961ea379e52773f2724dfe137ccdf106a2aa90f1c84644f92c69fe",
           "null_table_count": 0,
           "row_count": 5100,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -187,8 +187,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "e0ebb749355adbad512c6e49ce4a9455d61b36a83164cbd4ce1c1889563fa193",
-          "evidence_hash": "21518fe12601b189ba52d0ece77b6f6df0ece8ac6b19754e15224e82ca9a40cf",
+          "content_hash": "864c63412580d71f256e0c76c039feb082964421684d391b8a58f3c554ae58d6",
+          "evidence_hash": "750979c78dd9a14dca81e6cfe76d83b369043f7e57f5c4e2da3fb83c2b646594",
           "null_table_count": 0,
           "row_count": 5100,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -202,8 +202,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "2581a0ef44124edd031d996c39d7f2f3819921b0dbf9f4b0477558a0f04bc81f",
-          "evidence_hash": "eb8d7f14977ab07ad3d235721d3535ffb1547dbf56d57b4d583d27fbb09c247c",
+          "content_hash": "a586868028b7b46405454bfd09a9f11d4f28343200968a780b2047e0fa192390",
+          "evidence_hash": "73e69897c094ba25ba5d9f043fae8fce3fb79391d963da99481a6d77a1b63042",
           "null_table_count": 0,
           "row_count": 5100,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -217,8 +217,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "6e1e0a44d3876aa4091ee90044b4efc5c037634eb96dc4a21164abacfd905270",
-          "evidence_hash": "131bded0292c6130092cd8811fb4d5258cbda8d593bbb0d01b408744bd8ac1f9",
+          "content_hash": "83cbe5d6c351eec5b79485a94407e7f0b6eeb39c6f657e98b8d016cfc8e4fd75",
+          "evidence_hash": "47fcf7a31f2f5f441c55949823fb142b9a417ecda6648ae17686fea1ca086816",
           "null_table_count": 0,
           "row_count": 5100,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -232,8 +232,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "43c88f8a85a71dad131579c714c40622a28521c2b53da2a48c726f6adac4f991",
-          "evidence_hash": "ccf84c0144bbda268b3e4e771bc4c58afe8cdf4ca5731429543d80ef71a82943",
+          "content_hash": "83cbe5d6c351eec5b79485a94407e7f0b6eeb39c6f657e98b8d016cfc8e4fd75",
+          "evidence_hash": "2e7e118fb16654b33597832fe38e7d82544fdc9425f93af863de943454198f6b",
           "null_table_count": 0,
           "row_count": 5100,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -247,8 +247,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "6874bed04c26d067ccb4e2eaa83e8f06c70b0054f96938aeb9a14724b6b370a0",
-          "evidence_hash": "d75b5c970b42964332c529f6cafebbc1618c699de0521e5d9c489ff6fe6e3a51",
+          "content_hash": "c36e77d7c2b4f805096ffc5696bb5bd00581dd796c57de5326a20962968f310d",
+          "evidence_hash": "d030e0866466cc9fcb0dc7c29a456c7a6d926552b333edbc4a61b9433174dc20",
           "null_table_count": 0,
           "row_count": 5101,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -262,8 +262,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "d5ded8de88fda31a3458b5de0e17218d260ba3f8d7cb6c659ac56e8300895d94",
-          "evidence_hash": "dbf91422fc9436de2b1369027068f58f10d1aaedb8fb9647f0f06dd5f9c26029",
+          "content_hash": "75c696093ab01c2d44b2e3cac711fc22a236a425eab19316efa1ad58ba178138",
+          "evidence_hash": "cbf1b6c4c3989f419fa2fd41c1df8097d1595195f6083b33f3912cb97e8a04bf",
           "null_table_count": 0,
           "row_count": 5102,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -277,8 +277,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "a7fd3c1e071e3613b41cc20e5791e4cc22c32216e8376c882eebc90249716d07",
-          "evidence_hash": "4dee1a70a07fa90a0e26bf739e78a9c8a812fcc3077cc87521c3e26c09bdf043",
+          "content_hash": "bea03ebb79c28d16ec7f27186d90a5e97299af1b78220375a4c41e2199336ce7",
+          "evidence_hash": "09c3f30b558829ac282d17dea472238640b940238d56ed69e6ef2b76aba21e7c",
           "null_table_count": 0,
           "row_count": 5102,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -292,8 +292,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "a7fd3c1e071e3613b41cc20e5791e4cc22c32216e8376c882eebc90249716d07",
-          "evidence_hash": "89f298b6aca6c07ddc9d7aaa5c145b3438c65388f4563f298e75d9df3602af7c",
+          "content_hash": "36d5bd5f1a4b3b5ef1a399bea5050e9eb859fbd673eee2fc3816f49e908b167f",
+          "evidence_hash": "e3ffe0bd64b7ea017b29d52f5db2d0fbc1636e50e4bd9b8d2981858196524607",
           "null_table_count": 0,
           "row_count": 5102,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -307,8 +307,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "36d79571e9c219ef386bda246c046d07ffd9ae56ce3ed21f7fb850c2e0c28625",
-          "evidence_hash": "84370f70cd9295ba7847898ec3b664d16b54d4678a45ff2be12c511947af8057",
+          "content_hash": "31ca72e57d7f58ae8f673552e20c883d0c9a57b76f2ad33317aa0fbcd7e4de55",
+          "evidence_hash": "f845e60d0cdbaecfbef84ed83d702100ee392b9f0e62d6ab00e60cb48b6c6fe4",
           "null_table_count": 0,
           "row_count": 5104,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -322,8 +322,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "301a9ef379e687743b114c62d9362f4dd2546a1192c0042a46b134591c3b66d4",
-          "evidence_hash": "5a2451fd6f06497f97b50493b083ccbb843a2fb8ff25dab2982f83cd841df715",
+          "content_hash": "cf33ea668c1b75fecbacff2ae4a857260d1dad3f9b03077f66a193b1449cb3e9",
+          "evidence_hash": "264641f12bbb38814bc287805450c05f19a7608ac5898e43e8352b1cb774d7a7",
           "null_table_count": 0,
           "row_count": 5103,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -337,8 +337,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "879fc68e261361d4622f7f3617d5df2178c54c312358c650b29e608c79a19177",
-          "evidence_hash": "4a75b02c843275a75cc17ae60c646464b3ba435d43d74021e782784f4c56b466",
+          "content_hash": "9044ce17ffef1237989496ec30cb69ee0374c9a10c288d0368150888265a5c88",
+          "evidence_hash": "c3df73b2db7ebdd5a087e305f436faa6c0a1ab6d61bc67fcdc3cdb16ee7a59af",
           "null_table_count": 0,
           "row_count": 5103,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -352,8 +352,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "879fc68e261361d4622f7f3617d5df2178c54c312358c650b29e608c79a19177",
-          "evidence_hash": "2c6a48931da0995437bd5cafcbdb9a2fce167839242ec6184c73000c95a514ad",
+          "content_hash": "e04dee1e92f38e02df416096a325ea29f3d052735402f261156f88b270312600",
+          "evidence_hash": "3a2cc58bf1039a294f99e99ce7247833fdd54dde80fb83461cfd59f219820157",
           "null_table_count": 0,
           "row_count": 5103,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -367,8 +367,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "cb57f6d65bba1517d0d6396014510930f5b99175abebda23b9086ad04fdbff2d",
-          "evidence_hash": "66859bf94782930e4daadfdabf4896d8ee0dfc3712b7f3020e7d1653dc1f1977",
+          "content_hash": "673d8d60ef15d442835aeedd681fc8cd8726e7568722d6f13f0e08094b9bc335",
+          "evidence_hash": "95a0ee9d06c9256972b4e7e759c6d9979dea9f3189d6dbcf5602a3c2cf11bc5c",
           "null_table_count": 0,
           "row_count": 5104,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -382,8 +382,8 @@
       {
         "method": "BaseData.get_hist_code_list",
         "raw_persist": {
-          "content_hash": "80032ea9a931f76b57b6b3804eeeceaf844b0d2c90a33c5f7964c7a0faf17e85",
-          "evidence_hash": "feb33a2789ecd4776a3cb46b05a4e657715a3299e43988395e8af65e78f1e3aa",
+          "content_hash": "dff909960a62a22345ebcdf0584ba40bff562600de6fb9e993958726b3dc598f",
+          "evidence_hash": "3dfe7848a1343f1154ac9cc957921edaad93fa9cb359fe9dfddd7d9b1d247645",
           "null_table_count": 0,
           "row_count": 5104,
           "schema_hash": "c49f67417de675ec5c55c210384a9a59d23c7bba9360726b265c631e2f79c8a4",
@@ -395,10 +395,384 @@
         "status": "OK"
       },
       {
+        "exact_security_scope": true,
+        "exact_session": 20240102,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "7b8255ee5c4e2e5612cc43bd07913dd330f2af6ced71a12fc9ab720c212e5c2d",
+          "evidence_hash": "12a6e7c3d43f9321e2376a1b2ce9f8e03b0facf524b9255abe9a945d4cb99865",
+          "null_table_count": 0,
+          "row_count": 4505,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "d783490b6e9566c2d2dc4f4ff824885c27e1209dde76eeb579acae10857be7aa",
+        "row_count": 4505,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240103,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "50353f9f6de06cf083fc44bcd3449d8c65b3fc9bc896925a63ae4872803834e8",
+          "evidence_hash": "fd395043468336e1ff5b92a6cad278793c0b475b2cccd8049a096c1f4a9a666a",
+          "null_table_count": 0,
+          "row_count": 4039,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "7bbeb93efbec9df48bf8650e15865748ce4573ebe3e1bda67254b5046439f2fc",
+        "row_count": 4039,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240104,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "c0b84eeead8a5b6112a9a61b6b7c35996ce651564b7553983daaf0c33a63323f",
+          "evidence_hash": "46fafc8a7dfe25e86fb7473466da9f641770db6f4faa148ef00a8c5bebcbe139",
+          "null_table_count": 0,
+          "row_count": 4335,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "a4e624469b21d32315e139cf904edf879ce717f7aad6967ab007ab5dddd399d0",
+        "row_count": 4335,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240105,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "2ec285d9b4b09e338f1a6f280f8735d422b75068ea1550b5f867e4402ac0c4b5",
+          "evidence_hash": "80e31ebae4e877e872ebc0a972c8bdc897253e70e210d00b430b054856ff439b",
+          "null_table_count": 0,
+          "row_count": 4397,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "8ec8cb6d26ecd3f80afabdb10d162cac756236f471ebf63c9ca628271c278f4b",
+        "row_count": 4397,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240108,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "71464fdaee81189e8487f212f7072061f83c0abe7a4a7ed7aa7e0b2388e78e16",
+          "evidence_hash": "60e375abf12b430a78d431225055496c1f23d6c24d9053118db49ba9b233e51d",
+          "null_table_count": 0,
+          "row_count": 4492,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "25dff682c4fc8bd5a8a1f9681715117bb4db141d99c4f67aa6e0615d01abb526",
+        "row_count": 4492,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240109,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "7e6d721ee41e144e8a2780a0e5d67070113ecbe49bdbd988e0d8463a0331cb71",
+          "evidence_hash": "2456211de230f8350079671bff6c4f41822f568bdeb0d3b869c7a8624efbeae0",
+          "null_table_count": 0,
+          "row_count": 4447,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "803c9f1cb83d792d510bb2bc66ae99af19d65645ff30613f46b8e9cce9e5a879",
+        "row_count": 4447,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240110,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "67745ba86919d53cb1b73592720480409ec9345c4c3313a695656303f3d44da4",
+          "evidence_hash": "26b5ccbab21a8011095ffc91b40c9cad6062db0b69a01fc25c763435edfa34ef",
+          "null_table_count": 0,
+          "row_count": 4144,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "04d242f7cbea6a369078007c82936b408368fc88243925173125272a13e74b9b",
+        "row_count": 4144,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240111,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "e7efc0adb7a777f250e31da199c0de8251d2cfdab0da96203a00bf4d222515eb",
+          "evidence_hash": "d1a96eb9af240af32aa42c3059259826bd7f5b52da6ee993e1374755e39f0f26",
+          "null_table_count": 0,
+          "row_count": 4332,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "ec73062dc8d119b55a2eb3518bef89fd18325f8c8772ff7cb3caf2c1cc518c45",
+        "row_count": 4332,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240112,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "02679c5d18c435193daffdd221d46a771ea72e851be50f76d89c3fb2b60d3210",
+          "evidence_hash": "5e70defd4a6bd7c0da736f0014522782c6ad47eb346034713d313fbd710b65bd",
+          "null_table_count": 0,
+          "row_count": 4394,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "b5b47f7ada51fd394d9bdbf71fc74fc2d7ba947454b203c44ff783458b152265",
+        "row_count": 4394,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240115,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "88ff96f77503c5bf1fafcb421f3fb45e07d47c19b6704b8e52fc525b6bc5fa78",
+          "evidence_hash": "4394171e5d99f634cd2d0295b6a05cf57e521eed0cfb42975e420e02a91e997a",
+          "null_table_count": 0,
+          "row_count": 4115,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "43677f3e126acb24738cec2227dc955dcc7ed37f0269e8af5ce6e8a5967b74bb",
+        "row_count": 4115,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240116,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "fcd93520f870a7470c01e8e3e67da16b18c00e67f175ffa7aae0b8b5a2cf5399",
+          "evidence_hash": "b971218fb866c6457fa4c6bda5a80043e9dddc935e5b60b7b12cb7adc9cb43ba",
+          "null_table_count": 0,
+          "row_count": 4244,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "7df382117c3af421e975cea4574d36db72955b75a2a4b1349018fe3807de33a2",
+        "row_count": 4244,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240117,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "fe3b602b27c52541e6e249366aab606ad3b36e12085a50f53b6ab4d4fd1fbe26",
+          "evidence_hash": "3f775bf56de907d41658cc93c241ff08cce034b2db9368e4441065c52c72233f",
+          "null_table_count": 0,
+          "row_count": 4145,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "e5082bba674aba423534cce52a238fbc8c8f21d253a1d9eb5ab8af1b3e5808bd",
+        "row_count": 4145,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240118,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "a91cf3e0de61e1627c91e249943626d44bb24461c3cb2664c22ea82ef8a45aa1",
+          "evidence_hash": "0a9472b3e72c8bcece397b222763483d33066f631eddd767bd2dbfd95aab19dc",
+          "null_table_count": 0,
+          "row_count": 4683,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "1635f48f71477739f0105538d69e4f3340d7af71954beeed171d14b17f7e6dc3",
+        "row_count": 4683,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240119,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "0be51ddf7a560972abfa1e3dbd35688e37811b9f026a56b6da157ec11e88ef79",
+          "evidence_hash": "41d161b64083821ee78d460bc8f249bebf9907ae8e26112c96486aa4880f7cd2",
+          "null_table_count": 0,
+          "row_count": 4291,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "cc0aeee211b9cb76521a2f7a589641cb28f73a494fe430ecc5f121ba1e3356d2",
+        "row_count": 4291,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240122,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "e540eb3cb376888c994155a80740660013ba153c00ccf541b98ded744d67a953",
+          "evidence_hash": "453bb15fc041011d3b030a56ce1bc83a8e7057772ff9b2815b340c2fa62948f0",
+          "null_table_count": 0,
+          "row_count": 4512,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "86cfd279b6af340bb3804fa2f4d91384fdf1cc93cff1f935ab3996c2964d595d",
+        "row_count": 4512,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240123,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "57278aba3a378b0c7e95167a2acd43ffcdcde2c64ecc825cffdef1c78bc9d13c",
+          "evidence_hash": "8a5f8b13bdf3d1c6e0636fcd81f3e177ae8edeb86ac32602edbbb78e77a048b2",
+          "null_table_count": 0,
+          "row_count": 4506,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "20e626d73dff35b86fbb7170f30fed7e0a89d4dbffe0925dd9f005e21105d2d9",
+        "row_count": 4506,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240124,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "15abf31aca90eb9a7fe90875e0fd56bce888b83f0184f5386c4d58b506e82ed0",
+          "evidence_hash": "6f87c81bf62f3d963917cacc0b65000e460bad753025ebc8c301c16298a164b4",
+          "null_table_count": 0,
+          "row_count": 4541,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "cefcae2082bcc2abd2faa70e006bf9437795f675eabb7f7c2535986a18bbcee9",
+        "row_count": 4541,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240125,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "32aed9549666b0cd07c486ef5139506ecb0cfaaca842e3fdef86d12f9f86cc6f",
+          "evidence_hash": "f7236190ff8cf0f4670450aa4f182dc4f775a8155453101164a30bc9a5455ae2",
+          "null_table_count": 0,
+          "row_count": 4708,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "c73ba2f60e1f3921cb1e1bef379f7360c310f97124034ca8b2aa5553827dc28e",
+        "row_count": 4708,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240126,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "ebe102136cff5cd959616532a2e7f903e93592ab4093f4fa16ced0dc1c4e7392",
+          "evidence_hash": "09712caa4e1a96ce581a3ad8d00497fb0f08c0819da0715f9d6317c61caa03c1",
+          "null_table_count": 0,
+          "row_count": 4514,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "93a03ac45c735ab66a24e221c205fbeca3452c5690d7b2907acd7ef34c7a92a9",
+        "row_count": 4514,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240129,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "ecf0dbce4d653d4d7619269fb060b1a1a07f3cbf30cce10de770f97f1769d3f9",
+          "evidence_hash": "07a68d417add526665a08095bce81c17afa292979f66a2bd4feb8c1cb8e1ee29",
+          "null_table_count": 0,
+          "row_count": 4496,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "bf3e11bfae00ac07c0b385ae11ce27b0598820992b4e0450d5c74f9e585d7394",
+        "row_count": 4496,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240130,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "56acb0cdc0c2aec3c40740a98727138709b0bdd61cd289e61f3b2ba8960d1553",
+          "evidence_hash": "8ca820b9c31904498b5702a56d36ddb808215d997514813a65386bdc341b6667",
+          "null_table_count": 0,
+          "row_count": 4292,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "e0c1f03a83bed3edac7ad76efc433fb9953f4bd5742df47eb63f927353d3ae42",
+        "row_count": 4292,
+        "status": "OK"
+      },
+      {
+        "exact_security_scope": true,
+        "exact_session": 20240131,
+        "method": "MarketData.query_snapshot",
+        "raw_persist": {
+          "content_hash": "1c16aa9df6caa2edb269bd45d4aaa688374e3f6ccc4d248f3dbd0c6b0fac1dc7",
+          "evidence_hash": "315d482788c3b36265868cfd8555058004649be3375b4782540b217881b5537f",
+          "null_table_count": 0,
+          "row_count": 4649,
+          "schema_hash": "256f074f08e80b27fa3003368c0bf35c5d8b5546e558e46d266c2dabecfddffb",
+          "status": "PERSISTED_LOCAL_IGNORED_ONLY",
+          "table_count": 1
+        },
+        "request_params_hash": "68f951b6b4bfddaf192fa70a5b52e4a1072c00df7a3693630dafa5b43185d19e",
+        "row_count": 4649,
+        "status": "OK"
+      },
+      {
         "method": "MarketData.query_kline",
         "raw_persist": {
-          "content_hash": "afb72c2d2493379004e482778581017f4f1439773cb51ef654401bd31ef7fd5c",
-          "evidence_hash": "92fd2713ec66bd12c7f2e23f762744bd2df363c4b5f498a30e71e11b7de05cf4",
+          "content_hash": "8142b725002c4f8f0c1e1487bfb24272228b2f4bc9357a4e73e2dc18c2fb70ef",
+          "evidence_hash": "8a01bd05cc7e332c9ef468cdddc9c07c3bd1660c694ba66b28ed580a10bc51fa",
           "null_table_count": 3,
           "row_count": 112075,
           "schema_hash": "622025554781a6c217ffbc5beef68173d29a90b4f710d0d34c25de9e8047f33b",
@@ -440,23 +814,27 @@
       "applicable_pair_count": 112207,
       "applicable_pair_set_hash": "c7ec6c09664794369720fccc520e231a29a7b2d384ea9c80dfce5563187c73a4",
       "classification_counts": {
-        "EXTRA_RETURNED": 22,
+        "EXTRA_RETURNED": 0,
         "NOT_APPLICABLE_SESSION": 125,
-        "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 1,
+        "POSITIVE_TRADE_COUNT_ACTIVE": 22,
+        "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
         "SUSPENSION_NON_TRADING": 132,
         "UNEXPLAINED_MISSING": 0,
-        "UNRESOLVED": 22
+        "UNRESOLVED": 0
       },
-      "extra_returned_pair_count": 22,
-      "extra_returned_pair_set_hash": "8e6255c0f88de81ae3512b9e03a4609e494f7f2b4d25dbaa3d295f246a295d64",
+      "extra_returned_pair_count": 0,
+      "extra_returned_pair_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "missing_required_pair_count": 0,
       "missing_required_pair_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "monthly_security_count": 5106,
       "monthly_security_set_hash": "f9b15023b79cd261c599a5de52e5d00e62cdf82c4b9fddffcde601450a7e8fde",
       "not_applicable_pair_count": 125,
       "not_applicable_pair_set_hash": "83c8baf5688a76cb2468de119b41f118a3977e2abdc30b2d39f1f4805cd491e1",
-      "required_bar_pair_count": 112053,
-      "required_bar_pair_set_hash": "40809ff7f307cf473bfb6504cae528ce7f7d9a9e9c3f7b7a9f075bfd997d1fb5",
+      "positive_trade_fallback_version": "amazingdata-positive-trade-count-fallback-v1",
+      "positive_trade_pair_count": 22,
+      "positive_trade_pair_set_hash": "8e6255c0f88de81ae3512b9e03a4609e494f7f2b4d25dbaa3d295f246a295d64",
+      "required_bar_pair_count": 112075,
+      "required_bar_pair_set_hash": "14517c57e0a369b8b700a1a6c5f5fe9ed069f540b3d6ce28d79c44d8a12a2651",
       "returned_bar_pair_count": 112075,
       "returned_bar_pair_set_hash": "14517c57e0a369b8b700a1a6c5f5fe9ed069f540b3d6ce28d79c44d8a12a2651",
       "returned_first_date": "2024-01-02",
@@ -464,16 +842,14 @@
       "returned_row_count": 112075,
       "returned_trading_day_count": 22,
       "returned_trading_days_hash": "f7a391589c4ab102ce6b570c4001a92590eae94a3794e0f40f8554e6da903452",
-      "rule_version": "amazingdata-month-completeness-rule-v1",
+      "rule_version": "amazingdata-month-completeness-rule-v2",
       "session_count": 22,
       "session_set_hash": "f7a391589c4ab102ce6b570c4001a92590eae94a3794e0f40f8554e6da903452",
-      "status": "FAIL_CLOSED",
-      "structural_error_codes": [
-        "STATUS_SCHEMA_MISMATCH"
-      ],
+      "status": "PASS",
+      "structural_error_codes": [],
       "suspended_pair_count": 132,
       "suspended_pair_set_hash": "a3f5e8940a8993649c3dce226cd4082912eb3d1549f8769a885dc3fd5f0bb929",
-      "unresolved_pair_count": 22
+      "unresolved_pair_count": 0
     },
     "exact_session_universes": {
       "session_request_count": 22,
@@ -497,7 +873,126 @@
       "security_count": 5106,
       "security_set_hash": "f9b15023b79cd261c599a5de52e5d00e62cdf82c4b9fddffcde601450a7e8fde"
     },
-    "rule_version": "amazingdata-month-completeness-rule-v1",
+    "positive_trade_fallback": {
+      "eligible_pair_count": 22,
+      "observations": [
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240102
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240103
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240104
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240105
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240108
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240109
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240110
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240111
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240112
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240115
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240116
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240117
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240118
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240119
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240122
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240123
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240124
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240125
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240126
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240129
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240130
+        },
+        {
+          "positive_num_trades": true,
+          "structural_error_codes": [],
+          "trading_day": 20240131
+        }
+      ],
+      "positive_trade_pair_count": 22,
+      "positive_trade_pair_set_hash": "8e6255c0f88de81ae3512b9e03a4609e494f7f2b4d25dbaa3d295f246a295d64",
+      "queried_pair_count": 22,
+      "version": "amazingdata-positive-trade-count-fallback-v1"
+    },
+    "rule_version": "amazingdata-month-completeness-rule-v2",
     "scope": {
       "end": "2024-01-31",
       "inclusive": true,
@@ -505,7 +1000,7 @@
       "start": "2024-01-01"
     },
     "stage": "A",
-    "status": "FAIL_CLOSED",
+    "status": "PASS",
     "status_observation": {
       "flag_unreadable_table_count": 1,
       "member_count": 5106,
@@ -534,13 +1029,18 @@
       }
     }
   },
+  "positive_trade_fallback": {
+    "method": "MarketData.query_snapshot",
+    "rule": "finite_num_trades_strictly_greater_than_zero_only",
+    "version": "amazingdata-positive-trade-count-fallback-v1"
+  },
   "provider_access": {
     "runtime_version": "V4.3.0.260626-rc2.0-YHZQ",
     "sdk_version": "1.1.9",
     "status": "AUTHENTICATED_RUNTIME_READY"
   },
   "provider_use_mode": "SPIKE",
-  "schema": "cr7.month_completeness_semantics.v1",
+  "schema": "cr7.month_completeness_semantics.v2",
   "scope": {
     "end": "2024-01-31",
     "month": "2024-01",
@@ -562,5 +1062,5 @@
     "selection_version": "source-selection-retrieval-closure-20260912"
   },
   "stage": "A",
-  "status": "FAIL_CLOSED"
+  "status": "PASS"
 }

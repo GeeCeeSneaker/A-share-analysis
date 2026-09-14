@@ -6951,7 +6951,7 @@ GT-H3B #129 为策略性 `skipped`，不构成 Provider 或 Production 证据。
 
 **Type**：C1 — CR-7 same-source positive-trade fallback implementation
 **Date**：2026-09-14
-**Status**：`IMPLEMENTED / LOCAL QA GREEN / STAGE A NOT YET RERUN / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+**Status**：`IMPLEMENTED / LOCAL QA GREEN / STAGE A PASS / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
 **Trigger**：Issue #59 scheduler checkpoint `5665219753`；基线为 clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f`。
 
 **范围与决策**：
@@ -6979,8 +6979,16 @@ GT-H3B #129 为策略性 `skipped`，不构成 Provider 或 Production 证据。
 **本地验证与下一步**：
 
 - 本地 focused 和 full `pytest` 已通过；Ruff check/format、`mypy src`、compileall、`uv pip check`
-  已通过。实现提交后仍需 exact-head CI；Stage A 仅允许在该提交头重跑 `2024-01`，并将
-  脱敏报告 `code_head` 绑定实际执行头。
-- 在 Stage A PASS 且 unresolved/missing/extra/structural blockers 全为 0 之前，不运行 Stage B、
-  78 月物化、Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
-  不上传凭证、私有 endpoint、专有 SDK/runtime 或 raw payload；PR 保持 Draft，等待独立 review。
+  已通过。实现提交 `aeaf10acf3d3512ee63cfc03bcfa4f170002a8d3` 的 exact-head CI #610 在
+  Ubuntu 3.14、Windows 3.12、Windows 3.14 全部通过；GT-H3B #131 按策略 skipped。
+- 仅在该 exact head 执行了获准的 `2024-01` Stage A：22 个交易日、5,106 个月度证券、
+  112,075 个 required/returned 日×证券对闭合；22 个 fallback 候选全部为正 `num_trades`，
+  `unresolved=0`、`missing=0`、`extra=0`、结构错误为 0，报告和月份状态均为 `PASS`。脱敏报告为
+  [`cr7_month_completeness_stage_a_20260914.json`](../../docs/provider_verification/cr7_month_completeness_stage_a_20260914.json)，
+  人工可读摘要为 [`cr7_month_completeness_stage_a_20260914.md`](../../docs/provider_verification/cr7_month_completeness_stage_a_20260914.md)。
+- 原先的未闭合规范报告已保留为
+  [`cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json`](../../docs/provider_verification/cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json)。
+- 虽然本轮 Stage A 已 PASS 且四类阻断均为 0，但它仍只是 `SPIKE` 诊断；未签发 authoritative
+  receipt，未进入 materializer。Stage B、78 月物化、Formal/Production、BSE/index、CR-5/R2、
+  Golden/H1、baseline 或策略工作仍须 scheduler 独立审阅和单独授权。PR 保持 Draft，等待独立 review。
+  不上传凭证、私有 endpoint、专有 SDK/runtime 或 raw payload。
