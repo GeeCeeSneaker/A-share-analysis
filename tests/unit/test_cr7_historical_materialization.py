@@ -4,14 +4,34 @@ from __future__ import annotations
 
 import inspect
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+import duckdb
+import polars as pl
 import pytest
 
+from ashare_state.providers.amazingdata.authoritative_history import (
+    AmazingDataAcquisitionError,
+    AmazingDataHistoryAcquisition,
+)
+from ashare_state.providers.amazingdata.operations import (
+    DAILY_BAR_KLINE,
+    HIST_CODE_LIST,
+    TRADE_CALENDAR,
+)
+from ashare_state.providers.amazingdata.provider import AmazingDataProvider, RawEnvelope
+from ashare_state.providers.exchange import ProviderExchange
 from ashare_state.research import (
+    AMAZINGDATA_CALENDAR_MARKET,
+    AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
+    AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
     COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
+    AmazingDataAcquisitionReceipt,
+    AuthoritativeCoverageBasisAdapter,
+    AuthoritativeCoverageEvidence,
     CoverageBasisDescriptor,
     CoverageBasisError,
     CoverageEvidenceClass,
@@ -28,6 +48,9 @@ from ashare_state.research import (
     ResearchEligibility,
     ResearchSplit,
     VerifiedResearchProjection,
+    VerifiedSourceSnapshot,
+    build_authoritative_coverage_basis_descriptor,
+    build_authoritative_coverage_evidence_from_acquisition,
     build_fixture_coverage_basis_descriptor,
     compute_coverage_basis_set_hash,
     compute_writer_runtime_lock_hash,
@@ -38,6 +61,8 @@ from ashare_state.research.models import (
     canonical_json,
     sha256_hex,
 )
+from ashare_state.storage import apply_migrations
+from ashare_state.storage.raw_anchor import AnchoredRawEvidenceWriter
 
 SNAPSHOT_ID = "cr7-offline-snapshot"
 SNAPSHOT_MANIFEST_HASH = "a" * 64
@@ -206,6 +231,117 @@ def _full_window_fixture_bases(*, partial: bool = False) -> tuple[CoverageBasisD
         )
         for partition in expected_partition_keys()
     )
+
+
+class _FakeAmazingDataProvider(AmazingDataProvider):
+    """A typed-facade fake used only to exercise the acquisition boundary."""
+
+    def __init__(self) -> None:
+        self.calendar = _provider_exchange(
+            TRADE_CALENDAR,
+            {"market": AMAZINGDATA_CALENDAR_MARKET},
+            [20191231, 20200102, 20200103, 20200203],
+        )
+        self.code_list = _provider_exchange(
+            HIST_CODE_LIST,
+            {
+                "security_type": AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
+                "start_date": 20200101,
+                "end_date": 20200131,
+            },
+            ["000001.SZ", "600000.SH"],
+        )
+
+        def frame_for(symbol: str) -> pl.DataFrame:
+            return pl.DataFrame(
+                {
+                    "code": [symbol, symbol],
+                    "kline_time": [
+                        datetime(2020, 1, 2),
+                        datetime(2020, 1, 3),
+                    ],
+                    "open": [9.8, 10.2],
+                    "high": [10.1, 10.7],
+                    "low": [9.5, 10.0],
+                    "close": [10.0, 10.5],
+                    "volume": [100.0, 120.0],
+                    "amount": [1000.0, 1260.0],
+                }
+            )
+
+        self.kline = _provider_exchange(
+            DAILY_BAR_KLINE,
+            {
+                "code_list": ["000001.SZ", "600000.SH"],
+                "begin_date": 20200101,
+                "end_date": 20200131,
+                "kline_type": "DAY",
+                "period": 10008,
+                "trading_days": [20200102, 20200103],
+            },
+            {"000001.SZ": frame_for("000001.SZ"), "600000.SH": frame_for("600000.SH")},
+        )
+
+    def get_calendar_exchange(self, market: str = "SH") -> ProviderExchange:
+        return self.calendar
+
+    def get_hist_code_list_exchange(
+        self, security_type: str, start_date: int, end_date: int
+    ) -> ProviderExchange:
+        return self.code_list
+
+    def query_kline_exchange(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        kline_type: str = "DAY",
+        trading_days: list[int] | None = None,
+    ) -> ProviderExchange:
+        return self.kline
+
+
+def _provider_exchange(spec: Any, params: dict[str, Any], payload: Any) -> ProviderExchange:
+    now = "2026-08-01T00:00:00+00:00"
+    envelope = RawEnvelope(
+        provider_dataset=spec.provider_dataset,
+        endpoint=spec.endpoint,
+        request_params=params,
+        request_params_hash=RawEnvelope.params_hash(params),
+        requested_at=now,
+        received_at=now,
+        operation_id=spec.operation_id,
+        normalization_surface=spec.normalization_surface,
+    )
+    return ProviderExchange(envelope=envelope, payload=payload)
+
+
+def _acquisition_receipt(tmp_path: Path) -> Any:
+    source_snapshot = VerifiedSourceSnapshot.from_projection(_projection([]))
+    acquisition = AmazingDataHistoryAcquisition(
+        _FakeAmazingDataProvider(),
+        _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-acquisition"),
+        source_snapshot,
+    )
+    return acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+
+
+def _anchored_writer(raw_root: Path, *, ingest_run_id: str) -> AnchoredRawEvidenceWriter:
+    conn = duckdb.connect(":memory:")
+    apply_migrations(conn, Path(__file__).parents[2] / "migrations")
+    return AnchoredRawEvidenceWriter(conn, raw_root, ingest_run_id=ingest_run_id)
+
+
+def _authoritative_evidence(
+    partition: PartitionKey,
+    tmp_path: Path,
+) -> AuthoritativeCoverageEvidence:
+    receipt = _acquisition_receipt(tmp_path)
+    receipt_partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    if partition != receipt_partition:
+        raise AssertionError(f"test receipt is only for {receipt_partition.logical_key}")
+    return build_authoritative_coverage_evidence_from_acquisition(partition, receipt)
 
 
 def test_plan_has_78_months_and_keeps_bse_out_of_enabled_route(tmp_path: Path) -> None:
@@ -415,6 +551,210 @@ def test_coverage_basis_rejects_forged_method_and_exact_bytes_are_bound() -> Non
     with pytest.raises(CoverageBasisError, match="exact canonical"):
         CoverageBasisDescriptor.from_mapping(basis.as_dict(), artifact_bytes=wrong_bytes)
     assert partition == basis.partition_key
+
+
+def test_authoritative_adapter_emits_only_with_sealed_upstream_evidence(tmp_path: Path) -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    evidence = _authoritative_evidence(partition, tmp_path)
+    descriptor = build_authoritative_coverage_basis_descriptor(partition, evidence)
+
+    assert descriptor.completeness_method == AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD
+    assert descriptor.evidence_class is CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM
+    assert descriptor.authoritative_evidence is evidence
+    assert descriptor.authoritative_evidence.coverage_basis_evidence_hash
+
+    forged = descriptor.as_dict()
+    forged["completeness_method"] = AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD
+    forged_bytes = canonical_json(
+        {key: forged[key] for key in forged if key != "coverage_basis_artifact_hash"}
+    ).encode()
+    forged["coverage_basis_artifact_hash"] = sha256_hex(forged_bytes)
+    with pytest.raises(CoverageBasisError, match="typed evidence sidecar"):
+        CoverageBasisDescriptor.from_mapping(forged, artifact_bytes=forged_bytes)
+
+
+def test_authoritative_materializer_requires_the_retained_capture_root(tmp_path: Path) -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    evidence = _authoritative_evidence(partition, tmp_path)
+    descriptor = build_authoritative_coverage_basis_descriptor(partition, evidence)
+    materializer = OfflineHistoricalMaterializer(
+        tmp_path / "materialized",
+        writer_runtime_lock_hash=_writer_hash(),
+        build_code_fingerprint=BUILD_FINGERPRINT,
+    )
+    with pytest.raises(HistoricalMaterializationError, match="capture root"):
+        materializer.plan(_fixture_projection(), coverage_bases=(descriptor,))
+
+
+def test_authoritative_evidence_rejects_wrong_selection_scope_and_pit(tmp_path: Path) -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    evidence = _authoritative_evidence(partition, tmp_path)
+
+    wrong_selection = evidence.as_dict(include_artifact_hash=False)
+    wrong_selection["source_selection_fingerprint"] = "0" * 64
+    wrong_selection_bytes = canonical_json(wrong_selection).encode()
+    with pytest.raises(CoverageBasisError, match="typed binding"):
+        AuthoritativeCoverageEvidence.from_mapping(
+            wrong_selection,
+            artifact_bytes=wrong_selection_bytes,
+            artifact_hash=sha256_hex(wrong_selection_bytes),
+        )
+
+    wrong_scope = evidence.as_dict(include_artifact_hash=False)
+    wrong_scope["claimed_scope_start"] = "2020-02-01"
+    wrong_scope["claimed_scope_end"] = "2020-02-29"
+    wrong_scope["upstream_inventory_scope_start"] = "2020-02-01"
+    wrong_scope["upstream_inventory_scope_end"] = "2020-02-29"
+    wrong_scope_bytes = canonical_json(wrong_scope).encode()
+    with pytest.raises(CoverageBasisError, match="receipt|scope"):
+        AuthoritativeCoverageEvidence.from_mapping(
+            wrong_scope,
+            artifact_bytes=wrong_scope_bytes,
+            artifact_hash=sha256_hex(wrong_scope_bytes),
+        )
+
+    with pytest.raises(CoverageBasisError, match="stale|PIT"):
+        AuthoritativeCoverageBasisAdapter.reviewed_amazingdata_history().verify_descriptor(
+            build_authoritative_coverage_basis_descriptor(partition, evidence),
+            source_snapshot_id=SNAPSHOT_ID,
+            source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
+            source_snapshot_as_of=datetime(2026, 9, 2, tzinfo=UTC),
+        )
+
+
+def test_authoritative_evidence_rejects_tampered_bytes_and_downgrade(tmp_path: Path) -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    evidence = _authoritative_evidence(partition, tmp_path)
+    payload = evidence.as_dict(include_artifact_hash=False)
+    with pytest.raises(CoverageBasisError, match="not canonical|does not match bytes"):
+        AuthoritativeCoverageEvidence.from_mapping(
+            payload,
+            artifact_bytes=evidence.artifact_bytes + b"tampered",
+            artifact_hash=evidence.coverage_basis_evidence_hash,
+        )
+
+    with pytest.raises(CoverageBasisError, match="explicitly claim complete"):
+        replace(evidence, completeness_claim="PARTIAL_OBSERVED_DAILY_BAR_SCOPE")
+
+    partial = build_fixture_coverage_basis_descriptor(
+        partition,
+        source_snapshot_id=SNAPSHOT_ID,
+        source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
+        source_selection_fingerprint="selection-fixture-v1",
+        partial=True,
+    )
+    escalated = partial.as_dict()
+    escalated["completeness_method"] = AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD
+    escalated["completeness_claim"] = COMPLETE_OBSERVED_DAILY_BAR_SCOPE
+    escalated_bytes = canonical_json(
+        {key: escalated[key] for key in escalated if key != "coverage_basis_artifact_hash"}
+    ).encode()
+    escalated["coverage_basis_artifact_hash"] = sha256_hex(escalated_bytes)
+    with pytest.raises(CoverageBasisError, match="typed evidence sidecar"):
+        CoverageBasisDescriptor.from_mapping(
+            escalated,
+            artifact_bytes=escalated_bytes,
+        )
+
+
+def test_authority_cannot_be_minted_from_arbitrary_bytes_or_replayed_catalog(
+    tmp_path: Path,
+) -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    receipt = _acquisition_receipt(tmp_path)
+    evidence = build_authoritative_coverage_evidence_from_acquisition(partition, receipt)
+
+    assert (
+        "upstream_statement_bytes"
+        not in inspect.signature(build_authoritative_coverage_evidence_from_acquisition).parameters
+    )
+    replayed = AmazingDataAcquisitionReceipt.from_mapping(receipt.as_dict())
+    assert replayed.is_verified_capture is False
+    with pytest.raises(CoverageBasisError, match="issued by the AmazingData acquisition path"):
+        build_authoritative_coverage_evidence_from_acquisition(partition, replayed)
+    with pytest.raises(TypeError):
+        AmazingDataAcquisitionReceipt()  # type: ignore[call-arg]
+
+    evidence_payload = evidence.as_dict(include_artifact_hash=False)
+    replayed_evidence = AuthoritativeCoverageEvidence.from_mapping(
+        evidence_payload,
+        artifact_bytes=evidence.artifact_bytes,
+        artifact_hash=evidence.coverage_basis_evidence_hash,
+    )
+    assert replayed_evidence.acquisition_receipt.is_verified_capture is False
+
+
+def test_acquisition_persists_and_replays_the_raw_capture_chain(tmp_path: Path) -> None:
+    raw_root = tmp_path / "raw"
+    receipt = _acquisition_receipt(tmp_path)
+    receipt.verify_retained_capture(raw_root)
+    replayed = AmazingDataAcquisitionReceipt.from_mapping(receipt.as_dict())
+    replayed.verify_retained_capture(raw_root)
+
+    catalog_path = raw_root.joinpath(*receipt.source_capture_uri.split("/"))
+    catalog_path.write_bytes(b"tampered")
+    with pytest.raises(CoverageBasisError, match="catalog"):
+        replayed.verify_retained_capture(raw_root)
+
+
+def test_acquisition_rejects_partial_daily_bar_response(tmp_path: Path) -> None:
+    provider = _FakeAmazingDataProvider()
+    payload = provider.kline.payload
+    assert isinstance(payload, dict)
+    provider.kline = _provider_exchange(
+        DAILY_BAR_KLINE,
+        provider.kline.envelope.request_params,
+        {
+            "000001.SZ": payload["000001.SZ"].head(1),
+            "600000.SH": payload["600000.SH"],
+        },
+    )
+    acquisition = AmazingDataHistoryAcquisition(
+        provider,
+        _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-partial"),
+        VerifiedSourceSnapshot.from_projection(_projection([])),
+    )
+    with pytest.raises(AmazingDataAcquisitionError, match="partial"):
+        acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+
+
+def test_acquisition_rejects_daily_bar_schema_drift(tmp_path: Path) -> None:
+    provider = _FakeAmazingDataProvider()
+    payload = provider.kline.payload
+    assert isinstance(payload, dict)
+    invalid_frame = payload["000001.SZ"].select(["kline_time", "close"])
+    provider.kline = _provider_exchange(
+        DAILY_BAR_KLINE,
+        provider.kline.envelope.request_params,
+        {"000001.SZ": invalid_frame, "600000.SH": payload["600000.SH"]},
+    )
+    acquisition = AmazingDataHistoryAcquisition(
+        provider,
+        _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-schema-drift"),
+        VerifiedSourceSnapshot.from_projection(_projection([])),
+    )
+    with pytest.raises(AmazingDataAcquisitionError, match="symbol or OHLCV"):
+        acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+
+
+def test_authoritative_reader_protocol_tamper_stays_fail_closed(tmp_path: Path) -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    evidence = _authoritative_evidence(partition, tmp_path)
+    payload = evidence.as_dict(include_artifact_hash=False)
+    payload["acquisition_receipt"]["retrieved_at_utc"] = "2026-07-01T00:00:00+00:00"
+    tampered_bytes = canonical_json(payload).encode()
+    with pytest.raises(CoverageBasisError):
+        AuthoritativeCoverageEvidence.from_mapping(
+            payload,
+            artifact_bytes=tampered_bytes,
+            artifact_hash=sha256_hex(tampered_bytes),
+        )
+
+
+def _coverage_evidence_relative_path_for_test(
+    evidence: AuthoritativeCoverageEvidence,
+) -> str:
+    return f"coverage_basis_evidence/{evidence.coverage_basis_evidence_hash}.json"
 
 
 def test_writer_lock_and_basis_change_identity() -> None:

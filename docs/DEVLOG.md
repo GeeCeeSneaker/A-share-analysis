@@ -1,3 +1,54 @@
+## 2026-09-13 · CR-7 AmazingData 权威取数凭证边界整改
+
+> 状态：**IMPLEMENTED / LOCAL QA GREEN / REQUIRED CI GREEN / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED**
+
+- 实现 exact head 为 `8ce680c2821b8bdf3c1459c7285ebe9265dc1b60`，base 为
+  `main@2e9bdc36544c5320072969a2888180b6dfec2c7a`。GitHub Actions CI `#590`
+  （run `34799945484`）的 Ubuntu 3.14、Windows 3.12、Windows 3.14 required 矩阵全部
+  `success`；GT-H3B controlled execution `#117`（run `34799945474`）按边界 `skipped`。
+
+- PR #58 exact-head review `5192511594` 指出旧通用 builder 可由 caller 提供任意
+  `upstream_statement_bytes`、`upstream_inventory_bytes`、计数和时间戳铸造
+  `AUTHORITATIVE_UPSTREAM`。Issue #55 Owner corrections `5657524581`、`5657529299` 明确
+  AmazingData 本身是项目指定可信源，不要求供应商签名/证书/第三方 attestation；本轮按此
+  政策把信任锚收敛为 `OWNER_APPROVED_AMAZINGDATA_ACQUISITION_PATH`。
+- `AmazingDataAcquisitionReceipt` 现在只能由审阅的 AmazingData 三步取数路径生成，固定
+  绑定 SH calendar、`EXTRA_STOCK_A_SH_SZ` 历史证券列表和全量 daily-bar 请求；严格检查
+  月份/日期范围、Universe、`list[int]` / `list[str]` / `dict[str,dataframe]` 返回形状、
+  字段、每证券每日覆盖、哈希与请求参数。receipt 不能由 caller 直接构造，兼容字段只能
+  从已验证 receipt 派生。
+- 原始交换通过 `AnchoredRawEvidenceWriter` 留存；capture catalog 与 receipt 形成可重放
+  链，reader/materializer 会重新核对 meta/schema/content hash、请求参数、Universe/日历/日期
+  集合、PIT/available-at 和 catalog closure。缺失、partial、错 scope、schema drift、篡改、
+  冲突和非验证 provenance 均保持 fail-closed。新增回归覆盖任意 bytes、直接构造、重放篡改、
+  partial kline、shape drift、PIT/scope/selection 及 root gate。
+- 本地全量 pytest：1806 collected，1803 passed，3 个既有 Windows symlink 权限 skip；Ruff
+  check/format、`mypy src`（107 files）、compileall、`uv pip check`、合同 JSON 和 diff 检查
+  通过。旧代码 head `89ae6945e26472461fdfeddf132ac6ff265e124e` 的 CI #589 暴露治理遗漏：
+  `DEVLOG gate` 要求代码提交同批更新 `docs/DEVLOG.md`。本记录与实现修正同批补入，修正后
+  必须重新取得新 exact head CI；该要求已由 #590 满足，不能沿用 #589 旧 head 的结果。
+- 三个月 sentinel 预检仍没有生成 full-scope receipt、authoritative sidecar 或 materializer
+  输入，当前阻断码仍为 `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`。本轮没有执行 78 月
+  物化/回填、第三次 Formal/B1-B7、Production、resume/verdict、BSE/index、CR-5/R2、
+  Golden/H1、baseline 或策略工作；凭证、私有 endpoint、专有 SDK/runtime 和 raw payload
+  不进入 GitHub。
+
+Implementation Status：P0 caller-minting 边界已按 Owner-approved AmazingData 路径收口；
+三个月 full-scope receipt 和 authoritative evidence 仍未产生。
+
+Review Status：PR #58 继续 Draft；待新 exact head 的 required CI 与独立 delta review，
+项目经理再决定 PASS / REMEDIATE / BLOCKED。
+
+## 2026-09-13 · CR-7 authoritative evidence边界与三个月真实源预检
+
+> 状态：**IMPLEMENTED / PREFLIGHT FAIL-CLOSED / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED**
+
+- 以最新 clean `main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 为基线，完成 Issue #55 的最窄实现切片。提交 `624595f1d246597a9119959af975aa5f8eafd6ff` 新增 typed `AuthoritativeCoverageEvidence`、固定 AmazingData history source-selection binding、`AuthoritativeCoverageBasisAdapter`，并让 writer 与 ordinary reader 对 sidecar、scope、inventory/hash、source snapshot 和 PIT/available-at 链重复校验。
+- 按授权仅执行 Development `2020-01`、Validation A `2024-01`、Holdout `2026-01` 三个月预检；每月固定调用 calendar、historical code-list 和一个 daily-bar sentinel。三个月的九次调用均返回 `OK`，但这只是 source observation，不是完整覆盖证明。
+- 预检明确记录 `UPSTREAM_COMPLETENESS_STATEMENT_MISSING`：当前 source contract 没有明确声明 inclusive month 的 daily_bar inventory/range 完整性及历史可用性/PIT 语义，因此 authoritative evidence 为 `NOT_PRODUCED`，materializer 为 `NOT_ENTERED_FAIL_CLOSED`。没有使用 row count、日期连续性、SDK 成功或 sentinel 结果替代该声明。
+- 脱敏收据为 [`cr7_authoritative_history_preflight_20260913.json`](provider_verification/cr7_authoritative_history_preflight_20260913.json)，GitHub 提交字节 SHA-256 为 `364cee560ae69e1651e619060308741398170414b49de878e5405fba1a8c9449`。原始交换仅保留在本地 ignored raw 目录；账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime 和 raw payload 未进入 GitHub。
+- 本轮未执行 materialization、78 月回填、universe sweep、第三次 Formal/B1-B7、Production、resume/verdict、BSE/index 激活、CR-5/R2、Golden/H1、baseline 或策略工作。待最终本地门禁、exact-head CI 和独立 delta review。
+
 ## 2026-09-13 · CR-7 2020–2026H1 历史研究物化合同设计 / 离线预检
 
 > 状态：**DESIGN-ONLY / OFFLINE REMEDIATION GREEN / MATERIALIZATION NOT AUTHORIZED / EXACT-HEAD DELTA REVIEW REQUIRED**
@@ -4048,3 +4099,16 @@ Review Status：KEEP DRAFT / EXACT-HEAD INDEPENDENT REVIEW REQUIRED / REQUIRED C
   物化、Provider/Production 或第三次 Formal。
 
 Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI AND INDEPENDENT DELTA REVIEW REQUIRED`。
+## 2026-09-13 · CR-7 authoritative evidence adapter / bounded real-source preflight
+
+> 状态：**IMPLEMENTATION COMPLETE LOCALLY / REAL-SOURCE PREFLIGHT PENDING / FAIL-CLOSED BY DEFAULT / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED**
+
+- 按 Issue #55 scheduler comment `5653953863`，从最新 clean `main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 开始；已确认 runtime baseline `d2fa53371937d59ea0a118b79df1554d518f575f` 是该 main 的祖先。本任务分支只处理 CR-7 authoritative coverage evidence，不扩大到第三次 Formal、Production resume/verdict、78 月 backfill、universe sweep、BSE/index 激活、CR-5/R2、Golden/H1/baseline 或策略。
+- 新增 `AuthoritativeSourceSelection`、`AuthoritativeCoverageEvidence` 和窄 `AuthoritativeCoverageBasisAdapter`。唯一登记的方法是 `AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1`；它要求 reviewed AmazingData history surface、独立的上游 inventory/range statement 原文 hash、inclusive 月份范围、source snapshot/domain、available/PIT 时间链和 canonical sidecar bytes/hash。返回行数、日期连续性或成功响应不能升级为 COMPLETE。
+- historical materializer/reader 现在写入并重新验证 authoritative evidence sidecar；sidecar hash 进入 coverage-basis set hash 和 materialization identity。fixture-only evidence 仍不能解锁 ordinary reader；reader 另行核对 sidecar 与 materialization identity 的 snapshot id/hash/as-of。
+- 新增 bounded `scripts/spike/cr7_authoritative_history_preflight.py`：固定只检查 Development `2020-01`、Validation A `2024-01`、Holdout `2026-01`，每月最多一个日线哨兵；真实 Provider raw 只写本地 ignored 目录，提交报告不含凭证、账号 profile、endpoint、证券值或 raw payload。若上游没有可审计完整性声明，报告固定为 `FAIL_CLOSED_BLOCKED`，不生成 authoritative sidecar、不进入物化。
+- 新增 authoritative adapter/sidecar、tamper、wrong scope/PIT/source binding、downgrade/escalation、reader replay/conflict、预检脱敏与固定范围回归；当前 focused suite 已通过（30 tests）。
+
+当前阻断：AmazingData 已审阅的接口形态能提供 code-list、calendar 和日线 observation，但现有来源闭环/本地手册没有 provider-owned 完整库存或历史范围保证，也没有可绑定的 available-at/PIT 完整性声明。真实预检仍需在本地授权环境运行；无此声明时必须保留 blocker，不能提交伪造 `COMPLETE_OBSERVED_DAILY_BAR_SCOPE`。
+
+账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime、原始 Provider payload 和本地 raw 路径均不得进入 GitHub。实现提交后还必须补入真实预检脱敏 receipt、实际 exact head、CI 结果和项目管理文档更新。

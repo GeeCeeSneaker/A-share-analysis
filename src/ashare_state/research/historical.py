@@ -17,6 +17,7 @@ from calendar import monthrange
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -47,8 +48,18 @@ from ashare_state.research.splits import assign_research_split, split_windows
 from ashare_state.storage.atomic_files import ImmutableFileExistsError, write_file_atomic
 
 __all__ = [
+    "AMAZINGDATA_ACQUISITION_RECEIPT_VERSION",
+    "AMAZINGDATA_CALENDAR_MARKET",
+    "AMAZINGDATA_SECURITY_UNIVERSE_SELECTION",
+    "AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION",
+    "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD",
     "COMPLETE_OBSERVED_DAILY_BAR_SCOPE",
     "CoverageEvidenceClass",
+    "AmazingDataAcquisitionReceipt",
+    "AmazingDataExchangeReceipt",
+    "AuthoritativeCoverageEvidence",
+    "AuthoritativeSourceSelection",
+    "VerifiedSourceSnapshot",
     "CoverageBasisDescriptor",
     "CoverageBasisError",
     "CoverageEvaluation",
@@ -63,6 +74,7 @@ __all__ = [
     "PartitionKey",
     "PARTIAL_OBSERVED_DAILY_BAR_SCOPE",
     "WriterRuntimeLock",
+    "build_authoritative_coverage_evidence_from_acquisition",
     "build_fixture_coverage_basis_descriptor",
     "build_materialization_identity",
     "build_writer_runtime_lock_identity",
@@ -88,6 +100,30 @@ PARTITION_POLICY_VERSION = "monthly-route-v1"
 WRITER_CONFIGURATION_VERSION = "cr7-writer-v1"
 OFFLINE_FIXTURE_COMPLETE_METHOD = "OFFLINE_FIXTURE_COMPLETE_SCOPE_V1"
 OFFLINE_FIXTURE_PARTIAL_METHOD = "OFFLINE_FIXTURE_PARTIAL_SCOPE_V1"
+AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION = "authoritative-coverage-evidence-v1"
+AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD = "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1"
+AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "AMAZINGDATA_ACQUISITION_RECEIPT_V1"
+AUTHORITATIVE_SOURCE_SELECTION_VERSION = "source-selection-retrieval-closure-20260912"
+AUTHORITATIVE_SOURCE_CLASS = "amazingdata_provider_observation"
+AUTHORITATIVE_PROVIDER = "amazingdata"
+AUTHORITATIVE_RETRIEVAL_SURFACE = "history_acquisition"
+AUTHORITATIVE_SOURCE_METHODS = (
+    "BaseData.get_hist_code_list",
+    "BaseData.get_calendar",
+    "MarketData.query_kline",
+)
+AMAZINGDATA_ACQUISITION_RECEIPT_VERSION = "amazingdata-history-acquisition-receipt-v1"
+AMAZINGDATA_SECURITY_UNIVERSE_SELECTION = "EXTRA_STOCK_A_SH_SZ"
+AMAZINGDATA_CALENDAR_MARKET = "SH"
+
+_AMAZINGDATA_OPERATION_BINDINGS = {
+    "BaseData.get_hist_code_list": (
+        "BaseData.get_hist_code_list#security_master",
+        "list[str]",
+    ),
+    "BaseData.get_calendar": ("BaseData.get_calendar#trade_calendar", "list[int]"),
+    "MarketData.query_kline": ("MarketData.query_kline#daily_bar", "dict[str,dataframe]"),
+}
 
 
 class CoverageEvidenceClass(StrEnum):
@@ -95,9 +131,9 @@ class CoverageEvidenceClass(StrEnum):
 
     Fixture methods can exercise the planner and storage protocol, but they
     must never satisfy the ordinary historical-reader publication boundary.
-    The authoritative value is intentionally not registered by this offline
-    implementation; a future upstream method must be added through a reviewed
-    contract change.
+    The authoritative value is registered only for the reviewed typed
+    evidence-sidecar method below.  A provider observation without that
+    sidecar remains non-authoritative.
     """
 
     TEST_FIXTURE_ONLY = "TEST_FIXTURE_ONLY"
@@ -119,6 +155,10 @@ _RECOGNIZED_COMPLETENESS_METHODS = {
     OFFLINE_FIXTURE_PARTIAL_METHOD: _CompletenessMethodSpec(
         CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE,
         CoverageEvidenceClass.TEST_FIXTURE_ONLY,
+    ),
+    AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD: _CompletenessMethodSpec(
+        CoverageState.OBSERVED_DAILY_BAR_COVERAGE,
+        CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM,
     ),
 }
 _ROUTES = ("research_enabled", "disabled", "experimental")
@@ -167,6 +207,37 @@ _BASIS_FIELDS = (
 _BASIS_FIELDS_WITHOUT_HASH = tuple(
     field for field in _BASIS_FIELDS if field != "coverage_basis_artifact_hash"
 )
+_AUTHORITATIVE_EVIDENCE_FIELDS = (
+    "evidence_id",
+    "evidence_version",
+    "coverage_basis_id",
+    "source_snapshot_id",
+    "source_snapshot_manifest_hash",
+    "source_snapshot_as_of",
+    "source_domain",
+    "claimed_scope_start",
+    "claimed_scope_end",
+    "source_selection_fingerprint",
+    "completeness_method",
+    "completeness_claim",
+    "source_selection",
+    "acquisition_receipt",
+    "upstream_source",
+    "upstream_statement_kind",
+    "upstream_statement_id",
+    "upstream_statement_locator",
+    "upstream_statement_hash",
+    "upstream_inventory_id",
+    "upstream_inventory_scope_start",
+    "upstream_inventory_scope_end",
+    "upstream_inventory_hash",
+    "upstream_security_count",
+    "upstream_session_count",
+    "retrieved_at_utc",
+    "available_at",
+    "pit_as_of",
+    "coverage_basis_evidence_uri",
+)
 _HASH_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _MAX_OFFLINE_FIXTURE_ROWS = 10_000
 
@@ -200,6 +271,12 @@ def _require_sha256(value: Any, field: str) -> str:
     return normalized
 
 
+def _require_positive_int(value: Any, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise HistoricalMaterializationError(f"{field} must be a positive integer")
+    return value
+
+
 def _safe_relative_uri(value: Any, field: str) -> str:
     uri = _require_non_empty_string(value, field).replace("\\", "/")
     windows = PureWindowsPath(uri)
@@ -211,6 +288,10 @@ def _safe_relative_uri(value: Any, field: str) -> str:
 
 def _month_end(year: int, month: int) -> date:
     return date(year, month, monthrange(year, month)[1])
+
+
+def _yyyymmdd(value: date) -> int:
+    return value.year * 10000 + value.month * 100 + value.day
 
 
 def _next_month(value: date) -> date:
@@ -231,6 +312,1489 @@ def _coverage_rank(state: CoverageState) -> int:
         CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE: 1,
         CoverageState.UNRESOLVED_NOT_FOR_RESEARCH: 2,
     }[state]
+
+
+@dataclass(frozen=True)
+class AuthoritativeSourceSelection:
+    """The reviewed source-selection binding for the CR-7 evidence path.
+
+    A source-selection fingerprint is not an arbitrary caller label.  It is
+    the hash of this exact, intentionally narrow binding.  The binding is
+    still only a routing identity: it does not turn a provider response into
+    completeness evidence without the typed acquisition receipt below.
+    """
+
+    selection_version: str
+    source_class: str
+    provider: str
+    retrieval_surface: str
+    methods: tuple[str, ...]
+    source_domain: str
+    selection_fingerprint: str
+
+    def __post_init__(self) -> None:
+        try:
+            for field_name in (
+                "selection_version",
+                "source_class",
+                "provider",
+                "retrieval_surface",
+                "source_domain",
+            ):
+                _require_non_empty_string(getattr(self, field_name), field_name)
+            if not self.methods or any(
+                not isinstance(method, str) or not method.strip() for method in self.methods
+            ):
+                raise CoverageBasisError("authoritative source-selection methods are malformed")
+            if len(self.methods) != len(set(self.methods)):
+                raise CoverageBasisError("authoritative source-selection methods are duplicated")
+            fingerprint = _require_sha256(
+                self.selection_fingerprint, "source_selection_fingerprint"
+            )
+        except HistoricalMaterializationError as exc:
+            raise CoverageBasisError(str(exc)) from exc
+        if self.source_domain != "daily_bar":
+            raise CoverageBasisError("authoritative source-selection domain must be daily_bar")
+        expected_binding = {
+            "selection_version": AUTHORITATIVE_SOURCE_SELECTION_VERSION,
+            "source_class": AUTHORITATIVE_SOURCE_CLASS,
+            "provider": AUTHORITATIVE_PROVIDER,
+            "retrieval_surface": AUTHORITATIVE_RETRIEVAL_SURFACE,
+            "methods": list(AUTHORITATIVE_SOURCE_METHODS),
+            "source_domain": "daily_bar",
+        }
+        if self.as_dict(include_fingerprint=False) != expected_binding:
+            raise CoverageBasisError(
+                "authoritative source-selection binding is not the reviewed "
+                "AmazingData history path"
+            )
+        if fingerprint != sha256_hex(canonical_json(expected_binding)):
+            raise CoverageBasisError("source_selection_fingerprint does not match its binding")
+
+    @classmethod
+    def reviewed_amazingdata_history(cls) -> AuthoritativeSourceSelection:
+        """Return the only source-selection binding accepted by this adapter."""
+        binding: dict[str, Any] = {
+            "selection_version": AUTHORITATIVE_SOURCE_SELECTION_VERSION,
+            "source_class": AUTHORITATIVE_SOURCE_CLASS,
+            "provider": AUTHORITATIVE_PROVIDER,
+            "retrieval_surface": AUTHORITATIVE_RETRIEVAL_SURFACE,
+            "methods": list(AUTHORITATIVE_SOURCE_METHODS),
+            "source_domain": "daily_bar",
+        }
+        return cls(
+            selection_version=binding["selection_version"],
+            source_class=binding["source_class"],
+            provider=binding["provider"],
+            retrieval_surface=binding["retrieval_surface"],
+            methods=tuple(binding["methods"]),
+            source_domain=binding["source_domain"],
+            selection_fingerprint=sha256_hex(canonical_json(binding)),
+        )
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> AuthoritativeSourceSelection:
+        fields = {
+            "selection_version",
+            "source_class",
+            "provider",
+            "retrieval_surface",
+            "methods",
+            "source_domain",
+            "selection_fingerprint",
+        }
+        if not isinstance(payload, Mapping) or set(payload) != fields:
+            raise CoverageBasisError("authoritative source-selection fields are not exact")
+        methods = payload["methods"]
+        if not isinstance(methods, list):
+            raise CoverageBasisError("authoritative source-selection methods must be a list")
+        try:
+            return cls(
+                selection_version=_require_non_empty_string(
+                    payload["selection_version"], "selection_version"
+                ),
+                source_class=_require_non_empty_string(payload["source_class"], "source_class"),
+                provider=_require_non_empty_string(payload["provider"], "provider"),
+                retrieval_surface=_require_non_empty_string(
+                    payload["retrieval_surface"], "retrieval_surface"
+                ),
+                methods=tuple(
+                    _require_non_empty_string(method, "source-selection method")
+                    for method in methods
+                ),
+                source_domain=_require_non_empty_string(payload["source_domain"], "source_domain"),
+                selection_fingerprint=_require_sha256(
+                    payload["selection_fingerprint"], "selection_fingerprint"
+                ),
+            )
+        except HistoricalMaterializationError as exc:
+            raise CoverageBasisError(str(exc)) from exc
+
+    def as_dict(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "selection_version": self.selection_version,
+            "source_class": self.source_class,
+            "provider": self.provider,
+            "retrieval_surface": self.retrieval_surface,
+            "methods": list(self.methods),
+            "source_domain": self.source_domain,
+        }
+        if include_fingerprint:
+            payload["selection_fingerprint"] = self.selection_fingerprint
+        return payload
+
+
+@dataclass(frozen=True, init=False)
+class VerifiedSourceSnapshot:
+    """The already-verified CR-4 snapshot identity used by acquisition.
+
+    The class deliberately has no public constructor.  A source snapshot is
+    admitted to the authoritative path only from the typed
+    ``VerifiedResearchProjection`` returned by the R1 read-model boundary;
+    callers cannot pass a free-form id/hash/timestamp triple to mint a
+    receipt.
+    """
+
+    source_snapshot_id: str
+    source_snapshot_as_of: datetime
+    source_snapshot_manifest_hash: str
+    source_snapshot_semantic_hash: str
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError("VerifiedSourceSnapshot must come from a verified projection")
+
+    @classmethod
+    def from_projection(cls, projection: VerifiedResearchProjection) -> VerifiedSourceSnapshot:
+        if not isinstance(projection, VerifiedResearchProjection):
+            raise CoverageBasisError("authoritative acquisition needs a verified source projection")
+        try:
+            source_snapshot_id = _require_non_empty_string(
+                projection.source_snapshot_id, "source_snapshot_id"
+            )
+            source_snapshot_as_of = ensure_utc_timestamp(projection.source_snapshot_as_of)
+            source_snapshot_manifest_hash = _require_sha256(
+                projection.source_snapshot_manifest_hash, "source_snapshot_manifest_hash"
+            )
+            source_snapshot_semantic_hash = _require_sha256(
+                projection.source_snapshot_semantic_hash, "source_snapshot_semantic_hash"
+            )
+        except (HistoricalMaterializationError, ResearchPanelError) as exc:
+            raise CoverageBasisError("verified source snapshot identity is malformed") from exc
+        obj = object.__new__(cls)
+        object.__setattr__(obj, "source_snapshot_id", source_snapshot_id)
+        object.__setattr__(obj, "source_snapshot_as_of", source_snapshot_as_of)
+        object.__setattr__(obj, "source_snapshot_manifest_hash", source_snapshot_manifest_hash)
+        object.__setattr__(obj, "source_snapshot_semantic_hash", source_snapshot_semantic_hash)
+        return obj
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "source_snapshot_id": self.source_snapshot_id,
+            "source_snapshot_as_of": self.source_snapshot_as_of,
+            "source_snapshot_manifest_hash": self.source_snapshot_manifest_hash,
+            "source_snapshot_semantic_hash": self.source_snapshot_semantic_hash,
+        }
+
+
+@dataclass(frozen=True)
+class AmazingDataExchangeReceipt:
+    """One retained, hash-addressed exchange in the approved history path."""
+
+    method: str
+    operation_id: str
+    request_params_hash: str
+    response_shape: str
+    response_schema_hash: str
+    response_content_hash: str
+    row_count: int
+    captured_evidence_uri: str
+    captured_evidence_hash: str
+
+    def __post_init__(self) -> None:
+        try:
+            for field_name in (
+                "method",
+                "operation_id",
+                "response_shape",
+                "captured_evidence_uri",
+            ):
+                _require_non_empty_string(getattr(self, field_name), field_name)
+            for field_name in (
+                "request_params_hash",
+                "response_schema_hash",
+                "response_content_hash",
+                "captured_evidence_hash",
+            ):
+                _require_sha256(getattr(self, field_name), field_name)
+            _safe_relative_uri(self.captured_evidence_uri, "captured_evidence_uri")
+            _require_positive_int(self.row_count, "row_count")
+        except HistoricalMaterializationError as exc:
+            raise CoverageBasisError(str(exc)) from exc
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> AmazingDataExchangeReceipt:
+        fields = {
+            "method",
+            "operation_id",
+            "request_params_hash",
+            "response_shape",
+            "response_schema_hash",
+            "response_content_hash",
+            "row_count",
+            "captured_evidence_uri",
+            "captured_evidence_hash",
+        }
+        if not isinstance(payload, Mapping) or set(payload) != fields:
+            raise CoverageBasisError("AmazingData exchange receipt fields are not exact")
+        try:
+            return cls(
+                method=_require_non_empty_string(payload["method"], "method"),
+                operation_id=_require_non_empty_string(payload["operation_id"], "operation_id"),
+                request_params_hash=_require_sha256(
+                    payload["request_params_hash"], "request_params_hash"
+                ),
+                response_shape=_require_non_empty_string(
+                    payload["response_shape"], "response_shape"
+                ),
+                response_schema_hash=_require_sha256(
+                    payload["response_schema_hash"], "response_schema_hash"
+                ),
+                response_content_hash=_require_sha256(
+                    payload["response_content_hash"], "response_content_hash"
+                ),
+                row_count=_require_positive_int(payload["row_count"], "row_count"),
+                captured_evidence_uri=_require_non_empty_string(
+                    payload["captured_evidence_uri"], "captured_evidence_uri"
+                ),
+                captured_evidence_hash=_require_sha256(
+                    payload["captured_evidence_hash"], "captured_evidence_hash"
+                ),
+            )
+        except (HistoricalMaterializationError, KeyError, TypeError) as exc:
+            raise CoverageBasisError("AmazingData exchange receipt is malformed") from exc
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "method": self.method,
+            "operation_id": self.operation_id,
+            "request_params_hash": self.request_params_hash,
+            "response_shape": self.response_shape,
+            "response_schema_hash": self.response_schema_hash,
+            "response_content_hash": self.response_content_hash,
+            "row_count": self.row_count,
+            "captured_evidence_uri": self.captured_evidence_uri,
+            "captured_evidence_hash": self.captured_evidence_hash,
+        }
+
+
+def _amazingdata_capture_catalog(
+    *,
+    source_selection_fingerprint: str,
+    source_snapshot_id: str,
+    source_snapshot_manifest_hash: str,
+    source_snapshot_semantic_hash: str,
+    source_snapshot_as_of: datetime,
+    requested_scope_start: date,
+    requested_scope_end: date,
+    operations: tuple[AmazingDataExchangeReceipt, ...],
+) -> dict[str, Any]:
+    """Return the deterministic catalog identity used as the receipt proof."""
+    return {
+        "receipt_version": AMAZINGDATA_ACQUISITION_RECEIPT_VERSION,
+        "source_selection_fingerprint": source_selection_fingerprint,
+        "source_snapshot_id": source_snapshot_id,
+        "source_snapshot_manifest_hash": source_snapshot_manifest_hash,
+        "source_snapshot_semantic_hash": source_snapshot_semantic_hash,
+        "source_snapshot_as_of": source_snapshot_as_of,
+        "requested_scope_start": requested_scope_start,
+        "requested_scope_end": requested_scope_end,
+        "operations": [operation.as_dict() for operation in operations],
+    }
+
+
+@dataclass(frozen=True, init=False)
+class _VerifiedAmazingDataCapture:
+    """Facts emitted only after the reviewed provider path has validated data.
+
+    This is intentionally private and has no public constructor.  Keeping the
+    derived counts, ranges and retrieval timestamp behind one typed object
+    prevents the receipt issuer from exposing a call surface that accepts
+    caller-selected authority facts one field at a time.
+    """
+
+    requested_scope_start: date
+    requested_scope_end: date
+    security_universe_count: int
+    security_universe_hash: str
+    calendar_trading_day_count: int
+    calendar_trading_days_hash: str
+    returned_first_date: date
+    returned_last_date: date
+    returned_trading_day_count: int
+    returned_trading_days_hash: str
+    returned_row_count: int
+    operations: tuple[AmazingDataExchangeReceipt, ...]
+    retrieved_at_utc: datetime
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError("verified AmazingData capture must come from the provider path")
+
+    @classmethod
+    def _from_provider(
+        cls,
+        *,
+        requested_scope_start: date,
+        requested_scope_end: date,
+        security_universe_count: int,
+        security_universe_hash: str,
+        calendar_trading_day_count: int,
+        calendar_trading_days_hash: str,
+        returned_first_date: date,
+        returned_last_date: date,
+        returned_trading_day_count: int,
+        returned_trading_days_hash: str,
+        returned_row_count: int,
+        operations: tuple[AmazingDataExchangeReceipt, ...],
+        retrieved_at_utc: datetime,
+    ) -> _VerifiedAmazingDataCapture:
+        obj = object.__new__(cls)
+        for field_name, value in {
+            "requested_scope_start": requested_scope_start,
+            "requested_scope_end": requested_scope_end,
+            "security_universe_count": security_universe_count,
+            "security_universe_hash": security_universe_hash,
+            "calendar_trading_day_count": calendar_trading_day_count,
+            "calendar_trading_days_hash": calendar_trading_days_hash,
+            "returned_first_date": returned_first_date,
+            "returned_last_date": returned_last_date,
+            "returned_trading_day_count": returned_trading_day_count,
+            "returned_trading_days_hash": returned_trading_days_hash,
+            "returned_row_count": returned_row_count,
+            "operations": operations,
+            "retrieved_at_utc": retrieved_at_utc,
+        }.items():
+            object.__setattr__(obj, field_name, value)
+        obj._validate()
+        return obj
+
+    def _validate(self) -> None:
+        for field_name in (
+            "requested_scope_start",
+            "requested_scope_end",
+            "returned_first_date",
+            "returned_last_date",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, date) or isinstance(value, datetime):
+                raise CoverageBasisError(f"capture {field_name} must be a date")
+        if self.requested_scope_start.day != 1 or self.requested_scope_end != _month_end(
+            self.requested_scope_start.year, self.requested_scope_start.month
+        ):
+            raise CoverageBasisError("capture scope must be one complete calendar month")
+        if self.returned_first_date > self.returned_last_date or (
+            self.returned_first_date < self.requested_scope_start
+            or self.returned_last_date > self.requested_scope_end
+        ):
+            raise CoverageBasisError("capture returned date range is outside requested scope")
+        for field_name in (
+            "security_universe_hash",
+            "calendar_trading_days_hash",
+            "returned_trading_days_hash",
+        ):
+            _require_sha256(getattr(self, field_name), f"capture {field_name}")
+        for field_name in (
+            "security_universe_count",
+            "calendar_trading_day_count",
+            "returned_trading_day_count",
+            "returned_row_count",
+        ):
+            _require_positive_int(getattr(self, field_name), f"capture {field_name}")
+        if (
+            not isinstance(self.operations, tuple)
+            or len(self.operations) != len(AUTHORITATIVE_SOURCE_METHODS)
+            or any(
+                not isinstance(operation, AmazingDataExchangeReceipt)
+                for operation in self.operations
+            )
+        ):
+            raise CoverageBasisError("capture exchange set is not typed or complete")
+        operations_by_method = {operation.method: operation for operation in self.operations}
+        if set(operations_by_method) != set(AUTHORITATIVE_SOURCE_METHODS):
+            raise CoverageBasisError("capture exchange method set is not reviewed")
+        if len(operations_by_method) != len(self.operations):
+            raise CoverageBasisError("capture exchange methods are duplicated")
+        if (
+            operations_by_method["BaseData.get_hist_code_list"].row_count
+            != self.security_universe_count
+        ):
+            raise CoverageBasisError(
+                "capture universe count is not derived from the retained response"
+            )
+        if (
+            operations_by_method["BaseData.get_calendar"].row_count
+            < self.calendar_trading_day_count
+        ):
+            raise CoverageBasisError(
+                "capture calendar response does not cover the requested window"
+            )
+        if operations_by_method["MarketData.query_kline"].row_count != self.returned_row_count:
+            raise CoverageBasisError("capture bar count is not derived from the retained response")
+        try:
+            ensure_utc_timestamp(self.retrieved_at_utc)
+        except ResearchPanelError as exc:
+            raise CoverageBasisError("capture retrieval timestamp is invalid") from exc
+
+
+@dataclass(frozen=True, init=False)
+class AmazingDataAcquisitionReceipt:
+    """Typed proof emitted only by the reviewed AmazingData acquisition path.
+
+    ``init=False`` is intentional.  The public object can be rehydrated for
+    committed-reader replay, but a new authoritative receipt can only be
+    issued by the private provider-path factory after response validation.
+    Counts, timestamps and opaque statement bytes are not constructor inputs.
+    """
+
+    receipt_id: str
+    receipt_version: str
+    source_selection: AuthoritativeSourceSelection
+    source_snapshot_id: str
+    source_snapshot_manifest_hash: str
+    source_snapshot_semantic_hash: str
+    source_snapshot_as_of: datetime
+    requested_scope_start: date
+    requested_scope_end: date
+    security_universe_selection: str
+    security_universe_id: str
+    security_universe_count: int
+    security_universe_hash: str
+    calendar_market: str
+    calendar_scope_start: date
+    calendar_scope_end: date
+    calendar_trading_day_count: int
+    calendar_trading_days_hash: str
+    returned_security_count: int
+    returned_security_set_hash: str
+    returned_first_date: date
+    returned_last_date: date
+    returned_trading_day_count: int
+    returned_trading_days_hash: str
+    returned_row_count: int
+    operations: tuple[AmazingDataExchangeReceipt, ...]
+    retrieved_at_utc: datetime
+    available_at: datetime
+    pit_as_of: datetime
+    source_capture_uri: str
+    source_capture_hash: str
+    completeness_statement_id: str
+    receipt_hash: str
+    _provenance: str = dataclass_field(default="", init=False, repr=False, compare=False)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(
+            "AmazingDataAcquisitionReceipt must come from the reviewed acquisition path"
+        )
+
+    @classmethod
+    def _construct(
+        cls,
+        values: Mapping[str, Any],
+        *,
+        provenance: str,
+    ) -> AmazingDataAcquisitionReceipt:
+        obj = object.__new__(cls)
+        for field_name in (
+            "receipt_id",
+            "receipt_version",
+            "source_selection",
+            "source_snapshot_id",
+            "source_snapshot_manifest_hash",
+            "source_snapshot_semantic_hash",
+            "source_snapshot_as_of",
+            "requested_scope_start",
+            "requested_scope_end",
+            "security_universe_selection",
+            "security_universe_id",
+            "security_universe_count",
+            "security_universe_hash",
+            "calendar_market",
+            "calendar_scope_start",
+            "calendar_scope_end",
+            "calendar_trading_day_count",
+            "calendar_trading_days_hash",
+            "returned_security_count",
+            "returned_security_set_hash",
+            "returned_first_date",
+            "returned_last_date",
+            "returned_trading_day_count",
+            "returned_trading_days_hash",
+            "returned_row_count",
+            "operations",
+            "retrieved_at_utc",
+            "available_at",
+            "pit_as_of",
+            "source_capture_uri",
+            "source_capture_hash",
+            "completeness_statement_id",
+            "receipt_hash",
+        ):
+            object.__setattr__(obj, field_name, values[field_name])
+        object.__setattr__(obj, "_provenance", provenance)
+        obj._validate()
+        return obj
+
+    @property
+    def is_verified_capture(self) -> bool:
+        return self._provenance == "verified_capture"
+
+    def capture_catalog(self) -> dict[str, Any]:
+        """Return the canonical catalog whose hash identifies this receipt."""
+        return _amazingdata_capture_catalog(
+            source_selection_fingerprint=self.source_selection.selection_fingerprint,
+            source_snapshot_id=self.source_snapshot_id,
+            source_snapshot_manifest_hash=self.source_snapshot_manifest_hash,
+            source_snapshot_semantic_hash=self.source_snapshot_semantic_hash,
+            source_snapshot_as_of=self.source_snapshot_as_of,
+            requested_scope_start=self.requested_scope_start,
+            requested_scope_end=self.requested_scope_end,
+            operations=self.operations,
+        )
+
+    def verify_retained_capture(self, raw_root: Path | str) -> None:
+        """Replay the catalog and every retained RawWriter evidence anchor.
+
+        The receipt hash is not treated as a standalone trust root.  This
+        method follows its catalog URI and each exchange evidence URI back to
+        immutable local bytes, then rechecks the RawWriter payload closure.
+        """
+        root = Path(raw_root)
+        expected_catalog = canonical_json(self.capture_catalog()).encode("utf-8")
+        catalog_path = root.joinpath(*self.source_capture_uri.split("/"))
+        if not catalog_path.is_file():
+            raise CoverageBasisError("AmazingData capture catalog is not retained")
+        if catalog_path.read_bytes() != expected_catalog:
+            raise CoverageBasisError("AmazingData capture catalog bytes changed")
+        if sha256_hex(expected_catalog) != self.source_capture_hash:
+            raise CoverageBasisError("AmazingData capture catalog hash changed")
+
+        from ashare_state.storage.raw_writer import verify_meta_closure
+
+        for operation in self.operations:
+            evidence_path = root.joinpath(*operation.captured_evidence_uri.split("/"))
+            if not evidence_path.is_file():
+                raise CoverageBasisError(
+                    f"AmazingData retained evidence is missing for {operation.method}"
+                )
+            evidence_bytes = evidence_path.read_bytes()
+            if sha256_hex(evidence_bytes) != operation.captured_evidence_hash:
+                raise CoverageBasisError(
+                    f"AmazingData retained evidence hash changed for {operation.method}"
+                )
+            try:
+                evidence = json.loads(evidence_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise CoverageBasisError(
+                    f"AmazingData retained evidence is not valid JSON for {operation.method}"
+                ) from exc
+            if not isinstance(evidence, Mapping):
+                raise CoverageBasisError(
+                    f"AmazingData retained evidence is not an object for {operation.method}"
+                )
+            if not _retained_request_matches_receipt(
+                self,
+                operation.method,
+                evidence.get("request_params"),
+            ):
+                raise CoverageBasisError(
+                    f"AmazingData retained request scope changed for {operation.method}"
+                )
+            if (
+                evidence.get("status") != "OK"
+                or evidence.get("operation_id") != operation.operation_id
+                or evidence.get("request_params_hash") != operation.request_params_hash
+                or evidence.get("content_hash") != operation.response_content_hash
+                or evidence.get("row_count") != operation.row_count
+            ):
+                raise CoverageBasisError(
+                    f"AmazingData retained evidence identity changed for {operation.method}"
+                )
+            tables = evidence.get("tables")
+            if not isinstance(tables, list):
+                raise CoverageBasisError(
+                    f"AmazingData retained evidence tables are malformed for {operation.method}"
+                )
+            schema_parts = sorted(
+                (str(table.get("name")), str(table.get("schema_hash")))
+                for table in tables
+                if isinstance(table, Mapping)
+            )
+            if len(schema_parts) != len(tables) or sha256_hex(canonical_json(schema_parts)) != (
+                operation.response_schema_hash
+            ):
+                raise CoverageBasisError(
+                    f"AmazingData retained evidence schema changed for {operation.method}"
+                )
+            problems = verify_meta_closure(evidence_path.parent, dict(evidence))
+            if problems:
+                raise CoverageBasisError(
+                    f"AmazingData retained payload closure failed for {operation.method}: "
+                    + "; ".join(problems)
+                )
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> AmazingDataAcquisitionReceipt:
+        fields = {
+            "receipt_id",
+            "receipt_version",
+            "source_selection",
+            "source_snapshot_id",
+            "source_snapshot_manifest_hash",
+            "source_snapshot_semantic_hash",
+            "source_snapshot_as_of",
+            "requested_scope_start",
+            "requested_scope_end",
+            "security_universe_selection",
+            "security_universe_id",
+            "security_universe_count",
+            "security_universe_hash",
+            "calendar_market",
+            "calendar_scope_start",
+            "calendar_scope_end",
+            "calendar_trading_day_count",
+            "calendar_trading_days_hash",
+            "returned_security_count",
+            "returned_security_set_hash",
+            "returned_first_date",
+            "returned_last_date",
+            "returned_trading_day_count",
+            "returned_trading_days_hash",
+            "returned_row_count",
+            "operations",
+            "retrieved_at_utc",
+            "available_at",
+            "pit_as_of",
+            "source_capture_uri",
+            "source_capture_hash",
+            "completeness_statement_id",
+            "receipt_hash",
+        }
+        if not isinstance(payload, Mapping) or set(payload) != fields:
+            raise CoverageBasisError("AmazingData acquisition receipt fields are not exact")
+        try:
+            raw_operations = payload["operations"]
+            if not isinstance(raw_operations, list):
+                raise CoverageBasisError("AmazingData acquisition receipt operations are malformed")
+            values: dict[str, Any] = {
+                "receipt_id": _require_non_empty_string(payload["receipt_id"], "receipt_id"),
+                "receipt_version": _require_non_empty_string(
+                    payload["receipt_version"], "receipt_version"
+                ),
+                "source_selection": AuthoritativeSourceSelection.from_mapping(
+                    payload["source_selection"]
+                ),
+                "source_snapshot_id": _require_non_empty_string(
+                    payload["source_snapshot_id"], "source_snapshot_id"
+                ),
+                "source_snapshot_manifest_hash": _require_sha256(
+                    payload["source_snapshot_manifest_hash"], "source_snapshot_manifest_hash"
+                ),
+                "source_snapshot_semantic_hash": _require_sha256(
+                    payload["source_snapshot_semantic_hash"], "source_snapshot_semantic_hash"
+                ),
+                "source_snapshot_as_of": ensure_utc_timestamp(payload["source_snapshot_as_of"]),
+                "requested_scope_start": parse_date_value(payload["requested_scope_start"]),
+                "requested_scope_end": parse_date_value(payload["requested_scope_end"]),
+                "security_universe_selection": _require_non_empty_string(
+                    payload["security_universe_selection"], "security_universe_selection"
+                ),
+                "security_universe_id": _require_non_empty_string(
+                    payload["security_universe_id"], "security_universe_id"
+                ),
+                "security_universe_count": _require_positive_int(
+                    payload["security_universe_count"], "security_universe_count"
+                ),
+                "security_universe_hash": _require_sha256(
+                    payload["security_universe_hash"], "security_universe_hash"
+                ),
+                "calendar_market": _require_non_empty_string(
+                    payload["calendar_market"], "calendar_market"
+                ),
+                "calendar_scope_start": parse_date_value(payload["calendar_scope_start"]),
+                "calendar_scope_end": parse_date_value(payload["calendar_scope_end"]),
+                "calendar_trading_day_count": _require_positive_int(
+                    payload["calendar_trading_day_count"], "calendar_trading_day_count"
+                ),
+                "calendar_trading_days_hash": _require_sha256(
+                    payload["calendar_trading_days_hash"], "calendar_trading_days_hash"
+                ),
+                "returned_security_count": _require_positive_int(
+                    payload["returned_security_count"], "returned_security_count"
+                ),
+                "returned_security_set_hash": _require_sha256(
+                    payload["returned_security_set_hash"], "returned_security_set_hash"
+                ),
+                "returned_first_date": parse_date_value(payload["returned_first_date"]),
+                "returned_last_date": parse_date_value(payload["returned_last_date"]),
+                "returned_trading_day_count": _require_positive_int(
+                    payload["returned_trading_day_count"], "returned_trading_day_count"
+                ),
+                "returned_trading_days_hash": _require_sha256(
+                    payload["returned_trading_days_hash"], "returned_trading_days_hash"
+                ),
+                "returned_row_count": _require_positive_int(
+                    payload["returned_row_count"], "returned_row_count"
+                ),
+                "operations": tuple(
+                    AmazingDataExchangeReceipt.from_mapping(operation)
+                    for operation in raw_operations
+                ),
+                "retrieved_at_utc": ensure_utc_timestamp(payload["retrieved_at_utc"]),
+                "available_at": ensure_utc_timestamp(payload["available_at"]),
+                "pit_as_of": ensure_utc_timestamp(payload["pit_as_of"]),
+                "source_capture_uri": _require_non_empty_string(
+                    payload["source_capture_uri"], "source_capture_uri"
+                ),
+                "source_capture_hash": _require_sha256(
+                    payload["source_capture_hash"], "source_capture_hash"
+                ),
+                "completeness_statement_id": _require_non_empty_string(
+                    payload["completeness_statement_id"], "completeness_statement_id"
+                ),
+                "receipt_hash": _require_sha256(payload["receipt_hash"], "receipt_hash"),
+            }
+        except (HistoricalMaterializationError, ResearchPanelError, KeyError, TypeError) as exc:
+            raise CoverageBasisError("AmazingData acquisition receipt is malformed") from exc
+        return cls._construct(values, provenance="replayed_catalog")
+
+    def _validate(self) -> None:
+        try:
+            for field_name in (
+                "receipt_id",
+                "receipt_version",
+                "source_snapshot_id",
+                "security_universe_selection",
+                "security_universe_id",
+                "calendar_market",
+                "source_capture_uri",
+                "completeness_statement_id",
+            ):
+                _require_non_empty_string(getattr(self, field_name), field_name)
+            for field_name in (
+                "source_snapshot_manifest_hash",
+                "source_snapshot_semantic_hash",
+                "security_universe_hash",
+                "calendar_trading_days_hash",
+                "returned_security_set_hash",
+                "returned_trading_days_hash",
+                "source_capture_hash",
+                "receipt_hash",
+            ):
+                _require_sha256(getattr(self, field_name), field_name)
+            _safe_relative_uri(self.source_capture_uri, "source_capture_uri")
+        except HistoricalMaterializationError as exc:
+            raise CoverageBasisError(str(exc)) from exc
+        if self.receipt_version != AMAZINGDATA_ACQUISITION_RECEIPT_VERSION:
+            raise CoverageBasisError("unknown AmazingData acquisition receipt version")
+        if self.source_selection != AuthoritativeSourceSelection.reviewed_amazingdata_history():
+            raise CoverageBasisError(
+                "receipt source selection is not the reviewed AmazingData path"
+            )
+        if self.security_universe_selection != AMAZINGDATA_SECURITY_UNIVERSE_SELECTION:
+            raise CoverageBasisError("receipt security universe selection is not reviewed")
+        if self.calendar_market != AMAZINGDATA_CALENDAR_MARKET:
+            raise CoverageBasisError("receipt calendar market is not reviewed")
+        if not isinstance(self.operations, tuple) or len(self.operations) != len(
+            AUTHORITATIVE_SOURCE_METHODS
+        ):
+            raise CoverageBasisError("receipt must contain exactly the reviewed exchanges")
+        operations_by_method = {operation.method: operation for operation in self.operations}
+        if set(operations_by_method) != set(AUTHORITATIVE_SOURCE_METHODS):
+            raise CoverageBasisError("receipt exchange method set is not exact")
+        if len(operations_by_method) != len(self.operations):
+            raise CoverageBasisError("receipt exchange methods are duplicated")
+        for method, (operation_id, response_shape) in _AMAZINGDATA_OPERATION_BINDINGS.items():
+            operation = operations_by_method[method]
+            if operation.operation_id != operation_id:
+                raise CoverageBasisError("receipt operation identity is not provider-derived")
+            if operation.response_shape != response_shape:
+                raise CoverageBasisError("receipt response shape is not the reviewed shape")
+        for field_name in (
+            "requested_scope_start",
+            "requested_scope_end",
+            "calendar_scope_start",
+            "calendar_scope_end",
+            "returned_first_date",
+            "returned_last_date",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, date) or isinstance(value, datetime):
+                raise CoverageBasisError(f"{field_name} must be a date")
+        if self.requested_scope_start.day != 1 or self.requested_scope_end != _month_end(
+            self.requested_scope_start.year, self.requested_scope_start.month
+        ):
+            raise CoverageBasisError("receipt requested scope must be one complete calendar month")
+        if (self.calendar_scope_start, self.calendar_scope_end) != (
+            self.requested_scope_start,
+            self.requested_scope_end,
+        ):
+            raise CoverageBasisError("receipt calendar scope does not match requested scope")
+        if self.security_universe_id != (
+            f"hist-code-list:{self.security_universe_selection}:{self.security_universe_hash}"
+        ):
+            raise CoverageBasisError("receipt security universe identity is not derived")
+        if self.returned_security_count != self.security_universe_count:
+            raise CoverageBasisError(
+                "receipt returned security count differs from requested universe"
+            )
+        if self.returned_security_set_hash != self.security_universe_hash:
+            raise CoverageBasisError("receipt returned security universe hash differs")
+        if self.returned_first_date > self.returned_last_date or (
+            self.returned_first_date < self.requested_scope_start
+            or self.returned_last_date > self.requested_scope_end
+        ):
+            raise CoverageBasisError("receipt returned date range is outside requested scope")
+        if self.returned_trading_day_count != self.calendar_trading_day_count:
+            raise CoverageBasisError("receipt returned trading-day count differs from calendar")
+        if self.returned_trading_days_hash != self.calendar_trading_days_hash:
+            raise CoverageBasisError("receipt returned trading-day hash differs from calendar")
+        try:
+            source_snapshot_as_of = ensure_utc_timestamp(self.source_snapshot_as_of)
+            retrieved_at = ensure_utc_timestamp(self.retrieved_at_utc)
+            available_at = ensure_utc_timestamp(self.available_at)
+            pit_as_of = ensure_utc_timestamp(self.pit_as_of)
+        except ResearchPanelError as exc:
+            raise CoverageBasisError("receipt timestamps are invalid") from exc
+        if available_at != retrieved_at:
+            raise CoverageBasisError(
+                "receipt available_at must be derived from exchange receipt time"
+            )
+        if pit_as_of != source_snapshot_as_of:
+            raise CoverageBasisError("receipt PIT must be the verified source snapshot as_of")
+        if retrieved_at > pit_as_of:
+            raise CoverageBasisError("receipt was retrieved after its verified PIT snapshot")
+        capture_catalog = self.capture_catalog()
+        if self.source_capture_hash != sha256_hex(canonical_json(capture_catalog)):
+            raise CoverageBasisError("receipt source capture catalog hash does not match")
+        expected_receipt_id = f"amazingdata-history-receipt-{self.source_capture_hash[:32]}"
+        if self.receipt_id != expected_receipt_id:
+            raise CoverageBasisError("receipt id is not derived from the capture catalog")
+        if self.source_capture_uri != f"source_capture/amazingdata/{self.receipt_id}.json":
+            raise CoverageBasisError("receipt source capture URI is not derived")
+        if (
+            self.completeness_statement_id
+            != f"amazingdata-complete-{self.source_capture_hash[:32]}"
+        ):
+            raise CoverageBasisError("receipt completeness statement id is not derived")
+        if self.receipt_hash != sha256_hex(
+            canonical_json(self.as_dict(include_receipt_hash=False))
+        ):
+            raise CoverageBasisError("receipt hash does not match canonical receipt fields")
+        _require_positive_int(self.security_universe_count, "security_universe_count")
+        _require_positive_int(self.calendar_trading_day_count, "calendar_trading_day_count")
+        _require_positive_int(self.returned_security_count, "returned_security_count")
+        _require_positive_int(self.returned_trading_day_count, "returned_trading_day_count")
+        _require_positive_int(self.returned_row_count, "returned_row_count")
+
+    def as_dict(self, *, include_receipt_hash: bool = True) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "receipt_id": self.receipt_id,
+            "receipt_version": self.receipt_version,
+            "source_selection": self.source_selection.as_dict(),
+            "source_snapshot_id": self.source_snapshot_id,
+            "source_snapshot_manifest_hash": self.source_snapshot_manifest_hash,
+            "source_snapshot_semantic_hash": self.source_snapshot_semantic_hash,
+            "source_snapshot_as_of": self.source_snapshot_as_of,
+            "requested_scope_start": self.requested_scope_start,
+            "requested_scope_end": self.requested_scope_end,
+            "security_universe_selection": self.security_universe_selection,
+            "security_universe_id": self.security_universe_id,
+            "security_universe_count": self.security_universe_count,
+            "security_universe_hash": self.security_universe_hash,
+            "calendar_market": self.calendar_market,
+            "calendar_scope_start": self.calendar_scope_start,
+            "calendar_scope_end": self.calendar_scope_end,
+            "calendar_trading_day_count": self.calendar_trading_day_count,
+            "calendar_trading_days_hash": self.calendar_trading_days_hash,
+            "returned_security_count": self.returned_security_count,
+            "returned_security_set_hash": self.returned_security_set_hash,
+            "returned_first_date": self.returned_first_date,
+            "returned_last_date": self.returned_last_date,
+            "returned_trading_day_count": self.returned_trading_day_count,
+            "returned_trading_days_hash": self.returned_trading_days_hash,
+            "returned_row_count": self.returned_row_count,
+            "operations": [operation.as_dict() for operation in self.operations],
+            "retrieved_at_utc": self.retrieved_at_utc,
+            "available_at": self.available_at,
+            "pit_as_of": self.pit_as_of,
+            "source_capture_uri": self.source_capture_uri,
+            "source_capture_hash": self.source_capture_hash,
+            "completeness_statement_id": self.completeness_statement_id,
+        }
+        if include_receipt_hash:
+            payload["receipt_hash"] = self.receipt_hash
+        return payload
+
+
+def _retained_request_matches_receipt(
+    receipt: AmazingDataAcquisitionReceipt,
+    method: str,
+    request_params: Any,
+) -> bool:
+    """Check the scrubbed RawWriter request against receipt-derived scope."""
+    if not isinstance(request_params, Mapping):
+        return False
+    params = dict(request_params)
+    start = _yyyymmdd(receipt.requested_scope_start)
+    end = _yyyymmdd(receipt.requested_scope_end)
+    if method == "BaseData.get_calendar":
+        return params == {"market": receipt.calendar_market}
+    if method == "BaseData.get_hist_code_list":
+        return params == {
+            "security_type": receipt.security_universe_selection,
+            "start_date": start,
+            "end_date": end,
+        }
+    if method != "MarketData.query_kline":
+        return False
+    expected_keys = {
+        "code_list",
+        "begin_date",
+        "end_date",
+        "kline_type",
+        "period",
+        "trading_days",
+    }
+    if set(params) != expected_keys:
+        return False
+    if params.get("begin_date") != start or params.get("end_date") != end:
+        return False
+    if params.get("kline_type") != "DAY" or params.get("period") != 10008:
+        return False
+    code_list = params.get("code_list")
+    if (
+        not isinstance(code_list, list)
+        or not code_list
+        or any(
+            not isinstance(value, str) or re.fullmatch(r"\d{6}\.(?:SH|SZ)", value) is None
+            for value in code_list
+        )
+        or code_list != sorted(code_list)
+        or len(code_list) != len(set(code_list))
+        or len(code_list) != receipt.security_universe_count
+        or sha256_hex(canonical_json(code_list)) != receipt.security_universe_hash
+    ):
+        return False
+    trading_days = params.get("trading_days")
+    return (
+        isinstance(trading_days, list)
+        and bool(trading_days)
+        and all(
+            isinstance(value, int) and not isinstance(value, bool) and len(str(value)) == 8
+            for value in trading_days
+        )
+        and trading_days == sorted(trading_days)
+        and len(trading_days) == len(set(trading_days))
+        and len(trading_days) == receipt.calendar_trading_day_count
+        and sha256_hex(canonical_json(trading_days)) == receipt.calendar_trading_days_hash
+    )
+
+
+def _issue_amazingdata_acquisition_receipt(
+    *,
+    source_snapshot: VerifiedSourceSnapshot,
+    capture: _VerifiedAmazingDataCapture,
+) -> AmazingDataAcquisitionReceipt:
+    """Issue a receipt from facts validated by the AmazingData provider path.
+
+    This is intentionally private and accepts no statement bytes, caller
+    timestamps, counts, or caller-selected authority labels.  The provider
+    adapter is the only in-repository issuer.
+    """
+    if not isinstance(source_snapshot, VerifiedSourceSnapshot):
+        raise CoverageBasisError("receipt issuer needs a verified source snapshot")
+    if not isinstance(capture, _VerifiedAmazingDataCapture):
+        raise CoverageBasisError("receipt issuer needs a verified provider capture")
+    selection = AuthoritativeSourceSelection.reviewed_amazingdata_history()
+    ordered_operations = tuple(
+        next((operation for operation in capture.operations if operation.method == method), None)
+        for method in AUTHORITATIVE_SOURCE_METHODS
+    )
+    if any(operation is None for operation in ordered_operations):
+        raise CoverageBasisError("receipt issuer did not receive the reviewed exchange set")
+    normalized_operations = tuple(
+        operation for operation in ordered_operations if operation is not None
+    )
+    capture_catalog = _amazingdata_capture_catalog(
+        source_selection_fingerprint=selection.selection_fingerprint,
+        source_snapshot_id=source_snapshot.source_snapshot_id,
+        source_snapshot_manifest_hash=source_snapshot.source_snapshot_manifest_hash,
+        source_snapshot_semantic_hash=source_snapshot.source_snapshot_semantic_hash,
+        source_snapshot_as_of=source_snapshot.source_snapshot_as_of,
+        requested_scope_start=capture.requested_scope_start,
+        requested_scope_end=capture.requested_scope_end,
+        operations=normalized_operations,
+    )
+    capture_hash = sha256_hex(canonical_json(capture_catalog))
+    receipt_id = f"amazingdata-history-receipt-{capture_hash[:32]}"
+    base: dict[str, Any] = {
+        "receipt_id": receipt_id,
+        "receipt_version": AMAZINGDATA_ACQUISITION_RECEIPT_VERSION,
+        "source_selection": selection,
+        "source_snapshot_id": source_snapshot.source_snapshot_id,
+        "source_snapshot_manifest_hash": source_snapshot.source_snapshot_manifest_hash,
+        "source_snapshot_semantic_hash": source_snapshot.source_snapshot_semantic_hash,
+        "source_snapshot_as_of": source_snapshot.source_snapshot_as_of,
+        "requested_scope_start": capture.requested_scope_start,
+        "requested_scope_end": capture.requested_scope_end,
+        "security_universe_selection": AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
+        "security_universe_id": (
+            f"hist-code-list:{AMAZINGDATA_SECURITY_UNIVERSE_SELECTION}:{capture.security_universe_hash}"
+        ),
+        "security_universe_count": capture.security_universe_count,
+        "security_universe_hash": capture.security_universe_hash,
+        "calendar_market": AMAZINGDATA_CALENDAR_MARKET,
+        "calendar_scope_start": capture.requested_scope_start,
+        "calendar_scope_end": capture.requested_scope_end,
+        "calendar_trading_day_count": capture.calendar_trading_day_count,
+        "calendar_trading_days_hash": capture.calendar_trading_days_hash,
+        "returned_security_count": capture.security_universe_count,
+        "returned_security_set_hash": capture.security_universe_hash,
+        "returned_first_date": capture.returned_first_date,
+        "returned_last_date": capture.returned_last_date,
+        "returned_trading_day_count": capture.returned_trading_day_count,
+        "returned_trading_days_hash": capture.returned_trading_days_hash,
+        "returned_row_count": capture.returned_row_count,
+        "operations": normalized_operations,
+        "retrieved_at_utc": ensure_utc_timestamp(capture.retrieved_at_utc),
+        "available_at": ensure_utc_timestamp(capture.retrieved_at_utc),
+        "pit_as_of": source_snapshot.source_snapshot_as_of,
+        "source_capture_uri": f"source_capture/amazingdata/{receipt_id}.json",
+        "source_capture_hash": capture_hash,
+        "completeness_statement_id": f"amazingdata-complete-{capture_hash[:32]}",
+    }
+    serialized_base = base | {
+        "source_selection": selection.as_dict(),
+        "operations": [operation.as_dict() for operation in normalized_operations],
+    }
+    base["receipt_hash"] = sha256_hex(canonical_json(serialized_base))
+    return AmazingDataAcquisitionReceipt._construct(
+        base | {"source_selection": selection}, provenance="verified_capture"
+    )
+
+
+@dataclass(frozen=True)
+class AuthoritativeCoverageEvidence:
+    """Sealed, non-fixture proof package for one complete logical month.
+
+    The provider payload is never embedded here.  The sidecar embeds a typed
+    AmazingData acquisition receipt whose operation hashes point to retained
+    RawWriter evidence and a canonical capture catalog.  Its own canonical
+    bytes/hash and PIT timestamps are persisted by the historical materializer.
+    The explicit receipt kind and complete claim are required; any response
+    observation outside the reviewed full-scope path is deliberately not
+    sufficient.
+    """
+
+    evidence_id: str
+    evidence_version: str
+    coverage_basis_id: str
+    source_snapshot_id: str
+    source_snapshot_manifest_hash: str
+    source_snapshot_as_of: datetime
+    source_domain: str
+    claimed_scope_start: date
+    claimed_scope_end: date
+    source_selection_fingerprint: str
+    completeness_method: str
+    completeness_claim: str
+    source_selection: AuthoritativeSourceSelection
+    acquisition_receipt: AmazingDataAcquisitionReceipt
+    upstream_source: str
+    upstream_statement_kind: str
+    upstream_statement_id: str
+    upstream_statement_locator: str
+    upstream_statement_hash: str
+    upstream_inventory_id: str
+    upstream_inventory_scope_start: date
+    upstream_inventory_scope_end: date
+    upstream_inventory_hash: str
+    upstream_security_count: int
+    upstream_session_count: int
+    retrieved_at_utc: datetime
+    available_at: datetime
+    pit_as_of: datetime
+    coverage_basis_evidence_uri: str
+    coverage_basis_evidence_hash: str
+    artifact_bytes: bytes
+
+    def __post_init__(self) -> None:
+        try:
+            for field_name in (
+                "evidence_id",
+                "evidence_version",
+                "coverage_basis_id",
+                "source_snapshot_id",
+                "source_domain",
+                "source_selection_fingerprint",
+                "completeness_method",
+                "completeness_claim",
+                "upstream_source",
+                "upstream_statement_kind",
+                "upstream_statement_id",
+                "upstream_statement_locator",
+                "upstream_inventory_id",
+                "coverage_basis_evidence_uri",
+            ):
+                _require_non_empty_string(getattr(self, field_name), field_name)
+            _require_sha256(self.source_snapshot_manifest_hash, "source_snapshot_manifest_hash")
+            _require_sha256(self.source_selection_fingerprint, "source_selection_fingerprint")
+            _require_sha256(self.upstream_statement_hash, "upstream_statement_hash")
+            _require_sha256(self.upstream_inventory_hash, "upstream_inventory_hash")
+            _require_sha256(self.coverage_basis_evidence_hash, "coverage_basis_evidence_hash")
+            _safe_relative_uri(self.coverage_basis_evidence_uri, "coverage_basis_evidence_uri")
+        except HistoricalMaterializationError as exc:
+            raise CoverageBasisError(str(exc)) from exc
+        if self.evidence_version != AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION:
+            raise CoverageBasisError("unknown authoritative coverage evidence version")
+        if self.source_domain != "daily_bar":
+            raise CoverageBasisError(
+                "authoritative coverage evidence source_domain must be daily_bar"
+            )
+        if self.completeness_method != AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD:
+            raise CoverageBasisError("authoritative coverage evidence uses an unknown method")
+        if self.completeness_claim != COMPLETE_OBSERVED_DAILY_BAR_SCOPE:
+            raise CoverageBasisError(
+                "authoritative coverage evidence must explicitly claim complete daily-bar scope"
+            )
+        if self.upstream_source != AUTHORITATIVE_PROVIDER:
+            raise CoverageBasisError("authoritative coverage evidence names an unreviewed provider")
+        if self.upstream_statement_kind != AUTHORITATIVE_UPSTREAM_STATEMENT_KIND:
+            raise CoverageBasisError("authoritative inventory/range statement kind is missing")
+        if not isinstance(self.source_selection, AuthoritativeSourceSelection):
+            raise CoverageBasisError(
+                "authoritative coverage evidence needs a typed source selection"
+            )
+        if not isinstance(self.acquisition_receipt, AmazingDataAcquisitionReceipt):
+            raise CoverageBasisError(
+                "authoritative coverage evidence needs an AmazingData acquisition receipt"
+            )
+        if self.source_selection_fingerprint != self.source_selection.selection_fingerprint:
+            raise CoverageBasisError(
+                "source-selection fingerprint does not match the typed binding"
+            )
+        receipt = self.acquisition_receipt
+        if receipt.source_selection != self.source_selection:
+            raise CoverageBasisError("authoritative evidence receipt source-selection changed")
+        if (
+            receipt.requested_scope_start != self.claimed_scope_start
+            or receipt.requested_scope_end != self.claimed_scope_end
+        ):
+            raise CoverageBasisError("authoritative evidence receipt scope does not match")
+        if (
+            self.source_snapshot_id != receipt.source_snapshot_id
+            or self.source_snapshot_manifest_hash != receipt.source_snapshot_manifest_hash
+            or self.source_snapshot_as_of != receipt.source_snapshot_as_of
+            or self.source_selection_fingerprint != receipt.source_selection.selection_fingerprint
+            or self.upstream_statement_id != receipt.completeness_statement_id
+            or self.upstream_statement_locator != receipt.source_capture_uri
+            or self.upstream_statement_hash != receipt.receipt_hash
+            or self.upstream_inventory_id != receipt.security_universe_id
+            or self.upstream_inventory_scope_start != receipt.requested_scope_start
+            or self.upstream_inventory_scope_end != receipt.requested_scope_end
+            or self.upstream_inventory_hash != receipt.security_universe_hash
+            or self.upstream_security_count != receipt.security_universe_count
+            or self.upstream_session_count != receipt.calendar_trading_day_count
+            or self.retrieved_at_utc != receipt.retrieved_at_utc
+            or self.available_at != receipt.available_at
+            or self.pit_as_of != receipt.pit_as_of
+        ):
+            raise CoverageBasisError(
+                "authoritative evidence is not derived from its acquisition receipt"
+            )
+        if any(
+            token in self.upstream_statement_locator.lower()
+            for token in ("password", "token", "cookie", "secret", "authorization")
+        ):
+            raise CoverageBasisError("upstream statement locator contains a sensitive token")
+        for field_name in (
+            "claimed_scope_start",
+            "claimed_scope_end",
+            "upstream_inventory_scope_start",
+            "upstream_inventory_scope_end",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, date) or isinstance(value, datetime):
+                raise CoverageBasisError(f"{field_name} must be a date")
+        if (self.claimed_scope_start, self.claimed_scope_end) != (
+            self.upstream_inventory_scope_start,
+            self.upstream_inventory_scope_end,
+        ):
+            raise CoverageBasisError("upstream inventory scope does not match claimed scope")
+        for field_name in (
+            "source_snapshot_as_of",
+            "retrieved_at_utc",
+            "available_at",
+            "pit_as_of",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, datetime) or value.tzinfo is None:
+                raise CoverageBasisError(f"{field_name} must be timezone-aware")
+            try:
+                object.__setattr__(self, field_name, ensure_utc_timestamp(value))
+            except ResearchPanelError as exc:
+                raise CoverageBasisError(f"{field_name} is not a valid UTC timestamp") from exc
+        if self.available_at > self.pit_as_of:
+            raise CoverageBasisError("authoritative evidence is not available at its PIT as_of")
+        if self.pit_as_of > self.source_snapshot_as_of:
+            raise CoverageBasisError(
+                "authoritative evidence PIT as_of is after the source snapshot"
+            )
+        if self.retrieved_at_utc < self.available_at:
+            raise CoverageBasisError("authoritative evidence was retrieved before it was available")
+        for field_name in ("upstream_security_count", "upstream_session_count"):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise CoverageBasisError(f"{field_name} must be a positive integer")
+        if not isinstance(self.artifact_bytes, bytes):
+            raise CoverageBasisError("authoritative coverage evidence artifact_bytes must be bytes")
+        expected_bytes = canonical_json(self.as_dict(include_artifact_hash=False)).encode("utf-8")
+        if self.artifact_bytes != expected_bytes:
+            raise CoverageBasisError("authoritative coverage evidence bytes are not canonical")
+        if sha256_hex(self.artifact_bytes) != self.coverage_basis_evidence_hash:
+            raise CoverageBasisError("authoritative coverage evidence hash does not match bytes")
+
+    @classmethod
+    def from_mapping(
+        cls,
+        payload: Mapping[str, Any],
+        *,
+        artifact_bytes: bytes,
+        artifact_hash: str,
+    ) -> AuthoritativeCoverageEvidence:
+        if not isinstance(payload, Mapping) or set(payload) != set(_AUTHORITATIVE_EVIDENCE_FIELDS):
+            raise CoverageBasisError("authoritative coverage evidence fields are not exact")
+        if not isinstance(artifact_bytes, bytes):
+            raise CoverageBasisError("authoritative coverage evidence artifact_bytes must be bytes")
+        try:
+            parsed = {
+                field_name: _require_non_empty_string(payload[field_name], field_name)
+                for field_name in (
+                    "evidence_id",
+                    "evidence_version",
+                    "coverage_basis_id",
+                    "source_snapshot_id",
+                    "source_domain",
+                    "source_selection_fingerprint",
+                    "completeness_method",
+                    "completeness_claim",
+                    "upstream_source",
+                    "upstream_statement_kind",
+                    "upstream_statement_id",
+                    "upstream_statement_locator",
+                    "upstream_inventory_id",
+                    "coverage_basis_evidence_uri",
+                )
+            }
+            dates = {
+                field_name: parse_date_value(payload[field_name])
+                for field_name in (
+                    "claimed_scope_start",
+                    "claimed_scope_end",
+                    "upstream_inventory_scope_start",
+                    "upstream_inventory_scope_end",
+                )
+            }
+            timestamps = {
+                field_name: ensure_utc_timestamp(payload[field_name])
+                for field_name in (
+                    "source_snapshot_as_of",
+                    "retrieved_at_utc",
+                    "available_at",
+                    "pit_as_of",
+                )
+            }
+            selection = AuthoritativeSourceSelection.from_mapping(payload["source_selection"])
+            acquisition_receipt = AmazingDataAcquisitionReceipt.from_mapping(
+                payload["acquisition_receipt"]
+            )
+            snapshot_hash = _require_sha256(
+                payload["source_snapshot_manifest_hash"], "source_snapshot_manifest_hash"
+            )
+            _require_sha256(parsed["source_selection_fingerprint"], "source_selection_fingerprint")
+            statement_hash = _require_sha256(
+                payload["upstream_statement_hash"], "upstream_statement_hash"
+            )
+            inventory_hash = _require_sha256(
+                payload["upstream_inventory_hash"], "upstream_inventory_hash"
+            )
+            evidence_hash = _require_sha256(artifact_hash, "coverage_basis_evidence_hash")
+        except (HistoricalMaterializationError, ResearchPanelError, KeyError, TypeError) as exc:
+            raise CoverageBasisError("authoritative coverage evidence is malformed") from exc
+        return cls(
+            evidence_id=parsed["evidence_id"],
+            evidence_version=parsed["evidence_version"],
+            coverage_basis_id=parsed["coverage_basis_id"],
+            source_snapshot_id=parsed["source_snapshot_id"],
+            source_snapshot_manifest_hash=snapshot_hash,
+            source_snapshot_as_of=timestamps["source_snapshot_as_of"],
+            source_domain=parsed["source_domain"],
+            claimed_scope_start=dates["claimed_scope_start"],
+            claimed_scope_end=dates["claimed_scope_end"],
+            source_selection_fingerprint=parsed["source_selection_fingerprint"],
+            completeness_method=parsed["completeness_method"],
+            completeness_claim=parsed["completeness_claim"],
+            source_selection=selection,
+            acquisition_receipt=acquisition_receipt,
+            upstream_source=parsed["upstream_source"],
+            upstream_statement_kind=parsed["upstream_statement_kind"],
+            upstream_statement_id=parsed["upstream_statement_id"],
+            upstream_statement_locator=parsed["upstream_statement_locator"],
+            upstream_statement_hash=statement_hash,
+            upstream_inventory_id=parsed["upstream_inventory_id"],
+            upstream_inventory_scope_start=dates["upstream_inventory_scope_start"],
+            upstream_inventory_scope_end=dates["upstream_inventory_scope_end"],
+            upstream_inventory_hash=inventory_hash,
+            upstream_security_count=payload["upstream_security_count"],
+            upstream_session_count=payload["upstream_session_count"],
+            retrieved_at_utc=timestamps["retrieved_at_utc"],
+            available_at=timestamps["available_at"],
+            pit_as_of=timestamps["pit_as_of"],
+            coverage_basis_evidence_uri=parsed["coverage_basis_evidence_uri"],
+            coverage_basis_evidence_hash=evidence_hash,
+            artifact_bytes=artifact_bytes,
+        )
+
+    def as_dict(self, *, include_artifact_hash: bool = True) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "evidence_id": self.evidence_id,
+            "evidence_version": self.evidence_version,
+            "coverage_basis_id": self.coverage_basis_id,
+            "source_snapshot_id": self.source_snapshot_id,
+            "source_snapshot_manifest_hash": self.source_snapshot_manifest_hash,
+            "source_snapshot_as_of": self.source_snapshot_as_of,
+            "source_domain": self.source_domain,
+            "claimed_scope_start": self.claimed_scope_start,
+            "claimed_scope_end": self.claimed_scope_end,
+            "source_selection_fingerprint": self.source_selection_fingerprint,
+            "completeness_method": self.completeness_method,
+            "completeness_claim": self.completeness_claim,
+            "source_selection": self.source_selection.as_dict(),
+            "acquisition_receipt": self.acquisition_receipt.as_dict(),
+            "upstream_source": self.upstream_source,
+            "upstream_statement_kind": self.upstream_statement_kind,
+            "upstream_statement_id": self.upstream_statement_id,
+            "upstream_statement_locator": self.upstream_statement_locator,
+            "upstream_statement_hash": self.upstream_statement_hash,
+            "upstream_inventory_id": self.upstream_inventory_id,
+            "upstream_inventory_scope_start": self.upstream_inventory_scope_start,
+            "upstream_inventory_scope_end": self.upstream_inventory_scope_end,
+            "upstream_inventory_hash": self.upstream_inventory_hash,
+            "upstream_security_count": self.upstream_security_count,
+            "upstream_session_count": self.upstream_session_count,
+            "retrieved_at_utc": self.retrieved_at_utc,
+            "available_at": self.available_at,
+            "pit_as_of": self.pit_as_of,
+            "coverage_basis_evidence_uri": self.coverage_basis_evidence_uri,
+        }
+        if include_artifact_hash:
+            payload["coverage_basis_evidence_hash"] = self.coverage_basis_evidence_hash
+        return payload
+
+
+def build_authoritative_coverage_evidence_from_acquisition(
+    partition: PartitionKey,
+    acquisition_receipt: AmazingDataAcquisitionReceipt,
+) -> AuthoritativeCoverageEvidence:
+    """Build one authoritative sidecar from a verified AmazingData receipt.
+
+    The receipt is the only authority input.  Evidence ids, scope, inventory
+    hashes, counts and all time fields are derived from it; arbitrary source
+    bytes, caller timestamps and caller completeness labels are not accepted.
+    """
+    if not isinstance(acquisition_receipt, AmazingDataAcquisitionReceipt):
+        raise CoverageBasisError("authoritative evidence needs a typed acquisition receipt")
+    if not acquisition_receipt.is_verified_capture:
+        raise CoverageBasisError(
+            "authoritative evidence must be issued by the AmazingData acquisition path"
+        )
+    if (
+        acquisition_receipt.requested_scope_start != partition.scope_start
+        or acquisition_receipt.requested_scope_end != partition.scope_end
+    ):
+        raise CoverageBasisError("acquisition receipt scope does not match the partition")
+    evidence_id = f"amazingdata-evidence-{partition.logical_key}-{acquisition_receipt.receipt_id}"
+    coverage_basis_id = (
+        f"amazingdata-basis-{partition.logical_key}-{acquisition_receipt.receipt_id}"
+    )
+    coverage_basis_evidence_uri = (
+        f"coverage_basis_evidence/{partition.research_split.value}/"
+        f"{partition.calendar_year:04d}-{partition.calendar_month:02d}.json"
+    )
+    base: dict[str, Any] = {
+        "evidence_id": evidence_id,
+        "evidence_version": AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION,
+        "coverage_basis_id": coverage_basis_id,
+        "source_snapshot_id": acquisition_receipt.source_snapshot_id,
+        "source_snapshot_manifest_hash": acquisition_receipt.source_snapshot_manifest_hash,
+        "source_snapshot_as_of": acquisition_receipt.source_snapshot_as_of,
+        "source_domain": "daily_bar",
+        "claimed_scope_start": partition.scope_start,
+        "claimed_scope_end": partition.scope_end,
+        "source_selection_fingerprint": acquisition_receipt.source_selection.selection_fingerprint,
+        "completeness_method": AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
+        "completeness_claim": COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
+        "source_selection": acquisition_receipt.source_selection.as_dict(),
+        "acquisition_receipt": acquisition_receipt.as_dict(),
+        "upstream_source": AUTHORITATIVE_PROVIDER,
+        "upstream_statement_kind": AUTHORITATIVE_UPSTREAM_STATEMENT_KIND,
+        "upstream_statement_id": acquisition_receipt.completeness_statement_id,
+        "upstream_statement_locator": acquisition_receipt.source_capture_uri,
+        "upstream_statement_hash": acquisition_receipt.receipt_hash,
+        "upstream_inventory_id": acquisition_receipt.security_universe_id,
+        "upstream_inventory_scope_start": acquisition_receipt.requested_scope_start,
+        "upstream_inventory_scope_end": acquisition_receipt.requested_scope_end,
+        "upstream_inventory_hash": acquisition_receipt.security_universe_hash,
+        "upstream_security_count": acquisition_receipt.security_universe_count,
+        "upstream_session_count": acquisition_receipt.calendar_trading_day_count,
+        "retrieved_at_utc": acquisition_receipt.retrieved_at_utc,
+        "available_at": acquisition_receipt.available_at,
+        "pit_as_of": acquisition_receipt.pit_as_of,
+        "coverage_basis_evidence_uri": coverage_basis_evidence_uri,
+    }
+    artifact_bytes = canonical_json(base).encode("utf-8")
+    return AuthoritativeCoverageEvidence(
+        evidence_id=evidence_id,
+        evidence_version=AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION,
+        coverage_basis_id=coverage_basis_id,
+        source_snapshot_id=acquisition_receipt.source_snapshot_id,
+        source_snapshot_manifest_hash=acquisition_receipt.source_snapshot_manifest_hash,
+        source_snapshot_as_of=acquisition_receipt.source_snapshot_as_of,
+        source_domain="daily_bar",
+        claimed_scope_start=partition.scope_start,
+        claimed_scope_end=partition.scope_end,
+        source_selection_fingerprint=acquisition_receipt.source_selection.selection_fingerprint,
+        completeness_method=AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
+        completeness_claim=COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
+        source_selection=acquisition_receipt.source_selection,
+        acquisition_receipt=acquisition_receipt,
+        upstream_source=AUTHORITATIVE_PROVIDER,
+        upstream_statement_kind=AUTHORITATIVE_UPSTREAM_STATEMENT_KIND,
+        upstream_statement_id=acquisition_receipt.completeness_statement_id,
+        upstream_statement_locator=acquisition_receipt.source_capture_uri,
+        upstream_statement_hash=acquisition_receipt.receipt_hash,
+        upstream_inventory_id=acquisition_receipt.security_universe_id,
+        upstream_inventory_scope_start=acquisition_receipt.requested_scope_start,
+        upstream_inventory_scope_end=acquisition_receipt.requested_scope_end,
+        upstream_inventory_hash=acquisition_receipt.security_universe_hash,
+        upstream_security_count=acquisition_receipt.security_universe_count,
+        upstream_session_count=acquisition_receipt.calendar_trading_day_count,
+        retrieved_at_utc=acquisition_receipt.retrieved_at_utc,
+        available_at=acquisition_receipt.available_at,
+        pit_as_of=acquisition_receipt.pit_as_of,
+        coverage_basis_evidence_uri=coverage_basis_evidence_uri,
+        coverage_basis_evidence_hash=sha256_hex(artifact_bytes),
+        artifact_bytes=artifact_bytes,
+    )
 
 
 @dataclass(frozen=True, order=True)
@@ -319,6 +1883,9 @@ class CoverageBasisDescriptor:
     coverage_basis_artifact_uri: str
     coverage_basis_artifact_hash: str
     artifact_bytes: bytes
+    authoritative_evidence: AuthoritativeCoverageEvidence | None = dataclass_field(
+        default=None, repr=False
+    )
 
     def __post_init__(self) -> None:
         """Keep direct dataclass construction subject to the same seal checks."""
@@ -361,6 +1928,29 @@ class CoverageBasisDescriptor:
             raise CoverageBasisError("coverage basis scope is not the logical calendar month")
         if self.completeness_method not in _RECOGNIZED_COMPLETENESS_METHODS:
             raise CoverageBasisError("unknown versioned completeness_method")
+        method_spec = _RECOGNIZED_COMPLETENESS_METHODS[self.completeness_method]
+        if method_spec.evidence_class is CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM:
+            evidence = self.authoritative_evidence
+            if not isinstance(evidence, AuthoritativeCoverageEvidence):
+                raise CoverageBasisError(
+                    "authoritative completeness method requires a typed evidence sidecar"
+                )
+            if (
+                evidence.coverage_basis_id != self.coverage_basis_id
+                or evidence.source_snapshot_id != self.source_snapshot_id
+                or evidence.source_snapshot_manifest_hash != self.source_snapshot_manifest_hash
+                or evidence.source_domain != self.source_domain
+                or evidence.claimed_scope_start != self.claimed_scope_start
+                or evidence.claimed_scope_end != self.claimed_scope_end
+                or evidence.source_selection_fingerprint != self.source_selection_fingerprint
+                or evidence.completeness_method != self.completeness_method
+                or evidence.completeness_claim != self.completeness_claim
+            ):
+                raise CoverageBasisError("authoritative coverage evidence binding changed")
+        elif self.authoritative_evidence is not None:
+            raise CoverageBasisError(
+                "fixture or unresolved completeness cannot carry authoritative evidence"
+            )
         expected_claim = (
             COMPLETE_OBSERVED_DAILY_BAR_SCOPE
             if self.state is CoverageState.OBSERVED_DAILY_BAR_COVERAGE
@@ -388,6 +1978,7 @@ class CoverageBasisDescriptor:
         payload: Mapping[str, Any],
         *,
         artifact_bytes: bytes,
+        authoritative_evidence: AuthoritativeCoverageEvidence | None = None,
     ) -> CoverageBasisDescriptor:
         if not isinstance(payload, Mapping):
             raise CoverageBasisError("coverage basis must be an object")
@@ -505,6 +2096,7 @@ class CoverageBasisDescriptor:
             **normalized,
             coverage_basis_artifact_hash=artifact_hash,
             artifact_bytes=artifact_bytes,
+            authoritative_evidence=authoritative_evidence,
         )
 
     @property
@@ -618,6 +2210,13 @@ def verify_coverage_basis(
             raise CoverageBasisError(
                 "coverage basis source_snapshot_manifest_hash does not match projection"
             )
+        if descriptor.authoritative_evidence is not None and (
+            descriptor.authoritative_evidence.source_snapshot_as_of
+            != ensure_utc_timestamp(projection.source_snapshot_as_of)
+        ):
+            raise CoverageBasisError(
+                "authoritative coverage evidence source snapshot PIT does not match projection"
+            )
 
     enabled_keys: set[PartitionKey] = set()
     for ordinal, row in enumerate(projection.rows):
@@ -698,11 +2297,16 @@ def _aggregate_coverage_evidence(
 def compute_coverage_basis_set_hash(
     descriptors: Sequence[CoverageBasisDescriptor],
 ) -> str:
-    """Hash sorted enabled-route basis descriptors, including exact scope hashes."""
+    """Hash sorted basis descriptors and any authoritative sidecar hashes."""
     ordered = sorted(descriptors, key=lambda descriptor: descriptor.sort_key)
-    payload = [
-        {"research_route": "research_enabled", **descriptor.as_dict()} for descriptor in ordered
-    ]
+    payload: list[dict[str, Any]] = []
+    for descriptor in ordered:
+        item = {"research_route": "research_enabled", **descriptor.as_dict()}
+        if descriptor.authoritative_evidence is not None:
+            item["authoritative_evidence_hash"] = (
+                descriptor.authoritative_evidence.coverage_basis_evidence_hash
+            )
+        payload.append(item)
     return sha256_hex(canonical_json(payload))
 
 
@@ -1091,6 +2695,24 @@ def _coverage_basis_file_entry(descriptor: CoverageBasisDescriptor) -> dict[str,
     }
 
 
+def _coverage_basis_evidence_relative_path(
+    evidence: AuthoritativeCoverageEvidence,
+) -> str:
+    return f"coverage_basis_evidence/{evidence.coverage_basis_evidence_hash}.json"
+
+
+def _coverage_basis_evidence_file_entry(
+    evidence: AuthoritativeCoverageEvidence,
+) -> dict[str, Any]:
+    return {
+        "coverage_basis_id": evidence.coverage_basis_id,
+        "declared_uri": evidence.coverage_basis_evidence_uri,
+        "relative_path": _coverage_basis_evidence_relative_path(evidence),
+        "content_hash": evidence.coverage_basis_evidence_hash,
+        "byte_size": len(evidence.artifact_bytes),
+    }
+
+
 @dataclass(frozen=True)
 class HistoricalMaterializationPlan:
     """Fully computed, but not yet published, historical materialization."""
@@ -1151,6 +2773,11 @@ class HistoricalMaterializationPlan:
                 _coverage_basis_file_entry(descriptor)
                 for descriptor in self.coverage_basis_descriptors
             ],
+            "coverage_basis_evidence": [
+                _coverage_basis_evidence_file_entry(descriptor.authoritative_evidence)
+                for descriptor in self.coverage_basis_descriptors
+                if descriptor.authoritative_evidence is not None
+            ],
             "partition_policy_version": PARTITION_POLICY_VERSION,
             "research_split_windows": self.materialization_identity["research_split_windows"],
             "target_window": {
@@ -1199,12 +2826,16 @@ class OfflineHistoricalMaterializer:
         *,
         writer_runtime_lock_hash: str,
         build_code_fingerprint: str | None = None,
+        authoritative_capture_root: Path | str | None = None,
     ) -> None:
         self.root = Path(root)
         self.writer_runtime_lock_hash = _require_sha256(
             writer_runtime_lock_hash, "writer_runtime_lock_hash"
         )
         self.build_code_fingerprint = build_code_fingerprint
+        self.authoritative_capture_root = (
+            Path(authoritative_capture_root) if authoritative_capture_root is not None else None
+        )
 
     def plan(
         self,
@@ -1268,6 +2899,12 @@ class OfflineHistoricalMaterializer:
         )
         descriptors = tuple(coverage_bases)
         evaluations = verify_coverage_basis(normalized_projection, descriptors)
+        if any(descriptor.authoritative_evidence is not None for descriptor in descriptors) and (
+            self.authoritative_capture_root is None
+        ):
+            raise HistoricalMaterializationError(
+                "authoritative materialization requires the retained AmazingData capture root"
+            )
         evaluation_by_key = {evaluation.partition: evaluation for evaluation in evaluations}
         basis_hash = compute_coverage_basis_set_hash(descriptors)
         identity = build_materialization_identity(
@@ -1396,6 +3033,8 @@ class OfflineHistoricalMaterializer:
                         for artifact in ordered_artifacts
                     ],
                     "partition_inventory_hash": partition_inventory_hash,
+                    "coverage_basis_set_hash": basis_hash,
+                    "writer_runtime_lock_hash": self.writer_runtime_lock_hash,
                     "excluded_row_count": sum(excluded_reasons.values()),
                 }
             )
@@ -1458,6 +3097,12 @@ class OfflineHistoricalMaterializer:
                     stage_dir / _coverage_basis_relative_path(descriptor),
                     descriptor.artifact_bytes,
                 )
+                if descriptor.authoritative_evidence is not None:
+                    self._write_staged_file(
+                        stage_dir
+                        / _coverage_basis_evidence_relative_path(descriptor.authoritative_evidence),
+                        descriptor.authoritative_evidence.artifact_bytes,
+                    )
             self._write_staged_file(stage_dir / "partition_inventory.json", inventory_bytes)
             stage_manifest = stage_dir / "manifest.json"
             if stage_manifest.exists():
@@ -1511,6 +3156,11 @@ class OfflineHistoricalMaterializer:
             _coverage_basis_relative_path(descriptor)
             for descriptor in plan.coverage_basis_descriptors
         )
+        expected.update(
+            _coverage_basis_evidence_relative_path(descriptor.authoritative_evidence)
+            for descriptor in plan.coverage_basis_descriptors
+            if descriptor.authoritative_evidence is not None
+        )
         expected.update({"partition_inventory.json", "manifest.json", "_SUCCESS.json"})
         for path in stage_dir.rglob("*"):
             if path.is_file():
@@ -1534,6 +3184,32 @@ class OfflineHistoricalMaterializer:
                 raise MaterializationConflictError(
                     f"coverage basis bytes changed for {descriptor.coverage_basis_id}"
                 )
+            if descriptor.authoritative_evidence is not None:
+                evidence_path = stage_dir / _coverage_basis_evidence_relative_path(
+                    descriptor.authoritative_evidence
+                )
+                if (
+                    not evidence_path.is_file()
+                    or evidence_path.read_bytes()
+                    != descriptor.authoritative_evidence.artifact_bytes
+                ):
+                    raise MaterializationConflictError(
+                        "authoritative coverage evidence bytes changed for "
+                        f"{descriptor.coverage_basis_id}"
+                    )
+                capture_root = self.authoritative_capture_root
+                if capture_root is None:  # pragma: no cover - plan() guards this
+                    raise MaterializationConflictError(
+                        "authoritative materialization capture root is not configured"
+                    )
+                try:
+                    descriptor.authoritative_evidence.acquisition_receipt.verify_retained_capture(
+                        capture_root
+                    )
+                except CoverageBasisError as exc:
+                    raise MaterializationConflictError(
+                        "authoritative AmazingData capture proof chain is not replayable"
+                    ) from exc
         inventory_path = stage_dir / "partition_inventory.json"
         inventory_bytes = inventory_path.read_bytes()
         inventory = _load_json_list(inventory_bytes, "staged partition inventory")
@@ -1692,6 +3368,12 @@ def _assert_manifest_identity(
         _coverage_basis_file_entry(descriptor) for descriptor in plan.coverage_basis_descriptors
     ]:
         raise MaterializationConflictError("coverage basis artifact inventory changed")
+    if manifest.get("coverage_basis_evidence") != [
+        _coverage_basis_evidence_file_entry(descriptor.authoritative_evidence)
+        for descriptor in plan.coverage_basis_descriptors
+        if descriptor.authoritative_evidence is not None
+    ]:
+        raise MaterializationConflictError("authoritative coverage evidence inventory changed")
     if manifest.get("partition_inventory_hash") != plan.partition_inventory_hash:
         raise MaterializationConflictError("partition inventory hash changed")
     if manifest.get("artifact_set_hash") != plan.artifact_set_hash:
@@ -1783,7 +3465,12 @@ class HistoricalMaterializationReader:
     manifest: dict[str, Any]
 
     @classmethod
-    def from_manifest(cls, manifest_path: Path) -> HistoricalMaterializationReader:
+    def from_manifest(
+        cls,
+        manifest_path: Path,
+        *,
+        authoritative_capture_root: Path | str | None = None,
+    ) -> HistoricalMaterializationReader:
         path = Path(manifest_path)
         if ".staging" in path.parts:
             raise HistoricalReadError("staging materializations are never readable")
@@ -1892,21 +3579,89 @@ class HistoricalMaterializationReader:
             raise HistoricalReadError("historical artifact set hash changed")
         basis_descriptors = manifest.get("coverage_basis_descriptors")
         basis_files = manifest.get("coverage_basis_artifacts")
-        if not isinstance(basis_descriptors, list) or not isinstance(basis_files, list):
+        evidence_files = manifest.get("coverage_basis_evidence")
+        if (
+            not isinstance(basis_descriptors, list)
+            or not isinstance(basis_files, list)
+            or not isinstance(evidence_files, list)
+        ):
             raise HistoricalReadError("historical coverage-basis evidence is missing")
         if len(basis_descriptors) != len(basis_files):
             raise HistoricalReadError("historical coverage-basis evidence is incomplete")
+        if len(evidence_files) != len(basis_descriptors):
+            raise HistoricalReadError(
+                "ordinary historical reader requires one authoritative evidence sidecar per basis"
+            )
         parsed_bases: list[CoverageBasisDescriptor] = []
-        for raw_descriptor, raw_file in zip(basis_descriptors, basis_files, strict=True):
-            if not isinstance(raw_descriptor, Mapping) or not isinstance(raw_file, Mapping):
+        try:
+            expected_snapshot_as_of = ensure_utc_timestamp(str(identity["source_snapshot_as_of"]))
+        except (HistoricalMaterializationError, ResearchPanelError) as exc:
+            raise HistoricalReadError("historical materialization snapshot PIT is invalid") from exc
+        expected_snapshot_id = identity.get("source_snapshot_id")
+        expected_snapshot_hash = identity.get("source_snapshot_manifest_hash")
+        if not isinstance(expected_snapshot_id, str) or not expected_snapshot_id:
+            raise HistoricalReadError("historical materialization source snapshot id is invalid")
+        try:
+            expected_snapshot_hash = _require_sha256(
+                expected_snapshot_hash, "source_snapshot_manifest_hash"
+            )
+        except HistoricalMaterializationError as exc:
+            raise HistoricalReadError(
+                "historical materialization source snapshot hash is invalid"
+            ) from exc
+        for raw_descriptor, raw_file, raw_evidence_file in zip(
+            basis_descriptors, basis_files, evidence_files, strict=True
+        ):
+            if (
+                not isinstance(raw_descriptor, Mapping)
+                or not isinstance(raw_file, Mapping)
+                or not isinstance(raw_evidence_file, Mapping)
+            ):
                 raise HistoricalReadError("historical coverage-basis evidence is malformed")
             basis_path = _resolve_relative_file(path.parent, str(raw_file.get("relative_path")))
             if not basis_path.is_file():
                 raise HistoricalReadError("historical coverage-basis artifact is missing")
             basis_bytes = basis_path.read_bytes()
+            evidence_path = _resolve_relative_file(
+                path.parent, str(raw_evidence_file.get("relative_path"))
+            )
+            if not evidence_path.is_file():
+                raise HistoricalReadError("authoritative coverage evidence sidecar is missing")
+            evidence_bytes = evidence_path.read_bytes()
+            try:
+                evidence = AuthoritativeCoverageEvidence.from_mapping(
+                    _load_json_object(evidence_bytes, "authoritative coverage evidence"),
+                    artifact_bytes=evidence_bytes,
+                    artifact_hash=str(raw_evidence_file.get("content_hash")),
+                )
+            except (CoverageBasisError, HistoricalMaterializationError) as exc:
+                raise HistoricalReadError(
+                    "authoritative coverage evidence sidecar is invalid"
+                ) from exc
+            if dict(raw_evidence_file) != _coverage_basis_evidence_file_entry(evidence):
+                raise HistoricalReadError("authoritative coverage evidence inventory changed")
+            if (
+                evidence.source_snapshot_id != expected_snapshot_id
+                or evidence.source_snapshot_manifest_hash != expected_snapshot_hash
+            ):
+                raise HistoricalReadError("authoritative coverage evidence source snapshot changed")
+            if evidence.source_snapshot_as_of != expected_snapshot_as_of:
+                raise HistoricalReadError("authoritative coverage evidence snapshot PIT changed")
+            if authoritative_capture_root is None:
+                raise HistoricalReadError(
+                    "ordinary historical reader requires the retained AmazingData capture root"
+                )
+            try:
+                evidence.acquisition_receipt.verify_retained_capture(authoritative_capture_root)
+            except CoverageBasisError as exc:
+                raise HistoricalReadError(
+                    "authoritative AmazingData capture proof chain is not replayable"
+                ) from exc
             try:
                 descriptor = CoverageBasisDescriptor.from_mapping(
-                    raw_descriptor, artifact_bytes=basis_bytes
+                    raw_descriptor,
+                    artifact_bytes=basis_bytes,
+                    authoritative_evidence=evidence,
                 )
             except CoverageBasisError as exc:
                 raise HistoricalReadError("historical coverage-basis artifact is invalid") from exc

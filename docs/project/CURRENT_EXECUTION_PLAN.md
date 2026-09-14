@@ -43,6 +43,26 @@
 
 **重要事实**：当前只完成了可信历史物化框架，尚未证明 2020-01 至 2026-06 的真实市场历史覆盖，也尚未完成全 78 月真实历史物化。
 
+**当前分支进展**：以最新 `main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 建立的
+`feat/cr7-authoritative-evidence-preflight-20260913` 已实现 typed authoritative sidecar、
+固定来源选择绑定、writer/reader 双重重验和三个月真实源预检脚本；这些变更尚未合并到
+`main`，须以该分支最终 exact head 进行 CI 和独立审阅。
+
+当前实现 exact head 为 `8ce680c2821b8bdf3c1459c7285ebe9265dc1b60`，base 为
+`main@2e9bdc36544c5320072969a2888180b6dfec2c7a`；required CI `#590`（run
+`34799945484`）三矩阵全部成功，GT-H3B `#117` 按边界 skipped。此前 `89ae...` 的
+CI #589 仅因同批 DEVLOG 缺失而失败，已通过将管理记录并入实现提交修正；本段不把
+`89ae...` 的结果当作当前 head 证据。
+
+**最新整改要求**：PR #58 exact-head review `5192511594` 给出 `REMEDIATE`，指出旧的
+通用 builder 可用任意 statement/inventory bytes、计数和时间戳铸造
+`AUTHORITATIVE_UPSTREAM`。本分支已按 Owner 后续政策将信任锚收敛为
+`OWNER_APPROVED_AMAZINGDATA_ACQUISITION_PATH`：不要求供应商签名或第三方 attestation，
+但只允许经 typed AmazingData 三步取数、严格月份/Universe/响应形状范围校验和 retained
+RawWriter/catalog 重放后生成 receipt；receipt 之外的 caller bytes/counts/timestamps 和
+fixture 不能铸造权威证据。完整交接中的 exact head、CI run 和本地门禁结果在本文件和
+`DEVELOPMENT_MANAGEMENT.md`、`DEVLOG.md` 的最新条目中补录。
+
 ## 4. 当前唯一 P0 开发任务
 
 **Issue #55 — `P0: CR-7 authoritative historical evidence and bounded real-source preflight`**
@@ -60,10 +80,16 @@
 ### 4.1 必须完成
 
 1. 实现最窄的 authoritative coverage-evidence adapter，复用现有 typed coverage-basis contract，不另造旁路。
-2. completeness method 必须由真实上游 inventory/range statement 或等价可审计来源支撑；连续日期、row count、snapshot bytes 本身都不能证明 COMPLETE。
+2. completeness method 必须来自 Owner-approved AmazingData acquisition receipt；该路径必须执行精确的月份/日期/Universe 请求并验证返回语义。连续日期、row count、snapshot bytes 本身都不能证明 COMPLETE，也不额外要求供应商签名。
 3. coverage basis 必须绑定 source snapshot/domain、日期闭区间、source-selection fingerprint、artifact bytes/hash、PIT/available-at 证据。
 4. ordinary reader 继续只允许 committed + verified `AUTHORITATIVE_UPSTREAM` + `OBSERVED_DAILY_BAR_COVERAGE`。
 5. 增加对 missing/stale/wrong-scope/tampered basis、fixture escalation、PARTIAL/UNRESOLVED、replay/conflict 的对抗测试。
+
+本分支已完成以上代码和离线对抗测试：`AuthoritativeCoverageEvidence` 只能消费
+Owner-approved AmazingData typed receipt；receipt 绑定 source-selection fingerprint、
+月份/日期/Universe、日历和全量日线返回的 schema/range/row/hash、retained evidence、
+source snapshot 与 PIT/available-at 链。仅有 SDK 成功、返回行数、日历连续性或 sentinel
+日线时，adapter 不产生权威 sidecar，writer 与 ordinary reader 均保持 fail-closed。
 
 ### 4.2 三个月代表性真实源预检
 
@@ -75,7 +101,13 @@
 
 目的不是形成研究数据集，而是尽早证明 authoritative evidence path 在三个 split 都真实可行。
 
-如果任何一个月无法证明 authoritative completeness：**立即 fail closed**，记录缺口并返回审阅；禁止用 fixture、row count、月份连续性或人为声明升级为 COMPLETE。
+如果任何一个月没有完成该 full-scope receipt：**立即 fail closed**，记录缺口并返回审阅；禁止用 fixture、row count、月份连续性、sentinel 或人为声明升级为 COMPLETE。
+
+本分支已执行该预检：Development `2020-01`、Validation A `2024-01`、Holdout `2026-01` 的
+三组固定 sentinel 调用均成功返回观察结果，但它们没有生成 full-scope receipt；当前等价
+阻断码为 `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`，authoritative evidence 为
+`NOT_PRODUCED`，materializer 为 `NOT_ENTERED_FAIL_CLOSED`。整改前脱敏收据仍保留为历史记录：
+`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`。
 
 ### 4.3 明确禁止
 
@@ -99,9 +131,9 @@
 - exact base/head SHA 可复核；
 - focused tests 通过；
 - 全量项目质量门禁通过；
-- CI 对 exact head 绿色；
+- CI 对最终 exact head 绿色（提交 PR 后复核）；
 - fixture evidence 无法解锁普通 historical reader；
-- 三个月真实源预检全部可复现成功，或明确 fail-closed 到具体 upstream completeness blocker；
+- 三个月固定范围观察已完成；若 full-scope receipt 未产生，必须明确 fail-closed 到 `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`；
 - 没有 scope creep。
 
 ## 6. 审阅后的调度规则
@@ -161,7 +193,8 @@ B. path 本身可靠，但某个 source/completeness 边界仍不足 → 先发�
 
 ---
 
-**Last scheduler update**：2026-09-13
+**Last scheduler update**：2026-09-13；Issue #55 当前实现分支已完成本地 bounded preflight，
+required CI #590 已通过，仍等待项目经理/独立 Reviewer 对 exact head 作 delta review。
 
 **Current task**：Issue #55
 

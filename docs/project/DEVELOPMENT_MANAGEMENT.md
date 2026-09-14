@@ -1,3 +1,95 @@
+## DM-20260913-CR7-AUTH-034 · AmazingData 权威取数凭证边界整改
+
+**Type**：C1 — CR-7 exact-head remediation / trusted acquisition-path receipt
+**Date**：2026-09-13
+**Status**：`IMPLEMENTED / LOCAL QA GREEN / REQUIRED CI GREEN / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+**Trigger**：PR #58 exact-head review `5192511594` 的 P0；Issue #55 Owner policy corrections `5657524581`、`5657529299`。
+
+**精确交接**：实现提交 `8ce680c2821b8bdf3c1459c7285ebe9265dc1b60`（以
+`main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 为 base）；GitHub Actions CI `#590`
+（run `34799945484`）的 Ubuntu 3.14、Windows 3.12、Windows 3.14 三个 required
+矩阵均为 `success`；GT-H3B controlled execution `#117`（run `34799945474`）按当前
+边界为 `skipped`。
+
+**问题与决策**：
+
+- 原实现的通用 `build_authoritative_coverage_evidence()` 可由 caller 直接提供任意
+  statement/inventory bytes、计数和时间戳，形成 caller-mintable authority；这不满足
+  `AUTHORITATIVE_UPSTREAM` 的证据边界。
+- Owner 已明确 AmazingData 本身是项目指定可信源，不要求供应商签名、证书或第三方
+  attestation。本轮因此不引入 speculative 多源仲裁；信任锚改为
+  `OWNER_APPROVED_AMAZINGDATA_ACQUISITION_PATH`，只接受经审阅的内部三步取数路径。
+
+**本轮实现**：
+
+- 新增不可直接构造的 typed `AmazingDataAcquisitionReceipt`，由
+  `src/ashare_state/providers/amazingdata/authoritative_history.py` 的审阅取数路径唯一
+  生成；固定绑定 calendar、历史证券列表和 daily-bar 三个操作、请求参数、月份/日期闭区间、
+  `EXTRA_STOCK_A_SH_SZ` Universe、返回形状/字段、每证券每日完整性、行数与内容哈希。
+- 取数原始证据必须通过 `AnchoredRawEvidenceWriter` 留存，并生成可重放的 capture catalog；
+  receipt 记录 source snapshot、retrieved/available-at/PIT 链、catalog/receipt 哈希。reader
+  和 materializer 重新加载并验证原始 meta、schema/content hash、请求参数、Universe/日历/日期
+  集合和 catalog closure；缺失、部分、错范围、形状漂移、篡改或冲突均 fail-closed。
+- 删除 caller 任意 bytes/counts/timestamps 铸造权威证据的公共路径；兼容字段只能从已验证
+  receipt 派生。`FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED` 仍是当前未完成真实全范围
+  取数时的明确阻断码。
+
+**验证与治理修正**：
+
+- 本地全量 pytest 收集 1806 项，1803 passed、3 个既有 Windows symlink 权限 skip；Ruff
+  check/format、`mypy src`（107 个源码文件）、compileall、`uv pip check`、合同 JSON parse
+  和 `git diff --check` 均通过。新增对抗回归覆盖 arbitrary bytes、直接构造、重放/篡改、
+  partial kline、schema drift、PIT、scope、selection 和 reader/materializer root gate。
+- 旧实现提交 `89ae6945e26472461fdfeddf132ac6ff265e124e` 的 GitHub CI #589 首次发现
+  `DEVLOG gate` 阻断：代码提交未在同一提交更新 `docs/DEVLOG.md`；这条记录与实现修正同批
+  补入，不把该旧 head 的 CI 结果误报为通过。修正后的 exact head 已通过 CI #590。
+
+**范围边界与下一闸门**：
+
+- 三个月预检仍只是历史 sentinel 观察，未产生 full-scope authoritative receipt、sidecar
+  或 materialization；没有执行 78 月回填、第三次 Formal/B1-B7、Production、resume/verdict、
+  BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。账号、密码、私有 endpoint、专有
+  SDK/runtime 和原始 Provider payload 不进入 GitHub。
+- PR #58 继续 Draft。下一步是新 exact head 的 required CI 和独立 delta review；项目经理
+  必须据此决定 PASS、REMEDIATE 或 BLOCKED，开发人员不得自行批准、Ready 或合并。
+
+## DM-20260913-CR7-AUTH-033 · 权威覆盖证据适配器与三个月真实源预检
+
+**Type**：C1 — CR-7 authoritative coverage evidence / bounded real-source preflight
+**Date**：2026-09-13
+**Status**：`IMPLEMENTED / PREFLIGHT FAIL-CLOSED / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+**Trigger**：Issue #55 scheduler comment `5653953863`；基线为最新 clean `main@2e9bdc36544c5320072969a2888180b6dfec2c7a`。
+
+**已实现**：
+
+- 在既有 typed coverage-basis contract 上增加 `AuthoritativeCoverageEvidence` 和窄
+  `AuthoritativeCoverageBasisAdapter`。唯一登记的 completeness method 为
+  `AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1`，要求固定 reviewed source-selection fingerprint、
+  上游 inventory/range statement、inventory 范围/计数/hash、source snapshot/domain、sidecar
+  canonical bytes/hash 和 `available_at <= pit_as_of <= source_snapshot_as_of` 的时间链。
+- writer staging 和 ordinary historical reader 均重新加载、重算并核对 sidecar；fixture-only、
+  缺失、过期、错误 scope/source binding、篡改、PIT 不合格和 identity conflict 不能解锁普通 reader。
+- 新增固定范围的 `scripts/spike/cr7_authoritative_history_preflight.py`，只检查 Development
+  `2020-01`、Validation A `2024-01`、Holdout `2026-01`，每月调用 calendar、historical code-list
+  和一个 daily-bar sentinel；原始交换只写本地 ignored raw 目录，GitHub 只保存脱敏收据。
+
+**真实预检结论**：三个月共九次调用均返回 `OK`，但当前 source contract 没有上游
+completeness statement，不能把观察结果当作完整覆盖证明。收据固定记录：
+`FAIL_CLOSED_BLOCKED`、`UPSTREAM_COMPLETENESS_STATEMENT_MISSING`、
+`authoritative_evidence=NOT_PRODUCED`、`materializer=NOT_ENTERED_FAIL_CLOSED`。收据路径为
+`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`，摘要路径为
+`docs/provider_verification/cr7_authoritative_history_preflight_20260913.md`。
+
+**验证与硬边界**：CR-7 focused 30 passed；全量 `pytest -q` 退出码为 0，3 个既有 Windows
+symlink 权限 skip；Ruff、format、`mypy src`、compileall、`uv pip check`、JSON parse 和
+`git diff --check` 均通过。未执行 78 月物化、broad backfill、universe sweep、第三次 Formal/B1-B7、
+Production/resume/verdict、BSE/index 激活、CR-5/R2、Golden/H1/baseline 或策略工作；凭证、私有
+endpoint、专有 SDK/runtime 和原始 Provider payload 不进入仓库。
+
+**待完成闸门**：PR #58 保持 Draft，需以最新 exact head 重核 required CI 和独立 delta review。
+在项目管理者取得可审计的上游 inventory/range completeness statement 及 PIT/available-at 语义前，
+不得生成 authoritative sidecar、进入 materializer 或启动全历史物化。
+
 ## DM-20260913-CR7-HISTORY-MATERIALIZATION-032 · 2020–2026H1 历史物化合同设计
 
 **Type**：C1 — CR-7 historical materialization design / offline preflight
