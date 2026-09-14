@@ -218,6 +218,29 @@ Actions CI #601 三平台 required jobs 全部成功，受控执行 #125 为 ski
 authoritative receipt，也没有进入 materializer。不得运行 Stage B、78 月回补、Formal/Production、
 BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；不能用推断修平当前状态缺口。
 
+### 4.8 单一状态 schema blocker 的最小诊断（2026-09-14）
+
+PR #61 已合并为 `main@559f59169e00d91d52c43cad77f0cf1ea2d56665`，且该提交已核实为当前
+工作分支基线。按最新调度，本轮只处理 2024-01 原始状态批次中唯一的
+`STATUS_SCHEMA_MISMATCH` 成员，不扩大到其他月份或其他成员。
+
+新增 [`cr7_status_schema_blocker.py`](../../scripts/spike/cr7_status_schema_blocker.py)：它从本地
+ignored raw 的固定批次身份与成员文件名哈希定位异常成员，校验批次 scope/identity 和零行零列形态，
+再通过 typed AmazingData facade 对同一成员、同一 `2024-01` 闭区间做一次单成员请求。诊断只输出
+request id/参数哈希、schema/row count、已知 SDK callback 状态和本地 anchored raw 证据摘要，不输出
+证券值、原始 payload、凭证或 runtime 文件；Stage B、materializer 和 formal/production 均不会被调用。
+
+精确头 `d5a7577709f76d2caf2ad5b427aaa8ad8cb2d4a8` 的 GitHub Actions CI #604 三个平台均为
+`success`。随后 bounded probe 于 `2026-09-14T11:24:08.134017+00:00` 完成：保留批次中目标成员与
+singleton 响应均为零行零列，SDK callback 为 2 次 `kDataEmpty` + `data=None`，raw writer 保留
+形态，未发现适配器列丢失。脱敏报告见 [`cr7_status_schema_blocker_20260914.json`](../provider_verification/cr7_status_schema_blocker_20260914.json)
+和 [`cr7_status_schema_blocker_20260914.md`](../provider_verification/cr7_status_schema_blocker_20260914.md)。
+
+脚本锁定的语义边界仍有效：`kDataEmpty` 或空 DataFrame 只能表示“本次没有返回状态数据”，不能被
+转换为 `IS_SUSP_SEC=0`，也不能被转换为“无状态变化”。本次没有观察到正向 AmazingData 语义规则，
+因此唯一合法结论是 `STOP(BLOCKED)`；当前 Stage A 保持 fail-closed，等待 Owner 决定是否取得正式
+状态语义契约、替代接口或其他经授权的数据源。在此之前不重跑 Stage A 语义编码，不启动 Stage B。
+
 ## 5. 当前明确禁止
 
 Issue #59 **不授权**：
