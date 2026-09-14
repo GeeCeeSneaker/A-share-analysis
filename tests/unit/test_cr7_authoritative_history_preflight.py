@@ -10,6 +10,8 @@ _ROOT = Path(__file__).parents[2]
 _PREFLIGHT = run_path(str(_ROOT / "scripts" / "spike" / "cr7_authoritative_history_preflight.py"))
 _WINDOWS = _PREFLIGHT["_WINDOWS"]
 _base_report = _PREFLIGHT["_base_report"]
+_exit_code_for_report = _PREFLIGHT["_exit_code_for_report"]
+_PREFLIGHT_BLOCKED_EXIT_CODE = _PREFLIGHT["PREFLIGHT_BLOCKED_EXIT_CODE"]
 _calendar_summary = _PREFLIGHT["_calendar_summary"]
 _code_list_summary = _PREFLIGHT["_code_list_summary"]
 _kline_summary = _PREFLIGHT["_kline_summary"]
@@ -67,6 +69,14 @@ def test_missing_credentials_and_invalid_calendar_remain_fail_closed() -> None:
     summary, days = _calendar_summary(["not-a-date"], begin=20200101, end=20200131)
     assert summary["status"] == "UNEXPECTED_SHAPE"
     assert days == []
+
+
+def test_blocked_completeness_gate_has_nonzero_automation_exit_code() -> None:
+    report = _base_report(code_head="a" * 40, repo_root=Path(__file__).parents[2])
+    assert report["preflight_verdict"] == "FAIL_CLOSED_BLOCKED"
+    assert _PREFLIGHT_BLOCKED_EXIT_CODE == 2
+    assert report["automation_exit_contract"]["blocked_exit_code"] == 2
+    assert _exit_code_for_report(report) == 2
 
 
 def test_kline_summary_retains_only_shape_counts_and_hashes() -> None:

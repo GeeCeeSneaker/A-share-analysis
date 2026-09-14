@@ -153,25 +153,37 @@ identity 和 manifest。任何 scope、source selection、hash 或 completeness 
 改变幂等 key 或 fail closed。稀疏但字节完整的 verified snapshot 若没有 complete basis，
 即使 caller 请求 OBSERVED，也必须保持 unresolved/partial。
 
-### 6.2 AUTHORITATIVE_UPSTREAM 必须有独立的 typed evidence sidecar
+### 6.2 AUTHORITATIVE_UPSTREAM 必须有 Owner-approved AmazingData receipt
 
-`AUTHORITATIVE_UPSTREAM` 不是 caller 可以填写的标签。当前唯一注册的方法是
-`AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1`，并且每个 enabled 月份必须同时拥有：
+`AUTHORITATIVE_UPSTREAM` 不是 caller 可以填写的标签。AmazingData 的可信性由项目 Owner
+指定；本合同不要求供应商签名、第三方证明或额外的 source-trust 机制。当前唯一注册的方法仍是
+`AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1`，但它只能由 reviewed AmazingData acquisition
+path 生成的 `AMAZINGDATA_ACQUISITION_RECEIPT_V1` 支撑。每个 enabled 月份必须同时拥有：
 
 - 由 reviewed source-selection binding 产生的固定 fingerprint（当前绑定为
-  AmazingData 的 `get_hist_code_list`、`get_calendar` 和 `query_kline` history surface）；
-- 明确的 `UPSTREAM_INVENTORY_RANGE_STATEMENT` 或等价可审计上游证据，以及该原文/字节的
-  SHA-256；
-- 上游 inventory 的 inclusive 月份范围、security/session 计数和 inventory 字节 hash；
-- 与 source snapshot、domain、basis scope 一致的 typed sidecar；
-- `available_at <= pit_as_of <= source_snapshot_as_of` 且
-  `retrieved_at_utc >= available_at` 的时间链。
+  AmazingData 的 `get_hist_code_list`、`get_calendar` 和 `query_kline` history acquisition
+  surface）；
+- 只接受 exact inclusive month/date/universe 请求的 typed receipt；receipt 必须绑定固定
+  method/operation、请求 scope hash、Universe selection、calendar scope、返回日期范围、schema/
+  content/evidence hash、source snapshot 和 receipt hash；
+- 三次 exchange 必须通过 `AnchoredRawEvidenceWriter` 写入 RawWriter evidence anchor，
+  以及由这些 anchor 组成的 canonical capture catalog；catalog 与 raw meta/payload 的字节
+  hash 和请求 scope 必须可重放；
+- 与 source snapshot、daily_bar domain、basis scope 一致的 typed sidecar；
+- `available_at` 由已保留的 retrieval timestamp 派生，且
+  `available_at == retrieved_at_utc <= pit_as_of == source_snapshot_as_of`。
 
 sidecar 文件是去掉自身 hash 字段后的 canonical UTF-8 JSON；其精确字节 SHA-256 只放在
-manifest 的 `coverage_basis_evidence` 条目中，避免自引用。writer 在 staging 校验时、
-reader 在普通读取前都会重新加载、重算和核对 sidecar。SDK/HTTP 成功、返回行数、日期连续性、
-历史请求日期或单个哨兵证券的日线结果都不能代替上游完整性声明；缺少该声明时必须在进入
-authoritative materializer 前 fail closed，不产生 `COMPLETE_OBSERVED_DAILY_BAR_SCOPE`。
+manifest 的 `coverage_basis_evidence` 条目中，避免自引用。writer 在 staging 校验时、reader
+在普通读取前都会重新加载、重算和核对 sidecar；两者还必须通过显式 raw capture root 重放
+receipt catalog 和 RawWriter closure。SDK/HTTP 成功、返回行数、日期连续性、历史请求日期或
+单个哨兵证券的日线结果都不能代替 exact full-scope receipt；receipt 缺失或任一形状、范围、
+空/部分/歧义、PIT、catalog、hash 校验失败时必须在进入 authoritative materializer 前 fail
+closed，不产生 `COMPLETE_OBSERVED_DAILY_BAR_SCOPE`。
+
+任意 opaque statement/inventory bytes、caller-selected count/timestamp 或 fixture data 都
+不能构造新 receipt。replayed sidecar 可以由 reader 重新解析，但只能以 retained catalog/raw
+evidence 重验通过为前提；sidecar 自身 hash 不是 source evidence 的替代品。
 
 disabled / experimental route 的覆盖状态单独留在诊断 inventory 中，不会因为已知
 被排除的 BSE 或其他 unresolved 行而把可靠的 enabled route 降级；反过来，enabled
@@ -296,14 +308,21 @@ ReadModel 形状，不访问 Provider。夹具覆盖：
 Issue #55 另外规定一个固定范围的真实源预检：Development `2020-01`、Validation A
 `2024-01`、Holdout `2026-01`。预检只调用已审阅的 AmazingData history surface，最多每月
 读取一个日线哨兵，不执行 78 月物化、universe sweep、Production 或 Formal。真实接口的
-返回只作为观察和本地 ignored raw evidence；只有另行获得的上游 inventory/range statement
-才能进入上述 sidecar。任一月份无法证明完整性，报告必须写明具体 upstream blocker，
-`AUTHORITATIVE_UPSTREAM` 和普通 reader 均保持关闭。
+返回只作为观察和本地 ignored raw evidence；它不产生完整 acquisition receipt。真正允许
+`AUTHORITATIVE_UPSTREAM` 的窄路径必须对每个月执行 exact inclusive date/universe request，
+校验 `list[int]` 日历、`list[str]` 历史证券列表，以及包含日期和完整 OHLCV 列的
+`dict[str,dataframe]` 日线返回，并确认每个证券覆盖每个请求交易日；空、缺列、缺证券、缺日、
+重复日或越界都必须 fail closed。另行获得的上游 inventory/range statement 也不能替代上述
+typed receipt。任一月份没有完整 receipt，报告必须写明具体 blocker，`AUTHORITATIVE_UPSTREAM`
+和普通 reader 均保持关闭。AmazingData 的源信任由 Owner 决定，不额外要求 provider
+certificate 或第三方 attestation。
 
 本次预检的脱敏收据见
 `docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`：三个固定月份的
 观察调用均成功，但最终确认为 `FAIL_CLOSED_BLOCKED`，原因码为
-`UPSTREAM_COMPLETENESS_STATEMENT_MISSING`，没有生成 authoritative sidecar 或物化产物。
+`UPSTREAM_COMPLETENESS_STATEMENT_MISSING`；这是整改前收据的历史原因码。按当前 Owner 政策，
+当前代码路径的等价阻断是 `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`：没有生成
+authoritative sidecar 或物化产物。
 
 ## 11. 后续实现前必须满足的闸门
 
@@ -319,7 +338,8 @@ Issue #55 另外规定一个固定范围的真实源预检：Development `2020-0
 6. staging / resume / atomic publication 规则；
 7. 分区与 manifest hash 的可重算性；
 8. 有界夹具的离线断言；
-9. typed authoritative sidecar 的上游完整性声明、PIT 链和 reader 重验。
+9. Owner-approved AmazingData typed acquisition receipt、PIT 链、retained capture catalog
+   和 reader/materializer 重验。
 
 只有这些设计闸门接受后，才能另开实现 PR；还需要新的明确调度授权，才能执行
 2020–2026H1 物化。当前不宣称历史已物化、不宣称全覆盖、不宣称 R2 或 Formal 已就绪。

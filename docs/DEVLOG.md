@@ -1,3 +1,39 @@
+## 2026-09-13 · CR-7 AmazingData 权威取数凭证边界整改
+
+> 状态：**IMPLEMENTED / LOCAL QA GREEN / CI RE-RUN REQUIRED / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED**
+
+- PR #58 exact-head review `5192511594` 指出旧通用 builder 可由 caller 提供任意
+  `upstream_statement_bytes`、`upstream_inventory_bytes`、计数和时间戳铸造
+  `AUTHORITATIVE_UPSTREAM`。Issue #55 Owner corrections `5657524581`、`5657529299` 明确
+  AmazingData 本身是项目指定可信源，不要求供应商签名/证书/第三方 attestation；本轮按此
+  政策把信任锚收敛为 `OWNER_APPROVED_AMAZINGDATA_ACQUISITION_PATH`。
+- `AmazingDataAcquisitionReceipt` 现在只能由审阅的 AmazingData 三步取数路径生成，固定
+  绑定 SH calendar、`EXTRA_STOCK_A_SH_SZ` 历史证券列表和全量 daily-bar 请求；严格检查
+  月份/日期范围、Universe、`list[int]` / `list[str]` / `dict[str,dataframe]` 返回形状、
+  字段、每证券每日覆盖、哈希与请求参数。receipt 不能由 caller 直接构造，兼容字段只能
+  从已验证 receipt 派生。
+- 原始交换通过 `AnchoredRawEvidenceWriter` 留存；capture catalog 与 receipt 形成可重放
+  链，reader/materializer 会重新核对 meta/schema/content hash、请求参数、Universe/日历/日期
+  集合、PIT/available-at 和 catalog closure。缺失、partial、错 scope、schema drift、篡改、
+  冲突和非验证 provenance 均保持 fail-closed。新增回归覆盖任意 bytes、直接构造、重放篡改、
+  partial kline、shape drift、PIT/scope/selection 及 root gate。
+- 本地全量 pytest：1806 collected，1803 passed，3 个既有 Windows symlink 权限 skip；Ruff
+  check/format、`mypy src`（107 files）、compileall、`uv pip check`、合同 JSON 和 diff 检查
+  通过。旧代码 head `89ae6945e26472461fdfeddf132ac6ff265e124e` 的 CI #589 暴露治理遗漏：
+  `DEVLOG gate` 要求代码提交同批更新 `docs/DEVLOG.md`。本记录与实现修正同批补入，修正后
+  必须重新取得新 exact head CI，不能沿用 #589 旧 head 的结果。
+- 三个月 sentinel 预检仍没有生成 full-scope receipt、authoritative sidecar 或 materializer
+  输入，当前阻断码仍为 `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`。本轮没有执行 78 月
+  物化/回填、第三次 Formal/B1-B7、Production、resume/verdict、BSE/index、CR-5/R2、
+  Golden/H1、baseline 或策略工作；凭证、私有 endpoint、专有 SDK/runtime 和 raw payload
+  不进入 GitHub。
+
+Implementation Status：P0 caller-minting 边界已按 Owner-approved AmazingData 路径收口；
+三个月 full-scope receipt 和 authoritative evidence 仍未产生。
+
+Review Status：PR #58 继续 Draft；待新 exact head 的 required CI 与独立 delta review，
+项目经理再决定 PASS / REMEDIATE / BLOCKED。
+
 ## 2026-09-13 · CR-7 authoritative evidence边界与三个月真实源预检
 
 > 状态：**IMPLEMENTED / PREFLIGHT FAIL-CLOSED / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED**

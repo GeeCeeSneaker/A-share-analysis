@@ -221,15 +221,40 @@ def test_observed_coverage_requires_a_sealed_basis_and_sparse_input_fails_closed
     authoritative = basis["authoritative_evidence_contract"]
     assert authoritative["required_for_evidence_class"] == "AUTHORITATIVE_UPSTREAM"
     assert authoritative["completeness_method"] == "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1"
-    assert authoritative["statement_kind"] == "UPSTREAM_INVENTORY_RANGE_STATEMENT"
+    assert authoritative["statement_kind"] == "AMAZINGDATA_ACQUISITION_RECEIPT_V1"
     assert {
         "source_selection",
+        "acquisition_receipt",
         "upstream_statement_hash",
         "upstream_inventory_hash",
         "available_at",
         "pit_as_of",
     } <= set(authoritative["sidecar_fields_without_self_hash"])
-    assert "row_counts_date_continuity_HTTP_success" in authoritative["completeness_rule"]
+    assert "raw row counts_date continuity_HTTP success" in authoritative["completeness_rule"]
+    assert authoritative["trust_anchor"] == "OWNER_APPROVED_AMAZINGDATA_ACQUISITION_PATH"
+    assert {
+        "receipt_id",
+        "receipt_version",
+        "source_snapshot_id",
+        "requested_scope_start",
+        "requested_scope_end",
+        "security_universe_selection",
+        "security_universe_hash",
+        "calendar_scope_start",
+        "calendar_scope_end",
+        "returned_first_date",
+        "returned_last_date",
+        "retrieved_at_utc",
+        "available_at",
+        "pit_as_of",
+        "source_capture_uri",
+        "source_capture_hash",
+        "receipt_hash",
+    } <= set(authoritative["acquisition_receipt_fields"])
+    assert authoritative["caller_mint_rule"].startswith(
+        "No public builder may accept opaque statement bytes"
+    )
+    assert authoritative["retained_capture_rule"].startswith("The acquisition path must persist")
     sparse = contract["bounded_acceptance_fixture"]["sparse_verified_snapshot_without_basis"]
     assert sparse["caller_requested_state"] == "OBSERVED_DAILY_BAR_COVERAGE"
     assert sparse["coverage_basis"] is None

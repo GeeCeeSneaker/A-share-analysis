@@ -1,3 +1,52 @@
+## DM-20260913-CR7-AUTH-034 · AmazingData 权威取数凭证边界整改
+
+**Type**：C1 — CR-7 exact-head remediation / trusted acquisition-path receipt
+**Date**：2026-09-13
+**Status**：`IMPLEMENTED / LOCAL QA GREEN / CI RE-RUN REQUIRED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+**Trigger**：PR #58 exact-head review `5192511594` 的 P0；Issue #55 Owner policy corrections `5657524581`、`5657529299`。
+
+**问题与决策**：
+
+- 原实现的通用 `build_authoritative_coverage_evidence()` 可由 caller 直接提供任意
+  statement/inventory bytes、计数和时间戳，形成 caller-mintable authority；这不满足
+  `AUTHORITATIVE_UPSTREAM` 的证据边界。
+- Owner 已明确 AmazingData 本身是项目指定可信源，不要求供应商签名、证书或第三方
+  attestation。本轮因此不引入 speculative 多源仲裁；信任锚改为
+  `OWNER_APPROVED_AMAZINGDATA_ACQUISITION_PATH`，只接受经审阅的内部三步取数路径。
+
+**本轮实现**：
+
+- 新增不可直接构造的 typed `AmazingDataAcquisitionReceipt`，由
+  `src/ashare_state/providers/amazingdata/authoritative_history.py` 的审阅取数路径唯一
+  生成；固定绑定 calendar、历史证券列表和 daily-bar 三个操作、请求参数、月份/日期闭区间、
+  `EXTRA_STOCK_A_SH_SZ` Universe、返回形状/字段、每证券每日完整性、行数与内容哈希。
+- 取数原始证据必须通过 `AnchoredRawEvidenceWriter` 留存，并生成可重放的 capture catalog；
+  receipt 记录 source snapshot、retrieved/available-at/PIT 链、catalog/receipt 哈希。reader
+  和 materializer 重新加载并验证原始 meta、schema/content hash、请求参数、Universe/日历/日期
+  集合和 catalog closure；缺失、部分、错范围、形状漂移、篡改或冲突均 fail-closed。
+- 删除 caller 任意 bytes/counts/timestamps 铸造权威证据的公共路径；兼容字段只能从已验证
+  receipt 派生。`FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED` 仍是当前未完成真实全范围
+  取数时的明确阻断码。
+
+**验证与治理修正**：
+
+- 本地全量 pytest 收集 1806 项，1803 passed、3 个既有 Windows symlink 权限 skip；Ruff
+  check/format、`mypy src`（107 个源码文件）、compileall、`uv pip check`、合同 JSON parse
+  和 `git diff --check` 均通过。新增对抗回归覆盖 arbitrary bytes、直接构造、重放/篡改、
+  partial kline、schema drift、PIT、scope、selection 和 reader/materializer root gate。
+- 旧实现提交 `89ae6945e26472461fdfeddf132ac6ff265e124e` 的 GitHub CI #589 首次发现
+  `DEVLOG gate` 阻断：代码提交未在同一提交更新 `docs/DEVLOG.md`；这条记录与实现修正同批
+  补入，不把该旧 head 的 CI 结果误报为通过。修正后须以新 exact head 重新核对 required CI。
+
+**范围边界与下一闸门**：
+
+- 三个月预检仍只是历史 sentinel 观察，未产生 full-scope authoritative receipt、sidecar
+  或 materialization；没有执行 78 月回填、第三次 Formal/B1-B7、Production、resume/verdict、
+  BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。账号、密码、私有 endpoint、专有
+  SDK/runtime 和原始 Provider payload 不进入 GitHub。
+- PR #58 继续 Draft。下一步是新 exact head 的 required CI 和独立 delta review；项目经理
+  必须据此决定 PASS、REMEDIATE 或 BLOCKED，开发人员不得自行批准、Ready 或合并。
+
 ## DM-20260913-CR7-AUTH-033 · 权威覆盖证据适配器与三个月真实源预检
 
 **Type**：C1 — CR-7 authoritative coverage evidence / bounded real-source preflight

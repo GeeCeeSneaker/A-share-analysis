@@ -1,10 +1,10 @@
-"""Narrow CR-7 adapter for sealed authoritative coverage evidence.
+"""Narrow CR-7 adapter for sealed AmazingData acquisition evidence.
 
 This module has no SDK, Provider, network, or credential dependency.  It only
-turns an already retained upstream inventory/range statement and its typed
-PIT metadata into the existing ``CoverageBasisDescriptor``.  Missing or
-unverifiable source evidence is intentionally not representable as an
-authoritative descriptor.
+turns an acquisition receipt issued by the reviewed AmazingData path into the
+existing ``CoverageBasisDescriptor``.  Missing, replay-only, or unverifiable
+source evidence is intentionally not representable as a new authoritative
+descriptor.
 """
 
 from __future__ import annotations
@@ -55,6 +55,10 @@ class AuthoritativeCoverageBasisAdapter:
         """Emit the existing descriptor only after exact evidence binding."""
         if not isinstance(evidence, AuthoritativeCoverageEvidence):
             raise CoverageBasisError("authoritative adapter requires typed coverage evidence")
+        if not evidence.acquisition_receipt.is_verified_capture:
+            raise CoverageBasisError(
+                "authoritative adapter requires a receipt issued by the AmazingData path"
+            )
         if evidence.source_selection != self.source_selection:
             raise CoverageBasisError("authoritative evidence source-selection fingerprint changed")
         if evidence.source_selection_fingerprint != self.source_selection.selection_fingerprint:

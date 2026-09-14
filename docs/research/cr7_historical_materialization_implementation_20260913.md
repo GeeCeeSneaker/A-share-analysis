@@ -17,13 +17,14 @@
   不导入 Provider、AmazingData、正式账号或网络调用。
 - `CoverageBasisDescriptor` 严格验证 15 个合同字段、版本化 completeness method、源 snapshot、
   daily-bar 域、月度范围、source-selection fingerprint，以及不含自身 hash 引用的精确 canonical
-  UTF-8 artifact bytes/hash。新增 typed `AuthoritativeCoverageEvidence` sidecar 和
-  `AuthoritativeCoverageBasisAdapter`，将固定 source-selection、上游 inventory/range statement、
-  inventory hash、source snapshot、PIT/available-at 和 sidecar bytes/hash 绑定在一起。没有权威上游
-  completeness evidence 时，缺少 basis 的 enabled 月份只能得到 `UNRESOLVED_NOT_FOR_RESEARCH`，
-  不能由 caller label、row count、月份连续性或已验证字节提升为 OBSERVED。夹具方法明确标记为
-  `TEST_FIXTURE_ONLY`，不具备普通历史 reader 的发布权限；普通 reader 只接受显式
-  `AUTHORITATIVE_UPSTREAM` 证据等级。
+  UTF-8 artifact bytes/hash。`AUTHORITATIVE_UPSTREAM` 不再接受任意 statement/inventory bytes、
+  count 或 timestamp；新增 typed `AmazingDataAcquisitionReceipt`，仅由审阅过的 AmazingData
+  三步 acquisition path 在完整请求、响应形状/范围校验和 `AnchoredRawEvidenceWriter` 留存成功后生成。receipt 绑定
+  固定 method/operation、月份、Universe 选择、calendar、返回范围、schema/content/evidence hash、
+  source snapshot 和 PIT/available-at；`AuthoritativeCoverageEvidence` 与
+  `AuthoritativeCoverageBasisAdapter` 只消费这类 receipt。夹具方法明确标记为 `TEST_FIXTURE_ONLY`，
+  不具备普通历史 reader 的发布权限；普通 reader 只接受显式 `AUTHORITATIVE_UPSTREAM` 证据等级，
+  并要求提供 raw capture root 重放 catalog 与 RawWriter closure。
 - writer/runtime lock 只包含 dependency-lock content hash、Python runtime、Parquet writer engine、
   writer configuration version；materialization identity 按合同固定 23 个字段，并将 basis-set hash
   与 writer-lock hash 纳入 idempotency key。主机名、绝对路径、文件 mtime、墙上时间和凭证不进入身份。
@@ -39,8 +40,8 @@
   `PARTIAL`/`UNRESOLVED` 以及 `TEST_FIXTURE_ONLY` 证据自动读取一律阻断，不改变现有 R1 reader。
 - `scripts/spike/cr7_authoritative_history_preflight.py` 固定只探测 Development 2020-01、Validation A
   2024-01、Holdout 2026-01；每月只调用 calendar、historical code-list 和一个 daily-bar sentinel，
-  并将原始交换写入本地 ignored raw 目录。它只记录脱敏的调用状态、计数和哈希，绝不由 Provider
-  观察结果生成权威 sidecar。
+  并将原始交换写入本地 ignored raw 目录。它只记录脱敏的调用状态、计数和哈希，绝不把 sentinel
+  观察结果冒充完整 acquisition receipt；阻断时返回专用非零退出码 `2`。
 
 本轮针对独立审阅的窄修复保留并强化了三项边界：覆盖状态按完整 78 个月聚合，稀疏来源不能得到
 整体 OBSERVED；每个月的 `research_enabled` inventory 即使没有物理 artifact 也记录状态和原因；
@@ -51,9 +52,9 @@
 以下事项不属于本 PR，也没有被本实现暗中完成：
 
 - 真实 2020～2026H1 历史回填、universe sweep、Production 或 Formal/B1-B7；
-- 真实上游 completeness evidence **尚未取得**：三个月预检的三组 Provider 观察均成功，但当前
-  source contract 没有明确声明月度 daily_bar inventory 的完整范围及其 PIT/历史可用性，因此结果为
-  `UPSTREAM_COMPLETENESS_STATEMENT_MISSING`，未生成 authoritative sidecar，也未进入 materializer；
+- 真实完整范围 receipt **尚未生成**：三个月预检的三组 Provider sentinel 观察均成功，但该预检
+  没有执行完整月份/完整 Universe acquisition，也没有可消费的 verified CR-4 projection，因此结果为
+  `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`，未生成 authoritative sidecar，也未进入 materializer；
 - BSE mapping/index 激活、CR-5/R2 feature export；
 - Golden/H1/global baseline、策略和任何凭证/raw Provider payload 上传。
 
@@ -66,7 +67,7 @@
 | --- | --- |
 | R1 非发布投影是否零写入 | `src/ashare_state/research/panel.py` 的 `prepare_verified_projection()`；`tests/integration/test_r1_research_panel_integration.py` |
 | basis 是否绑定精确 bytes/hash 和版本化 method | `src/ashare_state/research/historical.py` 的 `CoverageBasisDescriptor`、`verify_coverage_basis()` |
-| 权威 sidecar 是否只能由固定来源选择和上游完整性声明产生 | `src/ashare_state/research/historical.py` 的 `AuthoritativeCoverageEvidence`；`src/ashare_state/research/authoritative.py`；`tests/unit/test_cr7_historical_materialization.py` |
+| 权威 sidecar 是否只能由 Owner-approved AmazingData receipt 产生，且可重放 retained capture | `src/ashare_state/research/historical.py` 的 `AmazingDataAcquisitionReceipt` / `AuthoritativeCoverageEvidence`；`src/ashare_state/providers/amazingdata/authoritative_history.py`；`tests/unit/test_cr7_historical_materialization.py` |
 | 23 字段 identity 和 writer lock | `build_materialization_identity()`、`build_writer_runtime_lock_identity()` |
 | 78 月和三 route inventory | `expected_partition_keys()`、`OfflineHistoricalMaterializer.plan()` |
 | staging、marker、replay、冲突、failure invisibility | `OfflineHistoricalMaterializer.materialize()`、`HistoricalMaterializationReader` |
@@ -76,9 +77,10 @@
 ## 4. 本地验证与下一道门
 
 三个月真实源预检已按固定范围执行：三个 split 的 calendar、historical code-list 和 daily-bar
-sentinel 调用均返回 `OK`，但没有上游 inventory/range completeness statement，因此收据结论为
-`FAIL_CLOSED_BLOCKED`，权威 evidence 为 `NOT_PRODUCED`，materializer 为
-`NOT_ENTERED_FAIL_CLOSED`。完整的脱敏收据见
+sentinel 调用均返回 `OK`，但该 sentinel 预检没有执行完整月份/完整 Universe acquisition，因而没有
+生成可消费的 receipt；当前实现把结论保持为 `FAIL_CLOSED_BLOCKED`，阻断码为
+`FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`，权威 evidence 为 `NOT_PRODUCED`，materializer 为
+`NOT_ENTERED_FAIL_CLOSED`。既有 JSON 收据是整改前的历史记录，见
 `docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`；本地 raw 交换只保留
 在 ignored 目录，不进入 GitHub。
 

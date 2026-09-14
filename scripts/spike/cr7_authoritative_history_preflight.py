@@ -6,11 +6,13 @@ uses one daily-bar sentinel per month, and writes raw exchanges only below an
 ignored local directory.  The committed report never contains credentials,
 account profiles, endpoint values, symbols, or raw provider payloads.
 
-Provider success is not completeness evidence.  AmazingData's reviewed
-surface returns observations and shapes, but the current source contract does
-not provide an upstream inventory/range statement that proves a complete
-monthly daily-bar universe.  Therefore this preflight records that exact
-blocker and never manufactures an authoritative coverage-basis sidecar.
+The sentinel probe is not the approved full-scope acquisition.  A successful
+sentinel response cannot stand in for the exact month/date/universe request
+that the typed acquisition path validates and records as an
+``AmazingDataAcquisitionReceipt``.  Therefore this preflight records that
+bounded-scope blocker and never manufactures an authoritative coverage-basis
+sidecar.  AmazingData source trust is an Owner policy; this script does not
+require a provider signature or third-party attestation.
 
 The three windows are constants by design:
 
@@ -54,7 +56,7 @@ _ENV_KEYS = (
     "TGW_SERVER_VIP",
     "TGW_SERVER_PORT",
 )
-_SCHEMA = "cr7.authoritative_history_preflight.v1"
+_SCHEMA = "cr7.authoritative_history_preflight.v2"
 _RAW_INGEST_ID = "cr7-authoritative-history-preflight-20260913"
 _SECURITY_TYPE = "EXTRA_STOCK_A_SH_SZ"
 _SENTINEL_SYMBOL = "600519.SH"
@@ -68,21 +70,23 @@ _WINDOWS: tuple[tuple[str, int, int], ...] = (
 )
 
 _COMPLETENESS_BLOCKER = {
-    "code": "UPSTREAM_COMPLETENESS_STATEMENT_MISSING",
+    "code": "FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED",
     "status": "BLOCKED",
     "required_evidence": (
-        "an upstream inventory/range statement or equivalent auditable source evidence "
-        "that explicitly asserts complete daily_bar coverage for the inclusive month "
-        "and its historical availability/PIT semantics"
+        "a typed receipt issued by the reviewed AmazingData acquisition path after the "
+        "exact inclusive month/date/universe request, response-shape checks, retained "
+        "raw evidence closure, and source-snapshot PIT binding all pass"
     ),
     "insufficient_substitutes": [
-        "successful SDK or HTTP response",
-        "returned historical code-list count or hash",
-        "returned calendar count or hash",
+        "a successful SDK or HTTP response for a sentinel request",
+        "a returned historical code-list count or hash without the full acquisition receipt",
+        "a returned calendar count or hash without the full acquisition receipt",
         "one sentinel security's daily-bar row count or date continuity",
+        "an arbitrary caller-supplied statement, inventory, count, or timestamp",
     ],
     "effect": "do_not_emit_authoritative_coverage_basis",
 }
+PREFLIGHT_BLOCKED_EXIT_CODE = 2
 
 
 def _load_env(path: Path) -> dict[str, str]:
@@ -389,12 +393,26 @@ def _base_report(*, code_head: str | None, repo_root: Path) -> dict[str, Any]:
         "materializer": {
             "status": "NOT_ENTERED_FAIL_CLOSED",
             "reason": (
-                "provider observations cannot substitute for a verified CR-4 projection "
-                "and authoritative completeness basis"
+                "sentinel observations cannot substitute for a verified CR-4 projection "
+                "and a full-scope AmazingData acquisition receipt"
             ),
         },
         "preflight_verdict": "FAIL_CLOSED_BLOCKED",
+        "automation_exit_contract": {
+            "blocked_exit_code": PREFLIGHT_BLOCKED_EXIT_CODE,
+            "meaning": (
+                "provider_observation_success_does_not mean authoritative completeness; "
+                "a blocked preflight is non-zero and cannot be treated as approval"
+            ),
+        },
     }
+
+
+def _exit_code_for_report(report: Mapping[str, Any]) -> int:
+    """Keep a blocked completeness gate distinct from probe execution success."""
+    if report.get("preflight_verdict") == "FAIL_CLOSED_BLOCKED":
+        return PREFLIGHT_BLOCKED_EXIT_CODE
+    return 0
 
 
 def _run_month(
@@ -500,8 +518,9 @@ def main() -> int:
         report["months"] = [
             _not_run_month(split, year, month, "MISSING_TGW_ENV") for split, year, month in _WINDOWS
         ]
+        report["automation_exit_code"] = PREFLIGHT_BLOCKED_EXIT_CODE
         _emit(report, args.output)
-        return 2
+        return PREFLIGHT_BLOCKED_EXIT_CODE
 
     session = AmazingDataSession(*credentials)
     writer = RawWriter(args.raw_root, ingest_run_id=_RAW_INGEST_ID)
@@ -518,6 +537,7 @@ def main() -> int:
                 _not_run_month(split, year, month, "PROVIDER_ACCESS_BLOCKED")
                 for split, year, month in _WINDOWS
             ]
+            report["automation_exit_code"] = 1
             _emit(report, args.output)
             return 1
         except Exception:  # noqa: BLE001 - never emit SDK text
@@ -529,6 +549,7 @@ def main() -> int:
                 _not_run_month(split, year, month, "PROVIDER_ACCESS_BLOCKED")
                 for split, year, month in _WINDOWS
             ]
+            report["automation_exit_code"] = 1
             _emit(report, args.output)
             return 1
 
@@ -541,6 +562,7 @@ def main() -> int:
                 _not_run_month(split, year, month, "RUNTIME_IDENTITY_UNAVAILABLE")
                 for split, year, month in _WINDOWS
             ]
+            report["automation_exit_code"] = 1
             _emit(report, args.output)
             return 1
 
@@ -560,10 +582,11 @@ def main() -> int:
             _run_month(provider, writer, split=split, year=year, month=month)
             for split, year, month in _WINDOWS
         ]
-        return_code = 0
+        return_code = _exit_code_for_report(report)
     finally:
         session.logout()
 
+    report["automation_exit_code"] = return_code
     _emit(report, args.output)
     return return_code
 

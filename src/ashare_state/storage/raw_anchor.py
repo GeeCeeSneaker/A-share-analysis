@@ -286,6 +286,11 @@ class AnchoredRawEvidenceWriter:
     def ingest_run_id(self) -> str:
         return self._writer.ingest_run_id
 
+    @property
+    def root(self) -> Path:
+        """Return the raw root used by this anchored writer."""
+        return self._root
+
     # ------------------------------------------------------------------ api
     def write_exchange(self, exchange: Any) -> RawWriteResult:
         """Persist ONE ProviderExchange AND enroll its trust anchor.

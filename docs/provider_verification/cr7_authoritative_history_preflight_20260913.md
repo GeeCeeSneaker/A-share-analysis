@@ -1,9 +1,9 @@
-# CR-7 三个月真实源预检收据摘要
+# CR-7 三个月真实源预检收据摘要（整改前历史记录）
 
 日期：2026-09-13
 Issue：#55  `P0: CR-7 authoritative historical evidence and bounded real-source preflight`
 基线：`main@2e9bdc36544c5320072969a2888180b6dfec2c7a`
-实现提交：`624595f1d246597a9119959af975aa5f8eafd6ff`
+实现提交：`624595f1d246597a9119959af975aa5f8eafd6ff`（整改前历史提交）
 机器收据：[`cr7_authoritative_history_preflight_20260913.json`](cr7_authoritative_history_preflight_20260913.json)
 GitHub 提交字节 SHA-256：`364cee560ae69e1651e619060308741398170414b49de878e5405fba1a8c9449`
 
@@ -17,6 +17,11 @@ GitHub 提交字节 SHA-256：`364cee560ae69e1651e619060308741398170414b49de878e
 - 阻断码：`UPSTREAM_COMPLETENESS_STATEMENT_MISSING`；
 - `materializer`：`NOT_ENTERED_FAIL_CLOSED`；
 - 没有把 SDK/HTTP 成功、返回行数、日历结果、日期连续性或单个哨兵的日线结果升级为 `COMPLETE`。
+
+本 JSON 是整改前的不可变历史收据，保留其原始原因码和 source-selection 摘要，不将其改写成
+当前 receipt 合同。后续 Owner 政策已明确 AmazingData 为可信源，不要求供应商签名或第三方
+attestation；当前工程阻断应解释为：该次预检只做了每月一个 sentinel，没有执行完整月份/完整
+Universe acquisition，因而没有生成 `AmazingDataAcquisitionReceipt`。
 
 ## 固定范围与实际观察
 
@@ -36,8 +41,17 @@ GitHub 提交字节 SHA-256：`364cee560ae69e1651e619060308741398170414b49de878e
 第三次 Formal/B1-B7、Production、`--resume`、`--verdict`、BSE/index 激活、CR-5/R2、Golden/H1、
 baseline 或策略工作。
 
-解除当前阻断所需的最小补充材料是：由上游或等价可审计来源明确声明每个目标月份的完整
-daily_bar inventory/range，并独立说明其历史可用性与 PIT/available-at 语义；在该材料进入
-typed sidecar 并通过 writer/reader 重验前，普通 reader 和 materializer 必须保持关闭。
+解除当前阻断所需的最小补充动作是：在 Owner-approved AmazingData path 上执行完整月份/完整
+Universe acquisition，完成响应形状、范围、非空/非部分、PIT 和 retained RawWriter evidence
+校验，生成并重放 `AmazingDataAcquisitionReceipt`；在 receipt 进入 typed sidecar 并通过
+materializer/reader 重验前，普通 reader 和 materializer 必须保持关闭。外部供应商证明不是必需项。
 
 账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime 和原始 Provider payload 不得进入 GitHub。
+
+## 当前整改后的执行合同
+
+`scripts/spike/cr7_authoritative_history_preflight.py` 已将阻断语义收敛为
+`FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`：只有 Owner-approved AmazingData typed
+acquisition path 完成精确月份/日期/Universe 请求、响应形状和范围校验、RawWriter evidence
+留存、capture catalog 重放及 source snapshot PIT 绑定，才允许生成权威 coverage basis。该脚本
+的 sentinel 预检仍然只用于观察，阻断时返回专用非零退出码 `2`；本历史 JSON 不包含该整改后字段。
