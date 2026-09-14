@@ -20,6 +20,7 @@ from ashare_state.providers.amazingdata.authoritative_history import (
 from ashare_state.providers.amazingdata.operations import (
     DAILY_BAR_KLINE,
     HIST_CODE_LIST,
+    HISTORY_STOCK_STATUS,
     TRADE_CALENDAR,
 )
 from ashare_state.providers.amazingdata.provider import AmazingDataProvider, RawEnvelope
@@ -251,6 +252,57 @@ class _FakeAmazingDataProvider(AmazingDataProvider):
             },
             ["000001.SZ", "600000.SH"],
         )
+        self.exact_code_lists = {
+            (20200102, 20200102): _provider_exchange(
+                HIST_CODE_LIST,
+                {
+                    "security_type": AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
+                    "start_date": 20200102,
+                    "end_date": 20200102,
+                },
+                ["000001.SZ", "600000.SH"],
+            ),
+            (20200103, 20200103): _provider_exchange(
+                HIST_CODE_LIST,
+                {
+                    "security_type": AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
+                    "start_date": 20200103,
+                    "end_date": 20200103,
+                },
+                ["000001.SZ", "600000.SH"],
+            ),
+        }
+
+        def status_frame() -> pl.DataFrame:
+            return pl.DataFrame(
+                {
+                    "MARKET_CODE": ["SH", "SH"],
+                    "TRADE_DATE": [20200102, 20200103],
+                    "PRECLOSE": [10.0, 10.5],
+                    "HIGH_LIMITED": [11.0, 11.55],
+                    "LOW_LIMITED": [9.0, 9.45],
+                    "PRICE_HIGH_LMT_RATE": [0.1, 0.1],
+                    "PRICE_LOW_LMT_RATE": [0.1, 0.1],
+                    "IS_ST_SEC": [0, 0],
+                    "IS_SUSP_SEC": [0, 0],
+                    "IS_WD_SEC": [0, 0],
+                    "IS_XR_SEC": [0, 0],
+                }
+            )
+
+        self.status = _provider_exchange(
+            HISTORY_STOCK_STATUS,
+            {
+                "begin_date": 20200101,
+                "end_date": 20200131,
+                "code_list": ["000001.SZ", "600000.SH"],
+                "is_local": False,
+            },
+            {
+                "000001.SZ": status_frame(),
+                "600000.SH": status_frame(),
+            },
+        )
 
         def frame_for(symbol: str) -> pl.DataFrame:
             return pl.DataFrame(
@@ -288,7 +340,14 @@ class _FakeAmazingDataProvider(AmazingDataProvider):
     def get_hist_code_list_exchange(
         self, security_type: str, start_date: int, end_date: int
     ) -> ProviderExchange:
-        return self.code_list
+        if (start_date, end_date) == (20200101, 20200131):
+            return self.code_list
+        return self.exact_code_lists[(start_date, end_date)]
+
+    def get_history_stock_status_exchange(
+        self, start_date: int, end_date: int, code_list: list[str]
+    ) -> ProviderExchange:
+        return self.status
 
     def query_kline_exchange(
         self,
@@ -684,6 +743,18 @@ def test_authority_cannot_be_minted_from_arbitrary_bytes_or_replayed_catalog(
     assert replayed_evidence.acquisition_receipt.is_verified_capture is False
 
 
+def test_acquisition_uses_closed_single_session_requests(tmp_path: Path) -> None:
+    receipt = _acquisition_receipt(tmp_path)
+
+    assert receipt.semantic_operations
+    for operation in receipt.semantic_operations:
+        payload = json.loads(
+            (tmp_path / "raw" / Path(operation.captured_evidence_uri)).read_text(encoding="utf-8")
+        )
+        request_params = payload["request_params"]
+        assert request_params["start_date"] == request_params["end_date"]
+
+
 def test_acquisition_persists_and_replays_the_raw_capture_chain(tmp_path: Path) -> None:
     raw_root = tmp_path / "raw"
     receipt = _acquisition_receipt(tmp_path)
@@ -714,7 +785,7 @@ def test_acquisition_rejects_partial_daily_bar_response(tmp_path: Path) -> None:
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-partial"),
         VerifiedSourceSnapshot.from_projection(_projection([])),
     )
-    with pytest.raises(AmazingDataAcquisitionError, match="partial"):
+    with pytest.raises(AmazingDataAcquisitionError, match="month completeness"):
         acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
 
 
@@ -733,7 +804,7 @@ def test_acquisition_rejects_daily_bar_schema_drift(tmp_path: Path) -> None:
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-schema-drift"),
         VerifiedSourceSnapshot.from_projection(_projection([])),
     )
-    with pytest.raises(AmazingDataAcquisitionError, match="symbol or OHLCV"):
+    with pytest.raises(AmazingDataAcquisitionError, match="month completeness"):
         acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
 
 

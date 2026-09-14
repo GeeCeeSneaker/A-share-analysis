@@ -102,6 +102,122 @@ A. 可重现的 `AUTHORITATIVE_UPSTREAM` full-scope receipt，并证明 material
 
 B. 精确、可审计的 fail-closed semantic/API blocker。
 
+### 4.4 当前执行记录（2026-09-14）
+
+> 本节记录的是整改前探索性观察。后续 exact-head 审阅确认精确日请求窗口错误，且 Stage B
+> 当时误通过了非 `PASS` 的 Stage A gate；下列 Stage A/B 结果均不构成当前验收证据，修正状态见 4.5。
+
+Issue #59 的实际开发 base 为 `67f37d7ef7a084d775d14dbd0d474e1604e96d25`，且已确认
+PR #58 merge `31515992021e34517de0b764dd1ebb7f9e7ef35b` 是其祖先。Stage A 已通过同一
+AmazingData SPIKE 路径取得并在本地 ignored raw 中保留完整的 2024-01 观察：22 个交易日、
+5,106 个月度证券、22 个精确日历史代码表、全量历史状态和全量日线，共 26 个成功交换。
+
+Stage A 的版本化规则已经替换旧的 `month_universe × all_sessions` 交叉乘积：精确日代码表
+定义 session applicability，`IS_SUSP_SEC=1` 定义合法非交易，只有 `IS_SUSP_SEC=0` 的
+适用 pair 进入必需 bar 集合；未知状态不转成“不适用”。离线重放结果为：132 个
+`SUSPENSION_NON_TRADING`、115 个 `NOT_APPLICABLE_SESSION`、0 个必需 bar 缺失，说明这些
+合法 gap 未被误报为数据损失；但供应商状态响应有 1 个无列成员和共 32 个适用 pair 无状态
+覆盖，另有 22 个返回行落在尚未证明必需的 pair 上，因此整体仍为 `FAIL_CLOSED`，不是
+authoritative receipt。
+
+实测重取时供应商在第 10 个精确日窗口返回 `ProviderPermissionError`；该次只写了本地
+忽略证据且未覆盖既有完整观察。Stage B 已按固定的 `2020-01` Development 与
+`2026-01` Holdout 进程隔离执行；两个 worker 均完整跑完（分别 20、24 个成功交换），
+没有超时，也没有把一个月份的原始证据或状态带入另一个月份。单月原生 SDK 卡住时由父进程
+以固定 900 秒 OS 边界收口；这不是把 SDK 的 `TimeBudget` 宣称为硬超时。
+
+Stage B 的脱敏结果见
+[`cr7_month_completeness_stage_b_20260914.json`](../provider_verification/cr7_month_completeness_stage_b_20260914.json)：
+两个月均为 `FAIL_CLOSED`，没有产生 authoritative receipt，也没有进入 materializer。
+`2020-01` 的 3 个状态成员为不可读/零列表，触发 `STATUS_SCHEMA_MISMATCH`，并留下 36 个
+`UNRESOLVED` pair；返回但尚未被状态证明为必需的 16 个 pair 也不作通过依据。`2026-01`
+没有结构错误，但仍有 4 个 `UNRESOLVED` pair。两个月的必需 bar 缺失均为 0；这只说明
+已判定为必需的集合没有观察到缺 bar，不能覆盖未决状态问题。
+
+因此当前最小下一任务是要求 AmazingData 状态接口/适配层明确并稳定提供：每个返回成员的
+可读 schema，以及足以区分“状态未变化”与“状态数据缺失”的完整月内语义。禁止用“无状态
+行即未变化”、跨源补齐或额外 heuristic 清除 2020 的 36 个或 2026 的 4 个未决 pair。
+整改后只重跑本 Issue 授权的三个代表月并重新核对 receipt/materializer gate；在此之前不做
+78 月回补。
+
+本地复现入口固定为（需要本地未跟踪的 `.env`，输出目录均已忽略）：
+
+```text
+uv run python scripts/spike/cr7_month_completeness_semantics.py --env-file .env --output data/spike/cr7-month-completeness-semantics-stage-a-20260914/report.json
+uv run python scripts/spike/cr7_month_completeness_semantics.py --stage-b --env-file .env --stage-a-report docs/provider_verification/cr7_month_completeness_stage_a_20260914.json --output data/spike/cr7-month-completeness-semantics-stage-b-20260914/report-process-isolated.json
+```
+
+第二条命令只接受脚本内固定的两个 Stage B 月份，不接受自由日期、Universe、resume 或
+production 参数；worker 输出会保留在本地 ignored raw 目录，提交的 JSON 仅为脱敏摘要。
+
+当前源码及聚焦回归已通过；全量 pytest 已通过（退出码 0，3 个既有 Windows symlink
+权限 skip）。本阶段仍保持 `CLOSURE_DESIGN_ONLY_NOT_ACTIVE`，不铸造 authoritative receipt、
+不进入 materializer、不做 78 月回补，也不执行 Formal B1-B7、Production、BSE/index、
+CR-5/R2、Golden/H1、baseline 或策略工作。
+
+### 4.5 Exact-head 审阅整改（2026-09-14）
+
+项目经理对 PR #61 的 exact head `089e4fa6ef2395bee1997b1e504cf5fb67c79502` 给出
+`REMEDIATE / KEEP DRAFT / DO NOT MERGE`。审阅确认 AmazingData 的 `get_hist_code_list`
+两端都是闭区间，因此旧实现用 `[D,D+1]` 取得的“精确日”观察可能混入 D+1 才适用的证券，旧
+计数不能作为语义验收依据；旧 Stage B 还在 Stage A 为 `FAIL_CLOSED` 时越过了错误的 gate。
+
+已提交整改 `c00524762827edf4acc34e992366e81e91f31825`：
+
+- acquisition、bounded diagnostic、retained replay 和离线 fake 全部改用
+  `start_date == end_date == D`；
+- applicability 版本升为 `amazingdata-hist-code-list-exact-session-v2`，因此旧版本的
+  两日证据不能被当作新语义重放；
+- Stage B 只接受当前 rule/applicability version 且 evaluation `status == PASS` 的 Stage A；
+  `FAIL_CLOSED` 会返回 `STAGE_A_GATE_BLOCKED`，不会调用 Provider；
+- 增加“证券只在 D+1 出现时，D 不得进入适用集合”的回归，以及精确请求和版本 gate 回归。
+
+下一步必须先取得该提交的三平台 exact-head CI；CI 通过后只从该不可变提交重跑 Stage A
+`2024-01`，并把真实运行使用的 code head 写入新的脱敏报告。此前的 Stage B 报告仅保留为
+历史诊断、明确标记为非验收证据；不得重跑 Stage B，不得进行 78 月回补。
+
+### 4.6 Corrected exact-head Stage A 结果（2026-09-14）
+
+整改提交 `d0710a28c7b6aa7376c4612c0b445d2c0fe7e41a` 的 exact-head CI #599 已通过：Ubuntu
+3.14、Windows 3.12、Windows 3.14 全部成功，受控执行保持 skipped。随后在干净工作树以该
+提交运行了唯一获准的 `2024-01` Stage A；脱敏报告中的 `code_head` 与该执行提交一致。
+
+本次 22 个精确日 `get_hist_code_list` 请求均为 `[D,D]` 闭区间（另有 1 个正常的整月请求），
+因此本次观察可以用于审阅修正后的请求绑定，但业务语义仍未通过：22 个交易日、5,106 个
+月度证券、1 个状态 schema mismatch、22 个 `UNRESOLVED` pair、22 个尚未证明为必需的返回
+pair，`missing_required_pair_count=0`，总体 `FAIL_CLOSED`。没有生成 authoritative receipt，
+没有进入 materializer。
+
+规范脱敏报告为
+[`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)，
+整改前报告保留为
+[`cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json)。
+两者不能混作同一语义版本的证据；整改前 Stage B 报告也已标记为历史诊断、非验收证据。
+
+当前返回门是独立 delta review：审阅人需核对 `d0710a2...`、CI #599、规范 Stage A 报告的
+`code_head` 和 `[D,D]` 请求结论。除非新的 Stage A 达到 `PASS` 并得到调度确认，不得运行
+Stage B、78 月回补、Formal/Production 或其他明确禁止的工作。
+
+### 4.7 状态重复日整改（2026-09-14）
+
+最新 delta review 发现 `_status_rows()` 只按 `(TRADE_DATE, IS_SUSP_SEC)` 元组去重；同一证券同一
+交易日若同时返回 `IS_SUSP_SEC=0` 与 `1`，两个元组并不相同，后行会覆盖前行并制造顺序依赖的
+状态事实。已按最小范围整改：重复的规范化 `TRADE_DATE`（相同 flag 或冲突 flag）均写入
+`STATUS_DUPLICATE_DATE`，并丢弃该证券的全部状态行，使其只能以 `FAIL_CLOSED` 进入结果，不会
+把任一重复行提升为 active/suspended 权威事实；新增冲突与相同 flag 两种对抗回归。
+
+本轮实现已提交为 `99cf9c61d60108b35bf200486222ab55926ce389`；focused/full QA 通过，GitHub
+Actions CI #601 三平台 required jobs 全部成功，受控执行 #125 为 skipped。随后从该干净提交头
+仅重跑 `2024-01` Stage A，规范报告已更新为
+[`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)，
+`code_head` 与实际执行头一致；上一版报告保留为
+[`cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json)。
+
+本次真实评估仍为 `FAIL_CLOSED`：22 个交易日、5,106 个证券、1 个 `STATUS_SCHEMA_MISMATCH`、
+22 个 `UNRESOLVED`、22 个未证明为必需的返回 pair，`missing_required_pair_count=0`；没有
+authoritative receipt，也没有进入 materializer。不得运行 Stage B、78 月回补、Formal/Production、
+BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；不能用推断修平当前状态缺口。
+
 ## 5. 当前明确禁止
 
 Issue #59 **不授权**：

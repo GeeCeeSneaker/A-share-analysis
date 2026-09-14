@@ -25,6 +25,13 @@ from typing import Any
 
 import polars as pl
 
+from ashare_state.providers.amazingdata.month_completeness import (
+    AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION,
+    AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION,
+    MonthCompletenessError,
+    MonthCompletenessEvaluation,
+    evaluate_month_completeness,
+)
 from ashare_state.research.models import (
     INDEX_PANEL_STATE,
     PRICE_BASIS,
@@ -49,7 +56,9 @@ from ashare_state.storage.atomic_files import ImmutableFileExistsError, write_fi
 
 __all__ = [
     "AMAZINGDATA_ACQUISITION_RECEIPT_VERSION",
+    "AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION",
     "AMAZINGDATA_CALENDAR_MARKET",
+    "AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION",
     "AMAZINGDATA_SECURITY_UNIVERSE_SELECTION",
     "AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION",
     "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD",
@@ -102,7 +111,7 @@ OFFLINE_FIXTURE_COMPLETE_METHOD = "OFFLINE_FIXTURE_COMPLETE_SCOPE_V1"
 OFFLINE_FIXTURE_PARTIAL_METHOD = "OFFLINE_FIXTURE_PARTIAL_SCOPE_V1"
 AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION = "authoritative-coverage-evidence-v1"
 AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD = "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1"
-AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "AMAZINGDATA_ACQUISITION_RECEIPT_V1"
+AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "AMAZINGDATA_ACQUISITION_RECEIPT_V2"
 AUTHORITATIVE_SOURCE_SELECTION_VERSION = "source-selection-retrieval-closure-20260912"
 AUTHORITATIVE_SOURCE_CLASS = "amazingdata_provider_observation"
 AUTHORITATIVE_PROVIDER = "amazingdata"
@@ -110,9 +119,10 @@ AUTHORITATIVE_RETRIEVAL_SURFACE = "history_acquisition"
 AUTHORITATIVE_SOURCE_METHODS = (
     "BaseData.get_hist_code_list",
     "BaseData.get_calendar",
+    "InfoData.get_history_stock_status",
     "MarketData.query_kline",
 )
-AMAZINGDATA_ACQUISITION_RECEIPT_VERSION = "amazingdata-history-acquisition-receipt-v1"
+AMAZINGDATA_ACQUISITION_RECEIPT_VERSION = "amazingdata-history-acquisition-receipt-v2"
 AMAZINGDATA_SECURITY_UNIVERSE_SELECTION = "EXTRA_STOCK_A_SH_SZ"
 AMAZINGDATA_CALENDAR_MARKET = "SH"
 
@@ -122,7 +132,14 @@ _AMAZINGDATA_OPERATION_BINDINGS = {
         "list[str]",
     ),
     "BaseData.get_calendar": ("BaseData.get_calendar#trade_calendar", "list[int]"),
-    "MarketData.query_kline": ("MarketData.query_kline#daily_bar", "dict[str,dataframe]"),
+    "InfoData.get_history_stock_status": (
+        "InfoData.get_history_stock_status#security_status_history",
+        "dict[str,dataframe|None]",
+    ),
+    "MarketData.query_kline": (
+        "MarketData.query_kline#daily_bar",
+        "dict[str,dataframe|None]",
+    ),
 }
 
 
@@ -292,6 +309,15 @@ def _month_end(year: int, month: int) -> date:
 
 def _yyyymmdd(value: date) -> int:
     return value.year * 10000 + value.month * 100 + value.day
+
+
+def _day_to_date(value: int) -> date:
+    if isinstance(value, bool) or not isinstance(value, int) or len(str(value)) != 8:
+        raise CoverageBasisError("historical date is malformed")
+    try:
+        return date(value // 10000, (value // 100) % 100, value % 100)
+    except ValueError as exc:
+        raise CoverageBasisError("historical date is malformed") from exc
 
 
 def _next_month(value: date) -> date:
@@ -597,6 +623,8 @@ def _amazingdata_capture_catalog(
     requested_scope_start: date,
     requested_scope_end: date,
     operations: tuple[AmazingDataExchangeReceipt, ...],
+    semantic_operations: tuple[AmazingDataExchangeReceipt, ...],
+    completeness_evaluation: MonthCompletenessEvaluation,
 ) -> dict[str, Any]:
     """Return the deterministic catalog identity used as the receipt proof."""
     return {
@@ -609,6 +637,8 @@ def _amazingdata_capture_catalog(
         "requested_scope_start": requested_scope_start,
         "requested_scope_end": requested_scope_end,
         "operations": [operation.as_dict() for operation in operations],
+        "semantic_operations": [operation.as_dict() for operation in semantic_operations],
+        "completeness_evaluation": completeness_evaluation.as_dict(),
     }
 
 
@@ -634,6 +664,8 @@ class _VerifiedAmazingDataCapture:
     returned_trading_days_hash: str
     returned_row_count: int
     operations: tuple[AmazingDataExchangeReceipt, ...]
+    semantic_operations: tuple[AmazingDataExchangeReceipt, ...]
+    completeness_evaluation: MonthCompletenessEvaluation
     retrieved_at_utc: datetime
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -655,6 +687,8 @@ class _VerifiedAmazingDataCapture:
         returned_trading_days_hash: str,
         returned_row_count: int,
         operations: tuple[AmazingDataExchangeReceipt, ...],
+        semantic_operations: tuple[AmazingDataExchangeReceipt, ...],
+        completeness_evaluation: MonthCompletenessEvaluation,
         retrieved_at_utc: datetime,
     ) -> _VerifiedAmazingDataCapture:
         obj = object.__new__(cls)
@@ -671,6 +705,8 @@ class _VerifiedAmazingDataCapture:
             "returned_trading_days_hash": returned_trading_days_hash,
             "returned_row_count": returned_row_count,
             "operations": operations,
+            "semantic_operations": semantic_operations,
+            "completeness_evaluation": completeness_evaluation,
             "retrieved_at_utc": retrieved_at_utc,
         }.items():
             object.__setattr__(obj, field_name, value)
@@ -723,6 +759,37 @@ class _VerifiedAmazingDataCapture:
             raise CoverageBasisError("capture exchange method set is not reviewed")
         if len(operations_by_method) != len(self.operations):
             raise CoverageBasisError("capture exchange methods are duplicated")
+        if (
+            not isinstance(self.semantic_operations, tuple)
+            or len(self.semantic_operations) != self.calendar_trading_day_count
+            or any(
+                not isinstance(operation, AmazingDataExchangeReceipt)
+                for operation in self.semantic_operations
+            )
+            or any(
+                operation.method != "BaseData.get_hist_code_list"
+                or operation.response_shape != "list[str]"
+                for operation in self.semantic_operations
+            )
+        ):
+            raise CoverageBasisError("capture exact-session semantic exchanges are malformed")
+        if not isinstance(self.completeness_evaluation, MonthCompletenessEvaluation):
+            raise CoverageBasisError("capture completeness evaluation is not typed")
+        if not self.completeness_evaluation.accepted:
+            raise CoverageBasisError("capture completeness evaluation is not accepted")
+        evaluation = self.completeness_evaluation
+        if (
+            evaluation.monthly_security_count != self.security_universe_count
+            or evaluation.monthly_security_set_hash != self.security_universe_hash
+            or evaluation.session_count != self.calendar_trading_day_count
+            or evaluation.session_set_hash != self.calendar_trading_days_hash
+            or evaluation.returned_first_date != self.returned_first_date
+            or evaluation.returned_last_date != self.returned_last_date
+            or evaluation.returned_trading_day_count != self.returned_trading_day_count
+            or evaluation.returned_trading_days_hash != self.returned_trading_days_hash
+            or evaluation.returned_row_count != self.returned_row_count
+        ):
+            raise CoverageBasisError("capture completeness evaluation is not derived")
         if (
             operations_by_method["BaseData.get_hist_code_list"].row_count
             != self.security_universe_count
@@ -781,6 +848,8 @@ class AmazingDataAcquisitionReceipt:
     returned_trading_days_hash: str
     returned_row_count: int
     operations: tuple[AmazingDataExchangeReceipt, ...]
+    semantic_operations: tuple[AmazingDataExchangeReceipt, ...]
+    completeness_evaluation: MonthCompletenessEvaluation
     retrieved_at_utc: datetime
     available_at: datetime
     pit_as_of: datetime
@@ -830,6 +899,8 @@ class AmazingDataAcquisitionReceipt:
             "returned_trading_days_hash",
             "returned_row_count",
             "operations",
+            "semantic_operations",
+            "completeness_evaluation",
             "retrieved_at_utc",
             "available_at",
             "pit_as_of",
@@ -858,6 +929,8 @@ class AmazingDataAcquisitionReceipt:
             requested_scope_start=self.requested_scope_start,
             requested_scope_end=self.requested_scope_end,
             operations=self.operations,
+            semantic_operations=self.semantic_operations,
+            completeness_evaluation=self.completeness_evaluation,
         )
 
     def verify_retained_capture(self, raw_root: Path | str) -> None:
@@ -940,6 +1013,103 @@ class AmazingDataAcquisitionReceipt:
                     f"AmazingData retained payload closure failed for {operation.method}: "
                     + "; ".join(problems)
                 )
+        for operation in self.semantic_operations:
+            evidence_path = root.joinpath(*operation.captured_evidence_uri.split("/"))
+            if not evidence_path.is_file():
+                raise CoverageBasisError("AmazingData retained exact-session evidence is missing")
+            evidence_bytes = evidence_path.read_bytes()
+            if sha256_hex(evidence_bytes) != operation.captured_evidence_hash:
+                raise CoverageBasisError("AmazingData retained exact-session evidence hash changed")
+            try:
+                evidence = json.loads(evidence_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise CoverageBasisError(
+                    "AmazingData retained exact-session evidence is not valid JSON"
+                ) from exc
+            if not isinstance(evidence, Mapping):
+                raise CoverageBasisError(
+                    "AmazingData retained exact-session evidence is not an object"
+                )
+            if not _retained_request_matches_receipt(
+                self,
+                operation.method,
+                evidence.get("request_params"),
+                exact_session=True,
+            ):
+                raise CoverageBasisError("AmazingData retained exact-session request scope changed")
+            if (
+                evidence.get("status") != "OK"
+                or evidence.get("operation_id") != operation.operation_id
+                or evidence.get("request_params_hash") != operation.request_params_hash
+                or evidence.get("content_hash") != operation.response_content_hash
+                or evidence.get("row_count") != operation.row_count
+            ):
+                raise CoverageBasisError(
+                    "AmazingData retained exact-session evidence identity changed"
+                )
+            tables = evidence.get("tables")
+            if not isinstance(tables, list):
+                raise CoverageBasisError(
+                    "AmazingData retained exact-session evidence tables are malformed"
+                )
+            schema_parts = sorted(
+                (str(table.get("name")), str(table.get("schema_hash")))
+                for table in tables
+                if isinstance(table, Mapping)
+            )
+            if len(schema_parts) != len(tables) or sha256_hex(canonical_json(schema_parts)) != (
+                operation.response_schema_hash
+            ):
+                raise CoverageBasisError(
+                    "AmazingData retained exact-session evidence schema changed"
+                )
+            problems = verify_meta_closure(evidence_path.parent, dict(evidence))
+            if problems:
+                raise CoverageBasisError(
+                    "AmazingData retained exact-session payload closure failed: "
+                    + "; ".join(problems)
+                )
+
+        try:
+            base_operations = {operation.method: operation for operation in self.operations}
+            calendar_payload, _calendar_meta = _read_retained_operation_payload(
+                root, self, base_operations["BaseData.get_calendar"]
+            )
+            code_payload, _code_meta = _read_retained_operation_payload(
+                root, self, base_operations["BaseData.get_hist_code_list"]
+            )
+            status_payload, _status_meta = _read_retained_operation_payload(
+                root, self, base_operations["InfoData.get_history_stock_status"]
+            )
+            daily_payload, _daily_meta = _read_retained_operation_payload(
+                root, self, base_operations["MarketData.query_kline"]
+            )
+            exact_day_universes: dict[int, list[str]] = {}
+            for operation in self.semantic_operations:
+                payload, meta = _read_retained_operation_payload(
+                    root, self, operation, exact_session=True
+                )
+                params = meta.get("request_params")
+                if not isinstance(params, Mapping) or not isinstance(params.get("start_date"), int):
+                    raise CoverageBasisError(
+                        "AmazingData retained exact-session request is malformed"
+                    )
+                exact_day_universes[int(params["start_date"])] = _single_value_column(payload)
+            evaluation = evaluate_month_completeness(
+                monthly_symbols=_single_value_column(code_payload),
+                trading_days=_calendar_values_for_receipt(calendar_payload, self),
+                exact_day_universes=exact_day_universes,
+                status_payload=status_payload,
+                daily_bar_payload=daily_payload,
+            )
+        except (KeyError, MonthCompletenessError, CoverageBasisError) as exc:
+            raise CoverageBasisError(
+                "AmazingData retained completeness semantics could not be replayed"
+            ) from exc
+        if evaluation.as_dict() != self.completeness_evaluation.as_dict():
+            raise CoverageBasisError(
+                "AmazingData retained completeness evaluation changed during replay"
+            )
 
     @classmethod
     def from_mapping(cls, payload: Mapping[str, Any]) -> AmazingDataAcquisitionReceipt:
@@ -970,6 +1140,8 @@ class AmazingDataAcquisitionReceipt:
             "returned_trading_days_hash",
             "returned_row_count",
             "operations",
+            "semantic_operations",
+            "completeness_evaluation",
             "retrieved_at_utc",
             "available_at",
             "pit_as_of",
@@ -984,6 +1156,11 @@ class AmazingDataAcquisitionReceipt:
             raw_operations = payload["operations"]
             if not isinstance(raw_operations, list):
                 raise CoverageBasisError("AmazingData acquisition receipt operations are malformed")
+            raw_semantic_operations = payload["semantic_operations"]
+            if not isinstance(raw_semantic_operations, list):
+                raise CoverageBasisError(
+                    "AmazingData exact-session semantic operations are malformed"
+                )
             values: dict[str, Any] = {
                 "receipt_id": _require_non_empty_string(payload["receipt_id"], "receipt_id"),
                 "receipt_version": _require_non_empty_string(
@@ -1047,6 +1224,13 @@ class AmazingDataAcquisitionReceipt:
                 "operations": tuple(
                     AmazingDataExchangeReceipt.from_mapping(operation)
                     for operation in raw_operations
+                ),
+                "semantic_operations": tuple(
+                    AmazingDataExchangeReceipt.from_mapping(operation)
+                    for operation in raw_semantic_operations
+                ),
+                "completeness_evaluation": MonthCompletenessEvaluation.from_mapping(
+                    payload["completeness_evaluation"]
                 ),
                 "retrieved_at_utc": ensure_utc_timestamp(payload["retrieved_at_utc"]),
                 "available_at": ensure_utc_timestamp(payload["available_at"]),
@@ -1118,6 +1302,31 @@ class AmazingDataAcquisitionReceipt:
                 raise CoverageBasisError("receipt operation identity is not provider-derived")
             if operation.response_shape != response_shape:
                 raise CoverageBasisError("receipt response shape is not the reviewed shape")
+        if (
+            not isinstance(self.semantic_operations, tuple)
+            or len(self.semantic_operations) != self.calendar_trading_day_count
+            or any(
+                not isinstance(operation, AmazingDataExchangeReceipt)
+                or operation.method != "BaseData.get_hist_code_list"
+                or operation.response_shape != "list[str]"
+                for operation in self.semantic_operations
+            )
+        ):
+            raise CoverageBasisError("receipt exact-session semantic operations are malformed")
+        if not isinstance(self.completeness_evaluation, MonthCompletenessEvaluation):
+            raise CoverageBasisError("receipt completeness evaluation is not typed")
+        evaluation = self.completeness_evaluation
+        try:
+            evaluation.require_accepted()
+        except ValueError as exc:
+            raise CoverageBasisError("receipt completeness evaluation is not accepted") from exc
+        if evaluation.rule_version != AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION:
+            raise CoverageBasisError("receipt completeness rule version is not reviewed")
+        if (
+            evaluation.applicability_semantics_version
+            != AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION
+        ):
+            raise CoverageBasisError("receipt applicability semantics version is not reviewed")
         for field_name in (
             "requested_scope_start",
             "requested_scope_end",
@@ -1157,6 +1366,22 @@ class AmazingDataAcquisitionReceipt:
             raise CoverageBasisError("receipt returned trading-day count differs from calendar")
         if self.returned_trading_days_hash != self.calendar_trading_days_hash:
             raise CoverageBasisError("receipt returned trading-day hash differs from calendar")
+        if (
+            evaluation.monthly_security_count != self.security_universe_count
+            or evaluation.monthly_security_set_hash != self.security_universe_hash
+            or evaluation.session_count != self.calendar_trading_day_count
+            or evaluation.session_set_hash != self.calendar_trading_days_hash
+            or evaluation.returned_row_count != self.returned_row_count
+            or evaluation.returned_bar_pair_count != self.returned_row_count
+            or evaluation.returned_first_date != self.returned_first_date
+            or evaluation.returned_last_date != self.returned_last_date
+            or evaluation.returned_trading_day_count != self.returned_trading_day_count
+            or evaluation.returned_trading_days_hash != self.returned_trading_days_hash
+            or evaluation.missing_required_pair_count != 0
+            or evaluation.extra_returned_pair_count != 0
+            or evaluation.unresolved_pair_count != 0
+        ):
+            raise CoverageBasisError("receipt completeness evaluation is not derived")
         try:
             source_snapshot_as_of = ensure_utc_timestamp(self.source_snapshot_as_of)
             retrieved_at = ensure_utc_timestamp(self.retrieved_at_utc)
@@ -1223,6 +1448,8 @@ class AmazingDataAcquisitionReceipt:
             "returned_trading_days_hash": self.returned_trading_days_hash,
             "returned_row_count": self.returned_row_count,
             "operations": [operation.as_dict() for operation in self.operations],
+            "semantic_operations": [operation.as_dict() for operation in self.semantic_operations],
+            "completeness_evaluation": self.completeness_evaluation.as_dict(),
             "retrieved_at_utc": self.retrieved_at_utc,
             "available_at": self.available_at,
             "pit_as_of": self.pit_as_of,
@@ -1239,6 +1466,8 @@ def _retained_request_matches_receipt(
     receipt: AmazingDataAcquisitionReceipt,
     method: str,
     request_params: Any,
+    *,
+    exact_session: bool = False,
 ) -> bool:
     """Check the scrubbed RawWriter request against receipt-derived scope."""
     if not isinstance(request_params, Mapping):
@@ -1249,11 +1478,38 @@ def _retained_request_matches_receipt(
     if method == "BaseData.get_calendar":
         return params == {"market": receipt.calendar_market}
     if method == "BaseData.get_hist_code_list":
+        if exact_session:
+            start_date = params.get("start_date")
+            end_date = params.get("end_date")
+            if (
+                isinstance(start_date, bool)
+                or not isinstance(start_date, int)
+                or isinstance(end_date, bool)
+                or not isinstance(end_date, int)
+            ):
+                return False
+            return params == {
+                "security_type": receipt.security_universe_selection,
+                "start_date": start_date,
+                "end_date": start_date,
+            }
         return params == {
             "security_type": receipt.security_universe_selection,
             "start_date": start,
             "end_date": end,
         }
+    if method == "InfoData.get_history_stock_status":
+        code_list = params.get("code_list")
+        return (
+            params.get("begin_date") == start
+            and params.get("end_date") == end
+            and params.get("is_local") is False
+            and isinstance(code_list, list)
+            and code_list == sorted(code_list)
+            and len(code_list) == receipt.security_universe_count
+            and len(code_list) == len(set(code_list))
+            and sha256_hex(canonical_json(code_list)) == receipt.security_universe_hash
+        )
     if method != "MarketData.query_kline":
         return False
     expected_keys = {
@@ -1299,6 +1555,93 @@ def _retained_request_matches_receipt(
     )
 
 
+def _read_retained_operation_payload(
+    root: Path,
+    receipt: AmazingDataAcquisitionReceipt,
+    operation: AmazingDataExchangeReceipt,
+    *,
+    exact_session: bool = False,
+) -> tuple[Any, Mapping[str, Any]]:
+    """Read one already-closed operation for semantic replay."""
+    evidence_path = root.joinpath(*operation.captured_evidence_uri.split("/"))
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CoverageBasisError("AmazingData retained operation meta is unreadable") from exc
+    if not isinstance(evidence, Mapping):
+        raise CoverageBasisError("AmazingData retained operation meta is malformed")
+    if not _retained_request_matches_receipt(
+        receipt,
+        operation.method,
+        evidence.get("request_params"),
+        exact_session=exact_session,
+    ):
+        raise CoverageBasisError("AmazingData retained operation request changed")
+    provider = _text_or_empty(evidence.get("provider"))
+    dataset = _text_or_empty(evidence.get("provider_dataset"))
+    request_id = _text_or_empty(evidence.get("request_id"))
+    if not all(value for value in (provider, dataset, request_id)):
+        raise CoverageBasisError("AmazingData retained operation identity is malformed")
+    from ashare_state.storage.raw_writer import read_raw_payload
+
+    try:
+        payload = read_raw_payload(
+            root,
+            provider=provider,
+            dataset=dataset,
+            request_id=request_id,
+            verify=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - replay boundary normalizes failure
+        raise CoverageBasisError("AmazingData retained operation payload is unreadable") from exc
+    return payload, evidence
+
+
+def _text_or_empty(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+def _single_value_column(payload: Any) -> list[Any]:
+    """Read the scalar ``value`` table emitted for a provider list."""
+    if not hasattr(payload, "columns") or "value" not in {
+        str(column) for column in payload.columns
+    }:
+        raise CoverageBasisError("AmazingData retained list payload shape changed")
+    try:
+        column = payload["value"]
+        if hasattr(column, "to_list"):
+            values = column.to_list()
+        elif hasattr(column, "tolist"):
+            values = column.tolist()
+        elif hasattr(column, "to_pylist"):
+            values = column.to_pylist()
+        else:
+            values = list(column)
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        raise CoverageBasisError("AmazingData retained list payload is unreadable") from exc
+    return list(values)
+
+
+def _calendar_values_for_receipt(
+    payload: Any,
+    receipt: AmazingDataAcquisitionReceipt,
+) -> list[int]:
+    """Reapply the acquisition calendar's in-month projection during replay."""
+    values = _single_value_column(payload)
+    scoped: list[int] = []
+    for value in values:
+        if isinstance(value, bool) or not isinstance(value, int) or len(str(value)) != 8:
+            raise CoverageBasisError("AmazingData retained calendar value is malformed")
+        parsed = _day_to_date(value)
+        if receipt.requested_scope_start <= parsed <= receipt.requested_scope_end:
+            scoped.append(value)
+    if len(scoped) != len(set(scoped)) or not scoped:
+        raise CoverageBasisError("AmazingData retained calendar scope is malformed")
+    return sorted(scoped)
+
+
 def _issue_amazingdata_acquisition_receipt(
     *,
     source_snapshot: VerifiedSourceSnapshot,
@@ -1333,6 +1676,8 @@ def _issue_amazingdata_acquisition_receipt(
         requested_scope_start=capture.requested_scope_start,
         requested_scope_end=capture.requested_scope_end,
         operations=normalized_operations,
+        semantic_operations=capture.semantic_operations,
+        completeness_evaluation=capture.completeness_evaluation,
     )
     capture_hash = sha256_hex(canonical_json(capture_catalog))
     receipt_id = f"amazingdata-history-receipt-{capture_hash[:32]}"
@@ -1365,6 +1710,8 @@ def _issue_amazingdata_acquisition_receipt(
         "returned_trading_days_hash": capture.returned_trading_days_hash,
         "returned_row_count": capture.returned_row_count,
         "operations": normalized_operations,
+        "semantic_operations": capture.semantic_operations,
+        "completeness_evaluation": capture.completeness_evaluation,
         "retrieved_at_utc": ensure_utc_timestamp(capture.retrieved_at_utc),
         "available_at": ensure_utc_timestamp(capture.retrieved_at_utc),
         "pit_as_of": source_snapshot.source_snapshot_as_of,
@@ -1375,6 +1722,8 @@ def _issue_amazingdata_acquisition_receipt(
     serialized_base = base | {
         "source_selection": selection.as_dict(),
         "operations": [operation.as_dict() for operation in normalized_operations],
+        "semantic_operations": [operation.as_dict() for operation in capture.semantic_operations],
+        "completeness_evaluation": capture.completeness_evaluation.as_dict(),
     }
     base["receipt_hash"] = sha256_hex(canonical_json(serialized_base))
     return AmazingDataAcquisitionReceipt._construct(

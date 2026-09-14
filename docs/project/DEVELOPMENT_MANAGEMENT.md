@@ -6698,3 +6698,165 @@ Provider/Production 或第三次 Formal；任何真实上游 completeness method
   Windows 3.14 CI，并由独立 Reviewer 做 exact-head delta review。PR #53 必须保持 Draft。
 - 除非 scheduler 另行授权，不得执行真实 2020-01-01～2026-06-30 历史物化、Provider/Production、第三次
   Formal/B1-B7、BSE/index 激活、CR-5/R2、Golden/H1 或策略工作。
+## DM-20260914-CR7-COMPLETENESS-035 · AmazingData 月度完整性语义与 bounded Stage A/B
+
+**Type**：C1 — CR-7 bounded real-source completeness semantics / fail-closed remediation
+**Date**：2026-09-14
+**Status**：`IMPLEMENTED / STAGE A+B FAIL-CLOSED / LOCAL QA GREEN / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+**Trigger**：Issue #59；按 scheduler 规则先完成 `2024-01` Stage A，再运行固定的 `2020-01` 与 `2026-01` Stage B。
+
+**精确交接**：本轮从 clean `main@67f37d7ef7a084d775d14dbd0d474e1604e96d25` 开始；
+PR #58 merge `31515992021e34517de0b764dd1ebb7f9e7ef35b` 已核实为该 base 的祖先。主体
+实现提交为 `a4cb8b0fb50fdf1a982b3754c8ac803682ceea8c`，Draft PR 为
+[#61](https://github.com/GeeCeeSneaker/A-share-analysis/pull/61)；文档清理后的最终
+exact head、required CI 和独立 delta review 以该 PR/Issue 的最新交接记录为准，不沿用旧 head。
+
+**本轮实现**：
+
+- 新增 versioned `amazingdata-month-completeness-rule-v1` 与
+  `amazingdata-hist-code-list-exact-session-v1`。精确日历史 code list 定义 session
+  applicability，历史状态 `IS_SUSP_SEC=1` 定义合法 suspension/non-trading；只有可读且
+  `IS_SUSP_SEC=0` 的适用 pair 进入必需 bar 集合。未知、畸形、范围漂移、缺状态和返回
+  extra 均不被 heuristic 吞掉，并保持 fail-closed。
+- 把状态、精确日适用性和全量 daily-bar 交换绑定进 `AmazingDataAcquisitionReceipt` v2
+  的验证/重放路径；`None` daily member 仅在该证券没有任何必需 pair 时可解释为合法空观测，
+  对仍有必需 pair 的 `None` 仍 fail-closed。移除不成立的月度 Universe 全交叉积前提，
+  保留 exact-session applicability 与状态范围一致性检查。
+- Stage A 固定为 `2024-01`；Stage B 只允许固定 `2020-01` Development、`2026-01`
+  Holdout。Stage B 使用每月独立 Python worker 和 900 秒父进程 OS 边界，单月 SDK 卡住
+  不会阻止另一月，也不会把跨月 evidence 混用。
+
+**真实观察与结论**：
+
+- Stage A 的完整本地 raw replay 包含 22 个交易日、5,106 个月度证券、22 个精确日 code
+  list、状态和 daily bar，共 26 个成功交换。离线评估得到 132 个
+  `SUSPENSION_NON_TRADING`、115 个 `NOT_APPLICABLE_SESSION`、0 个必需 bar 缺失，但有
+  1 个无列状态成员、32 个状态未决 pair 和 22 个尚未被状态证明为必需的返回 pair，故
+  `FAIL_CLOSED`。在线重取在第 10 个精确日窗口遇到 `ProviderPermissionError`，未覆盖
+  既有完整观察。
+- Stage B 的脱敏报告为
+  [`cr7_month_completeness_stage_b_20260914.json`](../provider_verification/cr7_month_completeness_stage_b_20260914.json)。
+  `2020-01` 完成 20 个交换：3 个不可读/零列状态成员触发 `STATUS_SCHEMA_MISMATCH`，
+  36 个 pair 为 `UNRESOLVED`，另有 16 个返回但尚未证明必需的 pair；
+  `2026-01` 完成 24 个交换：结构检查通过但仍有 4 个 `UNRESOLVED` pair。两个月必需
+  bar 缺失均为 0，但两个月均不能签发 receipt。
+- 三个月仍没有 `AUTHORITATIVE_UPSTREAM` receipt、materializer proof 或历史物化输入；
+  source-selection closure 仍为 `CLOSURE_DESIGN_ONLY_NOT_ACTIVE`。下一项应是最小化解决
+  状态接口的可读 schema 与完整月内语义，再仅重跑 Issue #59 授权的三个代表月。不得用
+  缺失即未变化、另一数据源或推测性多源仲裁掩盖未决状态。
+
+**验证与治理边界**：
+
+- focused completeness/materialization tests、full pytest、Ruff、mypy、compileall、
+  `uv pip check`、JSON parse 和 `git diff --check` 均须以本轮 exact head 重新核对；
+  CI 和独立 delta review 未完成前保持 Draft，不自行批准、Ready 或合并。
+- 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw
+  payload 和本地 vendor wheels 不进入 GitHub；不执行 78 月 backfill/materialization、
+  Formal B1-B7、Production、resume/verdict、BSE/index、CR-5/R2、Golden/H1、baseline
+  或策略工作。
+
+## DM-20260914-CR7-COMPLETENESS-036 · exact-session 窗口与 Stage B gate 审阅整改
+
+**Type**：C1 — CR-7 exact-head review remediation
+**Date**：2026-09-14
+**Remediation base**：PR #61 exact reviewed head `089e4fa6ef2395bee1997b1e504cf5fb67c79502`
+**Status**：`CODE REMEDIATION COMMITTED / CI PENDING / STAGE A RERUN PENDING / KEEP DRAFT`
+
+**审阅结论**
+
+项目经理对 PR #61 的 exact head 给出 `REMEDIATE / KEEP DRAFT / DO NOT MERGE`。已确认
+`BaseData.get_hist_code_list` 的 `start_date` 与 `end_date` 都是闭区间；此前以 `[D,D+1]`
+作为 exact-session 请求会混入下一日事实。此前 Stage A/B 报告的请求窗口和 code identity
+不能作为当前验收证据；Stage B 还错误接受了 `FAIL_CLOSED` 的 Stage A gate。
+
+**已完成的代码整改**
+
+- 提交 `c00524762827edf4acc34e992366e81e91f31825` 将 acquisition、SPIKE、retained replay
+  和 fake/test 全部改为 `[D,D]`；
+- applicability semantics 版本升为 `amazingdata-hist-code-list-exact-session-v2`，旧的两日
+  evidence 不能通过当前版本/请求校验；
+- Stage B gate 现在只接受当前 rule/applicability versions 且 `evaluation.status == PASS` 的
+  Stage A；旧的 `FAIL_CLOSED` 报告返回 `STAGE_A_GATE_BLOCKED` 并且不访问 Provider；
+- 增加 D+1-only applicability 回归、精确请求记录回归和旧版本 gate 回归。
+
+**证据与下一道门**
+
+- 本地 full pytest、Ruff、mypy、compileall、`uv pip check` 和 `git diff --check` 已通过；
+- 远端 exact-head CI 仍在执行；三平台已完成 lint/type，pytest 及后续 contract gates 尚未全部
+  收口，不能把当前 CI 当作通过；
+- 已将整改前 Stage B 报告限定为 `HISTORICAL_DIAGNOSTIC_ONLY_NOT_ACCEPTANCE_EVIDENCE`；
+  它不再代表当前 Stage B 授权结果；
+- CI 通过后，从该 exact committed head 只重跑 `2024-01` Stage A，并提交 code identity 一致的
+  脱敏报告；在新的 Stage A 达到 `PASS` 前，不得运行 `2020-01`/`2026-01` Stage B。
+
+账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 和
+vendor wheels 继续只保留在本地忽略路径；不执行 78 月 backfill、Formal/B1-B7、Production、
+BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
+
+## DM-20260914-CR7-COMPLETENESS-037 · exact-head Stage A 重跑交接
+
+**Type**：C1 — CR-7 bounded real-source verification after exact-session remediation
+**Date**：2026-09-14
+**Execution head**：`d0710a28c7b6aa7376c4612c0b445d2c0fe7e41a`
+**Status**：`STAGE A RERUN COMPLETE / FAIL-CLOSED / CI GREEN / DELTA REVIEW REQUIRED / KEEP DRAFT`
+
+**已核实事实**
+
+- exact-head CI #599 的 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功；受控执行仍为
+  skipped；
+- 本地从干净 `d0710a2...` 只重跑了授权的 `2024-01` Stage A，报告 `code_head` 与执行 head
+  完全一致；23 个 historical code-list 请求中 1 个为整月请求，22 个精确日请求全部为
+  `start_date == end_date`；
+- 22 个交易日、5,106 个月度证券的脱敏评估仍为 `FAIL_CLOSED`：1 个状态 schema mismatch、
+  22 个 `UNRESOLVED` pair、22 个返回但未被证明为必需的 pair，`missing_required_pair_count=0`。
+  因此没有 authoritative receipt，也没有进入 materializer；该结果不是 PASS。
+
+**证据与治理**
+
+- 当前规范报告为 [`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)；
+  旧 `[D,D+1]` 观察保留在 [`cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json)，
+  仅作历史诊断，不得与新语义合并；整改前 Stage B 报告同样已标记为非验收证据；
+- 当前下一道门是独立 delta review 对执行 head、CI、报告 code identity、22 个 exact-session
+  请求及 fail-closed 结果进行复核。Stage A 未达 `PASS` 前不运行 Stage B，更不做 78 月回补、
+  Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；
+- 凭证、私有 endpoint、专有 SDK/runtime、本地 raw payload 与 vendor wheels 未进入 GitHub。
+
+## DM-20260914-CR7-COMPLETENESS-038 · 重复状态日期 fail-closed 整改
+
+**Type**：C1 — CR-7 exact-head delta review remediation
+**Date**：2026-09-14
+**Scope**：仅 PR #61 的月度完整性 evaluator 与回归测试
+**Implementation head**：`99cf9c61d60108b35bf200486222ab55926ce389`
+**Status**：`STAGE A RERUN COMPLETE / FAIL-CLOSED / CI GREEN / DELTA REVIEW REQUIRED / KEEP DRAFT`
+
+**审阅问题**
+
+`_status_rows()` 原先按 `(TRADE_DATE, IS_SUSP_SEC)` 判断重复。相同规范化交易日如果带有冲突
+停牌标记 `0/1`，会被当成两个不同元组，随后写入 `status_by_pair` 时由响应顺序决定最终状态。
+这不应在完整性边界产生任何可消费的状态事实。
+
+**整改内容**
+
+- 对规范化 `TRADE_DATE` 独立去重，不论 `IS_SUSP_SEC` 是否相同；
+- 发现重复日即返回 `STATUS_DUPLICATE_DATE`，并丢弃该证券全部状态行，避免重复行继续写入
+  `status_by_pair`；
+- 增加 `0/1` 冲突和相同 flag 重复两种对抗测试，验证总体 `FAIL_CLOSED` 且重复成员不产生
+  row-order authority；
+- `[D,D]` exact-session、applicability v2、Stage B `PASS` gate 和 retained replay 逻辑保持不变。
+
+**执行结果**
+
+- focused/full QA 已通过；GitHub Actions CI #601 的 Ubuntu 3.14、Windows 3.12、Windows 3.14
+  全部成功，受控 GT-H3B #125 为 skipped；
+- 从上述干净 implementation head 仅重跑 `2024-01` Stage A，报告 `code_head` 精确匹配；
+  结果为 `FAIL_CLOSED`，22 个交易日、5,106 个证券、1 个 `STATUS_SCHEMA_MISMATCH`、22 个
+  `UNRESOLVED`、22 个 extra returned、required missing 0；
+- 规范报告为 [`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)，
+  前一版已归档为 [`cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json)；
+  两者均不产生 authoritative receipt 或 materializer 输入。
+
+**后续门禁**
+
+当前仅等待该 exact head 的独立 delta review。Stage A 仍未达到 `PASS`，因此不运行 Stage B 或
+78 月 materialization/backfill；不以返回 bar 推断并清除既有未决 pair，不触碰凭证、私有 endpoint、
+SDK/runtime 或 raw payload。
