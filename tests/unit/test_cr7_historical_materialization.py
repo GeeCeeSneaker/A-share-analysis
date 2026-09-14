@@ -253,21 +253,21 @@ class _FakeAmazingDataProvider(AmazingDataProvider):
             ["000001.SZ", "600000.SH"],
         )
         self.exact_code_lists = {
-            (20200102, 20200103): _provider_exchange(
+            (20200102, 20200102): _provider_exchange(
                 HIST_CODE_LIST,
                 {
                     "security_type": AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
                     "start_date": 20200102,
-                    "end_date": 20200103,
+                    "end_date": 20200102,
                 },
                 ["000001.SZ", "600000.SH"],
             ),
-            (20200103, 20200104): _provider_exchange(
+            (20200103, 20200103): _provider_exchange(
                 HIST_CODE_LIST,
                 {
                     "security_type": AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
                     "start_date": 20200103,
-                    "end_date": 20200104,
+                    "end_date": 20200103,
                 },
                 ["000001.SZ", "600000.SH"],
             ),
@@ -741,6 +741,18 @@ def test_authority_cannot_be_minted_from_arbitrary_bytes_or_replayed_catalog(
         artifact_hash=evidence.coverage_basis_evidence_hash,
     )
     assert replayed_evidence.acquisition_receipt.is_verified_capture is False
+
+
+def test_acquisition_uses_closed_single_session_requests(tmp_path: Path) -> None:
+    receipt = _acquisition_receipt(tmp_path)
+
+    assert receipt.semantic_operations
+    for operation in receipt.semantic_operations:
+        payload = json.loads(
+            (tmp_path / "raw" / Path(operation.captured_evidence_uri)).read_text(encoding="utf-8")
+        )
+        request_params = payload["request_params"]
+        assert request_params["start_date"] == request_params["end_date"]
 
 
 def test_acquisition_persists_and_replays_the_raw_capture_chain(tmp_path: Path) -> None:

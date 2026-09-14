@@ -8,7 +8,8 @@ authoritative receipt, or enter the historical materializer: the reviewed
 source-selection closure is not an in-memory CR-4 source snapshot.
 
 Stage B (2020-01 and 2026-01) is available only through this command's
-explicit ``--stage-b`` mode, which requires a sanitized Stage A evaluation.
+explicit ``--stage-b`` mode, which requires a sanitized Stage A ``PASS``
+evaluation using the current semantics versions.
 There is deliberately no free-form date/universe/resume/production option.
 """
 
@@ -21,14 +22,13 @@ import subprocess
 import sys
 from collections import Counter
 from collections.abc import Callable, Mapping
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, cast
 
 import duckdb
 
 from ashare_state.providers.amazingdata.authoritative_history import (
-    _day_to_date,
     _validate_calendar,
     _validate_security_universe,
 )
@@ -326,12 +326,16 @@ def _stage_a_gate(path: Path) -> dict[str, Any]:
     evaluation = month.get("evaluation")
     if not isinstance(evaluation, Mapping):
         raise ValueError("STAGE_A_EVALUATION_MISSING")
-    if evaluation.get("status") not in {"PASS", "FAIL_CLOSED"}:
-        raise ValueError("STAGE_A_EVALUATION_STATE_INVALID")
+    if evaluation.get("status") != "PASS":
+        raise ValueError("STAGE_A_EVALUATION_NOT_ACCEPTED")
     rule_version = evaluation.get("rule_version")
     applicability_version = evaluation.get("applicability_semantics_version")
     if not isinstance(rule_version, str) or not isinstance(applicability_version, str):
         raise ValueError("STAGE_A_RULE_VERSION_MISSING")
+    if rule_version != AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION:
+        raise ValueError("STAGE_A_RULE_VERSION_MISMATCH")
+    if applicability_version != AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION:
+        raise ValueError("STAGE_A_APPLICABILITY_VERSION_MISMATCH")
     code_head = payload.get("code_head")
     if not isinstance(code_head, str) or not code_head:
         raise ValueError("STAGE_A_CODE_HEAD_MISSING")
@@ -475,12 +479,10 @@ def _run_month(
     exact_day_universes: dict[int, list[str]] = {}
     exact_calls: list[dict[str, Any]] = []
     for trading_day in trading_days:
-        day = _day_to_date(trading_day)
-        next_day = _yyyymmdd(day + timedelta(days=1))
 
         def exact_session_exchange(
             start_day: int = trading_day,
-            end_day: int = next_day,
+            end_day: int = trading_day,
         ) -> ProviderExchange:
             return cast(
                 ProviderExchange,

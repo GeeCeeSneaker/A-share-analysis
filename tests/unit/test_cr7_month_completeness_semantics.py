@@ -89,6 +89,30 @@ def test_expected_bar_set_excludes_non_applicable_and_suspended_pairs() -> None:
     }
 
 
+def test_security_first_present_on_d_plus_one_is_not_applicable_on_d() -> None:
+    values = _valid_inputs()
+    values["exact_day_universes"] = {
+        20240102: ["600000.SH"],
+        20240103: _SYMBOLS,
+    }
+    values["status_payload"] = {
+        "000001.SZ": _status(day_values=[20240103], flags=[0]),
+        "600000.SH": _status(day_values=[20240102, 20240103], flags=[0, 1]),
+    }
+    values["daily_bar_payload"] = {
+        "000001.SZ": _bars("000001.SZ", [20240103]),
+        "600000.SH": _bars("600000.SH", [20240102]),
+    }
+
+    result = evaluate_month_completeness(**values)
+
+    assert result.accepted
+    assert result.applicable_pair_count == 3
+    assert result.not_applicable_pair_count == 1
+    assert result.required_bar_pair_count == 2
+    assert result.returned_bar_pair_count == 2
+
+
 def test_active_missing_bar_is_unexplained_and_fail_closed() -> None:
     values = _valid_inputs()
     values["daily_bar_payload"] = {

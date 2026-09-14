@@ -6754,3 +6754,41 @@ exact head、required CI 和独立 delta review 以该 PR/Issue 的最新交接�
   payload 和本地 vendor wheels 不进入 GitHub；不执行 78 月 backfill/materialization、
   Formal B1-B7、Production、resume/verdict、BSE/index、CR-5/R2、Golden/H1、baseline
   或策略工作。
+
+## DM-20260914-CR7-COMPLETENESS-036 · exact-session 窗口与 Stage B gate 审阅整改
+
+**Type**：C1 — CR-7 exact-head review remediation
+**Date**：2026-09-14
+**Remediation base**：PR #61 exact reviewed head `089e4fa6ef2395bee1997b1e504cf5fb67c79502`
+**Status**：`CODE REMEDIATION COMMITTED / CI PENDING / STAGE A RERUN PENDING / KEEP DRAFT`
+
+**审阅结论**
+
+项目经理对 PR #61 的 exact head 给出 `REMEDIATE / KEEP DRAFT / DO NOT MERGE`。已确认
+`BaseData.get_hist_code_list` 的 `start_date` 与 `end_date` 都是闭区间；此前以 `[D,D+1]`
+作为 exact-session 请求会混入下一日事实。此前 Stage A/B 报告的请求窗口和 code identity
+不能作为当前验收证据；Stage B 还错误接受了 `FAIL_CLOSED` 的 Stage A gate。
+
+**已完成的代码整改**
+
+- 提交 `c00524762827edf4acc34e992366e81e91f31825` 将 acquisition、SPIKE、retained replay
+  和 fake/test 全部改为 `[D,D]`；
+- applicability semantics 版本升为 `amazingdata-hist-code-list-exact-session-v2`，旧的两日
+  evidence 不能通过当前版本/请求校验；
+- Stage B gate 现在只接受当前 rule/applicability versions 且 `evaluation.status == PASS` 的
+  Stage A；旧的 `FAIL_CLOSED` 报告返回 `STAGE_A_GATE_BLOCKED` 并且不访问 Provider；
+- 增加 D+1-only applicability 回归、精确请求记录回归和旧版本 gate 回归。
+
+**证据与下一道门**
+
+- 本地 full pytest、Ruff、mypy、compileall、`uv pip check` 和 `git diff --check` 已通过；
+- 远端 exact-head CI 仍在执行；三平台已完成 lint/type，pytest 及后续 contract gates 尚未全部
+  收口，不能把当前 CI 当作通过；
+- 已将整改前 Stage B 报告限定为 `HISTORICAL_DIAGNOSTIC_ONLY_NOT_ACCEPTANCE_EVIDENCE`；
+  它不再代表当前 Stage B 授权结果；
+- CI 通过后，从该 exact committed head 只重跑 `2024-01` Stage A，并提交 code identity 一致的
+  脱敏报告；在新的 Stage A 达到 `PASS` 前，不得运行 `2020-01`/`2026-01` Stage B。
+
+账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 和
+vendor wheels 继续只保留在本地忽略路径；不执行 78 月 backfill、Formal/B1-B7、Production、
+BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。

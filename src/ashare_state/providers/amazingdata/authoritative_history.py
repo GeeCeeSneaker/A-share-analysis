@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 from ashare_state.providers.amazingdata.month_completeness import evaluate_month_completeness
@@ -125,17 +125,15 @@ class AmazingDataHistoryAcquisition:
         exact_day_exchanges: list[ProviderExchange] = []
         semantic_receipts: list[AmazingDataExchangeReceipt] = []
         for trading_day in trading_days:
-            exact_day = _day_to_date(trading_day)
-            exact_day_end = _yyyymmdd(exact_day + timedelta(days=1))
             exact_exchange, exact_receipt = self._exchange(
                 "BaseData.get_hist_code_list",
-                lambda start_day=trading_day, end_day=exact_day_end: (
-                    self.provider.get_hist_code_list_exchange(_SECURITY_TYPE, start_day, end_day)
+                lambda day=trading_day: self.provider.get_hist_code_list_exchange(
+                    _SECURITY_TYPE, day, day
                 ),
                 expected_params={
                     "security_type": _SECURITY_TYPE,
                     "start_date": trading_day,
-                    "end_date": exact_day_end,
+                    "end_date": trading_day,
                 },
             )
             exact_day_universes[trading_day] = _validate_security_universe(exact_exchange.payload)

@@ -2,6 +2,9 @@
   "schema": "cr7.month_completeness_semantics.stage-b.v1",
   "stage": "B",
   "status": "FAIL_CLOSED",
+  "evidence_role": "HISTORICAL_DIAGNOSTIC_ONLY_NOT_ACCEPTANCE_EVIDENCE",
+  "acceptance_evidence": false,
+  "superseded_reason": "STAGE_B_RAN_BEFORE_EXACT_SESSION_REMEDIATION_AND_BEFORE_STAGE_A_PASS_GATE",
   "checked_at": "2026-09-13T23:22:35.261027-07:00",
   "code_head": "67f37d7ef7a084d775d14dbd0d474e1604e96d25",
   "scope": {

@@ -4139,3 +4139,22 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
   只重跑 Issue #59 授权的三个代表月。没有执行 78 月回补、第三次 Formal/B1-B7、
   Production/resume/verdict、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；凭证、
   私有 endpoint、专有 SDK/runtime 和原始 Provider payload 不进入 GitHub。
+
+## 2026-09-14 · CR-7 exact-session 窗口与 Stage B gate 审阅整改
+
+> 状态：**CODE REMEDIATION COMMITTED / LOCAL QA GREEN / EXACT-HEAD CI PENDING / STAGE A RERUN PENDING / DRAFT**
+
+- 项目经理对 PR #61 exact head `089e4fa6ef2395bee1997b1e504cf5fb67c79502` 给出
+  `REMEDIATE / KEEP DRAFT / DO NOT MERGE`：AmazingData `get_hist_code_list` 的两个日期均为
+  闭区间，旧实现使用 `[D,D+1]`，因此旧 Stage A/B 观察不能作为当前验收证据；Stage B 还在
+  Stage A `FAIL_CLOSED` 时错误越过 gate。
+- 整改提交为 `c00524762827edf4acc34e992366e81e91f31825`。acquisition、SPIKE、retained
+  replay 和 fake/test 均改为 `start_date == end_date == D`；applicability 版本升为
+  `amazingdata-hist-code-list-exact-session-v2`，加入 D+1-only 回归和版本拒绝回归；Stage B
+  gate 只接受当前版本且 Stage A `PASS`，本地验证 `FAIL_CLOSED` 报告会无 Provider 地阻断并
+  返回 exit 2。
+- 本地全量 pytest、Ruff、mypy、compileall、`uv pip check`、`git diff --check` 已通过；远端
+  exact-head CI 仍在执行，PR 保持 Draft。整改前 Stage B 报告已明确为历史诊断、非验收证据。
+- 下一步：等待该提交的三平台 CI 完成；随后只从该 exact committed head 重跑 `2024-01` Stage A，
+  提交 code identity 一致的脱敏报告，再返回独立 delta review。Stage A 达到 `PASS` 前不运行
+  `2020-01`/`2026-01` Stage B，也不做 78 月回补或其他受禁工作。

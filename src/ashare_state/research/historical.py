@@ -18,7 +18,7 @@ from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
@@ -1488,14 +1488,10 @@ def _retained_request_matches_receipt(
                 or not isinstance(end_date, int)
             ):
                 return False
-            try:
-                expected_end = _yyyymmdd(_day_to_date(start_date) + timedelta(days=1))
-            except (TypeError, ValueError):
-                return False
             return params == {
                 "security_type": receipt.security_universe_selection,
                 "start_date": start_date,
-                "end_date": expected_end,
+                "end_date": start_date,
             }
         return params == {
             "security_type": receipt.security_universe_selection,

@@ -104,6 +104,9 @@ B. 精确、可审计的 fail-closed semantic/API blocker。
 
 ### 4.4 当前执行记录（2026-09-14）
 
+> 本节记录的是整改前探索性观察。后续 exact-head 审阅确认精确日请求窗口错误，且 Stage B
+> 当时误通过了非 `PASS` 的 Stage A gate；下列 Stage A/B 结果均不构成当前验收证据，修正状态见 4.5。
+
 Issue #59 的实际开发 base 为 `67f37d7ef7a084d775d14dbd0d474e1604e96d25`，且已确认
 PR #58 merge `31515992021e34517de0b764dd1ebb7f9e7ef35b` 是其祖先。Stage A 已通过同一
 AmazingData SPIKE 路径取得并在本地 ignored raw 中保留完整的 2024-01 观察：22 个交易日、
@@ -151,6 +154,27 @@ production 参数；worker 输出会保留在本地 ignored raw 目录，提交�
 权限 skip）。本阶段仍保持 `CLOSURE_DESIGN_ONLY_NOT_ACTIVE`，不铸造 authoritative receipt、
 不进入 materializer、不做 78 月回补，也不执行 Formal B1-B7、Production、BSE/index、
 CR-5/R2、Golden/H1、baseline 或策略工作。
+
+### 4.5 Exact-head 审阅整改（2026-09-14）
+
+项目经理对 PR #61 的 exact head `089e4fa6ef2395bee1997b1e504cf5fb67c79502` 给出
+`REMEDIATE / KEEP DRAFT / DO NOT MERGE`。审阅确认 AmazingData 的 `get_hist_code_list`
+两端都是闭区间，因此旧实现用 `[D,D+1]` 取得的“精确日”观察可能混入 D+1 才适用的证券，旧
+计数不能作为语义验收依据；旧 Stage B 还在 Stage A 为 `FAIL_CLOSED` 时越过了错误的 gate。
+
+已提交整改 `c00524762827edf4acc34e992366e81e91f31825`：
+
+- acquisition、bounded diagnostic、retained replay 和离线 fake 全部改用
+  `start_date == end_date == D`；
+- applicability 版本升为 `amazingdata-hist-code-list-exact-session-v2`，因此旧版本的
+  两日证据不能被当作新语义重放；
+- Stage B 只接受当前 rule/applicability version 且 evaluation `status == PASS` 的 Stage A；
+  `FAIL_CLOSED` 会返回 `STAGE_A_GATE_BLOCKED`，不会调用 Provider；
+- 增加“证券只在 D+1 出现时，D 不得进入适用集合”的回归，以及精确请求和版本 gate 回归。
+
+下一步必须先取得该提交的三平台 exact-head CI；CI 通过后只从该不可变提交重跑 Stage A
+`2024-01`，并把真实运行使用的 code head 写入新的脱敏报告。此前的 Stage B 报告仅保留为
+历史诊断、明确标记为非验收证据；不得重跑 Stage B，不得进行 78 月回补。
 
 ## 5. 当前明确禁止
 

@@ -35,7 +35,7 @@ __all__ = [
 
 
 AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION = "amazingdata-month-completeness-rule-v1"
-AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION = "amazingdata-hist-code-list-exact-session-v1"
+AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION = "amazingdata-hist-code-list-exact-session-v2"
 
 _SYMBOL_PATTERN = re.compile(r"^\d{6}\.(?:SH|SZ)$")
 _STATUS_COLUMNS = frozenset(
