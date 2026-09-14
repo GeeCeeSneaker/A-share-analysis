@@ -116,6 +116,15 @@ INDUSTRY_CONSTITUENT = _spec(
     "industry_taxonomy",
 )
 DAILY_BAR_KLINE = _spec("daily_bar", "MarketData.query_kline", "daily_bar", "daily_bar")
+# CR-7: the exact-session Level-1 snapshot is a same-provider, optional
+# semantic fallback only.  It is not a normalized canonical dataset; the
+# normalization surface is intentionally blocked pending a mapper.
+TRADE_ACTIVITY_SNAPSHOT = _spec(
+    "daily_bar",
+    "MarketData.query_snapshot",
+    "historical_snapshot",
+    "trade_activity_snapshot",
+)
 #: CR-2.3 P0-01: the index kline wrapper's DISTINCT operation identity -
 #: same endpoint + dataset as the stock wrapper, a different
 #: capability/surface. Only the two static specs distinguish them; no
@@ -144,6 +153,7 @@ _OPERATION_SPECS: dict[str, ProviderOperationSpec] = {
         INDUSTRY_BASE_INFO,
         INDUSTRY_CONSTITUENT,
         DAILY_BAR_KLINE,
+        TRADE_ACTIVITY_SNAPSHOT,
         INDEX_DAILY_KLINE,
     )
 }

@@ -403,6 +403,19 @@ _REGISTRY_SPECS: tuple[DatasetNormalizationSpec, ...] = (
         allow_partial=True,
         map_row=_map_daily_bar,
     ),
+    # CR-7: Level-1 snapshots are retained only as a bounded semantic
+    # fallback input.  No canonical snapshot mapper is approved, so ordinary
+    # normalization must remain blocked even though the raw evidence is
+    # typed, hashed, and replayable.
+    DatasetNormalizationSpec(
+        normalization_surface="trade_activity_snapshot",
+        provider_dataset="historical_snapshot",
+        endpoint="MarketData.query_snapshot",
+        support=SurfaceSupport.BLOCKED_PENDING_MAPPER,
+        mapper_version="none",
+        quarantine_scope=QuarantineScope.WHOLE_PAYLOAD,
+        allow_partial=False,
+    ),
     # CR-2.1 P0-01: the INDEX daily business surface. Same
     # (provider_dataset, endpoint) as the stock daily_bar surface -
     # ONLY the persisted system-derived normalization_surface

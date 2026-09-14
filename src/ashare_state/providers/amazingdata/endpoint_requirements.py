@@ -134,12 +134,19 @@ class EndpointRequirement:
 class SdkMethodClassification:
     """R4-B1.1: the auditable proof decision for ONE registry
     sdk_method - classification + reason. Every registry method has
-    exactly one entry; the reason is the recorded justification."""
+    exactly one entry; the reason is the recorded justification.
+
+    ``normalization_surface`` is normally the same as ``capability``.  It
+    may be set explicitly when an SDK method belongs to a bounded semantic
+    surface under an existing capability but must remain a distinct raw
+    dataset/normalization identity (for example CR-7's snapshot fallback).
+    """
 
     capability: str
     endpoint: str
     classification: SdkMethodProofClass
     reason: str
+    normalization_surface: str | None = None
 
 
 #: The explicit contract (B1-01). Derived from the capability registry's
@@ -300,6 +307,18 @@ SDK_METHOD_CLASSIFICATIONS: tuple[SdkMethodClassification, ...] = (
         endpoint="MarketData.query_kline",
         classification=SdkMethodProofClass.REQUIRED_ENDPOINT_PROOF,
         reason="the kline surface carrying daily bars",
+    ),
+    SdkMethodClassification(
+        capability="daily_bar",
+        endpoint="MarketData.query_snapshot",
+        classification=SdkMethodProofClass.OPTIONAL_NON_APPROVAL_SURFACE,
+        reason=(
+            "exact-session Level-1 trade-count fallback used only when the "
+            "historical-status member has the reviewed zero-column empty "
+            "schema; it cannot replace the daily-bar endpoint proof or "
+            "serve as a canonical normalized dataset"
+        ),
+        normalization_surface="trade_activity_snapshot",
     ),
     SdkMethodClassification(
         capability="security_status_history",

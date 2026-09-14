@@ -82,7 +82,7 @@ CAPABILITY_REGISTRY: dict[str, Capability] = {
         ),
         Capability(
             name="daily_bar",
-            sdk_methods=("MarketData.query_kline",),
+            sdk_methods=("MarketData.query_kline", "MarketData.query_snapshot"),
             canonical_domains=("fact_daily_bar",),
         ),
         Capability(

@@ -4256,3 +4256,26 @@ Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略
 
 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、原始 Provider payload 和本地
 vendor wheels 不进入 GitHub。
+## 2026-09-14 · CR-7 版本化正交易数 fallback 实现（Stage A 待重跑）
+
+**Implementation Status**：已完成 Issue #59 最新 scheduler checkpoint 要求的最小实现，基线为
+clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f`；实现提交的最终 SHA 和 exact-head CI
+结果待本轮提交后补记。当前没有重跑 Stage A、没有生成 authoritative receipt，也没有进入
+Stage B 或 78 月物化。
+
+- `month_completeness` 升级到 rule v2，并新增 `amazingdata-positive-trade-count-fallback-v1`。
+  仅 status 成员明确为零行零列 DataFrame 时可触发 exact-session fallback；普通空列表、
+  部分/非空 malformed schema 不可使用。
+- `MarketData.query_snapshot` 只以 exact request 下帧内 `code`、`trade_time` 身份一致且
+  finite `num_trades > 0` 作为 `POSITIVE_TRADE_COUNT_ACTIVE`；行存在、价格/盘口、
+  `volume`/`amount`、零值、缺失/空/错误均不生成正向事实。
+- acquisition receipt/capture catalog 升级为 v3，绑定 snapshot method、证券/日期请求、
+  request hash、raw evidence closure、SDK/runtime envelope、fallback 版本和 replay evaluation；
+  普通 snapshot normalization 保持 blocked。
+- 新增离线对抗回归覆盖正向/零值/缺失/空表、部分 schema、错误日期/证券、调用方伪造、
+  篡改 replay 和旧版本拒绝；本地 full pytest、Ruff、mypy、compileall、uv pip check 通过。
+
+**Review Status**：实现待 exact-head CI 与仅 `2024-01` 的 Stage A 重跑。若仍有 unresolved、
+missing、extra 或 structural blocker，记录精确阻断；Stage B、78 月物化、Formal/Production、
+BSE/index、CR-5/R2、Golden/H1、baseline 和策略继续禁止。凭证、私有 endpoint、专有
+SDK/runtime 与原始 payload 不进入 GitHub。

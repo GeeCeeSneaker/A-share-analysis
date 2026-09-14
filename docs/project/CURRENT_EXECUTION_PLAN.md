@@ -272,6 +272,32 @@ authoritative receipt/materializer。PR #63 的 exact-head CI #607 已在 Ubuntu
 Windows 3.14 全部成功，GT-H3B #129 按策略 skipped。下一道门是 exact head、报告、请求边界和候选
 语义的独立审阅。
 
+### 4.10 版本化正交易数 fallback 实现（2026-09-14，Stage A 待重跑）
+
+以最新 clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f` 为基线，本轮按 Issue #59
+最新 checkpoint 把已审阅的同源正向事实收敛为工程规则。实现仍在开发分支，尚未用新代码
+重跑 Stage A，也没有生成 authoritative receipt。
+
+- 月度完整性规则升级为 `amazingdata-month-completeness-rule-v2`；fallback 单独版本为
+  `amazingdata-positive-trade-count-fallback-v1`。只有状态响应中明确表现为零行、零列的
+  DataFrame 成员才有资格进入 fallback；普通空列表、部分列、非空 malformed schema 均不
+  得绕过状态结构门。
+- 对每个 exact-day applicability pair 发出单证券、单交易日 `[D,D]` 的
+  `MarketData.query_snapshot` 请求，固定 `09:30:00.000`–`15:00:00.000`。只有帧内
+  `code`/`trade_time` 与请求完全一致且 `num_trades` 存在有限严格正值，才能分类为
+  `POSITIVE_TRADE_COUNT_ACTIVE` 并加入 required-bar 集合。
+- 行存在、价格/盘口、`volume`/`amount`、零值、缺失/空快照、缺字段或请求失败不产生
+  正向事实；这些情况仍为 unresolved 或结构性 FAIL_CLOSED，绝不推断暂停或不适用。
+- acquisition receipt 升级为 v3，capture catalog、snapshot operation、完整请求哈希、
+  raw evidence closure、SDK/runtime envelope 和 fallback 版本均进入可重放链；旧评价/旧
+  receipt 版本不能按新规则回放。快照只作为语义证据留存，不开放 canonical normalization。
+- 已补齐正向、零值、缺失、空表、错误日期/证券、部分 schema、调用方伪造、篡改回放和
+  旧版本拒绝的离线回归；Stage B 仍必须等本轮 Stage A 达到 PASS 并经 scheduler review
+  后才能考虑授权。
+
+下一步是提交实现、完成 exact-head CI，然后只重跑 `2024-01` Stage A 并把脱敏报告的
+`code_head` 绑定到实际提交；不运行 Stage B、78 月物化或其他非授权范围。
+
 ## 5. 当前明确禁止
 
 Issue #59 **不授权**：

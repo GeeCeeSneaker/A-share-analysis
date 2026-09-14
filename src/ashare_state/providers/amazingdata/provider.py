@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -46,6 +46,7 @@ from ashare_state.providers.amazingdata.operations import (
     INDUSTRY_CONSTITUENT,
     RIGHT_ISSUE,
     STOCK_BASIC,
+    TRADE_ACTIVITY_SNAPSHOT,
     TRADE_CALENDAR,
     ProviderOperationSpec,
 )
@@ -568,6 +569,76 @@ class AmazingDataProvider:
             code_list, begin_date=begin_date, end_date=end_date, kline_type=kline_type
         ).payload
 
+    def query_snapshot_exchange(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        begin_time: int = 93000000,
+        end_time: int = 150000000,
+    ) -> Any:
+        """Query one exact-session Level-1 snapshot exchange.
+
+        CR-7 uses this wrapper only for the versioned positive-trade fallback.
+        The public SDK returns ``date -> code -> DataFrame``; the raw evidence
+        contract stores the single requested member as ``code -> DataFrame``
+        after this wrapper has verified that no out-of-scope date/member was
+        returned.  A missing exact date/member is retained as an explicit
+        ``None`` member and remains unresolved to the semantic evaluator.
+        """
+        if begin_date != end_date:
+            raise ValueError("query_snapshot_exchange requires one exact session")
+        if (
+            not isinstance(code_list, list)
+            or len(code_list) != 1
+            or not isinstance(code_list[0], str)
+            or not code_list[0]
+            or not isinstance(begin_date, int)
+            or isinstance(begin_date, bool)
+            or not isinstance(end_date, int)
+            or isinstance(end_date, bool)
+            or not isinstance(begin_time, int)
+            or isinstance(begin_time, bool)
+            or not isinstance(end_time, int)
+            or isinstance(end_time, bool)
+        ):
+            raise ValueError("query_snapshot_exchange requires one typed security and date window")
+        params = {
+            "code_list": list(code_list),
+            "begin_date": begin_date,
+            "end_date": end_date,
+            "begin_time": begin_time,
+            "end_time": end_time,
+        }
+        return self._execute_exchange(
+            TRADE_ACTIVITY_SNAPSHOT,
+            lambda: _normalize_exact_snapshot_payload(
+                self._market([begin_date]).query_snapshot(**params),
+                symbol=code_list[0],
+                trading_day=begin_date,
+            ),
+            params=params,
+        )
+
+    def query_snapshot(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        begin_time: int = 93000000,
+        end_time: int = 150000000,
+    ) -> Any:
+        """Business convenience path for one exact snapshot exchange."""
+        return self.query_snapshot_exchange(
+            code_list,
+            begin_date=begin_date,
+            end_date=end_date,
+            begin_time=begin_time,
+            end_time=end_time,
+        ).payload
+
     def query_index_kline_exchange(
         self,
         code_list: list[str],
@@ -676,3 +747,42 @@ def _count_rows(result: Any) -> int:
         except TypeError:
             return 1
     return 1
+
+
+def _normalize_exact_snapshot_payload(
+    payload: Any,
+    *,
+    symbol: str,
+    trading_day: int,
+) -> dict[str, Any]:
+    """Verify and flatten the SDK's nested exact-session snapshot result."""
+    if not isinstance(payload, Mapping):
+        raise ValueError("query_snapshot returned a non-mapping payload")
+    dates: dict[int, Any] = {}
+    for raw_day, member_map in payload.items():
+        if isinstance(raw_day, bool):
+            raise ValueError("query_snapshot returned a boolean date key")
+        try:
+            day = int(raw_day)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("query_snapshot returned an invalid date key") from exc
+        if day in dates:
+            raise ValueError("query_snapshot returned a duplicate date key")
+        if day != trading_day:
+            raise ValueError("query_snapshot returned a date outside the exact request")
+        dates[day] = member_map
+    if not dates:
+        return {symbol: None}
+    member_map = dates[trading_day]
+    if member_map is None:
+        return {symbol: None}
+    if not isinstance(member_map, Mapping):
+        raise ValueError("query_snapshot returned an invalid member map")
+    if any(key != symbol for key in member_map):
+        raise ValueError("query_snapshot returned a security outside the exact request")
+    if symbol not in member_map:
+        return {symbol: None}
+    frame = member_map[symbol]
+    if frame is not None and not hasattr(frame, "columns"):
+        raise ValueError("query_snapshot returned an invalid snapshot frame")
+    return {symbol: frame}

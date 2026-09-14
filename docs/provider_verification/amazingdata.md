@@ -283,6 +283,26 @@ PR #63 的 exact-head CI #607 已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 �
 足以作为正式正向语义合同；在该决定前，所有 Stage A unresolved pair、Stage B、78 月物化及其他
 文档列明的禁止项保持原状。
 
+### 9.4 scheduler 接受后的版本化 fallback 实现（2026-09-14）
+
+Issue #59 最新 scheduler checkpoint 已接受正式工程语义：同一 Owner-approved AmazingData
+路径中，exact-day-applicable security/session 的 `MDSnapshotL1.num_trades` /
+`Snapshot.num_trades` 只有在有限且严格大于零时，才是“该 session 至少发生一笔交易”的
+正向事实；`volume`/`amount` 只保留为诊断 corroboration，不进入正式规则。
+
+当前开发分支将该语义实现为 `amazingdata-month-completeness-rule-v2` +
+`amazingdata-positive-trade-count-fallback-v1`：仅零行零列 DataFrame 状态成员可触发，
+每个 exact applicability pair 单证券单日查询 `MarketData.query_snapshot`，并强制核对
+返回帧的 `code`、`trade_time` 和请求身份。缺失、空、零、非有限、缺字段、错误日期/证券、
+错误或部分 schema 均不生成 active 事实，仍 fail-closed；不使用价格、盘口、行存在或
+`volume`/`amount` 替代 `num_trades`。
+
+为防止证据降级，receipt/capture catalog 已升级为 v3，snapshot method、精确请求哈希、
+raw evidence/schema/content closure、SDK/runtime envelope 和 fallback 版本均进入 replay；
+普通 normalization 仍 `BLOCKED_PENDING_MAPPER`，快照不成为 canonical dataset。新实现尚未
+重跑 Stage A；下一步只允许从 exact committed head 运行 `2024-01` Stage A，Stage B 和
+78 月物化继续禁止，直到 scheduler 再次审阅。
+
 ## 8. 2026-09-12 BSE 当前代码归因 delta
 
 > 状态：**REVIEWER-AUTHORIZED SINGLE PROBE COMPLETED / OLD RECEIPT PRESERVED / LOCAL REGRESSION ADDED / INDEPENDENT DELTA REVIEW REQUIRED**

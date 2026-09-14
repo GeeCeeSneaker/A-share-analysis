@@ -11,6 +11,8 @@ from ashare_state.providers.amazingdata.month_completeness import (
     CompletenessPairClass,
     MonthCompletenessError,
     MonthCompletenessEvaluation,
+    _PositiveTradeFallbackEvidence,
+    _snapshot_trade_observation,
     evaluate_month_completeness,
 )
 
@@ -82,6 +84,7 @@ def test_expected_bar_set_excludes_non_applicable_and_suspended_pairs() -> None:
     assert result.classification_counts == {
         CompletenessPairClass.SUSPENSION_NON_TRADING.value: 1,
         CompletenessPairClass.NOT_APPLICABLE_SESSION.value: 1,
+        CompletenessPairClass.POSITIVE_TRADE_COUNT_ACTIVE.value: 0,
         CompletenessPairClass.PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH.value: 0,
         CompletenessPairClass.UNEXPLAINED_MISSING.value: 0,
         CompletenessPairClass.UNRESOLVED.value: 0,
@@ -207,6 +210,154 @@ def test_empty_status_for_an_applicable_security_remains_unresolved() -> None:
     assert result.unresolved_pair_count == 1
 
 
+def test_zero_column_status_uses_positive_num_trades_as_active_fact() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["000001.SZ"] = pl.DataFrame()
+    evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+        queried_pairs={("000001.SZ", 20240102)},
+        positive_pairs={("000001.SZ", 20240102)},
+        request_params_by_pair={("000001.SZ", 20240102): "a" * 64},
+    )
+
+    result = evaluate_month_completeness(**values, positive_trade_fallback=evidence)
+
+    assert result.accepted
+    assert result.positive_trade_pair_count == 1
+    assert (
+        result.classification_counts[CompletenessPairClass.POSITIVE_TRADE_COUNT_ACTIVE.value] == 1
+    )
+    assert result.required_bar_pair_count == 2
+
+
+def test_zero_num_trades_does_not_resolve_an_empty_status_member() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["000001.SZ"] = pl.DataFrame()
+    evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+        queried_pairs={("000001.SZ", 20240102)},
+        positive_pairs=set(),
+        request_params_by_pair={("000001.SZ", 20240102): "b" * 64},
+    )
+
+    result = evaluate_month_completeness(**values, positive_trade_fallback=evidence)
+
+    assert not result.accepted
+    assert result.unresolved_pair_count == 1
+    assert result.positive_trade_pair_count == 0
+
+
+def test_missing_snapshot_remains_unresolved() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["000001.SZ"] = pl.DataFrame()
+    evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+        queried_pairs={("000001.SZ", 20240102)},
+        positive_pairs=set(),
+        request_params_by_pair={("000001.SZ", 20240102): "c" * 64},
+    )
+
+    result = evaluate_month_completeness(**values, positive_trade_fallback=evidence)
+
+    assert result.unresolved_pair_count == 1
+    assert result.classification_counts[CompletenessPairClass.UNRESOLVED.value] == 1
+
+
+def test_partial_status_schema_cannot_use_positive_fallback() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["000001.SZ"] = _status(day_values=[20240102], flags=[0])
+    evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+        queried_pairs={("000001.SZ", 20240103)},
+        positive_pairs={("000001.SZ", 20240103)},
+        request_params_by_pair={("000001.SZ", 20240103): "d" * 64},
+    )
+
+    result = evaluate_month_completeness(**values, positive_trade_fallback=evidence)
+
+    assert not result.accepted
+    assert result.positive_trade_pair_count == 0
+    assert "POSITIVE_TRADE_FALLBACK_QUERY_SCOPE_MISMATCH" in result.structural_error_codes
+
+
+def test_plain_empty_list_status_is_not_fallback_eligible() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["000001.SZ"] = []
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert result.unresolved_pair_count == 1
+
+
+def test_request_hashes_must_be_bound_to_exact_pairs() -> None:
+    with pytest.raises(MonthCompletenessError, match="pair-bound"):
+        _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+            queried_pairs={("000001.SZ", 20240102)},
+            positive_pairs={("000001.SZ", 20240102)},
+            request_params_by_pair=["a" * 64],  # type: ignore[arg-type]
+        )
+
+
+def test_caller_supplied_fallback_observation_is_rejected() -> None:
+    with pytest.raises(MonthCompletenessError, match="provider-produced"):
+        evaluate_month_completeness(**_valid_inputs(), positive_trade_fallback={"pairs": []})
+
+
+def test_snapshot_identity_and_activity_checks_are_narrow() -> None:
+    frame = pl.DataFrame(
+        {
+            "code": ["000001.SZ"],
+            "trade_time": [2024_01_02],
+            "num_trades": [3],
+        }
+    )
+    positive, errors = _snapshot_trade_observation(
+        {"000001.SZ": frame}, symbol="000001.SZ", trading_day=20240102
+    )
+    assert positive and not errors
+
+    wrong_code, code_errors = _snapshot_trade_observation(
+        {"000001.SZ": frame.with_columns(pl.lit("600000.SH").alias("code"))},
+        symbol="000001.SZ",
+        trading_day=20240102,
+    )
+    assert not wrong_code and "SNAPSHOT_SECURITY_IDENTITY_MISMATCH" in code_errors
+
+    wrong_date, date_errors = _snapshot_trade_observation(
+        {"000001.SZ": frame.with_columns(pl.lit(20240103).alias("trade_time"))},
+        symbol="000001.SZ",
+        trading_day=20240102,
+    )
+    assert not wrong_date and "SNAPSHOT_DATE_IDENTITY_MISMATCH" in date_errors
+
+    missing_identity, identity_errors = _snapshot_trade_observation(
+        {"000001.SZ": frame.drop("trade_time")},
+        symbol="000001.SZ",
+        trading_day=20240102,
+    )
+    assert not missing_identity and "SNAPSHOT_DATE_IDENTITY_MISSING" in identity_errors
+
+    zero, zero_errors = _snapshot_trade_observation(
+        {"000001.SZ": frame.with_columns(pl.lit(0).alias("num_trades"))},
+        symbol="000001.SZ",
+        trading_day=20240102,
+    )
+    assert not zero and not zero_errors
+
+    missing_activity, missing_activity_errors = _snapshot_trade_observation(
+        {"000001.SZ": frame.drop("num_trades")},
+        symbol="000001.SZ",
+        trading_day=20240102,
+    )
+    assert not missing_activity and not missing_activity_errors
+
+
 def test_null_daily_member_is_allowed_when_all_pairs_are_suspended() -> None:
     values = _valid_inputs()
     status = values["status_payload"]
@@ -269,3 +420,11 @@ def test_evaluation_round_trip_is_exact_and_sanitized() -> None:
 
     assert replayed == result
     assert "000001.SZ" not in encoded
+
+
+def test_old_fallback_semantic_version_cannot_replay() -> None:
+    result = evaluate_month_completeness(**_valid_inputs())
+    payload = result.as_dict()
+    payload["positive_trade_fallback_version"] = "amazingdata-positive-trade-count-fallback-v0"
+    with pytest.raises(MonthCompletenessError, match="unknown positive-trade fallback version"):
+        MonthCompletenessEvaluation.from_mapping(payload)

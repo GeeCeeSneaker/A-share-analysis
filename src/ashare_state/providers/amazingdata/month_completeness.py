@@ -27,6 +27,7 @@ from typing import Any, cast
 __all__ = [
     "AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION",
     "AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION",
+    "AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION",
     "CompletenessPairClass",
     "MonthCompletenessError",
     "MonthCompletenessEvaluation",
@@ -34,8 +35,9 @@ __all__ = [
 ]
 
 
-AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION = "amazingdata-month-completeness-rule-v1"
+AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION = "amazingdata-month-completeness-rule-v2"
 AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION = "amazingdata-hist-code-list-exact-session-v2"
+AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION = "amazingdata-positive-trade-count-fallback-v1"
 
 _SYMBOL_PATTERN = re.compile(r"^\d{6}\.(?:SH|SZ)$")
 _STATUS_COLUMNS = frozenset(
@@ -67,6 +69,7 @@ class CompletenessPairClass(StrEnum):
 
     SUSPENSION_NON_TRADING = "SUSPENSION_NON_TRADING"
     NOT_APPLICABLE_SESSION = "NOT_APPLICABLE_SESSION"
+    POSITIVE_TRADE_COUNT_ACTIVE = "POSITIVE_TRADE_COUNT_ACTIVE"
     PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH = "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH"
     UNEXPLAINED_MISSING = "UNEXPLAINED_MISSING"
     UNRESOLVED = "UNRESOLVED"
@@ -106,6 +109,9 @@ class MonthCompletenessEvaluation:
     unresolved_pair_count: int
     classification_counts: dict[str, int]
     structural_error_codes: tuple[str, ...]
+    positive_trade_fallback_version: str
+    positive_trade_pair_count: int
+    positive_trade_pair_set_hash: str
 
     @property
     def accepted(self) -> bool:
@@ -151,6 +157,9 @@ class MonthCompletenessEvaluation:
             "unresolved_pair_count": self.unresolved_pair_count,
             "classification_counts": dict(self.classification_counts),
             "structural_error_codes": list(self.structural_error_codes),
+            "positive_trade_fallback_version": self.positive_trade_fallback_version,
+            "positive_trade_pair_count": self.positive_trade_pair_count,
+            "positive_trade_pair_set_hash": self.positive_trade_pair_set_hash,
         }
 
     @classmethod
@@ -186,6 +195,9 @@ class MonthCompletenessEvaluation:
             "unresolved_pair_count",
             "classification_counts",
             "structural_error_codes",
+            "positive_trade_fallback_version",
+            "positive_trade_pair_count",
+            "positive_trade_pair_set_hash",
         }
         if not isinstance(payload, Mapping) or set(payload) != fields:
             raise MonthCompletenessError("month completeness evaluation fields are not exact")
@@ -275,6 +287,16 @@ class MonthCompletenessEvaluation:
                 ),
                 "classification_counts": parsed_counts,
                 "structural_error_codes": tuple(sorted(set(errors))),
+                "positive_trade_fallback_version": _require_text(
+                    payload["positive_trade_fallback_version"],
+                    "positive_trade_fallback_version",
+                ),
+                "positive_trade_pair_count": _require_nonnegative_int(
+                    payload["positive_trade_pair_count"], "positive_trade_pair_count"
+                ),
+                "positive_trade_pair_set_hash": _require_hash(
+                    payload["positive_trade_pair_set_hash"], "positive_trade_pair_set_hash"
+                ),
             }
         except (TypeError, ValueError) as exc:
             raise MonthCompletenessError("month completeness evaluation is malformed") from exc
@@ -283,7 +305,101 @@ class MonthCompletenessEvaluation:
             raise MonthCompletenessError("unknown month completeness rule version")
         if result.applicability_semantics_version != AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION:
             raise MonthCompletenessError("unknown applicability semantics version")
+        if result.positive_trade_fallback_version != AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION:
+            raise MonthCompletenessError("unknown positive-trade fallback version")
         return result
+
+
+@dataclass(frozen=True, init=False)
+class _PositiveTradeFallbackEvidence:
+    """Provider-produced positive-trade observations for exact pairs.
+
+    This is intentionally not a public observation DTO.  The evaluator
+    accepts this exact type only after the reviewed provider path has built it
+    from a typed exchange and retained request evidence.  A plain mapping,
+    set, or fixture object therefore cannot mint a positive-trade fact.
+    """
+
+    fallback_version: str
+    method: str
+    queried_pairs: tuple[tuple[str, int], ...]
+    positive_pairs: tuple[tuple[str, int], ...]
+    request_params_by_pair: tuple[tuple[tuple[str, int], str], ...]
+    _provenance: str
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError("positive-trade fallback evidence must come from the provider path")
+
+    @classmethod
+    def _from_provider(
+        cls,
+        *,
+        queried_pairs: Collection[tuple[str, int]],
+        positive_pairs: Collection[tuple[str, int]],
+        request_params_by_pair: Mapping[tuple[str, int], str],
+    ) -> _PositiveTradeFallbackEvidence:
+        try:
+            queried = tuple(sorted(queried_pairs))
+            positive = tuple(sorted(positive_pairs))
+        except (TypeError, ValueError) as exc:
+            raise MonthCompletenessError(
+                "positive-trade fallback pairs must be sortable collections"
+            ) from exc
+        if not isinstance(request_params_by_pair, Mapping):
+            raise MonthCompletenessError(
+                "positive-trade fallback request evidence must be pair-bound"
+            )
+        try:
+            fingerprints = tuple(sorted(request_params_by_pair.items()))
+        except (TypeError, ValueError) as exc:
+            raise MonthCompletenessError(
+                "positive-trade fallback request evidence is malformed"
+            ) from exc
+        obj = object.__new__(cls)
+        for field_name, value in {
+            "fallback_version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
+            "method": "MarketData.query_snapshot",
+            "queried_pairs": queried,
+            "positive_pairs": positive,
+            "request_params_by_pair": fingerprints,
+            "_provenance": "provider_exchange",
+        }.items():
+            object.__setattr__(obj, field_name, value)
+        obj._validate_shape()
+        return obj
+
+    def _validate_shape(self) -> None:
+        if self.fallback_version != AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION:
+            raise MonthCompletenessError("unknown positive-trade fallback version")
+        if self.method != "MarketData.query_snapshot":
+            raise MonthCompletenessError("positive-trade fallback method is not reviewed")
+        if self._provenance != "provider_exchange":
+            raise MonthCompletenessError("positive-trade fallback evidence provenance is invalid")
+        for pairs in (self.queried_pairs, self.positive_pairs):
+            try:
+                if len(pairs) != len(set(pairs)):
+                    raise MonthCompletenessError("positive-trade fallback pairs are duplicated")
+            except TypeError as exc:
+                raise MonthCompletenessError("positive-trade fallback pairs are malformed") from exc
+            for pair in pairs:
+                if (
+                    not isinstance(pair, tuple)
+                    or len(pair) != 2
+                    or not isinstance(pair[0], str)
+                    or _SYMBOL_PATTERN.fullmatch(pair[0]) is None
+                    or _normalize_day(pair[1]) is None
+                ):
+                    raise MonthCompletenessError("positive-trade fallback pair is malformed")
+        if not set(self.positive_pairs).issubset(self.queried_pairs):
+            raise MonthCompletenessError("positive-trade fallback positive pair is not queried")
+        request_params_by_pair = dict(self.request_params_by_pair)
+        if set(request_params_by_pair) != set(self.queried_pairs):
+            raise MonthCompletenessError(
+                "positive-trade fallback request evidence does not cover queried pairs"
+            )
+        for value in request_params_by_pair.values():
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+                raise MonthCompletenessError("positive-trade fallback request hash is malformed")
 
 
 def evaluate_month_completeness(
@@ -293,6 +409,7 @@ def evaluate_month_completeness(
     exact_day_universes: Mapping[int, Collection[str]],
     status_payload: Mapping[str, Any],
     daily_bar_payload: Mapping[str, Any],
+    positive_trade_fallback: _PositiveTradeFallbackEvidence | None = None,
 ) -> MonthCompletenessEvaluation:
     """Evaluate one month without converting absence into a semantic fact.
 
@@ -300,7 +417,11 @@ def evaluate_month_completeness(
     observation for every calendar session.  Its set membership is the
     positive applicability fact.  ``status_payload`` must contain a validated
     status row for every applicable pair; ``IS_SUSP_SEC=1`` removes that pair
-    from the required-bar set.  The daily-bar response is checked against the
+    from the required-bar set.  The only fallback is a provider-produced
+    exact-session Level-1 snapshot observation for a pair whose status member
+    is specifically a zero-row, zero-column empty schema.  A finite
+    ``num_trades > 0`` value makes that pair required; every other snapshot
+    result remains unresolved.  The daily-bar response is checked against the
     resulting set, including extra rows.
     """
     symbols, symbol_errors = _validate_symbols(monthly_symbols)
@@ -328,6 +449,7 @@ def evaluate_month_completeness(
     structural_errors.extend(exact_universe_errors)
 
     status_by_pair: dict[tuple[str, int], int] = {}
+    empty_schema_symbols: set[str] = set()
     status_errors: list[str] = []
     if not isinstance(status_payload, Mapping) or set(status_payload) != symbol_set:
         status_errors.append("STATUS_RESPONSE_KEYS_MISMATCH")
@@ -336,6 +458,12 @@ def evaluate_month_completeness(
             frame = status_payload.get(symbol)
             if frame is None:
                 status_errors.append("STATUS_NULL_TABLE")
+                continue
+            if _is_zero_column_empty_schema(frame):
+                # This is the one explicitly supported historical-status
+                # failure shape.  It establishes no status fact and becomes
+                # eligible for the exact-session positive-trade fallback.
+                empty_schema_symbols.add(symbol)
                 continue
             rows, errors = _status_rows(frame, session_set=session_set)
             status_errors.extend(errors)
@@ -349,6 +477,39 @@ def evaluate_month_completeness(
     unresolved = applicable - status_pairs
     suspended = {pair for pair, flag in status_by_pair.items() if pair in applicable and flag == 1}
     required = {pair for pair, flag in status_by_pair.items() if pair in applicable and flag == 0}
+    fallback_eligible = {
+        (symbol, day)
+        for symbol in empty_schema_symbols
+        for day in sessions
+        if (symbol, day) in unresolved
+    }
+    positive_trade_pairs: set[tuple[str, int]] = set()
+    fallback_errors: list[str] = []
+    if positive_trade_fallback is not None:
+        if not isinstance(positive_trade_fallback, _PositiveTradeFallbackEvidence):
+            raise MonthCompletenessError(
+                "positive-trade fallback must be provider-produced typed evidence"
+            )
+        try:
+            positive_trade_fallback._validate_shape()
+        except MonthCompletenessError:
+            fallback_errors.append("POSITIVE_TRADE_FALLBACK_EVIDENCE_INVALID")
+        else:
+            queried = set(positive_trade_fallback.queried_pairs)
+            positive = set(positive_trade_fallback.positive_pairs)
+            if queried != fallback_eligible:
+                fallback_errors.append("POSITIVE_TRADE_FALLBACK_QUERY_SCOPE_MISMATCH")
+            if not positive.issubset(queried):
+                fallback_errors.append("POSITIVE_TRADE_FALLBACK_POSITIVE_SCOPE_MISMATCH")
+            if not positive.issubset(unresolved):
+                fallback_errors.append("POSITIVE_TRADE_FALLBACK_PAIR_NOT_UNRESOLVED")
+            if not positive.issubset(applicable):
+                fallback_errors.append("POSITIVE_TRADE_FALLBACK_PAIR_OUTSIDE_APPLICABILITY")
+            if not fallback_errors:
+                positive_trade_pairs = positive
+    structural_errors.extend(fallback_errors)
+    required.update(positive_trade_pairs)
+    unresolved = unresolved - positive_trade_pairs
     if suspended | required | unresolved != applicable:
         structural_errors.append("STATUS_APPLICABILITY_PARTITION_INCOMPLETE")
 
@@ -368,6 +529,7 @@ def evaluate_month_completeness(
     classification_counts = {
         CompletenessPairClass.SUSPENSION_NON_TRADING.value: len(suspended),
         CompletenessPairClass.NOT_APPLICABLE_SESSION.value: len(not_applicable),
+        CompletenessPairClass.POSITIVE_TRADE_COUNT_ACTIVE.value: len(positive_trade_pairs),
         CompletenessPairClass.PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH.value: len(structural_errors),
         CompletenessPairClass.UNEXPLAINED_MISSING.value: len(missing_required),
         CompletenessPairClass.UNRESOLVED.value: len(unresolved),
@@ -410,6 +572,9 @@ def evaluate_month_completeness(
         unresolved_pair_count=len(unresolved),
         classification_counts=classification_counts,
         structural_error_codes=tuple(sorted(set(structural_errors))),
+        positive_trade_fallback_version=AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
+        positive_trade_pair_count=len(positive_trade_pairs),
+        positive_trade_pair_set_hash=_hash_pairs(positive_trade_pairs),
     )
 
 
@@ -578,6 +743,103 @@ def _frame_columns(frame: Any) -> frozenset[str]:
     if columns is None:
         return frozenset()
     return frozenset(str(column) for column in columns)
+
+
+def _is_zero_column_empty_schema(frame: Any) -> bool:
+    """Return the one status shape eligible for the positive fallback."""
+    columns = getattr(frame, "columns", None)
+    if columns is None:
+        return False
+    if _frame_columns(frame):
+        return False
+    try:
+        return len(columns) == 0 and len(frame) == 0
+    except (TypeError, AttributeError):
+        return False
+
+
+def _positive_trade_fallback_candidates(
+    *,
+    monthly_symbols: Collection[str],
+    trading_days: Collection[int],
+    exact_day_universes: Mapping[int, Collection[str]],
+    status_payload: Mapping[str, Any],
+) -> set[tuple[str, int]]:
+    """Return only pairs eligible for the reviewed status fallback.
+
+    This helper is intentionally conservative and private.  Any malformed
+    collection, exact-session universe, or status key set yields no eligible
+    candidates; the main evaluator then remains fail-closed.
+    """
+    symbols, symbol_errors = _validate_symbols(monthly_symbols)
+    sessions, session_errors = _validate_days(trading_days)
+    if symbol_errors or session_errors or not isinstance(status_payload, Mapping):
+        return set()
+    symbol_set = set(symbols)
+    session_set = set(sessions)
+    if set(status_payload) != symbol_set or set(exact_day_universes) != session_set:
+        return set()
+    applicable: set[tuple[str, int]] = set()
+    for day in sessions:
+        values = exact_day_universes.get(day)
+        if values is None:
+            return set()
+        day_symbols, errors = _validate_symbols(values)
+        if errors or not set(day_symbols).issubset(symbol_set):
+            return set()
+        applicable.update((symbol, day) for symbol in day_symbols)
+    empty_symbols = {
+        symbol for symbol in symbols if _is_zero_column_empty_schema(status_payload.get(symbol))
+    }
+    return {pair for pair in applicable if pair[0] in empty_symbols}
+
+
+def _snapshot_trade_observation(
+    payload: Any,
+    *,
+    symbol: str,
+    trading_day: int,
+) -> tuple[bool, tuple[str, ...]]:
+    """Inspect one exact-date/symbol snapshot returned by the provider.
+
+    Only ``num_trades`` can produce a positive fact.  Missing, empty, zero,
+    non-finite, and malformed activity values return no fact.  Date/security
+    identity mismatches are returned as structural errors so callers cannot
+    silently reinterpret a response from another pair.
+    """
+    if not isinstance(payload, Mapping) or set(payload) != {symbol}:
+        return False, ("SNAPSHOT_RESPONSE_KEYS_MISMATCH",)
+    frame = payload.get(symbol)
+    if frame is None:
+        return False, ()
+    columns = _frame_columns(frame)
+    if not columns:
+        return False, ()
+    if "num_trades" not in columns:
+        return False, ()
+    missing_identity_columns = {"code", "trade_time"} - columns
+    if missing_identity_columns:
+        return False, tuple(
+            f"SNAPSHOT_{'SECURITY' if column == 'code' else 'DATE'}_IDENTITY_MISSING"
+            for column in sorted(missing_identity_columns)
+        )
+    errors: list[str] = []
+    try:
+        num_trades = _column_values(frame, "num_trades")
+        codes = _column_values(frame, "code")
+        dates = _column_values(frame, "trade_time")
+    except MonthCompletenessError:
+        return False, ("SNAPSHOT_REQUIRED_FIELD_UNREADABLE",)
+    if len(codes) != len(num_trades) or len(dates) != len(num_trades):
+        return False, ("SNAPSHOT_ROW_SHAPE_INVALID",)
+    if any(str(value).strip() != symbol for value in codes):
+        errors.append("SNAPSHOT_SECURITY_IDENTITY_MISMATCH")
+    normalized = [_normalize_day(value) for value in dates]
+    if any(value != trading_day for value in normalized):
+        errors.append("SNAPSHOT_DATE_IDENTITY_MISMATCH")
+    if errors:
+        return False, tuple(sorted(set(errors)))
+    return any(_is_finite_number(value) and float(value) > 0 for value in num_trades), ()
 
 
 def _column_values(frame: Any, name: str) -> list[Any]:

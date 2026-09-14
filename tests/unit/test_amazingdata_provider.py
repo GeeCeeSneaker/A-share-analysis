@@ -23,6 +23,7 @@ from ashare_state.providers.amazingdata.mapper import (
     project_limit_price,
 )
 from ashare_state.providers.amazingdata.production_identity import AccountKind
+from ashare_state.providers.amazingdata.provider import _normalize_exact_snapshot_payload
 from ashare_state.providers.amazingdata.session import AccountProfile
 from ashare_state.providers.amazingdata.timeout import RetryPolicy, TimeBudget, run_with_budget
 
@@ -233,6 +234,44 @@ class TestAccountProfile:
         assert profile.auth_ok  # from_scrubbed(None) models "login returned, no json"
         assert not profile.profile_parsed
         assert profile.account_profile_id == "UNKNOWN"
+
+
+class TestExactSnapshotPayload:
+    class _Frame:
+        columns = ("code", "trade_time", "num_trades")
+
+    def test_nested_sdk_payload_is_flattened_only_for_exact_scope(self):
+        frame = self._Frame()
+        payload = {20260814: {"600000.SH": frame}}
+        result = _normalize_exact_snapshot_payload(
+            payload,
+            symbol="600000.SH",
+            trading_day=20260814,
+        )
+        assert result == {"600000.SH": frame}
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {20260813: {"600000.SH": _Frame()}},
+            {20260814: {"000001.SZ": _Frame()}},
+        ],
+    )
+    def test_wrong_date_or_security_is_rejected(self, payload):
+        with pytest.raises(ValueError):
+            _normalize_exact_snapshot_payload(
+                payload,
+                symbol="600000.SH",
+                trading_day=20260814,
+            )
+
+    def test_missing_or_empty_snapshot_is_retained_as_unresolved(self):
+        assert _normalize_exact_snapshot_payload({}, symbol="600000.SH", trading_day=20260814) == {
+            "600000.SH": None
+        }
+        assert _normalize_exact_snapshot_payload(
+            {20260814: {}}, symbol="600000.SH", trading_day=20260814
+        ) == {"600000.SH": None}
 
 
 class TestTimeBudget:

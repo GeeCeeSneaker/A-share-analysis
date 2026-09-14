@@ -11,6 +11,7 @@ import pytest
 from ashare_state.providers.amazingdata.month_completeness import (
     AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION,
     AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION,
+    AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
 )
 
 _ROOT = Path(__file__).parents[2]
@@ -20,7 +21,7 @@ _stage_a_gate = _SCRIPT["_stage_a_gate"]
 
 def _stage_a_report(status: str) -> dict[str, object]:
     return {
-        "schema": "cr7.month_completeness_semantics.v1",
+        "schema": "cr7.month_completeness_semantics.v2",
         "stage": "A",
         "scope": {"month": "2024-01"},
         "code_head": "a" * 40,
@@ -28,6 +29,13 @@ def _stage_a_report(status: str) -> dict[str, object]:
             "status": status,
             "rule_version": AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION,
             "applicability_semantics_version": AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION,
+            "positive_trade_fallback_version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
+            "unresolved_pair_count": 0,
+            "missing_required_pair_count": 0,
+            "extra_returned_pair_count": 0,
+            "classification_counts": {
+                "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+            },
         },
     }
 

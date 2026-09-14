@@ -6947,3 +6947,40 @@ exact-head 探针已完成，脱敏 receipt 为
 端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 与 vendor wheels 不进入 GitHub。
 PR #63 的 exact-head CI #607 已确认 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部 `success`；
 GT-H3B #129 为策略性 `skipped`，不构成 Provider 或 Production 证据。
+## DM-20260914-CR7-COMPLETENESS-041 · 版本化正交易数 fallback 与 Stage A 重跑准备
+
+**Type**：C1 — CR-7 same-source positive-trade fallback implementation
+**Date**：2026-09-14
+**Status**：`IMPLEMENTED / LOCAL QA GREEN / STAGE A NOT YET RERUN / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+**Trigger**：Issue #59 scheduler checkpoint `5665219753`；基线为 clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f`。
+
+**范围与决策**：
+
+- 只实现 Owner-approved AmazingData 内的正交易数语义，不增加 Provider、不引入 source-trust
+  attestation 或 speculative multi-source arbitration；只针对现有状态 schema blocker 的
+  fallback 形态，普通/部分/非空 malformed status 不可使用 fallback。
+- `num_trades` 是唯一正式正向字段，要求 finite `> 0`；`volume`/`amount` 不进入正式判定。
+  Exact snapshot 必须绑定单证券、单交易日、固定日内时间窗，并核对返回帧证券/日期身份。
+  缺失、空、零、非有限、缺字段、错误身份、失败请求均不生成 active 事实。
+
+**实现交付**：
+
+- 月度完整性规则升级为 `amazingdata-month-completeness-rule-v2`，fallback 版本为
+  `amazingdata-positive-trade-count-fallback-v1`，新增 `POSITIVE_TRADE_COUNT_ACTIVE` 分类；
+  report schema 同步升级为 v2。
+- receipt 升级为 `amazingdata-history-acquisition-receipt-v3`；snapshot operation 的
+  request identity、raw evidence/meta/schema/content hash、capture catalog 和 replay
+  evaluation 均进入证据链；旧 receipt/semantic version 被拒绝。
+- 快照原始数据仍只保留在本地 ignored raw/anchor；normalization registry 保持
+  `BLOCKED_PENDING_MAPPER`，不把快照当作 canonical dataset。
+- 新增离线回归覆盖 eligible zero-column + positive、zero/missing/empty、partial schema、
+  wrong date/security、caller/fixture bypass、snapshot tamper/replay 和 old-version rejection。
+
+**本地验证与下一步**：
+
+- 本地 focused 和 full `pytest` 已通过；Ruff check/format、`mypy src`、compileall、`uv pip check`
+  已通过。实现提交后仍需 exact-head CI；Stage A 仅允许在该提交头重跑 `2024-01`，并将
+  脱敏报告 `code_head` 绑定实际执行头。
+- 在 Stage A PASS 且 unresolved/missing/extra/structural blockers 全为 0 之前，不运行 Stage B、
+  78 月物化、Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
+  不上传凭证、私有 endpoint、专有 SDK/runtime 或 raw payload；PR 保持 Draft，等待独立 review。

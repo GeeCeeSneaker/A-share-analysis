@@ -28,8 +28,11 @@ import polars as pl
 from ashare_state.providers.amazingdata.month_completeness import (
     AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION,
     AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION,
+    AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
     MonthCompletenessError,
     MonthCompletenessEvaluation,
+    _PositiveTradeFallbackEvidence,
+    _snapshot_trade_observation,
     evaluate_month_completeness,
 )
 from ashare_state.research.models import (
@@ -59,6 +62,7 @@ __all__ = [
     "AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION",
     "AMAZINGDATA_CALENDAR_MARKET",
     "AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION",
+    "AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION",
     "AMAZINGDATA_SECURITY_UNIVERSE_SELECTION",
     "AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION",
     "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD",
@@ -82,6 +86,7 @@ __all__ = [
     "OfflineHistoricalMaterializer",
     "PartitionKey",
     "PARTIAL_OBSERVED_DAILY_BAR_SCOPE",
+    "PositiveTradeFallbackOperation",
     "WriterRuntimeLock",
     "build_authoritative_coverage_evidence_from_acquisition",
     "build_fixture_coverage_basis_descriptor",
@@ -111,7 +116,7 @@ OFFLINE_FIXTURE_COMPLETE_METHOD = "OFFLINE_FIXTURE_COMPLETE_SCOPE_V1"
 OFFLINE_FIXTURE_PARTIAL_METHOD = "OFFLINE_FIXTURE_PARTIAL_SCOPE_V1"
 AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION = "authoritative-coverage-evidence-v1"
 AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD = "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1"
-AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "AMAZINGDATA_ACQUISITION_RECEIPT_V2"
+AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "AMAZINGDATA_ACQUISITION_RECEIPT_V3"
 AUTHORITATIVE_SOURCE_SELECTION_VERSION = "source-selection-retrieval-closure-20260912"
 AUTHORITATIVE_SOURCE_CLASS = "amazingdata_provider_observation"
 AUTHORITATIVE_PROVIDER = "amazingdata"
@@ -122,7 +127,7 @@ AUTHORITATIVE_SOURCE_METHODS = (
     "InfoData.get_history_stock_status",
     "MarketData.query_kline",
 )
-AMAZINGDATA_ACQUISITION_RECEIPT_VERSION = "amazingdata-history-acquisition-receipt-v2"
+AMAZINGDATA_ACQUISITION_RECEIPT_VERSION = "amazingdata-history-acquisition-receipt-v3"
 AMAZINGDATA_SECURITY_UNIVERSE_SELECTION = "EXTRA_STOCK_A_SH_SZ"
 AMAZINGDATA_CALENDAR_MARKET = "SH"
 
@@ -141,6 +146,10 @@ _AMAZINGDATA_OPERATION_BINDINGS = {
         "dict[str,dataframe|None]",
     ),
 }
+_AMAZINGDATA_POSITIVE_TRADE_OPERATION_BINDING = (
+    "MarketData.query_snapshot#trade_activity_snapshot",
+    "dict[str,dataframe|None]",
+)
 
 
 class CoverageEvidenceClass(StrEnum):
@@ -294,6 +303,12 @@ def _require_positive_int(value: Any, field: str) -> int:
     return value
 
 
+def _require_nonnegative_int(value: Any, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise HistoricalMaterializationError(f"{field} must be a nonnegative integer")
+    return value
+
+
 def _safe_relative_uri(value: Any, field: str) -> str:
     uri = _require_non_empty_string(value, field).replace("\\", "/")
     windows = PureWindowsPath(uri)
@@ -318,6 +333,12 @@ def _day_to_date(value: int) -> date:
         return date(value // 10000, (value // 100) % 100, value % 100)
     except ValueError as exc:
         raise CoverageBasisError("historical date is malformed") from exc
+
+
+def _hash_pairs(values: Any) -> str:
+    return sha256_hex(
+        canonical_json([[symbol, trading_day] for symbol, trading_day in sorted(values)])
+    )
 
 
 def _next_month(value: date) -> date:
@@ -553,7 +574,10 @@ class AmazingDataExchangeReceipt:
             ):
                 _require_sha256(getattr(self, field_name), field_name)
             _safe_relative_uri(self.captured_evidence_uri, "captured_evidence_uri")
-            _require_positive_int(self.row_count, "row_count")
+            if self.method == "MarketData.query_snapshot":
+                _require_nonnegative_int(self.row_count, "row_count")
+            else:
+                _require_positive_int(self.row_count, "row_count")
         except HistoricalMaterializationError as exc:
             raise CoverageBasisError(str(exc)) from exc
 
@@ -588,7 +612,11 @@ class AmazingDataExchangeReceipt:
                 response_content_hash=_require_sha256(
                     payload["response_content_hash"], "response_content_hash"
                 ),
-                row_count=_require_positive_int(payload["row_count"], "row_count"),
+                row_count=(
+                    _require_nonnegative_int(payload["row_count"], "row_count")
+                    if payload["method"] == "MarketData.query_snapshot"
+                    else _require_positive_int(payload["row_count"], "row_count")
+                ),
                 captured_evidence_uri=_require_non_empty_string(
                     payload["captured_evidence_uri"], "captured_evidence_uri"
                 ),
@@ -613,6 +641,60 @@ class AmazingDataExchangeReceipt:
         }
 
 
+@dataclass(frozen=True)
+class PositiveTradeFallbackOperation:
+    """One exact pair bound to one retained snapshot exchange."""
+
+    security: str
+    trading_day: int
+    exchange: AmazingDataExchangeReceipt
+
+    def __post_init__(self) -> None:
+        try:
+            if re.fullmatch(r"\d{6}\.(?:SH|SZ)", self.security) is None:
+                raise CoverageBasisError("positive-trade fallback security is malformed")
+            _day_to_date(self.trading_day)
+        except (CoverageBasisError, TypeError) as exc:
+            raise CoverageBasisError(str(exc)) from exc
+        if not isinstance(self.exchange, AmazingDataExchangeReceipt):
+            raise CoverageBasisError("positive-trade fallback exchange is not typed")
+        operation_id, response_shape = _AMAZINGDATA_POSITIVE_TRADE_OPERATION_BINDING
+        if (
+            self.exchange.method != "MarketData.query_snapshot"
+            or self.exchange.operation_id != operation_id
+            or self.exchange.response_shape != response_shape
+            or self.exchange.row_count <= 0
+        ):
+            raise CoverageBasisError("positive-trade fallback exchange is not an accepted snapshot")
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> PositiveTradeFallbackOperation:
+        fields = {"security", "trading_day", "exchange"}
+        if not isinstance(payload, Mapping) or set(payload) != fields:
+            raise CoverageBasisError("positive-trade fallback operation fields are not exact")
+        try:
+            security = payload["security"]
+            trading_day = payload["trading_day"]
+            if not isinstance(security, str):
+                raise CoverageBasisError("positive-trade fallback security is malformed")
+            if isinstance(trading_day, bool) or not isinstance(trading_day, int):
+                raise CoverageBasisError("positive-trade fallback date is malformed")
+            return cls(
+                security=security,
+                trading_day=trading_day,
+                exchange=AmazingDataExchangeReceipt.from_mapping(payload["exchange"]),
+            )
+        except (CoverageBasisError, KeyError, TypeError) as exc:
+            raise CoverageBasisError("positive-trade fallback operation is malformed") from exc
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "security": self.security,
+            "trading_day": self.trading_day,
+            "exchange": self.exchange.as_dict(),
+        }
+
+
 def _amazingdata_capture_catalog(
     *,
     source_selection_fingerprint: str,
@@ -624,6 +706,7 @@ def _amazingdata_capture_catalog(
     requested_scope_end: date,
     operations: tuple[AmazingDataExchangeReceipt, ...],
     semantic_operations: tuple[AmazingDataExchangeReceipt, ...],
+    positive_trade_operations: tuple[PositiveTradeFallbackOperation, ...],
     completeness_evaluation: MonthCompletenessEvaluation,
 ) -> dict[str, Any]:
     """Return the deterministic catalog identity used as the receipt proof."""
@@ -638,6 +721,10 @@ def _amazingdata_capture_catalog(
         "requested_scope_end": requested_scope_end,
         "operations": [operation.as_dict() for operation in operations],
         "semantic_operations": [operation.as_dict() for operation in semantic_operations],
+        "positive_trade_fallback_version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
+        "positive_trade_operations": [
+            operation.as_dict() for operation in positive_trade_operations
+        ],
         "completeness_evaluation": completeness_evaluation.as_dict(),
     }
 
@@ -665,6 +752,7 @@ class _VerifiedAmazingDataCapture:
     returned_row_count: int
     operations: tuple[AmazingDataExchangeReceipt, ...]
     semantic_operations: tuple[AmazingDataExchangeReceipt, ...]
+    positive_trade_operations: tuple[PositiveTradeFallbackOperation, ...]
     completeness_evaluation: MonthCompletenessEvaluation
     retrieved_at_utc: datetime
 
@@ -688,6 +776,7 @@ class _VerifiedAmazingDataCapture:
         returned_row_count: int,
         operations: tuple[AmazingDataExchangeReceipt, ...],
         semantic_operations: tuple[AmazingDataExchangeReceipt, ...],
+        positive_trade_operations: tuple[PositiveTradeFallbackOperation, ...],
         completeness_evaluation: MonthCompletenessEvaluation,
         retrieved_at_utc: datetime,
     ) -> _VerifiedAmazingDataCapture:
@@ -706,6 +795,7 @@ class _VerifiedAmazingDataCapture:
             "returned_row_count": returned_row_count,
             "operations": operations,
             "semantic_operations": semantic_operations,
+            "positive_trade_operations": positive_trade_operations,
             "completeness_evaluation": completeness_evaluation,
             "retrieved_at_utc": retrieved_at_utc,
         }.items():
@@ -775,9 +865,36 @@ class _VerifiedAmazingDataCapture:
             raise CoverageBasisError("capture exact-session semantic exchanges are malformed")
         if not isinstance(self.completeness_evaluation, MonthCompletenessEvaluation):
             raise CoverageBasisError("capture completeness evaluation is not typed")
+        if (
+            not isinstance(self.positive_trade_operations, tuple)
+            or any(
+                not isinstance(operation, PositiveTradeFallbackOperation)
+                for operation in self.positive_trade_operations
+            )
+            or len(self.positive_trade_operations)
+            != self.completeness_evaluation.positive_trade_pair_count
+            or len(
+                {
+                    (operation.security, operation.trading_day)
+                    for operation in self.positive_trade_operations
+                }
+            )
+            != len(self.positive_trade_operations)
+            or _hash_pairs(
+                (operation.security, operation.trading_day)
+                for operation in self.positive_trade_operations
+            )
+            != self.completeness_evaluation.positive_trade_pair_set_hash
+        ):
+            raise CoverageBasisError("capture positive-trade fallback exchanges are malformed")
         if not self.completeness_evaluation.accepted:
             raise CoverageBasisError("capture completeness evaluation is not accepted")
         evaluation = self.completeness_evaluation
+        if (
+            evaluation.positive_trade_fallback_version
+            != AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION
+        ):
+            raise CoverageBasisError("capture positive-trade fallback version is not reviewed")
         if (
             evaluation.monthly_security_count != self.security_universe_count
             or evaluation.monthly_security_set_hash != self.security_universe_hash
@@ -849,6 +966,8 @@ class AmazingDataAcquisitionReceipt:
     returned_row_count: int
     operations: tuple[AmazingDataExchangeReceipt, ...]
     semantic_operations: tuple[AmazingDataExchangeReceipt, ...]
+    positive_trade_fallback_version: str
+    positive_trade_operations: tuple[PositiveTradeFallbackOperation, ...]
     completeness_evaluation: MonthCompletenessEvaluation
     retrieved_at_utc: datetime
     available_at: datetime
@@ -900,6 +1019,8 @@ class AmazingDataAcquisitionReceipt:
             "returned_row_count",
             "operations",
             "semantic_operations",
+            "positive_trade_fallback_version",
+            "positive_trade_operations",
             "completeness_evaluation",
             "retrieved_at_utc",
             "available_at",
@@ -930,6 +1051,7 @@ class AmazingDataAcquisitionReceipt:
             requested_scope_end=self.requested_scope_end,
             operations=self.operations,
             semantic_operations=self.semantic_operations,
+            positive_trade_operations=self.positive_trade_operations,
             completeness_evaluation=self.completeness_evaluation,
         )
 
@@ -1070,6 +1192,72 @@ class AmazingDataAcquisitionReceipt:
                     + "; ".join(problems)
                 )
 
+        for fallback in self.positive_trade_operations:
+            operation = fallback.exchange
+            evidence_path = root.joinpath(*operation.captured_evidence_uri.split("/"))
+            if not evidence_path.is_file():
+                raise CoverageBasisError(
+                    "AmazingData retained positive-trade snapshot evidence is missing"
+                )
+            evidence_bytes = evidence_path.read_bytes()
+            if sha256_hex(evidence_bytes) != operation.captured_evidence_hash:
+                raise CoverageBasisError(
+                    "AmazingData retained positive-trade snapshot evidence hash changed"
+                )
+            try:
+                evidence = json.loads(evidence_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise CoverageBasisError(
+                    "AmazingData retained positive-trade snapshot evidence is not valid JSON"
+                ) from exc
+            if not isinstance(evidence, Mapping):
+                raise CoverageBasisError(
+                    "AmazingData retained positive-trade snapshot evidence is not an object"
+                )
+            if not _retained_request_matches_receipt(
+                self,
+                operation.method,
+                evidence.get("request_params"),
+                exact_snapshot=True,
+                snapshot_security=fallback.security,
+                snapshot_trading_day=fallback.trading_day,
+            ):
+                raise CoverageBasisError(
+                    "AmazingData retained positive-trade snapshot request scope changed"
+                )
+            if (
+                evidence.get("status") != "OK"
+                or evidence.get("operation_id") != operation.operation_id
+                or evidence.get("request_params_hash") != operation.request_params_hash
+                or evidence.get("content_hash") != operation.response_content_hash
+                or evidence.get("row_count") != operation.row_count
+            ):
+                raise CoverageBasisError(
+                    "AmazingData retained positive-trade snapshot identity changed"
+                )
+            tables = evidence.get("tables")
+            if not isinstance(tables, list):
+                raise CoverageBasisError(
+                    "AmazingData retained positive-trade snapshot tables are malformed"
+                )
+            schema_parts = sorted(
+                (str(table.get("name")), str(table.get("schema_hash")))
+                for table in tables
+                if isinstance(table, Mapping)
+            )
+            if len(schema_parts) != len(tables) or sha256_hex(canonical_json(schema_parts)) != (
+                operation.response_schema_hash
+            ):
+                raise CoverageBasisError(
+                    "AmazingData retained positive-trade snapshot schema changed"
+                )
+            problems = verify_meta_closure(evidence_path.parent, dict(evidence))
+            if problems:
+                raise CoverageBasisError(
+                    "AmazingData retained positive-trade snapshot payload closure failed: "
+                    + "; ".join(problems)
+                )
+
         try:
             base_operations = {operation.method: operation for operation in self.operations}
             calendar_payload, _calendar_meta = _read_retained_operation_payload(
@@ -1095,12 +1283,42 @@ class AmazingDataAcquisitionReceipt:
                         "AmazingData retained exact-session request is malformed"
                     )
                 exact_day_universes[int(params["start_date"])] = _single_value_column(payload)
+            positive_trade_pairs: list[tuple[str, int]] = []
+            positive_trade_hashes: dict[tuple[str, int], str] = {}
+            for fallback in self.positive_trade_operations:
+                payload, _meta = _read_retained_operation_payload(
+                    root,
+                    self,
+                    fallback.exchange,
+                    exact_snapshot=True,
+                    snapshot_security=fallback.security,
+                    snapshot_trading_day=fallback.trading_day,
+                )
+                positive, errors = _snapshot_trade_observation(
+                    payload,
+                    symbol=fallback.security,
+                    trading_day=fallback.trading_day,
+                )
+                if errors or not positive:
+                    raise CoverageBasisError(
+                        "AmazingData retained positive-trade snapshot no longer proves activity"
+                    )
+                positive_trade_pairs.append((fallback.security, fallback.trading_day))
+                positive_trade_hashes[(fallback.security, fallback.trading_day)] = (
+                    fallback.exchange.request_params_hash
+                )
+            positive_trade_evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+                queried_pairs=positive_trade_pairs,
+                positive_pairs=positive_trade_pairs,
+                request_params_by_pair=positive_trade_hashes,
+            )
             evaluation = evaluate_month_completeness(
                 monthly_symbols=_single_value_column(code_payload),
                 trading_days=_calendar_values_for_receipt(calendar_payload, self),
                 exact_day_universes=exact_day_universes,
                 status_payload=status_payload,
                 daily_bar_payload=daily_payload,
+                positive_trade_fallback=(positive_trade_evidence if positive_trade_pairs else None),
             )
         except (KeyError, MonthCompletenessError, CoverageBasisError) as exc:
             raise CoverageBasisError(
@@ -1141,6 +1359,8 @@ class AmazingDataAcquisitionReceipt:
             "returned_row_count",
             "operations",
             "semantic_operations",
+            "positive_trade_fallback_version",
+            "positive_trade_operations",
             "completeness_evaluation",
             "retrieved_at_utc",
             "available_at",
@@ -1160,6 +1380,11 @@ class AmazingDataAcquisitionReceipt:
             if not isinstance(raw_semantic_operations, list):
                 raise CoverageBasisError(
                     "AmazingData exact-session semantic operations are malformed"
+                )
+            raw_positive_trade_operations = payload["positive_trade_operations"]
+            if not isinstance(raw_positive_trade_operations, list):
+                raise CoverageBasisError(
+                    "AmazingData positive-trade fallback operations are malformed"
                 )
             values: dict[str, Any] = {
                 "receipt_id": _require_non_empty_string(payload["receipt_id"], "receipt_id"),
@@ -1229,6 +1454,14 @@ class AmazingDataAcquisitionReceipt:
                     AmazingDataExchangeReceipt.from_mapping(operation)
                     for operation in raw_semantic_operations
                 ),
+                "positive_trade_fallback_version": _require_non_empty_string(
+                    payload["positive_trade_fallback_version"],
+                    "positive_trade_fallback_version",
+                ),
+                "positive_trade_operations": tuple(
+                    PositiveTradeFallbackOperation.from_mapping(operation)
+                    for operation in raw_positive_trade_operations
+                ),
                 "completeness_evaluation": MonthCompletenessEvaluation.from_mapping(
                     payload["completeness_evaluation"]
                 ),
@@ -1261,6 +1494,7 @@ class AmazingDataAcquisitionReceipt:
                 "calendar_market",
                 "source_capture_uri",
                 "completeness_statement_id",
+                "positive_trade_fallback_version",
             ):
                 _require_non_empty_string(getattr(self, field_name), field_name)
             for field_name in (
@@ -1287,6 +1521,8 @@ class AmazingDataAcquisitionReceipt:
             raise CoverageBasisError("receipt security universe selection is not reviewed")
         if self.calendar_market != AMAZINGDATA_CALENDAR_MARKET:
             raise CoverageBasisError("receipt calendar market is not reviewed")
+        if self.positive_trade_fallback_version != AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION:
+            raise CoverageBasisError("receipt positive-trade fallback version is not reviewed")
         if not isinstance(self.operations, tuple) or len(self.operations) != len(
             AUTHORITATIVE_SOURCE_METHODS
         ):
@@ -1313,6 +1549,31 @@ class AmazingDataAcquisitionReceipt:
             )
         ):
             raise CoverageBasisError("receipt exact-session semantic operations are malformed")
+        if (
+            not isinstance(self.positive_trade_operations, tuple)
+            or any(
+                not isinstance(operation, PositiveTradeFallbackOperation)
+                for operation in self.positive_trade_operations
+            )
+            or len(
+                {
+                    (operation.security, operation.trading_day)
+                    for operation in self.positive_trade_operations
+                }
+            )
+            != len(self.positive_trade_operations)
+            or tuple(
+                (operation.trading_day, operation.security)
+                for operation in self.positive_trade_operations
+            )
+            != tuple(
+                sorted(
+                    (operation.trading_day, operation.security)
+                    for operation in self.positive_trade_operations
+                )
+            )
+        ):
+            raise CoverageBasisError("receipt positive-trade fallback operations are malformed")
         if not isinstance(self.completeness_evaluation, MonthCompletenessEvaluation):
             raise CoverageBasisError("receipt completeness evaluation is not typed")
         evaluation = self.completeness_evaluation
@@ -1327,6 +1588,16 @@ class AmazingDataAcquisitionReceipt:
             != AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION
         ):
             raise CoverageBasisError("receipt applicability semantics version is not reviewed")
+        if (
+            evaluation.positive_trade_fallback_version != self.positive_trade_fallback_version
+            or len(self.positive_trade_operations) != evaluation.positive_trade_pair_count
+            or _hash_pairs(
+                (operation.security, operation.trading_day)
+                for operation in self.positive_trade_operations
+            )
+            != evaluation.positive_trade_pair_set_hash
+        ):
+            raise CoverageBasisError("receipt positive-trade fallback facts are not derived")
         for field_name in (
             "requested_scope_start",
             "requested_scope_end",
@@ -1342,6 +1613,15 @@ class AmazingDataAcquisitionReceipt:
             self.requested_scope_start.year, self.requested_scope_start.month
         ):
             raise CoverageBasisError("receipt requested scope must be one complete calendar month")
+        if any(
+            not (
+                self.requested_scope_start
+                <= _day_to_date(operation.trading_day)
+                <= self.requested_scope_end
+            )
+            for operation in self.positive_trade_operations
+        ):
+            raise CoverageBasisError("receipt positive-trade fallback scope is outside month")
         if (self.calendar_scope_start, self.calendar_scope_end) != (
             self.requested_scope_start,
             self.requested_scope_end,
@@ -1449,6 +1729,10 @@ class AmazingDataAcquisitionReceipt:
             "returned_row_count": self.returned_row_count,
             "operations": [operation.as_dict() for operation in self.operations],
             "semantic_operations": [operation.as_dict() for operation in self.semantic_operations],
+            "positive_trade_fallback_version": self.positive_trade_fallback_version,
+            "positive_trade_operations": [
+                operation.as_dict() for operation in self.positive_trade_operations
+            ],
             "completeness_evaluation": self.completeness_evaluation.as_dict(),
             "retrieved_at_utc": self.retrieved_at_utc,
             "available_at": self.available_at,
@@ -1468,6 +1752,9 @@ def _retained_request_matches_receipt(
     request_params: Any,
     *,
     exact_session: bool = False,
+    exact_snapshot: bool = False,
+    snapshot_security: str | None = None,
+    snapshot_trading_day: int | None = None,
 ) -> bool:
     """Check the scrubbed RawWriter request against receipt-derived scope."""
     if not isinstance(request_params, Mapping):
@@ -1510,6 +1797,32 @@ def _retained_request_matches_receipt(
             and len(code_list) == len(set(code_list))
             and sha256_hex(canonical_json(code_list)) == receipt.security_universe_hash
         )
+    if method == "MarketData.query_snapshot":
+        if (
+            not exact_snapshot
+            or not isinstance(snapshot_security, str)
+            or re.fullmatch(r"\d{6}\.(?:SH|SZ)", snapshot_security) is None
+            or snapshot_trading_day is None
+            or isinstance(snapshot_trading_day, bool)
+            or not isinstance(snapshot_trading_day, int)
+        ):
+            return False
+        try:
+            snapshot_date = _day_to_date(snapshot_trading_day)
+        except CoverageBasisError:
+            return False
+        if (
+            snapshot_date < receipt.requested_scope_start
+            or snapshot_date > receipt.requested_scope_end
+        ):
+            return False
+        return params == {
+            "code_list": [snapshot_security],
+            "begin_date": snapshot_trading_day,
+            "end_date": snapshot_trading_day,
+            "begin_time": 93000000,
+            "end_time": 150000000,
+        }
     if method != "MarketData.query_kline":
         return False
     expected_keys = {
@@ -1561,6 +1874,9 @@ def _read_retained_operation_payload(
     operation: AmazingDataExchangeReceipt,
     *,
     exact_session: bool = False,
+    exact_snapshot: bool = False,
+    snapshot_security: str | None = None,
+    snapshot_trading_day: int | None = None,
 ) -> tuple[Any, Mapping[str, Any]]:
     """Read one already-closed operation for semantic replay."""
     evidence_path = root.joinpath(*operation.captured_evidence_uri.split("/"))
@@ -1575,6 +1891,9 @@ def _read_retained_operation_payload(
         operation.method,
         evidence.get("request_params"),
         exact_session=exact_session,
+        exact_snapshot=exact_snapshot,
+        snapshot_security=snapshot_security,
+        snapshot_trading_day=snapshot_trading_day,
     ):
         raise CoverageBasisError("AmazingData retained operation request changed")
     provider = _text_or_empty(evidence.get("provider"))
@@ -1677,6 +1996,7 @@ def _issue_amazingdata_acquisition_receipt(
         requested_scope_end=capture.requested_scope_end,
         operations=normalized_operations,
         semantic_operations=capture.semantic_operations,
+        positive_trade_operations=capture.positive_trade_operations,
         completeness_evaluation=capture.completeness_evaluation,
     )
     capture_hash = sha256_hex(canonical_json(capture_catalog))
@@ -1711,6 +2031,8 @@ def _issue_amazingdata_acquisition_receipt(
         "returned_row_count": capture.returned_row_count,
         "operations": normalized_operations,
         "semantic_operations": capture.semantic_operations,
+        "positive_trade_fallback_version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
+        "positive_trade_operations": capture.positive_trade_operations,
         "completeness_evaluation": capture.completeness_evaluation,
         "retrieved_at_utc": ensure_utc_timestamp(capture.retrieved_at_utc),
         "available_at": ensure_utc_timestamp(capture.retrieved_at_utc),
@@ -1723,6 +2045,10 @@ def _issue_amazingdata_acquisition_receipt(
         "source_selection": selection.as_dict(),
         "operations": [operation.as_dict() for operation in normalized_operations],
         "semantic_operations": [operation.as_dict() for operation in capture.semantic_operations],
+        "positive_trade_fallback_version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
+        "positive_trade_operations": [
+            operation.as_dict() for operation in capture.positive_trade_operations
+        ],
         "completeness_evaluation": capture.completeness_evaluation.as_dict(),
     }
     base["receipt_hash"] = sha256_hex(canonical_json(serialized_base))
