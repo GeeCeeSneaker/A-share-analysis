@@ -6860,3 +6860,38 @@ BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
 当前仅等待该 exact head 的独立 delta review。Stage A 仍未达到 `PASS`，因此不运行 Stage B 或
 78 月 materialization/backfill；不以返回 bar 推断并清除既有未决 pair，不触碰凭证、私有 endpoint、
 SDK/runtime 或 raw payload。
+
+## DM-20260914-CR7-COMPLETENESS-039 · 单一状态 schema blocker 最小诊断
+
+**Type**：C1 — CR-7 bounded provider diagnostic
+**Date**：2026-09-14
+**Base**：clean `main@559f59169e00d91d52c43cad77f0cf1ea2d56665`（PR #61 merge，已核实为祖先）
+**Status**：`DIAGNOSTIC IMPLEMENTED / EXACT-HEAD RUN PENDING / FAIL-CLOSED BY DEFAULT`
+
+**任务边界**
+
+最新 scheduler 只允许隔离 2024-01 状态批次中唯一的 `STATUS_SCHEMA_MISMATCH` 成员。不得借此
+重跑 Stage B、扩大到其他成员/月、做 78 月 backfill/materialization、Formal/B1-B7、Production、
+BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
+
+**实现**
+
+- 新增 `scripts/spike/cr7_status_schema_blocker.py`，固定使用保留本地 ignored raw 的批次身份、成员
+  文件名 SHA-256 和 2024-01 闭区间；不接受自由日期、自由成员或生产模式参数；
+- 先验证 retained batch 的 provider/dataset/endpoint/surface/request/scope，再定位零行零列成员；
+- 对同一成员发出一次 typed `InfoData.get_history_stock_status` 单成员请求，并仅捕获已知的
+  `kSuccess`/`kDataEmpty` callback 标签与 shape 摘要；
+- 成功交换通过 `AnchoredRawEvidenceWriter` 仅写入本地 ignored raw/ledger；GitHub 只接收脱敏报告；
+- `_assess_shape()` 和回归明确禁止从空响应推导 `IS_SUSP_SEC=0` 或“无状态变化”，默认结果为
+  `STOP(BLOCKED)`。
+
+**当前验证与下一道门**
+
+新增回归覆盖 `kDataEmpty + None`、未知 callback 和 callback 计数；扩展 raw writer 回归覆盖零列
+pandas DataFrame 的本地 round-trip。实施提交后必须取得该 exact head 的全量 QA/三平台 CI，再从
+该 exact head 执行一次单成员/单窗口诊断，并把实际 code head、请求身份哈希、响应 shape、callback
+摘要和最终三选一结论写入脱敏报告。没有正向 AmazingData 语义规则时必须记录具体 blocker 并停止，
+不能把空响应升格为状态事实。
+
+账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 和
+vendor wheels 继续不进入 GitHub。

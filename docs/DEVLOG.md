@@ -4197,3 +4197,23 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
   BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
 - 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 和
   vendor wheels 继续不进入 GitHub。
+
+## 2026-09-14 · CR-7 单一状态 schema blocker 诊断实现
+
+> 状态：**DIAGNOSTIC IMPLEMENTED / EXACT-HEAD RUN PENDING / FAIL-CLOSED BY DEFAULT / DRAFT**
+
+- PR #61 已以 `559f59169e00d91d52c43cad77f0cf1ea2d56665` 合并；从该 clean main 建立本任务分支，
+  只处理 2024-01 状态批次中唯一的 `STATUS_SCHEMA_MISMATCH` 成员。
+- 新增固定范围 `scripts/spike/cr7_status_schema_blocker.py`：从本地 ignored retained raw 的
+  批次身份与成员文件名哈希定位异常成员，校验 2024-01 scope 和零行零列形态，再向同一成员
+  发起一次单成员、单窗口 AmazingData 请求；报告不输出证券值、原始 payload、凭证、私有 endpoint
+  或 SDK/runtime 文件。
+- 诊断捕获已知 `kSuccess`/`kDataEmpty` callback 标签和 shape 摘要，并把成功交换通过 anchored
+  writer 留存在本地 ignored raw/ledger。`kDataEmpty` 不被当作 `IS_SUSP_SEC=0`，空响应也不被当作
+  “无状态变化”；没有正向 provider 语义时只能 `STOP(BLOCKED)`。
+- 新增回归覆盖该 fail-closed 决策、未知 callback 和零列 pandas DataFrame 的 raw round-trip；
+  exact-head QA/CI 和 bounded live probe 尚待本任务提交后完成。
+
+账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、原始 Provider payload 和
+vendor wheels 继续只保留在本地忽略路径；不执行 Stage B、78 月 backfill/materialization、
+Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。

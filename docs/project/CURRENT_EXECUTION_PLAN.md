@@ -218,6 +218,23 @@ Actions CI #601 三平台 required jobs 全部成功，受控执行 #125 为 ski
 authoritative receipt，也没有进入 materializer。不得运行 Stage B、78 月回补、Formal/Production、
 BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；不能用推断修平当前状态缺口。
 
+### 4.8 单一状态 schema blocker 的最小诊断（2026-09-14）
+
+PR #61 已合并为 `main@559f59169e00d91d52c43cad77f0cf1ea2d56665`，且该提交已核实为当前
+工作分支基线。按最新调度，本轮只处理 2024-01 原始状态批次中唯一的
+`STATUS_SCHEMA_MISMATCH` 成员，不扩大到其他月份或其他成员。
+
+新增 [`cr7_status_schema_blocker.py`](../../scripts/spike/cr7_status_schema_blocker.py)：它从本地
+ignored raw 的固定批次身份与成员文件名哈希定位异常成员，校验批次 scope/identity 和零行零列形态，
+再通过 typed AmazingData facade 对同一成员、同一 `2024-01` 闭区间做一次单成员请求。诊断只输出
+request id/参数哈希、schema/row count、已知 SDK callback 状态和本地 anchored raw 证据摘要，不输出
+证券值、原始 payload、凭证或 runtime 文件；Stage B、materializer 和 formal/production 均不会被调用。
+
+脚本还锁定一个重要边界：`kDataEmpty` 或空 DataFrame 只能表示“本次没有返回状态数据”，不能被
+转换为 `IS_SUSP_SEC=0`，也不能被转换为“无状态变化”。如果单成员响应仍无正向 provider 语义规则，
+唯一合法结论是 `STOP(BLOCKED)`；只有 AmazingData 正面定义了该形态的状态含义，才允许进入语义编码
+和 Stage A 重跑。当前先完成该脚本的 exact-head QA/CI，再执行一次 bounded probe。
+
 ## 5. 当前明确禁止
 
 Issue #59 **不授权**：

@@ -212,6 +212,23 @@ class TestPayloadShapes:
         assert back.shape[0] == 0
         assert set(back.columns) == {"code", "close"}
 
+    def test_zero_column_pandas_dataframe_round_trip(self, tmp_path: Path):
+        """A provider ``kDataEmpty`` callback may surface as ``pd.DataFrame()``.
+
+        The zero-column shape is evidence of missing returned data, not a
+        reason for the writer to manufacture status fields or a status row.
+        """
+        pandas = pytest.importorskip("pandas")
+        writer = RawWriter(tmp_path)
+        frame = pandas.DataFrame()
+        result = writer.write(_exchange("e-zero", "empty_zero_ds", {"member": frame}))
+
+        assert result.payload_kind == "multi_table_frames"
+        assert result.row_count == 0
+        back = writer.read(provider="amazingdata", dataset="empty_zero_ds", request_id="e-zero")
+        assert back["member"].shape == (0, 0)
+        assert back["member"].columns == []
+
     def test_arrow_table_round_trip(self, tmp_path: Path):
         writer = RawWriter(tmp_path)
         table = pa.table({"a": [1, 2, 3], "b": ["x", "y", "z"]})
