@@ -206,10 +206,17 @@ Stage B、78 月回补、Formal/Production 或其他明确禁止的工作。
 `STATUS_DUPLICATE_DATE`，并丢弃该证券的全部状态行，使其只能以 `FAIL_CLOSED` 进入结果，不会
 把任一重复行提升为 active/suspended 权威事实；新增冲突与相同 flag 两种对抗回归。
 
-本轮下一步严格为：先提交实现与测试并完成 focused/full QA 及 exact-head CI，再从新的干净提交头
-只重跑 `2024-01` Stage A，报告 `code_head` 必须等于实际执行提交。不得运行 Stage B、78 月回补、
-Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；当前 Stage A 的
-`STATUS_SCHEMA_MISMATCH`、未决 pair 和 fail-closed 状态不可通过推断修平。
+本轮实现已提交为 `99cf9c61d60108b35bf200486222ab55926ce389`；focused/full QA 通过，GitHub
+Actions CI #601 三平台 required jobs 全部成功，受控执行 #125 为 skipped。随后从该干净提交头
+仅重跑 `2024-01` Stage A，规范报告已更新为
+[`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)，
+`code_head` 与实际执行头一致；上一版报告保留为
+[`cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json)。
+
+本次真实评估仍为 `FAIL_CLOSED`：22 个交易日、5,106 个证券、1 个 `STATUS_SCHEMA_MISMATCH`、
+22 个 `UNRESOLVED`、22 个未证明为必需的返回 pair，`missing_required_pair_count=0`；没有
+authoritative receipt，也没有进入 materializer。不得运行 Stage B、78 月回补、Formal/Production、
+BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；不能用推断修平当前状态缺口。
 
 ## 5. 当前明确禁止
 

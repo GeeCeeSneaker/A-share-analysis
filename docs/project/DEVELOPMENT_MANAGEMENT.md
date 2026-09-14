@@ -6826,7 +6826,8 @@ BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
 **Type**：C1 — CR-7 exact-head delta review remediation
 **Date**：2026-09-14
 **Scope**：仅 PR #61 的月度完整性 evaluator 与回归测试
-**Status**：`IMPLEMENTATION COMMITTED / QA PENDING / STAGE A RERUN PENDING / KEEP DRAFT`
+**Implementation head**：`99cf9c61d60108b35bf200486222ab55926ce389`
+**Status**：`STAGE A RERUN COMPLETE / FAIL-CLOSED / CI GREEN / DELTA REVIEW REQUIRED / KEEP DRAFT`
 
 **审阅问题**
 
@@ -6843,8 +6844,19 @@ BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
   row-order authority；
 - `[D,D]` exact-session、applicability v2、Stage B `PASS` gate 和 retained replay 逻辑保持不变。
 
+**执行结果**
+
+- focused/full QA 已通过；GitHub Actions CI #601 的 Ubuntu 3.14、Windows 3.12、Windows 3.14
+  全部成功，受控 GT-H3B #125 为 skipped；
+- 从上述干净 implementation head 仅重跑 `2024-01` Stage A，报告 `code_head` 精确匹配；
+  结果为 `FAIL_CLOSED`，22 个交易日、5,106 个证券、1 个 `STATUS_SCHEMA_MISMATCH`、22 个
+  `UNRESOLVED`、22 个 extra returned、required missing 0；
+- 规范报告为 [`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)，
+  前一版已归档为 [`cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json)；
+  两者均不产生 authoritative receipt 或 materializer 输入。
+
 **后续门禁**
 
-先提交实现，再执行 focused/full QA 与 exact-head CI；仅在此之后从新提交头重跑唯一获准的
-`2024-01` Stage A 并绑定真实 `code_head`。不运行 Stage B 或 78 月 materialization/backfill，
-不以返回 bar 推断并清除既有未决 pair，不触碰凭证、私有 endpoint、SDK/runtime 或 raw payload。
+当前仅等待该 exact head 的独立 delta review。Stage A 仍未达到 `PASS`，因此不运行 Stage B 或
+78 月 materialization/backfill；不以返回 bar 推断并清除既有未决 pair，不触碰凭证、私有 endpoint、
+SDK/runtime 或 raw payload。
