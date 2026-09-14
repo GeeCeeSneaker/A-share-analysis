@@ -198,6 +198,19 @@ pair，`missing_required_pair_count=0`，总体 `FAIL_CLOSED`。没有生成 aut
 `code_head` 和 `[D,D]` 请求结论。除非新的 Stage A 达到 `PASS` 并得到调度确认，不得运行
 Stage B、78 月回补、Formal/Production 或其他明确禁止的工作。
 
+### 4.7 状态重复日整改（2026-09-14）
+
+最新 delta review 发现 `_status_rows()` 只按 `(TRADE_DATE, IS_SUSP_SEC)` 元组去重；同一证券同一
+交易日若同时返回 `IS_SUSP_SEC=0` 与 `1`，两个元组并不相同，后行会覆盖前行并制造顺序依赖的
+状态事实。已按最小范围整改：重复的规范化 `TRADE_DATE`（相同 flag 或冲突 flag）均写入
+`STATUS_DUPLICATE_DATE`，并丢弃该证券的全部状态行，使其只能以 `FAIL_CLOSED` 进入结果，不会
+把任一重复行提升为 active/suspended 权威事实；新增冲突与相同 flag 两种对抗回归。
+
+本轮下一步严格为：先提交实现与测试并完成 focused/full QA 及 exact-head CI，再从新的干净提交头
+只重跑 `2024-01` Stage A，报告 `code_head` 必须等于实际执行提交。不得运行 Stage B、78 月回补、
+Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；当前 Stage A 的
+`STATUS_SCHEMA_MISMATCH`、未决 pair 和 fail-closed 状态不可通过推断修平。
+
 ## 5. 当前明确禁止
 
 Issue #59 **不授权**：

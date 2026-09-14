@@ -6820,3 +6820,31 @@ BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
   请求及 fail-closed 结果进行复核。Stage A 未达 `PASS` 前不运行 Stage B，更不做 78 月回补、
   Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；
 - 凭证、私有 endpoint、专有 SDK/runtime、本地 raw payload 与 vendor wheels 未进入 GitHub。
+
+## DM-20260914-CR7-COMPLETENESS-038 · 重复状态日期 fail-closed 整改
+
+**Type**：C1 — CR-7 exact-head delta review remediation
+**Date**：2026-09-14
+**Scope**：仅 PR #61 的月度完整性 evaluator 与回归测试
+**Status**：`IMPLEMENTATION COMMITTED / QA PENDING / STAGE A RERUN PENDING / KEEP DRAFT`
+
+**审阅问题**
+
+`_status_rows()` 原先按 `(TRADE_DATE, IS_SUSP_SEC)` 判断重复。相同规范化交易日如果带有冲突
+停牌标记 `0/1`，会被当成两个不同元组，随后写入 `status_by_pair` 时由响应顺序决定最终状态。
+这不应在完整性边界产生任何可消费的状态事实。
+
+**整改内容**
+
+- 对规范化 `TRADE_DATE` 独立去重，不论 `IS_SUSP_SEC` 是否相同；
+- 发现重复日即返回 `STATUS_DUPLICATE_DATE`，并丢弃该证券全部状态行，避免重复行继续写入
+  `status_by_pair`；
+- 增加 `0/1` 冲突和相同 flag 重复两种对抗测试，验证总体 `FAIL_CLOSED` 且重复成员不产生
+  row-order authority；
+- `[D,D]` exact-session、applicability v2、Stage B `PASS` gate 和 retained replay 逻辑保持不变。
+
+**后续门禁**
+
+先提交实现，再执行 focused/full QA 与 exact-head CI；仅在此之后从新提交头重跑唯一获准的
+`2024-01` Stage A 并绑定真实 `code_head`。不运行 Stage B 或 78 月 materialization/backfill，
+不以返回 bar 推断并清除既有未决 pair，不触碰凭证、私有 endpoint、SDK/runtime 或 raw payload。

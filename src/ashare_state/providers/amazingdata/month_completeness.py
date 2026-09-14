@@ -483,18 +483,27 @@ def _status_rows(
         return [], []
     rows: list[tuple[int, int]] = []
     errors: list[str] = []
+    normalized_days: set[int] = set()
     for raw_day, raw_flag in zip(dates, flags, strict=True):
         day = _normalize_day(raw_day)
         flag = _normalize_flag(raw_flag)
         if day is None or day not in session_set:
             errors.append("STATUS_DATE_OUT_OF_SCOPE")
             continue
+        if day in normalized_days:
+            errors.append("STATUS_DUPLICATE_DATE")
+            continue
+        normalized_days.add(day)
         if flag is None:
             errors.append("STATUS_SUSPENSION_FLAG_INVALID")
             continue
         rows.append((day, flag))
-    if len(rows) != len(set(rows)):
-        errors.append("STATUS_DUPLICATE_DATE")
+    if "STATUS_DUPLICATE_DATE" in errors:
+        # Do not let a contradictory or repeated provider row become an
+        # order-dependent status fact.  The caller still receives the
+        # structural error and fails closed, while no duplicate row is
+        # allowed to populate ``status_by_pair``.
+        return [], errors
     return rows, errors
 
 

@@ -113,6 +113,29 @@ def test_security_first_present_on_d_plus_one_is_not_applicable_on_d() -> None:
     assert result.returned_bar_pair_count == 2
 
 
+@pytest.mark.parametrize("duplicate_flags", ([0, 1, 1], [0, 0, 1]))
+def test_duplicate_status_date_fails_closed_without_row_order_authority(
+    duplicate_flags: list[int],
+) -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["600000.SH"] = _status(
+        day_values=[20240102, 20240102, 20240103],
+        flags=duplicate_flags,
+    )
+
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert "STATUS_DUPLICATE_DATE" in result.structural_error_codes
+    # The invalid member contributes no status facts: neither duplicate row
+    # can make the pair active or suspended based on response order.
+    assert result.required_bar_pair_count == 1
+    assert result.suspended_pair_count == 0
+    assert result.unresolved_pair_count == 2
+
+
 def test_active_missing_bar_is_unexplained_and_fail_closed() -> None:
     values = _valid_inputs()
     values["daily_bar_payload"] = {

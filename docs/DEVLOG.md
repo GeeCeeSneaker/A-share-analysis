@@ -4174,3 +4174,20 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
   仅作历史诊断。整改前 Stage B 报告已标记为 `HISTORICAL_DIAGNOSTIC_ONLY_NOT_ACCEPTANCE_EVIDENCE`。
 - 本次没有 authoritative receipt、materializer proof 或 Stage B 运行。下一步是独立 delta review
   核对 exact head、CI、报告绑定和 `[D,D]` 语义；Stage A 未达 `PASS` 前不运行 Stage B 或 78 月回补。
+
+## 2026-09-14 · CR-7 重复状态日期 fail-closed 整改
+
+> 状态：**IMPLEMENTATION COMMITTED / QA PENDING / STAGE A RERUN PENDING / DRAFT**
+
+- 最新项目经理 delta review 指出：`month_completeness._status_rows()` 只按
+  `(TRADE_DATE, IS_SUSP_SEC)` 元组去重；同一证券同一交易日返回 `IS_SUSP_SEC=0` 与 `1` 时，
+  后行会覆盖前行，产生顺序依赖状态事实。
+- 本轮最小整改按规范化 `TRADE_DATE` 去重，不论 suspension flag 是否相同；发现重复日即返回
+  `STATUS_DUPLICATE_DATE` 并丢弃该证券的全部状态行，从而只保留 fail-closed 结果，禁止重复
+  响应被写入 `status_by_pair`。新增冲突 flag 与相同 flag 两个对抗回归。
+- 已保持上一轮 `[D,D]` exact-session、applicability v2、Stage B 只接受 Stage A `PASS`、
+  retained replay 与安全边界不变。当前先提交实现，随后运行 focused/full QA 和 exact-head CI。
+- CI 与 QA 通过后，只从新提交头重跑授权的 `2024-01` Stage A 并将报告 `code_head` 绑定到该提交；
+  不运行 Stage B、78 月回补、Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略。
+- 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 和
+  vendor wheels 继续不进入 GitHub。
