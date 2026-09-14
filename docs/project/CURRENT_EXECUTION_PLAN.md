@@ -260,10 +260,15 @@ Issue #59 的唯一下一任务，只在 Owner 批准的 AmazingData 内寻找�
 只留在本地 ignored raw/anchor，GitHub 只接收脱敏形态、计数和 hash；脚本不修改
 `month_completeness.py`，不创建 authoritative receipt/materializer。
 
-当前状态：代码与离线回归已完成，下一步必须从该实现的 exact committed head 执行一次固定单成员
-`2024-01` 探针并把报告 `code_head` 与执行提交绑定。若 22 个适用日全部出现正向活动字段，结果只
-作为 `PROVIDER_SEMANTIC_RESOLVED` 证据返回独立审阅，尚不编码 fallback；否则返回
-`STOP(BLOCKED)` 并写明缺口。
+exact committed head `dfb0e4875f17fe7dd3bbbfdf5bc608e642833782` 已完成固定单成员
+`2024-01` 探针，脱敏报告见 [`cr7_positive_semantic_fallback_20260914.json`](../provider_verification/cr7_positive_semantic_fallback_20260914.json)
+及其可读摘要 [`cr7_positive_semantic_fallback_20260914.md`](../provider_verification/cr7_positive_semantic_fallback_20260914.md)。
+保留日历确认的 22 个适用日中，22/22 返回 DataFrame，且 22/22 至少有一个有限且严格大于零的
+交易活动候选字段；返回帧合计 96,781 行，22 个分日 raw exchange 只保存在本地 ignored raw/anchor。
+探针结论为 `PROVIDER_SEMANTIC_RESOLVED`，但这是“公开 SDK 字段合同候选 + 单成员单月实测”的证据，
+不是供应商 capability approval，也不是普适历史完整性证明。由于没有独立供应商字段说明原文，仍需
+独立审阅人裁决合同等级；`fallback_rule_encoded=false`，未修改 `month_completeness.py`，未创建
+authoritative receipt/materializer。下一道门是 exact head、报告、请求边界和候选语义的独立审阅。
 
 ## 5. 当前明确禁止
 

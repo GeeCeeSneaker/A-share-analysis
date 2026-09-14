@@ -260,6 +260,25 @@ Golden、H1、全局 baseline 或旧封存结果。
 `STOP(BLOCKED)` 并记录缺口。Stage B、78 月物化、Formal/Production、BSE/index、CR-5/R2、Golden/H1、
 baseline 与策略工作均仍被禁止。
 
+### 9.3 exact-head 结果（2026-09-14）
+
+实现提交 `dfb0e4875f17fe7dd3bbbfdf5bc608e642833782` 已在本地 Owner-approved runtime 上完成一次固定
+探针。保留日历确认的 22 个 2024-01 适用交易日全部包含该成员；`MarketData.query_snapshot` 返回
+22 个日期帧，22/22 帧均出现 `num_trades`、`total_volume_trade`、`total_value_trade`（或其转换字段）
+的严格正值行，合计 96,781 行。SDK callback 共 22 次、返回数据非空 22 次；callback 状态标签没有
+被用来推导交易事实。
+
+脱敏机器 receipt 见 [`cr7_positive_semantic_fallback_20260914.json`](cr7_positive_semantic_fallback_20260914.json)，
+可读摘要见 [`cr7_positive_semantic_fallback_20260914.md`](cr7_positive_semantic_fallback_20260914.md)。
+结果是 `PROVIDER_SEMANTIC_RESOLVED` / `EVIDENCE_ONLY_PENDING_REVIEW`；这表示本次候选合同在
+单成员单月范围内取得了正向观测，不表示供应商 capability approval、全库历史完整性或可直接用于
+完整性计算。`fallback_rule_encoded=false`，未修改 `month_completeness.py`，未创建 authoritative
+receipt/materializer。原始 DataFrame 和本地 anchor 只保留在 ignored 工作区，未进入 GitHub。
+
+由于尚未找到独立供应商字段说明原文，独立 Reviewer 仍需决定“公开字段名 + typed annotation”是否
+足以作为正式正向语义合同；在该决定前，所有 Stage A unresolved pair、Stage B、78 月物化及其他
+文档列明的禁止项保持原状。
+
 ## 8. 2026-09-12 BSE 当前代码归因 delta
 
 > 状态：**REVIEWER-AUTHORIZED SINGLE PROBE COMPLETED / OLD RECEIPT PRESERVED / LOCAL REGRESSION ADDED / INDEPENDENT DELTA REVIEW REQUIRED**

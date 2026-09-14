@@ -6912,7 +6912,8 @@ Ready 或合并。
 **Type**：C1 — CR-7 same-source positive-semantic fallback discovery
 **Date**：2026-09-14
 **Base**：clean `main@548e336353495e5c168ccde3bd85a4e8031fbe63`（PR #62 merge）
-**Status**：`IMPLEMENTED / EXACT-COMMITTED-HEAD PROBE PENDING / FAIL-CLOSED / KEEP DRAFT`
+**Execution head**：`dfb0e4875f17fe7dd3bbbfdf5bc608e642833782`
+**Status**：`EXACT-HEAD PROBE COMPLETE / PROVIDER_SEMANTIC_RESOLVED EVIDENCE / KEEP DRAFT / INDEPENDENT REVIEW REQUIRED`
 
 **调度边界**
 
@@ -6935,7 +6936,12 @@ Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
 
 **下一道门**
 
-先在 exact committed head 上运行一次固定探针。22 个适用交易日全部有正向活动事实时，只提交
-`PROVIDER_SEMANTIC_RESOLVED` 的脱敏证据供独立审阅，暂不改 `month_completeness.py`；否则记录精确
-`STOP(BLOCKED)` 原因。账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、
-本地 raw payload 与 vendor wheels 不进入 GitHub。
+exact-head 探针已完成，脱敏 receipt 为
+[`cr7_positive_semantic_fallback_20260914.json`](../../docs/provider_verification/cr7_positive_semantic_fallback_20260914.json)，
+可读摘要为 [`cr7_positive_semantic_fallback_20260914.md`](../../docs/provider_verification/cr7_positive_semantic_fallback_20260914.md)。
+保留适用性日为 22 个，22/22 返回数据并满足候选正向字段规则，返回帧合计 96,781 行；callback 的
+状态标签没有被当作语义事实，判定只依赖返回帧中的候选活动字段。结论为
+`PROVIDER_SEMANTIC_RESOLVED`，实现状态为 `EVIDENCE_ONLY_PENDING_REVIEW`，`fallback_rule_encoded=false`。
+这不能替代独立供应商字段合同、capability approval 或历史完整性证明；在 Reviewer/Owner 明确接受
+合同等级前，不得改 `month_completeness.py`、清除 unresolved pair 或启动 Stage B。账号、密码、IP、
+端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 与 vendor wheels 不进入 GitHub。

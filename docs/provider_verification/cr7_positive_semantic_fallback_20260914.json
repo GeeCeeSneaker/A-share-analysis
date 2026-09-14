@@ -1,0 +1,1646 @@
+{
+  "applicability": {
+    "applicability_status": "TARGET_PRESENT_ON_ALL_RETAINED_EXACT_SESSIONS",
+    "calendar_meta_sha256": "9ed54e9d57285fe3e4d3cad5b0a954f98ebcd575f1491605b52bd39e5101fc31",
+    "calendar_request_id": "e3ad7f2e-4816-4deb-9fa6-021d12142de1",
+    "calendar_session_count": 22,
+    "calendar_table_content_hash": "937f1ff1ab9ed6c94fad5be38efd707a0d2a245a496778b43afb6b8fb4009ce0",
+    "exact_hist_code_request_count": 22,
+    "exact_hist_code_request_ids_sha256": "81853dcf80e995b23e9aaf5b8171002ce07fb7538758e485ce3c2a381bafaecf",
+    "exact_session_dates": [
+      20240102,
+      20240103,
+      20240104,
+      20240105,
+      20240108,
+      20240109,
+      20240110,
+      20240111,
+      20240112,
+      20240115,
+      20240116,
+      20240117,
+      20240118,
+      20240119,
+      20240122,
+      20240123,
+      20240124,
+      20240125,
+      20240126,
+      20240129,
+      20240130,
+      20240131
+    ],
+    "target_present_session_count": 22
+  },
+  "applicable_session_count": 22,
+  "authorization_boundary": {
+    "broad_backfill": false,
+    "formal_run_created": false,
+    "month_completeness_changed": false,
+    "other_members_queried": false,
+    "other_months_queried": false,
+    "production_activity": false,
+    "stage_b_started": false
+  },
+  "callback": {
+    "data_is_none_count": 0,
+    "data_non_none_count": 22,
+    "event_count": 22,
+    "status_counts": {
+      "NONE": 22
+    },
+    "status_counts_by_date": {
+      "20240102": {
+        "NONE": 1
+      },
+      "20240103": {
+        "NONE": 1
+      },
+      "20240104": {
+        "NONE": 1
+      },
+      "20240105": {
+        "NONE": 1
+      },
+      "20240108": {
+        "NONE": 1
+      },
+      "20240109": {
+        "NONE": 1
+      },
+      "20240110": {
+        "NONE": 1
+      },
+      "20240111": {
+        "NONE": 1
+      },
+      "20240112": {
+        "NONE": 1
+      },
+      "20240115": {
+        "NONE": 1
+      },
+      "20240116": {
+        "NONE": 1
+      },
+      "20240117": {
+        "NONE": 1
+      },
+      "20240118": {
+        "NONE": 1
+      },
+      "20240119": {
+        "NONE": 1
+      },
+      "20240122": {
+        "NONE": 1
+      },
+      "20240123": {
+        "NONE": 1
+      },
+      "20240124": {
+        "NONE": 1
+      },
+      "20240125": {
+        "NONE": 1
+      },
+      "20240126": {
+        "NONE": 1
+      },
+      "20240129": {
+        "NONE": 1
+      },
+      "20240130": {
+        "NONE": 1
+      },
+      "20240131": {
+        "NONE": 1
+      }
+    }
+  },
+  "checked_at": "2026-09-14T12:46:02.623607+00:00",
+  "code_head": "dfb0e4875f17fe7dd3bbbfdf5bc608e642833782",
+  "contract_evidence": {
+    "api": "MarketData.query_snapshot",
+    "api_declares_date_window_return_shape": true,
+    "api_declares_level_1_snapshot": true,
+    "api_doc_sha256": "014b037c32de42883bf2e6a1ab78c36b517d848abdac2bf6685ce484ac867f95",
+    "documentation_level": "PUBLIC_INSTALLED_SDK_CONTRACT_FIELD_IDENTIFIERS",
+    "field_semantics": [
+      {
+        "meaning_basis": "public field identifier and typed integer annotation",
+        "normalized_names": [
+          "num_trades"
+        ],
+        "raw_sdk_field": "tgw.MDSnapshotL1.num_trades",
+        "semantic_id": "trade_count",
+        "typed_sdk_field": "AmazingData.utils.constant.Snapshot.num_trades"
+      },
+      {
+        "meaning_basis": "public total-volume-trade identifier and typed volume annotation",
+        "normalized_names": [
+          "volume"
+        ],
+        "raw_sdk_field": "tgw.MDSnapshotL1.total_volume_trade",
+        "semantic_id": "executed_volume",
+        "typed_sdk_field": "AmazingData.utils.constant.Snapshot.volume"
+      },
+      {
+        "meaning_basis": "public total-value-trade identifier and typed amount annotation",
+        "normalized_names": [
+          "amount"
+        ],
+        "raw_sdk_field": "tgw.MDSnapshotL1.total_value_trade",
+        "semantic_id": "executed_amount",
+        "typed_sdk_field": "AmazingData.utils.constant.Snapshot.amount"
+      }
+    ],
+    "low_level_api_doc_sha256": "b3aba6f8f302048778b61368a0ea3ee30405268d6ef46a0634044451fbfff788",
+    "missing_low_level_fields": [],
+    "missing_typed_fields": [],
+    "package": "AmazingData",
+    "package_version": "1.1.9",
+    "positive_fact_rule": "A finite strictly-positive num_trades, total_volume_trade/volume, or total_value_trade/amount in a returned L1 snapshot row is a positive executed-activity fact; row presence, price/quote, zero, empty, and absence are not facts.",
+    "positive_field_contract_available": true,
+    "separate_vendor_field_prose_found": false,
+    "status": "CANDIDATE",
+    "tgw_package": "tgw",
+    "tgw_package_version": "1.0.9.2",
+    "vendor_public_surface": "http://www.chinastock.com.cn/newsite/cgs-services/strategyTrade/geWuInstitution.html"
+  },
+  "fallback_rule_encoded": false,
+  "implementation_status": "EVIDENCE_ONLY_PENDING_REVIEW",
+  "outcome": "PROVIDER_SEMANTIC_RESOLVED",
+  "positive_session_count": 22,
+  "positive_session_dates": [
+    20240102,
+    20240103,
+    20240104,
+    20240105,
+    20240108,
+    20240109,
+    20240110,
+    20240111,
+    20240112,
+    20240115,
+    20240116,
+    20240117,
+    20240118,
+    20240119,
+    20240122,
+    20240123,
+    20240124,
+    20240125,
+    20240126,
+    20240129,
+    20240130,
+    20240131
+  ],
+  "provider_access": {
+    "abi_dir": "win_py314_x64_package",
+    "python_version": "3.14.6",
+    "runtime_version": "V4.3.0.260626-rc2.0-YHZQ",
+    "sdk_version": "1.1.9",
+    "status": "AUTHENTICATED_RUNTIME_READY",
+    "tgw_package_version": "1.0.9.2"
+  },
+  "raw_persist": {
+    "evidence_hashes_sha256": "0a45957d6ed3688f55fe3ecb399604f9934342a461b5519858fac8be85f8a70a",
+    "exchange_count": 22,
+    "expected_exchange_count": 22,
+    "payload_kinds": [
+      "dataframe"
+    ],
+    "request_ids_sha256": "15b5839c8906a490050d637bc8ca02d3be4ae4f5c2c56d0b5eead86c2397401c",
+    "row_count": 96781,
+    "status": "PERSISTED_LOCAL_IGNORED_ONLY"
+  },
+  "repository": {
+    "root": "cr7-positive-semantic-fallback-20260914"
+  },
+  "retained_batch": {
+    "batch_meta_sha256": "a86667cb37b58cd86def0c591c031347b8a65a445c1696e2e5648d53594a3ae6",
+    "batch_payload_kind": "multi_table_frames",
+    "batch_request_id": "2a0ff664-3c1e-4e4d-b40e-86b71758c48c",
+    "batch_request_params_hash": "8d440e7eb501b0adc3a1d8139ac1ee24fedd2accadb77202daefede129fb2f59",
+    "batch_row_count": 112185,
+    "batch_table_content_hash": "cd9225d1c4474875f27908d757a422d710e90f3321b3cb30aaa3d94e77f5e4ed",
+    "batch_table_count": 5106,
+    "batch_table_row_count": 0,
+    "batch_table_schema_hash": "ede0b4846684d2e7e74187a188c2880d54b890c9bb7857b7ac5ae83003760f8d",
+    "member_identity_sha256": "2f3fcbddeafab98dcacf9a6b3b006b7192f704c9741cdf3eac96240083df1f54",
+    "provider_member_sha256": "55ca285636ae20356fa5c2233d239fd2411048e56fe9b882e42cf5c694bcedf9"
+  },
+  "returned_session_count": 22,
+  "review_required_before_rule_change": true,
+  "schema": "cr7.positive_semantic_fallback.v1",
+  "scope": {
+    "begin_time": 93000000,
+    "end": "2024-01-31",
+    "end_time": 150000000,
+    "inclusive": true,
+    "member_selection": "ONE_RETAINED_STATUS_SCHEMA_MISMATCH_MEMBER",
+    "month": "2024-01",
+    "query_surface": "MarketData.query_snapshot",
+    "start": "2024-01-01"
+  },
+  "session_observations": [
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240102,
+      "field_positive_row_counts": {
+        "num_trades": 4505,
+        "total_value_trade": 4505,
+        "total_volume_trade": 4505
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4505,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4505,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240103,
+      "field_positive_row_counts": {
+        "num_trades": 4039,
+        "total_value_trade": 4039,
+        "total_volume_trade": 4039
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4039,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4039,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240104,
+      "field_positive_row_counts": {
+        "num_trades": 4335,
+        "total_value_trade": 4335,
+        "total_volume_trade": 4335
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4335,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4335,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240105,
+      "field_positive_row_counts": {
+        "num_trades": 4397,
+        "total_value_trade": 4397,
+        "total_volume_trade": 4397
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4397,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4397,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240108,
+      "field_positive_row_counts": {
+        "num_trades": 4492,
+        "total_value_trade": 4492,
+        "total_volume_trade": 4492
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4492,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4492,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240109,
+      "field_positive_row_counts": {
+        "num_trades": 4447,
+        "total_value_trade": 4447,
+        "total_volume_trade": 4447
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4447,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4447,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240110,
+      "field_positive_row_counts": {
+        "num_trades": 4144,
+        "total_value_trade": 4144,
+        "total_volume_trade": 4144
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4144,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4144,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240111,
+      "field_positive_row_counts": {
+        "num_trades": 4332,
+        "total_value_trade": 4332,
+        "total_volume_trade": 4332
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4332,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4332,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240112,
+      "field_positive_row_counts": {
+        "num_trades": 4394,
+        "total_value_trade": 4394,
+        "total_volume_trade": 4394
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4394,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4394,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240115,
+      "field_positive_row_counts": {
+        "num_trades": 4115,
+        "total_value_trade": 4115,
+        "total_volume_trade": 4115
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4115,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4115,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240116,
+      "field_positive_row_counts": {
+        "num_trades": 4244,
+        "total_value_trade": 4244,
+        "total_volume_trade": 4244
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4244,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4244,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240117,
+      "field_positive_row_counts": {
+        "num_trades": 4145,
+        "total_value_trade": 4145,
+        "total_volume_trade": 4145
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4145,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4145,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240118,
+      "field_positive_row_counts": {
+        "num_trades": 4683,
+        "total_value_trade": 4683,
+        "total_volume_trade": 4683
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4683,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4683,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240119,
+      "field_positive_row_counts": {
+        "num_trades": 4291,
+        "total_value_trade": 4291,
+        "total_volume_trade": 4291
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4291,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4291,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240122,
+      "field_positive_row_counts": {
+        "num_trades": 4512,
+        "total_value_trade": 4512,
+        "total_volume_trade": 4512
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4512,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4512,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240123,
+      "field_positive_row_counts": {
+        "num_trades": 4506,
+        "total_value_trade": 4506,
+        "total_volume_trade": 4506
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4506,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4506,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240124,
+      "field_positive_row_counts": {
+        "num_trades": 4541,
+        "total_value_trade": 4541,
+        "total_volume_trade": 4541
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4541,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4541,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240125,
+      "field_positive_row_counts": {
+        "num_trades": 4708,
+        "total_value_trade": 4708,
+        "total_volume_trade": 4708
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4708,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4708,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240126,
+      "field_positive_row_counts": {
+        "num_trades": 4514,
+        "total_value_trade": 4514,
+        "total_volume_trade": 4514
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4514,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4514,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240129,
+      "field_positive_row_counts": {
+        "num_trades": 4496,
+        "total_value_trade": 4496,
+        "total_volume_trade": 4496
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4496,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4496,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240130,
+      "field_positive_row_counts": {
+        "num_trades": 4292,
+        "total_value_trade": 4292,
+        "total_volume_trade": 4292
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4292,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4292,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    },
+    {
+      "activity_fields_present": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "date": 20240131,
+      "field_positive_row_counts": {
+        "num_trades": 4649,
+        "total_value_trade": 4649,
+        "total_volume_trade": 4649
+      },
+      "frame_shape": {
+        "column_count": 35,
+        "columns": [
+          "code",
+          "trade_time",
+          "pre_close",
+          "last",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "num_trades",
+          "high_limited",
+          "low_limited",
+          "ask_price1",
+          "ask_volume1",
+          "bid_price1",
+          "bid_volume1",
+          "ask_price2",
+          "ask_volume2",
+          "bid_price2",
+          "bid_volume2",
+          "ask_price3",
+          "ask_volume3",
+          "bid_price3",
+          "bid_volume3",
+          "ask_price4",
+          "ask_volume4",
+          "bid_price4",
+          "bid_volume4",
+          "ask_price5",
+          "ask_volume5",
+          "bid_price5",
+          "bid_volume5",
+          "iopv",
+          "trading_phase_code"
+        ],
+        "row_count": 4649,
+        "type": "DataFrame"
+      },
+      "member_present": true,
+      "positive_fields": [
+        "num_trades",
+        "total_value_trade",
+        "total_volume_trade"
+      ],
+      "positive_row_count": 4649,
+      "status": "POSITIVE_EXECUTED_ACTIVITY"
+    }
+  ],
+  "single_exchange": {
+    "elapsed_ms": 43485.148,
+    "logical_member_count": 1,
+    "logical_month_count": 1,
+    "payload_type": "dict",
+    "request_params_hash": "b6eb9dc549b8b5da90d3595007f6d1579d560b574692e84774d53a1efdf16c6e",
+    "row_count": 96781,
+    "status": "OK"
+  },
+  "status": "PROVIDER_SEMANTIC_RESOLVED"
+}
