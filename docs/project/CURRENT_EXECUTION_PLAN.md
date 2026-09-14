@@ -176,6 +176,28 @@ CR-5/R2、Golden/H1、baseline 或策略工作。
 `2024-01`，并把真实运行使用的 code head 写入新的脱敏报告。此前的 Stage B 报告仅保留为
 历史诊断、明确标记为非验收证据；不得重跑 Stage B，不得进行 78 月回补。
 
+### 4.6 Corrected exact-head Stage A 结果（2026-09-14）
+
+整改提交 `d0710a28c7b6aa7376c4612c0b445d2c0fe7e41a` 的 exact-head CI #599 已通过：Ubuntu
+3.14、Windows 3.12、Windows 3.14 全部成功，受控执行保持 skipped。随后在干净工作树以该
+提交运行了唯一获准的 `2024-01` Stage A；脱敏报告中的 `code_head` 与该执行提交一致。
+
+本次 22 个精确日 `get_hist_code_list` 请求均为 `[D,D]` 闭区间（另有 1 个正常的整月请求），
+因此本次观察可以用于审阅修正后的请求绑定，但业务语义仍未通过：22 个交易日、5,106 个
+月度证券、1 个状态 schema mismatch、22 个 `UNRESOLVED` pair、22 个尚未证明为必需的返回
+pair，`missing_required_pair_count=0`，总体 `FAIL_CLOSED`。没有生成 authoritative receipt，
+没有进入 materializer。
+
+规范脱敏报告为
+[`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)，
+整改前报告保留为
+[`cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json)。
+两者不能混作同一语义版本的证据；整改前 Stage B 报告也已标记为历史诊断、非验收证据。
+
+当前返回门是独立 delta review：审阅人需核对 `d0710a2...`、CI #599、规范 Stage A 报告的
+`code_head` 和 `[D,D]` 请求结论。除非新的 Stage A 达到 `PASS` 并得到调度确认，不得运行
+Stage B、78 月回补、Formal/Production 或其他明确禁止的工作。
+
 ## 5. 当前明确禁止
 
 Issue #59 **不授权**：

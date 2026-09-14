@@ -1,0 +1,178 @@
+{
+  "schema": "cr7.month_completeness_semantics.v1",
+  "stage": "A",
+  "code_head": "67f37d7ef7a084d775d14dbd0d474e1604e96d25",
+  "scope": {
+    "month": "2024-01",
+    "start": "2024-01-01",
+    "end": "2024-01-31",
+    "inclusive": true
+  },
+  "provider": {
+    "name": "amazingdata",
+    "use_mode": "SPIKE",
+    "sdk_version": "1.1.9",
+    "runtime_version": "V4.3.0.260626-rc2.0-YHZQ",
+    "access_status": "AUTHENTICATED_RUNTIME_READY"
+  },
+  "source_contract": {
+    "path": "docs/provider_verification/source_selection_retrieval_closure_20260912.json",
+    "sha256": "02e3e42bad3b0fbd2cc10962b1b3d616518b8b230e160a085f3a6e7ab1e60a6d",
+    "status": "READ"
+  },
+  "full_scope_observation": {
+    "status": "COMPLETED_LOCAL_IGNORED_RAW_REPLAY",
+    "raw_retention": "LOCAL_IGNORED_ONLY",
+    "successful_exchange_count": 26,
+    "operation_counts": {
+      "calendar": 1,
+      "monthly_universe": 1,
+      "status": 1,
+      "exact_session_universe": 22,
+      "daily_bar": 1
+    },
+    "semantic_replay": "PASS"
+  },
+  "calendar": {
+    "session_count": 22,
+    "session_set_hash": "f7a391589c4ab102ce6b570c4001a92590eae94a3794e0f40f8554e6da903452"
+  },
+  "monthly_universe": {
+    "security_count": 5106,
+    "security_set_hash": "f9b15023b79cd261c599a5de52e5d00e62cdf82c4b9fddffcde601450a7e8fde"
+  },
+  "exact_session_universes": {
+    "session_request_count": 22,
+    "session_result_set_hash": "952085f1b1bb4f1b146b05985320d9016f89d092d687a63496041c625544a4fc",
+    "session_security_count_histogram": {
+      "5097": 5,
+      "5098": 1,
+      "5100": 4,
+      "5101": 2,
+      "5102": 3,
+      "5103": 2,
+      "5104": 5
+    }
+  },
+  "status_observation": {
+    "shape": "dict[str,dataframe|None]",
+    "status": "OK",
+    "member_count": 5106,
+    "non_null_table_count": 5106,
+    "null_table_count": 0,
+    "non_null_row_count": 112185,
+    "row_count_histogram": {
+      "0": 1,
+      "2": 1,
+      "6": 2,
+      "9": 1,
+      "10": 2,
+      "12": 1,
+      "15": 2,
+      "16": 1,
+      "17": 1,
+      "21": 1,
+      "22": 5093
+    },
+    "schema_set_hash": "f7e4eb4f04a396bf6a2606e149cd12b849987971aa2a1312e56b38eddad1facb",
+    "suspension_flag_counts": {
+      "0": 112053,
+      "1": 132
+    },
+    "flag_unreadable_table_count": 1
+  },
+  "daily_bar_observation": {
+    "shape": "dict[str,dataframe|None]",
+    "status": "OK",
+    "member_count": 5106,
+    "non_null_table_count": 5103,
+    "null_table_count": 3,
+    "non_null_row_count": 112075,
+    "row_count_histogram": {
+      "2": 1,
+      "6": 2,
+      "9": 1,
+      "10": 1,
+      "12": 4,
+      "13": 2,
+      "14": 1,
+      "15": 2,
+      "16": 2,
+      "17": 2,
+      "19": 2,
+      "20": 1,
+      "21": 4,
+      "22": 5078
+    },
+    "schema_set_hash": "dcfd76e6318ecd9702e1e414c5126e2cdedd85bddc9059587567a4d280808e7b"
+  },
+  "rule": {
+    "rule_version": "amazingdata-month-completeness-rule-v1",
+    "applicability_semantics_version": "amazingdata-hist-code-list-exact-session-v1",
+    "implementation_status": "IMPLEMENTED_LOCAL",
+    "receipt_bound": true,
+    "materializer_or_receipt_issued": false
+  },
+  "evaluation": {
+    "rule_version": "amazingdata-month-completeness-rule-v1",
+    "applicability_semantics_version": "amazingdata-hist-code-list-exact-session-v1",
+    "status": "FAIL_CLOSED",
+    "monthly_security_count": 5106,
+    "session_count": 22,
+    "monthly_security_set_hash": "f9b15023b79cd261c599a5de52e5d00e62cdf82c4b9fddffcde601450a7e8fde",
+    "session_set_hash": "f7a391589c4ab102ce6b570c4001a92590eae94a3794e0f40f8554e6da903452",
+    "applicable_pair_count": 112217,
+    "applicable_pair_set_hash": "e42e0d6253a3fcf83ea4118acd8b5e3f9961d4ec158a67cde154a029b7612de6",
+    "suspended_pair_count": 132,
+    "suspended_pair_set_hash": "a3f5e8940a8993649c3dce226cd4082912eb3d1549f8769a885dc3fd5f0bb929",
+    "not_applicable_pair_count": 115,
+    "not_applicable_pair_set_hash": "8ab415b01a4835b17c1aa5cb0627ca4571b4fe2854f9bfa2a2f41c6f7ab27f66",
+    "required_bar_pair_count": 112053,
+    "required_bar_pair_set_hash": "40809ff7f307cf473bfb6504cae528ce7f7d9a9e9c3f7b7a9f075bfd997d1fb5",
+    "returned_bar_pair_count": 112075,
+    "returned_bar_pair_set_hash": "14517c57e0a369b8b700a1a6c5f5fe9ed069f540b3d6ce28d79c44d8a12a2651",
+    "returned_first_date": "2024-01-02",
+    "returned_last_date": "2024-01-31",
+    "returned_trading_day_count": 22,
+    "returned_trading_days_hash": "f7a391589c4ab102ce6b570c4001a92590eae94a3794e0f40f8554e6da903452",
+    "returned_row_count": 112075,
+    "missing_required_pair_count": 0,
+    "missing_required_pair_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "extra_returned_pair_count": 22,
+    "extra_returned_pair_set_hash": "8e6255c0f88de81ae3512b9e03a4609e494f7f2b4d25dbaa3d295f246a295d64",
+    "unresolved_pair_count": 32,
+    "classification_counts": {
+      "EXTRA_RETURNED": 22,
+      "NOT_APPLICABLE_SESSION": 115,
+      "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 1,
+      "SUSPENSION_NON_TRADING": 132,
+      "UNEXPLAINED_MISSING": 0,
+      "UNRESOLVED": 32
+    },
+    "structural_error_codes": [
+      "STATUS_SCHEMA_MISMATCH"
+    ]
+  },
+  "reacquisition_attempt": {
+    "status": "FAIL_CLOSED",
+    "reason_code": "EXACT_SESSION_UNIVERSE_EXCHANGE_UNAVAILABLE",
+    "provider_error_code": "ProviderPermissionError",
+    "successful_calls_before_block": 11,
+    "raw_evidence_overwritten": false
+  },
+  "authoritative_receipt": {
+    "status": "NOT_PRODUCED_FAIL_CLOSED",
+    "reason_code": "VERIFIED_SOURCE_SNAPSHOT_NOT_SUPPLIED_TO_BOUNDED_SPIKE",
+    "source_selection_closure": "CLOSURE_DESIGN_ONLY_NOT_ACTIVE"
+  },
+  "materializer_gate": {
+    "status": "NOT_ENTERED_FAIL_CLOSED",
+    "reason_code": "NO_AUTHORITATIVE_RECEIPT_ISSUED"
+  },
+  "authorization_boundary": {
+    "formal_run_created": false,
+    "production_activity": false,
+    "broad_backfill": false,
+    "stage_b_started": false
+  }
+}

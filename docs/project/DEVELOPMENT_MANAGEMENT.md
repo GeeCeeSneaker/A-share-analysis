@@ -6792,3 +6792,31 @@ exact head、required CI 和独立 delta review 以该 PR/Issue 的最新交接�
 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 和
 vendor wheels 继续只保留在本地忽略路径；不执行 78 月 backfill、Formal/B1-B7、Production、
 BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
+
+## DM-20260914-CR7-COMPLETENESS-037 · exact-head Stage A 重跑交接
+
+**Type**：C1 — CR-7 bounded real-source verification after exact-session remediation
+**Date**：2026-09-14
+**Execution head**：`d0710a28c7b6aa7376c4612c0b445d2c0fe7e41a`
+**Status**：`STAGE A RERUN COMPLETE / FAIL-CLOSED / CI GREEN / DELTA REVIEW REQUIRED / KEEP DRAFT`
+
+**已核实事实**
+
+- exact-head CI #599 的 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功；受控执行仍为
+  skipped；
+- 本地从干净 `d0710a2...` 只重跑了授权的 `2024-01` Stage A，报告 `code_head` 与执行 head
+  完全一致；23 个 historical code-list 请求中 1 个为整月请求，22 个精确日请求全部为
+  `start_date == end_date`；
+- 22 个交易日、5,106 个月度证券的脱敏评估仍为 `FAIL_CLOSED`：1 个状态 schema mismatch、
+  22 个 `UNRESOLVED` pair、22 个返回但未被证明为必需的 pair，`missing_required_pair_count=0`。
+  因此没有 authoritative receipt，也没有进入 materializer；该结果不是 PASS。
+
+**证据与治理**
+
+- 当前规范报告为 [`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)；
+  旧 `[D,D+1]` 观察保留在 [`cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json)，
+  仅作历史诊断，不得与新语义合并；整改前 Stage B 报告同样已标记为非验收证据；
+- 当前下一道门是独立 delta review 对执行 head、CI、报告 code identity、22 个 exact-session
+  请求及 fail-closed 结果进行复核。Stage A 未达 `PASS` 前不运行 Stage B，更不做 78 月回补、
+  Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；
+- 凭证、私有 endpoint、专有 SDK/runtime、本地 raw payload 与 vendor wheels 未进入 GitHub。

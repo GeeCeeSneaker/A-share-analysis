@@ -4158,3 +4158,19 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
 - 下一步：等待该提交的三平台 CI 完成；随后只从该 exact committed head 重跑 `2024-01` Stage A，
   提交 code identity 一致的脱敏报告，再返回独立 delta review。Stage A 达到 `PASS` 前不运行
   `2020-01`/`2026-01` Stage B，也不做 78 月回补或其他受禁工作。
+
+## 2026-09-14 · CR-7 exact-head Stage A 重跑交接
+
+> 状态：**STAGE A RERUN COMPLETE / FAIL-CLOSED / CI GREEN / DELTA REVIEW REQUIRED / DRAFT**
+
+- 整改提交 `d0710a28c7b6aa7376c4612c0b445d2c0fe7e41a` 的 exact-head CI #599 已在 Ubuntu 3.14、
+  Windows 3.12、Windows 3.14 全部成功，受控执行保持 skipped。
+- 在干净 exact head 上只重跑了授权的 `2024-01` Stage A。23 个 historical code-list 请求中，
+  1 个是整月请求，22 个精确日请求全部为 `start_date == end_date`；报告 `code_head` 与执行
+  head 一致。脱敏评估仍为 `FAIL_CLOSED`：1 个状态 schema mismatch、22 个 `UNRESOLVED`
+  pair、22 个返回但未被证明为必需的 pair，`missing_required_pair_count=0`。
+- 规范报告已更新为 [`cr7_month_completeness_stage_a_20260914.json`](provider_verification/cr7_month_completeness_stage_a_20260914.json)；
+  旧 `[D,D+1]` 结果保留在 [`cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json`](provider_verification/cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json)，
+  仅作历史诊断。整改前 Stage B 报告已标记为 `HISTORICAL_DIAGNOSTIC_ONLY_NOT_ACCEPTANCE_EVIDENCE`。
+- 本次没有 authoritative receipt、materializer proof 或 Stage B 运行。下一步是独立 delta review
+  核对 exact head、CI、报告绑定和 `[D,D]` 语义；Stage A 未达 `PASS` 前不运行 Stage B 或 78 月回补。
