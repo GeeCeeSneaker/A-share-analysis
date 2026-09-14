@@ -4228,3 +4228,31 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、原始 Provider payload 和
 vendor wheels 继续只保留在本地忽略路径；不执行 Stage B、78 月 backfill/materialization、
 Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
+
+## 2026-09-14 · CR-7 同源正向交易事实 fallback 探针实现
+
+> 状态：**EXACT-HEAD PROBE COMPLETE / PROVIDER_SEMANTIC_RESOLVED EVIDENCE / KEEP DRAFT / INDEPENDENT REVIEW REQUIRED**
+
+- PR #62 已独立合并为 `main@548e336353495e5c168ccde3bd85a4e8031fbe63`；按 Issue #59 最新调度，
+  本轮只在 AmazingData 内检查 `MarketData.query_snapshot` 是否能以公开字段正向证明单成员当日实际交易，
+  不增加 Provider、不运行 Stage B/78 月/正式或 Formal 范围。
+- 本地 `AmazingData==1.1.9`/`tgw==1.0.9.2` 公共合同暴露 `num_trades`、`total_volume_trade`、
+  `total_value_trade` 及转换后的 `num_trades`、`volume`、`amount`。没有找到独立供应商字段说明原文，
+  因此代码和报告明确标记为“公开字段名 + typed annotation 合同候选”，不虚构单位或额外语义。
+- 新增固定边界 `scripts/spike/cr7_positive_semantic_fallback.py` 与离线回归：同一保留异常成员、同一
+  `2024-01`、22 个 `[D,D]` 适用日，只接受有限严格正活动字段；空/缺失/价格/盘口/非空本身/零值不通过。
+  返回 DataFrame 分日写入本地 ignored raw/anchor，GitHub 只接收脱敏 shape、计数和 hash；fallback 尚未编码。
+- 代码与离线回归已通过；exact committed head `dfb0e4875f17fe7dd3bbbfdf5bc608e642833782` 已完成固定
+  单成员 `2024-01` 探针。22/22 个保留适用日返回数据并满足有限严格正活动字段规则，返回帧合计
+  96,781 行，22 个分日 anchored raw exchange 仅写入本地 ignored raw。脱敏报告为
+  [`cr7_positive_semantic_fallback_20260914.json`](provider_verification/cr7_positive_semantic_fallback_20260914.json)，
+  可读摘要为 [`cr7_positive_semantic_fallback_20260914.md`](provider_verification/cr7_positive_semantic_fallback_20260914.md)。
+- 结论为 `PROVIDER_SEMANTIC_RESOLVED`，实现状态为 `EVIDENCE_ONLY_PENDING_REVIEW`；它仍只是公开
+  SDK 字段合同候选在一个成员/月份上的证据，因没有独立供应商字段说明原文，不自动升级为正式
+  fallback 或 capability approval。`fallback_rule_encoded=false`，未修改 `month_completeness.py`，
+  未创建 authoritative receipt/materializer；独立 Reviewer/Owner 需先裁决合同等级。
+- PR #63 exact-head CI #607 已确认 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功；GT-H3B #129
+  按策略 skipped。该 CI 结果只证明仓库门禁通过，不改变候选合同的审阅状态。
+
+账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、原始 Provider payload 和本地
+vendor wheels 不进入 GitHub。
