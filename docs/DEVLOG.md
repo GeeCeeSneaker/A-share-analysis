@@ -4251,6 +4251,8 @@ Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略
   SDK 字段合同候选在一个成员/月份上的证据，因没有独立供应商字段说明原文，不自动升级为正式
   fallback 或 capability approval。`fallback_rule_encoded=false`，未修改 `month_completeness.py`，
   未创建 authoritative receipt/materializer；独立 Reviewer/Owner 需先裁决合同等级。
+- PR #63 exact-head CI #607 已确认 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功；GT-H3B #129
+  按策略 skipped。该 CI 结果只证明仓库门禁通过，不改变候选合同的审阅状态。
 
 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、原始 Provider payload 和本地
 vendor wheels 不进入 GitHub。

@@ -6945,3 +6945,5 @@ exact-head 探针已完成，脱敏 receipt 为
 这不能替代独立供应商字段合同、capability approval 或历史完整性证明；在 Reviewer/Owner 明确接受
 合同等级前，不得改 `month_completeness.py`、清除 unresolved pair 或启动 Stage B。账号、密码、IP、
 端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 与 vendor wheels 不进入 GitHub。
+PR #63 的 exact-head CI #607 已确认 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部 `success`；
+GT-H3B #129 为策略性 `skipped`，不构成 Provider 或 Production 证据。

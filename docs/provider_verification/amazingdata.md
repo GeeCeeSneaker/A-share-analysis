@@ -275,6 +275,10 @@ baseline 与策略工作均仍被禁止。
 完整性计算。`fallback_rule_encoded=false`，未修改 `month_completeness.py`，未创建 authoritative
 receipt/materializer。原始 DataFrame 和本地 anchor 只保留在 ignored 工作区，未进入 GitHub。
 
+PR #63 的 exact-head CI #607 已在 Ubuntu 3.14、Windows 3.12、Windows 3.14 全部成功；GT-H3B #129
+按策略 skipped。该 CI 只验证仓库代码与文档门禁，不提升候选字段合同等级，也不替代独立 Reviewer/Owner
+裁决。
+
 由于尚未找到独立供应商字段说明原文，独立 Reviewer 仍需决定“公开字段名 + typed annotation”是否
 足以作为正式正向语义合同；在该决定前，所有 Stage A unresolved pair、Stage B、78 月物化及其他
 文档列明的禁止项保持原状。

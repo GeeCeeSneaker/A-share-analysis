@@ -268,7 +268,9 @@ exact committed head `dfb0e4875f17fe7dd3bbbfdf5bc608e642833782` 已完成固定�
 探针结论为 `PROVIDER_SEMANTIC_RESOLVED`，但这是“公开 SDK 字段合同候选 + 单成员单月实测”的证据，
 不是供应商 capability approval，也不是普适历史完整性证明。由于没有独立供应商字段说明原文，仍需
 独立审阅人裁决合同等级；`fallback_rule_encoded=false`，未修改 `month_completeness.py`，未创建
-authoritative receipt/materializer。下一道门是 exact head、报告、请求边界和候选语义的独立审阅。
+authoritative receipt/materializer。PR #63 的 exact-head CI #607 已在 Ubuntu 3.14、Windows 3.12、
+Windows 3.14 全部成功，GT-H3B #129 按策略 skipped。下一道门是 exact head、报告、请求边界和候选
+语义的独立审阅。
 
 ## 5. 当前明确禁止
 
