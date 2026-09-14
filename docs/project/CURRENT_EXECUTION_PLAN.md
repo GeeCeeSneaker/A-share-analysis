@@ -48,6 +48,12 @@
 固定来源选择绑定、writer/reader 双重重验和三个月真实源预检脚本；这些变更尚未合并到
 `main`，须以该分支最终 exact head 进行 CI 和独立审阅。
 
+当前实现 exact head 为 `8ce680c2821b8bdf3c1459c7285ebe9265dc1b60`，base 为
+`main@2e9bdc36544c5320072969a2888180b6dfec2c7a`；required CI `#590`（run
+`34799945484`）三矩阵全部成功，GT-H3B `#117` 按边界 skipped。此前 `89ae...` 的
+CI #589 仅因同批 DEVLOG 缺失而失败，已通过将管理记录并入实现提交修正；本段不把
+`89ae...` 的结果当作当前 head 证据。
+
 **最新整改要求**：PR #58 exact-head review `5192511594` 给出 `REMEDIATE`，指出旧的
 通用 builder 可用任意 statement/inventory bytes、计数和时间戳铸造
 `AUTHORITATIVE_UPSTREAM`。本分支已按 Owner 后续政策将信任锚收敛为
@@ -187,7 +193,8 @@ B. path 本身可靠，但某个 source/completeness 边界仍不足 → 先发�
 
 ---
 
-**Last scheduler update**：2026-09-13；Issue #55 当前实现分支已完成本地 bounded preflight，结果为具体上游完整性阻断，等待 exact-head CI 与独立审阅。
+**Last scheduler update**：2026-09-13；Issue #55 当前实现分支已完成本地 bounded preflight，
+required CI #590 已通过，仍等待项目经理/独立 Reviewer 对 exact head 作 delta review。
 
 **Current task**：Issue #55
 

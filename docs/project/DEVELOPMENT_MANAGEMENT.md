@@ -2,8 +2,14 @@
 
 **Type**：C1 — CR-7 exact-head remediation / trusted acquisition-path receipt
 **Date**：2026-09-13
-**Status**：`IMPLEMENTED / LOCAL QA GREEN / CI RE-RUN REQUIRED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+**Status**：`IMPLEMENTED / LOCAL QA GREEN / REQUIRED CI GREEN / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
 **Trigger**：PR #58 exact-head review `5192511594` 的 P0；Issue #55 Owner policy corrections `5657524581`、`5657529299`。
+
+**精确交接**：实现提交 `8ce680c2821b8bdf3c1459c7285ebe9265dc1b60`（以
+`main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 为 base）；GitHub Actions CI `#590`
+（run `34799945484`）的 Ubuntu 3.14、Windows 3.12、Windows 3.14 三个 required
+矩阵均为 `success`；GT-H3B controlled execution `#117`（run `34799945474`）按当前
+边界为 `skipped`。
 
 **问题与决策**：
 
@@ -36,7 +42,7 @@
   partial kline、schema drift、PIT、scope、selection 和 reader/materializer root gate。
 - 旧实现提交 `89ae6945e26472461fdfeddf132ac6ff265e124e` 的 GitHub CI #589 首次发现
   `DEVLOG gate` 阻断：代码提交未在同一提交更新 `docs/DEVLOG.md`；这条记录与实现修正同批
-  补入，不把该旧 head 的 CI 结果误报为通过。修正后须以新 exact head 重新核对 required CI。
+  补入，不把该旧 head 的 CI 结果误报为通过。修正后的 exact head 已通过 CI #590。
 
 **范围边界与下一闸门**：
 
