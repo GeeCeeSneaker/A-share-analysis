@@ -4228,3 +4228,23 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、原始 Provider payload 和
 vendor wheels 继续只保留在本地忽略路径；不执行 Stage B、78 月 backfill/materialization、
 Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
+
+## 2026-09-14 · CR-7 同源正向交易事实 fallback 探针实现
+
+> 状态：**IMPLEMENTED / EXACT-COMMITTED-HEAD PROBE PENDING / FAIL-CLOSED / DRAFT / INDEPENDENT REVIEW REQUIRED**
+
+- PR #62 已独立合并为 `main@548e336353495e5c168ccde3bd85a4e8031fbe63`；按 Issue #59 最新调度，
+  本轮只在 AmazingData 内检查 `MarketData.query_snapshot` 是否能以公开字段正向证明单成员当日实际交易，
+  不增加 Provider、不运行 Stage B/78 月/正式或 Formal 范围。
+- 本地 `AmazingData==1.1.9`/`tgw==1.0.9.2` 公共合同暴露 `num_trades`、`total_volume_trade`、
+  `total_value_trade` 及转换后的 `num_trades`、`volume`、`amount`。没有找到独立供应商字段说明原文，
+  因此代码和报告明确标记为“公开字段名 + typed annotation 合同候选”，不虚构单位或额外语义。
+- 新增固定边界 `scripts/spike/cr7_positive_semantic_fallback.py` 与离线回归：同一保留异常成员、同一
+  `2024-01`、22 个 `[D,D]` 适用日，只接受有限严格正活动字段；空/缺失/价格/盘口/非空本身/零值不通过。
+  返回 DataFrame 分日写入本地 ignored raw/anchor，GitHub 只接收脱敏 shape、计数和 hash；fallback 尚未编码。
+- 代码与离线回归已通过；下一步必须从 exact committed head 运行一次固定单成员探针，再提交与执行头绑定的
+  脱敏报告。全 22 日正向事实才可返回 `PROVIDER_SEMANTIC_RESOLVED` 供独立审阅，否则返回精确
+  `STOP(BLOCKED)`。
+
+账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、原始 Provider payload 和本地
+vendor wheels 不进入 GitHub。

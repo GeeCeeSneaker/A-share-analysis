@@ -6906,3 +6906,36 @@ pandas DataFrame 的本地 round-trip。实施 exact head `d5a7577709f76d2caf2ad
 vendor wheels 继续不进入 GitHub。下一道门是独立 Reviewer/项目 Owner 复核脱敏 receipt 并决定是否
 取得正式状态语义契约、替代接口或其他经授权的数据源；本 PR 保持 Draft，开发人员不得自行批准、
 Ready 或合并。
+
+## DM-20260914-CR7-COMPLETENESS-040 · 同源正向交易事实 fallback 探针实现
+
+**Type**：C1 — CR-7 same-source positive-semantic fallback discovery
+**Date**：2026-09-14
+**Base**：clean `main@548e336353495e5c168ccde3bd85a4e8031fbe63`（PR #62 merge）
+**Status**：`IMPLEMENTED / EXACT-COMMITTED-HEAD PROBE PENDING / FAIL-CLOSED / KEEP DRAFT`
+
+**调度边界**
+
+本轮只处理 Issue #59 指定的同源 fallback 发现：AmazingData 的一个历史 Level-1 快照成员、一个
+`2024-01` 月份；不增加其他数据源，不查询其他证券或月份，不启动 Stage B、78 月物化、Formal/
+Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
+
+**合同检查与实现**
+
+- `AmazingData==1.1.9` 的 `MarketData.query_snapshot` 公共 docstring 声明历史 Level-1 快照及
+  `date -> code -> DataFrame` 返回形态；`tgw==1.0.9.2` 的 `MDSnapshotL1` 暴露
+  `num_trades`、`total_volume_trade`、`total_value_trade`，typed `Snapshot` 暴露
+  `num_trades`、`volume`、`amount`。
+- 当前没有独立的供应商字段说明原文；因此实现把字段名/typed annotation 标为公开 SDK 合同候选，
+  不写入单位或未经证明的额外语义。正向事实只定义为有限且严格大于零的上述活动字段值。
+- `scripts/spike/cr7_positive_semantic_fallback.py` 固定使用保留异常成员、保留日历及 22 个 exact
+  applicability 日，不接受自由成员/日期参数；只允许一个成员、一个月份的 `query_snapshot` 调用。
+  原始 DataFrame 分日写入本地 ignored raw/anchor，报告不含证券值、凭证、私有 endpoint 或 raw。
+- 离线回归覆盖正向字段、价格-only/非空误判、零/负/NaN、缺日、额外成员和“证据返回但规则未编码”。
+
+**下一道门**
+
+先在 exact committed head 上运行一次固定探针。22 个适用交易日全部有正向活动事实时，只提交
+`PROVIDER_SEMANTIC_RESOLVED` 的脱敏证据供独立审阅，暂不改 `month_completeness.py`；否则记录精确
+`STOP(BLOCKED)` 原因。账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、
+本地 raw payload 与 vendor wheels 不进入 GitHub。

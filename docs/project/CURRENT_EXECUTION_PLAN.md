@@ -241,6 +241,30 @@ singleton 响应均为零行零列，SDK callback 为 2 次 `kDataEmpty` + `data
 因此唯一合法结论是 `STOP(BLOCKED)`；当前 Stage A 保持 fail-closed，等待 Owner 决定是否取得正式
 状态语义契约、替代接口或其他经授权的数据源。在此之前不重跑 Stage A 语义编码，不启动 Stage B。
 
+### 4.9 同源正向交易事实 fallback 探针（2026-09-14）
+
+PR #62 已由独立调度合并为 `main@548e336353495e5c168ccde3bd85a4e8031fbe63`。当前继续按
+Issue #59 的唯一下一任务，只在 Owner 批准的 AmazingData 内寻找能够证明“该证券当日实际发生交易”
+的正向事实；不增加其他 Provider，不做多源仲裁。
+
+已确认的 SDK 合同候选：本地安装的 `AmazingData==1.1.9` 公共 `MarketData.query_snapshot` 文档声明
+历史 Level-1 快照及 `date -> code -> DataFrame` 返回形态；`tgw==1.0.9.2` 的公开
+`MDSnapshotL1` 暴露 `num_trades`、`total_volume_trade`、`total_value_trade`，AmazingData 的 typed
+`Snapshot` 暴露 `num_trades`、`volume`、`amount`。当前没有找到独立的供应商字段说明原文，因此报告会把
+这组“公开字段名 + typed annotation”明确标为合同候选，不虚构单位或额外语义。
+
+已实现 [`cr7_positive_semantic_fallback.py`](../../scripts/spike/cr7_positive_semantic_fallback.py)：
+它固定读取同一保留状态异常成员、核对保留日历与 22 个 `[D,D]` 历史 code-list 适用日，仅查询
+`MarketData.query_snapshot` 的一个成员和 `2024-01`，只接受有限且严格大于零的交易数/成交量/成交额；
+空响应、缺日、非空响应、价格/盘口、零值和缺少活动字段均失败关闭。每个返回日的原始 DataFrame
+只留在本地 ignored raw/anchor，GitHub 只接收脱敏形态、计数和 hash；脚本不修改
+`month_completeness.py`，不创建 authoritative receipt/materializer。
+
+当前状态：代码与离线回归已完成，下一步必须从该实现的 exact committed head 执行一次固定单成员
+`2024-01` 探针并把报告 `code_head` 与执行提交绑定。若 22 个适用日全部出现正向活动字段，结果只
+作为 `PROVIDER_SEMANTIC_RESOLVED` 证据返回独立审阅，尚不编码 fallback；否则返回
+`STOP(BLOCKED)` 并写明缺口。
+
 ## 5. 当前明确禁止
 
 Issue #59 **不授权**：

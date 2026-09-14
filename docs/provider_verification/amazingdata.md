@@ -215,6 +215,51 @@ uv run python scripts/spike/production_account_bootstrap.py --output data/spike/
 在 PIT 状态、状态异常行、公司行为字段语义取得权威契约前，运行时继续失败关闭，不改
 Golden、H1、全局 baseline 或旧封存结果。
 
+## 9. 2026-09-14 CR-7 同源正向交易事实 fallback 候选
+
+本节对应 Issue #59 最新调度要求的最小探针，不是 capability approval、Formal B1-B7 或 Production
+运行。PR #62 已合并为 `main@548e336353495e5c168ccde3bd85a4e8031fbe63`；当前实现从该 clean main
+建立新分支，只处理保留的一个 `2024-01` 状态 schema blocker 成员。
+
+### 9.1 公开 SDK 合同核对
+
+本地 Owner-approved 安装包为 `AmazingData==1.1.9` 与 `tgw==1.0.9.2`；安装 wheel 与专有运行库只
+保留在本地工作区，不进入 GitHub。供应商公开服务页为
+[星耀数智服务平台](http://www.chinastock.com.cn/newsite/cgs-services/strategyTrade/geWuInstitution.html)。
+`MarketData.query_snapshot` 的公开 docstring 声明“仅支持 level-1 快照”，并声明返回
+`{date: {code: dataframe}}`；低层 `tgw.QuerySnapshot` 公共文档声明返回数据结果和错误码。
+
+`tgw.MDSnapshotL1` 的公开字段包含：
+
+| 候选正向事实 | 低层公开字段 | AmazingData typed 字段 | 采用的判定 |
+|---|---|---|---|
+| 交易笔数 | `num_trades` | `Snapshot.num_trades` | 有限且严格 `> 0` |
+| 成交量 | `total_volume_trade` | `Snapshot.volume` | 有限且严格 `> 0` |
+| 成交额 | `total_value_trade` | `Snapshot.amount` | 有限且严格 `> 0` |
+
+这里的合同证据等级是“公开字段名 + typed annotation + SDK conversion surface”，当前没有在安装包、
+供应商公开页或本地可审阅手册中找到独立的字段说明原文。因此不能从此处推导成交量/成交额单位，
+也不能把字段缺失、空响应、非空响应、价格/盘口或零值解释成交易事实；是否足以满足 scheduler 要求
+由独立审阅人裁决。
+
+### 9.2 固定探针边界
+
+[`cr7_positive_semantic_fallback.py`](../../scripts/spike/cr7_positive_semantic_fallback.py) 执行以下
+固定检查：
+
+- 从保留 ignored raw 的批次文件名 SHA-256 定位同一个异常成员，不把证券值写入报告；
+- 用保留日历和 22 个 `[D,D]` 历史 code-list 交换证明该成员在 22 个 2024-01 交易日均适用；
+- 只调用 `MarketData.query_snapshot` 的该成员和 `2024-01`，时间窗固定为 `09:30:00.000`–`15:00:00.000`；
+- 只把 `num_trades`、`volume`/`total_volume_trade`、`amount`/`total_value_trade` 的有限严格正值
+  作为正向活动事实；价格、盘口、行存在、空/缺失和零值均不通过；
+- 返回的每个日期 DataFrame 通过 anchored raw writer 只写入本地 ignored raw/anchor；GitHub 报告只有
+  shape、计数、hash、日期和固定结论，不含 raw values、凭证、profile、私有 endpoint 或 runtime 文件。
+
+代码与离线回归已完成；必须从 exact committed head 运行探针。若 22/22 个适用日都满足正向活动事实，
+只能返回 `PROVIDER_SEMANTIC_RESOLVED` 证据供独立审阅，尚不修改 `month_completeness.py`；否则返回
+`STOP(BLOCKED)` 并记录缺口。Stage B、78 月物化、Formal/Production、BSE/index、CR-5/R2、Golden/H1、
+baseline 与策略工作均仍被禁止。
+
 ## 8. 2026-09-12 BSE 当前代码归因 delta
 
 > 状态：**REVIEWER-AUTHORIZED SINGLE PROBE COMPLETED / OLD RECEIPT PRESERVED / LOCAL REGRESSION ADDED / INDEPENDENT DELTA REVIEW REQUIRED**
