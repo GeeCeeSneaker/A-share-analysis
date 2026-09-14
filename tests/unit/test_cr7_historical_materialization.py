@@ -21,12 +21,14 @@ from ashare_state.providers.amazingdata.operations import (
     DAILY_BAR_KLINE,
     HIST_CODE_LIST,
     HISTORY_STOCK_STATUS,
+    TRADE_ACTIVITY_SNAPSHOT,
     TRADE_CALENDAR,
 )
 from ashare_state.providers.amazingdata.provider import AmazingDataProvider, RawEnvelope
 from ashare_state.providers.exchange import ProviderExchange
 from ashare_state.research import (
     AMAZINGDATA_CALENDAR_MARKET,
+    AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
     AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
     AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
     COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
@@ -361,6 +363,56 @@ class _FakeAmazingDataProvider(AmazingDataProvider):
         return self.kline
 
 
+class _PositiveFallbackFakeAmazingDataProvider(_FakeAmazingDataProvider):
+    """Fake provider with exactly one zero-column status member."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        status_payload = dict(self.status.payload)
+        status_payload["000001.SZ"] = pl.DataFrame()
+        self.status = _provider_exchange(
+            HISTORY_STOCK_STATUS,
+            self.status.envelope.request_params,
+            status_payload,
+        )
+        self.snapshots = {
+            day: _provider_exchange(
+                TRADE_ACTIVITY_SNAPSHOT,
+                {
+                    "code_list": ["000001.SZ"],
+                    "begin_date": day,
+                    "end_date": day,
+                    "begin_time": 93000000,
+                    "end_time": 150000000,
+                },
+                {
+                    "000001.SZ": pl.DataFrame(
+                        {
+                            "code": ["000001.SZ"],
+                            "trade_time": [datetime(day // 10000, (day // 100) % 100, day % 100)],
+                            "num_trades": [1],
+                        }
+                    )
+                },
+            )
+            for day in (20200102, 20200103)
+        }
+
+    def query_snapshot_exchange(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        begin_time: int = 93000000,
+        end_time: int = 150000000,
+    ) -> ProviderExchange:
+        assert code_list == ["000001.SZ"]
+        assert begin_date == end_date
+        assert (begin_time, end_time) == (93000000, 150000000)
+        return self.snapshots[begin_date]
+
+
 def _provider_exchange(spec: Any, params: dict[str, Any], payload: Any) -> ProviderExchange:
     now = "2026-08-01T00:00:00+00:00"
     envelope = RawEnvelope(
@@ -376,10 +428,14 @@ def _provider_exchange(spec: Any, params: dict[str, Any], payload: Any) -> Provi
     return ProviderExchange(envelope=envelope, payload=payload)
 
 
-def _acquisition_receipt(tmp_path: Path) -> Any:
+def _acquisition_receipt(
+    tmp_path: Path,
+    *,
+    provider: AmazingDataProvider | None = None,
+) -> Any:
     source_snapshot = VerifiedSourceSnapshot.from_projection(_projection([]))
     acquisition = AmazingDataHistoryAcquisition(
-        _FakeAmazingDataProvider(),
+        provider or _FakeAmazingDataProvider(),
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-acquisition"),
         source_snapshot,
     )
@@ -766,6 +822,35 @@ def test_acquisition_persists_and_replays_the_raw_capture_chain(tmp_path: Path) 
     catalog_path.write_bytes(b"tampered")
     with pytest.raises(CoverageBasisError, match="catalog"):
         replayed.verify_retained_capture(raw_root)
+
+
+def test_positive_trade_fallback_is_retained_and_replayed(tmp_path: Path) -> None:
+    raw_root = tmp_path / "raw"
+    receipt = _acquisition_receipt(
+        tmp_path,
+        provider=_PositiveFallbackFakeAmazingDataProvider(),
+    )
+
+    assert receipt.positive_trade_fallback_version == (AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION)
+    assert len(receipt.positive_trade_operations) == 2
+    assert receipt.completeness_evaluation.positive_trade_pair_count == 2
+    receipt.verify_retained_capture(raw_root)
+    replayed = AmazingDataAcquisitionReceipt.from_mapping(receipt.as_dict())
+    replayed.verify_retained_capture(raw_root)
+
+    snapshot = receipt.positive_trade_operations[0]
+    snapshot_meta = raw_root / Path(snapshot.exchange.captured_evidence_uri)
+    snapshot_meta.write_bytes(snapshot_meta.read_bytes() + b"tampered")
+    with pytest.raises(CoverageBasisError, match="positive-trade snapshot evidence hash"):
+        replayed.verify_retained_capture(raw_root)
+
+
+def test_old_acquisition_receipt_version_is_rejected(tmp_path: Path) -> None:
+    receipt = _acquisition_receipt(tmp_path)
+    payload = receipt.as_dict()
+    payload["receipt_version"] = "amazingdata-history-acquisition-receipt-v2"
+    with pytest.raises(CoverageBasisError, match="unknown AmazingData acquisition receipt version"):
+        AmazingDataAcquisitionReceipt.from_mapping(payload)
 
 
 def test_acquisition_rejects_partial_daily_bar_response(tmp_path: Path) -> None:

@@ -17,11 +17,17 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from ashare_state.providers.amazingdata.month_completeness import evaluate_month_completeness
+from ashare_state.providers.amazingdata.month_completeness import (
+    _positive_trade_fallback_candidates,
+    _PositiveTradeFallbackEvidence,
+    _snapshot_trade_observation,
+    evaluate_month_completeness,
+)
 from ashare_state.providers.amazingdata.operations import (
     DAILY_BAR_KLINE,
     HIST_CODE_LIST,
     HISTORY_STOCK_STATUS,
+    TRADE_ACTIVITY_SNAPSHOT,
     TRADE_CALENDAR,
 )
 from ashare_state.providers.amazingdata.provider import AmazingDataProvider, RawEnvelope
@@ -33,6 +39,7 @@ from ashare_state.research.historical import (
     AmazingDataExchangeReceipt,
     CoverageBasisError,
     PartitionKey,
+    PositiveTradeFallbackOperation,
     VerifiedSourceSnapshot,
     _issue_amazingdata_acquisition_receipt,
     _VerifiedAmazingDataCapture,
@@ -56,12 +63,14 @@ _METHOD_SPECS = {
     "BaseData.get_hist_code_list": HIST_CODE_LIST,
     "InfoData.get_history_stock_status": HISTORY_STOCK_STATUS,
     "MarketData.query_kline": DAILY_BAR_KLINE,
+    "MarketData.query_snapshot": TRADE_ACTIVITY_SNAPSHOT,
 }
 _RESPONSE_SHAPES = {
     "BaseData.get_calendar": "list[int]",
     "BaseData.get_hist_code_list": "list[str]",
     "InfoData.get_history_stock_status": "dict[str,dataframe|None]",
     "MarketData.query_kline": "dict[str,dataframe|None]",
+    "MarketData.query_snapshot": "dict[str,dataframe|None]",
 }
 
 
@@ -140,6 +149,56 @@ class AmazingDataHistoryAcquisition:
             exact_day_exchanges.append(exact_exchange)
             semantic_receipts.append(exact_receipt)
 
+        fallback_candidates = _positive_trade_fallback_candidates(
+            monthly_symbols=symbols,
+            trading_days=trading_days,
+            exact_day_universes=exact_day_universes,
+            status_payload=status_exchange.payload,
+        )
+        snapshot_exchanges: list[ProviderExchange] = []
+        snapshot_receipts: dict[tuple[str, int], AmazingDataExchangeReceipt] = {}
+        positive_trade_pairs: list[tuple[str, int]] = []
+        snapshot_request_hashes: dict[tuple[str, int], str] = {}
+        for symbol, trading_day in sorted(fallback_candidates, key=lambda item: (item[1], item[0])):
+            snapshot_exchange, snapshot_receipt = self._exchange(
+                "MarketData.query_snapshot",
+                lambda symbol=symbol, day=trading_day: self.provider.query_snapshot_exchange(
+                    [symbol],
+                    begin_date=day,
+                    end_date=day,
+                ),
+                expected_params={
+                    "code_list": [symbol],
+                    "begin_date": trading_day,
+                    "end_date": trading_day,
+                    "begin_time": 93000000,
+                    "end_time": 150000000,
+                },
+            )
+            positive, snapshot_errors = _snapshot_trade_observation(
+                snapshot_exchange.payload,
+                symbol=symbol,
+                trading_day=trading_day,
+            )
+            if snapshot_errors:
+                raise AmazingDataAcquisitionError(
+                    "AmazingData positive-trade snapshot identity is malformed"
+                )
+            snapshot_exchanges.append(snapshot_exchange)
+            snapshot_request_hashes[(symbol, trading_day)] = snapshot_receipt.request_params_hash
+            if positive:
+                pair = (symbol, trading_day)
+                positive_trade_pairs.append(pair)
+                snapshot_receipts[pair] = snapshot_receipt
+
+        positive_trade_fallback = None
+        if fallback_candidates:
+            positive_trade_fallback = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+                queried_pairs=fallback_candidates,
+                positive_pairs=positive_trade_pairs,
+                request_params_by_pair=snapshot_request_hashes,
+            )
+
         kline_exchange, kline_receipt = self._exchange(
             "MarketData.query_kline",
             lambda: self.provider.query_kline_exchange(
@@ -164,6 +223,7 @@ class AmazingDataHistoryAcquisition:
             exact_day_universes=exact_day_universes,
             status_payload=status_exchange.payload,
             daily_bar_payload=kline_exchange.payload,
+            positive_trade_fallback=positive_trade_fallback,
         )
         try:
             evaluation.require_accepted()
@@ -181,6 +241,16 @@ class AmazingDataHistoryAcquisition:
                 "AmazingData daily-bar response has no returned date range"
             )
         operations = (calendar_receipt, code_receipt, status_receipt, kline_receipt)
+        positive_trade_operations = tuple(
+            PositiveTradeFallbackOperation(
+                security=symbol,
+                trading_day=trading_day,
+                exchange=snapshot_receipts[(symbol, trading_day)],
+            )
+            for symbol, trading_day in sorted(
+                positive_trade_pairs, key=lambda item: (item[1], item[0])
+            )
+        )
         retrieved_at = max(
             ensure_utc_timestamp(str(getattr(exchange.envelope, "received_at", "")))
             for exchange in (
@@ -189,6 +259,7 @@ class AmazingDataHistoryAcquisition:
                 status_exchange,
                 kline_exchange,
                 *exact_day_exchanges,
+                *snapshot_exchanges,
             )
         )
         capture = _VerifiedAmazingDataCapture._from_provider(  # noqa: SLF001
@@ -205,6 +276,7 @@ class AmazingDataHistoryAcquisition:
             returned_row_count=returned_row_count,
             operations=operations,
             semantic_operations=tuple(semantic_receipts),
+            positive_trade_operations=positive_trade_operations,
             completeness_evaluation=evaluation,
             retrieved_at_utc=retrieved_at,
         )

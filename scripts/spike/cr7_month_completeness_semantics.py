@@ -35,6 +35,10 @@ from ashare_state.providers.amazingdata.authoritative_history import (
 from ashare_state.providers.amazingdata.month_completeness import (
     AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION,
     AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION,
+    AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
+    _positive_trade_fallback_candidates,
+    _PositiveTradeFallbackEvidence,
+    _snapshot_trade_observation,
     evaluate_month_completeness,
 )
 from ashare_state.providers.amazingdata.provider import (
@@ -64,7 +68,7 @@ _ENV_KEYS = (
     "TGW_SERVER_VIP",
     "TGW_SERVER_PORT",
 )
-_SCHEMA = "cr7.month_completeness_semantics.v1"
+_SCHEMA = "cr7.month_completeness_semantics.v2"
 _RAW_INGEST_ID = "cr7-month-completeness-semantics-stage-a-20260914"
 _START = date(2024, 1, 1)
 _END = date(2024, 1, 31)
@@ -75,12 +79,14 @@ _STAGE_B_MONTHS = (
 )
 _STAGE_B_WORKER_TIMEOUT_SECONDS = 900
 _BLOCKED_EXIT_CODE = 2
-_STAGE_A_SCHEMA = "cr7.month_completeness_semantics.v1"
+_STAGE_A_SCHEMA = "cr7.month_completeness_semantics.v2"
 _STAGE_B_SCHEMA = "cr7.month_completeness_semantics.stage-b.v1"
 _STAGE_A_REPORT = Path("docs/provider_verification/cr7_month_completeness_stage_a_20260914.json")
 _SOURCE_CONTRACT = Path(
     "docs/provider_verification/source_selection_retrieval_closure_20260912.json"
 )
+_SNAPSHOT_BEGIN_TIME = 93000000
+_SNAPSHOT_END_TIME = 150000000
 
 
 def _load_env(path: Path) -> dict[str, str]:
@@ -336,6 +342,23 @@ def _stage_a_gate(path: Path) -> dict[str, Any]:
         raise ValueError("STAGE_A_RULE_VERSION_MISMATCH")
     if applicability_version != AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION:
         raise ValueError("STAGE_A_APPLICABILITY_VERSION_MISMATCH")
+    if evaluation.get("positive_trade_fallback_version") != (
+        AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION
+    ):
+        raise ValueError("STAGE_A_POSITIVE_TRADE_FALLBACK_VERSION_MISMATCH")
+    for field_name in (
+        "unresolved_pair_count",
+        "missing_required_pair_count",
+        "extra_returned_pair_count",
+    ):
+        if evaluation.get(field_name) != 0:
+            raise ValueError("STAGE_A_EVALUATION_HAS_BLOCKERS")
+    classification_counts = evaluation.get("classification_counts")
+    if (
+        not isinstance(classification_counts, Mapping)
+        or classification_counts.get("PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH") != 0
+    ):
+        raise ValueError("STAGE_A_EVALUATION_HAS_STRUCTURAL_BLOCKER")
     code_head = payload.get("code_head")
     if not isinstance(code_head, str) or not code_head:
         raise ValueError("STAGE_A_CODE_HEAD_MISSING")
@@ -518,6 +541,92 @@ def _run_month(
                 end=end,
             )
 
+    fallback_candidates = _positive_trade_fallback_candidates(
+        monthly_symbols=monthly_symbols,
+        trading_days=trading_days,
+        exact_day_universes=exact_day_universes,
+        status_payload=status_payload,
+    )
+    snapshot_calls: list[dict[str, Any]] = []
+    positive_trade_pairs: list[tuple[str, int]] = []
+    snapshot_request_hashes: dict[tuple[str, int], str] = {}
+    snapshot_observations: list[dict[str, Any]] = []
+    for symbol, trading_day in sorted(fallback_candidates, key=lambda item: (item[1], item[0])):
+
+        def snapshot_exchange(
+            requested_symbol: str = symbol,
+            requested_day: int = trading_day,
+        ) -> ProviderExchange:
+            return cast(
+                ProviderExchange,
+                provider.query_snapshot_exchange(
+                    [requested_symbol],
+                    begin_date=requested_day,
+                    end_date=requested_day,
+                    begin_time=_SNAPSHOT_BEGIN_TIME,
+                    end_time=_SNAPSHOT_END_TIME,
+                ),
+            )
+
+        snapshot_record, snapshot_payload = _call(
+            method="MarketData.query_snapshot",
+            fn=snapshot_exchange,
+            writer=writer,
+        )
+        snapshot_record = dict(snapshot_record)
+        snapshot_record["exact_security_scope"] = True
+        snapshot_record["exact_session"] = trading_day
+        snapshot_calls.append(snapshot_record)
+        if snapshot_payload is None:
+            return _blocked_month(
+                "POSITIVE_TRADE_FALLBACK_EXCHANGE_UNAVAILABLE",
+                calls=calls + exact_calls + snapshot_calls,
+                stage=stage,
+                start=start,
+                end=end,
+            )
+        positive, snapshot_errors = _snapshot_trade_observation(
+            snapshot_payload,
+            symbol=symbol,
+            trading_day=trading_day,
+        )
+        snapshot_observations.append(
+            {
+                "trading_day": trading_day,
+                "positive_num_trades": positive,
+                "structural_error_codes": list(snapshot_errors),
+            }
+        )
+        if snapshot_errors:
+            return _blocked_month(
+                "POSITIVE_TRADE_FALLBACK_IDENTITY_MISMATCH",
+                calls=calls + exact_calls + snapshot_calls,
+                stage=stage,
+                start=start,
+                end=end,
+            )
+        positive_trade_pairs.extend([(symbol, trading_day)] if positive else [])
+        snapshot_request_hashes[(symbol, trading_day)] = str(
+            snapshot_record.get("request_params_hash") or ""
+        )
+
+    positive_trade_fallback = None
+    if fallback_candidates:
+        try:
+            positive_trade_fallback = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+                queried_pairs=fallback_candidates,
+                positive_pairs=positive_trade_pairs,
+                request_params_by_pair=snapshot_request_hashes,
+            )
+        except Exception:  # noqa: BLE001 - private evidence admission is fail-closed
+            return _blocked_month(
+                "POSITIVE_TRADE_FALLBACK_EVIDENCE_INVALID",
+                calls=calls + exact_calls + snapshot_calls,
+                stage=stage,
+                start=start,
+                end=end,
+            )
+
     daily_record, daily_payload = _call(
         method="MarketData.query_kline",
         fn=lambda: provider.query_kline_exchange(
@@ -530,6 +639,7 @@ def _run_month(
         writer=writer,
     )
     calls.extend(exact_calls)
+    calls.extend(snapshot_calls)
     calls.append(daily_record)
     if daily_payload is None:
         return _blocked_month(
@@ -547,6 +657,7 @@ def _run_month(
             exact_day_universes=exact_day_universes,
             status_payload=status_payload,
             daily_bar_payload=daily_payload,
+            positive_trade_fallback=positive_trade_fallback,
         )
     except Exception:  # noqa: BLE001 - semantic failure is represented below
         return _blocked_month(
@@ -578,6 +689,16 @@ def _run_month(
         },
         "exact_session_universes": _exact_universe_summary(exact_day_universes),
         "status_observation": _status_summary(status_payload),
+        "positive_trade_fallback": {
+            "version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
+            "eligible_pair_count": len(fallback_candidates),
+            "queried_pair_count": len(snapshot_calls),
+            "positive_trade_pair_count": len(positive_trade_pairs),
+            "positive_trade_pair_set_hash": _hash_json(
+                [[symbol, day] for symbol, day in sorted(positive_trade_pairs)]
+            ),
+            "observations": snapshot_observations,
+        },
         "daily_bar_observation": _payload_shape_summary(daily_payload),
         "evaluation": evaluation.as_dict(),
         "calls": calls,
@@ -617,6 +738,11 @@ def _base_report(
             "selection_version": AUTHORITATIVE_SOURCE_SELECTION_VERSION,
             "provider": "amazingdata",
             "methods": list(AUTHORITATIVE_SOURCE_METHODS),
+        },
+        "positive_trade_fallback": {
+            "method": "MarketData.query_snapshot",
+            "version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
+            "rule": "finite_num_trades_strictly_greater_than_zero_only",
         },
         "source_contract": _source_contract(repo_root),
         "authorization_boundary": {

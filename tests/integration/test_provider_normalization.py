@@ -1818,10 +1818,13 @@ class TestRegistryStructuralGuard:
         surface of the provider contract has an explicit normalization
         classification - OPTIONAL_NON_APPROVAL surfaces are declared
         NOT_APPLICABLE instead of vanishing from structural truth."""
-        sdk = {(c.capability, c.endpoint) for c in SDK_METHOD_CLASSIFICATIONS}
+        sdk = {
+            (c.normalization_surface or c.capability, c.endpoint)
+            for c in SDK_METHOD_CLASSIFICATIONS
+        }
         registry = {(spec.normalization_surface, spec.endpoint) for spec in registry_specs()}
         assert sdk == registry
-        assert len(sdk) == 18  # 15 consumable + 3 NOT_APPLICABLE
+        assert len(sdk) == 19  # 16 consumable + 3 NOT_APPLICABLE
         not_applicable = {
             (spec.normalization_surface, spec.endpoint)
             for spec in registry_specs()
@@ -1881,6 +1884,7 @@ class TestRegistryStructuralGuard:
         from ashare_state.providers.amazingdata.operations import (
             DAILY_BAR_KLINE,
             INDEX_DAILY_KLINE,
+            TRADE_ACTIVITY_SNAPSHOT,
         )
 
         tree = ast.parse(PROVIDER_SOURCE.read_text(encoding="utf-8"))
@@ -1900,6 +1904,7 @@ class TestRegistryStructuralGuard:
                         spec_by_wrapper.setdefault(method.name, []).append(node.args[0].id)
         assert spec_by_wrapper.get("query_kline_exchange") == ["DAILY_BAR_KLINE"]
         assert spec_by_wrapper.get("query_index_kline_exchange") == ["INDEX_DAILY_KLINE"]
+        assert spec_by_wrapper.get("query_snapshot_exchange") == ["TRADE_ACTIVITY_SNAPSHOT"]
         # the two specs differ in capability + surface, share the endpoint
         assert DAILY_BAR_KLINE.capability == "daily_bar"
         assert DAILY_BAR_KLINE.normalization_surface == "daily_bar"
@@ -1907,6 +1912,9 @@ class TestRegistryStructuralGuard:
         assert INDEX_DAILY_KLINE.normalization_surface == "index_daily"
         assert DAILY_BAR_KLINE.endpoint == INDEX_DAILY_KLINE.endpoint
         assert DAILY_BAR_KLINE.provider_dataset == INDEX_DAILY_KLINE.provider_dataset
+        assert TRADE_ACTIVITY_SNAPSHOT.capability == "daily_bar"
+        assert TRADE_ACTIVITY_SNAPSHOT.normalization_surface == "trade_activity_snapshot"
+        assert TRADE_ACTIVITY_SNAPSHOT.endpoint == "MarketData.query_snapshot"
 
     def test_no_public_generic_exchange_boundary(self):
         """CR-2.3 P0-01 (audit 20260901 section 2.2): there is NO public
@@ -2403,7 +2411,7 @@ class TestOperationSpecProvenance:
             for spec in registry_specs()
         }
         ops = operation_specs()
-        assert len(ops) == 15
+        assert len(ops) == 16
         seen_registry_keys = set()
         for op in ops:
             assert (op.capability, op.endpoint) in sdk, (
