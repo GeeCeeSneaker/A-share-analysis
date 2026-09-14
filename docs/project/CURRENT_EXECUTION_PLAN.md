@@ -230,10 +230,16 @@ ignored raw 的固定批次身份与成员文件名哈希定位异常成员，�
 request id/参数哈希、schema/row count、已知 SDK callback 状态和本地 anchored raw 证据摘要，不输出
 证券值、原始 payload、凭证或 runtime 文件；Stage B、materializer 和 formal/production 均不会被调用。
 
-脚本还锁定一个重要边界：`kDataEmpty` 或空 DataFrame 只能表示“本次没有返回状态数据”，不能被
-转换为 `IS_SUSP_SEC=0`，也不能被转换为“无状态变化”。如果单成员响应仍无正向 provider 语义规则，
-唯一合法结论是 `STOP(BLOCKED)`；只有 AmazingData 正面定义了该形态的状态含义，才允许进入语义编码
-和 Stage A 重跑。当前先完成该脚本的 exact-head QA/CI，再执行一次 bounded probe。
+精确头 `d5a7577709f76d2caf2ad5b427aaa8ad8cb2d4a8` 的 GitHub Actions CI #604 三个平台均为
+`success`。随后 bounded probe 于 `2026-09-14T11:24:08.134017+00:00` 完成：保留批次中目标成员与
+singleton 响应均为零行零列，SDK callback 为 2 次 `kDataEmpty` + `data=None`，raw writer 保留
+形态，未发现适配器列丢失。脱敏报告见 [`cr7_status_schema_blocker_20260914.json`](../provider_verification/cr7_status_schema_blocker_20260914.json)
+和 [`cr7_status_schema_blocker_20260914.md`](../provider_verification/cr7_status_schema_blocker_20260914.md)。
+
+脚本锁定的语义边界仍有效：`kDataEmpty` 或空 DataFrame 只能表示“本次没有返回状态数据”，不能被
+转换为 `IS_SUSP_SEC=0`，也不能被转换为“无状态变化”。本次没有观察到正向 AmazingData 语义规则，
+因此唯一合法结论是 `STOP(BLOCKED)`；当前 Stage A 保持 fail-closed，等待 Owner 决定是否取得正式
+状态语义契约、替代接口或其他经授权的数据源。在此之前不重跑 Stage A 语义编码，不启动 Stage B。
 
 ## 5. 当前明确禁止
 
