@@ -1,3 +1,20 @@
+## 2026-09-15 · Issue #59 `300114.SZ` 单证券 provider identity 调查
+
+> 状态：**STOP(BLOCKED) / NO PROVIDER-OWNED IDENTITY-DATE EVIDENCE / NO CODE CHANGE**
+
+- 基于合并后的 `main@9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`，按 scheduler
+  comment `5689306424` 只调查 `300114.SZ`，没有查询其他证券、其他 provider 或未授权阶段。
+- 现有 typed `InfoData.get_stock_basic` 与底层 `DownloadInfoData.download_stock_basic` 均返回
+  `OK + 0 rows` 的 pandas DataFrame；schema 包含 `MARKET_CODE`、`LISTDATE`、`DELISTDATE`，
+  但没有身份或日期值。SDK 语义检查确认底层逐个使用传入 symbol，没有可用的隐藏日期来源。
+- 因此没有安全的代码适配；不能从 bars、查询日期、首个 session、代码前缀、请求顺序或 hist
+  membership 推断 PIT identity，也不能静默删除 universe member。完整 source-input → Canonical
+  仍 `STOP(BLOCKED)`，没有进入 Snapshot/ReadModel/projection、acquisition、receipt、coverage
+  或 materialization。
+- 脱敏证据见
+  [`cr7_issue59_300114_identity_probe_20260915.md`](provider_verification/cr7_issue59_300114_identity_probe_20260915.md)
+  及对应 JSON；完整 raw 与 SDK/runtime 仍仅在本地忽略的 `data/spike/`。
+
 ## 2026-09-15 · Issue #59 CR-2 provider-native shape 适配与完整 2024-01 复核
 
 > 状态：**CR-2 ADAPTER VERIFIED / FULL 2024-01 CANONICAL BLOCKED / NO RECEIPT / NO MATERIALIZATION**

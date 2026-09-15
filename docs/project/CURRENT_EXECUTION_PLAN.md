@@ -6,8 +6,8 @@
 
 ## 0. 2026-09-15 当前调度覆盖
 
-当前 clean `main` 为 `31b5fe478a6140839281c7877829f225277cae14`（PR #69 已合并，PR #68 的合并提交
-为其祖先）。当前唯一活动 P0 仍为 Issue #59：先完成完整 `2024-01` 的真实 source-input
+当前 clean `main` 为 `9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`（PR #70 已合并）。当前唯一活动
+P0 仍为 Issue #59：先完成完整 `2024-01` 的真实 source-input
 Canonical → Snapshot → ReadModel → projection，再进入既有 acquisition → receipt replay →
 coverage basis → bounded atomic materialization → ordinary-reader proof。
 
@@ -26,6 +26,13 @@ CR-5/R2、Golden/H1、baseline 或策略工作。
 最终代码版本重放的 Canonical run `958b02f2-e8c2-5815-be82-aa96ac6bf652` 以 `IDENTITY_MISSING (22)`
 `STOP(BLOCKED)`。这不是账号、网络或适配器阻断，不能删除成员或填造 PIT identity；完整
 verified source snapshot、receipt、coverage 和 materializer 仍未构造。
+
+PR #70 已通过独立审阅并合并。合并后的单证券调查记录在
+[`cr7_issue59_300114_identity_probe_20260915.md`](../provider_verification/cr7_issue59_300114_identity_probe_20260915.md)
+及对应 JSON：`InfoData.get_stock_basic` 和底层 `DownloadInfoData.download_stock_basic` 对
+`300114.SZ` 均为 `OK + 0 rows`，未找到 provider-owned identity/date evidence。当前不修改代码；
+下一决策只能是 Owner/PM 提供同一 provider 的权威身份/日期记录，或正式修订 2024-01 universe
+contract。条件满足前不得继续下游链，也不得执行 Stage B、78 月或其他未授权工作。
 
 ## 1. 项目管理责任
 
