@@ -742,6 +742,8 @@ def test_bounded_authoritative_materialization_is_readable_and_idempotent(
         build_timestamp="2026-09-16T00:00:00+00:00",
     )
     assert replay.idempotent_replay is True
+    assert replay.materialization_id == first.materialization_id
+    assert replay.idempotency_key == first.idempotency_key
 
     changed = _projection([_row(date(2020, 1, 2), "security-sse", close=11.5)])
     with pytest.raises(MaterializationConflictError, match="content|inventory"):
@@ -761,12 +763,20 @@ def test_bounded_scope_orders_multiple_typed_partitions(tmp_path: Path) -> None:
         writer_runtime_lock_hash=_writer_hash(),
         build_code_fingerprint=BUILD_FINGERPRINT,
     )
+    projection = _projection([_row(date(2020, 1, 2), "security-sse")])
 
+    single = materializer.plan(projection, materialization_partitions=(first,))
     plan = materializer.plan(
-        _projection([_row(date(2020, 1, 2), "security-sse")]),
+        projection,
         materialization_partitions=(second, first),
     )
 
+    assert single.materialization_id != plan.materialization_id
+    assert single.idempotency_key != plan.idempotency_key
+    assert (
+        single.materialization_identity["materialization_scope_hash"]
+        != plan.materialization_identity["materialization_scope_hash"]
+    )
     assert plan.materialization_partitions == (first, second)
     assert len(plan.logical_partition_inventory) == 2
     assert plan.coverage_evidence_class is CoverageEvidenceClass.UNRESOLVED

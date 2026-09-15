@@ -38,6 +38,8 @@
     "requested_logical_partition_count": 1,
     "current_default_logical_partition_count": 78,
     "explicit_scope_version": "bounded-materialization-scope-v1",
+    "scope_bound_identity_field": "materialization_scope_hash",
+    "scope_bound_idempotency_and_materialization_id": true,
     "default_full_window_unchanged": true,
     "bounded_scope_reader_supported": true,
     "current_reader_requires_authoritative_basis_per_inventory_partition": true,

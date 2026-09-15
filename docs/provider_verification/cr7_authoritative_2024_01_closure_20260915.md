@@ -1,6 +1,7 @@
 # CR-7 2024-01 权威闭环执行记录（2026-09-15）
 
-状态：`STOP(BLOCKED)`；bounded materializer/reader 整改已在本分支完成并待独立审阅，仍不铸造
+状态：`STOP(BLOCKED)`；bounded materializer/reader 整改（含 identity scope binding）已在本分支
+完成并待独立审阅，仍不铸造
 authoritative receipt、不执行真实 materialization、不执行 Stage B。
 
 本记录对应 Issue #59 当前要求，只检查 `2024-01`。原始 provider payload、账号凭证、私有
@@ -55,11 +56,14 @@ semantic hash、canonical run id 和 PIT；这些值可以脱敏记录，但不�
   `materialization_partitions`；省略参数仍使用既有 78 个月窗口。
 - 有界范围会裁剪范围外 projection rows，并让 coverage evaluation、artifact、inventory、
   basis 和 completeness evidence 只覆盖目标分区；范围外 coverage descriptor 会 fail closed。
-- manifest 写入版本化 `materialization_scope`；reader 按 manifest scope 验证 inventory、每个
+- manifest 写入版本化 `materialization_scope`，其确定性 SHA-256 同时进入
+  `materialization_identity`；因此同一 source/projection 的不同 scope 会产生不同的
+  `idempotency_key`/`materialization_id`。reader 按 manifest scope 验证 inventory、每个
   enabled 分区的 authoritative evidence，并拒绝跨出已发布范围的读取。
 - idempotent replay 复用同一 scope；manifest scope 改变、内容改变或 retained evidence 不一致时
   仍走既有 conflict/fail-closed 路径。
-- 新测试覆盖单分区读取、跨分区拒绝、相同 scope replay 和变更内容冲突；既有 78 月测试也通过。
+- 新测试覆盖单分区读取、跨分区拒绝、相同 scope replay、不同 scope 生成不同 identity 和变更
+  内容冲突；既有 78 月测试也通过。
 
 这项整改只证明代码边界可以承接一个月；测试使用的 fake receipt/fixture 不能作为生产 authority，
 也不替代真实 2024-01 acquisition。

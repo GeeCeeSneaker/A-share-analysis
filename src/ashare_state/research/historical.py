@@ -206,9 +206,13 @@ _EXPECTED_IDENTITY_FIELDS = (
     "universe_basis",
     "coverage_policy_version",
     "partition_policy_version",
+    "materialization_scope_hash",
     "build_code_fingerprint",
     "writer_runtime_lock_hash",
     "coverage_basis_set_hash",
+)
+_LEGACY_EXPECTED_IDENTITY_FIELDS = tuple(
+    field for field in _EXPECTED_IDENTITY_FIELDS if field != "materialization_scope_hash"
 )
 _BASIS_FIELDS = (
     "coverage_basis_id",
@@ -1984,6 +1988,10 @@ def _materialization_scope_manifest(
     }
 
 
+def _materialization_scope_hash(partitions: Sequence[PartitionKey]) -> str:
+    return sha256_hex(canonical_json(_materialization_scope_manifest(partitions)))
+
+
 @dataclass(frozen=True)
 class CoverageBasisDescriptor:
     """A sealed, typed completeness descriptor for one enabled month.
@@ -2531,11 +2539,16 @@ def build_materialization_identity(
     *,
     writer_runtime_lock_hash: str,
     coverage_basis_set_hash: str,
+    materialization_scope_hash: str | None = None,
     build_code_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     """Build the exact contract identity; wall-clock fields never enter it."""
     writer_hash = _require_sha256(writer_runtime_lock_hash, "writer_runtime_lock_hash")
     basis_hash = _require_sha256(coverage_basis_set_hash, "coverage_basis_set_hash")
+    scope_hash = _require_sha256(
+        materialization_scope_hash or _materialization_scope_hash(expected_partition_keys()),
+        "materialization_scope_hash",
+    )
     code_fingerprint = _require_sha256(
         build_code_fingerprint or research_code_fingerprint(), "build_code_fingerprint"
     )
@@ -2584,6 +2597,7 @@ def build_materialization_identity(
         "universe_basis": UNIVERSE_BASIS,
         "coverage_policy_version": COVERAGE_POLICY_VERSION,
         "partition_policy_version": PARTITION_POLICY_VERSION,
+        "materialization_scope_hash": scope_hash,
         "build_code_fingerprint": code_fingerprint,
         "writer_runtime_lock_hash": writer_hash,
         "coverage_basis_set_hash": basis_hash,
@@ -2595,7 +2609,10 @@ def build_materialization_identity(
 
 def compute_idempotency_key(identity: Mapping[str, Any]) -> str:
     """Hash canonical JSON of exactly the merged contract identity fields."""
-    if set(identity) != set(_EXPECTED_IDENTITY_FIELDS):
+    if set(identity) not in (
+        set(_EXPECTED_IDENTITY_FIELDS),
+        set(_LEGACY_EXPECTED_IDENTITY_FIELDS),
+    ):
         raise HistoricalMaterializationError("materialization identity fields are not exact")
     return sha256_hex(canonical_json(identity))
 
@@ -3066,6 +3083,7 @@ class OfflineHistoricalMaterializer:
             projection,
             writer_runtime_lock_hash=self.writer_runtime_lock_hash,
             coverage_basis_set_hash=basis_hash,
+            materialization_scope_hash=_materialization_scope_hash(target_partitions),
             build_code_fingerprint=self.build_code_fingerprint,
         )
         idempotency_key = compute_idempotency_key(identity)
@@ -3745,15 +3763,22 @@ class HistoricalMaterializationReader:
             if marker.get(field) != manifest.get(field):
                 raise HistoricalReadError(f"historical marker {field} mismatch")
         identity = manifest.get("materialization_identity")
-        if not isinstance(identity, Mapping) or set(identity) != set(_EXPECTED_IDENTITY_FIELDS):
+        if not isinstance(identity, Mapping) or set(identity) not in (
+            set(_EXPECTED_IDENTITY_FIELDS),
+            set(_LEGACY_EXPECTED_IDENTITY_FIELDS),
+        ):
             raise HistoricalReadError("historical materialization identity is malformed")
+        materialization_partitions = _read_materialization_scope(manifest)
+        if set(identity) == set(_EXPECTED_IDENTITY_FIELDS) and identity.get(
+            "materialization_scope_hash"
+        ) != _materialization_scope_hash(materialization_partitions):
+            raise HistoricalReadError("historical materialization scope hash changed")
         try:
             expected_materialization_id = compute_materialization_id(identity)
         except HistoricalMaterializationError as exc:
             raise HistoricalReadError("historical materialization identity is invalid") from exc
         if expected_materialization_id != manifest.get("materialization_id"):
             raise HistoricalReadError("historical materialization identity hash mismatch")
-        materialization_partitions = _read_materialization_scope(manifest)
         inventory_path = path.parent / "partition_inventory.json"
         if not inventory_path.is_file():
             raise HistoricalReadError("historical partition inventory is missing")

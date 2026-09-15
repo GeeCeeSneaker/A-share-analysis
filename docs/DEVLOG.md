@@ -13,7 +13,11 @@
   当作 source snapshot，也没有铸造 authoritative receipt。
 - 前置检查另发现历史 materializer/ordinary reader 固定 78 个月与本轮单月目标不一致；已在当前
   分支增加版本化 typed `materialization_partitions` scope。显式单月范围会绑定 coverage、
-  artifact、inventory、manifest、replay/conflict 和 reader；省略范围的默认路径仍是 78 月。
+  artifact、inventory、manifest、`materialization_scope_hash`、idempotency/conflict 和 reader；
+  省略范围的默认路径仍是 78 月。
+- `materialization_scope_hash` 已纳入现有 `materialization_identity`；同一 source/projection
+  的不同 scope 现在生成不同的 idempotency/materialization id，避免范围只存在 manifest 而与
+  identity 脱节。
 - bounded scope 的历史物化聚焦测试 27 项通过，全仓 pytest、ruff check/format、mypy 均通过；
   该测试使用 fake receipt/fixture，只证明代码边界，不能充当生产 authority。
 - 脱敏报告见 `docs/provider_verification/cr7_authoritative_2024_01_closure_20260915.md/json`。
