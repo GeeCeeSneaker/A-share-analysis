@@ -1,3 +1,17 @@
+## 2026-09-15 · DEVLOG gate historical exception disclosed
+
+> 状态：**GOVERNANCE CORRECTION / SHA-SCOPED EXCEPTION / NO PRODUCT CHANGE**
+
+- PR #71 的 CI run `35036641102` 首次在合并后的主线历史上执行完整 DEVLOG gate，发现已合并的
+  `a4cad46b0ea54f7a08ec6f6c80ef20918aef2d39`（PR #70 审阅要求的 `_to_int()` 局部修正）触碰
+  `src/` 但没有在同一历史提交触碰 `docs/DEVLOG.md`。
+- 该提交已经进入不可重写的 `main` 历史；本条记录与
+  `tests/integration/test_devlog_gate.py` 中的 SHA-scoped allowlist 共同披露这一已知例外。
+  例外只覆盖该精确 SHA，不放宽未来提交的同提交 DEVLOG 要求，也不改变任何产品语义。
+- 本次修正只恢复治理门禁的历史可验证性；`300114.SZ` provider identity/date 缺口仍为
+  Issue #59 的 `STOP(BLOCKED)`，调查证据见
+  [`cr7_issue59_300114_identity_probe_20260915.md`](provider_verification/cr7_issue59_300114_identity_probe_20260915.md)。
+
 ## 2026-09-15 · Issue #59 `300114.SZ` 单证券 provider identity 调查
 
 > 状态：**STOP(BLOCKED) / NO PROVIDER-OWNED IDENTITY-DATE EVIDENCE / NO CODE CHANGE**
