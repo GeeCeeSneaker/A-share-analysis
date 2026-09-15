@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from ashare_state.providers.amazingdata.mapper import (
@@ -47,6 +49,32 @@ class TestSecurityMasterMarket:
     def test_known_market_normalizes(self):
         dto = map_security_master_row({"SECURITY_CODE": "600000", "MARKET_CODE": "1"}, source="x")
         assert dto.provider_symbol == "600000.SH"
+
+    def test_suffixed_market_code_is_verified_provider_identity(self):
+        dto = map_security_master_row(
+            {"MARKET_CODE": "000001.SZ", "LISTDATE": 19910403}, source="x"
+        )
+        assert dto.provider_symbol == "000001.SZ"
+        assert dto.security_code == "000001"
+        assert dto.market_code == "2"
+        assert dto.list_date == date(1991, 4, 3)
+
+    def test_synthetic_index_does_not_override_verified_market_code_identity(self):
+        dto = map_security_master_row(
+            {
+                "MARKET_CODE": "000001.SZ",
+                "__index_level_0__": 0,
+                "LISTDATE": 19910403,
+            },
+            source="x",
+        )
+        assert dto.provider_symbol == "000001.SZ"
+
+    def test_conflicting_explicit_code_and_market_code_carrier_blocks(self):
+        with pytest.raises(MappingValidationError, match="conflicts"):
+            map_security_master_row(
+                {"SECURITY_CODE": "600000", "MARKET_CODE": "000001.SZ"}, source="x"
+            )
 
 
 class TestDailyBarSymbolNormalized:

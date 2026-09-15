@@ -12,7 +12,9 @@ Contract (audit R4-A2.3 sections 4-5 + R4-A2.4 section 3):
   conflicts with the envelope BLOCKS instead of silently overriding.
 - Idempotent: same request + same content hash -> no-op
 - Conflict: same request + different bytes -> BLOCK
-- Lossless: structured tabular payloads go to Parquet; never repr()
+- Lossless: structured tabular payloads go to Parquet; never repr(); a
+  non-default pandas index is retained because a provider may carry identity
+  there
 - Secret-scrubbed: params are scrubbed before persisting
 - Cross-platform logical URI: relative, forward slashes, no drive letters
 
@@ -189,6 +191,29 @@ def _is_dataframe_like(obj: Any) -> bool:
     return _to_arrow_table(obj) is not None
 
 
+def _has_meaningful_pandas_index(obj: Any) -> bool:
+    """Keep a provider index when it is not pandas' synthetic row index.
+
+    ``stock_basic`` in the observed AmazingData SDK omits the code column;
+    its only possible response-side identity is a meaningful DataFrame
+    index.  Preserving every default ``RangeIndex`` would add a synthetic
+    column to ordinary pandas payloads, while dropping a non-default index
+    is a lossy raw-evidence conversion.  This duck-typed check keeps the
+    optional pandas dependency out of the core package.
+    """
+    index = getattr(obj, "index", None)
+    if index is None:
+        return False
+    if type(index).__name__ != "RangeIndex":
+        return True
+    try:
+        return not (int(index.start) == 0 and int(index.step) == 1 and int(index.stop) == len(obj))
+    except (AttributeError, TypeError, ValueError):
+        # An unfamiliar index implementation is meaningful by default; raw
+        # evidence must not silently discard an identity-bearing structure.
+        return True
+
+
 def _to_arrow_table(obj: Any) -> Any | None:
     """Convert a DataFrame-like object to a pyarrow Table, or None."""
     if isinstance(obj, _pa_table_type()):
@@ -209,7 +234,7 @@ def _to_arrow_table(obj: Any) -> Any | None:
     if callable(to_records) and hasattr(obj, "columns"):
         import pyarrow as pa
 
-        return pa.Table.from_pandas(obj, preserve_index=False)
+        return pa.Table.from_pandas(obj, preserve_index=_has_meaningful_pandas_index(obj))
     return None
 
 

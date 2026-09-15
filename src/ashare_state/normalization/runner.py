@@ -73,6 +73,7 @@ from ashare_state.normalization.registry import (
     mapper_identity_for,
     specs_for,
 )
+from ashare_state.providers.amazingdata.mapper import validate_provider_symbol
 from ashare_state.providers.errors import MappingValidationError
 from ashare_state.storage.paths import physical_from_logical_uri, validate_logical_uri
 from ashare_state.storage.raw_anchor import lookup_raw_evidence_anchor
@@ -80,6 +81,7 @@ from ashare_state.storage.raw_writer import (
     KIND_EMPTY,
     KIND_MULTI_FRAMES,
     KIND_MULTI_ROWS,
+    KIND_PACKED_MULTI,
     RawWriter,
     RawWriterError,
     VerifiedRawEvidence,
@@ -100,6 +102,17 @@ _RUN_NAMESPACE = uuid.UUID("6f1c2b9a-4d3e-5f8a-9b7c-1e2d3c4b5a60")
 _QTZ_NAMESPACE = uuid.UUID("8d2e3f0b-5c4a-6e9d-af8d-2f3e4d5c6b71")
 
 _SECRET_MARKERS = ("password", "token", "secret", "credential")
+
+# CR-2 source-shape closure is intentionally explicit rather than a generic
+# adapter registry.  This is the one provider response whose logical table
+# names are dynamic security symbols and therefore cannot use DatasetNormalizationSpec.source_table.
+_DAILY_BAR_MEMBER_MAP = (
+    "amazingdata",
+    "daily_bar",
+    "MarketData.query_kline",
+    "daily_bar",
+)
+_DAILY_BAR_MEMBER_KEY_FIELD = "__provider_member_key__"
 
 #: semantic fields of a quarantine record entering the exact-set seal
 _QTZ_SEMANTIC_FIELDS = (
@@ -773,7 +786,85 @@ class NormalizationRunner:
 
         # ------------------------------------------ frame / table routing
         raw_table_name: str | None = None
-        if isinstance(payload, dict):
+        row_locators: list[tuple[str | None, int]] = []
+        if isinstance(payload, dict) and self._is_daily_bar_member_map(
+            provider=provider,
+            provider_dataset=provider_dataset,
+            endpoint=endpoint,
+            surface=surface,
+            payload_kind=payload_kind,
+        ):
+            # AmazingData's daily-bar response is an explicit
+            # provider-symbol -> DataFrame map.  Every member is processed;
+            # no member is selected by order and None members contribute no
+            # rows (their exact absence remains in the raw meta inventory).
+            row_list = []
+            for member_key in sorted(payload):
+                try:
+                    validate_provider_symbol(
+                        member_key,
+                        context="daily_bar member map",
+                    )
+                except MappingValidationError as exc:
+                    return self._blocked_run(
+                        provider=provider,
+                        provider_dataset=provider_dataset,
+                        request_id=request_id,
+                        raw_evidence_uri=raw_evidence_uri,
+                        raw_evidence_hash=raw_evidence_hash,
+                        raw_payload_kind=payload_kind,
+                        endpoint=endpoint,
+                        surface=surface or None,
+                        error_class=NormalizationErrorClass.MAPPING_VALIDATION_FAILED,
+                        error_message=str(exc),
+                        started=started,
+                        input_count=0,
+                        normalized_count=0,
+                        quarantined_count=0,
+                        manifest_uri=None,
+                        manifest_hash=None,
+                        quarantines=[],
+                        spec=spec,
+                        idempotency_key=idempotency_key,
+                    )
+                frame = payload[member_key]
+                if frame is None:
+                    continue
+                if not hasattr(frame, "iter_rows"):
+                    # RawWriter.read currently guarantees DataFrame-like
+                    # members.  Keep this boundary fail-closed if that
+                    # storage contract changes.
+                    detail = (
+                        f"daily_bar member {member_key!r} is not a readable DataFrame; "
+                        "provider member-map shape cannot be normalized"
+                    )
+                    return self._blocked_run(
+                        provider=provider,
+                        provider_dataset=provider_dataset,
+                        request_id=request_id,
+                        raw_evidence_uri=raw_evidence_uri,
+                        raw_evidence_hash=raw_evidence_hash,
+                        raw_payload_kind=payload_kind,
+                        endpoint=endpoint,
+                        surface=surface or None,
+                        error_class=NormalizationErrorClass.PAYLOAD_SHAPE_UNSUPPORTED,
+                        error_message=detail,
+                        started=started,
+                        input_count=0,
+                        normalized_count=0,
+                        quarantined_count=0,
+                        manifest_uri=None,
+                        manifest_hash=None,
+                        quarantines=[],
+                        spec=spec,
+                        idempotency_key=idempotency_key,
+                    )
+                for ordinal, row in enumerate(frame.iter_rows(named=True)):
+                    adapted = dict(row)
+                    adapted[_DAILY_BAR_MEMBER_KEY_FIELD] = str(member_key)
+                    row_list.append(adapted)
+                    row_locators.append((str(member_key), ordinal))
+        elif isinstance(payload, dict):
             # multi-table payload: exact table routing only (P0-06)
             if spec.source_table is None or spec.source_table not in payload:
                 names = sorted(payload.keys())
@@ -808,13 +899,16 @@ class NormalizationRunner:
                 )
             raw_table_name = spec.source_table
             frame = payload[spec.source_table]
+            rows: list[dict[str, Any]] = (
+                frame.iter_rows(named=True) if hasattr(frame, "iter_rows") else []
+            )
+            row_list = list(rows)
+            row_locators = [(raw_table_name, ordinal) for ordinal in range(len(row_list))]
         else:
             frame = payload
-
-        rows: list[dict[str, Any]] = (
-            frame.iter_rows(named=True) if hasattr(frame, "iter_rows") else []
-        )
-        row_list = list(rows)
+            rows = frame.iter_rows(named=True) if hasattr(frame, "iter_rows") else []
+            row_list = list(rows)
+            row_locators = [(raw_table_name, ordinal) for ordinal in range(len(row_list))]
         input_count = len(row_list)
 
         # ------------------------------------------------------ mapping
@@ -851,6 +945,8 @@ class NormalizationRunner:
         else:
             assert spec.map_row is not None
             for ordinal, row in enumerate(row_list):
+                row_table_name, row_source_ordinal = row_locators[ordinal]
+                row_source_key = self._source_key_of(row) or row_table_name
                 try:
                     outputs = spec.map_row(dict(row))
                     for output_name, dto in outputs.items():
@@ -864,9 +960,9 @@ class NormalizationRunner:
                             request_id=request_id,
                             raw_evidence_uri=raw_evidence_uri,
                             raw_evidence_hash=raw_evidence_hash,
-                            raw_table_name=raw_table_name,
-                            raw_row_ordinal=ordinal,
-                            source_key=self._source_key_of(row),
+                            raw_table_name=row_table_name,
+                            raw_row_ordinal=row_source_ordinal,
+                            source_key=row_source_key,
                             scope=QuarantineScope.ROW,
                             error_class=NormalizationErrorClass.MAPPING_VALIDATION_FAILED,
                             message=str(exc),
@@ -882,9 +978,9 @@ class NormalizationRunner:
                             request_id=request_id,
                             raw_evidence_uri=raw_evidence_uri,
                             raw_evidence_hash=raw_evidence_hash,
-                            raw_table_name=raw_table_name,
-                            raw_row_ordinal=ordinal,
-                            source_key=self._source_key_of(row),
+                            raw_table_name=row_table_name,
+                            raw_row_ordinal=row_source_ordinal,
+                            source_key=row_source_key,
                             scope=QuarantineScope.ROW,
                             error_class=NormalizationErrorClass.NORMALIZATION_INTERNAL_ERROR,
                             message=f"{type(exc).__name__}: {exc}"[:500],
@@ -1132,6 +1228,29 @@ class NormalizationRunner:
         )
 
     # ------------------------------------------------------------ routing
+    @staticmethod
+    def _is_daily_bar_member_map(
+        *,
+        provider: str,
+        provider_dataset: str,
+        endpoint: str,
+        surface: str,
+        payload_kind: str,
+    ) -> bool:
+        """Recognize only the observed AmazingData daily-bar member map.
+
+        Dynamic member names cannot be represented by the registry's exact
+        ``source_table`` field.  The shape is therefore closed at this one
+        explicit boundary; every other dict payload still requires an exact
+        static table route and fails closed.
+        """
+        return (
+            provider,
+            provider_dataset,
+            endpoint,
+            surface,
+        ) == _DAILY_BAR_MEMBER_MAP and payload_kind in (KIND_MULTI_FRAMES, KIND_PACKED_MULTI)
+
     def _route(
         self, provider: str, provider_dataset: str, endpoint: str, surface: str
     ) -> tuple[DatasetNormalizationSpec | None, tuple[NormalizationErrorClass, str] | None]:
@@ -1692,7 +1811,12 @@ class NormalizationRunner:
     def _source_key_of(row: dict[str, Any]) -> str | None:
         """Best-effort natural key for the quarantine record (never a
         REPLACEMENT for the raw row locator)."""
-        for candidate in ("SECURITY_CODE", "INDEX_CODE", "code"):
+        for candidate in (
+            "SECURITY_CODE",
+            "INDEX_CODE",
+            "code",
+            _DAILY_BAR_MEMBER_KEY_FIELD,
+        ):
             value = row.get(candidate)
             if value is not None:
                 return str(value)
@@ -1839,7 +1963,7 @@ class NormalizationRunner:
         write_file_atomic(path, data)
 
 
-_ = (KIND_EMPTY, KIND_MULTI_ROWS, KIND_MULTI_FRAMES)  # documented kinds
+_ = (KIND_EMPTY, KIND_MULTI_ROWS, KIND_MULTI_FRAMES, KIND_PACKED_MULTI)  # documented kinds
 
 
 def verify_normalized_run(

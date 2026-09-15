@@ -6,9 +6,10 @@
 
 ## 0. 2026-09-15 当前调度覆盖
 
-当前 clean `main` 为 `a7671ab34d301cb0aca2f351a31bbc865c100498`，PR #68 已合并，Issue #66 已关闭。
-当前唯一活动 P0 已回到 Issue #59：只推进 `2024-01` 的真实 AmazingData acquisition → anchored
-raw/receipt replay → coverage basis → bounded atomic materialization → ordinary-reader proof。
+当前 clean `main` 为 `31b5fe478a6140839281c7877829f225277cae14`（PR #69 已合并，PR #68 的合并提交
+为其祖先）。当前唯一活动 P0 仍为 Issue #59：先完成完整 `2024-01` 的真实 source-input
+Canonical → Snapshot → ReadModel → projection，再进入既有 acquisition → receipt replay →
+coverage basis → bounded atomic materialization → ordinary-reader proof。
 
 本文件后面的 Issue #66 文字是历史执行记录；如与本节或 Issue #59 当前 body 冲突，以本节和 Issue #59
 为准。当前不授权 Stage B（`2020-01` / `2026-01`）、78 月回补、Formal/Production、BSE/index、
@@ -18,10 +19,13 @@ CR-5/R2、Golden/H1、baseline 或策略工作。
 [`cr7_authoritative_2024_01_closure_20260915.md`](../provider_verification/cr7_authoritative_2024_01_closure_20260915.md)，
 合并后的真实 source-input 继续执行记录在
 [`cr7_authoritative_2024_01_source_input_20260915.md`](../provider_verification/cr7_authoritative_2024_01_source_input_20260915.md)。
-结论仍为 `STOP(BLOCKED)`：PR #68 已合并且本地 focused/full QA 与 exact-head CI 已通过；真实
-provider exchange 已完成 anchored raw，日历标准化成功，但 `hist_code_list`、`stock_basic` 和
-`daily_bar` 在现有 CR-2 shape/identity 入口阻断，Canonical 返回 `BLOCKED`。因此尚未构造
-verified source snapshot，没有铸造 receipt、没有执行真实 materializer，也没有提交凭证或 raw。
+本次最新适配与完整复核记录在
+[`cr7_cr2_provider_native_shape_adapter_20260915.md`](../provider_verification/cr7_cr2_provider_native_shape_adapter_20260915.md)
+及对应 JSON。结论为：三个观察到的 CR-2 shape/identity 入口均已 `SUCCESS`，完整真实输入的
+`stock_basic` 返回 `5,105/5,106`；唯一缺失 `300114.SZ` 的单例请求为 `OK + 0 rows`，所以
+最终代码版本重放的 Canonical run `958b02f2-e8c2-5815-be82-aa96ac6bf652` 以 `IDENTITY_MISSING (22)`
+`STOP(BLOCKED)`。这不是账号、网络或适配器阻断，不能删除成员或填造 PIT identity；完整
+verified source snapshot、receipt、coverage 和 materializer 仍未构造。
 
 ## 1. 项目管理责任
 
