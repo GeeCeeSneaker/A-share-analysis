@@ -6,7 +6,7 @@
 
 ## 0. 2026-09-15 当前调度覆盖
 
-当前 clean `main` 为 `1a14c87d19d527c56170df8bc9c24fccf69d55b3`，PR #67 已合并，Issue #66 已关闭。
+当前 clean `main` 为 `a7671ab34d301cb0aca2f351a31bbc865c100498`，PR #68 已合并，Issue #66 已关闭。
 当前唯一活动 P0 已回到 Issue #59：只推进 `2024-01` 的真实 AmazingData acquisition → anchored
 raw/receipt replay → coverage basis → bounded atomic materialization → ordinary-reader proof。
 
@@ -14,11 +14,14 @@ raw/receipt replay → coverage basis → bounded atomic materialization → ord
 为准。当前不授权 Stage B（`2020-01` / `2026-01`）、78 月回补、Formal/Production、BSE/index、
 CR-5/R2、Golden/H1、baseline 或策略工作。
 
-2026-09-15 的受控本地检查记录在
-[`cr7_authoritative_2024_01_closure_20260915.md`](../provider_verification/cr7_authoritative_2024_01_closure_20260915.md)。
-结论为 `STOP(BLOCKED)`：bounded materializer/reader 的 scope identity 与权威大 projection guard
-整改已在工作分支完成并通过本地 focused/full QA，但本地没有可通过现有 ReadModel/Canonical 链打开的 verified source snapshot；
-因此没有铸造 receipt、没有执行真实 materializer，也没有提交凭证或 raw。
+2026-09-15 的早期前置检查记录在
+[`cr7_authoritative_2024_01_closure_20260915.md`](../provider_verification/cr7_authoritative_2024_01_closure_20260915.md)，
+合并后的真实 source-input 继续执行记录在
+[`cr7_authoritative_2024_01_source_input_20260915.md`](../provider_verification/cr7_authoritative_2024_01_source_input_20260915.md)。
+结论仍为 `STOP(BLOCKED)`：PR #68 已合并且本地 focused/full QA 与 exact-head CI 已通过；真实
+provider exchange 已完成 anchored raw，日历标准化成功，但 `hist_code_list`、`stock_basic` 和
+`daily_bar` 在现有 CR-2 shape/identity 入口阻断，Canonical 返回 `BLOCKED`。因此尚未构造
+verified source snapshot，没有铸造 receipt、没有执行真实 materializer，也没有提交凭证或 raw。
 
 ## 1. 项目管理责任
 
@@ -48,9 +51,10 @@ CR-5/R2、Golden/H1、baseline 或策略工作。
 
 **阶段**：Phase 0 / CR-7 historical research data foundation
 
-PR #67 已通过项目经理 exact-head 审阅并合并：
+PR #68 已通过项目经理 exact-head 审阅并合并：
 
-- merge commit / 当前 clean main：`1a14c87d19d527c56170df8bc9c24fccf69d55b3`
+- PR #68 exact head：`0da6ebb0b48dbcf3c725e90aac8ef7c83017e0ba`
+- merge commit / 当前 clean main：`a7671ab34d301cb0aca2f351a31bbc865c100498`
 - Issue #55、Issue #66：已完成并关闭；当前唯一开放 P0 为 Issue #59
 
 当前主线已经具备：
@@ -444,8 +448,10 @@ Issue #66 **不授权**：
 
 **Last scheduler update**：2026-09-15
 
-**Current task**：Issue #59（Draft PR #68 bounded scope remediation review pending）
+**Current task**：Issue #59（PR #68 已合并；最小真实 2024-01 source-input 在 CR-2 shape
+normalization 边界阻断）
 
-**Required ancestor**：当前 clean `main@1a14c87d19d527c56170df8bc9c24fccf69d55b3`；PR #68
-当前 exact head 以 GitHub PR 元数据和 Issue #59 最新 scheduler checkpoint 为准，整改提交后保持
-Draft 等待独立复审。
+**Required ancestor**：当前 clean `main@a7671ab34d301cb0aca2f351a31bbc865c100498`。下一步只
+处理 [`cr7_authoritative_2024_01_source_input_20260915.md`](../provider_verification/cr7_authoritative_2024_01_source_input_20260915.md)
+列出的最小 provider-native shape/identity 适配；适配前不手填 snapshot，不进入 acquisition、
+materialization、Stage B 或 78 月回补。
