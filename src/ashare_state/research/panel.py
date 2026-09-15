@@ -13,10 +13,7 @@ from typing import Any
 
 import polars as pl
 
-from ashare_state.canonical.verifier import (
-    CanonicalConsumptionError,
-    verify_canonical_run_for_consumption,
-)
+from ashare_state.canonical.verifier import read_canonical_run_manifest
 from ashare_state.identity import resolve_security_identity
 from ashare_state.readmodel import (
     READMODEL_CONTRACT_VERSION,
@@ -54,7 +51,6 @@ from ashare_state.research.models import (
     sha256_hex,
 )
 from ashare_state.research.splits import assign_research_split
-from ashare_state.snapshot import verify_snapshot
 from ashare_state.storage.atomic_files import write_file_atomic
 from ashare_state.storage.paths import physical_from_logical_uri
 
@@ -179,7 +175,7 @@ class ResearchPanelBuilder:
             readmodel_root=self.readmodel_root,
         )
         try:
-            db = model.open_read_only(snapshot_id)
+            db, verified_snapshot = model.open_read_only_with_snapshot(snapshot_id)
         except ReadModelError as exc:
             raise ResearchPanelError(
                 f"research input ReadModel {snapshot_id} is not consumable: {exc}"
@@ -222,33 +218,25 @@ class ResearchPanelBuilder:
         finally:
             db.close()
 
+        if canonical_run_id != verified_snapshot.canonical_run_id:
+            raise ResearchPanelError("ReadModel canonical_run_id does not match its snapshot")
         try:
-            verified_snapshot = verify_snapshot(
+            _canonical_record, canonical_manifest, canonical_as_of = read_canonical_run_manifest(
                 self.conn,
-                snapshot_id,
-                raw_root=self.raw_root,
+                canonical_run_id,
                 normalized_root=self.normalized_root,
             )
         except Exception as exc:
             raise ResearchPanelError(
-                f"snapshot {snapshot_id} verification metadata is unavailable: {exc}"
+                f"canonical run {canonical_run_id} manifest seal is unavailable: {exc}"
             ) from exc
-        if canonical_run_id != verified_snapshot.canonical_run_id:
-            raise ResearchPanelError("ReadModel canonical_run_id does not match its snapshot")
-        try:
-            verified_canonical = verify_canonical_run_for_consumption(
-                self.conn,
-                canonical_run_id,
-                raw_root=self.raw_root,
-                normalized_root=self.normalized_root,
-            )
-        except CanonicalConsumptionError as exc:
-            raise ResearchPanelError(
-                f"canonical run {canonical_run_id} is not a verified identity source: {exc}"
-            ) from exc
-        if verified_canonical.as_of != verified_snapshot.as_of:
+        if canonical_as_of != verified_snapshot.as_of:
             raise ResearchPanelError("ReadModel and canonical run as_of values do not match")
-        identity_view = self._identity_view_from_verified_canonical(verified_canonical)
+        identity_view = self._identity_view_from_canonical_manifest(
+            canonical_manifest,
+            canonical_run_id=canonical_run_id,
+            canonical_as_of=canonical_as_of,
+        )
         record = verified_snapshot.ledger_record
         projected = self._project_rows(
             rows,
@@ -322,9 +310,20 @@ class ResearchPanelBuilder:
             publication_mode=TEST_ONLY_ROWS_PUBLICATION,
         )
 
-    def _identity_view_from_verified_canonical(self, canonical: Any) -> IdentityView:
-        """Materialize identity only from verified CR-2 security-master outputs."""
-        entries = canonical.manifest.get("input_normalized_runs")
+    def _identity_view_from_canonical_manifest(
+        self,
+        manifest: Mapping[str, Any],
+        *,
+        canonical_run_id: str,
+        canonical_as_of: datetime,
+    ) -> IdentityView:
+        """Materialize identity from the canonical manifest's sealed inputs.
+
+        The canonical owner has already deep-verified this run.  This R1
+        consumer checks the referenced manifest/output hashes it actually
+        reads, without invoking the full canonical verifier recursively.
+        """
+        entries = manifest.get("input_normalized_runs")
         if not isinstance(entries, list):
             raise ResearchPanelError("verified canonical manifest has no input lineage")
         records_by_key: dict[tuple[str, date, str, str], IdentityRecord] = {}
@@ -340,8 +339,8 @@ class ResearchPanelBuilder:
                 continue
             source, rows = self._read_verified_identity_output(
                 entry,
-                canonical_run_id=canonical.canonical_run_id,
-                canonical_as_of=canonical.as_of,
+                canonical_run_id=canonical_run_id,
+                canonical_as_of=canonical_as_of,
             )
             sources.append(source)
             for ordinal, row in enumerate(rows):

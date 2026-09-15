@@ -838,6 +838,30 @@ class TestSnapshotBuilder:
         assert verified.requested_domains == ("daily_bar",)
         assert len(verified.domain_rows["daily_bar"]) == 2
 
+    def test_verify_snapshot_consumes_canonical_seal_without_recursive_full_verify(
+        self, conn, env_root, monkeypatch
+    ):
+        """A durable snapshot boundary must not re-run canonical closure."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        built = _build(conn, env_root, result.canonical_run_id)
+        import ashare_state.canonical.verifier as canonical_verifier
+
+        def unexpected_recursive_verify(*args, **kwargs):
+            raise AssertionError("snapshot verifier recursively reverified canonical closure")
+
+        monkeypatch.setattr(
+            canonical_verifier,
+            "verify_canonical_run_for_consumption",
+            unexpected_recursive_verify,
+        )
+        verified = verify_snapshot(
+            conn,
+            built.snapshot_id,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+        )
+        assert verified.snapshot_id == built.snapshot_id
+
     def test_verify_snapshot_unknown_id_rejected(self, conn, env_root):
         """Mandatory 23: an unknown snapshot id is rejected."""
         _seed_base(conn, env_root)
@@ -1036,21 +1060,25 @@ class TestSnapshotBuilder:
             )
 
     def test_verify_snapshot_canonical_input_disappearance(self, conn, env_root):
-        """Mandatory 28 (ledger leg): the canonical run's consumed
-        CR-2 input disappears after the snapshot build -> the
-        provenance cross-bind (consumption verifier) fails closed."""
+        """A downstream snapshot consumes the canonical manifest seal.
+
+        Removing an upstream CR-2 ledger row after the snapshot boundary
+        does not invalidate the already materialized snapshot; the canonical
+        owner/continuity verifier remains responsible for deep upstream
+        re-audit.
+        """
         result = _canonical_success(conn, env_root, domains=("daily_bar",))
         built = _build(conn, env_root, result.canonical_run_id)
         conn.execute(
             "DELETE FROM meta_provider_normalization_run WHERE raw_request_id = 'req-bars'"
         )
-        with pytest.raises(SnapshotVerifierError, match="DAMAGED|no longer intact"):
-            verify_snapshot(
-                conn,
-                built.snapshot_id,
-                raw_root=env_root["raw"],
-                normalized_root=env_root["normalized"],
-            )
+        verified = verify_snapshot(
+            conn,
+            built.snapshot_id,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+        )
+        assert verified.snapshot_id == built.snapshot_id
 
     def test_verify_snapshot_requested_domain_drift(self, conn, env_root):
         """Mandatory 29: the snapshot's requested domain set no longer

@@ -11,7 +11,10 @@ set from two positive provider observations:
 Absence from either response is never treated as a lifecycle fact.  A missing
 status row for an applicable pair is unresolved, and malformed or mismatched
 responses fail closed.  The output contains only hashes/counts so it is safe
-to use as a sanitized diagnostic or bind to an acquisition receipt.
+to use as a sanitized diagnostic or bind to an acquisition receipt.  The
+persisted evaluation is intentionally compact: final required/returned pair
+seals, blockers and classification summaries are retained; intermediate
+applicability/suspension subset hashes are not.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Any, cast
 
 __all__ = [
@@ -31,6 +35,7 @@ __all__ = [
     "CompletenessPairClass",
     "MonthCompletenessError",
     "MonthCompletenessEvaluation",
+    "PositiveTradeFallback",
     "evaluate_month_completeness",
 ]
 
@@ -78,21 +83,21 @@ class CompletenessPairClass(StrEnum):
 
 @dataclass(frozen=True)
 class MonthCompletenessEvaluation:
-    """Deterministic counts and hashes for one bounded month."""
+    """Minimal deterministic result for one bounded month.
+
+    The persisted shape keeps the input identities, final required/returned
+    pair seals, unresolved/missing/extra blockers, structural diagnostics and
+    summary counts.  Intermediate applicability/suspension subset hashes are
+    derivable from ``classification_counts`` and are deliberately not
+    persisted.
+    """
 
     rule_version: str
-    applicability_semantics_version: str
     status: str
     monthly_security_count: int
     session_count: int
     monthly_security_set_hash: str
     session_set_hash: str
-    applicable_pair_count: int
-    applicable_pair_set_hash: str
-    suspended_pair_count: int
-    suspended_pair_set_hash: str
-    not_applicable_pair_count: int
-    not_applicable_pair_set_hash: str
     required_bar_pair_count: int
     required_bar_pair_set_hash: str
     returned_bar_pair_count: int
@@ -109,7 +114,6 @@ class MonthCompletenessEvaluation:
     unresolved_pair_count: int
     classification_counts: dict[str, int]
     structural_error_codes: tuple[str, ...]
-    positive_trade_fallback_version: str
     positive_trade_pair_count: int
     positive_trade_pair_set_hash: str
 
@@ -129,18 +133,11 @@ class MonthCompletenessEvaluation:
         """Return a sanitized, canonical-friendly representation."""
         return {
             "rule_version": self.rule_version,
-            "applicability_semantics_version": self.applicability_semantics_version,
             "status": self.status,
             "monthly_security_count": self.monthly_security_count,
             "session_count": self.session_count,
             "monthly_security_set_hash": self.monthly_security_set_hash,
             "session_set_hash": self.session_set_hash,
-            "applicable_pair_count": self.applicable_pair_count,
-            "applicable_pair_set_hash": self.applicable_pair_set_hash,
-            "suspended_pair_count": self.suspended_pair_count,
-            "suspended_pair_set_hash": self.suspended_pair_set_hash,
-            "not_applicable_pair_count": self.not_applicable_pair_count,
-            "not_applicable_pair_set_hash": self.not_applicable_pair_set_hash,
             "required_bar_pair_count": self.required_bar_pair_count,
             "required_bar_pair_set_hash": self.required_bar_pair_set_hash,
             "returned_bar_pair_count": self.returned_bar_pair_count,
@@ -157,7 +154,6 @@ class MonthCompletenessEvaluation:
             "unresolved_pair_count": self.unresolved_pair_count,
             "classification_counts": dict(self.classification_counts),
             "structural_error_codes": list(self.structural_error_codes),
-            "positive_trade_fallback_version": self.positive_trade_fallback_version,
             "positive_trade_pair_count": self.positive_trade_pair_count,
             "positive_trade_pair_set_hash": self.positive_trade_pair_set_hash,
         }
@@ -167,18 +163,11 @@ class MonthCompletenessEvaluation:
         """Rehydrate a receipt-bound evaluation with exact fields."""
         fields = {
             "rule_version",
-            "applicability_semantics_version",
             "status",
             "monthly_security_count",
             "session_count",
             "monthly_security_set_hash",
             "session_set_hash",
-            "applicable_pair_count",
-            "applicable_pair_set_hash",
-            "suspended_pair_count",
-            "suspended_pair_set_hash",
-            "not_applicable_pair_count",
-            "not_applicable_pair_set_hash",
             "required_bar_pair_count",
             "required_bar_pair_set_hash",
             "returned_bar_pair_count",
@@ -195,7 +184,6 @@ class MonthCompletenessEvaluation:
             "unresolved_pair_count",
             "classification_counts",
             "structural_error_codes",
-            "positive_trade_fallback_version",
             "positive_trade_pair_count",
             "positive_trade_pair_set_hash",
         }
@@ -216,10 +204,6 @@ class MonthCompletenessEvaluation:
             }
             values = {
                 "rule_version": _require_text(payload["rule_version"], "rule_version"),
-                "applicability_semantics_version": _require_text(
-                    payload["applicability_semantics_version"],
-                    "applicability_semantics_version",
-                ),
                 "status": _require_status(payload["status"]),
                 "monthly_security_count": _require_positive_int(
                     payload["monthly_security_count"], "monthly_security_count"
@@ -229,24 +213,6 @@ class MonthCompletenessEvaluation:
                     payload["monthly_security_set_hash"], "monthly_security_set_hash"
                 ),
                 "session_set_hash": _require_hash(payload["session_set_hash"], "session_set_hash"),
-                "applicable_pair_count": _require_nonnegative_int(
-                    payload["applicable_pair_count"], "applicable_pair_count"
-                ),
-                "applicable_pair_set_hash": _require_hash(
-                    payload["applicable_pair_set_hash"], "applicable_pair_set_hash"
-                ),
-                "suspended_pair_count": _require_nonnegative_int(
-                    payload["suspended_pair_count"], "suspended_pair_count"
-                ),
-                "suspended_pair_set_hash": _require_hash(
-                    payload["suspended_pair_set_hash"], "suspended_pair_set_hash"
-                ),
-                "not_applicable_pair_count": _require_nonnegative_int(
-                    payload["not_applicable_pair_count"], "not_applicable_pair_count"
-                ),
-                "not_applicable_pair_set_hash": _require_hash(
-                    payload["not_applicable_pair_set_hash"], "not_applicable_pair_set_hash"
-                ),
                 "required_bar_pair_count": _require_nonnegative_int(
                     payload["required_bar_pair_count"], "required_bar_pair_count"
                 ),
@@ -287,10 +253,6 @@ class MonthCompletenessEvaluation:
                 ),
                 "classification_counts": parsed_counts,
                 "structural_error_codes": tuple(sorted(set(errors))),
-                "positive_trade_fallback_version": _require_text(
-                    payload["positive_trade_fallback_version"],
-                    "positive_trade_fallback_version",
-                ),
                 "positive_trade_pair_count": _require_nonnegative_int(
                     payload["positive_trade_pair_count"], "positive_trade_pair_count"
                 ),
@@ -303,78 +265,46 @@ class MonthCompletenessEvaluation:
         result = cls(**cast(Any, values))
         if result.rule_version != AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION:
             raise MonthCompletenessError("unknown month completeness rule version")
-        if result.applicability_semantics_version != AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION:
-            raise MonthCompletenessError("unknown applicability semantics version")
-        if result.positive_trade_fallback_version != AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION:
-            raise MonthCompletenessError("unknown positive-trade fallback version")
         return result
 
 
-@dataclass(frozen=True, init=False)
-class _PositiveTradeFallbackEvidence:
-    """Provider-produced positive-trade observations for exact pairs.
+@dataclass(frozen=True)
+class PositiveTradeFallback:
+    """The small typed input for exact-session positive-trade observations.
 
-    This is intentionally not a public observation DTO.  The evaluator
-    accepts this exact type only after the reviewed provider path has built it
-    from a typed exchange and retained request evidence.  A plain mapping,
-    set, or fixture object therefore cannot mint a positive-trade fact.
+    The provider facade creates this value after it has retained each
+    snapshot exchange.  It carries only the pair scope and request hashes;
+    the evaluator owns the fallback method/version and rechecks the shape.
     """
 
-    fallback_version: str
-    method: str
-    queried_pairs: tuple[tuple[str, int], ...]
-    positive_pairs: tuple[tuple[str, int], ...]
-    request_params_by_pair: tuple[tuple[tuple[str, int], str], ...]
-    _provenance: str
+    queried_pairs: Collection[tuple[str, int]]
+    positive_pairs: Collection[tuple[str, int]]
+    request_params_by_pair: Mapping[tuple[str, int], str]
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError("positive-trade fallback evidence must come from the provider path")
-
-    @classmethod
-    def _from_provider(
-        cls,
-        *,
-        queried_pairs: Collection[tuple[str, int]],
-        positive_pairs: Collection[tuple[str, int]],
-        request_params_by_pair: Mapping[tuple[str, int], str],
-    ) -> _PositiveTradeFallbackEvidence:
+    def __post_init__(self) -> None:
         try:
-            queried = tuple(sorted(queried_pairs))
-            positive = tuple(sorted(positive_pairs))
+            queried = tuple(sorted(self.queried_pairs))
+            positive = tuple(sorted(self.positive_pairs))
         except (TypeError, ValueError) as exc:
             raise MonthCompletenessError(
                 "positive-trade fallback pairs must be sortable collections"
             ) from exc
-        if not isinstance(request_params_by_pair, Mapping):
+        if not isinstance(self.request_params_by_pair, Mapping):
             raise MonthCompletenessError(
                 "positive-trade fallback request evidence must be pair-bound"
             )
         try:
-            fingerprints = tuple(sorted(request_params_by_pair.items()))
+            fingerprints = dict(sorted(self.request_params_by_pair.items()))
         except (TypeError, ValueError) as exc:
             raise MonthCompletenessError(
                 "positive-trade fallback request evidence is malformed"
             ) from exc
-        obj = object.__new__(cls)
-        for field_name, value in {
-            "fallback_version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
-            "method": "MarketData.query_snapshot",
-            "queried_pairs": queried,
-            "positive_pairs": positive,
-            "request_params_by_pair": fingerprints,
-            "_provenance": "provider_exchange",
-        }.items():
-            object.__setattr__(obj, field_name, value)
-        obj._validate_shape()
-        return obj
+        object.__setattr__(self, "queried_pairs", queried)
+        object.__setattr__(self, "positive_pairs", positive)
+        object.__setattr__(self, "request_params_by_pair", MappingProxyType(fingerprints))
+        self._validate_shape()
 
     def _validate_shape(self) -> None:
-        if self.fallback_version != AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION:
-            raise MonthCompletenessError("unknown positive-trade fallback version")
-        if self.method != "MarketData.query_snapshot":
-            raise MonthCompletenessError("positive-trade fallback method is not reviewed")
-        if self._provenance != "provider_exchange":
-            raise MonthCompletenessError("positive-trade fallback evidence provenance is invalid")
         for pairs in (self.queried_pairs, self.positive_pairs):
             try:
                 if len(pairs) != len(set(pairs)):
@@ -409,7 +339,7 @@ def evaluate_month_completeness(
     exact_day_universes: Mapping[int, Collection[str]],
     status_payload: Mapping[str, Any],
     daily_bar_payload: Mapping[str, Any],
-    positive_trade_fallback: _PositiveTradeFallbackEvidence | None = None,
+    positive_trade_fallback: PositiveTradeFallback | None = None,
 ) -> MonthCompletenessEvaluation:
     """Evaluate one month without converting absence into a semantic fact.
 
@@ -486,10 +416,8 @@ def evaluate_month_completeness(
     positive_trade_pairs: set[tuple[str, int]] = set()
     fallback_errors: list[str] = []
     if positive_trade_fallback is not None:
-        if not isinstance(positive_trade_fallback, _PositiveTradeFallbackEvidence):
-            raise MonthCompletenessError(
-                "positive-trade fallback must be provider-produced typed evidence"
-            )
+        if not isinstance(positive_trade_fallback, PositiveTradeFallback):
+            raise MonthCompletenessError("positive-trade fallback must be typed evidence")
         try:
             positive_trade_fallback._validate_shape()
         except MonthCompletenessError:
@@ -544,18 +472,11 @@ def evaluate_month_completeness(
     returned_dates = sorted(returned_days)
     return MonthCompletenessEvaluation(
         rule_version=AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION,
-        applicability_semantics_version=AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION,
         status=status,
         monthly_security_count=len(symbols),
         session_count=len(sessions),
         monthly_security_set_hash=_hash_values(symbols),
         session_set_hash=_hash_values(sessions),
-        applicable_pair_count=len(applicable),
-        applicable_pair_set_hash=_hash_pairs(applicable),
-        suspended_pair_count=len(suspended),
-        suspended_pair_set_hash=_hash_pairs(suspended),
-        not_applicable_pair_count=len(not_applicable),
-        not_applicable_pair_set_hash=_hash_pairs(not_applicable),
         required_bar_pair_count=len(required),
         required_bar_pair_set_hash=_hash_pairs(required),
         returned_bar_pair_count=len(returned),
@@ -572,7 +493,6 @@ def evaluate_month_completeness(
         unresolved_pair_count=len(unresolved),
         classification_counts=classification_counts,
         structural_error_codes=tuple(sorted(set(structural_errors))),
-        positive_trade_fallback_version=AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
         positive_trade_pair_count=len(positive_trade_pairs),
         positive_trade_pair_set_hash=_hash_pairs(positive_trade_pairs),
     )

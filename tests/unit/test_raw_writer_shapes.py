@@ -20,7 +20,13 @@ import pytest
 
 from ashare_state.providers.amazingdata.provider import RawEnvelope
 from ashare_state.providers.exchange import ProviderExchange
-from ashare_state.storage.raw_writer import RawWriter, RawWriterError
+from ashare_state.storage.raw_writer import (
+    KIND_PACKED_MULTI,
+    PACKED_MEMBER_THRESHOLD,
+    RawWriter,
+    RawWriterError,
+    verify_raw_evidence,
+)
 
 
 def _envelope(request_id: str, dataset: str, *, status: str = "OK") -> RawEnvelope:
@@ -311,6 +317,110 @@ class TestPayloadShapes:
         assert result.null_tables == ("600519.SH", "000001.SZ")
         back = writer.read(provider="amazingdata", dataset="daily_bar", request_id="all-null")
         assert back == {"600519.SH": None, "000001.SZ": None}
+
+    def test_large_homogeneous_member_map_uses_one_packed_artifact(self, tmp_path: Path):
+        """The full-universe shape must not create one Parquet per security."""
+        polars = pytest.importorskip("polars")
+        writer = RawWriter(tmp_path)
+        payload = {
+            f"{index:06d}.SH": polars.DataFrame(
+                {"code": [f"{index:06d}.SH"], "close": [float(index)]}
+            )
+            for index in range(1, PACKED_MEMBER_THRESHOLD + 1)
+        }
+        payload["999999.SZ"] = None
+
+        result = writer.write(_exchange("packed", "daily_bar", payload))
+
+        assert result.payload_kind == KIND_PACKED_MULTI
+        dataset_dir = tmp_path / "provider=amazingdata" / "dataset=daily_bar"
+        assert (dataset_dir / "packed.parquet").is_file()
+        assert len(list(dataset_dir.rglob("*.parquet"))) == 1
+        meta = json.loads((dataset_dir / "packed.meta.json").read_text(encoding="utf-8"))
+        assert len(meta["packed_members"]) == PACKED_MEMBER_THRESHOLD + 1
+        assert meta["null_tables"] == ["999999.SZ"]
+
+        back = writer.read(provider="amazingdata", dataset="daily_bar", request_id="packed")
+        assert set(back) == set(payload)
+        assert back["000001.SH"].get_column("code").to_list() == ["000001.SH"]
+        assert back["999999.SZ"] is None
+
+    def test_packed_map_preserves_empty_member_schema_and_verified_handle(self, tmp_path: Path):
+        polars = pytest.importorskip("polars")
+        writer = RawWriter(tmp_path)
+        empty = polars.DataFrame(
+            {
+                "code": polars.Series([], dtype=polars.String),
+                "close": polars.Series([], dtype=polars.Float64),
+            }
+        )
+        payload = {
+            f"{index:06d}.SH": (
+                empty
+                if index == PACKED_MEMBER_THRESHOLD
+                else polars.DataFrame({"code": [f"{index:06d}.SH"], "close": [float(index)]})
+            )
+            for index in range(1, PACKED_MEMBER_THRESHOLD + 1)
+        }
+        writer.write(_exchange("packed-empty", "daily_bar", payload))
+        verified = verify_raw_evidence(
+            tmp_path,
+            provider="amazingdata",
+            dataset="daily_bar",
+            request_id="packed-empty",
+        )
+        back = writer.read(
+            provider="amazingdata",
+            dataset="daily_bar",
+            request_id="packed-empty",
+            verify=False,
+            verified=verified,
+        )
+        assert back[f"{PACKED_MEMBER_THRESHOLD:06d}.SH"].shape == (0, 2)
+        assert back[f"{PACKED_MEMBER_THRESHOLD:06d}.SH"].columns == ["code", "close"]
+
+    def test_packed_map_keeps_zero_column_empty_status_member(self, tmp_path: Path):
+        """The observed status shape must not trigger one file per security."""
+        polars = pytest.importorskip("polars")
+        writer = RawWriter(tmp_path)
+        normal_count = 2_000
+        zero_column_name = "000000.SZ"
+        null_name = "999999.SZ"
+        payload = {
+            f"{index:06d}.SH": polars.DataFrame(
+                {
+                    "TRADE_DATE": [20240102],
+                    "IS_SUSP_SEC": [0],
+                }
+            )
+            for index in range(1, normal_count + 1)
+        }
+        payload[zero_column_name] = polars.DataFrame()
+        payload[null_name] = None
+
+        result = writer.write(_exchange("packed-status-empty", "status", payload))
+
+        assert result.payload_kind == KIND_PACKED_MULTI
+        dataset_dir = tmp_path / "provider=amazingdata" / "dataset=status"
+        assert len(list(dataset_dir.rglob("*.parquet"))) == 1
+        meta = json.loads(
+            (dataset_dir / "packed-status-empty.meta.json").read_text(encoding="utf-8")
+        )
+        member_by_name = {member["name"]: member for member in meta["packed_members"]}
+        assert member_by_name[zero_column_name]["row_count"] == 0
+        assert member_by_name[zero_column_name]["columns"] == []
+        assert null_name in meta["null_tables"]
+
+        back = writer.read(
+            provider="amazingdata",
+            dataset="status",
+            request_id="packed-status-empty",
+        )
+        assert back[zero_column_name].shape == (0, 0)
+        assert back[zero_column_name].columns == []
+        assert back[null_name] is None
+        assert back["000001.SH"].shape == (1, 2)
+        assert back["000001.SH"]["IS_SUSP_SEC"].to_list() == [0]
 
     def test_scalar_list_round_trips_as_value_column(self, tmp_path: Path):
         writer = RawWriter(tmp_path)

@@ -42,9 +42,13 @@ Payload shapes (audit section 5.2 - MANDATORY support):
     dict[str, DataFrame | None]    -> one Parquet per present table; explicit
                                       null members are listed in the meta
 
-dict-of-tables uses scheme A (audit section 5.2): every present logical table
-gets its own Parquet file; the meta records the table list with each table's
-hash/schema/row-count and records explicit None members separately.
+dict-of-tables uses scheme A (audit section 5.2): small or heterogeneous
+payloads give every present logical table its own Parquet file; the meta
+records the table list with each table's hash/schema/row-count and records
+explicit None members separately.  A large homogeneous member map is the
+layout optimization exception: one request-level Parquet retains the member
+key, while meta inventory records each member's columns and row count so
+zero-row/zero-column DataFrames and explicit None values remain distinct.
 "Take the first dict value" is FORBIDDEN - mixed/unsupported shapes raise
 instead of silently picking a table.
 
@@ -65,7 +69,7 @@ import shutil
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from ashare_state.storage.atomic_files import ImmutableFileExistsError, write_file_atomic
@@ -77,6 +81,17 @@ KIND_DATAFRAME = "dataframe"
 KIND_ARROW_TABLE = "arrow_table"
 KIND_MULTI_ROWS = "multi_table_rows"
 KIND_MULTI_FRAMES = "multi_table_frames"
+# Large provider maps are stored as one request-level table.  The member key
+# remains explicit in the payload and in the meta, so packing changes the
+# physical layout without changing the logical mapping returned by ``read``.
+KIND_PACKED_MULTI = "packed_multi_table"
+
+# AmazingData full-universe responses are commonly thousands of homogeneous
+# security members.  Keep small/heterogeneous maps in the lossless legacy
+# layout; only cross this threshold when one physical file is materially
+# cheaper and the schema is safe to concatenate.
+PACKED_MEMBER_THRESHOLD = 128
+PACKED_MEMBER_COLUMN = "__ashare_member__"
 
 _TABLE_NAME_SAFE = re.compile(r"[^A-Za-z0-9_\-]")
 
@@ -128,6 +143,34 @@ class RawWriteResult:
     #: Logical tables whose provider value was explicitly None. They have no
     #: Parquet artifact, but remain part of the lossless mapping contract.
     null_tables: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class VerifiedRawEvidence:
+    """One full raw-closure verification result.
+
+    A caller may pass this handle to a downstream read after the immutable
+    raw boundary has verified the payload.  Downstream code checks the bound
+    request identity and reads the declared bytes without recursively
+    re-hashing the same raw chain.  ``verify_raw_evidence`` remains available
+    for an explicit deep audit or a new trust boundary.
+    """
+
+    provider: str
+    dataset: str
+    request_id: str
+    evidence_uri: str
+    evidence_hash: str
+    content_hash: str
+    payload_kind: str
+    meta: dict[str, Any]
+
+    def assert_matches(self, *, provider: str, dataset: str, request_id: str) -> None:
+        if (self.provider, self.dataset, self.request_id) != (provider, dataset, request_id):
+            raise RawWriterError(
+                "verified raw evidence handle is bound to a different request "
+                f"({self.provider!r}, {self.dataset!r}, {self.request_id!r})"
+            )
 
 
 def _scrub(params: dict[str, Any] | None) -> dict[str, Any]:
@@ -303,6 +346,83 @@ def _normalize_payload(
     )
 
 
+def _pack_large_homogeneous_tables(
+    payload_kind: str,
+    tables: list[tuple[str | None, Any]],
+    null_tables: tuple[str, ...],
+) -> tuple[str, list[tuple[str | None, Any]], tuple[str, ...], tuple[dict[str, Any], ...]]:
+    """Pack a large member map into one Parquet table.
+
+    A zero-row/zero-column DataFrame is a known AmazingData response shape,
+    not a reason to abandon packing for the whole response. Such members are
+    represented in the packed member inventory and need no physical row; the
+    inventory's ``columns`` field lets the reader reconstruct the exact empty
+    frame. Other heterogeneous schemas still use the lossless legacy layout
+    instead of coercing provider data.
+    """
+    if payload_kind not in (KIND_MULTI_ROWS, KIND_MULTI_FRAMES):
+        return payload_kind, tables, null_tables, ()
+    if len(tables) < PACKED_MEMBER_THRESHOLD or any(name is None for name, _ in tables):
+        return payload_kind, tables, null_tables, ()
+    if any(PACKED_MEMBER_COLUMN in table.column_names for _, table in tables):
+        return payload_kind, tables, null_tables, ()
+    empty_zero_column_names = {
+        str(name) for name, table in tables if table.num_rows == 0 and not table.column_names
+    }
+    # A zero-column table with rows cannot be reconstructed after dropping the
+    # member key, so keep the old layout for that unusual shape. The observed
+    # provider case is the zero-row/zero-column form.
+    if any(not table.column_names and table.num_rows for _, table in tables):
+        return payload_kind, tables, null_tables, ()
+    packable_tables = [
+        (name, table) for name, table in tables if str(name) not in empty_zero_column_names
+    ]
+    if not packable_tables:
+        import pyarrow as pa
+
+        # Keep an O(1) physical layout even when every materialized member is
+        # the known zero-row/zero-column shape.  There is no provider row to
+        # encode, so the packed artifact is a schema-only member-key table.
+        packed = pa.table({PACKED_MEMBER_COLUMN: pa.array([], type=pa.string())})
+        members = tuple(
+            {
+                "name": str(name),
+                "row_count": 0,
+                "columns": [],
+            }
+            for name, _ in tables
+        ) + tuple({"name": name, "row_count": None, "columns": None} for name in null_tables)
+        return KIND_PACKED_MULTI, [(None, packed)], null_tables, members
+    schema_hashes = {_schema_hash(table) for _, table in packable_tables}
+    if len(schema_hashes) != 1:
+        return payload_kind, tables, null_tables, ()
+
+    import pyarrow as pa
+
+    packed_tables = [
+        table.append_column(
+            PACKED_MEMBER_COLUMN,
+            pa.array([str(name)] * table.num_rows, type=pa.string()),
+        )
+        for name, table in packable_tables
+    ]
+    try:
+        packed = pa.concat_tables(packed_tables)
+    except (pa.ArrowException, TypeError, ValueError):
+        # Concatenation is an optimization only.  Preserve the proven
+        # per-member representation when Arrow refuses the combination.
+        return payload_kind, tables, null_tables, ()
+    members = tuple(
+        {
+            "name": str(name),
+            "row_count": int(table.num_rows),
+            "columns": [str(column) for column in table.column_names],
+        }
+        for name, table in tables
+    ) + tuple({"name": name, "row_count": None, "columns": None} for name in null_tables)
+    return KIND_PACKED_MULTI, [(None, packed)], null_tables, members
+
+
 def normalize_payload(payload: Any) -> tuple[str, list[tuple[str | None, Any]]]:
     """Backward-compatible two-item view of ``_normalize_payload``.
 
@@ -413,13 +533,16 @@ class RawWriter:
         envelope = exchange.envelope
         request_id = str(envelope.request_id)
         payload_kind, tables, null_tables = _normalize_payload(exchange.payload)
+        payload_kind, tables, null_tables, packed_members = _pack_large_homogeneous_tables(
+            payload_kind, tables, null_tables
+        )
 
         dataset_dir = self._dir_for(provider, dataset)
         dataset_dir.mkdir(parents=True, exist_ok=True)
 
         multi = (
             bool(null_tables) or len(tables) > 1 or (len(tables) == 1 and tables[0][0] is not None)
-        )
+        ) and payload_kind != KIND_PACKED_MULTI
         records: list[TableRecord] = []
         table_files: list[tuple[str | None, Path, bytes]] = []
         if multi:
@@ -470,6 +593,7 @@ class RawWriter:
             payload_kind=payload_kind,
             tables=records,
             null_tables=null_tables,
+            packed_members=packed_members,
         )
 
         idem = self._check_idempotent(request_id, records, meta_path, meta_bytes, table_files)
@@ -629,7 +753,15 @@ class RawWriter:
         )
 
     # ---------------------------------------------------------------- read
-    def read(self, *, provider: str, dataset: str, request_id: str, verify: bool = True) -> Any:
+    def read(
+        self,
+        *,
+        provider: str,
+        dataset: str,
+        request_id: str,
+        verify: bool = True,
+        verified: VerifiedRawEvidence | None = None,
+    ) -> Any:
         """Read back a persisted payload: DataFrame for single-table kinds,
         dict[str, DataFrame] for multi-table kinds (lossless round-trip
         support for audit section 5.3 tests). Uses polars - the project
@@ -643,16 +775,91 @@ class RawWriter:
         meta_path = dataset_dir / f"{request_id}.meta.json"
         if not meta_path.is_file():
             raise RawWriterError(f"no raw meta for request {request_id} under {dataset_dir}")
-        doc = json.loads(meta_path.read_text(encoding="utf-8"))
-        if verify:
-            problems = verify_meta_closure(dataset_dir, doc)
-            if problems:
-                msg = (
-                    f"raw integrity verification failed for request {request_id}: "
-                    f"{'; '.join(problems)}"
-                )
-                raise RawWriterError(msg)
+        if verified is not None:
+            verified.assert_matches(provider=provider, dataset=dataset, request_id=request_id)
+            doc = verified.meta
+        elif verify:
+            verified = verify_raw_evidence(
+                self.root,
+                provider=provider,
+                dataset=dataset,
+                request_id=request_id,
+            )
+            doc = verified.meta
+        else:
+            doc = json.loads(meta_path.read_text(encoding="utf-8"))
         kind = str(doc.get("payload_kind", ""))
+        if kind == KIND_PACKED_MULTI:
+            packed = pl.read_parquet(dataset_dir / f"{request_id}.parquet")
+            if PACKED_MEMBER_COLUMN not in packed.columns:
+                raise RawWriterError(
+                    f"packed raw payload for request {request_id} lacks the member key"
+                )
+            packed_frames: dict[str, Any] = {}
+            members = doc.get("packed_members")
+            if not isinstance(members, list) or any(
+                not isinstance(member, dict)
+                or not isinstance(member.get("name"), str)
+                or "row_count" not in member
+                or "columns" not in member
+                for member in members
+            ):
+                raise RawWriterError(
+                    f"packed raw meta for request {request_id} has no valid member inventory"
+                )
+            # ``partition_by`` performs one grouped scan of the packed frame.
+            # Filtering the full frame once per logical member made read cost
+            # grow with member_count * packed_row_count.
+            grouped = packed.partition_by(
+                PACKED_MEMBER_COLUMN,
+                as_dict=True,
+                maintain_order=True,
+            )
+            null_tables = set(doc.get("null_tables", []) or [])
+            for member in members:
+                name = str(member["name"])
+                row_count = member.get("row_count")
+                columns = member.get("columns")
+                if name in null_tables or row_count is None:
+                    packed_frames[name] = None
+                    continue
+                if (
+                    isinstance(row_count, bool)
+                    or not isinstance(row_count, int)
+                    or row_count < 0
+                    or not isinstance(columns, list)
+                    or any(not isinstance(column, str) for column in columns)
+                    or len(columns) != len(set(columns))
+                ):
+                    raise RawWriterError(
+                        f"packed raw meta for request {request_id} has malformed member schema"
+                    )
+                if not columns:
+                    if row_count != 0:
+                        raise RawWriterError(
+                            f"packed raw meta for request {request_id} has a non-empty "
+                            "zero-column member"
+                        )
+                    packed_frames[name] = pl.DataFrame()
+                    continue
+                group = grouped.get((name,))
+                if group is None:
+                    if row_count != 0:
+                        raise RawWriterError(
+                            f"packed raw payload for request {request_id} is missing "
+                            f"member {name!r}"
+                        )
+                    # Empty members have no physical group; the packed schema
+                    # supplies their original columns and dtypes.
+                    packed_frames[name] = packed.drop(PACKED_MEMBER_COLUMN).head(0).select(columns)
+                    continue
+                frame = group.drop(PACKED_MEMBER_COLUMN)
+                if frame.height != row_count or set(frame.columns) < set(columns):
+                    raise RawWriterError(
+                        f"packed raw payload for request {request_id} has a member shape mismatch"
+                    )
+                packed_frames[name] = frame.select(columns)
+            return packed_frames
         if kind in (KIND_MULTI_ROWS, KIND_MULTI_FRAMES):
             frames: dict[str, Any] = {}
             for table in doc.get("tables", []):
@@ -816,6 +1023,7 @@ class RawWriter:
         payload_kind: str,
         tables: tuple[TableRecord, ...] | list[TableRecord],
         null_tables: tuple[str, ...] | list[str] = (),
+        packed_members: tuple[dict[str, Any], ...] | list[dict[str, Any]] = (),
     ) -> bytes:
         doc = {
             "request_id": getattr(envelope, "request_id", ""),
@@ -865,6 +1073,11 @@ class RawWriter:
             # distinction without fabricating a row or silently dropping the
             # table.
             "null_tables": list(null_tables),
+            # For a packed provider map this is the logical member inventory
+            # needed to reconstruct empty and explicit-null members.  It is
+            # deliberately part of the meta closure, not hidden in a
+            # sidecar framework.
+            "packed_members": list(packed_members),
         }
         return json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=1).encode("utf-8")
 
@@ -924,19 +1137,105 @@ def verify_meta_closure(raw_root: Path | str, meta_doc: dict[str, Any]) -> list[
     Returns an empty list when the closure holds."""
     root = Path(raw_root)
     problems: list[str] = []
-    tables = meta_doc.get("tables") or []
+    raw_tables = meta_doc.get("tables", [])
+    if raw_tables is None and meta_doc.get("payload_kind") == "failure":
+        tables: Any = []
+    else:
+        tables = raw_tables
+    if not isinstance(tables, list):
+        return ["tables must be a list"]
     null_tables = meta_doc.get("null_tables", [])
     if not isinstance(null_tables, list) or any(not isinstance(name, str) for name in null_tables):
         problems.append("null_tables must be a list of logical table names")
         null_tables = []
-    table_names = [str(table.get("name", "")) for table in tables]
+    table_names: list[str] = []
+    for table in tables:
+        if not isinstance(table, dict):
+            problems.append("table record must be an object")
+            continue
+        table_names.append(str(table.get("name", "")))
     if len(set(null_tables)) != len(null_tables):
         problems.append("null_tables contains duplicate logical table names")
     if set(null_tables).intersection(table_names):
         problems.append("null_tables overlaps a materialized table")
+    if meta_doc.get("payload_kind") == KIND_PACKED_MULTI:
+        packed_members = meta_doc.get("packed_members")
+        if not isinstance(packed_members, list):
+            problems.append("packed_members must be a list for packed payloads")
+        else:
+            packed_names: list[str] = []
+            for member in packed_members:
+                if not isinstance(member, dict):
+                    problems.append("packed member record must be an object")
+                    continue
+                name = member.get("name")
+                row_count = member.get("row_count")
+                columns = member.get("columns")
+                if not isinstance(name, str) or not name:
+                    problems.append("packed member name must be a non-empty string")
+                else:
+                    packed_names.append(name)
+                if row_count is not None and (
+                    isinstance(row_count, bool) or not isinstance(row_count, int) or row_count < 0
+                ):
+                    problems.append("packed member row_count must be null or nonnegative")
+                if columns is not None and (
+                    not isinstance(columns, list)
+                    or any(not isinstance(column, str) for column in columns)
+                    or len(columns) != len(set(columns))
+                ):
+                    problems.append("packed member columns must be a unique string list or null")
+            if len(set(packed_names)) != len(packed_names):
+                problems.append("packed_members contains duplicate logical table names")
+            if set(null_tables) - set(packed_names):
+                problems.append("packed_members does not cover every null table")
+            packed_null_names: set[str] = set()
+            packed_row_count = 0
+            for member in packed_members:
+                if not isinstance(member, dict):
+                    continue
+                name = member.get("name")
+                row_count = member.get("row_count")
+                columns = member.get("columns")
+                if not isinstance(name, str):
+                    continue
+                if row_count is None:
+                    packed_null_names.add(name)
+                    if columns is not None:
+                        problems.append("null packed member columns must be null")
+                elif (
+                    isinstance(row_count, bool)
+                    or not isinstance(row_count, int)
+                    or row_count < 0
+                    or not isinstance(columns, list)
+                ):
+                    continue
+                else:
+                    packed_row_count += row_count
+                    if name in null_tables:
+                        problems.append("packed null table has materialized row metadata")
+            if packed_null_names != set(null_tables):
+                problems.append("packed member null coverage does not match null_tables")
+            if len(tables) != 1:
+                problems.append("packed payload must have exactly one physical table")
+            elif isinstance(tables[0], dict):
+                physical_rows = tables[0].get("row_count")
+                if (
+                    isinstance(physical_rows, int)
+                    and not isinstance(physical_rows, bool)
+                    and physical_rows != packed_row_count
+                ):
+                    problems.append("packed physical row_count does not match member inventory")
     for table in tables:
+        if not isinstance(table, dict):
+            continue
         rel = str(table.get("file", ""))
-        path = root / rel
+        try:
+            path = (root / Path(*PurePosixPath(rel.replace("\\", "/")).parts)).resolve()
+            path.relative_to(root.resolve())
+        except (ValueError, OSError):
+            problems.append(f"payload artifact path escapes raw dataset: {rel}")
+            continue
         if not path.is_file():
             problems.append(f"payload artifact missing: {rel}")
             continue
@@ -944,19 +1243,75 @@ def verify_meta_closure(raw_root: Path | str, meta_doc: dict[str, Any]) -> list[
         if actual != str(table.get("content_hash", "")):
             problems.append(f"payload hash mismatch: {rel}")
     if tables and not problems:
-        records = [
-            TableRecord(
-                name=t.get("name"),
-                file=str(t.get("file", "")),
-                content_hash=str(t.get("content_hash", "")),
-                schema_hash=str(t.get("schema_hash", "")),
-                row_count=int(t.get("row_count", 0) or 0),
-            )
-            for t in tables
-        ]
+        try:
+            records = [
+                TableRecord(
+                    name=t.get("name"),
+                    file=str(t.get("file", "")),
+                    content_hash=str(t.get("content_hash", "")),
+                    schema_hash=str(t.get("schema_hash", "")),
+                    row_count=int(t.get("row_count", 0) or 0),
+                )
+                for t in tables
+            ]
+        except (AttributeError, TypeError, ValueError):
+            problems.append("table record fields are malformed")
+            return problems
         if _combined_hash(records) != str(meta_doc.get("content_hash", "")):
             problems.append("combined content_hash does not recompute from tables")
     return problems
+
+
+def verify_raw_evidence(
+    raw_root: Path | str,
+    *,
+    provider: str,
+    dataset: str,
+    request_id: str,
+) -> VerifiedRawEvidence:
+    """Perform the single full physical verification for one raw exchange.
+
+    The returned handle is the small hand-off between the raw boundary and a
+    downstream consumer.  It binds the parsed meta to the request and lets a
+    caller avoid repeating the same payload hashing in the same call chain.
+    """
+    root = Path(raw_root)
+    dataset_dir = root / f"provider={provider}" / f"dataset={dataset}"
+    meta_path = dataset_dir / f"{request_id}.meta.json"
+    if not meta_path.is_file():
+        raise RawWriterError(f"no raw meta for request {request_id} under {dataset_dir}")
+    try:
+        meta_bytes = meta_path.read_bytes()
+        doc = json.loads(meta_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RawWriterError(f"raw meta unreadable for request {request_id}: {exc}") from exc
+    if not isinstance(doc, dict):
+        raise RawWriterError(f"raw meta for request {request_id} must be an object")
+    expected_identity = {
+        "request_id": request_id,
+        "provider": provider,
+        "provider_dataset": dataset,
+    }
+    identity_problems = [
+        f"meta {field} does not match requested {expected!r}"
+        for field, expected in expected_identity.items()
+        if str(doc.get(field, "")) != expected
+    ]
+    problems = identity_problems + verify_meta_closure(dataset_dir, doc)
+    if problems:
+        raise RawWriterError(
+            f"raw integrity verification failed for request {request_id}: {'; '.join(problems)}"
+        )
+    return VerifiedRawEvidence(
+        provider=provider,
+        dataset=dataset,
+        request_id=request_id,
+        evidence_uri=f"provider={provider}/dataset={dataset}/{request_id}.meta.json",
+        evidence_hash=hashlib.sha256(meta_bytes).hexdigest(),
+        content_hash=str(doc.get("content_hash") or ""),
+        payload_kind=str(doc.get("payload_kind") or ""),
+        meta=doc,
+    )
 
 
 def _with_request_id(
@@ -982,6 +1337,7 @@ def read_raw_payload(
     dataset: str,
     request_id: str,
     verify: bool = True,
+    verified: VerifiedRawEvidence | None = None,
 ) -> Any:
     """Read an immutable raw payload through the read-only RawWriter API.
 
@@ -994,6 +1350,7 @@ def read_raw_payload(
         dataset=dataset,
         request_id=request_id,
         verify=verify,
+        verified=verified,
     )
 
 
@@ -1019,7 +1376,9 @@ __all__ = [
     "RawWriter",
     "RawWriterError",
     "TableRecord",
+    "VerifiedRawEvidence",
     "list_orphan_payloads",
     "read_raw_payload",
     "verify_meta_closure",
+    "verify_raw_evidence",
 ]

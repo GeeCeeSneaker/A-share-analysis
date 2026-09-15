@@ -1,14 +1,12 @@
-"""CR-4.1: the ONE public canonical consumption boundary (audit
-20260902 sections 3-4, CR-4 work requirement P0-A01/P0-A02).
+"""CR-4.1: canonical owner verification and downstream seal hand-offs
+(audit 20260902 sections 3-4, CR-4 work requirement P0-A01/P0-A02).
 
-SnapshotBuilder (and any future governed consumer) must NEVER
-re-implement canonical correctness rules: it calls
-``verify_canonical_run_for_consumption`` - the ONLY supported entry
-point for reading canonical truth for downstream construction - which
-reuses the exact CR-3 verification implementations (typed identity
-seal, shared artifact closure verifier, findings truth + status
-semantic recompute, sealed CR-2 authority + physical verification).
-There is no second, weaker copy of any rule.
+SnapshotBuilder calls ``verify_canonical_run_for_consumption`` at the
+canonical owner boundary. Downstream durable boundaries consume the
+small ``read_canonical_run_manifest`` / ``load_canonical_projection``
+seal hand-offs and enforce their own artifact/schema/PIT invariants;
+they do not recursively re-run the full CR-3 chain on every read.
+The full verifier remains the explicit deep-audit/owner entry point.
 
 Deliberate distinction from the CR-3 continuity guard: consumption
 does NOT require the sealed CR-2 inputs to still be part of the
@@ -21,10 +19,15 @@ physical / anchored evidence.
 
 from __future__ import annotations
 
+import hashlib
+import io
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+import polars as pl
 
 from ashare_state.canonical.canonicalizer import (
     _LEDGER_COLUMNS,
@@ -32,10 +35,13 @@ from ashare_state.canonical.canonicalizer import (
     CanonicalRunSeal,
     _ledger_as_of,
 )
+from ashare_state.storage.paths import physical_from_logical_uri
 
 __all__ = [
     "CanonicalConsumptionError",
     "VerifiedCanonicalRun",
+    "load_canonical_projection",
+    "read_canonical_run_manifest",
     "verify_canonical_run_for_consumption",
 ]
 
@@ -60,6 +66,140 @@ class VerifiedCanonicalRun:
     ledger_record: dict[str, Any]
     manifest: dict[str, Any]
     selected_rows: tuple[dict[str, Any], ...]
+
+
+def read_canonical_run_manifest(
+    conn: Any,
+    canonical_run_id: str,
+    *,
+    normalized_root: Path,
+) -> tuple[dict[str, Any], dict[str, Any], datetime]:
+    """Read the durable canonical manifest seal for a downstream boundary.
+
+    This is intentionally lighter than ``verify_canonical_run_for_consumption``:
+    it verifies the current ledger row, deterministic manifest URI, manifest
+    bytes hash, and the manifest's identity fields, but it does not re-run
+    canonical artifact/finding/input closure.  The owner boundary performs
+    that deep verification once; downstream consumers compare this referenced
+    identity and verify only their own inputs.
+    """
+    row = conn.execute(
+        f"SELECT {', '.join(_LEDGER_COLUMNS)} FROM meta_canonicalization_run "
+        "WHERE canonical_run_id = ?",
+        [canonical_run_id],
+    ).fetchone()
+    if row is None:
+        raise CanonicalConsumptionError(
+            f"canonical run {canonical_run_id} does not exist in the canonical ledger"
+        )
+    record = dict(zip(_LEDGER_COLUMNS, row, strict=True))
+    if str(record["status"]) != "SUCCESS":
+        raise CanonicalConsumptionError(
+            f"canonical run {canonical_run_id} has status {record['status']!r}; "
+            "only SUCCESS runs may be referenced"
+        )
+    as_of = _ledger_as_of(record)
+    expected_uri = (
+        f"canonical/contract={record['canonical_contract_version']}/"
+        f"as_of={as_of.strftime('%Y%m%dT%H%M%SZ')}/"
+        f"run={canonical_run_id}/manifest.json"
+    )
+    if str(record["manifest_uri"]) != expected_uri:
+        raise CanonicalConsumptionError(
+            f"canonical manifest URI is not deterministic: {record['manifest_uri']!r}"
+        )
+    try:
+        manifest_path = physical_from_logical_uri(Path(normalized_root), expected_uri)
+    except Exception as exc:  # noqa: BLE001 - fail closed at the path boundary
+        raise CanonicalConsumptionError(
+            f"canonical manifest URI is outside the normalized root: {expected_uri!r}"
+        ) from exc
+    if not manifest_path.is_file():
+        raise CanonicalConsumptionError(f"canonical manifest missing: {expected_uri}")
+    manifest_bytes = manifest_path.read_bytes()
+    if hashlib.sha256(manifest_bytes).hexdigest() != str(record["manifest_hash"]):
+        raise CanonicalConsumptionError("canonical manifest bytes do not match the ledger hash")
+    try:
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CanonicalConsumptionError(f"canonical manifest is unreadable: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise CanonicalConsumptionError("canonical manifest root is not an object")
+    for field in (
+        "canonical_run_id",
+        "canonical_contract_version",
+        "requested_domains_hash",
+        "selected_semantic_hash",
+        "status",
+    ):
+        if str(manifest.get(field)) != str(record[field]):
+            raise CanonicalConsumptionError(
+                f"canonical manifest field {field} does not match the ledger seal"
+            )
+    if str(manifest.get("as_of")) != as_of.isoformat():
+        raise CanonicalConsumptionError("canonical manifest as_of does not match the ledger")
+    try:
+        requested_domains = json.loads(str(record["requested_domains_json"]))
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise CanonicalConsumptionError(
+            "canonical ledger requested_domains_json is unreadable"
+        ) from exc
+    if not isinstance(requested_domains, list) or not all(
+        isinstance(domain, str) for domain in requested_domains
+    ):
+        raise CanonicalConsumptionError(
+            "canonical ledger requested_domains_json is not a list of strings"
+        )
+    if manifest.get("requested_domains") != requested_domains:
+        raise CanonicalConsumptionError(
+            "canonical manifest requested_domains does not match the ledger"
+        )
+    return record, manifest, as_of
+
+
+def load_canonical_projection(
+    conn: Any,
+    canonical_run_id: str,
+    *,
+    normalized_root: Path,
+) -> tuple[dict[str, Any], dict[str, Any], datetime, tuple[dict[str, Any], ...]]:
+    """Load the selected projection after consuming the canonical manifest seal.
+
+    Only the selected artifact needed by snapshot construction is opened.  Its
+    URI, byte hash, schema hash, and row count are checked against the already
+    sealed manifest; canonical findings, decisions, and upstream inputs are
+    not recursively reverified here.
+    """
+    record, manifest, as_of = read_canonical_run_manifest(
+        conn, canonical_run_id, normalized_root=normalized_root
+    )
+    artifacts = manifest.get("artifacts")
+    selected = artifacts.get("selected") if isinstance(artifacts, dict) else None
+    if not isinstance(selected, dict):
+        raise CanonicalConsumptionError("canonical manifest has no selected artifact seal")
+    expected_uri = (
+        f"canonical/contract={record['canonical_contract_version']}/"
+        f"as_of={as_of.strftime('%Y%m%dT%H%M%SZ')}/"
+        f"run={canonical_run_id}/selected.parquet"
+    )
+    if str(selected.get("uri")) != expected_uri:
+        raise CanonicalConsumptionError("canonical selected artifact URI is not deterministic")
+    try:
+        path = physical_from_logical_uri(Path(normalized_root), expected_uri)
+    except Exception as exc:  # noqa: BLE001 - fail closed at the path boundary
+        raise CanonicalConsumptionError("canonical selected artifact URI is invalid") from exc
+    if not path.is_file():
+        raise CanonicalConsumptionError(f"canonical selected artifact missing: {expected_uri}")
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != str(selected.get("content_hash")):
+        raise CanonicalConsumptionError("canonical selected artifact bytes are tampered")
+    frame = pl.read_parquet(io.BytesIO(data))
+    schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
+    if schema_hash != str(selected.get("schema_hash")):
+        raise CanonicalConsumptionError("canonical selected artifact schema is tampered")
+    if frame.height != int(selected.get("row_count", -1)):
+        raise CanonicalConsumptionError("canonical selected artifact row count is tampered")
+    return record, manifest, as_of, tuple(frame.to_dicts())
 
 
 def verify_canonical_run_for_consumption(

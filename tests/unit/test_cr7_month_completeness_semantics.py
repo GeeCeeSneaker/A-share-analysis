@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 
 import polars as pl
 import pytest
@@ -11,7 +12,7 @@ from ashare_state.providers.amazingdata.month_completeness import (
     CompletenessPairClass,
     MonthCompletenessError,
     MonthCompletenessEvaluation,
-    _PositiveTradeFallbackEvidence,
+    PositiveTradeFallback,
     _snapshot_trade_observation,
     evaluate_month_completeness,
 )
@@ -76,9 +77,6 @@ def test_expected_bar_set_excludes_non_applicable_and_suspended_pairs() -> None:
     result = evaluate_month_completeness(**_valid_inputs())
 
     assert result.accepted
-    assert result.applicable_pair_count == 3
-    assert result.suspended_pair_count == 1
-    assert result.not_applicable_pair_count == 1
     assert result.required_bar_pair_count == 2
     assert result.returned_bar_pair_count == 2
     assert result.classification_counts == {
@@ -110,8 +108,6 @@ def test_security_first_present_on_d_plus_one_is_not_applicable_on_d() -> None:
     result = evaluate_month_completeness(**values)
 
     assert result.accepted
-    assert result.applicable_pair_count == 3
-    assert result.not_applicable_pair_count == 1
     assert result.required_bar_pair_count == 2
     assert result.returned_bar_pair_count == 2
 
@@ -135,7 +131,7 @@ def test_duplicate_status_date_fails_closed_without_row_order_authority(
     # The invalid member contributes no status facts: neither duplicate row
     # can make the pair active or suspended based on response order.
     assert result.required_bar_pair_count == 1
-    assert result.suspended_pair_count == 0
+    assert result.classification_counts[CompletenessPairClass.SUSPENSION_NON_TRADING.value] == 0
     assert result.unresolved_pair_count == 2
 
 
@@ -176,7 +172,7 @@ def test_missing_status_is_unresolved_not_not_applicable() -> None:
     assert not result.accepted
     assert result.unresolved_pair_count == 1
     assert result.classification_counts[CompletenessPairClass.UNRESOLVED.value] == 1
-    assert result.not_applicable_pair_count == 1
+    assert result.classification_counts[CompletenessPairClass.NOT_APPLICABLE_SESSION.value] == 1
 
 
 def test_schema_valid_empty_non_applicable_table_is_allowed() -> None:
@@ -195,7 +191,7 @@ def test_schema_valid_empty_non_applicable_table_is_allowed() -> None:
     result = evaluate_month_completeness(**values)
 
     assert result.accepted
-    assert result.not_applicable_pair_count == 2
+    assert result.classification_counts[CompletenessPairClass.NOT_APPLICABLE_SESSION.value] == 2
 
 
 def test_empty_status_for_an_applicable_security_remains_unresolved() -> None:
@@ -215,7 +211,7 @@ def test_zero_column_status_uses_positive_num_trades_as_active_fact() -> None:
     status = values["status_payload"]
     assert isinstance(status, dict)
     status["000001.SZ"] = pl.DataFrame()
-    evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+    evidence = PositiveTradeFallback(
         queried_pairs={("000001.SZ", 20240102)},
         positive_pairs={("000001.SZ", 20240102)},
         request_params_by_pair={("000001.SZ", 20240102): "a" * 64},
@@ -231,12 +227,25 @@ def test_zero_column_status_uses_positive_num_trades_as_active_fact() -> None:
     assert result.required_bar_pair_count == 2
 
 
+def test_positive_trade_fallback_keeps_request_evidence_mapping_type() -> None:
+    evidence = PositiveTradeFallback(
+        queried_pairs={("000001.SZ", 20240102)},
+        positive_pairs={("000001.SZ", 20240102)},
+        request_params_by_pair={("000001.SZ", 20240102): "a" * 64},
+    )
+
+    assert isinstance(evidence.request_params_by_pair, Mapping)
+    assert dict(evidence.request_params_by_pair) == {("000001.SZ", 20240102): "a" * 64}
+    with pytest.raises(TypeError):
+        evidence.request_params_by_pair[("000001.SZ", 20240103)] = "b" * 64  # type: ignore[index]
+
+
 def test_zero_num_trades_does_not_resolve_an_empty_status_member() -> None:
     values = _valid_inputs()
     status = values["status_payload"]
     assert isinstance(status, dict)
     status["000001.SZ"] = pl.DataFrame()
-    evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+    evidence = PositiveTradeFallback(
         queried_pairs={("000001.SZ", 20240102)},
         positive_pairs=set(),
         request_params_by_pair={("000001.SZ", 20240102): "b" * 64},
@@ -254,7 +263,7 @@ def test_missing_snapshot_remains_unresolved() -> None:
     status = values["status_payload"]
     assert isinstance(status, dict)
     status["000001.SZ"] = pl.DataFrame()
-    evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+    evidence = PositiveTradeFallback(
         queried_pairs={("000001.SZ", 20240102)},
         positive_pairs=set(),
         request_params_by_pair={("000001.SZ", 20240102): "c" * 64},
@@ -271,7 +280,7 @@ def test_partial_status_schema_cannot_use_positive_fallback() -> None:
     status = values["status_payload"]
     assert isinstance(status, dict)
     status["000001.SZ"] = _status(day_values=[20240102], flags=[0])
-    evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+    evidence = PositiveTradeFallback(
         queried_pairs={("000001.SZ", 20240103)},
         positive_pairs={("000001.SZ", 20240103)},
         request_params_by_pair={("000001.SZ", 20240103): "d" * 64},
@@ -297,7 +306,7 @@ def test_plain_empty_list_status_is_not_fallback_eligible() -> None:
 
 def test_request_hashes_must_be_bound_to_exact_pairs() -> None:
     with pytest.raises(MonthCompletenessError, match="pair-bound"):
-        _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+        PositiveTradeFallback(
             queried_pairs={("000001.SZ", 20240102)},
             positive_pairs={("000001.SZ", 20240102)},
             request_params_by_pair=["a" * 64],  # type: ignore[arg-type]
@@ -305,7 +314,7 @@ def test_request_hashes_must_be_bound_to_exact_pairs() -> None:
 
 
 def test_caller_supplied_fallback_observation_is_rejected() -> None:
-    with pytest.raises(MonthCompletenessError, match="provider-produced"):
+    with pytest.raises(MonthCompletenessError, match="typed evidence"):
         evaluate_month_completeness(**_valid_inputs(), positive_trade_fallback={"pairs": []})
 
 
@@ -370,7 +379,7 @@ def test_null_daily_member_is_allowed_when_all_pairs_are_suspended() -> None:
     result = evaluate_month_completeness(**values)
 
     assert result.accepted
-    assert result.suspended_pair_count == 2
+    assert result.classification_counts[CompletenessPairClass.SUSPENSION_NON_TRADING.value] == 2
     assert result.required_bar_pair_count == 1
     assert (
         result.classification_counts[
@@ -420,11 +429,16 @@ def test_evaluation_round_trip_is_exact_and_sanitized() -> None:
 
     assert replayed == result
     assert "000001.SZ" not in encoded
+    assert "applicable_pair_set_hash" not in encoded
+    assert "suspended_pair_set_hash" not in encoded
+    assert "not_applicable_pair_set_hash" not in encoded
+    assert "applicability_semantics_version" not in encoded
+    assert "positive_trade_fallback_version" not in encoded
 
 
-def test_old_fallback_semantic_version_cannot_replay() -> None:
+def test_unknown_month_semantic_rule_version_cannot_replay() -> None:
     result = evaluate_month_completeness(**_valid_inputs())
     payload = result.as_dict()
-    payload["positive_trade_fallback_version"] = "amazingdata-positive-trade-count-fallback-v0"
-    with pytest.raises(MonthCompletenessError, match="unknown positive-trade fallback version"):
+    payload["rule_version"] = "amazingdata-month-completeness-rule-v1"
+    with pytest.raises(MonthCompletenessError, match="unknown month completeness rule version"):
         MonthCompletenessEvaluation.from_mapping(payload)

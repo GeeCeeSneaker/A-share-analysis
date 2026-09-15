@@ -11,6 +11,11 @@
 > 状态：**T2 已确认；T3 身份冻结 PR 待独立审阅与合并；正式身份在合并前仍未冻结；Production B1-B7 / verdict / approval 继续 blocked**
 > 本文件是 Provider 事实的唯一权威记录处（V1.3.2 §7.14）。主架构文档不维护接口细节。
 
+> **2026-09-14 当前交接补充**：最新开发任务为 Issue #66 的 Phase-0/CR-7 最小化。当前
+> 分支只做 RawWriter、验证 hand-off、发布事务边界和 completeness 评价收敛；不因本文件中
+> 的历史正式账号 smoke 记录而自动授权 Production B1-B7、Stage B 或 78 月回补。凭证、真实
+> endpoint、Token、专有 SDK/runtime 和原始 provider payload 仍只允许存在本地受控环境。
+
 
 ## 1.5 2026-09-05 T1 受控线上身份候选（当前权威）
 
@@ -244,8 +249,8 @@ Golden、H1、全局 baseline 或旧封存结果。
 
 ### 9.2 固定探针边界
 
-[`cr7_positive_semantic_fallback.py`](../../scripts/spike/cr7_positive_semantic_fallback.py) 执行以下
-固定检查：
+历史固定探针曾执行以下检查；按 Issue #66，探针脚本已从当前树清理，以下内容只作为历史
+边界记录：
 
 - 从保留 ignored raw 的批次文件名 SHA-256 定位同一个异常成员，不把证券值写入报告；
 - 用保留日历和 22 个 `[D,D]` 历史 code-list 交换证明该成员在 22 个 2024-01 交易日均适用；
@@ -268,8 +273,7 @@ baseline 与策略工作均仍被禁止。
 的严格正值行，合计 96,781 行。SDK callback 共 22 次、返回数据非空 22 次；callback 状态标签没有
 被用来推导交易事实。
 
-脱敏机器 receipt 见 [`cr7_positive_semantic_fallback_20260914.json`](cr7_positive_semantic_fallback_20260914.json)，
-可读摘要见 [`cr7_positive_semantic_fallback_20260914.md`](cr7_positive_semantic_fallback_20260914.md)。
+脱敏机器 receipt 与可读摘要已按 Issue #66 从当前树清理，历史提交和 Issue 记录仍可追溯。
 结果是 `PROVIDER_SEMANTIC_RESOLVED` / `EVIDENCE_ONLY_PENDING_REVIEW`；这表示本次候选合同在
 单成员单月范围内取得了正向观测，不表示供应商 capability approval、全库历史完整性或可直接用于
 完整性计算。`fallback_rule_encoded=false`，未修改 `month_completeness.py`，未创建 authoritative

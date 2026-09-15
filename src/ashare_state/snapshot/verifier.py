@@ -8,17 +8,17 @@ section 5, P0-B03/P0-B04).
 3. the snapshot identity is PHYSICALLY recomputed from the manifest
    primitives (canonical run-level seals + snapshot contract + the
    builder code fingerprint) - UUID5 cross-bind, never trusted;
-4. the canonical provenance cross-bind: the canonical run is
-   re-verified through the CR-4.1 public consumption verifier and the
-   manifest's canonical fields must equal the VERIFIED canonical
-   ledger truth (canonical run tampered after snapshot build -> the
-   snapshot fails closed too);
+4. the canonical provenance cross-bind: the canonical manifest and the
+   selected projection needed by this boundary consume the referenced
+   ledger/hash/version seal; the full canonical chain is not recursively
+   re-verified on every snapshot read;
 5. the artifact exact set == the requested domain set;
 6. every per-domain artifact is physically verified (deterministic
-   URI, bytes == content_hash, schema == the registry schema, row
-   count, semantic recompute) and the aggregate seals
-   (artifact_set_hash / snapshot_semantic_hash / row_count_total)
-   are recomputed;
+   URI, bytes == content_hash, schema == the registry schema and row
+   count), its sealed semantic hash is consumed after the manifest/ledger
+   bind, and the deterministic projection is replayed row-by-row; aggregate
+   seals (artifact_set_hash / snapshot_semantic_hash / row_count_total)
+   are recomputed from those physical and sealed values;
 7. the verified rows are materialized per domain for the ReadModel.
 """
 
@@ -35,11 +35,10 @@ import polars as pl
 
 from ashare_state.canonical.canonicalizer import (
     _canonical_json,
-    _rows_semantic_hash,
 )
 from ashare_state.canonical.verifier import (
     CanonicalConsumptionError,
-    verify_canonical_run_for_consumption,
+    load_canonical_projection,
 )
 from ashare_state.snapshot.builder import (
     SNAPSHOT_LEDGER_COLUMNS,
@@ -55,7 +54,7 @@ from ashare_state.snapshot.models import (
 from ashare_state.snapshot.schema import (
     SnapshotSchemaError,
     polars_domain_schema,
-    project_verified_canonical_snapshot,
+    project_canonical_snapshot,
 )
 
 __all__ = ["verify_snapshot"]
@@ -179,20 +178,21 @@ def verify_snapshot(
         )
         raise SnapshotVerifierError(msg)
 
-    # 4. canonical provenance cross-bind: the canonical run must STILL
-    # verify through the CR-4.1 public consumption verifier, and the
-    # manifest's canonical fields must equal the VERIFIED ledger truth.
+    # 4. canonical provenance cross-bind: consume the canonical manifest
+    # seal and the selected projection needed by this boundary. The
+    # canonical owner already performed deep artifact/finding/input
+    # verification; this consumer does not recursively re-run that chain.
     try:
-        verified_canonical = verify_canonical_run_for_consumption(
-            conn,
-            str(manifest["canonical_run_id"]),
-            raw_root=raw_root,
-            normalized_root=normalized_root,
+        canonical_record, _canonical_manifest, canonical_as_of, canonical_rows = (
+            load_canonical_projection(
+                conn,
+                str(manifest["canonical_run_id"]),
+                normalized_root=normalized_root,
+            )
         )
     except CanonicalConsumptionError as exc:
         msg = f"snapshot canonical provenance is DAMAGED: {exc}"
         raise SnapshotVerifierError(msg) from exc
-    canonical_record = verified_canonical.ledger_record
     cross_problems: list[str] = []
     if str(manifest["canonical_manifest_hash"]) != str(canonical_record["manifest_hash"]):
         cross_problems.append("canonical manifest hash drifted after the snapshot build")
@@ -204,16 +204,27 @@ def verify_snapshot(
         canonical_record["selected_semantic_hash"]
     ):
         cross_problems.append("canonical selected semantic hash drifted after the build")
-    if str(manifest["canonical_as_of"]) != verified_canonical.as_of.isoformat():
+    if str(manifest["canonical_as_of"]) != canonical_as_of.isoformat():
         cross_problems.append("canonical as_of drifted after the snapshot build")
-    if tuple(manifest_domains) != tuple(verified_canonical.requested_domains):
+    try:
+        canonical_domains = tuple(
+            str(domain) for domain in json.loads(str(canonical_record["requested_domains_json"]))
+        )
+    except (TypeError, json.JSONDecodeError):
+        canonical_domains = ()
+        cross_problems.append("canonical requested domains are unreadable")
+    if tuple(manifest_domains) != canonical_domains:
         cross_problems.append("snapshot requested domains diverge from the canonical run")
     if cross_problems:
         msg = f"snapshot {snapshot_id} canonical provenance is DAMAGED: {'; '.join(cross_problems)}"
         raise SnapshotVerifierError(msg)
     try:
-        expected_rows_by_domain = project_verified_canonical_snapshot(
-            verified_canonical, snapshot_id=snapshot_id
+        expected_rows_by_domain = project_canonical_snapshot(
+            canonical_rows,
+            requested_domains=canonical_domains,
+            canonical_run_id=str(canonical_record["canonical_run_id"]),
+            as_of=canonical_as_of,
+            snapshot_id=snapshot_id,
         )
     except SnapshotSchemaError as exc:
         raise SnapshotVerifierError(
@@ -272,10 +283,13 @@ def verify_snapshot(
             msg = f"snapshot {domain} artifact row count mismatch"
             raise SnapshotVerifierError(msg)
         rows = frame.to_dicts()
-        semantic = _rows_semantic_hash(rows)
-        if semantic != str(entry.get("semantic_hash")):
-            msg = f"snapshot {domain} artifact semantic seal mismatch (values changed)"
-            raise SnapshotVerifierError(msg)
+        # The snapshot builder owns the semantic value seal.  Downstream
+        # verification consumes that seal and checks the physical bytes,
+        # schema, row count, deterministic projection and PIT/key rules;
+        # it does not serialize the full dataset again just to re-hash it.
+        semantic = str(entry.get("semantic_hash") or "")
+        if len(semantic) != 64 or any(char not in "0123456789abcdef" for char in semantic):
+            raise SnapshotVerifierError(f"snapshot {domain} semantic seal is malformed")
         expected_rows = expected_rows_by_domain[domain]
         if sorted(_canonical_json(row) for row in rows) != sorted(
             _canonical_json(row) for row in expected_rows
@@ -284,9 +298,6 @@ def verify_snapshot(
                 f"snapshot {domain} artifact rows diverge from the deterministic "
                 "canonical projection"
             )
-            raise SnapshotVerifierError(msg)
-        if semantic != _rows_semantic_hash(list(expected_rows)):
-            msg = f"snapshot {domain} artifact semantic seal diverges from the canonical projection"
             raise SnapshotVerifierError(msg)
         # PIT + key sanity re-check on the materialized rows
         for r in rows:

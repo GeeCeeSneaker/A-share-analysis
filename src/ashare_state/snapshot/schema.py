@@ -34,6 +34,7 @@ __all__ = [
     "SnapshotSchemaError",
     "domain_snapshot_schema",
     "polars_domain_schema",
+    "project_canonical_snapshot",
     "project_selected_row",
     "project_verified_canonical_snapshot",
     "snapshot_domains",
@@ -422,37 +423,41 @@ def project_selected_row(
     return projected
 
 
-def project_verified_canonical_snapshot(
-    verified_canonical: Any, *, snapshot_id: str
+def project_canonical_snapshot(
+    selected_rows: Any,
+    *,
+    requested_domains: Any,
+    canonical_run_id: str,
+    as_of: datetime,
+    snapshot_id: str,
 ) -> dict[str, tuple[dict[str, Any], ...]]:
-    """Replay one verified canonical run through the snapshot registry.
+    """Project selected canonical rows through the snapshot registry.
 
-    This is the single deterministic projection used by both the builder
-    and the snapshot verifier. It groups only the already verified selected
-    rows, validates their domain/key/typed/PIT contracts, rejects duplicate
-    natural keys, and returns rows in the registry's stable order.
+    This is the direct bridge used by both the builder and the snapshot
+    verifier.  It does not establish canonical truth; the caller supplies
+    rows after the appropriate canonical owner/seal boundary.  It validates
+    domain/key/typed/PIT contracts, rejects duplicate natural keys, and
+    returns rows in the registry's stable order.
     """
     try:
-        requested_domains = tuple(str(domain) for domain in verified_canonical.requested_domains)
+        requested_domains = tuple(str(domain) for domain in requested_domains)
     except (AttributeError, TypeError) as exc:
-        raise SnapshotSchemaError("verified canonical run has no requested domain set") from exc
+        raise SnapshotSchemaError("canonical projection has no requested domain set") from exc
     if not requested_domains or len(set(requested_domains)) != len(requested_domains):
-        raise SnapshotSchemaError("verified canonical run carries an empty or duplicate domain set")
+        raise SnapshotSchemaError("canonical projection carries an empty or duplicate domain set")
     for domain in requested_domains:
         domain_snapshot_schema(domain)
 
-    canonical_run_id = getattr(verified_canonical, "canonical_run_id", None)
     if not isinstance(canonical_run_id, str) or not canonical_run_id:
-        raise SnapshotSchemaError("verified canonical run carries no canonical_run_id")
-    as_of = getattr(verified_canonical, "as_of", None)
+        raise SnapshotSchemaError("canonical projection carries no canonical_run_id")
     if not isinstance(as_of, datetime) or as_of.tzinfo is None:
-        raise SnapshotSchemaError("verified canonical run carries no timezone-aware as_of")
+        raise SnapshotSchemaError("canonical projection carries no timezone-aware as_of")
     as_of = as_of.astimezone(UTC)
 
     grouped: dict[str, list[dict[str, Any]]] = {domain: [] for domain in requested_domains}
-    for row in verified_canonical.selected_rows:
+    for row in selected_rows:
         if not isinstance(row, dict):
-            raise SnapshotSchemaError(f"verified canonical selected row is not a mapping: {row!r}")
+            raise SnapshotSchemaError(f"canonical selected row is not a mapping: {row!r}")
         row_domain = row.get("canonical_domain")
         if not isinstance(row_domain, str) or row_domain not in grouped:
             raise SnapshotSchemaError(
@@ -479,3 +484,16 @@ def project_verified_canonical_snapshot(
         projected.sort(key=lambda row: tuple(row[name] for name in schema.stable_sort_key))
         projected_by_domain[domain] = tuple(projected)
     return projected_by_domain
+
+
+def project_verified_canonical_snapshot(
+    verified_canonical: Any, *, snapshot_id: str
+) -> dict[str, tuple[dict[str, Any], ...]]:
+    """Compatibility wrapper for callers holding a verified run handle."""
+    return project_canonical_snapshot(
+        verified_canonical.selected_rows,
+        requested_domains=verified_canonical.requested_domains,
+        canonical_run_id=verified_canonical.canonical_run_id,
+        as_of=verified_canonical.as_of,
+        snapshot_id=snapshot_id,
+    )

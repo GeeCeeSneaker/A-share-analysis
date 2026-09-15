@@ -34,7 +34,6 @@ from ashare_state.readmodel import (
     ReadModelError,
     duckdb_domain_columns,
 )
-from ashare_state.snapshot import verify_snapshot
 from ashare_state.storage.atomic_files import write_file_atomic
 
 __all__ = [
@@ -168,7 +167,7 @@ class FeatureBuilder:
             readmodel_root=self.readmodel_root,
         )
         try:
-            db = model.open_read_only(snapshot_id)
+            db, verified_snapshot = model.open_read_only_with_snapshot(snapshot_id)
         except ReadModelError as exc:
             raise FeatureBuilderError(
                 f"feature input ReadModel {snapshot_id} is not consumable: {exc}"
@@ -218,20 +217,9 @@ class FeatureBuilder:
         finally:
             db.close()
 
-        # The public Snapshot verifier supplies identity seals and as_of
-        # metadata only. Feature values still come exclusively from the
-        # verified ReadModel rows above.
-        try:
-            verified_snapshot = verify_snapshot(
-                self.conn,
-                snapshot_id,
-                raw_root=self.raw_root,
-                normalized_root=self.normalized_root,
-            )
-        except Exception as exc:
-            raise FeatureBuilderError(
-                f"snapshot {snapshot_id} verification metadata is unavailable: {exc}"
-            ) from exc
+        # The ReadModel boundary returns the snapshot seal it already
+        # consumed. Feature values still come exclusively from the verified
+        # ReadModel rows above; do not recursively verify the snapshot again.
         if metadata["snapshot_id"] != snapshot_id:
             raise FeatureBuilderError("ReadModel snapshot_id does not match the explicit input")
         if metadata["canonical_run_id"] != verified_snapshot.canonical_run_id:

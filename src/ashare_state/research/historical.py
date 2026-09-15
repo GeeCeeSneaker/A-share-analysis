@@ -31,7 +31,7 @@ from ashare_state.providers.amazingdata.month_completeness import (
     AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
     MonthCompletenessError,
     MonthCompletenessEvaluation,
-    _PositiveTradeFallbackEvidence,
+    PositiveTradeFallback,
     _snapshot_trade_observation,
     evaluate_month_completeness,
 )
@@ -71,8 +71,6 @@ __all__ = [
     "AmazingDataAcquisitionReceipt",
     "AmazingDataExchangeReceipt",
     "AuthoritativeCoverageEvidence",
-    "AuthoritativeSourceSelection",
-    "VerifiedSourceSnapshot",
     "CoverageBasisDescriptor",
     "CoverageBasisError",
     "CoverageEvaluation",
@@ -106,7 +104,7 @@ HISTORICAL_MATERIALIZATION_CONTRACT_VERSION = "cr7-history-materialization-v1"
 HISTORICAL_DATASET = RESEARCH_SECURITY_DAILY_DATASET
 TARGET_WINDOW_START = date(2020, 1, 1)
 TARGET_WINDOW_END = date(2026, 6, 30)
-COVERAGE_BASIS_VERSION = "coverage-basis-v1"
+COVERAGE_BASIS_VERSION = "coverage-basis-v2"
 COMPLETE_OBSERVED_DAILY_BAR_SCOPE = "COMPLETE_OBSERVED_DAILY_BAR_SCOPE"
 PARTIAL_OBSERVED_DAILY_BAR_SCOPE = "PARTIAL_OBSERVED_DAILY_BAR_SCOPE"
 COVERAGE_POLICY_VERSION = "coverage-basis-v1"
@@ -114,20 +112,17 @@ PARTITION_POLICY_VERSION = "monthly-route-v1"
 WRITER_CONFIGURATION_VERSION = "cr7-writer-v1"
 OFFLINE_FIXTURE_COMPLETE_METHOD = "OFFLINE_FIXTURE_COMPLETE_SCOPE_V1"
 OFFLINE_FIXTURE_PARTIAL_METHOD = "OFFLINE_FIXTURE_PARTIAL_SCOPE_V1"
-AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION = "authoritative-coverage-evidence-v1"
+AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION = "authoritative-coverage-evidence-v2"
 AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD = "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1"
-AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "AMAZINGDATA_ACQUISITION_RECEIPT_V3"
-AUTHORITATIVE_SOURCE_SELECTION_VERSION = "source-selection-retrieval-closure-20260912"
-AUTHORITATIVE_SOURCE_CLASS = "amazingdata_provider_observation"
+AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "AMAZINGDATA_ACQUISITION_RECEIPT_V4"
 AUTHORITATIVE_PROVIDER = "amazingdata"
-AUTHORITATIVE_RETRIEVAL_SURFACE = "history_acquisition"
 AUTHORITATIVE_SOURCE_METHODS = (
     "BaseData.get_hist_code_list",
     "BaseData.get_calendar",
     "InfoData.get_history_stock_status",
     "MarketData.query_kline",
 )
-AMAZINGDATA_ACQUISITION_RECEIPT_VERSION = "amazingdata-history-acquisition-receipt-v3"
+AMAZINGDATA_ACQUISITION_RECEIPT_VERSION = "amazingdata-history-acquisition-receipt-v4"
 AMAZINGDATA_SECURITY_UNIVERSE_SELECTION = "EXTRA_STOCK_A_SH_SZ"
 AMAZINGDATA_CALENDAR_MARKET = "SH"
 
@@ -224,7 +219,6 @@ _BASIS_FIELDS = (
     "source_domain",
     "claimed_scope_start",
     "claimed_scope_end",
-    "source_selection_fingerprint",
     "completeness_method",
     "completeness_claim",
     "coverage_basis_artifact_uri",
@@ -243,10 +237,8 @@ _AUTHORITATIVE_EVIDENCE_FIELDS = (
     "source_domain",
     "claimed_scope_start",
     "claimed_scope_end",
-    "source_selection_fingerprint",
     "completeness_method",
     "completeness_claim",
-    "source_selection",
     "acquisition_receipt",
     "upstream_source",
     "upstream_statement_kind",
@@ -359,188 +351,6 @@ def _coverage_rank(state: CoverageState) -> int:
         CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE: 1,
         CoverageState.UNRESOLVED_NOT_FOR_RESEARCH: 2,
     }[state]
-
-
-@dataclass(frozen=True)
-class AuthoritativeSourceSelection:
-    """The reviewed source-selection binding for the CR-7 evidence path.
-
-    A source-selection fingerprint is not an arbitrary caller label.  It is
-    the hash of this exact, intentionally narrow binding.  The binding is
-    still only a routing identity: it does not turn a provider response into
-    completeness evidence without the typed acquisition receipt below.
-    """
-
-    selection_version: str
-    source_class: str
-    provider: str
-    retrieval_surface: str
-    methods: tuple[str, ...]
-    source_domain: str
-    selection_fingerprint: str
-
-    def __post_init__(self) -> None:
-        try:
-            for field_name in (
-                "selection_version",
-                "source_class",
-                "provider",
-                "retrieval_surface",
-                "source_domain",
-            ):
-                _require_non_empty_string(getattr(self, field_name), field_name)
-            if not self.methods or any(
-                not isinstance(method, str) or not method.strip() for method in self.methods
-            ):
-                raise CoverageBasisError("authoritative source-selection methods are malformed")
-            if len(self.methods) != len(set(self.methods)):
-                raise CoverageBasisError("authoritative source-selection methods are duplicated")
-            fingerprint = _require_sha256(
-                self.selection_fingerprint, "source_selection_fingerprint"
-            )
-        except HistoricalMaterializationError as exc:
-            raise CoverageBasisError(str(exc)) from exc
-        if self.source_domain != "daily_bar":
-            raise CoverageBasisError("authoritative source-selection domain must be daily_bar")
-        expected_binding = {
-            "selection_version": AUTHORITATIVE_SOURCE_SELECTION_VERSION,
-            "source_class": AUTHORITATIVE_SOURCE_CLASS,
-            "provider": AUTHORITATIVE_PROVIDER,
-            "retrieval_surface": AUTHORITATIVE_RETRIEVAL_SURFACE,
-            "methods": list(AUTHORITATIVE_SOURCE_METHODS),
-            "source_domain": "daily_bar",
-        }
-        if self.as_dict(include_fingerprint=False) != expected_binding:
-            raise CoverageBasisError(
-                "authoritative source-selection binding is not the reviewed "
-                "AmazingData history path"
-            )
-        if fingerprint != sha256_hex(canonical_json(expected_binding)):
-            raise CoverageBasisError("source_selection_fingerprint does not match its binding")
-
-    @classmethod
-    def reviewed_amazingdata_history(cls) -> AuthoritativeSourceSelection:
-        """Return the only source-selection binding accepted by this adapter."""
-        binding: dict[str, Any] = {
-            "selection_version": AUTHORITATIVE_SOURCE_SELECTION_VERSION,
-            "source_class": AUTHORITATIVE_SOURCE_CLASS,
-            "provider": AUTHORITATIVE_PROVIDER,
-            "retrieval_surface": AUTHORITATIVE_RETRIEVAL_SURFACE,
-            "methods": list(AUTHORITATIVE_SOURCE_METHODS),
-            "source_domain": "daily_bar",
-        }
-        return cls(
-            selection_version=binding["selection_version"],
-            source_class=binding["source_class"],
-            provider=binding["provider"],
-            retrieval_surface=binding["retrieval_surface"],
-            methods=tuple(binding["methods"]),
-            source_domain=binding["source_domain"],
-            selection_fingerprint=sha256_hex(canonical_json(binding)),
-        )
-
-    @classmethod
-    def from_mapping(cls, payload: Mapping[str, Any]) -> AuthoritativeSourceSelection:
-        fields = {
-            "selection_version",
-            "source_class",
-            "provider",
-            "retrieval_surface",
-            "methods",
-            "source_domain",
-            "selection_fingerprint",
-        }
-        if not isinstance(payload, Mapping) or set(payload) != fields:
-            raise CoverageBasisError("authoritative source-selection fields are not exact")
-        methods = payload["methods"]
-        if not isinstance(methods, list):
-            raise CoverageBasisError("authoritative source-selection methods must be a list")
-        try:
-            return cls(
-                selection_version=_require_non_empty_string(
-                    payload["selection_version"], "selection_version"
-                ),
-                source_class=_require_non_empty_string(payload["source_class"], "source_class"),
-                provider=_require_non_empty_string(payload["provider"], "provider"),
-                retrieval_surface=_require_non_empty_string(
-                    payload["retrieval_surface"], "retrieval_surface"
-                ),
-                methods=tuple(
-                    _require_non_empty_string(method, "source-selection method")
-                    for method in methods
-                ),
-                source_domain=_require_non_empty_string(payload["source_domain"], "source_domain"),
-                selection_fingerprint=_require_sha256(
-                    payload["selection_fingerprint"], "selection_fingerprint"
-                ),
-            )
-        except HistoricalMaterializationError as exc:
-            raise CoverageBasisError(str(exc)) from exc
-
-    def as_dict(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "selection_version": self.selection_version,
-            "source_class": self.source_class,
-            "provider": self.provider,
-            "retrieval_surface": self.retrieval_surface,
-            "methods": list(self.methods),
-            "source_domain": self.source_domain,
-        }
-        if include_fingerprint:
-            payload["selection_fingerprint"] = self.selection_fingerprint
-        return payload
-
-
-@dataclass(frozen=True, init=False)
-class VerifiedSourceSnapshot:
-    """The already-verified CR-4 snapshot identity used by acquisition.
-
-    The class deliberately has no public constructor.  A source snapshot is
-    admitted to the authoritative path only from the typed
-    ``VerifiedResearchProjection`` returned by the R1 read-model boundary;
-    callers cannot pass a free-form id/hash/timestamp triple to mint a
-    receipt.
-    """
-
-    source_snapshot_id: str
-    source_snapshot_as_of: datetime
-    source_snapshot_manifest_hash: str
-    source_snapshot_semantic_hash: str
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError("VerifiedSourceSnapshot must come from a verified projection")
-
-    @classmethod
-    def from_projection(cls, projection: VerifiedResearchProjection) -> VerifiedSourceSnapshot:
-        if not isinstance(projection, VerifiedResearchProjection):
-            raise CoverageBasisError("authoritative acquisition needs a verified source projection")
-        try:
-            source_snapshot_id = _require_non_empty_string(
-                projection.source_snapshot_id, "source_snapshot_id"
-            )
-            source_snapshot_as_of = ensure_utc_timestamp(projection.source_snapshot_as_of)
-            source_snapshot_manifest_hash = _require_sha256(
-                projection.source_snapshot_manifest_hash, "source_snapshot_manifest_hash"
-            )
-            source_snapshot_semantic_hash = _require_sha256(
-                projection.source_snapshot_semantic_hash, "source_snapshot_semantic_hash"
-            )
-        except (HistoricalMaterializationError, ResearchPanelError) as exc:
-            raise CoverageBasisError("verified source snapshot identity is malformed") from exc
-        obj = object.__new__(cls)
-        object.__setattr__(obj, "source_snapshot_id", source_snapshot_id)
-        object.__setattr__(obj, "source_snapshot_as_of", source_snapshot_as_of)
-        object.__setattr__(obj, "source_snapshot_manifest_hash", source_snapshot_manifest_hash)
-        object.__setattr__(obj, "source_snapshot_semantic_hash", source_snapshot_semantic_hash)
-        return obj
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "source_snapshot_id": self.source_snapshot_id,
-            "source_snapshot_as_of": self.source_snapshot_as_of,
-            "source_snapshot_manifest_hash": self.source_snapshot_manifest_hash,
-            "source_snapshot_semantic_hash": self.source_snapshot_semantic_hash,
-        }
 
 
 @dataclass(frozen=True)
@@ -697,7 +507,6 @@ class PositiveTradeFallbackOperation:
 
 def _amazingdata_capture_catalog(
     *,
-    source_selection_fingerprint: str,
     source_snapshot_id: str,
     source_snapshot_manifest_hash: str,
     source_snapshot_semantic_hash: str,
@@ -712,7 +521,6 @@ def _amazingdata_capture_catalog(
     """Return the deterministic catalog identity used as the receipt proof."""
     return {
         "receipt_version": AMAZINGDATA_ACQUISITION_RECEIPT_VERSION,
-        "source_selection_fingerprint": source_selection_fingerprint,
         "source_snapshot_id": source_snapshot_id,
         "source_snapshot_manifest_hash": source_snapshot_manifest_hash,
         "source_snapshot_semantic_hash": source_snapshot_semantic_hash,
@@ -729,219 +537,17 @@ def _amazingdata_capture_catalog(
     }
 
 
-@dataclass(frozen=True, init=False)
-class _VerifiedAmazingDataCapture:
-    """Facts emitted only after the reviewed provider path has validated data.
-
-    This is intentionally private and has no public constructor.  Keeping the
-    derived counts, ranges and retrieval timestamp behind one typed object
-    prevents the receipt issuer from exposing a call surface that accepts
-    caller-selected authority facts one field at a time.
-    """
-
-    requested_scope_start: date
-    requested_scope_end: date
-    security_universe_count: int
-    security_universe_hash: str
-    calendar_trading_day_count: int
-    calendar_trading_days_hash: str
-    returned_first_date: date
-    returned_last_date: date
-    returned_trading_day_count: int
-    returned_trading_days_hash: str
-    returned_row_count: int
-    operations: tuple[AmazingDataExchangeReceipt, ...]
-    semantic_operations: tuple[AmazingDataExchangeReceipt, ...]
-    positive_trade_operations: tuple[PositiveTradeFallbackOperation, ...]
-    completeness_evaluation: MonthCompletenessEvaluation
-    retrieved_at_utc: datetime
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError("verified AmazingData capture must come from the provider path")
-
-    @classmethod
-    def _from_provider(
-        cls,
-        *,
-        requested_scope_start: date,
-        requested_scope_end: date,
-        security_universe_count: int,
-        security_universe_hash: str,
-        calendar_trading_day_count: int,
-        calendar_trading_days_hash: str,
-        returned_first_date: date,
-        returned_last_date: date,
-        returned_trading_day_count: int,
-        returned_trading_days_hash: str,
-        returned_row_count: int,
-        operations: tuple[AmazingDataExchangeReceipt, ...],
-        semantic_operations: tuple[AmazingDataExchangeReceipt, ...],
-        positive_trade_operations: tuple[PositiveTradeFallbackOperation, ...],
-        completeness_evaluation: MonthCompletenessEvaluation,
-        retrieved_at_utc: datetime,
-    ) -> _VerifiedAmazingDataCapture:
-        obj = object.__new__(cls)
-        for field_name, value in {
-            "requested_scope_start": requested_scope_start,
-            "requested_scope_end": requested_scope_end,
-            "security_universe_count": security_universe_count,
-            "security_universe_hash": security_universe_hash,
-            "calendar_trading_day_count": calendar_trading_day_count,
-            "calendar_trading_days_hash": calendar_trading_days_hash,
-            "returned_first_date": returned_first_date,
-            "returned_last_date": returned_last_date,
-            "returned_trading_day_count": returned_trading_day_count,
-            "returned_trading_days_hash": returned_trading_days_hash,
-            "returned_row_count": returned_row_count,
-            "operations": operations,
-            "semantic_operations": semantic_operations,
-            "positive_trade_operations": positive_trade_operations,
-            "completeness_evaluation": completeness_evaluation,
-            "retrieved_at_utc": retrieved_at_utc,
-        }.items():
-            object.__setattr__(obj, field_name, value)
-        obj._validate()
-        return obj
-
-    def _validate(self) -> None:
-        for field_name in (
-            "requested_scope_start",
-            "requested_scope_end",
-            "returned_first_date",
-            "returned_last_date",
-        ):
-            value = getattr(self, field_name)
-            if not isinstance(value, date) or isinstance(value, datetime):
-                raise CoverageBasisError(f"capture {field_name} must be a date")
-        if self.requested_scope_start.day != 1 or self.requested_scope_end != _month_end(
-            self.requested_scope_start.year, self.requested_scope_start.month
-        ):
-            raise CoverageBasisError("capture scope must be one complete calendar month")
-        if self.returned_first_date > self.returned_last_date or (
-            self.returned_first_date < self.requested_scope_start
-            or self.returned_last_date > self.requested_scope_end
-        ):
-            raise CoverageBasisError("capture returned date range is outside requested scope")
-        for field_name in (
-            "security_universe_hash",
-            "calendar_trading_days_hash",
-            "returned_trading_days_hash",
-        ):
-            _require_sha256(getattr(self, field_name), f"capture {field_name}")
-        for field_name in (
-            "security_universe_count",
-            "calendar_trading_day_count",
-            "returned_trading_day_count",
-            "returned_row_count",
-        ):
-            _require_positive_int(getattr(self, field_name), f"capture {field_name}")
-        if (
-            not isinstance(self.operations, tuple)
-            or len(self.operations) != len(AUTHORITATIVE_SOURCE_METHODS)
-            or any(
-                not isinstance(operation, AmazingDataExchangeReceipt)
-                for operation in self.operations
-            )
-        ):
-            raise CoverageBasisError("capture exchange set is not typed or complete")
-        operations_by_method = {operation.method: operation for operation in self.operations}
-        if set(operations_by_method) != set(AUTHORITATIVE_SOURCE_METHODS):
-            raise CoverageBasisError("capture exchange method set is not reviewed")
-        if len(operations_by_method) != len(self.operations):
-            raise CoverageBasisError("capture exchange methods are duplicated")
-        if (
-            not isinstance(self.semantic_operations, tuple)
-            or len(self.semantic_operations) != self.calendar_trading_day_count
-            or any(
-                not isinstance(operation, AmazingDataExchangeReceipt)
-                for operation in self.semantic_operations
-            )
-            or any(
-                operation.method != "BaseData.get_hist_code_list"
-                or operation.response_shape != "list[str]"
-                for operation in self.semantic_operations
-            )
-        ):
-            raise CoverageBasisError("capture exact-session semantic exchanges are malformed")
-        if not isinstance(self.completeness_evaluation, MonthCompletenessEvaluation):
-            raise CoverageBasisError("capture completeness evaluation is not typed")
-        if (
-            not isinstance(self.positive_trade_operations, tuple)
-            or any(
-                not isinstance(operation, PositiveTradeFallbackOperation)
-                for operation in self.positive_trade_operations
-            )
-            or len(self.positive_trade_operations)
-            != self.completeness_evaluation.positive_trade_pair_count
-            or len(
-                {
-                    (operation.security, operation.trading_day)
-                    for operation in self.positive_trade_operations
-                }
-            )
-            != len(self.positive_trade_operations)
-            or _hash_pairs(
-                (operation.security, operation.trading_day)
-                for operation in self.positive_trade_operations
-            )
-            != self.completeness_evaluation.positive_trade_pair_set_hash
-        ):
-            raise CoverageBasisError("capture positive-trade fallback exchanges are malformed")
-        if not self.completeness_evaluation.accepted:
-            raise CoverageBasisError("capture completeness evaluation is not accepted")
-        evaluation = self.completeness_evaluation
-        if (
-            evaluation.positive_trade_fallback_version
-            != AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION
-        ):
-            raise CoverageBasisError("capture positive-trade fallback version is not reviewed")
-        if (
-            evaluation.monthly_security_count != self.security_universe_count
-            or evaluation.monthly_security_set_hash != self.security_universe_hash
-            or evaluation.session_count != self.calendar_trading_day_count
-            or evaluation.session_set_hash != self.calendar_trading_days_hash
-            or evaluation.returned_first_date != self.returned_first_date
-            or evaluation.returned_last_date != self.returned_last_date
-            or evaluation.returned_trading_day_count != self.returned_trading_day_count
-            or evaluation.returned_trading_days_hash != self.returned_trading_days_hash
-            or evaluation.returned_row_count != self.returned_row_count
-        ):
-            raise CoverageBasisError("capture completeness evaluation is not derived")
-        if (
-            operations_by_method["BaseData.get_hist_code_list"].row_count
-            != self.security_universe_count
-        ):
-            raise CoverageBasisError(
-                "capture universe count is not derived from the retained response"
-            )
-        if (
-            operations_by_method["BaseData.get_calendar"].row_count
-            < self.calendar_trading_day_count
-        ):
-            raise CoverageBasisError(
-                "capture calendar response does not cover the requested window"
-            )
-        if operations_by_method["MarketData.query_kline"].row_count != self.returned_row_count:
-            raise CoverageBasisError("capture bar count is not derived from the retained response")
-        try:
-            ensure_utc_timestamp(self.retrieved_at_utc)
-        except ResearchPanelError as exc:
-            raise CoverageBasisError("capture retrieval timestamp is invalid") from exc
-
-
-@dataclass(frozen=True, init=False)
+@dataclass(frozen=True)
 class AmazingDataAcquisitionReceipt:
-    """Typed proof emitted only by the reviewed AmazingData acquisition path.
+    """One retained month acquisition result and its replay metadata.
 
-    ``init=False`` is intentional.  The public object can be rehydrated for
-    committed-reader replay, but a new authoritative receipt can only be
-    issued by the private provider-path factory after response validation.
-    Counts, timestamps and opaque statement bytes are not constructor inputs.
+    The provider boundary validates request scope and persists raw evidence
+    before constructing this value.  Replay applies the same field and raw
+    closure checks; no private constructor or provenance marker is needed.
     """
 
     receipt_id: str
     receipt_version: str
-    source_selection: AuthoritativeSourceSelection
     source_snapshot_id: str
     source_snapshot_manifest_hash: str
     source_snapshot_semantic_hash: str
@@ -976,73 +582,13 @@ class AmazingDataAcquisitionReceipt:
     source_capture_hash: str
     completeness_statement_id: str
     receipt_hash: str
-    _provenance: str = dataclass_field(default="", init=False, repr=False, compare=False)
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(
-            "AmazingDataAcquisitionReceipt must come from the reviewed acquisition path"
-        )
-
-    @classmethod
-    def _construct(
-        cls,
-        values: Mapping[str, Any],
-        *,
-        provenance: str,
-    ) -> AmazingDataAcquisitionReceipt:
-        obj = object.__new__(cls)
-        for field_name in (
-            "receipt_id",
-            "receipt_version",
-            "source_selection",
-            "source_snapshot_id",
-            "source_snapshot_manifest_hash",
-            "source_snapshot_semantic_hash",
-            "source_snapshot_as_of",
-            "requested_scope_start",
-            "requested_scope_end",
-            "security_universe_selection",
-            "security_universe_id",
-            "security_universe_count",
-            "security_universe_hash",
-            "calendar_market",
-            "calendar_scope_start",
-            "calendar_scope_end",
-            "calendar_trading_day_count",
-            "calendar_trading_days_hash",
-            "returned_security_count",
-            "returned_security_set_hash",
-            "returned_first_date",
-            "returned_last_date",
-            "returned_trading_day_count",
-            "returned_trading_days_hash",
-            "returned_row_count",
-            "operations",
-            "semantic_operations",
-            "positive_trade_fallback_version",
-            "positive_trade_operations",
-            "completeness_evaluation",
-            "retrieved_at_utc",
-            "available_at",
-            "pit_as_of",
-            "source_capture_uri",
-            "source_capture_hash",
-            "completeness_statement_id",
-            "receipt_hash",
-        ):
-            object.__setattr__(obj, field_name, values[field_name])
-        object.__setattr__(obj, "_provenance", provenance)
-        obj._validate()
-        return obj
-
-    @property
-    def is_verified_capture(self) -> bool:
-        return self._provenance == "verified_capture"
+    def __post_init__(self) -> None:
+        self._validate()
 
     def capture_catalog(self) -> dict[str, Any]:
         """Return the canonical catalog whose hash identifies this receipt."""
         return _amazingdata_capture_catalog(
-            source_selection_fingerprint=self.source_selection.selection_fingerprint,
             source_snapshot_id=self.source_snapshot_id,
             source_snapshot_manifest_hash=self.source_snapshot_manifest_hash,
             source_snapshot_semantic_hash=self.source_snapshot_semantic_hash,
@@ -1072,211 +618,52 @@ class AmazingDataAcquisitionReceipt:
         if sha256_hex(expected_catalog) != self.source_capture_hash:
             raise CoverageBasisError("AmazingData capture catalog hash changed")
 
-        from ashare_state.storage.raw_writer import verify_meta_closure
-
+        verified_operations: dict[str, tuple[Any, Mapping[str, Any]]] = {}
         for operation in self.operations:
-            evidence_path = root.joinpath(*operation.captured_evidence_uri.split("/"))
-            if not evidence_path.is_file():
-                raise CoverageBasisError(
-                    f"AmazingData retained evidence is missing for {operation.method}"
-                )
-            evidence_bytes = evidence_path.read_bytes()
-            if sha256_hex(evidence_bytes) != operation.captured_evidence_hash:
-                raise CoverageBasisError(
-                    f"AmazingData retained evidence hash changed for {operation.method}"
-                )
-            try:
-                evidence = json.loads(evidence_bytes.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise CoverageBasisError(
-                    f"AmazingData retained evidence is not valid JSON for {operation.method}"
-                ) from exc
-            if not isinstance(evidence, Mapping):
-                raise CoverageBasisError(
-                    f"AmazingData retained evidence is not an object for {operation.method}"
-                )
-            if not _retained_request_matches_receipt(
+            verified_operations[operation.captured_evidence_uri] = _verify_retained_operation(
+                root,
                 self,
-                operation.method,
-                evidence.get("request_params"),
-            ):
-                raise CoverageBasisError(
-                    f"AmazingData retained request scope changed for {operation.method}"
-                )
-            if (
-                evidence.get("status") != "OK"
-                or evidence.get("operation_id") != operation.operation_id
-                or evidence.get("request_params_hash") != operation.request_params_hash
-                or evidence.get("content_hash") != operation.response_content_hash
-                or evidence.get("row_count") != operation.row_count
-            ):
-                raise CoverageBasisError(
-                    f"AmazingData retained evidence identity changed for {operation.method}"
-                )
-            tables = evidence.get("tables")
-            if not isinstance(tables, list):
-                raise CoverageBasisError(
-                    f"AmazingData retained evidence tables are malformed for {operation.method}"
-                )
-            schema_parts = sorted(
-                (str(table.get("name")), str(table.get("schema_hash")))
-                for table in tables
-                if isinstance(table, Mapping)
+                operation,
+                label=f"AmazingData retained evidence for {operation.method}",
             )
-            if len(schema_parts) != len(tables) or sha256_hex(canonical_json(schema_parts)) != (
-                operation.response_schema_hash
-            ):
-                raise CoverageBasisError(
-                    f"AmazingData retained evidence schema changed for {operation.method}"
-                )
-            problems = verify_meta_closure(evidence_path.parent, dict(evidence))
-            if problems:
-                raise CoverageBasisError(
-                    f"AmazingData retained payload closure failed for {operation.method}: "
-                    + "; ".join(problems)
-                )
         for operation in self.semantic_operations:
-            evidence_path = root.joinpath(*operation.captured_evidence_uri.split("/"))
-            if not evidence_path.is_file():
-                raise CoverageBasisError("AmazingData retained exact-session evidence is missing")
-            evidence_bytes = evidence_path.read_bytes()
-            if sha256_hex(evidence_bytes) != operation.captured_evidence_hash:
-                raise CoverageBasisError("AmazingData retained exact-session evidence hash changed")
-            try:
-                evidence = json.loads(evidence_bytes.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise CoverageBasisError(
-                    "AmazingData retained exact-session evidence is not valid JSON"
-                ) from exc
-            if not isinstance(evidence, Mapping):
-                raise CoverageBasisError(
-                    "AmazingData retained exact-session evidence is not an object"
-                )
-            if not _retained_request_matches_receipt(
+            verified_operations[operation.captured_evidence_uri] = _verify_retained_operation(
+                root,
                 self,
-                operation.method,
-                evidence.get("request_params"),
+                operation,
                 exact_session=True,
-            ):
-                raise CoverageBasisError("AmazingData retained exact-session request scope changed")
-            if (
-                evidence.get("status") != "OK"
-                or evidence.get("operation_id") != operation.operation_id
-                or evidence.get("request_params_hash") != operation.request_params_hash
-                or evidence.get("content_hash") != operation.response_content_hash
-                or evidence.get("row_count") != operation.row_count
-            ):
-                raise CoverageBasisError(
-                    "AmazingData retained exact-session evidence identity changed"
-                )
-            tables = evidence.get("tables")
-            if not isinstance(tables, list):
-                raise CoverageBasisError(
-                    "AmazingData retained exact-session evidence tables are malformed"
-                )
-            schema_parts = sorted(
-                (str(table.get("name")), str(table.get("schema_hash")))
-                for table in tables
-                if isinstance(table, Mapping)
+                label="AmazingData retained exact-session evidence",
             )
-            if len(schema_parts) != len(tables) or sha256_hex(canonical_json(schema_parts)) != (
-                operation.response_schema_hash
-            ):
-                raise CoverageBasisError(
-                    "AmazingData retained exact-session evidence schema changed"
-                )
-            problems = verify_meta_closure(evidence_path.parent, dict(evidence))
-            if problems:
-                raise CoverageBasisError(
-                    "AmazingData retained exact-session payload closure failed: "
-                    + "; ".join(problems)
-                )
-
         for fallback in self.positive_trade_operations:
-            operation = fallback.exchange
-            evidence_path = root.joinpath(*operation.captured_evidence_uri.split("/"))
-            if not evidence_path.is_file():
-                raise CoverageBasisError(
-                    "AmazingData retained positive-trade snapshot evidence is missing"
+            verified_operations[fallback.exchange.captured_evidence_uri] = (
+                _verify_retained_operation(
+                    root,
+                    self,
+                    fallback.exchange,
+                    exact_snapshot=True,
+                    snapshot_security=fallback.security,
+                    snapshot_trading_day=fallback.trading_day,
+                    label="AmazingData retained positive-trade snapshot evidence",
                 )
-            evidence_bytes = evidence_path.read_bytes()
-            if sha256_hex(evidence_bytes) != operation.captured_evidence_hash:
-                raise CoverageBasisError(
-                    "AmazingData retained positive-trade snapshot evidence hash changed"
-                )
-            try:
-                evidence = json.loads(evidence_bytes.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise CoverageBasisError(
-                    "AmazingData retained positive-trade snapshot evidence is not valid JSON"
-                ) from exc
-            if not isinstance(evidence, Mapping):
-                raise CoverageBasisError(
-                    "AmazingData retained positive-trade snapshot evidence is not an object"
-                )
-            if not _retained_request_matches_receipt(
-                self,
-                operation.method,
-                evidence.get("request_params"),
-                exact_snapshot=True,
-                snapshot_security=fallback.security,
-                snapshot_trading_day=fallback.trading_day,
-            ):
-                raise CoverageBasisError(
-                    "AmazingData retained positive-trade snapshot request scope changed"
-                )
-            if (
-                evidence.get("status") != "OK"
-                or evidence.get("operation_id") != operation.operation_id
-                or evidence.get("request_params_hash") != operation.request_params_hash
-                or evidence.get("content_hash") != operation.response_content_hash
-                or evidence.get("row_count") != operation.row_count
-            ):
-                raise CoverageBasisError(
-                    "AmazingData retained positive-trade snapshot identity changed"
-                )
-            tables = evidence.get("tables")
-            if not isinstance(tables, list):
-                raise CoverageBasisError(
-                    "AmazingData retained positive-trade snapshot tables are malformed"
-                )
-            schema_parts = sorted(
-                (str(table.get("name")), str(table.get("schema_hash")))
-                for table in tables
-                if isinstance(table, Mapping)
             )
-            if len(schema_parts) != len(tables) or sha256_hex(canonical_json(schema_parts)) != (
-                operation.response_schema_hash
-            ):
-                raise CoverageBasisError(
-                    "AmazingData retained positive-trade snapshot schema changed"
-                )
-            problems = verify_meta_closure(evidence_path.parent, dict(evidence))
-            if problems:
-                raise CoverageBasisError(
-                    "AmazingData retained positive-trade snapshot payload closure failed: "
-                    + "; ".join(problems)
-                )
 
         try:
             base_operations = {operation.method: operation for operation in self.operations}
-            calendar_payload, _calendar_meta = _read_retained_operation_payload(
-                root, self, base_operations["BaseData.get_calendar"]
-            )
-            code_payload, _code_meta = _read_retained_operation_payload(
-                root, self, base_operations["BaseData.get_hist_code_list"]
-            )
-            status_payload, _status_meta = _read_retained_operation_payload(
-                root, self, base_operations["InfoData.get_history_stock_status"]
-            )
-            daily_payload, _daily_meta = _read_retained_operation_payload(
-                root, self, base_operations["MarketData.query_kline"]
-            )
+            calendar_payload, _calendar_meta = verified_operations[
+                base_operations["BaseData.get_calendar"].captured_evidence_uri
+            ]
+            code_payload, _code_meta = verified_operations[
+                base_operations["BaseData.get_hist_code_list"].captured_evidence_uri
+            ]
+            status_payload, _status_meta = verified_operations[
+                base_operations["InfoData.get_history_stock_status"].captured_evidence_uri
+            ]
+            daily_payload, _daily_meta = verified_operations[
+                base_operations["MarketData.query_kline"].captured_evidence_uri
+            ]
             exact_day_universes: dict[int, list[str]] = {}
             for operation in self.semantic_operations:
-                payload, meta = _read_retained_operation_payload(
-                    root, self, operation, exact_session=True
-                )
+                payload, meta = verified_operations[operation.captured_evidence_uri]
                 params = meta.get("request_params")
                 if not isinstance(params, Mapping) or not isinstance(params.get("start_date"), int):
                     raise CoverageBasisError(
@@ -1286,14 +673,7 @@ class AmazingDataAcquisitionReceipt:
             positive_trade_pairs: list[tuple[str, int]] = []
             positive_trade_hashes: dict[tuple[str, int], str] = {}
             for fallback in self.positive_trade_operations:
-                payload, _meta = _read_retained_operation_payload(
-                    root,
-                    self,
-                    fallback.exchange,
-                    exact_snapshot=True,
-                    snapshot_security=fallback.security,
-                    snapshot_trading_day=fallback.trading_day,
-                )
+                payload, _meta = verified_operations[fallback.exchange.captured_evidence_uri]
                 positive, errors = _snapshot_trade_observation(
                     payload,
                     symbol=fallback.security,
@@ -1307,7 +687,7 @@ class AmazingDataAcquisitionReceipt:
                 positive_trade_hashes[(fallback.security, fallback.trading_day)] = (
                     fallback.exchange.request_params_hash
                 )
-            positive_trade_evidence = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+            positive_trade_evidence = PositiveTradeFallback(
                 queried_pairs=positive_trade_pairs,
                 positive_pairs=positive_trade_pairs,
                 request_params_by_pair=positive_trade_hashes,
@@ -1334,7 +714,6 @@ class AmazingDataAcquisitionReceipt:
         fields = {
             "receipt_id",
             "receipt_version",
-            "source_selection",
             "source_snapshot_id",
             "source_snapshot_manifest_hash",
             "source_snapshot_semantic_hash",
@@ -1390,9 +769,6 @@ class AmazingDataAcquisitionReceipt:
                 "receipt_id": _require_non_empty_string(payload["receipt_id"], "receipt_id"),
                 "receipt_version": _require_non_empty_string(
                     payload["receipt_version"], "receipt_version"
-                ),
-                "source_selection": AuthoritativeSourceSelection.from_mapping(
-                    payload["source_selection"]
                 ),
                 "source_snapshot_id": _require_non_empty_string(
                     payload["source_snapshot_id"], "source_snapshot_id"
@@ -1481,7 +857,7 @@ class AmazingDataAcquisitionReceipt:
             }
         except (HistoricalMaterializationError, ResearchPanelError, KeyError, TypeError) as exc:
             raise CoverageBasisError("AmazingData acquisition receipt is malformed") from exc
-        return cls._construct(values, provenance="replayed_catalog")
+        return cls(**values)
 
     def _validate(self) -> None:
         try:
@@ -1513,10 +889,6 @@ class AmazingDataAcquisitionReceipt:
             raise CoverageBasisError(str(exc)) from exc
         if self.receipt_version != AMAZINGDATA_ACQUISITION_RECEIPT_VERSION:
             raise CoverageBasisError("unknown AmazingData acquisition receipt version")
-        if self.source_selection != AuthoritativeSourceSelection.reviewed_amazingdata_history():
-            raise CoverageBasisError(
-                "receipt source selection is not the reviewed AmazingData path"
-            )
         if self.security_universe_selection != AMAZINGDATA_SECURITY_UNIVERSE_SELECTION:
             raise CoverageBasisError("receipt security universe selection is not reviewed")
         if self.calendar_market != AMAZINGDATA_CALENDAR_MARKET:
@@ -1584,13 +956,7 @@ class AmazingDataAcquisitionReceipt:
         if evaluation.rule_version != AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION:
             raise CoverageBasisError("receipt completeness rule version is not reviewed")
         if (
-            evaluation.applicability_semantics_version
-            != AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION
-        ):
-            raise CoverageBasisError("receipt applicability semantics version is not reviewed")
-        if (
-            evaluation.positive_trade_fallback_version != self.positive_trade_fallback_version
-            or len(self.positive_trade_operations) != evaluation.positive_trade_pair_count
+            len(self.positive_trade_operations) != evaluation.positive_trade_pair_count
             or _hash_pairs(
                 (operation.security, operation.trading_day)
                 for operation in self.positive_trade_operations
@@ -1704,7 +1070,6 @@ class AmazingDataAcquisitionReceipt:
         payload: dict[str, Any] = {
             "receipt_id": self.receipt_id,
             "receipt_version": self.receipt_version,
-            "source_selection": self.source_selection.as_dict(),
             "source_snapshot_id": self.source_snapshot_id,
             "source_snapshot_manifest_hash": self.source_snapshot_manifest_hash,
             "source_snapshot_semantic_hash": self.source_snapshot_semantic_hash,
@@ -1868,7 +1233,7 @@ def _retained_request_matches_receipt(
     )
 
 
-def _read_retained_operation_payload(
+def _verify_retained_operation(
     root: Path,
     receipt: AmazingDataAcquisitionReceipt,
     operation: AmazingDataExchangeReceipt,
@@ -1877,31 +1242,80 @@ def _read_retained_operation_payload(
     exact_snapshot: bool = False,
     snapshot_security: str | None = None,
     snapshot_trading_day: int | None = None,
+    label: str,
 ) -> tuple[Any, Mapping[str, Any]]:
-    """Read one already-closed operation for semantic replay."""
+    """Verify and read one retained operation exactly once in this replay."""
     evidence_path = root.joinpath(*operation.captured_evidence_uri.split("/"))
+    if not evidence_path.is_file():
+        raise CoverageBasisError(f"{label} is missing")
     try:
-        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise CoverageBasisError("AmazingData retained operation meta is unreadable") from exc
+        evidence_bytes = evidence_path.read_bytes()
+    except (FileNotFoundError, OSError) as exc:
+        raise CoverageBasisError(f"{label} is not readable") from exc
+    if sha256_hex(evidence_bytes) != operation.captured_evidence_hash:
+        raise CoverageBasisError(f"{label} hash changed")
+    try:
+        evidence = json.loads(evidence_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CoverageBasisError(f"{label} is not readable") from exc
     if not isinstance(evidence, Mapping):
-        raise CoverageBasisError("AmazingData retained operation meta is malformed")
+        raise CoverageBasisError(f"{label} is malformed")
+    provider = _text_or_empty(evidence.get("provider"))
+    dataset = _text_or_empty(evidence.get("provider_dataset"))
+    request_id = _text_or_empty(evidence.get("request_id"))
+    if any(
+        not value or re.fullmatch(r"[A-Za-z0-9_.-]+", value) is None
+        for value in (provider, dataset, request_id)
+    ):
+        raise CoverageBasisError(f"{label} identity is malformed")
+    expected_uri = f"provider={provider}/dataset={dataset}/{request_id}.meta.json"
+    if operation.captured_evidence_uri != expected_uri:
+        raise CoverageBasisError(f"{label} identity changed")
+    from ashare_state.storage.raw_writer import read_raw_payload, verify_raw_evidence
+
+    try:
+        verified = verify_raw_evidence(
+            root,
+            provider=provider,
+            dataset=dataset,
+            request_id=request_id,
+        )
+    except Exception as exc:  # noqa: BLE001 - replay boundary normalizes failure
+        raise CoverageBasisError(f"{label} payload closure failed: {exc}") from exc
+    if verified.evidence_uri != operation.captured_evidence_uri:
+        raise CoverageBasisError(f"{label} identity changed")
+    if verified.evidence_hash != operation.captured_evidence_hash:
+        raise CoverageBasisError(f"{label} hash changed")
     if not _retained_request_matches_receipt(
         receipt,
         operation.method,
-        evidence.get("request_params"),
+        verified.meta.get("request_params"),
         exact_session=exact_session,
         exact_snapshot=exact_snapshot,
         snapshot_security=snapshot_security,
         snapshot_trading_day=snapshot_trading_day,
     ):
-        raise CoverageBasisError("AmazingData retained operation request changed")
-    provider = _text_or_empty(evidence.get("provider"))
-    dataset = _text_or_empty(evidence.get("provider_dataset"))
-    request_id = _text_or_empty(evidence.get("request_id"))
-    if not all(value for value in (provider, dataset, request_id)):
-        raise CoverageBasisError("AmazingData retained operation identity is malformed")
-    from ashare_state.storage.raw_writer import read_raw_payload
+        raise CoverageBasisError(f"{label} request scope changed")
+    if (
+        verified.meta.get("status") != "OK"
+        or verified.meta.get("operation_id") != operation.operation_id
+        or verified.meta.get("request_params_hash") != operation.request_params_hash
+        or verified.meta.get("content_hash") != operation.response_content_hash
+        or verified.meta.get("row_count") != operation.row_count
+    ):
+        raise CoverageBasisError(f"{label} identity changed")
+    tables = verified.meta.get("tables")
+    if not isinstance(tables, list):
+        raise CoverageBasisError(f"{label} tables are malformed")
+    schema_parts = sorted(
+        (str(table.get("name")), str(table.get("schema_hash")))
+        for table in tables
+        if isinstance(table, Mapping)
+    )
+    if len(schema_parts) != len(tables) or sha256_hex(canonical_json(schema_parts)) != (
+        operation.response_schema_hash
+    ):
+        raise CoverageBasisError(f"{label} schema changed")
 
     try:
         payload = read_raw_payload(
@@ -1909,11 +1323,12 @@ def _read_retained_operation_payload(
             provider=provider,
             dataset=dataset,
             request_id=request_id,
-            verify=True,
+            verify=False,
+            verified=verified,
         )
     except Exception as exc:  # noqa: BLE001 - replay boundary normalizes failure
-        raise CoverageBasisError("AmazingData retained operation payload is unreadable") from exc
-    return payload, evidence
+        raise CoverageBasisError(f"{label} payload is unreadable") from exc
+    return payload, verified.meta
 
 
 def _text_or_empty(value: Any) -> str:
@@ -1963,22 +1378,29 @@ def _calendar_values_for_receipt(
 
 def _issue_amazingdata_acquisition_receipt(
     *,
-    source_snapshot: VerifiedSourceSnapshot,
-    capture: _VerifiedAmazingDataCapture,
+    source_snapshot: VerifiedResearchProjection,
+    requested_scope_start: date,
+    requested_scope_end: date,
+    security_universe_count: int,
+    security_universe_hash: str,
+    calendar_trading_day_count: int,
+    calendar_trading_days_hash: str,
+    returned_first_date: date,
+    returned_last_date: date,
+    returned_trading_day_count: int,
+    returned_trading_days_hash: str,
+    returned_row_count: int,
+    operations: tuple[AmazingDataExchangeReceipt, ...],
+    semantic_operations: tuple[AmazingDataExchangeReceipt, ...],
+    positive_trade_operations: tuple[PositiveTradeFallbackOperation, ...],
+    completeness_evaluation: MonthCompletenessEvaluation,
+    retrieved_at_utc: datetime,
 ) -> AmazingDataAcquisitionReceipt:
-    """Issue a receipt from facts validated by the AmazingData provider path.
-
-    This is intentionally private and accepts no statement bytes, caller
-    timestamps, counts, or caller-selected authority labels.  The provider
-    adapter is the only in-repository issuer.
-    """
-    if not isinstance(source_snapshot, VerifiedSourceSnapshot):
+    """Issue one receipt from the already validated provider operation path."""
+    if not isinstance(source_snapshot, VerifiedResearchProjection):
         raise CoverageBasisError("receipt issuer needs a verified source snapshot")
-    if not isinstance(capture, _VerifiedAmazingDataCapture):
-        raise CoverageBasisError("receipt issuer needs a verified provider capture")
-    selection = AuthoritativeSourceSelection.reviewed_amazingdata_history()
     ordered_operations = tuple(
-        next((operation for operation in capture.operations if operation.method == method), None)
+        next((operation for operation in operations if operation.method == method), None)
         for method in AUTHORITATIVE_SOURCE_METHODS
     )
     if any(operation is None for operation in ordered_operations):
@@ -1987,74 +1409,69 @@ def _issue_amazingdata_acquisition_receipt(
         operation for operation in ordered_operations if operation is not None
     )
     capture_catalog = _amazingdata_capture_catalog(
-        source_selection_fingerprint=selection.selection_fingerprint,
         source_snapshot_id=source_snapshot.source_snapshot_id,
         source_snapshot_manifest_hash=source_snapshot.source_snapshot_manifest_hash,
         source_snapshot_semantic_hash=source_snapshot.source_snapshot_semantic_hash,
         source_snapshot_as_of=source_snapshot.source_snapshot_as_of,
-        requested_scope_start=capture.requested_scope_start,
-        requested_scope_end=capture.requested_scope_end,
+        requested_scope_start=requested_scope_start,
+        requested_scope_end=requested_scope_end,
         operations=normalized_operations,
-        semantic_operations=capture.semantic_operations,
-        positive_trade_operations=capture.positive_trade_operations,
-        completeness_evaluation=capture.completeness_evaluation,
+        semantic_operations=semantic_operations,
+        positive_trade_operations=positive_trade_operations,
+        completeness_evaluation=completeness_evaluation,
     )
     capture_hash = sha256_hex(canonical_json(capture_catalog))
     receipt_id = f"amazingdata-history-receipt-{capture_hash[:32]}"
     base: dict[str, Any] = {
         "receipt_id": receipt_id,
         "receipt_version": AMAZINGDATA_ACQUISITION_RECEIPT_VERSION,
-        "source_selection": selection,
         "source_snapshot_id": source_snapshot.source_snapshot_id,
         "source_snapshot_manifest_hash": source_snapshot.source_snapshot_manifest_hash,
         "source_snapshot_semantic_hash": source_snapshot.source_snapshot_semantic_hash,
         "source_snapshot_as_of": source_snapshot.source_snapshot_as_of,
-        "requested_scope_start": capture.requested_scope_start,
-        "requested_scope_end": capture.requested_scope_end,
+        "requested_scope_start": requested_scope_start,
+        "requested_scope_end": requested_scope_end,
         "security_universe_selection": AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
         "security_universe_id": (
-            f"hist-code-list:{AMAZINGDATA_SECURITY_UNIVERSE_SELECTION}:{capture.security_universe_hash}"
+            f"hist-code-list:{AMAZINGDATA_SECURITY_UNIVERSE_SELECTION}:{security_universe_hash}"
         ),
-        "security_universe_count": capture.security_universe_count,
-        "security_universe_hash": capture.security_universe_hash,
+        "security_universe_count": security_universe_count,
+        "security_universe_hash": security_universe_hash,
         "calendar_market": AMAZINGDATA_CALENDAR_MARKET,
-        "calendar_scope_start": capture.requested_scope_start,
-        "calendar_scope_end": capture.requested_scope_end,
-        "calendar_trading_day_count": capture.calendar_trading_day_count,
-        "calendar_trading_days_hash": capture.calendar_trading_days_hash,
-        "returned_security_count": capture.security_universe_count,
-        "returned_security_set_hash": capture.security_universe_hash,
-        "returned_first_date": capture.returned_first_date,
-        "returned_last_date": capture.returned_last_date,
-        "returned_trading_day_count": capture.returned_trading_day_count,
-        "returned_trading_days_hash": capture.returned_trading_days_hash,
-        "returned_row_count": capture.returned_row_count,
+        "calendar_scope_start": requested_scope_start,
+        "calendar_scope_end": requested_scope_end,
+        "calendar_trading_day_count": calendar_trading_day_count,
+        "calendar_trading_days_hash": calendar_trading_days_hash,
+        "returned_security_count": security_universe_count,
+        "returned_security_set_hash": security_universe_hash,
+        "returned_first_date": returned_first_date,
+        "returned_last_date": returned_last_date,
+        "returned_trading_day_count": returned_trading_day_count,
+        "returned_trading_days_hash": returned_trading_days_hash,
+        "returned_row_count": returned_row_count,
         "operations": normalized_operations,
-        "semantic_operations": capture.semantic_operations,
+        "semantic_operations": semantic_operations,
         "positive_trade_fallback_version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
-        "positive_trade_operations": capture.positive_trade_operations,
-        "completeness_evaluation": capture.completeness_evaluation,
-        "retrieved_at_utc": ensure_utc_timestamp(capture.retrieved_at_utc),
-        "available_at": ensure_utc_timestamp(capture.retrieved_at_utc),
+        "positive_trade_operations": positive_trade_operations,
+        "completeness_evaluation": completeness_evaluation,
+        "retrieved_at_utc": ensure_utc_timestamp(retrieved_at_utc),
+        "available_at": ensure_utc_timestamp(retrieved_at_utc),
         "pit_as_of": source_snapshot.source_snapshot_as_of,
         "source_capture_uri": f"source_capture/amazingdata/{receipt_id}.json",
         "source_capture_hash": capture_hash,
         "completeness_statement_id": f"amazingdata-complete-{capture_hash[:32]}",
     }
     serialized_base = base | {
-        "source_selection": selection.as_dict(),
         "operations": [operation.as_dict() for operation in normalized_operations],
-        "semantic_operations": [operation.as_dict() for operation in capture.semantic_operations],
+        "semantic_operations": [operation.as_dict() for operation in semantic_operations],
         "positive_trade_fallback_version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
         "positive_trade_operations": [
-            operation.as_dict() for operation in capture.positive_trade_operations
+            operation.as_dict() for operation in positive_trade_operations
         ],
-        "completeness_evaluation": capture.completeness_evaluation.as_dict(),
+        "completeness_evaluation": completeness_evaluation.as_dict(),
     }
     base["receipt_hash"] = sha256_hex(canonical_json(serialized_base))
-    return AmazingDataAcquisitionReceipt._construct(
-        base | {"source_selection": selection}, provenance="verified_capture"
-    )
+    return AmazingDataAcquisitionReceipt(**base)
 
 
 @dataclass(frozen=True)
@@ -2079,10 +1496,8 @@ class AuthoritativeCoverageEvidence:
     source_domain: str
     claimed_scope_start: date
     claimed_scope_end: date
-    source_selection_fingerprint: str
     completeness_method: str
     completeness_claim: str
-    source_selection: AuthoritativeSourceSelection
     acquisition_receipt: AmazingDataAcquisitionReceipt
     upstream_source: str
     upstream_statement_kind: str
@@ -2110,7 +1525,6 @@ class AuthoritativeCoverageEvidence:
                 "coverage_basis_id",
                 "source_snapshot_id",
                 "source_domain",
-                "source_selection_fingerprint",
                 "completeness_method",
                 "completeness_claim",
                 "upstream_source",
@@ -2122,7 +1536,6 @@ class AuthoritativeCoverageEvidence:
             ):
                 _require_non_empty_string(getattr(self, field_name), field_name)
             _require_sha256(self.source_snapshot_manifest_hash, "source_snapshot_manifest_hash")
-            _require_sha256(self.source_selection_fingerprint, "source_selection_fingerprint")
             _require_sha256(self.upstream_statement_hash, "upstream_statement_hash")
             _require_sha256(self.upstream_inventory_hash, "upstream_inventory_hash")
             _require_sha256(self.coverage_basis_evidence_hash, "coverage_basis_evidence_hash")
@@ -2145,21 +1558,11 @@ class AuthoritativeCoverageEvidence:
             raise CoverageBasisError("authoritative coverage evidence names an unreviewed provider")
         if self.upstream_statement_kind != AUTHORITATIVE_UPSTREAM_STATEMENT_KIND:
             raise CoverageBasisError("authoritative inventory/range statement kind is missing")
-        if not isinstance(self.source_selection, AuthoritativeSourceSelection):
-            raise CoverageBasisError(
-                "authoritative coverage evidence needs a typed source selection"
-            )
         if not isinstance(self.acquisition_receipt, AmazingDataAcquisitionReceipt):
             raise CoverageBasisError(
                 "authoritative coverage evidence needs an AmazingData acquisition receipt"
             )
-        if self.source_selection_fingerprint != self.source_selection.selection_fingerprint:
-            raise CoverageBasisError(
-                "source-selection fingerprint does not match the typed binding"
-            )
         receipt = self.acquisition_receipt
-        if receipt.source_selection != self.source_selection:
-            raise CoverageBasisError("authoritative evidence receipt source-selection changed")
         if (
             receipt.requested_scope_start != self.claimed_scope_start
             or receipt.requested_scope_end != self.claimed_scope_end
@@ -2169,7 +1572,6 @@ class AuthoritativeCoverageEvidence:
             self.source_snapshot_id != receipt.source_snapshot_id
             or self.source_snapshot_manifest_hash != receipt.source_snapshot_manifest_hash
             or self.source_snapshot_as_of != receipt.source_snapshot_as_of
-            or self.source_selection_fingerprint != receipt.source_selection.selection_fingerprint
             or self.upstream_statement_id != receipt.completeness_statement_id
             or self.upstream_statement_locator != receipt.source_capture_uri
             or self.upstream_statement_hash != receipt.receipt_hash
@@ -2259,7 +1661,6 @@ class AuthoritativeCoverageEvidence:
                     "coverage_basis_id",
                     "source_snapshot_id",
                     "source_domain",
-                    "source_selection_fingerprint",
                     "completeness_method",
                     "completeness_claim",
                     "upstream_source",
@@ -2288,14 +1689,12 @@ class AuthoritativeCoverageEvidence:
                     "pit_as_of",
                 )
             }
-            selection = AuthoritativeSourceSelection.from_mapping(payload["source_selection"])
             acquisition_receipt = AmazingDataAcquisitionReceipt.from_mapping(
                 payload["acquisition_receipt"]
             )
             snapshot_hash = _require_sha256(
                 payload["source_snapshot_manifest_hash"], "source_snapshot_manifest_hash"
             )
-            _require_sha256(parsed["source_selection_fingerprint"], "source_selection_fingerprint")
             statement_hash = _require_sha256(
                 payload["upstream_statement_hash"], "upstream_statement_hash"
             )
@@ -2315,10 +1714,8 @@ class AuthoritativeCoverageEvidence:
             source_domain=parsed["source_domain"],
             claimed_scope_start=dates["claimed_scope_start"],
             claimed_scope_end=dates["claimed_scope_end"],
-            source_selection_fingerprint=parsed["source_selection_fingerprint"],
             completeness_method=parsed["completeness_method"],
             completeness_claim=parsed["completeness_claim"],
-            source_selection=selection,
             acquisition_receipt=acquisition_receipt,
             upstream_source=parsed["upstream_source"],
             upstream_statement_kind=parsed["upstream_statement_kind"],
@@ -2350,10 +1747,8 @@ class AuthoritativeCoverageEvidence:
             "source_domain": self.source_domain,
             "claimed_scope_start": self.claimed_scope_start,
             "claimed_scope_end": self.claimed_scope_end,
-            "source_selection_fingerprint": self.source_selection_fingerprint,
             "completeness_method": self.completeness_method,
             "completeness_claim": self.completeness_claim,
-            "source_selection": self.source_selection.as_dict(),
             "acquisition_receipt": self.acquisition_receipt.as_dict(),
             "upstream_source": self.upstream_source,
             "upstream_statement_kind": self.upstream_statement_kind,
@@ -2388,10 +1783,6 @@ def build_authoritative_coverage_evidence_from_acquisition(
     """
     if not isinstance(acquisition_receipt, AmazingDataAcquisitionReceipt):
         raise CoverageBasisError("authoritative evidence needs a typed acquisition receipt")
-    if not acquisition_receipt.is_verified_capture:
-        raise CoverageBasisError(
-            "authoritative evidence must be issued by the AmazingData acquisition path"
-        )
     if (
         acquisition_receipt.requested_scope_start != partition.scope_start
         or acquisition_receipt.requested_scope_end != partition.scope_end
@@ -2415,10 +1806,8 @@ def build_authoritative_coverage_evidence_from_acquisition(
         "source_domain": "daily_bar",
         "claimed_scope_start": partition.scope_start,
         "claimed_scope_end": partition.scope_end,
-        "source_selection_fingerprint": acquisition_receipt.source_selection.selection_fingerprint,
         "completeness_method": AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
         "completeness_claim": COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
-        "source_selection": acquisition_receipt.source_selection.as_dict(),
         "acquisition_receipt": acquisition_receipt.as_dict(),
         "upstream_source": AUTHORITATIVE_PROVIDER,
         "upstream_statement_kind": AUTHORITATIVE_UPSTREAM_STATEMENT_KIND,
@@ -2447,10 +1836,8 @@ def build_authoritative_coverage_evidence_from_acquisition(
         source_domain="daily_bar",
         claimed_scope_start=partition.scope_start,
         claimed_scope_end=partition.scope_end,
-        source_selection_fingerprint=acquisition_receipt.source_selection.selection_fingerprint,
         completeness_method=AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
         completeness_claim=COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
-        source_selection=acquisition_receipt.source_selection,
         acquisition_receipt=acquisition_receipt,
         upstream_source=AUTHORITATIVE_PROVIDER,
         upstream_statement_kind=AUTHORITATIVE_UPSTREAM_STATEMENT_KIND,
@@ -2552,7 +1939,6 @@ class CoverageBasisDescriptor:
     source_domain: str
     claimed_scope_start: date
     claimed_scope_end: date
-    source_selection_fingerprint: str
     completeness_method: str
     completeness_claim: str
     coverage_basis_artifact_uri: str
@@ -2569,7 +1955,6 @@ class CoverageBasisDescriptor:
             "coverage_basis_version",
             "source_snapshot_id",
             "source_domain",
-            "source_selection_fingerprint",
             "completeness_method",
             "completeness_claim",
             "coverage_basis_artifact_uri",
@@ -2617,7 +2002,6 @@ class CoverageBasisDescriptor:
                 or evidence.source_domain != self.source_domain
                 or evidence.claimed_scope_start != self.claimed_scope_start
                 or evidence.claimed_scope_end != self.claimed_scope_end
-                or evidence.source_selection_fingerprint != self.source_selection_fingerprint
                 or evidence.completeness_method != self.completeness_method
                 or evidence.completeness_claim != self.completeness_claim
             ):
@@ -2673,7 +2057,6 @@ class CoverageBasisDescriptor:
             "source_snapshot_id",
             "source_snapshot_manifest_hash",
             "source_domain",
-            "source_selection_fingerprint",
             "completeness_method",
             "completeness_claim",
             "coverage_basis_artifact_uri",
@@ -2755,7 +2138,6 @@ class CoverageBasisDescriptor:
             "source_domain": values["source_domain"],
             "claimed_scope_start": scope_start,
             "claimed_scope_end": scope_end,
-            "source_selection_fingerprint": values["source_selection_fingerprint"],
             "completeness_method": values["completeness_method"],
             "completeness_claim": values["completeness_claim"],
             "coverage_basis_artifact_uri": uri,
@@ -2807,7 +2189,6 @@ class CoverageBasisDescriptor:
             "source_domain": self.source_domain,
             "claimed_scope_start": self.claimed_scope_start.isoformat(),
             "claimed_scope_end": self.claimed_scope_end.isoformat(),
-            "source_selection_fingerprint": self.source_selection_fingerprint,
             "completeness_method": self.completeness_method,
             "completeness_claim": self.completeness_claim,
             "coverage_basis_artifact_uri": self.coverage_basis_artifact_uri,
@@ -2822,7 +2203,6 @@ def build_fixture_coverage_basis_descriptor(
     *,
     source_snapshot_id: str,
     source_snapshot_manifest_hash: str,
-    source_selection_fingerprint: str,
     coverage_basis_id: str | None = None,
     partial: bool = False,
 ) -> CoverageBasisDescriptor:
@@ -2844,7 +2224,6 @@ def build_fixture_coverage_basis_descriptor(
         "source_domain": "daily_bar",
         "claimed_scope_start": partition.scope_start,
         "claimed_scope_end": partition.scope_end,
-        "source_selection_fingerprint": source_selection_fingerprint,
         "completeness_method": method,
         "completeness_claim": claim,
         "coverage_basis_artifact_uri": (

@@ -317,9 +317,8 @@ typed receipt。任一月份没有完整 receipt，报告必须写明具体 bloc
 和普通 reader 均保持关闭。AmazingData 的源信任由 Owner 决定，不额外要求 provider
 certificate 或第三方 attestation。
 
-本次预检的脱敏收据见
-`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`：三个固定月份的
-观察调用均成功，但最终确认为 `FAIL_CLOSED_BLOCKED`，原因码为
+本次预检的脱敏收据曾记录三个固定月份的观察调用均成功，但最终确认为
+`FAIL_CLOSED_BLOCKED`，原因码为
 `UPSTREAM_COMPLETENESS_STATEMENT_MISSING`；这是整改前收据的历史原因码。按当前 Owner 政策，
 当前代码路径的等价阻断是 `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`：没有生成
 authoritative sidecar 或物化产物。

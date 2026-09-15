@@ -18,8 +18,8 @@ from datetime import date
 from typing import Any
 
 from ashare_state.providers.amazingdata.month_completeness import (
+    PositiveTradeFallback,
     _positive_trade_fallback_candidates,
-    _PositiveTradeFallbackEvidence,
     _snapshot_trade_observation,
     evaluate_month_completeness,
 )
@@ -40,11 +40,10 @@ from ashare_state.research.historical import (
     CoverageBasisError,
     PartitionKey,
     PositiveTradeFallbackOperation,
-    VerifiedSourceSnapshot,
     _issue_amazingdata_acquisition_receipt,
-    _VerifiedAmazingDataCapture,
 )
 from ashare_state.research.models import canonical_json, ensure_utc_timestamp, sha256_hex
+from ashare_state.research.panel import VerifiedResearchProjection
 from ashare_state.storage.atomic_files import write_file_atomic
 from ashare_state.storage.raw_anchor import AnchoredRawEvidenceWriter
 from ashare_state.storage.raw_writer import RawWriteResult
@@ -80,7 +79,7 @@ class AmazingDataHistoryAcquisition:
 
     provider: AmazingDataProvider
     raw_writer: AnchoredRawEvidenceWriter
-    source_snapshot: VerifiedSourceSnapshot
+    source_snapshot: VerifiedResearchProjection
 
     def __post_init__(self) -> None:
         if not isinstance(self.provider, AmazingDataProvider):
@@ -89,7 +88,7 @@ class AmazingDataHistoryAcquisition:
             raise AmazingDataAcquisitionError(
                 "acquisition requires the anchored raw evidence writer"
             )
-        if not isinstance(self.source_snapshot, VerifiedSourceSnapshot):
+        if not isinstance(self.source_snapshot, VerifiedResearchProjection):
             raise AmazingDataAcquisitionError("acquisition requires a verified source snapshot")
 
     def acquire_month(self, partition: PartitionKey) -> AmazingDataAcquisitionReceipt:
@@ -193,7 +192,7 @@ class AmazingDataHistoryAcquisition:
 
         positive_trade_fallback = None
         if fallback_candidates:
-            positive_trade_fallback = _PositiveTradeFallbackEvidence._from_provider(  # noqa: SLF001
+            positive_trade_fallback = PositiveTradeFallback(
                 queried_pairs=fallback_candidates,
                 positive_pairs=positive_trade_pairs,
                 request_params_by_pair=snapshot_request_hashes,
@@ -262,7 +261,8 @@ class AmazingDataHistoryAcquisition:
                 *snapshot_exchanges,
             )
         )
-        capture = _VerifiedAmazingDataCapture._from_provider(  # noqa: SLF001
+        receipt = _issue_amazingdata_acquisition_receipt(
+            source_snapshot=self.source_snapshot,
             requested_scope_start=start,
             requested_scope_end=end,
             security_universe_count=len(symbols),
@@ -279,10 +279,6 @@ class AmazingDataHistoryAcquisition:
             positive_trade_operations=positive_trade_operations,
             completeness_evaluation=evaluation,
             retrieved_at_utc=retrieved_at,
-        )
-        receipt = _issue_amazingdata_acquisition_receipt(
-            source_snapshot=self.source_snapshot,
-            capture=capture,
         )
         _persist_capture_catalog(self.raw_writer, receipt)
         try:

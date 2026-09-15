@@ -958,16 +958,15 @@ class TestR4B21FullSealConsumption:
 
 @pytest.mark.integration
 class TestR4B21TransactionInternalPreconditions:
-    """P0-03: ALL authoritative publish-precondition reads happen
-    INSIDE the transaction; state that changes before the authoritative
-    read blocks the publish; a final failure still rolls back and
+    """P0-03/P0-04: lineage reads remain inside the publish transaction;
+    expensive physical validation is a preflight whose DB-bound seal is
+    consumed inside the transaction; a final failure still rolls back and
     preserves the old PUBLISHED."""
 
     def test_structural_guard_preconditions_inside_transaction(self):
-        """AST ordering guard: within publish_snapshot, BEGIN TRANSACTION
-        precedes the precondition resolver, the seal recheck and every
-        write; nothing database-read happens before BEGIN in the
-        function body."""
+        """AST ordering guard: the physical preflight happens before
+        BEGIN, while the lineage resolver and seal consumer happen after
+        BEGIN and before any publication write."""
         src = PUBLISH_SOURCE.read_text(encoding="utf-8")
         tree = ast.parse(src)
         fn = next(
@@ -993,6 +992,7 @@ class TestR4B21TransactionInternalPreconditions:
                 if name in (
                     "_resolve_publish_preconditions",
                     "_b2_recheck",
+                    "_consume_b2_seal",
                     "execute",
                 ):
                     key = f"call:{name}"
@@ -1000,11 +1000,15 @@ class TestR4B21TransactionInternalPreconditions:
         assert "begin" in positions
         assert "call:_resolve_publish_preconditions" in positions
         assert "call:_b2_recheck" in positions
+        assert "call:_consume_b2_seal" in positions
         assert positions["begin"] < positions["call:_resolve_publish_preconditions"], (
             "preconditions must be resolved AFTER BEGIN TRANSACTION"
         )
-        assert positions["begin"] < positions["call:_b2_recheck"], (
-            "the seal recheck must run AFTER BEGIN TRANSACTION"
+        assert positions["call:_b2_recheck"] < positions["begin"], (
+            "physical validation preflight must complete BEFORE BEGIN TRANSACTION"
+        )
+        assert positions["begin"] < positions["call:_consume_b2_seal"], (
+            "the DB-bound validation seal must be consumed AFTER BEGIN TRANSACTION"
         )
         # and the FIRST conn.execute in the function is the BEGIN itself
         first_execute = positions.get("call:execute")
@@ -1036,7 +1040,9 @@ class TestR4B21TransactionInternalPreconditions:
                 "WHERE feature_artifact_set_id = ?",
                 [base.feature_artifact_set_id],
             )
-            with pytest.raises(PublishStateError, match="SNAPSHOT_ARTIFACT_LINEAGE_VALID"):
+            with pytest.raises(
+                PublishStateError, match="SNAPSHOT_ARTIFACT_LINEAGE_VALID|DQ_INPUT_STALE"
+            ):
                 publish_snapshot(conn, **_kwargs(conn, base))
 
     def test_feature_set_definition_changed_before_publish_blocks(self, base):

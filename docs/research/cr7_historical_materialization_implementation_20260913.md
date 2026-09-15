@@ -3,7 +3,7 @@
 日期：2026-09-13
 基线：`main@2e9bdc36544c5320072969a2888180b6dfec2c7a`
 对应合同：[`cr7_historical_materialization_contract_20260913.json`](cr7_historical_materialization_contract_20260913.json)
-状态：`AUTHORITATIVE ADAPTER IMPLEMENTED / THREE-MONTH PREFLIGHT FAIL-CLOSED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
+状态：`HISTORICAL IMPLEMENTATION RECORD / THREE-MONTH PREFLIGHT FAIL-CLOSED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED`
 
 ## 1. 本切片做了什么
 
@@ -21,8 +21,8 @@
   count 或 timestamp；新增 typed `AmazingDataAcquisitionReceipt`，仅由审阅过的 AmazingData
   三步 acquisition path 在完整请求、响应形状/范围校验和 `AnchoredRawEvidenceWriter` 留存成功后生成。receipt 绑定
   固定 method/operation、月份、Universe 选择、calendar、返回范围、schema/content/evidence hash、
-  source snapshot 和 PIT/available-at；`AuthoritativeCoverageEvidence` 与
-  `AuthoritativeCoverageBasisAdapter` 只消费这类 receipt。夹具方法明确标记为 `TEST_FIXTURE_ONLY`，
+  source snapshot 和 PIT/available-at；`AuthoritativeCoverageEvidence` 的直接 bridge 只消费这类
+  receipt。夹具方法明确标记为 `TEST_FIXTURE_ONLY`，
   不具备普通历史 reader 的发布权限；普通 reader 只接受显式 `AUTHORITATIVE_UPSTREAM` 证据等级，
   并要求提供 raw capture root 重放 catalog 与 RawWriter closure。
 - writer/runtime lock 只包含 dependency-lock content hash、Python runtime、Parquet writer engine、
@@ -38,10 +38,9 @@
 - `HistoricalMaterializationReader` 是独立的历史合同 reader：必须存在合法 committed `_SUCCESS.json`、
   78 月 inventory、每个月 `research_enabled` 的显式覆盖状态、basis evidence 和完整 hash 校验；
   `PARTIAL`/`UNRESOLVED` 以及 `TEST_FIXTURE_ONLY` 证据自动读取一律阻断，不改变现有 R1 reader。
-- `scripts/spike/cr7_authoritative_history_preflight.py` 固定只探测 Development 2020-01、Validation A
-  2024-01、Holdout 2026-01；每月只调用 calendar、historical code-list 和一个 daily-bar sentinel，
-  并将原始交换写入本地 ignored raw 目录。它只记录脱敏的调用状态、计数和哈希，绝不把 sentinel
-  观察结果冒充完整 acquisition receipt；阻断时返回专用非零退出码 `2`。
+- 历史上曾有一个固定范围的三个月 source preflight；按 Issue #66，该一次性 SPIKE 已删除，
+  不再作为当前 production/acquisition 入口。原始交换仍只允许留在本地 ignored raw 目录，
+  脱敏观察结果不能冒充完整 acquisition receipt。
 
 本轮针对独立审阅的窄修复保留并强化了三项边界：覆盖状态按完整 78 个月聚合，稀疏来源不能得到
 整体 OBSERVED；每个月的 `research_enabled` inventory 即使没有物理 artifact 也记录状态和原因；
@@ -71,7 +70,7 @@
 | 23 字段 identity 和 writer lock | `build_materialization_identity()`、`build_writer_runtime_lock_identity()` |
 | 78 月和三 route inventory | `expected_partition_keys()`、`OfflineHistoricalMaterializer.plan()` |
 | staging、marker、replay、冲突、failure invisibility | `OfflineHistoricalMaterializer.materialize()`、`HistoricalMaterializationReader` |
-| 三个月真实源预检的固定范围和脱敏收据 | `scripts/spike/cr7_authoritative_history_preflight.py`；`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json` |
+| 三个月真实源预检的固定范围和脱敏收据 | Issue #59 的历史提交/交接记录（已按 Issue #66 从当前树清理） |
 | 对抗场景 | `tests/unit/test_cr7_historical_materialization.py` |
 
 ## 4. 本地验证与下一道门
@@ -80,9 +79,8 @@
 sentinel 调用均返回 `OK`，但该 sentinel 预检没有执行完整月份/完整 Universe acquisition，因而没有
 生成可消费的 receipt；当前实现把结论保持为 `FAIL_CLOSED_BLOCKED`，阻断码为
 `FULL_SCOPE_ACQUISITION_RECEIPT_NOT_PRODUCED`，权威 evidence 为 `NOT_PRODUCED`，materializer 为
-`NOT_ENTERED_FAIL_CLOSED`。既有 JSON 收据是整改前的历史记录，见
-`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`；本地 raw 交换只保留
-在 ignored 目录，不进入 GitHub。
+`NOT_ENTERED_FAIL_CLOSED`。既有 JSON 收据是整改前的历史记录，已按 Issue #66 从当前树清理；
+本地 raw 交换只保留在 ignored 目录，不进入 GitHub。
 
 最终本地门禁和 exact-head GitHub Actions 结果由 PR 交接记录；在新的 scheduler 决策前，不得把本
 切片扩大成真实历史物化或生产执行。PR 保持 Draft，等待独立 delta review。

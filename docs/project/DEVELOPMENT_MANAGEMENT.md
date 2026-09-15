@@ -1,3 +1,88 @@
+## DM-20260914-ISSUE66-043 · 按 scheduler exact-head 审阅整改 Issue #66
+
+**Type**：C1 — CR-7 Phase-0 minimalism / scheduler remediation
+**Date**：2026-09-14
+**Status**：`LOCAL REMEDIATION COMPLETE / FULL QA GREEN / EXACT-HEAD CI GREEN / KEEP DRAFT / INDEPENDENT REVIEW REQUIRED`
+**Trigger**：PR #67 exact-head review `5205558820` 与 Issue #66 checkpoint comment `5674829261`。
+审阅对象为旧 head `12adbb3e5310f6f75d775afd569a745a7533f9cc`，结论为
+`REMEDIATE / KEEP DRAFT / DO NOT MERGE`；本轮实际开发基线已同步为 clean
+`main@ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`。
+
+**四项整改**：
+
+1. RawWriter 对已确认的 2024-01 status 响应形状（大量正常成员、零行零列 DataFrame、显式
+   `None`）按 request 级 O(1) 物理文件布局保存；meta inventory 记录成员列形态，零列空表恢复
+   为 `(0, 0)`，`None` 保持 `None`，不制造伪行。
+2. packed reader 只做一次 `partition_by` 分组扫描，再按 inventory 重建成员；合成基准新增读取/
+   重建耗时，避免只报告写入收益。
+3. 删除运行时 `AuthoritativeSourceSelection` / `selection_fingerprint` 固定策略包装，改用
+   receipt 上已有的直接 provider、source method、scope、PIT 与 completeness 字段；旧设计归档
+   中的历史文字不作为当前运行时契约。
+4. `PositiveTradeFallback.request_params_by_pair` 保持 `Mapping` 的真实运行时类型，构造后使用
+   只读映射，不再以 tuple 冒充 Mapping。
+
+**当前证据**：合成 5,002 个逻辑成员的 legacy/packed 对照为 5,001/1 个 Parquet；物理字节
+`7,174,641 -> 84,344`，持久化 `45,911.01 -> 3,609.53 ms`，closure
+`44,985.21 -> 53.97 ms`，读取/重建 `14,919.95 -> 3,032.02 ms`。本地收集 1,839 项，
+`uv run pytest -q` 以退出码 0 完成（1,835 passed、4 个既有环境条件 skip）；Ruff、format、
+mypy、compileall、`uv pip check`、diff check 和提供值扫描均通过。复审仍待完成。实现提交为
+`40ca7733f2edb2643ec1cf491fdd617fdce7e583`；其 exact-head GitHub Actions CI #617（run
+`34935462639`）的 Ubuntu 3.14、Windows 3.12、Windows 3.14 required jobs 全部 success，
+GT-H3B controlled execution #135（run `34935462526`）按边界 skipped。仍禁止 Stage B、78 月
+物化、Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline、策略及真实生产取数。
+凭证、endpoint、专有 SDK/runtime、vendor wheel 和原始 provider payload 不进入 GitHub。
+
+## DM-20260914-ISSUE66-042 · CR-7 热路径最小化与 RawWriter 布局整改
+
+**Type**：C1 — Issue #66 P0 minimalism / bounded performance and replay remediation
+**Date**：2026-09-14
+**Base**：clean `main@41403d3a0083609f1b7ab110d4c03b4ff0093933`（PR #64 merge）
+**Status**：`FULL QA GREEN / EXACT-HEAD CI GREEN / DRAFT / INDEPENDENT REVIEW REQUIRED`
+
+**本轮范围**：只收敛 CR-7 当前历史取数链路，不执行 Stage B、78 月物化、Formal/Production、
+BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。Issue #66 要求减少生产/测试代码，
+不新增安全、签名、溯源或多源仲裁框架。
+
+**已完成**：
+
+- `RawWriter` 对至少 128 个同构成员的 map 使用一个 request-level Parquet；meta 保留成员键、
+  `None`/空表信息；小型、异构、列冲突或不能安全拼接的输入回退原布局；
+- `verify_raw_evidence()` 产生绑定的 `VerifiedRawEvidence`，normalization 和 replay 读取复用
+  已完成的 raw closure 验证；
+- `AmazingDataAcquisitionReceipt` 直接使用 `VerifiedResearchProjection`，正向交易 fallback
+  只保留窄 `PositiveTradeFallback`，删除不可直接构造的 capture/snapshot ceremony；
+- 删除 `AuthoritativeCoverageBasisAdapter`，改为单一直接 bridge；retained operation 的 base/
+  exact-session/positive-snapshot 重复校验合并为 `_verify_retained_operation()`；
+- canonical owner 只在 owner boundary 做完整 closure；Snapshot/Feature/R1 消费
+  `read_canonical_run_manifest()`、`load_canonical_projection()` 和一次
+  `open_read_only_with_snapshot()` hand-off，不递归重验整条下游链；ReadModel 的 semantic
+  recompute 保留为独立 DuckDB copy-integrity invariant，Feature 的逐行公式 replay 保留为
+  自身业务 invariant；
+- publish 的报告、组件和 DQ 物理校验改在 DB 事务前完成，事务内仅重绑 validation/component/
+  artifact/DQ 小型 seal 与数据库状态，过期和身份漂移仍 fail closed；
+- `MonthCompletenessEvaluation` 删除中间 applicability/suspension/not-applicable subset
+  hashes 和评价内重复子版本字段，保留单一 rule version、输入及最终集合 seal、阻塞计数、
+  结构错误和分类汇总；
+- 删除 obsolete CR-7 SPIKE 脚本、脚本测试和一次性诊断文件；CI 保留 lint/format/type/test 与
+  AmazingData SDK 隔离检查，删除 Spike framework 与历史扫描门禁。
+
+**验证与验收**：
+
+- 相关 completeness/materialization 与跨层消费回归已通过；RawWriter/normalization 回归：163
+  passed、1 skipped；Ruff/mypy/compileall 已通过；
+- 本地全量 `uv run pytest -q`：`1831 passed, 4 skipped`；Ruff check/format、mypy、compileall、
+  `uv pip check` 和 diff check 均通过；skip 为既有环境条件；
+- exact-head CI #614：Ubuntu 3.14、Windows 3.12、Windows 3.14 三个 required job 全部
+  `success`；GT-H3B controlled execution #133 按边界 `skipped`；
+- 合成基准见 `docs/provider_verification/issue66_minimalism_benchmark_20260914.md`，5,000 成员
+  从 5,000 个 Parquet 降为 1 个，且记录 bytes、持久化和 closure 校验的实测变化；
+- 待完成：独立 delta review；通过后由 scheduler 决定是否
+  恢复 Issue #59 的最小 `2024-01` authoritative acquisition/materializer proof。未取得该决定
+  前，任何真实 Stage B/78 月执行均保持 blocked。
+
+账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、vendor wheels 和
+原始 Provider payload 不进入 GitHub。
+
 ## DM-20260913-CR7-AUTH-034 · AmazingData 权威取数凭证边界整改
 
 **Type**：C1 — CR-7 exact-head remediation / trusted acquisition-path receipt
@@ -69,16 +154,15 @@
   canonical bytes/hash 和 `available_at <= pit_as_of <= source_snapshot_as_of` 的时间链。
 - writer staging 和 ordinary historical reader 均重新加载、重算并核对 sidecar；fixture-only、
   缺失、过期、错误 scope/source binding、篡改、PIT 不合格和 identity conflict 不能解锁普通 reader。
-- 新增固定范围的 `scripts/spike/cr7_authoritative_history_preflight.py`，只检查 Development
-  `2020-01`、Validation A `2024-01`、Holdout `2026-01`，每月调用 calendar、historical code-list
-  和一个 daily-bar sentinel；原始交换只写本地 ignored raw 目录，GitHub 只保存脱敏收据。
+- 历史上曾新增固定范围的 `scripts/spike/cr7_authoritative_history_preflight.py`；该一次性 SPIKE
+  已按 Issue #66 从当前树清理。它只检查 Development `2020-01`、Validation A `2024-01`、
+  Holdout `2026-01`，原始交换只写本地 ignored raw 目录，GitHub 只保存脱敏收据。
 
 **真实预检结论**：三个月共九次调用均返回 `OK`，但当前 source contract 没有上游
 completeness statement，不能把观察结果当作完整覆盖证明。收据固定记录：
 `FAIL_CLOSED_BLOCKED`、`UPSTREAM_COMPLETENESS_STATEMENT_MISSING`、
 `authoritative_evidence=NOT_PRODUCED`、`materializer=NOT_ENTERED_FAIL_CLOSED`。收据路径为
-`docs/provider_verification/cr7_authoritative_history_preflight_20260913.json`，摘要路径为
-`docs/provider_verification/cr7_authoritative_history_preflight_20260913.md`。
+上述一次性脱敏收据和摘要已按 Issue #66 从当前树清理，历史提交仍可追溯。
 
 **验证与硬边界**：CR-7 focused 30 passed；全量 `pytest -q` 退出码为 0，3 个既有 Windows
 symlink 权限 skip；Ruff、format、`mypy src`、compileall、`uv pip check`、JSON parse 和
@@ -6735,7 +6819,7 @@ exact head、required CI 和独立 delta review 以该 PR/Issue 的最新交接�
   `FAIL_CLOSED`。在线重取在第 10 个精确日窗口遇到 `ProviderPermissionError`，未覆盖
   既有完整观察。
 - Stage B 的脱敏报告为
-  [`cr7_month_completeness_stage_b_20260914.json`](../provider_verification/cr7_month_completeness_stage_b_20260914.json)。
+  已按 Issue #66 从当前树清理的历史 Stage B 脱敏报告。
   `2020-01` 完成 20 个交换：3 个不可读/零列状态成员触发 `STATUS_SCHEMA_MISMATCH`，
   36 个 pair 为 `UNRESOLVED`，另有 16 个返回但尚未证明必需的 pair；
   `2026-01` 完成 24 个交换：结构检查通过但仍有 4 个 `UNRESOLVED` pair。两个月必需
@@ -6814,8 +6898,8 @@ BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
 **证据与治理**
 
 - 当前规范报告为 [`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)；
-  旧 `[D,D+1]` 观察保留在 [`cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json)，
-  仅作历史诊断，不得与新语义合并；整改前 Stage B 报告同样已标记为非验收证据；
+  旧 `[D,D+1]` 观察已按 Issue #66 从当前树清理，仅作历史诊断，不得与新语义合并；整改前
+  Stage B 报告同样已标记为非验收证据；
 - 当前下一道门是独立 delta review 对执行 head、CI、报告 code identity、22 个 exact-session
   请求及 fail-closed 结果进行复核。Stage A 未达 `PASS` 前不运行 Stage B，更不做 78 月回补、
   Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作；
@@ -6852,7 +6936,7 @@ BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
   结果为 `FAIL_CLOSED`，22 个交易日、5,106 个证券、1 个 `STATUS_SCHEMA_MISMATCH`、22 个
   `UNRESOLVED`、22 个 extra returned、required missing 0；
 - 规范报告为 [`cr7_month_completeness_stage_a_20260914.json`](../provider_verification/cr7_month_completeness_stage_a_20260914.json)，
-  前一版已归档为 [`cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json`](../provider_verification/cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json)；
+  前一版已按 Issue #66 从当前树清理，历史提交仍可追溯；
   两者均不产生 authoritative receipt 或 materializer 输入。
 
 **后续门禁**
@@ -6876,7 +6960,8 @@ BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
 
 **实现**
 
-- 新增 `scripts/spike/cr7_status_schema_blocker.py`，固定使用保留本地 ignored raw 的批次身份、成员
+- 历史上曾新增 `scripts/spike/cr7_status_schema_blocker.py`；该一次性 SPIKE 已按 Issue #66 从当前树
+  清理，固定使用保留本地 ignored raw 的批次身份、成员
   文件名 SHA-256 和 2024-01 闭区间；不接受自由日期、自由成员或生产模式参数；
 - 先验证 retained batch 的 provider/dataset/endpoint/surface/request/scope，再定位零行零列成员；
 - 对同一成员发出一次 typed `InfoData.get_history_stock_status` 单成员请求，并仅捕获已知的
@@ -6895,8 +6980,7 @@ pandas DataFrame 的本地 round-trip。实施 exact head `d5a7577709f76d2caf2ad
 `2026-09-14T11:24:08.134017+00:00`。保留批次目标成员和 singleton 响应均为零行零列；callback
 共 2 次，均为 `kDataEmpty` 且 `data=None`；facade 没有状态字段合成/丢失，raw writer 形态保留在
 本地 ignored raw。脱敏 receipt 为
-[`cr7_status_schema_blocker_20260914.json`](../../docs/provider_verification/cr7_status_schema_blocker_20260914.json)，
-摘要为 [`cr7_status_schema_blocker_20260914.md`](../../docs/provider_verification/cr7_status_schema_blocker_20260914.md)。
+报告和摘要已按 Issue #66 从当前树清理，历史提交仍可追溯。
 
 最终三选一结论为 `STOP(BLOCKED)`，原因码 `NO_POSITIVE_PROVIDER_SEMANTIC_RULE`。观察不到把
 `kDataEmpty + data=None` 定义为“无状态变化”或其他可用于完整性判定的正向 AmazingData 规则；
@@ -6929,16 +7013,15 @@ Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
   `num_trades`、`volume`、`amount`。
 - 当前没有独立的供应商字段说明原文；因此实现把字段名/typed annotation 标为公开 SDK 合同候选，
   不写入单位或未经证明的额外语义。正向事实只定义为有限且严格大于零的上述活动字段值。
-- `scripts/spike/cr7_positive_semantic_fallback.py` 固定使用保留异常成员、保留日历及 22 个 exact
-  applicability 日，不接受自由成员/日期参数；只允许一个成员、一个月份的 `query_snapshot` 调用。
+- 历史 `scripts/spike/cr7_positive_semantic_fallback.py` 固定使用保留异常成员、保留日历及 22 个
+  exact applicability 日，不接受自由成员/日期参数；该一次性 SPIKE 已按 Issue #66 从当前树清理。
   原始 DataFrame 分日写入本地 ignored raw/anchor，报告不含证券值、凭证、私有 endpoint 或 raw。
 - 离线回归覆盖正向字段、价格-only/非空误判、零/负/NaN、缺日、额外成员和“证据返回但规则未编码”。
 
 **下一道门**
 
 exact-head 探针已完成，脱敏 receipt 为
-[`cr7_positive_semantic_fallback_20260914.json`](../../docs/provider_verification/cr7_positive_semantic_fallback_20260914.json)，
-可读摘要为 [`cr7_positive_semantic_fallback_20260914.md`](../../docs/provider_verification/cr7_positive_semantic_fallback_20260914.md)。
+上述一次性脱敏报告和摘要已按 Issue #66 从当前树清理，历史提交仍可追溯。
 保留适用性日为 22 个，22/22 返回数据并满足候选正向字段规则，返回帧合计 96,781 行；callback 的
 状态标签没有被当作语义事实，判定只依赖返回帧中的候选活动字段。结论为
 `PROVIDER_SEMANTIC_RESOLVED`，实现状态为 `EVIDENCE_ONLY_PENDING_REVIEW`，`fallback_rule_encoded=false`。
@@ -6987,7 +7070,8 @@ GT-H3B #129 为策略性 `skipped`，不构成 Provider 或 Production 证据。
   [`cr7_month_completeness_stage_a_20260914.json`](../../docs/provider_verification/cr7_month_completeness_stage_a_20260914.json)，
   人工可读摘要为 [`cr7_month_completeness_stage_a_20260914.md`](../../docs/provider_verification/cr7_month_completeness_stage_a_20260914.md)。
 - 原先的未闭合规范报告已保留为
-  [`cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json`](../../docs/provider_verification/cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json)。
+  `cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json` 已按 Issue #66 从当前
+  树清理，不再作为当前验收输入。
 - 虽然本轮 Stage A 已 PASS 且四类阻断均为 0，但它仍只是 `SPIKE` 诊断；未签发 authoritative
   receipt，未进入 materializer。Stage B、78 月物化、Formal/Production、BSE/index、CR-5/R2、
   Golden/H1、baseline 或策略工作仍须 scheduler 独立审阅和单独授权。PR 保持 Draft，等待独立 review。
