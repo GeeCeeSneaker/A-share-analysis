@@ -4,6 +4,22 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0. 2026-09-15 当前调度覆盖
+
+当前 clean `main` 为 `1a14c87d19d527c56170df8bc9c24fccf69d55b3`，PR #67 已合并，Issue #66 已关闭。
+当前唯一活动 P0 已回到 Issue #59：只推进 `2024-01` 的真实 AmazingData acquisition → anchored
+raw/receipt replay → coverage basis → bounded atomic materialization → ordinary-reader proof。
+
+本文件后面的 Issue #66 文字是历史执行记录；如与本节或 Issue #59 当前 body 冲突，以本节和 Issue #59
+为准。当前不授权 Stage B（`2020-01` / `2026-01`）、78 月回补、Formal/Production、BSE/index、
+CR-5/R2、Golden/H1、baseline 或策略工作。
+
+2026-09-15 的受控本地检查记录在
+[`cr7_authoritative_2024_01_closure_20260915.md`](../provider_verification/cr7_authoritative_2024_01_closure_20260915.md)。
+结论为 `STOP(BLOCKED)`：bounded materializer/reader 的最小范围整改已在工作分支完成并通过本地
+focused/full QA，但本地没有可通过现有 ReadModel/Canonical 链打开的 verified source snapshot；
+因此没有铸造 receipt、没有执行真实 materializer，也没有提交凭证或 raw。
+
 ## 1. 项目管理责任
 
 - **项目 Owner**：决定总体方向、数据源是否可信、例外授权和最终业务取舍。
@@ -32,9 +48,9 @@
 
 **阶段**：Phase 0 / CR-7 historical research data foundation
 
-PR #64 已通过项目经理 exact-head 审阅并合并：
+PR #67 已通过项目经理 exact-head 审阅并合并：
 
-- merge commit / 当前 clean main：`ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`
+- merge commit / 当前 clean main：`1a14c87d19d527c56170df8bc9c24fccf69d55b3`
 - Issue #55：已完成并关闭；Issue #66：当前唯一开放 P0
 
 当前主线已经具备：

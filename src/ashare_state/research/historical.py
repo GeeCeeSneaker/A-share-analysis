@@ -66,6 +66,7 @@ __all__ = [
     "AMAZINGDATA_SECURITY_UNIVERSE_SELECTION",
     "AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION",
     "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD",
+    "BOUNDED_MATERIALIZATION_SCOPE_VERSION",
     "COMPLETE_OBSERVED_DAILY_BAR_SCOPE",
     "CoverageEvidenceClass",
     "AmazingDataAcquisitionReceipt",
@@ -101,6 +102,7 @@ __all__ = [
 
 
 HISTORICAL_MATERIALIZATION_CONTRACT_VERSION = "cr7-history-materialization-v1"
+BOUNDED_MATERIALIZATION_SCOPE_VERSION = "bounded-materialization-scope-v1"
 HISTORICAL_DATASET = RESEARCH_SECURITY_DAILY_DATASET
 TARGET_WINDOW_START = date(2020, 1, 1)
 TARGET_WINDOW_END = date(2026, 6, 30)
@@ -1919,6 +1921,69 @@ def expected_partition_keys() -> tuple[PartitionKey, ...]:
     return tuple(keys)
 
 
+def _normalize_materialization_partitions(
+    partitions: Sequence[PartitionKey] | None,
+) -> tuple[PartitionKey, ...]:
+    """Return a deterministic, non-empty subset of the historical window.
+
+    The default remains the established 78-month contract.  A bounded
+    caller must opt in with typed partition keys; accepting a subset here is
+    what lets Issue #59 prove one month without weakening the default full
+    window contract.
+    """
+    expected = expected_partition_keys()
+    if partitions is None:
+        return expected
+    if isinstance(partitions, (str, bytes)):
+        raise HistoricalMaterializationError(
+            "materialization_partitions must be a sequence of PartitionKey values"
+        )
+    normalized: list[PartitionKey] = []
+    seen: set[PartitionKey] = set()
+    expected_set = set(expected)
+    for partition in partitions:
+        if not isinstance(partition, PartitionKey):
+            raise HistoricalMaterializationError(
+                "materialization_partitions must contain typed PartitionKey values"
+            )
+        if partition not in expected_set:
+            raise HistoricalMaterializationError(
+                f"materialization partition is outside the target window: {partition.logical_key}"
+            )
+        if partition in seen:
+            raise HistoricalMaterializationError(
+                f"duplicate materialization partition: {partition.logical_key}"
+            )
+        seen.add(partition)
+        normalized.append(partition)
+    if not normalized:
+        raise HistoricalMaterializationError("materialization_partitions must not be empty")
+    split_order = {
+        research_split: ordinal for ordinal, research_split in enumerate(split_windows())
+    }
+    return tuple(
+        sorted(
+            normalized,
+            key=lambda partition: (
+                split_order[partition.research_split],
+                partition.calendar_year,
+                partition.calendar_month,
+            ),
+        )
+    )
+
+
+def _materialization_scope_manifest(
+    partitions: Sequence[PartitionKey],
+) -> dict[str, Any]:
+    expected = expected_partition_keys()
+    return {
+        "version": BOUNDED_MATERIALIZATION_SCOPE_VERSION,
+        "kind": "FULL_WINDOW" if tuple(partitions) == expected else "BOUNDED_PARTITIONS",
+        "partitions": [partition.as_dict() for partition in partitions],
+    }
+
+
 @dataclass(frozen=True)
 class CoverageBasisDescriptor:
     """A sealed, typed completeness descriptor for one enabled month.
@@ -2248,8 +2313,12 @@ class CoverageEvaluation:
 def verify_coverage_basis(
     projection: VerifiedResearchProjection,
     descriptors: Sequence[CoverageBasisDescriptor],
+    *,
+    materialization_partitions: Sequence[PartitionKey] | None = None,
 ) -> tuple[CoverageEvaluation, ...]:
     """Verify basis descriptors and derive coverage without caller promotion."""
+    target_partitions = _normalize_materialization_partitions(materialization_partitions)
+    target_partition_set = set(target_partitions)
     seen_descriptors: set[PartitionKey] = set()
     for descriptor in descriptors:
         if not isinstance(descriptor, CoverageBasisDescriptor):
@@ -2257,6 +2326,11 @@ def verify_coverage_basis(
         key = descriptor.partition_key
         if key in seen_descriptors:
             raise CoverageBasisError(f"duplicate coverage basis for {key.logical_key}")
+        if key not in target_partition_set:
+            raise CoverageBasisError(
+                "coverage basis targets a partition outside the materialization scope: "
+                f"{key.logical_key}"
+            )
         seen_descriptors.add(key)
         if descriptor.source_snapshot_id != projection.source_snapshot_id:
             raise CoverageBasisError("coverage basis source_snapshot_id does not match projection")
@@ -2293,7 +2367,7 @@ def verify_coverage_basis(
             + ", ".join(sorted(key.logical_key for key in extra))
         )
     evaluations: list[CoverageEvaluation] = []
-    for key in expected_partition_keys():
+    for key in target_partitions:
         matched_descriptor = next(
             (candidate for candidate in descriptors if candidate.partition_key == key), None
         )
@@ -2332,9 +2406,12 @@ def verify_coverage_basis(
 
 def _aggregate_coverage_evidence(
     evaluations: Sequence[CoverageEvaluation],
+    *,
+    materialization_partitions: Sequence[PartitionKey] | None = None,
 ) -> CoverageEvidenceClass:
     """Classify the complete target window, failing closed for any gap."""
-    if len(evaluations) != len(expected_partition_keys()):
+    target_partitions = _normalize_materialization_partitions(materialization_partitions)
+    if len(evaluations) != len(target_partitions):
         return CoverageEvidenceClass.UNRESOLVED
     if any(
         evaluation.state is CoverageState.UNRESOLVED_NOT_FOR_RESEARCH
@@ -2776,6 +2853,7 @@ class HistoricalMaterializationPlan:
     materialization_id: str
     coverage_state: CoverageState
     coverage_evidence_class: CoverageEvidenceClass
+    materialization_partitions: tuple[PartitionKey, ...]
     coverage_basis_descriptors: tuple[CoverageBasisDescriptor, ...]
     coverage_evaluations: tuple[CoverageEvaluation, ...]
     identity_sources: tuple[dict[str, Any], ...]
@@ -2833,6 +2911,9 @@ class HistoricalMaterializationPlan:
                 if descriptor.authoritative_evidence is not None
             ],
             "partition_policy_version": PARTITION_POLICY_VERSION,
+            "materialization_scope": _materialization_scope_manifest(
+                self.materialization_partitions
+            ),
             "research_split_windows": self.materialization_identity["research_split_windows"],
             "target_window": {
                 "start": TARGET_WINDOW_START,
@@ -2896,7 +2977,10 @@ class OfflineHistoricalMaterializer:
         projection: VerifiedResearchProjection,
         *,
         coverage_bases: Sequence[CoverageBasisDescriptor] = (),
+        materialization_partitions: Sequence[PartitionKey] | None = None,
     ) -> HistoricalMaterializationPlan:
+        target_partitions = _normalize_materialization_partitions(materialization_partitions)
+        target_partition_set = set(target_partitions)
         if not isinstance(projection, VerifiedResearchProjection):
             raise HistoricalMaterializationError(
                 "historical materialization requires VerifiedResearchProjection"
@@ -2941,6 +3025,19 @@ class OfflineHistoricalMaterializer:
                 continue
             normalized_rows.append(row)
 
+        # A bounded publication may receive a wider verified projection, but
+        # it must never silently publish rows from another logical month.
+        scoped_rows: list[dict[str, Any]] = []
+        for row in normalized_rows:
+            row_date = row["trade_date"]
+            row_split = ResearchSplit(str(row["research_split"]))
+            row_partition = PartitionKey(row_split, row_date.year, row_date.month)
+            if row_partition in target_partition_set:
+                scoped_rows.append(row)
+            else:
+                excluded_reasons["outside_materialization_scope"] += 1
+        normalized_rows = scoped_rows
+
         normalized_projection = VerifiedResearchProjection(
             rows=tuple(normalized_rows),
             source_snapshot_id=projection.source_snapshot_id,
@@ -2952,7 +3049,11 @@ class OfflineHistoricalMaterializer:
             identity_view=projection.identity_view,
         )
         descriptors = tuple(coverage_bases)
-        evaluations = verify_coverage_basis(normalized_projection, descriptors)
+        evaluations = verify_coverage_basis(
+            normalized_projection,
+            descriptors,
+            materialization_partitions=target_partitions,
+        )
         if any(descriptor.authoritative_evidence is not None for descriptor in descriptors) and (
             self.authoritative_capture_root is None
         ):
@@ -2980,7 +3081,7 @@ class OfflineHistoricalMaterializer:
         schema_hash = _schema_hash()
         artifacts: list[HistoricalArtifact] = []
         artifact_by_key: dict[tuple[PartitionKey, str], HistoricalArtifact] = {}
-        for key in expected_partition_keys():
+        for key in target_partitions:
             for route in _ROUTES:
                 rows = grouped.get((key, route), [])
                 if not rows:
@@ -3035,7 +3136,7 @@ class OfflineHistoricalMaterializer:
                 artifact_by_key[(key, route)] = artifact
 
         logical_inventory: list[dict[str, Any]] = []
-        for key in expected_partition_keys():
+        for key in target_partitions:
             evaluation = evaluation_by_key[key]
             routes = {
                 route: _route_inventory_entry(
@@ -3097,13 +3198,17 @@ class OfflineHistoricalMaterializer:
             (evaluation.state for evaluation in evaluations),
             key=_coverage_rank,
         )
-        coverage_evidence_class = _aggregate_coverage_evidence(evaluations)
+        coverage_evidence_class = _aggregate_coverage_evidence(
+            evaluations,
+            materialization_partitions=target_partitions,
+        )
         return HistoricalMaterializationPlan(
             materialization_identity=identity,
             idempotency_key=idempotency_key,
             materialization_id=materialization_id,
             coverage_state=coverage_state,
             coverage_evidence_class=coverage_evidence_class,
+            materialization_partitions=target_partitions,
             coverage_basis_descriptors=tuple(sorted(descriptors, key=lambda item: item.sort_key)),
             coverage_evaluations=evaluations,
             identity_sources=tuple(source.as_dict() for source in projection.identity_view.sources),
@@ -3121,10 +3226,15 @@ class OfflineHistoricalMaterializer:
         projection: VerifiedResearchProjection,
         *,
         coverage_bases: Sequence[CoverageBasisDescriptor] = (),
+        materialization_partitions: Sequence[PartitionKey] | None = None,
         build_timestamp: datetime | str,
     ) -> MaterializationResult:
         """Publish one plan through non-readable staging and a directory rename."""
-        plan = self.plan(projection, coverage_bases=coverage_bases)
+        plan = self.plan(
+            projection,
+            coverage_bases=coverage_bases,
+            materialization_partitions=materialization_partitions,
+        )
         manifest = plan.manifest(build_timestamp=build_timestamp)
         manifest_bytes = _pretty_json_bytes(manifest)
         inventory_bytes = _pretty_json_bytes(list(plan.logical_partition_inventory))
@@ -3410,6 +3520,13 @@ def _assert_manifest_identity(
         raise MaterializationConflictError("manifest idempotency_key does not match")
     if manifest.get("materialization_identity") != plan.materialization_identity:
         raise MaterializationConflictError("materialization identity changed")
+    existing_scope = manifest.get("materialization_scope")
+    if existing_scope is None:
+        # Manifests written before bounded scopes were introduced are the
+        # established full-window contract.
+        existing_scope = _materialization_scope_manifest(expected_partition_keys())
+    if existing_scope != _materialization_scope_manifest(plan.materialization_partitions):
+        raise MaterializationConflictError("materialization scope changed")
     if manifest.get("coverage_state") != plan.coverage_state.value:
         raise MaterializationConflictError("materialization coverage_state changed")
     if manifest.get("coverage_evidence_class") != plan.coverage_evidence_class.value:
@@ -3511,6 +3628,58 @@ def _resolve_relative_file(parent: Path, relative_path: str) -> Path:
     return candidate
 
 
+def _read_materialization_scope(manifest: Mapping[str, Any]) -> tuple[PartitionKey, ...]:
+    """Read the committed scope, treating legacy manifests as full-window."""
+    raw_scope = manifest.get("materialization_scope")
+    if raw_scope is None:
+        return expected_partition_keys()
+    if not isinstance(raw_scope, Mapping) or set(raw_scope) != {
+        "version",
+        "kind",
+        "partitions",
+    }:
+        raise HistoricalReadError("historical materialization scope is malformed")
+    if raw_scope.get("version") != BOUNDED_MATERIALIZATION_SCOPE_VERSION:
+        raise HistoricalReadError("unknown historical materialization scope version")
+    raw_partitions = raw_scope.get("partitions")
+    if not isinstance(raw_partitions, list):
+        raise HistoricalReadError("historical materialization scope partitions are malformed")
+    parsed: list[PartitionKey] = []
+    for raw_partition in raw_partitions:
+        if not isinstance(raw_partition, Mapping) or set(raw_partition) != {
+            "research_split",
+            "calendar_year",
+            "calendar_month",
+            "logical_key",
+        }:
+            raise HistoricalReadError("historical materialization scope partition is malformed")
+        try:
+            partition = PartitionKey(
+                ResearchSplit(str(raw_partition["research_split"])),
+                raw_partition["calendar_year"],
+                raw_partition["calendar_month"],
+            )
+        except (KeyError, TypeError, ValueError, HistoricalMaterializationError) as exc:
+            raise HistoricalReadError(
+                "historical materialization scope partition is invalid"
+            ) from exc
+        if raw_partition.get("logical_key") != partition.logical_key:
+            raise HistoricalReadError("historical materialization scope logical key changed")
+        parsed.append(partition)
+    try:
+        normalized = _normalize_materialization_partitions(parsed)
+    except HistoricalMaterializationError as exc:
+        raise HistoricalReadError("historical materialization scope is invalid") from exc
+    if [partition.as_dict() for partition in normalized] != raw_partitions:
+        raise HistoricalReadError("historical materialization scope ordering or duplicates changed")
+    expected_kind = (
+        "FULL_WINDOW" if normalized == expected_partition_keys() else "BOUNDED_PARTITIONS"
+    )
+    if raw_scope.get("kind") != expected_kind:
+        raise HistoricalReadError("historical materialization scope kind changed")
+    return normalized
+
+
 @dataclass(frozen=True)
 class HistoricalMaterializationReader:
     """Ordinary reader gate for the separate CR-7 committed contract."""
@@ -3584,15 +3753,18 @@ class HistoricalMaterializationReader:
             raise HistoricalReadError("historical materialization identity is invalid") from exc
         if expected_materialization_id != manifest.get("materialization_id"):
             raise HistoricalReadError("historical materialization identity hash mismatch")
+        materialization_partitions = _read_materialization_scope(manifest)
         inventory_path = path.parent / "partition_inventory.json"
         if not inventory_path.is_file():
             raise HistoricalReadError("historical partition inventory is missing")
         inventory = _load_json_list(inventory_path.read_bytes(), "historical partition inventory")
-        if len(inventory) != 78 or inventory != manifest.get("logical_partition_inventory"):
+        if len(inventory) != len(materialization_partitions) or inventory != manifest.get(
+            "logical_partition_inventory"
+        ):
             raise HistoricalReadError("historical logical partition inventory changed")
         if sha256_hex(canonical_json(inventory)) != manifest.get("partition_inventory_hash"):
             raise HistoricalReadError("historical partition inventory hash changed")
-        expected_keys = set(expected_partition_keys())
+        expected_keys = set(materialization_partitions)
         inventory_keys: set[PartitionKey] = set()
         for raw_inventory in inventory:
             if not isinstance(raw_inventory, Mapping):
@@ -3758,6 +3930,22 @@ class HistoricalMaterializationReader:
                 raise HistoricalReadError("historical artifact semantic hash changed")
         return cls(manifest_path=path, manifest=manifest)
 
+    def _require_materialized_range(
+        self,
+        split: ResearchSplit,
+        start_date: date,
+        end_date: date,
+    ) -> None:
+        selected = set(_read_materialization_scope(self.manifest))
+        cursor = start_date.replace(day=1)
+        last = end_date.replace(day=1)
+        while cursor <= last:
+            if PartitionKey(split, cursor.year, cursor.month) not in selected:
+                raise HistoricalReadError(
+                    "historical read range exceeds the committed materialization scope"
+                )
+            cursor = _next_month(cursor)
+
     def load_security_daily(
         self,
         *,
@@ -3781,6 +3969,7 @@ class HistoricalMaterializationReader:
         end_date = window_end if end is None else parse_date_value(end)
         if start_date < window_start or end_date > window_end or start_date > end_date:
             raise HistoricalReadError("historical read range crosses its split window")
+        self._require_materialized_range(research_split, start_date, end_date)
         if security_ids is not None:
             if not isinstance(security_ids, Sequence) or isinstance(security_ids, str):
                 raise HistoricalReadError("security_ids must be a sequence")

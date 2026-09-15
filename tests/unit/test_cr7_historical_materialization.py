@@ -695,6 +695,83 @@ def test_authoritative_materializer_requires_the_retained_capture_root(tmp_path:
         materializer.plan(_fixture_projection(), coverage_bases=(descriptor,))
 
 
+def test_bounded_authoritative_materialization_is_readable_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    projection = _projection([_row(date(2020, 1, 2), "security-sse")])
+    evidence = _authoritative_evidence(partition, tmp_path)
+    descriptor = build_authoritative_coverage_basis_descriptor(partition, evidence)
+    materializer = OfflineHistoricalMaterializer(
+        tmp_path / "materialized",
+        writer_runtime_lock_hash=_writer_hash(),
+        build_code_fingerprint=BUILD_FINGERPRINT,
+        authoritative_capture_root=tmp_path / "raw",
+    )
+
+    first = materializer.materialize(
+        projection,
+        coverage_bases=(descriptor,),
+        materialization_partitions=(partition,),
+        build_timestamp="2026-09-15T00:00:00+00:00",
+    )
+    manifest_path = tmp_path / "materialized" / first.manifest_uri
+    reader = HistoricalMaterializationReader.from_manifest(
+        manifest_path,
+        authoritative_capture_root=tmp_path / "raw",
+    )
+    loaded = reader.load_security_daily(
+        split=ResearchSplit.DEVELOPMENT,
+        start="2020-01-02",
+        end="2020-01-02",
+    )
+    assert loaded.height == 1
+    assert reader.manifest["logical_partition_count"] == 1
+    assert reader.manifest["materialization_scope"]["kind"] == "BOUNDED_PARTITIONS"
+    with pytest.raises(HistoricalReadError, match="materialization scope"):
+        reader.load_security_daily(
+            split=ResearchSplit.DEVELOPMENT,
+            start="2020-02-01",
+            end="2020-02-01",
+        )
+
+    replay = materializer.materialize(
+        projection,
+        coverage_bases=(descriptor,),
+        materialization_partitions=(partition,),
+        build_timestamp="2026-09-16T00:00:00+00:00",
+    )
+    assert replay.idempotent_replay is True
+
+    changed = _projection([_row(date(2020, 1, 2), "security-sse", close=11.5)])
+    with pytest.raises(MaterializationConflictError, match="content|inventory"):
+        materializer.materialize(
+            changed,
+            coverage_bases=(descriptor,),
+            materialization_partitions=(partition,),
+            build_timestamp="2026-09-15T00:00:00+00:00",
+        )
+
+
+def test_bounded_scope_orders_multiple_typed_partitions(tmp_path: Path) -> None:
+    first = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    second = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 2)
+    materializer = OfflineHistoricalMaterializer(
+        tmp_path,
+        writer_runtime_lock_hash=_writer_hash(),
+        build_code_fingerprint=BUILD_FINGERPRINT,
+    )
+
+    plan = materializer.plan(
+        _projection([_row(date(2020, 1, 2), "security-sse")]),
+        materialization_partitions=(second, first),
+    )
+
+    assert plan.materialization_partitions == (first, second)
+    assert len(plan.logical_partition_inventory) == 2
+    assert plan.coverage_evidence_class is CoverageEvidenceClass.UNRESOLVED
+
+
 def test_authoritative_evidence_rejects_stale_selection_fields_and_wrong_scope(
     tmp_path: Path,
 ) -> None:

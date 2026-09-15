@@ -1,3 +1,26 @@
+## 2026-09-15 · Issue #59 2024-01 权威闭环前置检查
+
+> 状态：**STOP(BLOCKED) / BOUNDED CONTRACT REMEDIATION READY FOR REVIEW / NO RECEIPT / NO MATERIALIZATION**
+
+- 本轮从当前 clean `main@1a14c87d19d527c56170df8bc9c24fccf69d55b3` 建立工作分支，并确认该
+  基线为实际 HEAD 祖先。PR #67 已合并，Issue #66 已关闭；当前唯一活动 P0 回到 Issue #59。
+- 本地受控环境已完成 AmazingData 1.1.9 / tgw 1.0.9.2 的实际 runtime、网络、认证和 query
+  bootstrap；凭证只从未跟踪 `.env` 读取，未写入报告或 GitHub。SDK 包及 40 个依赖 wheel
+  保存在被忽略的当前工作区 `vendor/amazingdata/`，不属于仓库交付物。
+- 检查到的 5 个本地 Atlas 数据库没有可打开的 verified ReadModel/Canonical snapshot：
+  `rm_snapshot_meta`、`rm_daily_bar` 及相关 snapshot/build/run 记录均为 0。因而没有调用
+  `AmazingDataHistoryAcquisition.acquire_month()`，没有把历史 SPIKE raw 或手工 projection
+  当作 source snapshot，也没有铸造 authoritative receipt。
+- 前置检查另发现历史 materializer/ordinary reader 固定 78 个月与本轮单月目标不一致；已在当前
+  分支增加版本化 typed `materialization_partitions` scope。显式单月范围会绑定 coverage、
+  artifact、inventory、manifest、replay/conflict 和 reader；省略范围的默认路径仍是 78 月。
+- bounded scope 的历史物化聚焦测试 26 项通过，全仓 pytest、ruff check/format、mypy 均通过；
+  该测试使用 fake receipt/fixture，只证明代码边界，不能充当生产 authority。
+- 脱敏报告见 `docs/provider_verification/cr7_authoritative_2024_01_closure_20260915.md/json`。
+  当前仍需提供可由现有链路验证的 source snapshot，并对 bounded 2024-01
+  materializer/reader 整改做独立审阅；在此之前不执行 Stage B、78 月回补、
+  Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
+
 ## 2026-09-14 · Issue #66 scheduler 整改交接（旧 exact head 被要求 REMEDIATE）
 
 > 状态：**LOCAL REMEDIATION COMPLETE / FULL QA GREEN / EXACT-HEAD CI GREEN / DRAFT PR / INDEPENDENT REVIEW REQUIRED**
