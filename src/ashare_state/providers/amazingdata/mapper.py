@@ -283,10 +283,20 @@ def _required_float(row: Any, *names: str, context: str) -> float:
 
 
 def _to_int(value: Any) -> int | None:
-    if isinstance(value, date):
-        return int(value.strftime("%Y%m%d"))
     f = _to_float(value)
     return int(f) if f is not None else None
+
+
+def _to_kline_time(value: Any) -> int | None:
+    """Convert the provider's daily-bar date/time field to YYYYMMDD.
+
+    Date-like handling is deliberately local to ``KLINE_TIME``.  The generic
+    integer mapper must not reinterpret date objects supplied to unrelated
+    numeric fields as integers.
+    """
+    if isinstance(value, date):
+        return int(value.strftime("%Y%m%d"))
+    return _to_int(value)
 
 
 # ------------------------------------------------------------- calendar
@@ -350,7 +360,7 @@ def map_daily_bar_row(row: Any, *, kline_type: str = "DAY") -> DailyBarDTO:
     # R2-P1-05: daily bar symbols normalize through the SAME rule as
     # security master (600000 -> 600000.SH), never left bare
     symbol = normalize_provider_symbol(bare, market or None)
-    kline_time = _to_int(first_present(row, "KLINE_TIME", "kline_time"))
+    kline_time = _to_kline_time(first_present(row, "KLINE_TIME", "kline_time"))
     if kline_time is None:
         raise MappingValidationError(f"{ctx}: required KLINE_TIME missing/unparsable")
     return DailyBarDTO(
