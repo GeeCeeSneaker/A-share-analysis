@@ -52,11 +52,13 @@ from ashare_state.providers.amazingdata.dto import (
 from ashare_state.providers.amazingdata.mapper import (
     corporate_action_flags,
     map_adj_factor_row,
+    map_daily_bar_member_row,
     map_daily_bar_row,
     map_equity_structure_row,
     map_index_daily_row,
     map_industry_member_row,
     map_security_master_row,
+    map_security_master_symbol,
     map_security_status_row,
     map_trade_calendar,
     project_limit_price,
@@ -200,6 +202,27 @@ def _security_master_mapper(source_label: str) -> RowMapper:
     return map_row
 
 
+def _security_master_hist_mapper(row: dict[str, Any]) -> dict[str, Any]:
+    """The real historical code-list response is a scalar list.
+
+    RawWriter stores scalar members as ``{"value": ...}``; this dedicated
+    mapper closes that one observed provider shape without making the normal
+    row mapper accept arbitrary scalar input.
+    """
+    if "value" not in row:
+        return {"main": map_security_master_row(row, source="HIST")}
+    return {"main": map_security_master_symbol(row["value"], source="HIST")}
+
+
+def _map_daily_bar_member(row: dict[str, Any]) -> dict[str, Any]:
+    """Map direct rows or one row from the provider member map."""
+    if "__provider_member_key__" in row:
+        return {"main": map_daily_bar_member_row(row, member_key_field="__provider_member_key__")}
+    # Keep the existing list[dict] normalization shape backward compatible;
+    # only the explicitly marked provider member-map path uses the adapter.
+    return {"main": map_daily_bar_row(row)}
+
+
 def _map_status_row(row: dict[str, Any]) -> dict[str, Any]:
     """history_stock_status routes to THREE provider-faithful outputs
     (task book 1.3): the full-field status mirror, the limit-price
@@ -287,10 +310,10 @@ _REGISTRY_SPECS: tuple[DatasetNormalizationSpec, ...] = (
         provider_dataset="hist_code_list",
         endpoint="BaseData.get_hist_code_list",
         support=SurfaceSupport.SUPPORTED_NORMALIZATION,
-        mapper_version="security-master-mapper-v1",
+        mapper_version="security-master-scalar-symbol-mapper-v1",
         quarantine_scope=QuarantineScope.ROW,
         allow_partial=True,
-        map_row=_security_master_mapper("HIST"),
+        map_row=_security_master_hist_mapper,
     ),
     DatasetNormalizationSpec(
         normalization_surface="security_master",
@@ -401,7 +424,7 @@ _REGISTRY_SPECS: tuple[DatasetNormalizationSpec, ...] = (
         mapper_version="daily-bar-mapper-v1",
         quarantine_scope=QuarantineScope.ROW,
         allow_partial=True,
-        map_row=_map_daily_bar,
+        map_row=_map_daily_bar_member,
     ),
     # CR-7: Level-1 snapshots are retained only as a bounded semantic
     # fallback input.  No canonical snapshot mapper is approved, so ordinary

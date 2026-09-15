@@ -30,6 +30,24 @@ from ashare_state.providers.amazingdata.dto import (
 from ashare_state.providers.errors import MappingValidationError
 
 _MARKET_SUFFIX = {"1": ".SH", "2": ".SZ", "3": ".BJ"}
+_SUFFIX_MARKET = {suffix: market for market, suffix in _MARKET_SUFFIX.items()}
+_SECURITY_CODE_LENGTH = 6
+_PROVIDER_INDEX_FIELDS = (
+    "__index_level_0__",  # pandas unnamed Index preserved by RawWriter
+    "index",
+    "symbol",
+)
+_EXPLICIT_SECURITY_IDENTITY_FIELDS = (
+    "SECURITY_CODE",
+    "code",
+    "security_code",
+    "PROVIDER_SYMBOL",
+    "provider_symbol",
+)
+_SECURITY_IDENTITY_FIELDS = (
+    *_EXPLICIT_SECURITY_IDENTITY_FIELDS,
+    *_PROVIDER_INDEX_FIELDS,
+)
 
 
 def normalize_provider_symbol(code: str, market_code: str | None = None) -> str:
@@ -61,6 +79,130 @@ def normalize_provider_symbol(code: str, market_code: str | None = None) -> str:
     if not text.isdigit():
         raise MappingValidationError(f"provider symbol {text!r}: non-numeric code")
     return f"{text}{market_suffix}"
+
+
+def _security_master_identity(row: Any, *, context: str) -> tuple[str, str, str]:
+    """Resolve a security-master identity without request-order inference.
+
+    AmazingData ``stock_basic`` can expose the provider symbol as the
+    DataFrame index rather than a named column, or in the observed
+    ``MARKET_CODE`` literal.  RawWriter preserves a non-default index; this
+    helper accepts only an explicit provider code field, that verified
+    suffixed ``MARKET_CODE`` carrier, or one of the preserved index names.
+    A bare/default index value is not a valid identity unless it is a
+    six-digit provider code and an explicit market is present.
+    """
+    explicit_code = first_present(row, *_EXPLICIT_SECURITY_IDENTITY_FIELDS)
+    index_code = first_present(row, *_PROVIDER_INDEX_FIELDS)
+    raw_market = first_present(row, "MARKET_CODE", "market")
+    market_text = "" if raw_market is None else str(raw_market).strip()
+
+    # The observed stock_basic response calls its full provider symbol
+    # ``MARKET_CODE``.  Treat only a dotted, suffix-valid value in that
+    # literal as an identity carrier; bare MARKET_CODE values remain market
+    # enums (1/2/3) and still require a separate code/index.
+    market_identity: tuple[str, str, str | None] | None = None
+    if "." in market_text:
+        market_identity = _parse_security_identity(market_text, context=context)
+    if explicit_code is not None:
+        raw_code = explicit_code
+    elif market_identity is not None:
+        # The observed stock_basic response uses MARKET_CODE for the full
+        # provider symbol.  Prefer that verified carrier over the duplicate
+        # integer index produced by the SDK's batch concat.
+        raw_code = market_text
+    else:
+        raw_code = index_code
+
+    if raw_code is None:
+        _required(row, *_SECURITY_IDENTITY_FIELDS, context=context)
+    provider_symbol, bare, inferred_market = _parse_security_identity(raw_code, context=context)
+
+    if market_identity is not None:
+        carrier_symbol, carrier_bare, carrier_market = market_identity
+        if bare != carrier_bare:
+            raise MappingValidationError(
+                f"{context}: security identity {provider_symbol!r} conflicts with "
+                f"MARKET_CODE carrier {carrier_symbol!r}"
+            )
+        if inferred_market is not None and inferred_market != carrier_market:
+            raise MappingValidationError(
+                f"{context}: provider symbol market {inferred_market!r} conflicts "
+                f"with MARKET_CODE carrier {carrier_market!r}"
+            )
+        inferred_market = carrier_market
+        if explicit_code is None and index_code is not None:
+            # A valid provider index is additional identity evidence and
+            # must agree.  Synthetic/non-provider indexes (e.g. the SDK's
+            # repeated zero after batch concat) are retained in raw evidence
+            # but are not treated as a security identity.
+            try:
+                _, index_bare, index_market = _parse_security_identity(index_code, context=context)
+            except MappingValidationError:
+                pass
+            else:
+                if index_bare != carrier_bare or (
+                    index_market is not None and index_market != carrier_market
+                ):
+                    raise MappingValidationError(
+                        f"{context}: provider index identity conflicts with "
+                        f"MARKET_CODE carrier {carrier_symbol!r}"
+                    )
+
+    market = market_text if market_identity is None else ""
+    if market:
+        if market not in _MARKET_SUFFIX:
+            raise MappingValidationError(
+                f"{context}: unknown/missing MARKET_CODE {market!r}; "
+                "provider symbol normalization requires a known market "
+                f"(one of {sorted(_MARKET_SUFFIX)})"
+            )
+        if inferred_market is not None and market != inferred_market:
+            raise MappingValidationError(
+                f"{context}: provider symbol market {inferred_market!r} conflicts "
+                f"with MARKET_CODE {market!r}"
+            )
+    elif inferred_market is not None:
+        market = inferred_market
+    else:
+        raise MappingValidationError(
+            f"{context}: unknown/missing MARKET_CODE; provider symbol normalization "
+            f"requires a known market (one of {sorted(_MARKET_SUFFIX)})"
+        )
+
+    if not provider_symbol:
+        provider_symbol = normalize_provider_symbol(bare, market)
+    return provider_symbol, bare, market
+
+
+def _parse_security_identity(value: Any, *, context: str) -> tuple[str, str, str | None]:
+    """Parse one explicit bare or suffixed provider identity."""
+    text = str(value).strip()
+    if not text:
+        raise MappingValidationError(f"{context}: security code is empty")
+    if "." in text:
+        bare, _, suffix = text.partition(".")
+        provider_symbol = normalize_provider_symbol(text)
+        inferred_market = _SUFFIX_MARKET.get(f".{suffix}")
+        if inferred_market is None:
+            # normalize_provider_symbol already rejects this; keep the
+            # branch explicit for the tuple contract below.
+            raise MappingValidationError(f"{context}: unknown provider market suffix")
+        if len(bare) != _SECURITY_CODE_LENGTH or not bare.isdigit():
+            raise MappingValidationError(
+                f"{context}: security code {bare!r} is not a six-digit numeric code"
+            )
+        return provider_symbol, bare, inferred_market
+    if len(text) != _SECURITY_CODE_LENGTH or not text.isdigit():
+        raise MappingValidationError(
+            f"{context}: security code {text!r} is not a six-digit numeric code"
+        )
+    return "", text, None
+
+
+def validate_provider_symbol(value: Any, *, context: str) -> tuple[str, str, str]:
+    """Validate and split one provider-owned suffixed symbol."""
+    return _security_master_identity({"PROVIDER_SYMBOL": value}, context=context)
 
 
 def _col(row: Any, name: str) -> Any:
@@ -145,6 +287,18 @@ def _to_int(value: Any) -> int | None:
     return int(f) if f is not None else None
 
 
+def _to_kline_time(value: Any) -> int | None:
+    """Convert the provider's daily-bar date/time field to YYYYMMDD.
+
+    Date-like handling is deliberately local to ``KLINE_TIME``.  The generic
+    integer mapper must not reinterpret date objects supplied to unrelated
+    numeric fields as integers.
+    """
+    if isinstance(value, date):
+        return int(value.strftime("%Y%m%d"))
+    return _to_int(value)
+
+
 # ------------------------------------------------------------- calendar
 
 
@@ -168,26 +322,31 @@ def map_trade_calendar(market: str, trading_days: list[Any]) -> TradeCalendarDTO
 
 
 def map_security_master_row(row: Any, *, source: str) -> SecurityMasterDTO:
-    symbol = str(_required(row, "SECURITY_CODE", "code", context="security_master"))
-    market = str(first_present(row, "MARKET_CODE", "market") or "")
-    # R2-P1-05: market is REQUIRED - identity cannot accept unknown markets
-    suffix = _MARKET_SUFFIX.get(market)
-    if suffix is None:
-        raise MappingValidationError(
-            f"security_master: unknown/missing MARKET_CODE {market!r}; "
-            "provider symbol normalization requires a known market "
-            f"(one of {sorted(_MARKET_SUFFIX)})"
-        )
+    provider_symbol, symbol, market = _security_master_identity(row, context="security_master")
     return SecurityMasterDTO(
-        provider_symbol=f"{symbol}{suffix}",
+        provider_symbol=provider_symbol,
         security_code=symbol,
         market_code=market,
         security_type=str(first_present(row, "SECURITY_TYPE") or source),
         security_name=first_present(row, "SECURITY_NAME_ABBR", "SECURITY_NAME"),
-        list_date=_to_date(first_present(row, "LISTING_DATE")),
-        delist_date=_to_date(first_present(row, "DELISTING_DATE")),
+        list_date=_to_date(first_present(row, "LISTING_DATE", "LISTDATE")),
+        delist_date=_to_date(first_present(row, "DELISTING_DATE", "DELISTDATE")),
         is_listed=_to_int(first_present(row, "IS_LISTED")),
         st_flag=_to_int(first_present(row, "IS_ST")),
+    )
+
+
+def map_security_master_symbol(value: Any, *, source: str) -> SecurityMasterDTO:
+    """Map the provider's scalar code-list member into one master row.
+
+    The historical code-list endpoint returns suffixed provider symbols as
+    ``list[str]``.  It proves membership only; no listing date is invented
+    here, so PIT identity still depends on a separately verified
+    ``stock_basic`` row.
+    """
+    return map_security_master_row(
+        {"value": value, "PROVIDER_SYMBOL": value},
+        source=source,
     )
 
 
@@ -201,7 +360,7 @@ def map_daily_bar_row(row: Any, *, kline_type: str = "DAY") -> DailyBarDTO:
     # R2-P1-05: daily bar symbols normalize through the SAME rule as
     # security master (600000 -> 600000.SH), never left bare
     symbol = normalize_provider_symbol(bare, market or None)
-    kline_time = _to_int(first_present(row, "KLINE_TIME", "kline_time"))
+    kline_time = _to_kline_time(first_present(row, "KLINE_TIME", "kline_time"))
     if kline_time is None:
         raise MappingValidationError(f"{ctx}: required KLINE_TIME missing/unparsable")
     return DailyBarDTO(
@@ -216,6 +375,54 @@ def map_daily_bar_row(row: Any, *, kline_type: str = "DAY") -> DailyBarDTO:
         volume=_required_float(row, "VOLUME", "volume", context=ctx),
         amount=_required_float(row, "AMOUNT", "amount", context=ctx),
     )
+
+
+def map_daily_bar_member_row(row: Any, *, member_key_field: str) -> DailyBarDTO:
+    """Map one row from AmazingData's ``symbol -> DataFrame`` response.
+
+    The member key is the provider's explicit response identity.  It is
+    accepted only after suffix validation and is cross-checked against any
+    code already present in the row; request order and first-table selection
+    are never used.
+    """
+    member_key = _required(row, member_key_field, context="daily_bar member map")
+    member_symbol, member_code, member_market = validate_provider_symbol(
+        member_key, context="daily_bar member map"
+    )
+    adapted = dict(row)
+    if first_present(adapted, "MARKET_CODE", "market") is None:
+        adapted["MARKET_CODE"] = member_market
+    row_code = first_present(adapted, *_EXPLICIT_SECURITY_IDENTITY_FIELDS)
+    row_index = first_present(adapted, *_PROVIDER_INDEX_FIELDS)
+    row_market = first_present(adapted, "MARKET_CODE", "market")
+    has_row_identity = row_code is not None or (
+        row_market is not None and "." in str(row_market).strip()
+    )
+    if not has_row_identity and row_index is not None:
+        try:
+            _parse_security_identity(row_index, context="daily_bar member row")
+        except MappingValidationError:
+            pass
+        else:
+            has_row_identity = True
+    if has_row_identity:
+        row_symbol, row_bare, row_market_code = _security_master_identity(
+            adapted, context="daily_bar member row"
+        )
+        if row_symbol != member_symbol:
+            raise MappingValidationError(
+                "daily_bar member map: row security identity conflicts with "
+                f"member key {member_symbol!r}"
+            )
+        adapted["SECURITY_CODE"] = row_bare
+        adapted["MARKET_CODE"] = row_market_code
+    else:
+        if str(row_market) != member_market:
+            raise MappingValidationError(
+                f"daily_bar member map: row market conflicts with member key {member_symbol!r}"
+            )
+        adapted["SECURITY_CODE"] = member_code
+    return map_daily_bar_row(adapted)
 
 
 # ------------------------------------------------- status -> THREE domains

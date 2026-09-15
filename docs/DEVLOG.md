@@ -1,3 +1,25 @@
+## 2026-09-15 · Issue #59 CR-2 provider-native shape 适配与完整 2024-01 复核
+
+> 状态：**CR-2 ADAPTER VERIFIED / FULL 2024-01 CANONICAL BLOCKED / NO RECEIPT / NO MATERIALIZATION**
+
+- 从 PR #69 合并后的 `main@31b5fe478a6140839281c7877829f225277cae14` 继续，按 scheduler
+  comment `5681562056` 只关闭已观察的三个 provider shape，不添加通用 adapter framework。
+- 已实现并回归：`hist_code_list` scalar symbol、`stock_basic` 的真实 `MARKET_CODE` 后缀符号
+  identity + `LISTDATE`、`daily_bar` `symbol -> DataFrame|None` 全 member 映射；RawWriter 保留
+  非默认 pandas index，默认/重复合成 index 不被当作 provider identity；请求顺序、代码前缀和
+  take-first 均被拒绝。
+- 真实完整 2024-01 source-input：calendar `8,726`、hist `5,106`、stock-basic `5,105`、
+  daily-bar `112,075` 均完成 raw anchor 与 CR-2 `SUCCESS`（日线为 `packed_multi_table`）。
+- 最终代码版本对同一批 raw 的隔离重放中，Canonical run `958b02f2-e8c2-5815-be82-aa96ac6bf652`
+  仍 `BLOCKED / IDENTITY_MISSING`（22）：
+  唯一缺失 `300114.SZ` 的 stock-basic 单例诊断为 `OK + 0 rows`。因此这是 provider source
+  completeness blocker，不是账号、网络或 shape adapter blocker；不能伪造该证券 PIT identity。
+- 隔离单样本已验证 Canonical → Snapshot → ReadModel → `prepare_verified_projection()` 的连接性，
+  但完整 2024-01 尚未进入 Snapshot/ReadModel/projection、acquisition、receipt、coverage 或物化。
+- 详细脱敏结果见
+  [`cr7_cr2_provider_native_shape_adapter_20260915.md`](provider_verification/cr7_cr2_provider_native_shape_adapter_20260915.md)
+  及对应 JSON。PR/CI 前继续执行全量 QA；Stage B、78 月、Formal/Production 仍未授权。
+
 ## 2026-09-15 · Issue #59 合并后最小真实 source-input 探针
 
 > 状态：**STOP(BLOCKED) / RAW ANCHORED / CANONICAL BLOCKED / NO RECEIPT / NO MATERIALIZATION**

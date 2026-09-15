@@ -1,0 +1,140 @@
+{
+  "schema": "cr7.cr2_provider_native_shape_adapter_20260915.v1",
+  "status": "CR-2 ADAPTER VERIFIED / FULL_2024_01_CANONICAL_BLOCKED",
+  "authorization": {
+    "issue": 59,
+    "scheduler_comment": 5681562056,
+    "scope": "observed hist_code_list scalar-symbol, stock_basic identity+LISTDATE, daily_bar member-map only",
+    "generic_adapter_framework": "NOT_ADDED",
+    "stage_b": "NOT_AUTHORIZED_NOT_RUN",
+    "backfill_78_month": "NOT_AUTHORIZED_NOT_RUN",
+    "formal_b1_b7": "NOT_RUN",
+    "production_verdict": "NOT_RUN"
+  },
+  "source_control": {
+    "base_sha": "31b5fe478a6140839281c7877829f225277cae14",
+    "working_branch": "fix/cr2-provider-native-shapes-20260915"
+  },
+  "implementation": {
+    "raw_writer": "preserve non-default pandas index; do not add synthetic default index",
+    "stock_basic_identity_literal": "MARKET_CODE carrying a verified suffixed provider symbol",
+    "stock_basic_listing_date_literal": "LISTDATE",
+    "hist_code_list_mapper": "scalar provider symbol membership; no invented list_date",
+    "daily_bar_shape": "exact AmazingData symbol -> DataFrame|None member map",
+    "fail_closed": [
+      "unknown/bare/malformed provider symbols",
+      "identity or market conflicts",
+      "take-first member selection",
+      "None/empty member synthesis",
+      "request-order or code-prefix identity inference"
+    ]
+  },
+  "real_full_2024_01": {
+    "provider_mode": "SPIKE",
+    "calendar_window_trade_days": 22,
+    "hist_symbol_count": 5106,
+    "exchanges": [
+      {
+        "dataset": "trade_calendar",
+        "raw_row_count": 8726,
+        "normalization_status": "SUCCESS",
+        "normalized_count": 8726,
+        "quarantined_count": 0,
+        "raw_content_hash": "afc2d62522e009097858fcbc1bb71564e375b7ebfe689f706a486fec603917b3",
+        "raw_evidence_hash": "daaba92cffeb9036ecaae200c035eb0ddf1b95c1b6e650be5cc5dde5ea43b63f"
+      },
+      {
+        "dataset": "hist_code_list",
+        "raw_row_count": 5106,
+        "normalization_status": "SUCCESS",
+        "normalized_count": 5106,
+        "quarantined_count": 0,
+        "raw_content_hash": "58f051579b147754bee99159772be924e64b6cbc0b1eea140f0c87bdacb063de",
+        "raw_evidence_hash": "54069dff81bb30c8e7a6ec7e3b47860be50633e9191845b8318b98bafb98c2b1"
+      },
+      {
+        "dataset": "stock_basic",
+        "raw_row_count": 5105,
+        "normalization_status": "SUCCESS",
+        "normalized_count": 5105,
+        "quarantined_count": 0,
+        "raw_content_hash": "bd17367849eca01adc2ecc2e8687ff59ed6a472149e1305198cf2caf3d63d54e",
+        "raw_evidence_hash": "174a646f94e3f563030578ca75e2493f7dcb50ed4cabfb98b99d9ac97e8dff98"
+      },
+      {
+        "dataset": "daily_bar",
+        "raw_payload_kind": "packed_multi_table",
+        "raw_row_count": 112075,
+        "normalization_status": "SUCCESS",
+        "normalized_count": 112075,
+        "quarantined_count": 0,
+        "raw_content_hash": "fd67a552eaadac5ba7fa8975607c2229caa887792c668c9f4711101026e6b662",
+        "raw_evidence_hash": "2ad5a8f28ab443d697cde4554c448c8c839463637afaa9161eb0b71f2fd33a81"
+      }
+    ],
+    "missing_provider_symbol": "300114.SZ",
+    "missing_provider_symbol_sha256": "55ca285636ae20356fa5c2233d239fd2411048e56fe9b882e42cf5c694bcedf9",
+    "missing_singleton_status": "OK",
+    "missing_singleton_row_count": 0,
+    "canonical": {
+      "canonical_run_id": "958b02f2-e8c2-5815-be82-aa96ac6bf652",
+      "status": "BLOCKED",
+      "selected_count": 112053,
+      "finding_count": 1,
+      "blocking_finding": "IDENTITY_MISSING",
+      "blocking_count": 22
+    },
+    "final_code_replay": {
+      "normalization_runs": {
+        "trade_calendar": "c1111fb1-e84d-5fe2-9e62-68bebb046846",
+        "hist_code_list": "f6969f86-0ba3-5686-978f-4c6116060706",
+        "stock_basic": "784e4ff2-5e71-5759-8247-e71558477415",
+        "daily_bar": "d75c61ea-f2fd-5463-9f13-557d228d08e0"
+      },
+      "all_normalization_status": "SUCCESS",
+      "canonical_status": "BLOCKED",
+      "canonical_reason": "IDENTITY_MISSING count=22"
+    }
+  },
+  "small_downstream_shape_replay": {
+    "scope": "one real symbol and one real trading day",
+    "canonical_run_id": "75acd055-1a15-57e0-975b-169743226425",
+    "canonical_status": "SUCCESS",
+    "snapshot_id": "f8015068-c874-52a6-9a3c-77edafe9c111",
+    "snapshot_status": "SUCCESS",
+    "readmodel_status": "VERIFIED",
+    "projection_row_count": 1,
+    "identity_record_count": 1,
+    "authority": "shape/connectivity evidence only; not full 2024-01 acceptance"
+  },
+  "downstream_after_full_block": {
+    "snapshot": "NOT_ENTERED_CANONICAL_NOT_SUCCESS",
+    "readmodel": "NOT_ENTERED",
+    "verified_research_projection": "NOT_CREATED",
+    "acquisition_receipt": "NOT_ISSUED",
+    "coverage_basis": "NOT_ENTERED",
+    "materialization": "NOT_ENTERED",
+    "ordinary_reader": "NOT_STARTED",
+    "idempotency_proof": "NOT_STARTED"
+  },
+  "qa": {
+    "focused_tests": "PASS",
+    "full_pytest": "PASS_EXIT_CODE_0",
+    "ruff_format": "PASS",
+    "ruff_check": "PASS",
+    "mypy": "PASS",
+    "compileall": "PASS",
+    "uv_pip_check": "PASS",
+    "json_parse": "PASS",
+    "diff_check": "PASS",
+    "tracked_secret_value_matches": 0
+  },
+  "next_minimum_action": "resolve the single provider-empty stock_basic identity for 300114.SZ or formally revise the 2024-01 universe contract, then rerun the existing full path",
+  "sanitization": {
+    "credentials_committed": false,
+    "private_endpoints_committed": false,
+    "raw_payloads_committed": false,
+    "sdk_runtime_committed": false,
+    "local_capture_root_gitignored": true
+  }
+}
