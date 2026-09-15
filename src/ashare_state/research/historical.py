@@ -71,7 +71,6 @@ __all__ = [
     "AmazingDataAcquisitionReceipt",
     "AmazingDataExchangeReceipt",
     "AuthoritativeCoverageEvidence",
-    "AuthoritativeSourceSelection",
     "CoverageBasisDescriptor",
     "CoverageBasisError",
     "CoverageEvaluation",
@@ -105,7 +104,7 @@ HISTORICAL_MATERIALIZATION_CONTRACT_VERSION = "cr7-history-materialization-v1"
 HISTORICAL_DATASET = RESEARCH_SECURITY_DAILY_DATASET
 TARGET_WINDOW_START = date(2020, 1, 1)
 TARGET_WINDOW_END = date(2026, 6, 30)
-COVERAGE_BASIS_VERSION = "coverage-basis-v1"
+COVERAGE_BASIS_VERSION = "coverage-basis-v2"
 COMPLETE_OBSERVED_DAILY_BAR_SCOPE = "COMPLETE_OBSERVED_DAILY_BAR_SCOPE"
 PARTIAL_OBSERVED_DAILY_BAR_SCOPE = "PARTIAL_OBSERVED_DAILY_BAR_SCOPE"
 COVERAGE_POLICY_VERSION = "coverage-basis-v1"
@@ -113,20 +112,17 @@ PARTITION_POLICY_VERSION = "monthly-route-v1"
 WRITER_CONFIGURATION_VERSION = "cr7-writer-v1"
 OFFLINE_FIXTURE_COMPLETE_METHOD = "OFFLINE_FIXTURE_COMPLETE_SCOPE_V1"
 OFFLINE_FIXTURE_PARTIAL_METHOD = "OFFLINE_FIXTURE_PARTIAL_SCOPE_V1"
-AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION = "authoritative-coverage-evidence-v1"
+AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION = "authoritative-coverage-evidence-v2"
 AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD = "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1"
-AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "AMAZINGDATA_ACQUISITION_RECEIPT_V3"
-AUTHORITATIVE_SOURCE_SELECTION_VERSION = "source-selection-retrieval-closure-20260912"
-AUTHORITATIVE_SOURCE_CLASS = "amazingdata_provider_observation"
+AUTHORITATIVE_UPSTREAM_STATEMENT_KIND = "AMAZINGDATA_ACQUISITION_RECEIPT_V4"
 AUTHORITATIVE_PROVIDER = "amazingdata"
-AUTHORITATIVE_RETRIEVAL_SURFACE = "history_acquisition"
 AUTHORITATIVE_SOURCE_METHODS = (
     "BaseData.get_hist_code_list",
     "BaseData.get_calendar",
     "InfoData.get_history_stock_status",
     "MarketData.query_kline",
 )
-AMAZINGDATA_ACQUISITION_RECEIPT_VERSION = "amazingdata-history-acquisition-receipt-v3"
+AMAZINGDATA_ACQUISITION_RECEIPT_VERSION = "amazingdata-history-acquisition-receipt-v4"
 AMAZINGDATA_SECURITY_UNIVERSE_SELECTION = "EXTRA_STOCK_A_SH_SZ"
 AMAZINGDATA_CALENDAR_MARKET = "SH"
 
@@ -223,7 +219,6 @@ _BASIS_FIELDS = (
     "source_domain",
     "claimed_scope_start",
     "claimed_scope_end",
-    "source_selection_fingerprint",
     "completeness_method",
     "completeness_claim",
     "coverage_basis_artifact_uri",
@@ -242,10 +237,8 @@ _AUTHORITATIVE_EVIDENCE_FIELDS = (
     "source_domain",
     "claimed_scope_start",
     "claimed_scope_end",
-    "source_selection_fingerprint",
     "completeness_method",
     "completeness_claim",
-    "source_selection",
     "acquisition_receipt",
     "upstream_source",
     "upstream_statement_kind",
@@ -358,136 +351,6 @@ def _coverage_rank(state: CoverageState) -> int:
         CoverageState.PARTIAL_OBSERVED_DAILY_BAR_COVERAGE: 1,
         CoverageState.UNRESOLVED_NOT_FOR_RESEARCH: 2,
     }[state]
-
-
-@dataclass(frozen=True)
-class AuthoritativeSourceSelection:
-    """The reviewed source-selection binding for the CR-7 evidence path.
-
-    A source-selection fingerprint is not an arbitrary caller label.  It is
-    the hash of this exact, intentionally narrow binding.  The binding is
-    still only a routing identity: it does not turn a provider response into
-    completeness evidence without the typed acquisition receipt below.
-    """
-
-    selection_version: str
-    source_class: str
-    provider: str
-    retrieval_surface: str
-    methods: tuple[str, ...]
-    source_domain: str
-    selection_fingerprint: str
-
-    def __post_init__(self) -> None:
-        try:
-            for field_name in (
-                "selection_version",
-                "source_class",
-                "provider",
-                "retrieval_surface",
-                "source_domain",
-            ):
-                _require_non_empty_string(getattr(self, field_name), field_name)
-            if not self.methods or any(
-                not isinstance(method, str) or not method.strip() for method in self.methods
-            ):
-                raise CoverageBasisError("authoritative source-selection methods are malformed")
-            if len(self.methods) != len(set(self.methods)):
-                raise CoverageBasisError("authoritative source-selection methods are duplicated")
-            fingerprint = _require_sha256(
-                self.selection_fingerprint, "source_selection_fingerprint"
-            )
-        except HistoricalMaterializationError as exc:
-            raise CoverageBasisError(str(exc)) from exc
-        if self.source_domain != "daily_bar":
-            raise CoverageBasisError("authoritative source-selection domain must be daily_bar")
-        expected_binding = {
-            "selection_version": AUTHORITATIVE_SOURCE_SELECTION_VERSION,
-            "source_class": AUTHORITATIVE_SOURCE_CLASS,
-            "provider": AUTHORITATIVE_PROVIDER,
-            "retrieval_surface": AUTHORITATIVE_RETRIEVAL_SURFACE,
-            "methods": list(AUTHORITATIVE_SOURCE_METHODS),
-            "source_domain": "daily_bar",
-        }
-        if self.as_dict(include_fingerprint=False) != expected_binding:
-            raise CoverageBasisError(
-                "authoritative source-selection binding is not the reviewed "
-                "AmazingData history path"
-            )
-        if fingerprint != sha256_hex(canonical_json(expected_binding)):
-            raise CoverageBasisError("source_selection_fingerprint does not match its binding")
-
-    @classmethod
-    def reviewed_amazingdata_history(cls) -> AuthoritativeSourceSelection:
-        """Return the only source-selection binding accepted by this adapter."""
-        binding: dict[str, Any] = {
-            "selection_version": AUTHORITATIVE_SOURCE_SELECTION_VERSION,
-            "source_class": AUTHORITATIVE_SOURCE_CLASS,
-            "provider": AUTHORITATIVE_PROVIDER,
-            "retrieval_surface": AUTHORITATIVE_RETRIEVAL_SURFACE,
-            "methods": list(AUTHORITATIVE_SOURCE_METHODS),
-            "source_domain": "daily_bar",
-        }
-        return cls(
-            selection_version=binding["selection_version"],
-            source_class=binding["source_class"],
-            provider=binding["provider"],
-            retrieval_surface=binding["retrieval_surface"],
-            methods=tuple(binding["methods"]),
-            source_domain=binding["source_domain"],
-            selection_fingerprint=sha256_hex(canonical_json(binding)),
-        )
-
-    @classmethod
-    def from_mapping(cls, payload: Mapping[str, Any]) -> AuthoritativeSourceSelection:
-        fields = {
-            "selection_version",
-            "source_class",
-            "provider",
-            "retrieval_surface",
-            "methods",
-            "source_domain",
-            "selection_fingerprint",
-        }
-        if not isinstance(payload, Mapping) or set(payload) != fields:
-            raise CoverageBasisError("authoritative source-selection fields are not exact")
-        methods = payload["methods"]
-        if not isinstance(methods, list):
-            raise CoverageBasisError("authoritative source-selection methods must be a list")
-        try:
-            return cls(
-                selection_version=_require_non_empty_string(
-                    payload["selection_version"], "selection_version"
-                ),
-                source_class=_require_non_empty_string(payload["source_class"], "source_class"),
-                provider=_require_non_empty_string(payload["provider"], "provider"),
-                retrieval_surface=_require_non_empty_string(
-                    payload["retrieval_surface"], "retrieval_surface"
-                ),
-                methods=tuple(
-                    _require_non_empty_string(method, "source-selection method")
-                    for method in methods
-                ),
-                source_domain=_require_non_empty_string(payload["source_domain"], "source_domain"),
-                selection_fingerprint=_require_sha256(
-                    payload["selection_fingerprint"], "selection_fingerprint"
-                ),
-            )
-        except HistoricalMaterializationError as exc:
-            raise CoverageBasisError(str(exc)) from exc
-
-    def as_dict(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "selection_version": self.selection_version,
-            "source_class": self.source_class,
-            "provider": self.provider,
-            "retrieval_surface": self.retrieval_surface,
-            "methods": list(self.methods),
-            "source_domain": self.source_domain,
-        }
-        if include_fingerprint:
-            payload["selection_fingerprint"] = self.selection_fingerprint
-        return payload
 
 
 @dataclass(frozen=True)
@@ -644,7 +507,6 @@ class PositiveTradeFallbackOperation:
 
 def _amazingdata_capture_catalog(
     *,
-    source_selection_fingerprint: str,
     source_snapshot_id: str,
     source_snapshot_manifest_hash: str,
     source_snapshot_semantic_hash: str,
@@ -659,7 +521,6 @@ def _amazingdata_capture_catalog(
     """Return the deterministic catalog identity used as the receipt proof."""
     return {
         "receipt_version": AMAZINGDATA_ACQUISITION_RECEIPT_VERSION,
-        "source_selection_fingerprint": source_selection_fingerprint,
         "source_snapshot_id": source_snapshot_id,
         "source_snapshot_manifest_hash": source_snapshot_manifest_hash,
         "source_snapshot_semantic_hash": source_snapshot_semantic_hash,
@@ -687,7 +548,6 @@ class AmazingDataAcquisitionReceipt:
 
     receipt_id: str
     receipt_version: str
-    source_selection: AuthoritativeSourceSelection
     source_snapshot_id: str
     source_snapshot_manifest_hash: str
     source_snapshot_semantic_hash: str
@@ -729,7 +589,6 @@ class AmazingDataAcquisitionReceipt:
     def capture_catalog(self) -> dict[str, Any]:
         """Return the canonical catalog whose hash identifies this receipt."""
         return _amazingdata_capture_catalog(
-            source_selection_fingerprint=self.source_selection.selection_fingerprint,
             source_snapshot_id=self.source_snapshot_id,
             source_snapshot_manifest_hash=self.source_snapshot_manifest_hash,
             source_snapshot_semantic_hash=self.source_snapshot_semantic_hash,
@@ -855,7 +714,6 @@ class AmazingDataAcquisitionReceipt:
         fields = {
             "receipt_id",
             "receipt_version",
-            "source_selection",
             "source_snapshot_id",
             "source_snapshot_manifest_hash",
             "source_snapshot_semantic_hash",
@@ -911,9 +769,6 @@ class AmazingDataAcquisitionReceipt:
                 "receipt_id": _require_non_empty_string(payload["receipt_id"], "receipt_id"),
                 "receipt_version": _require_non_empty_string(
                     payload["receipt_version"], "receipt_version"
-                ),
-                "source_selection": AuthoritativeSourceSelection.from_mapping(
-                    payload["source_selection"]
                 ),
                 "source_snapshot_id": _require_non_empty_string(
                     payload["source_snapshot_id"], "source_snapshot_id"
@@ -1034,10 +889,6 @@ class AmazingDataAcquisitionReceipt:
             raise CoverageBasisError(str(exc)) from exc
         if self.receipt_version != AMAZINGDATA_ACQUISITION_RECEIPT_VERSION:
             raise CoverageBasisError("unknown AmazingData acquisition receipt version")
-        if self.source_selection != AuthoritativeSourceSelection.reviewed_amazingdata_history():
-            raise CoverageBasisError(
-                "receipt source selection is not the reviewed AmazingData path"
-            )
         if self.security_universe_selection != AMAZINGDATA_SECURITY_UNIVERSE_SELECTION:
             raise CoverageBasisError("receipt security universe selection is not reviewed")
         if self.calendar_market != AMAZINGDATA_CALENDAR_MARKET:
@@ -1219,7 +1070,6 @@ class AmazingDataAcquisitionReceipt:
         payload: dict[str, Any] = {
             "receipt_id": self.receipt_id,
             "receipt_version": self.receipt_version,
-            "source_selection": self.source_selection.as_dict(),
             "source_snapshot_id": self.source_snapshot_id,
             "source_snapshot_manifest_hash": self.source_snapshot_manifest_hash,
             "source_snapshot_semantic_hash": self.source_snapshot_semantic_hash,
@@ -1549,7 +1399,6 @@ def _issue_amazingdata_acquisition_receipt(
     """Issue one receipt from the already validated provider operation path."""
     if not isinstance(source_snapshot, VerifiedResearchProjection):
         raise CoverageBasisError("receipt issuer needs a verified source snapshot")
-    selection = AuthoritativeSourceSelection.reviewed_amazingdata_history()
     ordered_operations = tuple(
         next((operation for operation in operations if operation.method == method), None)
         for method in AUTHORITATIVE_SOURCE_METHODS
@@ -1560,7 +1409,6 @@ def _issue_amazingdata_acquisition_receipt(
         operation for operation in ordered_operations if operation is not None
     )
     capture_catalog = _amazingdata_capture_catalog(
-        source_selection_fingerprint=selection.selection_fingerprint,
         source_snapshot_id=source_snapshot.source_snapshot_id,
         source_snapshot_manifest_hash=source_snapshot.source_snapshot_manifest_hash,
         source_snapshot_semantic_hash=source_snapshot.source_snapshot_semantic_hash,
@@ -1577,7 +1425,6 @@ def _issue_amazingdata_acquisition_receipt(
     base: dict[str, Any] = {
         "receipt_id": receipt_id,
         "receipt_version": AMAZINGDATA_ACQUISITION_RECEIPT_VERSION,
-        "source_selection": selection,
         "source_snapshot_id": source_snapshot.source_snapshot_id,
         "source_snapshot_manifest_hash": source_snapshot.source_snapshot_manifest_hash,
         "source_snapshot_semantic_hash": source_snapshot.source_snapshot_semantic_hash,
@@ -1615,7 +1462,6 @@ def _issue_amazingdata_acquisition_receipt(
         "completeness_statement_id": f"amazingdata-complete-{capture_hash[:32]}",
     }
     serialized_base = base | {
-        "source_selection": selection.as_dict(),
         "operations": [operation.as_dict() for operation in normalized_operations],
         "semantic_operations": [operation.as_dict() for operation in semantic_operations],
         "positive_trade_fallback_version": AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION,
@@ -1625,7 +1471,7 @@ def _issue_amazingdata_acquisition_receipt(
         "completeness_evaluation": completeness_evaluation.as_dict(),
     }
     base["receipt_hash"] = sha256_hex(canonical_json(serialized_base))
-    return AmazingDataAcquisitionReceipt(**(base | {"source_selection": selection}))
+    return AmazingDataAcquisitionReceipt(**base)
 
 
 @dataclass(frozen=True)
@@ -1650,10 +1496,8 @@ class AuthoritativeCoverageEvidence:
     source_domain: str
     claimed_scope_start: date
     claimed_scope_end: date
-    source_selection_fingerprint: str
     completeness_method: str
     completeness_claim: str
-    source_selection: AuthoritativeSourceSelection
     acquisition_receipt: AmazingDataAcquisitionReceipt
     upstream_source: str
     upstream_statement_kind: str
@@ -1681,7 +1525,6 @@ class AuthoritativeCoverageEvidence:
                 "coverage_basis_id",
                 "source_snapshot_id",
                 "source_domain",
-                "source_selection_fingerprint",
                 "completeness_method",
                 "completeness_claim",
                 "upstream_source",
@@ -1693,7 +1536,6 @@ class AuthoritativeCoverageEvidence:
             ):
                 _require_non_empty_string(getattr(self, field_name), field_name)
             _require_sha256(self.source_snapshot_manifest_hash, "source_snapshot_manifest_hash")
-            _require_sha256(self.source_selection_fingerprint, "source_selection_fingerprint")
             _require_sha256(self.upstream_statement_hash, "upstream_statement_hash")
             _require_sha256(self.upstream_inventory_hash, "upstream_inventory_hash")
             _require_sha256(self.coverage_basis_evidence_hash, "coverage_basis_evidence_hash")
@@ -1716,21 +1558,11 @@ class AuthoritativeCoverageEvidence:
             raise CoverageBasisError("authoritative coverage evidence names an unreviewed provider")
         if self.upstream_statement_kind != AUTHORITATIVE_UPSTREAM_STATEMENT_KIND:
             raise CoverageBasisError("authoritative inventory/range statement kind is missing")
-        if not isinstance(self.source_selection, AuthoritativeSourceSelection):
-            raise CoverageBasisError(
-                "authoritative coverage evidence needs a typed source selection"
-            )
         if not isinstance(self.acquisition_receipt, AmazingDataAcquisitionReceipt):
             raise CoverageBasisError(
                 "authoritative coverage evidence needs an AmazingData acquisition receipt"
             )
-        if self.source_selection_fingerprint != self.source_selection.selection_fingerprint:
-            raise CoverageBasisError(
-                "source-selection fingerprint does not match the typed binding"
-            )
         receipt = self.acquisition_receipt
-        if receipt.source_selection != self.source_selection:
-            raise CoverageBasisError("authoritative evidence receipt source-selection changed")
         if (
             receipt.requested_scope_start != self.claimed_scope_start
             or receipt.requested_scope_end != self.claimed_scope_end
@@ -1740,7 +1572,6 @@ class AuthoritativeCoverageEvidence:
             self.source_snapshot_id != receipt.source_snapshot_id
             or self.source_snapshot_manifest_hash != receipt.source_snapshot_manifest_hash
             or self.source_snapshot_as_of != receipt.source_snapshot_as_of
-            or self.source_selection_fingerprint != receipt.source_selection.selection_fingerprint
             or self.upstream_statement_id != receipt.completeness_statement_id
             or self.upstream_statement_locator != receipt.source_capture_uri
             or self.upstream_statement_hash != receipt.receipt_hash
@@ -1830,7 +1661,6 @@ class AuthoritativeCoverageEvidence:
                     "coverage_basis_id",
                     "source_snapshot_id",
                     "source_domain",
-                    "source_selection_fingerprint",
                     "completeness_method",
                     "completeness_claim",
                     "upstream_source",
@@ -1859,14 +1689,12 @@ class AuthoritativeCoverageEvidence:
                     "pit_as_of",
                 )
             }
-            selection = AuthoritativeSourceSelection.from_mapping(payload["source_selection"])
             acquisition_receipt = AmazingDataAcquisitionReceipt.from_mapping(
                 payload["acquisition_receipt"]
             )
             snapshot_hash = _require_sha256(
                 payload["source_snapshot_manifest_hash"], "source_snapshot_manifest_hash"
             )
-            _require_sha256(parsed["source_selection_fingerprint"], "source_selection_fingerprint")
             statement_hash = _require_sha256(
                 payload["upstream_statement_hash"], "upstream_statement_hash"
             )
@@ -1886,10 +1714,8 @@ class AuthoritativeCoverageEvidence:
             source_domain=parsed["source_domain"],
             claimed_scope_start=dates["claimed_scope_start"],
             claimed_scope_end=dates["claimed_scope_end"],
-            source_selection_fingerprint=parsed["source_selection_fingerprint"],
             completeness_method=parsed["completeness_method"],
             completeness_claim=parsed["completeness_claim"],
-            source_selection=selection,
             acquisition_receipt=acquisition_receipt,
             upstream_source=parsed["upstream_source"],
             upstream_statement_kind=parsed["upstream_statement_kind"],
@@ -1921,10 +1747,8 @@ class AuthoritativeCoverageEvidence:
             "source_domain": self.source_domain,
             "claimed_scope_start": self.claimed_scope_start,
             "claimed_scope_end": self.claimed_scope_end,
-            "source_selection_fingerprint": self.source_selection_fingerprint,
             "completeness_method": self.completeness_method,
             "completeness_claim": self.completeness_claim,
-            "source_selection": self.source_selection.as_dict(),
             "acquisition_receipt": self.acquisition_receipt.as_dict(),
             "upstream_source": self.upstream_source,
             "upstream_statement_kind": self.upstream_statement_kind,
@@ -1982,10 +1806,8 @@ def build_authoritative_coverage_evidence_from_acquisition(
         "source_domain": "daily_bar",
         "claimed_scope_start": partition.scope_start,
         "claimed_scope_end": partition.scope_end,
-        "source_selection_fingerprint": acquisition_receipt.source_selection.selection_fingerprint,
         "completeness_method": AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
         "completeness_claim": COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
-        "source_selection": acquisition_receipt.source_selection.as_dict(),
         "acquisition_receipt": acquisition_receipt.as_dict(),
         "upstream_source": AUTHORITATIVE_PROVIDER,
         "upstream_statement_kind": AUTHORITATIVE_UPSTREAM_STATEMENT_KIND,
@@ -2014,10 +1836,8 @@ def build_authoritative_coverage_evidence_from_acquisition(
         source_domain="daily_bar",
         claimed_scope_start=partition.scope_start,
         claimed_scope_end=partition.scope_end,
-        source_selection_fingerprint=acquisition_receipt.source_selection.selection_fingerprint,
         completeness_method=AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
         completeness_claim=COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
-        source_selection=acquisition_receipt.source_selection,
         acquisition_receipt=acquisition_receipt,
         upstream_source=AUTHORITATIVE_PROVIDER,
         upstream_statement_kind=AUTHORITATIVE_UPSTREAM_STATEMENT_KIND,
@@ -2119,7 +1939,6 @@ class CoverageBasisDescriptor:
     source_domain: str
     claimed_scope_start: date
     claimed_scope_end: date
-    source_selection_fingerprint: str
     completeness_method: str
     completeness_claim: str
     coverage_basis_artifact_uri: str
@@ -2136,7 +1955,6 @@ class CoverageBasisDescriptor:
             "coverage_basis_version",
             "source_snapshot_id",
             "source_domain",
-            "source_selection_fingerprint",
             "completeness_method",
             "completeness_claim",
             "coverage_basis_artifact_uri",
@@ -2184,7 +2002,6 @@ class CoverageBasisDescriptor:
                 or evidence.source_domain != self.source_domain
                 or evidence.claimed_scope_start != self.claimed_scope_start
                 or evidence.claimed_scope_end != self.claimed_scope_end
-                or evidence.source_selection_fingerprint != self.source_selection_fingerprint
                 or evidence.completeness_method != self.completeness_method
                 or evidence.completeness_claim != self.completeness_claim
             ):
@@ -2240,7 +2057,6 @@ class CoverageBasisDescriptor:
             "source_snapshot_id",
             "source_snapshot_manifest_hash",
             "source_domain",
-            "source_selection_fingerprint",
             "completeness_method",
             "completeness_claim",
             "coverage_basis_artifact_uri",
@@ -2322,7 +2138,6 @@ class CoverageBasisDescriptor:
             "source_domain": values["source_domain"],
             "claimed_scope_start": scope_start,
             "claimed_scope_end": scope_end,
-            "source_selection_fingerprint": values["source_selection_fingerprint"],
             "completeness_method": values["completeness_method"],
             "completeness_claim": values["completeness_claim"],
             "coverage_basis_artifact_uri": uri,
@@ -2374,7 +2189,6 @@ class CoverageBasisDescriptor:
             "source_domain": self.source_domain,
             "claimed_scope_start": self.claimed_scope_start.isoformat(),
             "claimed_scope_end": self.claimed_scope_end.isoformat(),
-            "source_selection_fingerprint": self.source_selection_fingerprint,
             "completeness_method": self.completeness_method,
             "completeness_claim": self.completeness_claim,
             "coverage_basis_artifact_uri": self.coverage_basis_artifact_uri,
@@ -2389,7 +2203,6 @@ def build_fixture_coverage_basis_descriptor(
     *,
     source_snapshot_id: str,
     source_snapshot_manifest_hash: str,
-    source_selection_fingerprint: str,
     coverage_basis_id: str | None = None,
     partial: bool = False,
 ) -> CoverageBasisDescriptor:
@@ -2411,7 +2224,6 @@ def build_fixture_coverage_basis_descriptor(
         "source_domain": "daily_bar",
         "claimed_scope_start": partition.scope_start,
         "claimed_scope_end": partition.scope_end,
-        "source_selection_fingerprint": source_selection_fingerprint,
         "completeness_method": method,
         "completeness_claim": claim,
         "coverage_basis_artifact_uri": (

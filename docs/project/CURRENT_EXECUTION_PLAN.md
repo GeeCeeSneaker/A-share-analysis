@@ -34,7 +34,7 @@
 
 PR #64 已通过项目经理 exact-head 审阅并合并：
 
-- merge commit / 当前 clean main：`41403d3a0083609f1b7ab110d4c03b4ff0093933`
+- merge commit / 当前 clean main：`ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`
 - Issue #55：已完成并关闭；Issue #66：当前唯一开放 P0
 
 当前主线已经具备：
@@ -58,12 +58,28 @@ authoritative receipt 或 78 月物化授权。
 
 ### 3.1 Issue #66 当前 P0：先做最小化，再回到权威取数闸门
 
-Issue #66 的基线是当前 clean `main@41403d3a0083609f1b7ab110d4c03b4ff0093933`。目标是
+Issue #66 的基线是当前 clean `main@ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`。目标是
 在重新推进 Stage B 之前，删除 CR-7 热路径中只为防御“同进程恶意调用者”而存在的包装和重复校验，
 同时保留工程上真正有用的边界：请求 scope、schema/partial/missing fail-closed、语义完整性、
 原始文件 hash/replay、PIT，以及物化的 atomic/idempotent 行为。
 
-当前实现分支 `feat/issue66-minimalism-20260914` 已完成：
+当前实现分支 `feat/issue66-minimalism-20260914` 已完成本地整改，正在提交以取得新 exact head 的
+required CI；整改对应 scheduler 对旧 exact head
+`12adbb3e5310f6f75d775afd569a745a7533f9cc` 的 `REMEDIATE / KEEP DRAFT / DO NOT MERGE`
+意见（PR #67 review `5205558820`，Issue #66 comment `5674829261`）。四项整改为：
+
+- RawWriter 对 2024-01 已确认的“大量正常 DataFrame + 零行零列空 DataFrame + 显式
+  `None`”状态响应维持 request 级 O(1) 物理文件数；成员 inventory 保留每个成员的原始列形态，
+  空表恢复为 `(0, 0)`，`None` 不与空表混淆；
+- packed 读取只做一次有界 `partition_by` 分组扫描，再按 inventory 重建成员；基准同时记录读取/重建
+  耗时，不把写入收益冒充完整下游收益；
+- 删除运行时 `AuthoritativeSourceSelection` / `selection_fingerprint` 固定策略包装，保留
+  receipt 的直接 provider、source method、scope、PIT 和 completeness 字段；历史设计/审阅归档中
+  的旧文字不属于当前运行时契约；
+- `PositiveTradeFallback.request_params_by_pair` 保持 `Mapping` 运行时语义，构造后冻结为只读映射，
+  不再把 tuple 伪装成 Mapping。
+
+上述整改之外，原 Issue #66 最小化实现保持不变：
 
 - 大型同构 provider map（至少 128 个成员）按 request 级单个 Parquet 打包，meta 记录成员及
   `None`/空表信息；小型或异构 map 保持原有布局；
@@ -90,15 +106,16 @@ Issue #66 的基线是当前 clean `main@41403d3a0083609f1b7ab110d4c03b4ff009393
 BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。原始 provider 数据、凭证、私有 endpoint、
 专有 SDK/runtime 仍只在本地受控目录存在。
 
-Issue #66 的剩余验收是：完成独立 delta review，复核 P0-1 至 P0-4 的边界回归、
-代码净删除和真实可复核的 before/after 记录，确认 `2024-01` 既有 Stage-A 结果不被破坏，然后
-保持 Draft PR 等独立审阅。本地 full QA 已完成：`1831 passed, 4 skipped`；exact-head CI #614
-的 Ubuntu 3.14、Windows 3.12、Windows 3.14 required jobs 全部成功，受控 GT-H3B #133 skipped。
-当前没有真实 provider
-payload，因而 snapshot/readmodel/publish 的端到端吞吐、峰值内存和真实文件收益仍未测量，已在
-基准文档中明确列为后续授权任务。通过后由
-scheduler 决定是否恢复 Issue #59 的最小 `2024-01` authoritative acquisition/materializer proof；
-不得由开发者自行进入 Stage B。
+Issue #66 的整改验收是：精确 rebase 到 `main@ad25f7f`、完成 P0-1 至 P0-4 的边界回归、
+代码净删除和可复核 before/after 记录，确认 `2024-01` 既有 Stage-A 结果不被破坏，然后保持
+Draft PR 等 scheduler 独立复审。本轮基准为 5,002 个逻辑成员：legacy 5,001 个 Parquet、
+packed 1 个 Parquet；物理字节 `7,174,641 -> 84,344`，持久化 `45,911.01 -> 3,609.53 ms`，
+closure `44,985.21 -> 53.97 ms`，读取/重建 `14,919.95 -> 3,032.02 ms`。本轮没有真实
+provider payload，因而 snapshot/readmodel/publish 的端到端吞吐、峰值内存和真实文件收益仍未
+测量，已列为后续授权任务。本地收集 1,839 项，`uv run pytest -q` 退出码为 0（1,835 passed、
+4 个既有环境条件 skip）；Ruff、format、mypy、compileall、`uv pip check` 和 diff check 均通过。
+新 exact-head 的 required CI 尚未取得，仍由 scheduler 决定是否恢复 Issue #59 的最小
+`2024-01` authoritative acquisition/materializer proof；不得由开发者自行进入 Stage B。
 
 ## 4. 历史执行记录：Issue #59（已由 Issue #66 接管）
 
@@ -413,5 +430,5 @@ Issue #66 **不授权**：
 
 **Current task**：Issue #66
 
-**Required ancestor**：PR #64 merge / clean `main@41403d3a0083609f1b7ab110d4c03b4ff0093933`；
-实际开发 base 必须记录 exact SHA，完成后保持 Draft PR，等待独立审阅。
+**Required ancestor**：当前 clean `main@ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`；实际开发
+base 必须记录 exact SHA，完成后保持 Draft PR，等待 scheduler 对整改 exact head 的独立复审。

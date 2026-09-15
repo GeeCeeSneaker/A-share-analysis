@@ -211,7 +211,6 @@ def _january_basis() -> Any:
         PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1),
         source_snapshot_id=SNAPSHOT_ID,
         source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
-        source_selection_fingerprint="selection-fixture-v1",
     )
 
 
@@ -227,7 +226,6 @@ def _full_window_fixture_bases(*, partial: bool = False) -> tuple[CoverageBasisD
             partition,
             source_snapshot_id=SNAPSHOT_ID,
             source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
-            source_selection_fingerprint=f"selection-{partition.logical_key}",
             partial=partial,
         )
         for partition in expected_partition_keys()
@@ -610,13 +608,11 @@ def test_mixed_complete_partial_basis_is_order_independent(tmp_path: Path) -> No
         PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1),
         source_snapshot_id=SNAPSHOT_ID,
         source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
-        source_selection_fingerprint="selection-complete",
     )
     partial = build_fixture_coverage_basis_descriptor(
         PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 2),
         source_snapshot_id=SNAPSHOT_ID,
         source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
-        source_selection_fingerprint="selection-partial",
         partial=True,
     )
     materializer = OfflineHistoricalMaterializer(
@@ -699,18 +695,20 @@ def test_authoritative_materializer_requires_the_retained_capture_root(tmp_path:
         materializer.plan(_fixture_projection(), coverage_bases=(descriptor,))
 
 
-def test_authoritative_evidence_rejects_wrong_selection_scope_and_pit(tmp_path: Path) -> None:
+def test_authoritative_evidence_rejects_stale_selection_fields_and_wrong_scope(
+    tmp_path: Path,
+) -> None:
     partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
     evidence = _authoritative_evidence(partition, tmp_path)
 
-    wrong_selection = evidence.as_dict(include_artifact_hash=False)
-    wrong_selection["source_selection_fingerprint"] = "0" * 64
-    wrong_selection_bytes = canonical_json(wrong_selection).encode()
-    with pytest.raises(CoverageBasisError, match="typed binding"):
+    stale_selection = evidence.as_dict(include_artifact_hash=False)
+    stale_selection["source_selection_fingerprint"] = "0" * 64
+    stale_selection_bytes = canonical_json(stale_selection).encode()
+    with pytest.raises(CoverageBasisError, match="fields are not exact"):
         AuthoritativeCoverageEvidence.from_mapping(
-            wrong_selection,
-            artifact_bytes=wrong_selection_bytes,
-            artifact_hash=sha256_hex(wrong_selection_bytes),
+            stale_selection,
+            artifact_bytes=stale_selection_bytes,
+            artifact_hash=sha256_hex(stale_selection_bytes),
         )
 
     wrong_scope = evidence.as_dict(include_artifact_hash=False)
@@ -745,7 +743,6 @@ def test_authoritative_evidence_rejects_tampered_bytes_and_downgrade(tmp_path: P
         partition,
         source_snapshot_id=SNAPSHOT_ID,
         source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
-        source_selection_fingerprint="selection-fixture-v1",
         partial=True,
     )
     escalated = partial.as_dict()
@@ -810,6 +807,24 @@ def test_acquisition_persists_and_replays_the_raw_capture_chain(tmp_path: Path) 
         replayed.verify_retained_capture(raw_root)
 
 
+def test_fixed_amazingdata_policy_uses_direct_receipt_fields() -> None:
+    import ashare_state.research.historical as historical
+
+    assert not hasattr(historical, "AuthoritativeSourceSelection")
+    assert (
+        "source_selection_fingerprint"
+        not in historical.AmazingDataAcquisitionReceipt.__annotations__
+    )
+    assert "source_selection" not in historical.AmazingDataAcquisitionReceipt.__annotations__
+    assert (
+        "source_selection_fingerprint"
+        not in historical.AuthoritativeCoverageEvidence.__annotations__
+    )
+    assert "source_selection" not in historical.AuthoritativeCoverageEvidence.__annotations__
+    assert "source_selection_fingerprint" not in historical.CoverageBasisDescriptor.__annotations__
+    assert "source_selection" not in historical.CoverageBasisDescriptor.__annotations__
+
+
 def test_positive_trade_fallback_is_retained_and_replayed(tmp_path: Path) -> None:
     raw_root = tmp_path / "raw"
     receipt = _acquisition_receipt(
@@ -834,8 +849,16 @@ def test_positive_trade_fallback_is_retained_and_replayed(tmp_path: Path) -> Non
 def test_old_acquisition_receipt_version_is_rejected(tmp_path: Path) -> None:
     receipt = _acquisition_receipt(tmp_path)
     payload = receipt.as_dict()
-    payload["receipt_version"] = "amazingdata-history-acquisition-receipt-v2"
+    payload["receipt_version"] = "amazingdata-history-acquisition-receipt-v3"
     with pytest.raises(CoverageBasisError, match="unknown AmazingData acquisition receipt version"):
+        AmazingDataAcquisitionReceipt.from_mapping(payload)
+
+
+def test_legacy_source_selection_fields_are_rejected(tmp_path: Path) -> None:
+    receipt = _acquisition_receipt(tmp_path)
+    payload = receipt.as_dict()
+    payload["source_selection"] = {"selection_fingerprint": "0" * 64}
+    with pytest.raises(CoverageBasisError, match="fields are not exact"):
         AmazingDataAcquisitionReceipt.from_mapping(payload)
 
 
@@ -916,7 +939,7 @@ def test_writer_lock_and_basis_change_identity() -> None:
         basis.partition_key,
         source_snapshot_id=SNAPSHOT_ID,
         source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
-        source_selection_fingerprint="selection-fixture-v2",
+        coverage_basis_id="fixture-basis-altered",
     )
     third = OfflineHistoricalMaterializer(
         Path("fixture-a"),

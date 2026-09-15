@@ -25,6 +25,7 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Any, cast
 
 __all__ = [
@@ -293,14 +294,14 @@ class PositiveTradeFallback:
                 "positive-trade fallback request evidence must be pair-bound"
             )
         try:
-            fingerprints = tuple(sorted(self.request_params_by_pair.items()))
+            fingerprints = dict(sorted(self.request_params_by_pair.items()))
         except (TypeError, ValueError) as exc:
             raise MonthCompletenessError(
                 "positive-trade fallback request evidence is malformed"
             ) from exc
         object.__setattr__(self, "queried_pairs", queried)
         object.__setattr__(self, "positive_pairs", positive)
-        object.__setattr__(self, "request_params_by_pair", fingerprints)
+        object.__setattr__(self, "request_params_by_pair", MappingProxyType(fingerprints))
         self._validate_shape()
 
     def _validate_shape(self) -> None:

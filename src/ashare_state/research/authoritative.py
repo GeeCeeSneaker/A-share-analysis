@@ -12,7 +12,6 @@ from ashare_state.research.historical import (
     COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
     COVERAGE_BASIS_VERSION,
     AuthoritativeCoverageEvidence,
-    AuthoritativeSourceSelection,
     CoverageBasisDescriptor,
     CoverageBasisError,
     PartitionKey,
@@ -36,11 +35,6 @@ def build_authoritative_coverage_basis_descriptor(
         raise CoverageBasisError("authoritative coverage needs a typed partition")
     if not isinstance(evidence, AuthoritativeCoverageEvidence):
         raise CoverageBasisError("authoritative coverage needs typed acquisition evidence")
-    selection = AuthoritativeSourceSelection.reviewed_amazingdata_history()
-    if evidence.source_selection != selection:
-        raise CoverageBasisError("authoritative evidence source-selection binding changed")
-    if evidence.source_selection_fingerprint != selection.selection_fingerprint:
-        raise CoverageBasisError("authoritative evidence source-selection fingerprint is wrong")
     if (
         evidence.claimed_scope_start != partition.scope_start
         or evidence.claimed_scope_end != partition.scope_end
@@ -62,7 +56,6 @@ def build_authoritative_coverage_basis_descriptor(
         "source_domain": evidence.source_domain,
         "claimed_scope_start": partition.scope_start,
         "claimed_scope_end": partition.scope_end,
-        "source_selection_fingerprint": evidence.source_selection_fingerprint,
         "completeness_method": evidence.completeness_method,
         "completeness_claim": evidence.completeness_claim,
         "coverage_basis_artifact_uri": (

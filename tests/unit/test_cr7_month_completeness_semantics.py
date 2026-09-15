@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 
 import polars as pl
 import pytest
@@ -224,6 +225,19 @@ def test_zero_column_status_uses_positive_num_trades_as_active_fact() -> None:
         result.classification_counts[CompletenessPairClass.POSITIVE_TRADE_COUNT_ACTIVE.value] == 1
     )
     assert result.required_bar_pair_count == 2
+
+
+def test_positive_trade_fallback_keeps_request_evidence_mapping_type() -> None:
+    evidence = PositiveTradeFallback(
+        queried_pairs={("000001.SZ", 20240102)},
+        positive_pairs={("000001.SZ", 20240102)},
+        request_params_by_pair={("000001.SZ", 20240102): "a" * 64},
+    )
+
+    assert isinstance(evidence.request_params_by_pair, Mapping)
+    assert dict(evidence.request_params_by_pair) == {("000001.SZ", 20240102): "a" * 64}
+    with pytest.raises(TypeError):
+        evidence.request_params_by_pair[("000001.SZ", 20240103)] = "b" * 64  # type: ignore[index]
 
 
 def test_zero_num_trades_does_not_resolve_an_empty_status_member() -> None:

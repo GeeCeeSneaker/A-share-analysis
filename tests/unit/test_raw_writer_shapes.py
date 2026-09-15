@@ -379,6 +379,49 @@ class TestPayloadShapes:
         assert back[f"{PACKED_MEMBER_THRESHOLD:06d}.SH"].shape == (0, 2)
         assert back[f"{PACKED_MEMBER_THRESHOLD:06d}.SH"].columns == ["code", "close"]
 
+    def test_packed_map_keeps_zero_column_empty_status_member(self, tmp_path: Path):
+        """The observed status shape must not trigger one file per security."""
+        polars = pytest.importorskip("polars")
+        writer = RawWriter(tmp_path)
+        normal_count = 2_000
+        zero_column_name = "000000.SZ"
+        null_name = "999999.SZ"
+        payload = {
+            f"{index:06d}.SH": polars.DataFrame(
+                {
+                    "TRADE_DATE": [20240102],
+                    "IS_SUSP_SEC": [0],
+                }
+            )
+            for index in range(1, normal_count + 1)
+        }
+        payload[zero_column_name] = polars.DataFrame()
+        payload[null_name] = None
+
+        result = writer.write(_exchange("packed-status-empty", "status", payload))
+
+        assert result.payload_kind == KIND_PACKED_MULTI
+        dataset_dir = tmp_path / "provider=amazingdata" / "dataset=status"
+        assert len(list(dataset_dir.rglob("*.parquet"))) == 1
+        meta = json.loads(
+            (dataset_dir / "packed-status-empty.meta.json").read_text(encoding="utf-8")
+        )
+        member_by_name = {member["name"]: member for member in meta["packed_members"]}
+        assert member_by_name[zero_column_name]["row_count"] == 0
+        assert member_by_name[zero_column_name]["columns"] == []
+        assert null_name in meta["null_tables"]
+
+        back = writer.read(
+            provider="amazingdata",
+            dataset="status",
+            request_id="packed-status-empty",
+        )
+        assert back[zero_column_name].shape == (0, 0)
+        assert back[zero_column_name].columns == []
+        assert back[null_name] is None
+        assert back["000001.SH"].shape == (1, 2)
+        assert back["000001.SH"]["IS_SUSP_SEC"].to_list() == [0]
+
     def test_scalar_list_round_trips_as_value_column(self, tmp_path: Path):
         writer = RawWriter(tmp_path)
         writer.write(_exchange("cal1", "calendar_ds", [20220629, 20220630, 20220701]))

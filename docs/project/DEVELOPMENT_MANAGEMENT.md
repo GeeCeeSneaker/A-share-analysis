@@ -7042,3 +7042,34 @@ GT-H3B #129 为策略性 `skipped`，不构成 Provider 或 Production 证据。
   receipt，未进入 materializer。Stage B、78 月物化、Formal/Production、BSE/index、CR-5/R2、
   Golden/H1、baseline 或策略工作仍须 scheduler 独立审阅和单独授权。PR 保持 Draft，等待独立 review。
   不上传凭证、私有 endpoint、专有 SDK/runtime 或 raw payload。
+## DM-20260914-ISSUE66-043 · 按 scheduler exact-head 审阅整改 Issue #66
+
+**Type**：C1 — CR-7 Phase-0 minimalism / scheduler remediation
+**Date**：2026-09-14
+**Status**：`LOCAL REMEDIATION COMPLETE / FULL QA GREEN / EXACT-HEAD CI PENDING / KEEP DRAFT / DO NOT MERGE`
+**Trigger**：PR #67 exact-head review `5205558820` 与 Issue #66 checkpoint comment `5674829261`。
+审阅对象为旧 head `12adbb3e5310f6f75d775afd569a745a7533f9cc`，结论为
+`REMEDIATE / KEEP DRAFT / DO NOT MERGE`；本轮实际开发基线已同步为 clean
+`main@ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`。
+
+**四项整改**：
+
+1. RawWriter 对已确认的 2024-01 status 响应形状（大量正常成员、零行零列 DataFrame、显式
+   `None`）按 request 级 O(1) 物理文件布局保存；meta inventory 记录成员列形态，零列空表恢复
+   为 `(0, 0)`，`None` 保持 `None`，不制造伪行。
+2. packed reader 只做一次 `partition_by` 分组扫描，再按 inventory 重建成员；合成基准新增读取/
+   重建耗时，避免只报告写入收益。
+3. 删除运行时 `AuthoritativeSourceSelection` / `selection_fingerprint` 固定策略包装，改用
+   receipt 上已有的直接 provider、source method、scope、PIT 与 completeness 字段；旧设计归档
+   中的历史文字不作为当前运行时契约。
+4. `PositiveTradeFallback.request_params_by_pair` 保持 `Mapping` 的真实运行时类型，构造后使用
+   只读映射，不再以 tuple 冒充 Mapping。
+
+**当前证据**：合成 5,002 个逻辑成员的 legacy/packed 对照为 5,001/1 个 Parquet；物理字节
+`7,174,641 -> 84,344`，持久化 `45,911.01 -> 3,609.53 ms`，closure
+`44,985.21 -> 53.97 ms`，读取/重建 `14,919.95 -> 3,032.02 ms`。本地收集 1,839 项，
+`uv run pytest -q` 以退出码 0 完成（1,835 passed、4 个既有环境条件 skip）；Ruff、format、
+mypy、compileall、`uv pip check`、diff check 和提供值扫描均通过。exact-head CI 和 scheduler
+复审仍待完成。仍禁止 Stage B、78 月
+物化、Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline、策略及真实生产取数。
+凭证、endpoint、专有 SDK/runtime、vendor wheel 和原始 provider payload 不进入 GitHub。

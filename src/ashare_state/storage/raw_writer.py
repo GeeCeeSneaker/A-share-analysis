@@ -42,9 +42,13 @@ Payload shapes (audit section 5.2 - MANDATORY support):
     dict[str, DataFrame | None]    -> one Parquet per present table; explicit
                                       null members are listed in the meta
 
-dict-of-tables uses scheme A (audit section 5.2): every present logical table
-gets its own Parquet file; the meta records the table list with each table's
-hash/schema/row-count and records explicit None members separately.
+dict-of-tables uses scheme A (audit section 5.2): small or heterogeneous
+payloads give every present logical table its own Parquet file; the meta
+records the table list with each table's hash/schema/row-count and records
+explicit None members separately.  A large homogeneous member map is the
+layout optimization exception: one request-level Parquet retains the member
+key, while meta inventory records each member's columns and row count so
+zero-row/zero-column DataFrames and explicit None values remain distinct.
 "Take the first dict value" is FORBIDDEN - mixed/unsupported shapes raise
 instead of silently picking a table.
 
@@ -347,13 +351,14 @@ def _pack_large_homogeneous_tables(
     tables: list[tuple[str | None, Any]],
     null_tables: tuple[str, ...],
 ) -> tuple[str, list[tuple[str | None, Any]], tuple[str, ...], tuple[dict[str, Any], ...]]:
-    """Pack a large homogeneous member map into one Parquet table.
+    """Pack a large member map into one Parquet table.
 
-    The old one-file-per-member representation is still used for small or
-    heterogeneous responses.  Packing is deliberately conservative: a
-    reserved member column must be free and every materialized member must
-    have the same Arrow schema.  A failed eligibility check simply selects
-    the existing lossless layout; it never coerces or drops a provider value.
+    A zero-row/zero-column DataFrame is a known AmazingData response shape,
+    not a reason to abandon packing for the whole response. Such members are
+    represented in the packed member inventory and need no physical row; the
+    inventory's ``columns`` field lets the reader reconstruct the exact empty
+    frame. Other heterogeneous schemas still use the lossless legacy layout
+    instead of coercing provider data.
     """
     if payload_kind not in (KIND_MULTI_ROWS, KIND_MULTI_FRAMES):
         return payload_kind, tables, null_tables, ()
@@ -361,7 +366,34 @@ def _pack_large_homogeneous_tables(
         return payload_kind, tables, null_tables, ()
     if any(PACKED_MEMBER_COLUMN in table.column_names for _, table in tables):
         return payload_kind, tables, null_tables, ()
-    schema_hashes = {_schema_hash(table) for _, table in tables}
+    empty_zero_column_names = {
+        str(name) for name, table in tables if table.num_rows == 0 and not table.column_names
+    }
+    # A zero-column table with rows cannot be reconstructed after dropping the
+    # member key, so keep the old layout for that unusual shape. The observed
+    # provider case is the zero-row/zero-column form.
+    if any(not table.column_names and table.num_rows for _, table in tables):
+        return payload_kind, tables, null_tables, ()
+    packable_tables = [
+        (name, table) for name, table in tables if str(name) not in empty_zero_column_names
+    ]
+    if not packable_tables:
+        import pyarrow as pa
+
+        # Keep an O(1) physical layout even when every materialized member is
+        # the known zero-row/zero-column shape.  There is no provider row to
+        # encode, so the packed artifact is a schema-only member-key table.
+        packed = pa.table({PACKED_MEMBER_COLUMN: pa.array([], type=pa.string())})
+        members = tuple(
+            {
+                "name": str(name),
+                "row_count": 0,
+                "columns": [],
+            }
+            for name, _ in tables
+        ) + tuple({"name": name, "row_count": None, "columns": None} for name in null_tables)
+        return KIND_PACKED_MULTI, [(None, packed)], null_tables, members
+    schema_hashes = {_schema_hash(table) for _, table in packable_tables}
     if len(schema_hashes) != 1:
         return payload_kind, tables, null_tables, ()
 
@@ -372,7 +404,7 @@ def _pack_large_homogeneous_tables(
             PACKED_MEMBER_COLUMN,
             pa.array([str(name)] * table.num_rows, type=pa.string()),
         )
-        for name, table in tables
+        for name, table in packable_tables
     ]
     try:
         packed = pa.concat_tables(packed_tables)
@@ -381,8 +413,13 @@ def _pack_large_homogeneous_tables(
         # per-member representation when Arrow refuses the combination.
         return payload_kind, tables, null_tables, ()
     members = tuple(
-        {"name": str(name), "row_count": int(table.num_rows)} for name, table in tables
-    ) + tuple({"name": name, "row_count": None} for name in null_tables)
+        {
+            "name": str(name),
+            "row_count": int(table.num_rows),
+            "columns": [str(column) for column in table.column_names],
+        }
+        for name, table in tables
+    ) + tuple({"name": name, "row_count": None, "columns": None} for name in null_tables)
     return KIND_PACKED_MULTI, [(None, packed)], null_tables, members
 
 
@@ -761,20 +798,67 @@ class RawWriter:
             packed_frames: dict[str, Any] = {}
             members = doc.get("packed_members")
             if not isinstance(members, list) or any(
-                not isinstance(member, dict) or not isinstance(member.get("name"), str)
+                not isinstance(member, dict)
+                or not isinstance(member.get("name"), str)
+                or "row_count" not in member
+                or "columns" not in member
                 for member in members
             ):
                 raise RawWriterError(
                     f"packed raw meta for request {request_id} has no valid member inventory"
                 )
+            # ``partition_by`` performs one grouped scan of the packed frame.
+            # Filtering the full frame once per logical member made read cost
+            # grow with member_count * packed_row_count.
+            grouped = packed.partition_by(
+                PACKED_MEMBER_COLUMN,
+                as_dict=True,
+                maintain_order=True,
+            )
+            null_tables = set(doc.get("null_tables", []) or [])
             for member in members:
                 name = str(member["name"])
-                if name in doc.get("null_tables", []) or member.get("row_count") is None:
+                row_count = member.get("row_count")
+                columns = member.get("columns")
+                if name in null_tables or row_count is None:
                     packed_frames[name] = None
                     continue
-                packed_frames[name] = packed.filter(pl.col(PACKED_MEMBER_COLUMN) == name).drop(
-                    PACKED_MEMBER_COLUMN
-                )
+                if (
+                    isinstance(row_count, bool)
+                    or not isinstance(row_count, int)
+                    or row_count < 0
+                    or not isinstance(columns, list)
+                    or any(not isinstance(column, str) for column in columns)
+                    or len(columns) != len(set(columns))
+                ):
+                    raise RawWriterError(
+                        f"packed raw meta for request {request_id} has malformed member schema"
+                    )
+                if not columns:
+                    if row_count != 0:
+                        raise RawWriterError(
+                            f"packed raw meta for request {request_id} has a non-empty "
+                            "zero-column member"
+                        )
+                    packed_frames[name] = pl.DataFrame()
+                    continue
+                group = grouped.get((name,))
+                if group is None:
+                    if row_count != 0:
+                        raise RawWriterError(
+                            f"packed raw payload for request {request_id} is missing "
+                            f"member {name!r}"
+                        )
+                    # Empty members have no physical group; the packed schema
+                    # supplies their original columns and dtypes.
+                    packed_frames[name] = packed.drop(PACKED_MEMBER_COLUMN).head(0).select(columns)
+                    continue
+                frame = group.drop(PACKED_MEMBER_COLUMN)
+                if frame.height != row_count or set(frame.columns) < set(columns):
+                    raise RawWriterError(
+                        f"packed raw payload for request {request_id} has a member shape mismatch"
+                    )
+                packed_frames[name] = frame.select(columns)
             return packed_frames
         if kind in (KIND_MULTI_ROWS, KIND_MULTI_FRAMES):
             frames: dict[str, Any] = {}
@@ -1074,6 +1158,74 @@ def verify_meta_closure(raw_root: Path | str, meta_doc: dict[str, Any]) -> list[
         problems.append("null_tables contains duplicate logical table names")
     if set(null_tables).intersection(table_names):
         problems.append("null_tables overlaps a materialized table")
+    if meta_doc.get("payload_kind") == KIND_PACKED_MULTI:
+        packed_members = meta_doc.get("packed_members")
+        if not isinstance(packed_members, list):
+            problems.append("packed_members must be a list for packed payloads")
+        else:
+            packed_names: list[str] = []
+            for member in packed_members:
+                if not isinstance(member, dict):
+                    problems.append("packed member record must be an object")
+                    continue
+                name = member.get("name")
+                row_count = member.get("row_count")
+                columns = member.get("columns")
+                if not isinstance(name, str) or not name:
+                    problems.append("packed member name must be a non-empty string")
+                else:
+                    packed_names.append(name)
+                if row_count is not None and (
+                    isinstance(row_count, bool) or not isinstance(row_count, int) or row_count < 0
+                ):
+                    problems.append("packed member row_count must be null or nonnegative")
+                if columns is not None and (
+                    not isinstance(columns, list)
+                    or any(not isinstance(column, str) for column in columns)
+                    or len(columns) != len(set(columns))
+                ):
+                    problems.append("packed member columns must be a unique string list or null")
+            if len(set(packed_names)) != len(packed_names):
+                problems.append("packed_members contains duplicate logical table names")
+            if set(null_tables) - set(packed_names):
+                problems.append("packed_members does not cover every null table")
+            packed_null_names: set[str] = set()
+            packed_row_count = 0
+            for member in packed_members:
+                if not isinstance(member, dict):
+                    continue
+                name = member.get("name")
+                row_count = member.get("row_count")
+                columns = member.get("columns")
+                if not isinstance(name, str):
+                    continue
+                if row_count is None:
+                    packed_null_names.add(name)
+                    if columns is not None:
+                        problems.append("null packed member columns must be null")
+                elif (
+                    isinstance(row_count, bool)
+                    or not isinstance(row_count, int)
+                    or row_count < 0
+                    or not isinstance(columns, list)
+                ):
+                    continue
+                else:
+                    packed_row_count += row_count
+                    if name in null_tables:
+                        problems.append("packed null table has materialized row metadata")
+            if packed_null_names != set(null_tables):
+                problems.append("packed member null coverage does not match null_tables")
+            if len(tables) != 1:
+                problems.append("packed payload must have exactly one physical table")
+            elif isinstance(tables[0], dict):
+                physical_rows = tables[0].get("row_count")
+                if (
+                    isinstance(physical_rows, int)
+                    and not isinstance(physical_rows, bool)
+                    and physical_rows != packed_row_count
+                ):
+                    problems.append("packed physical row_count does not match member inventory")
     for table in tables:
         if not isinstance(table, dict):
             continue

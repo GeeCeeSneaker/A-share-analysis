@@ -4324,3 +4324,29 @@ clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f`；实现提交为
 Stage A 报告仍是 `SPIKE` 诊断，未签发 authoritative receipt，materializer 未进入。Stage B、
 78 月物化、Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline 和策略继续禁止，
 除非得到单独授权。凭证、私有 endpoint、专有 SDK/runtime 与原始 payload 不进入 GitHub。
+## 2026-09-14 · Issue #66 scheduler 整改交接（旧 exact head 被要求 REMEDIATE）
+
+> 状态：**LOCAL REMEDIATION COMPLETE / FULL QA GREEN / DRAFT PR / EXACT-HEAD CI PENDING / INDEPENDENT REVIEW REQUIRED**
+
+- PR #67 旧 exact head `12adbb3e5310f6f75d775afd569a745a7533f9cc` 收到 scheduler review
+  `5205558820` 和 Issue #66 checkpoint `5674829261`，结论为 `REMEDIATE / KEEP DRAFT /
+  DO NOT MERGE`。本轮先同步到 clean `main@ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`，不沿用
+  旧 head 的 CI 结论。
+- RawWriter 现在能把真实已确认的“大量正常成员 + 零行零列空 DataFrame + 显式 `None`”形状
+  收敛为一个 request-level Parquet；成员 inventory 保存列形态，零列空表恢复为 `(0, 0)`，
+  `None` 仍为 `None`。packed read 通过一次 `partition_by` 分组扫描后重建成员，不逐成员过滤
+  完整 packed frame。
+- 5,002 个合成逻辑成员的对照已重跑：legacy 5,001 个 Parquet、packed 1 个；物理字节
+  `7,174,641 -> 84,344`，持久化 `45,911.01 -> 3,609.53 ms`，closure
+  `44,985.21 -> 53.97 ms`，读取/重建 `14,919.95 -> 3,032.02 ms`。结果和限制见
+  `docs/provider_verification/issue66_minimalism_benchmark_20260914.md`。
+- 删除运行时 `AuthoritativeSourceSelection` / `selection_fingerprint` 固定策略包装，保留
+  receipt 直接字段和现有 scope/PIT/completeness 边界；`PositiveTradeFallback` 的
+  `request_params_by_pair` 现在以只读 Mapping 实现，运行时类型与注解一致。历史设计/审阅
+  归档仍保留历史文字，并已在当前计划中说明其不属于运行时契约。
+- 本地收集 1,839 项，`uv run pytest -q` 以退出码 0 完成（1,835 passed、4 个既有环境条件
+  skip）；Ruff check/format、mypy、compileall、`uv pip check`、diff check 和提供值扫描均通过。
+  精确新 head 的 required CI 和 scheduler 独立复审仍待完成。
+  期间不执行 Stage B、78 月物化、Formal/Production、BSE/index、CR-5/R2、Golden/H1、
+  baseline、策略或真实生产取数。账号、密码、endpoint、专有 SDK/runtime、vendor wheel
+  和原始 provider payload 不进入 GitHub。
