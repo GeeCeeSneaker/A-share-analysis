@@ -1,7 +1,13 @@
 # CR-7 2024-01 权威闭环执行记录（2026-09-15）
 
+> **后续执行更新**：本文件下方保留的是 2026-09-15 早期的 source-snapshot 前置检查。
+> PR #68 随后已合并，且在同日继续执行了真实 provider shape 探针。当前权威状态和最小
+> 阻断以 [`cr7_authoritative_2024_01_source_input_20260915.md`](cr7_authoritative_2024_01_source_input_20260915.md)
+> 及对应 JSON 为准：已完成 4 个真实交换的 raw 锚定，但在 CR-2 标准化边界阻断，Canonical
+> 返回 `BLOCKED`，仍未签发 receipt 或进入物化。
+
 状态：`STOP(BLOCKED)`；bounded materializer/reader 整改（含 identity scope binding 和
-authoritative large-projection guard）已在本分支完成并待独立审阅，仍不铸造
+authoritative large-projection guard）已由 PR #68 合并，仍不铸造
 authoritative receipt、不执行真实 materialization、不执行 Stage B。
 
 本记录对应 Issue #59 当前要求，只检查 `2024-01`。原始 provider payload、账号凭证、私有
@@ -50,7 +56,7 @@ canonical run id 和 PIT；这些值可以脱敏记录，但不能用占位值�
 
 ## 已完成的最小整改：bounded materializer/reader
 
-前置检查发现的单月合同不一致已在当前分支修正，且没有改变默认全窗口行为：
+前置检查发现的单月合同不一致已在 PR #68 修正并合并，且没有改变默认全窗口行为：
 
 - `OfflineHistoricalMaterializer.plan/materialize()` 接受非空、去重、窗口内的 typed
   `materialization_partitions`；省略参数仍使用既有 78 个月窗口。
@@ -71,30 +77,33 @@ canonical run id 和 PIT；这些值可以脱敏记录，但不能用占位值�
 这项整改只证明代码边界可以承接一个月；测试使用的 fake receipt/fixture 不能作为生产 authority，
 也不替代真实 2024-01 acquisition。
 
-该整改尚需独立 exact-head 审阅；在真实 source snapshot 到位前，不运行会产生生产 receipt 的
-acquisition。
+该整改只证明代码边界可以承接一个月；测试使用的 fake receipt/fixture 不能作为生产 authority，
+也不替代真实 2024-01 acquisition。PR #68 已由项目经理完成独立 exact-head 审阅并合并；
+后续真实 source-input 探针的阻断见同日 continuation 报告。
 
-## 当前唯一实质阻断
+## 早期前置检查与当前阻断的关系
 
-仍没有可由现有 ReadModel/Canonical 校验链打开的 verified source snapshot。当前本地检查的 5 个
-Atlas 数据库中，`rm_snapshot_meta`、`rm_daily_bar` 以及 snapshot/build/run 相关记录均为 0；
-因此无法合法构造 `VerifiedResearchProjection`，也无法执行 Issue #59 要求的真实 acquisition。
+本节记录的早期前置检查只确认“当时没有可由现有 ReadModel/Canonical 校验链打开的 verified
+source snapshot”。同日后续已用真实 provider 返回值完成 4 个 raw 锚定交换；当前不是简单地
+等待账号或数据库，而是在 CR-2 provider-native shape/identity 标准化入口阻断。Canonical
+仍返回 `BLOCKED`，精确错误、ID、哈希和最小解除条件以 continuation 报告为准。
 
 ## 最小下一步要求
 
-1. 项目通过既有 Canonical → Snapshot → ReadModel 链构造并验证一个能成功打开的真实 source
-   snapshot，保留 snapshot id、manifest/semantic hash、canonical run id 和 PIT；账号可用本身不足以
-   替代该数据输入，也不能手工填写 snapshot 身份。
-2. 对当前分支的 bounded scope 整改做独立 exact-head 审阅并等待 CI 通过；本地 focused/full QA
-   已通过。
-3. PR #68 独立审阅/合并且 snapshot 到位后，才运行唯一授权的 2024-01 acquisition，并按 Issue 顺序完成
-   raw anchor、completeness PASS、receipt replay、coverage
+1. 先由项目管理者接受/安排 continuation 报告列出的最小 CR-2 provider-native shape/identity
+   适配；不得用请求顺序、代码前缀或手填 snapshot 身份绕过它。
+2. 适配通过 exact-head 测试和 CI 后，再通过既有 Canonical → Snapshot → ReadModel 链构造并
+   验证能成功打开的真实 source snapshot，保留 snapshot id、manifest/semantic hash、canonical
+   run id 和 PIT；账号可用本身不足以替代该数据输入。
+3. 当前应先处理后续真实探针报告列出的 CR-2 provider-native shape/identity 阻断；只有该最小
+   适配通过 exact-head 测试并重新生成可验证 snapshot 后，才运行唯一授权的 2024-01
+   acquisition，并按 Issue 顺序完成 raw anchor、completeness PASS、receipt replay、coverage
    basis、atomic materialization、ordinary reader、idempotent replay/conflict fail-closed。
 4. 在上述闭环独立审阅通过前，继续禁止 `2020-01`、`2026-01`、78 月回补、Formal B1-B7、
    Production、BSE/index、CR-5/R2、Golden/H1、baseline 和策略工作。
 
 ## 结论
 
-本轮不是账号/网络阻断；bounded 发布合同已完成最小代码整改，当前唯一实质阻断是缺少可验证
-source snapshot，另需独立审阅该整改。保持 fail-closed 是当前唯一可审计结论。下一次运行不得
-复用本记录中的任何占位或历史 SPIKE 观察来铸造 receipt。
+本轮不是账号/网络阻断；bounded 发布合同已完成最小代码整改并合并，当前实质阻断是
+provider-native shape/identity 尚未接入现有 CR-2 标准化边界。保持 fail-closed 是当前唯一可
+审计结论。下一次运行不得复用本记录中的任何占位或历史 SPIKE 观察来铸造 receipt。

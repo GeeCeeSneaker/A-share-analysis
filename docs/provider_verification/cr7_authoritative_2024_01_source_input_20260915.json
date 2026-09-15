@@ -1,0 +1,132 @@
+{
+  "schema": "cr7.authoritative_2024_01_source_input.v1",
+  "checked_at_utc": "2026-09-15T12:55:59Z",
+  "status": "STOP(BLOCKED)",
+  "authorization": {
+    "issue": 59,
+    "scope": "2024-01 minimum real source input only",
+    "stage_b": "NOT_AUTHORIZED_NOT_RUN",
+    "backfill_78_month": "NOT_AUTHORIZED_NOT_RUN",
+    "formal_b1_b7": "NOT_RUN",
+    "production_verdict": "NOT_RUN"
+  },
+  "source_control": {
+    "actual_base_sha": "a7671ab34d301cb0aca2f351a31bbc865c100498",
+    "pr_68_exact_head": "0da6ebb0b48dbcf3c725e90aac8ef7c83017e0ba",
+    "pr_68_merge_commit": "a7671ab34d301cb0aca2f351a31bbc865c100498"
+  },
+  "runtime": {
+    "amazingdata_package_version": "1.1.9",
+    "tgw_package_version": "1.0.9.2",
+    "runtime_actual_load_verified": true,
+    "network_reachable": true,
+    "authenticated": true,
+    "query_ready": true,
+    "account_profile_id": "UNKNOWN_24e2ff401792",
+    "provider_use_mode": "SPIKE"
+  },
+  "scope": {
+    "month": "2024-01",
+    "calendar_market": "SH",
+    "hist_security_type": "EXTRA_STOCK_A_SH_SZ",
+    "hist_start_date": 20240101,
+    "hist_end_date": 20240131,
+    "calendar_window_trade_days": 22,
+    "hist_symbol_count": 5106,
+    "selected_symbol_count": 1,
+    "selected_day": 20240102,
+    "kline_type": "DAY"
+  },
+  "exchanges": [
+    {
+      "label": "calendar",
+      "provider_dataset": "trade_calendar",
+      "raw_request_id": "7a4bdf8e-3df9-447d-9864-df757a2452af",
+      "raw_payload_kind": "rows",
+      "raw_row_count": 8726,
+      "raw_parquet_count": 1,
+      "normalization_status": "SUCCESS",
+      "normalized_count": 8726,
+      "quarantined_count": 0,
+      "raw_content_hash": "afc2d62522e009097858fcbc1bb71564e375b7ebfe689f706a486fec603917b3",
+      "raw_evidence_hash": "408fb8d1ef24a6288d60914f7c525972c776ba22b5476e26c14a9e3e35bdc097",
+      "normalization_manifest_hash": "51982065c6aaa3b98badc4da0c3c3d093cfd57a495ab4e55ceb245de8f7b0b66"
+    },
+    {
+      "label": "hist_code_list",
+      "provider_dataset": "hist_code_list",
+      "raw_request_id": "1c3c6e6f-9e6c-4c2f-8e31-0b07a40e88f4",
+      "raw_payload_kind": "rows",
+      "raw_row_count": 5106,
+      "raw_parquet_count": 1,
+      "normalization_status": "BLOCKED",
+      "normalization_error_class": "MAPPING_VALIDATION_FAILED",
+      "normalized_count": 0,
+      "quarantined_count": 5106,
+      "raw_content_hash": "1b447a21d71094b40e99aca090af12d01b3b0216ead5f0474ee6f565f1e2c83",
+      "raw_evidence_hash": "b8ba5a8fbd0d8d571b5ade21f4c0704591934ebf4111ae3749127728c5f61897"
+    },
+    {
+      "label": "stock_basic",
+      "provider_dataset": "stock_basic",
+      "raw_request_id": "29b9e757-7dad-4023-a3c6-4268d065e6c5",
+      "raw_payload_kind": "dataframe",
+      "raw_row_count": 1,
+      "raw_parquet_count": 1,
+      "normalization_status": "BLOCKED",
+      "normalization_error_class": "MAPPING_VALIDATION_FAILED",
+      "normalized_count": 0,
+      "quarantined_count": 1,
+      "raw_content_hash": "12460957f70b720c0bef923c8509c0a3c923b0d78135c9ef459fe659ffbdd01e",
+      "raw_evidence_hash": "1252cad58d2110c5cb3269799f2d1629105145e86ed3a2e9ae51776b426b494b"
+    },
+    {
+      "label": "daily_bar",
+      "provider_dataset": "daily_bar",
+      "raw_request_id": "fb2021e8-5553-4c17-a34e-4f28808661a4",
+      "raw_payload_kind": "multi_table_frames",
+      "raw_row_count": 1,
+      "raw_parquet_count": 1,
+      "normalization_status": "BLOCKED",
+      "normalization_error_class": "PAYLOAD_SHAPE_UNSUPPORTED",
+      "normalized_count": 0,
+      "quarantined_count": 0,
+      "raw_content_hash": "95cad8071aac0d6eb7d540015e38425a768ac8a10d937d201523e007b02747c7",
+      "raw_evidence_hash": "dc80c7829c636c55c5b497b3c0a018e3890a55ad3729229a4386de46d46127c1"
+    }
+  ],
+  "canonical_attempt": {
+    "canonical_run_id": "4cd59195-2547-5b2e-a172-6f649892a3d2",
+    "requested_domains": ["daily_bar"],
+    "status": "BLOCKED",
+    "selected_count": 0,
+    "decision_count": 0,
+    "finding_count": 2,
+    "manifest_hash": "72cd70f3109d6767392c797a8526ea29331ab35d83162b1e35206e93f402f7ca",
+    "blocking_findings": ["IDENTITY_DATASET_MISSING", "REQUIRED_DOMAIN_MISSING"]
+  },
+  "downstream": {
+    "snapshot": "NOT_ENTERED_CANONICAL_NOT_SUCCESS",
+    "readmodel": "NOT_ENTERED",
+    "verified_research_projection": "NOT_CREATED",
+    "authoritative_acquisition_receipt": "NOT_ISSUED",
+    "retained_raw_replay": "NOT_STARTED",
+    "coverage_basis": "NOT_ENTERED",
+    "materialization": "NOT_ENTERED",
+    "ordinary_reader": "NOT_STARTED",
+    "idempotency_proof": "NOT_STARTED"
+  },
+  "blockers": [
+    "hist_code_list scalar list is retained as raw rows but the current security-master mapper requires SECURITY_CODE/code and produces zero normalized rows",
+    "stock_basic real DataFrame has no explicit SECURITY_CODE column, so current identity mapper quarantines the row",
+    "daily_bar real dict-of-frames has no exact registry source_table route; take-first is forbidden"
+  ],
+  "next_minimum_action": "Approve or implement the smallest versioned provider-native shape adapter at the existing CR-2 normalization boundary, then rerun only the minimum 2024-01 Canonical -> Snapshot -> ReadModel -> prepare_verified_projection path",
+  "sanitization": {
+    "raw_payloads_committed": false,
+    "credentials_committed": false,
+    "private_endpoints_committed": false,
+    "sdk_runtime_committed": false,
+    "local_raw_root_is_gitignored": true
+  }
+}

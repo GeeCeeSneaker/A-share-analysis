@@ -1,6 +1,10 @@
 {
   "schema": "cr7.authoritative_2024_01_closure.v1",
   "checked_at_utc": "2026-09-15T07:57:59Z",
+  "superseded_by_same_day_continuation": {
+    "report": "cr7_authoritative_2024_01_source_input_20260915.json",
+    "reason": "the later continuation performed four real anchored exchanges and reached the CR-2 normalization boundary; this file remains the earlier preflight record"
+  },
   "authorization": {
     "issue": 59,
     "scope": "2024-01 only",

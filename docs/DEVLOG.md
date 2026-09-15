@@ -1,3 +1,30 @@
+## 2026-09-15 · Issue #59 合并后最小真实 source-input 探针
+
+> 状态：**STOP(BLOCKED) / RAW ANCHORED / CANONICAL BLOCKED / NO RECEIPT / NO MATERIALIZATION**
+
+- PR #68 已由项目经理独立审阅并合并，当前 clean main 为
+  `a7671ab34d301cb0aca2f351a31bbc865c100498`；本轮从该基线继续，未执行 Stage B、78 月回补、
+  Formal B1-B7 或 Production verdict。
+- 使用已确认的本地正式账号完成真实接口 shape 探针，但只通过既有
+  `AmazingDataProvider → AnchoredRawEvidenceWriter → NormalizationRunner`；凭证、完整 raw
+  payload、私有 endpoint、SDK/runtime 和 DuckDB 仍只在被忽略的 `data/spike/` 本地目录。
+- 真实 `trade_calendar(SH)` 返回 8,726 行并标准化 `SUCCESS`；2024-01 历史代码表返回
+  5,106 个 scalar 字符串、`stock_basic` 返回 1 行无 `SECURITY_CODE` 的 DataFrame、日线返回
+  `dict[provider_symbol, DataFrame]`。四个交换均完成 raw anchor，raw 物理布局为每个请求 1 个
+  parquet + 1 个 meta。
+- 现有 CR-2 边界诚实阻断三种原生 shape：`hist_code_list` 5,106 行全部因缺
+  `SECURITY_CODE/code` quarantine；`stock_basic` 1 行同因缺代码 quarantine；`daily_bar`
+  因 registry 没有任意 member key 的 exact `source_table` route 返回
+  `PAYLOAD_SHAPE_UNSUPPORTED`，没有 take-first。
+- 随后调用既有 `CanonicalRunner.run(domains=("daily_bar",))` 得到
+  `4cd59195-2547-5b2e-a172-6f649892a3d2 / BLOCKED`，findings 为
+  `IDENTITY_DATASET_MISSING; REQUIRED_DOMAIN_MISSING`。没有进入 Snapshot/ReadModel，
+  没有构造 `VerifiedResearchProjection`，因而按规则未调用 `acquire_month()`。
+- 详细脱敏证据：[`cr7_authoritative_2024_01_source_input_20260915.md`](provider_verification/cr7_authoritative_2024_01_source_input_20260915.md)
+  与对应 JSON。最小下一步是由项目管理者接受/安排既有 CR-2 provider-native shape/identity
+  适配并补齐回归、代码指纹和 exact-head CI；不得用请求顺序、代码前缀、手填身份或伪造
+  ReadModel 绕过该阻断。
+
 ## 2026-09-15 · Issue #59 2024-01 权威闭环前置检查
 
 > 状态：**STOP(BLOCKED) / BOUNDED CONTRACT REMEDIATION READY FOR REVIEW / NO RECEIPT / NO MATERIALIZATION**
