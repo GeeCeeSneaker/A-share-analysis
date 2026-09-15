@@ -4,6 +4,22 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0. 2026-09-15 当前调度覆盖
+
+当前 clean `main` 为 `1a14c87d19d527c56170df8bc9c24fccf69d55b3`，PR #67 已合并，Issue #66 已关闭。
+当前唯一活动 P0 已回到 Issue #59：只推进 `2024-01` 的真实 AmazingData acquisition → anchored
+raw/receipt replay → coverage basis → bounded atomic materialization → ordinary-reader proof。
+
+本文件后面的 Issue #66 文字是历史执行记录；如与本节或 Issue #59 当前 body 冲突，以本节和 Issue #59
+为准。当前不授权 Stage B（`2020-01` / `2026-01`）、78 月回补、Formal/Production、BSE/index、
+CR-5/R2、Golden/H1、baseline 或策略工作。
+
+2026-09-15 的受控本地检查记录在
+[`cr7_authoritative_2024_01_closure_20260915.md`](../provider_verification/cr7_authoritative_2024_01_closure_20260915.md)。
+结论为 `STOP(BLOCKED)`：bounded materializer/reader 的 scope identity 与权威大 projection guard
+整改已在工作分支完成并通过本地 focused/full QA，但本地没有可通过现有 ReadModel/Canonical 链打开的 verified source snapshot；
+因此没有铸造 receipt、没有执行真实 materializer，也没有提交凭证或 raw。
+
 ## 1. 项目管理责任
 
 - **项目 Owner**：决定总体方向、数据源是否可信、例外授权和最终业务取舍。
@@ -32,10 +48,10 @@
 
 **阶段**：Phase 0 / CR-7 historical research data foundation
 
-PR #64 已通过项目经理 exact-head 审阅并合并：
+PR #67 已通过项目经理 exact-head 审阅并合并：
 
-- merge commit / 当前 clean main：`ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`
-- Issue #55：已完成并关闭；Issue #66：当前唯一开放 P0
+- merge commit / 当前 clean main：`1a14c87d19d527c56170df8bc9c24fccf69d55b3`
+- Issue #55、Issue #66：已完成并关闭；当前唯一开放 P0 为 Issue #59
 
 当前主线已经具备：
 
@@ -56,14 +72,14 @@ PR #64 已通过项目经理 exact-head 审阅并合并：
 日×证券对全部闭合，unresolved/missing/extra/structural error 均为 0。Stage A PASS 不等于
 authoritative receipt 或 78 月物化授权。
 
-### 3.1 Issue #66 当前 P0：先做最小化，再回到权威取数闸门
+### 3.1 历史执行记录：Issue #66（已关闭）
 
-Issue #66 的基线是当前 clean `main@ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`。目标是
+Issue #66 当时的基线是 clean `main@ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`。目标是
 在重新推进 Stage B 之前，删除 CR-7 热路径中只为防御“同进程恶意调用者”而存在的包装和重复校验，
 同时保留工程上真正有用的边界：请求 scope、schema/partial/missing fail-closed、语义完整性、
 原始文件 hash/replay、PIT，以及物化的 atomic/idempotent 行为。
 
-当前实现分支 `feat/issue66-minimalism-20260914` 已完成本地整改并取得新 exact head；整改对应 scheduler 对旧 exact head
+当时实现分支 `feat/issue66-minimalism-20260914` 已完成本地整改并取得新 exact head；整改对应 scheduler 对旧 exact head
 `12adbb3e5310f6f75d775afd569a745a7533f9cc` 的 `REMEDIATE / KEEP DRAFT / DO NOT MERGE`
 意见（PR #67 review `5205558820`，Issue #66 comment `5674829261`）。四项整改为：
 
@@ -117,9 +133,9 @@ provider payload，因而 snapshot/readmodel/publish 的端到端吞吐、峰值
 `34935462639`）三个矩阵均 success，受控 GT-H3B #135 skipped；仍由 scheduler 决定是否恢复 Issue #59 的最小
 `2024-01` authoritative acquisition/materializer proof；不得由开发者自行进入 Stage B。
 
-## 4. 历史执行记录：Issue #59（已由 Issue #66 接管）
+## 4. Issue #59 当前执行记录与历史证据
 
-**Issue #59 — `P0: validate AmazingData month-completeness semantics and bounded full-scope receipts`（历史）**
+**Issue #59 — `P0: prove bounded 2024-01 authoritative acquisition/materialization before Stage B`**
 
 开发起点：先本地 `git fetch`，从包含本文件最新版本的最新 clean `main` 建立 worktree；记录实际 base SHA，并确认 PR #58 merge `31515992021e34517de0b764dd1ebb7f9e7ef35b` 是该 base 的祖先。
 
@@ -354,7 +370,7 @@ not-applicable 125、unresolved 0、extra 0、structural error 0，报告和月�
 78 月物化。下一道门是 scheduler 独立 delta review；在得到后续明确授权前，不运行 Stage B、
 78 月物化、Formal/Production 或其他禁止范围。
 
-## 5. Issue #66 当前明确禁止
+## 5. 历史记录：Issue #66 明确禁止
 
 Issue #66 **不授权**：
 
@@ -371,7 +387,7 @@ Issue #66 **不授权**：
 **例外授权**：本轮只允许 Issue #66 的最小化实现、合成测量和回归；不得以历史 Issue #59
 的代表月授权文字推导新的在线取数授权。
 
-## 6. Issue #66 验收标准
+## 6. 历史记录：Issue #66 验收标准
 
 开发 PR 进入最终审阅前必须同时满足：
 
@@ -414,7 +430,7 @@ Issue #66 **不授权**：
 
 ## 8. 后续路线（非当前授权）
 
-1. Issue #66 最小化独立审阅；
+1. PR #68 bounded materializer/reader 整改的独立审阅；
 2. Issue #59 最小 `2024-01` authoritative acquisition/materializer proof；
 3. controlled 78-month authoritative historical materialization；
 4. 全量 coverage / artifact lineage / replay / corruption E2E；
@@ -426,9 +442,10 @@ Issue #66 **不授权**：
 
 ---
 
-**Last scheduler update**：2026-09-14
+**Last scheduler update**：2026-09-15
 
-**Current task**：Issue #66
+**Current task**：Issue #59（Draft PR #68 bounded scope remediation review pending）
 
-**Required ancestor**：当前 clean `main@ad25f7f8580ad745f3a4a652ae7d85553e8c51fd`；实际开发
-base 必须记录 exact SHA，完成后保持 Draft PR，等待 scheduler 对整改 exact head 的独立复审。
+**Required ancestor**：当前 clean `main@1a14c87d19d527c56170df8bc9c24fccf69d55b3`；PR #68
+当前 exact head 以 GitHub PR 元数据和 Issue #59 最新 scheduler checkpoint 为准，整改提交后保持
+Draft 等待独立复审。

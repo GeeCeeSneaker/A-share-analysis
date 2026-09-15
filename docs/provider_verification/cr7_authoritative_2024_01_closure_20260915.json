@@ -1,0 +1,80 @@
+{
+  "schema": "cr7.authoritative_2024_01_closure.v1",
+  "checked_at_utc": "2026-09-15T07:57:59Z",
+  "authorization": {
+    "issue": 59,
+    "scope": "2024-01 only",
+    "status": "STOP(BLOCKED)",
+    "stage_b": "NOT_AUTHORIZED_NOT_RUN",
+    "backfill_78_month": "NOT_AUTHORIZED_NOT_RUN"
+  },
+  "source_control": {
+    "required_base_sha": "1a14c87d19d527c56170df8bc9c24fccf69d55b3",
+    "actual_base_sha": "1a14c87d19d527c56170df8bc9c24fccf69d55b3",
+    "required_base_is_ancestor": true
+  },
+  "local_runtime": {
+    "amazingdata_package_version": "1.1.9",
+    "tgw_package_version": "1.0.9.2",
+    "runtime_actual_load_verified": true,
+    "network_reachable": true,
+    "authenticated": true,
+    "query_ready": true,
+    "credentials_committed": false,
+    "credential_source": "local_untracked_env_only",
+    "vendor_file_count": 49,
+    "vendor_total_bytes": 210130779
+  },
+  "verified_research_source_snapshot": {
+    "status": "UNAVAILABLE",
+    "atlas_database_candidates_checked": 5,
+    "rm_snapshot_meta_rows": 0,
+    "rm_daily_bar_rows": 0,
+    "canonical_snapshot_build_rows": 0,
+    "required_entry": "ResearchPanelBuilder.prepare_verified_projection"
+  },
+  "bounded_materializer_contract": {
+    "status": "REMEDIATED_LOCALLY_PENDING_INDEPENDENT_REVIEW",
+    "requested_logical_partition_count": 1,
+    "current_default_logical_partition_count": 78,
+    "explicit_scope_version": "bounded-materialization-scope-v1",
+    "scope_bound_identity_field": "materialization_scope_hash",
+    "scope_bound_idempotency_and_materialization_id": true,
+    "large_authoritative_bounded_projection_allowed": true,
+    "offline_fixture_row_limit": 10000,
+    "large_projection_regression_rows": 10001,
+    "fixture_row_limit_preserved": true,
+    "large_projection_guard_requires_explicit_bounded_scope": true,
+    "large_projection_guard_requires_authoritative_evidence_per_target": true,
+    "large_projection_guard_requires_retained_capture_root": true,
+    "default_full_window_unchanged": true,
+    "bounded_scope_reader_supported": true,
+    "current_reader_requires_authoritative_basis_per_inventory_partition": true,
+    "focused_materialization_tests_passed": 28
+  },
+  "qa": {
+    "full_pytest_exit_code": 0,
+    "ruff_check": "PASS",
+    "ruff_format_check": "PASS",
+    "mypy": "PASS: 108 source files"
+  },
+  "authority_chain": {
+    "provider_acquisition": "NOT_STARTED",
+    "receipt": "NOT_ISSUED",
+    "retained_raw_replay": "NOT_STARTED",
+    "coverage_basis": "NOT_ENTERED",
+    "materialization": "NOT_ENTERED",
+    "ordinary_reader": "NOT_STARTED"
+  },
+  "next_minimum_inputs": [
+    "project-generated verified ReadModel/Canonical source snapshot via the existing foundation path",
+    "independent exact-head review of bounded materializer/reader remediation",
+    "exact-head CI review"
+  ],
+  "sanitization": {
+    "raw_payloads_committed": false,
+    "credentials_committed": false,
+    "private_endpoints_committed": false,
+    "sdk_runtime_committed": false
+  }
+}
