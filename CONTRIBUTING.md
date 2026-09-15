@@ -14,6 +14,23 @@ That account continues to use the repository in the same way as before for norma
 
 No other GitHub user should be granted Write / Maintain / Admin permission unless the project owner explicitly changes this policy in the future.
 
+## Core engineering principle: minimal solution first
+
+All project development must follow [`docs/project/ENGINEERING_PRINCIPLES.md`](docs/project/ENGINEERING_PRINCIPLES.md).
+
+The default is the **smallest design that satisfies the functional purpose, correctness requirements, and basic operational safety**. If a requirement can be enforced adequately through a documented convention, clear module boundary, code review, or a small boundary validation, do not add a new framework, anti-forgery mechanism, policy layer, wrapper type, version dimension, hash/fingerprint, or test suite for it.
+
+In particular:
+
+- Owner-approved internal developers/agents are not treated as hostile in-process callers by default;
+- data-source trust is an Owner decision, not something code must cryptographically prove;
+- one invariant should have one primary enforcement layer rather than several nested re-validations;
+- exploratory SPIKE/probe code is disposable and should be removed after its conclusion is incorporated;
+- tests protect meaningful behavior and real regressions, not unnecessary implementation ceremony;
+- simplification refactors are expected to remove more code/test surface than they add.
+
+A proposed abstraction or safety mechanism must identify the concrete project failure it prevents and why a simpler convention or existing boundary is insufficient.
+
 ## Repository operation principle: local Git first
 
 For Codex, agents, automation, and normal maintainer work, the local clone / worktree is the **primary repository operation path and day-to-day code source of truth**.
