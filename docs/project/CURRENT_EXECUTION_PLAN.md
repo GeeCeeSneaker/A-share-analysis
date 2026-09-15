@@ -63,8 +63,7 @@ Issue #66 的基线是当前 clean `main@ad25f7f8580ad745f3a4a652ae7d85553e8c51f
 同时保留工程上真正有用的边界：请求 scope、schema/partial/missing fail-closed、语义完整性、
 原始文件 hash/replay、PIT，以及物化的 atomic/idempotent 行为。
 
-当前实现分支 `feat/issue66-minimalism-20260914` 已完成本地整改，正在提交以取得新 exact head 的
-required CI；整改对应 scheduler 对旧 exact head
+当前实现分支 `feat/issue66-minimalism-20260914` 已完成本地整改并取得新 exact head；整改对应 scheduler 对旧 exact head
 `12adbb3e5310f6f75d775afd569a745a7533f9cc` 的 `REMEDIATE / KEEP DRAFT / DO NOT MERGE`
 意见（PR #67 review `5205558820`，Issue #66 comment `5674829261`）。四项整改为：
 
@@ -114,7 +113,8 @@ closure `44,985.21 -> 53.97 ms`，读取/重建 `14,919.95 -> 3,032.02 ms`。本
 provider payload，因而 snapshot/readmodel/publish 的端到端吞吐、峰值内存和真实文件收益仍未
 测量，已列为后续授权任务。本地收集 1,839 项，`uv run pytest -q` 退出码为 0（1,835 passed、
 4 个既有环境条件 skip）；Ruff、format、mypy、compileall、`uv pip check` 和 diff check 均通过。
-新 exact-head 的 required CI 尚未取得，仍由 scheduler 决定是否恢复 Issue #59 的最小
+实现 exact head `40ca7733f2edb2643ec1cf491fdd617fdce7e583` 的 required CI #617（run
+`34935462639`）三个矩阵均 success，受控 GT-H3B #135 skipped；仍由 scheduler 决定是否恢复 Issue #59 的最小
 `2024-01` authoritative acquisition/materializer proof；不得由开发者自行进入 Stage B。
 
 ## 4. 历史执行记录：Issue #59（已由 Issue #66 接管）
