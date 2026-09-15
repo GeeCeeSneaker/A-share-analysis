@@ -755,6 +755,49 @@ def test_bounded_authoritative_materialization_is_readable_and_idempotent(
         )
 
 
+def test_large_authoritative_bounded_projection_reaches_plan_but_fixture_stays_bounded(
+    tmp_path: Path,
+) -> None:
+    partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
+    projection = _projection(
+        [_row(date(2020, 1, 2), f"security-{index:05d}") for index in range(10_001)]
+    )
+    evidence = _authoritative_evidence(partition, tmp_path)
+    authoritative = build_authoritative_coverage_basis_descriptor(partition, evidence)
+    materializer = OfflineHistoricalMaterializer(
+        tmp_path / "authoritative-materialized",
+        writer_runtime_lock_hash=_writer_hash(),
+        build_code_fingerprint=BUILD_FINGERPRINT,
+        authoritative_capture_root=tmp_path / "raw",
+    )
+
+    plan = materializer.plan(
+        projection,
+        coverage_bases=(authoritative,),
+        materialization_partitions=(partition,),
+    )
+    assert len(projection.rows) == 10_001
+    assert plan.coverage_evidence_class is CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM
+    assert plan.artifacts[0].row_count == 10_001
+
+    fixture = build_fixture_coverage_basis_descriptor(
+        partition,
+        source_snapshot_id=SNAPSHOT_ID,
+        source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
+    )
+    fixture_materializer = OfflineHistoricalMaterializer(
+        tmp_path / "fixture-materialized",
+        writer_runtime_lock_hash=_writer_hash(),
+        build_code_fingerprint=BUILD_FINGERPRINT,
+    )
+    with pytest.raises(HistoricalMaterializationError, match="offline fixture is limited"):
+        fixture_materializer.plan(
+            projection,
+            coverage_bases=(fixture,),
+            materialization_partitions=(partition,),
+        )
+
+
 def test_bounded_scope_orders_multiple_typed_partitions(tmp_path: Path) -> None:
     first = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
     second = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 2)

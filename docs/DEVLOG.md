@@ -18,10 +18,14 @@
 - `materialization_scope_hash` 已纳入现有 `materialization_identity`；同一 source/projection
   的不同 scope 现在生成不同的 idempotency/materialization id，避免范围只存在 manifest 而与
   identity 脱节。
-- bounded scope 的历史物化聚焦测试 27 项通过，全仓 pytest、ruff check/format、mypy 均通过；
+- 新 checkpoint 发现旧的 10,000 行 offline fixture guard 会在 bounded scope 裁剪前挡住真实
+  2024-01 的 112,075 行 projection；现已收窄为仅 fixture/非权威路径受限，显式 bounded
+  `AUTHORITATIVE_UPSTREAM` scope 在每个目标分区都有 typed evidence 且配置 retained capture root
+  时可进入 planning，并以 10,001 行回归确认 fixture 仍拒绝。
+- bounded scope 的历史物化聚焦测试 28 项通过，全仓 pytest、ruff check/format、mypy 均通过；
   该测试使用 fake receipt/fixture，只证明代码边界，不能充当生产 authority。
 - 脱敏报告见 `docs/provider_verification/cr7_authoritative_2024_01_closure_20260915.md/json`。
-  当前仍需提供可由现有链路验证的 source snapshot，并对 bounded 2024-01
+  当前仍需通过现有 Canonical → Snapshot → ReadModel 链构造并验证 source snapshot，并对 bounded 2024-01
   materializer/reader 整改做独立审阅；在此之前不执行 Stage B、78 月回补、
   Formal/Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
 

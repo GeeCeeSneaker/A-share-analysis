@@ -2970,7 +2970,7 @@ class HistoricalMaterializationPlan:
 
 
 class OfflineHistoricalMaterializer:
-    """Plan and atomically publish only bounded offline fixture materializations."""
+    """Plan and atomically publish bounded historical materializations."""
 
     def __init__(
         self,
@@ -3005,10 +3005,6 @@ class OfflineHistoricalMaterializer:
         if projection.identity_view.source_kind == UNVERIFIED_CALLER_IDENTITY_SOURCE:
             raise HistoricalMaterializationError(
                 "unverified caller identity rows cannot enter historical materialization"
-            )
-        if len(projection.rows) > _MAX_OFFLINE_FIXTURE_ROWS:
-            raise HistoricalMaterializationError(
-                f"offline fixture is limited to {_MAX_OFFLINE_FIXTURE_ROWS} rows"
             )
         normalized_rows: list[dict[str, Any]] = []
         seen_primary_keys: set[tuple[date, str]] = set()
@@ -3076,6 +3072,25 @@ class OfflineHistoricalMaterializer:
         ):
             raise HistoricalMaterializationError(
                 "authoritative materialization requires the retained AmazingData capture root"
+            )
+        # The row ceiling protects offline fixtures and caller-shaped inputs.
+        # A real bounded publication is admitted only after every target
+        # partition has the reviewed typed upstream evidence and its retained
+        # capture root is configured.
+        large_authoritative_scope = (
+            materialization_partitions is not None
+            and self.authoritative_capture_root is not None
+            and all(
+                evaluation.state is CoverageState.OBSERVED_DAILY_BAR_COVERAGE
+                and evaluation.evidence_class is CoverageEvidenceClass.AUTHORITATIVE_UPSTREAM
+                and evaluation.descriptor is not None
+                and evaluation.descriptor.authoritative_evidence is not None
+                for evaluation in evaluations
+            )
+        )
+        if len(projection.rows) > _MAX_OFFLINE_FIXTURE_ROWS and not large_authoritative_scope:
+            raise HistoricalMaterializationError(
+                f"offline fixture is limited to {_MAX_OFFLINE_FIXTURE_ROWS} rows"
             )
         evaluation_by_key = {evaluation.partition: evaluation for evaluation in evaluations}
         basis_hash = compute_coverage_basis_set_hash(descriptors)

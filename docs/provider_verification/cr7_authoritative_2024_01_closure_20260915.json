@@ -40,10 +40,17 @@
     "explicit_scope_version": "bounded-materialization-scope-v1",
     "scope_bound_identity_field": "materialization_scope_hash",
     "scope_bound_idempotency_and_materialization_id": true,
+    "large_authoritative_bounded_projection_allowed": true,
+    "offline_fixture_row_limit": 10000,
+    "large_projection_regression_rows": 10001,
+    "fixture_row_limit_preserved": true,
+    "large_projection_guard_requires_explicit_bounded_scope": true,
+    "large_projection_guard_requires_authoritative_evidence_per_target": true,
+    "large_projection_guard_requires_retained_capture_root": true,
     "default_full_window_unchanged": true,
     "bounded_scope_reader_supported": true,
     "current_reader_requires_authoritative_basis_per_inventory_partition": true,
-    "focused_materialization_tests_passed": 27
+    "focused_materialization_tests_passed": 28
   },
   "qa": {
     "full_pytest_exit_code": 0,
@@ -60,7 +67,7 @@
     "ordinary_reader": "NOT_STARTED"
   },
   "next_minimum_inputs": [
-    "verified ReadModel/Canonical source snapshot",
+    "project-generated verified ReadModel/Canonical source snapshot via the existing foundation path",
     "independent exact-head review of bounded materializer/reader remediation",
     "exact-head CI review"
   ],

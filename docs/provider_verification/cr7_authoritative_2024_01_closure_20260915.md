@@ -1,7 +1,7 @@
 # CR-7 2024-01 权威闭环执行记录（2026-09-15）
 
-状态：`STOP(BLOCKED)`；bounded materializer/reader 整改（含 identity scope binding）已在本分支
-完成并待独立审阅，仍不铸造
+状态：`STOP(BLOCKED)`；bounded materializer/reader 整改（含 identity scope binding 和
+authoritative large-projection guard）已在本分支完成并待独立审阅，仍不铸造
 authoritative receipt、不执行真实 materialization、不执行 Stage B。
 
 本记录对应 Issue #59 当前要求，只检查 `2024-01`。原始 provider payload、账号凭证、私有
@@ -19,8 +19,8 @@ endpoint、SDK/runtime 和本地 raw 均不进入 GitHub；本文件只保留脱
 | 本地账号 bootstrap | 网络可达、认证成功、查询就绪；脱敏画像与冻结身份匹配 |
 | 凭证是否进入 Git | `FALSE`；只从未跟踪本地 `.env` 读取 |
 | 工作区依赖归档 | `vendor/amazingdata/`，49 个文件，约 210,130,779 bytes；目录被 `.gitignore` 排除 |
-| bounded scope 整改 | 已实现显式 typed partition scope；默认 78 月合同保持不变 |
-| 历史物化聚焦回归 | 27 passed |
+| bounded scope 整改 | typed partition scope、scope identity binding 和权威大 projection guard 已实现；默认 78 月合同保持不变 |
+| 历史物化聚焦回归 | 28 passed |
 | 全仓 pytest | exit code `0` |
 | ruff check / format / mypy | 全部通过；mypy 108 source files 无问题 |
 | 可验证 ReadModel snapshot | `UNAVAILABLE` |
@@ -44,9 +44,9 @@ fixture projection 或手工填写的 hash 都不能替代这个输入，否则�
 source snapshot。因而本次没有调用 `AmazingDataHistoryAcquisition.acquire_month()`，也没有把
 任何真实响应提升为 authority。
 
-解除条件：项目管理者提供一个能由现有 ReadModel/Canonical 校验链成功打开的本地 snapshot
-根（或按既有链路授权并完成该 snapshot 的构建），同时保留其 snapshot id、manifest hash、
-semantic hash、canonical run id 和 PIT；这些值可以脱敏记录，但不能用占位值代替。
+解除条件：项目必须通过既有数据基座的 Canonical → Snapshot → ReadModel 链构造并验证一个能被
+现有校验链成功打开的本地 snapshot 根，同时保留其 snapshot id、manifest hash、semantic hash、
+canonical run id 和 PIT；这些值可以脱敏记录，但不能用占位值代替或手工填写。
 
 ## 已完成的最小整改：bounded materializer/reader
 
@@ -62,8 +62,11 @@ semantic hash、canonical run id 和 PIT；这些值可以脱敏记录，但不�
   enabled 分区的 authoritative evidence，并拒绝跨出已发布范围的读取。
 - idempotent replay 复用同一 scope；manifest scope 改变、内容改变或 retained evidence 不一致时
   仍走既有 conflict/fail-closed 路径。
+- 旧的 10,000 行 offline fixture 上限现在只约束 fixture/非权威路径；显式 bounded scope 且每个
+  目标分区均有 `AUTHORITATIVE_UPSTREAM` typed evidence、保留 capture root 的 projection 可超过
+  该上限进入 planning。新回归使用 10,001 行验证该放行，同时确认 fixture 仍被拒绝。
 - 新测试覆盖单分区读取、跨分区拒绝、相同 scope replay、不同 scope 生成不同 identity 和变更
-  内容冲突；既有 78 月测试也通过。
+  内容冲突，以及大于 10,000 行权威 projection 的 planning；既有 78 月测试也通过。
 
 这项整改只证明代码边界可以承接一个月；测试使用的 fake receipt/fixture 不能作为生产 authority，
 也不替代真实 2024-01 acquisition。
@@ -79,11 +82,12 @@ Atlas 数据库中，`rm_snapshot_meta`、`rm_daily_bar` 以及 snapshot/build/r
 
 ## 最小下一步要求
 
-1. 项目管理者提供一个能由现有 ReadModel/Canonical 链成功打开的真实 source snapshot，保留
-   snapshot id、manifest/semantic hash、canonical run id 和 PIT；账号可用本身不足以替代它。
+1. 项目通过既有 Canonical → Snapshot → ReadModel 链构造并验证一个能成功打开的真实 source
+   snapshot，保留 snapshot id、manifest/semantic hash、canonical run id 和 PIT；账号可用本身不足以
+   替代该数据输入，也不能手工填写 snapshot 身份。
 2. 对当前分支的 bounded scope 整改做独立 exact-head 审阅并等待 CI 通过；本地 focused/full QA
    已通过。
-3. 审阅通过且 snapshot 到位后，才运行唯一授权的 2024-01 acquisition，并按 Issue 顺序完成
+3. PR #68 独立审阅/合并且 snapshot 到位后，才运行唯一授权的 2024-01 acquisition，并按 Issue 顺序完成
    raw anchor、completeness PASS、receipt replay、coverage
    basis、atomic materialization、ordinary reader、idempotent replay/conflict fail-closed。
 4. 在上述闭环独立审阅通过前，继续禁止 `2020-01`、`2026-01`、78 月回补、Formal B1-B7、

@@ -16,8 +16,8 @@ CR-5/R2、Golden/H1、baseline 或策略工作。
 
 2026-09-15 的受控本地检查记录在
 [`cr7_authoritative_2024_01_closure_20260915.md`](../provider_verification/cr7_authoritative_2024_01_closure_20260915.md)。
-结论为 `STOP(BLOCKED)`：bounded materializer/reader 的最小范围整改已在工作分支完成并通过本地
-focused/full QA，但本地没有可通过现有 ReadModel/Canonical 链打开的 verified source snapshot；
+结论为 `STOP(BLOCKED)`：bounded materializer/reader 的 scope identity 与权威大 projection guard
+整改已在工作分支完成并通过本地 focused/full QA，但本地没有可通过现有 ReadModel/Canonical 链打开的 verified source snapshot；
 因此没有铸造 receipt、没有执行真实 materializer，也没有提交凭证或 raw。
 
 ## 1. 项目管理责任
