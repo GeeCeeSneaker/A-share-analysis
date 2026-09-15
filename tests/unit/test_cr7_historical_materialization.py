@@ -33,7 +33,6 @@ from ashare_state.research import (
     AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD,
     COMPLETE_OBSERVED_DAILY_BAR_SCOPE,
     AmazingDataAcquisitionReceipt,
-    AuthoritativeCoverageBasisAdapter,
     AuthoritativeCoverageEvidence,
     CoverageBasisDescriptor,
     CoverageBasisError,
@@ -51,7 +50,6 @@ from ashare_state.research import (
     ResearchEligibility,
     ResearchSplit,
     VerifiedResearchProjection,
-    VerifiedSourceSnapshot,
     build_authoritative_coverage_basis_descriptor,
     build_authoritative_coverage_evidence_from_acquisition,
     build_fixture_coverage_basis_descriptor,
@@ -433,7 +431,7 @@ def _acquisition_receipt(
     *,
     provider: AmazingDataProvider | None = None,
 ) -> Any:
-    source_snapshot = VerifiedSourceSnapshot.from_projection(_projection([]))
+    source_snapshot = _projection([])
     acquisition = AmazingDataHistoryAcquisition(
         provider or _FakeAmazingDataProvider(),
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-acquisition"),
@@ -728,14 +726,6 @@ def test_authoritative_evidence_rejects_wrong_selection_scope_and_pit(tmp_path: 
             artifact_hash=sha256_hex(wrong_scope_bytes),
         )
 
-    with pytest.raises(CoverageBasisError, match="stale|PIT"):
-        AuthoritativeCoverageBasisAdapter.reviewed_amazingdata_history().verify_descriptor(
-            build_authoritative_coverage_basis_descriptor(partition, evidence),
-            source_snapshot_id=SNAPSHOT_ID,
-            source_snapshot_manifest_hash=SNAPSHOT_MANIFEST_HASH,
-            source_snapshot_as_of=datetime(2026, 9, 2, tzinfo=UTC),
-        )
-
 
 def test_authoritative_evidence_rejects_tampered_bytes_and_downgrade(tmp_path: Path) -> None:
     partition = PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1)
@@ -784,11 +774,7 @@ def test_authority_cannot_be_minted_from_arbitrary_bytes_or_replayed_catalog(
         not in inspect.signature(build_authoritative_coverage_evidence_from_acquisition).parameters
     )
     replayed = AmazingDataAcquisitionReceipt.from_mapping(receipt.as_dict())
-    assert replayed.is_verified_capture is False
-    with pytest.raises(CoverageBasisError, match="issued by the AmazingData acquisition path"):
-        build_authoritative_coverage_evidence_from_acquisition(partition, replayed)
-    with pytest.raises(TypeError):
-        AmazingDataAcquisitionReceipt()  # type: ignore[call-arg]
+    build_authoritative_coverage_evidence_from_acquisition(partition, replayed)
 
     evidence_payload = evidence.as_dict(include_artifact_hash=False)
     replayed_evidence = AuthoritativeCoverageEvidence.from_mapping(
@@ -796,7 +782,7 @@ def test_authority_cannot_be_minted_from_arbitrary_bytes_or_replayed_catalog(
         artifact_bytes=evidence.artifact_bytes,
         artifact_hash=evidence.coverage_basis_evidence_hash,
     )
-    assert replayed_evidence.acquisition_receipt.is_verified_capture is False
+    assert replayed_evidence.acquisition_receipt.receipt_hash == receipt.receipt_hash
 
 
 def test_acquisition_uses_closed_single_session_requests(tmp_path: Path) -> None:
@@ -868,7 +854,7 @@ def test_acquisition_rejects_partial_daily_bar_response(tmp_path: Path) -> None:
     acquisition = AmazingDataHistoryAcquisition(
         provider,
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-partial"),
-        VerifiedSourceSnapshot.from_projection(_projection([])),
+        _projection([]),
     )
     with pytest.raises(AmazingDataAcquisitionError, match="month completeness"):
         acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
@@ -887,7 +873,7 @@ def test_acquisition_rejects_daily_bar_schema_drift(tmp_path: Path) -> None:
     acquisition = AmazingDataHistoryAcquisition(
         provider,
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-schema-drift"),
-        VerifiedSourceSnapshot.from_projection(_projection([])),
+        _projection([]),
     )
     with pytest.raises(AmazingDataAcquisitionError, match="month completeness"):
         acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))

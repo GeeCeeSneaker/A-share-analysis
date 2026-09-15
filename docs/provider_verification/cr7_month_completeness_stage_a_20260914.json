@@ -810,9 +810,6 @@
       "status": "OK"
     },
     "evaluation": {
-      "applicability_semantics_version": "amazingdata-hist-code-list-exact-session-v2",
-      "applicable_pair_count": 112207,
-      "applicable_pair_set_hash": "c7ec6c09664794369720fccc520e231a29a7b2d384ea9c80dfce5563187c73a4",
       "classification_counts": {
         "EXTRA_RETURNED": 0,
         "NOT_APPLICABLE_SESSION": 125,
@@ -828,9 +825,6 @@
       "missing_required_pair_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "monthly_security_count": 5106,
       "monthly_security_set_hash": "f9b15023b79cd261c599a5de52e5d00e62cdf82c4b9fddffcde601450a7e8fde",
-      "not_applicable_pair_count": 125,
-      "not_applicable_pair_set_hash": "83c8baf5688a76cb2468de119b41f118a3977e2abdc30b2d39f1f4805cd491e1",
-      "positive_trade_fallback_version": "amazingdata-positive-trade-count-fallback-v1",
       "positive_trade_pair_count": 22,
       "positive_trade_pair_set_hash": "8e6255c0f88de81ae3512b9e03a4609e494f7f2b4d25dbaa3d295f246a295d64",
       "required_bar_pair_count": 112075,
@@ -847,8 +841,6 @@
       "session_set_hash": "f7a391589c4ab102ce6b570c4001a92590eae94a3794e0f40f8554e6da903452",
       "status": "PASS",
       "structural_error_codes": [],
-      "suspended_pair_count": 132,
-      "suspended_pair_set_hash": "a3f5e8940a8993649c3dce226cd4082912eb3d1549f8769a885dc3fd5f0bb929",
       "unresolved_pair_count": 0
     },
     "exact_session_universes": {

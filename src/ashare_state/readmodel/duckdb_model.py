@@ -14,6 +14,13 @@
   (``readmodel/contract=readmodel-v1/snapshot=<id>/readmodel.duckdb``);
 - any failure leaves the previous target untouched and the temp file
   removed (no partial / corrupt / half-built model is ever visible).
+
+The ReadModel boundary consumes one verified snapshot hand-off.  The
+per-domain semantic recomputes in ``_validate_logical_seal`` are deliberately
+kept as a distinct copy-integrity invariant for the newly built DuckDB tables;
+they are not a recursive re-verification of the canonical/normalization/raw
+chain.  Downstream Feature and R1 consumers reuse the same snapshot hand-off
+instead of opening the model and verifying the snapshot a second time.
 """
 
 from __future__ import annotations
@@ -247,11 +254,12 @@ class DuckDBReadModel:
 
     # ------------------------------------------------------ logical seal
     def _validate_logical_seal(self, db: duckdb.DuckDBPyConnection, verified: Any) -> None:
-        """P0-B06/P0-B07/P0-B08: the LOGICAL truth of the built model
-        must equal the verified snapshot truth exactly - row counts,
-        per-domain semantic hashes recomputed FROM THE TABLE CONTENTS,
-        canonical-key uniqueness, schema exactness (declared DuckDB
-        types, explicit timezone semantics) and the meta tables."""
+        """Validate the new DuckDB copy against its one snapshot hand-off.
+
+        The semantic hash recompute is a distinct physical-copy invariant: it
+        detects a bad parquet-to-DuckDB transfer and is not a recursive
+        canonical-chain verification on downstream reads.
+        """
         problems: list[str] = []
         tables = {
             r[0]
@@ -416,3 +424,14 @@ class DuckDBReadModel:
         """Open only a ReadModel whose snapshot and logical seal verify."""
         db, _ = self._open_verified_read_only(snapshot_id)
         return db
+
+    def open_read_only_with_snapshot(
+        self, snapshot_id: str
+    ) -> tuple[duckdb.DuckDBPyConnection, Any]:
+        """Open a ReadModel and return the one snapshot seal it consumed.
+
+        Consumers that need snapshot provenance should use this hand-off
+        instead of opening the model and recursively calling
+        ``verify_snapshot`` a second time.
+        """
+        return self._open_verified_read_only(snapshot_id)

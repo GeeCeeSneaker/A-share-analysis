@@ -33,7 +33,10 @@ from typing import Any
 import polars as pl
 
 from ashare_state.canonical.canonicalizer import _canonical_json, _rows_semantic_hash
-from ashare_state.canonical.verifier import verify_canonical_run_for_consumption
+from ashare_state.canonical.verifier import (
+    read_canonical_run_manifest,
+    verify_canonical_run_for_consumption,
+)
 from ashare_state.snapshot.models import (
     SnapshotBuilderError,
     SnapshotBuildResult,
@@ -44,7 +47,7 @@ from ashare_state.snapshot.schema import (
     SNAPSHOT_CONTRACT_VERSION,
     SnapshotSchemaError,
     polars_domain_schema,
-    project_verified_canonical_snapshot,
+    project_canonical_snapshot,
 )
 
 __all__ = [
@@ -142,26 +145,28 @@ class SnapshotBuilder:
     # ------------------------------------------------------------- build
     def build(self, canonical_run_id: str) -> SnapshotBuildResult:
         started = datetime.now(UTC)
-        verified = verify_canonical_run_for_consumption(
+        # Read the durable source seal first so an idempotent retry can
+        # identify an existing snapshot without re-running the full
+        # canonical closure.  A new snapshot still crosses the owner
+        # boundary below and receives the complete canonical verification.
+        source_record, _source_manifest, source_as_of = read_canonical_run_manifest(
             self.conn,
             canonical_run_id,
-            raw_root=self.raw_root,
             normalized_root=self.normalized_root,
         )
-        record = verified.ledger_record
         fingerprint = snapshot_builder_code_fingerprint()
         base_hash = snapshot_base_hash_from_primitives(
-            canonical_run_id=verified.canonical_run_id,
-            canonical_manifest_hash=str(record["manifest_hash"]),
-            canonical_requested_domains_hash=str(record["requested_domains_hash"]),
-            canonical_selected_semantic_hash=str(record["selected_semantic_hash"]),
-            canonical_as_of=verified.as_of.isoformat(),
+            canonical_run_id=canonical_run_id,
+            canonical_manifest_hash=str(source_record["manifest_hash"]),
+            canonical_requested_domains_hash=str(source_record["requested_domains_hash"]),
+            canonical_selected_semantic_hash=str(source_record["selected_semantic_hash"]),
+            canonical_as_of=source_as_of.isoformat(),
             snapshot_contract_version=SNAPSHOT_CONTRACT_VERSION,
             snapshot_builder_code_fingerprint=fingerprint,
         )
         snapshot_id = snapshot_id_from_base_hash(base_hash)
 
-        # idempotent replay: the ledger row + the FULL physical verify
+        # idempotent replay: the snapshot boundary verifies its own seal.
         existing = self.conn.execute(
             "SELECT 1 FROM meta_snapshot_build WHERE snapshot_id = ?",
             [snapshot_id],
@@ -187,12 +192,30 @@ class SnapshotBuilder:
                 idempotent_replay=True,
             )
 
+        # New snapshot: the owner boundary performs the complete canonical
+        # verification exactly once before any snapshot bytes are written.
+        verified = verify_canonical_run_for_consumption(
+            self.conn,
+            canonical_run_id,
+            raw_root=self.raw_root,
+            normalized_root=self.normalized_root,
+        )
+        record = verified.ledger_record
+        if str(record["manifest_hash"]) != str(source_record["manifest_hash"]):
+            raise SnapshotBuilderError(
+                "canonical manifest changed between seal lookup and full verification"
+            )
+
         base_dir = snapshot_base_dir(snapshot_id, verified.as_of)
 
         # ---- one shared deterministic projection for build + verify
         try:
-            projected_by_domain = project_verified_canonical_snapshot(
-                verified, snapshot_id=snapshot_id
+            projected_by_domain = project_canonical_snapshot(
+                verified.selected_rows,
+                requested_domains=verified.requested_domains,
+                canonical_run_id=verified.canonical_run_id,
+                as_of=verified.as_of,
+                snapshot_id=snapshot_id,
             )
         except SnapshotSchemaError as exc:
             raise SnapshotBuilderError(

@@ -7,7 +7,6 @@ identity/read-model contract.
 """
 
 from ashare_state.research.authoritative import (
-    AuthoritativeCoverageBasisAdapter,
     build_authoritative_coverage_basis_descriptor,
 )
 from ashare_state.research.eligibility import EligibilityDecision, evaluate_daily_bar
@@ -40,7 +39,6 @@ from ashare_state.research.historical import (
     OfflineHistoricalMaterializer,
     PartitionKey,
     PositiveTradeFallbackOperation,
-    VerifiedSourceSnapshot,
     WriterRuntimeLock,
     build_authoritative_coverage_evidence_from_acquisition,
     build_fixture_coverage_basis_descriptor,
@@ -106,7 +104,6 @@ __all__ = [
     "BSE_IDENTITY_BOUNDARY_STATE",
     "AUTHORITATIVE_COVERAGE_EVIDENCE_VERSION",
     "AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_METHOD",
-    "AuthoritativeCoverageBasisAdapter",
     "AmazingDataAcquisitionReceipt",
     "AmazingDataExchangeReceipt",
     "PositiveTradeFallbackOperation",
@@ -141,7 +138,6 @@ __all__ = [
     "RESEARCH_SECURITY_DAILY_SCHEMA_VERSION",
     "ResearchBuildResult",
     "VerifiedResearchProjection",
-    "VerifiedSourceSnapshot",
     "ResearchEligibility",
     "ResearchManifest",
     "ResearchManifestError",

@@ -93,6 +93,21 @@ class TestBidirectionalClosure:
         problems = verify_meta_closure(_dataset_dir(tmp_path), doc)
         assert any("combined content_hash" in p for p in problems)
 
+    @pytest.mark.parametrize("tables", [["malformed"], [None]])
+    def test_malformed_table_records_fail_closed_without_raising(self, tmp_path: Path, tables):
+        problems = verify_meta_closure(
+            tmp_path,
+            {
+                "tables": tables,
+                "null_tables": [],
+                "content_hash": "0" * 64,
+            },
+        )
+        if tables is None:
+            assert problems == ["tables must be a list"]
+        else:
+            assert "table record must be an object" in problems
+
 
 class TestRequestParams:
     def test_full_params_persisted_and_reconstructable(self, tmp_path: Path):

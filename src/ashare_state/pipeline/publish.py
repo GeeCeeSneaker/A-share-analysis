@@ -18,9 +18,10 @@ R4-B2 (audit 20260830) Publish Validation Exactness:
   ``pipeline.artifact_validation.validate_artifact_for_publish`` (the old
   caller-facing count-writer ``record_artifact_validation`` is GONE);
 - the publish-critical validation recheck (report bytes hash, ledger
-  identity, exact artifact/component seal, required-check completeness)
-  runs INSIDE the publish transaction - the precheck TOCTOU window is
-  closed;
+  identity, exact artifact/component seal, required-check completeness) runs
+  as a preflight before the short publish transaction and returns a
+  ``PublishValidationSeal``; the transaction consumes that seal again against
+  current DB heads and immutable registry identities;
 - the latest-head policy is deterministic (validated_at DESC,
   artifact_validation_id DESC): a newer FAIL record makes an older PASS
   non-publishable, and legacy rows without the B2 seal require
@@ -36,13 +37,17 @@ R4-B2.1 closures (audit 20260830 19:13):
   validator_code_commit (ledger == report, non-empty),
   validation_version (ledger == report == the current supported
   version). "Wrote the seal" is now "the seal is a correctness input".
-- **P0-03 full transaction-internal preconditions**: ALL authoritative
-  publish-precondition reads (snapshot / artifact / feature set /
-  pipeline run / universes / validation head / seal / physical bytes)
-  happen INSIDE the transaction via
-  ``_resolve_publish_preconditions`` (Option A authoritative re-read);
-  the writes consume only those in-transaction values. Nothing outside
-  the transaction is a correctness input.
+- **P0-03 short transaction boundary**: expensive report parsing, physical
+  artifact/component hashing and DQ-input validation happen before
+  ``BEGIN``. ``_consume_b2_seal`` then re-reads the validation head,
+  component registry, artifact manifest identity and small DQ completion
+  proofs inside the transaction; the write consumes only the re-bound values.
+  This keeps the transaction short without treating an unbound preflight as
+  authoritative.
+- The preflight-to-transaction hand-off assumes registered artifact and
+  component files are immutable once published in their registry. A full
+  deep audit remains an explicit read-only operation; it is not repeated in
+  the publish transaction.
 - **P0-04 logical-URI confinement**: every registry file_uri and the
   validation report_uri resolve through the frozen
   ``physical_from_logical_uri`` helper - escaped/absolute/drive/
@@ -55,6 +60,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -73,14 +79,50 @@ class PublishStateError(PublishError):
     """Preconditions for publishing are not met."""
 
 
+@dataclass(frozen=True)
+class PublishValidationSeal:
+    """Small DB-bound hand-off from validation preflight to publish."""
+
+    feature_artifact_set_id: str
+    validation_id: str
+    identity_fallback_count: int
+    blocking_dq_count: int
+    report_uri: str
+    report_hash: str
+    artifact_manifest_hash: str
+    component_manifest_hash: str
+    validation_contract_hash: str
+    required_checks_hash: str
+    validator_code_commit: str
+    validation_version: str
+    dq_execution_seal_hash: str
+
+
+def _dq_execution_seal_hash(seals: list[dict[str, Any]]) -> str:
+    """Hash the small set of DQ completion-proof rows, not data artifacts."""
+    canonical = json.dumps(
+        sorted(seals, key=lambda seal: str(seal.get("check_id") or "")),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _b2_recheck(
     conn: DuckDBPyConnection,
     *,
     data_root: Path,
     feature_artifact_set_id: str,
-) -> str:
-    """B2-05 Option A + R4-B2.1 P0-02/P0-04: the publish-critical
-    validation recheck, executed INSIDE the publish transaction.
+) -> PublishValidationSeal:
+    """B2-05 + R4-B2.1 P0-02/P0-04: prevalidate the publish seal.
+
+    This is deliberately a preflight operation.  It performs the expensive
+    report parsing, component hashing and current DQ-input resolution before
+    the short publication transaction.  ``_consume_b2_seal`` then checks the
+    returned DB-bound identity inside that transaction.  Registered data
+    files are immutable; a deep physical re-audit remains an explicit audit
+    operation.
 
     Reads the COMPLETE seal from the ledger row and cross-verifies it
     against the persisted report AND the CURRENT contract. Returns the
@@ -416,7 +458,172 @@ def _b2_recheck(
             "R4-B2.3 section 3)"
         )
         raise PublishStateError(msg)
-    return str(validation_id)
+    return PublishValidationSeal(
+        feature_artifact_set_id=feature_artifact_set_id,
+        validation_id=str(validation_id),
+        identity_fallback_count=int(fallback_count),
+        blocking_dq_count=int(dq_count),
+        report_uri=str(report_uri),
+        report_hash=str(report_hash),
+        artifact_manifest_hash=str(seal_artifact_hash),
+        component_manifest_hash=str(seal_component_hash),
+        validation_contract_hash=str(ledger_contract_hash),
+        required_checks_hash=str(ledger_checks_hash),
+        validator_code_commit=str(ledger_validator_commit),
+        validation_version=str(ledger_validation_version),
+        dq_execution_seal_hash=_dq_execution_seal_hash(
+            [
+                {
+                    "check_id": str(item.get("check_id") or ""),
+                    "execution_id": str(item.get("execution_id") or ""),
+                    "scan_contract_version": str(item.get("scan_contract_version") or ""),
+                    "producer": str(item.get("producer") or ""),
+                    "authoritative_input_hash": str(item.get("authoritative_input_hash") or ""),
+                    "scanned_component_manifest_hash": str(
+                        item.get("scanned_component_manifest_hash") or ""
+                    ),
+                    "scanned_data_snapshot_id": str(item.get("scanned_data_snapshot_id") or ""),
+                }
+                for item in report.get("dq_execution_seals", [])
+            ]
+        ),
+    )
+
+
+def _consume_b2_seal(
+    conn: DuckDBPyConnection,
+    *,
+    seal: PublishValidationSeal,
+) -> None:
+    """Consume a prevalidated seal using only current DB state.
+
+    This is the transaction-side half of B2.  It intentionally does not read
+    or hash report/component files: the formal validator already produced the
+    physical seal, and the registry identities/proof rows are re-read here to
+    close a DB-level change between preflight and commit.
+    """
+    from ashare_state.pipeline.artifact_validation import (
+        REQUIRED_VALIDATION_CHECKS,
+        compute_component_manifest_hash,
+    )
+
+    validation = conn.execute(
+        "SELECT artifact_validation_id, identity_fallback_count, blocking_dq_count, "
+        "report_uri, report_hash, artifact_manifest_hash, component_manifest_hash, "
+        "validation_contract_hash, required_checks_hash, validator_code_commit, "
+        "validation_version "
+        "FROM meta_artifact_validation WHERE feature_artifact_set_id = ? "
+        "ORDER BY validated_at DESC, artifact_validation_id DESC LIMIT 1",
+        [seal.feature_artifact_set_id],
+    ).fetchone()
+    expected_validation = (
+        seal.validation_id,
+        seal.identity_fallback_count,
+        seal.blocking_dq_count,
+        seal.report_uri,
+        seal.report_hash,
+        seal.artifact_manifest_hash,
+        seal.component_manifest_hash,
+        seal.validation_contract_hash,
+        seal.required_checks_hash,
+        seal.validator_code_commit,
+        seal.validation_version,
+    )
+    if validation is None or tuple(validation) != expected_validation:
+        raise PublishStateError(
+            "ARTIFACT_VALIDATION_PRECHECK_STALE violated: the validation head "
+            f"for {seal.feature_artifact_set_id} changed after physical preflight; "
+            "revalidate before publish"
+        )
+
+    current_artifact = conn.execute(
+        "SELECT artifact_manifest_hash FROM meta_feature_artifact_set "
+        "WHERE feature_artifact_set_id = ?",
+        [seal.feature_artifact_set_id],
+    ).fetchone()
+    current_artifact_hash = str(current_artifact[0]) if current_artifact else ""
+    if current_artifact_hash != seal.artifact_manifest_hash:
+        raise PublishStateError(
+            "ARTIFACT_IDENTITY_CHANGED violated: the registered artifact manifest "
+            "changed after validation preflight; revalidation required"
+        )
+
+    components = conn.execute(
+        "SELECT layer, feature_family, feature_family_version, partition_key, "
+        "file_uri, content_hash, schema_hash, row_count "
+        "FROM meta_feature_artifact_component WHERE feature_artifact_set_id = ? "
+        "ORDER BY file_uri",
+        [seal.feature_artifact_set_id],
+    ).fetchall()
+    keys = (
+        "layer",
+        "feature_family",
+        "feature_family_version",
+        "partition_key",
+        "file_uri",
+        "content_hash",
+        "schema_hash",
+        "row_count",
+    )
+    component_rows = [dict(zip(keys, row, strict=True)) for row in components]
+    current_component_hash = compute_component_manifest_hash(component_rows)
+    if current_component_hash != seal.component_manifest_hash:
+        raise PublishStateError(
+            "ARTIFACT_COMPONENTS_CHANGED violated: the component registry changed "
+            "after validation preflight; revalidation required"
+        )
+
+    required_dq_ids = sorted(
+        check.value for check in REQUIRED_VALIDATION_CHECKS if check.value.endswith("_ZERO")
+    )
+    current_proofs: list[dict[str, str]] = []
+    for check_id in required_dq_ids:
+        proof = conn.execute(
+            "SELECT scan_contract_version, producer, scanned_component_manifest_hash, "
+            "authoritative_input_hash, scanned_data_snapshot_id, execution_id "
+            "FROM meta_artifact_check_execution "
+            "WHERE feature_artifact_set_id = ? AND check_id = ? "
+            "ORDER BY completed_at DESC, execution_id DESC LIMIT 1",
+            [seal.feature_artifact_set_id, check_id],
+        ).fetchone()
+        if proof is None:
+            raise PublishStateError(
+                "ARTIFACT_VALIDATION_PRECHECK_STALE violated: a required DQ "
+                f"completion proof {check_id} disappeared after preflight"
+            )
+        current_proofs.append(
+            {
+                "check_id": check_id,
+                "execution_id": str(proof[5] or ""),
+                "scan_contract_version": str(proof[0] or ""),
+                "producer": str(proof[1] or ""),
+                "authoritative_input_hash": str(proof[3] or ""),
+                "scanned_component_manifest_hash": str(proof[2] or ""),
+                "scanned_data_snapshot_id": str(proof[4] or ""),
+            }
+        )
+    if _dq_execution_seal_hash(current_proofs) != seal.dq_execution_seal_hash:
+        raise PublishStateError(
+            "ARTIFACT_VALIDATION_PRECHECK_STALE violated: required DQ completion "
+            "proofs changed after physical preflight; revalidate before publish"
+        )
+
+    for field, finding_class in (
+        ("identity_fallback_count", "IDENTITY_FALLBACK"),
+        ("blocking_dq_count", "BLOCKING_DQ"),
+    ):
+        count_row = conn.execute(
+            "SELECT count(*) FROM meta_artifact_dq_finding "
+            "WHERE feature_artifact_set_id = ? AND finding_class = ?",
+            [seal.feature_artifact_set_id, finding_class],
+        ).fetchone()
+        current_count = int(count_row[0]) if count_row else 0
+        expected_count = getattr(seal, field)
+        if current_count != expected_count:
+            raise PublishStateError(
+                "ARTIFACT_VALIDATION_PRECHECK_STALE violated: DQ finding counts "
+                "changed after physical preflight; revalidate before publish"
+            )
 
 
 def _resolve_publish_preconditions(
@@ -600,13 +807,13 @@ def publish_snapshot(
 ) -> str:
     """Atomically publish one trade_date. Returns the publish_id.
 
-    R4-B2.1 P0-03 (Option A): EVERY authoritative read happens inside
-    the single transaction - preconditions (snapshot / artifact /
-    feature set / run / universes), the validation head with its full
-    seal, and the physical component bytes. The writes consume only
-    in-transaction values; nothing read outside the transaction is a
-    correctness input. Any failure rolls everything back and the
-    previous PUBLISHED publish stays visible.
+    R4-B2.1 P0-03/P0-04: the heavy validation preflight (report and
+    component bytes) completes before the short transaction.  The
+    transaction then re-reads all lineage/status facts and consumes the
+    DB-bound validation seal before changing publication rows.  Physical
+    artifacts are immutable once registered; a deep physical re-audit is
+    owned by the validator/audit path.  Any failure rolls everything back
+    and the previous PUBLISHED publish stays visible.
     """
     pid = publish_id or str(uuid.uuid4())
     now = datetime.now(UTC)
@@ -619,9 +826,20 @@ def publish_snapshot(
         )
         raise PublishStateError(msg)
 
+    # P0-04: expensive report/component/DQ-input verification is a
+    # preflight.  The returned seal is checked again against current DB
+    # identities after BEGIN; no physical file hashing occurs in the write
+    # transaction.
+    validation_seal = _b2_recheck(
+        conn,
+        data_root=data_root,
+        feature_artifact_set_id=feature_artifact_set_id,
+    )
+
     conn.execute("BEGIN TRANSACTION")
     try:
-        # P0-03: authoritative preconditions - INSIDE the transaction.
+        # P0-03: authoritative lineage/status preconditions - INSIDE the
+        # transaction.
         _resolve_publish_preconditions(
             conn,
             trade_date=trade_date,
@@ -631,13 +849,10 @@ def publish_snapshot(
             universes=universes,
             pipeline_run_id=pipeline_run_id,
         )
-        # B2-05 + P0-02/P0-04: the full-seal validation recheck - also
-        # INSIDE the transaction (no TOCTOU window).
-        artifact_validation_id = _b2_recheck(
-            conn,
-            data_root=data_root,
-            feature_artifact_set_id=feature_artifact_set_id,
-        )
+        # P0-04: consume the preflight result using only current registry,
+        # validation-head and completion-proof identities.
+        _consume_b2_seal(conn, seal=validation_seal)
+        artifact_validation_id = validation_seal.validation_id
         existing = conn.execute(
             "SELECT publish_id FROM meta_publish_snapshot "
             "WHERE trade_date = ? AND status = 'PUBLISHED'",

@@ -17,8 +17,9 @@ The ONE formal normalization boundary::
 Machine-enforced invariants (audit sections 2-5):
 
 - P0-01 the runner NEVER calls the provider/SDK - its only input is
-  the persisted raw evidence, read through the verified RawWriter
-  reader (``read(verify=True)``);
+  the persisted raw evidence.  ``verify_raw_evidence()`` closes the raw
+  boundary once and the mapper read consumes its bound handle, so the same
+  physical files are not rehashed merely because the payload is read;
 - CR-2.1 P0-01 surface identity is the PERSISTED envelope field, not a
   request parameter: stock daily_bar and index daily_bar share the
   same (provider_dataset, endpoint) and route to different mappers
@@ -81,7 +82,8 @@ from ashare_state.storage.raw_writer import (
     KIND_MULTI_ROWS,
     RawWriter,
     RawWriterError,
-    verify_meta_closure,
+    VerifiedRawEvidence,
+    verify_raw_evidence,
 )
 
 if TYPE_CHECKING:
@@ -616,8 +618,17 @@ class NormalizationRunner:
         surface = str(meta_doc.get("normalization_surface") or "")
 
         # -------------------------------------------- closure verification
-        problems = verify_meta_closure(dataset_dir, meta_doc)
-        if problems:
+        # One raw boundary verifies the immutable payload set and hands the
+        # downstream mapper a bound handle.  The later read consumes that
+        # handle instead of hashing the same Parquet files a second time.
+        try:
+            verified_raw: VerifiedRawEvidence = verify_raw_evidence(
+                self.raw_root,
+                provider=provider,
+                dataset=provider_dataset,
+                request_id=request_id,
+            )
+        except RawWriterError as exc:
             replay = self._maybe_replay(
                 self._blocked_key(raw_evidence_hash, surface, provider_dataset, endpoint, None)
             )
@@ -633,7 +644,7 @@ class NormalizationRunner:
                 endpoint=endpoint,
                 surface=surface or None,
                 error_class=NormalizationErrorClass.RAW_EVIDENCE_INVALID,
-                error_message=f"raw evidence closure failed: {'; '.join(problems)}",
+                error_message=f"raw evidence closure failed: {exc}",
                 started=started,
                 input_count=0,
                 normalized_count=0,
@@ -727,7 +738,11 @@ class NormalizationRunner:
         # ------------------------------------- verified payload read (P0-01)
         try:
             payload = self._reader.read(
-                provider=provider, dataset=provider_dataset, request_id=request_id, verify=True
+                provider=provider,
+                dataset=provider_dataset,
+                request_id=request_id,
+                verify=False,
+                verified=verified_raw,
             )
         except RawWriterError as exc:
             replay = self._maybe_replay(

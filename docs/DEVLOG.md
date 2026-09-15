@@ -1,3 +1,35 @@
+## 2026-09-14 · Issue #66 CR-7 热路径最小化（当前交接）
+
+> 状态：**IMPLEMENTED LOCALLY / FULL QA GREEN / BENCHMARK RECORDED / DRAFT PR / INDEPENDENT REVIEW REQUIRED**
+
+- 基线为 clean `main@41403d3a0083609f1b7ab110d4c03b4ff0093933`（PR #64 merge）；本轮只处理
+  Issue #66 的最小化，不执行 Stage B、78 月物化、Formal/Production、BSE/index、CR-5/R2、
+  Golden/H1、baseline 或策略工作。
+- RawWriter 对至少 128 个同构成员的 provider map 使用一个 request-level Parquet，成员键、
+  `None` 成员和空表信息保存在 meta；小型/异构 map 保持原布局。`VerifiedRawEvidence` 将一次
+  raw closure 校验结果交给 normalization 和 replay，后续读取不重复哈希同一 payload。
+- receipt 直接消费已验证的 `VerifiedResearchProjection`；正向交易 fallback 收敛为普通的
+  `PositiveTradeFallback`；authoritative coverage 使用直接 bridge；retained operation 三套
+  重复校验合并为一个 `_verify_retained_operation()`。保留 scope、schema、语义、PIT、raw hash、
+  atomic/idempotent 等真实边界，不新增安全/溯源框架。
+- canonical owner 负责一次完整 closure；Snapshot/Feature/R1 通过 manifest/projection seal
+  hand-off 消费上游，不在普通消费路径递归重跑 CR-3 全链；ReadModel 的表内容 semantic
+  recompute 和 Feature 的精确公式 replay 作为各自的独立 copy/business invariant 保留。
+- publish 把报告、组件和 DQ 物理校验移到事务前，事务内只重绑当前 DB head、组件/manifest
+  identity 和小型 DQ proof；`MonthCompletenessEvaluation` 去掉中间 subset hashes 与评价内
+  重复子版本字段，保留最终集合、阻塞和诊断所需字段。
+- 删除 obsolete CR-7 SPIKE 脚本及其 ceremony tests，并移除 CI 的 Spike framework、历史 DEVLOG
+  scanner 和 management-doc scanner；技术质量检查、全量测试和 SDK 隔离检查保留。
+- 合成 5,000 成员基准见 `docs/provider_verification/issue66_minimalism_benchmark_20260914.md`：
+  legacy 5,000 个 Parquet 对比 packed 1 个 Parquet；physical file bytes、持久化和完整 raw
+  closure 校验均有实测记录。该基准不代表真实 provider 吞吐。
+- 本地全量 `uv run pytest -q` 已完成：`1831 passed, 4 skipped`；Ruff check/format、mypy、
+  compileall、`uv pip check` 和 diff check 均通过。4 个 skip 为既有环境条件，未发现失败。
+- 当前分支仍需取得 exact-head CI 和独立 delta review；真实 snapshot/readmodel/publish
+  端到端吞吐与峰值内存因 Stage B blocked 尚未测量，已记录为后续授权项。通过后由 scheduler 决定是否
+  恢复 Issue #59 的最小 `2024-01` authoritative acquisition/materializer proof。账号、密码、
+  endpoint、专有 SDK/runtime、vendor wheel 和 raw payload 不进入 GitHub。
+
 ## 2026-09-13 · CR-7 AmazingData 权威取数凭证边界整改
 
 > 状态：**IMPLEMENTED / LOCAL QA GREEN / REQUIRED CI GREEN / AUTHORITATIVE EVIDENCE NOT PRODUCED / DRAFT PR / INDEPENDENT DELTA REVIEW REQUIRED**
@@ -46,7 +78,7 @@ Review Status：PR #58 继续 Draft；待新 exact head 的 required CI 与独�
 - 以最新 clean `main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 为基线，完成 Issue #55 的最窄实现切片。提交 `624595f1d246597a9119959af975aa5f8eafd6ff` 新增 typed `AuthoritativeCoverageEvidence`、固定 AmazingData history source-selection binding、`AuthoritativeCoverageBasisAdapter`，并让 writer 与 ordinary reader 对 sidecar、scope、inventory/hash、source snapshot 和 PIT/available-at 链重复校验。
 - 按授权仅执行 Development `2020-01`、Validation A `2024-01`、Holdout `2026-01` 三个月预检；每月固定调用 calendar、historical code-list 和一个 daily-bar sentinel。三个月的九次调用均返回 `OK`，但这只是 source observation，不是完整覆盖证明。
 - 预检明确记录 `UPSTREAM_COMPLETENESS_STATEMENT_MISSING`：当前 source contract 没有明确声明 inclusive month 的 daily_bar inventory/range 完整性及历史可用性/PIT 语义，因此 authoritative evidence 为 `NOT_PRODUCED`，materializer 为 `NOT_ENTERED_FAIL_CLOSED`。没有使用 row count、日期连续性、SDK 成功或 sentinel 结果替代该声明。
-- 脱敏收据为 [`cr7_authoritative_history_preflight_20260913.json`](provider_verification/cr7_authoritative_history_preflight_20260913.json)，GitHub 提交字节 SHA-256 为 `364cee560ae69e1651e619060308741398170414b49de878e5405fba1a8c9449`。原始交换仅保留在本地 ignored raw 目录；账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime 和 raw payload 未进入 GitHub。
+- 脱敏收据曾记录在 `cr7_authoritative_history_preflight_20260913.json`；该一次性历史文件已按 Issue #66 从当前树清理，GitHub 提交字节 SHA-256 为 `364cee560ae69e1651e619060308741398170414b49de878e5405fba1a8c9449`。原始交换仅保留在本地 ignored raw 目录；账号、密码、IP、端口、Token、Cookie、专有 SDK/runtime 和 raw payload 未进入 GitHub。
 - 本轮未执行 materialization、78 月回填、universe sweep、第三次 Formal/B1-B7、Production、resume/verdict、BSE/index 激活、CR-5/R2、Golden/H1、baseline 或策略工作。待最终本地门禁、exact-head CI 和独立 delta review。
 
 ## 2026-09-13 · CR-7 2020–2026H1 历史研究物化合同设计 / 离线预检
@@ -4106,7 +4138,7 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
 - 按 Issue #55 scheduler comment `5653953863`，从最新 clean `main@2e9bdc36544c5320072969a2888180b6dfec2c7a` 开始；已确认 runtime baseline `d2fa53371937d59ea0a118b79df1554d518f575f` 是该 main 的祖先。本任务分支只处理 CR-7 authoritative coverage evidence，不扩大到第三次 Formal、Production resume/verdict、78 月 backfill、universe sweep、BSE/index 激活、CR-5/R2、Golden/H1/baseline 或策略。
 - 新增 `AuthoritativeSourceSelection`、`AuthoritativeCoverageEvidence` 和窄 `AuthoritativeCoverageBasisAdapter`。唯一登记的方法是 `AUTHORITATIVE_UPSTREAM_INVENTORY_RANGE_V1`；它要求 reviewed AmazingData history surface、独立的上游 inventory/range statement 原文 hash、inclusive 月份范围、source snapshot/domain、available/PIT 时间链和 canonical sidecar bytes/hash。返回行数、日期连续性或成功响应不能升级为 COMPLETE。
 - historical materializer/reader 现在写入并重新验证 authoritative evidence sidecar；sidecar hash 进入 coverage-basis set hash 和 materialization identity。fixture-only evidence 仍不能解锁 ordinary reader；reader 另行核对 sidecar 与 materialization identity 的 snapshot id/hash/as-of。
-- 新增 bounded `scripts/spike/cr7_authoritative_history_preflight.py`：固定只检查 Development `2020-01`、Validation A `2024-01`、Holdout `2026-01`，每月最多一个日线哨兵；真实 Provider raw 只写本地 ignored 目录，提交报告不含凭证、账号 profile、endpoint、证券值或 raw payload。若上游没有可审计完整性声明，报告固定为 `FAIL_CLOSED_BLOCKED`，不生成 authoritative sidecar、不进入物化。
+- 历史上曾新增 bounded `scripts/spike/cr7_authoritative_history_preflight.py`；该一次性 SPIKE 已按 Issue #66 从当前树清理。它固定检查 Development `2020-01`、Validation A `2024-01`、Holdout `2026-01`，真实 Provider raw 只写本地 ignored 目录，提交报告不含凭证、账号 profile、endpoint、证券值或 raw payload。
 - 新增 authoritative adapter/sidecar、tamper、wrong scope/PIT/source binding、downgrade/escalation、reader replay/conflict、预检脱敏与固定范围回归；当前 focused suite 已通过（30 tests）。
 
 当前阻断：AmazingData 已审阅的接口形态能提供 code-list、calendar 和日线 observation，但现有来源闭环/本地手册没有 provider-owned 完整库存或历史范围保证，也没有可绑定的 available-at/PIT 完整性声明。真实预检仍需在本地授权环境运行；无此声明时必须保留 blocker，不能提交伪造 `COMPLETE_OBSERVED_DAILY_BAR_SCOPE`。
@@ -4132,7 +4164,7 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
   `STATUS_SCHEMA_MISMATCH` 和 16 个未被证明必需的返回 pair；`2026-01` 无结构错误但有
   4 个 `UNRESOLVED` pair。两月必需 bar 缺失均为 0，仍不能签发 authoritative receipt。
 - 脱敏 Stage A/B 报告分别为 [`cr7_month_completeness_stage_a_20260914.json`](provider_verification/cr7_month_completeness_stage_a_20260914.json)
-  和 [`cr7_month_completeness_stage_b_20260914.json`](provider_verification/cr7_month_completeness_stage_b_20260914.json)。
+  和已按 Issue #66 从当前树清理的历史 Stage B 脱敏报告。
   三个月均保持 `CLOSURE_DESIGN_ONLY_NOT_ACTIVE`，materializer 未进入。
 - 下一任务是向 AmazingData 适配层取得可读、可解释的月内状态语义，明确区分“无状态变化”与
   “状态数据缺失”；不得以缺失即未变化、额外 source 或 heuristic 清除未决 pair。整改后
@@ -4170,8 +4202,8 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
   head 一致。脱敏评估仍为 `FAIL_CLOSED`：1 个状态 schema mismatch、22 个 `UNRESOLVED`
   pair、22 个返回但未被证明为必需的 pair，`missing_required_pair_count=0`。
 - 规范报告已更新为 [`cr7_month_completeness_stage_a_20260914.json`](provider_verification/cr7_month_completeness_stage_a_20260914.json)；
-  旧 `[D,D+1]` 结果保留在 [`cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json`](provider_verification/cr7_month_completeness_stage_a_20260914_pre_exact_session_remediation.json)，
-  仅作历史诊断。整改前 Stage B 报告已标记为 `HISTORICAL_DIAGNOSTIC_ONLY_NOT_ACCEPTANCE_EVIDENCE`。
+  旧 `[D,D+1]` 结果已按 Issue #66 从当前树清理，仅作历史诊断。整改前 Stage B 报告已标记为
+  `HISTORICAL_DIAGNOSTIC_ONLY_NOT_ACCEPTANCE_EVIDENCE`。
 - 本次没有 authoritative receipt、materializer proof 或 Stage B 运行。下一步是独立 delta review
   核对 exact head、CI、报告绑定和 `[D,D]` 语义；Stage A 未达 `PASS` 前不运行 Stage B 或 78 月回补。
 
@@ -4192,7 +4224,7 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
 - 本次报告仍为 `FAIL_CLOSED`：22 个交易日、5,106 个证券、1 个 `STATUS_SCHEMA_MISMATCH`、
   22 个 `UNRESOLVED`、22 个 extra returned、required missing 0；无 authoritative receipt、
   无 materializer 输入。规范报告为 [`cr7_month_completeness_stage_a_20260914.json`](provider_verification/cr7_month_completeness_stage_a_20260914.json)，
-  前一版保留在 [`cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json`](provider_verification/cr7_month_completeness_stage_a_20260914_pre_duplicate_status_date_remediation.json)。
+  前一版已按 Issue #66 从当前树清理，历史提交仍可追溯。
 - 当前仅等待独立 delta review；Stage A 未达 `PASS`，不得运行 Stage B、78 月回补、Formal/Production、
   BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
 - 账号、密码、IP、端口、Token、Cookie、私有 endpoint、专有 SDK/runtime、本地 raw payload 和
@@ -4204,7 +4236,8 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
 
 - PR #61 已以 `559f59169e00d91d52c43cad77f0cf1ea2d56665` 合并；从该 clean main 建立本任务分支，
   只处理 2024-01 状态批次中唯一的 `STATUS_SCHEMA_MISMATCH` 成员。
-- 新增固定范围 `scripts/spike/cr7_status_schema_blocker.py`：从本地 ignored retained raw 的
+- 历史上曾新增固定范围 `scripts/spike/cr7_status_schema_blocker.py`；该一次性 SPIKE 已按 Issue #66
+  从当前树清理。它从本地 ignored retained raw 的
   批次身份与成员文件名哈希定位异常成员，校验 2024-01 scope 和零行零列形态，再向同一成员
   发起一次单成员、单窗口 AmazingData 请求；报告不输出证券值、原始 payload、凭证、私有 endpoint
   或 SDK/runtime 文件。
@@ -4219,8 +4252,8 @@ Review Status：`KEEP DRAFT / BLOCKED REMEDIATION RETURNED / FRESH EXACT-HEAD CI
   均为 `kDataEmpty` 且 `data=None`；facade 原样转发 SDK payload，anchored raw writer 在本地 ignored
   路径保留形态。最终结论为 `STOP(BLOCKED)`，原因码为
   `NO_POSITIVE_PROVIDER_SEMANTIC_RULE`。完整脱敏 receipt 见
-  [`cr7_status_schema_blocker_20260914.json`](provider_verification/cr7_status_schema_blocker_20260914.json)，
-  可读摘要见 [`cr7_status_schema_blocker_20260914.md`](provider_verification/cr7_status_schema_blocker_20260914.md)。
+  `cr7_status_schema_blocker_20260914.json` 及可读摘要曾作为一次性诊断文件存在，已按 Issue #66
+  从当前树清理，历史提交仍可追溯。
 - 空响应没有被解释为 `IS_SUSP_SEC=0` 或“无状态变化”；没有其他成员查询，没有 Stage B、78 月回补/
   物化、Formal/Production 或其他受禁工作。下一步交由独立 Reviewer/Owner 决定是否取得正式语义
   契约、替代接口或其他经授权的数据源。
@@ -4239,14 +4272,15 @@ Formal/B1-B7、Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略
 - 本地 `AmazingData==1.1.9`/`tgw==1.0.9.2` 公共合同暴露 `num_trades`、`total_volume_trade`、
   `total_value_trade` 及转换后的 `num_trades`、`volume`、`amount`。没有找到独立供应商字段说明原文，
   因此代码和报告明确标记为“公开字段名 + typed annotation 合同候选”，不虚构单位或额外语义。
-- 新增固定边界 `scripts/spike/cr7_positive_semantic_fallback.py` 与离线回归：同一保留异常成员、同一
-  `2024-01`、22 个 `[D,D]` 适用日，只接受有限严格正活动字段；空/缺失/价格/盘口/非空本身/零值不通过。
+- 历史上曾新增固定边界 `scripts/spike/cr7_positive_semantic_fallback.py` 与离线回归；该一次性
+  SPIKE 已按 Issue #66 从当前树清理。它针对同一保留异常成员、同一 `2024-01`、22 个 `[D,D]`
+  适用日，只接受有限严格正活动字段；空/缺失/价格/盘口/非空本身/零值不通过。
   返回 DataFrame 分日写入本地 ignored raw/anchor，GitHub 只接收脱敏 shape、计数和 hash；fallback 尚未编码。
 - 代码与离线回归已通过；exact committed head `dfb0e4875f17fe7dd3bbbfdf5bc608e642833782` 已完成固定
   单成员 `2024-01` 探针。22/22 个保留适用日返回数据并满足有限严格正活动字段规则，返回帧合计
   96,781 行，22 个分日 anchored raw exchange 仅写入本地 ignored raw。脱敏报告为
-  [`cr7_positive_semantic_fallback_20260914.json`](provider_verification/cr7_positive_semantic_fallback_20260914.json)，
-  可读摘要为 [`cr7_positive_semantic_fallback_20260914.md`](provider_verification/cr7_positive_semantic_fallback_20260914.md)。
+  `cr7_positive_semantic_fallback_20260914.json` 及可读摘要曾作为一次性诊断文件存在，已按
+  Issue #66 从当前树清理，历史提交仍可追溯。
 - 结论为 `PROVIDER_SEMANTIC_RESOLVED`，实现状态为 `EVIDENCE_ONLY_PENDING_REVIEW`；它仍只是公开
   SDK 字段合同候选在一个成员/月份上的证据，因没有独立供应商字段说明原文，不自动升级为正式
   fallback 或 capability approval。`fallback_rule_encoded=false`，未修改 `month_completeness.py`，
@@ -4281,8 +4315,8 @@ clean `main@738474acb47b0e2e90bead53d12b481a5af4a55f`；实现提交为
   `unresolved=0`、`missing=0`、`extra=0`、结构错误为 0，报告和月份状态均为 `PASS`。报告为
   [`cr7_month_completeness_stage_a_20260914.json`](provider_verification/cr7_month_completeness_stage_a_20260914.json)，
   摘要为 [`cr7_month_completeness_stage_a_20260914.md`](provider_verification/cr7_month_completeness_stage_a_20260914.md)；
-  旧未闭合结果保留为
-  [`cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json`](provider_verification/cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json)。
+  旧未闭合结果 `cr7_month_completeness_stage_a_20260914_pre_positive_trade_fallback.json` 已按
+  Issue #66 从当前树清理，不再作为当前验收输入。
 
 **Review Status**：实现和本轮 Stage A 已达到 `PASS`，当前返回 scheduler 独立 delta review；
 Stage A 报告仍是 `SPIKE` 诊断，未签发 authoritative receipt，materializer 未进入。Stage B、

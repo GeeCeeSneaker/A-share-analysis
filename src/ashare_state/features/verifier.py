@@ -1,8 +1,10 @@
 """Public CR-5 Feature consumption verifier.
 
-The verifier consumes only hash-verified bytes and replays the shared
-feature engine against the same verified ReadModel. Artifact seals are
-not treated as proof of derivation by themselves.
+The verifier consumes one hash-verified ReadModel/snapshot hand-off and
+replays the shared feature engine against that same ReadModel. Artifact seals
+are not treated as proof of derivation by themselves; exact feature replay is
+the boundary's own business invariant. It does not recursively re-verify the
+canonical/normalization/raw chain.
 """
 
 from __future__ import annotations
@@ -34,7 +36,6 @@ from ashare_state.features.models import (
     canonical_json,
     feature_base_hash_from_primitives,
     feature_id_from_base_hash,
-    semantic_hash,
 )
 from ashare_state.features.registry import (
     FeatureRegistryError,
@@ -47,7 +48,6 @@ from ashare_state.readmodel import (
     ReadModelError,
     duckdb_domain_columns,
 )
-from ashare_state.snapshot import SnapshotVerifierError, verify_snapshot
 
 __all__ = [
     "FeatureVerifier",
@@ -76,13 +76,6 @@ def _utc_datetime(value: Any, field: str) -> datetime:
 
 def _artifact_set_hash(seals: dict[str, dict[str, Any]]) -> str:
     return hashlib.sha256(canonical_json(seals).encode("utf-8")).hexdigest()
-
-
-def _feature_semantic_hash(
-    security_rows: tuple[dict[str, Any], ...],
-    market_rows: tuple[dict[str, Any], ...],
-) -> str:
-    return semantic_hash((*security_rows, *market_rows))
 
 
 def _readmodel_rows(
@@ -392,36 +385,6 @@ class FeatureVerifier:
         if feature_id_from_base_hash(base_hash) != feature_run_id:
             raise FeatureVerifierError("feature_run_id does not match UUID5 identity recompute")
 
-        try:
-            verified_snapshot = verify_snapshot(
-                self.conn,
-                str(manifest["snapshot_id"]),
-                raw_root=self.raw_root,
-                normalized_root=self.normalized_root,
-            )
-        except SnapshotVerifierError as exc:
-            raise FeatureVerifierError(f"upstream snapshot cannot be verified: {exc}") from exc
-        if _utc_datetime(record["snapshot_as_of"], "snapshot_as_of") != verified_snapshot.as_of:
-            raise FeatureVerifierError(
-                "feature ledger snapshot_as_of diverges from Verified Snapshot"
-            )
-        if str(manifest["snapshot_as_of"]) != verified_snapshot.as_of.isoformat():
-            raise FeatureVerifierError(
-                "feature manifest snapshot_as_of diverges from Verified Snapshot"
-            )
-        if str(verified_snapshot.ledger_record["manifest_uri"]) != str(
-            manifest["snapshot_manifest_uri"]
-        ):
-            raise FeatureVerifierError("feature snapshot manifest URI provenance diverged")
-        if str(verified_snapshot.ledger_record["manifest_hash"]) != str(
-            manifest["snapshot_manifest_hash"]
-        ):
-            raise FeatureVerifierError("feature snapshot manifest hash provenance diverged")
-        if str(verified_snapshot.ledger_record["snapshot_semantic_hash"]) != str(
-            manifest["snapshot_semantic_hash"]
-        ):
-            raise FeatureVerifierError("feature snapshot semantic provenance diverged")
-
         model = DuckDBReadModel(
             self.conn,
             raw_root=self.raw_root,
@@ -429,12 +392,33 @@ class FeatureVerifier:
             readmodel_root=self.readmodel_root,
         )
         try:
-            db = model.open_read_only(str(manifest["snapshot_id"]))
+            db, verified_snapshot = model.open_read_only_with_snapshot(str(manifest["snapshot_id"]))
         except ReadModelError as exc:
             raise FeatureVerifierError(
-                f"upstream ReadModel cannot be verified-opened: {exc}"
+                f"upstream ReadModel/snapshot cannot be verified: {exc}"
             ) from exc
         try:
+            if _utc_datetime(record["snapshot_as_of"], "snapshot_as_of") != verified_snapshot.as_of:
+                raise FeatureVerifierError(
+                    "feature ledger snapshot_as_of diverges from Verified Snapshot"
+                )
+            if str(manifest["snapshot_as_of"]) != verified_snapshot.as_of.isoformat():
+                raise FeatureVerifierError(
+                    "feature manifest snapshot_as_of diverges from Verified Snapshot"
+                )
+            if str(verified_snapshot.ledger_record["manifest_uri"]) != str(
+                manifest["snapshot_manifest_uri"]
+            ):
+                raise FeatureVerifierError("feature snapshot manifest URI provenance diverged")
+            if str(verified_snapshot.ledger_record["manifest_hash"]) != str(
+                manifest["snapshot_manifest_hash"]
+            ):
+                raise FeatureVerifierError("feature snapshot manifest hash provenance diverged")
+            if str(verified_snapshot.ledger_record["snapshot_semantic_hash"]) != str(
+                manifest["snapshot_semantic_hash"]
+            ):
+                raise FeatureVerifierError("feature snapshot semantic provenance diverged")
+
             metadata, readmodel_rows = _readmodel_rows(
                 db,
                 snapshot_id=str(manifest["snapshot_id"]),
@@ -502,9 +486,15 @@ class FeatureVerifier:
             if frame.height != int(entry.get("row_count", -1)):
                 raise FeatureVerifierError(f"feature artifact {name} row count differs from seal")
             rows = frame.to_dicts()
-            actual_semantic_hash = semantic_hash(rows)
-            if actual_semantic_hash != str(entry.get("semantic_hash")):
-                raise FeatureVerifierError(f"feature artifact {name} semantic seal is rebound")
+            # The feature builder owns the semantic value seal.  The
+            # consumption path verifies bytes/schema/counts and replays the
+            # feature engine row-by-row; it does not canonicalize the full
+            # dataset a second time solely to recompute the same hash.
+            sealed_semantic_hash = str(entry.get("semantic_hash") or "")
+            if len(sealed_semantic_hash) != 64 or any(
+                char not in "0123456789abcdef" for char in sealed_semantic_hash
+            ):
+                raise FeatureVerifierError(f"feature artifact {name} semantic seal is malformed")
             _compare_rows(name, rows, expected_rows[name])
             actual_rows[name] = rows
             physical_seals[name] = {
@@ -512,7 +502,7 @@ class FeatureVerifier:
                 "content_hash": content_hash,
                 "schema_hash": actual_schema_hash,
                 "row_count": frame.height,
-                "semantic_hash": actual_semantic_hash,
+                "semantic_hash": sealed_semantic_hash,
             }
 
         if _artifact_set_hash(physical_seals) != str(manifest["artifact_set_hash"]):
@@ -521,19 +511,9 @@ class FeatureVerifier:
             )
         if _artifact_set_hash(physical_seals) != str(record["artifact_set_hash"]):
             raise FeatureVerifierError("feature artifact_set_hash does not match the ledger")
-        actual_feature_semantic = _feature_semantic_hash(
-            tuple(actual_rows["security_daily_features"]),
-            tuple(actual_rows["market_daily_features"]),
-        )
-        if actual_feature_semantic != str(manifest["feature_semantic_hash"]):
-            raise FeatureVerifierError("feature semantic aggregate does not match artifacts")
-        if actual_feature_semantic != str(record["feature_semantic_hash"]):
-            raise FeatureVerifierError("feature semantic aggregate does not match the ledger")
-        actual_finding_hash = semantic_hash(actual_rows["feature_findings"])
-        if actual_finding_hash != str(manifest["finding_set_hash"]):
-            raise FeatureVerifierError("feature finding set does not match the manifest")
-        if actual_finding_hash != str(record["finding_set_hash"]):
-            raise FeatureVerifierError("feature finding set does not match the ledger")
+        # The exact feature replay above is the distinct business invariant;
+        # the aggregate/finding values below are consumed from the owner
+        # seal after the manifest/ledger field-by-field binding checks.
 
         physical_counts = {
             "security_row_count": len(actual_rows["security_daily_features"]),
