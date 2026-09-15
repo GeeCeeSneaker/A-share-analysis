@@ -90,9 +90,11 @@ Issue #66 的基线是当前 clean `main@41403d3a0083609f1b7ab110d4c03b4ff009393
 BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。原始 provider 数据、凭证、私有 endpoint、
 专有 SDK/runtime 仍只在本地受控目录存在。
 
-Issue #66 的剩余验收是：取得 exact-head CI 和独立 delta review，复核 P0-1 至 P0-4 的边界回归、
+Issue #66 的剩余验收是：完成独立 delta review，复核 P0-1 至 P0-4 的边界回归、
 代码净删除和真实可复核的 before/after 记录，确认 `2024-01` 既有 Stage-A 结果不被破坏，然后
-保持 Draft PR 等独立审阅。本地 full QA 已完成：`1831 passed, 4 skipped`。当前没有真实 provider
+保持 Draft PR 等独立审阅。本地 full QA 已完成：`1831 passed, 4 skipped`；exact-head CI #614
+的 Ubuntu 3.14、Windows 3.12、Windows 3.14 required jobs 全部成功，受控 GT-H3B #133 skipped。
+当前没有真实 provider
 payload，因而 snapshot/readmodel/publish 的端到端吞吐、峰值内存和真实文件收益仍未测量，已在
 基准文档中明确列为后续授权任务。通过后由
 scheduler 决定是否恢复 Issue #59 的最小 `2024-01` authoritative acquisition/materializer proof；

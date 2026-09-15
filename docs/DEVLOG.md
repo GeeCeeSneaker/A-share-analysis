@@ -25,8 +25,10 @@
   closure 校验均有实测记录。该基准不代表真实 provider 吞吐。
 - 本地全量 `uv run pytest -q` 已完成：`1831 passed, 4 skipped`；Ruff check/format、mypy、
   compileall、`uv pip check` 和 diff check 均通过。4 个 skip 为既有环境条件，未发现失败。
-- 当前分支仍需取得 exact-head CI 和独立 delta review；真实 snapshot/readmodel/publish
-  端到端吞吐与峰值内存因 Stage B blocked 尚未测量，已记录为后续授权项。通过后由 scheduler 决定是否
+- exact-head CI #614 已完成：Ubuntu 3.14、Windows 3.12、Windows 3.14 三个 required job
+  全部成功；GT-H3B controlled execution #133 按边界 skipped。独立 delta review 仍待完成。
+- 真实 snapshot/readmodel/publish 端到端吞吐与峰值内存因 Stage B blocked 尚未测量，已记录为后续
+  授权项。通过后由 scheduler 决定是否
   恢复 Issue #59 的最小 `2024-01` authoritative acquisition/materializer proof。账号、密码、
   endpoint、专有 SDK/runtime、vendor wheel 和 raw payload 不进入 GitHub。
 

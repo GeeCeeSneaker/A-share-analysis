@@ -3,7 +3,7 @@
 **Type**：C1 — Issue #66 P0 minimalism / bounded performance and replay remediation
 **Date**：2026-09-14
 **Base**：clean `main@41403d3a0083609f1b7ab110d4c03b4ff0093933`（PR #64 merge）
-**Status**：`IMPLEMENTED LOCALLY / FULL QA GREEN / EXACT-HEAD CI PENDING / DRAFT / INDEPENDENT REVIEW REQUIRED`
+**Status**：`FULL QA GREEN / EXACT-HEAD CI GREEN / DRAFT / INDEPENDENT REVIEW REQUIRED`
 
 **本轮范围**：只收敛 CR-7 当前历史取数链路，不执行 Stage B、78 月物化、Formal/Production、
 BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。Issue #66 要求减少生产/测试代码，
@@ -38,9 +38,11 @@ BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。Issue #66 要求减
   passed、1 skipped；Ruff/mypy/compileall 已通过；
 - 本地全量 `uv run pytest -q`：`1831 passed, 4 skipped`；Ruff check/format、mypy、compileall、
   `uv pip check` 和 diff check 均通过；skip 为既有环境条件；
+- exact-head CI #614：Ubuntu 3.14、Windows 3.12、Windows 3.14 三个 required job 全部
+  `success`；GT-H3B controlled execution #133 按边界 `skipped`；
 - 合成基准见 `docs/provider_verification/issue66_minimalism_benchmark_20260914.md`，5,000 成员
   从 5,000 个 Parquet 降为 1 个，且记录 bytes、持久化和 closure 校验的实测变化；
-- 待完成：exact-head CI、独立 delta review；通过后由 scheduler 决定是否
+- 待完成：独立 delta review；通过后由 scheduler 决定是否
   恢复 Issue #59 的最小 `2024-01` authoritative acquisition/materializer proof。未取得该决定
   前，任何真实 Stage B/78 月执行均保持 blocked。
 
