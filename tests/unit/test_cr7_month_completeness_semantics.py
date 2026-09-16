@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from datetime import date
 
 import polars as pl
 import pytest
@@ -110,6 +111,72 @@ def test_security_first_present_on_d_plus_one_is_not_applicable_on_d() -> None:
     assert result.accepted
     assert result.required_bar_pair_count == 2
     assert result.returned_bar_pair_count == 2
+
+
+def test_provider_list_date_excludes_a_prelisting_exact_session() -> None:
+    values = _valid_inputs()
+    bars = values["daily_bar_payload"]
+    assert isinstance(bars, dict)
+    bars["000001.SZ"] = _bars("000001.SZ", [])
+
+    result = evaluate_month_completeness(
+        **values,
+        list_dates_by_symbol={"000001.SZ": date(2024, 1, 3)},
+    )
+
+    assert result.accepted
+    assert result.required_bar_pair_count == 1
+    assert result.returned_row_count == 1
+    assert result.classification_counts[CompletenessPairClass.NOT_APPLICABLE_SESSION.value] == 2
+    assert result.prelisting_list_dates == {"000001.SZ": date(2024, 1, 3)}
+
+
+@pytest.mark.parametrize("list_date", (date(2024, 1, 2), date(2024, 1, 1)))
+def test_session_on_or_after_list_date_still_requires_normal_status_or_bar_evidence(
+    list_date: date,
+) -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    bars = values["daily_bar_payload"]
+    assert isinstance(status, dict)
+    assert isinstance(bars, dict)
+    status["000001.SZ"] = pl.DataFrame()
+    bars["000001.SZ"] = _bars("000001.SZ", [])
+
+    result = evaluate_month_completeness(
+        **values,
+        list_dates_by_symbol={"000001.SZ": list_date},
+    )
+
+    assert not result.accepted
+    assert result.unresolved_pair_count == 1
+    assert result.classification_counts[CompletenessPairClass.NOT_APPLICABLE_SESSION.value] == 1
+    assert result.classification_counts[CompletenessPairClass.UNRESOLVED.value] == 1
+    assert result.prelisting_list_dates == {}
+
+
+@pytest.mark.parametrize("list_date", (None, "malformed-list-date"))
+def test_missing_or_malformed_list_date_does_not_resolve_an_unresolved_pair(
+    list_date: object,
+) -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    bars = values["daily_bar_payload"]
+    assert isinstance(status, dict)
+    assert isinstance(bars, dict)
+    status["000001.SZ"] = pl.DataFrame()
+    bars["000001.SZ"] = _bars("000001.SZ", [])
+
+    result = evaluate_month_completeness(
+        **values,
+        list_dates_by_symbol={"000001.SZ": list_date},
+    )
+
+    assert not result.accepted
+    assert result.unresolved_pair_count == 1
+    assert result.classification_counts[CompletenessPairClass.UNRESOLVED.value] == 1
+    assert result.classification_counts[CompletenessPairClass.NOT_APPLICABLE_SESSION.value] == 1
+    assert result.prelisting_list_dates == {}
 
 
 @pytest.mark.parametrize("duplicate_flags", ([0, 1, 1], [0, 0, 1]))

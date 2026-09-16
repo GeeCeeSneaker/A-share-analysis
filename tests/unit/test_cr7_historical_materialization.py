@@ -184,6 +184,19 @@ def _projection(rows: list[dict[str, Any]]) -> VerifiedResearchProjection:
     )
 
 
+def _january_capture_projection(
+    *,
+    source_snapshot_as_of: datetime = datetime(2026, 9, 1, tzinfo=UTC),
+) -> VerifiedResearchProjection:
+    rows = [
+        _row(day, security_id)
+        for security_id in ("security-000001", "security-600000")
+        for day in (date(2020, 1, 2), date(2020, 1, 3))
+    ]
+    projection = _projection(rows)
+    return replace(projection, source_snapshot_as_of=source_snapshot_as_of)
+
+
 def _fixture_projection() -> VerifiedResearchProjection:
     return _projection(
         [
@@ -435,7 +448,7 @@ def _acquisition_receipt(
     *,
     provider: AmazingDataProvider | None = None,
 ) -> Any:
-    source_snapshot = _projection([])
+    source_snapshot = _january_capture_projection()
     acquisition = AmazingDataHistoryAcquisition(
         provider or _FakeAmazingDataProvider(),
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-acquisition"),
@@ -452,8 +465,7 @@ def test_capture_finalizes_against_later_projection_without_provider_replay(tmp_
     calls_after_capture = tuple(provider.calls)
 
     assert capture.completeness_evaluation.status == "PASS"
-    projection = replace(
-        _projection([]),
+    projection = _january_capture_projection(
         source_snapshot_as_of=datetime(2026, 9, 2, tzinfo=UTC),
     )
     receipt = acquisition.finalize_capture(capture, source_snapshot=projection)
@@ -471,8 +483,7 @@ def test_capture_finalization_rejects_early_pit_without_provider_replay(tmp_path
     )
     capture = acquisition.capture_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
     calls_after_capture = tuple(provider.calls)
-    projection = replace(
-        _projection([]),
+    projection = _january_capture_projection(
         source_snapshot_as_of=datetime(2026, 7, 31, tzinfo=UTC),
     )
 
@@ -496,7 +507,7 @@ def test_capture_must_finalize_against_its_original_retained_root(tmp_path: Path
     calls_after_capture = tuple(provider.calls)
 
     with pytest.raises(AmazingDataAcquisitionError, match="original retained raw root"):
-        other.finalize_capture(capture, source_snapshot=_projection([]))
+        other.finalize_capture(capture, source_snapshot=_january_capture_projection())
 
     assert tuple(provider.calls) == calls_after_capture
     assert not (tmp_path / "other" / "source_capture").exists()
@@ -512,7 +523,50 @@ def test_capture_finalization_replays_its_exact_retained_exchange_bytes(tmp_path
     meta_path.write_bytes(meta_path.read_bytes() + b"tampered")
 
     with pytest.raises(AmazingDataAcquisitionError, match="could not be replayed"):
-        acquisition.finalize_capture(capture, source_snapshot=_projection([]))
+        acquisition.finalize_capture(capture, source_snapshot=_january_capture_projection())
+
+    assert tuple(provider.calls) == calls_after_capture
+
+
+@pytest.mark.parametrize("mismatch", ("month", "row_count"))
+def test_capture_finalization_rejects_mismatched_projection_without_provider_replay(
+    tmp_path: Path,
+    mismatch: str,
+) -> None:
+    provider = _FakeAmazingDataProvider()
+    acquisition = AmazingDataHistoryAcquisition(
+        provider,
+        _anchored_writer(tmp_path / "raw", ingest_run_id=f"unit-test-projection-{mismatch}"),
+    )
+    capture = acquisition.capture_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+    calls_after_capture = tuple(provider.calls)
+    if mismatch == "month":
+        rows = [
+            _row(day, security_id)
+            for security_id in ("security-000001", "security-600000")
+            for day in (date(2026, 1, 2), date(2026, 1, 5))
+        ]
+        projection = replace(
+            _projection(rows),
+            source_snapshot_as_of=datetime(2026, 9, 2, tzinfo=UTC),
+        )
+        expected_error = "bounded capture scope"
+    else:
+        projection = _projection(
+            [
+                _row(date(2020, 1, 2), "security-000001"),
+                _row(date(2020, 1, 3), "security-000001"),
+                _row(date(2020, 1, 2), "security-600000"),
+            ]
+        )
+        projection = replace(
+            projection,
+            source_snapshot_as_of=datetime(2026, 9, 2, tzinfo=UTC),
+        )
+        expected_error = "daily-row cardinality"
+
+    with pytest.raises(AmazingDataAcquisitionError, match=expected_error):
+        acquisition.finalize_capture(capture, source_snapshot=projection)
 
     assert tuple(provider.calls) == calls_after_capture
 

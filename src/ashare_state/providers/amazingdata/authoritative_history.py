@@ -12,6 +12,7 @@ No free-form snapshot id/hash/timestamp or completeness label is accepted.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -43,7 +44,12 @@ from ashare_state.research.historical import (
     PositiveTradeFallbackOperation,
     _issue_amazingdata_acquisition_receipt,
 )
-from ashare_state.research.models import canonical_json, ensure_utc_timestamp, sha256_hex
+from ashare_state.research.models import (
+    VERIFIED_SECURITY_MASTER_SOURCE,
+    canonical_json,
+    ensure_utc_timestamp,
+    sha256_hex,
+)
 from ashare_state.research.panel import VerifiedResearchProjection
 from ashare_state.storage.atomic_files import write_file_atomic
 from ashare_state.storage.raw_anchor import AnchoredRawEvidenceWriter
@@ -122,7 +128,12 @@ class AmazingDataHistoryAcquisition:
                 "acquisition requires the anchored raw evidence writer"
             )
 
-    def capture_month(self, partition: PartitionKey) -> AmazingDataHistoryCapture:
+    def capture_month(
+        self,
+        partition: PartitionKey,
+        *,
+        list_dates_by_symbol: Mapping[str, Any] | None = None,
+    ) -> AmazingDataHistoryCapture:
         """Retain one bounded month capture and evaluate completeness.
 
         A fail-closed completeness result is returned as capture evidence so
@@ -189,6 +200,7 @@ class AmazingDataHistoryAcquisition:
             trading_days=trading_days,
             exact_day_universes=exact_day_universes,
             status_payload=status_exchange.payload,
+            list_dates_by_symbol=list_dates_by_symbol,
         )
         snapshot_exchanges: list[ProviderExchange] = []
         snapshot_receipts: dict[tuple[str, int], AmazingDataExchangeReceipt] = {}
@@ -259,6 +271,7 @@ class AmazingDataHistoryAcquisition:
             status_payload=status_exchange.payload,
             daily_bar_payload=kline_exchange.payload,
             positive_trade_fallback=positive_trade_fallback,
+            list_dates_by_symbol=list_dates_by_symbol,
         )
         positive_trade_operations = tuple(
             PositiveTradeFallbackOperation(
@@ -315,6 +328,55 @@ class AmazingDataHistoryAcquisition:
                 "AmazingData month completeness is unresolved; authoritative acquisition is blocked"
             ) from exc
         evaluation = capture.completeness_evaluation
+        if len(source_snapshot.rows) != evaluation.returned_row_count:
+            raise AmazingDataAcquisitionError(
+                "verified projection daily-row cardinality does not match the retained capture"
+            )
+        for row in source_snapshot.rows:
+            if not isinstance(row, Mapping):
+                raise AmazingDataAcquisitionError("verified projection row is malformed")
+            raw_trade_date = row.get("trade_date")
+            if not isinstance(raw_trade_date, date) or isinstance(raw_trade_date, datetime):
+                raise AmazingDataAcquisitionError(
+                    "verified projection trade date is missing or malformed"
+                )
+            if not capture.partition.scope_start <= raw_trade_date <= capture.partition.scope_end:
+                raise AmazingDataAcquisitionError(
+                    "verified projection rows do not match the bounded capture scope"
+                )
+            if row.get("research_split") != capture.partition.research_split.value:
+                raise AmazingDataAcquisitionError(
+                    "verified projection research split does not match the bounded capture"
+                )
+        if evaluation.prelisting_list_dates:
+            identity_view = source_snapshot.identity_view
+            if (
+                identity_view.source_kind != VERIFIED_SECURITY_MASTER_SOURCE
+                or not identity_view.sources
+            ):
+                raise AmazingDataAcquisitionError(
+                    "pre-listing applicability requires verified security-master identity"
+                )
+            suffix_by_exchange = {"SSE": "SH", "SZSE": "SZ"}
+            expected_list_dates = evaluation.prelisting_list_dates
+            observed_list_dates: dict[str, date] = {}
+            for record in identity_view.records:
+                suffix = suffix_by_exchange.get(record.exchange)
+                if suffix is None:
+                    continue
+                provider_symbol = f"{record.symbol}.{suffix}"
+                if provider_symbol not in expected_list_dates:
+                    continue
+                previous = observed_list_dates.get(provider_symbol)
+                if previous is not None and previous != record.valid_from:
+                    raise AmazingDataAcquisitionError(
+                        "verified security-master LISTDATE is ambiguous for a pre-listing pair"
+                    )
+                observed_list_dates[provider_symbol] = record.valid_from
+            if observed_list_dates != expected_list_dates:
+                raise AmazingDataAcquisitionError(
+                    "verified security-master LISTDATE does not match captured applicability"
+                )
         returned_first_date = evaluation.returned_first_date
         returned_last_date = evaluation.returned_last_date
         if returned_first_date is None or returned_last_date is None:

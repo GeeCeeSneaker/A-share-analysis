@@ -705,6 +705,7 @@ class AmazingDataAcquisitionReceipt:
                 status_payload=status_payload,
                 daily_bar_payload=daily_payload,
                 positive_trade_fallback=(positive_trade_evidence if positive_trade_pairs else None),
+                list_dates_by_symbol=self.completeness_evaluation.prelisting_list_dates,
             )
         except (KeyError, MonthCompletenessError, CoverageBasisError) as exc:
             raise CoverageBasisError(

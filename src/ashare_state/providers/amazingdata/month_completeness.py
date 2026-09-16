@@ -4,17 +4,19 @@ The month-level historical code list is an interval-overlap universe, not a
 daily bar expectation.  This module derives a deterministic security/session
 set from two positive provider observations:
 
-* an exact-session historical code-list observation; and
+* an exact-session historical code-list observation, gated by provider-owned
+  listing dates when those facts are available; and
 * the historical stock-status table, whose ``IS_SUSP_SEC`` flag identifies a
   legitimate non-trading session.
 
 Absence from either response is never treated as a lifecycle fact.  A missing
 status row for an applicable pair is unresolved, and malformed or mismatched
-responses fail closed.  The output contains only hashes/counts so it is safe
-to use as a sanitized diagnostic or bind to an acquisition receipt.  The
-persisted evaluation is intentionally compact: final required/returned pair
-seals, blockers and classification summaries are retained; intermediate
-applicability/suspension subset hashes are not.
+responses fail closed. The persisted evaluation is intentionally compact:
+final required/returned pair seals, blockers and classification summaries are
+retained; intermediate applicability/suspension subset hashes are not. A
+provider LISTDATE is retained only when it excludes a pre-listing pair, so the
+existing capture-catalog hash can replay that fact without a separate hash
+dimension.
 """
 
 from __future__ import annotations
@@ -40,8 +42,10 @@ __all__ = [
 ]
 
 
-AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION = "amazingdata-month-completeness-rule-v2"
-AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION = "amazingdata-hist-code-list-exact-session-v2"
+AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION = "amazingdata-month-completeness-rule-v3"
+AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION = (
+    "amazingdata-hist-code-list-exact-session-list-date-v3"
+)
 AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION = "amazingdata-positive-trade-count-fallback-v1"
 
 _SYMBOL_PATTERN = re.compile(r"^\d{6}\.(?:SH|SZ)$")
@@ -116,6 +120,7 @@ class MonthCompletenessEvaluation:
     structural_error_codes: tuple[str, ...]
     positive_trade_pair_count: int
     positive_trade_pair_set_hash: str
+    prelisting_list_dates: dict[str, date]
 
     @property
     def accepted(self) -> bool:
@@ -156,6 +161,7 @@ class MonthCompletenessEvaluation:
             "structural_error_codes": list(self.structural_error_codes),
             "positive_trade_pair_count": self.positive_trade_pair_count,
             "positive_trade_pair_set_hash": self.positive_trade_pair_set_hash,
+            "prelisting_list_dates": dict(sorted(self.prelisting_list_dates.items())),
         }
 
     @classmethod
@@ -186,6 +192,7 @@ class MonthCompletenessEvaluation:
             "structural_error_codes",
             "positive_trade_pair_count",
             "positive_trade_pair_set_hash",
+            "prelisting_list_dates",
         }
         if not isinstance(payload, Mapping) or set(payload) != fields:
             raise MonthCompletenessError("month completeness evaluation fields are not exact")
@@ -198,6 +205,17 @@ class MonthCompletenessEvaluation:
         if not isinstance(errors, list) or any(not isinstance(item, str) for item in errors):
             raise MonthCompletenessError("month completeness structural errors are malformed")
         try:
+            raw_prelisting_dates = payload["prelisting_list_dates"]
+            if not isinstance(raw_prelisting_dates, Mapping):
+                raise MonthCompletenessError("pre-listing LISTDATE facts are malformed")
+            parsed_prelisting_dates: dict[str, date] = {}
+            for symbol, raw_date in raw_prelisting_dates.items():
+                if not isinstance(symbol, str) or _SYMBOL_PATTERN.fullmatch(symbol) is None:
+                    raise MonthCompletenessError("pre-listing LISTDATE symbol is malformed")
+                parsed_date = _optional_date(raw_date)
+                if parsed_date is None:
+                    raise MonthCompletenessError("pre-listing LISTDATE value is missing")
+                parsed_prelisting_dates[symbol] = parsed_date
             parsed_counts = {
                 str(key): _require_nonnegative_int(value, "classification count")
                 for key, value in counts.items()
@@ -259,6 +277,7 @@ class MonthCompletenessEvaluation:
                 "positive_trade_pair_set_hash": _require_hash(
                     payload["positive_trade_pair_set_hash"], "positive_trade_pair_set_hash"
                 ),
+                "prelisting_list_dates": dict(sorted(parsed_prelisting_dates.items())),
             }
         except (TypeError, ValueError) as exc:
             raise MonthCompletenessError("month completeness evaluation is malformed") from exc
@@ -340,14 +359,18 @@ def evaluate_month_completeness(
     status_payload: Mapping[str, Any],
     daily_bar_payload: Mapping[str, Any],
     positive_trade_fallback: PositiveTradeFallback | None = None,
+    list_dates_by_symbol: Mapping[str, Any] | None = None,
 ) -> MonthCompletenessEvaluation:
     """Evaluate one month without converting absence into a semantic fact.
 
     ``exact_day_universes`` must contain one successful historical code-list
-    observation for every calendar session.  Its set membership is the
-    positive applicability fact.  ``status_payload`` must contain a validated
-    status row for every applicable pair; ``IS_SUSP_SEC=1`` removes that pair
-    from the required-bar set.  The only fallback is a provider-produced
+    observation for every calendar session. Membership is the positive
+    applicability fact unless a valid provider ``LISTDATE`` is strictly after
+    that session, in which case the pair is pre-listing and not applicable.
+    Missing or malformed listing dates never establish non-applicability.
+    ``status_payload`` must contain a validated status row for every remaining
+    applicable pair; ``IS_SUSP_SEC=1`` removes that pair from the required-bar
+    set. The only fallback is a provider-produced
     exact-session Level-1 snapshot observation for a pair whose status member
     is specifically a zero-row, zero-column empty schema.  A finite
     ``num_trades > 0`` value makes that pair required; every other snapshot
@@ -360,7 +383,38 @@ def evaluate_month_completeness(
     symbol_set = set(symbols)
     session_set = set(sessions)
 
+    list_date_values: dict[str, date] = {}
+    list_date_errors: list[str] = []
+    if list_dates_by_symbol is not None:
+        if not isinstance(list_dates_by_symbol, Mapping):
+            list_date_errors.append("LIST_DATE_INPUT_NOT_MAPPING")
+        else:
+            for raw_symbol, raw_date in list_dates_by_symbol.items():
+                if (
+                    not isinstance(raw_symbol, str)
+                    or _SYMBOL_PATTERN.fullmatch(raw_symbol.strip().upper()) is None
+                ):
+                    list_date_errors.append("LIST_DATE_INPUT_SYMBOL_INVALID")
+                    continue
+                symbol = raw_symbol.strip().upper()
+                if symbol not in symbol_set:
+                    list_date_errors.append("LIST_DATE_INPUT_OUTSIDE_MONTH_UNIVERSE")
+                    continue
+                parsed_date = _parse_list_date(raw_date)
+                if parsed_date is None:
+                    # An absent or malformed date cannot remove an applicable
+                    # pair. Existing status/bar evidence may still resolve it;
+                    # otherwise the ordinary unresolved gate fails closed.
+                    continue
+                previous_date = list_date_values.get(symbol)
+                if previous_date is not None and previous_date != parsed_date:
+                    list_date_errors.append("LIST_DATE_INPUT_CONFLICT")
+                    continue
+                list_date_values[symbol] = parsed_date
+
     applicable: set[tuple[str, int]] = set()
+    prelisting_pairs: set[tuple[str, int]] = set()
+    prelisting_list_dates: dict[str, date] = {}
     exact_universe_errors: list[str] = []
     if set(exact_day_universes) != session_set:
         exact_universe_errors.append("EXACT_DAY_UNIVERSE_KEYS_MISMATCH")
@@ -375,7 +429,15 @@ def evaluate_month_completeness(
         day_set = set(day_symbols)
         if not day_set.issubset(symbol_set):
             exact_universe_errors.append("EXACT_DAY_UNIVERSE_OUTSIDE_MONTH_UNIVERSE")
-        applicable.update((symbol, day) for symbol in day_set & symbol_set)
+        session_date = _date_from_day(day)
+        for symbol in day_set & symbol_set:
+            list_date = list_date_values.get(symbol)
+            if list_date is not None and session_date < list_date:
+                prelisting_pairs.add((symbol, day))
+                prelisting_list_dates[symbol] = list_date
+            else:
+                applicable.add((symbol, day))
+    exact_universe_errors.extend(list_date_errors)
     structural_errors.extend(exact_universe_errors)
 
     status_by_pair: dict[tuple[str, int], int] = {}
@@ -402,7 +464,7 @@ def evaluate_month_completeness(
     structural_errors.extend(status_errors)
 
     status_pairs = set(status_by_pair)
-    if status_pairs - applicable:
+    if status_pairs - applicable - prelisting_pairs:
         structural_errors.append("STATUS_OUTSIDE_APPLICABILITY_SET")
     unresolved = applicable - status_pairs
     suspended = {pair for pair, flag in status_by_pair.items() if pair in applicable and flag == 1}
@@ -495,6 +557,7 @@ def evaluate_month_completeness(
         structural_error_codes=tuple(sorted(set(structural_errors))),
         positive_trade_pair_count=len(positive_trade_pairs),
         positive_trade_pair_set_hash=_hash_pairs(positive_trade_pairs),
+        prelisting_list_dates=dict(sorted(prelisting_list_dates.items())),
     )
 
 
@@ -684,6 +747,7 @@ def _positive_trade_fallback_candidates(
     trading_days: Collection[int],
     exact_day_universes: Mapping[int, Collection[str]],
     status_payload: Mapping[str, Any],
+    list_dates_by_symbol: Mapping[str, Any] | None = None,
 ) -> set[tuple[str, int]]:
     """Return only pairs eligible for the reviewed status fallback.
 
@@ -699,6 +763,15 @@ def _positive_trade_fallback_candidates(
     session_set = set(sessions)
     if set(status_payload) != symbol_set or set(exact_day_universes) != session_set:
         return set()
+    if list_dates_by_symbol is not None and not isinstance(list_dates_by_symbol, Mapping):
+        return set()
+    parsed_list_dates: dict[str, date] = {}
+    if list_dates_by_symbol is not None:
+        for symbol, raw_date in list_dates_by_symbol.items():
+            if isinstance(symbol, str) and _SYMBOL_PATTERN.fullmatch(symbol.strip().upper()):
+                parsed_date = _parse_list_date(raw_date)
+                if parsed_date is not None:
+                    parsed_list_dates[symbol.strip().upper()] = parsed_date
     applicable: set[tuple[str, int]] = set()
     for day in sessions:
         values = exact_day_universes.get(day)
@@ -707,7 +780,12 @@ def _positive_trade_fallback_candidates(
         day_symbols, errors = _validate_symbols(values)
         if errors or not set(day_symbols).issubset(symbol_set):
             return set()
-        applicable.update((symbol, day) for symbol in day_symbols)
+        session_date = _date_from_day(day)
+        applicable.update(
+            (symbol, day)
+            for symbol in day_symbols
+            if (list_date := parsed_list_dates.get(symbol)) is None or session_date >= list_date
+        )
     empty_symbols = {
         symbol for symbol in symbols if _is_zero_column_empty_schema(status_payload.get(symbol))
     }
@@ -791,6 +869,20 @@ def _normalize_day(value: Any) -> int | None:
         digits = "".join(char for char in value if char.isdigit())
         if len(digits) >= 8:
             return int(digits[:8])
+    return None
+
+
+def _parse_list_date(value: Any) -> date | None:
+    """Parse a provider-normalized LISTDATE without coercing malformed input."""
+    if isinstance(value, datetime):
+        return None
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value.strip())
+        except ValueError:
+            return None
     return None
 
 
