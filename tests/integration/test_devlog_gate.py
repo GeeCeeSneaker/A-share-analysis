@@ -40,11 +40,6 @@ GRANDFATHERED_WITH_DISCLOSURE = frozenset(
         "3c66d1118835266bd7d608b6af460bf91a03c57c",
         "d07d9628cb69b60f4d951033b12d0bc5dc00e8e5",
         "b236a8352211dbebe9702d36f4a631f6d8f27de6",
-        # PR #70's reviewer-mandated code-only hotfix was merged before its
-        # DEVLOG synchronization could be added.  The immutable merged
-        # history cannot be rewritten; this exact SHA is disclosed in the
-        # current DEVLOG and must not grandfather any future commit.
-        "a4cad46b0ea54f7a08ec6f6c80ef20918aef2d39",
     }
 )
 
