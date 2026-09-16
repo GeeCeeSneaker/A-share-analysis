@@ -1,3 +1,19 @@
+## 2026-09-16 · Issue #73 Stage B 两代表月真实验证
+
+> 状态：**BOTH MONTHS STOP(BLOCKED) / SANITIZED EVIDENCE READY / DRAFT PR AND PM REVIEW PENDING**
+
+- 按 Issue #73，仅在隔离环境执行 `2020-01` Development 与 `2026-01` Holdout；未复用旧 Stage B raw，未跨月共享本地 ledger、projection 或 capture，也未执行 78 月回补及其余禁止项。
+- 两个月的 calendar/security-master/daily-bar source-input normalization、Canonical、Snapshot、ReadModel 与 verified projection 均完成；Canonical findings/quarantine 均为 0。具体行数、run/snapshot ID 和 manifest/hash 见脱敏执行报告。
+- `2020-01` authoritative completeness `FAIL_CLOSED`：required/returned 均 59,930，missing/extra/structural error 为 0，但 5 个 applicable security-session pairs 仍 `UNRESOLVED`。没有删减范围或签发 receipt。
+- `2026-01` completeness `PASS`：required/returned 均 103,454，missing/extra/unresolved/structural error 为 0。但 verified projection PIT 为 `2026-09-16T00:07:55.8489-07:00`，最新提供方响应为 `00:14:17.383141-07:00`；PIT 晚到条件违反现有 `retrieved_at_utc <= pit_as_of` receipt invariant，receipt 未签发。
+- 两个月均未创建 authoritative coverage basis，未启动 bounded materialization、ordinary-reader、idempotent replay 或 changed-content conflict proof。没有为追求 PASS 而放宽规则或未来时间戳。
+- 本次全量离线测试在仅文档变更前、同一代码 head 上为 `1857 passed, 3 skipped`；当前 exact-head CI 状态以 Draft PR checks 为准，本记录不缓存动态 CI 状态。
+- PM/Owner 需分别决定：2020-01 五个 unresolved pairs 所需的最小 provider-owned 状态证据/已审规则；2026-01 PIT-consistent acquisition/replay lifecycle 或明确合同调整。保持 78 月回补未授权。
+
+详细脱敏记录：
+[`cr7_issue73_stage_b_execution_20260916.md`](provider_verification/cr7_issue73_stage_b_execution_20260916.md)
+及对应 [JSON](provider_verification/cr7_issue73_stage_b_execution_20260916.json)。凭证、account/profile identifier、IP/端口、SDK/runtime、原始提供方响应、数据库与物化文件均未进入 Git。
+
 ## 2026-09-16 · Issue #59 最小 current-code-first 身份事件与 2024-01 链重跑
 
 > 状态：**IDENTITY_FIX_IMPLEMENTED / 2024-01 AUTHORITATIVE CLOSURE VERIFIED / REVIEW_PENDING / PR NOT YET OPENED**

@@ -1,0 +1,242 @@
+{
+  "schema": "cr7.issue73.stage_b_execution.v1",
+  "issue_number": 73,
+  "executed_at_local_date": "2026-09-16",
+  "code_head": "f8a750b96f6d6fca4bc1996ba592a4d5dcfa4b48",
+  "authorized_months_only": ["2020-01", "2026-01"],
+  "production_activation": false,
+  "account_precheck": {
+    "status": "PASS",
+    "account_values_or_identifiers_published": false
+  },
+  "verification": {
+    "baseline_full_test_command": "uv run --locked --offline pytest -o addopts= -q",
+    "baseline_full_test_result": "PASS",
+    "baseline_passed": 1857,
+    "baseline_skipped": 3,
+    "baseline_code_head": "f8a750b96f6d6fca4bc1996ba592a4d5dcfa4b48",
+    "note": "The complete suite was run on this code head before the evidence-only documentation change. The current exact-head CI status is maintained by the Draft PR checks; this JSON is not a live check-status record."
+  },
+  "months": [
+    {
+      "month": "2020-01",
+      "role": "development",
+      "status": "STOP(BLOCKED)",
+      "reported_blocked_at": "AUTHORITATIVE_ACQUISITION",
+      "source_input": {
+        "status": "SUCCESS",
+        "monthly_security_count": 3769,
+        "trading_day_count": 16,
+        "monthly_security_set_sha256": "3a8ec2ddc188ed80348b35f666d15285ab8cb363d2f473c5dd0515e3a7e8d376",
+        "trading_days_set_sha256": "218726bdd4c2ce94c0950e5059e0fb9bfa6468965281fb91c05efc02eb67a7db",
+        "normalization": {
+          "calendar": {
+            "input": 8726,
+            "normalized": 8726,
+            "quarantined": 0,
+            "manifest_sha256": "6e47076c6fdbf49a360a46dc176cea1531686c87290c9ef0d5f838602ec1a196"
+          },
+          "hist_code_list": {
+            "input": 3769,
+            "normalized": 3769,
+            "quarantined": 0,
+            "manifest_sha256": "b35a90b2c4b1bb586c991c0a5e0c9589b467bd5b22f5fc04be70b914b8ffa83c"
+          },
+          "stock_basic": {
+            "input": 3768,
+            "normalized": 3768,
+            "quarantined": 0,
+            "manifest_sha256": "fe58601186ef097d8fec84c5d62b18e5912c29b347591cf9b663e08aa2f4314c"
+          },
+          "daily_bar": {
+            "input": 59930,
+            "normalized": 59930,
+            "quarantined": 0,
+            "manifest_sha256": "801bd0680b351db1a1c25d4c34511e356f906a12c4191d8edf5728d827cbae02"
+          }
+        }
+      },
+      "verified_projection": {
+        "status": "SUCCESS",
+        "canonical_run_id": "9bf0d456-540d-5d68-8691-a418c183b3b1",
+        "canonical_manifest_sha256": "c92f5ec89e203e28ba7160fa936761fd2e6faf39f37e8d62b33e4eb5c92103f0",
+        "snapshot_id": "56972c4e-2f91-5476-843a-e09ac1291568",
+        "snapshot_manifest_sha256": "77779ef8f781e88a541a82dfd17a18919175654294b4873ae98bef06d3b43a71",
+        "snapshot_semantic_sha256": "d82fffb71b56c6d95adbbba8189842c03cf4bd38e5abbd92eff74cdee0443e76",
+        "row_count": 59930,
+        "trade_date_range": ["2020-01-02", "2020-01-23"],
+        "research_split": "development",
+        "canonical_findings": 0
+      },
+      "acquisition": {
+        "completeness_status": "FAIL_CLOSED",
+        "rule_versions": {
+          "applicability": "amazingdata-hist-code-list-exact-session-v2",
+          "month_completeness": "amazingdata-month-completeness-rule-v2",
+          "positive_trade_fallback": "amazingdata-positive-trade-count-fallback-v1"
+        },
+        "monthly_security_count": 3769,
+        "session_count": 16,
+        "required_bar_pair_count": 59930,
+        "returned_bar_pair_count": 59930,
+        "required_returned_pair_sets_equal": true,
+        "required_returned_pair_set_sha256": "b58ba4a0f7b1d3b64a7a05c96e6cb4dbe3983f662e4f3edf73f255f4c481779e",
+        "missing_required_pair_count": 0,
+        "extra_returned_pair_count": 0,
+        "unresolved_pair_count": 5,
+        "classification_counts": {
+          "SUSPENSION_NON_TRADING": 181,
+          "NOT_APPLICABLE_SESSION": 188,
+          "POSITIVE_TRADE_COUNT_ACTIVE": 16,
+          "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+          "UNEXPLAINED_MISSING": 0,
+          "UNRESOLVED": 5,
+          "EXTRA_RETURNED": 0
+        },
+        "structural_error_codes": [],
+        "retained_capture_meta_file_count": 38,
+        "successful_calls": {
+          "BaseData.get_calendar": 1,
+          "BaseData.get_hist_code_list": 17,
+          "InfoData.get_history_stock_status": 1,
+          "MarketData.query_kline": 1,
+          "MarketData.query_snapshot": 18
+        },
+        "exact_session_requests": 16,
+        "exact_session_requests_match_calendar": true,
+        "receipt": "NOT_ISSUED",
+        "coverage_basis": "NOT_CREATED",
+        "materialization": "NOT_STARTED",
+        "blocker": {
+          "code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
+          "affected_scope": "2020-01 Development; 5 applicable security-session pairs remain unresolved",
+          "per_pair_identities_in_sanitized_evaluation": "NOT_RETAINED; evaluator persists aggregate counts and pair-set hashes, not unresolved-pair identities"
+        }
+      }
+    },
+    {
+      "month": "2026-01",
+      "role": "holdout",
+      "status": "STOP(BLOCKED)",
+      "reported_blocked_at": "AUTHORITATIVE_ACQUISITION",
+      "source_input": {
+        "status": "SUCCESS",
+        "monthly_security_count": 5186,
+        "trading_day_count": 20,
+        "monthly_security_set_sha256": "68215e5c9620b787d69634a52d8030d1ed281d55002a356884d91c78264335bd",
+        "trading_days_set_sha256": "53a297d0cd2df83c762d8081e9a01a162d671b91430dc6091b45933d733b021c",
+        "normalization": {
+          "calendar": {
+            "input": 8726,
+            "normalized": 8726,
+            "quarantined": 0,
+            "manifest_sha256": "332bc345e2b68a8c689996d7368c77d70b5a3836f37482798fac8befddd6ba0d"
+          },
+          "hist_code_list": {
+            "input": 5186,
+            "normalized": 5186,
+            "quarantined": 0,
+            "manifest_sha256": "b6b7ccaea367dbc693a47375b8041bef1709a98040cb62e887d8ba7307d24c01"
+          },
+          "stock_basic": {
+            "input": 5186,
+            "normalized": 5186,
+            "quarantined": 0,
+            "manifest_sha256": "9d344775dc3bf1430fe2acaa8ad9385456ab81a254c659c17566e167f3094fe8"
+          },
+          "daily_bar": {
+            "input": 103454,
+            "normalized": 103454,
+            "quarantined": 0,
+            "manifest_sha256": "3c658c9845541c58d5b3007bf94c15eeb43bb434b04151494471e0a80c9c5761"
+          }
+        }
+      },
+      "verified_projection": {
+        "status": "SUCCESS",
+        "canonical_run_id": "e44e1c19-a685-5145-975f-f06db8fbac49",
+        "canonical_manifest_sha256": "f7e3b2dafe4dbc9d6009604d6a8b81cae83a999991837d785832234cddab44e0",
+        "snapshot_id": "3bed4f48-2432-54d9-8e4a-1493211772fd",
+        "snapshot_manifest_sha256": "2622a9904b1f0625ca990bee7959b40f7004050e31fd2d3dcc7fb2cca30b5de3",
+        "snapshot_semantic_sha256": "04162da212b06defbfdb699da1b3c540b5ab272ba9be5827121adf03d5a9b01b",
+        "identity_view_sha256": "dd9ea0a3dc6fdee8e222a8b52e32cb0ad17c2bcb4cdc1662d801fad6490ff343",
+        "snapshot_as_of": "2026-09-16T00:07:55.8489-07:00",
+        "row_count": 103454,
+        "trade_date_range": ["2026-01-05", "2026-01-30"],
+        "research_split": "holdout",
+        "canonical_findings": 0
+      },
+      "acquisition": {
+        "completeness_status": "PASS",
+        "rule_versions": {
+          "applicability": "amazingdata-hist-code-list-exact-session-v2",
+          "month_completeness": "amazingdata-month-completeness-rule-v2",
+          "positive_trade_fallback": "amazingdata-positive-trade-count-fallback-v1"
+        },
+        "monthly_security_count": 5186,
+        "session_count": 20,
+        "required_bar_pair_count": 103454,
+        "returned_bar_pair_count": 103454,
+        "required_returned_pair_sets_equal": true,
+        "required_returned_pair_set_sha256": "ed888ecfcf6f327813441a3f4b3a82c8f6a533856d4fe087c414b4b843030df2",
+        "missing_required_pair_count": 0,
+        "extra_returned_pair_count": 0,
+        "unresolved_pair_count": 0,
+        "classification_counts": {
+          "SUSPENSION_NON_TRADING": 215,
+          "NOT_APPLICABLE_SESSION": 51,
+          "POSITIVE_TRADE_COUNT_ACTIVE": 0,
+          "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+          "UNEXPLAINED_MISSING": 0,
+          "UNRESOLVED": 0,
+          "EXTRA_RETURNED": 0
+        },
+        "structural_error_codes": [],
+        "retained_capture_meta_file_count": 24,
+        "successful_calls": {
+          "BaseData.get_calendar": 1,
+          "BaseData.get_hist_code_list": 21,
+          "InfoData.get_history_stock_status": 1,
+          "MarketData.query_kline": 1
+        },
+        "exact_session_requests": 20,
+        "exact_session_requests_match_calendar": true,
+        "latest_provider_request_at": "2026-09-16T00:13:32.548373-07:00",
+        "latest_provider_received_at": "2026-09-16T00:14:17.383141-07:00",
+        "latest_received_after_snapshot_pit_seconds": 381.534241,
+        "receipt_exception_class": "CoverageBasisError",
+        "receipt": "NOT_ISSUED",
+        "coverage_basis": "NOT_CREATED",
+        "materialization": "NOT_STARTED",
+        "blocker": {
+          "code": "PROVIDER_RETRIEVAL_AFTER_SOURCE_SNAPSHOT_PIT",
+          "observed_relation": "latest provider received_at is later than source_snapshot_as_of",
+          "contract_relation": "AmazingDataAcquisitionReceipt rejects retrieved_at_utc > pit_as_of",
+          "root_cause_confidence": "CONFIRMED_FROM_RETAINED_TIMESTAMPS_AND_CURRENT_VALIDATOR; the sanitized runner stores exception class but not exception message",
+          "do_not": [
+            "do not future-date source_snapshot_as_of",
+            "do not weaken the PIT validation",
+            "do not claim a receipt or materialization PASS"
+          ]
+        }
+      }
+    }
+  ],
+  "review_decisions_required": [
+    {
+      "month": "2020-01",
+      "decision": "Determine what provider-owned status evidence or already-reviewed narrow rule may resolve the 5 unresolved applicable pairs; until then preserve the fail-closed result."
+    },
+    {
+      "month": "2026-01",
+      "decision": "Approve a PIT-consistent acquisition/replay lifecycle that can bind retained provider evidence to a verified projection whose PIT is not earlier than retrieval, or explicitly revise the contract. Do not synthesize a future PIT timestamp or relax the current validator."
+    }
+  ],
+  "data_handling": {
+    "raw_provider_payloads_local_only": true,
+    "local_databases_and_materialized_artifacts_committed": false,
+    "credentials_private_network_address_port_account_profile_id_sdk_runtime_committed": false,
+    "old_stage_b_raw_reused": false,
+    "only_authorized_months_executed": true
+  }
+}
