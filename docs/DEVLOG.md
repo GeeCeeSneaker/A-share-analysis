@@ -1,3 +1,29 @@
+## 2026-09-15 · PR #71 cleanup exposes historical DEVLOG gate blocker
+
+> 状态：**CLEANUP_APPLIED / CI_BLOCKED_BY_HISTORICAL_GATE / IDENTITY_IMPLEMENTATION_NOT_STARTED**
+
+- 按 Owner decision `5690500282` 与 scheduler policy `5690539134`，提交
+  `aa4a63554388d9fbd6c129f4b2f3ad0fb14223c9` 从 `tests/integration/test_devlog_gate.py` 移除本轮
+  新增的 `a4cad46b0ea54f7a08ec6f6c80ef20918aef2d39` grandfather，并删除对应 DEVLOG 说明段；
+  既有八条更早的历史记录未改动。本次没有新增豁免、没有改写 Git 历史、没有运行时代码或 universe
+  变更。
+- 清理提交的权威 CI run `35045136501` 以真实 `main@9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`
+  为 base。Ubuntu 3.14 job `104633217457` 的 lint、format、mypy 均成功；完整 pytest 为
+  `1850 passed, 6 skipped, 1 failed`，唯一失败为
+  `TestDevlogGate.test_code_commit_requires_devlog_change`，精确指出
+  `a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']`。
+- 这不是 PR #71 连续性证据或产品逻辑失败，而是移除临时豁免后暴露的不可变历史治理/扫描器阻断。
+  按当前调度不得重新加 SHA 豁免；也不能通过重写主线历史补写原提交。Windows 矩阵在本记录首次
+  固化时仍在执行，最终状态随同一 run 复核后补充到证据 JSON/记录。
+- 因此 PR #71 继续保持 evidence-only Draft；没有开始 `300114.SZ → 302132.SZ` 身份事件实现，
+  没有重跑 2024-01 Canonical → Snapshot → ReadModel → projection 或下游 receipt/coverage/
+  materialization。项目经理需要把门禁策略/历史治理作为独立最小整改处理后，才能重新验证 exact head；
+  不得以另一条 grandfather 绕过。
+
+详细脱敏证据见
+[`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
+及对应 JSON。账号、密码、IP、端口、Token、Cookie、SDK/runtime、DuckDB 与 raw payload 均未进入 Git。
+
 ## 2026-09-15 · Issue #59 `300114.SZ` → `302132.SZ` same-provider continuity probe
 
 > 状态：**STOP(BLOCKED) / CURRENT-CODE IDENTITY FOUND / HISTORICAL CONTINUITY NOT PROVEN / NO CODE CHANGE**

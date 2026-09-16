@@ -42,6 +42,17 @@ PR #70 已通过独立审阅并合并。合并后的单证券调查记录在
 只有取得同一 provider 的 PIT 可用连续性证据后，才可提出最小映射并重跑既有链路；Stage B、
 78 月及其他未授权工作继续禁止。
 
+按 Owner decision comment `5690500282` / scheduler comment `5690539134`，PR #71 已先完成
+清理：提交 `aa4a63554388d9fbd6c129f4b2f3ad0fb14223c9` 移除了本轮新增的 `a4cad46...`
+DEVLOG grandfather 及其说明段，未新增豁免、未改写历史。清理后的权威 CI run `35045136501`
+在 Ubuntu 3.14 的完整 pytest 中暴露一个独立治理阻断：`1850 passed, 6 skipped, 1 failed`，
+唯一失败是历史 `a4cad46...` 改动 `src/ashare_state/providers/amazingdata/mapper.py` 却没有在同一
+历史提交更新 `docs/DEVLOG.md`。因此不能再向 PR #71 加 SHA 豁免，也不能把该历史事实伪装成
+本次清理已通过；详细记录见
+[`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](../provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
+及对应 JSON。PR #71 保持 Draft；在项目经理单独解决该门禁策略/历史治理阻断前，不启动身份事件
+实现，不重跑 2024-01 下游权威链。
+
 ## 1. 项目管理责任
 
 - **项目 Owner**：决定总体方向、数据源是否可信、例外授权和最终业务取舍。
