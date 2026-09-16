@@ -17,6 +17,9 @@ Fail-closed rulings:
 - relisting (same symbol, several list dates) resolves PIT: the latest
   identity whose list_date <= the row's trade_date; none applies ->
   missing;
+- the one Owner-approved official code-change event is represented as a
+  static, exact old/new interval record; it is not a generic alias or
+  corporate-action resolver;
 - a conflicting dataset (same provider_symbol + list_date resolving to
   different security ids - unreachable through ADR-002 but kept as a
   defensive branch) is AMBIGUOUS -> finding + excluded.
@@ -33,10 +36,13 @@ from typing import Any
 from ashare_state.identity.security_id import resolve_security_identity
 
 __all__ = [
+    "ApprovedIdentityEvent",
     "IDENTITY_BRIDGE_POLICY_VERSION",
     "IdentityBridge",
     "IdentityResolutionError",
     "ResolvedIdentityOutcome",
+    "approved_provider_identity_events",
+    "identity_event_for_provider_symbol",
     "identity_bridge_policy_hash",
     "identity_bridge_policy_version",
     "identity_dataset_hash",
@@ -44,7 +50,7 @@ __all__ = [
 
 
 #: versioned identity of the bridge policy (PIT selection rule)
-IDENTITY_BRIDGE_POLICY_VERSION = "identity-bridge-v1"
+IDENTITY_BRIDGE_POLICY_VERSION = "identity-bridge-v2"
 
 #: canonical description of the governed resolution RULES (CR-3.1 P0-05:
 #: the bridge policy identity - not just the version string - enters the
@@ -54,8 +60,101 @@ _BRIDGE_RULES: dict[str, str] = {
     "exchange_attribution": "provider_market_suffix_only",
     "bare_code": "unique_market_match_else_missing",
     "relist": "latest_list_date_le_trade_date",
+    "code_change": "approved_static_event_same_security_id_pit_intervals",
+    "current_symbol": "latest_open_provider_symbol",
     "conflict": "fail_closed_never_guess",
 }
+
+
+@dataclass(frozen=True)
+class ApprovedIdentityEvent:
+    """One exact, Owner-approved provider-code continuity event.
+
+    This deliberately models only the observed event rather than introducing
+    a general alias/corporate-action subsystem.  ``old_provider_symbol`` is
+    the historical code and remains the frozen ADR-002 seed; the new code is
+    the only open/current interval.
+    """
+
+    old_provider_symbol: str
+    new_provider_symbol: str
+    effective_from: date
+    original_list_date: date
+    exchange: str
+
+    @property
+    def initial_symbol(self) -> str:
+        """Return the bare old code used only for ADR-002 identity derivation."""
+        return self.old_provider_symbol.split(".", 1)[0]
+
+    @property
+    def security_id(self) -> str:
+        """Return the stable id derived from the frozen historical seed."""
+        resolved = resolve_security_identity(
+            self.exchange,
+            _ASSET_TYPE,
+            self.initial_symbol,
+            self.original_list_date,
+        )
+        return str(resolved.security_id)
+
+    @property
+    def current_provider_symbol(self) -> str:
+        return self.new_provider_symbol
+
+    def interval_for(self, provider_symbol: str) -> tuple[date, date | None] | None:
+        """Return the exact validity interval for one of the two codes."""
+        symbol = str(provider_symbol).strip().upper()
+        if symbol == self.old_provider_symbol:
+            return self.original_list_date, self.effective_from
+        if symbol == self.new_provider_symbol:
+            return self.effective_from, None
+        return None
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return the deterministic policy payload for hashing/audit."""
+        return {
+            "old_provider_symbol": self.old_provider_symbol,
+            "new_provider_symbol": self.new_provider_symbol,
+            "effective_from": self.effective_from.isoformat(),
+            "original_list_date": self.original_list_date.isoformat(),
+            "exchange": self.exchange,
+            "security_id": self.security_id,
+        }
+
+
+# Owner-approved official SZSE/CNINFO code-change event from Issue #59.
+# Keep this tuple tiny and immutable.  It is a policy input, not provider
+# data, and no other code-change/alias discovery is implied.
+_APPROVED_PROVIDER_IDENTITY_EVENTS = (
+    ApprovedIdentityEvent(
+        old_provider_symbol="300114.SZ",
+        new_provider_symbol="302132.SZ",
+        effective_from=date(2025, 2, 17),
+        original_list_date=date(2010, 8, 27),
+        exchange="SZSE",
+    ),
+)
+
+
+def approved_provider_identity_events() -> tuple[ApprovedIdentityEvent, ...]:
+    """Return the immutable set of approved static identity events."""
+    return _APPROVED_PROVIDER_IDENTITY_EVENTS
+
+
+def identity_event_for_provider_symbol(
+    provider_symbol: str,
+) -> ApprovedIdentityEvent | None:
+    """Find an exact event for a qualified provider symbol.
+
+    Matching is intentionally exact after upper-casing; there is no prefix,
+    fuzzy, or provider-side alias discovery.
+    """
+    symbol = str(provider_symbol).strip().upper()
+    for event in _APPROVED_PROVIDER_IDENTITY_EVENTS:
+        if symbol in {event.old_provider_symbol, event.new_provider_symbol}:
+            return event
+    return None
 
 
 def identity_bridge_policy_version() -> str:
@@ -64,9 +163,15 @@ def identity_bridge_policy_version() -> str:
 
 
 def identity_bridge_policy_hash() -> str:
-    """SHA-256 over the versioned canonical rule description."""
+    """SHA-256 over rules plus the exact approved event record."""
     canonical = json.dumps(
-        {"version": identity_bridge_policy_version(), "rules": _BRIDGE_RULES},
+        {
+            "version": identity_bridge_policy_version(),
+            "rules": _BRIDGE_RULES,
+            "approved_identity_events": [
+                event.as_dict() for event in approved_provider_identity_events()
+            ],
+        },
         sort_keys=True,
         separators=(",", ":"),
     )
@@ -130,38 +235,92 @@ class ResolvedIdentityOutcome:
 @dataclass(frozen=True)
 class _IdentityEntry:
     security_id: str
-    list_date: date
+    provider_symbol: str
+    valid_from: date
+    valid_to: date | None
 
 
 class IdentityBridge:
-    """The immutable provider-symbol -> security_id mapping for one
-    canonical run, built from the CR-2 verified security_master rows."""
+    """The immutable provider-symbol -> security_id mapping for one run.
+
+    Normal entries come from the CR-2 verified ``security_master`` rows.  The
+    one approved code-change event is added as a dated override so a current
+    code and its historical code share one stable identity without changing
+    the underlying historical universe.
+    """
 
     def __init__(self, master_rows: list[dict[str, Any]], *, master_input_set_hash: str) -> None:
         self._master_input_set_hash = str(master_input_set_hash)
         self._by_symbol: dict[str, list[_IdentityEntry]] = {}
         for row in master_rows:
-            symbol = str(row.get("provider_symbol") or "")
+            symbol = str(row.get("provider_symbol") or "").strip().upper()
             list_date_raw = row.get("list_date")
-            if not symbol or not list_date_raw:
-                # security_master rows without a list_date cannot build a
-                # publishable identity (ADR-002 fallback ruling) - the
-                # symbol simply has no governed entry here
+            if not symbol:
                 continue
-            list_date = _as_date(list_date_raw)
-            suffix = symbol[symbol.rfind(".") :] if "." in symbol else ""
-            exchange = _SUFFIX_TO_EXCHANGE.get(suffix)
-            if exchange is None:
-                msg = (
-                    f"security_master row carries provider symbol {symbol!r} "
-                    "without a known market suffix - cannot attribute exchange"
+            list_date = _as_date(list_date_raw) if list_date_raw else None
+            entry = self._entry_for_provider_symbol(symbol, list_date)
+            if entry is not None:
+                self._add_entry(entry)
+
+        # The event is a deliberately tiny static policy input.  Adding its
+        # two exact intervals also covers the real provider shape where the
+        # historical code-list member has no listing-date field and the
+        # current stock_basic response does not return the old code.
+        for event in approved_provider_identity_events():
+            for symbol in (event.old_provider_symbol, event.new_provider_symbol):
+                entry = self._entry_for_provider_symbol(symbol, None)
+                if entry is not None:
+                    self._add_entry(entry)
+
+    @staticmethod
+    def _entry_for_provider_symbol(symbol: str, list_date: date | None) -> _IdentityEntry | None:
+        event = identity_event_for_provider_symbol(symbol)
+        if event is not None:
+            if list_date is not None and list_date != event.original_list_date:
+                raise IdentityResolutionError(
+                    f"approved identity event {symbol!r} has provider list_date "
+                    f"{list_date.isoformat()}, expected "
+                    f"{event.original_list_date.isoformat()}"
                 )
-                raise IdentityResolutionError(msg)
-            resolved = resolve_security_identity(
-                exchange, _ASSET_TYPE, symbol[: symbol.rfind(".")], list_date
+            interval = event.interval_for(symbol)
+            if interval is None:  # pragma: no cover - guarded by the lookup above
+                raise IdentityResolutionError(
+                    f"approved identity event has no interval for {symbol!r}"
+                )
+            valid_from, valid_to = interval
+            return _IdentityEntry(
+                security_id=event.security_id,
+                provider_symbol=symbol,
+                valid_from=valid_from,
+                valid_to=valid_to,
             )
-            entry = _IdentityEntry(str(resolved.security_id), list_date)
-            self._by_symbol.setdefault(symbol, []).append(entry)
+
+        if list_date is None:
+            # Security-master membership without a list date cannot mint a
+            # publishable identity for any symbol outside the approved event.
+            return None
+        suffix = symbol[symbol.rfind(".") :] if "." in symbol else ""
+        exchange = _SUFFIX_TO_EXCHANGE.get(suffix)
+        if exchange is None:
+            msg = (
+                f"security_master row carries provider symbol {symbol!r} "
+                "without a known market suffix - cannot attribute exchange"
+            )
+            raise IdentityResolutionError(msg)
+        resolved = resolve_security_identity(
+            exchange, _ASSET_TYPE, symbol[: symbol.rfind(".")], list_date
+        )
+        return _IdentityEntry(
+            security_id=str(resolved.security_id),
+            provider_symbol=symbol,
+            valid_from=list_date,
+            valid_to=None,
+        )
+
+    def _add_entry(self, entry: _IdentityEntry) -> None:
+        entries = self._by_symbol.setdefault(entry.provider_symbol, [])
+        if entry not in entries:
+            entries.append(entry)
 
     @property
     def dataset_hash(self) -> str:
@@ -171,9 +330,11 @@ class IdentityBridge:
         return identity_dataset_hash(self._master_input_set_hash)
 
     def resolve(self, provider_symbol: str, trade_date: date) -> str | None:
-        """PIT resolution: the latest identity whose list_date <=
-        trade_date, or None (missing). Deterministic - relisted symbols
-        resolve to the identity valid AT the row's trade date.
+        """PIT resolution for a provider symbol, or None (missing).
+
+        The latest applicable interval is selected.  This preserves the
+        existing relisting rule and additionally makes the approved old/new
+        code event fail closed outside each code's exact validity interval.
 
         BARE codes (no market suffix - e.g. the CR-2 adj_factor surface
         carries provider symbols without market attribution) resolve
@@ -181,7 +342,7 @@ class IdentityBridge:
         suffixed variants exists in the dataset. Two variants existing
         is AMBIGUOUS (fail closed) - never a code-prefix guess, never a
         list-date tiebreak between markets."""
-        symbol = str(provider_symbol)
+        symbol = str(provider_symbol).strip().upper()
         if "." in symbol:
             entries = self._by_symbol.get(symbol, [])
         else:
@@ -195,16 +356,51 @@ class IdentityBridge:
             entries = self._by_symbol.get(present[0], []) if present else []
         if not entries:
             return None
-        ids_at_date = [e for e in entries if e.list_date <= trade_date]
+        ids_at_date = [
+            e
+            for e in entries
+            if e.valid_from <= trade_date and (e.valid_to is None or trade_date < e.valid_to)
+        ]
         if not ids_at_date:
             return None
-        latest = max(e.list_date for e in ids_at_date)
-        candidates = {e.security_id for e in ids_at_date if e.list_date == latest}
+        latest = max(e.valid_from for e in ids_at_date)
+        candidates = {e.security_id for e in ids_at_date if e.valid_from == latest}
         if len(candidates) > 1:
             # defensive: ADR-002 makes this unreachable, but a conflicting
             # dataset must fail closed, never pick one
             return None
         return next(iter(candidates))
+
+    def current_provider_symbol(self, security_id: str) -> str | None:
+        """Return the one open/current qualified provider symbol for an id.
+
+        Multiple open symbols for one id are ambiguous and therefore return
+        ``None`` rather than guessing.  The approved event has exactly one:
+        ``302132.SZ``.
+        """
+        entries = [
+            entry
+            for symbol_entries in self._by_symbol.values()
+            for entry in symbol_entries
+            if entry.security_id == str(security_id) and entry.valid_to is None
+        ]
+        if not entries:
+            return None
+        latest = max(entry.valid_from for entry in entries)
+        symbols = {entry.provider_symbol for entry in entries if entry.valid_from == latest}
+        return next(iter(symbols)) if len(symbols) == 1 else None
+
+    def current_symbol_for(self, provider_symbol: str) -> str | None:
+        """Resolve any known code to its current qualified provider symbol."""
+        symbol = str(provider_symbol).strip().upper()
+        event = identity_event_for_provider_symbol(symbol)
+        if event is not None:
+            return event.current_provider_symbol
+        entries = self._by_symbol.get(symbol, [])
+        ids = {entry.security_id for entry in entries}
+        if len(ids) != 1:
+            return None
+        return self.current_provider_symbol(next(iter(ids)))
 
 
 def _as_date(value: Any) -> date:

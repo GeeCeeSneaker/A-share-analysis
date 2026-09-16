@@ -58,6 +58,18 @@ authoritative manifest. If no verified identity source is available, display
 identity stays null and the affected rows remain disabled. The manifest records
 the concrete normalized identity artifact, hashes, run IDs, and PIT lineage.
 
+The persisted `symbol` column remains a bare code for compatibility with the
+existing R1 schema, but ordinary presentation is current-code-first. For the
+approved `300114.SZ -> 302132.SZ` event, a 2024 row is validated with the PIT
+identity `300114.SZ` while the default projected/displayed bare `symbol` is
+`302132`. Code that needs the qualified current symbol should call
+`projection.identity_view.current_symbol(security_id)` (or
+`IdentityView.current(security_id).provider_symbol`). Code that explicitly
+needs a historical provider code should call
+`IdentityView.resolve_provider_symbol(provider_symbol, trade_date)` or
+`IdentityView.resolve(security_id, trade_date)`; no symbol prefix inference is
+performed.
+
 Offline tests use a private `_build_fixture_from_rows()` helper and the visibly
 separate `research_security_daily_fixture` dataset with
 `publication_mode=TEST_ONLY_ROWS`. The ordinary reader rejects that dataset;

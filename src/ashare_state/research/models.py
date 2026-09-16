@@ -75,6 +75,8 @@ UNVERIFIED_CALLER_IDENTITY_SOURCE = "UNVERIFIED_CALLER_ROWS"
 PRICE_BASIS = "UNADJUSTED_CANONICAL"
 UNIVERSE_BASIS = "OBSERVED_DAILY_BAR_UNIVERSE"
 
+_EXCHANGE_TO_PROVIDER_SUFFIX = {"SSE": ".SH", "SZSE": ".SZ", "BSE": ".BJ"}
+
 
 class ResearchPanelError(RuntimeError):
     """A research panel cannot be built from a verified, coherent input."""
@@ -278,6 +280,23 @@ class IdentityRecord:
     exchange: str
     valid_from: date
     valid_to: date | None = None
+
+    @property
+    def provider_symbol(self) -> str:
+        """Return the qualified business-facing provider symbol.
+
+        The persisted R1 ``symbol`` column remains the established bare
+        code.  This property is the explicit qualified form used by current
+        lookup/display paths, so an internal ADR-002 seed cannot be mistaken
+        for the current code.
+        """
+        symbol = self.symbol.strip().upper()
+        if "." in symbol:
+            return symbol
+        suffix = _EXCHANGE_TO_PROVIDER_SUFFIX.get(self.exchange)
+        if suffix is None:  # construction already validates the exchange
+            raise ResearchPanelError(f"unknown exchange {self.exchange!r}")
+        return f"{symbol}{suffix}"
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -615,6 +634,47 @@ class IdentityView:
         if len(matches) > 1:  # defensive: construction already rejects overlap
             raise ResearchPanelError(
                 f"identity view resolves more than one row for {security_id} on {trade_date}"
+            )
+        return matches[0] if matches else None
+
+    def current(self, security_id: str) -> IdentityRecord | None:
+        """Return the open/current record for one stable identity.
+
+        Current lookup is intentionally separate from PIT ``resolve``.  A
+        code-change event closes the historical record and leaves the newest
+        record open, making the current/default result deterministic.
+        """
+        matches = [
+            record
+            for record in self.records
+            if record.security_id == security_id and record.valid_to is None
+        ]
+        if len(matches) > 1:
+            raise ResearchPanelError(
+                f"identity view has multiple current records for {security_id}"
+            )
+        return matches[0] if matches else None
+
+    def current_symbol(self, security_id: str) -> str | None:
+        """Return the current qualified symbol, or ``None`` if unresolved."""
+        record = self.current(security_id)
+        return record.provider_symbol if record is not None else None
+
+    def resolve_provider_symbol(
+        self, provider_symbol: str, trade_date: date
+    ) -> IdentityRecord | None:
+        """Resolve a qualified provider symbol at an explicit PIT date."""
+        symbol = str(provider_symbol).strip().upper()
+        matches = [
+            record
+            for record in self.records
+            if record.provider_symbol == symbol
+            and record.valid_from <= trade_date
+            and (record.valid_to is None or trade_date < record.valid_to)
+        ]
+        if len(matches) > 1:
+            raise ResearchPanelError(
+                f"identity view resolves more than one provider symbol {symbol} on {trade_date}"
             )
         return matches[0] if matches else None
 

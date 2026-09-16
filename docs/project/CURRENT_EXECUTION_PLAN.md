@@ -4,7 +4,57 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
-## 0. 2026-09-15 当前调度覆盖
+## 0. 2026-09-16 当前调度覆盖
+
+PR #71 已通过独立 PM 审阅并合并：exact head 为
+`8325ec4a85117213f514764444058e4664d5af16`，merge commit 为
+`c360354bee8698c8a2db61a607d0bb3dcefd0ddb`。本轮从该 clean `main` 建立
+`investigate/issue59-identity-event-20260916`，没有在历史分支上继续堆叠改动。
+
+Issue #59 的最小 current-code-first identity fix 已在本地实现，范围严格限于 Owner
+批准的静态事件 `300114.SZ -> 302132.SZ`：旧码有效区间为
+`[2010-08-27, 2025-02-17)`，新码从 `2025-02-17` 起开放；两者共用 ADR-002
+初始种子派生的一个稳定 `security_id`。现有 bridge 版本为 `identity-bridge-v2`；
+普通 current lookup 返回 `302132.SZ`，显式 PIT 查询在 2024 年仍解析
+`300114.SZ`。R1 保留既有裸码 `symbol` 列契约，但普通展示取 open/current 记录，
+不会把 2024 历史旧码泄漏为当前业务代码；PIT resolver 仍保留历史语义。
+
+本地离线行为测试已经通过，包括 identity bridge、Canonical 身份策略、R1 current/PIT
+展示和完整 `test_canonical.py`。随后在复制的 retained 2024-01 raw 上建立全新本地
+DuckDB ledger（保留原有 raw anchor，不改原始目录），用当前 mapper 重建四个 CR-2
+SUCCESS 运行并完成：
+
+`Canonical -> Snapshot -> ReadModel -> ResearchPanelBuilder.prepare_verified_projection()`
+
+实际结果为：22 个交易日、5,106 个历史证券、112,075 条日×证券行全部保留；Canonical
+`SUCCESS / selected=112075 / findings=0`，Snapshot、ReadModel、verified projection
+均为 `SUCCESS`，projection 行数为 112,075，current identity lookup 为 `302132.SZ`。
+此前旧 ledger 的 `mapper_code_hash` 属于旧代码版本，按现行 fail-closed 规则不能直接重用；
+这不是放宽校验或删除历史，而是对同一已锚定 raw 在隔离 ledger 中做可复现重放。
+
+随后已按 Issue #59 授权范围，用进程环境变量注入的正式账号完成一次真实但严格有界的
+2024-01 `AmazingDataHistoryAcquisition.acquire_month()`。代码 use mode 明确为 `SPIKE`；
+这表示本次运行允许调用尚未完成 Production 治理批准的候选能力，不等于 Formal B1-B7 或
+Production 已批准，也没有改变能力注册表状态。凭证没有写入文件或日志。
+
+真实 authoritative closure 结果：5,106 个证券、22 个交易日、112,075 条返回行；required
+pair 与 returned pair 均为 112,075，missing/extra/unresolved 均为 0，structural errors 为
+空，completeness `PASS`。分类为 `SUSPENSION_NON_TRADING=132`、
+`NOT_APPLICABLE_SESSION=125`、`POSITIVE_TRADE_COUNT_ACTIVE=22`。receipt 已签发并对保留
+capture 二次 `verify_retained_capture()` 通过；详细脱敏 ID、哈希和分类见
+[`cr7_issue59_authoritative_2024_01_closure_20260916.md`](../provider_verification/cr7_issue59_authoritative_2024_01_closure_20260916.md)
+及对应 JSON。
+
+receipt 已桥接为 authoritative coverage basis；单分区
+`validation_a:2024-01` bounded materialization 成功，ordinary reader 读回 112,075 行，
+相同输入的第二次物化返回 `idempotent_replay=true`，修改一行内容的重放被
+`MaterializationConflictError` 阻断。原始捕获、DuckDB、物化 Parquet 和 SDK/runtime 仍只
+在本地忽略目录，未提交 Git；此闭环等待独立 PM 审阅，不能把本地 artifact 当成已合并主线。
+
+Stage B（`2020-01` / `2026-01`）、78 月回补、Formal/Production、BSE/index、CR-5/R2、
+Golden/H1、baseline 和策略工作继续未授权。
+
+## 0A. 2026-09-15 历史调度快照
 
 当前 clean `main` 为 `9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`（PR #70 已合并）。当前唯一活动
 P0 仍为 Issue #59：先完成完整 `2024-01` 的真实 source-input

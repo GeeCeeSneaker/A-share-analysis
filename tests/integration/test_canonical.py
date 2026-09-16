@@ -575,6 +575,67 @@ class TestIdentityResolution:
         # 600000/000001 resolve through the single-list-date entries
         assert len(selected) == 2
 
+    def test_approved_code_change_resolves_2024_historical_bar(self, conn, env_root):
+        """Issue #59: the approved code change must repair identity only;
+        it must not remove the historical 2024 member or rewrite its PIT
+        symbol into the current code."""
+        from ashare_state.canonical import approved_provider_identity_events
+
+        event = approved_provider_identity_events()[0]
+        master = [
+            *_MASTER_ROWS,
+            {
+                "SECURITY_CODE": "300114",
+                "MARKET_CODE": "2",
+                "LISTING_DATE": "20100827",
+                "IS_LISTED": "1",
+            },
+            {
+                "SECURITY_CODE": "302132",
+                "MARKET_CODE": "2",
+                "LISTING_DATE": "20100827",
+                "IS_LISTED": "1",
+            },
+        ]
+        historical_bar = dict(_BAR_ROWS[0])
+        historical_bar.update(
+            {
+                "SECURITY_CODE": "300114",
+                "MARKET_CODE": "2",
+                "KLINE_TIME": 20240102,
+            }
+        )
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="code_list",
+            endpoint="BaseData.get_code_list",
+            surface="security_master",
+            request_id="req-event-master",
+            payload=master,
+        )
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="daily_bar",
+            endpoint="MarketData.query_kline",
+            surface="daily_bar",
+            request_id="req-event-bar",
+            payload=[historical_bar],
+        )
+
+        result = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+
+        assert result.status == "SUCCESS"
+        assert result.selected_count == 1
+        assert not any(
+            finding_class == "IDENTITY_MISSING"
+            for finding_class, _ in _findings(conn, result.canonical_run_id)
+        )
+        selected = _read_selected(env_root, result)
+        assert selected[0]["security_id"] == event.security_id
+        assert selected[0]["trade_date"] == "2024-01-02"
+
     def test_unknown_market_code_is_missing_not_prefix_guess(self, conn, env_root):
         """Audit §8-15: a row whose market attribution is unknown is a
         MISSING identity - code-prefix guessing never happens (the
@@ -1428,7 +1489,7 @@ class TestIdentityPolicyBinding:
         _seed_base(conn, env_root)
         _seed_bars(conn, env_root)
         first = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
-        monkeypatch.setattr(identity_module, "IDENTITY_BRIDGE_POLICY_VERSION", "identity-bridge-v2")
+        monkeypatch.setattr(identity_module, "IDENTITY_BRIDGE_POLICY_VERSION", "identity-bridge-v3")
         second = _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
         assert second.canonical_run_id != first.canonical_run_id
 

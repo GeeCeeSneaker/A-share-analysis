@@ -13,6 +13,10 @@ from typing import Any
 
 import polars as pl
 
+from ashare_state.canonical.identity import (
+    approved_provider_identity_events,
+    identity_event_for_provider_symbol,
+)
 from ashare_state.canonical.verifier import read_canonical_run_manifest
 from ashare_state.identity import resolve_security_identity
 from ashare_state.readmodel import (
@@ -357,6 +361,41 @@ class ResearchPanelBuilder:
                 records_by_key[key] = record
         if not sources:
             return IdentityView._without_verified_source()  # noqa: SLF001 - fail-closed state
+
+        # Keep the approved code-change event in the verified view even when
+        # one side is absent from the provider's current stock_basic output:
+        # historical code-list membership and current stock_basic are
+        # intentionally separate provider shapes.  This is one exact static
+        # event, not alias discovery.
+        for event in approved_provider_identity_events():
+            for provider_symbol in (
+                event.old_provider_symbol,
+                event.new_provider_symbol,
+            ):
+                symbol, _ = provider_symbol.rsplit(".", 1)
+                record = IdentityRecord(
+                    security_id=event.security_id,
+                    symbol=symbol,
+                    exchange=event.exchange,
+                    valid_from=(
+                        event.original_list_date
+                        if provider_symbol == event.old_provider_symbol
+                        else event.effective_from
+                    ),
+                    valid_to=(
+                        event.effective_from
+                        if provider_symbol == event.old_provider_symbol
+                        else None
+                    ),
+                )
+                key = (record.security_id, record.valid_from, record.symbol, record.exchange)
+                existing = records_by_key.get(key)
+                if existing is not None and existing != record:
+                    raise ResearchPanelError(
+                        "approved identity event conflicts with verified identity source "
+                        f"for {provider_symbol}"
+                    )
+                records_by_key[key] = record
         return IdentityView._from_verified_security_master(  # noqa: SLF001 - verified boundary
             tuple(records_by_key.values()),
             sources=tuple(sources),
@@ -456,6 +495,29 @@ class ResearchPanelBuilder:
                 f"verified identity row {ordinal} has an unknown exchange suffix"
             )
         raw_list_date = row.get("list_date")
+        event = identity_event_for_provider_symbol(provider_symbol)
+        if event is not None:
+            if (
+                raw_list_date is not None
+                and parse_date_value(raw_list_date) != event.original_list_date
+            ):
+                raise ResearchPanelError(
+                    f"approved identity event {provider_symbol!r} has a provider list_date "
+                    f"different from {event.original_list_date.isoformat()}"
+                )
+            interval = event.interval_for(provider_symbol)
+            if interval is None:  # pragma: no cover - guarded by exact event lookup
+                raise ResearchPanelError(
+                    f"approved identity event has no interval for {provider_symbol!r}"
+                )
+            valid_from, valid_to = interval
+            return IdentityRecord(
+                security_id=event.security_id,
+                symbol=symbol,
+                exchange=event.exchange,
+                valid_from=valid_from,
+                valid_to=valid_to,
+            )
         if raw_list_date is None:
             # Match the existing governed bridge: no list date cannot produce
             # a publishable identity; the corresponding bar remains unresolved.
@@ -511,6 +573,7 @@ class ResearchPanelBuilder:
                 )
             identity = identity_view.resolve(security_id, trade_date)
             identity_conflict = self._identity_conflict(source, identity)
+            current_identity = identity_view.current(security_id)
             split = assign_research_split(trade_date)
             decision = evaluate_daily_bar(
                 source,
@@ -526,8 +589,12 @@ class ResearchPanelBuilder:
                 {
                     "trade_date": trade_date,
                     "security_id": security_id,
-                    "symbol": identity.symbol if identity else None,
-                    "exchange": identity.exchange if identity else None,
+                    # Identity validation above is explicitly PIT.  Ordinary
+                    # R1 presentation is explicitly current-code-first: a
+                    # dated historical row such as 2024's 300114 must not
+                    # leak the old code after the approved 2025 change.
+                    "symbol": current_identity.symbol if current_identity else None,
+                    "exchange": current_identity.exchange if current_identity else None,
                     **numeric,
                     "research_split": split.value,
                     "research_eligibility": decision.eligibility.value,

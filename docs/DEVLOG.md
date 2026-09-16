@@ -1,3 +1,50 @@
+## 2026-09-16 · Issue #59 最小 current-code-first 身份事件与 2024-01 链重跑
+
+> 状态：**IDENTITY_FIX_IMPLEMENTED / 2024-01 AUTHORITATIVE CLOSURE VERIFIED / REVIEW_PENDING / PR NOT YET OPENED**
+
+- 依据 scheduler checkpoint `5691600928`，从 PR #71 合并后的 clean `main@c360354bee8698c8a2db61a607d0bb3dcefd0ddb`
+  建立 `investigate/issue59-identity-event-20260916`。PR #71 的治理清理已闭合，本轮没有恢复
+  DEVLOG/history scanner，也没有在其 evidence 分支上实现产品代码。
+- 实现严格限制为一个 Owner-approved 静态官方身份事件：`300114.SZ -> 302132.SZ`，
+  effective `2025-02-17`，original listing `2010-08-27`，旧码 `[2010-08-27, 2025-02-17)`、
+  新码 `[2025-02-17, ∞)`，共用一个稳定 `security_id`。bridge policy 升为
+  `identity-bridge-v2`；新增 current qualified lookup 和显式 PIT provider-symbol lookup，
+  没有新增通用 alias/corporate-action framework、service 或 table hierarchy。
+- R1 的既有裸码 `symbol` 物理契约保持不变；身份判断仍按交易日 PIT 记录，普通投影展示改为
+  唯一 open/current 记录，因此 2024 历史行仍按旧码解析但默认展示当前码 `302132`。
+- 离线回归已通过：identity bridge 事件/边界/冲突测试，Canonical 身份策略和完整
+  `tests/integration/test_canonical.py`，以及 R1 panel/PIT/current-display 回归。没有凭证、
+  账号 profile、私有 endpoint、SDK/runtime、raw payload 或 DuckDB 进入 Git。
+- 对上轮已留存的 2024-01 raw 做了隔离重放：旧 ledger 中的 normalization 运行由旧 mapper
+  code fingerprint 产生，现行 closure verifier 正确拒绝其过期指纹；没有删除旧记录，另建
+  本地 fresh ledger，复用并校验原有 raw anchors，按当前代码重建四个 CR-2 SUCCESS 运行。
+- 当前代码链结果：calendar `8,726`、hist code list `5,106`、stock basic `5,105`、daily bar
+  `112,075` 均 normalization SUCCESS；Canonical `SUCCESS / selected=112075 / findings=0`；
+  Snapshot、ReadModel、`prepare_verified_projection()` 均 SUCCESS，verified projection
+  `112,075` 行，identity view current lookup 返回 `302132.SZ`。这一步是 source replay 和
+  下游结构验证，不是新的 authoritative acquisition receipt。
+- 随后使用正式账号、进程环境变量和 `ProviderUseMode.SPIKE` 完成真实的 2024-01
+  `AmazingDataHistoryAcquisition.acquire_month()`。本次 SPIKE 是代码调用门控，不等于
+  Formal B1-B7 / Production capability approval；账号值、profile、私有地址和 provider
+  原始响应均未写入 Git。
+- authoritative closure 结果：5,106 个证券、22 个交易日、112,075 条返回行；required /
+  returned pair 均为 `112075`，missing/extra/unresolved 均为 `0`，structural errors 为空，
+  completeness 为 `PASS`。分类为 `SUSPENSION_NON_TRADING=132`、
+  `NOT_APPLICABLE_SESSION=125`、`POSITIVE_TRADE_COUNT_ACTIVE=22`。
+- receipt 已签发；保留 capture 的二次 `verify_retained_capture()` 通过；receipt 已构造
+  authoritative coverage evidence/basis。单分区 `validation_a:2024-01` bounded
+  materialization 成功，ordinary reader 读回 `112075` 行；同输入重放返回
+  `idempotent_replay=true`，修改一行内容的重放被 `MaterializationConflictError` 正确阻断。
+- 详细脱敏结果（receipt、coverage、materialization 的 ID/hash、source snapshot 绑定和本地
+  artifact 路径）见
+  [`cr7_issue59_authoritative_2024_01_closure_20260916.md`](provider_verification/cr7_issue59_authoritative_2024_01_closure_20260916.md)
+  及对应 JSON。当前只剩本分支 QA、GitHub Draft PR 和独立 PM 审阅；Stage B、78 月、
+  Formal/Production、BSE/index、CR-5/R2、Golden/H1 和策略工作继续禁止。
+
+凭证只允许通过本地环境变量进入运行进程；详细脱敏状态见
+[`cr7_issue59_identity_event_20260916.md`](provider_verification/cr7_issue59_identity_event_20260916.md)
+及对应 JSON。
+
 ## 2026-09-16 · obsolete DEVLOG history scanner 删除后 exact-head CI 通过
 
 > 状态：**GOVERNANCE_REMEDIATION_VERIFIED / REVIEW_PENDING / PR #71 EVIDENCE-ONLY**
