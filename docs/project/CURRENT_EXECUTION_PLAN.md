@@ -31,8 +31,16 @@ PR #70 已通过独立审阅并合并。合并后的单证券调查记录在
 [`cr7_issue59_300114_identity_probe_20260915.md`](../provider_verification/cr7_issue59_300114_identity_probe_20260915.md)
 及对应 JSON：`InfoData.get_stock_basic` 和底层 `DownloadInfoData.download_stock_basic` 对
 `300114.SZ` 均为 `OK + 0 rows`，未找到 provider-owned identity/date evidence。当前不修改代码；
-下一决策只能是 Owner/PM 提供同一 provider 的权威身份/日期记录，或正式修订 2024-01 universe
-contract。条件满足前不得继续下游链，也不得执行 Stage B、78 月或其他未授权工作。
+随后项目经理 review `5217204028` / Issue comment `5690045901` 修正了调查假设：不能因当前代码
+空结果就认定历史 universe 错误，下一步应在同一 provider 内调查当前代码 `302132.SZ` 与历史
+`300114.SZ` 的连续性。最新记录在
+[`cr7_issue59_300114_302132_continuity_probe_20260915.md`](../provider_verification/cr7_issue59_300114_302132_continuity_probe_20260915.md)
+及对应 JSON：`302132.SZ` 的两条既有 `stock_basic` 入口均 `OK + 1 row`，明确返回
+`MARKET_CODE=302132.SZ`、`LISTDATE=20100827`、`IS_LISTED=1`，但没有返回或暴露绑定
+`300114.SZ` 的 old/new relation、稳定跨代码 identity 或有效区间。因此当前仍为
+`STOP(BLOCKED)`；不得静默改动 5,106-member universe、凭数字相似性加 alias 或继续下游链。
+只有取得同一 provider 的 PIT 可用连续性证据后，才可提出最小映射并重跑既有链路；Stage B、
+78 月及其他未授权工作继续禁止。
 
 ## 1. 项目管理责任
 

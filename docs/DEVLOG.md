@@ -1,3 +1,23 @@
+## 2026-09-15 · Issue #59 `300114.SZ` → `302132.SZ` same-provider continuity probe
+
+> 状态：**STOP(BLOCKED) / CURRENT-CODE IDENTITY FOUND / HISTORICAL CONTINUITY NOT PROVEN / NO CODE CHANGE**
+
+- 项目经理 review `5217204028` 与 Issue #59 scheduler comment `5690045901` 修正了前一轮调查的
+  过早结论：`300114.SZ` 的当前 `stock_basic` 空结果不能证明 2024-01 universe 成员错误；本轮
+  只在同一 AmazingData 内调查当前代码 `302132.SZ` 和旧代码连续性。
+- 精确请求的唯一 symbol 是 `302132.SZ`。typed `InfoData.get_stock_basic` 与底层
+  `DownloadInfoData.download_stock_basic` 均 `OK + 1 row`，两者明确返回
+  `MARKET_CODE=302132.SZ`、`LISTDATE=20100827`、`DELISTDATE=null`、`IS_LISTED=1`。
+- SDK public surface 和 `tgw` 底层类型只显示当前 code/list-day 等字段；没有找到能同时绑定
+  `300114.SZ` 与 `302132.SZ`、并携带稳定 identity 与 effective interval 的 bounded
+  provider-owned relation。`BaseData.get_code_info` 仍是 security-type-only 无界查询，本轮未调用。
+- 因此当前代码自身的 identity/date 证据成立，但历史连续性不成立；没有添加映射、修改 universe、
+  使用公开网页事实或重跑 Canonical/Snapshot/ReadModel、receipt、coverage、materialization。
+  详细脱敏证据见
+  [`cr7_issue59_300114_302132_continuity_probe_20260915.md`](provider_verification/cr7_issue59_300114_302132_continuity_probe_20260915.md)
+  及对应 JSON。最小解除条件是同一 provider 提供 PIT 可用的 old/new continuity relation；
+  在此之前 Issue #59 保持 `STOP(BLOCKED)`，5,106-member universe 不得静默改成 5,105。
+
 ## 2026-09-15 · DEVLOG gate historical exception disclosed
 
 > 状态：**GOVERNANCE CORRECTION / SHA-SCOPED EXCEPTION / NO PRODUCT CHANGE**
