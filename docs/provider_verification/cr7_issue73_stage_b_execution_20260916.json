@@ -15,7 +15,7 @@
     "baseline_passed": 1857,
     "baseline_skipped": 3,
     "baseline_code_head": "f8a750b96f6d6fca4bc1996ba592a4d5dcfa4b48",
-    "note": "The complete suite was run on this code head before this evidence-only documentation change; exact-head CI is required on the Draft PR."
+    "note": "The complete suite was run on this code head before the evidence-only documentation change. The current exact-head CI status is maintained by the Draft PR checks; this JSON is not a live check-status record."
   },
   "months": [
     {

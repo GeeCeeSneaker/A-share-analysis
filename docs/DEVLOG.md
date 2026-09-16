@@ -7,7 +7,7 @@
 - `2020-01` authoritative completeness `FAIL_CLOSED`：required/returned 均 59,930，missing/extra/structural error 为 0，但 5 个 applicable security-session pairs 仍 `UNRESOLVED`。没有删减范围或签发 receipt。
 - `2026-01` completeness `PASS`：required/returned 均 103,454，missing/extra/unresolved/structural error 为 0。但 verified projection PIT 为 `2026-09-16T00:07:55.8489-07:00`，最新提供方响应为 `00:14:17.383141-07:00`；PIT 晚到条件违反现有 `retrieved_at_utc <= pit_as_of` receipt invariant，receipt 未签发。
 - 两个月均未创建 authoritative coverage basis，未启动 bounded materialization、ordinary-reader、idempotent replay 或 changed-content conflict proof。没有为追求 PASS 而放宽规则或未来时间戳。
-- 本次全量离线测试在仅文档变更前、同一代码 head 上为 `1857 passed, 3 skipped`；exact-head CI 仍需 Draft PR 验证。
+- 本次全量离线测试在仅文档变更前、同一代码 head 上为 `1857 passed, 3 skipped`；当前 exact-head CI 状态以 Draft PR checks 为准，本记录不缓存动态 CI 状态。
 - PM/Owner 需分别决定：2020-01 五个 unresolved pairs 所需的最小 provider-owned 状态证据/已审规则；2026-01 PIT-consistent acquisition/replay lifecycle 或明确合同调整。保持 78 月回补未授权。
 
 详细脱敏记录：

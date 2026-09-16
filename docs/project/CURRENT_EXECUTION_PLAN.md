@@ -20,8 +20,8 @@ basis 或 materialization PASS；没有删减 universe、放宽 completeness/PIT
 详细脱敏计数、ID、hash、阻断证据及 PM/Owner 最小决策要求见
 [`cr7_issue73_stage_b_execution_20260916.md`](../provider_verification/cr7_issue73_stage_b_execution_20260916.md)
 和对应 JSON。全量离线测试在本次仅文档变更前、同一代码 head 上通过 `1857 passed, 3 skipped`；
-Draft PR exact-head CI 与独立 PM 审阅仍待完成。审阅前不启动 78 月回补或任何 Issue #73 明确
-禁止的工作。
+当前 exact-head CI 状态以 Draft PR checks 为准，本文件不缓存动态 CI 状态。独立 PM 审阅仍待完成；
+审阅前不启动 78 月回补或任何 Issue #73 明确禁止的工作。
 
 ## 0A. Issue #59 closure evidence (historical snapshot, 2026-09-16)
 

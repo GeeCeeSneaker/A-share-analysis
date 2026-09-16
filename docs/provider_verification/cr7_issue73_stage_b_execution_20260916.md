@@ -46,6 +46,6 @@ These decisions do not authorize any additional month, backfill, Production/B1-B
 
 ## Verification and retained data
 
-The full offline suite passed on the unchanged code head before this evidence-only documentation update: `uv run --locked --offline pytest -o addopts= -q` → **1,857 passed, 3 skipped**. Exact-head PR CI remains required. This change adds evidence/docs only; no product code or test logic was changed.
+The full offline suite passed on the unchanged code head before this evidence-only documentation update: `uv run --locked --offline pytest -o addopts= -q` → **1,857 passed, 3 skipped**. The PR checks are the authoritative, current exact-head CI record; this report is not a live CI status record. This change adds evidence/docs only; no product code or test logic was changed.
 
 All raw provider responses, local ledgers, source-input artifacts, and the one-off runner remain in ignored local storage. Only the adjacent sanitized JSON and this review report are intended for Git.
