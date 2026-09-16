@@ -17,6 +17,9 @@
   [`cr7_issue59_300114_302132_continuity_probe_20260915.md`](provider_verification/cr7_issue59_300114_302132_continuity_probe_20260915.md)
   及对应 JSON。最小解除条件是同一 provider 提供 PIT 可用的 old/new continuity relation；
   在此之前 Issue #59 保持 `STOP(BLOCKED)`，5,106-member universe 不得静默改成 5,105。
+- exact-head CI run `35040411898`（提交 `1ec16ab671cb2581e47efdc22119c9a511632b85`）的 Ubuntu
+  3.14、Windows 3.12、Windows 3.14 required jobs 全部 `success`；GT-H3B controlled execution
+  run `35040411904` 按当前范围 `skipped`。
 
 ## 2026-09-15 · DEVLOG gate historical exception disclosed
 
