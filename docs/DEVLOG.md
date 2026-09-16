@@ -1,3 +1,107 @@
+## 2026-09-16 · obsolete DEVLOG history scanner 删除后 exact-head CI 通过
+
+> 状态：**GOVERNANCE_REMEDIATION_VERIFIED / REVIEW_PENDING / PR #71 EVIDENCE-ONLY**
+
+- 按 scheduler checkpoint `5691108824`，提交
+  `669137f7629f1b68e5a6401052cfd601c5b8530b` 删除整个
+  `tests/integration/test_devlog_gate.py`；没有添加替代历史扫描器、diff scanner、hook、
+  policy engine、SHA allowlist，也没有改写历史。
+- exact-head CI run `35049654822` 三个平台全部成功：Ubuntu 3.14、Windows 3.14、Windows
+  3.12 每个平台均为 `1848 passed, 6 skipped`，Ruff lint、format、mypy 和 AmazingData SDK
+  absence 检查通过；GT-H3B run `35049654866` 按当前范围跳过。
+- 治理整改已由 CI 验证；PR #71 仍保持 evidence-only Draft，等待独立审阅/合并。身份事件实现、
+  2024-01 Canonical → Snapshot → ReadModel → verified projection 重跑及下游 receipt/coverage/
+  materialization 均尚未开始；合并后再从最新 main 启动最小 current-code-first follow-up。
+
+上一轮失败的历史扫描证据仍见
+[`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
+及对应 JSON；账号、密码、IP、端口、Token、Cookie、SDK/runtime、DuckDB 与 raw payload 均未进入 Git。
+
+## 2026-09-16 · 删除 obsolete DEVLOG history scanner，等待 exact-head CI
+
+> 状态：**GOVERNANCE_REMEDIATION_APPLIED / CI_PENDING / PR #71 EVIDENCE-ONLY**
+
+- 最新 scheduler checkpoint `5691108824` 将上一轮历史门禁失败明确归类为 minimalism/governance
+  blocker，并授权最小处理：删除整个 `tests/integration/test_devlog_gate.py`。该文件扫描 Git
+  历史、维护永久 SHA grandfather，并强制历史提交同批修改 DEVLOG；这些维护约定已有
+  `CONTRIBUTING.md` 与 `ENGINEERING_PRINCIPLES.md` 覆盖，不属于产品集成行为。
+- 本轮不添加替代扫描器、diff scanner、hook、policy engine 或任何 SHA allowlist，也不改写历史。
+  PR #71 其余内容保持 evidence-only；`300114.SZ → 302132.SZ` 身份事件实现仍未开始。
+- 删除后必须重新执行完整 QA 和 exact-head 三平台 CI；GT-H3B 仍按范围跳过。只有 PR #71
+  独立通过并合并，才开始最小 current-code-first identity-event follow-up，再重跑已授权的
+  2024-01 Canonical → Snapshot → ReadModel → verified projection 链。
+
+上一轮 cleanup 暴露的历史扫描失败事实仍见
+[`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
+及对应 JSON；账号、密码、IP、端口、Token、Cookie、SDK/runtime、DuckDB 与 raw payload 均未进入 Git。
+
+## 2026-09-15 · PR #71 cleanup exposes historical DEVLOG gate blocker
+
+> 状态：**CLEANUP_APPLIED / CI_BLOCKED_BY_HISTORICAL_GATE / IDENTITY_IMPLEMENTATION_NOT_STARTED**
+
+- 按 Owner decision `5690500282` 与 scheduler policy `5690539134`，提交
+  `aa4a63554388d9fbd6c129f4b2f3ad0fb14223c9` 从 `tests/integration/test_devlog_gate.py` 移除本轮
+  新增的 `a4cad46b0ea54f7a08ec6f6c80ef20918aef2d39` grandfather，并删除对应 DEVLOG 说明段；
+  既有八条更早的历史记录未改动。本次没有新增豁免、没有改写 Git 历史、没有运行时代码或 universe
+  变更。
+- 清理提交的权威 CI run `35045136501` 以真实 `main@9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`
+  为 base。Ubuntu 3.14 job `104633217457` 的 lint、format、mypy 均成功；完整 pytest 为
+  `1850 passed, 6 skipped, 1 failed`，唯一失败为
+  `TestDevlogGate.test_code_commit_requires_devlog_change`，精确指出
+  `a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']`。
+- 这不是 PR #71 连续性证据或产品逻辑失败，而是移除临时豁免后暴露的不可变历史治理/扫描器阻断。
+  按当前调度不得重新加 SHA 豁免；也不能通过重写主线历史补写原提交。Windows 3.14、Windows
+  3.12 最终也均以同一门禁失败，三平台每个平台均为 `1850 passed, 6 skipped, 1 failed`；最终
+  job 状态与失败测试已写入证据 JSON。
+- 因此 PR #71 继续保持 evidence-only Draft；没有开始 `300114.SZ → 302132.SZ` 身份事件实现，
+  没有重跑 2024-01 Canonical → Snapshot → ReadModel → projection 或下游 receipt/coverage/
+  materialization。项目经理需要把门禁策略/历史治理作为独立最小整改处理后，才能重新验证 exact head；
+  不得以另一条 grandfather 绕过。
+
+详细脱敏证据见
+[`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
+及对应 JSON。账号、密码、IP、端口、Token、Cookie、SDK/runtime、DuckDB 与 raw payload 均未进入 Git。
+
+## 2026-09-15 · Issue #59 `300114.SZ` → `302132.SZ` same-provider continuity probe
+
+> 状态：**STOP(BLOCKED) / CURRENT-CODE IDENTITY FOUND / HISTORICAL CONTINUITY NOT PROVEN / NO CODE CHANGE**
+
+- 项目经理 review `5217204028` 与 Issue #59 scheduler comment `5690045901` 修正了前一轮调查的
+  过早结论：`300114.SZ` 的当前 `stock_basic` 空结果不能证明 2024-01 universe 成员错误；本轮
+  只在同一 AmazingData 内调查当前代码 `302132.SZ` 和旧代码连续性。
+- 精确请求的唯一 symbol 是 `302132.SZ`。typed `InfoData.get_stock_basic` 与底层
+  `DownloadInfoData.download_stock_basic` 均 `OK + 1 row`，两者明确返回
+  `MARKET_CODE=302132.SZ`、`LISTDATE=20100827`、`DELISTDATE=null`、`IS_LISTED=1`。
+- SDK public surface 和 `tgw` 底层类型只显示当前 code/list-day 等字段；没有找到能同时绑定
+  `300114.SZ` 与 `302132.SZ`、并携带稳定 identity 与 effective interval 的 bounded
+  provider-owned relation。`BaseData.get_code_info` 仍是 security-type-only 无界查询，本轮未调用。
+- 因此当前代码自身的 identity/date 证据成立，但历史连续性不成立；没有添加映射、修改 universe、
+  使用公开网页事实或重跑 Canonical/Snapshot/ReadModel、receipt、coverage、materialization。
+  详细脱敏证据见
+  [`cr7_issue59_300114_302132_continuity_probe_20260915.md`](provider_verification/cr7_issue59_300114_302132_continuity_probe_20260915.md)
+  及对应 JSON。最小解除条件是同一 provider 提供 PIT 可用的 old/new continuity relation；
+  在此之前 Issue #59 保持 `STOP(BLOCKED)`，5,106-member universe 不得静默改成 5,105。
+- exact-head CI run `35040411898`（提交 `1ec16ab671cb2581e47efdc22119c9a511632b85`）的 Ubuntu
+  3.14、Windows 3.12、Windows 3.14 required jobs 全部 `success`；GT-H3B controlled execution
+  run `35040411904` 按当前范围 `skipped`。
+
+## 2026-09-15 · Issue #59 `300114.SZ` 单证券 provider identity 调查
+
+> 状态：**STOP(BLOCKED) / NO PROVIDER-OWNED IDENTITY-DATE EVIDENCE / NO CODE CHANGE**
+
+- 基于合并后的 `main@9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`，按 scheduler
+  comment `5689306424` 只调查 `300114.SZ`，没有查询其他证券、其他 provider 或未授权阶段。
+- 现有 typed `InfoData.get_stock_basic` 与底层 `DownloadInfoData.download_stock_basic` 均返回
+  `OK + 0 rows` 的 pandas DataFrame；schema 包含 `MARKET_CODE`、`LISTDATE`、`DELISTDATE`，
+  但没有身份或日期值。SDK 语义检查确认底层逐个使用传入 symbol，没有可用的隐藏日期来源。
+- 因此没有安全的代码适配；不能从 bars、查询日期、首个 session、代码前缀、请求顺序或 hist
+  membership 推断 PIT identity，也不能静默删除 universe member。完整 source-input → Canonical
+  仍 `STOP(BLOCKED)`，没有进入 Snapshot/ReadModel/projection、acquisition、receipt、coverage
+  或 materialization。
+- 脱敏证据见
+  [`cr7_issue59_300114_identity_probe_20260915.md`](provider_verification/cr7_issue59_300114_identity_probe_20260915.md)
+  及对应 JSON；完整 raw 与 SDK/runtime 仍仅在本地忽略的 `data/spike/`。
+
 ## 2026-09-15 · Issue #59 CR-2 provider-native shape 适配与完整 2024-01 复核
 
 > 状态：**CR-2 ADAPTER VERIFIED / FULL 2024-01 CANONICAL BLOCKED / NO RECEIPT / NO MATERIALIZATION**

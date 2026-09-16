@@ -1,0 +1,136 @@
+{
+  "schema": "cr7.issue59_300114_identity_probe.v1",
+  "status": "STOP_BLOCKED",
+  "authorization": {
+    "issue": 59,
+    "scheduler_comment": 5689306424,
+    "scope": "single-symbol AmazingData identity/date evidence only"
+  },
+  "source_control": {
+    "base_main": "9423c1799ec970ea3d5076e1af5b3a5ab145ed8d",
+    "working_branch": "investigate/issue59-300114-20260915"
+  },
+  "provider": {
+    "name": "amazingdata",
+    "package_version": "1.1.9",
+    "target_symbol": "300114.SZ",
+    "other_provider_queried": false,
+    "other_symbols_queried": false
+  },
+  "surface_inventory": [
+    {
+      "method": "AmazingDataProvider.get_stock_basic_exchange -> InfoData.get_stock_basic",
+      "queried": true,
+      "query": {
+        "code_list": ["300114.SZ"]
+      },
+      "reason": "existing typed facade with exact code_list"
+    },
+    {
+      "method": "DownloadInfoData.download_stock_basic",
+      "queried": true,
+      "query": {
+        "code_list": ["300114.SZ"]
+      },
+      "reason": "existing underlying single-code surface"
+    },
+    {
+      "method": "BaseData.get_code_info",
+      "queried": false,
+      "reason": "security_type-only signature would require an unbounded universe query"
+    },
+    {
+      "method": "BaseData.get_code_list",
+      "queried": false,
+      "reason": "security_type-only membership surface"
+    },
+    {
+      "method": "BaseData.get_hist_code_list",
+      "queried": false,
+      "reason": "date-window membership surface, not identity/date evidence"
+    }
+  ],
+  "observations": [
+    {
+      "method": "InfoData.get_stock_basic",
+      "facade": "AmazingDataProvider.get_stock_basic_exchange",
+      "status": "OK",
+      "row_count": 0,
+      "type": "pandas.DataFrame",
+      "index_type": "pandas.RangeIndex",
+      "index_values_count": 0,
+      "columns": [
+        "MARKET_CODE",
+        "SECURITY_NAME",
+        "COMP_NAME",
+        "PINYIN",
+        "COMP_NAME_ENG",
+        "LISTDATE",
+        "DELISTDATE",
+        "LISTPLATE_NAME",
+        "COMP_SNAME_ENG",
+        "IS_LISTED"
+      ],
+      "identity_fields": ["MARKET_CODE"],
+      "date_fields": ["LISTDATE", "DELISTDATE"],
+      "identity_date_evidence": false,
+      "raw_request_id": "215b50ef-b582-4176-899b-c4a95adb0777",
+      "raw_payload_hash": "57eb2d33b8c45b7c573b08833a84eee80c150dfe22fa959a29a13cdc0e68799a",
+      "raw_evidence_hash": "35903afd3a8f98bf5b70b19a9c8b0e239c91baff91543cea13c9e40d45cbdc8b"
+    },
+    {
+      "method": "DownloadInfoData.download_stock_basic",
+      "status": "OK",
+      "row_count": 0,
+      "type": "pandas.DataFrame",
+      "index_type": "pandas.RangeIndex",
+      "index_values_count": 0,
+      "columns": [
+        "MARKET_CODE",
+        "SECURITY_NAME",
+        "COMP_NAME",
+        "PINYIN",
+        "COMP_NAME_ENG",
+        "LISTDATE",
+        "DELISTDATE",
+        "LISTPLATE_NAME",
+        "COMP_SNAME_ENG",
+        "IS_LISTED"
+      ],
+      "identity_fields": ["MARKET_CODE"],
+      "date_fields": ["LISTDATE", "DELISTDATE"],
+      "identity_date_evidence": false,
+      "local_raw_artifact": {
+        "path": "data/spike/identity_probe_300114_20260915/raw/direct_download_stock_basic.parquet",
+        "size_bytes": 5830,
+        "sha256": "4edda6c2ca2cec85333bede47c4c9e56aba43d58312a12cf3d8957d8d476c37c"
+      }
+    }
+  ],
+  "sdk_semantics": {
+    "download_stock_basic": "iterates supplied code_list and passes each exact value as provider market_code",
+    "stock_basic_spi": "StockBasicSpi(code) is constructed per supplied symbol",
+    "identity_inferred": false,
+    "list_date_inferred": false
+  },
+  "decision": {
+    "valid_provider_owned_identity_date_record": false,
+    "runtime_code_changed": false,
+    "canonical_progression": "STOP_BLOCKED",
+    "blocker": "provider returns OK with zero stock_basic rows for 300114.SZ"
+  },
+  "not_executed": [
+    "full 2024-01 Snapshot/ReadModel/projection",
+    "acquire_month(2024-01)",
+    "receipt/replay/coverage/materialization/ordinary-reader proof",
+    "Stage B",
+    "78-month backfill",
+    "Formal B1-B7",
+    "Production",
+    "BSE/index",
+    "CR-5/R2",
+    "Golden/H1/baseline",
+    "strategy/portfolio work"
+  ],
+  "next_decision_required": "Owner/PM must supply same-provider identity/date evidence or formally revise the 2024-01 universe contract"
+}

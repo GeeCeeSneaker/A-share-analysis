@@ -6,8 +6,8 @@
 
 ## 0. 2026-09-15 当前调度覆盖
 
-当前 clean `main` 为 `31b5fe478a6140839281c7877829f225277cae14`（PR #69 已合并，PR #68 的合并提交
-为其祖先）。当前唯一活动 P0 仍为 Issue #59：先完成完整 `2024-01` 的真实 source-input
+当前 clean `main` 为 `9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`（PR #70 已合并）。当前唯一活动
+P0 仍为 Issue #59：先完成完整 `2024-01` 的真实 source-input
 Canonical → Snapshot → ReadModel → projection，再进入既有 acquisition → receipt replay →
 coverage basis → bounded atomic materialization → ordinary-reader proof。
 
@@ -26,6 +26,32 @@ CR-5/R2、Golden/H1、baseline 或策略工作。
 最终代码版本重放的 Canonical run `958b02f2-e8c2-5815-be82-aa96ac6bf652` 以 `IDENTITY_MISSING (22)`
 `STOP(BLOCKED)`。这不是账号、网络或适配器阻断，不能删除成员或填造 PIT identity；完整
 verified source snapshot、receipt、coverage 和 materializer 仍未构造。
+
+PR #70 已通过独立审阅并合并。合并后的单证券调查记录在
+[`cr7_issue59_300114_identity_probe_20260915.md`](../provider_verification/cr7_issue59_300114_identity_probe_20260915.md)
+及对应 JSON：`InfoData.get_stock_basic` 和底层 `DownloadInfoData.download_stock_basic` 对
+`300114.SZ` 均为 `OK + 0 rows`，未找到 provider-owned identity/date evidence。当前不修改代码；
+随后项目经理 review `5217204028` / Issue comment `5690045901` 修正了调查假设：不能因当前代码
+空结果就认定历史 universe 错误，下一步应在同一 provider 内调查当前代码 `302132.SZ` 与历史
+`300114.SZ` 的连续性。最新记录在
+[`cr7_issue59_300114_302132_continuity_probe_20260915.md`](../provider_verification/cr7_issue59_300114_302132_continuity_probe_20260915.md)
+及对应 JSON：`302132.SZ` 的两条既有 `stock_basic` 入口均 `OK + 1 row`，明确返回
+`MARKET_CODE=302132.SZ`、`LISTDATE=20100827`、`IS_LISTED=1`，但没有返回或暴露绑定
+`300114.SZ` 的 old/new relation、稳定跨代码 identity 或有效区间。因此当前仍为
+`STOP(BLOCKED)`；不得静默改动 5,106-member universe、凭数字相似性加 alias 或继续下游链。
+只有取得同一 provider 的 PIT 可用连续性证据后，才可提出最小映射并重跑既有链路；Stage B、
+78 月及其他未授权工作继续禁止。
+
+按最新 scheduler checkpoint `5691108824`，上一轮已确认的历史 DEVLOG 扫描器阻断已按最小治理
+方案处理：从 PR #71 删除整个 `tests/integration/test_devlog_gate.py`，不替换为其他历史扫描器、
+diff 扫描器、hook、policy engine 或 SHA allowlist。提交
+`669137f7629f1b68e5a6401052cfd601c5b8530b` 的 exact-head CI `35049654822` 已在 Ubuntu 3.14、
+Windows 3.14、Windows 3.12 三平台成功（每平台 `1848 passed, 6 skipped`，AmazingData SDK
+absence 通过；GT-H3B `35049654866` 按范围跳过）。此前 `aa4a635...` 删除新增 grandfather
+的失败结果仍作为历史证据保留，详见
+[`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](../provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
+及对应 JSON。治理整改已通过 CI，但 PR #71 仍需独立审阅/合并；在该 PR 合并前，不启动身份
+事件实现，也不重跑 2024-01 下游权威链。Stage B、78 月及其他未授权工作继续禁止。
 
 ## 1. 项目管理责任
 

@@ -1,0 +1,121 @@
+{
+  "schema": "cr7.issue59.pr71_devlog_cleanup_gate_blocker.v1",
+  "status": "GOVERNANCE_REMEDIATION_VERIFIED_REVIEW_PENDING",
+  "authorization": {
+    "issue": 59,
+    "pr": 71,
+    "owner_comment": 5690500282,
+    "scheduler_comment": 5690539134,
+    "instruction": "remove the new grandfather first; if the scanner blocks cleanup, return it as a separate blocker and do not add another exception"
+  },
+  "source_control": {
+    "base_main": "9423c1799ec970ea3d5076e1af5b3a5ab145ed8d",
+    "cleanup_head": "aa4a63554388d9fbd6c129f4b2f3ad0fb14223c9",
+    "remediation_head": "669137f7629f1b68e5a6401052cfd601c5b8530b",
+    "branch": "investigate/issue59-300114-20260915",
+    "history_rewritten": false
+  },
+  "cleanup": {
+    "removed_grandfather_sha": "a4cad46b0ea54f7a08ec6f6c80ef20918aef2d39",
+    "removed_explanatory_devlog_section": true,
+    "existing_older_grandfathers_changed": false,
+    "new_exception_added": false,
+    "runtime_code_changed": false,
+    "universe_changed": false
+  },
+  "remediation": {
+    "scheduler_checkpoint": 5691108824,
+    "deleted_obsolete_history_scanner": "tests/integration/test_devlog_gate.py",
+    "replacement_history_scanner_added": false,
+    "replacement_diff_scanner_added": false,
+    "replacement_hook_or_policy_engine_added": false,
+    "history_rewritten": false,
+    "identity_event_implementation_started": false,
+    "commit": "669137f7629f1b68e5a6401052cfd601c5b8530b"
+  },
+  "ci": {
+    "run_id": 35045136501,
+    "ubuntu_py314": {
+      "job_id": 104633217457,
+      "status": "completed",
+      "conclusion": "failure",
+      "lint": "success",
+      "format": "success",
+      "mypy": "success",
+      "pytest": {
+        "passed": 1850,
+        "skipped": 6,
+        "failed": 1,
+        "failing_test": "TestDevlogGate.test_code_commit_requires_devlog_change"
+      },
+      "failure": "a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']"
+    },
+    "windows_py314": {
+      "job_id": 104633217255,
+      "status": "completed",
+      "conclusion": "failure",
+      "lint": "success",
+      "format": "success",
+      "mypy": "success",
+      "pytest": {
+        "passed": 1850,
+        "skipped": 6,
+        "failed": 1,
+        "failing_test": "TestDevlogGate.test_code_commit_requires_devlog_change"
+      },
+      "failure": "a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']"
+    },
+    "windows_py312": {
+      "job_id": 104633217454,
+      "status": "completed",
+      "conclusion": "failure",
+      "lint": "success",
+      "format": "success",
+      "mypy": "success",
+      "pytest": {
+        "passed": 1850,
+        "skipped": 6,
+        "failed": 1,
+        "failing_test": "TestDevlogGate.test_code_commit_requires_devlog_change"
+      },
+      "failure": "a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']"
+    },
+    "post_remediation": {
+      "head": "669137f7629f1b68e5a6401052cfd601c5b8530b",
+      "run_id": 35049654822,
+      "conclusion": "success",
+      "all_required_matrices": "success",
+      "pytest_per_matrix": {
+        "passed": 1848,
+        "skipped": 6,
+        "failed": 0
+      },
+      "amazingdata_sdk_absence": "success",
+      "gt_h3b_run_id": 35049654866,
+      "gt_h3b_conclusion": "skipped",
+      "jobs": {
+        "ubuntu_py314": 104647049644,
+        "windows_py314": 104647049461,
+        "windows_py312": 104647049371
+      }
+    }
+  },
+  "assessment": {
+    "blocker_class": "immutable_historical_governance_scan",
+    "blocker_resolution": "scanner deleted; exact-head CI passed; independent review pending",
+    "all_required_matrices": "success_after_scanner_deletion",
+    "product_or_provider_failure": false,
+    "identity_event_implementation_started": false,
+    "authorized_2024_01_chain_rerun": false,
+    "pr_status": "DRAFT_EVIDENCE_ONLY_REVIEW_PENDING",
+    "next_required_decision": "independent review and merge of evidence-only PR #71; then start the minimal identity-event follow-up from latest main"
+  },
+  "not_executed": [
+    "300114.SZ -> 302132.SZ identity event implementation",
+    "2024-01 Canonical -> Snapshot -> ReadModel -> projection rerun",
+    "receipt/replay/coverage/materialization/ordinary-reader closure",
+    "Stage B",
+    "78-month backfill"
+  ],
+  "secrets_boundary": "credentials, private endpoint, token/cookie, SDK/runtime, DuckDB and raw provider payloads were not committed"
+}
