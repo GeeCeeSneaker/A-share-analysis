@@ -143,7 +143,7 @@
     "ruff_check": "passed",
     "ruff_format_check": "passed; 216 files already formatted",
     "mypy": "passed; 108 source files",
-    "exact_head_ci": "not yet run; check Draft PR"
+    "exact_head_ci": "see Draft PR checks; dynamic status intentionally not cached"
   },
   "secrets_and_private_artifacts_in_git": false
 }
