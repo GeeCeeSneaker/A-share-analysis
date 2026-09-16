@@ -1,0 +1,94 @@
+{
+  "schema": "cr7.issue59.authoritative_2024_01_closure.v1",
+  "issue": 59,
+  "scheduler_comment_id": 5691600928,
+  "base_main": "c360354bee8698c8a2db61a607d0bb3dcefd0ddb",
+  "working_branch": "investigate/issue59-identity-event-20260916",
+  "status": "AUTHORITATIVE_CLOSURE_VERIFIED_LOCALLY_REVIEW_PENDING",
+  "scope": {
+    "research_split": "validation_a",
+    "calendar_year": 2024,
+    "calendar_month": 1,
+    "logical_key": "validation_a:2024-01",
+    "provider": "amazingdata",
+    "provider_use_mode": "SPIKE",
+    "capture_root": "data/spike/identity_event_chain_20260916/authoritative_capture_20260916/"
+  },
+  "completeness": {
+    "rule_version": "amazingdata-month-completeness-rule-v2",
+    "status": "PASS",
+    "monthly_security_count": 5106,
+    "session_count": 22,
+    "returned_security_count": 5106,
+    "returned_row_count": 112075,
+    "returned_first_date": "2024-01-02",
+    "returned_last_date": "2024-01-31",
+    "required_bar_pair_count": 112075,
+    "returned_bar_pair_count": 112075,
+    "missing_required_pair_count": 0,
+    "extra_returned_pair_count": 0,
+    "unresolved_pair_count": 0,
+    "structural_error_codes": [],
+    "classification_counts": {
+      "SUSPENSION_NON_TRADING": 132,
+      "NOT_APPLICABLE_SESSION": 125,
+      "POSITIVE_TRADE_COUNT_ACTIVE": 22,
+      "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+      "UNEXPLAINED_MISSING": 0,
+      "UNRESOLVED": 0,
+      "EXTRA_RETURNED": 0
+    },
+    "positive_trade_pair_count": 22,
+    "monthly_security_set_hash": "f9b15023b79cd261c599a5de52e5d00e62cdf82c4b9fddffcde601450a7e8fde",
+    "session_set_hash": "f7a391589c4ab102ce6b570c4001a92590eae94a3794e0f40f8554e6da903452",
+    "required_bar_pair_set_hash": "14517c57e0a369b8b700a1a6c5f5fe9ed069f540b3d6ce28d79c44d8a12a2651",
+    "returned_bar_pair_set_hash": "14517c57e0a369b8b700a1a6c5f5fe9ed069f540b3d6ce28d79c44d8a12a2651"
+  },
+  "receipt": {
+    "receipt_id": "amazingdata-history-receipt-dac6ef03211d95487cc7fcce68a4ed7d",
+    "receipt_hash": "2860764047844a61d8ab47e4949f98c93f74780a6a47cce3e9bd08d120db37e2",
+    "source_snapshot_id": "2cd0957a-2237-5127-afba-6127376a7ed0",
+    "source_snapshot_manifest_hash": "3cf5405cfa7a751427fd33c18bc9fa8cec5c66a7923a7779dc48f3b848823c1f",
+    "source_capture_uri": "source_capture/amazingdata/amazingdata-history-receipt-dac6ef03211d95487cc7fcce68a4ed7d.json",
+    "source_capture_hash": "dac6ef03211d95487cc7fcce68a4ed7d97eebed897ccb492ae4a2ed8d5101782",
+    "operations_count": 4,
+    "semantic_operations_count": 22,
+    "positive_trade_operations_count": 22,
+    "completeness_statement_id": "amazingdata-complete-dac6ef03211d95487cc7fcce68a4ed7d",
+    "retained_capture_replay_verified": true
+  },
+  "coverage": {
+    "evidence_class": "AUTHORITATIVE_UPSTREAM",
+    "evidence_id": "amazingdata-evidence-validation_a:2024-01-amazingdata-history-receipt-dac6ef03211d95487cc7fcce68a4ed7d",
+    "coverage_basis_id": "amazingdata-basis-validation_a:2024-01-amazingdata-history-receipt-dac6ef03211d95487cc7fcce68a4ed7d",
+    "evidence_hash": "390aed67d005385acfb83ce0cdb7773073a38536c12c4ccfbacbfc7cbda90112",
+    "basis_artifact_hash": "9ff7f821cc561db7fa78040fcc370c35a9f7ae3e12fff7decdbdc28ce0af7b61"
+  },
+  "materialization": {
+    "status": "SUCCESS",
+    "materialization_id": "rhm-04c8912e344ac251c6a5f6e9ebda5977423a41eb17ecb1c5347c23068fb6753b",
+    "idempotency_key": "04c8912e344ac251c6a5f6e9ebda5977423a41eb17ecb1c5347c23068fb6753b",
+    "manifest_uri": "research_security_daily/contract=cr7-history-materialization-v1/materialization=rhm-04c8912e344ac251c6a5f6e9ebda5977423a41eb17ecb1c5347c23068fb6753b/manifest.json",
+    "manifest_hash": "17cddb4c8586ed1921dcabd0a8db8764dc74e02590fc5c2f6ebb005ba681d2c7",
+    "content_hash": "2a313442e6cbb3f3f934e71c61aa7d71891047fdc5013d2243d1b10d267a237a",
+    "partition_inventory_hash": "216abe2c67612347373dff8b17ae32e5562c727e6613f6cb2ee6917b187600a9",
+    "ordinary_reader_row_count": 112075,
+    "idempotent_replay": true,
+    "conflict_rejection": "MaterializationConflictError"
+  },
+  "safety": {
+    "credentials_committed": false,
+    "account_profile_committed": false,
+    "private_endpoint_committed": false,
+    "raw_payload_committed": false,
+    "duckdb_committed": false,
+    "stage_b_run": false,
+    "78_month_backfill_run": false,
+    "production_approval_claimed": false
+  },
+  "review": {
+    "independent_pm_review": "PENDING",
+    "self_approved": false,
+    "self_merged": false
+  }
+}

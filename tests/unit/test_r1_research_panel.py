@@ -10,6 +10,7 @@ from typing import Any
 import polars as pl
 import pytest
 
+from ashare_state.canonical import approved_provider_identity_events
 from ashare_state.research import (
     BSE_IDENTITY_BOUNDARY_STATE,
     CoverageState,
@@ -286,6 +287,50 @@ def test_split_boundaries_and_identity_overlap_fail_closed() -> None:
             ],
             version="bad-v1",
         )
+
+
+def test_current_code_is_default_display_while_pit_identity_stays_historical(
+    tmp_path: Path,
+) -> None:
+    event = approved_provider_identity_events()[0]
+    identity_view = IdentityView.from_rows(
+        [
+            {
+                "security_id": event.security_id,
+                "symbol": "300114",
+                "exchange": "SZSE",
+                "valid_from": "2010-08-27",
+                "valid_to": "2025-02-17",
+            },
+            {
+                "security_id": event.security_id,
+                "symbol": "302132",
+                "exchange": "SZSE",
+                "valid_from": "2025-02-17",
+            },
+        ],
+        version="identity-code-change-fixture-v1",
+    )
+    builder = ResearchPanelBuilder(
+        None,
+        raw_root=tmp_path / "raw",
+        normalized_root=tmp_path / "normalized",
+        research_root=tmp_path / "research",
+    )
+    projected = builder._project_rows(  # noqa: SLF001 - verifies display/PIT split
+        [_row(date(2024, 1, 2), event.security_id)],
+        source_snapshot_id=SNAPSHOT_ID,
+        source_snapshot_as_of=AVAILABLE_AT,
+        source_canonical_run_id=CANONICAL_RUN_ID,
+        source_readmodel_contract_version="readmodel-v1",
+        identity_view=identity_view,
+    )
+
+    assert projected[0]["symbol"] == "302132"
+    assert identity_view.resolve(event.security_id, date(2024, 1, 2)).provider_symbol == (
+        "300114.SZ"
+    )
+    assert identity_view.current_symbol(event.security_id) == "302132.SZ"
 
 
 def test_builder_rejects_pit_violation_and_duplicate_primary_key(tmp_path: Path) -> None:

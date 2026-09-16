@@ -46,11 +46,14 @@ from ashare_state.canonical.eligibility import (
 )
 from ashare_state.canonical.identity import (
     IDENTITY_BRIDGE_POLICY_VERSION,
+    ApprovedIdentityEvent,
     IdentityBridge,
     IdentityResolutionError,
+    approved_provider_identity_events,
     identity_bridge_policy_hash,
     identity_bridge_policy_version,
     identity_dataset_hash,
+    identity_event_for_provider_symbol,
 )
 from ashare_state.canonical.source_policy import (
     SOURCE_POLICY_VERSION,
@@ -64,6 +67,7 @@ from ashare_state.canonical.source_policy import (
 
 __all__ = [
     "AVAILABILITY_POLICY_VERSION",
+    "ApprovedIdentityEvent",
     "AvailabilityBasis",
     "AvailabilityPolicyEntry",
     "CANONICAL_CONTRACT_VERSION",
@@ -87,6 +91,7 @@ __all__ = [
     "availability_policy_entries",
     "availability_policy_hash",
     "availability_policy_version",
+    "approved_provider_identity_events",
     "canonical_code_fingerprint",
     "derive_available_at",
     "domain_spec",
@@ -94,6 +99,7 @@ __all__ = [
     "identity_bridge_policy_hash",
     "identity_bridge_policy_version",
     "identity_dataset_hash",
+    "identity_event_for_provider_symbol",
     "source_policy_for",
     "source_policy_hash",
     "source_policies",

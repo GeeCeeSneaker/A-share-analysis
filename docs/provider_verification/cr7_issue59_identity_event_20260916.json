@@ -1,0 +1,69 @@
+{
+  "schema": "cr7.issue59.identity_event.v1",
+  "issue": 59,
+  "scheduler_comment_id": 5691600928,
+  "base_main": "c360354bee8698c8a2db61a607d0bb3dcefd0ddb",
+  "working_branch": "investigate/issue59-identity-event-20260916",
+  "status": "IDENTITY_FIX_IMPLEMENTED_SOURCE_CHAIN_VERIFIED_AUTHORITATIVE_CLOSURE_VERIFIED_REVIEW_PENDING",
+  "identity_event": {
+    "old_provider_symbol": "300114.SZ",
+    "new_provider_symbol": "302132.SZ",
+    "effective_from": "2025-02-17",
+    "original_list_date": "2010-08-27",
+    "exchange": "SZSE",
+    "old_valid_interval": "[2010-08-27,2025-02-17)",
+    "new_valid_interval": "[2025-02-17,INFINITY)",
+    "bridge_policy_version": "identity-bridge-v2",
+    "stable_security_id_policy": "ADR-002 old seed retained internally; old/new provider symbols share one derived id",
+    "current_lookup": "302132.SZ",
+    "pit_lookup_2024": "300114.SZ"
+  },
+  "source_chain_replay": {
+    "mode": "retained_raw_replayed_into_fresh_local_ledger",
+    "calendar_rows": 8726,
+    "historical_security_rows": 5106,
+    "stock_basic_rows": 5105,
+    "daily_bar_rows": 112075,
+    "trading_day_count": 22,
+    "canonical": {
+      "status": "SUCCESS",
+      "selected_count": 112075,
+      "finding_count": 0,
+      "canonical_run_id": "1c2f2ce3-f587-5780-bd76-f463c3eda6cb"
+    },
+    "snapshot": {
+      "status": "SUCCESS",
+      "row_count_total": 112075,
+      "snapshot_id": "2cd0957a-2237-5127-afba-6127376a7ed0"
+    },
+    "readmodel": {
+      "status": "SUCCESS",
+      "row_count_total": 112075
+    },
+    "verified_projection": {
+      "status": "SUCCESS",
+      "row_count": 112075,
+      "identity_view_version": "identity-master-v1-71bebdc027881a5b473a6ecc",
+      "identity_view_hash": "658efdb7d26c3630b5b0f533aaa494935f80f617613b04216fbbba0084e92c52",
+      "current_symbol": "302132.SZ"
+    }
+  },
+  "acquisition": {
+    "status": "VERIFIED_IN_LOCAL_SPIKE_CLOSURE",
+    "provider_use_mode": "SPIKE",
+    "receipt_issued": true,
+    "coverage_basis_issued": true,
+    "materialization_entered": true,
+    "ordinary_reader_verified": true,
+    "idempotent_replay_verified": true,
+    "conflict_rejection_verified": true,
+    "closure_report": "cr7_issue59_authoritative_2024_01_closure_20260916.md"
+  },
+  "safety": {
+    "credentials_committed": false,
+    "raw_payload_committed": false,
+    "duckdb_committed": false,
+    "stage_b_run": false,
+    "78_month_backfill_run": false
+  }
+}
