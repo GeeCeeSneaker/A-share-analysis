@@ -1,6 +1,6 @@
 # Issue #59 / PR #71 DEVLOG cleanup gate blocker（2026-09-15）
 
-状态：`HISTORICAL_GATE_POLICY_REMEDIATION_APPLIED / CI_PENDING / IDENTITY_IMPLEMENTATION_NOT_STARTED`
+状态：`HISTORICAL_GATE_POLICY_REMEDIATION_VERIFIED / REVIEW_PENDING / IDENTITY_IMPLEMENTATION_NOT_STARTED`
 
 本文件先记录 cleanup 提交触发的历史扫描失败；最新 scheduler checkpoint `5691108824`
 已给出后续治理决议：删除 obsolete history scanner，重新验证 exact head。以下历史 CI 事实
@@ -59,8 +59,11 @@ grandfather，并把维护约定当作产品 pytest 门禁；项目约定已由 
 `ENGINEERING_PRINCIPLES.md` 覆盖。整改明确不引入任何替代历史扫描、diff scanner、hook、
 policy engine 或 SHA allowlist，也不改写历史。
 
-删除后需要完整 QA 与 exact-head 三平台 CI。当前证据文件所记录的旧 run 是整改前的历史结果，
-不能代替删除后的 CI；PR #71 仍为 evidence-only Draft。只有该 PR 独立通过并合并，才允许
+删除后的完整 QA 与 exact-head 三平台 CI 已通过：head
+`669137f7629f1b68e5a6401052cfd601c5b8530b` 的 CI run `35049654822` 中，Ubuntu 3.14、Windows
+3.14、Windows 3.12 均为 success，每平台 `1848 passed, 6 skipped`，AmazingData SDK absence
+检查通过；GT-H3B run `35049654866` 按范围 skipped。当前证据文件前述旧 run 仍是整改前的历史
+结果，不与这次成功混淆。PR #71 仍为 evidence-only Draft，等待独立审阅/合并；合并后才允许
 开始最小身份事件 follow-up。
 
 最小解除条件是项目经理/Owner 单独决定并实施门禁历史策略整改，使 immutable pre-existing

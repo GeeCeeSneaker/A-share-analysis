@@ -1,3 +1,22 @@
+## 2026-09-16 · obsolete DEVLOG history scanner 删除后 exact-head CI 通过
+
+> 状态：**GOVERNANCE_REMEDIATION_VERIFIED / REVIEW_PENDING / PR #71 EVIDENCE-ONLY**
+
+- 按 scheduler checkpoint `5691108824`，提交
+  `669137f7629f1b68e5a6401052cfd601c5b8530b` 删除整个
+  `tests/integration/test_devlog_gate.py`；没有添加替代历史扫描器、diff scanner、hook、
+  policy engine、SHA allowlist，也没有改写历史。
+- exact-head CI run `35049654822` 三个平台全部成功：Ubuntu 3.14、Windows 3.14、Windows
+  3.12 每个平台均为 `1848 passed, 6 skipped`，Ruff lint、format、mypy 和 AmazingData SDK
+  absence 检查通过；GT-H3B run `35049654866` 按当前范围跳过。
+- 治理整改已由 CI 验证；PR #71 仍保持 evidence-only Draft，等待独立审阅/合并。身份事件实现、
+  2024-01 Canonical → Snapshot → ReadModel → verified projection 重跑及下游 receipt/coverage/
+  materialization 均尚未开始；合并后再从最新 main 启动最小 current-code-first follow-up。
+
+上一轮失败的历史扫描证据仍见
+[`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
+及对应 JSON；账号、密码、IP、端口、Token、Cookie、SDK/runtime、DuckDB 与 raw payload 均未进入 Git。
+
 ## 2026-09-16 · 删除 obsolete DEVLOG history scanner，等待 exact-head CI
 
 > 状态：**GOVERNANCE_REMEDIATION_APPLIED / CI_PENDING / PR #71 EVIDENCE-ONLY**

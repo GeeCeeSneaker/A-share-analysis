@@ -42,14 +42,16 @@ PR #70 已通过独立审阅并合并。合并后的单证券调查记录在
 只有取得同一 provider 的 PIT 可用连续性证据后，才可提出最小映射并重跑既有链路；Stage B、
 78 月及其他未授权工作继续禁止。
 
-按最新 scheduler checkpoint `5691108824`，上一轮已确认的历史 DEVLOG 扫描器阻断按最小治理
+按最新 scheduler checkpoint `5691108824`，上一轮已确认的历史 DEVLOG 扫描器阻断已按最小治理
 方案处理：从 PR #71 删除整个 `tests/integration/test_devlog_gate.py`，不替换为其他历史扫描器、
-diff 扫描器、hook、policy engine 或 SHA allowlist。此前 `aa4a635...` 删除新增 grandfather
-的结果和 CI 失败仍作为历史证据保留，详见
+diff 扫描器、hook、policy engine 或 SHA allowlist。提交
+`669137f7629f1b68e5a6401052cfd601c5b8530b` 的 exact-head CI `35049654822` 已在 Ubuntu 3.14、
+Windows 3.14、Windows 3.12 三平台成功（每平台 `1848 passed, 6 skipped`，AmazingData SDK
+absence 通过；GT-H3B `35049654866` 按范围跳过）。此前 `aa4a635...` 删除新增 grandfather
+的失败结果仍作为历史证据保留，详见
 [`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](../provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
-及对应 JSON；本轮删除后需重新跑 exact-head CI 验证治理整改是否收口。PR #71 继续保持
-evidence-only Draft；在该 PR 独立通过并合并前，不启动身份事件实现，也不重跑 2024-01 下游
-权威链。Stage B、78 月及其他未授权工作继续禁止。
+及对应 JSON。治理整改已通过 CI，但 PR #71 仍需独立审阅/合并；在该 PR 合并前，不启动身份
+事件实现，也不重跑 2024-01 下游权威链。Stage B、78 月及其他未授权工作继续禁止。
 
 ## 1. 项目管理责任
 
