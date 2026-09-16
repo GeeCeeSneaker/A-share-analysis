@@ -236,6 +236,7 @@ class _FakeAmazingDataProvider(AmazingDataProvider):
     """A typed-facade fake used only to exercise the acquisition boundary."""
 
     def __init__(self) -> None:
+        self.calls: list[tuple[Any, ...]] = []
         self.calendar = _provider_exchange(
             TRADE_CALENDAR,
             {"market": AMAZINGDATA_CALENDAR_MARKET},
@@ -333,11 +334,13 @@ class _FakeAmazingDataProvider(AmazingDataProvider):
         )
 
     def get_calendar_exchange(self, market: str = "SH") -> ProviderExchange:
+        self.calls.append(("calendar", market))
         return self.calendar
 
     def get_hist_code_list_exchange(
         self, security_type: str, start_date: int, end_date: int
     ) -> ProviderExchange:
+        self.calls.append(("hist_code_list", security_type, start_date, end_date))
         if (start_date, end_date) == (20200101, 20200131):
             return self.code_list
         return self.exact_code_lists[(start_date, end_date)]
@@ -345,6 +348,7 @@ class _FakeAmazingDataProvider(AmazingDataProvider):
     def get_history_stock_status_exchange(
         self, start_date: int, end_date: int, code_list: list[str]
     ) -> ProviderExchange:
+        self.calls.append(("history_stock_status", start_date, end_date, tuple(code_list)))
         return self.status
 
     def query_kline_exchange(
@@ -356,6 +360,7 @@ class _FakeAmazingDataProvider(AmazingDataProvider):
         kline_type: str = "DAY",
         trading_days: list[int] | None = None,
     ) -> ProviderExchange:
+        self.calls.append(("daily_bar", begin_date, end_date, tuple(code_list)))
         return self.kline
 
 
@@ -403,6 +408,7 @@ class _PositiveFallbackFakeAmazingDataProvider(_FakeAmazingDataProvider):
         begin_time: int = 93000000,
         end_time: int = 150000000,
     ) -> ProviderExchange:
+        self.calls.append(("snapshot", begin_date, end_date, tuple(code_list)))
         assert code_list == ["000001.SZ"]
         assert begin_date == end_date
         assert (begin_time, end_time) == (93000000, 150000000)
@@ -433,9 +439,82 @@ def _acquisition_receipt(
     acquisition = AmazingDataHistoryAcquisition(
         provider or _FakeAmazingDataProvider(),
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-acquisition"),
-        source_snapshot,
     )
-    return acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+    capture = acquisition.capture_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+    return acquisition.finalize_capture(capture, source_snapshot=source_snapshot)
+
+
+def test_capture_finalizes_against_later_projection_without_provider_replay(tmp_path: Path) -> None:
+    provider = _FakeAmazingDataProvider()
+    raw_writer = _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-two-phase")
+    acquisition = AmazingDataHistoryAcquisition(provider, raw_writer)
+    capture = acquisition.capture_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+    calls_after_capture = tuple(provider.calls)
+
+    assert capture.completeness_evaluation.status == "PASS"
+    projection = replace(
+        _projection([]),
+        source_snapshot_as_of=datetime(2026, 9, 2, tzinfo=UTC),
+    )
+    receipt = acquisition.finalize_capture(capture, source_snapshot=projection)
+
+    assert tuple(provider.calls) == calls_after_capture
+    assert receipt.retrieved_at_utc <= receipt.pit_as_of == projection.source_snapshot_as_of
+    receipt.verify_retained_capture(raw_writer.root)
+
+
+def test_capture_finalization_rejects_early_pit_without_provider_replay(tmp_path: Path) -> None:
+    provider = _FakeAmazingDataProvider()
+    acquisition = AmazingDataHistoryAcquisition(
+        provider,
+        _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-early-pit"),
+    )
+    capture = acquisition.capture_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+    calls_after_capture = tuple(provider.calls)
+    projection = replace(
+        _projection([]),
+        source_snapshot_as_of=datetime(2026, 7, 31, tzinfo=UTC),
+    )
+
+    with pytest.raises(CoverageBasisError):
+        acquisition.finalize_capture(capture, source_snapshot=projection)
+
+    assert tuple(provider.calls) == calls_after_capture
+
+
+def test_capture_must_finalize_against_its_original_retained_root(tmp_path: Path) -> None:
+    provider = _FakeAmazingDataProvider()
+    acquisition = AmazingDataHistoryAcquisition(
+        provider,
+        _anchored_writer(tmp_path / "capture", ingest_run_id="unit-test-root-binding"),
+    )
+    capture = acquisition.capture_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+    other = AmazingDataHistoryAcquisition(
+        provider,
+        _anchored_writer(tmp_path / "other", ingest_run_id="unit-test-other-root"),
+    )
+    calls_after_capture = tuple(provider.calls)
+
+    with pytest.raises(AmazingDataAcquisitionError, match="original retained raw root"):
+        other.finalize_capture(capture, source_snapshot=_projection([]))
+
+    assert tuple(provider.calls) == calls_after_capture
+    assert not (tmp_path / "other" / "source_capture").exists()
+
+
+def test_capture_finalization_replays_its_exact_retained_exchange_bytes(tmp_path: Path) -> None:
+    provider = _FakeAmazingDataProvider()
+    raw_writer = _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-capture-replay")
+    acquisition = AmazingDataHistoryAcquisition(provider, raw_writer)
+    capture = acquisition.capture_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+    calls_after_capture = tuple(provider.calls)
+    meta_path = raw_writer.root / Path(capture.operations[0].captured_evidence_uri)
+    meta_path.write_bytes(meta_path.read_bytes() + b"tampered")
+
+    with pytest.raises(AmazingDataAcquisitionError, match="could not be replayed"):
+        acquisition.finalize_capture(capture, source_snapshot=_projection([]))
+
+    assert tuple(provider.calls) == calls_after_capture
 
 
 def _anchored_writer(raw_root: Path, *, ingest_run_id: str) -> AnchoredRawEvidenceWriter:
@@ -1007,10 +1086,11 @@ def test_acquisition_rejects_partial_daily_bar_response(tmp_path: Path) -> None:
     acquisition = AmazingDataHistoryAcquisition(
         provider,
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-partial"),
-        _projection([]),
     )
+    capture = acquisition.capture_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+    assert capture.completeness_evaluation.status == "FAIL_CLOSED"
     with pytest.raises(AmazingDataAcquisitionError, match="month completeness"):
-        acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+        acquisition.finalize_capture(capture, source_snapshot=_projection([]))
 
 
 def test_acquisition_rejects_daily_bar_schema_drift(tmp_path: Path) -> None:
@@ -1026,10 +1106,11 @@ def test_acquisition_rejects_daily_bar_schema_drift(tmp_path: Path) -> None:
     acquisition = AmazingDataHistoryAcquisition(
         provider,
         _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-schema-drift"),
-        _projection([]),
     )
+    capture = acquisition.capture_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+    assert capture.completeness_evaluation.status == "FAIL_CLOSED"
     with pytest.raises(AmazingDataAcquisitionError, match="month completeness"):
-        acquisition.acquire_month(PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1))
+        acquisition.finalize_capture(capture, source_snapshot=_projection([]))
 
 
 def test_authoritative_reader_protocol_tamper_stays_fail_closed(tmp_path: Path) -> None:

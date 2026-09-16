@@ -4,9 +4,41 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
-## 0. 2026-09-16 当前调度覆盖 — Issue #73
+## 0. 2026-09-16 当前调度覆盖 — Issue #73 remediation
 
-当前执行基线为 `main@f8a750b96f6d6fca4bc1996ba592a4d5dcfa4b48`。Issue #73 仅授权
+当前基线为 PR #74 合并后的 `main@22c42a72e222d9b6f6519095fb641a4adb190e12`。本轮仅处理
+Issue #73 授权的 `2026-01` Holdout 与 `2020-01` Development；没有执行其他月份、78 月回补、
+Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1、baseline 或策略工作。
+
+月度验收状态：
+
+- **2026-01：PASS。** 在现有 authoritative-history 边界实现 typed capture/finalize；capture
+  先留存 bounded exchanges 并计算 completeness，刷新同月 verified projection 后，finalize
+  从相同 retained capture 出具 receipt，未增加 provider 请求，也未改变 `retrieved_at ≤ PIT`
+  校验。完整性为 `103454/103454`，缺失/额外/未决/结构错误均为 0；retained replay、coverage、
+  单分区 materialization、ordinary reader（103454 行）、幂等重放与 changed-content conflict
+  均通过。首次本地 one-off runner 在 receipt 后因变量名错误停止；从同一 capture 和 projection
+  离线续跑并验证了相同 receipt ID/hash，续跑 provider 请求数为 0。
+- **2020-01：STOP(BLOCKED)。** 对五个既定 `(symbol, session)` 精确重查 historical-status，
+  五次请求均为精确 scope 且 provider 响应 `OK`，但全部是零行、零列空结果，没有可用的
+  `IS_SUSP_SEC` 事实。五对继续 `UNRESOLVED`；没有推断停牌/零交易，没有签发 receipt 或物化。
+
+本地 QA：全量离线测试 `1861 passed, 3 skipped`；Issue #73 聚焦测试 `32 passed`；Ruff、
+format 与 mypy 均通过。具体 pair、IDs/hashes、计数与结果见
+[remediation 报告](../provider_verification/cr7_issue73_stage_b_remediation_20260916.md)及对应
+[JSON](../provider_verification/cr7_issue73_stage_b_remediation_20260916.json)。Draft PR 的 exact-head
+CI 状态以 GitHub 检查为准，不在此缓存动态值。
+
+下一步仅需 PM/Owner 审阅 2020-01 五个精确 pair 的空响应和可接受的最小解除条件；没有新的
+provider-owned 状态事实前继续 fail-closed。不得因此扩大数据源、猜测语义、执行其他月份、
+78 月回补或 Production/B1-B7。即使 2026-01 已通过，本轮也不等于 Issue #73 全部语义问题关闭。
+
+## 0H. 2026-09-16 PR #74 合并前的 Stage B blocker baseline（历史记录）
+
+以下内容记录 PR #74 合并前的历史阻断快照，仅作历史留存；当前状态以本节 0 的 remediation
+更新及 Issue #73 最新指示为准。
+
+当时执行基线为 `main@f8a750b96f6d6fca4bc1996ba592a4d5dcfa4b48`。Issue #73 仅授权
 Stage B 的 `2020-01` Development 与 `2026-01` Holdout 两个代表月；本轮未执行其他月份、
 78 月回补或 Production/B1-B7 工作。
 

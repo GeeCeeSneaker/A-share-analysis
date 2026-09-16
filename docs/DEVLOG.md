@@ -1,4 +1,35 @@
-## 2026-09-16 · Issue #73 Stage B 两代表月真实验证
+## 2026-09-16 · Issue #73 Stage B remediation：capture/finalize 与精确状态复核
+
+> 状态：**2026-01 PASS / 2020-01 STOP(BLOCKED) / READY FOR PM REVIEW**
+
+- 从 PR #74 合并后的 `main@22c42a72e222d9b6f6519095fb641a4adb190e12` 建立独立 remediation 分支；
+  严格只执行 Issue #73 授权的 `2026-01` Holdout 与 `2020-01` Development。
+- 在现有 AmazingData authoritative-history 边界实现 typed retained capture/finalize。capture
+  先完成 bounded provider exchanges、raw anchoring 与 completeness；调用方之后刷新 verified
+  projection；finalize 从原 raw root 的同一 capture 签发并重放 receipt，不再次请求 provider。
+  `retrieved_at_utc <= pit_as_of` 校验未改。
+- `2026-01` completeness `PASS`：required/returned 均 `103454`，missing/extra/unresolved/
+  structural errors 均为 `0`。receipt/capture replay、authoritative coverage、单 Holdout 分区
+  bounded materialization、ordinary reader `103454` 行、`idempotent_replay=true` 与
+  changed-content `MaterializationConflictError` 均通过。首次 ignored one-off runner 在 receipt
+  后因局部变量名错误停止；从已保留 capture/projection 续跑，receipt ID/hash 与原报告相同，
+  续跑 provider 调用数 `0`。
+- `2020-01` 仅对既有五个 exact unresolved `(symbol, session)` pair 重查 historical-status。
+  五次均为 exact request、provider `OK`，但均返回零行/零列空成员，usable exact `IS_SUSP_SEC`
+  facts `0`；五对仍未决。没有从旧空 snapshot、缺失 bar、代码前缀或邻近日期推断状态；不签发
+  receipt、不做 coverage/materialization。
+- 本地 QA：聚焦测试 `32 passed`；全量离线测试 `1861 passed, 3 skipped`；`ruff check`、
+  `ruff format --check`（216 文件）和 `mypy`（108 个源文件）通过。Draft PR exact-head CI 状态
+  以 GitHub 检查为准。
+- 未执行任何其他月份、78 月回补、Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1、
+  baseline 或策略工作。账号口令、profile/account identifier、IP/端口、SDK/runtime、raw 响应、
+  本地数据库与 materialized artifacts 均未纳入 Git。
+
+逐案脱敏结果、receipt/coverage/materialization IDs/hashes、五个 exact pair 及 PM 决策要求见
+[cr7_issue73_stage_b_remediation_20260916.md](provider_verification/cr7_issue73_stage_b_remediation_20260916.md)
+及对应 [JSON](provider_verification/cr7_issue73_stage_b_remediation_20260916.json)。
+
+## 2026-09-16 · Issue #73 Stage B 两代表月真实验证（PR #74 前历史记录）
 
 > 状态：**BOTH MONTHS STOP(BLOCKED) / SANITIZED EVIDENCE READY / DRAFT PR AND PM REVIEW PENDING**
 

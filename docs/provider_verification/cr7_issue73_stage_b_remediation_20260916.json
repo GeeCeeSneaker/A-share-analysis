@@ -1,0 +1,149 @@
+{
+  "schema": "issue73.stage_b.remediation.v2",
+  "issue": 73,
+  "baseline_sha": "22c42a72e222d9b6f6519095fb641a4adb190e12",
+  "scope": ["2026-01", "2020-01"],
+  "overall_status": "READY_FOR_PM_REVIEW",
+  "disposition": {
+    "2026-01": "PASS",
+    "2020-01": "STOP(BLOCKED)",
+    "stage_b_overall_pass": false,
+    "draft_pr_required": true
+  },
+  "unauthorized_work_started": [],
+  "lifecycle_change": {
+    "capture_then_finalize": true,
+    "finalize_uses_same_retained_capture": true,
+    "provider_calls_during_finalize": false,
+    "pit_invariant_changed": false
+  },
+  "months": {
+    "2026-01": {
+      "status": "PASS",
+      "source_inputs": {
+        "calendar": 8727,
+        "monthly_hist_code_list": 5186,
+        "stock_basic": 5186,
+        "daily_bars": 103454,
+        "quarantined_rows": 0,
+        "canonical_selected_rows": 103454,
+        "canonical_findings": 0,
+        "verified_projection_rows": 103454
+      },
+      "capture": {
+        "metadata_records": 24,
+        "unique_exact_session_hist_code_list_requests": 20,
+        "completeness": "PASS",
+        "required_pairs": 103454,
+        "returned_pairs": 103454,
+        "missing_pairs": 0,
+        "extra_pairs": 0,
+        "unresolved_pairs": 0,
+        "structural_errors": 0,
+        "classifications": {
+          "SUSPENSION_NON_TRADING": 215,
+          "NOT_APPLICABLE_SESSION": 51
+        }
+      },
+      "timing": {
+        "last_capture_retrieved_at_utc": "2026-09-16T11:32:54.572962+00:00",
+        "verified_projection_pit_as_of_utc": "2026-09-16T11:33:14.158803+00:00",
+        "pit_order_valid": true
+      },
+      "receipt": {
+        "id": "amazingdata-history-receipt-0b020510ae62ce051f58f429303be681",
+        "hash": "67a09173b0a2530c55c836df370fd7c55cf1d485e0aa0ffd3f027062b427e5e3",
+        "retained_capture_replay": "PASS",
+        "source_snapshot_id": "80af5da1-c99f-583d-a455-d756d9d6058d",
+        "source_snapshot_manifest_hash": "95d1fdb6932619543deb49f1ce464ad644e1d79348f58e4a80ddf9abcf6ada26"
+      },
+      "coverage": {
+        "status": "PASS",
+        "basis_id": "amazingdata-basis-holdout:2026-01-amazingdata-history-receipt-0b020510ae62ce051f58f429303be681",
+        "artifact_hash": "618814ff83bead921a3fe5898d80411ddb4cf0e84b3712d56cb4638b65d13df5"
+      },
+      "materialization": {
+        "status": "PASS",
+        "partition": "Holdout:2026-01",
+        "id": "rhm-1f783f7f2cdd867077c0bf1393a70f6f7c5c4f054a046bd7604b13235c5f7fa9",
+        "manifest_hash": "5079bc490be5e0e275f11ee963e33984ccf11dec4d3ba7dc92e98231f2b8ed3c",
+        "ordinary_reader_rows": 103454,
+        "date_range": ["2026-01-05", "2026-01-30"],
+        "idempotent_replay": true,
+        "changed_content_conflict": "MaterializationConflictError"
+      },
+      "offline_continuation": {
+        "prior_local_harness_stop": "NameError after acquisition, projection refresh, receipt issuance, and retained replay",
+        "same_retained_capture_and_projection": true,
+        "provider_requests": 0,
+        "receipt_id_and_hash_match_original": true
+      }
+    },
+    "2020-01": {
+      "status": "STOP(BLOCKED)",
+      "blocked_at": "EXACT_STATUS_EVIDENCE",
+      "exact_pair_status_requery_count": 5,
+      "exact_scope_verified": true,
+      "response_status": "OK",
+      "zero_row_responses": 5,
+      "zero_column_responses": 5,
+      "response_shape": "ZERO_COLUMN_EMPTY",
+      "usable_exact_is_susp_sec_facts": 0,
+      "unresolved_pair_count": 5,
+      "unresolved_pairs": [
+        {
+          "provider_symbol": "002971.SZ",
+          "session": "2020-01-02",
+          "prior_status_member": "schema-valid; 9 rows; target session missing",
+          "prior_exact_snapshot_fallback": "not queried",
+          "daily_bar": "absent",
+          "new_exact_status": "OK; 0 rows; 0 columns; ZERO_COLUMN_EMPTY"
+        },
+        {
+          "provider_symbol": "300813.SZ",
+          "session": "2020-01-03",
+          "prior_status_member": "schema-valid; 8 rows; target session missing",
+          "prior_exact_snapshot_fallback": "not queried",
+          "daily_bar": "absent",
+          "new_exact_status": "OK; 0 rows; 0 columns; ZERO_COLUMN_EMPTY"
+        },
+        {
+          "provider_symbol": "300815.SZ",
+          "session": "2020-01-14",
+          "prior_status_member": "schema-valid; 1 row; target session missing",
+          "prior_exact_snapshot_fallback": "not queried",
+          "daily_bar": "absent",
+          "new_exact_status": "OK; 0 rows; 0 columns; ZERO_COLUMN_EMPTY"
+        },
+        {
+          "provider_symbol": "002975.SZ",
+          "session": "2020-01-16",
+          "prior_status_member": "zero-column empty",
+          "prior_exact_snapshot_fallback": "queried; response null/missing",
+          "daily_bar": "absent",
+          "new_exact_status": "OK; 0 rows; 0 columns; ZERO_COLUMN_EMPTY"
+        },
+        {
+          "provider_symbol": "300816.SZ",
+          "session": "2020-01-17",
+          "prior_status_member": "zero-column empty",
+          "prior_exact_snapshot_fallback": "queried; response null/missing",
+          "daily_bar": "absent",
+          "new_exact_status": "OK; 0 rows; 0 columns; ZERO_COLUMN_EMPTY"
+        }
+      ],
+      "receipt_created": false,
+      "coverage_or_materialization_created": false,
+      "inference_from_missing_evidence": false
+    }
+  },
+  "local_qa": {
+    "focused_tests": "32 passed",
+    "full_offline_pytest": "1861 passed, 3 skipped",
+    "ruff_check": "passed",
+    "ruff_format_check": "passed; 216 files already formatted",
+    "mypy": "passed; 108 source files",
+    "exact_head_ci": "not yet run; check Draft PR"
+  },
+  "secrets_and_private_artifacts_in_git": false
+}
