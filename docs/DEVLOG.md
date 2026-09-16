@@ -1,4 +1,37 @@
-## 2026-09-16 · Issue #73 Stage B 两代表月真实验证
+## 2026-09-16 · Issue #73 Stage B remediation：LISTDATE 与双月闭环
+
+> 状态：**2020-01 PASS / 2026-01 PASS / 两代表月证据待 PM 审阅**
+
+- 以 PR #74 合并后的 `main@22c42a72e222d9b6f6519095fb641a4adb190e12` 为基线，只处理
+  Issue #73 授权的 `2020-01` Development 与 `2026-01` Holdout。
+- 2020-01 使用现有、已验证的 AmazingData security-master / `stock_basic.LISTDATE`。精确日代码表
+  中早于 LISTDATE 的证券日分类为 `NOT_APPLICABLE_SESSION`，不称作停牌；日期等于或晚于
+  LISTDATE 的配对仍按既有 status/bar 语义处理；缺失/格式错误日期不会解除未决。Completeness
+  与 applicability 版本更新到 v3；参与豁免的 LISTDATE 被包含在已有 receipt-bound evaluation，
+  未新增持久 hash 维度或数据源。
+- 在现有 AmazingData authoritative-history 边界完成 typed capture/finalize：先留存并验证有界
+  provider exchanges，再刷新 projection，最后从原 raw root 的同一 capture 签发和重放 receipt。
+  Finalize 增加分区月份/交易日范围、research split、daily-row cardinality 一致性检查；同 raw-root、
+  tamper 与 PIT 检查保持不变，`retrieved_at_utc <= pit_as_of` 未放宽。Mismatch 测试断言 finalize
+  不触发 provider 调用。
+- 变更后两个代表月都使用已留存、hash-anchored exchange 做完整离线复放，未重新请求 SDK/provider，
+  网络调用数为 `0`：2020-01 required/returned `59,930/59,930`、unresolved `0`、ordinary reader
+  `59,930` 行；2026-01 required/returned `103,454/103,454`、unresolved `0`、ordinary reader
+  `103,454` 行。两个分区的 retained replay、authoritative coverage、bounded materialization、
+  idempotent replay 与 changed-content conflict rejection 均通过。2020-01 五个上市前日期及两月
+  的 PIT 时间、分类计数和材料化 ID 见脱敏证据文件。
+- 本地 QA：聚焦测试 `61 passed`；全量离线 pytest `1868 passed, 3 skipped`；`ruff check src tests`
+  通过；`ruff format --check src tests` 显示 216 个文件已格式化；`mypy src/ashare_state`
+  对 108 个源文件无问题。Draft PR exact-head CI 为动态状态，以 GitHub 检查为准。
+- 未执行其他月份、78 月回补、Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1、baseline
+  或策略工作。账号口令、profile/account identifier、IP/端口、SDK/runtime、raw payload、本地数据库与
+  materialized artifacts 均未纳入 Git。
+
+逐月脱敏结果、LISTDATE 事实、capture/PIT 摘要和 PM 审阅事项见
+[cr7_issue73_stage_b_remediation_20260916.md](provider_verification/cr7_issue73_stage_b_remediation_20260916.md)
+及对应 [JSON](provider_verification/cr7_issue73_stage_b_remediation_20260916.json)。
+
+## 2026-09-16 · Issue #73 Stage B 两代表月真实验证（PR #74 前历史记录）
 
 > 状态：**BOTH MONTHS STOP(BLOCKED) / SANITIZED EVIDENCE READY / DRAFT PR AND PM REVIEW PENDING**
 

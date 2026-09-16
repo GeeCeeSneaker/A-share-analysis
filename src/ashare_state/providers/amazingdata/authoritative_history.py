@@ -1,23 +1,25 @@
 """Reviewed AmazingData acquisition path for CR-7 authoritative history.
 
 This module is the only issuer of a new ``AmazingDataAcquisitionReceipt``.
-It performs one complete calendar-month request against the typed provider
-facade, validates the response shape/range against the same request, and
-persists each exchange through ``RawWriter`` before issuing the receipt.
+It retains and evaluates a bounded calendar-month capture first; a later
+verified source projection is then bound to that capture without another
+provider request.
 
 The module never writes credentials or raw payloads to Git-tracked locations.
-The caller must provide a previously verified research snapshot; no free-form
-snapshot id/hash/timestamp or completeness label is accepted here.
+No free-form snapshot id/hash/timestamp or completeness label is accepted.
 """
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from datetime import date
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 from ashare_state.providers.amazingdata.month_completeness import (
+    MonthCompletenessEvaluation,
     PositiveTradeFallback,
     _positive_trade_fallback_candidates,
     _snapshot_trade_observation,
@@ -42,13 +44,22 @@ from ashare_state.research.historical import (
     PositiveTradeFallbackOperation,
     _issue_amazingdata_acquisition_receipt,
 )
-from ashare_state.research.models import canonical_json, ensure_utc_timestamp, sha256_hex
+from ashare_state.research.models import (
+    VERIFIED_SECURITY_MASTER_SOURCE,
+    canonical_json,
+    ensure_utc_timestamp,
+    sha256_hex,
+)
 from ashare_state.research.panel import VerifiedResearchProjection
 from ashare_state.storage.atomic_files import write_file_atomic
 from ashare_state.storage.raw_anchor import AnchoredRawEvidenceWriter
 from ashare_state.storage.raw_writer import RawWriteResult
 
-__all__ = ["AmazingDataHistoryAcquisition", "AmazingDataAcquisitionError"]
+__all__ = [
+    "AmazingDataHistoryAcquisition",
+    "AmazingDataHistoryCapture",
+    "AmazingDataAcquisitionError",
+]
 
 
 class AmazingDataAcquisitionError(CoverageBasisError):
@@ -74,12 +85,40 @@ _RESPONSE_SHAPES = {
 
 
 @dataclass(frozen=True)
+class AmazingDataHistoryCapture:
+    """Immutable in-memory handoff for one retained provider month capture.
+
+    Raw exchanges have already been anchored when this value is returned. The
+    source projection is deliberately absent: callers build or refresh it
+    after capture, then finalize this exact handoff without another request.
+    """
+
+    partition: PartitionKey
+    operations: tuple[AmazingDataExchangeReceipt, ...]
+    semantic_operations: tuple[AmazingDataExchangeReceipt, ...]
+    positive_trade_operations: tuple[PositiveTradeFallbackOperation, ...]
+    completeness_evaluation: MonthCompletenessEvaluation
+    retrieved_at_utc: datetime
+    raw_root: Path = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.partition, PartitionKey):
+            raise AmazingDataAcquisitionError("month capture partition is malformed")
+        if not isinstance(self.completeness_evaluation, MonthCompletenessEvaluation):
+            raise AmazingDataAcquisitionError("month capture completeness evaluation is malformed")
+        object.__setattr__(self, "operations", tuple(self.operations))
+        object.__setattr__(self, "semantic_operations", tuple(self.semantic_operations))
+        object.__setattr__(self, "positive_trade_operations", tuple(self.positive_trade_operations))
+        object.__setattr__(self, "retrieved_at_utc", ensure_utc_timestamp(self.retrieved_at_utc))
+        object.__setattr__(self, "raw_root", Path(self.raw_root))
+
+
+@dataclass(frozen=True)
 class AmazingDataHistoryAcquisition:
-    """Acquire and validate one complete logical month from AmazingData."""
+    """Capture and finalize one bounded AmazingData month acquisition."""
 
     provider: AmazingDataProvider
     raw_writer: AnchoredRawEvidenceWriter
-    source_snapshot: VerifiedResearchProjection
 
     def __post_init__(self) -> None:
         if not isinstance(self.provider, AmazingDataProvider):
@@ -88,11 +127,19 @@ class AmazingDataHistoryAcquisition:
             raise AmazingDataAcquisitionError(
                 "acquisition requires the anchored raw evidence writer"
             )
-        if not isinstance(self.source_snapshot, VerifiedResearchProjection):
-            raise AmazingDataAcquisitionError("acquisition requires a verified source snapshot")
 
-    def acquire_month(self, partition: PartitionKey) -> AmazingDataAcquisitionReceipt:
-        """Return a receipt only after the semantic expected-bar set passes."""
+    def capture_month(
+        self,
+        partition: PartitionKey,
+        *,
+        list_dates_by_symbol: Mapping[str, Any] | None = None,
+    ) -> AmazingDataHistoryCapture:
+        """Retain one bounded month capture and evaluate completeness.
+
+        A fail-closed completeness result is returned as capture evidence so
+        callers can diagnose the exact blocker. It cannot be converted to a
+        receipt unless :meth:`finalize_capture` accepts the evaluation.
+        """
         if not isinstance(partition, PartitionKey):
             raise AmazingDataAcquisitionError("acquisition requires a typed historical partition")
         start = partition.scope_start
@@ -153,6 +200,7 @@ class AmazingDataHistoryAcquisition:
             trading_days=trading_days,
             exact_day_universes=exact_day_universes,
             status_payload=status_exchange.payload,
+            list_dates_by_symbol=list_dates_by_symbol,
         )
         snapshot_exchanges: list[ProviderExchange] = []
         snapshot_receipts: dict[tuple[str, int], AmazingDataExchangeReceipt] = {}
@@ -223,23 +271,8 @@ class AmazingDataHistoryAcquisition:
             status_payload=status_exchange.payload,
             daily_bar_payload=kline_exchange.payload,
             positive_trade_fallback=positive_trade_fallback,
+            list_dates_by_symbol=list_dates_by_symbol,
         )
-        try:
-            evaluation.require_accepted()
-        except ValueError as exc:
-            raise AmazingDataAcquisitionError(
-                "AmazingData month completeness is unresolved; authoritative acquisition is blocked"
-            ) from exc
-        returned_first_date = evaluation.returned_first_date
-        returned_last_date = evaluation.returned_last_date
-        returned_trading_day_count = evaluation.returned_trading_day_count
-        returned_trading_days_hash = evaluation.returned_trading_days_hash
-        returned_row_count = evaluation.returned_row_count
-        if returned_first_date is None or returned_last_date is None:
-            raise AmazingDataAcquisitionError(
-                "AmazingData daily-bar response has no returned date range"
-            )
-        operations = (calendar_receipt, code_receipt, status_receipt, kline_receipt)
         positive_trade_operations = tuple(
             PositiveTradeFallbackOperation(
                 security=symbol,
@@ -261,28 +294,117 @@ class AmazingDataHistoryAcquisition:
                 *snapshot_exchanges,
             )
         )
-        receipt = _issue_amazingdata_acquisition_receipt(
-            source_snapshot=self.source_snapshot,
-            requested_scope_start=start,
-            requested_scope_end=end,
-            security_universe_count=len(symbols),
-            security_universe_hash=_hash_values(symbols),
-            calendar_trading_day_count=len(trading_days),
-            calendar_trading_days_hash=_hash_values(trading_days),
-            returned_first_date=returned_first_date,
-            returned_last_date=returned_last_date,
-            returned_trading_day_count=returned_trading_day_count,
-            returned_trading_days_hash=returned_trading_days_hash,
-            returned_row_count=returned_row_count,
-            operations=operations,
+        return AmazingDataHistoryCapture(
+            partition=partition,
+            operations=(calendar_receipt, code_receipt, status_receipt, kline_receipt),
             semantic_operations=tuple(semantic_receipts),
             positive_trade_operations=positive_trade_operations,
             completeness_evaluation=evaluation,
             retrieved_at_utc=retrieved_at,
+            raw_root=self.raw_writer.root,
+        )
+
+    def finalize_capture(
+        self,
+        capture: AmazingDataHistoryCapture,
+        *,
+        source_snapshot: VerifiedResearchProjection,
+    ) -> AmazingDataAcquisitionReceipt:
+        """Issue and replay a receipt from a retained capture, without I/O to provider."""
+        if not isinstance(capture, AmazingDataHistoryCapture):
+            raise AmazingDataAcquisitionError("receipt finalization requires a typed month capture")
+        if not isinstance(source_snapshot, VerifiedResearchProjection):
+            raise AmazingDataAcquisitionError(
+                "receipt finalization requires a verified source snapshot"
+            )
+        if capture.raw_root.resolve() != self.raw_writer.root.resolve():
+            raise AmazingDataAcquisitionError(
+                "month capture must be finalized against its original retained raw root"
+            )
+        try:
+            capture.completeness_evaluation.require_accepted()
+        except ValueError as exc:
+            raise AmazingDataAcquisitionError(
+                "AmazingData month completeness is unresolved; authoritative acquisition is blocked"
+            ) from exc
+        evaluation = capture.completeness_evaluation
+        if len(source_snapshot.rows) != evaluation.returned_row_count:
+            raise AmazingDataAcquisitionError(
+                "verified projection daily-row cardinality does not match the retained capture"
+            )
+        for row in source_snapshot.rows:
+            if not isinstance(row, Mapping):
+                raise AmazingDataAcquisitionError("verified projection row is malformed")
+            raw_trade_date = row.get("trade_date")
+            if not isinstance(raw_trade_date, date) or isinstance(raw_trade_date, datetime):
+                raise AmazingDataAcquisitionError(
+                    "verified projection trade date is missing or malformed"
+                )
+            if not capture.partition.scope_start <= raw_trade_date <= capture.partition.scope_end:
+                raise AmazingDataAcquisitionError(
+                    "verified projection rows do not match the bounded capture scope"
+                )
+            if row.get("research_split") != capture.partition.research_split.value:
+                raise AmazingDataAcquisitionError(
+                    "verified projection research split does not match the bounded capture"
+                )
+        if evaluation.prelisting_list_dates:
+            identity_view = source_snapshot.identity_view
+            if (
+                identity_view.source_kind != VERIFIED_SECURITY_MASTER_SOURCE
+                or not identity_view.sources
+            ):
+                raise AmazingDataAcquisitionError(
+                    "pre-listing applicability requires verified security-master identity"
+                )
+            suffix_by_exchange = {"SSE": "SH", "SZSE": "SZ"}
+            expected_list_dates = evaluation.prelisting_list_dates
+            observed_list_dates: dict[str, date] = {}
+            for record in identity_view.records:
+                suffix = suffix_by_exchange.get(record.exchange)
+                if suffix is None:
+                    continue
+                provider_symbol = f"{record.symbol}.{suffix}"
+                if provider_symbol not in expected_list_dates:
+                    continue
+                previous = observed_list_dates.get(provider_symbol)
+                if previous is not None and previous != record.valid_from:
+                    raise AmazingDataAcquisitionError(
+                        "verified security-master LISTDATE is ambiguous for a pre-listing pair"
+                    )
+                observed_list_dates[provider_symbol] = record.valid_from
+            if observed_list_dates != expected_list_dates:
+                raise AmazingDataAcquisitionError(
+                    "verified security-master LISTDATE does not match captured applicability"
+                )
+        returned_first_date = evaluation.returned_first_date
+        returned_last_date = evaluation.returned_last_date
+        if returned_first_date is None or returned_last_date is None:
+            raise AmazingDataAcquisitionError(
+                "AmazingData daily-bar response has no returned date range"
+            )
+        receipt = _issue_amazingdata_acquisition_receipt(
+            source_snapshot=source_snapshot,
+            requested_scope_start=capture.partition.scope_start,
+            requested_scope_end=capture.partition.scope_end,
+            security_universe_count=evaluation.monthly_security_count,
+            security_universe_hash=evaluation.monthly_security_set_hash,
+            calendar_trading_day_count=evaluation.session_count,
+            calendar_trading_days_hash=evaluation.session_set_hash,
+            returned_first_date=returned_first_date,
+            returned_last_date=returned_last_date,
+            returned_trading_day_count=evaluation.returned_trading_day_count,
+            returned_trading_days_hash=evaluation.returned_trading_days_hash,
+            returned_row_count=evaluation.returned_row_count,
+            operations=capture.operations,
+            semantic_operations=capture.semantic_operations,
+            positive_trade_operations=capture.positive_trade_operations,
+            completeness_evaluation=evaluation,
+            retrieved_at_utc=capture.retrieved_at_utc,
         )
         _persist_capture_catalog(self.raw_writer, receipt)
         try:
-            receipt.verify_retained_capture(self.raw_writer.root)
+            receipt.verify_retained_capture(capture.raw_root)
         except CoverageBasisError as exc:
             raise AmazingDataAcquisitionError(
                 "AmazingData acquisition proof chain could not be replayed"

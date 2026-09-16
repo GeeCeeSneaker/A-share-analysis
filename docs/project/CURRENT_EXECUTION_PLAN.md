@@ -4,9 +4,41 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
-## 0. 2026-09-16 当前调度覆盖 — Issue #73
+## 0. 2026-09-16 当前调度覆盖 — Issue #73 remediation
 
-当前执行基线为 `main@f8a750b96f6d6fca4bc1996ba592a4d5dcfa4b48`。Issue #73 仅授权
+当前基线为 PR #74 合并后的 `main@22c42a72e222d9b6f6519095fb641a4adb190e12`。本轮严格限定为
+Issue #73 授权的 `2020-01` Development 与 `2026-01` Holdout；两代表月的技术验收已 PASS，
+现提交 Draft PR #75 供 PM 审阅。此结论不扩大到其他月份或后续阶段。
+
+- **2020-01：PASS。** 五个缺口均由已有、已验证的 AmazingData `stock_basic.LISTDATE` 证明为
+  上市前配对，并分类为 `NOT_APPLICABLE_SESSION`（不是停牌）。缺失/格式错误 LISTDATE 不会
+  自动解除未决。required/returned `59,930/59,930`，unresolved `0`；receipt、retained replay、
+  coverage、Development 单分区 materialization、ordinary reader（59,930 行）、幂等重放和
+  changed-content conflict 全部通过。
+- **2026-01：PASS。** 两阶段 capture/finalize 与 projection 分区/cardinality mismatch 防护通过；
+  required/returned `103,454/103,454`，unresolved `0`；receipt、retained replay、coverage、Holdout
+  单分区 materialization、ordinary reader（103,454 行）、幂等重放和 changed-content conflict
+  全部通过。`retrieved_at_utc <= pit_as_of` 保持不变。
+- 两月变更后复放使用既有 hash-anchored provider exchanges，未发起新的 SDK/provider/network 请求；
+  两月分别以当前代码重算 completeness、重新签发 receipt，并走完 coverage/materialization/reader
+  断言。不能将此离线证据误述为新的供应商在线重取。
+
+脱敏时间、五项 LISTDATE、classification、材料化 ID 与验证明细见
+[remediation 报告](../provider_verification/cr7_issue73_stage_b_remediation_20260916.md)及对应
+[JSON](../provider_verification/cr7_issue73_stage_b_remediation_20260916.json)。本地 QA 已通过：
+聚焦测试 `61 passed`、全量离线 pytest `1868 passed, 3 skipped`、Ruff/格式检查通过、mypy
+108 个源文件无问题；exact-head CI 状态以 GitHub 检查为准，不缓存动态值。
+
+下一步由 PM 审阅双月证据、LISTDATE 适用规则及 finalize scope/cardinality guard，再决定是否接受
+本轮。不得据此启动 78 月回补、其他月份、Formal B1-B7/Production、BSE/index、CR-5/R2、
+Golden/H1、baseline 或策略工作；这些仍需独立授权。
+
+## 0H. 2026-09-16 PR #74 合并前的 Stage B blocker baseline（历史记录）
+
+以下内容记录 PR #74 合并前的历史阻断快照，仅作历史留存；当前状态以本节 0 的 remediation
+更新及 Issue #73 最新指示为准。
+
+当时执行基线为 `main@f8a750b96f6d6fca4bc1996ba592a4d5dcfa4b48`。Issue #73 仅授权
 Stage B 的 `2020-01` Development 与 `2026-01` Holdout 两个代表月；本轮未执行其他月份、
 78 月回补或 Production/B1-B7 工作。
 

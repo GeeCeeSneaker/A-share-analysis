@@ -1,0 +1,137 @@
+{
+  "schema": "issue73.stage_b.remediation.v3",
+  "issue": 73,
+  "baseline_sha": "22c42a72e222d9b6f6519095fb641a4adb190e12",
+  "scope": [
+    "2020-01",
+    "2026-01"
+  ],
+  "overall_status": "REPRESENTATIVE_MONTHS_PASS_PENDING_PM_REVIEW",
+  "disposition": {
+    "2020-01": "PASS",
+    "2026-01": "PASS",
+    "representative_months_pass": true,
+    "pm_review_pending": true,
+    "backfill_or_production_authorized": false
+  },
+  "execution": {
+    "mode": "RETAINED_OFFLINE_REPLAY",
+    "source": "previously retained ingestion-time hash-anchored AmazingData exchanges",
+    "provider_sdk_calls": 0,
+    "provider_network_requests": 0,
+    "new_online_vendor_fetch_claimed": false,
+    "raw_inputs_or_materialized_artifacts_committed": false
+  },
+  "unauthorized_work_started": [],
+  "changes": {
+    "list_date_source": "existing verified AmazingData security-master / normalized stock_basic identity input",
+    "prelisting_rule": "exact-session membership with session strictly before LISTDATE is NOT_APPLICABLE_SESSION, not suspension",
+    "on_or_after_list_date": "existing status/bar semantics remain in force",
+    "missing_or_malformed_list_date": "does not resolve an otherwise unresolved pair",
+    "month_completeness_rule_version": "amazingdata-month-completeness-rule-v3",
+    "applicability_semantics_version": "amazingdata-hist-code-list-exact-session-list-date-v3",
+    "persisted_hash_change": "prelisting dates are included in the existing serialized receipt-bound evaluation; no separate hash dimension",
+    "finalization_guard": {
+      "projection_scope_month_checked": true,
+      "projection_daily_row_cardinality_checked": true,
+      "projection_research_split_checked": true,
+      "raw_root_and_tamper_checks_preserved": true,
+      "retrieved_at_le_pit_invariant_preserved": true,
+      "provider_calls_during_finalize": 0,
+      "mismatch_test_cases": [
+        "wrong month",
+        "wrong row cardinality"
+      ]
+    }
+  },
+  "months": {
+    "2020-01": {
+      "status": "PASS",
+      "split": "Development",
+      "mode": "RETAINED_OFFLINE_REPLAY",
+      "source_capture_exchange_count": 38,
+      "retained_provider_facade_calls": 36,
+      "provider_sdk_calls": 0,
+      "required_bar_pair_count": 59930,
+      "returned_bar_pair_count": 59930,
+      "missing_pair_count": 0,
+      "extra_pair_count": 0,
+      "unresolved_pair_count": 0,
+      "structural_error_count": 0,
+      "classification_counts": {
+        "EXTRA_RETURNED": 0,
+        "NOT_APPLICABLE_SESSION": 193,
+        "POSITIVE_TRADE_COUNT_ACTIVE": 16,
+        "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+        "SUSPENSION_NON_TRADING": 181,
+        "UNEXPLAINED_MISSING": 0,
+        "UNRESOLVED": 0
+      },
+      "prelisting_list_dates": {
+        "002971.SZ": "2020-01-13",
+        "300813.SZ": "2020-01-14",
+        "300815.SZ": "2020-01-23",
+        "002975.SZ": "2020-02-05",
+        "300816.SZ": "2020-02-10"
+      },
+      "capture_retrieved_at_utc": "2026-09-16T06:52:27.237165Z",
+      "verified_projection_pit_as_of_utc": "2026-09-16T14:55:53.292594Z",
+      "pit_order_valid": true,
+      "receipt_id": "amazingdata-history-receipt-d169ebb9116fc485a309c706b5e56597",
+      "retained_capture_replay": "PASS",
+      "authoritative_coverage": "PASS",
+      "bounded_materialization": "PASS",
+      "ordinary_reader_rows": 59930,
+      "idempotent_replay": "PASS",
+      "changed_content_conflict_rejection": "PASS",
+      "materialization_id": "rhm-23e5d7f7c5733acdeb2acbdbd108d41018f4fb297d201771384a0f61cc927b0a"
+    },
+    "2026-01": {
+      "status": "PASS",
+      "split": "Holdout",
+      "mode": "RETAINED_OFFLINE_REPLAY",
+      "source_capture_exchange_count": 24,
+      "retained_provider_facade_calls": 24,
+      "provider_sdk_calls": 0,
+      "required_bar_pair_count": 103454,
+      "returned_bar_pair_count": 103454,
+      "missing_pair_count": 0,
+      "extra_pair_count": 0,
+      "unresolved_pair_count": 0,
+      "structural_error_count": 0,
+      "classification_counts": {
+        "EXTRA_RETURNED": 0,
+        "NOT_APPLICABLE_SESSION": 51,
+        "POSITIVE_TRADE_COUNT_ACTIVE": 0,
+        "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+        "SUSPENSION_NON_TRADING": 215,
+        "UNEXPLAINED_MISSING": 0,
+        "UNRESOLVED": 0
+      },
+      "prelisting_list_dates": {},
+      "capture_retrieved_at_utc": "2026-09-16T11:32:54.572962Z",
+      "verified_projection_pit_as_of_utc": "2026-09-16T15:03:17.173680Z",
+      "pit_order_valid": true,
+      "receipt_id": "amazingdata-history-receipt-1a9856933452b5b67a58a830b17a8ab0",
+      "retained_capture_replay": "PASS",
+      "authoritative_coverage": "PASS",
+      "bounded_materialization": "PASS",
+      "ordinary_reader_rows": 103454,
+      "idempotent_replay": "PASS",
+      "changed_content_conflict_rejection": "PASS",
+      "materialization_id": "rhm-07ae2edc9af328710d9191728cbb3ee7efa57447a22b49094d3fb91e26db35a0"
+    }
+  },
+  "local_qa": {
+    "focused_tests": "61 passed",
+    "full_offline_pytest": "1868 passed, 3 skipped in 435.39s",
+    "ruff_check": "passed; ruff check src tests",
+    "ruff_format_check": "passed; 216 files already formatted",
+    "mypy": "passed; 108 source files, no issues",
+    "exact_head_ci": "dynamic; check Draft PR #75 after commit"
+  },
+  "submitted_diff_pattern_scan": {
+    "checked": true,
+    "account_id_ip_tgw_env_password_patterns": "no matches"
+  }
+}
