@@ -13,8 +13,9 @@
   `TestDevlogGate.test_code_commit_requires_devlog_change`，精确指出
   `a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']`。
 - 这不是 PR #71 连续性证据或产品逻辑失败，而是移除临时豁免后暴露的不可变历史治理/扫描器阻断。
-  按当前调度不得重新加 SHA 豁免；也不能通过重写主线历史补写原提交。Windows 矩阵在本记录首次
-  固化时仍在执行，最终状态随同一 run 复核后补充到证据 JSON/记录。
+  按当前调度不得重新加 SHA 豁免；也不能通过重写主线历史补写原提交。Windows 3.14、Windows
+  3.12 最终也均以同一门禁失败，三平台每个平台均为 `1850 passed, 6 skipped, 1 failed`；最终
+  job 状态与失败测试已写入证据 JSON。
 - 因此 PR #71 继续保持 evidence-only Draft；没有开始 `300114.SZ → 302132.SZ` 身份事件实现，
   没有重跑 2024-01 Canonical → Snapshot → ReadModel → projection 或下游 receipt/coverage/
   materialization。项目经理需要把门禁策略/历史治理作为独立最小整改处理后，才能重新验证 exact head；

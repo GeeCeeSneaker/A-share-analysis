@@ -41,17 +41,38 @@
     },
     "windows_py314": {
       "job_id": 104633217255,
-      "status_at_initial_record": "in_progress",
-      "conclusion_at_initial_record": null
+      "status": "completed",
+      "conclusion": "failure",
+      "lint": "success",
+      "format": "success",
+      "mypy": "success",
+      "pytest": {
+        "passed": 1850,
+        "skipped": 6,
+        "failed": 1,
+        "failing_test": "TestDevlogGate.test_code_commit_requires_devlog_change"
+      },
+      "failure": "a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']"
     },
     "windows_py312": {
       "job_id": 104633217454,
-      "status_at_initial_record": "in_progress",
-      "conclusion_at_initial_record": null
+      "status": "completed",
+      "conclusion": "failure",
+      "lint": "success",
+      "format": "success",
+      "mypy": "success",
+      "pytest": {
+        "passed": 1850,
+        "skipped": 6,
+        "failed": 1,
+        "failing_test": "TestDevlogGate.test_code_commit_requires_devlog_change"
+      },
+      "failure": "a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']"
     }
   },
   "assessment": {
     "blocker_class": "immutable_historical_governance_scan",
+    "all_required_matrices": "failure_at_same_gate",
     "product_or_provider_failure": false,
     "identity_event_implementation_started": false,
     "authorized_2024_01_chain_rerun": false,

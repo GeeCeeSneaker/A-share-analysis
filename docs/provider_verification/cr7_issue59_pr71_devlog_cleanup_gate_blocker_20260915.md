@@ -23,18 +23,19 @@ PR #71 本轮新增的 DEVLOG SHA grandfather；如果扫描器因此失败，�
 - base：`main@9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`；
 - cleanup head：`aa4a63554388d9fbd6c129f4b2f3ad0fb14223c9`；
 - CI run：`35045136501`；
-- Ubuntu 3.14 job：`104633217457`，结果 `failure`；lint、format、mypy 均成功；
-  完整 pytest 为 `1850 passed, 6 skipped, 1 failed`；
-- 唯一失败：`TestDevlogGate.test_code_commit_requires_devlog_change`，错误为：
+- Ubuntu 3.14 job：`104633217457`，结果 `failure`；lint、format、mypy 均成功；完整 pytest
+  为 `1850 passed, 6 skipped, 1 failed`；
+- Windows 3.14 job：`104633217255`，结果 `failure`；完整 pytest 为
+  `1850 passed, 6 skipped, 1 failed`；
+- Windows 3.12 job：`104633217454`，结果 `failure`；完整 pytest 为
+  `1850 passed, 6 skipped, 1 failed`；
+- 三个平台唯一失败均为 `TestDevlogGate.test_code_commit_requires_devlog_change`，错误均为：
   `a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']`。
 
 该 `a4cad46...` 是主线已有的不可变历史代码提交；本次 cleanup 删除了允许它通过的临时
-grandfather 后，历史扫描器按当前规则正确地把它报告出来。给新提交补充 DEVLOG 不能改变原提交
+grandfather 后，历史扫描器按当前规则在三个矩阵中均报告它。给新提交补充 DEVLOG 不能改变原提交
 的同批文件集合，重写主线历史也没有获得授权。因此这不是连续性调查或产品实现失败，而是一个
-独立的历史治理/门禁策略阻断。
-
-Windows 3.14 / 3.12 两条矩阵在本记录第一次固化时仍在执行；最终状态以同一 run 的 Actions
-结果为准，并在 JSON 中更新。Ubuntu 的失败已足以证明当前 exact head 不能宣称全矩阵通过。
+独立的历史治理/门禁策略阻断；当前 exact head 不能宣称全矩阵通过。
 
 ## 当前决策与解除条件
 
