@@ -1,3 +1,21 @@
+## 2026-09-16 · 删除 obsolete DEVLOG history scanner，等待 exact-head CI
+
+> 状态：**GOVERNANCE_REMEDIATION_APPLIED / CI_PENDING / PR #71 EVIDENCE-ONLY**
+
+- 最新 scheduler checkpoint `5691108824` 将上一轮历史门禁失败明确归类为 minimalism/governance
+  blocker，并授权最小处理：删除整个 `tests/integration/test_devlog_gate.py`。该文件扫描 Git
+  历史、维护永久 SHA grandfather，并强制历史提交同批修改 DEVLOG；这些维护约定已有
+  `CONTRIBUTING.md` 与 `ENGINEERING_PRINCIPLES.md` 覆盖，不属于产品集成行为。
+- 本轮不添加替代扫描器、diff scanner、hook、policy engine 或任何 SHA allowlist，也不改写历史。
+  PR #71 其余内容保持 evidence-only；`300114.SZ → 302132.SZ` 身份事件实现仍未开始。
+- 删除后必须重新执行完整 QA 和 exact-head 三平台 CI；GT-H3B 仍按范围跳过。只有 PR #71
+  独立通过并合并，才开始最小 current-code-first identity-event follow-up，再重跑已授权的
+  2024-01 Canonical → Snapshot → ReadModel → verified projection 链。
+
+上一轮 cleanup 暴露的历史扫描失败事实仍见
+[`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
+及对应 JSON；账号、密码、IP、端口、Token、Cookie、SDK/runtime、DuckDB 与 raw payload 均未进入 Git。
+
 ## 2026-09-15 · PR #71 cleanup exposes historical DEVLOG gate blocker
 
 > 状态：**CLEANUP_APPLIED / CI_BLOCKED_BY_HISTORICAL_GATE / IDENTITY_IMPLEMENTATION_NOT_STARTED**

@@ -1,6 +1,10 @@
 # Issue #59 / PR #71 DEVLOG cleanup gate blocker（2026-09-15）
 
-状态：`CLEANUP_APPLIED / CI_BLOCKED_BY_HISTORICAL_GATE / IDENTITY_IMPLEMENTATION_NOT_STARTED`
+状态：`HISTORICAL_GATE_POLICY_REMEDIATION_APPLIED / CI_PENDING / IDENTITY_IMPLEMENTATION_NOT_STARTED`
+
+本文件先记录 cleanup 提交触发的历史扫描失败；最新 scheduler checkpoint `5691108824`
+已给出后续治理决议：删除 obsolete history scanner，重新验证 exact head。以下历史 CI 事实
+不因治理策略变更而被抹去。
 
 ## 授权与清理结果
 
@@ -46,6 +50,18 @@ PR #71 继续保持 Draft/evidence-only。当前不得：
 - 开始 `300114.SZ → 302132.SZ` 身份事件实现；
 - 重跑 2024-01 Canonical → Snapshot → ReadModel → projection 或下游 receipt、coverage、
   materialization 链。
+
+## 最新治理整改
+
+按 scheduler checkpoint `5691108824`，PR #71 本轮删除整个
+`tests/integration/test_devlog_gate.py`。原因是该测试扫描不可变 Git 历史、携带永久 SHA
+grandfather，并把维护约定当作产品 pytest 门禁；项目约定已由 `CONTRIBUTING.md` 和
+`ENGINEERING_PRINCIPLES.md` 覆盖。整改明确不引入任何替代历史扫描、diff scanner、hook、
+policy engine 或 SHA allowlist，也不改写历史。
+
+删除后需要完整 QA 与 exact-head 三平台 CI。当前证据文件所记录的旧 run 是整改前的历史结果，
+不能代替删除后的 CI；PR #71 仍为 evidence-only Draft。只有该 PR 独立通过并合并，才允许
+开始最小身份事件 follow-up。
 
 最小解除条件是项目经理/Owner 单独决定并实施门禁历史策略整改，使 immutable pre-existing
 commit 的处理与项目当前治理目标一致；该整改应作为独立治理变更审阅，不能藏进身份证据 PR。

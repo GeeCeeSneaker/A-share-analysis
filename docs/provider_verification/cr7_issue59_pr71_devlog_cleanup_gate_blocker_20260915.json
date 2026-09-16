@@ -1,6 +1,6 @@
 {
   "schema": "cr7.issue59.pr71_devlog_cleanup_gate_blocker.v1",
-  "status": "BLOCKED_BY_HISTORICAL_DEVLOG_GATE",
+  "status": "GOVERNANCE_REMEDIATION_APPLIED_CI_PENDING",
   "authorization": {
     "issue": 59,
     "pr": 71,
@@ -21,6 +21,15 @@
     "new_exception_added": false,
     "runtime_code_changed": false,
     "universe_changed": false
+  },
+  "remediation": {
+    "scheduler_checkpoint": 5691108824,
+    "deleted_obsolete_history_scanner": "tests/integration/test_devlog_gate.py",
+    "replacement_history_scanner_added": false,
+    "replacement_diff_scanner_added": false,
+    "replacement_hook_or_policy_engine_added": false,
+    "history_rewritten": false,
+    "identity_event_implementation_started": false
   },
   "ci": {
     "run_id": 35045136501,
@@ -72,6 +81,7 @@
   },
   "assessment": {
     "blocker_class": "immutable_historical_governance_scan",
+    "blocker_resolution": "scanner deletion authorized; exact-head CI pending",
     "all_required_matrices": "failure_at_same_gate",
     "product_or_provider_failure": false,
     "identity_event_implementation_started": false,
