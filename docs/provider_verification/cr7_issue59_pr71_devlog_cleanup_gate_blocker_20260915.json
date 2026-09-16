@@ -1,0 +1,90 @@
+{
+  "schema": "cr7.issue59.pr71_devlog_cleanup_gate_blocker.v1",
+  "status": "BLOCKED_BY_HISTORICAL_DEVLOG_GATE",
+  "authorization": {
+    "issue": 59,
+    "pr": 71,
+    "owner_comment": 5690500282,
+    "scheduler_comment": 5690539134,
+    "instruction": "remove the new grandfather first; if the scanner blocks cleanup, return it as a separate blocker and do not add another exception"
+  },
+  "source_control": {
+    "base_main": "9423c1799ec970ea3d5076e1af5b3a5ab145ed8d",
+    "cleanup_head": "aa4a63554388d9fbd6c129f4b2f3ad0fb14223c9",
+    "branch": "investigate/issue59-300114-20260915",
+    "history_rewritten": false
+  },
+  "cleanup": {
+    "removed_grandfather_sha": "a4cad46b0ea54f7a08ec6f6c80ef20918aef2d39",
+    "removed_explanatory_devlog_section": true,
+    "existing_older_grandfathers_changed": false,
+    "new_exception_added": false,
+    "runtime_code_changed": false,
+    "universe_changed": false
+  },
+  "ci": {
+    "run_id": 35045136501,
+    "ubuntu_py314": {
+      "job_id": 104633217457,
+      "status": "completed",
+      "conclusion": "failure",
+      "lint": "success",
+      "format": "success",
+      "mypy": "success",
+      "pytest": {
+        "passed": 1850,
+        "skipped": 6,
+        "failed": 1,
+        "failing_test": "TestDevlogGate.test_code_commit_requires_devlog_change"
+      },
+      "failure": "a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']"
+    },
+    "windows_py314": {
+      "job_id": 104633217255,
+      "status": "completed",
+      "conclusion": "failure",
+      "lint": "success",
+      "format": "success",
+      "mypy": "success",
+      "pytest": {
+        "passed": 1850,
+        "skipped": 6,
+        "failed": 1,
+        "failing_test": "TestDevlogGate.test_code_commit_requires_devlog_change"
+      },
+      "failure": "a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']"
+    },
+    "windows_py312": {
+      "job_id": 104633217454,
+      "status": "completed",
+      "conclusion": "failure",
+      "lint": "success",
+      "format": "success",
+      "mypy": "success",
+      "pytest": {
+        "passed": 1850,
+        "skipped": 6,
+        "failed": 1,
+        "failing_test": "TestDevlogGate.test_code_commit_requires_devlog_change"
+      },
+      "failure": "a4cad46b0e: ['src/ashare_state/providers/amazingdata/mapper.py']"
+    }
+  },
+  "assessment": {
+    "blocker_class": "immutable_historical_governance_scan",
+    "all_required_matrices": "failure_at_same_gate",
+    "product_or_provider_failure": false,
+    "identity_event_implementation_started": false,
+    "authorized_2024_01_chain_rerun": false,
+    "pr_status": "DRAFT_EVIDENCE_ONLY",
+    "next_required_decision": "resolve the historical DEVLOG gate policy as a separate governance change; do not add another SHA grandfather"
+  },
+  "not_executed": [
+    "300114.SZ -> 302132.SZ identity event implementation",
+    "2024-01 Canonical -> Snapshot -> ReadModel -> projection rerun",
+    "receipt/replay/coverage/materialization/ordinary-reader closure",
+    "Stage B",
+    "78-month backfill"
+  ],
+  "secrets_boundary": "credentials, private endpoint, token/cookie, SDK/runtime, DuckDB and raw provider payloads were not committed"
+}

@@ -1,0 +1,144 @@
+{
+  "schema": "cr7.issue59_300114_302132_continuity_probe.v1",
+  "status": "STOP_BLOCKED",
+  "authorization": {
+    "issue": 59,
+    "scheduler_comment": 5690045901,
+    "pr_review": 5217204028,
+    "scope": "single-issuer AmazingData current-code identity and historical-symbol continuity only"
+  },
+  "source_control": {
+    "base_main": "9423c1799ec970ea3d5076e1af5b3a5ab145ed8d",
+    "working_branch": "investigate/issue59-300114-20260915"
+  },
+  "provider": {
+    "name": "amazingdata",
+    "package_version": "1.1.9",
+    "transport_version": "1.0.9.2",
+    "requested_symbol": "302132.SZ",
+    "other_symbols_queried_in_this_probe": false,
+    "other_provider_queried": false
+  },
+  "observations": [
+    {
+      "method": "InfoData.get_stock_basic",
+      "facade": "AmazingDataProvider.get_stock_basic_exchange",
+      "request": {
+        "code_list": ["302132.SZ"]
+      },
+      "status": "OK",
+      "row_count": 1,
+      "type": "pandas.DataFrame",
+      "index_type": "pandas.RangeIndex",
+      "columns": [
+        "MARKET_CODE",
+        "SECURITY_NAME",
+        "COMP_NAME",
+        "PINYIN",
+        "COMP_NAME_ENG",
+        "LISTDATE",
+        "DELISTDATE",
+        "LISTPLATE_NAME",
+        "COMP_SNAME_ENG",
+        "IS_LISTED"
+      ],
+      "provider_values": {
+        "MARKET_CODE": "302132.SZ",
+        "LISTDATE": "20100827",
+        "DELISTDATE": null,
+        "IS_LISTED": 1
+      },
+      "identity_date_evidence_for_current_code": true,
+      "identity_date_evidence_linking_300114": false,
+      "raw_request_id": "114a9eb6-6ddb-4507-9e28-0df779ee4469",
+      "raw_payload_hash": "895311966dfbfe8f873c35aeed3399bb9b3668855afd64fa0f141e74c08629cd",
+      "raw_evidence_hash": "2e1cf312ea24895c41574dd0512ba90204c9f021a9721d1f2aa13a1d98d517ea"
+    },
+    {
+      "method": "DownloadInfoData.download_stock_basic",
+      "request": {
+        "code_list": ["302132.SZ"]
+      },
+      "status": "OK",
+      "row_count": 1,
+      "type": "pandas.DataFrame",
+      "index_type": "pandas.RangeIndex",
+      "columns": [
+        "MARKET_CODE",
+        "SECURITY_NAME",
+        "COMP_NAME",
+        "PINYIN",
+        "COMP_NAME_ENG",
+        "LISTDATE",
+        "DELISTDATE",
+        "LISTPLATE_NAME",
+        "COMP_SNAME_ENG",
+        "IS_LISTED"
+      ],
+      "provider_values": {
+        "MARKET_CODE": "302132.SZ",
+        "LISTDATE": "20100827",
+        "DELISTDATE": null,
+        "IS_LISTED": 1
+      },
+      "identity_date_evidence_for_current_code": true,
+      "identity_date_evidence_linking_300114": false,
+      "local_raw_artifact": {
+        "path": "data/spike/identity_probe_302132_SZ_20260915/raw/direct_download_stock_basic.parquet",
+        "size_bytes": 7239,
+        "sha256": "0cd1b34ebb80c344d3d0f0973505d8b4aebd470e925f1bb370fbdb187674e858"
+      }
+    }
+  ],
+  "surface_inspection": {
+    "queried": [
+      "AmazingDataProvider.get_stock_basic_exchange -> InfoData.get_stock_basic",
+      "DownloadInfoData.download_stock_basic"
+    ],
+    "not_queried": [
+      {
+        "method": "BaseData.get_code_info",
+        "reason": "security_type-only unbounded code-table query; outside exact-symbol scope"
+      },
+      {
+        "method": "BaseData.get_code_list",
+        "reason": "security-type membership surface, not a bounded identity-continuity query"
+      },
+      {
+        "method": "BaseData.get_hist_code_list",
+        "reason": "date-window membership surface, not a provider-owned old/new relation"
+      },
+      {
+        "method": "InfoData.get_bj_code_mapping",
+        "reason": "named for another exchange and no A-share continuity carrier in inspected public surface"
+      }
+    ],
+    "public_surface_finding": "No bounded AmazingData public method or inspected tgw carrier was found that binds 300114.SZ to 302132.SZ with a stable identity and effective interval.",
+    "download_stock_basic_semantics": "iterates supplied code_list and passes each exact value as provider market_code",
+    "identity_inferred": false,
+    "continuity_inferred": false
+  },
+  "decision": {
+    "current_code_identity_date_record": true,
+    "historical_symbol_continuity_record": false,
+    "valid_pit_mapping": false,
+    "runtime_code_changed": false,
+    "universe_changed": false,
+    "canonical_progression": "STOP_BLOCKED",
+    "blocker": "302132.SZ has provider-owned current identity/date, but no provider-owned relation to 300114.SZ was returned or exposed by the inspected bounded surfaces"
+  },
+  "not_executed": [
+    "full 2024-01 Canonical -> Snapshot -> ReadModel -> projection rerun",
+    "acquire_month(2024-01)",
+    "receipt/replay/coverage/materialization/ordinary-reader proof",
+    "Stage B",
+    "78-month backfill",
+    "Formal B1-B7",
+    "Production",
+    "BSE/index",
+    "CR-5/R2",
+    "Golden/H1/baseline",
+    "strategy/portfolio work"
+  ],
+  "next_decision_required": "Owner/PM must obtain same-provider old/new symbol continuity evidence with PIT-usable effective interval, then authorize the smallest mapping and rerun; do not silently revise the 5,106-member universe"
+}

@@ -6,8 +6,8 @@
 
 ## 0. 2026-09-15 当前调度覆盖
 
-当前 clean `main` 为 `31b5fe478a6140839281c7877829f225277cae14`（PR #69 已合并，PR #68 的合并提交
-为其祖先）。当前唯一活动 P0 仍为 Issue #59：先完成完整 `2024-01` 的真实 source-input
+当前 clean `main` 为 `9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`（PR #70 已合并）。当前唯一活动
+P0 仍为 Issue #59：先完成完整 `2024-01` 的真实 source-input
 Canonical → Snapshot → ReadModel → projection，再进入既有 acquisition → receipt replay →
 coverage basis → bounded atomic materialization → ordinary-reader proof。
 
@@ -26,6 +26,33 @@ CR-5/R2、Golden/H1、baseline 或策略工作。
 最终代码版本重放的 Canonical run `958b02f2-e8c2-5815-be82-aa96ac6bf652` 以 `IDENTITY_MISSING (22)`
 `STOP(BLOCKED)`。这不是账号、网络或适配器阻断，不能删除成员或填造 PIT identity；完整
 verified source snapshot、receipt、coverage 和 materializer 仍未构造。
+
+PR #70 已通过独立审阅并合并。合并后的单证券调查记录在
+[`cr7_issue59_300114_identity_probe_20260915.md`](../provider_verification/cr7_issue59_300114_identity_probe_20260915.md)
+及对应 JSON：`InfoData.get_stock_basic` 和底层 `DownloadInfoData.download_stock_basic` 对
+`300114.SZ` 均为 `OK + 0 rows`，未找到 provider-owned identity/date evidence。当前不修改代码；
+随后项目经理 review `5217204028` / Issue comment `5690045901` 修正了调查假设：不能因当前代码
+空结果就认定历史 universe 错误，下一步应在同一 provider 内调查当前代码 `302132.SZ` 与历史
+`300114.SZ` 的连续性。最新记录在
+[`cr7_issue59_300114_302132_continuity_probe_20260915.md`](../provider_verification/cr7_issue59_300114_302132_continuity_probe_20260915.md)
+及对应 JSON：`302132.SZ` 的两条既有 `stock_basic` 入口均 `OK + 1 row`，明确返回
+`MARKET_CODE=302132.SZ`、`LISTDATE=20100827`、`IS_LISTED=1`，但没有返回或暴露绑定
+`300114.SZ` 的 old/new relation、稳定跨代码 identity 或有效区间。因此当前仍为
+`STOP(BLOCKED)`；不得静默改动 5,106-member universe、凭数字相似性加 alias 或继续下游链。
+只有取得同一 provider 的 PIT 可用连续性证据后，才可提出最小映射并重跑既有链路；Stage B、
+78 月及其他未授权工作继续禁止。
+
+按 Owner decision comment `5690500282` / scheduler comment `5690539134`，PR #71 已先完成
+清理：提交 `aa4a63554388d9fbd6c129f4b2f3ad0fb14223c9` 移除了本轮新增的 `a4cad46...`
+DEVLOG grandfather 及其说明段，未新增豁免、未改写历史。清理后的权威 CI run `35045136501`
+在 Ubuntu 3.14、Windows 3.14、Windows 3.12 三个平台的完整 pytest 中均暴露同一个独立治理
+阻断；每个平台均为 `1850 passed, 6 skipped, 1 failed`，唯一失败是历史 `a4cad46...` 改动
+`src/ashare_state/providers/amazingdata/mapper.py` 却没有在同一历史提交更新 `docs/DEVLOG.md`。
+因此不能再向 PR #71 加 SHA 豁免，也不能把该历史事实伪装成
+本次清理已通过；详细记录见
+[`cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md`](../provider_verification/cr7_issue59_pr71_devlog_cleanup_gate_blocker_20260915.md)
+及对应 JSON。PR #71 保持 Draft；在项目经理单独解决该门禁策略/历史治理阻断前，不启动身份事件
+实现，不重跑 2024-01 下游权威链。
 
 ## 1. 项目管理责任
 
