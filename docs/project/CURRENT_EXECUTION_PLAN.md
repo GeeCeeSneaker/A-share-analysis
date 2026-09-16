@@ -4,7 +4,26 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
-## 0. 2026-09-16 当前调度覆盖
+## 0. 2026-09-16 当前调度覆盖 — Issue #73
+
+当前执行基线为 `main@f8a750b96f6d6fca4bc1996ba592a4d5dcfa4b48`。Issue #73 仅授权
+Stage B 的 `2020-01` Development 与 `2026-01` Holdout 两个代表月；本轮未执行其他月份、
+78 月回补或 Production/B1-B7 工作。
+
+两个隔离月均已完成源输入、Canonical → Snapshot → ReadModel → verified projection 与权威
+提供方采集，但都在物化前按现有规则 `STOP(BLOCKED)`：2020-01 completeness 为
+59,930/59,930 返回但有 5 个 unresolved security-session pairs；2026-01 completeness
+103,454/103,454 通过，但最新提供方响应晚于 verified projection 的 PIT 时间 381.534241 秒，
+现有 receipt validator 因 `retrieved_at_utc > pit_as_of` 拒绝签发。两月均没有 receipt、coverage
+basis 或 materialization PASS；没有删减 universe、放宽 completeness/PIT 校验或复用旧 Stage B raw。
+
+详细脱敏计数、ID、hash、阻断证据及 PM/Owner 最小决策要求见
+[`cr7_issue73_stage_b_execution_20260916.md`](../provider_verification/cr7_issue73_stage_b_execution_20260916.md)
+和对应 JSON。全量离线测试在本次仅文档变更前、同一代码 head 上通过 `1857 passed, 3 skipped`；
+Draft PR exact-head CI 与独立 PM 审阅仍待完成。审阅前不启动 78 月回补或任何 Issue #73 明确
+禁止的工作。
+
+## 0A. Issue #59 closure evidence (historical snapshot, 2026-09-16)
 
 PR #71 已通过独立 PM 审阅并合并：exact head 为
 `8325ec4a85117213f514764444058e4664d5af16`，merge commit 为
@@ -51,10 +70,11 @@ receipt 已桥接为 authoritative coverage basis；单分区
 `MaterializationConflictError` 阻断。原始捕获、DuckDB、物化 Parquet 和 SDK/runtime 仍只
 在本地忽略目录，未提交 Git；此闭环等待独立 PM 审阅，不能把本地 artifact 当成已合并主线。
 
-Stage B（`2020-01` / `2026-01`）、78 月回补、Formal/Production、BSE/index、CR-5/R2、
-Golden/H1、baseline 和策略工作继续未授权。
+在 Issue #59 closeout 时，Stage B（`2020-01` / `2026-01`）、78 月回补、Formal/Production、
+BSE/index、CR-5/R2、Golden/H1、baseline 和策略工作尚未授权。随后 Issue #73 仅为上述两个
+代表月授予了受限 Stage B 授权；当前结果与后续决策以本文件第 0 节和 Issue #73 为准。
 
-## 0A. 2026-09-15 历史调度快照
+## 0B. 2026-09-15 历史调度快照
 
 当前 clean `main` 为 `9423c1799ec970ea3d5076e1af5b3a5ab145ed8d`（PR #70 已合并）。当前唯一活动
 P0 仍为 Issue #59：先完成完整 `2024-01` 的真实 source-input
