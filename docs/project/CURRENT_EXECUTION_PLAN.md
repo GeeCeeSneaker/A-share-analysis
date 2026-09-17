@@ -4,19 +4,20 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
-## 0.1. 2026-09-16 当前调度覆盖 — Issue #76 78 个月历史构建
+## 0.1. 2026-09-17 当前调度覆盖 — Issue #76 78 个月历史构建
 
-> 状态：**STOP(BLOCKED) at 2020-03 / 2 of 78 capture PASS / no publication**
+> 状态：**STOP(BLOCKED) at 2023-01 / 36 of 78 capture PASS / no publication**
 
 Issue #76 授权从 `main@ad2ad528d3ffec1269772084f0860c8224e632d2` 构建 2020-01 至 2026-06 的 78 个月历史。PR #77 的 PM review 已批准最小 `DELISTDATE` 适用性修复：复用已验证 normalized security-master 的 `stock_basic.DELISTDATE`，仅当 `session >= DELISTDATE` 时判为 `NOT_APPLICABLE_SESSION`；不 carry-forward 停牌、不换源、不跳过 pair。现有 typed AmazingData → raw anchor → completeness → Canonical → Snapshot → ReadModel → verified projection → bounded materializer 路径保持不变。
 
 - 生产代码已升级 month-completeness/applicability 到 v4；`DELISTDATE` 进入 identity view，并仅保留实际用于排除 pair 的事实。`LISTDATE`、PIT、raw closure 和 finalized capture 的既有 fail-closed 约束保持不变。
 - `2020-01`：hash-anchored retained replay capture PASS，required/returned `59,930/59,930`，missing/extra/unresolved/structural `0/0/0/0`。
 - `2020-02`：使用已保留同范围 raw exchanges retained replay capture PASS，required/returned `75,463/75,463`，missing/extra/unresolved/structural `0/0/0/0`；`NOT_APPLICABLE_SESSION=238`，实际使用的 post-delisting 事实为 `600240.SH -> 2020-02-05`。
-- `2020-03`：执行器在 provider 登录前停止，原因是当前 Codex 执行进程看不到安全环境变量 `TGW_USERNAME`、`TGW_PASSWORD`、`TGW_SERVER_VIP`、`TGW_SERVER_PORT`。这是本地执行环境阻断，不是 2020-03 数据结论；值未写入聊天或仓库。其余 2020-03 至 2026-06 的 76 个月尚未运行。
+- `2020-03` 至 `2022-12`：在本机安全配置完成后，`2020-03` 至 `2022-12` 共 34 个月 fresh-provider capture PASS；与前两个月合计 `36/78`。每月均按现有 typed path 逐月执行，未跳过或 carry-forward。
+- `2023-01`：`4911` 个证券、`16` 个交易日，required/returned `78,403/78,403`，missing/extra/structural `0/0/0`，但 `UNRESOLVED=9`，故 STOP(BLOCKED)。9 个 pair 全是 `300114.SZ`（01-12、01-13、01-16、01-17、01-18、01-19、01-20、01-30、01-31）；history-status 对该代码为空 `0×0` 表，9 个 exact-session snapshot 的 `num_trades` 全为 `0`。当月 stock_basic 只有 `4910` 行且不含该代码，未形成 LISTDATE/DELISTDATE 豁免。
 - 本地 focused `67 passed`、全量离线 pytest `1874 passed, 3 skipped`、Ruff 与 mypy 均通过；由于 capture 阶段尚未闭合 78 个月，当前尚未产生完整 receipt、authoritative coverage、materialization、ordinary-reader、idempotency 或 changed-content conflict 结论。
 
-详细脱敏执行记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。下一步是由项目管理者在本机安全配置上述变量后，从保留状态恢复 2020-03；遇到下一个新 blocker 必须按 exact month/pair 停止并更新记录。
+详细脱敏执行记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。下一步不是继续猜测或改规则，而是由 PM/Owner 为 `300114.SZ` 的 9 个 exact-session pair 提供 provider-owned 状态事实，或批准最小 zero-activity 语义/API 扩展并规定持久证据；决策落实后只重跑 `2023-01`，通过后再按既有顺序继续。
 
 ### 本地安全配置说明（不进入 Git）
 

@@ -1,3 +1,14 @@
+## 2026-09-17 · Issue #76 2023-01 provider 语义阻断
+
+> 状态：**STOP(BLOCKED) at 2023-01 / 36 of 78 capture PASS / no publication**
+
+- 在本机安全配置变量后，既有 runner 已真实完成 `2020-01` 至 `2022-12` 共 36 个月的 capture：`2020-01`、`2020-02` 为 retained replay，`2020-03` 至 `2022-12` 为 fresh provider。此前的本地认证环境阻断已解除；没有把凭证或网络身份写入跟踪文件或 GitHub。
+- `2023-01` capture 在 `4911` 个证券、`16` 个交易日上返回 `78,403/78,403` required/returned bar pairs；missing/extra/structural 均为 `0`，但有 `9` 个 `UNRESOLVED`，所以按 fail-closed 规则停止。分类为 `NOT_APPLICABLE_SESSION=67`、`POSITIVE_TRADE_COUNT_ACTIVE=7`、`SUSPENSION_NON_TRADING=97`、`UNRESOLVED=9`。
+- 9 个未决 pair 全部是 `300114.SZ`：`2023-01-12`、`01-13`、`01-16`、`01-17`、`01-18`、`01-19`、`01-20`、`01-30`、`01-31`。当月 hist code list 明确包含该代码，但 verified `stock_basic` 返回 `4910` 行且不含该代码；因此本次没有可用的 LISTDATE/DELISTDATE 生命周期豁免事实。
+- `InfoData.get_history_stock_status` 当月请求 `beb1ade5-f2de-431f-9bf8-70e98e4428eb` 返回 `OK`、总行数 `78,493`，但 `300114_SZ.parquet` 是 `0×0` 空 schema。fallback 的 9 个 exact-session snapshot 各有 `331` 行，`num_trades` 全为 `0`；这只能证明 provider 返回了零活动快照，不能在现行合同下证明“停牌”。没有 carry-forward、缺失推断或跨源替代。
+- 详细 pair/request 证据、哈希和下一步决策要求见 [`cr7_issue76_history_build_20260916.md`](provider_verification/cr7_issue76_history_build_20260916.md) 与对应 [`JSON`](provider_verification/cr7_issue76_history_build_20260916.json)。该 blocker 需要 PM/Owner 提供 provider-owned 状态事实，或明确批准一个最小、可重放且有字段契约的 zero-activity 语义扩展；未获批准前不改分类规则、不跳过 `2023-01`、不继续后续月份。
+- 既有本地 QA（focused `67 passed`、全量离线 pytest `1874 passed, 3 skipped`、Ruff、mypy）仍对应当前产品代码 head；本次只更新执行证据与控制面。78 月 receipt、authoritative coverage、materialization、ordinary-reader、幂等及 conflict 全链路仍未完成。
+
 ## 2026-09-16 · Issue #76 78 个月权威历史构建：DELISTDATE 修复与执行检查点
 
 > 状态：**STOP(BLOCKED) at 2020-03 / 2 of 78 capture PASS / no publication**
