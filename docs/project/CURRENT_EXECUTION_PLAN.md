@@ -18,6 +18,35 @@ Issue #76 授权从 `main@ad2ad528d3ffec1269772084f0860c8224e632d2` 构建 2020-
 
 详细脱敏执行记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。下一步是由项目管理者在本机安全配置上述变量后，从保留状态恢复 2020-03；遇到下一个新 blocker 必须按 exact month/pair 停止并更新记录。
 
+### 本地安全配置说明（不进入 Git）
+
+环境变量只对设置它的进程及其子进程可见。已经启动的 Codex 进程不会因为另一个独立 PowerShell 窗口后来设置了变量而自动获得它们；因此应在**启动 runner 的同一个 PowerShell 窗口**中注入变量，或由同一进程的安全凭据管理器注入。下面的示例只展示变量名和流程，不包含任何真实账号、地址或口令：
+
+```powershell
+$env:TGW_USERNAME = Read-Host 'TGW username'
+$secure = Read-Host 'TGW password' -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try {
+    $env:TGW_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+}
+finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+    $secure.Dispose()
+}
+$env:TGW_SERVER_VIP = Read-Host 'approved TGW server VIP'
+$env:TGW_SERVER_PORT = Read-Host 'TGW server port'
+
+try {
+    Set-Location '<local-repository-root>'
+    uv run --locked --offline python data/spike/issue76_history_build_20260916/runner.py --resume --retry-blocked
+}
+finally {
+    Remove-Item Env:TGW_USERNAME, Env:TGW_PASSWORD, Env:TGW_SERVER_VIP, Env:TGW_SERVER_PORT -ErrorAction SilentlyContinue
+}
+```
+
+不要在命令行参数、脚本文件、日志、截图或 GitHub 中填写/回显口令；不要把变量设置在与 runner 无父子关系的另一个终端后，期待当前 Codex 进程同步获得。执行结束后应确认变量已清除，再把 runner 的脱敏结果更新到本 PR。
+
 Issue #76 完成前保持范围排除：Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1/global baseline、strategy/portfolio、speculative reconciliation。
 
 ## 0. 2026-09-16 当前调度覆盖 — Issue #73 remediation
