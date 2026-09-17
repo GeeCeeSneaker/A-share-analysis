@@ -1539,4 +1539,3 @@ def test_projection_rows_cannot_mix_splits_or_duplicate_primary_keys(tmp_path: P
             writer_runtime_lock_hash=_writer_hash(),
             build_code_fingerprint=BUILD_FINGERPRINT,
         ).plan(_projection([split_mismatch]))
-

@@ -1198,4 +1198,3 @@ def _sha256_hex(value: str) -> str:
     from ashare_state.research.models import sha256_hex
 
     return sha256_hex(value)
-

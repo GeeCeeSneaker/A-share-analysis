@@ -3806,4 +3806,3 @@ Stage A 报告仍是 `SPIKE` 诊断，未签发 authoritative receipt，material
   文件、输出或 GitHub；后续应在启动 runner 的同一 PowerShell 进程安全注入后 `--resume --retry-blocked`。
 - 本次不进入 78 月后的 receipt/coverage/materialization/publication，也不扩大到 Formal B1-B7、Production、
   BSE/index、CR-5/R2、Golden/H1、baseline、策略或 speculative reconciliation；PR #77 继续保持 Draft。
-

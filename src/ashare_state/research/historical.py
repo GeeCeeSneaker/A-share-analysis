@@ -4043,4 +4043,3 @@ class HistoricalMaterializationReader:
         if normalized_ids is not None:
             result = result.filter(pl.col("security_id").is_in(normalized_ids))
         return result.sort(["trade_date", "security_id", "source_canonical_key"])
-

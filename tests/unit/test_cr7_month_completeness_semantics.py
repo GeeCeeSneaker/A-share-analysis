@@ -676,4 +676,3 @@ def test_unknown_month_semantic_rule_version_cannot_replay() -> None:
     payload["rule_version"] = "amazingdata-month-completeness-rule-v1"
     with pytest.raises(MonthCompletenessError, match="unknown month completeness rule version"):
         MonthCompletenessEvaluation.from_mapping(payload)
-

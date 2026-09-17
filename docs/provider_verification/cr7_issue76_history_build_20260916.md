@@ -101,4 +101,3 @@ capture PASS；出现新的 API、schema、语义、PIT 或身份 blocker 时立
   reconciliation 均未执行。
 
 对应机器记录见同目录 [`cr7_issue76_history_build_20260916.json`](cr7_issue76_history_build_20260916.json)。
-

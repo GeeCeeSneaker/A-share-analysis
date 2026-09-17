@@ -583,4 +583,3 @@ def _yyyymmdd(value: date) -> int:
 
 def _hash_values(values: list[Any]) -> str:
     return sha256_hex(canonical_json(values))
-
