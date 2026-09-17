@@ -1,3 +1,14 @@
+## 2026-09-16 · Issue #76 78 个月权威历史构建在 2020-02 fail-closed
+
+> 状态：**STOP(BLOCKED) / 2020-01 capture PASS / 2020-02 唯一状态事实未决 / 78 月未完成**
+
+- 依据远端 Issue #76，基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`，授权范围为 2020-01 至 2026-06 的 78 个月；使用现有 typed AmazingData capture/finalize、普通 Canonical → Snapshot → ReadModel → verified projection 和 bounded materializer 路径，未引入第二套生产编排。
+- 真实执行已完成 2020-01 的留存复放：required/returned `59,930/59,930`，missing/extra/unresolved/structural 均为 0。由于下一月阻断，该月尚未 finalize、签发 receipt、建立 coverage 或物化，不能把 capture PASS 写成整月发布 PASS。
+- 2020-02 新鲜 provider capture 返回 required/returned `75,463/75,463`，missing/extra/structural 均为 0，但 `UNRESOLVED=1`。唯一 pair 是 `600240.SH / 2020-02-05`：精确日宇宙包含该证券，已验证 LISTDATE 为 `2000-06-28`，两次同范围 status 响应均只覆盖 02-03/02-04 的 `IS_SUSP_SEC=1`，02-05 无状态行，daily-bar 目标 symbol table 也不存在。现行合同禁止把此前状态或无 bar 外推成停牌，故按 fail-fast 停在 2020-02。
+- 2020-03 至 2026-06 的 76 个月未运行；没有伪造完成度，也没有进入 receipt/coverage/materialization/reader/replay/conflict 或任何禁止范围。首轮运行器暴露的精确日缓存、LISTDATE 月裁剪和阻断记录器问题已在最终真实结果前修复，属于一次性本地 harness 修复，不是生产代码变更。
+- 详细脱敏逐月 JSON/Markdown、请求范围与 content hash 见 [`cr7_issue76_history_build_20260916.json`](provider_verification/cr7_issue76_history_build_20260916.json) 和 [`cr7_issue76_history_build_20260916.md`](provider_verification/cr7_issue76_history_build_20260916.md)。原始 payload、ledger、账号/身份、网络地址、SDK/runtime 均未进入 Git。
+- 下一步只需项目管理者/Owner 为该 pair 提供明确 provider-owned status 事实，或批准最小语义/API 合同变化；获批前不得 carry-forward、换源、按代码前缀或请求顺序推断，也不得跳过 2020-02 继续声称 78 月完整。
+
 ## 2026-09-16 · Issue #73 Stage B remediation：LISTDATE 与双月闭环
 
 > 状态：**2020-01 PASS / 2026-01 PASS / 两代表月证据待 PM 审阅**

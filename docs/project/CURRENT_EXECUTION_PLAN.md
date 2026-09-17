@@ -4,6 +4,20 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.1. 2026-09-16 当前调度覆盖 — Issue #76 78 个月历史构建
+
+> 状态：**STOP(BLOCKED) at 2020-02 / 1 of 78 capture closures / no publication**
+
+Issue #76 授权从 `main@ad2ad528d3ffec1269772084f0860c8224e632d2` 构建 2020-01 至 2026-06 的 78 个月历史。已按现有 typed AmazingData → raw anchor → completeness → Canonical → Snapshot → ReadModel → verified projection → bounded materializer 路径启动；没有新增生产编排、没有进入 Formal B1-B7/Production 或其他禁止范围。
+
+- `2020-01`：留存复放 capture PASS，required/returned `59,930/59,930`，missing/extra/unresolved/structural `0/0/0/0`；因 2020-02 阻断，尚未 finalize/receipt/coverage/materialization。
+- `2020-02`：新鲜 provider capture 返回 `75,463` 个 pair；唯一未决为 `600240.SH / 2020-02-05`。精确日宇宙包含该证券，LISTDATE `2000-06-28`；同范围 status 两次仅返回 02-03/02-04 的暂停行，02-05 缺状态，daily-bar 目标 symbol table absent。评价 `FAIL_CLOSED / UNRESOLVED=1 / missing=0 / extra=0 / structural=0`。禁止把旧日暂停或无 bar 推断为 02-05 停牌。
+- `2020-03` 至 `2026-06`：76 个月 `NOT_RUN`。当前阶段未产生 receipt、authoritative coverage、materialization、ordinary-reader、idempotency 或 changed-content conflict 结论。
+
+详细逐月控制记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。阻断解除条件：Owner/项目管理者提供该 pair 的 provider-owned status 事实，或批准最小语义/API 合同变更；不得换源、carry-forward、跳过月份或推断。
+
+Issue #76 完成前保持范围排除：Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1/global baseline、strategy/portfolio、speculative reconciliation。
+
 ## 0. 2026-09-16 当前调度覆盖 — Issue #73 remediation
 
 当前基线为 PR #74 合并后的 `main@22c42a72e222d9b6f6519095fb641a4adb190e12`。本轮严格限定为
@@ -578,12 +592,11 @@ Issue #66 **不授权**：
 
 ---
 
-**Last scheduler update**：2026-09-15
+**Last scheduler update**：2026-09-16
 
-**Current task**：Issue #59（PR #68 已合并；最小真实 2024-01 source-input 在 CR-2 shape
-normalization 边界阻断）
+**Current task**：Issue #76（78 个月权威历史构建在 2020-02 的 provider status pair
+语义缺口处 fail-closed）
 
-**Required ancestor**：当前 clean `main@a7671ab34d301cb0aca2f351a31bbc865c100498`。下一步只
-处理 [`cr7_authoritative_2024_01_source_input_20260915.md`](../provider_verification/cr7_authoritative_2024_01_source_input_20260915.md)
-列出的最小 provider-native shape/identity 适配；适配前不手填 snapshot，不进入 acquisition、
-materialization、Stage B 或 78 月回补。
+**Required ancestor**：Issue #76 基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`；
+先解决 `600240.SH / 2020-02-05` 的明确 provider-owned status 事实或获得最小合同变更批准，
+再从已保留证据恢复，不得用推断跳过该月。

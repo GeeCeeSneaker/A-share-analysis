@@ -1,0 +1,608 @@
+{
+  "acceptance": {
+    "all_78_months": false,
+    "authoritative_coverage": false,
+    "exact_head_qa_and_ci": "not applicable to a blocked evidence-only draft",
+    "idempotency_and_conflict": false,
+    "materializations": false,
+    "ordinary_reader_full_partition_set": false,
+    "receipts_replayed": false
+  },
+  "baseline": "ad2ad528d3ffec1269772084f0860c8224e632d2",
+  "blocker": {
+    "affected_pair": {
+      "is_prelisting_on_session": false,
+      "security_id": "600240.SH",
+      "trade_date": "2020-02-05",
+      "verified_list_date": "2000-06-28"
+    },
+    "code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
+    "completeness": {
+      "classification_counts": {
+        "EXTRA_RETURNED": 0,
+        "NOT_APPLICABLE_SESSION": 237,
+        "POSITIVE_TRADE_COUNT_ACTIVE": 20,
+        "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+        "SUSPENSION_NON_TRADING": 79,
+        "UNEXPLAINED_MISSING": 0,
+        "UNRESOLVED": 1
+      },
+      "extra_returned_pair_count": 0,
+      "extra_returned_pair_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "missing_required_pair_count": 0,
+      "missing_required_pair_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "monthly_security_count": 3789,
+      "monthly_security_set_hash": "3e9266e41a5a4cdbd759f1fc5681eb2f88ac02f215a8ba1f43556b14e914b965",
+      "positive_trade_pair_count": 20,
+      "positive_trade_pair_set_hash": "875df758ba9f3cec559590b935dbc44f7dc7758d62018bd0eec723ba6c6c104a",
+      "prelisting_list_dates": {
+        "002976.SZ": "2020-03-06",
+        "300817.SZ": "2020-02-18",
+        "300818.SZ": "2020-02-12",
+        "300820.SZ": "2020-02-13"
+      },
+      "required_bar_pair_count": 75463,
+      "required_bar_pair_set_hash": "47894728d8cfb9469d1544e4ff184d5b5d8128d92e10780f4a40996724188fcb",
+      "returned_bar_pair_count": 75463,
+      "returned_bar_pair_set_hash": "47894728d8cfb9469d1544e4ff184d5b5d8128d92e10780f4a40996724188fcb",
+      "returned_first_date": "2020-02-03",
+      "returned_last_date": "2020-02-28",
+      "returned_row_count": 75463,
+      "returned_trading_day_count": 20,
+      "returned_trading_days_hash": "4e5c26a168444acc1b11d3e7e0b191d353621597dd129d0660a6202c2a04fbde",
+      "rule_version": "amazingdata-month-completeness-rule-v3",
+      "session_count": 20,
+      "session_set_hash": "4e5c26a168444acc1b11d3e7e0b191d353621597dd129d0660a6202c2a04fbde",
+      "status": "FAIL_CLOSED",
+      "structural_error_codes": [],
+      "unresolved_pair_count": 1
+    },
+    "daily_bar_observation": {
+      "affected_symbol_table": "ABSENT",
+      "content_hash": "2749690dbb82d6ce952f96a6719507d854d6e64a9400baa3a4a6b749ab517c29",
+      "request_id": "56ca2084-48ac-456a-845c-f89d4fa12747",
+      "request_scope": {
+        "begin_date": 20200201,
+        "code_list_count": 3789,
+        "end_date": 20200229
+      },
+      "row_count": 75463
+    },
+    "exact_day_universe": {
+      "content_hash": "c93791d94a0dda1bf9be4e9a82ad780c292049fe75ab2b4d2cb1f97dcf81ae96",
+      "request_id": "09011e96-30ca-489f-af3f-26ca1bd6ef5f",
+      "request_scope": {
+        "end_date": 20200205,
+        "security_type": "EXTRA_STOCK_A_SH_SZ",
+        "start_date": 20200205
+      },
+      "row_count": 3769,
+      "symbol_present": true,
+      "universe_count": 3769
+    },
+    "interpretation": "Current accepted semantics do not allow the 2020-02-03/04 suspension flags to be carried forward to 2020-02-05. No provider status fact for the affected pair was observed, so the pair remains UNRESOLVED and the month is FAIL_CLOSED.",
+    "month": "2020-02",
+    "required_owner_action": "Provide an explicit provider-owned status fact for 600240.SH on 2020-02-05 through the approved path, or approve the smallest documented semantic/API contract change. Do not resolve by inference, alternate source, code prefix, request order, or previous-day carry-forward.",
+    "status_observations": [
+      {
+        "affected_symbol_frame": {
+          "height": 2,
+          "missing_session": 20200205,
+          "observed_rows": [
+            {
+              "is_susp_sec": 1,
+              "trade_date": 20200203
+            },
+            {
+              "is_susp_sec": 1,
+              "trade_date": 20200204
+            }
+          ],
+          "width": 11
+        },
+        "content_hash": "55973d3c23478c192344910ae4d662902ffd37b4cd09fa2bbf15009566e8f8cb",
+        "request_id": "35d649b1-2b7b-47ba-8715-52a25a7f8d93",
+        "request_scope": {
+          "begin_date": 20200201,
+          "code_list_count": 3789,
+          "end_date": 20200229
+        },
+        "row_count": 75522
+      },
+      {
+        "affected_symbol_frame": {
+          "height": 2,
+          "missing_session": 20200205,
+          "observed_rows": [
+            {
+              "is_susp_sec": 1,
+              "trade_date": 20200203
+            },
+            {
+              "is_susp_sec": 1,
+              "trade_date": 20200204
+            }
+          ],
+          "width": 11
+        },
+        "content_hash": "9c235b4fbc6800671fc89987c8f153bb95920ef48f274fc44e7380dc9b581eee",
+        "request_id": "8628d292-e4dc-4ae6-96d3-748b3c3d723f",
+        "request_scope": {
+          "begin_date": 20200201,
+          "code_list_count": 3789,
+          "end_date": 20200229
+        },
+        "row_count": 75522
+      }
+    ]
+  },
+  "issue": 76,
+  "local_evidence": {
+    "raw_payloads_and_ledger_retained_untracked": true,
+    "raw_root_label": "data/spike/issue76_history_build_20260916/authoritative_capture",
+    "tracked_record_contains_account_or_network_identity": false,
+    "tracked_record_contains_credentials": false
+  },
+  "months": [
+    {
+      "capture_status": "PASS",
+      "changed_content_conflict": "NOT_REACHED",
+      "coverage": "NOT_REACHED",
+      "execution_mode": "RETAINED_REPLAY",
+      "extra_returned_pair_count": 0,
+      "idempotency": "NOT_REACHED",
+      "materialization": "NOT_REACHED",
+      "missing_required_pair_count": 0,
+      "month": "2020-01",
+      "monthly_security_count": 3769,
+      "reader": "NOT_REACHED",
+      "receipt": "NOT_REACHED",
+      "required_pair_count": 59930,
+      "research_split": "development",
+      "returned_pair_count": 59930,
+      "returned_row_count": 59930,
+      "session_count": 16,
+      "status": "CAPTURE_PASS_NOT_FINALIZED",
+      "structural_error_count": 0,
+      "unresolved_pair_count": 0
+    },
+    {
+      "capture_status": "FAIL_CLOSED",
+      "changed_content_conflict": "NOT_REACHED",
+      "coverage": "NOT_REACHED",
+      "execution_mode": "FRESH_PROVIDER",
+      "extra_returned_pair_count": 0,
+      "idempotency": "NOT_REACHED",
+      "materialization": "NOT_REACHED",
+      "missing_required_pair_count": 0,
+      "month": "2020-02",
+      "monthly_security_count": 3789,
+      "reader": "NOT_REACHED",
+      "receipt": "NOT_REACHED",
+      "required_pair_count": 75463,
+      "research_split": "development",
+      "returned_pair_count": 75463,
+      "returned_row_count": 75463,
+      "session_count": 20,
+      "status": "STOP(BLOCKED)",
+      "structural_error_count": 0,
+      "unresolved_pair_count": 1
+    },
+    {
+      "month": "2020-03",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2020-04",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2020-05",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2020-06",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2020-07",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2020-08",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2020-09",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2020-10",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2020-11",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2020-12",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-01",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-02",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-03",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-04",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-05",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-06",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-07",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-08",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-09",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-10",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-11",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2021-12",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-01",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-02",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-03",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-04",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-05",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-06",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-07",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-08",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-09",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-10",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-11",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2022-12",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-01",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-02",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-03",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-04",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-05",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-06",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-07",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-08",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-09",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-10",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-11",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2023-12",
+      "research_split": "development",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-01",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-02",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-03",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-04",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-05",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-06",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-07",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-08",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-09",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-10",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-11",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2024-12",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-01",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-02",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-03",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-04",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-05",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-06",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-07",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-08",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-09",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-10",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-11",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2025-12",
+      "research_split": "validation_a",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2026-01",
+      "research_split": "holdout",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2026-02",
+      "research_split": "holdout",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2026-03",
+      "research_split": "holdout",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2026-04",
+      "research_split": "holdout",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2026-05",
+      "research_split": "holdout",
+      "status": "NOT_RUN"
+    },
+    {
+      "month": "2026-06",
+      "research_split": "holdout",
+      "status": "NOT_RUN"
+    }
+  ],
+  "phase_summary": {
+    "canonical": "NOT_RUN",
+    "capture": "STOP(BLOCKED) at 2020-02",
+    "finalize_coverage": "NOT_RUN",
+    "materialization_reader_replay": "NOT_RUN",
+    "source_normalization": "NOT_RUN"
+  },
+  "pre_acceptance_harness_repairs": [
+    "delegated exact-day hist_code_list calls to the live provider instead of treating a monthly cache as an exact-day cache",
+    "clipped the merged LISTDATE map to each month universe during retained replay",
+    "fixed the sanitized failure emitter so the actual blocker is persisted"
+  ],
+  "provider": "amazingdata",
+  "provider_use_mode": "SPIKE",
+  "schema": "issue76.history_build.execution.v1",
+  "scope_exclusions": [
+    "Formal B1-B7 / Production",
+    "BSE/index",
+    "CR-5/R2",
+    "Golden/H1/global baseline",
+    "strategy/portfolio",
+    "speculative reconciliation"
+  ],
+  "status": "STOP(BLOCKED)",
+  "stop": {
+    "blocked_month": "2020-02",
+    "completed_capture_months": 1,
+    "exception_class": "RuntimeError",
+    "not_run_months": 76,
+    "stage": "CAPTURE"
+  },
+  "target_window": {
+    "calendar_month_count": 78,
+    "end": "2026-06-30",
+    "start": "2020-01-01"
+  }
+}
