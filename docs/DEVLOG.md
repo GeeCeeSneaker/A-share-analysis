@@ -3790,7 +3790,7 @@ Stage A 报告仍是 `SPIKE` 诊断，未签发 authoritative receipt，material
 
 ## 2026-09-17 · Issue #76 300114.SZ 官方停牌事件整改与恢复点
 
-> 状态：**2023-01 RETAINED REPLAY PASS / 2023-02 AUTHENTICATION BLOCKED / 37 OF 78 CAPTURE PASS / DRAFT**
+> 状态：**2023-01 RETAINED REPLAY PASS / 2023-02 AUTHENTICATION BLOCKED / 37 OF 78 CAPTURE PASS / CI #656 GREEN / DRAFT**
 
 - 按 PR #77 Owner 授权实现一个固定、窄范围的 `300114.SZ` 官方停牌事件：半开区间
   `[2023-01-12, 2023-02-02)`。事件只处理当前仍未决的 exact-session pair；provider 已有状态优先，
@@ -3804,5 +3804,9 @@ Stage A 报告仍是 `SPIKE` 诊断，未签发 authoritative receipt，material
 - 继续到 `2023-02` 时，runner 在 provider 请求前因当前执行进程缺少
   `TGW_USERNAME/TGW_PASSWORD/TGW_SERVER_VIP/TGW_SERVER_PORT` 停止。未发起该月请求，未把变量值写入
   文件、输出或 GitHub；后续应在启动 runner 的同一 PowerShell 进程安全注入后 `--resume --retry-blocked`。
+- exact-head CI run `656`（commit `ab133200ce7ff7247c356fd2cc603bbb34647858`）的 Ubuntu 3.14、Windows
+  3.14、Windows 3.12 三个必需作业全部 `success`；GT-H3B run `166` 按范围 `skipped`。本地
+  focused pytest `72 passed`、full offline pytest `1879 passed, 3 skipped`。CI 通过不等于线上
+  78 个月数据链路完成。
 - 本次不进入 78 月后的 receipt/coverage/materialization/publication，也不扩大到 Formal B1-B7、Production、
   BSE/index、CR-5/R2、Golden/H1、baseline、策略或 speculative reconciliation；PR #77 继续保持 Draft。

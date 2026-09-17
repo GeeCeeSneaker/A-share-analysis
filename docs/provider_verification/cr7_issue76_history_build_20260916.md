@@ -9,6 +9,7 @@
 - `2023-01` retained replay 结果：monthly universe `4911`、交易日 `16`、required/returned bar pairs `78,403/78,403`、returned rows `78,403`；missing `0`、extra `0`、structural error `0`、`UNRESOLVED=0`。分类为 `NOT_APPLICABLE_SESSION=67`、`POSITIVE_TRADE_COUNT_ACTIVE=7`、`SUSPENSION_NON_TRADING=106`。事件实际闭合原先的 9 个 `300114.SZ` pair，evaluation/catalog 已保存事件 ID、区间和来源 URL，retained replay 会重新校验该对象。
 - 官方原文来源：[CNINFO 2023-001（2023-01-12 起停牌）](https://static.cninfo.com.cn/finalpage/2023-01-12/1215580484.PDF)、[CNINFO 2023-007（2023-02-02 起复牌）](https://static.cninfo.com.cn/finalpage/2023-02-02/1215749576.PDF)、[深交所停复牌表（记录 300114.SZ 的 2023-01-12 停牌）](https://docs.static.szse.cn/www/certificate/secondb/GEMmsb/W020230202562529948780.html)。前两份公告证明区间起止，第三份是起始日的交易所交叉核验。
 - 随后 runner 在 `2023-02` provider 请求前停止：当前 Codex 执行进程缺少四个安全环境变量。没有发起该月 provider 请求，`2023-02` 不是数据结论；账号、口令、地址和端口均未进入日志、文件或 GitHub。
+- 本提交的 exact-head CI 已完成：run `35256614885`（run `656`）中 Ubuntu 3.14、Windows 3.14、Windows 3.12 三个必需作业均为 `success`；GT-H3B run `35256614895`（run `166`）按当前范围为 `skipped`。这只证明仓库门禁通过，不改变 `2023-02` 的执行阻断或 78 个月验收状态。
 
 ### 当前可执行下一步
 

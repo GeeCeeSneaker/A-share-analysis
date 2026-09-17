@@ -1335,7 +1335,7 @@
     "ordinary_reader_full_partition_set": false,
     "idempotency_and_conflict": false,
     "publication": false,
-    "exact_head_qa_and_ci": "local QA passed; CI pending for the new commit"
+    "exact_head_qa_and_ci": "local QA passed; CI run 656 (commit ab133200ce7ff7247c356fd2cc603bbb34647858) passed on Ubuntu 3.14, Windows 3.14, and Windows 3.12; GT-H3B run 166 skipped by scope"
   },
   "local_qa": {
     "focused_pytest": "72 passed",
