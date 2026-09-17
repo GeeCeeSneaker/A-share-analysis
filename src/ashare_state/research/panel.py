@@ -495,6 +495,8 @@ class ResearchPanelBuilder:
                 f"verified identity row {ordinal} has an unknown exchange suffix"
             )
         raw_list_date = row.get("list_date")
+        raw_delist_date = row.get("delist_date")
+        delist_date = None if raw_delist_date is None else parse_date_value(raw_delist_date)
         event = identity_event_for_provider_symbol(provider_symbol)
         if event is not None:
             if (
@@ -517,6 +519,7 @@ class ResearchPanelBuilder:
                 exchange=event.exchange,
                 valid_from=valid_from,
                 valid_to=valid_to,
+                delist_date=delist_date,
             )
         if raw_list_date is None:
             # Match the existing governed bridge: no list date cannot produce
@@ -529,6 +532,7 @@ class ResearchPanelBuilder:
             symbol=symbol,
             exchange=exchange,
             valid_from=list_date,
+            delist_date=delist_date,
         )
 
     @staticmethod

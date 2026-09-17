@@ -135,7 +135,9 @@ def _row(
     }
 
 
-def _projection(rows: list[dict[str, Any]]) -> VerifiedResearchProjection:
+def _projection(
+    rows: list[dict[str, Any]], *, delist_date: date | None = None
+) -> VerifiedResearchProjection:
     identity_view = IdentityView._from_verified_security_master(  # noqa: SLF001
         (
             IdentityRecord(
@@ -143,6 +145,7 @@ def _projection(rows: list[dict[str, Any]]) -> VerifiedResearchProjection:
                 symbol="600000",
                 exchange="SSE",
                 valid_from=date(1999, 1, 1),
+                delist_date=delist_date,
             ),
         ),
         sources=(
@@ -473,6 +476,40 @@ def test_capture_finalizes_against_later_projection_without_provider_replay(tmp_
     assert tuple(provider.calls) == calls_after_capture
     assert receipt.retrieved_at_utc <= receipt.pit_as_of == projection.source_snapshot_as_of
     receipt.verify_retained_capture(raw_writer.root)
+
+
+def test_retained_replay_preserves_used_delist_fact(tmp_path: Path) -> None:
+    provider = _FakeAmazingDataProvider()
+    kline_payload = dict(provider.kline.payload)
+    kline_payload["600000.SH"] = kline_payload["600000.SH"].head(1)
+    provider.kline = _provider_exchange(
+        DAILY_BAR_KLINE,
+        provider.kline.envelope.request_params,
+        kline_payload,
+    )
+    raw_writer = _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-delist-replay")
+    acquisition = AmazingDataHistoryAcquisition(provider, raw_writer)
+    delist_date = date(2020, 1, 3)
+    capture = acquisition.capture_month(
+        PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1),
+        delist_dates_by_symbol={"600000.SH": delist_date},
+    )
+
+    assert capture.completeness_evaluation.status == "PASS"
+    assert capture.completeness_evaluation.postdelisting_delist_dates == {"600000.SH": delist_date}
+    projection = _projection(
+        [
+            _row(date(2020, 1, 2), "security-000001"),
+            _row(date(2020, 1, 3), "security-000001"),
+            _row(date(2020, 1, 2), "security-600000"),
+        ],
+        delist_date=delist_date,
+    )
+    receipt = acquisition.finalize_capture(capture, source_snapshot=projection)
+    replayed = AmazingDataAcquisitionReceipt.from_mapping(receipt.as_dict())
+
+    replayed.verify_retained_capture(raw_writer.root)
+    assert replayed.completeness_evaluation.postdelisting_delist_dates == {"600000.SH": delist_date}
 
 
 def test_capture_finalization_rejects_early_pit_without_provider_replay(tmp_path: Path) -> None:

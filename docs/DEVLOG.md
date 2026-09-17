@@ -1,13 +1,14 @@
-## 2026-09-16 · Issue #76 78 个月权威历史构建在 2020-02 fail-closed
+## 2026-09-16 · Issue #76 78 个月权威历史构建：DELISTDATE 修复与执行检查点
 
-> 状态：**STOP(BLOCKED) / 2020-01 capture PASS / 2020-02 唯一状态事实未决 / 78 月未完成**
+> 状态：**STOP(BLOCKED) at 2020-03 / 2 of 78 capture PASS / no publication**
 
-- 依据远端 Issue #76，基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`，授权范围为 2020-01 至 2026-06 的 78 个月；使用现有 typed AmazingData capture/finalize、普通 Canonical → Snapshot → ReadModel → verified projection 和 bounded materializer 路径，未引入第二套生产编排。
-- 真实执行已完成 2020-01 的留存复放：required/returned `59,930/59,930`，missing/extra/unresolved/structural 均为 0。由于下一月阻断，该月尚未 finalize、签发 receipt、建立 coverage 或物化，不能把 capture PASS 写成整月发布 PASS。
-- 2020-02 新鲜 provider capture 返回 required/returned `75,463/75,463`，missing/extra/structural 均为 0，但 `UNRESOLVED=1`。唯一 pair 是 `600240.SH / 2020-02-05`：精确日宇宙包含该证券，已验证 LISTDATE 为 `2000-06-28`，两次同范围 status 响应均只覆盖 02-03/02-04 的 `IS_SUSP_SEC=1`，02-05 无状态行，daily-bar 目标 symbol table 也不存在。现行合同禁止把此前状态或无 bar 外推成停牌，故按 fail-fast 停在 2020-02。
-- 2020-03 至 2026-06 的 76 个月未运行；没有伪造完成度，也没有进入 receipt/coverage/materialization/reader/replay/conflict 或任何禁止范围。首轮运行器暴露的精确日缓存、LISTDATE 月裁剪和阻断记录器问题已在最终真实结果前修复，属于一次性本地 harness 修复，不是生产代码变更。
-- 详细脱敏逐月 JSON/Markdown、请求范围与 content hash 见 [`cr7_issue76_history_build_20260916.json`](provider_verification/cr7_issue76_history_build_20260916.json) 和 [`cr7_issue76_history_build_20260916.md`](provider_verification/cr7_issue76_history_build_20260916.md)。原始 payload、ledger、账号/身份、网络地址、SDK/runtime 均未进入 Git。
-- 下一步只需项目管理者/Owner 为该 pair 提供明确 provider-owned status 事实，或批准最小语义/API 合同变化；获批前不得 carry-forward、换源、按代码前缀或请求顺序推断，也不得跳过 2020-02 继续声称 78 月完整。
+- 远端 Issue #76 的基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`，授权范围仍是 2020-01 至 2026-06 的 78 个月。PR #77 的 PM review 已批准最小修复：复用已验证 security-master 的 `stock_basic.DELISTDATE`，只对 `session >= DELISTDATE` 分类为 `NOT_APPLICABLE_SESSION`；不把历史停牌行 carry-forward，也不引入第二数据源。
+- 生产代码已把 month-completeness/applicability 规则升级到 v4；`DELISTDATE` 从已验证 normalized security-master 进入 identity view，并只在实际排除 pair 时进入 capture evaluation 与 retained replay。`LISTDATE` 的既有语义和 `retrieved_at_utc <= pit_as_of` 约束保持不变。
+- 2020-01 使用 hash-anchored retained replay，capture PASS：required/returned `59,930/59,930`，missing/extra/unresolved/structural 均为 0。
+- 2020-02 使用已保留的同范围 raw exchanges 做 retained replay，capture PASS：required/returned `75,463/75,463`，missing/extra/unresolved/structural 均为 `0/0/0/0`；`NOT_APPLICABLE_SESSION=238`，其中实际使用的 post-delisting 事实为 `600240.SH -> 2020-02-05`。该事实使原先唯一未决 pair 在规则允许的生命周期边界内闭合。
+- 随后执行器按 fail-fast 顺序到达 2020-03，但当前 Codex 执行进程看不到安全环境变量 `TGW_USERNAME`、`TGW_PASSWORD`、`TGW_SERVER_VIP`、`TGW_SERVER_PORT`，因此在认证前停止。这个是本地执行环境阻断，不是 2020-03 的 provider 数据结论；变量值未写入聊天、本地跟踪文件或 GitHub。要继续，只需在本机安全配置这些变量后从保留状态恢复。
+- 本地 QA：focused `67 passed`；全量离线 pytest `1874 passed, 3 skipped`；`ruff check`、`ruff format --check`、`mypy src/ashare_state` 均通过。2020-03 至 2026-06 的其余 76 个月未运行，因此尚未生成 78 个月的 receipt、coverage、materialization、ordinary-reader、幂等或 conflict 完成结论。
+- 详细脱敏 JSON/Markdown、阻断原因与下一步要求见 [`cr7_issue76_history_build_20260916.json`](provider_verification/cr7_issue76_history_build_20260916.json) 和 [`cr7_issue76_history_build_20260916.md`](provider_verification/cr7_issue76_history_build_20260916.md)。原始 payload、ledger、账号/身份、网络地址、SDK/runtime 均未进入 Git。
 
 ## 2026-09-16 · Issue #73 Stage B remediation：LISTDATE 与双月闭环
 

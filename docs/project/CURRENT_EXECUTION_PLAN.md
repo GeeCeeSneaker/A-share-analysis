@@ -6,15 +6,17 @@
 
 ## 0.1. 2026-09-16 当前调度覆盖 — Issue #76 78 个月历史构建
 
-> 状态：**STOP(BLOCKED) at 2020-02 / 1 of 78 capture closures / no publication**
+> 状态：**STOP(BLOCKED) at 2020-03 / 2 of 78 capture PASS / no publication**
 
-Issue #76 授权从 `main@ad2ad528d3ffec1269772084f0860c8224e632d2` 构建 2020-01 至 2026-06 的 78 个月历史。已按现有 typed AmazingData → raw anchor → completeness → Canonical → Snapshot → ReadModel → verified projection → bounded materializer 路径启动；没有新增生产编排、没有进入 Formal B1-B7/Production 或其他禁止范围。
+Issue #76 授权从 `main@ad2ad528d3ffec1269772084f0860c8224e632d2` 构建 2020-01 至 2026-06 的 78 个月历史。PR #77 的 PM review 已批准最小 `DELISTDATE` 适用性修复：复用已验证 normalized security-master 的 `stock_basic.DELISTDATE`，仅当 `session >= DELISTDATE` 时判为 `NOT_APPLICABLE_SESSION`；不 carry-forward 停牌、不换源、不跳过 pair。现有 typed AmazingData → raw anchor → completeness → Canonical → Snapshot → ReadModel → verified projection → bounded materializer 路径保持不变。
 
-- `2020-01`：留存复放 capture PASS，required/returned `59,930/59,930`，missing/extra/unresolved/structural `0/0/0/0`；因 2020-02 阻断，尚未 finalize/receipt/coverage/materialization。
-- `2020-02`：新鲜 provider capture 返回 `75,463` 个 pair；唯一未决为 `600240.SH / 2020-02-05`。精确日宇宙包含该证券，LISTDATE `2000-06-28`；同范围 status 两次仅返回 02-03/02-04 的暂停行，02-05 缺状态，daily-bar 目标 symbol table absent。评价 `FAIL_CLOSED / UNRESOLVED=1 / missing=0 / extra=0 / structural=0`。禁止把旧日暂停或无 bar 推断为 02-05 停牌。
-- `2020-03` 至 `2026-06`：76 个月 `NOT_RUN`。当前阶段未产生 receipt、authoritative coverage、materialization、ordinary-reader、idempotency 或 changed-content conflict 结论。
+- 生产代码已升级 month-completeness/applicability 到 v4；`DELISTDATE` 进入 identity view，并仅保留实际用于排除 pair 的事实。`LISTDATE`、PIT、raw closure 和 finalized capture 的既有 fail-closed 约束保持不变。
+- `2020-01`：hash-anchored retained replay capture PASS，required/returned `59,930/59,930`，missing/extra/unresolved/structural `0/0/0/0`。
+- `2020-02`：使用已保留同范围 raw exchanges retained replay capture PASS，required/returned `75,463/75,463`，missing/extra/unresolved/structural `0/0/0/0`；`NOT_APPLICABLE_SESSION=238`，实际使用的 post-delisting 事实为 `600240.SH -> 2020-02-05`。
+- `2020-03`：执行器在 provider 登录前停止，原因是当前 Codex 执行进程看不到安全环境变量 `TGW_USERNAME`、`TGW_PASSWORD`、`TGW_SERVER_VIP`、`TGW_SERVER_PORT`。这是本地执行环境阻断，不是 2020-03 数据结论；值未写入聊天或仓库。其余 2020-03 至 2026-06 的 76 个月尚未运行。
+- 本地 focused `67 passed`、全量离线 pytest `1874 passed, 3 skipped`、Ruff 与 mypy 均通过；由于 capture 阶段尚未闭合 78 个月，当前尚未产生完整 receipt、authoritative coverage、materialization、ordinary-reader、idempotency 或 changed-content conflict 结论。
 
-详细逐月控制记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。阻断解除条件：Owner/项目管理者提供该 pair 的 provider-owned status 事实，或批准最小语义/API 合同变更；不得换源、carry-forward、跳过月份或推断。
+详细脱敏执行记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。下一步是由项目管理者在本机安全配置上述变量后，从保留状态恢复 2020-03；遇到下一个新 blocker 必须按 exact month/pair 停止并更新记录。
 
 Issue #76 完成前保持范围排除：Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1/global baseline、strategy/portfolio、speculative reconciliation。
 
@@ -594,9 +596,9 @@ Issue #66 **不授权**：
 
 **Last scheduler update**：2026-09-16
 
-**Current task**：Issue #76（78 个月权威历史构建在 2020-02 的 provider status pair
-语义缺口处 fail-closed）
+**Current task**：Issue #76（78 个月权威历史构建已通过 2020-02 `DELISTDATE` 适用性修复，
+当前在 2020-03 本地认证环境边界停止）
 
 **Required ancestor**：Issue #76 基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`；
-先解决 `600240.SH / 2020-02-05` 的明确 provider-owned status 事实或获得最小合同变更批准，
-再从已保留证据恢复，不得用推断跳过该月。
+在本机安全配置认证环境变量后，从已保留证据恢复并继续 2020-03，不得把环境阻断误写成
+provider 数据结论，也不得跳过月份或将当前进度写成 78/78。

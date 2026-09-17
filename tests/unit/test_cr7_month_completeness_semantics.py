@@ -131,6 +131,63 @@ def test_provider_list_date_excludes_a_prelisting_exact_session() -> None:
     assert result.prelisting_list_dates == {"000001.SZ": date(2024, 1, 3)}
 
 
+def test_provider_delist_date_excludes_on_and_after_delisting_session() -> None:
+    values = _valid_inputs()
+    result = evaluate_month_completeness(
+        **values,
+        delist_dates_by_symbol={"600000.SH": date(2024, 1, 3)},
+    )
+
+    assert result.accepted
+    assert result.required_bar_pair_count == 2
+    assert result.returned_bar_pair_count == 2
+    assert result.classification_counts[CompletenessPairClass.NOT_APPLICABLE_SESSION.value] == 2
+    assert result.postdelisting_delist_dates == {"600000.SH": date(2024, 1, 3)}
+
+
+def test_session_before_delist_date_keeps_ordinary_status_and_bar_requirement() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    bars = values["daily_bar_payload"]
+    assert isinstance(status, dict)
+    assert isinstance(bars, dict)
+    status["600000.SH"] = _status(day_values=[20240102, 20240103], flags=[0, 0])
+    bars["600000.SH"] = _bars("600000.SH", [20240102, 20240103])
+
+    result = evaluate_month_completeness(
+        **values,
+        delist_dates_by_symbol={"600000.SH": date(2024, 1, 4)},
+    )
+
+    assert result.accepted
+    assert result.required_bar_pair_count == 3
+    assert result.returned_bar_pair_count == 3
+    assert result.postdelisting_delist_dates == {}
+
+
+@pytest.mark.parametrize("delist_date", (None, "malformed-delist-date"))
+def test_missing_or_malformed_delist_date_does_not_resolve_an_unresolved_pair(
+    delist_date: object,
+) -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    bars = values["daily_bar_payload"]
+    assert isinstance(status, dict)
+    assert isinstance(bars, dict)
+    status["000001.SZ"] = pl.DataFrame()
+    bars["000001.SZ"] = _bars("000001.SZ", [])
+
+    result = evaluate_month_completeness(
+        **values,
+        delist_dates_by_symbol={"000001.SZ": delist_date},
+    )
+
+    assert not result.accepted
+    assert result.unresolved_pair_count == 1
+    assert result.classification_counts[CompletenessPairClass.UNRESOLVED.value] == 1
+    assert result.postdelisting_delist_dates == {}
+
+
 @pytest.mark.parametrize("list_date", (date(2024, 1, 2), date(2024, 1, 1)))
 def test_session_on_or_after_list_date_still_requires_normal_status_or_bar_evidence(
     list_date: date,
@@ -501,6 +558,18 @@ def test_evaluation_round_trip_is_exact_and_sanitized() -> None:
     assert "not_applicable_pair_set_hash" not in encoded
     assert "applicability_semantics_version" not in encoded
     assert "positive_trade_fallback_version" not in encoded
+
+
+def test_evaluation_round_trip_preserves_used_delist_fact() -> None:
+    result = evaluate_month_completeness(
+        **_valid_inputs(),
+        delist_dates_by_symbol={"600000.SH": date(2024, 1, 3)},
+    )
+    encoded = json.loads(json.dumps(result.as_dict(), ensure_ascii=False, default=str))
+    replayed = MonthCompletenessEvaluation.from_mapping(encoded)
+
+    assert replayed.as_dict() == result.as_dict()
+    assert replayed.postdelisting_delist_dates == {"600000.SH": date(2024, 1, 3)}
 
 
 def test_unknown_month_semantic_rule_version_cannot_replay() -> None:

@@ -280,6 +280,7 @@ class IdentityRecord:
     exchange: str
     valid_from: date
     valid_to: date | None = None
+    delist_date: date | None = None
 
     @property
     def provider_symbol(self) -> str:
@@ -305,6 +306,7 @@ class IdentityRecord:
             "exchange": self.exchange,
             "valid_from": self.valid_from,
             "valid_to": self.valid_to,
+            "delist_date": self.delist_date,
         }
 
 
@@ -512,6 +514,8 @@ class IdentityView:
                 valid_from = parse_date_value(row["valid_from"])
                 raw_valid_to = row.get("valid_to")
                 valid_to = None if raw_valid_to is None else parse_date_value(raw_valid_to)
+                raw_delist_date = row.get("delist_date")
+                delist_date = None if raw_delist_date is None else parse_date_value(raw_delist_date)
             except (KeyError, TypeError, ResearchPanelError) as exc:
                 raise ResearchPanelError(
                     f"identity view row {ordinal} is malformed: {exc}"
@@ -531,6 +535,7 @@ class IdentityView:
                     exchange=exchange,
                     valid_from=valid_from,
                     valid_to=valid_to,
+                    delist_date=delist_date,
                 )
             )
 
@@ -593,7 +598,7 @@ class IdentityView:
                 )
         source_payload = [source.as_dict() for source in source_tuple]
         source_hash = sha256_hex(canonical_json(source_payload))
-        version = f"identity-master-v1-{source_hash[:24]}"
+        version = f"identity-master-v2-{source_hash[:24]}"
         content_hash = sha256_hex(
             canonical_json(
                 {
