@@ -1,8 +1,22 @@
 # Issue #76：78 个月权威历史构建执行记录
 
-> 状态：**STOP(BLOCKED) at 2023-01 / 36 of 78 capture PASS / no publication**
+> 状态：**STOP(BLOCKED) at 2023-02 / 37 of 78 capture PASS / no publication**
 
-## 当前执行检查点（2026-09-17）
+## 当前执行检查点（2026-09-17，Owner 批准的静态事件整改后）
+
+- 本次从既有 anchored raw evidence 做 retained replay。状态文件确认 `37/78` 个月 capture PASS；其中原始 `2020-03` 至 `2022-12` 是此前已完成的 fresh-provider capture，本次只是重放，不应重复计为新的在线采集。
+- `2023-01` 已按 Owner 批准的最小范围接入一条官方停牌事实：`300114.SZ`，区间为半开区间 `[2023-01-12, 2023-02-02)`。该事实只作用于当前仍 `UNRESOLVED` 的目标 pair，不覆盖 provider 已给出的状态，不把零成交推断为停牌，也不引入 carry-forward 或第二 provider。
+- `2023-01` retained replay 结果：monthly universe `4911`、交易日 `16`、required/returned bar pairs `78,403/78,403`、returned rows `78,403`；missing `0`、extra `0`、structural error `0`、`UNRESOLVED=0`。分类为 `NOT_APPLICABLE_SESSION=67`、`POSITIVE_TRADE_COUNT_ACTIVE=7`、`SUSPENSION_NON_TRADING=106`。事件实际闭合原先的 9 个 `300114.SZ` pair，evaluation/catalog 已保存事件 ID、区间和来源 URL，retained replay 会重新校验该对象。
+- 官方原文来源：[CNINFO 2023-001（2023-01-12 起停牌）](https://static.cninfo.com.cn/finalpage/2023-01-12/1215580484.PDF)、[CNINFO 2023-007（2023-02-02 起复牌）](https://static.cninfo.com.cn/finalpage/2023-02-02/1215749576.PDF)、[深交所停复牌表（记录 300114.SZ 的 2023-01-12 停牌）](https://docs.static.szse.cn/www/certificate/secondb/GEMmsb/W020230202562529948780.html)。前两份公告证明区间起止，第三份是起始日的交易所交叉核验。
+- 随后 runner 在 `2023-02` provider 请求前停止：当前 Codex 执行进程缺少四个安全环境变量。没有发起该月 provider 请求，`2023-02` 不是数据结论；账号、口令、地址和端口均未进入日志、文件或 GitHub。
+
+### 当前可执行下一步
+
+1. 在启动 runner 的同一个本地 PowerShell 进程中安全注入四个变量，然后使用 `--resume --retry-blocked`；不要把值放进参数、脚本、截图、日志或聊天。
+2. 从 `2023-02` 继续逐月执行；每个月仍须通过 exact-session、状态、生命周期、bar 集合和 replay 校验，遇到新语义/结构/权限 blocker 必须停下并记录，不能跳过月份。
+3. 78 个月 capture 全部通过后，才可继续 receipt、authoritative coverage、materialization、ordinary-reader、幂等和 changed-content conflict 验收；当前仍无 publication。
+
+## 上一个执行检查点（2026-09-17，静态事件整改前的历史快照）
 
 - 本地 runner 在安全变量可见的同一进程中已通过登录并恢复执行。`2020-01`、`2020-02` 为 retained replay，`2020-03` 至 `2022-12` 为 fresh provider；共 `36/78` 个月 capture PASS。当前尚未对这些月份做完整 finalize/receipt/publication 链路，因此“capture PASS”不等于整月最终验收 PASS。
 - `2023-01` 使用 fresh provider：monthly universe `4911`、交易日 `16`、required/returned bar pairs `78,403/78,403`、returned rows `78,403`；missing `0`、extra `0`、structural error `0`。completeness 为 `FAIL_CLOSED`，因为 `UNRESOLVED=9`。
@@ -32,19 +46,19 @@
 
 本次 `2023-01` 的分类计数为：`NOT_APPLICABLE_SESSION=67`、`POSITIVE_TRADE_COUNT_ACTIVE=7`、`SUSPENSION_NON_TRADING=97`、`UNRESOLVED=9`、`UNEXPLAINED_MISSING=0`、`EXTRA_RETURNED=0`、`PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH=0`。daily bar request `717d823d-1695-4b99-b090-1b575958a3bf` 的 required/returned pair set 相等，故这不是 bar 缺失或数量不一致问题。
 
-## PM/Owner 需要决定的最小下一步
+## PM/Owner 在本次整改前需要决定的最小下一步（历史快照）
 
 1. 提供 `300114.SZ` 在上述 9 个 exact-session 的 provider-owned 非交易/停牌状态事实，且能绑定到现有 raw capture 和 retained replay；或
 2. 明确批准一个最小 zero-activity 语义/API 扩展，写明允许使用的 provider 字段、零值/空值含义、适用范围、持久化与 replay 校验；同时决定当月 stock_basic 不含历史代码时的身份/生命周期事实来源。
 
 在上述决定前，工程侧不应修改 `0` 交易次数的含义、不应把空 status 判成停牌、不应添加第二来源、不应跳过 `2023-01`，也不应继续后续月份。决定落实后只重跑该月，确认 `UNRESOLVED=0` 后再继续。
 
-## 当前执行范围与验收状态
+## 执行范围与验收状态（本次重跑后）
 
-- 已完成的是 `36/78` 个月 capture；`2023-01` 是首个新语义 blocker。此前本地认证环境阻断已经解除。
-- 本地 QA：focused `67 passed`；full offline pytest `1874 passed, 3 skipped`；Ruff、format check、mypy 均通过。最新远端 CI 在产品代码 head 上通过；本次文档更新后以新 commit 的 checks 为准。
+- 已完成的是 `37/78` 个月 capture；`2023-01` 已通过官方静态事件 retained replay，当前 blocker 已移动到 `2023-02` 的本地安全凭据可见性边界，未进入该月 provider 请求。
+- 本地 QA：本次新增事件边界与 retained replay 回归已通过；完整 QA 数字以本次提交前最后一次运行结果为准，远端 CI 以新 commit 的 checks 为准。
 - 78 个月的 receipt、authoritative coverage、bounded materialization、ordinary-reader、idempotency 和 changed-content conflict 尚未全部形成结论；因此不能称项目已完成，也没有 publication。
-- 原始 payload、ledger、物化文件、账号/身份、网络地址、SDK/runtime 和凭证均未进入 GitHub；本文件只保留脱敏计数、request id、hash/规则引用和阻断事实。
+- 原始 payload、ledger、物化文件、账号/身份、网络地址、SDK/runtime 和凭证均未进入 GitHub；本文件只保留脱敏计数、request id、hash/规则引用、官方来源 URL 和阻断事实。
 - 范围外的 Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1、baseline、策略和多源 reconciliation 仍未执行。
 
 ## 先前检查点（历史留存，已被后续执行替代）
@@ -64,7 +78,7 @@
 `POSITIVE_TRADE_COUNT_ACTIVE=20`、`UNRESOLVED=0`、`missing=0`、`extra=0`、
 `structural=0`。原先 `600240.SH / 2020-02-05` 的缺状态 pair 因已验证 DELISTDATE 正好落在该交易日，按获批规则闭合；它不是把 02-03/02-04 状态外推成 02-05 停牌。
 
-## 当前阻断
+## 上一个检查点的阻断（历史快照）
 
 执行器按 fail-fast 顺序到达 2020-03，但当前 Codex 执行进程看不到安全环境变量
 `TGW_USERNAME`、`TGW_PASSWORD`、`TGW_SERVER_VIP`、`TGW_SERVER_PORT`，所以在 provider 登录前停止。
@@ -74,7 +88,7 @@
 capture PASS；出现新的 API、schema、语义、PIT 或身份 blocker 时立即停止并记录 exact month/pair，
 不得跳过、carry-forward 或推断。
 
-## 本地 QA 与边界
+## 上一个检查点的本地 QA 与边界（历史快照）
 
 - focused：`67 passed`。
 - full offline pytest：`1874 passed, 3 skipped`。
@@ -87,3 +101,4 @@ capture PASS；出现新的 API、schema、语义、PIT 或身份 blocker 时立
   reconciliation 均未执行。
 
 对应机器记录见同目录 [`cr7_issue76_history_build_20260916.json`](cr7_issue76_history_build_20260916.json)。
+

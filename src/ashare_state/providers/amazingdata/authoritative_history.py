@@ -20,6 +20,7 @@ from typing import Any
 
 from ashare_state.providers.amazingdata.month_completeness import (
     MonthCompletenessEvaluation,
+    OfficialSuspensionEvent,
     PositiveTradeFallback,
     _positive_trade_fallback_candidates,
     _snapshot_trade_observation,
@@ -134,6 +135,7 @@ class AmazingDataHistoryAcquisition:
         *,
         list_dates_by_symbol: Mapping[str, Any] | None = None,
         delist_dates_by_symbol: Mapping[str, Any] | None = None,
+        official_suspension_event: OfficialSuspensionEvent | None = None,
     ) -> AmazingDataHistoryCapture:
         """Retain one bounded month capture and evaluate completeness.
 
@@ -203,6 +205,7 @@ class AmazingDataHistoryAcquisition:
             status_payload=status_exchange.payload,
             list_dates_by_symbol=list_dates_by_symbol,
             delist_dates_by_symbol=delist_dates_by_symbol,
+            official_suspension_event=official_suspension_event,
         )
         snapshot_exchanges: list[ProviderExchange] = []
         snapshot_receipts: dict[tuple[str, int], AmazingDataExchangeReceipt] = {}
@@ -275,6 +278,7 @@ class AmazingDataHistoryAcquisition:
             positive_trade_fallback=positive_trade_fallback,
             list_dates_by_symbol=list_dates_by_symbol,
             delist_dates_by_symbol=delist_dates_by_symbol,
+            official_suspension_event=official_suspension_event,
         )
         positive_trade_operations = tuple(
             PositiveTradeFallbackOperation(
@@ -579,3 +583,4 @@ def _yyyymmdd(value: date) -> int:
 
 def _hash_values(values: list[Any]) -> str:
     return sha256_hex(canonical_json(values))
+

@@ -1058,3 +1058,4 @@ def research_code_fingerprint() -> str:
         digest.update(source.encode("utf-8"))
         digest.update(b"\x00")
     return digest.hexdigest()
+

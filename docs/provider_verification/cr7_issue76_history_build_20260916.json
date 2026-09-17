@@ -1,6 +1,6 @@
 {
   "schema": "cr7.issue76.history-build.v2",
-  "evidence_updated_at_utc": "2026-09-17T14:46:09.438194+00:00",
+  "evidence_updated_at_utc": "2026-09-17T17:35:39.840603Z",
   "issue": 76,
   "baseline": "ad2ad528d3ffec1269772084f0860c8224e632d2",
   "target_window": {
@@ -11,27 +11,28 @@
   "status": "STOP(BLOCKED)",
   "stop": {
     "stage": "CAPTURE",
-    "blocked_month": "2023-01",
-    "completed_capture_months": 36,
-    "not_passed_months": 42,
-    "not_run_after_blocker_months": 41,
+    "blocked_month": "2023-02",
+    "completed_capture_months": 37,
+    "not_passed_months": 41,
+    "not_run_after_blocker_months": 40,
     "exception_class": "RuntimeError",
-    "code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
-    "sanitized_detail": "2023-01 completeness was not accepted: 9 unresolved exact-session pairs remain; authentication and provider login succeeded"
+    "code": "MISSING_SAFE_CREDENTIAL_ENVIRONMENT",
+    "sanitized_detail": "2023-02 capture stopped before any provider request because the current execution process could not see the four safe credential environment variables"
   },
   "authorized_remediation": {
     "source": "PR #77 PM review",
     "source_dataset": "stock_basic",
     "source_field": "DELISTDATE",
-    "month_completeness_rule_version": "amazingdata-month-completeness-rule-v4",
-    "applicability_semantics_version": "amazingdata-hist-code-list-exact-session-lifecycle-v4",
+    "month_completeness_rule_version": "amazingdata-month-completeness-rule-v5",
+    "applicability_semantics_version": "amazingdata-hist-code-list-exact-session-lifecycle-official-suspension-v5",
     "semantics": "session >= DELISTDATE is NOT_APPLICABLE_SESSION; session < DELISTDATE retains ordinary status/bar semantics; missing or malformed DELISTDATE remains unresolved when no other valid evidence exists"
   },
   "completed_capture": {
-    "count": 36,
+    "count": 37,
     "retained_replay_months": [
       "2020-01",
-      "2020-02"
+      "2020-02",
+      "2023-01"
     ],
     "fresh_provider_range": [
       "2020-03",
@@ -39,6 +40,18 @@
     ],
     "fresh_provider_count": 34,
     "all_completed_months_not_finalized": true
+  },
+  "authorized_official_suspension_event": {
+    "event_id": "300114-suspension-2023-01",
+    "security": "300114.SZ",
+    "suspended_from": "2023-01-12",
+    "resumes_on": "2023-02-02",
+    "source_urls": [
+      "https://static.cninfo.com.cn/finalpage/2023-01-12/1215580484.PDF",
+      "https://static.cninfo.com.cn/finalpage/2023-02-02/1215749576.PDF",
+      "https://docs.static.szse.cn/www/certificate/secondb/GEMmsb/W020230202562529948780.html"
+    ],
+    "scope": "Only currently unresolved exact-session pairs for 300114.SZ; no zero-activity inference, carry-forward, or second provider"
   },
   "months": [
     {
@@ -1160,14 +1173,14 @@
     {
       "month": "2023-01",
       "research_split": "development",
-      "status": "STOP(BLOCKED)",
-      "execution_mode": "FRESH_PROVIDER",
+      "status": "CAPTURE_PASS_NOT_FINALIZED",
+      "execution_mode": "RETAINED_REPLAY",
       "monthly_security_count": 4911,
       "session_count": 16,
       "required_pair_count": 78403,
       "returned_pair_count": 78403,
       "returned_row_count": 78403,
-      "unresolved_pair_count": 9,
+      "unresolved_pair_count": 0,
       "missing_required_pair_count": 0,
       "extra_returned_pair_count": 0,
       "structural_error_count": 0,
@@ -1176,9 +1189,21 @@
         "NOT_APPLICABLE_SESSION": 67,
         "POSITIVE_TRADE_COUNT_ACTIVE": 7,
         "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
-        "SUSPENSION_NON_TRADING": 97,
+        "SUSPENSION_NON_TRADING": 106,
         "UNEXPLAINED_MISSING": 0,
-        "UNRESOLVED": 9
+        "UNRESOLVED": 0
+      },
+      "official_suspension_event": {
+        "event_id": "300114-suspension-2023-01",
+        "security": "300114.SZ",
+        "suspended_from": "2023-01-12",
+        "resumes_on": "2023-02-02",
+        "resolved_pair_count": 9,
+        "source_urls": [
+          "https://static.cninfo.com.cn/finalpage/2023-01-12/1215580484.PDF",
+          "https://static.cninfo.com.cn/finalpage/2023-02-02/1215749576.PDF",
+          "https://docs.static.szse.cn/www/certificate/secondb/GEMmsb/W020230202562529948780.html"
+        ]
       },
       "receipt": "NOT_REACHED",
       "coverage": "NOT_REACHED",
@@ -1186,16 +1211,17 @@
       "reader": "NOT_REACHED",
       "idempotency": "NOT_REACHED",
       "changed_content_conflict": "NOT_REACHED",
-      "provider_calls_during_capture": 36,
-      "stage": "CAPTURE",
-      "failure_code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
-      "source_request_ids": {
+      "provider_calls_during_capture": 27,
+      "pre_remediation_provider_calls_during_capture": 36,
+      "pre_remediation_stage": "CAPTURE",
+      "pre_remediation_failure_code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
+      "pre_remediation_source_request_ids": {
         "hist_code_list": "2d0f3cbe-99e4-4585-8c26-4cfcb3c69a0f",
         "stock_basic": "14545323-755d-4369-ad68-6a83a140f351",
         "history_stock_status": "beb1ade5-f2de-431f-9bf8-70e98e4428eb",
         "daily_bar": "717d823d-1695-4b99-b090-1b575958a3bf"
       },
-      "unresolved_pairs": [
+      "pre_remediation_unresolved_pairs": [
         {
           "symbol": "300114.SZ",
           "session": "2023-01-12",
@@ -1269,7 +1295,7 @@
           "snapshot_content_hash": "0fba232acf8d81c99c1f52a317cd3c3c6ae2151843af5d0b82fb2379912ee31b"
         }
       ],
-      "provider_observation": {
+      "pre_remediation_provider_observation": {
         "hist_code_list_count": 4911,
         "hist_code_list_contains_300114_SZ": true,
         "stock_basic_count": 4910,
@@ -1282,7 +1308,23 @@
         "fallback_positive_trade_session_count": 7,
         "fallback_zero_trade_unresolved_session_count": 9
       },
-      "sanitized_detail": "all 9 unresolved pairs are 300114.SZ exact sessions with zero-activity fallback snapshots and no usable status or lifecycle exclusion fact"
+      "pre_remediation_sanitized_detail": "all 9 unresolved pairs were 300114.SZ exact sessions with zero-activity fallback snapshots and no usable status or lifecycle exclusion fact"
+    },
+    {
+      "month": "2023-02",
+      "research_split": "development",
+      "status": "STOP(BLOCKED)",
+      "execution_mode": "FRESH_PROVIDER",
+      "receipt": "NOT_REACHED",
+      "coverage": "NOT_REACHED",
+      "materialization": "NOT_REACHED",
+      "reader": "NOT_REACHED",
+      "idempotency": "NOT_REACHED",
+      "changed_content_conflict": "NOT_REACHED",
+      "provider_calls_during_capture": 0,
+      "stage": "CAPTURE",
+      "failure_code": "MISSING_SAFE_CREDENTIAL_ENVIRONMENT",
+      "sanitized_detail": "capture stopped before any provider request because the current execution process could not see the four safe credential environment variables"
     }
   ],
   "acceptance": {
@@ -1293,11 +1335,11 @@
     "ordinary_reader_full_partition_set": false,
     "idempotency_and_conflict": false,
     "publication": false,
-    "exact_head_qa_and_ci": "local QA passed; re-check new documentation commit CI after push"
+    "exact_head_qa_and_ci": "local QA passed; CI pending for the new commit"
   },
   "local_qa": {
-    "focused_pytest": "67 passed",
-    "full_pytest": "1874 passed, 3 skipped",
+    "focused_pytest": "72 passed",
+    "full_pytest": "1879 passed, 3 skipped",
     "ruff_check": "PASS",
     "ruff_format_check": "PASS",
     "mypy": "PASS"
@@ -1315,9 +1357,10 @@
     "strategy/portfolio",
     "speculative reconciliation"
   ],
-  "next_decision_required": [
-    "Provide provider-owned non-trading/suspension facts for all 9 exact-session pairs, bound to the retained capture and replayable",
-    "or approve a minimal zero-activity semantic/API extension that specifies provider fields, zero-value meaning, scope, persistence and replay validation",
-    "decide how the missing historical-code row in stock_basic is handled without inferring LISTDATE/DELISTDATE from absence"
+  "next_execution_required": [
+    "Expose the four safe TGW environment variables only to the same local process that starts the runner, without committing or printing their values",
+    "Resume from 2023-02 with --resume --retry-blocked and continue month by month; stop and record any new blocker",
+    "After all 78 capture months pass, run receipt, authoritative coverage, materialization, ordinary-reader, idempotency and changed-content conflict gates"
   ]
 }
+

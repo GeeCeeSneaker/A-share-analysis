@@ -878,3 +878,4 @@ class ResearchPanelBuilder:
             disabled_row_count=disabled_count,
             idempotent_replay=idempotent_replay,
         )
+
