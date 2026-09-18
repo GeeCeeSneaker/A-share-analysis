@@ -13,7 +13,12 @@
 - `2023-02` 原始 completeness 为 `FAIL_CLOSED`：`4,926` 个证券、`20` 个交易日，required/returned `98,194/98,194`，missing/extra/structural `0/0/0`，但 `UNRESOLVED=1`；分类为 `NOT_APPLICABLE_SESSION=153`、`POSITIVE_TRADE_COUNT_ACTIVE=19`、`SUSPENSION_NON_TRADING=172`、`UNRESOLVED=1`。唯一未决 pair 是 `300114.SZ / 2023-02-01`：status member 为 `0×0` 空表，daily bar 恰缺该日，不能靠零活动推断停牌。
 - 诊断确认这是本地 runner 的跨月事件传递缺陷：已批准事件 `[2023-01-12, 2023-02-02)` 本来覆盖 `2023-02-01`，但 runner 只在月份字符串等于 `2023-01` 时传入事件。已在本地未跟踪 runner 中改为按事件半开区间与月份相交传递；没有修改生产语义、没有放宽零成交规则，也没有重新请求 provider。用同一批已落盘 raw 做离线 retained replay 后，`2023-02` 为 `PASS`，required/returned 仍为 `98,194/98,194`，`UNRESOLVED=0`，`SUSPENSION_NON_TRADING=173`。
 - 该离线 replay 只证明修正后的 runner 编排能够重放已取得证据，不等同于完整 runner 已推进到下个月；当前状态文件仍保留原始 `STOP(BLOCKED)`，下一次正式 `--resume --retry-blocked` 应先重放 `2023-02`，随后从 `2023-03` 继续真实请求。receipt、coverage、materialization 和 78 个月验收仍未完成。
-- 远端 exact-head CI：run `35258689674`（`657`）在 Ubuntu 3.14、Windows 3.14、Windows 3.12 均为 `success`；GT-H3B run `35258689716`（`167`）按当前范围为 `skipped`。这只证明 GitHub 门禁通过，不改变 capture 尚未闭合 78 个月的事实。
+- 远端 exact-head CI：最新文档头 `e15128f431d23f0c512d99d6e15d4d29185274b8` 的 CI run `35294943702`（`659`）在 Ubuntu 3.14、Windows 3.14、Windows 3.12 均为 `success`；GT-H3B run `35294943736`（`169`）按当前范围为 `skipped`。这只证明 GitHub 门禁通过，不改变 capture 尚未闭合 78 个月的事实。
+
+## 继续执行检查（2026-09-18）
+
+- 当前 Codex 执行进程没有四个 TGW 安全变量，且未发现正在运行的匹配 runner；因此本次没有启动一个预期必然在认证前停止的正式恢复，持久化状态保持 `STOP(BLOCKED)`。
+- 这不是 provider 新结果，也不改变已经记录的 `2023-02` 原始 capture 或离线 replay 结论。正式恢复仍必须在同一安全进程中注入变量后运行修正 runner，先 replay `2023-02`，再从 `2023-03` 继续。
 
 ### 当前可执行下一步
 

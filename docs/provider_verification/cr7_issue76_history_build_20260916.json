@@ -1,6 +1,6 @@
 {
   "schema": "cr7.issue76.history-build.v2",
-  "evidence_updated_at_utc": "2026-09-18T01:11:09.0960749Z",
+  "evidence_updated_at_utc": "2026-09-18T01:44:30.6283929Z",
   "issue": 76,
   "baseline": "ad2ad528d3ffec1269772084f0860c8224e632d2",
   "target_window": {
@@ -1395,7 +1395,7 @@
     "ordinary_reader_full_partition_set": false,
     "idempotency_and_conflict": false,
     "publication": false,
-    "exact_head_qa_and_ci": "local QA passed; exact-head CI run 657 (workflow 35258689674, head 7d85c2812bac05ede0fcb85500655ea5e1297dd0) passed on Ubuntu 3.14, Windows 3.14, and Windows 3.12; GT-H3B run 167 (workflow 35258689716) skipped by scope"
+    "exact_head_qa_and_ci": "local QA passed; latest docs head e15128f431d23f0c512d99d6e15d4d29185274b8 exact-head CI run 659 (workflow 35294943702) passed on Ubuntu 3.14, Windows 3.14, and Windows 3.12; GT-H3B run 169 (workflow 35294943736) skipped by scope"
   },
   "local_qa": {
     "focused_pytest": "72 passed",
@@ -1417,6 +1417,14 @@
     "strategy/portfolio",
     "speculative reconciliation"
   ],
+  "current_execution_check": {
+    "checked_at_utc": "2026-09-18T01:44:30.6283929Z",
+    "matching_runner_process_found": false,
+    "codex_process_safe_tgw_variables_present": false,
+    "formal_resume_started": false,
+    "state_unchanged": true,
+    "sanitized_reason": "The current Codex process has no process-local TGW variables, so no formal resume was launched to avoid an expected authentication stop."
+  },
   "next_execution_required": [
     "Use the locally corrected runner that passes the approved cross-month event whenever the event interval intersects the month; do not broaden zero-activity semantics",
     "Expose the four safe TGW environment variables only to the same local process that starts the runner, without committing or printing their values",
