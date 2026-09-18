@@ -17,7 +17,7 @@
 
 详细脱敏记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 与对应 JSON。保持 PR #77 Draft；不得把本次 `2023-02` 离线 replay 写成 78 个月完成。
 
-## 0.1. 2026-09-17 当前调度覆盖 — Issue #76 78 个月历史构建
+## 0.1. 2026-09-17 历史调度检查点 — Issue #76 78 个月历史构建
 
 > 状态：**STOP(BLOCKED) at 2023-02 / 37 of 78 capture PASS / no publication**
 
@@ -31,7 +31,7 @@ Issue #76 授权从 `main@ad2ad528d3ffec1269772084f0860c8224e632d2` 构建 2020-
 - `2023-02`：历史检查点；当时 runner 在 provider 请求前因当前执行进程缺少安全环境变量停止。该检查点已被上方 0.2 的实际 provider capture 与离线 replay 诊断取代。
 - 本次新增静态事件、半开区间边界和 retained replay 回归已通过；本地 focused pytest 为 `72 passed`、full offline pytest 为 `1879 passed, 3 skipped`，Ruff、format、mypy、compile、依赖和敏感值扫描均通过。exact-head CI run `656`（commit `ab133200ce7ff7247c356fd2cc603bbb34647858`）的 Ubuntu 3.14、Windows 3.14、Windows 3.12 三个必需作业均 `success`，GT-H3B run `166` 按范围 `skipped`。这只证明仓库门禁通过；由于 capture 阶段尚未闭合 78 个月，当前尚未产生完整 receipt、authoritative coverage、materialization、ordinary-reader、idempotency 或 changed-content conflict 结论。
 
-详细脱敏执行记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。下一步是把安全变量配置到启动 runner 的同一 PowerShell 进程后，从 `2023-02` 恢复；不得把认证信息写入仓库。`2023-01` 的静态事件已完成授权范围内的闭合，不应扩大为零成交启发式。
+详细脱敏执行记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。上述内容是历史检查点；当前下一步以 0.2 为准：使用修正 runner 先 replay `2023-02`，再从 `2023-03` 恢复在线请求。不得把认证信息写入仓库，也不应扩大为零成交启发式。
 
 ### 本地安全配置说明（不进入 Git）
 
