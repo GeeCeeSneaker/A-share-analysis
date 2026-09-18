@@ -17,6 +17,9 @@ from ashare_state.providers.amazingdata.authoritative_history import (
     AmazingDataAcquisitionError,
     AmazingDataHistoryAcquisition,
 )
+from ashare_state.providers.amazingdata.month_completeness import (
+    APPROVED_300114_SUSPENSION_EVENT,
+)
 from ashare_state.providers.amazingdata.operations import (
     DAILY_BAR_KLINE,
     HIST_CODE_LIST,
@@ -135,7 +138,9 @@ def _row(
     }
 
 
-def _projection(rows: list[dict[str, Any]]) -> VerifiedResearchProjection:
+def _projection(
+    rows: list[dict[str, Any]], *, delist_date: date | None = None
+) -> VerifiedResearchProjection:
     identity_view = IdentityView._from_verified_security_master(  # noqa: SLF001
         (
             IdentityRecord(
@@ -143,6 +148,7 @@ def _projection(rows: list[dict[str, Any]]) -> VerifiedResearchProjection:
                 symbol="600000",
                 exchange="SSE",
                 valid_from=date(1999, 1, 1),
+                delist_date=delist_date,
             ),
         ),
         sources=(
@@ -377,6 +383,160 @@ class _FakeAmazingDataProvider(AmazingDataProvider):
         return self.kline
 
 
+class _OfficialSuspensionFakeAmazingDataProvider(AmazingDataProvider):
+    """Small retained-capture fixture for the approved static event."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[Any, ...]] = []
+        symbols = ["000001.SZ", "300114.SZ"]
+        days = [20230111, 20230112, 20230113, 20230130, 20230131]
+        self.calendar = _provider_exchange(
+            TRADE_CALENDAR,
+            {"market": AMAZINGDATA_CALENDAR_MARKET},
+            days,
+        )
+        self.code_list = _provider_exchange(
+            HIST_CODE_LIST,
+            {
+                "security_type": AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
+                "start_date": 20230101,
+                "end_date": 20230131,
+            },
+            symbols,
+        )
+        self.exact_code_lists = {
+            (day, day): _provider_exchange(
+                HIST_CODE_LIST,
+                {
+                    "security_type": AMAZINGDATA_SECURITY_UNIVERSE_SELECTION,
+                    "start_date": day,
+                    "end_date": day,
+                },
+                symbols,
+            )
+            for day in days
+        }
+        self.status = _provider_exchange(
+            HISTORY_STOCK_STATUS,
+            {
+                "begin_date": 20230101,
+                "end_date": 20230131,
+                "code_list": symbols,
+                "is_local": False,
+            },
+            {
+                "000001.SZ": pl.DataFrame(
+                    {
+                        "MARKET_CODE": ["SZ"] * len(days),
+                        "TRADE_DATE": days,
+                        "PRECLOSE": [10.0] * len(days),
+                        "HIGH_LIMITED": [11.0] * len(days),
+                        "LOW_LIMITED": [9.0] * len(days),
+                        "PRICE_HIGH_LMT_RATE": [0.1] * len(days),
+                        "PRICE_LOW_LMT_RATE": [0.1] * len(days),
+                        "IS_ST_SEC": [0] * len(days),
+                        "IS_SUSP_SEC": [0] * len(days),
+                        "IS_WD_SEC": [0] * len(days),
+                        "IS_XR_SEC": [0] * len(days),
+                    }
+                ),
+                "300114.SZ": pl.DataFrame(
+                    {
+                        "MARKET_CODE": ["SZ"],
+                        "TRADE_DATE": [20230111],
+                        "PRECLOSE": [10.0],
+                        "HIGH_LIMITED": [11.0],
+                        "LOW_LIMITED": [9.0],
+                        "PRICE_HIGH_LMT_RATE": [0.1],
+                        "PRICE_LOW_LMT_RATE": [0.1],
+                        "IS_ST_SEC": [0],
+                        "IS_SUSP_SEC": [0],
+                        "IS_WD_SEC": [0],
+                        "IS_XR_SEC": [0],
+                    }
+                ),
+            },
+        )
+        self.kline = _provider_exchange(
+            DAILY_BAR_KLINE,
+            {
+                "code_list": symbols,
+                "begin_date": 20230101,
+                "end_date": 20230131,
+                "kline_type": "DAY",
+                "period": 10008,
+                "trading_days": days,
+            },
+            {
+                "000001.SZ": pl.DataFrame(
+                    {
+                        "code": ["000001.SZ"] * len(days),
+                        "kline_time": days,
+                        "open": [10.0] * len(days),
+                        "high": [11.0] * len(days),
+                        "low": [9.0] * len(days),
+                        "close": [10.5] * len(days),
+                        "volume": [100.0] * len(days),
+                        "amount": [1000.0] * len(days),
+                    }
+                ),
+                "300114.SZ": pl.DataFrame(
+                    {
+                        "code": ["300114.SZ"],
+                        "kline_time": [20230111],
+                        "open": [10.0],
+                        "high": [11.0],
+                        "low": [9.0],
+                        "close": [10.5],
+                        "volume": [100.0],
+                        "amount": [1000.0],
+                    }
+                ),
+            },
+        )
+
+    def get_calendar_exchange(self, market: str = "SH") -> ProviderExchange:
+        self.calls.append(("calendar", market))
+        return self.calendar
+
+    def get_hist_code_list_exchange(
+        self, security_type: str, start_date: int, end_date: int
+    ) -> ProviderExchange:
+        self.calls.append(("hist_code_list", security_type, start_date, end_date))
+        if (start_date, end_date) == (20230101, 20230131):
+            return self.code_list
+        return self.exact_code_lists[(start_date, end_date)]
+
+    def get_history_stock_status_exchange(
+        self, start_date: int, end_date: int, code_list: list[str]
+    ) -> ProviderExchange:
+        self.calls.append(("history_stock_status", start_date, end_date, tuple(code_list)))
+        return self.status
+
+    def query_kline_exchange(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        kline_type: str = "DAY",
+        trading_days: list[int] | None = None,
+    ) -> ProviderExchange:
+        self.calls.append(("daily_bar", begin_date, end_date, tuple(code_list)))
+        return self.kline
+
+    def query_snapshot_exchange(
+        self,
+        code_list: list[str],
+        *,
+        begin_date: int,
+        end_date: int,
+        begin_time: int = 93000000,
+        end_time: int = 150000000,
+    ) -> ProviderExchange:
+        raise AssertionError("approved suspension event must not trigger a snapshot fallback")
+
+
 class _PositiveFallbackFakeAmazingDataProvider(_FakeAmazingDataProvider):
     """Fake provider with exactly one zero-column status member."""
 
@@ -473,6 +633,68 @@ def test_capture_finalizes_against_later_projection_without_provider_replay(tmp_
     assert tuple(provider.calls) == calls_after_capture
     assert receipt.retrieved_at_utc <= receipt.pit_as_of == projection.source_snapshot_as_of
     receipt.verify_retained_capture(raw_writer.root)
+
+
+def test_retained_replay_preserves_used_delist_fact(tmp_path: Path) -> None:
+    provider = _FakeAmazingDataProvider()
+    kline_payload = dict(provider.kline.payload)
+    kline_payload["600000.SH"] = kline_payload["600000.SH"].head(1)
+    provider.kline = _provider_exchange(
+        DAILY_BAR_KLINE,
+        provider.kline.envelope.request_params,
+        kline_payload,
+    )
+    raw_writer = _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-delist-replay")
+    acquisition = AmazingDataHistoryAcquisition(provider, raw_writer)
+    delist_date = date(2020, 1, 3)
+    capture = acquisition.capture_month(
+        PartitionKey(ResearchSplit.DEVELOPMENT, 2020, 1),
+        delist_dates_by_symbol={"600000.SH": delist_date},
+    )
+
+    assert capture.completeness_evaluation.status == "PASS"
+    assert capture.completeness_evaluation.postdelisting_delist_dates == {"600000.SH": delist_date}
+    projection = _projection(
+        [
+            _row(date(2020, 1, 2), "security-000001"),
+            _row(date(2020, 1, 3), "security-000001"),
+            _row(date(2020, 1, 2), "security-600000"),
+        ],
+        delist_date=delist_date,
+    )
+    receipt = acquisition.finalize_capture(capture, source_snapshot=projection)
+    replayed = AmazingDataAcquisitionReceipt.from_mapping(receipt.as_dict())
+
+    replayed.verify_retained_capture(raw_writer.root)
+    assert replayed.completeness_evaluation.postdelisting_delist_dates == {"600000.SH": delist_date}
+
+
+def test_retained_replay_preserves_approved_official_suspension_event(tmp_path: Path) -> None:
+    provider = _OfficialSuspensionFakeAmazingDataProvider()
+    raw_writer = _anchored_writer(tmp_path / "raw", ingest_run_id="unit-test-suspension-replay")
+    acquisition = AmazingDataHistoryAcquisition(provider, raw_writer)
+    capture = acquisition.capture_month(
+        PartitionKey(ResearchSplit.DEVELOPMENT, 2023, 1),
+        official_suspension_event=APPROVED_300114_SUSPENSION_EVENT,
+    )
+
+    assert capture.completeness_evaluation.status == "PASS"
+    assert capture.completeness_evaluation.official_suspension_event == (
+        APPROVED_300114_SUSPENSION_EVENT
+    )
+    assert not any(call[0] == "snapshot" for call in provider.calls)
+    projection_rows = [_row(date(2023, 1, day), "security-sse") for day in (11, 12, 13, 30, 31)]
+    projection_rows.append(_row(date(2023, 1, 11), "security-sse"))
+    receipt = acquisition.finalize_capture(
+        capture,
+        source_snapshot=_projection(projection_rows),
+    )
+    replayed = AmazingDataAcquisitionReceipt.from_mapping(receipt.as_dict())
+
+    replayed.verify_retained_capture(raw_writer.root)
+    assert replayed.completeness_evaluation.official_suspension_event == (
+        APPROVED_300114_SUSPENSION_EVENT
+    )
 
 
 def test_capture_finalization_rejects_early_pit_without_provider_replay(tmp_path: Path) -> None:

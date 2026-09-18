@@ -20,6 +20,7 @@ from typing import Any
 
 from ashare_state.providers.amazingdata.month_completeness import (
     MonthCompletenessEvaluation,
+    OfficialSuspensionEvent,
     PositiveTradeFallback,
     _positive_trade_fallback_candidates,
     _snapshot_trade_observation,
@@ -133,6 +134,8 @@ class AmazingDataHistoryAcquisition:
         partition: PartitionKey,
         *,
         list_dates_by_symbol: Mapping[str, Any] | None = None,
+        delist_dates_by_symbol: Mapping[str, Any] | None = None,
+        official_suspension_event: OfficialSuspensionEvent | None = None,
     ) -> AmazingDataHistoryCapture:
         """Retain one bounded month capture and evaluate completeness.
 
@@ -201,6 +204,8 @@ class AmazingDataHistoryAcquisition:
             exact_day_universes=exact_day_universes,
             status_payload=status_exchange.payload,
             list_dates_by_symbol=list_dates_by_symbol,
+            delist_dates_by_symbol=delist_dates_by_symbol,
+            official_suspension_event=official_suspension_event,
         )
         snapshot_exchanges: list[ProviderExchange] = []
         snapshot_receipts: dict[tuple[str, int], AmazingDataExchangeReceipt] = {}
@@ -272,6 +277,8 @@ class AmazingDataHistoryAcquisition:
             daily_bar_payload=kline_exchange.payload,
             positive_trade_fallback=positive_trade_fallback,
             list_dates_by_symbol=list_dates_by_symbol,
+            delist_dates_by_symbol=delist_dates_by_symbol,
+            official_suspension_event=official_suspension_event,
         )
         positive_trade_operations = tuple(
             PositiveTradeFallbackOperation(
@@ -348,34 +355,47 @@ class AmazingDataHistoryAcquisition:
                 raise AmazingDataAcquisitionError(
                     "verified projection research split does not match the bounded capture"
                 )
-        if evaluation.prelisting_list_dates:
+        if evaluation.prelisting_list_dates or evaluation.postdelisting_delist_dates:
             identity_view = source_snapshot.identity_view
             if (
                 identity_view.source_kind != VERIFIED_SECURITY_MASTER_SOURCE
                 or not identity_view.sources
             ):
                 raise AmazingDataAcquisitionError(
-                    "pre-listing applicability requires verified security-master identity"
+                    "lifecycle applicability requires verified security-master identity"
                 )
             suffix_by_exchange = {"SSE": "SH", "SZSE": "SZ"}
             expected_list_dates = evaluation.prelisting_list_dates
+            expected_delist_dates = evaluation.postdelisting_delist_dates
             observed_list_dates: dict[str, date] = {}
+            observed_delist_dates: dict[str, date] = {}
             for record in identity_view.records:
                 suffix = suffix_by_exchange.get(record.exchange)
                 if suffix is None:
                     continue
                 provider_symbol = f"{record.symbol}.{suffix}"
-                if provider_symbol not in expected_list_dates:
-                    continue
-                previous = observed_list_dates.get(provider_symbol)
-                if previous is not None and previous != record.valid_from:
-                    raise AmazingDataAcquisitionError(
-                        "verified security-master LISTDATE is ambiguous for a pre-listing pair"
-                    )
-                observed_list_dates[provider_symbol] = record.valid_from
+                if provider_symbol in expected_list_dates:
+                    previous = observed_list_dates.get(provider_symbol)
+                    if previous is not None and previous != record.valid_from:
+                        raise AmazingDataAcquisitionError(
+                            "verified security-master LISTDATE is ambiguous for a pre-listing pair"
+                        )
+                    observed_list_dates[provider_symbol] = record.valid_from
+                if provider_symbol in expected_delist_dates and record.delist_date is not None:
+                    previous = observed_delist_dates.get(provider_symbol)
+                    if previous is not None and previous != record.delist_date:
+                        raise AmazingDataAcquisitionError(
+                            "verified security-master DELISTDATE is ambiguous "
+                            "for a post-delisting pair"
+                        )
+                    observed_delist_dates[provider_symbol] = record.delist_date
             if observed_list_dates != expected_list_dates:
                 raise AmazingDataAcquisitionError(
                     "verified security-master LISTDATE does not match captured applicability"
+                )
+            if observed_delist_dates != expected_delist_dates:
+                raise AmazingDataAcquisitionError(
+                    "verified security-master DELISTDATE does not match captured applicability"
                 )
         returned_first_date = evaluation.returned_first_date
         returned_last_date = evaluation.returned_last_date

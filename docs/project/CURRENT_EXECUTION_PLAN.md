@@ -4,6 +4,66 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.2. 2026-09-18 当前调度覆盖 — Issue #76 2023-02 capture 诊断
+
+> 状态：**STOP(BLOCKED) at 2023-02 / raw capture obtained / offline replay fixed the cross-month orchestration defect / no publication**
+
+用户已在本机同一安全进程完成 TGW 变量注入，`2023-02` 实际发生 `44` 次 provider calls。原始请求均为 `OK`：calendar `27cd797f-43d7-460d-ac8f-1390178427d0`、hist code list `f0db8a97-700a-49db-b464-996719a3c83f`、stock basic `e0979f16-5c56-4fc9-bd66-1b934e30e771`、history status `5f13940b-d241-4320-91d7-aa30a9d3bd01`、daily bar `f6192d4d-74c3-4896-a0a1-cfd3b8ff623f`。凭证及网络身份仍未写入文件或 GitHub。
+
+- 原始 `2023-02` completeness：`4,926` securities、`20` sessions、required/returned `98,194/98,194`；missing/extra/structural `0/0/0`，但 `UNRESOLVED=1`。分类：`NOT_APPLICABLE_SESSION=153`、`POSITIVE_TRADE_COUNT_ACTIVE=19`、`SUSPENSION_NON_TRADING=172`、`UNRESOLVED=1`。
+- 唯一未决 pair 为 `300114.SZ / 2023-02-01`。status 返回 `0×0` 空表，daily bar 恰缺该日；这不是账号失败，也不能用 `num_trades=0` 推断停牌。
+- 根因是 runner 编排只在 `month == 2023-01` 传递已批准的 `[2023-01-12, 2023-02-02)` 事件，漏掉跨月的 `2023-02-01`。本地未跟踪 runner 已修为按事件半开区间与月份相交传递；使用同一批已落盘 raw 的 retained replay 已验证 `2023-02 PASS`、required/returned `98,194/98,194`、`UNRESOLVED=0`、`SUSPENSION_NON_TRADING=173`。这不是生产语义放宽，也没有重新请求 provider。
+- 当前执行状态文件仍保留原始 `STOP(BLOCKED)`，因为尚未用修正后的 runner 正式恢复整条链。下一次正式恢复会先 replay `2023-02`，然后从 `2023-03` 发起在线请求；receipt、coverage、materialization、ordinary-reader、幂等、冲突和 78/78 验收都仍未完成。
+
+详细脱敏记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 与对应 JSON。保持 PR #77 Draft；不得把本次 `2023-02` 离线 replay 写成 78 个月完成。
+
+## 0.1. 2026-09-17 历史调度检查点 — Issue #76 78 个月历史构建
+
+> 状态：**STOP(BLOCKED) at 2023-02 / 37 of 78 capture PASS / no publication**
+
+Issue #76 授权从 `main@ad2ad528d3ffec1269772084f0860c8224e632d2` 构建 2020-01 至 2026-06 的 78 个月历史。PR #77 的 PM review 已批准最小 `DELISTDATE` 适用性修复：复用已验证 normalized security-master 的 `stock_basic.DELISTDATE`，仅当 `session >= DELISTDATE` 时判为 `NOT_APPLICABLE_SESSION`；不 carry-forward 停牌、不换源、不跳过 pair。现有 typed AmazingData → raw anchor → completeness → Canonical → Snapshot → ReadModel → verified projection → bounded materializer 路径保持不变。
+
+- 生产代码已升级 month-completeness/applicability 到 v5；`DELISTDATE` 进入 identity view，并仅保留实际用于排除 pair 的事实；同时仅保留 Owner 批准的 `300114.SZ` 官方停牌事件 `[2023-01-12, 2023-02-02)`。该事件只闭合其 exact-session 未决 pair，不改变零成交含义，不做 carry-forward，不引入通用事件框架或第二 provider。`LISTDATE`、PIT、raw closure 和 finalized capture 的既有 fail-closed 约束保持不变。
+- `2020-01`：hash-anchored retained replay capture PASS，required/returned `59,930/59,930`，missing/extra/unresolved/structural `0/0/0/0`。
+- `2020-02`：使用已保留同范围 raw exchanges retained replay capture PASS，required/returned `75,463/75,463`，missing/extra/unresolved/structural `0/0/0/0`；`NOT_APPLICABLE_SESSION=238`，实际使用的 post-delisting 事实为 `600240.SH -> 2020-02-05`。
+- `2020-03` 至 `2022-12`：此前共 34 个月 fresh-provider capture PASS；本次使用保留 raw 做 retained replay，没有把 replay 误报为新的在线采集。与前两个月合计 `36/78`。
+- `2023-01`：retained replay 已通过。`4911` 个证券、`16` 个交易日，required/returned `78,403/78,403`，missing/extra/structural `0/0/0`，`UNRESOLVED=0`；分类为 `NOT_APPLICABLE_SESSION=67`、`POSITIVE_TRADE_COUNT_ACTIVE=7`、`SUSPENSION_NON_TRADING=106`。Owner 批准的官方事件实际闭合 9 个 `300114.SZ` pair，来源为 [CNINFO 2023-001](https://static.cninfo.com.cn/finalpage/2023-01-12/1215580484.PDF)、[CNINFO 2023-007](https://static.cninfo.com.cn/finalpage/2023-02-02/1215749576.PDF) 和 [深交所停复牌表](https://docs.static.szse.cn/www/certificate/secondb/GEMmsb/W020230202562529948780.html)。
+- `2023-02`：历史检查点；当时 runner 在 provider 请求前因当前执行进程缺少安全环境变量停止。该检查点已被上方 0.2 的实际 provider capture 与离线 replay 诊断取代。
+- 本次新增静态事件、半开区间边界和 retained replay 回归已通过；本地 focused pytest 为 `72 passed`、full offline pytest 为 `1879 passed, 3 skipped`，Ruff、format、mypy、compile、依赖和敏感值扫描均通过。exact-head CI run `656`（commit `ab133200ce7ff7247c356fd2cc603bbb34647858`）的 Ubuntu 3.14、Windows 3.14、Windows 3.12 三个必需作业均 `success`，GT-H3B run `166` 按范围 `skipped`。这只证明仓库门禁通过；由于 capture 阶段尚未闭合 78 个月，当前尚未产生完整 receipt、authoritative coverage、materialization、ordinary-reader、idempotency 或 changed-content conflict 结论。
+
+详细脱敏执行记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。上述内容是历史检查点；当前下一步以 0.2 为准：使用修正 runner 先 replay `2023-02`，再从 `2023-03` 恢复在线请求。不得把认证信息写入仓库，也不应扩大为零成交启发式。
+
+### 本地安全配置说明（不进入 Git）
+
+环境变量只对设置它的进程及其子进程可见。已经启动的 Codex 进程不会因为另一个独立 PowerShell 窗口后来设置了变量而自动获得它们；因此应在**启动 runner 的同一个 PowerShell 窗口**中注入变量，或由同一进程的安全凭据管理器注入。下面的示例只展示变量名和流程，不包含任何真实账号、地址或口令：
+
+```powershell
+$env:TGW_USERNAME = Read-Host 'TGW username'
+$secure = Read-Host 'TGW password' -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try {
+    $env:TGW_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+}
+finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+    $secure.Dispose()
+}
+$env:TGW_SERVER_VIP = Read-Host 'approved TGW server VIP'
+$env:TGW_SERVER_PORT = Read-Host 'TGW server port'
+
+try {
+    Set-Location '<local-repository-root>'
+    uv run --locked --offline python data/spike/issue76_history_build_20260916/runner.py --resume --retry-blocked
+}
+finally {
+    Remove-Item Env:TGW_USERNAME, Env:TGW_PASSWORD, Env:TGW_SERVER_VIP, Env:TGW_SERVER_PORT -ErrorAction SilentlyContinue
+}
+```
+
+不要在命令行参数、脚本文件、日志、截图或 GitHub 中填写/回显口令；不要把变量设置在与 runner 无父子关系的另一个终端后，期待当前 Codex 进程同步获得。执行结束后应确认变量已清除，再把 runner 的脱敏结果更新到本 PR。
+
+Issue #76 完成前保持范围排除：Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1/global baseline、strategy/portfolio、speculative reconciliation。
+
 ## 0. 2026-09-16 当前调度覆盖 — Issue #73 remediation
 
 当前基线为 PR #74 合并后的 `main@22c42a72e222d9b6f6519095fb641a4adb190e12`。本轮严格限定为
@@ -578,12 +638,12 @@ Issue #66 **不授权**：
 
 ---
 
-**Last scheduler update**：2026-09-15
+**Last scheduler update**：2026-09-16
 
-**Current task**：Issue #59（PR #68 已合并；最小真实 2024-01 source-input 在 CR-2 shape
-normalization 边界阻断）
+**Current task**：Issue #76（78 个月权威历史构建已通过 2020-02 `DELISTDATE` 适用性修复，
+当前在 2020-03 本地认证环境边界停止）
 
-**Required ancestor**：当前 clean `main@a7671ab34d301cb0aca2f351a31bbc865c100498`。下一步只
-处理 [`cr7_authoritative_2024_01_source_input_20260915.md`](../provider_verification/cr7_authoritative_2024_01_source_input_20260915.md)
-列出的最小 provider-native shape/identity 适配；适配前不手填 snapshot，不进入 acquisition、
-materialization、Stage B 或 78 月回补。
+**Required ancestor**：Issue #76 基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`；
+在本机安全配置认证环境变量后，从已保留证据恢复并继续 2020-03，不得把环境阻断误写成
+provider 数据结论，也不得跳过月份或将当前进度写成 78/78。
+

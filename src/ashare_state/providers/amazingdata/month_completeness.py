@@ -5,7 +5,7 @@ daily bar expectation.  This module derives a deterministic security/session
 set from two positive provider observations:
 
 * an exact-session historical code-list observation, gated by provider-owned
-  listing dates when those facts are available; and
+  listing/delisting dates when those facts are available; and
 * the historical stock-status table, whose ``IS_SUSP_SEC`` flag identifies a
   legitimate non-trading session.
 
@@ -14,9 +14,12 @@ status row for an applicable pair is unresolved, and malformed or mismatched
 responses fail closed. The persisted evaluation is intentionally compact:
 final required/returned pair seals, blockers and classification summaries are
 retained; intermediate applicability/suspension subset hashes are not. A
-provider LISTDATE is retained only when it excludes a pre-listing pair, so the
-existing capture-catalog hash can replay that fact without a separate hash
-dimension.
+provider LISTDATE or DELISTDATE is retained only when it excludes a
+pre-listing or post-delisting pair, so the existing capture-catalog hash can
+replay that fact without a separate hash dimension. One separately approved
+official suspension event is also retained when it resolves an otherwise
+unresolved pair; it is an exact static fact for ``300114.SZ`` only, not a
+zero-activity inference or a general suspension-event framework.
 """
 
 from __future__ import annotations
@@ -31,24 +34,35 @@ from types import MappingProxyType
 from typing import Any, cast
 
 __all__ = [
+    "APPROVED_300114_SUSPENSION_EVENT",
     "AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION",
     "AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION",
     "AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION",
     "CompletenessPairClass",
     "MonthCompletenessError",
     "MonthCompletenessEvaluation",
+    "OfficialSuspensionEvent",
     "PositiveTradeFallback",
     "evaluate_month_completeness",
 ]
 
 
-AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION = "amazingdata-month-completeness-rule-v3"
+AMAZINGDATA_MONTH_COMPLETENESS_RULE_VERSION = "amazingdata-month-completeness-rule-v5"
 AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION = (
-    "amazingdata-hist-code-list-exact-session-list-date-v3"
+    "amazingdata-hist-code-list-exact-session-lifecycle-official-suspension-v5"
 )
 AMAZINGDATA_POSITIVE_TRADE_FALLBACK_VERSION = "amazingdata-positive-trade-count-fallback-v1"
 
 _SYMBOL_PATTERN = re.compile(r"^\d{6}\.(?:SH|SZ)$")
+_APPROVED_SUSPENSION_EVENT_ID = "300114-suspension-2023-01"
+_APPROVED_SUSPENSION_SECURITY = "300114.SZ"
+_APPROVED_SUSPENSION_FROM = date(2023, 1, 12)
+_APPROVED_SUSPENSION_RESUMES = date(2023, 2, 2)
+_APPROVED_SUSPENSION_SOURCE_URLS = (
+    "https://static.cninfo.com.cn/finalpage/2023-01-12/1215580484.PDF",
+    "https://static.cninfo.com.cn/finalpage/2023-02-02/1215749576.PDF",
+    "https://docs.static.szse.cn/www/certificate/secondb/GEMmsb/W020230202562529948780.html",
+)
 _STATUS_COLUMNS = frozenset(
     {
         "HIGH_LIMITED",
@@ -83,6 +97,89 @@ class CompletenessPairClass(StrEnum):
     UNEXPLAINED_MISSING = "UNEXPLAINED_MISSING"
     UNRESOLVED = "UNRESOLVED"
     EXTRA_RETURNED = "EXTRA_RETURNED"
+
+
+@dataclass(frozen=True)
+class OfficialSuspensionEvent:
+    """The one Owner-approved official suspension fact used by Issue #76.
+
+    This type intentionally accepts exactly one reviewed event.  Keeping the
+    source URLs in the typed value makes the decision reproducible from the
+    evaluation/catalog without adding a second persistence hierarchy.
+    """
+
+    event_id: str
+    security: str
+    suspended_from: date
+    resumes_on: date
+    source_urls: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        try:
+            source_urls = tuple(self.source_urls)
+        except TypeError as exc:
+            raise MonthCompletenessError("official suspension source URLs are malformed") from exc
+        object.__setattr__(self, "source_urls", source_urls)
+        if self.event_id != _APPROVED_SUSPENSION_EVENT_ID:
+            raise MonthCompletenessError("unknown official suspension event")
+        if self.security != _APPROVED_SUSPENSION_SECURITY:
+            raise MonthCompletenessError("official suspension security is not approved")
+        if (
+            not isinstance(self.suspended_from, date)
+            or isinstance(self.suspended_from, datetime)
+            or not isinstance(self.resumes_on, date)
+            or isinstance(self.resumes_on, datetime)
+            or self.suspended_from != _APPROVED_SUSPENSION_FROM
+            or self.resumes_on != _APPROVED_SUSPENSION_RESUMES
+            or self.suspended_from >= self.resumes_on
+        ):
+            raise MonthCompletenessError("official suspension interval is malformed")
+        if source_urls != _APPROVED_SUSPENSION_SOURCE_URLS:
+            raise MonthCompletenessError("official suspension sources are not approved")
+
+    def covers(self, session_date: date) -> bool:
+        """Return whether the event covers a market-open session date."""
+        return self.suspended_from <= session_date < self.resumes_on
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return the canonical, replay-bound event representation."""
+        return {
+            "event_id": self.event_id,
+            "security": self.security,
+            "suspended_from": self.suspended_from,
+            "resumes_on": self.resumes_on,
+            "source_urls": list(self.source_urls),
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> OfficialSuspensionEvent:
+        """Rehydrate the exact approved event from a persisted evaluation."""
+        fields = {"event_id", "security", "suspended_from", "resumes_on", "source_urls"}
+        if not isinstance(payload, Mapping) or set(payload) != fields:
+            raise MonthCompletenessError("official suspension event fields are not exact")
+        raw_sources = payload["source_urls"]
+        if not isinstance(raw_sources, list):
+            raise MonthCompletenessError("official suspension source URLs are malformed")
+        suspended_from = _optional_date(payload["suspended_from"])
+        resumes_on = _optional_date(payload["resumes_on"])
+        if suspended_from is None or resumes_on is None:
+            raise MonthCompletenessError("official suspension interval is malformed")
+        return cls(
+            event_id=payload["event_id"],
+            security=payload["security"],
+            suspended_from=suspended_from,
+            resumes_on=resumes_on,
+            source_urls=tuple(raw_sources),
+        )
+
+
+APPROVED_300114_SUSPENSION_EVENT = OfficialSuspensionEvent(
+    event_id=_APPROVED_SUSPENSION_EVENT_ID,
+    security=_APPROVED_SUSPENSION_SECURITY,
+    suspended_from=_APPROVED_SUSPENSION_FROM,
+    resumes_on=_APPROVED_SUSPENSION_RESUMES,
+    source_urls=_APPROVED_SUSPENSION_SOURCE_URLS,
+)
 
 
 @dataclass(frozen=True)
@@ -121,6 +218,8 @@ class MonthCompletenessEvaluation:
     positive_trade_pair_count: int
     positive_trade_pair_set_hash: str
     prelisting_list_dates: dict[str, date]
+    postdelisting_delist_dates: dict[str, date]
+    official_suspension_event: OfficialSuspensionEvent | None
 
     @property
     def accepted(self) -> bool:
@@ -162,6 +261,12 @@ class MonthCompletenessEvaluation:
             "positive_trade_pair_count": self.positive_trade_pair_count,
             "positive_trade_pair_set_hash": self.positive_trade_pair_set_hash,
             "prelisting_list_dates": dict(sorted(self.prelisting_list_dates.items())),
+            "postdelisting_delist_dates": dict(sorted(self.postdelisting_delist_dates.items())),
+            "official_suspension_event": (
+                self.official_suspension_event.as_dict()
+                if self.official_suspension_event is not None
+                else None
+            ),
         }
 
     @classmethod
@@ -193,6 +298,8 @@ class MonthCompletenessEvaluation:
             "positive_trade_pair_count",
             "positive_trade_pair_set_hash",
             "prelisting_list_dates",
+            "postdelisting_delist_dates",
+            "official_suspension_event",
         }
         if not isinstance(payload, Mapping) or set(payload) != fields:
             raise MonthCompletenessError("month completeness evaluation fields are not exact")
@@ -216,6 +323,23 @@ class MonthCompletenessEvaluation:
                 if parsed_date is None:
                     raise MonthCompletenessError("pre-listing LISTDATE value is missing")
                 parsed_prelisting_dates[symbol] = parsed_date
+            raw_postdelisting_dates = payload["postdelisting_delist_dates"]
+            if not isinstance(raw_postdelisting_dates, Mapping):
+                raise MonthCompletenessError("post-delisting DELISTDATE facts are malformed")
+            parsed_postdelisting_dates: dict[str, date] = {}
+            for symbol, raw_date in raw_postdelisting_dates.items():
+                if not isinstance(symbol, str) or _SYMBOL_PATTERN.fullmatch(symbol) is None:
+                    raise MonthCompletenessError("post-delisting DELISTDATE symbol is malformed")
+                parsed_date = _optional_date(raw_date)
+                if parsed_date is None:
+                    raise MonthCompletenessError("post-delisting DELISTDATE value is missing")
+                parsed_postdelisting_dates[symbol] = parsed_date
+            raw_suspension_event = payload["official_suspension_event"]
+            parsed_suspension_event = (
+                None
+                if raw_suspension_event is None
+                else OfficialSuspensionEvent.from_mapping(raw_suspension_event)
+            )
             parsed_counts = {
                 str(key): _require_nonnegative_int(value, "classification count")
                 for key, value in counts.items()
@@ -278,6 +402,8 @@ class MonthCompletenessEvaluation:
                     payload["positive_trade_pair_set_hash"], "positive_trade_pair_set_hash"
                 ),
                 "prelisting_list_dates": dict(sorted(parsed_prelisting_dates.items())),
+                "postdelisting_delist_dates": dict(sorted(parsed_postdelisting_dates.items())),
+                "official_suspension_event": parsed_suspension_event,
             }
         except (TypeError, ValueError) as exc:
             raise MonthCompletenessError("month completeness evaluation is malformed") from exc
@@ -360,14 +486,18 @@ def evaluate_month_completeness(
     daily_bar_payload: Mapping[str, Any],
     positive_trade_fallback: PositiveTradeFallback | None = None,
     list_dates_by_symbol: Mapping[str, Any] | None = None,
+    delist_dates_by_symbol: Mapping[str, Any] | None = None,
+    official_suspension_event: OfficialSuspensionEvent | None = None,
 ) -> MonthCompletenessEvaluation:
     """Evaluate one month without converting absence into a semantic fact.
 
     ``exact_day_universes`` must contain one successful historical code-list
     observation for every calendar session. Membership is the positive
     applicability fact unless a valid provider ``LISTDATE`` is strictly after
-    that session, in which case the pair is pre-listing and not applicable.
-    Missing or malformed listing dates never establish non-applicability.
+    that session, in which case the pair is pre-listing and not applicable, or
+    a valid provider ``DELISTDATE`` is on or before that session, in which case
+    the pair is post-delisting and not applicable. Missing or malformed
+    lifecycle dates never establish non-applicability.
     ``status_payload`` must contain a validated status row for every remaining
     applicable pair; ``IS_SUSP_SEC=1`` removes that pair from the required-bar
     set. The only fallback is a provider-produced
@@ -375,13 +505,21 @@ def evaluate_month_completeness(
     is specifically a zero-row, zero-column empty schema.  A finite
     ``num_trades > 0`` value makes that pair required; every other snapshot
     result remains unresolved.  The daily-bar response is checked against the
-    resulting set, including extra rows.
+    resulting set, including extra rows.  The optional approved static event
+    resolves only its exact ``300114.SZ`` interval when the provider status
+    has left that pair unresolved; it never changes a provider status row and
+    never treats zero activity as suspension.
     """
     symbols, symbol_errors = _validate_symbols(monthly_symbols)
     sessions, session_errors = _validate_days(trading_days)
     structural_errors = list(symbol_errors) + list(session_errors)
     symbol_set = set(symbols)
     session_set = set(sessions)
+
+    if official_suspension_event is not None and not isinstance(
+        official_suspension_event, OfficialSuspensionEvent
+    ):
+        raise MonthCompletenessError("official suspension event must be typed evidence")
 
     list_date_values: dict[str, date] = {}
     list_date_errors: list[str] = []
@@ -400,7 +538,7 @@ def evaluate_month_completeness(
                 if symbol not in symbol_set:
                     list_date_errors.append("LIST_DATE_INPUT_OUTSIDE_MONTH_UNIVERSE")
                     continue
-                parsed_date = _parse_list_date(raw_date)
+                parsed_date = _parse_lifecycle_date(raw_date)
                 if parsed_date is None:
                     # An absent or malformed date cannot remove an applicable
                     # pair. Existing status/bar evidence may still resolve it;
@@ -412,9 +550,40 @@ def evaluate_month_completeness(
                     continue
                 list_date_values[symbol] = parsed_date
 
+    delist_date_values: dict[str, date] = {}
+    delist_date_errors: list[str] = []
+    if delist_dates_by_symbol is not None:
+        if not isinstance(delist_dates_by_symbol, Mapping):
+            delist_date_errors.append("DELIST_DATE_INPUT_NOT_MAPPING")
+        else:
+            for raw_symbol, raw_date in delist_dates_by_symbol.items():
+                if (
+                    not isinstance(raw_symbol, str)
+                    or _SYMBOL_PATTERN.fullmatch(raw_symbol.strip().upper()) is None
+                ):
+                    delist_date_errors.append("DELIST_DATE_INPUT_SYMBOL_INVALID")
+                    continue
+                symbol = raw_symbol.strip().upper()
+                if symbol not in symbol_set:
+                    delist_date_errors.append("DELIST_DATE_INPUT_OUTSIDE_MONTH_UNIVERSE")
+                    continue
+                parsed_date = _parse_lifecycle_date(raw_date)
+                if parsed_date is None:
+                    # An absent or malformed date cannot remove an applicable
+                    # pair. Existing status/bar evidence may still resolve it;
+                    # otherwise the ordinary unresolved gate fails closed.
+                    continue
+                previous_date = delist_date_values.get(symbol)
+                if previous_date is not None and previous_date != parsed_date:
+                    delist_date_errors.append("DELIST_DATE_INPUT_CONFLICT")
+                    continue
+                delist_date_values[symbol] = parsed_date
+
     applicable: set[tuple[str, int]] = set()
     prelisting_pairs: set[tuple[str, int]] = set()
     prelisting_list_dates: dict[str, date] = {}
+    postdelisting_pairs: set[tuple[str, int]] = set()
+    postdelisting_delist_dates: dict[str, date] = {}
     exact_universe_errors: list[str] = []
     if set(exact_day_universes) != session_set:
         exact_universe_errors.append("EXACT_DAY_UNIVERSE_KEYS_MISMATCH")
@@ -435,9 +604,15 @@ def evaluate_month_completeness(
             if list_date is not None and session_date < list_date:
                 prelisting_pairs.add((symbol, day))
                 prelisting_list_dates[symbol] = list_date
+            elif (
+                delist_date := delist_date_values.get(symbol)
+            ) is not None and session_date >= delist_date:
+                postdelisting_pairs.add((symbol, day))
+                postdelisting_delist_dates[symbol] = delist_date
             else:
                 applicable.add((symbol, day))
     exact_universe_errors.extend(list_date_errors)
+    exact_universe_errors.extend(delist_date_errors)
     structural_errors.extend(exact_universe_errors)
 
     status_by_pair: dict[tuple[str, int], int] = {}
@@ -464,11 +639,20 @@ def evaluate_month_completeness(
     structural_errors.extend(status_errors)
 
     status_pairs = set(status_by_pair)
-    if status_pairs - applicable - prelisting_pairs:
+    if status_pairs - applicable - prelisting_pairs - postdelisting_pairs:
         structural_errors.append("STATUS_OUTSIDE_APPLICABILITY_SET")
     unresolved = applicable - status_pairs
     suspended = {pair for pair, flag in status_by_pair.items() if pair in applicable and flag == 1}
     required = {pair for pair, flag in status_by_pair.items() if pair in applicable and flag == 0}
+    official_suspension_pairs = {
+        pair
+        for pair in unresolved
+        if official_suspension_event is not None
+        and pair[0] == official_suspension_event.security
+        and official_suspension_event.covers(_date_from_day(pair[1]))
+    }
+    suspended.update(official_suspension_pairs)
+    unresolved -= official_suspension_pairs
     fallback_eligible = {
         (symbol, day)
         for symbol in empty_schema_symbols
@@ -558,6 +742,10 @@ def evaluate_month_completeness(
         positive_trade_pair_count=len(positive_trade_pairs),
         positive_trade_pair_set_hash=_hash_pairs(positive_trade_pairs),
         prelisting_list_dates=dict(sorted(prelisting_list_dates.items())),
+        postdelisting_delist_dates=dict(sorted(postdelisting_delist_dates.items())),
+        official_suspension_event=(
+            official_suspension_event if official_suspension_pairs else None
+        ),
     )
 
 
@@ -748,6 +936,8 @@ def _positive_trade_fallback_candidates(
     exact_day_universes: Mapping[int, Collection[str]],
     status_payload: Mapping[str, Any],
     list_dates_by_symbol: Mapping[str, Any] | None = None,
+    delist_dates_by_symbol: Mapping[str, Any] | None = None,
+    official_suspension_event: OfficialSuspensionEvent | None = None,
 ) -> set[tuple[str, int]]:
     """Return only pairs eligible for the reviewed status fallback.
 
@@ -765,13 +955,26 @@ def _positive_trade_fallback_candidates(
         return set()
     if list_dates_by_symbol is not None and not isinstance(list_dates_by_symbol, Mapping):
         return set()
+    if delist_dates_by_symbol is not None and not isinstance(delist_dates_by_symbol, Mapping):
+        return set()
+    if official_suspension_event is not None and not isinstance(
+        official_suspension_event, OfficialSuspensionEvent
+    ):
+        return set()
     parsed_list_dates: dict[str, date] = {}
     if list_dates_by_symbol is not None:
         for symbol, raw_date in list_dates_by_symbol.items():
             if isinstance(symbol, str) and _SYMBOL_PATTERN.fullmatch(symbol.strip().upper()):
-                parsed_date = _parse_list_date(raw_date)
+                parsed_date = _parse_lifecycle_date(raw_date)
                 if parsed_date is not None:
                     parsed_list_dates[symbol.strip().upper()] = parsed_date
+    parsed_delist_dates: dict[str, date] = {}
+    if delist_dates_by_symbol is not None:
+        for symbol, raw_date in delist_dates_by_symbol.items():
+            if isinstance(symbol, str) and _SYMBOL_PATTERN.fullmatch(symbol.strip().upper()):
+                parsed_date = _parse_lifecycle_date(raw_date)
+                if parsed_date is not None:
+                    parsed_delist_dates[symbol.strip().upper()] = parsed_date
     applicable: set[tuple[str, int]] = set()
     for day in sessions:
         values = exact_day_universes.get(day)
@@ -784,12 +987,25 @@ def _positive_trade_fallback_candidates(
         applicable.update(
             (symbol, day)
             for symbol in day_symbols
-            if (list_date := parsed_list_dates.get(symbol)) is None or session_date >= list_date
+            if ((list_date := parsed_list_dates.get(symbol)) is None or session_date >= list_date)
+            and (
+                (delist_date := parsed_delist_dates.get(symbol)) is None
+                or session_date < delist_date
+            )
         )
     empty_symbols = {
         symbol for symbol in symbols if _is_zero_column_empty_schema(status_payload.get(symbol))
     }
-    return {pair for pair in applicable if pair[0] in empty_symbols}
+    return {
+        pair
+        for pair in applicable
+        if pair[0] in empty_symbols
+        and not (
+            official_suspension_event is not None
+            and pair[0] == official_suspension_event.security
+            and official_suspension_event.covers(_date_from_day(pair[1]))
+        )
+    }
 
 
 def _snapshot_trade_observation(
@@ -872,8 +1088,8 @@ def _normalize_day(value: Any) -> int | None:
     return None
 
 
-def _parse_list_date(value: Any) -> date | None:
-    """Parse a provider-normalized LISTDATE without coercing malformed input."""
+def _parse_lifecycle_date(value: Any) -> date | None:
+    """Parse a normalized LISTDATE/DELISTDATE without coercing bad input."""
     if isinstance(value, datetime):
         return None
     if isinstance(value, date):
