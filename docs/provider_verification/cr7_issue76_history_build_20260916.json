@@ -1,6 +1,6 @@
 {
   "schema": "cr7.issue76.history-build.v2",
-  "evidence_updated_at_utc": "2026-09-17T17:35:39.840603Z",
+  "evidence_updated_at_utc": "2026-09-18T01:11:09.0960749Z",
   "issue": 76,
   "baseline": "ad2ad528d3ffec1269772084f0860c8224e632d2",
   "target_window": {
@@ -16,8 +16,8 @@
     "not_passed_months": 41,
     "not_run_after_blocker_months": 40,
     "exception_class": "RuntimeError",
-    "code": "MISSING_SAFE_CREDENTIAL_ENVIRONMENT",
-    "sanitized_detail": "2023-02 capture stopped before any provider request because the current execution process could not see the four safe credential environment variables"
+    "code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
+    "sanitized_detail": "2023-02 provider capture completed, but completeness failed closed on one unresolved 300114.SZ / 2023-02-01 pair"
   },
   "authorized_remediation": {
     "source": "PR #77 PM review",
@@ -1315,16 +1315,76 @@
       "research_split": "development",
       "status": "STOP(BLOCKED)",
       "execution_mode": "FRESH_PROVIDER",
+      "monthly_security_count": 4926,
+      "session_count": 20,
+      "required_pair_count": 98194,
+      "returned_pair_count": 98194,
+      "returned_row_count": 98194,
+      "unresolved_pair_count": 1,
+      "missing_required_pair_count": 0,
+      "extra_returned_pair_count": 0,
+      "structural_error_count": 0,
+      "classification_counts": {
+        "EXTRA_RETURNED": 0,
+        "NOT_APPLICABLE_SESSION": 153,
+        "POSITIVE_TRADE_COUNT_ACTIVE": 19,
+        "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+        "SUSPENSION_NON_TRADING": 172,
+        "UNEXPLAINED_MISSING": 0,
+        "UNRESOLVED": 1
+      },
+      "calendar_request_id": "27cd797f-43d7-460d-ac8f-1390178427d0",
+      "hist_code_list_request_id": "f0db8a97-700a-49db-b464-996719a3c83f",
+      "stock_basic_request_id": "e0979f16-5c56-4fc9-bd66-1b934e30e771",
+      "history_stock_status_request_id": "5f13940b-d241-4320-91d7-aa30a9d3bd01",
+      "daily_bar_request_id": "f6192d4d-74c3-4896-a0a1-cfd3b8ff623f",
+      "provider_content_hashes": {
+        "calendar": "ccee3c8ed6f66bea9cb00f85921b1ae4ae108cd8c1bd9cbe81c7cbc251f66752",
+        "hist_code_list": "deaefd96f3b6ff04ada3cc3738eaa7a9421f7456379f1d07c48a0ed9336c683f",
+        "stock_basic": "403e2d0444e6127d1ad97acc3060ad38bdaf2c0cc112997ab4424285749d13eb",
+        "history_stock_status": "da167fd3bcacc97bdcf28ef7c867090aa9123c58e3a8d47348f8fbea823715b0",
+        "daily_bar": "8106a899f2a50e9ec8c1be0ca51a9cc04865a7dbf0456024dd6bc9f9ccc12c14"
+      },
+      "retrieved_at_utc": "2026-09-18T00:48:08.550698+00:00",
+      "unresolved_pair": {
+        "symbol": "300114.SZ",
+        "session": "2023-02-01",
+        "history_stock_status_shape": "0x0",
+        "daily_bar_missing": true,
+        "approved_event_covers_session": true,
+        "approved_event": "300114-suspension-2023-01"
+      },
+      "post_capture_replay_diagnostic": {
+        "status": "PASS",
+        "execution_mode": "RETAINED_REPLAY_AFTER_LOCAL_RUNNER_FIX",
+        "provider_calls": 43,
+        "required_pair_count": 98194,
+        "returned_pair_count": 98194,
+        "returned_row_count": 98194,
+        "missing_required_pair_count": 0,
+        "extra_returned_pair_count": 0,
+        "unresolved_pair_count": 0,
+        "classification_counts": {
+          "EXTRA_RETURNED": 0,
+          "NOT_APPLICABLE_SESSION": 153,
+          "POSITIVE_TRADE_COUNT_ACTIVE": 19,
+          "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+          "SUSPENSION_NON_TRADING": 173,
+          "UNEXPLAINED_MISSING": 0,
+          "UNRESOLVED": 0
+        },
+        "scope": "offline replay only; state remains fail-closed until the formal runner is resumed"
+      },
       "receipt": "NOT_REACHED",
       "coverage": "NOT_REACHED",
       "materialization": "NOT_REACHED",
       "reader": "NOT_REACHED",
       "idempotency": "NOT_REACHED",
       "changed_content_conflict": "NOT_REACHED",
-      "provider_calls_during_capture": 0,
+      "provider_calls_during_capture": 44,
       "stage": "CAPTURE",
-      "failure_code": "MISSING_SAFE_CREDENTIAL_ENVIRONMENT",
-      "sanitized_detail": "capture stopped before any provider request because the current execution process could not see the four safe credential environment variables"
+      "failure_code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
+      "sanitized_detail": "provider capture completed, but one unresolved 300114.SZ / 2023-02-01 pair remained because the approved cross-month suspension event was not passed by the pre-fix runner"
     }
   ],
   "acceptance": {
@@ -1335,7 +1395,7 @@
     "ordinary_reader_full_partition_set": false,
     "idempotency_and_conflict": false,
     "publication": false,
-    "exact_head_qa_and_ci": "local QA passed; CI run 656 (commit ab133200ce7ff7247c356fd2cc603bbb34647858) passed on Ubuntu 3.14, Windows 3.14, and Windows 3.12; GT-H3B run 166 skipped by scope"
+    "exact_head_qa_and_ci": "local QA passed; exact-head CI run 657 (workflow 35258689674, head 7d85c2812bac05ede0fcb85500655ea5e1297dd0) passed on Ubuntu 3.14, Windows 3.14, and Windows 3.12; GT-H3B run 167 (workflow 35258689716) skipped by scope"
   },
   "local_qa": {
     "focused_pytest": "72 passed",
@@ -1358,8 +1418,10 @@
     "speculative reconciliation"
   ],
   "next_execution_required": [
+    "Use the locally corrected runner that passes the approved cross-month event whenever the event interval intersects the month; do not broaden zero-activity semantics",
     "Expose the four safe TGW environment variables only to the same local process that starts the runner, without committing or printing their values",
-    "Resume from 2023-02 with --resume --retry-blocked and continue month by month; stop and record any new blocker",
+    "Resume with --resume --retry-blocked; replay 2023-02 first, then continue online from 2023-03 month by month and stop at any new blocker",
     "After all 78 capture months pass, run receipt, authoritative coverage, materialization, ordinary-reader, idempotency and changed-content conflict gates"
   ]
 }
+

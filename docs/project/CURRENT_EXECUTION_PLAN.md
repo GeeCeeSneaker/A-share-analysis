@@ -4,6 +4,19 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.2. 2026-09-18 当前调度覆盖 — Issue #76 2023-02 capture 诊断
+
+> 状态：**STOP(BLOCKED) at 2023-02 / raw capture obtained / offline replay fixed the cross-month orchestration defect / no publication**
+
+用户已在本机同一安全进程完成 TGW 变量注入，`2023-02` 实际发生 `44` 次 provider calls。原始请求均为 `OK`：calendar `27cd797f-43d7-460d-ac8f-1390178427d0`、hist code list `f0db8a97-700a-49db-b464-996719a3c83f`、stock basic `e0979f16-5c56-4fc9-bd66-1b934e30e771`、history status `5f13940b-d241-4320-91d7-aa30a9d3bd01`、daily bar `f6192d4d-74c3-4896-a0a1-cfd3b8ff623f`。凭证及网络身份仍未写入文件或 GitHub。
+
+- 原始 `2023-02` completeness：`4,926` securities、`20` sessions、required/returned `98,194/98,194`；missing/extra/structural `0/0/0`，但 `UNRESOLVED=1`。分类：`NOT_APPLICABLE_SESSION=153`、`POSITIVE_TRADE_COUNT_ACTIVE=19`、`SUSPENSION_NON_TRADING=172`、`UNRESOLVED=1`。
+- 唯一未决 pair 为 `300114.SZ / 2023-02-01`。status 返回 `0×0` 空表，daily bar 恰缺该日；这不是账号失败，也不能用 `num_trades=0` 推断停牌。
+- 根因是 runner 编排只在 `month == 2023-01` 传递已批准的 `[2023-01-12, 2023-02-02)` 事件，漏掉跨月的 `2023-02-01`。本地未跟踪 runner 已修为按事件半开区间与月份相交传递；使用同一批已落盘 raw 的 retained replay 已验证 `2023-02 PASS`、required/returned `98,194/98,194`、`UNRESOLVED=0`、`SUSPENSION_NON_TRADING=173`。这不是生产语义放宽，也没有重新请求 provider。
+- 当前执行状态文件仍保留原始 `STOP(BLOCKED)`，因为尚未用修正后的 runner 正式恢复整条链。下一次正式恢复会先 replay `2023-02`，然后从 `2023-03` 发起在线请求；receipt、coverage、materialization、ordinary-reader、幂等、冲突和 78/78 验收都仍未完成。
+
+详细脱敏记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 与对应 JSON。保持 PR #77 Draft；不得把本次 `2023-02` 离线 replay 写成 78 个月完成。
+
 ## 0.1. 2026-09-17 当前调度覆盖 — Issue #76 78 个月历史构建
 
 > 状态：**STOP(BLOCKED) at 2023-02 / 37 of 78 capture PASS / no publication**
@@ -15,7 +28,7 @@ Issue #76 授权从 `main@ad2ad528d3ffec1269772084f0860c8224e632d2` 构建 2020-
 - `2020-02`：使用已保留同范围 raw exchanges retained replay capture PASS，required/returned `75,463/75,463`，missing/extra/unresolved/structural `0/0/0/0`；`NOT_APPLICABLE_SESSION=238`，实际使用的 post-delisting 事实为 `600240.SH -> 2020-02-05`。
 - `2020-03` 至 `2022-12`：此前共 34 个月 fresh-provider capture PASS；本次使用保留 raw 做 retained replay，没有把 replay 误报为新的在线采集。与前两个月合计 `36/78`。
 - `2023-01`：retained replay 已通过。`4911` 个证券、`16` 个交易日，required/returned `78,403/78,403`，missing/extra/structural `0/0/0`，`UNRESOLVED=0`；分类为 `NOT_APPLICABLE_SESSION=67`、`POSITIVE_TRADE_COUNT_ACTIVE=7`、`SUSPENSION_NON_TRADING=106`。Owner 批准的官方事件实际闭合 9 个 `300114.SZ` pair，来源为 [CNINFO 2023-001](https://static.cninfo.com.cn/finalpage/2023-01-12/1215580484.PDF)、[CNINFO 2023-007](https://static.cninfo.com.cn/finalpage/2023-02-02/1215749576.PDF) 和 [深交所停复牌表](https://docs.static.szse.cn/www/certificate/secondb/GEMmsb/W020230202562529948780.html)。
-- `2023-02`：runner 在 provider 请求前因当前执行进程缺少安全环境变量停止；这不是 provider 数据结论。当前状态为 `37/78` capture PASS，后续 40 个月尚未运行。
+- `2023-02`：历史检查点；当时 runner 在 provider 请求前因当前执行进程缺少安全环境变量停止。该检查点已被上方 0.2 的实际 provider capture 与离线 replay 诊断取代。
 - 本次新增静态事件、半开区间边界和 retained replay 回归已通过；本地 focused pytest 为 `72 passed`、full offline pytest 为 `1879 passed, 3 skipped`，Ruff、format、mypy、compile、依赖和敏感值扫描均通过。exact-head CI run `656`（commit `ab133200ce7ff7247c356fd2cc603bbb34647858`）的 Ubuntu 3.14、Windows 3.14、Windows 3.12 三个必需作业均 `success`，GT-H3B run `166` 按范围 `skipped`。这只证明仓库门禁通过；由于 capture 阶段尚未闭合 78 个月，当前尚未产生完整 receipt、authoritative coverage、materialization、ordinary-reader、idempotency 或 changed-content conflict 结论。
 
 详细脱敏执行记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。下一步是把安全变量配置到启动 runner 的同一 PowerShell 进程后，从 `2023-02` 恢复；不得把认证信息写入仓库。`2023-01` 的静态事件已完成授权范围内的闭合，不应扩大为零成交启发式。
@@ -633,3 +646,4 @@ Issue #66 **不授权**：
 **Required ancestor**：Issue #76 基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`；
 在本机安全配置认证环境变量后，从已保留证据恢复并继续 2020-03，不得把环境阻断误写成
 provider 数据结论，也不得跳过月份或将当前进度写成 78/78。
+

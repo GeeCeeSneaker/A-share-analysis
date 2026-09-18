@@ -1,20 +1,24 @@
 # Issue #76：78 个月权威历史构建执行记录
 
-> 状态：**STOP(BLOCKED) at 2023-02 / 37 of 78 capture PASS / no publication**
+> 状态：**STOP(BLOCKED) at 2023-02 / 37 of 78 capture PASS / 2023-02 provider capture recorded / no publication**
 
-## 当前执行检查点（2026-09-17，Owner 批准的静态事件整改后）
+## 当前执行检查点（2026-09-18，2023-02 provider capture 后）
 
 - 本次从既有 anchored raw evidence 做 retained replay。状态文件确认 `37/78` 个月 capture PASS；其中原始 `2020-03` 至 `2022-12` 是此前已完成的 fresh-provider capture，本次只是重放，不应重复计为新的在线采集。
 - `2023-01` 已按 Owner 批准的最小范围接入一条官方停牌事实：`300114.SZ`，区间为半开区间 `[2023-01-12, 2023-02-02)`。该事实只作用于当前仍 `UNRESOLVED` 的目标 pair，不覆盖 provider 已给出的状态，不把零成交推断为停牌，也不引入 carry-forward 或第二 provider。
 - `2023-01` retained replay 结果：monthly universe `4911`、交易日 `16`、required/returned bar pairs `78,403/78,403`、returned rows `78,403`；missing `0`、extra `0`、structural error `0`、`UNRESOLVED=0`。分类为 `NOT_APPLICABLE_SESSION=67`、`POSITIVE_TRADE_COUNT_ACTIVE=7`、`SUSPENSION_NON_TRADING=106`。事件实际闭合原先的 9 个 `300114.SZ` pair，evaluation/catalog 已保存事件 ID、区间和来源 URL，retained replay 会重新校验该对象。
 - 官方原文来源：[CNINFO 2023-001（2023-01-12 起停牌）](https://static.cninfo.com.cn/finalpage/2023-01-12/1215580484.PDF)、[CNINFO 2023-007（2023-02-02 起复牌）](https://static.cninfo.com.cn/finalpage/2023-02-02/1215749576.PDF)、[深交所停复牌表（记录 300114.SZ 的 2023-01-12 停牌）](https://docs.static.szse.cn/www/certificate/secondb/GEMmsb/W020230202562529948780.html)。前两份公告证明区间起止，第三份是起始日的交易所交叉核验。
-- 随后 runner 在 `2023-02` provider 请求前停止：当前 Codex 执行进程缺少四个安全环境变量。没有发起该月 provider 请求，`2023-02` 不是数据结论；账号、口令、地址和端口均未进入日志、文件或 GitHub。
-- 本提交的 exact-head CI 已完成：run `35256614885`（run `656`）中 Ubuntu 3.14、Windows 3.14、Windows 3.12 三个必需作业均为 `success`；GT-H3B run `35256614895`（run `166`）按当前范围为 `skipped`。这只证明仓库门禁通过，不改变 `2023-02` 的执行阻断或 78 个月验收状态。
+- 用户在本机同一进程完成安全变量注入后，`2023-02` 已实际完成 `44` 次 provider calls；因此此前“认证前停止”的旧检查点已被新结果取代，账号、口令、地址和端口仍未进入日志、文件或 GitHub。
+- 原始脱敏请求证据：calendar `27cd797f-43d7-460d-ac8f-1390178427d0`、hist code list `f0db8a97-700a-49db-b464-996719a3c83f`、stock basic `e0979f16-5c56-4fc9-bd66-1b934e30e771`、history status `5f13940b-d241-4320-91d7-aa30a9d3bd01`、daily bar `f6192d4d-74c3-4896-a0a1-cfd3b8ff623f`；均为 provider `OK`，raw bytes 留在本地 anchored capture。
+- `2023-02` 原始 completeness 为 `FAIL_CLOSED`：`4,926` 个证券、`20` 个交易日，required/returned `98,194/98,194`，missing/extra/structural `0/0/0`，但 `UNRESOLVED=1`；分类为 `NOT_APPLICABLE_SESSION=153`、`POSITIVE_TRADE_COUNT_ACTIVE=19`、`SUSPENSION_NON_TRADING=172`、`UNRESOLVED=1`。唯一未决 pair 是 `300114.SZ / 2023-02-01`：status member 为 `0×0` 空表，daily bar 恰缺该日，不能靠零活动推断停牌。
+- 诊断确认这是本地 runner 的跨月事件传递缺陷：已批准事件 `[2023-01-12, 2023-02-02)` 本来覆盖 `2023-02-01`，但 runner 只在月份字符串等于 `2023-01` 时传入事件。已在本地未跟踪 runner 中改为按事件半开区间与月份相交传递；没有修改生产语义、没有放宽零成交规则，也没有重新请求 provider。用同一批已落盘 raw 做离线 retained replay 后，`2023-02` 为 `PASS`，required/returned 仍为 `98,194/98,194`，`UNRESOLVED=0`，`SUSPENSION_NON_TRADING=173`。
+- 该离线 replay 只证明修正后的 runner 编排能够重放已取得证据，不等同于完整 runner 已推进到下个月；当前状态文件仍保留原始 `STOP(BLOCKED)`，下一次正式 `--resume --retry-blocked` 应先重放 `2023-02`，随后从 `2023-03` 继续真实请求。receipt、coverage、materialization 和 78 个月验收仍未完成。
+- 远端 exact-head CI：run `35258689674`（`657`）在 Ubuntu 3.14、Windows 3.14、Windows 3.12 均为 `success`；GT-H3B run `35258689716`（`167`）按当前范围为 `skipped`。这只证明 GitHub 门禁通过，不改变 capture 尚未闭合 78 个月的事实。
 
 ### 当前可执行下一步
 
-1. 在启动 runner 的同一个本地 PowerShell 进程中安全注入四个变量，然后使用 `--resume --retry-blocked`；不要把值放进参数、脚本、截图、日志或聊天。
-2. 从 `2023-02` 继续逐月执行；每个月仍须通过 exact-session、状态、生命周期、bar 集合和 replay 校验，遇到新语义/结构/权限 blocker 必须停下并记录，不能跳过月份。
+1. 使用已经修正的本地 runner，在启动 runner 的同一个 PowerShell 进程中安全注入四个变量，然后使用 `--resume --retry-blocked`；不要把值放进参数、脚本、截图、日志或聊天。已有 `2023-02` raw 会先做 retained replay，不应重复请求该月。
+2. 从 `2023-03` 继续逐月执行；每个月仍须通过 exact-session、状态、生命周期、bar 集合和 replay 校验，遇到新语义/结构/权限 blocker 必须停下并记录，不能跳过月份。
 3. 78 个月 capture 全部通过后，才可继续 receipt、authoritative coverage、materialization、ordinary-reader、幂等和 changed-content conflict 验收；当前仍无 publication。
 
 ## 上一个执行检查点（2026-09-17，静态事件整改前的历史快照）
@@ -102,3 +106,4 @@ capture PASS；出现新的 API、schema、语义、PIT 或身份 blocker 时立
   reconciliation 均未执行。
 
 对应机器记录见同目录 [`cr7_issue76_history_build_20260916.json`](cr7_issue76_history_build_20260916.json)。
+
