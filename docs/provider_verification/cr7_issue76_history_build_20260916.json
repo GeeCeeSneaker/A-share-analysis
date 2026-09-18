@@ -1,6 +1,6 @@
 {
   "schema": "cr7.issue76.history-build.v2",
-  "evidence_updated_at_utc": "2026-09-18T01:44:30.6283929Z",
+  "evidence_updated_at_utc": "2026-09-18T02:15:00.0000000Z",
   "issue": 76,
   "baseline": "ad2ad528d3ffec1269772084f0860c8224e632d2",
   "target_window": {
@@ -8,16 +8,16 @@
     "months": 78,
     "start": "2020-01-01"
   },
-  "status": "STOP(BLOCKED)",
+  "status": "RUNNING",
   "stop": {
     "stage": "CAPTURE",
-    "blocked_month": "2023-02",
-    "completed_capture_months": 37,
-    "not_passed_months": 41,
-    "not_run_after_blocker_months": 40,
-    "exception_class": "RuntimeError",
-    "code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
-    "sanitized_detail": "2023-02 provider capture completed, but completeness failed closed on one unresolved 300114.SZ / 2023-02-01 pair"
+    "blocked_month": null,
+    "completed_capture_months": 39,
+    "not_passed_months": 39,
+    "not_run_after_blocker_months": 0,
+    "exception_class": null,
+    "code": null,
+    "sanitized_detail": "Formal resume is running 2023-04 after 2023-02 retained replay and 2023-03 fresh capture passed; no new blocker recorded"
   },
   "authorized_remediation": {
     "source": "PR #77 PM review",
@@ -28,17 +28,21 @@
     "semantics": "session >= DELISTDATE is NOT_APPLICABLE_SESSION; session < DELISTDATE retains ordinary status/bar semantics; missing or malformed DELISTDATE remains unresolved when no other valid evidence exists"
   },
   "completed_capture": {
-    "count": 37,
+    "count": 39,
     "retained_replay_months": [
       "2020-01",
       "2020-02",
-      "2023-01"
+      "2023-01",
+      "2023-02"
     ],
     "fresh_provider_range": [
       "2020-03",
       "2022-12"
     ],
-    "fresh_provider_count": 34,
+    "fresh_provider_count": 35,
+    "fresh_provider_additional_months": [
+      "2023-03"
+    ],
     "all_completed_months_not_finalized": true
   },
   "authorized_official_suspension_event": {
@@ -1313,14 +1317,14 @@
     {
       "month": "2023-02",
       "research_split": "development",
-      "status": "STOP(BLOCKED)",
-      "execution_mode": "FRESH_PROVIDER",
+      "status": "CAPTURE_PASS_NOT_FINALIZED",
+      "execution_mode": "RETAINED_REPLAY",
       "monthly_security_count": 4926,
       "session_count": 20,
       "required_pair_count": 98194,
       "returned_pair_count": 98194,
       "returned_row_count": 98194,
-      "unresolved_pair_count": 1,
+      "unresolved_pair_count": 0,
       "missing_required_pair_count": 0,
       "extra_returned_pair_count": 0,
       "structural_error_count": 0,
@@ -1329,9 +1333,9 @@
         "NOT_APPLICABLE_SESSION": 153,
         "POSITIVE_TRADE_COUNT_ACTIVE": 19,
         "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
-        "SUSPENSION_NON_TRADING": 172,
+        "SUSPENSION_NON_TRADING": 173,
         "UNEXPLAINED_MISSING": 0,
-        "UNRESOLVED": 1
+        "UNRESOLVED": 0
       },
       "calendar_request_id": "27cd797f-43d7-460d-ac8f-1390178427d0",
       "hist_code_list_request_id": "f0db8a97-700a-49db-b464-996719a3c83f",
@@ -1356,7 +1360,7 @@
       },
       "post_capture_replay_diagnostic": {
         "status": "PASS",
-        "execution_mode": "RETAINED_REPLAY_AFTER_LOCAL_RUNNER_FIX",
+        "execution_mode": "FORMAL_RETAINED_REPLAY_AFTER_LOCAL_RUNNER_FIX",
         "provider_calls": 43,
         "required_pair_count": 98194,
         "returned_pair_count": 98194,
@@ -1373,7 +1377,7 @@
           "UNEXPLAINED_MISSING": 0,
           "UNRESOLVED": 0
         },
-        "scope": "offline replay only; state remains fail-closed until the formal runner is resumed"
+        "scope": "formal runner retained replay using the already-captured raw; no new provider request for 2023-02"
       },
       "receipt": "NOT_REACHED",
       "coverage": "NOT_REACHED",
@@ -1383,8 +1387,40 @@
       "changed_content_conflict": "NOT_REACHED",
       "provider_calls_during_capture": 44,
       "stage": "CAPTURE",
-      "failure_code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
-      "sanitized_detail": "provider capture completed, but one unresolved 300114.SZ / 2023-02-01 pair remained because the approved cross-month suspension event was not passed by the pre-fix runner"
+      "failure_code": null,
+      "formal_replay_provider_calls": 43,
+      "sanitized_detail": "formal retained replay passed after the runner began passing the approved cross-month suspension event for overlapping months"
+    },
+    {
+      "month": "2023-03",
+      "research_split": "development",
+      "status": "CAPTURE_PASS_NOT_FINALIZED",
+      "execution_mode": "FRESH_PROVIDER",
+      "monthly_security_count": 4950,
+      "session_count": 23,
+      "required_pair_count": 113421,
+      "returned_pair_count": 113421,
+      "returned_row_count": 113421,
+      "unresolved_pair_count": 0,
+      "missing_required_pair_count": 0,
+      "extra_returned_pair_count": 0,
+      "structural_error_count": 0,
+      "classification_counts": {
+        "EXTRA_RETURNED": 0,
+        "NOT_APPLICABLE_SESSION": 278,
+        "POSITIVE_TRADE_COUNT_ACTIVE": 23,
+        "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+        "SUSPENSION_NON_TRADING": 151,
+        "UNEXPLAINED_MISSING": 0,
+        "UNRESOLVED": 0
+      },
+      "receipt": "NOT_REACHED",
+      "coverage": "NOT_REACHED",
+      "materialization": "NOT_REACHED",
+      "reader": "NOT_REACHED",
+      "idempotency": "NOT_REACHED",
+      "changed_content_conflict": "NOT_REACHED",
+      "provider_calls_during_capture": 50
     }
   ],
   "acceptance": {
@@ -1395,7 +1431,7 @@
     "ordinary_reader_full_partition_set": false,
     "idempotency_and_conflict": false,
     "publication": false,
-    "exact_head_qa_and_ci": "local QA passed; latest docs head e15128f431d23f0c512d99d6e15d4d29185274b8 exact-head CI run 659 (workflow 35294943702) passed on Ubuntu 3.14, Windows 3.14, and Windows 3.12; GT-H3B run 169 (workflow 35294943736) skipped by scope"
+    "exact_head_qa_and_ci": "local QA passed; preceding docs head e15128f431d23f0c512d99d6e15d4d29185274b8 exact-head CI run 659 (workflow 35294943702) passed on Ubuntu 3.14, Windows 3.14, and Windows 3.12; latest docs head b492e068720ebda6b25fe4b07f195e759f484577 CI run 660 is in progress; GT-H3B run 170 (workflow 35296661573) skipped by scope"
   },
   "local_qa": {
     "focused_pytest": "72 passed",
@@ -1418,17 +1454,19 @@
     "speculative reconciliation"
   ],
   "current_execution_check": {
-    "checked_at_utc": "2026-09-18T01:44:30.6283929Z",
-    "matching_runner_process_found": false,
+    "checked_at_utc": "2026-09-18T02:15:00.0000000Z",
+    "matching_runner_process_found": true,
     "codex_process_safe_tgw_variables_present": false,
-    "formal_resume_started": false,
-    "state_unchanged": true,
-    "sanitized_reason": "The current Codex process has no process-local TGW variables, so no formal resume was launched to avoid an expected authentication stop."
+    "secure_runner_process_started": true,
+    "formal_resume_started": true,
+    "state_unchanged": false,
+    "active_month": "2023-04",
+    "sanitized_reason": "The visible child PowerShell process owns the process-local variables and is running the corrected runner; 2023-02 replay and 2023-03 fresh capture have passed, and 2023-04 is CAPTURE_RUNNING."
   },
   "next_execution_required": [
     "Use the locally corrected runner that passes the approved cross-month event whenever the event interval intersects the month; do not broaden zero-activity semantics",
-    "Expose the four safe TGW environment variables only to the same local process that starts the runner, without committing or printing their values",
-    "Resume with --resume --retry-blocked; replay 2023-02 first, then continue online from 2023-03 month by month and stop at any new blocker",
+    "Do not start a second runner; let the current secure process continue from 2023-04 month by month and stop at any new blocker",
+    "If a later restart is needed, read the saved non-password variables locally and prompt for the password only in the same process, without committing or printing any values",
     "After all 78 capture months pass, run receipt, authoritative coverage, materialization, ordinary-reader, idempotency and changed-content conflict gates"
   ]
 }

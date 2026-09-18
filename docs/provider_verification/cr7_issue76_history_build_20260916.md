@@ -1,8 +1,16 @@
 # Issue #76：78 个月权威历史构建执行记录
 
-> 状态：**STOP(BLOCKED) at 2023-02 / 37 of 78 capture PASS / 2023-02 provider capture recorded / no publication**
+> 状态：**RUNNING at 2023-04 / 39 of 78 capture PASS / 2023-02 replay and 2023-03 fresh capture pass / no publication**
 
-## 当前执行检查点（2026-09-18，2023-02 provider capture 后）
+## 当前恢复检查点（2026-09-18，正式恢复后）
+
+- 已在同一安全 PowerShell 进程完成变量注入并正式执行 `--resume --retry-blocked`；当前没有启动第二个 runner。密码只在该进程及其子进程中存在，未写入文件、日志或 GitHub。
+- `2023-02` 已由正式 runner 使用既有 raw 做 retained replay 并通过：required/returned `98,194/98,194`、missing/extra/structural `0/0/0`、`UNRESOLVED=0`、`SUSPENSION_NON_TRADING=173`；本次 replay 的 facade provider calls 为 `43`，没有重新请求该月网络数据。
+- `2023-03` 已完成 fresh-provider capture PASS：`4,950` 个证券、`23` 个交易日、required/returned `113,421/113,421`、returned rows `113,421`，missing/extra/structural `0/0/0`、`UNRESOLVED=0`，provider calls `50`；分类为 `NOT_APPLICABLE_SESSION=278`、`POSITIVE_TRADE_COUNT_ACTIVE=23`、`SUSPENSION_NON_TRADING=151`。
+- 当前 runner 已进入 `2023-04`，状态为 `CAPTURE_RUNNING`；尚未产生该月完整性结论。当前累计 capture PASS 为 `39/78`。
+- 仍未进入 receipt、authoritative coverage、materialization、ordinary-reader、idempotency、changed-content conflict 或 publication；必须继续遵守首个新 blocker 即停止规则。
+
+## 2023-02 诊断检查点（历史快照）
 
 - 本次从既有 anchored raw evidence 做 retained replay。状态文件确认 `37/78` 个月 capture PASS；其中原始 `2020-03` 至 `2022-12` 是此前已完成的 fresh-provider capture，本次只是重放，不应重复计为新的在线采集。
 - `2023-01` 已按 Owner 批准的最小范围接入一条官方停牌事实：`300114.SZ`，区间为半开区间 `[2023-01-12, 2023-02-02)`。该事实只作用于当前仍 `UNRESOLVED` 的目标 pair，不覆盖 provider 已给出的状态，不把零成交推断为停牌，也不引入 carry-forward 或第二 provider。
@@ -15,15 +23,15 @@
 - 该离线 replay 只证明修正后的 runner 编排能够重放已取得证据，不等同于完整 runner 已推进到下个月；当前状态文件仍保留原始 `STOP(BLOCKED)`，下一次正式 `--resume --retry-blocked` 应先重放 `2023-02`，随后从 `2023-03` 继续真实请求。receipt、coverage、materialization 和 78 个月验收仍未完成。
 - 远端 exact-head CI：最新文档头 `e15128f431d23f0c512d99d6e15d4d29185274b8` 的 CI run `35294943702`（`659`）在 Ubuntu 3.14、Windows 3.14、Windows 3.12 均为 `success`；GT-H3B run `35294943736`（`169`）按当前范围为 `skipped`。这只证明 GitHub 门禁通过，不改变 capture 尚未闭合 78 个月的事实。
 
-## 继续执行检查（2026-09-18）
+## 启动前检查（已完成）
 
-- 当前 Codex 执行进程没有四个 TGW 安全变量，且未发现正在运行的匹配 runner；因此本次没有启动一个预期必然在认证前停止的正式恢复，持久化状态保持 `STOP(BLOCKED)`。
-- 这不是 provider 新结果，也不改变已经记录的 `2023-02` 原始 capture 或离线 replay 结论。正式恢复仍必须在同一安全进程中注入变量后运行修正 runner，先 replay `2023-02`，再从 `2023-03` 继续。
+- 启动前的 Codex 主进程没有四个 TGW 安全变量，且未发现正在运行的匹配 runner；因此没有从错误的主进程盲目重跑。
+- 随后已由可见的独立安全 PowerShell 窗口注入变量并启动正式 runner；当前进程已越过认证阶段，`2023-02` 和 `2023-03` 的结果已写回本地状态。
 
 ### 当前可执行下一步
 
-1. 使用已经修正的本地 runner，在启动 runner 的同一个 PowerShell 进程中安全注入四个变量，然后使用 `--resume --retry-blocked`；不要把值放进参数、脚本、截图、日志或聊天。已有 `2023-02` raw 会先做 retained replay，不应重复请求该月。
-2. 从 `2023-03` 继续逐月执行；每个月仍须通过 exact-session、状态、生命周期、bar 集合和 replay 校验，遇到新语义/结构/权限 blocker 必须停下并记录，不能跳过月份。
+1. 不要启动第二个 runner；让当前安全进程从 `2023-04` 继续逐月执行。后续月份仍须通过 exact-session、状态、生命周期、bar 集合和 replay 校验，遇到新语义/结构/权限 blocker 必须停下并记录，不能跳过月份。
+2. 后续恢复若需重新启动，使用本地辅助脚本读取已保存的非密码变量，只在隐藏提示中输入密码；不要把值放进参数、脚本、截图、日志或聊天。
 3. 78 个月 capture 全部通过后，才可继续 receipt、authoritative coverage、materialization、ordinary-reader、幂等和 changed-content conflict 验收；当前仍无 publication。
 
 ## 上一个执行检查点（2026-09-17，静态事件整改前的历史快照）
