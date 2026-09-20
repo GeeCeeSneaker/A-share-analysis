@@ -1,6 +1,6 @@
 {
   "schema": "cr7.issue76.history-build.v2",
-  "evidence_updated_at_utc": "2026-09-20T03:50:41.4936218Z",
+  "evidence_updated_at_utc": "2026-09-20T09:17:10.6441789Z",
   "issue": 76,
   "baseline": "ad2ad528d3ffec1269772084f0860c8224e632d2",
   "target_window": {
@@ -8,38 +8,55 @@
     "months": 78,
     "start": "2020-01-01"
   },
-  "status": "INTERRUPTED",
+  "status": "STOP(BLOCKED)",
   "stop": {
     "stage": "CAPTURE",
-    "blocked_month": null,
-    "active_month": "2024-08",
-    "active_month_status": "CAPTURE_RUNNING",
-    "completed_capture_months": 55,
-    "not_passed_months": 23,
-    "not_run_after_blocker_months": 0,
-    "exception_class": null,
-    "code": "RUNNER_PROCESS_EXITED_WITHOUT_TERMINAL_STATE",
-    "sanitized_detail": "No matching runner process was present; persisted state remained RUNNING/CAPTURE with 2024-08 CAPTURE_RUNNING and no failure object. This is an execution interruption observation, not a provider-data blocker."
+    "blocked_month": "2025-02",
+    "completed_capture_months": 61,
+    "not_passed_months": 17,
+    "not_run_after_blocker_months": 16,
+    "exception_class": "RuntimeError",
+    "code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
+    "sanitized_detail": "2025-02 provider capture returned equal required/returned bar pairs with no unresolved pairs, but fail-closed on one STATUS_OUTSIDE_APPLICABILITY_SET structural error caused by a provider-code transition."
   },
   "runtime_observation": {
-    "state_file_mtime_utc": "2026-09-20T03:40:59.9365129Z",
-    "state_updated_at": "2026-09-19T20:40:59.929154-07:00",
-    "state_status": "RUNNING",
+    "state_file_mtime_utc": "2026-09-20T08:02:13.8040243Z",
+    "state_updated_at": "2026-09-20T01:02:13.794443-07:00",
+    "state_status": "STOP(BLOCKED)",
     "state_phase": "CAPTURE",
-    "touched_months": 56,
-    "pass_months": 55,
-    "active_month": "2024-08",
-    "active_month_status": "CAPTURE_RUNNING",
-    "last_completed_month": "2024-07",
-    "last_completed_month_summaries": [
-      {"month": "2024-05", "provider_calls": 44},
-      {"month": "2024-06", "provider_calls": 42},
-      {"month": "2024-07", "provider_calls": 50}
-    ],
-    "runner_process_present_at_check": false,
-    "failure_record_present": false,
-    "execution_summary_current": false,
-    "cause_determinable_from_persisted_state": false
+    "touched_months": 62,
+    "pass_months": 61,
+    "blocked_month": "2025-02",
+    "blocked_month_status": "STOP(BLOCKED)",
+    "blocked_month_provider_calls": 30,
+    "last_completed_month": "2025-01",
+    "failure_record_present": true,
+    "failure_exception_class": "RuntimeError",
+    "failure_stage": "CAPTURE",
+    "failure_detail": "month 2025-02 completeness was not accepted",
+    "completeness_summary": {
+      "monthly_security_count": 5133,
+      "session_count": 18,
+      "required_pair_count": 92190,
+      "returned_pair_count": 92190,
+      "missing_required_pair_count": 0,
+      "extra_returned_pair_count": 0,
+      "unresolved_pair_count": 0,
+      "provider_api_shape_or_request_mismatch": 1,
+      "structural_error_codes": ["STATUS_OUTSIDE_APPLICABILITY_SET"]
+    },
+    "identity_transition_observation": {
+      "old_provider_symbol": "300114.SZ",
+      "new_provider_symbol": "302132.SZ",
+      "old_code_exact_days": ["2025-02-05", "2025-02-06", "2025-02-07", "2025-02-10", "2025-02-11", "2025-02-12", "2025-02-13", "2025-02-14"],
+      "new_code_effective_exact_day": "2025-02-17",
+      "status_rows_outside_applicability_count": 8,
+      "status_symbol_and_flag": "302132.SZ / IS_SUSP_SEC=0"
+    },
+    "runner_process_present_after_stop": false,
+    "secure_launcher_present_after_stop": true,
+    "execution_summary_current": true,
+    "cause_determinable_from_persisted_state": true
   },
   "authorized_remediation": {
     "source": "PR #77 PM review",
@@ -50,21 +67,16 @@
     "semantics": "session >= DELISTDATE is NOT_APPLICABLE_SESSION; session < DELISTDATE retains ordinary status/bar semantics; missing or malformed DELISTDATE remains unresolved when no other valid evidence exists"
   },
   "completed_capture": {
-    "count": 39,
-    "retained_replay_months": [
+    "count": 61,
+    "count_basis": "latest persisted execution_state: 61 months PASS and 2025-02 STOP(BLOCKED)",
+    "known_replay_examples": [
       "2020-01",
       "2020-02",
       "2023-01",
       "2023-02"
     ],
-    "fresh_provider_range": [
-      "2020-03",
-      "2022-12"
-    ],
-    "fresh_provider_count": 35,
-    "fresh_provider_additional_months": [
-      "2023-03"
-    ],
+    "latest_completed_month": "2025-01",
+    "blocked_month": "2025-02",
     "all_completed_months_not_finalized": true
   },
   "authorized_official_suspension_event": {

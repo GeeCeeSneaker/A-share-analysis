@@ -1,8 +1,28 @@
 # Issue #76：78 个月权威历史构建执行记录
 
-> 状态：**INTERRUPTED at 2024-08 / 55 of 78 capture PASS / no terminal blocker recorded / no publication**
+> 状态：**STOP(BLOCKED) at 2025-02 / 61 of 78 capture PASS / identity-applicability mismatch / no publication**
+
+## 最新正式运行检查点（2026-09-20，2025-02 fail-closed）
+
+- 这次不是窗口异常退出：runner 已将状态正式写成 `STOP(BLOCKED)`，安全启动窗口仍停留在结束提示；当前没有第二个 runner。状态文件最后更新时间为 `2026-09-20T08:02:13.8040243Z`。
+- 已完成 `61/78` 个月 capture `PASS`；最近通过的是 `2024-09` 至 `2025-01`，`2025-02` 是第一个未通过月份，之后 `2025-03` 至 `2026-06` 的 `16` 个月尚未运行。此次 `2025-02` 实际发生 `30` 次 provider calls，失败不是认证或窗口问题。
+- `2025-02` 的 raw 请求元数据均为 provider `OK`；交易日 `18` 天、月度证券 `5,133` 个，daily bar required/returned `92,190/92,190`，missing/extra/unresolved 为 `0/0/0`。但完整性状态仍为 `FAIL_CLOSED`，因为存在 `1` 个 `PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH`，结构错误为 `STATUS_OUTSIDE_APPLICABILITY_SET`。
+- 直接对本地 raw 做了只读重算：历史代码表在 `2025-02-05` 至 `2025-02-14` 使用 `300114.SZ`，从 `2025-02-17` 起切换为 `302132.SZ`；history-status 返回的 `302132.SZ / IS_SUSP_SEC=0` 却覆盖了整个月，因此前半月的 `8` 条当前代码状态行落在历史代码的 exact-day applicability 集合之外。缺失的旧码 pair 被正交易 fallback 解析为 `POSITIVE_TRADE_COUNT_ACTIVE=8`，但越界 status 行仍必须 fail-closed，不能静默当作旧码历史状态。
+- 仓库已有 Owner 批准的 `300114.SZ -> 302132.SZ` identity event（旧码区间至 `2025-02-17`、新码自该日生效），但当前 capture completeness evaluator 仍按 provider 原始代码检查 exact-day applicability，没有把 Canonical/PIT identity bridge 应用到这层 status 证据。这是当前的身份连续性与采集适用性边界问题；本次只完成诊断，没有未经授权修改生产语义或把两套代码强行合并。
+
+### 为什么会“跑几个月就停”
+
+这是项目明确采用的 **fail-fast / fail-closed** 行为，不是每隔几个月随机崩溃：runner 会逐月推进，遇到此前没有被证据和规则覆盖的第一个新语义或结构问题，就停止并保留精确月份。此前的 `2023-02` 是跨月官方停牌事件传递缺陷；本次的 `2025-02` 是代码变更后的 provider status 与历史 exact-day universe 不一致。若跳过这些月份，后续的 78 月结果会把未证明的身份/适用关系混入数据，反而不符合验收要求。
+
+### 当前最小解除要求
+
+1. 不得把本次 blocker 归因于账号、端口或窗口，也不能重跑同一输入期待它随机通过。
+2. 需要在既有 Owner 批准的 identity event 范围内，明确并实现一条可 replay 的 capture-layer 规则：如何把 `300114.SZ` 与 `302132.SZ` 的 provider status、exact-day code list、daily bar 和 request evidence 按有效区间绑定；不能用裸码替换、全局 alias 或忽略 `STATUS_OUTSIDE_APPLICABILITY_SET` 代替。
+3. 先用已落盘 `2025-02` raw 做 retained replay 和新增边界测试；只有该月达到 `PASS`，再恢复在线 runner 继续 `2025-03`。receipt、coverage、materialization、ordinary-reader、幂等、冲突和 publication 仍不得提前执行。
 
 ## 最新运行检查点（2026-09-20，窗口退出后）
+
+> 上述正式 `2025-02` 阻断已取代本节的 `2024-08` 中断观察；以下保留为历史检查点。
 
 - 检查时没有匹配的 runner 进程；本地状态文件最后更新时间为 `2026-09-20T03:40:59.9365129Z`，其内容仍为 `status=RUNNING`、`phase=CAPTURE`，当前月为 `2024-08`、状态为 `CAPTURE_RUNNING`。因此这是一个**未写入终态的进程中断**，不是已确认的 provider 数据 blocker。
 - 状态文件中已完成 `55/78` 个月 `PASS`，最近三个完成月份为 `2024-05`（provider calls `44`）、`2024-06`（`42`）、`2024-07`（`50`）；`2024-08` 尚未形成完整性结论。状态文件的 `failure` 为空。
