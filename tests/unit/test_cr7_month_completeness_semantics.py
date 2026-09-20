@@ -9,6 +9,8 @@ from datetime import date
 import polars as pl
 import pytest
 
+import ashare_state.providers.amazingdata.month_completeness as month_completeness_module
+from ashare_state.canonical.identity import ApprovedIdentityEvent
 from ashare_state.providers.amazingdata.month_completeness import (
     APPROVED_300114_SUSPENSION_EVENT,
     CompletenessPairClass,
@@ -75,6 +77,41 @@ def _valid_inputs() -> dict[str, object]:
     }
 
 
+def _identity_transition_values(
+    *,
+    old_symbol: str = "300114.SZ",
+    new_symbol: str = "302132.SZ",
+    pre_effective_day: int = 20250214,
+    effective_day: int = 20250217,
+    old_status: pl.DataFrame | None = None,
+) -> dict[str, object]:
+    """Build a two-session fixture for an approved provider-code event."""
+    return {
+        "monthly_symbols": [old_symbol, new_symbol],
+        "trading_days": [pre_effective_day, effective_day],
+        "exact_day_universes": {
+            pre_effective_day: [old_symbol],
+            effective_day: [new_symbol],
+        },
+        "status_payload": {
+            old_symbol: (pl.DataFrame() if old_status is None else old_status),
+            new_symbol: _status(
+                day_values=[pre_effective_day, effective_day],
+                flags=[1, 0],
+            ),
+        },
+        "daily_bar_payload": {
+            old_symbol: _bars(old_symbol, [pre_effective_day]),
+            new_symbol: _bars(new_symbol, [effective_day]),
+        },
+        "positive_trade_fallback": PositiveTradeFallback(
+            queried_pairs={(old_symbol, pre_effective_day)},
+            positive_pairs={(old_symbol, pre_effective_day)},
+            request_params_by_pair={(old_symbol, pre_effective_day): "a" * 64},
+        ),
+    }
+
+
 def test_expected_bar_set_excludes_non_applicable_and_suspended_pairs() -> None:
     result = evaluate_month_completeness(**_valid_inputs())
 
@@ -90,6 +127,135 @@ def test_expected_bar_set_excludes_non_applicable_and_suspended_pairs() -> None:
         CompletenessPairClass.UNRESOLVED.value: 0,
         CompletenessPairClass.EXTRA_RETURNED.value: 0,
     }
+
+
+def test_approved_identity_duplicate_is_tolerated_without_classifying_old_pair() -> None:
+    result = evaluate_month_completeness(**_identity_transition_values())
+
+    assert result.accepted
+    assert result.structural_error_codes == ()
+    assert result.required_bar_pair_count == 2
+    assert result.positive_trade_pair_count == 1
+    assert result.classification_counts[CompletenessPairClass.SUSPENSION_NON_TRADING.value] == 0
+
+
+def test_identity_event_valid_intervals_keep_both_sides_ordinary() -> None:
+    values = _identity_transition_values(
+        old_status=_status(day_values=[20250214], flags=[0]),
+    )
+    values.pop("positive_trade_fallback")
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["302132.SZ"] = _status(day_values=[20250217], flags=[0])
+
+    result = evaluate_month_completeness(**values)
+
+    assert result.accepted
+    assert result.structural_error_codes == ()
+    assert result.required_bar_pair_count == 2
+
+
+def test_identity_transition_helper_reuses_registry_for_a_second_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    synthetic_event = ApprovedIdentityEvent(
+        old_provider_symbol="600001.SH",
+        new_provider_symbol="600002.SH",
+        effective_from=date(2024, 2, 5),
+        original_list_date=date(2020, 1, 1),
+        exchange="SSE",
+    )
+    monkeypatch.setattr(
+        month_completeness_module,
+        "approved_provider_identity_events",
+        lambda: (synthetic_event,),
+    )
+
+    values = _identity_transition_values(
+        old_symbol="600001.SH",
+        new_symbol="600002.SH",
+        pre_effective_day=20240202,
+        effective_day=20240205,
+    )
+    result = evaluate_month_completeness(**values)
+
+    assert result.accepted
+    assert result.structural_error_codes == ()
+    assert result.positive_trade_pair_count == 1
+
+
+def test_unrelated_out_of_scope_status_row_still_fails_closed() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["000001.SZ"] = _status(day_values=[20240102, 20240103], flags=[0, 0])
+
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert "STATUS_OUTSIDE_APPLICABILITY_SET" in result.structural_error_codes
+
+
+def test_conflicting_old_and_new_status_evidence_fails_closed() -> None:
+    values = _identity_transition_values(
+        old_status=_status(day_values=[20250214], flags=[0]),
+    )
+    values.pop("positive_trade_fallback")
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["302132.SZ"] = _status(day_values=[20250214, 20250217], flags=[0, 0])
+
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert "STATUS_OUTSIDE_APPLICABILITY_SET" in result.structural_error_codes
+
+
+def test_ambiguous_identity_registry_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    overlapping_event = ApprovedIdentityEvent(
+        old_provider_symbol="302132.SZ",
+        new_provider_symbol="399999.SZ",
+        effective_from=date(2025, 3, 1),
+        original_list_date=date(2010, 8, 27),
+        exchange="SZSE",
+    )
+    approved_events = month_completeness_module.approved_provider_identity_events()
+    monkeypatch.setattr(
+        month_completeness_module,
+        "approved_provider_identity_events",
+        lambda: approved_events + (overlapping_event,),
+    )
+
+    values = _identity_transition_values()
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert "STATUS_OUTSIDE_APPLICABILITY_SET" in result.structural_error_codes
+
+
+def test_identity_date_gap_or_invalid_interval_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    invalid_event = ApprovedIdentityEvent(
+        old_provider_symbol="300114.SZ",
+        new_provider_symbol="302132.SZ",
+        effective_from=date(2025, 2, 1),
+        original_list_date=date(2025, 2, 3),
+        exchange="SZSE",
+    )
+    monkeypatch.setattr(
+        month_completeness_module,
+        "approved_provider_identity_events",
+        lambda: (invalid_event,),
+    )
+
+    values = _identity_transition_values()
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert "STATUS_OUTSIDE_APPLICABILITY_SET" in result.structural_error_codes
 
 
 def test_security_first_present_on_d_plus_one_is_not_applicable_on_d() -> None:
@@ -676,3 +842,4 @@ def test_unknown_month_semantic_rule_version_cannot_replay() -> None:
     payload["rule_version"] = "amazingdata-month-completeness-rule-v1"
     with pytest.raises(MonthCompletenessError, match="unknown month completeness rule version"):
         MonthCompletenessEvaluation.from_mapping(payload)
+
