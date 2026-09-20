@@ -1,8 +1,21 @@
 # Issue #76：78 个月权威历史构建执行记录
 
-> 状态：**RUNNING at 2023-04 / 39 of 78 capture PASS / 2023-02 replay and 2023-03 fresh capture pass / no publication**
+> 状态：**INTERRUPTED at 2024-08 / 55 of 78 capture PASS / no terminal blocker recorded / no publication**
 
-## 当前恢复检查点（2026-09-18，正式恢复后）
+## 最新运行检查点（2026-09-20，窗口退出后）
+
+- 检查时没有匹配的 runner 进程；本地状态文件最后更新时间为 `2026-09-20T03:40:59.9365129Z`，其内容仍为 `status=RUNNING`、`phase=CAPTURE`，当前月为 `2024-08`、状态为 `CAPTURE_RUNNING`。因此这是一个**未写入终态的进程中断**，不是已确认的 provider 数据 blocker。
+- 状态文件中已完成 `55/78` 个月 `PASS`，最近三个完成月份为 `2024-05`（provider calls `44`）、`2024-06`（`42`）、`2024-07`（`50`）；`2024-08` 尚未形成完整性结论。状态文件的 `failure` 为空。
+- 仅凭落盘状态无法区分 runner 正常返回、未处理异常、窗口被关闭或系统终止；当前不能把原因编造成 API、账号或数据质量问题。旧的 `execution_summary.json` 仍描述早期 `2023-02` 检查点（`37` 个月），与本次 `55/78` 状态不一致，已标记为过期观察，不能作为当前结果依据。
+- 本地安全启动脚本已补充退出码、异常类型和结束停留提示；它不会保存或输出密码。脚本本身位于本地忽略路径，不进入 GitHub。
+
+### 重新启动要求
+
+1. 先确认没有第二个 runner，再使用同一个本地安全启动脚本从现有状态恢复；`2024-08` 需重新取得并通过完整性结论，不能直接记为 PASS。
+2. 启动脚本会再次要求输入密码；用户名、服务地址和端口继续从本机用户环境读取，密码只存在于当前进程及子进程，运行结束后清除。
+3. 恢复成功后，先把新的脱敏状态（至少包含当前月、PASS 数、终态/失败字段和退出码）写入本报告，再继续后续月份；未完成 78/78 前不进入 receipt、coverage、materialization、ordinary-reader、idempotency、changed-content conflict 或 publication。
+
+## 上一个正式恢复检查点（2026-09-18，已被最新状态替代）
 
 - 已在同一安全 PowerShell 进程完成变量注入并正式执行 `--resume --retry-blocked`；当前没有启动第二个 runner。密码只在该进程及其子进程中存在，未写入文件、日志或 GitHub。
 - `2023-02` 已由正式 runner 使用既有 raw 做 retained replay 并通过：required/returned `98,194/98,194`、missing/extra/structural `0/0/0`、`UNRESOLVED=0`、`SUSPENSION_NON_TRADING=173`；本次 replay 的 facade provider calls 为 `43`，没有重新请求该月网络数据。

@@ -1,6 +1,6 @@
 {
   "schema": "cr7.issue76.history-build.v2",
-  "evidence_updated_at_utc": "2026-09-18T02:15:00.0000000Z",
+  "evidence_updated_at_utc": "2026-09-20T03:50:41.4936218Z",
   "issue": 76,
   "baseline": "ad2ad528d3ffec1269772084f0860c8224e632d2",
   "target_window": {
@@ -8,16 +8,38 @@
     "months": 78,
     "start": "2020-01-01"
   },
-  "status": "RUNNING",
+  "status": "INTERRUPTED",
   "stop": {
     "stage": "CAPTURE",
     "blocked_month": null,
-    "completed_capture_months": 39,
-    "not_passed_months": 39,
+    "active_month": "2024-08",
+    "active_month_status": "CAPTURE_RUNNING",
+    "completed_capture_months": 55,
+    "not_passed_months": 23,
     "not_run_after_blocker_months": 0,
     "exception_class": null,
-    "code": null,
-    "sanitized_detail": "Formal resume is running 2023-04 after 2023-02 retained replay and 2023-03 fresh capture passed; no new blocker recorded"
+    "code": "RUNNER_PROCESS_EXITED_WITHOUT_TERMINAL_STATE",
+    "sanitized_detail": "No matching runner process was present; persisted state remained RUNNING/CAPTURE with 2024-08 CAPTURE_RUNNING and no failure object. This is an execution interruption observation, not a provider-data blocker."
+  },
+  "runtime_observation": {
+    "state_file_mtime_utc": "2026-09-20T03:40:59.9365129Z",
+    "state_updated_at": "2026-09-19T20:40:59.929154-07:00",
+    "state_status": "RUNNING",
+    "state_phase": "CAPTURE",
+    "touched_months": 56,
+    "pass_months": 55,
+    "active_month": "2024-08",
+    "active_month_status": "CAPTURE_RUNNING",
+    "last_completed_month": "2024-07",
+    "last_completed_month_summaries": [
+      {"month": "2024-05", "provider_calls": 44},
+      {"month": "2024-06", "provider_calls": 42},
+      {"month": "2024-07", "provider_calls": 50}
+    ],
+    "runner_process_present_at_check": false,
+    "failure_record_present": false,
+    "execution_summary_current": false,
+    "cause_determinable_from_persisted_state": false
   },
   "authorized_remediation": {
     "source": "PR #77 PM review",
