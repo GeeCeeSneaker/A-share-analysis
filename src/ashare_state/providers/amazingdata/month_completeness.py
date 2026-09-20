@@ -33,6 +33,11 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, cast
 
+from ashare_state.canonical.identity import (
+    ApprovedIdentityEvent,
+    approved_provider_identity_events,
+)
+
 __all__ = [
     "APPROVED_300114_SUSPENSION_EVENT",
     "AMAZINGDATA_APPLICABILITY_SEMANTICS_VERSION",
@@ -639,7 +644,13 @@ def evaluate_month_completeness(
     structural_errors.extend(status_errors)
 
     status_pairs = set(status_by_pair)
-    if status_pairs - applicable - prelisting_pairs - postdelisting_pairs:
+    out_of_scope_status_pairs = status_pairs - applicable - prelisting_pairs - postdelisting_pairs
+    explainable_identity_status_pairs = _identity_transition_status_exemptions(
+        status_pairs=status_pairs,
+        out_of_scope_status_pairs=out_of_scope_status_pairs,
+        applicable_pairs=applicable,
+    )
+    if out_of_scope_status_pairs - explainable_identity_status_pairs:
         structural_errors.append("STATUS_OUTSIDE_APPLICABILITY_SET")
     unresolved = applicable - status_pairs
     suspended = {pair for pair, flag in status_by_pair.items() if pair in applicable and flag == 1}
@@ -794,6 +805,95 @@ def _validate_days(values: Collection[int]) -> tuple[list[int], list[str]]:
     if not days:
         errors.append("SESSION_COLLECTION_EMPTY")
     return sorted(set(days)), errors
+
+
+def _identity_transition_status_exemptions(
+    *,
+    status_pairs: Collection[tuple[str, int]],
+    out_of_scope_status_pairs: Collection[tuple[str, int]],
+    applicable_pairs: Collection[tuple[str, int]],
+) -> set[tuple[str, int]]:
+    """Return only provider-identity duplicates safe to ignore structurally.
+
+    The approved identity registry is the only source of transition meaning.
+    An out-of-scope status row is explainable only when exactly one approved
+    event identifies its symbol, the row is outside that symbol's interval,
+    the event's counterpart is valid on the same date, and that counterpart
+    is the exact-day applicable member.  A status row for the counterpart is
+    treated as conflicting evidence, not as something to merge or overwrite.
+
+    This helper deliberately returns no remapped status facts.  The caller's
+    existing ``status_by_pair`` remains keyed by the raw provider symbol, so
+    the ordinary status/snapshot/bar evidence for the applicable symbol still
+    determines classification.
+    """
+    try:
+        events = tuple(approved_provider_identity_events())
+    except (TypeError, ValueError):
+        return set()
+    if any(not isinstance(event, ApprovedIdentityEvent) for event in events):
+        return set()
+
+    status_pair_set = set(status_pairs)
+    applicable_pair_set = set(applicable_pairs)
+    exemptions: set[tuple[str, int]] = set()
+    for symbol, day in out_of_scope_status_pairs:
+        session_date = _date_from_day(day)
+        candidates: list[tuple[ApprovedIdentityEvent, str]] = []
+        for event in events:
+            symbol_interval = event.interval_for(symbol)
+            if symbol_interval is None:
+                continue
+            try:
+                security_id = event.security_id
+            except (AttributeError, TypeError, ValueError, RuntimeError):
+                continue
+            if not security_id:
+                continue
+            candidates.append((event, security_id))
+
+        # Multiple event records for one provider symbol are ambiguous even
+        # when one could otherwise appear to fit the exact-day universe.
+        if len(candidates) != 1:
+            continue
+        event, _security_id = candidates[0]
+        symbol_interval = event.interval_for(symbol)
+        if not _identity_interval_contains(symbol_interval, session_date):
+            counterpart = (
+                event.new_provider_symbol
+                if symbol == event.old_provider_symbol
+                else event.old_provider_symbol
+            )
+            counterpart_pair = (counterpart, day)
+            counterpart_interval = event.interval_for(counterpart)
+            if not _identity_interval_contains(counterpart_interval, session_date):
+                continue
+            if counterpart_pair not in applicable_pair_set:
+                continue
+            if counterpart_pair in status_pair_set:
+                # Do not accept duplicate/contradictory old/new evidence.
+                continue
+            exemptions.add((symbol, day))
+    return exemptions
+
+
+def _identity_interval_contains(
+    interval: tuple[date, date | None] | None,
+    session_date: date,
+) -> bool:
+    """Return whether a governed half-open identity interval contains a date."""
+    if interval is None:
+        return False
+    start, end = interval
+    if (
+        not isinstance(start, date)
+        or isinstance(start, datetime)
+        or (end is not None and (not isinstance(end, date) or isinstance(end, datetime)))
+    ):
+        return False
+    if end is not None and start >= end:
+        return False
+    return start <= session_date and (end is None or session_date < end)
 
 
 def _status_rows(
@@ -1198,3 +1298,4 @@ def _sha256_hex(value: str) -> str:
     from ashare_state.research.models import sha256_hex
 
     return sha256_hex(value)
+
