@@ -1,6 +1,6 @@
 {
   "schema": "cr7.issue76.history-build.v2",
-  "evidence_updated_at_utc": "2026-09-20T09:17:10.6441789Z",
+  "evidence_updated_at_utc": "2026-09-20T11:33:40.522190Z",
   "issue": 76,
   "baseline": "ad2ad528d3ffec1269772084f0860c8224e632d2",
   "target_window": {
@@ -11,29 +11,29 @@
   "status": "STOP(BLOCKED)",
   "stop": {
     "stage": "CAPTURE",
-    "blocked_month": "2025-02",
-    "completed_capture_months": 61,
-    "not_passed_months": 17,
-    "not_run_after_blocker_months": 16,
+    "blocked_month": "2025-03",
+    "completed_capture_months": 62,
+    "not_passed_months": 16,
+    "not_run_after_blocker_months": 15,
     "exception_class": "RuntimeError",
-    "code": "MONTH_COMPLETENESS_NOT_ACCEPTED",
-    "sanitized_detail": "2025-02 provider capture returned equal required/returned bar pairs with no unresolved pairs, but fail-closed on one STATUS_OUTSIDE_APPLICABILITY_SET structural error caused by a provider-code transition."
+    "code": "ONLINE_CAPTURE_AUTH_ENV_NOT_VISIBLE",
+    "sanitized_detail": "2025-02 retained replay passed after the approved identity-transition applicability fix; 2025-03 stopped before any provider request because TGW_PASSWORD was not visible in the same Codex execution process."
   },
   "runtime_observation": {
-    "state_file_mtime_utc": "2026-09-20T08:02:13.8040243Z",
-    "state_updated_at": "2026-09-20T01:02:13.794443-07:00",
+    "state_file_mtime_utc": "2026-09-20T11:33:40.522190Z",
+    "state_updated_at": "2026-09-20T04:33:40.522190-07:00",
     "state_status": "STOP(BLOCKED)",
     "state_phase": "CAPTURE",
-    "touched_months": 62,
-    "pass_months": 61,
-    "blocked_month": "2025-02",
-    "blocked_month_status": "STOP(BLOCKED)",
+    "touched_months": 63,
+    "pass_months": 62,
+    "blocked_month": "2025-03",
+    "blocked_month_status": "CAPTURE_RUNNING_BEFORE_AUTH",
     "blocked_month_provider_calls": 30,
-    "last_completed_month": "2025-01",
+    "last_completed_month": "2025-02",
     "failure_record_present": true,
     "failure_exception_class": "RuntimeError",
     "failure_stage": "CAPTURE",
-    "failure_detail": "month 2025-02 completeness was not accepted",
+    "failure_detail": "missing safe credential environment variables: TGW_PASSWORD",
     "completeness_summary": {
       "monthly_security_count": 5133,
       "session_count": 18,
@@ -43,20 +43,26 @@
       "extra_returned_pair_count": 0,
       "unresolved_pair_count": 0,
       "provider_api_shape_or_request_mismatch": 1,
-      "structural_error_codes": ["STATUS_OUTSIDE_APPLICABILITY_SET"]
+      "structural_error_codes": [
+        "STATUS_OUTSIDE_APPLICABILITY_SET"
+      ]
     },
     "identity_transition_observation": {
+      "status": "REMEDIATED_IN_COMPLETENESS_BOUNDARY",
       "old_provider_symbol": "300114.SZ",
       "new_provider_symbol": "302132.SZ",
-      "old_code_exact_days": ["2025-02-05", "2025-02-06", "2025-02-07", "2025-02-10", "2025-02-11", "2025-02-12", "2025-02-13", "2025-02-14"],
-      "new_code_effective_exact_day": "2025-02-17",
-      "status_rows_outside_applicability_count": 8,
-      "status_symbol_and_flag": "302132.SZ / IS_SUSP_SEC=0"
+      "effective_date": "2025-02-17",
+      "out_of_interval_status_rows_tolerated": 8,
+      "counterpart_status_manufactured": false,
+      "raw_symbols_preserved": true,
+      "structural_error_codes_after_replay": []
     },
     "runner_process_present_after_stop": false,
     "secure_launcher_present_after_stop": true,
     "execution_summary_current": true,
-    "cause_determinable_from_persisted_state": true
+    "cause_determinable_from_persisted_state": true,
+    "secure_runner_process_started": false,
+    "codex_process_safe_tgw_variables_present": false
   },
   "authorized_remediation": {
     "source": "PR #77 PM review",
@@ -67,16 +73,17 @@
     "semantics": "session >= DELISTDATE is NOT_APPLICABLE_SESSION; session < DELISTDATE retains ordinary status/bar semantics; missing or malformed DELISTDATE remains unresolved when no other valid evidence exists"
   },
   "completed_capture": {
-    "count": 61,
-    "count_basis": "latest persisted execution_state: 61 months PASS and 2025-02 STOP(BLOCKED)",
+    "count": 62,
+    "count_basis": "latest persisted execution_state: 62 months PASS; 2025-03 stopped before provider request",
     "known_replay_examples": [
       "2020-01",
       "2020-02",
       "2023-01",
-      "2023-02"
+      "2023-02",
+      "2025-02"
     ],
-    "latest_completed_month": "2025-01",
-    "blocked_month": "2025-02",
+    "latest_completed_month": "2025-02",
+    "blocked_month": "2025-03",
     "all_completed_months_not_finalized": true
   },
   "authorized_official_suspension_event": {
@@ -1455,6 +1462,60 @@
       "idempotency": "NOT_REACHED",
       "changed_content_conflict": "NOT_REACHED",
       "provider_calls_during_capture": 50
+    },
+    {
+      "month": "2025-02",
+      "research_split": "development",
+      "status": "CAPTURE_PASS_NOT_FINALIZED",
+      "execution_mode": "RETAINED_REPLAY",
+      "monthly_security_count": 5133,
+      "session_count": 18,
+      "required_pair_count": 92190,
+      "returned_pair_count": 92190,
+      "returned_row_count": 92190,
+      "unresolved_pair_count": 0,
+      "missing_required_pair_count": 0,
+      "extra_returned_pair_count": 0,
+      "structural_error_count": 0,
+      "classification_counts": {
+        "EXTRA_RETURNED": 0,
+        "NOT_APPLICABLE_SESSION": 33,
+        "POSITIVE_TRADE_COUNT_ACTIVE": 8,
+        "PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH": 0,
+        "SUSPENSION_NON_TRADING": 171,
+        "UNEXPLAINED_MISSING": 0,
+        "UNRESOLVED": 0
+      },
+      "calendar_request_id": "012200ed-1f00-4995-a3e9-f15b51731618",
+      "hist_code_list_request_id": "d5cd69c5-d6b5-467c-b024-7e625c8a61ad",
+      "stock_basic_request_id": "51156186-efec-4920-9f7a-b515042e58ba",
+      "history_stock_status_request_id": "22cff853-971f-4dd3-9efe-8f7d4c9e2c2f",
+      "daily_bar_request_id": "3185c250-7653-4449-9ac9-558682966eae",
+      "receipt": "NOT_REACHED",
+      "coverage": "NOT_REACHED",
+      "materialization": "NOT_REACHED",
+      "reader": "NOT_REACHED",
+      "idempotency": "NOT_REACHED",
+      "changed_content_conflict": "NOT_REACHED",
+      "provider_calls_during_capture": 30,
+      "outbound_provider_calls": 0,
+      "provider_call_semantics": "30 in-memory retained-facade method invocations; zero SDK/network provider requests",
+      "identity_fix_commit": "a5093e9ef9eefab2fd981441dd9873608554c6bc"
+    },
+    {
+      "month": "2025-03",
+      "research_split": "development",
+      "status": "CAPTURE_BLOCKED_BEFORE_PROVIDER_REQUEST",
+      "execution_mode": "FRESH_PROVIDER",
+      "provider_calls_during_capture": 0,
+      "outbound_provider_calls": 0,
+      "blocker": "missing safe credential environment variables: TGW_PASSWORD",
+      "receipt": "NOT_REACHED",
+      "coverage": "NOT_REACHED",
+      "materialization": "NOT_REACHED",
+      "reader": "NOT_REACHED",
+      "idempotency": "NOT_REACHED",
+      "changed_content_conflict": "NOT_REACHED"
     }
   ],
   "acceptance": {
@@ -1465,14 +1526,20 @@
     "ordinary_reader_full_partition_set": false,
     "idempotency_and_conflict": false,
     "publication": false,
-    "exact_head_qa_and_ci": "local QA passed; preceding docs head e15128f431d23f0c512d99d6e15d4d29185274b8 exact-head CI run 659 (workflow 35294943702) passed on Ubuntu 3.14, Windows 3.14, and Windows 3.12; latest docs head b492e068720ebda6b25fe4b07f195e759f484577 CI run 660 is in progress; GT-H3B run 170 (workflow 35296661573) skipped by scope"
+    "exact_head_qa_and_ci": "identity-transition fix local unit 500 passed/1 skipped; exact-head CI run 666 passed on required platforms; GT-H3B run 176 skipped by scope"
   },
   "local_qa": {
     "focused_pytest": "72 passed",
     "full_pytest": "1879 passed, 3 skipped",
     "ruff_check": "PASS",
     "ruff_format_check": "PASS",
-    "mypy": "PASS"
+    "mypy": "PASS",
+    "current_identity_fix_focused_pytest": "43 passed",
+    "current_identity_fix_unit_pytest": "500 passed, 1 skipped",
+    "current_identity_fix_ruff": "PASS",
+    "current_identity_fix_format": "PASS",
+    "current_identity_fix_mypy": "PASS",
+    "exact_head_ci": "PASS (CI run 666; GT-H3B run 176 skipped by scope)"
   },
   "security": {
     "tracked_record_contains_credentials": false,
@@ -1488,20 +1555,19 @@
     "speculative reconciliation"
   ],
   "current_execution_check": {
-    "checked_at_utc": "2026-09-18T02:15:00.0000000Z",
-    "matching_runner_process_found": true,
+    "checked_at_utc": "2026-09-20T11:33:40.522190Z",
+    "matching_runner_process_found": false,
     "codex_process_safe_tgw_variables_present": false,
-    "secure_runner_process_started": true,
+    "secure_runner_process_started": false,
     "formal_resume_started": true,
     "state_unchanged": false,
-    "active_month": "2023-04",
-    "sanitized_reason": "The visible child PowerShell process owns the process-local variables and is running the corrected runner; 2023-02 replay and 2023-03 fresh capture have passed, and 2023-04 is CAPTURE_RUNNING."
+    "active_month": "2025-03",
+    "sanitized_reason": "2025-02 retained replay passed with no outbound provider request; 2025-03 stopped before provider request because TGW_PASSWORD was not visible to the Codex execution process."
   },
   "next_execution_required": [
-    "Use the locally corrected runner that passes the approved cross-month event whenever the event interval intersects the month; do not broaden zero-activity semantics",
-    "Do not start a second runner; let the current secure process continue from 2023-04 month by month and stop at any new blocker",
-    "If a later restart is needed, read the saved non-password variables locally and prompt for the password only in the same process, without committing or printing any values",
-    "After all 78 capture months pass, run receipt, authoritative coverage, materialization, ordinary-reader, idempotency and changed-content conflict gates"
+    "Make TGW_USERNAME, TGW_PASSWORD, TGW_SERVER_VIP and TGW_SERVER_PORT available only to the same Codex runner process; do not commit, print or screenshot any values.",
+    "Resume from 2025-03; do not replay or refetch the already-passed 2025-02 evidence unless the persisted contract requires it.",
+    "Continue month by month to 2026-06 and stop at any genuinely novel provider/data blocker.",
+    "After all 78 capture months pass, run receipt, authoritative coverage, materialization, ordinary-reader, idempotency and changed-content conflict gates."
   ]
 }
-
