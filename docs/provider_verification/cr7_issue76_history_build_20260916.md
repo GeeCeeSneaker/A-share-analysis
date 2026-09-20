@@ -1,8 +1,22 @@
 # Issue #76：78 个月权威历史构建执行记录
 
-> 状态：**STOP(BLOCKED) at 2025-02 / 61 of 78 capture PASS / identity-applicability mismatch / no publication**
+## 当前整改检查点（2026-09-20：身份切换适用性修复与留存重放）
 
-## 最新正式运行检查点（2026-09-20，2025-02 fail-closed）
+> 状态：**STOP(BLOCKED) at 2025-03 / 62 of 78 capture-or-retained-replay PASS / no publication**
+
+本次已按 PM review 在既有 completeness/status applicability 边界接入 ApprovedIdentityEvent 注册表：
+
+- 对批准事件一侧的越区间状态行，仅当同一事件的另一侧是该交易日 exact-day applicable member 时消除结构误报；不重写原始 provider symbol、不制造另一侧状态，也不改 daily-bar/request pair。
+- 对应回归覆盖当前事件、第二个合成批准事件、半开区间边界、无关行、歧义/重叠、非法区间以及 old/new 冲突；失败证据仍 fail-closed。
+- 最终代码/测试提交为 `a5093e9ef9eefab2fd981441dd9873608554c6bc`；本地 unit 为 `500 passed, 1 skipped`，精确提交 CI run `666` 成功，GT-H3B run `176` 按范围跳过。
+- 使用已保留 raw 做 2025-02 retained replay：`PASS`，月度证券 `5,133`、交易日 `18`，required/returned `92,190/92,190`，missing/extra/unresolved/structural 均为 `0`。这次重放没有 SDK/网络 provider 请求；状态文件中的 `30` 是 retained in-memory facade 的方法调用计数，不是外部请求。
+- 2025-03 尚未发起 provider 请求，在同一 Codex 执行进程的安全环境检查处停止：`TGW_PASSWORD` 不可见。账号、口令、服务地址、原始 payload 和本地 ledger 均未写入 GitHub。
+
+因此当前不是数据完整性失败，也不是 78/78 完成；下一步是让 2025-03 起始在线 runner 在同一进程安全获得变量后继续，直到新的真实 blocker 或 78/78 capture closure。后续 receipt、authoritative coverage、materialization、ordinary-reader、idempotency 和 changed-content conflict gates 仍未到达。
+
+> 历史状态（修复前）：**STOP(BLOCKED) at 2025-02 / 61 of 78 capture PASS / identity-applicability mismatch / no publication**
+
+## 历史检查点（2026-09-20，身份修复前的 2025-02 fail-closed）
 
 - 这次不是窗口异常退出：runner 已将状态正式写成 `STOP(BLOCKED)`，安全启动窗口仍停留在结束提示；当前没有第二个 runner。状态文件最后更新时间为 `2026-09-20T08:02:13.8040243Z`。
 - 已完成 `61/78` 个月 capture `PASS`；最近通过的是 `2024-09` 至 `2025-01`，`2025-02` 是第一个未通过月份，之后 `2025-03` 至 `2026-06` 的 `16` 个月尚未运行。此次 `2025-02` 实际发生 `30` 次 provider calls，失败不是认证或窗口问题。
