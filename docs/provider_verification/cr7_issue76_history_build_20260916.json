@@ -1,6 +1,6 @@
 {
   "schema": "cr7.issue76.history-build.v2",
-  "evidence_updated_at_utc": "2026-09-20T11:33:40.522190Z",
+  "evidence_updated_at_utc": "2026-09-20T21:59:39Z",
   "issue": 76,
   "baseline": "ad2ad528d3ffec1269772084f0860c8224e632d2",
   "target_window": {
@@ -11,42 +11,30 @@
   "status": "STOP(BLOCKED)",
   "stop": {
     "stage": "CAPTURE",
-    "blocked_month": "2025-03",
-    "completed_capture_months": 62,
-    "not_passed_months": 16,
-    "not_run_after_blocker_months": 15,
-    "exception_class": "RuntimeError",
-    "code": "ONLINE_CAPTURE_AUTH_ENV_NOT_VISIBLE",
-    "sanitized_detail": "2025-02 retained replay passed after the approved identity-transition applicability fix; 2025-03 stopped before any provider request because TGW_PASSWORD was not visible in the same Codex execution process."
+    "blocked_month": "2025-09",
+    "completed_capture_months": 68,
+    "not_passed_months": 10,
+    "not_run_after_blocker_months": 9,
+    "exception_class": "ProviderSdkInternalError",
+    "code": "PROVIDER_QUERY_FAILURE_UNCLASSIFIED",
+    "sanitized_detail": "InfoData.get_stock_basic returned generic 查询失败 after 2025-09 hist_code_list returned 5161 rows; no stock_basic raw evidence was persisted. The classifier intentionally leaves params/server/entitlement cause unresolved."
   },
   "runtime_observation": {
-    "state_file_mtime_utc": "2026-09-20T11:33:40.522190Z",
-    "state_updated_at": "2026-09-20T04:33:40.522190-07:00",
+    "state_file_mtime_utc": "2026-09-20T21:59:39Z",
+    "state_updated_at": "2026-09-20T21:59:39Z",
     "state_status": "STOP(BLOCKED)",
     "state_phase": "CAPTURE",
-    "touched_months": 63,
-    "pass_months": 62,
-    "blocked_month": "2025-03",
-    "blocked_month_status": "CAPTURE_RUNNING_BEFORE_AUTH",
-    "blocked_month_provider_calls": 30,
-    "last_completed_month": "2025-02",
+    "touched_months": 69,
+    "pass_months": 68,
+    "blocked_month": "2025-09",
+    "blocked_month_status": "CAPTURE_RUNNING_BEFORE_STOCK_BASIC_RETURN",
+    "blocked_month_provider_calls": null,
+    "last_completed_month": "2025-08",
     "failure_record_present": true,
-    "failure_exception_class": "RuntimeError",
+    "failure_exception_class": "ProviderSdkInternalError",
     "failure_stage": "CAPTURE",
-    "failure_detail": "missing safe credential environment variables: TGW_PASSWORD",
-    "completeness_summary": {
-      "monthly_security_count": 5133,
-      "session_count": 18,
-      "required_pair_count": 92190,
-      "returned_pair_count": 92190,
-      "missing_required_pair_count": 0,
-      "extra_returned_pair_count": 0,
-      "unresolved_pair_count": 0,
-      "provider_api_shape_or_request_mismatch": 1,
-      "structural_error_codes": [
-        "STATUS_OUTSIDE_APPLICABILITY_SET"
-      ]
-    },
+    "failure_detail": "InfoData.get_stock_basic: generic query failure (unclassified; could be params/server/entitlement): 查询失败",
+    "completeness_summary": null,
     "identity_transition_observation": {
       "status": "REMEDIATED_IN_COMPLETENESS_BOUNDARY",
       "old_provider_symbol": "300114.SZ",
@@ -61,8 +49,41 @@
     "secure_launcher_present_after_stop": true,
     "execution_summary_current": true,
     "cause_determinable_from_persisted_state": true,
-    "secure_runner_process_started": false,
-    "codex_process_safe_tgw_variables_present": false
+    "secure_runner_process_started": true,
+    "codex_process_safe_tgw_variables_present": false,
+    "last_completed_month_completeness_summary": {
+      "monthly_security_count": 5133,
+      "session_count": 18,
+      "required_pair_count": 92190,
+      "returned_pair_count": 92190,
+      "missing_required_pair_count": 0,
+      "extra_returned_pair_count": 0,
+      "unresolved_pair_count": 0,
+      "provider_api_shape_or_request_mismatch": 1,
+      "structural_error_codes": [
+        "STATUS_OUTSIDE_APPLICABILITY_SET"
+      ]
+    },
+    "blocked_request_observation": {
+      "hist_code_list_request_id": "00d56838-f7b5-4f4f-87ff-203251a647e2",
+      "hist_code_list_row_count": 5161,
+      "stock_basic_raw_evidence_persisted": false,
+      "prior_successful_stock_basic_counts": {
+        "2025-07": 5159,
+        "2025-08": 5153
+      },
+      "new_symbols_vs_2025_08": [
+        "001285.SZ",
+        "301563.SZ",
+        "301575.SZ",
+        "301584.SZ",
+        "301656.SZ",
+        "301668.SZ",
+        "603370.SH",
+        "603418.SH"
+      ],
+      "root_cause_status": "UNDETERMINED_PROVIDER_QUERY_FAILURE"
+    }
   },
   "authorized_remediation": {
     "source": "PR #77 PM review",
@@ -1555,19 +1576,18 @@
     "speculative reconciliation"
   ],
   "current_execution_check": {
-    "checked_at_utc": "2026-09-20T11:33:40.522190Z",
+    "checked_at_utc": "2026-09-20T21:59:39Z",
     "matching_runner_process_found": false,
     "codex_process_safe_tgw_variables_present": false,
-    "secure_runner_process_started": false,
+    "secure_runner_process_started": true,
     "formal_resume_started": true,
     "state_unchanged": false,
-    "active_month": "2025-03",
-    "sanitized_reason": "2025-02 retained replay passed with no outbound provider request; 2025-03 stopped before provider request because TGW_PASSWORD was not visible to the Codex execution process."
+    "active_month": "2025-09",
+    "sanitized_reason": "2025-03 through 2025-08 passed after the broker-enabled local runtime fix; 2025-09 hist_code_list returned 5161 rows, then InfoData.get_stock_basic returned generic 查询失败 and the runner stopped fail-closed."
   },
   "next_execution_required": [
-    "Make TGW_USERNAME, TGW_PASSWORD, TGW_SERVER_VIP and TGW_SERVER_PORT available only to the same Codex runner process; do not commit, print or screenshot any values.",
-    "Resume from 2025-03; do not replay or refetch the already-passed 2025-02 evidence unless the persisted contract requires it.",
-    "Continue month by month to 2026-06 and stop at any genuinely novel provider/data blocker.",
-    "After all 78 capture months pass, run receipt, authoritative coverage, materialization, ordinary-reader, idempotency and changed-content conflict gates."
+    "Keep the 2025-09 blocker recorded; do not skip or delete the eight newly observed symbols and do not fabricate a successful stock_basic exchange.",
+    "After a fresh login, retry the same 2025-09 input once. If it repeats, run a controlled chunk/new-symbol probe to distinguish transient provider failure from request or symbol-triggered failure.",
+    "Continue month by month only after 2025-09 reaches PASS; after all 78 capture months pass, run receipt, authoritative coverage, materialization, ordinary-reader, idempotency and changed-content conflict gates."
   ]
 }
