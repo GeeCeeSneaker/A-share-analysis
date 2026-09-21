@@ -436,9 +436,7 @@ class TestTimeBudget:
                     backoff_base_seconds=5.0,
                     max_backoff_seconds=6.0,
                     jitter_fraction=0.0,
-                    retryable_generic_query_failure_endpoints=(
-                        "InfoData.get_stock_basic",
-                    ),
+                    retryable_generic_query_failure_endpoints=("InfoData.get_stock_basic",),
                 ),
                 endpoint="InfoData.get_stock_basic",
                 sleep=delays.append,
@@ -468,9 +466,7 @@ class TestTimeBudget:
                 retry=RetryPolicy(
                     max_retries=2,
                     backoff_base_seconds=5.0,
-                    retryable_generic_query_failure_endpoints=(
-                        "InfoData.get_stock_basic",
-                    ),
+                    retryable_generic_query_failure_endpoints=("InfoData.get_stock_basic",),
                 ),
                 endpoint="MarketData.query_kline",
             )
@@ -498,9 +494,7 @@ class TestTimeBudget:
                     backoff_base_seconds=5.0,
                     max_backoff_seconds=6.0,
                     jitter_fraction=0.0,
-                    retryable_generic_query_failure_endpoints=(
-                        "InfoData.get_stock_basic",
-                    ),
+                    retryable_generic_query_failure_endpoints=("InfoData.get_stock_basic",),
                 ),
                 endpoint="InfoData.get_stock_basic",
                 sleep=delays.append,
