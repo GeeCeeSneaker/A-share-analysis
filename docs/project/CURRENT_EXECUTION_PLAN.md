@@ -4,6 +4,21 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.4. 2026-09-21 provider 查询失败有界重试整改
+
+> 状态：**代码已补齐并通过离线 QA；在线 2025-09 重跑待执行，仍 STOP(BLOCKED)**
+
+针对 2025-09 的 InfoData.get_stock_basic 通用“查询失败”，已完成有界、延迟、端点准入的重试实现，详见 [重试整改报告](../provider_verification/cr7_issue76_provider_retry_20260920.md)：
+
+- 通用 QUERY_FAIL_UNCLASSIFIED 默认仍不可重试；只有历史运行实际触发的 InfoData.get_stock_basic 端点在本次 Issue 的 runner 配置中显式放行。
+- 最多 2 次重试，等待约 30 秒、60 秒，带 ±25% jitter，单次等待封顶 120 秒；不做立即重试或无限重试。
+- 认证、权限、schema、普通未知 SDK 错误不因本整改改变分类或获得重试资格；重试耗尽仍 STOP(BLOCKED)。
+- provider envelope 的 attempt_count 和预算耗尽上下文保留重试事实，便于在线结果审阅。
+- 本地 ignored runner 已同步该配置，但 data/spike 不属于 Git 源码；仓库提交的是共享 retry policy、回归测试和运行要求，不包含凭据、原始 payload 或本地状态。
+- 离线验证：provider focused 63 passed；tests/unit 504 passed、1 skipped；Ruff 与 mypy 通过。尚未声称 2025-09 在线恢复或 78/78 完成。
+
+下一步：在同一安全 PowerShell 进程执行 --resume --retry-blocked；若 3 次仍为同一通用失败，保持 STOP(BLOCKED)，按原计划做受控分块/新增证券窄探针，不扩大重试次数或端点 allowlist。receipt、coverage、materialization、publication 及 B1-B7/Production 仍未授权。
+
 ## 0.3. 2026-09-20 当前调度覆盖 — Issue #76 2025-09 provider 查询阻断
 
 > 状态：**STOP(BLOCKED) at 2025-09 / 68 of 78 capture PASS / no publication**
