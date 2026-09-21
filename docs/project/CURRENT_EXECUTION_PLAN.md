@@ -16,6 +16,7 @@
 - provider envelope 的 attempt_count 和预算耗尽上下文保留重试事实，便于在线结果审阅。
 - 本地 ignored runner 已同步该配置，但 data/spike 不属于 Git 源码；仓库提交的是共享 retry policy、回归测试和运行要求，不包含凭据、原始 payload 或本地状态。
 - 离线验证：provider focused 64 passed；tests/unit 505 passed、1 skipped；Ruff 与 mypy 通过。重试耗尽仍保留 ProviderSdkInternalError，并附带尝试次数；尚未声称 2025-09 在线恢复或 78/78 完成。
+- exact-head CI #684 的 Windows 3.14、Windows 3.12、Ubuntu 3.14 三个 required jobs 已全部 success；GT-H3B #194 按策略 skipped。
 
 下一步：在同一安全 PowerShell 进程执行 --resume --retry-blocked；若 3 次仍为同一通用失败，保持 STOP(BLOCKED)，按原计划做受控分块/新增证券窄探针，不扩大重试次数或端点 allowlist。receipt、coverage、materialization、publication 及 B1-B7/Production 仍未授权。
 
