@@ -176,4 +176,3 @@ def _default_retryable(exc: Exception) -> bool:
     # reaching here; a raw exception at this level is a programming error
     # and must not retry (audit P0-03: no silent retry of unknowns).
     return False
-
