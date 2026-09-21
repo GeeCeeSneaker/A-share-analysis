@@ -138,6 +138,22 @@ def run_with_budget(
             if attempt > retry.max_retries or time.monotonic() >= deadline:
                 break
             sleep(retry.sleep_for(attempt))
+    # The endpoint-specific generic query-failure exception is allowed to
+    # retry only as a controlled policy exception.  If it remains broken,
+    # preserve its true class instead of relabeling a persistent server/SDK
+    # response as a timeout; attach the retry outcome for the audit trail.
+    if (
+        isinstance(last_exc, ProviderSdkInternalError)
+        and last_exc.context.get("classification_rule_id") == "QUERY_FAIL_UNCLASSIFIED"
+    ):
+        last_exc.context.update(
+            {
+                "retry_exhausted": True,
+                "retry_attempts": attempt,
+                "retry_budget_seconds": budget.query_timeout_seconds,
+            }
+        )
+        raise last_exc
     raise ProviderTimeoutError(
         f"{endpoint}: budget exhausted after {attempt} attempt(s): {last_exc}",
         context={
