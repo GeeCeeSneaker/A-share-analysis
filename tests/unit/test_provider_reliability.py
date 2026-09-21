@@ -248,4 +248,3 @@ class _FakeSession:
 class _FakeIdentity:
     sdk_version = "fake-1.0"
     tgw_runtime_version = "fake-rt"
-
