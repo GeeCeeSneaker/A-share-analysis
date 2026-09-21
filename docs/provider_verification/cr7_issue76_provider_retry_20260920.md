@@ -34,6 +34,7 @@ ProviderSdkInternalError / QUERY_FAIL_UNCLASSIFIED，不能仅凭这条消息证
 - full tests/unit：505 passed，1 skipped。
 - Ruff：通过。
 - mypy（provider timeout/provider facade）：通过。
+- GitHub CI #684：Windows 3.14、Windows 3.12、Ubuntu 3.14 三个 required jobs 全部成功；GT-H3B controlled execution #194 按策略 skipped。
 - 尚未用正式账号重跑 2025-09；因此不能把本次代码验证写成在线数据已恢复，也不能宣称 Issue #76 已解除阻断。
 
 ## 下一次在线运行要求
