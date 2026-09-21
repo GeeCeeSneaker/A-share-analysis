@@ -557,4 +557,3 @@ class TestSdkLoaderAbsent:
 
         monkeypatch.setattr(loader, "SDK_MODULE", "definitely_not_installed_xyz")
         assert loader.probe_identity(require_sdk=False) is None
-
