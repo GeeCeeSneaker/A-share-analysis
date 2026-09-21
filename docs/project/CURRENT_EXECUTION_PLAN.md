@@ -4,6 +4,17 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.3. 2026-09-20 当前调度覆盖 — Issue #76 2025-09 provider 查询阻断
+
+> 状态：**STOP(BLOCKED) at 2025-09 / 68 of 78 capture PASS / no publication**
+
+最新正式运行结果已写入 [Issue #76 执行记录](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON：
+
+- broker-enabled 本地运行环境与最新代码已正常加载；2025-02 retained replay、2025-03 至 2025-08 均已通过，累计 68/78 个月。
+- 2025-09 的 hist_code_list 返回 5,161 个证券；随后 InfoData.get_stock_basic 返回未归因的通用“查询失败”，runner 按 fail-closed 写入 ProviderSdkInternalError 并停止。该错误当前不证明是账号、权限、参数上限或服务瞬时故障。
+- 不得跳过 2025-09、删减新增证券、伪造 stock_basic 成功或提前进入 receipt/coverage/materialization/publication。
+- 下一步是重新登录后对同一输入做一次明确重试；若重复，再做受控分块/新增证券窄探针，区分 provider 瞬时故障与请求/证券触发条件。只有 78/78 capture PASS 后才能进入下游 gates。
+
 ## 0.2. 2026-09-18 当前调度覆盖 — Issue #76 2023-02 capture 诊断
 
 > 状态：**STOP(BLOCKED) at 2023-02 / raw capture obtained / offline replay fixed the cross-month orchestration defect / no publication**
