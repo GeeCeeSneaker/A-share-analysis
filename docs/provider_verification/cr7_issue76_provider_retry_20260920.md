@@ -12,7 +12,7 @@ ProviderSdkInternalError / QUERY_FAIL_UNCLASSIFIED，不能仅凭这条消息证
 - 只有当前 Issue 观察到的 InfoData.get_stock_basic 端点在历史构建 runner 中显式允许重试。
 - 首次失败后最多再尝试 2 次；默认运行参数为指数退避约 30 秒、60 秒，抖动 ±25%，单次等待封顶 120 秒。
 - 认证、权限、schema、普通未知 SDK 错误不因本策略获得重试资格。
-- 重试耗尽仍然 STOP(BLOCKED)，不得伪造 stock_basic 成功、删减证券或跳过月份。
+- 重试耗尽仍然 STOP(BLOCKED)，不得伪造 stock_basic 成功、删减证券或跳过月份；最终仍保留 ProviderSdkInternalError，并在 context 标明已重试次数。
 - 每次 provider exchange 的 attempt_count 继续写入失败/成功 envelope，便于复核实际是否发生重试；预算耗尽错误额外保留 last_error_class 与分类规则 ID。
 
 ## 实现位置
@@ -30,8 +30,8 @@ ProviderSdkInternalError / QUERY_FAIL_UNCLASSIFIED，不能仅凭这条消息证
 
 ## 验证
 
-- focused provider tests：63 passed。
-- full tests/unit：504 passed，1 skipped。
+- focused provider tests：64 passed。
+- full tests/unit：505 passed，1 skipped。
 - Ruff：通过。
 - mypy（provider timeout/provider facade）：通过。
 - 尚未用正式账号重跑 2025-09；因此不能把本次代码验证写成在线数据已恢复，也不能宣称 Issue #76 已解除阻断。
