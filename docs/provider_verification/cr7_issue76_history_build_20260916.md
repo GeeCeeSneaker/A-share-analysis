@@ -1,5 +1,24 @@
 # Issue #76：78 个月权威历史构建执行记录
 
+## 最新运行检查点（2026-09-20：2025-09 provider 查询阻断）
+
+> 状态：**STOP(BLOCKED) at 2025-09 / 68 of 78 capture PASS / no publication**
+
+本次重启已使用本机 broker-enabled Python 环境加载最新代码，已越过认证和 SDK 缺失边界；这不是账号、密码、端口、窗口或 AmazingData/tgw 缺失问题。
+
+- 2025-02 retained replay、2025-03 至 2025-08 均为 PASS，当前累计 68/78 个月 capture PASS；2025-09 是首个未通过月份，之后还有 9 个月未运行。
+- 2025-09 的 BaseData.get_hist_code_list 已成功返回 5,161 个证券，raw request 为 00d56838-f7b5-4f4f-87ff-203251a647e2；与 2025-08 的 5,153 个相比新增 8 个 provider symbol：001285.SZ、301563.SZ、301575.SZ、301584.SZ、301656.SZ、301668.SZ、603370.SH、603418.SH。这只是输入差异观察，不是根因结论。
+- 阻断发生在随后唯一的 InfoData.get_stock_basic(code_list) 调用：ProviderSdkInternalError，cause chain 为 Exception，脱敏原文为“generic query failure ... 查询失败”。2025-09 没有形成 stock_basic raw meta，因此不能把该月标为部分成功。
+- 代码对该通用错误按低置信度、未归因的 SDK 内部错误处理，当前 runner 的 RetryPolicy(max_retries=0) 不会自动重试；fail-closed 逻辑因此正式写入 STOP(BLOCKED)，没有跳过该月。
+- 这不是已证实的参数上限：2025-07 的 stock_basic 曾以 5,159 个代码成功，2025-08 以 5,153 个代码成功。当前仍无法仅凭“查询失败”区分服务瞬时故障、某个新增证券/请求组合问题或账号侧接口限制。
+- 停止后没有活动 runner 子进程；安全启动窗口仅停留在结束提示。凭证、账号身份、服务地址、原始 payload 和本地 ledger 均未写入 GitHub。
+
+### 最小下一步
+
+1. 保持 2025-09 阻断，不跳过、不删减 8 个新增证券、不把失败调用伪造为 raw 成功。
+2. 重新登录后对同一 2025-09 输入做一次明确重试；若仍失败，再做受控的分块/新增证券窄探针，以区分 provider 瞬时故障与请求/证券数据触发条件。
+3. 只有 2025-09 及后续月份全部 capture PASS，才可进入 receipt、coverage、materialization、ordinary-reader、幂等、冲突和 publication gates。
+
 ## 当前整改检查点（2026-09-20：身份切换适用性修复与留存重放）
 
 > 状态：**STOP(BLOCKED) at 2025-03 / 62 of 78 capture-or-retained-replay PASS / no publication**
