@@ -52,3 +52,32 @@ ProviderSdkInternalError / QUERY_FAIL_UNCLASSIFIED，不能仅凭这条消息证
 - 跳过 2025-09 或其他月份；
 - receipt、coverage、materialization、publication；
 - Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1、strategy 工作。
+
+
+## 2026-09-21 follow-up：78 月物化阻塞与 SDK 日志边界整改
+
+### 已确认的物化阻塞
+
+在线重跑已完成 78/78 月份 capture，且每月状态均为 `PASS`；但最终阶段写入
+`STOP(BLOCKED)`，`phase=MATERIALIZATION`，异常为 `StopIteration`。根因不是服务端返回缺失，
+而是本机 ignored runner 的变更内容冲突回归使用了错误的字符串常量：runner 查找
+`research_eligibility == "ENABLED"`，而项目契约枚举的实际值是
+`ResearchEligibility.ENABLED.value == "RESEARCH_ENABLED"`。因此首轮物化和幂等 replay 已完成，
+在选择一条可变更的 research-enabled 行时找不到候选并提前停止。
+
+已修正 runner：导入 `ResearchEligibility`，使用枚举值而不是复制字符串。修复只涉及本地
+`data/spike/issue76_history_build_20260916/runner.py`，该目录按设计被 `data/*` 忽略，不上传
+原始数据、状态或凭据；修复后的 retained replay/物化重跑结果待本地执行结束后再追加。
+
+### SDK 登录输出泄露整改
+
+本轮终端曾观察到 SDK 输出的 `TGW Logon information`/`logon json`，其中包含会话 token。现有
+Python/CRT fd 捕获已经覆盖普通 `printf` 和 `os.write`，但 Windows 原生 DLL 还可能直接通过
+`GetStdHandle`/`WriteFile` 写入控制台句柄，绕过 fd 重定向。
+
+已在 `src/ashare_state/providers/amazingdata/stdout_capture.py` 增加 Windows 标准输出/错误句柄
+重定向，并新增原生 `WriteFile` 回归测试；SDK 登录原文仍只进入临时捕获区，解析后仅保留脱敏
+profile，token 不得进入终端、持久化证据或 GitHub。Focused stdout tests、Ruff 和 mypy 已在本机
+通过；exact-head CI 结果待 GitHub Actions 返回。
+
+本次已经暴露的会话 token 不再作为项目证据使用，应在本轮运行结束后登出/重新登录使其失效.
