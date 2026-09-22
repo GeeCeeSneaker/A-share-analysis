@@ -4,6 +4,20 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.9. 2026-09-22 M1 高内存边界整改（未重新测量）
+
+> 状态：**代码整改已提交；M1 真实 78 个月 RSS 门禁仍 STOP(BLOCKED)；不进入 M2/M3**
+
+针对 0.8 暴露的剩余分配边界，已完成不触碰真实历史窗口的最小代码整改：
+
+- canonical selected.parquet 新增批量、哈希已验证的行源；seal-only Snapshot/ReadModel 路径不再把 selected.parquet 全量 read_bytes/to_dicts。
+- seal-only snapshot 校验改为 Arrow 批量读取物理 Parquet，并对 canonical projection 使用受控 JSONL 外部排序块；保留原有 hash、schema、行数、PIT、key、逐行语义和 duplicate-key fail-closed 约束。
+- 保留 retain_domain_rows=True 的旧内存交接语义，避免改变需要完整行 hand-off 的调用方；新增回归确认 seal-only 不调用整表 read_parquet。
+- 代码提交：canonical 批量源 1339f3e83304324d0815cbe0856fbf5a2213b394；snapshot 有界校验 f3c4de311cf3da5bf7968dc9e05306b0ec27630f；回归 fc03bd1a1b32bb4bebe2c0f196a4b40cbccbfe92。
+- 离线验证：Ruff、mypy、Snapshot/ReadModel 集成测试及全量 pytest 均通过；未访问 provider、未使用正式账号、未启动 78 个月真实测量。
+
+这只能证明代码回归通过，不能证明实际 RSS 已低于 16 GiB。下一步仍须由 PM/Owner 决定是否在同一安全环境执行一次新的、带 15 GiB RSS 硬上限的 M1 测量；测量满足预算后才允许 M2/M3，否则继续 STOP 并记录新的峰值边界。
+
 ## 0.8. 2026-09-22 M1 RSS 门禁失败（最新）
 
 > 状态：**STOP(BLOCKED)；M1 未通过；按内存安全要求不进入 M2/M3**
