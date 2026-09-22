@@ -2,9 +2,10 @@
 
 SnapshotBuilder builds domain-partitioned point-in-time snapshots from
 VERIFIED canonical SUCCESS runs (the CR-4.1 public consumption
-verifier is the ONLY canonical input); verify_snapshot is the ONLY
-supported read path for downstream construction. No providers, no
-Raw access, no CR-2 re-implementation, no feature computation.
+verifier is the ONLY canonical input). ``verify_snapshot`` remains the
+explicit deep-audit path; downstream ReadModel construction consumes the
+smaller ``consume_snapshot_seal`` hand-off. No providers, no Raw access,
+no CR-2 re-implementation, no feature computation.
 """
 
 from ashare_state.snapshot.builder import (
@@ -38,7 +39,7 @@ from ashare_state.snapshot.schema import (
     snapshot_domains,
     validate_canonical_key,
 )
-from ashare_state.snapshot.verifier import verify_snapshot
+from ashare_state.snapshot.verifier import consume_snapshot_seal, verify_snapshot
 
 __all__ = [
     "ColumnSpec",
@@ -54,6 +55,7 @@ __all__ = [
     "SnapshotSchemaError",
     "SnapshotVerifierError",
     "VerifiedSnapshot",
+    "consume_snapshot_seal",
     "domain_snapshot_schema",
     "polars_domain_schema",
     "project_canonical_snapshot",
