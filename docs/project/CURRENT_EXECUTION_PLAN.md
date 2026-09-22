@@ -17,7 +17,7 @@
 - 终端曾观察到 SDK 的 `logon json` 会话 token。共享 fd 捕获不足以覆盖 Windows 原生
   `GetStdHandle`/`WriteFile` 路径；已在 `stdout_capture.py` 增加 Windows 标准句柄重定向，补充
   原生句柄回归测试。focused tests、Ruff、mypy 本地通过；CI 待回报。凭据、token、raw payload 和
-  本地状态仍不得进入 GitHub。
+  本地状态仍不得进入 GitHub；GitHub Actions CI #690 的 Ubuntu 3.14、Windows 3.12、Windows 3.14 required jobs 已全部 success。
 - 已暴露会话 token 不作为证据继续使用；本轮结束后必须登出/重新登录使其失效。
 
 ## 0.4. 2026-09-21 provider 查询失败有界重试整改
