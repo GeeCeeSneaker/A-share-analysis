@@ -442,4 +442,3 @@ def json_loads_domains(raw: str) -> list[str]:
     if not isinstance(domains, list) or not all(isinstance(d, str) for d in domains):
         raise ValueError("requested_domains_json is not a list of strings")
     return domains
-
