@@ -9,9 +9,9 @@
 > 状态：**STOP(BLOCKED)；无最终 PASS；按内存安全要求暂停继续重跑**
 
 - 78 个月 capture/replay 与规范化链路已完成，且已有一份本地 78 分区物化目录；但最新运行没有完成 changed-content conflict gate、最终 reader/幂等/冲突闭环，因此不能把现有目录写成最终发布或验收 PASS。
-- 旧版 snapshot verifier 在本机约 46.7 GB 内存处出现高峰；完成流式逐行比对等优化后，\`ResearchPanelBuilder.prepare_verified_projection\` 仍约 46.5 GB；进一步缩窄到既有 readmodel/物化输入的尝试仍约 38.5 GB，均在进入最终物化验收前安全停止。
-- 已完成的安全/代码整改仍有效：Windows 原生 SDK stdout/stderr 句柄捕获已补齐，CI #690 required jobs 全部成功；snapshot verifier 内存优化提交 \`1d55bea8120d336e40840071084b4c11de409dbf\`，CI #694 全部成功。
-- 当前主要问题不是凭据或 provider 认证：ReadModel 逻辑校验仍以 \`fetchall\`、全量 dict/list 和全量语义排序为主；verified projection 同时保留 source rows 与 projected rows；仓库没有受控的 materialization-only/resume 入口，导致恢复过程再次触发高峰。
+- 旧版 snapshot verifier 在本机约 46.7 GB 内存处出现高峰；完成流式逐行比对等优化后，`ResearchPanelBuilder.prepare_verified_projection` 仍约 46.5 GB；进一步缩窄到既有 readmodel/物化输入的尝试仍约 38.5 GB，均在进入最终物化验收前安全停止。
+- 已完成的安全/代码整改仍有效：Windows 原生 SDK stdout/stderr 句柄捕获已补齐，CI #690 required jobs 全部成功；snapshot verifier 内存优化提交 `1d55bea8120d336e40840071084b4c11de409dbf`，CI #694 全部成功。
+- 当前主要问题不是凭据或 provider 认证：ReadModel 逻辑校验仍以 `fetchall`、全量 dict/list 和全量语义排序为主；verified projection 同时保留 source rows 与 projected rows；仓库没有受控的 materialization-only/resume 入口，导致恢复过程再次触发高峰。
 - 下一次允许推进前，必须先完成并独立验证：有界内存的精确 ReadModel 语义校验、有界 projection/materialization、可审计的 materialization-only/resume 命令、内存回归/峰值门禁，以及明确区分既有本地目录、幂等重放、冲突阻断和最终 PASS 的状态契约。
 - 本轮已按要求停止本地重试；凭据、会话 token、raw payload 和本地执行状态未写入 GitHub。完整脱敏交接见 [Issue #76 物化内存阻断报告](ISSUE76_MATERIALIZATION_MEMORY_BLOCKER_20260922.md)。
 
