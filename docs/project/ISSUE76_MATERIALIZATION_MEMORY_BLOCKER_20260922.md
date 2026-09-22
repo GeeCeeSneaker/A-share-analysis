@@ -115,7 +115,7 @@ Observed result:
 - The retained execution state hash was unchanged, the temporary `.readmodel-verify` directory was absent after exit, and no ledger, raw evidence, normalized data, snapshot/ReadModel, or materialization artifact was intentionally written, deleted, or overwritten.
 - Provider calls: `0`. No account, credential, session token, network endpoint, or provider payload was read or emitted.
 
-M1 therefore remains **STOP(BLOCKED) and unmeasured**. M2/M3 were not started. The previous approximately 22.268 GiB result remains the only valid post-code-remediation-independent memory observation; it cannot be replaced by this provenance failure.
+M1 therefore remains **STOP(BLOCKED) and unmeasured**. M2/M3 were not started. The previous approximately 22.268 GiB result remains the only valid memory observation for the prior implementation; it is not a measurement of M1.1 and cannot be replaced by this provenance failure.
 
 Required next decision:
 
