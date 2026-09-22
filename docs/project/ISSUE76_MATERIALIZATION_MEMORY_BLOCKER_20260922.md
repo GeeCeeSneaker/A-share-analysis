@@ -98,3 +98,7 @@ The tracked remediation now provides one explicit `consume_snapshot_seal` hand-o
 ReadModel rebuild and verified-open now use the sealed hand-off, and regression tests cover the no-projection/no-full-frame boundary, snapshot artifact tampering, canonical manifest/ledger drift, and both rebuild/open consumers. Local Snapshot/ReadModel integration tests, Ruff, and mypy pass.
 
 This is still a code-only remediation. No new 78-month RSS measurement was attempted after the prior ~22.268 GiB stop; M1 remains STOP(BLOCKED), and M2/M3/final publication remain paused pending an explicit PM/Owner decision for one bounded measurement.
+
+CI follow-up — 2026-09-22
+
+CI run #716 passed all required jobs: Ubuntu 3.14, Windows 3.14, and Windows 3.12. GT-H3B was skipped by scope. This confirms the repository gates for M1.1; it does not change the M1 RSS result or authorize a new large-window measurement.
