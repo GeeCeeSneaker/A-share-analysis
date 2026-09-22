@@ -119,21 +119,20 @@ class TestDuckDBReadModel:
         finally:
             db.close()
 
-    def test_rebuild_uses_seal_only_snapshot_handoff(self, conn, env_root, monkeypatch):
-        """ReadModel rebuild does not retain the full snapshot row hand-off."""
+    def test_rebuild_and_open_use_sealed_snapshot_handoff(self, conn, env_root, monkeypatch):
+        """ReadModel rebuild/open do not re-read or re-project canonical rows."""
         built = _built_snapshot(conn, env_root)
-        import ashare_state.readmodel.duckdb_model as readmodel_module
+        import ashare_state.snapshot.verifier as snapshot_verifier
 
-        original = readmodel_module.verify_snapshot
-        retain_flags = []
+        def _forbidden(*args, **kwargs):
+            raise AssertionError("sealed ReadModel hand-off must not project canonical rows")
 
-        def _wrapped(*args, **kwargs):
-            retain_flags.append(kwargs["retain_domain_rows"])
-            return original(*args, **kwargs)
-
-        monkeypatch.setattr(readmodel_module, "verify_snapshot", _wrapped)
-        _model(conn, env_root).rebuild(built.snapshot_id)
-        assert retain_flags == [False]
+        monkeypatch.setattr(snapshot_verifier, "load_canonical_projection", _forbidden)
+        monkeypatch.setattr(snapshot_verifier, "project_canonical_snapshot", _forbidden)
+        model = _model(conn, env_root)
+        model.rebuild(built.snapshot_id)
+        db = model.open_read_only(built.snapshot_id)
+        db.close()
 
     def test_rebuild_success(self, conn, env_root):
         """Mandatory 31: a verified snapshot rebuilds into a complete
