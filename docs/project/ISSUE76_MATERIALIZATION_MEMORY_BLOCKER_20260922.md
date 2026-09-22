@@ -102,3 +102,23 @@ This is still a code-only remediation. No new 78-month RSS measurement was attem
 CI follow-up — 2026-09-22
 
 CI run #716 passed all required jobs: Ubuntu 3.14, Windows 3.14, and Windows 3.12. GT-H3B was skipped by scope. This confirms the repository gates for M1.1; it does not change the M1 RSS result or authorize a new large-window measurement.
+
+## M1.2 authorized gate attempt — retained artifact provenance blocked before RSS measurement (2026-09-22)
+
+PM review at exact head `1e656022a3702ed5ae4f51a42e1959257b8badce` authorized one M1-only rerun after the M1.1 sealed snapshot hand-off remediation. The bounded local attempt was executed once against the retained 78-month ReadModel and did not access the provider layer or credentials.
+
+Observed result:
+
+- The child entered `M1_READMODEL_VERIFY_START`, then stopped at the existing snapshot seal boundary before any ReadModel semantic scan or meaningful RSS measurement.
+- `consume_snapshot_seal` rejected the retained snapshot because its persisted `snapshot_builder_code_fingerprint` differs from the current builder fingerprint. This is the intended fail-closed provenance check; no compatibility bypass was used.
+- The process exited with code `1` after about `4.1` seconds. The observed working set was only about `0.005` GiB, but this is **not** an M1 memory result because the verifier never reached the memory-intensive ReadModel check.
+- The retained execution state hash was unchanged, the temporary `.readmodel-verify` directory was absent after exit, and no ledger, raw evidence, normalized data, snapshot/ReadModel, or materialization artifact was intentionally written, deleted, or overwritten.
+- Provider calls: `0`. No account, credential, session token, network endpoint, or provider payload was read or emitted.
+
+M1 therefore remains **STOP(BLOCKED) and unmeasured**. M2/M3 were not started. The previous approximately 22.268 GiB result remains the only valid post-code-remediation-independent memory observation; it cannot be replaced by this provenance failure.
+
+Required next decision:
+
+1. Do not weaken or bypass the snapshot builder fingerprint gate.
+2. Before another M1 RSS attempt, provide or explicitly authorize creation of a current-code-compatible retained snapshot/ReadModel from the already sealed local canonical evidence, without provider capture. That rebuild is a separate operation and was not performed under the current M1-only authorization.
+3. After a compatible retained artifact exists, run exactly one bounded M1 measurement with the existing 15 GiB hard stop and <16 GiB acceptance rule. Until then, keep M2/M3 and final publication paused.
