@@ -2,8 +2,9 @@
 
 ``DuckDBReadModel.rebuild(snapshot_id)``:
 
-- the ONLY input is the verified snapshot (``verify_snapshot`` - no
-  direct parquet/file trust);
+- the ONLY input is the sealed snapshot hand-off
+  (``consume_snapshot_seal`` - no direct parquet/file trust and no recursive
+  canonical projection);
 - builds into a TEMPORARY database file, applies the declared
   ``rm_<domain>`` tables + ``rm_snapshot_meta`` + ``rm_domain_meta``;
 - validates the LOGICAL semantic exactness IN the temp database
@@ -46,7 +47,7 @@ from ashare_state.readmodel.schema import (
 )
 from ashare_state.snapshot.models import SnapshotVerifierError
 from ashare_state.snapshot.schema import domain_snapshot_schema
-from ashare_state.snapshot.verifier import verify_snapshot
+from ashare_state.snapshot.verifier import consume_snapshot_seal
 
 __all__ = [
     "DuckDBReadModel",
@@ -235,12 +236,10 @@ class DuckDBReadModel:
 
     # ------------------------------------------------------------ rebuild
     def rebuild(self, snapshot_id: str) -> ReadModelBuildResult:
-        verified = verify_snapshot(
+        verified = consume_snapshot_seal(
             self.conn,
             snapshot_id,
-            raw_root=self.raw_root,
             normalized_root=self.normalized_root,
-            retain_domain_rows=False,
         )
         db_uri = readmodel_db_uri(snapshot_id)
         target = self.readmodel_root / db_uri
@@ -514,12 +513,10 @@ class DuckDBReadModel:
             msg = f"readmodel for snapshot {snapshot_id} has not been built: {target}"
             raise ReadModelError(msg)
         try:
-            verified = verify_snapshot(
+            verified = consume_snapshot_seal(
                 self.conn,
                 snapshot_id,
-                raw_root=self.raw_root,
                 normalized_root=self.normalized_root,
-                retain_domain_rows=False,
             )
         except SnapshotVerifierError as exc:
             # A readmodel handle must never expose an unverified snapshot.
@@ -560,7 +557,7 @@ class DuckDBReadModel:
         """Open a ReadModel and return the one snapshot seal it consumed.
 
         Consumers that need snapshot provenance should use this hand-off
-        instead of opening the model and recursively calling
-        ``verify_snapshot`` a second time.
+        instead of opening the model and recursively performing the deep
+        ``verify_snapshot`` audit a second time.
         """
         return self._open_verified_read_only(snapshot_id)
