@@ -4,6 +4,20 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.7. 2026-09-22 M1 有界 Snapshot/ReadModel 校验实现检查点
+
+> 状态：**M1 代码已提交；小型回归与静态 QA 通过；78 个月 RSS 门禁尚未运行；M2/M3 未开始**
+
+已按 PM 的 M1 要求提交以下最小整改：
+
+- Snapshot verifier 新增 seal-only 模式，ReadModel rebuild/open 使用 `retain_domain_rows=False`，仍执行逐行 projection/PIT/key/seal 校验，但不再把所有物理行留在 `VerifiedSnapshot.domain_rows`；build row count 改从已验证 ledger seal 读取。
+- ReadModel 逻辑语义 hash 保持既有 `_rows_semantic_hash` 字节契约，改为 `fetchmany` 分批、临时 sorted chunks、受控 fan-in merge 和增量 JSON-array hash；禁止大表 `fetchall`。校验连接设置显式 4GB DuckDB memory limit 和临时目录，临时 chunk 在成功/失败路径清理。
+- 新增回归覆盖：多批次 exact hash（时区时间、空值、浮点、非 ASCII）、禁止 `fetchall`、seal-only hand-off 和原有 Snapshot 行保留模式。
+- 提交：Snapshot `f4c876701bd3a12e4c0241f65ca97e8785eae7b7`；ReadModel `e2b3c4033368d9a79969b4f7ae17fb8e754dc1f1`；测试 `ce2fd134cc5dd5024825b92f89a3b3f5f051ae6b`、`fe7870f11ddc8fa27f2fb4d7141ccece09699a9e`。
+- 本地目标回归、Snapshot/ReadModel 集成测试、Ruff、mypy 和 diff 检查均通过；尚未声称实际 78 个月峰值低于 16GB，也未启动 M2/M3 或最终验收。
+
+下一步严格为：先对既有 78 个月 ReadModel 做一次带硬 RSS 上限的 M1 独立测量；若仍超过预算，立即 STOP 并补充阻断报告，不继续重复尝试。只有测量满足预算，才进入 M2。
+
 ## 0.6. 2026-09-22 78 月物化内存阻断（最新）
 
 > 状态：**STOP(BLOCKED)；无最终 PASS；按内存安全要求暂停继续重跑**
