@@ -4,6 +4,22 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.5. 2026-09-21 78 月重跑物化修复与 SDK 日志边界
+
+> 状态：**78/78 capture 已通过；首次物化因 runner 常量错误 STOP(BLOCKED)；修复后的 retained replay/物化重跑进行中；无 publication**
+
+- 首次完整重跑的 78 个月份均为 `PASS`，但 `MATERIALIZATION` 的变更内容冲突回归使用了
+  `"ENABLED"`，与契约值 `RESEARCH_ENABLED` 不一致，触发 `StopIteration`。已将本机 ignored
+  runner 改为使用 `ResearchEligibility.ENABLED.value`；不能把月度 capture PASS 写成最终交付 PASS。
+- 重跑只消费已有本地 retained raw/normalized 证据，不重新请求 78 个月；必须等最终
+  `MATERIALIZATION -> COMPLETE / PASS`、reader、幂等 replay 和 changed-content conflict 全部通过后，
+  才能写最终 summary。
+- 终端曾观察到 SDK 的 `logon json` 会话 token。共享 fd 捕获不足以覆盖 Windows 原生
+  `GetStdHandle`/`WriteFile` 路径；已在 `stdout_capture.py` 增加 Windows 标准句柄重定向，补充
+  原生句柄回归测试。focused tests、Ruff、mypy 本地通过；CI 待回报。凭据、token、raw payload 和
+  本地状态仍不得进入 GitHub。
+- 已暴露会话 token 不作为证据继续使用；本轮结束后必须登出/重新登录使其失效。
+
 ## 0.4. 2026-09-21 provider 查询失败有界重试整改
 
 > 状态：**代码已补齐并通过离线 QA；在线 2025-09 重跑待执行，仍 STOP(BLOCKED)**
@@ -673,4 +689,3 @@ Issue #66 **不授权**：
 **Required ancestor**：Issue #76 基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`；
 在本机安全配置认证环境变量后，从已保留证据恢复并继续 2020-03，不得把环境阻断误写成
 provider 数据结论，也不得跳过月份或将当前进度写成 78/78。
-
