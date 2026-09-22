@@ -78,6 +78,6 @@ Python/CRT fd 捕获已经覆盖普通 `printf` 和 `os.write`，但 Windows 原
 已在 `src/ashare_state/providers/amazingdata/stdout_capture.py` 增加 Windows 标准输出/错误句柄
 重定向，并新增原生 `WriteFile` 回归测试；SDK 登录原文仍只进入临时捕获区，解析后仅保留脱敏
 profile，token 不得进入终端、持久化证据或 GitHub。Focused stdout tests、Ruff 和 mypy 已在本机
-通过；exact-head CI 结果待 GitHub Actions 返回。
+通过；GitHub Actions CI #690 的 Ubuntu 3.14、Windows 3.12、Windows 3.14 required jobs 已全部 success。
 
 本次已经暴露的会话 token 不再作为项目证据使用，应在本轮运行结束后登出/重新登录使其失效.
