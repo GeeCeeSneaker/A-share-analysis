@@ -4,6 +4,21 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.11. 2026-09-22 M1 authorized gate attempt — retained artifact provenance blocked (未重新测量)
+
+> 状态：**M1 仍 STOP(BLOCKED) 且未完成有效 RSS 测量；不进入 M2/M3**
+
+PM 在审阅 exact head `1e656022a3702ed5ae4f51a42e1959257b8badce` 时确认 M1.1 代码整改通过，并授权只执行一次真实的 78 个月 retained ReadModel 校验；要求 15 GiB 外部硬停止、峰值 <16 GiB 才能接受，若超限不得重试。
+
+本次只读门禁已按授权执行一次，但在进入内存密集阶段前被持久化 provenance 封印拒绝：
+
+- `consume_snapshot_seal` 发现保留 snapshot 的 `snapshot_builder_code_fingerprint` 与当前代码不一致，按现有 fail-closed 合同停止；没有绕过版本封印，也没有改写快照/ReadModel。
+- 进程约 4.1 秒退出，工作集约 0.005 GiB；该数值不是有效 RSS 门禁结果，因为尚未进入 ReadModel 语义校验。
+- execution state 未变化，临时 `.readmodel-verify` 目录已清理，provider calls 为 0；没有启动 provider capture、全链重跑、M2、M3 或物化发布。
+
+下一步不是降低封印要求，而是由 PM/Owner 决定：从已有 sealed canonical evidence 生成与当前代码兼容的 retained snapshot/ReadModel，或提供一份已兼容的保留产物。该重建属于独立操作，不在本次 M1-only 授权内；在兼容产物就绪前，不得再次测量、不得启动 M2/M3，也不得把本次 0.005 GiB 写成 M1 PASS。
+
+
 ## 0.10. 2026-09-22 M1.1 sealed snapshot hand-off (未重新测量)
 
 > 状态：**M1.1 代码整改已提交；M1 真实 78 个月 RSS 门禁仍 STOP(BLOCKED)；不进入 M2/M3**
