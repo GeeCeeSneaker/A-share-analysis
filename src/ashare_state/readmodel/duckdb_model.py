@@ -26,6 +26,10 @@ instead of opening the model and verifying the snapshot a second time.
 from __future__ import annotations
 
 import hashlib
+import heapq
+import tempfile
+from collections.abc import Iterable, Iterator
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,7 +37,7 @@ from typing import Any
 
 import duckdb
 
-from ashare_state.canonical.canonicalizer import _canonical_json, _rows_semantic_hash
+from ashare_state.canonical.canonicalizer import _canonical_json
 from ashare_state.readmodel.schema import (
     _DTYPE_TO_DUCKDB,
     READMODEL_CONTRACT_VERSION,
@@ -107,6 +111,110 @@ def readmodel_db_uri(snapshot_id: str) -> str:
     )
 
 
+_READMODEL_VERIFY_MEMORY_LIMIT = "4GB"
+_READMODEL_SEMANTIC_HASH_BATCH_SIZE = 32_768
+_READMODEL_SEMANTIC_HASH_MAX_OPEN_CHUNKS = 64
+
+
+def _canonical_json_array_hash(values: Iterable[str]) -> str:
+    """Hash the exact JSON-array representation used by ``_rows_semantic_hash``.
+
+    The legacy contract sorts canonical row JSON strings and then hashes one
+    compact JSON array.  Incremental encoding preserves that byte contract
+    without constructing the full sorted array in memory.
+    """
+    digest = hashlib.sha256()
+    digest.update(b"[")
+    first = True
+    for value in values:
+        if not first:
+            digest.update(b",")
+        digest.update(_canonical_json(value).encode("utf-8"))
+        first = False
+    digest.update(b"]")
+    return digest.hexdigest()
+
+
+def _merge_sorted_chunk_group(paths: list[Path], destination: Path) -> None:
+    """Merge sorted newline-delimited canonical rows into one sorted chunk."""
+    with ExitStack() as stack:
+        streams = [
+            stack.enter_context(path.open("r", encoding="utf-8", newline="")) for path in paths
+        ]
+        with destination.open("w", encoding="utf-8", newline="") as output:
+            for line in heapq.merge(*(iter(stream) for stream in streams)):
+                output.write(line)
+
+
+def _iter_sorted_chunk_rows(paths: list[Path]) -> Iterator[str]:
+    """Yield canonical row JSON strings from sorted chunk files."""
+    with ExitStack() as stack:
+        streams = [
+            stack.enter_context(path.open("r", encoding="utf-8", newline="")) for path in paths
+        ]
+        for line in heapq.merge(*(iter(stream) for stream in streams)):
+            yield line[:-1] if line.endswith("\n") else line
+
+
+def _rows_semantic_hash_bounded(
+    db: duckdb.DuckDBPyConnection,
+    table: str,
+    column_names: list[str],
+    *,
+    temp_directory: Path,
+) -> str:
+    """Recompute the legacy row semantic hash with bounded Python memory.
+
+    DuckDB rows are normalized and sorted in bounded batches.  Sorted chunks
+    are merged externally, then the exact compact JSON-array hash contract is
+    encoded incrementally.  The caller owns a temporary workspace; all
+    chunks created here are also removed on both success and failure.
+    """
+    temp_directory.mkdir(parents=True, exist_ok=True)
+    created: list[Path] = []
+    cursor = db.execute(f"SELECT * FROM {table}")
+    try:
+        chunk_index = 0
+        while True:
+            batch = cursor.fetchmany(_READMODEL_SEMANTIC_HASH_BATCH_SIZE)
+            if not batch:
+                break
+            canonical_rows = sorted(
+                _canonical_json(_normalize_seal_row(dict(zip(column_names, row, strict=True))))
+                for row in batch
+            )
+            chunk = temp_directory / f"rows-{chunk_index:08d}.jsonl"
+            with chunk.open("w", encoding="utf-8", newline="") as output:
+                for row_json in canonical_rows:
+                    output.write(row_json)
+                    output.write("\n")
+            created.append(chunk)
+            chunk_index += 1
+            del batch, canonical_rows
+
+        current = list(created)
+        merge_round = 0
+        while len(current) > _READMODEL_SEMANTIC_HASH_MAX_OPEN_CHUNKS:
+            merged: list[Path] = []
+            for group_index in range(0, len(current), _READMODEL_SEMANTIC_HASH_MAX_OPEN_CHUNKS):
+                group = current[
+                    group_index : group_index + _READMODEL_SEMANTIC_HASH_MAX_OPEN_CHUNKS
+                ]
+                destination = temp_directory / (f"merge-{merge_round:04d}-{group_index:08d}.jsonl")
+                _merge_sorted_chunk_group(group, destination)
+                created.append(destination)
+                merged.append(destination)
+                for path in group:
+                    path.unlink(missing_ok=True)
+            current = merged
+            merge_round += 1
+
+        return _canonical_json_array_hash(_iter_sorted_chunk_rows(current))
+    finally:
+        for path in created:
+            path.unlink(missing_ok=True)
+
+
 class DuckDBReadModel:
     """Rebuilds (and opens) the DuckDB read model from a verified
     snapshot. Deterministic per snapshot id; the rebuild is atomic
@@ -132,6 +240,7 @@ class DuckDBReadModel:
             snapshot_id,
             raw_root=self.raw_root,
             normalized_root=self.normalized_root,
+            retain_domain_rows=False,
         )
         db_uri = readmodel_db_uri(snapshot_id)
         target = self.readmodel_root / db_uri
@@ -163,7 +272,7 @@ class DuckDBReadModel:
             canonical_run_id=verified.canonical_run_id,
             db_uri=db_uri,
             table_set=table_set,
-            row_count_total=sum(len(rows) for rows in verified.domain_rows.values()),
+            row_count_total=int(verified.ledger_record["row_count_total"]),
             readmodel_contract_version=READMODEL_CONTRACT_VERSION,
         )
 
@@ -254,6 +363,22 @@ class DuckDBReadModel:
 
     # ------------------------------------------------------ logical seal
     def _validate_logical_seal(self, db: duckdb.DuckDBPyConnection, verified: Any) -> None:
+        """Validate a ReadModel copy with bounded external semantic hashing."""
+        workspace_parent = self.readmodel_root / ".readmodel-verify"
+        workspace_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix=f"{verified.snapshot_id[:12]}-", dir=str(workspace_parent)
+        ) as workspace:
+            db.execute(f"SET memory_limit = '{_READMODEL_VERIFY_MEMORY_LIMIT}'")
+            db.execute("SET temp_directory = ?", [workspace])
+            self._validate_logical_seal_impl(db, verified, Path(workspace))
+
+    def _validate_logical_seal_impl(
+        self,
+        db: duckdb.DuckDBPyConnection,
+        verified: Any,
+        workspace: Path,
+    ) -> None:
         """Validate the new DuckDB copy against its one snapshot hand-off.
 
         The semantic hash recompute is a distinct physical-copy invariant: it
@@ -305,10 +430,13 @@ class DuckDBReadModel:
             # semantic exactness from the table contents (datetime
             # values normalized back to UTC - the DuckDB session
             # timezone otherwise shifts the string serialization)
-            rows = db.execute(f"SELECT * FROM {table}").fetchall()
             col_names = list(duckdb_domain_columns(domain))
-            dicts = [_normalize_seal_row(dict(zip(col_names, r, strict=True))) for r in rows]
-            semantic = _rows_semantic_hash(dicts)
+            semantic = _rows_semantic_hash_bounded(
+                db,
+                table,
+                col_names,
+                temp_directory=workspace / "semantic",
+            )
             if semantic != str(entry["semantic_hash"]):
                 problems.append(f"{table} logical semantic hash diverges from the snapshot seal")
         # meta tables: every provenance field is part of the logical seal.
@@ -391,6 +519,7 @@ class DuckDBReadModel:
                 snapshot_id,
                 raw_root=self.raw_root,
                 normalized_root=self.normalized_root,
+                retain_domain_rows=False,
             )
         except SnapshotVerifierError as exc:
             # A readmodel handle must never expose an unverified snapshot.
@@ -435,3 +564,4 @@ class DuckDBReadModel:
         ``verify_snapshot`` a second time.
         """
         return self._open_verified_read_only(snapshot_id)
+
