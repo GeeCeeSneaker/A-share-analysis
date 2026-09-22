@@ -838,6 +838,21 @@ class TestSnapshotBuilder:
         assert verified.requested_domains == ("daily_bar",)
         assert len(verified.domain_rows["daily_bar"]) == 2
 
+    def test_verify_snapshot_seal_only_does_not_retain_rows(self, conn, env_root):
+        """ReadModel consumers can consume the verified seal without a
+        second full in-memory copy of every snapshot row."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        built = _build(conn, env_root, result.canonical_run_id)
+        verified = verify_snapshot(
+            conn,
+            built.snapshot_id,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+            retain_domain_rows=False,
+        )
+        assert verified.domain_rows == {"daily_bar": ()}
+        assert int(verified.ledger_record["row_count_total"]) == 2
+
     def test_verify_snapshot_consumes_canonical_seal_without_recursive_full_verify(
         self, conn, env_root, monkeypatch
     ):
@@ -1335,3 +1350,4 @@ class TestBoundaryStructure:
             assert forbidden not in params, forbidden
         build_params = inspect.signature(SnapshotBuilder.build).parameters
         assert list(build_params) == ["self", "canonical_run_id"]
+
