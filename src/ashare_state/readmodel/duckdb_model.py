@@ -564,4 +564,3 @@ class DuckDBReadModel:
         ``verify_snapshot`` a second time.
         """
         return self._open_verified_read_only(snapshot_id)
-
