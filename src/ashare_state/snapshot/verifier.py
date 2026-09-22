@@ -230,6 +230,11 @@ def verify_snapshot(
         raise SnapshotVerifierError(
             f"snapshot {snapshot_id} canonical projection is DAMAGED: {exc}"
         ) from exc
+    # ``project_canonical_snapshot`` creates fresh schema-projected rows.  The
+    # source rows are no longer needed after that bridge has completed.  On a
+    # large daily-bar snapshot retaining both representations makes the
+    # subsequent physical verification unnecessarily peak-heavy.
+    del canonical_rows
 
     # 5. artifact exact set == the requested domain set
     artifacts = manifest.get("artifacts")
@@ -282,7 +287,6 @@ def verify_snapshot(
         if frame.height != int(entry.get("row_count", -1)):
             msg = f"snapshot {domain} artifact row count mismatch"
             raise SnapshotVerifierError(msg)
-        rows = frame.to_dicts()
         # The snapshot builder owns the semantic value seal.  Downstream
         # verification consumes that seal and checks the physical bytes,
         # schema, row count, deterministic projection and PIT/key rules;
@@ -291,16 +295,23 @@ def verify_snapshot(
         if len(semantic) != 64 or any(char not in "0123456789abcdef" for char in semantic):
             raise SnapshotVerifierError(f"snapshot {domain} semantic seal is malformed")
         expected_rows = expected_rows_by_domain[domain]
-        if sorted(_canonical_json(row) for row in rows) != sorted(
-            _canonical_json(row) for row in expected_rows
+        # Both the builder and the projection registry promise the same
+        # stable canonical-key order.  Compare one row at a time instead of
+        # allocating two full lists of canonical JSON strings (which is a
+        # material, avoidable peak for multi-million-row daily-bar snapshots).
+        rows: list[dict[str, Any]] = []
+        for ordinal, (actual, expected_row) in enumerate(
+            zip(frame.iter_rows(named=True), expected_rows, strict=True)
         ):
-            msg = (
-                f"snapshot {domain} artifact rows diverge from the deterministic "
-                "canonical projection"
-            )
-            raise SnapshotVerifierError(msg)
-        # PIT + key sanity re-check on the materialized rows
-        for r in rows:
+            if _canonical_json(actual) != _canonical_json(expected_row):
+                msg = (
+                    f"snapshot {domain} artifact row {ordinal} diverges from the "
+                    "deterministic canonical projection"
+                )
+                raise SnapshotVerifierError(msg)
+            rows.append(actual)
+            # PIT + key sanity re-check on the materialized rows
+            r = actual
             available = r.get("available_at")
             if not isinstance(available, datetime) or available > as_of:
                 msg = (
@@ -315,6 +326,7 @@ def verify_snapshot(
                 msg = f"snapshot {domain} row carries a foreign canonical_run_id projection"
                 raise SnapshotVerifierError(msg)
         domain_rows[domain] = tuple(rows)
+        del expected_rows_by_domain[domain]
         recomputed_seals[domain] = {
             "uri": str(entry.get("uri")),
             "content_hash": hashlib.sha256(data).hexdigest(),
@@ -322,7 +334,7 @@ def verify_snapshot(
             "row_count": frame.height,
             "semantic_hash": semantic,
         }
-        row_count_total += len(rows)
+        row_count_total += frame.height
 
     artifact_set_recompute = hashlib.sha256(
         _canonical_json(recomputed_seals).encode("utf-8")
@@ -351,3 +363,4 @@ def verify_snapshot(
         manifest=manifest,
         domain_rows=domain_rows,
     )
+
