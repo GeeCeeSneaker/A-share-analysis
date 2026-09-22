@@ -47,6 +47,7 @@ from ashare_state.canonical.verifier import (
     CanonicalProjectionSource,
     load_canonical_projection,
     open_canonical_projection_source,
+    read_canonical_run_manifest,
 )
 from ashare_state.snapshot.builder import (
     SNAPSHOT_LEDGER_COLUMNS,
@@ -66,7 +67,7 @@ from ashare_state.snapshot.schema import (
     project_selected_row,
 )
 
-__all__ = ["verify_snapshot"]
+__all__ = ["consume_snapshot_seal", "verify_snapshot"]
 
 
 _CANONICAL_PROJECTION_BATCH_SIZE = 32_768
@@ -590,4 +591,247 @@ def verify_snapshot(
         ledger_record=record,
         manifest=manifest,
         domain_rows=domain_rows,
+    )
+
+
+def consume_snapshot_seal(
+    conn: Any,
+    snapshot_id: str,
+    *,
+    normalized_root: Path,
+) -> VerifiedSnapshot:
+    """Consume a sealed snapshot without re-reading canonical selected rows.
+
+    ``SnapshotBuilder`` owns the deep canonical projection proof.  A
+    downstream ReadModel rebuild/open therefore consumes only the immutable
+    snapshot hand-off: ledger/manifest identity, the canonical manifest seal,
+    and each physical Parquet artifact's streamed content hash, schema, row
+    count, and aggregate seals.  The returned hand-off deliberately retains
+    no domain rows; the ReadModel's bounded semantic hash is the independent
+    Parquet-to-DuckDB copy check.
+
+    The full ``verify_snapshot`` function remains the explicit deep audit
+    entry point and continues to replay the canonical projection row by row.
+    """
+    row = conn.execute(
+        f"SELECT {', '.join(SNAPSHOT_LEDGER_COLUMNS)} FROM meta_snapshot_build "
+        "WHERE snapshot_id = ?",
+        [snapshot_id],
+    ).fetchone()
+    if row is None:
+        raise SnapshotVerifierError(f"snapshot {snapshot_id} does not exist in the snapshot ledger")
+    record = dict(zip(SNAPSHOT_LEDGER_COLUMNS, row, strict=True))
+    raw_as_of = record["canonical_as_of"]
+    if not isinstance(raw_as_of, datetime):
+        raise SnapshotVerifierError(f"snapshot {snapshot_id} ledger row carries no canonical as_of")
+    as_of = raw_as_of.astimezone(UTC) if raw_as_of.tzinfo else raw_as_of.replace(tzinfo=UTC)
+
+    expected_uri = snapshot_manifest_uri(snapshot_id, as_of)
+    if str(record["manifest_uri"]) != expected_uri:
+        raise SnapshotVerifierError(
+            f"snapshot manifest_uri {str(record['manifest_uri'])!r} is not the "
+            f"deterministic anchor {expected_uri!r} (rebind)"
+        )
+    manifest_path = normalized_root / str(record["manifest_uri"])
+    if not manifest_path.is_file():
+        raise SnapshotVerifierError(f"snapshot manifest missing: {record['manifest_uri']}")
+    manifest_bytes = manifest_path.read_bytes()
+    if hashlib.sha256(manifest_bytes).hexdigest() != str(record["manifest_hash"]):
+        raise SnapshotVerifierError("snapshot manifest bytes do not match the ledger hash (rebind)")
+    try:
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SnapshotVerifierError(f"snapshot manifest unreadable: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise SnapshotVerifierError("snapshot manifest root is not an object")
+
+    problems: list[str] = []
+    expected_fields = (
+        ("snapshot_id", snapshot_id),
+        ("snapshot_contract_version", str(record["snapshot_contract_version"])),
+        ("canonical_run_id", str(record["canonical_run_id"])),
+        ("canonical_manifest_uri", str(record["canonical_manifest_uri"])),
+        ("canonical_manifest_hash", str(record["canonical_manifest_hash"])),
+        ("canonical_as_of", as_of.isoformat()),
+        ("canonical_requested_domains_hash", str(record["requested_domains_hash"])),
+        ("snapshot_builder_code_fingerprint", str(record["builder_code_fingerprint"])),
+        ("artifact_set_hash", str(record["artifact_set_hash"])),
+        ("snapshot_semantic_hash", str(record["snapshot_semantic_hash"])),
+        ("status", str(record["status"])),
+    )
+    for field, expected in expected_fields:
+        if str(manifest.get(field)) != expected:
+            problems.append(f"snapshot manifest field {field} does not match the ledger seal")
+    try:
+        manifest_domains = [str(domain) for domain in manifest.get("requested_domains") or []]
+    except TypeError:
+        manifest_domains = []
+        problems.append("snapshot manifest requested_domains is unreadable")
+    try:
+        ledger_domains = [
+            str(domain) for domain in json.loads(str(record["requested_domains_json"]))
+        ]
+    except (TypeError, json.JSONDecodeError):
+        ledger_domains = []
+        problems.append("snapshot ledger requested_domains_json is unreadable")
+    if manifest_domains != ledger_domains:
+        problems.append("snapshot manifest requested_domains does not match the ledger")
+    if int(manifest.get("row_count_total", -1)) != int(record["row_count_total"]):
+        problems.append("snapshot manifest row_count_total does not match the ledger")
+    if problems:
+        raise SnapshotVerifierError(f"snapshot {snapshot_id} is DAMAGED: {'; '.join(problems)}")
+    if str(record["status"]) != "SUCCESS":
+        raise SnapshotVerifierError(
+            f"snapshot {snapshot_id} has status {record['status']!r} - only a "
+            "SUCCESS snapshot may be consumed"
+        )
+
+    base_recompute = snapshot_base_hash_from_primitives(
+        canonical_run_id=str(manifest["canonical_run_id"]),
+        canonical_manifest_hash=str(manifest["canonical_manifest_hash"]),
+        canonical_requested_domains_hash=str(manifest["canonical_requested_domains_hash"]),
+        canonical_selected_semantic_hash=str(manifest["canonical_selected_semantic_hash"]),
+        canonical_as_of=str(manifest["canonical_as_of"]),
+        snapshot_contract_version=str(manifest["snapshot_contract_version"]),
+        snapshot_builder_code_fingerprint=str(manifest["snapshot_builder_code_fingerprint"]),
+    )
+    if str(manifest.get("snapshot_base_hash")) != base_recompute:
+        raise SnapshotVerifierError(
+            "snapshot_base_hash does not match the manifest primitives (rebind)"
+        )
+    if snapshot_id_from_base_hash(base_recompute) != snapshot_id:
+        raise SnapshotVerifierError(
+            "snapshot_id does not match UUID5 of the recomputed base hash (identity rebind)"
+        )
+    if str(manifest["snapshot_builder_code_fingerprint"]) != snapshot_builder_code_fingerprint():
+        raise SnapshotVerifierError(
+            "snapshot was built by a DIFFERENT snapshot builder code version - "
+            "the current builder cannot verify its construction rules"
+        )
+
+    # Only the canonical manifest seal is needed downstream.  In particular,
+    # do not call load_canonical_projection/open_canonical_projection_source:
+    # the canonical selected artifact was already consumed by SnapshotBuilder.
+    try:
+        canonical_record, _canonical_manifest, canonical_as_of = read_canonical_run_manifest(
+            conn,
+            str(manifest["canonical_run_id"]),
+            normalized_root=normalized_root,
+        )
+    except CanonicalConsumptionError as exc:
+        raise SnapshotVerifierError(f"snapshot canonical provenance is DAMAGED: {exc}") from exc
+    cross_problems: list[str] = []
+    if str(manifest["canonical_manifest_hash"]) != str(canonical_record["manifest_hash"]):
+        cross_problems.append("canonical manifest hash drifted after the snapshot build")
+    if str(manifest["canonical_requested_domains_hash"]) != str(
+        canonical_record["requested_domains_hash"]
+    ):
+        cross_problems.append("canonical requested domains hash drifted after the build")
+    if str(manifest["canonical_selected_semantic_hash"]) != str(
+        canonical_record["selected_semantic_hash"]
+    ):
+        cross_problems.append("canonical selected semantic hash drifted after the build")
+    if str(manifest["canonical_as_of"]) != canonical_as_of.isoformat():
+        cross_problems.append("canonical as_of drifted after the snapshot build")
+    try:
+        canonical_domains = tuple(
+            str(domain) for domain in json.loads(str(canonical_record["requested_domains_json"]))
+        )
+    except (TypeError, json.JSONDecodeError):
+        canonical_domains = ()
+        cross_problems.append("canonical requested domains are unreadable")
+    if tuple(manifest_domains) != canonical_domains:
+        cross_problems.append("snapshot requested domains diverge from the canonical run")
+    if cross_problems:
+        raise SnapshotVerifierError(
+            f"snapshot {snapshot_id} canonical provenance is DAMAGED: {'; '.join(cross_problems)}"
+        )
+
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise SnapshotVerifierError(f"snapshot {snapshot_id} manifest carries no artifact map")
+    if set(artifacts) != set(manifest_domains):
+        raise SnapshotVerifierError(
+            f"snapshot artifact set {sorted(artifacts)} is not exactly the "
+            f"requested domain set {sorted(manifest_domains)}"
+        )
+
+    recomputed_seals: dict[str, dict[str, Any]] = {}
+    row_count_total = 0
+    for domain in manifest_domains:
+        entry = artifacts[domain]
+        expected_artifact_uri = (
+            f"{snapshot_manifest_uri(snapshot_id, as_of).rsplit('/', 1)[0]}/{domain}.parquet"
+        )
+        if str(entry.get("uri")) != expected_artifact_uri:
+            raise SnapshotVerifierError(
+                f"snapshot {domain} artifact uri is not the deterministic recompute"
+            )
+        path = normalized_root / str(entry.get("uri"))
+        if not path.is_file():
+            raise SnapshotVerifierError(f"snapshot {domain} artifact missing: {entry.get('uri')}")
+        content_hash = _sha256_file(path)
+        if content_hash != str(entry.get("content_hash")):
+            raise SnapshotVerifierError(f"snapshot {domain} artifact bytes tampered")
+        try:
+            physical_schema = pl.read_parquet_schema(path)
+            physical_parquet = pq.ParquetFile(path)
+            metadata = physical_parquet.metadata
+            physical_row_count = -1 if metadata is None else int(metadata.num_rows)
+        except Exception as exc:  # noqa: BLE001 - fail closed at the artifact boundary
+            raise SnapshotVerifierError(
+                f"snapshot {domain} artifact schema or metadata is unreadable"
+            ) from exc
+        actual_schema_hash = hashlib.sha256(str(physical_schema).encode("utf-8")).hexdigest()
+        if actual_schema_hash != str(entry.get("schema_hash")):
+            raise SnapshotVerifierError(
+                f"snapshot {domain} artifact schema hash does not match the physical schema"
+            )
+        if str(physical_schema) != str(polars_domain_schema(domain)):
+            raise SnapshotVerifierError(
+                f"snapshot {domain} artifact schema is not the registry schema"
+            )
+        if physical_row_count != int(entry.get("row_count", -1)):
+            raise SnapshotVerifierError(f"snapshot {domain} artifact row count mismatch")
+        semantic = str(entry.get("semantic_hash") or "")
+        if len(semantic) != 64 or any(char not in "0123456789abcdef" for char in semantic):
+            raise SnapshotVerifierError(f"snapshot {domain} semantic seal is malformed")
+        recomputed_seals[domain] = {
+            "uri": str(entry.get("uri")),
+            "content_hash": content_hash,
+            "schema_hash": actual_schema_hash,
+            "row_count": physical_row_count,
+            "semantic_hash": semantic,
+        }
+        row_count_total += physical_row_count
+
+    artifact_set_recompute = hashlib.sha256(
+        _canonical_json(recomputed_seals).encode("utf-8")
+    ).hexdigest()
+    if artifact_set_recompute != str(record["artifact_set_hash"]):
+        raise SnapshotVerifierError(
+            "snapshot artifact_set_hash does not match the physical artifacts (rebind)"
+        )
+    semantic_recompute = hashlib.sha256(
+        _canonical_json(
+            {domain: seal["semantic_hash"] for domain, seal in recomputed_seals.items()}
+        ).encode("utf-8")
+    ).hexdigest()
+    if semantic_recompute != str(record["snapshot_semantic_hash"]):
+        raise SnapshotVerifierError(
+            "snapshot_semantic_hash does not match the physical artifacts (rebind)"
+        )
+    if row_count_total != int(record["row_count_total"]):
+        raise SnapshotVerifierError(
+            "snapshot row_count_total does not match the physical artifacts"
+        )
+
+    return VerifiedSnapshot(
+        snapshot_id=snapshot_id,
+        canonical_run_id=str(manifest["canonical_run_id"]),
+        as_of=as_of,
+        requested_domains=tuple(manifest_domains),
+        ledger_record=record,
+        manifest=manifest,
+        domain_rows=dict.fromkeys(manifest_domains, ()),
     )
