@@ -166,9 +166,7 @@ class _BoundedProjectedRows:
                 raise SnapshotVerifierError(
                     f"snapshot {snapshot_id} canonical projection is DAMAGED: {exc}"
                 ) from exc
-            buffers[domain].append(
-                f"{projected['canonical_key']}\t{_canonical_json(projected)}\n"
-            )
+            buffers[domain].append(f"{projected['canonical_key']}\t{_canonical_json(projected)}\n")
             if len(buffers[domain]) >= _CANONICAL_SORT_CHUNK_ROWS:
                 self._flush(domain, buffers[domain])
         for domain in requested_domains:
@@ -180,8 +178,7 @@ class _BoundedProjectedRows:
 
         with ExitStack() as stack:
             streams = [
-                stack.enter_context(path.open("r", encoding="utf-8", newline=""))
-                for path in group
+                stack.enter_context(path.open("r", encoding="utf-8", newline="")) for path in group
             ]
             with destination.open("w", encoding="utf-8", newline="") as output:
                 for line in heapq.merge(*(iter(stream) for stream in streams)):
@@ -211,8 +208,7 @@ class _BoundedProjectedRows:
         paths = self._reduced_chunks(domain)
         with ExitStack() as stack:
             streams = [
-                stack.enter_context(path.open("r", encoding="utf-8", newline=""))
-                for path in paths
+                stack.enter_context(path.open("r", encoding="utf-8", newline="")) for path in paths
             ]
             previous_key: str | None = None
             for line in heapq.merge(*(iter(stream) for stream in streams)):
@@ -224,9 +220,7 @@ class _BoundedProjectedRows:
                         f"bounded canonical projection chunk for {domain} is malformed"
                     ) from exc
                 if key == previous_key:
-                    raise SnapshotVerifierError(
-                        f"domain {domain} carries duplicate canonical keys"
-                    )
+                    raise SnapshotVerifierError(f"domain {domain} carries duplicate canonical keys")
                 previous_key = key
                 yield row_json
 
@@ -495,8 +489,7 @@ def verify_snapshot(
                 raise SnapshotVerifierError(msg)
             if str(physical_schema) != str(polars_domain_schema(domain)):
                 msg = (
-                    f"snapshot {domain} artifact schema is not the registry schema "
-                    "(schema rebind)"
+                    f"snapshot {domain} artifact schema is not the registry schema (schema rebind)"
                 )
                 raise SnapshotVerifierError(msg)
             if physical_row_count != int(entry.get("row_count", -1)):
