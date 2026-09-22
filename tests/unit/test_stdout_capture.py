@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 from ashare_state.providers.amazingdata.stdout_capture import (
     CapturedStdout,
@@ -31,6 +32,39 @@ class TestCapture:
         with sdk_stdout_into(holder):
             os.write(1, b"native fd write\n")
         assert "native fd write" in holder.text
+
+    def test_windows_standard_handle_write_captured(self):
+        """A Windows native-handle write must not escape to the terminal."""
+        if sys.platform != "win32":
+            return
+        import ctypes
+
+        holder = CapturedStdout()
+        with sdk_stdout_into(holder):
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            get_std_handle = kernel32.GetStdHandle
+            get_std_handle.argtypes = [ctypes.c_uint32]
+            get_std_handle.restype = ctypes.c_void_p
+            write_file = kernel32.WriteFile
+            write_file.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_char_p,
+                ctypes.c_uint32,
+                ctypes.POINTER(ctypes.c_uint32),
+                ctypes.c_void_p,
+            ]
+            write_file.restype = ctypes.c_int
+            payload = b"native Windows handle write\n"
+            written = ctypes.c_uint32()
+            assert write_file(
+                get_std_handle(ctypes.c_uint32(-11 & 0xFFFFFFFF).value),
+                payload,
+                len(payload),
+                ctypes.byref(written),
+                None,
+            )
+            assert written.value == len(payload)
+        assert "native Windows handle write" in holder.text
 
     def test_stdout_restored_after_block(self):
         holder = CapturedStdout()
