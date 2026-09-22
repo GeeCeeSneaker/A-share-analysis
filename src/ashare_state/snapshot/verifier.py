@@ -19,7 +19,9 @@ section 5, P0-B03/P0-B04).
    bind, and the deterministic projection is replayed row-by-row; aggregate
    seals (artifact_set_hash / snapshot_semantic_hash / row_count_total)
    are recomputed from those physical and sealed values;
-7. the verified rows are materialized per domain for the ReadModel.
+7. the verified rows are optionally materialized per domain for callers that
+   need the in-memory hand-off; seal-only consumers can disable that
+   retention.
 """
 
 from __future__ import annotations
@@ -66,9 +68,17 @@ def verify_snapshot(
     *,
     raw_root: Path,
     normalized_root: Path,
+    retain_domain_rows: bool = True,
 ) -> VerifiedSnapshot:
     """Verify ONE snapshot ledger row end-to-end and materialize the
-    per-domain rows from the hash-verified parquet artifacts."""
+    per-domain rows from the hash-verified parquet artifacts.
+
+    ``retain_domain_rows=False`` keeps the exact physical/projection
+    comparison and all seals, PIT checks, and key checks, but does not retain
+    every verified row in the returned hand-off.  ReadModel consumers only
+    need the verified manifest/seals and use this mode to avoid a second
+    full-dataset Python representation.
+    """
     row = conn.execute(
         f"SELECT {', '.join(SNAPSHOT_LEDGER_COLUMNS)} FROM meta_snapshot_build "
         "WHERE snapshot_id = ?",
@@ -299,7 +309,7 @@ def verify_snapshot(
         # stable canonical-key order.  Compare one row at a time instead of
         # allocating two full lists of canonical JSON strings (which is a
         # material, avoidable peak for multi-million-row daily-bar snapshots).
-        rows: list[dict[str, Any]] = []
+        rows: list[dict[str, Any]] | None = [] if retain_domain_rows else None
         for ordinal, (actual, expected_row) in enumerate(
             zip(frame.iter_rows(named=True), expected_rows, strict=True)
         ):
@@ -309,7 +319,8 @@ def verify_snapshot(
                     "deterministic canonical projection"
                 )
                 raise SnapshotVerifierError(msg)
-            rows.append(actual)
+            if rows is not None:
+                rows.append(actual)
             # PIT + key sanity re-check on the materialized rows
             r = actual
             available = r.get("available_at")
@@ -325,7 +336,7 @@ def verify_snapshot(
             if r.get("canonical_run_id") != str(manifest["canonical_run_id"]):
                 msg = f"snapshot {domain} row carries a foreign canonical_run_id projection"
                 raise SnapshotVerifierError(msg)
-        domain_rows[domain] = tuple(rows)
+        domain_rows[domain] = tuple(rows) if rows is not None else ()
         del expected_rows_by_domain[domain]
         recomputed_seals[domain] = {
             "uri": str(entry.get("uri")),
@@ -363,3 +374,4 @@ def verify_snapshot(
         manifest=manifest,
         domain_rows=domain_rows,
     )
+
