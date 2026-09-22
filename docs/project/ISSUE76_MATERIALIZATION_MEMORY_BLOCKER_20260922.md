@@ -85,3 +85,7 @@ Code commits are 1339f3e83304324d0815cbe0856fbf5a2213b394, f3c4de311cf3da5bf7968
 
 This is a code-level remediation only. It does not establish that the real 78-month RSS is below the 16 GiB acceptance budget. M1 remains STOP(BLOCKED); M2 projection/materialization, M3 materialization-only/resume, and final publication acceptance remain paused pending an explicit PM/Owner decision for one new bounded RSS measurement.
 
+CI follow-up — 2026-09-22
+
+After the EOF normalization, CI run #711 passed all required jobs: Ubuntu 3.14, Windows 3.14, and Windows 3.12. This confirms repository lint, type checks, and offline test gates for the change; it does not change the M1 RSS result or authorize a new large-window measurement.
+
