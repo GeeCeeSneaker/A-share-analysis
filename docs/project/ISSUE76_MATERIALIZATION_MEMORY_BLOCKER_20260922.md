@@ -58,3 +58,17 @@ The local run root is ignored and must remain untracked:
 `data/spike/issue76_history_build_20260916/`
 
 The sensitive SDK environment remains local-only. No credentials or provider session material may be added to GitHub.
+
+## M1 follow-up — bounded ReadModel gate still blocked (2026-09-22)
+
+The M1 implementation was tested once against the existing 78-month snapshot/readmodel using a read-only child process and a hard 15 GiB RSS stop threshold. An external process check observed the verifier at approximately **22.268 GiB working set**, above the PM initial acceptance budget of <16 GiB. The child was stopped immediately; no second measurement or unchanged-code retry was made.
+
+Post-stop checks found:
+
+- execution_state.json was unchanged;
+- the temporary .readmodel-verify workspace was absent after cleanup;
+- no ledger, raw evidence, normalized snapshot/readmodel, or materialization artifact was intentionally written, deleted, or overwritten by this measurement;
+- M1 is therefore **not accepted**. M2 projection/materialization and M3 materialization-only/resume work remain paused.
+
+The bounded hash/seal-only code and fixture QA remain useful, but they are not sufficient to claim a bounded 78-month gate. The remaining high-memory allocation boundary must be isolated and reduced before any further large-window run. This is the final execution attempt for the current checkpoint.
+
