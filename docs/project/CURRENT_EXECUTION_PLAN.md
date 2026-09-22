@@ -4,6 +4,19 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.10. 2026-09-22 M1.1 sealed snapshot hand-off (未重新测量)
+
+> 状态：**M1.1 代码整改已提交；M1 真实 78 个月 RSS 门禁仍 STOP(BLOCKED)；不进入 M2/M3**
+
+PM 审阅指出，上一轮虽已把 ReadModel 逻辑 hash 改为有界算法，但 `ReadModel rebuild/open` 仍递归调用 `verify_snapshot`，会再次读取并重投影 canonical selected 数据。已按该要求补齐最小下游消费边界：
+
+- 新增 `consume_snapshot_seal`：校验 snapshot ledger/manifest 身份、canonical manifest seal 交叉绑定、快照 artifact 的流式 content hash、Parquet schema、metadata row count、semantic seal 格式及 artifact/snapshot/总行数聚合 seal；不调用 `load_canonical_projection`、`open_canonical_projection_source` 或 `project_canonical_snapshot`。
+- ReadModel rebuild/open 改为消费该 sealed hand-off；完整 `verify_snapshot` 深审计路径保留给显式审计和 Snapshot 自身回归，不被删除或放宽。
+- 新增回归：sealed hand-off 禁止整表 `read_parquet`/canonical projection；snapshot artifact 篡改和 canonical manifest/ledger 漂移仍 fail-closed；ReadModel rebuild/open 均走 sealed hand-off。
+- 本地离线 QA：Snapshot/ReadModel 集成测试、Ruff、mypy 通过；未访问 provider、未使用正式账号、未启动新的 78 个月真实 RSS 测量。
+
+这仍是代码级整改，不能证明峰值 RSS 已低于 PM 的 <16 GiB 门禁。下一步仍须 PM/Owner 明确批准一次新的、带 15 GiB RSS 硬上限的 M1 测量；只有满足预算才允许 M2/M3，否则立即 STOP 并记录峰值。
+
 ## 0.9. 2026-09-22 M1 高内存边界整改（未重新测量）
 
 > 状态：**代码整改已提交；M1 真实 78 个月 RSS 门禁仍 STOP(BLOCKED)；不进入 M2/M3**
