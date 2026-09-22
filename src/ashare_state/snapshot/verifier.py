@@ -374,4 +374,3 @@ def verify_snapshot(
         manifest=manifest,
         domain_rows=domain_rows,
     )
-
