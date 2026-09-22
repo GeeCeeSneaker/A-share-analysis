@@ -89,3 +89,12 @@ CI follow-up — 2026-09-22
 
 After the EOF normalization, CI run #711 passed all required jobs: Ubuntu 3.14, Windows 3.14, and Windows 3.12. This confirms repository lint, type checks, and offline test gates for the change; it does not change the M1 RSS result or authorize a new large-window measurement.
 
+## M1.1 sealed snapshot hand-off remediation — 2026-09-22
+
+The PM review identified that the previous seal-only mode still entered the snapshot verifier's bounded canonical projection path from ReadModel rebuild/open. That reduced Python retention but did not remove the dominant recursive canonical allocation.
+
+The tracked remediation now provides one explicit `consume_snapshot_seal` hand-off for downstream ReadModel use. It verifies the snapshot ledger/manifest identity, cross-binds only the canonical manifest seal, streams each snapshot artifact hash, checks Parquet schema and metadata row count, validates semantic seal shape, and recomputes the artifact-set, snapshot-semantic, and total-row seals. It does not call `load_canonical_projection`, `open_canonical_projection_source`, `project_canonical_snapshot`, or full-table `read_parquet`. The existing `verify_snapshot` deep-audit path remains available and its projection/PIT/key checks are unchanged.
+
+ReadModel rebuild and verified-open now use the sealed hand-off, and regression tests cover the no-projection/no-full-frame boundary, snapshot artifact tampering, canonical manifest/ledger drift, and both rebuild/open consumers. Local Snapshot/ReadModel integration tests, Ruff, and mypy pass.
+
+This is still a code-only remediation. No new 78-month RSS measurement was attempted after the prior ~22.268 GiB stop; M1 remains STOP(BLOCKED), and M2/M3/final publication remain paused pending an explicit PM/Owner decision for one bounded measurement.
