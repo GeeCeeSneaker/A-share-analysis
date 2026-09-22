@@ -38,6 +38,7 @@ from ashare_state.snapshot import (
     SnapshotBuilderError,
     SnapshotSchemaError,
     SnapshotVerifierError,
+    consume_snapshot_seal,
     snapshot_builder_code_fingerprint,
     snapshot_manifest_uri,
     validate_canonical_key,
@@ -873,6 +874,58 @@ class TestSnapshotBuilder:
             retain_domain_rows=False,
         )
         assert verified.domain_rows == {"daily_bar": ()}
+
+    def test_consume_snapshot_seal_does_not_project_canonical_rows(
+        self, conn, env_root, monkeypatch
+    ):
+        """The downstream seal hand-off must not load selected.parquet."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        built = _build(conn, env_root, result.canonical_run_id)
+        import ashare_state.snapshot.verifier as snapshot_verifier
+
+        def _forbidden(*args, **kwargs):
+            raise AssertionError("sealed snapshot consumption must not project canonical rows")
+
+        monkeypatch.setattr(snapshot_verifier, "load_canonical_projection", _forbidden)
+        monkeypatch.setattr(snapshot_verifier, "open_canonical_projection_source", _forbidden)
+        monkeypatch.setattr(snapshot_verifier, "project_canonical_snapshot", _forbidden)
+        monkeypatch.setattr(snapshot_verifier.pl, "read_parquet", _forbidden)
+        verified = consume_snapshot_seal(
+            conn,
+            built.snapshot_id,
+            normalized_root=env_root["normalized"],
+        )
+        assert verified.domain_rows == {"daily_bar": ()}
+        assert verified.requested_domains == ("daily_bar",)
+
+    def test_consume_snapshot_seal_rejects_artifact_tamper(self, conn, env_root):
+        """The sealed hand-off still fails closed on snapshot bytes tamper."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        built = _build(conn, env_root, result.canonical_run_id)
+        manifest = _snapshot_manifest(env_root, built)
+        uri = str(manifest["artifacts"]["daily_bar"]["uri"])
+        (env_root["normalized"] / uri).write_bytes(b"tampered-domain")
+        with pytest.raises(SnapshotVerifierError, match="bytes tampered"):
+            consume_snapshot_seal(
+                conn,
+                built.snapshot_id,
+                normalized_root=env_root["normalized"],
+            )
+
+    def test_consume_snapshot_seal_rejects_canonical_manifest_drift(self, conn, env_root):
+        """The seal hand-off still binds the canonical manifest to its ledger."""
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        built = _build(conn, env_root, result.canonical_run_id)
+        conn.execute(
+            "UPDATE meta_canonicalization_run SET manifest_hash = ? WHERE canonical_run_id = ?",
+            ["0" * 64, result.canonical_run_id],
+        )
+        with pytest.raises(SnapshotVerifierError, match="canonical provenance|canonical manifest"):
+            consume_snapshot_seal(
+                conn,
+                built.snapshot_id,
+                normalized_root=env_root["normalized"],
+            )
 
     def test_verify_snapshot_consumes_canonical_seal_without_recursive_full_verify(
         self, conn, env_root, monkeypatch
