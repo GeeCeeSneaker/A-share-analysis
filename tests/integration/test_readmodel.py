@@ -28,7 +28,10 @@ from ashare_state.readmodel import (
     readmodel_builder_code_fingerprint,
     readmodel_db_uri,
 )
-from ashare_state.readmodel.duckdb_model import _normalize_seal_row
+from ashare_state.readmodel.duckdb_model import (
+    _normalize_seal_row,
+    _rows_semantic_hash_bounded,
+)
 from ashare_state.readmodel.schema import duckdb_domain_columns, duckdb_domain_table_name
 from ashare_state.snapshot import SnapshotBuilder, SnapshotVerifierError
 
@@ -49,6 +52,88 @@ def _built_snapshot(conn, env_root, domains=("daily_bar",)):
 @pytest.mark.integration
 class TestDuckDBReadModel:
     """Mandatory tests 31-42."""
+
+    def test_bounded_semantic_hash_matches_legacy_without_fetchall(self, tmp_path, monkeypatch):
+        """The large-table hash path preserves the old byte contract and
+        consumes rows only through bounded fetchmany batches."""
+        import ashare_state.readmodel.duckdb_model as readmodel_module
+
+        monkeypatch.setattr(readmodel_module, "_READMODEL_SEMANTIC_HASH_BATCH_SIZE", 3)
+        monkeypatch.setattr(readmodel_module, "_READMODEL_SEMANTIC_HASH_MAX_OPEN_CHUNKS", 2)
+        db = duckdb.connect(":memory:")
+        try:
+            db.execute(
+                "CREATE TABLE hash_rows ("
+                "row_id INTEGER, value VARCHAR, ratio DOUBLE, "
+                "observed_at TIMESTAMPTZ, optional VARCHAR)"
+            )
+            observed_at = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+            values = [
+                (
+                    index,
+                    f"值-{index % 17}",
+                    index / 7.0,
+                    observed_at,
+                    None if index % 19 == 0 else f"optional-{index}",
+                )
+                for index in range(17)
+            ]
+            values[7] = (7, "非 ASCII\nvalue", 7 / 7.0, observed_at, None)
+            db.executemany("INSERT INTO hash_rows VALUES (?, ?, ?, ?, ?)", values)
+            expected_rows = [
+                _normalize_seal_row(
+                    {
+                        "row_id": row_id,
+                        "value": value,
+                        "ratio": ratio,
+                        "observed_at": row_observed_at,
+                        "optional": optional,
+                    }
+                )
+                for row_id, value, ratio, row_observed_at, optional in values
+            ]
+            expected = _rows_semantic_hash(expected_rows)
+
+            class _NoFetchAllCursor:
+                def __init__(self, cursor):
+                    self._cursor = cursor
+
+                def fetchmany(self, size):
+                    return self._cursor.fetchmany(size)
+
+                def fetchall(self):
+                    raise AssertionError("bounded semantic hashing must not call fetchall")
+
+            class _NoFetchAllConnection:
+                def execute(self, query):
+                    return _NoFetchAllCursor(db.execute(query))
+
+            actual = _rows_semantic_hash_bounded(
+                _NoFetchAllConnection(),
+                "hash_rows",
+                ["row_id", "value", "ratio", "observed_at", "optional"],
+                temp_directory=tmp_path,
+            )
+            assert actual == expected
+            assert list(tmp_path.glob("*.jsonl")) == []
+        finally:
+            db.close()
+
+    def test_rebuild_uses_seal_only_snapshot_handoff(self, conn, env_root, monkeypatch):
+        """ReadModel rebuild does not retain the full snapshot row hand-off."""
+        built = _built_snapshot(conn, env_root)
+        import ashare_state.readmodel.duckdb_model as readmodel_module
+
+        original = readmodel_module.verify_snapshot
+        retain_flags = []
+
+        def _wrapped(*args, **kwargs):
+            retain_flags.append(kwargs["retain_domain_rows"])
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(readmodel_module, "verify_snapshot", _wrapped)
+        _model(conn, env_root).rebuild(built.snapshot_id)
+        assert retain_flags == [False]
 
     def test_rebuild_success(self, conn, env_root):
         """Mandatory 31: a verified snapshot rebuilds into a complete
@@ -397,3 +482,4 @@ class TestDuckDBReadModel:
         finally:
             db1.close()
             db2.close()
+
