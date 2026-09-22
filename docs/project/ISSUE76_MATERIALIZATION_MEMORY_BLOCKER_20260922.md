@@ -72,3 +72,16 @@ Post-stop checks found:
 
 The bounded hash/seal-only code and fixture QA remain useful, but they are not sufficient to claim a bounded 78-month gate. The remaining high-memory allocation boundary must be isolated and reduced before any further large-window run. This is the final execution attempt for the current checkpoint.
 
+## M1 code remediation after the RSS stop — 2026-09-22
+
+No new 78-month measurement was attempted after the 0.8 RSS failure. The remaining read-in allocation boundary was reduced in code:
+
+- canonical selected.parquet now has a hash/schema/row-count verified batch source backed by Arrow Parquet batches;
+- seal-only snapshot verification streams physical Parquet batches and uses bounded JSONL external-sort chunks for the canonical projection, preserving the existing exact row, PIT, key, schema, duplicate-key, and seal checks;
+- the legacy retain-domain-rows hand-off remains available for callers that explicitly need in-memory rows;
+- regression coverage rejects a full-frame read on the seal-only path.
+
+Code commits are 1339f3e83304324d0815cbe0856fbf5a2213b394, f3c4de311cf3da5bf7968dc9e05306b0ec27630f, and fc03bd1a1b32bb4bebe2c0f196a4b40cbccbfe92. Ruff, mypy, Snapshot/ReadModel integration tests, and the full offline pytest run passed with exit code 0.
+
+This is a code-level remediation only. It does not establish that the real 78-month RSS is below the 16 GiB acceptance budget. M1 remains STOP(BLOCKED); M2 projection/materialization, M3 materialization-only/resume, and final publication acceptance remain paused pending an explicit PM/Owner decision for one new bounded RSS measurement.
+
