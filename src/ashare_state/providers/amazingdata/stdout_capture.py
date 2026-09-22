@@ -17,6 +17,7 @@ Rules:
 from __future__ import annotations
 
 import contextlib
+import ctypes
 import io
 import json
 import os
@@ -38,6 +39,41 @@ _STDERR_CAPTURE_FLAG = "_sdk_stderr_capture_active"
 # provider threads must be serialized or captures interleave / restore
 # in the wrong order (Token capture could leak).
 _GLOBAL_SDK_STDOUT_LOCK = threading.RLock()
+
+
+@contextmanager
+def _windows_std_handle_into(target_fd: int, std_handle: int) -> Iterator[None]:
+    """Redirect a Windows process standard handle to ``target_fd``.
+
+    ``os.dup2`` protects Python and CRT writes, but a native SDK can call
+    ``GetStdHandle``/``WriteFile`` directly. Those writes bypass CRT fd 1/2
+    and otherwise remain visible in the user's terminal. Keep this boundary
+    Windows-only so the portable fd capture remains unchanged elsewhere.
+    """
+    if sys.platform != "win32":
+        yield
+        return
+
+    import msvcrt
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    get_std_handle = kernel32.GetStdHandle
+    get_std_handle.argtypes = [ctypes.c_uint32]
+    get_std_handle.restype = ctypes.c_void_p
+    set_std_handle = kernel32.SetStdHandle
+    set_std_handle.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
+    set_std_handle.restype = ctypes.c_int
+
+    handle_id = ctypes.c_uint32(std_handle & 0xFFFFFFFF).value
+    previous = get_std_handle(handle_id)
+    target = ctypes.c_void_p(msvcrt.get_osfhandle(target_fd))
+    if not set_std_handle(handle_id, target):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        yield
+    finally:
+        if not set_std_handle(handle_id, previous):
+            raise ctypes.WinError(ctypes.get_last_error())
 
 
 def _set_capture_flag(obj: object, value: bool, flag: str = _CAPTURE_FLAG) -> None:
@@ -112,7 +148,10 @@ def sdk_stdout_into(holder: CapturedStdout, *, independent: bool = False) -> Ite
             _set_capture_flag(marker, True)
             try:
                 os.dup2(tmp.fileno(), 1)
-                with contextlib.redirect_stdout(tmp):
+                with (
+                    _windows_std_handle_into(tmp.fileno(), -11),
+                    contextlib.redirect_stdout(tmp),
+                ):
                     _set_capture_flag(tmp, True)
                     try:
                         yield
@@ -152,7 +191,10 @@ def sdk_stderr_into(holder: CapturedStderr) -> Iterator[None]:
             _set_capture_flag(marker, True, _STDERR_CAPTURE_FLAG)
             try:
                 os.dup2(tmp.fileno(), 2)
-                with contextlib.redirect_stderr(python_stderr):
+                with (
+                    _windows_std_handle_into(tmp.fileno(), -12),
+                    contextlib.redirect_stderr(python_stderr),
+                ):
                     _set_capture_flag(sys.stderr, True, _STDERR_CAPTURE_FLAG)
                     try:
                         yield
