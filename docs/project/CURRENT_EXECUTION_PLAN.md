@@ -4,6 +4,16 @@
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## 0.8. 2026-09-22 M1 RSS 门禁失败（最新）
+
+> 状态：**STOP(BLOCKED)；M1 未通过；按内存安全要求不进入 M2/M3**
+
+按 0.7 计划，对既有 78 个月 snapshot/readmodel 只读执行了一次 M1 独立测量，外层设置 15 GiB RSS 硬上限。外部进程观测到校验子进程约 22.268 GiB working set，已经超过 PM 的 <16 GiB 初始预算；进程随即停止，没有第二次或 unchanged-code 重试。
+
+测量后确认 execution_state.json 未变化，临时 .readmodel-verify 目录已清理；没有有意写入、删除或覆盖 ledger、raw、normalized、snapshot/readmodel 或 materialization 产物。M1 的小型 fixture、精确 hash 和 seal-only 回归仍通过，但不足以证明真实 78 个月路径有界。
+
+因此本轮不启动 M2 projection/materialization，也不启动 M3 materialization-only/resume。后续必须先隔离并消除剩余高内存分配边界，再由 PM/Owner 决定是否重新测量；完整脱敏事实见 [M1 RSS 阻断补充](ISSUE76_MATERIALIZATION_MEMORY_BLOCKER_20260922.md)。
+
 ## 0.7. 2026-09-22 M1 有界 Snapshot/ReadModel 校验实现检查点
 
 > 状态：**M1 代码已提交；小型回归与静态 QA 通过；78 个月 RSS 门禁尚未运行；M2/M3 未开始**
