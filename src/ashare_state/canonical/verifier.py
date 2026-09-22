@@ -22,12 +22,14 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import polars as pl
+import pyarrow.parquet as pq
 
 from ashare_state.canonical.canonicalizer import (
     _LEDGER_COLUMNS,
@@ -39,8 +41,10 @@ from ashare_state.storage.paths import physical_from_logical_uri
 
 __all__ = [
     "CanonicalConsumptionError",
+    "CanonicalProjectionSource",
     "VerifiedCanonicalRun",
     "load_canonical_projection",
+    "open_canonical_projection_source",
     "read_canonical_run_manifest",
     "verify_canonical_run_for_consumption",
 ]
@@ -50,6 +54,51 @@ class CanonicalConsumptionError(Exception):
     """A canonical run cannot be consumed: unknown id, damaged seal /
     artifacts / findings truth, non-SUCCESS status, or degraded
     upstream CR-2 evidence. Fail closed - no partial truth escapes."""
+
+
+@dataclass(frozen=True)
+class CanonicalProjectionSource:
+    """A hash-verified selected artifact that can be consumed in batches.
+
+    The legacy ``load_canonical_projection`` hand-off intentionally returns
+    all selected rows for builders that need an in-memory tuple.  ReadModel
+    and Snapshot seal-only consumers must not pay that memory cost, so this
+    hand-off exposes the same verified artifact through a bounded iterator.
+    """
+
+    record: dict[str, Any]
+    manifest: dict[str, Any]
+    as_of: datetime
+    path: Path
+    row_count: int
+
+    def iter_rows(self, *, batch_size: int = 32_768) -> Iterator[dict[str, Any]]:
+        """Yield selected rows from Parquet without materializing the file."""
+        if batch_size <= 0:
+            raise CanonicalConsumptionError("canonical projection batch_size must be positive")
+        try:
+            parquet = pq.ParquetFile(self.path)
+            for batch in parquet.iter_batches(batch_size=batch_size):
+                for row in batch.to_pylist():
+                    if not isinstance(row, dict):  # pragma: no cover - pyarrow contract
+                        raise CanonicalConsumptionError(
+                            "canonical selected artifact yielded a non-mapping row"
+                        )
+                    yield row
+        except CanonicalConsumptionError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - fail closed at the artifact boundary
+            raise CanonicalConsumptionError(
+                "canonical selected artifact cannot be streamed"
+            ) from exc
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 @dataclass(frozen=True)
@@ -155,6 +204,64 @@ def read_canonical_run_manifest(
             "canonical manifest requested_domains does not match the ledger"
         )
     return record, manifest, as_of
+
+
+def open_canonical_projection_source(
+    conn: Any,
+    canonical_run_id: str,
+    *,
+    normalized_root: Path,
+) -> CanonicalProjectionSource:
+    """Verify the selected artifact seal and return a bounded row source.
+
+    This is deliberately a separate hand-off from ``load_canonical_projection``:
+    callers that need the historical tuple keep the old API, while seal-only
+    consumers can stream the exact same artifact without a full ``read_bytes``
+    or ``to_dicts`` allocation.
+    """
+    record, manifest, as_of = read_canonical_run_manifest(
+        conn, canonical_run_id, normalized_root=normalized_root
+    )
+    artifacts = manifest.get("artifacts")
+    selected = artifacts.get("selected") if isinstance(artifacts, dict) else None
+    if not isinstance(selected, dict):
+        raise CanonicalConsumptionError("canonical manifest has no selected artifact seal")
+    expected_uri = (
+        f"canonical/contract={record['canonical_contract_version']}/"
+        f"as_of={as_of.strftime('%Y%m%dT%H%M%SZ')}/"
+        f"run={canonical_run_id}/selected.parquet"
+    )
+    if str(selected.get("uri")) != expected_uri:
+        raise CanonicalConsumptionError("canonical selected artifact URI is not deterministic")
+    try:
+        path = physical_from_logical_uri(Path(normalized_root), expected_uri)
+    except Exception as exc:  # noqa: BLE001 - fail closed at the path boundary
+        raise CanonicalConsumptionError("canonical selected artifact URI is invalid") from exc
+    if not path.is_file():
+        raise CanonicalConsumptionError(f"canonical selected artifact missing: {expected_uri}")
+    if _sha256_file(path) != str(selected.get("content_hash")):
+        raise CanonicalConsumptionError("canonical selected artifact bytes are tampered")
+    try:
+        schema = pl.read_parquet_schema(path)
+        parquet = pq.ParquetFile(path)
+        metadata = parquet.metadata
+        row_count = -1 if metadata is None else int(metadata.num_rows)
+    except Exception as exc:  # noqa: BLE001 - fail closed at the artifact boundary
+        raise CanonicalConsumptionError(
+            "canonical selected artifact schema or metadata is unreadable"
+        ) from exc
+    schema_hash = hashlib.sha256(str(schema).encode("utf-8")).hexdigest()
+    if schema_hash != str(selected.get("schema_hash")):
+        raise CanonicalConsumptionError("canonical selected artifact schema is tampered")
+    if row_count != int(selected.get("row_count", -1)):
+        raise CanonicalConsumptionError("canonical selected artifact row count is tampered")
+    return CanonicalProjectionSource(
+        record=record,
+        manifest=manifest,
+        as_of=as_of,
+        path=path,
+        row_count=row_count,
+    )
 
 
 def load_canonical_projection(
@@ -335,3 +442,4 @@ def json_loads_domains(raw: str) -> list[str]:
     if not isinstance(domains, list) or not all(isinstance(d, str) for d in domains):
         raise ValueError("requested_domains_json is not a list of strings")
     return domains
+
