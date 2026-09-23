@@ -1,29 +1,34 @@
-## 0.13. 2026-09-23 P0 #79 A0/A1 corrected evidence checkpoint
+## 0.14. 2026-09-23 P0 #79 A0/A1 exact confirmation checkpoint
 
-> 状态：**A0/A1 针对 PM 审阅意见已完成窄整改；资源门禁 PASS；物理选型仍待 PM/Owner 冻结；不进入 daily_bar 重构、Issue #76 历史迁移或 provider reacquisition**
+> 状态：**A0/A1 窄整改与 exact-runner 确认重跑已完成；资源门禁 PASS；物理选型仍待 PM/Owner 冻结；不进入 daily_bar 重构、Issue #76 历史迁移或 provider reacquisition**
 
-PM 对 exact head `1f31989ee656e8957c92811dc6cab74044bb9305` 的 A0/A1 审阅要求已落实。此前的 A0/A1 资源门禁结论保留，但旧的时钟定义和 W5/W6 文件集合证据不再作为当前依据；本节及下列绑定产物是当前审阅输入。
+PM 对 exact head `1f31989ee656e8957c92811dc6cab74044bb9305` 的 A0/A1 审阅要求已落实。当前绑定证据不把合成基准 PASS 写成架构冻结或 Issue #79 全部 PASS。
 
-已完成的窄整改：
+已完成：
 
-- A0 将 `market_as_of` 与 `source_vintage_as_of` 分离：普通历史研究只要求事实属于 `market_as_of`，不要求 `retrieved_at <= market_as_of`；若要证明严格源版本，则必须另有 `retrieved_at <= source_vintage_as_of` 的保留证据；不再使用含义混杂的持久化通用 `as_of`。
-- A1 一次性 runner 已在 W4-W8 同时运行 `open_fragments` 与 `closed_compacted` 两类 artifact。L1/L2 的 W5/W6 在 `read_parquet` 前按稳定 bucket manifest 选择候选文件；W4 仍读取相关 bucket 的完整集合；`files_available` 与 `all_files_available` 分开记录。
-- 已用 exact committed runner 重新生成结果：9 组配置（L0/L1/L2 × UUID string/fixed16/INT64），每组 21,600,000 行；`provider_calls=0`。W5/W6 的候选选择是 runner 的确定性 manifest 选择，不冒充 DuckDB 的物理 row-group 计数；运行时未暴露可靠 `row_groups_touched`，结果保持 `null`。
+- A0 将 `market_as_of` 与 `source_vintage_as_of` 分离：普通历史研究不要求 `retrieved_at <= market_as_of`；严格源版本才要求 `retrieved_at <= source_vintage_as_of` 的保留证据；不使用含义混杂的持久化通用 `as_of`。
+- A1 runner 在 W4-W8 同时运行 `open_fragments` 与 `closed_compacted`。L1/L2 的 W5/W6 在 `read_parquet` 前按稳定 bucket manifest 选择候选文件；W4 读取完整相关集合；`files_available` 与 `all_files_available` 分开记录；DuckDB 未暴露可靠 row-group touch count 时保持 `null`。
+- 同一格式化 exact runner 的第一次完整运行仅因 `uuid_string/L1` 的一次性 short/long 耗时比 `1.4325` 触发 FAIL；无内存、闭月重写或 full fact-copy 失败。按有界确认规则仅重跑一次，以下确认结果为当前唯一绑定结果，不再继续重试。
 
-绑定证据：
+确认结果：
+
+- 9 组配置（L0/L1/L2 × UUID string/fixed16/INT64），每组 21,600,000 行，`provider_calls=0`；
+- `resource_gate_status=PASS`，整体状态仍为 `REVIEW_REQUIRED_FOR_ARCHITECTURE_SELECTION`；
+- 最大 daily-ingest RSS 0.2776 GiB、month-compaction RSS 0.2828 GiB、查询 RSS 0.3200 GiB、short/long 最大比值 1.1580、closed-month rewrite=0、Snapshot/ReadModel full fact copy=0；
+- W5 单证券的 L1/L2 candidate byte set 在 open 与 closed artifact 上约比 L0 小 10–12 倍；W6 的 100/500-security 范围跨越全部 16 个 bucket，不宣称 bucket 减少。
+
+绑定产物：
 
 - A0：`docs/architecture/A0_MINUTE_READY_CONTRACTS_20260923.md`；
 - A1：`docs/architecture/A1_MINUTE_LAYOUT_BENCHMARK_DECISION_20260923.md`；
 - 结果：`docs/architecture/benchmarks/a1_minute_layout_benchmark_20260923.json` 与同名 `.md`；
-- runner Git head：`5d6635ec6b07488cc6997ad13610e0a8b076be5c`；
-- runner blob SHA：`6514f8083e5cc7a812953b780d2740280b637aa1`；
-- runner source SHA-256：`EAE1E60D4ECB4D386FDE0A317285989B4A1808BB6D76D5D17D51DD0D95A53FDB`；
-- benchmark JSON SHA-256：`5389F571188FC6B163BA0822C71718177BFFE112A52525062B634629660E7728`；
-- benchmark Markdown SHA-256：`9D9F0FA27FE09C7A916CB54F628A600B0A90A4C2584FF1364C0339F230AF9CE4`。
+- runner Git head：`f940ec782a816e6b63d6a13c462af5441e8256c0`；
+- runner blob SHA：`f91f891ac2dca782603753685c4106308626d15f`；
+- runner source SHA-256：`ad535f18c5de11b154a7291ad2cb4ac0c3384f15acaf2d35c6cfe644384f86d8`；
+- benchmark JSON SHA-256：`CD094B2C6509B34405A317BC0CF0D725603BDAB0D323827458CEBFF3DDBD783A`；
+- benchmark Markdown SHA-256：`81B8EB85CE5B151B328929DE4BB474BDD402EFBFE25D58E695912057B6D30E6A`。
 
-修正后资源结果：最大 daily-ingest RSS 0.3110 GiB、最大 month-compaction RSS 0.3165 GiB、最大查询 RSS 0.3347 GiB、short/long 最大耗时比 1.1295、closed-month rewrite=0、Snapshot/ReadModel full fact copy=0。W5 单证券在 L1/L2 上的候选字节集合相对 L0 约减少 10–12 倍；W6 的 100/500-security 范围跨越全部 16 个 bucket，因此不能宣称同样的 bucket 减少。
-
-当前只形成**临时选型建议**：L1 + fixed16 UUID physical key，UUID 作为稳定治理 identity；L0 + fixed16 是更简单的备选。现有证据不足以冻结 INT64 mapping，也不足以把 row-group 观测限制写成物理 I/O 证明。仍需 PM/Owner 审阅并冻结布局/键表示；在冻结前不得启动 daily_bar vertical slice。
+当前仍是临时选型建议：L1 + fixed16 UUID physical key；L0 + fixed16 是较简单备选；现有证据不足以冻结 INT64 mapping，也不授权 32 bucket、provider、daily_bar vertical refactor 或 Issue #76 迁移。下一步由 PM/Owner 审阅并冻结布局/键表示；冻结后 scheduler 才能授权一个 bounded `daily_bar` Canonical → logical Snapshot → DuckDB facade vertical slice。
 
 # Current Execution Plan
 
