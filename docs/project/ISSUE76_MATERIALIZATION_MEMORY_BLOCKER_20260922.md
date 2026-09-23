@@ -122,3 +122,22 @@ Required next decision:
 1. Do not weaken or bypass the snapshot builder fingerprint gate.
 2. Before another M1 RSS attempt, provide or explicitly authorize creation of a current-code-compatible retained snapshot/ReadModel from the already sealed local canonical evidence, without provider capture. That rebuild is a separate operation and was not performed under the current M1-only authorization.
 3. After a compatible retained artifact exists, run exactly one bounded M1 measurement with the existing 15 GiB hard stop and <16 GiB acceptance rule. Until then, keep M2/M3 and final publication paused.
+
+
+## Post-#80 PASS — retained-evidence C1 audit blocked (2026-09-23)
+
+Status: **STOP(BLOCKED) before the offline PIT/identity/lifecycle sample audit; provider_calls=0.**
+
+### Confirmed facts
+
+- Issue #80 implementation is complete at PR #81 head `21ec85bdaafeb40fb0c5a088d708970b1b5ee8ce`. Exact-head CI run [35834078040](https://github.com/GeeCeeSneaker/A-share-analysis/actions/runs/35834078040) passed all three required jobs (Ubuntu/Python 3.14, Windows/Python 3.12, Windows/Python 3.14), including full pytest, Ruff, mypy, and the SDK-absence check. PR #81 is ready for review and is not merged.
+- The latest #76 scheduler direction is to resume only with `provider_calls=0`, first auditing representative retained evidence against PIT/availability, identity, and lifecycle semantics.
+- The documented ignored local run root, `data/spike/issue76_history_build_20260916/`, is absent from the currently accessible #76 worktree. The earlier alternate local path referenced in historical execution notes is also unavailable in this environment. This establishes only that the artifacts are not available at those checked paths; it does **not** establish that they were deleted or do not exist elsewhere.
+- Tracked evidence is not sufficient to perform the audit: `docs/provider_verification/cr7_issue76_history_build_20260916.json` reports a 2026-09-20 capture stop at 68/78, while this later 2026-09-22 blocker report records 78 retained monthly partitions and a prior materialization publication. Neither tracked summary contains the raw per-month evidence and exact local state needed to independently reconcile that difference or verify migrated logical facts.
+- No provider call was made. No retained raw, normalized, Canonical, Snapshot, ReadModel, or materialization artifact was read, changed, deleted, or uploaded during this checkpoint.
+
+### Required project-manager action
+
+Restore/mount the exact existing ignored run root into an accessible local workspace, or identify its correct current path and provide access to that local storage. Preserve the artifacts in place. Before any migration, verify the execution-state and manifest hashes against the retained files and reconcile the 68/78 versus 78/78 summary discrepancy.
+
+After access is restored, perform the offline representative audit specified in `docs/architecture/ARCHITECTURE_OPTIMIZATION_PLAN_20260923.md §7.1`: 2020-01, 2024-01, 2026-01, the 2025-02 approved identity-transition month, and retained suspension/list/delist edge cases (including 2020-02 and 2023-01 where present). Compare event/market-availability time with provider retrieval time; validate stable UUID identity and approved symbol intervals; verify LISTDATE/DELISTDATE and the narrow suspension interval; record only sanitized hashes/counts. Do not reacquire data or proceed to bulk migration until that audit passes.
