@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -156,6 +157,10 @@ class Metric:
     files_with_matching_rows: int | None = None
     row_groups_touched: int | None = None
     bytes_read_estimate: int | None = None
+    artifact_set: str | None = None
+    file_selection_mode: str | None = None
+    all_files_available: int | None = None
+    candidate_bucket_ids: list[int] | None = None
     notes: list[str] | None = None
 
     def as_dict(self) -> dict[str, Any]:
@@ -452,6 +457,26 @@ def compact_files(
     return rows
 
 
+def runner_git_head() -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parent,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    head = completed.stdout.strip()
+    return head or None
+
+
+def runner_blob_sha(source: bytes) -> str:
+    header = f"blob {len(source)}\0".encode("ascii")
+    return hashlib.sha1(header + source).hexdigest()
+
+
 def make_closed_history(root: Path, history_case: str, month_count: int) -> None:
     target = root / "closed_history" / history_case
     target.mkdir(parents=True, exist_ok=True)
@@ -545,6 +570,24 @@ def sql_source(files: list[Path]) -> str:
     return f"read_parquet([{quoted}], union_by_name=true, filename=true)"
 
 
+def select_query_files(
+    *, all_files: list[Path], layout: str, security_ordinals: list[int] | None
+) -> tuple[list[Path], str, list[int] | None]:
+    """Select the manifest candidate set before constructing read_parquet."""
+
+    if layout == "L0" or security_ordinals is None:
+        return all_files, "all_relevant_files", None
+    bucket_ids = sorted({ordinal % BUCKET_COUNT for ordinal in security_ordinals})
+    selected = [
+        path
+        for path in all_files
+        if any(path.name == f"bucket={bucket:02d}.parquet" for bucket in bucket_ids)
+    ]
+    if not selected:
+        raise RuntimeError(f"no files selected for layout={layout} and buckets={bucket_ids}")
+    return selected, "stable_bucket_manifest", bucket_ids
+
+
 def _profile_numbers(profile_path: Path) -> dict[str, int]:
     if not profile_path.is_file():
         return {}
@@ -586,6 +629,10 @@ def run_query(
     files: list[Path],
     sql_tail: str,
     identity_table: pa.Table | None = None,
+    artifact_set: str,
+    all_files: list[Path],
+    file_selection_mode: str,
+    candidate_bucket_ids: list[int] | None = None,
 ) -> Metric:
     if not files:
         raise RuntimeError(f"no parquet files for {name}")
@@ -619,6 +666,10 @@ def run_query(
     metric.files_available = len(files)
     metric.row_groups_available = candidate_row_groups
     metric.bytes_read_estimate = candidate_bytes
+    metric.artifact_set = artifact_set
+    metric.file_selection_mode = file_selection_mode
+    metric.all_files_available = len(all_files)
+    metric.candidate_bucket_ids = candidate_bucket_ids
     if len(row) >= 2 and isinstance(row[1], (int, float)):
         metric.files_with_matching_rows = int(row[1])
     profile_numbers = _profile_numbers(profile)
@@ -637,8 +688,12 @@ def run_query(
 
 
 def run_queries(
-    root: Path, rep: str, layout: str, files: list[Path], security_count: int
-) -> list[Metric]:
+    root: Path,
+    rep: str,
+    layout: str,
+    artifact_sets: dict[str, list[Path]],
+    security_count: int,
+) -> dict[str, list[Metric]]:
     identity_keys = [key_value(rep, ordinal) for ordinal in range(security_count)]
     identity_table = pa.table(
         {
@@ -668,24 +723,28 @@ def run_queries(
             f"WHERE bar_time >= TIMESTAMPTZ '{query_start}' "
             f"AND bar_time < TIMESTAMPTZ '{query_end}'",
             None,
+            None,
         ),
         (
             "W5_one_security_history",
             f"SELECT count(*), count(DISTINCT filename) FROM {{source}} "
             f"WHERE security_key = {one_key}",
             None,
+            [min(1234, security_count - 1)],
         ),
         (
             "W6_100_security_range",
             f"SELECT count(*), count(DISTINCT filename) FROM {{source}} "
             f"WHERE security_key IN ({keys_100})",
             None,
+            list(range(min(100, security_count))),
         ),
         (
             "W6_500_security_range",
             f"SELECT count(*), count(DISTINCT filename) FROM {{source}} "
             f"WHERE security_key IN ({keys_500})",
             None,
+            list(range(min(500, security_count))),
         ),
         (
             "W7_resample_rolling_groupby",
@@ -693,26 +752,47 @@ def run_queries(
             "SELECT security_key, avg(close) AS avg_close, count(DISTINCT filename) AS group_files "
             "FROM {source} GROUP BY security_key)",
             None,
+            None,
         ),
         (
             "W8_identity_join",
             "SELECT count(*), count(DISTINCT b.filename) FROM {source} b "
             "JOIN identity_dim i ON b.security_key = i.security_key",
             identity_table,
+            None,
         ),
     ]
-    metrics: list[Metric] = []
-    for name, sql, table in queries:
-        metric = run_query(
-            root=root,
-            name=name,
-            files=files,
-            sql_tail=sql,
-            identity_table=table,
-        )
-        metrics.append(metric)
-        emit("QUERY", rep=rep, layout=layout, workload=name, metric=metric.as_dict())
-    return metrics
+    metrics_by_artifact: dict[str, list[Metric]] = {}
+    for artifact_set, all_files in artifact_sets.items():
+        metrics: list[Metric] = []
+        for name, sql, table, security_ordinals in queries:
+            files, selection_mode, bucket_ids = select_query_files(
+                all_files=all_files,
+                layout=layout,
+                security_ordinals=security_ordinals,
+            )
+            metric = run_query(
+                root=root,
+                name=f"{artifact_set}__{name}",
+                files=files,
+                sql_tail=sql,
+                identity_table=table,
+                artifact_set=artifact_set,
+                all_files=all_files,
+                file_selection_mode=selection_mode,
+                candidate_bucket_ids=bucket_ids,
+            )
+            metrics.append(metric)
+            emit(
+                "QUERY",
+                rep=rep,
+                layout=layout,
+                artifact_set=artifact_set,
+                workload=name,
+                metric=metric.as_dict(),
+            )
+        metrics_by_artifact[artifact_set] = metrics
+    return metrics_by_artifact
 
 
 def run_concurrent_query(
@@ -744,6 +824,9 @@ def run_concurrent_query(
                 "WHERE bar_time >= TIMESTAMPTZ '2024-01-12T02:00:00+00' "
                 "AND bar_time < TIMESTAMPTZ '2024-01-12T02:01:00+00'"
             ),
+            artifact_set="open_fragments",
+            all_files=files,
+            file_selection_mode="all_relevant_files",
         )
         compacted_rows = future.result()
     metric.notes = (metric.notes or []) + [
@@ -767,6 +850,13 @@ def markdown_report(result: dict[str, Any]) -> str:
         "- Candidate layouts: L0 month/time-first; L1 month + 16 buckets/time-first; "
         "L2 month + 16 buckets/security-first.",
         "- Candidate physical keys: UUID string, fixed 16-byte binary, INT64.",
+        "- W4-W8 are measured against both open fragments and closed-month compacted "
+        "artifacts; L1/L2 W5/W6 select stable bucket candidates before `read_parquet`.",
+        "- `row_groups_touched` remains null when the installed DuckDB runtime does not "
+        "expose a reliable value; no profiling subsystem is added.",
+        f"- Runner Git head: `{result['runner']['git_head']}`; "
+        f"runner blob SHA: `{result['runner']['git_blob_sha']}`; "
+        f"runner source SHA-256: `{result['runner']['source_sha256']}`.",
         "- Synthetic numeric columns are placeholders; A0 numeric/provider-unit "
         "contract remains open.",
         "",
@@ -820,10 +910,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "rows_per_day": args.security_count * args.minutes_per_day,
         "rows_per_month": args.security_count * args.minutes_per_day * args.days,
     }
+    runner_source = Path(__file__).resolve().read_bytes()
     result: dict[str, Any] = {
         "schema": "issue79.a1.synthetic_minute_layout.v1",
         "status": "REVIEW",
         "source": {"kind": "SYNTHETIC_ONLY", "provider_calls": 0},
+        "runner": {
+            "git_head": args.runner_git_head or runner_git_head(),
+            "git_blob_sha": runner_blob_sha(runner_source),
+            "source_sha256": hashlib.sha256(runner_source).hexdigest(),
+        },
         "shape": shape,
         "candidate_layouts": list(LAYOUTS),
         "candidate_key_representations": list(KEY_REPRESENTATIONS),
@@ -862,6 +958,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 ),
             )
             compaction_metric.rows = compaction_rows
+            compacted_root = config_root / "compacted" / f"month={MONTH_LABEL}"
+            compacted_files = fragment_files(compacted_root)
+            if not compacted_files:
+                raise RuntimeError(f"compaction produced no files: {compacted_root}")
             daily_metrics = [
                 run_daily_append(
                     root=config_root,
@@ -882,10 +982,19 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 minute_count=args.minutes_per_day,
                 chunk_securities=args.chunk_securities,
             )
-            query_metrics = [
-                metric.as_dict()
-                for metric in run_queries(config_root, rep, layout, files, args.security_count)
-            ]
+            query_metrics = {
+                artifact_set: [metric.as_dict() for metric in metrics]
+                for artifact_set, metrics in run_queries(
+                    config_root,
+                    rep,
+                    layout,
+                    {
+                        "open_fragments": files,
+                        "closed_compacted": compacted_files,
+                    },
+                    args.security_count,
+                ).items()
+            }
             concurrent = run_concurrent_query(
                 root=config_root,
                 rep=rep,
@@ -958,6 +1067,11 @@ def main() -> int:
     parser.add_argument("--minutes-per-day", type=int, default=240)
     parser.add_argument("--days", type=int, default=20)
     parser.add_argument("--chunk-securities", type=int, default=250)
+    parser.add_argument(
+        "--runner-git-head",
+        default=None,
+        help="exact committed Git head containing this runner; auto-detected when omitted",
+    )
     args = parser.parse_args()
     result = run(args)
     emit("BENCHMARK_COMPLETE", status=result["status"], output=str(Path(args.output).resolve()))
@@ -966,3 +1080,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
