@@ -9,8 +9,10 @@ no CR-2 re-implementation, no feature computation.
 """
 
 from ashare_state.snapshot.builder import (
+    LOGICAL_DAILY_SNAPSHOT_SEMANTICS_VERSION,
     SNAPSHOT_LEDGER_COLUMNS,
     SnapshotBuilder,
+    logical_daily_snapshot_semantics_fingerprint,
     snapshot_base_dir,
     snapshot_builder_code_fingerprint,
     snapshot_manifest_uri,
@@ -46,6 +48,7 @@ __all__ = [
     "DomainSnapshotSchema",
     "DType",
     "KeyBinding",
+    "LOGICAL_DAILY_SNAPSHOT_SEMANTICS_VERSION",
     "SNAPSHOT_CONTRACT_VERSION",
     "SNAPSHOT_LEDGER_COLUMNS",
     "SNAPSHOT_NAMESPACE",
@@ -57,6 +60,7 @@ __all__ = [
     "VerifiedSnapshot",
     "consume_snapshot_seal",
     "domain_snapshot_schema",
+    "logical_daily_snapshot_semantics_fingerprint",
     "polars_domain_schema",
     "project_canonical_snapshot",
     "project_selected_row",

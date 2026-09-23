@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import math
-from collections.abc import Mapping, Sequence
+import tempfile
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 import polars as pl
+import pyarrow.parquet as pq
 
 from ashare_state.canonical.identity import (
     approved_provider_identity_events,
@@ -54,8 +58,8 @@ from ashare_state.research.models import (
     research_security_daily_schema,
     sha256_hex,
 )
-from ashare_state.research.splits import assign_research_split
-from ashare_state.storage.atomic_files import write_file_atomic
+from ashare_state.research.splits import assign_research_split, split_window
+from ashare_state.storage.atomic_files import commit_staged_file_atomic, write_file_atomic
 from ashare_state.storage.paths import physical_from_logical_uri
 
 __all__ = ["ResearchBuildResult", "ResearchPanelBuilder", "VerifiedResearchProjection"]
@@ -113,6 +117,19 @@ class VerifiedResearchProjection:
     identity_view: IdentityView
 
 
+@dataclass(frozen=True)
+class _VerifiedResearchContext:
+    """Small verified source bindings used by the bounded R1 publisher."""
+
+    source_snapshot_id: str
+    source_snapshot_as_of: datetime
+    source_canonical_run_id: str
+    source_readmodel_contract_version: str
+    source_snapshot_manifest_hash: str
+    source_snapshot_semantic_hash: str
+    identity_view: IdentityView
+
+
 class ResearchPanelBuilder:
     """Thin R1 publisher with a verified ReadModel-only input boundary."""
 
@@ -144,14 +161,19 @@ class ResearchPanelBuilder:
         ``security_master`` output.  Callers cannot inject display identity
         rows into the authoritative publication path.
         """
-        projection = self.prepare_verified_projection(snapshot_id)
+        projection = self._prepare_verified_projection_context(snapshot_id)
         try:
             coverage = CoverageState(coverage_state)
         except ValueError as exc:
             raise ResearchPanelError(f"unknown coverage_state {coverage_state!r}") from exc
         built_at = ensure_utc_timestamp(build_timestamp)
+        batches = self.iter_projected_daily_batches(
+            snapshot_id,
+            split=None,
+            batch_size=32_768,
+        )
         return self._publish(
-            projection.rows,
+            batches,
             source_snapshot_id=projection.source_snapshot_id,
             source_snapshot_as_of=projection.source_snapshot_as_of,
             source_canonical_run_id=projection.source_canonical_run_id,
@@ -162,6 +184,80 @@ class ResearchPanelBuilder:
             build_timestamp=built_at,
             coverage_state=coverage,
             publication_mode=AUTHORITATIVE_READMODEL_PUBLICATION,
+        )
+
+    def _prepare_verified_projection_context(self, snapshot_id: str) -> _VerifiedResearchContext:
+        """Validate small source bindings without materializing daily facts."""
+        model = DuckDBReadModel(
+            self.conn,
+            raw_root=self.raw_root,
+            normalized_root=self.normalized_root,
+            readmodel_root=self.readmodel_root,
+        )
+        try:
+            db, verified_snapshot = model.open_read_only_with_snapshot(snapshot_id)
+        except ReadModelError as exc:
+            raise ResearchPanelError(
+                f"research input ReadModel {snapshot_id} is not consumable: {exc}"
+            ) from exc
+        try:
+            meta_rows = db.execute(
+                "SELECT snapshot_id, canonical_run_id, canonical_as_of, "
+                "readmodel_contract_version FROM rm_snapshot_meta"
+            ).fetchall()
+            if len(meta_rows) != 1:
+                raise ResearchPanelError("verified ReadModel metadata must contain exactly one row")
+            meta = meta_rows[0]
+            if str(meta[0]) != snapshot_id:
+                raise ResearchPanelError("ReadModel snapshot_id does not match explicit input")
+            if str(meta[3]) != READMODEL_CONTRACT_VERSION:
+                raise ResearchPanelError("ReadModel contract version is not readmodel-v1")
+            tables = {
+                str(row[0])
+                for row in db.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+                ).fetchall()
+            }
+            if "rm_daily_bar" not in tables:
+                raise ResearchPanelError("R1 security panel requires rm_daily_bar")
+            canonical_run_id = str(meta[1])
+        except ResearchPanelError:
+            raise
+        except Exception as exc:
+            raise ResearchPanelError(
+                f"verified ReadModel {snapshot_id} cannot provide typed daily bars: {exc}"
+            ) from exc
+        finally:
+            db.close()
+
+        if canonical_run_id != verified_snapshot.canonical_run_id:
+            raise ResearchPanelError("ReadModel canonical_run_id does not match its snapshot")
+        try:
+            _canonical_record, canonical_manifest, canonical_as_of = read_canonical_run_manifest(
+                self.conn,
+                canonical_run_id,
+                normalized_root=self.normalized_root,
+            )
+        except Exception as exc:
+            raise ResearchPanelError(
+                f"canonical run {canonical_run_id} manifest seal is unavailable: {exc}"
+            ) from exc
+        if canonical_as_of != verified_snapshot.as_of:
+            raise ResearchPanelError("ReadModel and canonical run as_of values do not match")
+        identity_view = self._identity_view_from_canonical_manifest(
+            canonical_manifest,
+            canonical_run_id=canonical_run_id,
+            canonical_as_of=canonical_as_of,
+        )
+        record = verified_snapshot.ledger_record
+        return _VerifiedResearchContext(
+            source_snapshot_id=snapshot_id,
+            source_snapshot_as_of=verified_snapshot.as_of,
+            source_canonical_run_id=canonical_run_id,
+            source_readmodel_contract_version=READMODEL_CONTRACT_VERSION,
+            source_snapshot_manifest_hash=str(record["manifest_hash"]),
+            source_snapshot_semantic_hash=str(record["snapshot_semantic_hash"]),
+            identity_view=identity_view,
         )
 
     def prepare_verified_projection(self, snapshot_id: str) -> VerifiedResearchProjection:
@@ -260,6 +356,157 @@ class ResearchPanelBuilder:
             source_snapshot_semantic_hash=str(record["snapshot_semantic_hash"]),
             identity_view=identity_view,
         )
+
+    def iter_projected_daily_batches(
+        self,
+        snapshot_id: str,
+        *,
+        split: ResearchSplit | str | None = None,
+        start: date | str | None = None,
+        end: date | str | None = None,
+        security_ids: Sequence[str] | None = None,
+        columns: Sequence[str] | None = None,
+        batch_size: int = 32_768,
+    ) -> Iterator[pl.DataFrame]:
+        """Yield verified R1 rows as bounded Polars batches.
+
+        Date/split and UUID filters are applied by DuckDB before rows cross
+        into Python. The row classifier and identity/PIT rules are the same
+        implementation used by full R1 publication; no whole-history
+        ``fetchall`` or list-of-dicts hand-off is created.
+        """
+        if batch_size <= 0:
+            raise ResearchPanelError("batch_size must be positive")
+        if split is None:
+            lower = parse_date_value(start) if start is not None else None
+            upper = parse_date_value(end) if end is not None else None
+        else:
+            try:
+                split_start, split_end = split_window(ResearchSplit(split))
+            except ValueError as exc:
+                raise ResearchPanelError(f"unknown research split {split!r}") from exc
+            except Exception as exc:
+                if isinstance(exc, ResearchPanelError):
+                    raise
+                raise ResearchPanelError(f"invalid research split {split!r}") from exc
+            requested_start = parse_date_value(start) if start is not None else split_start
+            requested_end = parse_date_value(end) if end is not None else split_end
+            lower = max(split_start, requested_start)
+            upper = min(split_end, requested_end)
+        if lower is not None and upper is not None and lower > upper:
+            return
+
+        if columns is not None and not columns:
+            raise ResearchPanelError("columns must select at least one research field")
+        output_columns = tuple(
+            columns if columns is not None else research_security_daily_schema().names()
+        )
+        allowed_output = set(research_security_daily_schema().names())
+        unknown_columns = sorted(set(output_columns) - allowed_output)
+        if unknown_columns:
+            raise ResearchPanelError(f"unknown projected research columns: {unknown_columns}")
+        requested_ids = tuple(sorted({str(value).strip() for value in security_ids or ()}))
+        if any(not value for value in requested_ids):
+            raise ResearchPanelError("security_ids must not contain empty values")
+        if security_ids is not None and not requested_ids:
+            return
+
+        model = DuckDBReadModel(
+            self.conn,
+            raw_root=self.raw_root,
+            normalized_root=self.normalized_root,
+            readmodel_root=self.readmodel_root,
+        )
+        try:
+            db, verified_snapshot = model.open_read_only_with_snapshot(snapshot_id)
+        except ReadModelError as exc:
+            raise ResearchPanelError(
+                f"research input ReadModel {snapshot_id} is not consumable: {exc}"
+            ) from exc
+        try:
+            meta = db.execute(
+                "SELECT snapshot_id, canonical_run_id, canonical_as_of, "
+                "readmodel_contract_version FROM rm_snapshot_meta"
+            ).fetchone()
+            if meta is None or str(meta[0]) != snapshot_id:
+                raise ResearchPanelError("verified ReadModel metadata does not match the snapshot")
+            if str(meta[3]) != READMODEL_CONTRACT_VERSION:
+                raise ResearchPanelError("ReadModel contract version is not readmodel-v1")
+            canonical_run_id = str(meta[1])
+            if canonical_run_id != verified_snapshot.canonical_run_id:
+                raise ResearchPanelError("ReadModel canonical_run_id does not match its snapshot")
+            _canonical_record, canonical_manifest, canonical_as_of = read_canonical_run_manifest(
+                self.conn,
+                canonical_run_id,
+                normalized_root=self.normalized_root,
+            )
+            if canonical_as_of != verified_snapshot.as_of:
+                raise ResearchPanelError("ReadModel and Canonical market_as_of values differ")
+            identity_view = self._identity_view_from_canonical_manifest(
+                canonical_manifest,
+                canonical_run_id=canonical_run_id,
+                canonical_as_of=canonical_as_of,
+            )
+
+            source_columns = (
+                "canonical_domain",
+                "canonical_key",
+                "security_id",
+                "trade_date",
+                "available_at",
+                "canonical_run_id",
+                "snapshot_id",
+                "source_row_identity_hash",
+                *_NUMERIC_FIELDS,
+            )
+            sql = "SELECT " + ", ".join(f'"{name}"' for name in source_columns)
+            sql += " FROM rm_daily_bar"
+            conditions: list[str] = []
+            params: list[Any] = []
+            if lower is not None:
+                conditions.append("trade_date >= ?")
+                params.append(lower)
+            if upper is not None:
+                conditions.append("trade_date <= ?")
+                params.append(upper)
+            if requested_ids:
+                conditions.append("security_id IN (" + ", ".join("?" for _ in requested_ids) + ")")
+                params.extend(requested_ids)
+            if conditions:
+                sql += " WHERE " + " AND ".join(conditions)
+            sql += " ORDER BY trade_date, security_id, canonical_key"
+            batches = db.execute(sql, params).to_arrow_reader(batch_size=batch_size)
+            previous_key: tuple[date, str] | None = None
+            result_schema = research_security_daily_schema()
+            for batch in batches:
+                source_rows = batch.to_pylist()
+                if not source_rows:
+                    continue
+                first_key = (source_rows[0]["trade_date"], str(source_rows[0]["security_id"]))
+                if previous_key is not None and first_key <= previous_key:
+                    raise ResearchPanelError(
+                        "filtered ReadModel has duplicate or unsorted daily keys"
+                    )
+                projected = self._project_rows(
+                    source_rows,
+                    source_snapshot_id=snapshot_id,
+                    source_snapshot_as_of=verified_snapshot.as_of,
+                    source_canonical_run_id=canonical_run_id,
+                    source_readmodel_contract_version=READMODEL_CONTRACT_VERSION,
+                    identity_view=identity_view,
+                )
+                last = source_rows[-1]
+                previous_key = (last["trade_date"], str(last["security_id"]))
+                frame = pl.DataFrame(projected, schema=result_schema, strict=False)
+                yield frame.select(list(output_columns))
+        except ResearchPanelError:
+            raise
+        except Exception as exc:
+            raise ResearchPanelError(
+                f"verified ReadModel {snapshot_id} cannot stream projected daily batches: {exc}"
+            ) from exc
+        finally:
+            db.close()
 
     def _build_fixture_from_rows(
         self,
@@ -683,7 +930,7 @@ class ResearchPanelBuilder:
 
     def _publish(
         self,
-        rows: Sequence[Mapping[str, Any]],
+        rows: Iterable[Mapping[str, Any]] | Iterable[pl.DataFrame],
         *,
         source_snapshot_id: str,
         source_snapshot_as_of: datetime,
@@ -749,44 +996,139 @@ class ResearchPanelBuilder:
             / f"version={RESEARCH_DATASET_VERSION}"
             / f"build={dataset_id}"
         )
-        artifact_rows: dict[str, list[Mapping[str, Any]]] = {split: [] for split in _ARTIFACT_NAMES}
-        for row in rows:
-            name = (
-                str(row["research_split"])
-                if row["research_eligibility"] == ResearchEligibility.ENABLED.value
-                else "disabled"
-            )
-            artifact_rows[name].append(row)
-        for name in _ARTIFACT_NAMES:
-            artifact_rows[name].sort(
-                key=lambda row: (
-                    str(row["trade_date"]),
-                    str(row["security_id"]),
-                    str(row["source_canonical_key"]),
-                )
-            )
 
+        def source_batches() -> Iterator[pl.DataFrame]:
+            if isinstance(rows, Sequence):
+                # Test-only fixture input is intentionally small and may arrive
+                # unsorted. Keep that boundary deterministic while production
+                # ReadModel publication below remains batch-bounded.
+                artifact_rows: dict[str, list[Mapping[str, Any]]] = {
+                    split: [] for split in _ARTIFACT_NAMES
+                }
+                for row in rows:
+                    name = (
+                        str(row["research_split"])
+                        if row["research_eligibility"] == ResearchEligibility.ENABLED.value
+                        else "disabled"
+                    )
+                    artifact_rows[name].append(row)
+                for name in _ARTIFACT_NAMES:
+                    artifact_rows[name].sort(
+                        key=lambda row: (
+                            str(row["trade_date"]),
+                            str(row["security_id"]),
+                            str(row["source_canonical_key"]),
+                        )
+                    )
+                    for offset in range(0, len(artifact_rows[name]), 32_768):
+                        yield pl.DataFrame(
+                            artifact_rows[name][offset : offset + 32_768],
+                            schema=schema,
+                            strict=True,
+                        )
+                return
+            for batch in rows:
+                if not isinstance(batch, pl.DataFrame):
+                    raise ResearchPanelError(
+                        "streamed research publication requires bounded Polars batches"
+                    )
+                if batch.columns != schema.names():
+                    raise ResearchPanelError("streamed research batch schema does not match R1")
+                yield batch
+
+        arrow_schema = pl.DataFrame(schema=schema, strict=True).to_arrow().schema
+        semantic_digests = {name: hashlib.sha256() for name in _ARTIFACT_NAMES}
+        for digest in semantic_digests.values():
+            digest.update(b"[")
+        row_counts = dict.fromkeys(_ARTIFACT_NAMES, 0)
+        semantic_row_counts = dict.fromkeys(_ARTIFACT_NAMES, 0)
+        previous_keys: dict[str, tuple[date, str, str] | None] = dict.fromkeys(
+            _ARTIFACT_NAMES, None
+        )
+        self.research_root.mkdir(parents=True, exist_ok=True)
         artifacts: list[ArtifactMetadata] = []
-        artifact_payloads: dict[str, bytes] = {}
-        for name in _ARTIFACT_NAMES:
-            frame = pl.DataFrame(artifact_rows[name], schema=schema, strict=True)
-            buffer = io.BytesIO()
-            frame.write_parquet(buffer, compression="zstd", statistics=False)
-            payload = buffer.getvalue()
-            semantic_hash = sha256_hex(canonical_json(frame.to_dicts()))
-            artifact = ArtifactMetadata(
-                name=name,
-                uri=str(base_dir / f"{name}.parquet").replace("\\", "/"),
-                split=name,
-                research_eligible=name != "disabled",
-                content_hash=sha256_hex(payload),
-                semantic_hash=semantic_hash,
-                schema_hash=schema_hash,
-                row_count=frame.height,
-                byte_size=len(payload),
-            )
-            artifacts.append(artifact)
-            artifact_payloads[name] = payload
+        artifact_replay: dict[str, bool] = {}
+        with tempfile.TemporaryDirectory(
+            prefix=f".{dataset_id}-", dir=self.research_root
+        ) as staging_name:
+            staging_root = Path(staging_name)
+            staged_paths = {name: staging_root / f"{name}.parquet" for name in _ARTIFACT_NAMES}
+            with ExitStack() as stack:
+                if not isinstance(rows, Sequence) and hasattr(rows, "close"):
+                    stack.callback(rows.close)
+                writers = {
+                    name: stack.enter_context(
+                        pq.ParquetWriter(
+                            staged_paths[name],
+                            arrow_schema,
+                            compression="zstd",
+                            write_statistics=False,
+                        )
+                    )
+                    for name in _ARTIFACT_NAMES
+                }
+                for batch in source_batches():
+                    for name in _ARTIFACT_NAMES:
+                        if name == "disabled":
+                            part = batch.filter(
+                                pl.col("research_eligibility") != ResearchEligibility.ENABLED.value
+                            )
+                        else:
+                            part = batch.filter(
+                                (
+                                    pl.col("research_eligibility")
+                                    == ResearchEligibility.ENABLED.value
+                                )
+                                & (pl.col("research_split") == name)
+                            )
+                        if part.is_empty():
+                            continue
+                        table = part.to_arrow()
+                        if not table.schema.equals(arrow_schema, check_metadata=False):
+                            table = table.cast(arrow_schema)
+                        writers[name].write_table(table)
+                        row_counts[name] += part.height
+                        for row in part.iter_rows(named=True):
+                            key = (
+                                row["trade_date"],
+                                str(row["security_id"]),
+                                str(row["source_canonical_key"]),
+                            )
+                            previous = previous_keys[name]
+                            if previous is not None and key <= previous:
+                                raise ResearchPanelError(
+                                    f"{name} research rows are duplicated or not time-first sorted"
+                                )
+                            previous_keys[name] = key
+                            digest = semantic_digests[name]
+                            if semantic_row_counts[name] > 0:
+                                digest.update(b",")
+                            digest.update(canonical_json(row).encode("utf-8"))
+                            semantic_row_counts[name] += 1
+            for digest in semantic_digests.values():
+                digest.update(b"]")
+            for name in _ARTIFACT_NAMES:
+                final_path = self.research_root / base_dir / f"{name}.parquet"
+                before = final_path.is_file()
+                artifact_replay[name] = before
+                file_hash = commit_staged_file_atomic(
+                    final_path,
+                    staged_paths[name],
+                    allow_existing_identical=True,
+                )
+                artifacts.append(
+                    ArtifactMetadata(
+                        name=name,
+                        uri=str(base_dir / f"{name}.parquet").replace("\\", "/"),
+                        split=name,
+                        research_eligible=name != "disabled",
+                        content_hash=file_hash,
+                        semantic_hash=semantic_digests[name].hexdigest(),
+                        schema_hash=schema_hash,
+                        row_count=row_counts[name],
+                        byte_size=final_path.stat().st_size,
+                    )
+                )
 
         ordered_artifacts = tuple(sorted(artifacts, key=lambda artifact: artifact.name))
         content_hash = sha256_hex(
@@ -859,13 +1201,7 @@ class ResearchPanelBuilder:
             ensure_ascii=False,
         ).encode("utf-8")
         manifest_path = self.research_root / manifest_uri
-        idempotent_replay = True
-        artifacts_by_name = {artifact.name: artifact for artifact in artifacts}
-        for name in _ARTIFACT_NAMES:
-            path = self.research_root / artifacts_by_name[name].uri
-            before = path.is_file()
-            write_file_atomic(path, artifact_payloads[name], allow_existing_identical=True)
-            idempotent_replay = idempotent_replay and before
+        idempotent_replay = all(artifact_replay.values())
         before_manifest = manifest_path.is_file()
         write_file_atomic(manifest_path, manifest_bytes, allow_existing_identical=True)
         idempotent_replay = idempotent_replay and before_manifest

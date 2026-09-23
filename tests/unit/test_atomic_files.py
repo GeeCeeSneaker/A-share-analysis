@@ -14,6 +14,7 @@ from ashare_state.storage.atomic_files import (
     HashMismatchError,
     ImmutableFileExistsError,
     VolumeMismatchError,
+    commit_staged_file_atomic,
     file_sha256,
     write_file_atomic,
 )
@@ -80,3 +81,26 @@ class TestWriteFileAtomic:
         monkeypatch.setattr(atomic_files, "_same_volume", fake_same_volume)
         with pytest.raises(VolumeMismatchError):
             write_file_atomic(final, b"x", staging_dir=tmp_path / "staging")
+
+    def test_streamed_stage_is_committed_immutably(self, tmp_path: Path):
+        staged = tmp_path / "stage.parquet.tmp"
+        staged.write_bytes(b"streamed payload")
+        final = tmp_path / "out" / "part.parquet"
+        expected = file_sha256(staged)
+        assert commit_staged_file_atomic(final, staged, expected_sha256=expected) == expected
+        assert final.read_bytes() == b"streamed payload"
+        assert not staged.exists()
+        with pytest.raises(ImmutableFileExistsError, match="immutable"):
+            another = tmp_path / "another.tmp"
+            another.write_bytes(b"different")
+            commit_staged_file_atomic(final, another)
+        assert final.read_bytes() == b"streamed payload"
+
+    def test_streamed_identical_replay_keeps_committed_bytes(self, tmp_path: Path):
+        final = tmp_path / "part.parquet"
+        final.write_bytes(b"same")
+        staged = tmp_path / "stage.tmp"
+        staged.write_bytes(b"same")
+        assert commit_staged_file_atomic(final, staged, allow_existing_identical=True)
+        assert final.read_bytes() == b"same"
+        assert not staged.exists()
