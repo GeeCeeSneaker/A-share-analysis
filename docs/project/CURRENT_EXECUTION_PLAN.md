@@ -11,6 +11,7 @@ PM 最新决策（PR #77 comment 5285114085）已将活动主线切换为 Issue 
 - 一次性 runner：`scripts/architecture/benchmark_minute_layout.py`；
 - A1 结果：`docs/architecture/A1_MINUTE_LAYOUT_BENCHMARK_DECISION_20260923.md` 及 `docs/architecture/benchmarks/` 下 JSON/Markdown；
 - runner 只生成 deterministic synthetic data，`provider_calls=0`，没有读取正式账号、token、retained raw/canonical 或上传本地 Parquet。
+- exact-head QA/CI：GitHub Actions CI #732 在 Windows/py3.12、Windows/py3.14、Ubuntu/py3.14 三个 required job 全部 `success`；GT-H3B controlled execution 按本次 synthetic-only 变更范围 `skipped`。
 
 A1 形状为 4,500 securities × 240 minutes/day × 20 days：1,080,000 行/日、21,600,000 行/open month；L0/L1/L2 与 UUID string/fixed16/INT64 共 9 组全部完成。资源结果：最大 daily-ingest RSS 0.2585 GiB、最大 month-compaction RSS 0.2636 GiB、最大查询 RSS 0.3352 GiB、short/long 最大耗时比 1.1226、closed-month rewrite=0、Snapshot/ReadModel full fact copy=0。结果文件把状态分开记为 `resource_gate_status=PASS` 与 `REVIEW_REQUIRED_FOR_ARCHITECTURE_SELECTION`。
 
