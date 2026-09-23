@@ -803,3 +803,16 @@ Issue #66 **不授权**：
 **Required ancestor**：Issue #76 基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`；
 在本机安全配置认证环境变量后，从已保留证据恢复并继续 2020-03，不得把环境阻断误写成
 provider 数据结论，也不得跳过月份或将当前进度写成 78/78。
+
+
+## 2026-09-23 authoritative active gate — Issue #76 PIT decision
+
+**This section supersedes the preceding end-of-file “Current task” / “Required decision” blocks** that described #79 as awaiting a physical-layout freeze or Issue #76 as waiting for 2020-03 credentials. Those are historical checkpoints and are not the current operating instructions.
+
+- Issue #79 passed; Issue #80 passed and closed; PR #81 was integrated into this Issue #76 branch at 50e5e2dd8c8a1722cd70fbf6a8b2233494a647e7. CI #744 / run 35852805033 passed the three required jobs. The latest audit-doc commit cb55629595cb25431907b05c14d69ae812fe254d also passed exact-head CI #745 / run 35857453802 on Ubuntu 3.14, Windows 3.12, and Windows 3.14. GT-H3B controlled execution was skipped by scope.
+- Two existing retained roots are reconciled read-only: 342,735 paths/files and 6,591,572,317 bytes in each; no relative-path, case-only, or file-size differences; the targeted state, summary, runner, ledger, and active source-manifest hashes match. This is an inventory/control-metadata reconciliation, not a claim that every retained payload was fully byte-hashed.
+- Actual retained state/summary, manifests, and receipts establish 78/78 capture/replay PASS for 2020-01 through 2026-06 (7,442,987 daily-bar rows). The old 68/78 PR description is stale for capture/replay. Six representative offline months passed selected receipt-closure and PIT/identity/lifecycle checks with provider_calls=0; see docs/project/ISSUE76_MATERIALIZATION_MEMORY_BLOCKER_20260922.md.
+- The representative audit's PIT result is **not PASS**: retained historical bars are a later backfill, have no row-level market_available_at, and legacy available_at means received_at/ingestion provenance. Do not derive historical availability from retrieval time or infer it from close prices.
+- **Immediate blocker before migration:** Owner/PM must record the C1 daily-bar rule: (a) a versioned trade-date/session-close event-eligibility convention explicitly distinguished from actual provider publication time; or (b) date-level eligibility with no row-level market_available_at assertion; or (c) a requirement for exact historical as-known values plus an acceptable vintage source. The retained archive alone cannot prove exact values physically known in 2020.
+- **Separate downstream gate:** the overall retained execution remains STOP(BLOCKED) at TARGETED_MATERIALIZATION_PREP_MEMORY_GUARD. A prior 78-partition publication exists, but final idempotent replay and changed-content conflict acceptance are not complete. Do not equate capture/replay PASS or the prior publication with Issue #76 completion.
+- No provider calls, reacquisition, migration, or retained-file mutation occurred in this audit. Keep PR #77 Draft. Do not start the 78-partition migration until the C1 decision is recorded. After that decision, continue only with month-bounded migration from the retained evidence, followed by logical Snapshot/DuckDB facade, ordinary-reader, idempotent replay, and changed-content conflict gates.
