@@ -149,3 +149,87 @@ This supersedes the earlier statement that the retained run root was unavailable
 Metadata-only inspection confirmed `runner.py`, `execution_state.json`, and `execution_summary.json` at both roots. A recursive inventory of the first root counted 342,735 files (339,108 Parquet and 3,621 JSON), totaling 6,591,572,231 bytes. No raw payload contents or execution-state values were opened; this count does not prove that all 78 monthly captures are complete or that either copy is internally consistent. The two roots must be reconciled by state/manifest hashes before selecting one. No files were copied, changed, or deleted. No matching runner process was active and `provider_calls=0`; the conditional request to reacquire data does not apply because retained roots were found.
 
 PR #81 logical-daily semantics remediation is now at exact head `13f25f0e9c46fe78f34a392f032a8b0d4e030ce0`; exact-head CI run 35846313200 passed all three required jobs. **This is CI PASS, not final PM PASS.** Issue #76 remains paused under the #80 architecture gate. After PM records final #80 PASS, reconcile the two retained roots, then run the specified representative PIT/identity/lifecycle audit before any migration. Do not use the Formal B1-B7/Production runner.
+
+
+## 2026-09-23 post-#80 retained-root reconciliation and offline audit
+
+This section supersedes the earlier 2026-09-23 follow-up that said root contents had not been opened and that the final #80 PM decision was still pending. The audit below was read-only, used retained local evidence, and made zero provider calls. It does not claim full byte-for-byte equality of every retained data file.
+
+### Branch and execution gate
+
+- PR #81 was integrated into the Issue #76 branch at commit 50e5e2dd8c8a1722cd70fbf6a8b2233494a647e7. Exact-head CI run 35852805033 passed all three required jobs.
+- Retained capture/replay is verified for 78/78 months, 2020-01 through 2026-06, totaling 7,442,987 returned daily-bar rows.
+- The overall execution state remains STOP(BLOCKED), at TARGETED_MATERIALIZATION_PREP_MEMORY_GUARD. A prior 78-partition materialization is committed, but the final idempotent replay and changed-content conflict gates have not both passed. Issue #76 is not complete.
+
+### Read-only reconciliation of the two retained roots
+
+The two existing roots were compared using a recursive root-relative path/size inventory and targeted control-file hashes. No raw files were copied, changed, or deleted.
+
+| Check | Result |
+|---|---:|
+| Files in each root | 342,735 |
+| Parquet files in each root | 339,108 |
+| JSON files in each root | 3,621 |
+| Total bytes in each root | 6,591,572,317 |
+| Relative paths missing or extra | 0 |
+| Same-path size mismatches | 0 |
+| Case-only path mismatches | 0 |
+
+The 6,591,572,317-byte total supersedes the earlier preliminary 6,591,572,231-byte inventory (an 86-byte correction). Equal path names and sizes do not prove every payload byte is equal. A full content-hash crawl of roughly 339k data files was intentionally not performed because no discrepancy justified it.
+
+The following control files match exactly across both roots:
+
+| File | SHA-256 |
+|---|---|
+| execution_state.json | AD9E078AA435B98C3219657B2DFEA0D1B2B859D5686089DCF4FF9F7696D0B317 |
+| execution_summary.json | A63CAED87252734CF4EEB51961B70C9D65A371C8160444D19F6548075EF4B15C |
+| runner.py | ABECE0F5081B2647ED495C69717AE68D04AAD35A6C73A293A5834B814FF93F01 |
+| ledger.duckdb | 9944795AF170C79CD57B19215649C4D3BE31D5D503543CAE77397DCAC4E27D37 |
+| active source snapshot manifest | 182A8C5ED9E42112B154733F8AB9C92427E277A027F137344C8336EB44AA5A08 |
+
+### Resolving 68/78 versus 78/78
+
+The current execution state and summary—not the older PR text—show all 78 month entries as PASS, with retained capture replay and coverage PASS. For all 78 months:
+
+- missing, extra, unresolved, and structural counts are zero;
+- finalize provider-call count is zero;
+- a source-capture receipt exists in both roots, with matching raw receipt hashes;
+- each receipt references the active source-snapshot manifest hash;
+- daily-bar metadata and Parquet artifacts exist, and metadata request/row counts agree with state.
+
+The 78 monthly returned-row counts sum to 7,442,987, matching the selected source projection and its manifest/ledger evidence. Thus the earlier 68/78 checkpoint is stale for capture/replay. This does not clear the overall STOP(BLOCKED) state or imply final materialization acceptance.
+
+The active execution/materialization provenance is Canonical run 3064e969-3466-5ae4-8fbd-9de0affeaccb, snapshot a585dec1-30ff-5da0-8a1b-44c42305ec42, and the manifest hash above. A separate later ledger build (run cf21d5bc-21c7-5e3e-839d-4c6b4d1b313a, manifest 2e2f…) is not referenced by the active execution state and must not be substituted.
+
+### Representative offline PIT, identity, and lifecycle audit
+
+Six representative months were checked against retained source receipts and actual captured data, with provider_calls=0. Each sampled receipt's security-master, trade-calendar, status-history, and daily-bar operations closed against captured metadata; all six referenced the active snapshot manifest. Sample daily-bar Parquet hashes matched their sidecars and across-root copies.
+
+| Month / case | Result | Evidence boundary |
+|---|---|---|
+| 2020-01 listing edge | PASS | LISTDATE matched first retained bars for sampled listings; later listings had no earlier-month bars. |
+| 2020-02 delisting edge | PASS | 600240.SH has provider DELISTDATE 2020-02-05; exact daily suspension rows are only 2020-02-03/04. No suspension carry-forward was used; the lifecycle bound excludes 02-05 onward. |
+| 2023-01 approved suspension interval | PASS | 300114.SZ is covered by the previously Owner-approved event [2023-01-12, 2023-02-02); daily bars are absent in the interval and resume 2023-02-02. The January status member has zero rows; no num_trades=0 or prior-status carry-forward was used. |
+| 2024-01 identity baseline | PASS | Retained daily bars use 300114.SZ before the approved symbol transition. |
+| 2025-02 identity transition | PASS | Retained bars move from 300114.SZ to 302132.SZ on 2025-02-17; current IdentityBridge maps both to stable UUID 70775532-7385-5377-b5ac-dcee91fbff33 with the expected effective-code intervals. |
+| 2026-01 holdout sample | Capture PASS; PIT contract unresolved | The retained month is classified Holdout and has 103,454 rows. Historical availability semantics are not established merely by capture completeness. |
+
+The 2023 suspension event is treated as already Owner-approved evidence; this audit did not newly verify external official sources. Sample results do not constitute a full byte-level audit of all 78 partitions.
+
+### Remaining C1 decision: row-level market availability
+
+The migration remains stopped at the PIT contract boundary:
+
+- The historical daily data is a backfill retrieved in 2026; for example, the 2020-01 daily request/receipt is dated 2026-09-16. The active logical snapshot has canonical_as_of 2026-09-21.
+- The retained daily-bar row schema has trade date and OHLCV fields but no row-level market_available_at.
+- The legacy availability policy derives available_at from received_at (OBSERVED_AT_INGEST). That is retrieval/provenance time, not historical market/event availability.
+- PR #81 separates market_as_of from source_vintage_as_of at partition-manifest level, but does not define a row-level daily-bar market_available_at mapping.
+- Consequently, these retained values cannot be represented as the exact values a researcher physically knew in 2020. Deriving availability from a daily close without an approved, versioned rule would be an inference and could be wrong for provider publication/correction timing.
+
+Owner/PM must choose or provide the explicit C1 rule before migration:
+
+1. Approve a versioned daily-bar event-eligibility rule tied to trade_date and the regular-session close, explicitly stating that this is a logical market/event eligibility convention—not proof of actual provider publication time. Preserve source_vintage_as_of as the verified 2026 retrieval/vintage time. Do not assume an exact clock timestamp unless Owner specifies it.
+2. Alternatively, narrow the daily-bar C1 contract to date-level event eligibility and explicitly assert that no row-level market_available_at is supplied.
+3. If exact historical as-known-at-the-time values are required, state that requirement and identify an acceptable vintage source; the retained backfill alone cannot satisfy it.
+
+Until this decision is recorded, do not migrate the retained 78 partitions, do not infer historical availability from retrieval time or close prices, and do not reacquire provider data. After the rule is approved, continue only with the authorized month-bounded migration, then logical Snapshot/facade, ordinary-reader, idempotent replay, and changed-content conflict gates. Keep PR #77 Draft until final Issue #76 acceptance.
