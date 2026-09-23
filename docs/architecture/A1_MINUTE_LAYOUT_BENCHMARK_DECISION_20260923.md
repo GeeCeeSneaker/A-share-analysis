@@ -79,7 +79,8 @@ python scripts/architecture/benchmark_minute_layout.py --output <disposable-outp
 
 The run used the defaults in the script. Local evidence hashes before upload:
 
-- runner SHA-256: `CDC182A1ED518747BD1693259EE6D6D5443FDCA246820EEAB290C27CD53D20BB`;
+- completed benchmark execution runner SHA-256: `DC8F1699C9464272C307160AC0AC19F089C4F34A660196E9C26D9AFA67119F06`;
+- committed post-run QA runner SHA-256: `CDC182A1ED518747BD1693259EE6D6D5443FDCA246820EEAB290C27CD53D20BB` (format/import/closure-binding cleanup only; the full-scale result was not regenerated after this cleanup);
 - benchmark JSON SHA-256: `8B10B1B8A4995AC31652276CC31A1ADC083033131381A5785BBFBC461AB2B4FD`;
 - benchmark Markdown SHA-256: `3D8B9FA93044B9A6825876AA96A90347BF5928F657865E5AC4654023DD2820AB`.
 
