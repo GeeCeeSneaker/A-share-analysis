@@ -22,11 +22,12 @@ import re
 import sys
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 try:
     import resource as _resource
@@ -37,8 +38,6 @@ import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-
-UTC = timezone.utc
 BASE_DATE = date(2024, 1, 2)
 MONTH_LABEL = "2024-01"
 LAYOUTS = ("L0", "L1", "L2")
@@ -56,6 +55,7 @@ def current_rss_bytes() -> int:
     """Return current process working-set/RSS without a third-party monitor."""
 
     if os.name == "nt":
+
         class MemoryCounters(ctypes.Structure):
             _fields_ = [
                 ("cb", ctypes.c_ulong),
@@ -463,7 +463,7 @@ def make_closed_history(root: Path, history_case: str, month_count: int) -> None
                     {
                         "logical_partition_id": f"security_bar_1m/closed/{month_index:02d}",
                         "logical_content_hash": hashlib.sha256(
-                            f"closed-{month_index}".encode("utf-8")
+                            f"closed-{month_index}".encode()
                         ).hexdigest(),
                         "immutable": True,
                     },
@@ -558,9 +558,17 @@ def _profile_numbers(profile_path: Path) -> dict[str, int]:
         if isinstance(value, dict):
             for key, child in value.items():
                 normalized = str(key).lower().replace("_", " ")
-                if isinstance(child, (int, float)) and "file" in normalized and "read" in normalized:
+                if (
+                    isinstance(child, (int, float))
+                    and "file" in normalized
+                    and "read" in normalized
+                ):
                     found[str(key)] = int(child)
-                if isinstance(child, (int, float)) and "row" in normalized and "group" in normalized:
+                if (
+                    isinstance(child, (int, float))
+                    and "row" in normalized
+                    and "group" in normalized
+                ):
                     found[str(key)] = int(child)
                 visit(child)
         elif isinstance(value, list):
@@ -622,12 +630,15 @@ def run_query(
             metric.row_groups_touched = value
     metric.notes = [
         "bytes_read_estimate is the candidate Parquet byte set, not a kernel I/O counter",
-        "files_with_matching_rows is a query observation; row-group touch count is reported only when DuckDB profiling exposes it",
+        "files_with_matching_rows is a query observation; row-group touch count is reported only "
+        "when DuckDB profiling exposes it",
     ]
     return metric
 
 
-def run_queries(root: Path, rep: str, layout: str, files: list[Path], security_count: int) -> list[Metric]:
+def run_queries(
+    root: Path, rep: str, layout: str, files: list[Path], security_count: int
+) -> list[Metric]:
     identity_keys = [key_value(rep, ordinal) for ordinal in range(security_count)]
     identity_table = pa.table(
         {
@@ -636,36 +647,44 @@ def run_queries(root: Path, rep: str, layout: str, files: list[Path], security_c
                 [f"security-{ordinal:08d}" for ordinal in range(security_count)],
                 type=pa.string(),
             ),
-            "sector_id": pa.array([ordinal % 32 for ordinal in range(security_count)], type=pa.int16()),
+            "sector_id": pa.array(
+                [ordinal % 32 for ordinal in range(security_count)], type=pa.int16()
+            ),
         }
     )
     one_key = key_literal(rep, min(1234, security_count - 1))
     keys_100 = ",".join(key_literal(rep, ordinal) for ordinal in range(min(100, security_count)))
     keys_500 = ",".join(key_literal(rep, ordinal) for ordinal in range(min(500, security_count)))
     query_day = BASE_DATE + timedelta(days=10)
-    query_minute = datetime.combine(query_day, datetime.min.time(), tzinfo=UTC) + timedelta(minutes=120)
+    query_minute = datetime.combine(query_day, datetime.min.time(), tzinfo=UTC) + timedelta(
+        minutes=120
+    )
     query_start = query_minute.isoformat().replace("+00:00", "+00")
     query_end = (query_minute + timedelta(minutes=1)).isoformat().replace("+00:00", "+00")
     queries = [
         (
             "W4_full_market_one_minute",
             "SELECT count(*), count(DISTINCT filename), avg(close) FROM {source} "
-            f"WHERE bar_time >= TIMESTAMPTZ '{query_start}' AND bar_time < TIMESTAMPTZ '{query_end}'",
+            f"WHERE bar_time >= TIMESTAMPTZ '{query_start}' "
+            f"AND bar_time < TIMESTAMPTZ '{query_end}'",
             None,
         ),
         (
             "W5_one_security_history",
-            f"SELECT count(*), count(DISTINCT filename) FROM {{source}} WHERE security_key = {one_key}",
+            f"SELECT count(*), count(DISTINCT filename) FROM {{source}} "
+            f"WHERE security_key = {one_key}",
             None,
         ),
         (
             "W6_100_security_range",
-            f"SELECT count(*), count(DISTINCT filename) FROM {{source}} WHERE security_key IN ({keys_100})",
+            f"SELECT count(*), count(DISTINCT filename) FROM {{source}} "
+            f"WHERE security_key IN ({keys_100})",
             None,
         ),
         (
             "W6_500_security_range",
-            f"SELECT count(*), count(DISTINCT filename) FROM {{source}} WHERE security_key IN ({keys_500})",
+            f"SELECT count(*), count(DISTINCT filename) FROM {{source}} "
+            f"WHERE security_key IN ({keys_500})",
             None,
         ),
         (
@@ -743,14 +762,18 @@ def markdown_report(result: dict[str, Any]) -> str:
         f"- Status: **{result['status']}**",
         f"- Resource gates: **{result['resource_gate_status']}**",
         "- Source: synthetic deterministic data only; `provider_calls=0`.",
-        f"- Shape: {result['shape']['rows_per_day']:,} rows/day × {result['shape']['days']} days = {result['shape']['rows_per_month']:,} rows/open-month.",
-        "- Candidate layouts: L0 month/time-first; L1 month + 16 buckets/time-first; L2 month + 16 buckets/security-first.",
+        f"- Shape: {result['shape']['rows_per_day']:,} rows/day × "
+        f"{result['shape']['days']} days = {result['shape']['rows_per_month']:,} rows/open-month.",
+        "- Candidate layouts: L0 month/time-first; L1 month + 16 buckets/time-first; "
+        "L2 month + 16 buckets/security-first.",
         "- Candidate physical keys: UUID string, fixed 16-byte binary, INT64.",
-        "- Synthetic numeric columns are placeholders; A0 numeric/provider-unit contract remains open.",
+        "- Synthetic numeric columns are placeholders; A0 numeric/provider-unit "
+        "contract remains open.",
         "",
         "## Resource gate summary",
         "",
-        "| key | layout | daily peak GiB | compaction peak GiB | short/long daily ratio | closed rewrite |",
+        "| key | layout | daily peak GiB | compaction peak GiB | "
+        "short/long daily ratio | closed rewrite |",
         "|---|---:|---:|---:|---:|---:|",
     ]
     for item in result["configs"]:
@@ -762,7 +785,9 @@ def markdown_report(result: dict[str, Any]) -> str:
         ratio = max(short["elapsed_seconds"], long["elapsed_seconds"]) / max(
             0.0001, min(short["elapsed_seconds"], long["elapsed_seconds"])
         )
-        rewritten = any("closed_months_rewritten=True" in note for m in daily for note in (m.get("notes") or []))
+        rewritten = any(
+            "closed_months_rewritten=True" in note for m in daily for note in (m.get("notes") or [])
+        )
         lines.append(
             f"| {item['key_representation']} | {item['layout']} | {daily_peak:.3f} | "
             f"{compaction['peak_rss_gib']:.3f} | {ratio:.2f} | {'YES' if rewritten else '0'} |"
@@ -772,9 +797,10 @@ def markdown_report(result: dict[str, Any]) -> str:
             "",
             "## Interpretation",
             "",
-            "The result is evidence for A1 layout selection, not a provider numeric or minute-semantic approval."
-            " `files_with_matching_rows` is a query observation and `bytes_read_estimate` is the candidate"
-            " Parquet byte set; exact kernel I/O counters are not claimed. A human/PM decision is still required"
+            "The result is evidence for A1 layout selection, not a provider numeric or "
+            "minute-semantic approval. `files_with_matching_rows` is a query observation "
+            "and `bytes_read_estimate` is the candidate Parquet byte set; exact kernel "
+            "I/O counters are not claimed. A human/PM decision is still required"
             " before freezing the physical layout and starting the daily vertical refactor.",
             "",
         ]
@@ -829,7 +855,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "month_compaction",
                 config_root,
                 config_root / "spill",
-                lambda: compact_files(
+                lambda files=files, layout=layout, config_root=config_root: compact_files(
                     files=files,
                     layout=layout,
                     destination=config_root / "compacted" / f"month={MONTH_LABEL}",
@@ -858,9 +884,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             )
             query_metrics = [
                 metric.as_dict()
-                for metric in run_queries(
-                    config_root, rep, layout, files, args.security_count
-                )
+                for metric in run_queries(config_root, rep, layout, files, args.security_count)
             ]
             concurrent = run_concurrent_query(
                 root=config_root,
@@ -904,11 +928,18 @@ def _passes_resource_gates(result: dict[str, Any]) -> bool:
             for metric in item["daily_ingest"]
         ):
             return False
-        if item["month_compaction"]["peak_rss_gib"] >= result["gates"]["month_compaction_peak_rss_gib_target"]:
+        if (
+            item["month_compaction"]["peak_rss_gib"]
+            >= result["gates"]["month_compaction_peak_rss_gib_target"]
+        ):
             return False
         if item["fact_copy_count_snapshot_readmodel"] != 0:
             return False
-        if any("closed_months_rewritten=True" in note for metric in item["daily_ingest"] for note in (metric.get("notes") or [])):
+        if any(
+            "closed_months_rewritten=True" in note
+            for metric in item["daily_ingest"]
+            for note in (metric.get("notes") or [])
+        ):
             return False
         short = next(m for m in item["daily_ingest"] if m["name"] == "daily_ingest_short")
         long = next(m for m in item["daily_ingest"] if m["name"] == "daily_ingest_long")
