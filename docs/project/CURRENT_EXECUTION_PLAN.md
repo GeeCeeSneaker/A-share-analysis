@@ -1,3 +1,23 @@
+## 0.12. 2026-09-23 P0 #79 A0/A1 checkpoint
+
+> 状态：**A0 契约与 A1 合成基准已提交；资源门禁 PASS；物理选型和 row-group 观测仍待 PM/Owner 审阅；不进入 daily vertical refactor 或 Issue #76 历史迁移**
+
+PM 最新决策（PR #77 comment 5285114085）已将活动主线切换为 Issue #79。此前 M1/M2/M3 与 superseded M1.2 compatibility rebuild 不得恢复；PR #77 保持 Draft，Issue #76 retained evidence 保持不变，provider reacquisition 未获授权。
+
+本检查点已完成：
+
+- A0 契约文档：`docs/architecture/A0_MINUTE_READY_CONTRACTS_20260923.md`；
+- A0 当前 daily 字段盘点：`docs/architecture/A0_DAILY_BAR_SCHEMA_INVENTORY_20260923.md`；
+- 一次性 runner：`scripts/architecture/benchmark_minute_layout.py`；
+- A1 结果：`docs/architecture/A1_MINUTE_LAYOUT_BENCHMARK_DECISION_20260923.md` 及 `docs/architecture/benchmarks/` 下 JSON/Markdown；
+- runner 只生成 deterministic synthetic data，`provider_calls=0`，没有读取正式账号、token、retained raw/canonical 或上传本地 Parquet。
+
+A1 形状为 4,500 securities × 240 minutes/day × 20 days：1,080,000 行/日、21,600,000 行/open month；L0/L1/L2 与 UUID string/fixed16/INT64 共 9 组全部完成。资源结果：最大 daily-ingest RSS 0.2585 GiB、最大 month-compaction RSS 0.2636 GiB、最大查询 RSS 0.3352 GiB、short/long 最大耗时比 1.1226、closed-month rewrite=0、Snapshot/ReadModel full fact copy=0。结果文件把状态分开记为 `resource_gate_status=PASS` 与 `REVIEW_REQUIRED_FOR_ARCHITECTURE_SELECTION`。
+
+当前证据支持的选型建议是 L0 + INT64 physical key（UUID 仍为治理 identity，需稳定 PIT-bound identity mapping）；fixed16 + L0 是写入/压缩更快的备选。该建议尚未冻结，因为 installed DuckDB profiling 没有提供可用的 row-group touch count，且 provider 数值单位/分钟会话语义仍属于 A0 未决项。不得把 benchmark PASS 写成 Issue #79 全部 PASS。
+
+下一步必须是 PM/Owner 审阅 A0/A1，决定是否接受观测限制并冻结布局/键表示，或授权一个小型 row-group/file-touch instrumentation 补充。审阅通过后，scheduler 才能授权一个 bounded `daily_bar` Canonical → logical Snapshot → DuckDB facade vertical slice；该 slice 必须删除旧的重复事实路径。只有该 slice 通过后，才允许以 `provider_calls=0` 从已封存 canonical evidence 迁移 Issue #76 的 78 个月历史。
+
 # Current Execution Plan
 
 > 本文件是项目**当前执行控制面**。开发人员用它确认：当前主线做到哪里、唯一 P0 是什么、允许做什么、做到什么算完成、完成后由谁决定下一步。
