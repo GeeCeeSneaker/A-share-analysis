@@ -1,23 +1,29 @@
-## 0.12. 2026-09-23 P0 #79 A0/A1 checkpoint
+## 0.13. 2026-09-23 P0 #79 A0/A1 corrected evidence checkpoint
 
-> 状态：**A0 契约与 A1 合成基准已提交；资源门禁 PASS；物理选型和 row-group 观测仍待 PM/Owner 审阅；不进入 daily vertical refactor 或 Issue #76 历史迁移**
+> 状态：**A0/A1 针对 PM 审阅意见已完成窄整改；资源门禁 PASS；物理选型仍待 PM/Owner 冻结；不进入 daily_bar 重构、Issue #76 历史迁移或 provider reacquisition**
 
-PM 最新决策（PR #77 comment 5285114085）已将活动主线切换为 Issue #79。此前 M1/M2/M3 与 superseded M1.2 compatibility rebuild 不得恢复；PR #77 保持 Draft，Issue #76 retained evidence 保持不变，provider reacquisition 未获授权。
+PM 对 exact head `1f31989ee656e8957c92811dc6cab74044bb9305` 的 A0/A1 审阅要求已落实。此前的 A0/A1 资源门禁结论保留，但旧的时钟定义和 W5/W6 文件集合证据不再作为当前依据；本节及下列绑定产物是当前审阅输入。
 
-本检查点已完成：
+已完成的窄整改：
 
-- A0 契约文档：`docs/architecture/A0_MINUTE_READY_CONTRACTS_20260923.md`；
-- A0 当前 daily 字段盘点：`docs/architecture/A0_DAILY_BAR_SCHEMA_INVENTORY_20260923.md`；
-- 一次性 runner：`scripts/architecture/benchmark_minute_layout.py`；
-- A1 结果：`docs/architecture/A1_MINUTE_LAYOUT_BENCHMARK_DECISION_20260923.md` 及 `docs/architecture/benchmarks/` 下 JSON/Markdown；
-- runner 只生成 deterministic synthetic data，`provider_calls=0`，没有读取正式账号、token、retained raw/canonical 或上传本地 Parquet。
-- exact-head QA/CI：GitHub Actions CI #732 在 Windows/py3.12、Windows/py3.14、Ubuntu/py3.14 三个 required job 全部 `success`；GT-H3B controlled execution 按本次 synthetic-only 变更范围 `skipped`。
+- A0 将 `market_as_of` 与 `source_vintage_as_of` 分离：普通历史研究只要求事实属于 `market_as_of`，不要求 `retrieved_at <= market_as_of`；若要证明严格源版本，则必须另有 `retrieved_at <= source_vintage_as_of` 的保留证据；不再使用含义混杂的持久化通用 `as_of`。
+- A1 一次性 runner 已在 W4-W8 同时运行 `open_fragments` 与 `closed_compacted` 两类 artifact。L1/L2 的 W5/W6 在 `read_parquet` 前按稳定 bucket manifest 选择候选文件；W4 仍读取相关 bucket 的完整集合；`files_available` 与 `all_files_available` 分开记录。
+- 已用 exact committed runner 重新生成结果：9 组配置（L0/L1/L2 × UUID string/fixed16/INT64），每组 21,600,000 行；`provider_calls=0`。W5/W6 的候选选择是 runner 的确定性 manifest 选择，不冒充 DuckDB 的物理 row-group 计数；运行时未暴露可靠 `row_groups_touched`，结果保持 `null`。
 
-A1 形状为 4,500 securities × 240 minutes/day × 20 days：1,080,000 行/日、21,600,000 行/open month；L0/L1/L2 与 UUID string/fixed16/INT64 共 9 组全部完成。资源结果：最大 daily-ingest RSS 0.2585 GiB、最大 month-compaction RSS 0.2636 GiB、最大查询 RSS 0.3352 GiB、short/long 最大耗时比 1.1226、closed-month rewrite=0、Snapshot/ReadModel full fact copy=0。结果文件把状态分开记为 `resource_gate_status=PASS` 与 `REVIEW_REQUIRED_FOR_ARCHITECTURE_SELECTION`。
+绑定证据：
 
-当前证据支持的选型建议是 L0 + INT64 physical key（UUID 仍为治理 identity，需稳定 PIT-bound identity mapping）；fixed16 + L0 是写入/压缩更快的备选。该建议尚未冻结，因为 installed DuckDB profiling 没有提供可用的 row-group touch count，且 provider 数值单位/分钟会话语义仍属于 A0 未决项。不得把 benchmark PASS 写成 Issue #79 全部 PASS。
+- A0：`docs/architecture/A0_MINUTE_READY_CONTRACTS_20260923.md`；
+- A1：`docs/architecture/A1_MINUTE_LAYOUT_BENCHMARK_DECISION_20260923.md`；
+- 结果：`docs/architecture/benchmarks/a1_minute_layout_benchmark_20260923.json` 与同名 `.md`；
+- runner Git head：`5d6635ec6b07488cc6997ad13610e0a8b076be5c`；
+- runner blob SHA：`6514f8083e5cc7a812953b780d2740280b637aa1`；
+- runner source SHA-256：`EAE1E60D4ECB4D386FDE0A317285989B4A1808BB6D76D5D17D51DD0D95A53FDB`；
+- benchmark JSON SHA-256：`5389F571188FC6B163BA0822C71718177BFFE112A52525062B634629660E7728`；
+- benchmark Markdown SHA-256：`9D9F0FA27FE09C7A916CB54F628A600B0A90A4C2584FF1364C0339F230AF9CE4`。
 
-下一步必须是 PM/Owner 审阅 A0/A1，决定是否接受观测限制并冻结布局/键表示，或授权一个小型 row-group/file-touch instrumentation 补充。审阅通过后，scheduler 才能授权一个 bounded `daily_bar` Canonical → logical Snapshot → DuckDB facade vertical slice；该 slice 必须删除旧的重复事实路径。只有该 slice 通过后，才允许以 `provider_calls=0` 从已封存 canonical evidence 迁移 Issue #76 的 78 个月历史。
+修正后资源结果：最大 daily-ingest RSS 0.3110 GiB、最大 month-compaction RSS 0.3165 GiB、最大查询 RSS 0.3347 GiB、short/long 最大耗时比 1.1295、closed-month rewrite=0、Snapshot/ReadModel full fact copy=0。W5 单证券在 L1/L2 上的候选字节集合相对 L0 约减少 10–12 倍；W6 的 100/500-security 范围跨越全部 16 个 bucket，因此不能宣称同样的 bucket 减少。
+
+当前只形成**临时选型建议**：L1 + fixed16 UUID physical key，UUID 作为稳定治理 identity；L0 + fixed16 是更简单的备选。现有证据不足以冻结 INT64 mapping，也不足以把 row-group 观测限制写成物理 I/O 证明。仍需 PM/Owner 审阅并冻结布局/键表示；在冻结前不得启动 daily_bar vertical slice。
 
 # Current Execution Plan
 
@@ -780,7 +786,11 @@ Issue #66 **不授权**：
 
 ---
 
-**Last scheduler update**：2026-09-16
+**Last scheduler update**：2026-09-23
+
+**Current task**：Issue #79（A0/A1 窄整改已完成，等待 PM/Owner 冻结物理布局与键表示；不进入 daily_bar vertical slice、Issue #76 历史迁移或 provider reacquisition）。
+
+**Required decision**：审阅 corrected A0/A1 证据并决定是否冻结 L1 + fixed16 UUID（或其他有充分证据的方案）；只有冻结后，scheduler 才能授权一个 bounded `daily_bar` Canonical → logical Snapshot → DuckDB facade vertical slice。Issue #76 仍保持历史证据不变、provider_calls=0 的迁移禁令。：2026-09-16
 
 **Current task**：Issue #76（78 个月权威历史构建已通过 2020-02 `DELISTDATE` 适用性修复，
 当前在 2020-03 本地认证环境边界停止）
