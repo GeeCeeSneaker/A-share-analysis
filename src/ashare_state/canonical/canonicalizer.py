@@ -2884,21 +2884,80 @@ class CanonicalRunner:
                 str(row["security_id"]).replace("-", "").lower(),
             )
         )
+        daily_month_by_key = {
+            str(row["canonical_key"]): str(row["trade_date"])[:7]
+            for row in daily_rows
+        }
+        daily_source_runs_by_month: dict[str, set[str]] = {}
+        for row in daily_rows:
+            source_run_id = row.get("source_normalization_run_id")
+            if source_run_id:
+                month = daily_month_by_key[str(row["canonical_key"])]
+                daily_source_runs_by_month.setdefault(month, set()).add(str(source_run_id))
+        for decision in decisions:
+            if (
+                decision.get("canonical_domain") != "daily_bar"
+                or decision.get("decision_class") == "EXCLUDED_FUTURE"
+            ):
+                continue
+            month = daily_month_by_key.get(str(decision.get("canonical_key", "")))
+            source_run_id = decision.get("source_normalization_run_id")
+            if month is not None and source_run_id:
+                daily_source_runs_by_month.setdefault(month, set()).add(str(source_run_id))
+        daily_source_run_ids = set().union(*daily_source_runs_by_month.values()) if (
+            daily_source_runs_by_month
+        ) else set()
         selected_file_rows = [
             row for row in selected_rows if row.get("canonical_domain") != "daily_bar"
         ]
         selected_file_rows = _align_schema(selected_file_rows)
-        source_receipts = [
-            _parse_ts(seal.received_at)
+        # The bar-value vintage is anchored only to its exact retained
+        # daily_bar receipts. Identity/version evidence remains independently
+        # sealed by the Canonical manifest and identity-dataset hashes.
+        daily_source_evidence_by_run = {
+            seal.run_id: {
+                "run_id": seal.run_id,
+                "role": seal.role,
+                "provider": seal.provider,
+                "provider_dataset": seal.provider_dataset,
+                "endpoint": seal.endpoint,
+                "raw_request_id": seal.raw_request_id,
+                "raw_evidence_uri": seal.raw_evidence_uri,
+                "raw_evidence_hash": seal.raw_evidence_hash,
+                "normalized_manifest_uri": seal.normalized_manifest_uri,
+                "normalized_manifest_hash": seal.normalized_manifest_hash,
+                "received_at": seal.received_at,
+            }
             for seal in snapshot.seals
-            if seal.role == "source" and seal.received_at
-        ]
-        source_vintage_as_of = max(source_receipts, default=snapshot.as_of)
+            if seal.role == "source"
+            and seal.provider_dataset == "daily_bar"
+            and seal.run_id in daily_source_run_ids
+        }
+        sealed_source_run_ids = set(daily_source_evidence_by_run)
+        if daily_source_run_ids != sealed_source_run_ids:
+            raise CanonicalRunnerError(
+                "selected daily-bar rows reference missing source-vintage receipt seals"
+            )
+        source_vintage_evidence_by_partition = {
+            month: [
+                daily_source_evidence_by_run[source_run_id]
+                for source_run_id in sorted(run_ids)
+                if source_run_id in daily_source_evidence_by_run
+            ]
+            for month, run_ids in sorted(daily_source_runs_by_month.items())
+        }
+        if any(
+            len(source_vintage_evidence_by_partition[month]) != len(run_ids)
+            for month, run_ids in daily_source_runs_by_month.items()
+        ):
+            raise CanonicalRunnerError(
+                "daily-bar partition references a missing source-vintage receipt seal"
+            )
         daily_bar_partitions = write_daily_bar_partitions(
             daily_rows,
             normalized_root=self.normalized_root,
-            market_as_of=snapshot.as_of,
-            source_vintage_as_of=source_vintage_as_of,
+            source_snapshot_as_of=snapshot.as_of,
+            source_vintage_evidence_by_partition=source_vintage_evidence_by_partition,
         )
 
         import io

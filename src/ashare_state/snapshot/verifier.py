@@ -51,6 +51,8 @@ from ashare_state.canonical.verifier import (
     read_canonical_run_manifest,
 )
 from ashare_state.snapshot.builder import (
+    ARCHIVE_DAILY_SNAPSHOT_CONTRACT,
+    LOGICAL_DAILY_SNAPSHOT_CONTRACT,
     SNAPSHOT_LEDGER_COLUMNS,
     snapshot_builder_code_fingerprint,
     snapshot_manifest_uri,
@@ -262,7 +264,18 @@ def verify_snapshot(
         msg = f"snapshot {snapshot_id} does not exist in the snapshot ledger"
         raise SnapshotVerifierError(msg)
     record = dict(zip(SNAPSHOT_LEDGER_COLUMNS, row, strict=True))
-    if str(record["snapshot_contract_version"]) == "snapshot-daily-v1":
+    snapshot_contract = str(record["snapshot_contract_version"])
+    if snapshot_contract.startswith("snapshot-daily-") and snapshot_contract not in {
+        LOGICAL_DAILY_SNAPSHOT_CONTRACT,
+        ARCHIVE_DAILY_SNAPSHOT_CONTRACT,
+    }:
+        raise SnapshotVerifierError(
+            f"unsupported logical daily Snapshot contract {snapshot_contract!r}"
+        )
+    if snapshot_contract in {
+        LOGICAL_DAILY_SNAPSHOT_CONTRACT,
+        ARCHIVE_DAILY_SNAPSHOT_CONTRACT,
+    }:
         return deep_verify_logical_daily_snapshot(
             conn,
             snapshot_id,
@@ -633,7 +646,18 @@ def consume_snapshot_seal(
     if row is None:
         raise SnapshotVerifierError(f"snapshot {snapshot_id} does not exist in the snapshot ledger")
     record = dict(zip(SNAPSHOT_LEDGER_COLUMNS, row, strict=True))
-    if str(record["snapshot_contract_version"]) == "snapshot-daily-v1":
+    snapshot_contract = str(record["snapshot_contract_version"])
+    if snapshot_contract.startswith("snapshot-daily-") and snapshot_contract not in {
+        LOGICAL_DAILY_SNAPSHOT_CONTRACT,
+        ARCHIVE_DAILY_SNAPSHOT_CONTRACT,
+    }:
+        raise SnapshotVerifierError(
+            f"unsupported logical daily Snapshot contract {snapshot_contract!r}"
+        )
+    if snapshot_contract in {
+        LOGICAL_DAILY_SNAPSHOT_CONTRACT,
+        ARCHIVE_DAILY_SNAPSHOT_CONTRACT,
+    }:
         return consume_logical_daily_snapshot(
             conn,
             snapshot_id,

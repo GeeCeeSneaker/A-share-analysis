@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -23,10 +24,16 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from ashare_state.canonical.daily_bar_event import (
+    DailyBarEventContractError,
+    daily_bar_event_eligibility_binding,
+    daily_bar_latest_session_close_at,
+    validate_daily_bar_event_eligibility_binding,
+)
 from ashare_state.storage.atomic_files import write_file_atomic
 from ashare_state.storage.paths import validate_logical_uri
 
-DAILY_BAR_PARTITION_CONTRACT = "security-bar-1d-v1"
+DAILY_BAR_PARTITION_CONTRACT = "security-bar-1d-v2"
 DAILY_BAR_LAYOUT_REVISION = "l0-month-fixed16-v1"
 DAILY_BAR_FACT_SCHEMA_VERSION = "security-bar-1d-fact-v1"
 DAILY_BAR_FACT_FIELDS = (
@@ -43,6 +50,19 @@ _DERIVED_COLUMNS = frozenset(
 )
 _LINEAGE_KEY_COLUMNS = ("security_id", "trade_date")
 _MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
+_SOURCE_VINTAGE_RECEIPT_FIELDS = (
+    "run_id",
+    "role",
+    "provider",
+    "provider_dataset",
+    "endpoint",
+    "raw_request_id",
+    "raw_evidence_uri",
+    "raw_evidence_hash",
+    "normalized_manifest_uri",
+    "normalized_manifest_hash",
+    "received_at",
+)
 
 
 class DailyBarPartitionError(ValueError):
@@ -87,6 +107,66 @@ def _trade_date(value: Any) -> date:
         except ValueError as exc:
             raise DailyBarPartitionError(f"invalid trade_date {value!r}") from exc
     raise DailyBarPartitionError(f"invalid trade_date type {type(value).__name__}")
+
+
+def normalize_source_vintage_evidence(
+    evidence: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, str]], datetime]:
+    """Validate and bind the exact retained receipts used for daily truth."""
+    if isinstance(evidence, (str, bytes)) or not isinstance(evidence, Sequence) or not evidence:
+        raise DailyBarPartitionError("daily-bar source-vintage evidence must be a non-empty list")
+    normalized: list[dict[str, str]] = []
+    seen_runs: set[str] = set()
+    for index, entry in enumerate(evidence):
+        if not isinstance(entry, Mapping) or set(entry) != set(_SOURCE_VINTAGE_RECEIPT_FIELDS):
+            raise DailyBarPartitionError(
+                f"source-vintage receipt {index} has an unexpected field set"
+            )
+        receipt = {field: str(entry[field]).strip() for field in _SOURCE_VINTAGE_RECEIPT_FIELDS}
+        empty_fields = [field for field in _SOURCE_VINTAGE_RECEIPT_FIELDS if not receipt[field]]
+        if empty_fields:
+            raise DailyBarPartitionError(
+                f"source-vintage receipt {index} has empty fields {empty_fields}"
+            )
+        if receipt["role"] != "source" or receipt["provider_dataset"] != "daily_bar":
+            raise DailyBarPartitionError(
+                "daily-bar source-vintage evidence must use daily_bar source runs only"
+            )
+        if receipt["run_id"] in seen_runs:
+            raise DailyBarPartitionError("source-vintage evidence repeats a normalization run")
+        seen_runs.add(receipt["run_id"])
+        for name in ("raw_evidence_hash", "normalized_manifest_hash"):
+            if re.fullmatch(r"[0-9a-f]{64}", receipt[name]) is None:
+                raise DailyBarPartitionError(
+                    f"source-vintage receipt {index} has an invalid {name}"
+                )
+        try:
+            receipt["normalized_manifest_uri"] = validate_logical_uri(
+                receipt["normalized_manifest_uri"]
+            )
+        except ValueError as exc:
+            raise DailyBarPartitionError(
+                f"source-vintage receipt {index} has an invalid normalized manifest URI"
+            ) from exc
+        try:
+            received_at = datetime.fromisoformat(receipt["received_at"].replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise DailyBarPartitionError(
+                f"source-vintage receipt {index} has an invalid received_at"
+            ) from exc
+        if received_at.tzinfo is None or received_at.utcoffset() is None:
+            raise DailyBarPartitionError(
+                f"source-vintage receipt {index} received_at must be timezone-aware"
+            )
+        receipt["received_at"] = received_at.astimezone(UTC).isoformat()
+        normalized.append(receipt)
+    if not normalized:
+        raise DailyBarPartitionError("source-vintage evidence does not bind a daily_bar source")
+    normalized.sort(key=lambda item: (item["role"], item["provider_dataset"], item["run_id"]))
+    source_vintage_as_of = max(
+        datetime.fromisoformat(item["received_at"]) for item in normalized
+    )
+    return normalized, source_vintage_as_of
 
 
 def _identity(value: Any) -> tuple[UUID, bytes]:
@@ -206,8 +286,10 @@ def write_daily_bar_partitions(
     rows: Iterable[Mapping[str, Any]],
     *,
     normalized_root: Path,
-    market_as_of: datetime,
-    source_vintage_as_of: datetime,
+    source_snapshot_as_of: datetime,
+    source_vintage_evidence_by_partition: Mapping[
+        str, Sequence[Mapping[str, Any]]
+    ],
 ) -> tuple[dict[str, Any], ...]:
     """Write daily rows into immutable monthly L0 partitions.
 
@@ -215,11 +297,34 @@ def write_daily_bar_partitions(
     retries reuse identical bytes; a logical correction receives a new
     ``data_revision`` while the prior closed-month artifact remains intact.
     """
-    if market_as_of.tzinfo is None or source_vintage_as_of.tzinfo is None:
-        raise DailyBarPartitionError("market/source-vintage clocks must be timezone-aware")
+    if source_snapshot_as_of.tzinfo is None or source_snapshot_as_of.utcoffset() is None:
+        raise DailyBarPartitionError("source_snapshot_as_of must be timezone-aware")
     results: list[dict[str, Any]] = []
     root = Path(normalized_root)
     for partition_id, entries in _iter_monthly_entries(rows):
+        try:
+            partition_evidence = source_vintage_evidence_by_partition[partition_id]
+        except KeyError as exc:
+            raise DailyBarPartitionError(
+                f"daily-bar partition {partition_id} has no source-vintage evidence"
+            ) from exc
+        normalized_vintage_evidence, source_vintage_as_of = normalize_source_vintage_evidence(
+            partition_evidence
+        )
+        try:
+            market_as_of = daily_bar_latest_session_close_at(
+                max(item["fact"]["trade_date"] for item in entries)
+            )
+        except DailyBarEventContractError as exc:
+            raise DailyBarPartitionError(f"daily-bar event boundary is invalid: {exc}") from exc
+        if market_as_of > source_snapshot_as_of:
+            raise DailyBarPartitionError(
+                "daily-bar event boundary is after the source snapshot cutoff"
+            )
+        if source_vintage_as_of > source_snapshot_as_of:
+            raise DailyBarPartitionError(
+                "source_vintage_as_of is after the retained source snapshot cutoff"
+            )
         logical_digest = hashlib.sha256()
         logical_digest.update(b"[")
         for ordinal, entry in enumerate(entries):
@@ -308,6 +413,8 @@ def write_daily_bar_partitions(
             "partition": partition_id,
             "market_as_of": market_as_of.astimezone(UTC).isoformat(),
             "source_vintage_as_of": source_vintage_as_of.astimezone(UTC).isoformat(),
+            "source_vintage_evidence": normalized_vintage_evidence,
+            "event_eligibility": daily_bar_event_eligibility_binding(),
             "schema_version": DAILY_BAR_FACT_SCHEMA_VERSION,
             "logical_key": ["security_id", "trade_date"],
             "data_revision": data_revision,
@@ -340,7 +447,7 @@ def write_daily_bar_partitions(
         lineage_path = root / lineage_uri
         manifest_path = root / manifest_uri
 
-        current_partition = market_as_of.astimezone(_MARKET_TIMEZONE).strftime("%Y-%m")
+        current_partition = source_snapshot_as_of.astimezone(_MARKET_TIMEZONE).strftime("%Y-%m")
         if partition_id < current_partition:
             prior_manifests = root / "canonical" / "security_bar_1d" / f"partition={partition_id}"
             if prior_manifests.is_dir():
@@ -352,7 +459,8 @@ def write_daily_bar_partitions(
                             f"closed-month manifest is unreadable: {prior_path}"
                         ) from exc
                     if (
-                        prior.get("contract_version") == DAILY_BAR_PARTITION_CONTRACT
+                        prior.get("logical_partition_id")
+                        == f"security_bar_1d:{partition_id}"
                         and prior.get("data_revision") != data_revision
                     ):
                         raise DailyBarPartitionError(
@@ -385,6 +493,8 @@ def write_daily_bar_partitions(
                 "max_trade_date": manifest["max_trade_date"],
                 "market_as_of": manifest["market_as_of"],
                 "source_vintage_as_of": manifest["source_vintage_as_of"],
+                "source_vintage_evidence": manifest["source_vintage_evidence"],
+                "event_eligibility": manifest["event_eligibility"],
             }
         )
     return tuple(results)
@@ -418,6 +528,22 @@ def iter_daily_bar_partition_rows(
         or manifest.get("contract_version") != DAILY_BAR_PARTITION_CONTRACT
     ):
         raise DailyBarPartitionError("daily-bar partition contract is invalid")
+    try:
+        validate_daily_bar_event_eligibility_binding(manifest.get("event_eligibility"))
+        source_vintage_evidence, source_vintage_as_of = normalize_source_vintage_evidence(
+            manifest.get("source_vintage_evidence")
+        )
+    except (DailyBarEventContractError, DailyBarPartitionError) as exc:
+        raise DailyBarPartitionError(f"daily-bar temporal contract is invalid: {exc}") from exc
+    if (
+        manifest.get("source_vintage_evidence") != source_vintage_evidence
+        or manifest.get("source_vintage_as_of") != source_vintage_as_of.isoformat()
+        or partition_entry.get("source_vintage_evidence") != source_vintage_evidence
+        or partition_entry.get("source_vintage_as_of") != source_vintage_as_of.isoformat()
+        or partition_entry.get("event_eligibility")
+        != daily_bar_event_eligibility_binding()
+    ):
+        raise DailyBarPartitionError("daily-bar temporal contract binding diverges")
     if manifest.get("data_revision") != partition_entry.get("data_revision"):
         raise DailyBarPartitionError("daily-bar partition data_revision binding diverges")
     if manifest.get("artifact_set_hash") != partition_entry.get("artifact_set_hash"):

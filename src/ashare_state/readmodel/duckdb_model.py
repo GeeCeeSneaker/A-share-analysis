@@ -347,6 +347,11 @@ class DuckDBReadModel:
         schema = domain_snapshot_schema("daily_bar")
         branches: list[str] = []
         for partition in entry["partitions"]:
+            source_run_id = str(
+                partition.get("source_canonical_run_id", verified.canonical_run_id)
+            )
+            if not source_run_id:
+                raise ReadModelError("daily-bar partition has no owning Canonical run id")
             manifest_path = self.normalized_root / str(partition["partition_manifest_uri"])
             try:
                 partition_doc = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -414,7 +419,7 @@ class DuckDBReadModel:
                         "strftime(f.trade_date, '%Y-%m-%d'), chr(34), ']')"
                     )
                 elif name == "canonical_run_id":
-                    expression = sql_literal(verified.canonical_run_id, column.dtype)
+                    expression = sql_literal(source_run_id, column.dtype)
                 elif name == "snapshot_id":
                     expression = sql_literal(verified.snapshot_id, column.dtype)
                 elif name in DAILY_BAR_FACT_FIELDS:

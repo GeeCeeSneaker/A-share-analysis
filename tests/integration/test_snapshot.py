@@ -26,6 +26,10 @@ import pytest
 
 from ashare_state.canonical import CanonicalRunner
 from ashare_state.canonical.daily_bar import DAILY_BAR_FACT_FIELDS
+from ashare_state.canonical.daily_bar_event import (
+    daily_bar_event_eligibility_binding,
+    daily_bar_latest_session_close_at,
+)
 from ashare_state.canonical.verifier import (
     CanonicalConsumptionError,
     verify_canonical_run_for_consumption,
@@ -37,6 +41,7 @@ from ashare_state.snapshot import (
     SnapshotVerifierError,
     consume_snapshot_seal,
     logical_daily_snapshot_semantics_fingerprint,
+    snapshot_base_hash_from_primitives,
     snapshot_builder_code_fingerprint,
     validate_canonical_key,
     verify_snapshot,
@@ -720,10 +725,17 @@ class TestSnapshotBuilder:
         assert manifest["canonical_manifest_hash"] == str(ledger_canonical[0])
         assert manifest["canonical_requested_domains_hash"] == str(ledger_canonical[1])
         assert manifest["canonical_selected_semantic_hash"] == str(ledger_canonical[2])
-        assert manifest["market_as_of"] == AS_OF_LATE.isoformat()
+        expected_market_as_of = daily_bar_latest_session_close_at("2026-08-14").astimezone(UTC)
+        assert manifest["market_as_of"] == expected_market_as_of.isoformat()
         assert manifest["source_vintage_as_of"]
+        assert datetime.fromisoformat(manifest["source_vintage_as_of"]) > expected_market_as_of
         assert "canonical_as_of" not in manifest
-        assert manifest["snapshot_contract_version"] == "snapshot-daily-v1"
+        assert manifest["snapshot_contract_version"] == "snapshot-daily-v2"
+        assert manifest["daily_bar_event_eligibility"] == daily_bar_event_eligibility_binding()
+        assert (
+            manifest["artifacts"]["daily_bar"]["event_eligibility"]
+            == daily_bar_event_eligibility_binding()
+        )
         assert manifest["snapshot_builder_code_fingerprint"] == (
             logical_daily_snapshot_semantics_fingerprint()
         )
@@ -799,7 +811,7 @@ class TestSnapshotBuilder:
 
         built = _build(conn, env_root, result.canonical_run_id)
         manifest = _snapshot_manifest(env_root, built)
-        assert manifest["snapshot_contract_version"] != "snapshot-daily-v1"
+        assert manifest["snapshot_contract_version"] != "snapshot-daily-v2"
         assert manifest["snapshot_builder_code_fingerprint"] == legacy_fingerprint
         verified = verify_snapshot(
             conn,
@@ -951,6 +963,144 @@ class TestSnapshotBuilder:
         )
         assert audited.domain_rows == {"daily_bar": ()}
 
+    def test_daily_partition_set_snapshot_and_external_facade(self, conn, env_root):
+        """Two independently sealed months retain their real source-run ids."""
+        from ashare_state.readmodel import DuckDBReadModel
+
+        _seed_base(conn, env_root)
+        master_run_id = conn.execute(
+            "SELECT normalization_run_id FROM meta_provider_normalization_run "
+            "WHERE raw_request_id = 'req-master' AND status = 'SUCCESS'"
+        ).fetchone()[0]
+        later_cutoff = datetime(2026, 10, 1, 0, 0, 1, tzinfo=UTC)
+        month_specs = (
+            ("2026-08", 20260814, T0, "req-bars-2026-08"),
+            ("2026-09", 20260915, later_cutoff, "req-bars-2026-09"),
+        )
+        daily_run_ids: dict[str, str] = {}
+        for month, trade_day, received_at, request_id in month_specs:
+            rows = [{**row, "KLINE_TIME": trade_day} for row in _BAR_ROWS]
+            _persist_raw(
+                conn,
+                env_root,
+                dataset="daily_bar",
+                endpoint="MarketData.query_kline",
+                surface="daily_bar",
+                request_id=request_id,
+                payload=rows,
+                received_at=received_at,
+            )
+            daily_run_ids[month] = str(
+                conn.execute(
+                    "SELECT normalization_run_id FROM meta_provider_normalization_run "
+                    "WHERE raw_request_id = ? AND status = 'SUCCESS'",
+                    [request_id],
+                ).fetchone()[0]
+            )
+
+        class _MonthScopedCanonicalRunner(CanonicalRunner):
+            def __init__(self, *args: Any, allowed_run_ids: set[str], **kwargs: Any) -> None:
+                super().__init__(*args, **kwargs)
+                self.allowed_run_ids = frozenset(allowed_run_ids)
+
+            def _surface_runs(self, normalization_surface, provider_datasets):
+                rows = super()._surface_runs(normalization_surface, provider_datasets)
+                return [
+                    row
+                    for row in rows
+                    if str(row["normalization_run_id"]) in self.allowed_run_ids
+                ]
+
+        canonical_ids: dict[str, str] = {}
+        for month, _trade_day, cutoff, _request_id in month_specs:
+            runner = _MonthScopedCanonicalRunner(
+                conn,
+                raw_root=env_root["raw"],
+                normalized_root=env_root["normalized"],
+                allowed_run_ids={str(master_run_id), daily_run_ids[month]},
+            )
+            result = runner.run(cutoff, domains=("daily_bar",))
+            assert result.status == "SUCCESS"
+            canonical_ids[month] = result.canonical_run_id
+
+        builder = SnapshotBuilder(
+            conn, raw_root=env_root["raw"], normalized_root=env_root["normalized"]
+        )
+        built = builder.build_daily_partition_set(
+            (canonical_ids["2026-09"], canonical_ids["2026-08"])
+        )
+        manifest = _snapshot_manifest(env_root, built)
+        assert manifest["snapshot_contract_version"] == "snapshot-daily-v3"
+        assert [source["partition_month"] for source in manifest["canonical_sources"]] == [
+            "2026-08",
+            "2026-09",
+        ]
+        partitions = manifest["artifacts"]["daily_bar"]["partitions"]
+        assert [part["source_canonical_run_id"] for part in partitions] == [
+            canonical_ids["2026-08"],
+            canonical_ids["2026-09"],
+        ]
+        assert built.row_count_total == 4
+        snapshot_dir = (env_root["normalized"] / built.manifest_uri).parent
+        assert list(snapshot_dir.rglob("*.parquet")) == []
+
+        verified = verify_snapshot(
+            conn,
+            built.snapshot_id,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+            retain_domain_rows=False,
+        )
+        assert verified.canonical_run_id == canonical_ids["2026-09"]
+        replay = builder.build_daily_partition_set(
+            (canonical_ids["2026-08"], canonical_ids["2026-09"])
+        )
+        assert replay.idempotent_replay is True
+        assert replay.snapshot_id == built.snapshot_id
+
+        readmodel = DuckDBReadModel(
+            conn,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+        )
+        readmodel.rebuild(built.snapshot_id)
+        readmodel.verify_readmodel(built.snapshot_id)
+        db = readmodel.open_read_only(built.snapshot_id)
+        try:
+            assert db.execute(
+                "SELECT table_type FROM information_schema.tables "
+                "WHERE table_name='rm_daily_bar'"
+            ).fetchone()[0] == "VIEW"
+            assert db.execute("SELECT count(*) FROM rm_daily_bar").fetchone()[0] == 4
+            ownership = db.execute(
+                "SELECT canonical_run_id, strftime(min(trade_date), '%Y-%m'), count(*) "
+                "FROM rm_daily_bar GROUP BY canonical_run_id ORDER BY 2"
+            ).fetchall()
+        finally:
+            db.close()
+        assert ownership == [
+            (canonical_ids["2026-08"], "2026-08", 2),
+            (canonical_ids["2026-09"], "2026-09", 2),
+        ]
+
+    def test_canonical_source_set_hash_changes_snapshot_identity(self):
+        common = {
+            "canonical_run_id": "run-anchor",
+            "canonical_manifest_hash": "a" * 64,
+            "canonical_requested_domains_hash": "b" * 64,
+            "canonical_selected_semantic_hash": "c" * 64,
+            "canonical_as_of": "2026-10-01T00:00:01+00:00",
+            "snapshot_contract_version": "snapshot-daily-v3",
+            "snapshot_builder_code_fingerprint": "d" * 64,
+        }
+        left = snapshot_base_hash_from_primitives(
+            **common, canonical_source_set_hash="e" * 64
+        )
+        right = snapshot_base_hash_from_primitives(
+            **common, canonical_source_set_hash="f" * 64
+        )
+        assert left != right
+
     def test_lineage_preserved_verbatim(self, conn, env_root):
         """Snapshot keeps the exact Canonical partition/lineage seal, without copying it."""
         result = _canonical_success(conn, env_root, domains=("daily_bar",))
@@ -1015,7 +1165,10 @@ class TestSnapshotBuilder:
         assert verified.canonical_run_id == result.canonical_run_id
         assert verified.requested_domains == ("daily_bar",)
         assert verified.domain_rows == {"daily_bar": ()}
-        assert verified.market_as_of == AS_OF_LATE
+        assert verified.as_of == AS_OF_LATE
+        assert verified.market_as_of == daily_bar_latest_session_close_at("2026-08-14").astimezone(
+            UTC
+        )
         assert verified.source_vintage_as_of is not None
 
     def test_verify_snapshot_seal_only_does_not_retain_rows(self, conn, env_root):
