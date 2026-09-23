@@ -6,7 +6,9 @@ canonical SUCCESS run:
 - the ONLY canonical input is the CR-4.1 public consumption verifier
   (no canonicalizer internals, no Raw, no CR-2 re-implementation);
 - deterministic snapshot identity (UUID5 over the canonical run-level
-  seals + the snapshot contract + the builder code fingerprint);
+  seals + the snapshot contract + a contract-specific identity component:
+  a source-code fingerprint for legacy snapshots and an output-semantics
+  fingerprint for logical daily snapshots);
 - strict schema-registry projection (key round-trip + PIT contract +
   typed columns; fail closed on ANY violation);
 - immutable per-domain parquet artifacts (selected/typed/sorted) +
@@ -53,8 +55,10 @@ from ashare_state.snapshot.schema import (
 )
 
 __all__ = [
+    "LOGICAL_DAILY_SNAPSHOT_SEMANTICS_VERSION",
     "SNAPSHOT_LEDGER_COLUMNS",
     "SnapshotBuilder",
+    "logical_daily_snapshot_semantics_fingerprint",
     "snapshot_builder_code_fingerprint",
     "snapshot_base_dir",
     "snapshot_manifest_uri",
@@ -84,6 +88,23 @@ SNAPSHOT_LEDGER_COLUMNS = (
 )
 
 LOGICAL_DAILY_SNAPSHOT_CONTRACT = "snapshot-daily-v1"
+LOGICAL_DAILY_SNAPSHOT_SEMANTICS_VERSION = "snapshot-daily-semantics-v1"
+
+
+def logical_daily_snapshot_semantics_fingerprint() -> str:
+    """Return the stable output-semantics identity for logical daily Snapshots.
+
+    The legacy ledger/manifest field ``builder_code_fingerprint`` stores this
+    digest for ``snapshot-daily-v1`` only. It is intentionally independent of
+    Python source, verifier implementation, batching, logging, and memory
+    management. Increment the explicit semantics version only when the
+    logical Snapshot output contract changes.
+    """
+    semantics = {
+        "snapshot_contract_version": LOGICAL_DAILY_SNAPSHOT_CONTRACT,
+        "semantics_version": LOGICAL_DAILY_SNAPSHOT_SEMANTICS_VERSION,
+    }
+    return hashlib.sha256(_canonical_json(semantics).encode("utf-8")).hexdigest()
 
 
 def snapshot_builder_code_fingerprint() -> str:
@@ -385,7 +406,7 @@ class SnapshotBuilder:
             if entry.get("source_vintage_as_of")
         ]
         source_vintage_as_of = max(source_times, default=source_as_of).astimezone(UTC)
-        fingerprint = snapshot_builder_code_fingerprint()
+        fingerprint = logical_daily_snapshot_semantics_fingerprint()
         base_hash = snapshot_base_hash_from_primitives(
             canonical_run_id=canonical_run_id,
             canonical_manifest_hash=str(source_record["manifest_hash"]),

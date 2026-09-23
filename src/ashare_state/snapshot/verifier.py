@@ -7,7 +7,8 @@ section 5, P0-B03/P0-B04).
 2. every explicit manifest correctness field == the ledger seal;
 3. the snapshot identity is PHYSICALLY recomputed from the manifest
    primitives (canonical run-level seals + snapshot contract + the
-   builder code fingerprint) - UUID5 cross-bind, never trusted;
+   contract-specific identity component: legacy source fingerprint or
+   logical-daily output-semantics fingerprint) - UUID5 cross-bind;
 4. the canonical provenance cross-bind: the canonical manifest and the
    selected projection needed by this boundary consume the referenced
    ledger/hash/version seal; the full canonical chain is not recursively

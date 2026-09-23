@@ -77,11 +77,12 @@ def snapshot_base_hash_from_primitives(
     """P0-A04: the snapshot base identity hash - a canonical JSON over
     the canonical run id + canonical manifest hash + canonical
     requested domains hash + canonical selected semantic hash +
-    canonical as_of + the snapshot contract version + the snapshot
-    builder code fingerprint. Deliberately derived from the canonical
-    RUN-LEVEL seals (not from the projected rows) so the identity is
-    computable BEFORE any artifact is written and verifiable from the
-    manifest primitives afterwards."""
+    canonical as_of + the snapshot contract version + its contract-specific
+    identity component. Legacy contracts supply the source-code fingerprint;
+    ``snapshot-daily-v1`` supplies an output-semantics fingerprint in the
+    same compatibility field. Deliberately derived from canonical RUN-LEVEL
+    seals (not projected rows) so identity is computable BEFORE any artifact
+    is written and verifiable from manifest primitives afterwards."""
     return hashlib.sha256(
         _canonical_json(
             {

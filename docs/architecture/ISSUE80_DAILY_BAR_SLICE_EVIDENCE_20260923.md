@@ -26,6 +26,7 @@ The three-month integration fixture (June–August 2026, two rows per month) pro
 - A new-month append emits only that month's partition and leaves the closed prior-month fact bytes unchanged. Partition fact and lineage are atomically committed before the partition manifest; the Canonical run manifest/ledger remains the outer publication boundary.
 - Existing R1 integration assertions still produce 2 Development, 2 Validation, and 2 Holdout rows for the deterministic fixture. Date/security/column filters return only matching rows, the active publisher succeeds when `prepare_verified_projection` is patched to fail, and exact replay retains identical content and manifest hashes.
 - Explicit Snapshot deep audit streams partition batches and detects fact tampering. Routine Snapshot/ReadModel open checks small manifests, bindings, schemas and Parquet footers without a total-row semantic hash scan.
+- Snapshot identity uses the existing `builder_code_fingerprint` ledger slot for compatibility: legacy contracts retain the governed source-code fingerprint, while `snapshot-daily-v1` stores a deterministic digest of the explicit `LOGICAL_DAILY_SNAPSHOT_SEMANTICS_VERSION` and daily Snapshot contract. The logical daily digest does not include verifier/builder source, batching, logging, scans, or memory-management code; increment the semantics version only for an output-contract change.
 
 ## Resource sample
 

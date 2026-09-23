@@ -36,6 +36,7 @@ from ashare_state.snapshot import (
     SnapshotSchemaError,
     SnapshotVerifierError,
     consume_snapshot_seal,
+    logical_daily_snapshot_semantics_fingerprint,
     snapshot_builder_code_fingerprint,
     validate_canonical_key,
     verify_snapshot,
@@ -705,7 +706,7 @@ class TestSnapshotBuilder:
         """Mandatory 16: the snapshot identity is derived from the
         canonical RUN-LEVEL seals (manifest hash / requested domains
         hash / selected semantic hash / as_of) + the snapshot contract
-        + the builder code fingerprint - all present in the manifest
+        + the contract-specific identity component - all present in the manifest
         and physically recomputable."""
         result = _canonical_success(conn, env_root, domains=("daily_bar",))
         built = _build(conn, env_root, result.canonical_run_id)
@@ -723,8 +724,102 @@ class TestSnapshotBuilder:
         assert manifest["source_vintage_as_of"]
         assert "canonical_as_of" not in manifest
         assert manifest["snapshot_contract_version"] == "snapshot-daily-v1"
-        assert manifest["snapshot_builder_code_fingerprint"] == snapshot_builder_code_fingerprint()
+        assert manifest["snapshot_builder_code_fingerprint"] == (
+            logical_daily_snapshot_semantics_fingerprint()
+        )
         assert manifest["snapshot_base_hash"]
+
+    def test_logical_daily_snapshot_does_not_use_legacy_source_fingerprint(
+        self, conn, env_root, monkeypatch
+    ):
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        import ashare_state.snapshot.builder as snapshot_builder
+        import ashare_state.snapshot.daily as daily_snapshot
+
+        def fail_if_called() -> str:
+            raise AssertionError("logical daily Snapshot used the legacy source fingerprint")
+
+        monkeypatch.setattr(snapshot_builder, "snapshot_builder_code_fingerprint", fail_if_called)
+        monkeypatch.setattr(
+            daily_snapshot, "snapshot_builder_code_fingerprint", fail_if_called, raising=False
+        )
+        built = _build(conn, env_root, result.canonical_run_id)
+        verified = verify_snapshot(
+            conn,
+            built.snapshot_id,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+        )
+        assert verified.snapshot_id == built.snapshot_id
+
+    def test_logical_daily_semantics_version_changes_snapshot_identity(
+        self, conn, env_root, monkeypatch
+    ):
+        result = _canonical_success(conn, env_root, domains=("daily_bar",))
+        first = _build(conn, env_root, result.canonical_run_id)
+        first_manifest = _snapshot_manifest(env_root, first)
+
+        import ashare_state.snapshot.builder as snapshot_builder
+
+        monkeypatch.setattr(
+            snapshot_builder,
+            "LOGICAL_DAILY_SNAPSHOT_SEMANTICS_VERSION",
+            "snapshot-daily-semantics-test-v2",
+        )
+        second = _build(conn, env_root, result.canonical_run_id)
+        second_manifest = _snapshot_manifest(env_root, second)
+
+        assert first.snapshot_id != second.snapshot_id
+        assert (
+            first_manifest["snapshot_builder_code_fingerprint"]
+            != second_manifest["snapshot_builder_code_fingerprint"]
+        )
+
+    def test_legacy_non_daily_snapshot_keeps_source_fingerprint_behavior(
+        self, conn, env_root, monkeypatch
+    ):
+        result = _canonical_success(conn, env_root, domains=("trade_calendar",))
+        import ashare_state.snapshot.builder as snapshot_builder
+        import ashare_state.snapshot.verifier as snapshot_verifier
+
+        legacy_fingerprint = snapshot_builder_code_fingerprint()
+        monkeypatch.setattr(
+            snapshot_builder, "snapshot_builder_code_fingerprint", lambda: legacy_fingerprint
+        )
+        monkeypatch.setattr(
+            snapshot_verifier, "snapshot_builder_code_fingerprint", lambda: legacy_fingerprint
+        )
+
+        def fail_if_called() -> str:
+            raise AssertionError("legacy Snapshot used daily semantics")
+
+        monkeypatch.setattr(
+            snapshot_builder, "logical_daily_snapshot_semantics_fingerprint", fail_if_called
+        )
+
+        built = _build(conn, env_root, result.canonical_run_id)
+        manifest = _snapshot_manifest(env_root, built)
+        assert manifest["snapshot_contract_version"] != "snapshot-daily-v1"
+        assert manifest["snapshot_builder_code_fingerprint"] == legacy_fingerprint
+        verified = verify_snapshot(
+            conn,
+            built.snapshot_id,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+        )
+        assert verified.snapshot_id == built.snapshot_id
+
+        monkeypatch.setattr(snapshot_builder, "snapshot_builder_code_fingerprint", lambda: "f" * 64)
+        monkeypatch.setattr(
+            snapshot_verifier, "snapshot_builder_code_fingerprint", lambda: "f" * 64
+        )
+        with pytest.raises(SnapshotVerifierError, match="DIFFERENT snapshot builder code"):
+            verify_snapshot(
+                conn,
+                built.snapshot_id,
+                raw_root=env_root["raw"],
+                normalized_root=env_root["normalized"],
+            )
 
     def test_artifact_set_equals_requested_domains(self, conn, env_root):
         """Mandatory 17: the artifact set is EXACTLY the requested
@@ -1213,15 +1308,18 @@ class TestSnapshotBuilder:
                 normalized_root=env_root["normalized"],
             )
 
-    def test_verify_snapshot_builder_fingerprint_mismatch(self, conn, env_root, monkeypatch):
-        """Mandatory 27: a snapshot built by a DIFFERENT builder code
-        version cannot be verified by the current builder."""
+    def test_verify_snapshot_daily_semantics_fingerprint_mismatch(
+        self, conn, env_root, monkeypatch
+    ):
+        """A logical daily Snapshot with a different semantics seal fails closed."""
         result = _canonical_success(conn, env_root, domains=("daily_bar",))
         built = _build(conn, env_root, result.canonical_run_id)
         import ashare_state.snapshot.daily as daily_snapshot
 
-        monkeypatch.setattr(daily_snapshot, "snapshot_builder_code_fingerprint", lambda: "f" * 64)
-        with pytest.raises(SnapshotVerifierError, match="DIFFERENT snapshot builder"):
+        monkeypatch.setattr(
+            daily_snapshot, "logical_daily_snapshot_semantics_fingerprint", lambda: "f" * 64
+        )
+        with pytest.raises(SnapshotVerifierError, match="DIFFERENT output semantics"):
             verify_snapshot(
                 conn,
                 built.snapshot_id,

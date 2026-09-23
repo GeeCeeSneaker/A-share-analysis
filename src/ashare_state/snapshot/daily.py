@@ -32,7 +32,7 @@ from ashare_state.snapshot.builder import (
     LOGICAL_DAILY_SNAPSHOT_CONTRACT,
     SNAPSHOT_LEDGER_COLUMNS,
     logical_daily_snapshot_manifest_uri,
-    snapshot_builder_code_fingerprint,
+    logical_daily_snapshot_semantics_fingerprint,
 )
 from ashare_state.snapshot.models import (
     SnapshotVerifierError,
@@ -264,9 +264,9 @@ def _load_sealed_snapshot(
         raise SnapshotVerifierError("logical daily snapshot manifest differs from its ledger seal")
     if (
         str(manifest.get("snapshot_builder_code_fingerprint"))
-        != snapshot_builder_code_fingerprint()
+        != logical_daily_snapshot_semantics_fingerprint()
     ):
-        raise SnapshotVerifierError("snapshot was built by a DIFFERENT snapshot builder")
+        raise SnapshotVerifierError("logical snapshot has DIFFERENT output semantics")
     if int(manifest.get("row_count_total", -1)) != int(record["row_count_total"]):
         raise SnapshotVerifierError("logical daily snapshot row_count_total differs from ledger")
 
