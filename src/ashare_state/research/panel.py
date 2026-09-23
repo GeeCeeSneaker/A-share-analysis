@@ -1055,7 +1055,7 @@ class ResearchPanelBuilder:
             staged_paths = {name: staging_root / f"{name}.parquet" for name in _ARTIFACT_NAMES}
             with ExitStack() as stack:
                 if not isinstance(rows, Sequence) and hasattr(rows, "close"):
-                    stack.callback(rows.close)  # type: ignore[attr-defined]
+                    stack.callback(rows.close)
                 writers = {
                     name: stack.enter_context(
                         pq.ParquetWriter(
