@@ -12,11 +12,18 @@
 | trade date | `trade_date` 是交易所本地交易日，用于分区、PIT 与 identity bridge；它不是由 provider `retrieved_at` 推导。 | daily canonical 已有 `trade_date`；分钟需补齐边界测试 |
 | market availability | `market_available_at` 表示事实在市场/事件语义上可被观察的时间；必须与 provider 请求完成时间分离。 | 当前 daily 合同使用 `available_at`/received-at 派生路径；分钟命名与语义待迁移 |
 | provider provenance | `retrieved_at`/`ingested_at` 只表示提供方响应或本次摄取时间，不能作为事实发生时间。 | 现有 lineage 字段存在；需避免在分钟行重复写批次常量 |
+| market PIT clock | `market_as_of` 只控制市场/事件时间资格：`market_available_at <= market_as_of`。它不约束 provider 的重新获取时间。 | 本文冻结命名；daily/minute 实现迁移待后续 vertical slice |
+| source-vintage clock | `source_vintage_as_of` 只控制来源证据版本资格：选入的 captured artifact 必须满足 `retrieved_at <= source_vintage_as_of`。 | 本文冻结命名；严格历史 vintage 依赖 retained evidence |
 | session state | 交易日历/会话定义必须明确开盘前集合竞价、午间休市、收盘后和非交易时段。 | provider 的分钟会话形状尚未完成 shape/语义探针，暂不硬编码具体补零规则 |
 | absent bar | 未返回的分钟不能自动生成价格为 0 的伪 bar。缺失、停牌、午间休市和不适用必须由日历/状态/质量结果分别表达。 | 规则冻结；生产字段/sidecar 待实现 |
 | zero value | 合法的 0/0.0 是真实数值，不能用 truthiness 当作缺失。 | 现有 mapper 已遵守 `first_present` 约束；分钟回归需复用 |
 
-PIT 规则：只有 `market_available_at <= as_of` 的事实可以进入该 PIT 视图；`retrieved_at` 晚于 `as_of` 的响应不能借助当前 snapshot 反推历史事实。日历和 identity 版本也必须绑定到 manifest。
+PIT 使用两个互不替代的时钟，不再在 durable contract 中使用含义不明的泛化 `as_of`：
+
+- `market_as_of` 是市场/事件时间时钟；只有 `market_available_at <= market_as_of` 的事实可以进入该 PIT 视图。
+- `source_vintage_as_of` 是来源证据/版本时钟；只有 `retrieved_at <= source_vintage_as_of` 的已捕获 artifact 才属于该来源 vintage snapshot。
+
+普通历史研究不得隐含要求 `retrieved_at <= market_as_of`：2026 年重新取得的 2020 行可以在市场语义上参与 2020 历史研究，但不能据此声称它证明了 2020 年当时可取得的精确数据 vintage。若研究需要严格历史 vintage，必须使用保留的 vintage evidence，并以 `source_vintage_as_of` 选择。日历和 identity 版本也必须绑定到 manifest。
 
 ## C2. 数值精度与单位
 
@@ -70,7 +77,7 @@ Issue #76 的 retained 78-month canonical evidence 只能在新契约通过审�
 
 1. provider shape probe 的单位/精度证据是否足够冻结数值物理类型；
 2. minute session 的 auction/lunch/close 和 missing/suspension sidecar 具体字段；
-3. manifest 字段的最终 schema 与 `available_at`/`retrieved_at` 的命名迁移；
+3. manifest 字段的最终 schema 与 `market_as_of`/`source_vintage_as_of`、`market_available_at`/`retrieved_at` 的命名迁移；
 4. A1 的 layout/key 选择以及 row-group touch 观测缺口；
 5. 上述审阅通过后，才进入一个 bounded `daily_bar` vertical refactor。
 
