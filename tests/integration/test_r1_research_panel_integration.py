@@ -24,6 +24,7 @@ def test_verified_readmodel_research_panel_reader_replay(
     conn,
     env_root,
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     """A fixed offline source reaches the public reader only via ReadModel."""
     _seed_base(conn, env_root)
@@ -136,6 +137,49 @@ def test_verified_readmodel_research_panel_reader_replay(
     projection = builder.prepare_verified_projection(snapshot.snapshot_id)
     assert projection.rows
     assert not (tmp_path / "research").exists()
+    development_batches = list(
+        builder.iter_projected_daily_batches(
+            snapshot.snapshot_id,
+            split=ResearchSplit.DEVELOPMENT,
+            start="2020-01-01",
+            end="2020-01-01",
+            columns=["trade_date", "security_id", "research_split", "research_eligibility"],
+            batch_size=1,
+        )
+    )
+    assert [batch.height for batch in development_batches] == [1, 1]
+    assert all(
+        batch.get_column("research_split").to_list() == [ResearchSplit.DEVELOPMENT.value]
+        for batch in development_batches
+    )
+    first_security_id = str(development_batches[0].get_column("security_id")[0])
+    filtered_batches = list(
+        builder.iter_projected_daily_batches(
+            snapshot.snapshot_id,
+            split=ResearchSplit.DEVELOPMENT,
+            start="2020-01-01",
+            end="2020-01-01",
+            security_ids=[first_security_id],
+            columns=["trade_date", "security_id", "close"],
+            batch_size=1,
+        )
+    )
+    assert sum(batch.height for batch in filtered_batches) == 1
+    assert (
+        list(
+            builder.iter_projected_daily_batches(
+                snapshot.snapshot_id,
+                split=ResearchSplit.DEVELOPMENT,
+                security_ids=[],
+            )
+        )
+        == []
+    )
+    monkeypatch.setattr(
+        builder,
+        "prepare_verified_projection",
+        lambda _snapshot_id: pytest.fail("production publication called whole-history projection"),
+    )
     result = builder.build_from_readmodel(
         snapshot.snapshot_id,
         build_timestamp="2026-09-12T00:00:00+00:00",

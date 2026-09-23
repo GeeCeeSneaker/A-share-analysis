@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import heapq
+import json
 import tempfile
 from collections.abc import Iterable, Iterator
 from contextlib import ExitStack
@@ -44,6 +45,7 @@ from ashare_state.readmodel.schema import (
     READMODEL_CONTRACT_VERSION,
     duckdb_domain_columns,
     duckdb_domain_table_name,
+    duckdb_type_of,
 )
 from ashare_state.snapshot.models import SnapshotVerifierError
 from ashare_state.snapshot.schema import domain_snapshot_schema
@@ -314,11 +316,15 @@ class DuckDBReadModel:
         )
         for domain in verified.requested_domains:
             schema = domain_snapshot_schema(domain)
+            table = duckdb_domain_table_name(domain)
+            entry = verified.manifest["artifacts"][domain]
+            if domain == "daily_bar" and entry.get("kind") == "canonical_partition_set":
+                db.execute(f"CREATE VIEW {table} AS {self._daily_bar_external_view_sql(verified)}")
+                continue
             column_sql = ", ".join(
                 f"{col.name} {_DTYPE_TO_DUCKDB[col.dtype]}{' NOT NULL' if not col.nullable else ''}"
                 for col in schema.columns
             )
-            table = duckdb_domain_table_name(domain)
             db.execute(f"CREATE TABLE {table} ({column_sql}, PRIMARY KEY (canonical_key))")
             parquet_path = (
                 (self.normalized_root / str(verified.manifest["artifacts"][domain]["uri"]))
@@ -332,6 +338,112 @@ class DuckDBReadModel:
                 f"INSERT INTO {table} SELECT * FROM "
                 f"read_parquet('{parquet_path}', hive_partitioning=false)"
             )
+
+    def _daily_bar_external_view_sql(self, verified: Any) -> str:
+        """Define rm_daily_bar as a non-persistent view of exact sealed files."""
+        from ashare_state.canonical.daily_bar import DAILY_BAR_FACT_FIELDS
+
+        entry = verified.manifest["artifacts"]["daily_bar"]
+        schema = domain_snapshot_schema("daily_bar")
+        branches: list[str] = []
+        for partition in entry["partitions"]:
+            manifest_path = self.normalized_root / str(partition["partition_manifest_uri"])
+            try:
+                partition_doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ReadModelError(
+                    "daily-bar partition manifest cannot build DuckDB view"
+                ) from exc
+            fact_path = (
+                (self.normalized_root / str(partition_doc["fact_artifact"]["uri"]))
+                .resolve()
+                .as_posix()
+            )
+            lineage_path = (
+                (self.normalized_root / str(partition_doc["lineage_artifact"]["uri"]))
+                .resolve()
+                .as_posix()
+            )
+            fact_sql_path = fact_path.replace("'", "''")
+            lineage_sql_path = lineage_path.replace("'", "''")
+            variable_fields = set(partition_doc["variable_fields"])
+            constant_fields = partition_doc["constant_fields"]
+
+            uuid_expr = (
+                "lower(substr(hex(f.security_id), 1, 8) || '-' || "
+                "substr(hex(f.security_id), 9, 4) || '-' || "
+                "substr(hex(f.security_id), 13, 4) || '-' || "
+                "substr(hex(f.security_id), 17, 4) || '-' || "
+                "substr(hex(f.security_id), 21, 12))"
+            )
+
+            def sql_literal(value: Any, dtype: Any) -> str:
+                duck_type = duckdb_type_of(dtype)
+                if value is None:
+                    return f"CAST(NULL AS {duck_type})"
+                if duck_type in {"VARCHAR", "DATE", "TIMESTAMP WITH TIME ZONE"}:
+                    literal = "'" + str(value).replace("'", "''") + "'"
+                elif duck_type in {"BIGINT", "DOUBLE"}:
+                    if isinstance(value, bool) or not isinstance(value, int | float):
+                        raise ReadModelError(
+                            "daily-bar constant lineage has an invalid numeric type"
+                        )
+                    literal = str(value)
+                elif duck_type == "BOOLEAN":
+                    if not isinstance(value, bool):
+                        raise ReadModelError(
+                            "daily-bar constant lineage has an invalid boolean type"
+                        )
+                    literal = "TRUE" if value else "FALSE"
+                else:  # pragma: no cover - schema registry is closed
+                    raise ReadModelError(f"unsupported daily-bar DuckDB type {duck_type}")
+                return f"CAST({literal} AS {duck_type})"
+
+            expressions: list[str] = []
+            for column in schema.columns:
+                name = column.name
+                if name == "security_id":
+                    expression = f"CAST({uuid_expr} AS VARCHAR)"
+                elif name == "trade_date":
+                    expression = "f.trade_date"
+                elif name == "canonical_domain":
+                    expression = "'daily_bar'"
+                elif name == "canonical_key":
+                    expression = (
+                        f"concat('[', chr(34), {uuid_expr}, chr(34), ',', chr(34), "
+                        "strftime(f.trade_date, '%Y-%m-%d'), chr(34), ']')"
+                    )
+                elif name == "canonical_run_id":
+                    expression = sql_literal(verified.canonical_run_id, column.dtype)
+                elif name == "snapshot_id":
+                    expression = sql_literal(verified.snapshot_id, column.dtype)
+                elif name in DAILY_BAR_FACT_FIELDS:
+                    expression = f'f."{name}"'
+                elif name in variable_fields:
+                    expression = f'l."{name}"'
+                elif name in constant_fields:
+                    expression = sql_literal(constant_fields[name], column.dtype)
+                elif column.nullable:
+                    expression = f"CAST(NULL AS {duckdb_type_of(column.dtype)})"
+                else:
+                    raise ReadModelError(
+                        f"daily-bar partition does not bind required view column {name}"
+                    )
+                expressions.append(f'{expression} AS "{name}"')
+            branches.append(
+                "SELECT "
+                + ", ".join(expressions)
+                + f" FROM read_parquet('{fact_sql_path}', hive_partitioning=false) f"
+                + f" JOIN read_parquet('{lineage_sql_path}', hive_partitioning=false) l"
+                + " USING (security_id, trade_date)"
+            )
+        if not branches:
+            columns = ", ".join(
+                f'CAST(NULL AS {duckdb_type_of(column.dtype)}) AS "{column.name}"'
+                for column in schema.columns
+            )
+            return f"SELECT {columns} WHERE FALSE"
+        return " UNION ALL ".join(branches)
 
     def _insert_meta(self, db: duckdb.DuckDBPyConnection, verified: Any) -> None:
         db.execute(
@@ -354,7 +466,12 @@ class DuckDBReadModel:
                 [
                     verified.snapshot_id,
                     domain,
-                    str(entry["uri"]),
+                    str(
+                        entry.get("uri")
+                        or verified.manifest.get(
+                            "canonical_manifest_uri", "canonical-partition-set"
+                        )
+                    ),
                     int(entry["row_count"]),
                     str(entry["semantic_hash"]),
                 ],
@@ -414,6 +531,11 @@ class DuckDBReadModel:
                     f"{table} column types diverge from the declared readmodel "
                     f"schema: { {k: actual[k] for k in actual if actual[k] != declared[k]} }"
                 )
+            if domain == "daily_bar" and entry.get("kind") == "canonical_partition_set":
+                # Snapshot seal consumption checks the exact small manifests,
+                # exact external paths and footer row counts. Do not scan the
+                # fact view for a total-history count/hash on ordinary open.
+                continue
             # row count
             count_row = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
             count = int(count_row[0]) if count_row is not None else -1
@@ -495,7 +617,11 @@ class DuckDBReadModel:
                 continue
             entry = verified.manifest["artifacts"][domain]
             uri, count, semantic = seen_domains[domain]
-            if uri != str(entry["uri"]) or count != int(entry["row_count"]):
+            expected_uri = str(
+                entry.get("uri")
+                or verified.manifest.get("canonical_manifest_uri", "canonical-partition-set")
+            )
+            if uri != expected_uri or count != int(entry["row_count"]):
                 problems.append(f"rm_domain_meta {domain} row mismatch")
             if str(semantic) != str(entry["semantic_hash"]):
                 problems.append(f"rm_domain_meta {domain} semantic hash mismatch")

@@ -54,6 +54,10 @@ from ashare_state.snapshot.builder import (
     snapshot_builder_code_fingerprint,
     snapshot_manifest_uri,
 )
+from ashare_state.snapshot.daily import (
+    consume_logical_daily_snapshot,
+    deep_verify_logical_daily_snapshot,
+)
 from ashare_state.snapshot.models import (
     SnapshotVerifierError,
     VerifiedSnapshot,
@@ -257,6 +261,13 @@ def verify_snapshot(
         msg = f"snapshot {snapshot_id} does not exist in the snapshot ledger"
         raise SnapshotVerifierError(msg)
     record = dict(zip(SNAPSHOT_LEDGER_COLUMNS, row, strict=True))
+    if str(record["snapshot_contract_version"]) == "snapshot-daily-v1":
+        return deep_verify_logical_daily_snapshot(
+            conn,
+            snapshot_id,
+            raw_root=raw_root,
+            normalized_root=normalized_root,
+        )
     raw_as_of = record["canonical_as_of"]
     if not isinstance(raw_as_of, datetime):
         msg = f"snapshot {snapshot_id} ledger row carries no canonical as_of"
@@ -621,6 +632,12 @@ def consume_snapshot_seal(
     if row is None:
         raise SnapshotVerifierError(f"snapshot {snapshot_id} does not exist in the snapshot ledger")
     record = dict(zip(SNAPSHOT_LEDGER_COLUMNS, row, strict=True))
+    if str(record["snapshot_contract_version"]) == "snapshot-daily-v1":
+        return consume_logical_daily_snapshot(
+            conn,
+            snapshot_id,
+            normalized_root=normalized_root,
+        )
     raw_as_of = record["canonical_as_of"]
     if not isinstance(raw_as_of, datetime):
         raise SnapshotVerifierError(f"snapshot {snapshot_id} ledger row carries no canonical as_of")

@@ -60,6 +60,8 @@ class VerifiedSnapshot:
     ledger_record: dict[str, Any]
     manifest: dict[str, Any]
     domain_rows: dict[str, tuple[dict[str, Any], ...]]
+    market_as_of: datetime | None = None
+    source_vintage_as_of: datetime | None = None
 
 
 def snapshot_base_hash_from_primitives(

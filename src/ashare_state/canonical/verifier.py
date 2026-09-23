@@ -37,6 +37,10 @@ from ashare_state.canonical.canonicalizer import (
     CanonicalRunSeal,
     _ledger_as_of,
 )
+from ashare_state.canonical.daily_bar import (
+    deep_verify_daily_bar_partitions,
+    iter_daily_bar_partition_rows,
+)
 from ashare_state.storage.paths import physical_from_logical_uri
 
 __all__ = [
@@ -71,6 +75,8 @@ class CanonicalProjectionSource:
     as_of: datetime
     path: Path
     row_count: int
+    daily_bar_partitions: tuple[dict[str, Any], ...] = ()
+    normalized_root: Path | None = None
 
     def iter_rows(self, *, batch_size: int = 32_768) -> Iterator[dict[str, Any]]:
         """Yield selected rows from Parquet without materializing the file."""
@@ -84,7 +90,19 @@ class CanonicalProjectionSource:
                         raise CanonicalConsumptionError(
                             "canonical selected artifact yielded a non-mapping row"
                         )
+                    for field in self.manifest.get("selected_schema_fields", []):
+                        row.setdefault(str(field), None)
                     yield row
+            if self.daily_bar_partitions:
+                if self.normalized_root is None:  # pragma: no cover - construction invariant
+                    raise CanonicalConsumptionError("daily-bar projection source has no root")
+                for entry in self.daily_bar_partitions:
+                    for row in iter_daily_bar_partition_rows(
+                        self.normalized_root, entry, batch_size=batch_size
+                    ):
+                        for field in self.manifest.get("selected_schema_fields", []):
+                            row.setdefault(str(field), None)
+                        yield row
         except CanonicalConsumptionError:
             raise
         except Exception as exc:  # noqa: BLE001 - fail closed at the artifact boundary
@@ -255,12 +273,38 @@ def open_canonical_projection_source(
         raise CanonicalConsumptionError("canonical selected artifact schema is tampered")
     if row_count != int(selected.get("row_count", -1)):
         raise CanonicalConsumptionError("canonical selected artifact row count is tampered")
+    partition_entries = manifest.get("daily_bar_partitions", [])
+    if not isinstance(partition_entries, list):
+        raise CanonicalConsumptionError("canonical daily_bar_partitions seal is not a list")
+    total_count = row_count
+    if partition_entries:
+        partition_count = sum(int(entry.get("row_count", -1)) for entry in partition_entries)
+        for entry in partition_entries:
+            if not isinstance(entry, dict):
+                raise CanonicalConsumptionError("canonical daily-bar partition entry is invalid")
+            # Check manifest and artifact identities before yielding rows. The
+            # bytes are deeply hashed by the explicit Canonical verifier.
+            manifest_uri = str(entry.get("partition_manifest_uri", ""))
+            partition_path = physical_from_logical_uri(Path(normalized_root), manifest_uri)
+            if not partition_path.is_file():
+                raise CanonicalConsumptionError("canonical daily-bar partition manifest is missing")
+            if _sha256_file(partition_path) != str(entry.get("partition_manifest_hash")):
+                raise CanonicalConsumptionError(
+                    "canonical daily-bar partition manifest is tampered"
+                )
+        total_count += partition_count
+    if total_count != int(record["selected_count"]):
+        raise CanonicalConsumptionError(
+            "canonical selected artifact plus daily partitions differ from selected_count"
+        )
     return CanonicalProjectionSource(
         record=record,
         manifest=manifest,
         as_of=as_of,
         path=path,
-        row_count=row_count,
+        row_count=total_count,
+        daily_bar_partitions=tuple(partition_entries),
+        normalized_root=Path(normalized_root),
     )
 
 
@@ -306,7 +350,21 @@ def load_canonical_projection(
         raise CanonicalConsumptionError("canonical selected artifact schema is tampered")
     if frame.height != int(selected.get("row_count", -1)):
         raise CanonicalConsumptionError("canonical selected artifact row count is tampered")
-    return record, manifest, as_of, tuple(frame.to_dicts())
+    selected_rows = frame.to_dicts()
+    partition_entries = manifest.get("daily_bar_partitions")
+    if partition_entries is not None:
+        if not isinstance(partition_entries, list):
+            raise CanonicalConsumptionError("canonical daily_bar_partitions seal is not a list")
+        selected_rows.extend(deep_verify_daily_bar_partitions(normalized_root, partition_entries))
+        selected_fields = manifest.get("selected_schema_fields", [])
+        if not isinstance(selected_fields, list) or any(
+            not isinstance(field, str) for field in selected_fields
+        ):
+            raise CanonicalConsumptionError("canonical selected_schema_fields seal is invalid")
+        for row in selected_rows:
+            for field in selected_fields:
+                row.setdefault(field, None)
+    return record, manifest, as_of, tuple(selected_rows)
 
 
 def verify_canonical_run_for_consumption(

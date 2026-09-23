@@ -131,6 +131,55 @@ def write_file_atomic(
         )
 
 
+def commit_staged_file_atomic(
+    final_path: Path,
+    staged_path: Path,
+    *,
+    expected_sha256: str | None = None,
+    allow_existing_identical: bool = False,
+) -> str:
+    """Atomically publish an already-streamed file without loading it in memory.
+
+    The staged file must be closed and live on the same volume as ``final_path``.
+    Its bytes are flushed, fsynced, and hashed before the immutable rename. This
+    is the streaming counterpart to :func:`write_file_atomic` for Parquet files
+    that are too large to represent as one ``bytes`` object.
+    """
+    final_path = Path(final_path)
+    staged_path = Path(staged_path)
+    with FileCommitCoordinator.lock():
+        if not staged_path.is_file():
+            raise FileNotFoundError(f"staged file does not exist: {staged_path}")
+        if not _same_volume(staged_path, final_path.parent):
+            msg = (
+                f"staged file {staged_path} and final dir {final_path.parent} are on "
+                "different volumes; os.replace would not be atomic"
+            )
+            raise VolumeMismatchError(msg)
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        with staged_path.open("r+b") as fh:
+            os.fsync(fh.fileno())
+        incoming_hash = file_sha256(staged_path)
+        if expected_sha256 is not None and incoming_hash != expected_sha256:
+            msg = (
+                f"content hash mismatch for {final_path.name}: "
+                f"expected {expected_sha256}, computed {incoming_hash}"
+            )
+            raise HashMismatchError(msg)
+        if final_path.exists():
+            if allow_existing_identical and file_sha256(final_path) == incoming_hash:
+                staged_path.unlink(missing_ok=True)
+                return incoming_hash
+            msg = (
+                f"immutable file {final_path} already exists; committed files must "
+                "never change bytes - write to a new identity-carrying filename, or "
+                "pass allow_existing_identical=True for same-hash idempotent retries"
+            )
+            raise ImmutableFileExistsError(msg)
+        os.replace(staged_path, final_path)  # noqa: PTH105 - atomic same-volume commit
+        return incoming_hash
+
+
 def _write_file_atomic_locked(
     final_path: Path,
     data: bytes,

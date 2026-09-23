@@ -21,6 +21,7 @@ from test_snapshot import (
 )
 
 from ashare_state.canonical.canonicalizer import _rows_semantic_hash
+from ashare_state.canonical.verifier import verify_canonical_run_for_consumption
 from ashare_state.readmodel import (
     READMODEL_CONTRACT_VERSION,
     DuckDBReadModel,
@@ -33,7 +34,8 @@ from ashare_state.readmodel.duckdb_model import (
     _rows_semantic_hash_bounded,
 )
 from ashare_state.readmodel.schema import duckdb_domain_columns, duckdb_domain_table_name
-from ashare_state.snapshot import SnapshotBuilder, SnapshotVerifierError
+from ashare_state.snapshot import SnapshotBuilder, SnapshotVerifierError, verify_snapshot
+from ashare_state.snapshot.schema import project_canonical_snapshot
 
 
 def _builder(conn, env_root):
@@ -160,6 +162,37 @@ class TestDuckDBReadModel:
         finally:
             db.close()
 
+    def test_daily_bar_is_external_view_and_ordinary_open_is_shallow(
+        self, conn, env_root, monkeypatch
+    ):
+        """Daily facts stay in Canonical; routine open never invokes deep audit/hash scans."""
+        built = _built_snapshot(conn, env_root)
+        manifest = _snapshot_manifest(env_root, built)
+        daily = manifest["artifacts"]["daily_bar"]
+        assert daily["kind"] == "canonical_partition_set"
+        assert "uri" not in daily
+
+        import ashare_state.readmodel.duckdb_model as readmodel_module
+        import ashare_state.snapshot.verifier as snapshot_verifier
+
+        def forbidden(*args, **kwargs):
+            raise AssertionError("ordinary daily-bar open must not deep-scan fact history")
+
+        monkeypatch.setattr(snapshot_verifier, "deep_verify_logical_daily_snapshot", forbidden)
+        monkeypatch.setattr(readmodel_module, "_rows_semantic_hash_bounded", forbidden)
+        model = _model(conn, env_root)
+        model.rebuild(built.snapshot_id)
+        db = model.open_read_only(built.snapshot_id)
+        try:
+            relation_type = db.execute(
+                "SELECT table_type FROM information_schema.tables "
+                "WHERE table_schema = 'main' AND table_name = 'rm_daily_bar'"
+            ).fetchone()[0]
+            assert relation_type == "VIEW"
+            assert int(db.execute("SELECT COUNT(*) FROM rm_daily_bar").fetchone()[0]) == 2
+        finally:
+            db.close()
+
     def test_logical_seal_row_counts_and_semantics(self, conn, env_root):
         """Mandatory 32 + 33: the built tables carry EXACTLY the
         snapshot row counts and the logical semantic hashes recomputed
@@ -168,6 +201,19 @@ class TestDuckDBReadModel:
         rebuilt = _model(conn, env_root).rebuild(built.snapshot_id)
         assert rebuilt.row_count_total == 7
         manifest = _snapshot_manifest(env_root, built)
+        canonical = verify_canonical_run_for_consumption(
+            conn,
+            built.canonical_run_id,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+        )
+        expected_domains = project_canonical_snapshot(
+            canonical.selected_rows,
+            requested_domains=canonical.requested_domains,
+            canonical_run_id=canonical.canonical_run_id,
+            as_of=canonical.as_of,
+            snapshot_id=built.snapshot_id,
+        )
         db = _model(conn, env_root).open_read_only(built.snapshot_id)
         try:
             for domain in ALL_DOMAINS:
@@ -178,7 +224,8 @@ class TestDuckDBReadModel:
                 rows = db.execute(f"SELECT * FROM {table}").fetchall()
                 col_names = list(duckdb_domain_columns(domain))
                 dicts = [_normalize_seal_row(dict(zip(col_names, r, strict=True))) for r in rows]
-                assert _rows_semantic_hash(dicts) == str(entry["semantic_hash"])
+                expected_rows = expected_domains[domain]
+                assert _rows_semantic_hash(dicts) == _rows_semantic_hash(expected_rows), domain
         finally:
             db.close()
 
@@ -214,7 +261,6 @@ class TestDuckDBReadModel:
         TIME ZONE and the UTC instants round-trip exactly."""
         built = _built_snapshot(conn, env_root)
         _model(conn, env_root).rebuild(built.snapshot_id)
-        manifest = _snapshot_manifest(env_root, built)
         db = _model(conn, env_root).open_read_only(built.snapshot_id)
         try:
             declared = duckdb_domain_columns("daily_bar")
@@ -230,12 +276,21 @@ class TestDuckDBReadModel:
             assert actual["available_at"] == "TIMESTAMP WITH TIME ZONE"
             assert actual["ingested_at"] == "TIMESTAMP WITH TIME ZONE"
             assert actual["trade_date"] == "DATE"
-            # exact UTC instant round-trip against the snapshot parquet
-            import polars as pl
-
-            snap_rows = pl.read_parquet(
-                env_root["normalized"] / str(manifest["artifacts"]["daily_bar"]["uri"])
-            ).to_dicts()
+            # Exact UTC instants round-trip from the Canonical partition view.
+            canonical = verify_canonical_run_for_consumption(
+                conn,
+                built.canonical_run_id,
+                raw_root=env_root["raw"],
+                normalized_root=env_root["normalized"],
+            )
+            expected_domains = project_canonical_snapshot(
+                canonical.selected_rows,
+                requested_domains=canonical.requested_domains,
+                canonical_run_id=canonical.canonical_run_id,
+                as_of=canonical.as_of,
+                snapshot_id=built.snapshot_id,
+            )
+            snap_rows = expected_domains["daily_bar"]
             db_rows = db.execute("SELECT * FROM rm_daily_bar").fetchall()
             col_names = list(duckdb_domain_columns("daily_bar"))
             db_dicts = [dict(zip(col_names, r, strict=True)) for r in db_rows]
@@ -294,7 +349,7 @@ class TestDuckDBReadModel:
             ).fetchone()
             entry = manifest["artifacts"]["daily_bar"]
             assert str(dmeta[0]) == "daily_bar"
-            assert str(dmeta[1]) == str(entry["uri"])
+            assert str(dmeta[1]) == str(manifest["canonical_manifest_uri"])
             assert int(dmeta[2]) == int(entry["row_count"])
             assert str(dmeta[3]) == str(entry["semantic_hash"])
         finally:
@@ -400,19 +455,39 @@ class TestDuckDBReadModel:
         with pytest.raises(ReadModelError, match="foreign snapshot_id"):
             model.open_read_only(built.snapshot_id)
 
-    def test_verified_open_rejects_logical_row_tamper(self, conn, env_root):
-        """A changed table value is rejected before a read-only handle escapes."""
+    def test_ordinary_open_is_shallow_but_deep_audit_rejects_fact_tamper(self, conn, env_root):
+        """Routine open avoids a history scan; explicit audit catches changed facts."""
         built = _built_snapshot(conn, env_root)
+        manifest = _snapshot_manifest(env_root, built)
         model = _model(conn, env_root)
         model.rebuild(built.snapshot_id)
-        target = env_root["normalized"] / readmodel_db_uri(built.snapshot_id)
-        db = duckdb.connect(str(target))
+        partition = manifest["artifacts"]["daily_bar"]["partitions"][0]
+        fact_path = env_root["normalized"] / str(partition["fact_artifact"]["uri"])
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        corrupted = pq.read_table(fact_path)
+        close_index = corrupted.schema.get_field_index("close")
+        corrupted = corrupted.set_column(
+            close_index,
+            corrupted.schema.field(close_index),
+            pa.array([999.0] * corrupted.num_rows, type=pa.float64()),
+        )
+        staged = fact_path.with_name("fact-corrupted.parquet")
+        pq.write_table(corrupted, staged, compression="zstd", write_statistics=False)
+        staged.replace(fact_path)
+        db = model.open_read_only(built.snapshot_id)
         try:
-            db.execute("UPDATE rm_daily_bar SET close = 999.0")
+            assert db.execute("SELECT DISTINCT close FROM rm_daily_bar").fetchall() == [(999.0,)]
         finally:
             db.close()
-        with pytest.raises(ReadModelError, match="logical semantic hash"):
-            model.open_read_only(built.snapshot_id)
+        with pytest.raises(SnapshotVerifierError, match="deep audit failed|content hash"):
+            verify_snapshot(
+                conn,
+                built.snapshot_id,
+                raw_root=env_root["raw"],
+                normalized_root=env_root["normalized"],
+            )
 
     def test_verified_open_rejects_foreign_snapshot_file(self, conn, env_root):
         """A database copied from another snapshot cannot be opened under A."""
