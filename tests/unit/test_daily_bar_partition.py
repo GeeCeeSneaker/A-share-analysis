@@ -72,9 +72,7 @@ def _write(
         normalized_root=root,
         source_snapshot_as_of=source_snapshot_as_of,
         source_vintage_evidence_by_partition={
-            month: _vintage_evidence(
-                received_at=source_snapshot_as_of.isoformat()
-            )
+            month: _vintage_evidence(received_at=source_snapshot_as_of.isoformat())
             for month in months
         },
     )

@@ -347,9 +347,7 @@ class DuckDBReadModel:
         schema = domain_snapshot_schema("daily_bar")
         branches: list[str] = []
         for partition in entry["partitions"]:
-            source_run_id = str(
-                partition.get("source_canonical_run_id", verified.canonical_run_id)
-            )
+            source_run_id = str(partition.get("source_canonical_run_id", verified.canonical_run_id))
             if not source_run_id:
                 raise ReadModelError("daily-bar partition has no owning Canonical run id")
             manifest_path = self.normalized_root / str(partition["partition_manifest_uri"])

@@ -1006,9 +1006,7 @@ class TestSnapshotBuilder:
             def _surface_runs(self, normalization_surface, provider_datasets):
                 rows = super()._surface_runs(normalization_surface, provider_datasets)
                 return [
-                    row
-                    for row in rows
-                    if str(row["normalization_run_id"]) in self.allowed_run_ids
+                    row for row in rows if str(row["normalization_run_id"]) in self.allowed_run_ids
                 ]
 
         canonical_ids: dict[str, str] = {}
@@ -1067,10 +1065,13 @@ class TestSnapshotBuilder:
         readmodel.verify_readmodel(built.snapshot_id)
         db = readmodel.open_read_only(built.snapshot_id)
         try:
-            assert db.execute(
-                "SELECT table_type FROM information_schema.tables "
-                "WHERE table_name='rm_daily_bar'"
-            ).fetchone()[0] == "VIEW"
+            assert (
+                db.execute(
+                    "SELECT table_type FROM information_schema.tables "
+                    "WHERE table_name='rm_daily_bar'"
+                ).fetchone()[0]
+                == "VIEW"
+            )
             assert db.execute("SELECT count(*) FROM rm_daily_bar").fetchone()[0] == 4
             ownership = db.execute(
                 "SELECT canonical_run_id, strftime(min(trade_date), '%Y-%m'), count(*) "
@@ -1093,12 +1094,8 @@ class TestSnapshotBuilder:
             "snapshot_contract_version": "snapshot-daily-v3",
             "snapshot_builder_code_fingerprint": "d" * 64,
         }
-        left = snapshot_base_hash_from_primitives(
-            **common, canonical_source_set_hash="e" * 64
-        )
-        right = snapshot_base_hash_from_primitives(
-            **common, canonical_source_set_hash="f" * 64
-        )
+        left = snapshot_base_hash_from_primitives(**common, canonical_source_set_hash="e" * 64)
+        right = snapshot_base_hash_from_primitives(**common, canonical_source_set_hash="f" * 64)
         assert left != right
 
     def test_lineage_preserved_verbatim(self, conn, env_root):

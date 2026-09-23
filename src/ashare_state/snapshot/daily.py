@@ -143,9 +143,12 @@ def validate_canonical_daily_partition_set(
                 "daily-bar source vintage is after its owning Canonical source cutoff"
             )
         try:
-            entry_evidence, entry_vintage = normalize_source_vintage_evidence(
-                entry.get("source_vintage_evidence")
-            )
+            entry_evidence_value = entry.get("source_vintage_evidence")
+            if not isinstance(entry_evidence_value, list):
+                raise SnapshotVerifierError(
+                    "Canonical daily-bar source-vintage evidence is not a list"
+                )
+            entry_evidence, entry_vintage = normalize_source_vintage_evidence(entry_evidence_value)
             validate_daily_bar_event_eligibility_binding(entry.get("event_eligibility"))
         except (DailyBarEventContractError, DailyBarPartitionError) as exc:
             raise SnapshotVerifierError(
@@ -189,12 +192,13 @@ def validate_canonical_daily_partition_set(
         if not isinstance(partition_doc, dict):
             raise SnapshotVerifierError("Canonical daily-bar partition manifest root is invalid")
         try:
+            document_evidence_value = partition_doc.get("source_vintage_evidence")
+            if not isinstance(document_evidence_value, list):
+                raise SnapshotVerifierError("daily partition source-vintage evidence is not a list")
             document_evidence, document_vintage = normalize_source_vintage_evidence(
-                partition_doc.get("source_vintage_evidence")
+                document_evidence_value
             )
-            validate_daily_bar_event_eligibility_binding(
-                partition_doc.get("event_eligibility")
-            )
+            validate_daily_bar_event_eligibility_binding(partition_doc.get("event_eligibility"))
         except (DailyBarEventContractError, DailyBarPartitionError) as exc:
             raise SnapshotVerifierError(
                 f"daily partition temporal contract is invalid: {exc}"
@@ -301,9 +305,7 @@ def _load_daily_canonical_source_set(
             **partition,
             "source_canonical_run_id": expected_descriptor["canonical_run_id"],
             "source_canonical_manifest_uri": expected_descriptor["canonical_manifest_uri"],
-            "source_canonical_manifest_hash": expected_descriptor[
-                "canonical_manifest_hash"
-            ],
+            "source_canonical_manifest_hash": expected_descriptor["canonical_manifest_hash"],
             "source_canonical_as_of": expected_descriptor["canonical_as_of"],
         }
         loaded.append(
@@ -469,9 +471,7 @@ def _load_sealed_snapshot(
         raise SnapshotVerifierError("Snapshot source_vintage_as_of differs from Canonical")
     expected_event_binding = daily_bar_event_eligibility_binding()
     try:
-        validate_daily_bar_event_eligibility_binding(
-            manifest.get("daily_bar_event_eligibility")
-        )
+        validate_daily_bar_event_eligibility_binding(manifest.get("daily_bar_event_eligibility"))
     except DailyBarEventContractError as exc:
         raise SnapshotVerifierError(
             f"logical daily Snapshot event-eligibility contract is invalid: {exc}"
@@ -528,9 +528,7 @@ def _load_sealed_snapshot(
         snapshot_contract_version=snapshot_contract,
         snapshot_builder_code_fingerprint=str(manifest["snapshot_builder_code_fingerprint"]),
         canonical_source_set_hash=(
-            source_set_hash
-            if snapshot_contract == ARCHIVE_DAILY_SNAPSHOT_CONTRACT
-            else None
+            source_set_hash if snapshot_contract == ARCHIVE_DAILY_SNAPSHOT_CONTRACT else None
         ),
     )
     if (
@@ -547,8 +545,6 @@ def _load_sealed_snapshot(
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict) or set(artifacts) != set(requested_domains):
         raise SnapshotVerifierError("logical daily snapshot artifact set differs from domains")
-    if snapshot_contract == LOGICAL_DAILY_SNAPSHOT_CONTRACT:
-        canonical_partitions = canonical_manifest.get("daily_bar_partitions")
     daily_artifact = artifacts.get("daily_bar")
     if "daily_bar" in requested_domains:
         if not isinstance(canonical_partitions, list) or not isinstance(daily_artifact, dict):

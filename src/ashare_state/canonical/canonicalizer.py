@@ -2885,8 +2885,7 @@ class CanonicalRunner:
             )
         )
         daily_month_by_key = {
-            str(row["canonical_key"]): str(row["trade_date"])[:7]
-            for row in daily_rows
+            str(row["canonical_key"]): str(row["trade_date"])[:7] for row in daily_rows
         }
         daily_source_runs_by_month: dict[str, set[str]] = {}
         for row in daily_rows:
@@ -2900,13 +2899,17 @@ class CanonicalRunner:
                 or decision.get("decision_class") == "EXCLUDED_FUTURE"
             ):
                 continue
-            month = daily_month_by_key.get(str(decision.get("canonical_key", "")))
-            source_run_id = decision.get("source_normalization_run_id")
-            if month is not None and source_run_id:
-                daily_source_runs_by_month.setdefault(month, set()).add(str(source_run_id))
-        daily_source_run_ids = set().union(*daily_source_runs_by_month.values()) if (
-            daily_source_runs_by_month
-        ) else set()
+            decision_month = daily_month_by_key.get(str(decision.get("canonical_key", "")))
+            decision_source_run_id = decision.get("source_normalization_run_id")
+            if decision_month is not None and decision_source_run_id:
+                daily_source_runs_by_month.setdefault(decision_month, set()).add(
+                    str(decision_source_run_id)
+                )
+        daily_source_run_ids = (
+            set().union(*daily_source_runs_by_month.values())
+            if (daily_source_runs_by_month)
+            else set()
+        )
         selected_file_rows = [
             row for row in selected_rows if row.get("canonical_domain") != "daily_bar"
         ]

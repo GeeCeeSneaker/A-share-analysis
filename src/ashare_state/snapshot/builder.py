@@ -420,9 +420,7 @@ class SnapshotBuilder:
             idempotent_replay=False,
         )
 
-    def build_daily_partition_set(
-        self, canonical_run_ids: Sequence[str]
-    ) -> SnapshotBuildResult:
+    def build_daily_partition_set(self, canonical_run_ids: Sequence[str]) -> SnapshotBuildResult:
         """Seal one logical daily Snapshot over distinct monthly Canonical runs.
 
         This archive path stores only source-manifest and partition references;
@@ -478,9 +476,11 @@ class SnapshotBuilder:
                 raise SnapshotBuilderError(
                     f"Canonical source {canonical_run_id} has invalid partition dates"
                 ) from exc
-            if first_day > last_day or first_day.strftime("%Y-%m") != descriptor[
-                "partition_month"
-            ] or last_day.strftime("%Y-%m") != descriptor["partition_month"]:
+            if (
+                first_day > last_day
+                or first_day.strftime("%Y-%m") != descriptor["partition_month"]
+                or last_day.strftime("%Y-%m") != descriptor["partition_month"]
+            ):
                 raise SnapshotBuilderError(
                     f"Canonical source {canonical_run_id} crosses its declared month"
                 )
@@ -558,12 +558,12 @@ class SnapshotBuilder:
         months = [str(item["descriptor"]["partition_month"]) for item in sources]
         if len(set(months)) != len(months):
             raise SnapshotBuilderError("daily partition set contains duplicate calendar months")
-        for previous, current in zip(months, months[1:], strict=False):
+        for previous, next_month in zip(months, months[1:], strict=False):
             year, month = (int(part) for part in previous.split("-", 1))
             expected = f"{year + (month == 12):04d}-{1 if month == 12 else month + 1:02d}"
-            if current != expected:
+            if next_month != expected:
                 raise SnapshotBuilderError(
-                    f"daily partition set has a month gap between {previous} and {current}"
+                    f"daily partition set has a month gap between {previous} and {next_month}"
                 )
 
         canonical_sources = [item["descriptor"] for item in sources]
@@ -673,9 +673,7 @@ class SnapshotBuilder:
         }
         artifact_set_hash = hashlib.sha256(_canonical_json(artifacts).encode("utf-8")).hexdigest()
         snapshot_semantic_hash = hashlib.sha256(
-            _canonical_json({"daily_bar": artifacts["daily_bar"]["semantic_hash"]}).encode(
-                "utf-8"
-            )
+            _canonical_json({"daily_bar": artifacts["daily_bar"]["semantic_hash"]}).encode("utf-8")
         ).hexdigest()
         manifest_uri = logical_daily_snapshot_manifest_uri(
             snapshot_id,

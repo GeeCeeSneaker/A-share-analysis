@@ -778,10 +778,7 @@ def _publish_archive_snapshot(
             actual_month_rows = {str(item[1]): int(item[2]) for item in ownership}
             if actual_month_rows != expected_month_rows:
                 raise RuntimeError("archive ordinary reader month row counts differ from Canonical")
-            if {
-                str(month)
-                for _run_id, month, _count in ownership
-            } != set(months):
+            if {str(month) for _run_id, month, _count in ownership} != set(months):
                 raise RuntimeError("archive ordinary reader has a missing/extra calendar month")
             snapshot_dir = (output_root / "normalized" / built.manifest_uri).parent
             if list(snapshot_dir.rglob("*.parquet")):

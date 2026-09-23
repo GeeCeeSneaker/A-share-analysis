@@ -163,9 +163,7 @@ def normalize_source_vintage_evidence(
     if not normalized:
         raise DailyBarPartitionError("source-vintage evidence does not bind a daily_bar source")
     normalized.sort(key=lambda item: (item["role"], item["provider_dataset"], item["run_id"]))
-    source_vintage_as_of = max(
-        datetime.fromisoformat(item["received_at"]) for item in normalized
-    )
+    source_vintage_as_of = max(datetime.fromisoformat(item["received_at"]) for item in normalized)
     return normalized, source_vintage_as_of
 
 
@@ -287,9 +285,7 @@ def write_daily_bar_partitions(
     *,
     normalized_root: Path,
     source_snapshot_as_of: datetime,
-    source_vintage_evidence_by_partition: Mapping[
-        str, Sequence[Mapping[str, Any]]
-    ],
+    source_vintage_evidence_by_partition: Mapping[str, Sequence[Mapping[str, Any]]],
 ) -> tuple[dict[str, Any], ...]:
     """Write daily rows into immutable monthly L0 partitions.
 
@@ -459,8 +455,7 @@ def write_daily_bar_partitions(
                             f"closed-month manifest is unreadable: {prior_path}"
                         ) from exc
                     if (
-                        prior.get("logical_partition_id")
-                        == f"security_bar_1d:{partition_id}"
+                        prior.get("logical_partition_id") == f"security_bar_1d:{partition_id}"
                         and prior.get("data_revision") != data_revision
                     ):
                         raise DailyBarPartitionError(
@@ -530,8 +525,11 @@ def iter_daily_bar_partition_rows(
         raise DailyBarPartitionError("daily-bar partition contract is invalid")
     try:
         validate_daily_bar_event_eligibility_binding(manifest.get("event_eligibility"))
+        source_vintage_evidence_value = manifest.get("source_vintage_evidence")
+        if not isinstance(source_vintage_evidence_value, list):
+            raise DailyBarPartitionError("daily-bar source-vintage evidence is not a list")
         source_vintage_evidence, source_vintage_as_of = normalize_source_vintage_evidence(
-            manifest.get("source_vintage_evidence")
+            source_vintage_evidence_value
         )
     except (DailyBarEventContractError, DailyBarPartitionError) as exc:
         raise DailyBarPartitionError(f"daily-bar temporal contract is invalid: {exc}") from exc
@@ -540,8 +538,7 @@ def iter_daily_bar_partition_rows(
         or manifest.get("source_vintage_as_of") != source_vintage_as_of.isoformat()
         or partition_entry.get("source_vintage_evidence") != source_vintage_evidence
         or partition_entry.get("source_vintage_as_of") != source_vintage_as_of.isoformat()
-        or partition_entry.get("event_eligibility")
-        != daily_bar_event_eligibility_binding()
+        or partition_entry.get("event_eligibility") != daily_bar_event_eligibility_binding()
     ):
         raise DailyBarPartitionError("daily-bar temporal contract binding diverges")
     if manifest.get("data_revision") != partition_entry.get("data_revision"):
