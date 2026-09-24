@@ -1,6 +1,6 @@
 """TGW connectivity smoke test (simulation account, minimal traffic).
 
-Usage (after filling .env):
+Usage (after filling non-secret .env settings and storing the password once):
     uv run python scripts/spike/connectivity_check.py
 
 Probes (each guarded, each archived - a permission denial is EVIDENCE,
@@ -26,31 +26,29 @@ hard failure. Results land in data/spike/results/connectivity.json.
 
 from __future__ import annotations
 
-import contextlib
 import json
-import os
 import sys
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ashare_state.providers.amazingdata.credentials import (
+    TgwCredentialsError,
+    credential_rotation_hint,
+    load_tgw_environment,
+    resolve_tgw_credentials,
+)
+from ashare_state.providers.amazingdata.session import AmazingDataSession
+from ashare_state.providers.errors import ProviderAuthError
+
 RESULTS = Path("data/spike/results")
 RESULTS.mkdir(parents=True, exist_ok=True)
 
-_SECRET_KEYS = ("TGW_USERNAME", "TGW_PASSWORD", "TGW_SERVER_VIP")
+_SECRET_KEYS = ("TGW_USERNAME", "TGW_PASSWORD", "TGW_SERVER_VIP", "TGW_SERVER_PORT")
 
 
 def load_env(path: Path = Path(".env")) -> dict[str, str]:
-    """Minimal .env parser (spike scripts stay independent of prod modules)."""
-    env: dict[str, str] = {}
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, value = line.partition("=")
-                env[key.strip()] = value.strip()
-    merged = {**os.environ, **env}
-    return {k: v for k, v in merged.items() if k.startswith("TGW_")}
+    return load_tgw_environment(path)
 
 
 def scrub(text: str, env: dict[str, str]) -> str:
@@ -89,31 +87,27 @@ def main() -> int:
             ok = False
 
     # P0 - env sanity ------------------------------------------------------
-    missing = [
-        k
-        for k in ("TGW_USERNAME", "TGW_PASSWORD", "TGW_SERVER_VIP", "TGW_SERVER_PORT")
-        if not env.get(k)
-    ]
-    if missing:
-        record("p0_env", "FAIL", f"missing env keys: {missing}; copy .env.example to .env and fill")
+    try:
+        credentials = resolve_tgw_credentials(env)
+    except TgwCredentialsError as exc:
+        record("p0_env", "FAIL", str(exc))
         _flush(report)
         return 2
     record("p0_env", "PASS")
 
     # P1 - login ----------------------------------------------------------
+    session = AmazingDataSession(*credentials)
+    env["TGW_PASSWORD"] = credentials[1]
     try:
-        # N813: `import AmazingData as ad` is the official manual idiom.
-        import AmazingData as ad  # noqa: N813
-
-        ad.login(
-            username=env["TGW_USERNAME"],
-            password=env["TGW_PASSWORD"],
-            host=env["TGW_SERVER_VIP"],
-            port=int(env["TGW_SERVER_PORT"]),
-        )
+        session.login()
+        ad = session.sdk
         record("p1_login", "PASS")
     except Exception as exc:  # noqa: BLE001 - provider errors are opaque evidence
-        record("p1_login", "FAIL", scrub(f"{type(exc).__name__}: {exc}", env))
+        detail = (
+            credential_rotation_hint() if isinstance(exc, ProviderAuthError) else type(exc).__name__
+        )
+        record("p1_login", "FAIL", detail)
+        session.logout()
         _flush(report)
         return 2
 
@@ -170,8 +164,7 @@ def main() -> int:
         record("p4_snapshot", "SKIP", "depends on p3 which failed")
 
     # logout best-effort -----------------------------------------------------
-    with contextlib.suppress(Exception):
-        ad.logout()
+    session.logout()
 
     _flush(report)
     return 0 if ok else 1

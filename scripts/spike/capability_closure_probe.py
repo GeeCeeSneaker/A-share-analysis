@@ -2,8 +2,9 @@
 
 This is a targeted, non-Production preflight.  It deliberately does not
 create a ``SpikeRun``, mutate the Golden set, or write a catalog/verdict.
-Credentials are read only from ``TGW_*`` environment variables (or a local
-ignored ``.env`` file).  Each successful or failed provider exchange is
+Non-secret settings come from ``TGW_*`` environment variables or a local
+ignored ``.env`` file; the password is resolved from Windows Credential
+Manager (or an explicit process-only override). Each provider exchange is
 written to the ignored local raw area; the report contains only counts,
 schemas, hashes, and fixed taxonomy labels.
 
@@ -21,13 +22,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ashare_state.providers.amazingdata.credentials import (
+    TgwCredentialsError,
+    credential_rotation_hint,
+    load_tgw_environment,
+    resolve_tgw_credentials,
+)
 from ashare_state.providers.amazingdata.provider import AmazingDataProvider, ProviderUseMode
 from ashare_state.providers.amazingdata.safe_diagnostics import safe_error_code
 from ashare_state.providers.amazingdata.sdk_loader import probe_identity
@@ -37,12 +43,6 @@ from ashare_state.providers.errors import ProviderError
 from ashare_state.providers.exchange import ProviderExchange
 from ashare_state.storage.raw_writer import RawWriter, RawWriteResult
 
-_ENV_KEYS = (
-    "TGW_USERNAME",
-    "TGW_PASSWORD",
-    "TGW_SERVER_VIP",
-    "TGW_SERVER_PORT",
-)
 _RAW_INGEST_ID = "capability-closure-preflight-20260912"
 _STATUS_SYMBOLS = [
     "002058.SZ",
@@ -83,32 +83,13 @@ _FIXTURE_END = 20200110
 
 
 def _load_env(path: Path) -> dict[str, str]:
-    """Load only TGW variables; never print or persist their values."""
-    values = {key: value for key, value in os.environ.items() if key in _ENV_KEYS}
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#") or "=" not in stripped:
-                continue
-            key, _, value = stripped.partition("=")
-            key = key.strip()
-            if key not in _ENV_KEYS or key in values:
-                continue
-            value = value.strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
-                value = value[1:-1]
-            values[key] = value
-    return values
+    """Load non-secret settings; password is resolved centrally from the OS vault."""
+
+    return load_tgw_environment(path)
 
 
-def _credentials(env: dict[str, str]) -> tuple[str, str, str, int] | None:
-    if not all(env.get(key) for key in _ENV_KEYS):
-        return None
-    try:
-        port = int(env["TGW_SERVER_PORT"])
-    except (TypeError, ValueError):
-        return None
-    return env["TGW_USERNAME"], env["TGW_PASSWORD"], env["TGW_SERVER_VIP"], port
+def _credentials(env: dict[str, str]) -> tuple[str, str, str, int]:
+    return resolve_tgw_credentials(env)
 
 
 def _symbol_scope(symbols: list[str]) -> dict[str, Any]:
@@ -618,11 +599,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    credentials = _credentials(_load_env(args.env_file))
-    if credentials is None:
+    try:
+        credentials = _credentials(_load_env(args.env_file))
+    except TgwCredentialsError as exc:
         report = _empty_report(code_head=args.code_head)
-        report["error_code"] = "MISSING_TGW_ENV"
+        report["error_code"] = "TGW_CREDENTIALS_UNAVAILABLE"
         _emit(report, args.output)
+        print(str(exc), file=sys.stderr)
         return 2
 
     session = AmazingDataSession(*credentials)
@@ -823,6 +806,8 @@ def main() -> int:
         session.logout()
 
     _emit(report, args.output)
+    if report.get("error_code") == "ProviderAuthError":
+        print(credential_rotation_hint(), file=sys.stderr)
     return return_code
 
 

@@ -57,7 +57,10 @@ AUDIT-H1 整改合并且最终三平台 required CI 成功前，暂停真实账�
 # 5.1 离线验证（不联网）：import + 安全版本/加载判定（不公开 DLL 路径）
 uv run ashare provider-doctor --offline
 
-# 5.2 T1 唯一入口（仅整改合并后；需本地安全注入凭证）
+# 5.2 首次设置/轮换凭据（仅 controlled Windows 用户；密码隐藏输入一次）
+uv run python scripts/spike/production_account_bootstrap.py --store-credential
+
+# 5.3 T1 唯一入口（仅整改合并后；密码由 Windows Credential Manager 自动读取）
 uv run python scripts/spike/production_account_bootstrap.py --output data/spike/results/production_account_bootstrap.json
 ```
 

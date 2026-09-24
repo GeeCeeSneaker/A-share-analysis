@@ -209,6 +209,10 @@ def test_all_diagnostic_entries_contain_output_and_errors(
         monkeypatch.setattr(sys, "argv", ["bootstrap", "--output", str(output)])
         assert module.main() == (3 if fails else 0)
     elif entry == "cli":
+        monkeypatch.setenv("TGW_USERNAME", "test-user")
+        monkeypatch.setenv("TGW_PASSWORD", SECRET)
+        monkeypatch.setenv("TGW_SERVER_VIP", "test-only-host")
+        monkeypatch.setenv("TGW_SERVER_PORT", "8600")
         monkeypatch.setattr(doctor, "run_doctor", noisy)
         monkeypatch.chdir(tmp_path)
         result = CliRunner().invoke(app, ["provider-doctor", "--output", str(output)])
@@ -347,7 +351,8 @@ def test_projection_is_idempotent_and_drops_untrusted_fields():
 
 def test_offline_cli_never_loads_credential_settings(monkeypatch):
     monkeypatch.setattr(
-        "ashare_state.cli.Settings", lambda: pytest.fail("offline loaded credential settings")
+        "ashare_state.providers.amazingdata.credentials.load_tgw_environment",
+        lambda: pytest.fail("offline loaded credential settings"),
     )
 
     def offline_doctor(**kwargs):
@@ -358,6 +363,35 @@ def test_offline_cli_never_loads_credential_settings(monkeypatch):
     result = CliRunner().invoke(app, ["provider-doctor", "--offline"])
     assert result.exit_code == 0
     assert "ACCOUNT_PROFILE" not in json.loads(result.stdout)
+
+
+def test_online_cli_without_vault_credential_fails_closed_with_setup_command(monkeypatch):
+    class MissingStore:
+        def get_password(self, _service: str, _username: str) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "ashare_state.providers.amazingdata.credentials.load_tgw_environment",
+        lambda: {
+            "TGW_USERNAME": "test-user",
+            "TGW_SERVER_VIP": "test-host",
+            "TGW_SERVER_PORT": "8600",
+        },
+    )
+    monkeypatch.setattr(
+        "ashare_state.providers.amazingdata.credentials._windows_credential_store",
+        lambda: MissingStore(),
+    )
+    monkeypatch.setattr(
+        doctor,
+        "run_doctor",
+        lambda **_kwargs: pytest.fail("doctor must not run without a stored credential"),
+    )
+
+    result = CliRunner().invoke(app, ["provider-doctor"])
+
+    assert result.exit_code == 2
+    assert "--store-credential" in result.output
 
 
 def test_known_runtime_release_suffix_is_preserved():

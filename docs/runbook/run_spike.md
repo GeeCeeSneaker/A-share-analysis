@@ -1,14 +1,23 @@
 # Runbook — P0-M-1 Spike 运行
 
 > 前提：完成 SDK 安装验证（install_amazingdata.md）+ provider doctor 绿灯。
-> 当前正式账号 native SDK smoke 已完成，但只属于连通性证据；正式验证仍必须先跑 doctor，再执行单一 CLOSED PRODUCTION B1-B7 run。
+> 正式账号 native SDK smoke 只属于连通性证据。任何 Production 命令都必须由
+> `docs/project/CURRENT_EXECUTION_PLAN.md` 和当前 Scheduler/PM 任务明确授权；历史 #39
+> Issue 本身不是授权。
 
 ## 1. 凭证配置
 
 ```powershell
 Copy-Item .env.example .env
-# 编辑 .env：TGW_USERNAME / TGW_PASSWORD / TGW_SERVER_VIP / TGW_SERVER_PORT
+# 编辑 .env：仅配置 TGW_USERNAME / TGW_SERVER_VIP / TGW_SERVER_PORT
+# 首次设置或轮换密码：隐藏输入一次并保存到当前 Windows 用户 Credential Manager
+uv run python scripts/spike/production_account_bootstrap.py --store-credential
 ```
+
+不要把 `TGW_PASSWORD` 写入 `.env`、脚本参数或任务计划。正常 online doctor、T1、
+capability probe、L1 与 Formal runner 从 Windows Credential Manager 非交互读取；缺少或
+不可访问时 fail closed 并提示运行 `--store-credential`。旧本地 `.env` 中遗留的密码不会
+自动迁移，也不会被正常运行读取；成功设置后可由操作者删除该旧行。
 
 ## 2. 执行顺序（正式账号：单一 Production run）
 
@@ -18,7 +27,7 @@ Copy-Item .env.example .env
 # 离线：确认 wheel 版本与打包运行时；不需要凭证
 uv run ashare provider-doctor --offline
 
-# 在线：注入 .env 后确认实际加载、网络、认证、查询和脱敏账号画像
+# 在线：从非敏感 .env 设置与 Credential Manager 自动解析账号，确认实际加载、网络、认证、查询和脱敏账号画像
 uv run ashare provider-doctor --output data/spike/results/provider_doctor.json
 ```
 

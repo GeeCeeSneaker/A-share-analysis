@@ -36,6 +36,18 @@ PM 对 exact head `1f31989ee656e8957c92811dc6cab74044bb9305` 的 A0/A1 审阅要
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
 
+## Current active P0 — Issue #84 secure TGW credential persistence (2026-09-24)
+
+> Status: **IN PROGRESS; acceptance is not yet demonstrated. Do not start Formal Production B1-B7.**
+
+Issue [#84](https://github.com/GeeCeeSneaker/A-share-analysis/issues/84) is the sole active P0: store the TGW password once in the current Windows user's OS-protected Credential Manager and let a fresh, non-interactive process resolve it. Missing, inaccessible, or rejected credentials must fail closed with one safe bootstrap/rotation instruction. `.env` remains for non-secret settings only; it is not a password source. A process-level `TGW_PASSWORD` override is retained only for tests/manual invocation.
+
+The current implementation uses one `keyring` Windows Credential Manager backend, one explicit `--store-credential` action, and one shared runtime resolver. T1, provider diagnostics, capability preflight, L1 smoke, and the Formal runner have been switched to this resolver. No custom encryption, generalized secret framework, GitHub secret, or automatic `.env` migration is introduced.
+
+Local implementation is on branch `ops/issue84-secure-tgw-credentials`, based on `main@b75636c57caffd0dbdc9d5a2c40988734daa2c34`; it is not yet committed or pushed. Focused credential/T1/runner boundary tests passed; full repository QA passed: `1930 passed, 9 skipped`, Ruff lint/format and Mypy passed. The controlled Windows Credential Manager still has **no credential entry**; the current explicit hidden bootstrap has not yet been confirmed, so no fresh-process T1 result is claimed.
+
+Next, finish full pytest; install the already-retained AmazingData SDK wheels locally if needed; perform the one-time hidden credential bootstrap and verify a fresh-process scrubbed T1; run exact-head CI; then submit a compact, secret-free evidence checkpoint for independent review. Do not run Production B1-B7, reacquire historical data, or treat #84 as complete until every issue acceptance gate passes. Issue #39 Production remains unauthorized pending independent review.
+
 ## 0.11. 2026-09-22 M1 authorized gate attempt — retained artifact provenance blocked (未重新测量)
 
 > 状态：**M1 仍 STOP(BLOCKED) 且未完成有效 RSS 测量；不进入 M2/M3**

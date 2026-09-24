@@ -7,7 +7,7 @@ from pathlib import Path
 
 import typer
 
-from ashare_state.config import Settings, load_config
+from ashare_state.config import load_config
 from ashare_state.identity import PROJECT_SECURITY_NAMESPACE, resolve_security_identity
 from ashare_state.logging_setup import setup_logging
 from ashare_state.storage.connection import DuckDBConnectionManager
@@ -92,6 +92,12 @@ def provider_doctor(
     """Runtime identity + connectivity diagnosis (task book section 2)."""
     import json
 
+    from ashare_state.providers.amazingdata.credentials import (
+        TgwCredentialsError,
+        credential_rotation_hint,
+        load_tgw_environment,
+        resolve_tgw_credentials,
+    )
     from ashare_state.providers.amazingdata.doctor import run_doctor
     from ashare_state.providers.amazingdata.safe_diagnostics import (
         safe_diagnostic_projection,
@@ -106,14 +112,11 @@ def provider_doctor(
 
     creds = None
     if not offline:
-        settings = Settings()
-        if settings.tgw_username and settings.tgw_password.get_secret_value():
-            creds = (
-                settings.tgw_username,
-                settings.tgw_password.get_secret_value(),
-                settings.tgw_server_vip,
-                settings.tgw_server_port,
-            )
+        try:
+            creds = resolve_tgw_credentials(load_tgw_environment())
+        except TgwCredentialsError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from None
     stdout, stderr = CapturedStdout(), CapturedStderr()
     try:
         with sdk_stdout_into(stdout), sdk_stderr_into(stderr):
@@ -126,6 +129,8 @@ def provider_doctor(
         stdout.text = ""
         stderr.text = ""
     typer.echo(json.dumps(report, indent=2, ensure_ascii=False, default=str))
+    if report.get("auth_error") == "ProviderAuthError":
+        typer.echo(credential_rotation_hint(), err=True)
     if output:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(
