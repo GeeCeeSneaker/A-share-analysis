@@ -440,6 +440,7 @@ def canonical_status_view(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     error rather than a guessed mapping.
     """
     view: list[dict[str, Any]] = []
+    seen_natural_keys: set[tuple[str, str]] = set()
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise ProviderRowShapeError(
@@ -459,6 +460,13 @@ def canonical_status_view(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 f"status row {index} has missing or invalid TRADE_DATE",
                 view="canonical_status_view",
             )
+        natural_key = (symbol, trade_date)
+        if natural_key in seen_natural_keys:
+            raise ProviderRowShapeError(
+                f"status row {index} duplicates canonical natural key",
+                view="canonical_status_view",
+            )
+        seen_natural_keys.add(natural_key)
         canonical = dict(row)
         canonical["SECURITY_CODE"] = code
         canonical["MARKET_CODE"] = _SUFFIX_MARKET[suffix]
