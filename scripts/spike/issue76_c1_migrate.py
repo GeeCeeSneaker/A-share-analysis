@@ -202,14 +202,14 @@ def _current_rss_bytes() -> int:
         try:
             pages = int(Path("/proc/self/statm").read_text(encoding="ascii").split()[1])
             return pages * os.sysconf("SC_PAGE_SIZE")
-        except (OSError, ValueError, IndexError):
+        except OSError, ValueError, IndexError:
             return 0
     try:
         import resource
 
         value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
         return value * 1024 if sys.platform.startswith("linux") else value
-    except (ImportError, OSError, ValueError):
+    except ImportError, OSError, ValueError:
         return 0
 
 

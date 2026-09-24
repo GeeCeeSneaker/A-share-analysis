@@ -39,9 +39,10 @@ uv run ashare self-test
 
 ## 5. CI 矩阵确认（任务书 §1.1）
 
-推送 GitHub 后确认 Actions 三矩阵：Windows+3.14（REQUIRED）、
-Windows+3.12、Linux+3.14。首跑全绿后将 M0 状态从 `PASS_PENDING_CI`
-改为 `PASS`（`docs/m0_exit_report.md`）。
+推送 GitHub 后确认 Actions 两项：Windows+3.14（唯一支持/参考应用运行时，REQUIRED）、
+Ubuntu+3.14（仅作跨平台 CI 检查，REQUIRED；不是支持的部署目标）。不再声明或测试
+Windows+3.12 应用支持。每个 PR 均以最新 head 的 required checks 为准；此运行时整理不改写
+`docs/m0_exit_report.md` 中的历史 M0 验收状态。
 
 ## 常见问题
 

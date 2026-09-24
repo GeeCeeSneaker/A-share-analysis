@@ -66,7 +66,7 @@ def _cells_equal(left, right) -> bool:
         # None == NaN equivalence (float('nan') stored/retrieved as null)
         try:
             return math.isnan(float(left if right is None else right))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
     if isinstance(left, float) and isinstance(right, float):
         return math.isnan(left) and math.isnan(right) or left == right

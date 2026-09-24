@@ -159,7 +159,7 @@ def load_frozen_production_identity(
 
     try:
         doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except (OSError, UnicodeError, yaml.YAMLError):
+    except OSError, UnicodeError, yaml.YAMLError:
         return None
     if not isinstance(doc, dict) or set(doc) - _ALLOWED_CONFIG_KEYS:
         return None

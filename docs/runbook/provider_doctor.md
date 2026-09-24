@@ -81,7 +81,7 @@ REV-06 后续评估 hard deadline、kill/reap、pipe/内存 IPC 和 backpressure
 
 ## 5. 分层验收
 
-1. Repository CI：Windows 3.14、Windows 3.12、Ubuntu 3.14 都必须成功；不安装专有 SDK、无真实凭证。
+1. Repository CI：Windows 3.14（唯一支持/参考应用运行时）和 Ubuntu 3.14（仅跨平台 CI 检查）都必须成功；不安装专有 SDK、无真实凭证。
 2. Controlled SDK/runtime：受控机器的独立加载证据，绑定源码 SHA 与环境。
 3. Formal account / Production：T1/T2/T3、单一正式 run 和 capability 决策。
 

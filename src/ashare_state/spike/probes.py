@@ -455,7 +455,7 @@ def _observe_units(bar_rows: list[dict[str, Any]]) -> dict[str, str]:
             close_f = float(row.get("CLOSE_PRICE") or 0)
             volume_f = float(row.get("VOLUME") or 0)
             amount_f = float(row.get("AMOUNT") or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         if close_f > 0 and volume_f > 0 and amount_f > 0:
             checked += 1

@@ -106,7 +106,7 @@ def resolve_tgw_credentials(settings: Mapping[str, str]) -> tuple[str, str, str,
         )
     try:
         port = int(settings["TGW_SERVER_PORT"])
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise TgwCredentialsError(
             "TGW_SERVER_PORT must be an integer in the local non-secret configuration."
         ) from None

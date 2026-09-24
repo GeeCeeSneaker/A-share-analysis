@@ -593,7 +593,7 @@ def _profile_numbers(profile_path: Path) -> dict[str, int]:
         return {}
     try:
         payload = json.loads(profile_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return {}
     found: dict[str, int] = {}
 

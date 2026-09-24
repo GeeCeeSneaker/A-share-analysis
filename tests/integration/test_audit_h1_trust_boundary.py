@@ -411,14 +411,13 @@ def test_unsupported_capture_platform_refuses_before_sdk_call(monkeypatch):
         pytest.fail("must not enter an uncontained SDK call")
 
 
-def test_three_ci_legs_are_required_and_production_identity_matches_t3_allowlist():
+def test_two_ci_legs_are_required_and_production_identity_matches_t3_allowlist():
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     job = workflow["jobs"]["quality"]
     assert job.get("continue-on-error", False) is False
     matrix = job["strategy"]["matrix"]["include"]
     assert {(row["os"], row["python-version"]) for row in matrix} == {
         ("windows-latest", "3.14"),
-        ("windows-latest", "3.12"),
         ("ubuntu-latest", "3.14"),
     }
     assert all(row["required"] is True for row in matrix)

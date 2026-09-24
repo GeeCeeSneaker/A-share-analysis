@@ -426,7 +426,7 @@ def verify_snapshot(
         canonical_domains = tuple(
             str(domain) for domain in json.loads(str(canonical_record["requested_domains_json"]))
         )
-    except (TypeError, json.JSONDecodeError):
+    except TypeError, json.JSONDecodeError:
         canonical_domains = ()
         cross_problems.append("canonical requested domains are unreadable")
     if tuple(manifest_domains) != canonical_domains:
@@ -713,7 +713,7 @@ def consume_snapshot_seal(
         ledger_domains = [
             str(domain) for domain in json.loads(str(record["requested_domains_json"]))
         ]
-    except (TypeError, json.JSONDecodeError):
+    except TypeError, json.JSONDecodeError:
         ledger_domains = []
         problems.append("snapshot ledger requested_domains_json is unreadable")
     if manifest_domains != ledger_domains:
@@ -779,7 +779,7 @@ def consume_snapshot_seal(
         canonical_domains = tuple(
             str(domain) for domain in json.loads(str(canonical_record["requested_domains_json"]))
         )
-    except (TypeError, json.JSONDecodeError):
+    except TypeError, json.JSONDecodeError:
         canonical_domains = ()
         cross_problems.append("canonical requested domains are unreadable")
     if tuple(manifest_domains) != canonical_domains:

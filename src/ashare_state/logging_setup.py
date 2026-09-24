@@ -76,7 +76,7 @@ class SecretMaskingFilter(logging.Filter):
             if masked_msg != record.msg and args:
                 try:
                     record.msg = masked_msg % args
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     record.msg = masked_msg
                 record.args = None
             else:

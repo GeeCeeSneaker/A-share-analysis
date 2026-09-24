@@ -829,7 +829,7 @@ def _identity_transition_status_exemptions(
     """
     try:
         events = tuple(approved_provider_identity_events())
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return set()
     if any(not isinstance(event, ApprovedIdentityEvent) for event in events):
         return set()
@@ -846,7 +846,7 @@ def _identity_transition_status_exemptions(
                 continue
             try:
                 security_id = event.security_id
-            except (AttributeError, TypeError, ValueError, RuntimeError):
+            except AttributeError, TypeError, ValueError, RuntimeError:
                 continue
             if not security_id:
                 continue
@@ -1025,7 +1025,7 @@ def _is_zero_column_empty_schema(frame: Any) -> bool:
         return False
     try:
         return len(columns) == 0 and len(frame) == 0
-    except (TypeError, AttributeError):
+    except TypeError, AttributeError:
         return False
 
 
@@ -1217,7 +1217,7 @@ def _is_finite_number(value: Any) -> bool:
         return False
     try:
         return math.isfinite(float(value))
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return False
 
 
