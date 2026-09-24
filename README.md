@@ -10,8 +10,8 @@
 
 ## 环境要求
 
-- Windows 10/11 + PowerShell（Linux 亦受 CI 支持）
-- Python 3.12+
+- Windows 10/11 x64 + PowerShell；Python 3.14.x 是唯一支持/参考应用运行时
+- Ubuntu + Python 3.14 仅用于 CI 跨平台检查，不代表支持 Linux 部署
 - [uv](https://docs.astral.sh/uv/) 包管理器
 
 ## 快速开始（Windows / PowerShell）

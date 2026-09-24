@@ -107,7 +107,7 @@ def probe_identity(*, require_sdk: bool = True) -> SdkIdentity | None:
             tgw_runtime = None
         runtime_path = resolve_packaged_runtime_path()
         abi_dir = runtime_path.name if runtime_path else None
-    except (ImportError, importlib.metadata.PackageNotFoundError):
+    except ImportError, importlib.metadata.PackageNotFoundError:
         pass
 
     if sdk is None:

@@ -3,7 +3,7 @@ name = "ashare-state"
 version = "0.1.0"
 description = "A-share market state data foundation (daily module), Phase 0 engineering skeleton"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14,<3.15"
 license = { text = "Proprietary" }
 dependencies = [
     # Core data stack (versions locked in uv.lock -> environment_lock_hash)
@@ -47,7 +47,7 @@ packages = ["src/ashare_state"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 src = ["src", "tests"]
 extend-exclude = [
     "docs",       # frozen design docs contain illustrative code blocks - never touched
@@ -80,7 +80,7 @@ ignore = [
 "tests/*" = ["A002", "N801", "N802", "N803", "B017"] # pytest conventions; B017: failure injection needs broad raises
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 mypy_path = "src"
 packages = ["ashare_state"]
 warn_unused_ignores = true

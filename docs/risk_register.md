@@ -26,16 +26,6 @@
 | 缓解 | Spike Go/No-Go 门禁在 P0a 之前；异常样本 Golden（50 ST/20 退市/30 涨跌停/20 除权） |
 | Review Date | Spike Report 提交时 |
 
-### R-003 uv 托管 Python 3.12 安装损坏（新增 2026-08-21，环境级）
-
-| 项 | 内容 |
-|---|---|
-| 影响 | 本地开发环境 |
-| 概率 | 已发生（untrusted mount point, os error 448） |
-| 监控 | `.python-version` 固定 3.14 避开损坏安装 |
-| 缓解 | 本地用系统 Python 3.14（满足 >=3.12）；CI 用 setup-uv 3.12 验证另一版本；可选修复：`uv python install 3.12 --reinstall` |
-| Review Date | 首次 CI 全绿后关闭 |
-
 ### R-004 单人维护 bus factor（继承冻结基线 §40）
 
 | 项 | 内容 |
@@ -45,4 +35,11 @@
 
 ## 已关闭风险
 
-（无）
+### R-003 uv 托管 Python 3.12 安装损坏（新增 2026-08-21，2026-09-24 关闭）
+
+| 项 | 内容 |
+|---|---|
+| 影响 | 本地开发环境 |
+| 结果 | 当前受控开发/应用运行时统一使用 Python 3.14；不再需要 3.12 环境或 CI 兼容路径。此项关闭表示项目策略已不依赖损坏的 3.12 安装，不代表对 uv 安装器缺陷作了系统修复。 |
+| 依据 | `.python-version`、Issue #85 运行时政策及 `docs/runbook/install_core.md` |
+| Review Date | 2026-09-24 |

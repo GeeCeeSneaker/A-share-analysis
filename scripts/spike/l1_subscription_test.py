@@ -109,7 +109,7 @@ def parse_event_time(value: object) -> datetime | None:
                 int(digits[12:14]),
                 tzinfo=SHANGHAI,
             )
-    except (ValueError, OSError):
+    except ValueError, OSError:
         return None
     return None
 

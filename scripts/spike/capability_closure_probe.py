@@ -174,7 +174,7 @@ def _field_stats(
         if date:
             try:
                 invalid_count += int(pd.to_datetime(series, errors="coerce").isna().sum())
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 invalid_count += len(series)
     return {
         "table_count": table_count,
@@ -262,7 +262,7 @@ def _calendar_days(payload: Any) -> list[int]:
                     values.append(int(text[:8]))
                 else:
                     values.append(int(value.strftime("%Y%m%d")))
-            except (AttributeError, TypeError, ValueError, OverflowError):
+            except AttributeError, TypeError, ValueError, OverflowError:
                 continue
     return sorted(set(values))
 

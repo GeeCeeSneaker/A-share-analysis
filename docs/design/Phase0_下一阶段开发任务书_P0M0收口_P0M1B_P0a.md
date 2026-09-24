@@ -70,6 +70,8 @@ Windows + Python 3.12    COMPATIBILITY（建议）
 Linux   + Python 3.14    RECOMMENDED
 ```
 
+> **运行时政策补充（2026-09-24，Issue #85）**：以上矩阵保留为本任务书编制时的历史要求；现行受控应用政策已收敛为 Windows Python 3.14.x 单一支持运行时，Ubuntu Python 3.14 仅为 CI 跨平台检查，Windows Python 3.12 不再受支持或测试。执行时以 [`CURRENT_EXECUTION_PLAN.md`](../project/CURRENT_EXECUTION_PLAN.md) 和 [`ISSUE85_PYTHON_RUNTIME_SIMPLIFICATION_20260924.md`](../project/ISSUE85_PYTHON_RUNTIME_SIMPLIFICATION_20260924.md) 为准，不据此改写 Frozen Baseline 的历史内容。
+
 执行：
 
 ```text

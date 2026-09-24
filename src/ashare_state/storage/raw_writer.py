@@ -208,7 +208,7 @@ def _has_meaningful_pandas_index(obj: Any) -> bool:
         return True
     try:
         return not (int(index.start) == 0 and int(index.step) == 1 and int(index.stop) == len(obj))
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         # An unfamiliar index implementation is meaningful by default; raw
         # evidence must not silently discard an identity-bearing structure.
         return True
@@ -433,7 +433,7 @@ def _pack_large_homogeneous_tables(
     ]
     try:
         packed = pa.concat_tables(packed_tables)
-    except (pa.ArrowException, TypeError, ValueError):
+    except pa.ArrowException, TypeError, ValueError:
         # Concatenation is an optimization only.  Preserve the proven
         # per-member representation when Arrow refuses the combination.
         return payload_kind, tables, null_tables, ()
@@ -1258,7 +1258,7 @@ def verify_meta_closure(raw_root: Path | str, meta_doc: dict[str, Any]) -> list[
         try:
             path = (root / Path(*PurePosixPath(rel.replace("\\", "/")).parts)).resolve()
             path.relative_to(root.resolve())
-        except (ValueError, OSError):
+        except ValueError, OSError:
             problems.append(f"payload artifact path escapes raw dataset: {rel}")
             continue
         if not path.is_file():
@@ -1279,7 +1279,7 @@ def verify_meta_closure(raw_root: Path | str, meta_doc: dict[str, Any]) -> list[
                 )
                 for t in tables
             ]
-        except (AttributeError, TypeError, ValueError):
+        except AttributeError, TypeError, ValueError:
             problems.append("table record fields are malformed")
             return problems
         if _combined_hash(records) != str(meta_doc.get("content_hash", "")):

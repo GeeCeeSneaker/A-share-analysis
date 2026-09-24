@@ -310,7 +310,7 @@ def _fetch_source_with_browser(
                 if result.get("base64Encoded")
                 else encoded_body.encode("utf-8")
             )
-        except (binascii.Error, UnicodeError, ValueError):
+        except binascii.Error, UnicodeError, ValueError:
             return None
 
     def looks_like_challenge(body: bytes, content_type: str) -> bool:

@@ -101,6 +101,7 @@ Risk Appetite、Style、Payoff/Feedback、Tradability、Positioning/Leverage、E
 ### 0.5 原型技术栈
 
 - **Python 3.12+**：数据处理、特征计算、审计；
+> **运行时政策补充（2026-09-24，Issue #85）**：上面的 Python 版本是原型基线的初始技术栈范围，不构成当前受控应用的多版本兼容承诺。当前应用只支持 Windows Python 3.14.x；Ubuntu Python 3.14 仅作为 CI 跨平台检查，不是部署目标。当前政策见 [`CURRENT_EXECUTION_PLAN.md`](../project/CURRENT_EXECUTION_PLAN.md) 与 [`ISSUE85_PYTHON_RUNTIME_SIMPLIFICATION_20260924.md`](../project/ISSUE85_PYTHON_RUNTIME_SIMPLIFICATION_20260924.md)。本补充保留冻结基线原文，不改写其历史设计记录。
 - **Parquet**：Raw / Provider-normalized / Canonical / Security Feature 持久化；
 - **DuckDB**：元数据、查询、市场/行业/题材长表、Mart；
 - **FastAPI**：Phase 1 起提供已发布数据查询；

@@ -711,7 +711,7 @@ def _replay_result_counts(replay: dict[str, Any]) -> collections.Counter[str]:
         for result, count in raw_counts.items():
             try:
                 counts[str(result)] += int(count)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
     if not counts and replay.get("result"):
         counts[str(replay["result"])] = 1
@@ -855,7 +855,7 @@ def _observe_units(rows: list[dict[str, Any]]) -> tuple[dict[str, str], int, int
             close = float(row.get("CLOSE_PRICE") or 0)
             volume = float(row.get("VOLUME") or 0)
             amount = float(row.get("AMOUNT") or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         if close > 0 and volume > 0 and amount > 0:
             checked += 1

@@ -211,7 +211,7 @@ def _col(row: Any, name: str) -> Any:
         if hasattr(row, "get"):
             return row.get(name)
         return row[name]
-    except (KeyError, IndexError, TypeError):
+    except KeyError, IndexError, TypeError:
         return None
 
 
@@ -267,7 +267,7 @@ def _to_float(value: Any) -> float | None:
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 

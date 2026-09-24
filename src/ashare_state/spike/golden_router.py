@@ -777,7 +777,7 @@ def _validate_limit_pit(
                     f"LOW_LIMITED {provider_low} != rule {exp_down} "
                     f"(preclose {pre_close}, rule {rule.rule_id})"
                 )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             price_problem = f"non-numeric preclose/high/low ({pre_close!r})"
     if price_problem:
         return ValidationOutcome(
@@ -1029,7 +1029,7 @@ def _validate_corp_action_context(
     try:
         close_prev = float(kline_by_day[str(t_prev)].get("CLOSE_PRICE") or 0)
         close_t = float(kline_by_day[str(t_day)].get("CLOSE_PRICE") or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return ValidationOutcome(
             result=CaseResult.VALIDATED_FAIL,
             expected=case.truth_source,
@@ -1197,7 +1197,7 @@ def _validate_bj_mapping(
             tick = float(rule.tick_size)
             if abs(float(provider_high) - float(exp_up)) > tick + 1e-9:
                 price_problem = f"HIGH_LIMITED {provider_high} != rule {exp_up}"
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             price_problem = f"non-numeric preclose/high ({pre_close!r})"
     if price_problem:
         return ValidationOutcome(
