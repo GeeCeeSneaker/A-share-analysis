@@ -44,7 +44,7 @@ Issue [#84](https://github.com/GeeCeeSneaker/A-share-analysis/issues/84) was com
 
 ## Current active P1 — Issue #85 Python runtime simplification (2026-09-24)
 
-> Status: **implementation in progress; exact-head CI and scheduler acceptance remain required. No #86 or new data-domain work before this issue is complete.**
+> Status: **implementation ready for review; the current PR head must remain CI-green and receive scheduler/Owner acceptance before closure. No #86 or new data-domain work before this issue is complete.**
 
 Issue [#85](https://github.com/GeeCeeSneaker/A-share-analysis/issues/85) is the sole current task. Repository evidence identifies Windows Python 3.14.6 as the controlled AmazingData/TGW runtime, `.python-version` and the operator installation runbook already select Python 3.14, and no concrete deployment, SDK, operator, or supported consumer requiring Python 3.12 was found. Therefore this controlled application will support Windows Python 3.14.x only; Ubuntu Python 3.14 remains a required CI-only cross-platform check and is not a supported deployment target.
 

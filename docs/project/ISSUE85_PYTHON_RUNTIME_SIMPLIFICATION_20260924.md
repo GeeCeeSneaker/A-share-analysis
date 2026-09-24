@@ -1,7 +1,7 @@
 # Issue #85 — Python runtime simplification
 
 Date: 2026-09-24
-Status: implementation prepared; exact-head CI and scheduler/Owner acceptance remain required.
+Status: implementation and local QA complete; scheduler/Owner acceptance is the remaining governance gate. Current PR-head checks remain the live merge gate.
 
 ## Decision and evidence
 
@@ -31,9 +31,10 @@ Local validation on Python 3.14.6:
 - `uv pip check`: PASS; 57 installed packages compatible.
 - `git diff --check`: PASS.
 
-Still required before Issue #85 can close:
+Remote acceptance record:
 
-- required exact-head GitHub CI green on Windows 3.14 and Ubuntu 3.14;
-- scheduler/Owner acceptance through the normal PR workflow.
+- Code-bearing commit `4ac74ef78afa82d5326fffd45a79c711c789b282` passed exact-head GitHub CI run #764: Ubuntu/Python 3.14 and Windows/Python 3.14 both succeeded, including full pytest and SDK-absence checks; controlled GT-H3B execution was skipped by scope.
+- PR [#88](https://github.com/GeeCeeSneaker/A-share-analysis/pull/88) is the live source for the latest head. This record update creates a later PR head, so merge/closure requires green checks on that current head as well; any subsequent commit must be rechecked.
+- Scheduler/Owner acceptance remains required before closing #85 or starting #86.
 
 The GitHub PR's latest-head checks are the live CI source of truth. Do not infer acceptance for Issue #86 or any new data-domain work from this runtime cleanup.
