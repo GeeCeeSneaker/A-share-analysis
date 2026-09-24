@@ -2620,7 +2620,7 @@
     }
   ],
   "qa": {
-    "exact_head_github_ci": "PENDING_AFTER_RUFF_FORMAT_FIX; predecessor f469fae CI #750 failed format only, Mypy/pytest skipped",
+    "exact_head_github_ci": "PASS — CI #751 on 195e0d2806f0ef0837f25fed1c0f628a97aa4c5d; Ubuntu py3.14 and Windows py3.12/py3.14 all passed; predecessor #750 format-only failure superseded",
     "full_pytest_exit_code": 0,
     "mypy": "PASS (111 source files)",
     "owner_pm_final_acceptance": "PENDING",

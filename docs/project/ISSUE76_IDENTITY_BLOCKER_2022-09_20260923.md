@@ -4,7 +4,7 @@
 
 **RESOLVED for the 2022-09 identity blocker; full offline execution PASS at 78/78.** The narrowly authorized retained LISTDATE path was executed using only the exact 1,669 static facts from the already-retained AmazingData 2023-02 stock_basic vintage. The 2022-09 Canonical partition passed with 100,844 rows and zero unresolved pairs. Full month migration, archive Snapshot, ordinary-reader, replay, and changed-content conflict checks are recorded in [the 2026-09-24 execution report](ISSUE76_78_MONTH_EXECUTION_20260924.md) and [sanitized JSON summary](ISSUE76_78_MONTH_EXECUTION_SUMMARY_20260924.json).
 
-The first evidence commit f469fae exact-head CI #750 passed Ruff lint but failed Ruff format only on the migration runner and identity test; Mypy/pytest were skipped. A formatting-only follow-up is prepared, and its exact-head CI is pending. Final Owner/PM acceptance remains open. PR #77 stays Draft. This report documents the historical blocker and its resolution; it does not authorize production activation or merging.
+Evidence commit f469fae CI #750 passed Ruff lint but failed Ruff format only on the migration runner and identity test; this was corrected in follow-up 195e0d2. Exact-head CI #751 on 195e0d2 passed Ubuntu 3.14 and Windows 3.12/3.14 (Ruff, Mypy, full pytest, SDK-absence checks); controlled GT-H3B #257 was skipped by scope. Final Owner/PM acceptance remains open. PR #77 stays Draft. This report documents the historical blocker and its resolution; it does not authorize production activation or merging.
 
 ## Historical disposition (2026-09-23)
 
