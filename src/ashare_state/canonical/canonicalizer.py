@@ -104,6 +104,11 @@ from ashare_state.canonical import availability as _availability
 from ashare_state.canonical import identity as _identity
 from ashare_state.canonical import source_policy as _source_policy
 from ashare_state.canonical.availability import derive_available_at
+from ashare_state.canonical.daily_bar import (
+    DailyBarPartitionError,
+    deep_verify_daily_bar_partitions,
+    write_daily_bar_partitions,
+)
 from ashare_state.canonical.eligibility import (
     CANONICAL_CONTRACT_VERSION,
     DomainEligibility,
@@ -2656,6 +2661,47 @@ class CanonicalRunner:
                 problems.append(f"canonical {name} artifact schema mismatch (rebind)")
             artifact_rows[name] = frame.to_dicts()
 
+        partition_entries = manifest.get("daily_bar_partitions")
+        if partition_entries is not None:
+            if not isinstance(partition_entries, list):
+                problems.append("daily_bar_partitions is not a list")
+            else:
+                try:
+                    daily_rows = list(
+                        deep_verify_daily_bar_partitions(
+                            self.normalized_root,
+                            partition_entries,
+                        )
+                    )
+                    if "selected" in artifact_rows:
+                        selected_fields = manifest.get("selected_schema_fields", [])
+                        if not isinstance(selected_fields, list) or any(
+                            not isinstance(field, str) for field in selected_fields
+                        ):
+                            problems.append("selected_schema_fields is invalid")
+                            selected_fields = []
+                        for selected_row in artifact_rows["selected"]:
+                            for field in selected_fields:
+                                selected_row.setdefault(field, None)
+                        for daily_row in daily_rows:
+                            for field in selected_fields:
+                                daily_row.setdefault(field, None)
+                        artifact_rows["selected"].extend(daily_rows)
+                        partition_count = sum(
+                            int(entry.get("row_count", -1)) for entry in partition_entries
+                        )
+                        if len(artifact_rows["selected"]) != int(record["selected_count"]):
+                            problems.append(
+                                "selected artifact plus daily partitions do not match "
+                                "selected_count"
+                            )
+                        if partition_count != len(daily_rows):
+                            problems.append(
+                                "daily-bar partition row counts do not match their artifacts"
+                            )
+                except (DailyBarPartitionError, OSError, ValueError, TypeError, KeyError) as exc:
+                    problems.append(f"daily-bar partition closure failed: {exc}")
+
         if "selected" in artifact_rows:
             recomputed = _rows_semantic_hash(artifact_rows["selected"])
             if recomputed != str(record["selected_semantic_hash"]) or recomputed != str(
@@ -2824,11 +2870,104 @@ class CanonicalRunner:
         selected_semantic = _rows_semantic_hash(aligned_selected)
         decision_set = _rows_semantic_hash(aligned_decisions)
 
+        # Daily market facts have one durable physical home: monthly L0
+        # partitions under canonical/security_bar_1d.  The run-level
+        # selected artifact remains the audit projection for other domains;
+        # daily rows are represented by exact partition references instead
+        # of being persisted a second time in selected.parquet.
+        daily_rows = [row for row in selected_rows if row.get("canonical_domain") == "daily_bar"]
+        # The partition writer consumes one month at a time. Canonical UUID
+        # hex ordering is byte ordering for fixed16 physical identities.
+        daily_rows.sort(
+            key=lambda row: (
+                str(row["trade_date"]),
+                str(row["security_id"]).replace("-", "").lower(),
+            )
+        )
+        daily_month_by_key = {
+            str(row["canonical_key"]): str(row["trade_date"])[:7] for row in daily_rows
+        }
+        daily_source_runs_by_month: dict[str, set[str]] = {}
+        for row in daily_rows:
+            source_run_id = row.get("source_normalization_run_id")
+            if source_run_id:
+                month = daily_month_by_key[str(row["canonical_key"])]
+                daily_source_runs_by_month.setdefault(month, set()).add(str(source_run_id))
+        for decision in decisions:
+            if (
+                decision.get("canonical_domain") != "daily_bar"
+                or decision.get("decision_class") == "EXCLUDED_FUTURE"
+            ):
+                continue
+            decision_month = daily_month_by_key.get(str(decision.get("canonical_key", "")))
+            decision_source_run_id = decision.get("source_normalization_run_id")
+            if decision_month is not None and decision_source_run_id:
+                daily_source_runs_by_month.setdefault(decision_month, set()).add(
+                    str(decision_source_run_id)
+                )
+        daily_source_run_ids = (
+            set().union(*daily_source_runs_by_month.values())
+            if (daily_source_runs_by_month)
+            else set()
+        )
+        selected_file_rows = [
+            row for row in selected_rows if row.get("canonical_domain") != "daily_bar"
+        ]
+        selected_file_rows = _align_schema(selected_file_rows)
+        # The bar-value vintage is anchored only to its exact retained
+        # daily_bar receipts. Identity/version evidence remains independently
+        # sealed by the Canonical manifest and identity-dataset hashes.
+        daily_source_evidence_by_run = {
+            seal.run_id: {
+                "run_id": seal.run_id,
+                "role": seal.role,
+                "provider": seal.provider,
+                "provider_dataset": seal.provider_dataset,
+                "endpoint": seal.endpoint,
+                "raw_request_id": seal.raw_request_id,
+                "raw_evidence_uri": seal.raw_evidence_uri,
+                "raw_evidence_hash": seal.raw_evidence_hash,
+                "normalized_manifest_uri": seal.normalized_manifest_uri,
+                "normalized_manifest_hash": seal.normalized_manifest_hash,
+                "received_at": seal.received_at,
+            }
+            for seal in snapshot.seals
+            if seal.role == "source"
+            and seal.provider_dataset == "daily_bar"
+            and seal.run_id in daily_source_run_ids
+        }
+        sealed_source_run_ids = set(daily_source_evidence_by_run)
+        if daily_source_run_ids != sealed_source_run_ids:
+            raise CanonicalRunnerError(
+                "selected daily-bar rows reference missing source-vintage receipt seals"
+            )
+        source_vintage_evidence_by_partition = {
+            month: [
+                daily_source_evidence_by_run[source_run_id]
+                for source_run_id in sorted(run_ids)
+                if source_run_id in daily_source_evidence_by_run
+            ]
+            for month, run_ids in sorted(daily_source_runs_by_month.items())
+        }
+        if any(
+            len(source_vintage_evidence_by_partition[month]) != len(run_ids)
+            for month, run_ids in daily_source_runs_by_month.items()
+        ):
+            raise CanonicalRunnerError(
+                "daily-bar partition references a missing source-vintage receipt seal"
+            )
+        daily_bar_partitions = write_daily_bar_partitions(
+            daily_rows,
+            normalized_root=self.normalized_root,
+            source_snapshot_as_of=snapshot.as_of,
+            source_vintage_evidence_by_partition=source_vintage_evidence_by_partition,
+        )
+
         import io
 
         artifacts: dict[str, dict[str, Any]] = {}
         parquet_rows = {
-            "selected": aligned_selected,
+            "selected": selected_file_rows,
             "decisions": aligned_decisions,
             # findings parquet: deterministic fields ONLY (no created_at)
             "findings": _align_schema(
@@ -2888,6 +3027,8 @@ class CanonicalRunner:
             },
             "code_fingerprint": snapshot.code_fingerprint,
             "artifacts": artifacts,
+            "daily_bar_partitions": list(daily_bar_partitions),
+            "selected_schema_fields": list(aligned_selected[0]) if aligned_selected else [],
             "selected_semantic_hash": selected_semantic,
             "decision_set_hash": decision_set,
             "finding_set_hash": finding_seal,

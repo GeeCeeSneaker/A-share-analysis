@@ -12,11 +12,12 @@ from ashare_state.providers.amazingdata.errors import (
     ProviderSdkInternalError,
     classify_sdk_error,
 )
-from ashare_state.providers.amazingdata.operations import ProviderOperationSpec
+from ashare_state.providers.amazingdata.operations import STOCK_BASIC, ProviderOperationSpec
 from ashare_state.providers.amazingdata.provider import (
     AmazingDataProvider,
     ProviderUseMode,
 )
+from ashare_state.providers.amazingdata.timeout import RetryPolicy, TimeBudget
 from ashare_state.providers.errors import (
     ProviderNetworkError,
     is_retryable,
@@ -150,6 +151,41 @@ class TestFailedCallEnvelope:
         assert env.error_class is None
         assert env.row_count == 2
         assert len(env.request_params_hash) == 64  # full sha-256
+
+    def test_allowlisted_generic_query_failure_retries_and_records_attempts(self):
+        from ashare_state.providers.amazingdata.session import AccountProfile
+
+        session = _FakeSession(AccountProfile())
+        provider = AmazingDataProvider(
+            session,
+            identity=_FakeIdentity(),
+            budget=TimeBudget(query_timeout_seconds=30.0),
+            retry=RetryPolicy(
+                max_retries=2,
+                backoff_base_seconds=0.001,
+                max_backoff_seconds=0.002,
+                jitter_fraction=0.0,
+                retryable_generic_query_failure_endpoints=(STOCK_BASIC.endpoint,),
+            ),
+            use_mode=ProviderUseMode.SPIKE,
+        )
+        calls = []
+
+        def flaky_server_feedback():
+            calls.append(1)
+            if len(calls) < 3:
+                raise RuntimeError("查询失败")
+            return ["ok"]
+
+        exchange = provider._execute_exchange(  # noqa: SLF001
+            STOCK_BASIC,
+            flaky_server_feedback,
+            params={"code_list": ["600000.SH"]},
+        )
+
+        assert exchange.payload == ["ok"]
+        assert calls == [1, 1, 1]
+        assert provider.last_envelopes[-1].attempt_count == 3
 
 
 class TestPrintfStyleSecretLogging:

@@ -1,8 +1,221 @@
+## 0.14. 2026-09-23 P0 #79 A0/A1 exact confirmation checkpoint
+
+> 状态：**A0/A1 窄整改与 exact-runner 确认重跑已完成；资源门禁 PASS；物理选型仍待 PM/Owner 冻结；不进入 daily_bar 重构、Issue #76 历史迁移或 provider reacquisition**
+
+PM 对 exact head `1f31989ee656e8957c92811dc6cab74044bb9305` 的 A0/A1 审阅要求已落实。当前绑定证据不把合成基准 PASS 写成架构冻结或 Issue #79 全部 PASS。
+
+已完成：
+
+- A0 将 `market_as_of` 与 `source_vintage_as_of` 分离：普通历史研究不要求 `retrieved_at <= market_as_of`；严格源版本才要求 `retrieved_at <= source_vintage_as_of` 的保留证据；不使用含义混杂的持久化通用 `as_of`。
+- A1 runner 在 W4-W8 同时运行 `open_fragments` 与 `closed_compacted`。L1/L2 的 W5/W6 在 `read_parquet` 前按稳定 bucket manifest 选择候选文件；W4 读取完整相关集合；`files_available` 与 `all_files_available` 分开记录；DuckDB 未暴露可靠 row-group touch count 时保持 `null`。
+- 同一格式化 exact runner 的第一次完整运行仅因 `uuid_string/L1` 的一次性 short/long 耗时比 `1.4325` 触发 FAIL；无内存、闭月重写或 full fact-copy 失败。按有界确认规则仅重跑一次，以下确认结果为当前唯一绑定结果，不再继续重试。
+
+确认结果：
+
+- 9 组配置（L0/L1/L2 × UUID string/fixed16/INT64），每组 21,600,000 行，`provider_calls=0`；
+- `resource_gate_status=PASS`，整体状态仍为 `REVIEW_REQUIRED_FOR_ARCHITECTURE_SELECTION`；
+- 最大 daily-ingest RSS 0.2776 GiB、month-compaction RSS 0.2828 GiB、查询 RSS 0.3200 GiB、short/long 最大比值 1.1580、closed-month rewrite=0、Snapshot/ReadModel full fact copy=0；
+- W5 单证券的 L1/L2 candidate byte set 在 open 与 closed artifact 上约比 L0 小 10–12 倍；W6 的 100/500-security 范围跨越全部 16 个 bucket，不宣称 bucket 减少。
+
+绑定产物：
+
+- A0：`docs/architecture/A0_MINUTE_READY_CONTRACTS_20260923.md`；
+- A1：`docs/architecture/A1_MINUTE_LAYOUT_BENCHMARK_DECISION_20260923.md`；
+- 结果：`docs/architecture/benchmarks/a1_minute_layout_benchmark_20260923.json` 与同名 `.md`；
+- runner Git head：`f940ec782a816e6b63d6a13c462af5441e8256c0`；
+- runner blob SHA：`f91f891ac2dca782603753685c4106308626d15f`；
+- runner source SHA-256：`ad535f18c5de11b154a7291ad2cb4ac0c3384f15acaf2d35c6cfe644384f86d8`；
+- benchmark JSON SHA-256：`CD094B2C6509B34405A317BC0CF0D725603BDAB0D323827458CEBFF3DDBD783A`；
+- benchmark Markdown SHA-256：`81B8EB85CE5B151B328929DE4BB474BDD402EFBFE25D58E695912057B6D30E6A`。
+
+当前仍是临时选型建议：L1 + fixed16 UUID physical key；L0 + fixed16 是较简单备选；现有证据不足以冻结 INT64 mapping，也不授权 32 bucket、provider、daily_bar vertical refactor 或 Issue #76 迁移。下一步由 PM/Owner 审阅并冻结布局/键表示；冻结后 scheduler 才能授权一个 bounded `daily_bar` Canonical → logical Snapshot → DuckDB facade vertical slice。
+
 # Current Execution Plan
 
 > 本文件是项目**当前执行控制面**。开发人员用它确认：当前主线做到哪里、唯一 P0 是什么、允许做什么、做到什么算完成、完成后由谁决定下一步。
 >
 > 历史决策继续保留在 `docs/project/DEVELOPMENT_MANAGEMENT.md`、`docs/DEVLOG.md`、Issues 和 PR reviews 中；日常接任务优先读取本文件与当前 Issue。
+
+## 0.11. 2026-09-22 M1 authorized gate attempt — retained artifact provenance blocked (未重新测量)
+
+> 状态：**M1 仍 STOP(BLOCKED) 且未完成有效 RSS 测量；不进入 M2/M3**
+
+PM 在审阅 exact head `1e656022a3702ed5ae4f51a42e1959257b8badce` 时确认 M1.1 代码整改通过，并授权只执行一次真实的 78 个月 retained ReadModel 校验；要求 15 GiB 外部硬停止、峰值 <16 GiB 才能接受，若超限不得重试。
+
+本次只读门禁已按授权执行一次，但在进入内存密集阶段前被持久化 provenance 封印拒绝：
+
+- `consume_snapshot_seal` 发现保留 snapshot 的 `snapshot_builder_code_fingerprint` 与当前代码不一致，按现有 fail-closed 合同停止；没有绕过版本封印，也没有改写快照/ReadModel。
+- 进程约 4.1 秒退出，工作集约 0.005 GiB；该数值不是有效 RSS 门禁结果，因为尚未进入 ReadModel 语义校验。
+- execution state 未变化，临时 `.readmodel-verify` 目录已清理，provider calls 为 0；没有启动 provider capture、全链重跑、M2、M3 或物化发布。
+
+下一步不是降低封印要求，而是由 PM/Owner 决定：从已有 sealed canonical evidence 生成与当前代码兼容的 retained snapshot/ReadModel，或提供一份已兼容的保留产物。该重建属于独立操作，不在本次 M1-only 授权内；在兼容产物就绪前，不得再次测量、不得启动 M2/M3，也不得把本次 0.005 GiB 写成 M1 PASS。
+
+
+## 0.10. 2026-09-22 M1.1 sealed snapshot hand-off (未重新测量)
+
+> 状态：**M1.1 代码整改已提交；M1 真实 78 个月 RSS 门禁仍 STOP(BLOCKED)；不进入 M2/M3**
+
+PM 审阅指出，上一轮虽已把 ReadModel 逻辑 hash 改为有界算法，但 `ReadModel rebuild/open` 仍递归调用 `verify_snapshot`，会再次读取并重投影 canonical selected 数据。已按该要求补齐最小下游消费边界：
+
+- 新增 `consume_snapshot_seal`：校验 snapshot ledger/manifest 身份、canonical manifest seal 交叉绑定、快照 artifact 的流式 content hash、Parquet schema、metadata row count、semantic seal 格式及 artifact/snapshot/总行数聚合 seal；不调用 `load_canonical_projection`、`open_canonical_projection_source` 或 `project_canonical_snapshot`。
+- ReadModel rebuild/open 改为消费该 sealed hand-off；完整 `verify_snapshot` 深审计路径保留给显式审计和 Snapshot 自身回归，不被删除或放宽。
+- 新增回归：sealed hand-off 禁止整表 `read_parquet`/canonical projection；snapshot artifact 篡改和 canonical manifest/ledger 漂移仍 fail-closed；ReadModel rebuild/open 均走 sealed hand-off。
+- 本地离线 QA：Snapshot/ReadModel 集成测试、Ruff、mypy 通过；未访问 provider、未使用正式账号、未启动新的 78 个月真实 RSS 测量。
+- CI #716 的 Ubuntu 3.14、Windows 3.14、Windows 3.12 required jobs 全部 success；GT-H3B 按范围 skipped。
+
+这仍是代码级整改，不能证明峰值 RSS 已低于 PM 的 <16 GiB 门禁。下一步仍须 PM/Owner 明确批准一次新的、带 15 GiB RSS 硬上限的 M1 测量；只有满足预算才允许 M2/M3，否则立即 STOP 并记录峰值。
+
+## 0.9. 2026-09-22 M1 高内存边界整改（未重新测量）
+
+> 状态：**代码整改已提交；M1 真实 78 个月 RSS 门禁仍 STOP(BLOCKED)；不进入 M2/M3**
+
+针对 0.8 暴露的剩余分配边界，已完成不触碰真实历史窗口的最小代码整改：
+
+- canonical selected.parquet 新增批量、哈希已验证的行源；seal-only Snapshot/ReadModel 路径不再把 selected.parquet 全量 read_bytes/to_dicts。
+- seal-only snapshot 校验改为 Arrow 批量读取物理 Parquet，并对 canonical projection 使用受控 JSONL 外部排序块；保留原有 hash、schema、行数、PIT、key、逐行语义和 duplicate-key fail-closed 约束。
+- 保留 retain_domain_rows=True 的旧内存交接语义，避免改变需要完整行 hand-off 的调用方；新增回归确认 seal-only 不调用整表 read_parquet。
+- 代码提交：canonical 批量源 1339f3e83304324d0815cbe0856fbf5a2213b394；snapshot 有界校验 f3c4de311cf3da5bf7968dc9e05306b0ec27630f；回归 fc03bd1a1b32bb4bebe2c0f196a4b40cbccbfe92；最终 EOF 格式修复分别为 eac3b7eafdcfd5227312c543b1ed9f84f6c241d8、c612ab66c49005a00dd8e3f5475c6ea7f8d414a0、44c346b40ff7551cbfac7974063f139d9ff94fa3。CI #711 的 Ubuntu 3.14、Windows 3.14、Windows 3.12 required jobs 全部 success。
+- 离线验证：Ruff、mypy、Snapshot/ReadModel 集成测试及全量 pytest 均通过；未访问 provider、未使用正式账号、未启动 78 个月真实测量。
+
+这只能证明代码回归通过，不能证明实际 RSS 已低于 16 GiB。下一步仍须由 PM/Owner 决定是否在同一安全环境执行一次新的、带 15 GiB RSS 硬上限的 M1 测量；测量满足预算后才允许 M2/M3，否则继续 STOP 并记录新的峰值边界。
+
+## 0.8. 2026-09-22 M1 RSS 门禁失败（最新）
+
+> 状态：**STOP(BLOCKED)；M1 未通过；按内存安全要求不进入 M2/M3**
+
+按 0.7 计划，对既有 78 个月 snapshot/readmodel 只读执行了一次 M1 独立测量，外层设置 15 GiB RSS 硬上限。外部进程观测到校验子进程约 22.268 GiB working set，已经超过 PM 的 <16 GiB 初始预算；进程随即停止，没有第二次或 unchanged-code 重试。
+
+测量后确认 execution_state.json 未变化，临时 .readmodel-verify 目录已清理；没有有意写入、删除或覆盖 ledger、raw、normalized、snapshot/readmodel 或 materialization 产物。M1 的小型 fixture、精确 hash 和 seal-only 回归仍通过，但不足以证明真实 78 个月路径有界。
+
+因此本轮不启动 M2 projection/materialization，也不启动 M3 materialization-only/resume。后续必须先隔离并消除剩余高内存分配边界，再由 PM/Owner 决定是否重新测量；完整脱敏事实见 [M1 RSS 阻断补充](ISSUE76_MATERIALIZATION_MEMORY_BLOCKER_20260922.md)。
+
+## 0.7. 2026-09-22 M1 有界 Snapshot/ReadModel 校验实现检查点
+
+> 状态：**M1 代码已提交；小型回归与静态 QA 通过；78 个月 RSS 门禁尚未运行；M2/M3 未开始**
+
+已按 PM 的 M1 要求提交以下最小整改：
+
+- Snapshot verifier 新增 seal-only 模式，ReadModel rebuild/open 使用 `retain_domain_rows=False`，仍执行逐行 projection/PIT/key/seal 校验，但不再把所有物理行留在 `VerifiedSnapshot.domain_rows`；build row count 改从已验证 ledger seal 读取。
+- ReadModel 逻辑语义 hash 保持既有 `_rows_semantic_hash` 字节契约，改为 `fetchmany` 分批、临时 sorted chunks、受控 fan-in merge 和增量 JSON-array hash；禁止大表 `fetchall`。校验连接设置显式 4GB DuckDB memory limit 和临时目录，临时 chunk 在成功/失败路径清理。
+- 新增回归覆盖：多批次 exact hash（时区时间、空值、浮点、非 ASCII）、禁止 `fetchall`、seal-only hand-off 和原有 Snapshot 行保留模式。
+- 提交：Snapshot `f4c876701bd3a12e4c0241f65ca97e8785eae7b7`；ReadModel `e2b3c4033368d9a79969b4f7ae17fb8e754dc1f1`；测试 `ce2fd134cc5dd5024825b92f89a3b3f5f051ae6b`、`fe7870f11ddc8fa27f2fb4d7141ccece09699a9e`。
+- 本地目标回归、Snapshot/ReadModel 集成测试、Ruff、mypy 和 diff 检查均通过；尚未声称实际 78 个月峰值低于 16GB，也未启动 M2/M3 或最终验收。
+
+下一步严格为：先对既有 78 个月 ReadModel 做一次带硬 RSS 上限的 M1 独立测量；若仍超过预算，立即 STOP 并补充阻断报告，不继续重复尝试。只有测量满足预算，才进入 M2。
+
+## 0.6. 2026-09-22 78 月物化内存阻断（最新）
+
+> 状态：**STOP(BLOCKED)；无最终 PASS；按内存安全要求暂停继续重跑**
+
+- 78 个月 capture/replay 与规范化链路已完成，且已有一份本地 78 分区物化目录；但最新运行没有完成 changed-content conflict gate、最终 reader/幂等/冲突闭环，因此不能把现有目录写成最终发布或验收 PASS。
+- 旧版 snapshot verifier 在本机约 46.7 GB 内存处出现高峰；完成流式逐行比对等优化后，`ResearchPanelBuilder.prepare_verified_projection` 仍约 46.5 GB；进一步缩窄到既有 readmodel/物化输入的尝试仍约 38.5 GB，均在进入最终物化验收前安全停止。
+- 已完成的安全/代码整改仍有效：Windows 原生 SDK stdout/stderr 句柄捕获已补齐，CI #690 required jobs 全部成功；snapshot verifier 内存优化提交 `1d55bea8120d336e40840071084b4c11de409dbf`，CI #694 全部成功。
+- 当前主要问题不是凭据或 provider 认证：ReadModel 逻辑校验仍以 `fetchall`、全量 dict/list 和全量语义排序为主；verified projection 同时保留 source rows 与 projected rows；仓库没有受控的 materialization-only/resume 入口，导致恢复过程再次触发高峰。
+- 下一次允许推进前，必须先完成并独立验证：有界内存的精确 ReadModel 语义校验、有界 projection/materialization、可审计的 materialization-only/resume 命令、内存回归/峰值门禁，以及明确区分既有本地目录、幂等重放、冲突阻断和最终 PASS 的状态契约。
+- 本轮已按要求停止本地重试；凭据、会话 token、raw payload 和本地执行状态未写入 GitHub。完整脱敏交接见 [Issue #76 物化内存阻断报告](ISSUE76_MATERIALIZATION_MEMORY_BLOCKER_20260922.md)。
+
+## 0.5. 2026-09-21 78 月重跑物化修复与 SDK 日志边界
+
+> 状态：**78/78 capture 已通过；首次物化因 runner 常量错误 STOP(BLOCKED)；修复后的 retained replay/物化重跑进行中；无 publication**
+
+- 首次完整重跑的 78 个月份均为 `PASS`，但 `MATERIALIZATION` 的变更内容冲突回归使用了
+  `"ENABLED"`，与契约值 `RESEARCH_ENABLED` 不一致，触发 `StopIteration`。已将本机 ignored
+  runner 改为使用 `ResearchEligibility.ENABLED.value`；不能把月度 capture PASS 写成最终交付 PASS。
+- 重跑只消费已有本地 retained raw/normalized 证据，不重新请求 78 个月；必须等最终
+  `MATERIALIZATION -> COMPLETE / PASS`、reader、幂等 replay 和 changed-content conflict 全部通过后，
+  才能写最终 summary。
+- 终端曾观察到 SDK 的 `logon json` 会话 token。共享 fd 捕获不足以覆盖 Windows 原生
+  `GetStdHandle`/`WriteFile` 路径；已在 `stdout_capture.py` 增加 Windows 标准句柄重定向，补充
+  原生句柄回归测试。focused tests、Ruff、mypy 本地通过；CI 待回报。凭据、token、raw payload 和
+  本地状态仍不得进入 GitHub；GitHub Actions CI #690 的 Ubuntu 3.14、Windows 3.12、Windows 3.14 required jobs 已全部 success。
+- 已暴露会话 token 不作为证据继续使用；本轮结束后必须登出/重新登录使其失效。
+
+## 0.4. 2026-09-21 provider 查询失败有界重试整改
+
+> 状态：**代码已补齐并通过离线 QA；在线 2025-09 重跑待执行，仍 STOP(BLOCKED)**
+
+针对 2025-09 的 InfoData.get_stock_basic 通用“查询失败”，已完成有界、延迟、端点准入的重试实现，详见 [重试整改报告](../provider_verification/cr7_issue76_provider_retry_20260920.md)：
+
+- 通用 QUERY_FAIL_UNCLASSIFIED 默认仍不可重试；只有历史运行实际触发的 InfoData.get_stock_basic 端点在本次 Issue 的 runner 配置中显式放行。
+- 最多 2 次重试，等待约 30 秒、60 秒，带 ±25% jitter，单次等待封顶 120 秒；不做立即重试或无限重试。
+- 认证、权限、schema、普通未知 SDK 错误不因本整改改变分类或获得重试资格；重试耗尽仍 STOP(BLOCKED)。
+- provider envelope 的 attempt_count 和预算耗尽上下文保留重试事实，便于在线结果审阅。
+- 本地 ignored runner 已同步该配置，但 data/spike 不属于 Git 源码；仓库提交的是共享 retry policy、回归测试和运行要求，不包含凭据、原始 payload 或本地状态。
+- 离线验证：provider focused 64 passed；tests/unit 505 passed、1 skipped；Ruff 与 mypy 通过。重试耗尽仍保留 ProviderSdkInternalError，并附带尝试次数；尚未声称 2025-09 在线恢复或 78/78 完成。
+- exact-head CI #684 的 Windows 3.14、Windows 3.12、Ubuntu 3.14 三个 required jobs 已全部 success；GT-H3B #194 按策略 skipped。
+
+下一步：在同一安全 PowerShell 进程执行 --resume --retry-blocked；若 3 次仍为同一通用失败，保持 STOP(BLOCKED)，按原计划做受控分块/新增证券窄探针，不扩大重试次数或端点 allowlist。receipt、coverage、materialization、publication 及 B1-B7/Production 仍未授权。
+
+## 0.3. 2026-09-20 当前调度覆盖 — Issue #76 2025-09 provider 查询阻断
+
+> 状态：**STOP(BLOCKED) at 2025-09 / 68 of 78 capture PASS / no publication**
+
+最新正式运行结果已写入 [Issue #76 执行记录](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON：
+
+- broker-enabled 本地运行环境与最新代码已正常加载；2025-02 retained replay、2025-03 至 2025-08 均已通过，累计 68/78 个月。
+- 2025-09 的 hist_code_list 返回 5,161 个证券；随后 InfoData.get_stock_basic 返回未归因的通用“查询失败”，runner 按 fail-closed 写入 ProviderSdkInternalError 并停止。该错误当前不证明是账号、权限、参数上限或服务瞬时故障。
+- 不得跳过 2025-09、删减新增证券、伪造 stock_basic 成功或提前进入 receipt/coverage/materialization/publication。
+- 下一步是重新登录后对同一输入做一次明确重试；若重复，再做受控分块/新增证券窄探针，区分 provider 瞬时故障与请求/证券触发条件。只有 78/78 capture PASS 后才能进入下游 gates。
+
+## 0.2. 2026-09-18 当前调度覆盖 — Issue #76 2023-02 capture 诊断
+
+> 状态：**STOP(BLOCKED) at 2023-02 / raw capture obtained / offline replay fixed the cross-month orchestration defect / no publication**
+
+用户已在本机同一安全进程完成 TGW 变量注入，`2023-02` 实际发生 `44` 次 provider calls。原始请求均为 `OK`：calendar `27cd797f-43d7-460d-ac8f-1390178427d0`、hist code list `f0db8a97-700a-49db-b464-996719a3c83f`、stock basic `e0979f16-5c56-4fc9-bd66-1b934e30e771`、history status `5f13940b-d241-4320-91d7-aa30a9d3bd01`、daily bar `f6192d4d-74c3-4896-a0a1-cfd3b8ff623f`。凭证及网络身份仍未写入文件或 GitHub。
+
+- 原始 `2023-02` completeness：`4,926` securities、`20` sessions、required/returned `98,194/98,194`；missing/extra/structural `0/0/0`，但 `UNRESOLVED=1`。分类：`NOT_APPLICABLE_SESSION=153`、`POSITIVE_TRADE_COUNT_ACTIVE=19`、`SUSPENSION_NON_TRADING=172`、`UNRESOLVED=1`。
+- 唯一未决 pair 为 `300114.SZ / 2023-02-01`。status 返回 `0×0` 空表，daily bar 恰缺该日；这不是账号失败，也不能用 `num_trades=0` 推断停牌。
+- 根因是 runner 编排只在 `month == 2023-01` 传递已批准的 `[2023-01-12, 2023-02-02)` 事件，漏掉跨月的 `2023-02-01`。本地未跟踪 runner 已修为按事件半开区间与月份相交传递；使用同一批已落盘 raw 的 retained replay 已验证 `2023-02 PASS`、required/returned `98,194/98,194`、`UNRESOLVED=0`、`SUSPENSION_NON_TRADING=173`。这不是生产语义放宽，也没有重新请求 provider。
+- 当前执行状态文件仍保留原始 `STOP(BLOCKED)`，因为尚未用修正后的 runner 正式恢复整条链。下一次正式恢复会先 replay `2023-02`，然后从 `2023-03` 发起在线请求；receipt、coverage、materialization、ordinary-reader、幂等、冲突和 78/78 验收都仍未完成。
+
+详细脱敏记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 与对应 JSON。保持 PR #77 Draft；不得把本次 `2023-02` 离线 replay 写成 78 个月完成。
+
+## 0.1. 2026-09-17 历史调度检查点 — Issue #76 78 个月历史构建
+
+> 状态：**STOP(BLOCKED) at 2023-02 / 37 of 78 capture PASS / no publication**
+
+Issue #76 授权从 `main@ad2ad528d3ffec1269772084f0860c8224e632d2` 构建 2020-01 至 2026-06 的 78 个月历史。PR #77 的 PM review 已批准最小 `DELISTDATE` 适用性修复：复用已验证 normalized security-master 的 `stock_basic.DELISTDATE`，仅当 `session >= DELISTDATE` 时判为 `NOT_APPLICABLE_SESSION`；不 carry-forward 停牌、不换源、不跳过 pair。现有 typed AmazingData → raw anchor → completeness → Canonical → Snapshot → ReadModel → verified projection → bounded materializer 路径保持不变。
+
+- 生产代码已升级 month-completeness/applicability 到 v5；`DELISTDATE` 进入 identity view，并仅保留实际用于排除 pair 的事实；同时仅保留 Owner 批准的 `300114.SZ` 官方停牌事件 `[2023-01-12, 2023-02-02)`。该事件只闭合其 exact-session 未决 pair，不改变零成交含义，不做 carry-forward，不引入通用事件框架或第二 provider。`LISTDATE`、PIT、raw closure 和 finalized capture 的既有 fail-closed 约束保持不变。
+- `2020-01`：hash-anchored retained replay capture PASS，required/returned `59,930/59,930`，missing/extra/unresolved/structural `0/0/0/0`。
+- `2020-02`：使用已保留同范围 raw exchanges retained replay capture PASS，required/returned `75,463/75,463`，missing/extra/unresolved/structural `0/0/0/0`；`NOT_APPLICABLE_SESSION=238`，实际使用的 post-delisting 事实为 `600240.SH -> 2020-02-05`。
+- `2020-03` 至 `2022-12`：此前共 34 个月 fresh-provider capture PASS；本次使用保留 raw 做 retained replay，没有把 replay 误报为新的在线采集。与前两个月合计 `36/78`。
+- `2023-01`：retained replay 已通过。`4911` 个证券、`16` 个交易日，required/returned `78,403/78,403`，missing/extra/structural `0/0/0`，`UNRESOLVED=0`；分类为 `NOT_APPLICABLE_SESSION=67`、`POSITIVE_TRADE_COUNT_ACTIVE=7`、`SUSPENSION_NON_TRADING=106`。Owner 批准的官方事件实际闭合 9 个 `300114.SZ` pair，来源为 [CNINFO 2023-001](https://static.cninfo.com.cn/finalpage/2023-01-12/1215580484.PDF)、[CNINFO 2023-007](https://static.cninfo.com.cn/finalpage/2023-02-02/1215749576.PDF) 和 [深交所停复牌表](https://docs.static.szse.cn/www/certificate/secondb/GEMmsb/W020230202562529948780.html)。
+- `2023-02`：历史检查点；当时 runner 在 provider 请求前因当前执行进程缺少安全环境变量停止。该检查点已被上方 0.2 的实际 provider capture 与离线 replay 诊断取代。
+- 本次新增静态事件、半开区间边界和 retained replay 回归已通过；本地 focused pytest 为 `72 passed`、full offline pytest 为 `1879 passed, 3 skipped`，Ruff、format、mypy、compile、依赖和敏感值扫描均通过。exact-head CI run `656`（commit `ab133200ce7ff7247c356fd2cc603bbb34647858`）的 Ubuntu 3.14、Windows 3.14、Windows 3.12 三个必需作业均 `success`，GT-H3B run `166` 按范围 `skipped`。这只证明仓库门禁通过；由于 capture 阶段尚未闭合 78 个月，当前尚未产生完整 receipt、authoritative coverage、materialization、ordinary-reader、idempotency 或 changed-content conflict 结论。
+
+详细脱敏执行记录见 [`cr7_issue76_history_build_20260916.md`](../provider_verification/cr7_issue76_history_build_20260916.md) 及对应 JSON。上述内容是历史检查点；当前下一步以 0.2 为准：使用修正 runner 先 replay `2023-02`，再从 `2023-03` 恢复在线请求。不得把认证信息写入仓库，也不应扩大为零成交启发式。
+
+### 本地安全配置说明（不进入 Git）
+
+环境变量只对设置它的进程及其子进程可见。已经启动的 Codex 进程不会因为另一个独立 PowerShell 窗口后来设置了变量而自动获得它们；因此应在**启动 runner 的同一个 PowerShell 窗口**中注入变量，或由同一进程的安全凭据管理器注入。下面的示例只展示变量名和流程，不包含任何真实账号、地址或口令：
+
+```powershell
+$env:TGW_USERNAME = Read-Host 'TGW username'
+$secure = Read-Host 'TGW password' -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try {
+    $env:TGW_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+}
+finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+    $secure.Dispose()
+}
+$env:TGW_SERVER_VIP = Read-Host 'approved TGW server VIP'
+$env:TGW_SERVER_PORT = Read-Host 'TGW server port'
+
+try {
+    Set-Location '<local-repository-root>'
+    uv run --locked --offline python data/spike/issue76_history_build_20260916/runner.py --resume --retry-blocked
+}
+finally {
+    Remove-Item Env:TGW_USERNAME, Env:TGW_PASSWORD, Env:TGW_SERVER_VIP, Env:TGW_SERVER_PORT -ErrorAction SilentlyContinue
+}
+```
+
+不要在命令行参数、脚本文件、日志、截图或 GitHub 中填写/回显口令；不要把变量设置在与 runner 无父子关系的另一个终端后，期待当前 Codex 进程同步获得。执行结束后应确认变量已清除，再把 runner 的脱敏结果更新到本 PR。
+
+Issue #76 完成前保持范围排除：Formal B1-B7/Production、BSE/index、CR-5/R2、Golden/H1/global baseline、strategy/portfolio、speculative reconciliation。
 
 ## 0. 2026-09-16 当前调度覆盖 — Issue #73 remediation
 
@@ -578,12 +791,51 @@ Issue #66 **不授权**：
 
 ---
 
-**Last scheduler update**：2026-09-15
+**Last scheduler update**：2026-09-23
 
-**Current task**：Issue #59（PR #68 已合并；最小真实 2024-01 source-input 在 CR-2 shape
-normalization 边界阻断）
+**Current task**：Issue #79（A0/A1 窄整改已完成，等待 PM/Owner 冻结物理布局与键表示；不进入 daily_bar vertical slice、Issue #76 历史迁移或 provider reacquisition）。
 
-**Required ancestor**：当前 clean `main@a7671ab34d301cb0aca2f351a31bbc865c100498`。下一步只
-处理 [`cr7_authoritative_2024_01_source_input_20260915.md`](../provider_verification/cr7_authoritative_2024_01_source_input_20260915.md)
-列出的最小 provider-native shape/identity 适配；适配前不手填 snapshot，不进入 acquisition、
-materialization、Stage B 或 78 月回补。
+**Required decision**：审阅 corrected A0/A1 证据并决定是否冻结 L1 + fixed16 UUID（或其他有充分证据的方案）；只有冻结后，scheduler 才能授权一个 bounded `daily_bar` Canonical → logical Snapshot → DuckDB facade vertical slice。Issue #76 仍保持历史证据不变、provider_calls=0 的迁移禁令。：2026-09-16
+
+**Current task**：Issue #76（78 个月权威历史构建已通过 2020-02 `DELISTDATE` 适用性修复，
+当前在 2020-03 本地认证环境边界停止）
+
+**Required ancestor**：Issue #76 基线为 `main@ad2ad528d3ffec1269772084f0860c8224e632d2`；
+在本机安全配置认证环境变量后，从已保留证据恢复并继续 2020-03，不得把环境阻断误写成
+provider 数据结论，也不得跳过月份或将当前进度写成 78/78。
+
+
+## 2026-09-23 authoritative active gate — Issue #76 PIT decision
+
+**This section supersedes the preceding end-of-file “Current task” / “Required decision” blocks** that described #79 as awaiting a physical-layout freeze or Issue #76 as waiting for 2020-03 credentials. Those are historical checkpoints and are not the current operating instructions.
+
+- Issue #79 passed; Issue #80 passed and closed; PR #81 was integrated into this Issue #76 branch at 50e5e2dd8c8a1722cd70fbf6a8b2233494a647e7. CI #744 / run 35852805033 passed the three required jobs. The latest audit-doc commit cb55629595cb25431907b05c14d69ae812fe254d also passed exact-head CI #745 / run 35857453802 on Ubuntu 3.14, Windows 3.12, and Windows 3.14. GT-H3B controlled execution was skipped by scope.
+- Two existing retained roots are reconciled read-only: 342,735 paths/files and 6,591,572,317 bytes in each; no relative-path, case-only, or file-size differences; the targeted state, summary, runner, ledger, and active source-manifest hashes match. This is an inventory/control-metadata reconciliation, not a claim that every retained payload was fully byte-hashed.
+- Actual retained state/summary, manifests, and receipts establish 78/78 capture/replay PASS for 2020-01 through 2026-06 (7,442,987 daily-bar rows). The old 68/78 PR description is stale for capture/replay. Six representative offline months passed selected receipt-closure and PIT/identity/lifecycle checks with provider_calls=0; see docs/project/ISSUE76_MATERIALIZATION_MEMORY_BLOCKER_20260922.md.
+- The representative audit's PIT result is **not PASS**: retained historical bars are a later backfill, have no row-level market_available_at, and legacy available_at means received_at/ingestion provenance. Do not derive historical availability from retrieval time or infer it from close prices.
+- **Immediate blocker before migration:** Owner/PM must record the C1 daily-bar rule: (a) a versioned trade-date/session-close event-eligibility convention explicitly distinguished from actual provider publication time; or (b) date-level eligibility with no row-level market_available_at assertion; or (c) a requirement for exact historical as-known values plus an acceptable vintage source. The retained archive alone cannot prove exact values physically known in 2020.
+- **Separate downstream gate:** the overall retained execution remains STOP(BLOCKED) at TARGETED_MATERIALIZATION_PREP_MEMORY_GUARD. A prior 78-partition publication exists, but final idempotent replay and changed-content conflict acceptance are not complete. Do not equate capture/replay PASS or the prior publication with Issue #76 completion.
+- No provider calls, reacquisition, migration, or retained-file mutation occurred in this audit. Keep PR #77 Draft. Do not start the 78-partition migration until the C1 decision is recorded. After that decision, continue only with month-bounded migration from the retained evidence, followed by logical Snapshot/DuckDB facade, ordinary-reader, idempotent replay, and changed-content conflict gates.
+
+## 2026-09-23 authoritative active gate — Issue #76 identity blocker
+
+**This section supersedes the earlier end-of-file C1-pending and credential-waiting checkpoints.** The PM/Owner approved the frozen DAILY_BAR_EVENT_ELIGIBILITY_V1 rule in Issue #76 comment #5795151285. The implementation keeps session-close event eligibility distinct from the retained source-vintage clock and adds no synthetic row-level market_available_at field.
+
+- Local regression QA passed for the C1 daily-bar event contract, Canonical, Snapshot, ReadModel, and R1 research-panel tests; Ruff checks for the affected implementation/tests passed. This is local QA, not a claim that the 78-month acceptance gates or exact-head CI have passed.
+- GitHub exact-head CI run #748 (`35894825115`) for code-bearing commit 545b96ad4b0af0d36bc60d67b17fec4bfeccbb12 passed all three required jobs (Ubuntu 3.14, Windows 3.12, Windows 3.14), including Ruff lint/format, Mypy, and the full pytest suite. GT-H3B controlled execution run #254 was skipped by scope. This supersedes the earlier pending-CI note.
+- The sequential, month-bounded, offline Canonical migration passed 32/78 months (2020-01 through 2022-08), with 2,758,510 selected rows and provider_calls=0 in that migration process. It stopped fail-fast at 2022-09; no later month was run.
+- Retained 2022-09 capture/coverage is PASS: 100,844 daily-bar rows, 4,828 symbols and 21 sessions. Canonical run c608860c-59b3-5c0f-9428-b4a6a177cc8c is BLOCKED at 66,000 selected/decision rows by one IDENTITY_MISSING finding for 34,844 pairs. Offline reproduction with the production IdentityBridge finds 1,669 affected symbols; each has a hist_code_list row with null list_date and no stock_basic row in the retained monthly inputs. The identity policy correctly fails closed.
+- Exact code/session evidence and hash-anchored input lineage are recorded in docs/project/ISSUE76_IDENTITY_BLOCKER_2022-09_20260923.md and ISSUE76_2022-09_IDENTITY_MISSING_PAIRS.csv. The CSV is only a derived symbol/session mask; raw provider payloads and database files are not committed.
+- Required next action: Owner/PM must provide or authorize authoritative listing-date facts for the exact affected symbols, name a specific authoritative identity source and its bounded use, or formally confirm that retained evidence is insufficient under the current identity contract. Do not guess, borrow identity from other months, reacquire provider data, or resume migration before this decision.
+- The earlier materialization-memory guard describes a separate prior execution path; this current migration stopped on identity before archive Snapshot publication and did not pass or re-test that downstream gate. Peak RSS for the failed invocation was not persisted, so no peak value is claimed.
+- Issue #76 remains incomplete: 46 months remain; the one logical archive Snapshot, DuckDB external facade, full ordinary-reader inventory, exact idempotent replay, changed-content conflict rejection, and final acceptance/CI gates are not complete. Keep PR #77 Draft.
+
+## Latest checkpoint — 2026-09-24 UTC
+
+**This checkpoint supersedes earlier 32/78, 2022-09 identity-stop, and credential-waiting instructions recorded above.** The PM/Owner-authorized retained LISTDATE diagnosis/remediation in Issue #76 comment [#5803824753](https://github.com/GeeCeeSneaker/A-share-analysis/issues/76#issuecomment-5803824753) is complete.
+
+- Sequential offline Canonical migration: **78/78 months PASS**, 2020-01 through 2026-06 inclusive; 7,442,987 rows; unresolved, missing, extra, and structural findings are zero in all months; migration-process provider calls = 0.
+- The 2022-09 identity gap was closed only with the exact 1,669 static LISTDATE facts from the already-retained, Owner-approved AmazingData 2023-02 stock_basic vintage. The fact-set hash and raw/normalized provenance are recorded in the report; no mutable master fields or guessed identities were used. The late source vintage is disclosed and is not represented as contemporaneous 2022 publication evidence.
+- One snapshot-daily-v3 archive Snapshot covers all 78 Canonical months. Deep verification and exact replay pass. Ordinary rm_daily_bar is a DuckDB external VIEW with 78/78 month/source coverage and 7,442,987 matching rows. Changed-content conflict protection also passed.
+- Local QA: the previously verified full pytest suite, Mypy (111 source files), and affected-file Ruff checks passed. Evidence commit f469fae CI #750 passed Ruff lint but failed Ruff format only on the migration runner and identity test; this was fixed by follow-up 195e0d2. Exact-head CI #751 for 195e0d2 passed all three matrices, including Ruff lint/format, Mypy, full pytest, and SDK-absence checks; controlled GT-H3B run #257 was skipped by scope. Final Owner/PM acceptance remains required; keep PR #77 Draft and do not merge or activate production scope.
+- Sanitized month-by-month receipts, coverage, manifests, splits, counts, replay, snapshot, resource, and QA metadata are in [the execution report](ISSUE76_78_MONTH_EXECUTION_20260924.md) and [its JSON record](ISSUE76_78_MONTH_EXECUTION_SUMMARY_20260924.json). Raw provider payloads, credentials, local ledgers/Parquet, and bulk OHLCV bytes are not included.

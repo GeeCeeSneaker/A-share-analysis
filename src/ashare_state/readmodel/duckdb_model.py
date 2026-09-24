@@ -2,8 +2,9 @@
 
 ``DuckDBReadModel.rebuild(snapshot_id)``:
 
-- the ONLY input is the verified snapshot (``verify_snapshot`` - no
-  direct parquet/file trust);
+- the ONLY input is the sealed snapshot hand-off
+  (``consume_snapshot_seal`` - no direct parquet/file trust and no recursive
+  canonical projection);
 - builds into a TEMPORARY database file, applies the declared
   ``rm_<domain>`` tables + ``rm_snapshot_meta`` + ``rm_domain_meta``;
 - validates the LOGICAL semantic exactness IN the temp database
@@ -26,6 +27,11 @@ instead of opening the model and verifying the snapshot a second time.
 from __future__ import annotations
 
 import hashlib
+import heapq
+import json
+import tempfile
+from collections.abc import Iterable, Iterator
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,16 +39,17 @@ from typing import Any
 
 import duckdb
 
-from ashare_state.canonical.canonicalizer import _canonical_json, _rows_semantic_hash
+from ashare_state.canonical.canonicalizer import _canonical_json
 from ashare_state.readmodel.schema import (
     _DTYPE_TO_DUCKDB,
     READMODEL_CONTRACT_VERSION,
     duckdb_domain_columns,
     duckdb_domain_table_name,
+    duckdb_type_of,
 )
 from ashare_state.snapshot.models import SnapshotVerifierError
 from ashare_state.snapshot.schema import domain_snapshot_schema
-from ashare_state.snapshot.verifier import verify_snapshot
+from ashare_state.snapshot.verifier import consume_snapshot_seal
 
 __all__ = [
     "DuckDBReadModel",
@@ -107,6 +114,110 @@ def readmodel_db_uri(snapshot_id: str) -> str:
     )
 
 
+_READMODEL_VERIFY_MEMORY_LIMIT = "4GB"
+_READMODEL_SEMANTIC_HASH_BATCH_SIZE = 32_768
+_READMODEL_SEMANTIC_HASH_MAX_OPEN_CHUNKS = 64
+
+
+def _canonical_json_array_hash(values: Iterable[str]) -> str:
+    """Hash the exact JSON-array representation used by ``_rows_semantic_hash``.
+
+    The legacy contract sorts canonical row JSON strings and then hashes one
+    compact JSON array.  Incremental encoding preserves that byte contract
+    without constructing the full sorted array in memory.
+    """
+    digest = hashlib.sha256()
+    digest.update(b"[")
+    first = True
+    for value in values:
+        if not first:
+            digest.update(b",")
+        digest.update(_canonical_json(value).encode("utf-8"))
+        first = False
+    digest.update(b"]")
+    return digest.hexdigest()
+
+
+def _merge_sorted_chunk_group(paths: list[Path], destination: Path) -> None:
+    """Merge sorted newline-delimited canonical rows into one sorted chunk."""
+    with ExitStack() as stack:
+        streams = [
+            stack.enter_context(path.open("r", encoding="utf-8", newline="")) for path in paths
+        ]
+        with destination.open("w", encoding="utf-8", newline="") as output:
+            for line in heapq.merge(*(iter(stream) for stream in streams)):
+                output.write(line)
+
+
+def _iter_sorted_chunk_rows(paths: list[Path]) -> Iterator[str]:
+    """Yield canonical row JSON strings from sorted chunk files."""
+    with ExitStack() as stack:
+        streams = [
+            stack.enter_context(path.open("r", encoding="utf-8", newline="")) for path in paths
+        ]
+        for line in heapq.merge(*(iter(stream) for stream in streams)):
+            yield line[:-1] if line.endswith("\n") else line
+
+
+def _rows_semantic_hash_bounded(
+    db: duckdb.DuckDBPyConnection,
+    table: str,
+    column_names: list[str],
+    *,
+    temp_directory: Path,
+) -> str:
+    """Recompute the legacy row semantic hash with bounded Python memory.
+
+    DuckDB rows are normalized and sorted in bounded batches.  Sorted chunks
+    are merged externally, then the exact compact JSON-array hash contract is
+    encoded incrementally.  The caller owns a temporary workspace; all
+    chunks created here are also removed on both success and failure.
+    """
+    temp_directory.mkdir(parents=True, exist_ok=True)
+    created: list[Path] = []
+    cursor = db.execute(f"SELECT * FROM {table}")
+    try:
+        chunk_index = 0
+        while True:
+            batch = cursor.fetchmany(_READMODEL_SEMANTIC_HASH_BATCH_SIZE)
+            if not batch:
+                break
+            canonical_rows = sorted(
+                _canonical_json(_normalize_seal_row(dict(zip(column_names, row, strict=True))))
+                for row in batch
+            )
+            chunk = temp_directory / f"rows-{chunk_index:08d}.jsonl"
+            with chunk.open("w", encoding="utf-8", newline="") as output:
+                for row_json in canonical_rows:
+                    output.write(row_json)
+                    output.write("\n")
+            created.append(chunk)
+            chunk_index += 1
+            del batch, canonical_rows
+
+        current = list(created)
+        merge_round = 0
+        while len(current) > _READMODEL_SEMANTIC_HASH_MAX_OPEN_CHUNKS:
+            merged: list[Path] = []
+            for group_index in range(0, len(current), _READMODEL_SEMANTIC_HASH_MAX_OPEN_CHUNKS):
+                group = current[
+                    group_index : group_index + _READMODEL_SEMANTIC_HASH_MAX_OPEN_CHUNKS
+                ]
+                destination = temp_directory / (f"merge-{merge_round:04d}-{group_index:08d}.jsonl")
+                _merge_sorted_chunk_group(group, destination)
+                created.append(destination)
+                merged.append(destination)
+                for path in group:
+                    path.unlink(missing_ok=True)
+            current = merged
+            merge_round += 1
+
+        return _canonical_json_array_hash(_iter_sorted_chunk_rows(current))
+    finally:
+        for path in created:
+            path.unlink(missing_ok=True)
+
+
 class DuckDBReadModel:
     """Rebuilds (and opens) the DuckDB read model from a verified
     snapshot. Deterministic per snapshot id; the rebuild is atomic
@@ -127,10 +238,9 @@ class DuckDBReadModel:
 
     # ------------------------------------------------------------ rebuild
     def rebuild(self, snapshot_id: str) -> ReadModelBuildResult:
-        verified = verify_snapshot(
+        verified = consume_snapshot_seal(
             self.conn,
             snapshot_id,
-            raw_root=self.raw_root,
             normalized_root=self.normalized_root,
         )
         db_uri = readmodel_db_uri(snapshot_id)
@@ -163,7 +273,7 @@ class DuckDBReadModel:
             canonical_run_id=verified.canonical_run_id,
             db_uri=db_uri,
             table_set=table_set,
-            row_count_total=sum(len(rows) for rows in verified.domain_rows.values()),
+            row_count_total=int(verified.ledger_record["row_count_total"]),
             readmodel_contract_version=READMODEL_CONTRACT_VERSION,
         )
 
@@ -206,11 +316,15 @@ class DuckDBReadModel:
         )
         for domain in verified.requested_domains:
             schema = domain_snapshot_schema(domain)
+            table = duckdb_domain_table_name(domain)
+            entry = verified.manifest["artifacts"][domain]
+            if domain == "daily_bar" and entry.get("kind") == "canonical_partition_set":
+                db.execute(f"CREATE VIEW {table} AS {self._daily_bar_external_view_sql(verified)}")
+                continue
             column_sql = ", ".join(
                 f"{col.name} {_DTYPE_TO_DUCKDB[col.dtype]}{' NOT NULL' if not col.nullable else ''}"
                 for col in schema.columns
             )
-            table = duckdb_domain_table_name(domain)
             db.execute(f"CREATE TABLE {table} ({column_sql}, PRIMARY KEY (canonical_key))")
             parquet_path = (
                 (self.normalized_root / str(verified.manifest["artifacts"][domain]["uri"]))
@@ -224,6 +338,115 @@ class DuckDBReadModel:
                 f"INSERT INTO {table} SELECT * FROM "
                 f"read_parquet('{parquet_path}', hive_partitioning=false)"
             )
+
+    def _daily_bar_external_view_sql(self, verified: Any) -> str:
+        """Define rm_daily_bar as a non-persistent view of exact sealed files."""
+        from ashare_state.canonical.daily_bar import DAILY_BAR_FACT_FIELDS
+
+        entry = verified.manifest["artifacts"]["daily_bar"]
+        schema = domain_snapshot_schema("daily_bar")
+        branches: list[str] = []
+        for partition in entry["partitions"]:
+            source_run_id = str(partition.get("source_canonical_run_id", verified.canonical_run_id))
+            if not source_run_id:
+                raise ReadModelError("daily-bar partition has no owning Canonical run id")
+            manifest_path = self.normalized_root / str(partition["partition_manifest_uri"])
+            try:
+                partition_doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ReadModelError(
+                    "daily-bar partition manifest cannot build DuckDB view"
+                ) from exc
+            fact_path = (
+                (self.normalized_root / str(partition_doc["fact_artifact"]["uri"]))
+                .resolve()
+                .as_posix()
+            )
+            lineage_path = (
+                (self.normalized_root / str(partition_doc["lineage_artifact"]["uri"]))
+                .resolve()
+                .as_posix()
+            )
+            fact_sql_path = fact_path.replace("'", "''")
+            lineage_sql_path = lineage_path.replace("'", "''")
+            variable_fields = set(partition_doc["variable_fields"])
+            constant_fields = partition_doc["constant_fields"]
+
+            uuid_expr = (
+                "lower(substr(hex(f.security_id), 1, 8) || '-' || "
+                "substr(hex(f.security_id), 9, 4) || '-' || "
+                "substr(hex(f.security_id), 13, 4) || '-' || "
+                "substr(hex(f.security_id), 17, 4) || '-' || "
+                "substr(hex(f.security_id), 21, 12))"
+            )
+
+            def sql_literal(value: Any, dtype: Any) -> str:
+                duck_type = duckdb_type_of(dtype)
+                if value is None:
+                    return f"CAST(NULL AS {duck_type})"
+                if duck_type in {"VARCHAR", "DATE", "TIMESTAMP WITH TIME ZONE"}:
+                    literal = "'" + str(value).replace("'", "''") + "'"
+                elif duck_type in {"BIGINT", "DOUBLE"}:
+                    if isinstance(value, bool) or not isinstance(value, int | float):
+                        raise ReadModelError(
+                            "daily-bar constant lineage has an invalid numeric type"
+                        )
+                    literal = str(value)
+                elif duck_type == "BOOLEAN":
+                    if not isinstance(value, bool):
+                        raise ReadModelError(
+                            "daily-bar constant lineage has an invalid boolean type"
+                        )
+                    literal = "TRUE" if value else "FALSE"
+                else:  # pragma: no cover - schema registry is closed
+                    raise ReadModelError(f"unsupported daily-bar DuckDB type {duck_type}")
+                return f"CAST({literal} AS {duck_type})"
+
+            expressions: list[str] = []
+            for column in schema.columns:
+                name = column.name
+                if name == "security_id":
+                    expression = f"CAST({uuid_expr} AS VARCHAR)"
+                elif name == "trade_date":
+                    expression = "f.trade_date"
+                elif name == "canonical_domain":
+                    expression = "'daily_bar'"
+                elif name == "canonical_key":
+                    expression = (
+                        f"concat('[', chr(34), {uuid_expr}, chr(34), ',', chr(34), "
+                        "strftime(f.trade_date, '%Y-%m-%d'), chr(34), ']')"
+                    )
+                elif name == "canonical_run_id":
+                    expression = sql_literal(source_run_id, column.dtype)
+                elif name == "snapshot_id":
+                    expression = sql_literal(verified.snapshot_id, column.dtype)
+                elif name in DAILY_BAR_FACT_FIELDS:
+                    expression = f'f."{name}"'
+                elif name in variable_fields:
+                    expression = f'l."{name}"'
+                elif name in constant_fields:
+                    expression = sql_literal(constant_fields[name], column.dtype)
+                elif column.nullable:
+                    expression = f"CAST(NULL AS {duckdb_type_of(column.dtype)})"
+                else:
+                    raise ReadModelError(
+                        f"daily-bar partition does not bind required view column {name}"
+                    )
+                expressions.append(f'{expression} AS "{name}"')
+            branches.append(
+                "SELECT "
+                + ", ".join(expressions)
+                + f" FROM read_parquet('{fact_sql_path}', hive_partitioning=false) f"
+                + f" JOIN read_parquet('{lineage_sql_path}', hive_partitioning=false) l"
+                + " USING (security_id, trade_date)"
+            )
+        if not branches:
+            columns = ", ".join(
+                f'CAST(NULL AS {duckdb_type_of(column.dtype)}) AS "{column.name}"'
+                for column in schema.columns
+            )
+            return f"SELECT {columns} WHERE FALSE"
+        return " UNION ALL ".join(branches)
 
     def _insert_meta(self, db: duckdb.DuckDBPyConnection, verified: Any) -> None:
         db.execute(
@@ -246,7 +469,12 @@ class DuckDBReadModel:
                 [
                     verified.snapshot_id,
                     domain,
-                    str(entry["uri"]),
+                    str(
+                        entry.get("uri")
+                        or verified.manifest.get(
+                            "canonical_manifest_uri", "canonical-partition-set"
+                        )
+                    ),
                     int(entry["row_count"]),
                     str(entry["semantic_hash"]),
                 ],
@@ -254,6 +482,22 @@ class DuckDBReadModel:
 
     # ------------------------------------------------------ logical seal
     def _validate_logical_seal(self, db: duckdb.DuckDBPyConnection, verified: Any) -> None:
+        """Validate a ReadModel copy with bounded external semantic hashing."""
+        workspace_parent = self.readmodel_root / ".readmodel-verify"
+        workspace_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix=f"{verified.snapshot_id[:12]}-", dir=str(workspace_parent)
+        ) as workspace:
+            db.execute(f"SET memory_limit = '{_READMODEL_VERIFY_MEMORY_LIMIT}'")
+            db.execute("SET temp_directory = ?", [workspace])
+            self._validate_logical_seal_impl(db, verified, Path(workspace))
+
+    def _validate_logical_seal_impl(
+        self,
+        db: duckdb.DuckDBPyConnection,
+        verified: Any,
+        workspace: Path,
+    ) -> None:
         """Validate the new DuckDB copy against its one snapshot hand-off.
 
         The semantic hash recompute is a distinct physical-copy invariant: it
@@ -290,6 +534,11 @@ class DuckDBReadModel:
                     f"{table} column types diverge from the declared readmodel "
                     f"schema: { {k: actual[k] for k in actual if actual[k] != declared[k]} }"
                 )
+            if domain == "daily_bar" and entry.get("kind") == "canonical_partition_set":
+                # Snapshot seal consumption checks the exact small manifests,
+                # exact external paths and footer row counts. Do not scan the
+                # fact view for a total-history count/hash on ordinary open.
+                continue
             # row count
             count_row = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
             count = int(count_row[0]) if count_row is not None else -1
@@ -305,10 +554,13 @@ class DuckDBReadModel:
             # semantic exactness from the table contents (datetime
             # values normalized back to UTC - the DuckDB session
             # timezone otherwise shifts the string serialization)
-            rows = db.execute(f"SELECT * FROM {table}").fetchall()
             col_names = list(duckdb_domain_columns(domain))
-            dicts = [_normalize_seal_row(dict(zip(col_names, r, strict=True))) for r in rows]
-            semantic = _rows_semantic_hash(dicts)
+            semantic = _rows_semantic_hash_bounded(
+                db,
+                table,
+                col_names,
+                temp_directory=workspace / "semantic",
+            )
             if semantic != str(entry["semantic_hash"]):
                 problems.append(f"{table} logical semantic hash diverges from the snapshot seal")
         # meta tables: every provenance field is part of the logical seal.
@@ -368,7 +620,11 @@ class DuckDBReadModel:
                 continue
             entry = verified.manifest["artifacts"][domain]
             uri, count, semantic = seen_domains[domain]
-            if uri != str(entry["uri"]) or count != int(entry["row_count"]):
+            expected_uri = str(
+                entry.get("uri")
+                or verified.manifest.get("canonical_manifest_uri", "canonical-partition-set")
+            )
+            if uri != expected_uri or count != int(entry["row_count"]):
                 problems.append(f"rm_domain_meta {domain} row mismatch")
             if str(semantic) != str(entry["semantic_hash"]):
                 problems.append(f"rm_domain_meta {domain} semantic hash mismatch")
@@ -386,10 +642,9 @@ class DuckDBReadModel:
             msg = f"readmodel for snapshot {snapshot_id} has not been built: {target}"
             raise ReadModelError(msg)
         try:
-            verified = verify_snapshot(
+            verified = consume_snapshot_seal(
                 self.conn,
                 snapshot_id,
-                raw_root=self.raw_root,
                 normalized_root=self.normalized_root,
             )
         except SnapshotVerifierError as exc:
@@ -431,7 +686,7 @@ class DuckDBReadModel:
         """Open a ReadModel and return the one snapshot seal it consumed.
 
         Consumers that need snapshot provenance should use this hand-off
-        instead of opening the model and recursively calling
-        ``verify_snapshot`` a second time.
+        instead of opening the model and recursively performing the deep
+        ``verify_snapshot`` audit a second time.
         """
         return self._open_verified_read_only(snapshot_id)

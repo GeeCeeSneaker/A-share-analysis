@@ -9,7 +9,10 @@ from datetime import date
 import polars as pl
 import pytest
 
+import ashare_state.providers.amazingdata.month_completeness as month_completeness_module
+from ashare_state.canonical.identity import ApprovedIdentityEvent
 from ashare_state.providers.amazingdata.month_completeness import (
+    APPROVED_300114_SUSPENSION_EVENT,
     CompletenessPairClass,
     MonthCompletenessError,
     MonthCompletenessEvaluation,
@@ -74,6 +77,41 @@ def _valid_inputs() -> dict[str, object]:
     }
 
 
+def _identity_transition_values(
+    *,
+    old_symbol: str = "300114.SZ",
+    new_symbol: str = "302132.SZ",
+    pre_effective_day: int = 20250214,
+    effective_day: int = 20250217,
+    old_status: pl.DataFrame | None = None,
+) -> dict[str, object]:
+    """Build a two-session fixture for an approved provider-code event."""
+    return {
+        "monthly_symbols": [old_symbol, new_symbol],
+        "trading_days": [pre_effective_day, effective_day],
+        "exact_day_universes": {
+            pre_effective_day: [old_symbol],
+            effective_day: [new_symbol],
+        },
+        "status_payload": {
+            old_symbol: (pl.DataFrame() if old_status is None else old_status),
+            new_symbol: _status(
+                day_values=[pre_effective_day, effective_day],
+                flags=[1, 0],
+            ),
+        },
+        "daily_bar_payload": {
+            old_symbol: _bars(old_symbol, [pre_effective_day]),
+            new_symbol: _bars(new_symbol, [effective_day]),
+        },
+        "positive_trade_fallback": PositiveTradeFallback(
+            queried_pairs={(old_symbol, pre_effective_day)},
+            positive_pairs={(old_symbol, pre_effective_day)},
+            request_params_by_pair={(old_symbol, pre_effective_day): "a" * 64},
+        ),
+    }
+
+
 def test_expected_bar_set_excludes_non_applicable_and_suspended_pairs() -> None:
     result = evaluate_month_completeness(**_valid_inputs())
 
@@ -89,6 +127,135 @@ def test_expected_bar_set_excludes_non_applicable_and_suspended_pairs() -> None:
         CompletenessPairClass.UNRESOLVED.value: 0,
         CompletenessPairClass.EXTRA_RETURNED.value: 0,
     }
+
+
+def test_approved_identity_duplicate_is_tolerated_without_classifying_old_pair() -> None:
+    result = evaluate_month_completeness(**_identity_transition_values())
+
+    assert result.accepted
+    assert result.structural_error_codes == ()
+    assert result.required_bar_pair_count == 2
+    assert result.positive_trade_pair_count == 1
+    assert result.classification_counts[CompletenessPairClass.SUSPENSION_NON_TRADING.value] == 0
+
+
+def test_identity_event_valid_intervals_keep_both_sides_ordinary() -> None:
+    values = _identity_transition_values(
+        old_status=_status(day_values=[20250214], flags=[0]),
+    )
+    values.pop("positive_trade_fallback")
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["302132.SZ"] = _status(day_values=[20250217], flags=[0])
+
+    result = evaluate_month_completeness(**values)
+
+    assert result.accepted
+    assert result.structural_error_codes == ()
+    assert result.required_bar_pair_count == 2
+
+
+def test_identity_transition_helper_reuses_registry_for_a_second_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    synthetic_event = ApprovedIdentityEvent(
+        old_provider_symbol="600001.SH",
+        new_provider_symbol="600002.SH",
+        effective_from=date(2024, 2, 5),
+        original_list_date=date(2020, 1, 1),
+        exchange="SSE",
+    )
+    monkeypatch.setattr(
+        month_completeness_module,
+        "approved_provider_identity_events",
+        lambda: (synthetic_event,),
+    )
+
+    values = _identity_transition_values(
+        old_symbol="600001.SH",
+        new_symbol="600002.SH",
+        pre_effective_day=20240202,
+        effective_day=20240205,
+    )
+    result = evaluate_month_completeness(**values)
+
+    assert result.accepted
+    assert result.structural_error_codes == ()
+    assert result.positive_trade_pair_count == 1
+
+
+def test_unrelated_out_of_scope_status_row_still_fails_closed() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["000001.SZ"] = _status(day_values=[20240102, 20240103], flags=[0, 0])
+
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert "STATUS_OUTSIDE_APPLICABILITY_SET" in result.structural_error_codes
+
+
+def test_conflicting_old_and_new_status_evidence_fails_closed() -> None:
+    values = _identity_transition_values(
+        old_status=_status(day_values=[20250214], flags=[0]),
+    )
+    values.pop("positive_trade_fallback")
+    status = values["status_payload"]
+    assert isinstance(status, dict)
+    status["302132.SZ"] = _status(day_values=[20250214, 20250217], flags=[0, 0])
+
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert "STATUS_OUTSIDE_APPLICABILITY_SET" in result.structural_error_codes
+
+
+def test_ambiguous_identity_registry_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    overlapping_event = ApprovedIdentityEvent(
+        old_provider_symbol="302132.SZ",
+        new_provider_symbol="399999.SZ",
+        effective_from=date(2025, 3, 1),
+        original_list_date=date(2010, 8, 27),
+        exchange="SZSE",
+    )
+    approved_events = month_completeness_module.approved_provider_identity_events()
+    monkeypatch.setattr(
+        month_completeness_module,
+        "approved_provider_identity_events",
+        lambda: approved_events + (overlapping_event,),
+    )
+
+    values = _identity_transition_values()
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert "STATUS_OUTSIDE_APPLICABILITY_SET" in result.structural_error_codes
+
+
+def test_identity_date_gap_or_invalid_interval_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    invalid_event = ApprovedIdentityEvent(
+        old_provider_symbol="300114.SZ",
+        new_provider_symbol="302132.SZ",
+        effective_from=date(2025, 2, 1),
+        original_list_date=date(2025, 2, 3),
+        exchange="SZSE",
+    )
+    monkeypatch.setattr(
+        month_completeness_module,
+        "approved_provider_identity_events",
+        lambda: (invalid_event,),
+    )
+
+    values = _identity_transition_values()
+    result = evaluate_month_completeness(**values)
+
+    assert not result.accepted
+    assert "STATUS_OUTSIDE_APPLICABILITY_SET" in result.structural_error_codes
 
 
 def test_security_first_present_on_d_plus_one_is_not_applicable_on_d() -> None:
@@ -129,6 +296,160 @@ def test_provider_list_date_excludes_a_prelisting_exact_session() -> None:
     assert result.returned_row_count == 1
     assert result.classification_counts[CompletenessPairClass.NOT_APPLICABLE_SESSION.value] == 2
     assert result.prelisting_list_dates == {"000001.SZ": date(2024, 1, 3)}
+
+
+def test_provider_delist_date_excludes_on_and_after_delisting_session() -> None:
+    values = _valid_inputs()
+    result = evaluate_month_completeness(
+        **values,
+        delist_dates_by_symbol={"600000.SH": date(2024, 1, 3)},
+    )
+
+    assert result.accepted
+    assert result.required_bar_pair_count == 2
+    assert result.returned_bar_pair_count == 2
+    assert result.classification_counts[CompletenessPairClass.NOT_APPLICABLE_SESSION.value] == 2
+    assert result.postdelisting_delist_dates == {"600000.SH": date(2024, 1, 3)}
+
+
+def test_session_before_delist_date_keeps_ordinary_status_and_bar_requirement() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    bars = values["daily_bar_payload"]
+    assert isinstance(status, dict)
+    assert isinstance(bars, dict)
+    status["600000.SH"] = _status(day_values=[20240102, 20240103], flags=[0, 0])
+    bars["600000.SH"] = _bars("600000.SH", [20240102, 20240103])
+
+    result = evaluate_month_completeness(
+        **values,
+        delist_dates_by_symbol={"600000.SH": date(2024, 1, 4)},
+    )
+
+    assert result.accepted
+    assert result.required_bar_pair_count == 3
+    assert result.returned_bar_pair_count == 3
+    assert result.postdelisting_delist_dates == {}
+
+
+@pytest.mark.parametrize("delist_date", (None, "malformed-delist-date"))
+def test_missing_or_malformed_delist_date_does_not_resolve_an_unresolved_pair(
+    delist_date: object,
+) -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    bars = values["daily_bar_payload"]
+    assert isinstance(status, dict)
+    assert isinstance(bars, dict)
+    status["000001.SZ"] = pl.DataFrame()
+    bars["000001.SZ"] = _bars("000001.SZ", [])
+
+    result = evaluate_month_completeness(
+        **values,
+        delist_dates_by_symbol={"000001.SZ": delist_date},
+    )
+
+    assert not result.accepted
+    assert result.unresolved_pair_count == 1
+    assert result.classification_counts[CompletenessPairClass.UNRESOLVED.value] == 1
+    assert result.postdelisting_delist_dates == {}
+
+
+def test_approved_official_suspension_event_resolves_only_its_exact_interval() -> None:
+    symbols = ["300114.SZ"]
+    days = [20230111, 20230112, 20230113, 20230130, 20230131]
+    values = {
+        "monthly_symbols": symbols,
+        "trading_days": days,
+        "exact_day_universes": dict.fromkeys(days, symbols),
+        "status_payload": {
+            "300114.SZ": _status(day_values=[20230111], flags=[0]),
+        },
+        "daily_bar_payload": {"300114.SZ": _bars("300114.SZ", [20230111])},
+    }
+
+    result = evaluate_month_completeness(
+        **values,
+        official_suspension_event=APPROVED_300114_SUSPENSION_EVENT,
+    )
+
+    assert result.accepted
+    assert result.required_bar_pair_count == 1
+    assert result.returned_row_count == 1
+    assert result.unresolved_pair_count == 0
+    assert result.classification_counts == {
+        CompletenessPairClass.SUSPENSION_NON_TRADING.value: 4,
+        CompletenessPairClass.NOT_APPLICABLE_SESSION.value: 0,
+        CompletenessPairClass.POSITIVE_TRADE_COUNT_ACTIVE.value: 0,
+        CompletenessPairClass.PROVIDER_API_SHAPE_OR_REQUEST_MISMATCH.value: 0,
+        CompletenessPairClass.UNEXPLAINED_MISSING.value: 0,
+        CompletenessPairClass.UNRESOLVED.value: 0,
+        CompletenessPairClass.EXTRA_RETURNED.value: 0,
+    }
+    assert result.official_suspension_event == APPROVED_300114_SUSPENSION_EVENT
+    assert APPROVED_300114_SUSPENSION_EVENT.covers(date(2023, 2, 1))
+    assert not APPROVED_300114_SUSPENSION_EVENT.covers(date(2023, 2, 2))
+
+
+def test_official_suspension_event_is_not_a_zero_activity_heuristic() -> None:
+    values = _valid_inputs()
+    status = values["status_payload"]
+    bars = values["daily_bar_payload"]
+    assert isinstance(status, dict)
+    assert isinstance(bars, dict)
+    status["000001.SZ"] = pl.DataFrame()
+    bars["000001.SZ"] = _bars("000001.SZ", [])
+
+    result = evaluate_month_completeness(
+        **values,
+        official_suspension_event=APPROVED_300114_SUSPENSION_EVENT,
+    )
+
+    assert not result.accepted
+    assert result.unresolved_pair_count == 1
+    assert result.classification_counts[CompletenessPairClass.SUSPENSION_NON_TRADING.value] == 1
+    assert result.official_suspension_event is None
+
+
+def test_official_suspension_event_round_trip_binds_sources() -> None:
+    symbols = ["300114.SZ"]
+    days = [20230111, 20230112]
+    result = evaluate_month_completeness(
+        monthly_symbols=symbols,
+        trading_days=days,
+        exact_day_universes=dict.fromkeys(days, symbols),
+        status_payload={"300114.SZ": _status(day_values=[20230111], flags=[0])},
+        daily_bar_payload={"300114.SZ": _bars("300114.SZ", [20230111])},
+        official_suspension_event=APPROVED_300114_SUSPENSION_EVENT,
+    )
+    encoded = json.loads(json.dumps(result.as_dict(), ensure_ascii=False, default=str))
+    replayed = MonthCompletenessEvaluation.from_mapping(encoded)
+
+    assert replayed == result
+    assert replayed.official_suspension_event == APPROVED_300114_SUSPENSION_EVENT
+    assert encoded["official_suspension_event"]["source_urls"] == list(
+        APPROVED_300114_SUSPENSION_EVENT.source_urls
+    )
+
+
+def test_tampered_official_suspension_source_is_rejected() -> None:
+    symbols = ["300114.SZ"]
+    days = [20230111, 20230112]
+    result = evaluate_month_completeness(
+        monthly_symbols=symbols,
+        trading_days=days,
+        exact_day_universes=dict.fromkeys(days, symbols),
+        status_payload={"300114.SZ": _status(day_values=[20230111], flags=[0])},
+        daily_bar_payload={"300114.SZ": _bars("300114.SZ", [20230111])},
+        official_suspension_event=APPROVED_300114_SUSPENSION_EVENT,
+    )
+    payload = result.as_dict()
+    event = payload["official_suspension_event"]
+    assert isinstance(event, dict)
+    event["source_urls"][0] = "https://example.invalid/not-official"
+
+    with pytest.raises(MonthCompletenessError, match="month completeness evaluation is malformed"):
+        MonthCompletenessEvaluation.from_mapping(payload)
 
 
 @pytest.mark.parametrize("list_date", (date(2024, 1, 2), date(2024, 1, 1)))
@@ -501,6 +822,18 @@ def test_evaluation_round_trip_is_exact_and_sanitized() -> None:
     assert "not_applicable_pair_set_hash" not in encoded
     assert "applicability_semantics_version" not in encoded
     assert "positive_trade_fallback_version" not in encoded
+
+
+def test_evaluation_round_trip_preserves_used_delist_fact() -> None:
+    result = evaluate_month_completeness(
+        **_valid_inputs(),
+        delist_dates_by_symbol={"600000.SH": date(2024, 1, 3)},
+    )
+    encoded = json.loads(json.dumps(result.as_dict(), ensure_ascii=False, default=str))
+    replayed = MonthCompletenessEvaluation.from_mapping(encoded)
+
+    assert replayed.as_dict() == result.as_dict()
+    assert replayed.postdelisting_delist_dates == {"600000.SH": date(2024, 1, 3)}
 
 
 def test_unknown_month_semantic_rule_version_cannot_replay() -> None:

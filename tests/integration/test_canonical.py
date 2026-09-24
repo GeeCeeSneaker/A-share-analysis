@@ -258,11 +258,24 @@ def _seed_bars(conn, env_root, request_id: str = "req-bars", received_at: dateti
 def _read_selected(roots: dict[str, Path], result) -> list[dict[str, Any]]:
     import polars as pl
 
+    from ashare_state.canonical.daily_bar import deep_verify_daily_bar_partitions
+
     manifest = json.loads(
         (roots["normalized"] / str(result.manifest_uri)).read_text(encoding="utf-8")
     )
     uri = manifest["artifacts"]["selected"]["uri"]
-    return pl.read_parquet(roots["normalized"] / uri).to_dicts()
+    rows = pl.read_parquet(roots["normalized"] / uri).to_dicts()
+    rows.extend(
+        deep_verify_daily_bar_partitions(
+            roots["normalized"],
+            manifest.get("daily_bar_partitions", []),
+        )
+    )
+    selected_fields = manifest.get("selected_schema_fields", [])
+    for row in rows:
+        for field in selected_fields:
+            row.setdefault(field, None)
+    return sorted(rows, key=lambda row: str(row.get("canonical_key", "")))
 
 
 def _read_decisions(roots: dict[str, Path], result) -> list[dict[str, Any]]:

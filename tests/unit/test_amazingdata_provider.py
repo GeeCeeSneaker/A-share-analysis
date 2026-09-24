@@ -391,6 +391,119 @@ class TestTimeBudget:
         )
         assert len(calls) == 3
 
+    def test_generic_query_failure_is_not_retried_by_default(self):
+        from ashare_state.providers.errors import ProviderSdkInternalError
+
+        calls = []
+
+        def generic_failure():
+            calls.append(1)
+            raise ProviderSdkInternalError(
+                "generic query failure",
+                context={"classification_rule_id": "QUERY_FAIL_UNCLASSIFIED"},
+            )
+
+        with pytest.raises(ProviderSdkInternalError):
+            run_with_budget(
+                generic_failure,
+                budget=TimeBudget(),
+                retry=RetryPolicy(max_retries=2, backoff_base_seconds=0.001),
+                endpoint="InfoData.get_stock_basic",
+            )
+        assert len(calls) == 1
+
+    def test_generic_query_failure_retries_only_for_allowlisted_endpoint(self):
+        from ashare_state.providers.errors import ProviderSdkInternalError
+
+        calls = []
+        delays = []
+
+        def flaky_server_feedback():
+            calls.append(1)
+            if len(calls) < 3:
+                raise ProviderSdkInternalError(
+                    "generic query failure",
+                    context={"classification_rule_id": "QUERY_FAIL_UNCLASSIFIED"},
+                )
+            return "ok"
+
+        assert (
+            run_with_budget(
+                flaky_server_feedback,
+                budget=TimeBudget(query_timeout_seconds=30.0),
+                retry=RetryPolicy(
+                    max_retries=2,
+                    backoff_base_seconds=5.0,
+                    max_backoff_seconds=6.0,
+                    jitter_fraction=0.0,
+                    retryable_generic_query_failure_endpoints=("InfoData.get_stock_basic",),
+                ),
+                endpoint="InfoData.get_stock_basic",
+                sleep=delays.append,
+            )
+            == "ok"
+        )
+        assert len(calls) == 3
+        # The second retry is capped; neither retry is immediate.
+        assert delays == [5.0, 6.0]
+
+    def test_generic_query_failure_allowlist_does_not_cross_endpoints(self):
+        from ashare_state.providers.errors import ProviderSdkInternalError
+
+        calls = []
+
+        def generic_failure():
+            calls.append(1)
+            raise ProviderSdkInternalError(
+                "generic query failure",
+                context={"classification_rule_id": "QUERY_FAIL_UNCLASSIFIED"},
+            )
+
+        with pytest.raises(ProviderSdkInternalError):
+            run_with_budget(
+                generic_failure,
+                budget=TimeBudget(),
+                retry=RetryPolicy(
+                    max_retries=2,
+                    backoff_base_seconds=5.0,
+                    retryable_generic_query_failure_endpoints=("InfoData.get_stock_basic",),
+                ),
+                endpoint="MarketData.query_kline",
+            )
+        assert len(calls) == 1
+
+    def test_exhausted_generic_query_failure_keeps_its_true_error_class(self):
+        from ashare_state.providers.errors import ProviderSdkInternalError
+
+        calls = []
+        delays = []
+
+        def always_fails():
+            calls.append(1)
+            raise ProviderSdkInternalError(
+                "generic query failure",
+                context={"classification_rule_id": "QUERY_FAIL_UNCLASSIFIED"},
+            )
+
+        with pytest.raises(ProviderSdkInternalError) as excinfo:
+            run_with_budget(
+                always_fails,
+                budget=TimeBudget(query_timeout_seconds=30.0),
+                retry=RetryPolicy(
+                    max_retries=2,
+                    backoff_base_seconds=5.0,
+                    max_backoff_seconds=6.0,
+                    jitter_fraction=0.0,
+                    retryable_generic_query_failure_endpoints=("InfoData.get_stock_basic",),
+                ),
+                endpoint="InfoData.get_stock_basic",
+                sleep=delays.append,
+            )
+        assert len(calls) == 3
+        assert delays == [5.0, 6.0]
+        assert excinfo.value.context["retry_exhausted"] is True
+        assert excinfo.value.context["retry_attempts"] == 3
+
     def test_blocking_callable_exceeding_budget_is_recorded_not_cancelled(self):
         """Audit P0-03: honest semantics - budget does NOT cancel a blocking
         native call; the fn runs to completion and the elapsed time is

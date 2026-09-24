@@ -60,6 +60,8 @@ class VerifiedSnapshot:
     ledger_record: dict[str, Any]
     manifest: dict[str, Any]
     domain_rows: dict[str, tuple[dict[str, Any], ...]]
+    market_as_of: datetime | None = None
+    source_vintage_as_of: datetime | None = None
 
 
 def snapshot_base_hash_from_primitives(
@@ -71,28 +73,29 @@ def snapshot_base_hash_from_primitives(
     canonical_as_of: str,
     snapshot_contract_version: str,
     snapshot_builder_code_fingerprint: str,
+    canonical_source_set_hash: str | None = None,
 ) -> str:
     """P0-A04: the snapshot base identity hash - a canonical JSON over
     the canonical run id + canonical manifest hash + canonical
     requested domains hash + canonical selected semantic hash +
-    canonical as_of + the snapshot contract version + the snapshot
-    builder code fingerprint. Deliberately derived from the canonical
-    RUN-LEVEL seals (not from the projected rows) so the identity is
-    computable BEFORE any artifact is written and verifiable from the
-    manifest primitives afterwards."""
-    return hashlib.sha256(
-        _canonical_json(
-            {
-                "canonical_run_id": canonical_run_id,
-                "canonical_manifest_hash": canonical_manifest_hash,
-                "canonical_requested_domains_hash": canonical_requested_domains_hash,
-                "canonical_selected_semantic_hash": canonical_selected_semantic_hash,
-                "canonical_as_of": canonical_as_of,
-                "snapshot_contract_version": snapshot_contract_version,
-                "snapshot_builder_code_fingerprint": snapshot_builder_code_fingerprint,
-            }
-        ).encode("utf-8")
-    ).hexdigest()
+    canonical as_of + the snapshot contract version + its contract-specific
+    identity component. Legacy contracts supply the source-code fingerprint;
+    ``snapshot-daily-v2`` supplies an output-semantics fingerprint in the
+    same compatibility field. Deliberately derived from canonical RUN-LEVEL
+    seals (not projected rows) so identity is computable BEFORE any artifact
+    is written and verifiable from manifest primitives afterwards."""
+    primitives = {
+        "canonical_run_id": canonical_run_id,
+        "canonical_manifest_hash": canonical_manifest_hash,
+        "canonical_requested_domains_hash": canonical_requested_domains_hash,
+        "canonical_selected_semantic_hash": canonical_selected_semantic_hash,
+        "canonical_as_of": canonical_as_of,
+        "snapshot_contract_version": snapshot_contract_version,
+        "snapshot_builder_code_fingerprint": snapshot_builder_code_fingerprint,
+    }
+    if canonical_source_set_hash is not None:
+        primitives["canonical_source_set_hash"] = canonical_source_set_hash
+    return hashlib.sha256(_canonical_json(primitives).encode("utf-8")).hexdigest()
 
 
 def snapshot_id_from_base_hash(snapshot_base_hash: str) -> str:
