@@ -62,7 +62,7 @@ The issue branch adds the minimum safety/test changes:
 | Required shapes and routing regression tests | Added on this branch; CI must pass at the exact PR head. |
 | Minimum SH/SZ request mechanics | Documented and mock-tested; provider batch ceiling and semantic row binding remain undocumented. |
 | No BSE/corporate-action/full-history/Formal expansion | Satisfied; none was run or activated. |
-| Ruff, format, mypy, focused/full pytest and Windows/Ubuntu Python 3.14 CI | Pending exact-head CI. |
+| Ruff, format, mypy, focused/full pytest and Windows/Ubuntu Python 3.14 CI | Required merge gate; use the exact final PR head's run status. |
 | Short semantic-closure record | This file; disposition is BLOCKED, not PASS. |
 
 To unblock the semantic issue, obtain a written Provider/SDK contract that classifies these missing-key rows, or recover the exact ignored raw artifacts and use them to design a genuinely targeted reproducible check. Raw shape alone is not enough to prove a row is non-fact; if it remains ambiguous after that, the provider must explain its meaning or the endpoint cannot feed canonical status/limit facts.
