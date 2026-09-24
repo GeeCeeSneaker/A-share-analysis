@@ -15,7 +15,7 @@ The only defensible classification is `STILL_UNRESOLVED`. The runtime continues 
 
 ### Retained-artifact recovery check (2026-09-24)
 
-The frozen receipt identifies request `3692c492-c5fc-431e-a8ec-6e7dcd69d0d0` and eight logical artifact URIs, but does not expose a local filesystem root. A targeted recursive search for the exact filenames below was run in the active Codex workspace, the current Windows user-profile tree, and the `D:\` volume. No matching artifacts were found. The checkout has the tracked Golden data but not these raw Parquet files.
+The frozen receipt identifies request `3692c492-c5fc-431e-a8ec-6e7dcd69d0d0` and eight logical artifact URIs, but does not record the resolved absolute raw-data root or whether the run overrode `--raw-root`. The probe script's default is `data/spike/capability-closure-20260912/raw`; that directory is absent from the current checkout. A targeted recursive search for the exact filenames below was run in the active Codex workspace, the current Windows user-profile tree, and the `D:\` volume. No matching artifacts were found. This establishes unavailability in the searched environment, not loss or absence in any external retained store.
 
 Because the files were unavailable, no Parquet content was read: no local content hash was verified, and anomaly count, source-row ordinal/position, documented status/limit null mask, and deterministic row fingerprint are **unavailable**, not zero or inferred. This local search does not establish that the artifacts are absent from external storage.
 
@@ -34,7 +34,7 @@ No Provider call was made. With no exact row or target symbol/date available, a 
 
 1. The issue's frozen receipt and scrubbed records:
    - `docs/provider_verification/capability_closure_20260911.json` records the 8-symbol, 1990-01-01–2099-12-31 response (20,638 rows), aggregate missing-date count, per-symbol table row counts, hashes, and raw artifact URIs.
-   - The receipt does **not** preserve the affected row bodies, their dates/field values, or which exact symbols contain the eight rows. The raw Parquet/meta files are under a local ignored path and are absent from the available clean checkout; GitHub cannot provide ignored local artifacts.
+   - The receipt does **not** preserve the affected row bodies, their dates/field values, or which exact symbols contain the eight rows. It stores logical URIs rather than a resolved filesystem root. The probe script defaults `--raw-root` to `data/spike/capability-closure-20260912/raw`, but the receipt does not record whether that default or an override was used. The expected files are unavailable in the searched local environment; GitHub cannot provide ignored local artifacts.
    - `docs/provider_verification/remaining_capability_truth_20260912.json` independently restates the 8/20,638 count and `STILL_UNRESOLVED` status.
 2. The local AmazingData 1.1.9 SDK manual, section 3.5.2.10 (`get_history_stock_status`, PDF pages 17–18), lists `code_list`, `local_path`, `is_local`, `begin_date`, and `end_date`, plus returned status/limit columns. It does not define the semantics of rows missing both keys, a maximum batch size, response-to-request one-to-one binding, or the meaning of an empty response. No semantic docstring/contract was present in the inspected SDK surface.
 3. Existing facade and adapter:
