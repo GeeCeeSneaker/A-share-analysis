@@ -830,3 +830,12 @@ provider 数据结论，也不得跳过月份或将当前进度写成 78/78。
 - The earlier materialization-memory guard describes a separate prior execution path; this current migration stopped on identity before archive Snapshot publication and did not pass or re-test that downstream gate. Peak RSS for the failed invocation was not persisted, so no peak value is claimed.
 - Issue #76 remains incomplete: 46 months remain; the one logical archive Snapshot, DuckDB external facade, full ordinary-reader inventory, exact idempotent replay, changed-content conflict rejection, and final acceptance/CI gates are not complete. Keep PR #77 Draft.
 
+## Latest checkpoint — 2026-09-24 UTC
+
+**This checkpoint supersedes earlier 32/78, 2022-09 identity-stop, and credential-waiting instructions recorded above.** The PM/Owner-authorized retained LISTDATE diagnosis/remediation in Issue #76 comment [#5803824753](https://github.com/GeeCeeSneaker/A-share-analysis/issues/76#issuecomment-5803824753) is complete.
+
+- Sequential offline Canonical migration: **78/78 months PASS**, 2020-01 through 2026-06 inclusive; 7,442,987 rows; unresolved, missing, extra, and structural findings are zero in all months; migration-process provider calls = 0.
+- The 2022-09 identity gap was closed only with the exact 1,669 static LISTDATE facts from the already-retained, Owner-approved AmazingData 2023-02 stock_basic vintage. The fact-set hash and raw/normalized provenance are recorded in the report; no mutable master fields or guessed identities were used. The late source vintage is disclosed and is not represented as contemporaneous 2022 publication evidence.
+- One snapshot-daily-v3 archive Snapshot covers all 78 Canonical months. Deep verification and exact replay pass. Ordinary rm_daily_bar is a DuckDB external VIEW with 78/78 month/source coverage and 7,442,987 matching rows. Changed-content conflict protection also passed.
+- Full local pytest, Mypy, and affected-file Ruff checks passed. The exact-head GitHub CI for the new evidence commit and final Owner/PM acceptance are still gates; keep PR #77 Draft and do not merge or activate production scope.
+- Sanitized month-by-month receipts, coverage, manifests, splits, counts, replay, snapshot, resource, and QA metadata are in [the execution report](ISSUE76_78_MONTH_EXECUTION_20260924.md) and [its JSON record](ISSUE76_78_MONTH_EXECUTION_SUMMARY_20260924.json). Raw provider payloads, credentials, local ledgers/Parquet, and bulk OHLCV bytes are not included.

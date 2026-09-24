@@ -2,11 +2,16 @@
 
 ## Disposition
 
+**RESOLVED for the 2022-09 identity blocker; full offline execution PASS at 78/78.** The narrowly authorized retained LISTDATE path was executed using only the exact 1,669 static facts from the already-retained AmazingData 2023-02 stock_basic vintage. The 2022-09 Canonical partition passed with 100,844 rows and zero unresolved pairs. Full month migration, archive Snapshot, ordinary-reader, replay, and changed-content conflict checks are recorded in [the 2026-09-24 execution report](ISSUE76_78_MONTH_EXECUTION_20260924.md) and [sanitized JSON summary](ISSUE76_78_MONTH_EXECUTION_SUMMARY_20260924.json).
+
+The separate gates still open are exact-head GitHub CI for the new evidence commit and final Owner/PM acceptance. PR #77 remains Draft. This report documents the historical blocker and its resolution; it does not authorize production activation or merging.
+
+## Historical disposition (2026-09-23)
+
 **STOP(BLOCKED) at 2022-09.** The C1 event-eligibility contract was approved by the PM/Owner in Issue #76 comment [#5795151285](https://github.com/GeeCeeSneaker/A-share-analysis/issues/76#issuecomment-5795151285). Its approved offline, month-bounded migration was started without provider calls. The first new blocker is not a daily-bar coverage or C1 event-time failure: 34,844 returned daily-bar pairs cannot be assigned a governed `security_id` under the existing fail-closed identity policy.
 
 Do not skip these pairs, infer identities from a code prefix, borrow identity dates from another month, or silently weaken the identity contract. Wait for an Owner/PM decision backed by authoritative listing-date facts or a specifically authorized identity source/policy.
-
-## Verified migration checkpoint
+## Historical pre-remediation checkpoint (2026-09-23)
 
 - Sequential Canonical migration passed **32/78 months**, 2020-01 through 2022-08, with **2,758,510** selected rows. Every completed month has exact selected/decision coverage and `provider_calls=0` for this offline migration process.
 - The next month, 2022-09, has retained capture/coverage PASS: 100,844 returned daily-bar rows, 4,828 provider symbols, and 21 trading sessions. No provider request was made to investigate this stop.
@@ -34,7 +39,7 @@ Input lineage (request IDs are included only to identify the already-retained lo
 
 The normalized manifests and output bytes were verified against their recorded hashes before diagnosis. The CSV SHA-256 is `e21963940a2f6e7bd44a941a100419626ec681c4f0a418f442b77d3bc42a1e56`.
 
-## Required next decision
+## Historical required next decision (superseded 2026-09-24)
 
 The project manager/Owner must choose and document one of these before migration resumes:
 
@@ -44,6 +49,6 @@ The project manager/Owner must choose and document one of these before migration
 
 Do not resume the month loop until a decision is recorded. Preserve the existing 32 passing monthly outputs and retained source root; do not re-fetch provider data or mutate either retained root. After a decision, re-run only the bounded 2022-09 offline month first, require exact identity/coverage PASS, and then continue sequentially.
 
-## Scope separation
+## Scope separation (as of the original diagnosis)
 
 This blocker is independent of the approved `DAILY_BAR_EVENT_ELIGIBILITY_V1` rule and does not invalidate the 32 completed months. It also differs from the previously documented memory guard: this run stopped on a reproducible identity finding before any archive Snapshot publication. Local regression tests for the C1 and archive-Snapshot changes passed, but passing unit/integration tests do not close the 78-month migration or its final acceptance gates.

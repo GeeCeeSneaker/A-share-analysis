@@ -21,6 +21,7 @@ builder after all 78 monthly Canonical partitions have passed.
 from __future__ import annotations
 
 import argparse
+import csv
 import ctypes
 import hashlib
 import json
@@ -30,7 +31,8 @@ import sys
 import tempfile
 import threading
 import time
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +62,36 @@ DEFAULT_AUDIT_MONTHS = (
 STATE_FILENAME = "c1_monthly_migration_state.json"
 STATE_VERSION = "issue76-c1-monthly-migration-v1"
 PROVIDER_TREE = "provider=amazingdata"
+IDENTITY_LISTDATE_SUPPLEMENT = {
+    "target_month": "2022-09",
+    "source_month": "2023-02",
+    "provider_dataset": "stock_basic",
+    "request_id": "e0979f16-5c56-4fc9-bd66-1b934e30e771",
+    "normalization_run_id": "e478b724-8040-52f2-99a2-d7c0de7b8f9c",
+    "raw_file_sha256": "403e2d0444e6127d1ad97acc3060ad38bdaf2c0cc112997ab4424285749d13eb",
+    "raw_evidence_hash": "79ebc807ac89b723ca948b13ae009f9028847476b73894f7dd67bf50b7f4cc8b",
+    "normalized_manifest_uri": (
+        "provider=amazingdata/dataset=stock_basic/"
+        "raw_request=e0979f16-5c56-4fc9-bd66-1b934e30e771/contract=cr2.1-v1/"
+        "run=e478b724-8040-52f2-99a2-d7c0de7b8f9c/manifest.json"
+    ),
+    "normalized_manifest_sha256": (
+        "228110892e8d8976cd7f6ee6e284b2344ab8ba791df82a2ddb0840932f30c660"
+    ),
+    "normalized_output_uri": (
+        "provider=amazingdata/dataset=stock_basic/"
+        "raw_request=e0979f16-5c56-4fc9-bd66-1b934e30e771/contract=cr2.1-v1/"
+        "run=e478b724-8040-52f2-99a2-d7c0de7b8f9c/main.parquet"
+    ),
+    "normalized_output_sha256": "65d8aceddcd10242f92cf85c947c8df5d7b21df97bc6f6c426ee7d6f136770d2",
+    "source_vintage_as_of": "2026-09-18T00:44:51.537152+00:00",
+    "request_code_count": 4926,
+    "response_row_count": 4925,
+    "fact_count": 1669,
+    "fact_set_sha256": "5c30ab57cf47c9d72d47174f51f40869667788f995416b0e8f12e7ef8139eeb7",
+    "scope_csv": "docs/project/ISSUE76_2022-09_IDENTITY_MISSING_PAIRS.csv",
+    "scope_csv_sha256": "e21963940a2f6e7bd44a941a100419626ec681c4f0a418f442b77d3bc42a1e56",
+}
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -86,6 +118,53 @@ def _atomic_json(path: Path, value: Any) -> None:
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _list_date_text(value: Any) -> str:
+    text = str(value).strip()
+    if len(text) == 8 and text.isdigit():
+        parsed = date(int(text[:4]), int(text[4:6]), int(text[6:8]))
+    else:
+        parsed = date.fromisoformat(text[:10])
+    return parsed.isoformat()
+
+
+def _identity_fact_set_hash(facts: dict[str, str]) -> str:
+    payload = [{"provider_symbol": symbol, "list_date": facts[symbol]} for symbol in sorted(facts)]
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _project_supplemental_identity_rows(
+    rows: tuple[tuple[tuple[str, Any], ...], ...],
+    *,
+    request_id: str,
+    expected_facts: dict[str, str],
+) -> tuple[tuple[tuple[str, Any], ...], ...]:
+    """Expose only the authorized LISTDATE facts from one retained source run."""
+    projected: list[tuple[tuple[str, Any], ...]] = []
+    observed: dict[str, str] = {}
+    for packed_row in rows:
+        row = dict(packed_row)
+        if str(row.get("raw_request") or "") != request_id:
+            projected.append(packed_row)
+            continue
+        symbol = str(row.get("provider_symbol") or "").strip().upper()
+        if symbol not in expected_facts:
+            continue
+        list_date = _list_date_text(row.get("list_date"))
+        if list_date != expected_facts[symbol] or symbol in observed:
+            raise RuntimeError(f"supplemental LISTDATE fact differs or repeats for {symbol}")
+        observed[symbol] = list_date
+        # Mutable stock_basic fields are deliberately not exposed to the bridge.
+        projected.append(tuple(sorted({"provider_symbol": symbol, "list_date": list_date}.items())))
+    if observed != expected_facts:
+        raise RuntimeError(
+            "supplemental retained LISTDATE source does not provide the exact approved symbol set"
+        )
+    return tuple(projected)
 
 
 def _current_rss_bytes() -> int:
@@ -271,9 +350,10 @@ def _initialize_output(source_root: Path, output_root: Path) -> dict[str, Any]:
 def _load_month_run_ids(
     conn: Any,
     source_root: Path,
+    output_root: Path,
     source_state: dict[str, Any],
     month: str,
-) -> tuple[set[str], dict[str, str], datetime]:
+) -> tuple[set[str], dict[str, str], datetime, dict[str, Any] | None]:
     try:
         month_state = source_state["months"][month]
     except KeyError as exc:
@@ -328,6 +408,26 @@ def _load_month_run_ids(
         ):
             raise RuntimeError(f"retained {month} {dataset} receipt identity/time is invalid")
         received_at_values.append(received_at.astimezone(UTC))
+
+    identity_supplement = _load_identity_listdate_supplement(
+        conn,
+        source_root=source_root,
+        output_root=output_root,
+        source_state=source_state,
+        month=month,
+        month_state=month_state,
+    )
+    if identity_supplement is not None:
+        supplement_run_id = str(identity_supplement["normalization_run_id"])
+        if supplement_run_id in allowed:
+            raise RuntimeError("supplemental LISTDATE run duplicates a monthly input run")
+        allowed.add(supplement_run_id)
+        request_ids["identity_listdate_source"] = str(identity_supplement["request_id"])
+        received_at_values.append(
+            datetime.fromisoformat(
+                str(identity_supplement["source_vintage_as_of"]).replace("Z", "+00:00")
+            )
+        )
     input_cutoff = max(received_at_values)
     retained_snapshot_cutoff = datetime.fromisoformat(
         str(month_state["source_snapshot_as_of"]).replace("Z", "+00:00")
@@ -338,15 +438,287 @@ def _load_month_run_ids(
         or input_cutoff > retained_snapshot_cutoff.astimezone(UTC)
     ):
         raise RuntimeError(f"retained {month} input receipt exceeds its source snapshot cutoff")
-    return allowed, request_ids, input_cutoff
+    return allowed, request_ids, input_cutoff, identity_supplement
+
+
+def _load_identity_listdate_supplement(
+    conn: Any,
+    *,
+    source_root: Path,
+    output_root: Path,
+    source_state: dict[str, Any],
+    month: str,
+    month_state: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Validate the one PM-authorized retained LISTDATE supplement for 2022-09."""
+    spec = IDENTITY_LISTDATE_SUPPLEMENT
+    if month != spec["target_month"]:
+        return None
+
+    repo_root = Path(__file__).resolve().parents[2]
+    scope_path = repo_root / spec["scope_csv"]
+    if _sha256_file(scope_path) != spec["scope_csv_sha256"]:
+        raise RuntimeError("2022-09 LISTDATE symbol-scope CSV hash differs")
+    with scope_path.open("r", encoding="utf-8", newline="") as stream:
+        scope_rows = list(csv.DictReader(stream))
+    symbols = [str(row.get("provider_symbol") or "").strip().upper() for row in scope_rows]
+    symbol_set = set(symbols)
+    if (
+        len(symbols) != int(spec["fact_count"])
+        or len(symbol_set) != len(symbols)
+        or any(not symbol for symbol in symbols)
+    ):
+        raise RuntimeError("2022-09 LISTDATE symbol-scope CSV is not the exact unique set")
+
+    source_month = source_state.get("months", {}).get(spec["source_month"])
+    if (
+        not isinstance(source_month, dict)
+        or source_month.get("status") != "PASS"
+        or source_month.get("coverage") != "PASS"
+        or source_month.get("retained_capture_replay") != "PASS"
+        or source_month.get("stock_basic_request_id") != spec["request_id"]
+    ):
+        raise RuntimeError("LISTDATE source request is not bound to retained PASS month 2023-02")
+
+    rows = conn.execute(
+        "SELECT normalization_run_id, raw_evidence_uri, normalized_manifest_uri, "
+        "normalized_manifest_hash, raw_request_id "
+        "FROM meta_provider_normalization_run "
+        "WHERE provider='amazingdata' AND provider_dataset='stock_basic' "
+        "AND raw_request_id=? AND status='SUCCESS'",
+        [spec["request_id"]],
+    ).fetchall()
+    if len(rows) != 1:
+        raise RuntimeError("retained supplemental LISTDATE request has no unique SUCCESS run")
+    run_id, raw_uri_value, manifest_uri_value, ledger_manifest_hash, ledger_request_id = rows[0]
+    raw_uri = str(raw_uri_value)
+    manifest_uri = str(manifest_uri_value)
+    if (
+        str(run_id) != spec["normalization_run_id"]
+        or str(ledger_request_id) != spec["request_id"]
+        or manifest_uri != spec["normalized_manifest_uri"]
+        or str(ledger_manifest_hash) != spec["normalized_manifest_sha256"]
+    ):
+        raise RuntimeError("supplemental LISTDATE normalization ledger seal differs")
+
+    raw_evidence_path = source_root / "authoritative_capture" / raw_uri
+    if raw_evidence_path.name.endswith(".meta.json"):
+        raw_meta_path = raw_evidence_path
+        raw_path = raw_evidence_path.with_suffix("").with_suffix(".parquet")
+    else:
+        raw_path = raw_evidence_path
+        raw_meta_path = raw_path.with_suffix(".meta.json")
+    manifest_path = output_root / "normalized" / manifest_uri
+    source_manifest_path = source_root / "normalized" / manifest_uri
+    if (
+        not raw_path.is_file()
+        or not raw_meta_path.is_file()
+        or not manifest_path.is_file()
+        or not source_manifest_path.is_file()
+    ):
+        raise RuntimeError("supplemental LISTDATE retained evidence is incomplete")
+    raw_file_hash = _sha256_file(raw_path)
+    manifest_hash = _sha256_file(manifest_path)
+    if (
+        raw_file_hash != spec["raw_file_sha256"]
+        or manifest_hash != spec["normalized_manifest_sha256"]
+        or _sha256_file(source_manifest_path) != manifest_hash
+    ):
+        raise RuntimeError("supplemental LISTDATE retained raw/manifest hash differs")
+
+    raw_meta = json.loads(raw_meta_path.read_text(encoding="utf-8"))
+    received_at_text = str(raw_meta.get("received_at") or "")
+    try:
+        received_at = datetime.fromisoformat(received_at_text.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise RuntimeError("supplemental LISTDATE receipt time is invalid") from exc
+    if received_at.tzinfo is None or received_at.utcoffset() is None:
+        raise RuntimeError("supplemental LISTDATE receipt time has no timezone")
+    received_at_text = received_at.astimezone(UTC).isoformat()
+    if (
+        raw_meta.get("provider") != "amazingdata"
+        or raw_meta.get("provider_dataset") != "stock_basic"
+        or raw_meta.get("request_id") != spec["request_id"]
+        or raw_meta.get("status") != "OK"
+        or int(raw_meta.get("row_count", -1)) != int(spec["response_row_count"])
+        or raw_meta.get("content_hash") != spec["raw_file_sha256"]
+        or received_at_text != spec["source_vintage_as_of"]
+    ):
+        raise RuntimeError("supplemental LISTDATE raw receipt does not match its pinned identity")
+    requested_symbols_value = raw_meta.get("request_params", {}).get("code_list")
+    if (
+        not isinstance(requested_symbols_value, list)
+        or len(requested_symbols_value) != int(spec["request_code_count"])
+        or len(set(requested_symbols_value)) != len(requested_symbols_value)
+        or not symbol_set.issubset(
+            {str(value).strip().upper() for value in requested_symbols_value}
+        )
+    ):
+        raise RuntimeError(
+            "supplemental LISTDATE request scope does not cover the exact blocker set"
+        )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if (
+        manifest.get("provider") != "amazingdata"
+        or manifest.get("provider_dataset") != "stock_basic"
+        or manifest.get("raw_request_id") != spec["request_id"]
+        or manifest.get("raw_evidence_hash") != spec["raw_evidence_hash"]
+        or int(manifest.get("input_count", -1)) != int(spec["response_row_count"])
+        or int(manifest.get("normalized_count", -1)) != int(spec["response_row_count"])
+    ):
+        raise RuntimeError("supplemental LISTDATE normalized manifest identity/count differs")
+    outputs = manifest.get("outputs")
+    if not isinstance(outputs, list) or len(outputs) != 1:
+        raise RuntimeError("supplemental LISTDATE normalization must have one output")
+    output_entry = outputs[0]
+    if (
+        output_entry.get("output_name") != "main"
+        or output_entry.get("uri") != spec["normalized_output_uri"]
+        or int(output_entry.get("row_count", -1)) != int(spec["response_row_count"])
+        or output_entry.get("content_hash") != spec["normalized_output_sha256"]
+    ):
+        raise RuntimeError("supplemental LISTDATE normalized output seal differs")
+    output_path = output_root / "normalized" / str(output_entry["uri"])
+    source_output_path = source_root / "normalized" / str(output_entry["uri"])
+    if (
+        not output_path.is_file()
+        or not source_output_path.is_file()
+        or _sha256_file(output_path) != spec["normalized_output_sha256"]
+        or _sha256_file(source_output_path) != spec["normalized_output_sha256"]
+    ):
+        raise RuntimeError("supplemental LISTDATE normalized output bytes differ")
+
+    raw_frame = pl.read_parquet(raw_path, columns=["MARKET_CODE", "LISTDATE"])
+    normalized_frame = pl.read_parquet(output_path, columns=["provider_symbol", "list_date"])
+    if raw_frame.height != int(spec["response_row_count"]) or normalized_frame.height != int(
+        spec["response_row_count"]
+    ):
+        raise RuntimeError("supplemental LISTDATE source row count differs")
+    raw_facts: dict[str, str] = {}
+    for row in raw_frame.iter_rows(named=True):
+        symbol = str(row.get("MARKET_CODE") or "").strip().upper()
+        if symbol not in symbol_set:
+            continue
+        if symbol in raw_facts:
+            raise RuntimeError(f"supplemental raw LISTDATE repeats {symbol}")
+        raw_facts[symbol] = _list_date_text(row.get("LISTDATE"))
+    facts: dict[str, str] = {}
+    for row in normalized_frame.iter_rows(named=True):
+        symbol = str(row.get("provider_symbol") or "").strip().upper()
+        if symbol not in symbol_set:
+            continue
+        if symbol in facts:
+            raise RuntimeError(f"supplemental normalized LISTDATE repeats {symbol}")
+        facts[symbol] = _list_date_text(row.get("list_date"))
+    if raw_facts != facts or set(facts) != symbol_set:
+        raise RuntimeError("supplemental raw and normalized LISTDATE facts do not close exactly")
+    fact_hash = _identity_fact_set_hash(facts)
+    if fact_hash != spec["fact_set_sha256"]:
+        raise RuntimeError("supplemental LISTDATE fact-set hash differs")
+
+    month_cutoff = datetime.fromisoformat(
+        str(month_state["source_snapshot_as_of"]).replace("Z", "+00:00")
+    )
+    if (
+        month_cutoff.tzinfo is None
+        or month_cutoff.utcoffset() is None
+        or received_at.astimezone(UTC) > month_cutoff.astimezone(UTC)
+    ):
+        raise RuntimeError("supplemental LISTDATE source is after the 2022-09 retained cutoff")
+
+    daily_request_id = str(month_state["daily_bar_request_id"])
+    daily_runs = conn.execute(
+        "SELECT normalized_manifest_uri FROM meta_provider_normalization_run "
+        "WHERE provider='amazingdata' AND provider_dataset='daily_bar' "
+        "AND raw_request_id=? AND status='SUCCESS'",
+        [daily_request_id],
+    ).fetchall()
+    if len(daily_runs) != 1:
+        raise RuntimeError("2022-09 daily-bar normalized run is not unique for LISTDATE checks")
+    daily_manifest = json.loads(
+        (output_root / "normalized" / str(daily_runs[0][0])).read_text(encoding="utf-8")
+    )
+    daily_outputs = [
+        entry for entry in daily_manifest.get("outputs", []) if entry.get("output_name") == "main"
+    ]
+    if len(daily_outputs) != 1:
+        raise RuntimeError("2022-09 daily-bar output is not uniquely sealed")
+    daily_path = output_root / "normalized" / str(daily_outputs[0]["uri"])
+    min_bar_frame = (
+        pl.scan_parquet(daily_path)
+        .filter(pl.col("provider_symbol").is_in(sorted(symbol_set)))
+        .group_by("provider_symbol")
+        .agg(pl.col("kline_time").min().alias("first_bar_date"))
+        .collect()
+    )
+    min_bar_dates = {
+        str(row["provider_symbol"]): _list_date_text(row["first_bar_date"])
+        for row in min_bar_frame.iter_rows(named=True)
+    }
+    if set(min_bar_dates) != symbol_set or any(
+        date.fromisoformat(facts[symbol]) > date.fromisoformat(min_bar_dates[symbol])
+        for symbol in symbol_set
+    ):
+        raise RuntimeError("supplemental LISTDATE does not precede every affected 2022-09 bar")
+
+    return {
+        "source_month": spec["source_month"],
+        "request_id": spec["request_id"],
+        "normalization_run_id": str(run_id),
+        "raw_evidence_uri": raw_uri,
+        "raw_file_sha256": raw_file_hash,
+        "raw_evidence_hash": str(manifest["raw_evidence_hash"]),
+        "normalized_manifest_uri": manifest_uri,
+        "normalized_manifest_sha256": manifest_hash,
+        "normalized_output_uri": str(output_entry["uri"]),
+        "normalized_output_sha256": str(output_entry["content_hash"]),
+        "source_vintage_as_of": received_at_text,
+        "fact_count": len(facts),
+        "fact_set_sha256": fact_hash,
+        "facts": facts,
+    }
 
 
 class _MonthBoundedCanonicalRunner(CanonicalRunner):
     """Private migration-only input fence: at most one retained month enters memory."""
 
-    def __init__(self, *args: Any, allowed_run_ids: set[str], **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        allowed_run_ids: set[str],
+        identity_supplement: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self._allowed_run_ids = frozenset(allowed_run_ids)
+        self._identity_supplement = identity_supplement
+
+    def _build_snapshot(self, as_of_dt: datetime, requested: tuple[str, ...]) -> Any:
+        snapshot = super()._build_snapshot(as_of_dt, requested)
+        if self._identity_supplement is None:
+            return snapshot
+        request_id = str(self._identity_supplement["request_id"])
+        source_rows: list[tuple[tuple[str, Any], ...]] = []
+        for run in snapshot.runs:
+            if run.seal.role != "identity_master" or not run.seal.pit_available:
+                continue
+            output = run.output("main")
+            if output is None:
+                continue
+            if run.seal.raw_request_id != request_id:
+                source_rows.extend(output.rows)
+                continue
+            for packed_row in output.rows:
+                tagged_row = dict(packed_row)
+                tagged_row["raw_request"] = request_id
+                source_rows.append(tuple(sorted(tagged_row.items())))
+        projected_rows = _project_supplemental_identity_rows(
+            tuple(source_rows),
+            request_id=request_id,
+            expected_facts=dict(self._identity_supplement["facts"]),
+        )
+        return replace(snapshot, available_master_rows=projected_rows)
 
     def _surface_runs(
         self, normalization_surface: str, provider_datasets: tuple[str, ...]
@@ -561,14 +933,15 @@ def _run_month(
     month_state = source_state["months"][month]
     conn = duckdb.connect(str(output_root / "ledger.duckdb"))
     try:
-        allowed_run_ids, request_ids, run_as_of = _load_month_run_ids(
-            conn, source_root, source_state, month
+        allowed_run_ids, request_ids, run_as_of, identity_supplement = _load_month_run_ids(
+            conn, source_root, output_root, source_state, month
         )
         runner = _MonthBoundedCanonicalRunner(
             conn,
             raw_root=source_root / "authoritative_capture",
             normalized_root=output_root / "normalized",
             allowed_run_ids=allowed_run_ids,
+            identity_supplement=identity_supplement,
         )
         result = runner.run(run_as_of, domains=("daily_bar",))
         if result.status != "SUCCESS" or result.selected_count != int(
@@ -586,6 +959,31 @@ def _run_month(
         actual_input_ids = {str(entry.get("run_id")) for entry in inputs}
         if actual_input_ids != allowed_run_ids:
             raise RuntimeError(f"Canonical {month} consumed an unexpected month/input set")
+        if identity_supplement is not None:
+            identity_seals = [
+                entry
+                for entry in inputs
+                if str(entry.get("run_id")) == str(identity_supplement["normalization_run_id"])
+            ]
+            if len(identity_seals) != 1:
+                raise RuntimeError("Canonical manifest does not bind one supplemental LISTDATE run")
+            identity_seal = identity_seals[0]
+            if (
+                str(identity_seal.get("raw_request_id")) != str(identity_supplement["request_id"])
+                or str(identity_seal.get("raw_evidence_hash"))
+                != str(identity_supplement["raw_evidence_hash"])
+                or str(identity_seal.get("normalized_manifest_uri"))
+                != str(identity_supplement["normalized_manifest_uri"])
+                or str(identity_seal.get("normalized_manifest_hash"))
+                != str(identity_supplement["normalized_manifest_sha256"])
+                or str(identity_seal.get("received_at"))
+                != str(identity_supplement["source_vintage_as_of"])
+                or datetime.fromisoformat(str(canonical_manifest["as_of"]))
+                < datetime.fromisoformat(str(identity_supplement["source_vintage_as_of"]))
+            ):
+                raise RuntimeError(
+                    "Canonical manifest does not bind the exact LISTDATE source vintage"
+                )
         partitions = canonical_manifest.get("daily_bar_partitions")
         if not isinstance(partitions, list) or len(partitions) != 1:
             raise RuntimeError(f"Canonical {month} must emit exactly one monthly L0 partition")
@@ -660,6 +1058,7 @@ def _run_month(
             raw_root=source_root / "authoritative_capture",
             normalized_root=output_root / "normalized",
             allowed_run_ids=allowed_run_ids,
+            identity_supplement=identity_supplement,
         )
         replay = replay_runner.run(run_as_of, domains=("daily_bar",))
         if not replay.idempotent_replay or replay.canonical_run_id != result.canonical_run_id:
@@ -673,6 +1072,11 @@ def _run_month(
             "decision_count": result.decision_count,
             "input_run_count": len(allowed_run_ids),
             "input_request_ids": request_ids,
+            "identity_listdate_source": (
+                {key: value for key, value in identity_supplement.items() if key != "facts"}
+                if identity_supplement is not None
+                else None
+            ),
             "canonical_source_cutoff": run_as_of.isoformat(),
             "retained_snapshot_cutoff": month_state["source_snapshot_as_of"],
             "source_capture_provider_calls": int(
@@ -893,8 +1297,8 @@ def main() -> int:
     try:
         cutoffs: dict[str, str] = {}
         for month in months:
-            _allowed, _request_ids, cutoff = _load_month_run_ids(
-                preflight_conn, source_root, source_state, month
+            _allowed, _request_ids, cutoff, _identity_supplement = _load_month_run_ids(
+                preflight_conn, source_root, output_root, source_state, month
             )
             cutoff_text = cutoff.isoformat()
             prior_month = cutoffs.get(cutoff_text)
@@ -940,3 +1344,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
