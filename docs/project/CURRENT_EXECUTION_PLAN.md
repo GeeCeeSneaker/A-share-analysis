@@ -839,3 +839,16 @@ provider 数据结论，也不得跳过月份或将当前进度写成 78/78。
 - One snapshot-daily-v3 archive Snapshot covers all 78 Canonical months. Deep verification and exact replay pass. Ordinary rm_daily_bar is a DuckDB external VIEW with 78/78 month/source coverage and 7,442,987 matching rows. Changed-content conflict protection also passed.
 - Local QA: the previously verified full pytest suite, Mypy (111 source files), and affected-file Ruff checks passed. Evidence commit f469fae CI #750 passed Ruff lint but failed Ruff format only on the migration runner and identity test; this was fixed by follow-up 195e0d2. Exact-head CI #751 for 195e0d2 passed all three matrices, including Ruff lint/format, Mypy, full pytest, and SDK-absence checks; controlled GT-H3B run #257 was skipped by scope. Final Owner/PM acceptance remains required; keep PR #77 Draft and do not merge or activate production scope.
 - Sanitized month-by-month receipts, coverage, manifests, splits, counts, replay, snapshot, resource, and QA metadata are in [the execution report](ISSUE76_78_MONTH_EXECUTION_20260924.md) and [its JSON record](ISSUE76_78_MONTH_EXECUTION_SUMMARY_20260924.json). Raw provider payloads, credentials, local ledgers/Parquet, and bulk OHLCV bytes are not included.
+
+## 2026-09-24 — Issue #76 final acceptance and closure (current)
+
+> This is the authoritative current checkpoint and supersedes all earlier statements in this file that Issue #76 is blocked, incomplete, awaiting review, or that PR #77 must remain Draft.
+
+- **Issue #76: PASS / completed / closed.** PM/Owner accepted the exact reviewed PR head `33070730ea9cfe897e98712b99db5e6bcb73e192` and authorized the normal merge procedure.
+- PR #77 is merged into `main`; merge commit: `b920a5b6549cb31f6cbd8643510be1ee29b301b7`. The reviewed head was preserved by an expected-head merge guard.
+- Exact-head CI #752 passed Ubuntu/Python 3.14 and Windows/Python 3.12/3.14, including Ruff lint/format, Mypy, full pytest and SDK-absence checks. Controlled GT-H3B #258 was skipped by scope as intended.
+- Final result: 78/78 Canonical monthly partitions, 2020-01 through 2026-06; 7,442,987 daily-bar rows; zero unresolved, missing, extra, or structural findings; provider calls = 0 for retained-history migration/publication; exact replay, logical `snapshot-daily-v3`, DuckDB external `rm_daily_bar` VIEW, 78/78 reader coverage, idempotency, and changed-content conflict protection all PASS.
+- The 2022-09 gap uses only 1,669 exact static LISTDATE facts from the already-retained, Owner-approved AmazingData 2023-02 `stock_basic` vintage. This is a narrowly accepted static-identity reconstruction; the later vintage is disclosed and is not represented as contemporaneous 2022 vendor evidence or generalized to mutable historical facts.
+- Preserve retained raw/local execution artifacts in place. Do not reacquire provider data to reproduce evidence. No Formal B1-B7/Production, BSE/index, CR-5/R2, Golden/H1, baseline, strategy/portfolio, or minute-provider scope is activated by this completion.
+
+**Current task:** Issue #76 is historical/completed; it is not an active task. Await a separately scheduled P0 before starting new work. No follow-on scope is implied.
