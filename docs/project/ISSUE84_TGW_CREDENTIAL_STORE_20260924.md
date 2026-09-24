@@ -1,6 +1,8 @@
 # Issue #84 — TGW credential-store acceptance checkpoint
 
-**Status:** controlled Windows credential-store and fresh-process T1 acceptance passed. Exact-head GitHub CI run #761 passed on head `07be642d81598f9873cf2def4e97c82a08910bcc`. PR #87 is Ready for review, not merged. GitHub PR checks are the live source of truth after any later head update; the latest head must be green before merge. Independent review is pending; Issue #84 remains open. This is not authorization for Production B1–B7.
+**Current disposition (2026-09-24): PASS / merged / closed.** PR #87 merged to `main` as `e1e320f9061ded52826b48df7ba9cf2b92c75639`; exact-head CI run #762 and independent scheduler review passed. This closes the credential-persistence task only; it does **not** authorize Formal Production B1–B7.
+
+The dated checkpoint details below preserve the pre-merge T1 implementation evidence and its then-current status; they are not the latest PR/issue state.
 
 ## Implementation and controlled T1
 

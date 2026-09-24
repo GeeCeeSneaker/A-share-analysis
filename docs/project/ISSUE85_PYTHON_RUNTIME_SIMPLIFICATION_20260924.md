@@ -1,7 +1,7 @@
 # Issue #85 — Python runtime simplification
 
 Date: 2026-09-24
-Status: implementation and local QA complete; scheduler/Owner acceptance is the remaining governance gate. Current PR-head checks remain the live merge gate.
+Status: **PASS / merged / closed.** PR #88 merged to `main` as `423af4b44460ee5fc0bee1b9435a0f96fca8920e` after exact-head review #5301987657 and CI #765 passed on Windows/Python 3.14 and Ubuntu/Python 3.14. The implementation and QA details below remain unchanged; no Provider call or Formal/Production execution was part of #85.
 
 ## Decision and evidence
 
