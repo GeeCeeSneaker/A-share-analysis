@@ -1,10 +1,11 @@
 """Scrubbed production-account bootstrap (P0-M-1B.0 / P0-AD-01).
 
 This command is the controlled entry point for a real-account identity
-check. Credentials are read only from TGW_* environment variables or the
-local .env file; they are never printed, saved as project evidence, or passed
-as CLI arguments. SDK fd output may use auto-cleaned local temporary capture
-files.
+check. Non-secret settings may come from TGW_* environment variables or the
+local .env file. The password comes from the current Windows user's
+Credential Manager, with an explicit process-environment override for tests
+and manual operations. SDK fd output may use auto-cleaned local temporary
+capture files.
 The command emits only a scrubbed profile and runtime facts.
 
 It deliberately does not write configs/production_account.yaml. A human
@@ -14,6 +15,7 @@ before the production allowlist is changed in a separate governed commit.
 Usage:
     uv run python scripts/spike/production_account_bootstrap.py
     uv run python scripts/spike/production_account_bootstrap.py --offline
+    uv run python scripts/spike/production_account_bootstrap.py --store-credential
     uv run python scripts/spike/production_account_bootstrap.py \
         --output data/spike/results/production_account_bootstrap.json
 """
@@ -22,12 +24,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ashare_state.providers.amazingdata.credentials import (
+    TgwCredentialsError,
+    credential_rotation_hint,
+    load_tgw_environment,
+    resolve_tgw_credentials,
+    store_tgw_password,
+)
 from ashare_state.providers.amazingdata.doctor import run_doctor
 from ashare_state.providers.amazingdata.production_identity import (
     is_freezable_production_candidate_id,
@@ -46,12 +54,6 @@ from ashare_state.providers.amazingdata.stdout_capture import (
     sdk_stdout_into,
 )
 
-_ENV_KEYS = (
-    "TGW_USERNAME",
-    "TGW_PASSWORD",
-    "TGW_SERVER_VIP",
-    "TGW_SERVER_PORT",
-)
 _RUNTIME_VERDICTS = {
     "RUNTIME_ACTUAL_LOAD_VERIFIED",
     "RUNTIME_PACKAGE_VERIFIED",
@@ -59,38 +61,13 @@ _RUNTIME_VERDICTS = {
 
 
 def load_env(path: Path = Path(".env")) -> dict[str, str]:
-    """Load only TGW_* values; process env takes precedence over .env."""
+    """Load non-secret settings from .env; never load its password."""
 
-    values = {key: value for key, value in os.environ.items() if key.startswith("TGW_")}
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#") or "=" not in stripped:
-                continue
-            key, _, value = stripped.partition("=")
-            key = key.strip()
-            if key not in _ENV_KEYS:
-                continue
-            value = value.strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
-                value = value[1:-1]
-            values.setdefault(key, value)
-    return values
+    return load_tgw_environment(path)
 
 
-def _credentials_from_env(env: dict[str, str]) -> tuple[str, str, str, int] | None:
-    if not all(env.get(key) for key in _ENV_KEYS):
-        return None
-    try:
-        port = int(env["TGW_SERVER_PORT"])
-    except (TypeError, ValueError):
-        return None
-    return (
-        env["TGW_USERNAME"],
-        env["TGW_PASSWORD"],
-        env["TGW_SERVER_VIP"],
-        port,
-    )
+def _credentials_from_env(env: dict[str, str]) -> tuple[str, str, str, int]:
+    return resolve_tgw_credentials(env)
 
 
 def _safe_permission_codes(value: Any) -> str:
@@ -297,7 +274,27 @@ def main() -> int:
         action="store_true",
         help="verify the packaged SDK/runtime without reading or using account credentials",
     )
+    parser.add_argument(
+        "--store-credential",
+        action="store_true",
+        help=(
+            "prompt once without echo and store/replace the TGW password in Windows "
+            "Credential Manager"
+        ),
+    )
     args = parser.parse_args()
+
+    if args.store_credential:
+        if args.offline or args.output:
+            parser.error("--store-credential cannot be combined with --offline or --output")
+        try:
+            settings = load_env(args.env_file)
+            store_tgw_password(settings.get("TGW_USERNAME", ""))
+        except TgwCredentialsError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print("TGW credential stored in the current Windows user's Credential Manager.")
+        return 0
 
     if args.offline:
         raw, stderr_observed = _run_doctor_with_stderr_containment(credentials=None, offline=True)
@@ -314,11 +311,12 @@ def main() -> int:
                 else 2
             )
     else:
-        env = load_env(args.env_file)
-        credentials = _credentials_from_env(env)
-        if credentials is None:
+        try:
+            credentials = _credentials_from_env(load_env(args.env_file))
+        except TgwCredentialsError as exc:
             safe = _safe_report(_not_tested_report(), offline=False, credentials_available=False)
             safe["sdk_stderr_observed"] = False
+            print(str(exc), file=sys.stderr)
             exit_code = 2
         else:
             raw, stderr_observed = _run_doctor_with_stderr_containment(
@@ -326,6 +324,8 @@ def main() -> int:
             )
             safe = _safe_report(_error_report() if raw is None else raw, offline=False)
             safe["sdk_stderr_observed"] = stderr_observed
+            if raw is not None and raw.get("auth_error") == "ProviderAuthError":
+                print(credential_rotation_hint(), file=sys.stderr)
             if raw is None:
                 safe["bootstrap_status"] = "ERROR"
                 exit_code = 3

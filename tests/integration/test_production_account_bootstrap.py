@@ -120,9 +120,70 @@ class TestProductionAccountBootstrap:
 
         assert module.main() == 2
         assert called is False
-        report = json.loads(capsys.readouterr().out)
+        captured = capsys.readouterr()
+        report = json.loads(captured.out)
         assert report["bootstrap_status"] == "NOT_TESTABLE_ACCOUNT"
         assert report["AUTHENTICATED"] == "NOT_TESTED"
+        assert "--store-credential" in captured.err
+
+    def test_store_credential_action_uses_username_only_and_prints_no_secret(
+        self, monkeypatch, capsys
+    ):
+        module = _load_script()
+        secret_marker = "SHOULD_NEVER_BE_AN_ARGUMENT_OR_OUTPUT"
+        stored_for: list[str] = []
+        monkeypatch.setattr(
+            module,
+            "load_env",
+            lambda _path: {"TGW_USERNAME": "local-user", "TGW_PASSWORD": secret_marker},
+        )
+        monkeypatch.setattr(
+            module,
+            "store_tgw_password",
+            lambda username: stored_for.append(username),
+        )
+        monkeypatch.setattr(sys, "argv", ["production_account_bootstrap.py", "--store-credential"])
+
+        assert module.main() == 0
+        assert stored_for == ["local-user"]
+        output = capsys.readouterr()
+        assert secret_marker not in output.out
+        assert secret_marker not in output.err
+
+    def test_rejected_vault_credential_fails_with_rotation_action_and_no_secret(
+        self, monkeypatch, capfd
+    ):
+        module = _load_script()
+        secret = "REJECTED_PASSWORD_MUST_NOT_LEAK"
+        monkeypatch.setattr(
+            module,
+            "load_env",
+            lambda _path: {
+                "TGW_USERNAME": "user",
+                "TGW_PASSWORD": secret,
+                "TGW_SERVER_VIP": "test-only-host",
+                "TGW_SERVER_PORT": "8600",
+            },
+        )
+        monkeypatch.setattr(
+            module,
+            "run_doctor",
+            lambda **_kwargs: {
+                "sdk_state": "SDK_INSTALLED",
+                "verdict": "RUNTIME_ACTUAL_LOAD_VERIFIED",
+                "AUTHENTICATED": "NO",
+                "QUERY_READY": "NOT_TESTED",
+                "auth_error": "ProviderAuthError",
+                "raw_error": secret,
+            },
+        )
+        monkeypatch.setattr(module, "load_frozen_production_identity", lambda: None)
+        monkeypatch.setattr(sys, "argv", ["production_account_bootstrap.py"])
+
+        assert module.main() == 1
+        captured = capfd.readouterr()
+        assert "--store-credential" in captured.err
+        assert secret not in captured.out + captured.err
 
     def test_offline_mode_bypasses_env_file_and_never_passes_credentials(
         self, monkeypatch, capsys, tmp_path: Path

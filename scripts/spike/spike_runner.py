@@ -26,6 +26,13 @@ import json
 import sys
 from pathlib import Path
 
+from ashare_state.providers.amazingdata.credentials import (
+    TgwCredentialsError,
+    credential_rotation_hint,
+    load_tgw_environment,
+    resolve_tgw_credentials,
+)
+from ashare_state.providers.errors import ProviderAuthError
 from ashare_state.spike import (
     CaseCatalog,
     ProbeContext,
@@ -64,38 +71,20 @@ PHASES = ("b1", "b2", "b3", "b4", "b5", "b6", "b7")
 
 
 def _load_env(path: Path = Path(".env")) -> dict[str, str]:
-    import os
-
-    env = {k: v for k, v in os.environ.items() if k.startswith("TGW_")}
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, value = line.partition("=")
-                env[key.strip()] = value.strip()
-    return env
+    return load_tgw_environment(path)
 
 
 def _make_real_target():
     from ashare_state.providers.amazingdata.session import AmazingDataSession
     from ashare_state.spike.target import make_real_target
 
-    env = _load_env()
-    missing = [
-        k
-        for k in ("TGW_USERNAME", "TGW_PASSWORD", "TGW_SERVER_VIP", "TGW_SERVER_PORT")
-        if not env.get(k)
-    ]
-    if missing:
-        print(f"missing env keys: {missing}; fill .env first")
-        sys.exit(2)
-    session = AmazingDataSession(
-        env["TGW_USERNAME"],
-        env["TGW_PASSWORD"],
-        env["TGW_SERVER_VIP"],
-        int(env["TGW_SERVER_PORT"]),
-    )
-    session.login()
+    credentials = resolve_tgw_credentials(_load_env())
+    session = AmazingDataSession(*credentials)
+    try:
+        session.login()
+    except Exception:
+        session.logout()
+        raise
     return make_real_target(session), session
 
 
@@ -359,7 +348,14 @@ def main() -> int:
             return 2
 
         run_kind = RunKind.PRODUCTION if args.production else RunKind.TRIAL
-        target, session = _make_real_target()
+        try:
+            target, session = _make_real_target()
+        except TgwCredentialsError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        except ProviderAuthError:
+            print(credential_rotation_hint(), file=sys.stderr)
+            return 1
         try:
             identity = target.identity()
             profile = session.profile

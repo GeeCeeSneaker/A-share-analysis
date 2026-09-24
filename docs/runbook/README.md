@@ -16,6 +16,6 @@
 ## 全局纪律
 
 1. 所有命令在仓库根目录、PowerShell 下执行
-2. 凭证只进 `.env`（已 gitignore）；任何日志/文档不得出现真实值
+2. TGW 用户名/服务地址/端口等非敏感设置可留在被忽略的 `.env`；密码不得进入 `.env`，只由当前 Windows 用户的 Credential Manager 保存；任何日志/文档不得出现真实值
 3. 任何"未实测能力 = APPROVED"的操作都被禁止（任务书 §21）
 4. 遇到与文档不符的行为：先记录（provider_verification / risk_register），再修正文档

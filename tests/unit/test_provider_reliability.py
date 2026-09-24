@@ -218,19 +218,6 @@ class TestPrintfStyleSecretLogging:
         assert record.getMessage() == "rows=42"
 
 
-class TestSecretStrConfig:
-    def test_settings_repr_does_not_expose_password(self, monkeypatch):
-        """Audit P1-14."""
-        monkeypatch.setenv("TGW_PASSWORD", "super-secret-123")
-        monkeypatch.setenv("TGW_USERNAME", "acct")
-        from ashare_state.config import Settings
-
-        settings = Settings(_env_file=None)
-        assert "super-secret-123" not in repr(settings)
-        assert "super-secret-123" not in str(settings.model_dump())
-        assert settings.tgw_password.get_secret_value() == "super-secret-123"
-
-
 # ------------------------------------------------------------------ fakes
 
 

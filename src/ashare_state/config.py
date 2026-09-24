@@ -1,33 +1,11 @@
-"""Application configuration.
-
-Secrets come from environment / .env (never committed); structural settings
-come from configs/base.yaml. M0 keeps this deliberately thin.
-"""
+"""Structural application configuration from configs/base.yaml."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class Settings(BaseSettings):
-    """Secret / environment settings loaded from .env or the environment."""
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    tgw_username: str = ""
-    # audit P1-14: SecretStr so repr(Settings)/debug dumps never leak it
-    tgw_password: SecretStr = SecretStr("")
-    tgw_server_vip: str = ""
-    tgw_server_port: int = 8000
-    tgw_module: str = "AmazingData"
+from pydantic import BaseModel, Field
 
 
 class DiskWatermark(BaseModel):

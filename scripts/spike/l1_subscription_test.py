@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from collections.abc import Callable
@@ -34,7 +33,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from ashare_state.providers.amazingdata.credentials import (
+    TgwCredentialsError,
+    credential_rotation_hint,
+    load_tgw_environment,
+    resolve_tgw_credentials,
+)
+from ashare_state.providers.amazingdata.safe_diagnostics import safe_error_code
+from ashare_state.providers.amazingdata.session import AmazingDataSession
 from ashare_state.providers.amazingdata.subscription import SubscriptionController
+from ashare_state.providers.errors import ProviderAuthError
 from ashare_state.providers.lifecycle import SdkLifecycle, SdkLifecycleState
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
@@ -59,14 +67,7 @@ def _run_id() -> str:
 
 
 def load_env(path: Path = Path(".env")) -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if k.startswith("TGW_")}
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, _, v = line.partition("=")
-                env[k.strip()] = v.strip()
-    return env
+    return load_tgw_environment(path)
 
 
 def session_state(now: datetime | None = None) -> str:
@@ -296,10 +297,11 @@ def main() -> int:
         "session_state": session_state(),
     }
 
-    if not all(
-        env.get(k) for k in ("TGW_USERNAME", "TGW_PASSWORD", "TGW_SERVER_VIP", "TGW_SERVER_PORT")
-    ):
+    try:
+        credentials = resolve_tgw_credentials(env)
+    except TgwCredentialsError as exc:
         report["status"] = "NOT_TESTABLE_ACCOUNT"
+        report["detail"] = str(exc)
         _flush(report, args.stage)
         return 2
     if session_state() != "IN_SESSION":
@@ -309,24 +311,16 @@ def main() -> int:
         _flush(report, args.stage)
         return 2
 
+    session = AmazingDataSession(*credentials)
     try:
-        import AmazingData as ad  # noqa: N813
-    except ImportError:
-        report["status"] = "NOT_TESTABLE_ACCOUNT"
-        report["detail"] = "SDK not installed"
-        _flush(report, args.stage)
-        return 2
-
-    try:
-        ad.login(
-            username=env["TGW_USERNAME"],
-            password=env["TGW_PASSWORD"],
-            host=env["TGW_SERVER_VIP"],
-            port=int(env["TGW_SERVER_PORT"]),
-        )
+        session.login()
+        ad = session.sdk
     except Exception as exc:  # noqa: BLE001
         report["status"] = "NOT_TESTABLE_ACCOUNT"
-        report["login_error"] = f"{type(exc).__name__}: {exc}"[:300]
+        report["login_error"] = safe_error_code(exc)
+        if isinstance(exc, ProviderAuthError):
+            report["detail"] = credential_rotation_hint()
+        session.logout()
         _flush(report, args.stage)
         return 1
 
@@ -343,10 +337,9 @@ def main() -> int:
         report.update(flow_report)
     except Exception as exc:  # noqa: BLE001 - evidence, not crash
         report["status"] = "NOT_TESTABLE_PERMISSION"
-        report["error"] = f"{type(exc).__name__}: {exc}"[:400]
+        report["error"] = safe_error_code(exc)
     finally:
-        with _suppress():
-            ad.logout()
+        session.logout()
         if sdk_lifecycle is not None:
             with _suppress():
                 # state-machine truth: logout closes the session (close() is

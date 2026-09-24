@@ -20,8 +20,10 @@
 # 1. 安装依赖（含 dev 工具链；不含 AmazingData SDK）
 uv sync
 
-# 2. 配置凭证（复制模板并填写真实值；.env 已被 gitignore）
+# 2. 配置非敏感连接设置（用户名、服务地址、端口；.env 已被 gitignore）
 Copy-Item .env.example .env
+# 首次安装或密码轮换：隐藏输入一次，保存到当前 Windows 用户的 Credential Manager
+uv run python scripts/spike/production_account_bootstrap.py --store-credential
 
 # 3. 从零初始化数据库（顺序执行 migrations 001-004，带 checksum 登记）
 uv run ashare init-db

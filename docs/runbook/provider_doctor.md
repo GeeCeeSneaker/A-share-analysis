@@ -23,9 +23,20 @@ uv run ashare provider-doctor --offline
 
 离线报告不包含账号画像、认证、查询或冻结身份事实。退出码 0 也不构成 T1 证据。
 
-## 2. 受控 T1（仅在 AUDIT-H1 合并后）
+## 2. 当前用户凭据库与受控 T1（仅在 AUDIT-H1 合并后）
 
-本地进程环境或未被跟踪的本地 .env 注入 TGW_*；值不进 CLI 参数、Git 或报告。
+`.env` 只保存 `TGW_USERNAME`、`TGW_SERVER_VIP`、`TGW_SERVER_PORT` 等非敏感设置；
+其中的 `TGW_PASSWORD` 会被忽略。首次设置或轮换时，在受控 Windows 用户下运行一次：
+
+```powershell
+uv run python scripts/spike/production_account_bootstrap.py --store-credential
+```
+
+密码通过不回显提示写入该 Windows 用户的 Credential Manager。在线 T1、诊断和后续 runner
+在新进程中自动读取；不会弹出登录提示。密码缺失/凭据库不可用会 fail closed，并提示执行
+上述命令；认证被服务端拒绝时也会提示轮换。仅保留进程级 `TGW_PASSWORD` 作为测试/临时
+运维覆盖值，不能放入 `.env`、命令行、报告或任务计划参数。
+
 T1 使用唯一入口：
 
 ```powershell
