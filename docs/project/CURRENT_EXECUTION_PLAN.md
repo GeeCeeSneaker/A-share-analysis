@@ -42,15 +42,19 @@ PM 对 exact head `1f31989ee656e8957c92811dc6cab74044bb9305` 的 A0/A1 审阅要
 
 Issue [#84](https://github.com/GeeCeeSneaker/A-share-analysis/issues/84) was completed through PR [#87](https://github.com/GeeCeeSneaker/A-share-analysis/pull/87), merged to `main` as `e1e320f9061ded52826b48df7ba9cf2b92c75639`. The reviewed code head was `9c2385d5cdb25192ca55a034e23eb833f9462fc8`; independent scheduler review passed and exact-head CI run #762 passed all required jobs. See `docs/project/ISSUE84_TGW_CREDENTIAL_STORE_20260924.md` for the secret-free acceptance record. Formal Production B1-B7 remains unauthorized; closure of #84 did not authorize it.
 
-## Current active P1 — Issue #85 Python runtime simplification (2026-09-24)
+## Completed P1 — Issue #85 Python runtime simplification (2026-09-24)
 
-> Status: **implementation ready for review; the current PR head must remain CI-green and receive scheduler/Owner acceptance before closure. No #86 or new data-domain work before this issue is complete.**
+> Status: **PASS / merged / closed.**
 
-Issue [#85](https://github.com/GeeCeeSneaker/A-share-analysis/issues/85) is the sole current task. Repository evidence identifies Windows Python 3.14.6 as the controlled AmazingData/TGW runtime, `.python-version` and the operator installation runbook already select Python 3.14, and no concrete deployment, SDK, operator, or supported consumer requiring Python 3.12 was found. Therefore this controlled application will support Windows Python 3.14.x only; Ubuntu Python 3.14 remains a required CI-only cross-platform check and is not a supported deployment target.
+Issue [#85](https://github.com/GeeCeeSneaker/A-share-analysis/issues/85) completed through PR [#88](https://github.com/GeeCeeSneaker/A-share-analysis/pull/88), merged to `main` as `423af4b44460ee5fc0bee1b9435a0f96fca8920e`. Independent scheduler review #5301987657 passed the exact code head `57bcc827df95b3a05a4ec6a7c4a4616107d7ea90`; exact-head CI #765 passed on Windows/Python 3.14 and Ubuntu/Python 3.14. Windows Python 3.14.x is the sole supported/reference application runtime; Ubuntu 3.14 is CI-only. See `docs/project/ISSUE85_PYTHON_RUNTIME_SIMPLIFICATION_20260924.md`.
 
-The bounded change removes the duplicate Windows 3.12 full CI leg, narrows `requires-python`, aligns Ruff/mypy targets and operator-facing runtime descriptions, and keeps a regression assertion for the two intentional CI legs. Ruff 0.16.4 formats Python 3.14's PEP 758 exception syntax differently: its full-repository format check required mechanical formatting in 19 Python files (exception syntax in 18 files and line wrapping in the matrix regression test); no runtime behavior or data semantics are changed by those edits. `uv.lock` is regenerated for the narrowed Python range.
+## Current active P1 — Issue #86 AmazingData coverage-gap review (2026-09-24)
 
-Acceptance remains: focused regression plus full QA on the supported runtime; `uv lock --check`; exact-head GitHub CI green; and scheduler/Owner review under the normal PR workflow. No provider request, SDK/credential use, Formal/Production execution, or data-domain change is part of this task. Historical CI evidence and historical issue reports are not rewritten. See `docs/project/ISSUE85_PYTHON_RUNTIME_SIMPLIFICATION_20260924.md` for the evidence and changed-scope record.
+> Status: **repository/evidence matrix drafted; no Provider calls, no ingestion, and no B1-B7/Production run; scheduler acceptance pending.**
+
+Issue [#86](https://github.com/GeeCeeSneaker/A-share-analysis/issues/86) is now active after #85 closed. Its one compact report, `docs/provider_verification/AMAZINGDATA_COVERAGE_MATRIX_20260924.md`, distinguishes SDK surface, prior Owner-confirmed account-call evidence, retained probes, authoritative history and actual Canonical/Research consumers. Unknown access remains `NOT_YET_VERIFIED`, not denied. No unresolved endpoint access probe would change the immediate recommendation, so this issue performed zero Provider calls and did not promote any capability.
+
+The matrix confirms that only daily bars have 78/78 authoritative Canonical history (2020-01 through 2026-06, 7,442,987 rows); other successful endpoint smokes remain probes. It recommends exactly one follow-on group: historical security status plus limit prices via `InfoData.get_history_stock_status`, after closing the known unkeyed-row/request-routing semantics. The existing month-bounded Canonical path should be reused. No bulk acquisition is authorized here; Formal B1-B7, capability approval and data-domain implementation remain separate scheduler decisions. See the matrix for the field-level evidence and handoff requirements.
 
 ## 0.11. 2026-09-22 M1 authorized gate attempt — retained artifact provenance blocked (未重新测量)
 
