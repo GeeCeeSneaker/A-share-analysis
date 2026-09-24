@@ -1,10 +1,10 @@
 # Issue #84 — TGW credential-store acceptance checkpoint
 
-**Status:** controlled Windows credential-store and fresh-process T1 acceptance passed. Exact-head GitHub CI run #760 passed on PR head `7dd416e0187ad07b0125905ab20194f619de5079`; this documentation correction advances the head, so the latest-head checks must also pass. PR #87 is Ready for review, not merged. Independent review is pending; Issue #84 remains open. This is not authorization for Production B1–B7.
+**Status:** controlled Windows credential-store and fresh-process T1 acceptance passed. Exact-head GitHub CI run #761 passed on head `07be642d81598f9873cf2def4e97c82a08910bcc`. PR #87 is Ready for review, not merged. GitHub PR checks are the live source of truth after any later head update; the latest head must be green before merge. Independent review is pending; Issue #84 remains open. This is not authorization for Production B1–B7.
 
 ## Implementation and controlled T1
 
-- Code-bearing commit: `78afd93e291a162348bdcd613ef55ebc2ee98a4e`; PR: [#87](https://github.com/GeeCeeSneaker/A-share-analysis/pull/87), Ready for review; verified head before this documentation correction: `7dd416e0187ad07b0125905ab20194f619de5079`; base: `main@b75636c57caffd0dbdc9d5a2c40988734daa2c34`.
+- Code-bearing commit: `78afd93e291a162348bdcd613ef55ebc2ee98a4e`; PR: [#87](https://github.com/GeeCeeSneaker/A-share-analysis/pull/87), Ready for review, not merged; base: `main@b75636c57caffd0dbdc9d5a2c40988734daa2c34`.
 - The one-time hidden bootstrap stores the password with `keyring.backends.Windows.WinVaultKeyring` in the current Windows user's Credential Manager. A presence-only lookup confirmed the entry without displaying or copying its value.
 - After the bootstrap process exited, a separate new process ran `production_account_bootstrap.py` with the process-level `TGW_PASSWORD` override removed. Exit code was 0; runtime verdict `RUNTIME_ACTUAL_LOAD_VERIFIED`; network `REACHABLE`; authentication `YES`; query readiness `YES`; SDK stderr observed `false`.
 - The scrubbed T1 status is `FROZEN_IDENTITY_MATCH_REQUIRES_REVIEW`. This is an authenticated/query-ready result, not final identity approval. The generated report remains only at the ignored local path `data/spike/results/production_account_bootstrap.json` and is not committed.
@@ -20,6 +20,5 @@
 
 ## Remaining gates and limits
 
-- Verify that exact-head CI passes for the PR #87 head created by this documentation correction; run #760 is evidence for the prior `7dd416e...` head only.
-- Obtain independent review before declaring Issue #84 complete. Issue #39 Production remains unauthorized until that review passes.
+- Obtain independent review before declaring Issue #84 complete. Before any merge, verify green GitHub checks for the then-current PR #87 head; GitHub's PR checks are authoritative after subsequent head updates. Issue #39 Production remains unauthorized until review passes.
 - No Production B1–B7 run, historical data reacquisition, or retained-data mutation was performed.
