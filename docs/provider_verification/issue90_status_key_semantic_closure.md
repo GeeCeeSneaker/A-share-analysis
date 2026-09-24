@@ -13,6 +13,25 @@ The only defensible classification is `STILL_UNRESOLVED`. The runtime continues 
 
 ## Evidence inspected
 
+### Retained-artifact recovery check (2026-09-24)
+
+The frozen receipt identifies request `3692c492-c5fc-431e-a8ec-6e7dcd69d0d0` and eight logical artifact URIs, but does not expose a local filesystem root. A targeted recursive search for the exact filenames below was run in the active Codex workspace, the current Windows user-profile tree, and the `D:\` volume. No matching artifacts were found. The checkout has the tracked Golden data but not these raw Parquet files.
+
+Because the files were unavailable, no Parquet content was read: no local content hash was verified, and anomaly count, source-row ordinal/position, documented status/limit null mask, and deterministic row fingerprint are **unavailable**, not zero or inferred. This local search does not establish that the artifacts are absent from external storage.
+
+| Symbol | Expected artifact | Receipt SHA-256 | Local result |
+|---|---|---|---|
+| 002058.SZ | `002058_SZ.parquet` | `21b47f8785b3e23939c243764882de78a79e94d3fdf7a5b031dbc94bcd235a50` | NOT FOUND; hash and row summary unavailable |
+| 002217.SZ | `002217_SZ.parquet` | `d2af1a3d3bf0f6e1da87ed7fdadfed43c2b18574fab1969b4eb704fa119d2f82` | NOT FOUND; hash and row summary unavailable |
+| 002313.SZ | `002313_SZ.parquet` | `f7ac1a9475f044ee3cf1c7b33067a05b9f765331638b0180f80eb30f50c5b13e` | NOT FOUND; hash and row summary unavailable |
+| 002366.SZ | `002366_SZ.parquet` | `129491e0602fa25887c1a8e3ac1193750bb50aca55fef49c764474e13649e3d1` | NOT FOUND; hash and row summary unavailable |
+| 600382.SH | `600382_SH.parquet` | `d990fec880a04da5e6c6168b623eee0cb0b37de1afe8f1b0fd227e012a502c37` | NOT FOUND; hash and row summary unavailable |
+| 688500.SH | `688500_SH.parquet` | `affdc7dd39d1d5339bfcf081f4b2d95b4dd9c87bb20633f292b7824908164392` | NOT FOUND; hash and row summary unavailable |
+| 605499.SH | `605499_SH.parquet` | `107995d14f605eb8b7239ddbf378641a23adf06e1003aa5c7c4a2550dd15081f` | NOT FOUND; hash and row summary unavailable |
+| 603887.SH | `603887_SH.parquet` | `7fd68baa8be33e1a3cb19cf15d86a10370852d5799e474fe00caaa010b48808f` | NOT FOUND; hash and row summary unavailable |
+
+No Provider call was made. With no exact row or target symbol/date available, a narrower request would still be guesswork and cannot distinguish `PROVEN_NON_FACT` from `PROVEN_KEYABLE`. Keep the issue `STILL_UNRESOLVED`; the next unblock is either (a) mount/provide access to the existing retained-data root in this execution environment, or (b) obtain a written Provider/SDK semantic explanation. Do not replay the 1990–2099 request or broaden the search/query to manufacture evidence.
+
 1. The issue's frozen receipt and scrubbed records:
    - `docs/provider_verification/capability_closure_20260911.json` records the 8-symbol, 1990-01-01–2099-12-31 response (20,638 rows), aggregate missing-date count, per-symbol table row counts, hashes, and raw artifact URIs.
    - The receipt does **not** preserve the affected row bodies, their dates/field values, or which exact symbols contain the eight rows. The raw Parquet/meta files are under a local ignored path and are absent from the available clean checkout; GitHub cannot provide ignored local artifacts.
@@ -32,7 +51,7 @@ A new Provider call would not close this gap: the receipt does not identify a ta
 | Symbol argument | `code_list: list[str]`; SH/SZ exchange-qualified codes are forwarded verbatim. | No automatic symbol remapping. The current facade does not claim an SDK maximum batch size. |
 | Date arguments | Facade accepts integer `start_date`/`end_date` and forwards them as SDK `begin_date`/`end_date`. | The manual does not specify whether bounds are inclusive or exclusive. Pass YYYYMMDD integer bounds, validate returned dates against the requested window, and do not claim inclusion semantics until confirmed. |
 | Remote/local mode | The facade explicitly sends `is_local=False`. | The request envelope records the effective parameters. |
-| Batching | A two-symbol mixed SH/SZ call is covered as a single pass-through facade call; the facade does not rechunk it. | SDK maximum and multi-symbol row-binding guarantee are undocumented. For the next narrowly scoped acquisition, use one symbol per request until the provider documents or a bounded controlled test validates a larger batch. This is an operational limit, not a claim that one-symbol requests fix missing dates. |
+| Batching | A two-symbol mixed SH/SZ call is covered as a single pass-through facade call; the facade does not rechunk it. | This proves facade pass-through only. SDK maximum and multi-symbol row-binding guarantee remain undocumented; no production batch size or one-symbol strategy is approved. A one-symbol call may be used only as a temporary minimal semantic probe if recovered row-specific evidence identifies a concrete target, and must not be extrapolated to the 78-month production build. |
 | Row-to-request binding | A provider-returned table key may be preserved when present; each accepted status row still needs a valid trade date and exactly one canonical natural key. | Never fill a row from the request list/order. No evidence establishes a general one-to-one request/response relationship for unkeyed rows. |
 | Empty response | An empty payload/table is preserved as empty. | It means “no status observation received”; it does not prove no event, no applicable session, or a successful completeness check. Applicable pairs remain unresolved unless independently reconciled. |
 | BSE | Existing routing evidence uses current code `920185.BJ`; historical old/new-code evidence remains separate. The facade passes its input unchanged. | No BSE history activation, BJ remapping, or authoritative-universe expansion under Issue #90. |
