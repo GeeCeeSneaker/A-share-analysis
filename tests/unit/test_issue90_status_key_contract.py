@@ -105,7 +105,9 @@ class _FakeIdentity:
     tgw_runtime_version: str = "fake-runtime"
 
 
-def _provider_with_history_result(calls: list[dict[str, object]], payload: Any) -> AmazingDataProvider:
+def _provider_with_history_result(
+    calls: list[dict[str, object]], payload: Any
+) -> AmazingDataProvider:
     from ashare_state.providers.amazingdata.session import AccountProfile
 
     class FakeInfo:
