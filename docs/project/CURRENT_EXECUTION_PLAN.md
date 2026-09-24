@@ -1,3 +1,17 @@
+## 0.15. 2026-09-23 P0 #82 — Formal B1–B7 post-#76 compatibility/preflight
+
+> 状态：**B1–B7 架构映射、冻结输入核验、离线运行时与 fixture wiring 检查通过；在线账户 T1 预检因当前环境缺少 TGW_PASSWORD 而 BLOCKED。未启动 Production、未新建 Production run ID、未重抓历史 Provider 数据。**
+>
+> **#82 是当前唯一 active P0。** 历史 Issue #39 仍是旧意图，不构成这次或未来 Production 的自动授权；#79 的布局/键选型仍待 PM/Owner 冻结，不在本轮执行。
+
+- 基线与被验证代码 head：`1d4418a649dddc196277fc0087521d3a069b05f5`（相同 SHA；本轮没有代码更改）。
+- B1–B7 与当前 Canonical → logical Snapshot → DuckDB external-view 架构逐项映射、冻结 Trading Rule / Golden 身份、DRY_RUN 边界、测试与在线 T1 阻塞详见[Issue #82 checkpoint](ISSUE82_FORMAL_B1_B7_PREFLIGHT_20260923.md)。
+- 未发现 B1–B7 对 superseded physical daily Snapshot/ReadModel fact-copy 的依赖，因此没有必要改造代码。B5 真实路径含 2020-01 起历史日线查询，因禁止 provider historical reacquisition 未在线运行；B7 的全市场最多五日容量查询也未在缺账户认证时运行。
+- 离线 SDK/runtime 实际加载和 180-case FakeTarget dry-run 完成；7 个聚焦 integration test 文件退出码为 0。FakeTarget/Golden 不匹配不作真实 Provider 语义结论。当前 base commit combined status 没有 CI checks；PR 精确 head 的状态单独记录。
+- 在线账户 T1 返回 `NOT_TESTABLE_ACCOUNT`；用户名/服务地址/端口存在但密码缺失，网络、登录、查询均未测试。仅需授权人员本机安全注入 TGW_PASSWORD 后重跑 scrubbed bootstrap；不在聊天/仓库传密码。
+- 未运行 `--production`、未创建 Production `spike_run_id`、未重抓/重建历史；Golden、H1、Trading Rule 冻结输入未修改。
+- T1 通过后把证据回交 scheduler。scheduler 再单独决定是否刷新/替换 #39 和是否授权一次受控 Production B1–B7。
+
 ## 0.14. 2026-09-23 P0 #79 A0/A1 exact confirmation checkpoint
 
 > 状态：**A0/A1 窄整改与 exact-runner 确认重跑已完成；资源门禁 PASS；物理选型仍待 PM/Owner 冻结；不进入 daily_bar 重构、Issue #76 历史迁移或 provider reacquisition**
