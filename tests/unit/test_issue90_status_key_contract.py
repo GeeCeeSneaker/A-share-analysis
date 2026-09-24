@@ -78,7 +78,7 @@ class TestStatusNaturalKeyBoundary:
         assert canonical_status_view([]) == []
 
     def test_duplicate_symbol_date_key_fails_closed(self):
-        with pytest.raises(ProviderRowShapeError, match="duplicate canonical natural key"):
+        with pytest.raises(ProviderRowShapeError, match="duplicates canonical natural key"):
             canonical_status_view(
                 [
                     _status_row("600000.SH", "2024-01-02"),
