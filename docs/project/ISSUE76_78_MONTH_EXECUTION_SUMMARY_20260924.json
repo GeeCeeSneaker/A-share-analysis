@@ -2620,7 +2620,7 @@
     }
   ],
   "qa": {
-    "exact_head_github_ci": "PENDING",
+    "exact_head_github_ci": "PENDING_AFTER_RUFF_FORMAT_FIX; predecessor f469fae CI #750 failed format only, Mypy/pytest skipped",
     "full_pytest_exit_code": 0,
     "mypy": "PASS (111 source files)",
     "owner_pm_final_acceptance": "PENDING",

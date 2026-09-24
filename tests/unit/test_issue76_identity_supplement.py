@@ -73,4 +73,3 @@ def test_supplement_fails_closed_on_missing_duplicate_or_conflicting_facts(
             request_id="approved",
             expected_facts={"600593.SH": "1992-03-27", "688001.SH": "2019-07-22"},
         )
-

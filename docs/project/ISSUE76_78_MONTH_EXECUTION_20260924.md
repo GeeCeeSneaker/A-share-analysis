@@ -69,5 +69,5 @@ The rule `DAILY_BAR_EVENT_ELIGIBILITY_V1` is the approved session-close event-el
 
 The migration output, copied normalized evidence, Canonical/ReadModel Parquet, and DuckDB ledgers remain in the ignored local `data/spike/issue76_c1_migration_listdate_20260923/` directory and are not included in this report or proposed Git commit. No credentials, network endpoints, raw provider payload, or bulk OHLCV facts are committed.
 
-**Still pending:** publish the sanitized execution report and runner/test changes to the existing Issue #76 branch through the GitHub connector, pass exact-head GitHub CI, and obtain final Owner/PM review. Keep PR #77 Draft until those gates pass.
+**Publication and CI checkpoint (2026-09-24 UTC):** the evidence bundle was published through the GitHub connector in commit `f469faef1d4f2fa476e784f47823d0b74feae330`. Its exact-head CI run #750 passed Ruff lint but failed Ruff format check on the migration runner and this new identity test; Mypy and pytest were skipped by workflow fail-fast. A formatting-only follow-up removes the trailing blank lines. The same locked Ruff version passes the targeted format/lint checks locally, and the four identity-projection tests pass. Exact-head CI for the follow-up is pending; final Owner/PM acceptance is still required. Keep PR #77 Draft.
 
