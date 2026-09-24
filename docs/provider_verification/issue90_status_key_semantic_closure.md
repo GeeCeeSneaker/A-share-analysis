@@ -3,7 +3,7 @@
 **Disposition: BLOCKED (`STILL_UNRESOLVED`).** This record closes the code/testable boundary work only. It does not approve the provider capability, authorize history acquisition, or meet the issue's PASS gate.
 
 As-of: 2026-09-24  
-Base: `main@409105925405e987d72636829a7ad144b46bf17c`
+Base: `main@88eb9f15d8c8b8ec3b77d8919273a8f542b445ed`
 
 ## Decision
 
@@ -30,7 +30,29 @@ Because the files were unavailable, no Parquet content was read: no local conten
 | 605499.SH | `605499_SH.parquet` | `107995d14f605eb8b7239ddbf378641a23adf06e1003aa5c7c4a2550dd15081f` | NOT FOUND; hash and row summary unavailable |
 | 603887.SH | `603887_SH.parquet` | `7fd68baa8be33e1a3cb19cf15d86a10370852d5799e474fe00caaa010b48808f` | NOT FOUND; hash and row summary unavailable |
 
-No Provider call was made. With no exact row or target symbol/date available, a narrower request would still be guesswork and cannot distinguish `PROVEN_NON_FACT` from `PROVEN_KEYABLE`. Keep the issue `STILL_UNRESOLVED`; the next unblock is either (a) mount/provide access to the existing retained-data root in this execution environment, or (b) obtain a written Provider/SDK semantic explanation. Do not replay the 1990–2099 request or broaden the search/query to manufacture evidence.
+At the time of the retained-artifact search no Provider request was made. The scheduler later explicitly authorized the two bounded diagnostics below; their results supersede only that historical statement, not the fail-closed semantic conclusion.
+
+### Scheduler-authorized live semantic diagnostics (2026-09-24)
+
+Both requests used the existing provider facade and native response, before Canonical adaptation. Each was one provider attempt (`max_retries=0`); authentication succeeded with SDK 1.1.9. Only sanitized counts, requested-symbol table binding, null masks, positions, and SHA-256 row fingerprints were emitted. No raw payload was persisted.
+
+1. **Exact historical request replay:** the same eight symbols listed below; `begin_date=19900101`, `end_date=20991231`, `is_local=False`. Provider status `OK`; 8 keyed tables, 20,710 rows total. Seven rows lacked both `TRADE_DATE` and `MARKET_CODE` (7 missing each); all seven were the final row of their returned symbol table. The response table key exactly matched its requested symbol in all eight tables.
+2. **One past-only boundary comparison:** same eight symbols, same start and `is_local=False`, with only the end changed to `20260831` (no future-bearing date bound). Provider status `OK`; 8 keyed tables, 20,566 rows total. The same seven double-missing rows reappeared as each table's final row. Their per-symbol row fingerprints exactly matched the exact-replay fingerprints below. Thus a 2099 future upper bound is **not necessary** for the anomaly; this does not distinguish long-range/pagination behavior from a historical structural row or establish row meaning.
+
+| Requested symbol | Exact replay rows / anomalous row ordinal | Past-only rows / anomalous row ordinal | Row SHA-256 (same in both calls) |
+|---|---:|---:|---|
+| 002058.SZ | 3,097 / 3,096 | 3,079 / 3,078 | `d5645147d15635ff8b6105def8b343865a0dd77ea280ddb002b0067f25a3eb31` |
+| 002217.SZ | 3,097 / 3,096 | 3,079 / 3,078 | `7a87baca774b8f68a384661175d125a6f630429531b8f44d8ab6b5d75915c596` |
+| 002313.SZ | 3,097 / 3,096 | 3,079 / 3,078 | `d5645147d15635ff8b6105def8b343865a0dd77ea280ddb002b0067f25a3eb31` |
+| 002366.SZ | 3,097 / 3,096 | 3,079 / 3,078 | `d5645147d15635ff8b6105def8b343865a0dd77ea280ddb002b0067f25a3eb31` |
+| 600382.SH | 3,097 / 3,096 | 3,079 / 3,078 | `d5645147d15635ff8b6105def8b343865a0dd77ea280ddb002b0067f25a3eb31` |
+| 688500.SH | 1,505 / 1,504 | 1,487 / 1,486 | `89ac63d4edf5130225b92cdcc68e9c0e5b204547c0cfd8f463debb1063f4f285` |
+| 605499.SH | 1,296 / none | 1,278 / none | — |
+| 603887.SH | 2,424 / 2,423 | 2,406 / 2,405 | `d5645147d15635ff8b6105def8b343865a0dd77ea280ddb002b0067f25a3eb31` |
+
+For each anomalous row, the non-null mask was `IS_ST_SEC`, `IS_SUSP_SEC`, `IS_WD_SEC`, `IS_XR_SEC`, `PRICE_HIGH_LMT_RATE`, and `PRICE_LOW_LMT_RATE`; `HIGH_LIMITED` and `LOW_LIMITED` were null. These are presence bits only; no values were emitted. Row ordinals are zero-based. The repeated table-tail position and masks generate a structural hypothesis, but are not an authoritative Provider definition. Although the response table key identifies the requested symbol, the row itself still has no trade date, so it cannot form `(security_id, trade_date)`.
+
+**Conclusion remains `STILL_UNRESOLVED`.** Do not drop or key-fill these rows and do not weaken the adapter. The one allowed boundary comparison is complete; no further probing is justified absent a Provider/SDK contract. The exact-replay anomaly branch applied, so the conditional 2020-01 monthly check for a non-reproduction was not run. No history acquisition, BSE activation, capability promotion, or Formal B1–B7 occurred. The remaining unblock is a written AmazingData/SDK explanation that classifies this exact returned-row shape; otherwise keep Issue #90 blocked.
 
 1. The issue's frozen receipt and scrubbed records:
    - `docs/provider_verification/capability_closure_20260911.json` records the 8-symbol, 1990-01-01–2099-12-31 response (20,638 rows), aggregate missing-date count, per-symbol table row counts, hashes, and raw artifact URIs.
@@ -42,7 +64,7 @@ No Provider call was made. With no exact row or target symbol/date available, a 
    - `canonical_status_view()` already fails closed when identity or date is missing. The response table name may be preserved as an observed symbol key by the existing adapter, but that cannot supply a missing trade date.
    - `month_completeness._status_rows()` already treats empty applicable coverage as unresolved and duplicate dates as structural errors.
 
-A new Provider call would not close this gap: the receipt does not identify a target symbol/date for the affected rows, and recreating the 20,638-row century-window observation would only reproduce shape—not prove its meaning. No Provider request was made for this issue.
+The live calls above reproduced the shape but did not establish semantics. The retained raw artifacts remain unavailable, and no rule may be inferred from row order, null masks, or fingerprints.
 
 ## Frozen minimum routing boundary
 
@@ -78,13 +100,13 @@ The issue branch adds the minimum safety/test changes:
 |---|---|
 | Classify all eight rows as non-fact or exactly keyable | **BLOCKED** — retained evidence and SDK contract are insufficient. |
 | Exact key for each admitted row | Enforced at the adapter boundary; no unkeyed row is admitted. |
-| Required shapes and routing regression tests | Added on this branch; CI must pass at the exact PR head. |
+| Required shapes and routing regression tests | **PASS** — merged PR #91; exact-head CI #773 passed on Windows and Ubuntu / Python 3.14. |
 | Minimum SH/SZ request mechanics | Documented and mock-tested; provider batch ceiling and semantic row binding remain undocumented. |
 | No BSE/corporate-action/full-history/Formal expansion | Satisfied; none was run or activated. |
-| Ruff, format, mypy, focused/full pytest and Windows/Ubuntu Python 3.14 CI | Required merge gate; use the exact final PR head's run status. |
+| Ruff, format, mypy, focused/full pytest and Windows/Ubuntu Python 3.14 CI | **PASS** at PR #91 exact head; see CI run #773. |
 | Short semantic-closure record | This file; disposition is BLOCKED, not PASS. |
 
-To unblock the semantic issue, obtain a written Provider/SDK contract that classifies these missing-key rows, or recover the exact ignored raw artifacts and use them to design a genuinely targeted reproducible check. Raw shape alone is not enough to prove a row is non-fact; if it remains ambiguous after that, the provider must explain its meaning or the endpoint cannot feed canonical status/limit facts.
+To unblock the semantic issue, obtain a written AmazingData/SDK contract that classifies this exact returned-row shape. The bounded replay and one past-only comparison both reproduced identical row fingerprints, but raw shape alone is not enough to prove a row is non-fact; without authoritative explanation the endpoint must keep failing closed for these rows and cannot yet feed complete canonical status/limit facts.
 
 **No 78-month acquisition/backfill is authorized by this record.** After semantic closure only, the scheduler must open a separate acquisition issue for SH/SZ `security_status + limit_price` over 2020-01 through 2026-06. BSE remains deferred.
 
