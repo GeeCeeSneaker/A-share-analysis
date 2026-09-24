@@ -1,6 +1,6 @@
 # Issue #82 — Formal B1–B7 post-#76 compatibility/preflight checkpoint
 
-**状态：兼容性映射与离线核查 PASS；在线账户 T1 预检 BLOCKED（当前执行环境缺少密码）；未运行 Production。**  
+**状态：B1–B7 兼容性、冻结输入、离线/在线 T1 预检及 QA 均已完成；T1 认证、网络与最小查询 PASS；未运行 Production。**  
 **范围：** 仅处理 Issue #82 的兼容性/非 Production 预检，不授权 Formal Production、历史 provider 重抓或下游研究任务。
 
 ## 精确代码基线
@@ -35,17 +35,18 @@
 
 - 离线运行时：Python 3.14.6、AmazingData 1.1.9、TGW 1.0.9.2；`SDK_INSTALLED`、`RUNTIME_ACTUAL_LOAD_VERIFIED`。离线 doctor 退出码 0。
 - `spike_runner.py --dry-run --date 20260908`：FakeTarget dry-run 关闭成功，180 cases；只证明 fixture/wiring 可执行。B4 等合成事实与 Golden 的差异不构成真实行情语义失败。
-- scrubbed account bootstrap：`NOT_TESTABLE_ACCOUNT`；`AUTHENTICATED`、`NETWORK_REACHABLE`、`QUERY_READY` 均为 `NOT_TESTED`，`config_written=false`。脚本在缺少完整凭据时提前返回，未调用 SDK 登录、网络或查询。
-- 当前进程环境只确认 TGW_USERNAME、TGW_SERVER_VIP、TGW_SERVER_PORT 存在；TGW_PASSWORD 缺失且 checkout 无 `.env`。凭据值未读取/记录到本 checkpoint。需要账户 T1 预检时，由授权人员在本机安全注入密码后，只重跑既有 scrubbed bootstrap；不得把密码发入聊天或提交仓库。
+- scrubbed account bootstrap 在可见 PowerShell 中安全提示输入密码后完成：`AUTHENTICATED=YES`、`NETWORK_REACHABLE=REACHABLE`、`QUERY_READY=YES`；AmazingData 1.1.9 / TGW 1.0.9.2 / Python 3.14.6，`RUNTIME_ACTUAL_LOAD_VERIFIED`，`sdk_stderr_observed=false`。
+- 身份结果为 `production_identity_status=PRODUCTION`、`bootstrap_status=FROZEN_IDENTITY_MATCH_REQUIRES_REVIEW`、`human_confirmation_required=true`；用户此前已确认相同冻结身份映射。bootstrap 未写 `configs/production_account.yaml`（`config_written=false`）。报告中的 profile 标识和权限明细不写入 GitHub。
+- 密码只在本机可见终端的 T1 进程环境中短暂使用，执行结束后已移除；不经聊天传输。在线预检只做账户身份/权限与最小查询能力检查，没有历史行情拉取。
 
 ## QA、数据与 Production 边界
 
 - 聚焦离线 pytest：`test_spike_framework.py`、`test_formal_gate_wiring.py`、`test_formal_runner_wiring.py`、`test_endpoint_requirement_proof.py`、`test_trading_rule_binding.py`、`test_trial_production_boundary.py`、`test_h1_rule_seal_lifecycle.py` 全部通过（退出码 0）。
-- `git diff --check` 通过；本地 GitHub main 基线 commit 的 combined status 未返回 checks。PR 精确 head 的检查状态需在 PR 创建后记录；本轮没有代码变化。
+- `git diff --check` 通过；本地聚焦测试全部通过。PR #83 的精确 head CI 结论及 run 链接记录在 PR 描述中；本轮只有文档变化。
 - 未执行 `spike_runner.py --production`，未创建 Production `spike_run_id`；未发起 Provider 历史重取/重建；Golden/H1/trading-rule 冻结产物无改动。
 - 不包含账号密码、真实 endpoint、token、profile 原始数据或 Provider 原始输出。
 
 ## 交接 / 下一步
 
-1. 先由授权人员在本机安全提供 TGW_PASSWORD，再只运行受控的账户 identity/network/minimal-query T1 bootstrap；不得经聊天传密码。
-2. 若 T1 通过，将结果补入 checkpoint 并交回 scheduler；scheduler 单独决定是否刷新/替换历史 Issue #39，以及是否授权唯一一次 Production Formal B1–B7。**本 checkpoint 不构成 Production 授权。**
+1. T1 现已通过认证、网络和最小查询门槛；用户此前对 frozen identity 的确认已记录。没有改写生产账号配置，也没有扩大到历史数据。
+2. 将 exact-head 结果交回 scheduler；scheduler 单独决定是否刷新/替换历史 Issue #39，以及是否授权唯一一次 Production Formal B1–B7。**本 checkpoint 不构成 Production 授权。**
