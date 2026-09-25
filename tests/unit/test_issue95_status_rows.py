@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 from pathlib import Path
 
@@ -18,6 +19,7 @@ sys.path.insert(0, str(_SPIKE_SCRIPT_DIR))
 _ISSUE95_BUILD = importlib.import_module("issue95_status_limit_build")
 BuildFailure = _ISSUE95_BUILD.BuildFailure
 Issue95Build = _ISSUE95_BUILD.Issue95Build
+_atomic_json = _ISSUE95_BUILD._atomic_json
 _candidate_status_probe_sizes = _ISSUE95_BUILD._candidate_status_probe_sizes
 
 
@@ -149,3 +151,28 @@ def test_normalized_status_domain_pair_keys_reject_missing_and_duplicate_rows(
     ).write_parquet(duplicate_path)
     with pytest.raises(BuildFailure, match="STATUS_PROJECTION_DUPLICATE_KEY"):
         runner._status_output_pairs("limit_price", duplicate_path)
+
+
+def test_atomic_manifest_replace_retries_a_transient_permission_error(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manifest_path = tmp_path / "execution_manifest.json"
+    path_type = type(tmp_path)
+    original_replace = path_type.replace
+    attempts = 0
+
+    def fail_once(self, target) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise PermissionError("synthetic sharing violation")
+        original_replace(self, target)
+
+    monkeypatch.setattr(path_type, "replace", fail_once)
+    monkeypatch.setattr(_ISSUE95_BUILD.time, "sleep", lambda _delay: None)
+
+    _atomic_json(manifest_path, {"status": "RUNNING"})
+
+    assert attempts == 2
+    assert json.loads(manifest_path.read_text(encoding="utf-8")) == {"status": "RUNNING"}

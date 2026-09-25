@@ -137,7 +137,15 @@ def _atomic_json(path: Path, value: Any) -> str:
             stream.write(payload)
             stream.flush()
             os.fsync(stream.fileno())
-        temporary.replace(path)
+        replace_delays = (0.05, 0.1, 0.25, 0.5, 1.0, 2.0)
+        for attempt, delay in enumerate(replace_delays):
+            try:
+                temporary.replace(path)
+                break
+            except PermissionError:
+                if attempt == len(replace_delays) - 1:
+                    raise
+                time.sleep(delay)
     finally:
         temporary.unlink(missing_ok=True)
     return _sha256_bytes(payload)
@@ -1723,7 +1731,7 @@ def main() -> int:
                 )
         _emit(
             "STOP_BLOCKED",
-            stage=exc.stage,
+            failure_stage=exc.stage,
             error_class=exc.error_class,
             run_root=run_rel,
         )
@@ -1741,7 +1749,12 @@ def main() -> int:
                     status="STOP_BLOCKED",
                     blocker={"gate": "UNEXPECTED", "error_class": type(exc).__name__},
                 )
-        _emit("STOP_BLOCKED", stage="UNEXPECTED", error_class=type(exc).__name__, run_root=run_rel)
+        _emit(
+            "STOP_BLOCKED",
+            failure_stage="UNEXPECTED",
+            error_class=type(exc).__name__,
+            run_root=run_rel,
+        )
         return 2
     finally:
         if session is not None:
