@@ -1,17 +1,45 @@
 # Issue #90 — history status key and routing semantic closure
 
-**Disposition: BLOCKED (`STILL_UNRESOLVED`).** This record closes the code/testable boundary work only. It does not approve the provider capability, authorize history acquisition, or meet the issue's PASS gate.
+**Current disposition: PASS CANDIDATE FOR INDEPENDENT REVIEW. Issue #90 is still OPEN; independent PASS is not yet recorded.**
 
-As-of: 2026-09-24  
-Base: `main@88eb9f15d8c8b8ec3b77d8919273a8f542b445ed`
+As-of: 2026-09-25 UTC  
+Execution-code base: `main@88eb9f15d8c8b8ec3b77d8919273a8f542b445ed`  
+Documentation base: `main@157bbc2b1c5bcf2c51ed465d02af6bd782190e84`  
+Scheduler gate: [Issue #90 comment #5824435432](https://github.com/GeeCeeSneaker/A-share-analysis/issues/90#issuecomment-5824435432)
 
 ## Decision
 
-The eight rows reported without both `TRADE_DATE` and `MARKET_CODE` remain unclassifiable as either `PROVEN_NON_FACT` or `PROVEN_KEYABLE`. Their status/limit fields are evidence that the payload contains values, not proof that the rows are observations, summaries, or safe to discard.
+The meaning of the seven table-tail rows reproduced by the 1990-start diagnostic remains unknown. They are not classified as non-facts or safely keyable. The 1990-start response shape is now treated as **unsupported for Canonical acquisition**; no row may be dropped, imputed, or key-filled, and the existing adapter remains fail-closed.
 
-The only defensible classification is `STILL_UNRESOLVED`. The runtime continues to reject rows without exact identity/date and now also rejects duplicate canonical `(provider_symbol, trade_date)` keys. There is no fallback, row-order inference, request-argument copying, imputation, or dropping.
+The scheduler's corrected gate concerns the actual month-bounded SH/SZ request shape, not a speculative interpretation of that unsupported diagnostic. The one authorized 2020-01 call below met its technical checks and is submitted as a **PASS candidate** for independent review. It does not establish completeness for other months/symbols, approve the capability, or authorize any bulk acquisition.
+
+## Authorized production-shape monthly check (2026-09-25 UTC)
+
+Request: the same eight SH/SZ symbols listed in the Issue #90 probes; `begin_date=20200101`, `end_date=20200131`, `is_local=False`. The native SDK response was inspected before Canonical adaptation.
+
+- Authentication succeeded through the existing local credential path; SDK version `1.1.9`; one provider attempt under the existing retry policy.
+- Native response type: dictionary with eight response tables. Each response table key exactly matched one requested exchange-qualified symbol.
+- SDK stdout/stderr were captured. No raw payload, credential, endpoint/account identity, or token was printed or persisted.
+- Result counts:
+
+| Response table key | Exact requested-symbol match | Rows | Disposition |
+|---|---|---:|---|
+| `002058.SZ` | yes | 16 | NONEMPTY |
+| `002217.SZ` | yes | 16 | NONEMPTY |
+| `002313.SZ` | yes | 16 | NONEMPTY |
+| `002366.SZ` | yes | 16 | NONEMPTY |
+| `600382.SH` | yes | 16 | NONEMPTY |
+| `688500.SH` | yes | 0 | EMPTY_UNRESOLVED |
+| `605499.SH` | yes | 0 | EMPTY_UNRESOLVED |
+| `603887.SH` | yes | 16 | NONEMPTY |
+
+Across the 96 returned rows: missing `TRADE_DATE` = 0; missing `MARKET_CODE` = 0; missing both = 0; invalid dates = 0; dates outside January 2020 = 0; exchange-qualified identity conflicts = 0; duplicate natural-key groups = 0 (duplicate extra rows = 0). Empty tables were preserved as empty and remain unresolved; no synthetic rows were added.
+
+**Technical gate: PASS candidate for independent review.** This is evidence for only the tested eight-symbol, one-month request shape; it does not prove general SDK batch limits, other-month completeness, or whether date bounds are inclusive. The adapter behavior was not changed. No 78-month acquisition, BSE history, capability promotion, or Formal B1–B7 was run or authorized.
 
 ## Evidence inspected
+
+
 
 ### Retained-artifact recovery check (2026-09-24)
 
@@ -52,7 +80,7 @@ Both requests used the existing provider facade and native response, before Cano
 
 For each anomalous row, the non-null mask was `IS_ST_SEC`, `IS_SUSP_SEC`, `IS_WD_SEC`, `IS_XR_SEC`, `PRICE_HIGH_LMT_RATE`, and `PRICE_LOW_LMT_RATE`; `HIGH_LIMITED` and `LOW_LIMITED` were null. These are presence bits only; no values were emitted. Row ordinals are zero-based. The repeated table-tail position and masks generate a structural hypothesis, but are not an authoritative Provider definition. Although the response table key identifies the requested symbol, the row itself still has no trade date, so it cannot form `(security_id, trade_date)`.
 
-**Conclusion remains `STILL_UNRESOLVED`.** Do not drop or key-fill these rows and do not weaken the adapter. The one allowed boundary comparison is complete; no further probing is justified absent a Provider/SDK contract. The exact-replay anomaly branch applied, so the conditional 2020-01 monthly check for a non-reproduction was not run. No history acquisition, BSE activation, capability promotion, or Formal B1–B7 occurred. The remaining unblock is a written AmazingData/SDK explanation that classifies this exact returned-row shape; otherwise keep Issue #90 blocked.
+**Conclusion remains `STILL_UNRESOLVED`.** Do not drop or key-fill these rows and do not weaken the adapter. The one allowed boundary comparison is complete; no further probing is justified absent a Provider/SDK contract. At that earlier checkpoint, the 2020-01 monthly check had not yet been run. Scheduler comment #5824435432 later superseded the written-explanation prerequisite for this unsupported long-range shape and authorized the bounded monthly check recorded above. The long-range row meaning remains unknown; no rows were dropped or key-filled, and no history acquisition, BSE activation, capability promotion, or Formal B1–B7 occurred.
 
 1. The issue's frozen receipt and scrubbed records:
    - `docs/provider_verification/capability_closure_20260911.json` records the 8-symbol, 1990-01-01–2099-12-31 response (20,638 rows), aggregate missing-date count, per-symbol table row counts, hashes, and raw artifact URIs.
@@ -73,8 +101,8 @@ The live calls above reproduced the shape but did not establish semantics. The r
 | Symbol argument | `code_list: list[str]`; SH/SZ exchange-qualified codes are forwarded verbatim. | No automatic symbol remapping. The current facade does not claim an SDK maximum batch size. |
 | Date arguments | Facade accepts integer `start_date`/`end_date` and forwards them as SDK `begin_date`/`end_date`. | The manual does not specify whether bounds are inclusive or exclusive. Pass YYYYMMDD integer bounds, validate returned dates against the requested window, and do not claim inclusion semantics until confirmed. |
 | Remote/local mode | The facade explicitly sends `is_local=False`. | The request envelope records the effective parameters. |
-| Batching | A two-symbol mixed SH/SZ call is covered as a single pass-through facade call; the facade does not rechunk it. | This proves facade pass-through only. SDK maximum and multi-symbol row-binding guarantee remain undocumented; no production batch size or one-symbol strategy is approved. A one-symbol call may be used only as a temporary minimal semantic probe if recovered row-specific evidence identifies a concrete target, and must not be extrapolated to the 78-month production build. |
-| Row-to-request binding | A provider-returned table key may be preserved when present; each accepted status row still needs a valid trade date and exactly one canonical natural key. | Never fill a row from the request list/order. No evidence establishes a general one-to-one request/response relationship for unkeyed rows. |
+| Batching | One month-bounded request containing the tested eight-symbol mixed SH/SZ list was passed through; the 2020-01 native response contained eight symbol-keyed tables. | This is one observed call shape only. It does not establish a general SDK batch ceiling or prove other-month completeness; later acquisition must remain month-bounded and separately reconciled. |
+| Row-to-request binding | In the tested 2020-01 call, all eight native response table keys exactly matched one requested exchange-qualified symbol; all 96 non-empty rows had valid dates and zero qualified-code conflicts. | This supports the observed table-key binding for this exact tested shape only. It is not a general SDK guarantee; unkeyed rows still fail closed and request order/arguments must never be used to reconstruct identity. |
 | Empty response | An empty payload/table is preserved as empty. | It means “no status observation received”; it does not prove no event, no applicable session, or a successful completeness check. Applicable pairs remain unresolved unless independently reconciled. |
 | BSE | Existing routing evidence uses current code `920185.BJ`; historical old/new-code evidence remains separate. The facade passes its input unchanged. | No BSE history activation, BJ remapping, or authoritative-universe expansion under Issue #90. |
 
@@ -98,17 +126,17 @@ The issue branch adds the minimum safety/test changes:
 
 | Acceptance item | Status |
 |---|---|
-| Classify all eight rows as non-fact or exactly keyable | **BLOCKED** — retained evidence and SDK contract are insufficient. |
-| Exact key for each admitted row | Enforced at the adapter boundary; no unkeyed row is admitted. |
-| Required shapes and routing regression tests | **PASS** — merged PR #91; exact-head CI #773 passed on Windows and Ubuntu / Python 3.14. |
-| Minimum SH/SZ request mechanics | Documented and mock-tested; provider batch ceiling and semantic row binding remain undocumented. |
-| No BSE/corporate-action/full-history/Formal expansion | Satisfied; none was run or activated. |
-| Ruff, format, mypy, focused/full pytest and Windows/Ubuntu Python 3.14 CI | **PASS** at PR #91 exact head; see CI run #773. |
-| Short semantic-closure record | This file; disposition is BLOCKED, not PASS. |
+| Meaning of the 1990-start tail rows | Still unknown; accepted as an unsupported Canonical-acquisition shape under scheduler comment #5824435432. Adapter remains fail-closed; no drop/fill rule. |
+| Tested month request table-key binding and dates | **PASS candidate** — all eight keys exactly matched requested symbols; 96 rows had valid dates; no missing key fields or identity conflicts. |
+| Duplicate `(symbol,date)` natural keys | **PASS candidate** — zero duplicate groups or extra rows in the tested call. |
+| Empty response handling | **PASS candidate** — two empty tables remain `EMPTY_UNRESOLVED`; no rows synthesized and no completeness claim made. |
+| Required fail-closed and routing regressions | **PASS** — merged PR #91; exact-head CI #773 passed on Windows and Ubuntu / Python 3.14. No adapter code changed in this monthly check. |
+| BSE/corporate-action/full-history/Formal expansion | **PASS (not run / not activated)** — remains prohibited until #90 PASS and separate authorization. |
+| Semantic-closure record | This document records the corrected scheduler gate and sanitized monthly evidence; #90 awaits independent PASS review. |
 
-To unblock the semantic issue, obtain a written AmazingData/SDK contract that classifies this exact returned-row shape. The bounded replay and one past-only comparison both reproduced identical row fingerprints, but raw shape alone is not enough to prove a row is non-fact; without authoritative explanation the endpoint must keep failing closed for these rows and cannot yet feed complete canonical status/limit facts.
+A written AmazingData/SDK explanation remains desirable for the unsupported 1990-start tail rows, but the scheduler's corrected gate no longer makes it a prerequisite for the supported month-bounded path. The 2020-01 check is a PASS candidate only; obtain independent PASS on Issue #90 before any subsequent acquisition task is opened. Keep fail-closed behavior for any future unkeyed row.
 
-**No 78-month acquisition/backfill is authorized by this record.** After semantic closure only, the scheduler must open a separate acquisition issue for SH/SZ `security_status + limit_price` over 2020-01 through 2026-06. BSE remains deferred.
+**No 78-month acquisition/backfill is authorized by this record.** Only after Issue #90 receives independent PASS may the scheduler open a separate task for SH/SZ `security_status + limit_price` over 2020-01 through 2026-06, with month-bounded capture and governed reconciliation. BSE remains deferred.
 
 ## Source paths
 
