@@ -802,7 +802,9 @@ class NormalizationRunner:
         # ------------------------------------------ frame / table routing
         raw_table_name: str | None = None
         row_locators: list[tuple[str | None, int]] = []
-        if (provider, provider_dataset, endpoint, surface) == _STATUS_MEMBER_MAP:
+        if (provider, provider_dataset, endpoint, surface) == _STATUS_MEMBER_MAP and isinstance(
+            payload, dict
+        ):
             try:
                 row_list, row_locators = self._status_rows_for_normalization(
                     payload,
@@ -1328,14 +1330,14 @@ class NormalizationRunner:
                     "status payload contains a non-mapping row",
                     view="status_normalization",
                 )
+            table_key_value = raw_row.get(_STATUS_TABLE_KEY_FIELD)
+            table_key = str(table_key_value).strip().upper() if table_key_value else None
             symbol = provider_symbol(raw_row)
             if not symbol:
                 raise ProviderRowShapeError(
                     "status row has no independently supported exchange-qualified identity",
                     view="status_normalization",
                 )
-            table_key_value = raw_row.get(_STATUS_TABLE_KEY_FIELD)
-            table_key = str(table_key_value).strip().upper() if table_key_value else None
             if table_key is not None and table_key != symbol:
                 raise ProviderRowShapeError(
                     "status row identity conflicts with its provider table key",
