@@ -26,7 +26,7 @@
 
 - 2020-01..2026-06 月度采集范围已批准；
 - 允许任务范围内自主 reacquire / retry / targeted probe；
-- 多个月真实采集已完成，但 45 个连续月份都残留少量 unresolved pair；
+- 连续多个月真实采集均残留少量 unresolved pair；最新检查时已到 48 个连续月份，实时进度以 Issue #95 为准；
 - Canonical publication 正确保持 blocked；
 - 当前迹象更像 applicability / endpoint coverage / denominator mismatch，而不是随机传输失败。
 
