@@ -483,7 +483,11 @@ class Issue95Build:
                     self.normalized_root,
                     str(output["uri"]),
                 )
-                projected_pairs = self._status_output_pairs(output_name, output_path)
+                projected_pairs = self._status_output_pairs(
+                    output_name,
+                    output_path,
+                    expected_row_count=output["row_count"],
+                )
                 if projected_pairs != expected_status_pairs:
                     raise BuildFailure("NORMALIZE", "STATUS_PROJECTION_KEY_SET_MISMATCH")
         return {
@@ -500,7 +504,15 @@ class Issue95Build:
     def _status_output_pairs(
         output_name: str,
         output_path: Path,
+        *,
+        expected_row_count: int,
     ) -> set[tuple[str, int]]:
+        # The verified normalization manifest and the projection-count gate
+        # establish this output as genuinely empty. Polars cannot select
+        # named columns from the valid zero-column Parquet it writes for an
+        # empty projection, so its exact natural-key set is empty as well.
+        if expected_row_count == 0:
+            return set()
         if output_name == "security_status":
             columns = ["security_code", "market_code", "trade_date"]
         elif output_name == "limit_price":
