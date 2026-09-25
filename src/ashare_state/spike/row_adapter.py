@@ -326,10 +326,17 @@ def _has_identity_field(row: dict[str, Any]) -> bool:
     return any(str(key).casefold() in identity_names for key in row)
 
 
-def _attach_table_identity(row: dict[str, Any], symbol: str) -> dict[str, Any]:
+def _attach_table_identity(
+    row: dict[str, Any], symbol: str, *, require_embedded_identity: bool = False
+) -> dict[str, Any]:
     """Attach a mapping key only when any embedded identity agrees with it."""
     embedded = provider_symbol(row)
     bare = symbol.split(".", 1)[0]
+    if require_embedded_identity and not embedded:
+        raise ProviderRowShapeError(
+            f"keyed table row has no independently supported identity for key={symbol}",
+            view="key_preserving_table_rows",
+        )
     if embedded:
         if "." in embedded:
             compatible = embedded == symbol
@@ -351,7 +358,9 @@ def _attach_table_identity(row: dict[str, Any], symbol: str) -> dict[str, Any]:
     return canonical
 
 
-def key_preserving_table_rows(payload: Any) -> list[dict[str, Any]]:
+def key_preserving_table_rows(
+    payload: Any, *, require_embedded_identity: bool = False
+) -> list[dict[str, Any]]:
     """Create an ephemeral row view that preserves keyed-table lineage.
 
     Live K-line responses are allowed to be ``dict[symbol, DataFrame | None]``.
@@ -398,7 +407,12 @@ def key_preserving_table_rows(payload: Any) -> list[dict[str, Any]]:
                     }
                 )
                 continue
-            rows.extend(_attach_table_identity(row, symbol) for row in member_rows)
+            rows.extend(
+                _attach_table_identity(
+                    row, symbol, require_embedded_identity=require_embedded_identity
+                )
+                for row in member_rows
+            )
         return rows
     if isinstance(payload, list):
         return [dict(row) if isinstance(row, dict) else {"value": row} for row in payload]
