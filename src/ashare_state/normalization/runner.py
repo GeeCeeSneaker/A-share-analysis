@@ -73,14 +73,11 @@ from ashare_state.normalization.registry import (
     mapper_identity_for,
     specs_for,
 )
-from ashare_state.providers.amazingdata.mapper import validate_provider_symbol
-from ashare_state.providers.errors import MappingValidationError
-from ashare_state.spike.row_adapter import (
-    ProviderRowShapeError,
-    canonical_status_view,
-    key_preserving_table_rows,
-    provider_symbol,
+from ashare_state.providers.amazingdata.mapper import (
+    normalize_status_payload,
+    validate_provider_symbol,
 )
+from ashare_state.providers.errors import MappingValidationError
 from ashare_state.storage.paths import physical_from_logical_uri, validate_logical_uri
 from ashare_state.storage.raw_anchor import lookup_raw_evidence_anchor
 from ashare_state.storage.raw_writer import (
@@ -125,9 +122,6 @@ _STATUS_MEMBER_MAP = (
     "InfoData.get_history_stock_status",
     "security_status_history",
 )
-_STATUS_TABLE_KEY_FIELD = "_TABLE_KEY"
-_STATUS_NONE_FIELD = "_TABLE_NONE"
-_STATUS_EMPTY_FIELD = "_TABLE_EMPTY"
 
 #: semantic fields of a quarantine record entering the exact-set seal
 _QTZ_SEMANTIC_FIELDS = (
@@ -810,7 +804,7 @@ class NormalizationRunner:
                     payload,
                     request_params=meta_doc.get("request_params"),
                 )
-            except (MappingValidationError, ProviderRowShapeError, TypeError, ValueError) as exc:
+            except (MappingValidationError, TypeError, ValueError) as exc:
                 return self._blocked_run(
                     provider=provider,
                     provider_dataset=provider_dataset,
@@ -1300,96 +1294,12 @@ class NormalizationRunner:
     def _status_rows_for_normalization(
         payload: Any, *, request_params: Any
     ) -> tuple[list[dict[str, Any]], list[tuple[str | None, int]]]:
-        """Adapt status payloads without losing keyed-table identity.
-
-        The provider may return a symbol-keyed map of DataFrames. Each
-        non-empty member must itself carry a usable identity; the map key is
-        only a cross-check, never a substitute for row identity. The
-        canonical view supplies the mapper's existing ``SECURITY_CODE`` /
-        ``MARKET_CODE`` fields while preserving every provider field.
-        """
-        try:
-            raw_rows = key_preserving_table_rows(
-                payload,
-                require_embedded_identity=True,
-            )
-        except TypeError as exc:
-            raise ProviderRowShapeError(
-                "status payload has an unsupported tabular shape",
-                view="status_normalization",
-            ) from exc
-
-        rows: list[dict[str, Any]] = []
-        row_locators: list[tuple[str | None, int]] = []
-        ordinals: dict[str | None, int] = {}
-        for raw_row in raw_rows:
-            if raw_row.get(_STATUS_NONE_FIELD) or raw_row.get(_STATUS_EMPTY_FIELD):
-                continue
-            if not isinstance(raw_row, dict):
-                raise ProviderRowShapeError(
-                    "status payload contains a non-mapping row",
-                    view="status_normalization",
-                )
-            table_key_value = raw_row.get(_STATUS_TABLE_KEY_FIELD)
-            table_key = str(table_key_value).strip().upper() if table_key_value else None
-            symbol = provider_symbol(raw_row)
-            if not symbol:
-                raise ProviderRowShapeError(
-                    "status row has no independently supported exchange-qualified identity",
-                    view="status_normalization",
-                )
-            if table_key is not None and table_key != symbol:
-                raise ProviderRowShapeError(
-                    "status row identity conflicts with its provider table key",
-                    view="status_normalization",
-                )
-            ordinal = ordinals.get(table_key, 0)
-            ordinals[table_key] = ordinal + 1
-            rows.append(raw_row)
-            row_locators.append((table_key, ordinal))
-
-        canonical_rows = canonical_status_view(rows)
-        params = request_params if isinstance(request_params, dict) else {}
-        scope_keys = {"begin_date", "end_date", "code_list"}
-        if scope_keys.intersection(params):
-            if not scope_keys.issubset(params):
-                raise ProviderRowShapeError(
-                    "status request metadata has an incomplete date/symbol scope",
-                    view="status_normalization",
-                )
-            symbols = params["code_list"]
-            if (
-                not isinstance(symbols, list)
-                or not symbols
-                or any(not isinstance(value, str) or not value for value in symbols)
-                or len(symbols) != len(set(symbols))
-            ):
-                raise ProviderRowShapeError(
-                    "status request metadata has an invalid symbol list",
-                    view="status_normalization",
-                )
-            requested = {value.upper() for value in symbols}
-            begin = int(params["begin_date"])
-            end = int(params["end_date"])
-            if begin > end:
-                raise ProviderRowShapeError(
-                    "status request metadata has a reversed date window",
-                    view="status_normalization",
-                )
-            for row in canonical_rows:
-                symbol = str(row["PROVIDER_SYMBOL"])
-                trade_day = int(str(row["TRADE_DATE"]))
-                if symbol not in requested:
-                    raise ProviderRowShapeError(
-                        "status row identity is outside the request symbol list",
-                        view="status_normalization",
-                    )
-                if not begin <= trade_day <= end:
-                    raise ProviderRowShapeError(
-                        "status row date is outside the request window",
-                        view="status_normalization",
-                    )
-        return canonical_rows, row_locators
+        """Delegate status table normalization to the production mapper."""
+        rows, locators, _empty_members = normalize_status_payload(
+            payload,
+            request_params=request_params,
+        )
+        return rows, locators
 
     def _route(
         self, provider: str, provider_dataset: str, endpoint: str, surface: str

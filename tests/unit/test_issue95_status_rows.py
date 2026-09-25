@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib
 import json
 import sys
@@ -9,10 +10,8 @@ import polars as pl
 import pytest
 
 from ashare_state.normalization.runner import NormalizationRunner
-from ashare_state.spike.row_adapter import (
-    ProviderRowShapeError,
-    key_preserving_table_rows,
-)
+from ashare_state.providers.amazingdata.mapper import normalize_status_payload
+from ashare_state.providers.errors import MappingValidationError
 
 _SPIKE_SCRIPT_DIR = Path(__file__).resolve().parents[2] / "scripts" / "spike"
 sys.path.insert(0, str(_SPIKE_SCRIPT_DIR))
@@ -60,7 +59,7 @@ def test_status_member_map_keeps_key_and_requires_independent_row_identity() -> 
     assert locators == [("600000.SH", 0)]
 
     unkeyed = {"600000.SH": [{"TRADE_DATE": 20200102, "IS_ST_SEC": 0}]}
-    with pytest.raises(ProviderRowShapeError):
+    with pytest.raises(MappingValidationError):
         NormalizationRunner._status_rows_for_normalization(
             unkeyed,
             request_params=_scope(),
@@ -68,19 +67,19 @@ def test_status_member_map_keeps_key_and_requires_independent_row_identity() -> 
 
 
 def test_status_member_map_rejects_key_identity_date_and_duplicate_conflicts() -> None:
-    with pytest.raises(ProviderRowShapeError):
+    with pytest.raises(MappingValidationError):
         NormalizationRunner._status_rows_for_normalization(
             {"600000.SH": [_status_row(code="600001")]},
             request_params=_scope(),
         )
 
-    with pytest.raises(ProviderRowShapeError):
+    with pytest.raises(MappingValidationError):
         NormalizationRunner._status_rows_for_normalization(
             {"600000.SH": [_status_row(day=20200203)]},
             request_params=_scope(),
         )
 
-    with pytest.raises(ProviderRowShapeError):
+    with pytest.raises(MappingValidationError):
         NormalizationRunner._status_rows_for_normalization(
             {"600000.SH": [_status_row(), _status_row()]},
             request_params=_scope(),
@@ -88,21 +87,45 @@ def test_status_member_map_rejects_key_identity_date_and_duplicate_conflicts() -
 
 
 def test_status_list_rows_must_match_the_request_symbols() -> None:
-    with pytest.raises(ProviderRowShapeError):
+    with pytest.raises(MappingValidationError):
         NormalizationRunner._status_rows_for_normalization(
             [_status_row()],
             request_params=_scope(symbols=["000001.SZ"]),
         )
 
 
-def test_key_preserving_adapter_can_fail_closed_on_missing_embedded_identity() -> None:
-    payload = {"600000.SH": [{"TRADE_DATE": 20200102}]}
+def test_production_normalizer_imports_status_rows_from_mapper_not_spike() -> None:
+    root = Path(__file__).resolve().parents[2]
+    sources = (
+        root / "src" / "ashare_state" / "normalization" / "runner.py",
+        root / "src" / "ashare_state" / "providers" / "amazingdata" / "mapper.py",
+    )
+    imports: list[str] = []
+    for source in sources:
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                imports.append(node.module)
+            elif isinstance(node, ast.Import):
+                imports.extend(alias.name for alias in node.names)
 
-    permissive = key_preserving_table_rows(payload)
-    assert permissive[0]["PROVIDER_SYMBOL"] == "600000.SH"
+    assert "ashare_state.providers.amazingdata.mapper" in imports
+    assert not any(module.startswith("ashare_state.spike") for module in imports)
 
-    with pytest.raises(ProviderRowShapeError):
-        key_preserving_table_rows(payload, require_embedded_identity=True)
+
+def test_status_member_map_counts_empty_members_without_creating_facts() -> None:
+    rows, locators, empty_count = normalize_status_payload(
+        {"600000.SH": [_status_row()], "000001.SZ": None},
+        request_params={
+            "begin_date": 20200101,
+            "end_date": 20200131,
+            "code_list": ["600000.SH", "000001.SZ"],
+        },
+    )
+
+    assert len(rows) == 1
+    assert locators == [("600000.SH", 0)]
+    assert empty_count == 1
 
 
 def test_status_batch_probe_sizes_are_bounded_by_provider_evidence() -> None:

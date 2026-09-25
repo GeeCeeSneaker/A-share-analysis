@@ -40,6 +40,10 @@ from ashare_state.providers.amazingdata.credentials import (
     load_tgw_environment,
     resolve_tgw_credentials,
 )
+from ashare_state.providers.amazingdata.mapper import (
+    normalize_provider_symbol,
+    normalize_status_payload,
+)
 from ashare_state.providers.amazingdata.production_identity import (
     AccountKind,
     production_account_status,
@@ -51,7 +55,6 @@ from ashare_state.providers.amazingdata.provider import (
 from ashare_state.providers.amazingdata.session import AmazingDataSession
 from ashare_state.providers.amazingdata.timeout import RetryPolicy, TimeBudget
 from ashare_state.research.historical import AMAZINGDATA_SECURITY_UNIVERSE_SELECTION
-from ashare_state.spike.row_adapter import key_preserving_table_rows, provider_symbol
 from ashare_state.storage.connection import DuckDBConnectionManager
 from ashare_state.storage.migrations import apply_migrations
 from ashare_state.storage.paths import physical_from_logical_uri
@@ -269,12 +272,10 @@ def _status_rows(
     exchange_payload: Any, request_params: dict[str, Any]
 ) -> tuple[list[dict[str, Any]], int]:
     """Validate row-owned identity/date and return rows plus empty-member count."""
-    rows, _locators = NormalizationRunner._status_rows_for_normalization(
+    rows, _locators, empty_members = normalize_status_payload(
         exchange_payload,
         request_params=request_params,
     )
-    adapted = key_preserving_table_rows(exchange_payload, require_embedded_identity=True)
-    empty_members = sum(bool(row.get("_TABLE_NONE") or row.get("_TABLE_EMPTY")) for row in adapted)
     return rows, empty_members
 
 
@@ -524,11 +525,9 @@ class Issue95Build:
             pairs: set[tuple[str, int]] = set()
             for row in frame.iter_rows(named=True):
                 if output_name == "security_status":
-                    symbol = provider_symbol(
-                        {
-                            "SECURITY_CODE": row.get("security_code"),
-                            "MARKET_CODE": row.get("market_code"),
-                        }
+                    symbol = normalize_provider_symbol(
+                        str(row.get("security_code") or ""),
+                        str(row.get("market_code") or ""),
                     )
                 else:
                     symbol = str(row.get("provider_symbol") or "").strip().upper()

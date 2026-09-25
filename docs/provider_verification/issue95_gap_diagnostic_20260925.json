@@ -1,0 +1,97 @@
+{
+    "schema": "issue95_gap_diagnostic.v1",
+    "as_of_date": "2026-09-25",
+    "isolated_run": {
+        "label": "run_20260925T065004Z_66850919",
+        "status": "INTERRUPTED",
+        "provider_call_count": 3271,
+        "execution_manifest_sha256": "cda2b5edb0ebdf7c9cf8f06714eaf3506b3bf58db2fb8625cb3f4b478c05caf0",
+        "report_json_sha256": "a8d0a1c96cde0fba3fbc72e658fb2fc36a99c9db93a33a2ba3287c8d33df5bb3",
+        "report_markdown_sha256": "6d39e709416bd3f429e7754e68db90b3fdaf78d6d9346e56f08f8110dd9f7ba6",
+        "canonical_published": false
+    },
+    "scope": {
+        "from_month": "2020-01",
+        "through_month": "2026-06",
+        "domains": ["security_status", "limit_price"]
+    },
+    "month_status_counts": {
+        "blocked_completeness": 62,
+        "pass": 5,
+        "partial_capturing": 1,
+        "not_started": 10
+    },
+    "partial_month": {
+        "month": "2025-08",
+        "expected_pairs_per_domain": 108198,
+        "returned_pairs_per_domain": 83990
+    },
+    "blocked_months": {
+        "range": ["2020-01", "2025-02"],
+        "unresolved_pairs_per_domain": 1563,
+        "manifest_reconciled_months": 62,
+        "manifest_count_mismatches": 0,
+        "duplicate_pairs": 0,
+        "unexplained_extra_pairs": 0,
+        "structural_errors": 0,
+        "symbols_missing_listing_date": 0,
+        "exact_session_universe": {"member": 1238, "absent": 325},
+        "exchange": {"SZ": 1470, "SH": 93},
+        "board": {"ChiNext": 1324, "SZ_main": 146, "SH_main": 93},
+        "sessions_since_listing": {"over_250": 1563},
+        "sessions_to_delisting": {"within_20": 0, "over_20": 249, "no_known_delisting_date": 1314}
+    },
+    "sentinel_months": [
+        {"month": "2020-07", "unresolved_pairs": 105},
+        {"month": "2022-08", "unresolved_pairs": 38},
+        {"month": "2025-02", "unresolved_pairs": 18}
+    ],
+    "sentinel_cross_tab": {
+        "unresolved_pairs": 161,
+        "manifest_reconciled_months": 3,
+        "exact_session_universe": {"member": 54, "absent": 107},
+        "exchange": {"SZ": 150, "SH": 11},
+        "board": {"ChiNext": 82, "SZ_main": 68, "SH_main": 11},
+        "sessions_since_listing": {"over_250": 161},
+        "sessions_to_delisting": {"within_20": 0, "over_20": 82, "no_known_delisting_date": 79}
+    },
+    "adjacent_returned_status_flags": {
+        "sampled_unresolved_pairs": 161,
+        "lookup": "nearest returned row in the month; adjacent captured month consulted at month edges",
+        "previous_row": {
+            "present": 82,
+            "missing": 79,
+            "is_susp_sec_1": 82,
+            "is_st_sec_1": 64,
+            "is_st_sec_0": 18
+        },
+        "next_row": {"present": 15, "missing": 146, "is_st_sec_1": 15, "is_susp_sec_0": 15},
+        "values_are_observations_not_applicability_rules": true
+    },
+    "targeted_probes": {
+        "single_symbol_missing_day_status": {
+            "calls": 7,
+            "exchange_status_ok_zero_rows": 7,
+            "adjacent_day_controls_with_rows": 3
+        },
+        "daily_bar": {
+            "missing_pair_dates_checked": 5,
+            "exact_security_date_bar_present": 2,
+            "no_bar_returned": 3,
+            "adjacent_control_dates_checked": 2,
+            "adjacent_controls_with_exact_bar": 1
+        }
+    },
+    "root_cause": {
+        "classification": "provider coverage versus documented applicability unresolved",
+        "evidence_supported_denominator_change": false,
+        "safe_local_capture_retry_fix_identified": false,
+        "canonical_publication_allowed": false,
+        "next_required_evidence": "authoritative Provider/Owner status-table coverage semantics or a corrected response under the approved endpoint"
+    },
+    "data_handling": {
+        "raw_provider_payloads_in_git": false,
+        "ticker_level_facts_in_git": false,
+        "credentials_or_server_addresses_in_git": false
+    }
+}

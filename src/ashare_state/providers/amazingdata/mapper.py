@@ -428,6 +428,247 @@ def map_daily_bar_member_row(row: Any, *, member_key_field: str) -> DailyBarDTO:
 # ------------------------------------------------- status -> THREE domains
 
 
+_STATUS_IDENTITY_FIELDS = (
+    "PROVIDER_SYMBOL",
+    "provider_symbol",
+    "SECURITY_CODE",
+    "security_code",
+    "code",
+)
+_STATUS_MARKET_FIELDS = ("MARKET_CODE", "market_code", "market")
+_STATUS_MEMBER_KEY_FIELD = "_TABLE_KEY"
+_STATUS_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "TRADE_DATE": ("TRADE_DATE", "trade_date"),
+    "PRECLOSE": ("PRECLOSE", "pre_close"),
+    "HIGH_LIMITED": ("HIGH_LIMITED", "high_limited"),
+    "LOW_LIMITED": ("LOW_LIMITED", "low_limited"),
+    "CLOSE_PRICE": ("CLOSE_PRICE", "CLOSE", "close_price", "close"),
+    "PRICE_HIGH_LMT_RATE": ("PRICE_HIGH_LMT_RATE", "price_high_lmt_rate"),
+    "PRICE_LOW_LMT_RATE": ("PRICE_LOW_LMT_RATE", "price_low_lmt_rate"),
+    "IS_ST_SEC": ("IS_ST_SEC", "is_st_sec"),
+    "IS_SUSP_SEC": ("IS_SUSP_SEC", "is_susp_sec"),
+    "IS_WD_SEC": ("IS_WD_SEC", "is_wd_sec"),
+    "IS_XR_SEC": ("IS_XR_SEC", "is_xr_sec"),
+}
+_STATUS_ROW_FIELDS = frozenset(
+    field.casefold()
+    for aliases in (*_STATUS_FIELD_ALIASES.values(), _STATUS_IDENTITY_FIELDS, _STATUS_MARKET_FIELDS)
+    for field in aliases
+)
+_STATUS_MARKET_ALIASES = {"SH": "1", "SZ": "2", "BJ": "3"}
+
+
+def _case_insensitive_values(row: dict[str, Any], names: tuple[str, ...]) -> list[Any]:
+    accepted = {name.casefold() for name in names}
+    return [
+        value for key, value in row.items() if str(key).casefold() in accepted and value is not None
+    ]
+
+
+def _case_insensitive_first(row: dict[str, Any], names: tuple[str, ...]) -> Any:
+    for name in names:
+        for key, value in row.items():
+            if str(key).casefold() == name.casefold() and value is not None:
+                return value
+    return None
+
+
+def _status_identity(row: dict[str, Any]) -> tuple[str, str, str]:
+    context = "security_status"
+    market_codes: set[str] = set()
+    market_symbols: set[str] = set()
+    for raw_market in _case_insensitive_values(row, _STATUS_MARKET_FIELDS):
+        text = str(raw_market).strip().upper()
+        if "." in text:
+            symbol, _code, _market = _parse_security_identity(text, context=context)
+            market_symbols.add(symbol)
+        else:
+            market = _STATUS_MARKET_ALIASES.get(text, text)
+            if market not in _MARKET_SUFFIX:
+                raise MappingValidationError(
+                    f"{context}: unsupported MARKET_CODE {text!r}; expected SH/SZ/BJ or 1/2/3"
+                )
+            market_codes.add(market)
+    if len(market_codes) > 1:
+        raise MappingValidationError(f"{context}: conflicting market-code fields")
+
+    resolved_symbols: set[str] = set(market_symbols)
+    for raw_identity in _case_insensitive_values(row, _STATUS_IDENTITY_FIELDS):
+        symbol, code, inferred_market = _parse_security_identity(
+            str(raw_identity).strip().upper(), context=context
+        )
+        market = inferred_market or next(iter(market_codes), None)
+        if market is None:
+            raise MappingValidationError(f"{context}: row identity has no exchange")
+        if inferred_market is not None and market_codes and inferred_market not in market_codes:
+            raise MappingValidationError(f"{context}: row identity conflicts with MARKET_CODE")
+        resolved_symbols.add(symbol or normalize_provider_symbol(code, market))
+
+    if len(resolved_symbols) != 1:
+        raise MappingValidationError(
+            f"{context}: missing or conflicting independently embedded security identity"
+        )
+    symbol = next(iter(resolved_symbols))
+    code, suffix = symbol.rsplit(".", 1)
+    market = _SUFFIX_MARKET[f".{suffix}"]
+    if market_codes and market not in market_codes:
+        raise MappingValidationError(f"{context}: row identity conflicts with MARKET_CODE")
+    return symbol, code, market
+
+
+def _status_table_member_rows(member: Any, *, context: str) -> list[dict[str, Any]]:
+    if member is None:
+        return []
+    if isinstance(member, dict):
+        return [dict(member)] if member else []
+    if isinstance(member, list):
+        if any(not isinstance(row, dict) for row in member):
+            raise MappingValidationError(f"{context}: status table contains a non-mapping row")
+        return [dict(row) for row in member]
+    iter_rows = getattr(member, "iter_rows", None)
+    if callable(iter_rows) and hasattr(member, "columns"):
+        return [dict(row) for row in iter_rows(named=True)]
+    rows = getattr(member, "rows", None)
+    columns = getattr(member, "columns", None)
+    if callable(rows) and columns is not None:
+        return [dict(zip(columns, values, strict=True)) for values in rows()]
+    to_dict = getattr(member, "to_dict", None)
+    if callable(to_dict):
+        try:
+            records = to_dict(orient="records")
+        except TypeError:
+            records = None
+        if records is not None and all(isinstance(row, dict) for row in records):
+            return [dict(row) for row in records]
+    raise MappingValidationError(f"{context}: unsupported status table shape")
+
+
+def _canonical_status_row(row: dict[str, Any], *, member_symbol: str | None) -> dict[str, Any]:
+    symbol, code, market = _status_identity(row)
+    if member_symbol is not None and symbol != member_symbol:
+        raise MappingValidationError(
+            "security_status: embedded identity conflicts with provider table key"
+        )
+
+    raw_dates = _case_insensitive_values(row, ("TRADE_DATE", "trade_date"))
+    parsed_dates = [_to_date(value) for value in raw_dates]
+    if not parsed_dates or any(value is None for value in parsed_dates):
+        raise MappingValidationError("security_status: missing or invalid TRADE_DATE")
+    if len(set(parsed_dates)) != 1:
+        raise MappingValidationError("security_status: conflicting TRADE_DATE fields")
+    trade_day = parsed_dates[0]
+    assert trade_day is not None
+
+    canonical = dict(row)
+    canonical.update(
+        {
+            "SECURITY_CODE": code,
+            "MARKET_CODE": market,
+            "EXCHANGE_CODE": symbol.rsplit(".", 1)[1],
+            "PROVIDER_SYMBOL": symbol,
+            "TRADE_DATE": trade_day.strftime("%Y%m%d"),
+        }
+    )
+    for field, aliases in _STATUS_FIELD_ALIASES.items():
+        if field == "TRADE_DATE":
+            continue
+        value = _case_insensitive_first(row, aliases)
+        if value is not None:
+            canonical[field] = value
+    return canonical
+
+
+def normalize_status_payload(
+    payload: Any, *, request_params: Any = None
+) -> tuple[list[dict[str, Any]], list[tuple[str | None, int]], int]:
+    """Normalize AmazingData status rows at the production mapper boundary.
+
+    Keyed response tables are flattened without using their keys to invent a
+    row identity. Every row must independently carry the same exchange-
+    qualified identity as its member key. The returned locators retain table
+    and row order for normalization provenance; empty members are counted but
+    never converted into negative status facts.
+    """
+    params = request_params if isinstance(request_params, dict) else {}
+    scope_keys = {"begin_date", "end_date", "code_list"}
+    requested_symbols: set[str] | None = None
+    begin: date | None = None
+    end: date | None = None
+    if scope_keys.intersection(params):
+        if not scope_keys.issubset(params):
+            raise MappingValidationError("security_status: incomplete request scope metadata")
+        symbols = params["code_list"]
+        if (
+            not isinstance(symbols, list)
+            or not symbols
+            or any(not isinstance(value, str) or not value.strip() for value in symbols)
+        ):
+            raise MappingValidationError("security_status: invalid request symbol list")
+        normalized_symbols = [
+            validate_provider_symbol(value.strip().upper(), context="security_status request")[0]
+            for value in symbols
+        ]
+        if len(normalized_symbols) != len(set(normalized_symbols)):
+            raise MappingValidationError("security_status: duplicate request symbols")
+        requested_symbols = set(normalized_symbols)
+        begin = _to_date(params["begin_date"])
+        end = _to_date(params["end_date"])
+        if begin is None or end is None or begin > end:
+            raise MappingValidationError("security_status: invalid request date window")
+
+    raw_members: list[tuple[str | None, list[dict[str, Any]]]] = []
+    empty_members = 0
+    if payload is None:
+        return [], [], 0
+    if isinstance(payload, dict) and any(
+        str(key).casefold() in _STATUS_ROW_FIELDS for key in payload
+    ):
+        raw_members.append((None, [dict(payload)]))
+    elif isinstance(payload, dict):
+        for raw_key, member in sorted(payload.items(), key=lambda item: str(item[0]).upper()):
+            member_symbol = validate_provider_symbol(
+                str(raw_key).strip().upper(), context="security_status table key"
+            )[0]
+            if requested_symbols is not None and member_symbol not in requested_symbols:
+                raise MappingValidationError(
+                    "security_status: provider table key is outside request scope"
+                )
+            member_rows = _status_table_member_rows(
+                member, context=f"security_status table {member_symbol}"
+            )
+            if not member_rows:
+                empty_members += 1
+            raw_members.append((member_symbol, member_rows))
+    else:
+        raw_rows = _status_table_member_rows(payload, context="security_status payload")
+        if not raw_rows:
+            empty_members = 0
+        raw_members.append((None, raw_rows))
+
+    rows: list[dict[str, Any]] = []
+    locators: list[tuple[str | None, int]] = []
+    seen: set[tuple[str, date]] = set()
+    for member_symbol, member_rows in raw_members:
+        for ordinal, raw_row in enumerate(member_rows):
+            canonical = _canonical_status_row(raw_row, member_symbol=member_symbol)
+            symbol = canonical["PROVIDER_SYMBOL"]
+            trade_day = _to_date(canonical["TRADE_DATE"])
+            assert trade_day is not None
+            if requested_symbols is not None and symbol not in requested_symbols:
+                raise MappingValidationError(
+                    "security_status: row identity is outside request scope"
+                )
+            if begin is not None and end is not None and not begin <= trade_day <= end:
+                raise MappingValidationError("security_status: row date is outside request window")
+            natural_key = (symbol, trade_day)
+            if natural_key in seen:
+                raise MappingValidationError("security_status: duplicate natural key")
+            seen.add(natural_key)
+            rows.append(canonical)
+            locators.append((member_symbol, ordinal))
+    return rows, locators, empty_members
+
+
 def map_security_status_row(row: Any) -> SecurityStatusDTO:
     ctx = "security_status"
     market_code = str(first_present(row, "MARKET_CODE") or "")

@@ -19,7 +19,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from ashare_state.providers.amazingdata.mapper import normalize_provider_symbol
+from ashare_state.providers.amazingdata.mapper import (
+    normalize_provider_symbol,
+    normalize_status_payload,
+)
 from ashare_state.providers.errors import MappingValidationError
 
 __all__ = [
@@ -326,17 +329,10 @@ def _has_identity_field(row: dict[str, Any]) -> bool:
     return any(str(key).casefold() in identity_names for key in row)
 
 
-def _attach_table_identity(
-    row: dict[str, Any], symbol: str, *, require_embedded_identity: bool = False
-) -> dict[str, Any]:
+def _attach_table_identity(row: dict[str, Any], symbol: str) -> dict[str, Any]:
     """Attach a mapping key only when any embedded identity agrees with it."""
     embedded = provider_symbol(row)
     bare = symbol.split(".", 1)[0]
-    if require_embedded_identity and not embedded:
-        raise ProviderRowShapeError(
-            f"keyed table row has no independently supported identity for key={symbol}",
-            view="key_preserving_table_rows",
-        )
     if embedded:
         if "." in embedded:
             compatible = embedded == symbol
@@ -358,9 +354,7 @@ def _attach_table_identity(
     return canonical
 
 
-def key_preserving_table_rows(
-    payload: Any, *, require_embedded_identity: bool = False
-) -> list[dict[str, Any]]:
+def key_preserving_table_rows(payload: Any) -> list[dict[str, Any]]:
     """Create an ephemeral row view that preserves keyed-table lineage.
 
     Live K-line responses are allowed to be ``dict[symbol, DataFrame | None]``.
@@ -407,12 +401,7 @@ def key_preserving_table_rows(
                     }
                 )
                 continue
-            rows.extend(
-                _attach_table_identity(
-                    row, symbol, require_embedded_identity=require_embedded_identity
-                )
-                for row in member_rows
-            )
+            rows.extend(_attach_table_identity(row, symbol) for row in member_rows)
         return rows
     if isinstance(payload, list):
         return [dict(row) if isinstance(row, dict) else {"value": row} for row in payload]
@@ -430,69 +419,18 @@ def key_preserving_table_rows(
     return [{"value": payload}]
 
 
-_STATUS_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
-    "TRADE_DATE": ("TRADE_DATE", "trade_date"),
-    "PRECLOSE": ("PRECLOSE", "pre_close"),
-    "HIGH_LIMITED": ("HIGH_LIMITED",),
-    "LOW_LIMITED": ("LOW_LIMITED",),
-    "CLOSE_PRICE": ("CLOSE_PRICE", "CLOSE"),
-    "IS_ST_SEC": ("IS_ST_SEC",),
-    "IS_SUSP_SEC": ("IS_SUSP_SEC",),
-    "IS_WD_SEC": ("IS_WD_SEC",),
-}
-
-
 def canonical_status_view(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Create the one canonical status view consumed by semantic validators.
-
-    Native status payloads may put an exchange-qualified symbol in
-    ``MARKET_CODE`` and omit ``SECURITY_CODE``.  Each accepted row is cloned
-    and receives a bare ``SECURITY_CODE``, numeric ``MARKET_CODE`` (1=SH,
-    2=SZ, 3=BJ), ``EXCHANGE_CODE`` and ``PROVIDER_SYMBOL``.  The view also
-    canonicalizes status dates/known fields.  An empty response remains an
-    empty response; an identity/date that cannot be proven is a loud shape
-    error rather than a guessed mapping.
-    """
-    view: list[dict[str, Any]] = []
-    seen_natural_keys: set[tuple[str, str]] = set()
-    for index, row in enumerate(rows):
-        if not isinstance(row, dict):
-            raise ProviderRowShapeError(
-                f"status row {index} is not a mapping",
-                view="canonical_status_view",
-            )
-        symbol = provider_symbol(row)
-        trade_date = row_date(row, "TRADE_DATE", "trade_date")
-        if "." not in symbol:
-            raise ProviderRowShapeError(
-                f"status row {index} has ambiguous or missing exchange-qualified identity",
-                view="canonical_status_view",
-            )
-        code, suffix = symbol.rsplit(".", 1)
-        if not trade_date:
-            raise ProviderRowShapeError(
-                f"status row {index} has missing or invalid TRADE_DATE",
-                view="canonical_status_view",
-            )
-        natural_key = (symbol, trade_date)
-        if natural_key in seen_natural_keys:
-            raise ProviderRowShapeError(
-                f"status row {index} duplicates canonical natural key",
-                view="canonical_status_view",
-            )
-        seen_natural_keys.add(natural_key)
-        canonical = dict(row)
-        canonical["SECURITY_CODE"] = code
-        canonical["MARKET_CODE"] = _SUFFIX_MARKET[suffix]
-        canonical["EXCHANGE_CODE"] = suffix
-        canonical["PROVIDER_SYMBOL"] = symbol
-        for field_name, aliases in _STATUS_FIELD_ALIASES.items():
-            value = first_case_insensitive(row, *aliases)
-            if value is not None:
-                canonical[field_name] = value
-        canonical["TRADE_DATE"] = trade_date
-        view.append(canonical)
-    return view
+    """Expose the production status mapper to one-off semantic validators."""
+    try:
+        normalized, _locators, _empty_members = normalize_status_payload(rows)
+    except MappingValidationError as exc:
+        message = str(exc)
+        if "no exchange" in message or "independently embedded security identity" in message:
+            message = "status row has ambiguous or missing exchange-qualified identity"
+        elif "duplicate natural key" in message:
+            message = "status row duplicates canonical natural key"
+        raise ProviderRowShapeError(message, view="canonical_status_view") from exc
+    return normalized
 
 
 _DAILY_BAR_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
