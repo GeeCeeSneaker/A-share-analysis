@@ -48,14 +48,19 @@ Issue [#84](https://github.com/GeeCeeSneaker/A-share-analysis/issues/84) was com
 
 Issue [#85](https://github.com/GeeCeeSneaker/A-share-analysis/issues/85) completed through PR [#88](https://github.com/GeeCeeSneaker/A-share-analysis/pull/88), merged to `main` as `423af4b44460ee5fc0bee1b9435a0f96fca8920e`. Independent scheduler review #5301987657 passed the exact code head `57bcc827df95b3a05a4ec6a7c4a4616107d7ea90`; exact-head CI #765 passed on Windows/Python 3.14 and Ubuntu/Python 3.14. Windows Python 3.14.x is the sole supported/reference application runtime; Ubuntu 3.14 is CI-only. See `docs/project/ISSUE85_PYTHON_RUNTIME_SIMPLIFICATION_20260924.md`.
 
-## Current active P1 — Issue #86 AmazingData coverage-gap review (2026-09-24)
+## Completed P1 — Issue #86 AmazingData coverage-gap review (2026-09-24)
 
-> Status: **repository/evidence matrix drafted; no Provider calls, no ingestion, and no B1-B7/Production run; scheduler acceptance pending.**
+> Status: **PASS / merged / closed.**
 
-Issue [#86](https://github.com/GeeCeeSneaker/A-share-analysis/issues/86) is now active after #85 closed. Its one compact report, `docs/provider_verification/AMAZINGDATA_COVERAGE_MATRIX_20260924.md`, distinguishes SDK surface, prior Owner-confirmed account-call evidence, retained probes, authoritative history and actual Canonical/Research consumers. Unknown access remains `NOT_YET_VERIFIED`, not denied. No unresolved endpoint access probe would change the immediate recommendation, so this issue performed zero Provider calls and did not promote any capability.
+Issue [#86](https://github.com/GeeCeeSneaker/A-share-analysis/issues/86) completed through PR [#89](https://github.com/GeeCeeSneaker/A-share-analysis/pull/89), merged as `409105925405e987d72636829a7ad144b46bf17c`. Exact head `ee9a8b1b0b42244ce04b8b86b9a845e9714a859c` passed CI #768 on Windows and Ubuntu / Python 3.14. The evidence matrix is `docs/provider_verification/AMAZINGDATA_COVERAGE_MATRIX_20260924.md`. It selected one follow-on group only: historical `security_status + limit_price`, gated by semantic closure in Issue #90. No bulk acquisition was authorized.
 
-The matrix confirms that only daily bars have 78/78 authoritative Canonical history (2020-01 through 2026-06, 7,442,987 rows); other successful endpoint smokes remain probes. It recommends exactly one follow-on group: historical security status plus limit prices via `InfoData.get_history_stock_status`, after closing the known unkeyed-row/request-routing semantics. The existing month-bounded Canonical path should be reused. No bulk acquisition is authorized here; Formal B1-B7, capability approval and data-domain implementation remain separate scheduler decisions. See the matrix for the field-level evidence and handoff requirements.
+## Current active P0 — Issue #90 status-key and request-routing semantics (2026-09-24)
 
+> Status: **OPEN / BLOCKED / STILL_UNRESOLVED.** Semantic closure only; no history acquisition.
+
+Issue [#90](https://github.com/GeeCeeSneaker/A-share-analysis/issues/90) is the current unique active P0. PR #91 merged the fail-closed duplicate-natural-key guard and focused routing/shape tests; PR #92 recorded that the original ignored Parquet artifacts were unavailable in the searched environment. Scheduler then authorized one exact replay of the original eight-symbol, 1990–2099 request and one same-start, past-only comparison ending 2026-08-31. Both succeeded through SDK 1.1.9: respectively 20,710 and 20,566 rows, with seven rows missing both key fields in each response. All seven were table-tail rows and had identical per-symbol row fingerprints across the two calls; the eighth symbol had none. The past-only result shows the 2099 future bound is not necessary, but neither shape nor position proves these rows are non-facts or supplies a trade date. The adapter remains fail-closed; no raw payload was persisted.
+
+The exact per-symbol sanitized masks/fingerprints and request evidence are recorded in `docs/provider_verification/issue90_status_key_semantic_closure.md` and the Issue #90 timeline. No additional Provider probe, 2020-01 conditional check, BSE/history acquisition, capability promotion, or Formal B1–B7 was run. Next unblock is a written AmazingData/SDK semantic explanation for this response shape. Until then, do not drop/key-fill the rows or start the 78-month build.
 ## 0.11. 2026-09-22 M1 authorized gate attempt — retained artifact provenance blocked (未重新测量)
 
 > 状态：**M1 仍 STOP(BLOCKED) 且未完成有效 RSS 测量；不进入 M2/M3**
