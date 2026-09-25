@@ -127,8 +127,19 @@ def test_normalized_status_domain_pair_keys_match(tmp_path) -> None:
     limit_frame.write_parquet(limit_path)
 
     expected = {("600000.SH", 20200102)}
-    assert runner._status_output_pairs("security_status", status_path) == expected
-    assert runner._status_output_pairs("limit_price", limit_path) == expected
+    assert (
+        runner._status_output_pairs("security_status", status_path, expected_row_count=1)
+        == expected
+    )
+    assert runner._status_output_pairs("limit_price", limit_path, expected_row_count=1) == expected
+
+
+def test_empty_normalized_status_projection_has_an_empty_key_set(tmp_path) -> None:
+    runner = Issue95Build.__new__(Issue95Build)
+    empty_path = tmp_path / "empty-projection.parquet"
+    pl.DataFrame().write_parquet(empty_path)
+
+    assert runner._status_output_pairs("limit_price", empty_path, expected_row_count=0) == set()
 
 
 def test_normalized_status_domain_pair_keys_reject_missing_and_duplicate_rows(
@@ -140,7 +151,7 @@ def test_normalized_status_domain_pair_keys_reject_missing_and_duplicate_rows(
         missing_key_path
     )
     with pytest.raises(BuildFailure, match="STATUS_PROJECTION_KEY_MISSING"):
-        runner._status_output_pairs("limit_price", missing_key_path)
+        runner._status_output_pairs("limit_price", missing_key_path, expected_row_count=1)
 
     duplicate_path = tmp_path / "duplicate.parquet"
     pl.DataFrame(
@@ -150,7 +161,7 @@ def test_normalized_status_domain_pair_keys_reject_missing_and_duplicate_rows(
         }
     ).write_parquet(duplicate_path)
     with pytest.raises(BuildFailure, match="STATUS_PROJECTION_DUPLICATE_KEY"):
-        runner._status_output_pairs("limit_price", duplicate_path)
+        runner._status_output_pairs("limit_price", duplicate_path, expected_row_count=2)
 
 
 def test_atomic_manifest_replace_retries_a_transient_permission_error(
