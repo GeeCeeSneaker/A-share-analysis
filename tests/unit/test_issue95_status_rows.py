@@ -1,18 +1,24 @@
 from __future__ import annotations
 
+import importlib
+import sys
+from pathlib import Path
+
 import polars as pl
 import pytest
-from scripts.spike.issue95_status_limit_build import (
-    BuildFailure,
-    Issue95Build,
-    _candidate_status_probe_sizes,
-)
 
 from ashare_state.normalization.runner import NormalizationRunner
 from ashare_state.spike.row_adapter import (
     ProviderRowShapeError,
     key_preserving_table_rows,
 )
+
+_SPIKE_SCRIPT_DIR = Path(__file__).resolve().parents[2] / "scripts" / "spike"
+sys.path.insert(0, str(_SPIKE_SCRIPT_DIR))
+_ISSUE95_BUILD = importlib.import_module("issue95_status_limit_build")
+BuildFailure = _ISSUE95_BUILD.BuildFailure
+Issue95Build = _ISSUE95_BUILD.Issue95Build
+_candidate_status_probe_sizes = _ISSUE95_BUILD._candidate_status_probe_sizes
 
 
 def _status_row(code: str = "600000", market: str = "1", day: int = 20200102) -> dict[str, object]:
