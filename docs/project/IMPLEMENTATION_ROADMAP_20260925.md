@@ -59,7 +59,7 @@ fail-closed 用于数据正确性和不可逆发布，不用于制造流程等�
 
 - 月度请求、身份/date/key fail-closed 路径已跑通；
 - 已完成多个连续月份的真实采集；
-- 45 个连续月份均存在少量 unresolved pair；
+- 连续多月均存在少量 unresolved pair；最新检查时已连续覆盖到 48 个月，具体实时数量以 Issue #95 为准；
 - Canonical publication 仍被正确阻断；
 - 这已经更像统一的 applicability / endpoint coverage / denominator mismatch，而不是随机网络失败。
 
