@@ -9,6 +9,7 @@ Covers M0 exit criteria:
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import duckdb
@@ -72,6 +73,7 @@ EXPECTED_TABLES = {
     "meta_canonical_reconciliation_finding",
     # 022 (CR-4.2 snapshot build ledger)
     "meta_snapshot_build",
+    "meta_daily_update_run",
     # 023 (CR-5 feature build ledger)
     "meta_feature_build",
     # 024 (CR-6.2 State build ledger)
@@ -92,9 +94,44 @@ class TestFromZeroInit:
         conn = duckdb.connect(str(db_path))
         try:
             applied = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(applied) == 24
+            assert len(applied) == 25
             tables = {row[0] for row in conn.execute("SHOW TABLES").fetchall()}
             assert tables >= EXPECTED_TABLES
+        finally:
+            conn.close()
+
+
+@pytest.mark.integration
+class TestMigrationLineEndings:
+    def test_legacy_crlf_ledger_accepts_same_sql_checked_out_as_lf(
+        self, db_path: Path, tmp_path: Path
+    ):
+        migrations_dir = tmp_path / "migrations"
+        migrations_dir.mkdir()
+        for source in MIGRATIONS_DIR.glob("*.sql"):
+            lf_bytes = source.read_bytes().replace(b"\r\n", b"\n")
+            crlf_bytes = lf_bytes.replace(b"\n", b"\r\n")
+            (migrations_dir / source.name).write_bytes(crlf_bytes)
+
+        conn = duckdb.connect(str(db_path))
+        try:
+            apply_migrations(conn, migrations_dir)
+            # Simulate an older release that recorded the exact CRLF bytes.
+            legacy_bytes = (migrations_dir / "001_identity_calendar.sql").read_bytes()
+            conn.execute(
+                "UPDATE meta_schema_version SET content_hash = ? WHERE migration_id = '001'",
+                [hashlib.sha256(legacy_bytes).hexdigest()],
+            )
+            for source in MIGRATIONS_DIR.glob("*.sql"):
+                path = migrations_dir / source.name
+                path.write_bytes(source.read_bytes().replace(b"\r\n", b"\n"))
+
+            assert apply_migrations(conn, migrations_dir) == []
+
+            target = migrations_dir / "001_identity_calendar.sql"
+            target.write_bytes(target.read_bytes() + b"\n-- actual content change\n")
+            with pytest.raises(MigrationTamperedError):
+                apply_migrations(conn, migrations_dir)
         finally:
             conn.close()
 
@@ -103,10 +140,10 @@ class TestFromZeroInit:
         try:
             first = apply_migrations(conn, MIGRATIONS_DIR)
             second = apply_migrations(conn, MIGRATIONS_DIR)
-            assert len(first) == 24
+            assert len(first) == 25
             assert second == []  # nothing new applied
             ledger = applied_migrations(conn)
-            assert len(ledger) == 24
+            assert len(ledger) == 25
         finally:
             conn.close()
 
@@ -142,10 +179,10 @@ class TestTamperDetection:
         conn = duckdb.connect(str(db_path))
         try:
             apply_migrations(conn, tampered_dir)
-            # tamper 002 and add a new 025 (001..024 exist in the real repo set)
+            # tamper 002 and add a new migration after the current repository head.
             target = tampered_dir / "002_provider_governance.sql"
             target.write_text(target.read_text(encoding="utf-8") + "\n-- tampered\n")
-            (tampered_dir / "025_new_thing.sql").write_text(
+            (tampered_dir / "026_new_thing.sql").write_text(
                 "CREATE TABLE tamper_probe (id INTEGER);"
             )
             with pytest.raises(MigrationTamperedError):

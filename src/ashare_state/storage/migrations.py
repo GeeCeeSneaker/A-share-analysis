@@ -82,7 +82,31 @@ class MigrationRecord:
 
 
 def _file_sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Hash migration SQL with CRLF/LF-normalized text identity.
+
+    The line-ending policy is LF in Git.  Normalization here also keeps an
+    existing ledger created from CRLF bytes usable after a Windows checkout
+    switches to LF; applied legacy raw hashes are checked against both valid
+    newline encodings below.  SQL-content changes still produce a new hash.
+    """
+    return hashlib.sha256(_normalized_migration_bytes(path.read_bytes())).hexdigest()
+
+
+def _normalized_migration_bytes(content: bytes) -> bytes:
+    return content.replace(b"\r\n", b"\n")
+
+
+def _migration_hash_candidates(path: Path) -> set[str]:
+    content = path.read_bytes()
+    normalized = _normalized_migration_bytes(content)
+    crlf = normalized.replace(b"\n", b"\r\n")
+    # Include the exact current bytes for an old ledger made from mixed EOLs;
+    # new ledger records always use the normalized hash returned by _file_sha256.
+    return {
+        hashlib.sha256(content).hexdigest(),
+        hashlib.sha256(normalized).hexdigest(),
+        hashlib.sha256(crlf).hexdigest(),
+    }
 
 
 def split_statements(sql_text: str) -> list[str]:
@@ -203,7 +227,7 @@ def apply_migrations(
         current_hash = _file_sha256(path)
         record = ledger.get(migration_id)
         if record is not None:
-            if record.content_hash != current_hash:
+            if record.content_hash not in _migration_hash_candidates(path):
                 msg = (
                     f"migration {path.name} was modified after being applied "
                     f"(recorded hash {record.content_hash}, current hash {current_hash}); "
