@@ -1,20 +1,24 @@
 from __future__ import annotations
 
+import importlib
 import subprocess
 import sys
 from pathlib import Path
 
-from scripts.spike.issue95_status_limit_build import Issue95Build
+_SPIKE_SCRIPT_DIR = Path(__file__).resolve().parents[2] / "scripts" / "spike"
+sys.path.insert(0, str(_SPIKE_SCRIPT_DIR))
+_ISSUE95_BUILD = importlib.import_module("issue95_status_limit_build")
+Issue95Build = _ISSUE95_BUILD.Issue95Build
 
 
 def test_runner_quarantines_delayed_native_stdout_but_keeps_safe_progress() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     code = """
 import os
-from scripts.spike.issue95_status_limit_build import (
-    _emit,
-    _quarantine_untrusted_sdk_output,
-)
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path.cwd() / 'scripts' / 'spike'))
+from issue95_status_limit_build import _emit, _quarantine_untrusted_sdk_output
 with _quarantine_untrusted_sdk_output():
     os.write(1, b'UNTRUSTED_SDK_MARKER\\n')
     _emit('SAFE_PROGRESS_MARKER')
