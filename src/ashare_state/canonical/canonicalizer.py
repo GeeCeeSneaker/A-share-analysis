@@ -2038,17 +2038,42 @@ class CanonicalRunner:
     def _surface_runs(
         self, normalization_surface: str, provider_datasets: tuple[str, ...]
     ) -> list[dict[str, Any]]:
+        # A raw request can have historical SUCCESS normalizations from an
+        # older mapper fingerprint as well as a replay through the current
+        # mapper. Keep the old immutable row as audit history, but do not let
+        # it invalidate the current replay. If no current replacement exists,
+        # retain the stale row so normal closure verification still fails
+        # closed instead of silently dropping the source request.
+        from ashare_state.normalization.registry import MAPPER_CODE_FINGERPRINT
+
         rows = self.conn.execute(
-            "SELECT normalization_run_id, provider, normalization_surface, "
-            "provider_dataset, endpoint, raw_request_id, raw_evidence_uri, "
-            "raw_evidence_hash, normalization_contract_version, mapper_identity, "
-            "mapper_code_hash, normalized_manifest_uri, normalized_manifest_hash, "
-            "normalized_output_set_hash, normalized_semantic_hash, status "
-            "FROM meta_provider_normalization_run "
-            "WHERE provider = 'amazingdata' AND normalization_surface = ? "
-            "AND provider_dataset IN (" + ",".join("?" * len(provider_datasets)) + ") "
-            "AND status = 'SUCCESS' ORDER BY normalization_run_id",
-            [normalization_surface, *provider_datasets],
+            "SELECT source.normalization_run_id, source.provider, "
+            "source.normalization_surface, source.provider_dataset, source.endpoint, "
+            "source.raw_request_id, source.raw_evidence_uri, source.raw_evidence_hash, "
+            "source.normalization_contract_version, source.mapper_identity, "
+            "source.mapper_code_hash, source.normalized_manifest_uri, "
+            "source.normalized_manifest_hash, source.normalized_output_set_hash, "
+            "source.normalized_semantic_hash, source.status "
+            "FROM meta_provider_normalization_run AS source "
+            "WHERE source.provider = 'amazingdata' "
+            "AND source.normalization_surface = ? "
+            "AND source.provider_dataset IN (" + ",".join("?" * len(provider_datasets)) + ") "
+            "AND source.status = 'SUCCESS' "
+            "AND (source.mapper_code_hash = ? OR NOT EXISTS ("
+            "SELECT 1 FROM meta_provider_normalization_run AS replacement "
+            "WHERE replacement.provider = source.provider "
+            "AND replacement.normalization_surface = source.normalization_surface "
+            "AND replacement.provider_dataset = source.provider_dataset "
+            "AND replacement.raw_request_id = source.raw_request_id "
+            "AND replacement.status = 'SUCCESS' "
+            "AND replacement.mapper_code_hash = ?)) "
+            "ORDER BY source.normalization_run_id",
+            [
+                normalization_surface,
+                *provider_datasets,
+                MAPPER_CODE_FINGERPRINT,
+                MAPPER_CODE_FINGERPRINT,
+            ],
         ).fetchall()
         columns = (
             "normalization_run_id",

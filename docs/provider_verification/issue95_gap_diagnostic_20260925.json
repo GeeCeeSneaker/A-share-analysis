@@ -1,97 +1,145 @@
 {
-    "schema": "issue95_gap_diagnostic.v1",
-    "as_of_date": "2026-09-25",
-    "isolated_run": {
-        "label": "run_20260925T065004Z_66850919",
-        "status": "INTERRUPTED",
-        "provider_call_count": 3271,
-        "execution_manifest_sha256": "cda2b5edb0ebdf7c9cf8f06714eaf3506b3bf58db2fb8625cb3f4b478c05caf0",
-        "report_json_sha256": "a8d0a1c96cde0fba3fbc72e658fb2fc36a99c9db93a33a2ba3287c8d33df5bb3",
-        "report_markdown_sha256": "6d39e709416bd3f429e7754e68db90b3fdaf78d6d9346e56f08f8110dd9f7ba6",
-        "canonical_published": false
-    },
+  "schema": "issue95_gap_diagnostic.v2",
+  "as_of_date": "2026-09-26",
+  "issue": 95,
+  "pull_request": 96,
+  "task_status": "ACTIVE_NOT_READY_FOR_PASS_REVIEW",
+  "execution": {
+    "run_label": "run_20260925T065004Z_66850919",
+    "run_id": "641bd874-e736-4255-a3bf-c530cb5664f6",
+    "last_manifest_status": "RUNNING",
+    "manifest_sha256": "cd220333eac51c4b73f46e2c9c29f1d62504281f8009472ec4474a0582d16ab1",
+    "provider_call_count": 3593,
     "scope": {
-        "from_month": "2020-01",
-        "through_month": "2026-06",
-        "domains": ["security_status", "limit_price"]
+      "from_month": "2020-01",
+      "through_month": "2026-06",
+      "month_count": 78,
+      "domains": ["security_status", "limit_price"]
     },
-    "month_status_counts": {
-        "blocked_completeness": 62,
-        "pass": 5,
-        "partial_capturing": 1,
-        "not_started": 10
+    "month_coverage": {
+      "COMPLETE": 16,
+      "PARTIAL_UPSTREAM_COVERAGE": 62
     },
-    "partial_month": {
-        "month": "2025-08",
-        "expected_pairs_per_domain": 108198,
-        "returned_pairs_per_domain": 83990
+    "per_domain": {
+      "expected_pairs": 7461248,
+      "returned_pairs": 7459685,
+      "missing_pairs": 1563,
+      "structural_errors": 0,
+      "duplicate_pairs": 0,
+      "unexplained_extra_pairs": 0
     },
-    "blocked_months": {
-        "range": ["2020-01", "2025-02"],
-        "unresolved_pairs_per_domain": 1563,
-        "manifest_reconciled_months": 62,
-        "manifest_count_mismatches": 0,
-        "duplicate_pairs": 0,
-        "unexplained_extra_pairs": 0,
-        "structural_errors": 0,
-        "symbols_missing_listing_date": 0,
-        "exact_session_universe": {"member": 1238, "absent": 325},
-        "exchange": {"SZ": 1470, "SH": 93},
-        "board": {"ChiNext": 1324, "SZ_main": 146, "SH_main": 93},
-        "sessions_since_listing": {"over_250": 1563},
-        "sessions_to_delisting": {"within_20": 0, "over_20": 249, "no_known_delisting_date": 1314}
+    "normalization": {
+      "monthly_run_count": 1927,
+      "current_mapper_replay_verified": true,
+      "fast_path_reused_month_count": 68,
+      "fast_path_reconstructed_month_count": 10
     },
-    "sentinel_months": [
-        {"month": "2020-07", "unresolved_pairs": 105},
-        {"month": "2022-08", "unresolved_pairs": 38},
-        {"month": "2025-02", "unresolved_pairs": 18}
+    "coverage_receipts": {
+      "record_count": 78,
+      "sha256": "962554a3df0f63d9f23f8d5b45b525f4e3beb6bb4ac861740788fa053a871d46",
+      "manifest_hash_match": true,
+      "missing_key_set_hash_mismatches": 0,
+      "missing_key_set_count_mismatches": 0,
+      "duplicate_missing_keys": 0,
+      "expected_returned_missing_equation_mismatches": 0,
+      "exact_key_files_committed_to_git": false
+    },
+    "stale_local_report": {
+      "present": true,
+      "last_write_utc": "2026-09-26T01:00:28Z",
+      "matches_current_manifest_checkpoint": false,
+      "reason": "runner was interrupted before writing a terminal report; older report and manifest blocker are preserved"
+    }
+  },
+  "canonical": {
+    "status": "NOT_COMPLETED",
+    "committed_run_records_in_isolated_ledger": 0,
+    "selected_artifact_directory_exists": false,
+    "artifact_identity": null,
+    "exact_replay": "NOT_RUN"
+  },
+  "memory_stop": {
+    "termination": "operator_interrupt_due_to_rapid_rss_growth",
+    "last_sampled_rss_gib": 9.91,
+    "observed_growth": {
+      "from_gib": 8.25,
+      "to_gib": 9.91,
+      "interval_seconds": 10
+    },
+    "configured_guard_gib": 16,
+    "guard_reached": false,
+    "available_host_memory_gib_at_last_sample": 32.74,
+    "retry_started": false,
+    "likely_pressure_sources_from_code_review": [
+      "CanonicalRunner builds candidate and selected-row Python lists",
+      "Canonical artifact writing creates an in-memory Parquet buffer",
+      "consumption verification converts selected Parquet rows to Python dictionaries"
     ],
-    "sentinel_cross_tab": {
-        "unresolved_pairs": 161,
-        "manifest_reconciled_months": 3,
-        "exact_session_universe": {"member": 54, "absent": 107},
-        "exchange": {"SZ": 150, "SH": 11},
-        "board": {"ChiNext": 82, "SZ_main": 68, "SH_main": 11},
-        "sessions_since_listing": {"over_250": 161},
-        "sessions_to_delisting": {"within_20": 0, "over_20": 82, "no_known_delisting_date": 79}
+    "allocation_source_profiled": false,
+    "required_followup": "project-manager review of a bounded/streaming Canonical build and verification path before any new full-window run"
+  },
+  "historical_gap_diagnostic": {
+    "classification": "reproducible upstream coverage/applicability limitation; no safe denominator exclusion established",
+    "zero_upstream_missing_pairs_required_for_pass": false,
+    "blocked_months": 62,
+    "unresolved_pairs_per_domain": 1563,
+    "exact_session_universe": {
+      "member": 1238,
+      "absent": 325
     },
-    "adjacent_returned_status_flags": {
-        "sampled_unresolved_pairs": 161,
-        "lookup": "nearest returned row in the month; adjacent captured month consulted at month edges",
-        "previous_row": {
-            "present": 82,
-            "missing": 79,
-            "is_susp_sec_1": 82,
-            "is_st_sec_1": 64,
-            "is_st_sec_0": 18
-        },
-        "next_row": {"present": 15, "missing": 146, "is_st_sec_1": 15, "is_susp_sec_0": 15},
-        "values_are_observations_not_applicability_rules": true
+    "exchange": {
+      "SZ": 1470,
+      "SH": 93
+    },
+    "board": {
+      "ChiNext": 1324,
+      "SZ_main": 146,
+      "SH_main": 93
+    },
+    "sessions_since_listing": {
+      "over_250": 1563
+    },
+    "sessions_to_delisting": {
+      "within_20": 0,
+      "over_20": 249,
+      "no_known_delisting_date": 1314
     },
     "targeted_probes": {
-        "single_symbol_missing_day_status": {
-            "calls": 7,
-            "exchange_status_ok_zero_rows": 7,
-            "adjacent_day_controls_with_rows": 3
-        },
-        "daily_bar": {
-            "missing_pair_dates_checked": 5,
-            "exact_security_date_bar_present": 2,
-            "no_bar_returned": 3,
-            "adjacent_control_dates_checked": 2,
-            "adjacent_controls_with_exact_bar": 1
-        }
-    },
-    "root_cause": {
-        "classification": "provider coverage versus documented applicability unresolved",
-        "evidence_supported_denominator_change": false,
-        "safe_local_capture_retry_fix_identified": false,
-        "canonical_publication_allowed": false,
-        "next_required_evidence": "authoritative Provider/Owner status-table coverage semantics or a corrected response under the approved endpoint"
-    },
-    "data_handling": {
-        "raw_provider_payloads_in_git": false,
-        "ticker_level_facts_in_git": false,
-        "credentials_or_server_addresses_in_git": false
+      "single_symbol_same_day_status": {
+        "calls": 7,
+        "successful_zero_row_responses": 7,
+        "adjacent_day_controls_with_rows": 3
+      },
+      "daily_bar": {
+        "missing_pair_dates_checked": 5,
+        "exact_same_day_bars": 2,
+        "no_bar_returned": 3,
+        "adjacent_controls_checked": 2,
+        "adjacent_controls_with_exact_bar": 1
+      }
     }
+  },
+  "security": {
+    "earlier_sdk_session_field_visible_before_quarantine": true,
+    "sensitive_value_reproduced_or_committed": false,
+    "process_level_stdout_stderr_quarantine": "implemented_and_subprocess_regression_tested",
+    "rotation_recommended_after_task": true
+  },
+  "quality": {
+    "python": "3.14.7",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "focused_tests": {
+      "count": 13,
+      "status": "PASS"
+    },
+    "full_repository_tests": "NOT_RUN_FOR_FINAL_LOCAL_HEAD",
+    "exact_head_github_ci": "PENDING"
+  },
+  "data_handling": {
+    "raw_provider_payloads_in_git": false,
+    "ticker_level_facts_in_git": false,
+    "credentials_tokens_or_server_addresses_in_git": false,
+    "missing_key_sets_in_git": false
+  }
 }

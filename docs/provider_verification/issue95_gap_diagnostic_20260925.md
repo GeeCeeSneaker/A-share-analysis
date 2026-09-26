@@ -1,60 +1,36 @@
-# Issue #95 recurring status gaps — diagnostic checkpoint (2026-09-25)
+# Issue #95 — upstream coverage and execution checkpoint
 
-## Disposition
+## Current disposition — 2026-09-26
 
-The approved 78-month acquisition remains **ACTIVE but publication-blocked**. The isolated run was interrupted after the scheduler-directed pause; no evidence was discarded and no Canonical run was created. The 62 completed months with gaps remain unresolved. Five later months passed their month capture checks, August 2025 is partial, and the final ten months were not started.
+Issue #95 remains **ACTIVE / not ready for independent PASS review**. The 78-month month-bounded capture and coverage reconciliation completed, but the Canonical run and exact replay did not. The isolated runner was stopped during the Canonical stage when memory rose rapidly; no second bulk attempt was made.
 
-No denominator or retry change is justified by the current evidence. Do not treat absence from the exact-session universe or absence of a daily bar as proof of non-applicability. A successful-but-empty status response is still unresolved for an applicable expected pair.
-
-## Run reconciliation
-
-The local isolated run `run_20260925T065004Z_66850919` made 3,271 Provider calls and ended `INTERRUPTED`. It records:
-
-| Month result | Count | Detail |
+| Coverage state | Months | Scope |
 |---|---:|---|
-| `BLOCKED_COMPLETENESS` | 62 | 2020-01 through 2025-02; 1,563 unresolved pairs in each requested domain |
-| `PASS` | 5 | 2025-03 through 2025-07 |
-| Partial capture | 1 | 2025-08: 83,990 / 108,198 expected pairs returned |
-| Not started | 10 | 2025-09 through 2026-06 |
+| `COMPLETE` | 16 | 2025-03 through 2026-06 |
+| `PARTIAL_UPSTREAM_COVERAGE` | 62 | 2020-01 through 2025-02 |
 
-Independent local reconciliation matched expected, returned, and missing-pair counts to the retained monthly manifest for all 62 blocked months (62/62; 0 count mismatches). Across those months: duplicate pairs = 0, unexplained extras = 0, structural errors = 0, and missing historical listing dates = 0. The Canonical reference is null; no data was published.
+Per requested domain, expected pairs = **7,461,248**, returned pairs = **7,459,685**, and missing pairs = **1,563**. These are the same `(security_id, trade_date)` gaps in `security_status` and `limit_price`; missing facts remain unknown and are not synthesized. All monthly structural-error, duplicate-key, and unexplained-extra counts are zero.
 
-The sanitized source artifacts remain in ignored local storage and are not included in Git. Audit anchors for the local execution manifest and report are recorded in the JSON companion; no account data, server address, credentials, ticker-level rows, or raw Provider payloads are included here.
+The run manifest records 3,593 Provider calls, 1,927 monthly normalization runs, and `current_mapper_replay_verified=true` (68 months reused and 10 reconstructed through the current mapper). Its coverage receipt contains all 78 months. Read-only validation confirmed the receipt hash, every missing-key-set hash and count, uniqueness of missing keys, and `expected = returned + missing` for all months. Exact key files and raw Provider evidence remain in ignored local storage; none are committed.
 
-## Cross-tab of all 1,563 unresolved pairs
+## Canonical and memory outcome
 
-| Dimension | Result |
-|---|---:|
-| Exact-session universe member / absent | 1,238 / 325 |
-| Exchange: SZ / SH | 1,470 / 93 |
-| Board: ChiNext / SZ main / SH main | 1,324 / 146 / 93 |
-| More than 250 exchange sessions after listing | 1,563 |
-| Within 20 sessions of listing / delisting | 0 / 0 |
-| Known delisting more than 20 sessions away / no known delisting date | 249 / 1,314 |
+No Canonical result was accepted: the run manifest has `canonical=null`, and a read-only query of the isolated ledger found zero committed Canonical run records. No selected-artifact manifest or exact Canonical replay was produced. The current runner manifest was last saved as `RUNNING`; the local `report.json` is stale from an earlier attempt and does not describe this checkpoint. Both are preserved as-is with the isolated run evidence.
 
-Thus, neither listing/delisting boundaries nor exact-session membership alone explain the repeated gap. In particular, 1,238 unresolved pairs are present in the exact-session universe. The 325 absent pairs remain unresolved rather than being dropped from the denominator.
+During the Canonical phase, process RSS rose from approximately **8.25 GiB to 9.91 GiB in 10 seconds**. The configured 16 GiB guard was not reached; available host memory at the final sample was about 32.74 GiB. Because RSS was rising sharply and the existing path could continue materializing the full selected row set, the process was interrupted once at the operator's memory stop condition. This is not a Provider or data-quality failure, and no retry was started.
 
-## Three sentinel months and adjacent returned-day flags
+Code inspection found that the existing Canonical path materializes candidates and selected rows in Python lists, constructs an in-memory Parquet buffer, and the consumption verifier converts the selected Parquet frame to Python dictionaries. These are confirmed implementation characteristics and a plausible explanation for the growth; no profiler or stack snapshot was collected, so the precise allocation source is **not proven**. The required follow-up is a bounded/streaming Canonical build and verification path that preserves current row-selection, seal, and exact-replay semantics. Do not resume the 78-month run until the project manager has reviewed that memory remediation, consistent with the no-repeat instruction.
 
-The stratified early/middle/recent months include both a high-gap and a low-gap month. Their unresolved counts are 105 (2020-07), 38 (2022-08), and 18 (2025-02), totaling 161. Recomputed expected/returned/missing counts matched each month manifest. Among these 161 missing pairs, 54 were exact-session members and 107 were absent; all were more than 250 exchange sessions past listing, and none was within 20 sessions of a known delisting date (82 had a known delisting date more than 20 sessions away; 79 had no known date).
+The process was interrupted before it could write a terminal report. The last manifest hash is `cd220333eac51c4b73f46e2c9c29f1d62504281f8009472ec4474a0582d16ab1`; the 78-record coverage receipt hash is `962554a3df0f63d9f23f8d5b45b525f4e3beb6bb4ac861740788fa053a871d46`. The DuckDB WAL/owner-lock sidecars are retained; no cleanup or write-mode recovery was attempted.
 
-For those 161 pairs, nearest returned status rows were checked within the month and, at month edges, the adjacent captured month:
+## Historical upstream-gap diagnostic
 
-- A preceding returned row existed for 82 pairs. Its provider `IS_SUSP_SEC` value was `1` in all 82; `IS_ST_SEC` was `1` in 64 and `0` in 18.
-- A following returned row existed for 15 pairs. Its `IS_ST_SEC` value was `1` and `IS_SUSP_SEC` was `0` in all 15.
-- No preceding row was found for 79 pairs; no following row was found for 146 pairs.
+The earlier 62-month diagnosis remains relevant. Exact-session membership alone does not explain the gaps: 1,238 missing pairs were present in the exact-session universe and 325 absent. The gaps were 1,470 SZ and 93 SH; all were more than 250 sessions after listing, and none was within 20 sessions of a known delisting date. Seven one-symbol/same-day status probes returned successful zero-row responses; three of seven adjacent-day controls returned rows. Of five bounded daily-bar checks, two had an exact same-day bar and three had no bar. This supports a reproducible upstream coverage/applicability limitation, not a safe denominator exclusion rule.
 
-These are observed provider field values, not an interpretation that a flagged row makes the missing date non-applicable. They do show that missing dates occur in more than one returned-history pattern; no universal denominator exclusion follows.
+Per the latest Issue #95 decision, zero upstream missing pairs are **not** required for PASS. The verified returned facts may be Canonicalized; absent status/limit values must remain unresolved/NULL. Status-dependent research must exclude or explicitly flag those observations; daily-bar-only research is not blocked. No Provider explanation or broad re-pull is required.
 
-## Targeted source checks
+## Security and QA
 
-- Seven one-symbol/same-day status probes at sampled missing pairs returned `exchange_status=OK` with zero rows. Three of seven adjacent-day status controls returned a row. Repeating the same missing-day request at a smaller request size therefore did not repair the sampled gaps.
-- Five bounded daily-bar checks were made for sampled missing pairs: two returned an exact security/date bar and three returned no bar. Of two adjacent-day controls, one returned an exact bar. The two same-day bars prove trading activity for those sampled pairs despite the empty status response; the three no-bar cases remain unresolved and are not reclassified as non-applicable.
+One SDK-generated session field appeared in an earlier terminal stream before process-wide output quarantine was installed. Its value is intentionally omitted and was not committed. Process-level stdout/stderr quarantine now keeps only safe progress output visible; a subprocess regression test confirms native file-descriptor writes are suppressed. Treat the prior provider session as exposed and rotate/revoke the affected credential/session after this task.
 
-## Root-cause classification and next action
-
-**Confirmed:** the gap is not explained by a local normalization/key loss in the reconciled 62-month outputs; sampled single-security status re-requests still returned empty; at least two sampled missing pairs have an exact same-day daily bar.
-
-**Not yet confirmed:** whether the AmazingData status endpoint has a documented applicability boundary for these rows, or silently omits otherwise-applicable historical status facts. The samples support an upstream coverage/applicability issue, but do not establish a contract rule that can safely change the denominator.
-
-Keep Issue #95 open and Canonical publication blocked. The next useful input is authoritative Provider/Owner evidence defining status-table coverage for these empty cases, or a corrected response under the same approved endpoint. Once a minimal rule is evidenced, rerun the three sentinel months; resume the remaining window only if unresolved applicable pairs reach zero. Do not restart the broad run or infer status/limit values before that evidence exists.
+Local Python 3.14.7 checks on the current code changes: Ruff lint passed, Ruff format check passed, and the focused Canonical/status/output-quarantine suite passed (**13 tests**). Full-repository tests and exact-head GitHub CI have not been run for this final local head. Do not claim overall acceptance or review readiness until the memory-bounded Canonical path, exact replay, and required CI are complete.
