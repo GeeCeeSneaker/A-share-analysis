@@ -177,10 +177,12 @@
     "compileall": "PASS",
     "git_diff_check": "PASS",
     "focused_tests": {
-      "count": 212,
+      "count": 304,
       "status": "PASS",
       "scope": [
         "tests/integration/test_canonical.py",
+        "tests/integration/test_snapshot.py",
+        "tests/integration/test_readmodel.py",
         "tests/unit/test_issue95_status_rows.py",
         "tests/unit/test_issue95_output_quarantine.py"
       ]
@@ -194,6 +196,21 @@
         "ubuntu-latest / Python 3.14",
         "windows-latest / Python 3.14"
       ]
+    },
+    "failed_ci_after_memory_remediation": {
+      "status": "FAIL",
+      "run_number": 807,
+      "head_sha": "2576506fe98ce2423a89ecc600fff0a581a84943",
+      "failed_step": "mypy",
+      "error_classes": [
+        "SpooledTemporaryFile optional ownership typing",
+        "CanonicalConsumption verifier expected _verify_canonical_artifacts_with_rows"
+      ],
+      "pytest": "SKIPPED"
+    },
+    "followup_local_validation": {
+      "mypy": "PASS (112 source files)",
+      "focused_tests": "PASS (304 collected and run)"
     },
     "current_delta_exact_head_ci": "PENDING_AFTER_PUSH"
   },

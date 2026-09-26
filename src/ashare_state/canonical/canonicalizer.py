@@ -2038,6 +2038,7 @@ class CanonicalRunner:
             backing = tempfile.SpooledTemporaryFile(  # noqa: SIM115 - ownership moves to snapshot
                 max_size=1024 * 1024, mode="w+b"
             )
+            close_backing = True
             try:
                 digest = hashlib.sha256()
                 with path.open("rb") as source:
@@ -2067,11 +2068,11 @@ class CanonicalRunner:
                             _parquet=backing,
                         )
                     )
-                    backing = None
+                    close_backing = False
             except OSError as exc:
                 problems.append(f"output artifact unreadable: {uri}: {exc}")
             finally:
-                if backing is not None:
+                if close_backing:
                     backing.close()
         return outputs, problems
 
@@ -2756,9 +2757,19 @@ class CanonicalRunner:
         return problems
 
     def _verify_canonical_artifacts(
-        self, record: dict[str, Any], manifest: dict[str, Any]
+        self,
+        record: dict[str, Any],
+        manifest: dict[str, Any],
+        *,
+        selected_rows_out: list[dict[str, Any]] | None = None,
     ) -> list[str]:
-        """Verify sealed artifacts without expanding full Parquet tables to dicts."""
+        """Verify sealed artifacts without expanding full Parquet tables to dicts.
+
+        A caller that must return selected rows can pass ``selected_rows_out``;
+        those rows are taken from the same verified Polars frame, while the
+        Canonical build/verifier path leaves the parameter unset and remains
+        columnar.
+        """
         problems: list[str] = []
         if int(manifest.get("selected_count", -1)) != int(record["selected_count"]):
             problems.append("manifest selected_count does not match the ledger")
@@ -2811,6 +2822,8 @@ class CanonicalRunner:
                         manifest.get("selected_semantic_hash")
                     ):
                         problems.append("selected semantic seal mismatch (values changed)")
+                    if selected_rows_out is not None:
+                        selected_rows_out.extend(frame.iter_rows(named=True))
             elif name == "decisions":
                 recomputed = _rows_semantic_hash(frame.iter_rows(named=True))
                 if recomputed != str(record["decision_set_hash"]) or recomputed != str(
@@ -2874,9 +2887,29 @@ class CanonicalRunner:
                         manifest.get("selected_semantic_hash")
                     ):
                         problems.append("selected semantic seal mismatch (values changed)")
+                    if selected_rows_out is not None:
+                        selected_rows_out.extend(selected_all.iter_rows(named=True))
             except (DailyBarPartitionError, OSError, ValueError, TypeError, KeyError) as exc:
                 problems.append(f"daily-bar partition closure failed: {exc}")
         return problems
+
+    def _verify_canonical_artifacts_with_rows(
+        self, record: dict[str, Any], manifest: dict[str, Any]
+    ) -> tuple[list[str], dict[str, list[dict[str, Any]]]]:
+        """Verify artifacts and return selected rows for the consumption API.
+
+        The public consumption result is explicitly row-oriented, so that
+        boundary materializes the selected rows. The normal Canonical
+        verification path calls ``_verify_canonical_artifacts`` without a
+        row collector and does not create this Python copy.
+        """
+        selected_rows: list[dict[str, Any]] = []
+        problems = self._verify_canonical_artifacts(
+            record,
+            manifest,
+            selected_rows_out=selected_rows,
+        )
+        return problems, {"selected": selected_rows}
 
     def _verify_sealed_input(self, entry: dict[str, Any], as_of_dt: datetime) -> list[str]:
         """Seal-based verification of ONE sealed input run (CR-3.2 P0-04
