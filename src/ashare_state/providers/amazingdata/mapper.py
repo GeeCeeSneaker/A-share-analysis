@@ -497,12 +497,12 @@ def _status_identity(row: dict[str, Any]) -> tuple[str, str, str]:
         symbol, code, inferred_market = _parse_security_identity(
             str(raw_identity).strip().upper(), context=context
         )
-        market = inferred_market or next(iter(market_codes), None)
-        if market is None:
+        resolved_market = inferred_market or next(iter(market_codes), None)
+        if resolved_market is None:
             raise MappingValidationError(f"{context}: row identity has no exchange")
         if inferred_market is not None and market_codes and inferred_market not in market_codes:
             raise MappingValidationError(f"{context}: row identity conflicts with MARKET_CODE")
-        resolved_symbols.add(symbol or normalize_provider_symbol(code, market))
+        resolved_symbols.add(symbol or normalize_provider_symbol(code, resolved_market))
 
     if len(resolved_symbols) != 1:
         raise MappingValidationError(
@@ -648,9 +648,9 @@ def normalize_status_payload(
     rows: list[dict[str, Any]] = []
     locators: list[tuple[str | None, int]] = []
     seen: set[tuple[str, date]] = set()
-    for member_symbol, member_rows in raw_members:
+    for table_symbol, member_rows in raw_members:
         for ordinal, raw_row in enumerate(member_rows):
-            canonical = _canonical_status_row(raw_row, member_symbol=member_symbol)
+            canonical = _canonical_status_row(raw_row, member_symbol=table_symbol)
             symbol = canonical["PROVIDER_SYMBOL"]
             trade_day = _to_date(canonical["TRADE_DATE"])
             assert trade_day is not None
@@ -665,7 +665,7 @@ def normalize_status_payload(
                 raise MappingValidationError("security_status: duplicate natural key")
             seen.add(natural_key)
             rows.append(canonical)
-            locators.append((member_symbol, ordinal))
+            locators.append((table_symbol, ordinal))
     return rows, locators, empty_members
 
 
