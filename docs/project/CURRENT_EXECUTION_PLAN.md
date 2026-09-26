@@ -1,119 +1,125 @@
 # Current Execution Plan
 
 > 本文件只维护**当前正在做什么、为什么、下一步是什么、什么会阻塞**。  
-> 项目实施路线、优先级和长期考虑见 [`IMPLEMENTATION_ROADMAP_20260925.md`](IMPLEMENTATION_ROADMAP_20260925.md)。  
-> 历史状态、SHA、CI run 和旧 scheduler 指令以 Git / Issue / PR 为准，不在这里重复维护。
+> 项目长期路线和优先级理由见 [`IMPLEMENTATION_ROADMAP_20260925.md`](IMPLEMENTATION_ROADMAP_20260925.md)。  
+> 历史 SHA、CI、旧 scheduler 指令留在 Git/Issue/PR，不在这里重复堆叠。
 
 ## 当前阶段目标
 
-尽快形成一个可持续使用的 SH/SZ 研究数据系统：
+把 SH/SZ 数据平台推进到三个同时成立的状态：
 
-- 日线可更新到最近完成交易日；
-- `security_status` / `limit_price` 的已知事实可复现，历史上游缺口显式标记为 unresolved/partial coverage，不被解释成负面状态；
-- 多日 momentum / MA 等研究特征口径正确；
-- 正式 accepted run 由 tracked production code 执行；
-- 常规 fetch/refetch/retry/probe 在已批准任务内自主执行，不等待逐次审批。
+1. **研究口径正确**：价格、收益和 PIT 术语不误导下游；
+2. **日常可运行**：tracked runner 可幂等更新到最近完成交易日；
+3. **普通研究可用**：窄读取不无条件整批物化全历史。
 
-在这一阶段完成前，不启动策略回测、BSE 扩展、行业/指数全面建设、分钟级或 Formal B1-B7 Production。
+外部审计 PR #99 已作为 advisory engineering evidence 吸收。其 synthetic reproductions 证明代码路径行为，不自动证明 retained real history 已发生同样污染。
 
-## 当前并行 P0
+## 当前主线优先级
 
-### P0-A — Issue #95 / PR #96：SH/SZ status + limit 历史闭环
+### P0-A — Issue #97 / PR #100：研究数值与语义正确性
 
-状态：**78/78 capture reconciled / Canonical one-time build remains**。
+状态：**ACTIVE / draft implementation exists / highest correctness priority**。
 
-已确认：
+当前必须完成：
 
-- 78/78 月度 capture 与 coverage receipt 已完成；
-- 16 月 `COMPLETE`，62 月 `PARTIAL_UPSTREAM_COVERAGE`；
-- 每个 domain：7,461,248 expected、7,459,685 returned、1,563 missing；
-- structural error / duplicate / unexplained extra = 0；
-- missing pair 保持 unresolved，不生成默认或负面事实；
-- status keyed-table 语义已经收敛到 production mapper/normalization，production 不反向依赖 spike；
-- 当前 exact-head Windows/Ubuntu Python 3.14 CI 已通过。
+- `close/pre_close` 构造 reference-price linked chain；
+- 5/20/60 日 return、MA、close-to-MA 使用同一链；
+- invalid/nonpositive `pre_close/close` 断链 -> NULL/finding；
+- research OHLC 必须 finite 且 `>0`，`volume==0` 本身允许；
+- feature semantic identity bump；
+- 分红/reference-step、送转/拆分、缺失 pre_close、zero-OHLC、zero-volume fixtures；
+- 明确该链**不是 total return / cash-inclusive holding return / NAV**；
+- R1 明确是 retrospective observed-at-ingest panel，不声称 historical decision-time knowability；
+- 重验依赖 MA20/mom20 的 breadth；
+- exact-head Windows/Ubuntu Python 3.14 CI。
 
-当前唯一 blocker：一轮全历史 Canonical build 的 Python 内存占用较高。上一次在约 9.91 GiB 时人工停止，但现有硬门槛 16 GiB **并未触发**。
+不等待 adj_factor，不建 temporal database，不做 FeatureEngine 大重写，不启动策略回测。
 
-当前动作：
+### P0-B — Issue #98：tracked runner + 日增量与运行可恢复性
 
-1. 完全复用已经保留的 78 个月 normalized evidence；Canonical 尝试不得重新调用 Provider。
-2. 先用**现有代码**完成一次 Canonical-only 尝试，在 16 GiB 硬门槛内继续运行；不得因为 RSS 上升但未到门槛而提前停止。
-3. 记录 bounded RSS checkpoint：Canonical 前、snapshot/input materialization 后、selection 后、artifact write 后、verify 后、exact replay 后。
-4. 若直接完成：立即 exact replay/verification，进入独立 PASS 审查；不要优化一个已经安全完成的一次性路径。
-5. 只有实际触发 16 GiB 门槛时才整改内存。整改只针对已确认的全量 Python copies：normalized `to_dicts()`/frozen tuples、`candidates`/`available`/`selected_rows`、schema alignment、semantic-hash 全量排序、`selected_file_rows`。复用 Parquet/Polars/DuckDB，保持持久 Canonical contract/seal 不变，不新建框架。
+状态：**ACTIVE / implementation PR A must start now**。
 
-仍严格阻塞的错误：unkeyed/invalid row、duplicate、identity conflict、out-of-window、unexplained extra、schema/semantic conflict、evidence binding 无法复现。
+PR A：
 
-### P0-B — Issue #97：修正多日研究特征口径
-
-状态：**ACTIVE / implementation must start now; no implementation PR yet**。
-
-第一实现 PR：
-
-- 用每日 `close / pre_close` 构造 PIT-safe linked return/price chain；
-- `return_lag_obs_5/20/60` 改为链式日收益乘积；
-- `ma_close_obs_5/20/60` 与 `close_to_ma_obs_*` 使用同一 linked-price series；
-- `pre_close` 缺失/非法时断链并输出 NULL/finding；
-- feature semantic version/hash 必须变化；
-- fixtures 覆盖普通序列、现金分红/reference-price step、送转/拆分类 step、缺失 `pre_close`；
-- 重验 `pct_above_ma20_observed` 与 `pct_positive_mom20_observed`；
-- 至少一个 retained real-data corporate-action 对照；
-- Windows/Ubuntu Python 3.14 CI。
-
-IPO 无涨跌幅期和长停牌保护若需要额外 governed input，不得阻塞第一 PR；明确 blocker 后在 #97 内做窄 follow-up。禁止策略回测和 FeatureEngine 大重写。
-
-### P0-C — Issue #98：生产化 runner + 日增量
-
-状态：**ACTIVE / PR A must start now; no implementation PR yet**。
-
-PR A 从 current `main` 独立开发，不依赖 #96：
-
-1. tracked `src/ashare_state/...` production update runner；
+1. tracked `src/ashare_state/...` production runner；
 2. `ashare update --through <date>` + 小型 plan/dry-run；
 3. calendar → identity/universe delta → missing daily bar → Canonical append → logical Snapshot/read refresh；
-4. accepted manifest 绑定 commit SHA + clean/dirty state，dirty 只能诊断不能 publish；
-5. 同日期重跑幂等并避免无意义 Provider 调用；
-6. 用 2026-06 accepted boundary 后前 5 个交易日证明连续更新；
-7. 在同一 bounded slice 完成 volume/amount VWAP unit check（至少 60/00/30/688 分组）；
-8. 无当前消费者时删除一次性 GT-H3B workflow。
+4. 同日期重跑幂等、避免无意义 Provider call；
+5. accepted manifest 绑定 clean tracked commit；
+6. 从 2026-06 accepted boundary 后连续至少 5 个交易日证明运行；
+7. bounded VWAP 检查冻结 volume/amount 单位。
 
-PR B 在 #96 contract merge 后把 status/limit 接入同一 runner；历史/实时上游 coverage 缺口继续保持 partial/unresolved，不转默认值。
+外审一并收口：
 
-## 并行资源原则
+- retry sleep 受 remaining budget 限制，下一次 Provider call 前再检查 deadline；
+- migration SQL 明确 EOL policy，同文本 CRLF/LF 既有 ledger 不误报 tamper；
+- 普通 repo text 用 `.gitattributes` 保证 fresh Windows clone 不因 EOL 假 dirty；
+- 当前只支持 source-checkout operation，缺 migrations 的运行布局明确报 unsupported；无真实 wheel consumer 前不做 installer/package-resource 工程。
 
-#95 的一次性 Canonical 完成性验证不得继续占住 #97/#98。三条 P0 必须独立 branch/PR 推进：
+PR B 在 #96 contract 合入后把 status/limit 接入同一 runner。不得增加 DAG/scheduler/catalog/第二持久化平面。
 
-- #95：只处理 Canonical 完成/真实资源边界；
-- #97：研究特征正确性；
-- #98：日常运行能力。
+### P0-C — Issue #95 / PR #96：历史 status/limit Canonical 收尾
 
-它们不要求串行等待，也不得互相修改对方 retained run。
+状态：**78/78 capture reconciled / real 16 GiB Canonical memory boundary confirmed / isolated finalization lane**。
 
-## 当前调度规则
+已完成：
 
-已批准 Issue 范围内，开发人员可自主执行 Provider fetch/refetch、retry/replay、bounded targeted probe、一致性验证、缺失 local evidence 重采和定位 blocker 的 fresh isolated run，无需新的 PM/Owner 批准。
+- 16 COMPLETE + 62 PARTIAL_UPSTREAM_COVERAGE；
+- 每 domain 7,461,248 expected / 7,459,685 returned / 1,563 missing；
+- structural / duplicate / unexplained extra = 0；
+- partial missing 保持 unresolved；
+- Canonical-only attempt 已真实触发 16 GiB 硬边界，Provider calls=0。
 
-仍需重新授权：SH/SZ 扩到 BSE、日期扩到批准范围之外、新业务域/新外部源、破坏性修改 accepted sealed history、research split/core research-contract change、capability promotion、Formal B1-B7/Production、明显超出当前 Issue 的大型架构重建。
+当前只做二选一：
 
-## 数据质量边界
+1. 有安全资源主机（>=32 GiB physical、启动前约 28 GiB available）时，允许一次 Canonical-only finalization，约 24 GiB isolated hard stop；或
+2. 无安全余量/触发 24 GiB 时，直接做窄 disk-backed/columnar selection 修复，删除全历史 Python object/list/sort copies，同时保持现有 Canonical artifacts/hash/seal/replay contract。
 
-**Unknown stays unknown.** 上游没有返回事实时，允许已知事实进入 Canonical，但缺失位置必须保持 unresolved/NULL 并保留 coverage evidence。不得把缺失解释成 `not suspended`、`not ST`、`no price limit` 或其他负面事实。
+不再重复 16 GiB 尝试，不重采 Provider，不重写 Canonical。#95 不阻塞 #97/#98。
 
-## 紧随 P0 的 P1
+### P1 — Issue #101：研究读取分区/谓词下推
 
-1. raw evidence 最小异地/异盘备份 + receipt/hash 巡检；
-2. Provider completeness/partial-coverage 固化到日常 ingestion；
-3. adapter / legacy / spike 路径净删除；
-4. 根据研究收益决定 `adj_factor`、指数基准、外部抽检和 warmup 历史。
+状态：**OPEN / may benchmark in parallel, does not block P0-A/B**。
 
-## 暂缓
+目标：publication/deep-audit 继续完整验证；ordinary read 先按 manifest 选 partition/file，再 materialize，并使用 DuckDB/Polars pushdown。
 
-当前不抢占 P0：2019 或更早 warmup、provider `adj_factor` 全历史、指数/行业全面建设、BSE、外部多源抽检体系、策略回测、分钟级真实 Provider 接入、Formal B1-B7 Production。
+基准：
+
+- one security / one year；
+- all market / one month；
+- all market / one year；
+- 每项记录 elapsed、peak RSS、files/partitions opened、cold/hot repeat。
+
+不建 cache server/index service/catalog/第二 research dataset。
+
+## 外部审计 PR #99
+
+状态：**advisory record accepted / implementation routed elsewhere**。
+
+- 审计 PR 只保留报告、evidence、reproducer；
+- 不把 production fix 混进 PR #99；
+- synthetic evidence 不扩大为真实 retained-history contamination 结论；
+- normal checks 通过后可作为审计记录合并。
+
+## 当前授权边界
+
+已批准 Issue 范围内，开发可自主执行 Provider fetch/refetch/retry/replay、bounded targeted probe、一致性验证和缺失本地证据重采，不需逐次授权。
+
+仍需项目级授权：市场/日期/业务域扩张、新外部数据源、破坏 accepted sealed history、核心 research contract/split 改变、capability promotion、Formal Production、明显大型架构重建。
+
+## 当前禁止的等待链
+
+- #97 不等 #95；
+- #98 PR A 不等 #95/#96；
+- #101 benchmark 不得拖慢 #97/#98；
+- PR #99 不成为新的 gate；
+- wheel packaging、strict decision-time PIT、total-return accounting、index/industry/BSE/minute 不抢当前主线。
 
 ## 下一次调度检查重点
 
-1. #96 的 Canonical-only 尝试是否直接在 16 GiB 内完成；若触发门槛，内存整改是否只处理已确认的全量 copies；
-2. #96 是否完成 exact replay 并进入 PASS review；
-3. #97 是否已经出现 chained-return/linked-price 代码 PR；
-4. #98 是否已经出现 tracked runner / `ashare update --through` PR A；
-5. 是否存在新的无必要审批、重复文档或等待链；发现即删除。
+1. PR #100 是否吸收 OHLC>0、PIT wording、reference-return naming，并 exact-head CI 通过；
+2. #98 是否已经出现 tracked runner PR A，并落实 retry/EOL/fresh-clone 三个窄修复；
+3. #96 是完成一次安全 higher-resource finalization，还是已进入 narrow disk-backed selection 修复；
+4. #101 是否给出真实 retained/representative read baseline，而不是只给 synthetic microbench；
+5. PR #99 是否保持纯审计记录并完成正常合并；
+6. 是否新增了无具体风险收益的审批、治理层或框架；发现即删除/合并。
