@@ -1,20 +1,24 @@
 {
-  "schema": "issue95_gap_diagnostic.v2",
+  "schema": "issue95_gap_diagnostic.v3",
   "as_of_date": "2026-09-26",
   "issue": 95,
   "pull_request": 96,
-  "task_status": "ACTIVE_NOT_READY_FOR_PASS_REVIEW",
+  "task_status": "ACTIVE_BLOCKED_BEFORE_PASS_REVIEW",
   "execution": {
     "run_label": "run_20260925T065004Z_66850919",
     "run_id": "641bd874-e736-4255-a3bf-c530cb5664f6",
     "last_manifest_status": "RUNNING",
-    "manifest_sha256": "cd220333eac51c4b73f46e2c9c29f1d62504281f8009472ec4474a0582d16ab1",
+    "last_manifest_sha256": "680ad8286cca4529411f5498873d78d0bc102157c147c326f2dd778e1e04adf7",
     "provider_call_count": 3593,
+    "provider_calls_during_canonical_attempts": 0,
     "scope": {
       "from_month": "2020-01",
       "through_month": "2026-06",
       "month_count": 78,
-      "domains": ["security_status", "limit_price"]
+      "domains": [
+        "security_status",
+        "limit_price"
+      ]
     },
     "month_coverage": {
       "COMPLETE": 16,
@@ -32,7 +36,8 @@
       "monthly_run_count": 1927,
       "current_mapper_replay_verified": true,
       "fast_path_reused_month_count": 68,
-      "fast_path_reconstructed_month_count": 10
+      "fast_path_reconstructed_month_count": 10,
+      "provider_calls_during_replay": 0
     },
     "coverage_receipts": {
       "record_count": 78,
@@ -44,39 +49,84 @@
       "expected_returned_missing_equation_mismatches": 0,
       "exact_key_files_committed_to_git": false
     },
-    "stale_local_report": {
+    "report": {
       "present": true,
-      "last_write_utc": "2026-09-26T01:00:28Z",
-      "matches_current_manifest_checkpoint": false,
-      "reason": "runner was interrupted before writing a terminal report; older report and manifest blocker are preserved"
+      "describes_current_attempt": false,
+      "status": "STOP_BLOCKED",
+      "reason": "report.json belongs to the earlier blocked Canonical run; no terminal report was written after attempt 3 was externally stopped",
+      "report_sha256_matches_manifest_pointer": true
     }
   },
   "canonical": {
-    "status": "NOT_COMPLETED",
-    "committed_run_records_in_isolated_ledger": 0,
-    "selected_artifact_directory_exists": false,
-    "artifact_identity": null,
+    "status": "BLOCKED_MEMORY_GUARD_AFTER_ONE_REMEDIATED_RETRY",
+    "attempts": [
+      {
+        "attempt": 2,
+        "code_state": "before_narrow_memory_remediation",
+        "provider_calls": 0,
+        "result": "STOPPED_AT_16_GIB_GUARD",
+        "last_progress_checkpoint": null,
+        "first_observed_above_guard_mib": 17543.2,
+        "guard_mib": 16384,
+        "exact_peak_known": false,
+        "new_success_artifacts": false,
+        "manifest_sha256_after_attempt": "616ED99C27EF17AA5F28682142E3161C8C87722AC378C27CFA86679EB2A67EC6"
+      },
+      {
+        "attempt": 3,
+        "code_state": "after_narrow_memory_remediation",
+        "provider_calls": 0,
+        "result": "STOPPED_AT_16_GIB_GUARD",
+        "checkpoints": [
+          {
+            "name": "BEFORE_CANONICAL",
+            "rss_mib": 105.0
+          },
+          {
+            "name": "SNAPSHOT_INPUT_MATERIALIZATION",
+            "rss_mib": 446.2
+          }
+        ],
+        "last_observed_below_guard_mib": 15370.5,
+        "first_observed_above_guard_mib": 16392.7,
+        "guard_mib": 16384,
+        "exact_peak_known": false,
+        "domain_selection_completed": false,
+        "artifact_write_reached": false,
+        "verifier_reached": false,
+        "exact_replay": "NOT_RUN",
+        "new_ledger_row": false,
+        "new_success_artifacts": false,
+        "manifest_sha256_after_attempt": "680ad8286cca4529411f5498873d78d0bc102157c147c326f2dd778e1e04adf7"
+      }
+    ],
+    "ledger": {
+      "record_count": 1,
+      "successful_record_count": 0,
+      "prior_blocked_record": {
+        "canonical_run_id": "c5b93927-405b-5a18-b5f3-d70968e940b1",
+        "status": "BLOCKED",
+        "selected_count": 0,
+        "decision_count": 0,
+        "finding_count": 3560
+      },
+      "prior_blocked_artifact_set_exists": true,
+      "successful_selected_artifact_exists": false
+    },
     "exact_replay": "NOT_RUN"
   },
-  "memory_stop": {
-    "termination": "operator_interrupt_due_to_rapid_rss_growth",
-    "last_sampled_rss_gib": 9.91,
-    "observed_growth": {
-      "from_gib": 8.25,
-      "to_gib": 9.91,
-      "interval_seconds": 10
-    },
-    "configured_guard_gib": 16,
-    "guard_reached": false,
-    "available_host_memory_gib_at_last_sample": 32.74,
-    "retry_started": false,
-    "likely_pressure_sources_from_code_review": [
-      "CanonicalRunner builds candidate and selected-row Python lists",
-      "Canonical artifact writing creates an in-memory Parquet buffer",
-      "consumption verification converts selected Parquet rows to Python dictionaries"
+  "memory_remediation": {
+    "persistent_canonical_contract_changed": false,
+    "changes": [
+      "Replace full-history frozen Python row tuples with exact hash-verified Parquet bytes in a disk-spilling snapshot buffer",
+      "Use slotted candidates, a generator, in-place ordering/grouping, and prompt per-domain conversion to Polars frames",
+      "Avoid duplicate Python schema-alignment and selected-file row copies",
+      "Use bounded external sorting for semantic hashes and avoid selected/decision to_dicts verification copies"
     ],
+    "measured_effect": "Snapshot/input materialization reached its checkpoint at 446.2 MiB, but RSS later crossed the hard guard during domain selection",
     "allocation_source_profiled": false,
-    "required_followup": "project-manager review of a bounded/streaming Canonical build and verification path before any new full-window run"
+    "further_canonical_attempt_without_new_decision": false,
+    "required_followup": "Project-manager decision: approve an additional bounded selection-memory design or provide a larger execution resource envelope; do not reacquire the retained 78-month Provider evidence"
   },
   "historical_gap_diagnostic": {
     "classification": "reproducible upstream coverage/applicability limitation; no safe denominator exclusion established",
@@ -90,11 +140,6 @@
     "exchange": {
       "SZ": 1470,
       "SH": 93
-    },
-    "board": {
-      "ChiNext": 1324,
-      "SZ_main": 146,
-      "SH_main": 93
     },
     "sessions_since_listing": {
       "over_250": 1563
@@ -129,21 +174,28 @@
     "python": "3.14.7",
     "ruff": "PASS",
     "ruff_format": "PASS",
+    "compileall": "PASS",
+    "git_diff_check": "PASS",
     "focused_tests": {
-      "count": 13,
-      "status": "PASS"
-    },
-    "full_repository_tests": "PASS",
-    "exact_head_github_ci": {
+      "count": 212,
       "status": "PASS",
-      "run_number": 803,
-      "code_test_head_sha": "4b27436770998607d3b6dc21bdd406812352eb2e",
+      "scope": [
+        "tests/integration/test_canonical.py",
+        "tests/unit/test_issue95_status_rows.py",
+        "tests/unit/test_issue95_output_quarantine.py"
+      ]
+    },
+    "full_repository_tests_for_current_delta": "NOT_RUN",
+    "prior_exact_head_github_ci": {
+      "status": "PASS",
+      "run_number": 804,
+      "head_sha": "047dea9d7538e2d12a3f78dce2e0c2d47335d914",
       "matrix": [
         "ubuntu-latest / Python 3.14",
         "windows-latest / Python 3.14"
-      ],
-      "documentation_only_follow_up_requires_fresh_ci": true
-    }
+      ]
+    },
+    "current_delta_exact_head_ci": "PENDING_AFTER_PUSH"
   },
   "data_handling": {
     "raw_provider_payloads_in_git": false,

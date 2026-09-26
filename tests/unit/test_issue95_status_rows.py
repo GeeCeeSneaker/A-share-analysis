@@ -210,3 +210,49 @@ def test_atomic_manifest_replace_retries_a_transient_permission_error(
 
     assert attempts == 2
     assert json.loads(manifest_path.read_text(encoding="utf-8")) == {"status": "RUNNING"}
+
+
+def test_canonical_attempt_reuses_as_of_for_exact_retry() -> None:
+    runner = Issue95Build.__new__(Issue95Build)
+    runner.state = {
+        "status": "STOP_BLOCKED",
+        "canonical_attempt_as_of": "2026-09-26T06:00:00+00:00",
+        "canonical_attempt_number": 0,
+        "blocker": {"gate": "MEMORY_GUARD"},
+    }
+    runner._save_state = lambda: None
+
+    first = runner.prepare_canonical_attempt()
+    second = runner.prepare_canonical_attempt()
+
+    assert first.isoformat() == "2026-09-26T06:00:00+00:00"
+    assert second == first
+    assert runner.state["canonical_attempt_number"] == 2
+    assert runner.state["status"] == "RUNNING"
+    assert "blocker" not in runner.state
+
+
+def test_canonical_rss_checkpoint_stops_at_the_hard_limit(monkeypatch) -> None:
+    runner = Issue95Build.__new__(Issue95Build)
+    runner.state = {"canonical_attempt_number": 1}
+    runner._save_state = lambda: None
+    emitted: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        _ISSUE95_BUILD,
+        "_current_rss_bytes",
+        lambda: _ISSUE95_BUILD.MAX_RSS_BYTES,
+    )
+    monkeypatch.setattr(
+        _ISSUE95_BUILD,
+        "_emit",
+        lambda stage, **fields: emitted.append((stage, fields)),
+    )
+
+    with pytest.raises(BuildFailure) as exc_info:
+        runner._canonical_rss_checkpoint("BEFORE_CANONICAL")
+
+    assert exc_info.value.stage == "MEMORY_GUARD"
+    assert exc_info.value.error_class == "RSS_LIMIT_REACHED_DURING_CANONICAL"
+    assert runner.state["canonical_rss_checkpoints"][0]["rss_mib"] == 16_384
+    assert emitted[0][0] == "CANONICAL_RSS_CHECKPOINT"
+    assert emitted[0][1]["provider_calls_during_canonical"] == 0

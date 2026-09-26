@@ -24,7 +24,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, TextIO, cast
 
 import polars as pl
 
@@ -1390,6 +1390,9 @@ class Issue95Build:
         self.state["resume"]["fast_path_reused_month_count"] = reused_months
         self.state["resume"]["fast_path_reconstructed_month_count"] = reconstructed_months
         self.state["resume"]["current_mapper_replay_verified"] = True
+        from ashare_state.normalization.registry import MAPPER_CODE_FINGERPRINT
+
+        self.state["resume"]["replayed_mapper_code_hash"] = MAPPER_CODE_FINGERPRINT
         self._verify_coverage_receipts()
         self._save_state()
         return calendars, identity_facts, universe_hashes, verified_pairs, captured_symbols
@@ -1830,6 +1833,7 @@ class Issue95Build:
             self._save_state()
             self._write_coverage_receipts()
             self._save_state()
+            rss_bytes = _current_rss_bytes()
             _emit(
                 "RETAINED_MONTH_REPLAYED",
                 month=month,
@@ -1837,7 +1841,11 @@ class Issue95Build:
                 returned_pairs=len(month_pairs),
                 coverage=month_state.get("coverage_status"),
                 provider_calls=self.call_count,
+                provider_calls_during_replay=0,
+                rss_mib=round(rss_bytes / 1024**2, 1),
             )
+            if rss_bytes >= MAX_RSS_BYTES:
+                raise BuildFailure("MEMORY_GUARD", "RSS_LIMIT_REACHED_DURING_REPLAY")
 
         self.state["resume"]["reconciled_month_count"] = sum(
             1
@@ -1845,6 +1853,9 @@ class Issue95Build:
             if item.get("coverage_status") in {"COMPLETE", "PARTIAL_UPSTREAM_COVERAGE"}
         )
         self.state["resume"]["current_mapper_replay_verified"] = True
+        from ashare_state.normalization.registry import MAPPER_CODE_FINGERPRINT
+
+        self.state["resume"]["replayed_mapper_code_hash"] = MAPPER_CODE_FINGERPRINT
         self._save_state()
         return calendars, identity_facts, universe_hashes, verified_pairs, captured_symbols
 
@@ -2746,18 +2757,75 @@ class Issue95Build:
         )
         return month_state
 
-    def build_canonical(self, *, expected_per_domain: int) -> dict[str, Any]:
-        if _current_rss_bytes() > MAX_RSS_BYTES:
-            raise BuildFailure("MEMORY_GUARD", "RSS_LIMIT_REACHED_BEFORE_CANONICAL")
-        as_of = datetime.now(UTC) + timedelta(seconds=2)
+    def prepare_canonical_attempt(self) -> datetime:
+        saved_as_of = self.state.get("canonical_attempt_as_of")
+        if saved_as_of:
+            try:
+                as_of = datetime.fromisoformat(str(saved_as_of))
+            except ValueError:
+                raise BuildFailure("CANONICAL", "SAVED_CANONICAL_AS_OF_INVALID") from None
+            if as_of.tzinfo is None or as_of.utcoffset() is None:
+                raise BuildFailure("CANONICAL", "SAVED_CANONICAL_AS_OF_NOT_TIMEZONED")
+        else:
+            as_of = datetime.now(UTC) + timedelta(seconds=2)
+            self.state["canonical_attempt_as_of"] = as_of.isoformat()
+
+        self.state["canonical_attempt_number"] = (
+            int(self.state.get("canonical_attempt_number", 0)) + 1
+        )
+        self.state["canonical_attempt_started_at_utc"] = datetime.now(UTC).isoformat()
+        self.state["canonical_attempt_provider_calls"] = 0
+        self.state["status"] = "RUNNING"
+        self.state.pop("completed_at_utc", None)
+        self.state.pop("blocker", None)
+        self._save_state()
+        return as_of
+
+    def _canonical_rss_checkpoint(self, checkpoint: str) -> None:
+        rss_bytes = _current_rss_bytes()
+        checkpoints = self.state.setdefault("canonical_rss_checkpoints", [])
+        checkpoints.append(
+            {
+                "attempt": int(self.state.get("canonical_attempt_number", 0)),
+                "checkpoint": checkpoint,
+                "rss_mib": round(rss_bytes / 1024**2, 1),
+                "observed_at_utc": datetime.now(UTC).isoformat(),
+            }
+        )
+        self._save_state()
+        _emit(
+            "CANONICAL_RSS_CHECKPOINT",
+            attempt=int(self.state.get("canonical_attempt_number", 0)),
+            checkpoint=checkpoint,
+            rss_mib=round(rss_bytes / 1024**2, 1),
+            hard_limit_mib=round(MAX_RSS_BYTES / 1024**2),
+            provider_calls_during_canonical=0,
+        )
+        if rss_bytes >= MAX_RSS_BYTES:
+            raise BuildFailure("MEMORY_GUARD", "RSS_LIMIT_REACHED_DURING_CANONICAL")
+
+    def build_canonical(
+        self, *, expected_per_domain: int, as_of: datetime | None = None
+    ) -> dict[str, Any]:
+        if as_of is None:
+            as_of = self.prepare_canonical_attempt()
+        provider_calls_before = self.call_count
+        self._canonical_rss_checkpoint("BEFORE_CANONICAL")
         try:
             result = CanonicalRunner(
                 self.conn,
                 raw_root=self.raw_root,
                 normalized_root=self.normalized_root,
-            ).run(as_of=as_of, domains=list(DOMAINS))
+            ).run(
+                as_of=as_of,
+                domains=list(DOMAINS),
+                progress_callback=self._canonical_rss_checkpoint,
+            )
+        except BuildFailure:
+            raise
         except Exception as exc:  # noqa: BLE001 - canonical diagnostics stay local
             raise BuildFailure("CANONICAL", type(exc).__name__) from None
+        self._canonical_rss_checkpoint("CANONICAL_COMMIT_COMPLETE")
         if result.status != "SUCCESS" or result.finding_count != 0 or not result.manifest_uri:
             raise BuildFailure("CANONICAL", "CANONICAL_RUN_NOT_SUCCESSFUL")
         try:
@@ -2805,13 +2873,18 @@ class Issue95Build:
             "selected_artifact_row_count": int(selected.get("row_count", -1)),
             "selected_artifact_schema_sha256": str(selected.get("schema_hash") or ""),
         }
+        self._canonical_rss_checkpoint("AFTER_CANONICAL_VERIFY")
         del verified
         del result
         replay = CanonicalRunner(
             self.conn,
             raw_root=self.raw_root,
             normalized_root=self.normalized_root,
-        ).run(as_of=as_of, domains=list(DOMAINS))
+        ).run(
+            as_of=as_of,
+            domains=list(DOMAINS),
+            progress_callback=lambda stage: self._canonical_rss_checkpoint(f"EXACT_REPLAY_{stage}"),
+        )
         if (
             replay.status != "SUCCESS"
             or not replay.idempotent_replay
@@ -2827,8 +2900,9 @@ class Issue95Build:
         canonical["replay_idempotent"] = replay.idempotent_replay
         canonical["replay_manifest_sha256"] = replay.manifest_hash
         del replay
-        if _current_rss_bytes() > MAX_RSS_BYTES:
-            raise BuildFailure("MEMORY_GUARD", "RSS_LIMIT_REACHED_AFTER_CANONICAL_REPLAY")
+        self._canonical_rss_checkpoint("AFTER_EXACT_REPLAY")
+        if self.call_count != provider_calls_before:
+            raise BuildFailure("CANONICAL", "PROVIDER_CALL_COUNT_CHANGED")
         return canonical
 
     def write_report(self, *, status: str, blocker: dict[str, str] | None = None) -> None:
@@ -3022,6 +3096,297 @@ def _load_resume_state(run_root: Path) -> tuple[dict[str, Any], str, str]:
     return state, manifest_hash, report_hash
 
 
+def _run_canonical_only(run_root: Path) -> int:
+    run_root = run_root.expanduser().resolve()
+    manifest_path = run_root / "execution_manifest.json"
+    try:
+        state = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 - local evidence details stay private
+        _emit(
+            "STOP_BLOCKED",
+            failure_stage="CANONICAL_ONLY_PREFLIGHT",
+            error_class=type(exc).__name__,
+            run_root=run_root.name,
+        )
+        return 2
+
+    expected_scope = {
+        "exchanges": ["SH", "SZ"],
+        "start_date": START_DATE.isoformat(),
+        "end_date": END_DATE.isoformat(),
+        "months": _months_in_scope(),
+        "canonical_domains": list(DOMAINS),
+    }
+    required_files = (
+        manifest_path,
+        run_root / "receipts.jsonl",
+        run_root / "report.json",
+        run_root / "ledger.duckdb",
+        run_root / "coverage_receipts.json",
+    )
+    required_directories = (
+        run_root / "raw",
+        run_root / "normalized",
+        run_root / "denominator" / "universe_by_month",
+    )
+    if (
+        state.get("schema") != "issue95_status_limit_build.v1"
+        or state.get("scope") != expected_scope
+        or state.get("status") not in {"RUNNING", "INTERRUPTED", "STOP_BLOCKED"}
+        or state.get("canonical") is not None
+        or not isinstance(state.get("resume"), dict)
+        or not all(path.is_file() for path in required_files)
+        or not all(path.is_dir() for path in required_directories)
+        or state.get("report_sha256") != _sha256_file(run_root / "report.json")
+    ):
+        _emit(
+            "STOP_BLOCKED",
+            failure_stage="CANONICAL_ONLY_PREFLIGHT",
+            error_class="RETAINED_RUN_NOT_ELIGIBLE",
+            run_root=run_root.name,
+        )
+        return 2
+
+    manager = DuckDBConnectionManager(run_root / "ledger.duckdb")
+    build: Issue95Build | None = None
+    try:
+        with manager.owner("read_write") as conn:
+            apply_migrations(conn, REPO_ROOT / "migrations")
+            build = Issue95Build(
+                run_root=run_root,
+                max_status_batch_size=STATUS_BATCH_FALLBACKS[0],
+                conn=conn,
+                provider=cast(AmazingDataProvider, None),
+                initial_state=state,
+            )
+            build.initialize_storage(resume=True)
+            build._read_receipt_log()
+
+            month_states = build.state.get("months", [])
+            if [item.get("month") for item in month_states] != _months_in_scope():
+                raise BuildFailure("CANONICAL_ONLY_PREFLIGHT", "MONTH_SCOPE_MISMATCH")
+            expected_per_domain = 0
+            expected_by_coverage: Counter[str] = Counter()
+            for item in month_states:
+                coverage = item.get("coverage_status")
+                if coverage not in {"COMPLETE", "PARTIAL_UPSTREAM_COVERAGE"}:
+                    raise BuildFailure("CANONICAL_ONLY_PREFLIGHT", "MONTH_COVERAGE_INCOMPLETE")
+                expected = int(item.get("expected_pairs_security_status", -1))
+                returned_status = int(item.get("returned_pairs_security_status", -1))
+                returned_limit = int(item.get("returned_pairs_limit_price", -1))
+                missing_status = int(item.get("missing_pairs_security_status", -1))
+                missing_limit = int(item.get("missing_pairs_limit_price", -1))
+                if (
+                    expected < 0
+                    or returned_status < 0
+                    or returned_status != returned_limit
+                    or missing_status != expected - returned_status
+                    or missing_limit != expected - returned_limit
+                    or int(item.get("unresolved_pairs", -1)) != expected - returned_status
+                    or any(
+                        int(item.get(key, 0)) != 0
+                        for key in ("extra_pairs", "duplicate_pairs", "structural_errors")
+                    )
+                    or not item.get("missing_key_set_uri")
+                    or not item.get("missing_key_set_sha256")
+                ):
+                    raise BuildFailure("CANONICAL_ONLY_PREFLIGHT", "MONTH_COVERAGE_INVALID")
+                build._verify_missing_keys(
+                    relative_uri=str(item["missing_key_set_uri"]),
+                    expected_hash=str(item["missing_key_set_sha256"]),
+                    expected_count=expected,
+                    returned_count=returned_status,
+                )
+                expected_per_domain += returned_status
+                expected_by_coverage[str(coverage)] += 1
+
+            if (
+                len(month_states) != 78
+                or expected_by_coverage
+                != Counter({"COMPLETE": 16, "PARTIAL_UPSTREAM_COVERAGE": 62})
+                or expected_per_domain != 7_459_685
+                or sum(int(item["expected_pairs_security_status"]) for item in month_states)
+                != 7_461_248
+                or sum(int(item["missing_pairs_security_status"]) for item in month_states) != 1_563
+                or int(build.state.get("identity", {}).get("missing_list_date_count", 0)) != 0
+                or int(
+                    build.state.get("identity", {}).get("terminated_without_delist_date_count", 0)
+                )
+                != 0
+            ):
+                raise BuildFailure("CANONICAL_ONLY_PREFLIGHT", "RECONCILED_CAPTURE_GATE_FAILED")
+            build._verify_coverage_receipts()
+
+            from ashare_state.normalization.registry import MAPPER_CODE_FINGERPRINT
+
+            replay_state = build.state["resume"]
+            replay_is_current = (
+                replay_state.get("current_mapper_replay_verified") is True
+                and replay_state.get("replayed_mapper_code_hash") == MAPPER_CODE_FINGERPRINT
+            )
+            mapper_replayed = False
+            if not replay_is_current:
+                prior_call_count = build.call_count
+                build.resume_mapper_verified = False
+                replay_state["current_mapper_replay_verified"] = False
+                replay_state["current_mapper_replay_started_at_utc"] = datetime.now(UTC).isoformat()
+                build._save_state()
+                _emit(
+                    "CURRENT_MAPPER_REPLAY_START",
+                    provider_calls_during_replay=0,
+                    retained_status_normalization_runs=sum(
+                        int(item.get("normalization_run_count", 0)) for item in month_states
+                    ),
+                    retained_identity_normalization_runs=int(
+                        build.state.get("identity", {}).get("normalization_run_count", 0)
+                    ),
+                    rss_mib=round(_current_rss_bytes() / 1024**2, 1),
+                    run_root=run_root.name,
+                )
+                build.load_retained_context()
+                mapper_replayed = True
+                if build.call_count != prior_call_count:
+                    raise BuildFailure("CANONICAL_ONLY_REPLAY", "PROVIDER_CALL_COUNT_CHANGED")
+                replay_state = build.state["resume"]
+                if (
+                    replay_state.get("current_mapper_replay_verified") is not True
+                    or replay_state.get("replayed_mapper_code_hash") != MAPPER_CODE_FINGERPRINT
+                ):
+                    raise BuildFailure("CANONICAL_ONLY_REPLAY", "CURRENT_MAPPER_REPLAY_UNVERIFIED")
+
+                replayed_expected = sum(
+                    int(item["expected_pairs_security_status"]) for item in month_states
+                )
+                replayed_returned = sum(
+                    int(item["returned_pairs_security_status"]) for item in month_states
+                )
+                replayed_missing = sum(
+                    int(item["missing_pairs_security_status"]) for item in month_states
+                )
+                replayed_coverage = Counter(
+                    str(item.get("coverage_status")) for item in month_states
+                )
+                if (
+                    replayed_expected != 7_461_248
+                    or replayed_returned != 7_459_685
+                    or replayed_missing != 1_563
+                    or replayed_coverage
+                    != Counter({"COMPLETE": 16, "PARTIAL_UPSTREAM_COVERAGE": 62})
+                ):
+                    raise BuildFailure("CANONICAL_ONLY_REPLAY", "COVERAGE_CHANGED_ON_REPLAY")
+                for item in month_states:
+                    build._verify_missing_keys(
+                        relative_uri=str(item["missing_key_set_uri"]),
+                        expected_hash=str(item["missing_key_set_sha256"]),
+                        expected_count=int(item["expected_pairs_security_status"]),
+                        returned_count=int(item["returned_pairs_security_status"]),
+                    )
+                build._verify_coverage_receipts()
+                expected_per_domain = replayed_returned
+                expected_by_coverage = replayed_coverage
+                _emit(
+                    "CURRENT_MAPPER_REPLAY_COMPLETE",
+                    provider_calls_during_replay=0,
+                    current_mapper_replay_verified=True,
+                    normalization_runs_replayed=(
+                        sum(int(item.get("normalization_run_count", 0)) for item in month_states)
+                        + int(build.state.get("identity", {}).get("normalization_run_count", 0))
+                    ),
+                    rss_mib=round(_current_rss_bytes() / 1024**2, 1),
+                    run_root=run_root.name,
+                )
+
+            if mapper_replayed:
+                _emit(
+                    "CANONICAL_DEFERRED_AFTER_NORMALIZATION_REPLAY",
+                    provider_calls_during_replay=0,
+                    canonical_started=False,
+                    reason="FRESH_PROCESS_REQUIRED_AFTER_OFFLINE_MAPPER_REPLAY",
+                    run_root=run_root.name,
+                )
+                return 0
+
+            canonical_count = int(
+                conn.execute("SELECT COUNT(*) FROM meta_canonicalization_run").fetchone()[0]
+            )
+            if canonical_count and not build.state.get("canonical_attempt_as_of"):
+                raise BuildFailure("CANONICAL_ONLY_PREFLIGHT", "UNBOUND_CANONICAL_HISTORY_EXISTS")
+            as_of = build.prepare_canonical_attempt()
+            _emit(
+                "CANONICAL_ONLY_START",
+                run_id=build.run_id,
+                months=len(month_states),
+                returned_pairs_per_domain=expected_per_domain,
+                provider_calls_during_canonical=0,
+                rss_mib=round(_current_rss_bytes() / 1024**2, 1),
+                run_root=run_root.name,
+            )
+            canonical = build.build_canonical(
+                expected_per_domain=expected_per_domain,
+                as_of=as_of,
+            )
+            build.state["coverage_summary"] = {
+                "complete_months": expected_by_coverage["COMPLETE"],
+                "partial_upstream_months": expected_by_coverage["PARTIAL_UPSTREAM_COVERAGE"],
+                "returned_pairs_per_domain": expected_per_domain,
+                "missing_pairs_per_domain": sum(
+                    int(item["missing_pairs_security_status"]) for item in month_states
+                ),
+                "expected_pairs_per_domain": sum(
+                    int(item["expected_pairs_security_status"]) for item in month_states
+                ),
+            }
+            build.state["canonical"] = canonical
+            build.write_report(status="PASS")
+            _emit(
+                "BUILD_PASS",
+                run_id=build.run_id,
+                provider_calls_during_canonical=0,
+                months=78,
+                returned_pairs_per_domain=expected_per_domain,
+                canonical_run_id=canonical["canonical_run_id"],
+                selected_rows=canonical["selected_count"],
+                complete_months=expected_by_coverage["COMPLETE"],
+                partial_months=expected_by_coverage["PARTIAL_UPSTREAM_COVERAGE"],
+                missing_pairs_per_domain=build.state["coverage_summary"][
+                    "missing_pairs_per_domain"
+                ],
+                report_root=run_root.name,
+            )
+            return 0
+    except BuildFailure as exc:
+        if build is not None:
+            with suppress(Exception):
+                build.write_report(
+                    status="STOP_BLOCKED",
+                    blocker={"gate": exc.stage, "reason_code": exc.error_class},
+                )
+        _emit(
+            "STOP_BLOCKED",
+            failure_stage=exc.stage,
+            error_class=exc.error_class,
+            run_root=run_root.name,
+        )
+        return 2
+    except Exception as exc:  # noqa: BLE001 - local diagnostics stay sanitized
+        if build is not None:
+            with suppress(Exception):
+                build.write_report(
+                    status="STOP_BLOCKED",
+                    blocker={
+                        "gate": "CANONICAL_ONLY_UNEXPECTED",
+                        "error_class": type(exc).__name__,
+                    },
+                )
+        _emit(
+            "STOP_BLOCKED",
+            failure_stage="CANONICAL_ONLY_UNEXPECTED",
+            error_class=type(exc).__name__,
+            run_root=run_root.name,
+        )
+        return 2
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -3031,7 +3396,8 @@ def main() -> int:
         default=STATUS_BATCH_FALLBACKS[0],
         help="Largest candidate tested through the live endpoint before the build selects a size.",
     )
-    parser.add_argument(
+    run_mode = parser.add_mutually_exclusive_group()
+    run_mode.add_argument(
         "--resume-run",
         type=Path,
         help=(
@@ -3039,7 +3405,17 @@ def main() -> int:
             "local evidence."
         ),
     )
+    run_mode.add_argument(
+        "--canonical-only",
+        type=Path,
+        help=(
+            "Build and verify Canonical from a reconciled retained Issue #95 run, "
+            "without logging in or calling the Provider."
+        ),
+    )
     args = parser.parse_args()
+    if args.canonical_only is not None:
+        return _run_canonical_only(args.canonical_only)
     if args.resume_run is None:
         run_root = _run_root()
         initial_state = None

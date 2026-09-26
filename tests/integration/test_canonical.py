@@ -304,6 +304,45 @@ def _findings(conn, run_id: str) -> list[tuple[str, str]]:
 
 @pytest.mark.integration
 class TestBoundaryStructure:
+    def test_semantic_hash_matches_legacy_with_bounded_external_sort(self):
+        from ashare_state.canonical.canonicalizer import (
+            _canonical_json,
+            _rows_semantic_hash,
+        )
+
+        rows = [
+            {"b": 2, "a": "line\nbreak"},
+            {"a": "中文", "nested": [1, None]},
+            {"a": None, "z": {"right": True, "left": 0}},
+            {"z": -1.5, "a": 'quote: "'},
+            {"a": "duplicate", "b": 1},
+        ]
+        expected = hashlib.sha256(
+            _canonical_json(sorted(_canonical_json(row) for row in rows)).encode("utf-8")
+        ).hexdigest()
+
+        assert _rows_semantic_hash(iter(reversed(rows)), chunk_size=2) == expected
+        assert _rows_semantic_hash(iter(()), chunk_size=2) == hashlib.sha256(b"[]").hexdigest()
+
+    def test_progress_callback_reports_bounded_canonical_stages(self, conn, env_root):
+        checkpoints: list[str] = []
+
+        CanonicalRunner(
+            conn,
+            raw_root=env_root["raw"],
+            normalized_root=env_root["normalized"],
+        ).run(
+            AS_OF_LATE,
+            domains=("trade_calendar",),
+            progress_callback=checkpoints.append,
+        )
+
+        assert checkpoints == [
+            "SNAPSHOT_INPUT_MATERIALIZATION",
+            "DOMAIN_SELECTION",
+            "ARTIFACT_WRITE",
+        ]
+
     def test_no_provider_sdk_access_in_canonical_package(self):
         """Audit §8-1: the canonicalizer never imports/calls the
         provider SDK (or any provider module) - its only input is the
@@ -1698,6 +1737,20 @@ class TestFullReplaySeal:
     """CR-3.1 P0-07 (audit section 7): the replay consumes the FULL
     seal - rebind-style tampering fails closed everywhere."""
 
+    def _setup_selected_artifact(self, conn, env_root):
+        """Use a non-partitioned domain so selected.parquet has real rows."""
+        _persist_raw(
+            conn,
+            env_root,
+            dataset="trade_calendar",
+            endpoint="BaseData.get_calendar",
+            surface="trade_calendar",
+            request_id="req-cal",
+            payload=["20260810", "20260811"],
+            params={"market": "SH"},
+        )
+        return _canonical(conn, env_root, AS_OF_LATE, domains=("trade_calendar",))
+
     def _setup(self, conn, env_root):
         _seed_base(conn, env_root)
         _seed_bars(conn, env_root)
@@ -1706,21 +1759,21 @@ class TestFullReplaySeal:
     def test_selected_values_rebind_blocks(self, conn, env_root):
         import polars as pl
 
-        result = self._setup(conn, env_root)
+        result = self._setup_selected_artifact(conn, env_root)
         _rebind_artifact(
             env_root,
             conn,
             result,
             "selected",
-            lambda f: f.with_columns(pl.lit(999.0).alias("close")),
+            lambda f: f.with_columns(pl.lit("SZ").alias("market")),
         )
         with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
-            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+            _canonical(conn, env_root, AS_OF_LATE, domains=("trade_calendar",))
 
     def test_selected_schema_rebind_blocks(self, conn, env_root):
         import polars as pl
 
-        result = self._setup(conn, env_root)
+        result = self._setup_selected_artifact(conn, env_root)
         _rebind_artifact(
             env_root,
             conn,
@@ -1729,7 +1782,7 @@ class TestFullReplaySeal:
             lambda f: f.with_columns(pl.lit(1).alias("injected_col")),
         )
         with pytest.raises(CanonicalRunnerError, match="DAMAGED"):
-            _canonical(conn, env_root, AS_OF_LATE, domains=("daily_bar",))
+            _canonical(conn, env_root, AS_OF_LATE, domains=("trade_calendar",))
 
     def test_decisions_rebind_blocks(self, conn, env_root):
         import polars as pl
@@ -2227,7 +2280,7 @@ class TestTransactionalSnapshot:
     def test_snapshot_deep_immutability(self, conn, env_root):
         """Audit item 06: attempting to mutate the snapshot's nested
         structures cannot change the authoritative truth (typed frozen
-        records; frozen findings; tuple-frozen rows)."""
+        records/findings; private exact-byte Parquet snapshot)."""
         from ashare_state.canonical import CanonicalFinding
 
         _seed_base(conn, env_root)
@@ -2247,10 +2300,18 @@ class TestTransactionalSnapshot:
         for run in snapshot.runs:
             with pytest.raises(Exception):  # noqa: B017 - frozen dataclass
                 run.seal.verification = "FORGED"  # type: ignore[misc]
-        # rows are tuple-frozen: mutation attempts on the snapshot cannot
-        # rebind what candidates later consume
+        # A yielded row is a fresh copy; callers cannot mutate the private
+        # exact-byte snapshot consumed by candidate iteration.
         assert isinstance(snapshot.runs, tuple)
         assert isinstance(snapshot.available_master_rows, tuple)
+        materialized = next(
+            output for run in snapshot.runs for output in run.outputs if output.row_count > 0
+        )
+        first = next(materialized.iter_rows())
+        field = next(iter(first))
+        original = first[field]
+        first[field] = "caller mutation"
+        assert next(materialized.iter_rows())[field] == original
         # run() after failed mutation attempts yields the normal truth
         result = runner.run(AS_OF_LATE, domains=("daily_bar",))
         assert result.status == "SUCCESS"
