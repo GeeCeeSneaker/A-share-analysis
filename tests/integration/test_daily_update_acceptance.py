@@ -5,11 +5,15 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, date, datetime
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
+import duckdb
 import pytest
 
+from ashare_state.storage.migrations import apply_migrations
+from ashare_state.storage.raw_writer import verify_raw_evidence
 from ashare_state.update import runner as daily_update
 from ashare_state.update.runner import (
     DailyUpdateRunner,
@@ -317,6 +321,60 @@ def test_five_session_append_unit_check_and_exact_target_replay(
         tmp_path / "backup" / "archives" / "daily_update" / f"run={result.update_run_id}.zip"
     )
     archive_bytes = archive_path.read_bytes()
+
+    from zipfile import ZipFile
+
+    daily_receipt = next(
+        item for item in manifest["request_receipts"] if item["provider_dataset"] == "daily_bar"
+    )
+    restored_raw_root = tmp_path / "restore-smoke" / "raw"
+    restored_dataset = restored_raw_root / "provider=amazingdata" / "dataset=daily_bar"
+    restored_dataset.mkdir(parents=True)
+    with ZipFile(
+        tmp_path / "backup" / "archives" / "daily_update" / f"run={result.update_run_id}.zip"
+    ) as archive:
+        raw_meta_bytes = archive.read(f"raw/{daily_receipt['raw_evidence_uri']}")
+        raw_meta = json.loads(raw_meta_bytes)
+        (restored_dataset / f"{daily_receipt['request_id']}.meta.json").write_bytes(raw_meta_bytes)
+        for table in raw_meta["tables"]:
+            filename = table["file"]
+            target = restored_dataset.joinpath(*filename.split("/"))
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(
+                archive.read(f"raw/provider=amazingdata/dataset=daily_bar/{filename}")
+            )
+
+    restored_evidence = verify_raw_evidence(
+        restored_raw_root,
+        provider="amazingdata",
+        dataset="daily_bar",
+        request_id=daily_receipt["request_id"],
+    )
+    assert restored_evidence.evidence_hash == daily_receipt["raw_evidence_hash"]
+    anchor = conn.execute(
+        "SELECT provider, provider_dataset, request_id, evidence_uri, evidence_hash, endpoint, "
+        "operation_id, normalization_surface, payload_kind, ingest_run_id, created_at "
+        "FROM meta_raw_evidence_anchor WHERE provider_dataset = 'daily_bar' AND request_id = ?",
+        [daily_receipt["request_id"]],
+    ).fetchone()
+    assert anchor is not None
+    restored_conn = duckdb.connect(":memory:")
+    try:
+        apply_migrations(restored_conn, Path(__file__).resolve().parents[2] / "migrations")
+        restored_conn.execute(
+            "INSERT INTO meta_raw_evidence_anchor VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            anchor,
+        )
+        restored_normalized = NormalizationRunner(
+            restored_conn,
+            raw_root=restored_raw_root,
+            normalized_root=tmp_path / "restore-smoke" / "normalized",
+        ).run(provider_dataset="daily_bar", request_id=daily_receipt["request_id"])
+    finally:
+        restored_conn.close()
+    assert restored_normalized.status == "SUCCESS"
+    assert restored_normalized.normalized_count == len(universe)
+
     archive_path.write_bytes(archive_bytes[:-1] + bytes([archive_bytes[-1] ^ 0x01]))
     corrupted = verify_daily_update_archives(
         conn,
