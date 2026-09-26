@@ -7,211 +7,240 @@
 
 ## 1. 当前阶段目标
 
-项目下一阶段不再以“通过更多 gate”为主要产出指标，而以形成可持续使用的研究数据系统为目标。
+项目当前不以“通过更多 gate”为主要产出指标，而以形成**研究口径正确、可以持续日更、普通研究读取足够低摩擦**的 SH/SZ 数据系统为目标。
 
-近期目标是：
+近期目标：
 
-> **让研究端稳定获得截至最近交易日的 SH/SZ 日线、可确认的交易状态和涨跌停事实；对 Provider 无法提供的历史状态明确标记为未知；同时保证多日研究特征不会因除权除息、新股无涨跌幅期或长停牌产生系统性错误。**
+> **稳定获得截至最近完成交易日的 SH/SZ 日线、可确认的交易状态和涨跌停事实；Provider 无法提供的历史状态明确保持未知；多日研究特征具有明确且不误导的收益/时间语义；正式 runner 可重复执行；普通研究读取不为窄查询整批物化全历史。**
 
-达到这个目标之前，不扩大到策略回测、BSE、行业/指数全面建设、分钟级数据或 Formal Production。
+达到这一目标前，不扩大到策略回测、BSE、行业/指数全面建设、分钟级真实 Provider 接入或 Formal B1-B7 Production。
 
-## 2. 已确认的项目原则
+## 2. 项目原则
 
 ### 2.1 正确性优先，但只在真实风险处 fail-closed
 
-继续保留 PIT、存活者偏差控制、Canonical 单一事实面、逻辑 Snapshot、身份稳定性、缺失分类、不可猜测补值等已经证明有价值的设计。
+继续保留 PIT 边界、存活者偏差控制、Canonical 单一事实面、逻辑 Snapshot、身份稳定性、缺失分类、不可猜测补值等已有有效设计。
 
-fail-closed 用于结构错误、语义冲突和不可逆发布，不用于要求上游数据源必须提供它事实上没有的数据。
+fail-closed 用于结构错误、语义冲突、不可复现证据和不可逆发布，不用于制造流程等待，也不要求上游提供其事实上不存在的数据。
 
-### 2.2 Unknown stays unknown，不让未知拖死已知事实
+### 2.2 Unknown stays unknown
 
-Provider 返回空并不代表 `false/0/正常/无涨跌停`。历史 status/limit 缺口必须保留为 unresolved/NULL，并有 coverage evidence。
+Provider 返回空不代表 `false / 0 / 正常 / 无涨跌停`。历史 status/limit 缺口保留为 unresolved/NULL，并携带 coverage evidence。
 
-但只要已返回行本身通过 identity/date/key/schema 验证，就可以作为 truthful Canonical fact 保存。研究层继续使用现有 `RESEARCH_DISABLED_UNRESOLVED`、`DataQualityState.UNRESOLVED` 和 partial/unresolved coverage 语义隔离未知字段。
+已返回且通过 identity/date/key/schema 验证的事实可以保存和消费；未知字段不能阻塞与其无关的 daily-bar-only 研究。
 
-### 2.3 任务范围需要授权，任务范围内的只读数据调用不逐次授权
+### 2.3 区分“数据谱系正确”和“研究数值/语义正确”
 
-一个 Issue 的业务范围一旦批准，开发人员可以自主进行合理的 Provider fetch/refetch/retry/replay、targeted probe、对照查询和一致性验证，不需要每次重新申请。
+CI、hash、manifest、replay 能证明工件来源和执行一致性，但不能单独证明研究公式、价格有效性和时间语义适合研究目的。
 
-只有以下变化需要新的项目级授权：
+因此研究层必须同时明确：
 
-- 扩大市场范围，例如 SH/SZ -> BSE；
-- 扩大时间范围到当前任务之外；
-- 引入新的业务数据域或新的外部数据源；
-- 破坏性覆盖/删除已经验收的 sealed history；
-- 修改研究切分、核心研究契约或正式发布语义；
-- capability promotion；
-- Formal B1-B7 / Production；
-- 明显超出当前任务自然范围的大规模架构重建。
+- 原始值是否合法；
+- 收益/价格链代表什么，不代表什么；
+- 数据何时被系统观察到，与历史交易时点是否可知是两件事；
+- 普通研究读取是否与数据规模成合理关系。
 
-### 2.4 优先解决实际问题，不为历史工件本身停工
+### 2.4 任务范围需要授权，任务内部执行自主
 
-旧 retained artifact 丢失或难以恢复时，如果重新拉取是更简单、更快且可验证的方式，应直接重新拉取。不要为了恢复旧路径而建立新的 recovery framework。
+Issue 范围一旦批准，开发人员可自主进行 Provider fetch/refetch/retry/replay、targeted probe、对照查询、一致性验证和缺失本地证据重采，不逐次申请。
 
-### 2.5 最小化同样适用于流程
+仅以下变化需重新项目级授权：市场/日期/业务域扩张、新外部数据源、破坏 accepted sealed history、核心 research contract/split 变化、capability promotion、Formal B1-B7/Production、明显超出当前 Issue 的大型架构重建。
 
-- 当前执行控制面保持一页级别；
-- 历史状态留在 Issue / PR / Git 历史，不重复复制 SHA、CI 编号和旧 scheduler 指令；
-- 一次性 spike 不得反向成为 production dependency；
-- 不为一个真实使用场景预建通用框架；
-- 每增加一个审批点，都必须能说明它具体防止什么不可逆或高代价失败，否则取消。
+### 2.5 最小化同样适用于流程和平台
 
-## 3. 当前优先级
+- 当前控制面保持短小；历史状态留给 Git/Issue/PR。
+- spike 不得成为 production dependency。
+- 不因单个问题预建 DAG、catalog、缓存服务、temporal database、第二持久化平面或安装器。
+- 先证明真实消费者和真实瓶颈，再增加抽象。
 
-### P0-A：完成 SH/SZ `security_status + limit_price` 历史闭环 — Issue #95 / PR #96
+## 3. 2026-09-26 外部审计吸收结论
 
-**目标**：完成 2020-01..2026-06 的月度历史，把 Provider 能确认的 status/limit 事实完整保存，并把上游历史 coverage 缺口显式建模，形成后续日增量可复用的正式契约。
+外部审计 PR #99 的可复现实验被接受为**代码路径行为证据**，不被扩大解释为“真实 retained history 已被污染”。审计不改变现有总体架构方向，但改变当前工作优先级。
+
+核心吸收：
+
+1. **研究正确性优先于继续增加治理门禁。** 零价格、收益命名和 PIT 术语必须先清楚。
+2. **运行可恢复性优先于包装/部署扩张。** retry budget、migration EOL、fresh-clone cleanliness 应在正式 runner 建设时一并收口。
+3. **读取路径是下一阶段真实性能边界。** 已简化存储平面不等于窄查询自然高效，需分区/谓词下推和代表性 workload benchmark。
+4. **#95 的历史 Canonical 内存问题是独立收尾/扩展性问题。** 它不能继续串行阻塞研究正确性和日增量系统建设。
+
+## 4. 当前优先级
+
+### P0-A：研究数值与语义正确性 — Issue #97 / PR #100
+
+这是当前最高业务正确性优先级。
+
+#### 4.1 Reference-price linked return / linked price
+
+- 使用有效正值 `close / pre_close` 构造逐日 reference-price factor。
+- `return_lag_obs_5/20/60` 使用连续日 factor 链，而不是跨公司行动断点直接 `current_close / prior_close`。
+- `ma_close_obs_*` / `close_to_ma_obs_*` 使用同一 deterministic linked-price series。
+- 缺失、非有限或非正 `pre_close/close` 断链并产生 NULL/finding；不得 forward-fill。
+- feature semantic version/hash 必须变化。
+
+语义必须明确：该链是 **reference-price linked return/price**，用于消除原始价格 reference step 对趋势特征的机械污染；它不是 `TOTAL_RETURN`、不是现金分红持有收益、不是 portfolio NAV/PnL，也不得用这些名称对外暴露。
+
+#### 4.2 Research OHLC 数值有效性
+
+在唯一 research-eligibility 边界收口：
+
+- OHLC 必须 finite 且严格 `> 0`；
+- `volume == 0` 本身允许；
+- 负值、非有限值和零价格不得进入 `RESEARCH_ENABLED / VERIFIED`。
+
+不得再建第二套 price validator。
+
+#### 4.3 PIT 术语边界
+
+R1 第一阶段定义为**retrospective observed-at-ingest research panel**：snapshot 可以证明系统在构建/观察时拥有这些数据，不自动证明某个 2020 trade-date 的研究者在 2020 当天已经知道后来获取的事实。
+
+- manifest/reader/docs 要明确这个边界；
+- 不伪造 historical decision-time `available_at`；
+- 不在 #97 建 temporal-version database；
+- 将来若具体策略需要严格 decision-time PIT，再以真实历史版本数据单独建设。
+
+#### 4.4 #97 第一批验收
+
+至少覆盖普通序列、分红/reference-price step、送转/拆分类 step、缺失/非法 `pre_close`、零 OHLC、正 OHLC+零 volume，并重验依赖 MA20/mom20 的市场 breadth。
+
+在 #97 完成前，旧口径 R1/CR-6 输出不得直接进入策略回测。
+
+### P0-B：生产化 runner + 日增量与可恢复性 — Issue #98
+
+目标：让项目从历史构建工具成为日常可运行的数据产品。
+
+#### PR A：daily-bar vertical
+
+1. tracked production runner 进入 `src/ashare_state/...`。
+2. 提供 `ashare update --through <date>` 与小型 plan/dry-run。
+3. calendar → identity/universe delta → missing daily bar → Canonical append → logical Snapshot/read refresh。
+4. 同日期重跑幂等，避免无意义 Provider 调用。
+5. accepted manifest 绑定 tracked commit + clean/dirty state；dirty 只诊断不 publish。
+6. 从 2026-06 accepted boundary 后连续至少 5 个交易日证明更新与重跑。
+7. bounded VWAP 检查冻结 SH/SZ volume/amount 单位。
+
+#### 外审合入的运行收口
+
+- **Retry budget**：sleep 不得超过剩余预算；下一次 Provider call 之前再次检查 deadline。
+- **Migration EOL**：明确 migration SQL line-ending policy；兼容同一 SQL 文本 CRLF/LF 的既有 ledger，真实内容/token 变化仍 fail-closed；不盲改历史 checksum。
+- **Fresh clone cleanliness**：普通 repository text 通过 `.gitattributes` 保证 Windows fresh clone 不因 EOL 变 dirty；只有 byte identity 属于契约的 sealed evidence 保持 byte-exact。
+- **Distribution boundary**：当前正式支持 source-checkout operation。若运行布局缺 migrations，startup/self-test 明确报 unsupported layout。没有真实 wheel 消费者前，不建设 migration-resource packaging 或 installer。
+
+#### PR B：status/limit
+
+#96 contract 合入后接入同一 runner。complete/partial upstream coverage 都保存 truthful facts，missing 继续 unresolved/NULL，结构错误继续 fail-closed。
+
+不得增加 scheduler service、DAG framework、distributed queue、新 catalog 或第二套持久化平面。
+
+### P0-C：历史 status/limit Canonical 收尾与扩展性 — Issue #95 / PR #96
+
+#95 不再处于整个项目的关键路径，但必须完成历史事实收尾。
 
 已确认：
 
-- status keyed-table identity/date/key fail-closed 路径已跑通；
-- production normalization 已收敛到正式 AmazingData mapper，不再反向依赖 spike；
-- 62 个已对账月份累计有 1,563 个 unresolved pair/domain；
-- 单证券/单日重拉仍可成功返回 0 行；
-- 至少两个缺口日存在同日 daily bar；
-- 因此这不是普通 batch、normalization 或 retry 问题，而是上游历史 coverage/applicability 不完整。
+- 78/78 capture/coverage reconciliation 完成；
+- 16 月 COMPLETE、62 月 PARTIAL_UPSTREAM_COVERAGE；
+- 每个 domain 7,461,248 expected / 7,459,685 returned / 1,563 missing；
+- structural/duplicate/unexplained-extra = 0；
+- 真实 Canonical-only 尝试已触发 16 GiB RSS 硬边界，Provider calls=0。
 
-路线决定：
+当前路径：
 
-1. 不再等待 Provider 对历史漏行给出书面解释，也不再要求同一 endpoint 把历史 gap 补到 0。
-2. 每月明确 `COMPLETE` 或 `PARTIAL_UPSTREAM_COVERAGE`（优先复用现有等价模型）。
-3. 对所有实际返回且结构正确的 status/limit 行正常 Normalize/Canonicalize。
-4. missing pair 不生成任何值；不得解释成 not suspended、not ST、no price limit 或其他负面状态。
-5. 每月保存 expected/returned/missing 计数、missing-key-set hash 和证据绑定。
-6. 复用已经验证的历史 capture，完成剩余月份，不为已确认的 coverage gap 做大规模重复重拉。
-7. downstream 对 missing status/limit 保持 unresolved/NULL；依赖这些字段的研究输出排除或显式标记，daily-bar-only 研究不受阻塞。
+1. 若执行主机确有安全余量，可做**一次** higher-resource Canonical-only finalization：至少 32 GiB 物理内存、启动前约 28 GiB 可用、约 24 GiB isolated hard stop；仍然零 Provider call。
+2. 无安全主机或触发 24 GiB 后，不继续抬内存上限，直接做窄 disk-backed/columnar selection 修复。
+3. 修复只删除已确认的全历史 Python copies/materialization/list-sort 压力，复用 Parquet/Polars/DuckDB；Canonical durable artifacts、hash/seal/replay contract 不变。
+4. 不重写 Canonical，不引入第二存储平面。
 
-**#95 PASS**：78/78 月完成 capture/reconciliation；所有返回行结构正确、可 replay；complete/partial coverage 明确；known facts Canonicalized；missing facts 未被猜测；Windows/Ubuntu Python 3.14 exact-head CI 通过。零 upstream missing **不再是** PASS 条件。
+PASS：完整 Canonical build、consumer verification、exact idempotent replay、exact-head CI，并记录 peak RSS/stage checkpoints。
 
-### P0-B：修正多日研究特征口径 — Issue #97
+### P1-A：研究读取分区/谓词下推与 workload benchmark — Issue #101
 
-**原因**：现有 `return_lag_obs_*`、`ma_close_obs_*`、`close_to_ma_obs_*` 基于未复权 raw `close`，在分红、送转、除权参考价变化时会制造假的多日跌幅/趋势变化，并污染市场态势聚合。
+目标：解决“存储已简化，但普通窄查询仍可能整批读取/物化”的问题。
 
-第一实现切片：
+- publication/deep-audit 可以做完整 artifact/hash verification；
+- ordinary research read 信任已验证且不可变的 manifest，先选相关 partition/file，再 materialize；
+- 用现有 DuckDB/Polars lazy/external scan 下推 date/security_id filter；
+- 去掉普通读路径中可避免的 whole-dataset `read_bytes -> read_parquet -> to_dicts` 和 DB `fetchall -> Python dict list`；
+- 不建 cache server、index service、catalog、第二 research dataset 或新 query framework。
 
-- 使用每日 `close / pre_close` 链式累计计算多日收益；
-- 从同一 PIT-safe 链构造 research-only linked price，用于均线和 close-to-MA；
-- `pre_close` 缺失/非法时断链并输出 NULL/finding，不 forward-fill、不跨 gap；
-- 一日 `raw_return_1` 等已正确口径保持不变；
-- feature semantic version/hash 明确变化；
-- fixtures 覆盖普通序列、现金分红/reference-price step、送转/拆分类 step、缺失 `pre_close`；
-- 重验 CR-6 中依赖 MA20/mom20 breadth 的状态。
+基准至少：
 
-无涨跌幅 IPO session 和长停牌保护仍属于 #97，但如果现有 feature engine 没有足够 governed input，不得阻塞第一 PR；先明确 disable/blocker，再做窄 follow-up。
+- one security / one year；
+- all market / one month；
+- all market / one year。
 
-性能优化不是前置条件。如果 Polars 改写能减少代码并保持逐值一致，可以完成；否则先修语义。
+记录 elapsed、peak RSS、opened partitions/files、cold run 和 immediate hot repeat。基线测量前不拍脑袋制定统一 latency SLA。
 
-**在 #97 完成前，不允许把旧口径 R1/CR-6 输出直接用于策略回测。**
+## 5. 紧随主线的可靠性工作
 
-### P0-C：生产化 runner + 日增量能力 — Issue #98
+### P1-B：raw evidence 最小备份与巡检
 
-**目标**：把项目从“一次历史构建”变成可日常运行的数据系统。
+每月/批次完成后压成少量不可变 archive + checksum；一个 configurable second backup root；一个 receipt→archive existence/hash verify command。只对新 accepted run 强制，不为旧历史先做迁移，不建对象存储/catalog 服务。
 
-分两步：
+### P1-C：Provider completeness / partial coverage
 
-**PR A：先生产化已经稳定的 daily-bar vertical**
+Provider OK 不等于完整。后续 ingestion 使用 explicit denominator/requested-key set、请求成员与返回成员逐一核对、coverage 状态入 receipt/manifest、缺失保持 unresolved、targeted refetch 可自主执行。
 
-1. 持久化运行编排进入 `src/ashare_state/...`。
-2. 提供 `ashare update --through <date>`。
-3. 最小链路：calendar → identity/universe delta → missing daily bar → Canonical append → logical Snapshot/read refresh。
-4. 同一日期重跑幂等，不做无意义 Provider 工作。
-5. accepted run manifest 记录 tracked commit SHA 和 clean/dirty state；dirty run 只诊断、不 publish。
-6. 用 2026-06 accepted boundary 后的前 5 个交易日证明连续更新和幂等重跑。
-7. 同一 bounded slice 完成 volume/amount VWAP unit check（至少 60/00/30/688 分组）。
+### P1-D：adapter / legacy / spike 净删除
 
-**PR B：#96 contract 合入后接 status/limit**
+production mapper/normalization 为唯一生产语义路径；diagnostic 尽量调用 production；spike 只保留一次性用途；优先净删除而不是造 replacement framework。
 
-- 接入同一个 tracked runner，不建第二套路径；
-- complete/partial upstream coverage 都能保存 truthful facts；
-- missing status/limit 保持 unresolved/NULL；
-- 结构错误仍然 fail-closed。
+## 6. 明确暂缓
 
-随后执行 `ashare update --through 2026-09-25` 追平数据边界，并完成新的 5-session operational cycle。
+当前不抢占主线：
 
-该 Issue 还需完成：最小 raw archive + second backup root + integrity verify，以及删除无当前消费者的一次性 `gt-h3b-controlled-execution.yml`。这些不应阻塞 PR A 的第一版 tracked vertical。
+- strict historical decision-time temporal database；
+- total-return / cash-inclusive corporate-action accounting model；
+- wheel/installer/migration-resource packaging；
+- 2019 或更早 warmup；
+- Provider `adj_factor` 全历史；
+- 指数/行业全面建设；
+- BSE；
+- 外部多源仲裁体系；
+- 策略回测；
+- 分钟级真实 Provider；
+- Formal B1-B7 Production。
 
-不要增加 scheduler service、DAG framework、distributed queue、新 catalog 或第二套持久化平面。
+这些不是永久取消，而是等真实消费者/研究需求证明价值后再排。
 
-## 4. 紧随 P0 的可靠性工作
+## 7. 近期实施顺序
 
-### P1-A：raw 证据备份与巡检
+### 立即并行
 
-- 每月/批次完成后，将碎 raw + receipt 打包为少量不可变 archive；
-- 一个可配置 second backup root；
-- 一个 `receipt -> archive exists + hash match` 巡检命令；
-- 只对新 accepted run 强制，不先做旧历史大迁移；
-- 不建对象存储/catalog/备份服务框架。
-
-### P1-B：Provider completeness / partial coverage 成为普通 ingestion 不变量
-
-Provider 返回 OK 不能等同于完整，也不能因为不完整就丢弃其余真实事实。
-
-所有后续 endpoint 采用：
-
-- explicit expected denominator 或 exact requested-key set；
-- 保守分批；
-- 请求成员与返回 table/member 逐一核对；
-- 缺失保持 unresolved，不自动当成 negative fact；
-- coverage 状态进入 manifest/receipt；
-- 必要时 targeted refetch 自主执行。
-
-### P1-C：收敛 adapter / legacy 路径
-
-- production mapper/normalization 成为唯一生产语义路径；
-- Golden/diagnostic 尽可能调用正式生产路径；
-- spike 只保留真正一次性或诊断用途；
-- 删除已经完成使命的旧 spike 和兼容层；
-- 以净删除/依赖方向变简单为目标，不建 replacement framework。
-
-## 5. 暂缓项及原因
-
-以下事项有价值，但当前不能抢占 P0：
-
-- **2019 或更早 warmup**：先把 2020+ 数据质量、特征口径和日增量做正确，再按真实研究需求回补。
-- **Provider `adj_factor`**：后续用于与 PIT linked-return 链交叉校验，不等待它修当前多日特征。
-- **指数 / 行业**：等 SH/SZ 核心数据可持续更新后再补。
-- **BSE**：先完成通用 identity/code mapping 能力再开启。
-- **外部抽检源**：以后作为小规模 DQ signal，不进入 Canonical，不建多源仲裁框架。
-- **Formal B1-B7 / Production**：仍不自动授权，当前重点是正确、稳定、日常可用的数据产品。
-
-## 6. 近期实施顺序
-
-### 现在并行推进
-
-- #95/#96：按 complete/partial coverage 契约完成剩余月份、Canonicalization、replay、CI；
-- #97：提交 chained-return/linked-price 第一 PR；
-- #98：提交 tracked daily-bar runner + `ashare update --through` PR A。
-
-三条线互不要求串行等待，但不能互相修改对方 retained run。
+1. **#97 / PR #100**：完成 reference-price chain、OHLC >0、PIT/return semantic boundary，exact-head CI 后优先审阅。
+2. **#98**：立即形成 PR A；daily-bar tracked runner 与 N2/N4/C3 运行收口同时推进，不等 #95。
+3. **#95 / PR #96**：独立完成历史 Canonical finalization/scalability，不占住 #97/#98。
+4. **#101**：可并行建立 read-path baseline，但不得拖慢前两条 P0。
+5. **PR #99**：作为外部审计记录独立保存/合并；实施代码不塞回审计 PR。
 
 ### 第一批完成后
 
-1. #95 形成 78/78 status + limit known-fact history + explicit partial coverage；
-2. #97 在真实公司行动样本上通过新特征语义验证；
-3. #98 用历史边界向 2026-09-25 增量追平；
-4. 连续 5 个交易日自动运行；
-5. 然后再决定 adj_factor、指数、外部抽检和 warmup。
+- #97 新语义成为默认 research feature contract；
+- #98 从历史边界追平到最新完成交易日并证明连续 5-session operation；
+- #95 完成历史 known-fact Canonical/replay；
+- #101 给出真实 retained-data 读取基线和最小 pushdown 改善；
+- 再按真实研究收益决定 warmup、adj_factor、index/industry 等后续项。
 
-## 7. 阶段验收指标
+## 8. 阶段验收指标
 
-未来阶段性评审优先看能力，而不是 gate 数量：
+未来评审优先看能力，而不是 gate 数：
 
-- 日线数据能更新到最近已完成交易日；
-- SH/SZ status + limit 的 known facts 可复现，upstream missing 有明确 partial coverage 且不会被解释成负面状态；
-- 研究端可以只在 status/limit 已知时消费对应状态字段；
-- 多日 momentum / MA 不受公司行动 raw-price discontinuity 污染；
-- update 可幂等重跑，失败可定位；
-- Provider OK 不会绕过 completeness/coverage 检查；
+- research OHLC 不接受 0/负/非有限价格，零成交量本身不误判；
+- multi-day return/MA 不被 raw-price corporate-action step 机械污染，且公开语义不会冒充 total/holding return；
+- R1 明确 retrospective observed-at-ingest 与 strict decision-time PIT 的区别；
+- 日线更新到最近完成交易日，update 可幂等重跑；
+- fresh Windows clone 不因普通文本 EOL 误报 dirty；retry budget 不越界发起下一次调用；
+- status/limit known facts 可复现，upstream missing 明确 partial/unresolved；
+- #95 historical Canonical 能完成并 exact replay；
+- 普通窄研究查询证明 partition/filter pushdown，避免无必要的全历史物化；
 - accepted run 可由 tracked code + retained evidence 重放；
-- raw 证据有独立副本并可巡检；
-- 控制面文档保持简短，没有同一决策在多份文档重复维护。
+- 控制面保持短小，无重复审批/重复文档层。
 
-## 8. 文档与调度约定
+## 9. 文档与调度约定
 
 - 本文维护“实施路线、优先级和为什么”；
-- `CURRENT_EXECUTION_PLAN.md` 只维护当前进行中的工作、阻塞和最近下一步；
-- Issue 维护具体任务 acceptance 与实时进展；
-- PR 维护具体代码/证据 review；
-- 历史 SHA、CI run、旧 scheduler 指令不再回填到本文。
-
-路线变化时，应先更新本文对应优先级/理由，再调整当前执行计划，确保参与项目的人员从仓库即可了解最新方向。
+- `CURRENT_EXECUTION_PLAN.md` 只维护当前工作、真正 blocker 和最近动作；
+- Issue 维护具体 acceptance/实时进展；
+- PR 维护代码/证据 review；
+- 外审/设计文档保留事实和建议，不直接成为新的审批层；
+- 路线实质变化时先更新本文，再调整当前执行计划。
