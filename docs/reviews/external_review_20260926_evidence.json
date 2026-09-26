@@ -1,0 +1,94 @@
+{
+  "reviewed_baseline": "76e8581701098da9896309cd976f62207a3b0510",
+  "python": "3.14.7",
+  "synthetic_only": true,
+  "migration_eol": {
+    "sql_text_equal": true,
+    "outcome": "MigrationTamperedError"
+  },
+  "r1_filter_pushdown": {
+    "parquet_reads": [
+      {
+        "rows": 2,
+        "columns": 24,
+        "reader_kwargs": {}
+      }
+    ],
+    "returned_rows": 1,
+    "returned_columns": 1
+  },
+  "r1_time_basis": {
+    "trade_date": "2020-01-02",
+    "available_at": "2026-07-01T08:00:00+00:00",
+    "default_reader_returns_row": true,
+    "fixture_only": true
+  },
+  "zero_price": {
+    "eligibility": "RESEARCH_ENABLED",
+    "quality": "VERIFIED",
+    "raw_return_1": -1,
+    "valid_raw_return_count": 1,
+    "mean_raw_return_observed": -1
+  },
+  "wheel": {
+    "sql_file_count": 0,
+    "init_db_exit": 1,
+    "migration_directory_missing": true
+  },
+  "retry_budget": {
+    "now": 1,
+    "attempts": 2,
+    "configured_budget": 0.05,
+    "returned": "retried after deadline",
+    "fake_clock": true
+  },
+  "linked_return_counterexample": {
+    "previous_close": 10,
+    "cash_dividend": 1,
+    "reference_preclose": 9,
+    "close": 9.9,
+    "close_over_reference_return": 0.10000000000000009,
+    "pre_tax_cash_holding_return": 0.09000000000000008
+  },
+  "review_date": "2026-09-26",
+  "validation": {
+    "os": "Windows",
+    "python": "3.14.7",
+    "dependency_install": "uv sync --frozen: success",
+    "ruff": "passed",
+    "ruff_format": {
+      "passed": true,
+      "files": 249
+    },
+    "mypy": {
+      "passed": true,
+      "source_files": 112
+    },
+    "pytest": {
+      "collected": 1948,
+      "passed": 1939,
+      "skipped": 9,
+      "failed": 0,
+      "errors": 0,
+      "exit_code": 0,
+      "count_method": "progress markers reconciled with collect-only"
+    },
+    "baseline_ci": {
+      "run_id": 36220340201,
+      "conclusion": "success",
+      "platforms": [
+        "windows-latest / Python 3.14",
+        "ubuntu-latest / Python 3.14"
+      ],
+      "url": "https://github.com/GeeCeeSneaker/A-share-analysis/actions/runs/36220340201"
+    },
+    "live_provider_access": false,
+    "real_history_reaudited": false
+  },
+  "scope_notes": [
+    "The tests exercise synthetic rows and temporary artifacts, not provider market history.",
+    "R1 diagnostics explicitly use the TEST_ONLY_ROWS fixture mode and do not mint authoritative production data.",
+    "The wheel diagnostic loads the built package outside the repository with existing locked dependencies; it is not a full clean-machine installation.",
+    "No actual historical-strategy performance was measured."
+  ]
+}
