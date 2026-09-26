@@ -275,6 +275,41 @@ class TestExactSnapshotPayload:
 
 
 class TestTimeBudget:
+    def test_retry_sleep_is_capped_and_deadline_is_checked_before_retry(self, monkeypatch):
+        from ashare_state.providers.amazingdata import timeout as timeout_module
+        from ashare_state.providers.errors import ProviderNetworkError, ProviderTimeoutError
+
+        now = [0.0]
+        monkeypatch.setattr(timeout_module.time, "monotonic", lambda: now[0])
+        calls = []
+        delays = []
+
+        def slow_failure():
+            calls.append(1)
+            now[0] += 0.8
+            raise ProviderNetworkError("temporary failure")
+
+        def wait(seconds: float) -> None:
+            delays.append(seconds)
+            now[0] += seconds
+
+        with pytest.raises(ProviderTimeoutError):
+            run_with_budget(
+                slow_failure,
+                budget=TimeBudget(query_timeout_seconds=1.0),
+                retry=RetryPolicy(
+                    max_retries=3,
+                    backoff_base_seconds=5.0,
+                    max_backoff_seconds=5.0,
+                    jitter_fraction=0.0,
+                ),
+                endpoint="test.endpoint",
+                sleep=wait,
+            )
+
+        assert calls == [1]
+        assert delays == pytest.approx([0.2])
+
     def test_budget_exhaustion_raises_typed(self):
         """Only RETRYABLE classes exhaust into a timeout (audit P0-03)."""
         from ashare_state.providers.errors import ProviderNetworkError

@@ -1,7 +1,6 @@
 # A-share Market State Data Foundation (Daily Module)
 
-可复现、可审计、可追溯的 A 股市场态势数据基座。本仓库当前处于 **Phase 0**：
-工程骨架（P0-M0）与 AmazingData Provider Spike（P0-M-1）并行推进。
+可复现、可审计、可追溯的 A 股市场态势数据基座。项目当前处于受控的 SH/SZ 日频研究数据建设阶段；活跃任务与阻塞见 [`CURRENT_EXECUTION_PLAN.md`](docs/project/CURRENT_EXECUTION_PLAN.md)，优先级路线见 [`IMPLEMENTATION_ROADMAP_20260925.md`](docs/project/IMPLEMENTATION_ROADMAP_20260925.md)。
 
 设计依据（冻结基线，只读保存于 `docs/design/`）：
 
@@ -13,6 +12,7 @@
 - Windows 10/11 x64 + PowerShell；Python 3.14.x 是唯一支持/参考应用运行时
 - Ubuntu + Python 3.14 仅用于 CI 跨平台检查，不代表支持 Linux 部署
 - [uv](https://docs.astral.sh/uv/) 包管理器
+- 当前仅支持从**源码 checkout** 运行；wheel/独立安装不受支持，因为 DuckDB migrations 位于仓库根目录。`ashare self-test` 会在不符合此布局时给出明确错误。
 
 ## 快速开始（Windows / PowerShell）
 
@@ -25,7 +25,7 @@ Copy-Item .env.example .env
 # 首次安装或密码轮换：隐藏输入一次，保存到当前 Windows 用户的 Credential Manager
 uv run python scripts/spike/production_account_bootstrap.py --store-credential
 
-# 3. 从零初始化数据库（顺序执行 migrations 001-004，带 checksum 登记）
+# 3. 从源码 checkout 初始化数据库（顺序执行全部 migrations，带 checksum 登记）
 uv run ashare init-db
 
 # 4. 运行全部测试（含迁移从零初始化、双重建身份一致性、单写者、失败注入）
@@ -54,7 +54,16 @@ uv run ashare init-db            # 从零执行迁移
 uv run ashare migrate            # 增量执行未应用迁移（幂等 + checksum 校验）
 uv run ashare security-id-check  # 双重建确定性校验（固定 fixture）
 uv run ashare self-test          # 快速自检
+uv run ashare update --through 2026-09-25 --plan  # 无登录地检查接受边界/更新计划
+$env:ASHARE_EVIDENCE_BACKUP_ROOT = "\\backup-host\ashare-evidence" # 独立网络/异地目录
+uv run ashare update --through 2026-09-25         # 有批准能力、已验收基线和备份根时增量更新
+uv run ashare evidence verify                     # 校验接受运行、归档与第二副本
+uv run ashare evidence archive <update-run-id>     # 补做/重试某次接受运行的归档
 ```
+
+每次新接受的日增量会封装为一个不可变 ZIP，内含更新 manifest、原始响应元数据和载荷；同一 ZIP 与留存收据会复制到 `ASHARE_EVIDENCE_BACKUP_ROOT`。也可用 `--backup-root <path>` 单次覆盖。备份失败会在更新结果中标为 `BACKUP_FAILED` 并输出醒目警告，但不会撤销已经接受的数据；之后可用 `ashare evidence archive <update-run-id>` 重试。备份根应位于独立网络共享/异地存储，不能与 `data_root` 重叠；程序只校验目录分离，无法判断配置的目标是否确实在另一台机器上。历史已接受运行可通过 `ashare evidence verify` 巡检本地 ZIP、第二副本和收据哈希。
+
+更新后应通过 `DuckDBReadModel.open_read_only_with_snapshot(snapshot_id)` 打开经 Snapshot seal 验证的只读研究面；先从 `meta_daily_update_run` 读取最近一次成功记录的 `snapshot_id`。目前没有独立 `ashare read` CLI，避免把未定义的查询接口伪装成稳定命令。
 
 ## 目录结构
 
@@ -63,8 +72,8 @@ docs/design/                  冻结设计文档（只读）
 docs/research/                CR-7 R1 研究面板合同与下游读取说明
 docs/adr/                     架构决策记录（ADR-007 Tushare 缺位、ADR-008 DuckDB 进程模型…）
 docs/provider_verification/   Provider 联调验证记录
-migrations/                   DuckDB 顺序迁移（001-004）
-src/ashare_state/             核心包（identity / providers / storage / research / cli）
+migrations/                   DuckDB 顺序迁移（按版本号连续应用）
+src/ashare_state/             核心包（identity / providers / canonical / snapshot / readmodel / update / cli）
 scripts/spike/                P0-M-1 AmazingData Spike 脚本（真实账号，输出隔离 data/spike/）
 tests/                        unit / integration / fixtures
 data/                         本地数据（gitignored，非 git 记录对象）

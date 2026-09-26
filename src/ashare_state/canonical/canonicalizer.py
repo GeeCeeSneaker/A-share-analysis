@@ -525,6 +525,10 @@ class CanonicalInputSnapshot:
     tolerance_policy_version: str
     tolerance_policy_hash: str
     code_fingerprint: str
+    # All discovered seals are retained for historical continuity. ``runs``
+    # may be a scoped subset so incremental appends need not materialize
+    # unrelated historical rows as Canonical candidates.
+    discovered_seals: tuple[InputRunSeal, ...] = ()
 
     # ------------------------------------------------------------ derived
     @property
@@ -1047,10 +1051,18 @@ class CanonicalRunner:
         *,
         raw_root: Path | str,
         normalized_root: Path | str,
+        scoped_input_run_ids: set[str] | frozenset[str] | None = None,
     ) -> None:
         self.conn = conn
         self.raw_root = Path(raw_root)
         self.normalized_root = Path(normalized_root)
+        if scoped_input_run_ids is not None and not scoped_input_run_ids:
+            raise CanonicalRunnerError("scoped_input_run_ids must not be empty")
+        self._scoped_input_run_ids = (
+            frozenset(str(item) for item in scoped_input_run_ids)
+            if scoped_input_run_ids is not None
+            else None
+        )
 
     # ---------------------------------------------------------------- api
     def run(
@@ -1354,7 +1366,9 @@ class CanonicalRunner:
             f"SELECT {', '.join(_LEDGER_COLUMNS)} FROM meta_canonicalization_run "
             "ORDER BY canonical_run_id"
         ).fetchall()
-        current_seal_by_run = {seal.run_id: seal for seal in snapshot.seals}
+        current_seal_by_run = {
+            seal.run_id: seal for seal in (snapshot.discovered_seals or snapshot.seals)
+        }
         for row in candidate_rows:
             record = dict(zip(_LEDGER_COLUMNS, row, strict=True))
             seal = CanonicalRunSeal.from_ledger(record)
@@ -1650,15 +1664,29 @@ class CanonicalRunner:
                     surface, datasets
                 )
             runs: list[SnapshotRun] = []
+            discovered_seals: list[InputRunSeal] = []
             prefindings: list[CanonicalFinding] = []
             available_master_rows: list[tuple[tuple[str, Any], ...]] = []
             for key, run_rows in sorted(discovered.items()):
                 surface = key.split("|")[0]
                 role = "identity_master" if surface == "security_master" else "source"
                 for run_row in run_rows:
-                    snapshot_run, findings = self._snapshot_run(run_row, role, as_of_dt, requested)
-                    runs.append(snapshot_run)
+                    run_id = str(run_row["normalization_run_id"])
+                    selected = (
+                        self._scoped_input_run_ids is None or run_id in self._scoped_input_run_ids
+                    )
+                    snapshot_run, findings = self._snapshot_run(
+                        run_row,
+                        role,
+                        as_of_dt,
+                        requested,
+                        keep_rows=selected,
+                    )
+                    discovered_seals.append(snapshot_run.seal)
                     prefindings.extend(findings)
+                    if not selected:
+                        continue
+                    runs.append(snapshot_run)
                     if (
                         role == "identity_master"
                         and snapshot_run.seal.verification == V_HEALTHY
@@ -1667,6 +1695,14 @@ class CanonicalRunner:
                         master_output = snapshot_run.output("main")
                         if master_output is not None:
                             available_master_rows.extend(master_output.rows)
+            if self._scoped_input_run_ids is not None:
+                discovered_ids = {seal.run_id for seal in discovered_seals}
+                missing_ids = sorted(self._scoped_input_run_ids - discovered_ids)
+                if missing_ids:
+                    raise CanonicalRunnerError(
+                        "scoped canonical input run(s) are absent from current verified "
+                        f"surface discovery: {missing_ids[:10]}"
+                    )
             self.conn.execute("COMMIT")
         except Exception:
             import contextlib
@@ -1698,6 +1734,7 @@ class CanonicalRunner:
             tolerance_policy_version=tolerance_version,
             tolerance_policy_hash=tolerance_hash,
             code_fingerprint=canonical_code_fingerprint(),
+            discovered_seals=tuple(discovered_seals),
         )
 
     @staticmethod
@@ -1717,7 +1754,13 @@ class CanonicalRunner:
         )
 
     def _snapshot_run(
-        self, run_row: dict[str, Any], role: str, as_of_dt: datetime, requested: tuple[str, ...]
+        self,
+        run_row: dict[str, Any],
+        role: str,
+        as_of_dt: datetime,
+        requested: tuple[str, ...],
+        *,
+        keep_rows: bool = True,
     ) -> tuple[SnapshotRun, list[CanonicalFinding]]:
         """Verify one discovered run (CR-2 closure + anchored
         availability + exact-byte materialization - all through the
@@ -1744,7 +1787,7 @@ class CanonicalRunner:
                 if domain_spec(domain).normalization_surface == surface
             )
         evidence = self._collect_input_verification_evidence(
-            run_row, role, as_of_dt, keep_rows=True
+            run_row, role, as_of_dt, keep_rows=keep_rows
         )
         if evidence.closure_problems:
             findings.append(
@@ -1859,7 +1902,9 @@ class CanonicalRunner:
         outputs: list[MaterializedOutput] = []
         materialization_problems: list[str] = []
         if verification == V_HEALTHY:
-            materialized, materialization_problems = self._materialize_outputs(run_row)
+            materialized, materialization_problems = self._materialize_outputs(
+                run_row, keep_rows=keep_rows
+            )
             if materialization_problems:
                 verification = V_CLOSURE_FAILED
                 pit_available = False
@@ -1885,7 +1930,7 @@ class CanonicalRunner:
         )
 
     def _materialize_outputs(
-        self, run_row: dict[str, Any]
+        self, run_row: dict[str, Any], *, keep_rows: bool = True
     ) -> tuple[list[MaterializedOutput], list[str]]:
         """Read the EXACT sealed output bytes (hash-verify each read
         against the manifest entry) and parse the SAME bytes into frozen
@@ -1923,9 +1968,13 @@ class CanonicalRunner:
             if frame.height != int(entry.get("row_count", -1)):
                 problems.append(f"output artifact row count mismatch: {uri}")
                 continue
-            rows = tuple(
-                tuple(sorted((str(k), _freeze(v)) for k, v in row.items()))
-                for row in frame.to_dicts()
+            rows = (
+                tuple(
+                    tuple(sorted((str(k), _freeze(v)) for k, v in row.items()))
+                    for row in frame.to_dicts()
+                )
+                if keep_rows
+                else ()
             )
             outputs.append(
                 MaterializedOutput(

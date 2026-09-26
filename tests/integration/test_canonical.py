@@ -2161,8 +2161,8 @@ class TestTransactionalSnapshot:
         original = CanonicalRunner._snapshot_run
         captured = {}
 
-        def racing(self, run_row, role, as_of_dt, requested):
-            result = original(self, run_row, role, as_of_dt, requested)
+        def racing(self, run_row, role, as_of_dt, requested, *, keep_rows=True):
+            result = original(self, run_row, role, as_of_dt, requested, keep_rows=keep_rows)
             if run_row["normalization_surface"] == "daily_bar" and "uri" not in captured:
                 captured["uri"] = run_row["normalized_manifest_uri"]
                 # a concurrent ledger UPDATE to a different manifest path
@@ -2198,8 +2198,8 @@ class TestTransactionalSnapshot:
         _seed_bars(conn, env_root, "req-bars")
         original = CanonicalRunner._snapshot_run
 
-        def racing_swap(self, run_row, role, as_of_dt, requested):
-            result = original(self, run_row, role, as_of_dt, requested)
+        def racing_swap(self, run_row, role, as_of_dt, requested, *, keep_rows=True):
+            result = original(self, run_row, role, as_of_dt, requested, keep_rows=keep_rows)
             if run_row["normalization_surface"] == "daily_bar":
                 manifest = json.loads(
                     (self.normalized_root / str(run_row["normalized_manifest_uri"])).read_text(
@@ -4225,3 +4225,50 @@ class TestMultiDomainReplayRegression:
         assert replay.idempotent_replay is True
         assert replay.canonical_run_id == first.canonical_run_id
         assert _canonical_count(conn) == 1
+
+
+@pytest.mark.integration
+def test_scoped_daily_canonical_excludes_old_rows_but_keeps_continuity_seals(conn, env_root):
+    """Monthly scope excludes unrelated facts but still verifies their input seals."""
+    from ashare_state.canonical.verifier import read_canonical_run_manifest
+
+    _seed_base(conn, env_root)
+    _seed_bars(conn, env_root, request_id="req-bars-current")
+    old_rows = [dict(row) for row in _BAR_ROWS]
+    for row in old_rows:
+        row["KLINE_TIME"] = 20260813
+    _persist_raw(
+        conn,
+        env_root,
+        dataset="daily_bar",
+        endpoint="MarketData.query_kline",
+        surface="daily_bar",
+        request_id="req-bars-unrelated",
+        payload=old_rows,
+    )
+    run_ids = {
+        str(request_id): str(run_id)
+        for request_id, run_id in conn.execute(
+            "SELECT raw_request_id, normalization_run_id "
+            "FROM meta_provider_normalization_run "
+            "WHERE raw_request_id IN ('req-master', 'req-bars-current', 'req-bars-unrelated')"
+        ).fetchall()
+    }
+    scoped_ids = {run_ids["req-master"], run_ids["req-bars-current"]}
+
+    result = CanonicalRunner(
+        conn,
+        raw_root=env_root["raw"],
+        normalized_root=env_root["normalized"],
+        scoped_input_run_ids=scoped_ids,
+    ).run(AS_OF_LATE, domains=("daily_bar",))
+
+    assert result.status == "SUCCESS"
+    _, manifest, _ = read_canonical_run_manifest(
+        conn, result.canonical_run_id, normalized_root=env_root["normalized"]
+    )
+    manifested_ids = {str(item["run_id"]) for item in manifest["input_normalized_runs"]}
+    assert manifested_ids == scoped_ids
+    assert result.selected_count == len(_BAR_ROWS)
+    assert len(manifest["daily_bar_partitions"]) == 1
+    assert manifest["daily_bar_partitions"][0]["partition"] == "2026-08"

@@ -128,6 +128,10 @@ def run_with_budget(
     attempt = 0
     last_exc: Exception | None = None
     while True:
+        # A sleep implementation may overshoot its requested duration.  Do
+        # not start another native SDK call once the retry budget has ended.
+        if attempt > 0 and time.monotonic() >= deadline:
+            break
         try:
             return fn()
         except Exception as exc:  # noqa: BLE001 - boundary
@@ -135,9 +139,12 @@ def run_with_budget(
             if not is_retryable_exc(exc):
                 raise
             attempt += 1
-            if attempt > retry.max_retries or time.monotonic() >= deadline:
+            if attempt > retry.max_retries:
                 break
-            sleep(retry.sleep_for(attempt))
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            sleep(min(retry.sleep_for(attempt), remaining))
     # The endpoint-specific generic query-failure exception is allowed to
     # retry only as a controlled policy exception.  If it remains broken,
     # preserve its true class instead of relabeling a persistent server/SDK

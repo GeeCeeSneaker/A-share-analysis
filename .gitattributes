@@ -1,3 +1,8 @@
+# Keep ordinary tracked text stable on Windows and Unix checkouts.  More
+# specific -text rules below continue to preserve byte-sealed evidence.
+* text=auto eol=lf
+*.sql text eol=lf
+
 # Byte-exact files: hashes are sealed over these bytes (audit R3/R4).
 # git autocrlf would rewrite LF to CRLF on Windows checkout and break
 # manifest_hash verification - force LF everywhere.
