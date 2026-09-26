@@ -332,3 +332,71 @@ The earlier PROPOSED / PENDING_REVIEW wording in the Review and exit and Amendme
 The final Reviewer decision recorded CR-5, CR-5.1, CR-5.2, and CR-5.2.1 as VERIFIED / CLOSED / FREEZE and accepted ADR-025. PR #3 then merged to main at 075ad80e5254998a0662a0f9c1cadc107a217fdb after the docs-inclusive run 33818320010 (run 179) passed on Ubuntu 3.14, Windows 3.12, and Windows 3.14. No CR-5 formula, window, universe, missingness, lineage, migration, or artifact semantics are changed by this status synchronization.
 
 CR-6 State is a new downstream contract. It must consume the public Verified Feature boundary and must not reopen or silently extend the frozen CR-5 V1 semantics.
+
+## Amendment C — Issue #97 PIT reference-price chain
+
+### Status
+
+Proposed implementation amendment, 2026-09-26; pending independent review.
+This adds a versioned feature contract and does not alter or reinterpret
+previously published V1 feature artifacts, Canonical daily bars, or the R1
+research-panel price basis.
+
+### Decisions
+
+1. The current feature registry is version 2 (`feature_set_version=2`,
+   `feature_registry_version=feature-registry-v2`). The registry hash and
+   deterministic feature identity therefore change. Existing V1 outputs are
+   not relabeled or silently replayed under the new semantics.
+2. Same-row `raw_return_1`, `gap_open_raw`, `intraday_return_raw`, and
+   `amplitude_preclose_raw` retain their existing formulas. Multi-day
+   `return_lag_obs_N`, `ma_close_obs_N`, and `close_to_ma_obs_N` use
+   `close / pre_close` factors only, with positive finite inputs and no
+   adjustment-factor or future-dependent data.
+3. Each exact observed-bar window is linked from its first observed close.
+   Returns compound the exact N daily factors from the prior close through the
+   target date. Moving-average windows link the N closes on the same local
+   window anchor; `close_to_ma_obs_N` compares the last linked value with that
+   window's linked mean. The linked values are derived feature inputs only and
+   are never persisted as Canonical facts.
+4. A missing, non-finite, zero, or negative `pre_close`/`close` on a required
+   transition breaks every affected window and produces NULL plus a typed
+   `PRICE_CHAIN_BREAK` finding. No factor is filled, bridged, or borrowed from
+   after the target date. Once the broken transition leaves a fixed window,
+   an otherwise complete window may resume from its own first close.
+5. `pct_above_ma20_observed` and `pct_positive_mom20_observed` continue to
+   consume the valid version-2 `close_to_ma_obs_20` and
+   `return_lag_obs_20` outputs respectively; their observed denominators
+   exclude NULL values exactly as before.
+
+### Deferred adjacent protections / evidence blocker
+
+The Issue #97 first PR is limited to the price-basis correction. This
+checkout contains no retained daily-bar Snapshot/ReadModel sample: the
+tracked `data/` has only golden fixtures, and the sibling ignored run data
+contains status/limit captures rather than daily bars. Thus synthetic
+corporate-action fixtures can prove deterministic formula behavior, but a
+representative retained real-data corporate-action check is not yet possible.
+Provide/recover a verified retained daily-bar Snapshot/ReadModel and its
+source lineage before claiming that acceptance item complete. Do not substitute
+Provider summaries or synthetic rows for that evidence.
+
+The feature ReadModel projection also does not bind a governed listing/trading
+rule fact that identifies the no-price-limit IPO sessions; a code-prefix
+heuristic is not acceptable. It has no exchange-session calendar plus approved
+maximum-gap policy for identifying long suspension windows either. Therefore
+this PR does not claim either aggregate/window protection: IPO affected
+aggregates and long-gap windows remain as in the explicitly declared observed
+daily-bar semantics until those exact governed inputs and a threshold decision
+are available. These items require a narrow follow-up within Issue #97.
+
+### Implementation and evidence
+
+Implementation: `src/ashare_state/features/engine.py`,
+`src/ashare_state/features/formulas.py`,
+`src/ashare_state/features/registry.py`; fixtures:
+`tests/integration/test_features.py`. The PR's synthetic cases cover ordinary
+trading, dividend/reference-price and split-like reference steps at 5/20/60
+windows, invalid-reference chain breaks, resumption after a break, and market
+breadth consumers. Independent review and Windows/Ubuntu Python 3.14 CI are
+required before this amendment is accepted.

@@ -10,6 +10,7 @@ __all__ = [
     "gap_open_raw",
     "amount_to_mean",
     "close_to_mean",
+    "chained_return",
     "intraday_return_raw",
     "lag_return",
     "ordered_mean",
@@ -89,6 +90,19 @@ def close_to_mean(close: float, mean: float) -> float | None:
 def lag_return(current_close: float, prior_close: float) -> float | None:
     ratio = safe_ratio(current_close, prior_close)
     return None if ratio is None else ratio - 1.0
+
+
+def chained_return(daily_factors: Sequence[float]) -> float | None:
+    """Return the compounded reference-price return for an exact factor window."""
+    if not daily_factors or any(not _finite(factor) or factor <= 0 for factor in daily_factors):
+        return None
+    product = 1.0
+    for factor in daily_factors:
+        product *= factor
+        if not _finite(product):
+            return None
+    result = product - 1.0
+    return result if _finite(result) else None
 
 
 def amount_to_mean(current_amount: float, mean_amount: float) -> float | None:
