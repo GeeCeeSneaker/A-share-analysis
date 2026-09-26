@@ -133,8 +133,17 @@
       "count": 13,
       "status": "PASS"
     },
-    "full_repository_tests": "NOT_RUN_FOR_FINAL_LOCAL_HEAD",
-    "exact_head_github_ci": "PENDING"
+    "full_repository_tests": "PASS",
+    "exact_head_github_ci": {
+      "status": "PASS",
+      "run_number": 803,
+      "code_test_head_sha": "4b27436770998607d3b6dc21bdd406812352eb2e",
+      "matrix": [
+        "ubuntu-latest / Python 3.14",
+        "windows-latest / Python 3.14"
+      ],
+      "documentation_only_follow_up_requires_fresh_ci": true
+    }
   },
   "data_handling": {
     "raw_provider_payloads_in_git": false,
