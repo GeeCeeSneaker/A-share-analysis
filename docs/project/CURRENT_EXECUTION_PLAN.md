@@ -16,7 +16,7 @@
 
 ## 阻塞与决定
 
-- **#98 实时验收：**当前干净 worktree 不含 `data/db/atlas.duckdb`、已接受的 2026-06 日线 Snapshot 或对应 raw/normalized 基线。需要恢复原接受状态及证据；fake-provider 五日测试只验证代码路径，不能替代真实验收，也不能把新抓取数据冒充旧 baseline。
+- **#98 实时验收：**隔离 runner worktree 中没有 `data/db/atlas.duckdb`。继续检查本机其他项目目录后，只发现一份候选 Atlas 数据库；只读核验得到 21 张元数据/维表均为 0 行，`dim_trade_calendar` 也为空，且同一项目副本没有 raw/normalized 证据目录。该文件是空初始化库，不是已接受的 2026-06 日线 Snapshot/baseline，不能作为起点。需要由管理人员恢复原接受状态及配套证据到受控 runner；fake-provider 五日测试只验证代码路径，不能替代真实验收，也不能把新抓取数据冒充旧 baseline。
 - **#98 PR B：**等 PR #96 的 status/limit contract 合并后再接入；不阻塞 PR A。
 - **#95：**按 expected-pair applicability 核清未解决键；不得放宽 denominator、填补缺失值或把缺失解释为负面事实。Canonical 内存决策遵从该 issue 最新 checkpoint。
 - **异地备份配置：**将 `ASHARE_EVIDENCE_BACKUP_ROOT` 指向独立网络共享/远端根。代码校验它不与主 `data_root` 重叠并检查归档、收据和校验和；它不能单凭本机路径证明存储介质确实位于另一台机器。
