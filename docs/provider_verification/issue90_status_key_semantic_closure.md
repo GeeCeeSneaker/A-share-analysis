@@ -1,17 +1,17 @@
 # Issue #90 — history status key and routing semantic closure
 
-**Current disposition: PASS CANDIDATE FOR INDEPENDENT REVIEW. Issue #90 is still OPEN; independent PASS is not yet recorded.**
+**Disposition: PASS — independently reviewed at PR #94 exact head; PR #94 is merged and Issue #90 is closed.**
 
 As-of: 2026-09-25 UTC  
 Execution-code base: `main@88eb9f15d8c8b8ec3b77d8919273a8f542b445ed`  
 Documentation base: `main@157bbc2b1c5bcf2c51ed465d02af6bd782190e84`  
-Scheduler gate: [Issue #90 comment #5824435432](https://github.com/GeeCeeSneaker/A-share-analysis/issues/90#issuecomment-5824435432)
+Scheduler gates: [Issue #90 correction #5824435432](https://github.com/GeeCeeSneaker/A-share-analysis/issues/90#issuecomment-5824435432); [PASS/next-step checkpoint #5824887599](https://github.com/GeeCeeSneaker/A-share-analysis/issues/90#issuecomment-5824887599); independent review #5312048062
 
 ## Decision
 
 The meaning of the seven table-tail rows reproduced by the 1990-start diagnostic remains unknown. They are not classified as non-facts or safely keyable. The 1990-start response shape is now treated as **unsupported for Canonical acquisition**; no row may be dropped, imputed, or key-filled, and the existing adapter remains fail-closed.
 
-The scheduler's corrected gate concerns the actual month-bounded SH/SZ request shape, not a speculative interpretation of that unsupported diagnostic. The one authorized 2020-01 call below met its technical checks and is submitted as a **PASS candidate** for independent review. It does not establish completeness for other months/symbols, approve the capability, or authorize any bulk acquisition.
+The scheduler's corrected gate concerned the actual month-bounded SH/SZ request shape, not a speculative interpretation of the unsupported diagnostic. The one authorized 2020-01 call below met the technical checks and received independent **PASS** at PR #94 exact head. It does not establish completeness for other months/symbols or approve the capability; the separately authorized acquisition is tracked in Issue #95.
 
 ## Authorized production-shape monthly check (2026-09-25 UTC)
 
@@ -35,7 +35,7 @@ Request: the same eight SH/SZ symbols listed in the Issue #90 probes; `begin_dat
 
 Across the 96 returned rows: missing `TRADE_DATE` = 0; missing `MARKET_CODE` = 0; missing both = 0; invalid dates = 0; dates outside January 2020 = 0; exchange-qualified identity conflicts = 0; duplicate natural-key groups = 0 (duplicate extra rows = 0). Empty tables were preserved as empty and remain unresolved; no synthetic rows were added.
 
-**Technical gate: PASS candidate for independent review.** This is evidence for only the tested eight-symbol, one-month request shape; it does not prove general SDK batch limits, other-month completeness, or whether date bounds are inclusive. The adapter behavior was not changed. No 78-month acquisition, BSE history, capability promotion, or Formal B1–B7 was run or authorized.
+**Technical gate: PASS, independently reviewed.** This is evidence for only the tested eight-symbol, one-month request shape; it does not prove general SDK batch limits, other-month completeness, or whether date bounds are inclusive. The adapter behavior was not changed. No acquisition was performed under Issue #90; the later 78-month acquisition authority is separate Issue #95. BSE history, capability promotion, and Formal B1–B7 remain outside scope.
 
 ## Evidence inspected
 
@@ -127,16 +127,16 @@ The issue branch adds the minimum safety/test changes:
 | Acceptance item | Status |
 |---|---|
 | Meaning of the 1990-start tail rows | Still unknown; accepted as an unsupported Canonical-acquisition shape under scheduler comment #5824435432. Adapter remains fail-closed; no drop/fill rule. |
-| Tested month request table-key binding and dates | **PASS candidate** — all eight keys exactly matched requested symbols; 96 rows had valid dates; no missing key fields or identity conflicts. |
-| Duplicate `(symbol,date)` natural keys | **PASS candidate** — zero duplicate groups or extra rows in the tested call. |
-| Empty response handling | **PASS candidate** — two empty tables remain `EMPTY_UNRESOLVED`; no rows synthesized and no completeness claim made. |
+| Tested month request table-key binding and dates | **PASS** — independently reviewed; all eight keys exactly matched requested symbols; 96 rows had valid dates; no missing key fields or identity conflicts. |
+| Duplicate `(symbol,date)` natural keys | **PASS** — independently reviewed; zero duplicate groups or extra rows in the tested call. |
+| Empty response handling | **PASS** — the tested behavior is correct: two empty tables remain `EMPTY_UNRESOLVED`; no rows synthesized and no completeness claim made. |
 | Required fail-closed and routing regressions | **PASS** — merged PR #91; exact-head CI #773 passed on Windows and Ubuntu / Python 3.14. No adapter code changed in this monthly check. |
-| BSE/corporate-action/full-history/Formal expansion | **PASS (not run / not activated)** — remains prohibited until #90 PASS and separate authorization. |
-| Semantic-closure record | This document records the corrected scheduler gate and sanitized monthly evidence; #90 awaits independent PASS review. |
+| BSE/corporate-action/full-history/Formal expansion | **NOT AUTHORIZED by #90** — the separate Issue #95 authorizes only SH/SZ status + limit acquisition; BSE, corporate-action expansion, capability promotion, and Formal B1-B7 remain excluded. |
+| Semantic-closure record | This document records the corrected scheduler gate and sanitized monthly evidence; #90 is closed PASS. Separate acquisition task: Issue #95. |
 
-A written AmazingData/SDK explanation remains desirable for the unsupported 1990-start tail rows, but the scheduler's corrected gate no longer makes it a prerequisite for the supported month-bounded path. The 2020-01 check is a PASS candidate only; obtain independent PASS on Issue #90 before any subsequent acquisition task is opened. Keep fail-closed behavior for any future unkeyed row.
+A written AmazingData/SDK explanation remains desirable for the unsupported 1990-start tail rows, but the scheduler's corrected gate does not make it a prerequisite for the supported month-bounded path. The 2020-01 check is independently accepted for the tested shape only. Keep fail-closed behavior for any future unkeyed row; do not extrapolate this one-month check into completeness evidence.
 
-**No 78-month acquisition/backfill is authorized by this record.** Only after Issue #90 receives independent PASS may the scheduler open a separate task for SH/SZ `security_status + limit_price` over 2020-01 through 2026-06, with month-bounded capture and governed reconciliation. BSE remains deferred.
+**This Issue #90 record does not itself authorize or report a 78-month acquisition.** The scheduler opened separate Issue [#95](https://github.com/GeeCeeSneaker/A-share-analysis/issues/95), which authorizes SH/SZ `security_status + limit_price` acquisition over 2020-01 through 2026-06, month-bounded and reconciled against the governed universe/sessions. Issue #95 requires retained-evidence and safe-request preflight before fresh calls; no acquisition outcome is claimed here. BSE remains deferred.
 
 ## Source paths
 

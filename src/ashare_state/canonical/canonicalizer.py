@@ -89,12 +89,16 @@ CR-3.4 closures (audit 20260902 "CR-3.3复审与CR-3.4最终ContinuitySeal
 from __future__ import annotations
 
 import hashlib
+import heapq
 import io
 import json
+import tempfile
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import UTC, date, datetime
+from itertools import groupby
 from pathlib import Path
 from typing import Any
 
@@ -451,17 +455,33 @@ class CanonicalRunSeal:
 
 @dataclass(frozen=True)
 class MaterializedOutput:
-    """One materialized CR-2 output table: rows frozen as tuples of
-    sorted item-tuples (deeply immutable), parsed from the EXACT bytes
-    that were hash-verified inside the snapshot transaction."""
+    """One materialized CR-2 output, backed by the exact hash-verified
+    Parquet bytes in a private spooled file. Large tables stay columnar
+    and spill to disk instead of expanding into millions of Python tuples."""
 
     output_name: str
-    rows: tuple[tuple[tuple[str, Any], ...], ...]
+    row_count: int
     content_hash: str
     schema_hash: str
+    _parquet: Any = dataclass_field(repr=False, compare=False)
 
-    def row_dicts(self) -> list[dict[str, Any]]:
-        return [dict(items) for items in self.rows]
+    def iter_rows(self) -> Iterator[dict[str, Any]]:
+        """Yield fresh row dictionaries decoded from the snapshotted bytes.
+
+        The backing file is private to this object and is never reopened
+        through the source path, so path replacement after snapshot cannot
+        alter the rows consumed by Canonical.
+        """
+        self._parquet.seek(0)
+        frame = pl.read_parquet(self._parquet)
+        if frame.height != self.row_count:
+            raise CanonicalRunnerError(
+                f"materialized output {self.output_name!r} row count changed"
+            )
+        yield from frame.iter_rows(named=True)
+
+    def close(self) -> None:
+        self._parquet.close()
 
 
 @dataclass(frozen=True)
@@ -498,6 +518,26 @@ class SnapshotRun:
             if materialized.output_name == name:
                 return materialized
         return None
+
+
+@dataclass(slots=True)
+class CanonicalCandidate:
+    """Compact per-row selection state; avoids one Python dict per fact."""
+
+    domain: str
+    key_json: str
+    identity_status: str
+    security_id: str | None
+    trade_date: str
+    payload: dict[str, Any]
+    provider: str
+    seal: InputRunSeal
+    output_name: str
+    ordinal: int
+    row_identity: str
+    available_at: datetime
+    received_at: datetime
+    run_manifest_hash: str
 
 
 @dataclass(frozen=True)
@@ -941,10 +981,52 @@ def _freeze(value: Any) -> Any:
     return value
 
 
-def _rows_semantic_hash(rows: list[dict[str, Any]]) -> str:
-    return hashlib.sha256(
-        _canonical_json(sorted(_canonical_json(r) for r in rows)).encode("utf-8")
-    ).hexdigest()
+def _rows_semantic_hash(rows: Iterable[Mapping[str, Any]], *, chunk_size: int = 50_000) -> str:
+    """Hash the same sorted canonical-JSON array without sorting all rows in RAM.
+
+    Sorted chunks spill to temporary files and are merged incrementally;
+    the byte stream is identical to ``_canonical_json(sorted(...))``.
+    """
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+
+    with tempfile.TemporaryDirectory(prefix="ashare-canonical-hash-") as temp_dir:
+        chunk_paths: list[Path] = []
+        chunk: list[str] = []
+
+        def flush_chunk() -> None:
+            if not chunk:
+                return
+            chunk.sort()
+            path = Path(temp_dir) / f"chunk-{len(chunk_paths):06d}.txt"
+            with path.open("w", encoding="utf-8", newline="\n") as stream:
+                for value in chunk:
+                    stream.write(value)
+                    stream.write("\n")
+            chunk_paths.append(path)
+            chunk.clear()
+
+        for row in rows:
+            chunk.append(_canonical_json(dict(row)))
+            if len(chunk) >= chunk_size:
+                flush_chunk()
+        flush_chunk()
+
+        def read_chunk(path: Path) -> Iterator[str]:
+            with path.open("r", encoding="utf-8", newline="\n") as stream:
+                for line in stream:
+                    yield line[:-1] if line.endswith("\n") else line
+
+        digest = hashlib.sha256()
+        digest.update(b"[")
+        first = True
+        for value in heapq.merge(*(read_chunk(path) for path in chunk_paths)):
+            if not first:
+                digest.update(b",")
+            digest.update(_canonical_json(value).encode("utf-8"))
+            first = False
+        digest.update(b"]")
+        return digest.hexdigest()
 
 
 def _finding_set_hash(findings: Sequence[Mapping[str, Any]]) -> str:
@@ -1058,6 +1140,7 @@ class CanonicalRunner:
         as_of: datetime | str,
         *,
         domains: tuple[str, ...] | list[str] | None = None,
+        progress_callback: Callable[[str], None] | None = None,
     ) -> CanonicalRunResult:
         started = datetime.now(UTC)
         as_of_dt = _parse_as_of(as_of)
@@ -1086,6 +1169,8 @@ class CanonicalRunner:
 
         # ------------------------ ONE transactional materialized snapshot
         snapshot = self._build_snapshot(as_of_dt, requested)
+        if progress_callback is not None:
+            progress_callback("SNAPSHOT_INPUT_MATERIALIZATION")
 
         # ------------- CR-3.3 P0-01 historical input continuity guard
         self._check_historical_continuity(snapshot)
@@ -1163,23 +1248,30 @@ class CanonicalRunner:
                 )
 
         # ------------------------------------------ candidates per domain
-        selected_rows: list[dict[str, Any]] = []
-        decisions: list[dict[str, Any]] = []
+        selected_frames: list[pl.DataFrame] = []
+        decision_frames: list[pl.DataFrame] = []
         identity_missing_by_domain: dict[str, int] = {}
 
         for domain in requested:
             policy = _source_policy.source_policy_for(domain)
-            candidates: list[dict[str, Any]] = []
+            candidates: list[CanonicalCandidate] = []
+            domain_decisions: list[dict[str, Any]] = []
+            identity_missing = 0
+            available_candidate_count = 0
             for run_snapshot in snapshot.source_runs_for(domain):
-                candidates.extend(self._build_candidates(domain, run_snapshot, bridge))
-            available: list[dict[str, Any]] = []
-            for candidate in candidates:
-                if candidate["available_at"] <= as_of_dt:
-                    available.append(candidate)
-                else:
-                    decisions.append(
-                        self._decision(domain, candidate, "EXCLUDED_FUTURE", "available_at > as_of")
-                    )
+                for candidate in self._build_candidates(domain, run_snapshot, bridge):
+                    if candidate.available_at > as_of_dt:
+                        domain_decisions.append(
+                            self._decision(
+                                domain, candidate, "EXCLUDED_FUTURE", "available_at > as_of"
+                            )
+                        )
+                        continue
+                    available_candidate_count += 1
+                    if candidate.identity_status == "MISSING":
+                        identity_missing += 1
+                    else:
+                        candidates.append(candidate)
             eligible_verified = [
                 s
                 for s in snapshot.runs
@@ -1206,7 +1298,7 @@ class CanonicalRunner:
                 )
             elif not healthy_verified:
                 pass  # damaged inputs already carry closure/evidence findings
-            elif not available:
+            elif available_candidate_count == 0:
                 findings.append(
                     _finding(
                         domain,
@@ -1223,12 +1315,18 @@ class CanonicalRunner:
                         blocking=True,
                     )
                 )
-            identity_missing_by_domain[domain] = sum(
-                1 for c in available if c["identity_status"] == "MISSING"
-            )
-            rows, domain_decisions, domain_findings = self._select(domain, policy, available)
-            selected_rows.extend(rows)
-            decisions.extend(domain_decisions)
+            identity_missing_by_domain[domain] = identity_missing
+            rows, selection_decisions, domain_findings = self._select(domain, policy, candidates)
+            candidates.clear()
+            del candidates
+            domain_decisions.extend(selection_decisions)
+            del selection_decisions
+            if rows:
+                selected_frames.append(pl.DataFrame(rows))
+            del rows
+            if domain_decisions:
+                decision_frames.append(pl.DataFrame(domain_decisions))
+            del domain_decisions
             findings.extend(domain_findings)
 
         for domain, missing in identity_missing_by_domain.items():
@@ -1255,6 +1353,22 @@ class CanonicalRunner:
                 )
             )
 
+        if progress_callback is not None:
+            progress_callback("DOMAIN_SELECTION")
+
+        selected_frame = (
+            pl.concat(selected_frames, how="diagonal_relaxed")
+            if selected_frames
+            else pl.DataFrame()
+        )
+        decisions_frame = (
+            pl.concat(decision_frames, how="diagonal_relaxed")
+            if decision_frames
+            else pl.DataFrame()
+        )
+        selected_count = selected_frame.height
+        decision_count = decisions_frame.height
+
         # CR-3.5 P0-02: status + derived error text are FUNCTIONS of
         # the exact findings truth - live build, replay and historical
         # continuity share this one derivation, so a status rebind that
@@ -1267,12 +1381,14 @@ class CanonicalRunner:
                 run_id=run_id,
                 snapshot=snapshot,
                 idempotency_key=idempotency_key,
-                selected_rows=selected_rows,
-                decisions=decisions,
+                selected_rows=selected_frame,
+                decisions=decisions_frame,
                 findings=findings,
                 status=status,
             )
         )
+        if progress_callback is not None:
+            progress_callback("ARTIFACT_WRITE")
         completed = datetime.now(UTC)
         self._commit_ledger(
             run_id=run_id,
@@ -1280,8 +1396,8 @@ class CanonicalRunner:
             idempotency_key=idempotency_key,
             manifest_uri=manifest_uri,
             manifest_hash=manifest_hash,
-            selected_count=len(selected_rows),
-            decision_count=len(decisions),
+            selected_count=selected_count,
+            decision_count=decision_count,
             selected_semantic=selected_semantic,
             decision_set=decision_set,
             findings=findings,
@@ -1295,8 +1411,8 @@ class CanonicalRunner:
             canonical_run_id=run_id,
             as_of=as_of_dt.isoformat(),
             status=status,
-            selected_count=len(selected_rows),
-            decision_count=len(decisions),
+            selected_count=selected_count,
+            decision_count=decision_count,
             finding_count=len(findings),
             manifest_uri=manifest_uri,
             manifest_hash=manifest_hash,
@@ -1666,7 +1782,12 @@ class CanonicalRunner:
                     ):
                         master_output = snapshot_run.output("main")
                         if master_output is not None:
-                            available_master_rows.extend(master_output.rows)
+                            available_master_rows.extend(
+                                tuple(
+                                    sorted((str(key), _freeze(value)) for key, value in row.items())
+                                )
+                                for row in master_output.iter_rows()
+                            )
             self.conn.execute("COMMIT")
         except Exception:
             import contextlib
@@ -1859,10 +1980,14 @@ class CanonicalRunner:
         outputs: list[MaterializedOutput] = []
         materialization_problems: list[str] = []
         if verification == V_HEALTHY:
-            materialized, materialization_problems = self._materialize_outputs(run_row)
+            materialized, materialization_problems = self._materialize_outputs(
+                run_row, retain_rows=keep_rows
+            )
             if materialization_problems:
                 verification = V_CLOSURE_FAILED
                 pit_available = False
+                for output in materialized:
+                    output.close()
             elif keep_rows:
                 outputs = materialized
         problem_evidence = {
@@ -1885,13 +2010,12 @@ class CanonicalRunner:
         )
 
     def _materialize_outputs(
-        self, run_row: dict[str, Any]
+        self, run_row: dict[str, Any], *, retain_rows: bool = True
     ) -> tuple[list[MaterializedOutput], list[str]]:
-        """Read the EXACT sealed output bytes (hash-verify each read
-        against the manifest entry) and parse the SAME bytes into frozen
-        rows - the candidate builder never rereads a current path."""
-        import io
-
+        """Hash and parse the exact verified bytes, retaining them in a
+        disk-spilling snapshot buffer for first consumption. Verification
+        replays validate each output but discard the buffer immediately.
+        """
         problems: list[str] = []
         manifest_path = self.normalized_root / str(run_row["normalized_manifest_uri"])
         if not manifest_path.is_file():
@@ -1911,30 +2035,45 @@ class CanonicalRunner:
             if not path.is_file():
                 problems.append(f"output artifact missing: {uri}")
                 continue
-            data = path.read_bytes()
-            if hashlib.sha256(data).hexdigest() != str(entry.get("content_hash")):
-                problems.append(f"output artifact bytes do not match the sealed hash: {uri}")
-                continue
+            backing = tempfile.SpooledTemporaryFile(  # noqa: SIM115 - ownership moves to snapshot
+                max_size=1024 * 1024, mode="w+b"
+            )
+            close_backing = True
             try:
-                frame = pl.read_parquet(io.BytesIO(data))
-            except Exception as exc:  # noqa: BLE001 - reported as problems
+                digest = hashlib.sha256()
+                with path.open("rb") as source:
+                    while chunk := source.read(1024 * 1024):
+                        digest.update(chunk)
+                        backing.write(chunk)
+                if digest.hexdigest() != str(entry.get("content_hash")):
+                    problems.append(f"output artifact bytes do not match the sealed hash: {uri}")
+                    continue
+                backing.seek(0)
+                try:
+                    frame = pl.read_parquet(backing)
+                except Exception as exc:  # noqa: BLE001 - reported as problems
+                    problems.append(f"output artifact unreadable: {uri}: {exc}")
+                    continue
+                if frame.height != int(entry.get("row_count", -1)):
+                    problems.append(f"output artifact row count mismatch: {uri}")
+                    continue
+                if retain_rows:
+                    backing.seek(0)
+                    outputs.append(
+                        MaterializedOutput(
+                            output_name=output_name,
+                            row_count=frame.height,
+                            content_hash=str(entry.get("content_hash")),
+                            schema_hash=str(entry.get("schema_hash")),
+                            _parquet=backing,
+                        )
+                    )
+                    close_backing = False
+            except OSError as exc:
                 problems.append(f"output artifact unreadable: {uri}: {exc}")
-                continue
-            if frame.height != int(entry.get("row_count", -1)):
-                problems.append(f"output artifact row count mismatch: {uri}")
-                continue
-            rows = tuple(
-                tuple(sorted((str(k), _freeze(v)) for k, v in row.items()))
-                for row in frame.to_dicts()
-            )
-            outputs.append(
-                MaterializedOutput(
-                    output_name=output_name,
-                    rows=rows,
-                    content_hash=str(entry.get("content_hash")),
-                    schema_hash=str(entry.get("schema_hash")),
-                )
-            )
+            finally:
+                if close_backing:
+                    backing.close()
         return outputs, problems
 
     def _verify_anchored_availability(
@@ -2038,17 +2177,42 @@ class CanonicalRunner:
     def _surface_runs(
         self, normalization_surface: str, provider_datasets: tuple[str, ...]
     ) -> list[dict[str, Any]]:
+        # A raw request can have historical SUCCESS normalizations from an
+        # older mapper fingerprint as well as a replay through the current
+        # mapper. Keep the old immutable row as audit history, but do not let
+        # it invalidate the current replay. If no current replacement exists,
+        # retain the stale row so normal closure verification still fails
+        # closed instead of silently dropping the source request.
+        from ashare_state.normalization.registry import MAPPER_CODE_FINGERPRINT
+
         rows = self.conn.execute(
-            "SELECT normalization_run_id, provider, normalization_surface, "
-            "provider_dataset, endpoint, raw_request_id, raw_evidence_uri, "
-            "raw_evidence_hash, normalization_contract_version, mapper_identity, "
-            "mapper_code_hash, normalized_manifest_uri, normalized_manifest_hash, "
-            "normalized_output_set_hash, normalized_semantic_hash, status "
-            "FROM meta_provider_normalization_run "
-            "WHERE provider = 'amazingdata' AND normalization_surface = ? "
-            "AND provider_dataset IN (" + ",".join("?" * len(provider_datasets)) + ") "
-            "AND status = 'SUCCESS' ORDER BY normalization_run_id",
-            [normalization_surface, *provider_datasets],
+            "SELECT source.normalization_run_id, source.provider, "
+            "source.normalization_surface, source.provider_dataset, source.endpoint, "
+            "source.raw_request_id, source.raw_evidence_uri, source.raw_evidence_hash, "
+            "source.normalization_contract_version, source.mapper_identity, "
+            "source.mapper_code_hash, source.normalized_manifest_uri, "
+            "source.normalized_manifest_hash, source.normalized_output_set_hash, "
+            "source.normalized_semantic_hash, source.status "
+            "FROM meta_provider_normalization_run AS source "
+            "WHERE source.provider = 'amazingdata' "
+            "AND source.normalization_surface = ? "
+            "AND source.provider_dataset IN (" + ",".join("?" * len(provider_datasets)) + ") "
+            "AND source.status = 'SUCCESS' "
+            "AND (source.mapper_code_hash = ? OR NOT EXISTS ("
+            "SELECT 1 FROM meta_provider_normalization_run AS replacement "
+            "WHERE replacement.provider = source.provider "
+            "AND replacement.normalization_surface = source.normalization_surface "
+            "AND replacement.provider_dataset = source.provider_dataset "
+            "AND replacement.raw_request_id = source.raw_request_id "
+            "AND replacement.status = 'SUCCESS' "
+            "AND replacement.mapper_code_hash = ?)) "
+            "ORDER BY source.normalization_run_id",
+            [
+                normalization_surface,
+                *provider_datasets,
+                MAPPER_CODE_FINGERPRINT,
+                MAPPER_CODE_FINGERPRINT,
+            ],
         ).fetchall()
         columns = (
             "normalization_run_id",
@@ -2073,8 +2237,8 @@ class CanonicalRunner:
     # --------------------------------------------------------- candidates
     def _build_candidates(
         self, domain: str, run_snapshot: SnapshotRun, bridge: IdentityBridge
-    ) -> list[dict[str, Any]]:
-        """Deterministic candidates from ONE materialized snapshot run:
+    ) -> Iterator[CanonicalCandidate]:
+        """Yield deterministic candidates from ONE materialized snapshot run:
         each row of the domain's output with its availability (the
         anchored received_at sealed on the snapshot), identity and
         lineage. Rows come from the EXACT verified bytes materialized
@@ -2085,10 +2249,8 @@ class CanonicalRunner:
         available_at = derive_available_at(domain, received_at)
         output = run_snapshot.output(spec.output_name)
         if output is None:
-            return []
-        candidates: list[dict[str, Any]] = []
-        for ordinal, row_items in enumerate(output.rows):
-            row = dict(row_items)
+            return
+        for ordinal, row in enumerate(output.iter_rows()):
             row_identity = hashlib.sha256(_canonical_json(row).encode("utf-8")).hexdigest()
             if domain == "trade_calendar":
                 # one CR-2 calendar row carries the whole market's days;
@@ -2097,22 +2259,19 @@ class CanonicalRunner:
                 for day in trading_days:
                     trade_date = _as_date(day)
                     key = (str(row.get("market")), trade_date.isoformat())
-                    candidates.append(
-                        self._candidate(
-                            domain,
-                            spec,
-                            seal,
-                            output,
-                            ordinal,
-                            row_identity,
-                            key,
-                            {"market": row.get("market")},
-                            trade_date,
-                            None,
-                            "RESOLVED_NOT_REQUIRED",
-                            received_at,
-                            available_at,
-                        )
+                    yield self._candidate(
+                        domain,
+                        spec,
+                        seal,
+                        ordinal,
+                        row_identity,
+                        key,
+                        {"market": row.get("market")},
+                        trade_date,
+                        None,
+                        "RESOLVED_NOT_REQUIRED",
+                        received_at,
+                        available_at,
                     )
                 continue
             trade_date = self._trade_date_of(domain, row)
@@ -2127,31 +2286,26 @@ class CanonicalRunner:
                     identity_status = "RESOLVED" if security_id else "MISSING"
             key = self._natural_key(domain, row, security_id, trade_date)
             payload = {field: row.get(field) for field in spec.payload_fields}
-            candidates.append(
-                self._candidate(
-                    domain,
-                    spec,
-                    seal,
-                    output,
-                    ordinal,
-                    row_identity,
-                    key,
-                    payload,
-                    trade_date,
-                    security_id,
-                    identity_status,
-                    received_at,
-                    available_at,
-                )
+            yield self._candidate(
+                domain,
+                spec,
+                seal,
+                ordinal,
+                row_identity,
+                key,
+                payload,
+                trade_date,
+                security_id,
+                identity_status,
+                received_at,
+                available_at,
             )
-        return candidates
 
     def _candidate(
         self,
         domain: str,
         spec: Any,
         seal: InputRunSeal,
-        output: MaterializedOutput,
         ordinal: int,
         row_identity: str,
         key: tuple[Any, ...],
@@ -2161,28 +2315,26 @@ class CanonicalRunner:
         identity_status: str,
         received_at: datetime,
         available_at: datetime,
-    ) -> dict[str, Any]:
-        return {
-            "domain": domain,
-            "key": key,
-            "key_json": _canonical_json(list(key)),
-            "identity_status": identity_status,
-            "security_id": security_id,
-            "trade_date": trade_date.isoformat(),
-            "payload": payload,
-            "provider": seal.provider,
-            "seal": seal,
-            "output_name": spec.output_name,
-            "output": output,
-            "ordinal": ordinal,
-            "row_identity": row_identity,
-            "available_at": available_at,
-            "received_at": received_at,
-            "run_manifest_hash": seal.normalized_manifest_hash,
-        }
+    ) -> CanonicalCandidate:
+        return CanonicalCandidate(
+            domain=domain,
+            key_json=_canonical_json(list(key)),
+            identity_status=identity_status,
+            security_id=security_id,
+            trade_date=trade_date.isoformat(),
+            payload=payload,
+            provider=seal.provider,
+            seal=seal,
+            output_name=spec.output_name,
+            ordinal=ordinal,
+            row_identity=row_identity,
+            available_at=available_at,
+            received_at=received_at,
+            run_manifest_hash=seal.normalized_manifest_hash,
+        )
 
     def _select(
-        self, domain: str, policy: Any, candidates: list[dict[str, Any]]
+        self, domain: str, policy: Any, candidates: list[CanonicalCandidate]
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[CanonicalFinding]]:
         """Deterministic source selection + EXACT reconciliation over
         the PIT-available candidates of ONE domain.
@@ -2194,27 +2346,28 @@ class CanonicalRunner:
         SOURCE_CONFLICT finding (EXACT tolerance - never
         last-write-wins). Duplicate keys within one run output are a
         blocking DUPLICATE_CANONICAL_KEY finding (never silent dedupe)."""
-        usable = [c for c in candidates if c["identity_status"] != "MISSING"]
-        by_key: dict[tuple, list[dict[str, Any]]] = {}
-        for candidate in usable:
-            by_key.setdefault(candidate["key"], []).append(candidate)
-
         selected: list[dict[str, Any]] = []
         decisions: list[dict[str, Any]] = []
         findings: list[CanonicalFinding] = []
         priority = {p: i for i, p in enumerate(policy.priority_providers)}
-
-        for key in sorted(by_key, key=_canonical_json):
-            group = sorted(
-                by_key[key],
-                key=lambda c: (
-                    priority.get(c["provider"], len(priority)),
-                    c["run_manifest_hash"],
-                    c["ordinal"],
-                ),
+        candidates.sort(
+            key=lambda candidate: (
+                candidate.key_json,
+                priority.get(candidate.provider, len(priority)),
+                candidate.run_manifest_hash,
+                candidate.ordinal,
             )
-            winner = group[0]
-            for other in group[1:]:
+        )
+
+        for key_json, candidate_group in groupby(candidates, key=lambda item: item.key_json):
+            group = iter(candidate_group)
+            winner = next(group)
+            decisions.append(
+                self._decision(domain, winner, "SELECTED", "deterministic policy winner")
+            )
+            selected.append(self._canonical_row(domain, winner))
+            seen_runs = {winner.seal.run_id}
+            for other in group:
                 if self._payload_equal(winner, other):
                     decisions.append(
                         self._decision(
@@ -2222,49 +2375,41 @@ class CanonicalRunner:
                             other,
                             "EQUIVALENT_MERGED",
                             "equal values (EXACT tolerance); deterministic winner "
-                            f"{winner['seal'].run_id[:12]}",
+                            f"{winner.seal.run_id[:12]}",
                         )
                     )
                 else:
                     findings.append(
                         _finding(
                             domain,
-                            winner["key_json"],
+                            key_json,
                             "SOURCE_CONFLICT",
-                            other["provider"],
-                            other["seal"].run_id,
+                            other.provider,
+                            other.seal.run_id,
                             {
-                                "winner_run": winner["seal"].run_id,
-                                "winner_values": winner["payload"],
-                                "conflicting_run": other["seal"].run_id,
-                                "conflicting_values": other["payload"],
+                                "winner_run": winner.seal.run_id,
+                                "winner_values": winner.payload,
+                                "conflicting_run": other.seal.run_id,
+                                "conflicting_values": other.payload,
                                 "tolerance": policy.tolerance_rule_id,
                             },
                             blocking=True,
                         )
                     )
-            decisions.append(
-                self._decision(domain, winner, "SELECTED", "deterministic policy winner")
-            )
-            selected.append(self._canonical_row(domain, winner))
-
-        seen: set[tuple[str, str]] = set()
-        for candidate in usable:
-            marker = (candidate["seal"].run_id, candidate["key_json"])
-            if marker in seen:
-                findings.append(
-                    _finding(
-                        domain,
-                        candidate["key_json"],
-                        "DUPLICATE_CANONICAL_KEY",
-                        candidate["provider"],
-                        candidate["seal"].run_id,
-                        {"output_name": candidate["output_name"]},
-                        blocking=True,
+                if other.seal.run_id in seen_runs:
+                    findings.append(
+                        _finding(
+                            domain,
+                            other.key_json,
+                            "DUPLICATE_CANONICAL_KEY",
+                            other.provider,
+                            other.seal.run_id,
+                            {"output_name": other.output_name},
+                            blocking=True,
+                        )
                     )
-                )
-            else:
-                seen.add(marker)
+                else:
+                    seen_runs.add(other.seal.run_id)
         return selected, decisions, findings
 
     # ------------------------------------------------------------ helpers
@@ -2300,31 +2445,31 @@ class CanonicalRunner:
         return (str(security_id), trade_date.isoformat())
 
     @staticmethod
-    def _payload_equal(a: dict[str, Any], b: dict[str, Any]) -> bool:
-        return _canonical_json(a["payload"]) == _canonical_json(b["payload"])
+    def _payload_equal(a: CanonicalCandidate, b: CanonicalCandidate) -> bool:
+        return _canonical_json(a.payload) == _canonical_json(b.payload)
 
-    def _canonical_row(self, domain: str, candidate: dict[str, Any]) -> dict[str, Any]:
+    def _canonical_row(self, domain: str, candidate: CanonicalCandidate) -> dict[str, Any]:
         spec = domain_spec(domain)
-        seal: InputRunSeal = candidate["seal"]
+        seal = candidate.seal
         row: dict[str, Any] = {
             "canonical_domain": domain,
-            "canonical_key": candidate["key_json"],
+            "canonical_key": candidate.key_json,
         }
         if spec.requires_security_identity:
-            row["security_id"] = candidate["security_id"]
-        row.update(candidate["payload"])
+            row["security_id"] = candidate.security_id
+        row.update(candidate.payload)
         row.update(
             {
-                "trade_date": candidate["trade_date"],
-                "available_at": candidate["available_at"].isoformat(),
-                "ingested_at": candidate["received_at"].isoformat(),
+                "trade_date": candidate.trade_date,
+                "available_at": candidate.available_at.isoformat(),
+                "ingested_at": candidate.received_at.isoformat(),
                 "availability_basis": "OBSERVED_AT_INGEST",
                 "availability_policy_version": _availability.availability_policy_version(),
-                "selected_provider": candidate["provider"],
+                "selected_provider": candidate.provider,
                 "source_normalization_run_id": seal.run_id,
-                "source_output_name": candidate["output_name"],
-                "source_row_ordinal": candidate["ordinal"],
-                "source_row_identity_hash": candidate["row_identity"],
+                "source_output_name": candidate.output_name,
+                "source_row_ordinal": candidate.ordinal,
+                "source_row_identity_hash": candidate.row_identity,
                 "source_raw_request_id": seal.raw_request_id,
                 "source_raw_evidence_hash": seal.raw_evidence_hash,
                 "source_mapper_identity": seal.mapper_identity,
@@ -2336,17 +2481,17 @@ class CanonicalRunner:
 
     @staticmethod
     def _decision(
-        domain: str, candidate: dict[str, Any], decision_class: str, reason: str
+        domain: str, candidate: CanonicalCandidate, decision_class: str, reason: str
     ) -> dict[str, Any]:
-        seal: InputRunSeal = candidate["seal"]
+        seal = candidate.seal
         return {
             "canonical_domain": domain,
-            "canonical_key": candidate["key_json"],
+            "canonical_key": candidate.key_json,
             "decision_class": decision_class,
-            "provider": candidate["provider"],
+            "provider": candidate.provider,
             "source_normalization_run_id": seal.run_id,
-            "source_row_ordinal": candidate["ordinal"],
-            "available_at": candidate["available_at"].isoformat(),
+            "source_row_ordinal": candidate.ordinal,
+            "available_at": candidate.available_at.isoformat(),
             "reason": reason,
         }
 
@@ -2612,17 +2757,19 @@ class CanonicalRunner:
         return problems
 
     def _verify_canonical_artifacts(
-        self, record: dict[str, Any], manifest: dict[str, Any]
+        self,
+        record: dict[str, Any],
+        manifest: dict[str, Any],
+        *,
+        selected_rows_out: list[dict[str, Any]] | None = None,
     ) -> list[str]:
-        """Compatibility wrapper for the frozen list-returning verifier."""
-        problems, _ = self._verify_canonical_artifacts_with_rows(record, manifest)
-        return problems
+        """Verify sealed artifacts without expanding full Parquet tables to dicts.
 
-    def _verify_canonical_artifacts_with_rows(
-        self, record: dict[str, Any], manifest: dict[str, Any]
-    ) -> tuple[list[str], dict[str, list[dict[str, Any]]]]:
-        """Verify canonical artifact closure and return rows parsed from the
-        exact bytes whose content hashes were verified."""
+        A caller that must return selected rows can pass ``selected_rows_out``;
+        those rows are taken from the same verified Polars frame, while the
+        Canonical build/verifier path leaves the parameter unset and remains
+        columnar.
+        """
         problems: list[str] = []
         if int(manifest.get("selected_count", -1)) != int(record["selected_count"]):
             problems.append("manifest selected_count does not match the ledger")
@@ -2634,7 +2781,8 @@ class CanonicalRunner:
                 f"manifest artifact set is not exactly {sorted(_ARTIFACT_NAMES)}: "
                 f"{sorted(artifacts)}"
             )
-        artifact_rows: dict[str, list[dict[str, Any]]] = {}
+        selected_frame: pl.DataFrame | None = None
+        partition_entries = manifest.get("daily_bar_partitions")
         for name in _ARTIFACT_NAMES:
             entry = artifacts.get(name)
             if entry is None:
@@ -2649,72 +2797,119 @@ class CanonicalRunner:
             if not path.is_file():
                 problems.append(f"canonical {name} artifact missing: {entry.get('uri')}")
                 continue
-            data = path.read_bytes()
-            if hashlib.sha256(data).hexdigest() != str(entry.get("content_hash")):
-                problems.append(f"canonical {name} artifact bytes tampered")
-                continue
-            frame = pl.read_parquet(io.BytesIO(data))
+            with tempfile.SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b") as exact_bytes:
+                digest = hashlib.sha256()
+                with path.open("rb") as source:
+                    while chunk := source.read(1024 * 1024):
+                        digest.update(chunk)
+                        exact_bytes.write(chunk)
+                if digest.hexdigest() != str(entry.get("content_hash")):
+                    problems.append(f"canonical {name} artifact bytes tampered")
+                    continue
+                exact_bytes.seek(0)
+                frame = pl.read_parquet(exact_bytes)
             if frame.height != int(entry.get("row_count", -1)):
                 problems.append(f"canonical {name} artifact row count mismatch")
             actual_schema_hash = hashlib.sha256(str(frame.schema).encode("utf-8")).hexdigest()
             if actual_schema_hash != str(entry.get("schema_hash")):
                 problems.append(f"canonical {name} artifact schema mismatch (rebind)")
-            artifact_rows[name] = frame.to_dicts()
+            if name == "selected":
+                if partition_entries:
+                    selected_frame = frame
+                else:
+                    recomputed = _rows_semantic_hash(frame.iter_rows(named=True))
+                    if recomputed != str(record["selected_semantic_hash"]) or recomputed != str(
+                        manifest.get("selected_semantic_hash")
+                    ):
+                        problems.append("selected semantic seal mismatch (values changed)")
+                    if selected_rows_out is not None:
+                        selected_rows_out.extend(frame.iter_rows(named=True))
+            elif name == "decisions":
+                recomputed = _rows_semantic_hash(frame.iter_rows(named=True))
+                if recomputed != str(record["decision_set_hash"]) or recomputed != str(
+                    manifest.get("decision_set_hash")
+                ):
+                    problems.append("decision semantic seal mismatch (values changed)")
 
-        partition_entries = manifest.get("daily_bar_partitions")
-        if partition_entries is not None:
-            if not isinstance(partition_entries, list):
-                problems.append("daily_bar_partitions is not a list")
-            else:
-                try:
-                    daily_rows = list(
-                        deep_verify_daily_bar_partitions(
-                            self.normalized_root,
-                            partition_entries,
-                        )
+        if partition_entries is not None and not isinstance(partition_entries, list):
+            problems.append("daily_bar_partitions is not a list")
+        elif partition_entries:
+            try:
+                daily_rows = list(
+                    deep_verify_daily_bar_partitions(
+                        self.normalized_root,
+                        partition_entries,
                     )
-                    if "selected" in artifact_rows:
-                        selected_fields = manifest.get("selected_schema_fields", [])
-                        if not isinstance(selected_fields, list) or any(
-                            not isinstance(field, str) for field in selected_fields
-                        ):
-                            problems.append("selected_schema_fields is invalid")
-                            selected_fields = []
-                        for selected_row in artifact_rows["selected"]:
-                            for field in selected_fields:
-                                selected_row.setdefault(field, None)
-                        for daily_row in daily_rows:
-                            for field in selected_fields:
-                                daily_row.setdefault(field, None)
-                        artifact_rows["selected"].extend(daily_rows)
-                        partition_count = sum(
-                            int(entry.get("row_count", -1)) for entry in partition_entries
+                )
+                if selected_frame is not None:
+                    selected_fields = manifest.get("selected_schema_fields", [])
+                    if not isinstance(selected_fields, list) or any(
+                        not isinstance(field, str) for field in selected_fields
+                    ):
+                        problems.append("selected_schema_fields is invalid")
+                        selected_fields = selected_frame.columns
+                    if not daily_rows:
+                        selected_all = selected_frame
+                    else:
+                        daily_frame = pl.DataFrame(daily_rows)
+                        selected_schema = selected_frame.schema
+                        for field_name in selected_fields:
+                            if field_name not in selected_frame.columns:
+                                selected_frame = selected_frame.with_columns(
+                                    pl.lit(None).alias(field_name)
+                                )
+                            if field_name not in daily_frame.columns:
+                                daily_frame = daily_frame.with_columns(
+                                    pl.lit(None, dtype=selected_schema.get(field_name)).alias(
+                                        field_name
+                                    )
+                                )
+                        selected_all = pl.concat(
+                            [
+                                selected_frame.select(selected_fields),
+                                daily_frame.select(selected_fields),
+                            ],
+                            how="vertical_relaxed",
                         )
-                        if len(artifact_rows["selected"]) != int(record["selected_count"]):
-                            problems.append(
-                                "selected artifact plus daily partitions do not match "
-                                "selected_count"
-                            )
-                        if partition_count != len(daily_rows):
-                            problems.append(
-                                "daily-bar partition row counts do not match their artifacts"
-                            )
-                except (DailyBarPartitionError, OSError, ValueError, TypeError, KeyError) as exc:
-                    problems.append(f"daily-bar partition closure failed: {exc}")
+                    partition_count = sum(
+                        int(entry.get("row_count", -1)) for entry in partition_entries
+                    )
+                    if selected_all.height != int(record["selected_count"]):
+                        problems.append(
+                            "selected artifact plus daily partitions do not match selected_count"
+                        )
+                    if partition_count != len(daily_rows):
+                        problems.append(
+                            "daily-bar partition row counts do not match their artifacts"
+                        )
+                    recomputed = _rows_semantic_hash(selected_all.iter_rows(named=True))
+                    if recomputed != str(record["selected_semantic_hash"]) or recomputed != str(
+                        manifest.get("selected_semantic_hash")
+                    ):
+                        problems.append("selected semantic seal mismatch (values changed)")
+                    if selected_rows_out is not None:
+                        selected_rows_out.extend(selected_all.iter_rows(named=True))
+            except (DailyBarPartitionError, OSError, ValueError, TypeError, KeyError) as exc:
+                problems.append(f"daily-bar partition closure failed: {exc}")
+        return problems
 
-        if "selected" in artifact_rows:
-            recomputed = _rows_semantic_hash(artifact_rows["selected"])
-            if recomputed != str(record["selected_semantic_hash"]) or recomputed != str(
-                manifest.get("selected_semantic_hash")
-            ):
-                problems.append("selected semantic seal mismatch (values changed)")
-        if "decisions" in artifact_rows:
-            recomputed = _rows_semantic_hash(artifact_rows["decisions"])
-            if recomputed != str(record["decision_set_hash"]) or recomputed != str(
-                manifest.get("decision_set_hash")
-            ):
-                problems.append("decision semantic seal mismatch (values changed)")
-        return problems, artifact_rows
+    def _verify_canonical_artifacts_with_rows(
+        self, record: dict[str, Any], manifest: dict[str, Any]
+    ) -> tuple[list[str], dict[str, list[dict[str, Any]]]]:
+        """Verify artifacts and return selected rows for the consumption API.
+
+        The public consumption result is explicitly row-oriented, so that
+        boundary materializes the selected rows. The normal Canonical
+        verification path calls ``_verify_canonical_artifacts`` without a
+        row collector and does not create this Python copy.
+        """
+        selected_rows: list[dict[str, Any]] = []
+        problems = self._verify_canonical_artifacts(
+            record,
+            manifest,
+            selected_rows_out=selected_rows,
+        )
+        return problems, {"selected": selected_rows}
 
     def _verify_sealed_input(self, entry: dict[str, Any], as_of_dt: datetime) -> list[str]:
         """Seal-based verification of ONE sealed input run (CR-3.2 P0-04
@@ -2834,8 +3029,8 @@ class CanonicalRunner:
         run_id: str,
         snapshot: CanonicalInputSnapshot,
         idempotency_key: str,
-        selected_rows: list[dict[str, Any]],
-        decisions: list[dict[str, Any]],
+        selected_rows: pl.DataFrame,
+        decisions: pl.DataFrame,
         findings: list[CanonicalFinding],
         status: str,
     ) -> tuple[str | None, str | None, str, str, str]:
@@ -2858,24 +3053,29 @@ class CanonicalRunner:
             )
             finding_dict["canonical_run_id"] = run_id
         finding_seal = _finding_set_hash(finding_dicts)
-        # CR-4 implementation finding (CR-3 latent defect, declared for
-        # Reviewer adjudication in the CR-4 batch): the semantic seals
-        # are computed over the SCHEMA-ALIGNED rows - the exact rows
-        # written to the parquet artifacts - so the replay verifier's
-        # recompute from the parquet can never diverge on multi-domain
-        # runs (single-domain behavior is byte-identical: aligning rows
-        # whose key sets already agree is a no-op).
-        aligned_selected = _align_schema(selected_rows)
-        aligned_decisions = _align_schema(decisions)
-        selected_semantic = _rows_semantic_hash(aligned_selected)
-        decision_set = _rows_semantic_hash(aligned_decisions)
+        # The per-domain selections are already union-aligned as columnar
+        # Polars frames. Hash their rows through bounded external sorting;
+        # never build another full-history Python list for schema alignment
+        # or semantic ordering.
+        selected_semantic = _rows_semantic_hash(selected_rows.iter_rows(named=True))
+        decision_set = _rows_semantic_hash(decisions.iter_rows(named=True))
 
         # Daily market facts have one durable physical home: monthly L0
         # partitions under canonical/security_bar_1d.  The run-level
         # selected artifact remains the audit projection for other domains;
         # daily rows are represented by exact partition references instead
         # of being persisted a second time in selected.parquet.
-        daily_rows = [row for row in selected_rows if row.get("canonical_domain") == "daily_bar"]
+        selected_domains = (
+            set(selected_rows.get_column("canonical_domain").unique().to_list())
+            if "canonical_domain" in selected_rows.columns
+            else set()
+        )
+        has_daily_rows = "daily_bar" in selected_domains
+        daily_rows = (
+            selected_rows.filter(pl.col("canonical_domain") == "daily_bar").to_dicts()
+            if has_daily_rows
+            else []
+        )
         # The partition writer consumes one month at a time. Canonical UUID
         # hex ordering is byte ordering for fixed16 physical identities.
         daily_rows.sort(
@@ -2893,27 +3093,29 @@ class CanonicalRunner:
             if source_run_id:
                 month = daily_month_by_key[str(row["canonical_key"])]
                 daily_source_runs_by_month.setdefault(month, set()).add(str(source_run_id))
-        for decision in decisions:
-            if (
-                decision.get("canonical_domain") != "daily_bar"
-                or decision.get("decision_class") == "EXCLUDED_FUTURE"
-            ):
-                continue
-            decision_month = daily_month_by_key.get(str(decision.get("canonical_key", "")))
-            decision_source_run_id = decision.get("source_normalization_run_id")
-            if decision_month is not None and decision_source_run_id:
-                daily_source_runs_by_month.setdefault(decision_month, set()).add(
-                    str(decision_source_run_id)
-                )
+        if has_daily_rows:
+            for decision in decisions.iter_rows(named=True):
+                if (
+                    decision.get("canonical_domain") != "daily_bar"
+                    or decision.get("decision_class") == "EXCLUDED_FUTURE"
+                ):
+                    continue
+                decision_month = daily_month_by_key.get(str(decision.get("canonical_key", "")))
+                decision_source_run_id = decision.get("source_normalization_run_id")
+                if decision_month is not None and decision_source_run_id:
+                    daily_source_runs_by_month.setdefault(decision_month, set()).add(
+                        str(decision_source_run_id)
+                    )
         daily_source_run_ids = (
             set().union(*daily_source_runs_by_month.values())
             if (daily_source_runs_by_month)
             else set()
         )
-        selected_file_rows = [
-            row for row in selected_rows if row.get("canonical_domain") != "daily_bar"
-        ]
-        selected_file_rows = _align_schema(selected_file_rows)
+        selected_file_rows = (
+            selected_rows.filter(pl.col("canonical_domain") != "daily_bar")
+            if has_daily_rows
+            else selected_rows
+        )
         # The bar-value vintage is anchored only to its exact retained
         # daily_bar receipts. Identity/version evidence remains independently
         # sealed by the Canonical manifest and identity-dataset hashes.
@@ -2966,24 +3168,25 @@ class CanonicalRunner:
         import io
 
         artifacts: dict[str, dict[str, Any]] = {}
-        parquet_rows = {
+        artifact_frames = {
             "selected": selected_file_rows,
-            "decisions": aligned_decisions,
+            "decisions": decisions,
             # findings parquet: deterministic fields ONLY (no created_at)
-            "findings": _align_schema(
-                [
-                    {
-                        "finding_id": f_dict["finding_id"],
-                        "canonical_run_id": f_dict["canonical_run_id"],
-                        **{field: f_dict.get(field) for field in _FINDING_SEMANTIC_FIELDS},
-                    }
-                    for f_dict in finding_dicts
-                ]
+            "findings": pl.DataFrame(
+                _align_schema(
+                    [
+                        {
+                            "finding_id": f_dict["finding_id"],
+                            "canonical_run_id": f_dict["canonical_run_id"],
+                            **{field: f_dict.get(field) for field in _FINDING_SEMANTIC_FIELDS},
+                        }
+                        for f_dict in finding_dicts
+                    ]
+                )
             ),
         }
         for name in _ARTIFACT_NAMES:
-            rows = parquet_rows[name]
-            frame = pl.DataFrame(rows)
+            frame = artifact_frames[name]
             if frame.height > 0:
                 frame = frame.sort(frame.columns)
             uri = f"{base_uri}/{name}.parquet"
@@ -3028,7 +3231,7 @@ class CanonicalRunner:
             "code_fingerprint": snapshot.code_fingerprint,
             "artifacts": artifacts,
             "daily_bar_partitions": list(daily_bar_partitions),
-            "selected_schema_fields": list(aligned_selected[0]) if aligned_selected else [],
+            "selected_schema_fields": selected_rows.columns,
             "selected_semantic_hash": selected_semantic,
             "decision_set_hash": decision_set,
             "finding_set_hash": finding_seal,

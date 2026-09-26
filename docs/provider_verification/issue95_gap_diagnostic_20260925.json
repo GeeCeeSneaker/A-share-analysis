@@ -1,0 +1,223 @@
+{
+  "schema": "issue95_gap_diagnostic.v3",
+  "as_of_date": "2026-09-26",
+  "issue": 95,
+  "pull_request": 96,
+  "task_status": "ACTIVE_BLOCKED_BEFORE_PASS_REVIEW",
+  "execution": {
+    "run_label": "run_20260925T065004Z_66850919",
+    "run_id": "641bd874-e736-4255-a3bf-c530cb5664f6",
+    "last_manifest_status": "RUNNING",
+    "last_manifest_sha256": "680ad8286cca4529411f5498873d78d0bc102157c147c326f2dd778e1e04adf7",
+    "provider_call_count": 3593,
+    "provider_calls_during_canonical_attempts": 0,
+    "scope": {
+      "from_month": "2020-01",
+      "through_month": "2026-06",
+      "month_count": 78,
+      "domains": [
+        "security_status",
+        "limit_price"
+      ]
+    },
+    "month_coverage": {
+      "COMPLETE": 16,
+      "PARTIAL_UPSTREAM_COVERAGE": 62
+    },
+    "per_domain": {
+      "expected_pairs": 7461248,
+      "returned_pairs": 7459685,
+      "missing_pairs": 1563,
+      "structural_errors": 0,
+      "duplicate_pairs": 0,
+      "unexplained_extra_pairs": 0
+    },
+    "normalization": {
+      "monthly_run_count": 1927,
+      "current_mapper_replay_verified": true,
+      "fast_path_reused_month_count": 68,
+      "fast_path_reconstructed_month_count": 10,
+      "provider_calls_during_replay": 0
+    },
+    "coverage_receipts": {
+      "record_count": 78,
+      "sha256": "962554a3df0f63d9f23f8d5b45b525f4e3beb6bb4ac861740788fa053a871d46",
+      "manifest_hash_match": true,
+      "missing_key_set_hash_mismatches": 0,
+      "missing_key_set_count_mismatches": 0,
+      "duplicate_missing_keys": 0,
+      "expected_returned_missing_equation_mismatches": 0,
+      "exact_key_files_committed_to_git": false
+    },
+    "report": {
+      "present": true,
+      "describes_current_attempt": false,
+      "status": "STOP_BLOCKED",
+      "reason": "report.json belongs to the earlier blocked Canonical run; no terminal report was written after attempt 3 was externally stopped",
+      "report_sha256_matches_manifest_pointer": true
+    }
+  },
+  "canonical": {
+    "status": "BLOCKED_MEMORY_GUARD_AFTER_ONE_REMEDIATED_RETRY",
+    "attempts": [
+      {
+        "attempt": 2,
+        "code_state": "before_narrow_memory_remediation",
+        "provider_calls": 0,
+        "result": "STOPPED_AT_16_GIB_GUARD",
+        "last_progress_checkpoint": null,
+        "first_observed_above_guard_mib": 17543.2,
+        "guard_mib": 16384,
+        "exact_peak_known": false,
+        "new_success_artifacts": false,
+        "manifest_sha256_after_attempt": "616ED99C27EF17AA5F28682142E3161C8C87722AC378C27CFA86679EB2A67EC6"
+      },
+      {
+        "attempt": 3,
+        "code_state": "after_narrow_memory_remediation",
+        "provider_calls": 0,
+        "result": "STOPPED_AT_16_GIB_GUARD",
+        "checkpoints": [
+          {
+            "name": "BEFORE_CANONICAL",
+            "rss_mib": 105.0
+          },
+          {
+            "name": "SNAPSHOT_INPUT_MATERIALIZATION",
+            "rss_mib": 446.2
+          }
+        ],
+        "last_observed_below_guard_mib": 15370.5,
+        "first_observed_above_guard_mib": 16392.7,
+        "guard_mib": 16384,
+        "exact_peak_known": false,
+        "domain_selection_completed": false,
+        "artifact_write_reached": false,
+        "verifier_reached": false,
+        "exact_replay": "NOT_RUN",
+        "new_ledger_row": false,
+        "new_success_artifacts": false,
+        "manifest_sha256_after_attempt": "680ad8286cca4529411f5498873d78d0bc102157c147c326f2dd778e1e04adf7"
+      }
+    ],
+    "ledger": {
+      "record_count": 1,
+      "successful_record_count": 0,
+      "prior_blocked_record": {
+        "canonical_run_id": "c5b93927-405b-5a18-b5f3-d70968e940b1",
+        "status": "BLOCKED",
+        "selected_count": 0,
+        "decision_count": 0,
+        "finding_count": 3560
+      },
+      "prior_blocked_artifact_set_exists": true,
+      "successful_selected_artifact_exists": false
+    },
+    "exact_replay": "NOT_RUN"
+  },
+  "memory_remediation": {
+    "persistent_canonical_contract_changed": false,
+    "changes": [
+      "Replace full-history frozen Python row tuples with exact hash-verified Parquet bytes in a disk-spilling snapshot buffer",
+      "Use slotted candidates, a generator, in-place ordering/grouping, and prompt per-domain conversion to Polars frames",
+      "Avoid duplicate Python schema-alignment and selected-file row copies",
+      "Use bounded external sorting for semantic hashes and avoid selected/decision to_dicts verification copies"
+    ],
+    "measured_effect": "Snapshot/input materialization reached its checkpoint at 446.2 MiB, but RSS later crossed the hard guard during domain selection",
+    "allocation_source_profiled": false,
+    "further_canonical_attempt_without_new_decision": false,
+    "required_followup": "Project-manager decision: approve an additional bounded selection-memory design or provide a larger execution resource envelope; do not reacquire the retained 78-month Provider evidence"
+  },
+  "historical_gap_diagnostic": {
+    "classification": "reproducible upstream coverage/applicability limitation; no safe denominator exclusion established",
+    "zero_upstream_missing_pairs_required_for_pass": false,
+    "blocked_months": 62,
+    "unresolved_pairs_per_domain": 1563,
+    "exact_session_universe": {
+      "member": 1238,
+      "absent": 325
+    },
+    "exchange": {
+      "SZ": 1470,
+      "SH": 93
+    },
+    "sessions_since_listing": {
+      "over_250": 1563
+    },
+    "sessions_to_delisting": {
+      "within_20": 0,
+      "over_20": 249,
+      "no_known_delisting_date": 1314
+    },
+    "targeted_probes": {
+      "single_symbol_same_day_status": {
+        "calls": 7,
+        "successful_zero_row_responses": 7,
+        "adjacent_day_controls_with_rows": 3
+      },
+      "daily_bar": {
+        "missing_pair_dates_checked": 5,
+        "exact_same_day_bars": 2,
+        "no_bar_returned": 3,
+        "adjacent_controls_checked": 2,
+        "adjacent_controls_with_exact_bar": 1
+      }
+    }
+  },
+  "security": {
+    "earlier_sdk_session_field_visible_before_quarantine": true,
+    "sensitive_value_reproduced_or_committed": false,
+    "process_level_stdout_stderr_quarantine": "implemented_and_subprocess_regression_tested",
+    "rotation_recommended_after_task": true
+  },
+  "quality": {
+    "python": "3.14.7",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "compileall": "PASS",
+    "git_diff_check": "PASS",
+    "focused_tests": {
+      "count": 304,
+      "status": "PASS",
+      "scope": [
+        "tests/integration/test_canonical.py",
+        "tests/integration/test_snapshot.py",
+        "tests/integration/test_readmodel.py",
+        "tests/unit/test_issue95_status_rows.py",
+        "tests/unit/test_issue95_output_quarantine.py"
+      ]
+    },
+    "full_repository_tests_for_current_delta": "NOT_RUN",
+    "prior_exact_head_github_ci": {
+      "status": "PASS",
+      "run_number": 804,
+      "head_sha": "047dea9d7538e2d12a3f78dce2e0c2d47335d914",
+      "matrix": [
+        "ubuntu-latest / Python 3.14",
+        "windows-latest / Python 3.14"
+      ]
+    },
+    "failed_ci_after_memory_remediation": {
+      "status": "FAIL",
+      "run_number": 807,
+      "head_sha": "2576506fe98ce2423a89ecc600fff0a581a84943",
+      "failed_step": "mypy",
+      "error_classes": [
+        "SpooledTemporaryFile optional ownership typing",
+        "CanonicalConsumption verifier expected _verify_canonical_artifacts_with_rows"
+      ],
+      "pytest": "SKIPPED"
+    },
+    "followup_local_validation": {
+      "mypy": "PASS (112 source files)",
+      "focused_tests": "PASS (304 collected and run)"
+    },
+    "current_delta_exact_head_ci": "PENDING_AFTER_PUSH"
+  },
+  "data_handling": {
+    "raw_provider_payloads_in_git": false,
+    "ticker_level_facts_in_git": false,
+    "credentials_tokens_or_server_addresses_in_git": false,
+    "missing_key_sets_in_git": false
+  }
+}

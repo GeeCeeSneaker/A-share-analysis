@@ -1703,6 +1703,88 @@ class TestProviderFaithfulOutput:
         assert limit["up_limit"][0] == 11.0
         assert limit["down_limit"][0] == 9.0
 
+    def test_status_keyed_dataframe_map_requires_and_preserves_row_identity(self, conn, env_root):
+        import polars as pl
+
+        payload = {
+            "600000.SH": pl.DataFrame(
+                [
+                    {
+                        "SECURITY_CODE": "600000",
+                        "MARKET_CODE": "1",
+                        "TRADE_DATE": 20200102,
+                        "PRECLOSE": 10.0,
+                        "HIGH_LIMITED": 11.0,
+                        "LOW_LIMITED": 9.0,
+                        "IS_ST_SEC": 0,
+                        "IS_SUSP_SEC": 0,
+                    }
+                ]
+            )
+        }
+        _persist_raw(
+            env_root,
+            dataset="history_stock_status",
+            endpoint="InfoData.get_history_stock_status",
+            request_id="req-status-keyed",
+            payload=payload,
+            params={
+                "begin_date": 20200101,
+                "end_date": 20200131,
+                "code_list": ["600000.SH"],
+                "is_local": False,
+            },
+            surface="security_status_history",
+            conn=conn,
+        )
+
+        result = _runner(conn, env_root).run(
+            provider_dataset="history_stock_status",
+            request_id="req-status-keyed",
+        )
+
+        assert result.status == "SUCCESS"
+        status = _read_output(
+            env_root,
+            "history_stock_status",
+            "req-status-keyed",
+            "security_status",
+        )
+        limit = _read_output(env_root, "history_stock_status", "req-status-keyed", "limit_price")
+        assert status.height == limit.height == 1
+        assert status["security_code"][0] == "600000"
+        assert status["market_code"][0] == "1"
+        assert limit["provider_symbol"][0] == "600000.SH"
+        assert str(status["trade_date"][0]) == str(limit["trade_date"][0]) == "2020-01-02"
+
+    def test_status_keyed_dataframe_map_rejects_key_only_identity(self, conn, env_root):
+        import polars as pl
+
+        payload = {"600000.SH": pl.DataFrame([{"TRADE_DATE": 20200102, "IS_ST_SEC": 0}])}
+        _persist_raw(
+            env_root,
+            dataset="history_stock_status",
+            endpoint="InfoData.get_history_stock_status",
+            request_id="req-status-key-only",
+            payload=payload,
+            params={
+                "begin_date": 20200101,
+                "end_date": 20200131,
+                "code_list": ["600000.SH"],
+                "is_local": False,
+            },
+            surface="security_status_history",
+            conn=conn,
+        )
+
+        result = _runner(conn, env_root).run(
+            provider_dataset="history_stock_status",
+            request_id="req-status-key-only",
+        )
+
+        assert result.status == "BLOCKED"
+        assert result.error_class == "MAPPING_VALIDATION_FAILED"
+
 
 @pytest.mark.integration
 class TestStatusMachine:

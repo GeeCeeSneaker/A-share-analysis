@@ -73,7 +73,10 @@ from ashare_state.normalization.registry import (
     mapper_identity_for,
     specs_for,
 )
-from ashare_state.providers.amazingdata.mapper import validate_provider_symbol
+from ashare_state.providers.amazingdata.mapper import (
+    normalize_status_payload,
+    validate_provider_symbol,
+)
 from ashare_state.providers.errors import MappingValidationError
 from ashare_state.storage.paths import physical_from_logical_uri, validate_logical_uri
 from ashare_state.storage.raw_anchor import lookup_raw_evidence_anchor
@@ -113,6 +116,12 @@ _DAILY_BAR_MEMBER_MAP = (
     "daily_bar",
 )
 _DAILY_BAR_MEMBER_KEY_FIELD = "__provider_member_key__"
+_STATUS_MEMBER_MAP = (
+    "amazingdata",
+    "history_stock_status",
+    "InfoData.get_history_stock_status",
+    "security_status_history",
+)
 
 #: semantic fields of a quarantine record entering the exact-set seal
 _QTZ_SEMANTIC_FIELDS = (
@@ -787,7 +796,37 @@ class NormalizationRunner:
         # ------------------------------------------ frame / table routing
         raw_table_name: str | None = None
         row_locators: list[tuple[str | None, int]] = []
-        if isinstance(payload, dict) and self._is_daily_bar_member_map(
+        if (provider, provider_dataset, endpoint, surface) == _STATUS_MEMBER_MAP and isinstance(
+            payload, dict
+        ):
+            try:
+                row_list, row_locators = self._status_rows_for_normalization(
+                    payload,
+                    request_params=meta_doc.get("request_params"),
+                )
+            except (MappingValidationError, TypeError, ValueError) as exc:
+                return self._blocked_run(
+                    provider=provider,
+                    provider_dataset=provider_dataset,
+                    request_id=request_id,
+                    raw_evidence_uri=raw_evidence_uri,
+                    raw_evidence_hash=raw_evidence_hash,
+                    raw_payload_kind=payload_kind,
+                    endpoint=endpoint,
+                    surface=surface or None,
+                    error_class=NormalizationErrorClass.MAPPING_VALIDATION_FAILED,
+                    error_message=f"status row identity/date validation failed: {exc}",
+                    started=started,
+                    input_count=0,
+                    normalized_count=0,
+                    quarantined_count=0,
+                    manifest_uri=None,
+                    manifest_hash=None,
+                    quarantines=[],
+                    spec=spec,
+                    idempotency_key=idempotency_key,
+                )
+        elif isinstance(payload, dict) and self._is_daily_bar_member_map(
             provider=provider,
             provider_dataset=provider_dataset,
             endpoint=endpoint,
@@ -1250,6 +1289,17 @@ class NormalizationRunner:
             endpoint,
             surface,
         ) == _DAILY_BAR_MEMBER_MAP and payload_kind in (KIND_MULTI_FRAMES, KIND_PACKED_MULTI)
+
+    @staticmethod
+    def _status_rows_for_normalization(
+        payload: Any, *, request_params: Any
+    ) -> tuple[list[dict[str, Any]], list[tuple[str | None, int]]]:
+        """Delegate status table normalization to the production mapper."""
+        rows, locators, _empty_members = normalize_status_payload(
+            payload,
+            request_params=request_params,
+        )
+        return rows, locators
 
     def _route(
         self, provider: str, provider_dataset: str, endpoint: str, surface: str
