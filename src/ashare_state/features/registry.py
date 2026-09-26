@@ -1,6 +1,6 @@
 """Static CR-5 Feature Registry.
 
-The registry is the only source of V1 feature names, formulas, windows,
+The registry is the only source of current feature names, formulas, windows,
 missingness rules, and availability rules. Callers cannot inject any of
 those parameters.
 """
@@ -29,9 +29,9 @@ __all__ = [
 
 
 FEATURE_SET_ID = "market-state-base-v1"
-FEATURE_SET_VERSION = "1"
-FEATURE_REGISTRY_VERSION = "feature-registry-v1"
-PRICE_BASIS = "UNADJUSTED_CANONICAL"
+FEATURE_SET_VERSION = "2"
+FEATURE_REGISTRY_VERSION = "feature-registry-v2"
+PRICE_BASIS = "CANONICAL_PIT_REFERENCE_RETURN_CHAIN"
 WINDOW_BASIS = "OBSERVED_SECURITY_BARS"
 UNIVERSE_RULE_ID = "OBSERVED_DAILY_BAR_UNIVERSE"
 
@@ -63,9 +63,9 @@ BLOCKED_FEATURE_SEMANTICS: tuple[BlockedFeatureSemantic, ...] = (
     BlockedFeatureSemantic("ADJUSTED_RETURN", "PRICE_BASIS", "adjusted return"),
     BlockedFeatureSemantic("TOTAL_RETURN", "PRICE_BASIS", "total return"),
     BlockedFeatureSemantic(
-        "CORPORATE_ACTION_NEUTRALIZED_RETURN",
+        "ADJ_FACTOR_OR_EVENT_RECONSTRUCTED_RETURN",
         "PRICE_BASIS",
-        "corporate-action neutralized return",
+        "return reconstructed from external adjustment-factor or corporate-action event data",
     ),
     BlockedFeatureSemantic(
         "STRICT_MARKET_SESSION_WINDOW",
@@ -220,68 +220,68 @@ _FEATURES: tuple[FeatureSpec, ...] = (
     ),
     _spec(
         "ma_close_obs_5",
-        ("close",),
+        ("close", "pre_close"),
         window_length=5,
-        rule="MEAN_ORDERED_OBSERVED_CLOSE",
+        rule="MEAN_ORDERED_PIT_LINKED_CLOSE_OBSERVED",
         window_basis=WINDOW_BASIS,
         denominator="EXACT_N_OBSERVED_BARS",
     ),
     _spec(
         "ma_close_obs_20",
-        ("close",),
+        ("close", "pre_close"),
         window_length=20,
-        rule="MEAN_ORDERED_OBSERVED_CLOSE",
+        rule="MEAN_ORDERED_PIT_LINKED_CLOSE_OBSERVED",
         window_basis=WINDOW_BASIS,
         denominator="EXACT_N_OBSERVED_BARS",
     ),
     _spec(
         "ma_close_obs_60",
-        ("close",),
+        ("close", "pre_close"),
         window_length=60,
-        rule="MEAN_ORDERED_OBSERVED_CLOSE",
+        rule="MEAN_ORDERED_PIT_LINKED_CLOSE_OBSERVED",
         window_basis=WINDOW_BASIS,
         denominator="EXACT_N_OBSERVED_BARS",
     ),
     _spec(
         "close_to_ma_obs_5",
-        ("close", "ma_close_obs_5"),
+        ("close", "pre_close", "ma_close_obs_5"),
         window_length=5,
-        rule="CLOSE_TO_MEAN",
+        rule="LINKED_CLOSE_TO_MEAN",
         window_basis=WINDOW_BASIS,
     ),
     _spec(
         "close_to_ma_obs_20",
-        ("close", "ma_close_obs_20"),
+        ("close", "pre_close", "ma_close_obs_20"),
         window_length=20,
-        rule="CLOSE_TO_MEAN",
+        rule="LINKED_CLOSE_TO_MEAN",
         window_basis=WINDOW_BASIS,
     ),
     _spec(
         "close_to_ma_obs_60",
-        ("close", "ma_close_obs_60"),
+        ("close", "pre_close", "ma_close_obs_60"),
         window_length=60,
-        rule="CLOSE_TO_MEAN",
+        rule="LINKED_CLOSE_TO_MEAN",
         window_basis=WINDOW_BASIS,
     ),
     _spec(
         "return_lag_obs_5",
-        ("close",),
+        ("close", "pre_close"),
         lag=5,
-        rule="RETURN_FROM_N_PRIOR_OBSERVED_CLOSE",
+        rule="PRODUCT_REFERENCE_RETURN_FROM_N_PRIOR_OBSERVED_BARS",
         window_basis=WINDOW_BASIS,
     ),
     _spec(
         "return_lag_obs_20",
-        ("close",),
+        ("close", "pre_close"),
         lag=20,
-        rule="RETURN_FROM_N_PRIOR_OBSERVED_CLOSE",
+        rule="PRODUCT_REFERENCE_RETURN_FROM_N_PRIOR_OBSERVED_BARS",
         window_basis=WINDOW_BASIS,
     ),
     _spec(
         "return_lag_obs_60",
-        ("close",),
+        ("close", "pre_close"),
         lag=60,
-        rule="RETURN_FROM_N_PRIOR_OBSERVED_CLOSE",
+        rule="PRODUCT_REFERENCE_RETURN_FROM_N_PRIOR_OBSERVED_BARS",
         window_basis=WINDOW_BASIS,
     ),
     _spec(
@@ -442,9 +442,9 @@ _FORMULA_HANDLER_BY_RULE: dict[str, ExecutionHandler] = {
     "GAP_OPEN_RAW": "gap_open_raw",
     "INTRADAY_RETURN_RAW": "intraday_return_raw",
     "AMPLITUDE_PRECLOSE_RAW": "amplitude_preclose_raw",
-    "MEAN_ORDERED_OBSERVED_CLOSE": "observed_close_mean",
-    "CLOSE_TO_MEAN": "close_to_mean",
-    "RETURN_FROM_N_PRIOR_OBSERVED_CLOSE": "lag_return",
+    "MEAN_ORDERED_PIT_LINKED_CLOSE_OBSERVED": "observed_close_mean",
+    "LINKED_CLOSE_TO_MEAN": "close_to_mean",
+    "PRODUCT_REFERENCE_RETURN_FROM_N_PRIOR_OBSERVED_BARS": "lag_return",
     "CURRENT_AMOUNT_OVER_LAST_20_VALID_AMOUNT_MEAN": "amount_to_mean",
     "POPULATION_STDDEV_LAST_20_VALID_RAW_RETURN": "volatility",
     "COUNT_OBSERVED_DAILY_BAR_UNIVERSE": "observed_security_count",
@@ -473,7 +473,7 @@ class FeatureExecutionSpec:
 
 @dataclass(frozen=True)
 class FeatureExecutionPlan:
-    """Compiled V1 plan; runtime cannot execute an unplanned declaration."""
+    """Compiled feature plan; runtime cannot execute an unplanned declaration."""
 
     feature_set: FeatureSet
     security: tuple[FeatureExecutionSpec, ...]
@@ -483,14 +483,12 @@ class FeatureExecutionPlan:
     def manifest_window_basis(self) -> str:
         bases = {entry.spec.window_basis for entry in self.security if entry.spec.window_basis}
         if len(bases) != 1:
-            raise FeatureRegistryError(
-                "V1 feature execution plan must have exactly one window_basis"
-            )
+            raise FeatureRegistryError("feature execution plan must have exactly one window_basis")
         return next(iter(bases))
 
     @property
     def max_security_lineage_members(self) -> int:
-        """Return the Registry-derived V1 upper bound for one security row.
+        """Return the Registry-derived upper bound for one security row.
 
         The bound is deliberately conservative: one current observation,
         the largest fixed observed-bar/lag dependency, and all selected
@@ -540,7 +538,7 @@ _CANONICAL_SECURITY_NAMES = frozenset(spec.feature_name for spec in _FEATURES)
 def compile_feature_execution_plan(feature_set: FeatureSet) -> FeatureExecutionPlan:
     """Validate every Registry field before any feature value is computed.
 
-    V1 is intentionally closed: a changed formula, window, denominator,
+    The current version is intentionally closed: a changed formula, window, denominator,
     availability, missingness, eligibility, input set, or output type is a
     new governed Registry contract and cannot silently reuse the old engine.
     """
@@ -554,27 +552,27 @@ def compile_feature_execution_plan(feature_set: FeatureSet) -> FeatureExecutionP
         or feature_set.price_basis != PRICE_BASIS
         or feature_set.universe_rule_id != UNIVERSE_RULE_ID
     ):
-        raise FeatureRegistryError("feature set metadata is not the current V1 contract")
+        raise FeatureRegistryError("feature set metadata is not the current contract")
     if tuple(feature_set.feature_names) != _CANONICAL_FEATURE_NAMES:
         raise FeatureRegistryError(
-            "feature set feature names/order are not the exact V1 execution set"
+            "feature set feature names/order are not the exact execution set"
         )
     if any(not isinstance(item, BlockedFeatureSemantic) for item in feature_set.blocked_semantics):
         raise FeatureRegistryError("blocked feature semantics must use typed classifications")
     if feature_set.blocked_semantics != BLOCKED_FEATURE_SEMANTICS:
-        raise FeatureRegistryError("blocked feature semantic classification is not the V1 set")
+        raise FeatureRegistryError("blocked feature semantic classification is not the current set")
 
     entries: list[FeatureExecutionSpec] = []
     for spec in feature_set.features:
         canonical = _CANONICAL_SPEC_BY_NAME.get(spec.feature_name)
         if canonical is None:
             raise FeatureRegistryError(
-                f"feature {spec.feature_name!r} is not declared by the V1 Registry"
+                f"feature {spec.feature_name!r} is not declared by the Registry"
             )
         if spec != canonical:
             raise FeatureRegistryError(
                 f"feature {spec.feature_name!r} Registry declaration is not honestly "
-                "supported by the V1 execution plan"
+                "supported by the current execution plan"
             )
         handler = _FORMULA_HANDLER_BY_RULE.get(spec.formula_rule_id)
         if handler is None:
@@ -587,9 +585,9 @@ def compile_feature_execution_plan(feature_set: FeatureSet) -> FeatureExecutionP
     if len(entries) != len(_CANONICAL_SPECS) or len(
         {entry.spec.feature_name for entry in entries}
     ) != len(entries):
-        raise FeatureRegistryError("V1 execution plan has duplicate or missing feature specs")
+        raise FeatureRegistryError("execution plan has duplicate or missing feature specs")
     if {entry.spec.feature_name for entry in entries} != set(_CANONICAL_FEATURE_NAMES):
-        raise FeatureRegistryError("V1 execution plan does not cover the exact Registry set")
+        raise FeatureRegistryError("execution plan does not cover the exact Registry set")
 
     return FeatureExecutionPlan(
         feature_set=feature_set,

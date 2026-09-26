@@ -259,9 +259,10 @@ class TestFeatureBoundary:
 
     def test_registry_is_static_and_versioned(self):
         registry = get_feature_set(FEATURE_SET_ID)
-        assert registry.feature_registry_version == "feature-registry-v1"
+        assert registry.feature_set_version == "2"
+        assert registry.feature_registry_version == "feature-registry-v2"
         assert registry.registry_hash
-        assert registry.price_basis == "UNADJUSTED_CANONICAL"
+        assert registry.price_basis == "CANONICAL_PIT_REFERENCE_RETURN_CHAIN"
         assert registry.universe_rule_id == "OBSERVED_DAILY_BAR_UNIVERSE"
         assert "ma_close_obs_20" in registry.feature_names
         assert "pct_above_ma20_observed" in registry.feature_names
@@ -361,6 +362,32 @@ def _source_row(index: int, *, snapshot_id: str = "snapshot-1") -> dict[str, Any
 
 def _fixture_rows(count: int = 65) -> list[dict[str, Any]]:
     return [_source_row(index) for index in range(count)]
+
+
+def _reference_step_rows(
+    kind: str,
+    *,
+    count: int,
+    action_index: int,
+) -> list[dict[str, Any]]:
+    rows = [_source_row(index) for index in range(count)]
+    previous_close = 100.0
+    for index, row in enumerate(rows):
+        if index == 0:
+            close = previous_close
+            pre_close = previous_close
+        else:
+            if index == action_index and kind == "cash_dividend":
+                pre_close = previous_close - 1.0
+            elif index == action_index and kind == "split":
+                pre_close = previous_close / 2.0
+            else:
+                pre_close = previous_close
+            close = pre_close * 1.01
+        row["close"] = close
+        row["pre_close"] = pre_close
+        previous_close = close
+    return rows
 
 
 def _capture_lineage_sizes(monkeypatch) -> list[int]:
@@ -565,7 +592,7 @@ class TestFeatureRegistryHonestExecution:
             "raw_return_1",
             feature_name="adjusted_return",
         )
-        with pytest.raises(FeatureEngineError, match="exact V1 execution set"):
+        with pytest.raises(FeatureEngineError, match="exact execution set"):
             _compute_rows(_fixture_rows(), renamed)
 
         untyped = replace(registry, blocked_semantics=("adjusted return",))
@@ -762,8 +789,74 @@ class TestFeatureFormulaAndMissingnessClosure:
             expected_lag = rows[60]["close"] / rows[60 - length]["close"] - 1
             assert target[f"return_lag_obs_{length}"] == pytest.approx(expected_lag)
 
+    @pytest.mark.parametrize("kind", ["cash_dividend", "split"])
+    @pytest.mark.parametrize("length", [5, 20, 60])
+    def test_reference_price_chain_removes_raw_close_step(self, kind, length):
+        rows = _reference_step_rows(kind, count=length + 2, action_index=2)
+        target_index = length
+        computed = _compute_rows(rows)
+        target = computed.security_rows[target_index]
+
+        expected_return = 1.01**length - 1.0
+        legacy_return = rows[target_index]["close"] / rows[target_index - length]["close"] - 1.0
+        assert target[f"return_lag_obs_{length}"] == pytest.approx(expected_return)
+        assert abs(target[f"return_lag_obs_{length}"] - legacy_return) > (
+            0.4 if kind == "split" else 0.005
+        )
+
+        window_start = target_index - length + 1
+        expected_linked_prices = [
+            rows[window_start]["close"] * 1.01**offset for offset in range(length)
+        ]
+        expected_ma = sum(expected_linked_prices) / length
+        assert target[f"ma_close_obs_{length}"] == pytest.approx(expected_ma)
+        assert target[f"close_to_ma_obs_{length}"] == pytest.approx(
+            expected_linked_prices[-1] / expected_ma - 1.0
+        )
+
+        if length == 20:
+            market = computed.market_rows[target_index]
+            assert market["pct_above_ma20_observed"] == pytest.approx(
+                float(target["close_to_ma_obs_20"] > 0)
+            )
+            assert market["pct_positive_mom20_observed"] == pytest.approx(
+                float(target["return_lag_obs_20"] > 0)
+            )
+
+    @pytest.mark.parametrize("invalid_pre_close", [None, 0.0, -1.0])
+    def test_invalid_pre_close_breaks_only_windows_that_cross_it(self, invalid_pre_close):
+        rows = _reference_step_rows("split", count=12, action_index=3)
+        rows[3]["pre_close"] = invalid_pre_close
+        computed = _compute_rows(rows)
+
+        broken_mean = computed.security_rows[4]
+        assert broken_mean["ma_close_obs_5"] is None
+        assert any(
+            finding["trade_date"] == rows[4]["trade_date"]
+            and finding["feature_name"] == "ma_close_obs_5"
+            and finding["finding_class"] == "PRICE_CHAIN_BREAK"
+            and json.loads(finding["detail_json"])["break_trade_date"]
+            == rows[3]["trade_date"].isoformat()
+            for finding in computed.finding_rows
+        )
+
+        broken_return = computed.security_rows[7]
+        assert broken_return["return_lag_obs_5"] is None
+        assert any(
+            finding["trade_date"] == rows[7]["trade_date"]
+            and finding["feature_name"] == "return_lag_obs_5"
+            and finding["finding_class"] == "PRICE_CHAIN_BREAK"
+            for finding in computed.finding_rows
+        )
+
+        recovered = computed.security_rows[8]
+        assert recovered["return_lag_obs_5"] == pytest.approx(1.01**5 - 1.0)
+        assert computed.security_rows[7]["ma_close_obs_5"] == pytest.approx(
+            sum(rows[3]["close"] * 1.01**offset for offset in range(5)) / 5
+        )
+
     @pytest.mark.parametrize("prior_close", [0.0, -1.0])
-    def test_lag_non_positive_prior_close_is_unsafe_denominator(self, prior_close):
+    def test_lag_non_positive_prior_close_breaks_linked_chain(self, prior_close):
         rows = _fixture_rows(21)
         rows[0]["close"] = prior_close
         computed = _compute_rows(rows)
@@ -772,12 +865,12 @@ class TestFeatureFormulaAndMissingnessClosure:
         assert any(
             finding["trade_date"] == target_date
             and finding["feature_name"] == "return_lag_obs_20"
-            and finding["finding_class"] == "UNSAFE_DENOMINATOR"
+            and finding["finding_class"] == "PRICE_CHAIN_BREAK"
             for finding in computed.finding_rows
         )
 
     @pytest.mark.parametrize("close_value", [0.0, -1.0])
-    def test_close_to_ma_non_positive_mean_is_unsafe_denominator(self, close_value):
+    def test_close_to_ma_non_positive_mean_breaks_linked_chain(self, close_value):
         rows = _fixture_rows(20)
         for row in rows:
             row["close"] = close_value
@@ -787,7 +880,7 @@ class TestFeatureFormulaAndMissingnessClosure:
         assert computed.security_rows[-1]["close_to_ma_obs_20"] is None
         assert any(
             finding["feature_name"] == "close_to_ma_obs_20"
-            and finding["finding_class"] == "UNSAFE_DENOMINATOR"
+            and finding["finding_class"] == "PRICE_CHAIN_BREAK"
             for finding in computed.finding_rows
         )
 
@@ -1135,8 +1228,8 @@ class TestFeatureIdentityAndBoundary:
             "readmodel_contract_version": "readmodel-v1",
             "readmodel_builder_code_fingerprint": "c" * 64,
             "feature_set_id": FEATURE_SET_ID,
-            "feature_set_version": "1",
-            "feature_registry_version": "feature-registry-v1",
+            "feature_set_version": "2",
+            "feature_registry_version": "feature-registry-v2",
             "feature_registry_hash": "d" * 64,
             "feature_contract_version": "feature-v1",
             "feature_builder_code_fingerprint": "e" * 64,

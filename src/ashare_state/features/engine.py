@@ -256,15 +256,45 @@ def _amplitude_feature(row: Mapping[str, Any]) -> tuple[float | None, Reason]:
     )
 
 
-def _fixed_close_window(
+def _positive_reference_factor(row: Mapping[str, Any]) -> tuple[float | None, Reason]:
+    """Return the PIT daily close/pre_close factor or a typed chain break."""
+    for name in ("close", "pre_close"):
+        state, value = _numeric(row, name)
+        if state != "ok":
+            return None, (
+                "PRICE_CHAIN_BREAK",
+                {"input": name, "reason": state},
+            )
+        assert value is not None
+        if value <= 0:
+            return None, (
+                "PRICE_CHAIN_BREAK",
+                {"input": name, "reason": "must be greater than zero"},
+            )
+
+    close_state, close = _numeric(row, "close")
+    pre_close_state, pre_close = _numeric(row, "pre_close")
+    assert close_state == "ok" and pre_close_state == "ok"
+    assert close is not None and pre_close is not None
+    factor = close / pre_close
+    if not math.isfinite(factor) or factor <= 0:
+        return None, (
+            "PRICE_CHAIN_BREAK",
+            {"input": "close/pre_close", "reason": "non-finite or non-positive factor"},
+        )
+    return factor, None
+
+
+def _fixed_linked_close_window(
     rows: Sequence[Mapping[str, Any]],
     *,
     index: int,
     length: int,
-) -> tuple[float | None, Reason, tuple[Mapping[str, Any], ...]]:
+) -> tuple[float | None, float | None, Reason, tuple[Mapping[str, Any], ...]]:
     window = tuple(rows[max(0, index + 1 - length) : index + 1])
     if len(window) != length:
         return (
+            None,
             None,
             (
                 "INSUFFICIENT_HISTORY",
@@ -272,25 +302,55 @@ def _fixed_close_window(
             ),
             window,
         )
-    values: list[float] = []
-    for row in window:
-        state, value = _numeric(row, "close")
-        reason = _reason_for_input(state, "close")
+    anchor_state, anchor = _numeric(window[0], "close")
+    if anchor_state != "ok" or anchor is None or anchor <= 0:
+        return (
+            None,
+            None,
+            (
+                "PRICE_CHAIN_BREAK",
+                {"input": "close", "reason": "window anchor must be finite and greater than zero"},
+            ),
+            window,
+        )
+
+    linked_prices = [anchor]
+    for row in window[1:]:
+        factor, reason = _positive_reference_factor(row)
         if reason is not None:
-            return None, reason, window
-        assert value is not None
-        values.append(value)
-    value = formulas.ordered_mean(values)
+            detail = dict(reason[1])
+            detail["break_trade_date"] = row["trade_date"].isoformat()
+            return None, None, (reason[0], detail), window
+        assert factor is not None
+        linked_price = linked_prices[-1] * factor
+        if not math.isfinite(linked_price) or linked_price <= 0:
+            return (
+                None,
+                None,
+                (
+                    "PRICE_CHAIN_BREAK",
+                    {
+                        "break_trade_date": row["trade_date"].isoformat(),
+                        "input": "linked_close",
+                        "reason": "non-finite or non-positive linked price",
+                    },
+                ),
+                window,
+            )
+        linked_prices.append(linked_price)
+
+    value = formulas.ordered_mean(linked_prices)
     if value is None:
         return (
+            None,
             None,
             ("NON_FINITE_RESULT", {"formula": f"ma_close_obs_{length}"}),
             window,
         )
-    return value, None, window
+    return value, linked_prices[-1], None, window
 
 
-def _lag_close_feature(
+def _chained_lag_return(
     rows: Sequence[Mapping[str, Any]],
     *,
     index: int,
@@ -310,19 +370,38 @@ def _lag_close_feature(
             ),
             inputs,
         )
-    current_state, current = _numeric(rows[index], "close")
-    prior_state, prior = _numeric(rows[index - lag], "close")
-    value, reason = _ratio_from_states(
-        numerator_state=current_state,
-        numerator=current,
-        numerator_name="close",
-        denominator_state=prior_state,
-        denominator=prior,
-        denominator_name="prior_close",
-        feature_name=f"return_lag_obs_{lag}",
-        formula=formulas.lag_return,
-    )
-    return value, reason, inputs
+    prior_state, prior_close = _numeric(rows[index - lag], "close")
+    if prior_state != "ok" or prior_close is None or prior_close <= 0:
+        return (
+            None,
+            (
+                "PRICE_CHAIN_BREAK",
+                {
+                    "input": "prior_close",
+                    "reason": "lag anchor must be finite and greater than zero",
+                },
+            ),
+            inputs,
+        )
+
+    factors: list[float] = []
+    for row in rows[index - lag + 1 : index + 1]:
+        factor, reason = _positive_reference_factor(row)
+        if reason is not None:
+            detail = dict(reason[1])
+            detail["break_trade_date"] = row["trade_date"].isoformat()
+            return None, (reason[0], detail), inputs
+        assert factor is not None
+        factors.append(factor)
+
+    value = formulas.chained_return(factors)
+    if value is None:
+        return (
+            None,
+            ("NON_FINITE_RESULT", {"formula": f"return_lag_obs_{lag}"}),
+            inputs,
+        )
+    return value, None, inputs
 
 
 def _add_finding(
@@ -549,6 +628,7 @@ def _security_features(
 
             ma_inputs: dict[str, tuple[Mapping[str, Any], ...]] = {}
             ma_reasons: dict[str, Reason] = {}
+            ma_linked_closes: dict[str, float | None] = {}
             for entry in security_entries:
                 if entry.handler != "observed_close_mean":
                     continue
@@ -559,12 +639,13 @@ def _security_features(
                         f"{spec.feature_name} has no positive observed window length"
                     )
                 name = spec.feature_name
-                ma_value, ma_reason, mean_window = _fixed_close_window(
+                ma_value, linked_close, ma_reason, mean_window = _fixed_linked_close_window(
                     security_rows,
                     index=index,
                     length=length,
                 )
                 ma_inputs[name] = mean_window
+                ma_linked_closes[name] = linked_close
                 for input_row in mean_window:
                     input_rows[str(input_row["canonical_key"])] = input_row
                 ma_reasons[name] = ma_reason
@@ -574,11 +655,14 @@ def _security_features(
                 if entry.handler != "close_to_mean":
                     continue
                 spec = entry.spec
-                if len(spec.required_inputs) != 2:
+                if len(spec.required_inputs) != 3 or spec.required_inputs[:2] != (
+                    "close",
+                    "pre_close",
+                ):
                     raise FeatureEngineError(
                         f"{spec.feature_name} has an invalid dependency declaration"
                     )
-                dependency = spec.required_inputs[1]
+                dependency = spec.required_inputs[2]
                 dependency_window = ma_inputs.get(dependency)
                 if dependency_window is None:
                     raise FeatureEngineError(
@@ -586,7 +670,6 @@ def _security_features(
                     )
                 for input_row in dependency_window:
                     input_rows[str(input_row["canonical_key"])] = input_row
-                close_state, close = _numeric(row, spec.required_inputs[0])
                 dependency_value = feature_values.get(dependency)
                 if dependency_value is None:
                     reason = ma_reasons.get(dependency) or (
@@ -595,10 +678,15 @@ def _security_features(
                     )
                     close_to_mean_value = None
                 else:
+                    linked_close = ma_linked_closes.get(dependency)
+                    if linked_close is None:
+                        raise FeatureEngineError(
+                            f"{spec.feature_name} has a valid mean but no linked close"
+                        )
                     close_to_mean_value, reason = _ratio_from_states(
-                        numerator_state=close_state,
-                        numerator=close,
-                        numerator_name=spec.required_inputs[0],
+                        numerator_state="ok",
+                        numerator=linked_close,
+                        numerator_name="linked_close",
                         denominator_state="ok",
                         denominator=dependency_value,
                         denominator_name=dependency,
@@ -614,7 +702,7 @@ def _security_features(
                 lag = spec.lag
                 if not isinstance(lag, int) or lag <= 0:
                     raise FeatureEngineError(f"{spec.feature_name} has no positive observed lag")
-                value, reason, inputs = _lag_close_feature(
+                value, reason, inputs = _chained_lag_return(
                     security_rows,
                     index=index,
                     lag=lag,
@@ -767,7 +855,7 @@ def _security_features(
             if len(ordered_inputs) > security_lineage_bound:
                 raise FeatureEngineError(
                     f"security feature row lineage has {len(ordered_inputs)} members; "
-                    f"compiled V1 bound is {security_lineage_bound}"
+                    f"compiled feature-plan bound is {security_lineage_bound}"
                 )
             available_at = max(item["available_at"] for item in ordered_inputs)
             if available_at > snapshot_as_of.astimezone(UTC):
@@ -1018,7 +1106,7 @@ def compute_feature_set(
     feature_set: FeatureSet,
     snapshot_as_of: datetime,
 ) -> ComputedFeatureSet:
-    """Compute V1 features from one explicitly verified ReadModel world."""
+    """Compute the current feature set from one explicitly verified ReadModel world."""
     try:
         execution_plan = compile_feature_execution_plan(feature_set)
     except FeatureRegistryError as exc:
