@@ -125,3 +125,36 @@ class TestParseLogonProfile:
         assert scrubbed["Token"] == "***MASKED***"
         assert scrubbed["CustomPermission"]["inner_token"] == "***MASKED***"
         assert scrubbed["PermissionCode"] == "ok"
+
+
+def test_session_login_and_logout_contain_native_sdk_output(monkeypatch, capfd):
+    from ashare_state.providers.amazingdata import sdk_loader
+    from ashare_state.providers.amazingdata.session import AmazingDataSession
+
+    private_token = "test-only-private-token"
+
+    class FakeSDK:
+        def login(self, **_kwargs):
+            os.write(1, b"TGW Logon information:\n")
+            os.write(
+                1,
+                (
+                    'logon json : {"PermissionCode":"1|2","TotalWeekFlow":500,'
+                    f'"Token":"{private_token}"}}\n'
+                ).encode(),
+            )
+            os.write(2, f"private sdk diagnostic {private_token}\n".encode())
+
+        def logout(self):
+            os.write(1, f"logout token={private_token}\n".encode())
+            os.write(2, f"logout diagnostic {private_token}\n".encode())
+
+    monkeypatch.setattr(sdk_loader, "load_sdk", lambda: FakeSDK())
+    session = AmazingDataSession("TESTUSER", "TESTPASSWORD", "test-host", 8600)
+
+    profile = session.login()
+    session.logout()
+
+    captured = capfd.readouterr()
+    assert private_token not in captured.out + captured.err
+    assert profile.raw_profile["Token"] == "***MASKED***"

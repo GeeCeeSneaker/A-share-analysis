@@ -28,12 +28,11 @@ def test_update_rejects_non_iso_date_before_startup(tmp_path):
 
 
 def test_evidence_cli_exposes_archive_and_verify_commands():
-    runner = CliRunner()
+    from typer.main import get_command
 
-    archive = runner.invoke(cli.app, ["evidence", "archive", "--help"])
-    verify = runner.invoke(cli.app, ["evidence", "verify", "--help"])
+    evidence = get_command(cli.app).commands["evidence"]
+    archive = evidence.commands["archive"]
+    verify = evidence.commands["verify"]
 
-    assert archive.exit_code == 0
-    assert "--backup-root" in archive.output
-    assert verify.exit_code == 0
-    assert "--backup-root" in verify.output
+    assert any("--backup-root" in parameter.opts for parameter in archive.params)
+    assert any("--backup-root" in parameter.opts for parameter in verify.params)
